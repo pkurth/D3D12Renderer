@@ -1,0 +1,52 @@
+#pragma once
+
+#include "dx.h"
+#include "threading.h"
+#include "memory.h"
+
+struct dx_allocation
+{
+	void* cpuPtr;
+	D3D12_GPU_VIRTUAL_ADDRESS gpuPtr;
+};
+
+struct dx_page
+{
+	dx_resource buffer;
+	dx_page* next;
+
+	uint8* cpuBasePtr;
+	D3D12_GPU_VIRTUAL_ADDRESS gpuBasePtr;
+
+	uint64 pageSize;
+	uint64 currentOffset;
+};
+
+struct dx_page_pool
+{
+	memory_arena arena;
+	dx_device device;
+
+	thread_mutex mutex;
+
+	uint64 pageSize;
+	dx_page* freePages;
+	dx_page* usedPages;
+	dx_page* lastUsedPage;
+
+	dx_page* getFreePage();
+	void returnPage(dx_page* page);
+	void reset();
+
+private:
+	dx_page* allocateNewPage();
+};
+
+struct dx_upload_buffer
+{
+	dx_page_pool* pagePool;
+	dx_page* currentPage;
+
+	dx_allocation allocate(uint64 size, uint64 alignment);
+	void reset();
+};
