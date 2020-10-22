@@ -81,7 +81,7 @@ ImGuiContext* initializeImGui(D3D12_RT_FORMAT_ARRAY screenRTFormats)
 
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 
-	//ImGui::StyleColorsDark();
+	ImGui::StyleColorsDark();
 
 	io.KeyMap[ImGuiKey_Tab] = button_tab;
 	io.KeyMap[ImGuiKey_LeftArrow] = button_left;
@@ -245,8 +245,6 @@ void renderImGui(dx_command_list* cl)
 	}
 
 
-	//dx_command_list* cl = dxContext.getFreeRenderCommandList();
-
 	uint32 vertexBufferSizeInBytes = sizeof(ImDrawVert) * drawData->TotalVtxCount;
 	dx_allocation vertexBufferAllocation = cl->allocateDynamicBuffer(vertexBufferSizeInBytes);
 
@@ -346,8 +344,4 @@ void renderImGui(dx_command_list* cl)
 		globalIndexOffset += cmd_list->IdxBuffer.Size;
 		globalVertexOffset += cmd_list->VtxBuffer.Size;
 	}
-
-
-
-	//dxContext.executeCommandList(cl);
 }
