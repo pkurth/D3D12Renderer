@@ -144,7 +144,7 @@ dx_vertex_buffer createUploadVertexBuffer(dx_context* context, uint32 elementSiz
 	return result;
 }
 
-static DXGI_FORMAT getIndexBufferFormat(uint32 elementSize)
+DXGI_FORMAT getIndexBufferFormat(uint32 elementSize)
 {
 	DXGI_FORMAT result = DXGI_FORMAT_UNKNOWN;
 	if (elementSize == 1)

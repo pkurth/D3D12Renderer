@@ -100,7 +100,9 @@ struct dx_command_list
 	void setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY topology);
 	void setVertexBuffer(uint32 slot, dx_vertex_buffer& buffer);
 	void setVertexBuffer(uint32 slot, dx_dynamic_vertex_buffer buffer);
+	void setVertexBuffer(uint32 slot, D3D12_VERTEX_BUFFER_VIEW& buffer);
 	void setIndexBuffer(dx_index_buffer& buffer);
+	void setIndexBuffer(D3D12_INDEX_BUFFER_VIEW& buffer);
 
 
 	// Rasterizer.
@@ -111,11 +113,12 @@ struct dx_command_list
 	// Render targets.
 	void setScreenRenderTarget(D3D12_CPU_DESCRIPTOR_HANDLE* rtvs, uint32 numRTVs, D3D12_CPU_DESCRIPTOR_HANDLE* dsv);
 	void setRenderTarget(dx_render_target& renderTarget, uint32 arraySlice = 0);
-	void clearRTV(D3D12_CPU_DESCRIPTOR_HANDLE rtv, float* clearColor);
+	void clearRTV(D3D12_CPU_DESCRIPTOR_HANDLE rtv, const float* clearColor);
 	void clearDepth(D3D12_CPU_DESCRIPTOR_HANDLE dsv, float depth = 1.f);
 	void clearStencil(D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32 stencil = 0);
 	void clearDepthAndStencil(D3D12_CPU_DESCRIPTOR_HANDLE dsv, float depth = 1.f, uint32 stencil = 0);
 	void setStencilReference(uint32 stencilReference);
+	void setBlendFactor(const float* blendFactor);
 
 
 	// Draw.
@@ -136,3 +139,32 @@ struct dx_command_list
 
 	void reset(dx_command_allocator* commandAllocator);
 };
+
+template<typename T>
+void dx_command_list::setGraphics32BitConstants(uint32 rootParameterIndex, const T& constants)
+{
+	static_assert(sizeof(T) % 4 == 0, "Size of type must be a multiple of 4 bytes.");
+	setGraphics32BitConstants(rootParameterIndex, sizeof(T) / 4, &constants);
+}
+
+template<typename T>
+void dx_command_list::setCompute32BitConstants(uint32 rootParameterIndex, const T& constants)
+{
+	static_assert(sizeof(T) % 4 == 0, "Size of type must be a multiple of 4 bytes.");
+	setCompute32BitConstants(rootParameterIndex, sizeof(T) / 4, &constants);
+}
+
+template <typename T> dx_dynamic_constant_buffer dx_command_list::uploadDynamicConstantBuffer(const T& data)
+{
+	return uploadDynamicConstantBuffer(sizeof(T), &data);
+}
+
+template <typename T> dx_dynamic_constant_buffer dx_command_list::uploadAndSetGraphicsDynamicConstantBuffer(uint32 rootParameterIndex, const T& data)
+{
+	return uploadAndSetGraphicsDynamicConstantBuffer(rootParameterIndex, sizeof(T), &data);
+}
+
+template <typename T> dx_dynamic_constant_buffer dx_command_list::uploadAndSetComputeDynamicConstantBuffer(uint32 rootParameterIndex, const T& data)
+{
+	return uploadAndSetComputeDynamicConstantBuffer(rootParameterIndex, sizeof(T), &data);
+}

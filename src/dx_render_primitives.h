@@ -221,6 +221,8 @@ struct dx_render_target
 	void resize(uint32 width, uint32 height); // This does NOT resize the textures, only updates the width, height and viewport variables.
 };
 
+DXGI_FORMAT getIndexBufferFormat(uint32 elementSize);
+
 void* mapBuffer(dx_buffer& buffer);
 void unmapBuffer(dx_buffer& buffer);
 void uploadBufferData(dx_context* context, dx_buffer& buffer, const void* bufferData);

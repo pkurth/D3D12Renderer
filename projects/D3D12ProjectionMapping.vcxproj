@@ -92,6 +92,7 @@
     <ClCompile Include="..\src\dx_render_primitives.cpp" />
     <ClCompile Include="..\src\dx_upload_buffer.cpp" />
     <ClCompile Include="..\src\dx_window.cpp" />
+    <ClCompile Include="..\src\imgui.cpp" />
     <ClCompile Include="..\src\main.cpp" />
     <ClCompile Include="..\src\memory.cpp" />
     <ClCompile Include="..\src\pch.cpp" />
@@ -106,6 +107,7 @@
     <ClInclude Include="..\src\dx_render_primitives.h" />
     <ClInclude Include="..\src\dx_upload_buffer.h" />
     <ClInclude Include="..\src\dx_window.h" />
+    <ClInclude Include="..\src\imgui.h" />
     <ClInclude Include="..\src\input.h" />
     <ClInclude Include="..\src\memory.h" />
     <ClInclude Include="..\src\pch.h" />

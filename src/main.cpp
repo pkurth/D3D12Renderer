@@ -3,6 +3,7 @@
 #include "dx_window.h"
 #include "dx_command_list.h"
 #include "input.h"
+#include "imgui.h"
 
 dx_context dxContext;
 
@@ -27,6 +28,8 @@ bool newFrame(user_input& input, float& dt)
 		result = false;
 	}
 
+	newImGuiFrame(input, dt);
+
 	return result;
 }
 
@@ -47,7 +50,12 @@ static uint64 renderToWindow(dx_window& window, float* clearColor)
 	cl->transitionBarrier(backbuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	cl->clearRTV(rtv, clearColor);
-	cl->setScreenRenderTarget(&rtv, 1, 0);
+	cl->setScreenRenderTarget(&rtv, 1, (window.depthFormat == DXGI_FORMAT_UNKNOWN) ? nullptr : &window.depthBuffer.dsvHandle.cpuHandle);
+
+	if (win32_window::mainWindow == &window)
+	{
+		renderImGui(cl);
+	}
 
 	cl->transitionBarrier(backbuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
@@ -118,14 +126,22 @@ int main(int argc, char** argv)
 
 	dxContext.initialize();
 
-	dx_window window;
-	window.initialize(TEXT("Main Window"), 1280, 800, color_depth_8, DXGI_FORMAT_UNKNOWN, false);
+	color_depth colorDepth = color_depth_8;
 
-	dx_window window2;
-	window2.initialize(TEXT("Window 2"), 1280, 800, color_depth_8, DXGI_FORMAT_UNKNOWN, false);
+	dx_window window;
+	window.initialize(TEXT("Main Window"), 1280, 800, colorDepth, DXGI_FORMAT_UNKNOWN, false);
+	window.vSync = true;
+
+	//dx_window window2;
+	//window2.initialize(TEXT("Window 2"), 1280, 800, colorDepth, DXGI_FORMAT_UNKNOWN, false);
 
 	setMainWindow(&window);
 
+	D3D12_RT_FORMAT_ARRAY screenRTFormats = {};
+	screenRTFormats.NumRenderTargets = 1;
+	screenRTFormats.RTFormats[0] = (colorDepth == color_depth_8) ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R10G10B10A2_UNORM;
+
+	initializeImGui(screenRTFormats);
 
 	LARGE_INTEGER perfFreqResult;
 	QueryPerformanceFrequency(&perfFreqResult);
@@ -139,21 +155,24 @@ int main(int argc, char** argv)
 
 
 	uint64 fenceValues[NUM_BUFFERED_FRAMES] = {};
-	uint64 frameID = 0;
 
 	fenceValues[NUM_BUFFERED_FRAMES - 1] = dxContext.renderQueue.signal();
+
+	uint64 frameID = 0;
 
 	while (newFrame(input, dt))
 	{
 		dxContext.renderQueue.waitForFence(fenceValues[window.currentBackbufferIndex]);
+
 		dxContext.newFrame(frameID);
 
+		ImGui::Text("Hallo");
 
-		float clearColor1[] = { 1.f, 0.f, 0.f, 1.f };
+		float clearColor1[] = { 0.f, 0.f, 0.f, 1.f };
 		float clearColor2[] = { 1.f, 1.f, 0.f, 1.f };
 
 		fenceValues[window.currentBackbufferIndex] = renderToWindow(window, clearColor1);
-		renderToWindow(window2, clearColor2);
+		//renderToWindow(window2, clearColor2);
 
 		++frameID;
 	}
