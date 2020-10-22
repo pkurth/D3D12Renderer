@@ -5,6 +5,9 @@
 #include <imgui/imgui_widgets.cpp>
 #include <imgui/imgui_demo.cpp>
 
+#include <imgui/backends/imgui_impl_win32.cpp>
+#include <imgui/backends/imgui_impl_dx12.cpp>
+
 #include "imgui.h"
 #include "window.h"
 #include "dx_context.h"
@@ -13,6 +16,7 @@
 
 #include <iostream>
 
+#if 0
 static dx_texture fontTexture;
 static dx_cbv_srv_uav_descriptor_heap fontTextureDescriptorHeap;
 static dx_descriptor_handle fontTextureDescriptorHandle;
@@ -82,6 +86,17 @@ ImGuiContext* initializeImGui(D3D12_RT_FORMAT_ARRAY screenRTFormats)
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 
 	ImGui::StyleColorsDark();
+
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
+	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
+
+	ImGuiStyle& style = ImGui::GetStyle();
+	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+	{
+		style.WindowRounding = 0.0f;
+		style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+	}
 
 	io.KeyMap[ImGuiKey_Tab] = button_tab;
 	io.KeyMap[ImGuiKey_LeftArrow] = button_left;
@@ -285,12 +300,12 @@ void renderImGui(dx_command_list* cl)
 	float B = drawData->DisplayPos.y + drawData->DisplaySize.y;
 	float mvp[4][4] =
 	{
-		{ 2.0f / (R - L),   0.0f,           0.0f,       0.0f },
-		{ 0.0f,         2.0f / (T - B),     0.0f,       0.0f },
-		{ 0.0f,         0.0f,           0.5f,       0.0f },
-		{ (R + L) / (L - R),  (T + B) / (B - T),    0.5f,       1.0f },
+		{ 2.f / (R - L),   0.f,           0.f,       0.f },
+		{ 0.f,         2.f / (T - B),     0.f,       0.f },
+		{ 0.f,         0.f,           0.5f,       0.f },
+		{ (R + L) / (L - R),  (T + B) / (B - T),    0.5f,       1.f },
 	};
-	memcpy(&cb.mvp[0][0], mvp, sizeof(mvp));
+	memcpy(&cb, mvp, sizeof(mvp));
 
 
 	CD3DX12_VIEWPORT viewport = CD3DX12_VIEWPORT(0.f, 0.f, drawData->DisplaySize.x, drawData->DisplaySize.y);
@@ -345,3 +360,74 @@ void renderImGui(dx_command_list* cl)
 		globalVertexOffset += cmd_list->VtxBuffer.Size;
 	}
 }
+#else
+
+static dx_cbv_srv_uav_descriptor_heap descriptorHeap;
+
+ImGuiContext* initializeImGui(D3D12_RT_FORMAT_ARRAY screenRTFormats)
+{
+	IMGUI_CHECKVERSION();
+	auto imguiContext = ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
+	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
+	//io.ConfigViewportsNoAutoMerge = true;
+	//io.ConfigViewportsNoTaskBarIcon = true;
+
+	// Setup Dear ImGui style
+	ImGui::StyleColorsDark();
+	//ImGui::StyleColorsClassic();
+
+	// When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
+	ImGuiStyle& style = ImGui::GetStyle();
+	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+	{
+		style.WindowRounding = 0.f;
+		style.Colors[ImGuiCol_WindowBg].w = 1.f;
+	}
+
+
+	descriptorHeap = createDescriptorHeap(&dxContext, 1);
+
+	ImGui_ImplWin32_Init(win32_window::mainWindow->windowHandle);
+	ImGui_ImplDX12_Init(dxContext.device.Get(), NUM_BUFFERED_FRAMES,
+		screenRTFormats.RTFormats[0], descriptorHeap.descriptorHeap.Get(),
+		descriptorHeap.base.cpuHandle,
+		descriptorHeap.base.gpuHandle);
+
+	return imguiContext;
+}
+
+void newImGuiFrame(const user_input& input, float dt)
+{
+	ImGui_ImplDX12_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+}
+
+void renderImGui(dx_command_list* cl)
+{
+	ImGui::Render();
+	cl->setDescriptorHeap(descriptorHeap);
+	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cl->commandList.Get());
+
+	auto& io = ImGui::GetIO();
+	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+	{
+		ImGui::UpdatePlatformWindows();
+		ImGui::RenderPlatformWindowsDefault(NULL, (void*)cl->commandList.Get());
+	}
+}
+
+void handleImGuiInput(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+}
+
+
+#endif
+
+
+

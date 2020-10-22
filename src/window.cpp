@@ -7,6 +7,7 @@
 
 #include "software_window.h"
 #include "input.h"
+#include "imgui.h"
 
 
 
@@ -469,6 +470,8 @@ bool handleWindowsMessages(user_input& input)
 	MSG msg = { 0 };
 	while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
 	{
+		handleImGuiInput(msg.hwnd, msg.message, msg.wParam, msg.lParam);
+
 		if (msg.message == WM_QUIT)
 		{
 			running = false;

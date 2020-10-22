@@ -29,6 +29,7 @@ bool newFrame(user_input& input, float& dt)
 	}
 
 	newImGuiFrame(input, dt);
+	ImGui::DockSpaceOverViewport();
 
 	return result;
 }
@@ -130,10 +131,9 @@ int main(int argc, char** argv)
 
 	dx_window window;
 	window.initialize(TEXT("Main Window"), 1280, 800, colorDepth, DXGI_FORMAT_UNKNOWN, false);
-	window.vSync = true;
 
-	//dx_window window2;
-	//window2.initialize(TEXT("Window 2"), 1280, 800, colorDepth, DXGI_FORMAT_UNKNOWN, false);
+	dx_window window2;
+	window2.initialize(TEXT("Window 2"), 1280, 800, colorDepth, DXGI_FORMAT_UNKNOWN, false);
 
 	setMainWindow(&window);
 
@@ -166,13 +166,15 @@ int main(int argc, char** argv)
 
 		dxContext.newFrame(frameID);
 
+		ImGui::Begin("Test");
 		ImGui::Text("Hallo");
+		ImGui::End();
 
 		float clearColor1[] = { 0.f, 0.f, 0.f, 1.f };
 		float clearColor2[] = { 1.f, 1.f, 0.f, 1.f };
 
 		fenceValues[window.currentBackbufferIndex] = renderToWindow(window, clearColor1);
-		//renderToWindow(window2, clearColor2);
+		renderToWindow(window2, clearColor2);
 
 		++frameID;
 	}
