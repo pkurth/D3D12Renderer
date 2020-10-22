@@ -4,6 +4,7 @@
 #include "dx_command_list.h"
 #include "input.h"
 #include "imgui.h"
+#include "file_browser.h"
 
 dx_context dxContext;
 
@@ -127,13 +128,13 @@ int main(int argc, char** argv)
 
 	dxContext.initialize();
 
-	color_depth colorDepth = color_depth_8;
+	const color_depth colorDepth = color_depth_8;
 
 	dx_window window;
 	window.initialize(TEXT("Main Window"), 1280, 800, colorDepth, DXGI_FORMAT_UNKNOWN, false);
 
-	dx_window window2;
-	window2.initialize(TEXT("Window 2"), 1280, 800, colorDepth, DXGI_FORMAT_UNKNOWN, false);
+	//dx_window window2;
+	//window2.initialize(TEXT("Window 2"), 1280, 800, colorDepth, DXGI_FORMAT_UNKNOWN, false);
 
 	setMainWindow(&window);
 
@@ -166,15 +167,13 @@ int main(int argc, char** argv)
 
 		dxContext.newFrame(frameID);
 
-		ImGui::Begin("Test");
-		ImGui::Text("Hallo");
-		ImGui::End();
+		drawFileBrowser();
 
 		float clearColor1[] = { 0.f, 0.f, 0.f, 1.f };
 		float clearColor2[] = { 1.f, 1.f, 0.f, 1.f };
 
 		fenceValues[window.currentBackbufferIndex] = renderToWindow(window, clearColor1);
-		renderToWindow(window2, clearColor2);
+		//renderToWindow(window2, clearColor2);
 
 		++frameID;
 	}

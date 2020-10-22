@@ -61,6 +61,8 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -76,6 +78,8 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -92,6 +96,7 @@
     <ClCompile Include="..\src\dx_render_primitives.cpp" />
     <ClCompile Include="..\src\dx_upload_buffer.cpp" />
     <ClCompile Include="..\src\dx_window.cpp" />
+    <ClCompile Include="..\src\file_browser.cpp" />
     <ClCompile Include="..\src\imgui.cpp" />
     <ClCompile Include="..\src\main.cpp" />
     <ClCompile Include="..\src\memory.cpp" />
@@ -107,6 +112,7 @@
     <ClInclude Include="..\src\dx_render_primitives.h" />
     <ClInclude Include="..\src\dx_upload_buffer.h" />
     <ClInclude Include="..\src\dx_window.h" />
+    <ClInclude Include="..\src\file_browser.h" />
     <ClInclude Include="..\src\imgui.h" />
     <ClInclude Include="..\src\input.h" />
     <ClInclude Include="..\src\memory.h" />
