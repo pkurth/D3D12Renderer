@@ -232,7 +232,7 @@ dx_buffer createBuffer(dx_context* context, uint32 elementSize, uint32 elementCo
 dx_buffer createUploadBuffer(dx_context* context, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
 dx_vertex_buffer createVertexBuffer(dx_context* context, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
 dx_vertex_buffer createUploadVertexBuffer(dx_context* context, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
-dx_index_buffer createIndexBuffer(dx_context* context, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess);
+dx_index_buffer createIndexBuffer(dx_context* context, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
 
 dx_texture createTexture(dx_context* context, D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
 dx_texture createTexture(dx_context* context, const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allowUnorderedAccess = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);

@@ -63,6 +63,8 @@
       <ConformanceMode>true</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -80,6 +82,8 @@
       <ConformanceMode>true</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -90,33 +94,49 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\camera.cpp" />
     <ClCompile Include="..\src\dx_command_list.cpp" />
     <ClCompile Include="..\src\dx_command_queue.cpp" />
     <ClCompile Include="..\src\dx_context.cpp" />
+    <ClCompile Include="..\src\dx_renderer.cpp" />
     <ClCompile Include="..\src\dx_render_primitives.cpp" />
     <ClCompile Include="..\src\dx_upload_buffer.cpp" />
     <ClCompile Include="..\src\dx_window.cpp" />
     <ClCompile Include="..\src\file_browser.cpp" />
+    <ClCompile Include="..\src\geometry.cpp" />
     <ClCompile Include="..\src\imgui.cpp" />
     <ClCompile Include="..\src\main.cpp" />
+    <ClCompile Include="..\src\math.cpp" />
     <ClCompile Include="..\src\memory.cpp" />
-    <ClCompile Include="..\src\pch.cpp" />
+    <ClCompile Include="..\src\pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\src\software_window.cpp" />
     <ClCompile Include="..\src\window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\src\animation.h" />
+    <ClInclude Include="..\src\camera.h" />
+    <ClInclude Include="..\src\colliders.h" />
     <ClInclude Include="..\src\dx.h" />
     <ClInclude Include="..\src\dx_command_list.h" />
     <ClInclude Include="..\src\dx_command_queue.h" />
     <ClInclude Include="..\src\dx_context.h" />
+    <ClInclude Include="..\src\dx_pipeline.h" />
     <ClInclude Include="..\src\dx_render_primitives.h" />
     <ClInclude Include="..\src\dx_upload_buffer.h" />
     <ClInclude Include="..\src\dx_window.h" />
+    <ClInclude Include="..\src\entity.h" />
     <ClInclude Include="..\src\file_browser.h" />
+    <ClInclude Include="..\src\geometry.h" />
     <ClInclude Include="..\src\imgui.h" />
     <ClInclude Include="..\src\input.h" />
+    <ClInclude Include="..\src\math.h" />
     <ClInclude Include="..\src\memory.h" />
     <ClInclude Include="..\src\pch.h" />
+    <ClInclude Include="..\src\dx_renderer.h" />
+    <ClInclude Include="..\src\simd.h" />
     <ClInclude Include="..\src\software_window.h" />
     <ClInclude Include="..\src\threading.h" />
     <ClInclude Include="..\src\window.h" />

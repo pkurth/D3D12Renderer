@@ -1,23 +1,30 @@
 #include "pch.h"
 #include "imgui.h"
+#include "threading.h"
 
 #include <filesystem>
 #include <iostream>
+#include <shellapi.h>
 
 namespace fs = std::filesystem;
 
-static const ImGuiTreeNodeFlags treeFlags = ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_OpenOnArrow;
+static const ImGuiTreeNodeFlags treeFlags = ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
 
 
 
 struct file_system_entry
 {
 	fs::path path;
+	std::string name;
 	std::vector<file_system_entry> children;
 	bool isFile;
 };
 
 static file_system_entry rootFileEntry;
+static thread_mutex fileSystemMutex;
+
+static const char* rootDirName = ".";
+static fs::path assetPath = (fs::path(rootDirName) / "assets").lexically_normal();
 
 static void recurseFileSystem(file_system_entry& entry)
 {
@@ -25,6 +32,7 @@ static void recurseFileSystem(file_system_entry& entry)
 	{
 		file_system_entry newEntry;
 		newEntry.path = p.path();
+		newEntry.name = newEntry.path.filename().string();
 		newEntry.isFile = !p.is_directory();
 
 		if (p.is_directory())
@@ -33,15 +41,41 @@ static void recurseFileSystem(file_system_entry& entry)
 		}
 
 		entry.children.push_back(std::move(newEntry));
+
+		std::sort(entry.children.begin(), entry.children.end(), [](file_system_entry& a, file_system_entry& b)
+		{
+			if (a.isFile && !b.isFile) { return false; }
+			if (b.isFile && !a.isFile) { return true; }
+			return a.name < b.name;
+		});
 	}
 }
 
-static DWORD checkForFileChanges(void* data)
+static file_system_entry& findFileSystemEntry(file_system_entry& parent, fs::path::iterator it, fs::path::iterator end)
 {
-	const char* rootDirName = ".";
-	fs::path assetPath = (fs::path(rootDirName) / "assets").lexically_normal();
+	fs::path cur = *it;
+	for (auto& c : parent.children)
+	{
+		if (c.name == cur)
+		{
+			auto next = ++it;
+			if (next == end)
+			{
+				return c;
+			}
+			return findFileSystemEntry(c, next, end);
+		}
+	}
+	return rootFileEntry;
+}
+
+static DWORD checkForFileChanges(void*)
+{
+	fileSystemMutex = createMutex();
+
 
 	rootFileEntry.path = assetPath;
+	rootFileEntry.name = rootFileEntry.path.filename().string();
 	rootFileEntry.isFile = false;
 	recurseFileSystem(rootFileEntry);
 
@@ -92,10 +126,11 @@ static DWORD checkForFileChanges(void* data)
 			NULL, &overlapped[i], NULL);
 
 		eventsToWaitOn[i] = overlapped[i].hEvent;
-		
 	}
-		
 
+	fs::path lastChangedPath = "";
+	fs::file_time_type lastChangedPathTimeStamp;
+	
 	while (true)
 	{
 		DWORD result = WaitForMultipleObjects(event_count, eventsToWaitOn, FALSE, INFINITE);
@@ -127,26 +162,45 @@ static DWORD checkForFileChanges(void* data)
 				filename[filenotify->FileNameLength / sizeof(WCHAR)] = 0;
 
 				fs::path changedPath = (rootDirName / fs::path(filename)).lexically_normal();
+				auto changedPathWriteTime = fs::last_write_time(changedPath);
+
+				// The filesystem usually sends multiple notifications for changed files, since the file is first written, then metadata is changed etc.
+				// This check prevents these notifications if they are too close together in time.
+				// This is a pretty crude fix. In this setup files should not change at the same time, since we only ever track one file.
+				if (changedPath == lastChangedPath 
+					&& std::chrono::duration_cast<std::chrono::milliseconds>(changedPathWriteTime - lastChangedPathTimeStamp).count() < 200)
+				{
+					lastChangedPath = changedPath;
+					lastChangedPathTimeStamp = changedPathWriteTime;
+					break;
+				}
 
 				auto [rootEnd, nothing] = std::mismatch(assetPath.begin(), assetPath.end(), changedPath.begin());
 
 				if (rootEnd == assetPath.end())
 				{
 					// This is inside the asset directory.
-					std::cout << (fs::is_directory(changedPath) ? "Directory " : "File ") << changedPath << " was modified" << std::endl;
+					bool isFile = !fs::is_directory(changedPath);
 
-					/*file_system_entry* entry = &rootFileEntry;
-					auto it = changedPath.begin();
-					
-					while (*it == entry->path)
+					fs::path relativeToAsset = fs::relative(changedPath, assetPath);
+
+					file_system_entry& entryToReload = (relativeToAsset.string() == ".") ? rootFileEntry : findFileSystemEntry(rootFileEntry, relativeToAsset.begin(), relativeToAsset.end());
+					assert(entryToReload.isFile == isFile);
+
+					if (!isFile)
 					{
-
+						lock(fileSystemMutex);
+						entryToReload.children.clear();
+						recurseFileSystem(entryToReload);
+						unlock(fileSystemMutex);
 					}
-					
-					++it;*/
+					else
+					{
+						std::cout << "File " << changedPath << " changed!" << std::endl;
+					}
 
-
-
+					lastChangedPath = changedPath;
+					lastChangedPathTimeStamp = changedPathWriteTime;
 				}
 
 			}
@@ -176,20 +230,47 @@ static DWORD checkForFileChanges(void* data)
 	return 0;
 }
 
+static fs::path selectedPath;
 
-static void recurseCachedFileEntries(file_system_entry& e)
+static void coloredText(const char* text, float r, float g, float b)
+{
+	ImGui::TextColored(ImColor(r, g, b, 1.f).Value, text);
+}
+
+static bool coloredTreeNode(const char* text, float r, float g, float b)
+{
+	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(r, g, b, 1.f).Value);
+	bool result = ImGui::TreeNodeEx(text, treeFlags);
+	ImGui::PopStyleColor();
+	return result;
+}
+
+static void printCachedFileEntries(file_system_entry& e)
 {
 	if (e.isFile)
 	{
-		ImGui::Text(e.path.stem().string().c_str());
+		if (e.path == selectedPath) { coloredText(e.name.c_str(), 0.8f, 0.2f, 0.1f); }
+		else { ImGui::Text(e.name.c_str()); }
+
+		if (ImGui::IsItemClicked())
+		{
+			selectedPath = e.path;
+		}
 	}
 	else
 	{
-		if (ImGui::TreeNodeEx(e.path.stem().string().c_str(), treeFlags))
+		bool openNode = (e.path == selectedPath) ? coloredTreeNode(e.name.c_str(), 0.8f, 0.2f, 0.1f) : ImGui::TreeNodeEx(e.name.c_str(), treeFlags);
+
+		if (ImGui::IsItemClicked())
+		{
+			selectedPath = e.path;
+		}
+
+		if (openNode)
 		{
 			for (file_system_entry& c : e.children)
 			{
-				recurseCachedFileEntries(c);
+				printCachedFileEntries(c);
 			}
 
 			ImGui::TreePop();
@@ -203,12 +284,95 @@ void drawFileBrowser()
 
 
 	ImGui::Begin("Assets");
-
-	ImGui::Begin("Directories");
-
-	recurseCachedFileEntries(rootFileEntry);
-
-
+	
+	if (ImGui::Begin("Directories"))
+	{
+		lock(fileSystemMutex);
+		printCachedFileEntries(rootFileEntry);
+		unlock(fileSystemMutex);
+	}
 	ImGui::End();
+
+
+	fs::path directoryToShow = selectedPath;
+	bool selectedPathIsFile = !fs::is_directory(selectedPath);
+	if (selectedPathIsFile)
+	{
+		directoryToShow = selectedPath.parent_path();
+	}
+	if (!fs::exists(directoryToShow))
+	{
+		directoryToShow = assetPath;
+	}
+
+	if (!selectedPathIsFile)
+	{
+		coloredText(directoryToShow.string().c_str(), 0.8f, 0.2f, 0.1f);
+	}
+	else
+	{
+		ImGui::Text(directoryToShow.string().c_str());
+	}
+	ImGui::Separator();
+
+	lock(fileSystemMutex);
+	fs::path relativeToAsset = fs::relative(directoryToShow, assetPath);
+	file_system_entry& entryToShow = (relativeToAsset.string() == ".") ? rootFileEntry : findFileSystemEntry(rootFileEntry, relativeToAsset.begin(), relativeToAsset.end());
+
+	ImGui::Text("..");
+	if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+	{
+		selectedPath = directoryToShow.parent_path();
+	}
+
+	float minWidthPerItem = 300.f;
+	float widthAvail = ImGui::GetContentRegionAvail().x;
+	uint32 columns = max(1, floor(widthAvail / minWidthPerItem));
+
+
+	ImGui::Columns(columns);
+
+	for (uint32 i = 0; i < entryToShow.children.size(); ++i)
+	{
+		if (i > 0 && i % columns == 0)
+		{
+			ImGui::Separator();
+		}
+
+		auto& c = entryToShow.children[i];
+
+		if (selectedPathIsFile && selectedPath == c.path)
+		{
+			coloredText(c.name.c_str(), 0.8f, 0.2f, 0.1f);
+		}
+		else
+		{
+			if (c.isFile)
+			{
+				coloredText(c.name.c_str(), 1.f, 1.f, 0.7f);
+			}
+			else
+			{
+				ImGui::Text(c.name.c_str());
+			}
+		}
+
+		if (ImGui::IsItemHovered() && (c.isFile ? ImGui::IsItemClicked() : ImGui::IsMouseDoubleClicked(0)))
+		{
+			selectedPath = c.path;
+		}
+
+		if (c.isFile && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+		{
+			ShellExecute(0, 0, c.path.wstring().c_str(), 0, 0, SW_SHOW);
+		}
+
+		ImGui::NextColumn();
+	}
+
+	ImGui::Columns(1);
+
+	unlock(fileSystemMutex);
+
 	ImGui::End();
 }

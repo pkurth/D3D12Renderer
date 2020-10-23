@@ -43,6 +43,7 @@ ImGuiContext* initializeImGui(D3D12_RT_FORMAT_ARRAY screenRTFormats)
 		style.Colors[ImGuiCol_WindowBg].w = 1.f;
 	}
 
+	io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/opensans/OpenSans-Regular.ttf", 18.f);
 
 	descriptorHeap = createDescriptorHeap(&dxContext, 1);
 

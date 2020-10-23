@@ -68,6 +68,35 @@ static uint64 renderToWindow(dx_window& window, float* clearColor)
 	return result;
 }
 
+static bool drawMainMenuBar()
+{
+	if (ImGui::BeginMainMenuBar())
+	{
+		if (ImGui::BeginMenu("File"))
+		{
+			if (ImGui::MenuItem("Save scene"))
+			{
+
+			}
+
+			if (ImGui::MenuItem("Load scene"))
+			{
+
+			}
+
+			ImGui::Separator();
+			if (ImGui::MenuItem("Exit"))
+			{
+				return false;
+			}
+			ImGui::EndMenu();
+		}
+		ImGui::EndMainMenuBar();
+	}
+
+	return true;
+}
+
 LONG NTAPI handleVectoredException(PEXCEPTION_POINTERS exceptionInfo)
 {
 	PEXCEPTION_RECORD exceptionRecord = exceptionInfo->ExceptionRecord;
@@ -132,10 +161,6 @@ int main(int argc, char** argv)
 
 	dx_window window;
 	window.initialize(TEXT("Main Window"), 1280, 800, colorDepth, DXGI_FORMAT_UNKNOWN, false);
-
-	//dx_window window2;
-	//window2.initialize(TEXT("Window 2"), 1280, 800, colorDepth, DXGI_FORMAT_UNKNOWN, false);
-
 	setMainWindow(&window);
 
 	D3D12_RT_FORMAT_ARRAY screenRTFormats = {};
@@ -164,8 +189,12 @@ int main(int argc, char** argv)
 	while (newFrame(input, dt))
 	{
 		dxContext.renderQueue.waitForFence(fenceValues[window.currentBackbufferIndex]);
-
 		dxContext.newFrame(frameID);
+
+		if (!drawMainMenuBar())
+		{
+			break;
+		}
 
 		drawFileBrowser();
 

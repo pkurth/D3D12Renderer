@@ -162,7 +162,7 @@ DXGI_FORMAT getIndexBufferFormat(uint32 elementSize)
 	return result;
 }
 
-dx_index_buffer createIndexBuffer(dx_context* context, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false)
+dx_index_buffer createIndexBuffer(dx_context* context, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess)
 {
 	dx_index_buffer result;
 	initializeBuffer(context, result, elementSize, elementCount, data, allowUnorderedAccess);

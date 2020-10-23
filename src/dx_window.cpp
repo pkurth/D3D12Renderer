@@ -288,6 +288,11 @@ void dx_window::onResize()
 		currentBackbufferIndex = swapchain->GetCurrentBackBufferIndex();
 
 		updateRenderTargetViews(*this, dxContext.device);
+
+		if (depthBuffer.resource)
+		{
+			resizeTexture(&dxContext, depthBuffer, clientWidth, clientHeight);
+		}
 	}
 }
 
