@@ -33,7 +33,8 @@ project "D3D12ProjectionMapping"
 
 	sysincludedirs {
 		"ext",
-		"ext/assimp/include"
+		"ext/assimp/include",
+		"ext/entt/single_include",
 	}
 
 	files {
