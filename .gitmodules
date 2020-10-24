@@ -4,3 +4,6 @@
 [submodule "ext/assimp"]
 	path = ext/assimp
 	url = git@github.com:pkurth/assimp.git
+[submodule "ext/entt"]
+	path = ext/entt
+	url = git@github.com:skypjack/entt.git
