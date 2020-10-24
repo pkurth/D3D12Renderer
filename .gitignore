@@ -1,2 +1,4 @@
 .vs/
 bin_int/
+*.sln
+*.vcxproj
