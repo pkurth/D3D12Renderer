@@ -13,13 +13,12 @@
 #include "dx_context.h"
 #include "dx_render_primitives.h"
 #include "dx_command_list.h"
+#include "dx_renderer.h"
 
 #include <iostream>
 
 
-static dx_cbv_srv_uav_descriptor_heap descriptorHeap;
-
-ImGuiContext* initializeImGui(D3D12_RT_FORMAT_ARRAY screenRTFormats)
+ImGuiContext* initializeImGui(DXGI_FORMAT screenFormat)
 {
 	IMGUI_CHECKVERSION();
 	auto imguiContext = ImGui::CreateContext();
@@ -31,7 +30,6 @@ ImGuiContext* initializeImGui(D3D12_RT_FORMAT_ARRAY screenRTFormats)
 	//io.ConfigViewportsNoAutoMerge = true;
 	//io.ConfigViewportsNoTaskBarIcon = true;
 
-	// Setup Dear ImGui style
 	ImGui::StyleColorsDark();
 	//ImGui::StyleColorsClassic();
 
@@ -45,13 +43,14 @@ ImGuiContext* initializeImGui(D3D12_RT_FORMAT_ARRAY screenRTFormats)
 
 	io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/opensans/OpenSans-Regular.ttf", 18.f);
 
-	descriptorHeap = createDescriptorHeap(&dxContext, 1);
+	auto& descriptorHeap = dx_renderer::globalDescriptorHeap;
+	auto handle = descriptorHeap.pushNullTextureSRV();
 
 	ImGui_ImplWin32_Init(win32_window::mainWindow->windowHandle);
 	ImGui_ImplDX12_Init(dxContext.device.Get(), NUM_BUFFERED_FRAMES,
-		screenRTFormats.RTFormats[0], descriptorHeap.descriptorHeap.Get(),
-		descriptorHeap.base.cpuHandle,
-		descriptorHeap.base.gpuHandle);
+		screenFormat, descriptorHeap.descriptorHeap.Get(),
+		handle.cpuHandle,
+		handle.gpuHandle);
 
 	return imguiContext;
 }
@@ -66,7 +65,7 @@ void newImGuiFrame(const user_input& input, float dt)
 void renderImGui(dx_command_list* cl)
 {
 	ImGui::Render();
-	cl->setDescriptorHeap(descriptorHeap);
+	cl->setDescriptorHeap(dx_renderer::globalDescriptorHeap);
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cl->commandList.Get());
 
 	auto& io = ImGui::GetIO();
@@ -82,6 +81,17 @@ void handleImGuiInput(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
 }
 
+namespace ImGui
+{
+	void Image(::dx_descriptor_handle& handle, ImVec2 size)
+	{
+		ImGui::Image((ImTextureID)handle.gpuHandle.ptr, size);
+	}
 
+	void Image(::dx_descriptor_handle& handle, uint32 width, uint32 height)
+	{
+		ImGui::Image((ImTextureID)handle.gpuHandle.ptr, ImVec2((float)width, (float)height));
+	}
+}
 
 

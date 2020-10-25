@@ -38,6 +38,8 @@ struct dx_command_list
 
 
 	// Barriers.
+	void barriers(CD3DX12_RESOURCE_BARRIER* barriers, uint32 numBarriers);
+
 	void transitionBarrier(dx_texture& texture, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 	void transitionBarrier(dx_buffer& buffer, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 	void transitionBarrier(dx_resource resource, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
@@ -126,6 +128,7 @@ struct dx_command_list
 	void drawIndexed(uint32 indexCount, uint32 instanceCount, uint32 startIndex, int32 baseVertex, uint32 startInstance);
 	void drawIndirect(dx_command_signature commandSignature, uint32 numDraws, dx_buffer commandBuffer);
 	void drawIndirect(dx_command_signature commandSignature, uint32 maxNumDraws, dx_buffer numDrawsBuffer, dx_buffer commandBuffer);
+	void drawFullscreenTriangle();
 
 
 	// Dispatch.

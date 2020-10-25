@@ -2,6 +2,7 @@
 #include "dx_context.h"
 #include "dx_window.h"
 #include "dx_command_list.h"
+#include "dx_renderer.h"
 #include "input.h"
 #include "imgui.h"
 #include "file_browser.h"
@@ -158,16 +159,15 @@ int main(int argc, char** argv)
 	dxContext.initialize();
 
 	const color_depth colorDepth = color_depth_8;
+	DXGI_FORMAT screenFormat = (colorDepth == color_depth_8) ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R10G10B10A2_UNORM;
 
 	dx_window window;
 	window.initialize(TEXT("Main Window"), 1280, 800, colorDepth, DXGI_FORMAT_UNKNOWN, false);
 	setMainWindow(&window);
 
-	D3D12_RT_FORMAT_ARRAY screenRTFormats = {};
-	screenRTFormats.NumRenderTargets = 1;
-	screenRTFormats.RTFormats[0] = (colorDepth == color_depth_8) ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R10G10B10A2_UNORM;
+	dx_renderer::initialize(1024, 1024);
 
-	initializeImGui(screenRTFormats);
+	initializeImGui(screenFormat);
 
 	LARGE_INTEGER perfFreqResult;
 	QueryPerformanceFrequency(&perfFreqResult);
@@ -186,10 +186,28 @@ int main(int argc, char** argv)
 
 	uint64 frameID = 0;
 
+	ImGuiWindowClass sceneViewWindowClass;
+	sceneViewWindowClass.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_AutoHideTabBar;
+
 	while (newFrame(input, dt))
 	{
 		dxContext.renderQueue.waitForFence(fenceValues[window.currentBackbufferIndex]);
 		dxContext.newFrame(frameID);
+
+
+		ImGui::SetNextWindowClass(&sceneViewWindowClass);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+		ImGui::Begin("Scene");
+		uint32 renderWidth = (uint32)ImGui::GetContentRegionAvail().x;
+		uint32 renderHeight = (uint32)ImGui::GetContentRegionAvail().y;
+		ImGui::Image(dx_renderer::frameResultSRV, renderWidth, renderHeight);
+		ImGui::End();
+		ImGui::PopStyleVar();
+
+
+
+		dx_renderer::beginFrame(renderWidth, renderHeight);
+		dx_renderer::dummyRender();
 
 		if (!drawMainMenuBar())
 		{
@@ -198,10 +216,11 @@ int main(int argc, char** argv)
 
 		drawFileBrowser();
 
-		float clearColor1[] = { 0.f, 0.f, 0.f, 1.f };
-		float clearColor2[] = { 1.f, 1.f, 0.f, 1.f };
 
+		float clearColor1[] = { 0.f, 0.f, 0.f, 1.f };
 		fenceValues[window.currentBackbufferIndex] = renderToWindow(window, clearColor1);
+		
+		//float clearColor2[] = { 1.f, 1.f, 0.f, 1.f };
 		//renderToWindow(window2, clearColor2);
 
 		++frameID;

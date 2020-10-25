@@ -23,15 +23,15 @@ struct cpu_mesh
 	cpu_mesh(cpu_mesh&& mesh);
 	~cpu_mesh();
 
-	uint32 flags;
-	uint32 vertexSize;
-	uint32 skinOffset;
+	uint32 flags = 0;
+	uint32 vertexSize = 0;
+	uint32 skinOffset = 0;
 
-	uint8* vertices;
-	indexed_triangle16* triangles;
+	uint8* vertices = 0;
+	indexed_triangle16* triangles = 0;
 
-	uint32 numVertices;
-	uint32 numTriangles;
+	uint32 numVertices = 0;
+	uint32 numTriangles = 0;
 
 	submesh_info pushQuad(vec2 radius);
 	submesh_info pushQuad(float radius) { return pushQuad(vec2(radius, radius)); }

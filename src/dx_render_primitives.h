@@ -6,6 +6,7 @@
 struct dx_texture;
 struct dx_buffer;
 struct dx_context;
+struct dx_command_list;
 
 #define UNBOUNDED_DESCRIPTOR_RANGE -1
 
@@ -42,39 +43,51 @@ struct dx_descriptor_range : dx_descriptor_heap
 {
 	uint32 pushIndex;
 
+	dx_descriptor_handle create2DTextureSRV(dx_texture& texture, dx_descriptor_handle handle, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_descriptor_handle create2DTextureSRV(dx_texture& texture, uint32 index, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_descriptor_handle push2DTextureSRV(dx_texture& texture, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 
+	dx_descriptor_handle createCubemapSRV(dx_texture& texture, dx_descriptor_handle handle, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_descriptor_handle createCubemapSRV(dx_texture& texture, uint32 index, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_descriptor_handle pushCubemapSRV(dx_texture& texture, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 
+	dx_descriptor_handle createCubemapArraySRV(dx_texture& texture, dx_descriptor_handle handle, texture_mip_range mipRange = {}, uint32 firstCube = 0, uint32 numCubes = 1, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_descriptor_handle createCubemapArraySRV(dx_texture& texture, uint32 index, texture_mip_range mipRange = {}, uint32 firstCube = 0, uint32 numCubes = 1, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_descriptor_handle pushCubemapArraySRV(dx_texture& texture, texture_mip_range mipRange = {}, uint32 firstCube = 0, uint32 numCubes = 1, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 
+	dx_descriptor_handle createDepthTextureSRV(dx_texture& texture, dx_descriptor_handle handle);
 	dx_descriptor_handle createDepthTextureSRV(dx_texture& texture, uint32 index);
 	dx_descriptor_handle pushDepthTextureSRV(dx_texture& texture);
 
+	dx_descriptor_handle createNullTextureSRV(dx_descriptor_handle handle);
 	dx_descriptor_handle createNullTextureSRV(uint32 index);
 	dx_descriptor_handle pushNullTextureSRV();
 
+	dx_descriptor_handle createBufferSRV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange = {});
 	dx_descriptor_handle createBufferSRV(dx_buffer& buffer, uint32 index, buffer_range bufferRange = {});
 	dx_descriptor_handle pushBufferSRV(dx_buffer& buffer, buffer_range bufferRange = {});
 
+	dx_descriptor_handle createRawBufferSRV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange = {});
 	dx_descriptor_handle createRawBufferSRV(dx_buffer& buffer, uint32 index, buffer_range bufferRange = {});
 	dx_descriptor_handle pushRawBufferSRV(dx_buffer& buffer, buffer_range bufferRange = {});
 
+	dx_descriptor_handle create2DTextureUAV(dx_texture& texture, dx_descriptor_handle handle, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_descriptor_handle create2DTextureUAV(dx_texture& texture, uint32 index, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_descriptor_handle push2DTextureUAV(dx_texture& texture, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 
+	dx_descriptor_handle create2DTextureArrayUAV(dx_texture& texture, dx_descriptor_handle handle, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_descriptor_handle create2DTextureArrayUAV(dx_texture& texture, uint32 index, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_descriptor_handle push2DTextureArrayUAV(dx_texture& texture, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 
+	dx_descriptor_handle createNullTextureUAV(dx_descriptor_handle handle);
 	dx_descriptor_handle createNullTextureUAV(uint32 index);
 	dx_descriptor_handle pushNullTextureUAV();
 
+	dx_descriptor_handle createBufferUAV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange = {});
 	dx_descriptor_handle createBufferUAV(dx_buffer& buffer, uint32 index, buffer_range bufferRange = {});
 	dx_descriptor_handle pushBufferUAV(dx_buffer& buffer, buffer_range bufferRange = {});
 
+	dx_descriptor_handle createRaytracingAccelerationStructureSRV(dx_buffer& tlas, dx_descriptor_handle handle);
 	dx_descriptor_handle createRaytracingAccelerationStructureSRV(dx_buffer& tlas, uint32 index);
 	dx_descriptor_handle pushRaytracingAccelerationStructureSRV(dx_buffer& tlas);
 };
@@ -201,16 +214,13 @@ struct dx_submesh
 
 struct dx_render_target
 {
-	dx_resource colorAttachments[8];
-	dx_resource depthStencilAttachment;
-
 	uint32 numAttachments;
 	uint32 width;
 	uint32 height;
 	D3D12_VIEWPORT viewport;
 
 	D3D12_RT_FORMAT_ARRAY renderTargetFormat;
-	DXGI_FORMAT depthStencilFormat;
+	DXGI_FORMAT depthStencilFormat = DXGI_FORMAT_UNKNOWN;
 
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[8];
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle;
@@ -218,7 +228,7 @@ struct dx_render_target
 
 	uint32 pushColorAttachment(dx_texture& texture);
 	void pushDepthStencilAttachment(dx_texture& texture);
-	void resize(uint32 width, uint32 height); // This does NOT resize the textures, only updates the width, height and viewport variables.
+	void notifyOnTextureResize(uint32 width, uint32 height); // This does NOT resize the textures, only updates the width, height and viewport variables.
 };
 
 DXGI_FORMAT getIndexBufferFormat(uint32 elementSize);
@@ -235,10 +245,12 @@ dx_vertex_buffer createUploadVertexBuffer(dx_context* context, uint32 elementSiz
 dx_index_buffer createIndexBuffer(dx_context* context, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
 
 dx_texture createTexture(dx_context* context, D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
-dx_texture createTexture(dx_context* context, const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allowUnorderedAccess = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
+dx_texture createTexture(dx_context* context, const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allowRenderTarget = false, bool allowUnorderedAccess = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
 dx_texture createDepthTexture(dx_context* context, uint32 width, uint32 height, DXGI_FORMAT format);
 void resizeTexture(dx_context* context, dx_texture& texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
 
+dx_root_signature createRootSignature(dx_context* context, dx_blob rootSignatureBlob);
+dx_root_signature createRootSignature(dx_context* context, const wchar* path);
 dx_root_signature createRootSignature(dx_context* context, const D3D12_ROOT_SIGNATURE_DESC1& desc);
 dx_root_signature createRootSignature(dx_context* context, CD3DX12_ROOT_PARAMETER1* rootParameters, uint32 numRootParameters, CD3DX12_STATIC_SAMPLER_DESC* samplers, uint32 numSamplers,
 	D3D12_ROOT_SIGNATURE_FLAGS flags);
@@ -246,6 +258,7 @@ dx_root_signature createRootSignature(dx_context* context, const D3D12_ROOT_SIGN
 dx_root_signature createRootSignature(dx_context* context, CD3DX12_ROOT_PARAMETER* rootParameters, uint32 numRootParameters, CD3DX12_STATIC_SAMPLER_DESC* samplers, uint32 numSamplers,
 	D3D12_ROOT_SIGNATURE_FLAGS flags);
 dx_command_signature createCommandSignature(dx_context* context, dx_root_signature rootSignature, const D3D12_COMMAND_SIGNATURE_DESC& commandSignatureDesc);
+dx_root_signature createRootSignature(dx_context* context, D3D12_ROOT_SIGNATURE_FLAGS flags);
 dx_command_signature createCommandSignature(dx_context* context, dx_root_signature rootSignature, D3D12_INDIRECT_ARGUMENT_DESC* argumentDescs, uint32 numArgumentDescs, uint32 commandStructureSize);
 
 dx_cbv_srv_uav_descriptor_heap createDescriptorHeap(dx_context* context, uint32 numDescriptors, bool shaderVisible = true);
@@ -256,6 +269,26 @@ dx_frame_descriptor_allocator createFrameDescriptorAllocator(dx_context* context
 
 dx_submesh createSubmesh(dx_mesh& mesh, submesh_info info);
 dx_submesh createSubmesh(dx_mesh& mesh);
+
+
+struct barrier_batcher
+{
+	barrier_batcher(dx_command_list* cl);
+	~barrier_batcher() { submit(); }
+
+	barrier_batcher& transition(dx_resource& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+	barrier_batcher& uav(dx_resource resource);
+	barrier_batcher& aliasing(dx_resource before, dx_resource after);
+
+	void submit();
+
+	dx_command_list* cl;
+	CD3DX12_RESOURCE_BARRIER barriers[16];
+	uint32 numBarriers = 0;
+};
+
+
+
 
 static bool isUAVCompatibleFormat(DXGI_FORMAT format)
 {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dx.h"
+#include "dx_context.h"
 
 #define CREATE_GRAPHICS_PIPELINE dx_graphics_pipeline_generator()
 #define CREATE_COMPUTE_PIPELINE dx_compute_pipeline_generator()
@@ -22,6 +23,7 @@ struct dx_graphics_pipeline_generator
 		desc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 		desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		desc.SampleDesc = { 1, 0 };
+		desc.SampleMask = 0xFFFFFFFF;
 	}
 
 	dx_pipeline_state create(dx_context& dxContext)
@@ -99,7 +101,7 @@ struct dx_graphics_pipeline_generator
 		return blendState(renderTargetIndex, D3D12_BLEND_ONE, D3D12_BLEND_ONE, D3D12_BLEND_OP_ADD);
 	}
 
-	dx_graphics_pipeline_generator& rasterizeWireframe()
+	dx_graphics_pipeline_generator& wireframe()
 	{
 		desc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
 		return *this;
@@ -108,6 +110,12 @@ struct dx_graphics_pipeline_generator
 	dx_graphics_pipeline_generator& cullFrontFaces()
 	{
 		desc.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT;
+		return *this;
+	}
+
+	dx_graphics_pipeline_generator& cullingOff()
+	{
+		desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 		return *this;
 	}
 
@@ -144,12 +152,6 @@ struct dx_graphics_pipeline_generator
 		desc.DepthStencilState.DepthEnable = depthTest;
 		desc.DepthStencilState.DepthWriteMask = depthWrite ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
 		desc.DepthStencilState.DepthFunc = func;
-		return *this;
-	}
-
-	dx_graphics_pipeline_generator& stencilSettings(bool stencilTest = true)
-	{
-		desc.DepthStencilState.StencilEnable = stencilTest;
 		return *this;
 	}
 
@@ -224,4 +226,28 @@ struct dx_compute_pipeline_generator
 		return *this;
 	}
 };
+
+
+
+struct dx_pipeline
+{
+	dx_pipeline_state* pipeline;
+	dx_root_signature* rootSignature;
+};
+
+struct graphics_pipeline_files
+{
+	std::string rs;
+	std::string vs;
+	std::string ps;
+	std::string ds;
+	std::string hs;
+	std::string gs;
+};
+
+dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files,
+	dx_root_signature userRootSignature = nullptr);
+void createAllReloadablePipelines();
+
+void checkForChangedPipelines();
 

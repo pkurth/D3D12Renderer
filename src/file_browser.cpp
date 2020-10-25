@@ -327,7 +327,7 @@ void drawFileBrowser()
 
 	float minWidthPerItem = 300.f;
 	float widthAvail = ImGui::GetContentRegionAvail().x;
-	uint32 columns = max(1, floor(widthAvail / minWidthPerItem));
+	uint32 columns = max(1, (uint32)floor(widthAvail / minWidthPerItem));
 
 
 	ImGui::Columns(columns);

@@ -1,6 +1,11 @@
 #include "pch.h"
 #include "dx_command_list.h"
 
+void dx_command_list::barriers(CD3DX12_RESOURCE_BARRIER* barriers, uint32 numBarriers)
+{
+	commandList->ResourceBarrier(numBarriers, barriers);
+}
+
 void dx_command_list::transitionBarrier(dx_texture& texture, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
 {
 	transitionBarrier(texture.resource, from, to, subresource);
@@ -243,7 +248,7 @@ void dx_command_list::setScreenRenderTarget(D3D12_CPU_DESCRIPTOR_HANDLE* rtvs, u
 
 void dx_command_list::setRenderTarget(dx_render_target& renderTarget, uint32 arraySlice)
 {
-	D3D12_CPU_DESCRIPTOR_HANDLE* dsv = (renderTarget.depthStencilAttachment) ? &renderTarget.dsvHandle : 0;
+	D3D12_CPU_DESCRIPTOR_HANDLE* dsv = (renderTarget.depthStencilFormat != DXGI_FORMAT_UNKNOWN) ? &renderTarget.dsvHandle : 0;
 	commandList->OMSetRenderTargets(renderTarget.numAttachments, renderTarget.rtvHandles, FALSE, dsv);
 }
 
@@ -307,6 +312,12 @@ void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32
 		0,
 		numDrawsBuffer.resource.Get(),
 		0);
+}
+
+void dx_command_list::drawFullscreenTriangle()
+{
+	setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	draw(3, 1, 0, 0);
 }
 
 void dx_command_list::dispatch(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ)

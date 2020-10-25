@@ -236,9 +236,12 @@ dx_texture createTexture(dx_context* context, D3D12_RESOURCE_DESC textureDesc, D
 	return result;
 }
 
-dx_texture createTexture(dx_context* context, const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allowUnorderedAccess, D3D12_RESOURCE_STATES initialState)
+dx_texture createTexture(dx_context* context, const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allowRenderTarget, bool allowUnorderedAccess, D3D12_RESOURCE_STATES initialState)
 {
-	D3D12_RESOURCE_FLAGS flags = allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
+	D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE
+		| (allowRenderTarget ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE)
+		| (allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE)
+		;
 
 	CD3DX12_RESOURCE_DESC textureDesc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, 1, 1, 0, flags);
 
@@ -268,7 +271,7 @@ dx_texture createDepthTexture(dx_context* context, uint32 width, uint32 height, 
 	optimizedClearValue.DepthStencil = { 1.f, 0 };
 
 	D3D12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height,
-		1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+		1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 
 	checkResult(context->device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
@@ -332,6 +335,24 @@ void resizeTexture(dx_context* context, dx_texture& texture, uint32 newWidth, ui
 	}
 }
 
+dx_root_signature createRootSignature(dx_context* context, dx_blob rootSignatureBlob)
+{
+	dx_root_signature rootSignature;
+
+	checkResult(context->device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
+		rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
+
+	return rootSignature;
+}
+
+dx_root_signature createRootSignature(dx_context* context, const wchar* path)
+{
+	dx_blob rootSignatureBlob;
+	checkResult(D3DReadFileToBlob(path, &rootSignatureBlob));
+
+	return createRootSignature(context, rootSignatureBlob);
+}
+
 dx_root_signature createRootSignature(dx_context* context, const D3D12_ROOT_SIGNATURE_DESC1& desc)
 {
 	D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
@@ -348,12 +369,7 @@ dx_root_signature createRootSignature(dx_context* context, const D3D12_ROOT_SIGN
 	dx_blob errorBlob;
 	checkResult(D3DX12SerializeVersionedRootSignature(&rootSignatureDescription, featureData.HighestVersion, &rootSignatureBlob, &errorBlob));
 
-	dx_root_signature rootSignature;
-
-	checkResult(context->device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
-		rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
-
-	return rootSignature;
+	return createRootSignature(context, rootSignatureBlob);
 }
 
 dx_root_signature createRootSignature(dx_context* context, CD3DX12_ROOT_PARAMETER1* rootParameters, uint32 numRootParameters, CD3DX12_STATIC_SAMPLER_DESC* samplers, uint32 numSamplers,
@@ -391,6 +407,13 @@ dx_root_signature createRootSignature(dx_context* context, CD3DX12_ROOT_PARAMETE
 	rootSignatureDesc.NumParameters = numRootParameters;
 	rootSignatureDesc.pStaticSamplers = samplers;
 	rootSignatureDesc.NumStaticSamplers = numSamplers;
+	return createRootSignature(context, rootSignatureDesc);
+}
+
+dx_root_signature createRootSignature(dx_context* context, D3D12_ROOT_SIGNATURE_FLAGS flags)
+{
+	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+	rootSignatureDesc.Flags = flags;
 	return createRootSignature(context, rootSignatureDesc);
 }
 
@@ -627,6 +650,11 @@ static dx_descriptor_handle createRaytracingAccelerationStructureSRV(dx_device d
 	return index;
 }
 
+dx_descriptor_handle dx_descriptor_range::create2DTextureSRV(dx_texture& texture, dx_descriptor_handle handle, texture_mip_range mipRange, DXGI_FORMAT overrideFormat)
+{
+	return ::create2DTextureSRV(getDevice(descriptorHeap), texture, handle, mipRange, overrideFormat);
+}
+
 dx_descriptor_handle dx_descriptor_range::create2DTextureSRV(dx_texture& texture, uint32 index, texture_mip_range mipRange, DXGI_FORMAT overrideFormat)
 {
 	return ::create2DTextureSRV(getDevice(descriptorHeap), texture, getHandle(*this, index), mipRange, overrideFormat);
@@ -635,6 +663,11 @@ dx_descriptor_handle dx_descriptor_range::create2DTextureSRV(dx_texture& texture
 dx_descriptor_handle dx_descriptor_range::push2DTextureSRV(dx_texture& texture, texture_mip_range mipRange, DXGI_FORMAT overrideFormat)
 {
 	return create2DTextureSRV(texture, pushIndex++, mipRange, overrideFormat);
+}
+
+dx_descriptor_handle dx_descriptor_range::createCubemapSRV(dx_texture& texture, dx_descriptor_handle handle, texture_mip_range mipRange, DXGI_FORMAT overrideFormat)
+{
+	return ::createCubemapSRV(getDevice(descriptorHeap), texture, handle, mipRange, overrideFormat);
 }
 
 dx_descriptor_handle dx_descriptor_range::createCubemapSRV(dx_texture& texture, uint32 index, texture_mip_range mipRange, DXGI_FORMAT overrideFormat)
@@ -647,6 +680,11 @@ dx_descriptor_handle dx_descriptor_range::pushCubemapSRV(dx_texture& texture, te
 	return createCubemapSRV(texture, pushIndex++, mipRange, overrideFormat);
 }
 
+dx_descriptor_handle dx_descriptor_range::createCubemapArraySRV(dx_texture& texture, dx_descriptor_handle handle, texture_mip_range mipRange, uint32 firstCube, uint32 numCubes, DXGI_FORMAT overrideFormat)
+{
+	return ::createCubemapArraySRV(getDevice(descriptorHeap), texture, handle, mipRange, firstCube, numCubes, overrideFormat);
+}
+
 dx_descriptor_handle dx_descriptor_range::createCubemapArraySRV(dx_texture& texture, uint32 index, texture_mip_range mipRange, uint32 firstCube, uint32 numCubes, DXGI_FORMAT overrideFormat)
 {
 	return ::createCubemapArraySRV(getDevice(descriptorHeap), texture, getHandle(*this, index), mipRange, firstCube, numCubes, overrideFormat);
@@ -655,6 +693,11 @@ dx_descriptor_handle dx_descriptor_range::createCubemapArraySRV(dx_texture& text
 dx_descriptor_handle dx_descriptor_range::pushCubemapArraySRV(dx_texture& texture, texture_mip_range mipRange, uint32 firstCube, uint32 numCubes, DXGI_FORMAT overrideFormat)
 {
 	return createCubemapArraySRV(texture, pushIndex++, mipRange, firstCube, numCubes, overrideFormat);
+}
+
+dx_descriptor_handle dx_descriptor_range::createDepthTextureSRV(dx_texture& texture, dx_descriptor_handle handle)
+{
+	return ::createDepthTextureSRV(getDevice(descriptorHeap), texture, handle);
 }
 
 dx_descriptor_handle dx_descriptor_range::createDepthTextureSRV(dx_texture& texture, uint32 index)
@@ -667,6 +710,11 @@ dx_descriptor_handle dx_descriptor_range::pushDepthTextureSRV(dx_texture& textur
 	return createDepthTextureSRV(texture, pushIndex++);
 }
 
+dx_descriptor_handle dx_descriptor_range::createNullTextureSRV(dx_descriptor_handle handle)
+{
+	return ::createNullTextureSRV(getDevice(descriptorHeap), handle);
+}
+
 dx_descriptor_handle dx_descriptor_range::createNullTextureSRV(uint32 index)
 {
 	return ::createNullTextureSRV(getDevice(descriptorHeap), getHandle(*this, index));
@@ -675,6 +723,11 @@ dx_descriptor_handle dx_descriptor_range::createNullTextureSRV(uint32 index)
 dx_descriptor_handle dx_descriptor_range::pushNullTextureSRV()
 {
 	return createNullTextureSRV(pushIndex++);
+}
+
+dx_descriptor_handle dx_descriptor_range::createBufferSRV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange)
+{
+	return ::createBufferSRV(getDevice(descriptorHeap), buffer, handle, bufferRange);
 }
 
 dx_descriptor_handle dx_descriptor_range::createBufferSRV(dx_buffer& buffer, uint32 index, buffer_range bufferRange)
@@ -687,6 +740,11 @@ dx_descriptor_handle dx_descriptor_range::pushBufferSRV(dx_buffer& buffer, buffe
 	return createBufferSRV(buffer, pushIndex++, bufferRange);
 }
 
+dx_descriptor_handle dx_descriptor_range::createRawBufferSRV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange)
+{
+	return ::createRawBufferSRV(getDevice(descriptorHeap), buffer, handle, bufferRange);
+}
+
 dx_descriptor_handle dx_descriptor_range::createRawBufferSRV(dx_buffer& buffer, uint32 index, buffer_range bufferRange)
 {
 	return ::createRawBufferSRV(getDevice(descriptorHeap), buffer, getHandle(*this, index), bufferRange);
@@ -695,6 +753,11 @@ dx_descriptor_handle dx_descriptor_range::createRawBufferSRV(dx_buffer& buffer, 
 dx_descriptor_handle dx_descriptor_range::pushRawBufferSRV(dx_buffer& buffer, buffer_range bufferRange)
 {
 	return createRawBufferSRV(buffer, pushIndex++, bufferRange);
+}
+
+dx_descriptor_handle dx_descriptor_range::create2DTextureUAV(dx_texture& texture, dx_descriptor_handle handle, uint32 mipSlice, DXGI_FORMAT overrideFormat)
+{
+	return ::create2DTextureUAV(getDevice(descriptorHeap), texture, handle, mipSlice, overrideFormat);
 }
 
 dx_descriptor_handle dx_descriptor_range::create2DTextureUAV(dx_texture& texture, uint32 index, uint32 mipSlice, DXGI_FORMAT overrideFormat)
@@ -707,6 +770,11 @@ dx_descriptor_handle dx_descriptor_range::push2DTextureUAV(dx_texture& texture, 
 	return create2DTextureUAV(texture, pushIndex++, mipSlice, overrideFormat);
 }
 
+dx_descriptor_handle dx_descriptor_range::create2DTextureArrayUAV(dx_texture& texture, dx_descriptor_handle handle, uint32 mipSlice, DXGI_FORMAT overrideFormat)
+{
+	return ::create2DTextureArrayUAV(getDevice(descriptorHeap), texture, handle, mipSlice, overrideFormat);
+}
+
 dx_descriptor_handle dx_descriptor_range::create2DTextureArrayUAV(dx_texture& texture, uint32 index, uint32 mipSlice, DXGI_FORMAT overrideFormat)
 {
 	return ::create2DTextureArrayUAV(getDevice(descriptorHeap), texture, getHandle(*this, index), mipSlice, overrideFormat);
@@ -715,6 +783,11 @@ dx_descriptor_handle dx_descriptor_range::create2DTextureArrayUAV(dx_texture& te
 dx_descriptor_handle dx_descriptor_range::push2DTextureArrayUAV(dx_texture& texture, uint32 mipSlice, DXGI_FORMAT overrideFormat)
 {
 	return create2DTextureArrayUAV(texture, pushIndex++, mipSlice, overrideFormat);
+}
+
+dx_descriptor_handle dx_descriptor_range::createNullTextureUAV(dx_descriptor_handle handle)
+{
+	return ::createNullTextureUAV(getDevice(descriptorHeap), handle);
 }
 
 dx_descriptor_handle dx_descriptor_range::createNullTextureUAV(uint32 index)
@@ -727,6 +800,11 @@ dx_descriptor_handle dx_descriptor_range::pushNullTextureUAV()
 	return createNullTextureUAV(pushIndex++);
 }
 
+dx_descriptor_handle dx_descriptor_range::createBufferUAV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange)
+{
+	return ::createBufferUAV(getDevice(descriptorHeap), buffer, handle, bufferRange);
+}
+
 dx_descriptor_handle dx_descriptor_range::createBufferUAV(dx_buffer& buffer, uint32 index, buffer_range bufferRange)
 {
 	return ::createBufferUAV(getDevice(descriptorHeap), buffer, getHandle(*this, index), bufferRange);
@@ -735,6 +813,11 @@ dx_descriptor_handle dx_descriptor_range::createBufferUAV(dx_buffer& buffer, uin
 dx_descriptor_handle dx_descriptor_range::pushBufferUAV(dx_buffer& buffer, buffer_range bufferRange)
 {
 	return createBufferUAV(buffer, pushIndex++, bufferRange);
+}
+
+dx_descriptor_handle dx_descriptor_range::createRaytracingAccelerationStructureSRV(dx_buffer& tlas, dx_descriptor_handle handle)
+{
+	return ::createRaytracingAccelerationStructureSRV(getDevice(descriptorHeap), tlas, handle);
 }
 
 dx_descriptor_handle dx_descriptor_range::createRaytracingAccelerationStructureSRV(dx_buffer& tlas, uint32 index)
@@ -906,10 +989,9 @@ uint32 dx_render_target::pushColorAttachment(dx_texture& texture)
 
 	uint32 attachmentPoint = numAttachments++;
 
-	colorAttachments[attachmentPoint] = texture.resource;
-	rtvHandles[attachmentPoint] = texture.rtvHandles.cpuHandle;
-
 	D3D12_RESOURCE_DESC desc = texture.resource->GetDesc();
+
+	rtvHandles[attachmentPoint] = texture.rtvHandles.cpuHandle;
 
 	if (width == 0 || height == 0)
 	{
@@ -922,15 +1004,8 @@ uint32 dx_render_target::pushColorAttachment(dx_texture& texture)
 		assert(width == desc.Width && height == desc.Height);
 	}
 
-	renderTargetFormat.NumRenderTargets = 0;
-	for (uint32 i = 0; i < arraysize(colorAttachments); ++i)
-	{
-		dx_resource tex = colorAttachments[i];
-		if (tex)
-		{
-			renderTargetFormat.RTFormats[renderTargetFormat.NumRenderTargets++] = tex->GetDesc().Format;
-		}
-	}
+	++renderTargetFormat.NumRenderTargets;
+	renderTargetFormat.RTFormats[attachmentPoint] = desc.Format;
 
 	return attachmentPoint;
 }
@@ -939,7 +1014,6 @@ void dx_render_target::pushDepthStencilAttachment(dx_texture& texture)
 {
 	assert(texture.resource);
 
-	depthStencilAttachment = texture.resource;
 	dsvHandle = texture.dsvHandle.cpuHandle;
 
 	D3D12_RESOURCE_DESC desc = texture.resource->GetDesc();
@@ -958,7 +1032,7 @@ void dx_render_target::pushDepthStencilAttachment(dx_texture& texture)
 	depthStencilFormat = getDepthFormatFromTypeless(desc.Format);
 }
 
-void dx_render_target::resize(uint32 width, uint32 height)
+void dx_render_target::notifyOnTextureResize(uint32 width, uint32 height)
 {
 	this->width = width;
 	this->height = height;
@@ -985,4 +1059,51 @@ dx_submesh createSubmesh(dx_mesh& mesh)
 	result.firstTriangle = 0;
 	result.numTriangles = mesh.indexBuffer.elementCount / 3;
 	return result;
+}
+
+barrier_batcher::barrier_batcher(dx_command_list* cl)
+{
+	this->cl = cl;
+}
+
+barrier_batcher& barrier_batcher::transition(dx_resource& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
+{
+	if (numBarriers == arraysize(barriers))
+	{
+		submit();
+	}
+
+	barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::Transition(res.Get(), from, to, subresource);
+	return *this;
+}
+
+barrier_batcher& barrier_batcher::uav(dx_resource resource)
+{
+	if (numBarriers == arraysize(barriers))
+	{
+		submit();
+	}
+
+	barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::UAV(resource.Get());
+	return *this;
+}
+
+barrier_batcher& barrier_batcher::aliasing(dx_resource before, dx_resource after)
+{
+	if (numBarriers == arraysize(barriers))
+	{
+		submit();
+	}
+
+	barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::Aliasing(before.Get(), after.Get());
+	return *this;
+}
+
+void barrier_batcher::submit()
+{
+	if (numBarriers)
+	{
+		cl->barriers(barriers, numBarriers);
+		numBarriers = 0;
+	}
 }

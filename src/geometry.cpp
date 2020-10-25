@@ -2,6 +2,11 @@
 #include "geometry.h"
 #include "memory.h"
 
+#include <assimp/Importer.hpp>
+#include <assimp/Exporter.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+
 
 struct vertex_info
 {
@@ -27,7 +32,7 @@ static vertex_info getVertexInfo(uint32 flags)
 
 cpu_mesh::cpu_mesh(uint32 flags)
 {
-	flags = flags;
+	this->flags = flags;
 	vertex_info info = getVertexInfo(flags);
 	vertexSize = info.vertexSize;
 	skinOffset = info.skinOffset;

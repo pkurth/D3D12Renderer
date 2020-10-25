@@ -40,3 +40,8 @@ enum color_depth
 	color_depth_10,
 };
 
+static DXGI_FORMAT getScreenFormat(color_depth colorDepth)
+{
+	return (colorDepth == color_depth_8) ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R10G10B10A2_UNORM;
+}
+
