@@ -70,6 +70,11 @@ project "D3D12ProjectionMapping"
 		"DirectXTex_Desktop_2019_Win10",
 	}
 
+	dependson {
+		"assimp",
+		"DirectXTex_Desktop_2019_Win10",
+	}
+
 	filter "system:windows"
 		systemversion "latest"
 
@@ -89,7 +94,7 @@ project "D3D12ProjectionMapping"
 
 	os.mkdir("shaders/bin")
 
-	-- HLSL files that don't end with 'Extensions' will be ignored as they will be used as includes
+	-- HLSL files that don't end with 'Extensions' will be ignored as they will be used as includes.
 	filter "files:**.hlsl*"
 		shadermodel "6.0"
 		flags "ExcludeFromBuild"

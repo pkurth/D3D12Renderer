@@ -106,7 +106,7 @@ void dx_renderer::beginFrame(uint32 width, uint32 height)
 	camera.recalculateMatrices(width, height);
 }
 
-void dx_renderer::dummyRender()
+void dx_renderer::dummyRender(float dt)
 {
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
@@ -120,6 +120,7 @@ void dx_renderer::dummyRender()
 		.transition(frameResult.resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	ImGui::Begin("Settings");
+	ImGui::Text("%f ms, %u FPS", dt, (uint32)(1.f / dt));
 	ImGui::SliderFloat("Exposure", &tonemap.exposure, -1.f, 2.f);
 	ImGui::End();
 

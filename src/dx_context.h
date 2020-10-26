@@ -41,6 +41,7 @@ struct dx_context
 	dx_command_queue copyQueue;
 
 	bool raytracingSupported;
+	bool meshShaderSupported;
 
 	uint64 frameID;
 	uint32 bufferedFrameID;

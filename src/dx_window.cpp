@@ -342,3 +342,8 @@ void dx_window::toggleFullscreen()
 		win32_window::toggleFullscreen();
 	}
 }
+
+void dx_window::toggleVSync()
+{
+	vSync = !vSync;
+}

@@ -98,9 +98,15 @@ static dx_device createDevice(dx_adapter adapter)
 static bool checkRaytracingSupport(dx_device device)
 {
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5 = {};
-	checkResult(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5,
-		&options5, sizeof(options5)));
+	checkResult(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5)));
 	return options5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_0;
+}
+
+static bool checkMeshShaderSupport(dx_device device)
+{
+	D3D12_FEATURE_DATA_D3D12_OPTIONS7 options7 = {};
+	checkResult(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options7, sizeof(options7)));
+	return options7.MeshShaderTier >= D3D12_MESH_SHADER_TIER_1;
 }
 
 
@@ -114,6 +120,7 @@ void dx_context::initialize()
 	adapter = getAdapter(factory);
 	device = createDevice(adapter);
 	raytracingSupported = checkRaytracingSupport(device);
+	meshShaderSupported = checkMeshShaderSupport(device);
 
 	arena.minimumBlockSize = MB(2);
 	allocationMutex = createMutex();

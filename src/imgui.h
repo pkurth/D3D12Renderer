@@ -1,6 +1,7 @@
 #pragma once
 
 #include <imgui/imgui.h>
+#include <fontawesome/IconsFontAwesome5.h>
 
 #include "dx.h"
 #include "input.h"

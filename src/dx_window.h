@@ -16,6 +16,7 @@ struct dx_window : win32_window
 
 	virtual void swapBuffers();
 	virtual void toggleFullscreen();
+	void toggleVSync();
 
 	virtual void onResize();
 	virtual void onMove();

@@ -7,7 +7,7 @@ struct dx_renderer
 	static void initialize(uint32 width, uint32 height);
 
 	static void beginFrame(uint32 width, uint32 height);
-	static void dummyRender();
+	static void dummyRender(float dt);
 
 
 	static dx_cbv_srv_uav_descriptor_heap globalDescriptorHeap;

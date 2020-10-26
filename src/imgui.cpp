@@ -43,6 +43,14 @@ ImGuiContext* initializeImGui(DXGI_FORMAT screenFormat)
 
 	io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/opensans/OpenSans-Regular.ttf", 18.f);
 
+	// Merge in icons.
+	static const ImWchar iconsRanges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
+	ImFontConfig iconsConfig;
+	iconsConfig.MergeMode = true; 
+	iconsConfig.PixelSnapH = true;
+	io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/icons/" FONT_ICON_FILE_NAME_FAS, 16.f, &iconsConfig, iconsRanges);
+
+
 	auto& descriptorHeap = dx_renderer::globalDescriptorHeap;
 	auto handle = descriptorHeap.pushNullTextureSRV();
 

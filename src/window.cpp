@@ -470,8 +470,6 @@ bool handleWindowsMessages(user_input& input)
 	MSG msg = { 0 };
 	while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
 	{
-		handleImGuiInput(msg.hwnd, msg.message, msg.wParam, msg.lParam);
-
 		if (msg.message == WM_QUIT)
 		{
 			running = false;
@@ -479,6 +477,8 @@ bool handleWindowsMessages(user_input& input)
 
 		if (win32_window::mainWindow && win32_window::mainWindow->open && msg.hwnd == win32_window::mainWindow->windowHandle)
 		{
+			handleImGuiInput(msg.hwnd, msg.message, msg.wParam, msg.lParam);
+
 			switch (msg.message)
 			{
 			case WM_SYSKEYDOWN:

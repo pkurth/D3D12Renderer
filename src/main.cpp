@@ -7,11 +7,16 @@
 #include "imgui.h"
 #include "file_browser.h"
 
+#include <fontawesome/list.h>
+
 dx_context dxContext;
 
 
 static float perfFreq;
 static LARGE_INTEGER lastTime;
+
+static bool showIconsWindow;
+static bool showDemoWindow;
 
 bool handleWindowsMessages(user_input& input);
 
@@ -69,29 +74,76 @@ static uint64 renderToWindow(dx_window& window, float* clearColor)
 	return result;
 }
 
+static void drawHelperWindows()
+{
+	if (showIconsWindow)
+	{
+		ImGui::Begin("Icons", &showIconsWindow);
+
+		static ImGuiTextFilter filter;
+		filter.Draw();
+		for (uint32 i = 0; i < arraysize(awesomeIcons); ++i)
+		{
+			ImGui::PushID(i);
+			if (filter.PassFilter(awesomeIconNames[i]))
+			{
+				ImGui::Text("%s: %s", awesomeIconNames[i], awesomeIcons[i]);
+				ImGui::SameLine();
+				if (ImGui::Button("Copy to clipboard"))
+				{
+					ImGui::SetClipboardText(awesomeIconNames[i]);
+				}
+			}
+			ImGui::PopID();
+		}
+		ImGui::End();
+	}
+
+	if (showDemoWindow)
+	{
+		ImGui::ShowDemoWindow(&showDemoWindow);
+	}
+}
+
 static bool drawMainMenuBar()
 {
 	if (ImGui::BeginMainMenuBar())
 	{
-		if (ImGui::BeginMenu("File"))
+		if (ImGui::BeginMenu(ICON_FA_FILE "  File"))
 		{
-			if (ImGui::MenuItem("Save scene"))
+			if (ImGui::MenuItem(ICON_FA_SAVE "  Save scene"))
 			{
 
 			}
 
-			if (ImGui::MenuItem("Load scene"))
+			if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN "  Load scene"))
 			{
 
 			}
 
 			ImGui::Separator();
-			if (ImGui::MenuItem("Exit"))
+			if (ImGui::MenuItem(ICON_FA_TIMES "  Exit"))
 			{
 				return false;
 			}
 			ImGui::EndMenu();
 		}
+
+		if (ImGui::BeginMenu(ICON_FA_TOOLS "  Developer"))
+		{
+			if (ImGui::MenuItem(ICON_FA_ICONS "  Show available icons"))
+			{
+				showIconsWindow = true;
+			}
+
+			if (ImGui::MenuItem(ICON_FA_PUZZLE_PIECE "  Show demo window"))
+			{
+				showDemoWindow = true;
+			}
+
+			ImGui::EndMenu();
+		}
+
 		ImGui::EndMainMenuBar();
 	}
 
@@ -191,6 +243,11 @@ int main(int argc, char** argv)
 
 	while (newFrame(input, dt))
 	{
+		if (buttonDownEvent(input, button_v))
+		{
+			window.toggleVSync();
+		}
+
 		dxContext.renderQueue.waitForFence(fenceValues[window.currentBackbufferIndex]);
 		dxContext.newFrame(frameID);
 
@@ -204,10 +261,10 @@ int main(int argc, char** argv)
 		ImGui::End();
 		ImGui::PopStyleVar();
 
-
+		drawHelperWindows();
 
 		dx_renderer::beginFrame(renderWidth, renderHeight);
-		dx_renderer::dummyRender();
+		dx_renderer::dummyRender(dt);
 
 		if (!drawMainMenuBar())
 		{
