@@ -15,6 +15,13 @@ outputdir = "%{cfg.buildcfg}_%{cfg.architecture}"
 
 group "Dependencies"
 	include "ext/assimp"
+
+
+	externalproject "DirectXTex_Desktop_2019_Win10"
+		location "ext/directxtex/DirectXTex"
+		kind "StaticLib"
+		language "C++"
+
 group ""
 
 project "D3D12ProjectionMapping"
@@ -32,9 +39,10 @@ project "D3D12ProjectionMapping"
 	pchsource "src/pch.cpp"
 
 	sysincludedirs {
-		"ext",
 		"ext/assimp/include",
 		"ext/entt/single_include",
+		"ext/directxtex",
+		"ext",
 	}
 
 	includedirs {
@@ -58,7 +66,8 @@ project "D3D12ProjectionMapping"
 		"DXGI",
 		"dxguid",
 		"dxcompiler",
-		"assimp"
+		"assimp",
+		"DirectXTex_Desktop_2019_Win10",
 	}
 
 	filter "system:windows"
