@@ -7,3 +7,6 @@
 [submodule "ext/entt"]
 	path = ext/entt
 	url = git@github.com:skypjack/entt.git
+[submodule "ext/directxtex"]
+	path = ext/directxtex
+	url = git@github.com:microsoft/DirectXTex.git
