@@ -139,3 +139,10 @@ struct ray
 	bool intersectSphere(vec3 center, float radius, float& outT) const;
 	bool intersectSphere(const sphere_collider& sphere, float& outT) const { return intersectSphere(sphere.center, sphere.radius, outT); }
 };
+
+bool aabbVSAABB(const aabb_collider& a, const aabb_collider& b);
+bool sphereVSSphere(const sphere_collider& a, const sphere_collider& b);
+bool sphereVSPlane(const sphere_collider& s, const plane_collider& p);
+vec3 closestPoint_PointSegment(const vec3& q, const line_segment& l);
+vec3 closestPoint_PointAABB(const vec3& q, const aabb_collider& aabb);
+float closestPoint_SegmentSegment(const line_segment& l1, const line_segment& l2, vec3& c1, vec3& c2);

@@ -6,6 +6,7 @@
 #include "camera.h"
 #include "geometry.h"
 #include "imgui.h"
+#include "texture.h"
 
 #include "model_rs.hlsl"
 #include "present_rs.hlsl"
@@ -28,6 +29,8 @@ uint32 dx_renderer::renderHeight;
 static render_camera camera;
 static dx_mesh mesh;
 static submesh_info submesh;
+static dx_texture texture;
+static dx_descriptor_handle textureHandle;
 
 static tonemap_cb tonemap = defaultTonemapParameters();
 
@@ -35,9 +38,17 @@ static tonemap_cb tonemap = defaultTonemapParameters();
 static dx_pipeline presentPipeline;
 static dx_pipeline modelPipeline;
 
+struct aiScene;
+const aiScene* loadAssimpSceneFile(const char* filepath);
+void freeAssimpScene(const aiScene* scene);
+void analyzeAssimpScene(const aiScene* scene);
 
 void dx_renderer::initialize(uint32 width, uint32 height)
 {
+	const aiScene* scene = loadAssimpSceneFile("assets/meshes/suzanne.fbx");
+	analyzeAssimpScene(scene);
+	freeAssimpScene(scene);
+
 	renderWidth = width;
 	renderHeight = height;
 
@@ -63,6 +74,9 @@ void dx_renderer::initialize(uint32 width, uint32 height)
 	cpu_mesh cpuMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals);
 	submesh = cpuMesh.pushSphere(15, 15, 1.f);
 	mesh = cpuMesh.createDXMesh(&dxContext);
+
+	texture = loadTextureFromFile(&dxContext, "assets/textures/hallo.png");
+	textureHandle = globalDescriptorHeap.push2DTextureSRV(texture);
 
 
 	{
@@ -122,6 +136,7 @@ void dx_renderer::dummyRender(float dt)
 	ImGui::Begin("Settings");
 	ImGui::Text("%f ms, %u FPS", dt, (uint32)(1.f / dt));
 	ImGui::SliderFloat("Exposure", &tonemap.exposure, -1.f, 2.f);
+	ImGui::Image(textureHandle, 128, 64);
 	ImGui::End();
 
 

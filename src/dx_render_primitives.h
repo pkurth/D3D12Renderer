@@ -43,6 +43,8 @@ struct dx_descriptor_range : dx_descriptor_heap
 {
 	uint32 pushIndex;
 
+	dx_descriptor_handle pushEmptyHandle();
+
 	dx_descriptor_handle create2DTextureSRV(dx_texture& texture, dx_descriptor_handle handle, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_descriptor_handle create2DTextureSRV(dx_texture& texture, uint32 index, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_descriptor_handle push2DTextureSRV(dx_texture& texture, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
@@ -244,6 +246,7 @@ dx_vertex_buffer createVertexBuffer(dx_context* context, uint32 elementSize, uin
 dx_vertex_buffer createUploadVertexBuffer(dx_context* context, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
 dx_index_buffer createIndexBuffer(dx_context* context, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
 
+void uploadTextureSubresourceData(dx_context* context, dx_texture& texture, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 firstSubresource, uint32 numSubresources);
 dx_texture createTexture(dx_context* context, D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
 dx_texture createTexture(dx_context* context, const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allowRenderTarget = false, bool allowUnorderedAccess = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
 dx_texture createDepthTexture(dx_context* context, uint32 width, uint32 height, DXGI_FORMAT format);

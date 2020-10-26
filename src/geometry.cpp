@@ -2,11 +2,7 @@
 #include "geometry.h"
 #include "memory.h"
 
-#include <assimp/Importer.hpp>
-#include <assimp/Exporter.hpp>
 #include <assimp/scene.h>
-#include <assimp/postprocess.h>
-
 
 struct vertex_info
 {
@@ -386,6 +382,123 @@ submesh_info cpu_mesh::pushCapsule(uint16 slices, uint16 rows, float height, flo
 	result.numTriangles = 2 * (rows + 1) * slices;
 	result.baseVertex = baseVertex;
 	result.numVertices = numVertices - baseVertex;
+	return result;
+}
+
+submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, aabb_collider* aabb)
+{
+	alignNextTriangle();
+
+	uint32 baseVertex = numVertices;
+	uint32 firstTriangle = numTriangles;
+
+	assert(mesh->mNumVertices <= UINT16_MAX);
+
+	reserve(mesh->mNumVertices, mesh->mNumFaces);
+
+	uint8* vertexPtr = vertices + vertexSize * numVertices;
+
+	vec3 position(0.f, 0.f, 0.f);
+	vec3 normal(0.f, 0.f, 0.f);
+	vec3 tangent(0.f, 0.f, 0.f);
+	vec2 uv(0.f, 0.f);
+
+	bool hasPositions = mesh->HasPositions();
+	bool hasNormals = mesh->HasNormals();
+	bool hasTangents = mesh->HasTangentsAndBitangents();
+	bool hasUVs = mesh->HasTextureCoords(0);
+
+	if (aabb)
+	{
+		*aabb = aabb_collider::negativeInfinity();
+	}
+
+	for (uint32 i = 0; i < mesh->mNumVertices; ++i)
+	{
+		if (hasPositions)
+		{
+			position = vec3(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z) * scale;
+			if (aabb)
+			{
+				aabb->grow(position);
+			}
+		}
+		if (hasNormals)
+		{
+			normal = vec3(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
+		}
+		if (hasTangents)
+		{
+			tangent = vec3(mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z);
+		}
+		if (hasUVs)
+		{
+			uv = vec2(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y);
+		}
+
+		pushVertex(position, uv, normal, tangent, {});
+	}
+
+#if 0
+	if ((flags & mesh_creation_flags_with_skin) && skeleton)
+	{
+		assert(mesh->HasBones());
+
+		uint32 numBones = mesh->mNumBones;
+		assert(numBones < MAX_NUM_JOINTS);
+
+		for (uint32 boneID = 0; boneID < numBones; ++boneID)
+		{
+			const aiBone* bone = mesh->mBones[boneID];
+			uint32 jointID = -1;
+			for (uint32 i = 0; i < skeleton->numJoints; ++i)
+			{
+				skeleton_joint& j = skeleton->joints[i];
+				if (stringsAreEqual(j.name, bone->mName.C_Str()))
+				{
+					jointID = i;
+					break;
+				}
+			}
+			assert(jointID != -1);
+
+			for (uint32 weightID = 0; weightID < bone->mNumWeights; ++weightID)
+			{
+				uint32 vertexID = bone->mWeights[weightID].mVertexId;
+				float weight = bone->mWeights[weightID].mWeight;
+
+				assert(vertexID + baseVertex < numVertices);
+
+				vertexID += baseVertex;
+				uint8* vertexBase = vertices + (vertexID * vertexSize);
+				skinning_weights& weights = *(skinning_weights*)(vertexBase + skinOffset);
+
+				for (uint32 i = 0; i < 4; ++i)
+				{
+					if (weights.skinWeights[i] == 0)
+					{
+						weights.skinIndices[i] = (uint8)jointID;
+						weights.skinWeights[i] = (uint8)clamp(weight * 255.f, 0.f, 255.f);
+						break;
+					}
+				}
+			}
+		}
+	}
+#endif
+
+
+	for (uint32 i = 0; i < mesh->mNumFaces; ++i)
+	{
+		const aiFace& face = mesh->mFaces[i];
+		pushTriangle(face.mIndices[0], face.mIndices[1], face.mIndices[2]);
+	}
+
+	submesh_info result;
+	result.firstTriangle = firstTriangle;
+	result.numTriangles = mesh->mNumFaces;
+	result.baseVertex = baseVertex;
+	result.numVertices = mesh->mNumVertices;
 	return result;
 }
 

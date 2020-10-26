@@ -52,7 +52,7 @@ ImGuiContext* initializeImGui(DXGI_FORMAT screenFormat)
 
 
 	auto& descriptorHeap = dx_renderer::globalDescriptorHeap;
-	auto handle = descriptorHeap.pushNullTextureSRV();
+	auto handle = descriptorHeap.pushEmptyHandle();
 
 	ImGui_ImplWin32_Init(win32_window::mainWindow->windowHandle);
 	ImGui_ImplDX12_Init(dxContext.device.Get(), NUM_BUFFERED_FRAMES,

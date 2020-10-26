@@ -1,6 +1,8 @@
 .vs/
+bin/
 bin_int/
 *.sln
 *.vcxproj
 *.filters
 shaders/bin/
+assets/

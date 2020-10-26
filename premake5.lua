@@ -28,7 +28,7 @@ project "D3D12ProjectionMapping"
 	kind "ConsoleApp"
 	language "C++"
 	cppdialect "C++17"
-	staticruntime "On"
+	staticruntime "Off"
 
 	targetdir ("./bin/" .. outputdir)
 	objdir ("./bin_int/" .. outputdir ..  "/%{prj.name}")

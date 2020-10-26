@@ -172,7 +172,7 @@ dx_index_buffer createIndexBuffer(dx_context* context, uint32 elementSize, uint3
 	return result;
 }
 
-static void uploadTextureSubresourceData(dx_context* context, dx_texture& texture, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 firstSubresource, uint32 numSubresources)
+void uploadTextureSubresourceData(dx_context* context, dx_texture& texture, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 firstSubresource, uint32 numSubresources)
 {
 	dx_command_list* commandList = context->getFreeCopyCommandList();
 	commandList->transitionBarrier(texture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
@@ -648,6 +648,11 @@ static dx_descriptor_handle createRaytracingAccelerationStructureSRV(dx_device d
 	device->CreateShaderResourceView(nullptr, &srvDesc, index.cpuHandle);
 
 	return index;
+}
+
+dx_descriptor_handle dx_descriptor_range::pushEmptyHandle()
+{
+	return getHandle(*this, pushIndex++);
 }
 
 dx_descriptor_handle dx_descriptor_range::create2DTextureSRV(dx_texture& texture, dx_descriptor_handle handle, texture_mip_range mipRange, DXGI_FORMAT overrideFormat)
