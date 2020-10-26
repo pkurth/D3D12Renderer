@@ -161,6 +161,13 @@ struct dx_graphics_pipeline_generator
 		return *this;
 	}
 
+	template <uint32 numElements>
+	dx_graphics_pipeline_generator& inputLayout(D3D12_INPUT_ELEMENT_DESC (&elements)[numElements])
+	{
+		desc.InputLayout = { elements, numElements };
+		return *this;
+	}
+
 	dx_graphics_pipeline_generator& inputLayout(D3D12_INPUT_ELEMENT_DESC* elements, uint32 numElements)
 	{
 		desc.InputLayout = { elements, numElements };
@@ -237,16 +244,19 @@ struct dx_pipeline
 
 struct graphics_pipeline_files
 {
-	std::string rs;
-	std::string vs;
-	std::string ps;
-	std::string ds;
-	std::string hs;
-	std::string gs;
+	const char* vs = 0;
+	const char* ps = 0;
+	const char* ds = 0;
+	const char* hs = 0;
+	const char* gs = 0;
 };
 
 dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files,
-	dx_root_signature userRootSignature = nullptr);
+	dx_root_signature userRootSignature);
+dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files,
+	const char* rootSignatureFile);
+
+
 void createAllReloadablePipelines();
 
 void checkForChangedPipelines();

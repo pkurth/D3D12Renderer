@@ -60,7 +60,7 @@ struct reloadable_pipeline_state
 
 struct reloadable_root_signature
 {
-	std::string file;
+	const char* file;
 	dx_root_signature rootSignature;
 };
 
@@ -76,11 +76,11 @@ static std::vector<reloadable_root_signature*> dirtyRootSignatures;
 static thread_mutex mutex;
 
 
-static reloadable_root_signature* pushBlob(const std::string& filename, reloadable_pipeline_state* pipelineIndex, bool isRootSignature = false)
+static reloadable_root_signature* pushBlob(const char* filename, reloadable_pipeline_state* pipelineIndex, bool isRootSignature = false)
 {
 	reloadable_root_signature* result = 0;
 
-	if (filename.size() > 0)
+	if (filename)
 	{
 		auto it = shaderBlobs.find(filename);
 		if (it == shaderBlobs.end())
@@ -128,25 +128,35 @@ dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& d
 	pipelines.emplace_back();
 	auto& state = pipelines.back();
 
-	reloadable_root_signature* reloadableRS = pushBlob(files.rs, &state, true);
 	pushBlob(files.vs, &state);
 	pushBlob(files.ps, &state);
 	pushBlob(files.gs, &state);
 	pushBlob(files.ds, &state);
 	pushBlob(files.hs, &state);
 
-	dx_root_signature* rootSignature;
-	if (reloadableRS)
-	{
-		rootSignature = &reloadableRS->rootSignature;
-	}
-	else
-	{
-		assert(userRootSignature);
-		userRootSignatures.push_back(userRootSignature);
-		rootSignature = &userRootSignatures.back();
-		userRootSignatures.back() = userRootSignature; // Fuck. You.
-	}
+	userRootSignatures.push_back(userRootSignature);
+	dx_root_signature* rootSignature = &userRootSignatures.back();
+	userRootSignatures.back() = userRootSignature; // Fuck. You.
+
+	state.initialize(desc, files, rootSignature);
+
+	dx_pipeline result = { &state.pipeline, rootSignature };
+	return result;
+}
+
+dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files, const char* rootSignatureFile)
+{
+	pipelines.emplace_back();
+	auto& state = pipelines.back();
+
+	reloadable_root_signature* reloadableRS = pushBlob(rootSignatureFile, &state, true);
+	pushBlob(files.vs, &state);
+	pushBlob(files.ps, &state);
+	pushBlob(files.gs, &state);
+	pushBlob(files.ds, &state);
+	pushBlob(files.hs, &state);
+
+	dx_root_signature* rootSignature = &reloadableRS->rootSignature;
 
 	state.initialize(desc, files, rootSignature);
 
@@ -164,11 +174,11 @@ static void loadRootSignature(reloadable_root_signature& r)
 
 static void loadPipeline(reloadable_pipeline_state& p)
 {
-	if (p.files.vs.size() > 0) { dx_blob shader = shaderBlobs[p.files.vs].blob; p.desc.VS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
-	if (p.files.ps.size() > 0) { dx_blob shader = shaderBlobs[p.files.ps].blob; p.desc.PS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
-	if (p.files.gs.size() > 0) { dx_blob shader = shaderBlobs[p.files.gs].blob; p.desc.GS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
-	if (p.files.ds.size() > 0) { dx_blob shader = shaderBlobs[p.files.ds].blob; p.desc.DS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
-	if (p.files.hs.size() > 0) { dx_blob shader = shaderBlobs[p.files.hs].blob; p.desc.HS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
+	if (p.files.vs) { dx_blob shader = shaderBlobs[p.files.vs].blob; p.desc.VS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
+	if (p.files.ps) { dx_blob shader = shaderBlobs[p.files.ps].blob; p.desc.PS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
+	if (p.files.gs) { dx_blob shader = shaderBlobs[p.files.gs].blob; p.desc.GS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
+	if (p.files.ds) { dx_blob shader = shaderBlobs[p.files.ds].blob; p.desc.DS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
+	if (p.files.hs) { dx_blob shader = shaderBlobs[p.files.hs].blob; p.desc.HS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
 
 	p.desc.pRootSignature = p.rootSignature->Get();
 	dxContext.retireObject(p.pipeline);

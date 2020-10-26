@@ -71,22 +71,16 @@ void dx_renderer::initialize(uint32 width, uint32 height)
 			.depthSettings(false, false)
 			.cullingOff();
 
-		presentPipeline = createReloadablePipeline(desc, { "present_ps", "fullscreen_triangle_vs", "present_ps" });
+		presentPipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "present_ps" }, "present_ps");
 	}
 
 	{
-		D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORDS", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		};
-
 		auto desc = CREATE_GRAPHICS_PIPELINE
-			.inputLayout(inputLayout, arraysize(inputLayout))
+			.inputLayout(inputLayout_position_uv_normal)
 			.rasterizeCounterClockwise()
 			.renderTargets(renderTarget.renderTargetFormat, renderTarget.depthStencilFormat);
 
-		modelPipeline = createReloadablePipeline(desc, { "model_vs", "model_vs", "model_ps" });
+		modelPipeline = createReloadablePipeline(desc, { "model_vs", "model_ps" }, "model_vs");
 	}
 
 	createAllReloadablePipelines();
