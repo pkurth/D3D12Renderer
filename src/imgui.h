@@ -16,4 +16,6 @@ namespace ImGui
 {
 	void Image(struct dx_descriptor_handle& handle, ImVec2 size);
 	void Image(struct dx_descriptor_handle& handle, uint32 width, uint32 height);
+
+	bool Dropdown(const char* label, const char** names, uint32 count, uint32& current);
 }

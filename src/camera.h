@@ -37,6 +37,7 @@ struct render_camera : camera_base
 	float verticalFOV;
 
 	void recalculateMatrices(uint32 renderWidth, uint32 renderHeight);
+	void recalculateMatrices(float renderWidth, float renderHeight);
 };
 
 struct real_camera : camera_base

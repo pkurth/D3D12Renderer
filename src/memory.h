@@ -4,6 +4,10 @@
 #define MB(n) (1024 * KB(n))
 #define GB(n) (1024 * MB(n))
 
+#define BYTE_TO_KB(b) ((b) / 1024)
+#define BYTE_TO_MB(b) ((b) / (1024 * 1024))
+#define BYTE_TO_GB(b) ((b) / (1024 * 1024))
+
 static uint32 alignTo(uint32 currentOffset, uint32 alignment)
 {
 	uint32 mask = alignment - 1;

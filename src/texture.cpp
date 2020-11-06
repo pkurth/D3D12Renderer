@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "texture.h"
-#include "dx_context.h"
 
 #include <DirectXTex/DirectXTex.h>
 
@@ -55,7 +54,7 @@ static bool loadImageFromFile(const char* filepathRaw, uint32 flags, DirectX::Sc
 	fs::path extension = filepath.extension();
 
 	fs::path cachedFilename = filepath;
-	cachedFilename.replace_extension(".cache.dds");
+	cachedFilename.replace_extension("." + std::to_string(flags) + ".cache.dds");
 
 	fs::path cacheFilepath = L"bin_cache" / cachedFilename;
 
@@ -85,15 +84,15 @@ static bool loadImageFromFile(const char* filepathRaw, uint32 flags, DirectX::Sc
 
 	if (!fromCache)
 	{
-		if (extension == "dds")
+		if (extension == ".dds")
 		{
 			checkResult(DirectX::LoadFromDDSFile(filepath.c_str(), DirectX::DDS_FLAGS_NONE, &metadata, scratchImage));
 		}
-		else if (extension == "hdr")
+		else if (extension == ".hdr")
 		{
 			checkResult(DirectX::LoadFromHDRFile(filepath.c_str(), &metadata, scratchImage));
 		}
-		else if (extension == "tga")
+		else if (extension == ".tga")
 		{
 			checkResult(DirectX::LoadFromTGAFile(filepath.c_str(), &metadata, scratchImage));
 		}
@@ -135,12 +134,17 @@ static bool loadImageFromFile(const char* filepathRaw, uint32 flags, DirectX::Sc
 			metadata = scratchImage.GetMetadata();
 		}
 
-		if (flags & texture_load_flags_compress_bc3)
+		if (flags & texture_load_flags_compress)
 		{
 			DirectX::ScratchImage compressedImage;
 
 			DirectX::TEX_COMPRESS_FLAGS compressFlags = DirectX::TEX_COMPRESS_PARALLEL;
 			DXGI_FORMAT compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;
+
+			/*if (metadata.format == DXGI_FORMAT_R16G16B16A16_FLOAT)
+			{
+				compressedFormat = DXGI_FORMAT_BC6H_UF16;
+			}*/
 
 			checkResult(DirectX::Compress(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata,
 				compressedFormat, compressFlags, DirectX::TEX_THRESHOLD_DEFAULT, compressedImage));
@@ -179,7 +183,7 @@ static bool loadImageFromFile(const char* filepathRaw, uint32 flags, DirectX::Sc
 	return true;
 }
 
-static dx_texture loadTextureInternal(dx_context* context, const char* filename, uint32 flags)
+static dx_texture loadTextureInternal(const char* filename, uint32 flags)
 {
 	DirectX::ScratchImage scratchImage;
 	D3D12_RESOURCE_DESC textureDesc;
@@ -198,11 +202,11 @@ static dx_texture loadTextureInternal(dx_context* context, const char* filename,
 		subresource.pData = images[i].pixels;
 	}
 
-	dx_texture result = createTexture(context, textureDesc, subresources, numImages);
+	dx_texture result = createTexture(textureDesc, subresources, numImages);
 	return result;
 }
 
-static void updateTextureInternal(dx_context* context, dx_texture& texture, const char* filename, uint32 flags)
+static void updateTextureInternal(dx_texture& texture, const char* filename, uint32 flags)
 {
 	DirectX::ScratchImage scratchImage;
 	D3D12_RESOURCE_DESC textureDesc;
@@ -221,12 +225,12 @@ static void updateTextureInternal(dx_context* context, dx_texture& texture, cons
 		subresource.pData = images[i].pixels;
 	}
 
-	uploadTextureSubresourceData(context, texture, subresources, 0, numImages);
+	uploadTextureSubresourceData(texture, subresources, 0, numImages);
 }
 
-dx_texture loadTextureFromFile(dx_context* context, const char* filename, uint32 flags)
+dx_texture loadTextureFromFile(const char* filename, uint32 flags)
 {
-	dx_texture result = loadTextureInternal(context, filename, flags);
+	dx_texture result = loadTextureInternal(filename, flags);
 	// TODO: Cache.
 	return result;
 }

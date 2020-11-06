@@ -27,7 +27,7 @@ static float clamp(float v, float l, float u) { return min(u, max(l, v)); }
 static uint32 clamp(uint32 v, uint32 l, uint32 u) { return min(u, max(l, v)); }
 static int32 clamp(int32 v, int32 l, int32 u) { return min(u, max(l, v)); }
 static float clamp01(float v) { return clamp(v, 0.f, 1.f); }
-
+static uint32 bucketize(uint32 problemSize, uint32 bucketSize) { return (problemSize + bucketSize - 1) / bucketSize; }
 
 struct vec2
 {
@@ -484,8 +484,9 @@ mat4 createPerspectiveProjectionMatrix(float width, float height, float fx, floa
 mat4 createOrthographicProjectionMatrix(float r, float l, float t, float b, float nearPlane, float farPlane);
 mat4 invertPerspectiveProjectionMatrix(mat4 m);
 mat4 invertOrthographicProjectionMatrix(mat4 m);
-mat4 createModelMatrix(vec3 position, quat rotation, vec3 scale);
+mat4 createModelMatrix(vec3 position, quat rotation, vec3 scale = vec3(1.f, 1.f, 1.f));
 mat4 createViewMatrix(vec3 eye, float pitch, float yaw);
+mat4 createSkyViewMatrix(mat4 v);
 mat4 lookAt(vec3 eye, vec3 target, vec3 up);
 mat4 createViewMatrix(vec3 position, quat rotation);
 mat4 invertedAffine(mat4 m);

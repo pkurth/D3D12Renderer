@@ -42,8 +42,8 @@ struct cpu_mesh
 
 	submesh_info cpu_mesh::pushAssimpMesh(const struct aiMesh* mesh, float scale, aabb_collider* aabb = 0);
 
-	dx_mesh createDXMesh(dx_context* context);
-	dx_vertex_buffer createVertexBufferWithAlternativeLayout(dx_context* context, uint32 otherFlags, bool allowUnorderedAccess = false);
+	dx_mesh createDXMesh();
+	dx_vertex_buffer createVertexBufferWithAlternativeLayout(uint32 otherFlags, bool allowUnorderedAccess = false);
 
 private:
 	void alignNextTriangle();

@@ -7,6 +7,7 @@
 #include <tchar.h>
 
 #include <cassert>
+#include <limits>
 
 typedef char int8;
 typedef unsigned char uint8;

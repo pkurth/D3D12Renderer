@@ -107,7 +107,13 @@ project "D3D12ProjectionMapping"
 			"mat4=float4x4",
 			"vec2=float2",
 			"vec3=float3",
-			"vec4=float4"
+			"vec4=float4",
+			"uint32=uint"
+		}
+
+		shaderoptions {
+			"/WX",
+			"/all_resources_bound",
 		}
  
 	filter("files:**_vs.hlsl*")
@@ -134,6 +140,4 @@ project "D3D12ProjectionMapping"
 		removeflags("ExcludeFromBuild")
 		shadertype("Compute")
 		
-
-   shaderoptions({"/WX"})
 

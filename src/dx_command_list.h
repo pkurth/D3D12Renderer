@@ -115,6 +115,7 @@ struct dx_command_list
 	// Render targets.
 	void setScreenRenderTarget(D3D12_CPU_DESCRIPTOR_HANDLE* rtvs, uint32 numRTVs, D3D12_CPU_DESCRIPTOR_HANDLE* dsv);
 	void setRenderTarget(dx_render_target& renderTarget, uint32 arraySlice = 0);
+	void clearRTV(D3D12_CPU_DESCRIPTOR_HANDLE rtv, float r, float g, float b, float a = 1.f);
 	void clearRTV(D3D12_CPU_DESCRIPTOR_HANDLE rtv, const float* clearColor);
 	void clearDepth(D3D12_CPU_DESCRIPTOR_HANDLE dsv, float depth = 1.f);
 	void clearStencil(D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32 stencil = 0);

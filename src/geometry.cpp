@@ -502,17 +502,17 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, aabb_coll
 	return result;
 }
 
-dx_mesh cpu_mesh::createDXMesh(dx_context* context)
+dx_mesh cpu_mesh::createDXMesh()
 {
 	dx_mesh result;
-	result.vertexBuffer = createVertexBuffer(context, vertexSize, numVertices, vertices);
-	result.indexBuffer = createIndexBuffer(context, sizeof(uint16), numTriangles * 3, triangles);
+	result.vertexBuffer = createVertexBuffer(vertexSize, numVertices, vertices);
+	result.indexBuffer = createIndexBuffer(sizeof(uint16), numTriangles * 3, triangles);
 	return result;
 }
 
 #define getVertexProperty(prop, base, info, type) *(type*)(base + info.prop##Offset) 
 
-dx_vertex_buffer cpu_mesh::createVertexBufferWithAlternativeLayout(dx_context* context, uint32 otherFlags, bool allowUnorderedAccess)
+dx_vertex_buffer cpu_mesh::createVertexBufferWithAlternativeLayout(uint32 otherFlags, bool allowUnorderedAccess)
 {
 #ifdef _DEBUG
 	for (uint32 i = 0; i < 31; ++i)
@@ -542,7 +542,7 @@ dx_vertex_buffer cpu_mesh::createVertexBufferWithAlternativeLayout(dx_context* c
 		if (otherFlags & mesh_creation_flags_with_skin) { getVertexProperty(skin, newBase, newInfo, skinning_weights) = getVertexProperty(skin, ownBase, ownInfo, skinning_weights); }
 	}
 
-	dx_vertex_buffer vertexBuffer = createVertexBuffer(context, newInfo.vertexSize, numVertices, newVertices, allowUnorderedAccess);
+	dx_vertex_buffer vertexBuffer = createVertexBuffer(newInfo.vertexSize, numVertices, newVertices, allowUnorderedAccess);
 	free(newVertices);
 	return vertexBuffer;
 }

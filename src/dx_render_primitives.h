@@ -5,7 +5,6 @@
 
 struct dx_texture;
 struct dx_buffer;
-struct dx_context;
 struct dx_command_list;
 
 #define UNBOUNDED_DESCRIPTOR_RANGE -1
@@ -237,38 +236,38 @@ DXGI_FORMAT getIndexBufferFormat(uint32 elementSize);
 
 void* mapBuffer(dx_buffer& buffer);
 void unmapBuffer(dx_buffer& buffer);
-void uploadBufferData(dx_context* context, dx_buffer& buffer, const void* bufferData);
-void updateBufferDataRange(dx_context* context, dx_buffer& buffer, const void* data, uint32 offset, uint32 size);
+void uploadBufferData(dx_buffer& buffer, const void* bufferData);
+void updateBufferDataRange(dx_buffer& buffer, const void* data, uint32 offset, uint32 size);
 
-dx_buffer createBuffer(dx_context* context, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
-dx_buffer createUploadBuffer(dx_context* context, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
-dx_vertex_buffer createVertexBuffer(dx_context* context, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
-dx_vertex_buffer createUploadVertexBuffer(dx_context* context, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
-dx_index_buffer createIndexBuffer(dx_context* context, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
+dx_buffer createBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
+dx_buffer createUploadBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
+dx_vertex_buffer createVertexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
+dx_vertex_buffer createUploadVertexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
+dx_index_buffer createIndexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
 
-void uploadTextureSubresourceData(dx_context* context, dx_texture& texture, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 firstSubresource, uint32 numSubresources);
-dx_texture createTexture(dx_context* context, D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
-dx_texture createTexture(dx_context* context, const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allowRenderTarget = false, bool allowUnorderedAccess = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
-dx_texture createDepthTexture(dx_context* context, uint32 width, uint32 height, DXGI_FORMAT format);
-void resizeTexture(dx_context* context, dx_texture& texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
+void uploadTextureSubresourceData(dx_texture& texture, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 firstSubresource, uint32 numSubresources);
+dx_texture createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
+dx_texture createTexture(const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allowRenderTarget = false, bool allowUnorderedAccess = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
+dx_texture createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format);
+void resizeTexture(dx_texture& texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
 
-dx_root_signature createRootSignature(dx_context* context, dx_blob rootSignatureBlob);
-dx_root_signature createRootSignature(dx_context* context, const wchar* path);
-dx_root_signature createRootSignature(dx_context* context, const D3D12_ROOT_SIGNATURE_DESC1& desc);
-dx_root_signature createRootSignature(dx_context* context, CD3DX12_ROOT_PARAMETER1* rootParameters, uint32 numRootParameters, CD3DX12_STATIC_SAMPLER_DESC* samplers, uint32 numSamplers,
+dx_root_signature createRootSignature(dx_blob rootSignatureBlob);
+dx_root_signature createRootSignature(const wchar* path);
+dx_root_signature createRootSignature(const D3D12_ROOT_SIGNATURE_DESC1& desc);
+dx_root_signature createRootSignature(CD3DX12_ROOT_PARAMETER1* rootParameters, uint32 numRootParameters, CD3DX12_STATIC_SAMPLER_DESC* samplers, uint32 numSamplers,
 	D3D12_ROOT_SIGNATURE_FLAGS flags);
-dx_root_signature createRootSignature(dx_context* context, const D3D12_ROOT_SIGNATURE_DESC& desc);
-dx_root_signature createRootSignature(dx_context* context, CD3DX12_ROOT_PARAMETER* rootParameters, uint32 numRootParameters, CD3DX12_STATIC_SAMPLER_DESC* samplers, uint32 numSamplers,
+dx_root_signature createRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc);
+dx_root_signature createRootSignature(CD3DX12_ROOT_PARAMETER* rootParameters, uint32 numRootParameters, CD3DX12_STATIC_SAMPLER_DESC* samplers, uint32 numSamplers,
 	D3D12_ROOT_SIGNATURE_FLAGS flags);
-dx_command_signature createCommandSignature(dx_context* context, dx_root_signature rootSignature, const D3D12_COMMAND_SIGNATURE_DESC& commandSignatureDesc);
-dx_root_signature createRootSignature(dx_context* context, D3D12_ROOT_SIGNATURE_FLAGS flags);
-dx_command_signature createCommandSignature(dx_context* context, dx_root_signature rootSignature, D3D12_INDIRECT_ARGUMENT_DESC* argumentDescs, uint32 numArgumentDescs, uint32 commandStructureSize);
+dx_command_signature createCommandSignature(dx_root_signature rootSignature, const D3D12_COMMAND_SIGNATURE_DESC& commandSignatureDesc);
+dx_root_signature createRootSignature(D3D12_ROOT_SIGNATURE_FLAGS flags);
+dx_command_signature createCommandSignature(dx_root_signature rootSignature, D3D12_INDIRECT_ARGUMENT_DESC* argumentDescs, uint32 numArgumentDescs, uint32 commandStructureSize);
 
-dx_cbv_srv_uav_descriptor_heap createDescriptorHeap(dx_context* context, uint32 numDescriptors, bool shaderVisible = true);
-dx_rtv_descriptor_heap createRTVDescriptorAllocator(dx_context* context, uint32 numDescriptors);
-dx_dsv_descriptor_heap createDSVDescriptorAllocator(dx_context* context, uint32 numDescriptors);
+dx_cbv_srv_uav_descriptor_heap createDescriptorHeap(uint32 numDescriptors, bool shaderVisible = true);
+dx_rtv_descriptor_heap createRTVDescriptorAllocator(uint32 numDescriptors);
+dx_dsv_descriptor_heap createDSVDescriptorAllocator(uint32 numDescriptors);
 
-dx_frame_descriptor_allocator createFrameDescriptorAllocator(dx_context* context);
+dx_frame_descriptor_allocator createFrameDescriptorAllocator();
 
 dx_submesh createSubmesh(dx_mesh& mesh, submesh_info info);
 dx_submesh createSubmesh(dx_mesh& mesh);

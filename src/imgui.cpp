@@ -100,6 +100,25 @@ namespace ImGui
 	{
 		ImGui::Image((ImTextureID)handle.gpuHandle.ptr, ImVec2((float)width, (float)height));
 	}
+
+	bool Dropdown(const char* label, const char** names, uint32 count, uint32& current)
+	{
+		bool changed = false;
+		if (ImGui::BeginCombo(label, names[current]))
+		{
+			for (uint32 i = 0; i < count; ++i)
+			{
+				bool selected = i == current;
+				if (ImGui::Selectable(names[i], selected))
+				{
+					current = i;
+					changed = true;
+				}
+			}
+			ImGui::EndCombo();
+		}
+		return changed;
+	}
 }
 
 

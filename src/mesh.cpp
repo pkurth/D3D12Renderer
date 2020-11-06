@@ -1,6 +1,5 @@
 #include "pch.h"
-#include "dx_render_primitives.h"
-#include "colliders.h"
+#include "mesh.h"
 #include "geometry.h"
 
 #include <assimp/Importer.hpp>
@@ -13,7 +12,21 @@
 
 namespace fs = std::filesystem;
 
-#define CACHE_FORMAT "fbx" // We don't export as assbin, because the exporter kills the mesh names, which we use to identify LODs.
+#define CACHE_FORMAT "assbin"
+
+static void fixUpMeshNames(const aiScene* scene, const aiNode* root)
+{
+	for (uint32 i = 0; i < root->mNumMeshes; ++i)
+	{
+		aiMesh* mesh = scene->mMeshes[root->mMeshes[i]];
+		mesh->mName = root->mName;
+	}
+
+	for (uint32 i = 0; i < root->mNumChildren; ++i)
+	{
+		fixUpMeshNames(scene, root->mChildren[i]);
+	}
+}
 
 const aiScene* loadAssimpSceneFile(const char* filepathRaw)
 {
@@ -43,7 +56,7 @@ const aiScene* loadAssimpSceneFile(const char* filepathRaw)
 			if (CompareFileTime(&cachedFiletime, &originalFiletime) >= 0)
 			{
 				// Cached file is newer than original, so load this.
-				scene = importer.ReadFile(cacheFilepath.string(), 0);
+				scene = importer.ReadFile(cacheFilepath.string(), 0); 
 			}
 		}
 	}
@@ -52,9 +65,7 @@ const aiScene* loadAssimpSceneFile(const char* filepathRaw)
 	{
 		importer.SetPropertyFloat(AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE, 80.f);
 		importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_POINT | aiPrimitiveType_LINE);
-		importer.SetPropertyInteger(AI_CONFIG_PP_SLM_VERTEX_LIMIT, UINT16_MAX);
-
-		//importer.SetPropertyInteger(AI_CONFIG_PP_SLM_TRIANGLE_LIMIT, 2000);
+		importer.SetPropertyInteger(AI_CONFIG_PP_SLM_VERTEX_LIMIT, UINT16_MAX); // So that we can use 16 bit indices.
 
 		uint32 importFlags = aiProcessPreset_TargetRealtime_MaxQuality | aiProcess_FlipUVs;
 		uint32 exportFlags = 0;
@@ -78,6 +89,7 @@ const aiScene* loadAssimpSceneFile(const char* filepathRaw)
 	if (scene)
 	{
 		scene = importer.GetOrphanedScene();
+		fixUpMeshNames(scene, scene->mRootNode);
 	}
 
 	return scene;
@@ -92,52 +104,7 @@ void freeAssimpScene(const aiScene* scene)
 }
 
 
-// Suzanne 0
-// Suzanne 1
-// Suzanne 2
-
-// Cube 0
-// Cube 1
-
-// Mesh [5]
-// Components
-//	- LOD Mesh [3]
-//		- Suzanne 0 + Cube 0
-//		- Suzanne 1 + Cube 1
-//		- Suzanne 2
-
-
-
-
-// Sponza
-// 24 Parts
-
-
-
-
-
-
-struct single_mesh
-{
-	submesh_info submesh;
-	aabb_collider boundingBox;
-	std::string name;
-};
-
-struct lod_mesh
-{
-	uint32 firstMesh;
-	uint32 numMeshes;
-};
-
-struct composite_mesh
-{
-	std::vector<single_mesh> singleMeshes;
-	std::vector<lod_mesh> lods;
-};
-
-
-void analyzeAssimpScene(const aiScene* scene)
+composite_mesh createCompositeMeshFromScene(const aiScene* scene)
 {
 	struct mesh_info
 	{
@@ -244,17 +211,29 @@ void analyzeAssimpScene(const aiScene* scene)
 		std::cout << "There is a gap in the LOD declarations." << std::endl;
 	}
 
+	result.lodDistances.resize(result.lods.size());
+
 	std::cout << "There are " << result.lods.size() << " LODs in this file" << std::endl;
-	
+
 	uint32 l = 0;
 	for (lod_mesh& lod : result.lods)
 	{
 		std::cout << "LOD " << l++ << ": " << std::endl;
 		for (uint32 i = lod.firstMesh; i < lod.firstMesh + lod.numMeshes; ++i)
 		{
-			std::cout << "   " << result.singleMeshes[i].name << std::endl;
+			std::cout << "   " 
+				<< result.singleMeshes[i].name << " -- " 
+				<< result.singleMeshes[i].submesh.numVertices << " vertices, " 
+				<< result.singleMeshes[i].submesh.numTriangles << " triangles." << std::endl;
 		}
-
 	}
 
+	for (uint32 i = 0; i < (uint32)result.lodDistances.size(); ++i)
+	{
+		result.lodDistances[i] = (float)i; // TODO: Better default values.
+	}
+
+	result.mesh = cpuMesh.createDXMesh();
+
+	return result;
 }

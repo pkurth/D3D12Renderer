@@ -9,8 +9,6 @@
 
 #include <fontawesome/list.h>
 
-dx_context dxContext;
-
 
 static float perfFreq;
 static LARGE_INTEGER lastTime;

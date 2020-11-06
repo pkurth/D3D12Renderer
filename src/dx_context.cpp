@@ -2,6 +2,9 @@
 #include "dx_context.h"
 #include "dx_command_list.h"
 
+
+dx_context dxContext;
+
 static void enableDebugLayer()
 {
 #if defined(_DEBUG)
@@ -136,10 +139,9 @@ void dx_context::initialize()
 	copyQueue.initialize(device, D3D12_COMMAND_LIST_TYPE_COPY);
 
 
-	rtvAllocator = createRTVDescriptorAllocator(this, 1024);
-	dsvAllocator = createDSVDescriptorAllocator(this, 1024);
-	frameDescriptorAllocator = createFrameDescriptorAllocator(this);
-	
+	rtvAllocator = createRTVDescriptorAllocator(1024);
+	dsvAllocator = createDSVDescriptorAllocator(1024);
+	frameDescriptorAllocator = createFrameDescriptorAllocator();
 }
 
 void dx_context::flushApplication()

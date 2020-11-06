@@ -741,6 +741,12 @@ mat4 createViewMatrix(vec3 eye, float pitch, float yaw)
 	return result;
 }
 
+mat4 createSkyViewMatrix(mat4 v)
+{
+	v.m03 = 0.f; v.m13 = 0.f; v.m23 = 0.f;
+	return v;
+}
+
 mat4 lookAt(vec3 eye, vec3 target, vec3 up)
 {
 	vec3 zAxis = normalize(eye - target);

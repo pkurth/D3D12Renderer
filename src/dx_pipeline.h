@@ -254,8 +254,11 @@ struct graphics_pipeline_files
 dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files,
 	dx_root_signature userRootSignature);
 dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files,
-	const char* rootSignatureFile);
+	const char* rootSignatureFile = 0); // If RS file is null, it will take the pixel shader by default.
 
+dx_pipeline createReloadablePipeline(const char* csFile,
+	dx_root_signature userRootSignature);
+dx_pipeline createReloadablePipeline(const char* csFile, const char* rootSignatureFile = 0);  // If RS file is null, it will take the cs by default.
 
 void createAllReloadablePipelines();
 

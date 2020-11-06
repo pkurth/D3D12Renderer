@@ -3,10 +3,14 @@
 
 void render_camera::recalculateMatrices(uint32 renderWidth, uint32 renderHeight)
 {
-	float aspect = (float)renderWidth / (float)renderHeight;
+	return recalculateMatrices((float)renderWidth, (float)renderHeight);
+}
+
+void render_camera::recalculateMatrices(float renderWidth, float renderHeight)
+{
+	float aspect = renderWidth / renderHeight;
 	proj = createPerspectiveProjectionMatrix(verticalFOV, aspect, nearPlane, farPlane);
 	invProj = invertPerspectiveProjectionMatrix(proj);
-	//view = createViewMatrix(position, pitch, yaw);
 	view = createViewMatrix(position, rotation);
 	invView = invertedAffine(view);
 	viewProj = proj * view;

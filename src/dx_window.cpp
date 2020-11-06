@@ -248,7 +248,7 @@ bool dx_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clientH
 	assert(depthFormat == DXGI_FORMAT_UNKNOWN || isDepthFormat(depthFormat));
 	if (depthFormat != DXGI_FORMAT_UNKNOWN)
 	{
-		depthBuffer = createDepthTexture(&dxContext, clientWidth, clientHeight, depthFormat);
+		depthBuffer = createDepthTexture(clientWidth, clientHeight, depthFormat);
 	}
 
 	initialized = true;
@@ -291,7 +291,7 @@ void dx_window::onResize()
 
 		if (depthBuffer.resource)
 		{
-			resizeTexture(&dxContext, depthBuffer, clientWidth, clientHeight);
+			resizeTexture(depthBuffer, clientWidth, clientHeight);
 		}
 	}
 }
