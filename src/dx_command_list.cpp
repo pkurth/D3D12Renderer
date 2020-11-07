@@ -143,6 +143,46 @@ dx_dynamic_vertex_buffer dx_command_list::createDynamicVertexBuffer(uint32 eleme
 	return { vertexBufferView };
 }
 
+void dx_command_list::setGraphicsUAV(uint32 rootParameterIndex, dx_buffer& buffer)
+{
+	commandList->SetGraphicsRootUnorderedAccessView(rootParameterIndex, buffer.gpuVirtualAddress);
+}
+
+void dx_command_list::setGraphicsUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
+{
+	commandList->SetGraphicsRootUnorderedAccessView(rootParameterIndex, address);
+}
+
+void dx_command_list::setComputeUAV(uint32 rootParameterIndex, dx_buffer& buffer)
+{
+	commandList->SetComputeRootUnorderedAccessView(rootParameterIndex, buffer.gpuVirtualAddress);
+}
+
+void dx_command_list::setComputeUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
+{
+	commandList->SetComputeRootUnorderedAccessView(rootParameterIndex, address);
+}
+
+void dx_command_list::setGraphicsSRV(uint32 rootParameterIndex, dx_buffer& buffer)
+{
+	commandList->SetGraphicsRootShaderResourceView(rootParameterIndex, buffer.gpuVirtualAddress);
+}
+
+void dx_command_list::setGraphicsSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
+{
+	commandList->SetGraphicsRootShaderResourceView(rootParameterIndex, address);
+}
+
+void dx_command_list::setComputeSRV(uint32 rootParameterIndex, dx_buffer& buffer)
+{
+	commandList->SetComputeRootShaderResourceView(rootParameterIndex, buffer.gpuVirtualAddress);
+}
+
+void dx_command_list::setComputeSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
+{
+	commandList->SetComputeRootShaderResourceView(rootParameterIndex, address);
+}
+
 void dx_command_list::setDescriptorHeap(dx_descriptor_heap& descriptorHeap)
 {
 	descriptorHeaps[descriptorHeap.type] = descriptorHeap.descriptorHeap.Get();

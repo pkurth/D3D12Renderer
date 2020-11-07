@@ -35,6 +35,22 @@ static tonemap_cb defaultTonemapParameters()
 	return result;
 }
 
+static float acesFilmic(float x, float A, float B, float C, float D, float E, float F)
+{
+	return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - (E / F);
+}
+
+static float filmicTonemapping(float color, tonemap_cb tonemap)
+{
+	float expExposure = exp2(tonemap.exposure);
+	color *= expExposure;
+
+	float r = acesFilmic(color, tonemap.A, tonemap.B, tonemap.C, tonemap.D, tonemap.E, tonemap.F) /
+		acesFilmic(tonemap.linearWhite, tonemap.A, tonemap.B, tonemap.C, tonemap.D, tonemap.E, tonemap.F);
+
+	return r;
+}
+
 #define PRESENT_RS \
 "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
 "DENY_VERTEX_SHADER_ROOT_ACCESS |" \

@@ -3,17 +3,11 @@
     "RootConstants(b0, num32BitConstants = 1), " \
     "DescriptorTable( UAV(u0, numDescriptors = 1, flags = DESCRIPTORS_VOLATILE) )"
 
+#include "cs.hlsl"
+
 #define BLOCK_SIZE 16
 
 #include "brdf.hlsl"
-
-struct cs_input
-{
-	uint3 groupID           : SV_GroupID;           // 3D index of the thread group in the dispatch.
-	uint3 groupThreadID     : SV_GroupThreadID;     // 3D index of local thread ID in a thread group.
-	uint3 dispatchThreadID  : SV_DispatchThreadID;  // 3D index of global thread ID in the dispatch.
-	uint  groupIndex        : SV_GroupIndex;        // Flattened local index of the thread within a thread group.
-};
 
 cbuffer integrate_brdf_cb : register(b0)
 {

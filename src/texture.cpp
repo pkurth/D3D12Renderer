@@ -1,5 +1,7 @@
 #include "pch.h"
 #include "texture.h"
+#include "dx_context.h"
+#include "texture_preprocessing.h"
 
 #include <DirectXTex/DirectXTex.h>
 
@@ -50,6 +52,13 @@ static DXGI_FORMAT makeLinear(DXGI_FORMAT format)
 
 static bool loadImageFromFile(const char* filepathRaw, uint32 flags, DirectX::ScratchImage& scratchImage, D3D12_RESOURCE_DESC& textureDesc)
 {
+	if (flags & texture_load_flags_gen_mips_on_gpu)
+	{
+		flags &= ~texture_load_flags_gen_mips_on_cpu;
+		flags |= texture_load_flags_allocate_full_mipchain;
+	}
+
+
 	fs::path filepath = filepathRaw;
 	fs::path extension = filepath.extension();
 
@@ -203,29 +212,16 @@ static dx_texture loadTextureInternal(const char* filename, uint32 flags)
 	}
 
 	dx_texture result = createTexture(textureDesc, subresources, numImages);
-	return result;
-}
 
-static void updateTextureInternal(dx_texture& texture, const char* filename, uint32 flags)
-{
-	DirectX::ScratchImage scratchImage;
-	D3D12_RESOURCE_DESC textureDesc;
-
-	loadImageFromFile(filename, flags, scratchImage, textureDesc);
-
-	const DirectX::Image* images = scratchImage.GetImages();
-	uint32 numImages = (uint32)scratchImage.GetImageCount();
-
-	D3D12_SUBRESOURCE_DATA subresources[64];
-	for (uint32 i = 0; i < numImages; ++i)
+	if (flags & texture_load_flags_gen_mips_on_gpu)
 	{
-		D3D12_SUBRESOURCE_DATA& subresource = subresources[i];
-		subresource.RowPitch = images[i].rowPitch;
-		subresource.SlicePitch = images[i].slicePitch;
-		subresource.pData = images[i].pixels;
+		dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
+		dx_command_list* cl = dxContext.getFreeRenderCommandList();
+		generateMipMapsOnGPU(cl, result);
+		dxContext.executeCommandList(cl);
 	}
 
-	uploadTextureSubresourceData(texture, subresources, 0, numImages);
+	return result;
 }
 
 dx_texture loadTextureFromFile(const char* filename, uint32 flags)

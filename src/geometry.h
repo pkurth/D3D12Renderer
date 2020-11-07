@@ -39,8 +39,12 @@ struct cpu_mesh
 	submesh_info pushCube(float radius, bool flipWindingOrder = false) { return pushCube(vec3(radius, radius, radius), flipWindingOrder); }
 	submesh_info pushSphere(uint16 slices, uint16 rows, float radius);
 	submesh_info pushCapsule(uint16 slices, uint16 rows, float height, float radius);
+	submesh_info pushCylinder(uint16 slices, float radius, float height);
+	submesh_info pushArrow(uint16 slices, float shaftRadius, float headRadius, float shaftLength, float headLength);
+	submesh_info pushTorus(uint16 slices, uint16 segments, float torusRadius, float tubeRadius);
+	submesh_info pushMace(uint16 slices, float shaftRadius, float headRadius, float shaftLength, float headLength);
 
-	submesh_info cpu_mesh::pushAssimpMesh(const struct aiMesh* mesh, float scale, aabb_collider* aabb = 0);
+	submesh_info pushAssimpMesh(const struct aiMesh* mesh, float scale, aabb_collider* aabb = 0);
 
 	dx_mesh createDXMesh();
 	dx_vertex_buffer createVertexBufferWithAlternativeLayout(uint32 otherFlags, bool allowUnorderedAccess = false);

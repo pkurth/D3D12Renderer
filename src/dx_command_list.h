@@ -88,6 +88,16 @@ struct dx_command_list
 
 	dx_dynamic_vertex_buffer createDynamicVertexBuffer(uint32 elementSize, uint32 elementCount, void* data);
 
+	void setGraphicsUAV(uint32 rootParameterIndex, dx_buffer& buffer);
+	void setGraphicsUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
+	void setComputeUAV(uint32 rootParameterIndex, dx_buffer& buffer);
+	void setComputeUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
+
+	void setGraphicsSRV(uint32 rootParameterIndex, dx_buffer& buffer);
+	void setGraphicsSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
+	void setComputeSRV(uint32 rootParameterIndex, dx_buffer& buffer);
+	void setComputeSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
+
 
 	// Shader resources.
 	void setDescriptorHeap(dx_descriptor_heap& descriptorHeap);

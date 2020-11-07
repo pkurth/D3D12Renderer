@@ -12,6 +12,8 @@ struct camera_cb
 	vec4 position;
 	vec4 forward;
 	vec4 projectionParams; // nearPlane, farPlane, farPlane / nearPlane, 1 - farPlane / nearPlane
+	vec2 screenDims;
+	vec2 invScreenDims;
 };
 
 static float3 restoreViewSpacePosition(float4x4 invProj, float2 uv, float depth)

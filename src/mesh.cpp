@@ -103,8 +103,15 @@ void freeAssimpScene(const aiScene* scene)
 	}
 }
 
+composite_mesh createCompositeMeshFromFile(const char* sceneFilename, uint32 flags)
+{
+	const aiScene* scene = loadAssimpSceneFile(sceneFilename);
+	auto mesh = createCompositeMeshFromScene(scene, flags);
+	freeAssimpScene(scene);
+	return mesh;
+}
 
-composite_mesh createCompositeMeshFromScene(const aiScene* scene)
+composite_mesh createCompositeMeshFromScene(const aiScene* scene, uint32 flags)
 {
 	struct mesh_info
 	{
@@ -114,7 +121,7 @@ composite_mesh createCompositeMeshFromScene(const aiScene* scene)
 		std::string name;
 	};
 
-	cpu_mesh cpuMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals);
+	cpu_mesh cpuMesh(flags);
 
 	std::vector<mesh_info> infos(scene->mNumMeshes);
 

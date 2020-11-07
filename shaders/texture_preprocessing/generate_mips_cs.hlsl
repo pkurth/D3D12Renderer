@@ -11,6 +11,7 @@
         "addressW = TEXTURE_ADDRESS_CLAMP," \
         "filter = FILTER_MIN_MAG_MIP_LINEAR)"
 
+#include "cs.hlsl"
 
 #define BLOCK_SIZE 8 // In one dimension. 64 in total.
 
@@ -18,14 +19,6 @@
 #define WIDTH_ODD_HEIGHT_EVEN	1 // The texture width is odd and the height is even.
 #define WIDTH_EVEN_HEIGHT_ODD	2 // The texture width is even and the height is odd.
 #define WIDTH_HEIGHT_ODD		3 // Both the width and height of the texture are odd.
-
-struct cs_input
-{
-	uint3 groupID           : SV_GroupID;           // 3D index of the thread group in the dispatch.
-	uint3 groupThreadID     : SV_GroupThreadID;     // 3D index of local thread ID in a thread group.
-	uint3 dispatchThreadID  : SV_DispatchThreadID;  // 3D index of global thread ID in the dispatch.
-	uint  groupIndex        : SV_GroupIndex;        // Flattened local index of the thread within a thread group.
-};
 
 cbuffer generate_mips_cb : register(b0)
 {

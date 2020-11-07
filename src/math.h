@@ -72,6 +72,7 @@ union vec4
 		float w;
 	};
 	floatx4 f4;
+	float data[4];
 
 	vec4() {}
 	vec4(float x_, float y_, float z_, float w_) { x = x_; y = y_; z = z_; w = w_; }

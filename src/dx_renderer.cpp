@@ -11,6 +11,7 @@
 #include "texture_preprocessing.h"
 
 #include "model_rs.hlsl"
+#include "outline_rs.hlsl"
 #include "present_rs.hlsl"
 #include "sky_rs.hlsl"
 
@@ -18,6 +19,9 @@
 
 
 dx_cbv_srv_uav_descriptor_heap dx_renderer::globalDescriptorHeap;
+
+dx_texture dx_renderer::whiteTexture;
+dx_descriptor_handle dx_renderer::whiteTextureSRV;
 
 dx_render_target dx_renderer::hdrRenderTarget;
 dx_texture dx_renderer::hdrColorTexture;
@@ -42,22 +46,57 @@ static dx_pipeline textureSkyPipeline;
 static dx_pipeline proceduralSkyPipeline;
 static dx_pipeline presentPipeline;
 static dx_pipeline modelPipeline;
+static dx_pipeline modelDepthOnlyPipeline;
+static dx_pipeline outlinePipeline;
+
+static dx_mesh skyMesh;
+static dx_mesh gizmoMesh;
+
+static union
+{
+	struct
+	{
+		submesh_info translationGizmoSubmesh;
+		submesh_info rotationGizmoSubmesh;
+		submesh_info scaleGizmoSubmesh;
+	};
+
+	submesh_info gizmoSubmeshes[3];
+};
+
+static quat gizmoRotations[] =
+{
+	quat(vec3(0.f, 0.f, -1.f), deg2rad(90.f)),
+	quat::identity,
+	quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)),
+};
+
+static vec4 gizmoColors[] =
+{
+	vec4(1.f, 0.f, 0.f, 1.f),
+	vec4(0.f, 1.f, 0.f, 1.f),
+	vec4(0.f, 0.f, 1.f, 1.f),
+};
 
 
+static dx_texture brdfTex;
+static dx_descriptor_handle brdfTexSRV;
 
 
 // The following stuff will eventually move into a different file.
 
 static render_camera camera;
 
-static composite_mesh suzanne;
-static dx_texture texture;
-static dx_descriptor_handle textureHandle;
-static trs* suzanneTransforms;
-static mat4* suzanneModelMatrices;
-static const uint32 numSuzannes = 1024;
+static composite_mesh mesh;
+static dx_texture albedoTex;
+static dx_texture normalTex;
+static dx_texture roughTex;
+static dx_texture metalTex;
+static dx_descriptor_handle textureSRV;
 
-static dx_mesh skyMesh;
+static trs meshTransform;
+
+
 static pbr_environment environment;
 
 
@@ -74,7 +113,24 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 
 	globalDescriptorHeap = createDescriptorHeap(2048);
 
+	uint8 white[] = { 255, 255, 255, 255 };
+	whiteTexture = createTexture(white, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
+	whiteTextureSRV = globalDescriptorHeap.push2DTextureSRV(whiteTexture);
+
+
 	initializeTexturePreprocessing();
+
+	// HDR render target.
+	{
+		depthBuffer = createDepthTexture(renderWidth, renderHeight, DXGI_FORMAT_D24_UNORM_S8_UINT);
+		SET_NAME(depthBuffer.resource, "HDR depth buffer");
+
+		hdrColorTexture = createTexture(0, renderWidth, renderHeight, DXGI_FORMAT_R16G16B16A16_FLOAT, true);
+		hdrColorTextureSRV = globalDescriptorHeap.push2DTextureSRV(hdrColorTexture);
+
+		hdrRenderTarget.pushColorAttachment(hdrColorTexture);
+		hdrRenderTarget.pushDepthStencilAttachment(depthBuffer);
+	}
 
 	// Frame result.
 	{
@@ -85,44 +141,52 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 		windowRenderTarget.pushColorAttachment(frameResult);
 	}
 
-	// HDR render target.
+	// Sky.
 	{
-		depthBuffer = createDepthTexture(renderWidth, renderHeight, DXGI_FORMAT_D32_FLOAT);
-		SET_NAME(depthBuffer.resource, "HDR depth buffer");
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.inputLayout(inputLayout_position)
+			.renderTargets(hdrRenderTarget.renderTargetFormat)
+			.depthSettings(false, false)
+			.cullFrontFaces();
 
-		hdrColorTexture = createTexture(0, renderWidth, renderHeight, DXGI_FORMAT_R16G16B16A16_FLOAT, true);
-		hdrColorTextureSRV = globalDescriptorHeap.push2DTextureSRV(hdrColorTexture);
-
-		hdrRenderTarget.pushColorAttachment(hdrColorTexture);
-		hdrRenderTarget.pushDepthStencilAttachment(depthBuffer);
+		proceduralSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_procedural_ps" });
+		textureSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_texture_ps" });
 	}
 
+	// Model.
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.renderTargets(0, 0, hdrRenderTarget.depthStencilFormat)
+			.inputLayout(inputLayout_position_uv_normal_tangent);
 
+		modelDepthOnlyPipeline = createReloadablePipeline(desc, { "model_vs" }, "model_vs"); // The depth-only RS is baked into the vertex shader.
+
+
+		desc
+			.renderTargets(hdrRenderTarget.renderTargetFormat, hdrRenderTarget.depthStencilFormat)
+			.stencilSettings(D3D12_COMPARISON_FUNC_ALWAYS, D3D12_STENCIL_OP_REPLACE, D3D12_STENCIL_OP_REPLACE) // Mark areas in stencil, for example for outline.
+			.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
+
+		modelPipeline = createReloadablePipeline(desc, { "model_vs", "model_ps" });
+	}
+
+	// Outline.
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.inputLayout(inputLayout_position_uv_normal_tangent)
+			.renderTargets(hdrRenderTarget.renderTargetFormat, hdrRenderTarget.depthStencilFormat)
+			.stencilSettings(D3D12_COMPARISON_FUNC_NOT_EQUAL);
+
+		outlinePipeline = createReloadablePipeline(desc, { "outline_vs", "outline_ps" }, "outline_vs");
+	}
+
+	// Present.
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.renderTargets(windowRenderTarget.renderTargetFormat)
 			.depthSettings(false, false);
 
 		presentPipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "present_ps" });
-	}
-
-	{
-		auto desc = CREATE_GRAPHICS_PIPELINE
-			.inputLayout(inputLayout_position_uv_normal)
-			.rasterizeCounterClockwise()
-			.renderTargets(hdrRenderTarget.renderTargetFormat, hdrRenderTarget.depthStencilFormat);
-
-		modelPipeline = createReloadablePipeline(desc, { "model_vs", "model_ps" });
-	}
-
-	{
-		auto desc = CREATE_GRAPHICS_PIPELINE
-			.inputLayout(inputLayout_position)
-			.renderTargets(hdrRenderTarget.renderTargetFormat)
-			.depthSettings(false, false);
-
-		proceduralSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_procedural_ps" });
-		textureSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_texture_ps" });
 	}
 
 	createAllReloadablePipelines();
@@ -137,51 +201,60 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	camera.nearPlane = 0.1f;
 
 	{
-		const aiScene* scene = loadAssimpSceneFile("assets/meshes/suzanne.fbx");
-		suzanne = createCompositeMeshFromScene(scene);
-		freeAssimpScene(scene);
-	}
-
-	{
 		cpu_mesh mesh(mesh_creation_flags_with_positions);
 		mesh.pushCube(1.f);
 		skyMesh = mesh.createDXMesh();
 	}
 
-	random_number_generator rng = { 6718923 };
-
-	suzanneTransforms = new trs[numSuzannes];
-	suzanneModelMatrices = new mat4[numSuzannes];
-	for (uint32 i = 0; i < numSuzannes; ++i)
 	{
-		suzanneTransforms[i].position.x = rng.randomFloatBetween(-30.f, 30.f);
-		suzanneTransforms[i].position.y = rng.randomFloatBetween(-30.f, 30.f);
-		suzanneTransforms[i].position.z = rng.randomFloatBetween(-30.f, 30.f);
-
-		vec3 rotationAxis = normalize(vec3(rng.randomFloatBetween(-1.f, 1.f), rng.randomFloatBetween(-1.f, 1.f), rng.randomFloatBetween(-1.f, 1.f)));
-		suzanneTransforms[i].rotation = quat(rotationAxis, rng.randomFloatBetween(0.f, 2.f * M_PI));
-
-		suzanneTransforms[i].scale = rng.randomFloatBetween(0.2f, 3.f);
+		cpu_mesh mesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+		float shaftLength = 2.f;
+		float headLength = 0.4f;
+		float radius = 0.06f;
+		float headRadius = 0.13f;
+		translationGizmoSubmesh = mesh.pushArrow(6, radius, headRadius, shaftLength, headLength);
+		rotationGizmoSubmesh = mesh.pushTorus(6, 64, shaftLength, radius);
+		scaleGizmoSubmesh = mesh.pushMace(6, radius, headRadius, shaftLength, headLength);
+		gizmoMesh = mesh.createDXMesh();
 	}
-
-
-	texture = loadTextureFromFile("assets/textures/hallo.png");
-	textureHandle = globalDescriptorHeap.push2DTextureSRV(texture);
 
 	{
 		dx_command_list* cl = dxContext.getFreeRenderCommandList();
-		dx_texture equiSky = loadTextureFromFile("assets/textures/hdri/aircraft_workshop_01_4k.hdr",
+		brdfTex = integrateBRDF(cl);
+		brdfTexSRV = globalDescriptorHeap.push2DTextureSRV(brdfTex);
+		dxContext.executeCommandList(cl);
+	}
+
+	mesh = createCompositeMeshFromFile("assets/meshes/cerberus.fbx", mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+
+	albedoTex = loadTextureFromFile("assets/textures/cerberus_a.tga");
+	normalTex = loadTextureFromFile("assets/textures/cerberus_n.tga", texture_load_flags_default | texture_load_flags_noncolor);
+	roughTex = loadTextureFromFile("assets/textures/cerberus_r.tga", texture_load_flags_default | texture_load_flags_noncolor);
+	metalTex = loadTextureFromFile("assets/textures/cerberus_m.tga", texture_load_flags_default | texture_load_flags_noncolor);
+	textureSRV = globalDescriptorHeap.push2DTextureSRV(albedoTex);
+	globalDescriptorHeap.push2DTextureSRV(normalTex);
+	globalDescriptorHeap.push2DTextureSRV(roughTex);
+	globalDescriptorHeap.push2DTextureSRV(metalTex);
+
+	meshTransform = trs::identity;
+	meshTransform.rotation = quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f));
+	meshTransform.scale = 0.04f;
+
+	{
+		dx_texture equiSky = loadTextureFromFile("assets/textures/hdri/leadenhall_market_4k.hdr",
 			texture_load_flags_noncolor | texture_load_flags_cache_to_dds | texture_load_flags_allocate_full_mipchain);
+
 		dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
+		dx_command_list* cl = dxContext.getFreeRenderCommandList();
 		generateMipMapsOnGPU(cl, equiSky);
 		environment.sky = equirectangularToCubemap(cl, equiSky, 2048, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
 		environment.prefiltered = prefilterEnvironment(cl, environment.sky, 128);
 		environment.irradiance = cubemapToIrradiance(cl, environment.sky);
 		dxContext.executeCommandList(cl);
 
-		environment.skyHandle = globalDescriptorHeap.pushCubemapSRV(environment.sky);
-		environment.prefilteredHandle = globalDescriptorHeap.pushCubemapSRV(environment.prefiltered);
-		environment.irradianceHandle = globalDescriptorHeap.pushCubemapSRV(environment.irradiance);
+		environment.skySRV = globalDescriptorHeap.pushCubemapSRV(environment.sky);
+		environment.irradianceSRV = globalDescriptorHeap.pushCubemapSRV(environment.irradiance);
+		environment.prefilteredSRV = globalDescriptorHeap.pushCubemapSRV(environment.prefiltered);
 
 		dxContext.retireObject(equiSky.resource);
 	}
@@ -246,26 +319,12 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 	}
 }
 
-static float acesFilmic(float x, float A, float B, float C, float D, float E, float F)
-{
-	return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - (E / F);
-}
-
-static float filmicTonemapping(float color, tonemap_cb tonemap)
-{
-	float expExposure = exp2(tonemap.exposure);
-	color *= expExposure;
-
-	float r = acesFilmic(color, tonemap.A, tonemap.B, tonemap.C, tonemap.D, tonemap.E, tonemap.F) /
-		acesFilmic(tonemap.linearWhite, tonemap.A, tonemap.B, tonemap.C, tonemap.D, tonemap.E, tonemap.F);
-
-	return r;
-}
-
 void dx_renderer::dummyRender(float dt)
 {
-	static uint32 suzanneLOD = 0;
-	static float suzanneSpeed = 1.f;
+	static float meshRotationSpeed = 1.f;
+	static gizmo_type gizmoType;
+	static bool showOutline = false;
+	static vec4 outlineColor(1.f, 1.f, 0.f, 1.f);
 
 	DXGI_QUERY_VIDEO_MEMORY_INFO memoryInfo;
 	checkResult(dxContext.adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memoryInfo));
@@ -273,14 +332,17 @@ void dx_renderer::dummyRender(float dt)
 	ImGui::Begin("Settings");
 	ImGui::Text("%f ms, %u FPS", dt, (uint32)(1.f / dt));
 
-	bool aspectRatioModeChanged = ImGui::Dropdown("Aspect Ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)aspectRatioMode);
+	bool aspectRatioModeChanged = ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)aspectRatioMode);
+	ImGui::Dropdown("Gizmo type", gizmoTypeNames, gizmo_type_count, (uint32&)gizmoType);
 
-	ImGui::SliderInt("LOD", (int*)&suzanneLOD, 0, (int)suzanne.lods.size() - 1);
-	ImGui::SliderFloat("Speed", &suzanneSpeed, -2.f, 2.f);
+	ImGui::Checkbox("Show outline", &showOutline);
+	ImGui::ColorEdit4("Outline color", outlineColor.data);
+
+	ImGui::SliderFloat("Rotation speed", &meshRotationSpeed, -2.f, 2.f);
 	ImGui::Text("Video memory available: %uMB", (uint32)BYTE_TO_MB(memoryInfo.Budget));
 	ImGui::Text("Video memory used: %uMB", (uint32)BYTE_TO_MB(memoryInfo.CurrentUsage));
 
-	ImGui::PlotLines("ACES",
+	ImGui::PlotLines("Tone map",
 		[](void* data, int idx)
 		{
 			float t = idx * 0.01f;
@@ -288,8 +350,7 @@ void dx_renderer::dummyRender(float dt)
 
 			return filmicTonemapping(t, aces);
 		},
-		&tonemap, 100,
-			0, 0, 0.f, 1.f, ImVec2(100.f, 100.f));
+		&tonemap, 100, 0, 0, 0.f, 1.f, ImVec2(100.f, 100.f));
 
 	ImGui::SliderFloat("[ACES] Shoulder strength", &tonemap.A, 0.f, 1.f);
 	ImGui::SliderFloat("[ACES] Linear strength", &tonemap.B, 0.f, 1.f);
@@ -308,17 +369,8 @@ void dx_renderer::dummyRender(float dt)
 	}
 
 
-	quat suzanneDeltaRotation(vec3(0.f, 1.f, 0.f), 2.f * M_PI * 0.1f * suzanneSpeed * dt);
-	for (uint32 i = 0; i < numSuzannes; ++i)
-	{
-		vec3 position = suzanneTransforms[i].position;
-		position = suzanneDeltaRotation * position;
-
-		suzanneTransforms[i].rotation = suzanneDeltaRotation * suzanneTransforms[i].rotation;
-		suzanneTransforms[i].position = position;
-
-		suzanneModelMatrices[i] = trsToMat4(suzanneTransforms[i]);
-	}
+	quat deltaRotation(vec3(0.f, 1.f, 0.f), 2.f * M_PI * 0.1f * meshRotationSpeed * dt);
+	meshTransform.rotation = deltaRotation * meshTransform.rotation;
 
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
@@ -336,7 +388,7 @@ void dx_renderer::dummyRender(float dt)
 
 	cl->setRenderTarget(hdrRenderTarget);
 	cl->setViewport(hdrRenderTarget.viewport);
-	cl->clearDepth(hdrRenderTarget.dsvHandle);
+	cl->clearDepthAndStencil(hdrRenderTarget.dsvHandle);
 
 
 	// Sky.
@@ -345,7 +397,7 @@ void dx_renderer::dummyRender(float dt)
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
-	cl->setGraphicsDescriptorTable(SKY_RS_TEX, environment.skyHandle);
+	cl->setGraphicsDescriptorTable(SKY_RS_TEX, environment.skySRV);
 
 	cl->setVertexBuffer(0, skyMesh.vertexBuffer);
 	cl->setIndexBuffer(skyMesh.indexBuffer);
@@ -353,18 +405,60 @@ void dx_renderer::dummyRender(float dt)
 
 
 	// Models.
+
+	auto submesh = mesh.singleMeshes[0].submesh;
+	mat4 m = trsToMat4(meshTransform);
+	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	cl->setVertexBuffer(0, mesh.mesh.vertexBuffer);
+	cl->setIndexBuffer(mesh.mesh.indexBuffer);
+
+	// Depth-only pass.
+	cl->setPipelineState(*modelDepthOnlyPipeline.pipeline);
+	cl->setGraphicsRootSignature(*modelDepthOnlyPipeline.rootSignature);
+	cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
+	cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+
+
+	// Light pass.
 	cl->setPipelineState(*modelPipeline.pipeline);
 	cl->setGraphicsRootSignature(*modelPipeline.rootSignature);
-	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	cl->setVertexBuffer(0, suzanne.mesh.vertexBuffer);
-	cl->setIndexBuffer(suzanne.mesh.indexBuffer);
-	cl->setGraphicsDescriptorTable(MODEL_RS_ALBEDO, textureHandle);
+	cl->setGraphicsDescriptorTable(MODEL_RS_PBR_TEXTURES, textureSRV);
+	cl->setGraphicsDescriptorTable(MODEL_RS_ENVIRONMENT_TEXTURES, environment.irradianceSRV);
+	cl->setGraphicsDescriptorTable(MODEL_RS_BRDF, brdfTexSRV);
+	cl->setGraphics32BitConstants(MODEL_RS_MATERIAL, pbr_material_cb{ vec4(1.f, 1.f, 1.f, 1.f), 0.f, 0.f, USE_ALBEDO_TEXTURE | USE_NORMAL_TEXTURE | USE_ROUGHNESS_TEXTURE | USE_METALLIC_TEXTURE });
 
-	for (uint32 i = 0; i < numSuzannes; ++i)
+	cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
+
+	cl->setStencilReference(1);
+	cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+
+
+	// Gizmos.
+	cl->setVertexBuffer(0, gizmoMesh.vertexBuffer);
+	cl->setIndexBuffer(gizmoMesh.indexBuffer);
+
+	for (uint32 i = 0; i < 3; ++i)
 	{
-		mat4& m = suzanneModelMatrices[i];
+		mat4 m = createModelMatrix(meshTransform.position, gizmoRotations[i]);
 		cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
-		auto submesh = suzanne.singleMeshes[suzanneLOD].submesh;
+		cl->setGraphics32BitConstants(MODEL_RS_MATERIAL, pbr_material_cb{ gizmoColors[i], 1.f, 0.f, 0 });
+		cl->drawIndexed(gizmoSubmeshes[gizmoType].numTriangles * 3, 1, gizmoSubmeshes[gizmoType].firstTriangle * 3, gizmoSubmeshes[gizmoType].baseVertex, 0);
+	}
+
+
+	// Outline.
+	if (showOutline)
+	{
+		cl->setPipelineState(*outlinePipeline.pipeline);
+		cl->setGraphicsRootSignature(*outlinePipeline.rootSignature);
+		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		cl->setVertexBuffer(0, mesh.mesh.vertexBuffer);
+		cl->setIndexBuffer(mesh.mesh.indexBuffer);
+
+		cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ camera.viewProj * m, outlineColor });
+
+		cl->setStencilReference(1);
 		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 	}
 

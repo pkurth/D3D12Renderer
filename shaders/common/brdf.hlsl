@@ -101,6 +101,44 @@ static float3 importanceSampleGGX(float2 Xi, float3 N, float roughness)
 	return normalize(sampleVec);
 }
 
+static float3 calculateAmbientLighting(float3 albedo, float3 irradiance,
+	TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState brdfSampler,
+	float3 N, float3 V, float3 F0, float roughness, float metallic, float ao)
+{
+	// Common.
+	float NdotV = max(dot(N, V), 0.f);
+	float3 F = fresnelSchlickRoughness(NdotV, F0, roughness);
+	float3 kS = F;
+	float3 kD = float3(1.f, 1.f, 1.f) - kS;
+	kD *= 1.f - metallic;
+
+	// Diffuse.
+	float3 diffuse = irradiance * albedo;
+
+	// Specular.
+	float3 R = reflect(-V, N);
+	uint width, height, numMipLevels;
+	environmentTexture.GetDimensions(0, width, height, numMipLevels);
+	float lod = roughness * float(numMipLevels - 1);
+
+	float3 prefilteredColor = environmentTexture.SampleLevel(brdfSampler, R, lod).rgb;
+	float2 envBRDF = brdf.Sample(brdfSampler, float2(roughness, NdotV)).rg;
+	float3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y);
+
+	float3 ambient = (kD * diffuse + specular) * ao;
+
+	//return diffuse;
+	return ambient;
+}
+
+static float3 calculateAmbientLighting(float3 albedo,
+	TextureCube<float4> irradianceTexture, TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState brdfSampler,
+	float3 N, float3 V, float3 F0, float roughness, float metallic, float ao)
+{
+	float3 irradiance = irradianceTexture.Sample(brdfSampler, N).rgb;
+	return calculateAmbientLighting(albedo, irradiance, environmentTexture, brdf, brdfSampler, N, V, F0, roughness, metallic, ao);
+}
+
 static float3 calculateDirectLighting(float3 albedo, float3 radiance, float3 N, float3 L, float3 V, float3 F0, float roughness, float metallic)
 {
 	float3 H = normalize(V + L);

@@ -19,16 +19,32 @@ static const char* aspectRatioNames[] =
 	"16:10",
 };
 
+enum gizmo_type
+{
+	gizmo_type_translation,
+	gizmo_type_rotation,
+	gizmo_type_scale,
+
+	gizmo_type_count,
+};
+
+static const char* gizmoTypeNames[] =
+{
+	"Translation",
+	"Rotation",
+	"Scale",
+};
+
 
 struct pbr_environment
 {
 	dx_texture sky;
-	dx_texture prefiltered;
 	dx_texture irradiance;
+	dx_texture prefiltered;
 
-	dx_descriptor_handle skyHandle;
-	dx_descriptor_handle prefilteredHandle;
-	dx_descriptor_handle irradianceHandle;
+	dx_descriptor_handle skySRV;
+	dx_descriptor_handle irradianceSRV;
+	dx_descriptor_handle prefilteredSRV;
 };
 
 
@@ -42,6 +58,9 @@ struct dx_renderer
 
 
 	static dx_cbv_srv_uav_descriptor_heap globalDescriptorHeap;
+
+	static dx_texture whiteTexture;
+	static dx_descriptor_handle whiteTextureSRV;
 
 	static dx_render_target hdrRenderTarget;
 	static dx_texture hdrColorTexture;

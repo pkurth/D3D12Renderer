@@ -20,6 +20,7 @@ struct dx_graphics_pipeline_generator
 		desc = {};
 		desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 		desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		desc.RasterizerState.FrontCounterClockwise = true;
 		desc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 		desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		desc.SampleDesc = { 1, 0 };
@@ -119,9 +120,9 @@ struct dx_graphics_pipeline_generator
 		return *this;
 	}
 
-	dx_graphics_pipeline_generator& rasterizeCounterClockwise()
+	dx_graphics_pipeline_generator& rasterizeClockwise()
 	{
-		desc.RasterizerState.FrontCounterClockwise = true;
+		desc.RasterizerState.FrontCounterClockwise = false;
 		return *this;
 	}
 
@@ -155,9 +156,26 @@ struct dx_graphics_pipeline_generator
 		return *this;
 	}
 
-	dx_graphics_pipeline_generator& stencilSettings(bool stencilTest = true)
+	dx_graphics_pipeline_generator& stencilSettings(
+		D3D12_COMPARISON_FUNC func = D3D12_COMPARISON_FUNC_ALWAYS,
+		D3D12_STENCIL_OP onPass = D3D12_STENCIL_OP_KEEP, 
+		D3D12_STENCIL_OP onStencilPassAndDepthFail = D3D12_STENCIL_OP_KEEP, 
+		D3D12_STENCIL_OP onFail = D3D12_STENCIL_OP_KEEP, 
+		uint8 readMask = D3D12_DEFAULT_STENCIL_READ_MASK, uint8 writeMask = D3D12_DEFAULT_STENCIL_WRITE_MASK)
 	{
-		desc.DepthStencilState.StencilEnable = stencilTest;
+		desc.DepthStencilState.StencilEnable = true;
+		desc.DepthStencilState.StencilReadMask = readMask;
+		desc.DepthStencilState.StencilWriteMask = writeMask;
+
+		desc.DepthStencilState.FrontFace.StencilFailOp = onFail;
+		desc.DepthStencilState.FrontFace.StencilDepthFailOp = onStencilPassAndDepthFail;
+		desc.DepthStencilState.FrontFace.StencilPassOp = onPass;
+		desc.DepthStencilState.FrontFace.StencilFunc = func;
+
+		desc.DepthStencilState.BackFace.StencilFailOp = onFail;
+		desc.DepthStencilState.BackFace.StencilDepthFailOp = onStencilPassAndDepthFail;
+		desc.DepthStencilState.BackFace.StencilPassOp = onPass;
+		desc.DepthStencilState.BackFace.StencilFunc = func;
 		return *this;
 	}
 
