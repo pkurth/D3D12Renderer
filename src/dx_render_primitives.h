@@ -9,6 +9,18 @@ struct dx_command_list;
 
 #define UNBOUNDED_DESCRIPTOR_RANGE -1
 
+
+struct dx_dynamic_constant_buffer
+{
+	D3D12_GPU_VIRTUAL_ADDRESS gpuPtr;
+	void* cpuPtr;
+};
+
+struct dx_dynamic_vertex_buffer
+{
+	D3D12_VERTEX_BUFFER_VIEW view;
+};
+
 struct texture_mip_range
 {
 	uint32 first = 0;
@@ -36,6 +48,8 @@ struct dx_descriptor_heap
 
 	uint32 maxNumDescriptors;
 	uint32 descriptorHandleIncrementSize;
+
+	dx_descriptor_handle getOffsetted(dx_descriptor_handle base, uint32 offset);
 };
 
 struct dx_descriptor_range : dx_descriptor_heap
@@ -87,6 +101,10 @@ struct dx_descriptor_range : dx_descriptor_heap
 	dx_descriptor_handle createBufferUAV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange = {});
 	dx_descriptor_handle createBufferUAV(dx_buffer& buffer, uint32 index, buffer_range bufferRange = {});
 	dx_descriptor_handle pushBufferUAV(dx_buffer& buffer, buffer_range bufferRange = {});
+
+	dx_descriptor_handle createBufferUintUAV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange = {});
+	dx_descriptor_handle createBufferUintUAV(dx_buffer& buffer, uint32 index, buffer_range bufferRange = {});
+	dx_descriptor_handle pushBufferUintUAV(dx_buffer& buffer, buffer_range bufferRange = {});
 
 	dx_descriptor_handle createRaytracingAccelerationStructureSRV(dx_buffer& tlas, dx_descriptor_handle handle);
 	dx_descriptor_handle createRaytracingAccelerationStructureSRV(dx_buffer& tlas, uint32 index);

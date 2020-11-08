@@ -248,10 +248,10 @@ vec3 closestPoint_PointAABB(const vec3& q, const aabb_collider& aabb)
 	vec3 result;
 	for (int i = 0; i < 3; i++)
 	{
-		float v = q.e[i];
-		if (v < aabb.minCorner.e[i]) v = aabb.minCorner.e[i];
-		if (v > aabb.maxCorner.e[i]) v = aabb.maxCorner.e[i];
-		result.e[i] = v;
+		float v = q.data[i];
+		if (v < aabb.minCorner.data[i]) v = aabb.minCorner.data[i];
+		if (v > aabb.maxCorner.data[i]) v = aabb.maxCorner.data[i];
+		result.data[i] = v;
 	}
 	return result;
 }

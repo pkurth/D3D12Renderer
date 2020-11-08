@@ -16,6 +16,7 @@ struct camera_cb
 	vec2 invScreenDims;
 };
 
+#ifdef HLSL
 static float3 restoreViewSpacePosition(float4x4 invProj, float2 uv, float depth)
 {
 	uv.y = 1.f - uv.y; // Screen uvs start at the top left, so flip y.
@@ -46,16 +47,20 @@ static float3 restoreWorldDirection(float4x4 invViewProj, float2 uv, float3 came
 	return direction;
 }
 
-static float depthBufferDepthToLinearNormalizedDepthEyeToFarPlane(float depthBufferDepth, float4 projectionParams)
+// This function returns a positive z value! This is a depth!
+static float depthBufferDepthToWorldSpaceDepth(float depthBufferDepth, float4 projectionParams)
 {
-	const float c1 = projectionParams.z;
-	const float c0 = projectionParams.w;
-	return 1.f / (c0 * depthBufferDepth + c1);
-}
-
-static float depthBufferDepthToLinearWorldDepthEyeToFarPlane(float depthBufferDepth, float4 projectionParams)
-{
-	return depthBufferDepthToLinearNormalizedDepthEyeToFarPlane(depthBufferDepth, projectionParams) * projectionParams.y;
+	if (projectionParams.y < 0.f) // Infinite far plane.
+	{
+		depthBufferDepth = clamp(depthBufferDepth, 0.f, 1.f - 1e-7f); // A depth of 1 is at infinity.
+		return -projectionParams.x / (depthBufferDepth - 1.f);
+	}
+	else
+	{
+		const float c1 = projectionParams.z;
+		const float c0 = projectionParams.w;
+		return projectionParams.y / (c0 * depthBufferDepth + c1);
+	}
 }
 
 struct camera_frustum_planes
@@ -120,5 +125,6 @@ static bool cullModelSpaceAABB(camera_frustum_planes planes, float4 min, float4 
 
 	return false;
 }
+#endif
 
 #endif

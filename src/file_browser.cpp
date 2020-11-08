@@ -3,7 +3,6 @@
 #include "threading.h"
 
 #include <filesystem>
-#include <iostream>
 #include <shellapi.h>
 
 namespace fs = std::filesystem;

@@ -4,17 +4,6 @@
 #include "dx_render_primitives.h"
 #include "dx_upload_buffer.h"
 
-struct dx_dynamic_constant_buffer
-{
-	D3D12_GPU_VIRTUAL_ADDRESS gpuPtr;
-	void* cpuPtr;
-};
-
-struct dx_dynamic_vertex_buffer
-{
-	D3D12_VERTEX_BUFFER_VIEW view;
-};
-
 struct dx_command_allocator
 {
 	com<ID3D12CommandAllocator> commandAllocator;
@@ -106,6 +95,9 @@ struct dx_command_list
 	void setGraphicsDescriptorTable(uint32 rootParameterIndex, dx_descriptor_handle handle);
 	void setComputeDescriptorTable(uint32 rootParameterIndex, CD3DX12_GPU_DESCRIPTOR_HANDLE handle);
 	void setComputeDescriptorTable(uint32 rootParameterIndex, dx_descriptor_handle handle);
+
+	void clearUAV(dx_resource resource, CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle, float val = 0.f);
+	void clearUAV(dx_resource resource, CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle, uint32 val = 0);
 
 
 	// Input assembly.

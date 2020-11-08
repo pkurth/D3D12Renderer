@@ -241,6 +241,18 @@ void dx_command_list::setComputeDescriptorTable(uint32 rootParameterIndex, dx_de
 	setComputeDescriptorTable(rootParameterIndex, handle.gpuHandle);
 }
 
+void dx_command_list::clearUAV(dx_resource resource, CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle, float val)
+{
+	float vals[] = { val, val, val, val };
+	commandList->ClearUnorderedAccessViewFloat(gpuHandle, cpuHandle, resource.Get(), vals, 0, 0);
+}
+
+void dx_command_list::clearUAV(dx_resource resource, CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle, uint32 val)
+{
+	uint32 vals[] = { val, val, val, val };
+	commandList->ClearUnorderedAccessViewUint(gpuHandle, cpuHandle, resource.Get(), vals, 0, 0);
+}
+
 void dx_command_list::setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY topology)
 {
 	commandList->IASetPrimitiveTopology(topology);

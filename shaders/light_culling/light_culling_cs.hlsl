@@ -3,20 +3,20 @@
 #include "light_culling.hlsl"
 
 #define BLOCK_SIZE 16
-#define MAX_NUM_LIGHTS_PER_TILE 1024
 
 ConstantBuffer<camera_cb> camera	: register(b0);
 ConstantBuffer<light_culling_cb> cb	: register(b1);
 
 Texture2D<float> depthBuffer                                : register(t0);
 
-StructuredBuffer<light_culling_view_frustum> frusta         : register(t1);
-StructuredBuffer<point_light_bounding_volume> pointLights   : register(t2);
-StructuredBuffer<spot_light_bounding_volume> spotLights     : register(t3);
+StructuredBuffer<point_light_bounding_volume> pointLights   : register(t1);
+StructuredBuffer<spot_light_bounding_volume> spotLights     : register(t2);
 
-RWStructuredBuffer<uint> opaqueLightIndexCounter    : register(u0);
-RWStructuredBuffer<uint> opaqueLightIndexList       : register(u1);
-RWTexture2D<uint2> opaqueLightGrid                  : register(u2);
+StructuredBuffer<light_culling_view_frustum> frusta         : register(t3);
+
+RWStructuredBuffer<uint> opaqueLightIndexCounter            : register(u0);
+RWStructuredBuffer<uint> opaqueLightIndexList               : register(u1);
+RWTexture2D<uint2> opaqueLightGrid                          : register(u2);
 
 groupshared uint groupMinDepth;
 groupshared uint groupMaxDepth;
@@ -107,10 +107,10 @@ void main(cs_input IN)
 
     if (IN.groupIndex == 0) // Avoid contention by other threads in the group.
     {
-        groupMinDepth = 0xffffffff;
+        groupMinDepth = asuint(0.9999999f);
         groupMaxDepth = 0;
         opaqueLightCount = 0;
-        groupFrustum = frusta[IN.groupID.x + (IN.groupID.y * cb.numThreadGroupsX)];
+        groupFrustum = frusta[IN.groupID.y * cb.numThreadGroupsX + IN.groupID.x];
     }
 
     GroupMemoryBarrierWithGroupSync();
@@ -124,13 +124,14 @@ void main(cs_input IN)
     float fMaxDepth = asfloat(groupMaxDepth);
 
     float3 forward = camera.forward.xyz;
+    float3 cameraPos = camera.position.xyz;
 
-    float nearZ = depthBufferDepthToLinearWorldDepthEyeToFarPlane(fMinDepth, camera.projectionParams);
-    float farZ = depthBufferDepthToLinearWorldDepthEyeToFarPlane(fMaxDepth, camera.projectionParams);
+    float nearZ = depthBufferDepthToWorldSpaceDepth(fMinDepth, camera.projectionParams); // Positive.
+    float farZ = depthBufferDepthToWorldSpaceDepth(fMaxDepth, camera.projectionParams); // Positive.
 
-    light_culling_frustum_plane cameraNearPlane = { forward, -camera.projectionParams.x };
-    light_culling_frustum_plane nearPlane = { forward, -nearZ };
-    light_culling_frustum_plane farPlane = { -forward, farZ };
+    light_culling_frustum_plane cameraNearPlane = { forward, dot(forward, cameraPos + camera.projectionParams.x * forward) };
+    light_culling_frustum_plane nearPlane = { forward, dot(forward, cameraPos + nearZ * forward) };
+    light_culling_frustum_plane farPlane = { -forward, -dot(forward, cameraPos + farZ * forward) };
 
 
     uint numPointLights = cb.numPointLights;

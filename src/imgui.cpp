@@ -15,8 +15,6 @@
 #include "dx_command_list.h"
 #include "dx_renderer.h"
 
-#include <iostream>
-
 
 ImGuiContext* initializeImGui(DXGI_FORMAT screenFormat)
 {

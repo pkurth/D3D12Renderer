@@ -26,14 +26,12 @@ static light_culling_frustum_plane getPlane(float3 p0, float3 p1, float3 p2)
 [numthreads(BLOCK_SIZE, BLOCK_SIZE, 1)]
 void main(cs_input IN)
 {
-    float3 cameraPos = camera.position.xyz;
-
     float2 invScreenDims = camera.invScreenDims;
 
-    float2 screenTL = invScreenDims * (IN.dispatchThreadID.xy * cb.tileSize);
-    float2 screenTR = invScreenDims * (float2(IN.dispatchThreadID.x + 1, IN.dispatchThreadID.y) * cb.tileSize);
-    float2 screenBL = invScreenDims * (float2(IN.dispatchThreadID.x, IN.dispatchThreadID.y + 1) * cb.tileSize);
-    float2 screenBR = invScreenDims * (float2(IN.dispatchThreadID.x + 1, IN.dispatchThreadID.y + 1) * cb.tileSize);
+    float2 screenTL = invScreenDims * (IN.dispatchThreadID.xy * LIGHT_CULLING_TILE_SIZE);
+    float2 screenTR = invScreenDims * (float2(IN.dispatchThreadID.x + 1, IN.dispatchThreadID.y) * LIGHT_CULLING_TILE_SIZE);
+    float2 screenBL = invScreenDims * (float2(IN.dispatchThreadID.x, IN.dispatchThreadID.y + 1) * LIGHT_CULLING_TILE_SIZE);
+    float2 screenBR = invScreenDims * (float2(IN.dispatchThreadID.x + 1, IN.dispatchThreadID.y + 1) * LIGHT_CULLING_TILE_SIZE);
 
     // Points on near plane.
     float3 tl = restoreWorldSpacePosition(camera.invVP, screenTL, 0.f);
@@ -41,6 +39,7 @@ void main(cs_input IN)
     float3 bl = restoreWorldSpacePosition(camera.invVP, screenBL, 0.f);
     float3 br = restoreWorldSpacePosition(camera.invVP, screenBR, 0.f);
 
+    float3 cameraPos = camera.position.xyz;
     light_culling_view_frustum frustum;
     frustum.planes[0] = getPlane(cameraPos, bl, tl);
     frustum.planes[1] = getPlane(cameraPos, tr, br);

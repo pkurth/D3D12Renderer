@@ -14,11 +14,17 @@
 #include "outline_rs.hlsl"
 #include "present_rs.hlsl"
 #include "sky_rs.hlsl"
+#include "light_culling.hlsl"
 
-#include <iostream>
+#include "camera.hlsl"
 
 
 dx_cbv_srv_uav_descriptor_heap dx_renderer::globalDescriptorHeap;
+dx_cbv_srv_uav_descriptor_heap dx_renderer::globalDescriptorHeapCPU;
+
+
+
+dx_dynamic_constant_buffer dx_renderer::cameraCBV;
 
 dx_texture dx_renderer::whiteTexture;
 dx_descriptor_handle dx_renderer::whiteTextureSRV;
@@ -27,6 +33,9 @@ dx_render_target dx_renderer::hdrRenderTarget;
 dx_texture dx_renderer::hdrColorTexture;
 dx_descriptor_handle dx_renderer::hdrColorTextureSRV;
 dx_texture dx_renderer::depthBuffer;
+dx_descriptor_handle dx_renderer::depthBufferSRV;
+
+light_culling_buffers dx_renderer::lightCullingBuffers;
 
 uint32 dx_renderer::renderWidth;
 uint32 dx_renderer::renderHeight;
@@ -48,21 +57,30 @@ static dx_pipeline presentPipeline;
 static dx_pipeline modelPipeline;
 static dx_pipeline modelDepthOnlyPipeline;
 static dx_pipeline outlinePipeline;
+static dx_pipeline flatUnlitPipeline;
 
-static dx_mesh skyMesh;
+static dx_pipeline worldSpaceFrustaPipeline;
+static dx_pipeline lightCullingPipeline;
+
 static dx_mesh gizmoMesh;
+static dx_mesh positionOnlyMesh;
 
 static union
 {
 	struct
 	{
+		submesh_info noneGizmoSubmesh;
 		submesh_info translationGizmoSubmesh;
 		submesh_info rotationGizmoSubmesh;
 		submesh_info scaleGizmoSubmesh;
 	};
 
-	submesh_info gizmoSubmeshes[3];
+	submesh_info gizmoSubmeshes[4];
 };
+
+static submesh_info cubeMesh;
+static submesh_info sphereMesh;
+
 
 static quat gizmoRotations[] =
 {
@@ -103,15 +121,15 @@ static pbr_environment environment;
 static tonemap_cb tonemap = defaultTonemapParameters();
 
 
-
 void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 {
 	dx_renderer::windowWidth = windowWidth;
 	dx_renderer::windowHeight = windowHeight;
 
-	recalculateViewport(false);
-
 	globalDescriptorHeap = createDescriptorHeap(2048);
+	globalDescriptorHeapCPU = createDescriptorHeap(2048, false);
+
+	recalculateViewport(false);
 
 	uint8 white[] = { 255, 255, 255, 255 };
 	whiteTexture = createTexture(white, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
@@ -123,7 +141,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	// HDR render target.
 	{
 		depthBuffer = createDepthTexture(renderWidth, renderHeight, DXGI_FORMAT_D24_UNORM_S8_UINT);
-		SET_NAME(depthBuffer.resource, "HDR depth buffer");
+		depthBufferSRV = globalDescriptorHeap.pushDepthTextureSRV(depthBuffer);
 
 		hdrColorTexture = createTexture(0, renderWidth, renderHeight, DXGI_FORMAT_R16G16B16A16_FLOAT, true);
 		hdrColorTextureSRV = globalDescriptorHeap.push2DTextureSRV(hdrColorTexture);
@@ -135,7 +153,6 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	// Frame result.
 	{
 		frameResult = createTexture(0, windowWidth, windowHeight, DXGI_FORMAT_R8G8B8A8_UNORM, true);
-		SET_NAME(frameResult.resource, "Frame result");
 		frameResultSRV = globalDescriptorHeap.push2DTextureSRV(frameResult);
 
 		windowRenderTarget.pushColorAttachment(frameResult);
@@ -180,6 +197,16 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 		outlinePipeline = createReloadablePipeline(desc, { "outline_vs", "outline_ps" }, "outline_vs");
 	}
 
+	// Flat unlit.
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.inputLayout(inputLayout_position)
+			.renderTargets(hdrRenderTarget.renderTargetFormat, hdrRenderTarget.depthStencilFormat)
+			.wireframe();
+
+		flatUnlitPipeline = createReloadablePipeline(desc, { "flat_unlit_vs", "flat_unlit_ps" }, "flat_unlit_vs");
+	}
+
 	// Present.
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
@@ -189,21 +216,29 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 		presentPipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "present_ps" });
 	}
 
+	// Light culling.
+	{
+		worldSpaceFrustaPipeline = createReloadablePipeline("world_space_tiled_frusta_cs");
+		lightCullingPipeline = createReloadablePipeline("light_culling_cs");
+	}
+
 	createAllReloadablePipelines();
 
 
 
 
 
-	camera.position = vec3(0.f, 0.f, 4.f);
-	camera.rotation = quat::identity;
+	camera.position = vec3(0.f, 30.f, 40.f);
+	camera.rotation = quat(vec3(1.f, 0.f, 0.f), deg2rad(-20.f));
 	camera.verticalFOV = deg2rad(70.f);
 	camera.nearPlane = 0.1f;
 
+
 	{
 		cpu_mesh mesh(mesh_creation_flags_with_positions);
-		mesh.pushCube(1.f);
-		skyMesh = mesh.createDXMesh();
+		cubeMesh = mesh.pushCube(1.f);
+		sphereMesh = mesh.pushSphere(10, 10, 1.f);
+		positionOnlyMesh = mesh.createDXMesh();
 	}
 
 	{
@@ -225,7 +260,10 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 		dxContext.executeCommandList(cl);
 	}
 
-	mesh = createCompositeMeshFromFile("assets/meshes/cerberus.fbx", mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+	//mesh = createCompositeMeshFromFile("assets/meshes/cerberus.fbx", mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+	cpu_mesh m(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+	mesh.singleMeshes.push_back({ m.pushQuad(10000.f) });
+	mesh.mesh = m.createDXMesh();
 
 	albedoTex = loadTextureFromFile("assets/textures/cerberus_a.tga");
 	normalTex = loadTextureFromFile("assets/textures/cerberus_n.tga", texture_load_flags_default | texture_load_flags_noncolor);
@@ -260,7 +298,22 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	}
 }
 
-void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
+void dx_renderer::fillCameraConstantBuffer(camera_cb& cb)
+{
+	cb.vp = camera.viewProj;
+	cb.v = camera.view;
+	cb.p = camera.proj;
+	cb.invVP = camera.invViewProj;
+	cb.invV = camera.invView;
+	cb.invP = camera.invProj;
+	cb.position = vec4(camera.position, 1.f);
+	cb.forward = vec4(camera.rotation * vec3(0.f, 0.f, -1.f), 0.f);
+	cb.projectionParams = vec4(camera.nearPlane, camera.farPlane, camera.farPlane / camera.nearPlane, 1.f - camera.farPlane / camera.nearPlane);
+	cb.screenDims = vec2((float)renderWidth, (float)renderHeight);
+	cb.invScreenDims = vec2(1.f / renderWidth, 1.f / renderHeight);
+}
+
+void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight, float dt)
 {
 	if (dx_renderer::windowWidth != windowWidth || dx_renderer::windowHeight != windowHeight)
 	{
@@ -280,6 +333,10 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 	checkForChangedPipelines();
 
 	camera.recalculateMatrices(renderWidth, renderHeight);
+
+	camera_cb cameraCB;
+	fillCameraConstantBuffer(cameraCB);
+	cameraCBV = dxContext.uploadDynamicConstantBuffer(cameraCB);
 }
 
 void dx_renderer::recalculateViewport(bool resizeTextures)
@@ -315,7 +372,71 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		resizeTexture(hdrColorTexture, renderWidth, renderHeight);
 		resizeTexture(depthBuffer, renderWidth, renderHeight);
 		globalDescriptorHeap.create2DTextureSRV(hdrColorTexture, hdrColorTextureSRV);
+		globalDescriptorHeap.createDepthTextureSRV(depthBuffer, depthBufferSRV);
 		hdrRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
+	}
+
+	allocateLightCullingBuffers();
+}
+
+void dx_renderer::allocateLightCullingBuffers()
+{
+	dxContext.retireObject(lightCullingBuffers.tiledFrusta.resource);
+	dxContext.retireObject(lightCullingBuffers.pointLightBoundingVolumes.resource);
+	dxContext.retireObject(lightCullingBuffers.spotLightBoundingVolumes.resource);
+	dxContext.retireObject(lightCullingBuffers.opaqueLightIndexCounter.resource);
+	dxContext.retireObject(lightCullingBuffers.opaqueLightIndexList.resource);
+	dxContext.retireObject(lightCullingBuffers.opaqueLightGrid.resource);
+
+	lightCullingBuffers.numTilesX = bucketize(renderWidth, LIGHT_CULLING_TILE_SIZE);
+	lightCullingBuffers.numTilesY = bucketize(renderHeight, LIGHT_CULLING_TILE_SIZE);
+
+	bool firstAllocation = lightCullingBuffers.opaqueLightGrid.resource == nullptr;
+
+	lightCullingBuffers.opaqueLightGrid = createTexture(0, lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY,
+		DXGI_FORMAT_R32G32_UINT, false, true);
+	lightCullingBuffers.opaqueLightIndexCounter = createBuffer(sizeof(uint32), 1, 0, true);
+	lightCullingBuffers.opaqueLightIndexList = createBuffer(sizeof(uint32), 
+		lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY * MAX_NUM_LIGHTS_PER_TILE, 0, true);
+	lightCullingBuffers.tiledFrusta = createBuffer(sizeof(light_culling_view_frustum), lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY, 0, true);
+
+	lightCullingBuffers.pointLightBoundingVolumes = createUploadBuffer(sizeof(point_light_bounding_volume), MAX_NUM_POINT_LIGHTS_PER_FRAME, 0); // TODO: Don't allocate here.
+	lightCullingBuffers.spotLightBoundingVolumes = createUploadBuffer(sizeof(spot_light_bounding_volume), MAX_NUM_SPOT_LIGHTS_PER_FRAME, 0); // TODO: Don't allocate here.
+
+	if (firstAllocation)
+	{
+		lightCullingBuffers.opaqueLightGridSRV = globalDescriptorHeap.push2DTextureSRV(lightCullingBuffers.opaqueLightGrid);
+		globalDescriptorHeap.pushBufferSRV(lightCullingBuffers.opaqueLightIndexList);
+
+		// SRVs.
+		lightCullingBuffers.resourceHandle = globalDescriptorHeap.pushBufferSRV(lightCullingBuffers.pointLightBoundingVolumes);
+		globalDescriptorHeap.pushBufferSRV(lightCullingBuffers.spotLightBoundingVolumes);
+		globalDescriptorHeap.pushBufferSRV(lightCullingBuffers.tiledFrusta);
+
+		// UAVs.
+		globalDescriptorHeap.pushBufferUAV(lightCullingBuffers.opaqueLightIndexCounter);
+		globalDescriptorHeap.pushBufferUAV(lightCullingBuffers.opaqueLightIndexList);
+		globalDescriptorHeap.push2DTextureUAV(lightCullingBuffers.opaqueLightGrid);
+
+		lightCullingBuffers.opaqueLightIndexCounterUAVGPU = globalDescriptorHeap.pushBufferUintUAV(lightCullingBuffers.opaqueLightIndexCounter);
+		lightCullingBuffers.opaqueLightIndexCounterUAVCPU = globalDescriptorHeapCPU.pushBufferUintUAV(lightCullingBuffers.opaqueLightIndexCounter);
+	}
+	else
+	{
+		globalDescriptorHeap.create2DTextureSRV(lightCullingBuffers.opaqueLightGrid, lightCullingBuffers.opaqueLightGridSRV);
+		globalDescriptorHeap.createBufferSRV(lightCullingBuffers.opaqueLightIndexList, globalDescriptorHeap.getOffsetted(lightCullingBuffers.opaqueLightGridSRV, 1));
+
+		auto base = lightCullingBuffers.resourceHandle;
+		globalDescriptorHeap.createBufferSRV(lightCullingBuffers.pointLightBoundingVolumes, globalDescriptorHeap.getOffsetted(base, 0));
+		globalDescriptorHeap.createBufferSRV(lightCullingBuffers.spotLightBoundingVolumes, globalDescriptorHeap.getOffsetted(base, 1));
+		globalDescriptorHeap.createBufferSRV(lightCullingBuffers.tiledFrusta, globalDescriptorHeap.getOffsetted(base, 2));
+
+		globalDescriptorHeap.createBufferUAV(lightCullingBuffers.opaqueLightIndexCounter, globalDescriptorHeap.getOffsetted(base, 3));
+		globalDescriptorHeap.createBufferUAV(lightCullingBuffers.opaqueLightIndexList, globalDescriptorHeap.getOffsetted(base, 4));
+		globalDescriptorHeap.create2DTextureUAV(lightCullingBuffers.opaqueLightGrid, globalDescriptorHeap.getOffsetted(base, 5));
+
+		globalDescriptorHeap.createBufferUintUAV(lightCullingBuffers.opaqueLightIndexCounter, lightCullingBuffers.opaqueLightIndexCounterUAVGPU);
+		globalDescriptorHeapCPU.createBufferUintUAV(lightCullingBuffers.opaqueLightIndexCounter, lightCullingBuffers.opaqueLightIndexCounterUAVCPU);
 	}
 }
 
@@ -399,51 +520,123 @@ void dx_renderer::dummyRender(float dt)
 	cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
 	cl->setGraphicsDescriptorTable(SKY_RS_TEX, environment.skySRV);
 
-	cl->setVertexBuffer(0, skyMesh.vertexBuffer);
-	cl->setIndexBuffer(skyMesh.indexBuffer);
-	cl->drawIndexed(skyMesh.indexBuffer.elementCount, 1, 0, 0, 0);
+	cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
+	cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
+	cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
 
 
-	// Models.
 
 	auto submesh = mesh.singleMeshes[0].submesh;
 	mat4 m = trsToMat4(meshTransform);
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	cl->setVertexBuffer(0, mesh.mesh.vertexBuffer);
-	cl->setIndexBuffer(mesh.mesh.indexBuffer);
 
-	// Depth-only pass.
+
+	// ----------------------------------------
+	// DEPTH-ONLY PASS
+	// ----------------------------------------
+
+	// Models.
 	cl->setPipelineState(*modelDepthOnlyPipeline.pipeline);
 	cl->setGraphicsRootSignature(*modelDepthOnlyPipeline.rootSignature);
 	cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
+
+	cl->setVertexBuffer(0, mesh.mesh.vertexBuffer);
+	cl->setIndexBuffer(mesh.mesh.indexBuffer);
 	cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 
+	// Gizmos.
+	if (gizmoType != gizmo_type_none)
+	{
+		cl->setVertexBuffer(0, gizmoMesh.vertexBuffer);
+		cl->setIndexBuffer(gizmoMesh.indexBuffer);
 
-	// Light pass.
+		for (uint32 i = 0; i < 3; ++i)
+		{
+			mat4 m = createModelMatrix(meshTransform.position, gizmoRotations[i]);
+			cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
+			cl->drawIndexed(gizmoSubmeshes[gizmoType].numTriangles * 3, 1, gizmoSubmeshes[gizmoType].firstTriangle * 3, gizmoSubmeshes[gizmoType].baseVertex, 0);
+		}
+	}
+
+
+
+	// ----------------------------------------
+	// LIGHT CULLING
+	// ----------------------------------------
+
+#if 1
+	point_light_bounding_volume* pointLightBVs = (point_light_bounding_volume*)mapBuffer(lightCullingBuffers.pointLightBoundingVolumes);
+
+	for (uint32 z = 0, i = 0; z < 8; ++z)
+	{
+		for (uint32 x = 0; x < 8; ++x, ++i)
+		{
+			pointLightBVs[i].position = (vec3((float)x, 0.f, (float)z) - vec3(4.f, 0.f, 4.f)) * 10.f;
+			pointLightBVs[i].radius = 10.f;
+		}
+	}
+
+	unmapBuffer(lightCullingBuffers.pointLightBoundingVolumes);
+
+
+	// Tiled frusta.
+	cl->setPipelineState(*worldSpaceFrustaPipeline.pipeline);
+	cl->setComputeRootSignature(*worldSpaceFrustaPipeline.rootSignature);
+	cl->setComputeDynamicConstantBuffer(WORLD_SPACE_TILED_FRUSTA_RS_CAMERA, cameraCBV);
+	cl->setCompute32BitConstants(WORLD_SPACE_TILED_FRUSTA_RS_CB, frusta_cb{ lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY });
+	cl->setComputeUAV(WORLD_SPACE_TILED_FRUSTA_RS_FRUSTA_UAV, lightCullingBuffers.tiledFrusta);
+	cl->dispatch(bucketize(lightCullingBuffers.numTilesX, 16), bucketize(lightCullingBuffers.numTilesY, 16));
+
+	// Light culling.
+	cl->clearUAV(lightCullingBuffers.opaqueLightIndexCounter.resource, lightCullingBuffers.opaqueLightIndexCounterUAVCPU.cpuHandle, lightCullingBuffers.opaqueLightIndexCounterUAVGPU.gpuHandle, 0.f);
+	cl->setPipelineState(*lightCullingPipeline.pipeline);
+	cl->setComputeRootSignature(*lightCullingPipeline.rootSignature);
+	cl->setComputeDynamicConstantBuffer(LIGHT_CULLING_RS_CAMERA, cameraCBV);
+	cl->setCompute32BitConstants(LIGHT_CULLING_RS_CB, light_culling_cb{ lightCullingBuffers.numTilesX, 64, 0 }); // TODO: Number of lights.
+	cl->setComputeDescriptorTable(LIGHT_CULLING_RS_DEPTH_BUFFER, depthBufferSRV);
+	cl->setComputeDescriptorTable(LIGHT_CULLING_RS_SRV_UAV, lightCullingBuffers.resourceHandle);
+	cl->dispatch(lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY);
+#endif
+
+
+	// ----------------------------------------
+	// LIGHT PASS
+	// ----------------------------------------
+
+
+	// Models.
 	cl->setPipelineState(*modelPipeline.pipeline);
 	cl->setGraphicsRootSignature(*modelPipeline.rootSignature);
 	cl->setGraphicsDescriptorTable(MODEL_RS_PBR_TEXTURES, textureSRV);
 	cl->setGraphicsDescriptorTable(MODEL_RS_ENVIRONMENT_TEXTURES, environment.irradianceSRV);
 	cl->setGraphicsDescriptorTable(MODEL_RS_BRDF, brdfTexSRV);
+	cl->setGraphicsDescriptorTable(MODEL_RS_LIGHTS, lightCullingBuffers.opaqueLightGridSRV);
 	cl->setGraphics32BitConstants(MODEL_RS_MATERIAL, pbr_material_cb{ vec4(1.f, 1.f, 1.f, 1.f), 0.f, 0.f, USE_ALBEDO_TEXTURE | USE_NORMAL_TEXTURE | USE_ROUGHNESS_TEXTURE | USE_METALLIC_TEXTURE });
+
 
 	cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
 
 	cl->setStencilReference(1);
+	cl->setVertexBuffer(0, mesh.mesh.vertexBuffer);
+	cl->setIndexBuffer(mesh.mesh.indexBuffer);
 	cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+	cl->setStencilReference(0);
 
 
 	// Gizmos.
-	cl->setVertexBuffer(0, gizmoMesh.vertexBuffer);
-	cl->setIndexBuffer(gizmoMesh.indexBuffer);
-
-	for (uint32 i = 0; i < 3; ++i)
+	if (gizmoType != gizmo_type_none)
 	{
-		mat4 m = createModelMatrix(meshTransform.position, gizmoRotations[i]);
-		cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
-		cl->setGraphics32BitConstants(MODEL_RS_MATERIAL, pbr_material_cb{ gizmoColors[i], 1.f, 0.f, 0 });
-		cl->drawIndexed(gizmoSubmeshes[gizmoType].numTriangles * 3, 1, gizmoSubmeshes[gizmoType].firstTriangle * 3, gizmoSubmeshes[gizmoType].baseVertex, 0);
+		cl->setVertexBuffer(0, gizmoMesh.vertexBuffer);
+		cl->setIndexBuffer(gizmoMesh.indexBuffer);
+
+		for (uint32 i = 0; i < 3; ++i)
+		{
+			mat4 m = createModelMatrix(meshTransform.position, gizmoRotations[i]);
+			cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
+			cl->setGraphics32BitConstants(MODEL_RS_MATERIAL, pbr_material_cb{ gizmoColors[i], 1.f, 0.f, 0 });
+			cl->drawIndexed(gizmoSubmeshes[gizmoType].numTriangles * 3, 1, gizmoSubmeshes[gizmoType].firstTriangle * 3, gizmoSubmeshes[gizmoType].baseVertex, 0);
+		}
 	}
 
 
@@ -461,6 +654,25 @@ void dx_renderer::dummyRender(float dt)
 		cl->setStencilReference(1);
 		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 	}
+
+
+#if 0
+	// Light volumes.
+	cl->setPipelineState(*flatUnlitPipeline.pipeline);
+	cl->setGraphicsRootSignature(*flatUnlitPipeline.rootSignature);
+	cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
+	cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
+
+	for (uint32 z = 0, i = 0; z < 8; ++z)
+	{
+		for (uint32 x = 0; x < 8; ++x, ++i)
+		{
+			float radius = 10.f;
+			cl->setGraphics32BitConstants(0, camera.viewProj * createModelMatrix((vec3((float)x, 0.f, (float)z) - vec3(4.f, 0.f, 4.f)) * 10.f, quat::identity, vec3(radius, radius, radius)));
+			cl->drawIndexed(sphereMesh.numTriangles * 3, 1, sphereMesh.firstTriangle * 3, sphereMesh.baseVertex, 0);
+		}
+	}
+#endif
 
 
 	// Present.

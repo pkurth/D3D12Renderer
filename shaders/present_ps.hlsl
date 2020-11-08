@@ -77,7 +77,7 @@ static float3 filmicTonemapping(float3 color)
 float4 main(ps_input IN) : SV_TARGET
 {
 	float4 scene = tex.Sample(texSampler, IN.uv);
-
+	
 	scene.rgb = filmicTonemapping(scene.rgb);
 
 	if (present.displayMode == SDR)
@@ -96,6 +96,7 @@ float4 main(ps_input IN) : SV_TARGET
 		scene.rgb = linearToST2084(scene.rgb * hdrScalar);
 	}
 
+	scene.a = 1.f;
 	return scene;
 }
 

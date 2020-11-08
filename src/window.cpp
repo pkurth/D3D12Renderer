@@ -2,7 +2,6 @@
 #include "window.h"
 #include <Windowsx.h>
 
-#include <iostream>
 #include <algorithm>
 
 #include "software_window.h"

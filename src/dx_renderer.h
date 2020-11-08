@@ -3,6 +3,9 @@
 #include "dx_render_primitives.h"
 #include "math.h"
 
+#define MAX_NUM_POINT_LIGHTS_PER_FRAME 4096
+#define MAX_NUM_SPOT_LIGHTS_PER_FRAME 4096
+
 enum aspect_ratio_mode
 {
 	aspect_ratio_free,
@@ -21,6 +24,7 @@ static const char* aspectRatioNames[] =
 
 enum gizmo_type
 {
+	gizmo_type_none,
 	gizmo_type_translation,
 	gizmo_type_rotation,
 	gizmo_type_scale,
@@ -30,11 +34,11 @@ enum gizmo_type
 
 static const char* gizmoTypeNames[] =
 {
+	"None",
 	"Translation",
 	"Rotation",
 	"Scale",
 };
-
 
 struct pbr_environment
 {
@@ -47,17 +51,43 @@ struct pbr_environment
 	dx_descriptor_handle prefilteredSRV;
 };
 
+struct light_culling_buffers
+{
+	dx_buffer tiledFrusta;
+	dx_buffer pointLightBoundingVolumes;
+	dx_buffer spotLightBoundingVolumes;
+
+	dx_buffer opaqueLightIndexCounter;
+	dx_buffer opaqueLightIndexList;
+
+	dx_texture opaqueLightGrid;
+
+	uint32 numTilesX;
+	uint32 numTilesY;
+
+	dx_descriptor_handle resourceHandle;
+	dx_descriptor_handle opaqueLightGridSRV;
+
+	dx_descriptor_handle opaqueLightIndexCounterUAVCPU;
+	dx_descriptor_handle opaqueLightIndexCounterUAVGPU;
+};
+
 
 struct dx_renderer
 {
 	static void initialize(uint32 windowWidth, uint32 windowHeight);
 
-	static void beginFrame(uint32 windowWidth, uint32 windowHeight);
+	static void beginFrame(uint32 windowWidth, uint32 windowHeight, float dt);
 	static void recalculateViewport(bool resizeTextures);
+	static void fillCameraConstantBuffer(struct camera_cb& cb);
+	static void allocateLightCullingBuffers();
 	static void dummyRender(float dt);
 
 
 	static dx_cbv_srv_uav_descriptor_heap globalDescriptorHeap;
+	static dx_cbv_srv_uav_descriptor_heap globalDescriptorHeapCPU;
+
+	static dx_dynamic_constant_buffer cameraCBV;
 
 	static dx_texture whiteTexture;
 	static dx_descriptor_handle whiteTextureSRV;
@@ -66,6 +96,9 @@ struct dx_renderer
 	static dx_texture hdrColorTexture;
 	static dx_descriptor_handle hdrColorTextureSRV;
 	static dx_texture depthBuffer;
+	static dx_descriptor_handle depthBufferSRV;
+
+	static light_culling_buffers lightCullingBuffers;
 
 	static uint32 renderWidth;
 	static uint32 renderHeight;

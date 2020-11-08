@@ -8,7 +8,6 @@
 #include <assimp/postprocess.h>
 
 #include <filesystem>
-#include <iostream>
 
 namespace fs = std::filesystem;
 
@@ -232,6 +231,8 @@ composite_mesh createCompositeMeshFromScene(const aiScene* scene, uint32 flags)
 				<< result.singleMeshes[i].name << " -- " 
 				<< result.singleMeshes[i].submesh.numVertices << " vertices, " 
 				<< result.singleMeshes[i].submesh.numTriangles << " triangles." << std::endl;
+			std::cout << "   " << result.singleMeshes[i].boundingBox.minCorner << std::endl;
+			std::cout << "   " << result.singleMeshes[i].boundingBox.maxCorner << std::endl;
 		}
 	}
 

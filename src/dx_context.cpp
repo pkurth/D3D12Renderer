@@ -286,6 +286,19 @@ uint64 dx_context::executeCommandList(dx_command_list* commandList)
 	return fenceValue;
 }
 
+dx_allocation dx_context::allocateDynamicBuffer(uint32 sizeInBytes, uint32 alignment)
+{
+	dx_allocation allocation = frameUploadBuffer.allocate(sizeInBytes, alignment);
+	return allocation;
+}
+
+dx_dynamic_constant_buffer dx_context::uploadDynamicConstantBuffer(uint32 sizeInBytes, const void* data)
+{
+	dx_allocation allocation = allocateDynamicBuffer(sizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+	memcpy(allocation.cpuPtr, data, sizeInBytes);
+	return { allocation.gpuPtr, allocation.cpuPtr };
+}
+
 void dx_context::retireObject(dx_object obj)
 {
 	if (obj)
@@ -306,6 +319,9 @@ void dx_context::newFrame(uint64 frameID)
 		objectRetirement.retiredObjects[bufferedFrameID][i].Reset();
 	}
 	objectRetirement.numRetiredObjects[bufferedFrameID] = 0;
+
+	frameUploadBuffer.reset();
+	frameUploadBuffer.pagePool = &pagePools[bufferedFrameID];
 
 	pagePools[bufferedFrameID].reset();
 	frameDescriptorAllocator.newFrame(bufferedFrameID);

@@ -222,12 +222,6 @@ dx_texture createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA
 		result.rtvHandles = dxContext.rtvAllocator.pushRenderTargetView(result);
 	}
 
-	if ((textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) != 0 &&
-		(formatSupportsDSV(result) || isDepthFormat(textureDesc.Format)))
-	{
-		result.dsvHandle = dxContext.dsvAllocator.pushDepthStencilView(result);
-	}
-
 	if (subresourceData)
 	{
 		uploadTextureSubresourceData(result, subresourceData, 0, numSubresources);
@@ -270,7 +264,9 @@ dx_texture createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format)
 	optimizedClearValue.Format = format;
 	optimizedClearValue.DepthStencil = { 1.f, 0 };
 
-	D3D12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height,
+	DXGI_FORMAT typelessFormat = getTypelessFormat(format);
+
+	D3D12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Tex2D(typelessFormat, width, height,
 		1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 
 	checkResult(dxContext.device->CreateCommittedResource(
@@ -304,7 +300,7 @@ void resizeTexture(dx_texture& texture, uint32 newWidth, uint32 newHeight, D3D12
 	if (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)
 	{
 		state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-		optimizedClearValue.Format = desc.Format;
+		optimizedClearValue.Format = texture.formatSupport.Format;
 		optimizedClearValue.DepthStencil = { 1.f, 0 };
 		clearValue = &optimizedClearValue;
 	}
@@ -638,6 +634,28 @@ static dx_descriptor_handle createBufferUAV(dx_device device, dx_buffer& buffer,
 	return index;
 }
 
+static dx_descriptor_handle createBufferUintUAV(dx_device device, dx_buffer& buffer, dx_descriptor_handle index, buffer_range bufferRange = {})
+{
+	uint32 firstElementByteOffset = bufferRange.firstElement * buffer.elementSize;
+	assert(firstElementByteOffset % 16 == 0);
+
+	uint32 count = (bufferRange.numElements != -1) ? bufferRange.numElements : (buffer.elementCount - bufferRange.firstElement);
+	uint32 totalSize = count * buffer.elementSize;
+
+	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+	uavDesc.Format = DXGI_FORMAT_R32_UINT;
+	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+	uavDesc.Buffer.CounterOffsetInBytes = 0;
+	uavDesc.Buffer.FirstElement = firstElementByteOffset / 4;
+	uavDesc.Buffer.NumElements = totalSize / 4;
+	uavDesc.Buffer.StructureByteStride = 0;
+	uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+
+	device->CreateUnorderedAccessView(buffer.resource.Get(), 0, &uavDesc, index.cpuHandle);
+
+	return index;
+}
+
 static dx_descriptor_handle createRaytracingAccelerationStructureSRV(dx_device device, dx_buffer& tlas, dx_descriptor_handle index)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -820,6 +838,21 @@ dx_descriptor_handle dx_descriptor_range::pushBufferUAV(dx_buffer& buffer, buffe
 	return createBufferUAV(buffer, pushIndex++, bufferRange);
 }
 
+dx_descriptor_handle dx_descriptor_range::createBufferUintUAV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange)
+{
+	return ::createBufferUintUAV(getDevice(descriptorHeap), buffer, handle, bufferRange);
+}
+
+dx_descriptor_handle dx_descriptor_range::createBufferUintUAV(dx_buffer& buffer, uint32 index, buffer_range bufferRange)
+{
+	return ::createBufferUintUAV(getDevice(descriptorHeap), buffer, getHandle(*this, index), bufferRange);
+}
+
+dx_descriptor_handle dx_descriptor_range::pushBufferUintUAV(dx_buffer& buffer, buffer_range bufferRange)
+{
+	return createBufferUintUAV(buffer, pushIndex++, bufferRange);
+}
+
 dx_descriptor_handle dx_descriptor_range::createRaytracingAccelerationStructureSRV(dx_buffer& tlas, dx_descriptor_handle handle)
 {
 	return ::createRaytracingAccelerationStructureSRV(getDevice(descriptorHeap), tlas, handle);
@@ -889,27 +922,14 @@ dx_descriptor_handle dx_dsv_descriptor_heap::pushDepthStencilView(dx_texture& te
 
 dx_descriptor_handle dx_dsv_descriptor_heap::createDepthStencilView(dx_texture& texture, dx_descriptor_handle index)
 {
-	D3D12_RESOURCE_DESC resourceDesc = texture.resource->GetDesc();
-	DXGI_FORMAT format = resourceDesc.Format;
-	if (isDepthFormat(format))
-	{
-		resourceDesc.Format = getTypelessFormat(format);
-	}
+	DXGI_FORMAT format = texture.formatSupport.Format; // This contains the original format, not the typeless.
 
-	assert(resourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D);
-	assert(resourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
-
-	if (isDepthFormat(format))
-	{
-		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-		dsvDesc.Format = format;
-		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-		getDevice(descriptorHeap)->CreateDepthStencilView(texture.resource.Get(), &dsvDesc, index.cpuHandle);
-	}
-	else
-	{
-		getDevice(descriptorHeap)->CreateDepthStencilView(texture.resource.Get(), 0, index.cpuHandle);
-	}
+	assert(isDepthFormat(format));
+	
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+	dsvDesc.Format = format;
+	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+	getDevice(descriptorHeap)->CreateDepthStencilView(texture.resource.Get(), &dsvDesc, index.cpuHandle);
 
 	return index;
 }
@@ -1111,4 +1131,12 @@ void barrier_batcher::submit()
 		cl->barriers(barriers, numBarriers);
 		numBarriers = 0;
 	}
+}
+
+dx_descriptor_handle dx_descriptor_heap::getOffsetted(dx_descriptor_handle base, uint32 offset)
+{
+	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(base.gpuHandle, offset, descriptorHandleIncrementSize);
+	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(base.cpuHandle, offset, descriptorHandleIncrementSize);
+
+	return { cpuHandle, gpuHandle };
 }

@@ -31,3 +31,4 @@ typedef wchar_t wchar;
 
 #include <string>
 #include <vector>
+#include <iostream>

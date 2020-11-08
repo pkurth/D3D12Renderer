@@ -42,7 +42,8 @@ struct pbr_material_cb
     "addressW = TEXTURE_ADDRESS_CLAMP," \
     "filter = FILTER_MIN_MAG_MIP_LINEAR," \
     "visibility=SHADER_VISIBILITY_PIXEL)," \
-"DescriptorTable(SRV(t0, space=2, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL)"
+"DescriptorTable(SRV(t0, space=2, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL), " \
+"DescriptorTable(SRV(t0, space=3, numDescriptors=4), visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define MODEL_DEPTH_ONLY_RS \
 "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
@@ -57,6 +58,7 @@ struct pbr_material_cb
 #define MODEL_RS_PBR_TEXTURES           2
 #define MODEL_RS_ENVIRONMENT_TEXTURES   3
 #define MODEL_RS_BRDF                   4
+#define MODEL_RS_LIGHTS                 5
 
 #endif
 

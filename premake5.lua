@@ -46,7 +46,8 @@ project "D3D12ProjectionMapping"
 	}
 
 	includedirs {
-		"shaders/rs"
+		"shaders/rs",
+		"shaders/common",
 	}
 
 	files {
@@ -104,6 +105,7 @@ project "D3D12ProjectionMapping"
 			"shaders/common"
 		}
 		shaderdefines {
+			"HLSL",
 			"mat4=float4x4",
 			"vec2=float2",
 			"vec3=float3",

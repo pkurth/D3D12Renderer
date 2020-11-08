@@ -30,6 +30,14 @@ struct dx_context
 	dx_command_list* getFreeRenderCommandList();
 	uint64 executeCommandList(dx_command_list* commandList);
 
+	// Careful with these functions. They are not thread safe.
+	dx_allocation allocateDynamicBuffer(uint32 sizeInBytes, uint32 alignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+	dx_dynamic_constant_buffer uploadDynamicConstantBuffer(uint32 sizeInBytes, const void* data);
+	template <typename T> dx_dynamic_constant_buffer uploadDynamicConstantBuffer(const T& data)
+	{
+		return uploadDynamicConstantBuffer(sizeof(T), &data);
+	}
+
 
 
 	dx_factory factory;
@@ -55,6 +63,7 @@ struct dx_context
 	dx_dsv_descriptor_heap dsvAllocator;
 
 	dx_page_pool pagePools[NUM_BUFFERED_FRAMES];
+	dx_upload_buffer frameUploadBuffer;
 	dx_frame_descriptor_allocator frameDescriptorAllocator;
 
 	volatile bool running = true;

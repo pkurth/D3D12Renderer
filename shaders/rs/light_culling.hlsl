@@ -1,6 +1,8 @@
 #ifndef LIGHT_CULLING_H
 #define LIGHT_CULLING_H
 
+#define LIGHT_CULLING_TILE_SIZE 16
+
 struct light_culling_frustum_plane
 {
     vec3 N;
@@ -16,7 +18,6 @@ struct frusta_cb
 {
     uint32 numThreadsX;
     uint32 numThreadsY;
-    uint32 tileSize;
 };
 
 struct light_culling_cb
@@ -43,7 +44,7 @@ struct spot_light_bounding_volume
 #define WORLD_SPACE_TILED_FRUSTA_RS \
     "RootFlags(0), " \
     "CBV(b0), " \
-    "RootConstants(b1, num32BitConstants = 3), " \
+    "RootConstants(b1, num32BitConstants = 2), " \
     "UAV(u0)"
 
 
@@ -54,7 +55,7 @@ struct spot_light_bounding_volume
     "DescriptorTable( SRV(t0, numDescriptors = 1, flags = DESCRIPTORS_VOLATILE) )," \
     "DescriptorTable( SRV(t1, numDescriptors = 3, flags = DESCRIPTORS_VOLATILE), UAV(u0, numDescriptors = 3, flags = DESCRIPTORS_VOLATILE) )"
 
-
+#define MAX_NUM_LIGHTS_PER_TILE 1024
 
 #define WORLD_SPACE_TILED_FRUSTA_RS_CAMERA      0
 #define WORLD_SPACE_TILED_FRUSTA_RS_CB          1

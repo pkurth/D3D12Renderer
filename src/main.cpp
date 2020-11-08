@@ -261,7 +261,7 @@ int main(int argc, char** argv)
 
 		drawHelperWindows();
 
-		dx_renderer::beginFrame(renderWidth, renderHeight);
+		dx_renderer::beginFrame(renderWidth, renderHeight, dt);
 		dx_renderer::dummyRender(dt);
 
 		if (!drawMainMenuBar())
