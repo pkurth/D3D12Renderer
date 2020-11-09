@@ -43,7 +43,8 @@ struct spot_light
 
 struct point_light
 {
-	float4 worldSpacePositionAndRadius;
+	float3 position;
+	float radius;
 	float4 color;
 };
 

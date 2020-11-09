@@ -162,9 +162,9 @@ void dx_context::quit()
 
 dx_command_list* dx_context::allocateCommandList(D3D12_COMMAND_LIST_TYPE type)
 {
-	lock(allocationMutex);
+	allocationMutex.lock();
 	dx_command_list* result = (dx_command_list*)arena.allocate(sizeof(dx_command_list), true);
-	unlock(allocationMutex);
+	allocationMutex.unlock();
 
 	result->type = type;
 
@@ -178,9 +178,9 @@ dx_command_list* dx_context::allocateCommandList(D3D12_COMMAND_LIST_TYPE type)
 
 dx_command_allocator* dx_context::allocateCommandAllocator(D3D12_COMMAND_LIST_TYPE type)
 {
-	lock(allocationMutex);
+	allocationMutex.lock();
 	dx_command_allocator* result = (dx_command_allocator*)arena.allocate(sizeof(dx_command_allocator), true);
-	unlock(allocationMutex);
+	allocationMutex.unlock();
 
 	checkResult(device->CreateCommandAllocator(type, IID_PPV_ARGS(&result->commandAllocator)));
 
@@ -196,13 +196,13 @@ dx_command_queue& dx_context::getQueue(D3D12_COMMAND_LIST_TYPE type)
 
 dx_command_list* dx_context::getFreeCommandList(dx_command_queue& queue)
 {
-	lock(queue.commandListMutex);
+	queue.commandListMutex.lock();
 	dx_command_list* result = queue.freeCommandLists;
 	if (result)
 	{
 		queue.freeCommandLists = result->next;
 	}
-	unlock(queue.commandListMutex);
+	queue.commandListMutex.unlock();
 
 	if (!result)
 	{
@@ -237,13 +237,13 @@ dx_command_list* dx_context::getFreeRenderCommandList()
 
 dx_command_allocator* dx_context::getFreeCommandAllocator(dx_command_queue& queue)
 {
-	lock(queue.commandListMutex);
+	queue.commandListMutex.lock();
 	dx_command_allocator* result = queue.freeCommandAllocators;
 	if (result)
 	{
 		queue.freeCommandAllocators = result->next;
 	}
-	unlock(queue.commandListMutex);
+	queue.commandListMutex.unlock();
 
 	if (!result)
 	{
@@ -272,7 +272,7 @@ uint64 dx_context::executeCommandList(dx_command_list* commandList)
 	dx_command_allocator* allocator = commandList->commandAllocator;
 	allocator->lastExecutionFenceValue = fenceValue;
 
-	lock(queue.commandListMutex);
+	queue.commandListMutex.lock();
 
 	allocator->next = queue.runningCommandAllocators;
 	queue.runningCommandAllocators = allocator;
@@ -281,7 +281,7 @@ uint64 dx_context::executeCommandList(dx_command_list* commandList)
 	commandList->next = queue.freeCommandLists;
 	queue.freeCommandLists = commandList;
 
-	unlock(queue.commandListMutex);
+	queue.commandListMutex.unlock();
 
 	return fenceValue;
 }

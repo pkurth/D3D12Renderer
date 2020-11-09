@@ -127,7 +127,6 @@ static float3 calculateAmbientLighting(float3 albedo, float3 irradiance,
 
 	float3 ambient = (kD * diffuse + specular) * ao;
 
-	//return diffuse;
 	return ambient;
 }
 

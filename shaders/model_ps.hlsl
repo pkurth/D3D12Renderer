@@ -1,5 +1,6 @@
 #include "model_rs.hlsl"
 #include "brdf.hlsl"
+#include "camera.hlsl"
 #include "light_culling.hlsl"
 
 struct ps_input
@@ -10,7 +11,8 @@ struct ps_input
 	float4 screenPosition	: SV_POSITION;
 };
 
-ConstantBuffer<pbr_material_cb> material : register(b1);
+ConstantBuffer<pbr_material_cb> material	: register(b1);
+ConstantBuffer<camera_cb> camera			: register(b2);
 
 
 SamplerState wrapSampler				: register(s0);
@@ -36,7 +38,6 @@ StructuredBuffer<spot_light_bounding_volume> spotLights     : register(t3, space
 // TODO
 static const float3 L = normalize(float3(1.f, 0.8f, 0.3f));
 static const float3 sunColor = float3(1.f, 1.f, 1.f) * 50.f;
-static const float3 cameraPosition = float3(0.f, 0.f, 4.f);
 
 [RootSignature(MODEL_RS)]
 float4 main(ps_input IN) : SV_TARGET
@@ -71,8 +72,8 @@ float4 main(ps_input IN) : SV_TARGET
 	const uint lightCount = lightIndexData.y;
 
 
-	
-	float3 camToP = IN.worldPosition - cameraPosition.xyz;
+	float3 cameraPosition = camera.position.xyz;
+	float3 camToP = IN.worldPosition - cameraPosition;
 	float3 V = -normalize(camToP);
 	float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo.xyz, metallic);
 
@@ -84,17 +85,18 @@ float4 main(ps_input IN) : SV_TARGET
 		point_light_bounding_volume pl = pointLights[index];
 		if (length(pl.position - IN.worldPosition) < pl.radius)
 		{
-			totalLighting.xyz += float3(0.4f, 0.f, 0.f);
+			float3 radiance = float3(50.f, 0.f, 0.f);
+			totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
 		}
 	}
 
-	//totalLighting.xyz += calculateAmbientLighting(albedo.xyz, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao);
+	totalLighting.xyz += calculateAmbientLighting(albedo.xyz, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao);
 
 	//float3 L = -sun.worldSpaceDirection.xyz;
 	float visibility = 1.f;
 	float3 radiance = sunColor.xyz * visibility; // No attenuation for sun.
 
-	//totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
+	totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
 
 	return totalLighting;
 }

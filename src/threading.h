@@ -28,6 +28,16 @@ static uint64 atomicDecrement(volatile uint64& a)
 struct thread_mutex
 {
 	HANDLE handle;
+
+	bool lock()
+	{
+		return WaitForSingleObject(handle, INFINITE) == WAIT_OBJECT_0;
+	}
+
+	bool unlock()
+	{
+		return ReleaseMutex(handle);
+	}
 };
 
 static thread_mutex createMutex()
@@ -36,12 +46,3 @@ static thread_mutex createMutex()
 	return result;
 }
 
-static bool lock(thread_mutex& mutex)
-{
-	return WaitForSingleObject(mutex.handle, INFINITE) == WAIT_OBJECT_0;
-}
-
-static bool unlock(thread_mutex& mutex)
-{
-	return ReleaseMutex(mutex.handle);
-}

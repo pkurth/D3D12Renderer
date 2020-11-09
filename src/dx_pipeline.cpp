@@ -285,7 +285,7 @@ void createAllReloadablePipelines()
 
 void checkForChangedPipelines()
 {
-	lock(mutex);
+	mutex.lock();
 	concurrency::parallel_for(0, (int)dirtyRootSignatures.size(), [&](int i)
 	{
 		loadRootSignature(*dirtyRootSignatures[i]);
@@ -297,7 +297,7 @@ void checkForChangedPipelines()
 	});
 	dirtyRootSignatures.clear();
 	dirtyPipelines.clear();
-	unlock(mutex);
+	mutex.unlock();
 }
 
 static bool fileIsLocked(const wchar* filename)
@@ -404,14 +404,14 @@ static DWORD checkForFileChanges(void*)
 						dx_blob blob;
 						checkResult(D3DReadFileToBlob(changedPath.wstring().c_str(), &blob));
 
-						lock(mutex);
+						mutex.lock();
 						it->second.blob = blob;
 						dirtyPipelines.insert(dirtyPipelines.end(), it->second.usedByPipelines.begin(), it->second.usedByPipelines.end());
 						if (it->second.rootSignature)
 						{
 							dirtyRootSignatures.push_back(it->second.rootSignature);
 						}
-						unlock(mutex);
+						mutex.unlock();
 					}
 
 					lastChangedPath = changedPath;

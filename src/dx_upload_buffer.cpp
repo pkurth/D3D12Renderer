@@ -4,9 +4,9 @@
 
 dx_page* dx_page_pool::allocateNewPage()
 {
-	lock(mutex);
+	mutex.lock();
 	dx_page* result = (dx_page*)arena.allocate(sizeof(dx_page), true);
-	unlock(mutex);
+	mutex.unlock();
 
 	checkResult(device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
@@ -26,13 +26,13 @@ dx_page* dx_page_pool::allocateNewPage()
 
 dx_page* dx_page_pool::getFreePage()
 {
-	lock(mutex);
+	mutex.lock();
 	dx_page* result = freePages;
 	if (result)
 	{
 		freePages = result->next;
 	}
-	unlock(mutex);
+	mutex.unlock();
 
 	if (!result)
 	{
@@ -46,14 +46,14 @@ dx_page* dx_page_pool::getFreePage()
 
 void dx_page_pool::returnPage(dx_page* page)
 {
-	lock(mutex);
+	mutex.lock();
 	page->next = usedPages;
 	usedPages = page;
 	if (!lastUsedPage)
 	{
 		lastUsedPage = page;
 	}
-	unlock(mutex);
+	mutex.unlock();
 }
 
 void dx_page_pool::reset()

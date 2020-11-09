@@ -188,10 +188,10 @@ static DWORD checkForFileChanges(void*)
 
 					if (!isFile)
 					{
-						lock(fileSystemMutex);
+						fileSystemMutex.lock();
 						entryToReload.children.clear();
 						recurseFileSystem(entryToReload);
-						unlock(fileSystemMutex);
+						fileSystemMutex.unlock();
 					}
 					else
 					{
@@ -286,9 +286,9 @@ void drawFileBrowser()
 	
 	if (ImGui::Begin("Directories"))
 	{
-		lock(fileSystemMutex);
+		fileSystemMutex.lock();
 		printCachedFileEntries(rootFileEntry);
-		unlock(fileSystemMutex);
+		fileSystemMutex.unlock();
 	}
 	ImGui::End();
 
@@ -314,7 +314,7 @@ void drawFileBrowser()
 	}
 	ImGui::Separator();
 
-	lock(fileSystemMutex);
+	fileSystemMutex.lock();
 	fs::path relativeToAsset = fs::relative(directoryToShow, assetPath);
 	file_system_entry& entryToShow = (relativeToAsset.string() == ".") ? rootFileEntry : findFileSystemEntry(rootFileEntry, relativeToAsset.begin(), relativeToAsset.end());
 
@@ -371,7 +371,7 @@ void drawFileBrowser()
 
 	ImGui::Columns(1);
 
-	unlock(fileSystemMutex);
+	fileSystemMutex.unlock();
 
 	ImGui::End();
 }

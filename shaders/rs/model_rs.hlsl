@@ -28,6 +28,7 @@ struct pbr_material_cb
 "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
 "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX),"  \
 "RootConstants(num32BitConstants=8, b1, visibility=SHADER_VISIBILITY_PIXEL),"  \
+"CBV(b2), " \
 "StaticSampler(s0," \
     "addressU = TEXTURE_ADDRESS_WRAP," \
     "addressV = TEXTURE_ADDRESS_WRAP," \
@@ -55,10 +56,11 @@ struct pbr_material_cb
 
 #define MODEL_RS_MVP	                0
 #define MODEL_RS_MATERIAL               1
-#define MODEL_RS_PBR_TEXTURES           2
-#define MODEL_RS_ENVIRONMENT_TEXTURES   3
-#define MODEL_RS_BRDF                   4
-#define MODEL_RS_LIGHTS                 5
+#define MODEL_RS_CAMERA                 2
+#define MODEL_RS_PBR_TEXTURES           3
+#define MODEL_RS_ENVIRONMENT_TEXTURES   4
+#define MODEL_RS_BRDF                   5
+#define MODEL_RS_LIGHTS                 6
 
 #endif
 

@@ -78,24 +78,24 @@ static DWORD processRunningCommandAllocators(void* data)
 	{
 		while (true)
 		{
-			lock(queue.commandListMutex);
+			queue.commandListMutex.lock();
 			dx_command_allocator* allocator = queue.runningCommandAllocators;
 			if (allocator)
 			{
 				queue.runningCommandAllocators = allocator->next;
 			}
-			unlock(queue.commandListMutex);
+			queue.commandListMutex.unlock();
 
 			if (allocator)
 			{
 				queue.waitForFence(allocator->lastExecutionFenceValue);
 				allocator->commandAllocator->Reset();
 
-				lock(queue.commandListMutex);
+				queue.commandListMutex.lock();
 				allocator->next = queue.freeCommandAllocators;
 				queue.freeCommandAllocators = allocator;
 				atomicDecrement(queue.numRunningCommandAllocators);
-				unlock(queue.commandListMutex);
+				queue.commandListMutex.unlock();
 			}
 			else
 			{

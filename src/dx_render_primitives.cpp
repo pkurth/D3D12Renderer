@@ -945,7 +945,7 @@ dx_frame_descriptor_allocator createFrameDescriptorAllocator()
 
 void dx_frame_descriptor_allocator::newFrame(uint32 bufferedFrameID)
 {
-	lock(mutex);
+	mutex.lock();
 
 	currentFrame = bufferedFrameID;
 
@@ -957,12 +957,12 @@ void dx_frame_descriptor_allocator::newFrame(uint32 bufferedFrameID)
 		freePages = page;
 	}
 
-	unlock(mutex);
+	mutex.unlock();
 }
 
 dx_descriptor_range dx_frame_descriptor_allocator::allocateContiguousDescriptorRange(uint32 count)
 {
-	lock(mutex);
+	mutex.lock();
 
 	dx_descriptor_page* current = usedPages[currentFrame];
 	if (!current || (current->maxNumDescriptors - current->usedDescriptors < count))
@@ -994,7 +994,7 @@ dx_descriptor_range dx_frame_descriptor_allocator::allocateContiguousDescriptorR
 	uint32 index = current->usedDescriptors;
 	current->usedDescriptors += count;
 
-	unlock(mutex);
+	mutex.unlock();
 
 	dx_descriptor_range result;
 

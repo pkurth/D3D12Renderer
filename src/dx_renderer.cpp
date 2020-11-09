@@ -228,7 +228,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 
 
 
-	camera.position = vec3(0.f, 30.f, 40.f);
+	camera.position = vec3(0.f, 3.f, 4.f);
 	camera.rotation = quat(vec3(1.f, 0.f, 0.f), deg2rad(-20.f));
 	camera.verticalFOV = deg2rad(70.f);
 	camera.nearPlane = 0.1f;
@@ -260,10 +260,10 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 		dxContext.executeCommandList(cl);
 	}
 
-	//mesh = createCompositeMeshFromFile("assets/meshes/cerberus.fbx", mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
-	cpu_mesh m(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
-	mesh.singleMeshes.push_back({ m.pushQuad(10000.f) });
-	mesh.mesh = m.createDXMesh();
+	mesh = createCompositeMeshFromFile("assets/meshes/cerberus.fbx", mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+	//cpu_mesh m(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+	//mesh.singleMeshes.push_back({ m.pushQuad(10000.f) });
+	//mesh.mesh = m.createDXMesh();
 
 	albedoTex = loadTextureFromFile("assets/textures/cerberus_a.tga");
 	normalTex = loadTextureFromFile("assets/textures/cerberus_n.tga", texture_load_flags_default | texture_load_flags_noncolor);
@@ -612,6 +612,7 @@ void dx_renderer::dummyRender(float dt)
 	cl->setGraphicsDescriptorTable(MODEL_RS_ENVIRONMENT_TEXTURES, environment.irradianceSRV);
 	cl->setGraphicsDescriptorTable(MODEL_RS_BRDF, brdfTexSRV);
 	cl->setGraphicsDescriptorTable(MODEL_RS_LIGHTS, lightCullingBuffers.opaqueLightGridSRV);
+	cl->setGraphicsDynamicConstantBuffer(MODEL_RS_CAMERA, cameraCBV);
 	cl->setGraphics32BitConstants(MODEL_RS_MATERIAL, pbr_material_cb{ vec4(1.f, 1.f, 1.f, 1.f), 0.f, 0.f, USE_ALBEDO_TEXTURE | USE_NORMAL_TEXTURE | USE_ROUGHNESS_TEXTURE | USE_METALLIC_TEXTURE });
 
 
