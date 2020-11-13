@@ -2,6 +2,7 @@
 #include "brdf.hlsl"
 #include "camera.hlsl"
 #include "light_culling.hlsl"
+#include "light_source.hlsl"
 
 struct ps_input
 {
@@ -29,15 +30,15 @@ TextureCube<float4> environmentTexture	: register(t1, space1);
 
 Texture2D<float4> brdf					: register(t0, space2);
 
-Texture2D<uint2> lightGrid									: register(t0, space3);
-StructuredBuffer<uint> lightIndexList						: register(t1, space3);
-StructuredBuffer<point_light_bounding_volume> pointLights   : register(t2, space3);
-StructuredBuffer<spot_light_bounding_volume> spotLights     : register(t3, space3);
+Texture2D<uint2> lightGrid						: register(t0, space3);
+StructuredBuffer<uint> lightIndexList			: register(t1, space3);
+StructuredBuffer<point_light_cb> pointLights	: register(t2, space3);
+StructuredBuffer<spot_light_cb> spotLights		: register(t3, space3);
 
 
 // TODO
 static const float3 L = normalize(float3(1.f, 0.8f, 0.3f));
-static const float3 sunColor = float3(1.f, 1.f, 1.f) * 50.f;
+static const float3 sunColor = float3(1.f, 1.f, 1.f) * LIGHT_IRRADIANCE_SCALE;
 
 [RootSignature(MODEL_RS)]
 float4 main(ps_input IN) : SV_TARGET
@@ -82,10 +83,12 @@ float4 main(ps_input IN) : SV_TARGET
 	for (uint lightIndex = lightOffset; lightIndex < lightOffset + lightCount; ++lightIndex)
 	{
 		uint index = lightIndexList[lightIndex];
-		point_light_bounding_volume pl = pointLights[index];
-		if (length(pl.position - IN.worldPosition) < pl.radius)
+		point_light_cb pl = pointLights[index];
+		float distanceToLight = length(pl.position - IN.worldPosition);
+		if (distanceToLight < pl.radius)
 		{
-			float3 radiance = float3(50.f, 0.f, 0.f);
+			//float3 radiance = float3(500.f, 0.f, 0.f);
+			float3 radiance = pl.radiance * getAttenuation(distanceToLight, pl.radius) * LIGHT_IRRADIANCE_SCALE;
 			totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
 		}
 	}

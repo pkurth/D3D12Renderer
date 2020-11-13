@@ -29,6 +29,9 @@ typedef wchar_t wchar;
 #define max(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
+#define setBit(mask, bit) mask |= (1 << (bit))
+#define unsetBit(mask, bit) mask ^= (1 << (bit))
+
 #include <string>
 #include <vector>
 #include <iostream>

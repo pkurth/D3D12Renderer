@@ -2,6 +2,7 @@
 #include "dx_render_primitives.h"
 #include "dx_command_list.h"
 #include "dx_context.h"
+#include "dx_descriptor_allocation.h"
 
 void* mapBuffer(dx_buffer& buffer)
 {
@@ -77,7 +78,7 @@ void updateBufferDataRange(dx_buffer& buffer, const void* data, uint32 offset, u
 	dxContext.executeCommandList(commandList);
 }
 
-static void initializeBuffer(dx_buffer& buffer, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess,
+static void initializeBuffer(dx_buffer& buffer, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing,
 	D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON, D3D12_HEAP_TYPE heapType = D3D12_HEAP_TYPE_DEFAULT)
 {
 	D3D12_RESOURCE_FLAGS flags = allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
@@ -85,6 +86,7 @@ static void initializeBuffer(dx_buffer& buffer, uint32 elementSize, uint32 eleme
 	buffer.elementSize = elementSize;
 	buffer.elementCount = elementCount;
 	buffer.totalSize = elementSize * elementCount;
+	buffer.heapType = heapType;
 
 	checkResult(dxContext.device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(heapType),
@@ -108,36 +110,48 @@ static void initializeBuffer(dx_buffer& buffer, uint32 elementSize, uint32 eleme
 			unmapBuffer(buffer);
 		}
 	}
+
+	buffer.defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createBufferSRV(buffer);
+	if (allowUnorderedAccess)
+	{
+		buffer.defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createBufferUAV(buffer);
+	}
+	if (allowClearing)
+	{
+		buffer.cpuClearUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createBufferUintUAV(buffer);
+		dx_cpu_descriptor_handle shaderVisibleCPUHandle = dxContext.descriptorAllocatorGPU.getFreeHandle().createBufferUintUAV(buffer);
+		buffer.gpuClearUAV = dxContext.descriptorAllocatorGPU.getMatchingGPUHandle(shaderVisibleCPUHandle);
+	}
 }
 
-dx_buffer createBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, D3D12_RESOURCE_STATES initialState)
+dx_buffer createBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing, D3D12_RESOURCE_STATES initialState)
 {
-	dx_buffer result;
-	initializeBuffer(result, elementSize, elementCount, data, allowUnorderedAccess, initialState, D3D12_HEAP_TYPE_DEFAULT);
+	dx_buffer result = {};
+	initializeBuffer(result, elementSize, elementCount, data, allowUnorderedAccess, allowClearing, initialState, D3D12_HEAP_TYPE_DEFAULT);
 	return result;
 }
 
-dx_buffer createUploadBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess)
+dx_buffer createUploadBuffer(uint32 elementSize, uint32 elementCount, void* data)
 {
-	dx_buffer result;
-	initializeBuffer(result, elementSize, elementCount, data, allowUnorderedAccess, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_HEAP_TYPE_UPLOAD);
+	dx_buffer result = {};
+	initializeBuffer(result, elementSize, elementCount, data, false, false, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_HEAP_TYPE_UPLOAD);
 	return result;
 }
 
-dx_vertex_buffer createVertexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess)
+dx_vertex_buffer createVertexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing)
 {
-	dx_vertex_buffer result;
-	initializeBuffer(result, elementSize, elementCount, data, allowUnorderedAccess);
+	dx_vertex_buffer result = {};
+	initializeBuffer(result, elementSize, elementCount, data, allowUnorderedAccess, allowClearing);
 	result.view.BufferLocation = result.gpuVirtualAddress;
 	result.view.SizeInBytes = result.totalSize;
 	result.view.StrideInBytes = elementSize;
 	return result;
 }
 
-dx_vertex_buffer createUploadVertexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess)
+dx_vertex_buffer createUploadVertexBuffer(uint32 elementSize, uint32 elementCount, void* data)
 {
-	dx_vertex_buffer result;
-	initializeBuffer(result, elementSize, elementCount, data, allowUnorderedAccess, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_HEAP_TYPE_UPLOAD);
+	dx_vertex_buffer result = {};
+	initializeBuffer(result, elementSize, elementCount, data, false, false, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_HEAP_TYPE_UPLOAD);
 	result.view.BufferLocation = result.gpuVirtualAddress;
 	result.view.SizeInBytes = result.totalSize;
 	result.view.StrideInBytes = elementSize;
@@ -162,14 +176,55 @@ DXGI_FORMAT getIndexBufferFormat(uint32 elementSize)
 	return result;
 }
 
-dx_index_buffer createIndexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess)
+dx_index_buffer createIndexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing)
 {
-	dx_index_buffer result;
-	initializeBuffer(result, elementSize, elementCount, data, allowUnorderedAccess);
+	dx_index_buffer result = {};
+	initializeBuffer(result, elementSize, elementCount, data, allowUnorderedAccess, allowClearing);
 	result.view.BufferLocation = result.gpuVirtualAddress;
 	result.view.SizeInBytes = result.totalSize;
 	result.view.Format = getIndexBufferFormat(elementSize);
 	return result;
+}
+
+void resizeBuffer(dx_buffer& buffer, uint32 newElementCount, D3D12_RESOURCE_STATES initialState)
+{
+	buffer.elementCount = newElementCount;
+	buffer.totalSize = buffer.elementCount * buffer.elementSize;
+
+	auto desc = buffer.resource->GetDesc();
+
+	checkResult(dxContext.device->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(buffer.heapType),
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(buffer.totalSize, desc.Flags),
+		initialState,
+		0,
+		IID_PPV_ARGS(&buffer.resource)));
+	buffer.gpuVirtualAddress = buffer.resource->GetGPUVirtualAddress();
+
+	buffer.defaultSRV.createBufferSRV(buffer);
+	if (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS)
+	{
+		buffer.defaultUAV.createBufferUAV(buffer);
+	}
+	if (buffer.cpuClearUAV.cpuHandle.ptr)
+	{
+		buffer.cpuClearUAV.createBufferUintUAV(buffer);
+		dx_cpu_descriptor_handle shaderVisibleCPUHandle = dxContext.descriptorAllocatorGPU.getMatchingCPUHandle(buffer.gpuClearUAV);
+		shaderVisibleCPUHandle.createBufferUintUAV(buffer);
+	}
+}
+
+void freeBuffer(dx_buffer& buffer)
+{
+	if (buffer.defaultSRV.cpuHandle.ptr)
+	{
+		dxContext.descriptorAllocatorCPU.freeHandle(buffer.defaultSRV);
+	}
+	if (buffer.defaultUAV.cpuHandle.ptr)
+	{
+		dxContext.descriptorAllocatorCPU.freeHandle(buffer.defaultUAV);
+	}
 }
 
 void uploadTextureSubresourceData(dx_texture& texture, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 firstSubresource, uint32 numSubresources)
@@ -200,7 +255,7 @@ void uploadTextureSubresourceData(dx_texture& texture, D3D12_SUBRESOURCE_DATA* s
 
 dx_texture createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState)
 {
-	dx_texture result;
+	dx_texture result = {};
 
 	checkResult(dxContext.device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
@@ -227,6 +282,27 @@ dx_texture createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA
 		uploadTextureSubresourceData(result, subresourceData, 0, numSubresources);
 	}
 
+	if (textureDesc.DepthOrArraySize == 6)
+	{
+		result.defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapSRV(result);
+	}
+	else
+	{
+		result.defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureSRV(result);
+	}
+
+	if (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS)
+	{
+		if (textureDesc.DepthOrArraySize == 6)
+		{
+			result.defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapUAV(result);
+		}
+		else
+		{
+			result.defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureUAV(result);
+		}
+	}
+	
 	return result;
 }
 
@@ -258,7 +334,7 @@ dx_texture createTexture(const void* data, uint32 width, uint32 height, DXGI_FOR
 
 dx_texture createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format)
 {
-	dx_texture result;
+	dx_texture result = {};
 
 	D3D12_CLEAR_VALUE optimizedClearValue = {};
 	optimizedClearValue.Format = format;
@@ -285,6 +361,7 @@ dx_texture createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format)
 		sizeof(D3D12_FEATURE_DATA_FORMAT_SUPPORT)));
 
 	result.dsvHandle = dxContext.dsvAllocator.pushDepthStencilView(result);
+	result.defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureSRV(result);
 
 	return result;
 }
@@ -328,24 +405,127 @@ void resizeTexture(dx_texture& texture, uint32 newWidth, uint32 newHeight, D3D12
 	if (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)
 	{
 		dxContext.dsvAllocator.createDepthStencilView(texture, texture.dsvHandle);
+		texture.defaultSRV.createDepthTextureSRV(texture);
+	}
+	else
+	{
+		if (desc.DepthOrArraySize == 6)
+		{
+			texture.defaultSRV.createCubemapSRV(texture);
+		}
+		else
+		{
+			texture.defaultSRV.create2DTextureSRV(texture);
+		}
+	}
+
+	if (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS)
+	{
+		if (desc.DepthOrArraySize == 6)
+		{
+			texture.defaultUAV.createCubemapUAV(texture);
+		}
+		else
+		{
+			texture.defaultUAV.create2DTextureUAV(texture);
+		}
+	}
+}
+
+void freeTexture(dx_texture& texture)
+{
+	if (texture.defaultSRV.cpuHandle.ptr)
+	{
+		dxContext.descriptorAllocatorCPU.freeHandle(texture.defaultSRV);
+	}
+	if (texture.defaultUAV.cpuHandle.ptr)
+	{
+		dxContext.descriptorAllocatorCPU.freeHandle(texture.defaultUAV);
+	}
+}
+
+static void copyRootSignatureDesc(const D3D12_ROOT_SIGNATURE_DESC* desc, dx_root_signature& result)
+{
+	uint32 numDescriptorTables = 0;
+	for (uint32 i = 0; i < desc->NumParameters; ++i)
+	{
+		if (desc->pParameters[i].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+		{
+			++numDescriptorTables;
+			setBit(result.tableRootParameterMask, i);
+		}
+	}
+
+	result.descriptorTableSizes = new uint32[numDescriptorTables];
+	result.numDescriptorTables = numDescriptorTables;
+
+	uint32 index = 0;
+	for (uint32 i = 0; i < desc->NumParameters; ++i)
+	{
+		if (desc->pParameters[i].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+		{
+			uint32 numRanges = desc->pParameters[i].DescriptorTable.NumDescriptorRanges;
+			result.descriptorTableSizes[index] = 0;
+			for (uint32 r = 0; r < numRanges; ++r)
+			{
+				result.descriptorTableSizes[index] += desc->pParameters[i].DescriptorTable.pDescriptorRanges[r].NumDescriptors;
+			}
+			++index;
+		}
+	}
+}
+
+static void copyRootSignatureDesc(const D3D12_ROOT_SIGNATURE_DESC1* desc, dx_root_signature& result)
+{
+	uint32 numDescriptorTables = 0;
+	for (uint32 i = 0; i < desc->NumParameters; ++i)
+	{
+		if (desc->pParameters[i].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+		{
+			++numDescriptorTables;
+			setBit(result.tableRootParameterMask, i);
+		}
+	}
+
+	result.descriptorTableSizes = new uint32[numDescriptorTables];
+	result.numDescriptorTables = numDescriptorTables;
+
+	uint32 index = 0;
+	for (uint32 i = 0; i < desc->NumParameters; ++i)
+	{
+		if (desc->pParameters[i].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+		{
+			uint32 numRanges = desc->pParameters[i].DescriptorTable.NumDescriptorRanges;
+			result.descriptorTableSizes[index] = 0;
+			for (uint32 r = 0; r < numRanges; ++r)
+			{
+				result.descriptorTableSizes[index] += desc->pParameters[i].DescriptorTable.pDescriptorRanges[r].NumDescriptors;
+			}
+			++index;
+		}
 	}
 }
 
 dx_root_signature createRootSignature(dx_blob rootSignatureBlob)
 {
-	dx_root_signature rootSignature;
+	dx_root_signature result = {};
 
 	checkResult(dxContext.device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
-		rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
+		rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&result.rootSignature)));
 
-	return rootSignature;
+	com<ID3D12RootSignatureDeserializer> deserializer;
+	checkResult(D3D12CreateRootSignatureDeserializer(rootSignatureBlob->GetBufferPointer(), rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&deserializer)));
+	D3D12_ROOT_SIGNATURE_DESC* desc = (D3D12_ROOT_SIGNATURE_DESC*)deserializer->GetRootSignatureDesc();
+
+	copyRootSignatureDesc(desc, result);
+
+	return result;
 }
 
 dx_root_signature createRootSignature(const wchar* path)
 {
 	dx_blob rootSignatureBlob;
 	checkResult(D3DReadFileToBlob(path, &rootSignatureBlob));
-
 	return createRootSignature(rootSignatureBlob);
 }
 
@@ -365,7 +545,14 @@ dx_root_signature createRootSignature(const D3D12_ROOT_SIGNATURE_DESC1& desc)
 	dx_blob errorBlob;
 	checkResult(D3DX12SerializeVersionedRootSignature(&rootSignatureDescription, featureData.HighestVersion, &rootSignatureBlob, &errorBlob));
 
-	return createRootSignature(rootSignatureBlob);
+	dx_root_signature rootSignature = {};
+
+	checkResult(dxContext.device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
+		rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature.rootSignature)));
+
+	copyRootSignatureDesc(&desc, rootSignature);
+
+	return rootSignature;
 }
 
 dx_root_signature createRootSignature(CD3DX12_ROOT_PARAMETER1* rootParameters, uint32 numRootParameters, CD3DX12_STATIC_SAMPLER_DESC* samplers, uint32 numSamplers,
@@ -386,10 +573,12 @@ dx_root_signature createRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
 	dx_blob errorBlob;
 	checkResult(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &rootSignatureBlob, &errorBlob));
 
-	dx_root_signature rootSignature;
+	dx_root_signature rootSignature = {};
 
 	checkResult(dxContext.device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
-		rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
+		rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature.rootSignature)));
+
+	copyRootSignatureDesc(&desc, rootSignature);
 
 	return rootSignature;
 }
@@ -413,11 +602,19 @@ dx_root_signature createRootSignature(D3D12_ROOT_SIGNATURE_FLAGS flags)
 	return createRootSignature(rootSignatureDesc);
 }
 
+void freeRootSignature(dx_root_signature& rs)
+{
+	if (rs.descriptorTableSizes)
+	{
+		delete[] rs.descriptorTableSizes;
+	}
+}
+
 dx_command_signature createCommandSignature(dx_root_signature rootSignature, const D3D12_COMMAND_SIGNATURE_DESC& commandSignatureDesc)
 {
 	dx_command_signature commandSignature;
 	checkResult(dxContext.device->CreateCommandSignature(&commandSignatureDesc,
-		commandSignatureDesc.NumArgumentDescs == 1 ? 0 : rootSignature.Get(),
+		commandSignatureDesc.NumArgumentDescs == 1 ? 0 : rootSignature.rootSignature.Get(),
 		IID_PPV_ARGS(&commandSignature)));
 	return commandSignature;
 }
@@ -431,581 +628,6 @@ dx_command_signature createCommandSignature(dx_root_signature rootSignature, D3D
 	commandSignatureDesc.NodeMask = 0;
 
 	return createCommandSignature(rootSignature, commandSignatureDesc);
-}
-
-static void initializeDescriptorHeap(dx_descriptor_heap& descriptorHeap, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32 numDescriptors, bool shaderVisible)
-{
-	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-	desc.NumDescriptors = numDescriptors;
-	desc.Type = type;
-	if (shaderVisible)
-	{
-		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	}
-
-	checkResult(dxContext.device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&descriptorHeap.descriptorHeap)));
-
-	descriptorHeap.type = type;
-	descriptorHeap.maxNumDescriptors = numDescriptors;
-	descriptorHeap.descriptorHandleIncrementSize = dxContext.device->GetDescriptorHandleIncrementSize(type);
-	descriptorHeap.base.cpuHandle = descriptorHeap.descriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	descriptorHeap.base.gpuHandle = descriptorHeap.descriptorHeap->GetGPUDescriptorHandleForHeapStart();
-}
-
-dx_cbv_srv_uav_descriptor_heap createDescriptorHeap(uint32 numDescriptors, bool shaderVisible)
-{
-	dx_cbv_srv_uav_descriptor_heap descriptorHeap;
-	initializeDescriptorHeap(descriptorHeap, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, numDescriptors, shaderVisible);
-	descriptorHeap.pushIndex = 0;
-	return descriptorHeap;
-}
-
-dx_rtv_descriptor_heap createRTVDescriptorAllocator(uint32 numDescriptors)
-{
-	dx_rtv_descriptor_heap descriptorHeap;
-	initializeDescriptorHeap(descriptorHeap, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, numDescriptors, false);
-	descriptorHeap.pushIndex = 0;
-	return descriptorHeap;
-}
-
-dx_dsv_descriptor_heap createDSVDescriptorAllocator(uint32 numDescriptors)
-{
-	dx_dsv_descriptor_heap descriptorHeap;
-	initializeDescriptorHeap(descriptorHeap, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, numDescriptors, false);
-	descriptorHeap.pushIndex = 0;
-	return descriptorHeap;
-}
-
-static dx_descriptor_handle create2DTextureSRV(dx_device device, dx_texture& texture, dx_descriptor_handle index, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN)
-{
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Format = (overrideFormat == DXGI_FORMAT_UNKNOWN) ? texture.resource->GetDesc().Format : overrideFormat;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Texture2D.MostDetailedMip = mipRange.first;
-	srvDesc.Texture2D.MipLevels = mipRange.count;
-
-	device->CreateShaderResourceView(texture.resource.Get(), &srvDesc, index.cpuHandle);
-
-	return index;
-}
-
-static dx_descriptor_handle createCubemapSRV(dx_device device, dx_texture& texture, dx_descriptor_handle index, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN)
-{
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Format = (overrideFormat == DXGI_FORMAT_UNKNOWN) ? texture.resource->GetDesc().Format : overrideFormat;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-	srvDesc.TextureCube.MostDetailedMip = mipRange.first;
-	srvDesc.TextureCube.MipLevels = mipRange.count;
-
-	device->CreateShaderResourceView(texture.resource.Get(), &srvDesc, index.cpuHandle);
-
-	return index;
-}
-
-static dx_descriptor_handle createCubemapArraySRV(dx_device device, dx_texture& texture, dx_descriptor_handle index, texture_mip_range mipRange = {}, uint32 firstCube = 0, uint32 numCubes = 1, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN)
-{
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Format = (overrideFormat == DXGI_FORMAT_UNKNOWN) ? texture.resource->GetDesc().Format : overrideFormat;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
-	srvDesc.TextureCubeArray.MostDetailedMip = mipRange.first;
-	srvDesc.TextureCubeArray.MipLevels = mipRange.count;
-	srvDesc.TextureCubeArray.NumCubes = numCubes;
-	srvDesc.TextureCubeArray.First2DArrayFace = firstCube * 6;
-
-	device->CreateShaderResourceView(texture.resource.Get(), &srvDesc, index.cpuHandle);
-
-	return index;
-}
-
-static dx_descriptor_handle createDepthTextureSRV(dx_device device, dx_texture& texture, dx_descriptor_handle index)
-{
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Format = getReadFormatFromTypeless(texture.resource->GetDesc().Format);
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Texture2D.MipLevels = 1;
-
-	device->CreateShaderResourceView(texture.resource.Get(), &srvDesc, index.cpuHandle);
-
-	return index;
-}
-
-static dx_descriptor_handle createNullTextureSRV(dx_device device, dx_descriptor_handle index)
-{
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.Texture2D.MipLevels = 0;
-
-	device->CreateShaderResourceView(0, &srvDesc, index.cpuHandle);
-
-	return index;
-}
-
-static dx_descriptor_handle createBufferSRV(dx_device device, dx_buffer& buffer, dx_descriptor_handle index, buffer_range bufferRange = {})
-{
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-	srvDesc.Buffer.FirstElement = bufferRange.firstElement;
-	srvDesc.Buffer.NumElements = (bufferRange.numElements != -1) ? bufferRange.numElements : (buffer.elementCount - bufferRange.firstElement);
-	srvDesc.Buffer.StructureByteStride = buffer.elementSize;
-	srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-
-	device->CreateShaderResourceView(buffer.resource.Get(), &srvDesc, index.cpuHandle);
-
-	return index;
-}
-
-static dx_descriptor_handle createRawBufferSRV(dx_device device, dx_buffer& buffer, dx_descriptor_handle index, buffer_range bufferRange = {})
-{
-	uint32 firstElementByteOffset = bufferRange.firstElement * buffer.elementSize;
-	assert(firstElementByteOffset % 16 == 0);
-
-	uint32 count = (bufferRange.numElements != -1) ? bufferRange.numElements : (buffer.elementCount - bufferRange.firstElement);
-	uint32 totalSize = count * buffer.elementSize;
-
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-	srvDesc.Buffer.FirstElement = firstElementByteOffset / 4;
-	srvDesc.Buffer.NumElements = totalSize / 4;
-	srvDesc.Buffer.StructureByteStride = 0;
-	srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
-
-	device->CreateShaderResourceView(buffer.resource.Get(), &srvDesc, index.cpuHandle);
-
-	return index;
-}
-
-static dx_descriptor_handle create2DTextureUAV(dx_device device, dx_texture& texture, dx_descriptor_handle index, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN)
-{
-	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-	uavDesc.Format = overrideFormat;
-	uavDesc.Texture2D.MipSlice = mipSlice;
-	device->CreateUnorderedAccessView(texture.resource.Get(), 0, &uavDesc, index.cpuHandle);
-
-	return index;
-}
-
-static dx_descriptor_handle create2DTextureArrayUAV(dx_device device, dx_texture& texture, dx_descriptor_handle index, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN)
-{
-	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
-	uavDesc.Format = overrideFormat;
-	uavDesc.Texture2DArray.FirstArraySlice = 0;
-	uavDesc.Texture2DArray.ArraySize = texture.resource->GetDesc().DepthOrArraySize;
-	uavDesc.Texture2DArray.MipSlice = mipSlice;
-	device->CreateUnorderedAccessView(texture.resource.Get(), 0, &uavDesc, index.cpuHandle);
-
-	return index;
-}
-
-static dx_descriptor_handle createNullTextureUAV(dx_device device, dx_descriptor_handle index)
-{
-	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-	uavDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-
-	device->CreateUnorderedAccessView(0, 0, &uavDesc, index.cpuHandle);
-
-	return index;
-}
-
-static dx_descriptor_handle createBufferUAV(dx_device device, dx_buffer& buffer, dx_descriptor_handle index, buffer_range bufferRange = {})
-{
-	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-	uavDesc.Buffer.CounterOffsetInBytes = 0;
-	uavDesc.Buffer.FirstElement = bufferRange.firstElement;
-	uavDesc.Buffer.NumElements = (bufferRange.numElements != -1) ? bufferRange.numElements : (buffer.elementCount - bufferRange.firstElement);
-	uavDesc.Buffer.StructureByteStride = buffer.elementSize;
-	uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
-
-	device->CreateUnorderedAccessView(buffer.resource.Get(), 0, &uavDesc, index.cpuHandle);
-
-	return index;
-}
-
-static dx_descriptor_handle createBufferUintUAV(dx_device device, dx_buffer& buffer, dx_descriptor_handle index, buffer_range bufferRange = {})
-{
-	uint32 firstElementByteOffset = bufferRange.firstElement * buffer.elementSize;
-	assert(firstElementByteOffset % 16 == 0);
-
-	uint32 count = (bufferRange.numElements != -1) ? bufferRange.numElements : (buffer.elementCount - bufferRange.firstElement);
-	uint32 totalSize = count * buffer.elementSize;
-
-	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-	uavDesc.Format = DXGI_FORMAT_R32_UINT;
-	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-	uavDesc.Buffer.CounterOffsetInBytes = 0;
-	uavDesc.Buffer.FirstElement = firstElementByteOffset / 4;
-	uavDesc.Buffer.NumElements = totalSize / 4;
-	uavDesc.Buffer.StructureByteStride = 0;
-	uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
-
-	device->CreateUnorderedAccessView(buffer.resource.Get(), 0, &uavDesc, index.cpuHandle);
-
-	return index;
-}
-
-static dx_descriptor_handle createRaytracingAccelerationStructureSRV(dx_device device, dx_buffer& tlas, dx_descriptor_handle index)
-{
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.RaytracingAccelerationStructure.Location = tlas.gpuVirtualAddress;
-
-	device->CreateShaderResourceView(nullptr, &srvDesc, index.cpuHandle);
-
-	return index;
-}
-
-dx_descriptor_handle dx_descriptor_range::pushEmptyHandle()
-{
-	return getHandle(*this, pushIndex++);
-}
-
-dx_descriptor_handle dx_descriptor_range::create2DTextureSRV(dx_texture& texture, dx_descriptor_handle handle, texture_mip_range mipRange, DXGI_FORMAT overrideFormat)
-{
-	return ::create2DTextureSRV(getDevice(descriptorHeap), texture, handle, mipRange, overrideFormat);
-}
-
-dx_descriptor_handle dx_descriptor_range::create2DTextureSRV(dx_texture& texture, uint32 index, texture_mip_range mipRange, DXGI_FORMAT overrideFormat)
-{
-	return ::create2DTextureSRV(getDevice(descriptorHeap), texture, getHandle(*this, index), mipRange, overrideFormat);
-}
-
-dx_descriptor_handle dx_descriptor_range::push2DTextureSRV(dx_texture& texture, texture_mip_range mipRange, DXGI_FORMAT overrideFormat)
-{
-	return create2DTextureSRV(texture, pushIndex++, mipRange, overrideFormat);
-}
-
-dx_descriptor_handle dx_descriptor_range::createCubemapSRV(dx_texture& texture, dx_descriptor_handle handle, texture_mip_range mipRange, DXGI_FORMAT overrideFormat)
-{
-	return ::createCubemapSRV(getDevice(descriptorHeap), texture, handle, mipRange, overrideFormat);
-}
-
-dx_descriptor_handle dx_descriptor_range::createCubemapSRV(dx_texture& texture, uint32 index, texture_mip_range mipRange, DXGI_FORMAT overrideFormat)
-{
-	return ::createCubemapSRV(getDevice(descriptorHeap), texture, getHandle(*this, index), mipRange, overrideFormat);
-}
-
-dx_descriptor_handle dx_descriptor_range::pushCubemapSRV(dx_texture& texture, texture_mip_range mipRange, DXGI_FORMAT overrideFormat)
-{
-	return createCubemapSRV(texture, pushIndex++, mipRange, overrideFormat);
-}
-
-dx_descriptor_handle dx_descriptor_range::createCubemapArraySRV(dx_texture& texture, dx_descriptor_handle handle, texture_mip_range mipRange, uint32 firstCube, uint32 numCubes, DXGI_FORMAT overrideFormat)
-{
-	return ::createCubemapArraySRV(getDevice(descriptorHeap), texture, handle, mipRange, firstCube, numCubes, overrideFormat);
-}
-
-dx_descriptor_handle dx_descriptor_range::createCubemapArraySRV(dx_texture& texture, uint32 index, texture_mip_range mipRange, uint32 firstCube, uint32 numCubes, DXGI_FORMAT overrideFormat)
-{
-	return ::createCubemapArraySRV(getDevice(descriptorHeap), texture, getHandle(*this, index), mipRange, firstCube, numCubes, overrideFormat);
-}
-
-dx_descriptor_handle dx_descriptor_range::pushCubemapArraySRV(dx_texture& texture, texture_mip_range mipRange, uint32 firstCube, uint32 numCubes, DXGI_FORMAT overrideFormat)
-{
-	return createCubemapArraySRV(texture, pushIndex++, mipRange, firstCube, numCubes, overrideFormat);
-}
-
-dx_descriptor_handle dx_descriptor_range::createDepthTextureSRV(dx_texture& texture, dx_descriptor_handle handle)
-{
-	return ::createDepthTextureSRV(getDevice(descriptorHeap), texture, handle);
-}
-
-dx_descriptor_handle dx_descriptor_range::createDepthTextureSRV(dx_texture& texture, uint32 index)
-{
-	return ::createDepthTextureSRV(getDevice(descriptorHeap), texture, getHandle(*this, index));
-}
-
-dx_descriptor_handle dx_descriptor_range::pushDepthTextureSRV(dx_texture& texture)
-{
-	return createDepthTextureSRV(texture, pushIndex++);
-}
-
-dx_descriptor_handle dx_descriptor_range::createNullTextureSRV(dx_descriptor_handle handle)
-{
-	return ::createNullTextureSRV(getDevice(descriptorHeap), handle);
-}
-
-dx_descriptor_handle dx_descriptor_range::createNullTextureSRV(uint32 index)
-{
-	return ::createNullTextureSRV(getDevice(descriptorHeap), getHandle(*this, index));
-}
-
-dx_descriptor_handle dx_descriptor_range::pushNullTextureSRV()
-{
-	return createNullTextureSRV(pushIndex++);
-}
-
-dx_descriptor_handle dx_descriptor_range::createBufferSRV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange)
-{
-	return ::createBufferSRV(getDevice(descriptorHeap), buffer, handle, bufferRange);
-}
-
-dx_descriptor_handle dx_descriptor_range::createBufferSRV(dx_buffer& buffer, uint32 index, buffer_range bufferRange)
-{
-	return ::createBufferSRV(getDevice(descriptorHeap), buffer, getHandle(*this, index), bufferRange);
-}
-
-dx_descriptor_handle dx_descriptor_range::pushBufferSRV(dx_buffer& buffer, buffer_range bufferRange)
-{
-	return createBufferSRV(buffer, pushIndex++, bufferRange);
-}
-
-dx_descriptor_handle dx_descriptor_range::createRawBufferSRV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange)
-{
-	return ::createRawBufferSRV(getDevice(descriptorHeap), buffer, handle, bufferRange);
-}
-
-dx_descriptor_handle dx_descriptor_range::createRawBufferSRV(dx_buffer& buffer, uint32 index, buffer_range bufferRange)
-{
-	return ::createRawBufferSRV(getDevice(descriptorHeap), buffer, getHandle(*this, index), bufferRange);
-}
-
-dx_descriptor_handle dx_descriptor_range::pushRawBufferSRV(dx_buffer& buffer, buffer_range bufferRange)
-{
-	return createRawBufferSRV(buffer, pushIndex++, bufferRange);
-}
-
-dx_descriptor_handle dx_descriptor_range::create2DTextureUAV(dx_texture& texture, dx_descriptor_handle handle, uint32 mipSlice, DXGI_FORMAT overrideFormat)
-{
-	return ::create2DTextureUAV(getDevice(descriptorHeap), texture, handle, mipSlice, overrideFormat);
-}
-
-dx_descriptor_handle dx_descriptor_range::create2DTextureUAV(dx_texture& texture, uint32 index, uint32 mipSlice, DXGI_FORMAT overrideFormat)
-{
-	return ::create2DTextureUAV(getDevice(descriptorHeap), texture, getHandle(*this, index), mipSlice, overrideFormat);
-}
-
-dx_descriptor_handle dx_descriptor_range::push2DTextureUAV(dx_texture& texture, uint32 mipSlice, DXGI_FORMAT overrideFormat)
-{
-	return create2DTextureUAV(texture, pushIndex++, mipSlice, overrideFormat);
-}
-
-dx_descriptor_handle dx_descriptor_range::create2DTextureArrayUAV(dx_texture& texture, dx_descriptor_handle handle, uint32 mipSlice, DXGI_FORMAT overrideFormat)
-{
-	return ::create2DTextureArrayUAV(getDevice(descriptorHeap), texture, handle, mipSlice, overrideFormat);
-}
-
-dx_descriptor_handle dx_descriptor_range::create2DTextureArrayUAV(dx_texture& texture, uint32 index, uint32 mipSlice, DXGI_FORMAT overrideFormat)
-{
-	return ::create2DTextureArrayUAV(getDevice(descriptorHeap), texture, getHandle(*this, index), mipSlice, overrideFormat);
-}
-
-dx_descriptor_handle dx_descriptor_range::push2DTextureArrayUAV(dx_texture& texture, uint32 mipSlice, DXGI_FORMAT overrideFormat)
-{
-	return create2DTextureArrayUAV(texture, pushIndex++, mipSlice, overrideFormat);
-}
-
-dx_descriptor_handle dx_descriptor_range::createNullTextureUAV(dx_descriptor_handle handle)
-{
-	return ::createNullTextureUAV(getDevice(descriptorHeap), handle);
-}
-
-dx_descriptor_handle dx_descriptor_range::createNullTextureUAV(uint32 index)
-{
-	return ::createNullTextureUAV(getDevice(descriptorHeap), getHandle(*this, index));
-}
-
-dx_descriptor_handle dx_descriptor_range::pushNullTextureUAV()
-{
-	return createNullTextureUAV(pushIndex++);
-}
-
-dx_descriptor_handle dx_descriptor_range::createBufferUAV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange)
-{
-	return ::createBufferUAV(getDevice(descriptorHeap), buffer, handle, bufferRange);
-}
-
-dx_descriptor_handle dx_descriptor_range::createBufferUAV(dx_buffer& buffer, uint32 index, buffer_range bufferRange)
-{
-	return ::createBufferUAV(getDevice(descriptorHeap), buffer, getHandle(*this, index), bufferRange);
-}
-
-dx_descriptor_handle dx_descriptor_range::pushBufferUAV(dx_buffer& buffer, buffer_range bufferRange)
-{
-	return createBufferUAV(buffer, pushIndex++, bufferRange);
-}
-
-dx_descriptor_handle dx_descriptor_range::createBufferUintUAV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange)
-{
-	return ::createBufferUintUAV(getDevice(descriptorHeap), buffer, handle, bufferRange);
-}
-
-dx_descriptor_handle dx_descriptor_range::createBufferUintUAV(dx_buffer& buffer, uint32 index, buffer_range bufferRange)
-{
-	return ::createBufferUintUAV(getDevice(descriptorHeap), buffer, getHandle(*this, index), bufferRange);
-}
-
-dx_descriptor_handle dx_descriptor_range::pushBufferUintUAV(dx_buffer& buffer, buffer_range bufferRange)
-{
-	return createBufferUintUAV(buffer, pushIndex++, bufferRange);
-}
-
-dx_descriptor_handle dx_descriptor_range::createRaytracingAccelerationStructureSRV(dx_buffer& tlas, dx_descriptor_handle handle)
-{
-	return ::createRaytracingAccelerationStructureSRV(getDevice(descriptorHeap), tlas, handle);
-}
-
-dx_descriptor_handle dx_descriptor_range::createRaytracingAccelerationStructureSRV(dx_buffer& tlas, uint32 index)
-{
-	return ::createRaytracingAccelerationStructureSRV(getDevice(descriptorHeap), tlas, getHandle(*this, index));
-}
-
-dx_descriptor_handle dx_descriptor_range::pushRaytracingAccelerationStructureSRV(dx_buffer& tlas)
-{
-	return createRaytracingAccelerationStructureSRV(tlas, pushIndex++);
-}
-
-dx_descriptor_handle dx_rtv_descriptor_heap::pushRenderTargetView(dx_texture& texture)
-{
-	D3D12_RESOURCE_DESC resourceDesc = texture.resource->GetDesc();
-	assert(resourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
-	uint32 slices = resourceDesc.DepthOrArraySize;
-
-	uint32 index = atomicAdd(pushIndex, slices);
-	dx_descriptor_handle result = getHandle(*this, index);
-	return createRenderTargetView(texture, result);
-}
-
-dx_descriptor_handle dx_rtv_descriptor_heap::createRenderTargetView(dx_texture& texture, dx_descriptor_handle index)
-{
-	D3D12_RESOURCE_DESC resourceDesc = texture.resource->GetDesc();
-	assert(resourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
-	uint32 slices = resourceDesc.DepthOrArraySize;
-
-	if (slices > 1)
-	{
-		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc;
-		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
-		rtvDesc.Format = resourceDesc.Format;
-		rtvDesc.Texture2DArray.ArraySize = 1;
-		rtvDesc.Texture2DArray.MipSlice = 0;
-		rtvDesc.Texture2DArray.PlaneSlice = 0;
-
-		for (uint32 i = 0; i < slices; ++i)
-		{
-			rtvDesc.Texture2DArray.FirstArraySlice = i;
-			CD3DX12_CPU_DESCRIPTOR_HANDLE rtv(index.cpuHandle, i, descriptorHandleIncrementSize);
-			getDevice(descriptorHeap)->CreateRenderTargetView(texture.resource.Get(), &rtvDesc, rtv);
-		}
-	}
-	else
-	{
-		getDevice(descriptorHeap)->CreateRenderTargetView(texture.resource.Get(), 0, index.cpuHandle);
-	}
-
-	return index;
-}
-
-dx_descriptor_handle dx_dsv_descriptor_heap::pushDepthStencilView(dx_texture& texture)
-{
-	D3D12_RESOURCE_DESC resourceDesc = texture.resource->GetDesc();
-	assert(resourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
-	uint32 slices = resourceDesc.DepthOrArraySize;
-
-	uint32 index = atomicAdd(pushIndex, slices);
-	dx_descriptor_handle result = getHandle(*this, index);
-	return createDepthStencilView(texture, result);
-}
-
-dx_descriptor_handle dx_dsv_descriptor_heap::createDepthStencilView(dx_texture& texture, dx_descriptor_handle index)
-{
-	DXGI_FORMAT format = texture.formatSupport.Format; // This contains the original format, not the typeless.
-
-	assert(isDepthFormat(format));
-	
-	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-	dsvDesc.Format = format;
-	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-	getDevice(descriptorHeap)->CreateDepthStencilView(texture.resource.Get(), &dsvDesc, index.cpuHandle);
-
-	return index;
-}
-
-dx_frame_descriptor_allocator createFrameDescriptorAllocator()
-{
-	dx_frame_descriptor_allocator result = {};
-	result.device = dxContext.device;
-	result.mutex = createMutex();
-	result.currentFrame = NUM_BUFFERED_FRAMES - 1;
-	return result;
-}
-
-void dx_frame_descriptor_allocator::newFrame(uint32 bufferedFrameID)
-{
-	mutex.lock();
-
-	currentFrame = bufferedFrameID;
-
-	while (usedPages[currentFrame])
-	{
-		dx_descriptor_page* page = usedPages[currentFrame];
-		usedPages[currentFrame] = page->next;
-		page->next = freePages;
-		freePages = page;
-	}
-
-	mutex.unlock();
-}
-
-dx_descriptor_range dx_frame_descriptor_allocator::allocateContiguousDescriptorRange(uint32 count)
-{
-	mutex.lock();
-
-	dx_descriptor_page* current = usedPages[currentFrame];
-	if (!current || (current->maxNumDescriptors - current->usedDescriptors < count))
-	{
-		dx_descriptor_page* freePage = freePages;
-		if (!freePage)
-		{
-			freePage = (dx_descriptor_page*)calloc(1, sizeof(dx_descriptor_page));
-
-			D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-			desc.NumDescriptors = 1024;
-			desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-			desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-
-			checkResult(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&freePage->descriptorHeap)));
-
-			freePage->maxNumDescriptors = desc.NumDescriptors;
-			freePage->descriptorHandleIncrementSize = device->GetDescriptorHandleIncrementSize(desc.Type);
-			freePage->base.cpuHandle = freePage->descriptorHeap->GetCPUDescriptorHandleForHeapStart();
-			freePage->base.gpuHandle = freePage->descriptorHeap->GetGPUDescriptorHandleForHeapStart();
-		}
-
-		freePage->usedDescriptors = 0;
-		freePage->next = current;
-		usedPages[currentFrame] = freePage;
-		current = freePage;
-	}
-
-	uint32 index = current->usedDescriptors;
-	current->usedDescriptors += count;
-
-	mutex.unlock();
-
-	dx_descriptor_range result;
-
-	result.base.gpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(current->base.gpuHandle, index, current->descriptorHandleIncrementSize);
-	result.base.cpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(current->base.cpuHandle, index, current->descriptorHandleIncrementSize);
-	result.descriptorHandleIncrementSize = current->descriptorHandleIncrementSize;
-	result.descriptorHeap = current->descriptorHeap;
-	result.maxNumDescriptors = count;
-	result.pushIndex = 0;
-
-	return result;
 }
 
 uint32 dx_render_target::pushColorAttachment(dx_texture& texture)
@@ -1131,12 +753,4 @@ void barrier_batcher::submit()
 		cl->barriers(barriers, numBarriers);
 		numBarriers = 0;
 	}
-}
-
-dx_descriptor_handle dx_descriptor_heap::getOffsetted(dx_descriptor_handle base, uint32 offset)
-{
-	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(base.gpuHandle, offset, descriptorHandleIncrementSize);
-	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(base.cpuHandle, offset, descriptorHandleIncrementSize);
-
-	return { cpuHandle, gpuHandle };
 }

@@ -1,22 +1,23 @@
 #include "cs.hlsl"
 #include "camera.hlsl"
 #include "light_culling.hlsl"
+#include "light_source.hlsl"
 
 #define BLOCK_SIZE 16
 
 ConstantBuffer<camera_cb> camera	: register(b0);
 ConstantBuffer<light_culling_cb> cb	: register(b1);
 
-Texture2D<float> depthBuffer                                : register(t0);
+Texture2D<float> depthBuffer                        : register(t0);
 
-StructuredBuffer<point_light_bounding_volume> pointLights   : register(t1);
-StructuredBuffer<spot_light_bounding_volume> spotLights     : register(t2);
+StructuredBuffer<point_light_cb> pointLights        : register(t1);
+StructuredBuffer<spot_light_cb> spotLights          : register(t2);
 
-StructuredBuffer<light_culling_view_frustum> frusta         : register(t3);
+StructuredBuffer<light_culling_view_frustum> frusta : register(t3);
 
-RWStructuredBuffer<uint> opaqueLightIndexCounter            : register(u0);
-RWStructuredBuffer<uint> opaqueLightIndexList               : register(u1);
-RWTexture2D<uint2> opaqueLightGrid                          : register(u2);
+RWStructuredBuffer<uint> opaqueLightIndexCounter    : register(u0);
+RWStructuredBuffer<uint> opaqueLightIndexList       : register(u1);
+RWTexture2D<uint2> opaqueLightGrid                  : register(u2);
 
 groupshared uint groupMinDepth;
 groupshared uint groupMaxDepth;
@@ -27,12 +28,12 @@ groupshared uint opaqueLightIndexStartOffset;
 groupshared uint opaqueLightList[MAX_NUM_LIGHTS_PER_TILE];
 
 
-static bool pointLightOutsidePlane(point_light_bounding_volume pl, light_culling_frustum_plane plane)
+static bool pointLightOutsidePlane(point_light_cb pl, light_culling_frustum_plane plane)
 {
     return dot(plane.N, pl.position) - plane.d < -pl.radius;
 }
 
-static bool pointLightInsideFrustum(point_light_bounding_volume pl, light_culling_view_frustum frustum, light_culling_frustum_plane nearPlane, light_culling_frustum_plane farPlane)
+static bool pointLightInsideFrustum(point_light_cb pl, light_culling_view_frustum frustum, light_culling_frustum_plane nearPlane, light_culling_frustum_plane farPlane)
 {
     bool result = true;
 
@@ -137,7 +138,7 @@ void main(cs_input IN)
     uint numPointLights = cb.numPointLights;
     for (uint i = IN.groupIndex; i < numPointLights; i += BLOCK_SIZE * BLOCK_SIZE)
     {
-        point_light_bounding_volume pl = pointLights[i];
+        point_light_cb pl = pointLights[i];
         if (pointLightInsideFrustum(pl, groupFrustum, nearPlane, farPlane))
         {
             opaqueAppendLight(i);

@@ -3,6 +3,9 @@
 #include "dx.h"
 #include "dx_render_primitives.h"
 #include "dx_upload_buffer.h"
+#include "dx_dynamic_descriptor_heap.h"
+#include "dx_descriptor_allocation.h"
+
 
 struct dx_command_allocator
 {
@@ -21,6 +24,7 @@ struct dx_command_list
 	dx_command_list* next;
 
 	dx_upload_buffer uploadBuffer;
+	dx_dynamic_descriptor_heap dynamicDescriptorHeap;
 
 
 	ID3D12DescriptorHeap* descriptorHeaps[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES];
@@ -52,11 +56,11 @@ struct dx_command_list
 
 
 	// Uniforms.
-	void setGraphicsRootSignature(dx_root_signature rootSignature);
+	void setGraphicsRootSignature(const dx_root_signature& rootSignature);
 	void setGraphics32BitConstants(uint32 rootParameterIndex, uint32 numConstants, const void* constants);
 	template<typename T> void setGraphics32BitConstants(uint32 rootParameterIndex, const T& constants);
 
-	void setComputeRootSignature(dx_root_signature rootSignature);
+	void setComputeRootSignature(const dx_root_signature& rootSignature);
 	void setCompute32BitConstants(uint32 rootParameterIndex, uint32 numConstants, const void* constants);
 	template<typename T> void setCompute32BitConstants(uint32 rootParameterIndex, const T& constants);
 
@@ -77,25 +81,32 @@ struct dx_command_list
 
 	dx_dynamic_vertex_buffer createDynamicVertexBuffer(uint32 elementSize, uint32 elementCount, void* data);
 
-	void setGraphicsUAV(uint32 rootParameterIndex, dx_buffer& buffer);
-	void setGraphicsUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
-	void setComputeUAV(uint32 rootParameterIndex, dx_buffer& buffer);
-	void setComputeUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
+	void setRootGraphicsUAV(uint32 rootParameterIndex, dx_buffer& buffer);
+	void setRootGraphicsUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
+	void setRootComputeUAV(uint32 rootParameterIndex, dx_buffer& buffer);
+	void setRootComputeUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
+	
+	void setRootGraphicsSRV(uint32 rootParameterIndex, dx_buffer& buffer);
+	void setRootGraphicsSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
+	void setRootComputeSRV(uint32 rootParameterIndex, dx_buffer& buffer);
+	void setRootComputeSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
 
-	void setGraphicsSRV(uint32 rootParameterIndex, dx_buffer& buffer);
-	void setGraphicsSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
-	void setComputeSRV(uint32 rootParameterIndex, dx_buffer& buffer);
-	void setComputeSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
+	void setDescriptorHeapResource(uint32 rootParameterIndex, uint32 offset, uint32 count, dx_cpu_descriptor_handle handle);
+	void setDescriptorHeapSRV(uint32 rootParameterIndex, uint32 offset, dx_texture& texture) { setDescriptorHeapResource(rootParameterIndex, offset, 1, texture.defaultSRV); }
+	void setDescriptorHeapSRV(uint32 rootParameterIndex, uint32 offset, dx_buffer& buffer) { setDescriptorHeapResource(rootParameterIndex, offset, 1, buffer.defaultSRV); }
+	void setDescriptorHeapUAV(uint32 rootParameterIndex, uint32 offset, dx_texture& texture) { setDescriptorHeapResource(rootParameterIndex, offset, 1, texture.defaultUAV); }
+	void setDescriptorHeapUAV(uint32 rootParameterIndex, uint32 offset, dx_buffer& buffer) { setDescriptorHeapResource(rootParameterIndex, offset, 1, buffer.defaultUAV); }
 
 
 	// Shader resources.
 	void setDescriptorHeap(dx_descriptor_heap& descriptorHeap);
 	void setDescriptorHeap(dx_descriptor_range& descriptorRange);
+	void setDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, com<ID3D12DescriptorHeap> descriptorHeap);
+	void resetToDynamicDescriptorHeap();
 	void setGraphicsDescriptorTable(uint32 rootParameterIndex, CD3DX12_GPU_DESCRIPTOR_HANDLE handle);
-	void setGraphicsDescriptorTable(uint32 rootParameterIndex, dx_descriptor_handle handle);
 	void setComputeDescriptorTable(uint32 rootParameterIndex, CD3DX12_GPU_DESCRIPTOR_HANDLE handle);
-	void setComputeDescriptorTable(uint32 rootParameterIndex, dx_descriptor_handle handle);
 
+	void clearUAV(dx_buffer& buffer, float val = 0.f);
 	void clearUAV(dx_resource resource, CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle, float val = 0.f);
 	void clearUAV(dx_resource resource, CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle, uint32 val = 0);
 

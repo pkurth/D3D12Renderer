@@ -13,7 +13,15 @@
 #include "dx_context.h"
 #include "dx_render_primitives.h"
 #include "dx_command_list.h"
-#include "dx_renderer.h"
+
+
+static com<ID3D12DescriptorHeap> imguiDescriptorHeap;
+static CD3DX12_CPU_DESCRIPTOR_HANDLE startCPUDescriptor;
+static CD3DX12_GPU_DESCRIPTOR_HANDLE startGPUDescriptor;
+static uint32 descriptorHandleIncrementSize;
+static uint32 numImagesThisFrame;
+
+#define MAX_NUM_IMGUI_IMAGES_PER_FRAME 16
 
 
 ImGuiContext* initializeImGui(DXGI_FORMAT screenFormat)
@@ -49,14 +57,22 @@ ImGuiContext* initializeImGui(DXGI_FORMAT screenFormat)
 	io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/icons/" FONT_ICON_FILE_NAME_FAS, 16.f, &iconsConfig, iconsRanges);
 
 
-	auto& descriptorHeap = dx_renderer::globalDescriptorHeap;
-	auto handle = descriptorHeap.pushEmptyHandle();
+	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+	desc.NumDescriptors = NUM_BUFFERED_FRAMES * MAX_NUM_IMGUI_IMAGES_PER_FRAME + 1;
+	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+	checkResult(dxContext.device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&imguiDescriptorHeap)));
+
+	startCPUDescriptor = imguiDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	startGPUDescriptor = imguiDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	descriptorHandleIncrementSize = dxContext.device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	ImGui_ImplWin32_Init(win32_window::mainWindow->windowHandle);
 	ImGui_ImplDX12_Init(dxContext.device.Get(), NUM_BUFFERED_FRAMES,
-		screenFormat, descriptorHeap.descriptorHeap.Get(),
-		handle.cpuHandle,
-		handle.gpuHandle);
+		screenFormat, imguiDescriptorHeap.Get(),
+		startCPUDescriptor,
+		startGPUDescriptor);
 
 	return imguiContext;
 }
@@ -71,7 +87,7 @@ void newImGuiFrame(const user_input& input, float dt)
 void renderImGui(dx_command_list* cl)
 {
 	ImGui::Render();
-	cl->setDescriptorHeap(dx_renderer::globalDescriptorHeap);
+	cl->setDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, imguiDescriptorHeap);
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cl->commandList.Get());
 
 	auto& io = ImGui::GetIO();
@@ -80,6 +96,8 @@ void renderImGui(dx_command_list* cl)
 		ImGui::UpdatePlatformWindows();
 		ImGui::RenderPlatformWindowsDefault(NULL, (void*)cl->commandList.Get());
 	}
+
+	numImagesThisFrame = 0;
 }
 
 void handleImGuiInput(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -89,14 +107,24 @@ void handleImGuiInput(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 namespace ImGui
 {
-	void Image(::dx_descriptor_handle& handle, ImVec2 size)
+	void Image(::dx_cpu_descriptor_handle& handle, ImVec2 size)
 	{
-		ImGui::Image((ImTextureID)handle.gpuHandle.ptr, size);
+		if (numImagesThisFrame < MAX_NUM_IMGUI_IMAGES_PER_FRAME)
+		{
+			CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(startCPUDescriptor, 1 + dxContext.bufferedFrameID * MAX_NUM_IMGUI_IMAGES_PER_FRAME + numImagesThisFrame, descriptorHandleIncrementSize);
+			CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(startGPUDescriptor, 1 + dxContext.bufferedFrameID * MAX_NUM_IMGUI_IMAGES_PER_FRAME + numImagesThisFrame, descriptorHandleIncrementSize);
+
+			dxContext.device->CopyDescriptorsSimple(1, cpuHandle, handle.cpuHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+			++numImagesThisFrame;
+
+			ImGui::Image((ImTextureID)gpuHandle.ptr, size);
+		}
 	}
 
-	void Image(::dx_descriptor_handle& handle, uint32 width, uint32 height)
+	void Image(::dx_cpu_descriptor_handle& handle, uint32 width, uint32 height)
 	{
-		ImGui::Image((ImTextureID)handle.gpuHandle.ptr, ImVec2((float)width, (float)height));
+		ImGui::Image(handle, ImVec2((float)width, (float)height));
 	}
 
 	bool Dropdown(const char* label, const char** names, uint32 count, uint32& current)

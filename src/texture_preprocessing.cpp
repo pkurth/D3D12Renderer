@@ -170,21 +170,23 @@ void generateMipMapsOnGPU(dx_command_list* cl, dx_texture& texture)
 
 	dx_descriptor_range descriptors = dxContext.frameDescriptorAllocator.allocateContiguousDescriptorRange(numDescriptors);
 
-	dx_descriptor_handle srvOffset;
+	dx_double_descriptor_handle srvOffset;
 	for (uint32 i = 0; i < numSrcMipLevels; ++i)
 	{
-		dx_descriptor_handle h = descriptors.push2DTextureSRV(tmpTexture, { i, 1 }, overrideFormat);
+		dx_double_descriptor_handle h = descriptors.pushHandle();
+		h.create2DTextureSRV(tmpTexture, { i, 1 }, overrideFormat);
 		if (i == 0)
 		{
 			srvOffset = h;
 		}
 	}
 
-	dx_descriptor_handle uavOffset;
+	dx_double_descriptor_handle uavOffset;
 	for (uint32 i = 0; i < numDstMipLevels; ++i)
 	{
 		uint32 mip = i + 1;
-		dx_descriptor_handle h = descriptors.push2DTextureUAV(tmpTexture, mip);
+		dx_double_descriptor_handle h = descriptors.pushHandle();
+		h.create2DTextureUAV(tmpTexture, mip);
 		if (i == 0)
 		{
 			uavOffset = h;
@@ -308,7 +310,8 @@ dx_texture equirectangularToCubemap(dx_command_list* cl, dx_texture& equirectang
 
 	dx_descriptor_range descriptors = dxContext.frameDescriptorAllocator.allocateContiguousDescriptorRange(numMips + 1);
 
-	dx_descriptor_handle srvOffset = descriptors.push2DTextureSRV(equirectangular);
+	dx_double_descriptor_handle srvOffset = descriptors.pushHandle();
+	srvOffset.create2DTextureSRV(equirectangular);
 
 	cl->setDescriptorHeap(descriptors);
 	cl->setComputeDescriptorTable(1, srvOffset);
@@ -328,10 +331,11 @@ dx_texture equirectangularToCubemap(dx_command_list* cl, dx_texture& equirectang
 
 		for (uint32 mip = 0; mip < numMips; ++mip)
 		{
-			dx_descriptor_handle h = descriptors.push2DTextureArrayUAV(stagingTexture, mipSlice + mip, getUAVCompatibleFormat(cubemapDesc.Format));
+			dx_double_descriptor_handle h = descriptors.pushHandle();
+			h.create2DTextureArrayUAV(stagingTexture, mipSlice + mip, getUAVCompatibleFormat(cubemapDesc.Format));
 			if (mip == 0)
 			{
-				cl->setComputeDescriptorTable(2, h);
+				cl->setComputeDescriptorTable(2, h.gpuHandle);
 			}
 		}
 
@@ -407,17 +411,17 @@ dx_texture cubemapToIrradiance(dx_command_list* cl, dx_texture& environment, uin
 	dx_descriptor_range descriptors = dxContext.frameDescriptorAllocator.allocateContiguousDescriptorRange(2);
 	cl->setDescriptorHeap(descriptors);
 
-	dx_descriptor_handle uavOffset = descriptors.push2DTextureArrayUAV(stagingTexture, 0, getUAVCompatibleFormat(irradianceDesc.Format));
+	dx_double_descriptor_handle uavOffset = descriptors.pushHandle();
+	uavOffset.create2DTextureArrayUAV(stagingTexture, 0, getUAVCompatibleFormat(irradianceDesc.Format));
 
-	dx_descriptor_handle srvOffset;
-
+	dx_double_descriptor_handle srvOffset = descriptors.pushHandle();
 	if (sourceSlice == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
 	{
-		srvOffset = descriptors.pushCubemapSRV(environment);
+		srvOffset.createCubemapSRV(environment);
 	}
 	else
 	{
-		srvOffset = descriptors.pushCubemapArraySRV(environment, { 0, 1 }, sourceSlice, 1);
+		srvOffset.createCubemapArraySRV(environment, { 0, 1 }, sourceSlice, 1);
 	}
 
 	cl->setCompute32BitConstants(0, cubemapToIrradianceCB);
@@ -485,7 +489,8 @@ dx_texture prefilterEnvironment(dx_command_list* cl, dx_texture& environment, ui
 	dx_descriptor_range descriptors = dxContext.frameDescriptorAllocator.allocateContiguousDescriptorRange(prefilteredDesc.MipLevels + 1);
 	cl->setDescriptorHeap(descriptors);
 
-	dx_descriptor_handle srvOffset = descriptors.pushCubemapSRV(environment);
+	dx_double_descriptor_handle srvOffset = descriptors.pushHandle();
+	srvOffset.createCubemapSRV(environment);
 	cl->setComputeDescriptorTable(1, srvOffset);
 
 	for (uint32 mipSlice = 0; mipSlice < prefilteredDesc.MipLevels; )
@@ -501,7 +506,8 @@ dx_texture prefilterEnvironment(dx_command_list* cl, dx_texture& environment, ui
 
 		for (uint32 mip = 0; mip < numMips; ++mip)
 		{
-			dx_descriptor_handle h = descriptors.push2DTextureArrayUAV(stagingTexture, mipSlice + mip, getUAVCompatibleFormat(prefilteredDesc.Format));
+			dx_double_descriptor_handle h = descriptors.pushHandle();
+			h.create2DTextureArrayUAV(stagingTexture, mipSlice + mip, getUAVCompatibleFormat(prefilteredDesc.Format));
 			if (mip == 0)
 			{
 				cl->setComputeDescriptorTable(2, h);
@@ -567,7 +573,8 @@ dx_texture integrateBRDF(dx_command_list* cl, uint32 resolution)
 	dx_descriptor_range descriptors = dxContext.frameDescriptorAllocator.allocateContiguousDescriptorRange(1);
 	cl->setDescriptorHeap(descriptors);
 
-	dx_descriptor_handle uav = descriptors.push2DTextureUAV(stagingTexture, 0, getUAVCompatibleFormat(desc.Format));
+	dx_double_descriptor_handle uav = descriptors.pushHandle();
+	uav.create2DTextureUAV(stagingTexture, 0, getUAVCompatibleFormat(desc.Format));
 	cl->setComputeDescriptorTable(1, uav);
 
 	cl->dispatch(bucketize(resolution, 16), bucketize(resolution, 16), 1);

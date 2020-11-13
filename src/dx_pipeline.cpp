@@ -239,7 +239,8 @@ static void loadRootSignature(reloadable_root_signature& r)
 {
 	dx_blob rs = shaderBlobs[r.file].blob;
 
-	dxContext.retireObject(r.rootSignature); 
+	dxContext.retireObject(r.rootSignature.rootSignature); 
+	freeRootSignature(r.rootSignature);
 	r.rootSignature = createRootSignature(rs);
 }
 
@@ -255,20 +256,21 @@ static void loadPipeline(reloadable_pipeline_state& p)
 		if (p.graphicsFiles.ds) { dx_blob shader = shaderBlobs[p.graphicsFiles.ds].blob; p.graphicsDesc.DS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
 		if (p.graphicsFiles.hs) { dx_blob shader = shaderBlobs[p.graphicsFiles.hs].blob; p.graphicsDesc.HS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
 
-		p.graphicsDesc.pRootSignature = p.rootSignature->Get();
+		p.graphicsDesc.pRootSignature = p.rootSignature->rootSignature.Get();
 		checkResult(dxContext.device->CreateGraphicsPipelineState(&p.graphicsDesc, IID_PPV_ARGS(&p.pipeline)));
 	}
 	else
 	{
 		dx_blob shader = shaderBlobs[p.computeFile].blob; p.computeDesc.CS = CD3DX12_SHADER_BYTECODE(shader.Get());
 
-		p.computeDesc.pRootSignature = p.rootSignature->Get();
+		p.computeDesc.pRootSignature = p.rootSignature->rootSignature.Get();
 		checkResult(dxContext.device->CreateComputePipelineState(&p.computeDesc, IID_PPV_ARGS(&p.pipeline)));
 	}
 }
 
 void createAllReloadablePipelines()
 {
+#if 1
 	concurrency::parallel_for(0, (int)rootSignaturesFromFiles.size(), [&](int i)
 	{
 		loadRootSignature(rootSignaturesFromFiles[i]);
@@ -278,6 +280,16 @@ void createAllReloadablePipelines()
 	{
 		loadPipeline(pipelines[i]);
 	});
+#else
+	for (uint32 i = 0; i < (uint32)rootSignaturesFromFiles.size(); ++i)
+	{
+		loadRootSignature(rootSignaturesFromFiles[i]);
+	}
+	for (uint32 i = 0; i < (uint32)pipelines.size(); ++i)
+	{
+		loadPipeline(pipelines[i]);
+	}
+#endif
 
 	mutex = createMutex();
 	CreateThread(0, 0, checkForFileChanges, 0, 0, 0);

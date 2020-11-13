@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dx.h"
+#include "dx_descriptor.h"
 #include "threading.h"
 
 struct dx_texture;
@@ -21,170 +22,17 @@ struct dx_dynamic_vertex_buffer
 	D3D12_VERTEX_BUFFER_VIEW view;
 };
 
-struct texture_mip_range
-{
-	uint32 first = 0;
-	uint32 count = (uint32)-1; // Use all mips.
-};
-
-struct buffer_range
-{
-	uint32 firstElement = 0;
-	uint32 numElements = (uint32)-1;
-};
-
-struct dx_descriptor_handle
-{
-	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle;
-};
-
-struct dx_descriptor_heap
-{
-	com<ID3D12DescriptorHeap> descriptorHeap;
-	D3D12_DESCRIPTOR_HEAP_TYPE type;
-
-	dx_descriptor_handle base;
-
-	uint32 maxNumDescriptors;
-	uint32 descriptorHandleIncrementSize;
-
-	dx_descriptor_handle getOffsetted(dx_descriptor_handle base, uint32 offset);
-};
-
-struct dx_descriptor_range : dx_descriptor_heap
-{
-	uint32 pushIndex;
-
-	dx_descriptor_handle pushEmptyHandle();
-
-	dx_descriptor_handle create2DTextureSRV(dx_texture& texture, dx_descriptor_handle handle, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
-	dx_descriptor_handle create2DTextureSRV(dx_texture& texture, uint32 index, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
-	dx_descriptor_handle push2DTextureSRV(dx_texture& texture, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
-
-	dx_descriptor_handle createCubemapSRV(dx_texture& texture, dx_descriptor_handle handle, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
-	dx_descriptor_handle createCubemapSRV(dx_texture& texture, uint32 index, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
-	dx_descriptor_handle pushCubemapSRV(dx_texture& texture, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
-
-	dx_descriptor_handle createCubemapArraySRV(dx_texture& texture, dx_descriptor_handle handle, texture_mip_range mipRange = {}, uint32 firstCube = 0, uint32 numCubes = 1, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
-	dx_descriptor_handle createCubemapArraySRV(dx_texture& texture, uint32 index, texture_mip_range mipRange = {}, uint32 firstCube = 0, uint32 numCubes = 1, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
-	dx_descriptor_handle pushCubemapArraySRV(dx_texture& texture, texture_mip_range mipRange = {}, uint32 firstCube = 0, uint32 numCubes = 1, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
-
-	dx_descriptor_handle createDepthTextureSRV(dx_texture& texture, dx_descriptor_handle handle);
-	dx_descriptor_handle createDepthTextureSRV(dx_texture& texture, uint32 index);
-	dx_descriptor_handle pushDepthTextureSRV(dx_texture& texture);
-
-	dx_descriptor_handle createNullTextureSRV(dx_descriptor_handle handle);
-	dx_descriptor_handle createNullTextureSRV(uint32 index);
-	dx_descriptor_handle pushNullTextureSRV();
-
-	dx_descriptor_handle createBufferSRV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange = {});
-	dx_descriptor_handle createBufferSRV(dx_buffer& buffer, uint32 index, buffer_range bufferRange = {});
-	dx_descriptor_handle pushBufferSRV(dx_buffer& buffer, buffer_range bufferRange = {});
-
-	dx_descriptor_handle createRawBufferSRV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange = {});
-	dx_descriptor_handle createRawBufferSRV(dx_buffer& buffer, uint32 index, buffer_range bufferRange = {});
-	dx_descriptor_handle pushRawBufferSRV(dx_buffer& buffer, buffer_range bufferRange = {});
-
-	dx_descriptor_handle create2DTextureUAV(dx_texture& texture, dx_descriptor_handle handle, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
-	dx_descriptor_handle create2DTextureUAV(dx_texture& texture, uint32 index, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
-	dx_descriptor_handle push2DTextureUAV(dx_texture& texture, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
-
-	dx_descriptor_handle create2DTextureArrayUAV(dx_texture& texture, dx_descriptor_handle handle, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
-	dx_descriptor_handle create2DTextureArrayUAV(dx_texture& texture, uint32 index, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
-	dx_descriptor_handle push2DTextureArrayUAV(dx_texture& texture, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
-
-	dx_descriptor_handle createNullTextureUAV(dx_descriptor_handle handle);
-	dx_descriptor_handle createNullTextureUAV(uint32 index);
-	dx_descriptor_handle pushNullTextureUAV();
-
-	dx_descriptor_handle createBufferUAV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange = {});
-	dx_descriptor_handle createBufferUAV(dx_buffer& buffer, uint32 index, buffer_range bufferRange = {});
-	dx_descriptor_handle pushBufferUAV(dx_buffer& buffer, buffer_range bufferRange = {});
-
-	dx_descriptor_handle createBufferUintUAV(dx_buffer& buffer, dx_descriptor_handle handle, buffer_range bufferRange = {});
-	dx_descriptor_handle createBufferUintUAV(dx_buffer& buffer, uint32 index, buffer_range bufferRange = {});
-	dx_descriptor_handle pushBufferUintUAV(dx_buffer& buffer, buffer_range bufferRange = {});
-
-	dx_descriptor_handle createRaytracingAccelerationStructureSRV(dx_buffer& tlas, dx_descriptor_handle handle);
-	dx_descriptor_handle createRaytracingAccelerationStructureSRV(dx_buffer& tlas, uint32 index);
-	dx_descriptor_handle pushRaytracingAccelerationStructureSRV(dx_buffer& tlas);
-};
-
-struct dx_cbv_srv_uav_descriptor_heap : dx_descriptor_range
-{
-
-};
-
-struct dx_descriptor_page
-{
-	com<ID3D12DescriptorHeap> descriptorHeap;
-	dx_descriptor_handle base;
-	uint32 usedDescriptors;
-	uint32 maxNumDescriptors;
-	uint32 descriptorHandleIncrementSize;
-
-	dx_descriptor_page* next;
-};
-
-struct dx_frame_descriptor_allocator
-{
-	dx_device device;
-
-	dx_descriptor_page* usedPages[NUM_BUFFERED_FRAMES];
-	dx_descriptor_page* freePages;
-	uint32 currentFrame;
-
-	thread_mutex mutex;
-
-	void newFrame(uint32 bufferedFrameID);
-	dx_descriptor_range allocateContiguousDescriptorRange(uint32 count);
-};
-
-struct dx_rtv_descriptor_heap : dx_descriptor_heap
-{
-	volatile uint32 pushIndex;
-
-	dx_descriptor_handle pushRenderTargetView(dx_texture& texture);
-	dx_descriptor_handle createRenderTargetView(dx_texture& texture, dx_descriptor_handle index);
-};
-
-struct dx_dsv_descriptor_heap : dx_descriptor_heap
-{
-	volatile uint32 pushIndex;
-
-	dx_descriptor_handle pushDepthStencilView(dx_texture& texture);
-	dx_descriptor_handle createDepthStencilView(dx_texture& texture, dx_descriptor_handle index);
-};
-
-static dx_descriptor_handle getHandle(dx_descriptor_heap& descriptorHeap, uint32 index)
-{
-	assert(index < descriptorHeap.maxNumDescriptors);
-
-	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(descriptorHeap.base.gpuHandle, index, descriptorHeap.descriptorHandleIncrementSize);
-	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(descriptorHeap.base.cpuHandle, index, descriptorHeap.descriptorHandleIncrementSize);
-
-	return { cpuHandle, gpuHandle };
-}
-
-static dx_descriptor_handle getHandle(dx_descriptor_range& range, uint32 index)
-{
-	assert(index < range.maxNumDescriptors);
-
-	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(range.base.gpuHandle, index, range.descriptorHandleIncrementSize);
-	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(range.base.cpuHandle, index, range.descriptorHandleIncrementSize);
-
-	return { cpuHandle, gpuHandle };
-}
-
 struct dx_texture
 {
 	dx_resource resource;
 
 	D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport;
 
-	dx_descriptor_handle rtvHandles;
-	dx_descriptor_handle dsvHandle;
+	dx_cpu_descriptor_handle rtvHandles;
+	dx_cpu_descriptor_handle dsvHandle;
+
+	dx_cpu_descriptor_handle defaultSRV;
+	dx_cpu_descriptor_handle defaultUAV;
 };
 
 struct dx_buffer
@@ -194,8 +42,15 @@ struct dx_buffer
 	uint32 elementSize;
 	uint32 elementCount;
 	uint32 totalSize;
+	D3D12_HEAP_TYPE heapType;
 
 	D3D12_GPU_VIRTUAL_ADDRESS gpuVirtualAddress;
+
+	dx_cpu_descriptor_handle defaultSRV;
+	dx_cpu_descriptor_handle defaultUAV;
+
+	dx_cpu_descriptor_handle cpuClearUAV;
+	dx_gpu_descriptor_handle gpuClearUAV;
 };
 
 struct dx_vertex_buffer : dx_buffer
@@ -257,17 +112,28 @@ void unmapBuffer(dx_buffer& buffer);
 void uploadBufferData(dx_buffer& buffer, const void* bufferData);
 void updateBufferDataRange(dx_buffer& buffer, const void* data, uint32 offset, uint32 size);
 
-dx_buffer createBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
-dx_buffer createUploadBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
-dx_vertex_buffer createVertexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
-dx_vertex_buffer createUploadVertexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
-dx_index_buffer createIndexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false);
+dx_buffer createBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, bool allowClearing = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
+dx_buffer createUploadBuffer(uint32 elementSize, uint32 elementCount, void* data);
+dx_vertex_buffer createVertexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, bool allowClearing = false);
+dx_vertex_buffer createUploadVertexBuffer(uint32 elementSize, uint32 elementCount, void* data);
+dx_index_buffer createIndexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, bool allowClearing = false);
+void resizeBuffer(dx_buffer& buffer, uint32 newElementCount, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
+void freeBuffer(dx_buffer& buffer);
 
 void uploadTextureSubresourceData(dx_texture& texture, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 firstSubresource, uint32 numSubresources);
 dx_texture createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
 dx_texture createTexture(const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allowRenderTarget = false, bool allowUnorderedAccess = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
 dx_texture createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format);
 void resizeTexture(dx_texture& texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
+void freeTexture(dx_texture& texture);
+
+struct dx_root_signature
+{
+	com<ID3D12RootSignature> rootSignature;
+	uint32* descriptorTableSizes;
+	uint32 numDescriptorTables;
+	uint32 tableRootParameterMask;
+};
 
 dx_root_signature createRootSignature(dx_blob rootSignatureBlob);
 dx_root_signature createRootSignature(const wchar* path);
@@ -279,13 +145,9 @@ dx_root_signature createRootSignature(CD3DX12_ROOT_PARAMETER* rootParameters, ui
 	D3D12_ROOT_SIGNATURE_FLAGS flags);
 dx_command_signature createCommandSignature(dx_root_signature rootSignature, const D3D12_COMMAND_SIGNATURE_DESC& commandSignatureDesc);
 dx_root_signature createRootSignature(D3D12_ROOT_SIGNATURE_FLAGS flags);
+void freeRootSignature(dx_root_signature& rs);
+
 dx_command_signature createCommandSignature(dx_root_signature rootSignature, D3D12_INDIRECT_ARGUMENT_DESC* argumentDescs, uint32 numArgumentDescs, uint32 commandStructureSize);
-
-dx_cbv_srv_uav_descriptor_heap createDescriptorHeap(uint32 numDescriptors, bool shaderVisible = true);
-dx_rtv_descriptor_heap createRTVDescriptorAllocator(uint32 numDescriptors);
-dx_dsv_descriptor_heap createDSVDescriptorAllocator(uint32 numDescriptors);
-
-dx_frame_descriptor_allocator createFrameDescriptorAllocator();
 
 dx_submesh createSubmesh(dx_mesh& mesh, submesh_info info);
 dx_submesh createSubmesh(dx_mesh& mesh);

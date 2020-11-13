@@ -21,7 +21,6 @@ typedef com<IDXGISwapChain4> dx_swapchain;
 typedef com<ID3D12Resource> dx_resource;
 typedef com<ID3D12GraphicsCommandList4> dx_graphics_command_list;
 typedef com<ID3DBlob> dx_blob;
-typedef com<ID3D12RootSignature> dx_root_signature;
 typedef com<ID3D12PipelineState> dx_pipeline_state;
 typedef com<ID3D12Resource> dx_resource;
 typedef com<ID3D12CommandSignature> dx_command_signature;

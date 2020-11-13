@@ -139,9 +139,11 @@ void dx_context::initialize()
 	copyQueue.initialize(device, D3D12_COMMAND_LIST_TYPE_COPY);
 
 
-	rtvAllocator = createRTVDescriptorAllocator(1024);
-	dsvAllocator = createDSVDescriptorAllocator(1024);
-	frameDescriptorAllocator = createFrameDescriptorAllocator();
+	descriptorAllocatorCPU.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096, false);
+	descriptorAllocatorGPU.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
+	rtvAllocator.initialize(1024, false);
+	dsvAllocator.initialize(1024, false);
+	frameDescriptorAllocator.initialize();
 }
 
 void dx_context::flushApplication()
@@ -166,12 +168,16 @@ dx_command_list* dx_context::allocateCommandList(D3D12_COMMAND_LIST_TYPE type)
 	dx_command_list* result = (dx_command_list*)arena.allocate(sizeof(dx_command_list), true);
 	allocationMutex.unlock();
 
+	new (result) dx_command_list();
+
 	result->type = type;
 
 	dx_command_allocator* allocator = getFreeCommandAllocator(type);
 	result->commandAllocator = allocator;
 
 	checkResult(device->CreateCommandList(0, type, allocator->commandAllocator.Get(), 0, IID_PPV_ARGS(&result->commandList)));
+
+	result->dynamicDescriptorHeap.initialize();
 
 	return result;
 }

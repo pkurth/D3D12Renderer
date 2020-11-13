@@ -45,17 +45,11 @@ struct pbr_environment
 	dx_texture sky;
 	dx_texture irradiance;
 	dx_texture prefiltered;
-
-	dx_descriptor_handle skySRV;
-	dx_descriptor_handle irradianceSRV;
-	dx_descriptor_handle prefilteredSRV;
 };
 
 struct light_culling_buffers
 {
 	dx_buffer tiledFrusta;
-	dx_buffer pointLightBoundingVolumes;
-	dx_buffer spotLightBoundingVolumes;
 
 	dx_buffer opaqueLightIndexCounter;
 	dx_buffer opaqueLightIndexList;
@@ -64,12 +58,6 @@ struct light_culling_buffers
 
 	uint32 numTilesX;
 	uint32 numTilesY;
-
-	dx_descriptor_handle resourceHandle;
-	dx_descriptor_handle opaqueLightGridSRV;
-
-	dx_descriptor_handle opaqueLightIndexCounterUAVCPU;
-	dx_descriptor_handle opaqueLightIndexCounterUAVGPU;
 };
 
 
@@ -84,21 +72,17 @@ struct dx_renderer
 	static void dummyRender(float dt);
 
 
-	static dx_cbv_srv_uav_descriptor_heap globalDescriptorHeap;
-	static dx_cbv_srv_uav_descriptor_heap globalDescriptorHeapCPU;
-
 	static dx_dynamic_constant_buffer cameraCBV;
 
 	static dx_texture whiteTexture;
-	static dx_descriptor_handle whiteTextureSRV;
 
 	static dx_render_target hdrRenderTarget;
 	static dx_texture hdrColorTexture;
-	static dx_descriptor_handle hdrColorTextureSRV;
 	static dx_texture depthBuffer;
-	static dx_descriptor_handle depthBufferSRV;
 
 	static light_culling_buffers lightCullingBuffers;
+	static dx_buffer pointLightBoundingVolumes[NUM_BUFFERED_FRAMES];
+	static dx_buffer spotLightBoundingVolumes[NUM_BUFFERED_FRAMES];
 
 	static uint32 renderWidth;
 	static uint32 renderHeight;
@@ -106,7 +90,6 @@ struct dx_renderer
 	static uint32 windowHeight;
 
 	static dx_render_target windowRenderTarget;
-	static dx_descriptor_handle frameResultSRV;
 	static dx_texture frameResult;
 
 	static D3D12_VIEWPORT windowViewport;

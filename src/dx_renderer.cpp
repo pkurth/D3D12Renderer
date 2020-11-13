@@ -9,33 +9,29 @@
 #include "mesh.h"
 #include "random.h"
 #include "texture_preprocessing.h"
+#include "perlin.h"
 
 #include "model_rs.hlsl"
 #include "outline_rs.hlsl"
 #include "present_rs.hlsl"
 #include "sky_rs.hlsl"
 #include "light_culling.hlsl"
+#include "light_source.hlsl"
 
 #include "camera.hlsl"
-
-
-dx_cbv_srv_uav_descriptor_heap dx_renderer::globalDescriptorHeap;
-dx_cbv_srv_uav_descriptor_heap dx_renderer::globalDescriptorHeapCPU;
-
 
 
 dx_dynamic_constant_buffer dx_renderer::cameraCBV;
 
 dx_texture dx_renderer::whiteTexture;
-dx_descriptor_handle dx_renderer::whiteTextureSRV;
 
 dx_render_target dx_renderer::hdrRenderTarget;
 dx_texture dx_renderer::hdrColorTexture;
-dx_descriptor_handle dx_renderer::hdrColorTextureSRV;
 dx_texture dx_renderer::depthBuffer;
-dx_descriptor_handle dx_renderer::depthBufferSRV;
 
 light_culling_buffers dx_renderer::lightCullingBuffers;
+dx_buffer dx_renderer::pointLightBoundingVolumes[NUM_BUFFERED_FRAMES];
+dx_buffer dx_renderer::spotLightBoundingVolumes[NUM_BUFFERED_FRAMES];
 
 uint32 dx_renderer::renderWidth;
 uint32 dx_renderer::renderHeight;
@@ -43,7 +39,6 @@ uint32 dx_renderer::windowWidth;
 uint32 dx_renderer::windowHeight;
 
 dx_render_target dx_renderer::windowRenderTarget;
-dx_descriptor_handle dx_renderer::frameResultSRV;
 dx_texture dx_renderer::frameResult;
 
 D3D12_VIEWPORT dx_renderer::windowViewport;
@@ -98,7 +93,6 @@ static vec4 gizmoColors[] =
 
 
 static dx_texture brdfTex;
-static dx_descriptor_handle brdfTexSRV;
 
 
 // The following stuff will eventually move into a different file.
@@ -110,9 +104,12 @@ static dx_texture albedoTex;
 static dx_texture normalTex;
 static dx_texture roughTex;
 static dx_texture metalTex;
-static dx_descriptor_handle textureSRV;
 
 static trs meshTransform;
+
+static const uint32 numLights = 4096;
+static vec3* lightVelocities;
+static point_light_cb* lights;
 
 
 static pbr_environment environment;
@@ -126,25 +123,23 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	dx_renderer::windowWidth = windowWidth;
 	dx_renderer::windowHeight = windowHeight;
 
-	globalDescriptorHeap = createDescriptorHeap(2048);
-	globalDescriptorHeapCPU = createDescriptorHeap(2048, false);
-
 	recalculateViewport(false);
 
 	uint8 white[] = { 255, 255, 255, 255 };
 	whiteTexture = createTexture(white, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
-	whiteTextureSRV = globalDescriptorHeap.push2DTextureSRV(whiteTexture);
 
+	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
+	{
+		pointLightBoundingVolumes[i] = createUploadBuffer(sizeof(point_light_cb), MAX_NUM_POINT_LIGHTS_PER_FRAME, 0);
+		spotLightBoundingVolumes[i] = createUploadBuffer(sizeof(spot_light_cb), MAX_NUM_SPOT_LIGHTS_PER_FRAME, 0);
+	}
 
 	initializeTexturePreprocessing();
 
 	// HDR render target.
 	{
 		depthBuffer = createDepthTexture(renderWidth, renderHeight, DXGI_FORMAT_D24_UNORM_S8_UINT);
-		depthBufferSRV = globalDescriptorHeap.pushDepthTextureSRV(depthBuffer);
-
 		hdrColorTexture = createTexture(0, renderWidth, renderHeight, DXGI_FORMAT_R16G16B16A16_FLOAT, true);
-		hdrColorTextureSRV = globalDescriptorHeap.push2DTextureSRV(hdrColorTexture);
 
 		hdrRenderTarget.pushColorAttachment(hdrColorTexture);
 		hdrRenderTarget.pushDepthStencilAttachment(depthBuffer);
@@ -153,7 +148,6 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	// Frame result.
 	{
 		frameResult = createTexture(0, windowWidth, windowHeight, DXGI_FORMAT_R8G8B8A8_UNORM, true);
-		frameResultSRV = globalDescriptorHeap.push2DTextureSRV(frameResult);
 
 		windowRenderTarget.pushColorAttachment(frameResult);
 	}
@@ -228,7 +222,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 
 
 
-	camera.position = vec3(0.f, 3.f, 4.f);
+	camera.position = vec3(0.f, 30.f, 40.f);
 	camera.rotation = quat(vec3(1.f, 0.f, 0.f), deg2rad(-20.f));
 	camera.verticalFOV = deg2rad(70.f);
 	camera.nearPlane = 0.1f;
@@ -256,23 +250,18 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	{
 		dx_command_list* cl = dxContext.getFreeRenderCommandList();
 		brdfTex = integrateBRDF(cl);
-		brdfTexSRV = globalDescriptorHeap.push2DTextureSRV(brdfTex);
 		dxContext.executeCommandList(cl);
 	}
 
-	mesh = createCompositeMeshFromFile("assets/meshes/cerberus.fbx", mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
-	//cpu_mesh m(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
-	//mesh.singleMeshes.push_back({ m.pushQuad(10000.f) });
-	//mesh.mesh = m.createDXMesh();
+	//mesh = createCompositeMeshFromFile("assets/meshes/cerberus.fbx", mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+	cpu_mesh m(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+	mesh.singleMeshes.push_back({ m.pushQuad(10000.f) });
+	mesh.mesh = m.createDXMesh();
 
 	albedoTex = loadTextureFromFile("assets/textures/cerberus_a.tga");
 	normalTex = loadTextureFromFile("assets/textures/cerberus_n.tga", texture_load_flags_default | texture_load_flags_noncolor);
 	roughTex = loadTextureFromFile("assets/textures/cerberus_r.tga", texture_load_flags_default | texture_load_flags_noncolor);
 	metalTex = loadTextureFromFile("assets/textures/cerberus_m.tga", texture_load_flags_default | texture_load_flags_noncolor);
-	textureSRV = globalDescriptorHeap.push2DTextureSRV(albedoTex);
-	globalDescriptorHeap.push2DTextureSRV(normalTex);
-	globalDescriptorHeap.push2DTextureSRV(roughTex);
-	globalDescriptorHeap.push2DTextureSRV(metalTex);
 
 	meshTransform = trs::identity;
 	meshTransform.rotation = quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f));
@@ -290,11 +279,31 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 		environment.irradiance = cubemapToIrradiance(cl, environment.sky);
 		dxContext.executeCommandList(cl);
 
-		environment.skySRV = globalDescriptorHeap.pushCubemapSRV(environment.sky);
-		environment.irradianceSRV = globalDescriptorHeap.pushCubemapSRV(environment.irradiance);
-		environment.prefilteredSRV = globalDescriptorHeap.pushCubemapSRV(environment.prefiltered);
-
 		dxContext.retireObject(equiSky.resource);
+	}
+
+	lights = new point_light_cb[numLights];
+	lightVelocities = new vec3[numLights];
+
+	random_number_generator rng = { 14878213 };
+	for (uint32 i = 0; i < numLights; ++i)
+	{
+		lights[i] = 
+		{
+			{
+				rng.randomFloatBetween(-100.f, 100.f),
+				0.f,
+				rng.randomFloatBetween(-100.f, 100.f),
+			}
+			// Rest is set in update step.
+		};
+
+		lightVelocities[i] =
+		{
+			rng.randomFloatBetween(-1.f, 1.f),
+			0.f,
+			rng.randomFloatBetween(-1.f, 1.f),
+		};
 	}
 }
 
@@ -323,7 +332,6 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight, float dt)
 		// Frame result.
 		{
 			resizeTexture(frameResult, windowWidth, windowHeight);
-			globalDescriptorHeap.create2DTextureSRV(frameResult, frameResultSRV);
 			windowRenderTarget.notifyOnTextureResize(windowWidth, windowHeight);
 		}
 
@@ -371,8 +379,6 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 	{
 		resizeTexture(hdrColorTexture, renderWidth, renderHeight);
 		resizeTexture(depthBuffer, renderWidth, renderHeight);
-		globalDescriptorHeap.create2DTextureSRV(hdrColorTexture, hdrColorTextureSRV);
-		globalDescriptorHeap.createDepthTextureSRV(depthBuffer, depthBufferSRV);
 		hdrRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
 	}
 
@@ -382,8 +388,6 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 void dx_renderer::allocateLightCullingBuffers()
 {
 	dxContext.retireObject(lightCullingBuffers.tiledFrusta.resource);
-	dxContext.retireObject(lightCullingBuffers.pointLightBoundingVolumes.resource);
-	dxContext.retireObject(lightCullingBuffers.spotLightBoundingVolumes.resource);
 	dxContext.retireObject(lightCullingBuffers.opaqueLightIndexCounter.resource);
 	dxContext.retireObject(lightCullingBuffers.opaqueLightIndexList.resource);
 	dxContext.retireObject(lightCullingBuffers.opaqueLightGrid.resource);
@@ -393,59 +397,33 @@ void dx_renderer::allocateLightCullingBuffers()
 
 	bool firstAllocation = lightCullingBuffers.opaqueLightGrid.resource == nullptr;
 
-	lightCullingBuffers.opaqueLightGrid = createTexture(0, lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY,
-		DXGI_FORMAT_R32G32_UINT, false, true);
-	lightCullingBuffers.opaqueLightIndexCounter = createBuffer(sizeof(uint32), 1, 0, true);
-	lightCullingBuffers.opaqueLightIndexList = createBuffer(sizeof(uint32), 
-		lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY * MAX_NUM_LIGHTS_PER_TILE, 0, true);
-	lightCullingBuffers.tiledFrusta = createBuffer(sizeof(light_culling_view_frustum), lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY, 0, true);
-
-	lightCullingBuffers.pointLightBoundingVolumes = createUploadBuffer(sizeof(point_light_bounding_volume), MAX_NUM_POINT_LIGHTS_PER_FRAME, 0); // TODO: Don't allocate here.
-	lightCullingBuffers.spotLightBoundingVolumes = createUploadBuffer(sizeof(spot_light_bounding_volume), MAX_NUM_SPOT_LIGHTS_PER_FRAME, 0); // TODO: Don't allocate here.
-
 	if (firstAllocation)
 	{
-		lightCullingBuffers.opaqueLightGridSRV = globalDescriptorHeap.push2DTextureSRV(lightCullingBuffers.opaqueLightGrid);
-		globalDescriptorHeap.pushBufferSRV(lightCullingBuffers.opaqueLightIndexList);
-
-		// SRVs.
-		lightCullingBuffers.resourceHandle = globalDescriptorHeap.pushBufferSRV(lightCullingBuffers.pointLightBoundingVolumes);
-		globalDescriptorHeap.pushBufferSRV(lightCullingBuffers.spotLightBoundingVolumes);
-		globalDescriptorHeap.pushBufferSRV(lightCullingBuffers.tiledFrusta);
-
-		// UAVs.
-		globalDescriptorHeap.pushBufferUAV(lightCullingBuffers.opaqueLightIndexCounter);
-		globalDescriptorHeap.pushBufferUAV(lightCullingBuffers.opaqueLightIndexList);
-		globalDescriptorHeap.push2DTextureUAV(lightCullingBuffers.opaqueLightGrid);
-
-		lightCullingBuffers.opaqueLightIndexCounterUAVGPU = globalDescriptorHeap.pushBufferUintUAV(lightCullingBuffers.opaqueLightIndexCounter);
-		lightCullingBuffers.opaqueLightIndexCounterUAVCPU = globalDescriptorHeapCPU.pushBufferUintUAV(lightCullingBuffers.opaqueLightIndexCounter);
+		lightCullingBuffers.opaqueLightGrid = createTexture(0, lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY,
+			DXGI_FORMAT_R32G32_UINT, false, true);
+		lightCullingBuffers.opaqueLightIndexCounter = createBuffer(sizeof(uint32), 1, 0, true, true);
+		lightCullingBuffers.opaqueLightIndexList = createBuffer(sizeof(uint32),
+			lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY * MAX_NUM_LIGHTS_PER_TILE, 0, true);
+		lightCullingBuffers.tiledFrusta = createBuffer(sizeof(light_culling_view_frustum), lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY, 0, true);
 	}
 	else
 	{
-		globalDescriptorHeap.create2DTextureSRV(lightCullingBuffers.opaqueLightGrid, lightCullingBuffers.opaqueLightGridSRV);
-		globalDescriptorHeap.createBufferSRV(lightCullingBuffers.opaqueLightIndexList, globalDescriptorHeap.getOffsetted(lightCullingBuffers.opaqueLightGridSRV, 1));
-
-		auto base = lightCullingBuffers.resourceHandle;
-		globalDescriptorHeap.createBufferSRV(lightCullingBuffers.pointLightBoundingVolumes, globalDescriptorHeap.getOffsetted(base, 0));
-		globalDescriptorHeap.createBufferSRV(lightCullingBuffers.spotLightBoundingVolumes, globalDescriptorHeap.getOffsetted(base, 1));
-		globalDescriptorHeap.createBufferSRV(lightCullingBuffers.tiledFrusta, globalDescriptorHeap.getOffsetted(base, 2));
-
-		globalDescriptorHeap.createBufferUAV(lightCullingBuffers.opaqueLightIndexCounter, globalDescriptorHeap.getOffsetted(base, 3));
-		globalDescriptorHeap.createBufferUAV(lightCullingBuffers.opaqueLightIndexList, globalDescriptorHeap.getOffsetted(base, 4));
-		globalDescriptorHeap.create2DTextureUAV(lightCullingBuffers.opaqueLightGrid, globalDescriptorHeap.getOffsetted(base, 5));
-
-		globalDescriptorHeap.createBufferUintUAV(lightCullingBuffers.opaqueLightIndexCounter, lightCullingBuffers.opaqueLightIndexCounterUAVGPU);
-		globalDescriptorHeapCPU.createBufferUintUAV(lightCullingBuffers.opaqueLightIndexCounter, lightCullingBuffers.opaqueLightIndexCounterUAVCPU);
+		resizeTexture(lightCullingBuffers.opaqueLightGrid, lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY);
+		resizeBuffer(lightCullingBuffers.opaqueLightIndexList, lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY * MAX_NUM_LIGHTS_PER_TILE);
+		resizeBuffer(lightCullingBuffers.tiledFrusta, lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY);
 	}
 }
 
 void dx_renderer::dummyRender(float dt)
 {
-	static float meshRotationSpeed = 1.f;
+	static float meshRotationSpeed = 0.f;
 	static gizmo_type gizmoType;
 	static bool showOutline = false;
 	static vec4 outlineColor(1.f, 1.f, 0.f, 1.f);
+	static bool showLightVolumes = false;
+	static float lightIntensity = 5.f;
+	static float lightRadius = 10.f;
+
 
 	DXGI_QUERY_VIDEO_MEMORY_INFO memoryInfo;
 	checkResult(dxContext.adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memoryInfo));
@@ -458,6 +436,8 @@ void dx_renderer::dummyRender(float dt)
 
 	ImGui::Checkbox("Show outline", &showOutline);
 	ImGui::ColorEdit4("Outline color", outlineColor.data);
+
+	ImGui::Checkbox("Show light volumes", &showLightVolumes);
 
 	ImGui::SliderFloat("Rotation speed", &meshRotationSpeed, -2.f, 2.f);
 	ImGui::Text("Video memory available: %uMB", (uint32)BYTE_TO_MB(memoryInfo.Budget));
@@ -482,11 +462,32 @@ void dx_renderer::dummyRender(float dt)
 	ImGui::SliderFloat("[ACES] Linear white", &tonemap.linearWhite, 0.f, 100.f);
 	ImGui::SliderFloat("[ACES] Exposure", &tonemap.exposure, -3.f, 3.f);
 
+	ImGui::SliderFloat("Light intensity", &lightIntensity, 0.1f, 400.f);
+	ImGui::SliderFloat("Light radius", &lightRadius, 1.f, 20.f);
+
 	ImGui::End();
 
 	if (aspectRatioModeChanged)
 	{
 		recalculateViewport(true);
+	}
+
+	const vec3 vortexCenter(0.f, 0.f, 0.f);
+	const float vortexSpeed = 1.f;
+	const float vortexSize = 60.f;
+	for (uint32 i = 0; i < numLights; ++i)
+	{
+		lightVelocities[i] *= (1.f - 0.005f);
+		lights[i].position += lightVelocities[i] * dt;
+
+		vec3 d = lights[i].position - vortexCenter;
+		vec3 v = vec3(-d.z, 0.f, d.x) * vortexSpeed;
+		float factor = 1.f / (1.f + (d.x * d.x + d.z * d.z) / vortexSize);
+
+		lightVelocities[i] += (v - lightVelocities[i]) * factor;
+
+		lights[i].radiance = vec3(1.f, 1.f, 1.f) * lightIntensity;
+		lights[i].radius = lightRadius;
 	}
 
 
@@ -504,7 +505,7 @@ void dx_renderer::dummyRender(float dt)
 		.transition(hdrColorTexture.resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
 		.transition(frameResult.resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-	cl->setDescriptorHeap(globalDescriptorHeap);
+	//cl->setDescriptorHeap(globalDescriptorHeap);
 
 
 	cl->setRenderTarget(hdrRenderTarget);
@@ -518,12 +519,11 @@ void dx_renderer::dummyRender(float dt)
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
-	cl->setGraphicsDescriptorTable(SKY_RS_TEX, environment.skySRV);
+	cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment.sky);
 
 	cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
 	cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
 	cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
-
 
 
 	auto submesh = mesh.singleMeshes[0].submesh;
@@ -566,18 +566,9 @@ void dx_renderer::dummyRender(float dt)
 	// ----------------------------------------
 
 #if 1
-	point_light_bounding_volume* pointLightBVs = (point_light_bounding_volume*)mapBuffer(lightCullingBuffers.pointLightBoundingVolumes);
-
-	for (uint32 z = 0, i = 0; z < 8; ++z)
-	{
-		for (uint32 x = 0; x < 8; ++x, ++i)
-		{
-			pointLightBVs[i].position = (vec3((float)x, 0.f, (float)z) - vec3(4.f, 0.f, 4.f)) * 10.f;
-			pointLightBVs[i].radius = 10.f;
-		}
-	}
-
-	unmapBuffer(lightCullingBuffers.pointLightBoundingVolumes);
+	point_light_cb* pointLightBVs = (point_light_cb*)mapBuffer(pointLightBoundingVolumes[dxContext.bufferedFrameID]);
+	memcpy(pointLightBVs, lights, sizeof(point_light_cb) * numLights);
+	unmapBuffer(pointLightBoundingVolumes[dxContext.bufferedFrameID]);
 
 
 	// Tiled frusta.
@@ -585,17 +576,22 @@ void dx_renderer::dummyRender(float dt)
 	cl->setComputeRootSignature(*worldSpaceFrustaPipeline.rootSignature);
 	cl->setComputeDynamicConstantBuffer(WORLD_SPACE_TILED_FRUSTA_RS_CAMERA, cameraCBV);
 	cl->setCompute32BitConstants(WORLD_SPACE_TILED_FRUSTA_RS_CB, frusta_cb{ lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY });
-	cl->setComputeUAV(WORLD_SPACE_TILED_FRUSTA_RS_FRUSTA_UAV, lightCullingBuffers.tiledFrusta);
+	cl->setRootComputeUAV(WORLD_SPACE_TILED_FRUSTA_RS_FRUSTA_UAV, lightCullingBuffers.tiledFrusta);
 	cl->dispatch(bucketize(lightCullingBuffers.numTilesX, 16), bucketize(lightCullingBuffers.numTilesY, 16));
 
 	// Light culling.
-	cl->clearUAV(lightCullingBuffers.opaqueLightIndexCounter.resource, lightCullingBuffers.opaqueLightIndexCounterUAVCPU.cpuHandle, lightCullingBuffers.opaqueLightIndexCounterUAVGPU.gpuHandle, 0.f);
+	cl->clearUAV(lightCullingBuffers.opaqueLightIndexCounter, 0.f);
 	cl->setPipelineState(*lightCullingPipeline.pipeline);
 	cl->setComputeRootSignature(*lightCullingPipeline.rootSignature);
 	cl->setComputeDynamicConstantBuffer(LIGHT_CULLING_RS_CAMERA, cameraCBV);
-	cl->setCompute32BitConstants(LIGHT_CULLING_RS_CB, light_culling_cb{ lightCullingBuffers.numTilesX, 64, 0 }); // TODO: Number of lights.
-	cl->setComputeDescriptorTable(LIGHT_CULLING_RS_DEPTH_BUFFER, depthBufferSRV);
-	cl->setComputeDescriptorTable(LIGHT_CULLING_RS_SRV_UAV, lightCullingBuffers.resourceHandle);
+	cl->setCompute32BitConstants(LIGHT_CULLING_RS_CB, light_culling_cb{ lightCullingBuffers.numTilesX, numLights, 0 }); // TODO: Number of lights.
+	cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 0, depthBuffer);
+	cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 1, pointLightBoundingVolumes[dxContext.bufferedFrameID]);
+	cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 2, spotLightBoundingVolumes[dxContext.bufferedFrameID]);
+	cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 3, lightCullingBuffers.tiledFrusta);
+	cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 4, lightCullingBuffers.opaqueLightIndexCounter);
+	cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 5, lightCullingBuffers.opaqueLightIndexList);
+	cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 6, lightCullingBuffers.opaqueLightGrid);
 	cl->dispatch(lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY);
 #endif
 
@@ -608,10 +604,18 @@ void dx_renderer::dummyRender(float dt)
 	// Models.
 	cl->setPipelineState(*modelPipeline.pipeline);
 	cl->setGraphicsRootSignature(*modelPipeline.rootSignature);
-	cl->setGraphicsDescriptorTable(MODEL_RS_PBR_TEXTURES, textureSRV);
-	cl->setGraphicsDescriptorTable(MODEL_RS_ENVIRONMENT_TEXTURES, environment.irradianceSRV);
-	cl->setGraphicsDescriptorTable(MODEL_RS_BRDF, brdfTexSRV);
-	cl->setGraphicsDescriptorTable(MODEL_RS_LIGHTS, lightCullingBuffers.opaqueLightGridSRV);
+	cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 0, albedoTex);
+	cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 1, normalTex);
+	cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 2, roughTex);
+	cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 3, metalTex);
+	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 0, environment.irradiance);
+	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 1, environment.prefiltered);
+	cl->setDescriptorHeapSRV(MODEL_RS_BRDF, 0, brdfTex);
+	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 0, lightCullingBuffers.opaqueLightGrid);
+	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 1, lightCullingBuffers.opaqueLightIndexList);
+	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 2, pointLightBoundingVolumes[dxContext.bufferedFrameID]);
+	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 3, spotLightBoundingVolumes[dxContext.bufferedFrameID]);
+
 	cl->setGraphicsDynamicConstantBuffer(MODEL_RS_CAMERA, cameraCBV);
 	cl->setGraphics32BitConstants(MODEL_RS_MATERIAL, pbr_material_cb{ vec4(1.f, 1.f, 1.f, 1.f), 0.f, 0.f, USE_ALBEDO_TEXTURE | USE_NORMAL_TEXTURE | USE_ROUGHNESS_TEXTURE | USE_METALLIC_TEXTURE });
 
@@ -657,24 +661,22 @@ void dx_renderer::dummyRender(float dt)
 	}
 
 
-#if 0
-	// Light volumes.
-	cl->setPipelineState(*flatUnlitPipeline.pipeline);
-	cl->setGraphicsRootSignature(*flatUnlitPipeline.rootSignature);
-	cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
-	cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
-
-	for (uint32 z = 0, i = 0; z < 8; ++z)
+	if (showLightVolumes)
 	{
-		for (uint32 x = 0; x < 8; ++x, ++i)
+		// Light volumes.
+		cl->setPipelineState(*flatUnlitPipeline.pipeline);
+		cl->setGraphicsRootSignature(*flatUnlitPipeline.rootSignature);
+		cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
+		cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
+
+		for (uint32 i = 0; i < numLights; ++i)
 		{
-			float radius = 10.f;
-			cl->setGraphics32BitConstants(0, camera.viewProj * createModelMatrix((vec3((float)x, 0.f, (float)z) - vec3(4.f, 0.f, 4.f)) * 10.f, quat::identity, vec3(radius, radius, radius)));
+			float radius = lights[i].radius;
+			vec3 position = lights[i].position;
+			cl->setGraphics32BitConstants(0, camera.viewProj * createModelMatrix(position, quat::identity, vec3(radius, radius, radius)));
 			cl->drawIndexed(sphereMesh.numTriangles * 3, 1, sphereMesh.firstTriangle * 3, sphereMesh.baseVertex, 0);
 		}
 	}
-#endif
-
 
 	// Present.
 	barrier_batcher(cl)
@@ -692,7 +694,7 @@ void dx_renderer::dummyRender(float dt)
 
 	cl->setGraphics32BitConstants(PRESENT_RS_TONEMAP, tonemap);
 	cl->setGraphics32BitConstants(PRESENT_RS_PRESENT, present_cb{ 0, 0.f });
-	cl->setGraphicsDescriptorTable(PRESENT_RS_TEX, hdrColorTextureSRV);
+	cl->setDescriptorHeapSRV(PRESENT_RS_TEX, 0, hdrColorTexture);
 	cl->drawFullscreenTriangle();
 
 

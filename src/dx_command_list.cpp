@@ -69,9 +69,10 @@ void dx_command_list::setPipelineState(dx_raytracing_pipeline_state pipelineStat
 	commandList->SetPipelineState1(pipelineState.Get());
 }
 
-void dx_command_list::setGraphicsRootSignature(dx_root_signature rootSignature)
+void dx_command_list::setGraphicsRootSignature(const dx_root_signature& rootSignature)
 {
-	commandList->SetGraphicsRootSignature(rootSignature.Get());
+	dynamicDescriptorHeap.parseRootSignature(rootSignature);
+	commandList->SetGraphicsRootSignature(rootSignature.rootSignature.Get());
 }
 
 void dx_command_list::setGraphics32BitConstants(uint32 rootParameterIndex, uint32 numConstants, const void* constants)
@@ -79,9 +80,10 @@ void dx_command_list::setGraphics32BitConstants(uint32 rootParameterIndex, uint3
 	commandList->SetGraphicsRoot32BitConstants(rootParameterIndex, numConstants, constants, 0);
 }
 
-void dx_command_list::setComputeRootSignature(dx_root_signature rootSignature)
+void dx_command_list::setComputeRootSignature(const dx_root_signature& rootSignature)
 {
-	commandList->SetComputeRootSignature(rootSignature.Get());
+	dynamicDescriptorHeap.parseRootSignature(rootSignature);
+	commandList->SetComputeRootSignature(rootSignature.rootSignature.Get());
 }
 
 void dx_command_list::setCompute32BitConstants(uint32 rootParameterIndex, uint32 numConstants, const void* constants)
@@ -143,44 +145,49 @@ dx_dynamic_vertex_buffer dx_command_list::createDynamicVertexBuffer(uint32 eleme
 	return { vertexBufferView };
 }
 
-void dx_command_list::setGraphicsUAV(uint32 rootParameterIndex, dx_buffer& buffer)
+void dx_command_list::setRootGraphicsUAV(uint32 rootParameterIndex, dx_buffer& buffer)
 {
 	commandList->SetGraphicsRootUnorderedAccessView(rootParameterIndex, buffer.gpuVirtualAddress);
 }
 
-void dx_command_list::setGraphicsUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
+void dx_command_list::setRootGraphicsUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
 {
 	commandList->SetGraphicsRootUnorderedAccessView(rootParameterIndex, address);
 }
 
-void dx_command_list::setComputeUAV(uint32 rootParameterIndex, dx_buffer& buffer)
+void dx_command_list::setRootComputeUAV(uint32 rootParameterIndex, dx_buffer& buffer)
 {
 	commandList->SetComputeRootUnorderedAccessView(rootParameterIndex, buffer.gpuVirtualAddress);
 }
 
-void dx_command_list::setComputeUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
+void dx_command_list::setRootComputeUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
 {
 	commandList->SetComputeRootUnorderedAccessView(rootParameterIndex, address);
 }
 
-void dx_command_list::setGraphicsSRV(uint32 rootParameterIndex, dx_buffer& buffer)
+void dx_command_list::setRootGraphicsSRV(uint32 rootParameterIndex, dx_buffer& buffer)
 {
 	commandList->SetGraphicsRootShaderResourceView(rootParameterIndex, buffer.gpuVirtualAddress);
 }
 
-void dx_command_list::setGraphicsSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
+void dx_command_list::setRootGraphicsSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
 {
 	commandList->SetGraphicsRootShaderResourceView(rootParameterIndex, address);
 }
 
-void dx_command_list::setComputeSRV(uint32 rootParameterIndex, dx_buffer& buffer)
+void dx_command_list::setRootComputeSRV(uint32 rootParameterIndex, dx_buffer& buffer)
 {
 	commandList->SetComputeRootShaderResourceView(rootParameterIndex, buffer.gpuVirtualAddress);
 }
 
-void dx_command_list::setComputeSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
+void dx_command_list::setRootComputeSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
 {
 	commandList->SetComputeRootShaderResourceView(rootParameterIndex, address);
+}
+
+void dx_command_list::setDescriptorHeapResource(uint32 rootParameterIndex, uint32 offset, uint32 count, dx_cpu_descriptor_handle handle)
+{
+	dynamicDescriptorHeap.stageDescriptors(rootParameterIndex, offset, count, handle);
 }
 
 void dx_command_list::setDescriptorHeap(dx_descriptor_heap& descriptorHeap)
@@ -221,14 +228,33 @@ void dx_command_list::setDescriptorHeap(dx_descriptor_range& descriptorRange)
 	commandList->SetDescriptorHeaps(numDescriptorHeaps, heaps);
 }
 
+void dx_command_list::setDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, com<ID3D12DescriptorHeap> descriptorHeap)
+{
+	descriptorHeaps[type] = descriptorHeap.Get();
+
+	uint32 numDescriptorHeaps = 0;
+	ID3D12DescriptorHeap* heaps[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES] = {};
+
+	for (uint32_t i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
+	{
+		ID3D12DescriptorHeap* heap = descriptorHeaps[i];
+		if (heap)
+		{
+			heaps[numDescriptorHeaps++] = heap;
+		}
+	}
+
+	commandList->SetDescriptorHeaps(numDescriptorHeaps, heaps);
+}
+
+void dx_command_list::resetToDynamicDescriptorHeap()
+{
+	dynamicDescriptorHeap.setCurrentDescriptorHeap(this);
+}
+
 void dx_command_list::setGraphicsDescriptorTable(uint32 rootParameterIndex, CD3DX12_GPU_DESCRIPTOR_HANDLE handle)
 {
 	commandList->SetGraphicsRootDescriptorTable(rootParameterIndex, handle);
-}
-
-void dx_command_list::setGraphicsDescriptorTable(uint32 rootParameterIndex, dx_descriptor_handle handle)
-{
-	setGraphicsDescriptorTable(rootParameterIndex, handle.gpuHandle);
 }
 
 void dx_command_list::setComputeDescriptorTable(uint32 rootParameterIndex, CD3DX12_GPU_DESCRIPTOR_HANDLE handle)
@@ -236,9 +262,9 @@ void dx_command_list::setComputeDescriptorTable(uint32 rootParameterIndex, CD3DX
 	commandList->SetComputeRootDescriptorTable(rootParameterIndex, handle);
 }
 
-void dx_command_list::setComputeDescriptorTable(uint32 rootParameterIndex, dx_descriptor_handle handle)
+void dx_command_list::clearUAV(dx_buffer& buffer, float val)
 {
-	setComputeDescriptorTable(rootParameterIndex, handle.gpuHandle);
+	clearUAV(buffer.resource, buffer.cpuClearUAV, buffer.gpuClearUAV, val);
 }
 
 void dx_command_list::clearUAV(dx_resource resource, CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle, float val)
@@ -342,16 +368,19 @@ void dx_command_list::setBlendFactor(const float* blendFactor)
 
 void dx_command_list::draw(uint32 vertexCount, uint32 instanceCount, uint32 startVertex, uint32 startInstance)
 {
+	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
 	commandList->DrawInstanced(vertexCount, instanceCount, startVertex, startInstance);
 }
 
 void dx_command_list::drawIndexed(uint32 indexCount, uint32 instanceCount, uint32 startIndex, int32 baseVertex, uint32 startInstance)
 {
+	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
 	commandList->DrawIndexedInstanced(indexCount, instanceCount, startIndex, baseVertex, startInstance);
 }
 
 void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 numDraws, dx_buffer commandBuffer)
 {
+	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
 	commandList->ExecuteIndirect(
 		commandSignature.Get(),
 		numDraws,
@@ -363,6 +392,7 @@ void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32
 
 void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 maxNumDraws, dx_buffer numDrawsBuffer, dx_buffer commandBuffer)
 {
+	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
 	commandList->ExecuteIndirect(
 		commandSignature.Get(),
 		maxNumDraws,
@@ -374,17 +404,20 @@ void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32
 
 void dx_command_list::drawFullscreenTriangle()
 {
+	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
 	setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	draw(3, 1, 0, 0);
 }
 
 void dx_command_list::dispatch(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ)
 {
+	dynamicDescriptorHeap.commitStagedDescriptorsForDispatch(this);
 	commandList->Dispatch(numGroupsX, numGroupsY, numGroupsZ);
 }
 
 void dx_command_list::dispatchIndirect(dx_command_signature commandSignature, uint32 numDispatches, dx_buffer commandBuffer)
 {
+	dynamicDescriptorHeap.commitStagedDescriptorsForDispatch(this);
 	commandList->ExecuteIndirect(
 		commandSignature.Get(),
 		numDispatches,
@@ -396,6 +429,7 @@ void dx_command_list::dispatchIndirect(dx_command_signature commandSignature, ui
 
 void dx_command_list::dispatchIndirect(dx_command_signature commandSignature, uint32 maxNumDispatches, dx_buffer numDispatchesBuffer, dx_buffer commandBuffer)
 {
+	dynamicDescriptorHeap.commitStagedDescriptorsForDispatch(this);
 	commandList->ExecuteIndirect(
 		commandSignature.Get(),
 		maxNumDispatches,
@@ -407,6 +441,7 @@ void dx_command_list::dispatchIndirect(dx_command_signature commandSignature, ui
 
 void dx_command_list::raytrace(D3D12_DISPATCH_RAYS_DESC& raytraceDesc)
 {
+	dynamicDescriptorHeap.commitStagedDescriptorsForDispatch(this);
 	commandList->DispatchRays(&raytraceDesc);
 }
 
@@ -421,4 +456,5 @@ void dx_command_list::reset(dx_command_allocator* commandAllocator)
 	}
 
 	uploadBuffer.reset();
+	dynamicDescriptorHeap.reset();
 }

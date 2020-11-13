@@ -255,7 +255,7 @@ int main(int argc, char** argv)
 		ImGui::Begin("Scene");
 		uint32 renderWidth = (uint32)ImGui::GetContentRegionAvail().x;
 		uint32 renderHeight = (uint32)ImGui::GetContentRegionAvail().y;
-		ImGui::Image(dx_renderer::frameResultSRV, renderWidth, renderHeight);
+		ImGui::Image(dx_renderer::frameResult.defaultSRV, renderWidth, renderHeight);
 		ImGui::End();
 		ImGui::PopStyleVar();
 

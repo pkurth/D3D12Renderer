@@ -6,7 +6,7 @@
 #include "threading.h"
 #include "memory.h"
 #include "dx_upload_buffer.h"
-
+#include "dx_descriptor_allocation.h"
 
 
 struct object_retirement
@@ -54,22 +54,26 @@ struct dx_context
 	uint64 frameID;
 	uint32 bufferedFrameID;
 
-	thread_mutex allocationMutex;
-	memory_arena arena;
-
-	object_retirement objectRetirement;
+	dx_descriptor_heap descriptorAllocatorCPU; // Used for all kinds of resources.
+	dx_descriptor_heap descriptorAllocatorGPU; // Used for resources, which can be UAV cleared.
 
 	dx_rtv_descriptor_heap rtvAllocator;
 	dx_dsv_descriptor_heap dsvAllocator;
-
-	dx_page_pool pagePools[NUM_BUFFERED_FRAMES];
 	dx_upload_buffer frameUploadBuffer;
+
 	dx_frame_descriptor_allocator frameDescriptorAllocator;
 
 	volatile bool running = true;
 
 
 private:
+	dx_page_pool pagePools[NUM_BUFFERED_FRAMES];
+
+	object_retirement objectRetirement;
+
+	thread_mutex allocationMutex;
+	memory_arena arena;
+
 	dx_command_queue& getQueue(D3D12_COMMAND_LIST_TYPE type);
 	dx_command_list* getFreeCommandList(dx_command_queue& queue);
 	dx_command_allocator* getFreeCommandAllocator(dx_command_queue& queue);
@@ -77,8 +81,4 @@ private:
 
 	dx_command_list* allocateCommandList(D3D12_COMMAND_LIST_TYPE type);
 	dx_command_allocator* allocateCommandAllocator(D3D12_COMMAND_LIST_TYPE type);
-
-	void initializeBuffer(dx_buffer& buffer, uint32 elementSize, uint32 elementCount, void* data = 0, bool allowUnorderedAccess = false);
-	void initializeDescriptorHeap(dx_descriptor_heap& descriptorHeap, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32 numDescriptors, bool shaderVisible = true);
-
 };

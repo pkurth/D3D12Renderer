@@ -34,9 +34,9 @@ struct dx_graphics_pipeline_generator
 		return result;
 	}
 
-	dx_graphics_pipeline_generator& rootSignature(dx_root_signature rootSignature)
+	dx_graphics_pipeline_generator& rootSignature(const dx_root_signature& rootSignature)
 	{
-		desc.pRootSignature = rootSignature.Get();
+		desc.pRootSignature = rootSignature.rootSignature.Get();
 		return *this;
 	}
 
@@ -239,9 +239,9 @@ struct dx_compute_pipeline_generator
 		return result;
 	}
 
-	dx_compute_pipeline_generator& rootSignature(dx_root_signature rootSignature)
+	dx_compute_pipeline_generator& rootSignature(const dx_root_signature& rootSignature)
 	{
-		desc.pRootSignature = rootSignature.Get();
+		desc.pRootSignature = rootSignature.rootSignature.Get();
 		return *this;
 	}
 
