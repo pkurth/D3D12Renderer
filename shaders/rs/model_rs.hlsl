@@ -28,7 +28,7 @@ struct pbr_material_cb
 "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
 "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX),"  \
 "RootConstants(num32BitConstants=8, b1, visibility=SHADER_VISIBILITY_PIXEL),"  \
-"CBV(b2), " \
+"CBV(b2, visibility=SHADER_VISIBILITY_PIXEL), " \
 "StaticSampler(s0," \
     "addressU = TEXTURE_ADDRESS_WRAP," \
     "addressV = TEXTURE_ADDRESS_WRAP," \
@@ -44,7 +44,8 @@ struct pbr_material_cb
     "filter = FILTER_MIN_MAG_MIP_LINEAR," \
     "visibility=SHADER_VISIBILITY_PIXEL)," \
 "DescriptorTable(SRV(t0, space=2, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL), " \
-"DescriptorTable(SRV(t0, space=3, numDescriptors=4), visibility=SHADER_VISIBILITY_PIXEL)"
+"CBV(b0, space=3, visibility=SHADER_VISIBILITY_PIXEL), " \
+"DescriptorTable(SRV(t0, space=3, numDescriptors=5), visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define MODEL_DEPTH_ONLY_RS \
 "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
@@ -60,7 +61,8 @@ struct pbr_material_cb
 #define MODEL_RS_PBR_TEXTURES           3
 #define MODEL_RS_ENVIRONMENT_TEXTURES   4
 #define MODEL_RS_BRDF                   5
-#define MODEL_RS_LIGHTS                 6
+#define MODEL_RS_SUN                    6
+#define MODEL_RS_LIGHTS                 7
 
 #endif
 

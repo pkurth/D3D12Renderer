@@ -48,7 +48,7 @@ static float3 restoreWorldDirection(float4x4 invViewProj, float2 uv, float3 came
 }
 
 // This function returns a positive z value! This is a depth!
-static float depthBufferDepthToWorldSpaceDepth(float depthBufferDepth, float4 projectionParams)
+static float depthBufferDepthToEyeDepth(float depthBufferDepth, float4 projectionParams)
 {
 	if (projectionParams.y < 0.f) // Infinite far plane.
 	{

@@ -51,10 +51,11 @@ struct light_culling_buffers
 {
 	dx_buffer tiledFrusta;
 
-	dx_buffer opaqueLightIndexCounter;
-	dx_buffer opaqueLightIndexList;
+	dx_buffer lightIndexCounter;
+	dx_buffer pointLightIndexList;
+	dx_buffer spotLightIndexList;
 
-	dx_texture opaqueLightGrid;
+	dx_texture lightGrid;
 
 	uint32 numTilesX;
 	uint32 numTilesY;
@@ -65,7 +66,7 @@ struct dx_renderer
 {
 	static void initialize(uint32 windowWidth, uint32 windowHeight);
 
-	static void beginFrame(uint32 windowWidth, uint32 windowHeight, float dt);
+	static void beginFrame(const struct user_input& input, uint32 windowWidth, uint32 windowHeight, float dt);
 	static void recalculateViewport(bool resizeTextures);
 	static void fillCameraConstantBuffer(struct camera_cb& cb);
 	static void allocateLightCullingBuffers();
@@ -73,6 +74,7 @@ struct dx_renderer
 
 
 	static dx_dynamic_constant_buffer cameraCBV;
+	static dx_dynamic_constant_buffer sunCBV;
 
 	static dx_texture whiteTexture;
 
@@ -81,8 +83,8 @@ struct dx_renderer
 	static dx_texture depthBuffer;
 
 	static light_culling_buffers lightCullingBuffers;
-	static dx_buffer pointLightBoundingVolumes[NUM_BUFFERED_FRAMES];
-	static dx_buffer spotLightBoundingVolumes[NUM_BUFFERED_FRAMES];
+	static dx_buffer pointLightBuffer[NUM_BUFFERED_FRAMES];
+	static dx_buffer spotLightBuffer[NUM_BUFFERED_FRAMES];
 
 	static uint32 renderWidth;
 	static uint32 renderHeight;

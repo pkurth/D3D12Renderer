@@ -5,7 +5,6 @@
 #include <algorithm>
 
 #include "software_window.h"
-#include "input.h"
 #include "imgui.h"
 
 
@@ -342,69 +341,76 @@ static LRESULT CALLBACK windowCallBack(
 {
 	LRESULT result = 0;
 
+	handleImGuiInput(hwnd, msg, wParam, lParam);
+
 	win32_window* window = (win32_window*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
 	switch (msg)
 	{
-	case WM_SIZE:
-	{
-		if (window && window->open)
+		// The default window procedure will play a system notification sound 
+		// when pressing the Alt+Enter keyboard combination if this message is 
+		// not handled.
+		case WM_SYSCHAR:
+			break;
+		case WM_SIZE:
 		{
-			window->clientWidth = LOWORD(lParam);
-			window->clientHeight = HIWORD(lParam);
-			window->onResize();
-		}
-	} break;
-	case WM_CLOSE:
-	{
-		DestroyWindow(hwnd);
-	} break;
-	case WM_DESTROY:
-	{
-		if (window->windowHandle && window->open)
-		{
-			window->open = false;
-			--numOpenWindows;
-			window->shutdown();
-		}
-	} break;
-	case WM_PAINT:
-	{
-		if (window)
-		{
-			software_window* sWindow = dynamic_cast<software_window*>(window);
-
-			if (sWindow)
+			if (window && window->open)
 			{
-				const uint8* image = sWindow->buffer;
-				if (image)
-				{
-					PAINTSTRUCT ps;
+				window->clientWidth = LOWORD(lParam);
+				window->clientHeight = HIWORD(lParam);
+				window->onResize();
+			}
+		} break;
+		case WM_CLOSE:
+		{
+			DestroyWindow(hwnd);
+		} break;
+		case WM_DESTROY:
+		{
+			if (window && window->windowHandle && window->open)
+			{
+				window->open = false;
+				--numOpenWindows;
+				window->shutdown();
+			}
+		} break;
+		case WM_PAINT:
+		{
+			if (window)
+			{
+				software_window* sWindow = dynamic_cast<software_window*>(window);
 
-					HDC hdc = BeginPaint(hwnd, &ps);
-					StretchDIBits(hdc,
+				if (sWindow)
+				{
+					const uint8* image = sWindow->buffer;
+					if (image)
+					{
+						PAINTSTRUCT ps;
+
+						HDC hdc = BeginPaint(hwnd, &ps);
+						StretchDIBits(hdc,
 #if 0
-						0, 0, window->clientWidth, window->clientHeight,
-						0, 0, sWindow->bitmapInfo->bmiHeader.biWidth, abs(sWindow->bitmapInfo->bmiHeader.biHeight),
+							0, 0, window->clientWidth, window->clientHeight,
+							0, 0, sWindow->bitmapInfo->bmiHeader.biWidth, abs(sWindow->bitmapInfo->bmiHeader.biHeight),
 #else
-						0, window->clientHeight - 1, window->clientWidth, -(int)window->clientHeight,
-						sWindow->blitX, sWindow->blitY, sWindow->blitWidth, sWindow->blitHeight,
+							0, window->clientHeight - 1, window->clientWidth, -(int)window->clientHeight,
+							sWindow->blitX, sWindow->blitY, sWindow->blitWidth, sWindow->blitHeight,
 #endif
-						image, sWindow->bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
-					EndPaint(hwnd, &ps);
+							image, sWindow->bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
+						EndPaint(hwnd, &ps);
 				}
+					else
+					{
+						result = DefWindowProcW(hwnd, msg, wParam, lParam);
+					}
+			}
 				else
 				{
-					result = DefWindowProcW(hwnd, msg, wParam, lParam);
+					result = DefWindowProc(hwnd, msg, wParam, lParam);
 				}
-			}
-			else
-			{
-				result = DefWindowProc(hwnd, msg, wParam, lParam);
-			}
 		}
 	} break;
-	default:
+		default:
 	{
 		result = DefWindowProc(hwnd, msg, wParam, lParam);
 	} break;
@@ -414,188 +420,19 @@ static LRESULT CALLBACK windowCallBack(
 	return result;
 }
 
-static kb_button mapVKCodeToRawButton(uint32 vkCode)
+bool handleWindowsMessages()
 {
-	if (vkCode >= '0' && vkCode <= '9')
-	{
-		return (kb_button)(vkCode + button_0 - '0');
-	}
-	else if (vkCode >= 'A' && vkCode <= 'Z')
-	{
-		return (kb_button)(vkCode + button_a - 'A');
-	}
-	else if (vkCode >= VK_F1 && vkCode <= VK_F12)
-	{
-		return (kb_button)(vkCode + button_f1 - VK_F1);
-	}
-	else
-	{
-		switch (vkCode)
-		{
-		case VK_SPACE: return button_space;
-		case VK_TAB: return button_tab;
-		case VK_RETURN: return button_enter;
-		case VK_SHIFT: return button_shift;
-		case VK_CONTROL: return button_ctrl;
-		case VK_ESCAPE: return button_esc;
-		case VK_UP: return button_up;
-		case VK_DOWN: return button_down;
-		case VK_LEFT: return button_left;
-		case VK_RIGHT: return button_right;
-		case VK_MENU: return button_alt;
-		case VK_BACK: return button_backspace;
-		case VK_DELETE: return button_delete;
-		}
-	}
-	return button_unknown;
-}
-
-bool handleWindowsMessages(user_input& input)
-{
-	for (int buttonIndex = 0; buttonIndex < button_count; ++buttonIndex)
-	{
-		input.keyboard[buttonIndex].wasDown = input.keyboard[buttonIndex].isDown;
-	}
-	input.mouse.left.wasDown = input.mouse.left.isDown;
-	input.mouse.right.wasDown = input.mouse.right.isDown;
-	input.mouse.middle.wasDown = input.mouse.middle.isDown;
-	input.mouse.scroll = 0.f;
-
-	int oldMouseX = input.mouse.x;
-	int oldMouseY = input.mouse.y;
-	float oldMouseRelX = input.mouse.relX;
-	float oldMouseRelY = input.mouse.relY;
-
 	MSG msg = { 0 };
 	while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
 	{
 		if (msg.message == WM_QUIT)
 		{
 			running = false;
+			break;
 		}
 
-		if (win32_window::mainWindow && win32_window::mainWindow->open && msg.hwnd == win32_window::mainWindow->windowHandle)
-		{
-			handleImGuiInput(msg.hwnd, msg.message, msg.wParam, msg.lParam);
-
-			switch (msg.message)
-			{
-			case WM_SYSKEYDOWN:
-			case WM_SYSKEYUP:
-			case WM_KEYDOWN:
-			case WM_KEYUP:
-			{
-				uint32 vkCode = (uint32)msg.wParam;
-				bool wasDown = ((msg.lParam & (1 << 30)) != 0);
-				bool isDown = ((msg.lParam & (1 << 31)) == 0);
-				kb_button button = mapVKCodeToRawButton(vkCode);
-				if (button != button_unknown)
-				{
-					input.keyboard[button].isDown = isDown;
-					input.keyboard[button].wasDown = wasDown;
-				}
-
-				if (button == button_alt)
-				{
-					TranslateMessage(&msg);
-					DispatchMessage(&msg);
-				}
-				if (vkCode == VK_F4 && (msg.lParam & (1 << 29))) // Alt + F4.
-				{
-					running = false;
-				}
-				TranslateMessage(&msg); // This generates the WM_CHAR message.
-				DispatchMessage(&msg);
-			} break;
-
-			// The default window procedure will play a system notification sound 
-			// when pressing the Alt+Enter keyboard combination if this message is 
-			// not handled.
-			case WM_SYSCHAR:
-				break;
-
-			case WM_CHAR:
-			{
-				//ImGui::GetIO().AddInputCharacter((uint16)msg.wParam);
-			} break;
-			case WM_LBUTTONDOWN:
-			{
-				input.mouse.left.isDown = true;
-				input.mouse.left.wasDown = false;
-			} break;
-			case WM_LBUTTONUP:
-			{
-				input.mouse.left.isDown = false;
-				input.mouse.left.wasDown = true;
-			} break;
-			case WM_RBUTTONDOWN:
-			{
-				input.mouse.right.isDown = true;
-				input.mouse.right.wasDown = false;
-			} break;
-			case WM_RBUTTONUP:
-			{
-				input.mouse.right.isDown = false;
-				input.mouse.right.wasDown = true;
-			} break;
-			case WM_MBUTTONDOWN:
-			{
-				input.mouse.middle.isDown = true;
-				input.mouse.middle.wasDown = false;
-			} break;
-			case WM_MBUTTONUP:
-			{
-				input.mouse.middle.isDown = false;
-				input.mouse.middle.wasDown = true;
-			} break;
-			case WM_MOUSEMOVE:
-			{
-				int mousePosX = GET_X_LPARAM(msg.lParam); // Relative to client area.
-				int mousePosY = GET_Y_LPARAM(msg.lParam);
-				input.mouse.x = mousePosX;
-				input.mouse.y = mousePosY;
-			} break;
-			case WM_MOUSEWHEEL:
-			{
-				float scroll = GET_WHEEL_DELTA_WPARAM(msg.wParam) / 120.f;
-				input.mouse.scroll = scroll;
-			} break;
-			default:
-			{
-				TranslateMessage(&msg);
-				DispatchMessage(&msg);
-			} break;
-			}
-		}
-		else
-		{
-			if (msg.message == WM_KEYDOWN)
-			{
-				uint32 vkCode = (uint32)msg.wParam;
-				if (vkCode == VK_F4 && (msg.lParam & (1 << 29)) || vkCode == VK_ESCAPE)
-				{
-					running = false;
-				}
-			}
-
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-	}
-
-	if (win32_window::mainWindow)
-	{
-		input.mouse.relX = (float)input.mouse.x / (win32_window::mainWindow->clientWidth - 1);
-		input.mouse.relY = (float)input.mouse.y / (win32_window::mainWindow->clientHeight - 1);
-		input.mouse.dx = input.mouse.x - oldMouseX;
-		input.mouse.dy = input.mouse.y - oldMouseY;
-		input.mouse.reldx = input.mouse.relX - oldMouseRelX;
-		input.mouse.reldy = input.mouse.relY - oldMouseRelY;
-
-		if (buttonDownEvent(input, button_enter) && input.keyboard[button_alt].isDown)
-		{
-			win32_window::mainWindow->toggleFullscreen();
-		}
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
 	}
 
 	if (atLeastOneWindowWasOpened && numOpenWindows == 0)

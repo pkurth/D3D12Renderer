@@ -9,6 +9,8 @@
 
 #include <fontawesome/list.h>
 
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include <imgui/imgui_internal.h>
 
 static float perfFreq;
 static LARGE_INTEGER lastTime;
@@ -16,24 +18,18 @@ static LARGE_INTEGER lastTime;
 static bool showIconsWindow;
 static bool showDemoWindow;
 
-bool handleWindowsMessages(user_input& input);
+bool handleWindowsMessages();
 
-bool newFrame(user_input& input, float& dt)
+static bool newFrame(float& dt)
 {
 	LARGE_INTEGER currentTime;
 	QueryPerformanceCounter(&currentTime);
 	dt = ((float)(currentTime.QuadPart - lastTime.QuadPart) / perfFreq);
 	lastTime = currentTime;
 
-	bool result = handleWindowsMessages(input);
+	bool result = handleWindowsMessages();
 
-	// Quit when escape is pressed, but not if in combination with ctrl or shift. This combination is usually pressed to open the task manager.
-	if (buttonDownEvent(input, button_esc) && !(isDown(input, button_ctrl) || isDown(input, button_shift)))
-	{
-		result = false;
-	}
-
-	newImGuiFrame(input, dt);
+	newImGuiFrame(dt);
 	ImGui::DockSpaceOverViewport();
 
 	return result;
@@ -239,13 +235,8 @@ int main(int argc, char** argv)
 	ImGuiWindowClass sceneViewWindowClass;
 	sceneViewWindowClass.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_AutoHideTabBar;
 
-	while (newFrame(input, dt))
+	while (newFrame(dt))
 	{
-		if (buttonDownEvent(input, button_v))
-		{
-			window.toggleVSync();
-		}
-
 		dxContext.renderQueue.waitForFence(fenceValues[window.currentBackbufferIndex]);
 		dxContext.newFrame(frameID);
 
@@ -256,12 +247,66 @@ int main(int argc, char** argv)
 		uint32 renderWidth = (uint32)ImGui::GetContentRegionAvail().x;
 		uint32 renderHeight = (uint32)ImGui::GetContentRegionAvail().y;
 		ImGui::Image(dx_renderer::frameResult.defaultSRV, renderWidth, renderHeight);
+
+		ImGuiIO& io = ImGui::GetIO();
+		if (ImGui::IsItemHovered())
+		{
+			ImVec2 relativeMouse = ImGui::GetMousePos() - ImGui::GetItemRectMin();
+			vec2 mousePos = { relativeMouse.x, relativeMouse.y };
+			input.mouse.dx = mousePos.x - input.mouse.x;
+			input.mouse.dy = mousePos.y - input.mouse.y;
+			input.mouse.reldx = input.mouse.dx / (renderWidth - 1);
+			input.mouse.reldy = input.mouse.dy / (renderHeight - 1);
+			input.mouse.x = mousePos.x;
+			input.mouse.y = mousePos.y;
+			input.mouse.relX = mousePos.x / (renderWidth - 1);
+			input.mouse.relY = mousePos.y / (renderHeight - 1);
+			input.mouse.left = { ImGui::IsMouseDown(ImGuiMouseButton_Left), ImGui::IsMouseClicked(ImGuiMouseButton_Left), ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) };
+			input.mouse.right = { ImGui::IsMouseDown(ImGuiMouseButton_Right), ImGui::IsMouseClicked(ImGuiMouseButton_Right), ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Right) };
+			input.mouse.middle = { ImGui::IsMouseDown(ImGuiMouseButton_Middle), ImGui::IsMouseClicked(ImGuiMouseButton_Middle), ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Middle) };
+		
+			for (uint32 i = 0; i < arraysize(user_input::keyboard); ++i)
+			{
+				input.keyboard[i] = { ImGui::IsKeyDown(i), ImGui::IsKeyPressed(i) };
+			}
+
+			input.overWindow = true;
+		}
+		else
+		{
+			input.mouse.dx = 0.f;
+			input.mouse.dy = 0.f;
+			input.mouse.reldx = 0.f;
+			input.mouse.reldy = 0.f;
+
+			if (input.mouse.left.down && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) { input.mouse.left.down = false; }
+			if (input.mouse.right.down && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) { input.mouse.right.down = false; }
+			if (input.mouse.middle.down && !ImGui::IsMouseDown(ImGuiMouseButton_Middle)) { input.mouse.middle.down = false; }
+
+			input.mouse.left.clicked = input.mouse.left.doubleClicked = false;
+			input.mouse.right.clicked = input.mouse.right.doubleClicked = false;
+			input.mouse.middle.clicked = input.mouse.middle.doubleClicked = false;
+
+			for (uint32 i = 0; i < arraysize(user_input::keyboard); ++i)
+			{
+				if (input.keyboard[i].down && !ImGui::IsKeyDown(i)) { input.keyboard[i].down = false; }
+				input.keyboard[i].pressed = false;
+			}
+
+			input.overWindow = false;
+		}
 		ImGui::End();
 		ImGui::PopStyleVar();
 
+
+		if (input.keyboard['V'].pressed) { window.toggleVSync(); }
+		if (ImGui::IsKeyPressed(key_esc)) { break; } // Also allowed if not focused on main window.
+		if (ImGui::IsKeyPressed(key_enter) && ImGui::IsKeyDown(key_alt)) { window.toggleFullscreen(); } // Also allowed if not focused on main window.
+
+
 		drawHelperWindows();
 
-		dx_renderer::beginFrame(renderWidth, renderHeight, dt);
+		dx_renderer::beginFrame(input, renderWidth, renderHeight, dt);
 		dx_renderer::dummyRender(dt);
 
 		if (!drawMainMenuBar())

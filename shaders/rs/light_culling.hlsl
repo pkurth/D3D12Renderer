@@ -39,7 +39,7 @@ struct light_culling_cb
     "RootFlags(0), " \
     "CBV(b0), " \
     "RootConstants(b1, num32BitConstants = 3), " \
-    "DescriptorTable( SRV(t0, numDescriptors = 4, flags = DESCRIPTORS_VOLATILE), UAV(u0, numDescriptors = 3, flags = DESCRIPTORS_VOLATILE) )"
+    "DescriptorTable( SRV(t0, numDescriptors = 4, flags = DESCRIPTORS_VOLATILE), UAV(u0, numDescriptors = 4, flags = DESCRIPTORS_VOLATILE) )"
 
 
 #define WORLD_SPACE_TILED_FRUSTA_RS_CAMERA      0

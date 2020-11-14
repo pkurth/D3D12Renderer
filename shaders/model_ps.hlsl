@@ -30,15 +30,14 @@ TextureCube<float4> environmentTexture	: register(t1, space1);
 
 Texture2D<float4> brdf					: register(t0, space2);
 
-Texture2D<uint2> lightGrid						: register(t0, space3);
-StructuredBuffer<uint> lightIndexList			: register(t1, space3);
-StructuredBuffer<point_light_cb> pointLights	: register(t2, space3);
-StructuredBuffer<spot_light_cb> spotLights		: register(t3, space3);
+ConstantBuffer<directional_light_cb> sun		: register(b0, space3);
+Texture2D<uint4> lightGrid						: register(t0, space3);
+StructuredBuffer<uint> pointLightIndexList		: register(t1, space3);
+StructuredBuffer<uint> spotLightIndexList		: register(t2, space3);
+StructuredBuffer<point_light_cb> pointLights	: register(t3, space3);
+StructuredBuffer<spot_light_cb> spotLights		: register(t4, space3);
 
 
-// TODO
-static const float3 L = normalize(float3(1.f, 0.8f, 0.3f));
-static const float3 sunColor = float3(1.f, 1.f, 1.f) * LIGHT_IRRADIANCE_SCALE;
 
 [RootSignature(MODEL_RS)]
 float4 main(ps_input IN) : SV_TARGET
@@ -66,13 +65,6 @@ float4 main(ps_input IN) : SV_TARGET
 	float ao = 1.f;// (flags & USE_AO_TEXTURE) ? RMAO.z : 1.f;
 
 
-
-	const uint2 tileIndex = uint2(floor(IN.screenPosition.xy / LIGHT_CULLING_TILE_SIZE));
-	const uint2 lightIndexData = lightGrid.Load(int3(tileIndex, 0));
-	const uint lightOffset = lightIndexData.x;
-	const uint lightCount = lightIndexData.y;
-
-
 	float3 cameraPosition = camera.position.xyz;
 	float3 camToP = IN.worldPosition - cameraPosition;
 	float3 V = -normalize(camToP);
@@ -80,26 +72,75 @@ float4 main(ps_input IN) : SV_TARGET
 
 	float4 totalLighting = float4(0.f, 0.f, 0.f, albedo.w);
 
-	for (uint lightIndex = lightOffset; lightIndex < lightOffset + lightCount; ++lightIndex)
+	// Point and spot lights.
 	{
-		uint index = lightIndexList[lightIndex];
-		point_light_cb pl = pointLights[index];
-		float distanceToLight = length(pl.position - IN.worldPosition);
-		if (distanceToLight < pl.radius)
+		const uint2 tileIndex = uint2(floor(IN.screenPosition.xy / LIGHT_CULLING_TILE_SIZE));
+		const uint4 lightIndexData = lightGrid.Load(int3(tileIndex, 0));
+
+		const uint pointLightOffset = lightIndexData.x;
+		const uint pointLightCount = lightIndexData.y;
+
+		const uint spotLightOffset = lightIndexData.z;
+		const uint spotLightCount = lightIndexData.w;
+
+		//return float4(spotLightCount, 0.f, 0.f, 1.f);
+
+
+		// Point lights.
+		for (uint lightIndex = pointLightOffset; lightIndex < pointLightOffset + pointLightCount; ++lightIndex)
 		{
-			//float3 radiance = float3(500.f, 0.f, 0.f);
-			float3 radiance = pl.radiance * getAttenuation(distanceToLight, pl.radius) * LIGHT_IRRADIANCE_SCALE;
-			totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
+			uint index = pointLightIndexList[lightIndex];
+			point_light_cb pl = pointLights[index];
+			float distanceToLight = length(pl.position - IN.worldPosition);
+			if (distanceToLight <= pl.radius)
+			{
+				float3 L = (pl.position - IN.worldPosition) / distanceToLight;
+				float3 radiance = pl.radiance * getAttenuation(distanceToLight, pl.radius) * LIGHT_IRRADIANCE_SCALE;
+				totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
+			}
+		}
+
+		// Spot lights.
+		for (lightIndex = spotLightOffset; lightIndex < spotLightOffset + spotLightCount; ++lightIndex)
+		{
+			uint index = spotLightIndexList[lightIndex];
+			spot_light_cb sl = spotLights[index];
+			float distanceToLight = length(sl.position - IN.worldPosition);
+
+			if (distanceToLight <= sl.maxDistance)
+			{
+				float3 L = (sl.position - IN.worldPosition) / distanceToLight;
+
+				float theta = dot(-L, sl.direction);
+				if (theta > sl.outerCutoff)
+				{
+					float attenuation = getAttenuation(distanceToLight, sl.maxDistance);
+
+					float epsilon = sl.innerCutoff - sl.outerCutoff;
+					float intensity = saturate((theta - sl.outerCutoff) / epsilon);
+
+					float totalIntensity = intensity * attenuation;
+					if (totalIntensity > 0.f)
+					{
+						float3 radiance = sl.radiance * totalIntensity * LIGHT_IRRADIANCE_SCALE;
+						totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
+					}
+				}
+			}
 		}
 	}
 
+	// Sun.
+	{
+		float3 L = -sun.direction.xyz;
+		float visibility = 1.f;
+		float3 radiance = sun.radiance * visibility; // No attenuation for sun.
+
+		totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
+	}
+
+	// Ambient.
 	totalLighting.xyz += calculateAmbientLighting(albedo.xyz, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao);
-
-	//float3 L = -sun.worldSpaceDirection.xyz;
-	float visibility = 1.f;
-	float3 radiance = sunColor.xyz * visibility; // No attenuation for sun.
-
-	totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
 
 	return totalLighting;
 }

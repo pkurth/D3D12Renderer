@@ -77,7 +77,7 @@ ImGuiContext* initializeImGui(DXGI_FORMAT screenFormat)
 	return imguiContext;
 }
 
-void newImGuiFrame(const user_input& input, float dt)
+void newImGuiFrame(float dt)
 {
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();

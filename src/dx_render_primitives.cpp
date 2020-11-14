@@ -188,6 +188,8 @@ dx_index_buffer createIndexBuffer(uint32 elementSize, uint32 elementCount, void*
 
 void resizeBuffer(dx_buffer& buffer, uint32 newElementCount, D3D12_RESOURCE_STATES initialState)
 {
+	dxContext.retireObject(buffer.resource);
+
 	buffer.elementCount = newElementCount;
 	buffer.totalSize = buffer.elementCount * buffer.elementSize;
 
@@ -225,6 +227,16 @@ void freeBuffer(dx_buffer& buffer)
 	{
 		dxContext.descriptorAllocatorCPU.freeHandle(buffer.defaultUAV);
 	}
+	if (buffer.cpuClearUAV.cpuHandle.ptr)
+	{
+		dxContext.descriptorAllocatorCPU.freeHandle(buffer.cpuClearUAV);
+	}
+	if (buffer.gpuClearUAV.gpuHandle.ptr)
+	{
+		dxContext.descriptorAllocatorGPU.freeHandle(dxContext.descriptorAllocatorGPU.getMatchingCPUHandle(buffer.gpuClearUAV));
+	}
+	dxContext.retireObject(buffer.resource);
+	buffer = {};
 }
 
 void uploadTextureSubresourceData(dx_texture& texture, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 firstSubresource, uint32 numSubresources)
@@ -442,6 +454,10 @@ void freeTexture(dx_texture& texture)
 	{
 		dxContext.descriptorAllocatorCPU.freeHandle(texture.defaultUAV);
 	}
+	// TODO: Free RTV & DVS.
+
+	dxContext.retireObject(texture.resource);
+	texture = {};
 }
 
 static void copyRootSignatureDesc(const D3D12_ROOT_SIGNATURE_DESC* desc, dx_root_signature& result)

@@ -15,18 +15,44 @@ StructuredBuffer<spot_light_cb> spotLights          : register(t2);
 
 StructuredBuffer<light_culling_view_frustum> frusta : register(t3);
 
-RWStructuredBuffer<uint> opaqueLightIndexCounter    : register(u0);
-RWStructuredBuffer<uint> opaqueLightIndexList       : register(u1);
-RWTexture2D<uint2> opaqueLightGrid                  : register(u2);
+RWStructuredBuffer<uint> lightIndexCounter          : register(u0);
+RWStructuredBuffer<uint> pointLightIndexList        : register(u1);
+RWStructuredBuffer<uint> spotLightIndexList         : register(u2);
+RWTexture2D<uint4> lightGrid                        : register(u3);
 
 groupshared uint groupMinDepth;
 groupshared uint groupMaxDepth;
 groupshared light_culling_view_frustum groupFrustum;
 
-groupshared uint opaqueLightCount;
-groupshared uint opaqueLightIndexStartOffset;
-groupshared uint opaqueLightList[MAX_NUM_LIGHTS_PER_TILE];
+groupshared uint groupPointLightCount;
+groupshared uint groupSpotLightCount;
 
+groupshared uint groupPointLightIndexStartOffset;
+groupshared uint groupSpotLightIndexStartOffset;
+
+groupshared uint groupPointLightList[MAX_NUM_LIGHTS_PER_TILE];
+groupshared uint groupSpotLightList[MAX_NUM_LIGHTS_PER_TILE];
+
+
+
+struct spot_light_bounding_volume
+{
+    float3 tip;
+    float height;
+    float3 direction;
+    float radius;
+};
+
+static spot_light_bounding_volume getSpotLightBoundingVolume(spot_light_cb sl)
+{
+    spot_light_bounding_volume result;
+    result.tip = sl.position;
+    result.direction = sl.direction;
+    result.height = sl.maxDistance;
+    float oc = sl.outerCutoff;
+    result.radius = result.height * tan(acos(oc));// sqrt(1.f - oc * oc) / oc; // Same as height * tan(acos(oc)).
+    return result;
+}
 
 static bool pointLightOutsidePlane(point_light_cb pl, light_culling_frustum_plane plane)
 {
@@ -61,7 +87,7 @@ static bool pointOutsidePlane(float3 p, light_culling_frustum_plane plane)
 
 static bool spotLightOutsidePlane(spot_light_bounding_volume sl, light_culling_frustum_plane plane)
 {
-    float3 m = cross(cross(plane.N, sl.direction), sl.direction);
+    float3 m = normalize(cross(cross(plane.N, sl.direction), sl.direction));
     float3 Q = sl.tip + sl.direction * sl.height - m * sl.radius;
     return pointOutsidePlane(sl.tip, plane) && pointOutsidePlane(Q, plane);
 }
@@ -87,13 +113,23 @@ static bool spotLightInsideFrustum(spot_light_bounding_volume sl, light_culling_
     return result;
 }
 
-static void opaqueAppendLight(uint lightIndex)
+static void groupAppendPointLight(uint lightIndex)
 {
     uint index;
-    InterlockedAdd(opaqueLightCount, 1, index);
+    InterlockedAdd(groupPointLightCount, 1, index);
     if (index < MAX_NUM_LIGHTS_PER_TILE)
     {
-        opaqueLightList[index] = lightIndex;
+        groupPointLightList[index] = lightIndex;
+    }
+}
+
+static void groupAppendSpotLight(uint lightIndex)
+{
+    uint index;
+    InterlockedAdd(groupSpotLightCount, 1, index);
+    if (index < MAX_NUM_LIGHTS_PER_TILE)
+    {
+        groupSpotLightList[index] = lightIndex;
     }
 }
 
@@ -110,7 +146,8 @@ void main(cs_input IN)
     {
         groupMinDepth = asuint(0.9999999f);
         groupMaxDepth = 0;
-        opaqueLightCount = 0;
+        groupPointLightCount = 0;
+        groupSpotLightCount = 0;
         groupFrustum = frusta[IN.groupID.y * cb.numThreadGroupsX + IN.groupID.x];
     }
 
@@ -127,42 +164,54 @@ void main(cs_input IN)
     float3 forward = camera.forward.xyz;
     float3 cameraPos = camera.position.xyz;
 
-    float nearZ = depthBufferDepthToWorldSpaceDepth(fMinDepth, camera.projectionParams); // Positive.
-    float farZ = depthBufferDepthToWorldSpaceDepth(fMaxDepth, camera.projectionParams); // Positive.
+    float nearZ = depthBufferDepthToEyeDepth(fMinDepth, camera.projectionParams); // Positive.
+    float farZ = depthBufferDepthToEyeDepth(fMaxDepth, camera.projectionParams); // Positive.
 
     light_culling_frustum_plane cameraNearPlane = { forward, dot(forward, cameraPos + camera.projectionParams.x * forward) };
     light_culling_frustum_plane nearPlane = { forward, dot(forward, cameraPos + nearZ * forward) };
     light_culling_frustum_plane farPlane = { -forward, -dot(forward, cameraPos + farZ * forward) };
 
 
-    uint numPointLights = cb.numPointLights;
+    const uint numPointLights = cb.numPointLights;
     for (uint i = IN.groupIndex; i < numPointLights; i += BLOCK_SIZE * BLOCK_SIZE)
     {
         point_light_cb pl = pointLights[i];
         if (pointLightInsideFrustum(pl, groupFrustum, nearPlane, farPlane))
         {
-            opaqueAppendLight(i);
+            groupAppendPointLight(i);
         }
     }
 
-    // TODO: Spotlights.
-    uint numSpotLights = 0;
+    const uint numSpotLights = cb.numSpotLights;
+    for (i = IN.groupIndex; i < numSpotLights; i += BLOCK_SIZE * BLOCK_SIZE)
+    {
+        spot_light_bounding_volume sl = getSpotLightBoundingVolume(spotLights[i]);
+        if (spotLightInsideFrustum(sl, groupFrustum, nearPlane, farPlane))
+        {
+            groupAppendSpotLight(i);
+        }
+    }
+
 
     GroupMemoryBarrierWithGroupSync();
 
     if (IN.groupIndex == 0)
     {
-        InterlockedAdd(opaqueLightIndexCounter[0], opaqueLightCount, opaqueLightIndexStartOffset);
-        opaqueLightGrid[IN.groupID.xy] = uint2(opaqueLightIndexStartOffset, opaqueLightCount);
+        InterlockedAdd(lightIndexCounter[0], groupPointLightCount, groupPointLightIndexStartOffset);
+        InterlockedAdd(lightIndexCounter[1], groupSpotLightCount, groupSpotLightIndexStartOffset);
 
-        //InterlockedAdd(t_LightIndexCounter[0], t_LightCount, t_LightIndexStartOffset);
-        //t_LightGrid[IN.groupID.xy] = uint2(t_LightIndexStartOffset, t_LightCount);
+        lightGrid[IN.groupID.xy] = uint4(groupPointLightIndexStartOffset, groupPointLightCount, groupSpotLightIndexStartOffset, groupSpotLightCount);
     }
 
     GroupMemoryBarrierWithGroupSync();
 
-    for (i = IN.groupIndex; i < opaqueLightCount; i += BLOCK_SIZE * BLOCK_SIZE)
+    for (i = IN.groupIndex; i < groupPointLightCount; i += BLOCK_SIZE * BLOCK_SIZE)
     {
-        opaqueLightIndexList[opaqueLightIndexStartOffset + i] = opaqueLightList[i];
+        pointLightIndexList[groupPointLightIndexStartOffset + i] = groupPointLightList[i];
+    }
+
+    for (i = IN.groupIndex; i < groupSpotLightCount; i += BLOCK_SIZE * BLOCK_SIZE)
+    {
+        spotLightIndexList[groupSpotLightIndexStartOffset + i] = groupSpotLightList[i];
     }
 }

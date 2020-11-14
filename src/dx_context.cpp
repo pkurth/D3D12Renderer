@@ -238,7 +238,10 @@ dx_command_list* dx_context::getFreeComputeCommandList(bool async)
 
 dx_command_list* dx_context::getFreeRenderCommandList()
 {
-	return getFreeCommandList(renderQueue);
+	dx_command_list* cl = getFreeCommandList(renderQueue);
+	CD3DX12_RECT scissorRect(0, 0, LONG_MAX, LONG_MAX);
+	cl->setScissor(scissorRect);
+	return cl;
 }
 
 dx_command_allocator* dx_context::getFreeCommandAllocator(dx_command_queue& queue)

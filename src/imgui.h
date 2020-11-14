@@ -4,10 +4,9 @@
 #include <fontawesome/IconsFontAwesome5.h>
 
 #include "dx.h"
-#include "input.h"
 
 ImGuiContext* initializeImGui(DXGI_FORMAT screenFormat);
-void newImGuiFrame(const user_input& input, float dt);
+void newImGuiFrame(float dt);
 void renderImGui(struct dx_command_list* cl);
 
 void handleImGuiInput(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);

@@ -1,83 +1,69 @@
 #pragma once
 
-enum kb_button
+enum key_code
 {
-	button_0, button_1, button_2, button_3, button_4, button_5, button_6, button_7, button_8, button_9,
-	button_a, button_b, button_c, button_d, button_e, button_f, button_g, button_h, button_i, button_j,
-	button_k, button_l, button_m, button_n, button_o, button_p, button_q, button_r, button_s, button_t,
-	button_u, button_v, button_w, button_x, button_y, button_z,
-	button_space, button_enter, button_shift, button_alt, button_tab, button_ctrl, button_esc,
-	button_up, button_down, button_left, button_right,
-	button_backspace, button_delete,
-
-	button_f1, button_f2, button_f3, button_f4, button_f5, button_f6, button_f7, button_f8, button_f9, button_f10, button_f11, button_f12,
-
-	button_count, button_unknown
+	key_shift = VK_SHIFT,
+	key_ctrl = VK_CONTROL,
+	key_alt = VK_MENU,
+	key_esc = VK_ESCAPE,
+	key_caps = VK_CAPITAL,
+	key_space = VK_SPACE,
+	key_enter = VK_RETURN,
+	key_backspace = VK_BACK,
+	key_tab = VK_TAB,
+	key_left = VK_LEFT,
+	key_right = VK_RIGHT,
+	key_up = VK_UP,
+	key_down = VK_DOWN,
+	key_f1 = VK_F1,
+	key_f2 = VK_F2,
+	key_f3 = VK_F3,
+	key_f4 = VK_F4,
+	key_f5 = VK_F5,
+	key_f6 = VK_F6,
+	key_f7 = VK_F7,
+	key_f8 = VK_F8,
+	key_f9 = VK_F9,
+	key_f10 = VK_F10,
+	key_f11 = VK_F11,
+	key_f12 = VK_F12,
 };
 
-struct button_state
+struct input_key
 {
-	bool isDown;
-	bool wasDown;
+	bool down;
+	bool pressed;
 };
 
-struct keyboard_input
+struct input_mouse_button
 {
-	button_state buttons[button_count];
+	bool down;
+	bool clicked;
+	bool doubleClicked;
 };
 
 struct mouse_input
 {
-	button_state left;
-	button_state right;
-	button_state middle;
+	input_mouse_button left;
+	input_mouse_button right;
+	input_mouse_button middle;
 	float scroll;
 
-	int x;
-	int y;
+	float x;
+	float y;
+	float dx;
+	float dy;
 
 	float relX;
 	float relY;
-
-	int dx;
-	int dy;
-
 	float reldx;
 	float reldy;
 };
 
 struct user_input
 {
-	button_state keyboard[button_count];
+	input_key keyboard[128];
 	mouse_input mouse;
+	bool overWindow;
 };
 
-inline bool isDown(const user_input& input, kb_button buttonID)
-{
-	return input.keyboard[buttonID].isDown;
-}
-
-inline bool isUp(const user_input& input, kb_button buttonID)
-{
-	return !input.keyboard[buttonID].isDown;
-}
-
-inline bool buttonDownEvent(const button_state& button)
-{
-	return button.isDown && !button.wasDown;
-}
-
-inline bool buttonUpEvent(const button_state& button)
-{
-	return !button.isDown && button.wasDown;
-}
-
-inline bool buttonDownEvent(const user_input& input, kb_button buttonID)
-{
-	return buttonDownEvent(input.keyboard[buttonID]);
-}
-
-inline bool buttonUpEvent(const user_input& input, kb_button buttonID)
-{
-	return buttonUpEvent(input.keyboard[buttonID]);
-}

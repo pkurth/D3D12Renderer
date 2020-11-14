@@ -10,6 +10,8 @@
 #include "random.h"
 #include "texture_preprocessing.h"
 #include "perlin.h"
+#include "color.h"
+#include "input.h"
 
 #include "model_rs.hlsl"
 #include "outline_rs.hlsl"
@@ -22,6 +24,7 @@
 
 
 dx_dynamic_constant_buffer dx_renderer::cameraCBV;
+dx_dynamic_constant_buffer dx_renderer::sunCBV;
 
 dx_texture dx_renderer::whiteTexture;
 
@@ -30,8 +33,8 @@ dx_texture dx_renderer::hdrColorTexture;
 dx_texture dx_renderer::depthBuffer;
 
 light_culling_buffers dx_renderer::lightCullingBuffers;
-dx_buffer dx_renderer::pointLightBoundingVolumes[NUM_BUFFERED_FRAMES];
-dx_buffer dx_renderer::spotLightBoundingVolumes[NUM_BUFFERED_FRAMES];
+dx_buffer dx_renderer::pointLightBuffer[NUM_BUFFERED_FRAMES];
+dx_buffer dx_renderer::spotLightBuffer[NUM_BUFFERED_FRAMES];
 
 uint32 dx_renderer::renderWidth;
 uint32 dx_renderer::renderHeight;
@@ -107,10 +110,13 @@ static dx_texture metalTex;
 
 static trs meshTransform;
 
-static const uint32 numLights = 4096;
-static vec3* lightVelocities;
-static point_light_cb* lights;
+static const uint32 numPointLights = 128;
+static point_light_cb* pointLights;
 
+static const uint32 numSpotLights = 128;
+static spot_light_cb* spotLights;
+
+static vec3* lightVelocities;
 
 static pbr_environment environment;
 
@@ -130,8 +136,8 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 
 	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
 	{
-		pointLightBoundingVolumes[i] = createUploadBuffer(sizeof(point_light_cb), MAX_NUM_POINT_LIGHTS_PER_FRAME, 0);
-		spotLightBoundingVolumes[i] = createUploadBuffer(sizeof(spot_light_cb), MAX_NUM_SPOT_LIGHTS_PER_FRAME, 0);
+		pointLightBuffer[i] = createUploadBuffer(sizeof(point_light_cb), MAX_NUM_POINT_LIGHTS_PER_FRAME, 0);
+		spotLightBuffer[i] = createUploadBuffer(sizeof(spot_light_cb), MAX_NUM_SPOT_LIGHTS_PER_FRAME, 0);
 	}
 
 	initializeTexturePreprocessing();
@@ -282,20 +288,21 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 		dxContext.retireObject(equiSky.resource);
 	}
 
-	lights = new point_light_cb[numLights];
-	lightVelocities = new vec3[numLights];
+	pointLights = new point_light_cb[MAX_NUM_POINT_LIGHTS_PER_FRAME];
+	lightVelocities = new vec3[MAX_NUM_POINT_LIGHTS_PER_FRAME];
 
 	random_number_generator rng = { 14878213 };
-	for (uint32 i = 0; i < numLights; ++i)
+	for (uint32 i = 0; i < numPointLights; ++i)
 	{
-		lights[i] = 
+		pointLights[i] = 
 		{
 			{
 				rng.randomFloatBetween(-100.f, 100.f),
-				0.f,
+				2.f,
 				rng.randomFloatBetween(-100.f, 100.f),
-			}
-			// Rest is set in update step.
+			},
+			25,
+			randomRGB(rng) * 250.f,
 		};
 
 		lightVelocities[i] =
@@ -303,6 +310,26 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 			rng.randomFloatBetween(-1.f, 1.f),
 			0.f,
 			rng.randomFloatBetween(-1.f, 1.f),
+		};
+	}
+
+	spotLights = new spot_light_cb[MAX_NUM_SPOT_LIGHTS_PER_FRAME];
+	for (uint32 i = 0; i < numSpotLights; ++i)
+	{
+		spotLights[i] =
+		{
+			{
+				rng.randomFloatBetween(-100.f, 100.f),
+				10.f,
+				rng.randomFloatBetween(-100.f, 100.f),
+			},
+			0.f,
+			{
+				0.f, -1.f, 0.f
+			},
+			0.f,
+			randomRGB(rng) * 250.f,
+			25
 		};
 	}
 }
@@ -322,7 +349,7 @@ void dx_renderer::fillCameraConstantBuffer(camera_cb& cb)
 	cb.invScreenDims = vec2(1.f / renderWidth, 1.f / renderHeight);
 }
 
-void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight, float dt)
+void dx_renderer::beginFrame(const user_input& input, uint32 windowWidth, uint32 windowHeight, float dt)
 {
 	if (dx_renderer::windowWidth != windowWidth || dx_renderer::windowHeight != windowHeight)
 	{
@@ -340,11 +367,40 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight, float dt)
 
 	checkForChangedPipelines();
 
+
+
+	const float CAMERA_MOVEMENT_SPEED = 4.f;
+	const float CAMERA_SENSITIVITY = 4.f;
+
+	if (input.mouse.right.down)
+	{
+		vec3 cameraInputDir = vec3(
+			(input.keyboard['D'].down ? 1.f : 0.f) + (input.keyboard['A'].down ? -1.f : 0.f),
+			(input.keyboard['E'].down ? 1.f : 0.f) + (input.keyboard['Q'].down ? -1.f : 0.f),
+			(input.keyboard['W'].down ? -1.f : 0.f) + (input.keyboard['S'].down ? 1.f : 0.f)
+		) * (input.keyboard[key_shift].down ? 3.f : 1.f) * (input.keyboard[key_ctrl].down ? 0.1f : 1.f) * CAMERA_MOVEMENT_SPEED;
+
+		vec2 turnAngle(0.f, 0.f);
+		turnAngle = vec2(-input.mouse.reldx, -input.mouse.reldy) * CAMERA_SENSITIVITY;
+
+		quat& cameraRotation = camera.rotation;
+		cameraRotation = quat(vec3(0.f, 1.f, 0.f), turnAngle.x) * cameraRotation;
+		cameraRotation = cameraRotation * quat(vec3(1.f, 0.f, 0.f), turnAngle.y);
+
+		camera.position += cameraRotation * cameraInputDir * dt;
+	}
+
 	camera.recalculateMatrices(renderWidth, renderHeight);
+
 
 	camera_cb cameraCB;
 	fillCameraConstantBuffer(cameraCB);
 	cameraCBV = dxContext.uploadDynamicConstantBuffer(cameraCB);
+
+	directional_light_cb sunCB;
+	sunCB.direction = normalize(-vec3(1.f, 0.8f, 0.3f));
+	sunCB.radiance = vec3(1.f, 0.9f, 0.8f) * 50.f;
+	sunCBV = dxContext.uploadDynamicConstantBuffer(sunCB);
 }
 
 void dx_renderer::recalculateViewport(bool resizeTextures)
@@ -387,29 +443,27 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 
 void dx_renderer::allocateLightCullingBuffers()
 {
-	dxContext.retireObject(lightCullingBuffers.tiledFrusta.resource);
-	dxContext.retireObject(lightCullingBuffers.opaqueLightIndexCounter.resource);
-	dxContext.retireObject(lightCullingBuffers.opaqueLightIndexList.resource);
-	dxContext.retireObject(lightCullingBuffers.opaqueLightGrid.resource);
-
 	lightCullingBuffers.numTilesX = bucketize(renderWidth, LIGHT_CULLING_TILE_SIZE);
 	lightCullingBuffers.numTilesY = bucketize(renderHeight, LIGHT_CULLING_TILE_SIZE);
 
-	bool firstAllocation = lightCullingBuffers.opaqueLightGrid.resource == nullptr;
+	bool firstAllocation = lightCullingBuffers.lightGrid.resource == nullptr;
 
 	if (firstAllocation)
 	{
-		lightCullingBuffers.opaqueLightGrid = createTexture(0, lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY,
-			DXGI_FORMAT_R32G32_UINT, false, true);
-		lightCullingBuffers.opaqueLightIndexCounter = createBuffer(sizeof(uint32), 1, 0, true, true);
-		lightCullingBuffers.opaqueLightIndexList = createBuffer(sizeof(uint32),
+		lightCullingBuffers.lightGrid = createTexture(0, lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY,
+			DXGI_FORMAT_R32G32B32A32_UINT, false, true);
+		lightCullingBuffers.lightIndexCounter = createBuffer(sizeof(uint32), 2, 0, true, true);
+		lightCullingBuffers.pointLightIndexList = createBuffer(sizeof(uint32),
+			lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY * MAX_NUM_LIGHTS_PER_TILE, 0, true);
+		lightCullingBuffers.spotLightIndexList = createBuffer(sizeof(uint32),
 			lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY * MAX_NUM_LIGHTS_PER_TILE, 0, true);
 		lightCullingBuffers.tiledFrusta = createBuffer(sizeof(light_culling_view_frustum), lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY, 0, true);
 	}
 	else
 	{
-		resizeTexture(lightCullingBuffers.opaqueLightGrid, lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY);
-		resizeBuffer(lightCullingBuffers.opaqueLightIndexList, lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY * MAX_NUM_LIGHTS_PER_TILE);
+		resizeTexture(lightCullingBuffers.lightGrid, lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY);
+		resizeBuffer(lightCullingBuffers.pointLightIndexList, lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY * MAX_NUM_LIGHTS_PER_TILE);
+		resizeBuffer(lightCullingBuffers.spotLightIndexList, lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY * MAX_NUM_LIGHTS_PER_TILE);
 		resizeBuffer(lightCullingBuffers.tiledFrusta, lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY);
 	}
 }
@@ -421,8 +475,9 @@ void dx_renderer::dummyRender(float dt)
 	static bool showOutline = false;
 	static vec4 outlineColor(1.f, 1.f, 0.f, 1.f);
 	static bool showLightVolumes = false;
-	static float lightIntensity = 5.f;
-	static float lightRadius = 10.f;
+
+	static float innerAngle = 30.f;
+	static float outerAngle = 45.f;
 
 
 	DXGI_QUERY_VIDEO_MEMORY_INFO memoryInfo;
@@ -443,27 +498,33 @@ void dx_renderer::dummyRender(float dt)
 	ImGui::Text("Video memory available: %uMB", (uint32)BYTE_TO_MB(memoryInfo.Budget));
 	ImGui::Text("Video memory used: %uMB", (uint32)BYTE_TO_MB(memoryInfo.CurrentUsage));
 
-	ImGui::PlotLines("Tone map",
-		[](void* data, int idx)
-		{
-			float t = idx * 0.01f;
-			tonemap_cb& aces = *(tonemap_cb*)data;
+	if (ImGui::TreeNode("Tonemapping"))
+	{
+		ImGui::PlotLines("Tone map",
+			[](void* data, int idx)
+			{
+				float t = idx * 0.01f;
+				tonemap_cb& aces = *(tonemap_cb*)data;
 
-			return filmicTonemapping(t, aces);
-		},
-		&tonemap, 100, 0, 0, 0.f, 1.f, ImVec2(100.f, 100.f));
+				return filmicTonemapping(t, aces);
+			},
+			&tonemap, 100, 0, 0, 0.f, 1.f, ImVec2(100.f, 100.f));
 
-	ImGui::SliderFloat("[ACES] Shoulder strength", &tonemap.A, 0.f, 1.f);
-	ImGui::SliderFloat("[ACES] Linear strength", &tonemap.B, 0.f, 1.f);
-	ImGui::SliderFloat("[ACES] Linear angle", &tonemap.C, 0.f, 1.f);
-	ImGui::SliderFloat("[ACES] Toe strength", &tonemap.D, 0.f, 1.f);
-	ImGui::SliderFloat("[ACES] Tone numerator", &tonemap.E, 0.f, 1.f);
-	ImGui::SliderFloat("[ACES] Toe denominator", &tonemap.F, 0.f, 1.f);
-	ImGui::SliderFloat("[ACES] Linear white", &tonemap.linearWhite, 0.f, 100.f);
-	ImGui::SliderFloat("[ACES] Exposure", &tonemap.exposure, -3.f, 3.f);
+		ImGui::SliderFloat("[ACES] Shoulder strength", &tonemap.A, 0.f, 1.f);
+		ImGui::SliderFloat("[ACES] Linear strength", &tonemap.B, 0.f, 1.f);
+		ImGui::SliderFloat("[ACES] Linear angle", &tonemap.C, 0.f, 1.f);
+		ImGui::SliderFloat("[ACES] Toe strength", &tonemap.D, 0.f, 1.f);
+		ImGui::SliderFloat("[ACES] Tone numerator", &tonemap.E, 0.f, 1.f);
+		ImGui::SliderFloat("[ACES] Toe denominator", &tonemap.F, 0.f, 1.f);
+		ImGui::SliderFloat("[ACES] Linear white", &tonemap.linearWhite, 0.f, 100.f);
+		ImGui::SliderFloat("[ACES] Exposure", &tonemap.exposure, -3.f, 3.f);
 
-	ImGui::SliderFloat("Light intensity", &lightIntensity, 0.1f, 400.f);
-	ImGui::SliderFloat("Light radius", &lightRadius, 1.f, 20.f);
+		ImGui::TreePop();
+	}
+
+	ImGui::Separator();
+	ImGui::SliderFloat("Outer angle", &outerAngle, 2.f, 90.f);
+	ImGui::SliderFloat("Inner angle", &innerAngle, 1.f, outerAngle);
 
 	ImGui::End();
 
@@ -475,19 +536,24 @@ void dx_renderer::dummyRender(float dt)
 	const vec3 vortexCenter(0.f, 0.f, 0.f);
 	const float vortexSpeed = 1.f;
 	const float vortexSize = 60.f;
-	for (uint32 i = 0; i < numLights; ++i)
+	for (uint32 i = 0; i < numPointLights; ++i)
 	{
 		lightVelocities[i] *= (1.f - 0.005f);
-		lights[i].position += lightVelocities[i] * dt;
+		pointLights[i].position += lightVelocities[i] * dt;
 
-		vec3 d = lights[i].position - vortexCenter;
+		vec3 d = pointLights[i].position - vortexCenter;
 		vec3 v = vec3(-d.z, 0.f, d.x) * vortexSpeed;
 		float factor = 1.f / (1.f + (d.x * d.x + d.z * d.z) / vortexSize);
 
 		lightVelocities[i] += (v - lightVelocities[i]) * factor;
+	}
 
-		lights[i].radiance = vec3(1.f, 1.f, 1.f) * lightIntensity;
-		lights[i].radius = lightRadius;
+	float innerCutoff = cos(deg2rad(innerAngle));
+	float outerCutoff = cos(deg2rad(outerAngle));
+	for (uint32 i = 0; i < numSpotLights; ++i)
+	{
+		spotLights[i].innerCutoff = innerCutoff;
+		spotLights[i].outerCutoff = outerCutoff;
 	}
 
 
@@ -497,15 +563,9 @@ void dx_renderer::dummyRender(float dt)
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
-	CD3DX12_RECT scissorRect(0, 0, LONG_MAX, LONG_MAX);
-
-	cl->setScissor(scissorRect);
-
 	barrier_batcher(cl)
 		.transition(hdrColorTexture.resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
 		.transition(frameResult.resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-	//cl->setDescriptorHeap(globalDescriptorHeap);
 
 
 	cl->setRenderTarget(hdrRenderTarget);
@@ -566,33 +626,46 @@ void dx_renderer::dummyRender(float dt)
 	// ----------------------------------------
 
 #if 1
-	point_light_cb* pointLightBVs = (point_light_cb*)mapBuffer(pointLightBoundingVolumes[dxContext.bufferedFrameID]);
-	memcpy(pointLightBVs, lights, sizeof(point_light_cb) * numLights);
-	unmapBuffer(pointLightBoundingVolumes[dxContext.bufferedFrameID]);
+	if (numPointLights || numSpotLights)
+	{
+		if (numPointLights)
+		{
+			point_light_cb* pls = (point_light_cb*)mapBuffer(pointLightBuffer[dxContext.bufferedFrameID]);
+			memcpy(pls, pointLights, sizeof(point_light_cb) * numPointLights);
+			unmapBuffer(pointLightBuffer[dxContext.bufferedFrameID]);
+		}
+		if (numSpotLights)
+		{
+			spot_light_cb* sls = (spot_light_cb*)mapBuffer(spotLightBuffer[dxContext.bufferedFrameID]);
+			memcpy(sls, spotLights, sizeof(spot_light_cb) * numSpotLights);
+			unmapBuffer(spotLightBuffer[dxContext.bufferedFrameID]);
+		}
 
 
-	// Tiled frusta.
-	cl->setPipelineState(*worldSpaceFrustaPipeline.pipeline);
-	cl->setComputeRootSignature(*worldSpaceFrustaPipeline.rootSignature);
-	cl->setComputeDynamicConstantBuffer(WORLD_SPACE_TILED_FRUSTA_RS_CAMERA, cameraCBV);
-	cl->setCompute32BitConstants(WORLD_SPACE_TILED_FRUSTA_RS_CB, frusta_cb{ lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY });
-	cl->setRootComputeUAV(WORLD_SPACE_TILED_FRUSTA_RS_FRUSTA_UAV, lightCullingBuffers.tiledFrusta);
-	cl->dispatch(bucketize(lightCullingBuffers.numTilesX, 16), bucketize(lightCullingBuffers.numTilesY, 16));
+		// Tiled frusta.
+		cl->setPipelineState(*worldSpaceFrustaPipeline.pipeline);
+		cl->setComputeRootSignature(*worldSpaceFrustaPipeline.rootSignature);
+		cl->setComputeDynamicConstantBuffer(WORLD_SPACE_TILED_FRUSTA_RS_CAMERA, cameraCBV);
+		cl->setCompute32BitConstants(WORLD_SPACE_TILED_FRUSTA_RS_CB, frusta_cb{ lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY });
+		cl->setRootComputeUAV(WORLD_SPACE_TILED_FRUSTA_RS_FRUSTA_UAV, lightCullingBuffers.tiledFrusta);
+		cl->dispatch(bucketize(lightCullingBuffers.numTilesX, 16), bucketize(lightCullingBuffers.numTilesY, 16));
 
-	// Light culling.
-	cl->clearUAV(lightCullingBuffers.opaqueLightIndexCounter, 0.f);
-	cl->setPipelineState(*lightCullingPipeline.pipeline);
-	cl->setComputeRootSignature(*lightCullingPipeline.rootSignature);
-	cl->setComputeDynamicConstantBuffer(LIGHT_CULLING_RS_CAMERA, cameraCBV);
-	cl->setCompute32BitConstants(LIGHT_CULLING_RS_CB, light_culling_cb{ lightCullingBuffers.numTilesX, numLights, 0 }); // TODO: Number of lights.
-	cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 0, depthBuffer);
-	cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 1, pointLightBoundingVolumes[dxContext.bufferedFrameID]);
-	cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 2, spotLightBoundingVolumes[dxContext.bufferedFrameID]);
-	cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 3, lightCullingBuffers.tiledFrusta);
-	cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 4, lightCullingBuffers.opaqueLightIndexCounter);
-	cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 5, lightCullingBuffers.opaqueLightIndexList);
-	cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 6, lightCullingBuffers.opaqueLightGrid);
-	cl->dispatch(lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY);
+		// Light culling.
+		cl->clearUAV(lightCullingBuffers.lightIndexCounter, 0.f);
+		cl->setPipelineState(*lightCullingPipeline.pipeline);
+		cl->setComputeRootSignature(*lightCullingPipeline.rootSignature);
+		cl->setComputeDynamicConstantBuffer(LIGHT_CULLING_RS_CAMERA, cameraCBV);
+		cl->setCompute32BitConstants(LIGHT_CULLING_RS_CB, light_culling_cb{ lightCullingBuffers.numTilesX, numPointLights, numSpotLights });
+		cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 0, depthBuffer);
+		cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 1, pointLightBuffer[dxContext.bufferedFrameID]);
+		cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 2, spotLightBuffer[dxContext.bufferedFrameID]);
+		cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 3, lightCullingBuffers.tiledFrusta);
+		cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 4, lightCullingBuffers.lightIndexCounter);
+		cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 5, lightCullingBuffers.pointLightIndexList);
+		cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 6, lightCullingBuffers.spotLightIndexList);
+		cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 7, lightCullingBuffers.lightGrid);
+		cl->dispatch(lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY);
+	}
 #endif
 
 
@@ -611,10 +684,12 @@ void dx_renderer::dummyRender(float dt)
 	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 0, environment.irradiance);
 	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 1, environment.prefiltered);
 	cl->setDescriptorHeapSRV(MODEL_RS_BRDF, 0, brdfTex);
-	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 0, lightCullingBuffers.opaqueLightGrid);
-	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 1, lightCullingBuffers.opaqueLightIndexList);
-	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 2, pointLightBoundingVolumes[dxContext.bufferedFrameID]);
-	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 3, spotLightBoundingVolumes[dxContext.bufferedFrameID]);
+	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 0, lightCullingBuffers.lightGrid);
+	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 1, lightCullingBuffers.pointLightIndexList);
+	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 2, lightCullingBuffers.spotLightIndexList);
+	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 3, pointLightBuffer[dxContext.bufferedFrameID]);
+	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 4, spotLightBuffer[dxContext.bufferedFrameID]);
+	cl->setGraphicsDynamicConstantBuffer(MODEL_RS_SUN, sunCBV);
 
 	cl->setGraphicsDynamicConstantBuffer(MODEL_RS_CAMERA, cameraCBV);
 	cl->setGraphics32BitConstants(MODEL_RS_MATERIAL, pbr_material_cb{ vec4(1.f, 1.f, 1.f, 1.f), 0.f, 0.f, USE_ALBEDO_TEXTURE | USE_NORMAL_TEXTURE | USE_ROUGHNESS_TEXTURE | USE_METALLIC_TEXTURE });
@@ -627,6 +702,11 @@ void dx_renderer::dummyRender(float dt)
 	cl->setIndexBuffer(mesh.mesh.indexBuffer);
 	cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 	cl->setStencilReference(0);
+
+
+	// ----------------------------------------
+	// HELPER STUFF
+	// ----------------------------------------
 
 
 	// Gizmos.
@@ -669,10 +749,10 @@ void dx_renderer::dummyRender(float dt)
 		cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
 		cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
 
-		for (uint32 i = 0; i < numLights; ++i)
+		for (uint32 i = 0; i < numPointLights; ++i)
 		{
-			float radius = lights[i].radius;
-			vec3 position = lights[i].position;
+			float radius = pointLights[i].radius;
+			vec3 position = pointLights[i].position;
 			cl->setGraphics32BitConstants(0, camera.viewProj * createModelMatrix(position, quat::identity, vec3(radius, radius, radius)));
 			cl->drawIndexed(sphereMesh.numTriangles * 3, 1, sphereMesh.firstTriangle * 3, sphereMesh.baseVertex, 0);
 		}
