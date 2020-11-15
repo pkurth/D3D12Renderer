@@ -2,6 +2,7 @@
 #include "dx_context.h"
 #include "dx_command_list.h"
 
+#include <sdkddkver.h>
 
 dx_context dxContext;
 

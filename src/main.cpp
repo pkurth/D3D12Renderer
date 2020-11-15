@@ -6,6 +6,7 @@
 #include "input.h"
 #include "imgui.h"
 #include "file_browser.h"
+#include "game.h"
 
 #include <fontawesome/list.h>
 
@@ -215,6 +216,12 @@ int main(int argc, char** argv)
 
 	initializeImGui(screenFormat);
 
+
+	game_scene scene;
+	scene.initialize();
+
+
+
 	LARGE_INTEGER perfFreqResult;
 	QueryPerformanceFrequency(&perfFreqResult);
 	perfFreq = (float)perfFreqResult.QuadPart;
@@ -283,14 +290,14 @@ int main(int argc, char** argv)
 			if (input.mouse.right.down && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) { input.mouse.right.down = false; }
 			if (input.mouse.middle.down && !ImGui::IsMouseDown(ImGuiMouseButton_Middle)) { input.mouse.middle.down = false; }
 
-			input.mouse.left.clicked = input.mouse.left.doubleClicked = false;
-			input.mouse.right.clicked = input.mouse.right.doubleClicked = false;
-			input.mouse.middle.clicked = input.mouse.middle.doubleClicked = false;
+			input.mouse.left.clickEvent = input.mouse.left.doubleClickEvent = false;
+			input.mouse.right.clickEvent = input.mouse.right.doubleClickEvent = false;
+			input.mouse.middle.clickEvent = input.mouse.middle.doubleClickEvent = false;
 
 			for (uint32 i = 0; i < arraysize(user_input::keyboard); ++i)
 			{
 				if (input.keyboard[i].down && !ImGui::IsKeyDown(i)) { input.keyboard[i].down = false; }
-				input.keyboard[i].pressed = false;
+				input.keyboard[i].pressEvent = false;
 			}
 
 			input.overWindow = false;
@@ -299,15 +306,16 @@ int main(int argc, char** argv)
 		ImGui::PopStyleVar();
 
 
-		if (input.keyboard['V'].pressed) { window.toggleVSync(); }
+		if (input.keyboard['V'].pressEvent) { window.toggleVSync(); }
 		if (ImGui::IsKeyPressed(key_esc)) { break; } // Also allowed if not focused on main window.
 		if (ImGui::IsKeyPressed(key_enter) && ImGui::IsKeyDown(key_alt)) { window.toggleFullscreen(); } // Also allowed if not focused on main window.
 
 
 		drawHelperWindows();
 
-		dx_renderer::beginFrame(input, renderWidth, renderHeight, dt);
-		dx_renderer::dummyRender(dt);
+		dx_renderer::beginFrame(renderWidth, renderHeight);
+		scene.update(input, dt);
+		dx_renderer::render(dt);
 
 		if (!drawMainMenuBar())
 		{

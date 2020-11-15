@@ -2,6 +2,10 @@
 
 #include "dx_render_primitives.h"
 #include "math.h"
+#include "camera.h"
+
+#include "model_rs.hlsl"
+#include "light_source.hlsl"
 
 #define MAX_NUM_POINT_LIGHTS_PER_FRAME 4096
 #define MAX_NUM_SPOT_LIGHTS_PER_FRAME 4096
@@ -40,6 +44,18 @@ static const char* gizmoTypeNames[] =
 	"Scale",
 };
 
+struct pbr_material
+{
+	dx_texture* albedo;
+	dx_texture* normal;
+	dx_texture* roughness;
+	dx_texture* metallic;
+
+	vec4 albedoTint;
+	float roughnessOverride;
+	float metallicOverride;
+};
+
 struct pbr_environment
 {
 	dx_texture sky;
@@ -65,13 +81,31 @@ struct light_culling_buffers
 struct dx_renderer
 {
 	static void initialize(uint32 windowWidth, uint32 windowHeight);
+	static pbr_environment createEnvironment(const char* filename);
 
-	static void beginFrame(const struct user_input& input, uint32 windowWidth, uint32 windowHeight, float dt);
-	static void recalculateViewport(bool resizeTextures);
-	static void fillCameraConstantBuffer(struct camera_cb& cb);
-	static void allocateLightCullingBuffers();
-	static void dummyRender(float dt);
+	static void beginFrame(uint32 windowWidth, uint32 windowHeight);
+	static void setCamera(const render_camera& camera);
 
+	static void setEnvironment(const pbr_environment& environment);
+	static void setSun(const vec3& direction, const vec3& radiance);
+	static void setPointLights(const point_light_cb* lights, uint32 numLights);
+	static void setSpotLights(const spot_light_cb* lights, uint32 numLights);
+
+	static void renderObject(const dx_mesh* mesh, submesh_info submesh, const pbr_material* material, const trs& transform);
+
+	static void render(float dt);
+
+
+
+	static uint32 renderWidth;
+	static uint32 renderHeight;
+
+	static dx_render_target windowRenderTarget;
+	static dx_texture frameResult;
+
+private:
+	static D3D12_VIEWPORT windowViewport;
+	static aspect_ratio_mode aspectRatioMode;
 
 	static dx_dynamic_constant_buffer cameraCBV;
 	static dx_dynamic_constant_buffer sunCBV;
@@ -86,16 +120,30 @@ struct dx_renderer
 	static dx_buffer pointLightBuffer[NUM_BUFFERED_FRAMES];
 	static dx_buffer spotLightBuffer[NUM_BUFFERED_FRAMES];
 
-	static uint32 renderWidth;
-	static uint32 renderHeight;
 	static uint32 windowWidth;
 	static uint32 windowHeight;
 
-	static dx_render_target windowRenderTarget;
-	static dx_texture frameResult;
+	// Per frame stuff.
+	static const render_camera* camera;
+	static const pbr_environment* environment;
+	static const point_light_cb* pointLights;
+	static const spot_light_cb* spotLights;
+	static uint32 numPointLights;
+	static uint32 numSpotLights;
 
-	static D3D12_VIEWPORT windowViewport;
+	struct draw_call
+	{
+		const mat4 transform;
+		const dx_mesh* mesh;
+		const pbr_material* material;
+		submesh_info submesh;
+	};
 
-	static aspect_ratio_mode aspectRatioMode;
+	static std::vector<draw_call> drawCalls;
+
+
+
+	static void recalculateViewport(bool resizeTextures);
+	static void allocateLightCullingBuffers();
 };
 

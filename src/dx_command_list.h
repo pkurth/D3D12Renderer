@@ -92,10 +92,10 @@ struct dx_command_list
 	void setRootComputeSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
 
 	void setDescriptorHeapResource(uint32 rootParameterIndex, uint32 offset, uint32 count, dx_cpu_descriptor_handle handle);
-	void setDescriptorHeapSRV(uint32 rootParameterIndex, uint32 offset, dx_texture& texture) { setDescriptorHeapResource(rootParameterIndex, offset, 1, texture.defaultSRV); }
-	void setDescriptorHeapSRV(uint32 rootParameterIndex, uint32 offset, dx_buffer& buffer) { setDescriptorHeapResource(rootParameterIndex, offset, 1, buffer.defaultSRV); }
-	void setDescriptorHeapUAV(uint32 rootParameterIndex, uint32 offset, dx_texture& texture) { setDescriptorHeapResource(rootParameterIndex, offset, 1, texture.defaultUAV); }
-	void setDescriptorHeapUAV(uint32 rootParameterIndex, uint32 offset, dx_buffer& buffer) { setDescriptorHeapResource(rootParameterIndex, offset, 1, buffer.defaultUAV); }
+	void setDescriptorHeapSRV(uint32 rootParameterIndex, uint32 offset, const dx_texture& texture) { setDescriptorHeapResource(rootParameterIndex, offset, 1, texture.defaultSRV); }
+	void setDescriptorHeapSRV(uint32 rootParameterIndex, uint32 offset, const dx_buffer& buffer) { setDescriptorHeapResource(rootParameterIndex, offset, 1, buffer.defaultSRV); }
+	void setDescriptorHeapUAV(uint32 rootParameterIndex, uint32 offset, const dx_texture& texture) { setDescriptorHeapResource(rootParameterIndex, offset, 1, texture.defaultUAV); }
+	void setDescriptorHeapUAV(uint32 rootParameterIndex, uint32 offset, const dx_buffer& buffer) { setDescriptorHeapResource(rootParameterIndex, offset, 1, buffer.defaultUAV); }
 
 
 	// Shader resources.
@@ -113,10 +113,10 @@ struct dx_command_list
 
 	// Input assembly.
 	void setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY topology);
-	void setVertexBuffer(uint32 slot, dx_vertex_buffer& buffer);
+	void setVertexBuffer(uint32 slot, const dx_vertex_buffer& buffer);
 	void setVertexBuffer(uint32 slot, dx_dynamic_vertex_buffer buffer);
 	void setVertexBuffer(uint32 slot, D3D12_VERTEX_BUFFER_VIEW& buffer);
-	void setIndexBuffer(dx_index_buffer& buffer);
+	void setIndexBuffer(const dx_index_buffer& buffer);
 	void setIndexBuffer(D3D12_INDEX_BUFFER_VIEW& buffer);
 
 

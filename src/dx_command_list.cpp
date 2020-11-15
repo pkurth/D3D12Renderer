@@ -284,7 +284,7 @@ void dx_command_list::setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY topology)
 	commandList->IASetPrimitiveTopology(topology);
 }
 
-void dx_command_list::setVertexBuffer(uint32 slot, dx_vertex_buffer& buffer)
+void dx_command_list::setVertexBuffer(uint32 slot, const dx_vertex_buffer& buffer)
 {
 	commandList->IASetVertexBuffers(slot, 1, &buffer.view);
 }
@@ -299,7 +299,7 @@ void dx_command_list::setVertexBuffer(uint32 slot, D3D12_VERTEX_BUFFER_VIEW& buf
 	commandList->IASetVertexBuffers(slot, 1, &buffer);
 }
 
-void dx_command_list::setIndexBuffer(dx_index_buffer& buffer)
+void dx_command_list::setIndexBuffer(const dx_index_buffer& buffer)
 {
 	commandList->IASetIndexBuffer(&buffer.view);
 }

@@ -32,14 +32,14 @@ enum key_code
 struct input_key
 {
 	bool down;
-	bool pressed;
+	bool pressEvent;
 };
 
 struct input_mouse_button
 {
 	bool down;
-	bool clicked;
-	bool doubleClicked;
+	bool clickEvent;
+	bool doubleClickEvent;
 };
 
 struct mouse_input

@@ -2,23 +2,16 @@
 #include "dx_renderer.h"
 #include "dx_command_list.h"
 #include "dx_pipeline.h"
-#include "camera.h"
 #include "geometry.h"
 #include "imgui.h"
 #include "texture.h"
 #include "mesh.h"
-#include "random.h"
 #include "texture_preprocessing.h"
-#include "perlin.h"
-#include "color.h"
-#include "input.h"
 
-#include "model_rs.hlsl"
 #include "outline_rs.hlsl"
 #include "present_rs.hlsl"
 #include "sky_rs.hlsl"
 #include "light_culling.hlsl"
-#include "light_source.hlsl"
 
 #include "camera.hlsl"
 
@@ -40,6 +33,14 @@ uint32 dx_renderer::renderWidth;
 uint32 dx_renderer::renderHeight;
 uint32 dx_renderer::windowWidth;
 uint32 dx_renderer::windowHeight;
+
+const render_camera* dx_renderer::camera;
+const pbr_environment* dx_renderer::environment;
+const point_light_cb* dx_renderer::pointLights;
+const spot_light_cb* dx_renderer::spotLights;
+uint32 dx_renderer::numPointLights;
+uint32 dx_renderer::numSpotLights;
+std::vector<dx_renderer::draw_call> dx_renderer::drawCalls;
 
 dx_render_target dx_renderer::windowRenderTarget;
 dx_texture dx_renderer::frameResult;
@@ -96,31 +97,6 @@ static vec4 gizmoColors[] =
 
 
 static dx_texture brdfTex;
-
-
-// The following stuff will eventually move into a different file.
-
-static render_camera camera;
-
-static composite_mesh mesh;
-static dx_texture albedoTex;
-static dx_texture normalTex;
-static dx_texture roughTex;
-static dx_texture metalTex;
-
-static trs meshTransform;
-
-static const uint32 numPointLights = 128;
-static point_light_cb* pointLights;
-
-static const uint32 numSpotLights = 128;
-static spot_light_cb* spotLights;
-
-static vec3* lightVelocities;
-
-static pbr_environment environment;
-
-
 static tonemap_cb tonemap = defaultTonemapParameters();
 
 
@@ -226,14 +202,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 
 
 
-
-
-	camera.position = vec3(0.f, 30.f, 40.f);
-	camera.rotation = quat(vec3(1.f, 0.f, 0.f), deg2rad(-20.f));
-	camera.verticalFOV = deg2rad(70.f);
-	camera.nearPlane = 0.1f;
-
-
+	
 	{
 		cpu_mesh mesh(mesh_creation_flags_with_positions);
 		cubeMesh = mesh.pushCube(1.f);
@@ -258,84 +227,12 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 		brdfTex = integrateBRDF(cl);
 		dxContext.executeCommandList(cl);
 	}
-
-	//mesh = createCompositeMeshFromFile("assets/meshes/cerberus.fbx", mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
-	cpu_mesh m(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
-	mesh.singleMeshes.push_back({ m.pushQuad(10000.f) });
-	mesh.mesh = m.createDXMesh();
-
-	albedoTex = loadTextureFromFile("assets/textures/cerberus_a.tga");
-	normalTex = loadTextureFromFile("assets/textures/cerberus_n.tga", texture_load_flags_default | texture_load_flags_noncolor);
-	roughTex = loadTextureFromFile("assets/textures/cerberus_r.tga", texture_load_flags_default | texture_load_flags_noncolor);
-	metalTex = loadTextureFromFile("assets/textures/cerberus_m.tga", texture_load_flags_default | texture_load_flags_noncolor);
-
-	meshTransform = trs::identity;
-	meshTransform.rotation = quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f));
-	meshTransform.scale = 0.04f;
-
-	{
-		dx_texture equiSky = loadTextureFromFile("assets/textures/hdri/leadenhall_market_4k.hdr",
-			texture_load_flags_noncolor | texture_load_flags_cache_to_dds | texture_load_flags_allocate_full_mipchain);
-
-		dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
-		dx_command_list* cl = dxContext.getFreeRenderCommandList();
-		generateMipMapsOnGPU(cl, equiSky);
-		environment.sky = equirectangularToCubemap(cl, equiSky, 2048, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
-		environment.prefiltered = prefilterEnvironment(cl, environment.sky, 128);
-		environment.irradiance = cubemapToIrradiance(cl, environment.sky);
-		dxContext.executeCommandList(cl);
-
-		dxContext.retireObject(equiSky.resource);
-	}
-
-	pointLights = new point_light_cb[MAX_NUM_POINT_LIGHTS_PER_FRAME];
-	lightVelocities = new vec3[MAX_NUM_POINT_LIGHTS_PER_FRAME];
-
-	random_number_generator rng = { 14878213 };
-	for (uint32 i = 0; i < numPointLights; ++i)
-	{
-		pointLights[i] = 
-		{
-			{
-				rng.randomFloatBetween(-100.f, 100.f),
-				2.f,
-				rng.randomFloatBetween(-100.f, 100.f),
-			},
-			25,
-			randomRGB(rng) * 250.f,
-		};
-
-		lightVelocities[i] =
-		{
-			rng.randomFloatBetween(-1.f, 1.f),
-			0.f,
-			rng.randomFloatBetween(-1.f, 1.f),
-		};
-	}
-
-	spotLights = new spot_light_cb[MAX_NUM_SPOT_LIGHTS_PER_FRAME];
-	for (uint32 i = 0; i < numSpotLights; ++i)
-	{
-		spotLights[i] =
-		{
-			{
-				rng.randomFloatBetween(-100.f, 100.f),
-				10.f,
-				rng.randomFloatBetween(-100.f, 100.f),
-			},
-			0.f,
-			{
-				0.f, -1.f, 0.f
-			},
-			0.f,
-			randomRGB(rng) * 250.f,
-			25
-		};
-	}
 }
 
-void dx_renderer::fillCameraConstantBuffer(camera_cb& cb)
+void dx_renderer::setCamera(const render_camera& camera)
 {
+	camera_cb cb;
+
 	cb.vp = camera.viewProj;
 	cb.v = camera.view;
 	cb.p = camera.proj;
@@ -347,9 +244,50 @@ void dx_renderer::fillCameraConstantBuffer(camera_cb& cb)
 	cb.projectionParams = vec4(camera.nearPlane, camera.farPlane, camera.farPlane / camera.nearPlane, 1.f - camera.farPlane / camera.nearPlane);
 	cb.screenDims = vec2((float)renderWidth, (float)renderHeight);
 	cb.invScreenDims = vec2(1.f / renderWidth, 1.f / renderHeight);
+
+	cameraCBV = dxContext.uploadDynamicConstantBuffer(cb);
+
+	dx_renderer::camera = &camera;
 }
 
-void dx_renderer::beginFrame(const user_input& input, uint32 windowWidth, uint32 windowHeight, float dt)
+void dx_renderer::setEnvironment(const pbr_environment& environment)
+{
+	dx_renderer::environment = &environment;
+}
+
+void dx_renderer::setSun(const vec3& direction, const vec3& radiance)
+{
+	directional_light_cb sunCB;
+	sunCB.direction = direction;
+	sunCB.radiance = radiance;
+	sunCBV = dxContext.uploadDynamicConstantBuffer(sunCB);
+}
+
+void dx_renderer::setPointLights(const point_light_cb* lights, uint32 numLights)
+{
+	dx_renderer::pointLights = lights;
+	dx_renderer::numPointLights = numLights;
+}
+
+void dx_renderer::setSpotLights(const spot_light_cb* lights, uint32 numLights)
+{
+	dx_renderer::spotLights = lights;
+	dx_renderer::numSpotLights = numLights;
+}
+
+void dx_renderer::renderObject(const dx_mesh* mesh, submesh_info submesh, const pbr_material* material, const trs& transform)
+{
+	drawCalls.push_back(
+		{
+			trsToMat4(transform),
+			mesh,
+			material,
+			submesh,
+		}
+	);
+}
+
+void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 {
 	if (dx_renderer::windowWidth != windowWidth || dx_renderer::windowHeight != windowHeight)
 	{
@@ -367,40 +305,28 @@ void dx_renderer::beginFrame(const user_input& input, uint32 windowWidth, uint32
 
 	checkForChangedPipelines();
 
+	drawCalls.clear();
+	camera = 0;
+}
 
+pbr_environment dx_renderer::createEnvironment(const char* filename)
+{
+	pbr_environment environment;
 
-	const float CAMERA_MOVEMENT_SPEED = 4.f;
-	const float CAMERA_SENSITIVITY = 4.f;
+	dx_texture equiSky = loadTextureFromFile(filename,
+		texture_load_flags_noncolor | texture_load_flags_cache_to_dds | texture_load_flags_allocate_full_mipchain);
 
-	if (input.mouse.right.down)
-	{
-		vec3 cameraInputDir = vec3(
-			(input.keyboard['D'].down ? 1.f : 0.f) + (input.keyboard['A'].down ? -1.f : 0.f),
-			(input.keyboard['E'].down ? 1.f : 0.f) + (input.keyboard['Q'].down ? -1.f : 0.f),
-			(input.keyboard['W'].down ? -1.f : 0.f) + (input.keyboard['S'].down ? 1.f : 0.f)
-		) * (input.keyboard[key_shift].down ? 3.f : 1.f) * (input.keyboard[key_ctrl].down ? 0.1f : 1.f) * CAMERA_MOVEMENT_SPEED;
+	dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
+	dx_command_list* cl = dxContext.getFreeRenderCommandList();
+	generateMipMapsOnGPU(cl, equiSky);
+	environment.sky = equirectangularToCubemap(cl, equiSky, 2048, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
+	environment.prefiltered = prefilterEnvironment(cl, environment.sky, 128);
+	environment.irradiance = cubemapToIrradiance(cl, environment.sky);
+	dxContext.executeCommandList(cl);
 
-		vec2 turnAngle(0.f, 0.f);
-		turnAngle = vec2(-input.mouse.reldx, -input.mouse.reldy) * CAMERA_SENSITIVITY;
+	dxContext.retireObject(equiSky.resource);
 
-		quat& cameraRotation = camera.rotation;
-		cameraRotation = quat(vec3(0.f, 1.f, 0.f), turnAngle.x) * cameraRotation;
-		cameraRotation = cameraRotation * quat(vec3(1.f, 0.f, 0.f), turnAngle.y);
-
-		camera.position += cameraRotation * cameraInputDir * dt;
-	}
-
-	camera.recalculateMatrices(renderWidth, renderHeight);
-
-
-	camera_cb cameraCB;
-	fillCameraConstantBuffer(cameraCB);
-	cameraCBV = dxContext.uploadDynamicConstantBuffer(cameraCB);
-
-	directional_light_cb sunCB;
-	sunCB.direction = normalize(-vec3(1.f, 0.8f, 0.3f));
-	sunCB.radiance = vec3(1.f, 0.9f, 0.8f) * 50.f;
-	sunCBV = dxContext.uploadDynamicConstantBuffer(sunCB);
+	return environment;
 }
 
 void dx_renderer::recalculateViewport(bool resizeTextures)
@@ -468,17 +394,9 @@ void dx_renderer::allocateLightCullingBuffers()
 	}
 }
 
-void dx_renderer::dummyRender(float dt)
+void dx_renderer::render(float dt)
 {
-	static float meshRotationSpeed = 0.f;
-	static gizmo_type gizmoType;
-	static bool showOutline = false;
-	static vec4 outlineColor(1.f, 1.f, 0.f, 1.f);
 	static bool showLightVolumes = false;
-
-	static float innerAngle = 30.f;
-	static float outerAngle = 45.f;
-
 
 	DXGI_QUERY_VIDEO_MEMORY_INFO memoryInfo;
 	checkResult(dxContext.adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memoryInfo));
@@ -487,14 +405,7 @@ void dx_renderer::dummyRender(float dt)
 	ImGui::Text("%f ms, %u FPS", dt, (uint32)(1.f / dt));
 
 	bool aspectRatioModeChanged = ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)aspectRatioMode);
-	ImGui::Dropdown("Gizmo type", gizmoTypeNames, gizmo_type_count, (uint32&)gizmoType);
-
-	ImGui::Checkbox("Show outline", &showOutline);
-	ImGui::ColorEdit4("Outline color", outlineColor.data);
-
 	ImGui::Checkbox("Show light volumes", &showLightVolumes);
-
-	ImGui::SliderFloat("Rotation speed", &meshRotationSpeed, -2.f, 2.f);
 	ImGui::Text("Video memory available: %uMB", (uint32)BYTE_TO_MB(memoryInfo.Budget));
 	ImGui::Text("Video memory used: %uMB", (uint32)BYTE_TO_MB(memoryInfo.CurrentUsage));
 
@@ -522,43 +433,12 @@ void dx_renderer::dummyRender(float dt)
 		ImGui::TreePop();
 	}
 
-	ImGui::Separator();
-	ImGui::SliderFloat("Outer angle", &outerAngle, 2.f, 90.f);
-	ImGui::SliderFloat("Inner angle", &innerAngle, 1.f, outerAngle);
-
 	ImGui::End();
 
 	if (aspectRatioModeChanged)
 	{
 		recalculateViewport(true);
 	}
-
-	const vec3 vortexCenter(0.f, 0.f, 0.f);
-	const float vortexSpeed = 1.f;
-	const float vortexSize = 60.f;
-	for (uint32 i = 0; i < numPointLights; ++i)
-	{
-		lightVelocities[i] *= (1.f - 0.005f);
-		pointLights[i].position += lightVelocities[i] * dt;
-
-		vec3 d = pointLights[i].position - vortexCenter;
-		vec3 v = vec3(-d.z, 0.f, d.x) * vortexSpeed;
-		float factor = 1.f / (1.f + (d.x * d.x + d.z * d.z) / vortexSize);
-
-		lightVelocities[i] += (v - lightVelocities[i]) * factor;
-	}
-
-	float innerCutoff = cos(deg2rad(innerAngle));
-	float outerCutoff = cos(deg2rad(outerAngle));
-	for (uint32 i = 0; i < numSpotLights; ++i)
-	{
-		spotLights[i].innerCutoff = innerCutoff;
-		spotLights[i].outerCutoff = outerCutoff;
-	}
-
-
-	quat deltaRotation(vec3(0.f, 1.f, 0.f), 2.f * M_PI * 0.1f * meshRotationSpeed * dt);
-	meshTransform.rotation = deltaRotation * meshTransform.rotation;
 
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
@@ -578,16 +458,14 @@ void dx_renderer::dummyRender(float dt)
 	cl->setGraphicsRootSignature(*textureSkyPipeline.rootSignature);
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
-	cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment.sky);
+	cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera->proj * createSkyViewMatrix(camera->view) });
+	cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment->sky);
 
 	cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
 	cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
 	cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
 
 
-	auto submesh = mesh.singleMeshes[0].submesh;
-	mat4 m = trsToMat4(meshTransform);
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 
@@ -599,12 +477,21 @@ void dx_renderer::dummyRender(float dt)
 	// Models.
 	cl->setPipelineState(*modelDepthOnlyPipeline.pipeline);
 	cl->setGraphicsRootSignature(*modelDepthOnlyPipeline.rootSignature);
-	cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
 
-	cl->setVertexBuffer(0, mesh.mesh.vertexBuffer);
-	cl->setIndexBuffer(mesh.mesh.indexBuffer);
-	cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+	for (const draw_call& dc : drawCalls)
+	{
+		const mat4& m = dc.transform;
+		const submesh_info& submesh = dc.submesh;
+		const dx_mesh* mesh = dc.mesh;
 
+		cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera->viewProj * m, m });
+
+		cl->setVertexBuffer(0, mesh->vertexBuffer);
+		cl->setIndexBuffer(mesh->indexBuffer);
+		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+	}
+
+#if 0
 	// Gizmos.
 	if (gizmoType != gizmo_type_none)
 	{
@@ -618,6 +505,7 @@ void dx_renderer::dummyRender(float dt)
 			cl->drawIndexed(gizmoSubmeshes[gizmoType].numTriangles * 3, 1, gizmoSubmeshes[gizmoType].firstTriangle * 3, gizmoSubmeshes[gizmoType].baseVertex, 0);
 		}
 	}
+#endif
 
 
 
@@ -677,12 +565,8 @@ void dx_renderer::dummyRender(float dt)
 	// Models.
 	cl->setPipelineState(*modelPipeline.pipeline);
 	cl->setGraphicsRootSignature(*modelPipeline.rootSignature);
-	cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 0, albedoTex);
-	cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 1, normalTex);
-	cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 2, roughTex);
-	cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 3, metalTex);
-	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 0, environment.irradiance);
-	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 1, environment.prefiltered);
+	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 0, environment->irradiance);
+	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 1, environment->prefiltered);
 	cl->setDescriptorHeapSRV(MODEL_RS_BRDF, 0, brdfTex);
 	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 0, lightCullingBuffers.lightGrid);
 	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 1, lightCullingBuffers.pointLightIndexList);
@@ -692,16 +576,49 @@ void dx_renderer::dummyRender(float dt)
 	cl->setGraphicsDynamicConstantBuffer(MODEL_RS_SUN, sunCBV);
 
 	cl->setGraphicsDynamicConstantBuffer(MODEL_RS_CAMERA, cameraCBV);
-	cl->setGraphics32BitConstants(MODEL_RS_MATERIAL, pbr_material_cb{ vec4(1.f, 1.f, 1.f, 1.f), 0.f, 0.f, USE_ALBEDO_TEXTURE | USE_NORMAL_TEXTURE | USE_ROUGHNESS_TEXTURE | USE_METALLIC_TEXTURE });
+
+	for (const draw_call& dc : drawCalls)
+	{
+		const mat4& m = dc.transform;
+		const submesh_info& submesh = dc.submesh;
+		const dx_mesh* mesh = dc.mesh;
+		const pbr_material* material = dc.material;
+
+		uint32 flags = 0;
+
+		if (material->albedo) 
+		{
+			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 0, *material->albedo); 
+			flags |= USE_ALBEDO_TEXTURE;
+		}
+		if (material->normal)
+		{
+			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 1, *material->normal);
+			flags |= USE_NORMAL_TEXTURE;
+		}
+		if (material->roughness)
+		{
+			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 2, *material->roughness);
+			flags |= USE_ROUGHNESS_TEXTURE;
+		}
+		if (material->metallic)
+		{
+			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 3, *material->metallic);
+			flags |= USE_METALLIC_TEXTURE;
+		}
+
+		cl->setGraphics32BitConstants(MODEL_RS_MATERIAL, pbr_material_cb{ material->albedoTint, material->roughnessOverride, material->metallicOverride, flags });
+
+		cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera->viewProj * m, m });
+
+		cl->setVertexBuffer(0, mesh->vertexBuffer);
+		cl->setIndexBuffer(mesh->indexBuffer);
+		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+	}
 
 
-	cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
-
-	cl->setStencilReference(1);
-	cl->setVertexBuffer(0, mesh.mesh.vertexBuffer);
-	cl->setIndexBuffer(mesh.mesh.indexBuffer);
-	cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-	cl->setStencilReference(0);
+	//cl->setStencilReference(1);
+	//cl->setStencilReference(0);
 
 
 	// ----------------------------------------
@@ -709,6 +626,7 @@ void dx_renderer::dummyRender(float dt)
 	// ----------------------------------------
 
 
+#if 0
 	// Gizmos.
 	if (gizmoType != gizmo_type_none)
 	{
@@ -723,22 +641,7 @@ void dx_renderer::dummyRender(float dt)
 			cl->drawIndexed(gizmoSubmeshes[gizmoType].numTriangles * 3, 1, gizmoSubmeshes[gizmoType].firstTriangle * 3, gizmoSubmeshes[gizmoType].baseVertex, 0);
 		}
 	}
-
-
-	// Outline.
-	if (showOutline)
-	{
-		cl->setPipelineState(*outlinePipeline.pipeline);
-		cl->setGraphicsRootSignature(*outlinePipeline.rootSignature);
-		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		cl->setVertexBuffer(0, mesh.mesh.vertexBuffer);
-		cl->setIndexBuffer(mesh.mesh.indexBuffer);
-
-		cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ camera.viewProj * m, outlineColor });
-
-		cl->setStencilReference(1);
-		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-	}
+#endif
 
 
 	if (showLightVolumes)
@@ -753,7 +656,7 @@ void dx_renderer::dummyRender(float dt)
 		{
 			float radius = pointLights[i].radius;
 			vec3 position = pointLights[i].position;
-			cl->setGraphics32BitConstants(0, camera.viewProj * createModelMatrix(position, quat::identity, vec3(radius, radius, radius)));
+			cl->setGraphics32BitConstants(0, camera->viewProj * createModelMatrix(position, quat::identity, vec3(radius, radius, radius)));
 			cl->drawIndexed(sphereMesh.numTriangles * 3, 1, sphereMesh.firstTriangle * 3, sphereMesh.baseVertex, 0);
 		}
 	}
