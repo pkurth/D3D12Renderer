@@ -3,12 +3,12 @@
 
 struct camera_cb
 {
-	mat4 vp;
-	mat4 v;
-	mat4 p;
-	mat4 invVP;
-	mat4 invV;
-	mat4 invP;
+	mat4 viewProj;
+	mat4 view;
+	mat4 proj;
+	mat4 invViewProj;
+	mat4 invView;
+	mat4 invProj;
 	vec4 position;
 	vec4 forward;
 	vec4 projectionParams; // nearPlane, farPlane, farPlane / nearPlane, 1 - farPlane / nearPlane

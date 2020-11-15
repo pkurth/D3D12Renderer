@@ -18,6 +18,7 @@ ConstantBuffer<camera_cb> camera			: register(b2);
 
 SamplerState wrapSampler				: register(s0);
 SamplerState clampSampler				: register(s1);
+SamplerComparisonState  shadowSampler	: register(s2);
 
 
 Texture2D<float4> albedoTex				: register(t0);
@@ -36,7 +37,7 @@ StructuredBuffer<uint> pointLightIndexList		: register(t1, space3);
 StructuredBuffer<uint> spotLightIndexList		: register(t2, space3);
 StructuredBuffer<point_light_cb> pointLights	: register(t3, space3);
 StructuredBuffer<spot_light_cb> spotLights		: register(t4, space3);
-
+Texture2D<float> sunShadowCascades[4]			: register(t5, space3);
 
 
 [RootSignature(MODEL_RS)]
@@ -132,10 +133,45 @@ float4 main(ps_input IN) : SV_TARGET
 
 	// Sun.
 	{
-		float3 L = -sun.direction.xyz;
-		float visibility = 1.f;
+		uint numCascades = sun.numShadowCascades;
+		float4 cascadeDistances = sun.cascadeDistances;
+
+		float currentPixelDepth = dot(camera.forward.xyz, camToP);
+		float4 comparison = float4(currentPixelDepth, currentPixelDepth, currentPixelDepth, currentPixelDepth) > cascadeDistances;
+
+		int currentCascadeIndex = dot(float4(numCascades > 0, numCascades > 1, numCascades > 2, numCascades > 3), comparison);
+		currentCascadeIndex = min(currentCascadeIndex, numCascades - 1);
+
+		int nextCascadeIndex = min(numCascades - 1, currentCascadeIndex + 1);
+
+		float4 bias = sun.bias;
+		float visibility = sampleShadowMap(sun.vp[currentCascadeIndex], IN.worldPosition, sunShadowCascades[currentCascadeIndex],
+			shadowSampler, SUN_SHADOW_TEXEL_SIZE, bias[currentCascadeIndex]);
+
+		// Blend between cascades.
+		float currentPixelsBlendBandLocation = 1.f;
+		if (numCascades > 1)
+		{
+			// Calculate blend amount.
+			int blendIntervalBelowIndex = max(0, currentCascadeIndex - 1);
+			float cascade0Factor = float(currentCascadeIndex > 0);
+			float pixelDepth = currentPixelDepth - cascadeDistances[blendIntervalBelowIndex] * cascade0Factor;
+			float blendInterval = cascadeDistances[currentCascadeIndex] - cascadeDistances[blendIntervalBelowIndex] * cascade0Factor;
+
+			// Relative to current cascade. 0 means at nearplane of cascade, 1 at farplane of cascade.
+			currentPixelsBlendBandLocation = 1.f - pixelDepth / blendInterval;
+		}
+		if (currentPixelsBlendBandLocation < sun.blendArea) // Blend area is relative!
+		{
+			float blendBetweenCascadesAmount = currentPixelsBlendBandLocation / sun.blendArea;
+			float visibilityOfNextCascade = sampleShadowMap(sun.vp[nextCascadeIndex], IN.worldPosition, sunShadowCascades[nextCascadeIndex],
+				shadowSampler, SUN_SHADOW_TEXEL_SIZE, bias[nextCascadeIndex]);
+			visibility = lerp(visibilityOfNextCascade, visibility, blendBetweenCascadesAmount);
+		}
+
 		float3 radiance = sun.radiance * visibility; // No attenuation for sun.
 
+		float3 L = -sun.direction.xyz;
 		totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
 	}
 

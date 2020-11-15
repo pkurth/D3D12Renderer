@@ -77,15 +77,6 @@ struct submesh_info
 	uint32 numVertices;
 };
 
-struct dx_submesh
-{
-	dx_vertex_buffer vertexBuffer;
-	dx_index_buffer indexBuffer;
-	uint32 numTriangles;
-	uint32 firstTriangle;
-	uint32 baseVertex;
-};
-
 struct dx_render_target
 {
 	uint32 numAttachments;
@@ -101,7 +92,7 @@ struct dx_render_target
 
 
 	uint32 pushColorAttachment(dx_texture& texture);
-	void pushDepthStencilAttachment(dx_texture& texture);
+	void pushDepthStencilAttachment(dx_texture& texture, uint32 arraySlice = 0);
 	void notifyOnTextureResize(uint32 width, uint32 height); // This does NOT resize the textures, only updates the width, height and viewport variables.
 };
 
@@ -123,7 +114,7 @@ void freeBuffer(dx_buffer& buffer);
 void uploadTextureSubresourceData(dx_texture& texture, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 firstSubresource, uint32 numSubresources);
 dx_texture createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
 dx_texture createTexture(const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allowRenderTarget = false, bool allowUnorderedAccess = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
-dx_texture createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format);
+dx_texture createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format, uint32 arrayLength = 1, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_DEPTH_WRITE);
 void resizeTexture(dx_texture& texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
 void freeTexture(dx_texture& texture);
 
@@ -149,8 +140,6 @@ void freeRootSignature(dx_root_signature& rs);
 
 dx_command_signature createCommandSignature(dx_root_signature rootSignature, D3D12_INDIRECT_ARGUMENT_DESC* argumentDescs, uint32 numArgumentDescs, uint32 commandStructureSize);
 
-dx_submesh createSubmesh(dx_mesh& mesh, submesh_info info);
-dx_submesh createSubmesh(dx_mesh& mesh);
 
 
 struct barrier_batcher

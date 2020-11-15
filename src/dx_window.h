@@ -10,7 +10,7 @@ struct dx_window : win32_window
 	dx_window(dx_window&) = delete;
 	dx_window(dx_window&&) = default;
 
-	bool initialize(const TCHAR* name, uint32 initialWidth, uint32 initialHeight, color_depth colorDepth, DXGI_FORMAT depthFormat, bool exclusiveFullscreen = false);
+	bool initialize(const TCHAR* name, uint32 initialWidth, uint32 initialHeight, color_depth colorDepth, DXGI_FORMAT depthFormat = DXGI_FORMAT_UNKNOWN, bool exclusiveFullscreen = false);
 
 	virtual void shutdown();
 

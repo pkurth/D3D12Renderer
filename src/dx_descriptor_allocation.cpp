@@ -33,7 +33,7 @@ dx_cpu_descriptor_handle dx_descriptor_heap::getFreeHandle()
 	}
 	else
 	{
-		index = allFreeIncludingAndAfter++;
+		index = atomicAdd(allFreeIncludingAndAfter, 1);
 	}
 	return { CD3DX12_CPU_DESCRIPTOR_HANDLE(cpuBase, index, descriptorHandleIncrementSize) };
 }
@@ -123,6 +123,8 @@ dx_cpu_descriptor_handle dx_dsv_descriptor_heap::pushDepthStencilView(dx_texture
 
 dx_cpu_descriptor_handle dx_dsv_descriptor_heap::createDepthStencilView(dx_texture& texture, dx_cpu_descriptor_handle index)
 {
+	D3D12_RESOURCE_DESC resourceDesc = texture.resource->GetDesc();
+
 	DXGI_FORMAT format = texture.formatSupport.Format; // This contains the original format, not the typeless.
 
 	assert(isDepthFormat(format));
@@ -130,7 +132,24 @@ dx_cpu_descriptor_handle dx_dsv_descriptor_heap::createDepthStencilView(dx_textu
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
 	dsvDesc.Format = format;
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-	getDevice(descriptorHeap)->CreateDepthStencilView(texture.resource.Get(), &dsvDesc, index.cpuHandle);
+
+	if (resourceDesc.DepthOrArraySize > 1)
+	{
+		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+		dsvDesc.Texture2DArray.ArraySize = 1;
+
+		for (uint32 i = 0; i < resourceDesc.DepthOrArraySize; ++i)
+		{
+			dsvDesc.Texture2DArray.FirstArraySlice = i;
+
+			dx_cpu_descriptor_handle handle = { CD3DX12_CPU_DESCRIPTOR_HANDLE(index.cpuHandle, i, dxContext.device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV)) };
+			dxContext.device->CreateDepthStencilView(texture.resource.Get(), &dsvDesc, handle);
+		}
+	}
+	else
+	{
+		dxContext.device->CreateDepthStencilView(texture.resource.Get(), &dsvDesc, index.cpuHandle);
+	}
 
 	return index;
 }

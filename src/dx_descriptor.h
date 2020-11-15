@@ -28,6 +28,7 @@ struct dx_cpu_descriptor_handle
 	dx_cpu_descriptor_handle& createCubemapSRV(dx_texture& texture, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_cpu_descriptor_handle& createCubemapArraySRV(dx_texture& texture, texture_mip_range mipRange = {}, uint32 firstCube = 0, uint32 numCubes = 1, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_cpu_descriptor_handle& createDepthTextureSRV(dx_texture& texture);
+	dx_cpu_descriptor_handle& createDepthTextureArraySRV(dx_texture& texture);
 	dx_cpu_descriptor_handle& createNullTextureSRV();
 	dx_cpu_descriptor_handle& createBufferSRV(dx_buffer& buffer, buffer_range bufferRange = {});
 	dx_cpu_descriptor_handle& createRawBufferSRV(dx_buffer& buffer, buffer_range bufferRange = {});

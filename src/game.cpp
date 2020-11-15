@@ -5,10 +5,12 @@
 #include "random.h"
 #include "color.h"
 
-void game_scene::initialize()
+void game_scene::initialize(dx_renderer* renderer)
 {
+	this->renderer = renderer;
+
 	camera.position = vec3(0.f, 30.f, 40.f);
-	camera.rotation = quat(vec3(1.f, 0.f, 0.f), deg2rad(-20.f));
+	camera.rotation = quat::identity;
 	camera.verticalFOV = deg2rad(70.f);
 	camera.nearPlane = 0.1f;
 
@@ -111,6 +113,19 @@ void game_scene::initialize()
 			25
 		};
 	}
+
+	sun.direction = normalize(vec3(-0.6f, -1.f, -0.3f));
+	sun.radiance = vec3(1.f, 0.93f, 0.76f) * 50.f;
+
+	sun.cascadeDistances.data[0] = 9.f;
+	sun.cascadeDistances.data[1] = 39.f;
+	sun.cascadeDistances.data[2] = 74.f;
+	sun.cascadeDistances.data[3] = 10000.f;
+
+	sun.numShadowCascades = 3;
+
+	sun.bias = vec4(0.001f, 0.0015f, 0.0015f, 0.0035f);
+	sun.blendArea = 0.07f;
 }
 
 void game_scene::update(const user_input& input, float dt)
@@ -136,8 +151,9 @@ void game_scene::update(const user_input& input, float dt)
 		camera.position += cameraRotation * cameraInputDir * dt;
 	}
 
-	camera.recalculateMatrices(dx_renderer::renderWidth, dx_renderer::renderHeight);
+	camera.recalculateMatrices(renderer->renderWidth, renderer->renderHeight);
 
+	sun.updateMatrices(camera, 1000.f);
 
 
 	const vec3 vortexCenter(0.f, 0.f, 0.f);
@@ -155,12 +171,16 @@ void game_scene::update(const user_input& input, float dt)
 		lightVelocities[i] += (v - lightVelocities[i]) * factor;
 	}
 
-	dx_renderer::setCamera(camera);
-	dx_renderer::setSun(normalize(-vec3(1.f, 0.8f, 0.3f)), vec3(1.f, 0.9f, 0.8f) * 50.f);
-	dx_renderer::setEnvironment(environment);
-	dx_renderer::setPointLights(pointLights, numPointLights);
-	dx_renderer::setSpotLights(spotLights, numSpotLights);
 
+	renderer->setCamera(camera);
+	renderer->setSun(sun);
+	renderer->setEnvironment(environment);
+	renderer->setPointLights(pointLights, numPointLights);
+	renderer->setSpotLights(spotLights, numSpotLights);
+
+
+	geometry_render_pass* geometryPass = renderer->beginGeometryPass();
+	sun_shadow_render_pass* shadowPass = renderer->beginSunShadowPass();
 
 
 	for (const game_object& go : gameObjects)
@@ -169,7 +189,10 @@ void game_scene::update(const user_input& input, float dt)
 		submesh_info submesh = meshes[go.meshIndex].singleMeshes[0].submesh;
 		const pbr_material& material = materials[go.materialIndex];
 
-		dx_renderer::renderObject(&mesh, submesh, &material, go.transform);
+		mat4 m = trsToMat4(go.transform);
+
+		geometryPass->renderObject(&mesh, submesh, &material, m);
+		shadowPass->renderObject(0, &mesh, submesh, m);
 	}
 
 

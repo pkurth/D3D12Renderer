@@ -4,6 +4,10 @@
 // Used for point and spot lights, because I dislike very high numbers.
 #define LIGHT_IRRADIANCE_SCALE 1000.f
 
+#define MAX_NUM_SUN_SHADOW_CASCADES 4
+#define SUN_SHADOW_DIMENSIONS 2048
+#define SUN_SHADOW_TEXEL_SIZE (1.f / SUN_SHADOW_DIMENSIONS)
+
 static float getAttenuation(float distance, float maxDistance)
 {
 	// https://imdoingitwrong.wordpress.com/2011/02/10/improved-light-attenuation/
@@ -16,10 +20,14 @@ static float getAttenuation(float distance, float maxDistance)
 
 struct directional_light_cb
 {
+	mat4 vp[MAX_NUM_SUN_SHADOW_CASCADES];
+	vec4 cascadeDistances;
+	vec4 bias;
+
 	vec3 direction;
-	uint32 padding;
+	float blendArea;
 	vec3 radiance;
-	uint32 padding2;
+	uint32 numShadowCascades;
 };
 
 struct point_light_cb
@@ -39,5 +47,57 @@ struct spot_light_cb
 	vec3 radiance;
 	float maxDistance;
 };
+
+#ifdef HLSL
+static float sampleShadowMap(float4x4 vp, float3 worldPosition, Texture2D<float> shadowMap, SamplerComparisonState shadowMapSampler, 
+	float texelSize, float bias)
+{
+	float4 lightProjected = mul(vp, float4(worldPosition, 1.f));
+	lightProjected.xyz /= lightProjected.w;
+
+	float2 lightUV = lightProjected.xy * 0.5f + float2(0.5f, 0.5f);
+	lightUV.y = 1.f - lightUV.y;
+
+	float visibility = 0.f;
+
+	for (float y = -1.5f; y <= 1.5f; y += 1.f)
+	{
+		for (float x = -1.5f; x <= 1.5f; x += 1.f)
+		{
+			visibility += shadowMap.SampleCmpLevelZero(
+				shadowMapSampler,
+				lightUV + float2(x, y) * texelSize,
+				lightProjected.z - bias);
+		}
+	}
+	visibility /= 16.f;
+	return visibility;
+}
+
+static float sampleShadowMapArray(float4x4 vp, float3 worldPosition, Texture2DArray<float> shadowMap, uint arraySlice, SamplerComparisonState shadowMapSampler,
+	float texelSize, float bias)
+{
+	float4 lightProjected = mul(vp, float4(worldPosition, 1.f));
+	lightProjected.xyz /= lightProjected.w;
+
+	float2 lightUV = lightProjected.xy * 0.5f + float2(0.5f, 0.5f);
+	lightUV.y = 1.f - lightUV.y;
+
+	float visibility = 0.f;
+
+	for (float y = -1.5f; y <= 1.5f; y += 1.f)
+	{
+		for (float x = -1.5f; x <= 1.5f; x += 1.f)
+		{
+			visibility += shadowMap.SampleCmpLevelZero(
+				shadowMapSampler,
+				float3(lightUV + float2(x, y) * texelSize, arraySlice),
+				lightProjected.z - bias);
+		}
+	}
+	visibility /= 16.f;
+	return visibility;
+}
+#endif
 
 #endif

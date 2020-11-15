@@ -21,7 +21,7 @@ protected:
 	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuBase;
 	uint32 descriptorHandleIncrementSize;
 	std::vector<uint16> freeDescriptors;
-	uint16 allFreeIncludingAndAfter;
+	uint32 allFreeIncludingAndAfter;
 
 	inline dx_cpu_descriptor_handle getHandle(uint32 index) { return { CD3DX12_CPU_DESCRIPTOR_HANDLE(cpuBase, index, descriptorHandleIncrementSize) }; }
 };

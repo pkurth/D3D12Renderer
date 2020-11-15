@@ -6,6 +6,8 @@
 #include "input.h"
 #include "camera.h"
 #include "light_source.hlsl" // TODO: For now. The game should only know about the C++ version of lights eventually.
+#include "light_source.h"
+
 
 struct game_object
 {
@@ -16,24 +18,27 @@ struct game_object
 
 struct game_scene
 {
+	void initialize(dx_renderer* renderer);
+	void update(const user_input& input, float dt);
+
+
+	dx_renderer* renderer;
+
 	std::vector<dx_texture> textures;
 	std::vector<composite_mesh> meshes;
-	std::vector<pbr_material> materials;
+	std::vector<pbr_material> materials; // TODO: Eventually store indices to textures here, instead of pointers.
 	std::vector<game_object> gameObjects;
 	pbr_environment environment;
 
 	render_camera camera;
 
-	const uint32 numPointLights = 128;
+	const uint32 numPointLights = 0;
 	point_light_cb* pointLights;
 
 	const uint32 numSpotLights = 0;
 	spot_light_cb* spotLights;
 
+	directional_light sun;
+
 	vec3* lightVelocities;
-
-
-
-	void initialize();
-	void update(const user_input& input, float dt);
 };

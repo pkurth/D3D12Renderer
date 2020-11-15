@@ -344,7 +344,7 @@ dx_texture createTexture(const void* data, uint32 width, uint32 height, DXGI_FOR
 	}
 }
 
-dx_texture createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format)
+dx_texture createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format, uint32 arrayLength, D3D12_RESOURCE_STATES initialState)
 {
 	dx_texture result = {};
 
@@ -355,13 +355,13 @@ dx_texture createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format)
 	DXGI_FORMAT typelessFormat = getTypelessFormat(format);
 
 	D3D12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Tex2D(typelessFormat, width, height,
-		1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+		arrayLength, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 
 	checkResult(dxContext.device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&desc,
-		D3D12_RESOURCE_STATE_DEPTH_WRITE,
+		initialState,
 		&optimizedClearValue,
 		IID_PPV_ARGS(&result.resource)
 	));
@@ -373,7 +373,14 @@ dx_texture createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format)
 		sizeof(D3D12_FEATURE_DATA_FORMAT_SUPPORT)));
 
 	result.dsvHandle = dxContext.dsvAllocator.pushDepthStencilView(result);
-	result.defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureSRV(result);
+	if (arrayLength == 1)
+	{
+		result.defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureSRV(result);
+	}
+	else
+	{
+		result.defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureArraySRV(result);
+	}
 
 	return result;
 }
@@ -417,7 +424,14 @@ void resizeTexture(dx_texture& texture, uint32 newWidth, uint32 newHeight, D3D12
 	if (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)
 	{
 		dxContext.dsvAllocator.createDepthStencilView(texture, texture.dsvHandle);
-		texture.defaultSRV.createDepthTextureSRV(texture);
+		if (desc.DepthOrArraySize == 1)
+		{
+			texture.defaultSRV.createDepthTextureSRV(texture);
+		}
+		else
+		{
+			texture.defaultSRV.createDepthTextureArraySRV(texture);
+		}
 	}
 	else
 	{
@@ -673,11 +687,11 @@ uint32 dx_render_target::pushColorAttachment(dx_texture& texture)
 	return attachmentPoint;
 }
 
-void dx_render_target::pushDepthStencilAttachment(dx_texture& texture)
+void dx_render_target::pushDepthStencilAttachment(dx_texture& texture, uint32 arraySlice)
 {
 	assert(texture.resource);
 
-	dsvHandle = texture.dsvHandle.cpuHandle;
+	dsvHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(texture.dsvHandle.cpuHandle, arraySlice, dxContext.device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
 
 	D3D12_RESOURCE_DESC desc = texture.resource->GetDesc();
 
@@ -700,28 +714,6 @@ void dx_render_target::notifyOnTextureResize(uint32 width, uint32 height)
 	this->width = width;
 	this->height = height;
 	viewport = { 0, 0, (float)width, (float)height, 0.f, 1.f };
-}
-
-dx_submesh createSubmesh(dx_mesh& mesh, submesh_info info)
-{
-	dx_submesh result;
-	result.vertexBuffer = mesh.vertexBuffer;
-	result.indexBuffer = mesh.indexBuffer;
-	result.baseVertex = info.baseVertex;
-	result.firstTriangle = info.firstTriangle;
-	result.numTriangles = info.numTriangles;
-	return result;
-}
-
-dx_submesh createSubmesh(dx_mesh& mesh)
-{
-	dx_submesh result;
-	result.vertexBuffer = mesh.vertexBuffer;
-	result.indexBuffer = mesh.indexBuffer;
-	result.baseVertex = 0;
-	result.firstTriangle = 0;
-	result.numTriangles = mesh.indexBuffer.elementCount / 3;
-	return result;
 }
 
 barrier_batcher::barrier_batcher(dx_command_list* cl)

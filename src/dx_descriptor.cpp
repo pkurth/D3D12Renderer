@@ -61,6 +61,21 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createDepthTextureSRV(dx_tex
 	return *this;
 }
 
+dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createDepthTextureArraySRV(dx_texture& texture)
+{
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Format = getReadFormatFromTypeless(texture.resource->GetDesc().Format);
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+	srvDesc.Texture2DArray.MipLevels = 1;
+	srvDesc.Texture2DArray.FirstArraySlice = 0;
+	srvDesc.Texture2DArray.ArraySize = texture.resource->GetDesc().DepthOrArraySize;
+
+	dxContext.device->CreateShaderResourceView(texture.resource.Get(), &srvDesc, cpuHandle);
+
+	return *this;
+}
+
 dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createNullTextureSRV()
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};

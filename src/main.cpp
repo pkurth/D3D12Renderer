@@ -209,16 +209,23 @@ int main(int argc, char** argv)
 	DXGI_FORMAT screenFormat = (colorDepth == color_depth_8) ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R10G10B10A2_UNORM;
 
 	dx_window window;
-	window.initialize(TEXT("Main Window"), 1280, 800, colorDepth, DXGI_FORMAT_UNKNOWN, false);
+	window.initialize(TEXT("Main Window"), 1280, 800, colorDepth);
 	setMainWindow(&window);
 
-	dx_renderer::initialize(1024, 1024);
+	dx_renderer::initializeGlobal(screenFormat);
 
 	initializeImGui(screenFormat);
 
+	ImGuiWindowClass sceneViewWindowClass;
+	sceneViewWindowClass.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_AutoHideTabBar;
 
-	game_scene scene;
-	scene.initialize();
+
+
+	dx_renderer renderer = {};
+	renderer.initialize(1024, 1024);
+
+	game_scene scene = {};
+	scene.initialize(&renderer);
 
 
 
@@ -239,9 +246,6 @@ int main(int argc, char** argv)
 
 	uint64 frameID = 0;
 
-	ImGuiWindowClass sceneViewWindowClass;
-	sceneViewWindowClass.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_AutoHideTabBar;
-
 	while (newFrame(dt))
 	{
 		dxContext.renderQueue.waitForFence(fenceValues[window.currentBackbufferIndex]);
@@ -253,7 +257,7 @@ int main(int argc, char** argv)
 		ImGui::Begin("Scene");
 		uint32 renderWidth = (uint32)ImGui::GetContentRegionAvail().x;
 		uint32 renderHeight = (uint32)ImGui::GetContentRegionAvail().y;
-		ImGui::Image(dx_renderer::frameResult.defaultSRV, renderWidth, renderHeight);
+		ImGui::Image(renderer.frameResult.defaultSRV, renderWidth, renderHeight);
 
 		ImGuiIO& io = ImGui::GetIO();
 		if (ImGui::IsItemHovered())
@@ -313,9 +317,9 @@ int main(int argc, char** argv)
 
 		drawHelperWindows();
 
-		dx_renderer::beginFrame(renderWidth, renderHeight);
+		renderer.beginFrame(renderWidth, renderHeight);
 		scene.update(input, dt);
-		dx_renderer::render(dt);
+		renderer.endFrame(dt);
 
 		if (!drawMainMenuBar())
 		{
@@ -328,9 +332,6 @@ int main(int argc, char** argv)
 		float clearColor1[] = { 0.f, 0.f, 0.f, 1.f };
 		fenceValues[window.currentBackbufferIndex] = renderToWindow(window, clearColor1);
 		
-		//float clearColor2[] = { 1.f, 1.f, 0.f, 1.f };
-		//renderToWindow(window2, clearColor2);
-
 		++frameID;
 	}
 

@@ -43,9 +43,15 @@ struct pbr_material_cb
     "addressW = TEXTURE_ADDRESS_CLAMP," \
     "filter = FILTER_MIN_MAG_MIP_LINEAR," \
     "visibility=SHADER_VISIBILITY_PIXEL)," \
+"StaticSampler(s2," \
+    "addressU = TEXTURE_ADDRESS_BORDER," \
+    "addressV = TEXTURE_ADDRESS_BORDER," \
+    "addressW = TEXTURE_ADDRESS_BORDER," \
+    "filter = FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT," \
+    "visibility=SHADER_VISIBILITY_PIXEL)," \
 "DescriptorTable(SRV(t0, space=2, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL), " \
 "CBV(b0, space=3, visibility=SHADER_VISIBILITY_PIXEL), " \
-"DescriptorTable(SRV(t0, space=3, numDescriptors=5), visibility=SHADER_VISIBILITY_PIXEL)"
+"DescriptorTable(SRV(t0, space=3, numDescriptors=9), visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define MODEL_DEPTH_ONLY_RS \
 "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \

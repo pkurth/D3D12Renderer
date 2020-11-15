@@ -34,10 +34,10 @@ void main(cs_input IN)
     float2 screenBR = invScreenDims * (float2(IN.dispatchThreadID.x + 1, IN.dispatchThreadID.y + 1) * LIGHT_CULLING_TILE_SIZE);
 
     // Points on near plane.
-    float3 tl = restoreWorldSpacePosition(camera.invVP, screenTL, 0.f);
-    float3 tr = restoreWorldSpacePosition(camera.invVP, screenTR, 0.f);
-    float3 bl = restoreWorldSpacePosition(camera.invVP, screenBL, 0.f);
-    float3 br = restoreWorldSpacePosition(camera.invVP, screenBR, 0.f);
+    float3 tl = restoreWorldSpacePosition(camera.invViewProj, screenTL, 0.f);
+    float3 tr = restoreWorldSpacePosition(camera.invViewProj, screenTR, 0.f);
+    float3 bl = restoreWorldSpacePosition(camera.invViewProj, screenBL, 0.f);
+    float3 br = restoreWorldSpacePosition(camera.invViewProj, screenBR, 0.f);
 
     float3 cameraPos = camera.position.xyz;
     light_culling_view_frustum frustum;

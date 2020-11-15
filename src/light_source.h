@@ -3,7 +3,10 @@
 #include "math.h"
 #include "camera.h"
 
-#define MAX_NUM_SUN_SHADOW_CASCADES 4
+#include "light_source.hlsl"
+
+#define SUN_SHADOW_DIMENSIONS 2048
+#define SUN_SHADOW_TEXEL_SIZE (1.f / SUN_SHADOW_DIMENSIONS)
 #define SHADOW_MAP_NEGATIVE_Z_OFFSET 100.f
 
 
@@ -13,14 +16,12 @@ struct directional_light
 	vec4 cascadeDistances;
 	vec4 bias;
 
-	vec4 worldSpaceDirection;
-	vec4 color;
-
-	uint32 numShadowCascades = 3;
+	vec3 direction;
 	float blendArea;
-	float texelSize;
-	uint32 shadowMapDimensions = 2048;
 
-	void updateMatrices(const render_camera& camera);
+	vec3 radiance;
+	uint32 numShadowCascades;
+
+	void updateMatrices(const render_camera& camera, float maxShadowDistance = 10000.f);
 };
 

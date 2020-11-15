@@ -198,7 +198,7 @@ struct dx_graphics_pipeline_generator
 		return *this;
 	}
 
-	dx_graphics_pipeline_generator& renderTargets(DXGI_FORMAT* rtFormats, uint32 numRenderTargets, DXGI_FORMAT dsvFormat = DXGI_FORMAT_UNKNOWN)
+	dx_graphics_pipeline_generator& renderTargets(const DXGI_FORMAT* rtFormats, uint32 numRenderTargets, DXGI_FORMAT dsvFormat = DXGI_FORMAT_UNKNOWN)
 	{
 		memcpy(desc.RTVFormats, rtFormats, sizeof(DXGI_FORMAT) * numRenderTargets);
 		desc.NumRenderTargets = numRenderTargets;
@@ -206,7 +206,7 @@ struct dx_graphics_pipeline_generator
 		return *this;
 	}
 
-	dx_graphics_pipeline_generator& renderTargets(D3D12_RT_FORMAT_ARRAY& rtFormats, DXGI_FORMAT dsvFormat = DXGI_FORMAT_UNKNOWN)
+	dx_graphics_pipeline_generator& renderTargets(const D3D12_RT_FORMAT_ARRAY& rtFormats, DXGI_FORMAT dsvFormat = DXGI_FORMAT_UNKNOWN)
 	{
 		return renderTargets(rtFormats.RTFormats, rtFormats.NumRenderTargets, dsvFormat);
 	}

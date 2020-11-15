@@ -654,7 +654,7 @@ mat4 createPerspectiveProjectionMatrix(float width, float height, float fx, floa
 
 mat4 createOrthographicProjectionMatrix(float r, float l, float t, float b, float nearPlane, float farPlane)
 {
-	mat4 result;
+	mat4 result = mat4::identity;
 	result.m00 = 2.f / (r - l);
 	result.m03 = -(r + l) / (r - l);
 	result.m11 = 2.f / (t - b);

@@ -3,9 +3,13 @@
 #include "dx_render_primitives.h"
 #include "math.h"
 #include "camera.h"
+#include "render_pass.h"
+#include "light_source.h"
 
 #include "model_rs.hlsl"
 #include "light_source.hlsl"
+#include "camera.hlsl"
+
 
 #define MAX_NUM_POINT_LIGHTS_PER_FRAME 4096
 #define MAX_NUM_SPOT_LIGHTS_PER_FRAME 4096
@@ -63,87 +67,62 @@ struct pbr_environment
 	dx_texture prefiltered;
 };
 
-struct light_culling_buffers
-{
-	dx_buffer tiledFrusta;
-
-	dx_buffer lightIndexCounter;
-	dx_buffer pointLightIndexList;
-	dx_buffer spotLightIndexList;
-
-	dx_texture lightGrid;
-
-	uint32 numTilesX;
-	uint32 numTilesY;
-};
-
 
 struct dx_renderer
 {
-	static void initialize(uint32 windowWidth, uint32 windowHeight);
+	static void initializeGlobal(DXGI_FORMAT screenFormat);
 	static pbr_environment createEnvironment(const char* filename);
 
-	static void beginFrame(uint32 windowWidth, uint32 windowHeight);
-	static void setCamera(const render_camera& camera);
 
-	static void setEnvironment(const pbr_environment& environment);
-	static void setSun(const vec3& direction, const vec3& radiance);
-	static void setPointLights(const point_light_cb* lights, uint32 numLights);
-	static void setSpotLights(const spot_light_cb* lights, uint32 numLights);
-
-	static void renderObject(const dx_mesh* mesh, submesh_info submesh, const pbr_material* material, const trs& transform);
-
-	static void render(float dt);
+	void initialize(uint32 windowWidth, uint32 windowHeight);
+	void beginFrame(uint32 windowWidth, uint32 windowHeight);	
+	void endFrame(float dt);
 
 
+	void setCamera(const render_camera& camera);
+	void setEnvironment(const pbr_environment& environment);
+	void setSun(const directional_light& light);
 
-	static uint32 renderWidth;
-	static uint32 renderHeight;
+	void setPointLights(const point_light_cb* lights, uint32 numLights);
+	void setSpotLights(const spot_light_cb* lights, uint32 numLights);
 
-	static dx_render_target windowRenderTarget;
-	static dx_texture frameResult;
+	geometry_render_pass* beginGeometryPass() { return &geometryRenderPass; }
+	sun_shadow_render_pass* beginSunShadowPass() { return &sunShadowRenderPass; }
+
+
+	uint32 renderWidth;
+	uint32 renderHeight;
+
+	dx_render_target windowRenderTarget;
+	dx_texture frameResult;
 
 private:
-	static D3D12_VIEWPORT windowViewport;
-	static aspect_ratio_mode aspectRatioMode;
+	const pbr_environment* environment;
+	const point_light_cb* pointLights;
+	const spot_light_cb* spotLights;
+	uint32 numPointLights;
+	uint32 numSpotLights;
 
-	static dx_dynamic_constant_buffer cameraCBV;
-	static dx_dynamic_constant_buffer sunCBV;
-
-	static dx_texture whiteTexture;
-
-	static dx_render_target hdrRenderTarget;
-	static dx_texture hdrColorTexture;
-	static dx_texture depthBuffer;
-
-	static light_culling_buffers lightCullingBuffers;
-	static dx_buffer pointLightBuffer[NUM_BUFFERED_FRAMES];
-	static dx_buffer spotLightBuffer[NUM_BUFFERED_FRAMES];
-
-	static uint32 windowWidth;
-	static uint32 windowHeight;
-
-	// Per frame stuff.
-	static const render_camera* camera;
-	static const pbr_environment* environment;
-	static const point_light_cb* pointLights;
-	static const spot_light_cb* spotLights;
-	static uint32 numPointLights;
-	static uint32 numSpotLights;
-
-	struct draw_call
-	{
-		const mat4 transform;
-		const dx_mesh* mesh;
-		const pbr_material* material;
-		submesh_info submesh;
-	};
-
-	static std::vector<draw_call> drawCalls;
+	camera_cb camera;
+	directional_light_cb sun;
 
 
 
-	static void recalculateViewport(bool resizeTextures);
-	static void allocateLightCullingBuffers();
+	D3D12_VIEWPORT windowViewport;
+	aspect_ratio_mode aspectRatioMode;
+
+	dx_render_target hdrRenderTarget;
+	dx_texture hdrColorTexture;
+	dx_texture depthBuffer;
+
+	uint32 windowWidth;
+	uint32 windowHeight;
+
+	geometry_render_pass geometryRenderPass;
+	sun_shadow_render_pass sunShadowRenderPass;
+
+
+	void recalculateViewport(bool resizeTextures);
+	void allocateLightCullingBuffers();
 };
 

@@ -87,14 +87,20 @@ void newImGuiFrame(float dt)
 void renderImGui(dx_command_list* cl)
 {
 	ImGui::Render();
-	cl->setDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, imguiDescriptorHeap);
-	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cl->commandList.Get());
+	if (cl)
+	{
+		cl->setDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, imguiDescriptorHeap);
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cl->commandList.Get());
+	}
 
 	auto& io = ImGui::GetIO();
 	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 	{
 		ImGui::UpdatePlatformWindows();
-		ImGui::RenderPlatformWindowsDefault(NULL, (void*)cl->commandList.Get());
+		if (cl)
+		{
+			ImGui::RenderPlatformWindowsDefault(0, cl->commandList.Get());
+		}
 	}
 
 	numImagesThisFrame = 0;
