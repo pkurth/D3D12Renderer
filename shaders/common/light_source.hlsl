@@ -55,47 +55,27 @@ static float sampleShadowMap(float4x4 vp, float3 worldPosition, Texture2D<float>
 	float4 lightProjected = mul(vp, float4(worldPosition, 1.f));
 	lightProjected.xyz /= lightProjected.w;
 
-	float2 lightUV = lightProjected.xy * 0.5f + float2(0.5f, 0.5f);
-	lightUV.y = 1.f - lightUV.y;
+	float visibility = 1.f;
 
-	float visibility = 0.f;
-
-	for (float y = -1.5f; y <= 1.5f; y += 1.f)
+	if (lightProjected.z < 1.f)
 	{
-		for (float x = -1.5f; x <= 1.5f; x += 1.f)
+		visibility = 0.f;
+
+		float2 lightUV = lightProjected.xy * 0.5f + float2(0.5f, 0.5f);
+		lightUV.y = 1.f - lightUV.y;
+
+		for (float y = -1.5f; y <= 1.5f; y += 1.f)
 		{
-			visibility += shadowMap.SampleCmpLevelZero(
-				shadowMapSampler,
-				lightUV + float2(x, y) * texelSize,
-				lightProjected.z - bias);
+			for (float x = -1.5f; x <= 1.5f; x += 1.f)
+			{
+				visibility += shadowMap.SampleCmpLevelZero(
+					shadowMapSampler,
+					lightUV + float2(x, y) * texelSize,
+					lightProjected.z - bias);
+			}
 		}
+		visibility /= 16.f;
 	}
-	visibility /= 16.f;
-	return visibility;
-}
-
-static float sampleShadowMapArray(float4x4 vp, float3 worldPosition, Texture2DArray<float> shadowMap, uint arraySlice, SamplerComparisonState shadowMapSampler,
-	float texelSize, float bias)
-{
-	float4 lightProjected = mul(vp, float4(worldPosition, 1.f));
-	lightProjected.xyz /= lightProjected.w;
-
-	float2 lightUV = lightProjected.xy * 0.5f + float2(0.5f, 0.5f);
-	lightUV.y = 1.f - lightUV.y;
-
-	float visibility = 0.f;
-
-	for (float y = -1.5f; y <= 1.5f; y += 1.f)
-	{
-		for (float x = -1.5f; x <= 1.5f; x += 1.f)
-		{
-			visibility += shadowMap.SampleCmpLevelZero(
-				shadowMapSampler,
-				float3(lightUV + float2(x, y) * texelSize, arraySlice),
-				lightProjected.z - bias);
-		}
-	}
-	visibility /= 16.f;
 	return visibility;
 }
 #endif

@@ -63,20 +63,22 @@ struct pbr_material
 struct pbr_environment
 {
 	dx_texture sky;
+	dx_texture environment;
 	dx_texture irradiance;
-	dx_texture prefiltered;
 };
 
 
 struct dx_renderer
 {
-	static void initializeGlobal(DXGI_FORMAT screenFormat);
-	static pbr_environment createEnvironment(const char* filename);
-
-
+	static void initializeCommon(DXGI_FORMAT screenFormat);
+	static pbr_environment createEnvironment(const char* filename, uint32 skyResolution = 2048, uint32 environmentResolution = 128, uint32 irradianceResolution = 32);
+	
 	void initialize(uint32 windowWidth, uint32 windowHeight);
+
+	static void beginFrameCommon();
 	void beginFrame(uint32 windowWidth, uint32 windowHeight);	
-	void endFrame(float dt);
+	void endFrame(dx_command_list* cl, float dt, bool mainWindow = false);
+	void blitResultToScreen(dx_command_list* cl, dx_cpu_descriptor_handle rtv);
 
 
 	void setCamera(const render_camera& camera);
@@ -97,7 +99,28 @@ struct dx_renderer
 	dx_texture frameResult;
 
 private:
-	const pbr_environment* environment;
+	struct pbr_environment_handles
+	{
+		dx_cpu_descriptor_handle sky;
+		dx_cpu_descriptor_handle irradiance;
+		dx_cpu_descriptor_handle environment;
+	};
+
+	struct light_culling_buffers
+	{
+		dx_buffer tiledFrusta;
+
+		dx_buffer lightIndexCounter;
+		dx_buffer pointLightIndexList;
+		dx_buffer spotLightIndexList;
+
+		dx_texture lightGrid;
+
+		uint32 numTilesX;
+		uint32 numTilesY;
+	};
+
+	pbr_environment_handles environment;
 	const point_light_cb* pointLights;
 	const spot_light_cb* spotLights;
 	uint32 numPointLights;
@@ -121,6 +144,7 @@ private:
 	geometry_render_pass geometryRenderPass;
 	sun_shadow_render_pass sunShadowRenderPass;
 
+	light_culling_buffers lightCullingBuffers;
 
 	void recalculateViewport(bool resizeTextures);
 	void allocateLightCullingBuffers();

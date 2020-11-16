@@ -10,27 +10,12 @@
 #include "outline_rs.hlsl"
 #include "present_rs.hlsl"
 #include "sky_rs.hlsl"
-#include "light_culling.hlsl"
+#include "light_culling_rs.hlsl"
 
 #include "camera.hlsl"
 
 
-struct light_culling_buffers
-{
-	dx_buffer tiledFrusta;
-
-	dx_buffer lightIndexCounter;
-	dx_buffer pointLightIndexList;
-	dx_buffer spotLightIndexList;
-
-	dx_texture lightGrid;
-
-	uint32 numTilesX;
-	uint32 numTilesY;
-};
-
 static dx_texture whiteTexture;
-static light_culling_buffers lightCullingBuffers;
 static dx_buffer pointLightBuffer[NUM_BUFFERED_FRAMES];
 static dx_buffer spotLightBuffer[NUM_BUFFERED_FRAMES];
 
@@ -45,6 +30,7 @@ static dx_pipeline modelDepthOnlyPipeline;
 static dx_pipeline modelShadowPipeline; // Only different from depth-only pipeline in the depth format.
 static dx_pipeline outlinePipeline;
 static dx_pipeline flatUnlitPipeline;
+static dx_pipeline blitPipeline;
 
 static dx_pipeline worldSpaceFrustaPipeline;
 static dx_pipeline lightCullingPipeline;
@@ -96,7 +82,7 @@ static const DXGI_FORMAT hdrDepthFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 static const DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D32_FLOAT;
 
 
-void dx_renderer::initializeGlobal(DXGI_FORMAT screenFormat)
+void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 {
 	::screenFormat = screenFormat;
 
@@ -181,6 +167,15 @@ void dx_renderer::initializeGlobal(DXGI_FORMAT screenFormat)
 		presentPipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "present_ps" });
 	}
 
+	// Blit.
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+		.renderTargets(&screenFormat, 1)
+		.depthSettings(false, false);
+
+		blitPipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "blit_ps" });
+	}
+
 	// Light culling.
 	{
 		worldSpaceFrustaPipeline = createReloadablePipeline("world_space_tiled_frusta_cs");
@@ -191,33 +186,6 @@ void dx_renderer::initializeGlobal(DXGI_FORMAT screenFormat)
 
 
 
-}
-
-void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
-{
-	dx_renderer::windowWidth = windowWidth;
-	dx_renderer::windowHeight = windowHeight;
-
-	recalculateViewport(false);
-
-	// HDR render target.
-	{
-		depthBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthFormat);
-		hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[0], true);
-
-		hdrRenderTarget.pushColorAttachment(hdrColorTexture);
-		hdrRenderTarget.pushDepthStencilAttachment(depthBuffer);
-	}
-
-	// Frame result.
-	{
-		frameResult = createTexture(0, windowWidth, windowHeight, screenFormat, true);
-
-		windowRenderTarget.pushColorAttachment(frameResult);
-	}
-
-
-	
 	{
 		cpu_mesh mesh(mesh_creation_flags_with_positions);
 		cubeMesh = mesh.pushCube(1.f);
@@ -244,18 +212,47 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	}
 }
 
+void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
+{
+	this->windowWidth = windowWidth;
+	this->windowHeight = windowHeight;
+
+	recalculateViewport(false);
+
+	// HDR render target.
+	{
+		depthBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthFormat);
+		hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[0], true);
+
+		hdrRenderTarget.pushColorAttachment(hdrColorTexture);
+		hdrRenderTarget.pushDepthStencilAttachment(depthBuffer);
+	}
+
+	// Frame result.
+	{
+		frameResult = createTexture(0, windowWidth, windowHeight, screenFormat, true);
+
+		windowRenderTarget.pushColorAttachment(frameResult);
+	}
+}
+
+void dx_renderer::beginFrameCommon()
+{
+
+	checkForChangedPipelines();
+}
+
 void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 {
-	environment = 0;
 	pointLights = 0;
 	spotLights = 0;
 	numPointLights = 0;
 	numSpotLights = 0;
 
-	if (dx_renderer::windowWidth != windowWidth || dx_renderer::windowHeight != windowHeight)
+	if (this->windowWidth != windowWidth || this->windowHeight != windowHeight)
 	{
-		dx_renderer::windowWidth = windowWidth;
-		dx_renderer::windowHeight = windowHeight;
+		this->windowWidth = windowWidth;
+		this->windowHeight = windowHeight;
 
 		// Frame result.
 		{
@@ -266,13 +263,11 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 		recalculateViewport(true);
 	}
 
-	checkForChangedPipelines();
-
 	geometryRenderPass.reset();
 	sunShadowRenderPass.reset();
 }
 
-pbr_environment dx_renderer::createEnvironment(const char* filename)
+pbr_environment dx_renderer::createEnvironment(const char* filename, uint32 skyResolution, uint32 environmentResolution, uint32 irradianceResolution)
 {
 	pbr_environment environment;
 
@@ -282,9 +277,9 @@ pbr_environment dx_renderer::createEnvironment(const char* filename)
 	dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 	generateMipMapsOnGPU(cl, equiSky);
-	environment.sky = equirectangularToCubemap(cl, equiSky, 2048, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
-	environment.prefiltered = prefilterEnvironment(cl, environment.sky, 128);
-	environment.irradiance = cubemapToIrradiance(cl, environment.sky);
+	environment.sky = equirectangularToCubemap(cl, equiSky, skyResolution, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
+	environment.environment = prefilterEnvironment(cl, environment.sky, environmentResolution);
+	environment.irradiance = cubemapToIrradiance(cl, environment.sky, irradianceResolution);
 	dxContext.executeCommandList(cl);
 
 	dxContext.retireObject(equiSky.resource);
@@ -374,7 +369,9 @@ void dx_renderer::setCamera(const render_camera& camera)
 
 void dx_renderer::setEnvironment(const pbr_environment& environment)
 {
-	this->environment = &environment;
+	this->environment.sky = environment.sky.defaultSRV;
+	this->environment.environment = environment.environment.defaultSRV;
+	this->environment.irradiance = environment.irradiance.defaultSRV;
 }
 
 void dx_renderer::setSun(const directional_light& light)
@@ -401,78 +398,85 @@ void dx_renderer::setSpotLights(const spot_light_cb* lights, uint32 numLights)
 	numSpotLights = numLights;
 }
 
-void dx_renderer::endFrame(float dt)
+void dx_renderer::endFrame(dx_command_list* cl, float dt, bool mainWindow)
 {
 	static bool showLightVolumes = false;
 
-	DXGI_QUERY_VIDEO_MEMORY_INFO memoryInfo;
-	checkResult(dxContext.adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memoryInfo));
+	bool aspectRatioModeChanged = false;
 
-	ImGui::Begin("Settings");
-	ImGui::Text("%f ms, %u FPS", dt, (uint32)(1.f / dt));
-
-	bool aspectRatioModeChanged = ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)aspectRatioMode);
-	ImGui::Checkbox("Show light volumes", &showLightVolumes);
-	ImGui::Text("Video memory available: %uMB", (uint32)BYTE_TO_MB(memoryInfo.Budget));
-	ImGui::Text("Video memory used: %uMB", (uint32)BYTE_TO_MB(memoryInfo.CurrentUsage));
-
-	if (ImGui::TreeNode("Tonemapping"))
+	if (mainWindow)
 	{
-		ImGui::PlotLines("Tone map",
-			[](void* data, int idx)
-			{
-				float t = idx * 0.01f;
-				tonemap_cb& aces = *(tonemap_cb*)data;
+		DXGI_QUERY_VIDEO_MEMORY_INFO memoryInfo;
+		checkResult(dxContext.adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memoryInfo));
 
-				return filmicTonemapping(t, aces);
-			},
-			&tonemap, 100, 0, 0, 0.f, 1.f, ImVec2(100.f, 100.f));
+		ImGui::Begin("Settings");
+		ImGui::Text("%f ms, %u FPS", dt, (uint32)(1.f / dt));
 
-		ImGui::SliderFloat("[ACES] Shoulder strength", &tonemap.A, 0.f, 1.f);
-		ImGui::SliderFloat("[ACES] Linear strength", &tonemap.B, 0.f, 1.f);
-		ImGui::SliderFloat("[ACES] Linear angle", &tonemap.C, 0.f, 1.f);
-		ImGui::SliderFloat("[ACES] Toe strength", &tonemap.D, 0.f, 1.f);
-		ImGui::SliderFloat("[ACES] Tone numerator", &tonemap.E, 0.f, 1.f);
-		ImGui::SliderFloat("[ACES] Toe denominator", &tonemap.F, 0.f, 1.f);
-		ImGui::SliderFloat("[ACES] Linear white", &tonemap.linearWhite, 0.f, 100.f);
-		ImGui::SliderFloat("[ACES] Exposure", &tonemap.exposure, -3.f, 3.f);
+		aspectRatioModeChanged = ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)aspectRatioMode);
+		ImGui::Checkbox("Show light volumes", &showLightVolumes);
+		ImGui::Text("Video memory available: %uMB", (uint32)BYTE_TO_MB(memoryInfo.Budget));
+		ImGui::Text("Video memory used: %uMB", (uint32)BYTE_TO_MB(memoryInfo.CurrentUsage));
 
-		ImGui::TreePop();
-	}
+		if (ImGui::TreeNode("Tonemapping"))
+		{
+			ImGui::PlotLines("Tone map",
+				[](void* data, int idx)
+				{
+					float t = idx * 0.01f;
+					tonemap_cb& aces = *(tonemap_cb*)data;
 
-	ImGui::End();
+					return filmicTonemapping(t, aces);
+				},
+				&tonemap, 100, 0, 0, 0.f, 1.f, ImVec2(100.f, 100.f));
 
-	if (aspectRatioModeChanged)
-	{
-		recalculateViewport(true);
+			ImGui::SliderFloat("[ACES] Shoulder strength", &tonemap.A, 0.f, 1.f);
+			ImGui::SliderFloat("[ACES] Linear strength", &tonemap.B, 0.f, 1.f);
+			ImGui::SliderFloat("[ACES] Linear angle", &tonemap.C, 0.f, 1.f);
+			ImGui::SliderFloat("[ACES] Toe strength", &tonemap.D, 0.f, 1.f);
+			ImGui::SliderFloat("[ACES] Tone numerator", &tonemap.E, 0.f, 1.f);
+			ImGui::SliderFloat("[ACES] Toe denominator", &tonemap.F, 0.f, 1.f);
+			ImGui::SliderFloat("[ACES] Linear white", &tonemap.linearWhite, 0.f, 100.f);
+			ImGui::SliderFloat("[ACES] Exposure", &tonemap.exposure, -3.f, 3.f);
+
+			ImGui::TreePop();
+		}
+
+		ImGui::End();
+
+		if (aspectRatioModeChanged)
+		{
+			recalculateViewport(true);
+		}
 	}
 
 	auto cameraCBV = dxContext.uploadDynamicConstantBuffer(camera);
 	auto sunCBV = dxContext.uploadDynamicConstantBuffer(sun);
 
-	dx_command_list* cl = dxContext.getFreeRenderCommandList();
+	//dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
 	barrier_batcher(cl)
 		.transition(hdrColorTexture.resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
 		.transition(frameResult.resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
-		.transition(sunShadowCascadeTextures[0].resource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
-		.transition(sunShadowCascadeTextures[1].resource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
-		.transition(sunShadowCascadeTextures[2].resource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
-		.transition(sunShadowCascadeTextures[3].resource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+		.transition(sunShadowCascadeTextures, MAX_NUM_SUN_SHADOW_CASCADES, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 
 	cl->setRenderTarget(hdrRenderTarget);
 	cl->setViewport(hdrRenderTarget.viewport);
 	cl->clearDepthAndStencil(hdrRenderTarget.dsvHandle);
 
-
-	// Sky.
-	cl->setPipelineState(*textureSkyPipeline.pipeline);
-	cl->setGraphicsRootSignature(*textureSkyPipeline.rootSignature);
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+
+
+	// ----------------------------------------
+	// SKY PASS
+	// ----------------------------------------
+
+	cl->setPipelineState(*textureSkyPipeline.pipeline);
+	cl->setGraphicsRootSignature(*textureSkyPipeline.rootSignature);
+
 	cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
-	cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment->sky);
+	cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment.sky);
 
 	cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
 	cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
@@ -549,6 +553,7 @@ void dx_renderer::endFrame(float dt)
 
 		// Light culling.
 		cl->clearUAV(lightCullingBuffers.lightIndexCounter, 0.f);
+		//cl->uavBarrier(lightCullingBuffers.lightIndexCounter); // Is this necessary?
 		cl->setPipelineState(*lightCullingPipeline.pipeline);
 		cl->setComputeRootSignature(*lightCullingPipeline.rootSignature);
 		cl->setComputeDynamicConstantBuffer(LIGHT_CULLING_RS_CAMERA, cameraCBV);
@@ -597,10 +602,7 @@ void dx_renderer::endFrame(float dt)
 	}
 
 	barrier_batcher(cl)
-		.transition(sunShadowCascadeTextures[0].resource, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
-		.transition(sunShadowCascadeTextures[1].resource, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
-		.transition(sunShadowCascadeTextures[2].resource, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
-		.transition(sunShadowCascadeTextures[3].resource, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		.transition(sunShadowCascadeTextures, MAX_NUM_SUN_SHADOW_CASCADES, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 
 	// ----------------------------------------
@@ -613,8 +615,8 @@ void dx_renderer::endFrame(float dt)
 	// Models.
 	cl->setPipelineState(*modelPipeline.pipeline);
 	cl->setGraphicsRootSignature(*modelPipeline.rootSignature);
-	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 0, environment->irradiance);
-	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 1, environment->prefiltered);
+	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 0, environment.irradiance);
+	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 1, environment.environment);
 	cl->setDescriptorHeapSRV(MODEL_RS_BRDF, 0, brdfTex);
 	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 0, lightCullingBuffers.lightGrid);
 	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 1, lightCullingBuffers.pointLightIndexList);
@@ -742,5 +744,18 @@ void dx_renderer::endFrame(float dt)
 		.transition(hdrColorTexture.resource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
 		.transition(frameResult.resource, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON);
 
-	dxContext.executeCommandList(cl);
+	//dxContext.executeCommandList(cl);
+}
+
+void dx_renderer::blitResultToScreen(dx_command_list* cl, dx_cpu_descriptor_handle rtv)
+{
+	CD3DX12_VIEWPORT viewport = CD3DX12_VIEWPORT(0.f, 0.f, (float)windowWidth, (float)windowHeight);
+	cl->setViewport(viewport);
+
+	cl->setRenderTarget(&rtv.cpuHandle, 1, 0);
+
+	cl->setPipelineState(*blitPipeline.pipeline);
+	cl->setGraphicsRootSignature(*blitPipeline.rootSignature);
+	cl->setDescriptorHeapSRV(0, 0, frameResult);
+	cl->drawFullscreenTriangle();
 }

@@ -18,11 +18,15 @@ struct game_object
 
 struct game_scene
 {
-	void initialize(dx_renderer* renderer);
+	void initialize(dx_renderer* renderers, uint32 numRenderers);
 	void update(const user_input& input, float dt);
 
 
-	dx_renderer* renderer;
+	void setEnvironment(const char* filename);
+
+
+	dx_renderer* renderers;
+	uint32 numRenderers;
 
 	std::vector<dx_texture> textures;
 	std::vector<composite_mesh> meshes;
@@ -30,7 +34,7 @@ struct game_scene
 	std::vector<game_object> gameObjects;
 	pbr_environment environment;
 
-	render_camera camera;
+	render_camera* cameras;
 
 	const uint32 numPointLights = 0;
 	point_light_cb* pointLights;

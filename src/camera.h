@@ -100,3 +100,5 @@ struct real_camera : camera_base
 
 	void recalculateMatrices();
 };
+
+camera_frustum_planes getWorldSpaceFrustumPlanes(const mat4& viewProj);

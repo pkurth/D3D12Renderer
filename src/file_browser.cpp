@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "imgui.h"
 #include "threading.h"
+#include "game.h"
 
 #include <filesystem>
 #include <shellapi.h>
@@ -277,7 +278,7 @@ static void printCachedFileEntries(file_system_entry& e)
 	}
 }
 
-void drawFileBrowser()
+void drawFileBrowser(game_scene& scene)
 {
 	static HANDLE checkForFileChangesThread = CreateThread(0, 0, checkForFileChanges, 0, 0, 0);
 
@@ -340,6 +341,8 @@ void drawFileBrowser()
 
 		auto& c = entryToShow.children[i];
 
+		auto extension = c.path.extension();
+
 		if (selectedPathIsFile && selectedPath == c.path)
 		{
 			coloredText(c.name.c_str(), 0.8f, 0.2f, 0.1f);
@@ -363,7 +366,30 @@ void drawFileBrowser()
 
 		if (c.isFile && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
 		{
-			ShellExecute(0, 0, c.path.wstring().c_str(), 0, 0, SW_SHOW);
+			ShellExecuteW(0, 0, c.path.c_str(), 0, 0, SW_SHOWNORMAL);
+		}
+
+		if (ImGui::BeginPopupContextItem(c.name.c_str(), ImGuiPopupFlags_MouseButtonRight))
+		{
+			if (c.isFile && ImGui::MenuItem("Open in default program"))
+			{
+				ShellExecuteW(0, 0, c.path.c_str(), 0, 0, SW_SHOWNORMAL);
+			}
+
+			if (ImGui::MenuItem("Open in file browser"))
+			{
+				ShellExecuteW(0, 0, c.path.parent_path().c_str(), 0, 0, SW_SHOWNORMAL);
+			}
+
+			if (extension == ".hdr")
+			{
+				if (ImGui::MenuItem("Set as environment"))
+				{
+					scene.setEnvironment(c.path.string().c_str());
+				}
+			}
+
+			ImGui::EndPopup();
 		}
 
 		ImGui::NextColumn();

@@ -1,7 +1,7 @@
 #include "model_rs.hlsl"
 #include "brdf.hlsl"
 #include "camera.hlsl"
-#include "light_culling.hlsl"
+#include "light_culling_rs.hlsl"
 #include "light_source.hlsl"
 
 struct ps_input

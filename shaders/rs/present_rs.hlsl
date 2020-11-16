@@ -65,7 +65,7 @@ static float filmicTonemapping(float color, tonemap_cb tonemap)
 	"addressW = TEXTURE_ADDRESS_CLAMP," \
 	"filter = FILTER_MIN_MAG_LINEAR_MIP_POINT,"	\
 	"visibility=SHADER_VISIBILITY_PIXEL)," \
-"DescriptorTable(SRV(t0, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL)"
+"DescriptorTable(SRV(t0, numDescriptors=1, flags = DESCRIPTORS_VOLATILE), visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define PRESENT_RS_TONEMAP	0
 #define PRESENT_RS_PRESENT	1

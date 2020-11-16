@@ -319,7 +319,7 @@ void dx_command_list::setScissor(const D3D12_RECT& scissor)
 	commandList->RSSetScissorRects(1, &scissor);
 }
 
-void dx_command_list::setScreenRenderTarget(D3D12_CPU_DESCRIPTOR_HANDLE* rtvs, uint32 numRTVs, D3D12_CPU_DESCRIPTOR_HANDLE* dsv)
+void dx_command_list::setRenderTarget(D3D12_CPU_DESCRIPTOR_HANDLE* rtvs, uint32 numRTVs, D3D12_CPU_DESCRIPTOR_HANDLE* dsv)
 {
 	commandList->OMSetRenderTargets(numRTVs, rtvs, FALSE, dsv);
 }

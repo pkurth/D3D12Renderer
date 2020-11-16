@@ -108,7 +108,7 @@ camera_frustum_corners camera_base::getWorldSpaceFrustumCorners(float alternativ
 	return result;
 }
 
-camera_frustum_planes camera_base::getWorldSpaceFrustumPlanes() const
+camera_frustum_planes getWorldSpaceFrustumPlanes(const mat4& viewProj)
 {
 	camera_frustum_planes result;
 
@@ -125,6 +125,11 @@ camera_frustum_planes camera_base::getWorldSpaceFrustumPlanes() const
 	result.farPlane = c3 - c2;
 
 	return result;
+}
+
+camera_frustum_planes camera_base::getWorldSpaceFrustumPlanes() const
+{
+	return ::getWorldSpaceFrustumPlanes(viewProj);
 }
 
 void real_camera::recalculateMatrices()

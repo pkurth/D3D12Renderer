@@ -5,14 +5,20 @@
 #include "random.h"
 #include "color.h"
 
-void game_scene::initialize(dx_renderer* renderer)
+void game_scene::initialize(dx_renderer* renderers, uint32 numRenderers)
 {
-	this->renderer = renderer;
+	this->renderers = renderers;
+	this->numRenderers = numRenderers;
 
-	camera.position = vec3(0.f, 30.f, 40.f);
-	camera.rotation = quat::identity;
-	camera.verticalFOV = deg2rad(70.f);
-	camera.nearPlane = 0.1f;
+	cameras = new render_camera[numRenderers];
+	for (uint32 i = 0; i < numRenderers; ++i)
+	{
+		render_camera& camera = cameras[i];
+		camera.position = vec3(0.f, 30.f, 40.f);
+		camera.rotation = quat::identity;
+		camera.verticalFOV = deg2rad(70.f);
+		camera.nearPlane = 0.1f;
+	}
 
 
 	meshes.push_back(createCompositeMeshFromFile("assets/meshes/cerberus.fbx", 
@@ -144,17 +150,12 @@ void game_scene::update(const user_input& input, float dt)
 		vec2 turnAngle(0.f, 0.f);
 		turnAngle = vec2(-input.mouse.reldx, -input.mouse.reldy) * CAMERA_SENSITIVITY;
 
-		quat& cameraRotation = camera.rotation;
+		quat& cameraRotation = cameras[0].rotation;
 		cameraRotation = quat(vec3(0.f, 1.f, 0.f), turnAngle.x) * cameraRotation;
 		cameraRotation = cameraRotation * quat(vec3(1.f, 0.f, 0.f), turnAngle.y);
 
-		camera.position += cameraRotation * cameraInputDir * dt;
+		cameras[0].position += cameraRotation * cameraInputDir * dt;
 	}
-
-	camera.recalculateMatrices(renderer->renderWidth, renderer->renderHeight);
-
-	sun.updateMatrices(camera, 1000.f);
-
 
 	const vec3 vortexCenter(0.f, 0.f, 0.f);
 	const float vortexSpeed = 1.f;
@@ -171,29 +172,44 @@ void game_scene::update(const user_input& input, float dt)
 		lightVelocities[i] += (v - lightVelocities[i]) * factor;
 	}
 
-
-	renderer->setCamera(camera);
-	renderer->setSun(sun);
-	renderer->setEnvironment(environment);
-	renderer->setPointLights(pointLights, numPointLights);
-	renderer->setSpotLights(spotLights, numSpotLights);
-
-
-	geometry_render_pass* geometryPass = renderer->beginGeometryPass();
-	sun_shadow_render_pass* shadowPass = renderer->beginSunShadowPass();
-
-
-	for (const game_object& go : gameObjects)
+	for (uint32 rendererIndex = 0; rendererIndex < numRenderers; ++rendererIndex)
 	{
-		const dx_mesh& mesh = meshes[go.meshIndex].mesh;
-		submesh_info submesh = meshes[go.meshIndex].singleMeshes[0].submesh;
-		const pbr_material& material = materials[go.materialIndex];
+		render_camera& camera = cameras[rendererIndex];
+		dx_renderer* renderer = &renderers[rendererIndex];
 
-		mat4 m = trsToMat4(go.transform);
+		camera.recalculateMatrices(renderer->renderWidth, renderer->renderHeight);
 
-		geometryPass->renderObject(&mesh, submesh, &material, m);
-		shadowPass->renderObject(0, &mesh, submesh, m);
+		sun.updateMatrices(camera);
+
+
+
+		renderer->setCamera(camera);
+		renderer->setSun(sun);
+		renderer->setEnvironment(environment);
+		renderer->setPointLights(pointLights, numPointLights);
+		renderer->setSpotLights(spotLights, numSpotLights);
+
+
+		geometry_render_pass* geometryPass = renderer->beginGeometryPass();
+		sun_shadow_render_pass* shadowPass = renderer->beginSunShadowPass();
+
+
+		for (const game_object& go : gameObjects)
+		{
+			const dx_mesh& mesh = meshes[go.meshIndex].mesh;
+			submesh_info submesh = meshes[go.meshIndex].singleMeshes[0].submesh;
+			const pbr_material& material = materials[go.materialIndex];
+
+			mat4 m = trsToMat4(go.transform);
+
+			geometryPass->renderObject(&mesh, submesh, &material, m);
+			shadowPass->renderObject(0, &mesh, submesh, m);
+		}
+
 	}
+}
 
-
+void game_scene::setEnvironment(const char* filename)
+{
+	environment = dx_renderer::createEnvironment(filename);
 }

@@ -22,7 +22,7 @@ struct sky_cb
 "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
 "RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX)," \
 "StaticSampler(s0, visibility=SHADER_VISIBILITY_PIXEL)," \
-"DescriptorTable(SRV(t0, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL)"
+"DescriptorTable(SRV(t0, numDescriptors=1, flags = DESCRIPTORS_VOLATILE), visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define SKY_RS_VP	0
 #define SKY_RS_TEX	1

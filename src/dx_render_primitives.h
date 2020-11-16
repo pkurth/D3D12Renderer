@@ -147,9 +147,11 @@ struct barrier_batcher
 	barrier_batcher(dx_command_list* cl);
 	~barrier_batcher() { submit(); }
 
-	barrier_batcher& transition(dx_resource& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-	barrier_batcher& uav(dx_resource resource);
-	barrier_batcher& aliasing(dx_resource before, dx_resource after);
+	barrier_batcher& transition(const dx_resource& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+	barrier_batcher& transition(const dx_texture& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+	barrier_batcher& transition(const dx_texture* res, uint32 count, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+	barrier_batcher& uav(const dx_resource& resource);
+	barrier_batcher& aliasing(const dx_resource& before, const dx_resource& after);
 
 	void submit();
 

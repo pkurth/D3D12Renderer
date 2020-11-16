@@ -2,12 +2,12 @@
 #include "light_source.h"
 
 
-void directional_light::updateMatrices(const render_camera& camera, float maxShadowDistance)
+void directional_light::updateMatrices(const render_camera& camera)
 {
 	mat4 viewMatrix = lookAt(vec3(0.f, 0.f, 0.f), direction, vec3(0.f, 1.f, 0.f));
 
 	vec4 worldForward(camera.rotation * vec3(0.f, 0.f, -1.f), 0.f);
-	camera_frustum_corners worldFrustum = camera.getWorldSpaceFrustumCorners(maxShadowDistance);
+	camera_frustum_corners worldFrustum = camera.getWorldSpaceFrustumCorners(cascadeDistances.w);
 
 	vec4 worldBottomLeft(worldFrustum.farBottomLeft - worldFrustum.nearBottomLeft, 0.f);
 	vec4 worldBottomRight(worldFrustum.farBottomRight - worldFrustum.nearBottomRight, 0.f);

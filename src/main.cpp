@@ -13,8 +13,6 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui/imgui_internal.h>
 
-static float perfFreq;
-static LARGE_INTEGER lastTime;
 
 static bool showIconsWindow;
 static bool showDemoWindow;
@@ -23,6 +21,21 @@ bool handleWindowsMessages();
 
 static bool newFrame(float& dt)
 {
+	static bool first = true;
+	static float perfFreq;
+	static LARGE_INTEGER lastTime;
+
+	if (first)
+	{
+		LARGE_INTEGER perfFreqResult;
+		QueryPerformanceFrequency(&perfFreqResult);
+		perfFreq = (float)perfFreqResult.QuadPart;
+
+		QueryPerformanceCounter(&lastTime);
+
+		first = false;
+	}
+
 	LARGE_INTEGER currentTime;
 	QueryPerformanceCounter(&currentTime);
 	dt = ((float)(currentTime.QuadPart - lastTime.QuadPart) / perfFreq);
@@ -36,29 +49,45 @@ static bool newFrame(float& dt)
 	return result;
 }
 
-static uint64 renderToWindow(dx_window& window, float* clearColor)
+static uint64 renderToMainWindow(dx_window& window)
 {
 	dx_resource backbuffer = window.backBuffers[window.currentBackbufferIndex];
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtv(window.rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), window.currentBackbufferIndex, window.rtvDescriptorSize);
 
-
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
-	CD3DX12_RECT scissorRect = CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX);
 	CD3DX12_VIEWPORT viewport = CD3DX12_VIEWPORT(0.f, 0.f, (float)window.clientWidth, (float)window.clientHeight);
-
-	cl->setScissor(scissorRect);
 	cl->setViewport(viewport);
 
 	cl->transitionBarrier(backbuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
+	float clearColor[] = { 0.f, 0.f, 0.f, 1.f };
 	cl->clearRTV(rtv, clearColor);
-	cl->setScreenRenderTarget(&rtv, 1, (window.depthFormat == DXGI_FORMAT_UNKNOWN) ? nullptr : &window.depthBuffer.dsvHandle.cpuHandle);
+	cl->setRenderTarget(&rtv, 1, 0);
 
 	if (win32_window::mainWindow == &window)
 	{
 		renderImGui(cl);
 	}
+
+	cl->transitionBarrier(backbuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+
+	uint64 result = dxContext.executeCommandList(cl);
+
+	window.swapBuffers();
+
+	return result;
+}
+
+static uint64 renderToSecondaryWindow(dx_renderer* renderer, dx_window& window)
+{
+	dx_resource backbuffer = window.backBuffers[window.currentBackbufferIndex];
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtv(window.rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), window.currentBackbufferIndex, window.rtvDescriptorSize);
+
+	dx_command_list* cl = dxContext.getFreeRenderCommandList();
+	cl->transitionBarrier(backbuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+	renderer->blitResultToScreen(cl, { rtv });
 
 	cl->transitionBarrier(backbuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
@@ -203,6 +232,8 @@ int main(int argc, char** argv)
 	SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 	AddVectoredExceptionHandler(TRUE, handleVectoredException);
 
+	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
 	dxContext.initialize();
 
 	const color_depth colorDepth = color_depth_8;
@@ -212,7 +243,10 @@ int main(int argc, char** argv)
 	window.initialize(TEXT("Main Window"), 1280, 800, colorDepth);
 	setMainWindow(&window);
 
-	dx_renderer::initializeGlobal(screenFormat);
+	dx_window projectorWindow;
+	projectorWindow.initialize(TEXT("Projector Window"), 1280, 800, colorDepth);
+
+	dx_renderer::initializeCommon(screenFormat);
 
 	initializeImGui(screenFormat);
 
@@ -221,31 +255,22 @@ int main(int argc, char** argv)
 
 
 
-	dx_renderer renderer = {};
-	renderer.initialize(1024, 1024);
+	dx_renderer renderers[2] = {};
+	renderers[0].initialize(1024, 1024);
+	renderers[1].initialize(projectorWindow.clientWidth, projectorWindow.clientHeight);
 
 	game_scene scene = {};
-	scene.initialize(&renderer);
-
-
-
-	LARGE_INTEGER perfFreqResult;
-	QueryPerformanceFrequency(&perfFreqResult);
-	perfFreq = (float)perfFreqResult.QuadPart;
-
-	QueryPerformanceCounter(&lastTime);
+	scene.initialize(renderers, arraysize(renderers));
 
 
 	user_input input = {};
-	float dt;
-
 
 	uint64 fenceValues[NUM_BUFFERED_FRAMES] = {};
-
 	fenceValues[NUM_BUFFERED_FRAMES - 1] = dxContext.renderQueue.signal();
 
 	uint64 frameID = 0;
 
+	float dt;
 	while (newFrame(dt))
 	{
 		dxContext.renderQueue.waitForFence(fenceValues[window.currentBackbufferIndex]);
@@ -257,7 +282,7 @@ int main(int argc, char** argv)
 		ImGui::Begin("Scene");
 		uint32 renderWidth = (uint32)ImGui::GetContentRegionAvail().x;
 		uint32 renderHeight = (uint32)ImGui::GetContentRegionAvail().y;
-		ImGui::Image(renderer.frameResult.defaultSRV, renderWidth, renderHeight);
+		ImGui::Image(renderers[0].frameResult.defaultSRV, renderWidth, renderHeight);
 
 		ImGuiIO& io = ImGui::GetIO();
 		if (ImGui::IsItemHovered())
@@ -317,20 +342,28 @@ int main(int argc, char** argv)
 
 		drawHelperWindows();
 
-		renderer.beginFrame(renderWidth, renderHeight);
+		dx_renderer::beginFrameCommon();
+
+		renderers[0].beginFrame(renderWidth, renderHeight);
+		renderers[1].beginFrame(projectorWindow.clientWidth, projectorWindow.clientHeight);
 		scene.update(input, dt);
-		renderer.endFrame(dt);
+
+		dx_command_list* cl = dxContext.getFreeRenderCommandList();
+		renderers[0].endFrame(cl, dt, true);
+		renderers[1].endFrame(cl, dt);
+
+		dxContext.executeCommandList(cl);
 
 		if (!drawMainMenuBar())
 		{
 			break;
 		}
 
-		drawFileBrowser();
+		drawFileBrowser(scene);
 
+		renderToSecondaryWindow(&renderers[1], projectorWindow);
+		fenceValues[window.currentBackbufferIndex] = renderToMainWindow(window);
 
-		float clearColor1[] = { 0.f, 0.f, 0.f, 1.f };
-		fenceValues[window.currentBackbufferIndex] = renderToWindow(window, clearColor1);
 		
 		++frameID;
 	}

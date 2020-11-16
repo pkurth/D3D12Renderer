@@ -92,8 +92,10 @@ struct dx_command_list
 	void setRootComputeSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
 
 	void setDescriptorHeapResource(uint32 rootParameterIndex, uint32 offset, uint32 count, dx_cpu_descriptor_handle handle);
+	void setDescriptorHeapSRV(uint32 rootParameterIndex, uint32 offset, dx_cpu_descriptor_handle handle) { setDescriptorHeapResource(rootParameterIndex, offset, 1, handle); }
 	void setDescriptorHeapSRV(uint32 rootParameterIndex, uint32 offset, const dx_texture& texture) { setDescriptorHeapResource(rootParameterIndex, offset, 1, texture.defaultSRV); }
 	void setDescriptorHeapSRV(uint32 rootParameterIndex, uint32 offset, const dx_buffer& buffer) { setDescriptorHeapResource(rootParameterIndex, offset, 1, buffer.defaultSRV); }
+	void setDescriptorHeapUAV(uint32 rootParameterIndex, uint32 offset, dx_cpu_descriptor_handle handle) { setDescriptorHeapResource(rootParameterIndex, offset, 1, handle); }
 	void setDescriptorHeapUAV(uint32 rootParameterIndex, uint32 offset, const dx_texture& texture) { setDescriptorHeapResource(rootParameterIndex, offset, 1, texture.defaultUAV); }
 	void setDescriptorHeapUAV(uint32 rootParameterIndex, uint32 offset, const dx_buffer& buffer) { setDescriptorHeapResource(rootParameterIndex, offset, 1, buffer.defaultUAV); }
 
@@ -126,7 +128,7 @@ struct dx_command_list
 
 
 	// Render targets.
-	void setScreenRenderTarget(D3D12_CPU_DESCRIPTOR_HANDLE* rtvs, uint32 numRTVs, D3D12_CPU_DESCRIPTOR_HANDLE* dsv);
+	void setRenderTarget(D3D12_CPU_DESCRIPTOR_HANDLE* rtvs, uint32 numRTVs, D3D12_CPU_DESCRIPTOR_HANDLE* dsv);
 	void setRenderTarget(dx_render_target& renderTarget, uint32 arraySlice = 0);
 	void clearRTV(D3D12_CPU_DESCRIPTOR_HANDLE rtv, float r, float g, float b, float a = 1.f);
 	void clearRTV(D3D12_CPU_DESCRIPTOR_HANDLE rtv, const float* clearColor);

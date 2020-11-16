@@ -22,6 +22,6 @@ struct directional_light
 	vec3 radiance;
 	uint32 numShadowCascades;
 
-	void updateMatrices(const render_camera& camera, float maxShadowDistance = 10000.f);
+	void updateMatrices(const render_camera& camera);
 };
 

@@ -1,3 +1,3 @@
 #pragma once
 
-void drawFileBrowser();
+void drawFileBrowser(struct game_scene& scene);

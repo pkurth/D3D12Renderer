@@ -721,7 +721,7 @@ barrier_batcher::barrier_batcher(dx_command_list* cl)
 	this->cl = cl;
 }
 
-barrier_batcher& barrier_batcher::transition(dx_resource& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
+barrier_batcher& barrier_batcher::transition(const dx_resource& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
 {
 	if (numBarriers == arraysize(barriers))
 	{
@@ -732,7 +732,21 @@ barrier_batcher& barrier_batcher::transition(dx_resource& res, D3D12_RESOURCE_ST
 	return *this;
 }
 
-barrier_batcher& barrier_batcher::uav(dx_resource resource)
+barrier_batcher& barrier_batcher::transition(const dx_texture& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
+{
+	return transition(res.resource, from, to, subresource);
+}
+
+barrier_batcher& barrier_batcher::transition(const dx_texture* res, uint32 count, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
+{
+	for (uint32 i = 0; i < count; ++i)
+	{
+		transition(res[i].resource, from, to, subresource);
+	}
+	return *this;
+}
+
+barrier_batcher& barrier_batcher::uav(const dx_resource& resource)
 {
 	if (numBarriers == arraysize(barriers))
 	{
@@ -743,7 +757,7 @@ barrier_batcher& barrier_batcher::uav(dx_resource resource)
 	return *this;
 }
 
-barrier_batcher& barrier_batcher::aliasing(dx_resource before, dx_resource after)
+barrier_batcher& barrier_batcher::aliasing(const dx_resource& before, const dx_resource& after)
 {
 	if (numBarriers == arraysize(barriers))
 	{
