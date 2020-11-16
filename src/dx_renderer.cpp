@@ -267,15 +267,24 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 	sunShadowRenderPass.reset();
 }
 
-pbr_environment dx_renderer::createEnvironment(const char* filename, uint32 skyResolution, uint32 environmentResolution, uint32 irradianceResolution)
+pbr_environment dx_renderer::createEnvironment(const char* filename, uint32 skyResolution, uint32 environmentResolution, uint32 irradianceResolution, bool asyncCompute)
 {
 	pbr_environment environment;
 
 	dx_texture equiSky = loadTextureFromFile(filename,
 		texture_load_flags_noncolor | texture_load_flags_cache_to_dds | texture_load_flags_allocate_full_mipchain);
 
-	dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
-	dx_command_list* cl = dxContext.getFreeRenderCommandList();
+	dx_command_list* cl;
+	if (asyncCompute)
+	{
+		dxContext.computeQueue.waitForOtherQueue(dxContext.copyQueue);
+		cl = dxContext.getFreeComputeCommandList(true);
+	}
+	else
+	{
+		dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
+		cl = dxContext.getFreeRenderCommandList();
+	}
 	generateMipMapsOnGPU(cl, equiSky);
 	environment.sky = equirectangularToCubemap(cl, equiSky, skyResolution, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
 	environment.environment = prefilterEnvironment(cl, environment.sky, environmentResolution);

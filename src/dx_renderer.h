@@ -71,7 +71,7 @@ struct pbr_environment
 struct dx_renderer
 {
 	static void initializeCommon(DXGI_FORMAT screenFormat);
-	static pbr_environment createEnvironment(const char* filename, uint32 skyResolution = 2048, uint32 environmentResolution = 128, uint32 irradianceResolution = 32);
+	static pbr_environment createEnvironment(const char* filename, uint32 skyResolution = 2048, uint32 environmentResolution = 128, uint32 irradianceResolution = 32, bool asyncCompute = false);
 	
 	void initialize(uint32 windowWidth, uint32 windowHeight);
 

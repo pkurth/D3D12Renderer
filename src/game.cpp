@@ -72,7 +72,7 @@ void game_scene::initialize(dx_renderer* renderers, uint32 numRenderers)
 		}
 	);
 
-	environment = dx_renderer::createEnvironment("assets/textures/hdri/leadenhall_market_4k.hdr");
+	setEnvironment("assets/textures/hdri/leadenhall_market_4k.hdr");
 
 	pointLights = new point_light_cb[MAX_NUM_POINT_LIGHTS_PER_FRAME];
 	lightVelocities = new vec3[MAX_NUM_POINT_LIGHTS_PER_FRAME];
@@ -211,5 +211,5 @@ void game_scene::update(const user_input& input, float dt)
 
 void game_scene::setEnvironment(const char* filename)
 {
-	environment = dx_renderer::createEnvironment(filename);
+	environment = dx_renderer::createEnvironment(filename); // Currently synchronous (on render queue).
 }
