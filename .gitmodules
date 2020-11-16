@@ -10,3 +10,6 @@
 [submodule "ext/directxtex"]
 	path = ext/directxtex
 	url = git@github.com:microsoft/DirectXTex.git
+[submodule "ext/yaml-cpp"]
+	path = ext/yaml-cpp
+	url = git@github.com:pkurth/yaml-cpp.git
