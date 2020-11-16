@@ -15,6 +15,7 @@ outputdir = "%{cfg.buildcfg}_%{cfg.architecture}"
 
 group "Dependencies"
 	include "ext/assimp"
+	include "ext/yaml-cpp"
 
 
 	externalproject "DirectXTex_Desktop_2019_Win10"
@@ -40,6 +41,7 @@ project "D3D12ProjectionMapping"
 
 	sysincludedirs {
 		"ext/assimp/include",
+		"ext/yaml-cpp/include",
 		"ext/entt/single_include",
 		"ext/directxtex",
 		"ext",
@@ -68,6 +70,7 @@ project "D3D12ProjectionMapping"
 		"dxguid",
 		"dxcompiler",
 		"assimp",
+		"yaml-cpp",
 		"DirectXTex_Desktop_2019_Win10",
 	}
 

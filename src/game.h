@@ -21,6 +21,9 @@ struct game_scene
 	void initialize(dx_renderer* renderers, uint32 numRenderers);
 	void update(const user_input& input, float dt);
 
+	void serializeToFile(const char* filename);
+	void unserializeFromFile(const char* filename);
+
 
 	void setEnvironment(const char* filename);
 

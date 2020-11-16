@@ -5,6 +5,8 @@
 #include "random.h"
 #include "color.h"
 
+#include <yaml-cpp/yaml.h>
+
 void game_scene::initialize(dx_renderer* renderers, uint32 numRenderers)
 {
 	this->renderers = renderers;
@@ -207,6 +209,14 @@ void game_scene::update(const user_input& input, float dt)
 		}
 
 	}
+}
+
+void game_scene::serializeToFile(const char* filename)
+{
+}
+
+void game_scene::unserializeFromFile(const char* filename)
+{
 }
 
 void game_scene::setEnvironment(const char* filename)
