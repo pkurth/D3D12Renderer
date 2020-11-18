@@ -129,7 +129,7 @@ static void drawHelperWindows()
 	}
 }
 
-static bool drawMainMenuBar()
+static bool drawMainMenuBar(game_scene& scene)
 {
 	if (ImGui::BeginMainMenuBar())
 	{
@@ -137,12 +137,12 @@ static bool drawMainMenuBar()
 		{
 			if (ImGui::MenuItem(ICON_FA_SAVE "  Save scene"))
 			{
-
+				scene.serializeToFile("assets/scenes/scene.sc");
 			}
 
 			if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN "  Load scene"))
 			{
-
+				scene.unserializeFromFile("assets/scenes/scene.sc");
 			}
 
 			ImGui::Separator();
@@ -232,7 +232,7 @@ int main(int argc, char** argv)
 	SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 	AddVectoredExceptionHandler(TRUE, handleVectoredException);
 
-	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+	checkResult(CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE));
 
 	dxContext.initialize();
 
@@ -270,6 +270,8 @@ int main(int argc, char** argv)
 
 	uint64 frameID = 0;
 
+	bool appFocusedLastFrame = true;
+
 	float dt;
 	while (newFrame(dt))
 	{
@@ -289,10 +291,20 @@ int main(int argc, char** argv)
 		{
 			ImVec2 relativeMouse = ImGui::GetMousePos() - ImGui::GetItemRectMin();
 			vec2 mousePos = { relativeMouse.x, relativeMouse.y };
-			input.mouse.dx = mousePos.x - input.mouse.x;
-			input.mouse.dy = mousePos.y - input.mouse.y;
-			input.mouse.reldx = input.mouse.dx / (renderWidth - 1);
-			input.mouse.reldy = input.mouse.dy / (renderHeight - 1);
+			if (appFocusedLastFrame)
+			{
+				input.mouse.dx = mousePos.x - input.mouse.x;
+				input.mouse.dy = mousePos.y - input.mouse.y;
+				input.mouse.reldx = input.mouse.dx / (renderWidth - 1);
+				input.mouse.reldy = input.mouse.dy / (renderHeight - 1);
+			}
+			else
+			{
+				input.mouse.dx = 0.f;
+				input.mouse.dy = 0.f;
+				input.mouse.reldx = 0.f;
+				input.mouse.reldy = 0.f;
+			}
 			input.mouse.x = mousePos.x;
 			input.mouse.y = mousePos.y;
 			input.mouse.relX = mousePos.x / (renderWidth - 1);
@@ -334,12 +346,13 @@ int main(int argc, char** argv)
 		ImGui::End();
 		ImGui::PopStyleVar();
 
+		appFocusedLastFrame =  ImGui::IsMousePosValid();
 
 		if (input.keyboard['V'].pressEvent) { window.toggleVSync(); }
 		if (ImGui::IsKeyPressed(key_esc)) { break; } // Also allowed if not focused on main window.
 		if (ImGui::IsKeyPressed(key_enter) && ImGui::IsKeyDown(key_alt)) { window.toggleFullscreen(); } // Also allowed if not focused on main window.
 
-
+		
 		drawHelperWindows();
 
 		dx_renderer::beginFrameCommon();
@@ -348,13 +361,10 @@ int main(int argc, char** argv)
 		renderers[1].beginFrame(projectorWindow.clientWidth, projectorWindow.clientHeight);
 		scene.update(input, dt);
 
-		dx_command_list* cl = dxContext.getFreeRenderCommandList();
-		renderers[0].endFrame(cl, dt, true);
-		renderers[1].endFrame(cl, dt);
+		renderers[0].endFrame(dt, true);
+		renderers[1].endFrame(dt);
 
-		dxContext.executeCommandList(cl);
-
-		if (!drawMainMenuBar())
+		if (!drawMainMenuBar(scene))
 		{
 			break;
 		}

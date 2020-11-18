@@ -116,7 +116,7 @@ composite_mesh createCompositeMeshFromScene(const aiScene* scene, uint32 flags)
 	{
 		int32 lod;
 		submesh_info submesh;
-		aabb_collider aabb;
+		bounding_box aabb;
 		std::string name;
 	};
 

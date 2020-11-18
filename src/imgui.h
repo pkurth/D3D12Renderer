@@ -9,7 +9,7 @@ ImGuiContext* initializeImGui(DXGI_FORMAT screenFormat);
 void newImGuiFrame(float dt);
 void renderImGui(struct dx_command_list* cl);
 
-void handleImGuiInput(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+LRESULT handleImGuiInput(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 namespace ImGui
 {

@@ -5,7 +5,12 @@
 #include "random.h"
 #include "color.h"
 
+// TODO: Pull serialization into separate file?
 #include <yaml-cpp/yaml.h>
+#include <fstream>
+#include <filesystem>
+namespace fs = std::filesystem;
+
 
 void game_scene::initialize(dx_renderer* renderers, uint32 numRenderers)
 {
@@ -21,6 +26,8 @@ void game_scene::initialize(dx_renderer* renderers, uint32 numRenderers)
 		camera.verticalFOV = deg2rad(70.f);
 		camera.nearPlane = 0.1f;
 	}
+
+	mainCamera = &cameras[0];
 
 
 	meshes.push_back(createCompositeMeshFromFile("assets/meshes/cerberus.fbx", 
@@ -136,13 +143,16 @@ void game_scene::initialize(dx_renderer* renderers, uint32 numRenderers)
 	sun.blendArea = 0.07f;
 }
 
-void game_scene::update(const user_input& input, float dt)
+void game_scene::updateCamera(const user_input& input, float dt)
 {
-	const float CAMERA_MOVEMENT_SPEED = 4.f;
+	const float CAMERA_MOVEMENT_SPEED = 8.f;
 	const float CAMERA_SENSITIVITY = 4.f;
+	const float CAMERA_ORBIT_RADIUS = 50.f;
 
 	if (input.mouse.right.down)
 	{
+		// Fly camera.
+
 		vec3 cameraInputDir = vec3(
 			(input.keyboard['D'].down ? 1.f : 0.f) + (input.keyboard['A'].down ? -1.f : 0.f),
 			(input.keyboard['E'].down ? 1.f : 0.f) + (input.keyboard['Q'].down ? -1.f : 0.f),
@@ -152,15 +162,37 @@ void game_scene::update(const user_input& input, float dt)
 		vec2 turnAngle(0.f, 0.f);
 		turnAngle = vec2(-input.mouse.reldx, -input.mouse.reldy) * CAMERA_SENSITIVITY;
 
-		quat& cameraRotation = cameras[0].rotation;
+		quat& cameraRotation = mainCamera->rotation;
 		cameraRotation = quat(vec3(0.f, 1.f, 0.f), turnAngle.x) * cameraRotation;
 		cameraRotation = cameraRotation * quat(vec3(1.f, 0.f, 0.f), turnAngle.y);
 
-		cameras[0].position += cameraRotation * cameraInputDir * dt;
+		mainCamera->position += cameraRotation * cameraInputDir * dt;
 	}
+	else if (input.keyboard[key_alt].down && input.mouse.left.down)
+	{
+		// Orbit camera.
 
+		vec2 turnAngle(0.f, 0.f);
+		turnAngle = vec2(-input.mouse.reldx, -input.mouse.reldy) * CAMERA_SENSITIVITY;
+
+		quat& cameraRotation = mainCamera->rotation;
+
+		vec3 center = mainCamera->position + cameraRotation * vec3(0.f, 0.f, -CAMERA_ORBIT_RADIUS);
+
+		cameraRotation = quat(vec3(0.f, 1.f, 0.f), turnAngle.x) * cameraRotation;
+		cameraRotation = cameraRotation * quat(vec3(1.f, 0.f, 0.f), turnAngle.y);
+
+		mainCamera->position = center - cameraRotation * vec3(0.f, 0.f, -CAMERA_ORBIT_RADIUS);
+	}
+}
+
+void game_scene::update(const user_input& input, float dt)
+{
+	updateCamera(input, dt);
+
+	// Update light positions.
 	const vec3 vortexCenter(0.f, 0.f, 0.f);
-	const float vortexSpeed = 1.f;
+	const float vortexSpeed = 0.75f;
 	const float vortexSize = 60.f;
 	for (uint32 i = 0; i < numPointLights; ++i)
 	{
@@ -173,6 +205,7 @@ void game_scene::update(const user_input& input, float dt)
 
 		lightVelocities[i] += (v - lightVelocities[i]) * factor;
 	}
+
 
 	for (uint32 rendererIndex = 0; rendererIndex < numRenderers; ++rendererIndex)
 	{
@@ -213,6 +246,16 @@ void game_scene::update(const user_input& input, float dt)
 
 void game_scene::serializeToFile(const char* filename)
 {
+	YAML::Emitter out;
+	out << YAML::BeginMap;
+	out << YAML::Key << "Scene" << YAML::Value << "PLACEHOLDER";
+
+	out << YAML::EndMap;
+
+	fs::create_directories(fs::path(filename).parent_path());
+
+	std::ofstream fout(filename);
+	fout << out.c_str();
 }
 
 void game_scene::unserializeFromFile(const char* filename)

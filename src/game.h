@@ -27,6 +27,10 @@ struct game_scene
 
 	void setEnvironment(const char* filename);
 
+private:
+	void updateCamera(const user_input& input, float dt);
+
+
 
 	dx_renderer* renderers;
 	uint32 numRenderers;
@@ -35,9 +39,11 @@ struct game_scene
 	std::vector<composite_mesh> meshes;
 	std::vector<pbr_material> materials; // TODO: Eventually store indices to textures here, instead of pointers.
 	std::vector<game_object> gameObjects;
+	
 	pbr_environment environment;
 
 	render_camera* cameras;
+	render_camera* mainCamera;
 
 	const uint32 numPointLights = 0;
 	point_light_cb* pointLights;

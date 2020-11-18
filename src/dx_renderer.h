@@ -77,7 +77,7 @@ struct dx_renderer
 
 	static void beginFrameCommon();
 	void beginFrame(uint32 windowWidth, uint32 windowHeight);	
-	void endFrame(dx_command_list* cl, float dt, bool mainWindow = false);
+	void endFrame(float dt, bool mainWindow = false);
 	void blitResultToScreen(dx_command_list* cl, dx_cpu_descriptor_handle rtv);
 
 

@@ -143,7 +143,7 @@ void real_camera::recalculateMatrices()
 	invViewProj = invView * invProj;
 }
 
-bool camera_frustum_planes::cullWorldSpaceAABB(const aabb_collider& aabb) const
+bool camera_frustum_planes::cullWorldSpaceAABB(const bounding_box& aabb) const
 {
 	for (uint32 i = 0; i < 6; ++i)
 	{
@@ -162,12 +162,12 @@ bool camera_frustum_planes::cullWorldSpaceAABB(const aabb_collider& aabb) const
 	return false;
 }
 
-bool camera_frustum_planes::cullModelSpaceAABB(const aabb_collider& aabb, const trs& transform) const
+bool camera_frustum_planes::cullModelSpaceAABB(const bounding_box& aabb, const trs& transform) const
 {
 	return cullModelSpaceAABB(aabb, trsToMat4(transform));
 }
 
-bool camera_frustum_planes::cullModelSpaceAABB(const aabb_collider& aabb, const mat4& transform) const
+bool camera_frustum_planes::cullModelSpaceAABB(const bounding_box& aabb, const mat4& transform) const
 {
 	// TODO: Transform planes instead of AABB?
 

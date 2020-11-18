@@ -1,7 +1,7 @@
 #include "pch.h"
-#include "colliders.h"
+#include "bounding_volumes.h"
 
-static bool pointInAABB(vec3 point, aabb_collider aabb)
+static bool pointInAABB(vec3 point, bounding_box aabb)
 {
 	return point.x >= aabb.minCorner.x
 		&& point.y >= aabb.minCorner.y
@@ -19,7 +19,7 @@ static float closestPointOnLineSegment(vec3 point, vec3 lineA, vec3 lineB)
 	return t;
 }
 
-void aabb_collider::grow(vec3 o)
+void bounding_box::grow(vec3 o)
 {
 	minCorner.x = min(minCorner.x, o.x);
 	minCorner.y = min(minCorner.y, o.y);
@@ -29,25 +29,25 @@ void aabb_collider::grow(vec3 o)
 	maxCorner.z = max(maxCorner.z, o.z);
 }
 
-void aabb_collider::pad(vec3 p)
+void bounding_box::pad(vec3 p)
 {
 	minCorner -= p;
 	maxCorner += p;
 }
 
-vec3 aabb_collider::getCenter() const
+vec3 bounding_box::getCenter() const
 {
 	return (minCorner + maxCorner) * 0.5f;
 }
 
-vec3 aabb_collider::getRadius() const
+vec3 bounding_box::getRadius() const
 {
 	return (maxCorner - minCorner) * 0.5f;
 }
 
-aabb_collider aabb_collider::transform(quat rotation, vec3 translation) const
+bounding_box bounding_box::transform(quat rotation, vec3 translation) const
 {
-	aabb_collider result = aabb_collider::negativeInfinity();
+	bounding_box result = bounding_box::negativeInfinity();
 	result.grow(rotation * minCorner + translation);
 	result.grow(rotation * vec3(maxCorner.x, minCorner.y, minCorner.z) + translation);
 	result.grow(rotation * vec3(minCorner.x, maxCorner.y, minCorner.z) + translation);
@@ -59,9 +59,9 @@ aabb_collider aabb_collider::transform(quat rotation, vec3 translation) const
 	return result;
 }
 
-aabb_corners aabb_collider::getCorners() const
+bounding_box_corners bounding_box::getCorners() const
 {
-	aabb_corners result;
+	bounding_box_corners result;
 	result.i = minCorner;
 	result.x = vec3(maxCorner.x, minCorner.y, minCorner.z);
 	result.y = vec3(minCorner.x, maxCorner.y, minCorner.z);
@@ -73,9 +73,9 @@ aabb_corners aabb_collider::getCorners() const
 	return result;
 }
 
-aabb_corners aabb_collider::getCorners(quat rotation, vec3 translation) const
+bounding_box_corners bounding_box::getCorners(quat rotation, vec3 translation) const
 {
-	aabb_corners result;
+	bounding_box_corners result;
 	result.i = rotation * minCorner + translation;
 	result.x = rotation * vec3(maxCorner.x, minCorner.y, minCorner.z) + translation;
 	result.y = rotation * vec3(minCorner.x, maxCorner.y, minCorner.z) + translation;
@@ -87,40 +87,19 @@ aabb_corners aabb_collider::getCorners(quat rotation, vec3 translation) const
 	return result;
 }
 
-aabb_collider aabb_collider::negativeInfinity()
+bounding_box bounding_box::negativeInfinity()
 {
-	return aabb_collider{ vec3(FLT_MAX, FLT_MAX, FLT_MAX), vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX) };
+	return bounding_box{ vec3(FLT_MAX, FLT_MAX, FLT_MAX), vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX) };
 }
 
-aabb_collider aabb_collider::fromMinMax(vec3 minCorner, vec3 maxCorner)
+bounding_box bounding_box::fromMinMax(vec3 minCorner, vec3 maxCorner)
 {
-	return aabb_collider{ minCorner, maxCorner };
+	return bounding_box{ minCorner, maxCorner };
 }
 
-aabb_collider aabb_collider::fromCenterRadius(vec3 center, vec3 radius)
+bounding_box bounding_box::fromCenterRadius(vec3 center, vec3 radius)
 {
-	return aabb_collider{ center - radius, center + radius };
-}
-
-plane_collider::plane_collider(const vec3& point, const vec3& normal)
-{
-	this->normal = normal;
-	this->d = -dot(normal, point);
-}
-
-float plane_collider::signedDistance(const vec3& p) const
-{
-	return dot(normal, p) + d;
-}
-
-bool plane_collider::isFrontFacingTo(const vec3& dir) const
-{
-	return dot(normal, dir) <= 0.f;
-}
-
-vec3 plane_collider::getPointOnPlane() const
-{
-	return -d * normal;
+	return bounding_box{ center - radius, center + radius };
 }
 
 bool ray::intersectPlane(vec3 normal, float d, float& outT) const
@@ -141,7 +120,7 @@ bool ray::intersectPlane(vec3 normal, vec3 point, float& outT) const
 	return intersectPlane(normal, d, outT);
 }
 
-bool ray::intersectAABB(const aabb_collider& a, float& outT) const
+bool ray::intersectAABB(const bounding_box& a, float& outT) const
 {
 	vec3 invDir = vec3(1.f / direction.x, 1.f / direction.y, 1.f / direction.z); // This can be Inf (when one direction component is 0) but still works.
 
@@ -214,7 +193,12 @@ bool ray::intersectSphere(vec3 center, float radius, float& outT) const
 	return true;
 }
 
-bool aabbVSAABB(const aabb_collider& a, const aabb_collider& b)
+float signedDistanceToPlane(const vec3& p, const vec4& plane)
+{
+	return dot(vec4(p, 1.f), plane);
+}
+
+bool aabbVSAABB(const bounding_box& a, const bounding_box& b)
 {
 	if (a.maxCorner.x < b.minCorner.x || a.minCorner.x > b.maxCorner.x) return false;
 	if (a.maxCorner.z < b.minCorner.z || a.minCorner.z > b.maxCorner.z) return false;
@@ -222,7 +206,7 @@ bool aabbVSAABB(const aabb_collider& a, const aabb_collider& b)
 	return true;
 }
 
-bool sphereVSSphere(const sphere_collider& a, const sphere_collider& b)
+bool sphereVSSphere(const bounding_sphere& a, const bounding_sphere& b)
 {
 	vec3 d = a.center - b.center;
 	float dist2 = dot(d, d);
@@ -230,9 +214,9 @@ bool sphereVSSphere(const sphere_collider& a, const sphere_collider& b)
 	return dist2 <= radiusSum * radiusSum;
 }
 
-bool sphereVSPlane(const sphere_collider& s, const plane_collider& p)
+bool sphereVSPlane(const bounding_sphere& s, const vec4& p)
 {
-	return fabsf(p.signedDistance(s.center)) <= s.radius;
+	return abs(signedDistanceToPlane(s.center, p)) <= s.radius;
 }
 
 vec3 closestPoint_PointSegment(const vec3& q, const line_segment& l)
@@ -243,7 +227,7 @@ vec3 closestPoint_PointSegment(const vec3& q, const line_segment& l)
 	return l.a + t * ab;
 }
 
-vec3 closestPoint_PointAABB(const vec3& q, const aabb_collider& aabb)
+vec3 closestPoint_PointAABB(const vec3& q, const bounding_box& aabb)
 {
 	vec3 result;
 	for (int i = 0; i < 3; i++)

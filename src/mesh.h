@@ -1,6 +1,6 @@
 #pragma once
 
-#include "colliders.h"
+#include "bounding_volumes.h"
 #include "dx_render_primitives.h"
 
 struct aiScene;
@@ -9,7 +9,7 @@ struct aiScene;
 struct single_mesh
 {
 	submesh_info submesh;
-	aabb_collider boundingBox;
+	bounding_box boundingBox;
 	std::string name;
 };
 

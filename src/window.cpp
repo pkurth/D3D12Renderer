@@ -341,7 +341,10 @@ static LRESULT CALLBACK windowCallBack(
 {
 	LRESULT result = 0;
 
-	handleImGuiInput(hwnd, msg, wParam, lParam);
+	if (handleImGuiInput(hwnd, msg, wParam, lParam))
+	{
+		return true;
+	}
 
 	win32_window* window = (win32_window*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
@@ -374,6 +377,18 @@ static LRESULT CALLBACK windowCallBack(
 				window->shutdown();
 			}
 		} break;
+
+		case WM_ACTIVATEAPP:
+		{
+			if (wParam)
+			{
+			}
+			else
+			{
+			}
+		} break;
+
+		// For software windows.
 		case WM_PAINT:
 		{
 			if (window)

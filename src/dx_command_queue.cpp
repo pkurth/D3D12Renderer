@@ -65,7 +65,7 @@ void dx_command_queue::waitForOtherQueue(dx_command_queue& other)
 
 void dx_command_queue::flush()
 {
-	while (numRunningCommandAllocators) {}
+	while (numRunningCommandLists) {}
 
 	waitForFence(signal());
 }
@@ -79,22 +79,22 @@ static DWORD processRunningCommandAllocators(void* data)
 		while (true)
 		{
 			queue.commandListMutex.lock();
-			dx_command_allocator* allocator = queue.runningCommandAllocators;
-			if (allocator)
+			dx_command_list* list = queue.runningCommandLists;
+			if (list)
 			{
-				queue.runningCommandAllocators = allocator->next;
+				queue.runningCommandLists = list->next;
 			}
 			queue.commandListMutex.unlock();
 
-			if (allocator)
+			if (list)
 			{
-				queue.waitForFence(allocator->lastExecutionFenceValue);
-				allocator->commandAllocator->Reset();
+				queue.waitForFence(list->lastExecutionFenceValue);
+				list->reset();
 
 				queue.commandListMutex.lock();
-				allocator->next = queue.freeCommandAllocators;
-				queue.freeCommandAllocators = allocator;
-				atomicDecrement(queue.numRunningCommandAllocators);
+				list->next = queue.freeCommandLists;
+				queue.freeCommandLists = list;
+				atomicDecrement(queue.numRunningCommandLists);
 				queue.commandListMutex.unlock();
 			}
 			else

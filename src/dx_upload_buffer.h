@@ -44,8 +44,8 @@ private:
 
 struct dx_upload_buffer
 {
-	dx_page_pool* pagePool;
-	dx_page* currentPage;
+	dx_page_pool* pagePool = 0;
+	dx_page* currentPage = 0;
 
 	dx_allocation allocate(uint64 size, uint64 alignment);
 	void reset();

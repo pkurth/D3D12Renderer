@@ -6,28 +6,21 @@
 #include "dx_dynamic_descriptor_heap.h"
 #include "dx_descriptor_allocation.h"
 
-
-struct dx_command_allocator
-{
-	com<ID3D12CommandAllocator> commandAllocator;
-	dx_command_allocator* next;
-	uint64 lastExecutionFenceValue;
-};
-
 struct dx_command_list
 {
-	D3D12_COMMAND_LIST_TYPE type;
-	dx_command_allocator* commandAllocator;
-	dx_graphics_command_list commandList;
-	uint64 usedLastOnFrame;
+	dx_command_list(D3D12_COMMAND_LIST_TYPE type);
 
+	D3D12_COMMAND_LIST_TYPE type;
+	dx_command_allocator commandAllocator;
+	dx_graphics_command_list commandList;
+	uint64 lastExecutionFenceValue;
 	dx_command_list* next;
 
 	dx_upload_buffer uploadBuffer;
 	dx_dynamic_descriptor_heap dynamicDescriptorHeap;
 
 
-	ID3D12DescriptorHeap* descriptorHeaps[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES];
+	ID3D12DescriptorHeap* descriptorHeaps[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES] = {};
 
 
 	// Barriers.
@@ -156,7 +149,7 @@ struct dx_command_list
 	// Raytracing.
 	void raytrace(D3D12_DISPATCH_RAYS_DESC& raytraceDesc);
 
-	void reset(dx_command_allocator* commandAllocator);
+	void reset();
 };
 
 template<typename T>

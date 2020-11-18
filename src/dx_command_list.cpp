@@ -1,5 +1,15 @@
 #include "pch.h"
 #include "dx_command_list.h"
+#include "dx_context.h"
+
+dx_command_list::dx_command_list(D3D12_COMMAND_LIST_TYPE type)
+{
+	this->type = type;
+	checkResult(dxContext.device->CreateCommandAllocator(type, IID_PPV_ARGS(&commandAllocator)));
+	checkResult(dxContext.device->CreateCommandList(0, type, commandAllocator.Get(), 0, IID_PPV_ARGS(&commandList)));
+
+	dynamicDescriptorHeap.initialize();
+}
 
 void dx_command_list::barriers(CD3DX12_RESOURCE_BARRIER* barriers, uint32 numBarriers)
 {
@@ -445,10 +455,10 @@ void dx_command_list::raytrace(D3D12_DISPATCH_RAYS_DESC& raytraceDesc)
 	commandList->DispatchRays(&raytraceDesc);
 }
 
-void dx_command_list::reset(dx_command_allocator* commandAllocator)
+void dx_command_list::reset()
 {
-	this->commandAllocator = commandAllocator;
-	checkResult(commandList->Reset(commandAllocator->commandAllocator.Get(), 0));
+	commandAllocator->Reset();
+	checkResult(commandList->Reset(commandAllocator.Get(), 0));
 
 	for (uint32 i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
 	{

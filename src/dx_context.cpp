@@ -2,7 +2,6 @@
 #include "dx_context.h"
 #include "dx_command_list.h"
 
-#include <sdkddkver.h>
 
 dx_context dxContext;
 
@@ -126,7 +125,6 @@ void dx_context::initialize()
 	raytracingSupported = checkRaytracingSupport(device);
 	meshShaderSupported = checkMeshShaderSupport(device);
 
-	arena.minimumBlockSize = MB(2);
 	allocationMutex = createMutex();
 	bufferedFrameID = NUM_BUFFERED_FRAMES - 1;
 
@@ -163,37 +161,6 @@ void dx_context::quit()
 	WaitForSingleObject(copyQueue.processThreadHandle, INFINITE);
 }
 
-dx_command_list* dx_context::allocateCommandList(D3D12_COMMAND_LIST_TYPE type)
-{
-	allocationMutex.lock();
-	dx_command_list* result = (dx_command_list*)arena.allocate(sizeof(dx_command_list), true);
-	allocationMutex.unlock();
-
-	new (result) dx_command_list();
-
-	result->type = type;
-
-	dx_command_allocator* allocator = getFreeCommandAllocator(type);
-	result->commandAllocator = allocator;
-
-	checkResult(device->CreateCommandList(0, type, allocator->commandAllocator.Get(), 0, IID_PPV_ARGS(&result->commandList)));
-
-	result->dynamicDescriptorHeap.initialize();
-
-	return result;
-}
-
-dx_command_allocator* dx_context::allocateCommandAllocator(D3D12_COMMAND_LIST_TYPE type)
-{
-	allocationMutex.lock();
-	dx_command_allocator* result = (dx_command_allocator*)arena.allocate(sizeof(dx_command_allocator), true);
-	allocationMutex.unlock();
-
-	checkResult(device->CreateCommandAllocator(type, IID_PPV_ARGS(&result->commandAllocator)));
-
-	return result;
-}
-
 dx_command_queue& dx_context::getQueue(D3D12_COMMAND_LIST_TYPE type)
 {
 	return type == D3D12_COMMAND_LIST_TYPE_DIRECT ? renderQueue :
@@ -213,15 +180,10 @@ dx_command_list* dx_context::getFreeCommandList(dx_command_queue& queue)
 
 	if (!result)
 	{
-		result = allocateCommandList(queue.commandListType);
-	}
-	else
-	{
-		dx_command_allocator* allocator = getFreeCommandAllocator(queue.commandListType);
-		result->reset(allocator);
+		result = new dx_command_list(queue.commandListType);
+		atomicIncrement(queue.totalNumCommandLists);
 	}
 
-	result->usedLastOnFrame = frameID;
 	result->uploadBuffer.pagePool = &pagePools[bufferedFrameID];
 
 	return result;
@@ -245,29 +207,6 @@ dx_command_list* dx_context::getFreeRenderCommandList()
 	return cl;
 }
 
-dx_command_allocator* dx_context::getFreeCommandAllocator(dx_command_queue& queue)
-{
-	queue.commandListMutex.lock();
-	dx_command_allocator* result = queue.freeCommandAllocators;
-	if (result)
-	{
-		queue.freeCommandAllocators = result->next;
-	}
-	queue.commandListMutex.unlock();
-
-	if (!result)
-	{
-		result = allocateCommandAllocator(queue.commandListType);
-	}
-	return result;
-}
-
-dx_command_allocator* dx_context::getFreeCommandAllocator(D3D12_COMMAND_LIST_TYPE type)
-{
-	dx_command_queue& queue = getQueue(type);
-	return getFreeCommandAllocator(queue);
-}
-
 uint64 dx_context::executeCommandList(dx_command_list* commandList)
 {
 	dx_command_queue& queue = getQueue(commandList->type);
@@ -279,17 +218,13 @@ uint64 dx_context::executeCommandList(dx_command_list* commandList)
 
 	uint64 fenceValue = queue.signal();
 
-	dx_command_allocator* allocator = commandList->commandAllocator;
-	allocator->lastExecutionFenceValue = fenceValue;
+	commandList->lastExecutionFenceValue = fenceValue;
 
 	queue.commandListMutex.lock();
 
-	allocator->next = queue.runningCommandAllocators;
-	queue.runningCommandAllocators = allocator;
-	atomicIncrement(queue.numRunningCommandAllocators);
-
-	commandList->next = queue.freeCommandLists;
-	queue.freeCommandLists = commandList;
+	commandList->next = queue.runningCommandLists;
+	queue.runningCommandLists = commandList;
+	atomicIncrement(queue.numRunningCommandLists);
 
 	queue.commandListMutex.unlock();
 

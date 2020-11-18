@@ -829,7 +829,7 @@ submesh_info cpu_mesh::pushMace(uint16 slices, float shaftRadius, float headRadi
 	return result;
 }
 
-submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, aabb_collider* aabb)
+submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_box* aabb)
 {
 	alignNextTriangle();
 
@@ -854,7 +854,7 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, aabb_coll
 
 	if (aabb)
 	{
-		*aabb = aabb_collider::negativeInfinity();
+		*aabb = bounding_box::negativeInfinity();
 	}
 
 	for (uint32 i = 0; i < mesh->mNumVertices; ++i)

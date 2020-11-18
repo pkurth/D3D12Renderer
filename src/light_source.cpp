@@ -22,7 +22,7 @@ void directional_light::updateMatrices(const render_camera& camera)
 	vec4 worldEye = vec4(camera.position, 1.f);
 	vec4 sunEye = viewMatrix * worldEye;
 
-	aabb_collider initialBB = aabb_collider::fromMinMax(sunEye.xyz, sunEye.xyz);
+	bounding_box initialBB = bounding_box::fromMinMax(sunEye.xyz, sunEye.xyz);
 
 	for (uint32 i = 0; i < numShadowCascades; ++i)
 	{
@@ -33,7 +33,7 @@ void directional_light::updateMatrices(const render_camera& camera)
 		vec4 sunTopLeft = viewMatrix * (worldEye + distance * worldTopLeft);
 		vec4 sunTopRight = viewMatrix * (worldEye + distance * worldTopRight);
 
-		aabb_collider bb = initialBB;
+		bounding_box bb = initialBB;
 		bb.grow(sunBottomLeft.xyz);
 		bb.grow(sunBottomRight.xyz);
 		bb.grow(sunTopLeft.xyz);

@@ -20,6 +20,7 @@ typedef com<IDXGIFactory4> dx_factory;
 typedef com<IDXGISwapChain4> dx_swapchain;
 typedef com<ID3D12Resource> dx_resource;
 typedef com<ID3D12GraphicsCommandList4> dx_graphics_command_list;
+typedef com<ID3D12CommandAllocator> dx_command_allocator;
 typedef com<ID3DBlob> dx_blob;
 typedef com<ID3D12PipelineState> dx_pipeline_state;
 typedef com<ID3D12Resource> dx_resource;

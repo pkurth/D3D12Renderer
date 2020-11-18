@@ -51,7 +51,7 @@ static void recurseFileSystem(file_system_entry& entry)
 	}
 }
 
-static file_system_entry& findFileSystemEntry(file_system_entry& parent, fs::path::iterator it, fs::path::iterator end)
+static std::pair<file_system_entry*, bool> findFileSystemEntry(file_system_entry& parent, fs::path::iterator it, fs::path::iterator end)
 {
 	fs::path cur = *it;
 	for (auto& c : parent.children)
@@ -61,12 +61,12 @@ static file_system_entry& findFileSystemEntry(file_system_entry& parent, fs::pat
 			auto next = ++it;
 			if (next == end)
 			{
-				return c;
+				return { &c, true };
 			}
 			return findFileSystemEntry(c, next, end);
 		}
 	}
-	return rootFileEntry;
+	return { &parent, false };
 }
 
 static DWORD checkForFileChanges(void*)
@@ -184,14 +184,13 @@ static DWORD checkForFileChanges(void*)
 
 					fs::path relativeToAsset = fs::relative(changedPath, assetPath);
 
-					file_system_entry& entryToReload = (relativeToAsset.string() == ".") ? rootFileEntry : findFileSystemEntry(rootFileEntry, relativeToAsset.begin(), relativeToAsset.end());
-					assert(entryToReload.isFile == isFile);
-
-					if (!isFile)
+					auto [entryToReload, success] = findFileSystemEntry(rootFileEntry, relativeToAsset.begin(), relativeToAsset.end());
+					
+					if (!success || !isFile)
 					{
 						fileSystemMutex.lock();
-						entryToReload.children.clear();
-						recurseFileSystem(entryToReload);
+						entryToReload->children.clear();
+						recurseFileSystem(*entryToReload);
 						fileSystemMutex.unlock();
 					}
 					else
@@ -317,7 +316,7 @@ void drawFileBrowser(game_scene& scene)
 
 	fileSystemMutex.lock();
 	fs::path relativeToAsset = fs::relative(directoryToShow, assetPath);
-	file_system_entry& entryToShow = (relativeToAsset.string() == ".") ? rootFileEntry : findFileSystemEntry(rootFileEntry, relativeToAsset.begin(), relativeToAsset.end());
+	file_system_entry& entryToShow = (relativeToAsset.string() == ".") ? rootFileEntry : *findFileSystemEntry(rootFileEntry, relativeToAsset.begin(), relativeToAsset.end()).first;
 
 	ImGui::Text("..");
 	if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))

@@ -106,9 +106,9 @@ void renderImGui(dx_command_list* cl)
 	numImagesThisFrame = 0;
 }
 
-void handleImGuiInput(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+LRESULT handleImGuiInput(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-	ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+	return ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
 }
 
 namespace ImGui

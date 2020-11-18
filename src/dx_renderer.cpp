@@ -407,7 +407,7 @@ void dx_renderer::setSpotLights(const spot_light_cb* lights, uint32 numLights)
 	numSpotLights = numLights;
 }
 
-void dx_renderer::endFrame(dx_command_list* cl, float dt, bool mainWindow)
+void dx_renderer::endFrame(float dt, bool mainWindow)
 {
 	static bool showLightVolumes = false;
 
@@ -461,7 +461,7 @@ void dx_renderer::endFrame(dx_command_list* cl, float dt, bool mainWindow)
 	auto cameraCBV = dxContext.uploadDynamicConstantBuffer(camera);
 	auto sunCBV = dxContext.uploadDynamicConstantBuffer(sun);
 
-	//dx_command_list* cl = dxContext.getFreeRenderCommandList();
+	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
 	barrier_batcher(cl)
 		.transition(hdrColorTexture.resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
@@ -707,7 +707,7 @@ void dx_renderer::endFrame(dx_command_list* cl, float dt, bool mainWindow)
 #endif
 
 
-	if (showLightVolumes)
+	if (mainWindow && showLightVolumes)
 	{
 		// Light volumes.
 		cl->setPipelineState(*flatUnlitPipeline.pipeline);
@@ -753,7 +753,7 @@ void dx_renderer::endFrame(dx_command_list* cl, float dt, bool mainWindow)
 		.transition(hdrColorTexture.resource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
 		.transition(frameResult.resource, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON);
 
-	//dxContext.executeCommandList(cl);
+	dxContext.executeCommandList(cl);
 }
 
 void dx_renderer::blitResultToScreen(dx_command_list* cl, dx_cpu_descriptor_handle rtv)

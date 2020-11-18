@@ -72,13 +72,7 @@ private:
 	object_retirement objectRetirement;
 
 	thread_mutex allocationMutex;
-	memory_arena arena;
 
 	dx_command_queue& getQueue(D3D12_COMMAND_LIST_TYPE type);
 	dx_command_list* getFreeCommandList(dx_command_queue& queue);
-	dx_command_allocator* getFreeCommandAllocator(dx_command_queue& queue);
-	dx_command_allocator* getFreeCommandAllocator(D3D12_COMMAND_LIST_TYPE type);
-
-	dx_command_list* allocateCommandList(D3D12_COMMAND_LIST_TYPE type);
-	dx_command_allocator* allocateCommandAllocator(D3D12_COMMAND_LIST_TYPE type);
 };

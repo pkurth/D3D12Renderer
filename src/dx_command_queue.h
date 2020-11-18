@@ -4,7 +4,6 @@
 #include "threading.h"
 
 struct dx_command_list;
-struct dx_command_allocator;
 
 struct dx_command_queue
 {
@@ -22,11 +21,12 @@ struct dx_command_queue
 	com<ID3D12Fence> fence;
 	volatile uint64 fenceValue;
 
-	dx_command_allocator* runningCommandAllocators;
-	dx_command_allocator* freeCommandAllocators;
-	volatile uint32 numRunningCommandAllocators;
-
+	dx_command_list* runningCommandLists;
 	dx_command_list* freeCommandLists;
+
+	volatile uint32 numRunningCommandLists;
+	volatile uint32 totalNumCommandLists; // Used only for validation.
+
 	HANDLE processThreadHandle;
 
 	thread_mutex commandListMutex;

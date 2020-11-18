@@ -1,7 +1,7 @@
 #pragma once
 
 #include "dx_render_primitives.h"
-#include "colliders.h"
+#include "bounding_volumes.h"
 #include "animation.h"
 
 // Members are always pushed in this order!
@@ -44,7 +44,7 @@ struct cpu_mesh
 	submesh_info pushTorus(uint16 slices, uint16 segments, float torusRadius, float tubeRadius);
 	submesh_info pushMace(uint16 slices, float shaftRadius, float headRadius, float shaftLength, float headLength);
 
-	submesh_info pushAssimpMesh(const struct aiMesh* mesh, float scale, aabb_collider* aabb = 0);
+	submesh_info pushAssimpMesh(const struct aiMesh* mesh, float scale, bounding_box* aabb = 0);
 
 	dx_mesh createDXMesh();
 	dx_vertex_buffer createVertexBufferWithAlternativeLayout(uint32 otherFlags, bool allowUnorderedAccess = false);

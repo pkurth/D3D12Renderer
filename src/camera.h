@@ -1,7 +1,7 @@
 #pragma once
 
 #include "math.h"
-#include "colliders.h"
+#include "bounding_volumes.h"
 
 union camera_frustum_corners
 {
@@ -42,9 +42,9 @@ union camera_frustum_planes
 	camera_frustum_planes() {}
 
 	// Returns true, if object should be culled.
-	bool cullWorldSpaceAABB(const aabb_collider& aabb) const;
-	bool cullModelSpaceAABB(const aabb_collider& aabb, const trs& transform) const;
-	bool cullModelSpaceAABB(const aabb_collider& aabb, const mat4& transform) const;
+	bool cullWorldSpaceAABB(const bounding_box& aabb) const;
+	bool cullModelSpaceAABB(const bounding_box& aabb, const trs& transform) const;
+	bool cullModelSpaceAABB(const bounding_box& aabb, const mat4& transform) const;
 };
 
 
