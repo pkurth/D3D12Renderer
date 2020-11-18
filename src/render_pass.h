@@ -1,6 +1,7 @@
 #pragma once
 
 #include "math.h"
+#include "bounding_volumes.h"
 #include "dx_render_primitives.h"
 #include "light_source.h"
 
@@ -45,6 +46,23 @@ private:
 	};
 
 	std::vector<draw_call> drawCalls[MAX_NUM_SUN_SHADOW_CASCADES];
+
+	friend struct dx_renderer;
+};
+
+struct volumetrics_render_pass
+{
+	void addVolume(const bounding_box& aabb);
+
+private:
+	void reset();
+
+	struct draw_call
+	{
+		bounding_box aabb;
+	};
+
+	std::vector<draw_call> drawCalls;
 
 	friend struct dx_renderer;
 };

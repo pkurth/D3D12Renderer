@@ -244,6 +244,14 @@ dx_dynamic_constant_buffer dx_context::uploadDynamicConstantBuffer(uint32 sizeIn
 	return { allocation.gpuPtr, allocation.cpuPtr };
 }
 
+dx_memory_usage dx_context::getMemoryUsage()
+{
+	DXGI_QUERY_VIDEO_MEMORY_INFO memoryInfo;
+	checkResult(dxContext.adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memoryInfo));
+	
+	return { (uint32)BYTE_TO_MB(memoryInfo.CurrentUsage), (uint32)BYTE_TO_MB(memoryInfo.Budget) };
+}
+
 void dx_context::retireObject(dx_object obj)
 {
 	if (obj)

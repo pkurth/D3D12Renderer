@@ -1,33 +1,23 @@
 #include "pch.h"
-#include "game.h"
+#include "application.h"
 #include "geometry.h"
 #include "texture.h"
 #include "random.h"
 #include "color.h"
-
-// TODO: Pull serialization into separate file?
-#include <yaml-cpp/yaml.h>
-#include <fstream>
-#include <filesystem>
-namespace fs = std::filesystem;
+#include "imgui.h"
+#include "dx_context.h"
 
 
-void game_scene::initialize(dx_renderer* renderers, uint32 numRenderers)
+void application::initialize(dx_renderer* renderer)
 {
-	this->renderers = renderers;
-	this->numRenderers = numRenderers;
+	this->renderer = renderer;
 
-	cameras = new render_camera[numRenderers];
-	for (uint32 i = 0; i < numRenderers; ++i)
-	{
-		render_camera& camera = cameras[i];
-		camera.position = vec3(0.f, 30.f, 40.f);
-		camera.rotation = quat::identity;
-		camera.verticalFOV = deg2rad(70.f);
-		camera.nearPlane = 0.1f;
-	}
+	camera.position = vec3(0.f, 30.f, 40.f);
+	camera.rotation = quat::identity;
+	camera.verticalFOV = deg2rad(70.f);
+	camera.nearPlane = 0.1f;
+	camera.farPlane = 1000.f;
 
-	mainCamera = &cameras[0];
 
 
 	meshes.push_back(createCompositeMeshFromFile("assets/meshes/cerberus.fbx", 
@@ -83,8 +73,10 @@ void game_scene::initialize(dx_renderer* renderers, uint32 numRenderers)
 
 	setEnvironment("assets/textures/hdri/leadenhall_market_4k.hdr");
 
-	pointLights = new point_light_cb[MAX_NUM_POINT_LIGHTS_PER_FRAME];
-	lightVelocities = new vec3[MAX_NUM_POINT_LIGHTS_PER_FRAME];
+	pointLights = new point_light_cb[numPointLights];
+	lightVelocities = new vec3[numPointLights];
+	spotLights = new spot_light_cb[numSpotLights];
+	
 
 
 	random_number_generator rng = { 14878213 };
@@ -109,7 +101,6 @@ void game_scene::initialize(dx_renderer* renderers, uint32 numRenderers)
 		};
 	}
 
-	spotLights = new spot_light_cb[MAX_NUM_SPOT_LIGHTS_PER_FRAME];
 	for (uint32 i = 0; i < numSpotLights; ++i)
 	{
 		spotLights[i] =
@@ -143,7 +134,7 @@ void game_scene::initialize(dx_renderer* renderers, uint32 numRenderers)
 	sun.blendArea = 0.07f;
 }
 
-void game_scene::updateCamera(const user_input& input, float dt)
+void application::updateCamera(const user_input& input, float dt)
 {
 	const float CAMERA_MOVEMENT_SPEED = 8.f;
 	const float CAMERA_SENSITIVITY = 4.f;
@@ -162,11 +153,11 @@ void game_scene::updateCamera(const user_input& input, float dt)
 		vec2 turnAngle(0.f, 0.f);
 		turnAngle = vec2(-input.mouse.reldx, -input.mouse.reldy) * CAMERA_SENSITIVITY;
 
-		quat& cameraRotation = mainCamera->rotation;
+		quat& cameraRotation = camera.rotation;
 		cameraRotation = quat(vec3(0.f, 1.f, 0.f), turnAngle.x) * cameraRotation;
 		cameraRotation = cameraRotation * quat(vec3(1.f, 0.f, 0.f), turnAngle.y);
 
-		mainCamera->position += cameraRotation * cameraInputDir * dt;
+		camera.position += cameraRotation * cameraInputDir * dt;
 	}
 	else if (input.keyboard[key_alt].down && input.mouse.left.down)
 	{
@@ -175,20 +166,64 @@ void game_scene::updateCamera(const user_input& input, float dt)
 		vec2 turnAngle(0.f, 0.f);
 		turnAngle = vec2(-input.mouse.reldx, -input.mouse.reldy) * CAMERA_SENSITIVITY;
 
-		quat& cameraRotation = mainCamera->rotation;
+		quat& cameraRotation = camera.rotation;
 
-		vec3 center = mainCamera->position + cameraRotation * vec3(0.f, 0.f, -CAMERA_ORBIT_RADIUS);
+		vec3 center = camera.position + cameraRotation * vec3(0.f, 0.f, -CAMERA_ORBIT_RADIUS);
 
 		cameraRotation = quat(vec3(0.f, 1.f, 0.f), turnAngle.x) * cameraRotation;
 		cameraRotation = cameraRotation * quat(vec3(1.f, 0.f, 0.f), turnAngle.y);
 
-		mainCamera->position = center - cameraRotation * vec3(0.f, 0.f, -CAMERA_ORBIT_RADIUS);
+		camera.position = center - cameraRotation * vec3(0.f, 0.f, -CAMERA_ORBIT_RADIUS);
 	}
 }
 
-void game_scene::update(const user_input& input, float dt)
+static bool plotAndEditTonemapping(tonemap_cb& tonemap)
+{
+	bool result = false;
+	if (ImGui::TreeNode("Tonemapping"))
+	{
+		ImGui::PlotLines("Tone map",
+			[](void* data, int idx)
+			{
+				float t = idx * 0.01f;
+				tonemap_cb& aces = *(tonemap_cb*)data;
+
+				return filmicTonemapping(t, aces);
+			},
+			&tonemap, 100, 0, 0, 0.f, 1.f, ImVec2(100.f, 100.f));
+
+		result |= ImGui::SliderFloat("[ACES] Shoulder strength", &tonemap.A, 0.f, 1.f);
+		result |= ImGui::SliderFloat("[ACES] Linear strength", &tonemap.B, 0.f, 1.f);
+		result |= ImGui::SliderFloat("[ACES] Linear angle", &tonemap.C, 0.f, 1.f);
+		result |= ImGui::SliderFloat("[ACES] Toe strength", &tonemap.D, 0.f, 1.f);
+		result |= ImGui::SliderFloat("[ACES] Tone numerator", &tonemap.E, 0.f, 1.f);
+		result |= ImGui::SliderFloat("[ACES] Toe denominator", &tonemap.F, 0.f, 1.f);
+		result |= ImGui::SliderFloat("[ACES] Linear white", &tonemap.linearWhite, 0.f, 100.f);
+		result |= ImGui::SliderFloat("[ACES] Exposure", &tonemap.exposure, -3.f, 3.f);
+
+		ImGui::TreePop();
+	}
+	return result;
+}
+
+void application::update(const user_input& input, float dt)
 {
 	updateCamera(input, dt);
+	camera.recalculateMatrices(renderer->renderWidth, renderer->renderHeight);
+
+	ImGui::Begin("Settings");
+	ImGui::Text("%f ms, %u FPS", dt, (uint32)(1.f / dt));
+
+	dx_memory_usage memoryUsage = dxContext.getMemoryUsage();
+
+	ImGui::Text("Video memory available: %uMB", memoryUsage.available);
+	ImGui::Text("Video memory used: %uMB", memoryUsage.currentlyUsed);
+
+	ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->settings.aspectRatioMode);
+	ImGui::Checkbox("Show light volumes", &renderer->settings.showLightVolumes);
+	plotAndEditTonemapping(renderer->settings.tonemap);
+
+	ImGui::End();
 
 	// Update light positions.
 	const vec3 vortexCenter(0.f, 0.f, 0.f);
@@ -207,44 +242,54 @@ void game_scene::update(const user_input& input, float dt)
 	}
 
 
-	for (uint32 rendererIndex = 0; rendererIndex < numRenderers; ++rendererIndex)
+	sun.updateMatrices(camera);
+
+
+	renderer->setCamera(camera);
+	renderer->setSun(sun);
+	renderer->setEnvironment(environment);
+	renderer->setPointLights(pointLights, numPointLights);
+	renderer->setSpotLights(spotLights, numSpotLights);
+
+
+	geometry_render_pass* geometryPass = renderer->beginGeometryPass();
+	sun_shadow_render_pass* shadowPass = renderer->beginSunShadowPass();
+	volumetrics_render_pass* volumetricsPass = renderer->beginVolumetricsPass();
+
+
+	for (const scene_object& go : gameObjects)
 	{
-		render_camera& camera = cameras[rendererIndex];
-		dx_renderer* renderer = &renderers[rendererIndex];
+		const dx_mesh& mesh = meshes[go.meshIndex].mesh;
+		submesh_info submesh = meshes[go.meshIndex].singleMeshes[0].submesh;
+		const pbr_material& material = materials[go.materialIndex];
 
-		camera.recalculateMatrices(renderer->renderWidth, renderer->renderHeight);
+		mat4 m = trsToMat4(go.transform);
 
-		sun.updateMatrices(camera);
-
-
-
-		renderer->setCamera(camera);
-		renderer->setSun(sun);
-		renderer->setEnvironment(environment);
-		renderer->setPointLights(pointLights, numPointLights);
-		renderer->setSpotLights(spotLights, numSpotLights);
-
-
-		geometry_render_pass* geometryPass = renderer->beginGeometryPass();
-		sun_shadow_render_pass* shadowPass = renderer->beginSunShadowPass();
-
-
-		for (const game_object& go : gameObjects)
-		{
-			const dx_mesh& mesh = meshes[go.meshIndex].mesh;
-			submesh_info submesh = meshes[go.meshIndex].singleMeshes[0].submesh;
-			const pbr_material& material = materials[go.materialIndex];
-
-			mat4 m = trsToMat4(go.transform);
-
-			geometryPass->renderObject(&mesh, submesh, &material, m);
-			shadowPass->renderObject(0, &mesh, submesh, m);
-		}
-
+		geometryPass->renderObject(&mesh, submesh, &material, m);
+		shadowPass->renderObject(0, &mesh, submesh, m);
 	}
+
+	volumetricsPass->addVolume(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(100.f, 100.f, 100.f)));
+
 }
 
-void game_scene::serializeToFile(const char* filename)
+void application::setEnvironment(const char* filename)
+{
+	environment = dx_renderer::createEnvironment(filename); // Currently synchronous (on render queue).
+}
+
+
+
+
+// Serialization stuff.
+
+#include <yaml-cpp/yaml.h>
+#include <fstream>
+#include <filesystem>
+namespace fs = std::filesystem;
+
+
+void application::serializeToFile(const char* filename)
 {
 	YAML::Emitter out;
 	out << YAML::BeginMap;
@@ -258,11 +303,6 @@ void game_scene::serializeToFile(const char* filename)
 	fout << out.c_str();
 }
 
-void game_scene::unserializeFromFile(const char* filename)
+void application::unserializeFromFile(const char* filename)
 {
-}
-
-void game_scene::setEnvironment(const char* filename)
-{
-	environment = dx_renderer::createEnvironment(filename); // Currently synchronous (on render queue).
 }

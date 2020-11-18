@@ -35,16 +35,15 @@ static float3 restoreWorldSpacePosition(float4x4 invViewProj, float2 uv, float d
 	return position;
 }
 
+// The directions are NOT normalized. Their z-coordinate is 'nearPlane' long.
 static float3 restoreViewDirection(float4x4 invProj, float2 uv)
 {
-	return restoreViewSpacePosition(invProj, uv, 1.f);
+	return restoreViewSpacePosition(invProj, uv, 0.f);
 }
 
-static float3 restoreWorldDirection(float4x4 invViewProj, float2 uv, float3 cameraPos, float farPlane)
+static float3 restoreWorldDirection(float4x4 invViewProj, float2 uv, float3 cameraPos)
 {
-	float3 direction = restoreWorldSpacePosition(invViewProj, uv, 1.f) - cameraPos; // At this point, the result should be on a plane 'farPlane' units away from the camera.
-	direction /= farPlane;
-	return direction;
+	return restoreWorldSpacePosition(invViewProj, uv, 0.f) - cameraPos; // At this point, the result should be 'nearPlane' units away from the camera.
 }
 
 // This function returns a positive z value! This is a depth!
@@ -60,6 +59,21 @@ static float depthBufferDepthToEyeDepth(float depthBufferDepth, float4 projectio
 		const float c1 = projectionParams.z;
 		const float c0 = projectionParams.w;
 		return projectionParams.y / (c0 * depthBufferDepth + c1);
+	}
+}
+
+static float linearizeDepthBuffer(float depthBufferDepth, float4 projectionParams)
+{
+	if (projectionParams.y < 0.f) // Infinite far plane.
+	{
+		depthBufferDepth = clamp(depthBufferDepth, 0.f, 1.f - 1e-7f); // A depth of 1 is at infinity.
+		return -1.f / (depthBufferDepth - 1.f);
+	}
+	else
+	{
+		const float c1 = projectionParams.z;
+		const float c0 = projectionParams.w;
+		return 1.f / (c0 * depthBufferDepth + c1);
 	}
 }
 

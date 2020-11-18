@@ -3,12 +3,10 @@
 #include "dx_command_list.h"
 #include "dx_pipeline.h"
 #include "geometry.h"
-#include "imgui.h"
 #include "texture.h"
 #include "texture_preprocessing.h"
 
 #include "outline_rs.hlsl"
-#include "present_rs.hlsl"
 #include "sky_rs.hlsl"
 #include "light_culling_rs.hlsl"
 
@@ -16,7 +14,7 @@
 
 
 static dx_texture whiteTexture;
-static dx_buffer pointLightBuffer[NUM_BUFFERED_FRAMES];
+static dx_buffer pointLightBuffer[NUM_BUFFERED_FRAMES]; // TODO: When using multiple renderers, these should not be here (I guess).
 static dx_buffer spotLightBuffer[NUM_BUFFERED_FRAMES];
 
 static dx_render_target sunShadowRenderTarget[MAX_NUM_SUN_SHADOW_CASCADES];
@@ -31,6 +29,7 @@ static dx_pipeline modelShadowPipeline; // Only different from depth-only pipeli
 static dx_pipeline outlinePipeline;
 static dx_pipeline flatUnlitPipeline;
 static dx_pipeline blitPipeline;
+static dx_pipeline volumetricsPipeline;
 
 static dx_pipeline worldSpaceFrustaPipeline;
 static dx_pipeline lightCullingPipeline;
@@ -71,15 +70,15 @@ static vec4 gizmoColors[] =
 
 
 static dx_texture brdfTex;
-static tonemap_cb tonemap = defaultTonemapParameters();
 
 
 
 static DXGI_FORMAT screenFormat;
 
-static const DXGI_FORMAT hdrFormat[] = { DXGI_FORMAT_R8G8B8A8_UNORM };
+static const DXGI_FORMAT hdrFormat[] = { DXGI_FORMAT_R16G16B16A16_FLOAT };
 static const DXGI_FORMAT hdrDepthFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 static const DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D32_FLOAT;
+static const DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16_FLOAT;
 
 
 void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
@@ -136,6 +135,18 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 			.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
 
 		modelPipeline = createReloadablePipeline(desc, { "model_vs", "model_ps" });
+	}
+
+	// Volumetrics.
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.renderTargets(&hdrFormat[0], 1)
+			.inputLayout(inputLayout_position)
+			.cullFrontFaces()
+			.alphaBlending(0)
+			.depthSettings(false, false);
+
+		volumetricsPipeline = createReloadablePipeline(desc, { "volumetrics_vs", "volumetrics_ps" });
 	}
 
 	// Outline.
@@ -217,6 +228,13 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	this->windowWidth = windowWidth;
 	this->windowHeight = windowHeight;
 
+
+	settings.tonemap = defaultTonemapParameters();
+	settings.aspectRatioMode = aspect_ratio_free;
+	settings.showLightVolumes = false;
+
+	oldSettings = settings;
+
 	recalculateViewport(false);
 
 	// HDR render target.
@@ -233,6 +251,13 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 		frameResult = createTexture(0, windowWidth, windowHeight, screenFormat, true);
 
 		windowRenderTarget.pushColorAttachment(frameResult);
+	}
+
+	// Volumetrics.
+	{
+		volumetricsTexture = createTexture(0, renderWidth, renderHeight, volumetricsFormat, true);
+
+		volumetricsRenderTarget.pushColorAttachment(volumetricsTexture);
 	}
 }
 
@@ -265,6 +290,7 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 
 	geometryRenderPass.reset();
 	sunShadowRenderPass.reset();
+	volumetricsPass.reset();
 }
 
 pbr_environment dx_renderer::createEnvironment(const char* filename, uint32 skyResolution, uint32 environmentResolution, uint32 irradianceResolution, bool asyncCompute)
@@ -298,13 +324,13 @@ pbr_environment dx_renderer::createEnvironment(const char* filename, uint32 skyR
 
 void dx_renderer::recalculateViewport(bool resizeTextures)
 {
-	if (aspectRatioMode == aspect_ratio_free)
+	if (settings.aspectRatioMode == aspect_ratio_free)
 	{
 		windowViewport = { 0.f, 0.f, (float)windowWidth, (float)windowHeight, 0.f, 1.f };
 	}
 	else
 	{
-		const float targetAspect = aspectRatioMode == aspect_ratio_fix_16_9 ? (16.f / 9.f) : (16.f / 10.f);
+		const float targetAspect = settings.aspectRatioMode == aspect_ratio_fix_16_9 ? (16.f / 9.f) : (16.f / 10.f);
 
 		float aspect = (float)windowWidth / (float)windowHeight;
 		if (aspect > targetAspect)
@@ -329,6 +355,9 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		resizeTexture(hdrColorTexture, renderWidth, renderHeight);
 		resizeTexture(depthBuffer, renderWidth, renderHeight);
 		hdrRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
+
+		resizeTexture(volumetricsTexture, renderWidth, renderHeight);
+		volumetricsRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
 	}
 
 	allocateLightCullingBuffers();
@@ -407,56 +436,15 @@ void dx_renderer::setSpotLights(const spot_light_cb* lights, uint32 numLights)
 	numSpotLights = numLights;
 }
 
-void dx_renderer::endFrame(float dt, bool mainWindow)
+void dx_renderer::endFrame()
 {
-	static bool showLightVolumes = false;
+	bool aspectRatioModeChanged = settings.aspectRatioMode != oldSettings.aspectRatioMode;
 
-	bool aspectRatioModeChanged = false;
-
-	if (mainWindow)
+	if (aspectRatioModeChanged)
 	{
-		DXGI_QUERY_VIDEO_MEMORY_INFO memoryInfo;
-		checkResult(dxContext.adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memoryInfo));
-
-		ImGui::Begin("Settings");
-		ImGui::Text("%f ms, %u FPS", dt, (uint32)(1.f / dt));
-
-		aspectRatioModeChanged = ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)aspectRatioMode);
-		ImGui::Checkbox("Show light volumes", &showLightVolumes);
-		ImGui::Text("Video memory available: %uMB", (uint32)BYTE_TO_MB(memoryInfo.Budget));
-		ImGui::Text("Video memory used: %uMB", (uint32)BYTE_TO_MB(memoryInfo.CurrentUsage));
-
-		if (ImGui::TreeNode("Tonemapping"))
-		{
-			ImGui::PlotLines("Tone map",
-				[](void* data, int idx)
-				{
-					float t = idx * 0.01f;
-					tonemap_cb& aces = *(tonemap_cb*)data;
-
-					return filmicTonemapping(t, aces);
-				},
-				&tonemap, 100, 0, 0, 0.f, 1.f, ImVec2(100.f, 100.f));
-
-			ImGui::SliderFloat("[ACES] Shoulder strength", &tonemap.A, 0.f, 1.f);
-			ImGui::SliderFloat("[ACES] Linear strength", &tonemap.B, 0.f, 1.f);
-			ImGui::SliderFloat("[ACES] Linear angle", &tonemap.C, 0.f, 1.f);
-			ImGui::SliderFloat("[ACES] Toe strength", &tonemap.D, 0.f, 1.f);
-			ImGui::SliderFloat("[ACES] Tone numerator", &tonemap.E, 0.f, 1.f);
-			ImGui::SliderFloat("[ACES] Toe denominator", &tonemap.F, 0.f, 1.f);
-			ImGui::SliderFloat("[ACES] Linear white", &tonemap.linearWhite, 0.f, 100.f);
-			ImGui::SliderFloat("[ACES] Exposure", &tonemap.exposure, -3.f, 3.f);
-
-			ImGui::TreePop();
-		}
-
-		ImGui::End();
-
-		if (aspectRatioModeChanged)
-		{
-			recalculateViewport(true);
-		}
+		recalculateViewport(true);
 	}
+
 
 	auto cameraCBV = dxContext.uploadDynamicConstantBuffer(camera);
 	auto sunCBV = dxContext.uploadDynamicConstantBuffer(sun);
@@ -513,22 +501,6 @@ void dx_renderer::endFrame(float dt, bool mainWindow)
 		cl->setIndexBuffer(mesh->indexBuffer);
 		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 	}
-
-#if 0
-	// Gizmos.
-	if (gizmoType != gizmo_type_none)
-	{
-		cl->setVertexBuffer(0, gizmoMesh.vertexBuffer);
-		cl->setIndexBuffer(gizmoMesh.indexBuffer);
-
-		for (uint32 i = 0; i < 3; ++i)
-		{
-			mat4 m = createModelMatrix(meshTransform.position, gizmoRotations[i]);
-			cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
-			cl->drawIndexed(gizmoSubmeshes[gizmoType].numTriangles * 3, 1, gizmoSubmeshes[gizmoType].firstTriangle * 3, gizmoSubmeshes[gizmoType].baseVertex, 0);
-		}
-	}
-#endif
 
 
 
@@ -684,30 +656,54 @@ void dx_renderer::endFrame(float dt, bool mainWindow)
 	//cl->setStencilReference(0);
 
 
+
+	// ----------------------------------------
+	// VOLUMETRICS
+	// ----------------------------------------
+
+	if (volumetricsPass.drawCalls.size() > 0)
+	{
+		barrier_batcher(cl)
+			.transition(depthBuffer.resource, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+		//cl->setRenderTarget(volumetricsRenderTarget);
+		//cl->clearRTV(volumetricsRenderTarget.rtvHandles[0], 0.f, 0.f, 0.f);
+
+		cl->setPipelineState(*volumetricsPipeline.pipeline);
+		cl->setGraphicsRootSignature(*volumetricsPipeline.rootSignature);
+
+		cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
+		cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
+
+		cl->setGraphicsDynamicConstantBuffer(VOLUMETRICS_RS_CAMERA, cameraCBV);
+		cl->setDescriptorHeapSRV(VOLUMETRICS_RS_DEPTHBUFFER, 0, depthBuffer);
+
+		for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
+		{
+			cl->setDescriptorHeapSRV(VOLUMETRICS_RS_SUNCASCADES, i, sunShadowCascadeTextures[i]);
+		}
+		cl->setGraphicsDynamicConstantBuffer(VOLUMETRICS_RS_SUN, sunCBV);
+
+		for (volumetrics_render_pass::draw_call& dc : volumetricsPass.drawCalls)
+		{
+			mat4 m = createModelMatrix(dc.aabb.getCenter(), quat::identity, dc.aabb.getRadius());
+			cl->setGraphics32BitConstants(VOLUMETRICS_RS_MVP, volumetrics_transform_cb{ camera.view * m, camera.viewProj * m });
+			cl->setGraphics32BitConstants(VOLUMETRICS_RS_BOX, volumetrics_bounding_box_cb{ vec4(dc.aabb.minCorner, 1.f), vec4(dc.aabb.maxCorner, 1.f) });
+			cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
+		}
+
+		barrier_batcher(cl)
+			.transition(depthBuffer.resource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+	}
+
+
+
 	// ----------------------------------------
 	// HELPER STUFF
 	// ----------------------------------------
 
 
-#if 0
-	// Gizmos.
-	if (gizmoType != gizmo_type_none)
-	{
-		cl->setVertexBuffer(0, gizmoMesh.vertexBuffer);
-		cl->setIndexBuffer(gizmoMesh.indexBuffer);
-
-		for (uint32 i = 0; i < 3; ++i)
-		{
-			mat4 m = createModelMatrix(meshTransform.position, gizmoRotations[i]);
-			cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
-			cl->setGraphics32BitConstants(MODEL_RS_MATERIAL, pbr_material_cb{ gizmoColors[i], 1.f, 0.f, 0 });
-			cl->drawIndexed(gizmoSubmeshes[gizmoType].numTriangles * 3, 1, gizmoSubmeshes[gizmoType].firstTriangle * 3, gizmoSubmeshes[gizmoType].baseVertex, 0);
-		}
-	}
-#endif
-
-
-	if (mainWindow && showLightVolumes)
+	if (settings.showLightVolumes)
 	{
 		// Light volumes.
 		cl->setPipelineState(*flatUnlitPipeline.pipeline);
@@ -743,7 +739,7 @@ void dx_renderer::endFrame(float dt, bool mainWindow)
 	cl->setPipelineState(*presentPipeline.pipeline);
 	cl->setGraphicsRootSignature(*presentPipeline.rootSignature);
 
-	cl->setGraphics32BitConstants(PRESENT_RS_TONEMAP, tonemap);
+	cl->setGraphics32BitConstants(PRESENT_RS_TONEMAP, settings.tonemap);
 	cl->setGraphics32BitConstants(PRESENT_RS_PRESENT, present_cb{ 0, 0.f });
 	cl->setDescriptorHeapSRV(PRESENT_RS_TEX, 0, hdrColorTexture);
 	cl->drawFullscreenTriangle();
@@ -754,6 +750,8 @@ void dx_renderer::endFrame(float dt, bool mainWindow)
 		.transition(frameResult.resource, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON);
 
 	dxContext.executeCommandList(cl);
+
+	oldSettings = settings;
 }
 
 void dx_renderer::blitResultToScreen(dx_command_list* cl, dx_cpu_descriptor_handle rtv)

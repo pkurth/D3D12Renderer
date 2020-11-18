@@ -18,7 +18,7 @@ ConstantBuffer<camera_cb> camera			: register(b2);
 
 SamplerState wrapSampler				: register(s0);
 SamplerState clampSampler				: register(s1);
-SamplerComparisonState  shadowSampler	: register(s2);
+SamplerComparisonState shadowSampler	: register(s2);
 
 
 Texture2D<float4> albedoTex				: register(t0);

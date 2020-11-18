@@ -5,10 +5,13 @@
 #include "camera.h"
 #include "render_pass.h"
 #include "light_source.h"
+#include "gizmo.h"
 
 #include "model_rs.hlsl"
 #include "light_source.hlsl"
 #include "camera.hlsl"
+#include "present_rs.hlsl"
+#include "volumetrics_rs.hlsl"
 
 
 #define MAX_NUM_POINT_LIGHTS_PER_FRAME 4096
@@ -30,24 +33,6 @@ static const char* aspectRatioNames[] =
 	"16:10",
 };
 
-enum gizmo_type
-{
-	gizmo_type_none,
-	gizmo_type_translation,
-	gizmo_type_rotation,
-	gizmo_type_scale,
-
-	gizmo_type_count,
-};
-
-static const char* gizmoTypeNames[] =
-{
-	"None",
-	"Translation",
-	"Rotation",
-	"Scale",
-};
-
 struct pbr_material
 {
 	dx_texture* albedo;
@@ -67,6 +52,13 @@ struct pbr_environment
 	dx_texture irradiance;
 };
 
+struct renderer_settings
+{
+	tonemap_cb tonemap;
+	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
+	bool showLightVolumes;
+};
+
 
 struct dx_renderer
 {
@@ -77,10 +69,11 @@ struct dx_renderer
 
 	static void beginFrameCommon();
 	void beginFrame(uint32 windowWidth, uint32 windowHeight);	
-	void endFrame(float dt, bool mainWindow = false);
+	void endFrame();
 	void blitResultToScreen(dx_command_list* cl, dx_cpu_descriptor_handle rtv);
 
 
+	// Set these with your application.
 	void setCamera(const render_camera& camera);
 	void setEnvironment(const pbr_environment& environment);
 	void setSun(const directional_light& light);
@@ -90,12 +83,13 @@ struct dx_renderer
 
 	geometry_render_pass* beginGeometryPass() { return &geometryRenderPass; }
 	sun_shadow_render_pass* beginSunShadowPass() { return &sunShadowRenderPass; }
+	volumetrics_render_pass* beginVolumetricsPass() { return &volumetricsPass; }
 
+	
+	renderer_settings settings;
 
 	uint32 renderWidth;
 	uint32 renderHeight;
-
-	dx_render_target windowRenderTarget;
 	dx_texture frameResult;
 
 private:
@@ -120,6 +114,23 @@ private:
 		uint32 numTilesY;
 	};
 
+
+	uint32 windowWidth;
+	uint32 windowHeight;
+	D3D12_VIEWPORT windowViewport;
+
+	dx_render_target windowRenderTarget;
+
+	dx_render_target hdrRenderTarget;
+	dx_texture hdrColorTexture;
+	dx_texture depthBuffer;
+
+	dx_render_target volumetricsRenderTarget;
+	dx_texture volumetricsTexture;
+
+
+
+
 	pbr_environment_handles environment;
 	const point_light_cb* pointLights;
 	const spot_light_cb* spotLights;
@@ -131,20 +142,15 @@ private:
 
 
 
-	D3D12_VIEWPORT windowViewport;
-	aspect_ratio_mode aspectRatioMode;
 
-	dx_render_target hdrRenderTarget;
-	dx_texture hdrColorTexture;
-	dx_texture depthBuffer;
-
-	uint32 windowWidth;
-	uint32 windowHeight;
 
 	geometry_render_pass geometryRenderPass;
 	sun_shadow_render_pass sunShadowRenderPass;
+	volumetrics_render_pass volumetricsPass;
 
 	light_culling_buffers lightCullingBuffers;
+
+	renderer_settings oldSettings;
 
 	void recalculateViewport(bool resizeTextures);
 	void allocateLightCullingBuffers();

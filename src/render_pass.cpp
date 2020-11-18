@@ -39,3 +39,17 @@ void sun_shadow_render_pass::renderObject(uint32 cascadeIndex, const dx_mesh* me
 		}
 	);
 }
+
+void volumetrics_render_pass::addVolume(const bounding_box& aabb)
+{
+	drawCalls.push_back(
+		{
+			aabb
+		}
+	);
+}
+
+void volumetrics_render_pass::reset()
+{
+	drawCalls.clear();
+}

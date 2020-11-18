@@ -15,6 +15,13 @@ struct object_retirement
 	volatile uint32 numRetiredObjects[NUM_BUFFERED_FRAMES];
 };
 
+struct dx_memory_usage
+{
+	// In MB.
+	uint32 currentlyUsed;
+	uint32 available;
+};
+
 struct dx_context
 {
 	void initialize();
@@ -38,6 +45,7 @@ struct dx_context
 		return uploadDynamicConstantBuffer(sizeof(T), &data);
 	}
 
+	dx_memory_usage getMemoryUsage();
 
 
 	dx_factory factory;

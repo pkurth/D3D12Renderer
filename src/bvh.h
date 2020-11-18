@@ -44,8 +44,6 @@ struct world_bvh
 	std::vector<uint16> objectIDs;
 	std::vector<bvh_node> nodes;
 	uint32 root;
-
-	void build(const std::vector<uint16>& objects);
 };
 
 

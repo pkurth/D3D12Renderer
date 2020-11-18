@@ -6,7 +6,7 @@
 #include "input.h"
 #include "imgui.h"
 #include "file_browser.h"
-#include "game.h"
+#include "application.h"
 
 #include <fontawesome/list.h>
 
@@ -129,7 +129,7 @@ static void drawHelperWindows()
 	}
 }
 
-static bool drawMainMenuBar(game_scene& scene)
+static bool drawMainMenuBar(application& app)
 {
 	if (ImGui::BeginMainMenuBar())
 	{
@@ -137,12 +137,12 @@ static bool drawMainMenuBar(game_scene& scene)
 		{
 			if (ImGui::MenuItem(ICON_FA_SAVE "  Save scene"))
 			{
-				scene.serializeToFile("assets/scenes/scene.sc");
+				app.serializeToFile("assets/scenes/scene.sc");
 			}
 
 			if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN "  Load scene"))
 			{
-				scene.unserializeFromFile("assets/scenes/scene.sc");
+				app.unserializeFromFile("assets/scenes/scene.sc");
 			}
 
 			ImGui::Separator();
@@ -243,8 +243,6 @@ int main(int argc, char** argv)
 	window.initialize(TEXT("Main Window"), 1280, 800, colorDepth);
 	setMainWindow(&window);
 
-	dx_window projectorWindow;
-	projectorWindow.initialize(TEXT("Projector Window"), 1280, 800, colorDepth);
 
 	dx_renderer::initializeCommon(screenFormat);
 
@@ -255,12 +253,11 @@ int main(int argc, char** argv)
 
 
 
-	dx_renderer renderers[2] = {};
-	renderers[0].initialize(1024, 1024);
-	renderers[1].initialize(projectorWindow.clientWidth, projectorWindow.clientHeight);
+	dx_renderer renderer = {};
+	renderer.initialize(1024, 1024);
 
-	game_scene scene = {};
-	scene.initialize(renderers, arraysize(renderers));
+	application app = {};
+	app.initialize(&renderer);
 
 
 	user_input input = {};
@@ -284,7 +281,7 @@ int main(int argc, char** argv)
 		ImGui::Begin("Scene");
 		uint32 renderWidth = (uint32)ImGui::GetContentRegionAvail().x;
 		uint32 renderHeight = (uint32)ImGui::GetContentRegionAvail().y;
-		ImGui::Image(renderers[0].frameResult.defaultSRV, renderWidth, renderHeight);
+		ImGui::Image(renderer.frameResult.defaultSRV, renderWidth, renderHeight);
 
 		ImGuiIO& io = ImGui::GetIO();
 		if (ImGui::IsItemHovered())
@@ -357,21 +354,17 @@ int main(int argc, char** argv)
 
 		dx_renderer::beginFrameCommon();
 
-		renderers[0].beginFrame(renderWidth, renderHeight);
-		renderers[1].beginFrame(projectorWindow.clientWidth, projectorWindow.clientHeight);
-		scene.update(input, dt);
+		renderer.beginFrame(renderWidth, renderHeight);
+		app.update(input, dt);
+		renderer.endFrame();
 
-		renderers[0].endFrame(dt, true);
-		renderers[1].endFrame(dt);
-
-		if (!drawMainMenuBar(scene))
+		if (!drawMainMenuBar(app))
 		{
 			break;
 		}
 
-		drawFileBrowser(scene);
+		drawFileBrowser(app);
 
-		renderToSecondaryWindow(&renderers[1], projectorWindow);
 		fenceValues[window.currentBackbufferIndex] = renderToMainWindow(window);
 
 		

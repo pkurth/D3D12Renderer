@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "imgui.h"
 #include "threading.h"
-#include "game.h"
+#include "application.h"
 
 #include <filesystem>
 #include <shellapi.h>
@@ -277,7 +277,7 @@ static void printCachedFileEntries(file_system_entry& e)
 	}
 }
 
-void drawFileBrowser(game_scene& scene)
+void drawFileBrowser(application& app)
 {
 	static HANDLE checkForFileChangesThread = CreateThread(0, 0, checkForFileChanges, 0, 0, 0);
 
@@ -384,7 +384,7 @@ void drawFileBrowser(game_scene& scene)
 			{
 				if (ImGui::MenuItem("Set as environment"))
 				{
-					scene.setEnvironment(c.path.string().c_str());
+					app.setEnvironment(c.path.string().c_str());
 				}
 			}
 
