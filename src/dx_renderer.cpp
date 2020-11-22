@@ -9,8 +9,10 @@
 #include "outline_rs.hlsl"
 #include "sky_rs.hlsl"
 #include "light_culling_rs.hlsl"
+#include "raytracing.hlsl"
 
 #include "camera.hlsl"
+#include "raytracing.h"
 
 
 static dx_texture whiteTexture;
@@ -33,6 +35,9 @@ static dx_pipeline atmospherePipeline;
 
 static dx_pipeline worldSpaceFrustaPipeline;
 static dx_pipeline lightCullingPipeline;
+
+static dx_raytracing_pipeline raytracingPipeline;
+static raytracing_shader_binding_table_desc raytracingBindingTableDesc;
 
 static dx_mesh gizmoMesh;
 static dx_mesh positionOnlyMesh;
@@ -174,8 +179,8 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	// Blit.
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
-		.renderTargets(&screenFormat, 1)
-		.depthSettings(false, false);
+			.renderTargets(&screenFormat, 1)
+			.depthSettings(false, false);
 
 		blitPipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "blit_ps" });
 	}
@@ -186,8 +191,31 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		lightCullingPipeline = createReloadablePipeline("light_culling_cs");
 	}
 
+	// Atmosphere.
 	{
 		atmospherePipeline = createReloadablePipeline("atmosphere_cs");
+	}
+
+	// Raytracing.
+	{
+		CD3DX12_DESCRIPTOR_RANGE globalRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0); // TLAS.
+		CD3DX12_ROOT_PARAMETER globalRootParameters[3]; 
+		globalRootParameters[0].InitAsDescriptorTable(1, &globalRange);
+		globalRootParameters[1].InitAsConstantBufferView(0);
+		globalRootParameters[2].InitAsConstants(1, 1);
+		D3D12_ROOT_SIGNATURE_DESC globalDesc = { arraysize(globalRootParameters), globalRootParameters };
+
+		CD3DX12_DESCRIPTOR_RANGE raygenRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0); // Output.
+		CD3DX12_ROOT_PARAMETER raygenRootParameter; raygenRootParameter.InitAsDescriptorTable(1, &raygenRange);
+		D3D12_ROOT_SIGNATURE_DESC raygenDesc = { 1, &raygenRootParameter };
+
+		raytracingPipeline = 
+			raytracing_pipeline_builder(L"shaders/raytracing_rts.hlsl", 4 * sizeof(float), 1)
+				.globalRootSignature(globalDesc)
+				.raygen(L"rayGen", raygenDesc)
+				.hitgroup(L"Radiance", { L"radianceClosestHit", L"radianceAnyHit", L"radianceMiss" })
+				.hitgroup(L"Shadow", { L"shadowClosestHit", L"shadowAnyHit", L"shadowMiss" })
+				.finish();
 	}
 
 	createAllReloadablePipelines();
@@ -287,7 +315,7 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 
 	geometryRenderPass.reset();
 	sunShadowRenderPass.reset();
-	volumetricsPass.reset();
+	raytracingRenderPass.reset();
 }
 
 pbr_environment dx_renderer::createEnvironment(const char* filename, uint32 skyResolution, uint32 environmentResolution, uint32 irradianceResolution, bool asyncCompute)

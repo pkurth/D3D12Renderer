@@ -18,15 +18,9 @@ void application::initialize(dx_renderer* renderer)
 	camera.nearPlane = 0.1f;
 
 
-	meshes.push_back(createCompositeMeshFromFile("assets/meshes/window.fbx", 
+	meshes.push_back(createCompositeMeshFromFile("assets/meshes/cerberus.fbx", 
 		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
 	);
-
-	composite_mesh mesh = {};
-	cpu_mesh m(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
-	mesh.singleMeshes.push_back({ m.pushQuad(1.f) });
-	mesh.mesh = m.createDXMesh();
-	meshes.push_back(mesh);
 
 	textures.push_back(loadTextureFromFile("assets/textures/cerberus_a.tga"));
 	textures.push_back(loadTextureFromFile("assets/textures/cerberus_n.tga", texture_load_flags_default | texture_load_flags_noncolor));
@@ -45,14 +39,9 @@ void application::initialize(dx_renderer* renderer)
 		}
 	);
 
-	materials.push_back(
-		{
-			0, 0, 0, 0,
-			vec4(0.1f, 0.1f, 0.1f, 1.f),
-			1.f,
-			0.f,
-		}
-	);
+	blas.push_back(raytracing_blas_builder()
+		.push(meshes[0].mesh.vertexBuffer, meshes[0].mesh.indexBuffer, meshes[0].singleMeshes[0].submesh)
+		.finish());
 
 	// Cerberus.
 	gameObjects.push_back(
@@ -64,110 +53,9 @@ void application::initialize(dx_renderer* renderer)
 			},
 			0,
 			0,
+			0,
 		}
 	);
-
-	// Ground plane.
-	gameObjects.push_back(
-		{
-			{
-				vec3(0.f, 0.f, 0.f),
-				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
-				100.f,
-			},
-			1,
-			1,
-		}
-	);
-
-	gameObjects.push_back(
-		{
-			{
-				vec3(30.f, 20.f, 0.f),
-				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
-				15.f
-			},
-			1,
-			1
-		}
-	);
-	/*gameObjects.push_back(
-		{
-			{
-				vec3(-30.f, 20.f, 0.f),
-				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
-				15.f
-			},
-			1,
-			1
-		}
-	);
-	gameObjects.push_back(
-		{
-			{
-				vec3(0.f, 20.f, 30.f),
-				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
-				15.f
-			},
-			1,
-			1
-		}
-	);
-	gameObjects.push_back(
-		{
-			{
-				vec3(0.f, 20.f, -30.f),
-				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
-				15.f
-			},
-			1,
-			1
-		}
-	);
-	gameObjects.push_back(
-		{
-			{
-				vec3(-30.f, 20.f, 30.f),
-				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
-				15.f
-			},
-			1,
-			1
-		}
-	);
-	gameObjects.push_back(
-		{
-			{
-				vec3(-30.f, 20.f, -30.f),
-				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
-				15.f
-			},
-			1,
-			1
-		}
-	);
-	gameObjects.push_back(
-		{
-			{
-				vec3(30.f, 20.f, -30.f),
-				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
-				15.f
-			},
-			1,
-			1
-		}
-	);
-	gameObjects.push_back(
-		{
-			{
-				vec3(30.f, 20.f, 30.f),
-				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
-				15.f
-			},
-			1,
-			1
-		}
-	);*/
 
 	setEnvironment("assets/textures/hdri/leadenhall_market_4k.hdr");
 
@@ -381,7 +269,6 @@ void application::update(const user_input& input, float dt)
 
 	geometry_render_pass* geometryPass = renderer->beginGeometryPass();
 	sun_shadow_render_pass* shadowPass = renderer->beginSunShadowPass();
-	volumetrics_render_pass* volumetricsPass = renderer->beginVolumetricsPass();
 
 
 	for (const scene_object& go : gameObjects)
@@ -395,8 +282,6 @@ void application::update(const user_input& input, float dt)
 		geometryPass->renderObject(&mesh, submesh, &material, m);
 		shadowPass->renderObject(0, &mesh, submesh, m);
 	}
-
-	//volumetricsPass->addVolume(bounding_box::fromCenterRadius(vec3(0.f, 10.f, 0.f), vec3(40.f, 10.f, 40.f)));
 
 }
 
@@ -477,6 +362,28 @@ void application::serializeToFile(const char* filename)
 	out << YAML::BeginMap;
 	out << YAML::Key << "Scene" << YAML::Value << "My scene";
 
+	out << YAML::Key << "Camera"
+		<< YAML::Value
+			<< YAML::BeginMap
+				<< YAML::Key << "Position" << YAML::Value << camera.position
+				<< YAML::Key << "Rotation" << YAML::Value << camera.rotation
+				<< YAML::Key << "Near Plane" << YAML::Value << camera.nearPlane
+				<< YAML::Key << "Far Plane" << YAML::Value << camera.farPlane
+			<< YAML::EndMap;
+
+	out << YAML::Key << "Tone Map"
+		<< YAML::Value
+			<< YAML::BeginMap
+				<< YAML::Key << "A" << YAML::Value << renderer->settings.tonemap.A
+				<< YAML::Key << "B" << YAML::Value << renderer->settings.tonemap.B
+				<< YAML::Key << "C" << YAML::Value << renderer->settings.tonemap.C
+				<< YAML::Key << "D" << YAML::Value << renderer->settings.tonemap.D
+				<< YAML::Key << "E" << YAML::Value << renderer->settings.tonemap.E
+				<< YAML::Key << "F" << YAML::Value << renderer->settings.tonemap.F
+				<< YAML::Key << "Linear White" << YAML::Value << renderer->settings.tonemap.linearWhite
+				<< YAML::Key << "Exposure" << YAML::Value << renderer->settings.tonemap.exposure
+			<< YAML::EndMap;
+
 	out << YAML::Key << "Sun" 
 		<< YAML::Value 
 			<< YAML::BeginMap
@@ -507,6 +414,22 @@ bool application::deserializeFromFile(const char* filename)
 	}
 
 	std::string sceneName = data["Scene"].as<std::string>();
+
+	auto cameraNode = data["Camera"];
+	camera.position = cameraNode["Position"].as<vec3>();
+	camera.rotation = cameraNode["Rotation"].as<quat>();
+	camera.nearPlane = cameraNode["Near Plane"].as<float>();
+	camera.farPlane = cameraNode["Far Plane"].as<float>();
+
+	auto tonemapNode = data["Tone Map"];
+	renderer->settings.tonemap.A = tonemapNode["A"].as<float>();
+	renderer->settings.tonemap.B = tonemapNode["B"].as<float>();
+	renderer->settings.tonemap.C = tonemapNode["C"].as<float>();
+	renderer->settings.tonemap.D = tonemapNode["D"].as<float>();
+	renderer->settings.tonemap.E = tonemapNode["E"].as<float>();
+	renderer->settings.tonemap.F = tonemapNode["F"].as<float>();
+	renderer->settings.tonemap.linearWhite = tonemapNode["Linear White"].as<float>();
+	renderer->settings.tonemap.exposure = tonemapNode["Exposure"].as<float>();
 
 	auto sunNode = data["Sun"];
 	sun.color = sunNode["Color"].as<vec3>();

@@ -7,12 +7,14 @@
 #include "dx_renderer.h"
 #include "light_source.hlsl" // TODO: For now. The game should only know about the C++ version of lights eventually.
 #include "light_source.h"
+#include "raytracing.h"
 
 
 struct scene_object
 {
 	trs transform;
 	uint32 meshIndex;
+	uint32 blasIndex;
 	uint32 materialIndex;
 };
 
@@ -32,8 +34,8 @@ private:
 
 	std::vector<dx_texture> textures;
 	std::vector<composite_mesh> meshes;
+	std::vector<raytracing_blas> blas;
 	std::vector<pbr_material> materials; // TODO: Eventually store indices to textures here, instead of pointers.
-
 
 	std::vector<scene_object> gameObjects;
 

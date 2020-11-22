@@ -7,8 +7,7 @@
 
 struct dx_mesh;
 struct pbr_material;
-struct pbr_environment;
-struct render_camera;
+struct raytracing_blas;
 
 struct geometry_render_pass
 {
@@ -50,16 +49,18 @@ private:
 	friend struct dx_renderer;
 };
 
-struct volumetrics_render_pass
+struct raytracing_render_pass
 {
-	void addVolume(const bounding_box& aabb);
+	void renderObject(const raytracing_blas* blas, const pbr_material* material, const mat4& transform);
 
 private:
 	void reset();
 
 	struct draw_call
 	{
-		bounding_box aabb;
+		const mat4 transform; 
+		const raytracing_blas* blas;
+		const pbr_material* material;
 	};
 
 	std::vector<draw_call> drawCalls;

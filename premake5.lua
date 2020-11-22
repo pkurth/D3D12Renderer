@@ -35,6 +35,9 @@ project "D3D12ProjectionMapping"
 	objdir ("./bin_int/" .. outputdir ..  "/%{prj.name}")
 
 	debugdir "."
+	debugenvs {
+		"PATH=ext/bin;%PATH%;"
+	}
 
 	pchheader "pch.h"
 	pchsource "src/pch.cpp"

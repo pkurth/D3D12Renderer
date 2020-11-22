@@ -40,16 +40,18 @@ void sun_shadow_render_pass::renderObject(uint32 cascadeIndex, const dx_mesh* me
 	);
 }
 
-void volumetrics_render_pass::addVolume(const bounding_box& aabb)
+void raytracing_render_pass::reset()
+{
+	drawCalls.clear();
+}
+
+void raytracing_render_pass::renderObject(const raytracing_blas* blas, const pbr_material* material, const mat4& transform)
 {
 	drawCalls.push_back(
 		{
-			aabb
+			transform,
+			blas,
+			material,
 		}
 	);
-}
-
-void volumetrics_render_pass::reset()
-{
-	drawCalls.clear();
 }

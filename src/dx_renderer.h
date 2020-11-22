@@ -83,7 +83,7 @@ struct dx_renderer
 
 	geometry_render_pass* beginGeometryPass() { return &geometryRenderPass; }
 	sun_shadow_render_pass* beginSunShadowPass() { return &sunShadowRenderPass; }
-	volumetrics_render_pass* beginVolumetricsPass() { return &volumetricsPass; }
+	raytracing_render_pass* beginRaytracingPass() { return &raytracingRenderPass; }
 
 	
 	renderer_settings settings;
@@ -146,7 +146,7 @@ private:
 
 	geometry_render_pass geometryRenderPass;
 	sun_shadow_render_pass sunShadowRenderPass;
-	volumetrics_render_pass volumetricsPass;
+	raytracing_render_pass raytracingRenderPass;
 
 	light_culling_buffers lightCullingBuffers;
 
