@@ -142,7 +142,7 @@ static bool drawMainMenuBar(application& app)
 
 			if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN "  Load scene"))
 			{
-				app.unserializeFromFile("assets/scenes/scene.sc");
+				app.deserializeFromFile("assets/scenes/scene.sc");
 			}
 
 			ImGui::Separator();

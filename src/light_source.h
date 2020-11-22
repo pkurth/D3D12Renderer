@@ -19,7 +19,8 @@ struct directional_light
 	vec3 direction;
 	float blendArea;
 
-	vec3 radiance;
+	vec3 color;
+	float intensity; // Final radiance is color * intensity.
 	uint32 numShadowCascades;
 
 	void updateMatrices(const render_camera& camera);

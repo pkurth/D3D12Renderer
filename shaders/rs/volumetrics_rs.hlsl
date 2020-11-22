@@ -3,7 +3,6 @@
 
 struct volumetrics_transform_cb
 {
-	mat4 mv;
 	mat4 mvp;
 };
 

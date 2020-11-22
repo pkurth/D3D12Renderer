@@ -49,7 +49,27 @@ struct spot_light_cb
 };
 
 #ifdef HLSL
-static float sampleShadowMap(float4x4 vp, float3 worldPosition, Texture2D<float> shadowMap, SamplerComparisonState shadowMapSampler, 
+static float sampleShadowMapSimple(float4x4 vp, float3 worldPosition, Texture2D<float> shadowMap, SamplerComparisonState shadowMapSampler, float bias)
+{
+	float4 lightProjected = mul(vp, float4(worldPosition, 1.f));
+	lightProjected.xyz /= lightProjected.w;
+
+	float visibility = 1.f;
+
+	if (lightProjected.z < 1.f)
+	{
+		float2 lightUV = lightProjected.xy * 0.5f + float2(0.5f, 0.5f);
+		lightUV.y = 1.f - lightUV.y;
+
+		visibility = shadowMap.SampleCmpLevelZero(
+			shadowMapSampler,
+			lightUV,
+			lightProjected.z - bias);
+	}
+	return visibility;
+}
+
+static float sampleShadowMapPCF(float4x4 vp, float3 worldPosition, Texture2D<float> shadowMap, SamplerComparisonState shadowMapSampler, 
 	float texelSize, float bias)
 {
 	float4 lightProjected = mul(vp, float4(worldPosition, 1.f));
@@ -78,6 +98,79 @@ static float sampleShadowMap(float4x4 vp, float3 worldPosition, Texture2D<float>
 	}
 	return visibility;
 }
+
+static float sampleCascadedShadowMapSimple(float4x4 vp[4], float3 worldPosition, Texture2D<float> shadowMaps[4], SamplerComparisonState shadowMapSampler,
+	float pixelDepth, uint numCascades, float4 cascadeDistances, float4 bias, float blendArea)
+{
+	float4 comparison = pixelDepth.xxxx > cascadeDistances;
+
+	int currentCascadeIndex = dot(float4(numCascades > 0, numCascades > 1, numCascades > 2, numCascades > 3), comparison);
+	currentCascadeIndex = min(currentCascadeIndex, numCascades - 1);
+
+	int nextCascadeIndex = min(numCascades - 1, currentCascadeIndex + 1);
+
+	float visibility = sampleShadowMapSimple(vp[currentCascadeIndex], worldPosition, shadowMaps[currentCascadeIndex],
+		shadowMapSampler, bias[currentCascadeIndex]);
+
+	// Blend between cascades.
+	float currentPixelsBlendBandLocation = 1.f;
+	if (numCascades > 1)
+	{
+		// Calculate blend amount.
+		int blendIntervalBelowIndex = max(0, currentCascadeIndex - 1);
+		float cascade0Factor = float(currentCascadeIndex > 0);
+		float depth = pixelDepth - cascadeDistances[blendIntervalBelowIndex] * cascade0Factor;
+		float blendInterval = cascadeDistances[currentCascadeIndex] - cascadeDistances[blendIntervalBelowIndex] * cascade0Factor;
+
+		// Relative to current cascade. 0 means at nearplane of cascade, 1 at farplane of cascade.
+		currentPixelsBlendBandLocation = 1.f - depth / blendInterval;
+	}
+	if (currentPixelsBlendBandLocation < blendArea) // Blend area is relative!
+	{
+		float blendBetweenCascadesAmount = currentPixelsBlendBandLocation / blendArea;
+		float visibilityOfNextCascade = sampleShadowMapSimple(vp[nextCascadeIndex], worldPosition, shadowMaps[nextCascadeIndex],
+			shadowMapSampler, bias[nextCascadeIndex]);
+		visibility = lerp(visibilityOfNextCascade, visibility, blendBetweenCascadesAmount);
+	}
+	return visibility;
+}
+
+static float sampleCascadedShadowMapPCF(float4x4 vp[4], float3 worldPosition, Texture2D<float> shadowMaps[4], SamplerComparisonState shadowMapSampler, 
+	float texelSize, float pixelDepth, uint numCascades, float4 cascadeDistances, float4 bias, float blendArea)
+{
+	float4 comparison = pixelDepth.xxxx > cascadeDistances;
+
+	int currentCascadeIndex = dot(float4(numCascades > 0, numCascades > 1, numCascades > 2, numCascades > 3), comparison);
+	currentCascadeIndex = min(currentCascadeIndex, numCascades - 1);
+
+	int nextCascadeIndex = min(numCascades - 1, currentCascadeIndex + 1);
+
+	float visibility = sampleShadowMapPCF(vp[currentCascadeIndex], worldPosition, shadowMaps[currentCascadeIndex],
+		shadowMapSampler, texelSize, bias[currentCascadeIndex]);
+
+	// Blend between cascades.
+	float currentPixelsBlendBandLocation = 1.f;
+	if (numCascades > 1)
+	{
+		// Calculate blend amount.
+		int blendIntervalBelowIndex = max(0, currentCascadeIndex - 1);
+		float cascade0Factor = float(currentCascadeIndex > 0);
+		float depth = pixelDepth - cascadeDistances[blendIntervalBelowIndex] * cascade0Factor;
+		float blendInterval = cascadeDistances[currentCascadeIndex] - cascadeDistances[blendIntervalBelowIndex] * cascade0Factor;
+
+		// Relative to current cascade. 0 means at nearplane of cascade, 1 at farplane of cascade.
+		currentPixelsBlendBandLocation = 1.f - depth / blendInterval;
+	}
+	if (currentPixelsBlendBandLocation < blendArea) // Blend area is relative!
+	{
+		float blendBetweenCascadesAmount = currentPixelsBlendBandLocation / blendArea;
+		float visibilityOfNextCascade = sampleShadowMapPCF(vp[nextCascadeIndex], worldPosition, shadowMaps[nextCascadeIndex],
+			shadowMapSampler, texelSize, bias[nextCascadeIndex]);
+		visibility = lerp(visibilityOfNextCascade, visibility, blendBetweenCascadesAmount);
+	}
+	return visibility;
+}
+
 #endif
 
 #endif

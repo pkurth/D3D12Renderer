@@ -51,7 +51,7 @@ struct pbr_material_cb
         "visibility=SHADER_VISIBILITY_PIXEL)," \
     "DescriptorTable(SRV(t0, space=2, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL), " \
     "CBV(b0, space=3, visibility=SHADER_VISIBILITY_PIXEL), " \
-    "DescriptorTable(SRV(t0, space=3, numDescriptors=9), visibility=SHADER_VISIBILITY_PIXEL)"
+    "DescriptorTable(SRV(t0, space=3, numDescriptors=10), visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define MODEL_DEPTH_ONLY_RS \
     "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \

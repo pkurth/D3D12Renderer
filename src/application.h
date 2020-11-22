@@ -24,7 +24,7 @@ struct application
 	void setEnvironment(const char* filename);
 
 	void serializeToFile(const char* filename);
-	void unserializeFromFile(const char* filename);
+	bool deserializeFromFile(const char* filename);
 
 private:
 	void updateCamera(const user_input& input, float dt);
@@ -40,7 +40,7 @@ private:
 	pbr_environment environment;
 
 
-	static const uint32 numPointLights = 128;
+	static const uint32 numPointLights = 0;
 	static const uint32 numSpotLights = 0;
 
 	point_light_cb* pointLights;

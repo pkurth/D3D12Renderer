@@ -29,7 +29,7 @@ static dx_pipeline modelShadowPipeline; // Only different from depth-only pipeli
 static dx_pipeline outlinePipeline;
 static dx_pipeline flatUnlitPipeline;
 static dx_pipeline blitPipeline;
-static dx_pipeline volumetricsPipeline;
+static dx_pipeline atmospherePipeline;
 
 static dx_pipeline worldSpaceFrustaPipeline;
 static dx_pipeline lightCullingPipeline;
@@ -78,7 +78,7 @@ static DXGI_FORMAT screenFormat;
 static const DXGI_FORMAT hdrFormat[] = { DXGI_FORMAT_R16G16B16A16_FLOAT };
 static const DXGI_FORMAT hdrDepthFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 static const DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D32_FLOAT;
-static const DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16_FLOAT;
+static const DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
 
 void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
@@ -125,11 +125,6 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		modelDepthOnlyPipeline = createReloadablePipeline(desc, { "model_vs" }, "model_vs"); // The depth-only RS is baked into the vertex shader.
 
 		desc
-			.renderTargets(0, 0, shadowDepthFormat);
-
-		modelShadowPipeline = createReloadablePipeline(desc, { "model_vs" }, "model_vs"); // The depth-only RS is baked into the vertex shader.
-
-		desc
 			.renderTargets(hdrFormat, arraysize(hdrFormat), hdrDepthFormat)
 			.stencilSettings(D3D12_COMPARISON_FUNC_ALWAYS, D3D12_STENCIL_OP_REPLACE, D3D12_STENCIL_OP_REPLACE) // Mark areas in stencil, for example for outline.
 			.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
@@ -137,16 +132,14 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		modelPipeline = createReloadablePipeline(desc, { "model_vs", "model_ps" });
 	}
 
-	// Volumetrics.
+	// Shadow.
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(&hdrFormat[0], 1)
-			.inputLayout(inputLayout_position)
-			.cullFrontFaces()
-			.alphaBlending(0)
-			.depthSettings(false, false);
+			.renderTargets(0, 0, shadowDepthFormat)
+			.inputLayout(inputLayout_position_uv_normal_tangent)
+			.cullFrontFaces();
 
-		volumetricsPipeline = createReloadablePipeline(desc, { "volumetrics_vs", "volumetrics_ps" });
+		modelShadowPipeline = createReloadablePipeline(desc, { "model_vs" }, "model_vs"); // The depth-only RS is baked into the vertex shader.
 	}
 
 	// Outline.
@@ -191,6 +184,10 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	{
 		worldSpaceFrustaPipeline = createReloadablePipeline("world_space_tiled_frusta_cs");
 		lightCullingPipeline = createReloadablePipeline("light_culling_cs");
+	}
+
+	{
+		atmospherePipeline = createReloadablePipeline("atmosphere_cs");
 	}
 
 	createAllReloadablePipelines();
@@ -255,7 +252,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 
 	// Volumetrics.
 	{
-		volumetricsTexture = createTexture(0, renderWidth, renderHeight, volumetricsFormat, true);
+		volumetricsTexture = createTexture(0, renderWidth, renderHeight, volumetricsFormat, false, true);
 
 		volumetricsRenderTarget.pushColorAttachment(volumetricsTexture);
 	}
@@ -418,7 +415,7 @@ void dx_renderer::setSun(const directional_light& light)
 	sun.bias = light.bias;
 	sun.direction = light.direction;
 	sun.blendArea = light.blendArea;
-	sun.radiance = light.radiance;
+	sun.radiance = light.color * light.intensity;
 	sun.numShadowCascades = light.numShadowCascades;
 
 	memcpy(sun.vp, light.vp, sizeof(mat4) * light.numShadowCascades);
@@ -586,6 +583,30 @@ void dx_renderer::endFrame()
 		.transition(sunShadowCascadeTextures, MAX_NUM_SUN_SHADOW_CASCADES, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 
+
+
+	// ----------------------------------------
+	// VOLUMETRICS
+	// ----------------------------------------
+
+#if 0
+	cl->setPipelineState(*atmospherePipeline.pipeline);
+	cl->setComputeRootSignature(*atmospherePipeline.rootSignature);
+	cl->setComputeDynamicConstantBuffer(0, cameraCBV);
+	cl->setComputeDynamicConstantBuffer(1, sunCBV);
+	cl->setDescriptorHeapSRV(2, 0, depthBuffer);
+	for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
+	{
+		cl->setDescriptorHeapSRV(2, i + 1, sunShadowCascadeTextures[i]);
+	}
+	cl->setDescriptorHeapUAV(2, 5, volumetricsTexture);
+
+	cl->dispatch(bucketize(renderWidth, 16), bucketize(renderHeight, 16));
+#endif
+
+
+
+
 	// ----------------------------------------
 	// LIGHT PASS
 	// ----------------------------------------
@@ -608,6 +629,7 @@ void dx_renderer::endFrame()
 	{
 		cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 5 + i, sunShadowCascadeTextures[i]);
 	}
+	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 9, volumetricsTexture);
 	cl->setGraphicsDynamicConstantBuffer(MODEL_RS_SUN, sunCBV);
 
 	cl->setGraphicsDynamicConstantBuffer(MODEL_RS_CAMERA, cameraCBV);
@@ -656,45 +678,6 @@ void dx_renderer::endFrame()
 	//cl->setStencilReference(0);
 
 
-
-	// ----------------------------------------
-	// VOLUMETRICS
-	// ----------------------------------------
-
-	if (volumetricsPass.drawCalls.size() > 0)
-	{
-		barrier_batcher(cl)
-			.transition(depthBuffer.resource, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-		//cl->setRenderTarget(volumetricsRenderTarget);
-		//cl->clearRTV(volumetricsRenderTarget.rtvHandles[0], 0.f, 0.f, 0.f);
-
-		cl->setPipelineState(*volumetricsPipeline.pipeline);
-		cl->setGraphicsRootSignature(*volumetricsPipeline.rootSignature);
-
-		cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
-		cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
-
-		cl->setGraphicsDynamicConstantBuffer(VOLUMETRICS_RS_CAMERA, cameraCBV);
-		cl->setDescriptorHeapSRV(VOLUMETRICS_RS_DEPTHBUFFER, 0, depthBuffer);
-
-		for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
-		{
-			cl->setDescriptorHeapSRV(VOLUMETRICS_RS_SUNCASCADES, i, sunShadowCascadeTextures[i]);
-		}
-		cl->setGraphicsDynamicConstantBuffer(VOLUMETRICS_RS_SUN, sunCBV);
-
-		for (volumetrics_render_pass::draw_call& dc : volumetricsPass.drawCalls)
-		{
-			mat4 m = createModelMatrix(dc.aabb.getCenter(), quat::identity, dc.aabb.getRadius());
-			cl->setGraphics32BitConstants(VOLUMETRICS_RS_MVP, volumetrics_transform_cb{ camera.view * m, camera.viewProj * m });
-			cl->setGraphics32BitConstants(VOLUMETRICS_RS_BOX, volumetrics_bounding_box_cb{ vec4(dc.aabb.minCorner, 1.f), vec4(dc.aabb.maxCorner, 1.f) });
-			cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
-		}
-
-		barrier_batcher(cl)
-			.transition(depthBuffer.resource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-	}
 
 
 

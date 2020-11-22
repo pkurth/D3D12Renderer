@@ -138,7 +138,7 @@ static void groupAppendSpotLight(uint lightIndex)
 void main(cs_input IN)
 {
     uint2 texCoord = IN.dispatchThreadID.xy;
-    float fDepth = depthBuffer.Load(uint3(texCoord, 0)).r;
+    float fDepth = depthBuffer.Load(uint3(texCoord, 0));
     // Since the depth is between 0 and 1, we can perform min and max operations on the bit pattern as uint. This is because native HLSL does not support floating point atomics.
     uint uDepth = asuint(fDepth);
 

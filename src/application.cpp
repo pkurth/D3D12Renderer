@@ -16,17 +16,15 @@ void application::initialize(dx_renderer* renderer)
 	camera.rotation = quat::identity;
 	camera.verticalFOV = deg2rad(70.f);
 	camera.nearPlane = 0.1f;
-	camera.farPlane = 1000.f;
 
 
-
-	meshes.push_back(createCompositeMeshFromFile("assets/meshes/cerberus.fbx", 
+	meshes.push_back(createCompositeMeshFromFile("assets/meshes/window.fbx", 
 		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
 	);
 
 	composite_mesh mesh = {};
 	cpu_mesh m(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
-	mesh.singleMeshes.push_back({ m.pushQuad(100.f) });
+	mesh.singleMeshes.push_back({ m.pushQuad(1.f) });
 	mesh.mesh = m.createDXMesh();
 	meshes.push_back(mesh);
 
@@ -47,6 +45,16 @@ void application::initialize(dx_renderer* renderer)
 		}
 	);
 
+	materials.push_back(
+		{
+			0, 0, 0, 0,
+			vec4(0.1f, 0.1f, 0.1f, 1.f),
+			1.f,
+			0.f,
+		}
+	);
+
+	// Cerberus.
 	gameObjects.push_back(
 		{
 			{
@@ -59,17 +67,107 @@ void application::initialize(dx_renderer* renderer)
 		}
 	);
 
+	// Ground plane.
 	gameObjects.push_back(
 		{
 			{
 				vec3(0.f, 0.f, 0.f),
 				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
-				1.f,
+				100.f,
 			},
 			1,
-			0,
+			1,
 		}
 	);
+
+	gameObjects.push_back(
+		{
+			{
+				vec3(30.f, 20.f, 0.f),
+				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
+				15.f
+			},
+			1,
+			1
+		}
+	);
+	/*gameObjects.push_back(
+		{
+			{
+				vec3(-30.f, 20.f, 0.f),
+				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
+				15.f
+			},
+			1,
+			1
+		}
+	);
+	gameObjects.push_back(
+		{
+			{
+				vec3(0.f, 20.f, 30.f),
+				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
+				15.f
+			},
+			1,
+			1
+		}
+	);
+	gameObjects.push_back(
+		{
+			{
+				vec3(0.f, 20.f, -30.f),
+				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
+				15.f
+			},
+			1,
+			1
+		}
+	);
+	gameObjects.push_back(
+		{
+			{
+				vec3(-30.f, 20.f, 30.f),
+				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
+				15.f
+			},
+			1,
+			1
+		}
+	);
+	gameObjects.push_back(
+		{
+			{
+				vec3(-30.f, 20.f, -30.f),
+				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
+				15.f
+			},
+			1,
+			1
+		}
+	);
+	gameObjects.push_back(
+		{
+			{
+				vec3(30.f, 20.f, -30.f),
+				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
+				15.f
+			},
+			1,
+			1
+		}
+	);
+	gameObjects.push_back(
+		{
+			{
+				vec3(30.f, 20.f, 30.f),
+				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
+				15.f
+			},
+			1,
+			1
+		}
+	);*/
 
 	setEnvironment("assets/textures/hdri/leadenhall_market_4k.hdr");
 
@@ -120,13 +218,14 @@ void application::initialize(dx_renderer* renderer)
 		};
 	}
 
-	sun.direction = normalize(vec3(-0.6f, -1.f, -0.3f));
-	sun.radiance = vec3(1.f, 0.93f, 0.76f) * 50.f;
+	sun.direction = normalize(vec3(-0.6f, -1.f, -1.3f));
+	sun.color = vec3(1.f, 0.93f, 0.76f);
+	sun.intensity = 500.f;
 
 	sun.cascadeDistances.data[0] = 9.f;
 	sun.cascadeDistances.data[1] = 39.f;
-	sun.cascadeDistances.data[2] = 74.f;
-	sun.cascadeDistances.data[3] = 10000.f;
+	sun.cascadeDistances.data[2] = 100.f;
+	sun.cascadeDistances.data[3] = 300.f;
 
 	sun.numShadowCascades = 3;
 
@@ -206,13 +305,39 @@ static bool plotAndEditTonemapping(tonemap_cb& tonemap)
 	return result;
 }
 
+static bool editSunShadowParameters(directional_light& sun)
+{
+	bool result = false;
+	if (ImGui::TreeNode("Sun"))
+	{
+		result |= ImGui::SliderFloat("Intensity", &sun.intensity, 50.f, 1000.f);
+		result |= ImGui::ColorEdit3("Color", sun.color.data);
+		result |= ImGui::SliderInt("# Cascades", (int*)&sun.numShadowCascades, 1, 4);
+		for (uint32 i = 0; i < sun.numShadowCascades; ++i)
+		{
+			ImGui::PushID(i);
+			if (ImGui::TreeNode("Cascade"))
+			{
+				result |= ImGui::SliderFloat("Distance", &sun.cascadeDistances.data[i], 0.f, 300.f);
+				result |= ImGui::SliderFloat("Bias", &sun.bias.data[i], 0.f, 0.005f);
+				ImGui::TreePop();
+			}
+			ImGui::PopID();
+		}
+		result |= ImGui::SliderFloat("Blend area", &sun.blendArea, 0.f, 0.1f);
+
+		ImGui::TreePop();
+	}
+	return result;
+}
+
 void application::update(const user_input& input, float dt)
 {
 	updateCamera(input, dt);
 	camera.recalculateMatrices(renderer->renderWidth, renderer->renderHeight);
 
 	ImGui::Begin("Settings");
-	ImGui::Text("%f ms, %u FPS", dt, (uint32)(1.f / dt));
+	ImGui::Text("%f ms, %u FPS", dt * 1000.f, (uint32)(1.f / dt));
 
 	dx_memory_usage memoryUsage = dxContext.getMemoryUsage();
 
@@ -221,7 +346,9 @@ void application::update(const user_input& input, float dt)
 
 	ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->settings.aspectRatioMode);
 	ImGui::Checkbox("Show light volumes", &renderer->settings.showLightVolumes);
+
 	plotAndEditTonemapping(renderer->settings.tonemap);
+	editSunShadowParameters(sun);
 
 	ImGui::End();
 
@@ -269,7 +396,7 @@ void application::update(const user_input& input, float dt)
 		shadowPass->renderObject(0, &mesh, submesh, m);
 	}
 
-	volumetricsPass->addVolume(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(100.f, 100.f, 100.f)));
+	//volumetricsPass->addVolume(bounding_box::fromCenterRadius(vec3(0.f, 10.f, 0.f), vec3(40.f, 10.f, 40.f)));
 
 }
 
@@ -289,11 +416,78 @@ void application::setEnvironment(const char* filename)
 namespace fs = std::filesystem;
 
 
+static YAML::Emitter& operator<<(YAML::Emitter& out, const vec2& v)
+{
+	out << YAML::Flow << YAML::BeginSeq << v.x << v.y << YAML::EndSeq;
+	return out;
+}
+
+static YAML::Emitter& operator<<(YAML::Emitter& out, const vec3& v)
+{
+	out << YAML::Flow << YAML::BeginSeq << v.x << v.y << v.z << YAML::EndSeq;
+	return out;
+}
+
+static YAML::Emitter& operator<<(YAML::Emitter& out, const vec4& v)
+{
+	out << YAML::Flow << YAML::BeginSeq << v.x << v.y << v.z << v.w << YAML::EndSeq;
+	return out;
+}
+
+static YAML::Emitter& operator<<(YAML::Emitter& out, const quat& v)
+{
+	out << v.v4;
+	return out;
+}
+
+namespace YAML
+{
+	template<> 
+	struct convert<vec2>
+	{
+		static Node encode(const vec2& v) { Node n; n.push_back(v.x); n.push_back(v.y); return n; }
+		static bool decode(const Node& n, vec2& v) { if (!n.IsSequence() || n.size() != 2) return false; v.x = n[0].as<float>(); v.y = n[1].as<float>(); return true; }
+	};
+
+	template<>
+	struct convert<vec3>
+	{
+		static Node encode(const vec3& v) { Node n; n.push_back(v.x); n.push_back(v.y); n.push_back(v.z); return n; }
+		static bool decode(const Node& n, vec3& v) { if (!n.IsSequence() || n.size() != 3) return false; v.x = n[0].as<float>(); v.y = n[1].as<float>(); v.z = n[2].as<float>(); return true; }
+	};
+
+	template<>
+	struct convert<vec4>
+	{
+		static Node encode(const vec4& v) { Node n; n.push_back(v.x); n.push_back(v.y); n.push_back(v.z); n.push_back(v.w); return n; }
+		static bool decode(const Node& n, vec4& v) { if (!n.IsSequence() || n.size() != 4) return false; v.x = n[0].as<float>(); v.y = n[1].as<float>(); v.z = n[2].as<float>(); v.w = n[3].as<float>(); return true; }
+	};
+
+	template<>
+	struct convert<quat>
+	{
+		static Node encode(const quat& v) { return convert<vec4>::encode(v.v4); }
+		static bool decode(const Node& n, quat& v) { return convert<vec4>::decode(n, v.v4); }
+	};
+}
+
 void application::serializeToFile(const char* filename)
 {
 	YAML::Emitter out;
 	out << YAML::BeginMap;
-	out << YAML::Key << "Scene" << YAML::Value << "PLACEHOLDER";
+	out << YAML::Key << "Scene" << YAML::Value << "My scene";
+
+	out << YAML::Key << "Sun" 
+		<< YAML::Value 
+			<< YAML::BeginMap
+				<< YAML::Key << "Color" << YAML::Value << sun.color
+				<< YAML::Key << "Intensity" << YAML::Value << sun.intensity
+				<< YAML::Key << "Direction" << YAML::Value << sun.direction
+				<< YAML::Key << "Cascades" << YAML::Value << sun.numShadowCascades
+				<< YAML::Key << "Distances" << YAML::Value << sun.cascadeDistances
+				<< YAML::Key << "Bias" << YAML::Value << sun.bias
+				<< YAML::Key << "Blend Area" << YAML::Value << sun.blendArea
+			<< YAML::EndMap;
 
 	out << YAML::EndMap;
 
@@ -303,6 +497,25 @@ void application::serializeToFile(const char* filename)
 	fout << out.c_str();
 }
 
-void application::unserializeFromFile(const char* filename)
+bool application::deserializeFromFile(const char* filename)
 {
+	std::ifstream stream(filename);
+	YAML::Node data = YAML::Load(stream);
+	if (!data["Scene"])
+	{
+		return false;
+	}
+
+	std::string sceneName = data["Scene"].as<std::string>();
+
+	auto sunNode = data["Sun"];
+	sun.color = sunNode["Color"].as<vec3>();
+	sun.intensity = sunNode["Intensity"].as<float>();
+	sun.direction = sunNode["Direction"].as<vec3>();
+	sun.numShadowCascades = sunNode["Cascades"].as<uint32>();
+	sun.cascadeDistances = sunNode["Distances"].as<vec4>();
+	sun.bias = sunNode["Bias"].as<vec4>();
+	sun.blendArea = sunNode["Blend Area"].as<float>();
+
+	return true;
 }
