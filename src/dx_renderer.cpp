@@ -213,8 +213,8 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 			raytracing_pipeline_builder(L"shaders/raytracing_rts.hlsl", 4 * sizeof(float), 1)
 				.globalRootSignature(globalDesc)
 				.raygen(L"rayGen", raygenDesc)
-				.hitgroup(L"Radiance", { L"radianceClosestHit", L"radianceAnyHit", L"radianceMiss" })
-				.hitgroup(L"Shadow", { L"shadowClosestHit", L"shadowAnyHit", L"shadowMiss" })
+				.hitgroup(L"Radiance", L"radianceClosestHit", L"radianceAnyHit", L"radianceMiss")
+				.hitgroup(L"Shadow", L"shadowClosestHit", L"shadowAnyHit", L"shadowMiss")
 				.finish();
 	}
 

@@ -37,7 +37,7 @@ private:
 	std::vector<mat4> localTransforms;
 };
 
-struct raytracing_tlas_builder
+struct raytracing_tlas_builder // This will eventually become a raytracing_scene, which contains the TLAS.
 {
 	raytracing_tlas_builder(acceleration_structure_rebuild_mode rebuildMode = acceleration_structure_no_rebuild);
 	raytracing_tlas_builder& push(const raytracing_blas& blas, const trs& transform);
@@ -53,17 +53,34 @@ private:
 
 
 
+struct raytracing_shader_binding_table_entry
+{
+	void* identifier;
+	std::vector<uint32> byteOffsetPerRootparameter;
+};
 
 struct raytracing_shader_binding_table_desc
 {
 	uint32 entrySize;
-	uint32 numHitShaders;
 
 	uint32 raygenOffset;
 	uint32 missOffset;
 	uint32 hitOffset;
 
 	uint32 sizeWithoutHitEntries;
+
+	raytracing_shader_binding_table_entry raygen;
+	std::vector<raytracing_shader_binding_table_entry> miss;
+	std::vector<raytracing_shader_binding_table_entry> hitGroups;
+
+	uint32 getTotalRequiredBufferSize(uint32 totalNumGeometries)
+	{
+		uint32 numHitGroups = (uint32)hitGroups.size();
+		uint32 numHitShaderEntries = numHitGroups * totalNumGeometries;
+
+		uint32 size = sizeWithoutHitEntries + numHitShaderEntries * entrySize;
+		return size;
+	}
 };
 
 struct dx_raytracing_pipeline
@@ -71,30 +88,7 @@ struct dx_raytracing_pipeline
 	dx_raytracing_pipeline_state pipeline;
 	dx_root_signature rootSignature;
 
-	void* raygenIdentifier;
-	std::vector<void*> hitGroupIdentifiers;
-	std::vector<void*> missIdentifiers;
-
 	raytracing_shader_binding_table_desc shaderBindingTableDesc;
-};
-
-enum raytracing_association
-{
-	associate_with_nothing = 0,
-	associate_with_closest_hit = (1 << 0),
-	associate_with_any_hit = (1 << 1),
-	associate_with_all = (associate_with_closest_hit | associate_with_any_hit),
-};
-
-union raytracing_hit_group_desc
-{
-	struct
-	{
-		const wchar* closestHit;
-		const wchar* anyHit;
-		const wchar* miss;
-	};
-	const wchar* entryPoints[3];
 };
 
 struct raytracing_pipeline_builder
@@ -103,7 +97,8 @@ struct raytracing_pipeline_builder
 
 	raytracing_pipeline_builder& globalRootSignature(D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc);
 	raytracing_pipeline_builder& raygen(const wchar* entryPoint, D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc);
-	raytracing_pipeline_builder& hitgroup(const wchar* groupName, raytracing_hit_group_desc desc, D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {}, uint32 associateWith = associate_with_nothing);
+	raytracing_pipeline_builder& hitgroup(const wchar* groupName, const wchar* closestHit, const wchar* anyHit, const wchar* miss, 
+		D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {}); // The root signature describes parameters for both hit shaders. Miss will not get any arguments for now.
 
 	dx_raytracing_pipeline finish();
 
@@ -117,6 +112,7 @@ private:
 
 	raytracing_root_signature createRaytracingRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc);
 
+
 	raytracing_root_signature globalRS;
 	raytracing_root_signature raygenRS;
 
@@ -126,6 +122,9 @@ private:
 
 	const wchar* raygenEntryPoint;
 	std::vector<const wchar*> missEntryPoints;
+
+	D3D12_ROOT_SIGNATURE_DESC raygenRSDesc;
+	std::vector<D3D12_ROOT_SIGNATURE_DESC> hitGroupRSDescs;
 
 	uint32 payloadSize;
 	uint32 maxRecursionDepth;

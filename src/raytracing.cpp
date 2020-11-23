@@ -343,6 +343,27 @@ static uint32 getShaderBindingTableSize(const D3D12_ROOT_SIGNATURE_DESC& rootSig
 	return size;
 }
 
+static void fillTableEntryOffsets(raytracing_shader_binding_table_entry& entry, const D3D12_ROOT_SIGNATURE_DESC& rootSignatureDesc)
+{
+	entry.byteOffsetPerRootparameter.clear();
+
+	uint32 currentOffset = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+
+	for (uint32 i = 0; i < rootSignatureDesc.NumParameters; ++i)
+	{
+		entry.byteOffsetPerRootparameter.push_back(currentOffset);
+
+		if (rootSignatureDesc.pParameters[i].ParameterType == D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS)
+		{
+			currentOffset += alignTo(rootSignatureDesc.pParameters[i].Constants.Num32BitValues * 4, 8);
+		}
+		else
+		{
+			currentOffset += 8;
+		}
+	}
+}
+
 raytracing_pipeline_builder& raytracing_pipeline_builder::raygen(const wchar* entryPoint, D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc)
 {
 	assert(!raygenRS.rootSignature.rootSignature);
@@ -384,18 +405,19 @@ raytracing_pipeline_builder& raytracing_pipeline_builder::raygen(const wchar* en
 	uint32 size = getShaderBindingTableSize(rootSignatureDesc);
 	tableEntrySize = max(size, tableEntrySize);
 
+	raygenRSDesc = rootSignatureDesc;
+
 	return *this;
 }
 
-raytracing_pipeline_builder& raytracing_pipeline_builder::hitgroup(const wchar* groupName, raytracing_hit_group_desc desc, D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc, uint32 associateWith)
+raytracing_pipeline_builder& raytracing_pipeline_builder::hitgroup(const wchar* groupName, const wchar* closestHit, const wchar* anyHit, const wchar* miss,
+	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc)
 {
-	missEntryPoints.push_back(desc.miss);
-
 	D3D12_HIT_GROUP_DESC& hitGroup = hitGroups[numHitGroups++];
 	
 	hitGroup.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
-	hitGroup.AnyHitShaderImport = desc.anyHit;
-	hitGroup.ClosestHitShaderImport = desc.closestHit;
+	hitGroup.AnyHitShaderImport = anyHit;
+	hitGroup.ClosestHitShaderImport = closestHit;
 	hitGroup.HitGroupExport = groupName;
 	hitGroup.IntersectionShaderImport = 0;
 
@@ -405,21 +427,20 @@ raytracing_pipeline_builder& raytracing_pipeline_builder::hitgroup(const wchar* 
 		so.pDesc = &hitGroup;
 	}
 
+	const wchar* entries[] = { closestHit, anyHit, miss };
+
 	for (uint32 i = 0; i < 3; ++i)
 	{
-		const wchar* entryPoint = desc.entryPoints[i];
+		const wchar* entryPoint = entries[i];
 		D3D12_EXPORT_DESC& exp = exports[numExports++];
 		exp.Name = entryPoint;
 		exp.Flags = D3D12_EXPORT_FLAG_NONE;
 		exp.ExportToRename = 0;
 
-		allExports.push_back(desc.entryPoints[i]);
+		allExports.push_back(entries[i]);
 	}
 
-
-	uint32 unassociatedEntryPoints = associate_with_all;
-
-	if (associateWith != associate_with_nothing)
+	if (rootSignatureDesc.NumParameters > 0)
 	{
 		rootSignatureDesc.Flags |= D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 		raytracing_root_signature rs = createRaytracingRootSignature(rootSignatureDesc);
@@ -440,13 +461,8 @@ raytracing_pipeline_builder& raytracing_pipeline_builder::hitgroup(const wchar* 
 			const wchar** entryPoints = &stringBuffer[numStrings];
 			uint32 numEntryPoints = 0;
 
-			DWORD index;
-			while (_BitScanForward(&index, associateWith))
-			{
-				entryPoints[numEntryPoints++] = desc.entryPoints[index];
-				unsetBit(associateWith, index);
-				unsetBit(unassociatedEntryPoints, index);
-			}
+			entryPoints[numEntryPoints++] = closestHit;
+			entryPoints[numEntryPoints++] = anyHit;
 
 			numStrings += numEntryPoints;
 
@@ -462,16 +478,9 @@ raytracing_pipeline_builder& raytracing_pipeline_builder::hitgroup(const wchar* 
 		tableEntrySize = max(size, tableEntrySize);
 	}
 
-	{
-		emptyAssociations.push_back(desc.miss);
-
-		DWORD index;
-		while (_BitScanForward(&index, unassociatedEntryPoints))
-		{
-			emptyAssociations.push_back(desc.entryPoints[index]);
-			unsetBit(unassociatedEntryPoints, index);
-		}
-	}
+	emptyAssociations.push_back(miss);
+	missEntryPoints.push_back(miss);
+	hitGroupRSDescs.push_back(rootSignatureDesc);
 
 	return *this;
 }
@@ -570,14 +579,6 @@ dx_raytracing_pipeline raytracing_pipeline_builder::finish()
 	com<ID3D12StateObjectProperties> rtsoProps;
 	result.pipeline->QueryInterface(IID_PPV_ARGS(&rtsoProps));
 
-	result.raygenIdentifier = rtsoProps->GetShaderIdentifier(raygenEntryPoint);
-
-	for (uint32 i = 0; i < numHitGroups; ++i)
-	{
-		result.missIdentifiers.push_back(rtsoProps->GetShaderIdentifier(missEntryPoints[i]));
-		result.hitGroupIdentifiers.push_back(rtsoProps->GetShaderIdentifier(hitGroups[i].HitGroupExport));
-	}
-
 
 	{
 		auto& shaderBindingTableDesc = result.shaderBindingTableDesc;
@@ -592,10 +593,105 @@ dx_raytracing_pipeline raytracing_pipeline_builder::finish()
 		shaderBindingTableDesc.hitOffset = shaderBindingTableDesc.missOffset + (uint32)alignTo(numMissShaderEntries * shaderBindingTableDesc.entrySize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
 
 		shaderBindingTableDesc.sizeWithoutHitEntries = shaderBindingTableDesc.hitOffset;
+
+
+
+		shaderBindingTableDesc.raygen.identifier = rtsoProps->GetShaderIdentifier(raygenEntryPoint);
+		fillTableEntryOffsets(shaderBindingTableDesc.raygen, raygenRSDesc);
+
+		for (uint32 i = 0; i < numHitGroups; ++i)
+		{
+			raytracing_shader_binding_table_entry missEntry;
+			missEntry.identifier = rtsoProps->GetShaderIdentifier(missEntryPoints[i]);
+
+			raytracing_shader_binding_table_entry hitGroupEntry;
+			hitGroupEntry.identifier = rtsoProps->GetShaderIdentifier(hitGroups[i].HitGroupExport);
+			fillTableEntryOffsets(hitGroupEntry, hitGroupRSDescs[i]);
+
+
+			shaderBindingTableDesc.miss.push_back(missEntry);
+			shaderBindingTableDesc.hitGroups.push_back(hitGroupEntry);
+		}
 	}
 
 	return result;
 }
 
+static void fillShaderBindingTable(uint8* base, const raytracing_shader_binding_table_desc& tableDesc)
+{
+	uint32 entrySize = tableDesc.entrySize;
 
+	{
+		uint8* raygenBase = base + tableDesc.raygenOffset; // Should be zero, but..
+		const auto& raygen = tableDesc.raygen;
+
+		memcpy(raygenBase, raygen.identifier, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+
+		uint32 numRootParameters = (uint32)raygen.byteOffsetPerRootparameter.size();
+		for (uint32 rootParameterIndex = 0; rootParameterIndex < numRootParameters; ++rootParameterIndex)
+		{
+			uint32 offset = raygen.byteOffsetPerRootparameter[rootParameterIndex];
+			uint8* target = raygenBase + offset;
+			// Copy to target.
+		}
+	}
+
+	{
+		uint32 numMissShaders = (uint32)tableDesc.miss.size();
+
+		uint8* missBase = base + tableDesc.missOffset;
+
+		for (uint32 i = 0; i < numMissShaders; ++i)
+		{
+			const auto& miss = tableDesc.miss[i];
+
+			memcpy(missBase, miss.identifier, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+
+			uint32 numRootParameters = (uint32)miss.byteOffsetPerRootparameter.size();
+			assert(numRootParameters == 0); // Miss shaders don't have root parameters for now. I think a sky box (or whatever) can be bound globally more easily.
+
+			missBase += entrySize;
+		}
+	}
+
+	{
+		uint32 numHitShaders = (uint32)tableDesc.miss.size();
+
+		void* hitIdentifiers[16];
+		for (uint32 i = 0; i < numHitShaders; ++i)
+		{
+			hitIdentifiers[i] = tableDesc.hitGroups[i].identifier;
+		}
+
+
+
+		uint32 numSceneObjects = 1; // TODO
+
+		uint8* hitBase = base + tableDesc.hitOffset;
+		uint8* hit = hitBase;
+
+		for (uint32 sceneObjectIndex = 0; sceneObjectIndex < numSceneObjects; ++sceneObjectIndex)
+		{
+			uint32 numInstances = 1; // TODO
+			uint32 numGeometries = 1; // TODO
+
+			for (uint32 instance = 0; instance < numInstances; ++instance)
+			{
+				for (uint32 geometry = 0; geometry < numGeometries; ++geometry)
+				{
+					for (uint32 hitGroup = 0; hitGroup < numHitShaders; ++hitGroup)
+					{
+						memcpy(hit, hitIdentifiers[hitGroup], D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+
+						// TODO: Set root parameters
+
+						hit += entrySize;
+					}
+				}
+			}
+		}
+
+	}
+
+}
 
