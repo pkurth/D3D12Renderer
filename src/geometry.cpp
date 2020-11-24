@@ -3,6 +3,7 @@
 #include "memory.h"
 
 #include <assimp/scene.h>
+#include <unordered_map>
 
 struct vertex_info
 {
@@ -286,6 +287,130 @@ submesh_info cpu_mesh::pushSphere(uint16 slices, uint16 rows, float radius)
 	result.baseVertex = baseVertex;
 	result.numVertices = numVertices - baseVertex;
 	return result;
+}
+
+submesh_info cpu_mesh::pushIcoSphere(float radius, uint32 refinement)
+{
+	alignNextTriangle();
+
+	uint32 baseVertex = numVertices;
+	uint32 firstTriangle = numTriangles;
+
+	struct vert
+	{
+		vec3 p;
+		vec3 n;
+		vec3 t;
+	};
+
+	std::vector<vert> vertices;
+	std::vector<indexed_triangle16> triangles;
+
+	float t = (1.f + sqrt(5.f)) / 2.f;
+
+#define push_ico_vertex(p) { vec3 nor = normalize(p); vec3 px = nor * radius; vec3 tan = normalize(cross(vec3(0.f, 1.f, 0.f), nor)); vertices.push_back({px, nor, tan}); }
+
+	push_ico_vertex(vec3(-1.f, t, 0));
+	push_ico_vertex(vec3(1.f, t, 0));
+	push_ico_vertex(vec3(-1.f, -t, 0));
+	push_ico_vertex(vec3(1.f, -t, 0));
+
+	push_ico_vertex(vec3(0, -1.f, t));
+	push_ico_vertex(vec3(0, 1.f, t));
+	push_ico_vertex(vec3(0, -1.f, -t));
+	push_ico_vertex(vec3(0, 1.f, -t));
+
+	push_ico_vertex(vec3(t, 0, -1.f));
+	push_ico_vertex(vec3(t, 0, 1.f));
+	push_ico_vertex(vec3(-t, 0, -1.f));
+	push_ico_vertex(vec3(-t, 0, 1.f));
+
+	triangles.push_back({ 0, 11, 5 });
+	triangles.push_back({ 0, 5, 1 });
+	triangles.push_back({ 0, 1, 7 });
+	triangles.push_back({ 0, 7, 10 });
+	triangles.push_back({ 0, 10, 11 });
+	triangles.push_back({ 1, 5, 9 });
+	triangles.push_back({ 5, 11, 4 });
+	triangles.push_back({ 11, 10, 2 });
+	triangles.push_back({ 10, 7, 6 });
+	triangles.push_back({ 7, 1, 8 });
+	triangles.push_back({ 3, 9, 4 });
+	triangles.push_back({ 3, 4, 2 });
+	triangles.push_back({ 3, 2, 6 });
+	triangles.push_back({ 3, 6, 8 });
+	triangles.push_back({ 3, 8, 9 });
+	triangles.push_back({ 4, 9, 5 });
+	triangles.push_back({ 2, 4, 11 });
+	triangles.push_back({ 6, 2, 10 });
+	triangles.push_back({ 8, 6, 7 });
+	triangles.push_back({ 9, 8, 1 });
+
+	std::unordered_map<uint32, uint16> midpoints;
+
+	auto getMiddlePoint = [&midpoints, &vertices, radius](uint32 a, uint32 b)
+	{
+		uint32 edge = (min(a, b) << 16) | (max(a, b));
+		auto it = midpoints.find(edge);
+		if (it == midpoints.end())
+		{
+			vec3 point1 = vertices[a].p;
+			vec3 point2 = vertices[b].p;
+
+			vec3 center = 0.5f * (point1 + point2);
+			push_ico_vertex(center);
+
+			uint16 index = (uint16)vertices.size() - 1;
+
+			midpoints.insert({ edge, index });
+			return index;
+		}
+
+		return it->second;
+	};
+
+	for (uint32 r = 0; r < refinement; ++r)
+	{
+		std::vector<indexed_triangle16> refinedTriangles;
+
+		for (uint32 tri = 0; tri < (uint32)triangles.size(); ++tri)
+		{
+			indexed_triangle16& t = triangles[tri];
+
+			uint16 a = getMiddlePoint(t.a, t.b);
+			uint16 b = getMiddlePoint(t.b, t.c);
+			uint16 c = getMiddlePoint(t.c, t.a);
+
+			refinedTriangles.push_back({ t.a, a, c });
+			refinedTriangles.push_back({ t.b, b, a });
+			refinedTriangles.push_back({ t.c, c, b });
+			refinedTriangles.push_back({ a, b, c });
+		}
+
+		triangles = refinedTriangles;
+	}
+
+	reserve((uint32)vertices.size(), (uint32)triangles.size());
+
+	uint8* vertexPtr = this->vertices + vertexSize * numVertices;
+	for (const vert& v : vertices)
+	{
+		pushVertex(v.p, {}, v.n, v.t, {});
+	}
+
+	for (indexed_triangle16 t : triangles)
+	{
+		pushTriangle(t.a, t.b, t.c);
+	}
+
+	submesh_info result;
+	result.firstTriangle = firstTriangle;
+	result.numTriangles = (uint32)triangles.size();
+	result.baseVertex = baseVertex;
+	result.numVertices = (uint32)vertices.size();
+	return result;
+
+#undef push_ico_vertex
 }
 
 submesh_info cpu_mesh::pushCapsule(uint16 slices, uint16 rows, float height, float radius)

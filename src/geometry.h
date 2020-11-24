@@ -38,6 +38,7 @@ struct cpu_mesh
 	submesh_info pushCube(vec3 radius, bool flipWindingOrder = false);
 	submesh_info pushCube(float radius, bool flipWindingOrder = false) { return pushCube(vec3(radius, radius, radius), flipWindingOrder); }
 	submesh_info pushSphere(uint16 slices, uint16 rows, float radius);
+	submesh_info pushIcoSphere(float radius, uint32 refinement);
 	submesh_info pushCapsule(uint16 slices, uint16 rows, float height, float radius);
 	submesh_info pushCylinder(uint16 slices, float radius, float height);
 	submesh_info pushArrow(uint16 slices, float shaftRadius, float headRadius, float shaftLength, float headLength);
