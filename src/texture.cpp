@@ -226,7 +226,19 @@ static ref<dx_texture> loadTextureInternal(const char* filename, uint32 flags)
 
 ref<dx_texture> loadTextureFromFile(const char* filename, uint32 flags)
 {
-	ref<dx_texture> result = loadTextureInternal(filename, flags);
-	// TODO: Cache.
-	return result;
+	static std::unordered_map<std::string, weakref<dx_texture>> textureCache; // TODO: Pack flags into key.
+	static thread_mutex mutex = createMutex();
+
+	mutex.lock();
+
+	std::string s = filename;
+	
+	auto sp = textureCache[s].lock();
+	if (!sp)
+	{
+		textureCache[s] = sp = loadTextureInternal(filename, flags);
+	}
+
+	mutex.unlock();
+	return sp;
 }

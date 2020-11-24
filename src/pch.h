@@ -8,6 +8,10 @@
 
 #include <cassert>
 #include <limits>
+#include <array>
+#include <string>
+#include <vector>
+#include <iostream>
 #include <memory>
 
 typedef char int8;
@@ -20,8 +24,8 @@ typedef long long int64;
 typedef unsigned long long uint64;
 typedef wchar_t wchar;
 
-template <typename T>
-using ref = std::shared_ptr<T>;
+template <typename T> using ref = std::shared_ptr<T>;
+template <typename T> using weakref = std::weak_ptr<T>;
 
 template <typename T, class... Args>
 inline ref<T> make_ref(Args&&... args) 
@@ -42,7 +46,4 @@ inline ref<T> make_ref(Args&&... args)
 #define setBit(mask, bit) mask |= (1 << (bit))
 #define unsetBit(mask, bit) mask ^= (1 << (bit))
 
-#include <string>
-#include <vector>
-#include <iostream>
 

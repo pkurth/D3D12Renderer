@@ -24,4 +24,12 @@ enum texture_load_flags
 	texture_load_flags_default = texture_load_flags_compress | texture_load_flags_gen_mips_on_cpu | texture_load_flags_cache_to_dds,
 };
 
+
+
+
+// This system caches textures. It does not keep the resource alive (we store weak ptrs).
+// So if no one else has a reference, the texture gets deleted.
+// This means you should keep a reference to your textures yourself and not call this every frame.
+// TODO: Maybe we want to keep the texture around for a couple more frames?
+
 ref<dx_texture> loadTextureFromFile(const char* filename, uint32 flags = texture_load_flags_default);

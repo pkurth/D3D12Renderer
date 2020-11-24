@@ -337,7 +337,7 @@ pbr_environment dx_renderer::createEnvironment(const char* filename, uint32 skyR
 		dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
 		cl = dxContext.getFreeRenderCommandList();
 	}
-	generateMipMapsOnGPU(cl, equiSky);
+	//generateMipMapsOnGPU(cl, equiSky);
 	environment.sky = equirectangularToCubemap(cl, equiSky, skyResolution, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
 	environment.environment = prefilterEnvironment(cl, environment.sky, environmentResolution);
 	environment.irradiance = cubemapToIrradiance(cl, environment.sky, irradianceResolution);
