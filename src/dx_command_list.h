@@ -26,16 +26,16 @@ struct dx_command_list
 	// Barriers.
 	void barriers(CD3DX12_RESOURCE_BARRIER* barriers, uint32 numBarriers);
 
-	void transitionBarrier(dx_texture& texture, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-	void transitionBarrier(dx_buffer& buffer, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+	void transitionBarrier(const ref<dx_texture>& texture, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+	void transitionBarrier(const ref<dx_buffer>& buffer, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 	void transitionBarrier(dx_resource resource, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 
-	void uavBarrier(dx_texture& texture);
-	void uavBarrier(dx_buffer& buffer);
+	void uavBarrier(const ref<dx_texture>& texture);
+	void uavBarrier(const ref<dx_buffer>& buffer);
 	void uavBarrier(dx_resource resource);
 
-	void aliasingBarrier(dx_texture& before, dx_texture& after);
-	void aliasingBarrier(dx_buffer& before, dx_buffer& after);
+	void aliasingBarrier(const ref<dx_texture>& before, const ref<dx_texture>& after);
+	void aliasingBarrier(const ref<dx_buffer>& before, const ref<dx_buffer>& after);
 	void aliasingBarrier(dx_resource before, dx_resource after);
 
 
@@ -74,23 +74,23 @@ struct dx_command_list
 
 	dx_dynamic_vertex_buffer createDynamicVertexBuffer(uint32 elementSize, uint32 elementCount, void* data);
 
-	void setRootGraphicsUAV(uint32 rootParameterIndex, dx_buffer& buffer);
+	void setRootGraphicsUAV(uint32 rootParameterIndex, const ref<dx_buffer>& buffer);
 	void setRootGraphicsUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
-	void setRootComputeUAV(uint32 rootParameterIndex, dx_buffer& buffer);
+	void setRootComputeUAV(uint32 rootParameterIndex, const ref<dx_buffer>& buffer);
 	void setRootComputeUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
 	
-	void setRootGraphicsSRV(uint32 rootParameterIndex, dx_buffer& buffer);
+	void setRootGraphicsSRV(uint32 rootParameterIndex, const ref<dx_buffer>& buffer);
 	void setRootGraphicsSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
-	void setRootComputeSRV(uint32 rootParameterIndex, dx_buffer& buffer);
+	void setRootComputeSRV(uint32 rootParameterIndex, const ref<dx_buffer>& buffer);
 	void setRootComputeSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
 
 	void setDescriptorHeapResource(uint32 rootParameterIndex, uint32 offset, uint32 count, dx_cpu_descriptor_handle handle);
 	void setDescriptorHeapSRV(uint32 rootParameterIndex, uint32 offset, dx_cpu_descriptor_handle handle) { setDescriptorHeapResource(rootParameterIndex, offset, 1, handle); }
-	void setDescriptorHeapSRV(uint32 rootParameterIndex, uint32 offset, const dx_texture& texture) { setDescriptorHeapResource(rootParameterIndex, offset, 1, texture.defaultSRV); }
-	void setDescriptorHeapSRV(uint32 rootParameterIndex, uint32 offset, const dx_buffer& buffer) { setDescriptorHeapResource(rootParameterIndex, offset, 1, buffer.defaultSRV); }
+	void setDescriptorHeapSRV(uint32 rootParameterIndex, uint32 offset, const ref<dx_texture>& texture) { setDescriptorHeapResource(rootParameterIndex, offset, 1, texture->defaultSRV); }
+	void setDescriptorHeapSRV(uint32 rootParameterIndex, uint32 offset, const ref<dx_buffer>& buffer) { setDescriptorHeapResource(rootParameterIndex, offset, 1, buffer->defaultSRV); }
 	void setDescriptorHeapUAV(uint32 rootParameterIndex, uint32 offset, dx_cpu_descriptor_handle handle) { setDescriptorHeapResource(rootParameterIndex, offset, 1, handle); }
-	void setDescriptorHeapUAV(uint32 rootParameterIndex, uint32 offset, const dx_texture& texture) { setDescriptorHeapResource(rootParameterIndex, offset, 1, texture.defaultUAV); }
-	void setDescriptorHeapUAV(uint32 rootParameterIndex, uint32 offset, const dx_buffer& buffer) { setDescriptorHeapResource(rootParameterIndex, offset, 1, buffer.defaultUAV); }
+	void setDescriptorHeapUAV(uint32 rootParameterIndex, uint32 offset, const ref<dx_texture>& texture) { setDescriptorHeapResource(rootParameterIndex, offset, 1, texture->defaultUAV); }
+	void setDescriptorHeapUAV(uint32 rootParameterIndex, uint32 offset, const ref<dx_buffer>& buffer) { setDescriptorHeapResource(rootParameterIndex, offset, 1, buffer->defaultUAV); }
 
 
 	// Shader resources.
@@ -101,17 +101,17 @@ struct dx_command_list
 	void setGraphicsDescriptorTable(uint32 rootParameterIndex, CD3DX12_GPU_DESCRIPTOR_HANDLE handle);
 	void setComputeDescriptorTable(uint32 rootParameterIndex, CD3DX12_GPU_DESCRIPTOR_HANDLE handle);
 
-	void clearUAV(dx_buffer& buffer, float val = 0.f);
+	void clearUAV(const ref<dx_buffer>& buffer, float val = 0.f);
 	void clearUAV(dx_resource resource, CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle, float val = 0.f);
 	void clearUAV(dx_resource resource, CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle, uint32 val = 0);
 
 
 	// Input assembly.
 	void setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY topology);
-	void setVertexBuffer(uint32 slot, const dx_vertex_buffer& buffer);
+	void setVertexBuffer(uint32 slot, const ref<dx_vertex_buffer>& buffer);
 	void setVertexBuffer(uint32 slot, dx_dynamic_vertex_buffer buffer);
 	void setVertexBuffer(uint32 slot, D3D12_VERTEX_BUFFER_VIEW& buffer);
-	void setIndexBuffer(const dx_index_buffer& buffer);
+	void setIndexBuffer(const ref<dx_index_buffer>& buffer);
 	void setIndexBuffer(D3D12_INDEX_BUFFER_VIEW& buffer);
 
 
@@ -135,15 +135,15 @@ struct dx_command_list
 	// Draw.
 	void draw(uint32 vertexCount, uint32 instanceCount, uint32 startVertex, uint32 startInstance);
 	void drawIndexed(uint32 indexCount, uint32 instanceCount, uint32 startIndex, int32 baseVertex, uint32 startInstance);
-	void drawIndirect(dx_command_signature commandSignature, uint32 numDraws, dx_buffer commandBuffer);
-	void drawIndirect(dx_command_signature commandSignature, uint32 maxNumDraws, dx_buffer numDrawsBuffer, dx_buffer commandBuffer);
+	void drawIndirect(dx_command_signature commandSignature, uint32 numDraws, const ref<dx_buffer>& commandBuffer);
+	void drawIndirect(dx_command_signature commandSignature, uint32 maxNumDraws, const ref<dx_buffer>& numDrawsBuffer, const ref<dx_buffer>& commandBuffer);
 	void drawFullscreenTriangle();
 
 
 	// Dispatch.
 	void dispatch(uint32 numGroupsX, uint32 numGroupsY = 1, uint32 numGroupsZ = 1);
-	void dispatchIndirect(dx_command_signature commandSignature, uint32 numDispatches, dx_buffer commandBuffer);
-	void dispatchIndirect(dx_command_signature commandSignature, uint32 maxNumDispatches, dx_buffer numDispatchesBuffer, dx_buffer commandBuffer);
+	void dispatchIndirect(dx_command_signature commandSignature, uint32 numDispatches, const ref<dx_buffer>& commandBuffer);
+	void dispatchIndirect(dx_command_signature commandSignature, uint32 maxNumDispatches, const ref<dx_buffer>& numDispatchesBuffer, const ref<dx_buffer>& commandBuffer);
 
 
 	// Raytracing.

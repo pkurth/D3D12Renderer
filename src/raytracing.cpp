@@ -12,7 +12,7 @@ raytracing_blas_builder::raytracing_blas_builder(acceleration_structure_rebuild_
 	this->rebuildMode = rebuildMode;
 }
 
-raytracing_blas_builder& raytracing_blas_builder::push(const dx_vertex_buffer& vertexBuffer, const dx_index_buffer& indexBuffer, submesh_info submesh, bool opaque, const trs& localTransform)
+raytracing_blas_builder& raytracing_blas_builder::push(ref<dx_vertex_buffer> vertexBuffer, ref<dx_index_buffer> indexBuffer, submesh_info submesh, bool opaque, const trs& localTransform)
 {
 	D3D12_RAYTRACING_GEOMETRY_DESC geomDesc;
 
@@ -29,13 +29,13 @@ raytracing_blas_builder& raytracing_blas_builder::push(const dx_vertex_buffer& v
 		localTransforms.push_back(transpose(trsToMat4(localTransform)));
 	}
 
-	geomDesc.Triangles.VertexBuffer.StartAddress = vertexBuffer.gpuVirtualAddress + (vertexBuffer.elementSize * submesh.baseVertex);
-	geomDesc.Triangles.VertexBuffer.StrideInBytes = vertexBuffer.elementSize;
+	geomDesc.Triangles.VertexBuffer.StartAddress = vertexBuffer->gpuVirtualAddress + (vertexBuffer->elementSize * submesh.baseVertex);
+	geomDesc.Triangles.VertexBuffer.StrideInBytes = vertexBuffer->elementSize;
 	geomDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 	geomDesc.Triangles.VertexCount = submesh.numVertices;
 
-	geomDesc.Triangles.IndexBuffer = indexBuffer.gpuVirtualAddress + (indexBuffer.elementSize * submesh.firstTriangle * 3);
-	geomDesc.Triangles.IndexFormat = getIndexBufferFormat(indexBuffer.elementSize);
+	geomDesc.Triangles.IndexBuffer = indexBuffer->gpuVirtualAddress + (indexBuffer->elementSize * submesh.firstTriangle * 3);
+	geomDesc.Triangles.IndexFormat = getIndexBufferFormat(indexBuffer->elementSize);
 	geomDesc.Triangles.IndexCount = submesh.numTriangles * 3;
 
 	geometryDescs.push_back(geomDesc);
@@ -72,8 +72,8 @@ raytracing_blas raytracing_blas_builder::finish()
 	blas.scratch = createBuffer((uint32)info.ScratchDataSizeInBytes, 1, 0, true, false, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	blas.result = createBuffer((uint32)info.ResultDataMaxSizeInBytes, 1, 0, true, false, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
 
-	SET_NAME(blas.scratch.resource, "BLAS Scratch");
-	SET_NAME(blas.result.resource, "BLAS Result");
+	SET_NAME(blas.scratch->resource, "BLAS Scratch");
+	SET_NAME(blas.result->resource, "BLAS Result");
 
 
 
@@ -101,8 +101,8 @@ raytracing_blas raytracing_blas_builder::finish()
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
 	asDesc.Inputs = inputs;
-	asDesc.DestAccelerationStructureData = blas.result.gpuVirtualAddress;
-	asDesc.ScratchAccelerationStructureData = blas.scratch.gpuVirtualAddress;
+	asDesc.DestAccelerationStructureData = blas.result->gpuVirtualAddress;
+	asDesc.ScratchAccelerationStructureData = blas.scratch->gpuVirtualAddress;
 
 	/*if (rebuild)
 	{
@@ -133,14 +133,14 @@ raytracing_tlas_builder& raytracing_tlas_builder::push(const raytracing_blas& bl
 {
 	D3D12_RAYTRACING_INSTANCE_DESC instance = {};
 
-	std::vector<D3D12_RAYTRACING_INSTANCE_DESC>& instancesOfThisBlas = instances[blas.result.gpuVirtualAddress];
+	std::vector<D3D12_RAYTRACING_INSTANCE_DESC>& instancesOfThisBlas = instances[blas.result->gpuVirtualAddress];
 
 	instance.Flags = 0;// D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE;
 	instance.InstanceContributionToHitGroupIndex = blas.numGeometries; // Is used later. This is not the final contribution.
 	
 	mat4 m = transpose(trsToMat4(transform));
 	memcpy(instance.Transform, &m, sizeof(instance.Transform));
-	instance.AccelerationStructure = blas.result.gpuVirtualAddress;
+	instance.AccelerationStructure = blas.result->gpuVirtualAddress;
 	instance.InstanceMask = 0xFF;
 
 	instancesOfThisBlas.push_back(instance);
@@ -198,8 +198,8 @@ raytracing_tlas raytracing_tlas_builder::finish(uint32 numRayTypes)
 	tlas.scratch = createBuffer((uint32)info.ScratchDataSizeInBytes, 1, 0, true, false, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	tlas.result = createBuffer((uint32)info.ResultDataMaxSizeInBytes, 1, 0, true, false, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
 
-	SET_NAME(tlas.scratch.resource, "TLAS Scratch");
-	SET_NAME(tlas.result.resource, "TLAS Result");
+	SET_NAME(tlas.scratch->resource, "TLAS Scratch");
+	SET_NAME(tlas.result->resource, "TLAS Result");
 
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
@@ -211,8 +211,8 @@ raytracing_tlas raytracing_tlas_builder::finish(uint32 numRayTypes)
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
 	asDesc.Inputs = inputs;
-	asDesc.DestAccelerationStructureData = tlas.result.gpuVirtualAddress;
-	asDesc.ScratchAccelerationStructureData = tlas.scratch.gpuVirtualAddress;
+	asDesc.DestAccelerationStructureData = tlas.result->gpuVirtualAddress;
+	asDesc.ScratchAccelerationStructureData = tlas.scratch->gpuVirtualAddress;
 
 	/*if (rebuild)
 	{

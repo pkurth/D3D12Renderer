@@ -24,33 +24,37 @@ struct dx_dynamic_vertex_buffer
 
 struct dx_texture
 {
-	dx_resource resource;
+	~dx_texture();
 
-	D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport;
+	dx_resource resource = {};
 
-	dx_cpu_descriptor_handle rtvHandles;
-	dx_cpu_descriptor_handle dsvHandle;
+	D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport = {};
 
-	dx_cpu_descriptor_handle defaultSRV;
-	dx_cpu_descriptor_handle defaultUAV;
+	dx_cpu_descriptor_handle rtvHandles = {};
+	dx_cpu_descriptor_handle dsvHandle = {};
+
+	dx_cpu_descriptor_handle defaultSRV = {};
+	dx_cpu_descriptor_handle defaultUAV = {};
 };
 
 struct dx_buffer
 {
-	dx_resource resource;
+	~dx_buffer();
 
-	uint32 elementSize;
-	uint32 elementCount;
-	uint32 totalSize;
+	dx_resource resource = {};
+
+	uint32 elementSize = 0;
+	uint32 elementCount = 0;
+	uint32 totalSize = 0;
 	D3D12_HEAP_TYPE heapType;
 
-	D3D12_GPU_VIRTUAL_ADDRESS gpuVirtualAddress;
+	D3D12_GPU_VIRTUAL_ADDRESS gpuVirtualAddress = 0;
 
-	dx_cpu_descriptor_handle defaultSRV;
-	dx_cpu_descriptor_handle defaultUAV;
+	dx_cpu_descriptor_handle defaultSRV = {};
+	dx_cpu_descriptor_handle defaultUAV = {};
 
-	dx_cpu_descriptor_handle cpuClearUAV;
-	dx_gpu_descriptor_handle gpuClearUAV;
+	dx_cpu_descriptor_handle cpuClearUAV = {};
+	dx_gpu_descriptor_handle gpuClearUAV = {};
 };
 
 struct dx_vertex_buffer : dx_buffer
@@ -65,8 +69,8 @@ struct dx_index_buffer : dx_buffer
 
 struct dx_mesh
 {
-	dx_vertex_buffer vertexBuffer;
-	dx_index_buffer indexBuffer;
+	ref<dx_vertex_buffer> vertexBuffer;
+	ref<dx_index_buffer> indexBuffer;
 };
 
 struct submesh_info
@@ -91,32 +95,30 @@ struct dx_render_target
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle;
 
 
-	uint32 pushColorAttachment(dx_texture& texture);
-	void pushDepthStencilAttachment(dx_texture& texture, uint32 arraySlice = 0);
+	uint32 pushColorAttachment(const ref<dx_texture>& texture);
+	void pushDepthStencilAttachment(const ref<dx_texture>& texture, uint32 arraySlice = 0);
 	void notifyOnTextureResize(uint32 width, uint32 height); // This does NOT resize the textures, only updates the width, height and viewport variables.
 };
 
 DXGI_FORMAT getIndexBufferFormat(uint32 elementSize);
 
-void* mapBuffer(dx_buffer& buffer);
-void unmapBuffer(dx_buffer& buffer);
-void uploadBufferData(dx_buffer& buffer, const void* bufferData);
-void updateBufferDataRange(dx_buffer& buffer, const void* data, uint32 offset, uint32 size);
+void* mapBuffer(const ref<dx_buffer>& buffer);
+void unmapBuffer(const ref<dx_buffer>& buffer);
+void uploadBufferData(ref<dx_buffer> buffer, const void* bufferData);
+void updateBufferDataRange(ref<dx_buffer> buffer, const void* data, uint32 offset, uint32 size);
 
-dx_buffer createBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, bool allowClearing = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
-dx_buffer createUploadBuffer(uint32 elementSize, uint32 elementCount, void* data);
-dx_vertex_buffer createVertexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, bool allowClearing = false);
-dx_vertex_buffer createUploadVertexBuffer(uint32 elementSize, uint32 elementCount, void* data);
-dx_index_buffer createIndexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, bool allowClearing = false);
-void resizeBuffer(dx_buffer& buffer, uint32 newElementCount, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
-void freeBuffer(dx_buffer& buffer);
+ref<dx_buffer> createBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, bool allowClearing = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
+ref<dx_buffer> createUploadBuffer(uint32 elementSize, uint32 elementCount, void* data);
+ref<dx_vertex_buffer> createVertexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, bool allowClearing = false);
+ref<dx_vertex_buffer> createUploadVertexBuffer(uint32 elementSize, uint32 elementCount, void* data);
+ref<dx_index_buffer> createIndexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, bool allowClearing = false);
+void resizeBuffer(ref<dx_buffer> buffer, uint32 newElementCount, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
 
-void uploadTextureSubresourceData(dx_texture& texture, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 firstSubresource, uint32 numSubresources);
-dx_texture createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
-dx_texture createTexture(const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allowRenderTarget = false, bool allowUnorderedAccess = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
-dx_texture createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format, uint32 arrayLength = 1, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_DEPTH_WRITE);
-void resizeTexture(dx_texture& texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
-void freeTexture(dx_texture& texture);
+void uploadTextureSubresourceData(ref<dx_texture> texture, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 firstSubresource, uint32 numSubresources);
+ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
+ref<dx_texture> createTexture(const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allowRenderTarget = false, bool allowUnorderedAccess = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
+ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format, uint32 arrayLength = 1, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_DEPTH_WRITE);
+void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
 
 struct dx_root_signature
 {
@@ -148,8 +150,8 @@ struct barrier_batcher
 	~barrier_batcher() { submit(); }
 
 	barrier_batcher& transition(const dx_resource& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-	barrier_batcher& transition(const dx_texture& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-	barrier_batcher& transition(const dx_texture* res, uint32 count, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+	barrier_batcher& transition(const ref<dx_texture>& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+	barrier_batcher& transition(const ref<dx_texture>* res, uint32 count, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 	barrier_batcher& uav(const dx_resource& resource);
 	barrier_batcher& aliasing(const dx_resource& before, const dx_resource& after);
 
@@ -574,31 +576,24 @@ static bool checkFormatSupport(D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport, 
 	return (formatSupport.Support2 & support) != 0;
 }
 
-static bool formatSupportsRTV(dx_texture& texture)
+static bool formatSupportsRTV(const ref<dx_texture>& texture)
 {
-	return checkFormatSupport(texture.formatSupport, D3D12_FORMAT_SUPPORT1_RENDER_TARGET);
+	return checkFormatSupport(texture->formatSupport, D3D12_FORMAT_SUPPORT1_RENDER_TARGET);
 }
 
-static bool formatSupportsDSV(dx_texture& texture)
+static bool formatSupportsDSV(const ref<dx_texture>& texture)
 {
-	return checkFormatSupport(texture.formatSupport, D3D12_FORMAT_SUPPORT1_DEPTH_STENCIL);
+	return checkFormatSupport(texture->formatSupport, D3D12_FORMAT_SUPPORT1_DEPTH_STENCIL);
 }
 
-static bool formatSupportsSRV(dx_texture& texture)
+static bool formatSupportsSRV(const ref<dx_texture>& texture)
 {
-	return checkFormatSupport(texture.formatSupport, D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE);
+	return checkFormatSupport(texture->formatSupport, D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE);
 }
 
-static bool formatSupportsUAV(dx_texture& texture)
+static bool formatSupportsUAV(const ref<dx_texture>& texture)
 {
-	return checkFormatSupport(texture.formatSupport, D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW) &&
-		checkFormatSupport(texture.formatSupport, D3D12_FORMAT_SUPPORT2_UAV_TYPED_LOAD) &&
-		checkFormatSupport(texture.formatSupport, D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE);
-}
-
-static dx_device getDevice(com<ID3D12DeviceChild> object)
-{
-	dx_device device = 0;
-	object->GetDevice(IID_ID3D12Device, &device);
-	return device;
+	return checkFormatSupport(texture->formatSupport, D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW) &&
+		checkFormatSupport(texture->formatSupport, D3D12_FORMAT_SUPPORT2_UAV_TYPED_LOAD) &&
+		checkFormatSupport(texture->formatSupport, D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE);
 }

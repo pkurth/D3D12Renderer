@@ -281,7 +281,7 @@ int main(int argc, char** argv)
 		ImGui::Begin("Scene");
 		uint32 renderWidth = (uint32)ImGui::GetContentRegionAvail().x;
 		uint32 renderHeight = (uint32)ImGui::GetContentRegionAvail().y;
-		ImGui::Image(renderer.frameResult.defaultSRV, renderWidth, renderHeight);
+		ImGui::Image(renderer.frameResult->defaultSRV, renderWidth, renderHeight);
 
 		ImGuiIO& io = ImGui::GetIO();
 		if (ImGui::IsItemHovered())

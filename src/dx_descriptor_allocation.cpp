@@ -63,9 +63,9 @@ void dx_rtv_descriptor_heap::initialize(uint32 numDescriptors, bool shaderVisibl
 	dx_descriptor_heap::initialize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, numDescriptors, shaderVisible);
 }
 
-dx_cpu_descriptor_handle dx_rtv_descriptor_heap::pushRenderTargetView(dx_texture& texture)
+dx_cpu_descriptor_handle dx_rtv_descriptor_heap::pushRenderTargetView(const ref<dx_texture>& texture)
 {
-	D3D12_RESOURCE_DESC resourceDesc = texture.resource->GetDesc();
+	D3D12_RESOURCE_DESC resourceDesc = texture->resource->GetDesc();
 	assert(resourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
 	uint32 slices = resourceDesc.DepthOrArraySize;
 
@@ -74,9 +74,9 @@ dx_cpu_descriptor_handle dx_rtv_descriptor_heap::pushRenderTargetView(dx_texture
 	return createRenderTargetView(texture, result);
 }
 
-dx_cpu_descriptor_handle dx_rtv_descriptor_heap::createRenderTargetView(dx_texture& texture, dx_cpu_descriptor_handle index)
+dx_cpu_descriptor_handle dx_rtv_descriptor_heap::createRenderTargetView(const ref<dx_texture>& texture, dx_cpu_descriptor_handle index)
 {
-	D3D12_RESOURCE_DESC resourceDesc = texture.resource->GetDesc();
+	D3D12_RESOURCE_DESC resourceDesc = texture->resource->GetDesc();
 	assert(resourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
 	uint32 slices = resourceDesc.DepthOrArraySize;
 
@@ -93,12 +93,12 @@ dx_cpu_descriptor_handle dx_rtv_descriptor_heap::createRenderTargetView(dx_textu
 		{
 			rtvDesc.Texture2DArray.FirstArraySlice = i;
 			CD3DX12_CPU_DESCRIPTOR_HANDLE rtv(index.cpuHandle, i, descriptorHandleIncrementSize);
-			getDevice(descriptorHeap)->CreateRenderTargetView(texture.resource.Get(), &rtvDesc, rtv);
+			dxContext.device->CreateRenderTargetView(texture->resource.Get(), &rtvDesc, rtv);
 		}
 	}
 	else
 	{
-		getDevice(descriptorHeap)->CreateRenderTargetView(texture.resource.Get(), 0, index.cpuHandle);
+		dxContext.device->CreateRenderTargetView(texture->resource.Get(), 0, index.cpuHandle);
 	}
 
 	return index;
@@ -110,9 +110,9 @@ void dx_dsv_descriptor_heap::initialize(uint32 numDescriptors, bool shaderVisibl
 	dx_descriptor_heap::initialize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, numDescriptors, shaderVisible);
 }
 
-dx_cpu_descriptor_handle dx_dsv_descriptor_heap::pushDepthStencilView(dx_texture& texture)
+dx_cpu_descriptor_handle dx_dsv_descriptor_heap::pushDepthStencilView(const ref<dx_texture>& texture)
 {
-	D3D12_RESOURCE_DESC resourceDesc = texture.resource->GetDesc();
+	D3D12_RESOURCE_DESC resourceDesc = texture->resource->GetDesc();
 	assert(resourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 	uint32 slices = resourceDesc.DepthOrArraySize;
 
@@ -121,11 +121,11 @@ dx_cpu_descriptor_handle dx_dsv_descriptor_heap::pushDepthStencilView(dx_texture
 	return createDepthStencilView(texture, result);
 }
 
-dx_cpu_descriptor_handle dx_dsv_descriptor_heap::createDepthStencilView(dx_texture& texture, dx_cpu_descriptor_handle index)
+dx_cpu_descriptor_handle dx_dsv_descriptor_heap::createDepthStencilView(const ref<dx_texture>& texture, dx_cpu_descriptor_handle index)
 {
-	D3D12_RESOURCE_DESC resourceDesc = texture.resource->GetDesc();
+	D3D12_RESOURCE_DESC resourceDesc = texture->resource->GetDesc();
 
-	DXGI_FORMAT format = texture.formatSupport.Format; // This contains the original format, not the typeless.
+	DXGI_FORMAT format = texture->formatSupport.Format; // This contains the original format, not the typeless.
 
 	assert(isDepthFormat(format));
 
@@ -143,12 +143,12 @@ dx_cpu_descriptor_handle dx_dsv_descriptor_heap::createDepthStencilView(dx_textu
 			dsvDesc.Texture2DArray.FirstArraySlice = i;
 
 			dx_cpu_descriptor_handle handle = { CD3DX12_CPU_DESCRIPTOR_HANDLE(index.cpuHandle, i, dxContext.device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV)) };
-			dxContext.device->CreateDepthStencilView(texture.resource.Get(), &dsvDesc, handle);
+			dxContext.device->CreateDepthStencilView(texture->resource.Get(), &dsvDesc, handle);
 		}
 	}
 	else
 	{
-		dxContext.device->CreateDepthStencilView(texture.resource.Get(), &dsvDesc, index.cpuHandle);
+		dxContext.device->CreateDepthStencilView(texture->resource.Get(), &dsvDesc, index.cpuHandle);
 	}
 
 	return index;

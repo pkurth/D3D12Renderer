@@ -16,14 +16,14 @@ void dx_command_list::barriers(CD3DX12_RESOURCE_BARRIER* barriers, uint32 numBar
 	commandList->ResourceBarrier(numBarriers, barriers);
 }
 
-void dx_command_list::transitionBarrier(dx_texture& texture, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
+void dx_command_list::transitionBarrier(const ref<dx_texture>& texture, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
 {
-	transitionBarrier(texture.resource, from, to, subresource);
+	transitionBarrier(texture->resource, from, to, subresource);
 }
 
-void dx_command_list::transitionBarrier(dx_buffer& buffer, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
+void dx_command_list::transitionBarrier(const ref<dx_buffer>& buffer, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
 {
-	transitionBarrier(buffer.resource, from, to, subresource);
+	transitionBarrier(buffer->resource, from, to, subresource);
 }
 
 void dx_command_list::transitionBarrier(dx_resource resource, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
@@ -32,14 +32,14 @@ void dx_command_list::transitionBarrier(dx_resource resource, D3D12_RESOURCE_STA
 	commandList->ResourceBarrier(1, &barrier);
 }
 
-void dx_command_list::uavBarrier(dx_texture& texture)
+void dx_command_list::uavBarrier(const ref<dx_texture>& texture)
 {
-	uavBarrier(texture.resource);
+	uavBarrier(texture->resource);
 }
 
-void dx_command_list::uavBarrier(dx_buffer& buffer)
+void dx_command_list::uavBarrier(const ref<dx_buffer>& buffer)
 {
-	uavBarrier(buffer.resource);
+	uavBarrier(buffer->resource);
 }
 
 void dx_command_list::uavBarrier(dx_resource resource)
@@ -48,14 +48,14 @@ void dx_command_list::uavBarrier(dx_resource resource)
 	commandList->ResourceBarrier(1, &barrier);
 }
 
-void dx_command_list::aliasingBarrier(dx_texture& before, dx_texture& after)
+void dx_command_list::aliasingBarrier(const ref<dx_texture>& before, const ref<dx_texture>& after)
 {
-	aliasingBarrier(before.resource, after.resource);
+	aliasingBarrier(before->resource, after->resource);
 }
 
-void dx_command_list::aliasingBarrier(dx_buffer& before, dx_buffer& after)
+void dx_command_list::aliasingBarrier(const ref<dx_buffer>& before, const ref<dx_buffer>& after)
 {
-	aliasingBarrier(before.resource, after.resource);
+	aliasingBarrier(before->resource, after->resource);
 }
 
 void dx_command_list::aliasingBarrier(dx_resource before, dx_resource after)
@@ -155,9 +155,9 @@ dx_dynamic_vertex_buffer dx_command_list::createDynamicVertexBuffer(uint32 eleme
 	return { vertexBufferView };
 }
 
-void dx_command_list::setRootGraphicsUAV(uint32 rootParameterIndex, dx_buffer& buffer)
+void dx_command_list::setRootGraphicsUAV(uint32 rootParameterIndex, const ref<dx_buffer>& buffer)
 {
-	commandList->SetGraphicsRootUnorderedAccessView(rootParameterIndex, buffer.gpuVirtualAddress);
+	commandList->SetGraphicsRootUnorderedAccessView(rootParameterIndex, buffer->gpuVirtualAddress);
 }
 
 void dx_command_list::setRootGraphicsUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
@@ -165,9 +165,9 @@ void dx_command_list::setRootGraphicsUAV(uint32 rootParameterIndex, D3D12_GPU_VI
 	commandList->SetGraphicsRootUnorderedAccessView(rootParameterIndex, address);
 }
 
-void dx_command_list::setRootComputeUAV(uint32 rootParameterIndex, dx_buffer& buffer)
+void dx_command_list::setRootComputeUAV(uint32 rootParameterIndex, const ref<dx_buffer>& buffer)
 {
-	commandList->SetComputeRootUnorderedAccessView(rootParameterIndex, buffer.gpuVirtualAddress);
+	commandList->SetComputeRootUnorderedAccessView(rootParameterIndex, buffer->gpuVirtualAddress);
 }
 
 void dx_command_list::setRootComputeUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
@@ -175,9 +175,9 @@ void dx_command_list::setRootComputeUAV(uint32 rootParameterIndex, D3D12_GPU_VIR
 	commandList->SetComputeRootUnorderedAccessView(rootParameterIndex, address);
 }
 
-void dx_command_list::setRootGraphicsSRV(uint32 rootParameterIndex, dx_buffer& buffer)
+void dx_command_list::setRootGraphicsSRV(uint32 rootParameterIndex, const ref<dx_buffer>& buffer)
 {
-	commandList->SetGraphicsRootShaderResourceView(rootParameterIndex, buffer.gpuVirtualAddress);
+	commandList->SetGraphicsRootShaderResourceView(rootParameterIndex, buffer->gpuVirtualAddress);
 }
 
 void dx_command_list::setRootGraphicsSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
@@ -185,9 +185,9 @@ void dx_command_list::setRootGraphicsSRV(uint32 rootParameterIndex, D3D12_GPU_VI
 	commandList->SetGraphicsRootShaderResourceView(rootParameterIndex, address);
 }
 
-void dx_command_list::setRootComputeSRV(uint32 rootParameterIndex, dx_buffer& buffer)
+void dx_command_list::setRootComputeSRV(uint32 rootParameterIndex, const ref<dx_buffer>& buffer)
 {
-	commandList->SetComputeRootShaderResourceView(rootParameterIndex, buffer.gpuVirtualAddress);
+	commandList->SetComputeRootShaderResourceView(rootParameterIndex, buffer->gpuVirtualAddress);
 }
 
 void dx_command_list::setRootComputeSRV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address)
@@ -272,9 +272,9 @@ void dx_command_list::setComputeDescriptorTable(uint32 rootParameterIndex, CD3DX
 	commandList->SetComputeRootDescriptorTable(rootParameterIndex, handle);
 }
 
-void dx_command_list::clearUAV(dx_buffer& buffer, float val)
+void dx_command_list::clearUAV(const ref<dx_buffer>& buffer, float val)
 {
-	clearUAV(buffer.resource, buffer.cpuClearUAV, buffer.gpuClearUAV, val);
+	clearUAV(buffer->resource, buffer->cpuClearUAV, buffer->gpuClearUAV, val);
 }
 
 void dx_command_list::clearUAV(dx_resource resource, CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle, float val)
@@ -294,9 +294,9 @@ void dx_command_list::setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY topology)
 	commandList->IASetPrimitiveTopology(topology);
 }
 
-void dx_command_list::setVertexBuffer(uint32 slot, const dx_vertex_buffer& buffer)
+void dx_command_list::setVertexBuffer(uint32 slot, const ref<dx_vertex_buffer>& buffer)
 {
-	commandList->IASetVertexBuffers(slot, 1, &buffer.view);
+	commandList->IASetVertexBuffers(slot, 1, &buffer->view);
 }
 
 void dx_command_list::setVertexBuffer(uint32 slot, dx_dynamic_vertex_buffer buffer)
@@ -309,9 +309,9 @@ void dx_command_list::setVertexBuffer(uint32 slot, D3D12_VERTEX_BUFFER_VIEW& buf
 	commandList->IASetVertexBuffers(slot, 1, &buffer);
 }
 
-void dx_command_list::setIndexBuffer(const dx_index_buffer& buffer)
+void dx_command_list::setIndexBuffer(const ref<dx_index_buffer>& buffer)
 {
-	commandList->IASetIndexBuffer(&buffer.view);
+	commandList->IASetIndexBuffer(&buffer->view);
 }
 
 void dx_command_list::setIndexBuffer(D3D12_INDEX_BUFFER_VIEW& buffer)
@@ -388,27 +388,27 @@ void dx_command_list::drawIndexed(uint32 indexCount, uint32 instanceCount, uint3
 	commandList->DrawIndexedInstanced(indexCount, instanceCount, startIndex, baseVertex, startInstance);
 }
 
-void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 numDraws, dx_buffer commandBuffer)
+void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 numDraws, const ref<dx_buffer>& commandBuffer)
 {
 	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
 	commandList->ExecuteIndirect(
 		commandSignature.Get(),
 		numDraws,
-		commandBuffer.resource.Get(),
+		commandBuffer->resource.Get(),
 		0,
 		0,
 		0);
 }
 
-void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 maxNumDraws, dx_buffer numDrawsBuffer, dx_buffer commandBuffer)
+void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 maxNumDraws, const ref<dx_buffer>& numDrawsBuffer, const ref<dx_buffer>& commandBuffer)
 {
 	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
 	commandList->ExecuteIndirect(
 		commandSignature.Get(),
 		maxNumDraws,
-		commandBuffer.resource.Get(),
+		commandBuffer->resource.Get(),
 		0,
-		numDrawsBuffer.resource.Get(),
+		numDrawsBuffer->resource.Get(),
 		0);
 }
 
@@ -425,27 +425,27 @@ void dx_command_list::dispatch(uint32 numGroupsX, uint32 numGroupsY, uint32 numG
 	commandList->Dispatch(numGroupsX, numGroupsY, numGroupsZ);
 }
 
-void dx_command_list::dispatchIndirect(dx_command_signature commandSignature, uint32 numDispatches, dx_buffer commandBuffer)
+void dx_command_list::dispatchIndirect(dx_command_signature commandSignature, uint32 numDispatches, const ref<dx_buffer>& commandBuffer)
 {
 	dynamicDescriptorHeap.commitStagedDescriptorsForDispatch(this);
 	commandList->ExecuteIndirect(
 		commandSignature.Get(),
 		numDispatches,
-		commandBuffer.resource.Get(),
+		commandBuffer->resource.Get(),
 		0,
 		0,
 		0);
 }
 
-void dx_command_list::dispatchIndirect(dx_command_signature commandSignature, uint32 maxNumDispatches, dx_buffer numDispatchesBuffer, dx_buffer commandBuffer)
+void dx_command_list::dispatchIndirect(dx_command_signature commandSignature, uint32 maxNumDispatches, const ref<dx_buffer>& numDispatchesBuffer, const ref<dx_buffer>& commandBuffer)
 {
 	dynamicDescriptorHeap.commitStagedDescriptorsForDispatch(this);
 	commandList->ExecuteIndirect(
 		commandSignature.Get(),
 		maxNumDispatches,
-		commandBuffer.resource.Get(),
+		commandBuffer->resource.Get(),
 		0,
-		numDispatchesBuffer.resource.Get(),
+		numDispatchesBuffer->resource.Get(),
 		0);
 }
 

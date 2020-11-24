@@ -32,8 +32,8 @@ struct dx_rtv_descriptor_heap : dx_descriptor_heap
 
 	volatile uint32 pushIndex;
 
-	dx_cpu_descriptor_handle pushRenderTargetView(dx_texture& texture);
-	dx_cpu_descriptor_handle createRenderTargetView(dx_texture& texture, dx_cpu_descriptor_handle index);
+	dx_cpu_descriptor_handle pushRenderTargetView(const ref<dx_texture>& texture);
+	dx_cpu_descriptor_handle createRenderTargetView(const ref<dx_texture>& texture, dx_cpu_descriptor_handle index);
 };
 
 struct dx_dsv_descriptor_heap : dx_descriptor_heap
@@ -42,8 +42,8 @@ struct dx_dsv_descriptor_heap : dx_descriptor_heap
 
 	volatile uint32 pushIndex;
 
-	dx_cpu_descriptor_handle pushDepthStencilView(dx_texture& texture);
-	dx_cpu_descriptor_handle createDepthStencilView(dx_texture& texture, dx_cpu_descriptor_handle index);
+	dx_cpu_descriptor_handle pushDepthStencilView(const ref<dx_texture>& texture);
+	dx_cpu_descriptor_handle createDepthStencilView(const ref<dx_texture>& texture, dx_cpu_descriptor_handle index);
 };
 
 struct dx_descriptor_page

@@ -1081,7 +1081,7 @@ dx_mesh cpu_mesh::createDXMesh()
 
 #define getVertexProperty(prop, base, info, type) *(type*)(base + info.prop##Offset) 
 
-dx_vertex_buffer cpu_mesh::createVertexBufferWithAlternativeLayout(uint32 otherFlags, bool allowUnorderedAccess)
+ref<dx_vertex_buffer> cpu_mesh::createVertexBufferWithAlternativeLayout(uint32 otherFlags, bool allowUnorderedAccess)
 {
 #ifdef _DEBUG
 	for (uint32 i = 0; i < 31; ++i)
@@ -1111,7 +1111,7 @@ dx_vertex_buffer cpu_mesh::createVertexBufferWithAlternativeLayout(uint32 otherF
 		if (otherFlags & mesh_creation_flags_with_skin) { getVertexProperty(skin, newBase, newInfo, skinning_weights) = getVertexProperty(skin, ownBase, ownInfo, skinning_weights); }
 	}
 
-	dx_vertex_buffer vertexBuffer = createVertexBuffer(newInfo.vertexSize, numVertices, newVertices, allowUnorderedAccess);
+	ref<dx_vertex_buffer> vertexBuffer = createVertexBuffer(newInfo.vertexSize, numVertices, newVertices, allowUnorderedAccess);
 	free(newVertices);
 	return vertexBuffer;
 }

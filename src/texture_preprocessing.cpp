@@ -60,9 +60,9 @@ void initializeTexturePreprocessing()
 	integrateBRDFPipeline = createReloadablePipeline("integrate_brdf_cs");
 }
 
-void generateMipMapsOnGPU(dx_command_list* cl, dx_texture& texture)
+void generateMipMapsOnGPU(dx_command_list* cl, ref<dx_texture>& texture)
 {
-	dx_resource resource = texture.resource;
+	dx_resource resource = texture->resource;
 	if (!resource)
 	{
 		return;
@@ -162,7 +162,8 @@ void generateMipMapsOnGPU(dx_command_list* cl, dx_texture& texture)
 
 	DXGI_FORMAT overrideFormat = isSRGB ? getSRGBFormat(resourceDesc.Format) : resourceDesc.Format;
 
-	dx_texture tmpTexture = { uavResource };
+	ref<dx_texture> tmpTexture = make_ref<dx_texture>();
+	tmpTexture->resource = uavResource;
 
 	uint32 numSrcMipLevels = resourceDesc.MipLevels - 1;
 	uint32 numDstMipLevels = resourceDesc.MipLevels - 1;
@@ -257,11 +258,11 @@ void generateMipMapsOnGPU(dx_command_list* cl, dx_texture& texture)
 	}
 }
 
-dx_texture equirectangularToCubemap(dx_command_list* cl, dx_texture& equirectangular, uint32 resolution, uint32 numMips, DXGI_FORMAT format)
+ref<dx_texture> equirectangularToCubemap(dx_command_list* cl, const ref<dx_texture>& equirectangular, uint32 resolution, uint32 numMips, DXGI_FORMAT format)
 {
-	assert(equirectangular.resource);
+	assert(equirectangular->resource);
 
-	CD3DX12_RESOURCE_DESC cubemapDesc(equirectangular.resource->GetDesc());
+	CD3DX12_RESOURCE_DESC cubemapDesc(equirectangular->resource->GetDesc());
 	cubemapDesc.Width = cubemapDesc.Height = resolution;
 	cubemapDesc.DepthOrArraySize = 6;
 	cubemapDesc.MipLevels = numMips;
@@ -270,15 +271,16 @@ dx_texture equirectangularToCubemap(dx_command_list* cl, dx_texture& equirectang
 		cubemapDesc.Format = format;
 	}
 
-	dx_texture cubemap = createTexture(cubemapDesc, 0, 0);
+	ref<dx_texture> cubemap = createTexture(cubemapDesc, 0, 0);
 
-	cubemapDesc = CD3DX12_RESOURCE_DESC(cubemap.resource->GetDesc());
+	cubemapDesc = CD3DX12_RESOURCE_DESC(cubemap->resource->GetDesc());
 	numMips = cubemapDesc.MipLevels;
 
-	dx_resource cubemapResource = cubemap.resource;
+	dx_resource cubemapResource = cubemap->resource;
 	dx_resource stagingResource = cubemapResource;
 
-	dx_texture stagingTexture = cubemap;
+	ref<dx_texture> stagingTexture = make_ref<dx_texture>();
+	stagingTexture->resource = cubemapResource;
 
 
 	if ((cubemapDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) == 0)
@@ -296,7 +298,7 @@ dx_texture equirectangularToCubemap(dx_command_list* cl, dx_texture& equirectang
 			IID_PPV_ARGS(&stagingResource)
 		));
 
-		stagingTexture.resource = stagingResource;
+		stagingTexture->resource = stagingResource;
 	}
 
 	cl->setPipelineState(*equirectangularToCubemapPipeline.pipeline);
@@ -346,20 +348,20 @@ dx_texture equirectangularToCubemap(dx_command_list* cl, dx_texture& equirectang
 
 	if (stagingResource != cubemapResource)
 	{
-		cl->copyResource(stagingTexture.resource, cubemap.resource);
-		cl->transitionBarrier(cubemap.resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
+		cl->copyResource(stagingTexture->resource, cubemap->resource);
+		cl->transitionBarrier(cubemap->resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
 	}
 
-	dxContext.retireObject(stagingTexture.resource);
+	dxContext.retireObject(stagingTexture->resource);
 
 	return cubemap;
 }
 
-dx_texture cubemapToIrradiance(dx_command_list* cl, dx_texture& environment, uint32 resolution, uint32 sourceSlice, float uvzScale)
+ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& environment, uint32 resolution, uint32 sourceSlice, float uvzScale)
 {
-	assert(environment.resource);
+	assert(environment->resource);
 
-	CD3DX12_RESOURCE_DESC irradianceDesc(environment.resource->GetDesc());
+	CD3DX12_RESOURCE_DESC irradianceDesc(environment->resource->GetDesc());
 
 	if (isSRGBFormat(irradianceDesc.Format))
 	{
@@ -370,14 +372,15 @@ dx_texture cubemapToIrradiance(dx_command_list* cl, dx_texture& environment, uin
 	irradianceDesc.DepthOrArraySize = 6;
 	irradianceDesc.MipLevels = 1;
 
-	dx_texture irradiance = createTexture(irradianceDesc, 0, 0);
+	ref<dx_texture> irradiance = createTexture(irradianceDesc, 0, 0);
 
-	irradianceDesc = CD3DX12_RESOURCE_DESC(irradiance.resource->GetDesc());
+	irradianceDesc = CD3DX12_RESOURCE_DESC(irradiance->resource->GetDesc());
 
-	dx_resource irradianceResource = irradiance.resource;
+	dx_resource irradianceResource = irradiance->resource;
 	dx_resource stagingResource = irradianceResource;
 
-	dx_texture stagingTexture = irradiance;
+	ref<dx_texture> stagingTexture = make_ref<dx_texture>();
+	stagingTexture->resource = irradianceResource;
 
 
 	if ((irradianceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) == 0)
@@ -395,7 +398,7 @@ dx_texture cubemapToIrradiance(dx_command_list* cl, dx_texture& environment, uin
 			IID_PPV_ARGS(&stagingResource)
 		));
 
-		stagingTexture.resource = stagingResource;
+		stagingTexture->resource = stagingResource;
 	}
 
 	cl->setPipelineState(*cubemapToIrradiancePipeline.pipeline);
@@ -433,32 +436,34 @@ dx_texture cubemapToIrradiance(dx_command_list* cl, dx_texture& environment, uin
 
 	if (stagingResource != irradianceResource)
 	{
-		cl->copyResource(stagingTexture.resource, irradiance.resource);
-		cl->transitionBarrier(irradiance.resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
+		cl->copyResource(stagingTexture->resource, irradiance->resource);
+		cl->transitionBarrier(irradiance->resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
 	}
 
-	dxContext.retireObject(stagingTexture.resource);
+	dxContext.retireObject(stagingTexture->resource);
 
 	return irradiance;
 }
 
-dx_texture prefilterEnvironment(dx_command_list* cl, dx_texture& environment, uint32 resolution)
+ref<dx_texture> prefilterEnvironment(dx_command_list* cl, const ref<dx_texture>& environment, uint32 resolution)
 {
-	assert(environment.resource);
+	assert(environment->resource);
 
-	CD3DX12_RESOURCE_DESC prefilteredDesc(environment.resource->GetDesc());
+	CD3DX12_RESOURCE_DESC prefilteredDesc(environment->resource->GetDesc());
 	prefilteredDesc.Width = prefilteredDesc.Height = resolution;
 	prefilteredDesc.DepthOrArraySize = 6;
 	prefilteredDesc.MipLevels = 0;
 
-	dx_texture prefiltered = createTexture(prefilteredDesc, 0, 0);
+	ref<dx_texture> prefiltered = createTexture(prefilteredDesc, 0, 0);
 
-	prefilteredDesc = CD3DX12_RESOURCE_DESC(prefiltered.resource->GetDesc());
+	prefilteredDesc = CD3DX12_RESOURCE_DESC(prefiltered->resource->GetDesc());
 
-	dx_resource prefilteredResource = prefiltered.resource;
+	dx_resource prefilteredResource = prefiltered->resource;
 	dx_resource stagingResource = prefilteredResource;
 
-	dx_texture stagingTexture = prefiltered;
+	ref<dx_texture> stagingTexture = make_ref<dx_texture>();
+	stagingTexture->resource = prefilteredResource;
+
 
 	if ((prefilteredDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) == 0)
 	{
@@ -475,9 +480,9 @@ dx_texture prefilterEnvironment(dx_command_list* cl, dx_texture& environment, ui
 			IID_PPV_ARGS(&stagingResource)
 		));
 
-		stagingTexture.resource = stagingResource;
+		stagingTexture->resource = stagingResource;
 
-		SET_NAME(stagingTexture.resource, "Staging");
+		SET_NAME(stagingTexture->resource, "Staging");
 	}
 
 	cl->setPipelineState(*prefilterEnvironmentPipeline.pipeline);
@@ -521,28 +526,29 @@ dx_texture prefilterEnvironment(dx_command_list* cl, dx_texture& environment, ui
 
 	if (stagingResource != prefilteredResource)
 	{
-		cl->copyResource(stagingTexture.resource, prefiltered.resource);
-		cl->transitionBarrier(prefiltered.resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
+		cl->copyResource(stagingTexture->resource, prefiltered->resource);
+		cl->transitionBarrier(prefiltered->resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
 	}
 
-	dxContext.retireObject(stagingTexture.resource);
+	dxContext.retireObject(stagingTexture->resource);
 
 	return prefiltered;
 }
 
-dx_texture integrateBRDF(dx_command_list* cl, uint32 resolution)
+ref<dx_texture> integrateBRDF(dx_command_list* cl, uint32 resolution)
 {
 	CD3DX12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Tex2D(
 		DXGI_FORMAT_R16G16_FLOAT,
 		resolution, resolution, 1, 1);
 
-	dx_texture brdf = createTexture(desc, 0, 0);
-	desc = CD3DX12_RESOURCE_DESC(brdf.resource->GetDesc());
+	ref<dx_texture> brdf = createTexture(desc, 0, 0);
+	desc = CD3DX12_RESOURCE_DESC(brdf->resource->GetDesc());
 
-	dx_resource brdfResource = brdf.resource;
+	dx_resource brdfResource = brdf->resource;
 	dx_resource stagingResource = brdfResource;
 
-	dx_texture stagingTexture = brdf;
+	ref<dx_texture> stagingTexture = make_ref<dx_texture>();
+	stagingTexture->resource = brdfResource;
 
 	if ((desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) == 0)
 	{
@@ -559,7 +565,7 @@ dx_texture integrateBRDF(dx_command_list* cl, uint32 resolution)
 			IID_PPV_ARGS(&stagingResource)
 		));
 
-		stagingTexture.resource = stagingResource;
+		stagingTexture->resource = stagingResource;
 	}
 
 	cl->setPipelineState(*integrateBRDFPipeline.pipeline);
@@ -581,11 +587,11 @@ dx_texture integrateBRDF(dx_command_list* cl, uint32 resolution)
 
 	if (stagingResource != brdfResource)
 	{
-		cl->copyResource(stagingTexture.resource, brdf.resource);
-		cl->transitionBarrier(brdf.resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
+		cl->copyResource(stagingTexture->resource, brdf->resource);
+		cl->transitionBarrier(brdf->resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
 	}
 
-	dxContext.retireObject(stagingTexture.resource);
+	dxContext.retireObject(stagingTexture->resource);
 
 	return brdf;
 }

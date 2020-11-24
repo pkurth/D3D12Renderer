@@ -4,19 +4,19 @@
 #include "dx_context.h"
 #include "dx_descriptor_allocation.h"
 
-void* mapBuffer(dx_buffer& buffer)
+void* mapBuffer(const ref<dx_buffer>& buffer)
 {
 	void* result;
-	buffer.resource->Map(0, 0, &result);
+	buffer->resource->Map(0, 0, &result);
 	return result;
 }
 
-void unmapBuffer(dx_buffer& buffer)
+void unmapBuffer(const ref<dx_buffer>& buffer)
 {
-	buffer.resource->Unmap(0, 0);
+	buffer->resource->Unmap(0, 0);
 }
 
-void uploadBufferData(dx_buffer& buffer, const void* bufferData)
+void uploadBufferData(ref<dx_buffer> buffer, const void* bufferData)
 {
 	dx_command_list* commandList = dxContext.getFreeCopyCommandList();
 
@@ -25,20 +25,20 @@ void uploadBufferData(dx_buffer& buffer, const void* bufferData)
 	checkResult(dxContext.device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(buffer.totalSize),
+		&CD3DX12_RESOURCE_DESC::Buffer(buffer->totalSize),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		0,
 		IID_PPV_ARGS(&intermediateResource)));
 
 	D3D12_SUBRESOURCE_DATA subresourceData = {};
 	subresourceData.pData = bufferData;
-	subresourceData.RowPitch = buffer.totalSize;
+	subresourceData.RowPitch = buffer->totalSize;
 	subresourceData.SlicePitch = subresourceData.RowPitch;
 
 	commandList->transitionBarrier(buffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
 
 	UpdateSubresources(commandList->commandList.Get(),
-		buffer.resource.Get(), intermediateResource.Get(),
+		buffer->resource.Get(), intermediateResource.Get(),
 		0, 0, 1, &subresourceData);
 
 	// We are omitting the transition to common here, since the resource automatically decays to common state after being accessed on a copy queue.
@@ -47,9 +47,9 @@ void uploadBufferData(dx_buffer& buffer, const void* bufferData)
 	dxContext.executeCommandList(commandList);
 }
 
-void updateBufferDataRange(dx_buffer& buffer, const void* data, uint32 offset, uint32 size)
+void updateBufferDataRange(ref<dx_buffer> buffer, const void* data, uint32 offset, uint32 size)
 {
-	assert(offset + size <= buffer.totalSize);
+	assert(offset + size <= buffer->totalSize);
 
 	dx_command_list* commandList = dxContext.getFreeCopyCommandList();
 
@@ -70,7 +70,7 @@ void updateBufferDataRange(dx_buffer& buffer, const void* data, uint32 offset, u
 	memcpy(mapped, data, size);
 	intermediateResource->Unmap(0, 0);
 
-	commandList->commandList->CopyBufferRegion(buffer.resource.Get(), offset, intermediateResource.Get(), 0, size);
+	commandList->commandList->CopyBufferRegion(buffer->resource.Get(), offset, intermediateResource.Get(), 0, size);
 
 	// We are omitting the transition to common here, since the resource automatically decays to common state after being accessed on a copy queue.
 
@@ -78,24 +78,24 @@ void updateBufferDataRange(dx_buffer& buffer, const void* data, uint32 offset, u
 	dxContext.executeCommandList(commandList);
 }
 
-static void initializeBuffer(dx_buffer& buffer, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing,
+static void initializeBuffer(ref<dx_buffer> buffer, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing,
 	D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON, D3D12_HEAP_TYPE heapType = D3D12_HEAP_TYPE_DEFAULT)
 {
 	D3D12_RESOURCE_FLAGS flags = allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
 
-	buffer.elementSize = elementSize;
-	buffer.elementCount = elementCount;
-	buffer.totalSize = elementSize * elementCount;
-	buffer.heapType = heapType;
+	buffer->elementSize = elementSize;
+	buffer->elementCount = elementCount;
+	buffer->totalSize = elementSize * elementCount;
+	buffer->heapType = heapType;
 
 	checkResult(dxContext.device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(heapType),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(buffer.totalSize, flags),
+		&CD3DX12_RESOURCE_DESC::Buffer(buffer->totalSize, flags),
 		initialState,
 		0,
-		IID_PPV_ARGS(&buffer.resource)));
-	buffer.gpuVirtualAddress = buffer.resource->GetGPUVirtualAddress();
+		IID_PPV_ARGS(&buffer->resource)));
+	buffer->gpuVirtualAddress = buffer->resource->GetGPUVirtualAddress();
 
 	if (data)
 	{
@@ -106,55 +106,55 @@ static void initializeBuffer(dx_buffer& buffer, uint32 elementSize, uint32 eleme
 		else if (heapType == D3D12_HEAP_TYPE_UPLOAD)
 		{
 			void* dataPtr = mapBuffer(buffer);
-			memcpy(dataPtr, data, buffer.totalSize);
+			memcpy(dataPtr, data, buffer->totalSize);
 			unmapBuffer(buffer);
 		}
 	}
 
-	buffer.defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createBufferSRV(buffer);
+	buffer->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createBufferSRV(buffer);
 	if (allowUnorderedAccess)
 	{
-		buffer.defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createBufferUAV(buffer);
+		buffer->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createBufferUAV(buffer);
 	}
 	if (allowClearing)
 	{
-		buffer.cpuClearUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createBufferUintUAV(buffer);
+		buffer->cpuClearUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createBufferUintUAV(buffer);
 		dx_cpu_descriptor_handle shaderVisibleCPUHandle = dxContext.descriptorAllocatorGPU.getFreeHandle().createBufferUintUAV(buffer);
-		buffer.gpuClearUAV = dxContext.descriptorAllocatorGPU.getMatchingGPUHandle(shaderVisibleCPUHandle);
+		buffer->gpuClearUAV = dxContext.descriptorAllocatorGPU.getMatchingGPUHandle(shaderVisibleCPUHandle);
 	}
 }
 
-dx_buffer createBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing, D3D12_RESOURCE_STATES initialState)
+ref<dx_buffer> createBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing, D3D12_RESOURCE_STATES initialState)
 {
-	dx_buffer result = {};
+	ref<dx_buffer> result = make_ref<dx_buffer>();
 	initializeBuffer(result, elementSize, elementCount, data, allowUnorderedAccess, allowClearing, initialState, D3D12_HEAP_TYPE_DEFAULT);
 	return result;
 }
 
-dx_buffer createUploadBuffer(uint32 elementSize, uint32 elementCount, void* data)
+ref<dx_buffer> createUploadBuffer(uint32 elementSize, uint32 elementCount, void* data)
 {
-	dx_buffer result = {};
+	ref<dx_buffer> result = make_ref<dx_buffer>();
 	initializeBuffer(result, elementSize, elementCount, data, false, false, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_HEAP_TYPE_UPLOAD);
 	return result;
 }
 
-dx_vertex_buffer createVertexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing)
+ref<dx_vertex_buffer> createVertexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing)
 {
-	dx_vertex_buffer result = {};
+	ref<dx_vertex_buffer> result = make_ref<dx_vertex_buffer>();
 	initializeBuffer(result, elementSize, elementCount, data, allowUnorderedAccess, allowClearing);
-	result.view.BufferLocation = result.gpuVirtualAddress;
-	result.view.SizeInBytes = result.totalSize;
-	result.view.StrideInBytes = elementSize;
+	result->view.BufferLocation = result->gpuVirtualAddress;
+	result->view.SizeInBytes = result->totalSize;
+	result->view.StrideInBytes = elementSize;
 	return result;
 }
 
-dx_vertex_buffer createUploadVertexBuffer(uint32 elementSize, uint32 elementCount, void* data)
+ref<dx_vertex_buffer> createUploadVertexBuffer(uint32 elementSize, uint32 elementCount, void* data)
 {
-	dx_vertex_buffer result = {};
+	ref<dx_vertex_buffer> result = make_ref<dx_vertex_buffer>();
 	initializeBuffer(result, elementSize, elementCount, data, false, false, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_HEAP_TYPE_UPLOAD);
-	result.view.BufferLocation = result.gpuVirtualAddress;
-	result.view.SizeInBytes = result.totalSize;
-	result.view.StrideInBytes = elementSize;
+	result->view.BufferLocation = result->gpuVirtualAddress;
+	result->view.SizeInBytes = result->totalSize;
+	result->view.StrideInBytes = elementSize;
 	return result;
 }
 
@@ -176,75 +176,74 @@ DXGI_FORMAT getIndexBufferFormat(uint32 elementSize)
 	return result;
 }
 
-dx_index_buffer createIndexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing)
+ref<dx_index_buffer> createIndexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing)
 {
-	dx_index_buffer result = {};
+	ref<dx_index_buffer> result = make_ref<dx_index_buffer>();
 	initializeBuffer(result, elementSize, elementCount, data, allowUnorderedAccess, allowClearing);
-	result.view.BufferLocation = result.gpuVirtualAddress;
-	result.view.SizeInBytes = result.totalSize;
-	result.view.Format = getIndexBufferFormat(elementSize);
+	result->view.BufferLocation = result->gpuVirtualAddress;
+	result->view.SizeInBytes = result->totalSize;
+	result->view.Format = getIndexBufferFormat(elementSize);
 	return result;
 }
 
-void resizeBuffer(dx_buffer& buffer, uint32 newElementCount, D3D12_RESOURCE_STATES initialState)
+void resizeBuffer(ref<dx_buffer> buffer, uint32 newElementCount, D3D12_RESOURCE_STATES initialState)
 {
-	dxContext.retireObject(buffer.resource);
+	dxContext.retireObject(buffer->resource);
 
-	buffer.elementCount = newElementCount;
-	buffer.totalSize = buffer.elementCount * buffer.elementSize;
+	buffer->elementCount = newElementCount;
+	buffer->totalSize = buffer->elementCount * buffer->elementSize;
 
-	auto desc = buffer.resource->GetDesc();
+	auto desc = buffer->resource->GetDesc();
 
 	checkResult(dxContext.device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(buffer.heapType),
+		&CD3DX12_HEAP_PROPERTIES(buffer->heapType),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(buffer.totalSize, desc.Flags),
+		&CD3DX12_RESOURCE_DESC::Buffer(buffer->totalSize, desc.Flags),
 		initialState,
 		0,
-		IID_PPV_ARGS(&buffer.resource)));
-	buffer.gpuVirtualAddress = buffer.resource->GetGPUVirtualAddress();
+		IID_PPV_ARGS(&buffer->resource)));
+	buffer->gpuVirtualAddress = buffer->resource->GetGPUVirtualAddress();
 
-	buffer.defaultSRV.createBufferSRV(buffer);
+	buffer->defaultSRV.createBufferSRV(buffer);
 	if (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS)
 	{
-		buffer.defaultUAV.createBufferUAV(buffer);
+		buffer->defaultUAV.createBufferUAV(buffer);
 	}
-	if (buffer.cpuClearUAV.cpuHandle.ptr)
+	if (buffer->cpuClearUAV.cpuHandle.ptr)
 	{
-		buffer.cpuClearUAV.createBufferUintUAV(buffer);
-		dx_cpu_descriptor_handle shaderVisibleCPUHandle = dxContext.descriptorAllocatorGPU.getMatchingCPUHandle(buffer.gpuClearUAV);
+		buffer->cpuClearUAV.createBufferUintUAV(buffer);
+		dx_cpu_descriptor_handle shaderVisibleCPUHandle = dxContext.descriptorAllocatorGPU.getMatchingCPUHandle(buffer->gpuClearUAV);
 		shaderVisibleCPUHandle.createBufferUintUAV(buffer);
 	}
 }
 
-void freeBuffer(dx_buffer& buffer)
+dx_buffer::~dx_buffer()
 {
-	if (buffer.defaultSRV.cpuHandle.ptr)
+	if (defaultSRV.cpuHandle.ptr)
 	{
-		dxContext.descriptorAllocatorCPU.freeHandle(buffer.defaultSRV);
+		dxContext.descriptorAllocatorCPU.freeHandle(defaultSRV);
 	}
-	if (buffer.defaultUAV.cpuHandle.ptr)
+	if (defaultUAV.cpuHandle.ptr)
 	{
-		dxContext.descriptorAllocatorCPU.freeHandle(buffer.defaultUAV);
+		dxContext.descriptorAllocatorCPU.freeHandle(defaultUAV);
 	}
-	if (buffer.cpuClearUAV.cpuHandle.ptr)
+	if (cpuClearUAV.cpuHandle.ptr)
 	{
-		dxContext.descriptorAllocatorCPU.freeHandle(buffer.cpuClearUAV);
+		dxContext.descriptorAllocatorCPU.freeHandle(cpuClearUAV);
 	}
-	if (buffer.gpuClearUAV.gpuHandle.ptr)
+	if (gpuClearUAV.gpuHandle.ptr)
 	{
-		dxContext.descriptorAllocatorGPU.freeHandle(dxContext.descriptorAllocatorGPU.getMatchingCPUHandle(buffer.gpuClearUAV));
+		dxContext.descriptorAllocatorGPU.freeHandle(dxContext.descriptorAllocatorGPU.getMatchingCPUHandle(gpuClearUAV));
 	}
-	dxContext.retireObject(buffer.resource);
-	buffer = {};
+	dxContext.retireObject(resource);
 }
 
-void uploadTextureSubresourceData(dx_texture& texture, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 firstSubresource, uint32 numSubresources)
+void uploadTextureSubresourceData(ref<dx_texture> texture, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 firstSubresource, uint32 numSubresources)
 {
 	dx_command_list* commandList = dxContext.getFreeCopyCommandList();
 	commandList->transitionBarrier(texture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
 
-	UINT64 requiredSize = GetRequiredIntermediateSize(texture.resource.Get(), firstSubresource, numSubresources);
+	UINT64 requiredSize = GetRequiredIntermediateSize(texture->resource.Get(), firstSubresource, numSubresources);
 
 	dx_resource intermediateResource;
 	checkResult(dxContext.device->CreateCommittedResource(
@@ -256,7 +255,7 @@ void uploadTextureSubresourceData(dx_texture& texture, D3D12_SUBRESOURCE_DATA* s
 		IID_PPV_ARGS(&intermediateResource)
 	));
 
-	UpdateSubresources<128>(commandList->commandList.Get(), texture.resource.Get(), intermediateResource.Get(), 0, firstSubresource, numSubresources, subresourceData);
+	UpdateSubresources<128>(commandList->commandList.Get(), texture->resource.Get(), intermediateResource.Get(), 0, firstSubresource, numSubresources, subresourceData);
 	dxContext.retireObject(intermediateResource);
 
 	// We are omitting the transition to common here, since the resource automatically decays to common state after being accessed on a copy queue.
@@ -265,28 +264,28 @@ void uploadTextureSubresourceData(dx_texture& texture, D3D12_SUBRESOURCE_DATA* s
 	dxContext.executeCommandList(commandList);
 }
 
-dx_texture createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState)
+ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState)
 {
-	dx_texture result = {};
+	ref<dx_texture> result = make_ref<dx_texture>();
 
 	checkResult(dxContext.device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&textureDesc,
 		initialState,
 		0,
-		IID_PPV_ARGS(&result.resource)));
+		IID_PPV_ARGS(&result->resource)));
 
-	result.formatSupport.Format = textureDesc.Format;
+	result->formatSupport.Format = textureDesc.Format;
 	checkResult(dxContext.device->CheckFeatureSupport(
 		D3D12_FEATURE_FORMAT_SUPPORT,
-		&result.formatSupport,
+		&result->formatSupport,
 		sizeof(D3D12_FEATURE_DATA_FORMAT_SUPPORT)));
 
 
 	if ((textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) != 0 &&
 		formatSupportsRTV(result))
 	{
-		result.rtvHandles = dxContext.rtvAllocator.pushRenderTargetView(result);
+		result->rtvHandles = dxContext.rtvAllocator.pushRenderTargetView(result);
 	}
 
 	if (subresourceData)
@@ -296,29 +295,29 @@ dx_texture createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA
 
 	if (textureDesc.DepthOrArraySize == 6)
 	{
-		result.defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapSRV(result);
+		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapSRV(result);
 	}
 	else
 	{
-		result.defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureSRV(result);
+		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureSRV(result);
 	}
 
 	if (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS)
 	{
 		if (textureDesc.DepthOrArraySize == 6)
 		{
-			result.defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapUAV(result);
+			result->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapUAV(result);
 		}
 		else
 		{
-			result.defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureUAV(result);
+			result->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureUAV(result);
 		}
 	}
 	
 	return result;
 }
 
-dx_texture createTexture(const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allowRenderTarget, bool allowUnorderedAccess, D3D12_RESOURCE_STATES initialState)
+ref<dx_texture> createTexture(const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allowRenderTarget, bool allowUnorderedAccess, D3D12_RESOURCE_STATES initialState)
 {
 	D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE
 		| (allowRenderTarget ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE)
@@ -344,9 +343,9 @@ dx_texture createTexture(const void* data, uint32 width, uint32 height, DXGI_FOR
 	}
 }
 
-dx_texture createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format, uint32 arrayLength, D3D12_RESOURCE_STATES initialState)
+ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format, uint32 arrayLength, D3D12_RESOURCE_STATES initialState)
 {
-	dx_texture result = {};
+	ref<dx_texture> result = make_ref<dx_texture>();
 
 	D3D12_CLEAR_VALUE optimizedClearValue = {};
 	optimizedClearValue.Format = format;
@@ -363,31 +362,31 @@ dx_texture createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format, u
 		&desc,
 		initialState,
 		&optimizedClearValue,
-		IID_PPV_ARGS(&result.resource)
+		IID_PPV_ARGS(&result->resource)
 	));
 
-	result.formatSupport.Format = format;
+	result->formatSupport.Format = format;
 	checkResult(dxContext.device->CheckFeatureSupport(
 		D3D12_FEATURE_FORMAT_SUPPORT,
-		&result.formatSupport,
+		&result->formatSupport,
 		sizeof(D3D12_FEATURE_DATA_FORMAT_SUPPORT)));
 
-	result.dsvHandle = dxContext.dsvAllocator.pushDepthStencilView(result);
+	result->dsvHandle = dxContext.dsvAllocator.pushDepthStencilView(result);
 	if (arrayLength == 1)
 	{
-		result.defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureSRV(result);
+		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureSRV(result);
 	}
 	else
 	{
-		result.defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureArraySRV(result);
+		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureArraySRV(result);
 	}
 
 	return result;
 }
 
-void resizeTexture(dx_texture& texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState)
+void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState)
 {
-	D3D12_RESOURCE_DESC desc = texture.resource->GetDesc();
+	D3D12_RESOURCE_DESC desc = texture->resource->GetDesc();
 
 	D3D12_RESOURCE_STATES state = initialState;
 	D3D12_CLEAR_VALUE optimizedClearValue = {};
@@ -396,12 +395,12 @@ void resizeTexture(dx_texture& texture, uint32 newWidth, uint32 newHeight, D3D12
 	if (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)
 	{
 		state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-		optimizedClearValue.Format = texture.formatSupport.Format;
+		optimizedClearValue.Format = texture->formatSupport.Format;
 		optimizedClearValue.DepthStencil = { 1.f, 0 };
 		clearValue = &optimizedClearValue;
 	}
 
-	dxContext.retireObject(texture.resource);
+	dxContext.retireObject(texture->resource);
 
 	desc.Width = newWidth;
 	desc.Height = newHeight;
@@ -412,36 +411,36 @@ void resizeTexture(dx_texture& texture, uint32 newWidth, uint32 newHeight, D3D12
 		&desc,
 		state,
 		clearValue,
-		IID_PPV_ARGS(&texture.resource)
+		IID_PPV_ARGS(&texture->resource)
 	));
 
 	if ((desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) != 0 &&
 		formatSupportsRTV(texture))
 	{
-		dxContext.rtvAllocator.createRenderTargetView(texture, texture.rtvHandles);
+		dxContext.rtvAllocator.createRenderTargetView(texture, texture->rtvHandles);
 	}
 
 	if (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)
 	{
-		dxContext.dsvAllocator.createDepthStencilView(texture, texture.dsvHandle);
+		dxContext.dsvAllocator.createDepthStencilView(texture, texture->dsvHandle);
 		if (desc.DepthOrArraySize == 1)
 		{
-			texture.defaultSRV.createDepthTextureSRV(texture);
+			texture->defaultSRV.createDepthTextureSRV(texture);
 		}
 		else
 		{
-			texture.defaultSRV.createDepthTextureArraySRV(texture);
+			texture->defaultSRV.createDepthTextureArraySRV(texture);
 		}
 	}
 	else
 	{
 		if (desc.DepthOrArraySize == 6)
 		{
-			texture.defaultSRV.createCubemapSRV(texture);
+			texture->defaultSRV.createCubemapSRV(texture);
 		}
 		else
 		{
-			texture.defaultSRV.create2DTextureSRV(texture);
+			texture->defaultSRV.create2DTextureSRV(texture);
 		}
 	}
 
@@ -449,29 +448,28 @@ void resizeTexture(dx_texture& texture, uint32 newWidth, uint32 newHeight, D3D12
 	{
 		if (desc.DepthOrArraySize == 6)
 		{
-			texture.defaultUAV.createCubemapUAV(texture);
+			texture->defaultUAV.createCubemapUAV(texture);
 		}
 		else
 		{
-			texture.defaultUAV.create2DTextureUAV(texture);
+			texture->defaultUAV.create2DTextureUAV(texture);
 		}
 	}
 }
 
-void freeTexture(dx_texture& texture)
+dx_texture::~dx_texture()
 {
-	if (texture.defaultSRV.cpuHandle.ptr)
+	if (defaultSRV.cpuHandle.ptr)
 	{
-		dxContext.descriptorAllocatorCPU.freeHandle(texture.defaultSRV);
+		dxContext.descriptorAllocatorCPU.freeHandle(defaultSRV);
 	}
-	if (texture.defaultUAV.cpuHandle.ptr)
+	if (defaultUAV.cpuHandle.ptr)
 	{
-		dxContext.descriptorAllocatorCPU.freeHandle(texture.defaultUAV);
+		dxContext.descriptorAllocatorCPU.freeHandle(defaultUAV);
 	}
 	// TODO: Free RTV & DVS.
 
-	dxContext.retireObject(texture.resource);
-	texture = {};
+	dxContext.retireObject(resource);
 }
 
 static void copyRootSignatureDesc(const D3D12_ROOT_SIGNATURE_DESC* desc, dx_root_signature& result)
@@ -660,15 +658,15 @@ dx_command_signature createCommandSignature(dx_root_signature rootSignature, D3D
 	return createCommandSignature(rootSignature, commandSignatureDesc);
 }
 
-uint32 dx_render_target::pushColorAttachment(dx_texture& texture)
+uint32 dx_render_target::pushColorAttachment(const ref<dx_texture>& texture)
 {
-	assert(texture.resource);
+	assert(texture->resource);
 
 	uint32 attachmentPoint = numAttachments++;
 
-	D3D12_RESOURCE_DESC desc = texture.resource->GetDesc();
+	D3D12_RESOURCE_DESC desc = texture->resource->GetDesc();
 
-	rtvHandles[attachmentPoint] = texture.rtvHandles.cpuHandle;
+	rtvHandles[attachmentPoint] = texture->rtvHandles.cpuHandle;
 
 	if (width == 0 || height == 0)
 	{
@@ -687,13 +685,13 @@ uint32 dx_render_target::pushColorAttachment(dx_texture& texture)
 	return attachmentPoint;
 }
 
-void dx_render_target::pushDepthStencilAttachment(dx_texture& texture, uint32 arraySlice)
+void dx_render_target::pushDepthStencilAttachment(const ref<dx_texture>& texture, uint32 arraySlice)
 {
-	assert(texture.resource);
+	assert(texture->resource);
 
-	dsvHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(texture.dsvHandle.cpuHandle, arraySlice, dxContext.device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
+	dsvHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(texture->dsvHandle.cpuHandle, arraySlice, dxContext.device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
 
-	D3D12_RESOURCE_DESC desc = texture.resource->GetDesc();
+	D3D12_RESOURCE_DESC desc = texture->resource->GetDesc();
 
 	if (width == 0 || height == 0)
 	{
@@ -732,16 +730,16 @@ barrier_batcher& barrier_batcher::transition(const dx_resource& res, D3D12_RESOU
 	return *this;
 }
 
-barrier_batcher& barrier_batcher::transition(const dx_texture& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
+barrier_batcher& barrier_batcher::transition(const ref<dx_texture>& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
 {
-	return transition(res.resource, from, to, subresource);
+	return transition(res->resource, from, to, subresource);
 }
 
-barrier_batcher& barrier_batcher::transition(const dx_texture* res, uint32 count, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
+barrier_batcher& barrier_batcher::transition(const ref<dx_texture>* res, uint32 count, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
 {
 	for (uint32 i = 0; i < count; ++i)
 	{
-		transition(res[i].resource, from, to, subresource);
+		transition(res[i]->resource, from, to, subresource);
 	}
 	return *this;
 }

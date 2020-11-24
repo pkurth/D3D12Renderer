@@ -29,10 +29,10 @@ void application::initialize(dx_renderer* renderer)
 
 	materials.push_back(
 		{
-			&textures[0],
-			&textures[1],
-			&textures[2],
-			&textures[3],
+			textures[0],
+			textures[1],
+			textures[2],
+			textures[3],
 			vec4(1.f, 1.f, 1.f, 1.f),
 			0.f, 
 			0.f,

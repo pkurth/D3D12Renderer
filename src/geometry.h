@@ -48,7 +48,7 @@ struct cpu_mesh
 	submesh_info pushAssimpMesh(const struct aiMesh* mesh, float scale, bounding_box* aabb = 0);
 
 	dx_mesh createDXMesh();
-	dx_vertex_buffer createVertexBufferWithAlternativeLayout(uint32 otherFlags, bool allowUnorderedAccess = false);
+	ref<dx_vertex_buffer> createVertexBufferWithAlternativeLayout(uint32 otherFlags, bool allowUnorderedAccess = false);
 
 private:
 	void alignNextTriangle();

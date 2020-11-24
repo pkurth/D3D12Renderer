@@ -35,10 +35,10 @@ static const char* aspectRatioNames[] =
 
 struct pbr_material
 {
-	dx_texture* albedo;
-	dx_texture* normal;
-	dx_texture* roughness;
-	dx_texture* metallic;
+	ref<dx_texture> albedo;
+	ref<dx_texture> normal;
+	ref<dx_texture> roughness;
+	ref<dx_texture> metallic;
 
 	vec4 albedoTint;
 	float roughnessOverride;
@@ -47,9 +47,9 @@ struct pbr_material
 
 struct pbr_environment
 {
-	dx_texture sky;
-	dx_texture environment;
-	dx_texture irradiance;
+	ref<dx_texture> sky;
+	ref<dx_texture> environment;
+	ref<dx_texture> irradiance;
 };
 
 struct renderer_settings
@@ -90,7 +90,7 @@ struct dx_renderer
 
 	uint32 renderWidth;
 	uint32 renderHeight;
-	dx_texture frameResult;
+	ref<dx_texture> frameResult;
 
 private:
 	struct pbr_environment_handles
@@ -102,13 +102,13 @@ private:
 
 	struct light_culling_buffers
 	{
-		dx_buffer tiledFrusta;
+		ref<dx_buffer> tiledFrusta;
 
-		dx_buffer lightIndexCounter;
-		dx_buffer pointLightIndexList;
-		dx_buffer spotLightIndexList;
+		ref<dx_buffer> lightIndexCounter;
+		ref<dx_buffer> pointLightIndexList;
+		ref<dx_buffer> spotLightIndexList;
 
-		dx_texture lightGrid;
+		ref<dx_texture> lightGrid;
 
 		uint32 numTilesX;
 		uint32 numTilesY;
@@ -122,11 +122,11 @@ private:
 	dx_render_target windowRenderTarget;
 
 	dx_render_target hdrRenderTarget;
-	dx_texture hdrColorTexture;
-	dx_texture depthBuffer;
+	ref<dx_texture> hdrColorTexture;
+	ref<dx_texture> depthBuffer;
 
 	dx_render_target volumetricsRenderTarget;
-	dx_texture volumetricsTexture;
+	ref<dx_texture> volumetricsTexture;
 
 
 

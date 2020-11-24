@@ -42,6 +42,6 @@ struct dx_window : win32_window
 	bool open = true;
 	bool initialized = false;
 
-	dx_texture depthBuffer;
+	ref<dx_texture> depthBuffer;
 	DXGI_FORMAT depthFormat;
 };

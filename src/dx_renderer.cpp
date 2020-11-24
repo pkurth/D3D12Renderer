@@ -15,12 +15,12 @@
 #include "raytracing.h"
 
 
-static dx_texture whiteTexture;
-static dx_buffer pointLightBuffer[NUM_BUFFERED_FRAMES]; // TODO: When using multiple renderers, these should not be here (I guess).
-static dx_buffer spotLightBuffer[NUM_BUFFERED_FRAMES];
+static ref<dx_texture> whiteTexture;
+static ref<dx_buffer> pointLightBuffer[NUM_BUFFERED_FRAMES]; // TODO: When using multiple renderers, these should not be here (I guess).
+static ref<dx_buffer> spotLightBuffer[NUM_BUFFERED_FRAMES];
 
 static dx_render_target sunShadowRenderTarget[MAX_NUM_SUN_SHADOW_CASCADES];
-static dx_texture sunShadowCascadeTextures[MAX_NUM_SUN_SHADOW_CASCADES];
+static ref<dx_texture> sunShadowCascadeTextures[MAX_NUM_SUN_SHADOW_CASCADES];
 
 static dx_pipeline textureSkyPipeline;
 static dx_pipeline proceduralSkyPipeline;
@@ -74,7 +74,7 @@ static vec4 gizmoColors[] =
 };
 
 
-static dx_texture brdfTex;
+static ref<dx_texture> brdfTex;
 
 
 
@@ -162,6 +162,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position)
 			.renderTargets(hdrFormat, arraysize(hdrFormat), hdrDepthFormat)
+			.cullingOff()
 			.wireframe();
 
 		flatUnlitPipeline = createReloadablePipeline(desc, { "flat_unlit_vs", "flat_unlit_ps" }, "flat_unlit_vs");
@@ -225,7 +226,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	{
 		cpu_mesh mesh(mesh_creation_flags_with_positions);
 		cubeMesh = mesh.pushCube(1.f);
-		sphereMesh = mesh.pushSphere(10, 10, 1.f);
+		sphereMesh = mesh.pushIcoSphere(1.f, 2);
 		positionOnlyMesh = mesh.createDXMesh();
 	}
 
@@ -322,8 +323,8 @@ pbr_environment dx_renderer::createEnvironment(const char* filename, uint32 skyR
 {
 	pbr_environment environment;
 
-	dx_texture equiSky = loadTextureFromFile(filename,
-		texture_load_flags_noncolor | texture_load_flags_cache_to_dds | texture_load_flags_allocate_full_mipchain);
+	ref<dx_texture> equiSky = loadTextureFromFile(filename,
+		texture_load_flags_noncolor | texture_load_flags_cache_to_dds | texture_load_flags_gen_mips_on_cpu);
 
 	dx_command_list* cl;
 	if (asyncCompute)
@@ -342,7 +343,7 @@ pbr_environment dx_renderer::createEnvironment(const char* filename, uint32 skyR
 	environment.irradiance = cubemapToIrradiance(cl, environment.sky, irradianceResolution);
 	dxContext.executeCommandList(cl);
 
-	dxContext.retireObject(equiSky.resource);
+	dxContext.retireObject(equiSky->resource);
 
 	return environment;
 }
@@ -393,7 +394,7 @@ void dx_renderer::allocateLightCullingBuffers()
 	lightCullingBuffers.numTilesX = bucketize(renderWidth, LIGHT_CULLING_TILE_SIZE);
 	lightCullingBuffers.numTilesY = bucketize(renderHeight, LIGHT_CULLING_TILE_SIZE);
 
-	bool firstAllocation = lightCullingBuffers.lightGrid.resource == nullptr;
+	bool firstAllocation = lightCullingBuffers.lightGrid == nullptr;
 
 	if (firstAllocation)
 	{
@@ -432,9 +433,9 @@ void dx_renderer::setCamera(const render_camera& camera)
 
 void dx_renderer::setEnvironment(const pbr_environment& environment)
 {
-	this->environment.sky = environment.sky.defaultSRV;
-	this->environment.environment = environment.environment.defaultSRV;
-	this->environment.irradiance = environment.irradiance.defaultSRV;
+	this->environment.sky = environment.sky->defaultSRV;
+	this->environment.environment = environment.environment->defaultSRV;
+	this->environment.irradiance = environment.irradiance->defaultSRV;
 }
 
 void dx_renderer::setSun(const directional_light& light)
@@ -477,8 +478,8 @@ void dx_renderer::endFrame()
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
 	barrier_batcher(cl)
-		.transition(hdrColorTexture.resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
-		.transition(frameResult.resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
+		.transition(hdrColorTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
+		.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
 		.transition(sunShadowCascadeTextures, MAX_NUM_SUN_SHADOW_CASCADES, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 
@@ -673,22 +674,22 @@ void dx_renderer::endFrame()
 
 		if (material->albedo) 
 		{
-			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 0, *material->albedo); 
+			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 0, material->albedo); 
 			flags |= USE_ALBEDO_TEXTURE;
 		}
 		if (material->normal)
 		{
-			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 1, *material->normal);
+			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 1, material->normal);
 			flags |= USE_NORMAL_TEXTURE;
 		}
 		if (material->roughness)
 		{
-			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 2, *material->roughness);
+			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 2, material->roughness);
 			flags |= USE_ROUGHNESS_TEXTURE;
 		}
 		if (material->metallic)
 		{
-			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 3, *material->metallic);
+			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 3, material->metallic);
 			flags |= USE_METALLIC_TEXTURE;
 		}
 
@@ -738,7 +739,7 @@ void dx_renderer::endFrame()
 	// ----------------------------------------
 
 	barrier_batcher(cl)
-		.transition(hdrColorTexture.resource, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 	cl->setRenderTarget(windowRenderTarget);
 	cl->setViewport(windowViewport);
@@ -757,8 +758,8 @@ void dx_renderer::endFrame()
 
 
 	barrier_batcher(cl)
-		.transition(hdrColorTexture.resource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
-		.transition(frameResult.resource, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON);
+		.transition(hdrColorTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
+		.transition(frameResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON);
 
 	dxContext.executeCommandList(cl);
 

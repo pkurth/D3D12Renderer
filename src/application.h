@@ -32,7 +32,7 @@ private:
 	void updateCamera(const user_input& input, float dt);
 
 
-	std::vector<dx_texture> textures;
+	std::vector<ref<dx_texture>> textures;
 	std::vector<composite_mesh> meshes;
 	std::vector<raytracing_blas> blas;
 	std::vector<pbr_material> materials; // TODO: Eventually store indices to textures here, instead of pointers.
@@ -42,7 +42,7 @@ private:
 	pbr_environment environment;
 
 
-	static const uint32 numPointLights = 0;
+	static const uint32 numPointLights = 10;
 	static const uint32 numSpotLights = 0;
 
 	point_light_cb* pointLights;

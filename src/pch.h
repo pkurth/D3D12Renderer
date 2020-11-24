@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <limits>
+#include <memory>
 
 typedef char int8;
 typedef unsigned char uint8;
@@ -18,6 +19,15 @@ typedef unsigned int uint32;
 typedef long long int64;
 typedef unsigned long long uint64;
 typedef wchar_t wchar;
+
+template <typename T>
+using ref = std::shared_ptr<T>;
+
+template <typename T, class... Args>
+inline ref<T> make_ref(Args&&... args) 
+{ 
+	return std::make_shared<T>(std::forward<Args>(args)...); 
+}
 
 #define arraysize(arr) (sizeof(arr) / sizeof(arr[0]))
 

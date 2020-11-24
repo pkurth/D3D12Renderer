@@ -192,7 +192,7 @@ static bool loadImageFromFile(const char* filepathRaw, uint32 flags, DirectX::Sc
 	return true;
 }
 
-static dx_texture loadTextureInternal(const char* filename, uint32 flags)
+static ref<dx_texture> loadTextureInternal(const char* filename, uint32 flags)
 {
 	DirectX::ScratchImage scratchImage;
 	D3D12_RESOURCE_DESC textureDesc;
@@ -211,7 +211,7 @@ static dx_texture loadTextureInternal(const char* filename, uint32 flags)
 		subresource.pData = images[i].pixels;
 	}
 
-	dx_texture result = createTexture(textureDesc, subresources, numImages);
+	ref<dx_texture> result = createTexture(textureDesc, subresources, numImages);
 
 	if (flags & texture_load_flags_gen_mips_on_gpu)
 	{
@@ -224,9 +224,9 @@ static dx_texture loadTextureInternal(const char* filename, uint32 flags)
 	return result;
 }
 
-dx_texture loadTextureFromFile(const char* filename, uint32 flags)
+ref<dx_texture> loadTextureFromFile(const char* filename, uint32 flags)
 {
-	dx_texture result = loadTextureInternal(filename, flags);
+	ref<dx_texture> result = loadTextureInternal(filename, flags);
 	// TODO: Cache.
 	return result;
 }

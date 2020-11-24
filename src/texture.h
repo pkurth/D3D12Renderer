@@ -24,4 +24,4 @@ enum texture_load_flags
 	texture_load_flags_default = texture_load_flags_compress | texture_load_flags_gen_mips_on_cpu | texture_load_flags_cache_to_dds,
 };
 
-dx_texture loadTextureFromFile(const char* filename, uint32 flags = texture_load_flags_default);
+ref<dx_texture> loadTextureFromFile(const char* filename, uint32 flags = texture_load_flags_default);

@@ -14,21 +14,21 @@ enum acceleration_structure_rebuild_mode
 
 struct raytracing_blas
 {
-	dx_buffer scratch;
-	dx_buffer result;
+	ref<dx_buffer> scratch;
+	ref<dx_buffer> result;
 	uint32 numGeometries;
 };
 
 struct raytracing_tlas
 {
-	dx_buffer scratch;
-	dx_buffer result;
+	ref<dx_buffer> scratch;
+	ref<dx_buffer> result;
 };
 
 struct raytracing_blas_builder
 {
 	raytracing_blas_builder(acceleration_structure_rebuild_mode rebuildMode = acceleration_structure_no_rebuild);
-	raytracing_blas_builder& push(const dx_vertex_buffer& vertexBuffer, const dx_index_buffer& indexBuffer, submesh_info submesh, bool opaque = true, const trs& localTransform = trs::identity);
+	raytracing_blas_builder& push(ref<dx_vertex_buffer> vertexBuffer, ref<dx_index_buffer> indexBuffer, submesh_info submesh, bool opaque = true, const trs& localTransform = trs::identity);
 	raytracing_blas finish();
 
 private:

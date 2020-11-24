@@ -289,7 +289,7 @@ void dx_window::onResize()
 
 		updateRenderTargetViews(*this, dxContext.device);
 
-		if (depthBuffer.resource)
+		if (depthBuffer->resource)
 		{
 			resizeTexture(depthBuffer, clientWidth, clientHeight);
 		}
