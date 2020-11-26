@@ -6,6 +6,7 @@
 #include "render_pass.h"
 #include "light_source.h"
 #include "gizmo.h"
+#include "pbr.h"
 
 #include "model_rs.hlsl"
 #include "light_source.hlsl"
@@ -33,25 +34,6 @@ static const char* aspectRatioNames[] =
 	"16:10",
 };
 
-struct pbr_material
-{
-	ref<dx_texture> albedo;
-	ref<dx_texture> normal;
-	ref<dx_texture> roughness;
-	ref<dx_texture> metallic;
-
-	vec4 albedoTint;
-	float roughnessOverride;
-	float metallicOverride;
-};
-
-struct pbr_environment
-{
-	ref<dx_texture> sky;
-	ref<dx_texture> environment;
-	ref<dx_texture> irradiance;
-};
-
 struct renderer_settings
 {
 	tonemap_cb tonemap;
@@ -63,7 +45,6 @@ struct renderer_settings
 struct dx_renderer
 {
 	static void initializeCommon(DXGI_FORMAT screenFormat);
-	static pbr_environment createEnvironment(const char* filename, uint32 skyResolution = 2048, uint32 environmentResolution = 128, uint32 irradianceResolution = 32, bool asyncCompute = false);
 	
 	void initialize(uint32 windowWidth, uint32 windowHeight);
 
@@ -75,7 +56,7 @@ struct dx_renderer
 
 	// Set these with your application.
 	void setCamera(const render_camera& camera);
-	void setEnvironment(const pbr_environment& environment);
+	void setEnvironment(const ref<pbr_environment>& environment);
 	void setSun(const directional_light& light);
 
 	void setPointLights(const point_light_cb* lights, uint32 numLights);
@@ -83,7 +64,6 @@ struct dx_renderer
 
 	geometry_render_pass* beginGeometryPass() { return &geometryRenderPass; }
 	sun_shadow_render_pass* beginSunShadowPass() { return &sunShadowRenderPass; }
-	raytracing_render_pass* beginRaytracingPass() { return &raytracingRenderPass; }
 
 	
 	renderer_settings settings;
@@ -146,7 +126,6 @@ private:
 
 	geometry_render_pass geometryRenderPass;
 	sun_shadow_render_pass sunShadowRenderPass;
-	raytracing_render_pass raytracingRenderPass;
 
 	light_culling_buffers lightCullingBuffers;
 

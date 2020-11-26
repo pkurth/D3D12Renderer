@@ -9,12 +9,13 @@ void geometry_render_pass::reset()
 	drawCalls.clear();
 }
 
-void geometry_render_pass::renderObject(const dx_mesh* mesh, submesh_info submesh, const pbr_material* material, const mat4& transform)
+void geometry_render_pass::renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, const mat4& transform)
 {
 	drawCalls.push_back(
 		{
 			transform,
-			mesh,
+			vertexBuffer,
+			indexBuffer,
 			material,
 			submesh,
 		}
@@ -29,29 +30,14 @@ void sun_shadow_render_pass::reset()
 	}
 }
 
-void sun_shadow_render_pass::renderObject(uint32 cascadeIndex, const dx_mesh* mesh, submesh_info submesh, const mat4& transform)
+void sun_shadow_render_pass::renderObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
 {
 	drawCalls[cascadeIndex].push_back(
 		{
 			transform,
-			mesh,
+			vertexBuffer,
+			indexBuffer,
 			submesh,
-		}
-	);
-}
-
-void raytracing_render_pass::reset()
-{
-	drawCalls.clear();
-}
-
-void raytracing_render_pass::renderObject(const raytracing_blas* blas, const pbr_material* material, const mat4& transform)
-{
-	drawCalls.push_back(
-		{
-			transform,
-			blas,
-			material,
 		}
 	);
 }

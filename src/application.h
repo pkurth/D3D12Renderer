@@ -13,9 +13,8 @@
 struct scene_object
 {
 	trs transform;
+	ref<pbr_material> material;
 	uint32 meshIndex;
-	uint32 blasIndex;
-	uint32 materialIndex;
 };
 
 struct application
@@ -31,15 +30,11 @@ struct application
 private:
 	void updateCamera(const user_input& input, float dt);
 
-
-	std::vector<ref<dx_texture>> textures;
 	std::vector<composite_mesh> meshes;
-	std::vector<raytracing_blas> blas;
-	std::vector<pbr_material> materials; // TODO: Eventually store indices to textures here, instead of pointers.
 
 	std::vector<scene_object> gameObjects;
 
-	pbr_environment environment;
+	ref<pbr_environment> environment;
 
 
 	static const uint32 numPointLights = 10;

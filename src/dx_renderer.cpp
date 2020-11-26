@@ -316,36 +316,6 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 
 	geometryRenderPass.reset();
 	sunShadowRenderPass.reset();
-	raytracingRenderPass.reset();
-}
-
-pbr_environment dx_renderer::createEnvironment(const char* filename, uint32 skyResolution, uint32 environmentResolution, uint32 irradianceResolution, bool asyncCompute)
-{
-	pbr_environment environment;
-
-	ref<dx_texture> equiSky = loadTextureFromFile(filename,
-		texture_load_flags_noncolor | texture_load_flags_cache_to_dds | texture_load_flags_gen_mips_on_cpu);
-
-	dx_command_list* cl;
-	if (asyncCompute)
-	{
-		dxContext.computeQueue.waitForOtherQueue(dxContext.copyQueue);
-		cl = dxContext.getFreeComputeCommandList(true);
-	}
-	else
-	{
-		dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
-		cl = dxContext.getFreeRenderCommandList();
-	}
-	//generateMipMapsOnGPU(cl, equiSky);
-	environment.sky = equirectangularToCubemap(cl, equiSky, skyResolution, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
-	environment.environment = prefilterEnvironment(cl, environment.sky, environmentResolution);
-	environment.irradiance = cubemapToIrradiance(cl, environment.sky, irradianceResolution);
-	dxContext.executeCommandList(cl);
-
-	dxContext.retireObject(equiSky->resource);
-
-	return environment;
 }
 
 void dx_renderer::recalculateViewport(bool resizeTextures)
@@ -431,11 +401,11 @@ void dx_renderer::setCamera(const render_camera& camera)
 	this->camera.invScreenDims = vec2(1.f / renderWidth, 1.f / renderHeight);
 }
 
-void dx_renderer::setEnvironment(const pbr_environment& environment)
+void dx_renderer::setEnvironment(const ref<pbr_environment>& environment)
 {
-	this->environment.sky = environment.sky->defaultSRV;
-	this->environment.environment = environment.environment->defaultSRV;
-	this->environment.irradiance = environment.irradiance->defaultSRV;
+	this->environment.sky = environment->sky->defaultSRV;
+	this->environment.environment = environment->environment->defaultSRV;
+	this->environment.irradiance = environment->irradiance->defaultSRV;
 }
 
 void dx_renderer::setSun(const directional_light& light)
@@ -519,12 +489,11 @@ void dx_renderer::endFrame()
 	{
 		const mat4& m = dc.transform;
 		const submesh_info& submesh = dc.submesh;
-		const dx_mesh* mesh = dc.mesh;
 
 		cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
 
-		cl->setVertexBuffer(0, mesh->vertexBuffer);
-		cl->setIndexBuffer(mesh->indexBuffer);
+		cl->setVertexBuffer(0, dc.vertexBuffer);
+		cl->setIndexBuffer(dc.indexBuffer);
 		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 	}
 
@@ -597,12 +566,11 @@ void dx_renderer::endFrame()
 			{
 				const mat4& m = dc.transform;
 				const submesh_info& submesh = dc.submesh;
-				const dx_mesh* mesh = dc.mesh;
 
 				cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ sun.vp[i] * m, m });
 
-				cl->setVertexBuffer(0, mesh->vertexBuffer);
-				cl->setIndexBuffer(mesh->indexBuffer);
+				cl->setVertexBuffer(0, dc.vertexBuffer);
+				cl->setIndexBuffer(dc.indexBuffer);
 				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 			}
 		}
@@ -667,8 +635,7 @@ void dx_renderer::endFrame()
 	{
 		const mat4& m = dc.transform;
 		const submesh_info& submesh = dc.submesh;
-		const dx_mesh* mesh = dc.mesh;
-		const pbr_material* material = dc.material;
+		const ref<pbr_material>& material = dc.material;
 
 		uint32 flags = 0;
 
@@ -697,8 +664,8 @@ void dx_renderer::endFrame()
 
 		cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
 
-		cl->setVertexBuffer(0, mesh->vertexBuffer);
-		cl->setIndexBuffer(mesh->indexBuffer);
+		cl->setVertexBuffer(0, dc.vertexBuffer);
+		cl->setIndexBuffer(dc.indexBuffer);
 		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 	}
 

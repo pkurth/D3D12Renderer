@@ -330,6 +330,8 @@ static vec2& operator/=(vec2& a, float b) { a = a / b; return a; }
 
 static vec2 operator-(vec2 a) { return vec2(-a.x, -a.y); }
 
+static bool operator==(vec2 a, vec2 b) { return a.x == b.x && a.y == b.y; }
+
 
 // Vec3 operators.
 static vec3 operator+(vec3 a, vec3 b) { vec3 result = { a.x + b.x, a.y + b.y, a.z + b.z }; return result; }
@@ -369,6 +371,8 @@ static vec4 operator/(vec4 a, float b) { vec4 result = { a.f4 / floatx4(b) }; re
 static vec4& operator/=(vec4& a, float b) { a = a / b; return a; }
 
 static vec4 operator-(vec4 a) { return vec4(-a.f4); }
+
+static bool operator==(vec4 a, vec4 b) { return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w; }
 
 
 static float dot(vec2 a, vec2 b) { float result = a.x * b.x + a.y * b.y; return result; }
@@ -458,6 +462,10 @@ mat2& operator*=(mat2& a, float b);
 mat3& operator*=(mat3& a, float b);
 mat4& operator*=(mat4& a, float b);
 trs operator*(trs a, trs b);
+
+bool operator==(vec2 a, vec2 b);
+bool operator==(vec3 a, vec3 b);
+bool operator==(vec4 a, vec4 b);
 
 mat2 transpose(mat2 a);
 mat3 transpose(mat3 a);

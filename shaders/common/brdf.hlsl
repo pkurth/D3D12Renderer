@@ -1,18 +1,11 @@
 #ifndef BRDF_HLSLI
 #define BRDF_HLSLI
 
+#include "math.hlsl"
+
 // http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
 // We should really make an optimization pass over this code. Many terms are computed multiple times.
 
-
-
-#ifndef M_PI
-#define M_PI  3.14159265359f
-#endif
-
-#ifndef M_ONE_OVER_PI
-#define M_ONE_OVER_PI (1.f / M_PI)
-#endif
 
 
 static float3 fresnelSchlick(float LdotH, float3 F0)
@@ -35,7 +28,7 @@ static float distributionGGX(float3 N, float3 H, float roughness)
 
 	float nom = a2;
 	float denom = (NdotH2 * (a2 - 1.f) + 1.f);
-	denom = M_PI * denom * denom;
+	denom = pi * denom * denom;
 
 	return nom / max(denom, 0.001f);
 }
@@ -82,7 +75,7 @@ static float3 importanceSampleGGX(float2 Xi, float3 N, float roughness)
 {
 	float a = roughness * roughness;
 
-	float phi = 2.f * M_PI * Xi.x;
+	float phi = 2.f * pi * Xi.x;
 	float cosTheta = sqrt((1.f - Xi.y) / (1.f + (a * a - 1.f) * Xi.y));
 	float sinTheta = sqrt(1.f - cosTheta * cosTheta);
 
@@ -157,7 +150,7 @@ static float3 calculateDirectLighting(float3 albedo, float3 radiance, float3 N, 
 	float denominator = 4.f * NdotV * NdotL;
 	float3 specular = numerator / max(denominator, 0.001f);
 
-	return (kD * albedo * M_ONE_OVER_PI + specular) * radiance * NdotL;
+	return (kD * albedo * invPI + specular) * radiance * NdotL;
 }
 
 #endif

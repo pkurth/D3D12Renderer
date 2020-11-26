@@ -18,30 +18,19 @@ void application::initialize(dx_renderer* renderer)
 	camera.nearPlane = 0.1f;
 
 
-	meshes.push_back(createCompositeMeshFromFile("assets/meshes/cerberus.fbx", 
+	meshes.push_back(loadMeshFromFile("assets/meshes/cerberus.fbx", 
 		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
 	);
 
-	textures.push_back(loadTextureFromFile("assets/textures/cerberus_a.tga"));
-	textures.push_back(loadTextureFromFile("assets/textures/cerberus_n.tga", texture_load_flags_default | texture_load_flags_noncolor));
-	textures.push_back(loadTextureFromFile("assets/textures/cerberus_r.tga", texture_load_flags_default | texture_load_flags_noncolor));
-	textures.push_back(loadTextureFromFile("assets/textures/cerberus_m.tga", texture_load_flags_default | texture_load_flags_noncolor));
-
-	materials.push_back(
-		{
-			textures[0],
-			textures[1],
-			textures[2],
-			textures[3],
-			vec4(1.f, 1.f, 1.f, 1.f),
-			0.f, 
-			0.f,
-		}
+	ref<pbr_material> cerberusMaterial = createMaterial(
+		"assets/textures/cerberus_a.tga",
+		"assets/textures/cerberus_n.tga",
+		"assets/textures/cerberus_r.tga",
+		"assets/textures/cerberus_m.tga",
+		vec4(1.f, 1.f, 1.f, 1.f),
+		0.f,
+		0.f
 	);
-
-	blas.push_back(raytracing_blas_builder()
-		.push(meshes[0].mesh.vertexBuffer, meshes[0].mesh.indexBuffer, meshes[0].singleMeshes[0].submesh)
-		.finish());
 
 	// Cerberus.
 	gameObjects.push_back(
@@ -51,8 +40,7 @@ void application::initialize(dx_renderer* renderer)
 				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
 				0.4f,
 			},
-			0,
-			0,
+			cerberusMaterial,
 			0,
 		}
 	);
@@ -275,19 +263,19 @@ void application::update(const user_input& input, float dt)
 	{
 		const dx_mesh& mesh = meshes[go.meshIndex].mesh;
 		submesh_info submesh = meshes[go.meshIndex].singleMeshes[0].submesh;
-		const pbr_material& material = materials[go.materialIndex];
+		const ref<pbr_material>& material = go.material;
 
 		mat4 m = trsToMat4(go.transform);
 
-		geometryPass->renderObject(&mesh, submesh, &material, m);
-		shadowPass->renderObject(0, &mesh, submesh, m);
+		geometryPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m);
+		shadowPass->renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
 	}
 
 }
 
 void application::setEnvironment(const char* filename)
 {
-	environment = dx_renderer::createEnvironment(filename); // Currently synchronous (on render queue).
+	environment = createEnvironment(filename); // Currently synchronous (on render queue).
 }
 
 

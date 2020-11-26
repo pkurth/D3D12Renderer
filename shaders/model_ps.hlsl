@@ -85,7 +85,6 @@ float4 main(ps_input IN) : SV_TARGET
 		const uint spotLightOffset = lightIndexData.z;
 		const uint spotLightCount = lightIndexData.w;
 
-		//return float4(spotLightCount, 0.f, 0.f, 1.f);
 
 
 		// Point lights.

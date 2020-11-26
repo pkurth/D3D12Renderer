@@ -102,15 +102,15 @@ void freeAssimpScene(const aiScene* scene)
 	}
 }
 
-composite_mesh createCompositeMeshFromFile(const char* sceneFilename, uint32 flags)
+composite_mesh loadMeshFromFile(const char* sceneFilename, uint32 flags)
 {
 	const aiScene* scene = loadAssimpSceneFile(sceneFilename);
-	auto mesh = createCompositeMeshFromScene(scene, flags);
+	auto mesh = loadMeshFromScene(scene, flags);
 	freeAssimpScene(scene);
 	return mesh;
 }
 
-composite_mesh createCompositeMeshFromScene(const aiScene* scene, uint32 flags)
+composite_mesh loadMeshFromScene(const aiScene* scene, uint32 flags)
 {
 	struct mesh_info
 	{

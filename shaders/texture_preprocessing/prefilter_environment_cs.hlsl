@@ -90,7 +90,7 @@ static float4 filter(uint mip, float3 N, float3 V)
 			float pdf = (D * NdotH / (4.f * HdotV)) + 0.0001f;
 
 			uint resolution = width; // We expect quadratic faces, so width == height.
-			float saTexel = 4.f * M_PI / (6.f * width * height);
+			float saTexel = 4.f * pi / (6.f * width * height);
 			float saSample = 1.f / (SAMPLE_COUNT * pdf + 0.00001f);
 
 			float sampleMipLevel = (roughness == 0.f) ? 0.f : 0.5f * log2(saSample / saTexel);
