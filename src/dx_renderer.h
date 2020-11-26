@@ -37,7 +37,8 @@ static const char* aspectRatioNames[] =
 struct renderer_settings
 {
 	tonemap_cb tonemap;
-	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
+	float environmentIntensity;
+	aspect_ratio_mode aspectRatioMode;
 	bool showLightVolumes;
 };
 

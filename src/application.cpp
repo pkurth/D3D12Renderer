@@ -18,6 +18,7 @@ void application::initialize(dx_renderer* renderer)
 	camera.nearPlane = 0.1f;
 
 
+#if 0
 	meshes.push_back(loadMeshFromFile("assets/meshes/cerberus.fbx", 
 		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
 	);
@@ -31,19 +32,20 @@ void application::initialize(dx_renderer* renderer)
 		0.f,
 		0.f
 	);
+	meshes[0].singleMeshes[0].material = cerberusMaterial;
 
-	// Cerberus.
-	gameObjects.push_back(
-		{
-			{
-				vec3(0.f, 10.f, 0.f),
-				quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
-				0.4f,
-			},
-			cerberusMaterial,
-			0,
-		}
+	trs transform = { vec3(0.f, 10.f, 0.f),	quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.4f };
+
+#else
+	meshes.push_back(loadMeshFromFile("assets/meshes/sponza.obj",
+		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents,
+		true)
 	);
+
+	trs transform = { vec3(0.f, 10.f, 0.f),	quat::identity, 0.03f };
+#endif
+
+	gameObjects.push_back({	transform, 0, });
 
 	setEnvironment("assets/textures/hdri/leadenhall_market_4k.hdr");
 
@@ -94,16 +96,15 @@ void application::initialize(dx_renderer* renderer)
 		};
 	}
 
-	sun.direction = normalize(vec3(-0.6f, -1.f, -1.3f));
+	sun.direction = normalize(vec3(-0.6f, -1.f, -0.3f));
 	sun.color = vec3(1.f, 0.93f, 0.76f);
-	sun.intensity = 500.f;
-
-	sun.cascadeDistances.data[0] = 9.f;
-	sun.cascadeDistances.data[1] = 39.f;
-	sun.cascadeDistances.data[2] = 100.f;
-	sun.cascadeDistances.data[3] = 300.f;
+	sun.intensity = 50.f;
 
 	sun.numShadowCascades = 3;
+	sun.cascadeDistances.data[0] = 9.f;
+	sun.cascadeDistances.data[1] = 39.f;
+	sun.cascadeDistances.data[2] = 74.f;
+	sun.cascadeDistances.data[3] = 10000.f;
 
 	sun.bias = vec4(0.001f, 0.0015f, 0.0015f, 0.0035f);
 	sun.blendArea = 0.07f;
@@ -226,6 +227,8 @@ void application::update(const user_input& input, float dt)
 	plotAndEditTonemapping(renderer->settings.tonemap);
 	editSunShadowParameters(sun);
 
+	ImGui::SliderFloat("Environment intensity", &renderer->settings.environmentIntensity, 0.f, 2.f);
+
 	ImGui::End();
 
 	// Update light positions.
@@ -262,13 +265,17 @@ void application::update(const user_input& input, float dt)
 	for (const scene_object& go : gameObjects)
 	{
 		const dx_mesh& mesh = meshes[go.meshIndex].mesh;
-		submesh_info submesh = meshes[go.meshIndex].singleMeshes[0].submesh;
-		const ref<pbr_material>& material = go.material;
 
-		mat4 m = trsToMat4(go.transform);
+		for (auto& single : meshes[go.meshIndex].singleMeshes)
+		{
+			submesh_info submesh = single.submesh;
+			const ref<pbr_material>& material = single.material;
 
-		geometryPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m);
-		shadowPass->renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+			mat4 m = trsToMat4(go.transform);
+
+			geometryPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m);
+			shadowPass->renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+		}
 	}
 
 }
@@ -384,6 +391,12 @@ void application::serializeToFile(const char* filename)
 				<< YAML::Key << "Blend Area" << YAML::Value << sun.blendArea
 			<< YAML::EndMap;
 
+	out << YAML::Key << "Lighting"
+		<< YAML::Value
+			<< YAML::BeginMap
+				<< YAML::Key << "Environment Intensity" << renderer->settings.environmentIntensity
+			<< YAML::EndMap;
+
 	out << YAML::EndMap;
 
 	fs::create_directories(fs::path(filename).parent_path());
@@ -427,6 +440,9 @@ bool application::deserializeFromFile(const char* filename)
 	sun.cascadeDistances = sunNode["Distances"].as<vec4>();
 	sun.bias = sunNode["Bias"].as<vec4>();
 	sun.blendArea = sunNode["Blend Area"].as<float>();
+
+	auto lightingNode = data["Lighting"];
+	renderer->settings.environmentIntensity = lightingNode["Environment Intensity"].as<float>();
 
 	return true;
 }

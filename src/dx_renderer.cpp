@@ -256,6 +256,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 
 
 	settings.tonemap = defaultTonemapParameters();
+	settings.environmentIntensity = 1.f;
 	settings.aspectRatioMode = aspect_ratio_free;
 	settings.showLightVolumes = false;
 
@@ -616,6 +617,7 @@ void dx_renderer::endFrame()
 	cl->setGraphicsRootSignature(*modelPipeline.rootSignature);
 	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 0, environment.irradiance);
 	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 1, environment.environment);
+	cl->setGraphics32BitConstants(MODEL_RS_LIGHTING, lighting_cb{ settings.environmentIntensity });
 	cl->setDescriptorHeapSRV(MODEL_RS_BRDF, 0, brdfTex);
 	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 0, lightCullingBuffers.lightGrid);
 	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 1, lightCullingBuffers.pointLightIndexList);

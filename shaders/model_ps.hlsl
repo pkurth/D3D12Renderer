@@ -14,6 +14,7 @@ struct ps_input
 
 ConstantBuffer<pbr_material_cb> material	: register(b1);
 ConstantBuffer<camera_cb> camera			: register(b2);
+ConstantBuffer<lighting_cb> lighting		: register(b3);
 
 
 SamplerState wrapSampler				: register(s0);
@@ -144,7 +145,7 @@ float4 main(ps_input IN) : SV_TARGET
 	}
 
 	// Ambient.
-	totalLighting.xyz += calculateAmbientLighting(albedo.xyz, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao);
+	totalLighting.xyz += calculateAmbientLighting(albedo.xyz, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao) * lighting.environmentIntensity;
 
 	//float4 volume = volumetrics.Sample(wrapSampler, IN.screenPosition.xy * camera.invScreenDims);
 	//totalLighting.xyz += volume.xyz;

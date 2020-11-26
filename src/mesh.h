@@ -4,12 +4,14 @@
 #include "dx_render_primitives.h"
 
 struct aiScene;
+struct pbr_material;
 
 
 struct single_mesh
 {
 	submesh_info submesh;
 	bounding_box boundingBox;
+	ref<pbr_material> material;
 	std::string name;
 };
 
@@ -30,5 +32,5 @@ struct composite_mesh
 
 const aiScene* loadAssimpSceneFile(const char* filepath);
 void freeAssimpScene(const aiScene* scene);
-composite_mesh loadMeshFromScene(const aiScene* scene, uint32 flags);
-composite_mesh loadMeshFromFile(const char* sceneFilename, uint32 flags);
+composite_mesh loadMeshFromScene(const aiScene* scene, uint32 flags, bool loadMaterials = false);
+composite_mesh loadMeshFromFile(const char* sceneFilename, uint32 flags, bool loadMaterials = false);

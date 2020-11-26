@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "mesh.h"
 #include "geometry.h"
+#include "pbr.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/Exporter.hpp>
@@ -66,7 +67,7 @@ const aiScene* loadAssimpSceneFile(const char* filepathRaw)
 		importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_POINT | aiPrimitiveType_LINE);
 		importer.SetPropertyInteger(AI_CONFIG_PP_SLM_VERTEX_LIMIT, UINT16_MAX); // So that we can use 16 bit indices.
 
-		uint32 importFlags = aiProcessPreset_TargetRealtime_MaxQuality | aiProcess_FlipUVs;
+		uint32 importFlags = aiProcessPreset_TargetRealtime_MaxQuality | aiProcess_OptimizeGraph | aiProcess_FlipUVs;
 		uint32 exportFlags = 0;
 
 		scene = importer.ReadFile(filepath.string(), importFlags);
@@ -102,15 +103,37 @@ void freeAssimpScene(const aiScene* scene)
 	}
 }
 
-composite_mesh loadMeshFromFile(const char* sceneFilename, uint32 flags)
+static ref<pbr_material> loadAssimpMaterial(const aiMaterial* material)
+{
+	aiString diffuse, normal, roughness, metallic;
+	bool hasDiffuse = material->GetTexture(aiTextureType_DIFFUSE, 0, &diffuse) == aiReturn_SUCCESS;
+	bool hasNormal = material->GetTexture(aiTextureType_HEIGHT, 0, &normal) == aiReturn_SUCCESS || 
+		material->GetTexture(aiTextureType_NORMALS, 0, &normal) == aiReturn_SUCCESS;
+	bool hasRoughness = material->GetTexture(aiTextureType_SHININESS, 0, &roughness) == aiReturn_SUCCESS;
+	bool hasMetallic = material->GetTexture(aiTextureType_AMBIENT, 0, &metallic) == aiReturn_SUCCESS;
+
+	const char* albedoName = 0;
+	const char* normalName = 0;
+	const char* roughnessName = 0;
+	const char* metallicName = 0;
+
+	if (hasDiffuse) { albedoName = diffuse.C_Str(); }
+	if (hasNormal) { normalName = normal.C_Str(); }
+	if (hasRoughness) { roughnessName = roughness.C_Str(); }
+	if (hasMetallic) { metallicName = metallic.C_Str(); }
+
+	return createMaterial(albedoName, normalName, roughnessName, metallicName);
+}
+
+composite_mesh loadMeshFromFile(const char* sceneFilename, uint32 flags, bool loadMaterials)
 {
 	const aiScene* scene = loadAssimpSceneFile(sceneFilename);
-	auto mesh = loadMeshFromScene(scene, flags);
+	auto mesh = loadMeshFromScene(scene, flags, loadMaterials);
 	freeAssimpScene(scene);
 	return mesh;
 }
 
-composite_mesh loadMeshFromScene(const aiScene* scene, uint32 flags)
+composite_mesh loadMeshFromScene(const aiScene* scene, uint32 flags, bool loadMaterials)
 {
 	struct mesh_info
 	{
@@ -118,6 +141,7 @@ composite_mesh loadMeshFromScene(const aiScene* scene, uint32 flags)
 		submesh_info submesh;
 		bounding_box aabb;
 		std::string name;
+		ref<pbr_material> material;
 	};
 
 	cpu_mesh cpuMesh(flags);
@@ -165,6 +189,17 @@ composite_mesh loadMeshFromScene(const aiScene* scene, uint32 flags)
 		infos[i].lod = lod;
 		infos[i].submesh = cpuMesh.pushAssimpMesh(mesh, 1.f, &infos[i].aabb);
 		infos[i].name = name;
+
+
+		if (loadMaterials && mesh->mMaterialIndex < scene->mNumMaterials)
+		{
+			const aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+			infos[i].material = loadAssimpMaterial(material);
+		}
+		else
+		{
+			infos[i].material = getDefaultMaterial();
+		}
 	}
 
 	std::sort(infos.begin(), infos.end(), [](const mesh_info& a, const mesh_info& b)
@@ -196,14 +231,14 @@ composite_mesh loadMeshFromScene(const aiScene* scene, uint32 flags)
 
 		for (uint32 j = 0; j < numMeshesWithoutLOD; ++j, ++lod.numMeshes)
 		{
-			result.singleMeshes.push_back({ infos[j].submesh, infos[j].aabb, infos[j].name });
+			result.singleMeshes.push_back({ infos[j].submesh, infos[j].aabb, infos[j].material, infos[j].name });
 		}
 
 		if (currentInfoOffset < infos.size())
 		{
 			while (currentInfoOffset < infos.size() && infos[currentInfoOffset].lod - lodReduce == i)
 			{
-				result.singleMeshes.push_back({ infos[currentInfoOffset].submesh, infos[currentInfoOffset].aabb, infos[currentInfoOffset].name });
+				result.singleMeshes.push_back({ infos[currentInfoOffset].submesh, infos[currentInfoOffset].aabb, infos[currentInfoOffset].material, infos[currentInfoOffset].name });
 				++currentInfoOffset;
 				++lod.numMeshes;
 			}
@@ -219,7 +254,7 @@ composite_mesh loadMeshFromScene(const aiScene* scene, uint32 flags)
 
 	result.lodDistances.resize(result.lods.size());
 
-	std::cout << "There are " << result.lods.size() << " LODs in this file" << std::endl;
+	std::cout << "There are " << result.lods.size() << " LODs in this file." << std::endl;
 
 	uint32 l = 0;
 	for (lod_mesh& lod : result.lods)

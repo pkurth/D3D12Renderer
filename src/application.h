@@ -13,7 +13,6 @@
 struct scene_object
 {
 	trs transform;
-	ref<pbr_material> material;
 	uint32 meshIndex;
 };
 
@@ -37,7 +36,7 @@ private:
 	ref<pbr_environment> environment;
 
 
-	static const uint32 numPointLights = 10;
+	static const uint32 numPointLights = 0;
 	static const uint32 numSpotLights = 0;
 
 	point_light_cb* pointLights;

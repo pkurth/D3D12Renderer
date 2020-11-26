@@ -112,6 +112,15 @@ ref<pbr_material> createMaterial(const char* albedoTex, const char* normalTex, c
 	return sp;
 }
 
+ref<pbr_material> getDefaultMaterial()
+{
+	static ref<pbr_material> material = make_ref<pbr_material>(
+		pbr_material{ 0, 0, 0, 0, vec4(1.f, 0.f, 1.f, 1.f), 1.f, 0.f }
+	);
+
+	return material;
+}
+
 ref<pbr_environment> createEnvironment(const char* filename, uint32 skyResolution, uint32 environmentResolution, uint32 irradianceResolution, bool asyncCompute)
 {
 	static std::unordered_map<std::string, weakref<pbr_environment>> cache;
