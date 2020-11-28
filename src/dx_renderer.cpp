@@ -595,7 +595,7 @@ void dx_renderer::endFrame()
 #if 1
 	for (const raytraced_reflections_render_pass::draw_call& dc : raytracedReflectionsRenderPass.drawCalls)
 	{
-		dc.batch->render(cl, raytracingTexture, cameraCBV);
+		dc.batch->render(cl, raytracingTexture, settings.numRaytracingBounces, cameraCBV, sunCBV);
 	}
 	cl->resetToDynamicDescriptorHeap();
 #endif

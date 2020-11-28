@@ -96,9 +96,6 @@ private:
 	const wchar* raygenEntryPoint;
 	std::vector<const wchar*> missEntryPoints;
 
-	D3D12_ROOT_SIGNATURE_DESC raygenRSDesc;
-	std::vector<D3D12_ROOT_SIGNATURE_DESC> hitGroupRSDescs;
-
 	uint32 payloadSize;
 	uint32 maxRecursionDepth;
 

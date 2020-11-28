@@ -53,10 +53,11 @@ void application::initialize(dx_renderer* renderer)
 	}
 	blas.push_back(blasBuilder.finish());
 
-	raytracingBatch.initialize(1);
-	raytracingBatch.beginObjectType(blas[0], raytracingMaterials);
-	raytracingBatch.pushInstance(transform);
-	raytracingBatch.build();
+	raytracingBatch.initialize(128);
+	auto type = raytracingBatch.defineObjectType(blas[0], raytracingMaterials);
+	raytracingBatch.instantiate(type, transform);
+	raytracingBatch.instantiate(type, { transform.position + vec3(0.f, 100.f, 0.f), transform.rotation, transform.scale });
+	raytracingBatch.buildAll();
 #endif
 
 	gameObjects.push_back({	transform, 0, });
@@ -244,6 +245,7 @@ void application::update(const user_input& input, float dt)
 	editSunShadowParameters(sun);
 
 	ImGui::SliderFloat("Environment intensity", &renderer->settings.environmentIntensity, 0.f, 2.f);
+	ImGui::SliderInt("Raytracing bounces", (int*)&renderer->settings.numRaytracingBounces, 1, MAX_RAYTRACING_RECURSION_DEPTH);
 
 	ImGui::End();
 

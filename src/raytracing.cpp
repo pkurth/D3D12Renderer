@@ -252,8 +252,6 @@ raytracing_pipeline_builder& raytracing_pipeline_builder::raygen(const wchar* en
 	uint32 size = getShaderBindingTableSize(rootSignatureDesc);
 	tableEntrySize = max(size, tableEntrySize);
 
-	raygenRSDesc = rootSignatureDesc;
-
 	return *this;
 }
 
@@ -324,7 +322,6 @@ raytracing_pipeline_builder& raytracing_pipeline_builder::hitgroup(const wchar* 
 
 	emptyAssociations.push_back(miss);
 	missEntryPoints.push_back(miss);
-	hitGroupRSDescs.push_back(rootSignatureDesc);
 
 	return *this;
 }

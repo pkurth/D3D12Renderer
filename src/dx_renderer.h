@@ -38,6 +38,7 @@ struct renderer_settings
 {
 	tonemap_cb tonemap;
 	float environmentIntensity;
+	uint32 numRaytracingBounces = 1;
 	aspect_ratio_mode aspectRatioMode;
 	bool showLightVolumes;
 };

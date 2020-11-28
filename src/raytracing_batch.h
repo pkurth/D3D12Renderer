@@ -6,14 +6,33 @@
 
 
 
+#define MAX_RAYTRACING_RECURSION_DEPTH         4
+
+struct raytracing_object_handle
+{
+    D3D12_GPU_VIRTUAL_ADDRESS blas;
+    uint32 instanceContributionToHitGroupIndex;
+};
+
+struct raytracing_instance_handle
+{
+    uint32 instanceIndex;
+};
+
 struct raytracing_batch
 {
-    void build();
-    virtual void render(struct dx_command_list* cl, const ref<dx_texture>& output, dx_dynamic_constant_buffer cameraCBV) = 0;
+    raytracing_instance_handle instantiate(raytracing_object_handle type, const trs& transform);
+    void updateInstanceTransform(raytracing_instance_handle handle, const trs& transform);
+
+    void buildAccelerationStructure();
+    virtual void buildBindingTable() = 0;
+
+    void buildAll();
+
+    virtual void render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, dx_dynamic_constant_buffer cameraCBV, dx_dynamic_constant_buffer sunCBV) = 0;
 
 protected:
     void fillOutRayTracingRenderDesc(D3D12_DISPATCH_RAYS_DESC& raytraceDesc, uint32 renderWidth, uint32 renderHeight, uint32 numRayTypes);
-    virtual void buildBindingTable() = 0;
 
     com<ID3D12DescriptorHeap> descriptorHeap;
     dx_cpu_descriptor_handle cpuBaseDescriptorHandle;
@@ -26,18 +45,19 @@ protected:
     raytracing_tlas tlas;
     ref<dx_buffer> bindingTableBuffer;
 
-    friend struct dx_renderer;
+    uint32 tlasDescriptorIndex = 0;
+
+    acceleration_structure_rebuild_mode rebuildMode;
 };
 
 struct pbr_raytracing_batch : raytracing_batch
 {
-    void initialize(uint32 maxNumObjectTypes = 0);
+    void initialize(uint32 maxNumObjectTypes = 0, acceleration_structure_rebuild_mode rebuildMode = acceleration_structure_rebuild);
 
-    void beginObjectType(const raytracing_blas& blas, const std::vector<ref<pbr_material>>& materials);
-    void pushInstance(const trs& transform);
+    raytracing_object_handle defineObjectType(const raytracing_blas& blas, const std::vector<ref<pbr_material>>& materials);
     virtual void buildBindingTable() override;
 
-    virtual void render(struct dx_command_list* cl, const ref<dx_texture>& output, dx_dynamic_constant_buffer cameraCBV) override;
+    virtual void render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, dx_dynamic_constant_buffer cameraCBV, dx_dynamic_constant_buffer sunCBV) override;
 
 private:
     struct raygen_table_entry
@@ -70,10 +90,6 @@ private:
     };
 
     std::vector<binding_table_entry> bindingTable;
-
-
-    uint32 currentInstanceContributionToHitGroupIndex = 0;
-    D3D12_GPU_VIRTUAL_ADDRESS currentBlas;
 
     uint32 instanceContributionToHitGroupIndex = 0;
 };

@@ -8,6 +8,7 @@
 
 #include "common/camera.hlsl"
 #include "common/raytracing.hlsl"
+#include "common/light_source.hlsl"
 
 // Raytracing intrinsics: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#ray-system-values
 // Ray flags: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#ray-flags
@@ -24,7 +25,8 @@ struct mesh_vertex
 // Global.
 RaytracingAccelerationStructure rtScene		: register(t0);
 ConstantBuffer<camera_cb> camera			: register(b0);
-ConstantBuffer<raytracing_cb> raytracing	: register(b1);
+ConstantBuffer<directional_light_cb> sun	: register(b1);
+ConstantBuffer<raytracing_cb> raytracing	: register(b2);
 RWTexture2D<float4> output					: register(u0);
 SamplerState wrapSampler					: register(s0);
 
@@ -55,10 +57,10 @@ struct shadow_ray_payload
 
 static float3 traceRadianceRay(float3 origin, float3 direction, uint recursion)
 {
-	/*if (recursion >= raytracing.maxRecursionDepth)
+	if (recursion >= raytracing.maxRecursionDepth)
 	{
 		return float3(0, 0, 0);
-	}*/
+	}
 
 	RayDesc ray;
 	ray.Origin = origin;
@@ -82,10 +84,10 @@ static float3 traceRadianceRay(float3 origin, float3 direction, uint recursion)
 
 static bool traceShadowRay(float3 origin, float3 direction, uint recursion)
 {
-	/*if (recursion >= raytracing.maxRecursionDepth)
+	if (recursion >= raytracing.maxRecursionDepth)
 	{
 		return false;
-	}*/
+	}
 
 	RayDesc ray;
 	ray.Origin = origin;
@@ -141,6 +143,16 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float2 uv = interpolateAttribute(uvs, attribs);
 
 	float3 albedo = albedoTex.SampleLevel(wrapSampler, uv, 0).xyz;
+
+	float3 hitPosition = hitWorldPosition();
+	float3 L = -sun.direction;
+	bool inShadow = traceShadowRay(hitPosition, L, payload.recursion);
+
+	albedo = albedo * ((1 - (float)inShadow) * 0.5 + 0.5);
+	//if (inShadow)
+	//{
+	//	albedo = float3(1.f, 0.f, 1.f);
+	//}
 
 	payload.color = albedo;
 }

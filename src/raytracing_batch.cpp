@@ -18,17 +18,21 @@ Hit group shader table index =
 #define PBR_RAYTRACING_RS_TLAS      0
 #define PBR_RAYTRACING_RS_OUTPUT    1
 #define PBR_RAYTRACING_RS_CAMERA    2
-#define PBR_RAYTRACING_RS_CB        3
+#define PBR_RAYTRACING_RS_SUN       3
+#define PBR_RAYTRACING_RS_CB        4
 
-void pbr_raytracing_batch::initialize(uint32 maxNumObjectTypes)
+void pbr_raytracing_batch::initialize(uint32 maxNumObjectTypes, acceleration_structure_rebuild_mode rebuildMode)
 {
+    this->rebuildMode = rebuildMode;
+
     CD3DX12_DESCRIPTOR_RANGE tlasRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
     CD3DX12_DESCRIPTOR_RANGE outputRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0);
-    CD3DX12_ROOT_PARAMETER globalRootParameters[4];
+    CD3DX12_ROOT_PARAMETER globalRootParameters[5];
     globalRootParameters[PBR_RAYTRACING_RS_TLAS].InitAsDescriptorTable(1, &tlasRange);
     globalRootParameters[PBR_RAYTRACING_RS_OUTPUT].InitAsDescriptorTable(1, &outputRange);
     globalRootParameters[PBR_RAYTRACING_RS_CAMERA].InitAsConstantBufferView(0);
-    globalRootParameters[PBR_RAYTRACING_RS_CB].InitAsConstants(1, 1);
+    globalRootParameters[PBR_RAYTRACING_RS_SUN].InitAsConstantBufferView(1);
+    globalRootParameters[PBR_RAYTRACING_RS_CB].InitAsConstants(1, 2);
     CD3DX12_STATIC_SAMPLER_DESC globalStaticSamplers[1];
     globalStaticSamplers[0].Init(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
     D3D12_ROOT_SIGNATURE_DESC globalDesc = { arraysize(globalRootParameters), globalRootParameters, arraysize(globalStaticSamplers), globalStaticSamplers };
@@ -40,7 +44,7 @@ void pbr_raytracing_batch::initialize(uint32 maxNumObjectTypes)
 
 
     pipeline =
-        raytracing_pipeline_builder(L"shaders/raytracing_rts.hlsl", 4 * sizeof(float), 1)
+        raytracing_pipeline_builder(L"shaders/raytracing_rts.hlsl", 4 * sizeof(float), MAX_RAYTRACING_RECURSION_DEPTH)
         .globalRootSignature(globalDesc)
         .raygen(L"rayGen")
         .hitgroup(L"Radiance", L"radianceClosestHit", L"radianceAnyHit", L"radianceMiss", hitDesc)
@@ -77,11 +81,11 @@ void pbr_raytracing_batch::initialize(uint32 maxNumObjectTypes)
     cpuBaseDescriptorHandle = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
     gpuBaseDescriptorHandle = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
     
-    // Offset for the output and TLAS descriptor. Output is set every frame, so we ring buffer this.
-    cpuCurrentDescriptorHandle = cpuBaseDescriptorHandle + 1 + NUM_BUFFERED_FRAMES;
+    // Offset for the output and TLAS descriptor. Output is set every frame, and TLAS can be updated, so we ring buffer this.
+    cpuCurrentDescriptorHandle = cpuBaseDescriptorHandle + NUM_BUFFERED_FRAMES + NUM_BUFFERED_FRAMES;
 }
 
-void pbr_raytracing_batch::beginObjectType(const raytracing_blas& blas, const std::vector<ref<pbr_material>>& materials)
+raytracing_object_handle pbr_raytracing_batch::defineObjectType(const raytracing_blas& blas, const std::vector<ref<pbr_material>>& materials)
 {
     assert(blas.geometries.size() == materials.size());
 
@@ -144,25 +148,11 @@ void pbr_raytracing_batch::beginObjectType(const raytracing_blas& blas, const st
         bindingTable.push_back(shadowHit);
     }
 
-    currentBlas = blas.blas->gpuVirtualAddress;
-    currentInstanceContributionToHitGroupIndex = instanceContributionToHitGroupIndex;
+    raytracing_object_handle result = { blas.blas->gpuVirtualAddress, instanceContributionToHitGroupIndex };
+    
     instanceContributionToHitGroupIndex += numGeometries * numRayTypes;
-}
 
-void pbr_raytracing_batch::pushInstance(const trs& transform)
-{
-    D3D12_RAYTRACING_INSTANCE_DESC instance = {};
-
-    instance.Flags = 0;// D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE;
-    instance.InstanceContributionToHitGroupIndex = currentInstanceContributionToHitGroupIndex;
-
-    mat4 m = transpose(trsToMat4(transform));
-    memcpy(instance.Transform, &m, sizeof(instance.Transform));
-    instance.AccelerationStructure = currentBlas;
-    instance.InstanceMask = 0xFF;
-    instance.InstanceID = 0; // This value will be exposed to the shader via InstanceID().
-
-    allInstances.push_back(instance);
+    return result;
 }
 
 void pbr_raytracing_batch::buildBindingTable()
@@ -170,35 +160,44 @@ void pbr_raytracing_batch::buildBindingTable()
     bindingTableBuffer = createBuffer(sizeof(binding_table_entry), (uint32)bindingTable.size(), bindingTable.data());
 }
 
-void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_texture>& output, dx_dynamic_constant_buffer cameraCBV)
+void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, dx_dynamic_constant_buffer cameraCBV, dx_dynamic_constant_buffer sunCBV)
 {
-    uint32 index = dxContext.bufferedFrameID + 1; // TLAS is at 0.
-    dxContext.device->CopyDescriptorsSimple(1, (cpuBaseDescriptorHandle + index).cpuHandle, output->defaultUAV.cpuHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    uint32 tlasIndex = tlasDescriptorIndex;
+
+    uint32 outputIndex = dxContext.bufferedFrameID + 2; // TLAS is at 0 or 1.
+    dxContext.device->CopyDescriptorsSimple(1, (cpuBaseDescriptorHandle + outputIndex).cpuHandle, output->defaultUAV.cpuHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     auto desc = output->resource->GetDesc();
 
     D3D12_DISPATCH_RAYS_DESC raytraceDesc;
     fillOutRayTracingRenderDesc(raytraceDesc, (uint32)desc.Width, desc.Height, numRayTypes);
 
-    dx_gpu_descriptor_handle tlasHandle = gpuBaseDescriptorHandle;
-    dx_gpu_descriptor_handle outputHandle = gpuBaseDescriptorHandle + index;
+    dx_gpu_descriptor_handle tlasHandle = gpuBaseDescriptorHandle + tlasIndex;
+    dx_gpu_descriptor_handle outputHandle = gpuBaseDescriptorHandle + outputIndex;
 
     cl->setDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, descriptorHeap);
 
     cl->setPipelineState(pipeline.pipeline);
     cl->setComputeRootSignature(pipeline.rootSignature);
 
-    raytracing_cb raytracingCB = { 1 };
+    raytracing_cb raytracingCB = { numBounces };
 
     cl->setComputeDescriptorTable(PBR_RAYTRACING_RS_TLAS, tlasHandle);
     cl->setComputeDescriptorTable(PBR_RAYTRACING_RS_OUTPUT, outputHandle);
     cl->setComputeDynamicConstantBuffer(PBR_RAYTRACING_RS_CAMERA, cameraCBV);
+    cl->setComputeDynamicConstantBuffer(PBR_RAYTRACING_RS_SUN, sunCBV);
     cl->setCompute32BitConstants(PBR_RAYTRACING_RS_CB, raytracingCB);
 
     cl->raytrace(raytraceDesc);
 }
 
-void raytracing_batch::build()
+void raytracing_batch::buildAll()
+{
+    buildAccelerationStructure();
+    buildBindingTable();
+}
+
+void raytracing_batch::buildAccelerationStructure()
 {
     uint32 totalNumInstances = (uint32)allInstances.size();
 
@@ -208,25 +207,51 @@ void raytracing_batch::build()
     inputs.NumDescs = totalNumInstances;
     inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
+    if (rebuildMode == acceleration_structure_refit)
+    {
+        inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+    }
 
-    // Allocate.
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
     dxContext.device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
-
     info.ScratchDataSizeInBytes = alignTo(info.ScratchDataSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
     info.ResultDataMaxSizeInBytes = alignTo(info.ResultDataMaxSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 
-    tlas.scratch = createBuffer((uint32)info.ScratchDataSizeInBytes, 1, 0, true, false, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-    tlas.tlas = createBuffer((uint32)info.ResultDataMaxSizeInBytes, 1, 0, true, false, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
+    bool fromScratch = false;
 
-    SET_NAME(tlas.scratch->resource, "TLAS Scratch");
-    SET_NAME(tlas.tlas->resource, "TLAS Result");
+    // Allocate.
+    if (!tlas.tlas || tlas.tlas->totalSize < info.ResultDataMaxSizeInBytes)
+    {
+        if (tlas.tlas)
+        {
+            resizeBuffer(tlas.tlas, (uint32)info.ResultDataMaxSizeInBytes, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
+        }
+        else
+        {
+            tlas.tlas = createBuffer(1, (uint32)info.ResultDataMaxSizeInBytes, 0, true, false, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
+            SET_NAME(tlas.tlas->resource, "TLAS Result");
+        }
 
+        fromScratch = true;
+    }
+
+    if (!tlas.scratch || tlas.scratch->totalSize < info.ScratchDataSizeInBytes)
+    {
+        if (tlas.scratch)
+        {
+            resizeBuffer(tlas.scratch, (uint32)info.ScratchDataSizeInBytes, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        }
+        else
+        {
+            tlas.scratch = createBuffer(1, (uint32)info.ScratchDataSizeInBytes, 0, true, false, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            SET_NAME(tlas.scratch->resource, "TLAS Scratch");
+        }
+    }
+
+    
 
     dx_command_list* cl = dxContext.getFreeRenderCommandList();
-
     dx_dynamic_constant_buffer gpuInstances = cl->uploadDynamicConstantBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalNumInstances, allInstances.data());
-
 
     inputs.InstanceDescs = gpuInstances.gpuPtr;
 
@@ -235,15 +260,53 @@ void raytracing_batch::build()
     asDesc.DestAccelerationStructureData = tlas.tlas->gpuVirtualAddress;
     asDesc.ScratchAccelerationStructureData = tlas.scratch->gpuVirtualAddress;
 
+    if (!fromScratch)
+    {
+        assert(rebuildMode != acceleration_structure_no_rebuild);
+
+        cl->uavBarrier(tlas.tlas);
+
+        if (rebuildMode == acceleration_structure_refit)
+        {
+            asDesc.Inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+            asDesc.SourceAccelerationStructureData = tlas.tlas->gpuVirtualAddress;
+        }
+    }
+
 
     cl->commandList->BuildRaytracingAccelerationStructure(&asDesc, 0, 0);
     cl->uavBarrier(tlas.tlas);
 
     dxContext.executeCommandList(cl);
 
-    cpuBaseDescriptorHandle.createRaytracingAccelerationStructureSRV(tlas.tlas);
+    tlasDescriptorIndex = (tlasDescriptorIndex + 1) % NUM_BUFFERED_FRAMES;
+    (cpuBaseDescriptorHandle + tlasDescriptorIndex).createRaytracingAccelerationStructureSRV(tlas.tlas);
+}
 
-    buildBindingTable();
+raytracing_instance_handle raytracing_batch::instantiate(raytracing_object_handle type, const trs& transform)
+{
+    D3D12_RAYTRACING_INSTANCE_DESC instance;
+
+    instance.Flags = 0;// D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE;
+    instance.InstanceContributionToHitGroupIndex = type.instanceContributionToHitGroupIndex;
+
+    mat4 m = transpose(trsToMat4(transform));
+    memcpy(instance.Transform, &m, sizeof(instance.Transform));
+    instance.AccelerationStructure = type.blas;
+    instance.InstanceMask = 0xFF;
+    instance.InstanceID = 0; // This value will be exposed to the shader via InstanceID().
+
+    uint32 result = (uint32)allInstances.size();
+    allInstances.push_back(instance);
+
+    return { result };
+}
+
+void raytracing_batch::updateInstanceTransform(raytracing_instance_handle handle, const trs& transform)
+{
+    D3D12_RAYTRACING_INSTANCE_DESC& instance = allInstances[handle.instanceIndex];
+    mat4 m = transpose(trsToMat4(transform));
+    memcpy(instance.Transform, &m, sizeof(instance.Transform));
 }
 
 void raytracing_batch::fillOutRayTracingRenderDesc(D3D12_DISPATCH_RAYS_DESC& raytraceDesc, uint32 renderWidth, uint32 renderHeight, uint32 numRayTypes)
