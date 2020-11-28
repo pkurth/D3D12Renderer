@@ -17,14 +17,25 @@ struct mesh_vertex
 	float3 position;
 	float2 uv;
 	float3 normal;
+	float3 tangent;
 };
 
 
-RaytracingAccelerationStructure rtScene		: register(t0); // Global.
-ConstantBuffer<camera_cb> camera			: register(b0);	// Global.
-ConstantBuffer<raytracing_cb> raytracing	: register(b1);	// Global.
+// Global.
+RaytracingAccelerationStructure rtScene		: register(t0);
+ConstantBuffer<camera_cb> camera			: register(b0);
+ConstantBuffer<raytracing_cb> raytracing	: register(b1);
+RWTexture2D<float4> output					: register(u0);
+SamplerState wrapSampler					: register(s0);
 
-RWTexture2D<float4> output					: register(u0);	// Raygen.
+
+// Radiance hit group.
+StructuredBuffer<mesh_vertex> meshVertices	: register(t0, space1);
+ByteAddressBuffer meshIndices				: register(t1, space1);
+Texture2D<float4> albedoTex					: register(t2, space1);
+Texture2D<float3> normalTex					: register(t3, space1);
+Texture2D<float> roughTex					: register(t4, space1);
+Texture2D<float> metalTex					: register(t5, space1);
 
 
 #define RADIANCE_RAY	0
@@ -62,7 +73,7 @@ static float3 traceRadianceRay(float3 origin, float3 direction, uint recursion)
 		0xFF,				// Cull mask.
 		RADIANCE_RAY,		// Addend on the hit index.
 		NUM_RAY_TYPES,		// Multiplier on the geometry index within a BLAS.
-		0,
+		RADIANCE_RAY,		// Miss index.
 		ray,
 		payload);
 
@@ -89,7 +100,7 @@ static bool traceShadowRay(float3 origin, float3 direction, uint recursion)
 		0xFF,				// Cull mask.
 		SHADOW_RAY,			// Addend on the hit index.
 		NUM_RAY_TYPES,		// Multiplier on the geometry index within a BLAS.
-		1,
+		SHADOW_RAY,			// Miss index.
 		ray,
 		payload);
 
@@ -102,15 +113,18 @@ void rayGen()
 	uint3 launchIndex = DispatchRaysIndex();
 	uint3 launchDim = DispatchRaysDimensions();
 
-	float3 origin = float3(0.f, 0.f, 0.f);
+	float3 origin = camera.position.xyz;
 
-	//float2 uv = float2(launchIndex.xy) / float2(launchDim.xy);
-	//float3 direction = normalize(restoreWorldSpaceDirection(camera.invViewProj, uv, camera.position, camera.nearPlane));
-	float3 direction = float3(0.f, 0.f, -1.f);
+	float2 uv = float2(launchIndex.xy) / float2(launchDim.xy);
+	float3 direction = normalize(restoreWorldDirection(camera.invViewProj, uv, camera.position.xyz));
 	float3 color = traceRadianceRay(origin, direction, 0);
 	
 	output[launchIndex.xy] = float4(color, 1);
 }
+
+// ----------------------------------------
+// RADIANCE
+// ----------------------------------------
 
 [shader("miss")]
 void radianceMiss(inout radiance_ray_payload payload)
@@ -121,15 +135,27 @@ void radianceMiss(inout radiance_ray_payload payload)
 [shader("closesthit")]
 void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-	payload.color = float3(1.f, 1.f, 1.f);
+	uint3 tri = load3x16BitIndices(meshIndices);
+
+	float2 uvs[] = { meshVertices[tri.x].uv, meshVertices[tri.y].uv, meshVertices[tri.z].uv };
+	float2 uv = interpolateAttribute(uvs, attribs);
+
+	float3 albedo = albedoTex.SampleLevel(wrapSampler, uv, 0).xyz;
+
+	payload.color = albedo;
 }
 
 [shader("anyhit")]
 void radianceAnyHit(inout radiance_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-	//IgnoreHit(); // Test.
 	AcceptHitAndEndSearch();
 }
+
+
+
+// ----------------------------------------
+// SHADOW
+// ----------------------------------------
 
 [shader("miss")]
 void shadowMiss(inout shadow_ray_payload payload)

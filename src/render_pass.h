@@ -9,6 +9,7 @@ struct pbr_material;
 struct raytracing_blas;
 struct dx_vertex_buffer;
 struct dx_index_buffer;
+struct raytracing_batch;
 
 struct geometry_render_pass
 {
@@ -48,6 +49,23 @@ private:
 	};
 
 	std::vector<draw_call> drawCalls[MAX_NUM_SUN_SHADOW_CASCADES];
+
+	friend struct dx_renderer;
+};
+
+struct raytraced_reflections_render_pass
+{
+	void renderObject(raytracing_batch* batch);
+
+private:
+	void reset();
+
+	struct draw_call
+	{
+		raytracing_batch* batch;
+	};
+
+	std::vector<draw_call> drawCalls;
 
 	friend struct dx_renderer;
 };

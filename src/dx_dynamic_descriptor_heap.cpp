@@ -13,7 +13,7 @@ void dx_dynamic_descriptor_heap::initialize(uint32 numDescriptorsPerHeap)
 	currentGPUDescriptorHandle = D3D12_DEFAULT;
 	numFreeHandles = 0;
 
-	descriptorHandleIncrementSize = dxContext.device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	descriptorHandleIncrementSize = dxContext.descriptorHandleIncrementSize;
 
 	descriptorHandleCache.resize(numDescriptorsPerHeap);
 }

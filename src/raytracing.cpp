@@ -7,9 +7,9 @@
 #include <fstream>
 #include <sstream>
 
-raytracing_blas_builder::raytracing_blas_builder(acceleration_structure_rebuild_mode rebuildMode)
+raytracing_blas_builder::raytracing_blas_builder()
 {
-	this->rebuildMode = rebuildMode;
+	
 }
 
 raytracing_blas_builder& raytracing_blas_builder::push(ref<dx_vertex_buffer> vertexBuffer, ref<dx_index_buffer> indexBuffer, submesh_info submesh, bool opaque, const trs& localTransform)
@@ -39,6 +39,7 @@ raytracing_blas_builder& raytracing_blas_builder::push(ref<dx_vertex_buffer> ver
 	geomDesc.Triangles.IndexCount = submesh.numTriangles * 3;
 
 	geometryDescs.push_back(geomDesc);
+	geometries.push_back({ vertexBuffer, indexBuffer, submesh });
 
 	return *this;
 }
@@ -48,11 +49,6 @@ raytracing_blas raytracing_blas_builder::finish()
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
 	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 	inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
-
-	if (rebuildMode == acceleration_structure_refit)
-	{
-		inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
-	}
 
 	inputs.NumDescs = (uint32)geometryDescs.size();
 	inputs.pGeometryDescs = geometryDescs.data();
@@ -70,12 +66,10 @@ raytracing_blas raytracing_blas_builder::finish()
 
 	raytracing_blas blas = {};
 	blas.scratch = createBuffer((uint32)info.ScratchDataSizeInBytes, 1, 0, true, false, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	blas.result = createBuffer((uint32)info.ResultDataMaxSizeInBytes, 1, 0, true, false, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
+	blas.blas = createBuffer((uint32)info.ResultDataMaxSizeInBytes, 1, 0, true, false, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
 
 	SET_NAME(blas.scratch->resource, "BLAS Scratch");
-	SET_NAME(blas.result->resource, "BLAS Result");
-
-
+	SET_NAME(blas.blas->resource, "BLAS Result");
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 	dx_dynamic_constant_buffer localTransformsBuffer;
@@ -96,145 +90,19 @@ raytracing_blas raytracing_blas_builder::finish()
 		}
 	}
 
-	blas.numGeometries = (uint32)geometryDescs.size();
-
+	blas.geometries = std::move(geometries);
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
 	asDesc.Inputs = inputs;
-	asDesc.DestAccelerationStructureData = blas.result->gpuVirtualAddress;
+	asDesc.DestAccelerationStructureData = blas.blas->gpuVirtualAddress;
 	asDesc.ScratchAccelerationStructureData = blas.scratch->gpuVirtualAddress;
 
-	/*if (rebuild)
-	{
-		assert(rebuildMode != acceleration_structure_no_rebuild);
-
-		commandList->uavBarrier(raytracing.blas.result);
-
-		if (rebuildMode == acceleration_structure_refit)
-		{
-			inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
-			asDesc.SourceAccelerationStructureData = raytracing.blas.result.gpuVirtualAddress;
-		}
-	}*/
-
 	cl->commandList->BuildRaytracingAccelerationStructure(&asDesc, 0, 0);
-	cl->uavBarrier(blas.result);
+	cl->uavBarrier(blas.blas);
 	dxContext.executeCommandList(cl);
 
 	return blas;
 }
-
-raytracing_tlas_builder::raytracing_tlas_builder(acceleration_structure_rebuild_mode rebuildMode)
-{
-	this->rebuildMode = rebuildMode;
-}
-
-raytracing_tlas_builder& raytracing_tlas_builder::push(const raytracing_blas& blas, const trs& transform)
-{
-	D3D12_RAYTRACING_INSTANCE_DESC instance = {};
-
-	std::vector<D3D12_RAYTRACING_INSTANCE_DESC>& instancesOfThisBlas = instances[blas.result->gpuVirtualAddress];
-
-	instance.Flags = 0;// D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE;
-	instance.InstanceContributionToHitGroupIndex = blas.numGeometries; // Is used later. This is not the final contribution.
-	
-	mat4 m = transpose(trsToMat4(transform));
-	memcpy(instance.Transform, &m, sizeof(instance.Transform));
-	instance.AccelerationStructure = blas.result->gpuVirtualAddress;
-	instance.InstanceMask = 0xFF;
-
-	instancesOfThisBlas.push_back(instance);
-
-	return *this;
-}
-
-raytracing_tlas raytracing_tlas_builder::finish(uint32 numRayTypes)
-{
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
-	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-	inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
-
-	if (rebuildMode == acceleration_structure_refit)
-	{
-		inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
-	}
-
-
-	std::vector<D3D12_RAYTRACING_INSTANCE_DESC> allInstances;
-
-	uint32 indexOfThisBlas = 0;
-	uint32 instanceContributionOffset = 0;
-	for (auto& blas : instances)
-	{
-		uint32 numInstances = (uint32)blas.second.size();
-		uint32 numGeometries = blas.second[0].InstanceContributionToHitGroupIndex; // Is set above, when pushing instances.
-		for (uint32 i = 0; i < numInstances; ++i)
-		{
-			D3D12_RAYTRACING_INSTANCE_DESC desc = blas.second[i];
-			desc.InstanceID = indexOfThisBlas; // This value will be exposed to the shader via InstanceID().
-			desc.InstanceContributionToHitGroupIndex = instanceContributionOffset + i * numGeometries * numRayTypes;
-
-			allInstances.push_back(desc);
-		}
-		instanceContributionOffset += numInstances * numGeometries * numRayTypes;
-
-		++indexOfThisBlas;
-	}
-
-	uint32 totalNumInstances = (uint32)allInstances.size();
-
-	inputs.NumDescs = totalNumInstances;
-	inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-
-
-	// Allocate.
-	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
-	dxContext.device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
-
-	info.ScratchDataSizeInBytes = alignTo(info.ScratchDataSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-	info.ResultDataMaxSizeInBytes = alignTo(info.ResultDataMaxSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-
-	raytracing_tlas tlas;
-	tlas.scratch = createBuffer((uint32)info.ScratchDataSizeInBytes, 1, 0, true, false, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	tlas.result = createBuffer((uint32)info.ResultDataMaxSizeInBytes, 1, 0, true, false, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
-
-	SET_NAME(tlas.scratch->resource, "TLAS Scratch");
-	SET_NAME(tlas.result->resource, "TLAS Result");
-
-
-	dx_command_list* cl = dxContext.getFreeRenderCommandList();
-
-	dx_dynamic_constant_buffer gpuInstances = cl->uploadDynamicConstantBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalNumInstances, allInstances.data());
-
-
-	inputs.InstanceDescs = gpuInstances.gpuPtr;
-
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
-	asDesc.Inputs = inputs;
-	asDesc.DestAccelerationStructureData = tlas.result->gpuVirtualAddress;
-	asDesc.ScratchAccelerationStructureData = tlas.scratch->gpuVirtualAddress;
-
-	/*if (rebuild)
-	{
-		assert(rebuildMode != acceleration_structure_no_rebuild);
-
-		commandList->uavBarrier(tlas.result);
-
-		if (rebuildMode == acceleration_structure_refit)
-		{
-			inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
-			asDesc.SourceAccelerationStructureData = tlas.result.gpuVirtualAddress;
-		}
-	}*/
-	cl->commandList->BuildRaytracingAccelerationStructure(&asDesc, 0, 0);
-	cl->uavBarrier(tlas.result);
-
-	dxContext.executeCommandList(cl);
-
-	return tlas;
-}
-
-
 
 
 static void reportShaderCompileError(com<IDxcBlobEncoding> blob)
@@ -343,27 +211,6 @@ static uint32 getShaderBindingTableSize(const D3D12_ROOT_SIGNATURE_DESC& rootSig
 	return size;
 }
 
-static void fillTableEntryOffsets(raytracing_shader_binding_table_entry& entry, const D3D12_ROOT_SIGNATURE_DESC& rootSignatureDesc)
-{
-	entry.byteOffsetPerRootparameter.clear();
-
-	uint32 currentOffset = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-
-	for (uint32 i = 0; i < rootSignatureDesc.NumParameters; ++i)
-	{
-		entry.byteOffsetPerRootparameter.push_back(currentOffset);
-
-		if (rootSignatureDesc.pParameters[i].ParameterType == D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS)
-		{
-			currentOffset += alignTo(rootSignatureDesc.pParameters[i].Constants.Num32BitValues * 4, 8);
-		}
-		else
-		{
-			currentOffset += 8;
-		}
-	}
-}
-
 raytracing_pipeline_builder& raytracing_pipeline_builder::raygen(const wchar* entryPoint, D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc)
 {
 	assert(!raygenRS.rootSignature.rootSignature);
@@ -443,14 +290,11 @@ raytracing_pipeline_builder& raytracing_pipeline_builder::hitgroup(const wchar* 
 	if (rootSignatureDesc.NumParameters > 0)
 	{
 		rootSignatureDesc.Flags |= D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-		raytracing_root_signature rs = createRaytracingRootSignature(rootSignatureDesc);
-
-
-		rootSignatures.push_back(rs);
+		rootSignatures[numRootSignatures++] = createRaytracingRootSignature(rootSignatureDesc);
 
 		{
 			auto& so = subobjects[numSubobjects++];
-			so.pDesc = &rs.rootSignaturePtr;
+			so.pDesc = &rootSignatures[numRootSignatures - 1].rootSignaturePtr;
 			so.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
 		}
 
@@ -569,9 +413,9 @@ dx_raytracing_pipeline raytracing_pipeline_builder::finish()
 	result.rootSignature = globalRS.rootSignature;
 
 
-	for (auto& rs : rootSignatures)
+	for (uint32 i = 0; i < numRootSignatures; ++i)
 	{
-		freeRootSignature(rs.rootSignature);
+		freeRootSignature(rootSignatures[i].rootSignature);
 	}
 	freeRootSignature(raygenRS.rootSignature);
 
@@ -588,110 +432,15 @@ dx_raytracing_pipeline raytracing_pipeline_builder::finish()
 		uint32 numRaygenShaderEntries = 1;
 		uint32 numMissShaderEntries = numHitGroups;
 
-		shaderBindingTableDesc.raygenOffset = 0;
-		shaderBindingTableDesc.missOffset = shaderBindingTableDesc.raygenOffset + (uint32)alignTo(numRaygenShaderEntries * shaderBindingTableDesc.entrySize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
-		shaderBindingTableDesc.hitOffset = shaderBindingTableDesc.missOffset + (uint32)alignTo(numMissShaderEntries * shaderBindingTableDesc.entrySize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
-
-		shaderBindingTableDesc.sizeWithoutHitEntries = shaderBindingTableDesc.hitOffset;
-
-
-
-		shaderBindingTableDesc.raygen.identifier = rtsoProps->GetShaderIdentifier(raygenEntryPoint);
-		fillTableEntryOffsets(shaderBindingTableDesc.raygen, raygenRSDesc);
+		shaderBindingTableDesc.raygen = rtsoProps->GetShaderIdentifier(raygenEntryPoint);
 
 		for (uint32 i = 0; i < numHitGroups; ++i)
 		{
-			raytracing_shader_binding_table_entry missEntry;
-			missEntry.identifier = rtsoProps->GetShaderIdentifier(missEntryPoints[i]);
-
-			raytracing_shader_binding_table_entry hitGroupEntry;
-			hitGroupEntry.identifier = rtsoProps->GetShaderIdentifier(hitGroups[i].HitGroupExport);
-			fillTableEntryOffsets(hitGroupEntry, hitGroupRSDescs[i]);
-
-
-			shaderBindingTableDesc.miss.push_back(missEntry);
-			shaderBindingTableDesc.hitGroups.push_back(hitGroupEntry);
+			shaderBindingTableDesc.miss.push_back(rtsoProps->GetShaderIdentifier(missEntryPoints[i]));
+			shaderBindingTableDesc.hitGroups.push_back(rtsoProps->GetShaderIdentifier(hitGroups[i].HitGroupExport));
 		}
 	}
 
 	return result;
-}
-
-static void fillShaderBindingTable(uint8* base, const raytracing_shader_binding_table_desc& tableDesc)
-{
-	uint32 entrySize = tableDesc.entrySize;
-
-	{
-		uint8* raygenBase = base + tableDesc.raygenOffset; // Should be zero, but..
-		const auto& raygen = tableDesc.raygen;
-
-		memcpy(raygenBase, raygen.identifier, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-
-		uint32 numRootParameters = (uint32)raygen.byteOffsetPerRootparameter.size();
-		for (uint32 rootParameterIndex = 0; rootParameterIndex < numRootParameters; ++rootParameterIndex)
-		{
-			uint32 offset = raygen.byteOffsetPerRootparameter[rootParameterIndex];
-			uint8* target = raygenBase + offset;
-			// Copy to target.
-		}
-	}
-
-	{
-		uint32 numMissShaders = (uint32)tableDesc.miss.size();
-
-		uint8* missBase = base + tableDesc.missOffset;
-
-		for (uint32 i = 0; i < numMissShaders; ++i)
-		{
-			const auto& miss = tableDesc.miss[i];
-
-			memcpy(missBase, miss.identifier, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-
-			uint32 numRootParameters = (uint32)miss.byteOffsetPerRootparameter.size();
-			assert(numRootParameters == 0); // Miss shaders don't have root parameters for now. I think a sky box (or whatever) can be bound globally more easily.
-
-			missBase += entrySize;
-		}
-	}
-
-	{
-		uint32 numHitShaders = (uint32)tableDesc.miss.size();
-
-		void* hitIdentifiers[16];
-		for (uint32 i = 0; i < numHitShaders; ++i)
-		{
-			hitIdentifiers[i] = tableDesc.hitGroups[i].identifier;
-		}
-
-
-
-		uint32 numSceneObjects = 1; // TODO
-
-		uint8* hitBase = base + tableDesc.hitOffset;
-		uint8* hit = hitBase;
-
-		for (uint32 sceneObjectIndex = 0; sceneObjectIndex < numSceneObjects; ++sceneObjectIndex)
-		{
-			uint32 numInstances = 1; // TODO
-			uint32 numGeometries = 1; // TODO
-
-			for (uint32 instance = 0; instance < numInstances; ++instance)
-			{
-				for (uint32 geometry = 0; geometry < numGeometries; ++geometry)
-				{
-					for (uint32 hitGroup = 0; hitGroup < numHitShaders; ++hitGroup)
-					{
-						memcpy(hit, hitIdentifiers[hitGroup], D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-
-						// TODO: Set root parameters
-
-						hit += entrySize;
-					}
-				}
-			}
-		}
-
-	}
-
 }
 

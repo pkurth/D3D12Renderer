@@ -223,3 +223,39 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createRaytracingAcceleration
 
 	return *this;
 }
+
+dx_cpu_descriptor_handle dx_cpu_descriptor_handle::operator+(uint32 i)
+{
+	return { CD3DX12_CPU_DESCRIPTOR_HANDLE(cpuHandle, i, dxContext.descriptorHandleIncrementSize) };
+}
+
+dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::operator++()
+{
+	cpuHandle.Offset(dxContext.descriptorHandleIncrementSize);
+	return *this;
+}
+
+dx_cpu_descriptor_handle dx_cpu_descriptor_handle::operator++(int)
+{
+	dx_cpu_descriptor_handle result = *this;
+	cpuHandle.Offset(dxContext.descriptorHandleIncrementSize);
+	return result;
+}
+
+dx_gpu_descriptor_handle dx_gpu_descriptor_handle::operator+(uint32 i)
+{
+	return { CD3DX12_GPU_DESCRIPTOR_HANDLE(gpuHandle, i, dxContext.descriptorHandleIncrementSize) };
+}
+
+dx_gpu_descriptor_handle& dx_gpu_descriptor_handle::operator++()
+{
+	gpuHandle.Offset(dxContext.descriptorHandleIncrementSize);
+	return *this;
+}
+
+dx_gpu_descriptor_handle dx_gpu_descriptor_handle::operator++(int)
+{
+	dx_gpu_descriptor_handle result = *this;
+	gpuHandle.Offset(dxContext.descriptorHandleIncrementSize);
+	return result;
+}

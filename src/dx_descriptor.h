@@ -18,8 +18,14 @@ struct buffer_range
 	uint32 numElements = (uint32)-1; // Use all elements.
 };
 
+// These are only for the D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV heaps!
+
 struct dx_cpu_descriptor_handle
 {
+	dx_cpu_descriptor_handle() = default;
+	dx_cpu_descriptor_handle(CD3DX12_CPU_DESCRIPTOR_HANDLE handle) : cpuHandle(handle) {}
+	dx_cpu_descriptor_handle(D3D12_CPU_DESCRIPTOR_HANDLE handle) : cpuHandle(handle) {}
+
 	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle;
 
 	inline operator CD3DX12_CPU_DESCRIPTOR_HANDLE() const { return cpuHandle; }
@@ -39,13 +45,27 @@ struct dx_cpu_descriptor_handle
 	dx_cpu_descriptor_handle& createBufferUAV(const ref<dx_buffer>& buffer, buffer_range bufferRange = {});
 	dx_cpu_descriptor_handle& createBufferUintUAV(const ref<dx_buffer>& buffer, buffer_range bufferRange = {});
 	dx_cpu_descriptor_handle& createRaytracingAccelerationStructureSRV(const ref<dx_buffer>& tlas);
+
+
+	dx_cpu_descriptor_handle operator+(uint32 i);
+	dx_cpu_descriptor_handle& operator++();
+	dx_cpu_descriptor_handle operator++(int);
 };
 
 struct dx_gpu_descriptor_handle
 {
+	dx_gpu_descriptor_handle() = default;
+	dx_gpu_descriptor_handle(CD3DX12_GPU_DESCRIPTOR_HANDLE handle) : gpuHandle(handle) {}
+	dx_gpu_descriptor_handle(D3D12_GPU_DESCRIPTOR_HANDLE handle) : gpuHandle(handle) {}
+
 	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle;
 
 	inline operator CD3DX12_GPU_DESCRIPTOR_HANDLE() const { return gpuHandle; }
+
+
+	dx_gpu_descriptor_handle operator+(uint32 i);
+	dx_gpu_descriptor_handle& operator++();
+	dx_gpu_descriptor_handle operator++(int);
 };
 
 struct dx_double_descriptor_handle : dx_cpu_descriptor_handle, dx_gpu_descriptor_handle

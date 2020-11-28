@@ -72,6 +72,7 @@ struct dx_context
 
 	volatile bool running = true;
 
+	uint32 descriptorHandleIncrementSize;
 
 private:
 	dx_page_pool pagePools[NUM_BUFFERED_FRAMES];

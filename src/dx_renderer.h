@@ -65,6 +65,7 @@ struct dx_renderer
 
 	geometry_render_pass* beginGeometryPass() { return &geometryRenderPass; }
 	sun_shadow_render_pass* beginSunShadowPass() { return &sunShadowRenderPass; }
+	raytraced_reflections_render_pass* beginRaytracedReflectionsPass() { return &raytracedReflectionsRenderPass; }
 
 	
 	renderer_settings settings;
@@ -73,7 +74,7 @@ struct dx_renderer
 	uint32 renderHeight;
 	ref<dx_texture> frameResult;
 
-private:
+//private:
 	struct pbr_environment_handles
 	{
 		dx_cpu_descriptor_handle sky;
@@ -109,6 +110,7 @@ private:
 	dx_render_target volumetricsRenderTarget;
 	ref<dx_texture> volumetricsTexture;
 
+	ref<dx_texture> raytracingTexture;
 
 
 
@@ -127,6 +129,7 @@ private:
 
 	geometry_render_pass geometryRenderPass;
 	sun_shadow_render_pass sunShadowRenderPass;
+	raytraced_reflections_render_pass raytracedReflectionsRenderPass;
 
 	light_culling_buffers lightCullingBuffers;
 

@@ -137,6 +137,8 @@ void dx_context::initialize()
 	computeQueue.initialize(device, D3D12_COMMAND_LIST_TYPE_COMPUTE);
 	copyQueue.initialize(device, D3D12_COMMAND_LIST_TYPE_COPY);
 
+	descriptorHandleIncrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
 
 	descriptorAllocatorCPU.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096, false);
 	descriptorAllocatorGPU.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
@@ -159,6 +161,15 @@ void dx_context::quit()
 	WaitForSingleObject(renderQueue.processThreadHandle, INFINITE);
 	WaitForSingleObject(computeQueue.processThreadHandle, INFINITE);
 	WaitForSingleObject(copyQueue.processThreadHandle, INFINITE);
+
+	for (uint32 b = 0; b < NUM_BUFFERED_FRAMES; ++b)
+	{
+		for (uint32 i = 0; i < objectRetirement.numRetiredObjects[b]; ++i)
+		{
+			objectRetirement.retiredObjects[b][i].Reset();
+		}
+		objectRetirement.numRetiredObjects[b] = 0;
+	}
 }
 
 dx_command_queue& dx_context::getQueue(D3D12_COMMAND_LIST_TYPE type)

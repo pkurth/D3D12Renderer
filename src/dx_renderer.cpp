@@ -13,6 +13,7 @@
 
 #include "camera.hlsl"
 #include "raytracing.h"
+#include "raytracing_batch.h"
 
 
 static ref<dx_texture> whiteTexture;
@@ -35,9 +36,6 @@ static dx_pipeline atmospherePipeline;
 
 static dx_pipeline worldSpaceFrustaPipeline;
 static dx_pipeline lightCullingPipeline;
-
-static dx_raytracing_pipeline raytracingPipeline;
-static raytracing_shader_binding_table_desc raytracingBindingTableDesc;
 
 static dx_mesh gizmoMesh;
 static dx_mesh positionOnlyMesh;
@@ -84,6 +82,7 @@ static const DXGI_FORMAT hdrFormat[] = { DXGI_FORMAT_R16G16B16A16_FLOAT };
 static const DXGI_FORMAT hdrDepthFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 static const DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D32_FLOAT;
 static const DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+static const DXGI_FORMAT raytracedReflectionsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
 
 void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
@@ -197,28 +196,6 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		atmospherePipeline = createReloadablePipeline("atmosphere_cs");
 	}
 
-	// Raytracing.
-	{
-		CD3DX12_DESCRIPTOR_RANGE globalRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0); // TLAS.
-		CD3DX12_ROOT_PARAMETER globalRootParameters[3]; 
-		globalRootParameters[0].InitAsDescriptorTable(1, &globalRange);
-		globalRootParameters[1].InitAsConstantBufferView(0);
-		globalRootParameters[2].InitAsConstants(1, 1);
-		D3D12_ROOT_SIGNATURE_DESC globalDesc = { arraysize(globalRootParameters), globalRootParameters };
-
-		CD3DX12_DESCRIPTOR_RANGE raygenRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0); // Output.
-		CD3DX12_ROOT_PARAMETER raygenRootParameter; raygenRootParameter.InitAsDescriptorTable(1, &raygenRange);
-		D3D12_ROOT_SIGNATURE_DESC raygenDesc = { 1, &raygenRootParameter };
-
-		raytracingPipeline = 
-			raytracing_pipeline_builder(L"shaders/raytracing_rts.hlsl", 4 * sizeof(float), 1)
-				.globalRootSignature(globalDesc)
-				.raygen(L"rayGen", raygenDesc)
-				.hitgroup(L"Radiance", L"radianceClosestHit", L"radianceAnyHit", L"radianceMiss")
-				.hitgroup(L"Shadow", L"shadowClosestHit", L"shadowAnyHit", L"shadowMiss")
-				.finish();
-	}
-
 	createAllReloadablePipelines();
 
 
@@ -286,6 +263,11 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 
 		volumetricsRenderTarget.pushColorAttachment(volumetricsTexture);
 	}
+
+	// Raytracing.
+	{
+		raytracingTexture = createTexture(0, renderWidth, renderHeight, raytracedReflectionsFormat, false, true);
+	}
 }
 
 void dx_renderer::beginFrameCommon()
@@ -317,6 +299,7 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 
 	geometryRenderPass.reset();
 	sunShadowRenderPass.reset();
+	raytracedReflectionsRenderPass.reset();
 }
 
 void dx_renderer::recalculateViewport(bool resizeTextures)
@@ -355,6 +338,8 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 
 		resizeTexture(volumetricsTexture, renderWidth, renderHeight);
 		volumetricsRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
+
+		resizeTexture(raytracingTexture, renderWidth, renderHeight);
 	}
 
 	allocateLightCullingBuffers();
@@ -600,6 +585,19 @@ void dx_renderer::endFrame()
 	cl->setDescriptorHeapUAV(2, 5, volumetricsTexture);
 
 	cl->dispatch(bucketize(renderWidth, 16), bucketize(renderHeight, 16));
+#endif
+
+
+	// ----------------------------------------
+	// RAYTRACING
+	// ----------------------------------------
+
+#if 1
+	for (const raytraced_reflections_render_pass::draw_call& dc : raytracedReflectionsRenderPass.drawCalls)
+	{
+		dc.batch->render(cl, raytracingTexture, cameraCBV);
+	}
+	cl->resetToDynamicDescriptorHeap();
 #endif
 
 

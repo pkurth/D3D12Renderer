@@ -42,12 +42,26 @@ void application::initialize(dx_renderer* renderer)
 		true)
 	);
 
-	trs transform = { vec3(0.f, 10.f, 0.f),	quat::identity, 0.03f };
+	trs transform = { vec3(0.f, 0.f, 0.f), quat::identity, 0.03f };
+
+	raytracing_blas_builder blasBuilder;
+	std::vector<ref<pbr_material>> raytracingMaterials;
+	for (auto& m : meshes[0].singleMeshes)
+	{
+		blasBuilder.push(meshes[0].mesh.vertexBuffer, meshes[0].mesh.indexBuffer, m.submesh);
+		raytracingMaterials.push_back(m.material);
+	}
+	blas.push_back(blasBuilder.finish());
+
+	raytracingBatch.initialize(1);
+	raytracingBatch.beginObjectType(blas[0], raytracingMaterials);
+	raytracingBatch.pushInstance(transform);
+	raytracingBatch.build();
 #endif
 
 	gameObjects.push_back({	transform, 0, });
 
-	setEnvironment("assets/textures/hdri/leadenhall_market_4k.hdr");
+	setEnvironment("assets/textures/hdri/sunset_in_the_chalk_quarry_4k.hdr");
 
 	pointLights = new point_light_cb[numPointLights];
 	lightVelocities = new vec3[numPointLights];
@@ -62,11 +76,11 @@ void application::initialize(dx_renderer* renderer)
 		{
 			{
 				rng.randomFloatBetween(-100.f, 100.f),
-				2.f,
+				10.f,
 				rng.randomFloatBetween(-100.f, 100.f),
 			},
 			25,
-			randomRGB(rng) * 250.f,
+			randomRGB(rng),
 		};
 
 		lightVelocities[i] =
@@ -106,7 +120,7 @@ void application::initialize(dx_renderer* renderer)
 	sun.cascadeDistances.data[2] = 74.f;
 	sun.cascadeDistances.data[3] = 10000.f;
 
-	sun.bias = vec4(0.001f, 0.0015f, 0.0015f, 0.0035f);
+	sun.bias = vec4(0.000163f, 0.000389f, 0.000477f, 0.0035f);
 	sun.blendArea = 0.07f;
 }
 
@@ -196,12 +210,12 @@ static bool editSunShadowParameters(directional_light& sun)
 			if (ImGui::TreeNode("Cascade"))
 			{
 				result |= ImGui::SliderFloat("Distance", &sun.cascadeDistances.data[i], 0.f, 300.f);
-				result |= ImGui::SliderFloat("Bias", &sun.bias.data[i], 0.f, 0.005f);
+				result |= ImGui::SliderFloat("Bias", &sun.bias.data[i], 0.f, 0.005f, "%.6f");
 				ImGui::TreePop();
 			}
 			ImGui::PopID();
 		}
-		result |= ImGui::SliderFloat("Blend area", &sun.blendArea, 0.f, 0.1f);
+		result |= ImGui::SliderFloat("Blend area", &sun.blendArea, 0.f, 0.1f, "%.6f");
 
 		ImGui::TreePop();
 	}
@@ -214,7 +228,7 @@ void application::update(const user_input& input, float dt)
 	camera.recalculateMatrices(renderer->renderWidth, renderer->renderHeight);
 
 	ImGui::Begin("Settings");
-	ImGui::Text("%f ms, %u FPS", dt * 1000.f, (uint32)(1.f / dt));
+	ImGui::Text("%.3f ms, %u FPS", dt * 1000.f, (uint32)(1.f / dt));
 
 	dx_memory_usage memoryUsage = dxContext.getMemoryUsage();
 
@@ -223,6 +237,8 @@ void application::update(const user_input& input, float dt)
 
 	ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->settings.aspectRatioMode);
 	ImGui::Checkbox("Show light volumes", &renderer->settings.showLightVolumes);
+
+	ImGui::Image(renderer->raytracingTexture->defaultSRV, ImVec2(256, 256));
 
 	plotAndEditTonemapping(renderer->settings.tonemap);
 	editSunShadowParameters(sun);
@@ -278,6 +294,7 @@ void application::update(const user_input& input, float dt)
 		}
 	}
 
+	renderer->beginRaytracedReflectionsPass()->renderObject(&raytracingBatch);
 }
 
 void application::setEnvironment(const char* filename)
