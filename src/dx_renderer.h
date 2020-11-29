@@ -106,6 +106,7 @@ struct dx_renderer
 
 	dx_render_target hdrRenderTarget;
 	ref<dx_texture> hdrColorTexture;
+	ref<dx_texture> worldNormalsTexture;
 	ref<dx_texture> depthBuffer;
 
 	dx_render_target volumetricsRenderTarget;

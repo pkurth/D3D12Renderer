@@ -6,9 +6,10 @@
 #define vec4 float4
 #define uint32 uint
 
-#include "common/camera.hlsl"
-#include "common/raytracing.hlsl"
-#include "common/light_source.hlsl"
+#include "../common/camera.hlsl"
+#include "../common/raytracing.hlsl"
+#include "../common/light_source.hlsl"
+#include "../common/normal.hlsl"
 
 // Raytracing intrinsics: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#ray-system-values
 // Ray flags: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#ray-flags
@@ -30,14 +31,18 @@ ConstantBuffer<raytracing_cb> raytracing	: register(b2);
 RWTexture2D<float4> output					: register(u0);
 SamplerState wrapSampler					: register(s0);
 
+// Gbuffer (global).
+Texture2D<float> depthBuffer                : register(t0, space1);
+Texture2D<float2> worldNormals				: register(t1, space1);
+
 
 // Radiance hit group.
-StructuredBuffer<mesh_vertex> meshVertices	: register(t0, space1);
-ByteAddressBuffer meshIndices				: register(t1, space1);
-Texture2D<float4> albedoTex					: register(t2, space1);
-Texture2D<float3> normalTex					: register(t3, space1);
-Texture2D<float> roughTex					: register(t4, space1);
-Texture2D<float> metalTex					: register(t5, space1);
+StructuredBuffer<mesh_vertex> meshVertices	: register(t0, space2);
+ByteAddressBuffer meshIndices				: register(t1, space2);
+Texture2D<float4> albedoTex					: register(t2, space2);
+Texture2D<float3> normalTex					: register(t3, space2);
+Texture2D<float> roughTex					: register(t4, space2);
+Texture2D<float> metalTex					: register(t5, space2);
 
 
 #define RADIANCE_RAY	0
@@ -115,12 +120,21 @@ void rayGen()
 	uint3 launchIndex = DispatchRaysIndex();
 	uint3 launchDim = DispatchRaysDimensions();
 
-	float3 origin = camera.position.xyz;
+	float depth = depthBuffer.Load(launchIndex);
 
-	float2 uv = float2(launchIndex.xy) / float2(launchDim.xy);
-	float3 direction = normalize(restoreWorldDirection(camera.invViewProj, uv, camera.position.xyz));
-	float3 color = traceRadianceRay(origin, direction, 0);
-	
+	float3 color = (float3)0.f;
+	if (depth < 1.f)
+	{
+		float2 uv = float2(launchIndex.xy) / float2(launchDim.xy);
+		float3 origin = restoreWorldSpacePosition(camera.invViewProj, uv, depth);
+
+		float3 direction = normalize(origin - camera.position.xyz);
+
+		float3 normal = unpackNormal(worldNormals.Load(launchIndex));
+		direction = reflect(direction, normal);
+
+		color = traceRadianceRay(origin, direction, 0);
+	}
 	output[launchIndex.xy] = float4(color, 1);
 }
 

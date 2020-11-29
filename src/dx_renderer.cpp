@@ -78,9 +78,9 @@ static ref<dx_texture> brdfTex;
 
 static DXGI_FORMAT screenFormat;
 
-static const DXGI_FORMAT hdrFormat[] = { DXGI_FORMAT_R16G16B16A16_FLOAT };
+static const DXGI_FORMAT hdrFormat[] = { DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16_FLOAT };
 static const DXGI_FORMAT hdrDepthFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-static const DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D32_FLOAT;
+static const DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM; // TODO: Evaluate whether this is enough.
 static const DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 static const DXGI_FORMAT raytracedReflectionsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
@@ -112,7 +112,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position)
-			.renderTargets(hdrFormat, arraysize(hdrFormat))
+			.renderTargets(hdrFormat[0])
 			.depthSettings(false, false)
 			.cullFrontFaces();
 
@@ -150,7 +150,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position_uv_normal_tangent)
-			.renderTargets(hdrFormat, arraysize(hdrFormat), hdrDepthFormat)
+			.renderTargets(hdrFormat[0], hdrDepthFormat)
 			.stencilSettings(D3D12_COMPARISON_FUNC_NOT_EQUAL);
 
 		outlinePipeline = createReloadablePipeline(desc, { "outline_vs", "outline_ps" }, "outline_vs");
@@ -160,7 +160,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position)
-			.renderTargets(hdrFormat, arraysize(hdrFormat), hdrDepthFormat)
+			.renderTargets(hdrFormat[0], hdrDepthFormat)
 			.cullingOff()
 			.wireframe();
 
@@ -245,8 +245,10 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	{
 		depthBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthFormat);
 		hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[0], true);
+		worldNormalsTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[1], true);
 
 		hdrRenderTarget.pushColorAttachment(hdrColorTexture);
+		hdrRenderTarget.pushColorAttachment(worldNormalsTexture);
 		hdrRenderTarget.pushDepthStencilAttachment(depthBuffer);
 	}
 
@@ -333,6 +335,7 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 	if (resizeTextures)
 	{
 		resizeTexture(hdrColorTexture, renderWidth, renderHeight);
+		resizeTexture(worldNormalsTexture, renderWidth, renderHeight);
 		resizeTexture(depthBuffer, renderWidth, renderHeight);
 		hdrRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
 
@@ -435,6 +438,7 @@ void dx_renderer::endFrame()
 
 	barrier_batcher(cl)
 		.transition(hdrColorTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
+		.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
 		.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
 		.transition(sunShadowCascadeTextures, MAX_NUM_SUN_SHADOW_CASCADES, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
@@ -589,21 +593,6 @@ void dx_renderer::endFrame()
 
 
 	// ----------------------------------------
-	// RAYTRACING
-	// ----------------------------------------
-
-#if 1
-	for (const raytraced_reflections_render_pass::draw_call& dc : raytracedReflectionsRenderPass.drawCalls)
-	{
-		dc.batch->render(cl, raytracingTexture, settings.numRaytracingBounces, cameraCBV, sunCBV);
-	}
-	cl->resetToDynamicDescriptorHeap();
-#endif
-
-
-
-
-	// ----------------------------------------
 	// LIGHT PASS
 	// ----------------------------------------
 
@@ -675,6 +664,23 @@ void dx_renderer::endFrame()
 
 
 
+	barrier_batcher(cl)
+		.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+	// ----------------------------------------
+	// RAYTRACING
+	// ----------------------------------------
+
+#if 1
+
+	for (const raytraced_reflections_render_pass::draw_call& dc : raytracedReflectionsRenderPass.drawCalls)
+	{
+		dc.batch->render(cl, raytracingTexture, settings.numRaytracingBounces, cameraCBV, sunCBV, depthBuffer, worldNormalsTexture);
+	}
+	cl->resetToDynamicDescriptorHeap();
+#endif
+
+
 
 
 	// ----------------------------------------
@@ -726,6 +732,7 @@ void dx_renderer::endFrame()
 
 	barrier_batcher(cl)
 		.transition(hdrColorTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
+		.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
 		.transition(frameResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON);
 
 	dxContext.executeCommandList(cl);

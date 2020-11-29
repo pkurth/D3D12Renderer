@@ -3,6 +3,7 @@
 #include "camera.hlsl"
 #include "light_culling_rs.hlsl"
 #include "light_source.hlsl"
+#include "normal.hlsl"
 
 struct ps_input
 {
@@ -41,9 +42,14 @@ StructuredBuffer<spot_light_cb> spotLights		: register(t4, space3);
 Texture2D<float> sunShadowCascades[4]			: register(t5, space3);
 Texture2D<float4> volumetrics					: register(t9, space3);
 
+struct ps_output
+{
+	float4 hdrColor		: SV_Target0;
+	float4 worldNormal	: SV_Target1;
+};
 
 [RootSignature(MODEL_RS)]
-float4 main(ps_input IN) : SV_TARGET
+ps_output main(ps_input IN)
 {
 	uint flags = material.flags;
 
@@ -150,5 +156,8 @@ float4 main(ps_input IN) : SV_TARGET
 	//float4 volume = volumetrics.Sample(wrapSampler, IN.screenPosition.xy * camera.invScreenDims);
 	//totalLighting.xyz += volume.xyz;
 
-	return totalLighting;
+	ps_output OUT;
+	OUT.hdrColor = totalLighting;
+	OUT.worldNormal = float4(packNormal(N), 0.f, 1.f);
+	return OUT;
 }

@@ -53,11 +53,11 @@ void application::initialize(dx_renderer* renderer)
 	}
 	blas.push_back(blasBuilder.finish());
 
-	raytracingBatch.initialize(128);
-	auto type = raytracingBatch.defineObjectType(blas[0], raytracingMaterials);
-	raytracingBatch.instantiate(type, transform);
-	raytracingBatch.instantiate(type, { transform.position + vec3(0.f, 100.f, 0.f), transform.rotation, transform.scale });
-	raytracingBatch.buildAll();
+	reflectionsRaytracingBatch.initialize(128);
+	auto type = reflectionsRaytracingBatch.defineObjectType(blas[0], raytracingMaterials);
+	reflectionsRaytracingBatch.instantiate(type, transform);
+	//raytracingBatch.instantiate(type, { transform.position + vec3(0.f, 100.f, 0.f), transform.rotation, transform.scale });
+	reflectionsRaytracingBatch.buildAll();
 #endif
 
 	gameObjects.push_back({	transform, 0, });
@@ -239,7 +239,7 @@ void application::update(const user_input& input, float dt)
 	ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->settings.aspectRatioMode);
 	ImGui::Checkbox("Show light volumes", &renderer->settings.showLightVolumes);
 
-	ImGui::Image(renderer->raytracingTexture->defaultSRV, ImVec2(256, 256));
+	ImGui::Image(renderer->raytracingTexture->defaultSRV, ImVec2(256, 256)); // TODO: When you remove this, make renderer attributes private again.
 
 	plotAndEditTonemapping(renderer->settings.tonemap);
 	editSunShadowParameters(sun);
@@ -296,7 +296,7 @@ void application::update(const user_input& input, float dt)
 		}
 	}
 
-	renderer->beginRaytracedReflectionsPass()->renderObject(&raytracingBatch);
+	renderer->beginRaytracedReflectionsPass()->renderObject(&reflectionsRaytracingBatch);
 }
 
 void application::setEnvironment(const char* filename)

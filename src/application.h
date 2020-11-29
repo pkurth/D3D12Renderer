@@ -34,7 +34,7 @@ private:
 	std::vector<scene_object> gameObjects;
 	std::vector<raytracing_blas> blas;
 
-	pbr_raytracing_batch raytracingBatch;
+	specular_reflections_raytracing_batch reflectionsRaytracingBatch;
 
 	ref<pbr_environment> environment;
 

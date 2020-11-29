@@ -43,7 +43,7 @@ void sun_shadow_render_pass::reset()
 	}
 }
 
-void raytraced_reflections_render_pass::renderObject(raytracing_batch* batch)
+void raytraced_reflections_render_pass::renderObject(specular_reflections_raytracing_batch* batch)
 {
 	drawCalls.push_back({ batch });
 }

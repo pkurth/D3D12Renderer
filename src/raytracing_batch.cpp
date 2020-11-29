@@ -17,19 +17,30 @@ Hit group shader table index =
 
 #define PBR_RAYTRACING_RS_TLAS      0
 #define PBR_RAYTRACING_RS_OUTPUT    1
-#define PBR_RAYTRACING_RS_CAMERA    2
-#define PBR_RAYTRACING_RS_SUN       3
-#define PBR_RAYTRACING_RS_CB        4
+#define PBR_RAYTRACING_RS_GBUFFER   2
+#define PBR_RAYTRACING_RS_CAMERA    3
+#define PBR_RAYTRACING_RS_SUN       4
+#define PBR_RAYTRACING_RS_CB        5
 
-void pbr_raytracing_batch::initialize(uint32 maxNumObjectTypes, acceleration_structure_rebuild_mode rebuildMode)
+
+void specular_reflections_raytracing_batch::initialize(uint32 maxNumObjectTypes, acceleration_structure_rebuild_mode rebuildMode)
 {
-    this->rebuildMode = rebuildMode;
+    pbr_raytracing_batch::initialize(L"shaders/raytracing/specular_reflections_rts.hlsl", maxNumObjectTypes, rebuildMode);
+}
+
+void pbr_raytracing_batch::initialize(const wchar* shaderName, uint32 maxNumObjectTypes, acceleration_structure_rebuild_mode rebuildMode)
+{
+    uint32 numResources = 2; // One more slot for normal map.
+
+    raytracing_batch::initialize(rebuildMode, numResources);
 
     CD3DX12_DESCRIPTOR_RANGE tlasRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
     CD3DX12_DESCRIPTOR_RANGE outputRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0);
-    CD3DX12_ROOT_PARAMETER globalRootParameters[5];
+    CD3DX12_DESCRIPTOR_RANGE gbufferRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numResources, 0, 1);
+    CD3DX12_ROOT_PARAMETER globalRootParameters[6];
     globalRootParameters[PBR_RAYTRACING_RS_TLAS].InitAsDescriptorTable(1, &tlasRange);
     globalRootParameters[PBR_RAYTRACING_RS_OUTPUT].InitAsDescriptorTable(1, &outputRange);
+    globalRootParameters[PBR_RAYTRACING_RS_GBUFFER].InitAsDescriptorTable(1, &gbufferRange);
     globalRootParameters[PBR_RAYTRACING_RS_CAMERA].InitAsConstantBufferView(0);
     globalRootParameters[PBR_RAYTRACING_RS_SUN].InitAsConstantBufferView(1);
     globalRootParameters[PBR_RAYTRACING_RS_CB].InitAsConstants(1, 2);
@@ -37,14 +48,14 @@ void pbr_raytracing_batch::initialize(uint32 maxNumObjectTypes, acceleration_str
     globalStaticSamplers[0].Init(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
     D3D12_ROOT_SIGNATURE_DESC globalDesc = { arraysize(globalRootParameters), globalRootParameters, arraysize(globalStaticSamplers), globalStaticSamplers };
 
-    CD3DX12_DESCRIPTOR_RANGE hitSRVRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0, 1);
+    CD3DX12_DESCRIPTOR_RANGE hitSRVRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0, 2);
     CD3DX12_ROOT_PARAMETER hitRootParameters[1];
     hitRootParameters[0].InitAsDescriptorTable(1, &hitSRVRange);
     D3D12_ROOT_SIGNATURE_DESC hitDesc = { arraysize(hitRootParameters), hitRootParameters };
 
 
     pipeline =
-        raytracing_pipeline_builder(L"shaders/raytracing_rts.hlsl", 4 * sizeof(float), MAX_RAYTRACING_RECURSION_DEPTH)
+        raytracing_pipeline_builder(shaderName, 4 * sizeof(float), MAX_RAYTRACING_RECURSION_DEPTH)
         .globalRootSignature(globalDesc)
         .raygen(L"rayGen")
         .hitgroup(L"Radiance", L"radianceClosestHit", L"radianceAnyHit", L"radianceMiss", hitDesc)
@@ -54,7 +65,7 @@ void pbr_raytracing_batch::initialize(uint32 maxNumObjectTypes, acceleration_str
 
     assert(sizeof(binding_table_entry) == pipeline.shaderBindingTableDesc.entrySize);
 
-    bindingTable.reserve(maxNumObjectTypes * 32 * numRayTypes + 1 + numRayTypes); // 8 is a random number. How many geometries do we expect per blas?
+    bindingTable.reserve(maxNumObjectTypes * 32 * numRayTypes + 1 + numRayTypes); // 32 is a random number. How many geometries do we expect per blas?
 
     binding_table_entry raygen;
     memcpy(raygen.identifier, pipeline.shaderBindingTableDesc.raygen, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
@@ -69,20 +80,6 @@ void pbr_raytracing_batch::initialize(uint32 maxNumObjectTypes, acceleration_str
     bindingTable.push_back(shadowMiss);
 
 
-    allInstances.reserve(4096); // TODO.
-
-
-    D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc = {};
-    descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    descriptorHeapDesc.NumDescriptors = 4096; // TODO
-    descriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-
-    checkResult(dxContext.device->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&descriptorHeap)));
-    cpuBaseDescriptorHandle = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
-    gpuBaseDescriptorHandle = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
-    
-    // Offset for the output and TLAS descriptor. Output is set every frame, and TLAS can be updated, so we ring buffer this.
-    cpuCurrentDescriptorHandle = cpuBaseDescriptorHandle + NUM_BUFFERED_FRAMES + NUM_BUFFERED_FRAMES;
 }
 
 raytracing_object_handle pbr_raytracing_batch::defineObjectType(const raytracing_blas& blas, const std::vector<ref<pbr_material>>& materials)
@@ -157,23 +154,28 @@ raytracing_object_handle pbr_raytracing_batch::defineObjectType(const raytracing
 
 void pbr_raytracing_batch::buildBindingTable()
 {
+    assert(!bindingTableBuffer);
     bindingTableBuffer = createBuffer(sizeof(binding_table_entry), (uint32)bindingTable.size(), bindingTable.data());
 }
 
-void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, dx_dynamic_constant_buffer cameraCBV, dx_dynamic_constant_buffer sunCBV)
+void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, 
+    dx_dynamic_constant_buffer cameraCBV, dx_dynamic_constant_buffer sunCBV, 
+    const ref<dx_texture>& depthBuffer, const ref<dx_texture>& normalMap)
 {
-    uint32 tlasIndex = tlasDescriptorIndex;
+    const ref<dx_texture> textures[] =
+    {
+        depthBuffer,
+        normalMap,
+    };
 
-    uint32 outputIndex = dxContext.bufferedFrameID + 2; // TLAS is at 0 or 1.
-    dxContext.device->CopyDescriptorsSimple(1, (cpuBaseDescriptorHandle + outputIndex).cpuHandle, output->defaultUAV.cpuHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    dx_gpu_descriptor_handle tlasHandle = getTLASHandle();
+    dx_gpu_descriptor_handle outputHandle = setOutputTexture(output);
+    dx_gpu_descriptor_handle resourceHandle = setTextures(textures);
 
     auto desc = output->resource->GetDesc();
 
     D3D12_DISPATCH_RAYS_DESC raytraceDesc;
     fillOutRayTracingRenderDesc(raytraceDesc, (uint32)desc.Width, desc.Height, numRayTypes);
-
-    dx_gpu_descriptor_handle tlasHandle = gpuBaseDescriptorHandle + tlasIndex;
-    dx_gpu_descriptor_handle outputHandle = gpuBaseDescriptorHandle + outputIndex;
 
     cl->setDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, descriptorHeap);
 
@@ -184,6 +186,7 @@ void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_textu
 
     cl->setComputeDescriptorTable(PBR_RAYTRACING_RS_TLAS, tlasHandle);
     cl->setComputeDescriptorTable(PBR_RAYTRACING_RS_OUTPUT, outputHandle);
+    cl->setComputeDescriptorTable(PBR_RAYTRACING_RS_GBUFFER, resourceHandle);
     cl->setComputeDynamicConstantBuffer(PBR_RAYTRACING_RS_CAMERA, cameraCBV);
     cl->setComputeDynamicConstantBuffer(PBR_RAYTRACING_RS_SUN, sunCBV);
     cl->setCompute32BitConstants(PBR_RAYTRACING_RS_CB, raytracingCB);
@@ -309,6 +312,26 @@ void raytracing_batch::updateInstanceTransform(raytracing_instance_handle handle
     memcpy(instance.Transform, &m, sizeof(instance.Transform));
 }
 
+void raytracing_batch::initialize(acceleration_structure_rebuild_mode rebuildMode, uint32 reserveDescriptorsAtStart)
+{
+    this->rebuildMode = rebuildMode;
+    this->reservedDescriptorsAtStart = reserveDescriptorsAtStart;
+
+    allInstances.reserve(4096); // TODO
+
+    D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc = {};
+    descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    descriptorHeapDesc.NumDescriptors = 4096; // TODO
+    descriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+    checkResult(dxContext.device->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&descriptorHeap)));
+    cpuBaseDescriptorHandle = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
+    gpuBaseDescriptorHandle = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
+
+    // Offset for the output and TLAS descriptor. Output is set every frame, and TLAS can be updated, so we ring buffer this.
+    cpuCurrentDescriptorHandle = cpuBaseDescriptorHandle + (1 + 1 + reserveDescriptorsAtStart) * NUM_BUFFERED_FRAMES;
+}
+
 void raytracing_batch::fillOutRayTracingRenderDesc(D3D12_DISPATCH_RAYS_DESC& raytraceDesc, uint32 renderWidth, uint32 renderHeight, uint32 numRayTypes)
 {
     raytraceDesc.Width = renderWidth;
@@ -332,4 +355,43 @@ void raytracing_batch::fillOutRayTracingRenderDesc(D3D12_DISPATCH_RAYS_DESC& ray
     raytraceDesc.HitGroupTable.SizeInBytes = bindingTableBuffer->elementSize * numHitShaders;
 
     raytraceDesc.CallableShaderTable = {};
+}
+
+dx_gpu_descriptor_handle raytracing_batch::getTLASHandle()
+{
+    dx_gpu_descriptor_handle tlasHandle = gpuBaseDescriptorHandle + tlasDescriptorIndex;
+    return tlasHandle;
+}
+
+dx_gpu_descriptor_handle raytracing_batch::setOutputTexture(const ref<dx_texture>& output)
+{
+    uint32 outputIndex = 2 + dxContext.bufferedFrameID; // TLAS is at 0 or 1.
+    dxContext.device->CopyDescriptorsSimple(1, (cpuBaseDescriptorHandle + outputIndex).cpuHandle, output->defaultUAV.cpuHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+    dx_gpu_descriptor_handle outputHandle = gpuBaseDescriptorHandle + outputIndex;
+    return outputHandle;
+}
+
+dx_gpu_descriptor_handle raytracing_batch::setTextures(const ref<dx_texture>* textures)
+{
+    uint32 index = 4 + reservedDescriptorsAtStart * dxContext.bufferedFrameID; // First 4 are TLAS (x2) and output (x2).
+
+    D3D12_CPU_DESCRIPTOR_HANDLE destDescriptorRangeStart = (cpuBaseDescriptorHandle + index).cpuHandle;
+    uint32 numSrcDescriptors = reservedDescriptorsAtStart;
+
+    D3D12_CPU_DESCRIPTOR_HANDLE srcHandles[32];
+    assert(numSrcDescriptors <= arraysize(srcHandles));
+
+    for (uint32 i = 0; i < numSrcDescriptors; ++i)
+    {
+        srcHandles[i] = textures[i]->defaultSRV;
+    }
+
+    dxContext.device->CopyDescriptors(
+        1, &destDescriptorRangeStart, &numSrcDescriptors,
+        numSrcDescriptors, srcHandles, nullptr,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+    dx_gpu_descriptor_handle handle = gpuBaseDescriptorHandle + index;
+    return handle;
 }

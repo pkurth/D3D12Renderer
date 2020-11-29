@@ -198,6 +198,11 @@ struct dx_graphics_pipeline_generator
 		return *this;
 	}
 
+	dx_graphics_pipeline_generator& renderTargets(DXGI_FORMAT rtFormat, DXGI_FORMAT dsvFormat = DXGI_FORMAT_UNKNOWN)
+	{
+		return renderTargets(&rtFormat, 1, dsvFormat);
+	}
+
 	dx_graphics_pipeline_generator& renderTargets(const DXGI_FORMAT* rtFormats, uint32 numRenderTargets, DXGI_FORMAT dsvFormat = DXGI_FORMAT_UNKNOWN)
 	{
 		memcpy(desc.RTVFormats, rtFormats, sizeof(DXGI_FORMAT) * numRenderTargets);

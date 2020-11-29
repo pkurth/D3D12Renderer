@@ -21,6 +21,7 @@ struct raytracing_instance_handle
 
 struct raytracing_batch
 {
+    // Maybe we want to rebuild this every frame anyway.
     raytracing_instance_handle instantiate(raytracing_object_handle type, const trs& transform);
     void updateInstanceTransform(raytracing_instance_handle handle, const trs& transform);
 
@@ -29,35 +30,45 @@ struct raytracing_batch
 
     void buildAll();
 
-    virtual void render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, dx_dynamic_constant_buffer cameraCBV, dx_dynamic_constant_buffer sunCBV) = 0;
-
 protected:
+    void initialize(acceleration_structure_rebuild_mode rebuildMode, uint32 reserveDescriptorsAtStart);
+
     void fillOutRayTracingRenderDesc(D3D12_DISPATCH_RAYS_DESC& raytraceDesc, uint32 renderWidth, uint32 renderHeight, uint32 numRayTypes);
 
-    com<ID3D12DescriptorHeap> descriptorHeap;
-    dx_cpu_descriptor_handle cpuBaseDescriptorHandle;
-    dx_gpu_descriptor_handle gpuBaseDescriptorHandle;
-    dx_cpu_descriptor_handle cpuCurrentDescriptorHandle;
+    dx_gpu_descriptor_handle getTLASHandle();
+    dx_gpu_descriptor_handle setOutputTexture(const ref<dx_texture>& output);
+    dx_gpu_descriptor_handle setTextures(const ref<dx_texture>* textures);
+
 
     dx_raytracing_pipeline pipeline;
-    std::vector<D3D12_RAYTRACING_INSTANCE_DESC> allInstances;
-
-    raytracing_tlas tlas;
     ref<dx_buffer> bindingTableBuffer;
 
-    uint32 tlasDescriptorIndex = 0;
+    com<ID3D12DescriptorHeap> descriptorHeap;
+    dx_cpu_descriptor_handle cpuCurrentDescriptorHandle;
 
+private:
+    raytracing_tlas tlas;
+
+    uint32 tlasDescriptorIndex = 0;
+    uint32 reservedDescriptorsAtStart;
     acceleration_structure_rebuild_mode rebuildMode;
+    std::vector<D3D12_RAYTRACING_INSTANCE_DESC> allInstances;
+
+    dx_gpu_descriptor_handle gpuBaseDescriptorHandle;
+    dx_cpu_descriptor_handle cpuBaseDescriptorHandle;
 };
 
 struct pbr_raytracing_batch : raytracing_batch
 {
-    void initialize(uint32 maxNumObjectTypes = 0, acceleration_structure_rebuild_mode rebuildMode = acceleration_structure_rebuild);
-
     raytracing_object_handle defineObjectType(const raytracing_blas& blas, const std::vector<ref<pbr_material>>& materials);
     virtual void buildBindingTable() override;
 
-    virtual void render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, dx_dynamic_constant_buffer cameraCBV, dx_dynamic_constant_buffer sunCBV) override;
+    void render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, 
+        dx_dynamic_constant_buffer cameraCBV, dx_dynamic_constant_buffer sunCBV, 
+        const ref<dx_texture>& depthBuffer, const ref<dx_texture>& normalMap);
+
+protected:
+    void initialize(const wchar* shaderName, uint32 maxNumObjectTypes, acceleration_structure_rebuild_mode rebuildMode);
 
 private:
     struct raygen_table_entry
@@ -92,4 +103,9 @@ private:
     std::vector<binding_table_entry> bindingTable;
 
     uint32 instanceContributionToHitGroupIndex = 0;
+};
+
+struct specular_reflections_raytracing_batch : pbr_raytracing_batch
+{
+    void initialize(uint32 maxNumObjectTypes = 32, acceleration_structure_rebuild_mode rebuildMode = acceleration_structure_rebuild);
 };
