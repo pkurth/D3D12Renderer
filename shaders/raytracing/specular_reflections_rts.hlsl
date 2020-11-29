@@ -11,6 +11,7 @@
 #include "../common/light_source.hlsl"
 #include "../common/brdf.hlsl"
 #include "../common/normal.hlsl"
+#include "../common/material.hlsl"
 
 // Raytracing intrinsics: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#ray-system-values
 // Ray flags: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#ray-flags
@@ -44,6 +45,7 @@ TextureCube<float4> sky						: register(t4, space1);
 Texture2D<float4> brdf						: register(t5, space1);
 
 // Radiance hit group.
+ConstantBuffer<pbr_material_cb> material	: register(b0, space2);
 StructuredBuffer<mesh_vertex> meshVertices	: register(t0, space2);
 ByteAddressBuffer meshIndices				: register(t1, space2);
 Texture2D<float4> albedoTex					: register(t2, space2);
@@ -172,10 +174,28 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 
 	uint mipLevel = 0;
 
-	float3 albedo = albedoTex.SampleLevel(wrapSampler, uv, mipLevel).xyz;
-	float roughness = roughTex.SampleLevel(wrapSampler, uv, mipLevel);
-	float metallic = metalTex.SampleLevel(wrapSampler, uv, mipLevel);
-	float ao = 1.f;
+
+	uint flags = material.flags;
+
+	float4 albedo = ((flags & USE_ALBEDO_TEXTURE)
+		? albedoTex.SampleLevel(wrapSampler, uv, mipLevel)
+		: float4(1.f, 1.f, 1.f, 1.f))
+		* material.albedoTint;
+
+	// We ignore normal maps for now.
+
+	float roughness = (flags & USE_ROUGHNESS_TEXTURE)
+		? roughTex.SampleLevel(wrapSampler, uv, mipLevel)
+		: getRoughnessOverride(material);
+	roughness = clamp(roughness, 0.01f, 0.99f);
+
+	float metallic = (flags & USE_METALLIC_TEXTURE)
+		? metalTex.SampleLevel(wrapSampler, uv, mipLevel)
+		: getMetallicOverride(material);
+
+	float ao = 1.f;// (flags & USE_AO_TEXTURE) ? RMAO.z : 1.f;
+
+
 
 	float3 hitPosition = hitWorldPosition();
 	float3 L = -sun.direction;

@@ -4,7 +4,7 @@
 #include "dx_descriptor.h"
 #include "pbr.h"
 
-
+#include "material.hlsl"
 
 #define MAX_RAYTRACING_RECURSION_DEPTH         4
 
@@ -80,13 +80,14 @@ private:
     };
     struct radiance_hit_entry
     {
+        pbr_material_cb materialCB;
         dx_cpu_descriptor_handle srvRange; // Vertex buffer, index buffer, pbr textures.
     };
     struct shadow_hit_entry
     {
     };
 
-    const uint32 numRayTypes = 2;
+    static const uint32 numRayTypes = 2;
 
     struct alignas(D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT) binding_table_entry
     {
@@ -99,6 +100,8 @@ private:
             radiance_hit_entry radianceHit;
             shadow_hit_entry shadowHit;
         };
+
+        binding_table_entry() {}
     };
 
     std::vector<binding_table_entry> bindingTable;

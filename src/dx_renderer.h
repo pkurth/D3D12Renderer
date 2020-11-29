@@ -8,7 +8,6 @@
 #include "gizmo.h"
 #include "pbr.h"
 
-#include "model_rs.hlsl"
 #include "light_source.hlsl"
 #include "camera.hlsl"
 #include "present_rs.hlsl"

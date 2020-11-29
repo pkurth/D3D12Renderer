@@ -10,6 +10,8 @@
 #include "sky_rs.hlsl"
 #include "light_culling_rs.hlsl"
 #include "raytracing.hlsl"
+#include "model_rs.hlsl"
+#include "material.hlsl"
 
 #include "camera.hlsl"
 #include "raytracing.h"
@@ -649,7 +651,13 @@ void dx_renderer::endFrame()
 			flags |= USE_METALLIC_TEXTURE;
 		}
 
-		cl->setGraphics32BitConstants(MODEL_RS_MATERIAL, pbr_material_cb{ material->albedoTint, material->roughnessOverride, material->metallicOverride, flags });
+		cl->setGraphics32BitConstants(MODEL_RS_MATERIAL, 
+			pbr_material_cb
+			{
+				material->albedoTint.x, material->albedoTint.y, material->albedoTint.z, material->albedoTint.w,
+				packRoughnessAndMetallic(material->roughnessOverride, material->metallicOverride), 
+				flags 
+			});
 
 		cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
 

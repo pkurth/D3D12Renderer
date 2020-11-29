@@ -7,20 +7,6 @@ struct transform_cb
 	mat4 m;
 };
 
-#define USE_ALBEDO_TEXTURE		(1 << 0)
-#define USE_NORMAL_TEXTURE		(1 << 1)
-#define USE_ROUGHNESS_TEXTURE	(1 << 2)
-#define USE_METALLIC_TEXTURE	(1 << 3)
-#define USE_AO_TEXTURE			(1 << 4)
-
-struct pbr_material_cb
-{
-    vec4 albedoTint;
-    float roughnessOverride;
-    float metallicOverride;
-    uint32 flags;
-};
-
 struct lighting_cb
 {
     float environmentIntensity;
@@ -32,7 +18,7 @@ struct lighting_cb
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
     "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX),"  \
-    "RootConstants(num32BitConstants=8, b1, visibility=SHADER_VISIBILITY_PIXEL),"  \
+    "RootConstants(num32BitConstants=6, b1, visibility=SHADER_VISIBILITY_PIXEL),"  \
     "RootConstants(num32BitConstants=1, b3, visibility=SHADER_VISIBILITY_PIXEL),"  \
     "CBV(b2, visibility=SHADER_VISIBILITY_PIXEL), " \
     "StaticSampler(s0," \

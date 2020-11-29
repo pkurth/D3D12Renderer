@@ -51,8 +51,9 @@ void pbr_raytracing_batch::initialize(const wchar* shaderName, uint32 maxNumObje
     D3D12_ROOT_SIGNATURE_DESC globalDesc = { arraysize(globalRootParameters), globalRootParameters, arraysize(globalStaticSamplers), globalStaticSamplers };
 
     CD3DX12_DESCRIPTOR_RANGE hitSRVRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0, 2);
-    CD3DX12_ROOT_PARAMETER hitRootParameters[1];
-    hitRootParameters[0].InitAsDescriptorTable(1, &hitSRVRange);
+    CD3DX12_ROOT_PARAMETER hitRootParameters[2];
+    hitRootParameters[0].InitAsConstants(sizeof(pbr_material_cb) / 4, 0, 2);
+    hitRootParameters[1].InitAsDescriptorTable(1, &hitSRVRange);
     D3D12_ROOT_SIGNATURE_DESC hitDesc = { arraysize(hitRootParameters), hitRootParameters };
 
 
@@ -99,10 +100,13 @@ raytracing_object_handle pbr_raytracing_batch::defineObjectType(const raytracing
 
         (cpuCurrentDescriptorHandle++).createBufferSRV(blas.geometries[i].vertexBuffer, { submesh.baseVertex, submesh.numVertices });
         (cpuCurrentDescriptorHandle++).createRawBufferSRV(blas.geometries[i].indexBuffer, { submesh.firstTriangle * 3, submesh.numTriangles * 3 });
-        
+
+        uint32 flags = 0;
+
         if (material->albedo) 
         {
             (cpuCurrentDescriptorHandle++).create2DTextureSRV(material->albedo);
+            flags |= USE_ALBEDO_TEXTURE;
         }
         else
         {
@@ -112,6 +116,7 @@ raytracing_object_handle pbr_raytracing_batch::defineObjectType(const raytracing
         if (material->normal)
         {
             (cpuCurrentDescriptorHandle++).create2DTextureSRV(material->normal);
+            flags |= USE_NORMAL_TEXTURE;
         }
         else
         {
@@ -121,6 +126,7 @@ raytracing_object_handle pbr_raytracing_batch::defineObjectType(const raytracing
         if (material->roughness)
         {
             (cpuCurrentDescriptorHandle++).create2DTextureSRV(material->roughness);
+            flags |= USE_ROUGHNESS_TEXTURE;
         }
         else
         {
@@ -130,6 +136,7 @@ raytracing_object_handle pbr_raytracing_batch::defineObjectType(const raytracing
         if (material->metallic)
         {
             (cpuCurrentDescriptorHandle++).create2DTextureSRV(material->metallic);
+            flags |= USE_METALLIC_TEXTURE;
         }
         else
         {
@@ -139,6 +146,12 @@ raytracing_object_handle pbr_raytracing_batch::defineObjectType(const raytracing
 
         binding_table_entry radianceHit;
         memcpy(radianceHit.identifier, pipeline.shaderBindingTableDesc.hitGroups[0], D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+        radianceHit.radianceHit.materialCB = pbr_material_cb
+        { 
+            material->albedoTint.x, material->albedoTint.y, material->albedoTint.z, material->albedoTint.w,
+            packRoughnessAndMetallic(material->roughnessOverride, material->metallicOverride), 
+            flags 
+        };
         radianceHit.radianceHit.srvRange = base;
         bindingTable.push_back(radianceHit);
 

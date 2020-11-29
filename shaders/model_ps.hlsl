@@ -4,6 +4,7 @@
 #include "light_culling_rs.hlsl"
 #include "light_source.hlsl"
 #include "normal.hlsl"
+#include "material.hlsl"
 
 struct ps_input
 {
@@ -64,12 +65,12 @@ ps_output main(ps_input IN)
 
 	float roughness = (flags & USE_ROUGHNESS_TEXTURE)
 		? roughTex.Sample(wrapSampler, IN.uv)
-		: material.roughnessOverride;
+		: getRoughnessOverride(material);
 	roughness = clamp(roughness, 0.01f, 0.99f);
 
 	float metallic = (flags & USE_METALLIC_TEXTURE)
 		? metalTex.Sample(wrapSampler, IN.uv)
-		: material.metallicOverride;
+		: getMetallicOverride(material);
 
 	float ao = 1.f;// (flags & USE_AO_TEXTURE) ? RMAO.z : 1.f;
 
