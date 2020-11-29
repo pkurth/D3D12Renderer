@@ -18,7 +18,6 @@ void application::initialize(dx_renderer* renderer)
 	camera.nearPlane = 0.1f;
 
 
-#if 0
 	meshes.push_back(loadMeshFromFile("assets/meshes/cerberus.fbx", 
 		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
 	);
@@ -32,35 +31,49 @@ void application::initialize(dx_renderer* renderer)
 		0.f,
 		0.f
 	);
-	meshes[0].singleMeshes[0].material = cerberusMaterial;
+	meshes.back().singleMeshes[0].material = cerberusMaterial;
 
-	trs transform = { vec3(0.f, 10.f, 0.f),	quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.4f };
 
-#else
 	meshes.push_back(loadMeshFromFile("assets/meshes/sponza.obj",
 		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents,
 		true)
 	);
 
-	trs transform = { vec3(0.f, 0.f, 0.f), quat::identity, 0.03f };
 
-	raytracing_blas_builder blasBuilder;
-	std::vector<ref<pbr_material>> raytracingMaterials;
-	for (auto& m : meshes[0].singleMeshes)
-	{
-		blasBuilder.push(meshes[0].mesh.vertexBuffer, meshes[0].mesh.indexBuffer, m.submesh);
-		raytracingMaterials.push_back(m.material);
-	}
-	blas.push_back(blasBuilder.finish());
+
 
 	reflectionsRaytracingBatch.initialize(128);
-	auto type = reflectionsRaytracingBatch.defineObjectType(blas[0], raytracingMaterials);
-	reflectionsRaytracingBatch.instantiate(type, transform);
-	//raytracingBatch.instantiate(type, { transform.position + vec3(0.f, 100.f, 0.f), transform.rotation, transform.scale });
-	reflectionsRaytracingBatch.buildAll();
-#endif
 
-	gameObjects.push_back({	transform, 0, });
+
+	std::vector<raytracing_object_handle> types;
+	for (auto& m : meshes)
+	{
+		raytracing_blas_builder blasBuilder;
+		std::vector<ref<pbr_material>> raytracingMaterials;
+
+		for (auto& sm : m.singleMeshes)
+		{
+			blasBuilder.push(m.mesh.vertexBuffer, m.mesh.indexBuffer, sm.submesh);
+			raytracingMaterials.push_back(sm.material);
+		}
+
+		blas.push_back(blasBuilder.finish());
+		types.push_back(reflectionsRaytracingBatch.defineObjectType(blas.back(), raytracingMaterials));
+	}
+
+
+
+	trs cerberusTransform = { vec3(0.f, 10.f, -5.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.04f };
+	gameObjects.push_back({ cerberusTransform, 0, });
+	reflectionsRaytracingBatch.instantiate(types[0], cerberusTransform);
+
+	trs sponzaTransform = { vec3(0.f, 0.f, 0.f), quat::identity, 0.03f };
+	gameObjects.push_back({ sponzaTransform, 1, });
+	reflectionsRaytracingBatch.instantiate(types[1], sponzaTransform);
+
+
+	reflectionsRaytracingBatch.buildAll();
+
 
 	setEnvironment("assets/textures/hdri/sunset_in_the_chalk_quarry_4k.hdr");
 
@@ -239,14 +252,15 @@ void application::update(const user_input& input, float dt)
 	ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->settings.aspectRatioMode);
 	ImGui::Checkbox("Show light volumes", &renderer->settings.showLightVolumes);
 
-	ImGui::Image(renderer->raytracingTexture->defaultSRV, ImVec2(256, 256)); // TODO: When you remove this, make renderer attributes private again.
+	//ImGui::Image(renderer->raytracingTexture->defaultSRV, ImVec2(256, 256)); // TODO: When you remove this, make renderer attributes private again.
 
 	plotAndEditTonemapping(renderer->settings.tonemap);
 	editSunShadowParameters(sun);
 
 	ImGui::SliderFloat("Environment intensity", &renderer->settings.environmentIntensity, 0.f, 2.f);
 	ImGui::SliderFloat("Sky intensity", &renderer->settings.skyIntensity, 0.f, 2.f);
-	ImGui::SliderInt("Raytracing bounces", (int*)&renderer->settings.numRaytracingBounces, 1, MAX_RAYTRACING_RECURSION_DEPTH);
+	ImGui::SliderInt("Raytracing bounces", (int*)&renderer->settings.numRaytracingBounces, 1, MAX_RAYTRACING_RECURSION_DEPTH - 1);
+	ImGui::SliderInt("Raytracing downsampling", (int*)&renderer->settings.raytracingDownsampleFactor, 1, 4);
 
 	ImGui::End();
 

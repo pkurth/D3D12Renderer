@@ -239,6 +239,8 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	settings.skyIntensity = 1.f;
 	settings.aspectRatioMode = aspect_ratio_free;
 	settings.showLightVolumes = false;
+	settings.numRaytracingBounces = 1;
+	settings.raytracingDownsampleFactor = 2;
 
 	oldSettings = settings;
 
@@ -271,7 +273,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 
 	// Raytracing.
 	{
-		raytracingTexture = createTexture(0, renderWidth, renderHeight, raytracedReflectionsFormat, false, true);
+		raytracingTexture = createTexture(0, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor, raytracedReflectionsFormat, false, true);
 	}
 }
 
@@ -345,7 +347,7 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		resizeTexture(volumetricsTexture, renderWidth, renderHeight);
 		volumetricsRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
 
-		resizeTexture(raytracingTexture, renderWidth, renderHeight);
+		resizeTexture(raytracingTexture, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor);
 	}
 
 	allocateLightCullingBuffers();
@@ -426,7 +428,8 @@ void dx_renderer::endFrame()
 {
 	bool aspectRatioModeChanged = settings.aspectRatioMode != oldSettings.aspectRatioMode;
 
-	if (aspectRatioModeChanged)
+	if (aspectRatioModeChanged
+		|| settings.raytracingDownsampleFactor != oldSettings.raytracingDownsampleFactor)
 	{
 		recalculateViewport(true);
 	}

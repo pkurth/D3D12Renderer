@@ -98,11 +98,6 @@ static float3 traceRadianceRay(float3 origin, float3 direction, uint recursion)
 
 static bool traceShadowRay(float3 origin, float3 direction, uint recursion)
 {
-	if (recursion >= raytracing.maxRecursionDepth)
-	{
-		return false;
-	}
-
 	RayDesc ray;
 	ray.Origin = origin;
 	ray.Direction = direction;
@@ -129,17 +124,31 @@ void rayGen()
 	uint3 launchIndex = DispatchRaysIndex();
 	uint3 launchDim = DispatchRaysDimensions();
 
-	float depth = depthBuffer.Load(launchIndex);
+	float2 uv = float2(launchIndex.xy) / float2(launchDim.xy);
+	float4 depth4 = depthBuffer.Gather(clampSampler, uv);
+	uint minComponent =
+		(depth4.x < depth4.y) ?
+		(depth4.x < depth4.z) ?
+		(depth4.x < depth4.w) ? 0 : 3 :
+		(depth4.z < depth4.w) ? 2 : 3 :
+		(depth4.y < depth4.z) ?
+		(depth4.y < depth4.w) ? 1 : 3 :
+		(depth4.z < depth4.w) ? 2 : 3;
+
+	float depth = depth4[minComponent];
 
 	float3 color = (float3)0.f;
 	if (depth < 1.f)
 	{
-		float2 uv = float2(launchIndex.xy) / float2(launchDim.xy);
-
 #if 1
 		float3 origin = restoreWorldSpacePosition(camera.invViewProj, uv, depth);
 		float3 direction = normalize(origin - camera.position);
-		float3 normal = unpackNormal(worldNormals.Load(launchIndex));
+
+		float2 normal2 = float2(
+			worldNormals.GatherRed(clampSampler, uv)[minComponent],
+			worldNormals.GatherGreen(clampSampler, uv)[minComponent]
+		);
+		float3 normal = unpackNormal(normal2);
 		direction = reflect(direction, normal);
 #else
 		float3 origin = camera.position.xyz;
@@ -207,6 +216,10 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	
 	payload.color = calculateDirectLighting(albedo, radiance, N, L, V, F0, roughness, metallic);
 	payload.color += calculateAmbientLighting(albedo, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao) * raytracing.environmentIntensity;
+
+	float3 reflectionDirection = normalize(reflect(WorldRayDirection(), N));
+	float3 bounceRadiance = traceRadianceRay(hitPosition, reflectionDirection, payload.recursion);
+	payload.color += calculateDirectLighting(albedo, bounceRadiance, N, reflectionDirection, V, F0, roughness, metallic);
 }
 
 [shader("anyhit")]

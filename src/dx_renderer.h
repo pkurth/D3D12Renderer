@@ -38,7 +38,8 @@ struct renderer_settings
 	tonemap_cb tonemap;
 	float environmentIntensity;
 	float skyIntensity;
-	uint32 numRaytracingBounces = 2;
+	uint32 raytracingDownsampleFactor;
+	uint32 numRaytracingBounces;
 	aspect_ratio_mode aspectRatioMode;
 	bool showLightVolumes;
 };

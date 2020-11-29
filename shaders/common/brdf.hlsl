@@ -95,7 +95,7 @@ static float3 importanceSampleGGX(float2 Xi, float3 N, float roughness)
 }
 
 static float3 calculateAmbientLighting(float3 albedo, float3 irradiance,
-	TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState brdfSampler,
+	TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState clampSampler,
 	float3 N, float3 V, float3 F0, float roughness, float metallic, float ao)
 {
 	// Common.
@@ -114,8 +114,8 @@ static float3 calculateAmbientLighting(float3 albedo, float3 irradiance,
 	environmentTexture.GetDimensions(0, width, height, numMipLevels);
 	float lod = roughness * float(numMipLevels - 1);
 
-	float3 prefilteredColor = environmentTexture.SampleLevel(brdfSampler, R, lod).rgb;
-	float2 envBRDF = brdf.SampleLevel(brdfSampler, float2(roughness, NdotV), 0).rg;
+	float3 prefilteredColor = environmentTexture.SampleLevel(clampSampler, R, lod).rgb;
+	float2 envBRDF = brdf.SampleLevel(clampSampler, float2(roughness, NdotV), 0).rg;
 	float3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y);
 
 	float3 ambient = (kD * diffuse + specular) * ao;
@@ -124,11 +124,11 @@ static float3 calculateAmbientLighting(float3 albedo, float3 irradiance,
 }
 
 static float3 calculateAmbientLighting(float3 albedo,
-	TextureCube<float4> irradianceTexture, TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState brdfSampler,
+	TextureCube<float4> irradianceTexture, TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState clampSampler,
 	float3 N, float3 V, float3 F0, float roughness, float metallic, float ao)
 {
-	float3 irradiance = irradianceTexture.SampleLevel(brdfSampler, N, 0).rgb;
-	return calculateAmbientLighting(albedo, irradiance, environmentTexture, brdf, brdfSampler, N, V, F0, roughness, metallic, ao);
+	float3 irradiance = irradianceTexture.SampleLevel(clampSampler, N, 0).rgb;
+	return calculateAmbientLighting(albedo, irradiance, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao);
 }
 
 static float3 calculateDirectLighting(float3 albedo, float3 radiance, float3 N, float3 L, float3 V, float3 F0, float roughness, float metallic)
