@@ -115,7 +115,7 @@ static float3 calculateAmbientLighting(float3 albedo, float3 irradiance,
 	float lod = roughness * float(numMipLevels - 1);
 
 	float3 prefilteredColor = environmentTexture.SampleLevel(brdfSampler, R, lod).rgb;
-	float2 envBRDF = brdf.Sample(brdfSampler, float2(roughness, NdotV)).rg;
+	float2 envBRDF = brdf.SampleLevel(brdfSampler, float2(roughness, NdotV), 0).rg;
 	float3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y);
 
 	float3 ambient = (kD * diffuse + specular) * ao;
@@ -127,7 +127,7 @@ static float3 calculateAmbientLighting(float3 albedo,
 	TextureCube<float4> irradianceTexture, TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState brdfSampler,
 	float3 N, float3 V, float3 F0, float roughness, float metallic, float ao)
 {
-	float3 irradiance = irradianceTexture.Sample(brdfSampler, N).rgb;
+	float3 irradiance = irradianceTexture.SampleLevel(brdfSampler, N, 0).rgb;
 	return calculateAmbientLighting(albedo, irradiance, environmentTexture, brdf, brdfSampler, N, V, F0, roughness, metallic, ao);
 }
 

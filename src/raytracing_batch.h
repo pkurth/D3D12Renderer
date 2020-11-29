@@ -65,7 +65,8 @@ struct pbr_raytracing_batch : raytracing_batch
 
     void render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, 
         dx_dynamic_constant_buffer cameraCBV, dx_dynamic_constant_buffer sunCBV, 
-        const ref<dx_texture>& depthBuffer, const ref<dx_texture>& normalMap);
+        const ref<dx_texture>& depthBuffer, const ref<dx_texture>& normalMap,
+        const ref<pbr_environment>& environment, const ref<dx_texture>& brdf);
 
 protected:
     void initialize(const wchar* shaderName, uint32 maxNumObjectTypes, acceleration_structure_rebuild_mode rebuildMode);

@@ -17,7 +17,7 @@ Hit group shader table index =
 
 #define PBR_RAYTRACING_RS_TLAS      0
 #define PBR_RAYTRACING_RS_OUTPUT    1
-#define PBR_RAYTRACING_RS_GBUFFER   2
+#define PBR_RAYTRACING_RS_TEXTURES  2
 #define PBR_RAYTRACING_RS_CAMERA    3
 #define PBR_RAYTRACING_RS_SUN       4
 #define PBR_RAYTRACING_RS_CB        5
@@ -30,22 +30,24 @@ void specular_reflections_raytracing_batch::initialize(uint32 maxNumObjectTypes,
 
 void pbr_raytracing_batch::initialize(const wchar* shaderName, uint32 maxNumObjectTypes, acceleration_structure_rebuild_mode rebuildMode)
 {
-    uint32 numResources = 2; // One more slot for normal map.
+    uint32 numResources = 6; // Depth buffer, normal map, global irradiance, environment, sky, brdf.
 
     raytracing_batch::initialize(rebuildMode, numResources);
 
     CD3DX12_DESCRIPTOR_RANGE tlasRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
     CD3DX12_DESCRIPTOR_RANGE outputRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0);
-    CD3DX12_DESCRIPTOR_RANGE gbufferRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numResources, 0, 1);
+    CD3DX12_DESCRIPTOR_RANGE texturesRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numResources, 0, 1);
     CD3DX12_ROOT_PARAMETER globalRootParameters[6];
     globalRootParameters[PBR_RAYTRACING_RS_TLAS].InitAsDescriptorTable(1, &tlasRange);
     globalRootParameters[PBR_RAYTRACING_RS_OUTPUT].InitAsDescriptorTable(1, &outputRange);
-    globalRootParameters[PBR_RAYTRACING_RS_GBUFFER].InitAsDescriptorTable(1, &gbufferRange);
+    globalRootParameters[PBR_RAYTRACING_RS_TEXTURES].InitAsDescriptorTable(1, &texturesRange);
     globalRootParameters[PBR_RAYTRACING_RS_CAMERA].InitAsConstantBufferView(0);
     globalRootParameters[PBR_RAYTRACING_RS_SUN].InitAsConstantBufferView(1);
     globalRootParameters[PBR_RAYTRACING_RS_CB].InitAsConstants(1, 2);
-    CD3DX12_STATIC_SAMPLER_DESC globalStaticSamplers[1];
+
+    CD3DX12_STATIC_SAMPLER_DESC globalStaticSamplers[2];
     globalStaticSamplers[0].Init(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+    globalStaticSamplers[1].Init(1, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
     D3D12_ROOT_SIGNATURE_DESC globalDesc = { arraysize(globalRootParameters), globalRootParameters, arraysize(globalStaticSamplers), globalStaticSamplers };
 
     CD3DX12_DESCRIPTOR_RANGE hitSRVRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0, 2);
@@ -160,12 +162,17 @@ void pbr_raytracing_batch::buildBindingTable()
 
 void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, 
     dx_dynamic_constant_buffer cameraCBV, dx_dynamic_constant_buffer sunCBV, 
-    const ref<dx_texture>& depthBuffer, const ref<dx_texture>& normalMap)
+    const ref<dx_texture>& depthBuffer, const ref<dx_texture>& normalMap,
+    const ref<pbr_environment>& environment, const ref<dx_texture>& brdf)
 {
     const ref<dx_texture> textures[] =
     {
         depthBuffer,
         normalMap,
+        environment->irradiance,
+        environment->environment,
+        environment->sky,
+        brdf
     };
 
     dx_gpu_descriptor_handle tlasHandle = getTLASHandle();
@@ -186,7 +193,7 @@ void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_textu
 
     cl->setComputeDescriptorTable(PBR_RAYTRACING_RS_TLAS, tlasHandle);
     cl->setComputeDescriptorTable(PBR_RAYTRACING_RS_OUTPUT, outputHandle);
-    cl->setComputeDescriptorTable(PBR_RAYTRACING_RS_GBUFFER, resourceHandle);
+    cl->setComputeDescriptorTable(PBR_RAYTRACING_RS_TEXTURES, resourceHandle);
     cl->setComputeDynamicConstantBuffer(PBR_RAYTRACING_RS_CAMERA, cameraCBV);
     cl->setComputeDynamicConstantBuffer(PBR_RAYTRACING_RS_SUN, sunCBV);
     cl->setCompute32BitConstants(PBR_RAYTRACING_RS_CB, raytracingCB);

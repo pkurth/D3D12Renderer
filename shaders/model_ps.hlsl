@@ -146,7 +146,7 @@ ps_output main(ps_input IN)
 
 		float3 radiance = sun.radiance * visibility; // No attenuation for sun.
 
-		float3 L = -sun.direction.xyz;
+		float3 L = -sun.direction;
 		totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
 	}
 

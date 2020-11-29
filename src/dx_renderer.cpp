@@ -392,9 +392,7 @@ void dx_renderer::setCamera(const render_camera& camera)
 
 void dx_renderer::setEnvironment(const ref<pbr_environment>& environment)
 {
-	this->environment.sky = environment->sky->defaultSRV;
-	this->environment.environment = environment->environment->defaultSRV;
-	this->environment.irradiance = environment->irradiance->defaultSRV;
+	this->environment = environment;
 }
 
 void dx_renderer::setSun(const directional_light& light)
@@ -459,7 +457,7 @@ void dx_renderer::endFrame()
 	cl->setGraphicsRootSignature(*textureSkyPipeline.rootSignature);
 
 	cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
-	cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment.sky);
+	cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment->sky->defaultSRV);
 
 	cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
 	cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
@@ -602,8 +600,8 @@ void dx_renderer::endFrame()
 	// Models.
 	cl->setPipelineState(*modelPipeline.pipeline);
 	cl->setGraphicsRootSignature(*modelPipeline.rootSignature);
-	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 0, environment.irradiance);
-	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 1, environment.environment);
+	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 0, environment->irradiance->defaultSRV);
+	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 1, environment->environment->defaultSRV);
 	cl->setGraphics32BitConstants(MODEL_RS_LIGHTING, lighting_cb{ settings.environmentIntensity });
 	cl->setDescriptorHeapSRV(MODEL_RS_BRDF, 0, brdfTex);
 	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 0, lightCullingBuffers.lightGrid);
@@ -675,7 +673,7 @@ void dx_renderer::endFrame()
 
 	for (const raytraced_reflections_render_pass::draw_call& dc : raytracedReflectionsRenderPass.drawCalls)
 	{
-		dc.batch->render(cl, raytracingTexture, settings.numRaytracingBounces, cameraCBV, sunCBV, depthBuffer, worldNormalsTexture);
+		dc.batch->render(cl, raytracingTexture, settings.numRaytracingBounces, cameraCBV, sunCBV, depthBuffer, worldNormalsTexture, environment, brdfTex);
 	}
 	cl->resetToDynamicDescriptorHeap();
 #endif

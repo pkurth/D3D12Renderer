@@ -38,7 +38,7 @@ struct renderer_settings
 {
 	tonemap_cb tonemap;
 	float environmentIntensity;
-	uint32 numRaytracingBounces = 1;
+	uint32 numRaytracingBounces = 2;
 	aspect_ratio_mode aspectRatioMode;
 	bool showLightVolumes;
 };
@@ -76,12 +76,6 @@ struct dx_renderer
 	ref<dx_texture> frameResult;
 
 //private:
-	struct pbr_environment_handles
-	{
-		dx_cpu_descriptor_handle sky;
-		dx_cpu_descriptor_handle irradiance;
-		dx_cpu_descriptor_handle environment;
-	};
 
 	struct light_culling_buffers
 	{
@@ -116,7 +110,7 @@ struct dx_renderer
 
 
 
-	pbr_environment_handles environment;
+	ref<pbr_environment> environment;
 	const point_light_cb* pointLights;
 	const spot_light_cb* spotLights;
 	uint32 numPointLights;

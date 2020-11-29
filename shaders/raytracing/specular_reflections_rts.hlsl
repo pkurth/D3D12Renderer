@@ -9,6 +9,7 @@
 #include "../common/camera.hlsl"
 #include "../common/raytracing.hlsl"
 #include "../common/light_source.hlsl"
+#include "../common/brdf.hlsl"
 #include "../common/normal.hlsl"
 
 // Raytracing intrinsics: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#ray-system-values
@@ -30,11 +31,17 @@ ConstantBuffer<directional_light_cb> sun	: register(b1);
 ConstantBuffer<raytracing_cb> raytracing	: register(b2);
 RWTexture2D<float4> output					: register(u0);
 SamplerState wrapSampler					: register(s0);
+SamplerState clampSampler					: register(s1);
 
 // Gbuffer (global).
 Texture2D<float> depthBuffer                : register(t0, space1);
 Texture2D<float2> worldNormals				: register(t1, space1);
 
+// Environment (global).
+TextureCube<float4> irradianceTexture		: register(t2, space1);
+TextureCube<float4> environmentTexture		: register(t3, space1);
+TextureCube<float4> sky						: register(t4, space1);
+Texture2D<float4> brdf						: register(t5, space1);
 
 // Radiance hit group.
 StructuredBuffer<mesh_vertex> meshVertices	: register(t0, space2);
@@ -127,11 +134,9 @@ void rayGen()
 	{
 		float2 uv = float2(launchIndex.xy) / float2(launchDim.xy);
 
-#if 0
+#if 1
 		float3 origin = restoreWorldSpacePosition(camera.invViewProj, uv, depth);
-
-		float3 direction = normalize(origin - camera.position.xyz);
-
+		float3 direction = normalize(origin - camera.position);
 		float3 normal = unpackNormal(worldNormals.Load(launchIndex));
 		direction = reflect(direction, normal);
 #else
@@ -151,7 +156,7 @@ void rayGen()
 [shader("miss")]
 void radianceMiss(inout radiance_ray_payload payload)
 {
-	payload.color = float3(0.f, 0.f, 0.f);
+	payload.color = sky.SampleLevel(wrapSampler, WorldRayDirection(), 0).xyz;
 }
 
 [shader("closesthit")]
@@ -162,27 +167,27 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float2 uvs[] = { meshVertices[tri.x].uv, meshVertices[tri.y].uv, meshVertices[tri.z].uv };
 	float3 normals[] = { meshVertices[tri.x].normal, meshVertices[tri.y].normal, meshVertices[tri.z].normal };
 
-	float3x4 M = ObjectToWorld3x4();
-
 	float2 uv = interpolateAttribute(uvs, attribs);
-	float3 normal = interpolateAttribute(normals, attribs);
-	normal = normalize(mul(M, float4(normal, 0.f)).xyz);
+	float3 N = transformDirectionToWorld(interpolateAttribute(normals, attribs));
 
-	float3 albedo = albedoTex.SampleLevel(wrapSampler, uv, 0).xyz;
-	float roughness = roughTex.Sample(wrapSampler, uv);
-	float metallic = metalTex.Sample(wrapSampler, uv);
+	uint mipLevel = 0;
+
+	float3 albedo = albedoTex.SampleLevel(wrapSampler, uv, mipLevel).xyz;
+	float roughness = roughTex.SampleLevel(wrapSampler, uv, mipLevel);
+	float metallic = metalTex.SampleLevel(wrapSampler, uv, mipLevel);
+	float ao = 1.f;
+	float environmentIntensity = 1.f;
 
 	float3 hitPosition = hitWorldPosition();
 	float3 L = -sun.direction;
-	bool inShadow = traceShadowRay(hitPosition, L, payload.recursion);
-
-	albedo = albedo * ((1 - (float)inShadow) * 0.5 + 0.5);
-	//if (inShadow)
-	//{
-	//	albedo = float3(1.f, 0.f, 1.f);
-	//}
-
-	payload.color = normal;
+	float visibility = 1.f - (float)traceShadowRay(hitPosition, L, payload.recursion);
+	
+	float3 radiance = sun.radiance * visibility; // No attenuation for sun.
+	float3 V = -WorldRayDirection();
+	float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
+	
+	payload.color = calculateDirectLighting(albedo, radiance, N, L, V, F0, roughness, metallic);
+	payload.color += calculateAmbientLighting(albedo, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao) * environmentIntensity;
 }
 
 [shader("anyhit")]

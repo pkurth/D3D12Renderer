@@ -15,6 +15,18 @@ static float3 hitWorldPosition()
 	return WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
 }
 
+static float3 transformPositionToWorld(float3 position)
+{
+	float3x4 M = ObjectToWorld3x4();
+	return mul(M, float4(position, 1.f)).xyz;
+}
+
+static float3 transformDirectionToWorld(float3 direction)
+{
+	float3x4 M = ObjectToWorld3x4();
+	return normalize(mul(M, float4(direction, 0.f)).xyz);
+}
+
 static float2 interpolateAttribute(float2 vertexAttribute[3], BuiltInTriangleIntersectionAttributes attribs)
 {
 	return vertexAttribute[0] +
