@@ -12,6 +12,7 @@ static dx_pipeline equirectangularToCubemapPipeline;
 static dx_pipeline cubemapToIrradiancePipeline;
 static dx_pipeline prefilterEnvironmentPipeline;
 static dx_pipeline integrateBRDFPipeline;
+static dx_pipeline gaussianBlurPipeline;
 
 
 
@@ -51,6 +52,12 @@ struct integrate_brdf_cb
 	uint32 textureDim;
 };
 
+struct gaussian_blur_cb
+{
+	vec2 direction;					// [1, 0] or [0, 1], scaled by inverse screen dimensions.
+	int halfKernelSize;
+};
+
 void initializeTexturePreprocessing()
 {
 	mipmapPipeline = createReloadablePipeline("generate_mips_cs");
@@ -58,6 +65,7 @@ void initializeTexturePreprocessing()
 	cubemapToIrradiancePipeline = createReloadablePipeline("cubemap_to_irradiance_cs");
 	prefilterEnvironmentPipeline = createReloadablePipeline("prefilter_environment_cs");
 	integrateBRDFPipeline = createReloadablePipeline("integrate_brdf_cs");
+	gaussianBlurPipeline = createReloadablePipeline("gaussian_blur_cs");
 }
 
 void generateMipMapsOnGPU(dx_command_list* cl, ref<dx_texture>& texture)
@@ -594,5 +602,44 @@ ref<dx_texture> integrateBRDF(dx_command_list* cl, uint32 resolution)
 	dxContext.retireObject(stagingTexture->resource);
 
 	return brdf;
+}
+
+void gaussianBlur(dx_command_list* cl, ref<dx_texture> tex, ref<dx_texture> tmpTex)
+{
+	cl->setPipelineState(*gaussianBlurPipeline.pipeline);
+	cl->setComputeRootSignature(*gaussianBlurPipeline.rootSignature);
+
+	//float weights[] = { 0.38774f, 0.24477f, 0.06136f };
+	float weights[] = { 0.20236f, 0.179044f, 0.124009f, 0.067234f, 0.028532f };
+
+	auto weightsBuffer = cl->uploadDynamicConstantBuffer(sizeof(weights), weights);
+	auto desc = tex->resource->GetDesc();
+	uint32 width = (uint32)desc.Width;
+	uint32 height = (uint32)desc.Height;
+
+	cl->setRootComputeSRV(2, weightsBuffer.gpuPtr);
+
+	uint32 numIterations = 1;
+	for (uint32 i = 0; i < numIterations; ++i)
+	{
+		// Vertical pass.
+		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(0.f, 1.f / height), arraysize(weights) });
+		cl->setDescriptorHeapSRV(1, 0, tex);
+		cl->setDescriptorHeapUAV(1, 1, tmpTex);
+
+		cl->dispatch(bucketize(width, 16), bucketize(height, 16), 1);
+
+		cl->uavBarrier(tmpTex);
+
+
+		// Horizontal pass.
+		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(1.f / width, 0.f), arraysize(weights) });
+		cl->setDescriptorHeapSRV(1, 0, tmpTex);
+		cl->setDescriptorHeapUAV(1, 1, tex);
+
+		cl->dispatch(bucketize(width, 16), bucketize(height, 16), 1);
+
+		cl->uavBarrier(tex);
+	}
 }
 

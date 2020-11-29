@@ -108,6 +108,7 @@ struct dx_renderer
 	ref<dx_texture> volumetricsTexture;
 
 	ref<dx_texture> raytracingTexture;
+	ref<dx_texture> raytracingTextureTmpForBlur;
 
 
 

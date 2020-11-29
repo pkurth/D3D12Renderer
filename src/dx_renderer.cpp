@@ -240,7 +240,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	settings.aspectRatioMode = aspect_ratio_free;
 	settings.showLightVolumes = false;
 	settings.numRaytracingBounces = 1;
-	settings.raytracingDownsampleFactor = 2;
+	settings.raytracingDownsampleFactor = 1;
 
 	oldSettings = settings;
 
@@ -249,8 +249,8 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	// HDR render target.
 	{
 		depthBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthFormat);
-		hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[0], true);
-		worldNormalsTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[1], true);
+		hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[0], false, true);
+		worldNormalsTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[1], false, true);
 
 		hdrRenderTarget.pushColorAttachment(hdrColorTexture);
 		hdrRenderTarget.pushColorAttachment(worldNormalsTexture);
@@ -259,21 +259,22 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 
 	// Frame result.
 	{
-		frameResult = createTexture(0, windowWidth, windowHeight, screenFormat, true);
+		frameResult = createTexture(0, windowWidth, windowHeight, screenFormat, false, true);
 
 		windowRenderTarget.pushColorAttachment(frameResult);
 	}
 
 	// Volumetrics.
 	{
-		volumetricsTexture = createTexture(0, renderWidth, renderHeight, volumetricsFormat, false, true);
+		volumetricsTexture = createTexture(0, renderWidth, renderHeight, volumetricsFormat, false, false, true);
 
 		volumetricsRenderTarget.pushColorAttachment(volumetricsTexture);
 	}
 
 	// Raytracing.
 	{
-		raytracingTexture = createTexture(0, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor, raytracedReflectionsFormat, false, true);
+		raytracingTexture = createTexture(0, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor, raytracedReflectionsFormat, false, false, true);
+		raytracingTextureTmpForBlur = createTexture(0, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor, raytracedReflectionsFormat, false, false, true);
 	}
 }
 
@@ -348,6 +349,7 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		volumetricsRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
 
 		resizeTexture(raytracingTexture, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor);
+		resizeTexture(raytracingTextureTmpForBlur, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor);
 	}
 
 	allocateLightCullingBuffers();
@@ -363,7 +365,7 @@ void dx_renderer::allocateLightCullingBuffers()
 	if (firstAllocation)
 	{
 		lightCullingBuffers.lightGrid = createTexture(0, lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY,
-			DXGI_FORMAT_R32G32B32A32_UINT, false, true);
+			DXGI_FORMAT_R32G32B32A32_UINT, false, false, true);
 		lightCullingBuffers.lightIndexCounter = createBuffer(sizeof(uint32), 2, 0, true, true);
 		lightCullingBuffers.pointLightIndexList = createBuffer(sizeof(uint32),
 			lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY * MAX_NUM_LIGHTS_PER_TILE, 0, true);
@@ -689,7 +691,12 @@ void dx_renderer::endFrame()
 		dc.batch->render(cl, raytracingTexture, settings.numRaytracingBounces, settings.environmentIntensity, settings.skyIntensity,
 			cameraCBV, sunCBV, depthBuffer, worldNormalsTexture, environment, brdfTex);
 	}
+
+	//generateMipMapsOnGPU(cl, raytracingTexture);
 	cl->resetToDynamicDescriptorHeap();
+
+	cl->uavBarrier(raytracingTexture);
+	gaussianBlur(cl, raytracingTexture, raytracingTextureTmpForBlur);
 #endif
 
 
