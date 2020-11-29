@@ -33,7 +33,7 @@ struct raytracing_batch
 protected:
     void initialize(acceleration_structure_rebuild_mode rebuildMode, uint32 reserveDescriptorsAtStart);
 
-    void fillOutRayTracingRenderDesc(D3D12_DISPATCH_RAYS_DESC& raytraceDesc, uint32 renderWidth, uint32 renderHeight, uint32 numRayTypes);
+    void fillOutRayTracingRenderDesc(D3D12_DISPATCH_RAYS_DESC& raytraceDesc, uint32 renderWidth, uint32 renderHeight, uint32 renderDepth, uint32 numRayTypes, uint32 numHitGroups);
 
     dx_gpu_descriptor_handle getTLASHandle();
     dx_gpu_descriptor_handle setOutputTexture(const ref<dx_texture>& output);
@@ -60,6 +60,8 @@ private:
 
 struct pbr_raytracing_batch : raytracing_batch
 {
+    virtual ~pbr_raytracing_batch() { if (bindingTable) { free(bindingTable); } }
+
     raytracing_object_handle defineObjectType(const raytracing_blas& blas, const std::vector<ref<pbr_material>>& materials);
     virtual void buildBindingTable() override;
 
@@ -72,39 +74,29 @@ protected:
     void initialize(const wchar* shaderName, uint32 maxNumObjectTypes, acceleration_structure_rebuild_mode rebuildMode);
 
 private:
-    struct raygen_table_entry
-    {
-    };
-    struct miss_table_entry
-    {
-    };
-    struct radiance_hit_entry
-    {
-        pbr_material_cb materialCB;
-        dx_cpu_descriptor_handle srvRange; // Vertex buffer, index buffer, pbr textures.
-    };
-    struct shadow_hit_entry
-    {
-    };
-
     static const uint32 numRayTypes = 2;
 
     struct alignas(D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT) binding_table_entry
     {
         uint8 identifier[D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES];
-
-        union
-        {
-            raygen_table_entry raygen;
-            miss_table_entry miss;
-            radiance_hit_entry radianceHit;
-            shadow_hit_entry shadowHit;
-        };
-
-        binding_table_entry() {}
+        
+        // Only set in radiance hit.
+        pbr_material_cb materialCB;
+        dx_cpu_descriptor_handle srvRange; // Vertex buffer, index buffer, pbr textures.
     };
 
-    std::vector<binding_table_entry> bindingTable;
+    struct binding_table
+    {
+        alignas(D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT) binding_table_entry raygen;
+        alignas(D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT) binding_table_entry miss[numRayTypes];
+
+        alignas(D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT) binding_table_entry hit[1]; // Dynamically allocated.
+    };
+
+    binding_table* bindingTable = 0;
+    binding_table_entry* currentHitGroup = 0;
+    uint32 totalBindingTableSize;
+    uint32 numHitGroups = 0;
 
     uint32 instanceContributionToHitGroupIndex = 0;
 };

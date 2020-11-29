@@ -67,22 +67,27 @@ void pbr_raytracing_batch::initialize(const wchar* shaderName, uint32 maxNumObje
 
 
     assert(sizeof(binding_table_entry) == pipeline.shaderBindingTableDesc.entrySize);
+    assert(offsetof(binding_table, raygen) == pipeline.shaderBindingTableDesc.raygenOffset);
+    assert(offsetof(binding_table, miss) == pipeline.shaderBindingTableDesc.missOffset);
+    assert(offsetof(binding_table, hit) == pipeline.shaderBindingTableDesc.hitOffset);
 
-    bindingTable.reserve(maxNumObjectTypes * 32 * numRayTypes + 1 + numRayTypes); // 32 is a random number. How many geometries do we expect per blas?
+    uint32 maxNumHitGroups = maxNumObjectTypes * 32;  // 32 is a random number. How many geometries do we expect per blas?
 
-    binding_table_entry raygen;
-    memcpy(raygen.identifier, pipeline.shaderBindingTableDesc.raygen, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-    bindingTable.push_back(raygen);
+    totalBindingTableSize = (uint32)
+        (alignTo(sizeof(binding_table_entry), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT)
+        + alignTo(sizeof(binding_table_entry) * numRayTypes, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT)
+        + alignTo(sizeof(binding_table_entry) * numRayTypes * maxNumHitGroups, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT));
 
-    binding_table_entry radianceMiss;
-    memcpy(radianceMiss.identifier, pipeline.shaderBindingTableDesc.miss[0], D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-    bindingTable.push_back(radianceMiss);
+    bindingTable = (binding_table*)malloc(totalBindingTableSize);
 
-    binding_table_entry shadowMiss;
-    memcpy(shadowMiss.identifier, pipeline.shaderBindingTableDesc.miss[1], D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-    bindingTable.push_back(shadowMiss);
+    memcpy(bindingTable->raygen.identifier, pipeline.shaderBindingTableDesc.raygen, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 
+    for (uint32 i = 0; i < numRayTypes; ++i)
+    {
+        memcpy(bindingTable->miss[i].identifier, pipeline.shaderBindingTableDesc.miss[i], D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+    }
 
+    currentHitGroup = bindingTable->hit;
 }
 
 raytracing_object_handle pbr_raytracing_batch::defineObjectType(const raytracing_blas& blas, const std::vector<ref<pbr_material>>& materials)
@@ -144,20 +149,21 @@ raytracing_object_handle pbr_raytracing_batch::defineObjectType(const raytracing
         }
 
 
-        binding_table_entry radianceHit;
-        memcpy(radianceHit.identifier, pipeline.shaderBindingTableDesc.hitGroups[0], D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-        radianceHit.radianceHit.materialCB = pbr_material_cb
+
+        memcpy(currentHitGroup->identifier, pipeline.shaderBindingTableDesc.hitGroups[0], D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+        currentHitGroup->materialCB = pbr_material_cb
         { 
             material->albedoTint.x, material->albedoTint.y, material->albedoTint.z, material->albedoTint.w,
             packRoughnessAndMetallic(material->roughnessOverride, material->metallicOverride), 
             flags 
         };
-        radianceHit.radianceHit.srvRange = base;
-        bindingTable.push_back(radianceHit);
+        currentHitGroup->srvRange = base;
+        ++currentHitGroup;
 
-        binding_table_entry shadowHit;
-        memcpy(shadowHit.identifier, pipeline.shaderBindingTableDesc.hitGroups[1], D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-        bindingTable.push_back(shadowHit);
+        memcpy(currentHitGroup->identifier, pipeline.shaderBindingTableDesc.hitGroups[1], D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+        ++currentHitGroup;
+
+        ++numHitGroups;
     }
 
     raytracing_object_handle result = { blas.blas->gpuVirtualAddress, instanceContributionToHitGroupIndex };
@@ -170,7 +176,7 @@ raytracing_object_handle pbr_raytracing_batch::defineObjectType(const raytracing
 void pbr_raytracing_batch::buildBindingTable()
 {
     assert(!bindingTableBuffer);
-    bindingTableBuffer = createBuffer(sizeof(binding_table_entry), (uint32)bindingTable.size(), bindingTable.data());
+    bindingTableBuffer = createBuffer(1, totalBindingTableSize, bindingTable);
 }
 
 void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, float environmentIntensity, float skyIntensity,
@@ -195,7 +201,7 @@ void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_textu
     auto desc = output->resource->GetDesc();
 
     D3D12_DISPATCH_RAYS_DESC raytraceDesc;
-    fillOutRayTracingRenderDesc(raytraceDesc, (uint32)desc.Width, desc.Height, numRayTypes);
+    fillOutRayTracingRenderDesc(raytraceDesc, (uint32)desc.Width, desc.Height, 1, numRayTypes, numHitGroups);
 
     cl->setDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, descriptorHeap);
 
@@ -352,27 +358,27 @@ void raytracing_batch::initialize(acceleration_structure_rebuild_mode rebuildMod
     cpuCurrentDescriptorHandle = cpuBaseDescriptorHandle + (1 + 1 + reserveDescriptorsAtStart) * NUM_BUFFERED_FRAMES;
 }
 
-void raytracing_batch::fillOutRayTracingRenderDesc(D3D12_DISPATCH_RAYS_DESC& raytraceDesc, uint32 renderWidth, uint32 renderHeight, uint32 numRayTypes)
+void raytracing_batch::fillOutRayTracingRenderDesc(D3D12_DISPATCH_RAYS_DESC& raytraceDesc, uint32 renderWidth, uint32 renderHeight, uint32 renderDepth, uint32 numRayTypes, uint32 numHitGroups)
 {
     raytraceDesc.Width = renderWidth;
     raytraceDesc.Height = renderHeight;
-    raytraceDesc.Depth = 1;
+    raytraceDesc.Depth = renderDepth;
 
-    uint32 numHitShaders = bindingTableBuffer->elementCount - 1 - numRayTypes;
+    uint32 numHitShaders = numHitGroups * numRayTypes;
 
     // Pointer to the entry point of the ray-generation shader.
-    raytraceDesc.RayGenerationShaderRecord.StartAddress = bindingTableBuffer->gpuVirtualAddress + 0;
-    raytraceDesc.RayGenerationShaderRecord.SizeInBytes = bindingTableBuffer->elementSize;
+    raytraceDesc.RayGenerationShaderRecord.StartAddress = bindingTableBuffer->gpuVirtualAddress + pipeline.shaderBindingTableDesc.raygenOffset;
+    raytraceDesc.RayGenerationShaderRecord.SizeInBytes = pipeline.shaderBindingTableDesc.entrySize;
 
     // Pointer to the entry point(s) of the miss shader.
-    raytraceDesc.MissShaderTable.StartAddress = bindingTableBuffer->gpuVirtualAddress + bindingTableBuffer->elementSize;
-    raytraceDesc.MissShaderTable.StrideInBytes = bindingTableBuffer->elementSize;
-    raytraceDesc.MissShaderTable.SizeInBytes = bindingTableBuffer->elementSize * numRayTypes;
+    raytraceDesc.MissShaderTable.StartAddress = bindingTableBuffer->gpuVirtualAddress + pipeline.shaderBindingTableDesc.missOffset;
+    raytraceDesc.MissShaderTable.StrideInBytes = pipeline.shaderBindingTableDesc.entrySize;
+    raytraceDesc.MissShaderTable.SizeInBytes = pipeline.shaderBindingTableDesc.entrySize * numRayTypes;
 
     // Pointer to the entry point(s) of the hit shader.
-    raytraceDesc.HitGroupTable.StartAddress = bindingTableBuffer->gpuVirtualAddress + bindingTableBuffer->elementSize * (numRayTypes + 1);
-    raytraceDesc.HitGroupTable.StrideInBytes = bindingTableBuffer->elementSize;
-    raytraceDesc.HitGroupTable.SizeInBytes = bindingTableBuffer->elementSize * numHitShaders;
+    raytraceDesc.HitGroupTable.StartAddress = bindingTableBuffer->gpuVirtualAddress + pipeline.shaderBindingTableDesc.hitOffset;
+    raytraceDesc.HitGroupTable.StrideInBytes = pipeline.shaderBindingTableDesc.entrySize;
+    raytraceDesc.HitGroupTable.SizeInBytes = pipeline.shaderBindingTableDesc.entrySize * numHitShaders;
 
     raytraceDesc.CallableShaderTable = {};
 }

@@ -55,6 +55,10 @@ struct raytracing_shader_binding_table_desc
 	void* raygen;
 	std::vector<void*> miss;
 	std::vector<void*> hitGroups;
+
+	uint32 raygenOffset;
+	uint32 missOffset;
+	uint32 hitOffset;
 };
 
 struct dx_raytracing_pipeline

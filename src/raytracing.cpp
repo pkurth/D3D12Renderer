@@ -436,6 +436,11 @@ dx_raytracing_pipeline raytracing_pipeline_builder::finish()
 			shaderBindingTableDesc.miss.push_back(rtsoProps->GetShaderIdentifier(missEntryPoints[i]));
 			shaderBindingTableDesc.hitGroups.push_back(rtsoProps->GetShaderIdentifier(hitGroups[i].HitGroupExport));
 		}
+
+
+		shaderBindingTableDesc.raygenOffset = 0;
+		shaderBindingTableDesc.missOffset = shaderBindingTableDesc.raygenOffset + (uint32)alignTo(numRaygenShaderEntries * tableEntrySize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+		shaderBindingTableDesc.hitOffset = shaderBindingTableDesc.missOffset + (uint32)alignTo(numMissShaderEntries * tableEntrySize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
 	}
 
 	return result;
