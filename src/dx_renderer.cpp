@@ -234,6 +234,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 
 	settings.tonemap = defaultTonemapParameters();
 	settings.environmentIntensity = 1.f;
+	settings.skyIntensity = 1.f;
 	settings.aspectRatioMode = aspect_ratio_free;
 	settings.showLightVolumes = false;
 
@@ -457,6 +458,7 @@ void dx_renderer::endFrame()
 	cl->setGraphicsRootSignature(*textureSkyPipeline.rootSignature);
 
 	cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
+	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
 	cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment->sky->defaultSRV);
 
 	cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
@@ -673,7 +675,8 @@ void dx_renderer::endFrame()
 
 	for (const raytraced_reflections_render_pass::draw_call& dc : raytracedReflectionsRenderPass.drawCalls)
 	{
-		dc.batch->render(cl, raytracingTexture, settings.numRaytracingBounces, cameraCBV, sunCBV, depthBuffer, worldNormalsTexture, environment, brdfTex);
+		dc.batch->render(cl, raytracingTexture, settings.numRaytracingBounces, settings.environmentIntensity, settings.skyIntensity,
+			cameraCBV, sunCBV, depthBuffer, worldNormalsTexture, environment, brdfTex);
 	}
 	cl->resetToDynamicDescriptorHeap();
 #endif

@@ -43,7 +43,7 @@ void pbr_raytracing_batch::initialize(const wchar* shaderName, uint32 maxNumObje
     globalRootParameters[PBR_RAYTRACING_RS_TEXTURES].InitAsDescriptorTable(1, &texturesRange);
     globalRootParameters[PBR_RAYTRACING_RS_CAMERA].InitAsConstantBufferView(0);
     globalRootParameters[PBR_RAYTRACING_RS_SUN].InitAsConstantBufferView(1);
-    globalRootParameters[PBR_RAYTRACING_RS_CB].InitAsConstants(1, 2);
+    globalRootParameters[PBR_RAYTRACING_RS_CB].InitAsConstants(sizeof(raytracing_cb) / 4, 2);
 
     CD3DX12_STATIC_SAMPLER_DESC globalStaticSamplers[2];
     globalStaticSamplers[0].Init(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
@@ -160,7 +160,7 @@ void pbr_raytracing_batch::buildBindingTable()
     bindingTableBuffer = createBuffer(sizeof(binding_table_entry), (uint32)bindingTable.size(), bindingTable.data());
 }
 
-void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, 
+void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, float environmentIntensity, float skyIntensity,
     dx_dynamic_constant_buffer cameraCBV, dx_dynamic_constant_buffer sunCBV, 
     const ref<dx_texture>& depthBuffer, const ref<dx_texture>& normalMap,
     const ref<pbr_environment>& environment, const ref<dx_texture>& brdf)
@@ -189,7 +189,7 @@ void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_textu
     cl->setPipelineState(pipeline.pipeline);
     cl->setComputeRootSignature(pipeline.rootSignature);
 
-    raytracing_cb raytracingCB = { numBounces };
+    raytracing_cb raytracingCB = { numBounces, environmentIntensity, skyIntensity };
 
     cl->setComputeDescriptorTable(PBR_RAYTRACING_RS_TLAS, tlasHandle);
     cl->setComputeDescriptorTable(PBR_RAYTRACING_RS_OUTPUT, outputHandle);

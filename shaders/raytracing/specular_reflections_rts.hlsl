@@ -156,7 +156,7 @@ void rayGen()
 [shader("miss")]
 void radianceMiss(inout radiance_ray_payload payload)
 {
-	payload.color = sky.SampleLevel(wrapSampler, WorldRayDirection(), 0).xyz;
+	payload.color = sky.SampleLevel(wrapSampler, WorldRayDirection(), 0).xyz * raytracing.skyIntensity;
 }
 
 [shader("closesthit")]
@@ -176,7 +176,6 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float roughness = roughTex.SampleLevel(wrapSampler, uv, mipLevel);
 	float metallic = metalTex.SampleLevel(wrapSampler, uv, mipLevel);
 	float ao = 1.f;
-	float environmentIntensity = 1.f;
 
 	float3 hitPosition = hitWorldPosition();
 	float3 L = -sun.direction;
@@ -187,7 +186,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
 	
 	payload.color = calculateDirectLighting(albedo, radiance, N, L, V, F0, roughness, metallic);
-	payload.color += calculateAmbientLighting(albedo, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao) * environmentIntensity;
+	payload.color += calculateAmbientLighting(albedo, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao) * raytracing.environmentIntensity;
 }
 
 [shader("anyhit")]

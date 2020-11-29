@@ -1,9 +1,12 @@
 #include "math.hlsl"
 #include "sky_rs.hlsl"
 
+
+ConstantBuffer<sky_intensity_cb> skyIntensity : register(b1);
+
 struct ps_input
 {
-	float3 uv	: TEXCOORDS;
+	float3 uv		: TEXCOORDS;
 };
 
 [RootSignature(SKY_PROCEDURAL_RS)]
@@ -22,7 +25,7 @@ float4 main(ps_input IN) : SV_TARGET
 	int x = (int)(panoUV.x / step) & 1;
 	int y = (int)(panoUV.y / step) & 1;
 
-	float intensity = remap((float)(x == y), 0.f, 1.f, 0.05f, 1.f);
+	float intensity = remap((float)(x == y), 0.f, 1.f, 0.05f, 1.f) * skyIntensity.intensity;
 
 	return float4(intensity * float3(0.4f, 0.6f, 0.2f), 1.f);
 }

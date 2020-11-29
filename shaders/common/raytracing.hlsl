@@ -5,6 +5,8 @@
 struct raytracing_cb
 {
 	uint32 maxRecursionDepth;
+	float environmentIntensity;
+	float skyIntensity;
 };
 
 
