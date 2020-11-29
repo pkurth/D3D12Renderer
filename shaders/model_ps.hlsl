@@ -45,7 +45,7 @@ Texture2D<float4> volumetrics					: register(t9, space3);
 struct ps_output
 {
 	float4 hdrColor		: SV_Target0;
-	float4 worldNormal	: SV_Target1;
+	float2 worldNormal	: SV_Target1;
 };
 
 [RootSignature(MODEL_RS)]
@@ -158,6 +158,6 @@ ps_output main(ps_input IN)
 
 	ps_output OUT;
 	OUT.hdrColor = totalLighting;
-	OUT.worldNormal = float4(packNormal(N), 0.f, 1.f);
+	OUT.worldNormal = packNormal(N);
 	return OUT;
 }

@@ -126,12 +126,18 @@ void rayGen()
 	if (depth < 1.f)
 	{
 		float2 uv = float2(launchIndex.xy) / float2(launchDim.xy);
+
+#if 0
 		float3 origin = restoreWorldSpacePosition(camera.invViewProj, uv, depth);
 
 		float3 direction = normalize(origin - camera.position.xyz);
 
 		float3 normal = unpackNormal(worldNormals.Load(launchIndex));
 		direction = reflect(direction, normal);
+#else
+		float3 origin = camera.position.xyz;
+		float3 direction = normalize(restoreWorldDirection(camera.invViewProj, uv, origin));
+#endif
 
 		color = traceRadianceRay(origin, direction, 0);
 	}
@@ -154,9 +160,17 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	uint3 tri = load3x16BitIndices(meshIndices);
 
 	float2 uvs[] = { meshVertices[tri.x].uv, meshVertices[tri.y].uv, meshVertices[tri.z].uv };
+	float3 normals[] = { meshVertices[tri.x].normal, meshVertices[tri.y].normal, meshVertices[tri.z].normal };
+
+	float3x4 M = ObjectToWorld3x4();
+
 	float2 uv = interpolateAttribute(uvs, attribs);
+	float3 normal = interpolateAttribute(normals, attribs);
+	normal = normalize(mul(M, float4(normal, 0.f)).xyz);
 
 	float3 albedo = albedoTex.SampleLevel(wrapSampler, uv, 0).xyz;
+	float roughness = roughTex.Sample(wrapSampler, uv);
+	float metallic = metalTex.Sample(wrapSampler, uv);
 
 	float3 hitPosition = hitWorldPosition();
 	float3 L = -sun.direction;
@@ -168,7 +182,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	//	albedo = float3(1.f, 0.f, 1.f);
 	//}
 
-	payload.color = albedo;
+	payload.color = normal;
 }
 
 [shader("anyhit")]
