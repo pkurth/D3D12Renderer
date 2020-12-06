@@ -19,7 +19,6 @@ struct vs_output
 	float4 position			: SV_POSITION;
 };
 
-[RootSignature(MODEL_DEPTH_ONLY_RS)]
 vs_output main(vs_input IN)
 {
 	vs_output OUT;

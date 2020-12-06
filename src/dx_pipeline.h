@@ -296,23 +296,33 @@ struct dx_pipeline
 	dx_root_signature* rootSignature;
 };
 
-struct graphics_pipeline_files
+union graphics_pipeline_files
 {
-	const char* vs = 0;
-	const char* ps = 0;
-	const char* ds = 0;
-	const char* hs = 0;
-	const char* gs = 0;
+	struct
+	{
+		const char* vs;
+		const char* ps;
+		const char* ds;
+		const char* hs;
+		const char* gs;
+	};
+	const char* shaders[5] = {};
 };
 
-dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files,
-	dx_root_signature userRootSignature);
-dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files,
-	const char* rootSignatureFile = 0); // If RS file is null, it will take the pixel shader by default.
+enum rs_file
+{
+	rs_in_vertex_shader,
+	rs_in_pixel_shader,
+	rs_in_domain_shader,
+	rs_in_hull_shader,
+	rs_in_geometry_shader,
+};
 
-dx_pipeline createReloadablePipeline(const char* csFile,
-	dx_root_signature userRootSignature);
-dx_pipeline createReloadablePipeline(const char* csFile, const char* rootSignatureFile = 0);  // If RS file is null, it will take the cs by default.
+dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files, dx_root_signature userRootSignature);
+dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files, rs_file rootSignatureFile = rs_in_pixel_shader);
+
+dx_pipeline createReloadablePipeline(const char* csFile, dx_root_signature userRootSignature);
+dx_pipeline createReloadablePipeline(const char* csFile);
 
 void createAllReloadablePipelines();
 

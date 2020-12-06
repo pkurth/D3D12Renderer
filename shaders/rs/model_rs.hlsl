@@ -3,8 +3,13 @@
 
 struct transform_cb
 {
+    mat4 mvp;
+    mat4 m;
+};
+
+struct depth_only_transform_cb
+{
 	mat4 mvp;
-	mat4 m;
 };
 
 struct lighting_cb
@@ -51,7 +56,7 @@ struct lighting_cb
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS |" \
     "DENY_PIXEL_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX)"
+    "RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX)"
 
 #define MODEL_RS_MVP	                0
 #define MODEL_RS_MATERIAL               1

@@ -144,7 +144,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 			.renderTargets(0, 0, hdrDepthFormat)
 			.inputLayout(inputLayout_position_uv_normal_tangent);
 
-		modelDepthOnlyPipeline = createReloadablePipeline(desc, { "model_vs" }, "model_vs"); // The depth-only RS is baked into the vertex shader.
+		modelDepthOnlyPipeline = createReloadablePipeline(desc, { "model_depth_only_vs" }, rs_in_vertex_shader);
 
 		desc
 			.renderTargets(hdrFormat, arraysize(hdrFormat), hdrDepthFormat)
@@ -161,7 +161,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 			.inputLayout(inputLayout_position_uv_normal_tangent)
 			.cullFrontFaces();
 
-		modelShadowPipeline = createReloadablePipeline(desc, { "model_vs" }, "model_vs"); // The depth-only RS is baked into the vertex shader.
+		modelShadowPipeline = createReloadablePipeline(desc, { "model_depth_only_vs" }, rs_in_vertex_shader);
 	}
 
 	// Outline.
@@ -171,7 +171,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 			.renderTargets(hdrFormat[0], hdrDepthFormat)
 			.stencilSettings(D3D12_COMPARISON_FUNC_NOT_EQUAL);
 
-		outlinePipeline = createReloadablePipeline(desc, { "outline_vs", "outline_ps" }, "outline_vs");
+		outlinePipeline = createReloadablePipeline(desc, { "outline_vs", "outline_ps" }, rs_in_vertex_shader);
 	}
 
 	// Flat unlit.
@@ -182,7 +182,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 			.cullingOff()
 			.wireframe();
 
-		flatUnlitPipeline = createReloadablePipeline(desc, { "flat_unlit_vs", "flat_unlit_ps" }, "flat_unlit_vs");
+		flatUnlitPipeline = createReloadablePipeline(desc, { "flat_unlit_vs", "flat_unlit_ps" }, rs_in_vertex_shader);
 	}
 
 	// Present.
@@ -517,7 +517,7 @@ void dx_renderer::endFrame()
 		const mat4& m = dc.transform;
 		const submesh_info& submesh = dc.submesh;
 
-		cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ camera.viewProj * m, m });
+		cl->setGraphics32BitConstants(MODEL_RS_MVP, depth_only_transform_cb{ camera.viewProj * m });
 
 		cl->setVertexBuffer(0, dc.vertexBuffer);
 		cl->setIndexBuffer(dc.indexBuffer);
@@ -594,7 +594,7 @@ void dx_renderer::endFrame()
 				const mat4& m = dc.transform;
 				const submesh_info& submesh = dc.submesh;
 
-				cl->setGraphics32BitConstants(MODEL_RS_MVP, transform_cb{ sun.vp[i] * m, m });
+				cl->setGraphics32BitConstants(MODEL_RS_MVP, depth_only_transform_cb{ sun.vp[i] * m });
 
 				cl->setVertexBuffer(0, dc.vertexBuffer);
 				cl->setIndexBuffer(dc.indexBuffer);

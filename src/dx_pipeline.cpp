@@ -172,17 +172,12 @@ dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& d
 	return result;
 }
 
-dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files, const char* rootSignatureFile)
+dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files, rs_file rootSignatureFile)
 {
-	if (!rootSignatureFile)
-	{
-		rootSignatureFile = files.ps;
-	}
-
 	pipelines.emplace_back();
 	auto& state = pipelines.back();
 
-	reloadable_root_signature* reloadableRS = pushBlob(rootSignatureFile, &state, true);
+	reloadable_root_signature* reloadableRS = pushBlob(files.shaders[rootSignatureFile], &state, true);
 	pushBlob(files.vs, &state);
 	pushBlob(files.ps, &state);
 	pushBlob(files.gs, &state);
@@ -214,18 +209,12 @@ dx_pipeline createReloadablePipeline(const char* csFile, dx_root_signature userR
 	return result;
 }
 
-dx_pipeline createReloadablePipeline(const char* csFile, const char* rootSignatureFile)
+dx_pipeline createReloadablePipeline(const char* csFile)
 {
-	if (!rootSignatureFile)
-	{
-		rootSignatureFile = csFile;
-	}
-
 	pipelines.emplace_back();
 	auto& state = pipelines.back();
 
-	reloadable_root_signature* reloadableRS = pushBlob(rootSignatureFile, &state, true);
-	pushBlob(csFile, &state);
+	reloadable_root_signature* reloadableRS = pushBlob(csFile, &state, true);
 
 	dx_root_signature* rootSignature = &reloadableRS->rootSignature;
 
