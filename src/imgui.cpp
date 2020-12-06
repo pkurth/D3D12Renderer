@@ -11,7 +11,6 @@
 #include "imgui.h"
 #include "window.h"
 #include "dx_context.h"
-#include "dx_render_primitives.h"
 #include "dx_command_list.h"
 
 
@@ -131,6 +130,16 @@ namespace ImGui
 	void Image(::dx_cpu_descriptor_handle& handle, uint32 width, uint32 height)
 	{
 		ImGui::Image(handle, ImVec2((float)width, (float)height));
+	}
+
+	void Image(const ref<dx_texture>& texture, ImVec2 size)
+	{
+		ImGui::Image(texture->defaultSRV, size);
+	}
+
+	void Image(const ref<dx_texture>& texture, uint32 width, uint32 height)
+	{
+		ImGui::Image(texture->defaultSRV, width, height);
 	}
 
 	bool Dropdown(const char* label, const char** names, uint32 count, uint32& current)

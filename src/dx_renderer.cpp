@@ -3,7 +3,8 @@
 #include "dx_command_list.h"
 #include "dx_pipeline.h"
 #include "geometry.h"
-#include "texture.h"
+#include "dx_texture.h"
+#include "dx_barrier_batcher.h"
 #include "texture_preprocessing.h"
 
 #include "outline_rs.hlsl"
@@ -19,6 +20,10 @@
 
 
 static ref<dx_texture> whiteTexture;
+static ref<dx_texture> blackTexture;
+static ref<dx_texture> blackCubeTexture;
+
+
 static ref<dx_buffer> pointLightBuffer[NUM_BUFFERED_FRAMES]; // TODO: When using multiple renderers, these should not be here (I guess).
 static ref<dx_buffer> spotLightBuffer[NUM_BUFFERED_FRAMES];
 
@@ -91,8 +96,19 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 {
 	::screenFormat = screenFormat;
 
-	uint8 white[] = { 255, 255, 255, 255 };
-	whiteTexture = createTexture(white, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
+	{
+		uint8 white[] = { 255, 255, 255, 255 };
+		whiteTexture = createTexture(white, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
+		SET_NAME(whiteTexture->resource, "White");
+	}
+	{
+		uint8 black[] = { 0, 0, 0, 255 };
+		blackTexture = createTexture(black, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
+		SET_NAME(blackTexture->resource, "Black");
+
+		blackCubeTexture = createCubeTexture(black, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
+		SET_NAME(blackCubeTexture->resource, "Black cube");
+	}
 
 	initializeTexturePreprocessing();
 
@@ -241,6 +257,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	settings.showLightVolumes = false;
 	settings.numRaytracingBounces = 1;
 	settings.raytracingDownsampleFactor = 1;
+	settings.blurRaytracingResultIterations = 1;
 
 	oldSettings = settings;
 
@@ -252,6 +269,9 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 		hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[0], false, true);
 		worldNormalsTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[1], false, true);
 
+		SET_NAME(hdrColorTexture->resource, "HDR Color");
+		SET_NAME(worldNormalsTexture->resource, "World normals");
+
 		hdrRenderTarget.pushColorAttachment(hdrColorTexture);
 		hdrRenderTarget.pushColorAttachment(worldNormalsTexture);
 		hdrRenderTarget.pushDepthStencilAttachment(depthBuffer);
@@ -260,6 +280,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	// Frame result.
 	{
 		frameResult = createTexture(0, windowWidth, windowHeight, screenFormat, false, true);
+		SET_NAME(frameResult->resource, "Frame result");
 
 		windowRenderTarget.pushColorAttachment(frameResult);
 	}
@@ -267,14 +288,16 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	// Volumetrics.
 	{
 		volumetricsTexture = createTexture(0, renderWidth, renderHeight, volumetricsFormat, false, false, true);
-
-		volumetricsRenderTarget.pushColorAttachment(volumetricsTexture);
+		SET_NAME(volumetricsTexture->resource, "Volumetrics");
 	}
 
 	// Raytracing.
 	{
 		raytracingTexture = createTexture(0, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor, raytracedReflectionsFormat, false, false, true);
 		raytracingTextureTmpForBlur = createTexture(0, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor, raytracedReflectionsFormat, false, false, true);
+
+		SET_NAME(raytracingTexture->resource, "Raytracing");
+		SET_NAME(raytracingTextureTmpForBlur->resource, "Raytracing TMP");
 	}
 }
 
@@ -344,10 +367,9 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		resizeTexture(worldNormalsTexture, renderWidth, renderHeight);
 		resizeTexture(depthBuffer, renderWidth, renderHeight);
 		hdrRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
-
+		
 		resizeTexture(volumetricsTexture, renderWidth, renderHeight);
-		volumetricsRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
-
+		
 		resizeTexture(raytracingTexture, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor);
 		resizeTexture(raytracingTextureTmpForBlur, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor);
 	}
@@ -366,6 +388,8 @@ void dx_renderer::allocateLightCullingBuffers()
 	{
 		lightCullingBuffers.lightGrid = createTexture(0, lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY,
 			DXGI_FORMAT_R32G32B32A32_UINT, false, false, true);
+		SET_NAME(lightCullingBuffers.lightGrid->resource, "Light grid");
+
 		lightCullingBuffers.lightIndexCounter = createBuffer(sizeof(uint32), 2, 0, true, true);
 		lightCullingBuffers.pointLightIndexList = createBuffer(sizeof(uint32),
 			lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY * MAX_NUM_LIGHTS_PER_TILE, 0, true);
@@ -451,7 +475,7 @@ void dx_renderer::endFrame()
 
 	cl->setRenderTarget(hdrRenderTarget);
 	cl->setViewport(hdrRenderTarget.viewport);
-	cl->clearDepthAndStencil(hdrRenderTarget.dsvHandle);
+	cl->clearDepthAndStencil(hdrRenderTarget.depthAttachment->dsvHandle);
 
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -461,17 +485,23 @@ void dx_renderer::endFrame()
 	// SKY PASS
 	// ----------------------------------------
 
-	cl->setPipelineState(*textureSkyPipeline.pipeline);
-	cl->setGraphicsRootSignature(*textureSkyPipeline.rootSignature);
+	if (environment)
+	{
+		cl->setPipelineState(*textureSkyPipeline.pipeline);
+		cl->setGraphicsRootSignature(*textureSkyPipeline.rootSignature);
 
-	cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
-	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
-	cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment->sky->defaultSRV);
+		cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
+		cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
+		cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment->sky->defaultSRV);
 
-	cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
-	cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
-	cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
-
+		cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
+		cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
+		cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
+	}
+	else
+	{
+		cl->clearRTV(hdrRenderTarget, 0, 0.f, 0.f, 0.f);
+	}
 
 
 
@@ -555,7 +585,7 @@ void dx_renderer::endFrame()
 	{
 		cl->setRenderTarget(sunShadowRenderTarget[i]);
 		cl->setViewport(sunShadowRenderTarget[i].viewport);
-		cl->clearDepth(sunShadowRenderTarget[i].dsvHandle);
+		cl->clearDepth(sunShadowRenderTarget[i]);
 
 		for (uint32 cascade = 0; cascade <= i; ++cascade)
 		{
@@ -609,8 +639,16 @@ void dx_renderer::endFrame()
 	// Models.
 	cl->setPipelineState(*modelPipeline.pipeline);
 	cl->setGraphicsRootSignature(*modelPipeline.rootSignature);
-	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 0, environment->irradiance->defaultSRV);
-	cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 1, environment->environment->defaultSRV);
+	if (environment)
+	{
+		cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 0, environment->irradiance->defaultSRV);
+		cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 1, environment->environment->defaultSRV);
+	}
+	else
+	{
+		cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 0, blackCubeTexture->defaultSRV);
+		cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 1, blackCubeTexture->defaultSRV);
+	}
 	cl->setGraphics32BitConstants(MODEL_RS_LIGHTING, lighting_cb{ settings.environmentIntensity });
 	cl->setDescriptorHeapSRV(MODEL_RS_BRDF, 0, brdfTex);
 	cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 0, lightCullingBuffers.lightGrid);
@@ -696,7 +734,7 @@ void dx_renderer::endFrame()
 	cl->resetToDynamicDescriptorHeap();
 
 	cl->uavBarrier(raytracingTexture);
-	gaussianBlur(cl, raytracingTexture, raytracingTextureTmpForBlur);
+	gaussianBlur(cl, raytracingTexture, raytracingTextureTmpForBlur, settings.blurRaytracingResultIterations);
 #endif
 
 
@@ -737,7 +775,7 @@ void dx_renderer::endFrame()
 	cl->setViewport(windowViewport);
 	if (aspectRatioModeChanged)
 	{
-		cl->clearRTV(windowRenderTarget.rtvHandles[0], 0.f, 0.f, 0.f);
+		cl->clearRTV(windowRenderTarget, 0, 0.f, 0.f, 0.f);
 	}
 
 	cl->setPipelineState(*presentPipeline.pipeline);
@@ -764,7 +802,7 @@ void dx_renderer::blitResultToScreen(dx_command_list* cl, dx_cpu_descriptor_hand
 	CD3DX12_VIEWPORT viewport = CD3DX12_VIEWPORT(0.f, 0.f, (float)windowWidth, (float)windowHeight);
 	cl->setViewport(viewport);
 
-	cl->setRenderTarget(&rtv.cpuHandle, 1, 0);
+	cl->setRenderTarget(&rtv, 1, 0);
 
 	cl->setPipelineState(*blitPipeline.pipeline);
 	cl->setGraphicsRootSignature(*blitPipeline.rootSignature);

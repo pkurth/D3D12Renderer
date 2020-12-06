@@ -4,6 +4,7 @@
 #include "math.h"
 #include "dx_command_list.h"
 #include "dx_pipeline.h"
+#include "dx_barrier_batcher.h"
 
 
 
@@ -55,7 +56,6 @@ struct integrate_brdf_cb
 struct gaussian_blur_cb
 {
 	vec2 direction;					// [1, 0] or [0, 1], scaled by inverse screen dimensions.
-	int halfKernelSize;
 };
 
 void initializeTexturePreprocessing()
@@ -95,8 +95,7 @@ void generateMipMapsOnGPU(dx_command_list* cl, ref<dx_texture>& texture)
 	dx_resource uavResource = resource;
 	dx_resource aliasResource; // In case the format of our texture does not support UAVs.
 
-	if (!formatSupportsUAV(texture) ||
-		(resourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) == 0)
+	if (texture->supportsUAV)
 	{
 		D3D12_RESOURCE_DESC aliasDesc = resourceDesc;
 		// Placed resources can't be render targets or depth-stencil views.
@@ -126,7 +125,7 @@ void generateMipMapsOnGPU(dx_command_list* cl, ref<dx_texture>& texture)
 
 		dx_heap heap;
 		checkResult(dxContext.device->CreateHeap(&heapDesc, IID_PPV_ARGS(&heap)));
-		dxContext.retireObject(heap);
+		dxContext.retire(heap);
 
 		checkResult(dxContext.device->CreatePlacedResource(
 			heap.Get(),
@@ -137,7 +136,7 @@ void generateMipMapsOnGPU(dx_command_list* cl, ref<dx_texture>& texture)
 			IID_PPV_ARGS(&aliasResource)
 		));
 
-		dxContext.retireObject(aliasResource);
+		dxContext.retire(aliasResource);
 
 		checkResult(dxContext.device->CreatePlacedResource(
 			heap.Get(),
@@ -148,7 +147,7 @@ void generateMipMapsOnGPU(dx_command_list* cl, ref<dx_texture>& texture)
 			IID_PPV_ARGS(&uavResource)
 		));
 
-		dxContext.retireObject(uavResource);
+		dxContext.retire(uavResource);
 
 		cl->aliasingBarrier(0, aliasResource);
 
@@ -285,6 +284,7 @@ ref<dx_texture> equirectangularToCubemap(dx_command_list* cl, const ref<dx_textu
 	numMips = cubemapDesc.MipLevels;
 
 	dx_resource cubemapResource = cubemap->resource;
+	SET_NAME(cubemapResource, "Cubemap");
 	dx_resource stagingResource = cubemapResource;
 
 	ref<dx_texture> stagingTexture = make_ref<dx_texture>();
@@ -360,8 +360,6 @@ ref<dx_texture> equirectangularToCubemap(dx_command_list* cl, const ref<dx_textu
 		cl->transitionBarrier(cubemap->resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
 	}
 
-	dxContext.retireObject(stagingTexture->resource);
-
 	return cubemap;
 }
 
@@ -385,6 +383,7 @@ ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& 
 	irradianceDesc = CD3DX12_RESOURCE_DESC(irradiance->resource->GetDesc());
 
 	dx_resource irradianceResource = irradiance->resource;
+	SET_NAME(irradianceResource, "Irradiance");
 	dx_resource stagingResource = irradianceResource;
 
 	ref<dx_texture> stagingTexture = make_ref<dx_texture>();
@@ -448,8 +447,6 @@ ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& 
 		cl->transitionBarrier(irradiance->resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
 	}
 
-	dxContext.retireObject(stagingTexture->resource);
-
 	return irradiance;
 }
 
@@ -467,6 +464,8 @@ ref<dx_texture> prefilterEnvironment(dx_command_list* cl, const ref<dx_texture>&
 	prefilteredDesc = CD3DX12_RESOURCE_DESC(prefiltered->resource->GetDesc());
 
 	dx_resource prefilteredResource = prefiltered->resource;
+	SET_NAME(prefilteredResource, "Prefiltered");
+
 	dx_resource stagingResource = prefilteredResource;
 
 	ref<dx_texture> stagingTexture = make_ref<dx_texture>();
@@ -538,8 +537,6 @@ ref<dx_texture> prefilterEnvironment(dx_command_list* cl, const ref<dx_texture>&
 		cl->transitionBarrier(prefiltered->resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
 	}
 
-	dxContext.retireObject(stagingTexture->resource);
-
 	return prefiltered;
 }
 
@@ -553,6 +550,7 @@ ref<dx_texture> integrateBRDF(dx_command_list* cl, uint32 resolution)
 	desc = CD3DX12_RESOURCE_DESC(brdf->resource->GetDesc());
 
 	dx_resource brdfResource = brdf->resource;
+	SET_NAME(brdfResource, "BRDF");
 	dx_resource stagingResource = brdfResource;
 
 	ref<dx_texture> stagingTexture = make_ref<dx_texture>();
@@ -599,31 +597,21 @@ ref<dx_texture> integrateBRDF(dx_command_list* cl, uint32 resolution)
 		cl->transitionBarrier(brdf->resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
 	}
 
-	dxContext.retireObject(stagingTexture->resource);
-
 	return brdf;
 }
 
-void gaussianBlur(dx_command_list* cl, ref<dx_texture> tex, ref<dx_texture> tmpTex)
+void gaussianBlur(dx_command_list* cl, ref<dx_texture> tex, ref<dx_texture> tmpTex, uint32 numIterations)
 {
 	cl->setPipelineState(*gaussianBlurPipeline.pipeline);
 	cl->setComputeRootSignature(*gaussianBlurPipeline.rootSignature);
 
-	//float weights[] = { 0.38774f, 0.24477f, 0.06136f };
-	float weights[] = { 0.20236f, 0.179044f, 0.124009f, 0.067234f, 0.028532f };
+	uint32 width = tex->width;
+	uint32 height = tex->height;
 
-	auto weightsBuffer = cl->uploadDynamicConstantBuffer(sizeof(weights), weights);
-	auto desc = tex->resource->GetDesc();
-	uint32 width = (uint32)desc.Width;
-	uint32 height = (uint32)desc.Height;
-
-	cl->setRootComputeSRV(2, weightsBuffer.gpuPtr);
-
-	uint32 numIterations = 1;
 	for (uint32 i = 0; i < numIterations; ++i)
 	{
 		// Vertical pass.
-		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(0.f, 1.f / height), arraysize(weights) });
+		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(0.f, 1.f / height) });
 		cl->setDescriptorHeapSRV(1, 0, tex);
 		cl->setDescriptorHeapUAV(1, 1, tmpTex);
 
@@ -633,7 +621,7 @@ void gaussianBlur(dx_command_list* cl, ref<dx_texture> tex, ref<dx_texture> tmpT
 
 
 		// Horizontal pass.
-		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(1.f / width, 0.f), arraysize(weights) });
+		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(1.f / width, 0.f) });
 		cl->setDescriptorHeapSRV(1, 0, tmpTex);
 		cl->setDescriptorHeapUAV(1, 1, tex);
 

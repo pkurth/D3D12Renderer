@@ -20,7 +20,6 @@ void dx_command_queue::initialize(dx_device device, D3D12_COMMAND_LIST_TYPE type
 	checkResult(device->CreateCommandQueue(&desc, IID_PPV_ARGS(&commandQueue)));
 	checkResult(device->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
 
-	commandListMutex = createMutex();
 	processThreadHandle = CreateThread(0, 0, processRunningCommandAllocators, this, 0, 0);
 
 	switch (type)

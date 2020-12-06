@@ -14,6 +14,8 @@
 #include <iostream>
 #include <memory>
 
+#include <mutex>
+
 typedef char int8;
 typedef unsigned char uint8;
 typedef short int16;

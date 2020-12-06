@@ -1,10 +1,13 @@
 #pragma once
 
 #include "dx.h"
-#include "dx_render_primitives.h"
 #include "dx_upload_buffer.h"
 #include "dx_dynamic_descriptor_heap.h"
 #include "dx_descriptor_allocation.h"
+#include "dx_texture.h"
+#include "dx_buffer.h"
+#include "dx_render_target.h"
+#include "dx_pipeline.h"
 
 struct dx_command_list
 {
@@ -102,8 +105,8 @@ struct dx_command_list
 	void setComputeDescriptorTable(uint32 rootParameterIndex, CD3DX12_GPU_DESCRIPTOR_HANDLE handle);
 
 	void clearUAV(const ref<dx_buffer>& buffer, float val = 0.f);
-	void clearUAV(dx_resource resource, CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle, float val = 0.f);
-	void clearUAV(dx_resource resource, CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle, uint32 val = 0);
+	void clearUAV(dx_resource resource, dx_cpu_descriptor_handle cpuHandle, dx_gpu_descriptor_handle gpuHandle, float val = 0.f);
+	void clearUAV(dx_resource resource, dx_cpu_descriptor_handle cpuHandle, dx_gpu_descriptor_handle gpuHandle, uint32 val = 0);
 
 
 	// Input assembly.
@@ -121,13 +124,25 @@ struct dx_command_list
 
 
 	// Render targets.
-	void setRenderTarget(D3D12_CPU_DESCRIPTOR_HANDLE* rtvs, uint32 numRTVs, D3D12_CPU_DESCRIPTOR_HANDLE* dsv);
-	void setRenderTarget(dx_render_target& renderTarget, uint32 arraySlice = 0);
-	void clearRTV(D3D12_CPU_DESCRIPTOR_HANDLE rtv, float r, float g, float b, float a = 1.f);
-	void clearRTV(D3D12_CPU_DESCRIPTOR_HANDLE rtv, const float* clearColor);
-	void clearDepth(D3D12_CPU_DESCRIPTOR_HANDLE dsv, float depth = 1.f);
-	void clearStencil(D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32 stencil = 0);
-	void clearDepthAndStencil(D3D12_CPU_DESCRIPTOR_HANDLE dsv, float depth = 1.f, uint32 stencil = 0);
+	void setRenderTarget(dx_cpu_descriptor_handle* rtvs, uint32 numRTVs, dx_cpu_descriptor_handle* dsv);
+	void setRenderTarget(dx_render_target& renderTarget);
+
+	void clearRTV(dx_cpu_descriptor_handle rtv, float r, float g, float b, float a = 1.f);
+	void clearRTV(dx_cpu_descriptor_handle rtv, const float* clearColor);
+	void clearRTV(const ref<dx_texture>& texture, float r, float g, float b, float a = 1.f);
+	void clearRTV(const ref<dx_texture>& texture, const float* clearColor);
+	void clearRTV(dx_render_target& renderTarget, uint32 attachment, const float* clearColor);
+	void clearRTV(dx_render_target& renderTarget, uint32 attachment, float r, float g, float b, float a = 1.f);
+
+	void clearDepth(dx_cpu_descriptor_handle dsv, float depth = 1.f);
+	void clearDepth(dx_render_target& renderTarget, float depth = 1.f);
+
+	void clearStencil(dx_cpu_descriptor_handle dsv, uint32 stencil = 0);
+	void clearStencil(dx_render_target& renderTarget, uint32 stencil = 0);
+
+	void clearDepthAndStencil(dx_cpu_descriptor_handle dsv, float depth = 1.f, uint32 stencil = 0);
+	void clearDepthAndStencil(dx_render_target& renderTarget, float depth = 1.f, uint32 stencil = 0);
+
 	void setStencilReference(uint32 stencilReference);
 	void setBlendFactor(const float* blendFactor);
 

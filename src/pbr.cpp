@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "pbr.h"
-#include "texture.h"
+#include "dx_texture.h"
 #include "texture_preprocessing.h"
 #include "dx_context.h"
 
@@ -88,7 +88,7 @@ ref<pbr_material> createMaterial(const char* albedoTex, const char* normalTex, c
 
 
 	static std::unordered_map<material_key, weakref<pbr_material>> cache;
-	static thread_mutex mutex = createMutex();
+	static std::mutex mutex;
 
 	mutex.lock();
 
@@ -124,7 +124,7 @@ ref<pbr_material> getDefaultMaterial()
 ref<pbr_environment> createEnvironment(const char* filename, uint32 skyResolution, uint32 environmentResolution, uint32 irradianceResolution, bool asyncCompute)
 {
 	static std::unordered_map<std::string, weakref<pbr_environment>> cache;
-	static thread_mutex mutex = createMutex();
+	static std::mutex mutex;
 
 	mutex.lock();
 
@@ -154,8 +154,6 @@ ref<pbr_environment> createEnvironment(const char* filename, uint32 skyResolutio
 		environment->environment = prefilterEnvironment(cl, environment->sky, environmentResolution);
 		environment->irradiance = cubemapToIrradiance(cl, environment->sky, irradianceResolution);
 		dxContext.executeCommandList(cl);
-
-		dxContext.retireObject(equiSky->resource);
 
 		cache[s] = sp = environment;
 	}

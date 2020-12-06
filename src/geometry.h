@@ -1,8 +1,9 @@
 #pragma once
 
-#include "dx_render_primitives.h"
 #include "bounding_volumes.h"
 #include "animation.h"
+#include "dx_buffer.h"
+#include "mesh.h"
 
 // Members are always pushed in this order!
 enum mesh_creation_flags

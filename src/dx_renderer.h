@@ -1,6 +1,7 @@
 #pragma once
 
-#include "dx_render_primitives.h"
+#include "dx_render_target.h"
+#include "dx_command_list.h"
 #include "math.h"
 #include "camera.h"
 #include "render_pass.h"
@@ -38,8 +39,11 @@ struct renderer_settings
 	tonemap_cb tonemap;
 	float environmentIntensity;
 	float skyIntensity;
+
 	uint32 raytracingDownsampleFactor;
 	uint32 numRaytracingBounces;
+	uint32 blurRaytracingResultIterations;
+
 	aspect_ratio_mode aspectRatioMode;
 	bool showLightVolumes;
 };
@@ -104,7 +108,6 @@ struct dx_renderer
 	ref<dx_texture> worldNormalsTexture;
 	ref<dx_texture> depthBuffer;
 
-	dx_render_target volumetricsRenderTarget;
 	ref<dx_texture> volumetricsTexture;
 
 	ref<dx_texture> raytracingTexture;

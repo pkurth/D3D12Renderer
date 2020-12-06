@@ -1,16 +1,18 @@
 #include "pch.h"
 #include "dx_context.h"
 #include "dx_command_list.h"
-
+#include "dx_texture.h"
+#include "dx_buffer.h"
 
 dx_context dxContext;
 
 static void enableDebugLayer()
 {
 #if defined(_DEBUG)
-	com<ID3D12Debug> debugInterface;
+	com<ID3D12Debug3> debugInterface;
 	checkResult(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface)));
 	debugInterface->EnableDebugLayer();
+	//debugInterface->SetEnableAutoDebugName(true);
 #endif
 }
 
@@ -112,9 +114,6 @@ static bool checkMeshShaderSupport(dx_device device)
 	return options7.MeshShaderTier >= D3D12_MESH_SHADER_TIER_1;
 }
 
-
-dx_page_pool createPagePool(dx_device device, uint64 pageSize);
-
 void dx_context::initialize()
 {
 	enableDebugLayer();
@@ -125,12 +124,11 @@ void dx_context::initialize()
 	raytracingSupported = checkRaytracingSupport(device);
 	meshShaderSupported = checkMeshShaderSupport(device);
 
-	allocationMutex = createMutex();
 	bufferedFrameID = NUM_BUFFERED_FRAMES - 1;
 
 	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
 	{
-		pagePools[i] = createPagePool(device, MB(2));
+		pagePools[i].initialize(MB(2));
 	}
 
 	renderQueue.initialize(device, D3D12_COMMAND_LIST_TYPE_DIRECT);
@@ -164,12 +162,29 @@ void dx_context::quit()
 
 	for (uint32 b = 0; b < NUM_BUFFERED_FRAMES; ++b)
 	{
-		for (uint32 i = 0; i < objectRetirement.numRetiredObjects[b]; ++i)
-		{
-			objectRetirement.retiredObjects[b][i].Reset();
-		}
-		objectRetirement.numRetiredObjects[b] = 0;
+		textureGraveyard[b].clear();
 	}
+}
+
+void dx_context::retire(texture_grave&& texture)
+{
+	mutex.lock();
+	textureGraveyard[bufferedFrameID].push_back(std::move(texture));
+	mutex.unlock();
+}
+
+void dx_context::retire(buffer_grave&& buffer)
+{
+	mutex.lock();
+	bufferGraveyard[bufferedFrameID].push_back(std::move(buffer));
+	mutex.unlock();
+}
+
+void dx_context::retire(dx_object obj)
+{
+	mutex.lock();
+	objectGraveyard[bufferedFrameID].push_back(obj);
+	mutex.unlock();
 }
 
 dx_command_queue& dx_context::getQueue(D3D12_COMMAND_LIST_TYPE type)
@@ -195,7 +210,9 @@ dx_command_list* dx_context::getFreeCommandList(dx_command_queue& queue)
 		atomicIncrement(queue.totalNumCommandLists);
 	}
 
+	mutex.lock();
 	result->uploadBuffer.pagePool = &pagePools[bufferedFrameID];
+	mutex.unlock();
 
 	return result;
 }
@@ -263,32 +280,25 @@ dx_memory_usage dx_context::getMemoryUsage()
 	return { (uint32)BYTE_TO_MB(memoryInfo.CurrentUsage), (uint32)BYTE_TO_MB(memoryInfo.Budget) };
 }
 
-void dx_context::retireObject(dx_object obj)
-{
-	if (obj)
-	{
-		uint32 index = atomicIncrement(objectRetirement.numRetiredObjects[bufferedFrameID]);
-		assert(!objectRetirement.retiredObjects[bufferedFrameID][index]);
-		objectRetirement.retiredObjects[bufferedFrameID][index] = obj;
-	}
-}
-
 void dx_context::newFrame(uint64 frameID)
 {
 	this->frameID = frameID;
 
+	mutex.lock();
 	bufferedFrameID = (uint32)(frameID % NUM_BUFFERED_FRAMES);
-	for (uint32 i = 0; i < objectRetirement.numRetiredObjects[bufferedFrameID]; ++i)
-	{
-		objectRetirement.retiredObjects[bufferedFrameID][i].Reset();
-	}
-	objectRetirement.numRetiredObjects[bufferedFrameID] = 0;
+
+	textureGraveyard[bufferedFrameID].clear();
+	bufferGraveyard[bufferedFrameID].clear();
+	objectGraveyard[bufferedFrameID].clear();
+
 
 	frameUploadBuffer.reset();
 	frameUploadBuffer.pagePool = &pagePools[bufferedFrameID];
 
 	pagePools[bufferedFrameID].reset();
 	frameDescriptorAllocator.newFrame(bufferedFrameID);
+
+	mutex.unlock();
 }
 
 

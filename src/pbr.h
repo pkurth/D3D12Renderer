@@ -1,7 +1,8 @@
 #pragma once
 
-#include "dx_render_primitives.h"
 #include "math.h"
+
+struct dx_texture;
 
 struct pbr_material
 {

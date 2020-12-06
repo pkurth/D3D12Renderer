@@ -1,11 +1,19 @@
 #pragma once
 
 #include "bounding_volumes.h"
-#include "dx_render_primitives.h"
+#include "dx_buffer.h"
 
 struct aiScene;
 struct pbr_material;
 
+
+struct submesh_info
+{
+	uint32 numTriangles;
+	uint32 firstTriangle;
+	uint32 baseVertex;
+	uint32 numVertices;
+};
 
 struct single_mesh
 {

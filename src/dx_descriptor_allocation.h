@@ -89,7 +89,7 @@ struct dx_frame_descriptor_allocator
 	dx_descriptor_page* freePages;
 	uint32 currentFrame;
 
-	thread_mutex mutex;
+	std::mutex mutex;
 
 	void initialize();
 	void newFrame(uint32 bufferedFrameID);

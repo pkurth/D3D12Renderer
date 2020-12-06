@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "application.h"
 #include "geometry.h"
-#include "texture.h"
+#include "dx_texture.h"
 #include "random.h"
 #include "color.h"
 #include "imgui.h"
@@ -16,7 +16,6 @@ void application::initialize(dx_renderer* renderer)
 	camera.rotation = quat::identity;
 	camera.verticalFOV = deg2rad(70.f);
 	camera.nearPlane = 0.1f;
-
 
 	meshes.push_back(loadMeshFromFile("assets/meshes/cerberus.fbx", 
 		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
@@ -252,7 +251,7 @@ void application::update(const user_input& input, float dt)
 	ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->settings.aspectRatioMode);
 	ImGui::Checkbox("Show light volumes", &renderer->settings.showLightVolumes);
 
-	//ImGui::Image(renderer->raytracingTexture->defaultSRV, ImVec2(256, 256)); // TODO: When you remove this, make renderer attributes private again.
+	ImGui::Image(renderer->raytracingTexture, 256, 256); // TODO: When you remove this, make renderer attributes private again.
 
 	plotAndEditTonemapping(renderer->settings.tonemap);
 	editSunShadowParameters(sun);
@@ -261,6 +260,8 @@ void application::update(const user_input& input, float dt)
 	ImGui::SliderFloat("Sky intensity", &renderer->settings.skyIntensity, 0.f, 2.f);
 	ImGui::SliderInt("Raytracing bounces", (int*)&renderer->settings.numRaytracingBounces, 1, MAX_RAYTRACING_RECURSION_DEPTH - 1);
 	ImGui::SliderInt("Raytracing downsampling", (int*)&renderer->settings.raytracingDownsampleFactor, 1, 4);
+	ImGui::SliderInt("Raytracing blur iteations", (int*)&renderer->settings.blurRaytracingResultIterations, 1, 4);
+
 
 	ImGui::End();
 

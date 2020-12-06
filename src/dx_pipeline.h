@@ -6,6 +6,37 @@
 #define CREATE_GRAPHICS_PIPELINE dx_graphics_pipeline_generator()
 #define CREATE_COMPUTE_PIPELINE dx_compute_pipeline_generator()
 
+#define UNBOUNDED_DESCRIPTOR_RANGE -1
+
+
+
+
+struct dx_root_signature
+{
+	com<ID3D12RootSignature> rootSignature;
+	uint32* descriptorTableSizes;
+	uint32 numDescriptorTables;
+	uint32 tableRootParameterMask;
+};
+
+dx_root_signature createRootSignature(dx_blob rootSignatureBlob);
+dx_root_signature createRootSignature(const wchar* path);
+dx_root_signature createRootSignature(const D3D12_ROOT_SIGNATURE_DESC1& desc);
+dx_root_signature createRootSignature(CD3DX12_ROOT_PARAMETER1* rootParameters, uint32 numRootParameters, CD3DX12_STATIC_SAMPLER_DESC* samplers, uint32 numSamplers,
+	D3D12_ROOT_SIGNATURE_FLAGS flags);
+dx_root_signature createRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc);
+dx_root_signature createRootSignature(CD3DX12_ROOT_PARAMETER* rootParameters, uint32 numRootParameters, CD3DX12_STATIC_SAMPLER_DESC* samplers, uint32 numSamplers,
+	D3D12_ROOT_SIGNATURE_FLAGS flags);
+dx_command_signature createCommandSignature(dx_root_signature rootSignature, const D3D12_COMMAND_SIGNATURE_DESC& commandSignatureDesc);
+dx_root_signature createRootSignature(D3D12_ROOT_SIGNATURE_FLAGS flags);
+void freeRootSignature(dx_root_signature& rs);
+
+dx_command_signature createCommandSignature(dx_root_signature rootSignature, D3D12_INDIRECT_ARGUMENT_DESC* argumentDescs, uint32 numArgumentDescs, uint32 commandStructureSize);
+
+
+
+
+
 struct dx_graphics_pipeline_generator
 {
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC desc;

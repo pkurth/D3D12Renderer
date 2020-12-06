@@ -101,7 +101,7 @@ static std::deque<dx_root_signature> userRootSignatures;
 
 static std::vector<reloadable_pipeline_state*> dirtyPipelines;
 static std::vector<reloadable_root_signature*> dirtyRootSignatures;
-static thread_mutex mutex;
+static std::mutex mutex;
 
 
 static reloadable_root_signature* pushBlob(const char* filename, reloadable_pipeline_state* pipelineIndex, bool isRootSignature = false)
@@ -239,14 +239,14 @@ static void loadRootSignature(reloadable_root_signature& r)
 {
 	dx_blob rs = shaderBlobs[r.file].blob;
 
-	dxContext.retireObject(r.rootSignature.rootSignature); 
+	dxContext.retire(r.rootSignature.rootSignature); 
 	freeRootSignature(r.rootSignature);
 	r.rootSignature = createRootSignature(rs);
 }
 
 static void loadPipeline(reloadable_pipeline_state& p)
 {
-	dxContext.retireObject(p.pipeline);
+	dxContext.retire(p.pipeline);
 
 	if (p.type == pipeline_type_graphics)
 	{
@@ -291,7 +291,6 @@ void createAllReloadablePipelines()
 	}
 #endif
 
-	mutex = createMutex();
 	CreateThread(0, 0, checkForFileChanges, 0, 0, 0);
 }
 
@@ -455,6 +454,192 @@ static DWORD checkForFileChanges(void*)
 	}
 
 	return 0;
+}
+
+static void copyRootSignatureDesc(const D3D12_ROOT_SIGNATURE_DESC* desc, dx_root_signature& result)
+{
+	uint32 numDescriptorTables = 0;
+	for (uint32 i = 0; i < desc->NumParameters; ++i)
+	{
+		if (desc->pParameters[i].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+		{
+			++numDescriptorTables;
+			setBit(result.tableRootParameterMask, i);
+		}
+	}
+
+	result.descriptorTableSizes = new uint32[numDescriptorTables];
+	result.numDescriptorTables = numDescriptorTables;
+
+	uint32 index = 0;
+	for (uint32 i = 0; i < desc->NumParameters; ++i)
+	{
+		if (desc->pParameters[i].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+		{
+			uint32 numRanges = desc->pParameters[i].DescriptorTable.NumDescriptorRanges;
+			result.descriptorTableSizes[index] = 0;
+			for (uint32 r = 0; r < numRanges; ++r)
+			{
+				result.descriptorTableSizes[index] += desc->pParameters[i].DescriptorTable.pDescriptorRanges[r].NumDescriptors;
+			}
+			++index;
+		}
+	}
+}
+
+static void copyRootSignatureDesc(const D3D12_ROOT_SIGNATURE_DESC1* desc, dx_root_signature& result)
+{
+	uint32 numDescriptorTables = 0;
+	for (uint32 i = 0; i < desc->NumParameters; ++i)
+	{
+		if (desc->pParameters[i].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+		{
+			++numDescriptorTables;
+			setBit(result.tableRootParameterMask, i);
+		}
+	}
+
+	result.descriptorTableSizes = new uint32[numDescriptorTables];
+	result.numDescriptorTables = numDescriptorTables;
+
+	uint32 index = 0;
+	for (uint32 i = 0; i < desc->NumParameters; ++i)
+	{
+		if (desc->pParameters[i].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+		{
+			uint32 numRanges = desc->pParameters[i].DescriptorTable.NumDescriptorRanges;
+			result.descriptorTableSizes[index] = 0;
+			for (uint32 r = 0; r < numRanges; ++r)
+			{
+				result.descriptorTableSizes[index] += desc->pParameters[i].DescriptorTable.pDescriptorRanges[r].NumDescriptors;
+			}
+			++index;
+		}
+	}
+}
+
+dx_root_signature createRootSignature(dx_blob rootSignatureBlob)
+{
+	dx_root_signature result = {};
+
+	checkResult(dxContext.device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
+		rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&result.rootSignature)));
+
+	com<ID3D12RootSignatureDeserializer> deserializer;
+	checkResult(D3D12CreateRootSignatureDeserializer(rootSignatureBlob->GetBufferPointer(), rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&deserializer)));
+	D3D12_ROOT_SIGNATURE_DESC* desc = (D3D12_ROOT_SIGNATURE_DESC*)deserializer->GetRootSignatureDesc();
+
+	copyRootSignatureDesc(desc, result);
+
+	return result;
+}
+
+dx_root_signature createRootSignature(const wchar* path)
+{
+	dx_blob rootSignatureBlob;
+	checkResult(D3DReadFileToBlob(path, &rootSignatureBlob));
+	return createRootSignature(rootSignatureBlob);
+}
+
+dx_root_signature createRootSignature(const D3D12_ROOT_SIGNATURE_DESC1& desc)
+{
+	D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+	featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+	if (FAILED(dxContext.device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+	{
+		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+	}
+
+	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+	rootSignatureDescription.Init_1_1(desc.NumParameters, desc.pParameters, desc.NumStaticSamplers, desc.pStaticSamplers, desc.Flags);
+
+	dx_blob rootSignatureBlob;
+	dx_blob errorBlob;
+	checkResult(D3DX12SerializeVersionedRootSignature(&rootSignatureDescription, featureData.HighestVersion, &rootSignatureBlob, &errorBlob));
+
+	dx_root_signature rootSignature = {};
+
+	checkResult(dxContext.device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
+		rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature.rootSignature)));
+
+	copyRootSignatureDesc(&desc, rootSignature);
+
+	return rootSignature;
+}
+
+dx_root_signature createRootSignature(CD3DX12_ROOT_PARAMETER1* rootParameters, uint32 numRootParameters, CD3DX12_STATIC_SAMPLER_DESC* samplers, uint32 numSamplers,
+	D3D12_ROOT_SIGNATURE_FLAGS flags)
+{
+	D3D12_ROOT_SIGNATURE_DESC1 rootSignatureDesc = {};
+	rootSignatureDesc.Flags = flags;
+	rootSignatureDesc.pParameters = rootParameters;
+	rootSignatureDesc.NumParameters = numRootParameters;
+	rootSignatureDesc.pStaticSamplers = samplers;
+	rootSignatureDesc.NumStaticSamplers = numSamplers;
+	return createRootSignature(rootSignatureDesc);
+}
+
+dx_root_signature createRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
+{
+	dx_blob rootSignatureBlob;
+	dx_blob errorBlob;
+	checkResult(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &rootSignatureBlob, &errorBlob));
+
+	dx_root_signature rootSignature = {};
+
+	checkResult(dxContext.device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
+		rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature.rootSignature)));
+
+	copyRootSignatureDesc(&desc, rootSignature);
+
+	return rootSignature;
+}
+
+dx_root_signature createRootSignature(CD3DX12_ROOT_PARAMETER* rootParameters, uint32 numRootParameters, CD3DX12_STATIC_SAMPLER_DESC* samplers, uint32 numSamplers,
+	D3D12_ROOT_SIGNATURE_FLAGS flags)
+{
+	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+	rootSignatureDesc.Flags = flags;
+	rootSignatureDesc.pParameters = rootParameters;
+	rootSignatureDesc.NumParameters = numRootParameters;
+	rootSignatureDesc.pStaticSamplers = samplers;
+	rootSignatureDesc.NumStaticSamplers = numSamplers;
+	return createRootSignature(rootSignatureDesc);
+}
+
+dx_root_signature createRootSignature(D3D12_ROOT_SIGNATURE_FLAGS flags)
+{
+	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+	rootSignatureDesc.Flags = flags;
+	return createRootSignature(rootSignatureDesc);
+}
+
+void freeRootSignature(dx_root_signature& rs)
+{
+	if (rs.descriptorTableSizes)
+	{
+		delete[] rs.descriptorTableSizes;
+	}
+}
+
+dx_command_signature createCommandSignature(dx_root_signature rootSignature, const D3D12_COMMAND_SIGNATURE_DESC& commandSignatureDesc)
+{
+	dx_command_signature commandSignature;
+	checkResult(dxContext.device->CreateCommandSignature(&commandSignatureDesc,
+		commandSignatureDesc.NumArgumentDescs == 1 ? 0 : rootSignature.rootSignature.Get(),
+		IID_PPV_ARGS(&commandSignature)));
+	return commandSignature;
+}
+
+dx_command_signature createCommandSignature(dx_root_signature rootSignature, D3D12_INDIRECT_ARGUMENT_DESC* argumentDescs, uint32 numArgumentDescs, uint32 commandStructureSize)
+{
+	D3D12_COMMAND_SIGNATURE_DESC commandSignatureDesc;
+	commandSignatureDesc.pArgumentDescs = argumentDescs;
+	commandSignatureDesc.NumArgumentDescs = numArgumentDescs;
+	commandSignatureDesc.ByteStride = commandStructureSize;
+	commandSignatureDesc.NodeMask = 0;
+
+	return createCommandSignature(rootSignature, commandSignatureDesc);
 }
 
 

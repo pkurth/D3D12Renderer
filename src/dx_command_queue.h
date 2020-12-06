@@ -1,7 +1,6 @@
 #pragma once
 
 #include "dx.h"
-#include "threading.h"
 
 struct dx_command_list;
 
@@ -29,5 +28,5 @@ struct dx_command_queue
 
 	HANDLE processThreadHandle;
 
-	thread_mutex commandListMutex;
+	std::mutex commandListMutex;
 };

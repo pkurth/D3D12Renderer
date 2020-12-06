@@ -2,7 +2,7 @@
 
 #include "math.h"
 #include "bounding_volumes.h"
-#include "dx_render_primitives.h"
+#include "mesh.h"
 #include "light_source.h"
 
 struct pbr_material;

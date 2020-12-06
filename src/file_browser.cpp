@@ -21,10 +21,12 @@ struct file_system_entry
 };
 
 static file_system_entry rootFileEntry;
-static thread_mutex fileSystemMutex;
+static std::mutex fileSystemMutex;
 
 static const char* rootDirName = ".";
 static fs::path assetPath = (fs::path(rootDirName) / "assets").lexically_normal();
+
+static bool initializedFileBrowser;
 
 static void recurseFileSystem(file_system_entry& entry)
 {
@@ -71,13 +73,13 @@ static std::pair<file_system_entry*, bool> findFileSystemEntry(file_system_entry
 
 static DWORD checkForFileChanges(void*)
 {
-	fileSystemMutex = createMutex();
-
-
+	fileSystemMutex.lock();
 	rootFileEntry.path = assetPath;
 	rootFileEntry.name = rootFileEntry.path.filename().string();
 	rootFileEntry.isFile = false;
 	recurseFileSystem(rootFileEntry);
+	initializedFileBrowser = true;
+	fileSystemMutex.unlock();
 
 	uint32 numDirectories = 0;
 
@@ -281,6 +283,10 @@ void drawFileBrowser(application& app)
 {
 	static HANDLE checkForFileChangesThread = CreateThread(0, 0, checkForFileChanges, 0, 0, 0);
 
+	if (!initializedFileBrowser)
+	{
+		return;
+	}
 
 	ImGui::Begin("Assets");
 	

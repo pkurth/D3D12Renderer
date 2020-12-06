@@ -2,6 +2,7 @@
 #include "dx_descriptor_allocation.h"
 #include "dx_command_list.h"
 #include "dx_context.h"
+#include "dx_texture.h"
 
 
 void dx_descriptor_heap::initialize(D3D12_DESCRIPTOR_HEAP_TYPE type, uint32 numDescriptors, bool shaderVisible)
@@ -65,9 +66,7 @@ void dx_rtv_descriptor_heap::initialize(uint32 numDescriptors, bool shaderVisibl
 
 dx_cpu_descriptor_handle dx_rtv_descriptor_heap::pushRenderTargetView(const ref<dx_texture>& texture)
 {
-	D3D12_RESOURCE_DESC resourceDesc = texture->resource->GetDesc();
-	assert(resourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
-	uint32 slices = resourceDesc.DepthOrArraySize;
+	uint32 slices = texture->depth;
 
 	uint32 index = atomicAdd(pushIndex, slices);
 	dx_cpu_descriptor_handle result = getHandle(index);
@@ -76,15 +75,14 @@ dx_cpu_descriptor_handle dx_rtv_descriptor_heap::pushRenderTargetView(const ref<
 
 dx_cpu_descriptor_handle dx_rtv_descriptor_heap::createRenderTargetView(const ref<dx_texture>& texture, dx_cpu_descriptor_handle index)
 {
-	D3D12_RESOURCE_DESC resourceDesc = texture->resource->GetDesc();
-	assert(resourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
-	uint32 slices = resourceDesc.DepthOrArraySize;
+	assert(texture->supportsRTV);
 
+	uint32 slices = texture->depth;
 	if (slices > 1)
 	{
 		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc;
 		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
-		rtvDesc.Format = resourceDesc.Format;
+		rtvDesc.Format = texture->format;
 		rtvDesc.Texture2DArray.ArraySize = 1;
 		rtvDesc.Texture2DArray.MipSlice = 0;
 		rtvDesc.Texture2DArray.PlaneSlice = 0;
@@ -112,10 +110,7 @@ void dx_dsv_descriptor_heap::initialize(uint32 numDescriptors, bool shaderVisibl
 
 dx_cpu_descriptor_handle dx_dsv_descriptor_heap::pushDepthStencilView(const ref<dx_texture>& texture)
 {
-	D3D12_RESOURCE_DESC resourceDesc = texture->resource->GetDesc();
-	assert(resourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
-	uint32 slices = resourceDesc.DepthOrArraySize;
-
+	uint32 slices = texture->depth;
 	uint32 index = atomicAdd(pushIndex, slices);
 	dx_cpu_descriptor_handle result = getHandle(index);
 	return createDepthStencilView(texture, result);
@@ -123,9 +118,8 @@ dx_cpu_descriptor_handle dx_dsv_descriptor_heap::pushDepthStencilView(const ref<
 
 dx_cpu_descriptor_handle dx_dsv_descriptor_heap::createDepthStencilView(const ref<dx_texture>& texture, dx_cpu_descriptor_handle index)
 {
-	D3D12_RESOURCE_DESC resourceDesc = texture->resource->GetDesc();
-
-	DXGI_FORMAT format = texture->formatSupport.Format; // This contains the original format, not the typeless.
+	DXGI_FORMAT format = texture->format;
+	uint32 slices = texture->depth;
 
 	assert(isDepthFormat(format));
 
@@ -133,12 +127,12 @@ dx_cpu_descriptor_handle dx_dsv_descriptor_heap::createDepthStencilView(const re
 	dsvDesc.Format = format;
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 
-	if (resourceDesc.DepthOrArraySize > 1)
+	if (slices > 1)
 	{
 		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
 		dsvDesc.Texture2DArray.ArraySize = 1;
 
-		for (uint32 i = 0; i < resourceDesc.DepthOrArraySize; ++i)
+		for (uint32 i = 0; i < slices; ++i)
 		{
 			dsvDesc.Texture2DArray.FirstArraySlice = i;
 
@@ -156,7 +150,6 @@ dx_cpu_descriptor_handle dx_dsv_descriptor_heap::createDepthStencilView(const re
 
 void dx_frame_descriptor_allocator::initialize()
 {
-	mutex = createMutex();
 	currentFrame = NUM_BUFFERED_FRAMES - 1;
 }
 

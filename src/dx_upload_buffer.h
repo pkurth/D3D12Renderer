@@ -1,7 +1,6 @@
 #pragma once
 
 #include "dx.h"
-#include "threading.h"
 #include "memory.h"
 
 struct dx_allocation
@@ -24,10 +23,11 @@ struct dx_page
 
 struct dx_page_pool
 {
-	memory_arena arena;
-	dx_device device;
+	void initialize(uint32 sizeInBytes);
 
-	thread_mutex mutex;
+	memory_arena arena;
+
+	std::mutex mutex;
 
 	uint64 pageSize;
 	dx_page* freePages;

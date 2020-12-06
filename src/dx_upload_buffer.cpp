@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "dx_upload_buffer.h"
 #include "memory.h"
+#include "dx_context.h"
 
 dx_page* dx_page_pool::allocateNewPage()
 {
@@ -8,7 +9,7 @@ dx_page* dx_page_pool::allocateNewPage()
 	dx_page* result = (dx_page*)arena.allocate(sizeof(dx_page), true);
 	mutex.unlock();
 
-	checkResult(device->CreateCommittedResource(
+	checkResult(dxContext.device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Buffer(pageSize),
@@ -107,13 +108,8 @@ void dx_upload_buffer::reset()
 	currentPage = 0;
 }
 
-dx_page_pool createPagePool(dx_device device, uint64 pageSize)
+void dx_page_pool::initialize(uint32 sizeInBytes)
 {
-	dx_page_pool pool = {};
-	pool.device = device;
-	pool.mutex = createMutex();
-	pool.pageSize = pageSize;
-	return pool;
+	pageSize = sizeInBytes;
 }
-
 

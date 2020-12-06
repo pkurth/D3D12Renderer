@@ -213,7 +213,23 @@ static void updateRenderTargetViews(dx_window& window, dx_device device)
 	}
 }
 
-bool dx_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clientHeight, color_depth colorDepth, DXGI_FORMAT depthFormat, bool exclusiveFullscreen)
+dx_window::~dx_window()
+{
+	dxContext.flushApplication();
+
+	shutdown();
+	/*for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
+	{
+		dxContext.retireObject(backBuffers[i]);
+	}
+	dxContext.retireObject(rtvDescriptorHeap);
+	if (depthBuffer)
+	{
+		dxContext.retireObject(depthBuffer->resource);
+	}*/
+}
+
+bool dx_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clientHeight, color_depth colorDepth, bool exclusiveFullscreen)
 {
 	bool result = win32_window::initialize(name, clientWidth, clientHeight);
 	if (!result)
@@ -223,7 +239,6 @@ bool dx_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clientH
 
 	this->colorDepth = colorDepth;
 	this->exclusiveFullscreen = exclusiveFullscreen;
-	this->depthFormat = depthFormat;
 	tearingSupported = checkTearingSupport(dxContext.factory);
 
 
@@ -244,12 +259,6 @@ bool dx_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clientH
 	setSwapChainColorSpace(swapchain, colorDepth, hdrSupport);
 
 	updateRenderTargetViews(*this, dxContext.device);
-
-	assert(depthFormat == DXGI_FORMAT_UNKNOWN || isDepthFormat(depthFormat));
-	if (depthFormat != DXGI_FORMAT_UNKNOWN)
-	{
-		depthBuffer = createDepthTexture(clientWidth, clientHeight, depthFormat);
-	}
 
 	initialized = true;
 
@@ -288,11 +297,6 @@ void dx_window::onResize()
 		currentBackbufferIndex = swapchain->GetCurrentBackBufferIndex();
 
 		updateRenderTargetViews(*this, dxContext.device);
-
-		if (depthBuffer && depthBuffer->resource)
-		{
-			resizeTexture(depthBuffer, clientWidth, clientHeight);
-		}
 	}
 }
 

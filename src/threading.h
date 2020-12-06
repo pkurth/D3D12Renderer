@@ -25,24 +25,3 @@ static uint64 atomicDecrement(volatile uint64& a)
 	return InterlockedDecrement64((volatile LONG64*)&a) + 1;
 }
 
-struct thread_mutex
-{
-	HANDLE handle;
-
-	bool lock()
-	{
-		return WaitForSingleObject(handle, INFINITE) == WAIT_OBJECT_0;
-	}
-
-	bool unlock()
-	{
-		return ReleaseMutex(handle);
-	}
-};
-
-static thread_mutex createMutex()
-{
-	thread_mutex result = { CreateMutex(0, FALSE, 0) };
-	return result;
-}
-

@@ -2,17 +2,10 @@
 
 #include "dx.h"
 #include "dx_command_queue.h"
-#include "dx_render_primitives.h"
 #include "threading.h"
 #include "dx_upload_buffer.h"
 #include "dx_descriptor_allocation.h"
-
-
-struct object_retirement
-{
-	dx_object retiredObjects[NUM_BUFFERED_FRAMES][128];
-	volatile uint32 numRetiredObjects[NUM_BUFFERED_FRAMES];
-};
+#include "dx_buffer.h"
 
 struct dx_memory_usage
 {
@@ -28,8 +21,6 @@ struct dx_context
 
 	void newFrame(uint64 frameID);
 	void flushApplication();
-
-	void retireObject(dx_object object);
 
 	dx_command_list* getFreeCopyCommandList();
 	dx_command_list* getFreeComputeCommandList(bool async);
@@ -74,12 +65,20 @@ struct dx_context
 
 	uint32 descriptorHandleIncrementSize;
 
+
+	void retire(struct texture_grave&& texture);
+	void retire(struct buffer_grave&& buffer);
+	void retire(dx_object obj);
+
 private:
+
 	dx_page_pool pagePools[NUM_BUFFERED_FRAMES];
 
-	object_retirement objectRetirement;
+	std::mutex mutex;
 
-	thread_mutex allocationMutex;
+	std::vector<struct texture_grave> textureGraveyard[NUM_BUFFERED_FRAMES];
+	std::vector<struct buffer_grave> bufferGraveyard[NUM_BUFFERED_FRAMES];
+	std::vector<dx_object> objectGraveyard[NUM_BUFFERED_FRAMES];
 
 	dx_command_queue& getQueue(D3D12_COMMAND_LIST_TYPE type);
 	dx_command_list* getFreeCommandList(dx_command_queue& queue);

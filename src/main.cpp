@@ -52,7 +52,7 @@ static bool newFrame(float& dt)
 static uint64 renderToMainWindow(dx_window& window)
 {
 	dx_resource backbuffer = window.backBuffers[window.currentBackbufferIndex];
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtv(window.rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), window.currentBackbufferIndex, window.rtvDescriptorSize);
+	dx_cpu_descriptor_handle rtv = { CD3DX12_CPU_DESCRIPTOR_HANDLE(window.rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), window.currentBackbufferIndex, window.rtvDescriptorSize) };
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
@@ -61,8 +61,7 @@ static uint64 renderToMainWindow(dx_window& window)
 
 	cl->transitionBarrier(backbuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-	float clearColor[] = { 0.f, 0.f, 0.f, 1.f };
-	cl->clearRTV(rtv, clearColor);
+	cl->clearRTV(rtv, 0.f, 0.f, 0.f);
 	cl->setRenderTarget(&rtv, 1, 0);
 
 	if (win32_window::mainWindow == &window)
@@ -180,48 +179,48 @@ LONG NTAPI handleVectoredException(PEXCEPTION_POINTERS exceptionInfo)
 
 	switch (exceptionRecord->ExceptionCode)
 	{
-	case DBG_PRINTEXCEPTION_WIDE_C:
-	case DBG_PRINTEXCEPTION_C:
+		case DBG_PRINTEXCEPTION_WIDE_C:
+		case DBG_PRINTEXCEPTION_C:
 
-		if (exceptionRecord->NumberParameters >= 2)
-		{
-			ULONG len = (ULONG)exceptionRecord->ExceptionInformation[0];
-
-			union
+			if (exceptionRecord->NumberParameters >= 2)
 			{
-				ULONG_PTR up;
-				PCWSTR pwz;
-				PCSTR psz;
-			};
+				ULONG len = (ULONG)exceptionRecord->ExceptionInformation[0];
 
-			up = exceptionRecord->ExceptionInformation[1];
-
-			HANDLE hOut = GetStdHandle(STD_ERROR_HANDLE);
-
-			if (exceptionRecord->ExceptionCode == DBG_PRINTEXCEPTION_C)
-			{
-				// Localized text will be incorrect displayed, if used not CP_OEMCP encoding.
-				// WriteConsoleA(hOut, psz, len, &len, 0);
-
-				// assume CP_ACP encoding
-				if (ULONG n = MultiByteToWideChar(CP_ACP, 0, psz, len, 0, 0))
+				union
 				{
-					PWSTR wz = (PWSTR)alloca(n * sizeof(WCHAR));
+					ULONG_PTR up;
+					PCWSTR pwz;
+					PCSTR psz;
+				};
 
-					if (len = MultiByteToWideChar(CP_ACP, 0, psz, len, wz, n))
+				up = exceptionRecord->ExceptionInformation[1];
+
+				HANDLE hOut = GetStdHandle(STD_ERROR_HANDLE);
+
+				if (exceptionRecord->ExceptionCode == DBG_PRINTEXCEPTION_C)
+				{
+					// Localized text will be incorrect displayed, if used not CP_OEMCP encoding.
+					// WriteConsoleA(hOut, psz, len, &len, 0);
+
+					// assume CP_ACP encoding
+					if (ULONG n = MultiByteToWideChar(CP_ACP, 0, psz, len, 0, 0))
 					{
-						pwz = wz;
+						PWSTR wz = (PWSTR)alloca(n * sizeof(WCHAR));
+
+						if (len = MultiByteToWideChar(CP_ACP, 0, psz, len, wz, n))
+						{
+							pwz = wz;
+						}
 					}
 				}
-			}
 
-			if (len)
-			{
-				WriteConsoleW(hOut, pwz, len - 1, &len, 0);
-			}
+				if (len)
+				{
+					WriteConsoleW(hOut, pwz, len - 1, &len, 0);
+				}
 
-		}
-		return EXCEPTION_CONTINUE_EXECUTION;
+			}
+			return EXCEPTION_CONTINUE_EXECUTION;
 	}
 
 	return EXCEPTION_CONTINUE_SEARCH;
@@ -254,7 +253,7 @@ int main(int argc, char** argv)
 
 
 	dx_renderer renderer = {};
-	renderer.initialize(1024, 1024);
+	renderer.initialize(1280, 800);
 
 	application app = {};
 	app.initialize(&renderer);
@@ -269,6 +268,8 @@ int main(int argc, char** argv)
 
 	bool appFocusedLastFrame = true;
 
+	dxContext.flushApplication();
+
 	float dt;
 	while (newFrame(dt))
 	{
@@ -281,7 +282,7 @@ int main(int argc, char** argv)
 		ImGui::Begin("Scene");
 		uint32 renderWidth = (uint32)ImGui::GetContentRegionAvail().x;
 		uint32 renderHeight = (uint32)ImGui::GetContentRegionAvail().y;
-		ImGui::Image(renderer.frameResult->defaultSRV, renderWidth, renderHeight);
+		ImGui::Image(renderer.frameResult, renderWidth, renderHeight);
 
 		ImGuiIO& io = ImGui::GetIO();
 		if (ImGui::IsItemHovered())
@@ -309,7 +310,7 @@ int main(int argc, char** argv)
 			input.mouse.left = { ImGui::IsMouseDown(ImGuiMouseButton_Left), ImGui::IsMouseClicked(ImGuiMouseButton_Left), ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) };
 			input.mouse.right = { ImGui::IsMouseDown(ImGuiMouseButton_Right), ImGui::IsMouseClicked(ImGuiMouseButton_Right), ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Right) };
 			input.mouse.middle = { ImGui::IsMouseDown(ImGuiMouseButton_Middle), ImGui::IsMouseClicked(ImGuiMouseButton_Middle), ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Middle) };
-		
+
 			for (uint32 i = 0; i < arraysize(user_input::keyboard); ++i)
 			{
 				input.keyboard[i] = { ImGui::IsKeyDown(i), ImGui::IsKeyPressed(i) };
@@ -343,13 +344,13 @@ int main(int argc, char** argv)
 		ImGui::End();
 		ImGui::PopStyleVar();
 
-		appFocusedLastFrame =  ImGui::IsMousePosValid();
+		appFocusedLastFrame = ImGui::IsMousePosValid();
 
 		if (input.keyboard['V'].pressEvent) { window.toggleVSync(); }
 		if (ImGui::IsKeyPressed(key_esc)) { break; } // Also allowed if not focused on main window.
 		if (ImGui::IsKeyPressed(key_enter) && ImGui::IsKeyDown(key_alt)) { window.toggleFullscreen(); } // Also allowed if not focused on main window.
 
-		
+
 		drawHelperWindows();
 
 		dx_renderer::beginFrameCommon();
@@ -367,9 +368,11 @@ int main(int argc, char** argv)
 
 		fenceValues[window.currentBackbufferIndex] = renderToMainWindow(window);
 
-		
+
 		++frameID;
 	}
+
+	dxContext.flushApplication();
 
 	dxContext.quit();
 }

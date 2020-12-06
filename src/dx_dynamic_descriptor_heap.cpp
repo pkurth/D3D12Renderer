@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "dx_dynamic_descriptor_heap.h"
 #include "dx_command_list.h"
-#include "dx_render_primitives.h"
 #include "dx_context.h"
 
 void dx_dynamic_descriptor_heap::initialize(uint32 numDescriptorsPerHeap)

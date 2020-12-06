@@ -198,10 +198,8 @@ void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_textu
     dx_gpu_descriptor_handle outputHandle = setOutputTexture(output);
     dx_gpu_descriptor_handle resourceHandle = setTextures(textures);
 
-    auto desc = output->resource->GetDesc();
-
     D3D12_DISPATCH_RAYS_DESC raytraceDesc;
-    fillOutRayTracingRenderDesc(raytraceDesc, (uint32)desc.Width, desc.Height, 1, numRayTypes, numHitGroups);
+    fillOutRayTracingRenderDesc(raytraceDesc, output->width, output->height, 1, numRayTypes, numHitGroups);
 
     cl->setDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, descriptorHeap);
 

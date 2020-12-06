@@ -3,6 +3,8 @@
 
 #include "dx_render_primitives.h"
 #include "dx_context.h"
+#include "dx_texture.h"
+#include "dx_buffer.h"
 
 dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::create2DTextureSRV(const ref<dx_texture>& texture, texture_mip_range mipRange, DXGI_FORMAT overrideFormat)
 {
