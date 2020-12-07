@@ -31,7 +31,6 @@ typedef com<ID3D12StateObject> dx_raytracing_pipeline_state;
 #define NUM_BUFFERED_FRAMES 2
 
 #define SET_NAME(obj, name) checkResult(obj->SetName(L##name));
-#define GET_NAME(obj, buffer) { uint32 size = sizeof(buffer); obj->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, buffer); buffer[min(arraysize(buffer) - 1, size)] = 0; }
 
 extern struct dx_context dxContext;
 

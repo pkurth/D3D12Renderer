@@ -7,6 +7,7 @@
 #include "dx_descriptor_allocation.h"
 #include "dx_buffer.h"
 
+
 struct dx_memory_usage
 {
 	// In MB.
@@ -52,11 +53,13 @@ struct dx_context
 	uint64 frameID;
 	uint32 bufferedFrameID;
 
-	dx_descriptor_heap descriptorAllocatorCPU; // Used for all kinds of resources.
-	dx_descriptor_heap descriptorAllocatorGPU; // Used for resources, which can be UAV cleared.
+	dx_descriptor_heap<dx_cpu_descriptor_handle> descriptorAllocatorCPU;
+	dx_descriptor_heap<dx_cpu_descriptor_handle> descriptorAllocatorGPU; // Used for resources, which can be UAV cleared.
 
-	dx_rtv_descriptor_heap rtvAllocator;
-	dx_dsv_descriptor_heap dsvAllocator;
+	dx_descriptor_heap<dx_rtv_descriptor_handle> rtvAllocator;
+	dx_descriptor_heap<dx_dsv_descriptor_handle> dsvAllocator;
+
+
 	dx_upload_buffer frameUploadBuffer;
 
 	dx_frame_descriptor_allocator frameDescriptorAllocator;

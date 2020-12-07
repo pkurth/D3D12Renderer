@@ -4,19 +4,20 @@
 #include "dx_descriptor.h"
 #include "threading.h"
 
+template <typename descriptor_t>
 struct dx_descriptor_heap
 {
 	void initialize(D3D12_DESCRIPTOR_HEAP_TYPE type, uint32 numDescriptors, bool shaderVisible);
-	dx_cpu_descriptor_handle getFreeHandle();
-	void freeHandle(dx_cpu_descriptor_handle handle);
+	descriptor_t getFreeHandle();
+	void freeHandle(descriptor_t handle);
 
 	dx_gpu_descriptor_handle getMatchingGPUHandle(dx_cpu_descriptor_handle handle);
 	dx_cpu_descriptor_handle getMatchingCPUHandle(dx_gpu_descriptor_handle handle);
 
+protected:
 	D3D12_DESCRIPTOR_HEAP_TYPE type;
 	com<ID3D12DescriptorHeap> descriptorHeap;
 
-protected:
 	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuBase;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuBase;
 	uint32 descriptorHandleIncrementSize;
@@ -26,25 +27,69 @@ protected:
 	inline dx_cpu_descriptor_handle getHandle(uint32 index) { return { CD3DX12_CPU_DESCRIPTOR_HANDLE(cpuBase, index, descriptorHandleIncrementSize) }; }
 };
 
-struct dx_rtv_descriptor_heap : dx_descriptor_heap
+template<typename descriptor_t>
+inline void dx_descriptor_heap<descriptor_t>::initialize(D3D12_DESCRIPTOR_HEAP_TYPE type, uint32 numDescriptors, bool shaderVisible)
 {
-	void initialize(uint32 numDescriptors, bool shaderVisible = true);
+	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+	desc.NumDescriptors = numDescriptors;
+	desc.Type = type;
+	if (shaderVisible)
+	{
+		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	}
 
-	volatile uint32 pushIndex;
+	checkResult(dxContext.device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&descriptorHeap)));
 
-	dx_cpu_descriptor_handle pushRenderTargetView(const ref<dx_texture>& texture);
-	dx_cpu_descriptor_handle createRenderTargetView(const ref<dx_texture>& texture, dx_cpu_descriptor_handle index);
-};
+	allFreeIncludingAndAfter = 0;
+	descriptorHandleIncrementSize = dxContext.device->GetDescriptorHandleIncrementSize(type);
+	cpuBase = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	gpuBase = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	this->type = type;
+}
 
-struct dx_dsv_descriptor_heap : dx_descriptor_heap
+template<typename descriptor_t>
+descriptor_t dx_descriptor_heap<descriptor_t>::getFreeHandle()
 {
-	void initialize(uint32 numDescriptors, bool shaderVisible = true);
+	uint32 index;
+	if (!freeDescriptors.empty())
+	{
+		index = freeDescriptors.back();
+		freeDescriptors.pop_back();
+	}
+	else
+	{
+		index = atomicAdd(allFreeIncludingAndAfter, 1);
+	}
+	return { CD3DX12_CPU_DESCRIPTOR_HANDLE(cpuBase, index, descriptorHandleIncrementSize) };
+}
 
-	volatile uint32 pushIndex;
+template<typename descriptor_t>
+void dx_descriptor_heap<descriptor_t>::freeHandle(descriptor_t handle)
+{
+	uint32 index = (uint32)((handle.cpuHandle.ptr - cpuBase.ptr) / descriptorHandleIncrementSize);
+	freeDescriptors.push_back(index);
+}
 
-	dx_cpu_descriptor_handle pushDepthStencilView(const ref<dx_texture>& texture);
-	dx_cpu_descriptor_handle createDepthStencilView(const ref<dx_texture>& texture, dx_cpu_descriptor_handle index);
-};
+template<typename descriptor_t>
+dx_gpu_descriptor_handle dx_descriptor_heap<descriptor_t>::getMatchingGPUHandle(dx_cpu_descriptor_handle handle)
+{
+	uint32 offset = (uint32)(handle.cpuHandle.ptr - cpuBase.ptr);
+	return { CD3DX12_GPU_DESCRIPTOR_HANDLE(gpuBase, offset) };
+}
+
+template<typename descriptor_t>
+dx_cpu_descriptor_handle dx_descriptor_heap<descriptor_t>::getMatchingCPUHandle(dx_gpu_descriptor_handle handle)
+{
+	uint32 offset = (uint32)(handle.gpuHandle.ptr - gpuBase.ptr);
+	return { CD3DX12_CPU_DESCRIPTOR_HANDLE(cpuBase, offset) };
+}
+
+
+
+
+
+
+
 
 struct dx_descriptor_page
 {

@@ -58,7 +58,7 @@ struct dx_renderer
 	static void beginFrameCommon();
 	void beginFrame(uint32 windowWidth, uint32 windowHeight);	
 	void endFrame();
-	void blitResultToScreen(dx_command_list* cl, dx_cpu_descriptor_handle rtv);
+	void blitResultToScreen(dx_command_list* cl, dx_rtv_descriptor_handle rtv);
 
 
 	// Set these with your application.

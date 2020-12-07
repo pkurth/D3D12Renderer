@@ -97,7 +97,7 @@ struct dx_command_list
 
 
 	// Shader resources.
-	void setDescriptorHeap(dx_descriptor_heap& descriptorHeap);
+	template <typename T> void setDescriptorHeap(dx_descriptor_heap<T>& descriptorHeap);
 	void setDescriptorHeap(dx_descriptor_range& descriptorRange);
 	void setDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, com<ID3D12DescriptorHeap> descriptorHeap);
 	void resetToDynamicDescriptorHeap();
@@ -124,23 +124,23 @@ struct dx_command_list
 
 
 	// Render targets.
-	void setRenderTarget(dx_cpu_descriptor_handle* rtvs, uint32 numRTVs, dx_cpu_descriptor_handle* dsv);
+	void setRenderTarget(dx_rtv_descriptor_handle* rtvs, uint32 numRTVs, dx_dsv_descriptor_handle* dsv);
 	void setRenderTarget(dx_render_target& renderTarget);
 
-	void clearRTV(dx_cpu_descriptor_handle rtv, float r, float g, float b, float a = 1.f);
-	void clearRTV(dx_cpu_descriptor_handle rtv, const float* clearColor);
+	void clearRTV(dx_rtv_descriptor_handle rtv, float r, float g, float b, float a = 1.f);
+	void clearRTV(dx_rtv_descriptor_handle rtv, const float* clearColor);
 	void clearRTV(const ref<dx_texture>& texture, float r, float g, float b, float a = 1.f);
 	void clearRTV(const ref<dx_texture>& texture, const float* clearColor);
 	void clearRTV(dx_render_target& renderTarget, uint32 attachment, const float* clearColor);
 	void clearRTV(dx_render_target& renderTarget, uint32 attachment, float r, float g, float b, float a = 1.f);
 
-	void clearDepth(dx_cpu_descriptor_handle dsv, float depth = 1.f);
+	void clearDepth(dx_dsv_descriptor_handle dsv, float depth = 1.f);
 	void clearDepth(dx_render_target& renderTarget, float depth = 1.f);
 
-	void clearStencil(dx_cpu_descriptor_handle dsv, uint32 stencil = 0);
+	void clearStencil(dx_dsv_descriptor_handle dsv, uint32 stencil = 0);
 	void clearStencil(dx_render_target& renderTarget, uint32 stencil = 0);
 
-	void clearDepthAndStencil(dx_cpu_descriptor_handle dsv, float depth = 1.f, uint32 stencil = 0);
+	void clearDepthAndStencil(dx_dsv_descriptor_handle dsv, float depth = 1.f, uint32 stencil = 0);
 	void clearDepthAndStencil(dx_render_target& renderTarget, float depth = 1.f, uint32 stencil = 0);
 
 	void setStencilReference(uint32 stencilReference);
@@ -166,6 +166,26 @@ struct dx_command_list
 
 	void reset();
 };
+
+template<typename T>
+void dx_command_list::setDescriptorHeap(dx_descriptor_heap<T>& descriptorHeap)
+{
+	descriptorHeaps[descriptorHeap.type] = descriptorHeap.descriptorHeap.Get();
+
+	uint32 numDescriptorHeaps = 0;
+	ID3D12DescriptorHeap* heaps[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES] = {};
+
+	for (uint32_t i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
+	{
+		ID3D12DescriptorHeap* heap = descriptorHeaps[i];
+		if (heap)
+		{
+			heaps[numDescriptorHeaps++] = heap;
+		}
+	}
+
+	commandList->SetDescriptorHeaps(numDescriptorHeaps, heaps);
+}
 
 template<typename T>
 void dx_command_list::setGraphics32BitConstants(uint32 rootParameterIndex, const T& constants)

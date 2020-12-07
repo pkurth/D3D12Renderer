@@ -37,8 +37,8 @@ struct dx_texture
 	dx_cpu_descriptor_handle defaultSRV;
 	dx_cpu_descriptor_handle defaultUAV;
 
-	dx_cpu_descriptor_handle rtvHandles;
-	dx_cpu_descriptor_handle dsvHandle;
+	dx_rtv_descriptor_handle rtvHandles;
+	dx_dsv_descriptor_handle dsvHandle;
 
 	uint32 width, height, depth;
 	DXGI_FORMAT format;
@@ -58,8 +58,8 @@ struct texture_grave
 
 	dx_cpu_descriptor_handle srv;
 	dx_cpu_descriptor_handle uav;
-	dx_cpu_descriptor_handle rtv;
-	dx_cpu_descriptor_handle dsv;
+	dx_rtv_descriptor_handle rtv;
+	dx_dsv_descriptor_handle dsv;
 
 	texture_grave() {}
 	texture_grave(const texture_grave& o) = delete;

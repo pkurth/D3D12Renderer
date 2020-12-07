@@ -200,25 +200,6 @@ void dx_command_list::setDescriptorHeapResource(uint32 rootParameterIndex, uint3
 	dynamicDescriptorHeap.stageDescriptors(rootParameterIndex, offset, count, handle);
 }
 
-void dx_command_list::setDescriptorHeap(dx_descriptor_heap& descriptorHeap)
-{
-	descriptorHeaps[descriptorHeap.type] = descriptorHeap.descriptorHeap.Get();
-
-	uint32 numDescriptorHeaps = 0;
-	ID3D12DescriptorHeap* heaps[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES] = {};
-
-	for (uint32_t i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
-	{
-		ID3D12DescriptorHeap* heap = descriptorHeaps[i];
-		if (heap)
-		{
-			heaps[numDescriptorHeaps++] = heap;
-		}
-	}
-
-	commandList->SetDescriptorHeaps(numDescriptorHeaps, heaps);
-}
-
 void dx_command_list::setDescriptorHeap(dx_descriptor_range& descriptorRange)
 {
 	descriptorHeaps[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV] = descriptorRange.descriptorHeap.Get();
@@ -329,15 +310,15 @@ void dx_command_list::setScissor(const D3D12_RECT& scissor)
 	commandList->RSSetScissorRects(1, &scissor);
 }
 
-void dx_command_list::setRenderTarget(dx_cpu_descriptor_handle* rtvs, uint32 numRTVs, dx_cpu_descriptor_handle* dsv)
+void dx_command_list::setRenderTarget(dx_rtv_descriptor_handle* rtvs, uint32 numRTVs, dx_dsv_descriptor_handle* dsv)
 {
 	commandList->OMSetRenderTargets(numRTVs, (D3D12_CPU_DESCRIPTOR_HANDLE*)rtvs, FALSE, (D3D12_CPU_DESCRIPTOR_HANDLE*)dsv);
 }
 
 void dx_command_list::setRenderTarget(dx_render_target& renderTarget)
 {
-	dx_cpu_descriptor_handle rtv[8];
-	dx_cpu_descriptor_handle* dsv = 0;
+	dx_rtv_descriptor_handle rtv[8];
+	dx_dsv_descriptor_handle* dsv = 0;
 
 	for (uint32 i = 0; i < renderTarget.numAttachments; ++i)
 	{
@@ -351,13 +332,13 @@ void dx_command_list::setRenderTarget(dx_render_target& renderTarget)
 	setRenderTarget(rtv, renderTarget.numAttachments, dsv);
 }
 
-void dx_command_list::clearRTV(dx_cpu_descriptor_handle rtv, float r, float g, float b, float a)
+void dx_command_list::clearRTV(dx_rtv_descriptor_handle rtv, float r, float g, float b, float a)
 {
 	float clearColor[] = { r, g, b, a };
 	clearRTV(rtv, clearColor);
 }
 
-void dx_command_list::clearRTV(dx_cpu_descriptor_handle rtv, const float* clearColor)
+void dx_command_list::clearRTV(dx_rtv_descriptor_handle rtv, const float* clearColor)
 {
 	commandList->ClearRenderTargetView(rtv, clearColor, 0, 0);
 }
@@ -382,7 +363,7 @@ void dx_command_list::clearRTV(dx_render_target& renderTarget, uint32 attachment
 	clearRTV(renderTarget.colorAttachments[attachment], r, g, b, a);
 }
 
-void dx_command_list::clearDepth(dx_cpu_descriptor_handle dsv, float depth)
+void dx_command_list::clearDepth(dx_dsv_descriptor_handle dsv, float depth)
 {
 	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, depth, 0, 0, 0);
 }
@@ -392,7 +373,7 @@ void dx_command_list::clearDepth(dx_render_target& renderTarget, float depth)
 	clearDepth(renderTarget.depthAttachment->dsvHandle, depth);
 }
 
-void dx_command_list::clearStencil(dx_cpu_descriptor_handle dsv, uint32 stencil)
+void dx_command_list::clearStencil(dx_dsv_descriptor_handle dsv, uint32 stencil)
 {
 	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_STENCIL, 0.f, stencil, 0, 0);
 }
@@ -402,7 +383,7 @@ void dx_command_list::clearStencil(dx_render_target& renderTarget, uint32 stenci
 	clearStencil(renderTarget.depthAttachment->dsvHandle, stencil);
 }
 
-void dx_command_list::clearDepthAndStencil(dx_cpu_descriptor_handle dsv, float depth, uint32 stencil)
+void dx_command_list::clearDepthAndStencil(dx_dsv_descriptor_handle dsv, float depth, uint32 stencil)
 {
 	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth, stencil, 0, 0);
 }

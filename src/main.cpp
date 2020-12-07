@@ -52,7 +52,7 @@ static bool newFrame(float& dt)
 static uint64 renderToMainWindow(dx_window& window)
 {
 	dx_resource backbuffer = window.backBuffers[window.currentBackbufferIndex];
-	dx_cpu_descriptor_handle rtv = { CD3DX12_CPU_DESCRIPTOR_HANDLE(window.rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), window.currentBackbufferIndex, window.rtvDescriptorSize) };
+	dx_rtv_descriptor_handle rtv = { CD3DX12_CPU_DESCRIPTOR_HANDLE(window.rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), window.currentBackbufferIndex, window.rtvDescriptorSize) };
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 

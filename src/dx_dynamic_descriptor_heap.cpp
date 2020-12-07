@@ -12,12 +12,10 @@ void dx_dynamic_descriptor_heap::initialize(uint32 numDescriptorsPerHeap)
 	currentGPUDescriptorHandle = D3D12_DEFAULT;
 	numFreeHandles = 0;
 
-	descriptorHandleIncrementSize = dxContext.descriptorHandleIncrementSize;
-
 	descriptorHandleCache.resize(numDescriptorsPerHeap);
 }
 
-void dx_dynamic_descriptor_heap::stageDescriptors(uint32 rootParameterIndex, uint32 offset, uint32 numDescriptors, D3D12_CPU_DESCRIPTOR_HANDLE srcDescriptor)
+void dx_dynamic_descriptor_heap::stageDescriptors(uint32 rootParameterIndex, uint32 offset, uint32 numDescriptors, dx_cpu_descriptor_handle srcDescriptor)
 {
 	assert(numDescriptors <= numDescriptorsPerHeap && rootParameterIndex < maxDescriptorTables);
 
@@ -28,7 +26,7 @@ void dx_dynamic_descriptor_heap::stageDescriptors(uint32 rootParameterIndex, uin
 	D3D12_CPU_DESCRIPTOR_HANDLE* dstDescriptor = (cache.baseDescriptor + offset);
 	for (uint32 i = 0; i < numDescriptors; ++i)
 	{
-		dstDescriptor[i] = CD3DX12_CPU_DESCRIPTOR_HANDLE(srcDescriptor, i, descriptorHandleIncrementSize);
+		dstDescriptor[i] = srcDescriptor + i;
 	}
 
 	setBit(staleDescriptorTableBitMask, rootParameterIndex);
@@ -76,8 +74,8 @@ void dx_dynamic_descriptor_heap::commitStagedDescriptors(dx_command_list* comman
 				commandList->setComputeDescriptorTable(rootIndex, currentGPUDescriptorHandle);
 			}
 
-			currentCPUDescriptorHandle.Offset(numSrcDescriptors, descriptorHandleIncrementSize);
-			currentGPUDescriptorHandle.Offset(numSrcDescriptors, descriptorHandleIncrementSize);
+			currentCPUDescriptorHandle += numSrcDescriptors;
+			currentGPUDescriptorHandle += numSrcDescriptors;
 			numFreeHandles -= numSrcDescriptors;
 
 			unsetBit(staleDescriptorTableBitMask, rootIndex);

@@ -200,24 +200,25 @@ ref<dx_index_buffer> createIndexBuffer(uint32 elementSize, uint32 elementCount, 
 	return result;
 }
 
-static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_descriptor_handle uav, dx_cpu_descriptor_handle clear)
+static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_descriptor_handle uav, dx_cpu_descriptor_handle clear, dx_gpu_descriptor_handle gpuClear)
 {
 	buffer_grave grave;
 	grave.resource = resource;
 	grave.srv = srv;
 	grave.uav = uav;
 	grave.clear = clear;
+	grave.gpuClear = dxContext.descriptorAllocatorGPU.getMatchingCPUHandle(gpuClear);
 	dxContext.retire(std::move(grave));
 }
 
 dx_buffer::~dx_buffer()
 {
-	retire(resource, defaultSRV, defaultUAV, cpuClearUAV);
+	retire(resource, defaultSRV, defaultUAV, cpuClearUAV, gpuClearUAV);
 }
 
 void resizeBuffer(ref<dx_buffer> buffer, uint32 newElementCount, D3D12_RESOURCE_STATES initialState)
 {
-	retire(buffer->resource, buffer->defaultSRV, buffer->defaultUAV, buffer->cpuClearUAV);
+	retire(buffer->resource, buffer->defaultSRV, buffer->defaultUAV, buffer->cpuClearUAV, buffer->gpuClearUAV);
 
 	buffer->elementCount = newElementCount;
 	buffer->totalSize = buffer->elementCount * buffer->elementSize;
@@ -257,5 +258,19 @@ buffer_grave::~buffer_grave()
 	if (resource)
 	{
 		std::cout << "Finally deleting buffer." << std::endl;
+
+		if (srv.cpuHandle.ptr)
+		{
+			dxContext.descriptorAllocatorCPU.freeHandle(srv);
+		}
+		if (uav.cpuHandle.ptr)
+		{
+			dxContext.descriptorAllocatorCPU.freeHandle(uav);
+		}
+		if (clear.cpuHandle.ptr)
+		{
+			dxContext.descriptorAllocatorCPU.freeHandle(clear);
+			dxContext.descriptorAllocatorGPU.freeHandle(gpuClear);
+		}
 	}
 }

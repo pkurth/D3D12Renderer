@@ -61,6 +61,7 @@ struct buffer_grave
 	dx_cpu_descriptor_handle srv;
 	dx_cpu_descriptor_handle uav;
 	dx_cpu_descriptor_handle clear;
+	dx_cpu_descriptor_handle gpuClear;
 
 	buffer_grave() {}
 	buffer_grave(const buffer_grave& o) = delete;

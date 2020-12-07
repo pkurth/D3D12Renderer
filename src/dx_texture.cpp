@@ -357,7 +357,7 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 	// RTV.
 	if (result->supportsRTV)
 	{
-		result->rtvHandles = dxContext.rtvAllocator.pushRenderTargetView(result);
+		result->rtvHandles = dxContext.rtvAllocator.getFreeHandle().create2DTextureRTV(result);
 	}
 
 	// UAV.
@@ -450,7 +450,7 @@ ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT form
 
 	assert(result->supportsDSV);
 
-	result->dsvHandle = dxContext.dsvAllocator.pushDepthStencilView(result);
+	result->dsvHandle = dxContext.dsvAllocator.getFreeHandle().create2DTextureDSV(result);
 	if (arrayLength == 1)
 	{
 		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureSRV(result);
@@ -505,12 +505,16 @@ std::wstring dx_texture::getName() const
 	{
 		return L"";
 	}
+
 	wchar name[128];
-	GET_NAME(resource, name);
+	uint32 size = sizeof(name); 
+	resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name); 
+	name[min(arraysize(name) - 1, size)] = 0;
+
 	return name;
 }
 
-static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_descriptor_handle uav, dx_cpu_descriptor_handle rtv, dx_cpu_descriptor_handle dsv)
+static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_descriptor_handle uav, dx_rtv_descriptor_handle rtv, dx_dsv_descriptor_handle dsv)
 {
 	texture_grave grave;
 	grave.resource = resource;
@@ -568,13 +572,13 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 	// RTV.
 	if (texture->supportsRTV)
 	{
-		texture->rtvHandles = dxContext.rtvAllocator.pushRenderTargetView(texture);
+		texture->rtvHandles = dxContext.rtvAllocator.getFreeHandle().create2DTextureRTV(texture);
 	}
 
 	// DSV & SRV.
 	if (texture->supportsDSV)
 	{
-		texture->dsvHandle = dxContext.dsvAllocator.pushDepthStencilView(texture);
+		texture->dsvHandle = dxContext.dsvAllocator.getFreeHandle().create2DTextureDSV(texture);
 		if (texture->depth == 1)
 		{
 			texture->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureSRV(texture);
@@ -615,6 +619,23 @@ texture_grave::~texture_grave()
 	if (resource)
 	{
 		std::cout << "Finally deleting texture." << std::endl;
+
+		if (srv.cpuHandle.ptr)
+		{
+			dxContext.descriptorAllocatorCPU.freeHandle(srv);
+		}
+		if (uav.cpuHandle.ptr)
+		{
+			dxContext.descriptorAllocatorCPU.freeHandle(uav);
+		}
+		if (rtv.cpuHandle.ptr)
+		{
+			dxContext.rtvAllocator.freeHandle(rtv);
+		}
+		if (dsv.cpuHandle.ptr)
+		{
+			dxContext.dsvAllocator.freeHandle(dsv);
+		}
 	}
 }
 

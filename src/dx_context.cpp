@@ -140,8 +140,8 @@ void dx_context::initialize()
 
 	descriptorAllocatorCPU.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096, false);
 	descriptorAllocatorGPU.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
-	rtvAllocator.initialize(1024, false);
-	dsvAllocator.initialize(1024, false);
+	rtvAllocator.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1024, false);
+	dsvAllocator.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1024, false);
 	frameDescriptorAllocator.initialize();
 }
 

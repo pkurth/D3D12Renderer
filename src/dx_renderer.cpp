@@ -797,7 +797,7 @@ void dx_renderer::endFrame()
 	oldSettings = settings;
 }
 
-void dx_renderer::blitResultToScreen(dx_command_list* cl, dx_cpu_descriptor_handle rtv)
+void dx_renderer::blitResultToScreen(dx_command_list* cl, dx_rtv_descriptor_handle rtv)
 {
 	CD3DX12_VIEWPORT viewport = CD3DX12_VIEWPORT(0.f, 0.f, (float)windowWidth, (float)windowHeight);
 	cl->setViewport(viewport);

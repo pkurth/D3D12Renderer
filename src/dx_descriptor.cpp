@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "dx_descriptor.h"
 
-#include "dx_render_primitives.h"
 #include "dx_context.h"
 #include "dx_texture.h"
 #include "dx_buffer.h"
@@ -231,6 +230,12 @@ dx_cpu_descriptor_handle dx_cpu_descriptor_handle::operator+(uint32 i)
 	return { CD3DX12_CPU_DESCRIPTOR_HANDLE(cpuHandle, i, dxContext.descriptorHandleIncrementSize) };
 }
 
+dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::operator+=(uint32 i)
+{
+	cpuHandle.Offset(i, dxContext.descriptorHandleIncrementSize);
+	return *this;
+}
+
 dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::operator++()
 {
 	cpuHandle.Offset(dxContext.descriptorHandleIncrementSize);
@@ -249,6 +254,12 @@ dx_gpu_descriptor_handle dx_gpu_descriptor_handle::operator+(uint32 i)
 	return { CD3DX12_GPU_DESCRIPTOR_HANDLE(gpuHandle, i, dxContext.descriptorHandleIncrementSize) };
 }
 
+dx_gpu_descriptor_handle& dx_gpu_descriptor_handle::operator+=(uint32 i)
+{
+	gpuHandle.Offset(i, dxContext.descriptorHandleIncrementSize);
+	return *this;
+}
+
 dx_gpu_descriptor_handle& dx_gpu_descriptor_handle::operator++()
 {
 	gpuHandle.Offset(dxContext.descriptorHandleIncrementSize);
@@ -260,4 +271,60 @@ dx_gpu_descriptor_handle dx_gpu_descriptor_handle::operator++(int)
 	dx_gpu_descriptor_handle result = *this;
 	gpuHandle.Offset(dxContext.descriptorHandleIncrementSize);
 	return result;
+}
+
+dx_rtv_descriptor_handle& dx_rtv_descriptor_handle::create2DTextureRTV(const ref<dx_texture>& texture, uint32 arraySlice, uint32 mipSlice)
+{
+	assert(texture->supportsRTV);
+
+	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc;
+	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+	rtvDesc.Format = texture->format;
+
+	if (texture->depth == 1)
+	{
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		rtvDesc.Texture2D.MipSlice = mipSlice;
+		rtvDesc.Texture2D.PlaneSlice = 0;
+
+		dxContext.device->CreateRenderTargetView(texture->resource.Get(), &rtvDesc, cpuHandle);
+	}
+	else
+	{
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+		rtvDesc.Texture2DArray.FirstArraySlice = arraySlice;
+		rtvDesc.Texture2DArray.ArraySize = 1;
+		rtvDesc.Texture2DArray.MipSlice = mipSlice;
+		rtvDesc.Texture2DArray.PlaneSlice = 0;
+
+		dxContext.device->CreateRenderTargetView(texture->resource.Get(), &rtvDesc, cpuHandle);
+	}
+	return *this;
+}
+
+dx_dsv_descriptor_handle& dx_dsv_descriptor_handle::create2DTextureDSV(const ref<dx_texture>& texture, uint32 arraySlice, uint32 mipSlice)
+{
+	assert(texture->supportsDSV);
+	assert(isDepthFormat(texture->format));
+
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+	dsvDesc.Format = texture->format;
+
+	if (texture->depth == 1)
+	{
+		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+		dsvDesc.Texture2D.MipSlice = mipSlice;
+
+		dxContext.device->CreateDepthStencilView(texture->resource.Get(), &dsvDesc, cpuHandle);
+	}
+	else
+	{
+		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+		dsvDesc.Texture2DArray.FirstArraySlice = arraySlice;
+		dsvDesc.Texture2DArray.ArraySize = 1;
+		dsvDesc.Texture2DArray.MipSlice = mipSlice;
+
+		dxContext.device->CreateDepthStencilView(texture->resource.Get(), &dsvDesc, cpuHandle);
+	}
+	return *this;
 }
