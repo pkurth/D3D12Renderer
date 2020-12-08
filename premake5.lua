@@ -101,8 +101,8 @@ project "D3D12ProjectionMapping"
 
 	os.mkdir("shaders/bin")
 
-	-- HLSL files that don't end with 'Extensions' will be ignored as they will be used as includes.
-	filter "files:**.hlsl*"
+	
+	filter "files:**.hlsl"
 		shadermodel "5.1" -- 6.0 generates no output message, so I'll stick with 5.1 for now.
 		flags "ExcludeFromBuild"
 		shaderobjectfileoutput("shaders/bin/%{file.basename}" .. ".cso")
@@ -125,7 +125,7 @@ project "D3D12ProjectionMapping"
 			--"/Qembed_debug",
 		}
  
-	filter("files:**_vs.hlsl*")
+	filter("files:**_vs.hlsl")
 		removeflags("ExcludeFromBuild")
 		shadertype("Vertex")
  

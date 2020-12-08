@@ -5,9 +5,9 @@
 #include "dx_context.h"
 
 
-void geometry_render_pass::renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, const mat4& transform)
+void geometry_render_pass::renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, const mat4& transform)
 {
-	drawCalls.push_back(
+	staticDrawCalls.push_back(
 		{
 			transform,
 			vertexBuffer,
@@ -18,9 +18,24 @@ void geometry_render_pass::renderObject(const ref<dx_vertex_buffer>& vertexBuffe
 	);
 }
 
+void geometry_render_pass::renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, const mat4& transform, const mat4& prevFrameTransform)
+{
+	dynamicDrawCalls.push_back(
+		{
+			transform,
+			prevFrameTransform,
+			vertexBuffer,
+			indexBuffer,
+			material,
+			submesh,
+		}
+	);
+}
+
 void geometry_render_pass::reset()
 {
-	drawCalls.clear();
+	staticDrawCalls.clear();
+	dynamicDrawCalls.clear();
 }
 
 void sun_shadow_render_pass::renderObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)

@@ -1,4 +1,4 @@
-#include "model_rs.hlsl"
+#include "model_rs.hlsli"
 
 
 ConstantBuffer<depth_only_transform_cb> transform : register(b0);

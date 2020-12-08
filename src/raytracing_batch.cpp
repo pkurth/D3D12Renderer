@@ -3,7 +3,7 @@
 #include "dx_context.h"
 #include "dx_command_list.h"
 
-#include "raytracing.hlsl"
+#include "raytracing.hlsli"
 
 /*
 Hit group shader table index =

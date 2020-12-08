@@ -13,12 +13,14 @@ struct specular_reflections_raytracing_batch;
 
 struct geometry_render_pass
 {
-	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, const mat4& transform);
+	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, const mat4& transform);
+	void renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, 
+		const mat4& transform, const mat4& prevFrameTransform);
 
 private:
 	void reset();
 	
-	struct draw_call
+	struct static_draw_call
 	{
 		const mat4 transform;
 		ref<dx_vertex_buffer> vertexBuffer;
@@ -27,7 +29,18 @@ private:
 		submesh_info submesh;
 	};
 
-	std::vector<draw_call> drawCalls;
+	struct dynamic_draw_call
+	{
+		const mat4 transform;
+		const mat4 prevFrameTransform;
+		ref<dx_vertex_buffer> vertexBuffer;
+		ref<dx_index_buffer> indexBuffer;
+		ref<pbr_material> material;
+		submesh_info submesh;
+	};
+
+	std::vector<static_draw_call> staticDrawCalls;
+	std::vector<dynamic_draw_call> dynamicDrawCalls;
 
 	friend struct dx_renderer;
 };

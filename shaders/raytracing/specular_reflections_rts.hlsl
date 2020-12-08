@@ -6,12 +6,12 @@
 #define vec4 float4
 #define uint32 uint
 
-#include "../common/camera.hlsl"
-#include "../common/raytracing.hlsl"
-#include "../common/light_source.hlsl"
-#include "../common/brdf.hlsl"
-#include "../common/normal.hlsl"
-#include "../common/material.hlsl"
+#include "../common/camera.hlsli"
+#include "../common/raytracing.hlsli"
+#include "../common/light_source.hlsli"
+#include "../common/brdf.hlsli"
+#include "../common/normal.hlsli"
+#include "../common/material.hlsli"
 
 // Raytracing intrinsics: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#ray-system-values
 // Ray flags: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#ray-flags

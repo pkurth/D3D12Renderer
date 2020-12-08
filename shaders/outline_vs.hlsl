@@ -1,4 +1,4 @@
-#include "outline_rs.hlsl"
+#include "outline_rs.hlsli"
 
 
 ConstantBuffer<outline_cb> outline : register(b0);

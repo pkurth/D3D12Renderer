@@ -11,8 +11,8 @@
 
 #define BLOCK_SIZE 16
 
-#include "brdf.hlsl"
-#include "cs.hlsl"
+#include "brdf.hlsli"
+#include "cs.hlsli"
 
 
 cbuffer prefilter_environment_cb : register(b0)

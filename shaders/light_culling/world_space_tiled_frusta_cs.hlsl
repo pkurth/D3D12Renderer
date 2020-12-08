@@ -1,6 +1,6 @@
-#include "cs.hlsl"
-#include "camera.hlsl"
-#include "light_culling_rs.hlsl"
+#include "cs.hlsli"
+#include "camera.hlsli"
+#include "light_culling_rs.hlsli"
 
 #define BLOCK_SIZE 16
 

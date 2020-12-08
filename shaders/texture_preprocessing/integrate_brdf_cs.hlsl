@@ -3,11 +3,10 @@
     "RootConstants(b0, num32BitConstants = 1), " \
     "DescriptorTable( UAV(u0, numDescriptors = 1, flags = DESCRIPTORS_VOLATILE) )"
 
-#include "cs.hlsl"
+#include "cs.hlsli"
+#include "brdf.hlsli"
 
 #define BLOCK_SIZE 16
-
-#include "brdf.hlsl"
 
 cbuffer integrate_brdf_cb : register(b0)
 {

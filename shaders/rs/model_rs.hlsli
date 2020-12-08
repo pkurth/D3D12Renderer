@@ -1,10 +1,17 @@
 #ifndef MODEL_RS_HLSLI
 #define MODEL_RS_HLSLI
 
-struct transform_cb
+struct static_transform_cb
 {
     mat4 mvp;
     mat4 m;
+};
+
+struct dynamic_transform_cb
+{
+    mat4 mvp;
+    mat4 m;
+    mat4 prevFrameMVP;
 };
 
 struct depth_only_transform_cb
@@ -17,15 +24,21 @@ struct lighting_cb
     float environmentIntensity;
 };
 
+#ifdef DYNAMIC
+#define TRANSFORM_CB_SIZE "48"
+#else
+#define TRANSFORM_CB_SIZE "32"
+#endif
+
 #define MODEL_RS \
     "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
     "DENY_HULL_SHADER_ROOT_ACCESS |" \
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX),"  \
-    "RootConstants(num32BitConstants=6, b1, visibility=SHADER_VISIBILITY_PIXEL),"  \
-    "RootConstants(num32BitConstants=1, b3, visibility=SHADER_VISIBILITY_PIXEL),"  \
-    "CBV(b2, visibility=SHADER_VISIBILITY_PIXEL), " \
+    "RootConstants(num32BitConstants=" TRANSFORM_CB_SIZE ", b0, visibility=SHADER_VISIBILITY_VERTEX),"  \
+    "RootConstants(num32BitConstants=6, b0, space=1, visibility=SHADER_VISIBILITY_PIXEL),"  \
+    "RootConstants(num32BitConstants=1, b2, space=1, visibility=SHADER_VISIBILITY_PIXEL),"  \
+    "CBV(b1, space=1, visibility=SHADER_VISIBILITY_PIXEL), " \
     "StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_WRAP," \
         "addressV = TEXTURE_ADDRESS_WRAP," \
@@ -67,6 +80,7 @@ struct lighting_cb
 #define MODEL_RS_BRDF                   6
 #define MODEL_RS_SUN                    7
 #define MODEL_RS_LIGHTS                 8
+
 
 #endif
 

@@ -1,38 +1,44 @@
-#include "model_rs.hlsl"
-#include "brdf.hlsl"
-#include "camera.hlsl"
-#include "light_culling_rs.hlsl"
-#include "light_source.hlsl"
-#include "normal.hlsl"
-#include "material.hlsl"
+#include "model_rs.hlsli"
+#include "brdf.hlsli"
+#include "camera.hlsli"
+#include "light_culling_rs.hlsli"
+#include "light_source.hlsli"
+#include "normal.hlsli"
+#include "material.hlsli"
 
 struct ps_input
 {
 	float2 uv				: TEXCOORDS;
 	float3x3 tbn			: TANGENT_FRAME;
 	float3 worldPosition	: POSITION;
+
+#ifdef DYNAMIC
+	float3 thisFrameNDC		: THIS_FRAME_NDC;
+	float3 prevFrameNDC		: PREV_FRAME_NDC;
+#endif
+
 	float4 screenPosition	: SV_POSITION;
 };
 
-ConstantBuffer<pbr_material_cb> material	: register(b1);
-ConstantBuffer<camera_cb> camera			: register(b2);
-ConstantBuffer<lighting_cb> lighting		: register(b3);
+ConstantBuffer<pbr_material_cb> material		: register(b0, space1);
+ConstantBuffer<camera_cb> camera				: register(b1, space1);
+ConstantBuffer<lighting_cb> lighting			: register(b2, space1);
 
 
-SamplerState wrapSampler				: register(s0);
-SamplerState clampSampler				: register(s1);
-SamplerComparisonState shadowSampler	: register(s2);
+SamplerState wrapSampler						: register(s0);
+SamplerState clampSampler						: register(s1);
+SamplerComparisonState shadowSampler			: register(s2);
 
 
-Texture2D<float4> albedoTex				: register(t0);
-Texture2D<float3> normalTex				: register(t1);
-Texture2D<float> roughTex				: register(t2);
-Texture2D<float> metalTex				: register(t3);
+Texture2D<float4> albedoTex						: register(t0);
+Texture2D<float3> normalTex						: register(t1);
+Texture2D<float> roughTex						: register(t2);
+Texture2D<float> metalTex						: register(t3);
 
-TextureCube<float4> irradianceTexture	: register(t0, space1);
-TextureCube<float4> environmentTexture	: register(t1, space1);
+TextureCube<float4> irradianceTexture			: register(t0, space1);
+TextureCube<float4> environmentTexture			: register(t1, space1);
 
-Texture2D<float4> brdf					: register(t0, space2);
+Texture2D<float4> brdf							: register(t0, space2);
 
 ConstantBuffer<directional_light_cb> sun		: register(b0, space3);
 Texture2D<uint4> lightGrid						: register(t0, space3);
@@ -47,6 +53,10 @@ struct ps_output
 {
 	float4 hdrColor		: SV_Target0;
 	float2 worldNormal	: SV_Target1;
+
+#ifdef DYNAMIC
+	float2 screenVel	: SV_Target2;
+#endif
 };
 
 [RootSignature(MODEL_RS)]
@@ -160,5 +170,10 @@ ps_output main(ps_input IN)
 	ps_output OUT;
 	OUT.hdrColor = totalLighting;
 	OUT.worldNormal = packNormal(N);
+
+#ifdef DYNAMIC
+	OUT.screenVel = (IN.thisFrameNDC.xy / IN.thisFrameNDC.z) - (IN.prevFrameNDC.xy / IN.prevFrameNDC.z);
+#endif
+
 	return OUT;
 }

@@ -5,10 +5,12 @@
 #include "mesh.h"
 #include "math.h"
 #include "dx_renderer.h"
-#include "light_source.hlsl" // TODO: For now. The game should only know about the C++ version of lights eventually.
+#include "light_source.hlsli" // TODO: For now. The game should only know about the C++ version of lights eventually.
 #include "light_source.h"
 #include "raytracing.h"
 #include "raytracing_batch.h"
+
+#include "scene.h"
 
 
 struct scene_object
@@ -48,7 +50,8 @@ private:
 
 	directional_light sun;
 
-
 	dx_renderer* renderer;
 	render_camera camera;
+
+	scene scene;
 };

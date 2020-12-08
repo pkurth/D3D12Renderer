@@ -1,7 +1,7 @@
 #ifndef BRDF_HLSLI
 #define BRDF_HLSLI
 
-#include "math.hlsl"
+#include "math.hlsli"
 
 // http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
 // TODO: We should make an optimization pass over this code. Many terms are computed multiple times.

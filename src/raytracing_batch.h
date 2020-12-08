@@ -4,7 +4,7 @@
 #include "dx_descriptor.h"
 #include "pbr.h"
 
-#include "material.hlsl"
+#include "material.hlsli"
 
 #define MAX_RAYTRACING_RECURSION_DEPTH         4
 

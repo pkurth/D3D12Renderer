@@ -11,7 +11,7 @@
         "addressW = TEXTURE_ADDRESS_CLAMP," \
         "filter = FILTER_MIN_MAG_MIP_LINEAR)"
 
-#include "cs.hlsl"
+#include "cs.hlsli"
 
 #define BLOCK_SIZE 8 // In one dimension. 64 in total.
 

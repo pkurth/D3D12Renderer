@@ -1,5 +1,5 @@
-#include "math.hlsl"
-#include "sky_rs.hlsl"
+#include "math.hlsli"
+#include "sky_rs.hlsli"
 
 
 ConstantBuffer<sky_intensity_cb> skyIntensity : register(b1);

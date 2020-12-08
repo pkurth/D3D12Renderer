@@ -9,10 +9,10 @@
 #include "gizmo.h"
 #include "pbr.h"
 
-#include "light_source.hlsl"
-#include "camera.hlsl"
-#include "present_rs.hlsl"
-#include "volumetrics_rs.hlsl"
+#include "light_source.hlsli"
+#include "camera.hlsli"
+#include "present_rs.hlsli"
+#include "volumetrics_rs.hlsli"
 
 
 #define MAX_NUM_POINT_LIGHTS_PER_FRAME 4096
@@ -106,8 +106,10 @@ struct dx_renderer
 	dx_render_target windowRenderTarget;
 
 	dx_render_target hdrRenderTarget;
+	dx_render_target hdrRenderTargetWithVelocities;
 	ref<dx_texture> hdrColorTexture;
 	ref<dx_texture> worldNormalsTexture;
+	ref<dx_texture> screenSpaceVelocityTexture;
 	ref<dx_texture> depthBuffer;
 
 	ref<dx_texture> volumetricsTexture;

@@ -1,4 +1,4 @@
-#include "present_rs.hlsl"
+#include "present_rs.hlsli"
 
 struct ps_input
 {

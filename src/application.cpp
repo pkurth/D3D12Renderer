@@ -61,7 +61,6 @@ void application::initialize(dx_renderer* renderer)
 	}
 
 
-
 	trs cerberusTransform = { vec3(0.f, 10.f, -5.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.04f };
 	gameObjects.push_back({ cerberusTransform, 0, });
 	reflectionsRaytracingBatch.instantiate(types[0], cerberusTransform);
@@ -307,7 +306,7 @@ void application::update(const user_input& input, float dt)
 
 			mat4 m = trsToMat4(go.transform);
 
-			geometryPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m);
+			geometryPass->renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m);
 			shadowPass->renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
 		}
 	}

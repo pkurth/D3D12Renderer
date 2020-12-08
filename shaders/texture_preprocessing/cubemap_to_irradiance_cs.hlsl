@@ -9,7 +9,7 @@
         "addressW = TEXTURE_ADDRESS_WRAP," \
         "filter = FILTER_MIN_MAG_MIP_LINEAR)"
 
-#include "cs.hlsl"
+#include "cs.hlsli"
 
 #define BLOCK_SIZE 16
 

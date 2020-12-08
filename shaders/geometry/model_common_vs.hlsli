@@ -1,7 +1,11 @@
-#include "model_rs.hlsl"
+#include "model_rs.hlsli"
 
 
-ConstantBuffer<transform_cb> transform : register(b0);
+#ifdef DYNAMIC
+ConstantBuffer<dynamic_transform_cb> transform : register(b0);
+#else
+ConstantBuffer<static_transform_cb> transform : register(b0);
+#endif
 
 struct vs_input
 {
@@ -16,6 +20,12 @@ struct vs_output
 	float2 uv				: TEXCOORDS;
 	float3x3 tbn			: TANGENT_FRAME;
 	float3 worldPosition	: POSITION;
+
+#ifdef DYNAMIC
+	float3 thisFrameNDC		: THIS_FRAME_NDC;
+	float3 prevFrameNDC		: PREV_FRAME_NDC;
+#endif
+
 	float4 position			: SV_POSITION;
 };
 
@@ -31,6 +41,11 @@ vs_output main(vs_input IN)
 	float3 tangent = normalize(mul(transform.m, float4(IN.tangent, 0.f)).xyz);
 	float3 bitangent = normalize(cross(normal, tangent));
 	OUT.tbn = float3x3(tangent, bitangent, normal);
+
+#ifdef DYNAMIC
+	OUT.thisFrameNDC = OUT.position.xyw;
+	OUT.prevFrameNDC = mul(transform.prevFrameMVP, float4(IN.position, 1.f)).xyw;
+#endif
 
 	return OUT;
 }

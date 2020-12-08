@@ -3,7 +3,7 @@
 #include "math.h"
 #include "camera.h"
 
-#include "light_source.hlsl"
+#include "light_source.hlsli"
 
 #define SUN_SHADOW_DIMENSIONS 2048
 #define SUN_SHADOW_TEXEL_SIZE (1.f / SUN_SHADOW_DIMENSIONS)
