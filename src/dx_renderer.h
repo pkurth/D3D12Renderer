@@ -36,16 +36,18 @@ static const char* aspectRatioNames[] =
 
 struct renderer_settings
 {
-	tonemap_cb tonemap;
-	float environmentIntensity;
-	float skyIntensity;
+	tonemap_cb tonemap = defaultTonemapParameters();
+	float environmentIntensity = 1.f;
+	float skyIntensity = 1.f;
 
-	uint32 raytracingDownsampleFactor;
-	uint32 numRaytracingBounces;
-	uint32 blurRaytracingResultIterations;
+	uint32 raytracingDownsampleFactor = 1;
+	uint32 numRaytracingBounces = 1;
+	uint32 blurRaytracingResultIterations = 1;
+	float raytracingMaxDistance = 100.f;
+	float raytracingFadeoutDistance = 80.f;
 
-	aspect_ratio_mode aspectRatioMode;
-	bool showLightVolumes;
+	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
+	bool showLightVolumes = false;
 };
 
 

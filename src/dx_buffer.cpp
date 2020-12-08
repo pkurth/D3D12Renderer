@@ -257,7 +257,7 @@ buffer_grave::~buffer_grave()
 {
 	if (resource)
 	{
-		std::cout << "Finally deleting buffer." << std::endl;
+		//std::cout << "Finally deleting buffer." << std::endl;
 
 		if (srv.cpuHandle.ptr)
 		{

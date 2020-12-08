@@ -618,7 +618,7 @@ texture_grave::~texture_grave()
 {
 	if (resource)
 	{
-		std::cout << "Finally deleting texture." << std::endl;
+		//std::cout << "Finally deleting texture." << std::endl;
 
 		if (srv.cpuHandle.ptr)
 		{

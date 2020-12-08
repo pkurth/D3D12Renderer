@@ -4,7 +4,7 @@
 #include "math.hlsl"
 
 // http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
-// We should really make an optimization pass over this code. Many terms are computed multiple times.
+// TODO: We should make an optimization pass over this code. Many terms are computed multiple times.
 
 
 

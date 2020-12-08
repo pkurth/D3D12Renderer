@@ -69,6 +69,11 @@ struct shadow_ray_payload
 	bool hitGeometry;
 };
 
+static float3 sampleEnvironment(float3 direction)
+{
+	return sky.SampleLevel(wrapSampler, direction, 0).xyz * raytracing.skyIntensity;
+}
+
 static float3 traceRadianceRay(float3 origin, float3 direction, uint recursion)
 {
 	if (recursion >= raytracing.maxRecursionDepth)
@@ -80,7 +85,7 @@ static float3 traceRadianceRay(float3 origin, float3 direction, uint recursion)
 	ray.Origin = origin;
 	ray.Direction = direction;
 	ray.TMin = 0.01f;
-	ray.TMax = 100000.f;
+	ray.TMax = raytracing.maxRayDistance;
 
 	radiance_ray_payload payload = { float3(0.f, 0.f, 0.f), recursion + 1 };
 
@@ -167,7 +172,7 @@ void rayGen()
 [shader("miss")]
 void radianceMiss(inout radiance_ray_payload payload)
 {
-	payload.color = sky.SampleLevel(wrapSampler, WorldRayDirection(), 0).xyz * raytracing.skyIntensity;
+	payload.color = sampleEnvironment(WorldRayDirection());
 }
 
 [shader("closesthit")]
@@ -220,6 +225,13 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float3 reflectionDirection = normalize(reflect(WorldRayDirection(), N));
 	float3 bounceRadiance = traceRadianceRay(hitPosition, reflectionDirection, payload.recursion);
 	payload.color += calculateDirectLighting(albedo, bounceRadiance, N, reflectionDirection, V, F0, roughness, metallic);
+
+	float t = RayTCurrent();
+	if (t > raytracing.fadeoutDistance)
+	{
+		float3 env = sampleEnvironment(WorldRayDirection());
+		payload.color = lerp(payload.color, env, (t - raytracing.fadeoutDistance) / (raytracing.maxRayDistance - raytracing.fadeoutDistance));
+	}
 }
 
 [shader("anyhit")]

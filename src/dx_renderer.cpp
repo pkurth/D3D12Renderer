@@ -249,18 +249,6 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	this->windowWidth = windowWidth;
 	this->windowHeight = windowHeight;
 
-
-	settings.tonemap = defaultTonemapParameters();
-	settings.environmentIntensity = 1.f;
-	settings.skyIntensity = 1.f;
-	settings.aspectRatioMode = aspect_ratio_free;
-	settings.showLightVolumes = false;
-	settings.numRaytracingBounces = 1;
-	settings.raytracingDownsampleFactor = 1;
-	settings.blurRaytracingResultIterations = 1;
-
-	oldSettings = settings;
-
 	recalculateViewport(false);
 
 	// HDR render target.
@@ -726,7 +714,7 @@ void dx_renderer::endFrame()
 
 	for (const raytraced_reflections_render_pass::draw_call& dc : raytracedReflectionsRenderPass.drawCalls)
 	{
-		dc.batch->render(cl, raytracingTexture, settings.numRaytracingBounces, settings.environmentIntensity, settings.skyIntensity,
+		dc.batch->render(cl, raytracingTexture, settings.numRaytracingBounces, settings.raytracingFadeoutDistance, settings.raytracingMaxDistance, settings.environmentIntensity, settings.skyIntensity,
 			cameraCBV, sunCBV, depthBuffer, worldNormalsTexture, environment, brdfTex);
 	}
 

@@ -65,7 +65,9 @@ struct pbr_raytracing_batch : raytracing_batch
     raytracing_object_handle defineObjectType(const raytracing_blas& blas, const std::vector<ref<pbr_material>>& materials);
     virtual void buildBindingTable() override;
 
-    void render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, float environmentIntensity, float skyIntensity,
+    void render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, 
+        float fadeoutDistance, float maxDistance,
+        float environmentIntensity, float skyIntensity,
         dx_dynamic_constant_buffer cameraCBV, dx_dynamic_constant_buffer sunCBV, 
         const ref<dx_texture>& depthBuffer, const ref<dx_texture>& normalMap,
         const ref<pbr_environment>& environment, const ref<dx_texture>& brdf);

@@ -179,7 +179,10 @@ void pbr_raytracing_batch::buildBindingTable()
     bindingTableBuffer = createBuffer(1, totalBindingTableSize, bindingTable);
 }
 
-void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_texture>& output, uint32 numBounces, float environmentIntensity, float skyIntensity,
+void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_texture>& output, 
+    uint32 numBounces,
+    float fadeoutDistance, float maxDistance, 
+    float environmentIntensity, float skyIntensity,
     dx_dynamic_constant_buffer cameraCBV, dx_dynamic_constant_buffer sunCBV, 
     const ref<dx_texture>& depthBuffer, const ref<dx_texture>& normalMap,
     const ref<pbr_environment>& environment, const ref<dx_texture>& brdf)
@@ -206,7 +209,7 @@ void pbr_raytracing_batch::render(struct dx_command_list* cl, const ref<dx_textu
     cl->setPipelineState(pipeline.pipeline);
     cl->setComputeRootSignature(pipeline.rootSignature);
 
-    raytracing_cb raytracingCB = { numBounces, environmentIntensity, skyIntensity };
+    raytracing_cb raytracingCB = { numBounces, fadeoutDistance, maxDistance, environmentIntensity, skyIntensity };
 
     cl->setComputeDescriptorTable(PBR_RAYTRACING_RS_TLAS, tlasHandle);
     cl->setComputeDescriptorTable(PBR_RAYTRACING_RS_OUTPUT, outputHandle);

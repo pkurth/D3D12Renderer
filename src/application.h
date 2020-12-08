@@ -39,7 +39,7 @@ private:
 	ref<pbr_environment> environment;
 
 
-	static const uint32 numPointLights = 512;
+	static const uint32 numPointLights = 0;
 	static const uint32 numSpotLights = 0;
 
 	point_light_cb* pointLights;
