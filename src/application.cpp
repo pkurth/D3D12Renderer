@@ -250,7 +250,7 @@ void application::update(const user_input& input, float dt)
 	ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->settings.aspectRatioMode);
 	ImGui::Checkbox("Show light volumes", &renderer->settings.showLightVolumes);
 
-	ImGui::Image(renderer->raytracingTexture, 256, 256); // TODO: When you remove this, make renderer attributes private again.
+	ImGui::Image(renderer->raytracingTexture, 512, 512); // TODO: When you remove this, make renderer attributes private again.
 
 	plotAndEditTonemapping(renderer->settings.tonemap);
 	editSunShadowParameters(sun);

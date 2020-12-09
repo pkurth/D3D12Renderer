@@ -86,8 +86,7 @@ static ref<dx_texture> brdfTex;
 
 static DXGI_FORMAT screenFormat;
 
-static const DXGI_FORMAT hdrFormat[] = { DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16_FLOAT };
-static const DXGI_FORMAT hdrFormatWithVelocities[] = { DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16_FLOAT, DXGI_FORMAT_R16G16_FLOAT };
+static const DXGI_FORMAT hdrFormat[] = { DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT };
 static const DXGI_FORMAT hdrDepthFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 static const DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM; // TODO: Evaluate whether this is enough.
 static const DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
@@ -162,10 +161,6 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 			.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
 
 		staticModelPipeline = createReloadablePipeline(desc, { "model_static_vs", "model_static_ps" });
-
-
-		desc.renderTargets(hdrFormatWithVelocities, arraysize(hdrFormatWithVelocities), hdrDepthFormat);
-
 		dynamicModelPipeline = createReloadablePipeline(desc, { "model_dynamic_vs", "model_dynamic_ps" });
 	}
 
@@ -270,19 +265,14 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	{
 		depthBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthFormat);
 		hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[0], false, true);
-		worldNormalsTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[1], false, true);
-		screenSpaceVelocityTexture = createTexture(0, renderWidth, renderHeight, hdrFormatWithVelocities[2], false, true);
+		worldNormalsScreenVelocityTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[1], false, true);
 
 		SET_NAME(hdrColorTexture->resource, "HDR Color");
-		SET_NAME(worldNormalsTexture->resource, "World normals");
-		SET_NAME(screenSpaceVelocityTexture->resource, "Screen space velocities");
+		SET_NAME(worldNormalsScreenVelocityTexture->resource, "World normals and screen velocities");
 
 		hdrRenderTarget.pushColorAttachment(hdrColorTexture);
-		hdrRenderTarget.pushColorAttachment(worldNormalsTexture);
+		hdrRenderTarget.pushColorAttachment(worldNormalsScreenVelocityTexture);
 		hdrRenderTarget.pushDepthStencilAttachment(depthBuffer);
-
-		hdrRenderTargetWithVelocities = hdrRenderTarget;
-		hdrRenderTargetWithVelocities.pushColorAttachment(screenSpaceVelocityTexture);
 	}
 
 	// Frame result.
@@ -372,11 +362,9 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 	if (resizeTextures)
 	{
 		resizeTexture(hdrColorTexture, renderWidth, renderHeight);
-		resizeTexture(worldNormalsTexture, renderWidth, renderHeight);
-		resizeTexture(screenSpaceVelocityTexture, renderWidth, renderHeight);
+		resizeTexture(worldNormalsScreenVelocityTexture, renderWidth, renderHeight);
 		resizeTexture(depthBuffer, renderWidth, renderHeight);
 		hdrRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
-		hdrRenderTargetWithVelocities.notifyOnTextureResize(renderWidth, renderHeight);
 		
 		resizeTexture(volumetricsTexture, renderWidth, renderHeight);
 		
@@ -479,8 +467,7 @@ void dx_renderer::endFrame()
 
 	barrier_batcher(cl)
 		.transition(hdrColorTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
-		.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
-		.transition(screenSpaceVelocityTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
+		.transition(worldNormalsScreenVelocityTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
 		.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
 		.transition(sunShadowCascadeTextures, MAX_NUM_SUN_SHADOW_CASCADES, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
@@ -538,24 +525,18 @@ void dx_renderer::endFrame()
 	}
 
 	// Dynamic.
-	if (geometryRenderPass.dynamicDrawCalls.size() > 0)
+	for (const geometry_render_pass::dynamic_draw_call& dc : geometryRenderPass.dynamicDrawCalls)
 	{
-		cl->setRenderTarget(hdrRenderTargetWithVelocities);
+		const mat4& m = dc.transform;
+		const submesh_info& submesh = dc.submesh;
 
-		for (const geometry_render_pass::dynamic_draw_call& dc : geometryRenderPass.dynamicDrawCalls)
-		{
-			const mat4& m = dc.transform;
-			const submesh_info& submesh = dc.submesh;
+		cl->setGraphics32BitConstants(MODEL_RS_MVP, depth_only_transform_cb{ camera.viewProj * m });
 
-			cl->setGraphics32BitConstants(MODEL_RS_MVP, depth_only_transform_cb{ camera.viewProj * m });
-
-			cl->setVertexBuffer(0, dc.vertexBuffer);
-			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-		}
-
-		cl->setRenderTarget(hdrRenderTarget);
+		cl->setVertexBuffer(0, dc.vertexBuffer);
+		cl->setIndexBuffer(dc.indexBuffer);
+		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 	}
+
 
 
 
@@ -758,7 +739,6 @@ void dx_renderer::endFrame()
 
 	if (geometryRenderPass.dynamicDrawCalls.size() > 0)
 	{
-		cl->setRenderTarget(hdrRenderTargetWithVelocities);
 		cl->setPipelineState(*dynamicModelPipeline.pipeline);
 		cl->setGraphicsRootSignature(*dynamicModelPipeline.rootSignature);
 		setUpModelPipeline();
@@ -779,8 +759,6 @@ void dx_renderer::endFrame()
 			cl->setIndexBuffer(dc.indexBuffer);
 			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 		}
-
-		cl->setRenderTarget(hdrRenderTarget);
 	}
 
 
@@ -789,7 +767,7 @@ void dx_renderer::endFrame()
 
 
 	barrier_batcher(cl)
-		.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		.transition(worldNormalsScreenVelocityTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
 	// ----------------------------------------
 	// RAYTRACING
@@ -800,7 +778,7 @@ void dx_renderer::endFrame()
 	for (const raytraced_reflections_render_pass::draw_call& dc : raytracedReflectionsRenderPass.drawCalls)
 	{
 		dc.batch->render(cl, raytracingTexture, settings.numRaytracingBounces, settings.raytracingFadeoutDistance, settings.raytracingMaxDistance, settings.environmentIntensity, settings.skyIntensity,
-			cameraCBV, sunCBV, depthBuffer, worldNormalsTexture, environment, brdfTex);
+			cameraCBV, sunCBV, depthBuffer, worldNormalsScreenVelocityTexture, environment, brdfTex);
 	}
 
 	//generateMipMapsOnGPU(cl, raytracingTexture);
@@ -862,8 +840,7 @@ void dx_renderer::endFrame()
 
 	barrier_batcher(cl)
 		.transition(hdrColorTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
-		.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
-		.transition(screenSpaceVelocityTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON)
+		.transition(worldNormalsScreenVelocityTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
 		.transition(frameResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON);
 
 	dxContext.executeCommandList(cl);

@@ -51,12 +51,8 @@ Texture2D<float4> volumetrics					: register(t9, space3);
 
 struct ps_output
 {
-	float4 hdrColor		: SV_Target0;
-	float2 worldNormal	: SV_Target1;
-
-#ifdef DYNAMIC
-	float2 screenVel	: SV_Target2;
-#endif
+	float4 hdrColor						: SV_Target0;
+	float4 worldNormalScreenVelocity	: SV_Target1; // XY is world normal. ZW is screen volocity.
 };
 
 [RootSignature(MODEL_RS)]
@@ -164,16 +160,27 @@ ps_output main(ps_input IN)
 	// Ambient.
 	totalLighting.xyz += calculateAmbientLighting(albedo.xyz, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao) * lighting.environmentIntensity;
 
-	//float4 volume = volumetrics.Sample(wrapSampler, IN.screenPosition.xy * camera.invScreenDims);
+
+	float2 screenUV = IN.screenPosition.xy * camera.invScreenDims;
+	float2 screenNDC = 2.f * screenUV - float2(1.f, 1.f);
+
+	//float4 volume = volumetrics.Sample(wrapSampler, screenUV);
 	//totalLighting.xyz += volume.xyz;
 
 	ps_output OUT;
 	OUT.hdrColor = totalLighting;
-	OUT.worldNormal = packNormal(N);
 
 #ifdef DYNAMIC
-	OUT.screenVel = (IN.thisFrameNDC.xy / IN.thisFrameNDC.z) - (IN.prevFrameNDC.xy / IN.prevFrameNDC.z);
+	float2 screenVel = (IN.thisFrameNDC.xy / IN.thisFrameNDC.z) - (IN.prevFrameNDC.xy / IN.prevFrameNDC.z);
+	screenVel.y = -screenVel.y;
+#else
+	float4 prevFrameProjected = mul(camera.prevFrameViewProj, float4(IN.worldPosition, 1.f));
+	float2 prevFrameNDC = prevFrameProjected.xy / prevFrameProjected.w;
+	prevFrameNDC.y = -prevFrameNDC.y;
+	float2 screenVel = screenNDC - prevFrameNDC;
 #endif
+
+	OUT.worldNormalScreenVelocity = float4(packNormal(N), screenVel);
 
 	return OUT;
 }

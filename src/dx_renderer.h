@@ -106,10 +106,8 @@ struct dx_renderer
 	dx_render_target windowRenderTarget;
 
 	dx_render_target hdrRenderTarget;
-	dx_render_target hdrRenderTargetWithVelocities;
 	ref<dx_texture> hdrColorTexture;
-	ref<dx_texture> worldNormalsTexture;
-	ref<dx_texture> screenSpaceVelocityTexture;
+	ref<dx_texture> worldNormalsScreenVelocityTexture; // Screen velocity: x points right, y points down! This is in accordance with UV coordinates, which start at the top left.
 	ref<dx_texture> depthBuffer;
 
 	ref<dx_texture> volumetricsTexture;
