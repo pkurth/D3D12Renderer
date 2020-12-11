@@ -6,7 +6,6 @@
 #include "camera.h"
 #include "render_pass.h"
 #include "light_source.h"
-#include "gizmo.h"
 #include "pbr.h"
 
 #include "light_source.hlsli"
@@ -74,6 +73,7 @@ struct dx_renderer
 	geometry_render_pass* beginGeometryPass() { return &geometryRenderPass; }
 	outline_render_pass* beginOutlinePass() { return &outlineRenderPass; }
 	sun_shadow_render_pass* beginSunShadowPass() { return &sunShadowRenderPass; }
+	visualization_render_pass* beginVisualizationPass() { return &visualizationRenderPass; }
 	raytraced_reflections_render_pass* beginRaytracedReflectionsPass() { return &raytracedReflectionsRenderPass; }
 
 	
@@ -134,6 +134,7 @@ struct dx_renderer
 	geometry_render_pass geometryRenderPass;
 	outline_render_pass outlineRenderPass;
 	sun_shadow_render_pass sunShadowRenderPass;
+	visualization_render_pass visualizationRenderPass;
 	raytraced_reflections_render_pass raytracedReflectionsRenderPass;
 
 	light_culling_buffers lightCullingBuffers;

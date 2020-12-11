@@ -77,6 +77,24 @@ void sun_shadow_render_pass::reset()
 	}
 }
 
+void visualization_render_pass::renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform, vec4 color)
+{
+	drawCalls.push_back(
+		{
+			transform,
+			vertexBuffer,
+			indexBuffer,
+			submesh,
+			color
+		}
+	);
+}
+
+void visualization_render_pass::reset()
+{
+	drawCalls.clear();
+}
+
 void raytraced_reflections_render_pass::renderObject(specular_reflections_raytracing_batch* batch)
 {
 	drawCalls.push_back({ batch });

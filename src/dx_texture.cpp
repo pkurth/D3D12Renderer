@@ -97,19 +97,31 @@ static bool loadImageFromFile(const char* filepathRaw, uint32 flags, DirectX::Sc
 	{
 		if (extension == ".dds")
 		{
-			checkResult(DirectX::LoadFromDDSFile(filepath.c_str(), DirectX::DDS_FLAGS_NONE, &metadata, scratchImage));
+			if (FAILED(DirectX::LoadFromDDSFile(filepath.c_str(), DirectX::DDS_FLAGS_NONE, &metadata, scratchImage)))
+			{
+				return false;
+			}
 		}
 		else if (extension == ".hdr")
 		{
-			checkResult(DirectX::LoadFromHDRFile(filepath.c_str(), &metadata, scratchImage));
+			if (FAILED(DirectX::LoadFromHDRFile(filepath.c_str(), &metadata, scratchImage)))
+			{
+				return false;
+			}
 		}
 		else if (extension == ".tga")
 		{
-			checkResult(DirectX::LoadFromTGAFile(filepath.c_str(), &metadata, scratchImage));
+			if (FAILED(DirectX::LoadFromTGAFile(filepath.c_str(), &metadata, scratchImage)))
+			{
+				return false;
+			}
 		}
 		else
 		{
-			checkResult(DirectX::LoadFromWICFile(filepath.c_str(), DirectX::WIC_FLAGS_FORCE_RGB, &metadata, scratchImage));
+			if (FAILED(DirectX::LoadFromWICFile(filepath.c_str(), DirectX::WIC_FLAGS_FORCE_RGB, &metadata, scratchImage)))
+			{
+				return false;
+			}
 		}
 
 		if (flags & texture_load_flags_noncolor)
@@ -199,7 +211,10 @@ static ref<dx_texture> loadTextureInternal(const char* filename, uint32 flags)
 	DirectX::ScratchImage scratchImage;
 	D3D12_RESOURCE_DESC textureDesc;
 
-	loadImageFromFile(filename, flags, scratchImage, textureDesc);
+	if (!loadImageFromFile(filename, flags, scratchImage, textureDesc))
+	{
+		return nullptr;
+	}
 
 	const DirectX::Image* images = scratchImage.GetImages();
 	uint32 numImages = (uint32)scratchImage.GetImageCount();

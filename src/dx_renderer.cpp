@@ -14,6 +14,7 @@
 #include "model_rs.hlsli"
 #include "material.hlsli"
 #include "camera.hlsli"
+#include "flat_simple_rs.hlsli"
 
 #include "raytracing.h"
 #include "raytracing_batch.h"
@@ -30,15 +31,21 @@ static ref<dx_buffer> spotLightBuffer[NUM_BUFFERED_FRAMES];
 static dx_render_target sunShadowRenderTarget[MAX_NUM_SUN_SHADOW_CASCADES];
 static ref<dx_texture> sunShadowCascadeTextures[MAX_NUM_SUN_SHADOW_CASCADES];
 
-static dx_pipeline textureSkyPipeline;
-static dx_pipeline proceduralSkyPipeline;
-static dx_pipeline presentPipeline;
 static dx_pipeline staticModelPipeline;
 static dx_pipeline dynamicModelPipeline;
 static dx_pipeline modelDepthOnlyPipeline;
 static dx_pipeline modelShadowPipeline; // Only different from depth-only pipeline in the depth format.
-static dx_pipeline flatUnlitPipeline;
+
+static dx_pipeline textureSkyPipeline;
+static dx_pipeline proceduralSkyPipeline;
+
 static dx_pipeline blitPipeline;
+static dx_pipeline presentPipeline;
+
+static dx_pipeline flatUnlitPipeline;
+static dx_pipeline flatSimplePipeline;
+
+
 static dx_pipeline atmospherePipeline;
 
 static dx_pipeline outlineMarkerPipeline;
@@ -47,39 +54,14 @@ static dx_pipeline outlineDrawerPipeline;
 static dx_pipeline worldSpaceFrustaPipeline;
 static dx_pipeline lightCullingPipeline;
 
-static dx_mesh gizmoMesh;
+
+
 static dx_mesh positionOnlyMesh;
-
-static union
-{
-	struct
-	{
-		submesh_info noneGizmoSubmesh;
-		submesh_info translationGizmoSubmesh;
-		submesh_info rotationGizmoSubmesh;
-		submesh_info scaleGizmoSubmesh;
-	};
-
-	submesh_info gizmoSubmeshes[4];
-};
 
 static submesh_info cubeMesh;
 static submesh_info sphereMesh;
 
 
-static quat gizmoRotations[] =
-{
-	quat(vec3(0.f, 0.f, -1.f), deg2rad(90.f)),
-	quat::identity,
-	quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)),
-};
-
-static vec4 gizmoColors[] =
-{
-	vec4(1.f, 0.f, 0.f, 1.f),
-	vec4(0.f, 1.f, 0.f, 1.f),
-	vec4(0.f, 0.f, 1.f, 1.f),
-};
 
 
 static ref<dx_texture> brdfTex;
@@ -216,6 +198,15 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		flatUnlitPipeline = createReloadablePipeline(desc, { "flat_unlit_vs", "flat_unlit_ps" }, rs_in_vertex_shader);
 	}
 
+	// Flat simple.
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.inputLayout(inputLayout_position_normal)
+			.renderTargets(hdrFormat[0], hdrDepthStencilFormat);
+
+		flatSimplePipeline = createReloadablePipeline(desc, { "flat_simple_vs", "flat_simple_ps" });
+	}
+
 	// Present.
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
@@ -254,18 +245,6 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		cubeMesh = mesh.pushCube(1.f);
 		sphereMesh = mesh.pushIcoSphere(1.f, 2);
 		positionOnlyMesh = mesh.createDXMesh();
-	}
-
-	{
-		cpu_mesh mesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
-		float shaftLength = 2.f;
-		float headLength = 0.4f;
-		float radius = 0.06f;
-		float headRadius = 0.13f;
-		translationGizmoSubmesh = mesh.pushArrow(6, radius, headRadius, shaftLength, headLength);
-		rotationGizmoSubmesh = mesh.pushTorus(6, 64, shaftLength, radius);
-		scaleGizmoSubmesh = mesh.pushMace(6, radius, headRadius, shaftLength, headLength);
-		gizmoMesh = mesh.createDXMesh();
 	}
 
 	{
@@ -350,6 +329,7 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 	geometryRenderPass.reset();
 	outlineRenderPass.reset();
 	sunShadowRenderPass.reset();
+	visualizationRenderPass.reset();
 	raytracedReflectionsRenderPass.reset();
 }
 
@@ -796,14 +776,14 @@ void dx_renderer::endFrame()
 	{
 		cl->setStencilReference(stencil_flag_selected_object);
 
+		cl->setPipelineState(*outlineMarkerPipeline.pipeline);
+		cl->setGraphicsRootSignature(*outlineMarkerPipeline.rootSignature);
+
 		// Mark object in stencil.
 		for (const auto& dc : outlineRenderPass.drawCalls)
 		{
 			const mat4& m = dc.transform;
 			const submesh_info& submesh = dc.submesh;
-
-			cl->setPipelineState(*outlineMarkerPipeline.pipeline);
-			cl->setGraphicsRootSignature(*outlineMarkerPipeline.rootSignature);
 
 			cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ camera.viewProj * m });
 
@@ -852,6 +832,26 @@ void dx_renderer::endFrame()
 	// ----------------------------------------
 	// HELPER STUFF
 	// ----------------------------------------
+
+
+	if (visualizationRenderPass.drawCalls.size() > 0)
+	{
+		cl->setPipelineState(*flatSimplePipeline.pipeline);
+		cl->setGraphicsRootSignature(*flatSimplePipeline.rootSignature);
+
+		for (const auto& dc : visualizationRenderPass.drawCalls)
+		{
+			const mat4& m = dc.transform;
+			const submesh_info& submesh = dc.submesh;
+
+			cl->setGraphics32BitConstants(0, flat_simple_transform_cb{ camera.viewProj * m, camera.view * m });
+			cl->setGraphics32BitConstants(1, dc.color);
+
+			cl->setVertexBuffer(0, dc.vertexBuffer);
+			cl->setIndexBuffer(dc.indexBuffer);
+			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		}
+	}
 
 
 	if (settings.showLightVolumes)

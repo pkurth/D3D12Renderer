@@ -86,6 +86,28 @@ private:
 	friend struct dx_renderer;
 };
 
+struct visualization_render_pass
+{
+	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform, vec4 color);
+
+private:
+	void reset();
+
+	struct draw_call
+	{
+		const mat4 transform;
+		ref<dx_vertex_buffer> vertexBuffer;
+		ref<dx_index_buffer> indexBuffer;
+		submesh_info submesh;
+
+		vec4 color;
+	};
+
+	std::vector<draw_call> drawCalls;
+
+	friend struct dx_renderer;
+};
+
 struct raytraced_reflections_render_pass
 {
 	void renderObject(specular_reflections_raytracing_batch* batch);

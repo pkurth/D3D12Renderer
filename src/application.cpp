@@ -23,13 +23,15 @@ void application::initialize(dx_renderer* renderer)
 
 	this->renderer = renderer;
 
+	gizmos.initialize();
+
 	camera.initializeIngame(vec3(0.f, 30.f, 40.f), quat::identity, deg2rad(70.f), 0.1f);
 
 	meshes.push_back(loadMeshFromFile("assets/meshes/cerberus.fbx", 
 		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
 	);
 
-	ref<pbr_material> cerberusMaterial = createMaterial(
+	meshes.back().singleMeshes[0].material = createMaterial(
 		"assets/textures/cerberus_a.tga",
 		"assets/textures/cerberus_n.tga",
 		"assets/textures/cerberus_r.tga",
@@ -38,13 +40,38 @@ void application::initialize(dx_renderer* renderer)
 		0.f,
 		0.f
 	);
-	meshes.back().singleMeshes[0].material = cerberusMaterial;
 
 
-	meshes.push_back(loadMeshFromFile("assets/meshes/sponza.obj",
-		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents,
-		true)
+	meshes.push_back(loadMeshFromFile("assets/meshes/stormtrooper.fbx",
+		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
 	);
+
+	meshes.back().singleMeshes[0].material = createMaterial(
+		"assets/textures/stormtrooper/Stormtrooper_D.png",
+		0, 0, 0,
+		vec4(1.f, 1.f, 1.f, 1.f),
+		0.f,
+		1.f
+	);
+
+	meshes.push_back(loadMeshFromFile("assets/meshes/pilot.fbx",
+		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
+	);
+
+	meshes.back().singleMeshes[0].material = createMaterial(
+		"assets/textures/pilot/A.png",
+		"assets/textures/pilot/N.png",
+		"assets/textures/pilot/R.png",
+		"assets/textures/pilot/M.png",
+		vec4(1.f, 1.f, 1.f, 1.f),
+		0.f,
+		1.f
+	);
+
+	//meshes.push_back(loadMeshFromFile("assets/meshes/sponza.obj",
+	//	mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents,
+	//	true)
+	//);
 
 
 
@@ -73,10 +100,17 @@ void application::initialize(dx_renderer* renderer)
 	gameObjects.push_back({ cerberusTransform, 0, });
 	reflectionsRaytracingBatch.instantiate(types[0], cerberusTransform);
 
-	trs sponzaTransform = { vec3(0.f, 0.f, 0.f), quat::identity, 0.03f };
-	gameObjects.push_back({ sponzaTransform, 1, });
-	reflectionsRaytracingBatch.instantiate(types[1], sponzaTransform);
+	trs trooperTransform = { vec3(0.f, 0.f, 0.f), quat::identity, 1.f };
+	gameObjects.push_back({ trooperTransform, 1, });
+	reflectionsRaytracingBatch.instantiate(types[1], trooperTransform);
 
+	trs pilotTransform = { vec3(1.f, 0.f, 0.f), quat::identity, 1.f };
+	gameObjects.push_back({ pilotTransform, 2, });
+	reflectionsRaytracingBatch.instantiate(types[2], pilotTransform);
+
+	//trs sponzaTransform = { vec3(0.f, 0.f, 0.f), quat::identity, 0.03f };
+	//gameObjects.push_back({ sponzaTransform, 3, });
+	//reflectionsRaytracingBatch.instantiate(types[3], sponzaTransform);
 
 	reflectionsRaytracingBatch.buildAll();
 
@@ -290,6 +324,25 @@ void application::update(const user_input& input, float dt)
 			}
 		}
 	}
+
+	gizmo_type type = gizmo_type_translation;
+
+	visualization_render_pass* visualizationPass = renderer->beginVisualizationPass();
+	visualizationPass->renderObject(gizmos.mesh.vertexBuffer, gizmos.mesh.indexBuffer, 
+		gizmos.submesh(type),
+		createModelMatrix(gameObjects[0].transform.position, gizmos.rotation(gizmo_axis_x)), 
+		gizmos.color(gizmo_axis_x)
+	);
+	visualizationPass->renderObject(gizmos.mesh.vertexBuffer, gizmos.mesh.indexBuffer,
+		gizmos.submesh(type),
+		createModelMatrix(gameObjects[0].transform.position, gizmos.rotation(gizmo_axis_y)),
+		gizmos.color(gizmo_axis_y)
+	);
+	visualizationPass->renderObject(gizmos.mesh.vertexBuffer, gizmos.mesh.indexBuffer,
+		gizmos.submesh(type),
+		createModelMatrix(gameObjects[0].transform.position, gizmos.rotation(gizmo_axis_z)),
+		gizmos.color(gizmo_axis_z)
+	);
 
 	renderer->beginRaytracedReflectionsPass()->renderObject(&reflectionsRaytracingBatch);
 }

@@ -7,6 +7,7 @@
 #include "dx_renderer.h"
 #include "light_source.hlsli" // TODO: For now. The game should only know about the C++ version of lights eventually.
 #include "light_source.h"
+#include "gizmo.h"
 #include "raytracing.h"
 #include "raytracing_batch.h"
 
@@ -50,6 +51,8 @@ private:
 
 	dx_renderer* renderer;
 	render_camera camera;
+
+	gizmo gizmos;
 
 	scene scene;
 };
