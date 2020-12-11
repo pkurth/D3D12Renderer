@@ -46,7 +46,7 @@ const mat4 mat4::zero =
 
 const quat quat::identity = { 0.f, 0.f, 0.f, 1.f };
 
-const trs trs::identity = { vec3(0.f, 0.f, 0.f), quat(0.f, 0.f, 0.f, 1.f), 1.f };
+const trs trs::identity = { vec3(0.f, 0.f, 0.f), quat(0.f, 0.f, 0.f, 1.f), vec3(1.f, 1.f, 1.f) };
 
 
 
@@ -540,39 +540,46 @@ quat mat3ToQuaternion(mat3 m)
 {
 	float tr = m.m00 + m.m11 + m.m22;
 
+	//quat result;
+	//if (tr > 0.f)
+	//{
+	//	float s = sqrtf(tr + 1.f) * 2.f; // S=4*qw 
+	//	result.w = 0.25f * s;
+	//	result.x = (m.m21 - m.m12) / s;
+	//	result.y = (m.m02 - m.m20) / s;
+	//	result.z = (m.m10 - m.m01) / s;
+	//}
+	//else if ((m.m00 > m.m11) && (m.m00 > m.m22))
+	//{
+	//	float s = sqrtf(1.f + m.m00 - m.m11 - m.m22) * 2.f; // S=4*qx 
+	//	result.w = (m.m21 - m.m12) / s;
+	//	result.x = 0.25f * s;
+	//	result.y = (m.m01 + m.m10) / s;
+	//	result.z = (m.m02 + m.m20) / s;
+	//}
+	//else if (m.m11 > m.m22)
+	//{
+	//	float s = sqrtf(1.f + m.m11 - m.m00 - m.m22) * 2.f; // S=4*qy
+	//	result.w = (m.m02 - m.m20) / s;
+	//	result.x = (m.m01 + m.m10) / s;
+	//	result.y = 0.25f * s;
+	//	result.z = (m.m12 + m.m21) / s;
+	//}
+	//else
+	//{
+	//	float s = sqrtf(1.f + m.m22 - m.m00 - m.m11) * 2.f; // S=4*qz
+	//	result.w = (m.m10 - m.m01) / s;
+	//	result.x = (m.m02 + m.m20) / s;
+	//	result.y = (m.m12 + m.m21) / s;
+	//	result.z = 0.25f * s;
+	//}
+
 	quat result;
-	if (tr > 0.f)
-	{
-		float s = sqrtf(tr + 1.f) * 2.f; // S=4*qw 
-		result.w = 0.25f * s;
-		result.x = (m.m21 - m.m12) / s;
-		result.y = (m.m02 - m.m20) / s;
-		result.z = (m.m10 - m.m01) / s;
-	}
-	else if ((m.m00 > m.m11) && (m.m00 > m.m22))
-	{
-		float s = sqrtf(1.f + m.m00 - m.m11 - m.m22) * 2.f; // S=4*qx 
-		result.w = (m.m21 - m.m12) / s;
-		result.x = 0.25f * s;
-		result.y = (m.m01 + m.m10) / s;
-		result.z = (m.m02 + m.m20) / s;
-	}
-	else if (m.m11 > m.m22)
-	{
-		float s = sqrtf(1.f + m.m11 - m.m00 - m.m22) * 2.f; // S=4*qy
-		result.w = (m.m02 - m.m20) / s;
-		result.x = (m.m01 + m.m10) / s;
-		result.y = 0.25f * s;
-		result.z = (m.m12 + m.m21) / s;
-	}
-	else
-	{
-		float s = sqrtf(1.f + m.m22 - m.m00 - m.m11) * 2.f; // S=4*qz
-		result.w = (m.m10 - m.m01) / s;
-		result.x = (m.m02 + m.m20) / s;
-		result.y = (m.m12 + m.m21) / s;
-		result.z = 0.25f * s;
-	}
+	result.w = sqrt(1.f + m.m00 + m.m11 + m.m22) * 0.5f;
+	float w4 = 1.f / (4.f * result.w);
+	result.x = (m.m21 - m.m12) * w4;
+	result.y = (m.m02 - m.m20) * w4;
+	result.z = (m.m10 - m.m02) * w4;
 
 	return normalize(result);
 }
@@ -968,49 +975,32 @@ bool insideTriangle(vec3 barycentrics)
 trs::trs(const mat4& m)
 {
 	vec3 c0(m.m00, m.m10, m.m20);
-	scale = sqrt(dot(c0, c0));
-	float invScale = 1.f / scale;
+	vec3 c1(m.m01, m.m11, m.m21);
+	vec3 c2(m.m02, m.m12, m.m22);
+	scale.x = sqrt(dot(c0, c0));
+	scale.y = sqrt(dot(c1, c1));
+	scale.z = sqrt(dot(c2, c2));
+
+
+	vec3 invScale = 1.f / scale;
 
 	position.x = m.m03;
 	position.y = m.m13;
 	position.z = m.m23;
 
-	mat4 R = m;
-	R.m03 = R.m13 = R.m23 = 0.f;
-	R = R * invScale;
+	mat3 R;
 
-	float tr = m.m00 + m.m11 + m.m22;
+	R.m00 = m.m00 * invScale.x;
+	R.m10 = m.m10 * invScale.x;
+	R.m20 = m.m20 * invScale.x;
+			
+	R.m01 = m.m01 * invScale.y;
+	R.m11 = m.m11 * invScale.y;
+	R.m21 = m.m21 * invScale.y;
+			
+	R.m02 = m.m02 * invScale.z;
+	R.m12 = m.m12 * invScale.z;
+	R.m22 = m.m22 * invScale.z;
 
-	if (tr > 0.f)
-	{
-		float s = sqrtf(tr + 1.f) * 2.f; // S=4*qw 
-		rotation.w = 0.25f * s;
-		rotation.x = (R.m21 - R.m12) / s;
-		rotation.y = (R.m02 - R.m20) / s;
-		rotation.z = (R.m10 - R.m01) / s;
-	}
-	else if ((R.m00 > R.m11) && (R.m00 > R.m22))
-	{
-		float s = sqrtf(1.f + R.m00 - R.m11 - R.m22) * 2.f; // S=4*qx 
-		rotation.w = (R.m21 - R.m12) / s;
-		rotation.x = 0.25f * s;
-		rotation.y = (R.m01 + R.m10) / s;
-		rotation.z = (R.m02 + R.m20) / s;
-	}
-	else if (R.m11 > R.m22)
-	{
-		float s = sqrtf(1.f + R.m11 - R.m00 - R.m22) * 2.f; // S=4*qy
-		rotation.w = (R.m02 - R.m20) / s;
-		rotation.x = (R.m01 + R.m10) / s;
-		rotation.y = 0.25f * s;
-		rotation.z = (R.m12 + R.m21) / s;
-	}
-	else
-	{
-		float s = sqrtf(1.f + R.m22 - R.m00 - R.m11) * 2.f; // S=4*qz
-		rotation.w = (R.m10 - R.m01) / s;
-		rotation.x = (R.m02 + R.m20) / s;
-		rotation.y = (R.m12 + R.m21) / s;
-		rotation.z = 0.25f * s;
-	}
+	rotation = mat3ToQuaternion(R);
 }

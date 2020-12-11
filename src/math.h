@@ -34,6 +34,7 @@ struct vec2
 	float x, y;
 
 	vec2() {}
+	vec2(float v) : vec2(v, v) {}
 	vec2(float x_, float y_) { x = x_; y = y_; }
 };
 
@@ -58,6 +59,7 @@ union vec3
 	};
 
 	vec3() {}
+	vec3(float v) : vec3(v, v, v) {}
 	vec3(float x_, float y_, float z_) { x = x_; y = y_; z = z_; }
 	vec3(vec2 v2, float z_) { x = v2.x; y = v2.y; z = z_; }
 };
@@ -81,6 +83,7 @@ union vec4
 	float data[4];
 
 	vec4() {}
+	vec4(float v) : vec4(v, v, v, v) {}
 	vec4(float x_, float y_, float z_, float w_) { x = x_; y = y_; z = z_; w = w_; }
 	vec4(floatx4 f4_) { f4 = f4_; }
 	vec4(vec3 v3, float w_) { x = v3.x; y = v3.y; z = v3.z; w = w_; }
@@ -297,10 +300,10 @@ struct trs
 {
 	quat rotation;
 	vec3 position;
-	float scale;
+	vec3 scale;
 
 	trs() {}
-	trs(vec3 position_, quat rotation_, float scale_) { position = position_; rotation = rotation_; scale = scale_; }
+	trs(vec3 position_, quat rotation_, vec3 scale_ = { 1.f, 1.f, 1.f }) { position = position_; rotation = rotation_; scale = scale_; }
 	trs(const mat4& m);
 
 	static const trs identity;
