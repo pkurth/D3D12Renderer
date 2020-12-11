@@ -45,6 +45,26 @@ private:
 	friend struct dx_renderer;
 };
 
+struct outline_render_pass
+{
+	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+
+private:
+	void reset();
+
+	struct draw_call
+	{
+		const mat4 transform;
+		ref<dx_vertex_buffer> vertexBuffer;
+		ref<dx_index_buffer> indexBuffer;
+		submesh_info submesh;
+	};
+
+	std::vector<draw_call> drawCalls;
+
+	friend struct dx_renderer;
+};
+
 struct sun_shadow_render_pass
 {
 	// Since each cascade includes the next lower one, if you submit a draw to cascade N, it will also be rendered in N-1 automatically. No need to add it to the lower one.

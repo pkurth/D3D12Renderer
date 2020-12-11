@@ -12,16 +12,19 @@
 
 struct directional_light
 {
-	mat4 vp[MAX_NUM_SUN_SHADOW_CASCADES];
-	vec4 cascadeDistances;
-	vec4 bias;
-
 	vec3 direction;
-	float blendArea;
+	uint32 numShadowCascades;
 
 	vec3 color;
 	float intensity; // Final radiance is color * intensity.
-	uint32 numShadowCascades;
+
+	vec4 cascadeDistances;
+	vec4 bias;
+
+	mat4 vp[MAX_NUM_SUN_SHADOW_CASCADES];
+
+	float blendArea;
+
 
 	void updateMatrices(const render_camera& camera);
 };

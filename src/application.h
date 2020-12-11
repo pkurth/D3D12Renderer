@@ -30,8 +30,6 @@ struct application
 	bool deserializeFromFile(const char* filename);
 
 private:
-	void updateCamera(const user_input& input, float dt);
-
 	std::vector<composite_mesh> meshes;
 	std::vector<scene_object> gameObjects;
 	std::vector<raytracing_blas> blas;

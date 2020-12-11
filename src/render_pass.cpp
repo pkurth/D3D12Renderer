@@ -5,7 +5,8 @@
 #include "dx_context.h"
 
 
-void geometry_render_pass::renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, const mat4& transform)
+void geometry_render_pass::renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, 
+	const mat4& transform)
 {
 	staticDrawCalls.push_back(
 		{
@@ -18,7 +19,8 @@ void geometry_render_pass::renderStaticObject(const ref<dx_vertex_buffer>& verte
 	);
 }
 
-void geometry_render_pass::renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, const mat4& transform, const mat4& prevFrameTransform)
+void geometry_render_pass::renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, 
+	const mat4& transform, const mat4& prevFrameTransform)
 {
 	dynamicDrawCalls.push_back(
 		{
@@ -36,6 +38,23 @@ void geometry_render_pass::reset()
 {
 	staticDrawCalls.clear();
 	dynamicDrawCalls.clear();
+}
+
+void outline_render_pass::renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+{
+	drawCalls.push_back(
+		{
+			transform, 
+			vertexBuffer, 
+			indexBuffer, 
+			submesh,
+		}
+	);
+}
+
+void outline_render_pass::reset()
+{
+	drawCalls.clear();
 }
 
 void sun_shadow_render_pass::renderObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)

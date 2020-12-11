@@ -496,6 +496,7 @@ mat4 trsToMat4(const trs& transform);
 
 mat4 createPerspectiveProjectionMatrix(float fov, float aspect, float nearPlane, float farPlane);
 mat4 createPerspectiveProjectionMatrix(float width, float height, float fx, float fy, float cx, float cy, float nearPlane, float farPlane);
+mat4 createPerspectiveProjectionMatrix(float r, float l, float t, float b, float nearPlane, float farPlane);
 mat4 createOrthographicProjectionMatrix(float r, float l, float t, float b, float nearPlane, float farPlane);
 mat4 invertPerspectiveProjectionMatrix(mat4 m);
 mat4 invertOrthographicProjectionMatrix(mat4 m);

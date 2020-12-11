@@ -37,10 +37,12 @@ static dx_pipeline staticModelPipeline;
 static dx_pipeline dynamicModelPipeline;
 static dx_pipeline modelDepthOnlyPipeline;
 static dx_pipeline modelShadowPipeline; // Only different from depth-only pipeline in the depth format.
-static dx_pipeline outlinePipeline;
 static dx_pipeline flatUnlitPipeline;
 static dx_pipeline blitPipeline;
 static dx_pipeline atmospherePipeline;
+
+static dx_pipeline outlineMarkerPipeline;
+static dx_pipeline outlineDrawerPipeline;
 
 static dx_pipeline worldSpaceFrustaPipeline;
 static dx_pipeline lightCullingPipeline;
@@ -87,7 +89,7 @@ static ref<dx_texture> brdfTex;
 static DXGI_FORMAT screenFormat;
 
 static const DXGI_FORMAT hdrFormat[] = { DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT };
-static const DXGI_FORMAT hdrDepthFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+static const DXGI_FORMAT hdrDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 static const DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM; // TODO: Evaluate whether this is enough.
 static const DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 static const DXGI_FORMAT raytracedReflectionsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
@@ -149,15 +151,15 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	// Model.
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(0, 0, hdrDepthFormat)
+			.renderTargets(0, 0, hdrDepthStencilFormat)
 			.inputLayout(inputLayout_position_uv_normal_tangent);
 
 		modelDepthOnlyPipeline = createReloadablePipeline(desc, { "model_depth_only_vs" }, rs_in_vertex_shader);
 
 
 		desc
-			.renderTargets(hdrFormat, arraysize(hdrFormat), hdrDepthFormat)
-			.stencilSettings(D3D12_COMPARISON_FUNC_ALWAYS, D3D12_STENCIL_OP_REPLACE, D3D12_STENCIL_OP_REPLACE) // Mark areas in stencil, for example for outline.
+			.renderTargets(hdrFormat, arraysize(hdrFormat), hdrDepthStencilFormat)
+			.stencilSettings(D3D12_COMPARISON_FUNC_ALWAYS, D3D12_STENCIL_OP_REPLACE)
 			.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
 
 		staticModelPipeline = createReloadablePipeline(desc, { "model_static_vs", "model_static_ps" });
@@ -176,19 +178,38 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 	// Outline.
 	{
-		auto desc = CREATE_GRAPHICS_PIPELINE
+		auto markerDesc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position_uv_normal_tangent)
-			.renderTargets(hdrFormat[0], hdrDepthFormat)
-			.stencilSettings(D3D12_COMPARISON_FUNC_NOT_EQUAL);
+			.renderTargets(0, 0, hdrDepthStencilFormat)
+			.stencilSettings(D3D12_COMPARISON_FUNC_ALWAYS, 
+				D3D12_STENCIL_OP_REPLACE, 
+				D3D12_STENCIL_OP_REPLACE, 
+				D3D12_STENCIL_OP_KEEP, 
+				D3D12_DEFAULT_STENCIL_READ_MASK, 
+				stencil_flag_selected_object) // Mark selected object.
+			.depthSettings(false, false);
 
-		outlinePipeline = createReloadablePipeline(desc, { "outline_vs", "outline_ps" }, rs_in_vertex_shader);
+		outlineMarkerPipeline = createReloadablePipeline(markerDesc, { "outline_vs" }, rs_in_vertex_shader);
+
+
+		auto drawerDesc = CREATE_GRAPHICS_PIPELINE
+			.renderTargets(hdrFormat[0], hdrDepthStencilFormat)
+			.stencilSettings(D3D12_COMPARISON_FUNC_EQUAL,
+				D3D12_STENCIL_OP_KEEP,
+				D3D12_STENCIL_OP_KEEP,
+				D3D12_STENCIL_OP_KEEP,
+				stencil_flag_selected_object,
+				0)
+			.depthSettings(false, false);
+
+		outlineDrawerPipeline = createReloadablePipeline(drawerDesc, { "fullscreen_triangle_vs", "outline_ps" });
 	}
 
 	// Flat unlit.
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position)
-			.renderTargets(hdrFormat[0], hdrDepthFormat)
+			.renderTargets(hdrFormat[0], hdrDepthStencilFormat)
 			.cullingOff()
 			.wireframe();
 
@@ -263,7 +284,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 
 	// HDR render target.
 	{
-		depthBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthFormat);
+		depthStencilBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthStencilFormat);
 		hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[0], false, true);
 		worldNormalsScreenVelocityTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[1], false, true);
 
@@ -272,7 +293,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 
 		hdrRenderTarget.pushColorAttachment(hdrColorTexture);
 		hdrRenderTarget.pushColorAttachment(worldNormalsScreenVelocityTexture);
-		hdrRenderTarget.pushDepthStencilAttachment(depthBuffer);
+		hdrRenderTarget.pushDepthStencilAttachment(depthStencilBuffer);
 	}
 
 	// Frame result.
@@ -327,6 +348,7 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 	}
 
 	geometryRenderPass.reset();
+	outlineRenderPass.reset();
 	sunShadowRenderPass.reset();
 	raytracedReflectionsRenderPass.reset();
 }
@@ -363,7 +385,7 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 	{
 		resizeTexture(hdrColorTexture, renderWidth, renderHeight);
 		resizeTexture(worldNormalsScreenVelocityTexture, renderWidth, renderHeight);
-		resizeTexture(depthBuffer, renderWidth, renderHeight);
+		resizeTexture(depthStencilBuffer, renderWidth, renderHeight);
 		hdrRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
 		
 		resizeTexture(volumetricsTexture, renderWidth, renderHeight);
@@ -512,7 +534,7 @@ void dx_renderer::endFrame()
 	cl->setGraphicsRootSignature(*modelDepthOnlyPipeline.rootSignature);
 
 	// Static.
-	for (const geometry_render_pass::static_draw_call& dc : geometryRenderPass.staticDrawCalls)
+	for (const auto& dc : geometryRenderPass.staticDrawCalls)
 	{
 		const mat4& m = dc.transform;
 		const submesh_info& submesh = dc.submesh;
@@ -525,7 +547,7 @@ void dx_renderer::endFrame()
 	}
 
 	// Dynamic.
-	for (const geometry_render_pass::dynamic_draw_call& dc : geometryRenderPass.dynamicDrawCalls)
+	for (const auto& dc : geometryRenderPass.dynamicDrawCalls)
 	{
 		const mat4& m = dc.transform;
 		const submesh_info& submesh = dc.submesh;
@@ -575,7 +597,7 @@ void dx_renderer::endFrame()
 		cl->setComputeRootSignature(*lightCullingPipeline.rootSignature);
 		cl->setComputeDynamicConstantBuffer(LIGHT_CULLING_RS_CAMERA, cameraCBV);
 		cl->setCompute32BitConstants(LIGHT_CULLING_RS_CB, light_culling_cb{ lightCullingBuffers.numTilesX, numPointLights, numSpotLights });
-		cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 0, depthBuffer);
+		cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 0, depthStencilBuffer);
 		cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 1, pointLightBuffer[dxContext.bufferedFrameID]);
 		cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 2, spotLightBuffer[dxContext.bufferedFrameID]);
 		cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 3, lightCullingBuffers.tiledFrusta);
@@ -603,7 +625,7 @@ void dx_renderer::endFrame()
 
 		for (uint32 cascade = 0; cascade <= i; ++cascade)
 		{
-			for (const sun_shadow_render_pass::draw_call& dc : sunShadowRenderPass.drawCalls[cascade])
+			for (const auto& dc : sunShadowRenderPass.drawCalls[cascade])
 			{
 				const mat4& m = dc.transform;
 				const submesh_info& submesh = dc.submesh;
@@ -721,7 +743,7 @@ void dx_renderer::endFrame()
 		cl->setPipelineState(*staticModelPipeline.pipeline);
 		cl->setGraphicsRootSignature(*staticModelPipeline.rootSignature);
 		setUpModelPipeline();
-		for (const geometry_render_pass::static_draw_call& dc : geometryRenderPass.staticDrawCalls)
+		for (const auto& dc : geometryRenderPass.staticDrawCalls)
 		{
 			const mat4& m = dc.transform;
 			const submesh_info& submesh = dc.submesh;
@@ -742,9 +764,9 @@ void dx_renderer::endFrame()
 		cl->setPipelineState(*dynamicModelPipeline.pipeline);
 		cl->setGraphicsRootSignature(*dynamicModelPipeline.rootSignature);
 		setUpModelPipeline();
-		//cl->setStencilReference(stencil_flag_dynamic_geometry);
+		cl->setStencilReference(stencil_flag_dynamic_geometry);
 
-		for (const geometry_render_pass::dynamic_draw_call& dc : geometryRenderPass.dynamicDrawCalls)
+		for (const auto& dc : geometryRenderPass.dynamicDrawCalls)
 		{
 			const mat4& m = dc.transform;
 			const mat4& prevFrameM = dc.prevFrameTransform;
@@ -762,12 +784,48 @@ void dx_renderer::endFrame()
 	}
 
 
-	//cl->setStencilReference(0);
-
-
-
 	barrier_batcher(cl)
 		.transition(worldNormalsScreenVelocityTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+
+	// ----------------------------------------
+	// OUTLINES
+	// ----------------------------------------
+
+	if (outlineRenderPass.drawCalls.size() > 0)
+	{
+		cl->setStencilReference(stencil_flag_selected_object);
+
+		// Mark object in stencil.
+		for (const auto& dc : outlineRenderPass.drawCalls)
+		{
+			const mat4& m = dc.transform;
+			const submesh_info& submesh = dc.submesh;
+
+			cl->setPipelineState(*outlineMarkerPipeline.pipeline);
+			cl->setGraphicsRootSignature(*outlineMarkerPipeline.rootSignature);
+
+			cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ camera.viewProj * m });
+
+			cl->setVertexBuffer(0, dc.vertexBuffer);
+			cl->setIndexBuffer(dc.indexBuffer);
+			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		}
+
+		// Draw outline.
+		cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ);
+
+		cl->setPipelineState(*outlineDrawerPipeline.pipeline);
+		cl->setGraphicsRootSignature(*outlineDrawerPipeline.rootSignature);
+
+		cl->setDescriptorHeapResource(OUTLINE_RS_STENCIL, 0, 1, depthStencilBuffer->stencilSRV);
+
+		cl->drawFullscreenTriangle();
+
+		cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+	}
+
+
 
 	// ----------------------------------------
 	// RAYTRACING
@@ -775,10 +833,10 @@ void dx_renderer::endFrame()
 
 #if 1
 
-	for (const raytraced_reflections_render_pass::draw_call& dc : raytracedReflectionsRenderPass.drawCalls)
+	for (const auto& dc : raytracedReflectionsRenderPass.drawCalls)
 	{
 		dc.batch->render(cl, raytracingTexture, settings.numRaytracingBounces, settings.raytracingFadeoutDistance, settings.raytracingMaxDistance, settings.environmentIntensity, settings.skyIntensity,
-			cameraCBV, sunCBV, depthBuffer, worldNormalsScreenVelocityTexture, environment, brdfTex);
+			cameraCBV, sunCBV, depthStencilBuffer, worldNormalsScreenVelocityTexture, environment, brdfTex);
 	}
 
 	//generateMipMapsOnGPU(cl, raytracingTexture);

@@ -52,7 +52,7 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createCubemapArraySRV(const 
 dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createDepthTextureSRV(const ref<dx_texture>& texture)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Format = getReadFormatFromTypeless(texture->resource->GetDesc().Format);
+	srvDesc.Format = getDepthReadFormat(texture->format);
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MipLevels = 1;
@@ -65,12 +65,26 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createDepthTextureSRV(const 
 dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createDepthTextureArraySRV(const ref<dx_texture>& texture)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Format = getReadFormatFromTypeless(texture->resource->GetDesc().Format);
+	srvDesc.Format = getDepthReadFormat(texture->format);
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
 	srvDesc.Texture2DArray.MipLevels = 1;
 	srvDesc.Texture2DArray.FirstArraySlice = 0;
 	srvDesc.Texture2DArray.ArraySize = texture->resource->GetDesc().DepthOrArraySize;
+
+	dxContext.device->CreateShaderResourceView(texture->resource.Get(), &srvDesc, cpuHandle);
+
+	return *this;
+}
+
+dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createStencilTextureSRV(const ref<dx_texture>& texture)
+{
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Format = getStencilReadFormat(texture->format);
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MipLevels = 1;
+	srvDesc.Texture2D.PlaneSlice = 1;
 
 	dxContext.device->CreateShaderResourceView(texture->resource.Get(), &srvDesc, cpuHandle);
 

@@ -1,15 +1,50 @@
 #include "pch.h"
 #include "camera.h"
 
-void render_camera::recalculateMatrices(uint32 renderWidth, uint32 renderHeight)
+void render_camera::initializeIngame(vec3 position, quat rotation, float verticalFOV, float nearPlane, float farPlane)
 {
-	return recalculateMatrices((float)renderWidth, (float)renderHeight);
+	type = camera_type_ingame;
+	this->position = position;
+	this->rotation = rotation;
+	this->verticalFOV = verticalFOV;
+	this->nearPlane = nearPlane;
+	this->farPlane = farPlane;
 }
 
-void render_camera::recalculateMatrices(float renderWidth, float renderHeight)
+void render_camera::initializeCalibrated(vec3 position, quat rotation, uint32 width, uint32 height, float fx, float fy, float cx, float cy, float nearPlane, float farPlane)
 {
-	float aspect = renderWidth / renderHeight;
-	proj = createPerspectiveProjectionMatrix(verticalFOV, aspect, nearPlane, farPlane);
+	type = camera_type_calibrated;
+	this->position = position;
+	this->rotation = rotation;
+	this->fx = fx;
+	this->fy = fy;
+	this->cx = cx;
+	this->cy = cy;
+	this->width = width;
+	this->height = height;
+	this->nearPlane = nearPlane;
+	this->farPlane = farPlane;
+}
+
+void render_camera::setViewport(uint32 width, uint32 height)
+{
+	this->width = width;
+	this->height = height;
+	aspect = (float)width / (float)height;
+}
+
+void render_camera::updateMatrices()
+{
+	if (type == camera_type_ingame)
+	{
+		proj = createPerspectiveProjectionMatrix(verticalFOV, aspect, nearPlane, farPlane);
+	}
+	else
+	{
+		assert(type == camera_type_calibrated);
+		proj = createPerspectiveProjectionMatrix((float)width, (float)height, fx, fy, cx, cy, nearPlane, farPlane);
+	}
+
 	invProj = invertPerspectiveProjectionMatrix(proj);
 	view = createViewMatrix(position, rotation);
 	invView = invertedAffine(view);
@@ -17,7 +52,27 @@ void render_camera::recalculateMatrices(float renderWidth, float renderHeight)
 	invViewProj = invView * invProj;
 }
 
-ray camera_base::generateWorldSpaceRay(float relX, float relY) const
+camera_projection_extents render_camera::getProjectionExtents()
+{
+	if (type == camera_type_ingame)
+	{
+		float extentY = tanf(0.5f * verticalFOV);
+		float extentX = extentY * aspect;
+
+		return camera_projection_extents{ extentX, extentX, extentY, extentY };
+	}
+	else
+	{
+		assert(type == camera_type_calibrated);
+
+		vec3 topLeft = restoreViewSpacePosition(vec2(0.f, 0.f), 0.f) / nearPlane;
+		vec3 bottomRight = restoreViewSpacePosition(vec2(1.f, 1.f), 0.f) / nearPlane;
+
+		return camera_projection_extents{ -topLeft.x, bottomRight.x, topLeft.y, -bottomRight.y };
+	}
+}
+
+ray render_camera::generateWorldSpaceRay(float relX, float relY) const
 {
 	float ndcX = 2.f * relX - 1.f;
 	float ndcY = -(2.f * relY - 1.f);
@@ -31,13 +86,13 @@ ray camera_base::generateWorldSpaceRay(float relX, float relY) const
 	return result;
 }
 
-ray camera_base::generateViewSpaceRay(float relX, float relY) const
+ray render_camera::generateViewSpaceRay(float relX, float relY) const
 {
 	float ndcX = 2.f * relX - 1.f;
 	float ndcY = -(2.f * relY - 1.f);
 	vec4 clip(ndcX, ndcY, -1.f, 1.f);
 	vec4 eye = invProj * clip;
-	eye.z = -1.f; eye.w = 0.f;
+	eye.z = -1.f;
 
 	ray result;
 	result.origin = vec3(0.f, 0.f, 0.f);
@@ -45,7 +100,7 @@ ray camera_base::generateViewSpaceRay(float relX, float relY) const
 	return result;
 }
 
-vec3 camera_base::restoreViewSpacePosition(vec2 uv, float depthBufferDepth) const
+vec3 render_camera::restoreViewSpacePosition(vec2 uv, float depthBufferDepth) const
 {
 	uv.y = 1.f - uv.y; // Screen uvs start at the top left, so flip y.
 	vec3 ndc = vec3(uv * 2.f - vec2(1.f, 1.f), depthBufferDepth);
@@ -54,7 +109,7 @@ vec3 camera_base::restoreViewSpacePosition(vec2 uv, float depthBufferDepth) cons
 	return position;
 }
 
-vec3 camera_base::restoreWorldSpacePosition(vec2 uv, float depthBufferDepth) const
+vec3 render_camera::restoreWorldSpacePosition(vec2 uv, float depthBufferDepth) const
 {
 	uv.y = 1.f - uv.y; // Screen uvs start at the top left, so flip y.
 	vec3 ndc = vec3(uv * 2.f - vec2(1.f, 1.f), depthBufferDepth);
@@ -63,7 +118,7 @@ vec3 camera_base::restoreWorldSpacePosition(vec2 uv, float depthBufferDepth) con
 	return position;
 }
 
-float camera_base::depthBufferDepthToEyeDepth(float depthBufferDepth) const
+float render_camera::depthBufferDepthToEyeDepth(float depthBufferDepth) const
 {
 	if (farPlane < 0.f) // Infinite far plane.
 	{
@@ -73,17 +128,32 @@ float camera_base::depthBufferDepthToEyeDepth(float depthBufferDepth) const
 	else
 	{
 		const float c1 = farPlane / nearPlane;
-		const float c0 = 1.f - farPlane / nearPlane;
+		const float c0 = 1.f - c1;
 		return farPlane / (c0 * depthBufferDepth + c1);
 	}
 }
 
-float camera_base::eyeDepthToDepthBufferDepth(float eyeDepth) const
+float render_camera::eyeDepthToDepthBufferDepth(float eyeDepth) const
 {
 	return -proj.m22 + proj.m23 / eyeDepth;
 }
 
-camera_frustum_corners camera_base::getWorldSpaceFrustumCorners(float alternativeFarPlane) const
+float render_camera::linearizeDepthBuffer(float depthBufferDepth) const
+{
+	if (farPlane < 0.f) // Infinite far plane.
+	{
+		depthBufferDepth = clamp(depthBufferDepth, 0.f, 1.f - 1e-7f); // A depth of 1 is at infinity.
+		return -1.f / (depthBufferDepth - 1.f);
+	}
+	else
+	{
+		const float c1 = farPlane / nearPlane;
+		const float c0 = 1.f - c1;
+		return 1.f / (c0 * depthBufferDepth + c1);
+	}
+}
+
+camera_frustum_corners render_camera::getWorldSpaceFrustumCorners(float alternativeFarPlane) const
 {
 	if (alternativeFarPlane <= 0.f)
 	{
@@ -127,20 +197,36 @@ camera_frustum_planes getWorldSpaceFrustumPlanes(const mat4& viewProj)
 	return result;
 }
 
-camera_frustum_planes camera_base::getWorldSpaceFrustumPlanes() const
+camera_frustum_planes render_camera::getWorldSpaceFrustumPlanes() const
 {
 	return ::getWorldSpaceFrustumPlanes(viewProj);
 }
 
-void real_camera::recalculateMatrices()
+render_camera render_camera::getJitteredVersion(vec2 offset)
 {
-	float aspect = (float)width / (float)height;
-	proj = createPerspectiveProjectionMatrix((float)width, (float)height, intr.fx, intr.fy, intr.cx, intr.cy, nearPlane, farPlane);
-	invProj = invertPerspectiveProjectionMatrix(proj);
-	view = createViewMatrix(position, rotation);
-	invView = invertedAffine(view);
-	viewProj = proj * view;
-	invViewProj = invView * invProj;
+	camera_projection_extents extents = getProjectionExtents();
+	float texelSizeX = (extents.left + extents.right) / width;
+	float texelSizeY = (extents.top + extents.bottom) / height;
+
+	float jitterX = texelSizeX * offset.x;
+	float jitterY = texelSizeY * offset.y;
+
+	float left = jitterX - extents.left;
+	float right = jitterX + extents.right;
+	float bottom = jitterY - extents.bottom;
+	float top = jitterY + extents.top;
+
+	mat4 jitteredProj = createPerspectiveProjectionMatrix(right * nearPlane, left * nearPlane, top * nearPlane, bottom * nearPlane, nearPlane, farPlane);
+
+
+	render_camera result = *this;
+
+	result.proj = jitteredProj;
+	result.invProj = invertPerspectiveProjectionMatrix(jitteredProj);
+	result.viewProj = jitteredProj * view;
+	result.invViewProj = invView * result.invProj;
+
+	return result;
 }
 
 bool camera_frustum_planes::cullWorldSpaceAABB(const bounding_box& aabb) const

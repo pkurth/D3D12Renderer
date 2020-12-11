@@ -277,6 +277,10 @@ ref<dx_texture> equirectangularToCubemap(dx_command_list* cl, const ref<dx_textu
 	{
 		cubemapDesc.Format = format;
 	}
+	if (isUAVCompatibleFormat(cubemapDesc.Format))
+	{
+		cubemapDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	}
 
 	ref<dx_texture> cubemap = createTexture(cubemapDesc, 0, 0);
 
@@ -354,6 +358,8 @@ ref<dx_texture> equirectangularToCubemap(dx_command_list* cl, const ref<dx_textu
 		mipSlice += numMips;
 	}
 
+	cl->uavBarrier(stagingResource);
+
 	if (stagingResource != cubemapResource)
 	{
 		cl->copyResource(stagingTexture->resource, cubemap->resource);
@@ -377,6 +383,11 @@ ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& 
 	irradianceDesc.Width = irradianceDesc.Height = resolution;
 	irradianceDesc.DepthOrArraySize = 6;
 	irradianceDesc.MipLevels = 1;
+
+	if (isUAVCompatibleFormat(irradianceDesc.Format))
+	{
+		irradianceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	}
 
 	ref<dx_texture> irradiance = createTexture(irradianceDesc, 0, 0);
 
@@ -440,6 +451,7 @@ ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& 
 
 	cl->dispatch(bucketize(cubemapToIrradianceCB.irradianceMapSize, 16), bucketize(cubemapToIrradianceCB.irradianceMapSize, 16), 6);
 
+	cl->uavBarrier(stagingResource);
 
 	if (stagingResource != irradianceResource)
 	{
@@ -458,6 +470,11 @@ ref<dx_texture> prefilterEnvironment(dx_command_list* cl, const ref<dx_texture>&
 	prefilteredDesc.Width = prefilteredDesc.Height = resolution;
 	prefilteredDesc.DepthOrArraySize = 6;
 	prefilteredDesc.MipLevels = 0;
+
+	if (isUAVCompatibleFormat(prefilteredDesc.Format))
+	{
+		prefilteredDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	}
 
 	ref<dx_texture> prefiltered = createTexture(prefilteredDesc, 0, 0);
 
@@ -531,6 +548,8 @@ ref<dx_texture> prefilterEnvironment(dx_command_list* cl, const ref<dx_texture>&
 		mipSlice += numMips;
 	}
 
+	cl->uavBarrier(stagingResource);
+
 	if (stagingResource != prefilteredResource)
 	{
 		cl->copyResource(stagingTexture->resource, prefiltered->resource);
@@ -546,33 +565,17 @@ ref<dx_texture> integrateBRDF(dx_command_list* cl, uint32 resolution)
 		DXGI_FORMAT_R16G16_FLOAT,
 		resolution, resolution, 1, 1);
 
+	desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
 	ref<dx_texture> brdf = createTexture(desc, 0, 0);
 	desc = CD3DX12_RESOURCE_DESC(brdf->resource->GetDesc());
 
+	// TODO: Technically R16G16 is not guaranteed to be UAV compatible.
+	// If we ever run on hardware, which does not support this, we need to find a solution.
+	// https://docs.microsoft.com/en-us/windows/win32/direct3d11/typed-unordered-access-view-loads
+
 	dx_resource brdfResource = brdf->resource;
 	SET_NAME(brdfResource, "BRDF");
-	dx_resource stagingResource = brdfResource;
-
-	ref<dx_texture> stagingTexture = make_ref<dx_texture>();
-	stagingTexture->resource = brdfResource;
-
-	if ((desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) == 0)
-	{
-		CD3DX12_RESOURCE_DESC stagingDesc = desc;
-		stagingDesc.Format = getUAVCompatibleFormat(desc.Format);
-		stagingDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-		checkResult(dxContext.device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-			D3D12_HEAP_FLAG_NONE,
-			&stagingDesc,
-			D3D12_RESOURCE_STATE_COMMON,
-			0,
-			IID_PPV_ARGS(&stagingResource)
-		));
-
-		stagingTexture->resource = stagingResource;
-	}
 
 	cl->setPipelineState(*integrateBRDFPipeline.pipeline);
 	cl->setComputeRootSignature(*integrateBRDFPipeline.rootSignature);
@@ -582,20 +585,12 @@ ref<dx_texture> integrateBRDF(dx_command_list* cl, uint32 resolution)
 
 	cl->setCompute32BitConstants(0, integrateBrdfCB);
 
-	dx_descriptor_range descriptors = dxContext.frameDescriptorAllocator.allocateContiguousDescriptorRange(1);
-	cl->setDescriptorHeap(descriptors);
-
-	dx_double_descriptor_handle uav = descriptors.pushHandle();
-	uav.create2DTextureUAV(stagingTexture, 0, getUAVCompatibleFormat(desc.Format));
-	cl->setComputeDescriptorTable(1, uav);
+	cl->resetToDynamicDescriptorHeap();
+	cl->setDescriptorHeapUAV(1, 0, brdf);
 
 	cl->dispatch(bucketize(resolution, 16), bucketize(resolution, 16), 1);
 
-	if (stagingResource != brdfResource)
-	{
-		cl->copyResource(stagingTexture->resource, brdf->resource);
-		cl->transitionBarrier(brdf->resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
-	}
+	cl->uavBarrier(brdf);
 
 	return brdf;
 }
@@ -605,27 +600,30 @@ void gaussianBlur(dx_command_list* cl, ref<dx_texture> tex, ref<dx_texture> tmpT
 	cl->setPipelineState(*gaussianBlurPipeline.pipeline);
 	cl->setComputeRootSignature(*gaussianBlurPipeline.rootSignature);
 
-	uint32 width = tex->width;
-	uint32 height = tex->height;
+	float invWidth = 1.f / tex->width;
+	float invHeight = 1.f / tex->height;
+
+	uint32 widthBuckets = bucketize(tex->width, 16);
+	uint32 heightBuckets = bucketize(tex->height, 16);
 
 	for (uint32 i = 0; i < numIterations; ++i)
 	{
 		// Vertical pass.
-		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(0.f, 1.f / height) });
+		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(0.f, invHeight) });
 		cl->setDescriptorHeapSRV(1, 0, tex);
 		cl->setDescriptorHeapUAV(1, 1, tmpTex);
 
-		cl->dispatch(bucketize(width, 16), bucketize(height, 16), 1);
+		cl->dispatch(widthBuckets, heightBuckets, 1);
 
 		cl->uavBarrier(tmpTex);
 
 
 		// Horizontal pass.
-		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(1.f / width, 0.f) });
+		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(invWidth, 0.f) });
 		cl->setDescriptorHeapSRV(1, 0, tmpTex);
 		cl->setDescriptorHeapUAV(1, 1, tex);
 
-		cl->dispatch(bucketize(width, 16), bucketize(height, 16), 1);
+		cl->dispatch(widthBuckets, heightBuckets, 1);
 
 		cl->uavBarrier(tex);
 	}

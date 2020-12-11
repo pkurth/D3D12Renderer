@@ -5,17 +5,25 @@
 #include "random.h"
 #include "color.h"
 #include "imgui.h"
+#include "camera_controller.h"
 #include "dx_context.h"
+
+#include "random.hlsli"
+
+
+static vec2 halton23Sequence[16];
 
 
 void application::initialize(dx_renderer* renderer)
 {
+	for (uint32 i = 0; i < arraysize(halton23Sequence); ++i)
+	{
+		halton23Sequence[i] = halton23(i + 1);
+	}
+
 	this->renderer = renderer;
 
-	camera.position = vec3(0.f, 30.f, 40.f);
-	camera.rotation = quat::identity;
-	camera.verticalFOV = deg2rad(70.f);
-	camera.nearPlane = 0.1f;
+	camera.initializeIngame(vec3(0.f, 30.f, 40.f), quat::identity, deg2rad(70.f), 0.1f);
 
 	meshes.push_back(loadMeshFromFile("assets/meshes/cerberus.fbx", 
 		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
@@ -136,49 +144,6 @@ void application::initialize(dx_renderer* renderer)
 	sun.blendArea = 0.07f;
 }
 
-void application::updateCamera(const user_input& input, float dt)
-{
-	const float CAMERA_MOVEMENT_SPEED = 8.f;
-	const float CAMERA_SENSITIVITY = 4.f;
-	const float CAMERA_ORBIT_RADIUS = 50.f;
-
-	if (input.mouse.right.down)
-	{
-		// Fly camera.
-
-		vec3 cameraInputDir = vec3(
-			(input.keyboard['D'].down ? 1.f : 0.f) + (input.keyboard['A'].down ? -1.f : 0.f),
-			(input.keyboard['E'].down ? 1.f : 0.f) + (input.keyboard['Q'].down ? -1.f : 0.f),
-			(input.keyboard['W'].down ? -1.f : 0.f) + (input.keyboard['S'].down ? 1.f : 0.f)
-		) * (input.keyboard[key_shift].down ? 3.f : 1.f) * (input.keyboard[key_ctrl].down ? 0.1f : 1.f) * CAMERA_MOVEMENT_SPEED;
-
-		vec2 turnAngle(0.f, 0.f);
-		turnAngle = vec2(-input.mouse.reldx, -input.mouse.reldy) * CAMERA_SENSITIVITY;
-
-		quat& cameraRotation = camera.rotation;
-		cameraRotation = quat(vec3(0.f, 1.f, 0.f), turnAngle.x) * cameraRotation;
-		cameraRotation = cameraRotation * quat(vec3(1.f, 0.f, 0.f), turnAngle.y);
-
-		camera.position += cameraRotation * cameraInputDir * dt;
-	}
-	else if (input.keyboard[key_alt].down && input.mouse.left.down)
-	{
-		// Orbit camera.
-
-		vec2 turnAngle(0.f, 0.f);
-		turnAngle = vec2(-input.mouse.reldx, -input.mouse.reldy) * CAMERA_SENSITIVITY;
-
-		quat& cameraRotation = camera.rotation;
-
-		vec3 center = camera.position + cameraRotation * vec3(0.f, 0.f, -CAMERA_ORBIT_RADIUS);
-
-		cameraRotation = quat(vec3(0.f, 1.f, 0.f), turnAngle.x) * cameraRotation;
-		cameraRotation = cameraRotation * quat(vec3(1.f, 0.f, 0.f), turnAngle.y);
-
-		camera.position = center - cameraRotation * vec3(0.f, 0.f, -CAMERA_ORBIT_RADIUS);
-	}
-}
-
 static bool plotAndEditTonemapping(tonemap_cb& tonemap)
 {
 	bool result = false;
@@ -236,8 +201,7 @@ static bool editSunShadowParameters(directional_light& sun)
 
 void application::update(const user_input& input, float dt)
 {
-	updateCamera(input, dt);
-	camera.recalculateMatrices(renderer->renderWidth, renderer->renderHeight);
+	updateCamera(camera, input, renderer->renderWidth, renderer->renderHeight, dt);
 
 	ImGui::Begin("Settings");
 	ImGui::Text("%.3f ms, %u FPS", dt * 1000.f, (uint32)(1.f / dt));
@@ -261,6 +225,8 @@ void application::update(const user_input& input, float dt)
 	ImGui::SliderInt("Raytracing downsampling", (int*)&renderer->settings.raytracingDownsampleFactor, 1, 4);
 	ImGui::SliderInt("Raytracing blur iteations", (int*)&renderer->settings.blurRaytracingResultIterations, 1, 4);
 
+	static float jitterStrength = 1.f;
+	ImGui::SliderFloat("Jitter strength", &jitterStrength, 0.f, 1.f);
 
 	ImGui::End();
 
@@ -280,11 +246,18 @@ void application::update(const user_input& input, float dt)
 		lightVelocities[i] += (v - lightVelocities[i]) * factor;
 	}
 
+#if 0
+	static uint32 haltonIndex = 0;
+	auto jitteredCamera = camera.getJitteredVersion(halton23Sequence[haltonIndex] * jitterStrength);
+	haltonIndex = (haltonIndex + 1) % arraysize(halton23Sequence);
+#else
+	auto& jitteredCamera = camera;
+#endif
 
-	sun.updateMatrices(camera);
+	sun.updateMatrices(jitteredCamera);
 
 
-	renderer->setCamera(camera);
+	renderer->setCamera(jitteredCamera);
 	renderer->setSun(sun);
 	renderer->setEnvironment(environment);
 	renderer->setPointLights(pointLights, numPointLights);
@@ -292,22 +265,29 @@ void application::update(const user_input& input, float dt)
 
 
 	geometry_render_pass* geometryPass = renderer->beginGeometryPass();
+	outline_render_pass* outlinePass = renderer->beginOutlinePass();
 	sun_shadow_render_pass* shadowPass = renderer->beginSunShadowPass();
 
 
 	for (const scene_object& go : gameObjects)
 	{
 		const dx_mesh& mesh = meshes[go.meshIndex].mesh;
+		mat4 m = trsToMat4(go.transform);
+
+		bool outline = go.meshIndex == 0;
 
 		for (auto& single : meshes[go.meshIndex].singleMeshes)
 		{
 			submesh_info submesh = single.submesh;
 			const ref<pbr_material>& material = single.material;
 
-			mat4 m = trsToMat4(go.transform);
-
 			geometryPass->renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m);
 			shadowPass->renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+			
+			if (outline)
+			{
+				outlinePass->renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+			}
 		}
 	}
 

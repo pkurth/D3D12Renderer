@@ -4,18 +4,26 @@
 struct outline_cb
 {
     mat4 mvp;
-    vec4 color;
 };
 
-#define OUTLINE_RS \
+#define OUTLINE_MARKER_RS \
 "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
 "DENY_HULL_SHADER_ROOT_ACCESS |" \
 "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
 "DENY_GEOMETRY_SHADER_ROOT_ACCESS |" \
 "DENY_PIXEL_SHADER_ROOT_ACCESS)," \
-"RootConstants(num32BitConstants=20, b0, visibility=SHADER_VISIBILITY_VERTEX)"
+"RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX)"
 
-#define OUTLINE_RS_MVP	                0
+#define OUTLINE_DRAWER_RS \
+"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
+"DENY_HULL_SHADER_ROOT_ACCESS |" \
+"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
+"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
+"DescriptorTable(SRV(t0, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL)"
+
+
+#define OUTLINE_RS_MVP	    0
+#define OUTLINE_RS_STENCIL  0
 
 #endif
 

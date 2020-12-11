@@ -47,13 +47,18 @@ union camera_frustum_planes
 	bool cullModelSpaceAABB(const bounding_box& aabb, const mat4& transform) const;
 };
 
-
-struct camera_intrinsics
+enum camera_type
 {
-	float fx, fy, cx, cy;
+	camera_type_ingame,
+	camera_type_calibrated,
 };
 
-struct camera_base
+struct camera_projection_extents
+{
+	float left, right, top, bottom; // Extents of frustum at distance 1.
+};
+
+struct render_camera
 {
 	// Camera properties.
 	quat rotation;
@@ -61,6 +66,20 @@ struct camera_base
 
 	float nearPlane;
 	float farPlane = -1.f;
+
+	uint32 width, height;
+
+	camera_type type;
+
+	union
+	{
+		float verticalFOV; // For ingame cameras.
+
+		struct
+		{
+			float fx, fy, cx, cy; // For calibrated cameras.
+		};
+	};
 
 
 	// Derived values.
@@ -72,6 +91,22 @@ struct camera_base
 
 	mat4 viewProj;
 	mat4 invViewProj;
+	
+	float aspect;
+
+
+
+
+	void initializeIngame(vec3 position, quat rotation, float verticalFOV, float nearPlane, float farPlane = -1.f);
+	void initializeCalibrated(vec3 position, quat rotation, uint32 width, uint32 height, float fx, float fy, float cx, float cy, float nearPlane, float farPlane = -1.f);
+
+	void setViewport(uint32 width, uint32 height);
+
+	void updateMatrices();
+
+
+
+
 
 	ray generateWorldSpaceRay(float relX, float relY) const;
 	ray generateViewSpaceRay(float relX, float relY) const;
@@ -80,25 +115,17 @@ struct camera_base
 	vec3 restoreWorldSpacePosition(vec2 uv, float depthBufferDepth) const;
 	float depthBufferDepthToEyeDepth(float depthBufferDepth) const;
 	float eyeDepthToDepthBufferDepth(float eyeDepth) const;
+	float linearizeDepthBuffer(float depthBufferDepth) const;
 
 	camera_frustum_corners getWorldSpaceFrustumCorners(float alternativeFarPlane = 0.f) const;
 	camera_frustum_planes getWorldSpaceFrustumPlanes() const;
+
+	camera_projection_extents getProjectionExtents();
+
+
+
+	render_camera getJitteredVersion(vec2 offset);
 };
 
-struct render_camera : camera_base
-{
-	float verticalFOV;
-
-	void recalculateMatrices(uint32 renderWidth, uint32 renderHeight);
-	void recalculateMatrices(float renderWidth, float renderHeight);
-};
-
-struct real_camera : camera_base
-{
-	camera_intrinsics intr;
-	uint32 width, height;
-
-	void recalculateMatrices();
-};
 
 camera_frustum_planes getWorldSpaceFrustumPlanes(const mat4& viewProj);

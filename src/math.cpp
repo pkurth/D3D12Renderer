@@ -652,6 +652,48 @@ mat4 createPerspectiveProjectionMatrix(float width, float height, float fx, floa
 	return result;
 }
 
+mat4 createPerspectiveProjectionMatrix(float r, float l, float t, float b, float nearPlane, float farPlane)
+{
+	mat4 result;
+	result.m00 = (2.f * nearPlane) / (r - l);
+	result.m01 = 0.f; 
+	result.m02 = (r + l) / (r - l);
+	result.m03 = 0.f;
+
+	result.m10 = 0.f; 
+	result.m11 = (2.f * nearPlane) / (t - b);
+	result.m12 = (t + b) / (t - b);
+	result.m13 = 0.f;
+
+	result.m20 = 0; result.m21 = 0;
+	if (farPlane > 0.f)
+	{
+#if DIRECTX_COORDINATE_SYSTEM
+		result.m22 = -farPlane / (farPlane - nearPlane);
+		result.m23 = result.m22 * nearPlane;
+#else
+		result.m22 = -(farPlane + nearPlane) / (farPlane - nearPlane);
+		result.m23 = -2.f * farPlane * nearPlane / (farPlane - nearPlane);
+#endif
+	}
+	else
+	{
+		result.m22 = -1.f;
+#if DIRECTX_COORDINATE_SYSTEM
+		result.m23 = -nearPlane;
+#else
+		result.m23 = -2.f * nearPlane;
+#endif
+	}
+
+	result.m30 = 0.f; 
+	result.m31 = 0.f; 
+	result.m32 = -1.f; 
+	result.m33 = 0.f;
+
+	return result;
+}
+
 mat4 createOrthographicProjectionMatrix(float r, float l, float t, float b, float nearPlane, float farPlane)
 {
 	mat4 result = mat4::identity;

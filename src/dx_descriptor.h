@@ -34,6 +34,7 @@ struct dx_cpu_descriptor_handle
 	dx_cpu_descriptor_handle& createCubemapArraySRV(const ref<dx_texture>& texture, texture_mip_range mipRange = {}, uint32 firstCube = 0, uint32 numCubes = 1, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_cpu_descriptor_handle& createDepthTextureSRV(const ref<dx_texture>& texture);
 	dx_cpu_descriptor_handle& createDepthTextureArraySRV(const ref<dx_texture>& texture);
+	dx_cpu_descriptor_handle& createStencilTextureSRV(const ref<dx_texture>& texture);
 	dx_cpu_descriptor_handle& createNullTextureSRV();
 	dx_cpu_descriptor_handle& createBufferSRV(const ref<dx_buffer>& buffer, buffer_range bufferRange = {});
 	dx_cpu_descriptor_handle& createRawBufferSRV(const ref<dx_buffer>& buffer, buffer_range bufferRange = {});

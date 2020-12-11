@@ -72,6 +72,7 @@ struct dx_renderer
 	void setSpotLights(const spot_light_cb* lights, uint32 numLights);
 
 	geometry_render_pass* beginGeometryPass() { return &geometryRenderPass; }
+	outline_render_pass* beginOutlinePass() { return &outlineRenderPass; }
 	sun_shadow_render_pass* beginSunShadowPass() { return &sunShadowRenderPass; }
 	raytraced_reflections_render_pass* beginRaytracedReflectionsPass() { return &raytracedReflectionsRenderPass; }
 
@@ -108,7 +109,7 @@ struct dx_renderer
 	dx_render_target hdrRenderTarget;
 	ref<dx_texture> hdrColorTexture;
 	ref<dx_texture> worldNormalsScreenVelocityTexture; // Screen velocity: x points right, y points down! This is in accordance with UV coordinates, which start at the top left.
-	ref<dx_texture> depthBuffer;
+	ref<dx_texture> depthStencilBuffer;
 
 	ref<dx_texture> volumetricsTexture;
 
@@ -131,6 +132,7 @@ struct dx_renderer
 
 
 	geometry_render_pass geometryRenderPass;
+	outline_render_pass outlineRenderPass;
 	sun_shadow_render_pass sunShadowRenderPass;
 	raytraced_reflections_render_pass raytracedReflectionsRenderPass;
 

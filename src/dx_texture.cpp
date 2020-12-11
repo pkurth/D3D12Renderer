@@ -336,6 +336,7 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 	result->defaultUAV = {};
 	result->rtvHandles = {};
 	result->dsvHandle = {};
+	result->stencilSRV = {};
 
 
 	// Upload.
@@ -411,9 +412,7 @@ ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT form
 	optimizedClearValue.Format = format;
 	optimizedClearValue.DepthStencil = { 1.f, 0 };
 
-	DXGI_FORMAT typelessFormat = getTypelessFormat(format);
-
-	D3D12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Tex2D(typelessFormat, width, height,
+	D3D12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Tex2D(getTypelessFormat(format), width, height,
 		arrayLength, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 
 	checkResult(dxContext.device->CreateCommittedResource(
@@ -447,6 +446,7 @@ ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT form
 	result->defaultUAV = {};
 	result->rtvHandles = {};
 	result->dsvHandle = {};
+	result->stencilSRV = {};
 
 	assert(result->supportsDSV);
 
@@ -454,6 +454,11 @@ ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT form
 	if (arrayLength == 1)
 	{
 		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureSRV(result);
+
+		if (isStencilFormat(format))
+		{
+			result->stencilSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createStencilTextureSRV(result);
+		}
 	}
 	else
 	{
@@ -514,12 +519,13 @@ std::wstring dx_texture::getName() const
 	return name;
 }
 
-static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_descriptor_handle uav, dx_rtv_descriptor_handle rtv, dx_dsv_descriptor_handle dsv)
+static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_descriptor_handle uav, dx_cpu_descriptor_handle stencil, dx_rtv_descriptor_handle rtv, dx_dsv_descriptor_handle dsv)
 {
 	texture_grave grave;
 	grave.resource = resource;
 	grave.srv = srv;
 	grave.uav = uav;
+	grave.stencil = stencil;
 	grave.rtv = rtv;
 	grave.dsv = dsv;
 	dxContext.retire(std::move(grave));
@@ -527,12 +533,12 @@ static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_de
 
 dx_texture::~dx_texture()
 {
-	retire(resource, defaultSRV, defaultUAV, rtvHandles, dsvHandle);
+	retire(resource, defaultSRV, defaultUAV, stencilSRV, rtvHandles, dsvHandle);
 }
 
 void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState)
 {
-	retire(texture->resource, texture->defaultSRV, texture->defaultUAV, texture->rtvHandles, texture->dsvHandle);
+	retire(texture->resource, texture->defaultSRV, texture->defaultUAV, texture->stencilSRV, texture->rtvHandles, texture->dsvHandle);
 
 	D3D12_RESOURCE_DESC desc = texture->resource->GetDesc();
 	texture->resource.Reset();
@@ -587,6 +593,11 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 		{
 			texture->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureArraySRV(texture);
 		}
+
+		if (isStencilFormat(texture->format))
+		{
+			texture->stencilSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createStencilTextureSRV(texture);
+		}
 	}
 	else
 	{
@@ -627,6 +638,10 @@ texture_grave::~texture_grave()
 		if (uav.cpuHandle.ptr)
 		{
 			dxContext.descriptorAllocatorCPU.freeHandle(uav);
+		}
+		if (stencil.cpuHandle.ptr)
+		{
+			dxContext.descriptorAllocatorCPU.freeHandle(stencil);
 		}
 		if (rtv.cpuHandle.ptr)
 		{

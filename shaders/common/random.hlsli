@@ -1,7 +1,7 @@
 #ifndef RANDOM_H
 #define RANDOM_H
 
-static float halton(uint index, uint base)
+static float halton(uint32 index, uint32 base)
 {
 	float fraction = 1.f;
 	float result = 0.f;
@@ -14,9 +14,9 @@ static float halton(uint index, uint base)
 	return result;
 }
 
-static float2 halton23(uint index)
+static vec2 halton23(uint32 index)
 {
-	return float2(halton(index, 2), halton(index, 3));
+	return vec2(halton(index, 2), halton(index, 3));
 }
 
 #endif
