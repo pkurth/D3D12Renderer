@@ -33,6 +33,7 @@ static const char* aspectRatioNames[] =
 	"16:10",
 };
 
+
 struct renderer_settings
 {
 	tonemap_cb tonemap = defaultTonemapParameters();

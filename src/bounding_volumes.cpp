@@ -193,6 +193,339 @@ bool ray::intersectSphere(vec3 center, float radius, float& outT) const
 	return true;
 }
 
+bool ray::intersectCylinder(const bounding_cylinder& cylinder, float& outT) const
+{
+	vec3 d = direction;
+	vec3 o = origin;
+
+	vec3 axis = cylinder.positionB - cylinder.positionA;
+	float height = length(axis);
+
+	quat q = rotateFromTo(axis, vec3(0.f, 1.f, 0.f));
+
+	vec3 posA = cylinder.positionA;
+	vec3 posB = posA + vec3(0.f, height, 0.f);
+
+	o = q * (o - posA);
+	d = q * d;
+
+	float a = d.x * d.x + d.z * d.z;
+	float b = d.x * o.x + d.z * o.z;
+	float c = o.x * o.x + o.z * o.z - cylinder.radius * cylinder.radius;
+
+	float delta = b * b - a * c;
+
+	float epsilon = 1e-6f;
+
+	if (delta < epsilon)
+	{
+		return false;
+	}
+
+	outT = (-b - sqrt(delta)) / a;
+	if (outT <= epsilon)
+	{
+		return false; // Behind ray.
+	}
+
+
+	float y = o.y + outT * d.y;
+
+	// Check bases.
+	if (y > height + epsilon || y < -epsilon) 
+	{
+		ray localRay = { o, d };
+
+		float dist;
+		bool b1 = localRay.intersectDisk(posB, vec3(0.f, 1.f, 0.f), cylinder.radius, dist);
+		if (b1)
+		{
+			outT = dist;
+		}
+		bool b2 = localRay.intersectDisk(posA, vec3(0.f, -1.f, 0.f), cylinder.radius, dist);
+		if (b2 && dist > epsilon && outT >= dist)
+		{
+			outT = dist;
+		}
+	}
+
+	return true;
+}
+
+bool ray::intersectDisk(vec3 pos, vec3 normal, float radius, float& outT) const
+{
+	bool intersectsPlane = intersectPlane(normal, pos, outT);
+	if (intersectsPlane)
+	{
+		return length(origin + outT * direction - pos) <= radius;
+	}
+	return false;
+}
+
+static bool isZero(float x) 
+{
+	return abs(x) < 1e-6f;
+}
+
+struct solve_2_result
+{
+	uint32 numResults;
+	float results[2];
+};
+
+struct solve_3_result
+{
+	uint32 numResults;
+	float results[3];
+};
+
+struct solve_4_result
+{
+	uint32 numResults;
+	float results[4];
+};
+
+static solve_2_result solve2(float c0, float c1, float c2)
+{
+	float p = c1 / (2 * c2);
+	float q = c0 / c2;
+
+	float D = p * p - q;
+
+	if (isZero(D)) 
+	{
+		return { 1, -p };
+	}
+	else if (D < 0) 
+	{
+		return { 0 };
+	}
+	else /* if (D > 0) */ 
+	{
+		float sqrt_D = sqrt(D);
+
+		return { 2, sqrt_D - p, -sqrt_D - p };
+	}
+}
+
+static solve_3_result solve3(float c0, float c1, float c2, float c3)
+{
+	float A = c2 / c3;
+	float B = c1 / c3;
+	float C = c0 / c3;
+
+	float sq_A = A * A;
+	float p = 1.f / 3 * (-1.f / 3 * sq_A + B);
+	float q = 1.f / 2 * (2.f / 27 * A * sq_A - 1.f / 3 * A * B + C);
+
+	/* use Cardano's formula */
+
+	float cb_p = p * p * p;
+	float D = q * q + cb_p;
+
+	solve_3_result s = {};
+
+	if (isZero(D))
+	{
+		if (isZero(q))
+		{
+			s = { 1, 0.f };
+		}
+		else
+		{
+			float u = cbrt(-q);
+			s = { 2, 2.f * u, -u };
+		}
+	}
+	else if (D < 0) /* Casus irreducibilis: three real solutions */ 
+	{
+		float phi = 1.f / 3.f * acos(-q / sqrt(-cb_p));
+		float t = 2.f * sqrt(-p);
+
+		s = { 3,
+			t * cos(phi),
+			-t * cos(phi + M_PI / 3),
+			-t * cos(phi - M_PI / 3) };
+
+	}
+	else /* one real solution */ 
+	{
+		float sqrt_D = sqrt(D);
+		float u = cbrt(sqrt_D - q);
+		float v = -cbrt(sqrt_D + q);
+
+		s = { 1, u + v };
+
+	}
+
+	/* resubstitute */
+
+	float sub = 1.f / 3.f * A;
+
+	for (uint32 i = 0; i < s.numResults; ++i)
+	{
+		s.results[i] -= sub;
+	}
+
+	return s;
+}
+
+/**
+ *  Solves equation:
+ *
+ *      c[0] + c[1]*x + c[2]*x^2 + c[3]*x^3 + c[4]*x^4 = 0
+ *
+ */
+static solve_4_result solve4(float c0, float c1, float c2, float c3, float c4)
+{
+	/* normal form: x^4 + Ax^3 + Bx^2 + Cx + D = 0 */
+
+	float A = c3 / c4;
+	float B = c2 / c4;
+	float C = c1 / c4;
+	float D = c0 / c4;
+
+	/*  substitute x = y - A/4 to eliminate cubic term:
+	x^4 + px^2 + qx + r = 0 */
+
+	float sq_A = A * A;
+	float p = -3.f / 8 * sq_A + B;
+	float q = 1.f / 8 * sq_A * A - 1.f / 2 * A * B + C;
+	float r = -3.f / 256 * sq_A * sq_A + 1.f / 16 * sq_A * B - 1.f / 4 * A * C + D;
+	solve_4_result s = {};
+
+	if (isZero(r)) 
+	{
+		/* no absolute term: y(y^3 + py + q) = 0 */
+
+		auto s3 = solve3(q, p, 0, 1);
+		for (uint32 i = 0; i < s3.numResults; ++i)
+		{
+			s.results[s.numResults++] = s3.results[i];
+		}
+
+		s.results[s.numResults++] = 0.f;
+	}
+	else 
+	{
+		/* solve the resolvent cubic ... */
+		
+		auto s3 = solve3(1.f / 2 * r * p - 1.f / 8 * q * q, -r, -0.5f * p, 1.f);
+		for (uint32 i = 0; i < s3.numResults; ++i)
+		{
+			s.results[s.numResults++] = s3.results[i];
+		}
+
+		/* ... and take the one real solution ... */
+
+		float z = s.results[0];
+
+		/* ... to build two quadric equations */
+
+		float u = z * z - r;
+		float v = 2.f * z - p;
+
+		if (isZero(u))
+		{
+			u = 0;
+		}
+		else if (u > 0)
+		{
+			u = sqrt(u);
+		}
+		else
+		{
+			return {};
+		}
+
+		if (isZero(v))
+		{
+			v = 0;
+		}
+		else if (v > 0)
+		{
+			v = sqrt(v);
+		}
+		else
+		{
+			return {};
+		}
+
+		auto s2 = solve2(z - u, q < 0 ? -v : v, 1);
+		s = {};
+		for (uint32 i = 0; i < s2.numResults; ++i)
+		{
+			s.results[s.numResults++] = s2.results[i];
+		}
+
+		s2 = solve2(z + u, q < 0 ? v : -v, 1);
+		for (uint32 i = 0; i < s2.numResults; ++i)
+		{
+			s.results[s.numResults++] = s2.results[i];
+		}
+	}
+
+	/* resubstitute */
+
+	float sub = 1.f / 4 * A;
+
+	for (uint32 i = 0; i < s.numResults; ++i)
+	{
+		s.results[i] -= sub;
+	}
+
+	return s;
+}
+
+bool ray::intersectTorus(const bounding_torus& torus, float& outT) const
+{
+	vec3 d = direction;
+	vec3 o = origin;
+
+	vec3 axis = torus.upAxis;
+
+	quat q = rotateFromTo(axis, vec3(0.f, 1.f, 0.f));
+
+	o = q * (o - torus.position);
+	d = q * d;
+
+
+
+	// define the coefficients of the quartic equation
+	float sum_d_sqrd = dot(d, d);
+
+	float e = dot(o, o) - torus.majorRadius * torus.majorRadius - torus.tubeRadius * torus.tubeRadius;
+	float f = dot(o, d);
+	float four_a_sqrd = 4.f * torus.majorRadius * torus.majorRadius;
+
+	auto solution = solve4(
+		e * e - four_a_sqrd * (torus.tubeRadius * torus.tubeRadius - o.y * o.y),
+		4.f * f * e + 2.f * four_a_sqrd * o.y * d.y,
+		2.f * sum_d_sqrd * e + 4.f * f * f + four_a_sqrd * d.y * d.y,
+		4.f * sum_d_sqrd * f,
+		sum_d_sqrd * sum_d_sqrd
+	);
+
+	// ray misses the torus
+	if (solution.numResults == 0)
+	{
+		return false;
+	}
+
+	// find the smallest root greater than kEpsilon, if any
+	// the roots array is not sorted
+	float minT = FLT_MAX;
+	for (uint32 i = 0; i < solution.numResults; ++i) 
+	{
+		float t = solution.results[i];
+		if ((t > 1e-6f) && (t < minT)) {
+			minT = t;
+		}
+	}
+	outT = minT;
+	return true;
+}
+
 float signedDistanceToPlane(const vec3& p, const vec4& plane)
 {
 	return dot(vec4(p, 1.f), plane);

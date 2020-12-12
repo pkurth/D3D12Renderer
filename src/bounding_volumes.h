@@ -40,6 +40,21 @@ struct bounding_capsule
 	float radius;
 };
 
+struct bounding_cylinder
+{
+	vec3 positionA;
+	vec3 positionB;
+	float radius;
+};
+
+struct bounding_torus
+{
+	vec3 position;
+	vec3 upAxis;
+	float majorRadius;
+	float tubeRadius;
+};
+
 union bounding_box_corners
 {
 	struct
@@ -96,7 +111,16 @@ struct ray
 	bool intersectTriangle(vec3 a, vec3 b, vec3 c, float& outT, bool& outFrontFacing) const;
 	bool intersectSphere(vec3 center, float radius, float& outT) const;
 	bool intersectSphere(const bounding_sphere& sphere, float& outT) const { return intersectSphere(sphere.center, sphere.radius, outT); }
+	bool intersectCylinder(const bounding_cylinder& cylinder, float& outT) const;
+	bool intersectDisk(vec3 pos, vec3 normal, float radius, float& outT) const;
+	bool intersectTorus(const bounding_torus& torus, float& outT) const;
 };
+
+inline vec4 createPlane(vec3 point, vec3 normal)
+{
+	float d = -dot(normal, point);
+	return vec4(normal, d);
+}
 
 float signedDistanceToPlane(const vec3& p, const vec4& plane);
 

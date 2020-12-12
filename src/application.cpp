@@ -23,8 +23,6 @@ void application::initialize(dx_renderer* renderer)
 
 	this->renderer = renderer;
 
-	gizmos.initialize();
-
 	camera.initializeIngame(vec3(0.f, 30.f, 40.f), quat::identity, deg2rad(70.f), 0.1f);
 
 	meshes.push_back(loadMeshFromFile("assets/meshes/cerberus.fbx", 
@@ -262,6 +260,12 @@ void application::update(const user_input& input, float dt)
 	static float jitterStrength = 1.f;
 	ImGui::SliderFloat("Jitter strength", &jitterStrength, 0.f, 1.f);
 
+	static transformation_type transformationType = transformation_type_translation;
+	static transformation_space transformationSpace = transformation_global;
+
+	ImGui::Dropdown("Gizmo type", transformationTypeNames, 3, (uint32&)transformationType);
+	ImGui::Dropdown("Gizmo space", transformationSpaceNames, 2, (uint32&)transformationSpace);
+
 	ImGui::End();
 
 	// Update light positions.
@@ -325,24 +329,7 @@ void application::update(const user_input& input, float dt)
 		}
 	}
 
-	gizmo_type type = gizmo_type_translation;
-
-	visualization_render_pass* visualizationPass = renderer->beginVisualizationPass();
-	visualizationPass->renderObject(gizmos.mesh.vertexBuffer, gizmos.mesh.indexBuffer, 
-		gizmos.submesh(type),
-		createModelMatrix(gameObjects[0].transform.position, gizmos.rotation(gizmo_axis_x)), 
-		gizmos.color(gizmo_axis_x)
-	);
-	visualizationPass->renderObject(gizmos.mesh.vertexBuffer, gizmos.mesh.indexBuffer,
-		gizmos.submesh(type),
-		createModelMatrix(gameObjects[0].transform.position, gizmos.rotation(gizmo_axis_y)),
-		gizmos.color(gizmo_axis_y)
-	);
-	visualizationPass->renderObject(gizmos.mesh.vertexBuffer, gizmos.mesh.indexBuffer,
-		gizmos.submesh(type),
-		createModelMatrix(gameObjects[0].transform.position, gizmos.rotation(gizmo_axis_z)),
-		gizmos.color(gizmo_axis_z)
-	);
+	manipulateTransformation(gameObjects[0].transform, transformationType, transformationSpace, camera, input, renderer);
 
 	renderer->beginRaytracedReflectionsPass()->renderObject(&reflectionsRaytracingBatch);
 }
