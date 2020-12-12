@@ -202,7 +202,9 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position_normal)
-			.renderTargets(hdrFormat[0], hdrDepthStencilFormat);
+			.renderTargets(hdrFormat[0], hdrDepthStencilFormat)
+			//.depthSettings(false)
+			;
 
 		flatSimplePipeline = createReloadablePipeline(desc, { "flat_simple_vs", "flat_simple_ps" });
 	}

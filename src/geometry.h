@@ -36,8 +36,8 @@ struct cpu_mesh
 
 	submesh_info pushQuad(vec2 radius);
 	submesh_info pushQuad(float radius) { return pushQuad(vec2(radius, radius)); }
-	submesh_info pushCube(vec3 radius, bool flipWindingOrder = false);
-	submesh_info pushCube(float radius, bool flipWindingOrder = false) { return pushCube(vec3(radius, radius, radius), flipWindingOrder); }
+	submesh_info pushCube(vec3 radius, bool flipWindingOrder = false, vec3 center = vec3(0.f, 0.f, 0.f));
+	submesh_info pushCube(float radius, bool flipWindingOrder = false, vec3 center = vec3(0.f, 0.f, 0.f)) { return pushCube(vec3(radius, radius, radius), flipWindingOrder, center); }
 	submesh_info pushSphere(uint16 slices, uint16 rows, float radius);
 	submesh_info pushIcoSphere(float radius, uint32 refinement);
 	submesh_info pushCapsule(uint16 slices, uint16 rows, float height, float radius);

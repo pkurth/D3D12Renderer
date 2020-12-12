@@ -260,12 +260,6 @@ void application::update(const user_input& input, float dt)
 	static float jitterStrength = 1.f;
 	ImGui::SliderFloat("Jitter strength", &jitterStrength, 0.f, 1.f);
 
-	static transformation_type transformationType = transformation_type_translation;
-	static transformation_space transformationSpace = transformation_global;
-
-	ImGui::Dropdown("Gizmo type", transformationTypeNames, 3, (uint32&)transformationType);
-	ImGui::Dropdown("Gizmo space", transformationSpaceNames, 2, (uint32&)transformationSpace);
-
 	ImGui::End();
 
 	// Update light positions.
@@ -329,6 +323,8 @@ void application::update(const user_input& input, float dt)
 		}
 	}
 
+	static transformation_type transformationType = transformation_type_translation;
+	static transformation_space transformationSpace = transformation_global;
 	manipulateTransformation(gameObjects[0].transform, transformationType, transformationSpace, camera, input, renderer);
 
 	renderer->beginRaytracedReflectionsPass()->renderObject(&reflectionsRaytracingBatch);

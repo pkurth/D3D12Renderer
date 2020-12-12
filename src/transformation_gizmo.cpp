@@ -20,16 +20,10 @@ static union
 		submesh_info translationSubmesh;
 		submesh_info rotationSubmesh;
 		submesh_info scaleSubmesh;
+		submesh_info planeSubmesh;
 	};
 
-	submesh_info submeshes[3];
-};
-
-static const quat rotations[] =
-{
-	quat(vec3(0.f, 0.f, -1.f), deg2rad(90.f)),
-	quat::identity,
-	quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)),
+	submesh_info submeshes[4];
 };
 
 static bounding_cylinder cylinders[3] =
@@ -46,22 +40,26 @@ static bounding_torus tori[3] =
 	bounding_torus{ vec3(0.f), vec3(0.f, 0.f, 1.f), 1.f, 1.f },
 };
 
-static const vec4 colors[] =
+struct gizmo_rectangle
 {
-	vec4(1.f, 0.f, 0.f, 1.f),
-	vec4(0.f, 1.f, 0.f, 1.f),
-	vec4(0.f, 0.f, 1.f, 1.f),
+	vec3 position;
+	vec3 tangent;
+	vec3 bitangent;
+	vec2 radius;
 };
 
-static submesh_info submesh(transformation_type type) { return submeshes[type]; }
-
-static quat rotation(gizmo_axis axis) { return rotations[axis]; }
-static vec4 color(gizmo_axis axis) { return colors[axis]; }
+static gizmo_rectangle rectangles[] =
+{
+	gizmo_rectangle{ vec3(1.f, 0.f, 1.f), vec3(1.f, 0.f, 0.f), vec3(0.f, 0.f, 1.f), vec2(1.f) },
+	gizmo_rectangle{ vec3(1.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), vec2(1.f) },
+	gizmo_rectangle{ vec3(0.f, 1.f, 1.f), vec3(0.f, 1.f, 0.f), vec3(0.f, 0.f, 1.f), vec2(1.f) },
+};
 
 
 static bool dragging;
 static uint32 axisIndex;
 static float anchor;
+static vec3 anchor3;
 static vec4 plane;
 
 static vec3 originalPosition;
@@ -78,6 +76,7 @@ void initializeTransformationGizmos()
 	translationSubmesh = mesh.pushArrow(6, radius, headRadius, shaftLength, headLength);
 	rotationSubmesh = mesh.pushTorus(6, 64, shaftLength, radius);
 	scaleSubmesh = mesh.pushMace(6, radius, headRadius, shaftLength, headLength);
+	planeSubmesh = mesh.pushCube(vec3(shaftLength, 0.01f, shaftLength) * 0.2f, false, vec3(shaftLength, 0.f, shaftLength) * 0.35f);
 	::mesh = mesh.createDXMesh();
 
 	for (uint32 i = 0; i < 3; ++i)
@@ -87,6 +86,9 @@ void initializeTransformationGizmos()
 
 		tori[i].majorRadius *= shaftLength;
 		tori[i].tubeRadius *= radius * 1.1f;
+
+		rectangles[i].position *= shaftLength * 0.35f;
+		rectangles[i].radius *= shaftLength * 0.2f;
 	}
 }
 
@@ -106,32 +108,47 @@ static uint32 handleTranslation(trs& transform, ray r, const user_input& input, 
 			hoverAxisIndex = i;
 			minT = t;
 		}
+
+		if (r.intersectRectangle(rot * rectangles[i].position + transform.position, rot * rectangles[i].tangent, rot * rectangles[i].bitangent, rectangles[i].radius, t) && t < minT)
+		{
+			hoverAxisIndex = i + 3;
+			minT = t;
+		}
 	}
 
 	if (input.mouse.left.clickEvent && hoverAxisIndex != -1)
 	{
-		const vec4 planes[][2] =
-		{
-			{ createPlane(transform.position, rot * vec3(0.f, 1.f, 0.f)), createPlane(transform.position, rot * vec3(0.f, 0.f, 1.f)) },
-			{ createPlane(transform.position, rot * vec3(0.f, 0.f, 1.f)), createPlane(transform.position, rot * vec3(0.f, 0.f, 1.f)) },
-			{ createPlane(transform.position, rot * vec3(1.f, 0.f, 0.f)), createPlane(transform.position, rot * vec3(0.f, 1.f, 0.f)) },
-		};
-
 		dragging = true;
 		axisIndex = hoverAxisIndex;
-		
-		const vec4* axisPlanes = planes[hoverAxisIndex];
-		float a = abs(dot(r.direction, axisPlanes[0].xyz));
-		float b = abs(dot(r.direction, axisPlanes[1].xyz));
 
-		plane = (a > b) ? axisPlanes[0] : axisPlanes[1];
+		if (hoverAxisIndex < 3)
+		{
+			vec3 candidate0(0.f); candidate0.data[(axisIndex + 1) % 3] = 1.f;
+			vec3 candidate1(0.f); candidate1.data[(axisIndex + 2) % 3] = 1.f;
 
-		vec3 axis(0.f); axis.data[axisIndex] = 1.f;
-		axis = rot * axis;
+			const vec4 axisPlanes[] =
+			{
+				createPlane(transform.position, rot * candidate0),
+				createPlane(transform.position, rot * candidate1),
+			};
 
-		float t;
-		r.intersectPlane(plane.xyz, plane.w, t);
-		anchor = dot(r.origin + t * r.direction - transform.position, axis);
+			float a = abs(dot(r.direction, axisPlanes[0].xyz));
+			float b = abs(dot(r.direction, axisPlanes[1].xyz));
+
+			plane = (a > b) ? axisPlanes[0] : axisPlanes[1];
+
+			vec3 axis(0.f); axis.data[axisIndex] = 1.f;
+			axis = rot * axis;
+
+			float t;
+			r.intersectPlane(plane.xyz, plane.w, t);
+			anchor = dot(r.origin + t * r.direction - transform.position, axis);
+		}
+		else
+		{
+			plane = createPlane(rot * rectangles[axisIndex - 3].position + transform.position, rot * cross(rectangles[axisIndex - 3].tangent, rectangles[axisIndex - 3].bitangent));
+			anchor3 = r.origin + minT * r.direction - transform.position;
+		}
 		originalPosition = transform.position;
 	}
 
@@ -140,10 +157,17 @@ static uint32 handleTranslation(trs& transform, ray r, const user_input& input, 
 		float t;
 		r.intersectPlane(plane.xyz, plane.w, t);
 
-		vec3 axis(0.f); axis.data[axisIndex] = 1.f;
-		axis = rot * axis;
+		if (axisIndex < 3)
+		{
+			vec3 axis(0.f); axis.data[axisIndex] = 1.f;
+			axis = rot * axis;
 
-		transform.position = originalPosition + (dot(r.origin + t * r.direction - originalPosition, axis) - anchor) * axis;
+			transform.position = originalPosition + (dot(r.origin + t * r.direction - originalPosition, axis) - anchor) * axis;
+		}
+		else
+		{
+			transform.position = r.origin + t * r.direction - anchor3;
+		}
 	}
 
 	return dragging ? axisIndex : hoverAxisIndex;
@@ -230,17 +254,18 @@ static uint32 handleScaling(trs& transform, ray r, const user_input& input, tran
 
 	if (input.mouse.left.clickEvent && hoverAxisIndex != -1)
 	{
-		const vec4 planes[][2] =
+		vec3 candidate0(0.f); candidate0.data[(hoverAxisIndex + 1) % 3] = 1.f;
+		vec3 candidate1(0.f); candidate1.data[(hoverAxisIndex + 2) % 3] = 1.f;
+
+		const vec4 axisPlanes[] =
 		{
-			{ createPlane(transform.position, rot * vec3(0.f, 1.f, 0.f)), createPlane(transform.position, rot * vec3(0.f, 0.f, 1.f)) },
-			{ createPlane(transform.position, rot * vec3(0.f, 0.f, 1.f)), createPlane(transform.position, rot * vec3(0.f, 0.f, 1.f)) },
-			{ createPlane(transform.position, rot * vec3(1.f, 0.f, 0.f)), createPlane(transform.position, rot * vec3(0.f, 1.f, 0.f)) },
+			createPlane(transform.position, rot * candidate0),
+			createPlane(transform.position, rot * candidate1),
 		};
 
 		dragging = true;
 		axisIndex = hoverAxisIndex;
 
-		const vec4* axisPlanes = planes[hoverAxisIndex];
 		float a = abs(dot(r.direction, axisPlanes[0].xyz));
 		float b = abs(dot(r.direction, axisPlanes[1].xyz));
 
@@ -289,45 +314,113 @@ static uint32 handleScaling(trs& transform, ray r, const user_input& input, tran
 	return dragging ? axisIndex : hoverAxisIndex;
 }
 
-bool manipulateTransformation(trs& transform, transformation_type type, transformation_space space, const render_camera& camera, const user_input& input, dx_renderer* renderer)
+bool manipulateTransformation(trs& transform, transformation_type& type, transformation_space& space, const render_camera& camera, const user_input& input, dx_renderer* renderer)
 {
 	if (!input.mouse.left.down)
 	{
 		dragging = false;
 	}
 
-	vec3 originalPosition = transform.position;
-
-	ray r = camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY);
-
-
 	uint32 highlightAxis = -1;
-	switch (type)
+
+	if (input.mouse.right.down)
 	{
-		case transformation_type_translation: highlightAxis = handleTranslation(transform, r, input, space); break;
-		case transformation_type_rotation: highlightAxis = handleRotation(transform, r, input, space); break;
-		case transformation_type_scale: highlightAxis = handleScaling(transform, r, input, space); break;
+		dragging = false; // If right mouse is down, we are in fly camera.
 	}
+	else
+	{
+		if (input.keyboard['G'].pressEvent)
+		{
+			space = (transformation_space)(1 - space);
+			dragging = false;
+		}
+		if (input.keyboard['W'].pressEvent)
+		{
+			type = transformation_type_translation;
+			dragging = false;
+		}
+		if (input.keyboard['E'].pressEvent)
+		{
+			type = transformation_type_rotation;
+			dragging = false;
+		}
+		if (input.keyboard['R'].pressEvent)
+		{
+			type = transformation_type_scale;
+			dragging = false;
+		}
+
+		vec3 originalPosition = transform.position;
+
+		ray r = camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY);
+
+
+		switch (type)
+		{
+			case transformation_type_translation: highlightAxis = handleTranslation(transform, r, input, space); break;
+			case transformation_type_rotation: highlightAxis = handleRotation(transform, r, input, space); break;
+			case transformation_type_scale: highlightAxis = handleScaling(transform, r, input, space); break;
+		}
+	}
+
+
+
+	// Render.
 
 	quat rot = (space == transformation_global) ? quat::identity : transform.rotation;
 
 	visualization_render_pass* visualizationPass = renderer->beginVisualizationPass();
-	visualizationPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
-		submesh(type),
-		createModelMatrix(transform.position, rot * rotation(gizmo_axis_x)),
-		color(gizmo_axis_x) * (highlightAxis == gizmo_axis_x ? 0.5f : 1.f)
-	);
-	visualizationPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
-		submesh(type),
-		createModelMatrix(transform.position, rot * rotation(gizmo_axis_y)),
-		color(gizmo_axis_y) * (highlightAxis == gizmo_axis_y ? 0.5f : 1.f)
-	);
-	visualizationPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
-		submesh(type),
-		createModelMatrix(transform.position, rot * rotation(gizmo_axis_z)),
-		color(gizmo_axis_z) * (highlightAxis == gizmo_axis_z ? 0.5f : 1.f)
-	);
 
+	{
+		const quat rotations[] =
+		{
+			rot * quat(vec3(0.f, 0.f, -1.f), deg2rad(90.f)),
+			rot,
+			rot * quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)),
+		};
+
+		const vec4 colors[] =
+		{
+			vec4(1.f, 0.f, 0.f, 1.f),
+			vec4(0.f, 1.f, 0.f, 1.f),
+			vec4(0.f, 0.f, 1.f, 1.f),
+		};
+
+		for (uint32 i = 0; i < 3; ++i)
+		{
+			visualizationPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
+				submeshes[type],
+				createModelMatrix(transform.position, rotations[i]),
+				colors[i] * (highlightAxis == i ? 0.5f : 1.f)
+			);
+		}
+	}
+
+	if (type == transformation_type_translation)
+	{
+		const quat rotations[] =
+		{
+			rot,
+			rot * quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)),
+			rot * quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)),
+		};
+
+		const vec4 colors[] =
+		{
+			vec4(1.f, 0.f, 1.f, 1.f),
+			vec4(1.f, 1.f, 0.f, 1.f),
+			vec4(0.f, 1.f, 1.f, 1.f)
+		};
+
+		for (uint32 i = 0; i < 3; ++i)
+		{
+			visualizationPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
+				planeSubmesh,
+				createModelMatrix(transform.position, rotations[i]),
+				colors[i] * (highlightAxis == (i + 3) ? 0.5f : 1.f));
+		}
+	}
+	
 	return dragging;
 }
 

@@ -249,7 +249,9 @@ bool ray::intersectCylinder(const bounding_cylinder& cylinder, float& outT) cons
 		}
 	}
 
-	return true;
+	y = o.y + outT * d.y;
+
+	return y > -epsilon && y < height + epsilon;
 }
 
 bool ray::intersectDisk(vec3 pos, vec3 normal, float radius, float& outT) const
@@ -258,6 +260,23 @@ bool ray::intersectDisk(vec3 pos, vec3 normal, float radius, float& outT) const
 	if (intersectsPlane)
 	{
 		return length(origin + outT * direction - pos) <= radius;
+	}
+	return false;
+}
+
+bool ray::intersectRectangle(vec3 pos, vec3 tangent, vec3 bitangent, vec2 radius, float& outT) const
+{
+	vec3 normal = cross(tangent, bitangent);
+	bool intersectsPlane = intersectPlane(normal, pos, outT);
+	if (intersectsPlane)
+	{
+		vec3 offset = origin + outT * direction - pos;
+		vec2 projected(dot(offset, tangent), dot(offset, bitangent));
+		projected = abs(projected);
+		if (projected.x <= radius.x && projected.y <= radius.y)
+		{
+			return true;
+		}
 	}
 	return false;
 }

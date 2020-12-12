@@ -113,6 +113,7 @@ struct ray
 	bool intersectSphere(const bounding_sphere& sphere, float& outT) const { return intersectSphere(sphere.center, sphere.radius, outT); }
 	bool intersectCylinder(const bounding_cylinder& cylinder, float& outT) const;
 	bool intersectDisk(vec3 pos, vec3 normal, float radius, float& outT) const;
+	bool intersectRectangle(vec3 pos, vec3 tangent, vec3 bitangent, vec2 radius, float& outT) const;
 	bool intersectTorus(const bounding_torus& torus, float& outT) const;
 };
 
