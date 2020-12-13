@@ -93,7 +93,7 @@ void initializeTransformationGizmos()
 }
 
 
-static uint32 handleTranslation(trs& transform, ray r, const user_input& input, transformation_space space)
+static uint32 handleTranslation(trs& transform, ray r, const user_input& input, transformation_space space, float snapping)
 {
 	quat rot = (space == transformation_global) ? quat::identity : transform.rotation;
 
@@ -162,18 +162,38 @@ static uint32 handleTranslation(trs& transform, ray r, const user_input& input, 
 			vec3 axis(0.f); axis.data[axisIndex] = 1.f;
 			axis = rot * axis;
 
-			transform.position = originalPosition + (dot(r.origin + t * r.direction - originalPosition, axis) - anchor) * axis;
+			float amount = (dot(r.origin + t * r.direction - originalPosition, axis) - anchor);
+
+			if (snapping > 0.f)
+			{
+				amount = round(amount / snapping) * snapping;
+			}
+
+			transform.position = originalPosition + amount * axis;
 		}
 		else
 		{
-			transform.position = r.origin + t * r.direction - anchor3;
+			vec3 amount = r.origin + t * r.direction - originalPosition - anchor3;
+
+			if (snapping > 0.f)
+			{
+				vec3 tangent = rot * rectangles[axisIndex - 3].tangent;
+				vec3 bitangent = rot * rectangles[axisIndex - 3].bitangent;
+
+				float tangentAmount = round(dot(tangent, amount) / snapping) * snapping;
+				float bitangentAmount = round(dot(bitangent, amount) / snapping)* snapping;
+
+				amount = tangent * tangentAmount + bitangent * bitangentAmount;
+			}
+
+			transform.position = originalPosition + amount;
 		}
 	}
 
 	return dragging ? axisIndex : hoverAxisIndex;
 }
 
-static uint32 handleRotation(trs& transform, ray r, const user_input& input, transformation_space space)
+static uint32 handleRotation(trs& transform, ray r, const user_input& input, transformation_space space, float snapping)
 {
 	quat rot = (space == transformation_global) ? quat::identity : transform.rotation;
 
@@ -222,6 +242,11 @@ static uint32 handleRotation(trs& transform, ray r, const user_input& input, tra
 		float y = p.data[(axisIndex + 2) % 3];
 
 		float angle = atan2(y, x);
+
+		if (snapping > 0.f)
+		{
+			angle = round((angle - anchor) / snapping) * snapping + anchor;
+		}
 
 		quat currentRotation(plane.xyz, angle);
 		quat deltaRotation = currentRotation * conjugate(originalRotation);
@@ -314,7 +339,7 @@ static uint32 handleScaling(trs& transform, ray r, const user_input& input, tran
 	return dragging ? axisIndex : hoverAxisIndex;
 }
 
-bool manipulateTransformation(trs& transform, transformation_type& type, transformation_space& space, const render_camera& camera, const user_input& input, dx_renderer* renderer)
+bool manipulateTransformation(trs& transform, transformation_type& type, transformation_space& space, const render_camera& camera, const user_input& input, bool allowInput, dx_renderer* renderer)
 {
 	if (!input.mouse.left.down)
 	{
@@ -323,11 +348,7 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 
 	uint32 highlightAxis = -1;
 
-	if (input.mouse.right.down)
-	{
-		dragging = false; // If right mouse is down, we are in fly camera.
-	}
-	else
+	if (allowInput)
 	{
 		if (input.keyboard['G'].pressEvent)
 		{
@@ -350,6 +371,8 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 			dragging = false;
 		}
 
+		float snapping = input.keyboard[key_ctrl].down ? (type == transformation_type_rotation ? deg2rad(45.f) : 0.5f) : 0.f;
+
 		vec3 originalPosition = transform.position;
 
 		ray r = camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY);
@@ -357,9 +380,9 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 
 		switch (type)
 		{
-			case transformation_type_translation: highlightAxis = handleTranslation(transform, r, input, space); break;
-			case transformation_type_rotation: highlightAxis = handleRotation(transform, r, input, space); break;
-			case transformation_type_scale: highlightAxis = handleScaling(transform, r, input, space); break;
+			case transformation_type_translation: highlightAxis = handleTranslation(transform, r, input, space, snapping); break;
+			case transformation_type_rotation: highlightAxis = handleRotation(transform, r, input, space, snapping); break;
+			case transformation_type_scale: highlightAxis = handleScaling(transform, r, input, space); break; // TODO: Snapping for scale.
 		}
 	}
 

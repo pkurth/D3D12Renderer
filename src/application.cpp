@@ -233,7 +233,7 @@ static bool editSunShadowParameters(directional_light& sun)
 
 void application::update(const user_input& input, float dt)
 {
-	updateCamera(camera, input, renderer->renderWidth, renderer->renderHeight, dt);
+	bool inputCaptured = updateCamera(camera, input, renderer->renderWidth, renderer->renderHeight, dt);
 
 	ImGui::Begin("Settings");
 	ImGui::Text("%.3f ms, %u FPS", dt * 1000.f, (uint32)(1.f / dt));
@@ -295,6 +295,10 @@ void application::update(const user_input& input, float dt)
 	renderer->setPointLights(pointLights, numPointLights);
 	renderer->setSpotLights(spotLights, numSpotLights);
 
+	static transformation_type transformationType = transformation_type_translation;
+	static transformation_space transformationSpace = transformation_global;
+	manipulateTransformation(gameObjects[0].transform, transformationType, transformationSpace, camera, input, !inputCaptured, renderer);
+
 
 	geometry_render_pass* geometryPass = renderer->beginGeometryPass();
 	outline_render_pass* outlinePass = renderer->beginOutlinePass();
@@ -322,10 +326,6 @@ void application::update(const user_input& input, float dt)
 			}
 		}
 	}
-
-	static transformation_type transformationType = transformation_type_translation;
-	static transformation_space transformationSpace = transformation_global;
-	manipulateTransformation(gameObjects[0].transform, transformationType, transformationSpace, camera, input, renderer);
 
 	renderer->beginRaytracedReflectionsPass()->renderObject(&reflectionsRaytracingBatch);
 }

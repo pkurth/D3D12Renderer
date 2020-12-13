@@ -32,5 +32,5 @@ static const char* transformationSpaceNames[] =
 };
 
 void initializeTransformationGizmos();
-bool manipulateTransformation(trs& transform, transformation_type& type, transformation_space& space, const render_camera& camera, const user_input& input, dx_renderer* renderer);
+bool manipulateTransformation(trs& transform, transformation_type& type, transformation_space& space, const render_camera& camera, const user_input& input, bool allowInput, dx_renderer* renderer);
 

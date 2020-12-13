@@ -4,4 +4,5 @@
 #include "input.h"
 
 
-void updateCamera(render_camera& camera, const user_input& input, uint32 viewportWidth, uint32 viewportHeight, float dt);
+// Returns true, if camera is moved, and therefore input is captured.
+bool updateCamera(render_camera& camera, const user_input& input, uint32 viewportWidth, uint32 viewportHeight, float dt);

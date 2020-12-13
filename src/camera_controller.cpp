@@ -2,13 +2,15 @@
 #include "camera_controller.h"
 
 
-void updateCamera(render_camera& camera, const user_input& input, uint32 viewportWidth, uint32 viewportHeight, float dt)
+bool updateCamera(render_camera& camera, const user_input& input, uint32 viewportWidth, uint32 viewportHeight, float dt)
 {
 	const float CAMERA_MOVEMENT_SPEED = 8.f;
 	const float CAMERA_SENSITIVITY = 4.f;
 	const float CAMERA_ORBIT_RADIUS = 50.f;
 
 	camera.setViewport(viewportWidth, viewportHeight);
+
+	bool result = false;
 
 	if (input.mouse.right.down)
 	{
@@ -28,6 +30,8 @@ void updateCamera(render_camera& camera, const user_input& input, uint32 viewpor
 		cameraRotation = cameraRotation * quat(vec3(1.f, 0.f, 0.f), turnAngle.y);
 
 		camera.position += cameraRotation * cameraInputDir * dt;
+
+		result = true;
 	}
 	else if (input.keyboard[key_alt].down)
 	{
@@ -59,7 +63,11 @@ void updateCamera(render_camera& camera, const user_input& input, uint32 viewpor
 
 			camera.position += camera.rotation * cameraInputDir * dt;
 		}
+
+		result = true;
 	}
 
 	camera.updateMatrices();
+
+	return result;
 }
