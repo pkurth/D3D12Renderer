@@ -95,9 +95,9 @@ void visualization_render_pass::reset()
 	drawCalls.clear();
 }
 
-void raytraced_reflections_render_pass::renderObject(specular_reflections_raytracing_batch* batch)
+void raytraced_reflections_render_pass::renderObject(pbr_raytracing_pipeline& pipeline, raytracing_tlas& tlas)
 {
-	drawCalls.push_back({ batch });
+	drawCalls.push_back({ &pipeline, &tlas });
 }
 
 void raytraced_reflections_render_pass::reset()

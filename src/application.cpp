@@ -74,7 +74,8 @@ void application::initialize(dx_renderer* renderer)
 
 
 
-	reflectionsRaytracingBatch.initialize(128);
+	reflectionsRaytracingPipeline.initialize(L"shaders/raytracing/specular_reflections_rts.hlsl");
+	raytracingTLAS.initialize(acceleration_structure_refit);
 
 
 	std::vector<raytracing_object_handle> types;
@@ -90,27 +91,28 @@ void application::initialize(dx_renderer* renderer)
 		}
 
 		blas.push_back(blasBuilder.finish());
-		types.push_back(reflectionsRaytracingBatch.defineObjectType(blas.back(), raytracingMaterials));
+		types.push_back(reflectionsRaytracingPipeline.defineObjectType(blas.back(), raytracingMaterials));
 	}
 
 
 	trs cerberusTransform = { vec3(0.f, 10.f, -5.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.04f };
 	gameObjects.push_back({ cerberusTransform, 0, });
-	reflectionsRaytracingBatch.instantiate(types[0], cerberusTransform);
+	raytracingTLAS.instantiate(types[0], cerberusTransform);
 
 	trs trooperTransform = { vec3(0.f, 0.f, 0.f), quat::identity, 1.f };
 	gameObjects.push_back({ trooperTransform, 1, });
-	reflectionsRaytracingBatch.instantiate(types[1], trooperTransform);
+	raytracingTLAS.instantiate(types[1], trooperTransform);
 
 	trs pilotTransform = { vec3(1.f, 0.f, 0.f), quat::identity, 1.f };
 	gameObjects.push_back({ pilotTransform, 2, });
-	reflectionsRaytracingBatch.instantiate(types[2], pilotTransform);
+	raytracingTLAS.instantiate(types[2], pilotTransform);
 
 	//trs sponzaTransform = { vec3(0.f, 0.f, 0.f), quat::identity, 0.03f };
 	//gameObjects.push_back({ sponzaTransform, 3, });
 	//reflectionsRaytracingBatch.instantiate(types[3], sponzaTransform);
 
-	reflectionsRaytracingBatch.buildAll();
+	reflectionsRaytracingPipeline.build();
+	raytracingTLAS.build();
 
 
 	setEnvironment("assets/textures/hdri/sunset_in_the_chalk_quarry_4k.hdr");
@@ -253,9 +255,9 @@ void application::update(const user_input& input, float dt)
 
 	ImGui::SliderFloat("Environment intensity", &renderer->settings.environmentIntensity, 0.f, 2.f);
 	ImGui::SliderFloat("Sky intensity", &renderer->settings.skyIntensity, 0.f, 2.f);
-	ImGui::SliderInt("Raytracing bounces", (int*)&renderer->settings.numRaytracingBounces, 1, MAX_RAYTRACING_RECURSION_DEPTH - 1);
+	ImGui::SliderInt("Raytracing bounces", (int*)&renderer->settings.numRaytracingBounces, 1, MAX_PBR_RAYTRACING_RECURSION_DEPTH - 1);
 	ImGui::SliderInt("Raytracing downsampling", (int*)&renderer->settings.raytracingDownsampleFactor, 1, 4);
-	ImGui::SliderInt("Raytracing blur iteations", (int*)&renderer->settings.blurRaytracingResultIterations, 1, 4);
+	ImGui::SliderInt("Raytracing blur iteations", (int*)&renderer->settings.blurRaytracingResultIterations, 0, 4);
 
 	static float jitterStrength = 1.f;
 	ImGui::SliderFloat("Jitter strength", &jitterStrength, 0.f, 1.f);
@@ -297,7 +299,11 @@ void application::update(const user_input& input, float dt)
 
 	static transformation_type transformationType = transformation_type_translation;
 	static transformation_space transformationSpace = transformation_global;
-	manipulateTransformation(gameObjects[0].transform, transformationType, transformationSpace, camera, input, !inputCaptured, renderer);
+	if (manipulateTransformation(gameObjects[0].transform, transformationType, transformationSpace, camera, input, !inputCaptured, renderer))
+	{
+		raytracingTLAS.updateInstanceTransform({ 0 }, gameObjects[0].transform);
+		raytracingTLAS.build();
+	}
 
 
 	geometry_render_pass* geometryPass = renderer->beginGeometryPass();
@@ -327,7 +333,7 @@ void application::update(const user_input& input, float dt)
 		}
 	}
 
-	renderer->beginRaytracedReflectionsPass()->renderObject(&reflectionsRaytracingBatch);
+	renderer->beginRaytracedReflectionsPass()->renderObject(reflectionsRaytracingPipeline, raytracingTLAS);
 }
 
 void application::setEnvironment(const char* filename)

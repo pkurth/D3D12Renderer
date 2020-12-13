@@ -17,7 +17,7 @@
 #include "flat_simple_rs.hlsli"
 
 #include "raytracing.h"
-#include "raytracing_batch.h"
+#include "pbr_raytracing_pipeline.h"
 
 
 static ref<dx_texture> whiteTexture;
@@ -817,7 +817,7 @@ void dx_renderer::endFrame()
 
 	for (const auto& dc : raytracedReflectionsRenderPass.drawCalls)
 	{
-		dc.batch->render(cl, raytracingTexture, settings.numRaytracingBounces, settings.raytracingFadeoutDistance, settings.raytracingMaxDistance, settings.environmentIntensity, settings.skyIntensity,
+		dc.pipeline->render(cl, *dc.tlas, raytracingTexture, settings.numRaytracingBounces, settings.raytracingFadeoutDistance, settings.raytracingMaxDistance, settings.environmentIntensity, settings.skyIntensity,
 			cameraCBV, sunCBV, depthStencilBuffer, worldNormalsScreenVelocityTexture, environment, brdfTex);
 	}
 

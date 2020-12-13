@@ -9,7 +9,8 @@ struct pbr_material;
 struct raytracing_blas;
 struct dx_vertex_buffer;
 struct dx_index_buffer;
-struct specular_reflections_raytracing_batch;
+struct pbr_raytracing_pipeline;
+struct raytracing_tlas;
 
 struct geometry_render_pass
 {
@@ -110,14 +111,15 @@ private:
 
 struct raytraced_reflections_render_pass
 {
-	void renderObject(specular_reflections_raytracing_batch* batch);
+	void renderObject(pbr_raytracing_pipeline& pipeline, raytracing_tlas& tlas);
 
 private:
 	void reset();
 
 	struct draw_call
 	{
-		specular_reflections_raytracing_batch* batch;
+		pbr_raytracing_pipeline* pipeline;
+		raytracing_tlas* tlas;
 	};
 
 	std::vector<draw_call> drawCalls;
