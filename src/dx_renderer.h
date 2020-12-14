@@ -84,6 +84,9 @@ struct dx_renderer
 	uint32 renderHeight;
 	ref<dx_texture> frameResult;
 
+
+	static struct pbr_raytracing_pipeline* getRaytracingPipeline();
+
 //private:
 
 	struct light_culling_buffers

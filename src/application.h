@@ -9,8 +9,9 @@
 #include "light_source.h"
 #include "transformation_gizmo.h"
 #include "raytracing.h"
+
 #include "raytracing_tlas.h"
-#include "pbr_raytracing_pipeline.h"
+#include "pbr_raytracing_binding_table.h"
 
 #include "scene.h"
 
@@ -36,7 +37,7 @@ private:
 	std::vector<scene_object> gameObjects;
 	std::vector<raytracing_blas> blas;
 
-	pbr_raytracing_pipeline reflectionsRaytracingPipeline;
+	pbr_raytracing_binding_table reflectionsRaytracingPipeline;
 	raytracing_tlas raytracingTLAS;
 
 	ref<pbr_environment> environment;

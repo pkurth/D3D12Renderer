@@ -54,6 +54,8 @@ static dx_pipeline outlineDrawerPipeline;
 static dx_pipeline worldSpaceFrustaPipeline;
 static dx_pipeline lightCullingPipeline;
 
+static pbr_specular_reflections_raytracing_pipeline raytracingPipeline;
+
 
 
 static dx_mesh positionOnlyMesh;
@@ -236,6 +238,11 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	// Atmosphere.
 	{
 		atmospherePipeline = createReloadablePipeline("atmosphere_cs");
+	}
+
+	// Raytracing.
+	{
+		raytracingPipeline.initialize(L"shaders/raytracing/specular_reflections_rts.hlsl");
 	}
 
 	createAllReloadablePipelines();
@@ -451,6 +458,11 @@ void dx_renderer::setSpotLights(const spot_light_cb* lights, uint32 numLights)
 {
 	spotLights = lights;
 	numSpotLights = numLights;
+}
+
+pbr_raytracing_pipeline* dx_renderer::getRaytracingPipeline()
+{
+	return &raytracingPipeline;
 }
 
 void dx_renderer::endFrame()
@@ -817,7 +829,7 @@ void dx_renderer::endFrame()
 
 	for (const auto& dc : raytracedReflectionsRenderPass.drawCalls)
 	{
-		dc.pipeline->render(cl, *dc.tlas, raytracingTexture, settings.numRaytracingBounces, settings.raytracingFadeoutDistance, settings.raytracingMaxDistance, settings.environmentIntensity, settings.skyIntensity,
+		raytracingPipeline.render(cl, *dc.bindingTable, *dc.tlas, raytracingTexture, settings.numRaytracingBounces, settings.raytracingFadeoutDistance, settings.raytracingMaxDistance, settings.environmentIntensity, settings.skyIntensity,
 			cameraCBV, sunCBV, depthStencilBuffer, worldNormalsScreenVelocityTexture, environment, brdfTex);
 	}
 

@@ -95,9 +95,9 @@ void visualization_render_pass::reset()
 	drawCalls.clear();
 }
 
-void raytraced_reflections_render_pass::renderObject(pbr_raytracing_pipeline& pipeline, raytracing_tlas& tlas)
+void raytraced_reflections_render_pass::renderObject(pbr_raytracing_binding_table& bindingTable, raytracing_tlas& tlas)
 {
-	drawCalls.push_back({ &pipeline, &tlas });
+	drawCalls.push_back({ &bindingTable, &tlas });
 }
 
 void raytraced_reflections_render_pass::reset()

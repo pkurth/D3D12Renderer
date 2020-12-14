@@ -105,8 +105,6 @@ void raytracing_tlas::build()
 
     if (!fromScratch)
     {
-        assert(rebuildMode != acceleration_structure_no_rebuild);
-
         cl->uavBarrier(tlas);
 
         if (rebuildMode == acceleration_structure_refit)

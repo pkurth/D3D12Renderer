@@ -25,7 +25,7 @@ void application::initialize(dx_renderer* renderer)
 
 	camera.initializeIngame(vec3(0.f, 30.f, 40.f), quat::identity, deg2rad(70.f), 0.1f);
 
-	meshes.push_back(loadMeshFromFile("assets/meshes/cerberus.fbx", 
+	/*meshes.push_back(loadMeshFromFile("assets/meshes/cerberus.fbx", 
 		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
 	);
 
@@ -37,10 +37,16 @@ void application::initialize(dx_renderer* renderer)
 		vec4(1.f, 1.f, 1.f, 1.f),
 		0.f,
 		0.f
-	);
+	);*/
+
+	cpu_mesh sphere(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+	meshes.push_back({});
+	meshes.back().singleMeshes.push_back({ sphere.pushSphere(21, 21, 1), {}, createMaterial(0, 0, 0, 0, vec4(1.f), 0.f, 1.f) });
+	meshes.back().mesh = sphere.createDXMesh();
+	
 
 
-	meshes.push_back(loadMeshFromFile("assets/meshes/stormtrooper.fbx",
+	/*meshes.push_back(loadMeshFromFile("assets/meshes/stormtrooper.fbx",
 		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
 	);
 
@@ -64,17 +70,17 @@ void application::initialize(dx_renderer* renderer)
 		vec4(1.f, 1.f, 1.f, 1.f),
 		0.f,
 		1.f
+	);*/
+
+	meshes.push_back(loadMeshFromFile("assets/meshes/sponza.obj",
+		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents,
+		true)
 	);
 
-	//meshes.push_back(loadMeshFromFile("assets/meshes/sponza.obj",
-	//	mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents,
-	//	true)
-	//);
 
 
 
-
-	reflectionsRaytracingPipeline.initialize(L"shaders/raytracing/specular_reflections_rts.hlsl");
+	reflectionsRaytracingPipeline.initialize();
 	raytracingTLAS.initialize(acceleration_structure_refit);
 
 
@@ -95,21 +101,21 @@ void application::initialize(dx_renderer* renderer)
 	}
 
 
-	trs cerberusTransform = { vec3(0.f, 10.f, -5.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.04f };
+	trs cerberusTransform = { vec3(0.f, 10.f, -5.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 1 };
 	gameObjects.push_back({ cerberusTransform, 0, });
 	raytracingTLAS.instantiate(types[0], cerberusTransform);
 
-	trs trooperTransform = { vec3(0.f, 0.f, 0.f), quat::identity, 1.f };
-	gameObjects.push_back({ trooperTransform, 1, });
-	raytracingTLAS.instantiate(types[1], trooperTransform);
+	//trs trooperTransform = { vec3(0.f, 0.f, 0.f), quat::identity, 1.f };
+	//gameObjects.push_back({ trooperTransform, 1, });
+	//raytracingTLAS.instantiate(types[1], trooperTransform);
 
-	trs pilotTransform = { vec3(1.f, 0.f, 0.f), quat::identity, 1.f };
-	gameObjects.push_back({ pilotTransform, 2, });
-	raytracingTLAS.instantiate(types[2], pilotTransform);
+	//trs pilotTransform = { vec3(1.f, 0.f, 0.f), quat::identity, 1.f };
+	//gameObjects.push_back({ pilotTransform, 2, });
+	//raytracingTLAS.instantiate(types[2], pilotTransform);
 
-	//trs sponzaTransform = { vec3(0.f, 0.f, 0.f), quat::identity, 0.03f };
-	//gameObjects.push_back({ sponzaTransform, 3, });
-	//reflectionsRaytracingBatch.instantiate(types[3], sponzaTransform);
+	trs sponzaTransform = { vec3(0.f, 0.f, 0.f), quat::identity, 0.01f };
+	gameObjects.push_back({ sponzaTransform, 1, });
+	raytracingTLAS.instantiate(types[1], sponzaTransform);
 
 	reflectionsRaytracingPipeline.build();
 	raytracingTLAS.build();

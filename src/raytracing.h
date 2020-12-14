@@ -7,7 +7,6 @@
 
 enum acceleration_structure_rebuild_mode
 {
-	acceleration_structure_no_rebuild,
 	acceleration_structure_rebuild,
 	acceleration_structure_refit,
 };

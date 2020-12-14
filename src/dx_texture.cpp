@@ -553,6 +553,12 @@ dx_texture::~dx_texture()
 
 void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState)
 {
+	wchar name[128];
+	uint32 size = sizeof(name);
+	texture->resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);
+	name[min(arraysize(name) - 1, size)] = 0;
+
+
 	retire(texture->resource, texture->defaultSRV, texture->defaultUAV, texture->stencilSRV, texture->rtvHandles, texture->dsvHandle);
 
 	D3D12_RESOURCE_DESC desc = texture->resource->GetDesc();
@@ -638,12 +644,21 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 			texture->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureUAV(texture);
 		}
 	}
+
+	texture->setName(name);
 }
 
 texture_grave::~texture_grave()
 {
+	wchar name[128];
+
 	if (resource)
 	{
+		uint32 size = sizeof(name);
+		resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);
+		name[min(arraysize(name) - 1, size)] = 0;
+
+
 		//std::cout << "Finally deleting texture." << std::endl;
 
 		if (srv.cpuHandle.ptr)

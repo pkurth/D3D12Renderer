@@ -9,7 +9,7 @@ struct pbr_material;
 struct raytracing_blas;
 struct dx_vertex_buffer;
 struct dx_index_buffer;
-struct pbr_raytracing_pipeline;
+struct pbr_raytracing_binding_table;
 struct raytracing_tlas;
 
 struct geometry_render_pass
@@ -111,14 +111,14 @@ private:
 
 struct raytraced_reflections_render_pass
 {
-	void renderObject(pbr_raytracing_pipeline& pipeline, raytracing_tlas& tlas);
+	void renderObject(pbr_raytracing_binding_table& bindingTable, raytracing_tlas& tlas);
 
 private:
 	void reset();
 
 	struct draw_call
 	{
-		pbr_raytracing_pipeline* pipeline;
+		pbr_raytracing_binding_table* bindingTable;
 		raytracing_tlas* tlas;
 	};
 
