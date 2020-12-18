@@ -40,11 +40,10 @@ void application::initialize(dx_renderer* renderer)
 	);*/
 
 	cpu_mesh sphere(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
-	meshes.push_back({});
-	meshes.back().singleMeshes.push_back({ sphere.pushSphere(21, 21, 1), bounding_box::fromCenterRadius(0.f, 1.f), createMaterial(0, 0, 0, 0, vec4(1.f), 0.f, 1.f) });
-	meshes.back().mesh = sphere.createDXMesh();
+	composite_mesh& sphereMesh = meshes.emplace_back();
+	sphereMesh.submeshes.push_back({ sphere.pushSphere(21, 21, 1), bounding_box::fromCenterRadius(0.f, 1.f), trs::identity, createMaterial(0, 0, 0, 0, vec4(1.f), 0.f, 1.f), "Sphere" });
+	sphereMesh.mesh = sphere.createDXMesh();
 	
-
 
 	/*meshes.push_back(loadMeshFromFile("assets/meshes/stormtrooper.fbx",
 		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
@@ -73,8 +72,7 @@ void application::initialize(dx_renderer* renderer)
 	);*/
 
 	meshes.push_back(loadMeshFromFile("assets/meshes/sponza.obj",
-		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents,
-		true)
+		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
 	);
 
 
@@ -90,9 +88,9 @@ void application::initialize(dx_renderer* renderer)
 		raytracing_blas_builder blasBuilder;
 		std::vector<ref<pbr_material>> raytracingMaterials;
 
-		for (auto& sm : m.singleMeshes)
+		for (auto& sm : m.submeshes)
 		{
-			blasBuilder.push(m.mesh.vertexBuffer, m.mesh.indexBuffer, sm.submesh);
+			blasBuilder.push(m.mesh.vertexBuffer, m.mesh.indexBuffer, sm.info);
 			raytracingMaterials.push_back(sm.material);
 		}
 
@@ -243,7 +241,7 @@ void application::update(const user_input& input, float dt)
 {
 	if (input.keyboard['F'].pressEvent)
 	{
-		auto aabb = meshes[0].singleMeshes[0].boundingBox;
+		auto aabb = meshes[0].submeshes[0].aabb;
 		aabb.minCorner += gameObjects[0].transform.position;
 		aabb.maxCorner += gameObjects[0].transform.position;
 		cameraController.centerCameraOnObject(aabb);
@@ -331,10 +329,10 @@ void application::update(const user_input& input, float dt)
 
 		bool outline = go.meshIndex == 0;
 
-		for (auto& single : meshes[go.meshIndex].singleMeshes)
+		for (auto& sm : meshes[go.meshIndex].submeshes)
 		{
-			submesh_info submesh = single.submesh;
-			const ref<pbr_material>& material = single.material;
+			submesh_info submesh = sm.info;
+			const ref<pbr_material>& material = sm.material;
 
 			geometryPass->renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, outline);
 			shadowPass->renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
