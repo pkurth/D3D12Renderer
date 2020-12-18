@@ -14,6 +14,13 @@ struct dynamic_transform_cb
     mat4 prevFrameMVP;
 };
 
+struct animated_transform_cb
+{
+    mat4 m;
+    mat4 mvp;
+    mat4 skinMatrices[256];
+};
+
 struct depth_only_transform_cb
 {
 	mat4 mvp;
@@ -24,10 +31,12 @@ struct lighting_cb
     float environmentIntensity;
 };
 
-#ifdef DYNAMIC
-#define TRANSFORM_CB_SIZE "48"
+#if defined(ANIMATED)
+#define TRANSFORM_STRING "CBV(b0, visibility=SHADER_VISIBILITY_VERTEX),"
+#elif defined(DYNAMIC)
+#define TRANSFORM_STRING "RootConstants(num32BitConstants=48, b0, visibility=SHADER_VISIBILITY_VERTEX),"
 #else
-#define TRANSFORM_CB_SIZE "32"
+#define TRANSFORM_STRING "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX),"
 #endif
 
 #define MODEL_RS \
@@ -35,7 +44,7 @@ struct lighting_cb
     "DENY_HULL_SHADER_ROOT_ACCESS |" \
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=" TRANSFORM_CB_SIZE ", b0, visibility=SHADER_VISIBILITY_VERTEX),"  \
+    TRANSFORM_STRING  \
     "RootConstants(num32BitConstants=6, b0, space=1, visibility=SHADER_VISIBILITY_PIXEL),"  \
     "RootConstants(num32BitConstants=1, b2, space=1, visibility=SHADER_VISIBILITY_PIXEL),"  \
     "CBV(b1, space=1, visibility=SHADER_VISIBILITY_PIXEL), " \
@@ -45,8 +54,8 @@ struct lighting_cb
         "addressW = TEXTURE_ADDRESS_WRAP," \
         "filter = FILTER_MIN_MAG_MIP_LINEAR," \
         "visibility=SHADER_VISIBILITY_PIXEL)," \
-    "DescriptorTable(SRV(t0, numDescriptors=4), visibility=SHADER_VISIBILITY_PIXEL), " \
-    "DescriptorTable(SRV(t0, space=1, numDescriptors=2), visibility=SHADER_VISIBILITY_PIXEL), " \
+    "DescriptorTable(SRV(t0, numDescriptors=4, space=1), visibility=SHADER_VISIBILITY_PIXEL), " \
+    "DescriptorTable(SRV(t0, space=2, numDescriptors=2), visibility=SHADER_VISIBILITY_PIXEL), " \
     "StaticSampler(s1," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \
         "addressV = TEXTURE_ADDRESS_CLAMP," \
@@ -59,9 +68,9 @@ struct lighting_cb
         "addressW = TEXTURE_ADDRESS_BORDER," \
         "filter = FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT," \
         "visibility=SHADER_VISIBILITY_PIXEL)," \
-    "DescriptorTable(SRV(t0, space=2, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL), " \
-    "CBV(b0, space=3, visibility=SHADER_VISIBILITY_PIXEL), " \
-    "DescriptorTable(SRV(t0, space=3, numDescriptors=10), visibility=SHADER_VISIBILITY_PIXEL)"
+    "DescriptorTable(SRV(t0, space=3, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL), " \
+    "CBV(b0, space=4, visibility=SHADER_VISIBILITY_PIXEL), " \
+    "DescriptorTable(SRV(t0, space=4, numDescriptors=10), visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define MODEL_DEPTH_ONLY_RS \
     "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \

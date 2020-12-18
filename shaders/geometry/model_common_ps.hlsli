@@ -12,7 +12,7 @@ struct ps_input
 	float3x3 tbn			: TANGENT_FRAME;
 	float3 worldPosition	: POSITION;
 
-#ifdef DYNAMIC
+#if defined(DYNAMIC) || defined(ANIMATED)
 	float3 thisFrameNDC		: THIS_FRAME_NDC;
 	float3 prevFrameNDC		: PREV_FRAME_NDC;
 #endif
@@ -30,24 +30,24 @@ SamplerState clampSampler						: register(s1);
 SamplerComparisonState shadowSampler			: register(s2);
 
 
-Texture2D<float4> albedoTex						: register(t0);
-Texture2D<float3> normalTex						: register(t1);
-Texture2D<float> roughTex						: register(t2);
-Texture2D<float> metalTex						: register(t3);
+Texture2D<float4> albedoTex						: register(t0, space1);
+Texture2D<float3> normalTex						: register(t1, space1);
+Texture2D<float> roughTex						: register(t2, space1);
+Texture2D<float> metalTex						: register(t3, space1);
 
-TextureCube<float4> irradianceTexture			: register(t0, space1);
-TextureCube<float4> environmentTexture			: register(t1, space1);
+TextureCube<float4> irradianceTexture			: register(t0, space2);
+TextureCube<float4> environmentTexture			: register(t1, space2);
 
-Texture2D<float4> brdf							: register(t0, space2);
+Texture2D<float4> brdf							: register(t0, space3);
 
-ConstantBuffer<directional_light_cb> sun		: register(b0, space3);
-Texture2D<uint4> lightGrid						: register(t0, space3);
-StructuredBuffer<uint> pointLightIndexList		: register(t1, space3);
-StructuredBuffer<uint> spotLightIndexList		: register(t2, space3);
-StructuredBuffer<point_light_cb> pointLights	: register(t3, space3);
-StructuredBuffer<spot_light_cb> spotLights		: register(t4, space3);
-Texture2D<float> sunShadowCascades[4]			: register(t5, space3);
-Texture2D<float4> volumetrics					: register(t9, space3);
+ConstantBuffer<directional_light_cb> sun		: register(b0, space4);
+Texture2D<uint4> lightGrid						: register(t0, space4);
+StructuredBuffer<uint> pointLightIndexList		: register(t1, space4);
+StructuredBuffer<uint> spotLightIndexList		: register(t2, space4);
+StructuredBuffer<point_light_cb> pointLights	: register(t3, space4);
+StructuredBuffer<spot_light_cb> spotLights		: register(t4, space4);
+Texture2D<float> sunShadowCascades[4]			: register(t5, space4);
+Texture2D<float4> volumetrics					: register(t9, space4);
 
 struct ps_output
 {
@@ -170,7 +170,7 @@ ps_output main(ps_input IN)
 	ps_output OUT;
 	OUT.hdrColor = totalLighting;
 
-#ifdef DYNAMIC
+#if defined(DYNAMIC) || defined(ANIMATED)
 	float2 screenVel = (IN.thisFrameNDC.xy / IN.thisFrameNDC.z) - (IN.prevFrameNDC.xy / IN.prevFrameNDC.z);
 	screenVel.y = -screenVel.y;
 #else

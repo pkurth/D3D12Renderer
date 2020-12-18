@@ -20,6 +20,7 @@ struct vs_output
 vs_output main(vs_input IN)
 {
 	vs_output OUT;
-	OUT.position = mul(transform.mvp, float4(IN.position, 1.f));
+	float4x4 mvp = transform.mvp; // This local transform is necessary, because we do the same in the normal vertex shader. This makes the floating point math be the same in both passes.
+	OUT.position = mul(mvp, float4(IN.position, 1.f));
 	return OUT;
 }
