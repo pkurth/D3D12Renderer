@@ -6,7 +6,7 @@
 
 
 void geometry_render_pass::renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, 
-	const mat4& transform)
+	const mat4& transform, bool outline)
 {
 	staticDrawCalls.push_back(
 		{
@@ -17,10 +17,19 @@ void geometry_render_pass::renderStaticObject(const ref<dx_vertex_buffer>& verte
 			submesh,
 		}
 	);
+
+	if (outline)
+	{
+		outlinedObjects.push_back(
+			{
+				false, (uint16)(staticDrawCalls.size() - 1)
+			}
+		);
+	}
 }
 
 void geometry_render_pass::renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, 
-	const mat4& transform, const mat4& prevFrameTransform)
+	const mat4& transform, const mat4& prevFrameTransform, bool outline)
 {
 	dynamicDrawCalls.push_back(
 		{
@@ -32,29 +41,22 @@ void geometry_render_pass::renderDynamicObject(const ref<dx_vertex_buffer>& vert
 			submesh,
 		}
 	);
+
+	if (outline)
+	{
+		outlinedObjects.push_back(
+			{
+				true, (uint16)(dynamicDrawCalls.size() - 1)
+			}
+		);
+	}
 }
 
 void geometry_render_pass::reset()
 {
 	staticDrawCalls.clear();
 	dynamicDrawCalls.clear();
-}
-
-void outline_render_pass::renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
-{
-	drawCalls.push_back(
-		{
-			transform, 
-			vertexBuffer, 
-			indexBuffer, 
-			submesh,
-		}
-	);
-}
-
-void outline_render_pass::reset()
-{
-	drawCalls.clear();
+	outlinedObjects.clear();
 }
 
 void sun_shadow_render_pass::renderObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)

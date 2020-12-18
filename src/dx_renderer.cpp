@@ -336,7 +336,6 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 	}
 
 	geometryRenderPass.reset();
-	outlineRenderPass.reset();
 	sunShadowRenderPass.reset();
 	visualizationRenderPass.reset();
 	raytracedReflectionsRenderPass.reset();
@@ -786,7 +785,7 @@ void dx_renderer::endFrame()
 	// OUTLINES
 	// ----------------------------------------
 
-	if (outlineRenderPass.drawCalls.size() > 0)
+	if (geometryRenderPass.outlinedObjects.size() > 0)
 	{
 		cl->setStencilReference(stencil_flag_selected_object);
 
@@ -794,15 +793,17 @@ void dx_renderer::endFrame()
 		cl->setGraphicsRootSignature(*outlineMarkerPipeline.rootSignature);
 
 		// Mark object in stencil.
-		for (const auto& dc : outlineRenderPass.drawCalls)
+		for (const auto& outlined : geometryRenderPass.outlinedObjects)
 		{
-			const mat4& m = dc.transform;
-			const submesh_info& submesh = dc.submesh;
+			const submesh_info& submesh = outlined.dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].submesh : geometryRenderPass.staticDrawCalls[outlined.index].submesh;
+			const mat4& m = outlined.dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].transform : geometryRenderPass.staticDrawCalls[outlined.index].transform;
+			const auto& vertexBuffer = outlined.dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].vertexBuffer : geometryRenderPass.staticDrawCalls[outlined.index].vertexBuffer;
+			const auto& indexBuffer = outlined.dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].indexBuffer : geometryRenderPass.staticDrawCalls[outlined.index].indexBuffer;
 
 			cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ camera.viewProj * m });
 
-			cl->setVertexBuffer(0, dc.vertexBuffer);
-			cl->setIndexBuffer(dc.indexBuffer);
+			cl->setVertexBuffer(0, vertexBuffer);
+			cl->setIndexBuffer(indexBuffer);
 			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 		}
 

@@ -14,12 +14,19 @@ struct raytracing_tlas;
 
 struct geometry_render_pass
 {
-	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, const mat4& transform);
+	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, const mat4& transform,
+		bool outline = false);
 	void renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, 
-		const mat4& transform, const mat4& prevFrameTransform);
+		const mat4& transform, const mat4& prevFrameTransform, bool outline = false);
 
 private:
 	void reset();
+
+	struct outline_reference
+	{
+		uint16 dynamic; // This is a bool
+		uint16 index;
+	};
 	
 	struct static_draw_call
 	{
@@ -43,25 +50,7 @@ private:
 	std::vector<static_draw_call> staticDrawCalls;
 	std::vector<dynamic_draw_call> dynamicDrawCalls;
 
-	friend struct dx_renderer;
-};
-
-struct outline_render_pass
-{
-	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
-
-private:
-	void reset();
-
-	struct draw_call
-	{
-		const mat4 transform;
-		ref<dx_vertex_buffer> vertexBuffer;
-		ref<dx_index_buffer> indexBuffer;
-		submesh_info submesh;
-	};
-
-	std::vector<draw_call> drawCalls;
+	std::vector<outline_reference> outlinedObjects;
 
 	friend struct dx_renderer;
 };

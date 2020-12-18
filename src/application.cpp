@@ -5,7 +5,6 @@
 #include "random.h"
 #include "color.h"
 #include "imgui.h"
-#include "camera_controller.h"
 #include "dx_context.h"
 
 #include "random.hlsli"
@@ -24,6 +23,7 @@ void application::initialize(dx_renderer* renderer)
 	this->renderer = renderer;
 
 	camera.initializeIngame(vec3(0.f, 30.f, 40.f), quat::identity, deg2rad(70.f), 0.1f);
+	cameraController.initialize(&camera);
 
 	/*meshes.push_back(loadMeshFromFile("assets/meshes/cerberus.fbx", 
 		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
@@ -41,7 +41,7 @@ void application::initialize(dx_renderer* renderer)
 
 	cpu_mesh sphere(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 	meshes.push_back({});
-	meshes.back().singleMeshes.push_back({ sphere.pushSphere(21, 21, 1), {}, createMaterial(0, 0, 0, 0, vec4(1.f), 0.f, 1.f) });
+	meshes.back().singleMeshes.push_back({ sphere.pushSphere(21, 21, 1), bounding_box::fromCenterRadius(0.f, 1.f), createMaterial(0, 0, 0, 0, vec4(1.f), 0.f, 1.f) });
 	meshes.back().mesh = sphere.createDXMesh();
 	
 
@@ -241,7 +241,15 @@ static bool editSunShadowParameters(directional_light& sun)
 
 void application::update(const user_input& input, float dt)
 {
-	bool inputCaptured = updateCamera(camera, input, renderer->renderWidth, renderer->renderHeight, dt);
+	if (input.keyboard['F'].pressEvent)
+	{
+		auto aabb = meshes[0].singleMeshes[0].boundingBox;
+		aabb.minCorner += gameObjects[0].transform.position;
+		aabb.maxCorner += gameObjects[0].transform.position;
+		cameraController.centerCameraOnObject(aabb);
+	}
+
+	bool inputCaptured = cameraController.update(input, renderer->renderWidth, renderer->renderHeight, dt);
 
 	ImGui::Begin("Settings");
 	ImGui::Text("%.3f ms, %u FPS", dt * 1000.f, (uint32)(1.f / dt));
@@ -254,7 +262,7 @@ void application::update(const user_input& input, float dt)
 	ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->settings.aspectRatioMode);
 	ImGui::Checkbox("Show light volumes", &renderer->settings.showLightVolumes);
 
-	ImGui::Image(renderer->raytracingTexture, 512, 512); // TODO: When you remove this, make renderer attributes private again.
+	//ImGui::Image(renderer->raytracingTexture, 512, 512); // TODO: When you remove this, make renderer attributes private again.
 
 	plotAndEditTonemapping(renderer->settings.tonemap);
 	editSunShadowParameters(sun);
@@ -307,13 +315,12 @@ void application::update(const user_input& input, float dt)
 	static transformation_space transformationSpace = transformation_global;
 	if (manipulateTransformation(gameObjects[0].transform, transformationType, transformationSpace, camera, input, !inputCaptured, renderer))
 	{
-		raytracingTLAS.updateInstanceTransform({ 0 }, gameObjects[0].transform);
-		raytracingTLAS.build();
+		//raytracingTLAS.updateInstanceTransform({ 0 }, gameObjects[0].transform);
+		//raytracingTLAS.build();
 	}
 
 
 	geometry_render_pass* geometryPass = renderer->beginGeometryPass();
-	outline_render_pass* outlinePass = renderer->beginOutlinePass();
 	sun_shadow_render_pass* shadowPass = renderer->beginSunShadowPass();
 
 
@@ -329,17 +336,12 @@ void application::update(const user_input& input, float dt)
 			submesh_info submesh = single.submesh;
 			const ref<pbr_material>& material = single.material;
 
-			geometryPass->renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m);
+			geometryPass->renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, outline);
 			shadowPass->renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-			
-			if (outline)
-			{
-				outlinePass->renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-			}
 		}
 	}
 
-	renderer->beginRaytracedReflectionsPass()->renderObject(reflectionsRaytracingPipeline, raytracingTLAS);
+	//renderer->beginRaytracedReflectionsPass()->renderObject(reflectionsRaytracingPipeline, raytracingTLAS);
 }
 
 void application::setEnvironment(const char* filename)

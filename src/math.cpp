@@ -538,49 +538,50 @@ mat3 quaternionToMat3(quat q)
 
 quat mat3ToQuaternion(mat3 m)
 {
+#if 1
 	float tr = m.m00 + m.m11 + m.m22;
 
-	//quat result;
-	//if (tr > 0.f)
-	//{
-	//	float s = sqrtf(tr + 1.f) * 2.f; // S=4*qw 
-	//	result.w = 0.25f * s;
-	//	result.x = (m.m21 - m.m12) / s;
-	//	result.y = (m.m02 - m.m20) / s;
-	//	result.z = (m.m10 - m.m01) / s;
-	//}
-	//else if ((m.m00 > m.m11) && (m.m00 > m.m22))
-	//{
-	//	float s = sqrtf(1.f + m.m00 - m.m11 - m.m22) * 2.f; // S=4*qx 
-	//	result.w = (m.m21 - m.m12) / s;
-	//	result.x = 0.25f * s;
-	//	result.y = (m.m01 + m.m10) / s;
-	//	result.z = (m.m02 + m.m20) / s;
-	//}
-	//else if (m.m11 > m.m22)
-	//{
-	//	float s = sqrtf(1.f + m.m11 - m.m00 - m.m22) * 2.f; // S=4*qy
-	//	result.w = (m.m02 - m.m20) / s;
-	//	result.x = (m.m01 + m.m10) / s;
-	//	result.y = 0.25f * s;
-	//	result.z = (m.m12 + m.m21) / s;
-	//}
-	//else
-	//{
-	//	float s = sqrtf(1.f + m.m22 - m.m00 - m.m11) * 2.f; // S=4*qz
-	//	result.w = (m.m10 - m.m01) / s;
-	//	result.x = (m.m02 + m.m20) / s;
-	//	result.y = (m.m12 + m.m21) / s;
-	//	result.z = 0.25f * s;
-	//}
-
+	quat result;
+	if (tr > 0.f)
+	{
+		float s = sqrtf(tr + 1.f) * 2.f; // S=4*qw 
+		result.w = 0.25f * s;
+		result.x = (m.m21 - m.m12) / s;
+		result.y = (m.m02 - m.m20) / s;
+		result.z = (m.m10 - m.m01) / s;
+	}
+	else if ((m.m00 > m.m11) && (m.m00 > m.m22))
+	{
+		float s = sqrtf(1.f + m.m00 - m.m11 - m.m22) * 2.f; // S=4*qx 
+		result.w = (m.m21 - m.m12) / s;
+		result.x = 0.25f * s;
+		result.y = (m.m01 + m.m10) / s;
+		result.z = (m.m02 + m.m20) / s;
+	}
+	else if (m.m11 > m.m22)
+	{
+		float s = sqrtf(1.f + m.m11 - m.m00 - m.m22) * 2.f; // S=4*qy
+		result.w = (m.m02 - m.m20) / s;
+		result.x = (m.m01 + m.m10) / s;
+		result.y = 0.25f * s;
+		result.z = (m.m12 + m.m21) / s;
+	}
+	else
+	{
+		float s = sqrtf(1.f + m.m22 - m.m00 - m.m11) * 2.f; // S=4*qz
+		result.w = (m.m10 - m.m01) / s;
+		result.x = (m.m02 + m.m20) / s;
+		result.y = (m.m12 + m.m21) / s;
+		result.z = 0.25f * s;
+	}
+#else
 	quat result;
 	result.w = sqrt(1.f + m.m00 + m.m11 + m.m22) * 0.5f;
 	float w4 = 1.f / (4.f * result.w);
 	result.x = (m.m21 - m.m12) * w4;
 	result.y = (m.m02 - m.m20) * w4;
 	result.z = (m.m10 - m.m02) * w4;
-
+#endif
 	return normalize(result);
 }
 
@@ -809,6 +810,20 @@ mat4 lookAt(vec3 eye, vec3 target, vec3 up)
 	result.m03 = -dot(xAxis, eye); result.m13 = -dot(yAxis, eye); result.m23 = -dot(zAxis, eye); result.m33 = 1.f;
 
 	return result;
+}
+
+quat lookAtQuaternion(vec3 forward, vec3 up)
+{
+	vec3 zAxis = -normalize(forward);
+	vec3 xAxis = normalize(cross(up, zAxis));
+	vec3 yAxis = normalize(cross(zAxis, xAxis));
+
+	mat3 m;
+	m.m00 = xAxis.x; m.m01 = yAxis.x; m.m02 = zAxis.x;
+	m.m10 = xAxis.y; m.m11 = yAxis.y; m.m12 = zAxis.y;
+	m.m20 = xAxis.z; m.m21 = yAxis.z; m.m22 = zAxis.z;
+
+	return mat3ToQuaternion(m);
 }
 
 mat4 createViewMatrix(vec3 position, quat rotation)

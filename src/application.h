@@ -2,6 +2,7 @@
 
 #include "input.h"
 #include "camera.h"
+#include "camera_controller.h"
 #include "mesh.h"
 #include "math.h"
 #include "dx_renderer.h"
@@ -53,7 +54,9 @@ private:
 	directional_light sun;
 
 	dx_renderer* renderer;
+
 	render_camera camera;
+	camera_controller cameraController;
 
 	scene scene;
 };

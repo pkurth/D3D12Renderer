@@ -229,6 +229,7 @@ static ref<dx_texture> loadTextureInternal(const char* filename, uint32 flags)
 	}
 
 	ref<dx_texture> result = createTexture(textureDesc, subresources, numImages);
+	SET_NAME(result->resource, "Loaded from file");
 
 	if (flags & texture_load_flags_gen_mips_on_gpu)
 	{

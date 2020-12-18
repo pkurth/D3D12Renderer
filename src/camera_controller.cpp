@@ -2,17 +2,55 @@
 #include "camera_controller.h"
 
 
-bool updateCamera(render_camera& camera, const user_input& input, uint32 viewportWidth, uint32 viewportHeight, float dt)
+void camera_controller::centerCameraOnObject(const bounding_box& aabb)
+{
+	vec3 center = aabb.getCenter();
+	float radius = length(aabb.getRadius());
+
+	vec3 offsetDirection = normalize(camera->position - center);
+
+	camera_projection_extents extents = camera->getProjectionExtents();
+	float minHorizontalExtent = min(extents.left, extents.right);
+	float minVerticalExtent = min(extents.top, extents.bottom);
+	float minExtent = min(minHorizontalExtent, minVerticalExtent);
+
+	float scaling = radius / minExtent;
+
+	centeringTime = 0.f;
+
+	centeringPositionStart = camera->position;
+	centeringRotationStart = camera->rotation;
+
+	centeringPositionTarget = center + scaling * offsetDirection;
+	centeringRotationTarget = lookAtQuaternion(-offsetDirection, vec3(0.f, 1.f, 0.f));
+
+	orbitRadius = scaling;
+}
+
+bool camera_controller::update(const user_input& input, uint32 viewportWidth, uint32 viewportHeight, float dt)
 {
 	const float CAMERA_MOVEMENT_SPEED = 8.f;
 	const float CAMERA_SENSITIVITY = 4.f;
-	const float CAMERA_ORBIT_RADIUS = 50.f;
+	const float CAMERA_CENTERING_TIME = 0.1f;
 
-	camera.setViewport(viewportWidth, viewportHeight);
+	camera->setViewport(viewportWidth, viewportHeight);
 
 	bool result = false;
 
-	if (input.mouse.right.down)
+	if (centeringTime >= 0.f)
+	{
+		centeringTime += dt;
+
+		float relativeTime = min(centeringTime / CAMERA_CENTERING_TIME, 1.f);
+		camera->position = lerp(centeringPositionStart, centeringPositionTarget, relativeTime);
+		camera->rotation = slerp(centeringRotationStart, centeringRotationTarget, relativeTime);
+
+		if (relativeTime == 1.f)
+		{
+			centeringTime = -1.f;
+		}
+	}
+	else if (input.mouse.right.down)
 	{
 		// Fly camera.
 
@@ -25,11 +63,11 @@ bool updateCamera(render_camera& camera, const user_input& input, uint32 viewpor
 		vec2 turnAngle(0.f, 0.f);
 		turnAngle = vec2(-input.mouse.reldx, -input.mouse.reldy) * CAMERA_SENSITIVITY;
 
-		quat& cameraRotation = camera.rotation;
+		quat& cameraRotation = camera->rotation;
 		cameraRotation = quat(vec3(0.f, 1.f, 0.f), turnAngle.x) * cameraRotation;
 		cameraRotation = cameraRotation * quat(vec3(1.f, 0.f, 0.f), turnAngle.y);
 
-		camera.position += cameraRotation * cameraInputDir * dt;
+		camera->position += cameraRotation * cameraInputDir * dt;
 
 		result = true;
 	}
@@ -42,32 +80,32 @@ bool updateCamera(render_camera& camera, const user_input& input, uint32 viewpor
 			vec2 turnAngle(0.f, 0.f);
 			turnAngle = vec2(-input.mouse.reldx, -input.mouse.reldy) * CAMERA_SENSITIVITY;
 
-			quat& cameraRotation = camera.rotation;
+			quat& cameraRotation = camera->rotation;
 
-			vec3 center = camera.position + cameraRotation * vec3(0.f, 0.f, -CAMERA_ORBIT_RADIUS);
+			vec3 center = camera->position + cameraRotation * vec3(0.f, 0.f, -orbitRadius);
 
 			cameraRotation = quat(vec3(0.f, 1.f, 0.f), turnAngle.x) * cameraRotation;
 			cameraRotation = cameraRotation * quat(vec3(1.f, 0.f, 0.f), turnAngle.y);
 
-			camera.position = center - cameraRotation * vec3(0.f, 0.f, -CAMERA_ORBIT_RADIUS);
+			camera->position = center - cameraRotation * vec3(0.f, 0.f, -orbitRadius);
 		}
 		else if (input.mouse.middle.down)
 		{
 			// Pan camera.
 
 			vec3 cameraInputDir = vec3(
-				-input.mouse.reldx * camera.aspect,
+				-input.mouse.reldx * camera->aspect,
 				input.mouse.reldy,
 				0.f
 			) * (input.keyboard[key_shift].down ? 3.f : 1.f) * (input.keyboard[key_ctrl].down ? 0.1f : 1.f) * 1000.f * CAMERA_MOVEMENT_SPEED;
 
-			camera.position += camera.rotation * cameraInputDir * dt;
+			camera->position += camera->rotation * cameraInputDir * dt;
 		}
 
 		result = true;
 	}
 
-	camera.updateMatrices();
+	camera->updateMatrices();
 
 	return result;
 }

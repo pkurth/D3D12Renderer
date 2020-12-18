@@ -26,6 +26,11 @@ barrier_batcher& barrier_batcher::transition(const ref<dx_texture>& res, D3D12_R
 	return transition(res->resource, from, to, subresource);
 }
 
+barrier_batcher& barrier_batcher::transition(const ref<dx_buffer>& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to)
+{
+	return transition(res->resource, from, to);
+}
+
 barrier_batcher& barrier_batcher::transition(const ref<dx_texture>* res, uint32 count, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
 {
 	for (uint32 i = 0; i < count; ++i)
@@ -44,6 +49,16 @@ barrier_batcher& barrier_batcher::uav(const dx_resource& resource)
 
 	barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::UAV(resource.Get());
 	return *this;
+}
+
+barrier_batcher& barrier_batcher::uav(const ref<dx_texture>& res)
+{
+	return uav(res->resource);
+}
+
+barrier_batcher& barrier_batcher::uav(const ref<dx_buffer>& res)
+{
+	return uav(res->resource);
 }
 
 barrier_batcher& barrier_batcher::aliasing(const dx_resource& before, const dx_resource& after)

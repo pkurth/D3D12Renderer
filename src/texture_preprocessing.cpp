@@ -136,6 +136,8 @@ void generateMipMapsOnGPU(dx_command_list* cl, ref<dx_texture>& texture)
 			IID_PPV_ARGS(&aliasResource)
 		));
 
+		SET_NAME(aliasResource, "Alias resource for mip map generation");
+
 		dxContext.retire(aliasResource);
 
 		checkResult(dxContext.device->CreatePlacedResource(
@@ -146,6 +148,8 @@ void generateMipMapsOnGPU(dx_command_list* cl, ref<dx_texture>& texture)
 			0,
 			IID_PPV_ARGS(&uavResource)
 		));
+
+		SET_NAME(uavResource, "UAV resource for mip map generation");
 
 		dxContext.retire(uavResource);
 
@@ -310,6 +314,8 @@ ref<dx_texture> equirectangularToCubemap(dx_command_list* cl, const ref<dx_textu
 			IID_PPV_ARGS(&stagingResource)
 		));
 
+		SET_NAME(stagingResource, "Staging resource for equirectangular to cubemap");
+
 		stagingTexture->resource = stagingResource;
 	}
 
@@ -416,6 +422,8 @@ ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& 
 			IID_PPV_ARGS(&stagingResource)
 		));
 
+		SET_NAME(stagingResource, "Staging resource for cubemap to irradiance");
+
 		stagingTexture->resource = stagingResource;
 	}
 
@@ -506,7 +514,7 @@ ref<dx_texture> prefilterEnvironment(dx_command_list* cl, const ref<dx_texture>&
 
 		stagingTexture->resource = stagingResource;
 
-		SET_NAME(stagingTexture->resource, "Staging");
+		SET_NAME(stagingResource, "Staging resource for environment prefiltering");
 	}
 
 	cl->setPipelineState(*prefilterEnvironmentPipeline.pipeline);

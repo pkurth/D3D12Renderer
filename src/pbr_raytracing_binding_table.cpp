@@ -30,7 +30,7 @@ void pbr_raytracing_binding_table::initialize()
     assert(offsetof(binding_table, miss) == pipeline->pipeline.shaderBindingTableDesc.missOffset);
     assert(offsetof(binding_table, hit) == pipeline->pipeline.shaderBindingTableDesc.hitOffset);
 
-    maxNumHitGroups = 1024;
+    maxNumHitGroups = 1024; // Initial size. This buffer gets reallocated if needed.
     allocateBindingTableBuffer();
 
     memcpy(bindingTable->raygen.identifier, pipeline->pipeline.shaderBindingTableDesc.raygen, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);

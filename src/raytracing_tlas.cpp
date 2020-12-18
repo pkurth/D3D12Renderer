@@ -2,6 +2,7 @@
 #include "raytracing_tlas.h"
 
 #include "dx_command_list.h"
+#include "dx_barrier_batcher.h"
 
 void raytracing_tlas::initialize(acceleration_structure_rebuild_mode rebuildMode)
 {
@@ -105,7 +106,9 @@ void raytracing_tlas::build()
 
     if (!fromScratch)
     {
-        cl->uavBarrier(tlas);
+        barrier_batcher(cl)
+            .uav(tlas)
+            .uav(scratch);
 
         if (rebuildMode == acceleration_structure_refit)
         {
