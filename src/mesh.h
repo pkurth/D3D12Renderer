@@ -2,8 +2,8 @@
 
 #include "bounding_volumes.h"
 #include "dx_buffer.h"
+#include "animation.h"
 
-struct aiScene;
 struct pbr_material;
 
 
@@ -15,30 +15,22 @@ struct submesh_info
 	uint32 numVertices;
 };
 
-struct single_mesh
+struct submesh
 {
-	submesh_info submesh;
-	bounding_box boundingBox;
+	submesh_info info;
+	bounding_box aabb; // In composite's local space.
+	trs transform;
+
 	ref<pbr_material> material;
 	std::string name;
 };
 
-struct lod_mesh
-{
-	uint32 firstMesh;
-	uint32 numMeshes;
-};
-
 struct composite_mesh
 {
-	std::vector<single_mesh> singleMeshes;
-	std::vector<lod_mesh> lods;
-	std::vector<float> lodDistances;
+	std::vector<submesh> submeshes;
+	animation_skeleton skeleton;
 	dx_mesh mesh;
 };
 
 
-const aiScene* loadAssimpSceneFile(const char* filepath);
-void freeAssimpScene(const aiScene* scene);
-composite_mesh loadMeshFromScene(const aiScene* scene, uint32 flags, bool loadMaterials = false);
-composite_mesh loadMeshFromFile(const char* sceneFilename, uint32 flags, bool loadMaterials = false);
+composite_mesh loadMeshFromFile(const char* sceneFilename, uint32 flags);

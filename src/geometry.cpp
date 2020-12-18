@@ -954,7 +954,7 @@ submesh_info cpu_mesh::pushMace(uint16 slices, float shaftRadius, float headRadi
 	return result;
 }
 
-submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_box* aabb)
+submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_box* aabb, animation_skeleton* skeleton)
 {
 	alignNextTriangle();
 
@@ -1008,28 +1008,21 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_
 		pushVertex(position, uv, normal, tangent, {});
 	}
 
-#if 0
+#if 1
 	if ((flags & mesh_creation_flags_with_skin) && skeleton)
 	{
 		assert(mesh->HasBones());
 
 		uint32 numBones = mesh->mNumBones;
-		assert(numBones < MAX_NUM_JOINTS);
 
 		for (uint32 boneID = 0; boneID < numBones; ++boneID)
 		{
 			const aiBone* bone = mesh->mBones[boneID];
-			uint32 jointID = -1;
-			for (uint32 i = 0; i < skeleton->numJoints; ++i)
-			{
-				skeleton_joint& j = skeleton->joints[i];
-				if (stringsAreEqual(j.name, bone->mName.C_Str()))
-				{
-					jointID = i;
-					break;
-				}
-			}
-			assert(jointID != -1);
+
+			auto it = skeleton->nameToJointID.find(bone->mName.C_Str());
+			assert(it != skeleton->nameToJointID.end());
+
+			uint32 jointID = it->second;
 
 			for (uint32 weightID = 0; weightID < bone->mNumWeights; ++weightID)
 			{

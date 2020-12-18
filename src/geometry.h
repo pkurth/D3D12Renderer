@@ -46,7 +46,7 @@ struct cpu_mesh
 	submesh_info pushTorus(uint16 slices, uint16 segments, float torusRadius, float tubeRadius);
 	submesh_info pushMace(uint16 slices, float shaftRadius, float headRadius, float shaftLength, float headLength);
 
-	submesh_info pushAssimpMesh(const struct aiMesh* mesh, float scale, bounding_box* aabb = 0);
+	submesh_info pushAssimpMesh(const struct aiMesh* mesh, float scale, bounding_box* aabb = 0, animation_skeleton* skeleton = 0);
 
 	dx_mesh createDXMesh();
 	ref<dx_vertex_buffer> createVertexBufferWithAlternativeLayout(uint32 otherFlags, bool allowUnorderedAccess = false);

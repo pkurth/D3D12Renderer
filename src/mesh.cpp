@@ -14,21 +14,7 @@ namespace fs = std::filesystem;
 
 #define CACHE_FORMAT "assbin"
 
-static void fixUpMeshNames(const aiScene* scene, const aiNode* root)
-{
-	for (uint32 i = 0; i < root->mNumMeshes; ++i)
-	{
-		aiMesh* mesh = scene->mMeshes[root->mMeshes[i]];
-		mesh->mName = root->mName;
-	}
-
-	for (uint32 i = 0; i < root->mNumChildren; ++i)
-	{
-		fixUpMeshNames(scene, root->mChildren[i]);
-	}
-}
-
-const aiScene* loadAssimpSceneFile(const char* filepathRaw)
+static const aiScene* loadAssimpSceneFile(const char* filepathRaw, Assimp::Importer& importer)
 {
 	fs::path filepath = filepathRaw;
 	fs::path extension = filepath.extension();
@@ -38,7 +24,6 @@ const aiScene* loadAssimpSceneFile(const char* filepathRaw)
 
 	fs::path cacheFilepath = L"bin_cache" / cachedFilename;
 
-	Assimp::Importer importer;
 	const aiScene* scene = 0;
 
 	{
@@ -88,19 +73,10 @@ const aiScene* loadAssimpSceneFile(const char* filepathRaw)
 
 	if (scene)
 	{
-		scene = importer.GetOrphanedScene();
-		fixUpMeshNames(scene, scene->mRootNode);
+		scene = importer.GetScene();
 	}
 
 	return scene;
-}
-
-void freeAssimpScene(const aiScene* scene)
-{
-	if (scene)
-	{
-		scene->~aiScene(); // TODO: I am not sure, if this deletes everything. Probably not.
-	}
 }
 
 static ref<pbr_material> loadAssimpMaterial(const aiMaterial* material)
@@ -117,166 +93,257 @@ static ref<pbr_material> loadAssimpMaterial(const aiMaterial* material)
 	const char* roughnessName = 0;
 	const char* metallicName = 0;
 
+	aiColor3D aiColor;
+	vec4 albedoTint(1.f);
+	if (material->Get(AI_MATKEY_COLOR_DIFFUSE, aiColor) == aiReturn_SUCCESS)
+	{
+		albedoTint.x = aiColor.r;
+		albedoTint.y = aiColor.g;
+		albedoTint.z = aiColor.b;
+	}
+
+	float roughnessOverride = 1.f;
+	float metallicOverride = 0.f;
+
 	if (hasDiffuse) { albedoName = diffuse.C_Str(); }
 	if (hasNormal) { normalName = normal.C_Str(); }
-	if (hasRoughness) { roughnessName = roughness.C_Str(); }
-	if (hasMetallic) { metallicName = metallic.C_Str(); }
-
-	return createMaterial(albedoName, normalName, roughnessName, metallicName);
-}
-
-composite_mesh loadMeshFromFile(const char* sceneFilename, uint32 flags, bool loadMaterials)
-{
-	const aiScene* scene = loadAssimpSceneFile(sceneFilename);
-	auto mesh = loadMeshFromScene(scene, flags, loadMaterials);
-	freeAssimpScene(scene);
-	return mesh;
-}
-
-composite_mesh loadMeshFromScene(const aiScene* scene, uint32 flags, bool loadMaterials)
-{
-	struct mesh_info
+	if (hasRoughness) 
+	{ 
+		roughnessName = roughness.C_Str(); 
+	}
+	else
 	{
-		int32 lod;
-		submesh_info submesh;
-		bounding_box aabb;
-		std::string name;
-		ref<pbr_material> material;
-	};
+		float shininess;
+		if (material->Get(AI_MATKEY_SHININESS, shininess) != aiReturn_SUCCESS)
+		{
+			shininess = 80.f; // Default value.
+		}
+		roughnessOverride = 1.f - sqrt(shininess * 0.01f);
+	}
 
+	if (hasMetallic) 
+	{ 
+		metallicName = metallic.C_Str(); 
+	}
+	else
+	{
+		if (material->Get(AI_MATKEY_REFLECTIVITY, metallicOverride) != aiReturn_SUCCESS)
+		{
+			metallicOverride = 0.f;
+		}
+	}
+
+	return createMaterial(albedoName, normalName, roughnessName, metallicName, albedoTint, roughnessOverride, metallicOverride);
+}
+
+static mat4 readAssimpMatrix(const aiMatrix4x4& m)
+{
+	mat4 result;
+	result.m00 = m.a1; result.m10 = m.b1; result.m20 = m.c1; result.m30 = m.d1;
+	result.m01 = m.a2; result.m11 = m.b2; result.m21 = m.c2; result.m31 = m.d2;
+	result.m02 = m.a3; result.m12 = m.b3; result.m22 = m.c3; result.m32 = m.d3;
+	result.m03 = m.a4; result.m13 = m.b4; result.m23 = m.c4; result.m33 = m.d4;
+	return result;
+}
+
+static vec3 readAssimpVector(const aiVectorKey& v)
+{
+	vec3 result;
+	result.x = v.mValue.x;
+	result.y = v.mValue.y;
+	result.z = v.mValue.z;
+	return result;
+}
+
+static quat readAssimpQuaternion(const aiQuatKey& q)
+{
+	quat result;
+	result.x = q.mValue.x;
+	result.y = q.mValue.y;
+	result.z = q.mValue.z;
+	result.w = q.mValue.w;
+	return result;
+}
+
+static void getMeshNamesAndTransforms(const aiNode* node, composite_mesh& mesh, const mat4& parentTransform = mat4::identity)
+{
+	mat4 transform = parentTransform * readAssimpMatrix(node->mTransformation);
+	for (uint32 i = 0; i < node->mNumMeshes; ++i)
+	{
+		uint32 meshIndex = node->mMeshes[i];
+		auto& submesh = mesh.submeshes[meshIndex];
+		submesh.name = node->mName.C_Str();
+		submesh.transform = transform;
+	}
+
+	for (uint32 i = 0; i < node->mNumChildren; ++i)
+	{
+		getMeshNamesAndTransforms(node->mChildren[i], mesh, transform);
+	}
+}
+
+static void loadAssimpAnimation(const aiAnimation* animation, animation_clip& clip, animation_skeleton& skeleton, float scale)
+{
+	clip.name = animation->mName.C_Str();
+	clip.ticksPerSecond = (float)animation->mTicksPerSecond;
+	clip.length = (float)animation->mDuration / clip.ticksPerSecond;
+
+	clip.joints.resize(skeleton.joints.size());
+	clip.positionKeyframes.clear();
+	clip.rotationKeyframes.clear();
+	clip.scaleKeyframes.clear();
+
+	for (uint32 channelID = 0; channelID < animation->mNumChannels; ++channelID)
+	{
+		const aiNodeAnim* channel = animation->mChannels[channelID];
+		std::string jointName = channel->mNodeName.C_Str();
+
+		auto it = skeleton.nameToJointID.find(jointName);
+		if (it != skeleton.nameToJointID.end())
+		{
+			animation_joint& joint = clip.joints[it->second];
+
+			joint.firstPositionKeyframe = (uint32)clip.positionKeyframes.size();
+			joint.firstRotationKeyframe = (uint32)clip.rotationKeyframes.size();
+			joint.firstScaleKeyframe = (uint32)clip.scaleKeyframes.size();
+
+			joint.numPositionKeyframes = channel->mNumPositionKeys;
+			joint.numRotationKeyframes = channel->mNumRotationKeys;
+			joint.numScaleKeyframes = channel->mNumScalingKeys;
+
+
+			for (uint32 keyID = 0; keyID < channel->mNumPositionKeys; ++keyID)
+			{
+				clip.positionKeyframes.push_back(readAssimpVector(channel->mPositionKeys[keyID]));
+			}
+
+			for (uint32 keyID = 0; keyID < channel->mNumRotationKeys; ++keyID)
+			{
+				clip.rotationKeyframes.push_back(readAssimpQuaternion(channel->mRotationKeys[keyID]));
+			}
+
+			for (uint32 keyID = 0; keyID < channel->mNumScalingKeys; ++keyID)
+			{
+				clip.scaleKeyframes.push_back(readAssimpVector(channel->mScalingKeys[keyID]));
+			}
+
+			joint.isAnimated = true;
+		}
+	}
+
+	for (uint32 i = 0; i < (uint32)skeleton.joints.size(); ++i)
+	{
+		if (skeleton.joints[i].parentID == NO_PARENT)
+		{
+			for (uint32 keyID = 0; keyID < clip.joints[i].numPositionKeyframes; ++keyID)
+			{
+				clip.positionKeyframes[clip.joints[i].firstPositionKeyframe + keyID] *= scale;
+			}
+			for (uint32 keyID = 0; keyID < clip.joints[i].numScaleKeyframes; ++keyID)
+			{
+				clip.scaleKeyframes[clip.joints[i].firstScaleKeyframe + keyID] *= scale;
+			}
+		}
+	}
+}
+
+static void readAssimpSkeletonHierarchy(const aiNode* node, animation_skeleton& skeleton, uint32& insertIndex, uint32 parentID = NO_PARENT)
+{
+	std::string name = node->mName.C_Str();
+
+	auto it = skeleton.nameToJointID.find(name);
+	if (it != skeleton.nameToJointID.end())
+	{
+		uint32 jointID = it->second;
+
+		skeleton.joints[jointID].parentID = parentID;
+
+		// This sorts the joints, such that parents are before their children.
+		skeleton.nameToJointID[name] = insertIndex;
+		skeleton.nameToJointID[skeleton.joints[insertIndex].name] = jointID;
+		std::swap(skeleton.joints[jointID], skeleton.joints[insertIndex]);
+
+		parentID = insertIndex;
+
+		++insertIndex;
+	}
+
+	for (uint32 i = 0; i < node->mNumChildren; ++i)
+	{
+		readAssimpSkeletonHierarchy(node->mChildren[i], skeleton, insertIndex, parentID);
+	}
+}
+
+static void loadAssimpSkeleton(const aiScene* scene, animation_skeleton& skeleton, float scale = 1.f)
+{
+	mat4 scaleMatrix = mat4::identity * (1.f / scale);
+	scaleMatrix.m33 = 1.f;
+
+	for (uint32 meshID = 0; meshID < scene->mNumMeshes; ++meshID)
+	{
+		const aiMesh* mesh = scene->mMeshes[meshID];
+
+		for (uint32 boneID = 0; boneID < mesh->mNumBones; ++boneID)
+		{
+			const aiBone* bone = mesh->mBones[boneID];
+			std::string name = bone->mName.C_Str();
+
+			auto it = skeleton.nameToJointID.find(name);
+			if (it == skeleton.nameToJointID.end())
+			{
+				skeleton.nameToJointID[name] = (uint32)skeleton.joints.size();
+
+				skeleton_joint& joint = skeleton.joints.emplace_back();
+				joint.name = std::move(name);
+				joint.invBindMatrix = readAssimpMatrix(bone->mOffsetMatrix) * scaleMatrix;
+				joint.bindTransform = trs(invert(joint.invBindMatrix));
+			}
+		}
+	}
+
+	uint32 insertIndex = 0;
+	readAssimpSkeletonHierarchy(scene->mRootNode, skeleton, insertIndex);
+}
+
+static composite_mesh loadMeshFromScene(const aiScene* scene, uint32 flags)
+{
 	cpu_mesh cpuMesh(flags);
 
-	std::vector<mesh_info> infos(scene->mNumMeshes);
-
-	int32 maxLOD = 0;
-	uint32 numMeshesWithoutLOD = 0;
-
-	for (uint32 i = 0; i < scene->mNumMeshes; ++i)
-	{
-		const aiMesh* mesh = scene->mMeshes[i];
-		std::string name = mesh->mName.C_Str();
-
-		int32 lod = -1;
-
-		if (name.length() >= 4)
-		{
-			uint32 j;
-			for (j = (uint32)name.length() - 1; j >= 3; --j)
-			{
-				if (name[j] < '0' || name[j] > '9')
-				{
-					break;
-				}
-			}
-			if (j < (uint32)name.length() - 1)
-			{
-				if (   (name[j - 2] == 'L' || name[j - 2] == 'l')
-					&& (name[j - 1] == 'O' || name[j - 1] == 'o')
-					&& (name[j]     == 'D' || name[j]     == 'd'))
-				{
-					lod = atoi(name.c_str() + j + 1);
-				}
-			}
-		}
-
-		maxLOD = max(maxLOD, lod);
-
-		if (lod == -1)
-		{
-			++numMeshesWithoutLOD;
-		}
-
-		infos[i].lod = lod;
-		infos[i].submesh = cpuMesh.pushAssimpMesh(mesh, 1.f, &infos[i].aabb);
-		infos[i].name = name;
-
-
-		if (loadMaterials && mesh->mMaterialIndex < scene->mNumMaterials)
-		{
-			const aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-			infos[i].material = loadAssimpMaterial(material);
-		}
-		else
-		{
-			infos[i].material = getDefaultMaterial();
-		}
-	}
-
-	std::sort(infos.begin(), infos.end(), [](const mesh_info& a, const mesh_info& b)
-	{
-		return a.lod < b.lod;
-	});
-
-
-
 	composite_mesh result;
-	result.lods.resize(maxLOD + 1);
 
-	uint32 currentInfoOffset = numMeshesWithoutLOD;
-	int32 lodReduce = 0;
-
-	for (int32 i = 0; i <= maxLOD; ++i)
+	if (flags & mesh_creation_flags_with_skin)
 	{
-		lod_mesh& lod = result.lods[i];
-		lod.firstMesh = (uint32)result.singleMeshes.size();
-		lod.numMeshes = 0;
+		loadAssimpSkeleton(scene, result.skeleton, 1.f);
 
-		if (currentInfoOffset < infos.size())
+		result.skeleton.clips.resize(scene->mNumAnimations);
+		for (uint32 i = 0; i < scene->mNumAnimations; ++i)
 		{
-			while (infos[currentInfoOffset].lod - lodReduce != i)
-			{
-				++lodReduce;
-			}
-		}
-
-		for (uint32 j = 0; j < numMeshesWithoutLOD; ++j, ++lod.numMeshes)
-		{
-			result.singleMeshes.push_back({ infos[j].submesh, infos[j].aabb, infos[j].material, infos[j].name });
-		}
-
-		if (currentInfoOffset < infos.size())
-		{
-			while (currentInfoOffset < infos.size() && infos[currentInfoOffset].lod - lodReduce == i)
-			{
-				result.singleMeshes.push_back({ infos[currentInfoOffset].submesh, infos[currentInfoOffset].aabb, infos[currentInfoOffset].material, infos[currentInfoOffset].name });
-				++currentInfoOffset;
-				++lod.numMeshes;
-			}
+			loadAssimpAnimation(scene->mAnimations[i], result.skeleton.clips[i], result.skeleton, 1.f);
+			result.skeleton.nameToClipID[result.skeleton.clips[i].name] = i;
 		}
 	}
 
-	result.lods.resize(result.lods.size() - lodReduce);
+	result.submeshes.resize(scene->mNumMeshes);
+	getMeshNamesAndTransforms(scene->mRootNode, result);
 
-	if (lodReduce > 0)
+	for (uint32 m = 0; m < scene->mNumMeshes; ++m)
 	{
-		std::cout << "There is a gap in the LOD declarations." << std::endl;
-	}
+		submesh& sub = result.submeshes[m];
 
-	result.lodDistances.resize(result.lods.size());
-
-	std::cout << "There are " << result.lods.size() << " LODs in this file." << std::endl;
-
-	uint32 l = 0;
-	for (lod_mesh& lod : result.lods)
-	{
-		std::cout << "LOD " << l++ << ": " << std::endl;
-		for (uint32 i = lod.firstMesh; i < lod.firstMesh + lod.numMeshes; ++i)
-		{
-			std::cout << "   " 
-				<< result.singleMeshes[i].name << " -- " 
-				<< result.singleMeshes[i].submesh.numVertices << " vertices, " 
-				<< result.singleMeshes[i].submesh.numTriangles << " triangles." << std::endl;
-			std::cout << "   " << result.singleMeshes[i].boundingBox.minCorner << std::endl;
-			std::cout << "   " << result.singleMeshes[i].boundingBox.maxCorner << std::endl;
-		}
-	}
-
-	for (uint32 i = 0; i < (uint32)result.lodDistances.size(); ++i)
-	{
-		result.lodDistances[i] = (float)i; // TODO: Better default values.
+		aiMesh* mesh = scene->mMeshes[m];
+		sub.info = cpuMesh.pushAssimpMesh(mesh, 1.f, &sub.aabb, (flags & mesh_creation_flags_with_skin) ? &result.skeleton : 0);
+		sub.material = scene->HasMaterials() ? loadAssimpMaterial(scene->mMaterials[mesh->mMaterialIndex]) : getDefaultMaterial();
 	}
 
 	result.mesh = cpuMesh.createDXMesh();
 
 	return result;
+}
+
+composite_mesh loadMeshFromFile(const char* sceneFilename, uint32 flags)
+{
+	Assimp::Importer importer;
+
+	const aiScene* scene = loadAssimpSceneFile(sceneFilename, importer);
+	return loadMeshFromScene(scene, flags);
 }
