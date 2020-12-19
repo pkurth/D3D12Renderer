@@ -305,6 +305,10 @@ void application::update(const user_input& input, float dt)
 	trs localTransforms[128];
 
 	{
+		ImGui::Begin("Settings");
+		ImGui::Value("Time", fmod(time, stormtrooperMesh.skeleton.clips[0].length));
+		ImGui::End();
+
 		static trs transform = trs::identity;
 		static transformation_type transformationType = transformation_type_translation;
 		static transformation_space transformationSpace = transformation_global;

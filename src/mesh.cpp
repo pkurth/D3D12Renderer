@@ -146,22 +146,22 @@ static mat4 readAssimpMatrix(const aiMatrix4x4& m)
 	return result;
 }
 
-static vec3 readAssimpVector(const aiVectorKey& v)
+static vec3 readAssimpVector(const aiVector3D& v)
 {
 	vec3 result;
-	result.x = v.mValue.x;
-	result.y = v.mValue.y;
-	result.z = v.mValue.z;
+	result.x = v.x;
+	result.y = v.y;
+	result.z = v.z;
 	return result;
 }
 
-static quat readAssimpQuaternion(const aiQuatKey& q)
+static quat readAssimpQuaternion(const aiQuaternion& q)
 {
 	quat result;
-	result.x = q.mValue.x;
-	result.y = q.mValue.y;
-	result.z = q.mValue.z;
-	result.w = q.mValue.w;
+	result.x = q.x;
+	result.y = q.y;
+	result.z = q.z;
+	result.w = q.w;
 	return result;
 }
 
@@ -214,17 +214,17 @@ static void loadAssimpAnimation(const aiAnimation* animation, animation_clip& cl
 
 			for (uint32 keyID = 0; keyID < channel->mNumPositionKeys; ++keyID)
 			{
-				clip.positionKeyframes.push_back(readAssimpVector(channel->mPositionKeys[keyID]));
+				clip.positionKeyframes.push_back(readAssimpVector(channel->mPositionKeys[keyID].mValue));
 			}
 
 			for (uint32 keyID = 0; keyID < channel->mNumRotationKeys; ++keyID)
 			{
-				clip.rotationKeyframes.push_back(readAssimpQuaternion(channel->mRotationKeys[keyID]));
+				clip.rotationKeyframes.push_back(readAssimpQuaternion(channel->mRotationKeys[keyID].mValue));
 			}
 
 			for (uint32 keyID = 0; keyID < channel->mNumScalingKeys; ++keyID)
 			{
-				clip.scaleKeyframes.push_back(readAssimpVector(channel->mScalingKeys[keyID]));
+				clip.scaleKeyframes.push_back(readAssimpVector(channel->mScalingKeys[keyID].mValue));
 			}
 
 			joint.isAnimated = true;

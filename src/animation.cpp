@@ -1,6 +1,48 @@
 #include "pch.h"
 #include "animation.h"
 
+static vec3 samplePosition(const animation_clip& clip, const animation_joint& animJoint, uint32 firstKeyframeIndex, uint32 secondKeyframeIndex, float t)
+{
+	if (animJoint.numPositionKeyframes == 1)
+	{
+		return clip.positionKeyframes[animJoint.firstPositionKeyframe];
+	}
+
+	return lerp(clip.positionKeyframes[animJoint.firstPositionKeyframe + firstKeyframeIndex],
+		clip.positionKeyframes[animJoint.firstPositionKeyframe + secondKeyframeIndex],
+		t);
+}
+
+static quat sampleRotation(const animation_clip& clip, const animation_joint& animJoint, uint32 firstKeyframeIndex, uint32 secondKeyframeIndex, float t)
+{
+	if (animJoint.numRotationKeyframes == 1)
+	{
+		return clip.rotationKeyframes[animJoint.firstRotationKeyframe];
+	}
+
+	quat a = clip.rotationKeyframes[animJoint.firstRotationKeyframe + firstKeyframeIndex];
+	quat b = clip.rotationKeyframes[animJoint.firstRotationKeyframe + secondKeyframeIndex];
+
+	if (dot(a.v4, b.v4) < 0.f)
+	{
+		b.v4 *= -1.f;
+	}
+
+	return lerp(a, b, t);
+}
+
+static vec3 sampleScale(const animation_clip& clip, const animation_joint& animJoint, uint32 firstKeyframeIndex, uint32 secondKeyframeIndex, float t)
+{
+	if (animJoint.numScaleKeyframes == 1)
+	{
+		return clip.scaleKeyframes[animJoint.firstScaleKeyframe];
+	}
+
+	return lerp(clip.scaleKeyframes[animJoint.firstScaleKeyframe + firstKeyframeIndex],
+		clip.scaleKeyframes[animJoint.firstScaleKeyframe + secondKeyframeIndex],
+		t);
+}
+
 void animation_skeleton::sampleAnimation(const std::string& name, float time, trs* outLocalTransforms) const
 {
 	auto clipIndexIt = nameToClipID.find(name);
@@ -10,9 +52,10 @@ void animation_skeleton::sampleAnimation(const std::string& name, float time, tr
 	assert(clip.joints.size() == joints.size());
 
 	time = fmod(time, clip.length);
+
 	float tick = time * clip.ticksPerSecond;
 	uint32 firstKeyframeIndex = (uint32)tick;
-
+	uint32 secondKeyframeIndex = firstKeyframeIndex + 1;
 	float t = tick - firstKeyframeIndex;
 
 	uint32 numJoints = (uint32)joints.size();
@@ -20,55 +63,9 @@ void animation_skeleton::sampleAnimation(const std::string& name, float time, tr
 	{
 		const animation_joint& animJoint = clip.joints[i];
 
-		vec3 position;
-		quat rotation;
-		vec3 scale;
-
-		if (animJoint.numPositionKeyframes == 1)
-		{
-			position = clip.positionKeyframes[animJoint.firstPositionKeyframe];
-		}
-		else
-		{
-			assert(firstKeyframeIndex < animJoint.numPositionKeyframes);
-			uint32 secondKeyframeIndex = min(firstKeyframeIndex + 1, animJoint.numPositionKeyframes);
-			
-			position = lerp(clip.positionKeyframes[animJoint.firstPositionKeyframe + firstKeyframeIndex], 
-				clip.positionKeyframes[animJoint.firstPositionKeyframe + secondKeyframeIndex],
-				t);
-		}
-
-		if (animJoint.numRotationKeyframes == 1)
-		{
-			rotation = clip.rotationKeyframes[animJoint.firstRotationKeyframe];
-		}
-		else
-		{
-			assert(firstKeyframeIndex < animJoint.numRotationKeyframes);
-			uint32 secondKeyframeIndex = min(firstKeyframeIndex + 1, animJoint.numRotationKeyframes);
-
-			rotation = lerp(clip.rotationKeyframes[animJoint.firstRotationKeyframe + firstKeyframeIndex],
-				clip.rotationKeyframes[animJoint.firstRotationKeyframe + secondKeyframeIndex],
-				t);
-		}
-
-		if (animJoint.numScaleKeyframes == 1)
-		{
-			scale = clip.scaleKeyframes[animJoint.firstScaleKeyframe];
-		}
-		else
-		{
-			assert(firstKeyframeIndex < animJoint.numScaleKeyframes);
-			uint32 secondKeyframeIndex = min(firstKeyframeIndex + 1, animJoint.numScaleKeyframes);
-
-			scale = lerp(clip.scaleKeyframes[animJoint.firstScaleKeyframe + firstKeyframeIndex],
-				clip.scaleKeyframes[animJoint.firstScaleKeyframe + secondKeyframeIndex],
-				t);
-		}
-
-		outLocalTransforms[i].position = position;
-		outLocalTransforms[i].rotation = rotation;
-		outLocalTransforms[i].scale = scale;
+		outLocalTransforms[i].position = samplePosition(clip, animJoint, firstKeyframeIndex, secondKeyframeIndex, t);
+		outLocalTransforms[i].rotation = sampleRotation(clip, animJoint, firstKeyframeIndex, secondKeyframeIndex, t);
+		outLocalTransforms[i].scale = sampleScale(clip, animJoint, firstKeyframeIndex, secondKeyframeIndex, t);
 	}
 }
 

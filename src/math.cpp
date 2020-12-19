@@ -768,7 +768,7 @@ mat4 createModelMatrix(vec3 position, quat rotation, vec3 scale)
 
 mat4 trsToMat4(const trs& transform)
 {
-	return createModelMatrix(transform.position, transform.rotation, vec3(1.f, 1.f, 1.f) * transform.scale);
+	return createModelMatrix(transform.position, transform.rotation, transform.scale);
 }
 
 mat4 createViewMatrix(vec3 eye, float pitch, float yaw)
