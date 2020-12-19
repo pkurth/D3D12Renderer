@@ -362,7 +362,11 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 	}
 
 	// SRV.
-	if (textureDesc.DepthOrArraySize == 6)
+	if (textureDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+	{
+		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createVolumeTextureSRV(result);
+	}
+	else if (textureDesc.DepthOrArraySize == 6)
 	{
 		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapSRV(result);
 	}
@@ -380,7 +384,11 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 	// UAV.
 	if (result->supportsUAV)
 	{
-		if (textureDesc.DepthOrArraySize == 6)
+		if (textureDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+		{
+			result->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createVolumeTextureUAV(result);
+		}
+		else if (textureDesc.DepthOrArraySize == 6)
 		{
 			result->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapUAV(result);
 		}
@@ -515,6 +523,35 @@ ref<dx_texture> createCubeTexture(const void* data, uint32 width, uint32 height,
 	}
 }
 
+ref<dx_texture> createVolumeTexture(const void* data, uint32 width, uint32 height, uint32 depth, DXGI_FORMAT format, bool allowUnorderedAccess, D3D12_RESOURCE_STATES initialState)
+{
+	D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE
+		| (allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE)
+		;
+
+	CD3DX12_RESOURCE_DESC textureDesc = CD3DX12_RESOURCE_DESC::Tex3D(format, width, height, depth, 1, flags);
+
+	uint32 formatSize = getFormatSize(textureDesc.Format);
+
+	if (data)
+	{
+		D3D12_SUBRESOURCE_DATA* subresources = (D3D12_SUBRESOURCE_DATA*)alloca(sizeof(D3D12_SUBRESOURCE_DATA) * depth);
+		for (uint32 i = 0; i < depth; ++i)
+		{
+			auto& subresource = subresources[i];
+			subresource.RowPitch = width * formatSize;
+			subresource.SlicePitch = width * height * formatSize;
+			subresource.pData = data;
+		}
+
+		return createTexture(textureDesc, subresources, depth, initialState);
+	}
+	else
+	{
+		return createTexture(textureDesc, 0, 0, initialState);
+	}
+}
+
 void dx_texture::setName(const wchar* name)
 {
 	checkResult(resource->SetName(name));
@@ -623,7 +660,11 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 	}
 	else
 	{
-		if (texture->depth == 6)
+		if (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+		{
+			texture->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createVolumeTextureSRV(texture);
+		}
+		else if (texture->depth == 6)
 		{
 			texture->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapSRV(texture);
 		}
@@ -636,7 +677,11 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 	// UAV.
 	if (texture->supportsUAV)
 	{
-		if (texture->depth == 6)
+		if (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+		{
+			texture->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createVolumeTextureUAV(texture);
+		}
+		else if (texture->depth == 6)
 		{
 			texture->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapUAV(texture);
 		}

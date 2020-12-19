@@ -293,7 +293,7 @@ void application::update(const user_input& input, float dt)
 		static transformation_space transformationSpace = transformation_global;
 		manipulateTransformation(transform, transformationType, transformationSpace, camera, input, !inputCaptured, renderer);
 
-		auto renderST0 = [=]()
+		auto renderST0 = [&]()
 		{
 			static uint32 prevFrameSkinID = -1;
 
@@ -309,7 +309,7 @@ void application::update(const user_input& input, float dt)
 			prevFrameSkinID = skinID;
 		};
 
-		auto renderST1 = [=]()
+		auto renderST1 = [&]()
 		{
 			static uint32 prevFrameSkinID = -1;
 

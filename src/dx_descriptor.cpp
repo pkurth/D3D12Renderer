@@ -49,6 +49,21 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createCubemapArraySRV(const 
 	return *this;
 }
 
+dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createVolumeTextureSRV(const ref<dx_texture>& texture, texture_mip_range mipRange, DXGI_FORMAT overrideFormat)
+{
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Format = (overrideFormat == DXGI_FORMAT_UNKNOWN) ? texture->resource->GetDesc().Format : overrideFormat;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+	srvDesc.Texture3D.MostDetailedMip = mipRange.first;
+	srvDesc.Texture3D.MipLevels = mipRange.count;
+	srvDesc.Texture3D.ResourceMinLODClamp = 0;
+
+	dxContext.device->CreateShaderResourceView(texture->resource.Get(), &srvDesc, cpuHandle);
+
+	return *this;
+}
+
 dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createDepthTextureSRV(const ref<dx_texture>& texture)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -174,6 +189,19 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createCubemapUAV(const ref<d
 	uavDesc.Texture2DArray.FirstArraySlice = 0;
 	uavDesc.Texture2DArray.ArraySize = texture->resource->GetDesc().DepthOrArraySize;
 	uavDesc.Texture2DArray.MipSlice = mipSlice;
+	dxContext.device->CreateUnorderedAccessView(texture->resource.Get(), 0, &uavDesc, cpuHandle);
+
+	return *this;
+}
+
+dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createVolumeTextureUAV(const ref<dx_texture>& texture, uint32 mipSlice, DXGI_FORMAT overrideFormat)
+{
+	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+	uavDesc.Format = overrideFormat;
+	uavDesc.Texture3D.MipSlice = mipSlice;
+	uavDesc.Texture3D.FirstWSlice = 0;
+	uavDesc.Texture3D.WSize = texture->depth;
 	dxContext.device->CreateUnorderedAccessView(texture->resource.Get(), 0, &uavDesc, cpuHandle);
 
 	return *this;

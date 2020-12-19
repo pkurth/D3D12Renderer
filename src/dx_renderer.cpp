@@ -889,12 +889,8 @@ void dx_renderer::endFrame()
 
 			// Prev frame vertex buffer.
 			uint32 prevFrameSkinID = dc.prevFrameSkinID;
-			uint32 prevFrameVertexOffset = 0;
-			if (prevFrameSkinID == -1 || prevFrameSkinID >= (uint32)skinningPass.prevFrameVertexOffsets.size())
-			{
-				prevFrameVertexOffset = 0; // TODO: How do we handle this? This should only happen, if the object popped in this frame.
-			}
-			else
+			uint32 prevFrameVertexOffset = 0; // TODO: How do we handle the else case, where no vertex buffer for last frame is available?
+			if (prevFrameSkinID < (uint32)skinningPass.prevFrameVertexOffsets.size())
 			{
 				prevFrameVertexOffset = skinningPass.prevFrameVertexOffsets[prevFrameSkinID];
 			}
