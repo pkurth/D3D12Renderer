@@ -158,20 +158,47 @@ static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::S
 
 		if (flags & texture_load_flags_compress)
 		{
-			DirectX::ScratchImage compressedImage;
-
-			DirectX::TEX_COMPRESS_FLAGS compressFlags = DirectX::TEX_COMPRESS_PARALLEL;
-			DXGI_FORMAT compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;
-
-			/*if (metadata.format == DXGI_FORMAT_R16G16B16A16_FLOAT)
+			if (!DirectX::IsCompressed(metadata.format))
 			{
-				compressedFormat = DXGI_FORMAT_BC6H_UF16;
-			}*/
+				uint32 numChannels = getNumberOfChannels(metadata.format);
 
-			checkResult(DirectX::Compress(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata,
-				compressedFormat, compressFlags, DirectX::TEX_THRESHOLD_DEFAULT, compressedImage));
-			scratchImage = std::move(compressedImage);
-			metadata = scratchImage.GetMetadata();
+				DXGI_FORMAT compressedFormat;
+
+				switch (numChannels)
+				{
+					case 1: compressedFormat = DXGI_FORMAT_BC4_UNORM; break;
+					case 2: compressedFormat = DXGI_FORMAT_BC5_UNORM; break;
+
+					case 3:
+					case 4:
+					{
+						if (scratchImage.IsAlphaAllOpaque())
+						{
+							compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
+						}
+						else
+						{
+							compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;  // 7 would be better, but takes forever to compress.
+						}
+					} break;
+				}
+
+
+
+				DirectX::ScratchImage compressedImage;
+
+				DirectX::TEX_COMPRESS_FLAGS compressFlags = DirectX::TEX_COMPRESS_PARALLEL;
+
+				/*if (metadata.format == DXGI_FORMAT_R16G16B16A16_FLOAT)
+				{
+					compressedFormat = DXGI_FORMAT_BC6H_UF16;
+				}*/
+
+				checkResult(DirectX::Compress(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata,
+					compressedFormat, compressFlags, DirectX::TEX_THRESHOLD_DEFAULT, compressedImage));
+				scratchImage = std::move(compressedImage);
+				metadata = scratchImage.GetMetadata();
+			}
 		}
 
 		if (flags & texture_load_flags_cache_to_dds)
@@ -272,10 +299,10 @@ static ref<dx_texture> loadVolumeTextureInternal(const std::string& dirname, uin
 			assert(image.slicePitch == scratchImages.begin()->GetImages()[0].slicePitch);
 		}
 
-		totalSize += image.slicePitch;
+		totalSize += (uint32)image.slicePitch;
 	}
 
-	uint32 width = textureDesc.Width;
+	uint32 width = (uint32)textureDesc.Width;
 	uint32 height = textureDesc.Height;
 	uint32 depth = (uint32)scratchImages.size();
 
