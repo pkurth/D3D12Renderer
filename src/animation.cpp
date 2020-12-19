@@ -63,9 +63,16 @@ void animation_skeleton::sampleAnimation(const std::string& name, float time, tr
 	{
 		const animation_joint& animJoint = clip.joints[i];
 
-		outLocalTransforms[i].position = samplePosition(clip, animJoint, firstKeyframeIndex, secondKeyframeIndex, t);
-		outLocalTransforms[i].rotation = sampleRotation(clip, animJoint, firstKeyframeIndex, secondKeyframeIndex, t);
-		outLocalTransforms[i].scale = sampleScale(clip, animJoint, firstKeyframeIndex, secondKeyframeIndex, t);
+		if (animJoint.isAnimated)
+		{
+			outLocalTransforms[i].position = samplePosition(clip, animJoint, firstKeyframeIndex, secondKeyframeIndex, t);
+			outLocalTransforms[i].rotation = sampleRotation(clip, animJoint, firstKeyframeIndex, secondKeyframeIndex, t);
+			outLocalTransforms[i].scale = sampleScale(clip, animJoint, firstKeyframeIndex, secondKeyframeIndex, t);
+		}
+		else
+		{
+			outLocalTransforms[i] = trs::identity;
+		}
 	}
 }
 

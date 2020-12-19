@@ -73,22 +73,6 @@ void application::initialize(dx_renderer* renderer)
 		0.f
 	);
 
-	pilotMesh = loadMeshFromFile("assets/meshes/pilot.fbx",
-		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents | mesh_creation_flags_with_skin);
-
-	pilotMesh.submeshes[0].material = createMaterial(
-		"assets/textures/pilot/A.png",
-		"assets/textures/pilot/N.png",
-		"assets/textures/pilot/R.png",
-		"assets/textures/pilot/M.png",
-		vec4(1.f, 1.f, 1.f, 1.f),
-		0.f,
-		1.f
-	);
-
-
-
-
 
 
 
@@ -305,10 +289,6 @@ void application::update(const user_input& input, float dt)
 	trs localTransforms[128];
 
 	{
-		ImGui::Begin("Settings");
-		ImGui::Value("Time", fmod(time, stormtrooperMesh.skeleton.clips[0].length));
-		ImGui::End();
-
 		static trs transform = trs::identity;
 		static transformation_type transformationType = transformation_type_translation;
 		static transformation_space transformationSpace = transformation_global;
@@ -322,14 +302,6 @@ void application::update(const user_input& input, float dt)
 		renderer->geometryRenderPass.renderAnimatedObject(skinID, stormtrooperMesh.mesh.indexBuffer, stormtrooperMesh.submeshes[0].material, m, m, true);
 		renderer->sunShadowRenderPass.renderObject(0, skinID, stormtrooperMesh.mesh.indexBuffer, m);
 	}
-
-	/*{
-		auto [skinID, skinningMatrices] = renderer->skinningPass.skinObject(pilotMesh.mesh.vertexBuffer, pilotMesh.submeshes[0].info, (uint32)pilotMesh.skeleton.joints.size());
-		pilotMesh.skeleton.sampleAnimation(pilotMesh.skeleton.clips[0].name, time, localTransforms);
-		pilotMesh.skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
-		renderer->geometryRenderPass.renderAnimatedObject(skinID, pilotMesh.mesh.indexBuffer, pilotMesh.submeshes[0].material, mat4::identity, mat4::identity);
-	}*/
-
 
 	//renderer->raytracedReflectionsRenderPass.renderObject(reflectionsRaytracingPipeline, raytracingTLAS);
 }
