@@ -52,7 +52,7 @@ static DXGI_FORMAT makeLinear(DXGI_FORMAT format)
 	return format;
 }
 
-static bool loadImageFromFile(const char* filepathRaw, uint32 flags, DirectX::ScratchImage& scratchImage, D3D12_RESOURCE_DESC& textureDesc)
+static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::ScratchImage& scratchImage, D3D12_RESOURCE_DESC& textureDesc)
 {
 	if (flags & texture_load_flags_gen_mips_on_gpu)
 	{
@@ -61,7 +61,6 @@ static bool loadImageFromFile(const char* filepathRaw, uint32 flags, DirectX::Sc
 	}
 
 
-	fs::path filepath = filepathRaw;
 	fs::path extension = filepath.extension();
 
 	fs::path cachedFilename = filepath;
@@ -206,7 +205,7 @@ static bool loadImageFromFile(const char* filepathRaw, uint32 flags, DirectX::Sc
 	return true;
 }
 
-static ref<dx_texture> loadTextureInternal(const char* filename, uint32 flags)
+static ref<dx_texture> loadTextureInternal(const std::string& filename, uint32 flags)
 {
 	DirectX::ScratchImage scratchImage;
 	D3D12_RESOURCE_DESC textureDesc;
@@ -242,11 +241,72 @@ static ref<dx_texture> loadTextureInternal(const char* filename, uint32 flags)
 	return result;
 }
 
+static ref<dx_texture> loadVolumeTextureInternal(const std::string& dirname, uint32 flags)
+{
+	// No mip maps allowed for now!
+	assert(!(flags & texture_load_flags_allocate_full_mipchain));
+	assert(!(flags & texture_load_flags_gen_mips_on_cpu));
+	assert(!(flags & texture_load_flags_gen_mips_on_gpu));
+
+	std::vector<DirectX::ScratchImage> scratchImages;
+	D3D12_RESOURCE_DESC textureDesc = {};
+
+	uint32 totalSize = 0;
+
+	for (auto& p : fs::directory_iterator(dirname))
+	{
+		auto& path = p.path();
+		DirectX::ScratchImage& s = scratchImages.emplace_back();
+		if (!loadImageFromFile(p, flags, s, textureDesc))
+		{
+			return nullptr;
+		}
+
+		assert(s.GetImageCount() == 1);
+		const auto& image = s.GetImages()[0];
+
+		if (scratchImages.size() > 1)
+		{
+			assert(image.width == scratchImages.begin()->GetImages()[0].width);
+			assert(image.height == scratchImages.begin()->GetImages()[0].height);
+			assert(image.slicePitch == scratchImages.begin()->GetImages()[0].slicePitch);
+		}
+
+		totalSize += image.slicePitch;
+	}
+
+	uint32 width = textureDesc.Width;
+	uint32 height = textureDesc.Height;
+	uint32 depth = (uint32)scratchImages.size();
+
+	uint8* allPixels = new uint8[totalSize];
+
+	for (uint32 i = 0; i < depth; ++i)
+	{
+		DirectX::ScratchImage& s = scratchImages[i];
+		const auto& image = s.GetImages()[0];
+
+		memcpy(allPixels + i * image.slicePitch, image.pixels, image.slicePitch);
+	}
+
+	D3D12_SUBRESOURCE_DATA subresource;
+	subresource.RowPitch = scratchImages.begin()->GetImages()[0].rowPitch;
+	subresource.SlicePitch = scratchImages.begin()->GetImages()[0].slicePitch;
+	subresource.pData = allPixels;
+
+	ref<dx_texture> result = createVolumeTexture(0, width, height, depth, textureDesc.Format, false);
+	uploadTextureSubresourceData(result, &subresource, 0, 1);
+
+	delete[] allPixels;
+
+	return result;
+}
+
+static std::unordered_map<std::string, weakref<dx_texture>> textureCache; // TODO: Pack flags into key.
+static std::mutex mutex;
+
 ref<dx_texture> loadTextureFromFile(const char* filename, uint32 flags)
 {
-	static std::unordered_map<std::string, weakref<dx_texture>> textureCache; // TODO: Pack flags into key.
-	static std::mutex mutex;
-
 	mutex.lock();
 
 	std::string s = filename;
@@ -254,7 +314,23 @@ ref<dx_texture> loadTextureFromFile(const char* filename, uint32 flags)
 	auto sp = textureCache[s].lock();
 	if (!sp)
 	{
-		textureCache[s] = sp = loadTextureInternal(filename, flags);
+		textureCache[s] = sp = loadTextureInternal(s, flags);
+	}
+
+	mutex.unlock();
+	return sp;
+}
+
+ref<dx_texture> loadVolumeTextureFromDirectory(const char* dirname, uint32 flags)
+{
+	mutex.lock();
+
+	std::string s = dirname;
+
+	auto sp = textureCache[s].lock();
+	if (!sp)
+	{
+		textureCache[s] = sp = loadVolumeTextureInternal(s, flags);
 	}
 
 	mutex.unlock();
@@ -502,10 +578,10 @@ ref<dx_texture> createCubeTexture(const void* data, uint32 width, uint32 height,
 	uint32 numMips = allocateMips ? 0 : 1;
 	CD3DX12_RESOURCE_DESC textureDesc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 6, numMips, 1, 0, flags);
 
-	uint32 formatSize = getFormatSize(textureDesc.Format);
-
 	if (data)
 	{
+		uint32 formatSize = getFormatSize(textureDesc.Format);
+
 		D3D12_SUBRESOURCE_DATA subresources[6];
 		for (uint32 i = 0; i < 6; ++i)
 		{
@@ -531,10 +607,10 @@ ref<dx_texture> createVolumeTexture(const void* data, uint32 width, uint32 heigh
 
 	CD3DX12_RESOURCE_DESC textureDesc = CD3DX12_RESOURCE_DESC::Tex3D(format, width, height, depth, 1, flags);
 
-	uint32 formatSize = getFormatSize(textureDesc.Format);
-
 	if (data)
 	{
+		uint32 formatSize = getFormatSize(textureDesc.Format);
+
 		D3D12_SUBRESOURCE_DATA* subresources = (D3D12_SUBRESOURCE_DATA*)alloca(sizeof(D3D12_SUBRESOURCE_DATA) * depth);
 		for (uint32 i = 0; i < depth; ++i)
 		{
