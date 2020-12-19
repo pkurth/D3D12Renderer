@@ -31,6 +31,12 @@ std::pair<uint32, mat4*> skinning_pass::skinObject(const ref<dx_vertex_buffer>& 
 
 void skinning_pass::reset()
 {
+	prevFrameVertexOffsets.resize(calls.size());
+	for (uint32 i = 0; i < (uint32)calls.size(); ++i)
+	{
+		prevFrameVertexOffsets[i] = calls[i].vertexOffset;
+	}
+
 	calls.clear();
 	skinningMatrices.clear();
 	totalNumVertices = 0;
@@ -83,13 +89,14 @@ void geometry_render_pass::renderDynamicObject(const ref<dx_vertex_buffer>& vert
 	}
 }
 
-void geometry_render_pass::renderAnimatedObject(uint32 skinID, const ref<dx_index_buffer>& indexBuffer, const ref<pbr_material>& material, const mat4& transform, const mat4& prevFrameTransform, bool outline)
+void geometry_render_pass::renderAnimatedObject(uint32 skinID, uint32 prevFrameSkinID, const ref<dx_index_buffer>& indexBuffer, const ref<pbr_material>& material, const mat4& transform, const mat4& prevFrameTransform, bool outline)
 {
 	animatedDrawCalls.push_back(
 		{
 			transform,
 			prevFrameTransform,
 			skinID,
+			prevFrameSkinID,
 			indexBuffer,
 			material,
 		}

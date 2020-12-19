@@ -1,3 +1,3 @@
-#define DYNAMIC
+#define ANIMATED
 
 #include "model_common_vs.hlsli"

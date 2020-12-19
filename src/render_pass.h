@@ -25,11 +25,12 @@ private:
 		submesh_info submesh; 
 		uint32 jointOffset;
 		uint32 numJoints;
-		uint32 totalVertexOffset;
+		uint32 vertexOffset;
 	};
 
 	std::vector<skinning_call> calls;
 	std::vector<mat4> skinningMatrices;
+	std::vector<uint32> prevFrameVertexOffsets;
 
 	uint32 totalNumVertices;
 
@@ -42,8 +43,8 @@ struct geometry_render_pass
 		bool outline = false);
 	void renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, 
 		const mat4& transform, const mat4& prevFrameTransform, bool outline = false);
-	void renderAnimatedObject(uint32 skinID, const ref<dx_index_buffer>& indexBuffer, const ref<pbr_material>& material,
-		const mat4& transform, const mat4& prevFrameTransform, bool outline = false);
+	void renderAnimatedObject(uint32 skinID, uint32 prevFrameSkinID, const ref<dx_index_buffer>& indexBuffer, const ref<pbr_material>& material,
+		const mat4& transform, const mat4& prevFrameTransform, bool outline = false); // Pass -1 as prevFrameSkinID if you haven't rendered the object last frame.
 
 private:
 	void reset();
@@ -85,6 +86,7 @@ private:
 		const mat4 transform;
 		const mat4 prevFrameTransform;
 		uint32 skinID;
+		uint32 prevFrameSkinID;
 		ref<dx_index_buffer> indexBuffer;
 		ref<pbr_material> material;
 	};

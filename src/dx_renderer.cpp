@@ -31,7 +31,9 @@ static ref<dx_buffer> pointLightBuffer[NUM_BUFFERED_FRAMES];
 static ref<dx_buffer> spotLightBuffer[NUM_BUFFERED_FRAMES];
 
 static ref<dx_buffer> skinningMatricesBuffer[NUM_BUFFERED_FRAMES];
-static ref<dx_vertex_buffer> skinnedVerticesBuffer; // Not double buffered.
+
+static uint32 currentSkinnedVertexBuffer;
+static ref<dx_vertex_buffer> skinnedVertexBuffer[2]; // We have two of these, so that we can compute screen space velocities.
 
 
 static dx_render_target sunShadowRenderTarget[MAX_NUM_SUN_SHADOW_CASCADES];
@@ -123,9 +125,11 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		skinningMatricesBuffer[i] = createUploadBuffer(sizeof(mat4), MAX_NUM_SKINNING_MATRICES_PER_FRAME, 0);
 	}
 
-	skinnedVerticesBuffer = createVertexBuffer(getVertexSize(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals| mesh_creation_flags_with_tangents),
-		MAX_NUM_SKINNED_VERTICES_PER_FRAME, 0, true);
-
+	for (uint32 i = 0; i < 2; ++i)
+	{
+		skinnedVertexBuffer[i] = createVertexBuffer(getVertexSize(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents),
+			MAX_NUM_SKINNED_VERTICES_PER_FRAME, 0, true);
+	}
 
 	for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
 	{
@@ -162,9 +166,6 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 		staticModelPipeline = createReloadablePipeline(desc, { "model_static_vs", "model_static_ps" });
 		dynamicModelPipeline = createReloadablePipeline(desc, { "model_dynamic_vs", "model_dynamic_ps" });
-
-
-		desc.inputLayout(inputLayout_position_uv_normal_tangent_skin);
 		animatedModelPipeline = createReloadablePipeline(desc, { "model_animated_vs", "model_animated_ps" });
 	}
 
@@ -363,6 +364,8 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 	sunShadowRenderPass.reset();
 	visualizationRenderPass.reset();
 	raytracedReflectionsRenderPass.reset();
+
+	currentSkinnedVertexBuffer = 1 - currentSkinnedVertexBuffer;
 }
 
 void dx_renderer::recalculateViewport(bool resizeTextures)
@@ -532,18 +535,18 @@ void dx_renderer::endFrame()
 		cl->setComputeRootSignature(*skinningPipeline.rootSignature);
 
 		cl->setDescriptorHeapSRV(SKINNING_RS_SRV_UAV, 0, skinningMatricesBuffer[dxContext.bufferedFrameID]);
-		cl->setDescriptorHeapUAV(SKINNING_RS_SRV_UAV, 1, skinnedVerticesBuffer);
+		cl->setDescriptorHeapUAV(SKINNING_RS_SRV_UAV, 1, skinnedVertexBuffer[currentSkinnedVertexBuffer]);
 
 		for (const auto& c : skinningPass.calls)
 		{
 			cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER, c.vertexBuffer->gpuVirtualAddress);
 
-			cl->setCompute32BitConstants(SKINNING_RS_CB, skinning_cb{ c.jointOffset, c.numJoints, c.submesh.baseVertex, c.submesh.numVertices, c.totalVertexOffset });
+			cl->setCompute32BitConstants(SKINNING_RS_CB, skinning_cb{ c.jointOffset, c.numJoints, c.submesh.baseVertex, c.submesh.numVertices, c.vertexOffset });
 
 			cl->dispatch(bucketize(c.submesh.numVertices, 512));
 		}
 
-		cl->uavBarrier(skinnedVerticesBuffer);
+		cl->uavBarrier(skinnedVertexBuffer[currentSkinnedVertexBuffer]);
 	}
 
 
@@ -610,13 +613,13 @@ void dx_renderer::endFrame()
 	}
 
 	// Animated.
-	cl->setVertexBuffer(0, skinnedVerticesBuffer);
+	cl->setVertexBuffer(0, skinnedVertexBuffer[currentSkinnedVertexBuffer]);
 	for (const auto& dc : geometryRenderPass.animatedDrawCalls)
 	{
 		const mat4& m = dc.transform;
 		uint32 skinID = dc.skinID;
 		const submesh_info& submesh = skinningPass.calls[skinID].submesh;
-		uint32 vertexOffset = skinningPass.calls[skinID].totalVertexOffset;
+		uint32 vertexOffset = skinningPass.calls[skinID].vertexOffset;
 
 		cl->setGraphics32BitConstants(MODEL_RS_MVP, depth_only_transform_cb{ camera.viewProj * m });
 
@@ -707,9 +710,9 @@ void dx_renderer::endFrame()
 				{
 					uint32 skinID = dc.skinID;
 					const submesh_info& submesh = skinningPass.calls[skinID].submesh;
-					uint32 vertexOffset = skinningPass.calls[skinID].totalVertexOffset;
+					uint32 vertexOffset = skinningPass.calls[skinID].vertexOffset;
 
-					cl->setVertexBuffer(0, skinnedVerticesBuffer);
+					cl->setVertexBuffer(0, skinnedVertexBuffer[currentSkinnedVertexBuffer]);
 					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, vertexOffset, 0);
 				}
 			}
@@ -755,26 +758,26 @@ void dx_renderer::endFrame()
 	{
 		if (environment)
 		{
-			cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 0, environment->irradiance->defaultSRV);
-			cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 1, environment->environment->defaultSRV);
+			cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 0, environment->irradiance->defaultSRV);
+			cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 1, environment->environment->defaultSRV);
 		}
 		else
 		{
-			cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 0, blackCubeTexture->defaultSRV);
-			cl->setDescriptorHeapSRV(MODEL_RS_ENVIRONMENT_TEXTURES, 1, blackCubeTexture->defaultSRV);
+			cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 0, blackCubeTexture->defaultSRV);
+			cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 1, blackCubeTexture->defaultSRV);
 		}
 		cl->setGraphics32BitConstants(MODEL_RS_LIGHTING, lighting_cb{ settings.environmentIntensity });
-		cl->setDescriptorHeapSRV(MODEL_RS_BRDF, 0, brdfTex);
-		cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 0, lightCullingBuffers.lightGrid);
-		cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 1, lightCullingBuffers.pointLightIndexList);
-		cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 2, lightCullingBuffers.spotLightIndexList);
-		cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 3, pointLightBuffer[dxContext.bufferedFrameID]);
-		cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 4, spotLightBuffer[dxContext.bufferedFrameID]);
+		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 2, brdfTex);
+		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 3, lightCullingBuffers.lightGrid);
+		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 4, lightCullingBuffers.pointLightIndexList);
+		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 5, lightCullingBuffers.spotLightIndexList);
+		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 6, pointLightBuffer[dxContext.bufferedFrameID]);
+		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 7, spotLightBuffer[dxContext.bufferedFrameID]);
 		for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
 		{
-			cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 5 + i, sunShadowCascadeTextures[i]);
+			cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 8 + i, sunShadowCascadeTextures[i]);
 		}
-		cl->setDescriptorHeapSRV(MODEL_RS_LIGHTS, 9, volumetricsTexture);
+		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 12, volumetricsTexture);
 		cl->setGraphicsDynamicConstantBuffer(MODEL_RS_SUN, sunCBV);
 
 		cl->setGraphicsDynamicConstantBuffer(MODEL_RS_CAMERA, cameraCBV);
@@ -814,7 +817,7 @@ void dx_renderer::endFrame()
 			});
 	};
 
-	
+	// Static.
 	if (geometryRenderPass.staticDrawCalls.size() > 0)
 	{
 		cl->setPipelineState(*staticModelPipeline.pipeline);
@@ -836,14 +839,14 @@ void dx_renderer::endFrame()
 		}
 	}
 
-	if (geometryRenderPass.dynamicDrawCalls.size() > 0 || geometryRenderPass.animatedDrawCalls.size() > 0)
+	// Dynamic.
+	if (geometryRenderPass.dynamicDrawCalls.size() > 0)
 	{
 		cl->setPipelineState(*dynamicModelPipeline.pipeline);
 		cl->setGraphicsRootSignature(*dynamicModelPipeline.rootSignature);
 		setUpModelPipeline();
 		cl->setStencilReference(stencil_flag_dynamic_geometry);
 
-		// Dynamic.
 		for (const auto& dc : geometryRenderPass.dynamicDrawCalls)
 		{
 			const mat4& m = dc.transform;
@@ -859,20 +862,44 @@ void dx_renderer::endFrame()
 			cl->setIndexBuffer(dc.indexBuffer);
 			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 		}
+	}
 
-		// Animated.
-		cl->setVertexBuffer(0, skinnedVerticesBuffer);
+	// Animated.
+	if (geometryRenderPass.animatedDrawCalls.size() > 0)
+	{
+		cl->setPipelineState(*animatedModelPipeline.pipeline);
+		cl->setGraphicsRootSignature(*animatedModelPipeline.rootSignature);
+		setUpModelPipeline();
+		cl->setStencilReference(stencil_flag_dynamic_geometry);
+
+		const ref<dx_vertex_buffer> prevVertexBuffer = skinnedVertexBuffer[1 - currentSkinnedVertexBuffer];
+
+		cl->setVertexBuffer(0, skinnedVertexBuffer[currentSkinnedVertexBuffer]);
 		for (const auto& dc : geometryRenderPass.animatedDrawCalls)
 		{
 			const mat4& m = dc.transform;
 			const mat4& prevFrameM = dc.prevFrameTransform;
 			uint32 skinID = dc.skinID;
 			const submesh_info& submesh = skinningPass.calls[skinID].submesh;
-			uint32 vertexOffset = skinningPass.calls[skinID].totalVertexOffset;
+			uint32 vertexOffset = skinningPass.calls[skinID].vertexOffset;
 			const ref<pbr_material>& material = dc.material;
 
 			setMaterialCB(material);
 
+
+			// Prev frame vertex buffer.
+			uint32 prevFrameSkinID = dc.prevFrameSkinID;
+			uint32 prevFrameVertexOffset = 0;
+			if (prevFrameSkinID == -1 || prevFrameSkinID >= (uint32)skinningPass.prevFrameVertexOffsets.size())
+			{
+				prevFrameVertexOffset = 0; // TODO: How do we handle this? This should only happen, if the object popped in this frame.
+			}
+			else
+			{
+				prevFrameVertexOffset = skinningPass.prevFrameVertexOffsets[prevFrameSkinID];
+			}
+
+			cl->setRootGraphicsSRV(MODEL_RS_PREV_FRAME_POSITIONS, prevVertexBuffer->gpuVirtualAddress + prevFrameVertexOffset * prevVertexBuffer->elementSize);
 			cl->setGraphics32BitConstants(MODEL_RS_MVP, dynamic_transform_cb{ camera.viewProj * m, m, camera.prevFrameViewProj * prevFrameM });
 
 			cl->setIndexBuffer(dc.indexBuffer);
@@ -904,12 +931,12 @@ void dx_renderer::endFrame()
 				auto& dc = geometryRenderPass.animatedDrawCalls[outlined.index];
 				uint32 skinID = dc.skinID;
 				const submesh_info& submesh = skinningPass.calls[skinID].submesh;
-				uint32 vertexOffset = skinningPass.calls[skinID].totalVertexOffset;
+				uint32 vertexOffset = skinningPass.calls[skinID].vertexOffset;
 				const mat4& m = dc.transform;
 
 				cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ camera.viewProj * m });
 
-				cl->setVertexBuffer(0, skinnedVerticesBuffer);
+				cl->setVertexBuffer(0, skinnedVertexBuffer[currentSkinnedVertexBuffer]);
 				cl->setIndexBuffer(dc.indexBuffer);
 				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, vertexOffset, 0);
 			}

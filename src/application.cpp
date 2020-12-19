@@ -226,7 +226,7 @@ void application::update(const user_input& input, float dt)
 	ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->settings.aspectRatioMode);
 	ImGui::Checkbox("Show light volumes", &renderer->settings.showLightVolumes);
 
-	//ImGui::Image(renderer->raytracingTexture, 512, 512); // TODO: When you remove this, make renderer attributes private again.
+	//ImGui::Image(renderer->worldNormalsScreenVelocityTexture, 512, 512); // TODO: When you remove this, make renderer attributes private again.
 
 	plotAndEditTonemapping(renderer->settings.tonemap);
 	editSunShadowParameters(sun);
@@ -286,7 +286,6 @@ void application::update(const user_input& input, float dt)
 	static float time = 0.f;
 	time += dt;
 
-	trs localTransforms[128];
 
 	{
 		static trs transform = trs::identity;
@@ -294,13 +293,51 @@ void application::update(const user_input& input, float dt)
 		static transformation_space transformationSpace = transformation_global;
 		manipulateTransformation(transform, transformationType, transformationSpace, camera, input, !inputCaptured, renderer);
 
-		auto [skinID, skinningMatrices] = renderer->skinningPass.skinObject(stormtrooperMesh.mesh.vertexBuffer, stormtrooperMesh.submeshes[0].info, (uint32)stormtrooperMesh.skeleton.joints.size());
-		stormtrooperMesh.skeleton.sampleAnimation(stormtrooperMesh.skeleton.clips[0].name, time, localTransforms);
-		stormtrooperMesh.skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
+		auto renderST0 = [=]()
+		{
+			static uint32 prevFrameSkinID = -1;
 
-		mat4 m = trsToMat4(transform);
-		renderer->geometryRenderPass.renderAnimatedObject(skinID, stormtrooperMesh.mesh.indexBuffer, stormtrooperMesh.submeshes[0].material, m, m, true);
-		renderer->sunShadowRenderPass.renderObject(0, skinID, stormtrooperMesh.mesh.indexBuffer, m);
+			trs localTransforms[128];
+			auto [skinID, skinningMatrices] = renderer->skinningPass.skinObject(stormtrooperMesh.mesh.vertexBuffer, stormtrooperMesh.submeshes[0].info, (uint32)stormtrooperMesh.skeleton.joints.size());
+			stormtrooperMesh.skeleton.sampleAnimation(stormtrooperMesh.skeleton.clips[0].name, time, localTransforms);
+			stormtrooperMesh.skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
+
+			mat4 m = trsToMat4(transform);
+			renderer->geometryRenderPass.renderAnimatedObject(skinID, prevFrameSkinID, stormtrooperMesh.mesh.indexBuffer, stormtrooperMesh.submeshes[0].material, m, m, true);
+			renderer->sunShadowRenderPass.renderObject(0, skinID, stormtrooperMesh.mesh.indexBuffer, m);
+
+			prevFrameSkinID = skinID;
+		};
+
+		auto renderST1 = [=]()
+		{
+			static uint32 prevFrameSkinID = -1;
+
+			trs localTransforms[128];
+			auto [skinID, skinningMatrices] = renderer->skinningPass.skinObject(stormtrooperMesh.mesh.vertexBuffer, stormtrooperMesh.submeshes[0].info, (uint32)stormtrooperMesh.skeleton.joints.size());
+			stormtrooperMesh.skeleton.sampleAnimation(stormtrooperMesh.skeleton.clips[0].name, time + 1.5f, localTransforms);
+			stormtrooperMesh.skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
+
+			mat4 m = trsToMat4(transform);
+			m.m03 += 5.f;
+			renderer->geometryRenderPass.renderAnimatedObject(skinID, prevFrameSkinID, stormtrooperMesh.mesh.indexBuffer, stormtrooperMesh.submeshes[0].material, m, m, true);
+			renderer->sunShadowRenderPass.renderObject(0, skinID, stormtrooperMesh.mesh.indexBuffer, m);
+
+			prevFrameSkinID = skinID;
+		};
+
+		static uint32 frame = 0;
+		if (frame == 0)
+		{
+			renderST0();
+			renderST1();
+		}
+		else
+		{
+			renderST1();
+			renderST0();
+		}
+		frame = 1 - frame;
 	}
 
 	//renderer->raytracedReflectionsRenderPass.renderObject(reflectionsRaytracingPipeline, raytracingTLAS);

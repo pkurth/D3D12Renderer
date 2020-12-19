@@ -1,10 +1,24 @@
 #include "model_rs.hlsli"
 
 
-#if defined(DYNAMIC) || defined(ANIMATED)
-ConstantBuffer<dynamic_transform_cb> transform : register(b0);
+#if defined(DYNAMIC)
+ConstantBuffer<dynamic_transform_cb> transform	: register(b0);
+#elif defined(ANIMATED)
+ConstantBuffer<dynamic_transform_cb> transform	: register(b0);
 #else
-ConstantBuffer<static_transform_cb> transform : register(b0);
+ConstantBuffer<static_transform_cb> transform	: register(b0);
+#endif
+
+#ifdef ANIMATED
+struct mesh_vertex
+{
+	float3 position;
+	float2 uv;
+	float3 normal;
+	float3 tangent;
+};
+
+StructuredBuffer<mesh_vertex> prevFrameVertices : register(t0);
 #endif
 
 struct vs_input
@@ -15,7 +29,7 @@ struct vs_input
 	float3 tangent		: TANGENT;
 
 #ifdef ANIMATED
-	float3 prevPosition	: PREV_FRAME_POSITION; // For screen space velocities.
+	uint vertexID		: SV_VertexID;
 #endif
 };
 
@@ -50,9 +64,9 @@ vs_output main(vs_input IN)
 	OUT.thisFrameNDC = OUT.position.xyw;
 	OUT.prevFrameNDC = mul(transform.prevFrameMVP, float4(IN.position, 1.f)).xyw;
 #elif defined(ANIMATED)
-	// TODO
-	OUT.thisFrameNDC = float3(0.f, 0.f, 1.f);
-	OUT.prevFrameNDC = float3(0.f, 0.f, 1.f);
+	OUT.thisFrameNDC = OUT.position.xyw;
+	float3 prevFramePosition = prevFrameVertices[IN.vertexID].position;
+	OUT.prevFrameNDC = mul(transform.prevFrameMVP, float4(prevFramePosition, 1.f)).xyw;
 #endif
 
 	return OUT;

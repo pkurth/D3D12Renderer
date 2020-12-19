@@ -35,19 +35,21 @@ Texture2D<float3> normalTex						: register(t1, space1);
 Texture2D<float> roughTex						: register(t2, space1);
 Texture2D<float> metalTex						: register(t3, space1);
 
+
+ConstantBuffer<directional_light_cb> sun		: register(b0, space2);
+
 TextureCube<float4> irradianceTexture			: register(t0, space2);
 TextureCube<float4> environmentTexture			: register(t1, space2);
 
-Texture2D<float4> brdf							: register(t0, space3);
+Texture2D<float4> brdf							: register(t2, space2);
 
-ConstantBuffer<directional_light_cb> sun		: register(b0, space4);
-Texture2D<uint4> lightGrid						: register(t0, space4);
-StructuredBuffer<uint> pointLightIndexList		: register(t1, space4);
-StructuredBuffer<uint> spotLightIndexList		: register(t2, space4);
-StructuredBuffer<point_light_cb> pointLights	: register(t3, space4);
-StructuredBuffer<spot_light_cb> spotLights		: register(t4, space4);
-Texture2D<float> sunShadowCascades[4]			: register(t5, space4);
-Texture2D<float4> volumetrics					: register(t9, space4);
+Texture2D<uint4> lightGrid						: register(t3, space2);
+StructuredBuffer<uint> pointLightIndexList		: register(t4, space2);
+StructuredBuffer<uint> spotLightIndexList		: register(t5, space2);
+StructuredBuffer<point_light_cb> pointLights	: register(t6, space2);
+StructuredBuffer<spot_light_cb> spotLights		: register(t7, space2);
+Texture2D<float> sunShadowCascades[4]			: register(t8, space2);
+Texture2D<float4> volumetrics					: register(t12, space2);
 
 struct ps_output
 {

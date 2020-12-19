@@ -24,10 +24,15 @@ struct lighting_cb
     float environmentIntensity;
 };
 
-#if defined(DYNAMIC) || defined(ANIMATED)
+#if defined(DYNAMIC)
 #define TRANSFORM_STRING "RootConstants(num32BitConstants=48, b0, visibility=SHADER_VISIBILITY_VERTEX),"
+#define MODEL_RS_PREV_FRAME_POSITIONS_STRING ""
+#elif defined(ANIMATED)
+#define TRANSFORM_STRING "RootConstants(num32BitConstants=48, b0, visibility=SHADER_VISIBILITY_VERTEX),"
+#define MODEL_RS_PREV_FRAME_POSITIONS_STRING ", SRV(t0)"
 #else
 #define TRANSFORM_STRING "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX),"
+#define MODEL_RS_PREV_FRAME_POSITIONS_STRING ""
 #endif
 
 #define MODEL_RS \
@@ -39,14 +44,15 @@ struct lighting_cb
     "RootConstants(num32BitConstants=6, b0, space=1, visibility=SHADER_VISIBILITY_PIXEL),"  \
     "RootConstants(num32BitConstants=1, b2, space=1, visibility=SHADER_VISIBILITY_PIXEL),"  \
     "CBV(b1, space=1, visibility=SHADER_VISIBILITY_PIXEL), " \
+    "DescriptorTable(SRV(t0, numDescriptors=4, space=1), visibility=SHADER_VISIBILITY_PIXEL), " \
+    "CBV(b0, space=2, visibility=SHADER_VISIBILITY_PIXEL), " \
+    "DescriptorTable(SRV(t0, space=2, numDescriptors=13), visibility=SHADER_VISIBILITY_PIXEL), " \
     "StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_WRAP," \
         "addressV = TEXTURE_ADDRESS_WRAP," \
         "addressW = TEXTURE_ADDRESS_WRAP," \
         "filter = FILTER_MIN_MAG_MIP_LINEAR," \
         "visibility=SHADER_VISIBILITY_PIXEL)," \
-    "DescriptorTable(SRV(t0, numDescriptors=4, space=1), visibility=SHADER_VISIBILITY_PIXEL), " \
-    "DescriptorTable(SRV(t0, space=2, numDescriptors=2), visibility=SHADER_VISIBILITY_PIXEL), " \
     "StaticSampler(s1," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \
         "addressV = TEXTURE_ADDRESS_CLAMP," \
@@ -58,10 +64,8 @@ struct lighting_cb
         "addressV = TEXTURE_ADDRESS_BORDER," \
         "addressW = TEXTURE_ADDRESS_BORDER," \
         "filter = FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT," \
-        "visibility=SHADER_VISIBILITY_PIXEL)," \
-    "DescriptorTable(SRV(t0, space=3, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL), " \
-    "CBV(b0, space=4, visibility=SHADER_VISIBILITY_PIXEL), " \
-    "DescriptorTable(SRV(t0, space=4, numDescriptors=10), visibility=SHADER_VISIBILITY_PIXEL)"
+        "visibility=SHADER_VISIBILITY_PIXEL)" \
+    MODEL_RS_PREV_FRAME_POSITIONS_STRING
 
 #define MODEL_DEPTH_ONLY_RS \
     "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
@@ -76,10 +80,9 @@ struct lighting_cb
 #define MODEL_RS_LIGHTING               2
 #define MODEL_RS_CAMERA                 3
 #define MODEL_RS_PBR_TEXTURES           4
-#define MODEL_RS_ENVIRONMENT_TEXTURES   5
-#define MODEL_RS_BRDF                   6
-#define MODEL_RS_SUN                    7
-#define MODEL_RS_LIGHTS                 8
+#define MODEL_RS_SUN                    5
+#define MODEL_RS_FRAME_CONSTANTS        6
+#define MODEL_RS_PREV_FRAME_POSITIONS   7
 
 
 #endif
