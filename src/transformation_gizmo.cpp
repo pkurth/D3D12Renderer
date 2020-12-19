@@ -392,8 +392,6 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 
 	quat rot = (space == transformation_global) ? quat::identity : transform.rotation;
 
-	visualization_render_pass* visualizationPass = renderer->beginVisualizationPass();
-
 	{
 		const quat rotations[] =
 		{
@@ -411,7 +409,7 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 
 		for (uint32 i = 0; i < 3; ++i)
 		{
-			visualizationPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
+			renderer->visualizationRenderPass.renderObject(mesh.vertexBuffer, mesh.indexBuffer,
 				submeshes[type],
 				createModelMatrix(transform.position, rotations[i]),
 				colors[i] * (highlightAxis == i ? 0.5f : 1.f)
@@ -437,7 +435,7 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 
 		for (uint32 i = 0; i < 3; ++i)
 		{
-			visualizationPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
+			renderer->visualizationRenderPass.renderObject(mesh.vertexBuffer, mesh.indexBuffer,
 				planeSubmesh,
 				createModelMatrix(transform.position, rotations[i]),
 				colors[i] * (highlightAxis == (i + 3) ? 0.5f : 1.f));

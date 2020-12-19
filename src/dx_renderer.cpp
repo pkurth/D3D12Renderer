@@ -15,6 +15,7 @@
 #include "material.hlsli"
 #include "camera.hlsli"
 #include "flat_simple_rs.hlsli"
+#include "skinning_rs.hlsli"
 
 #include "raytracing.h"
 #include "pbr_raytracing_pipeline.h"
@@ -25,14 +26,20 @@ static ref<dx_texture> blackTexture;
 static ref<dx_texture> blackCubeTexture;
 
 
-static ref<dx_buffer> pointLightBuffer[NUM_BUFFERED_FRAMES]; // TODO: When using multiple renderers, these should not be here (I guess).
+// TODO: When using multiple renderers, these should not be here (I guess).
+static ref<dx_buffer> pointLightBuffer[NUM_BUFFERED_FRAMES];
 static ref<dx_buffer> spotLightBuffer[NUM_BUFFERED_FRAMES];
+
+static ref<dx_buffer> skinningMatricesBuffer[NUM_BUFFERED_FRAMES];
+static ref<dx_vertex_buffer> skinnedVerticesBuffer; // Not double buffered.
+
 
 static dx_render_target sunShadowRenderTarget[MAX_NUM_SUN_SHADOW_CASCADES];
 static ref<dx_texture> sunShadowCascadeTextures[MAX_NUM_SUN_SHADOW_CASCADES];
 
 static dx_pipeline staticModelPipeline;
 static dx_pipeline dynamicModelPipeline;
+static dx_pipeline animatedModelPipeline;
 static dx_pipeline modelDepthOnlyPipeline;
 static dx_pipeline modelShadowPipeline; // Only different from depth-only pipeline in the depth format.
 
@@ -44,6 +51,8 @@ static dx_pipeline presentPipeline;
 
 static dx_pipeline flatUnlitPipeline;
 static dx_pipeline flatSimplePipeline;
+
+static dx_pipeline skinningPipeline;
 
 
 static dx_pipeline atmospherePipeline;
@@ -110,7 +119,12 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	{
 		pointLightBuffer[i] = createUploadBuffer(sizeof(point_light_cb), MAX_NUM_POINT_LIGHTS_PER_FRAME, 0);
 		spotLightBuffer[i] = createUploadBuffer(sizeof(spot_light_cb), MAX_NUM_SPOT_LIGHTS_PER_FRAME, 0);
+
+		skinningMatricesBuffer[i] = createUploadBuffer(sizeof(mat4), MAX_NUM_SKINNING_MATRICES_PER_FRAME, 0);
 	}
+
+	skinnedVerticesBuffer = createVertexBuffer(getVertexSize(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals| mesh_creation_flags_with_tangents),
+		MAX_NUM_SKINNED_VERTICES_PER_FRAME, 0, true);
 
 
 	for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
@@ -148,6 +162,10 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 		staticModelPipeline = createReloadablePipeline(desc, { "model_static_vs", "model_static_ps" });
 		dynamicModelPipeline = createReloadablePipeline(desc, { "model_dynamic_vs", "model_dynamic_ps" });
+
+
+		desc.inputLayout(inputLayout_position_uv_normal_tangent_skin);
+		animatedModelPipeline = createReloadablePipeline(desc, { "model_animated_vs", "model_animated_ps" });
 	}
 
 	// Shadow.
@@ -182,7 +200,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 				D3D12_STENCIL_OP_KEEP,
 				D3D12_STENCIL_OP_KEEP,
 				D3D12_STENCIL_OP_KEEP,
-				stencil_flag_selected_object,
+				stencil_flag_selected_object, // Read only selected object bit.
 				0)
 			.depthSettings(false, false);
 
@@ -233,6 +251,11 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	{
 		worldSpaceFrustaPipeline = createReloadablePipeline("world_space_tiled_frusta_cs");
 		lightCullingPipeline = createReloadablePipeline("light_culling_cs");
+	}
+
+	// Skinning.
+	{
+		skinningPipeline = createReloadablePipeline("skinning_cs");
 	}
 
 	// Atmosphere.
@@ -335,6 +358,7 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 		recalculateViewport(true);
 	}
 
+	skinningPass.reset();
 	geometryRenderPass.reset();
 	sunShadowRenderPass.reset();
 	visualizationRenderPass.reset();
@@ -492,6 +516,39 @@ void dx_renderer::endFrame()
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 
+
+	// ----------------------------------------
+	// SKINNING
+	// ----------------------------------------
+
+	if (skinningPass.calls.size() > 0)
+	{
+		mat4* mats = (mat4*)mapBuffer(skinningMatricesBuffer[dxContext.bufferedFrameID]);
+		memcpy(mats, skinningPass.skinningMatrices.data(), sizeof(mat4) * skinningPass.skinningMatrices.size());
+		unmapBuffer(skinningMatricesBuffer[dxContext.bufferedFrameID]);
+
+
+		cl->setPipelineState(*skinningPipeline.pipeline);
+		cl->setComputeRootSignature(*skinningPipeline.rootSignature);
+
+		cl->setDescriptorHeapSRV(SKINNING_RS_SRV_UAV, 0, skinningMatricesBuffer[dxContext.bufferedFrameID]);
+		cl->setDescriptorHeapUAV(SKINNING_RS_SRV_UAV, 1, skinnedVerticesBuffer);
+
+		for (const auto& c : skinningPass.calls)
+		{
+			cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER, c.vertexBuffer->gpuVirtualAddress);
+
+			cl->setCompute32BitConstants(SKINNING_RS_CB, skinning_cb{ c.jointOffset, c.numJoints, c.submesh.baseVertex, c.submesh.numVertices, c.totalVertexOffset });
+
+			cl->dispatch(bucketize(c.submesh.numVertices, 512));
+		}
+
+		cl->uavBarrier(skinnedVerticesBuffer);
+	}
+
+
+
+
 	cl->setRenderTarget(hdrRenderTarget);
 	cl->setViewport(hdrRenderTarget.viewport);
 
@@ -550,6 +607,21 @@ void dx_renderer::endFrame()
 		cl->setVertexBuffer(0, dc.vertexBuffer);
 		cl->setIndexBuffer(dc.indexBuffer);
 		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+	}
+
+	// Animated.
+	cl->setVertexBuffer(0, skinnedVerticesBuffer);
+	for (const auto& dc : geometryRenderPass.animatedDrawCalls)
+	{
+		const mat4& m = dc.transform;
+		uint32 skinID = dc.skinID;
+		const submesh_info& submesh = skinningPass.calls[skinID].submesh;
+		uint32 vertexOffset = skinningPass.calls[skinID].totalVertexOffset;
+
+		cl->setGraphics32BitConstants(MODEL_RS_MVP, depth_only_transform_cb{ camera.viewProj * m });
+
+		cl->setIndexBuffer(dc.indexBuffer);
+		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, vertexOffset, 0);
 	}
 
 
@@ -621,13 +693,25 @@ void dx_renderer::endFrame()
 			for (const auto& dc : sunShadowRenderPass.drawCalls[cascade])
 			{
 				const mat4& m = dc.transform;
-				const submesh_info& submesh = dc.submesh;
-
 				cl->setGraphics32BitConstants(MODEL_RS_MVP, depth_only_transform_cb{ sun.vp[i] * m });
 
-				cl->setVertexBuffer(0, dc.vertexBuffer);
 				cl->setIndexBuffer(dc.indexBuffer);
-				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+
+				if (dc.type == sun_shadow_render_pass::shadow_object_default)
+				{
+					const submesh_info& submesh = dc.submesh;
+					cl->setVertexBuffer(0, dc.vertexBuffer);
+					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+				}
+				else
+				{
+					uint32 skinID = dc.skinID;
+					const submesh_info& submesh = skinningPass.calls[skinID].submesh;
+					uint32 vertexOffset = skinningPass.calls[skinID].totalVertexOffset;
+
+					cl->setVertexBuffer(0, skinnedVerticesBuffer);
+					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, vertexOffset, 0);
+				}
 			}
 		}
 	}
@@ -752,13 +836,14 @@ void dx_renderer::endFrame()
 		}
 	}
 
-	if (geometryRenderPass.dynamicDrawCalls.size() > 0)
+	if (geometryRenderPass.dynamicDrawCalls.size() > 0 || geometryRenderPass.animatedDrawCalls.size() > 0)
 	{
 		cl->setPipelineState(*dynamicModelPipeline.pipeline);
 		cl->setGraphicsRootSignature(*dynamicModelPipeline.rootSignature);
 		setUpModelPipeline();
 		cl->setStencilReference(stencil_flag_dynamic_geometry);
 
+		// Dynamic.
 		for (const auto& dc : geometryRenderPass.dynamicDrawCalls)
 		{
 			const mat4& m = dc.transform;
@@ -773,6 +858,25 @@ void dx_renderer::endFrame()
 			cl->setVertexBuffer(0, dc.vertexBuffer);
 			cl->setIndexBuffer(dc.indexBuffer);
 			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		}
+
+		// Animated.
+		cl->setVertexBuffer(0, skinnedVerticesBuffer);
+		for (const auto& dc : geometryRenderPass.animatedDrawCalls)
+		{
+			const mat4& m = dc.transform;
+			const mat4& prevFrameM = dc.prevFrameTransform;
+			uint32 skinID = dc.skinID;
+			const submesh_info& submesh = skinningPass.calls[skinID].submesh;
+			uint32 vertexOffset = skinningPass.calls[skinID].totalVertexOffset;
+			const ref<pbr_material>& material = dc.material;
+
+			setMaterialCB(material);
+
+			cl->setGraphics32BitConstants(MODEL_RS_MVP, dynamic_transform_cb{ camera.viewProj * m, m, camera.prevFrameViewProj * prevFrameM });
+
+			cl->setIndexBuffer(dc.indexBuffer);
+			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, vertexOffset, 0);
 		}
 	}
 
@@ -795,16 +899,34 @@ void dx_renderer::endFrame()
 		// Mark object in stencil.
 		for (const auto& outlined : geometryRenderPass.outlinedObjects)
 		{
-			const submesh_info& submesh = outlined.dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].submesh : geometryRenderPass.staticDrawCalls[outlined.index].submesh;
-			const mat4& m = outlined.dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].transform : geometryRenderPass.staticDrawCalls[outlined.index].transform;
-			const auto& vertexBuffer = outlined.dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].vertexBuffer : geometryRenderPass.staticDrawCalls[outlined.index].vertexBuffer;
-			const auto& indexBuffer = outlined.dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].indexBuffer : geometryRenderPass.staticDrawCalls[outlined.index].indexBuffer;
+			if (outlined.type == geometry_render_pass::outlined_animated)
+			{
+				auto& dc = geometryRenderPass.animatedDrawCalls[outlined.index];
+				uint32 skinID = dc.skinID;
+				const submesh_info& submesh = skinningPass.calls[skinID].submesh;
+				uint32 vertexOffset = skinningPass.calls[skinID].totalVertexOffset;
+				const mat4& m = dc.transform;
 
-			cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ camera.viewProj * m });
+				cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ camera.viewProj * m });
 
-			cl->setVertexBuffer(0, vertexBuffer);
-			cl->setIndexBuffer(indexBuffer);
-			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+				cl->setVertexBuffer(0, skinnedVerticesBuffer);
+				cl->setIndexBuffer(dc.indexBuffer);
+				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, vertexOffset, 0);
+			}
+			else
+			{
+				bool dynamic = (outlined.type == geometry_render_pass::outlined_dynamic);
+				const submesh_info& submesh = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].submesh : geometryRenderPass.staticDrawCalls[outlined.index].submesh;
+				const mat4& m = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].transform : geometryRenderPass.staticDrawCalls[outlined.index].transform;
+				const auto& vertexBuffer = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].vertexBuffer : geometryRenderPass.staticDrawCalls[outlined.index].vertexBuffer;
+				const auto& indexBuffer = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].indexBuffer : geometryRenderPass.staticDrawCalls[outlined.index].indexBuffer;
+
+				cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ camera.viewProj * m });
+
+				cl->setVertexBuffer(0, vertexBuffer);
+				cl->setIndexBuffer(indexBuffer);
+				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			}
 		}
 
 		// Draw outline.

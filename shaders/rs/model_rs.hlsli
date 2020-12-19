@@ -14,13 +14,6 @@ struct dynamic_transform_cb
     mat4 prevFrameMVP;
 };
 
-struct animated_transform_cb
-{
-    mat4 m;
-    mat4 mvp;
-    mat4 skinMatrices[256];
-};
-
 struct depth_only_transform_cb
 {
 	mat4 mvp;
@@ -31,9 +24,7 @@ struct lighting_cb
     float environmentIntensity;
 };
 
-#if defined(ANIMATED)
-#define TRANSFORM_STRING "CBV(b0, visibility=SHADER_VISIBILITY_VERTEX),"
-#elif defined(DYNAMIC)
+#if defined(DYNAMIC) || defined(ANIMATED)
 #define TRANSFORM_STRING "RootConstants(num32BitConstants=48, b0, visibility=SHADER_VISIBILITY_VERTEX),"
 #else
 #define TRANSFORM_STRING "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX),"

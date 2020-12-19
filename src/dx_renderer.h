@@ -17,6 +17,9 @@
 #define MAX_NUM_POINT_LIGHTS_PER_FRAME 4096
 #define MAX_NUM_SPOT_LIGHTS_PER_FRAME 4096
 
+#define MAX_NUM_SKINNING_MATRICES_PER_FRAME 4096
+#define MAX_NUM_SKINNED_VERTICES_PER_FRAME (1 << 20)
+
 enum aspect_ratio_mode
 {
 	aspect_ratio_free,
@@ -71,10 +74,12 @@ struct dx_renderer
 	void setPointLights(const point_light_cb* lights, uint32 numLights);
 	void setSpotLights(const spot_light_cb* lights, uint32 numLights);
 
-	geometry_render_pass* beginGeometryPass() { return &geometryRenderPass; }
-	sun_shadow_render_pass* beginSunShadowPass() { return &sunShadowRenderPass; }
-	visualization_render_pass* beginVisualizationPass() { return &visualizationRenderPass; }
-	raytraced_reflections_render_pass* beginRaytracedReflectionsPass() { return &raytracedReflectionsRenderPass; }
+
+	skinning_pass skinningPass;
+	geometry_render_pass geometryRenderPass;
+	sun_shadow_render_pass sunShadowRenderPass;
+	visualization_render_pass visualizationRenderPass;
+	raytraced_reflections_render_pass raytracedReflectionsRenderPass;
 
 	
 	renderer_settings settings;
@@ -133,11 +138,6 @@ struct dx_renderer
 
 
 
-
-	geometry_render_pass geometryRenderPass;
-	sun_shadow_render_pass sunShadowRenderPass;
-	visualization_render_pass visualizationRenderPass;
-	raytraced_reflections_render_pass raytracedReflectionsRenderPass;
 
 	light_culling_buffers lightCullingBuffers;
 

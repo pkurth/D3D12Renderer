@@ -1,10 +1,8 @@
 #include "model_rs.hlsli"
 
 
-#ifdef DYNAMIC
+#if defined(DYNAMIC) || defined(ANIMATED)
 ConstantBuffer<dynamic_transform_cb> transform : register(b0);
-#elif defined(ANIMATED)
-ConstantBuffer<animated_transform_cb> transform : register(b0);
 #else
 ConstantBuffer<static_transform_cb> transform : register(b0);
 #endif
@@ -17,8 +15,7 @@ struct vs_input
 	float3 tangent		: TANGENT;
 
 #ifdef ANIMATED
-	uint4 skinIndices	: SKIN_INDICES;
-	float4 skinWeights	: SKIN_WEIGHTS;
+	float3 prevPosition	: PREV_FRAME_POSITION; // For screen space velocities.
 #endif
 };
 
@@ -38,28 +35,14 @@ struct vs_output
 
 vs_output main(vs_input IN)
 {
-#ifdef ANIMATED
-	float4x4 s =
-		transform.skinMatrices[IN.skinIndices.x] * IN.skinWeights.x +
-		transform.skinMatrices[IN.skinIndices.y] * IN.skinWeights.y +
-		transform.skinMatrices[IN.skinIndices.z] * IN.skinWeights.z +
-		transform.skinMatrices[IN.skinIndices.w] * IN.skinWeights.w;
-
-	float4x4 m = mul(transform.m, s);
-	float4x4 mvp = mul(transform.mvp, s);
-#else
-	float4x4 m = transform.m;
-	float4x4 mvp = transform.mvp;
-#endif
-
 	vs_output OUT;
-	OUT.position = mul(mvp, float4(IN.position, 1.f));
+	OUT.position = mul(transform.mvp, float4(IN.position, 1.f));
 
 	OUT.uv = IN.uv;
-	OUT.worldPosition = (mul(m, float4(IN.position, 1.f))).xyz;
+	OUT.worldPosition = (mul(transform.m, float4(IN.position, 1.f))).xyz;
 
-	float3 normal = normalize(mul(m, float4(IN.normal, 0.f)).xyz);
-	float3 tangent = normalize(mul(m, float4(IN.tangent, 0.f)).xyz);
+	float3 normal = normalize(mul(transform.m, float4(IN.normal, 0.f)).xyz);
+	float3 tangent = normalize(mul(transform.m, float4(IN.tangent, 0.f)).xyz);
 	float3 bitangent = normalize(cross(normal, tangent));
 	OUT.tbn = float3x3(tangent, bitangent, normal);
 

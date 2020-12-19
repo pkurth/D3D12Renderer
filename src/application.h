@@ -38,6 +38,10 @@ private:
 	std::vector<scene_object> gameObjects;
 	std::vector<raytracing_blas> blas;
 
+	composite_mesh stormtrooperMesh;
+	composite_mesh pilotMesh;
+
+
 	pbr_raytracing_binding_table reflectionsRaytracingPipeline;
 	raytracing_tlas raytracingTLAS;
 

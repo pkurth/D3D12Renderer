@@ -7,69 +7,18 @@
 #include "imgui.h"
 #include "dx_context.h"
 
-#include "random.hlsli"
-
-
-static vec2 halton23Sequence[16];
-
 
 void application::initialize(dx_renderer* renderer)
 {
-	for (uint32 i = 0; i < arraysize(halton23Sequence); ++i)
-	{
-		halton23Sequence[i] = halton23(i + 1);
-	}
-
 	this->renderer = renderer;
 
 	camera.initializeIngame(vec3(0.f, 30.f, 40.f), quat::identity, deg2rad(70.f), 0.1f);
 	cameraController.initialize(&camera);
 
-	/*meshes.push_back(loadMeshFromFile("assets/meshes/cerberus.fbx", 
-		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
-	);
-
-	meshes.back().singleMeshes[0].material = createMaterial(
-		"assets/textures/cerberus_a.tga",
-		"assets/textures/cerberus_n.tga",
-		"assets/textures/cerberus_r.tga",
-		"assets/textures/cerberus_m.tga",
-		vec4(1.f, 1.f, 1.f, 1.f),
-		0.f,
-		0.f
-	);*/
-
 	cpu_mesh sphere(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 	composite_mesh& sphereMesh = meshes.emplace_back();
 	sphereMesh.submeshes.push_back({ sphere.pushSphere(21, 21, 1), bounding_box::fromCenterRadius(0.f, 1.f), trs::identity, createMaterial(0, 0, 0, 0, vec4(1.f), 0.f, 1.f), "Sphere" });
 	sphereMesh.mesh = sphere.createDXMesh();
-	
-
-	/*meshes.push_back(loadMeshFromFile("assets/meshes/stormtrooper.fbx",
-		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
-	);
-
-	meshes.back().singleMeshes[0].material = createMaterial(
-		"assets/textures/stormtrooper/Stormtrooper_D.png",
-		0, 0, 0,
-		vec4(1.f, 1.f, 1.f, 1.f),
-		0.f,
-		1.f
-	);
-
-	meshes.push_back(loadMeshFromFile("assets/meshes/pilot.fbx",
-		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
-	);
-
-	meshes.back().singleMeshes[0].material = createMaterial(
-		"assets/textures/pilot/A.png",
-		"assets/textures/pilot/N.png",
-		"assets/textures/pilot/R.png",
-		"assets/textures/pilot/M.png",
-		vec4(1.f, 1.f, 1.f, 1.f),
-		0.f,
-		1.f
-	);*/
 
 	meshes.push_back(loadMeshFromFile("assets/meshes/sponza.obj",
 		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
@@ -99,21 +48,54 @@ void application::initialize(dx_renderer* renderer)
 	}
 
 
-	trs cerberusTransform = { vec3(0.f, 10.f, -5.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 1 };
-	gameObjects.push_back({ cerberusTransform, 0, });
-	raytracingTLAS.instantiate(types[0], cerberusTransform);
-
-	//trs trooperTransform = { vec3(0.f, 0.f, 0.f), quat::identity, 1.f };
-	//gameObjects.push_back({ trooperTransform, 1, });
-	//raytracingTLAS.instantiate(types[1], trooperTransform);
-
-	//trs pilotTransform = { vec3(1.f, 0.f, 0.f), quat::identity, 1.f };
-	//gameObjects.push_back({ pilotTransform, 2, });
-	//raytracingTLAS.instantiate(types[2], pilotTransform);
+	trs sphereTransform = { vec3(0.f, 10.f, -5.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 1 };
+	gameObjects.push_back({ sphereTransform, 0, });
+	raytracingTLAS.instantiate(types[0], sphereTransform);
 
 	trs sponzaTransform = { vec3(0.f, 0.f, 0.f), quat::identity, 0.01f };
 	gameObjects.push_back({ sponzaTransform, 1, });
 	raytracingTLAS.instantiate(types[1], sponzaTransform);
+
+
+
+
+
+
+
+	stormtrooperMesh = loadMeshFromFile("assets/meshes/stormtrooper.fbx",
+		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents | mesh_creation_flags_with_skin);
+
+	stormtrooperMesh.submeshes[0].material = createMaterial(
+		"assets/textures/stormtrooper/Stormtrooper_D.png",
+		0, 0, 0,
+		vec4(1.f, 1.f, 1.f, 1.f),
+		0.f,
+		0.f
+	);
+
+	pilotMesh = loadMeshFromFile("assets/meshes/pilot.fbx",
+		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents | mesh_creation_flags_with_skin);
+
+	pilotMesh.submeshes[0].material = createMaterial(
+		"assets/textures/pilot/A.png",
+		"assets/textures/pilot/N.png",
+		"assets/textures/pilot/R.png",
+		"assets/textures/pilot/M.png",
+		vec4(1.f, 1.f, 1.f, 1.f),
+		0.f,
+		1.f
+	);
+
+
+
+
+
+
+
+
+
+
+
 
 	reflectionsRaytracingPipeline.build();
 	raytracingTLAS.build();
@@ -292,34 +274,14 @@ void application::update(const user_input& input, float dt)
 		lightVelocities[i] += (v - lightVelocities[i]) * factor;
 	}
 
-#if 0
-	static uint32 haltonIndex = 0;
-	auto jitteredCamera = camera.getJitteredVersion(halton23Sequence[haltonIndex] * jitterStrength);
-	haltonIndex = (haltonIndex + 1) % arraysize(halton23Sequence);
-#else
-	auto& jitteredCamera = camera;
-#endif
+	sun.updateMatrices(camera);
 
-	sun.updateMatrices(jitteredCamera);
-
-
-	renderer->setCamera(jitteredCamera);
+	renderer->setCamera(camera);
 	renderer->setSun(sun);
 	renderer->setEnvironment(environment);
 	renderer->setPointLights(pointLights, numPointLights);
 	renderer->setSpotLights(spotLights, numSpotLights);
 
-	static transformation_type transformationType = transformation_type_translation;
-	static transformation_space transformationSpace = transformation_global;
-	if (manipulateTransformation(gameObjects[0].transform, transformationType, transformationSpace, camera, input, !inputCaptured, renderer))
-	{
-		//raytracingTLAS.updateInstanceTransform({ 0 }, gameObjects[0].transform);
-		//raytracingTLAS.build();
-	}
-
-
-	geometry_render_pass* geometryPass = renderer->beginGeometryPass();
-	sun_shadow_render_pass* shadowPass = renderer->beginSunShadowPass();
 
 
 	for (const scene_object& go : gameObjects)
@@ -327,19 +289,45 @@ void application::update(const user_input& input, float dt)
 		const dx_mesh& mesh = meshes[go.meshIndex].mesh;
 		mat4 m = trsToMat4(go.transform);
 
-		bool outline = go.meshIndex == 0;
-
 		for (auto& sm : meshes[go.meshIndex].submeshes)
 		{
 			submesh_info submesh = sm.info;
 			const ref<pbr_material>& material = sm.material;
 
-			geometryPass->renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, outline);
-			shadowPass->renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+			renderer->geometryRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m);
+			renderer->sunShadowRenderPass.renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
 		}
 	}
 
-	//renderer->beginRaytracedReflectionsPass()->renderObject(reflectionsRaytracingPipeline, raytracingTLAS);
+	static float time = 0.f;
+	time += dt;
+
+	trs localTransforms[128];
+
+	{
+		static trs transform = trs::identity;
+		static transformation_type transformationType = transformation_type_translation;
+		static transformation_space transformationSpace = transformation_global;
+		manipulateTransformation(transform, transformationType, transformationSpace, camera, input, !inputCaptured, renderer);
+
+		auto [skinID, skinningMatrices] = renderer->skinningPass.skinObject(stormtrooperMesh.mesh.vertexBuffer, stormtrooperMesh.submeshes[0].info, (uint32)stormtrooperMesh.skeleton.joints.size());
+		stormtrooperMesh.skeleton.sampleAnimation(stormtrooperMesh.skeleton.clips[0].name, time, localTransforms);
+		stormtrooperMesh.skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
+
+		mat4 m = trsToMat4(transform);
+		renderer->geometryRenderPass.renderAnimatedObject(skinID, stormtrooperMesh.mesh.indexBuffer, stormtrooperMesh.submeshes[0].material, m, m, true);
+		renderer->sunShadowRenderPass.renderObject(0, skinID, stormtrooperMesh.mesh.indexBuffer, m);
+	}
+
+	/*{
+		auto [skinID, skinningMatrices] = renderer->skinningPass.skinObject(pilotMesh.mesh.vertexBuffer, pilotMesh.submeshes[0].info, (uint32)pilotMesh.skeleton.joints.size());
+		pilotMesh.skeleton.sampleAnimation(pilotMesh.skeleton.clips[0].name, time, localTransforms);
+		pilotMesh.skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
+		renderer->geometryRenderPass.renderAnimatedObject(skinID, pilotMesh.mesh.indexBuffer, pilotMesh.submeshes[0].material, mat4::identity, mat4::identity);
+	}*/
+
+
+	//renderer->raytracedReflectionsRenderPass.renderObject(reflectionsRaytracingPipeline, raytracingTLAS);
 }
 
 void application::setEnvironment(const char* filename)

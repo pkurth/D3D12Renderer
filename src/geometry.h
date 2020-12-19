@@ -16,6 +16,17 @@ enum mesh_creation_flags
 	mesh_creation_flags_with_skin		= (1 << 4),
 };
 
+static uint32 getVertexSize(uint32 meshFlags)
+{
+	uint32 size = 0;
+	if (meshFlags & mesh_creation_flags_with_positions) { size += sizeof(vec3); }
+	if (meshFlags & mesh_creation_flags_with_uvs) { size += sizeof(vec2); }
+	if (meshFlags & mesh_creation_flags_with_normals) { size += sizeof(vec3); }
+	if (meshFlags & mesh_creation_flags_with_tangents) { size += sizeof(vec3); }
+	if (meshFlags & mesh_creation_flags_with_skin) { size += sizeof(skinning_weights); }
+	return size;
+}
+
 struct cpu_mesh
 {
 	cpu_mesh() {}
