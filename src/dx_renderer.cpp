@@ -6,6 +6,8 @@
 #include "dx_texture.h"
 #include "dx_barrier_batcher.h"
 #include "texture_preprocessing.h"
+#include "skinning.h"
+#include "dx_context.h"
 
 #include "outline_rs.hlsli"
 #include "sky_rs.hlsli"
@@ -15,7 +17,6 @@
 #include "material.hlsli"
 #include "camera.hlsli"
 #include "flat_simple_rs.hlsli"
-#include "skinning_rs.hlsli"
 
 #include "raytracing.h"
 #include "pbr_raytracing_pipeline.h"
@@ -29,11 +30,6 @@ static ref<dx_texture> blackCubeTexture;
 // TODO: When using multiple renderers, these should not be here (I guess).
 static ref<dx_buffer> pointLightBuffer[NUM_BUFFERED_FRAMES];
 static ref<dx_buffer> spotLightBuffer[NUM_BUFFERED_FRAMES];
-
-static ref<dx_buffer> skinningMatricesBuffer[NUM_BUFFERED_FRAMES];
-
-static uint32 currentSkinnedVertexBuffer;
-static ref<dx_vertex_buffer> skinnedVertexBuffer[2]; // We have two of these, so that we can compute screen space velocities.
 
 
 static dx_render_target sunShadowRenderTarget[MAX_NUM_SUN_SHADOW_CASCADES];
@@ -53,8 +49,6 @@ static dx_pipeline presentPipeline;
 
 static dx_pipeline flatUnlitPipeline;
 static dx_pipeline flatSimplePipeline;
-
-static dx_pipeline skinningPipeline;
 
 
 static dx_pipeline atmospherePipeline;
@@ -116,19 +110,12 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	}
 
 	initializeTexturePreprocessing();
+	initializeSkinning();
 
 	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
 	{
 		pointLightBuffer[i] = createUploadBuffer(sizeof(point_light_cb), MAX_NUM_POINT_LIGHTS_PER_FRAME, 0);
 		spotLightBuffer[i] = createUploadBuffer(sizeof(spot_light_cb), MAX_NUM_SPOT_LIGHTS_PER_FRAME, 0);
-
-		skinningMatricesBuffer[i] = createUploadBuffer(sizeof(mat4), MAX_NUM_SKINNING_MATRICES_PER_FRAME, 0);
-	}
-
-	for (uint32 i = 0; i < 2; ++i)
-	{
-		skinnedVertexBuffer[i] = createVertexBuffer(getVertexSize(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents),
-			MAX_NUM_SKINNED_VERTICES_PER_FRAME, 0, true);
 	}
 
 	for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
@@ -254,11 +241,6 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		lightCullingPipeline = createReloadablePipeline("light_culling_cs");
 	}
 
-	// Skinning.
-	{
-		skinningPipeline = createReloadablePipeline("skinning_cs");
-	}
-
 	// Atmosphere.
 	{
 		atmospherePipeline = createReloadablePipeline("atmosphere_cs");
@@ -334,8 +316,12 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 
 void dx_renderer::beginFrameCommon()
 {
-
 	checkForChangedPipelines();
+}
+
+void dx_renderer::endFrameCommon()
+{
+	performSkinning();
 }
 
 void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
@@ -359,13 +345,10 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 		recalculateViewport(true);
 	}
 
-	skinningPass.reset();
 	geometryRenderPass.reset();
 	sunShadowRenderPass.reset();
 	visualizationRenderPass.reset();
-	raytracedReflectionsRenderPass.reset();
-
-	currentSkinnedVertexBuffer = 1 - currentSkinnedVertexBuffer;
+	giRenderPass.reset();
 }
 
 void dx_renderer::recalculateViewport(bool resizeTextures)
@@ -520,38 +503,6 @@ void dx_renderer::endFrame()
 
 
 
-	// ----------------------------------------
-	// SKINNING
-	// ----------------------------------------
-
-	if (skinningPass.calls.size() > 0)
-	{
-		mat4* mats = (mat4*)mapBuffer(skinningMatricesBuffer[dxContext.bufferedFrameID]);
-		memcpy(mats, skinningPass.skinningMatrices.data(), sizeof(mat4) * skinningPass.skinningMatrices.size());
-		unmapBuffer(skinningMatricesBuffer[dxContext.bufferedFrameID]);
-
-
-		cl->setPipelineState(*skinningPipeline.pipeline);
-		cl->setComputeRootSignature(*skinningPipeline.rootSignature);
-
-		cl->setDescriptorHeapSRV(SKINNING_RS_SRV_UAV, 0, skinningMatricesBuffer[dxContext.bufferedFrameID]);
-		cl->setDescriptorHeapUAV(SKINNING_RS_SRV_UAV, 1, skinnedVertexBuffer[currentSkinnedVertexBuffer]);
-
-		for (const auto& c : skinningPass.calls)
-		{
-			cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER, c.vertexBuffer->gpuVirtualAddress);
-
-			cl->setCompute32BitConstants(SKINNING_RS_CB, skinning_cb{ c.jointOffset, c.numJoints, c.submesh.baseVertex, c.submesh.numVertices, c.vertexOffset });
-
-			cl->dispatch(bucketize(c.submesh.numVertices, 512));
-		}
-
-		cl->uavBarrier(skinnedVertexBuffer[currentSkinnedVertexBuffer]);
-	}
-
-
-
-
 	cl->setRenderTarget(hdrRenderTarget);
 	cl->setViewport(hdrRenderTarget.viewport);
 
@@ -612,19 +563,19 @@ void dx_renderer::endFrame()
 		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 	}
 
+	dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // Wait for GPU skinning.
+
 	// Animated.
-	cl->setVertexBuffer(0, skinnedVertexBuffer[currentSkinnedVertexBuffer]);
 	for (const auto& dc : geometryRenderPass.animatedDrawCalls)
 	{
 		const mat4& m = dc.transform;
-		uint32 skinID = dc.skinID;
-		const submesh_info& submesh = skinningPass.calls[skinID].submesh;
-		uint32 vertexOffset = skinningPass.calls[skinID].vertexOffset;
+		const submesh_info& submesh = dc.submesh;
 
 		cl->setGraphics32BitConstants(MODEL_RS_MVP, depth_only_transform_cb{ camera.viewProj * m });
 
+		cl->setVertexBuffer(0, dc.vertexBuffer);
 		cl->setIndexBuffer(dc.indexBuffer);
-		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, vertexOffset, 0);
+		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 	}
 
 
@@ -696,25 +647,13 @@ void dx_renderer::endFrame()
 			for (const auto& dc : sunShadowRenderPass.drawCalls[cascade])
 			{
 				const mat4& m = dc.transform;
+				const submesh_info& submesh = dc.submesh;
 				cl->setGraphics32BitConstants(MODEL_RS_MVP, depth_only_transform_cb{ sun.vp[i] * m });
 
+				cl->setVertexBuffer(0, dc.vertexBuffer);
 				cl->setIndexBuffer(dc.indexBuffer);
 
-				if (dc.type == sun_shadow_render_pass::shadow_object_default)
-				{
-					const submesh_info& submesh = dc.submesh;
-					cl->setVertexBuffer(0, dc.vertexBuffer);
-					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-				}
-				else
-				{
-					uint32 skinID = dc.skinID;
-					const submesh_info& submesh = skinningPass.calls[skinID].submesh;
-					uint32 vertexOffset = skinningPass.calls[skinID].vertexOffset;
-
-					cl->setVertexBuffer(0, skinnedVertexBuffer[currentSkinnedVertexBuffer]);
-					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, vertexOffset, 0);
-				}
+				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 			}
 		}
 	}
@@ -872,34 +811,30 @@ void dx_renderer::endFrame()
 		setUpModelPipeline();
 		cl->setStencilReference(stencil_flag_dynamic_geometry);
 
-		const ref<dx_vertex_buffer> prevVertexBuffer = skinnedVertexBuffer[1 - currentSkinnedVertexBuffer];
-
-		cl->setVertexBuffer(0, skinnedVertexBuffer[currentSkinnedVertexBuffer]);
 		for (const auto& dc : geometryRenderPass.animatedDrawCalls)
 		{
 			const mat4& m = dc.transform;
 			const mat4& prevFrameM = dc.prevFrameTransform;
-			uint32 skinID = dc.skinID;
-			const submesh_info& submesh = skinningPass.calls[skinID].submesh;
-			uint32 vertexOffset = skinningPass.calls[skinID].vertexOffset;
+			const submesh_info& submesh = dc.submesh;
+			const submesh_info& prevFrameSubmesh = dc.prevFrameSubmesh;
 			const ref<pbr_material>& material = dc.material;
 
 			setMaterialCB(material);
 
-
-			// Prev frame vertex buffer.
-			uint32 prevFrameSkinID = dc.prevFrameSkinID;
-			uint32 prevFrameVertexOffset = 0; // TODO: How do we handle the else case, where no vertex buffer for last frame is available?
-			if (prevFrameSkinID < (uint32)skinningPass.prevFrameVertexOffsets.size())
+			if (dc.prevFrameVertexBuffer)
 			{
-				prevFrameVertexOffset = skinningPass.prevFrameVertexOffsets[prevFrameSkinID];
+				cl->setRootGraphicsSRV(MODEL_RS_PREV_FRAME_POSITIONS, dc.prevFrameVertexBuffer->gpuVirtualAddress + prevFrameSubmesh.baseVertex * dc.prevFrameVertexBuffer->elementSize);
+			}
+			else
+			{
+				cl->setRootGraphicsSRV(MODEL_RS_PREV_FRAME_POSITIONS, dc.vertexBuffer->gpuVirtualAddress + submesh.baseVertex * dc.vertexBuffer->elementSize);
 			}
 
-			cl->setRootGraphicsSRV(MODEL_RS_PREV_FRAME_POSITIONS, prevVertexBuffer->gpuVirtualAddress + prevFrameVertexOffset * prevVertexBuffer->elementSize);
 			cl->setGraphics32BitConstants(MODEL_RS_MVP, dynamic_transform_cb{ camera.viewProj * m, m, camera.prevFrameViewProj * prevFrameM });
 
+			cl->setVertexBuffer(0, dc.vertexBuffer);
 			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, vertexOffset, 0);
+			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 		}
 	}
 
@@ -922,34 +857,18 @@ void dx_renderer::endFrame()
 		// Mark object in stencil.
 		for (const auto& outlined : geometryRenderPass.outlinedObjects)
 		{
-			if (outlined.type == geometry_render_pass::outlined_animated)
-			{
-				auto& dc = geometryRenderPass.animatedDrawCalls[outlined.index];
-				uint32 skinID = dc.skinID;
-				const submesh_info& submesh = skinningPass.calls[skinID].submesh;
-				uint32 vertexOffset = skinningPass.calls[skinID].vertexOffset;
-				const mat4& m = dc.transform;
+			bool dynamic = (outlined.type == geometry_render_pass::outlined_dynamic);
+			bool animated = (outlined.type == geometry_render_pass::outlined_animated);
+			const submesh_info& submesh = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].submesh : (animated ? geometryRenderPass.animatedDrawCalls[outlined.index].submesh : geometryRenderPass.staticDrawCalls[outlined.index].submesh);
+			const mat4& m = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].transform : (animated ? geometryRenderPass.animatedDrawCalls[outlined.index].transform : geometryRenderPass.staticDrawCalls[outlined.index].transform);
+			const auto& vertexBuffer = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].vertexBuffer : (animated ? geometryRenderPass.animatedDrawCalls[outlined.index].vertexBuffer : geometryRenderPass.staticDrawCalls[outlined.index].vertexBuffer);
+			const auto& indexBuffer = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].indexBuffer : (animated ? geometryRenderPass.animatedDrawCalls[outlined.index].indexBuffer :geometryRenderPass.staticDrawCalls[outlined.index].indexBuffer);
 
-				cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ camera.viewProj * m });
+			cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ camera.viewProj * m });
 
-				cl->setVertexBuffer(0, skinnedVertexBuffer[currentSkinnedVertexBuffer]);
-				cl->setIndexBuffer(dc.indexBuffer);
-				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, vertexOffset, 0);
-			}
-			else
-			{
-				bool dynamic = (outlined.type == geometry_render_pass::outlined_dynamic);
-				const submesh_info& submesh = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].submesh : geometryRenderPass.staticDrawCalls[outlined.index].submesh;
-				const mat4& m = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].transform : geometryRenderPass.staticDrawCalls[outlined.index].transform;
-				const auto& vertexBuffer = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].vertexBuffer : geometryRenderPass.staticDrawCalls[outlined.index].vertexBuffer;
-				const auto& indexBuffer = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].indexBuffer : geometryRenderPass.staticDrawCalls[outlined.index].indexBuffer;
-
-				cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ camera.viewProj * m });
-
-				cl->setVertexBuffer(0, vertexBuffer);
-				cl->setIndexBuffer(indexBuffer);
-				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-			}
+			cl->setVertexBuffer(0, vertexBuffer);
+			cl->setIndexBuffer(indexBuffer);
+			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 		}
 
 		// Draw outline.
@@ -972,10 +891,10 @@ void dx_renderer::endFrame()
 	// ----------------------------------------
 
 #if 1
-
-	for (const auto& dc : raytracedReflectionsRenderPass.drawCalls)
+	if (giRenderPass.bindingTable)
 	{
-		raytracingPipeline.render(cl, *dc.bindingTable, *dc.tlas, raytracingTexture, settings.numRaytracingBounces, settings.raytracingFadeoutDistance, settings.raytracingMaxDistance, settings.environmentIntensity, settings.skyIntensity,
+		raytracingPipeline.render(cl, *giRenderPass.bindingTable, *giRenderPass.tlas,
+			raytracingTexture, settings.numRaytracingBounces, settings.raytracingFadeoutDistance, settings.raytracingMaxDistance, settings.environmentIntensity, settings.skyIntensity,
 			cameraCBV, sunCBV, depthStencilBuffer, worldNormalsScreenVelocityTexture, environment, brdfTex);
 	}
 

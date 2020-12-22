@@ -7,41 +7,6 @@
 
 
 
-std::pair<uint32, mat4*> skinning_pass::skinObject(const ref<dx_vertex_buffer>& vertexBuffer, submesh_info submesh, uint32 numJoints)
-{
-	uint32 offset = (uint32)skinningMatrices.size();
-	skinningMatrices.resize(skinningMatrices.size() + numJoints);
-
-	uint32 id = (uint32)calls.size();
-
-	calls.push_back(
-		{
-			vertexBuffer,
-			submesh,
-			offset,
-			numJoints,
-			totalNumVertices
-		}
-	);
-
-	totalNumVertices += submesh.numVertices;
-
-	return { id, skinningMatrices.data() + offset };
-}
-
-void skinning_pass::reset()
-{
-	prevFrameVertexOffsets.resize(calls.size());
-	for (uint32 i = 0; i < (uint32)calls.size(); ++i)
-	{
-		prevFrameVertexOffsets[i] = calls[i].vertexOffset;
-	}
-
-	calls.clear();
-	skinningMatrices.clear();
-	totalNumVertices = 0;
-}
-
 void geometry_render_pass::renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, 
 	const mat4& transform, bool outline)
 {
@@ -89,16 +54,21 @@ void geometry_render_pass::renderDynamicObject(const ref<dx_vertex_buffer>& vert
 	}
 }
 
-void geometry_render_pass::renderAnimatedObject(uint32 skinID, uint32 prevFrameSkinID, const ref<dx_index_buffer>& indexBuffer, const ref<pbr_material>& material, const mat4& transform, const mat4& prevFrameTransform, bool outline)
+void geometry_render_pass::renderAnimatedObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_vertex_buffer>& prevFrameVertexBuffer,
+	submesh_info submesh, submesh_info prevFrameSubmesh,
+	const ref<dx_index_buffer>& indexBuffer, const ref<pbr_material>& material,
+	const mat4& transform, const mat4& prevFrameTransform, bool outline)
 {
 	animatedDrawCalls.push_back(
 		{
 			transform,
 			prevFrameTransform,
-			skinID,
-			prevFrameSkinID,
+			vertexBuffer,
+			prevFrameVertexBuffer,
 			indexBuffer,
 			material,
+			submesh,
+			prevFrameSubmesh,
 		}
 	);
 
@@ -128,21 +98,6 @@ void sun_shadow_render_pass::renderObject(uint32 cascadeIndex, const ref<dx_vert
 			vertexBuffer,
 			indexBuffer,
 			submesh,
-			shadow_object_default
-		}
-	);
-}
-
-void sun_shadow_render_pass::renderObject(uint32 cascadeIndex, uint32 skinID, const ref<dx_index_buffer>& indexBuffer, const mat4& transform)
-{
-	drawCalls[cascadeIndex].push_back(
-		{
-			transform,
-			0,
-			indexBuffer,
-			{},
-			shadow_object_animated,
-			skinID
 		}
 	);
 }
@@ -173,12 +128,29 @@ void visualization_render_pass::reset()
 	drawCalls.clear();
 }
 
-void raytraced_reflections_render_pass::renderObject(pbr_raytracing_binding_table& bindingTable, raytracing_tlas& tlas)
+void global_illumination_render_pass::specularReflection(pbr_raytracing_binding_table& bindingTable, raytracing_tlas& tlas)
 {
-	drawCalls.push_back({ &bindingTable, &tlas });
+	this->bindingTable = &bindingTable;
+	this->tlas = &tlas;
 }
 
-void raytraced_reflections_render_pass::reset()
+void global_illumination_render_pass::reset()
+{
+	bindingTable = 0;
+	tlas = 0;
+}
+
+void application_render_pass::render(const func_t& func)
+{
+	drawCalls.push_back(func);
+}
+
+void application_render_pass::render(func_t&& func)
+{
+	drawCalls.emplace_back(std::move(func));
+}
+
+void application_render_pass::reset()
 {
 	drawCalls.clear();
 }

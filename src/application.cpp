@@ -6,6 +6,7 @@
 #include "color.h"
 #include "imgui.h"
 #include "dx_context.h"
+#include "skinning.h"
 
 
 void application::initialize(dx_renderer* renderer)
@@ -295,35 +296,39 @@ void application::update(const user_input& input, float dt)
 
 		auto renderST0 = [&]()
 		{
-			static uint32 prevFrameSkinID = -1;
+			static ref<dx_vertex_buffer> prevFrameVB = 0;
+			static submesh_info prevFrameSM;
 
 			trs localTransforms[128];
-			auto [skinID, skinningMatrices] = renderer->skinningPass.skinObject(stormtrooperMesh.mesh.vertexBuffer, stormtrooperMesh.submeshes[0].info, (uint32)stormtrooperMesh.skeleton.joints.size());
+			auto [vb, sm, skinningMatrices] = skinObject(stormtrooperMesh.mesh.vertexBuffer, stormtrooperMesh.submeshes[0].info, (uint32)stormtrooperMesh.skeleton.joints.size());
 			stormtrooperMesh.skeleton.sampleAnimation(stormtrooperMesh.skeleton.clips[0].name, time, localTransforms);
 			stormtrooperMesh.skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
 
 			mat4 m = trsToMat4(transform);
-			renderer->geometryRenderPass.renderAnimatedObject(skinID, prevFrameSkinID, stormtrooperMesh.mesh.indexBuffer, stormtrooperMesh.submeshes[0].material, m, m, true);
-			renderer->sunShadowRenderPass.renderObject(0, skinID, stormtrooperMesh.mesh.indexBuffer, m);
+			renderer->geometryRenderPass.renderAnimatedObject(vb, prevFrameVB, sm, prevFrameSM, stormtrooperMesh.mesh.indexBuffer, stormtrooperMesh.submeshes[0].material, m, m, true);
+			renderer->sunShadowRenderPass.renderObject(0, vb, stormtrooperMesh.mesh.indexBuffer, sm, m);
 
-			prevFrameSkinID = skinID;
+			prevFrameVB = vb;
+			prevFrameSM = sm;
 		};
 
 		auto renderST1 = [&]()
 		{
-			static uint32 prevFrameSkinID = -1;
+			static ref<dx_vertex_buffer> prevFrameVB = 0;
+			static submesh_info prevFrameSM;
 
 			trs localTransforms[128];
-			auto [skinID, skinningMatrices] = renderer->skinningPass.skinObject(stormtrooperMesh.mesh.vertexBuffer, stormtrooperMesh.submeshes[0].info, (uint32)stormtrooperMesh.skeleton.joints.size());
+			auto [vb, sm, skinningMatrices] = skinObject(stormtrooperMesh.mesh.vertexBuffer, stormtrooperMesh.submeshes[0].info, (uint32)stormtrooperMesh.skeleton.joints.size());
 			stormtrooperMesh.skeleton.sampleAnimation(stormtrooperMesh.skeleton.clips[0].name, time + 1.5f, localTransforms);
 			stormtrooperMesh.skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
 
 			mat4 m = trsToMat4(transform);
 			m.m03 += 5.f;
-			renderer->geometryRenderPass.renderAnimatedObject(skinID, prevFrameSkinID, stormtrooperMesh.mesh.indexBuffer, stormtrooperMesh.submeshes[0].material, m, m, true);
-			renderer->sunShadowRenderPass.renderObject(0, skinID, stormtrooperMesh.mesh.indexBuffer, m);
+			renderer->geometryRenderPass.renderAnimatedObject(vb, prevFrameVB, sm, prevFrameSM, stormtrooperMesh.mesh.indexBuffer, stormtrooperMesh.submeshes[0].material, m, m, true);
+			renderer->sunShadowRenderPass.renderObject(0, vb, stormtrooperMesh.mesh.indexBuffer, sm, m);
 
-			prevFrameSkinID = skinID;
+			prevFrameVB = vb;
+			prevFrameSM = sm;
 		};
 
 		static uint32 frame = 0;
@@ -340,7 +345,7 @@ void application::update(const user_input& input, float dt)
 		frame = 1 - frame;
 	}
 
-	//renderer->raytracedReflectionsRenderPass.renderObject(reflectionsRaytracingPipeline, raytracingTLAS);
+	//renderer->giRenderPass.specularReflection(reflectionsRaytracingPipeline, raytracingTLAS);
 }
 
 void application::setEnvironment(const char* filename)

@@ -5,37 +5,17 @@
 #include "mesh.h"
 #include "light_source.h"
 
+#include <functional>
+
 struct pbr_material;
 struct raytracing_blas;
 struct dx_vertex_buffer;
 struct dx_index_buffer;
 struct pbr_raytracing_binding_table;
 struct raytracing_tlas;
+struct dx_render_target;
+struct pbr_render_resources;
 
-struct skinning_pass
-{
-	std::pair<uint32, mat4*> skinObject(const ref<dx_vertex_buffer>& vertexBuffer, submesh_info submesh, uint32 numJoints);
-
-private:
-	void reset();
-
-	struct skinning_call
-	{
-		ref<dx_vertex_buffer> vertexBuffer;
-		submesh_info submesh; 
-		uint32 jointOffset;
-		uint32 numJoints;
-		uint32 vertexOffset;
-	};
-
-	std::vector<skinning_call> calls;
-	std::vector<mat4> skinningMatrices;
-	std::vector<uint32> prevFrameVertexOffsets;
-
-	uint32 totalNumVertices;
-
-	friend struct dx_renderer;
-};
 
 struct geometry_render_pass
 {
@@ -43,8 +23,10 @@ struct geometry_render_pass
 		bool outline = false);
 	void renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, 
 		const mat4& transform, const mat4& prevFrameTransform, bool outline = false);
-	void renderAnimatedObject(uint32 skinID, uint32 prevFrameSkinID, const ref<dx_index_buffer>& indexBuffer, const ref<pbr_material>& material,
-		const mat4& transform, const mat4& prevFrameTransform, bool outline = false); // Pass -1 as prevFrameSkinID if you haven't rendered the object last frame.
+	void renderAnimatedObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_vertex_buffer>& prevFrameVertexBuffer,
+		submesh_info submesh, submesh_info prevFrameSubmesh,
+		const ref<dx_index_buffer>& indexBuffer, const ref<pbr_material>& material,
+		const mat4& transform, const mat4& prevFrameTransform, bool outline = false); // Pass null as prevFrameVertexBuffer, if the object hasn't been rendered last frame.
 
 private:
 	void reset();
@@ -85,10 +67,12 @@ private:
 	{
 		const mat4 transform;
 		const mat4 prevFrameTransform;
-		uint32 skinID;
-		uint32 prevFrameSkinID;
+		ref<dx_vertex_buffer> vertexBuffer;
+		ref<dx_vertex_buffer> prevFrameVertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
 		ref<pbr_material> material;
+		submesh_info submesh;
+		submesh_info prevFrameSubmesh;
 	};
 
 	std::vector<static_draw_call> staticDrawCalls;
@@ -104,16 +88,9 @@ struct sun_shadow_render_pass
 {
 	// Since each cascade includes the next lower one, if you submit a draw to cascade N, it will also be rendered in N-1 automatically. No need to add it to the lower one.
 	void renderObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
-	void renderObject(uint32 cascadeIndex, uint32 skinID, const ref<dx_index_buffer>& indexBuffer, const mat4& transform);
 
 private:
 	void reset();
-
-	enum shadow_object_type
-	{
-		shadow_object_default,
-		shadow_object_animated,
-	};
 
 	struct draw_call
 	{
@@ -121,9 +98,6 @@ private:
 		ref<dx_vertex_buffer> vertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
 		submesh_info submesh;
-
-		shadow_object_type type;
-		uint32 skinID;
 	};
 
 	std::vector<draw_call> drawCalls[MAX_NUM_SUN_SHADOW_CASCADES];
@@ -153,20 +127,30 @@ private:
 	friend struct dx_renderer;
 };
 
-struct raytraced_reflections_render_pass
+struct global_illumination_render_pass
 {
-	void renderObject(pbr_raytracing_binding_table& bindingTable, raytracing_tlas& tlas);
+	void specularReflection(pbr_raytracing_binding_table& bindingTable, raytracing_tlas& tlas);
 
 private:
 	void reset();
 
-	struct draw_call
-	{
-		pbr_raytracing_binding_table* bindingTable;
-		raytracing_tlas* tlas;
-	};
+	pbr_raytracing_binding_table* bindingTable;
+	raytracing_tlas* tlas;
 
-	std::vector<draw_call> drawCalls;
+	friend struct dx_renderer;
+};
+
+struct application_render_pass
+{
+	using func_t = std::function<void(const dx_render_target& renderTarget, const pbr_render_resources& pbrResources)>;
+
+	void render(const func_t& func);
+	void render(func_t&& func);
+
+private:
+	void reset();
+
+	std::vector<func_t> drawCalls;
 
 	friend struct dx_renderer;
 };

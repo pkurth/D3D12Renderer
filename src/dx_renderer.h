@@ -17,9 +17,6 @@
 #define MAX_NUM_POINT_LIGHTS_PER_FRAME 4096
 #define MAX_NUM_SPOT_LIGHTS_PER_FRAME 4096
 
-#define MAX_NUM_SKINNING_MATRICES_PER_FRAME 4096
-#define MAX_NUM_SKINNED_VERTICES_PER_FRAME (1 << 20)
-
 enum aspect_ratio_mode
 {
 	aspect_ratio_free,
@@ -53,6 +50,23 @@ struct renderer_settings
 	bool showLightVolumes = false;
 };
 
+struct pbr_render_resources
+{
+	ref<dx_texture> irradiance;
+	ref<dx_texture> environment;
+	ref<dx_texture> brdf;
+
+	ref<dx_texture> lightGrid;
+	ref<dx_buffer> pointLightIndexList;
+	ref<dx_buffer> spotLightIndexList;
+	ref<dx_buffer> pointLightBuffer;
+	ref<dx_buffer> spotLightBuffer;
+
+	ref<dx_texture> opaqueTexture;
+
+	ref<dx_texture> sunShadowCascades[MAX_NUM_SUN_SHADOW_CASCADES];
+};
+
 
 struct dx_renderer
 {
@@ -61,6 +75,8 @@ struct dx_renderer
 	void initialize(uint32 windowWidth, uint32 windowHeight);
 
 	static void beginFrameCommon();
+	static void endFrameCommon();
+
 	void beginFrame(uint32 windowWidth, uint32 windowHeight);	
 	void endFrame();
 	void blitResultToScreen(dx_command_list* cl, dx_rtv_descriptor_handle rtv);
@@ -75,11 +91,10 @@ struct dx_renderer
 	void setSpotLights(const spot_light_cb* lights, uint32 numLights);
 
 
-	skinning_pass skinningPass;
 	geometry_render_pass geometryRenderPass;
 	sun_shadow_render_pass sunShadowRenderPass;
 	visualization_render_pass visualizationRenderPass;
-	raytraced_reflections_render_pass raytracedReflectionsRenderPass;
+	global_illumination_render_pass giRenderPass;
 
 	
 	renderer_settings settings;

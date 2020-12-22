@@ -355,9 +355,11 @@ int main(int argc, char** argv)
 		drawHelperWindows();
 
 		dx_renderer::beginFrameCommon();
-
 		renderer.beginFrame(renderWidth, renderHeight);
+		
 		app.update(input, dt);
+
+		dx_renderer::endFrameCommon();
 		renderer.endFrame();
 
 		if (!drawMainMenuBar(app))

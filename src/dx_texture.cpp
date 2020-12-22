@@ -183,19 +183,10 @@ static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::S
 					} break;
 				}
 
-
-
 				DirectX::ScratchImage compressedImage;
 
-				DirectX::TEX_COMPRESS_FLAGS compressFlags = DirectX::TEX_COMPRESS_PARALLEL;
-
-				/*if (metadata.format == DXGI_FORMAT_R16G16B16A16_FLOAT)
-				{
-					compressedFormat = DXGI_FORMAT_BC6H_UF16;
-				}*/
-
 				checkResult(DirectX::Compress(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata,
-					compressedFormat, compressFlags, DirectX::TEX_THRESHOLD_DEFAULT, compressedImage));
+					compressedFormat, DirectX::TEX_COMPRESS_PARALLEL, DirectX::TEX_THRESHOLD_DEFAULT, compressedImage));
 				scratchImage = std::move(compressedImage);
 				metadata = scratchImage.GetMetadata();
 			}
