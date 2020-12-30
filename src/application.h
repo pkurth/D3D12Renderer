@@ -41,7 +41,7 @@ private:
 	composite_mesh stormtrooperMesh;
 
 
-	pbr_raytracing_binding_table reflectionsRaytracingPipeline;
+	pbr_raytracing_binding_table raytracingBindingTable;
 	raytracing_tlas raytracingTLAS;
 
 	ref<pbr_environment> environment;

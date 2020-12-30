@@ -4,6 +4,12 @@
 #include "dx_texture.h"
 #include "dx_buffer.h"
 
+extern "C"
+{
+	__declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+	__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+
 dx_context dxContext;
 
 static void enableDebugLayer()
@@ -29,37 +35,76 @@ static dx_factory createFactory()
 	return dxgiFactory;
 }
 
-static dx_adapter getAdapter(dx_factory factory)
+static std::pair<dx_adapter, D3D_FEATURE_LEVEL> getAdapter(dx_factory factory, D3D_FEATURE_LEVEL minimumFeatureLevel = D3D_FEATURE_LEVEL_11_0)
 {
 	com<IDXGIAdapter1> dxgiAdapter1;
 	dx_adapter dxgiAdapter;
 
-	size_t maxDedicatedVideoMemory = 0;
+	D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_9_1;
+
+	D3D_FEATURE_LEVEL possibleFeatureLevels[] = 
+	{
+		D3D_FEATURE_LEVEL_9_1,
+		D3D_FEATURE_LEVEL_9_2,
+		D3D_FEATURE_LEVEL_9_3,
+		D3D_FEATURE_LEVEL_10_0,
+		D3D_FEATURE_LEVEL_10_1,
+		D3D_FEATURE_LEVEL_11_0,
+		D3D_FEATURE_LEVEL_11_1,
+		D3D_FEATURE_LEVEL_12_0,
+		D3D_FEATURE_LEVEL_12_1
+	};
+
+	uint32 firstFeatureLevel = 0;
+	for (uint32 i = 0; i < arraysize(possibleFeatureLevels); ++i)
+	{
+		if (possibleFeatureLevels[i] == minimumFeatureLevel)
+		{
+			firstFeatureLevel = i;
+			break;
+		}
+	}
+
+	uint64 maxDedicatedVideoMemory = 0;
 	for (uint32 i = 0; factory->EnumAdapters1(i, &dxgiAdapter1) != DXGI_ERROR_NOT_FOUND; ++i)
 	{
 		DXGI_ADAPTER_DESC1 dxgiAdapterDesc1;
 		dxgiAdapter1->GetDesc1(&dxgiAdapterDesc1);
 
 		// Check to see if the adapter can create a D3D12 device without actually 
-		// creating it. The adapter with the largest dedicated video memory
-		// is favored.
-		if ((dxgiAdapterDesc1.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0 &&
-			SUCCEEDED(D3D12CreateDevice(dxgiAdapter1.Get(),
-				D3D_FEATURE_LEVEL_12_1, __uuidof(ID3D12Device), 0)) &&
-			dxgiAdapterDesc1.DedicatedVideoMemory > maxDedicatedVideoMemory)
+		// creating it. Out of all adapters which support the minimum feature level,
+		// the adapter with the largest dedicated video memory is favored.
+		if ((dxgiAdapterDesc1.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0)
 		{
-			maxDedicatedVideoMemory = dxgiAdapterDesc1.DedicatedVideoMemory;
-			checkResult(dxgiAdapter1.As(&dxgiAdapter));
+			D3D_FEATURE_LEVEL adapterFeatureLevel = D3D_FEATURE_LEVEL_9_1;
+			bool supportsFeatureLevel = false;
+
+			for (uint32 fl = firstFeatureLevel; fl < arraysize(possibleFeatureLevels); ++fl)
+			{
+				if (SUCCEEDED(D3D12CreateDevice(dxgiAdapter1.Get(),
+					possibleFeatureLevels[fl], __uuidof(ID3D12Device), 0)))
+				{
+					adapterFeatureLevel = possibleFeatureLevels[fl];
+					supportsFeatureLevel = true;
+				}
+			}
+
+			if (supportsFeatureLevel && dxgiAdapterDesc1.DedicatedVideoMemory > maxDedicatedVideoMemory)
+			{
+				checkResult(dxgiAdapter1.As(&dxgiAdapter));
+				maxDedicatedVideoMemory = dxgiAdapterDesc1.DedicatedVideoMemory;
+				featureLevel = adapterFeatureLevel;
+			}
 		}
 	}
 
-	return dxgiAdapter;
+	return { dxgiAdapter, featureLevel };
 }
 
-static dx_device createDevice(dx_adapter adapter)
+static dx_device createDevice(dx_adapter adapter, D3D_FEATURE_LEVEL featureLevel)
 {
 	dx_device device;
-	checkResult(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_1, IID_PPV_ARGS(&device)));
+	checkResult(D3D12CreateDevice(adapter.Get(), featureLevel, IID_PPV_ARGS(&device)));
 
 #if defined(_DEBUG)
 	com<ID3D12InfoQueue> infoQueue;
@@ -70,7 +115,7 @@ static dx_device createDevice(dx_adapter adapter)
 		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, TRUE);
 
 		// Suppress whole categories of messages
-		//D3D12_MESSAGE_CATEGORY Categories[] = {};
+		//D3D12_MESSAGE_CATEGORY categories[] = {};
 
 		// Suppress messages based on their severity level
 		D3D12_MESSAGE_SEVERITY severities[] =
@@ -79,21 +124,21 @@ static dx_device createDevice(dx_adapter adapter)
 		};
 
 		// Suppress individual messages by their ID
-		D3D12_MESSAGE_ID denyIDs[] = {
+		D3D12_MESSAGE_ID ids[] = {
 			D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE,   // I'm really not sure how to avoid this message.
 			D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,                         // This warning occurs when using capture frame while graphics debugging.
 			D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE,                       // This warning occurs when using capture frame while graphics debugging.
 		};
 
-		D3D12_INFO_QUEUE_FILTER newFilter = {};
-		//NewFilter.DenyList.NumCategories = arraysize(Categories);
-		//NewFilter.DenyList.pCategoryList = Categories;
-		newFilter.DenyList.NumSeverities = arraysize(severities);
-		newFilter.DenyList.pSeverityList = severities;
-		newFilter.DenyList.NumIDs = arraysize(denyIDs);
-		newFilter.DenyList.pIDList = denyIDs;
+		D3D12_INFO_QUEUE_FILTER filter = {};
+		//filter.DenyList.NumCategories = arraysize(categories);
+		//filter.DenyList.pCategoryList = categories;
+		filter.DenyList.NumSeverities = arraysize(severities);
+		filter.DenyList.pSeverityList = severities;
+		filter.DenyList.NumIDs = arraysize(ids);
+		filter.DenyList.pIDList = ids;
 
-		checkResult(infoQueue->PushStorageFilter(&newFilter));
+		checkResult(infoQueue->PushStorageFilter(&filter));
 	}
 #endif
 
@@ -107,20 +152,40 @@ static bool checkRaytracingSupport(dx_device device)
 	return options5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_0;
 }
 
+template<typename, typename = void>
+constexpr bool typeComplete = false;
+
+template<typename T>
+constexpr bool typeComplete<T, std::void_t<decltype(sizeof(T))>> = true;
+
+template <typename T = void> // Constexpr-if only works in templated code.
 static bool checkMeshShaderSupport(dx_device device)
 {
-	D3D12_FEATURE_DATA_D3D12_OPTIONS7 options7 = {};
-	checkResult(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options7, sizeof(options7)));
-	return options7.MeshShaderTier >= D3D12_MESH_SHADER_TIER_1;
+	struct D3D12_FEATURE_DATA_D3D12_OPTIONS7;
+
+	if constexpr (typeComplete<D3D12_FEATURE_DATA_D3D12_OPTIONS7>)
+	{
+		D3D12_FEATURE_DATA_D3D12_OPTIONS7 options7 = {};
+		checkResult(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options7, sizeof(options7)));
+		return options7.MeshShaderTier >= D3D12_MESH_SHADER_TIER_1;
+	}
+	return false;
 }
 
-void dx_context::initialize()
+bool dx_context::initialize()
 {
 	enableDebugLayer();
 
 	factory = createFactory();
-	adapter = getAdapter(factory);
-	device = createDevice(adapter);
+	auto [adapter, featureLevel] = getAdapter(factory);
+	if (!adapter)
+	{
+		std::cerr << "No DX12 capable GPU found." << std::endl;
+		return false;
+	}
+	this->adapter = adapter;
+
+	device = createDevice(adapter, featureLevel);
 	raytracingSupported = checkRaytracingSupport(device);
 	meshShaderSupported = checkMeshShaderSupport(device);
 
@@ -143,6 +208,8 @@ void dx_context::initialize()
 	rtvAllocator.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1024, false);
 	dsvAllocator.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1024, false);
 	frameDescriptorAllocator.initialize();
+
+	return true;
 }
 
 void dx_context::flushApplication()

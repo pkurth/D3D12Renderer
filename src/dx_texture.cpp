@@ -417,18 +417,6 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 {
 	ref<dx_texture> result = make_ref<dx_texture>();
 
-	checkResult(dxContext.device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-		D3D12_HEAP_FLAG_NONE,
-		&textureDesc,
-		initialState,
-		0,
-		IID_PPV_ARGS(&result->resource)));
-
-
-	result->format = textureDesc.Format;
-	result->width = (uint32)textureDesc.Width;
-	result->height = textureDesc.Height;
-	result->depth = textureDesc.DepthOrArraySize;
 
 	D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport;
 	formatSupport.Format = textureDesc.Format;
@@ -441,6 +429,39 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 	result->supportsDSV = (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) && formatSupportsDSV(formatSupport);
 	result->supportsUAV = (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) && formatSupportsUAV(formatSupport);
 	result->supportsSRV = formatSupportsSRV(formatSupport);
+
+	if (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET && !result->supportsRTV)
+	{
+		std::cout << "Warning. Requested RTV, but not supported by format." << std::endl;
+		__debugbreak();
+	}
+
+	if (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL && !result->supportsDSV)
+	{
+		std::cout << "Warning. Requested DSV, but not supported by format." << std::endl;
+		__debugbreak();
+	}
+
+	if (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS && !result->supportsUAV)
+	{
+		std::cout << "Warning. Requested UAV, but not supported by format." << std::endl;
+		__debugbreak();
+	}
+
+
+	// Create.
+	checkResult(dxContext.device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		D3D12_HEAP_FLAG_NONE,
+		&textureDesc,
+		initialState,
+		0,
+		IID_PPV_ARGS(&result->resource)));
+
+
+	result->format = textureDesc.Format;
+	result->width = (uint32)textureDesc.Width;
+	result->height = textureDesc.Height;
+	result->depth = textureDesc.DepthOrArraySize;
 
 	result->defaultSRV = {};
 	result->defaultUAV = {};

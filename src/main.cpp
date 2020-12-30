@@ -233,7 +233,10 @@ int main(int argc, char** argv)
 
 	checkResult(CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE));
 
-	dxContext.initialize();
+	if (!dxContext.initialize())
+	{
+		return 1;
+	}
 
 	const color_depth colorDepth = color_depth_8;
 	DXGI_FORMAT screenFormat = (colorDepth == color_depth_8) ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R10G10B10A2_UNORM;

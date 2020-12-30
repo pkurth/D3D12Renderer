@@ -17,7 +17,7 @@ struct dx_memory_usage
 
 struct dx_context
 {
-	void initialize();
+	bool initialize();
 	void quit();
 
 	void newFrame(uint64 frameID);

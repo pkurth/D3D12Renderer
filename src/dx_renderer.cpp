@@ -247,6 +247,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	}
 
 	// Raytracing.
+	if (dxContext.raytracingSupported)
 	{
 		raytracingPipeline.initialize(L"shaders/raytracing/specular_reflections_rts.hlsl");
 	}
@@ -305,6 +306,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	}
 
 	// Raytracing.
+	if (dxContext.raytracingSupported)
 	{
 		raytracingTexture = createTexture(0, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor, raytracedReflectionsFormat, false, false, true);
 		raytracingTextureTmpForBlur = createTexture(0, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor, raytracedReflectionsFormat, false, false, true);
@@ -388,8 +390,11 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		
 		resizeTexture(volumetricsTexture, renderWidth, renderHeight);
 		
-		resizeTexture(raytracingTexture, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor);
-		resizeTexture(raytracingTextureTmpForBlur, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor);
+		if (dxContext.raytracingSupported)
+		{
+			resizeTexture(raytracingTexture, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor);
+			resizeTexture(raytracingTextureTmpForBlur, renderWidth / settings.raytracingDownsampleFactor, renderHeight / settings.raytracingDownsampleFactor);
+		}
 	}
 
 	allocateLightCullingBuffers();
@@ -891,7 +896,7 @@ void dx_renderer::endFrame()
 	// ----------------------------------------
 
 #if 1
-	if (giRenderPass.bindingTable)
+	if (dxContext.raytracingSupported && giRenderPass.bindingTable)
 	{
 		raytracingPipeline.render(cl, *giRenderPass.bindingTable, *giRenderPass.tlas,
 			raytracingTexture, settings.numRaytracingBounces, settings.raytracingFadeoutDistance, settings.raytracingMaxDistance, settings.environmentIntensity, settings.skyIntensity,

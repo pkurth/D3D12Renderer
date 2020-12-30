@@ -48,11 +48,11 @@ struct intx4
 
 	intx4(int i_) { i = _mm_set1_epi32(i_); }
 	intx4(__m128i i_) { i = i_; }
-	intx4(int* i_) { i = _mm_loadu_epi32(i_); }
+	//intx4(int* i_) { i = _mm_loadu_epi32(i_); } // TODO: Give non-AVX512 alternative.
 
 	operator __m128i() { return i; }
 
-	void store(int* i_) { _mm_storeu_epi32(i_, i); }
+	//void store(int* i_) { _mm_storeu_epi32(i_, i); }
 };
 
 static floatx4 truex4() { const float nnan = (const float&)0xFFFFFFFF; return nnan; }

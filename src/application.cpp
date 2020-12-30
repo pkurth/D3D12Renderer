@@ -26,37 +26,41 @@ void application::initialize(dx_renderer* renderer)
 	);
 
 
-
-
-	reflectionsRaytracingPipeline.initialize();
-	raytracingTLAS.initialize(acceleration_structure_refit);
-
-
-	std::vector<raytracing_object_handle> types;
-	for (auto& m : meshes)
-	{
-		raytracing_blas_builder blasBuilder;
-		std::vector<ref<pbr_material>> raytracingMaterials;
-
-		for (auto& sm : m.submeshes)
-		{
-			blasBuilder.push(m.mesh.vertexBuffer, m.mesh.indexBuffer, sm.info);
-			raytracingMaterials.push_back(sm.material);
-		}
-
-		blas.push_back(blasBuilder.finish());
-		types.push_back(reflectionsRaytracingPipeline.defineObjectType(blas.back(), raytracingMaterials));
-	}
-
-
 	trs sphereTransform = { vec3(0.f, 10.f, -5.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 1 };
 	gameObjects.push_back({ sphereTransform, 0, });
-	raytracingTLAS.instantiate(types[0], sphereTransform);
 
 	trs sponzaTransform = { vec3(0.f, 0.f, 0.f), quat::identity, 0.01f };
 	gameObjects.push_back({ sponzaTransform, 1, });
-	raytracingTLAS.instantiate(types[1], sponzaTransform);
 
+
+	if (dxContext.raytracingSupported)
+	{
+		raytracingBindingTable.initialize();
+		raytracingTLAS.initialize(acceleration_structure_refit);
+
+		std::vector<raytracing_object_handle> types;
+		for (auto& m : meshes)
+		{
+			raytracing_blas_builder blasBuilder;
+			std::vector<ref<pbr_material>> raytracingMaterials;
+
+			for (auto& sm : m.submeshes)
+			{
+				blasBuilder.push(m.mesh.vertexBuffer, m.mesh.indexBuffer, sm.info);
+				raytracingMaterials.push_back(sm.material);
+			}
+
+			blas.push_back(blasBuilder.finish());
+			types.push_back(raytracingBindingTable.defineObjectType(blas.back(), raytracingMaterials));
+		}
+
+		raytracingTLAS.instantiate(types[0], sphereTransform);
+		raytracingTLAS.instantiate(types[1], sponzaTransform);
+
+
+		raytracingBindingTable.build();
+		raytracingTLAS.build();
+	}
 
 
 
@@ -80,10 +84,6 @@ void application::initialize(dx_renderer* renderer)
 
 
 
-
-
-	reflectionsRaytracingPipeline.build();
-	raytracingTLAS.build();
 
 
 	setEnvironment("assets/textures/hdri/sunset_in_the_chalk_quarry_4k.hdr");
