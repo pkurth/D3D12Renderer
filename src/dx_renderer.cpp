@@ -9,14 +9,14 @@
 #include "skinning.h"
 #include "dx_context.h"
 
+#include "depth_only_rs.hlsli"
 #include "outline_rs.hlsli"
 #include "sky_rs.hlsli"
 #include "light_culling_rs.hlsli"
 #include "raytracing.hlsli"
-#include "model_rs.hlsli"
-#include "material.hlsli"
 #include "camera.hlsli"
 #include "flat_simple_rs.hlsli"
+#include "transform.hlsli"
 
 #include "raytracing.h"
 #include "pbr_raytracing_pipeline.h"
@@ -35,11 +35,9 @@ static ref<dx_buffer> spotLightBuffer[NUM_BUFFERED_FRAMES];
 static dx_render_target sunShadowRenderTarget[MAX_NUM_SUN_SHADOW_CASCADES];
 static ref<dx_texture> sunShadowCascadeTextures[MAX_NUM_SUN_SHADOW_CASCADES];
 
-static dx_pipeline staticModelPipeline;
-static dx_pipeline dynamicModelPipeline;
-static dx_pipeline animatedModelPipeline;
-static dx_pipeline modelDepthOnlyPipeline;
-static dx_pipeline modelShadowPipeline; // Only different from depth-only pipeline in the depth format.
+static dx_pipeline depthOnlyPipeline;
+static dx_pipeline animatedDepthOnlyPipeline;
+static dx_pipeline shadowPipeline;
 
 static dx_pipeline textureSkyPipeline;
 static dx_pipeline proceduralSkyPipeline;
@@ -75,25 +73,21 @@ static ref<dx_texture> brdfTex;
 
 
 
-static DXGI_FORMAT screenFormat;
+DXGI_FORMAT dx_renderer::screenFormat;
 
-static const DXGI_FORMAT hdrFormat[] = { DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT };
-static const DXGI_FORMAT hdrDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-static const DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM; // TODO: Evaluate whether this is enough.
-static const DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-static const DXGI_FORMAT raytracedReflectionsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+
+static bool performedSkinning;
 
 
 enum stencil_flags
 {
-	stencil_flag_dynamic_geometry = (1 << 0),
-	stencil_flag_selected_object = (1 << 1),
+	stencil_flag_selected_object = (1 << 0),
 };
 
 
 void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 {
-	::screenFormat = screenFormat;
+	dx_renderer::screenFormat = screenFormat;
 
 	{
 		uint8 white[] = { 255, 255, 255, 255 };
@@ -140,20 +134,11 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	// Model.
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(0, 0, hdrDepthStencilFormat)
+			.renderTargets(screenVelocitiesFormat, hdrDepthStencilFormat)
 			.inputLayout(inputLayout_position_uv_normal_tangent);
 
-		modelDepthOnlyPipeline = createReloadablePipeline(desc, { "model_depth_only_vs" }, rs_in_vertex_shader);
-
-
-		desc
-			.renderTargets(hdrFormat, arraysize(hdrFormat), hdrDepthStencilFormat)
-			.stencilSettings(D3D12_COMPARISON_FUNC_ALWAYS, D3D12_STENCIL_OP_REPLACE)
-			.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
-
-		staticModelPipeline = createReloadablePipeline(desc, { "model_static_vs", "model_static_ps" });
-		dynamicModelPipeline = createReloadablePipeline(desc, { "model_dynamic_vs", "model_dynamic_ps" });
-		animatedModelPipeline = createReloadablePipeline(desc, { "model_animated_vs", "model_animated_ps" });
+		depthOnlyPipeline = createReloadablePipeline(desc, { "depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
+		animatedDepthOnlyPipeline = createReloadablePipeline(desc, { "depth_only_animated_vs", "depth_only_ps" }, rs_in_vertex_shader);
 	}
 
 	// Shadow.
@@ -163,7 +148,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 			.inputLayout(inputLayout_position_uv_normal_tangent)
 			.cullFrontFaces();
 
-		modelShadowPipeline = createReloadablePipeline(desc, { "model_depth_only_vs" }, rs_in_vertex_shader);
+		shadowPipeline = createReloadablePipeline(desc, { "shadow_vs" }, rs_in_vertex_shader);
 	}
 
 	// Outline.
@@ -252,7 +237,9 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		raytracingPipeline.initialize(L"shaders/raytracing/specular_reflections_rts.hlsl");
 	}
 
-	createAllReloadablePipelines();
+	pbr_material::initializePipeline();
+
+	createAllPendingReloadablePipelines();
 
 
 
@@ -281,14 +268,19 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 	{
 		depthStencilBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthStencilFormat);
 		hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[0], false, true);
-		worldNormalsScreenVelocityTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[1], false, true);
+		worldNormalsTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[1], false, true);
+		screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, screenVelocitiesFormat, false, true);
 
 		SET_NAME(hdrColorTexture->resource, "HDR Color");
-		SET_NAME(worldNormalsScreenVelocityTexture->resource, "World normals and screen velocities");
+		SET_NAME(worldNormalsTexture->resource, "World normals");
+		SET_NAME(screenVelocitiesTexture->resource, "Screen velocities");
 
 		hdrRenderTarget.pushColorAttachment(hdrColorTexture);
-		hdrRenderTarget.pushColorAttachment(worldNormalsScreenVelocityTexture);
+		hdrRenderTarget.pushColorAttachment(worldNormalsTexture);
 		hdrRenderTarget.pushDepthStencilAttachment(depthStencilBuffer);
+
+		depthOnlyRenderTarget.pushColorAttachment(screenVelocitiesTexture);
+		depthOnlyRenderTarget.pushDepthStencilAttachment(depthStencilBuffer);
 	}
 
 	// Frame result.
@@ -323,7 +315,7 @@ void dx_renderer::beginFrameCommon()
 
 void dx_renderer::endFrameCommon()
 {
-	performSkinning();
+	performedSkinning = performSkinning();
 }
 
 void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
@@ -384,9 +376,12 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 	if (resizeTextures)
 	{
 		resizeTexture(hdrColorTexture, renderWidth, renderHeight);
-		resizeTexture(worldNormalsScreenVelocityTexture, renderWidth, renderHeight);
+		resizeTexture(worldNormalsTexture, renderWidth, renderHeight);
 		resizeTexture(depthStencilBuffer, renderWidth, renderHeight);
 		hdrRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
+
+		resizeTexture(screenVelocitiesTexture, renderWidth, renderHeight);
+		depthOnlyRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
 		
 		resizeTexture(volumetricsTexture, renderWidth, renderHeight);
 		
@@ -493,11 +488,39 @@ void dx_renderer::endFrame()
 	auto cameraCBV = dxContext.uploadDynamicConstantBuffer(camera);
 	auto sunCBV = dxContext.uploadDynamicConstantBuffer(sun);
 
+	common_material_info materialInfo;
+	if (environment)
+	{
+		materialInfo.environment = environment->environment;
+		materialInfo.irradiance = environment->irradiance;
+	}
+	else
+	{
+		materialInfo.environment = blackCubeTexture;
+		materialInfo.irradiance = blackCubeTexture;
+	}
+	materialInfo.environmentIntensity = settings.environmentIntensity;
+	materialInfo.brdf = brdfTex;
+	materialInfo.lightGrid = lightCullingBuffers.lightGrid;
+	materialInfo.pointLightIndexList = lightCullingBuffers.pointLightIndexList;
+	materialInfo.spotLightIndexList = lightCullingBuffers.spotLightIndexList;
+	materialInfo.pointLightBuffer = pointLightBuffer[dxContext.bufferedFrameID];
+	materialInfo.spotLightBuffer = spotLightBuffer[dxContext.bufferedFrameID];
+	for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
+	{
+		materialInfo.sunShadowCascades[i] = sunShadowCascadeTextures[i];
+	}
+	materialInfo.volumetricsTexture = volumetricsTexture;
+	materialInfo.cameraCBV = cameraCBV;
+	materialInfo.sunCBV = sunCBV;
+
+
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
 	barrier_batcher(cl)
 		.transition(hdrColorTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
-		.transition(worldNormalsScreenVelocityTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
+		.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
+		.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
 		.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
 		.transition(sunShadowCascadeTextures, MAX_NUM_SUN_SHADOW_CASCADES, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
@@ -534,53 +557,79 @@ void dx_renderer::endFrame()
 	}
 
 
+	if (performedSkinning)
+	{
+		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // Wait for GPU skinning.
+	}
+
 
 	// ----------------------------------------
 	// DEPTH-ONLY PASS
 	// ----------------------------------------
 
-	cl->setPipelineState(*modelDepthOnlyPipeline.pipeline);
-	cl->setGraphicsRootSignature(*modelDepthOnlyPipeline.rootSignature);
+	cl->setRenderTarget(depthOnlyRenderTarget);
+	cl->setViewport(depthOnlyRenderTarget.viewport);
 
 	// Static.
-	for (const auto& dc : geometryRenderPass.staticDrawCalls)
+	if (geometryRenderPass.staticDepthOnlyDrawCalls.size() > 0)
 	{
-		const mat4& m = dc.transform;
-		const submesh_info& submesh = dc.submesh;
+		cl->setPipelineState(*depthOnlyPipeline.pipeline);
+		cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
 
-		cl->setGraphics32BitConstants(MODEL_RS_MVP, depth_only_transform_cb{ camera.viewProj * m });
+		for (const auto& dc : geometryRenderPass.staticDepthOnlyDrawCalls)
+		{
+			const mat4& m = dc.transform;
+			const submesh_info& submesh = dc.submesh;
 
-		cl->setVertexBuffer(0, dc.vertexBuffer);
-		cl->setIndexBuffer(dc.indexBuffer);
-		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ camera.viewProj * m, camera.prevFrameViewProj * m });
+
+			cl->setVertexBuffer(0, dc.vertexBuffer);
+			cl->setIndexBuffer(dc.indexBuffer);
+			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		}
 	}
 
 	// Dynamic.
-	for (const auto& dc : geometryRenderPass.dynamicDrawCalls)
+	if (geometryRenderPass.dynamicDepthOnlyDrawCalls.size() > 0)
 	{
-		const mat4& m = dc.transform;
-		const submesh_info& submesh = dc.submesh;
+		cl->setPipelineState(*depthOnlyPipeline.pipeline);
+		cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
 
-		cl->setGraphics32BitConstants(MODEL_RS_MVP, depth_only_transform_cb{ camera.viewProj * m });
+		for (const auto& dc : geometryRenderPass.dynamicDepthOnlyDrawCalls)
+		{
+			const mat4& m = dc.transform;
+			const mat4& prevFrameM = dc.prevFrameTransform;
+			const submesh_info& submesh = dc.submesh;
 
-		cl->setVertexBuffer(0, dc.vertexBuffer);
-		cl->setIndexBuffer(dc.indexBuffer);
-		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ camera.viewProj * m, camera.prevFrameViewProj * prevFrameM });
+
+			cl->setVertexBuffer(0, dc.vertexBuffer);
+			cl->setIndexBuffer(dc.indexBuffer);
+			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		}
 	}
 
-	dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // Wait for GPU skinning.
-
 	// Animated.
-	for (const auto& dc : geometryRenderPass.animatedDrawCalls)
+	if (geometryRenderPass.animatedDepthOnlyDrawCalls.size() > 0)
 	{
-		const mat4& m = dc.transform;
-		const submesh_info& submesh = dc.submesh;
+		cl->setPipelineState(*animatedDepthOnlyPipeline.pipeline);
+		cl->setGraphicsRootSignature(*animatedDepthOnlyPipeline.rootSignature);
 
-		cl->setGraphics32BitConstants(MODEL_RS_MVP, depth_only_transform_cb{ camera.viewProj * m });
+		for (const auto& dc : geometryRenderPass.animatedDepthOnlyDrawCalls)
+		{
+			const mat4& m = dc.transform;
+			const mat4& prevFrameM = dc.prevFrameTransform;
+			const submesh_info& submesh = dc.submesh;
+			const submesh_info& prevFrameSubmesh = dc.prevFrameSubmesh;
+			const ref<dx_vertex_buffer>& prevFrameVertexBuffer = dc.prevFrameVertexBuffer;
 
-		cl->setVertexBuffer(0, dc.vertexBuffer);
-		cl->setIndexBuffer(dc.indexBuffer);
-		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ camera.viewProj * m, camera.prevFrameViewProj * prevFrameM });
+			cl->setRootGraphicsSRV(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS, prevFrameVertexBuffer->gpuVirtualAddress + prevFrameSubmesh.baseVertex * prevFrameVertexBuffer->elementSize);
+
+			cl->setVertexBuffer(0, dc.vertexBuffer);
+			cl->setIndexBuffer(dc.indexBuffer);
+			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		}
 	}
 
 
@@ -638,8 +687,8 @@ void dx_renderer::endFrame()
 	// SHADOW MAP PASS
 	// ----------------------------------------
 
-	cl->setPipelineState(*modelShadowPipeline.pipeline);
-	cl->setGraphicsRootSignature(*modelShadowPipeline.rootSignature);
+	cl->setPipelineState(*shadowPipeline.pipeline);
+	cl->setGraphicsRootSignature(*shadowPipeline.rootSignature);
 
 	for (uint32 i = 0; i < sun.numShadowCascades; ++i)
 	{
@@ -653,7 +702,7 @@ void dx_renderer::endFrame()
 			{
 				const mat4& m = dc.transform;
 				const submesh_info& submesh = dc.submesh;
-				cl->setGraphics32BitConstants(MODEL_RS_MVP, depth_only_transform_cb{ sun.vp[i] * m });
+				cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, sun.vp[i] * m);
 
 				cl->setVertexBuffer(0, dc.vertexBuffer);
 				cl->setIndexBuffer(dc.indexBuffer);
@@ -698,144 +747,24 @@ void dx_renderer::endFrame()
 
 	// Models.
 
-	auto setUpModelPipeline = [this, cl, sunCBV, cameraCBV]()
+	if (geometryRenderPass.drawCalls.size() > 0)
 	{
-		if (environment)
-		{
-			cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 0, environment->irradiance->defaultSRV);
-			cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 1, environment->environment->defaultSRV);
-		}
-		else
-		{
-			cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 0, blackCubeTexture->defaultSRV);
-			cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 1, blackCubeTexture->defaultSRV);
-		}
-		cl->setGraphics32BitConstants(MODEL_RS_LIGHTING, lighting_cb{ settings.environmentIntensity });
-		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 2, brdfTex);
-		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 3, lightCullingBuffers.lightGrid);
-		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 4, lightCullingBuffers.pointLightIndexList);
-		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 5, lightCullingBuffers.spotLightIndexList);
-		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 6, pointLightBuffer[dxContext.bufferedFrameID]);
-		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 7, spotLightBuffer[dxContext.bufferedFrameID]);
-		for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
-		{
-			cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 8 + i, sunShadowCascadeTextures[i]);
-		}
-		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 12, volumetricsTexture);
-		cl->setGraphicsDynamicConstantBuffer(MODEL_RS_SUN, sunCBV);
+		material_setup_function lastSetupFunc = 0;
 
-		cl->setGraphicsDynamicConstantBuffer(MODEL_RS_CAMERA, cameraCBV);
-	};
-
-	auto setMaterialCB = [cl](const ref<pbr_material>& material)
-	{
-		uint32 flags = 0;
-
-		if (material->albedo)
-		{
-			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 0, material->albedo);
-			flags |= USE_ALBEDO_TEXTURE;
-		}
-		if (material->normal)
-		{
-			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 1, material->normal);
-			flags |= USE_NORMAL_TEXTURE;
-		}
-		if (material->roughness)
-		{
-			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 2, material->roughness);
-			flags |= USE_ROUGHNESS_TEXTURE;
-		}
-		if (material->metallic)
-		{
-			cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 3, material->metallic);
-			flags |= USE_METALLIC_TEXTURE;
-		}
-
-		cl->setGraphics32BitConstants(MODEL_RS_MATERIAL,
-			pbr_material_cb
-			{
-				material->albedoTint.x, material->albedoTint.y, material->albedoTint.z, material->albedoTint.w,
-				packRoughnessAndMetallic(material->roughnessOverride, material->metallicOverride),
-				flags
-			});
-	};
-
-	// Static.
-	if (geometryRenderPass.staticDrawCalls.size() > 0)
-	{
-		cl->setPipelineState(*staticModelPipeline.pipeline);
-		cl->setGraphicsRootSignature(*staticModelPipeline.rootSignature);
-		setUpModelPipeline();
-		for (const auto& dc : geometryRenderPass.staticDrawCalls)
+		for (const auto& dc : geometryRenderPass.drawCalls)
 		{
 			const mat4& m = dc.transform;
 			const submesh_info& submesh = dc.submesh;
-			const ref<pbr_material>& material = dc.material;
 
-			setMaterialCB(material);
-
-			cl->setGraphics32BitConstants(MODEL_RS_MVP, static_transform_cb{ camera.viewProj * m, m });
-
-			cl->setVertexBuffer(0, dc.vertexBuffer);
-			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-		}
-	}
-
-	// Dynamic.
-	if (geometryRenderPass.dynamicDrawCalls.size() > 0)
-	{
-		cl->setPipelineState(*dynamicModelPipeline.pipeline);
-		cl->setGraphicsRootSignature(*dynamicModelPipeline.rootSignature);
-		setUpModelPipeline();
-		cl->setStencilReference(stencil_flag_dynamic_geometry);
-
-		for (const auto& dc : geometryRenderPass.dynamicDrawCalls)
-		{
-			const mat4& m = dc.transform;
-			const mat4& prevFrameM = dc.prevFrameTransform;
-			const submesh_info& submesh = dc.submesh;
-			const ref<pbr_material>& material = dc.material;
-
-			setMaterialCB(material);
-
-			cl->setGraphics32BitConstants(MODEL_RS_MVP, dynamic_transform_cb{ camera.viewProj * m, m, camera.prevFrameViewProj * prevFrameM });
-
-			cl->setVertexBuffer(0, dc.vertexBuffer);
-			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-		}
-	}
-
-	// Animated.
-	if (geometryRenderPass.animatedDrawCalls.size() > 0)
-	{
-		cl->setPipelineState(*animatedModelPipeline.pipeline);
-		cl->setGraphicsRootSignature(*animatedModelPipeline.rootSignature);
-		setUpModelPipeline();
-		cl->setStencilReference(stencil_flag_dynamic_geometry);
-
-		for (const auto& dc : geometryRenderPass.animatedDrawCalls)
-		{
-			const mat4& m = dc.transform;
-			const mat4& prevFrameM = dc.prevFrameTransform;
-			const submesh_info& submesh = dc.submesh;
-			const submesh_info& prevFrameSubmesh = dc.prevFrameSubmesh;
-			const ref<pbr_material>& material = dc.material;
-
-			setMaterialCB(material);
-
-			if (dc.prevFrameVertexBuffer)
+			if (dc.materialSetupFunc != lastSetupFunc)
 			{
-				cl->setRootGraphicsSRV(MODEL_RS_PREV_FRAME_POSITIONS, dc.prevFrameVertexBuffer->gpuVirtualAddress + prevFrameSubmesh.baseVertex * dc.prevFrameVertexBuffer->elementSize);
-			}
-			else
-			{
-				cl->setRootGraphicsSRV(MODEL_RS_PREV_FRAME_POSITIONS, dc.vertexBuffer->gpuVirtualAddress + submesh.baseVertex * dc.vertexBuffer->elementSize);
+				dc.materialSetupFunc(cl, materialInfo);
+				lastSetupFunc = dc.materialSetupFunc;
 			}
 
-			cl->setGraphics32BitConstants(MODEL_RS_MVP, dynamic_transform_cb{ camera.viewProj * m, m, camera.prevFrameViewProj * prevFrameM });
+			dc.material->prepareForRendering(cl);
+
+			cl->setGraphics32BitConstants(0, transform_cb{ camera.viewProj * m, m });
 
 			cl->setVertexBuffer(0, dc.vertexBuffer);
 			cl->setIndexBuffer(dc.indexBuffer);
@@ -845,7 +774,8 @@ void dx_renderer::endFrame()
 
 
 	barrier_batcher(cl)
-		.transition(worldNormalsScreenVelocityTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+		.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
 
 	// ----------------------------------------
@@ -862,12 +792,10 @@ void dx_renderer::endFrame()
 		// Mark object in stencil.
 		for (const auto& outlined : geometryRenderPass.outlinedObjects)
 		{
-			bool dynamic = (outlined.type == geometry_render_pass::outlined_dynamic);
-			bool animated = (outlined.type == geometry_render_pass::outlined_animated);
-			const submesh_info& submesh = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].submesh : (animated ? geometryRenderPass.animatedDrawCalls[outlined.index].submesh : geometryRenderPass.staticDrawCalls[outlined.index].submesh);
-			const mat4& m = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].transform : (animated ? geometryRenderPass.animatedDrawCalls[outlined.index].transform : geometryRenderPass.staticDrawCalls[outlined.index].transform);
-			const auto& vertexBuffer = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].vertexBuffer : (animated ? geometryRenderPass.animatedDrawCalls[outlined.index].vertexBuffer : geometryRenderPass.staticDrawCalls[outlined.index].vertexBuffer);
-			const auto& indexBuffer = dynamic ? geometryRenderPass.dynamicDrawCalls[outlined.index].indexBuffer : (animated ? geometryRenderPass.animatedDrawCalls[outlined.index].indexBuffer :geometryRenderPass.staticDrawCalls[outlined.index].indexBuffer);
+			const submesh_info& submesh = geometryRenderPass.drawCalls[outlined].submesh;
+			const mat4& m = geometryRenderPass.drawCalls[outlined].transform;
+			const auto& vertexBuffer = geometryRenderPass.drawCalls[outlined].vertexBuffer;
+			const auto& indexBuffer = geometryRenderPass.drawCalls[outlined].indexBuffer;
 
 			cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ camera.viewProj * m });
 
@@ -900,7 +828,7 @@ void dx_renderer::endFrame()
 	{
 		raytracingPipeline.render(cl, *giRenderPass.bindingTable, *giRenderPass.tlas,
 			raytracingTexture, settings.numRaytracingBounces, settings.raytracingFadeoutDistance, settings.raytracingMaxDistance, settings.environmentIntensity, settings.skyIntensity,
-			cameraCBV, sunCBV, depthStencilBuffer, worldNormalsScreenVelocityTexture, environment, brdfTex);
+			cameraCBV, sunCBV, depthStencilBuffer, worldNormalsTexture, environment, brdfTex);
 	}
 
 	//generateMipMapsOnGPU(cl, raytracingTexture);
@@ -982,7 +910,8 @@ void dx_renderer::endFrame()
 
 	barrier_batcher(cl)
 		.transition(hdrColorTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
-		.transition(worldNormalsScreenVelocityTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
+		.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
+		.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
 		.transition(frameResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON);
 
 	dxContext.executeCommandList(cl);

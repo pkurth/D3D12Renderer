@@ -1,4 +1,4 @@
-#include "model_rs.hlsli"
+#include "default_pbr_rs.hlsli"
 #include "brdf.hlsli"
 #include "camera.hlsli"
 #include "light_culling_rs.hlsli"
@@ -11,11 +11,6 @@ struct ps_input
 	float2 uv				: TEXCOORDS;
 	float3x3 tbn			: TANGENT_FRAME;
 	float3 worldPosition	: POSITION;
-
-#if defined(DYNAMIC) || defined(ANIMATED)
-	float3 thisFrameNDC		: THIS_FRAME_NDC;
-	float3 prevFrameNDC		: PREV_FRAME_NDC;
-#endif
 
 	float4 screenPosition	: SV_POSITION;
 };
@@ -53,8 +48,8 @@ Texture2D<float4> volumetrics					: register(t12, space2);
 
 struct ps_output
 {
-	float4 hdrColor						: SV_Target0;
-	float4 worldNormalScreenVelocity	: SV_Target1; // XY is world normal. ZW is screen volocity.
+	float4 hdrColor		: SV_Target0;
+	float2 worldNormal	: SV_Target1;
 };
 
 [RootSignature(MODEL_RS)]
@@ -162,27 +157,9 @@ ps_output main(ps_input IN)
 	// Ambient.
 	totalLighting.xyz += calculateAmbientLighting(albedo.xyz, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao) * lighting.environmentIntensity;
 
-
-	float2 screenUV = IN.screenPosition.xy * camera.invScreenDims;
-	float2 screenNDC = 2.f * screenUV - float2(1.f, 1.f);
-
-	//float4 volume = volumetrics.Sample(wrapSampler, screenUV);
-	//totalLighting.xyz += volume.xyz;
-
 	ps_output OUT;
 	OUT.hdrColor = totalLighting;
-
-#if defined(DYNAMIC) || defined(ANIMATED)
-	float2 screenVel = (IN.thisFrameNDC.xy / IN.thisFrameNDC.z) - (IN.prevFrameNDC.xy / IN.prevFrameNDC.z);
-	screenVel.y = -screenVel.y;
-#else
-	float4 prevFrameProjected = mul(camera.prevFrameViewProj, float4(IN.worldPosition, 1.f));
-	float2 prevFrameNDC = prevFrameProjected.xy / prevFrameProjected.w;
-	prevFrameNDC.y = -prevFrameNDC.y;
-	float2 screenVel = screenNDC - prevFrameNDC;
-#endif
-
-	OUT.worldNormalScreenVelocity = float4(packNormal(N), screenVel);
+	OUT.worldNormal = packNormal(N);
 
 	return OUT;
 }

@@ -4,82 +4,138 @@
 #include "bounding_volumes.h"
 #include "mesh.h"
 #include "light_source.h"
+#include "material.h"
 
-#include <functional>
-
-struct pbr_material;
 struct raytracing_blas;
 struct dx_vertex_buffer;
 struct dx_index_buffer;
 struct pbr_raytracing_binding_table;
 struct raytracing_tlas;
-struct dx_render_target;
-struct pbr_render_resources;
 
 
 struct geometry_render_pass
 {
-	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, const mat4& transform,
-		bool outline = false);
-	void renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<pbr_material>& material, 
-		const mat4& transform, const mat4& prevFrameTransform, bool outline = false);
-	void renderAnimatedObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_vertex_buffer>& prevFrameVertexBuffer,
-		submesh_info submesh, submesh_info prevFrameSubmesh,
-		const ref<dx_index_buffer>& indexBuffer, const ref<pbr_material>& material,
-		const mat4& transform, const mat4& prevFrameTransform, bool outline = false); // Pass null as prevFrameVertexBuffer, if the object hasn't been rendered last frame.
+	template <typename material_t>
+	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
+		bool outline = false)
+	{
+		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
+
+		staticDepthOnlyDrawCalls.push_back(
+			{
+				transform, vertexBuffer, indexBuffer, submesh
+			}
+		);
+	}
+
+	template <typename material_t>
+	void renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, 
+		const mat4& transform, const mat4& prevFrameTransform,
+		bool outline = false)
+	{
+		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
+
+		dynamicDepthOnlyDrawCalls.push_back(
+			{
+				transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh
+			}
+		);
+	}
+
+	template <typename material_t>
+	void renderAnimatedObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_vertex_buffer>& prevFrameVertexBuffer, 
+		const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, submesh_info prevFrameSubmesh, const ref<material_t>& material,
+		const mat4& transform, const mat4& prevFrameTransform,
+		bool outline = false)
+	{
+		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
+
+				animatedDepthOnlyDrawCalls.push_back(
+			{
+				transform, prevFrameTransform, vertexBuffer, 
+				prevFrameVertexBuffer ? prevFrameVertexBuffer : vertexBuffer, 
+				indexBuffer, 
+				submesh, 
+				prevFrameVertexBuffer ? prevFrameSubmesh : submesh
+			}
+		);
+	}
 
 private:
 	void reset();
 
-	enum outlined_object_type : uint16
+	template <typename material_t>
+	void common(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform, bool outline)
 	{
-		outlined_static,
-		outlined_dynamic,
-		outlined_animated,
-	};
+		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
 
-	struct outline_reference
-	{
-		outlined_object_type type;
-		uint16 index;
-	};
-	
-	struct static_draw_call
+		material_setup_function setupFunc = material_t::setupPipeline;
+
+		drawCalls.push_back(
+			{
+				transform,
+				vertexBuffer,
+				indexBuffer,
+				material,
+				submesh,
+				setupFunc,
+			}
+		);
+
+		if (outline)
+		{
+			outlinedObjects.push_back(
+				{
+					(uint16)(drawCalls.size() - 1)
+				}
+			);
+		}
+	}
+		
+	struct draw_call
 	{
 		const mat4 transform;
 		ref<dx_vertex_buffer> vertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
-		ref<pbr_material> material;
+		ref<material_base> material;
+		submesh_info submesh;
+		material_setup_function materialSetupFunc;
+	};
+
+	struct static_depth_only_draw_call
+	{
+		const mat4 transform;
+		ref<dx_vertex_buffer> vertexBuffer;
+		ref<dx_index_buffer> indexBuffer;
 		submesh_info submesh;
 	};
 
-	struct dynamic_draw_call
+	struct dynamic_depth_only_draw_call
 	{
 		const mat4 transform;
 		const mat4 prevFrameTransform;
 		ref<dx_vertex_buffer> vertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
-		ref<pbr_material> material;
 		submesh_info submesh;
 	};
 
-	struct animated_draw_call
+	struct animated_depth_only_draw_call
 	{
 		const mat4 transform;
 		const mat4 prevFrameTransform;
 		ref<dx_vertex_buffer> vertexBuffer;
 		ref<dx_vertex_buffer> prevFrameVertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
-		ref<pbr_material> material;
 		submesh_info submesh;
 		submesh_info prevFrameSubmesh;
 	};
 
-	std::vector<static_draw_call> staticDrawCalls;
-	std::vector<dynamic_draw_call> dynamicDrawCalls;
-	std::vector<animated_draw_call> animatedDrawCalls;
+	std::vector<draw_call> drawCalls;
+	std::vector<uint16> outlinedObjects;
 
-	std::vector<outline_reference> outlinedObjects;
+	std::vector<static_depth_only_draw_call> staticDepthOnlyDrawCalls;
+	std::vector<dynamic_depth_only_draw_call> dynamicDepthOnlyDrawCalls;
+	std::vector<animated_depth_only_draw_call> animatedDepthOnlyDrawCalls;
 
 	friend struct dx_renderer;
 };
@@ -136,21 +192,6 @@ private:
 
 	pbr_raytracing_binding_table* bindingTable;
 	raytracing_tlas* tlas;
-
-	friend struct dx_renderer;
-};
-
-struct application_render_pass
-{
-	using func_t = std::function<void(const dx_render_target& renderTarget, const pbr_render_resources& pbrResources)>;
-
-	void render(const func_t& func);
-	void render(func_t&& func);
-
-private:
-	void reset();
-
-	std::vector<func_t> drawCalls;
 
 	friend struct dx_renderer;
 };

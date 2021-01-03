@@ -133,7 +133,7 @@ static ref<pbr_material> loadAssimpMaterial(const aiMaterial* material)
 		}
 	}
 
-	return createMaterial(albedoName, normalName, roughnessName, metallicName, albedoTint, roughnessOverride, metallicOverride);
+	return createPBRMaterial(albedoName, normalName, roughnessName, metallicName, albedoTint, roughnessOverride, metallicOverride);
 }
 
 static mat4 readAssimpMatrix(const aiMatrix4x4& m)
@@ -332,7 +332,7 @@ static composite_mesh loadMeshFromScene(const aiScene* scene, uint32 flags)
 
 		aiMesh* mesh = scene->mMeshes[m];
 		sub.info = cpuMesh.pushAssimpMesh(mesh, 1.f, &sub.aabb, (flags & mesh_creation_flags_with_skin) ? &result.skeleton : 0);
-		sub.material = scene->HasMaterials() ? loadAssimpMaterial(scene->mMaterials[mesh->mMaterialIndex]) : getDefaultMaterial();
+		sub.material = scene->HasMaterials() ? loadAssimpMaterial(scene->mMaterials[mesh->mMaterialIndex]) : getDefaultPBRMaterial();
 	}
 
 	result.mesh = cpuMesh.createDXMesh();

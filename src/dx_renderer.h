@@ -50,24 +50,6 @@ struct renderer_settings
 	bool showLightVolumes = false;
 };
 
-struct pbr_render_resources
-{
-	ref<dx_texture> irradiance;
-	ref<dx_texture> environment;
-	ref<dx_texture> brdf;
-
-	ref<dx_texture> lightGrid;
-	ref<dx_buffer> pointLightIndexList;
-	ref<dx_buffer> spotLightIndexList;
-	ref<dx_buffer> pointLightBuffer;
-	ref<dx_buffer> spotLightBuffer;
-
-	ref<dx_texture> opaqueTexture;
-
-	ref<dx_texture> sunShadowCascades[MAX_NUM_SUN_SHADOW_CASCADES];
-};
-
-
 struct dx_renderer
 {
 	static void initializeCommon(DXGI_FORMAT screenFormat);
@@ -106,6 +88,16 @@ struct dx_renderer
 
 	static struct pbr_raytracing_pipeline* getRaytracingPipeline();
 
+
+	static DXGI_FORMAT screenFormat;
+
+	static constexpr DXGI_FORMAT hdrFormat[] = { DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16_FLOAT }; // HDR color, world normals.
+	static constexpr DXGI_FORMAT hdrDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	static constexpr DXGI_FORMAT screenVelocitiesFormat = DXGI_FORMAT_R16G16_FLOAT;
+	static constexpr DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM; // TODO: Evaluate whether this is enough.
+	static constexpr DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	static constexpr DXGI_FORMAT raytracedReflectionsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+
 //private:
 
 	struct light_culling_buffers
@@ -130,8 +122,10 @@ struct dx_renderer
 	dx_render_target windowRenderTarget;
 
 	dx_render_target hdrRenderTarget;
+	dx_render_target depthOnlyRenderTarget;
 	ref<dx_texture> hdrColorTexture;
-	ref<dx_texture> worldNormalsScreenVelocityTexture; // Screen velocity: x points right, y points down! This is in accordance with UV coordinates, which start at the top left.
+	ref<dx_texture> worldNormalsTexture;
+	ref<dx_texture> screenVelocitiesTexture;
 	ref<dx_texture> depthStencilBuffer;
 
 	ref<dx_texture> volumetricsTexture;

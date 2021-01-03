@@ -18,7 +18,7 @@ void application::initialize(dx_renderer* renderer)
 
 	cpu_mesh sphere(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 	composite_mesh& sphereMesh = meshes.emplace_back();
-	sphereMesh.submeshes.push_back({ sphere.pushSphere(21, 21, 1), bounding_box::fromCenterRadius(0.f, 1.f), trs::identity, createMaterial(0, 0, 0, 0, vec4(1.f), 0.f, 1.f), "Sphere" });
+	sphereMesh.submeshes.push_back({ sphere.pushSphere(21, 21, 1), bounding_box::fromCenterRadius(0.f, 1.f), trs::identity, createPBRMaterial(0, 0, 0, 0, vec4(1.f), 0.f, 1.f), "Sphere" });
 	sphereMesh.mesh = sphere.createDXMesh();
 
 	meshes.push_back(loadMeshFromFile("assets/meshes/sponza.obj",
@@ -70,7 +70,7 @@ void application::initialize(dx_renderer* renderer)
 	stormtrooperMesh = loadMeshFromFile("assets/meshes/stormtrooper.fbx",
 		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents | mesh_creation_flags_with_skin);
 
-	stormtrooperMesh.submeshes[0].material = createMaterial(
+	stormtrooperMesh.submeshes[0].material = createPBRMaterial(
 		"assets/textures/stormtrooper/Stormtrooper_D.png",
 		0, 0, 0,
 		vec4(1.f, 1.f, 1.f, 1.f),
@@ -305,7 +305,7 @@ void application::update(const user_input& input, float dt)
 			stormtrooperMesh.skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
 
 			mat4 m = trsToMat4(transform);
-			renderer->geometryRenderPass.renderAnimatedObject(vb, prevFrameVB, sm, prevFrameSM, stormtrooperMesh.mesh.indexBuffer, stormtrooperMesh.submeshes[0].material, m, m, true);
+			renderer->geometryRenderPass.renderAnimatedObject(vb, prevFrameVB, stormtrooperMesh.mesh.indexBuffer, sm, prevFrameSM, stormtrooperMesh.submeshes[0].material, m, m, true);
 			renderer->sunShadowRenderPass.renderObject(0, vb, stormtrooperMesh.mesh.indexBuffer, sm, m);
 
 			prevFrameVB = vb;
@@ -324,7 +324,7 @@ void application::update(const user_input& input, float dt)
 
 			mat4 m = trsToMat4(transform);
 			m.m03 += 5.f;
-			renderer->geometryRenderPass.renderAnimatedObject(vb, prevFrameVB, sm, prevFrameSM, stormtrooperMesh.mesh.indexBuffer, stormtrooperMesh.submeshes[0].material, m, m, true);
+			renderer->geometryRenderPass.renderAnimatedObject(vb, prevFrameVB, stormtrooperMesh.mesh.indexBuffer, sm, prevFrameSM, stormtrooperMesh.submeshes[0].material, m, m, true);
 			renderer->sunShadowRenderPass.renderObject(0, vb, stormtrooperMesh.mesh.indexBuffer, sm, m);
 
 			prevFrameVB = vb;

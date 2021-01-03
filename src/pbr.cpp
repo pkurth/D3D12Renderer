@@ -3,8 +3,16 @@
 #include "dx_texture.h"
 #include "texture_preprocessing.h"
 #include "dx_context.h"
+#include "dx_command_list.h"
+#include "dx_renderer.h"
+#include "geometry.h"
+
+#include "default_pbr_rs.hlsli"
+#include "material.hlsli"
 
 #include <unordered_map>
+
+static dx_pipeline defaultPBRPipeline;
 
 struct material_key
 {
@@ -73,7 +81,7 @@ static bool operator==(const material_key& a, const material_key& b)
 		&& a.metallicOverride == b.metallicOverride;
 }
 
-ref<pbr_material> createMaterial(const char* albedoTex, const char* normalTex, const char* roughTex, const char* metallicTex, const vec4& albedoTint, float roughOverride, float metallicOverride)
+ref<pbr_material> createPBRMaterial(const char* albedoTex, const char* normalTex, const char* roughTex, const char* metallicTex, const vec4& albedoTint, float roughOverride, float metallicOverride)
 {
 	material_key s =
 	{
@@ -112,12 +120,9 @@ ref<pbr_material> createMaterial(const char* albedoTex, const char* normalTex, c
 	return sp;
 }
 
-ref<pbr_material> getDefaultMaterial()
+ref<pbr_material> getDefaultPBRMaterial()
 {
-	static ref<pbr_material> material = make_ref<pbr_material>(
-		pbr_material{ 0, 0, 0, 0, vec4(1.f, 0.f, 1.f, 1.f), 1.f, 0.f }
-	);
-
+	static ref<pbr_material> material = make_ref<pbr_material>(nullptr, nullptr, nullptr, nullptr, vec4(1.f, 0.f, 1.f, 1.f), 1.f, 0.f);
 	return material;
 }
 
@@ -160,4 +165,74 @@ ref<pbr_environment> createEnvironment(const char* filename, uint32 skyResolutio
 
 	mutex.unlock();
 	return sp;
+}
+
+void pbr_material::prepareForRendering(dx_command_list* cl)
+{
+	uint32 flags = 0;
+
+	if (albedo)
+	{
+		cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 0, albedo);
+		flags |= USE_ALBEDO_TEXTURE;
+	}
+	if (normal)
+	{
+		cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 1, normal);
+		flags |= USE_NORMAL_TEXTURE;
+	}
+	if (roughness)
+	{
+		cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 2, roughness);
+		flags |= USE_ROUGHNESS_TEXTURE;
+	}
+	if (metallic)
+	{
+		cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 3, metallic);
+		flags |= USE_METALLIC_TEXTURE;
+	}
+
+	cl->setGraphics32BitConstants(MODEL_RS_MATERIAL,
+		pbr_material_cb
+		{
+			albedoTint.x, albedoTint.y, albedoTint.z, albedoTint.w,
+			packRoughnessAndMetallic(roughnessOverride, metallicOverride),
+			flags
+		});
+}
+
+void pbr_material::setupPipeline(dx_command_list* cl, const common_material_info& info)
+{
+	cl->setPipelineState(*defaultPBRPipeline.pipeline);
+	cl->setGraphicsRootSignature(*defaultPBRPipeline.rootSignature);
+
+	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 0, info.irradiance->defaultSRV);
+	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 1, info.environment->defaultSRV);
+	cl->setGraphics32BitConstants(MODEL_RS_LIGHTING, lighting_cb{ info.environmentIntensity });
+	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 2, info.brdf);
+	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 3, info.lightGrid);
+	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 4, info.pointLightIndexList);
+	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 5, info.spotLightIndexList);
+	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 6, info.pointLightBuffer);
+	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 7, info.spotLightBuffer);
+	for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
+	{
+		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 8 + i, info.sunShadowCascades[i]);
+	}
+	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 12, info.volumetricsTexture);
+	cl->setGraphicsDynamicConstantBuffer(MODEL_RS_SUN, info.sunCBV);
+
+	cl->setGraphicsDynamicConstantBuffer(MODEL_RS_CAMERA, info.cameraCBV);
+}
+
+void pbr_material::initializePipeline()
+{
+	auto desc = CREATE_GRAPHICS_PIPELINE
+		.inputLayout(inputLayout_position_uv_normal_tangent)
+		.renderTargets(dx_renderer::hdrFormat, arraysize(dx_renderer::hdrFormat), dx_renderer::hdrDepthStencilFormat)
+		.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
+
+	defaultPBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_ps" });
+
+	// We are omitting the call to createAllPendingReloadablePipelines here, because this is called from the renderer. In custom materials, you have to call this at some point.
 }

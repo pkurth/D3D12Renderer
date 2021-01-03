@@ -4,7 +4,6 @@
 #include "dx_context.h"
 
 #define CREATE_GRAPHICS_PIPELINE dx_graphics_pipeline_generator()
-#define CREATE_COMPUTE_PIPELINE dx_compute_pipeline_generator()
 
 #define UNBOUNDED_DESCRIPTOR_RANGE -1
 
@@ -254,40 +253,6 @@ struct dx_graphics_pipeline_generator
 	}
 };
 
-struct dx_compute_pipeline_generator
-{
-	D3D12_COMPUTE_PIPELINE_STATE_DESC desc;
-
-	operator const D3D12_COMPUTE_PIPELINE_STATE_DESC& () const
-	{
-		return desc;
-	}
-
-	dx_compute_pipeline_generator()
-	{
-		desc = {};
-	}
-
-	dx_pipeline_state create(dx_context& dxContext)
-	{
-		dx_pipeline_state result;
-		checkResult(dxContext.device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&result)));
-		return result;
-	}
-
-	dx_compute_pipeline_generator& rootSignature(const dx_root_signature& rootSignature)
-	{
-		desc.pRootSignature = rootSignature.rootSignature.Get();
-		return *this;
-	}
-
-	dx_compute_pipeline_generator& cs(dx_blob shader)
-	{
-		desc.CS = CD3DX12_SHADER_BYTECODE(shader.Get());
-		return *this;
-	}
-};
-
 
 
 struct dx_pipeline
@@ -324,7 +289,7 @@ dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& d
 dx_pipeline createReloadablePipeline(const char* csFile, dx_root_signature userRootSignature);
 dx_pipeline createReloadablePipeline(const char* csFile);
 
-void createAllReloadablePipelines();
+void createAllPendingReloadablePipelines();
 
 void checkForChangedPipelines();
 

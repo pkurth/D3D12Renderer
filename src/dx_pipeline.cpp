@@ -126,13 +126,17 @@ static reloadable_root_signature* pushBlob(const char* filename, reloadable_pipe
 				result = &rootSignaturesFromFiles.back();
 			}
 
+			mutex.lock();
 			shaderBlobs[filename] = { blob, { pipelineIndex }, result };
+			mutex.unlock();
 		}
 		else
 		{
 			// Already used.
 
+			mutex.lock();
 			it->second.usedByPipelines.insert(pipelineIndex);
+			mutex.unlock();
 
 			if (isRootSignature)
 			{
@@ -257,30 +261,25 @@ static void loadPipeline(reloadable_pipeline_state& p)
 	}
 }
 
-void createAllReloadablePipelines()
+void createAllPendingReloadablePipelines()
 {
-#if 1
-	concurrency::parallel_for(0, (int)rootSignaturesFromFiles.size(), [&](int i)
+	static int rsOffset = 0;
+	static int pipelineOffset = 0;
+
+	concurrency::parallel_for(rsOffset, (int)rootSignaturesFromFiles.size(), [&](int i)
 	{
 		loadRootSignature(rootSignaturesFromFiles[i]);
 	});
 
-	concurrency::parallel_for(0, (int)pipelines.size(), [&](int i)
+	concurrency::parallel_for(pipelineOffset, (int)pipelines.size(), [&](int i)
 	{
 		loadPipeline(pipelines[i]);
 	});
-#else
-	for (uint32 i = 0; i < (uint32)rootSignaturesFromFiles.size(); ++i)
-	{
-		loadRootSignature(rootSignaturesFromFiles[i]);
-	}
-	for (uint32 i = 0; i < (uint32)pipelines.size(); ++i)
-	{
-		loadPipeline(pipelines[i]);
-	}
-#endif
 
-	CreateThread(0, 0, checkForFileChanges, 0, 0, 0);
+	rsOffset = (int)rootSignaturesFromFiles.size();
+	pipelineOffset = (int)pipelines.size();
+
+	static HANDLE thread = CreateThread(0, 0, checkForFileChanges, 0, 0, 0); // Static, so that we only do this once.
 }
 
 void checkForChangedPipelines()
@@ -392,10 +391,13 @@ static DWORD checkForFileChanges(void*)
 
 				if (isFile)
 				{
+					mutex.lock();
 					auto it = shaderBlobs.find(changedPath.stem().string());
 					if (it != shaderBlobs.end())
 					{
-						while (fileIsLocked(changedPath.wstring().c_str()))
+						mutex.unlock();
+						auto wPath = changedPath.wstring();
+						while (fileIsLocked(wPath.c_str()))
 						{
 							//printf("File is locked.\n");
 						}
@@ -411,6 +413,10 @@ static DWORD checkForFileChanges(void*)
 						{
 							dirtyRootSignatures.push_back(it->second.rootSignature);
 						}
+						mutex.unlock();
+					}
+					else
+					{
 						mutex.unlock();
 					}
 

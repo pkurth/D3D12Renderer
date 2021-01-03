@@ -1,7 +1,7 @@
-#include "model_rs.hlsli"
+#include "depth_only_rs.hlsli"
 
 
-ConstantBuffer<depth_only_transform_cb> transform : register(b0);
+ConstantBuffer<shadow_depth_only_transform_cb> transform : register(b0);
 
 struct vs_input
 {
@@ -16,7 +16,7 @@ struct vs_output
 	float4 position			: SV_POSITION;
 };
 
-[RootSignature(MODEL_DEPTH_ONLY_RS)]
+[RootSignature(STATIC_DEPTH_ONLY_RS)]
 vs_output main(vs_input IN)
 {
 	vs_output OUT;

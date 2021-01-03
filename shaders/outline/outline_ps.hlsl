@@ -13,7 +13,7 @@ float4 main(ps_input IN) : SV_TARGET
 {
 	int2 texCoords = int2(IN.screenPosition.xy);
 
-	int selected = (1 << 1); // TODO: This must be the same as in renderer.
+	int selected = (1 << 0); // TODO: This must be the same as in renderer.
 
 	uint s = 0;
 	for (int x = -2; x <= 2; ++x)

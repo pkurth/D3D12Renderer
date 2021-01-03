@@ -76,8 +76,9 @@ std::tuple<ref<dx_vertex_buffer>, submesh_info, mat4*> skinObject(const ref<dx_v
 	return { skinnedVertexBuffer[currentSkinnedVertexBuffer], resultInfo, skinningMatrices.data() + offset };
 }
 
-void performSkinning()
+bool performSkinning()
 {
+	bool result = false;
 	if (calls.size() > 0)
 	{
 		dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
@@ -105,12 +106,16 @@ void performSkinning()
 		cl->uavBarrier(skinnedVertexBuffer[currentSkinnedVertexBuffer]);
 
 		dxContext.executeCommandList(cl);
+
+		result = true;
 	}
 
 	currentSkinnedVertexBuffer = 1 - currentSkinnedVertexBuffer;
 	calls.clear();
 	skinningMatrices.clear();
 	totalNumVertices = 0;
+
+	return result;
 }
 
 
