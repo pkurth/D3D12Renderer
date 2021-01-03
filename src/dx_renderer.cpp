@@ -13,7 +13,6 @@
 #include "outline_rs.hlsli"
 #include "sky_rs.hlsli"
 #include "light_culling_rs.hlsli"
-#include "raytracing.hlsli"
 #include "camera.hlsli"
 #include "flat_simple_rs.hlsli"
 #include "transform.hlsli"

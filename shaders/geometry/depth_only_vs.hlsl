@@ -19,7 +19,7 @@ struct vs_output
 	float4 position			: SV_POSITION;
 };
 
-[RootSignature(DYNAMIC_DEPTH_ONLY_RS)]
+[RootSignature(DEPTH_ONLY_RS)]
 vs_output main(vs_input IN)
 {
 	vs_output OUT;

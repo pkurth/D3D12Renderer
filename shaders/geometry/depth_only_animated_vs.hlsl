@@ -11,7 +11,7 @@ struct mesh_vertex
 	float3 tangent;
 };
 
-StructuredBuffer<mesh_vertex> prevFrameVertices				: register(t0);
+StructuredBuffer<mesh_vertex> prevFrameVertices		: register(t0);
 
 struct vs_input
 {
