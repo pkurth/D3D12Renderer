@@ -23,11 +23,21 @@ barrier_batcher& barrier_batcher::transition(const dx_resource& res, D3D12_RESOU
 
 barrier_batcher& barrier_batcher::transition(const ref<dx_texture>& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
 {
+	if (!res)
+	{
+		return *this;
+	}
+
 	return transition(res->resource, from, to, subresource);
 }
 
 barrier_batcher& barrier_batcher::transition(const ref<dx_buffer>& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to)
 {
+	if (!res)
+	{
+		return *this;
+	}
+
 	return transition(res->resource, from, to);
 }
 
@@ -53,11 +63,21 @@ barrier_batcher& barrier_batcher::uav(const dx_resource& resource)
 
 barrier_batcher& barrier_batcher::uav(const ref<dx_texture>& res)
 {
+	if (!res)
+	{
+		return *this;
+	}
+
 	return uav(res->resource);
 }
 
 barrier_batcher& barrier_batcher::uav(const ref<dx_buffer>& res)
 {
+	if (!res)
+	{
+		return *this;
+	}
+
 	return uav(res->resource);
 }
 

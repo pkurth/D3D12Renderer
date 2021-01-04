@@ -55,7 +55,7 @@ struct dx_renderer
 {
 	static void initializeCommon(DXGI_FORMAT screenFormat);
 	
-	void initialize(uint32 windowWidth, uint32 windowHeight);
+	void initialize(uint32 windowWidth, uint32 windowHeight, bool renderObjectIDs);
 
 	static void beginFrameCommon();
 	static void endFrameCommon();
@@ -87,7 +87,7 @@ struct dx_renderer
 	uint32 renderHeight;
 	ref<dx_texture> frameResult;
 
-	uint16 hoveredObjectID;
+	uint16 hoveredObjectID = 0xFFFF;
 
 	static struct pbr_raytracing_pipeline* getRaytracingPipeline();
 
@@ -149,8 +149,6 @@ struct dx_renderer
 
 	camera_cb camera;
 	directional_light_cb sun;
-
-
 
 
 

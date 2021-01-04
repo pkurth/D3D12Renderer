@@ -257,7 +257,7 @@ int main(int argc, char** argv)
 	initializeTransformationGizmos();
 
 	dx_renderer renderer = {};
-	renderer.initialize(1280, 800);
+	renderer.initialize(1280, 800, true);
 
 	application app = {};
 	app.initialize(&renderer);

@@ -263,7 +263,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	}
 }
 
-void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
+void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool renderObjectIDs)
 {
 	this->windowWidth = windowWidth;
 	this->windowHeight = windowHeight;
@@ -276,19 +276,27 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 		hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[0], false, true);
 		worldNormalsTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[1], false, true);
 		screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, depthOnlyFormat[0], false, true);
-		objectIDsTexture = createTexture(0, renderWidth, renderHeight, depthOnlyFormat[1], false, true, true);
 
 		SET_NAME(hdrColorTexture->resource, "HDR Color");
 		SET_NAME(worldNormalsTexture->resource, "World normals");
 		SET_NAME(screenVelocitiesTexture->resource, "Screen velocities");
-		SET_NAME(objectIDsTexture->resource, "Object IDs");
+
+		if (renderObjectIDs)
+		{
+			objectIDsTexture = createTexture(0, renderWidth, renderHeight, depthOnlyFormat[1], false, true, true);
+			SET_NAME(objectIDsTexture->resource, "Object IDs");
+		}
 
 		hdrRenderTarget.pushColorAttachment(hdrColorTexture);
 		hdrRenderTarget.pushColorAttachment(worldNormalsTexture);
 		hdrRenderTarget.pushDepthStencilAttachment(depthStencilBuffer);
 
 		depthOnlyRenderTarget.pushColorAttachment(screenVelocitiesTexture);
-		depthOnlyRenderTarget.pushColorAttachment(objectIDsTexture);
+
+		if (renderObjectIDs)
+		{
+			depthOnlyRenderTarget.pushColorAttachment(objectIDsTexture);
+		}
 		depthOnlyRenderTarget.pushDepthStencilAttachment(depthStencilBuffer);
 	}
 
@@ -316,9 +324,12 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 		SET_NAME(raytracingTextureTmpForBlur->resource, "Raytracing TMP");
 	}
 
-	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
+	if (renderObjectIDs)
 	{
-		hoveredObjectIDReadbackBuffer[i] = createReadbackBuffer(getFormatSize(depthOnlyFormat[1]), 1);
+		for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
+		{
+			hoveredObjectIDReadbackBuffer[i] = createReadbackBuffer(getFormatSize(depthOnlyFormat[1]), 1);
+		}
 	}
 }
 
@@ -353,6 +364,7 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 		recalculateViewport(true);
 	}
 
+	if (objectIDsTexture)
 	{
 		uint16* id = (uint16*)mapBuffer(hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID]);
 		hoveredObjectID = *id;
@@ -402,7 +414,10 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		hdrRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
 
 		resizeTexture(screenVelocitiesTexture, renderWidth, renderHeight);
-		resizeTexture(objectIDsTexture, renderWidth, renderHeight);
+		if (objectIDsTexture)
+		{
+			resizeTexture(objectIDsTexture, renderWidth, renderHeight);
+		}
 		depthOnlyRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
 		
 		resizeTexture(volumetricsTexture, renderWidth, renderHeight);
@@ -558,6 +573,7 @@ void dx_renderer::endFrame(const user_input& input)
 	// CLEAR OBJECT IDS
 	// ----------------------------------------
 
+	if (objectIDsTexture)
 	{
 		cl->setPipelineState(*clearObjectIDsPipeline.pipeline);
 		cl->setComputeRootSignature(*clearObjectIDsPipeline.rootSignature);
@@ -680,19 +696,22 @@ void dx_renderer::endFrame(const user_input& input)
 	}
 
 
-	barrier_batcher(cl)
-		.transition(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-
-	// Copy hovered object id to readback buffer.
-	if (input.overWindow)
+	if (objectIDsTexture)
 	{
-		D3D12_TEXTURE_COPY_LOCATION destLocation = { hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID]->resource.Get(), D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
-			D3D12_PLACED_SUBRESOURCE_FOOTPRINT { 0, { depthOnlyFormat[1], 1, 1, 1, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT } } };
-		D3D12_TEXTURE_COPY_LOCATION srcLocation = { objectIDsTexture->resource.Get(), D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX, 0 };
-		uint32 x = (uint32)input.mouse.x;
-		uint32 y = (uint32)input.mouse.y;
-		D3D12_BOX srcBox = { x, y, 0, x + 1, y + 1, 1 };
-		cl->commandList->CopyTextureRegion(&destLocation, 0, 0, 0, &srcLocation, &srcBox);
+		barrier_batcher(cl)
+			.transition(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+		// Copy hovered object id to readback buffer.
+		if (input.overWindow)
+		{
+			D3D12_TEXTURE_COPY_LOCATION destLocation = { hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID]->resource.Get(), D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
+				D3D12_PLACED_SUBRESOURCE_FOOTPRINT { 0, { depthOnlyFormat[1], 1, 1, 1, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT } } };
+			D3D12_TEXTURE_COPY_LOCATION srcLocation = { objectIDsTexture->resource.Get(), D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX, 0 };
+			uint32 x = (uint32)input.mouse.x;
+			uint32 y = (uint32)input.mouse.y;
+			D3D12_BOX srcBox = { x, y, 0, x + 1, y + 1, 1 };
+			cl->commandList->CopyTextureRegion(&destLocation, 0, 0, 0, &srcLocation, &srcBox);
+		}
 	}
 
 
