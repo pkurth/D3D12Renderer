@@ -15,6 +15,56 @@ struct raytracing_tlas;
 
 struct geometry_render_pass
 {
+protected:
+	template <typename material_t>
+	void common(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform, bool outline)
+	{
+		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
+
+		material_setup_function setupFunc = material_t::setupPipeline;
+
+		drawCalls.push_back(
+			{
+				transform,
+				vertexBuffer,
+				indexBuffer,
+				material,
+				submesh,
+				setupFunc,
+			}
+		);
+
+		if (outline)
+		{
+			outlinedObjects.push_back(
+				{
+					(uint16)(drawCalls.size() - 1)
+				}
+			);
+		}
+	}
+
+	void reset();
+
+private:
+	struct draw_call
+	{
+		const mat4 transform;
+		ref<dx_vertex_buffer> vertexBuffer;
+		ref<dx_index_buffer> indexBuffer;
+		ref<material_base> material;
+		submesh_info submesh;
+		material_setup_function materialSetupFunc;
+	};
+
+	std::vector<draw_call> drawCalls;
+	std::vector<uint16> outlinedObjects;
+
+	friend struct dx_renderer;
+};
+
+struct opaque_render_pass : geometry_render_pass
+{
 	template <typename material_t>
 	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
 		bool outline = false)
@@ -50,7 +100,7 @@ struct geometry_render_pass
 	{
 		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 
-				animatedDepthOnlyDrawCalls.push_back(
+		animatedDepthOnlyDrawCalls.push_back(
 			{
 				transform, prevFrameTransform, vertexBuffer, 
 				prevFrameVertexBuffer ? prevFrameVertexBuffer : vertexBuffer, 
@@ -63,44 +113,6 @@ struct geometry_render_pass
 
 private:
 	void reset();
-
-	template <typename material_t>
-	void common(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform, bool outline)
-	{
-		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
-
-		material_setup_function setupFunc = material_t::setupPipeline;
-
-		drawCalls.push_back(
-			{
-				transform,
-				vertexBuffer,
-				indexBuffer,
-				material,
-				submesh,
-				setupFunc,
-			}
-		);
-
-		if (outline)
-		{
-			outlinedObjects.push_back(
-				{
-					(uint16)(drawCalls.size() - 1)
-				}
-			);
-		}
-	}
-		
-	struct draw_call
-	{
-		const mat4 transform;
-		ref<dx_vertex_buffer> vertexBuffer;
-		ref<dx_index_buffer> indexBuffer;
-		ref<material_base> material;
-		submesh_info submesh;
-		material_setup_function materialSetupFunc;
-	};
 
 	struct static_depth_only_draw_call
 	{
@@ -130,14 +142,21 @@ private:
 		submesh_info prevFrameSubmesh;
 	};
 
-	std::vector<draw_call> drawCalls;
-	std::vector<uint16> outlinedObjects;
-
 	std::vector<static_depth_only_draw_call> staticDepthOnlyDrawCalls;
 	std::vector<dynamic_depth_only_draw_call> dynamicDepthOnlyDrawCalls;
 	std::vector<animated_depth_only_draw_call> animatedDepthOnlyDrawCalls;
 
 	friend struct dx_renderer;
+};
+
+struct transparent_render_pass : geometry_render_pass
+{
+	template <typename material_t>
+	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
+		bool outline = false)
+	{
+		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
+	}
 };
 
 struct sun_shadow_render_pass

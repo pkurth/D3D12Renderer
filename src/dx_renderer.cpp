@@ -130,7 +130,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		textureSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_texture_ps" });
 	}
 
-	// Model.
+	// Depth prepass.
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.renderTargets(screenVelocitiesFormat, hdrDepthStencilFormat)
@@ -338,7 +338,8 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 		recalculateViewport(true);
 	}
 
-	geometryRenderPass.reset();
+	opaqueRenderPass.reset();
+	transparentRenderPass.reset();
 	sunShadowRenderPass.reset();
 	visualizationRenderPass.reset();
 	giRenderPass.reset();
@@ -570,12 +571,12 @@ void dx_renderer::endFrame()
 	cl->setViewport(depthOnlyRenderTarget.viewport);
 
 	// Static.
-	if (geometryRenderPass.staticDepthOnlyDrawCalls.size() > 0)
+	if (opaqueRenderPass.staticDepthOnlyDrawCalls.size() > 0)
 	{
 		cl->setPipelineState(*depthOnlyPipeline.pipeline);
 		cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
 
-		for (const auto& dc : geometryRenderPass.staticDepthOnlyDrawCalls)
+		for (const auto& dc : opaqueRenderPass.staticDepthOnlyDrawCalls)
 		{
 			const mat4& m = dc.transform;
 			const submesh_info& submesh = dc.submesh;
@@ -589,12 +590,12 @@ void dx_renderer::endFrame()
 	}
 
 	// Dynamic.
-	if (geometryRenderPass.dynamicDepthOnlyDrawCalls.size() > 0)
+	if (opaqueRenderPass.dynamicDepthOnlyDrawCalls.size() > 0)
 	{
 		cl->setPipelineState(*depthOnlyPipeline.pipeline);
 		cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
 
-		for (const auto& dc : geometryRenderPass.dynamicDepthOnlyDrawCalls)
+		for (const auto& dc : opaqueRenderPass.dynamicDepthOnlyDrawCalls)
 		{
 			const mat4& m = dc.transform;
 			const mat4& prevFrameM = dc.prevFrameTransform;
@@ -609,12 +610,12 @@ void dx_renderer::endFrame()
 	}
 
 	// Animated.
-	if (geometryRenderPass.animatedDepthOnlyDrawCalls.size() > 0)
+	if (opaqueRenderPass.animatedDepthOnlyDrawCalls.size() > 0)
 	{
 		cl->setPipelineState(*animatedDepthOnlyPipeline.pipeline);
 		cl->setGraphicsRootSignature(*animatedDepthOnlyPipeline.rootSignature);
 
-		for (const auto& dc : geometryRenderPass.animatedDepthOnlyDrawCalls)
+		for (const auto& dc : opaqueRenderPass.animatedDepthOnlyDrawCalls)
 		{
 			const mat4& m = dc.transform;
 			const mat4& prevFrameM = dc.prevFrameTransform;
@@ -744,13 +745,11 @@ void dx_renderer::endFrame()
 	cl->setRenderTarget(hdrRenderTarget);
 	cl->setViewport(hdrRenderTarget.viewport);
 
-	// Models.
-
-	if (geometryRenderPass.drawCalls.size() > 0)
+	if (opaqueRenderPass.drawCalls.size() > 0)
 	{
 		material_setup_function lastSetupFunc = 0;
 
-		for (const auto& dc : geometryRenderPass.drawCalls)
+		for (const auto& dc : opaqueRenderPass.drawCalls)
 		{
 			const mat4& m = dc.transform;
 			const submesh_info& submesh = dc.submesh;
@@ -781,7 +780,7 @@ void dx_renderer::endFrame()
 	// OUTLINES
 	// ----------------------------------------
 
-	if (geometryRenderPass.outlinedObjects.size() > 0)
+	if (opaqueRenderPass.outlinedObjects.size() > 0)
 	{
 		cl->setStencilReference(stencil_flag_selected_object);
 
@@ -789,19 +788,25 @@ void dx_renderer::endFrame()
 		cl->setGraphicsRootSignature(*outlineMarkerPipeline.rootSignature);
 
 		// Mark object in stencil.
-		for (const auto& outlined : geometryRenderPass.outlinedObjects)
+		auto mark = [](const geometry_render_pass& rp, dx_command_list* cl, const mat4& viewProj)
 		{
-			const submesh_info& submesh = geometryRenderPass.drawCalls[outlined].submesh;
-			const mat4& m = geometryRenderPass.drawCalls[outlined].transform;
-			const auto& vertexBuffer = geometryRenderPass.drawCalls[outlined].vertexBuffer;
-			const auto& indexBuffer = geometryRenderPass.drawCalls[outlined].indexBuffer;
+			for (const auto& outlined : rp.outlinedObjects)
+			{
+				const submesh_info& submesh = rp.drawCalls[outlined].submesh;
+				const mat4& m = rp.drawCalls[outlined].transform;
+				const auto& vertexBuffer = rp.drawCalls[outlined].vertexBuffer;
+				const auto& indexBuffer = rp.drawCalls[outlined].indexBuffer;
 
-			cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ camera.viewProj * m });
+				cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ viewProj * m });
 
-			cl->setVertexBuffer(0, vertexBuffer);
-			cl->setIndexBuffer(indexBuffer);
-			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-		}
+				cl->setVertexBuffer(0, vertexBuffer);
+				cl->setIndexBuffer(indexBuffer);
+				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			}
+		};
+
+		mark(opaqueRenderPass, cl, camera.viewProj);
+		mark(transparentRenderPass, cl, camera.viewProj);
 
 		// Draw outline.
 		cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ);

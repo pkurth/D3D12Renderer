@@ -10,6 +10,12 @@ void geometry_render_pass::reset()
 {
 	drawCalls.clear();
 	outlinedObjects.clear();
+}
+
+void opaque_render_pass::reset()
+{
+	geometry_render_pass::reset();
+
 	staticDepthOnlyDrawCalls.clear();
 	dynamicDepthOnlyDrawCalls.clear();
 	animatedDepthOnlyDrawCalls.clear();

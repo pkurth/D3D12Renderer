@@ -173,26 +173,26 @@ void pbr_material::prepareForRendering(dx_command_list* cl)
 
 	if (albedo)
 	{
-		cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 0, albedo);
+		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 0, albedo);
 		flags |= USE_ALBEDO_TEXTURE;
 	}
 	if (normal)
 	{
-		cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 1, normal);
+		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 1, normal);
 		flags |= USE_NORMAL_TEXTURE;
 	}
 	if (roughness)
 	{
-		cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 2, roughness);
+		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 2, roughness);
 		flags |= USE_ROUGHNESS_TEXTURE;
 	}
 	if (metallic)
 	{
-		cl->setDescriptorHeapSRV(MODEL_RS_PBR_TEXTURES, 3, metallic);
+		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 3, metallic);
 		flags |= USE_METALLIC_TEXTURE;
 	}
 
-	cl->setGraphics32BitConstants(MODEL_RS_MATERIAL,
+	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_MATERIAL,
 		pbr_material_cb
 		{
 			albedoTint.x, albedoTint.y, albedoTint.z, albedoTint.w,
@@ -206,23 +206,23 @@ void pbr_material::setupPipeline(dx_command_list* cl, const common_material_info
 	cl->setPipelineState(*defaultPBRPipeline.pipeline);
 	cl->setGraphicsRootSignature(*defaultPBRPipeline.rootSignature);
 
-	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 0, info.irradiance->defaultSRV);
-	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 1, info.environment->defaultSRV);
-	cl->setGraphics32BitConstants(MODEL_RS_LIGHTING, lighting_cb{ info.environmentIntensity });
-	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 2, info.brdf);
-	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 3, info.lightGrid);
-	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 4, info.pointLightIndexList);
-	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 5, info.spotLightIndexList);
-	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 6, info.pointLightBuffer);
-	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 7, info.spotLightBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 0, info.irradiance->defaultSRV);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 1, info.environment->defaultSRV);
+	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_LIGHTING, lighting_cb{ info.environmentIntensity });
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 2, info.brdf);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 3, info.lightGrid);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 4, info.pointLightIndexList);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 5, info.spotLightIndexList);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 6, info.pointLightBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 7, info.spotLightBuffer);
 	for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
 	{
-		cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 8 + i, info.sunShadowCascades[i]);
+		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 8 + i, info.sunShadowCascades[i]);
 	}
-	cl->setDescriptorHeapSRV(MODEL_RS_FRAME_CONSTANTS, 12, info.volumetricsTexture);
-	cl->setGraphicsDynamicConstantBuffer(MODEL_RS_SUN, info.sunCBV);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 12, info.volumetricsTexture);
+	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_SUN, info.sunCBV);
 
-	cl->setGraphicsDynamicConstantBuffer(MODEL_RS_CAMERA, info.cameraCBV);
+	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_CAMERA, info.cameraCBV);
 }
 
 void pbr_material::initializePipeline()

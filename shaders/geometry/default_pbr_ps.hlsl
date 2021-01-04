@@ -52,7 +52,7 @@ struct ps_output
 	float2 worldNormal	: SV_Target1;
 };
 
-[RootSignature(MODEL_RS)]
+[RootSignature(DEFAULT_PBR_RS)]
 ps_output main(ps_input IN)
 {
 	uint flags = material.flags;

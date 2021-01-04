@@ -1,5 +1,5 @@
-#ifndef MODEL_RS_HLSLI
-#define MODEL_RS_HLSLI
+#ifndef DEFAULT_PBR_RS_HLSLI
+#define DEFAULT_PBR_RS_HLSLI
 
 #include "transform.hlsli"
 
@@ -8,7 +8,7 @@ struct lighting_cb
     float environmentIntensity;
 };
 
-#define MODEL_RS \
+#define DEFAULT_PBR_RS \
     "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
     "DENY_HULL_SHADER_ROOT_ACCESS |" \
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
@@ -39,13 +39,13 @@ struct lighting_cb
         "filter = FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT," \
         "visibility=SHADER_VISIBILITY_PIXEL)"
 
-#define MODEL_RS_MVP	                0
-#define MODEL_RS_MATERIAL               1
-#define MODEL_RS_LIGHTING               2
-#define MODEL_RS_CAMERA                 3
-#define MODEL_RS_PBR_TEXTURES           4
-#define MODEL_RS_SUN                    5
-#define MODEL_RS_FRAME_CONSTANTS        6
+#define DEFAULT_PBR_RS_MVP	                0
+#define DEFAULT_PBR_RS_MATERIAL             1
+#define DEFAULT_PBR_RS_LIGHTING             2
+#define DEFAULT_PBR_RS_CAMERA               3
+#define DEFAULT_PBR_RS_PBR_TEXTURES         4
+#define DEFAULT_PBR_RS_SUN                  5
+#define DEFAULT_PBR_RS_FRAME_CONSTANTS      6
 
 
 #endif

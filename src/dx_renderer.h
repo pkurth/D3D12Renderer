@@ -73,7 +73,8 @@ struct dx_renderer
 	void setSpotLights(const spot_light_cb* lights, uint32 numLights);
 
 
-	geometry_render_pass geometryRenderPass;
+	opaque_render_pass opaqueRenderPass;
+	transparent_render_pass transparentRenderPass;
 	sun_shadow_render_pass sunShadowRenderPass;
 	visualization_render_pass visualizationRenderPass;
 	global_illumination_render_pass giRenderPass;
