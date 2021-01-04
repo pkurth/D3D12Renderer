@@ -405,6 +405,8 @@ static vec2 abs(vec2 a) { return vec2(abs(a.x), abs(a.y)); }
 static vec3 abs(vec3 a) { return vec3(abs(a.x), abs(a.y), abs(a.z)); }
 static vec4 abs(vec4 a) { return vec4(abs(a.f4)); }
 
+static vec4 round(vec4 a) { return vec4(round(a.f4)); }
+
 static quat normalize(quat a) { return { normalize(a.v4).f4 }; }
 static quat conjugate(quat a) { return { -a.x, -a.y, -a.z, a.w }; }
 

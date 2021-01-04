@@ -156,6 +156,7 @@ static bool anyFalse(floatx4 a) { return !allTrue(a); }
 
 static floatx4 abs(floatx4 a) { floatx4 result = andNot(-0.f, a); return result; }
 static floatx4 floor(floatx4 a) { floatx4 result = { _mm_floor_ps(a) }; return result; }
+static floatx4 round(floatx4 a) { floatx4 result = { _mm_round_ps(a, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC) }; return result; }
 static floatx4 minimum(floatx4 a, floatx4 b) { floatx4 result = { _mm_min_ps(a, b) }; return result; }
 static floatx4 maximum(floatx4 a, floatx4 b) { floatx4 result = { _mm_max_ps(a, b) }; return result; }
 

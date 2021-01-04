@@ -2,7 +2,7 @@
 #include "light_source.h"
 
 
-void directional_light::updateMatrices(const render_camera& camera)
+void directional_light::updateMatrices(const render_camera& camera, bool preventShimmering)
 {
 	mat4 viewMatrix = lookAt(vec3(0.f, 0.f, 0.f), direction, vec3(0.f, 1.f, 0.f));
 
@@ -44,5 +44,20 @@ void directional_light::updateMatrices(const render_camera& camera)
 		mat4 projMatrix = createOrthographicProjectionMatrix(bb.minCorner.x, bb.maxCorner.x, bb.maxCorner.y, bb.minCorner.y, -bb.maxCorner.z - SHADOW_MAP_NEGATIVE_Z_OFFSET, -bb.minCorner.z);
 
 		vp[i] = projMatrix * viewMatrix;
+
+		if (preventShimmering)
+		{
+			// https://stackoverflow.com/questions/33499053/cascaded-shadow-map-shimmering
+			// Seems to only work for translation, not for rotation.
+
+			vec4 shadowOrigin = (vp[i] * vec4(0.f, 0.f, 0.f, 1.f)) * SUN_SHADOW_DIMENSIONS * 0.5f;
+			vec4 roundedOrigin = round(shadowOrigin);
+			vec4 roundOffset = roundedOrigin - shadowOrigin;
+			roundOffset = roundOffset * 2.f / SUN_SHADOW_DIMENSIONS;
+			roundOffset.z = 0.f;
+			roundOffset.w = 0.f;
+
+			vp[i].col3 += roundOffset;
+		}
 	}
 }

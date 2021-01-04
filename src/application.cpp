@@ -299,6 +299,9 @@ void application::update(const user_input& input, float dt)
 	ImGui::SliderInt("Raytracing downsampling", (int*)&renderer->settings.raytracingDownsampleFactor, 1, 4);
 	ImGui::SliderInt("Raytracing blur iteations", (int*)&renderer->settings.blurRaytracingResultIterations, 0, 4);
 
+	static bool preventShadowShimmering = true;
+	ImGui::Checkbox("Prevent shadow shimmering", &preventShadowShimmering);
+
 	ImGui::End();
 
 	// Update light positions.
@@ -317,7 +320,7 @@ void application::update(const user_input& input, float dt)
 		lightVelocities[i] += (v - lightVelocities[i]) * factor;
 	}
 
-	sun.updateMatrices(camera);
+	sun.updateMatrices(camera, preventShadowShimmering);
 
 	renderer->setCamera(camera);
 	renderer->setSun(sun);

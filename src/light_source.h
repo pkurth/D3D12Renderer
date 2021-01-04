@@ -26,6 +26,6 @@ struct directional_light
 	vec4 blendDistances;
 
 
-	void updateMatrices(const render_camera& camera);
+	void updateMatrices(const render_camera& camera, bool preventShimmering = true);
 };
 
