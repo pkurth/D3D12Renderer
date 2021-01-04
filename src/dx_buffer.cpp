@@ -105,7 +105,7 @@ static void initializeBuffer(ref<dx_buffer> buffer, uint32 elementSize, uint32 e
 	buffer->elementCount = elementCount;
 	buffer->totalSize = elementSize * elementCount;
 	buffer->heapType = heapType;
-	buffer->supportsSRV = true;
+	buffer->supportsSRV = heapType != D3D12_HEAP_TYPE_READBACK;
 	buffer->supportsUAV = allowUnorderedAccess;
 	buffer->supportsClearing = allowClearing;
 
@@ -167,6 +167,13 @@ ref<dx_buffer> createUploadBuffer(uint32 elementSize, uint32 elementCount, void*
 {
 	ref<dx_buffer> result = make_ref<dx_buffer>();
 	initializeBuffer(result, elementSize, elementCount, data, false, false, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_HEAP_TYPE_UPLOAD);
+	return result;
+}
+
+ref<dx_buffer> createReadbackBuffer(uint32 elementSize, uint32 elementCount, D3D12_RESOURCE_STATES initialState)
+{
+	ref<dx_buffer> result = make_ref<dx_buffer>();
+	initializeBuffer(result, elementSize, elementCount, 0, false, false, initialState, D3D12_HEAP_TYPE_READBACK);
 	return result;
 }
 

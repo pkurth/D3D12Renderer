@@ -17,7 +17,8 @@ struct geometry_render_pass
 {
 protected:
 	template <typename material_t>
-	void common(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform, bool outline)
+	void common(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
+		bool outline)
 	{
 		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
 
@@ -67,13 +68,13 @@ struct opaque_render_pass : geometry_render_pass
 {
 	template <typename material_t>
 	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
-		bool outline = false)
+		uint16 objectID, bool outline = false)
 	{
 		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 
 		staticDepthOnlyDrawCalls.push_back(
 			{
-				transform, vertexBuffer, indexBuffer, submesh
+				transform, vertexBuffer, indexBuffer, submesh, objectID
 			}
 		);
 	}
@@ -81,13 +82,13 @@ struct opaque_render_pass : geometry_render_pass
 	template <typename material_t>
 	void renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, 
 		const mat4& transform, const mat4& prevFrameTransform,
-		bool outline = false)
+		uint16 objectID, bool outline = false)
 	{
 		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 
 		dynamicDepthOnlyDrawCalls.push_back(
 			{
-				transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh
+				transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh, objectID
 			}
 		);
 	}
@@ -96,7 +97,7 @@ struct opaque_render_pass : geometry_render_pass
 	void renderAnimatedObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_vertex_buffer>& prevFrameVertexBuffer, 
 		const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, submesh_info prevFrameSubmesh, const ref<material_t>& material,
 		const mat4& transform, const mat4& prevFrameTransform,
-		bool outline = false)
+		uint16 objectID, bool outline = false)
 	{
 		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 
@@ -106,7 +107,8 @@ struct opaque_render_pass : geometry_render_pass
 				prevFrameVertexBuffer ? prevFrameVertexBuffer : vertexBuffer, 
 				indexBuffer, 
 				submesh, 
-				prevFrameVertexBuffer ? prevFrameSubmesh : submesh
+				prevFrameVertexBuffer ? prevFrameSubmesh : submesh, 
+				objectID
 			}
 		);
 	}
@@ -120,6 +122,7 @@ private:
 		ref<dx_vertex_buffer> vertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
 		submesh_info submesh;
+		uint16 objectID;
 	};
 
 	struct dynamic_depth_only_draw_call
@@ -129,6 +132,7 @@ private:
 		ref<dx_vertex_buffer> vertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
 		submesh_info submesh;
+		uint16 objectID;
 	};
 
 	struct animated_depth_only_draw_call
@@ -140,6 +144,7 @@ private:
 		ref<dx_index_buffer> indexBuffer;
 		submesh_info submesh;
 		submesh_info prevFrameSubmesh;
+		uint16 objectID;
 	};
 
 	std::vector<static_depth_only_draw_call> staticDepthOnlyDrawCalls;

@@ -279,7 +279,7 @@ void application::update(const user_input& input, float dt)
 			submesh_info submesh = sm.info;
 			const ref<pbr_material>& material = sm.material;
 
-			renderer->opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m);
+			renderer->opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, 999, renderer->hoveredObjectID == 999);
 			renderer->sunShadowRenderPass.renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
 		}
 	}
@@ -305,7 +305,8 @@ void application::update(const user_input& input, float dt)
 			stormtrooperMesh.skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
 
 			mat4 m = trsToMat4(transform);
-			renderer->opaqueRenderPass.renderAnimatedObject(vb, prevFrameVB, stormtrooperMesh.mesh.indexBuffer, sm, prevFrameSM, stormtrooperMesh.submeshes[0].material, m, m, true);
+			renderer->opaqueRenderPass.renderAnimatedObject(vb, prevFrameVB, stormtrooperMesh.mesh.indexBuffer, sm, prevFrameSM, stormtrooperMesh.submeshes[0].material, m, m, 0, 
+				renderer->hoveredObjectID == 0);
 			renderer->sunShadowRenderPass.renderObject(0, vb, stormtrooperMesh.mesh.indexBuffer, sm, m);
 
 			prevFrameVB = vb;
@@ -324,7 +325,8 @@ void application::update(const user_input& input, float dt)
 
 			mat4 m = trsToMat4(transform);
 			m.m03 += 5.f;
-			renderer->opaqueRenderPass.renderAnimatedObject(vb, prevFrameVB, stormtrooperMesh.mesh.indexBuffer, sm, prevFrameSM, stormtrooperMesh.submeshes[0].material, m, m, true);
+			renderer->opaqueRenderPass.renderAnimatedObject(vb, prevFrameVB, stormtrooperMesh.mesh.indexBuffer, sm, prevFrameSM, stormtrooperMesh.submeshes[0].material, m, m, 1, 
+				renderer->hoveredObjectID == 1);
 			renderer->sunShadowRenderPass.renderObject(0, vb, stormtrooperMesh.mesh.indexBuffer, sm, m);
 
 			prevFrameVB = vb;

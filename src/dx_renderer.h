@@ -7,6 +7,7 @@
 #include "render_pass.h"
 #include "light_source.h"
 #include "pbr.h"
+#include "input.h"
 
 #include "light_source.hlsli"
 #include "camera.hlsli"
@@ -60,7 +61,7 @@ struct dx_renderer
 	static void endFrameCommon();
 
 	void beginFrame(uint32 windowWidth, uint32 windowHeight);	
-	void endFrame();
+	void endFrame(const user_input& input);
 	void blitResultToScreen(dx_command_list* cl, dx_rtv_descriptor_handle rtv);
 
 
@@ -86,6 +87,7 @@ struct dx_renderer
 	uint32 renderHeight;
 	ref<dx_texture> frameResult;
 
+	uint16 hoveredObjectID;
 
 	static struct pbr_raytracing_pipeline* getRaytracingPipeline();
 
@@ -94,7 +96,7 @@ struct dx_renderer
 
 	static constexpr DXGI_FORMAT hdrFormat[] = { DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16_FLOAT }; // HDR color, world normals.
 	static constexpr DXGI_FORMAT hdrDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	static constexpr DXGI_FORMAT screenVelocitiesFormat = DXGI_FORMAT_R16G16_FLOAT;
+	static constexpr DXGI_FORMAT depthOnlyFormat[] = { DXGI_FORMAT_R16G16_FLOAT, DXGI_FORMAT_R16_UINT }; // Screen velocities, object ID.
 	static constexpr DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM; // TODO: Evaluate whether this is enough.
 	static constexpr DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	static constexpr DXGI_FORMAT raytracedReflectionsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
@@ -127,12 +129,15 @@ struct dx_renderer
 	ref<dx_texture> hdrColorTexture;
 	ref<dx_texture> worldNormalsTexture;
 	ref<dx_texture> screenVelocitiesTexture;
+	ref<dx_texture> objectIDsTexture;
 	ref<dx_texture> depthStencilBuffer;
 
 	ref<dx_texture> volumetricsTexture;
 
 	ref<dx_texture> raytracingTexture;
 	ref<dx_texture> raytracingTextureTmpForBlur;
+
+	ref<dx_buffer> hoveredObjectIDReadbackBuffer[NUM_BUFFERED_FRAMES];
 
 
 

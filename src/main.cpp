@@ -295,20 +295,20 @@ int main(int argc, char** argv)
 			vec2 mousePos = { relativeMouse.x, relativeMouse.y };
 			if (appFocusedLastFrame)
 			{
-				input.mouse.dx = mousePos.x - input.mouse.x;
-				input.mouse.dy = mousePos.y - input.mouse.y;
-				input.mouse.reldx = input.mouse.dx / (renderWidth - 1);
-				input.mouse.reldy = input.mouse.dy / (renderHeight - 1);
+				input.mouse.dx = (int32)(mousePos.x - input.mouse.x);
+				input.mouse.dy = (int32)(mousePos.y - input.mouse.y);
+				input.mouse.reldx = (float)input.mouse.dx / (renderWidth - 1);
+				input.mouse.reldy = (float)input.mouse.dy / (renderHeight - 1);
 			}
 			else
 			{
-				input.mouse.dx = 0.f;
-				input.mouse.dy = 0.f;
+				input.mouse.dx = 0;
+				input.mouse.dy = 0;
 				input.mouse.reldx = 0.f;
 				input.mouse.reldy = 0.f;
 			}
-			input.mouse.x = mousePos.x;
-			input.mouse.y = mousePos.y;
+			input.mouse.x = (int32)mousePos.x;
+			input.mouse.y = (int32)mousePos.y;
 			input.mouse.relX = mousePos.x / (renderWidth - 1);
 			input.mouse.relY = mousePos.y / (renderHeight - 1);
 			input.mouse.left = { ImGui::IsMouseDown(ImGuiMouseButton_Left), ImGui::IsMouseClicked(ImGuiMouseButton_Left), ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) };
@@ -324,8 +324,8 @@ int main(int argc, char** argv)
 		}
 		else
 		{
-			input.mouse.dx = 0.f;
-			input.mouse.dy = 0.f;
+			input.mouse.dx = 0;
+			input.mouse.dy = 0;
 			input.mouse.reldx = 0.f;
 			input.mouse.reldy = 0.f;
 
@@ -363,7 +363,7 @@ int main(int argc, char** argv)
 		app.update(input, dt);
 
 		dx_renderer::endFrameCommon();
-		renderer.endFrame();
+		renderer.endFrame(input);
 
 		if (!drawMainMenuBar(app))
 		{

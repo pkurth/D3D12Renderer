@@ -49,10 +49,10 @@ struct mouse_input
 	input_mouse_button middle;
 	float scroll;
 
-	float x;
-	float y;
-	float dx;
-	float dy;
+	int32 x;
+	int32 y;
+	int32 dx;
+	int32 dy;
 
 	float relX;
 	float relY;

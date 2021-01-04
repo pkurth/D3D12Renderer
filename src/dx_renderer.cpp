@@ -34,6 +34,8 @@ static ref<dx_buffer> spotLightBuffer[NUM_BUFFERED_FRAMES];
 static dx_render_target sunShadowRenderTarget[MAX_NUM_SUN_SHADOW_CASCADES];
 static ref<dx_texture> sunShadowCascadeTextures[MAX_NUM_SUN_SHADOW_CASCADES];
 
+static dx_pipeline clearObjectIDsPipeline;
+
 static dx_pipeline depthOnlyPipeline;
 static dx_pipeline animatedDepthOnlyPipeline;
 static dx_pipeline shadowPipeline;
@@ -133,7 +135,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	// Depth prepass.
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(screenVelocitiesFormat, hdrDepthStencilFormat)
+			.renderTargets(depthOnlyFormat, arraysize(depthOnlyFormat), hdrDepthStencilFormat)
 			.inputLayout(inputLayout_position_uv_normal_tangent);
 
 		depthOnlyPipeline = createReloadablePipeline(desc, { "depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
@@ -230,6 +232,11 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		atmospherePipeline = createReloadablePipeline("atmosphere_cs");
 	}
 
+	// Clear object IDs.
+	{
+		clearObjectIDsPipeline = createReloadablePipeline("clear_object_ids_cs");
+	}
+
 	// Raytracing.
 	if (dxContext.raytracingSupported)
 	{
@@ -268,17 +275,20 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 		depthStencilBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthStencilFormat);
 		hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[0], false, true);
 		worldNormalsTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[1], false, true);
-		screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, screenVelocitiesFormat, false, true);
+		screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, depthOnlyFormat[0], false, true);
+		objectIDsTexture = createTexture(0, renderWidth, renderHeight, depthOnlyFormat[1], false, true, true);
 
 		SET_NAME(hdrColorTexture->resource, "HDR Color");
 		SET_NAME(worldNormalsTexture->resource, "World normals");
 		SET_NAME(screenVelocitiesTexture->resource, "Screen velocities");
+		SET_NAME(objectIDsTexture->resource, "Object IDs");
 
 		hdrRenderTarget.pushColorAttachment(hdrColorTexture);
 		hdrRenderTarget.pushColorAttachment(worldNormalsTexture);
 		hdrRenderTarget.pushDepthStencilAttachment(depthStencilBuffer);
 
 		depthOnlyRenderTarget.pushColorAttachment(screenVelocitiesTexture);
+		depthOnlyRenderTarget.pushColorAttachment(objectIDsTexture);
 		depthOnlyRenderTarget.pushDepthStencilAttachment(depthStencilBuffer);
 	}
 
@@ -304,6 +314,11 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight)
 
 		SET_NAME(raytracingTexture->resource, "Raytracing");
 		SET_NAME(raytracingTextureTmpForBlur->resource, "Raytracing TMP");
+	}
+
+	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
+	{
+		hoveredObjectIDReadbackBuffer[i] = createReadbackBuffer(getFormatSize(depthOnlyFormat[1]), 1);
 	}
 }
 
@@ -336,6 +351,12 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 		}
 
 		recalculateViewport(true);
+	}
+
+	{
+		uint16* id = (uint16*)mapBuffer(hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID]);
+		hoveredObjectID = *id;
+		unmapBuffer(hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID]);
 	}
 
 	opaqueRenderPass.reset();
@@ -381,6 +402,7 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		hdrRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
 
 		resizeTexture(screenVelocitiesTexture, renderWidth, renderHeight);
+		resizeTexture(objectIDsTexture, renderWidth, renderHeight);
 		depthOnlyRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
 		
 		resizeTexture(volumetricsTexture, renderWidth, renderHeight);
@@ -474,7 +496,7 @@ pbr_raytracing_pipeline* dx_renderer::getRaytracingPipeline()
 	return &raytracingPipeline;
 }
 
-void dx_renderer::endFrame()
+void dx_renderer::endFrame(const user_input& input)
 {
 	bool aspectRatioModeChanged = settings.aspectRatioMode != oldSettings.aspectRatioMode;
 
@@ -521,13 +543,35 @@ void dx_renderer::endFrame()
 		.transition(hdrColorTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
 		.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
 		.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
+		.transition(objectIDsTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 		.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
 		.transition(sunShadowCascadeTextures, MAX_NUM_SUN_SHADOW_CASCADES, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 
-	cl->clearDepthAndStencil(hdrRenderTarget.depthAttachment->dsvHandle);
+	cl->clearDepthAndStencil(depthStencilBuffer->dsvHandle);
 
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+
+
+	// ----------------------------------------
+	// CLEAR OBJECT IDS
+	// ----------------------------------------
+
+	{
+		cl->setPipelineState(*clearObjectIDsPipeline.pipeline);
+		cl->setComputeRootSignature(*clearObjectIDsPipeline.rootSignature);
+
+		struct clear_ids_cb { uint32 width, height; };
+		cl->setCompute32BitConstants(0, clear_ids_cb{ objectIDsTexture->width, objectIDsTexture->height });
+		cl->setDescriptorHeapUAV(1, 0, objectIDsTexture);
+		cl->dispatch(bucketize(objectIDsTexture->width, 16), bucketize(objectIDsTexture->height, 16));
+
+		barrier_batcher(cl)
+			.transition(objectIDsTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	}
+
+
 
 
 
@@ -581,6 +625,7 @@ void dx_renderer::endFrame()
 			const mat4& m = dc.transform;
 			const submesh_info& submesh = dc.submesh;
 
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
 			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ camera.viewProj * m, camera.prevFrameViewProj * m });
 
 			cl->setVertexBuffer(0, dc.vertexBuffer);
@@ -601,6 +646,7 @@ void dx_renderer::endFrame()
 			const mat4& prevFrameM = dc.prevFrameTransform;
 			const submesh_info& submesh = dc.submesh;
 
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
 			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ camera.viewProj * m, camera.prevFrameViewProj * prevFrameM });
 
 			cl->setVertexBuffer(0, dc.vertexBuffer);
@@ -623,6 +669,7 @@ void dx_renderer::endFrame()
 			const submesh_info& prevFrameSubmesh = dc.prevFrameSubmesh;
 			const ref<dx_vertex_buffer>& prevFrameVertexBuffer = dc.prevFrameVertexBuffer;
 
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
 			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ camera.viewProj * m, camera.prevFrameViewProj * prevFrameM });
 			cl->setRootGraphicsSRV(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS, prevFrameVertexBuffer->gpuVirtualAddress + prevFrameSubmesh.baseVertex * prevFrameVertexBuffer->elementSize);
 
@@ -633,6 +680,20 @@ void dx_renderer::endFrame()
 	}
 
 
+	barrier_batcher(cl)
+		.transition(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+	// Copy hovered object id to readback buffer.
+	if (input.overWindow)
+	{
+		D3D12_TEXTURE_COPY_LOCATION destLocation = { hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID]->resource.Get(), D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
+			D3D12_PLACED_SUBRESOURCE_FOOTPRINT { 0, { depthOnlyFormat[1], 1, 1, 1, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT } } };
+		D3D12_TEXTURE_COPY_LOCATION srcLocation = { objectIDsTexture->resource.Get(), D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX, 0 };
+		uint32 x = (uint32)input.mouse.x;
+		uint32 y = (uint32)input.mouse.y;
+		D3D12_BOX srcBox = { x, y, 0, x + 1, y + 1, 1 };
+		cl->commandList->CopyTextureRegion(&destLocation, 0, 0, 0, &srcLocation, &srcBox);
+	}
 
 
 	// ----------------------------------------
@@ -702,7 +763,7 @@ void dx_renderer::endFrame()
 			{
 				const mat4& m = dc.transform;
 				const submesh_info& submesh = dc.submesh;
-				cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, sun.vp[i] * m);
+				cl->setGraphics32BitConstants(SHADOW_RS_MVP, sun.vp[i] * m);
 
 				cl->setVertexBuffer(0, dc.vertexBuffer);
 				cl->setIndexBuffer(dc.indexBuffer);
@@ -914,6 +975,7 @@ void dx_renderer::endFrame()
 
 	barrier_batcher(cl)
 		.transition(hdrColorTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
+		.transition(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON)
 		.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
 		.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
 		.transition(frameResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON);
