@@ -704,13 +704,9 @@ void dx_renderer::endFrame(const user_input& input)
 		// Copy hovered object id to readback buffer.
 		if (input.overWindow)
 		{
-			D3D12_TEXTURE_COPY_LOCATION destLocation = { hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID]->resource.Get(), D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
-				D3D12_PLACED_SUBRESOURCE_FOOTPRINT { 0, { depthOnlyFormat[1], 1, 1, 1, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT } } };
-			D3D12_TEXTURE_COPY_LOCATION srcLocation = { objectIDsTexture->resource.Get(), D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX, 0 };
 			uint32 x = (uint32)input.mouse.x;
 			uint32 y = (uint32)input.mouse.y;
-			D3D12_BOX srcBox = { x, y, 0, x + 1, y + 1, 1 };
-			cl->commandList->CopyTextureRegion(&destLocation, 0, 0, 0, &srcLocation, &srcBox);
+			cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID], x, y, 1, 1);
 		}
 	}
 

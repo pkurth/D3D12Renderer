@@ -13,6 +13,7 @@ struct pbr_raytracing_binding_table;
 struct raytracing_tlas;
 
 
+// Base for both opaque and transparent pass.
 struct geometry_render_pass
 {
 protected:
@@ -64,6 +65,7 @@ private:
 	friend struct dx_renderer;
 };
 
+// Renders opaque objects. It also generates screen space velocities, which is why there are three methods for static, dynamic and animated objects.
 struct opaque_render_pass : geometry_render_pass
 {
 	template <typename material_t>
@@ -154,6 +156,7 @@ private:
 	friend struct dx_renderer;
 };
 
+// Transparent pass currently generates no screen velocities and no object ids.
 struct transparent_render_pass : geometry_render_pass
 {
 	template <typename material_t>
