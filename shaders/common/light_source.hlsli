@@ -25,9 +25,10 @@ struct directional_light_cb
 	vec4 bias;
 
 	vec3 direction;
-	float blendArea;
-	vec3 radiance;
 	uint32 numShadowCascades;
+	vec3 radiance;
+	uint32 padding;
+	vec4 blendDistances;
 };
 
 struct point_light_cb
@@ -100,8 +101,10 @@ static float sampleShadowMapPCF(float4x4 vp, float3 worldPosition, Texture2D<flo
 }
 
 static float sampleCascadedShadowMapSimple(float4x4 vp[4], float3 worldPosition, Texture2D<float> shadowMaps[4], SamplerComparisonState shadowMapSampler,
-	float pixelDepth, uint numCascades, float4 cascadeDistances, float4 bias, float blendArea)
+	float pixelDepth, uint numCascades, float4 cascadeDistances, float4 bias, float4 blendDistances)
 {
+	float blendArea = blendDistances.x;
+
 	float4 comparison = pixelDepth.xxxx > cascadeDistances;
 
 	int currentCascadeIndex = dot(float4(numCascades > 0, numCascades > 1, numCascades > 2, numCascades > 3), comparison);
@@ -112,31 +115,20 @@ static float sampleCascadedShadowMapSimple(float4x4 vp[4], float3 worldPosition,
 	float visibility = sampleShadowMapSimple(vp[currentCascadeIndex], worldPosition, shadowMaps[currentCascadeIndex],
 		shadowMapSampler, bias[currentCascadeIndex]);
 
-	// Blend between cascades.
-	float currentPixelsBlendBandLocation = 1.f;
-	if (numCascades > 1)
-	{
-		// Calculate blend amount.
-		int blendIntervalBelowIndex = max(0, currentCascadeIndex - 1);
-		float cascade0Factor = float(currentCascadeIndex > 0);
-		float depth = pixelDepth - cascadeDistances[blendIntervalBelowIndex] * cascade0Factor;
-		float blendInterval = cascadeDistances[currentCascadeIndex] - cascadeDistances[blendIntervalBelowIndex] * cascade0Factor;
+	float blendEnd = cascadeDistances[currentCascadeIndex];
+	float blendStart = blendEnd - blendDistances[currentCascadeIndex];
+	float alpha = smoothstep(blendStart, blendEnd, pixelDepth);
 
-		// Relative to current cascade. 0 means at nearplane of cascade, 1 at farplane of cascade.
-		currentPixelsBlendBandLocation = 1.f - depth / blendInterval;
-	}
-	if (currentPixelsBlendBandLocation < blendArea) // Blend area is relative!
-	{
-		float blendBetweenCascadesAmount = currentPixelsBlendBandLocation / blendArea;
-		float visibilityOfNextCascade = sampleShadowMapSimple(vp[nextCascadeIndex], worldPosition, shadowMaps[nextCascadeIndex],
-			shadowMapSampler, bias[nextCascadeIndex]);
-		visibility = lerp(visibilityOfNextCascade, visibility, blendBetweenCascadesAmount);
-	}
+	float nextCascadeVisibility = (currentCascadeIndex == nextCascadeIndex || alpha == 0.f)
+		? 1.f // No need to sample next cascade, if we are the last cascade or if we are not in the blend area.
+		: sampleShadowMapSimple(vp[nextCascadeIndex], worldPosition, shadowMaps[nextCascadeIndex], shadowMapSampler, bias[nextCascadeIndex]);
+
+	visibility = lerp(visibility, nextCascadeVisibility, alpha);
 	return visibility;
 }
 
 static float sampleCascadedShadowMapPCF(float4x4 vp[4], float3 worldPosition, Texture2D<float> shadowMaps[4], SamplerComparisonState shadowMapSampler, 
-	float texelSize, float pixelDepth, uint numCascades, float4 cascadeDistances, float4 bias, float blendArea)
+	float texelSize, float pixelDepth, uint numCascades, float4 cascadeDistances, float4 bias, float4 blendDistances)
 {
 	float4 comparison = pixelDepth.xxxx > cascadeDistances;
 
@@ -148,26 +140,15 @@ static float sampleCascadedShadowMapPCF(float4x4 vp[4], float3 worldPosition, Te
 	float visibility = sampleShadowMapPCF(vp[currentCascadeIndex], worldPosition, shadowMaps[currentCascadeIndex],
 		shadowMapSampler, texelSize, bias[currentCascadeIndex]);
 
-	// Blend between cascades.
-	float currentPixelsBlendBandLocation = 1.f;
-	if (numCascades > 1)
-	{
-		// Calculate blend amount.
-		int blendIntervalBelowIndex = max(0, currentCascadeIndex - 1);
-		float cascade0Factor = float(currentCascadeIndex > 0);
-		float depth = pixelDepth - cascadeDistances[blendIntervalBelowIndex] * cascade0Factor;
-		float blendInterval = cascadeDistances[currentCascadeIndex] - cascadeDistances[blendIntervalBelowIndex] * cascade0Factor;
+	float blendEnd = cascadeDistances[currentCascadeIndex];
+	float blendStart = blendEnd - blendDistances[currentCascadeIndex];
+	float alpha = smoothstep(blendStart, blendEnd, pixelDepth);
 
-		// Relative to current cascade. 0 means at nearplane of cascade, 1 at farplane of cascade.
-		currentPixelsBlendBandLocation = 1.f - depth / blendInterval;
-	}
-	if (currentPixelsBlendBandLocation < blendArea) // Blend area is relative!
-	{
-		float blendBetweenCascadesAmount = currentPixelsBlendBandLocation / blendArea;
-		float visibilityOfNextCascade = sampleShadowMapPCF(vp[nextCascadeIndex], worldPosition, shadowMaps[nextCascadeIndex],
-			shadowMapSampler, texelSize, bias[nextCascadeIndex]);
-		visibility = lerp(visibilityOfNextCascade, visibility, blendBetweenCascadesAmount);
-	}
+	float nextCascadeVisibility = (currentCascadeIndex == nextCascadeIndex || alpha == 0.f) 
+		? 1.f // No need to sample next cascade, if we are the last cascade or if we are not in the blend area.
+		: sampleShadowMapPCF(vp[nextCascadeIndex], worldPosition, shadowMaps[nextCascadeIndex], shadowMapSampler, texelSize, bias[nextCascadeIndex]);
+
+	visibility = lerp(visibility, nextCascadeVisibility, alpha);
 	return visibility;
 }
 

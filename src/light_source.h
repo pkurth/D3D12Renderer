@@ -23,7 +23,7 @@ struct directional_light
 
 	mat4 vp[MAX_NUM_SUN_SHADOW_CASCADES];
 
-	float blendArea;
+	vec4 blendDistances;
 
 
 	void updateMatrices(const render_camera& camera);

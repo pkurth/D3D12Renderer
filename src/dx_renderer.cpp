@@ -487,7 +487,7 @@ void dx_renderer::setSun(const directional_light& light)
 	sun.cascadeDistances = light.cascadeDistances;
 	sun.bias = light.bias;
 	sun.direction = light.direction;
-	sun.blendArea = light.blendArea;
+	sun.blendDistances = light.blendDistances;
 	sun.radiance = light.color * light.intensity;
 	sun.numShadowCascades = light.numShadowCascades;
 

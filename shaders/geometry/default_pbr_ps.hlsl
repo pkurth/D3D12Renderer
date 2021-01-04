@@ -146,7 +146,7 @@ ps_output main(ps_input IN)
 	{
 		float pixelDepth = dot(camera.forward.xyz, camToP);
 		float visibility = sampleCascadedShadowMapPCF(sun.vp, IN.worldPosition, sunShadowCascades, shadowSampler, SUN_SHADOW_TEXEL_SIZE, pixelDepth, sun.numShadowCascades,
-			sun.cascadeDistances, sun.bias, sun.blendArea);
+			sun.cascadeDistances, sun.bias, sun.blendDistances);
 
 		float3 radiance = sun.radiance * visibility; // No attenuation for sun.
 
