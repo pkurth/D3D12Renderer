@@ -17,12 +17,6 @@
 #include "scene.h"
 
 
-struct scene_object
-{
-	trs transform;
-	uint32 meshIndex;
-};
-
 struct application
 {
 	void initialize(dx_renderer* renderer);
@@ -34,12 +28,7 @@ struct application
 	bool deserializeFromFile(const char* filename);
 
 private:
-	std::vector<composite_mesh> meshes;
-	std::vector<scene_object> gameObjects;
 	std::vector<raytracing_blas> blas;
-
-	composite_mesh stormtrooperMesh;
-
 
 	pbr_raytracing_binding_table raytracingBindingTable;
 	raytracing_tlas raytracingTLAS;
@@ -62,4 +51,5 @@ private:
 	camera_controller cameraController;
 
 	scene scene;
+	scene_entity selectedEntity;
 };

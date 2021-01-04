@@ -165,13 +165,13 @@ static quat readAssimpQuaternion(const aiQuaternion& q)
 	return result;
 }
 
-static void getMeshNamesAndTransforms(const aiNode* node, composite_mesh& mesh, const mat4& parentTransform = mat4::identity)
+static void getMeshNamesAndTransforms(const aiNode* node, ref<composite_mesh>& mesh, const mat4& parentTransform = mat4::identity)
 {
 	mat4 transform = parentTransform * readAssimpMatrix(node->mTransformation);
 	for (uint32 i = 0; i < node->mNumMeshes; ++i)
 	{
 		uint32 meshIndex = node->mMeshes[i];
-		auto& submesh = mesh.submeshes[meshIndex];
+		auto& submesh = mesh->submeshes[meshIndex];
 		submesh.name = node->mName.C_Str();
 		submesh.transform = transform;
 	}
@@ -305,42 +305,47 @@ static void loadAssimpSkeleton(const aiScene* scene, animation_skeleton& skeleto
 	readAssimpSkeletonHierarchy(scene->mRootNode, skeleton, insertIndex);
 }
 
-static composite_mesh loadMeshFromScene(const aiScene* scene, uint32 flags)
+static ref<composite_mesh> loadMeshFromScene(const aiScene* scene, uint32 flags)
 {
 	cpu_mesh cpuMesh(flags);
 
-	composite_mesh result;
+	ref<composite_mesh> result = make_ref<composite_mesh>();
 
 	if (flags & mesh_creation_flags_with_skin)
 	{
-		loadAssimpSkeleton(scene, result.skeleton, 1.f);
+		loadAssimpSkeleton(scene, result->skeleton, 1.f);
 
-		result.skeleton.clips.resize(scene->mNumAnimations);
+		result->skeleton.clips.resize(scene->mNumAnimations);
 		for (uint32 i = 0; i < scene->mNumAnimations; ++i)
 		{
-			loadAssimpAnimation(scene->mAnimations[i], result.skeleton.clips[i], result.skeleton, 1.f);
-			result.skeleton.nameToClipID[result.skeleton.clips[i].name] = i;
+			loadAssimpAnimation(scene->mAnimations[i], result->skeleton.clips[i], result->skeleton, 1.f);
+			result->skeleton.nameToClipID[result->skeleton.clips[i].name] = i;
 		}
 	}
 
-	result.submeshes.resize(scene->mNumMeshes);
+	result->submeshes.resize(scene->mNumMeshes);
 	getMeshNamesAndTransforms(scene->mRootNode, result);
+
+	result->aabb = bounding_box::negativeInfinity();
 
 	for (uint32 m = 0; m < scene->mNumMeshes; ++m)
 	{
-		submesh& sub = result.submeshes[m];
+		submesh& sub = result->submeshes[m];
 
 		aiMesh* mesh = scene->mMeshes[m];
-		sub.info = cpuMesh.pushAssimpMesh(mesh, 1.f, &sub.aabb, (flags & mesh_creation_flags_with_skin) ? &result.skeleton : 0);
+		sub.info = cpuMesh.pushAssimpMesh(mesh, 1.f, &sub.aabb, (flags & mesh_creation_flags_with_skin) ? &result->skeleton : 0);
 		sub.material = scene->HasMaterials() ? loadAssimpMaterial(scene->mMaterials[mesh->mMaterialIndex]) : getDefaultPBRMaterial();
+
+		result->aabb.grow(sub.aabb.minCorner);
+		result->aabb.grow(sub.aabb.maxCorner);
 	}
 
-	result.mesh = cpuMesh.createDXMesh();
+	result->mesh = cpuMesh.createDXMesh();
 
 	return result;
 }
 
-composite_mesh loadMeshFromFile(const char* sceneFilename, uint32 flags)
+ref<composite_mesh> loadMeshFromFile(const char* sceneFilename, uint32 flags)
 {
 	Assimp::Importer importer;
 

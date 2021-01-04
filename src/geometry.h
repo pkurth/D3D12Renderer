@@ -3,7 +3,17 @@
 #include "bounding_volumes.h"
 #include "animation.h"
 #include "dx_buffer.h"
-#include "mesh.h"
+
+
+
+struct submesh_info
+{
+	uint32 numTriangles;
+	uint32 firstTriangle;
+	uint32 baseVertex;
+	uint32 numVertices;
+};
+
 
 // Members are always pushed in this order!
 enum mesh_creation_flags

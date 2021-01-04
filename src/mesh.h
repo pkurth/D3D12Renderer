@@ -3,17 +3,10 @@
 #include "bounding_volumes.h"
 #include "dx_buffer.h"
 #include "animation.h"
+#include "geometry.h"
 
 struct pbr_material;
 
-
-struct submesh_info
-{
-	uint32 numTriangles;
-	uint32 firstTriangle;
-	uint32 baseVertex;
-	uint32 numVertices;
-};
 
 struct submesh
 {
@@ -30,7 +23,8 @@ struct composite_mesh
 	std::vector<submesh> submeshes;
 	animation_skeleton skeleton;
 	dx_mesh mesh;
+	bounding_box aabb;
 };
 
 
-composite_mesh loadMeshFromFile(const char* sceneFilename, uint32 flags);
+ref<composite_mesh> loadMeshFromFile(const char* sceneFilename, uint32 flags = mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);

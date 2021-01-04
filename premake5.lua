@@ -45,7 +45,7 @@ project "D3D12ProjectionMapping"
 	sysincludedirs {
 		"ext/assimp/include",
 		"ext/yaml-cpp/include",
-		"ext/entt/single_include",
+		"ext/entt/src",
 		"ext/directxtex",
 		"ext",
 	}
@@ -87,7 +87,8 @@ project "D3D12ProjectionMapping"
 
 		defines {
 			"_UNICODE",
-			"UNICODE"
+			"UNICODE",
+			"_CRT_SECURE_NO_WARNINGS"
 		}
 
 	filter "configurations:Debug"

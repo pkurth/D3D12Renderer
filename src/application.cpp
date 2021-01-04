@@ -9,6 +9,23 @@
 #include "skinning.h"
 
 
+struct raster_component
+{
+	ref<composite_mesh> mesh;
+};
+
+struct animation_component
+{
+	float time;
+
+	ref<dx_vertex_buffer> vb;
+	submesh_info sm;
+
+	ref<dx_vertex_buffer> prevFrameVB;
+	submesh_info prevFrameSM;
+};
+
+
 void application::initialize(dx_renderer* renderer)
 {
 	this->renderer = renderer;
@@ -16,24 +33,39 @@ void application::initialize(dx_renderer* renderer)
 	camera.initializeIngame(vec3(0.f, 30.f, 40.f), quat::identity, deg2rad(70.f), 0.1f);
 	cameraController.initialize(&camera);
 
-	cpu_mesh sphere(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
-	composite_mesh& sphereMesh = meshes.emplace_back();
-	sphereMesh.submeshes.push_back({ sphere.pushSphere(21, 21, 1), bounding_box::fromCenterRadius(0.f, 1.f), trs::identity, createPBRMaterial(0, 0, 0, 0, vec4(1.f), 0.f, 1.f), "Sphere" });
-	sphereMesh.mesh = sphere.createDXMesh();
+	
+	// Sponza.
+	scene.createEntity("Sponza")
+		.addComponent<trs>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
+		.addComponent<raster_component>(loadMeshFromFile("assets/meshes/sponza.obj"));
 
-	meshes.push_back(loadMeshFromFile("assets/meshes/sponza.obj",
-		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents)
+
+	// Stormtroopers.
+	auto stormtrooperMesh = loadMeshFromFile("assets/meshes/stormtrooper.fbx",
+		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents | mesh_creation_flags_with_skin);
+
+	stormtrooperMesh->submeshes[0].material = createPBRMaterial(
+		"assets/textures/stormtrooper/Stormtrooper_D.png",
+		0, 0, 0,
+		vec4(1.f, 1.f, 1.f, 1.f),
+		0.f,
+		0.f
 	);
 
+	scene.createEntity("Stormtrooper 1")
+		.addComponent<trs>(vec3(0.f), quat::identity)
+		.addComponent<raster_component>(stormtrooperMesh)
+		.addComponent<animation_component>(0.f);
 
-	trs sphereTransform = { vec3(0.f, 10.f, -5.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 1 };
-	gameObjects.push_back({ sphereTransform, 0, });
+	scene.createEntity("Stormtrooper 2")
+		.addComponent<trs>(vec3(5.f, 0.f, 0.f), quat::identity)
+		.addComponent<raster_component>(stormtrooperMesh)
+		.addComponent<animation_component>(1.5f);
 
-	trs sponzaTransform = { vec3(0.f, 0.f, 0.f), quat::identity, 0.01f };
-	gameObjects.push_back({ sponzaTransform, 1, });
 
 
-	if (dxContext.raytracingSupported)
+	// Raytracing.
+	/*if (dxContext.raytracingSupported)
 	{
 		raytracingBindingTable.initialize();
 		raytracingTLAS.initialize(acceleration_structure_refit);
@@ -54,32 +86,12 @@ void application::initialize(dx_renderer* renderer)
 			types.push_back(raytracingBindingTable.defineObjectType(blas.back(), raytracingMaterials));
 		}
 
-		raytracingTLAS.instantiate(types[0], sphereTransform);
-		raytracingTLAS.instantiate(types[1], sponzaTransform);
+		raytracingTLAS.instantiate(types[0], sponzaTransform);
 
 
 		raytracingBindingTable.build();
 		raytracingTLAS.build();
-	}
-
-
-
-
-
-
-	stormtrooperMesh = loadMeshFromFile("assets/meshes/stormtrooper.fbx",
-		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents | mesh_creation_flags_with_skin);
-
-	stormtrooperMesh.submeshes[0].material = createPBRMaterial(
-		"assets/textures/stormtrooper/Stormtrooper_D.png",
-		0, 0, 0,
-		vec4(1.f, 1.f, 1.f, 1.f),
-		0.f,
-		0.f
-	);
-
-
-
+	}*/
 
 
 
@@ -206,15 +218,45 @@ static bool editSunShadowParameters(directional_light& sun)
 
 void application::update(const user_input& input, float dt)
 {
-	if (input.keyboard['F'].pressEvent)
+	if (input.keyboard['F'].pressEvent && selectedEntity)
 	{
-		auto aabb = meshes[0].submeshes[0].aabb;
-		aabb.minCorner += gameObjects[0].transform.position;
-		aabb.maxCorner += gameObjects[0].transform.position;
+		auto& raster = selectedEntity.getComponent<raster_component>();
+		auto& transform = selectedEntity.getComponent<trs>();
+
+		auto aabb = raster.mesh->aabb;
+		aabb.minCorner *= transform.scale;
+		aabb.maxCorner *= transform.scale;
+
+		aabb.minCorner += transform.position;
+		aabb.maxCorner += transform.position;
+
 		cameraController.centerCameraOnObject(aabb);
 	}
 
 	bool inputCaptured = cameraController.update(input, renderer->renderWidth, renderer->renderHeight, dt);
+
+	if (selectedEntity && selectedEntity.hasComponent<trs>())
+	{
+		trs& transform = selectedEntity.getComponent<trs>();
+
+		static transformation_type type = transformation_type_translation;
+		static transformation_space space = transformation_global;
+		inputCaptured = manipulateTransformation(transform, type, space, camera, input, !inputCaptured, renderer);
+	}
+
+	if (!inputCaptured && input.mouse.left.clickEvent)
+	{
+		if (renderer->hoveredObjectID != 0xFFFF)
+		{
+			selectedEntity = { renderer->hoveredObjectID, scene };
+		}
+		else
+		{
+			selectedEntity = {};
+		}
+		inputCaptured = true;
+	}
+
 
 	ImGui::Begin("Settings");
 	ImGui::Text("%.3f ms, %u FPS", dt * 1000.f, (uint32)(1.f / dt));
@@ -237,9 +279,6 @@ void application::update(const user_input& input, float dt)
 	ImGui::SliderInt("Raytracing bounces", (int*)&renderer->settings.numRaytracingBounces, 1, MAX_PBR_RAYTRACING_RECURSION_DEPTH - 1);
 	ImGui::SliderInt("Raytracing downsampling", (int*)&renderer->settings.raytracingDownsampleFactor, 1, 4);
 	ImGui::SliderInt("Raytracing blur iteations", (int*)&renderer->settings.blurRaytracingResultIterations, 0, 4);
-
-	static float jitterStrength = 1.f;
-	ImGui::SliderFloat("Jitter strength", &jitterStrength, 0.f, 1.f);
 
 	ImGui::End();
 
@@ -269,83 +308,58 @@ void application::update(const user_input& input, float dt)
 
 
 
-	for (const scene_object& go : gameObjects)
+	scene.group<animation_component>(entt::get<raster_component>)
+		.each([dt](auto& anim, auto& raster)
 	{
-		const dx_mesh& mesh = meshes[go.meshIndex].mesh;
-		mat4 m = trsToMat4(go.transform);
+		anim.time += dt;
+		const dx_mesh& mesh = raster.mesh->mesh;
+		const animation_skeleton& skeleton = raster.mesh->skeleton;
+		submesh_info info = raster.mesh->submeshes[0].info;
 
-		for (auto& sm : meshes[go.meshIndex].submeshes)
-		{
-			submesh_info submesh = sm.info;
-			const ref<pbr_material>& material = sm.material;
+		trs localTransforms[128];
+		auto [vb, sm, skinningMatrices] = skinObject(mesh.vertexBuffer, info, (uint32)skeleton.joints.size());
+		skeleton.sampleAnimation(skeleton.clips[0].name, anim.time, localTransforms);
+		skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
 
-			renderer->opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, 999, renderer->hoveredObjectID == 999);
-			renderer->sunShadowRenderPass.renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-		}
-	}
+		anim.prevFrameVB = anim.vb;
+		anim.prevFrameSM = anim.sm;
 
-	static float time = 0.f;
-	time += dt;
+		anim.vb = vb;
+		anim.sm = sm;
+	});
 
 
+	scene.group<raster_component>(entt::get<trs>)
+		.each([this](entt::entity entityHandle, auto& raster, auto& transform)
 	{
-		static trs transform = trs::identity;
-		static transformation_type transformationType = transformation_type_translation;
-		static transformation_space transformationSpace = transformation_global;
-		manipulateTransformation(transform, transformationType, transformationSpace, camera, input, !inputCaptured, renderer);
+		const dx_mesh& mesh = raster.mesh->mesh;
+		mat4 m = trsToMat4(transform);
 
-		auto renderST0 = [&]()
+		scene_entity entity = { entityHandle, scene };
+		bool outline = selectedEntity == entity;
+
+		if (entity.hasComponent<animation_component>())
 		{
-			static ref<dx_vertex_buffer> prevFrameVB = 0;
-			static submesh_info prevFrameSM;
+			// Currently only one submesh in animated meshes.
 
-			trs localTransforms[128];
-			auto [vb, sm, skinningMatrices] = skinObject(stormtrooperMesh.mesh.vertexBuffer, stormtrooperMesh.submeshes[0].info, (uint32)stormtrooperMesh.skeleton.joints.size());
-			stormtrooperMesh.skeleton.sampleAnimation(stormtrooperMesh.skeleton.clips[0].name, time, localTransforms);
-			stormtrooperMesh.skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
+			auto& anim = entity.getComponent<animation_component>();
 
-			mat4 m = trsToMat4(transform);
-			renderer->opaqueRenderPass.renderAnimatedObject(vb, prevFrameVB, stormtrooperMesh.mesh.indexBuffer, sm, prevFrameSM, stormtrooperMesh.submeshes[0].material, m, m, 0, 
-				renderer->hoveredObjectID == 0);
-			renderer->sunShadowRenderPass.renderObject(0, vb, stormtrooperMesh.mesh.indexBuffer, sm, m);
-
-			prevFrameVB = vb;
-			prevFrameSM = sm;
-		};
-
-		auto renderST1 = [&]()
-		{
-			static ref<dx_vertex_buffer> prevFrameVB = 0;
-			static submesh_info prevFrameSM;
-
-			trs localTransforms[128];
-			auto [vb, sm, skinningMatrices] = skinObject(stormtrooperMesh.mesh.vertexBuffer, stormtrooperMesh.submeshes[0].info, (uint32)stormtrooperMesh.skeleton.joints.size());
-			stormtrooperMesh.skeleton.sampleAnimation(stormtrooperMesh.skeleton.clips[0].name, time + 1.5f, localTransforms);
-			stormtrooperMesh.skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
-
-			mat4 m = trsToMat4(transform);
-			m.m03 += 5.f;
-			renderer->opaqueRenderPass.renderAnimatedObject(vb, prevFrameVB, stormtrooperMesh.mesh.indexBuffer, sm, prevFrameSM, stormtrooperMesh.submeshes[0].material, m, m, 1, 
-				renderer->hoveredObjectID == 1);
-			renderer->sunShadowRenderPass.renderObject(0, vb, stormtrooperMesh.mesh.indexBuffer, sm, m);
-
-			prevFrameVB = vb;
-			prevFrameSM = sm;
-		};
-
-		static uint32 frame = 0;
-		if (frame == 0)
-		{
-			renderST0();
-			renderST1();
+			renderer->opaqueRenderPass.renderAnimatedObject(anim.vb, anim.prevFrameVB, mesh.indexBuffer, anim.sm, anim.prevFrameSM, raster.mesh->submeshes[0].material, m, m, 
+				(uint32)entityHandle, outline);
+			renderer->sunShadowRenderPass.renderObject(0, anim.vb, mesh.indexBuffer, anim.sm, m);
 		}
 		else
 		{
-			renderST1();
-			renderST0();
+			for (auto& sm : raster.mesh->submeshes)
+			{
+				submesh_info submesh = sm.info;
+				const ref<pbr_material>& material = sm.material;
+
+				renderer->opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, (uint32)entityHandle, outline);
+				renderer->sunShadowRenderPass.renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+			}
 		}
-		frame = 1 - frame;
-	}
+	});
 
 	//renderer->giRenderPass.specularReflection(reflectionsRaytracingPipeline, raytracingTLAS);
 }

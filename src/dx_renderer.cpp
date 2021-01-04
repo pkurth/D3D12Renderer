@@ -511,6 +511,16 @@ pbr_raytracing_pipeline* dx_renderer::getRaytracingPipeline()
 	return &raytracingPipeline;
 }
 
+ref<dx_texture> dx_renderer::getWhiteTexture()
+{
+	return whiteTexture;
+}
+
+ref<dx_texture> dx_renderer::getBlackTexture()
+{
+	return blackTexture;
+}
+
 void dx_renderer::endFrame(const user_input& input)
 {
 	bool aspectRatioModeChanged = settings.aspectRatioMode != oldSettings.aspectRatioMode;

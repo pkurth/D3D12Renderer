@@ -91,6 +91,9 @@ struct dx_renderer
 
 	static struct pbr_raytracing_pipeline* getRaytracingPipeline();
 
+	static ref<dx_texture> getWhiteTexture();
+	static ref<dx_texture> getBlackTexture();
+
 
 	static DXGI_FORMAT screenFormat;
 

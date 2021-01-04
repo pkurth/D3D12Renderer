@@ -223,6 +223,18 @@ void pbr_material::setupPipeline(dx_command_list* cl, const common_material_info
 	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_SUN, info.sunCBV);
 
 	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_CAMERA, info.cameraCBV);
+
+
+	// Default material properties. This is JUST to make the dynamic descriptor heap happy.
+	// These textures will NEVER be read.
+	// TODO: Remove this.
+
+	ref<dx_texture> white = dx_renderer::getWhiteTexture();
+
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 0, white);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 1, white);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 2, white);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 3, white);
 }
 
 void pbr_material::initializePipeline()
