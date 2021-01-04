@@ -1,7 +1,7 @@
 #include "outline_rs.hlsli"
 
 
-ConstantBuffer<outline_cb> outline : register(b0);
+ConstantBuffer<outline_marker_cb> outline : register(b0);
 
 struct vs_input
 {

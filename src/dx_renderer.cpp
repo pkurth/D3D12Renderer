@@ -696,17 +696,15 @@ void dx_renderer::endFrame(const user_input& input)
 	}
 
 
+	// Copy hovered object id to readback buffer.
 	if (objectIDsTexture)
 	{
 		barrier_batcher(cl)
 			.transition(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-		// Copy hovered object id to readback buffer.
 		if (input.overWindow)
 		{
-			uint32 x = (uint32)input.mouse.x;
-			uint32 y = (uint32)input.mouse.y;
-			cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID], x, y, 1, 1);
+			cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID], (uint32)input.mouse.x, (uint32)input.mouse.y, 1, 1);
 		}
 	}
 
@@ -873,7 +871,7 @@ void dx_renderer::endFrame(const user_input& input)
 				const auto& vertexBuffer = rp.drawCalls[outlined].vertexBuffer;
 				const auto& indexBuffer = rp.drawCalls[outlined].indexBuffer;
 
-				cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_cb{ viewProj * m });
+				cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * m });
 
 				cl->setVertexBuffer(0, vertexBuffer);
 				cl->setIndexBuffer(indexBuffer);
@@ -890,6 +888,7 @@ void dx_renderer::endFrame(const user_input& input)
 		cl->setPipelineState(*outlineDrawerPipeline.pipeline);
 		cl->setGraphicsRootSignature(*outlineDrawerPipeline.rootSignature);
 
+		cl->setGraphics32BitConstants(OUTLINE_RS_CB, outline_drawer_cb{ (int)renderWidth, (int)renderHeight });
 		cl->setDescriptorHeapResource(OUTLINE_RS_STENCIL, 0, 1, depthStencilBuffer->stencilSRV);
 
 		cl->drawFullscreenTriangle();

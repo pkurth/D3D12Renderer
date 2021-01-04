@@ -56,6 +56,8 @@ struct integrate_brdf_cb
 struct gaussian_blur_cb
 {
 	vec2 direction;					// [1, 0] or [0, 1], scaled by inverse screen dimensions.
+	uint32 width;
+	uint32 height;
 };
 
 void initializeTexturePreprocessing()
@@ -617,7 +619,7 @@ void gaussianBlur(dx_command_list* cl, ref<dx_texture> tex, ref<dx_texture> tmpT
 	for (uint32 i = 0; i < numIterations; ++i)
 	{
 		// Vertical pass.
-		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(0.f, invHeight) });
+		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(0.f, invHeight), tex->width, tex->height });
 		cl->setDescriptorHeapSRV(1, 0, tex);
 		cl->setDescriptorHeapUAV(1, 1, tmpTex);
 
@@ -627,7 +629,7 @@ void gaussianBlur(dx_command_list* cl, ref<dx_texture> tex, ref<dx_texture> tmpT
 
 
 		// Horizontal pass.
-		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(invWidth, 0.f) });
+		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(invWidth, 0.f), tex->width, tex->height });
 		cl->setDescriptorHeapSRV(1, 0, tmpTex);
 		cl->setDescriptorHeapUAV(1, 1, tex);
 
