@@ -553,7 +553,7 @@ void dx_renderer::endFrame(const user_input& input)
 	{
 		float relYOffset = (float)SUN_SHADOW_DIMENSIONS / (float)SHADOW_MAP_HEIGHT;
 
-		assert(numSpotLightShadowRenderPasses <= 1);
+		uint32 x = 0;
 
 		for (uint32 i = 0; i < numSpotLightShadowRenderPasses; ++i)
 		{
@@ -562,17 +562,20 @@ void dx_renderer::endFrame(const user_input& input)
 			float relWidth = (float)dimensions / (float)SHADOW_MAP_WIDTH;
 			float relHeight = (float)dimensions / (float)SHADOW_MAP_HEIGHT;
 
+			float relXOffset = (float)x / (float)SHADOW_MAP_WIDTH;
+
 			shadowInfos[i].vp = spotLightShadowRenderPasses[i]->viewProjMatrix;
-			shadowInfos[i].viewport = vec4(0.f, relYOffset, relWidth, relHeight);
+			shadowInfos[i].viewport = vec4(relXOffset, relYOffset, relWidth, relHeight);
 			shadowInfos[i].bias = 0.000005f;
 
-			shadowInfos[i].cpuViewport = vec4(0.f, SUN_SHADOW_DIMENSIONS, (float)dimensions, (float)dimensions);
+			shadowInfos[i].cpuViewport = vec4(x, SUN_SHADOW_DIMENSIONS, (float)dimensions, (float)dimensions);
+
+			x += dimensions;
 		}
 
 		shadow_info* si = (shadow_info*)mapBuffer(shadowInfoBuffer[dxContext.bufferedFrameID]);
 		memcpy(si, shadowInfos, sizeof(shadow_info) * numSpotLightShadowRenderPasses);
 		unmapBuffer(shadowInfoBuffer[dxContext.bufferedFrameID]);
-
 	}
 
 	auto cameraCBV = dxContext.uploadDynamicConstantBuffer(camera);

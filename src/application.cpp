@@ -55,12 +55,17 @@ void application::initialize(dx_renderer* renderer)
 	);
 
 	scene.createEntity("Stormtrooper 1")
-		.addComponent<trs>(vec3(0.f), quat::identity)
+		.addComponent<trs>(vec3(-5.f, 0.f, -1.f), quat::identity)
+		.addComponent<raster_component>(stormtrooperMesh)
+		.addComponent<animation_component>(1.5f);
+
+	scene.createEntity("Stormtrooper 2")
+		.addComponent<trs>(vec3(0.f, 0.f, -2.f), quat::identity)
 		.addComponent<raster_component>(stormtrooperMesh)
 		.addComponent<animation_component>(0.f);
 
-	scene.createEntity("Stormtrooper 2")
-		.addComponent<trs>(vec3(5.f, 0.f, 0.f), quat::identity)
+	scene.createEntity("Stormtrooper 3")
+		.addComponent<trs>(vec3(5.f, 0.f, -1.f), quat::identity)
 		.addComponent<raster_component>(stormtrooperMesh)
 		.addComponent<animation_component>(1.5f);
 
@@ -104,7 +109,7 @@ void application::initialize(dx_renderer* renderer)
 
 
 	const uint32 numPointLights = 0;
-	const uint32 numSpotLights = 1;
+	const uint32 numSpotLights = 2;
 
 
 	pointLights.resize(numPointLights);
@@ -125,18 +130,25 @@ void application::initialize(dx_renderer* renderer)
 		};
 	}
 
-	for (uint32 i = 0; i < numSpotLights; ++i)
+	spotLights[0] =
 	{
-		spotLights[i] =
-		{
-			{ 2.f, 3.f, 0.f }, // Position.
-			packInnerAndOuterCutoff(cos(deg2rad(20.f)), cos(deg2rad(30.f))),
-			{ 1.f, 0.f, 0.f }, // Direction.
-			25.f, // Max distance.
-			randomRGB(rng) * 5.f,
-			0 // Shadow info index.
-		};
-	}
+		{ 2.f, 3.f, 0.f }, // Position.
+		packInnerAndOuterCutoff(cos(deg2rad(20.f)), cos(deg2rad(30.f))),
+		{ 1.f, 0.f, 0.f }, // Direction.
+		25.f, // Max distance.
+		randomRGB(rng) * 5.f,
+		0 // Shadow info index.
+	};
+
+	spotLights[1] =
+	{
+		{ -2.f, 3.f, 0.f }, // Position.
+		packInnerAndOuterCutoff(cos(deg2rad(20.f)), cos(deg2rad(30.f))),
+		{ -1.f, 0.f, 0.f }, // Direction.
+		25.f, // Max distance.
+		randomRGB(rng) * 5.f,
+		1 // Shadow info index.
+	};
 
 	sun.direction = normalize(vec3(-0.6f, -1.f, -0.3f));
 	sun.color = vec3(1.f, 0.93f, 0.76f);
@@ -239,7 +251,8 @@ void application::update(const user_input& input, float dt)
 {
 	opaqueRenderPass.reset();
 	sunShadowRenderPass.reset();
-	spotShadowRenderPass.reset();
+	spotShadowRenderPasses[0].reset();
+	spotShadowRenderPasses[1].reset();
 
 	if (input.keyboard['F'].pressEvent && selectedEntity)
 	{
@@ -311,8 +324,11 @@ void application::update(const user_input& input, float dt)
 	renderer->setEnvironment(environment);
 
 
-	spotShadowRenderPass.viewProjMatrix = getSpotLightViewProjectionMatrix(spotLights[0]);
-	spotShadowRenderPass.dimensions = 2048;
+	spotShadowRenderPasses[0].viewProjMatrix = getSpotLightViewProjectionMatrix(spotLights[0]);
+	spotShadowRenderPasses[0].dimensions = 2048;
+
+	spotShadowRenderPasses[1].viewProjMatrix = getSpotLightViewProjectionMatrix(spotLights[1]);
+	spotShadowRenderPasses[1].dimensions = 2048;
 
 
 	// Upload and set lights.
@@ -375,7 +391,8 @@ void application::update(const user_input& input, float dt)
 			opaqueRenderPass.renderAnimatedObject(anim.vb, anim.prevFrameVB, mesh.indexBuffer, anim.sm, anim.prevFrameSM, raster.mesh->submeshes[0].material, m, m, 
 				(uint32)entityHandle, outline);
 			sunShadowRenderPass.renderObject(0, anim.vb, mesh.indexBuffer, anim.sm, m);
-			spotShadowRenderPass.renderObject(anim.vb, mesh.indexBuffer, anim.sm, m);
+			spotShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, anim.sm, m);
+			spotShadowRenderPasses[1].renderObject(anim.vb, mesh.indexBuffer, anim.sm, m);
 		}
 		else
 		{
@@ -386,14 +403,16 @@ void application::update(const user_input& input, float dt)
 
 				opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, (uint32)entityHandle, outline);
 				sunShadowRenderPass.renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-				spotShadowRenderPass.renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+				spotShadowRenderPasses[0].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+				spotShadowRenderPasses[1].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
 			}
 		}
 	});
 
 	renderer->submitRenderPass(&opaqueRenderPass);
 	renderer->submitRenderPass(&sunShadowRenderPass);
-	renderer->submitRenderPass(&spotShadowRenderPass);
+	renderer->submitRenderPass(&spotShadowRenderPasses[0]);
+	renderer->submitRenderPass(&spotShadowRenderPasses[1]);
 }
 
 void application::setEnvironment(const char* filename)
