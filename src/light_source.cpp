@@ -2,62 +2,97 @@
 #include "light_source.h"
 
 
-void directional_light::updateMatrices(const render_camera& camera, bool preventShimmering)
+void directional_light::updateMatrices(const render_camera& camera, bool preventRotationalShimmering)
 {
 	mat4 viewMatrix = lookAt(vec3(0.f, 0.f, 0.f), direction, vec3(0.f, 1.f, 0.f));
 
-	vec4 worldForward(camera.rotation * vec3(0.f, 0.f, -1.f), 0.f);
-	camera_frustum_corners worldFrustum = camera.getWorldSpaceFrustumCorners(cascadeDistances.w);
+	camera_frustum_corners viewFrustum = camera.getViewSpaceFrustumCorners(cascadeDistances.w);
 
-	vec4 worldBottomLeft(worldFrustum.farBottomLeft - worldFrustum.nearBottomLeft, 0.f);
-	vec4 worldBottomRight(worldFrustum.farBottomRight - worldFrustum.nearBottomRight, 0.f);
-	vec4 worldTopLeft(worldFrustum.farTopLeft - worldFrustum.nearTopLeft, 0.f);
-	vec4 worldTopRight(worldFrustum.farTopRight - worldFrustum.nearTopRight, 0.f);
+	// View space.
+	vec4 viewBottomLeft(viewFrustum.farBottomLeft - viewFrustum.nearBottomLeft, 0.f);
+	vec4 viewBottomRight(viewFrustum.farBottomRight - viewFrustum.nearBottomRight, 0.f);
+	vec4 viewTopLeft(viewFrustum.farTopLeft - viewFrustum.nearTopLeft, 0.f);
+	vec4 viewTopRight(viewFrustum.farTopRight - viewFrustum.nearTopRight, 0.f);
 
-	worldBottomLeft /= dot(worldBottomLeft, worldForward);
-	worldBottomRight /= dot(worldBottomRight, worldForward);
-	worldTopLeft /= dot(worldTopLeft, worldForward);
-	worldTopRight /= dot(worldTopRight, worldForward);
+	// Normalize to z == -1.
+	viewBottomLeft /= -viewBottomLeft.z;
+	viewBottomRight /= -viewBottomRight.z;
+	viewTopLeft /= -viewTopLeft.z;
+	viewTopRight /= -viewTopRight.z;
+
+	bounding_box initialViewSpaceBB = bounding_box::negativeInfinity();
+	initialViewSpaceBB.grow((camera.nearPlane * viewBottomLeft).xyz);
+	initialViewSpaceBB.grow((camera.nearPlane * viewBottomRight).xyz);
+	initialViewSpaceBB.grow((camera.nearPlane * viewTopLeft).xyz);
+	initialViewSpaceBB.grow((camera.nearPlane * viewTopRight).xyz);
+
+
+	// World space.
+	vec4 worldBottomLeft = vec4(camera.rotation * viewBottomLeft.xyz, 0.f);
+	vec4 worldBottomRight = vec4(camera.rotation * viewBottomRight.xyz, 0.f);
+	vec4 worldTopLeft = vec4(camera.rotation * viewTopLeft.xyz, 0.f);
+	vec4 worldTopRight = vec4(camera.rotation * viewTopRight.xyz, 0.f);
 
 	vec4 worldEye = vec4(camera.position, 1.f);
-	vec4 sunEye = viewMatrix * worldEye;
 
-	bounding_box initialBB = bounding_box::fromMinMax(sunEye.xyz, sunEye.xyz);
+	bounding_box initialWorldSpaceBB = bounding_box::negativeInfinity();
+	initialWorldSpaceBB.grow((viewMatrix * (worldEye + camera.nearPlane * worldBottomLeft)).xyz);
+	initialWorldSpaceBB.grow((viewMatrix * (worldEye + camera.nearPlane * worldBottomRight)).xyz);
+	initialWorldSpaceBB.grow((viewMatrix * (worldEye + camera.nearPlane * worldTopLeft)).xyz);
+	initialWorldSpaceBB.grow((viewMatrix * (worldEye + camera.nearPlane * worldTopRight)).xyz);
+
 
 	for (uint32 i = 0; i < numShadowCascades; ++i)
 	{
 		float distance = cascadeDistances.data[i];
 
-		vec4 sunBottomLeft = viewMatrix * (worldEye + distance * worldBottomLeft);
-		vec4 sunBottomRight = viewMatrix * (worldEye + distance * worldBottomRight);
-		vec4 sunTopLeft = viewMatrix * (worldEye + distance * worldTopLeft);
-		vec4 sunTopRight = viewMatrix * (worldEye + distance * worldTopRight);
+		bounding_box worldBB = initialWorldSpaceBB;
+		worldBB.grow((viewMatrix * (worldEye + distance * worldBottomLeft)).xyz);
+		worldBB.grow((viewMatrix * (worldEye + distance * worldBottomRight)).xyz);
+		worldBB.grow((viewMatrix * (worldEye + distance * worldTopLeft)).xyz);
+		worldBB.grow((viewMatrix * (worldEye + distance * worldTopRight)).xyz);
+		worldBB.pad(0.1f);
 
-		bounding_box bb = initialBB;
-		bb.grow(sunBottomLeft.xyz);
-		bb.grow(sunBottomRight.xyz);
-		bb.grow(sunTopLeft.xyz);
-		bb.grow(sunTopRight.xyz);
+		mat4 projMatrix;
 
-		bb.pad(vec3(2.f, 2.f, 2.f));
+		if (!preventRotationalShimmering)
+		{
+			projMatrix = createOrthographicProjectionMatrix(worldBB.minCorner.x, worldBB.maxCorner.x, worldBB.maxCorner.y, worldBB.minCorner.y,
+				-worldBB.maxCorner.z - SHADOW_MAP_NEGATIVE_Z_OFFSET, -worldBB.minCorner.z);
+		}
+		else
+		{
+			float lastDistance = i == 0 ? camera.nearPlane : cascadeDistances.data[i - 1];
 
-		mat4 projMatrix = createOrthographicProjectionMatrix(bb.minCorner.x, bb.maxCorner.x, bb.maxCorner.y, bb.minCorner.y, -bb.maxCorner.z - SHADOW_MAP_NEGATIVE_Z_OFFSET, -bb.minCorner.z);
+			bounding_box viewBB = initialViewSpaceBB;
+			viewBB.grow((distance * viewBottomLeft).xyz);
+			viewBB.grow((distance * viewBottomRight).xyz);
+			viewBB.grow((distance * viewTopLeft).xyz);
+			viewBB.grow((distance * viewTopRight).xyz);
+			viewBB.pad(0.1f);
+
+			vec3 cameraSpaceCenter = viewBB.getCenter();
+			vec3 cameraSpaceRadius3 = viewBB.getRadius();
+			float radius = length(cameraSpaceRadius3);
+
+			vec3 center = (viewMatrix * vec4(cameraSpaceCenter, 1.f)).xyz;
+
+			projMatrix = createOrthographicProjectionMatrix(center.x + radius, center.x - radius, center.y + radius, center.y - radius,
+				-worldBB.maxCorner.z - SHADOW_MAP_NEGATIVE_Z_OFFSET, -worldBB.minCorner.z);
+		}
 
 		vp[i] = projMatrix * viewMatrix;
 
-		if (preventShimmering)
-		{
-			// https://stackoverflow.com/questions/33499053/cascaded-shadow-map-shimmering
-			// Seems to only work for translation, not for rotation.
+		// Move in pixel increments.
+		// https://stackoverflow.com/questions/33499053/cascaded-shadow-map-shimmering
 
-			vec4 shadowOrigin = (vp[i] * vec4(0.f, 0.f, 0.f, 1.f)) * SUN_SHADOW_DIMENSIONS * 0.5f;
-			vec4 roundedOrigin = round(shadowOrigin);
-			vec4 roundOffset = roundedOrigin - shadowOrigin;
-			roundOffset = roundOffset * 2.f / SUN_SHADOW_DIMENSIONS;
-			roundOffset.z = 0.f;
-			roundOffset.w = 0.f;
+		vec4 shadowOrigin = (vp[i] * vec4(0.f, 0.f, 0.f, 1.f)) * SUN_SHADOW_DIMENSIONS * 0.5f;
+		vec4 roundedOrigin = round(shadowOrigin);
+		vec4 roundOffset = roundedOrigin - shadowOrigin;
+		roundOffset = roundOffset * 2.f / SUN_SHADOW_DIMENSIONS;
+		roundOffset.z = 0.f;
+		roundOffset.w = 0.f;
 
-			vp[i].col3 += roundOffset;
-		}
+		vp[i].col3 += roundOffset;
 	}
 }

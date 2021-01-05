@@ -120,6 +120,8 @@ struct render_camera
 	camera_frustum_corners getWorldSpaceFrustumCorners(float alternativeFarPlane = 0.f) const;
 	camera_frustum_planes getWorldSpaceFrustumPlanes() const;
 
+	camera_frustum_corners getViewSpaceFrustumCorners(float alternativeFarPlane = 0.f) const;
+
 	camera_projection_extents getProjectionExtents();
 
 

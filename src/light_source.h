@@ -5,7 +5,6 @@
 
 #include "light_source.hlsli"
 
-#define SUN_SHADOW_DIMENSIONS 2048
 #define SUN_SHADOW_TEXEL_SIZE (1.f / SUN_SHADOW_DIMENSIONS)
 #define SHADOW_MAP_NEGATIVE_Z_OFFSET 1000.f
 
@@ -26,6 +25,9 @@ struct directional_light
 	vec4 blendDistances;
 
 
-	void updateMatrices(const render_camera& camera, bool preventShimmering = true);
+	// 'preventRotationalShimmering' uses bounding spheres instead of bounding boxes. 
+	// This prevents shimmering along shadow edges, when the camera rotates.
+	// It slightly reduces shadow map resolution though.
+	void updateMatrices(const render_camera& camera, bool preventRotationalShimmering = true);
 };
 

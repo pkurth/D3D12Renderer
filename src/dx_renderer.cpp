@@ -147,7 +147,8 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.renderTargets(0, 0, shadowDepthFormat)
 			.inputLayout(inputLayout_position_uv_normal_tangent)
-			.cullFrontFaces();
+			//.cullFrontFaces()
+			;
 
 		shadowPipeline = createReloadablePipeline(desc, { "shadow_vs" }, rs_in_vertex_shader);
 	}

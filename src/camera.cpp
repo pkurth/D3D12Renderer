@@ -202,6 +202,31 @@ camera_frustum_planes render_camera::getWorldSpaceFrustumPlanes() const
 	return ::getWorldSpaceFrustumPlanes(viewProj);
 }
 
+camera_frustum_corners render_camera::getViewSpaceFrustumCorners(float alternativeFarPlane) const
+{
+	if (alternativeFarPlane <= 0.f)
+	{
+		alternativeFarPlane = farPlane;
+	}
+
+	float depthValue = eyeDepthToDepthBufferDepth(alternativeFarPlane);
+
+	camera_frustum_corners result;
+
+	result.eye = position;
+
+	result.nearBottomLeft = restoreViewSpacePosition(vec2(0.f, 1.f), 0.f);
+	result.nearBottomRight = restoreViewSpacePosition(vec2(1.f, 1.f), 0.f);
+	result.nearTopLeft = restoreViewSpacePosition(vec2(0.f, 0.f), 0.f);
+	result.nearTopRight = restoreViewSpacePosition(vec2(1.f, 0.f), 0.f);
+	result.farBottomLeft = restoreViewSpacePosition(vec2(0.f, 1.f), depthValue);
+	result.farBottomRight = restoreViewSpacePosition(vec2(1.f, 1.f), depthValue);
+	result.farTopLeft = restoreViewSpacePosition(vec2(0.f, 0.f), depthValue);
+	result.farTopRight = restoreViewSpacePosition(vec2(1.f, 0.f), depthValue);
+
+	return result;
+}
+
 render_camera render_camera::getJitteredVersion(vec2 offset)
 {
 	camera_projection_extents extents = getProjectionExtents();
