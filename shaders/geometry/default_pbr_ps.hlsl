@@ -44,7 +44,7 @@ StructuredBuffer<uint> spotLightIndexList		: register(t5, space2);
 StructuredBuffer<point_light_cb> pointLights	: register(t6, space2);
 StructuredBuffer<spot_light_cb> spotLights		: register(t7, space2);
 Texture2D<float> shadowMap						: register(t8, space2);
-Texture2D<float4> volumetrics					: register(t9, space2);
+StructuredBuffer<shadow_info> shadowInfos		: register(t9, space2);
 
 struct ps_output
 {
@@ -123,19 +123,36 @@ ps_output main(ps_input IN)
 			{
 				float3 L = (sl.position - IN.worldPosition) / distanceToLight;
 
+				float innerCutoff = getInnerCutoff(sl.innerAndOuterCutoff);
+				float outerCutoff = getOuterCutoff(sl.innerAndOuterCutoff);
+
 				float theta = dot(-L, sl.direction);
-				if (theta > sl.outerCutoff)
+				if (theta > outerCutoff)
 				{
 					float attenuation = getAttenuation(distanceToLight, sl.maxDistance);
 
-					float epsilon = sl.innerCutoff - sl.outerCutoff;
-					float intensity = saturate((theta - sl.outerCutoff) / epsilon);
+					float epsilon = innerCutoff - outerCutoff;
+					float intensity = saturate((theta - outerCutoff) / epsilon) * attenuation;
 
-					float totalIntensity = intensity * attenuation;
-					if (totalIntensity > 0.f)
+					if (intensity > 0.f)
 					{
-						float3 radiance = sl.radiance * totalIntensity * LIGHT_IRRADIANCE_SCALE;
-						totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
+						float visibility = 1.f;
+						if (sl.shadowInfoIndex != -1)
+						{
+							shadow_info info = shadowInfos[sl.shadowInfoIndex];
+							visibility = sampleShadowMapPCF(info.vp, IN.worldPosition,
+								shadowMap, info.viewport,
+								shadowSampler,
+								lighting.shadowMapTexelSize, info.bias);
+						}
+
+						if (visibility > 0.f)
+						{
+							float totalIntensity = intensity * visibility;
+
+							float3 radiance = sl.radiance * totalIntensity * LIGHT_IRRADIANCE_SCALE;
+							totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
+						}
 					}
 				}
 			}
@@ -147,13 +164,16 @@ ps_output main(ps_input IN)
 		float pixelDepth = dot(camera.forward.xyz, camToP);
 		float visibility = sampleCascadedShadowMapPCF(sun.vp, IN.worldPosition, 
 			shadowMap, sun.viewports,
-			shadowSampler, sun.texelSize, pixelDepth, sun.numShadowCascades,
+			shadowSampler, lighting.shadowMapTexelSize, pixelDepth, sun.numShadowCascades,
 			sun.cascadeDistances, sun.bias, sun.blendDistances);
 
-		float3 radiance = sun.radiance * visibility; // No attenuation for sun.
+		if (visibility > 0.f)
+		{
+			float3 radiance = sun.radiance * visibility;
 
-		float3 L = -sun.direction;
-		totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
+			float3 L = -sun.direction;
+			totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
+		}
 	}
 
 	// Ambient.

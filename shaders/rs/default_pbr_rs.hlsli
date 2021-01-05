@@ -5,6 +5,7 @@
 
 struct lighting_cb
 {
+    vec2 shadowMapTexelSize;
     float environmentIntensity;
 };
 
@@ -15,7 +16,7 @@ struct lighting_cb
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
     "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX),"  \
     "RootConstants(num32BitConstants=6, b0, space=1, visibility=SHADER_VISIBILITY_PIXEL),"  \
-    "RootConstants(num32BitConstants=1, b2, space=1, visibility=SHADER_VISIBILITY_PIXEL),"  \
+    "RootConstants(num32BitConstants=3, b2, space=1, visibility=SHADER_VISIBILITY_PIXEL),"  \
     "CBV(b1, space=1, visibility=SHADER_VISIBILITY_PIXEL), " \
     "DescriptorTable(SRV(t0, numDescriptors=4, space=1), visibility=SHADER_VISIBILITY_PIXEL), " \
     "CBV(b0, space=2, visibility=SHADER_VISIBILITY_PIXEL), " \

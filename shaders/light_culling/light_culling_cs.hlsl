@@ -49,7 +49,8 @@ static spot_light_bounding_volume getSpotLightBoundingVolume(spot_light_cb sl)
     result.tip = sl.position;
     result.direction = sl.direction;
     result.height = sl.maxDistance;
-    float oc = sl.outerCutoff;
+
+    float oc = getOuterCutoff(sl.innerAndOuterCutoff);
     result.radius = result.height * tan(acos(oc));// sqrt(1.f - oc * oc) / oc; // Same as height * tan(acos(oc)).
     return result;
 }

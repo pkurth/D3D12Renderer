@@ -102,11 +102,13 @@ void application::initialize(dx_renderer* renderer)
 
 	setEnvironment("assets/textures/hdri/sunset_in_the_chalk_quarry_4k.hdr");
 
-	pointLights = new point_light_cb[numPointLights];
-	lightVelocities = new vec3[numPointLights];
-	spotLights = new spot_light_cb[numSpotLights];
-	
 
+	const uint32 numPointLights = 0;
+	const uint32 numSpotLights = 1;
+
+
+	pointLights.resize(numPointLights);
+	spotLights.resize(numSpotLights);
 
 	random_number_generator rng = { 14878213 };
 	for (uint32 i = 0; i < numPointLights; ++i)
@@ -121,31 +123,18 @@ void application::initialize(dx_renderer* renderer)
 			25,
 			randomRGB(rng),
 		};
-
-		lightVelocities[i] =
-		{
-			rng.randomFloatBetween(-1.f, 1.f),
-			0.f,
-			rng.randomFloatBetween(-1.f, 1.f),
-		};
 	}
 
 	for (uint32 i = 0; i < numSpotLights; ++i)
 	{
 		spotLights[i] =
 		{
-			{
-				rng.randomFloatBetween(-100.f, 100.f),
-				10.f,
-				rng.randomFloatBetween(-100.f, 100.f),
-			},
-			0.f,
-			{
-				0.f, -1.f, 0.f
-			},
-			0.f,
-			randomRGB(rng) * 250.f,
-			25
+			{ 2.f, 3.f, 0.f }, // Position.
+			packInnerAndOuterCutoff(cos(deg2rad(20.f)), cos(deg2rad(30.f))),
+			{ 1.f, 0.f, 0.f }, // Direction.
+			25.f, // Max distance.
+			randomRGB(rng) * 5.f,
+			0 // Shadow info index.
 		};
 	}
 
@@ -250,6 +239,7 @@ void application::update(const user_input& input, float dt)
 {
 	opaqueRenderPass.reset();
 	sunShadowRenderPass.reset();
+	spotShadowRenderPass.reset();
 
 	if (input.keyboard['F'].pressEvent && selectedEntity)
 	{
@@ -301,8 +291,6 @@ void application::update(const user_input& input, float dt)
 
 	ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->settings.aspectRatioMode);
 
-	//ImGui::Image(renderer->screenVelocitiesTexture, 512, 512); // TODO: When you remove this, make renderer attributes private again.
-
 	plotAndEditTonemapping(renderer->settings.tonemap);
 	editSunShadowParameters(sun);
 
@@ -314,52 +302,39 @@ void application::update(const user_input& input, float dt)
 
 	ImGui::End();
 
-	// Update light positions.
-	const vec3 vortexCenter(0.f, 0.f, 0.f);
-	const float vortexSpeed = 0.75f;
-	const float vortexSize = 60.f;
-	for (uint32 i = 0; i < numPointLights; ++i)
-	{
-		lightVelocities[i] *= (1.f - 0.005f);
-		pointLights[i].position += lightVelocities[i] * dt;
-
-		vec3 d = pointLights[i].position - vortexCenter;
-		vec3 v = vec3(-d.z, 0.f, d.x) * vortexSpeed;
-		float factor = 1.f / (1.f + (d.x * d.x + d.z * d.z) / vortexSize);
-
-		lightVelocities[i] += (v - lightVelocities[i]) * factor;
-	}
-
-
-	//quat sunDeltaRotation(vec3(0.f, 1.f, 0.f), deg2rad(10.f) * dt);
-	//sun.direction = sunDeltaRotation * sun.direction;
 
 	sun.updateMatrices(camera);
 
+	// Set global rendering stuff.
 	renderer->setCamera(camera);
 	renderer->setSun(sun);
 	renderer->setEnvironment(environment);
 
+
+	spotShadowRenderPass.viewProjMatrix = getSpotLightViewProjectionMatrix(spotLights[0]);
+	spotShadowRenderPass.dimensions = 2048;
+
+
+	// Upload and set lights.
+	if (pointLights.size())
 	{
-		if (numPointLights)
-		{
-			point_light_cb* pls = (point_light_cb*)mapBuffer(pointLightBuffer[dxContext.bufferedFrameID]);
-			memcpy(pls, pointLights, sizeof(point_light_cb) * numPointLights);
-			unmapBuffer(pointLightBuffer[dxContext.bufferedFrameID]);
+		point_light_cb* pls = (point_light_cb*)mapBuffer(pointLightBuffer[dxContext.bufferedFrameID]);
+		memcpy(pls, pointLights.data(), sizeof(point_light_cb) * pointLights.size());
+		unmapBuffer(pointLightBuffer[dxContext.bufferedFrameID]);
 
-			renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], numPointLights);
-		}
-		if (numSpotLights)
-		{
-			spot_light_cb* sls = (spot_light_cb*)mapBuffer(spotLightBuffer[dxContext.bufferedFrameID]);
-			memcpy(sls, spotLights, sizeof(spot_light_cb) * numSpotLights);
-			unmapBuffer(spotLightBuffer[dxContext.bufferedFrameID]);
+		renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], (uint32)pointLights.size());
+	}
+	if (spotLights.size())
+	{
+		spot_light_cb* sls = (spot_light_cb*)mapBuffer(spotLightBuffer[dxContext.bufferedFrameID]);
+		memcpy(sls, spotLights.data(), sizeof(spot_light_cb) * spotLights.size());
+		unmapBuffer(spotLightBuffer[dxContext.bufferedFrameID]);
 
-			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], numSpotLights);
-		}
+		renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], (uint32)spotLights.size());
 	}
 
 
+	// Skin animated meshes.
 	scene.group<animation_component>(entt::get<raster_component>)
 		.each([dt](auto& anim, auto& raster)
 	{
@@ -381,6 +356,7 @@ void application::update(const user_input& input, float dt)
 	});
 
 
+	// Submit render calls.
 	scene.group<raster_component>(entt::get<trs>)
 		.each([this](entt::entity entityHandle, auto& raster, auto& transform)
 	{
@@ -399,6 +375,7 @@ void application::update(const user_input& input, float dt)
 			opaqueRenderPass.renderAnimatedObject(anim.vb, anim.prevFrameVB, mesh.indexBuffer, anim.sm, anim.prevFrameSM, raster.mesh->submeshes[0].material, m, m, 
 				(uint32)entityHandle, outline);
 			sunShadowRenderPass.renderObject(0, anim.vb, mesh.indexBuffer, anim.sm, m);
+			spotShadowRenderPass.renderObject(anim.vb, mesh.indexBuffer, anim.sm, m);
 		}
 		else
 		{
@@ -409,14 +386,14 @@ void application::update(const user_input& input, float dt)
 
 				opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, (uint32)entityHandle, outline);
 				sunShadowRenderPass.renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+				spotShadowRenderPass.renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
 			}
 		}
 	});
 
 	renderer->submitRenderPass(&opaqueRenderPass);
 	renderer->submitRenderPass(&sunShadowRenderPass);
-
-	//renderer->giRenderPass.specularReflection(reflectionsRaytracingPipeline, raytracingTLAS);
+	renderer->submitRenderPass(&spotShadowRenderPass);
 }
 
 void application::setEnvironment(const char* filename)

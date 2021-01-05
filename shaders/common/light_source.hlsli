@@ -30,8 +30,6 @@ struct directional_light_cb
 	vec3 radiance;
 	uint32 padding;
 	vec4 blendDistances;
-
-	vec2 texelSize;
 };
 
 struct point_light_cb
@@ -39,18 +37,52 @@ struct point_light_cb
 	vec3 position;
 	float radius; // Maximum distance.
 	vec3 radiance;
-	uint32 padding;
+	int shadowInfoIndex; // -1, if light casts no shadows.
 };
 
 struct spot_light_cb
 {
 	vec3 position;
-	float innerCutoff; // cos(innerAngle).
+	int innerAndOuterCutoff; // cos(innerAngle) << 16 | cos(outerAngle). Both are packed into 16 bit signed ints.
 	vec3 direction;
-	float outerCutoff; // cos(outerAngle).
-	vec3 radiance;
 	float maxDistance;
+	vec3 radiance;
+	int shadowInfoIndex; // -1, if light casts no shadows.
 };
+
+struct shadow_info
+{
+	mat4 vp;
+	vec4 viewport;
+	float bias;
+
+	float padding0[3];
+
+	vec4 cpuViewport;
+
+	vec4 padding1;
+};
+
+#ifndef HLSL
+static_assert(sizeof(shadow_info) == sizeof(mat4) * 2, "");
+#endif
+
+static float getInnerCutoff(int innerAndOuterCutoff)
+{
+	return (innerAndOuterCutoff >> 16) / float((1 << 15) - 1);
+}
+
+static float getOuterCutoff(int innerAndOuterCutoff)
+{
+	return (innerAndOuterCutoff & 0xFFFF) / float((1 << 15) - 1);
+}
+
+static int packInnerAndOuterCutoff(float innerCutoff, float outerCutoff)
+{
+	int inner = (int)(innerCutoff * ((1 << 15) - 1));
+	int outer = (int)(outerCutoff * ((1 << 15) - 1));
+	return (inner << 16) | outer;
+}
 
 #ifdef HLSL
 static float sampleShadowMapSimple(float4x4 vp, float3 worldPosition, 

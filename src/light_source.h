@@ -34,3 +34,5 @@ struct directional_light
 	void updateMatrices(const render_camera& camera, bool preventRotationalShimmering = true);
 };
 
+mat4 getSpotLightViewProjectionMatrix(const spot_light_cb& sl);
+

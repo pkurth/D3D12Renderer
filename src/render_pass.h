@@ -197,6 +197,9 @@ private:
 
 struct spot_shadow_render_pass : shadow_render_pass
 {
+	mat4 viewProjMatrix;
+	uint32 dimensions;
+
 	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
 
 	void reset();

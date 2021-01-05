@@ -36,12 +36,8 @@ private:
 	ref<pbr_environment> environment;
 
 
-	static const uint32 numPointLights = 0;
-	static const uint32 numSpotLights = 0;
-
-	point_light_cb* pointLights;
-	spot_light_cb* spotLights;
-	vec3* lightVelocities;
+	std::vector<point_light_cb> pointLights;
+	std::vector<spot_light_cb> spotLights;
 
 	directional_light sun;
 
@@ -56,4 +52,5 @@ private:
 
 	opaque_render_pass opaqueRenderPass;
 	sun_shadow_render_pass sunShadowRenderPass;
+	spot_shadow_render_pass spotShadowRenderPass;
 };

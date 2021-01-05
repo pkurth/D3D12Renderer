@@ -15,6 +15,28 @@
 #include "volumetrics_rs.hlsli"
 
 
+/*
+	The layout of our shadow map is:
+	_________________________________
+	|		|		|		|		|
+	| Sun 0 | Sun 1 | Sun 2 | Sun 3 |
+	|_______|_______|_______|_______|
+	|								|
+	|								|
+	|								|
+	|								|
+	|								|
+	|								|
+	|_______________________________|
+
+	Sun 0-3 are the sun cascades.
+	The space at the bottom is free for the application to use for shadow casters other than the sun.
+*/
+
+
+#define SHADOW_MAP_WIDTH (SUN_SHADOW_DIMENSIONS * MAX_NUM_SUN_SHADOW_CASCADES)
+#define SHADOW_MAP_HEIGHT 8192
+
 enum aspect_ratio_mode
 {
 	aspect_ratio_free,
@@ -100,6 +122,7 @@ struct dx_renderer
 
 	static ref<dx_texture> getWhiteTexture();
 	static ref<dx_texture> getBlackTexture();
+	static ref<dx_texture> getShadowMap();
 
 	static dx_cpu_descriptor_handle nullTextureSRV;
 	static dx_cpu_descriptor_handle nullBufferSRV;
@@ -158,6 +181,7 @@ private:
 
 	ref<dx_buffer> hoveredObjectIDReadbackBuffer[NUM_BUFFERED_FRAMES];
 
+	ref<dx_buffer> shadowInfoBuffer[NUM_BUFFERED_FRAMES];
 
 
 	ref<pbr_environment> environment;
