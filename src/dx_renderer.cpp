@@ -25,14 +25,8 @@ static ref<dx_texture> whiteTexture;
 static ref<dx_texture> blackTexture;
 static ref<dx_texture> blackCubeTexture;
 
-
-// TODO: When using multiple renderers, these should not be here (I guess).
-static ref<dx_buffer> pointLightBuffer[NUM_BUFFERED_FRAMES];
-static ref<dx_buffer> spotLightBuffer[NUM_BUFFERED_FRAMES];
-
-
-static dx_render_target sunShadowRenderTarget[MAX_NUM_SUN_SHADOW_CASCADES];
-static ref<dx_texture> sunShadowCascadeTextures[MAX_NUM_SUN_SHADOW_CASCADES];
+static ref<dx_texture> shadowMap;
+static dx_render_target shadowRenderTarget;
 
 static dx_pipeline clearObjectIDsPipeline;
 
@@ -65,8 +59,6 @@ static pbr_specular_reflections_raytracing_pipeline raytracingPipeline;
 static dx_mesh positionOnlyMesh;
 
 static submesh_info cubeMesh;
-static submesh_info sphereMesh;
-
 
 
 
@@ -75,6 +67,9 @@ static ref<dx_texture> brdfTex;
 
 
 DXGI_FORMAT dx_renderer::screenFormat;
+
+dx_cpu_descriptor_handle dx_renderer::nullTextureSRV;
+dx_cpu_descriptor_handle dx_renderer::nullBufferSRV;
 
 
 static bool performedSkinning;
@@ -104,20 +99,18 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		SET_NAME(blackCubeTexture->resource, "Black cube");
 	}
 
+	nullTextureSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createNullTextureSRV();
+	nullBufferSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createNullBufferSRV();
+
 	initializeTexturePreprocessing();
 	initializeSkinning();
 
-	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
-	{
-		pointLightBuffer[i] = createUploadBuffer(sizeof(point_light_cb), MAX_NUM_POINT_LIGHTS_PER_FRAME, 0);
-		spotLightBuffer[i] = createUploadBuffer(sizeof(spot_light_cb), MAX_NUM_SPOT_LIGHTS_PER_FRAME, 0);
-	}
 
-	for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
-	{
-		sunShadowCascadeTextures[i] = createDepthTexture(SUN_SHADOW_DIMENSIONS, SUN_SHADOW_DIMENSIONS, shadowDepthFormat, 1, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		sunShadowRenderTarget[i].pushDepthStencilAttachment(sunShadowCascadeTextures[i]);
-	}
+	shadowMap = createDepthTexture(
+		SUN_SHADOW_DIMENSIONS * MAX_NUM_SUN_SHADOW_CASCADES,
+		SUN_SHADOW_DIMENSIONS, dx_renderer::shadowDepthFormat, 1, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+	shadowRenderTarget.pushDepthStencilAttachment(shadowMap);
 
 
 	// Sky.
@@ -253,7 +246,6 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	{
 		cpu_mesh mesh(mesh_creation_flags_with_positions);
 		cubeMesh = mesh.pushCube(1.f);
-		sphereMesh = mesh.pushIcoSphere(1.f, 2);
 		positionOnlyMesh = mesh.createDXMesh();
 	}
 
@@ -372,11 +364,16 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 		unmapBuffer(hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID]);
 	}
 
-	opaqueRenderPass.reset();
-	transparentRenderPass.reset();
-	sunShadowRenderPass.reset();
-	visualizationRenderPass.reset();
-	giRenderPass.reset();
+	opaqueRenderPass = 0;
+	sunShadowRenderPass = 0;
+	numSpotLightShadowRenderPasses = 0;
+
+	pointLights = 0;
+	spotLights = 0;
+	numPointLights = 0;
+	numSpotLights = 0;
+
+	environment = 0;
 }
 
 void dx_renderer::recalculateViewport(bool resizeTextures)
@@ -493,15 +490,22 @@ void dx_renderer::setSun(const directional_light& light)
 	sun.numShadowCascades = light.numShadowCascades;
 
 	memcpy(sun.vp, light.vp, sizeof(mat4) * light.numShadowCascades);
+
+	sun.viewports[0] = vec4(0.f, 0.f, 0.25f, 1.f);
+	sun.viewports[1] = vec4(0.25f, 0.f, 0.25f, 1.f);
+	sun.viewports[2] = vec4(0.5f, 0.f, 0.25f, 1.f);
+	sun.viewports[3] = vec4(0.75f, 0.f, 0.25f, 1.f);
+
+	sun.texelSize = vec2(1.f / (SUN_SHADOW_DIMENSIONS * 4), 1.f / SUN_SHADOW_DIMENSIONS);
 }
 
-void dx_renderer::setPointLights(const point_light_cb* lights, uint32 numLights)
+void dx_renderer::setPointLights(const ref<dx_buffer>& lights, uint32 numLights)
 {
 	pointLights = lights;
 	numPointLights = numLights;
 }
 
-void dx_renderer::setSpotLights(const spot_light_cb* lights, uint32 numLights)
+void dx_renderer::setSpotLights(const ref<dx_buffer>& lights, uint32 numLights)
 {
 	spotLights = lights;
 	numSpotLights = numLights;
@@ -552,12 +556,9 @@ void dx_renderer::endFrame(const user_input& input)
 	materialInfo.lightGrid = lightCullingBuffers.lightGrid;
 	materialInfo.pointLightIndexList = lightCullingBuffers.pointLightIndexList;
 	materialInfo.spotLightIndexList = lightCullingBuffers.spotLightIndexList;
-	materialInfo.pointLightBuffer = pointLightBuffer[dxContext.bufferedFrameID];
-	materialInfo.spotLightBuffer = spotLightBuffer[dxContext.bufferedFrameID];
-	for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
-	{
-		materialInfo.sunShadowCascades[i] = sunShadowCascadeTextures[i];
-	}
+	materialInfo.pointLightBuffer = pointLights;
+	materialInfo.spotLightBuffer = spotLights;
+	materialInfo.shadowMap = shadowMap;
 	materialInfo.volumetricsTexture = volumetricsTexture;
 	materialInfo.cameraCBV = cameraCBV;
 	materialInfo.sunCBV = sunCBV;
@@ -571,7 +572,7 @@ void dx_renderer::endFrame(const user_input& input)
 		.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
 		.transition(objectIDsTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 		.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
-		.transition(sunShadowCascadeTextures, MAX_NUM_SUN_SHADOW_CASCADES, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+		.transition(shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 
 	cl->clearDepthAndStencil(depthStencilBuffer->dsvHandle);
@@ -642,12 +643,12 @@ void dx_renderer::endFrame(const user_input& input)
 	cl->setViewport(depthOnlyRenderTarget.viewport);
 
 	// Static.
-	if (opaqueRenderPass.staticDepthOnlyDrawCalls.size() > 0)
+	if (opaqueRenderPass && opaqueRenderPass->staticDepthOnlyDrawCalls.size() > 0)
 	{
 		cl->setPipelineState(*depthOnlyPipeline.pipeline);
 		cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
 
-		for (const auto& dc : opaqueRenderPass.staticDepthOnlyDrawCalls)
+		for (const auto& dc : opaqueRenderPass->staticDepthOnlyDrawCalls)
 		{
 			const mat4& m = dc.transform;
 			const submesh_info& submesh = dc.submesh;
@@ -662,12 +663,12 @@ void dx_renderer::endFrame(const user_input& input)
 	}
 
 	// Dynamic.
-	if (opaqueRenderPass.dynamicDepthOnlyDrawCalls.size() > 0)
+	if (opaqueRenderPass && opaqueRenderPass->dynamicDepthOnlyDrawCalls.size() > 0)
 	{
 		cl->setPipelineState(*depthOnlyPipeline.pipeline);
 		cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
 
-		for (const auto& dc : opaqueRenderPass.dynamicDepthOnlyDrawCalls)
+		for (const auto& dc : opaqueRenderPass->dynamicDepthOnlyDrawCalls)
 		{
 			const mat4& m = dc.transform;
 			const mat4& prevFrameM = dc.prevFrameTransform;
@@ -683,12 +684,12 @@ void dx_renderer::endFrame(const user_input& input)
 	}
 
 	// Animated.
-	if (opaqueRenderPass.animatedDepthOnlyDrawCalls.size() > 0)
+	if (opaqueRenderPass && opaqueRenderPass->animatedDepthOnlyDrawCalls.size() > 0)
 	{
 		cl->setPipelineState(*animatedDepthOnlyPipeline.pipeline);
 		cl->setGraphicsRootSignature(*animatedDepthOnlyPipeline.rootSignature);
 
-		for (const auto& dc : opaqueRenderPass.animatedDepthOnlyDrawCalls)
+		for (const auto& dc : opaqueRenderPass->animatedDepthOnlyDrawCalls)
 		{
 			const mat4& m = dc.transform;
 			const mat4& prevFrameM = dc.prevFrameTransform;
@@ -726,20 +727,6 @@ void dx_renderer::endFrame(const user_input& input)
 
 	if (numPointLights || numSpotLights)
 	{
-		if (numPointLights)
-		{
-			point_light_cb* pls = (point_light_cb*)mapBuffer(pointLightBuffer[dxContext.bufferedFrameID]);
-			memcpy(pls, pointLights, sizeof(point_light_cb) * numPointLights);
-			unmapBuffer(pointLightBuffer[dxContext.bufferedFrameID]);
-		}
-		if (numSpotLights)
-		{
-			spot_light_cb* sls = (spot_light_cb*)mapBuffer(spotLightBuffer[dxContext.bufferedFrameID]);
-			memcpy(sls, spotLights, sizeof(spot_light_cb) * numSpotLights);
-			unmapBuffer(spotLightBuffer[dxContext.bufferedFrameID]);
-		}
-
-
 		// Tiled frusta.
 		cl->setPipelineState(*worldSpaceFrustaPipeline.pipeline);
 		cl->setComputeRootSignature(*worldSpaceFrustaPipeline.rootSignature);
@@ -756,8 +743,8 @@ void dx_renderer::endFrame(const user_input& input)
 		cl->setComputeDynamicConstantBuffer(LIGHT_CULLING_RS_CAMERA, cameraCBV);
 		cl->setCompute32BitConstants(LIGHT_CULLING_RS_CB, light_culling_cb{ lightCullingBuffers.numTilesX, numPointLights, numSpotLights });
 		cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 0, depthStencilBuffer);
-		cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 1, pointLightBuffer[dxContext.bufferedFrameID]);
-		cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 2, spotLightBuffer[dxContext.bufferedFrameID]);
+		cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 1, pointLights);
+		cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 2, spotLights);
 		cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 3, lightCullingBuffers.tiledFrusta);
 		cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 4, lightCullingBuffers.lightIndexCounter);
 		cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 5, lightCullingBuffers.pointLightIndexList);
@@ -772,33 +759,39 @@ void dx_renderer::endFrame(const user_input& input)
 	// SHADOW MAP PASS
 	// ----------------------------------------
 
-	cl->setPipelineState(*shadowPipeline.pipeline);
-	cl->setGraphicsRootSignature(*shadowPipeline.rootSignature);
+	cl->clearDepth(shadowRenderTarget);
 
-	for (uint32 i = 0; i < sun.numShadowCascades; ++i)
+	if (sunShadowRenderPass)
 	{
-		cl->setRenderTarget(sunShadowRenderTarget[i]);
-		cl->setViewport(sunShadowRenderTarget[i].viewport);
-		cl->clearDepth(sunShadowRenderTarget[i]);
+		cl->setPipelineState(*shadowPipeline.pipeline);
+		cl->setGraphicsRootSignature(*shadowPipeline.rootSignature);
 
-		for (uint32 cascade = 0; cascade <= i; ++cascade)
+		cl->setRenderTarget(shadowRenderTarget);
+		cl->clearDepth(shadowRenderTarget);
+
+		for (uint32 i = 0; i < sun.numShadowCascades; ++i)
 		{
-			for (const auto& dc : sunShadowRenderPass.drawCalls[cascade])
+			cl->setViewport((float)(i * SUN_SHADOW_DIMENSIONS), 0.f, SUN_SHADOW_DIMENSIONS, SUN_SHADOW_DIMENSIONS);
+
+			for (uint32 cascade = 0; cascade <= i; ++cascade)
 			{
-				const mat4& m = dc.transform;
-				const submesh_info& submesh = dc.submesh;
-				cl->setGraphics32BitConstants(SHADOW_RS_MVP, sun.vp[i] * m);
+				for (const auto& dc : sunShadowRenderPass->drawCalls[cascade])
+				{
+					const mat4& m = dc.transform;
+					const submesh_info& submesh = dc.submesh;
+					cl->setGraphics32BitConstants(SHADOW_RS_MVP, sun.vp[i] * m);
 
-				cl->setVertexBuffer(0, dc.vertexBuffer);
-				cl->setIndexBuffer(dc.indexBuffer);
+					cl->setVertexBuffer(0, dc.vertexBuffer);
+					cl->setIndexBuffer(dc.indexBuffer);
 
-				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+				}
 			}
 		}
 	}
 
 	barrier_batcher(cl)
-		.transition(sunShadowCascadeTextures, MAX_NUM_SUN_SHADOW_CASCADES, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		.transition(shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 
 
@@ -827,14 +820,14 @@ void dx_renderer::endFrame(const user_input& input)
 	// LIGHT PASS
 	// ----------------------------------------
 
-	cl->setRenderTarget(hdrRenderTarget);
-	cl->setViewport(hdrRenderTarget.viewport);
-
-	if (opaqueRenderPass.drawCalls.size() > 0)
+	if (opaqueRenderPass && opaqueRenderPass->drawCalls.size() > 0)
 	{
+		cl->setRenderTarget(hdrRenderTarget);
+		cl->setViewport(hdrRenderTarget.viewport);
+
 		material_setup_function lastSetupFunc = 0;
 
-		for (const auto& dc : opaqueRenderPass.drawCalls)
+		for (const auto& dc : opaqueRenderPass->drawCalls)
 		{
 			const mat4& m = dc.transform;
 			const submesh_info& submesh = dc.submesh;
@@ -865,7 +858,7 @@ void dx_renderer::endFrame(const user_input& input)
 	// OUTLINES
 	// ----------------------------------------
 
-	if (opaqueRenderPass.outlinedObjects.size() > 0)
+	if (opaqueRenderPass && opaqueRenderPass->outlinedObjects.size() > 0)
 	{
 		cl->setStencilReference(stencil_flag_selected_object);
 
@@ -890,8 +883,8 @@ void dx_renderer::endFrame(const user_input& input)
 			}
 		};
 
-		mark(opaqueRenderPass, cl, camera.viewProj);
-		mark(transparentRenderPass, cl, camera.viewProj);
+		mark(*opaqueRenderPass, cl, camera.viewProj);
+		//mark(transparentRenderPass, cl, camera.viewProj);
 
 		// Draw outline.
 		cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ);
@@ -913,7 +906,7 @@ void dx_renderer::endFrame(const user_input& input)
 	// RAYTRACING
 	// ----------------------------------------
 
-#if 1
+#if 0
 	if (dxContext.raytracingSupported && giRenderPass.bindingTable)
 	{
 		raytracingPipeline.render(cl, *giRenderPass.bindingTable, *giRenderPass.tlas,
@@ -935,7 +928,7 @@ void dx_renderer::endFrame(const user_input& input)
 	// HELPER STUFF
 	// ----------------------------------------
 
-
+#if 0
 	if (visualizationRenderPass.drawCalls.size() > 0)
 	{
 		cl->setPipelineState(*flatSimplePipeline.pipeline);
@@ -954,24 +947,7 @@ void dx_renderer::endFrame(const user_input& input)
 			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 		}
 	}
-
-
-	if (settings.showLightVolumes)
-	{
-		// Light volumes.
-		cl->setPipelineState(*flatUnlitPipeline.pipeline);
-		cl->setGraphicsRootSignature(*flatUnlitPipeline.rootSignature);
-		cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
-		cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
-
-		for (uint32 i = 0; i < numPointLights; ++i)
-		{
-			float radius = pointLights[i].radius;
-			vec3 position = pointLights[i].position;
-			cl->setGraphics32BitConstants(0, camera.viewProj * createModelMatrix(position, quat::identity, vec3(radius, radius, radius)));
-			cl->drawIndexed(sphereMesh.numTriangles * 3, 1, sphereMesh.firstTriangle * 3, sphereMesh.baseVertex, 0);
-		}
-	}
+#endif
 
 
 

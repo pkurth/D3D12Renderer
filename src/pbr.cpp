@@ -203,6 +203,9 @@ void pbr_material::prepareForRendering(dx_command_list* cl)
 
 void pbr_material::setupPipeline(dx_command_list* cl, const common_material_info& info)
 {
+	dx_cpu_descriptor_handle nullTexture = dx_renderer::nullTextureSRV;
+	dx_cpu_descriptor_handle nullBuffer = dx_renderer::nullBufferSRV;
+
 	cl->setPipelineState(*defaultPBRPipeline.pipeline);
 	cl->setGraphicsRootSignature(*defaultPBRPipeline.rootSignature);
 
@@ -213,13 +216,10 @@ void pbr_material::setupPipeline(dx_command_list* cl, const common_material_info
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 3, info.lightGrid);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 4, info.pointLightIndexList);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 5, info.spotLightIndexList);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 6, info.pointLightBuffer);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 7, info.spotLightBuffer);
-	for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
-	{
-		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 8 + i, info.sunShadowCascades[i]);
-	}
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 12, info.volumetricsTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 6, info.pointLightBuffer ? info.pointLightBuffer->defaultSRV : nullBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 7, info.spotLightBuffer ? info.spotLightBuffer->defaultSRV : nullBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 8, info.shadowMap);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 9, info.volumetricsTexture);
 	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_SUN, info.sunCBV);
 
 	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_CAMERA, info.cameraCBV);
@@ -229,12 +229,10 @@ void pbr_material::setupPipeline(dx_command_list* cl, const common_material_info
 	// These textures will NEVER be read.
 	// TODO: Remove this.
 
-	ref<dx_texture> white = dx_renderer::getWhiteTexture();
-
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 0, white);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 1, white);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 2, white);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 3, white);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 0, nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 1, nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 2, nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 3, nullTexture);
 }
 
 void pbr_material::initializePipeline()

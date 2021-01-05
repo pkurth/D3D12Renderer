@@ -409,11 +409,11 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 
 		for (uint32 i = 0; i < 3; ++i)
 		{
-			renderer->visualizationRenderPass.renderObject(mesh.vertexBuffer, mesh.indexBuffer,
+			/*renderer->visualizationRenderPass.renderObject(mesh.vertexBuffer, mesh.indexBuffer,
 				submeshes[type],
 				createModelMatrix(transform.position, rotations[i]),
 				colors[i] * (highlightAxis == i ? 0.5f : 1.f)
-			);
+			);*/
 		}
 	}
 
@@ -435,10 +435,11 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 
 		for (uint32 i = 0; i < 3; ++i)
 		{
-			renderer->visualizationRenderPass.renderObject(mesh.vertexBuffer, mesh.indexBuffer,
+			/*renderer->visualizationRenderPass.renderObject(mesh.vertexBuffer, mesh.indexBuffer,
 				planeSubmesh,
 				createModelMatrix(transform.position, rotations[i]),
-				colors[i] * (highlightAxis == (i + 3) ? 0.5f : 1.f));
+				colors[i] * (highlightAxis == (i + 3) ? 0.5f : 1.f)
+			);*/
 		}
 	}
 	

@@ -18,7 +18,7 @@ struct common_material_info
 	ref<dx_buffer> pointLightBuffer;
 	ref<dx_buffer> spotLightBuffer;
 
-	ref<dx_texture> sunShadowCascades[MAX_NUM_SUN_SHADOW_CASCADES];
+	ref<dx_texture> shadowMap;
 
 	ref<dx_texture> volumetricsTexture;
 

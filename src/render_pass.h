@@ -16,6 +16,8 @@ struct raytracing_tlas;
 // Base for both opaque and transparent pass.
 struct geometry_render_pass
 {
+	void reset();
+
 protected:
 	template <typename material_t>
 	void common(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
@@ -45,8 +47,6 @@ protected:
 			);
 		}
 	}
-
-	void reset();
 
 private:
 	struct draw_call
@@ -115,9 +115,9 @@ struct opaque_render_pass : geometry_render_pass
 		);
 	}
 
-private:
 	void reset();
 
+private:
 	struct static_depth_only_draw_call
 	{
 		const mat4 transform;
@@ -167,14 +167,10 @@ struct transparent_render_pass : geometry_render_pass
 	}
 };
 
-struct sun_shadow_render_pass
+// Base for all shadow map passes.
+struct shadow_render_pass
 {
-	// Since each cascade includes the next lower one, if you submit a draw to cascade N, it will also be rendered in N-1 automatically. No need to add it to the lower one.
-	void renderObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
-
-private:
-	void reset();
-
+protected:
 	struct draw_call
 	{
 		const mat4 transform;
@@ -183,43 +179,33 @@ private:
 		submesh_info submesh;
 	};
 
+	friend struct dx_renderer;
+};
+
+struct sun_shadow_render_pass : shadow_render_pass
+{
+	// Since each cascade includes the next lower one, if you submit a draw to cascade N, it will also be rendered in N-1 automatically. No need to add it to the lower one.
+	void renderObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+
+	void reset();
+
+private:
 	std::vector<draw_call> drawCalls[MAX_NUM_SUN_SHADOW_CASCADES];
 
 	friend struct dx_renderer;
 };
 
-struct visualization_render_pass
+struct spot_shadow_render_pass : shadow_render_pass
 {
-	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform, vec4 color);
+	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
 
-private:
 	void reset();
 
-	struct draw_call
-	{
-		const mat4 transform;
-		ref<dx_vertex_buffer> vertexBuffer;
-		ref<dx_index_buffer> indexBuffer;
-		submesh_info submesh;
-
-		vec4 color;
-	};
-
+private:
 	std::vector<draw_call> drawCalls;
 
 	friend struct dx_renderer;
 };
 
-struct global_illumination_render_pass
-{
-	void specularReflection(pbr_raytracing_binding_table& bindingTable, raytracing_tlas& tlas);
 
-private:
-	void reset();
-
-	pbr_raytracing_binding_table* bindingTable;
-	raytracing_tlas* tlas;
-
-	friend struct dx_renderer;
-};
 

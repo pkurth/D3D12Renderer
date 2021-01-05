@@ -157,6 +157,22 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createRawBufferSRV(const ref
 	return *this;
 }
 
+dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createNullBufferSRV()
+{
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Buffer.FirstElement = 0;
+	srvDesc.Buffer.NumElements = 1;
+	srvDesc.Buffer.StructureByteStride = 0;
+	srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+
+	dxContext.device->CreateShaderResourceView(0, &srvDesc, cpuHandle);
+
+	return *this;
+}
+
 dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::create2DTextureUAV(const ref<dx_texture>& texture, uint32 mipSlice, DXGI_FORMAT overrideFormat)
 {
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -251,6 +267,17 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createBufferUintUAV(const re
 	uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 
 	dxContext.device->CreateUnorderedAccessView(buffer->resource.Get(), 0, &uavDesc, cpuHandle);
+
+	return *this;
+}
+
+dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createNullBufferUAV()
+{
+	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+	uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+
+	dxContext.device->CreateUnorderedAccessView(0, 0, &uavDesc, cpuHandle);
 
 	return *this;
 }

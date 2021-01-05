@@ -318,6 +318,12 @@ void dx_command_list::setViewport(const D3D12_VIEWPORT& viewport)
 	commandList->RSSetViewports(1, &viewport);
 }
 
+void dx_command_list::setViewport(float x, float y, float width, float height, float minDepth, float maxDepth)
+{
+	D3D12_VIEWPORT viewport = { x, y, width, height, minDepth, maxDepth };
+	setViewport(viewport);
+}
+
 void dx_command_list::setScissor(const D3D12_RECT& scissor)
 {
 	commandList->RSSetScissorRects(1, &scissor);

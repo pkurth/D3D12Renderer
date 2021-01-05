@@ -43,8 +43,8 @@ StructuredBuffer<uint> pointLightIndexList		: register(t4, space2);
 StructuredBuffer<uint> spotLightIndexList		: register(t5, space2);
 StructuredBuffer<point_light_cb> pointLights	: register(t6, space2);
 StructuredBuffer<spot_light_cb> spotLights		: register(t7, space2);
-Texture2D<float> sunShadowCascades[4]			: register(t8, space2);
-Texture2D<float4> volumetrics					: register(t12, space2);
+Texture2D<float> shadowMap						: register(t8, space2);
+Texture2D<float4> volumetrics					: register(t9, space2);
 
 struct ps_output
 {
@@ -145,7 +145,9 @@ ps_output main(ps_input IN)
 	// Sun.
 	{
 		float pixelDepth = dot(camera.forward.xyz, camToP);
-		float visibility = sampleCascadedShadowMapPCF(sun.vp, IN.worldPosition, sunShadowCascades, shadowSampler, SUN_SHADOW_TEXEL_SIZE, pixelDepth, sun.numShadowCascades,
+		float visibility = sampleCascadedShadowMapPCF(sun.vp, IN.worldPosition, 
+			shadowMap, sun.viewports,
+			shadowSampler, sun.texelSize, pixelDepth, sun.numShadowCascades,
 			sun.cascadeDistances, sun.bias, sun.blendDistances);
 
 		float3 radiance = sun.radiance * visibility; // No attenuation for sun.

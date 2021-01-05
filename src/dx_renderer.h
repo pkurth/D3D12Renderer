@@ -15,9 +15,6 @@
 #include "volumetrics_rs.hlsli"
 
 
-#define MAX_NUM_POINT_LIGHTS_PER_FRAME 4096
-#define MAX_NUM_SPOT_LIGHTS_PER_FRAME 4096
-
 enum aspect_ratio_mode
 {
 	aspect_ratio_free,
@@ -48,7 +45,6 @@ struct renderer_settings
 	float raytracingFadeoutDistance = 80.f;
 
 	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
-	bool showLightVolumes = false;
 };
 
 struct dx_renderer
@@ -70,15 +66,26 @@ struct dx_renderer
 	void setEnvironment(const ref<pbr_environment>& environment);
 	void setSun(const directional_light& light);
 
-	void setPointLights(const point_light_cb* lights, uint32 numLights);
-	void setSpotLights(const spot_light_cb* lights, uint32 numLights);
+	void setPointLights(const ref<dx_buffer>& lights, uint32 numLights);
+	void setSpotLights(const ref<dx_buffer>& lights, uint32 numLights);
 
+	void submitRenderPass(opaque_render_pass* renderPass)
+	{
+		assert(!opaqueRenderPass);
+		opaqueRenderPass = renderPass;
+	}
 
-	opaque_render_pass opaqueRenderPass;
-	transparent_render_pass transparentRenderPass;
-	sun_shadow_render_pass sunShadowRenderPass;
-	visualization_render_pass visualizationRenderPass;
-	global_illumination_render_pass giRenderPass;
+	void submitRenderPass(sun_shadow_render_pass* renderPass)
+	{
+		assert(!sunShadowRenderPass);
+		sunShadowRenderPass = renderPass;
+	}
+
+	void submitRenderPass(spot_shadow_render_pass* renderPass)
+	{
+		assert(numSpotLightShadowRenderPasses < MAX_NUM_SPOT_LIGHT_SHADOW_PASSES);
+		spotLightShadowRenderPasses[numSpotLightShadowRenderPasses++] = renderPass;
+	}
 
 	
 	renderer_settings settings;
@@ -94,6 +101,9 @@ struct dx_renderer
 	static ref<dx_texture> getWhiteTexture();
 	static ref<dx_texture> getBlackTexture();
 
+	static dx_cpu_descriptor_handle nullTextureSRV;
+	static dx_cpu_descriptor_handle nullBufferSRV;
+
 
 	static DXGI_FORMAT screenFormat;
 
@@ -104,7 +114,7 @@ struct dx_renderer
 	static constexpr DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	static constexpr DXGI_FORMAT raytracedReflectionsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
-//private:
+private:
 
 	struct light_culling_buffers
 	{
@@ -119,6 +129,12 @@ struct dx_renderer
 		uint32 numTilesX;
 		uint32 numTilesY;
 	};
+
+
+	opaque_render_pass* opaqueRenderPass;
+	sun_shadow_render_pass* sunShadowRenderPass;
+	spot_shadow_render_pass* spotLightShadowRenderPasses[MAX_NUM_SPOT_LIGHT_SHADOW_PASSES];
+	uint32 numSpotLightShadowRenderPasses;
 
 
 	uint32 windowWidth;
@@ -145,8 +161,8 @@ struct dx_renderer
 
 
 	ref<pbr_environment> environment;
-	const point_light_cb* pointLights;
-	const spot_light_cb* spotLights;
+	ref<dx_buffer> pointLights;
+	ref<dx_buffer> spotLights;
 	uint32 numPointLights;
 	uint32 numSpotLights;
 

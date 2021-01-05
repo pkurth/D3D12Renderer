@@ -41,7 +41,7 @@ void sun_shadow_render_pass::reset()
 	}
 }
 
-void visualization_render_pass::renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform, vec4 color)
+void spot_shadow_render_pass::renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
 {
 	drawCalls.push_back(
 		{
@@ -49,24 +49,11 @@ void visualization_render_pass::renderObject(const ref<dx_vertex_buffer>& vertex
 			vertexBuffer,
 			indexBuffer,
 			submesh,
-			color
 		}
 	);
 }
 
-void visualization_render_pass::reset()
+void spot_shadow_render_pass::reset()
 {
 	drawCalls.clear();
-}
-
-void global_illumination_render_pass::specularReflection(pbr_raytracing_binding_table& bindingTable, raytracing_tlas& tlas)
-{
-	this->bindingTable = &bindingTable;
-	this->tlas = &tlas;
-}
-
-void global_illumination_render_pass::reset()
-{
-	bindingTable = 0;
-	tlas = 0;
 }

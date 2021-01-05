@@ -39,6 +39,7 @@ struct dx_cpu_descriptor_handle
 	dx_cpu_descriptor_handle& createNullTextureSRV();
 	dx_cpu_descriptor_handle& createBufferSRV(const ref<dx_buffer>& buffer, buffer_range bufferRange = {});
 	dx_cpu_descriptor_handle& createRawBufferSRV(const ref<dx_buffer>& buffer, buffer_range bufferRange = {});
+	dx_cpu_descriptor_handle& createNullBufferSRV();
 	dx_cpu_descriptor_handle& create2DTextureUAV(const ref<dx_texture>& texture, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_cpu_descriptor_handle& create2DTextureArrayUAV(const ref<dx_texture>& texture, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_cpu_descriptor_handle& createCubemapUAV(const ref<dx_texture>& texture, uint32 mipSlice = 0, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
@@ -46,6 +47,7 @@ struct dx_cpu_descriptor_handle
 	dx_cpu_descriptor_handle& createNullTextureUAV();
 	dx_cpu_descriptor_handle& createBufferUAV(const ref<dx_buffer>& buffer, buffer_range bufferRange = {});
 	dx_cpu_descriptor_handle& createBufferUintUAV(const ref<dx_buffer>& buffer, buffer_range bufferRange = {});
+	dx_cpu_descriptor_handle& createNullBufferUAV();
 	dx_cpu_descriptor_handle& createRaytracingAccelerationStructureSRV(const ref<dx_buffer>& tlas);
 
 

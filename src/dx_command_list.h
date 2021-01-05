@@ -121,6 +121,7 @@ struct dx_command_list
 
 	// Rasterizer.
 	void setViewport(const D3D12_VIEWPORT& viewport);
+	void setViewport(float x, float y, float width, float height, float minDepth = 0.f, float maxDepth = 1.f);
 	void setScissor(const D3D12_RECT& scissor);
 
 

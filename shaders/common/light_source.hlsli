@@ -6,7 +6,6 @@
 
 #define MAX_NUM_SUN_SHADOW_CASCADES 4
 #define SUN_SHADOW_DIMENSIONS 2048
-#define SUN_SHADOW_TEXEL_SIZE (1.f / SUN_SHADOW_DIMENSIONS)
 
 static float getAttenuation(float distance, float maxDistance)
 {
@@ -21,6 +20,8 @@ static float getAttenuation(float distance, float maxDistance)
 struct directional_light_cb
 {
 	mat4 vp[MAX_NUM_SUN_SHADOW_CASCADES];
+	vec4 viewports[MAX_NUM_SUN_SHADOW_CASCADES];
+
 	vec4 cascadeDistances;
 	vec4 bias;
 
@@ -29,6 +30,8 @@ struct directional_light_cb
 	vec3 radiance;
 	uint32 padding;
 	vec4 blendDistances;
+
+	vec2 texelSize;
 };
 
 struct point_light_cb
@@ -50,7 +53,9 @@ struct spot_light_cb
 };
 
 #ifdef HLSL
-static float sampleShadowMapSimple(float4x4 vp, float3 worldPosition, Texture2D<float> shadowMap, SamplerComparisonState shadowMapSampler, float bias)
+static float sampleShadowMapSimple(float4x4 vp, float3 worldPosition, 
+	Texture2D<float> shadowMap, float4 viewport,
+	SamplerComparisonState shadowMapSampler, float bias)
 {
 	float4 lightProjected = mul(vp, float4(worldPosition, 1.f));
 	lightProjected.xyz /= lightProjected.w;
@@ -62,6 +67,8 @@ static float sampleShadowMapSimple(float4x4 vp, float3 worldPosition, Texture2D<
 		float2 lightUV = lightProjected.xy * 0.5f + float2(0.5f, 0.5f);
 		lightUV.y = 1.f - lightUV.y;
 
+		lightUV = lightUV * viewport.zw + viewport.xy;
+
 		visibility = shadowMap.SampleCmpLevelZero(
 			shadowMapSampler,
 			lightUV,
@@ -70,8 +77,10 @@ static float sampleShadowMapSimple(float4x4 vp, float3 worldPosition, Texture2D<
 	return visibility;
 }
 
-static float sampleShadowMapPCF(float4x4 vp, float3 worldPosition, Texture2D<float> shadowMap, SamplerComparisonState shadowMapSampler, 
-	float texelSize, float bias)
+static float sampleShadowMapPCF(float4x4 vp, float3 worldPosition, 
+	Texture2D<float> shadowMap, float4 viewport,
+	SamplerComparisonState shadowMapSampler, 
+	float2 texelSize, float bias)
 {
 	float4 lightProjected = mul(vp, float4(worldPosition, 1.f));
 	lightProjected.xyz /= lightProjected.w;
@@ -84,6 +93,8 @@ static float sampleShadowMapPCF(float4x4 vp, float3 worldPosition, Texture2D<flo
 
 		float2 lightUV = lightProjected.xy * 0.5f + float2(0.5f, 0.5f);
 		lightUV.y = 1.f - lightUV.y;
+
+		lightUV = lightUV * viewport.zw + viewport.xy;
 
 		for (float y = -1.5f; y <= 1.5f; y += 1.f)
 		{
@@ -100,7 +111,9 @@ static float sampleShadowMapPCF(float4x4 vp, float3 worldPosition, Texture2D<flo
 	return visibility;
 }
 
-static float sampleCascadedShadowMapSimple(float4x4 vp[4], float3 worldPosition, Texture2D<float> shadowMaps[4], SamplerComparisonState shadowMapSampler,
+static float sampleCascadedShadowMapSimple(float4x4 vp[4], float3 worldPosition, 
+	Texture2D<float> shadowMap, float4 viewports[4],
+	SamplerComparisonState shadowMapSampler,
 	float pixelDepth, uint numCascades, float4 cascadeDistances, float4 bias, float4 blendDistances)
 {
 	float blendArea = blendDistances.x;
@@ -112,7 +125,8 @@ static float sampleCascadedShadowMapSimple(float4x4 vp[4], float3 worldPosition,
 
 	int nextCascadeIndex = min(numCascades - 1, currentCascadeIndex + 1);
 
-	float visibility = sampleShadowMapSimple(vp[currentCascadeIndex], worldPosition, shadowMaps[currentCascadeIndex],
+	float visibility = sampleShadowMapSimple(vp[currentCascadeIndex], worldPosition, 
+		shadowMap, viewports[currentCascadeIndex],
 		shadowMapSampler, bias[currentCascadeIndex]);
 
 	float blendEnd = cascadeDistances[currentCascadeIndex];
@@ -121,14 +135,18 @@ static float sampleCascadedShadowMapSimple(float4x4 vp[4], float3 worldPosition,
 
 	float nextCascadeVisibility = (currentCascadeIndex == nextCascadeIndex || alpha == 0.f)
 		? 1.f // No need to sample next cascade, if we are the last cascade or if we are not in the blend area.
-		: sampleShadowMapSimple(vp[nextCascadeIndex], worldPosition, shadowMaps[nextCascadeIndex], shadowMapSampler, bias[nextCascadeIndex]);
+		: sampleShadowMapSimple(vp[nextCascadeIndex], worldPosition, 
+			shadowMap, viewports[nextCascadeIndex], 
+			shadowMapSampler, bias[nextCascadeIndex]);
 
 	visibility = lerp(visibility, nextCascadeVisibility, alpha);
 	return visibility;
 }
 
-static float sampleCascadedShadowMapPCF(float4x4 vp[4], float3 worldPosition, Texture2D<float> shadowMaps[4], SamplerComparisonState shadowMapSampler, 
-	float texelSize, float pixelDepth, uint numCascades, float4 cascadeDistances, float4 bias, float4 blendDistances)
+static float sampleCascadedShadowMapPCF(float4x4 vp[4], float3 worldPosition, 
+	Texture2D<float> shadowMap, float4 viewports[4], 
+	SamplerComparisonState shadowMapSampler, 
+	float2 texelSize, float pixelDepth, uint numCascades, float4 cascadeDistances, float4 bias, float4 blendDistances)
 {
 	float4 comparison = pixelDepth.xxxx > cascadeDistances;
 
@@ -137,7 +155,8 @@ static float sampleCascadedShadowMapPCF(float4x4 vp[4], float3 worldPosition, Te
 
 	int nextCascadeIndex = min(numCascades - 1, currentCascadeIndex + 1);
 
-	float visibility = sampleShadowMapPCF(vp[currentCascadeIndex], worldPosition, shadowMaps[currentCascadeIndex],
+	float visibility = sampleShadowMapPCF(vp[currentCascadeIndex], worldPosition, 
+		shadowMap, viewports[currentCascadeIndex],
 		shadowMapSampler, texelSize, bias[currentCascadeIndex]);
 
 	float blendEnd = cascadeDistances[currentCascadeIndex];
@@ -146,7 +165,9 @@ static float sampleCascadedShadowMapPCF(float4x4 vp[4], float3 worldPosition, Te
 
 	float nextCascadeVisibility = (currentCascadeIndex == nextCascadeIndex || alpha == 0.f) 
 		? 1.f // No need to sample next cascade, if we are the last cascade or if we are not in the blend area.
-		: sampleShadowMapPCF(vp[nextCascadeIndex], worldPosition, shadowMaps[nextCascadeIndex], shadowMapSampler, texelSize, bias[nextCascadeIndex]);
+		: sampleShadowMapPCF(vp[nextCascadeIndex], worldPosition, 
+			shadowMap, viewports[nextCascadeIndex], 
+			shadowMapSampler, texelSize, bias[nextCascadeIndex]);
 
 	visibility = lerp(visibility, nextCascadeVisibility, alpha);
 	return visibility;

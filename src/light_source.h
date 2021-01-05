@@ -5,9 +5,12 @@
 
 #include "light_source.hlsli"
 
-#define SUN_SHADOW_TEXEL_SIZE (1.f / SUN_SHADOW_DIMENSIONS)
 #define SHADOW_MAP_NEGATIVE_Z_OFFSET 1000.f
 
+#define MAX_NUM_POINT_LIGHTS_PER_FRAME 4096
+#define MAX_NUM_SPOT_LIGHTS_PER_FRAME 4096
+
+#define MAX_NUM_SPOT_LIGHT_SHADOW_PASSES 16
 
 struct directional_light
 {

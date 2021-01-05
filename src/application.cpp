@@ -25,6 +25,8 @@ struct animation_component
 	submesh_info prevFrameSM;
 };
 
+static ref<dx_buffer> pointLightBuffer[NUM_BUFFERED_FRAMES];
+static ref<dx_buffer> spotLightBuffer[NUM_BUFFERED_FRAMES];
 
 void application::initialize(dx_renderer* renderer)
 {
@@ -155,6 +157,15 @@ void application::initialize(dx_renderer* renderer)
 	sun.cascadeDistances = vec4(9.f, 39.f, 74.f, 10000.f);
 	sun.bias = vec4(0.000049f, 0.000114f, 0.000082f, 0.0035f);
 	sun.blendDistances = vec4(3.f, 3.f, 10.f, 10.f);
+
+	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
+	{
+		pointLightBuffer[i] = createUploadBuffer(sizeof(point_light_cb), MAX_NUM_POINT_LIGHTS_PER_FRAME, 0);
+		spotLightBuffer[i] = createUploadBuffer(sizeof(spot_light_cb), MAX_NUM_SPOT_LIGHTS_PER_FRAME, 0);
+
+		SET_NAME(pointLightBuffer[i]->resource, "Point lights");
+		SET_NAME(spotLightBuffer[i]->resource, "Spot lights");
+	}
 }
 
 static bool plotAndEditTonemapping(tonemap_cb& tonemap)
@@ -237,6 +248,9 @@ static bool editSunShadowParameters(directional_light& sun)
 
 void application::update(const user_input& input, float dt)
 {
+	opaqueRenderPass.reset();
+	sunShadowRenderPass.reset();
+
 	if (input.keyboard['F'].pressEvent && selectedEntity)
 	{
 		auto& raster = selectedEntity.getComponent<raster_component>();
@@ -286,7 +300,6 @@ void application::update(const user_input& input, float dt)
 	ImGui::Text("Video memory used: %uMB", memoryUsage.currentlyUsed);
 
 	ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->settings.aspectRatioMode);
-	ImGui::Checkbox("Show light volumes", &renderer->settings.showLightVolumes);
 
 	//ImGui::Image(renderer->screenVelocitiesTexture, 512, 512); // TODO: When you remove this, make renderer attributes private again.
 
@@ -326,9 +339,25 @@ void application::update(const user_input& input, float dt)
 	renderer->setCamera(camera);
 	renderer->setSun(sun);
 	renderer->setEnvironment(environment);
-	renderer->setPointLights(pointLights, numPointLights);
-	renderer->setSpotLights(spotLights, numSpotLights);
 
+	{
+		if (numPointLights)
+		{
+			point_light_cb* pls = (point_light_cb*)mapBuffer(pointLightBuffer[dxContext.bufferedFrameID]);
+			memcpy(pls, pointLights, sizeof(point_light_cb) * numPointLights);
+			unmapBuffer(pointLightBuffer[dxContext.bufferedFrameID]);
+
+			renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], numPointLights);
+		}
+		if (numSpotLights)
+		{
+			spot_light_cb* sls = (spot_light_cb*)mapBuffer(spotLightBuffer[dxContext.bufferedFrameID]);
+			memcpy(sls, spotLights, sizeof(spot_light_cb) * numSpotLights);
+			unmapBuffer(spotLightBuffer[dxContext.bufferedFrameID]);
+
+			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], numSpotLights);
+		}
+	}
 
 
 	scene.group<animation_component>(entt::get<raster_component>)
@@ -367,9 +396,9 @@ void application::update(const user_input& input, float dt)
 
 			auto& anim = entity.getComponent<animation_component>();
 
-			renderer->opaqueRenderPass.renderAnimatedObject(anim.vb, anim.prevFrameVB, mesh.indexBuffer, anim.sm, anim.prevFrameSM, raster.mesh->submeshes[0].material, m, m, 
+			opaqueRenderPass.renderAnimatedObject(anim.vb, anim.prevFrameVB, mesh.indexBuffer, anim.sm, anim.prevFrameSM, raster.mesh->submeshes[0].material, m, m, 
 				(uint32)entityHandle, outline);
-			renderer->sunShadowRenderPass.renderObject(0, anim.vb, mesh.indexBuffer, anim.sm, m);
+			sunShadowRenderPass.renderObject(0, anim.vb, mesh.indexBuffer, anim.sm, m);
 		}
 		else
 		{
@@ -378,11 +407,14 @@ void application::update(const user_input& input, float dt)
 				submesh_info submesh = sm.info;
 				const ref<pbr_material>& material = sm.material;
 
-				renderer->opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, (uint32)entityHandle, outline);
-				renderer->sunShadowRenderPass.renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+				opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, (uint32)entityHandle, outline);
+				sunShadowRenderPass.renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
 			}
 		}
 	});
+
+	renderer->submitRenderPass(&opaqueRenderPass);
+	renderer->submitRenderPass(&sunShadowRenderPass);
 
 	//renderer->giRenderPass.specularReflection(reflectionsRaytracingPipeline, raytracingTLAS);
 }

@@ -214,12 +214,29 @@ static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_de
 	grave.srv = srv;
 	grave.uav = uav;
 	grave.clear = clear;
-	grave.gpuClear = dxContext.descriptorAllocatorGPU.getMatchingCPUHandle(gpuClear);
+	if (gpuClear.gpuHandle.ptr)
+	{
+		grave.gpuClear = dxContext.descriptorAllocatorGPU.getMatchingCPUHandle(gpuClear);
+	}
+	else
+	{
+		grave.gpuClear = {};
+	}
 	dxContext.retire(std::move(grave));
 }
 
 dx_buffer::~dx_buffer()
 {
+	wchar name[128];
+
+	if (resource)
+	{
+		uint32 size = sizeof(name);
+		resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);
+		name[min(arraysize(name) - 1, size)] = 0;
+	}
+
+
 	retire(resource, defaultSRV, defaultUAV, cpuClearUAV, gpuClearUAV);
 }
 

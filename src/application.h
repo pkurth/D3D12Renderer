@@ -52,4 +52,8 @@ private:
 
 	scene scene;
 	scene_entity selectedEntity;
+
+
+	opaque_render_pass opaqueRenderPass;
+	sun_shadow_render_pass sunShadowRenderPass;
 };

@@ -11,14 +11,14 @@
         "addressV = TEXTURE_ADDRESS_BORDER," \
         "addressW = TEXTURE_ADDRESS_BORDER," \
         "filter = FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT)," \
-    "DescriptorTable( SRV(t0, numDescriptors = 5, flags = DESCRIPTORS_VOLATILE), UAV(u0, numDescriptors = 1, flags = DESCRIPTORS_VOLATILE) )"
+    "DescriptorTable( SRV(t0, numDescriptors = 2, flags = DESCRIPTORS_VOLATILE), UAV(u0, numDescriptors = 1, flags = DESCRIPTORS_VOLATILE) )"
 
 #define BLOCK_SIZE 16
 
 ConstantBuffer<camera_cb> camera			: register(b0);
 ConstantBuffer<directional_light_cb> sun	: register(b1);
 Texture2D<float> depthBuffer				: register(t0);
-Texture2D<float> sunShadowCascades[4]		: register(t1);
+Texture2D<float> shadowMap					: register(t1);
 
 RWTexture2D<float4> output					: register(u0);
 
@@ -164,17 +164,22 @@ void main(cs_input IN)
 #if 1 // Cascaded vs single.
 		float pixelDepth = dot(camera.forward.xyz, inScatterPoint - O);
 #if 1 // Simple vs PCF
-		float visibility = sampleCascadedShadowMapSimple(sun.vp, inScatterPoint, sunShadowCascades, shadowSampler, pixelDepth, sun.numShadowCascades,
+		float visibility = sampleCascadedShadowMapSimple(sun.vp, inScatterPoint, 
+			shadowMap, sun.viewports,
+			shadowSampler, pixelDepth, sun.numShadowCascades,
 			sun.cascadeDistances, sun.bias, sun.blendDistances);
 #else
-		float visibility = sampleCascadedShadowMapPCF(sun.vp, inScatterPoint, sunShadowCascades, shadowSampler, SUN_SHADOW_TEXEL_SIZE, pixelDepth, sun.numShadowCascades,
+		float visibility = sampleCascadedShadowMapPCF(sun.vp, inScatterPoint, 
+			shadowMap, sun.viewports,
+			shadowSampler, sun.texelSize, pixelDepth, sun.numShadowCascades,
 			sun.cascadeDistances, sun.bias, sun.blendArea);
 #endif
 #else
 		uint currentCascadeIndex = sun.numShadowCascades - 1;
 		float4 bias = sun.bias;
-		float visibility = sampleShadowMapPCF(sun.vp[currentCascadeIndex], inScatterPoint, sunShadowCascades[currentCascadeIndex],
-			shadowSampler, SUN_SHADOW_TEXEL_SIZE, bias[currentCascadeIndex]);
+		float visibility = sampleShadowMapPCF(sun.vp[currentCascadeIndex], inScatterPoint, 
+			shadowMap, sun.viewports[currentCascadeIndex],
+			shadowSampler, sun.texelSize, bias[currentCascadeIndex]);
 #endif
 
 		inScatteredLight += localDensity * transmittance * visibility;
