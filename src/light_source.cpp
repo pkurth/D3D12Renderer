@@ -72,7 +72,7 @@ void directional_light::updateMatrices(const render_camera& camera, bool prevent
 			vec3 viewSpaceCenter = viewBB.getCenter();
 			float radius = length(viewBB.getRadius());
 
-			vec3 center = (viewMatrix * vec4(viewSpaceCenter, 1.f)).xyz;
+			vec3 center = (viewMatrix * vec4(camera.rotation * viewSpaceCenter + camera.position, 1.f)).xyz;
 
 			projMatrix = createOrthographicProjectionMatrix(center.x + radius, center.x - radius, center.y + radius, center.y - radius,
 				-worldBB.maxCorner.z - SHADOW_MAP_NEGATIVE_Z_OFFSET, -worldBB.minCorner.z);
