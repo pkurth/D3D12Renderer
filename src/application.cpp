@@ -70,6 +70,27 @@ void application::initialize(dx_renderer* renderer)
 		.addComponent<animation_component>(1.5f);
 
 
+	// Pilot.
+	auto pilotMesh = loadMeshFromFile("assets/meshes/pilot.fbx",
+		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents | mesh_creation_flags_with_skin);
+
+	pilotMesh->submeshes[0].material = createPBRMaterial(
+		"assets/textures/pilot/A.png",
+		"assets/textures/pilot/N.png",
+		"assets/textures/pilot/R.png",
+		"assets/textures/pilot/M.png",
+		vec4(1.f, 1.f, 1.f, 1.f),
+		0.f,
+		0.f
+	);
+
+	scene.createEntity("Pilot")
+		.addComponent<trs>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
+		.addComponent<raster_component>(pilotMesh)
+		.addComponent<animation_component>(0.f);
+
+
+
 
 	// Raytracing.
 	/*if (dxContext.raytracingSupported)

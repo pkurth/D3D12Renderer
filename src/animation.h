@@ -37,6 +37,10 @@ struct animation_clip
 {
 	std::string name;
 
+	std::vector<float> positionTimestamps;
+	std::vector<float> rotationTimestamps;
+	std::vector<float> scaleTimestamps;
+
 	std::vector<vec3> positionKeyframes;
 	std::vector<quat> rotationKeyframes;
 	std::vector<vec3> scaleKeyframes;

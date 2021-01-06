@@ -1035,17 +1035,36 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_
 				uint8* vertexBase = vertices + (vertexID * vertexSize);
 				skinning_weights& weights = *(skinning_weights*)(vertexBase + skinOffset);
 
+				bool foundFreeSlot = false;
 				for (uint32 i = 0; i < 4; ++i)
 				{
 					if (weights.skinWeights[i] == 0)
 					{
 						weights.skinIndices[i] = (uint8)jointID;
 						weights.skinWeights[i] = (uint8)clamp(weight * 255.f, 0.f, 255.f);
+						foundFreeSlot = true;
 						break;
 					}
 				}
+				if (!foundFreeSlot)
+				{
+					assert(!"Mesh has more than 4 weights per vertex.");
+				}
 			}
 		}
+
+#if 0
+		for (uint32 i = 0; i < mesh->mNumVertices; ++i)
+		{
+			uint8* vertexBase = vertices + (i * vertexSize);
+			skinning_weights& weights = *(skinning_weights*)(vertexBase + skinOffset);
+
+			vec4 v = { (float)weights.skinWeights[0], (float)weights.skinWeights[1], (float)weights.skinWeights[2], (float)weights.skinWeights[3] };
+			v /= 255.f;
+
+			float sum = dot(v, 1.f);
+		}
+#endif
 	}
 #endif
 

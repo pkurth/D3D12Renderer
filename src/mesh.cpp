@@ -215,16 +215,19 @@ static void loadAssimpAnimation(const aiAnimation* animation, animation_clip& cl
 			for (uint32 keyID = 0; keyID < channel->mNumPositionKeys; ++keyID)
 			{
 				clip.positionKeyframes.push_back(readAssimpVector(channel->mPositionKeys[keyID].mValue));
+				clip.positionTimestamps.push_back((float)channel->mPositionKeys[keyID].mTime);
 			}
 
 			for (uint32 keyID = 0; keyID < channel->mNumRotationKeys; ++keyID)
 			{
 				clip.rotationKeyframes.push_back(readAssimpQuaternion(channel->mRotationKeys[keyID].mValue));
+				clip.rotationTimestamps.push_back((float)channel->mRotationKeys[keyID].mTime);
 			}
 
 			for (uint32 keyID = 0; keyID < channel->mNumScalingKeys; ++keyID)
 			{
 				clip.scaleKeyframes.push_back(readAssimpVector(channel->mScalingKeys[keyID].mValue));
+				clip.scaleTimestamps.push_back((float)channel->mScalingKeys[keyID].mTime);
 			}
 
 			joint.isAnimated = true;
@@ -250,6 +253,11 @@ static void loadAssimpAnimation(const aiAnimation* animation, animation_clip& cl
 static void readAssimpSkeletonHierarchy(const aiNode* node, animation_skeleton& skeleton, uint32& insertIndex, uint32 parentID = NO_PARENT)
 {
 	std::string name = node->mName.C_Str();
+
+	if (name == "Animation") // TODO: Temporary fix for the pilot.fbx mesh.
+	{
+		return;
+	}
 
 	auto it = skeleton.nameToJointID.find(name);
 	if (it != skeleton.nameToJointID.end())

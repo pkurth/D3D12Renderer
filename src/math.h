@@ -543,3 +543,9 @@ inline std::ostream& operator<<(std::ostream& s, vec4 v)
 	return s;
 }
 
+inline std::ostream& operator<<(std::ostream& s, quat v)
+{
+	s << "[" << v.x << ", " << v.y << ", " << v.z << ", " << v.w << "]";
+	return s;
+}
+

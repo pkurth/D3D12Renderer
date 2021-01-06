@@ -568,7 +568,7 @@ void dx_renderer::endFrame(const user_input& input)
 			shadowInfos[i].viewport = vec4(relXOffset, relYOffset, relWidth, relHeight);
 			shadowInfos[i].bias = 0.000005f;
 
-			shadowInfos[i].cpuViewport = vec4(x, SUN_SHADOW_DIMENSIONS, (float)dimensions, (float)dimensions);
+			shadowInfos[i].cpuViewport = vec4((float)x, SUN_SHADOW_DIMENSIONS, (float)dimensions, (float)dimensions);
 
 			x += dimensions;
 		}
