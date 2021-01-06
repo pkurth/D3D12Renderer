@@ -57,3 +57,20 @@ void spot_shadow_render_pass::reset()
 {
 	drawCalls.clear();
 }
+
+void point_shadow_render_pass::renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+{
+	drawCalls.push_back(
+		{
+			transform,
+			vertexBuffer,
+			indexBuffer,
+			submesh,
+		}
+	);
+}
+
+void point_shadow_render_pass::reset()
+{
+	drawCalls.clear();
+}

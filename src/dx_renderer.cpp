@@ -33,6 +33,7 @@ static dx_pipeline clearObjectIDsPipeline;
 static dx_pipeline depthOnlyPipeline;
 static dx_pipeline animatedDepthOnlyPipeline;
 static dx_pipeline shadowPipeline;
+static dx_pipeline pointLightShadowPipeline;
 
 static dx_pipeline textureSkyPipeline;
 static dx_pipeline proceduralSkyPipeline;
@@ -143,6 +144,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 			;
 
 		shadowPipeline = createReloadablePipeline(desc, { "shadow_vs" }, rs_in_vertex_shader);
+		pointLightShadowPipeline = createReloadablePipeline(desc, { "shadow_point_light_vs", "shadow_point_light_ps" }, rs_in_vertex_shader);
 	}
 
 	// Outline.
@@ -326,7 +328,8 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 
 	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
 	{
-		shadowInfoBuffer[i] = createUploadBuffer(sizeof(shadow_info), 16, 0);
+		spotLightShadowInfoBuffer[i] = createUploadBuffer(sizeof(spot_shadow_info), 16, 0);
+		pointLightShadowInfoBuffer[i] = createUploadBuffer(sizeof(point_shadow_info), 16, 0);
 	}
 }
 
@@ -371,6 +374,7 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 	opaqueRenderPass = 0;
 	sunShadowRenderPass = 0;
 	numSpotLightShadowRenderPasses = 0;
+	numPointLightShadowRenderPasses = 0;
 
 	pointLights = 0;
 	spotLights = 0;
@@ -547,7 +551,8 @@ void dx_renderer::endFrame(const user_input& input)
 	}
 
 
-	shadow_info shadowInfos[16];
+	spot_shadow_info spotLightShadowInfos[16];
+	point_shadow_info pointLightShadowInfos[16];
 
 	// Pack shadow maps.
 	{
@@ -564,18 +569,37 @@ void dx_renderer::endFrame(const user_input& input)
 
 			float relXOffset = (float)x / (float)SHADOW_MAP_WIDTH;
 
-			shadowInfos[i].vp = spotLightShadowRenderPasses[i]->viewProjMatrix;
-			shadowInfos[i].viewport = vec4(relXOffset, relYOffset, relWidth, relHeight);
-			shadowInfos[i].bias = 0.000005f;
+			spot_shadow_info& si = spotLightShadowInfos[i];
+			si.vp = spotLightShadowRenderPasses[i]->viewProjMatrix;
+			si.viewport = vec4(relXOffset, relYOffset, relWidth, relHeight);
+			si.bias = 0.000005f;
 
-			shadowInfos[i].cpuViewport = vec4((float)x, SUN_SHADOW_DIMENSIONS, (float)dimensions, (float)dimensions);
+			si.cpuViewport = vec4((float)x, SUN_SHADOW_DIMENSIONS, (float)dimensions, (float)dimensions);
 
 			x += dimensions;
 		}
 
-		shadow_info* si = (shadow_info*)mapBuffer(shadowInfoBuffer[dxContext.bufferedFrameID]);
-		memcpy(si, shadowInfos, sizeof(shadow_info) * numSpotLightShadowRenderPasses);
-		unmapBuffer(shadowInfoBuffer[dxContext.bufferedFrameID]);
+		for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
+		{
+			uint32 dimensions = pointLightShadowRenderPasses[i]->dimensions;
+
+			float relWidth = (float)dimensions / (float)SHADOW_MAP_WIDTH;
+			float relHeight = (float)dimensions / (float)SHADOW_MAP_HEIGHT;
+
+			float relXOffset = (float)x / (float)SHADOW_MAP_WIDTH;
+
+			point_shadow_info& si = pointLightShadowInfos[i];
+			si.viewport = vec4(relXOffset, relYOffset, relWidth, relHeight);
+			si.viewport2 = vec4(relXOffset + relWidth, relYOffset, relWidth, relHeight);
+
+			si.cpuViewports[0] = vec4((float)x, SUN_SHADOW_DIMENSIONS, (float)dimensions, (float)dimensions);
+			si.cpuViewports[1] = vec4((float)(x + dimensions), SUN_SHADOW_DIMENSIONS, (float)dimensions, (float)dimensions);
+
+			x += dimensions * 2;
+		}
+
+		updateUploadBufferData(spotLightShadowInfoBuffer[dxContext.bufferedFrameID], spotLightShadowInfos, (uint32)(sizeof(spot_shadow_info) * numSpotLightShadowRenderPasses));
+		updateUploadBufferData(pointLightShadowInfoBuffer[dxContext.bufferedFrameID], pointLightShadowInfos, (uint32)(sizeof(point_shadow_info) * numPointLightShadowRenderPasses));
 	}
 
 	auto cameraCBV = dxContext.uploadDynamicConstantBuffer(camera);
@@ -600,7 +624,8 @@ void dx_renderer::endFrame(const user_input& input)
 	materialInfo.pointLightBuffer = pointLights;
 	materialInfo.spotLightBuffer = spotLights;
 	materialInfo.shadowMap = shadowMap;
-	materialInfo.shadowInfoBuffer = shadowInfoBuffer[dxContext.bufferedFrameID];
+	materialInfo.pointLightShadowInfoBuffer = pointLightShadowInfoBuffer[dxContext.bufferedFrameID];
+	materialInfo.spotLightShadowInfoBuffer = spotLightShadowInfoBuffer[dxContext.bufferedFrameID];
 	materialInfo.volumetricsTexture = volumetricsTexture;
 	materialInfo.cameraCBV = cameraCBV;
 	materialInfo.sunCBV = sunCBV;
@@ -834,7 +859,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 	for (uint32 i = 0; i < numSpotLightShadowRenderPasses; ++i)
 	{
-		shadow_info& si = shadowInfos[i];
+		spot_shadow_info& si = spotLightShadowInfos[i];
 		const mat4& viewProj = si.vp;
 
 		cl->setViewport(si.cpuViewport.x, si.cpuViewport.y, si.cpuViewport.z, si.cpuViewport.w);
@@ -843,12 +868,46 @@ void dx_renderer::endFrame(const user_input& input)
 		{
 			const mat4& m = dc.transform;
 			const submesh_info& submesh = dc.submesh;
-			cl->setGraphics32BitConstants(SHADOW_RS_MVP, viewProj* m);
+			cl->setGraphics32BitConstants(SHADOW_RS_MVP, viewProj * m);
 
 			cl->setVertexBuffer(0, dc.vertexBuffer);
 			cl->setIndexBuffer(dc.indexBuffer);
 
 			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		}
+	}
+
+	cl->setPipelineState(*pointLightShadowPipeline.pipeline);
+	cl->setGraphicsRootSignature(*pointLightShadowPipeline.rootSignature);
+
+	for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
+	{
+		point_shadow_info& si = pointLightShadowInfos[i];
+
+		for (uint32 v = 0; v < 2; ++v)
+		{
+			cl->setViewport(si.cpuViewports[v].x, si.cpuViewports[v].y, si.cpuViewports[v].z, si.cpuViewports[v].w);
+
+			float flip = (v == 0) ? 1.f : -1.f;
+
+			for (const auto& dc : pointLightShadowRenderPasses[i]->drawCalls)
+			{
+				const mat4& m = dc.transform;
+				const submesh_info& submesh = dc.submesh;
+				cl->setGraphics32BitConstants(SHADOW_RS_MVP,
+					point_shadow_transform_cb
+					{
+						m,
+						pointLightShadowRenderPasses[i]->lightPosition,
+						pointLightShadowRenderPasses[i]->maxDistance,
+						flip
+					});
+
+				cl->setVertexBuffer(0, dc.vertexBuffer);
+				cl->setIndexBuffer(dc.indexBuffer);
+
+				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			}
 		}
 	}
 

@@ -17,7 +17,8 @@ struct common_material_info
 	ref<dx_buffer> spotLightIndexList;
 	ref<dx_buffer> pointLightBuffer;
 	ref<dx_buffer> spotLightBuffer;
-	ref<dx_buffer> shadowInfoBuffer;
+	ref<dx_buffer> pointLightShadowInfoBuffer;
+	ref<dx_buffer> spotLightShadowInfoBuffer;
 
 	ref<dx_texture> shadowMap;
 

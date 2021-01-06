@@ -77,8 +77,8 @@ DXGI_FORMAT getIndexBufferFormat(uint32 elementSize);
 
 void* mapBuffer(const ref<dx_buffer>& buffer);
 void unmapBuffer(const ref<dx_buffer>& buffer);
-void uploadBufferData(ref<dx_buffer> buffer, const void* bufferData);
-void updateBufferDataRange(ref<dx_buffer> buffer, const void* data, uint32 offset, uint32 size);
+
+void updateUploadBufferData(const ref<dx_buffer>& buffer, void* data, uint32 size);
 
 ref<dx_buffer> createBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, bool allowClearing = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
 ref<dx_buffer> createUploadBuffer(uint32 elementSize, uint32 elementCount, void* data);

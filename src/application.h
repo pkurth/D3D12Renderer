@@ -53,4 +53,5 @@ private:
 	opaque_render_pass opaqueRenderPass;
 	sun_shadow_render_pass sunShadowRenderPass;
 	spot_shadow_render_pass spotShadowRenderPasses[2];
+	point_shadow_render_pass pointShadowRenderPasses[1];
 };

@@ -50,21 +50,29 @@ struct spot_light_cb
 	int shadowInfoIndex; // -1, if light casts no shadows.
 };
 
-struct shadow_info
+struct spot_shadow_info
 {
 	mat4 vp;
+
 	vec4 viewport;
 	float bias;
 
 	float padding0[3];
+	vec4 padding1;
 
 	vec4 cpuViewport;
+};
 
-	vec4 padding1;
+struct point_shadow_info
+{
+	vec4 viewport;
+	vec4 viewport2;
+
+	vec4 cpuViewports[2];
 };
 
 #ifndef HLSL
-static_assert(sizeof(shadow_info) == sizeof(mat4) * 2, "");
+static_assert(sizeof(spot_shadow_info) == sizeof(mat4) * 2, "");
 #endif
 
 static float getInnerCutoff(int innerAndOuterCutoff)
@@ -140,6 +148,54 @@ static float sampleShadowMapPCF(float4x4 vp, float3 worldPosition,
 		}
 		visibility /= 16.f;
 	}
+	return visibility;
+}
+
+static float samplePointLightShadowMapPCF(float3 worldPosition, float3 lightPosition,
+	Texture2D<float> shadowMap, 
+	vec4 viewport, vec4 viewport2, 
+	SamplerComparisonState shadowMapSampler, 
+	float2 texelSize, float maxDistance)
+{
+	float3 L = worldPosition - lightPosition;
+	float l = length(L);
+	L /= l;
+
+	float flip = L.z > 0.f ? 1.f : -1.f;
+	vec4 vp = L.z > 0.f ? viewport : viewport2;
+
+	L.z *= flip;
+	L.xy /= L.z + 1.f;
+
+	float2 lightUV = L.xy * 0.5f + float2(0.5f, 0.5f);
+	lightUV.y = 1.f - lightUV.y;
+
+	lightUV = lightUV * vp.zw + vp.xy;
+
+	float compareDistance = l / maxDistance;
+
+	float bias = -0.001f * flip;
+
+#if 0
+	float visibility = shadowMap.SampleCmpLevelZero(
+		shadowMapSampler,
+		lightUV,
+		compareDistance - bias);
+#else
+	float visibility = 0.f;
+	for (float y = -1.5f; y <= 1.5f; y += 1.f)
+	{
+		for (float x = -1.5f; x <= 1.5f; x += 1.f)
+		{
+			visibility += shadowMap.SampleCmpLevelZero(
+				shadowMapSampler,
+				lightUV + float2(x, y) * texelSize,
+				compareDistance - bias);
+		}
+	}
+	visibility /= 16.f;
+#endif
+
 	return visibility;
 }
 

@@ -15,36 +15,37 @@ struct ps_input
 	float4 screenPosition	: SV_POSITION;
 };
 
-ConstantBuffer<pbr_material_cb> material		: register(b0, space1);
-ConstantBuffer<camera_cb> camera				: register(b1, space1);
-ConstantBuffer<lighting_cb> lighting			: register(b2, space1);
+ConstantBuffer<pbr_material_cb> material				: register(b0, space1);
+ConstantBuffer<camera_cb> camera						: register(b1, space1);
+ConstantBuffer<lighting_cb> lighting					: register(b2, space1);
 
 
-SamplerState wrapSampler						: register(s0);
-SamplerState clampSampler						: register(s1);
-SamplerComparisonState shadowSampler			: register(s2);
+SamplerState wrapSampler								: register(s0);
+SamplerState clampSampler								: register(s1);
+SamplerComparisonState shadowSampler					: register(s2);
 
 
-Texture2D<float4> albedoTex						: register(t0, space1);
-Texture2D<float3> normalTex						: register(t1, space1);
-Texture2D<float> roughTex						: register(t2, space1);
-Texture2D<float> metalTex						: register(t3, space1);
+Texture2D<float4> albedoTex								: register(t0, space1);
+Texture2D<float3> normalTex								: register(t1, space1);
+Texture2D<float> roughTex								: register(t2, space1);
+Texture2D<float> metalTex								: register(t3, space1);
 
 
-ConstantBuffer<directional_light_cb> sun		: register(b0, space2);
+ConstantBuffer<directional_light_cb> sun				: register(b0, space2);
 
-TextureCube<float4> irradianceTexture			: register(t0, space2);
-TextureCube<float4> environmentTexture			: register(t1, space2);
+TextureCube<float4> irradianceTexture					: register(t0, space2);
+TextureCube<float4> environmentTexture					: register(t1, space2);
 
-Texture2D<float4> brdf							: register(t2, space2);
+Texture2D<float4> brdf									: register(t2, space2);
 
-Texture2D<uint4> lightGrid						: register(t3, space2);
-StructuredBuffer<uint> pointLightIndexList		: register(t4, space2);
-StructuredBuffer<uint> spotLightIndexList		: register(t5, space2);
-StructuredBuffer<point_light_cb> pointLights	: register(t6, space2);
-StructuredBuffer<spot_light_cb> spotLights		: register(t7, space2);
-Texture2D<float> shadowMap						: register(t8, space2);
-StructuredBuffer<shadow_info> shadowInfos		: register(t9, space2);
+Texture2D<uint4> lightGrid								: register(t3, space2);
+StructuredBuffer<uint> pointLightIndexList				: register(t4, space2);
+StructuredBuffer<uint> spotLightIndexList				: register(t5, space2);
+StructuredBuffer<point_light_cb> pointLights			: register(t6, space2);
+StructuredBuffer<spot_light_cb> spotLights				: register(t7, space2);
+Texture2D<float> shadowMap								: register(t8, space2);
+StructuredBuffer<point_shadow_info> pointShadowInfos	: register(t9, space2);
+StructuredBuffer<spot_shadow_info> spotShadowInfos		: register(t10, space2);
 
 struct ps_output
 {
@@ -106,9 +107,24 @@ ps_output main(ps_input IN)
 			float distanceToLight = length(pl.position - IN.worldPosition);
 			if (distanceToLight <= pl.radius)
 			{
-				float3 L = (pl.position - IN.worldPosition) / distanceToLight;
-				float3 radiance = pl.radiance * getAttenuation(distanceToLight, pl.radius) * LIGHT_IRRADIANCE_SCALE;
-				totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
+				float visibility = 1.f;
+				if (pl.shadowInfoIndex != -1)
+				{
+					point_shadow_info info = pointShadowInfos[pl.shadowInfoIndex];
+
+					visibility = samplePointLightShadowMapPCF(IN.worldPosition, pl.position,
+						shadowMap,
+						info.viewport, info.viewport2,
+						shadowSampler,
+						lighting.shadowMapTexelSize, pl.radius);
+				}
+
+				if (visibility > 0.f)
+				{
+					float3 L = (pl.position - IN.worldPosition) / distanceToLight;
+					float3 radiance = pl.radiance * getAttenuation(distanceToLight, pl.radius) * LIGHT_IRRADIANCE_SCALE;
+					totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
+				}
 			}
 		}
 
@@ -139,7 +155,7 @@ ps_output main(ps_input IN)
 						float visibility = 1.f;
 						if (sl.shadowInfoIndex != -1)
 						{
-							shadow_info info = shadowInfos[sl.shadowInfoIndex];
+							spot_shadow_info info = spotShadowInfos[sl.shadowInfoIndex];
 							visibility = sampleShadowMapPCF(info.vp, IN.worldPosition,
 								shadowMap, info.viewport,
 								shadowSampler,

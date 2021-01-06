@@ -210,5 +210,22 @@ private:
 	friend struct dx_renderer;
 };
 
+struct point_shadow_render_pass : shadow_render_pass
+{
+	vec3 lightPosition;
+	uint32 dimensions;
+	float maxDistance;
+
+	// TODO: Split this into positive and negative direction for frustum culling.
+	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+
+	void reset();
+
+private:
+	std::vector<draw_call> drawCalls;
+
+	friend struct dx_renderer;
+};
+
 
 

@@ -42,13 +42,22 @@ void application::initialize(dx_renderer* renderer)
 		.addComponent<raster_component>(loadMeshFromFile("assets/meshes/sponza.obj"));
 
 
-	// Stormtroopers.
-	auto stormtrooperMesh = loadMeshFromFile("assets/meshes/stormtrooper.fbx",
-		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents | mesh_creation_flags_with_skin);
-
+#if 0
+	auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/meshes/stormtrooper.fbx");
 	stormtrooperMesh->submeshes[0].material = createPBRMaterial(
 		"assets/textures/stormtrooper/Stormtrooper_D.png",
 		0, 0, 0,
+		vec4(1.f, 1.f, 1.f, 1.f),
+		0.f,
+		0.f
+	);
+
+	auto pilotMesh = loadAnimatedMeshFromFile("assets/meshes/pilot.fbx");
+	pilotMesh->submeshes[0].material = createPBRMaterial(
+		"assets/textures/pilot/A.png",
+		"assets/textures/pilot/N.png",
+		"assets/textures/pilot/R.png",
+		"assets/textures/pilot/M.png",
 		vec4(1.f, 1.f, 1.f, 1.f),
 		0.f,
 		0.f
@@ -69,26 +78,11 @@ void application::initialize(dx_renderer* renderer)
 		.addComponent<raster_component>(stormtrooperMesh)
 		.addComponent<animation_component>(1.5f);
 
-
-	// Pilot.
-	auto pilotMesh = loadMeshFromFile("assets/meshes/pilot.fbx",
-		mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents | mesh_creation_flags_with_skin);
-
-	pilotMesh->submeshes[0].material = createPBRMaterial(
-		"assets/textures/pilot/A.png",
-		"assets/textures/pilot/N.png",
-		"assets/textures/pilot/R.png",
-		"assets/textures/pilot/M.png",
-		vec4(1.f, 1.f, 1.f, 1.f),
-		0.f,
-		0.f
-	);
-
 	scene.createEntity("Pilot")
 		.addComponent<trs>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
 		.addComponent<raster_component>(pilotMesh)
 		.addComponent<animation_component>(0.f);
-
+#endif
 
 
 
@@ -129,27 +123,10 @@ void application::initialize(dx_renderer* renderer)
 	setEnvironment("assets/textures/hdri/sunset_in_the_chalk_quarry_4k.hdr");
 
 
-	const uint32 numPointLights = 0;
-	const uint32 numSpotLights = 2;
-
-
-	pointLights.resize(numPointLights);
-	spotLights.resize(numSpotLights);
 
 	random_number_generator rng = { 14878213 };
-	for (uint32 i = 0; i < numPointLights; ++i)
-	{
-		pointLights[i] =
-		{
-			{
-				rng.randomFloatBetween(-100.f, 100.f),
-				10.f,
-				rng.randomFloatBetween(-100.f, 100.f),
-			},
-			25,
-			randomRGB(rng),
-		};
-	}
+
+	spotLights.resize(2);
 
 	spotLights[0] =
 	{
@@ -171,6 +148,17 @@ void application::initialize(dx_renderer* renderer)
 		1 // Shadow info index.
 	};
 
+	pointLights.resize(1);
+
+	pointLights[0] =
+	{
+		{ 0.f, 8.f, 0.f }, // Position.
+		20, // Max distance.
+		randomRGB(rng),
+		0 // Shadow info index.
+	};
+
+
 	sun.direction = normalize(vec3(-0.6f, -1.f, -0.3f));
 	sun.color = vec3(1.f, 0.93f, 0.76f);
 	sun.intensity = 50.f;
@@ -182,8 +170,8 @@ void application::initialize(dx_renderer* renderer)
 
 	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
 	{
-		pointLightBuffer[i] = createUploadBuffer(sizeof(point_light_cb), MAX_NUM_POINT_LIGHTS_PER_FRAME, 0);
-		spotLightBuffer[i] = createUploadBuffer(sizeof(spot_light_cb), MAX_NUM_SPOT_LIGHTS_PER_FRAME, 0);
+		pointLightBuffer[i] = createUploadBuffer(sizeof(point_light_cb), 512, 0);
+		spotLightBuffer[i] = createUploadBuffer(sizeof(spot_light_cb), 512, 0);
 
 		SET_NAME(pointLightBuffer[i]->resource, "Point lights");
 		SET_NAME(spotLightBuffer[i]->resource, "Spot lights");
@@ -272,8 +260,16 @@ void application::update(const user_input& input, float dt)
 {
 	opaqueRenderPass.reset();
 	sunShadowRenderPass.reset();
-	spotShadowRenderPasses[0].reset();
-	spotShadowRenderPasses[1].reset();
+
+	for (uint32 i = 0; i < arraysize(spotShadowRenderPasses); ++i)
+	{
+		spotShadowRenderPasses[i].reset();
+	}
+
+	for (uint32 i = 0; i < arraysize(pointShadowRenderPasses); ++i)
+	{
+		pointShadowRenderPasses[i].reset();
+	}
 
 	if (input.keyboard['F'].pressEvent && selectedEntity)
 	{
@@ -334,6 +330,8 @@ void application::update(const user_input& input, float dt)
 	ImGui::SliderInt("Raytracing downsampling", (int*)&renderer->settings.raytracingDownsampleFactor, 1, 4);
 	ImGui::SliderInt("Raytracing blur iteations", (int*)&renderer->settings.blurRaytracingResultIterations, 0, 4);
 
+	ImGui::Image(renderer->getShadowMap(), 512, 512);
+
 	ImGui::End();
 
 
@@ -351,22 +349,21 @@ void application::update(const user_input& input, float dt)
 	spotShadowRenderPasses[1].viewProjMatrix = getSpotLightViewProjectionMatrix(spotLights[1]);
 	spotShadowRenderPasses[1].dimensions = 2048;
 
+	pointShadowRenderPasses[0].lightPosition = pointLights[0].position;
+	pointShadowRenderPasses[0].dimensions = 2048;
+	pointShadowRenderPasses[0].maxDistance = pointLights[0].radius;
+	
+
 
 	// Upload and set lights.
 	if (pointLights.size())
 	{
-		point_light_cb* pls = (point_light_cb*)mapBuffer(pointLightBuffer[dxContext.bufferedFrameID]);
-		memcpy(pls, pointLights.data(), sizeof(point_light_cb) * pointLights.size());
-		unmapBuffer(pointLightBuffer[dxContext.bufferedFrameID]);
-
+		updateUploadBufferData(pointLightBuffer[dxContext.bufferedFrameID], pointLights.data(), (uint32)(sizeof(point_light_cb) * pointLights.size()));
 		renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], (uint32)pointLights.size());
 	}
 	if (spotLights.size())
 	{
-		spot_light_cb* sls = (spot_light_cb*)mapBuffer(spotLightBuffer[dxContext.bufferedFrameID]);
-		memcpy(sls, spotLights.data(), sizeof(spot_light_cb) * spotLights.size());
-		unmapBuffer(spotLightBuffer[dxContext.bufferedFrameID]);
-
+		updateUploadBufferData(spotLightBuffer[dxContext.bufferedFrameID], spotLights.data(), (uint32)(sizeof(spot_light_cb) * spotLights.size()));
 		renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], (uint32)spotLights.size());
 	}
 
@@ -414,6 +411,7 @@ void application::update(const user_input& input, float dt)
 			sunShadowRenderPass.renderObject(0, anim.vb, mesh.indexBuffer, anim.sm, m);
 			spotShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, anim.sm, m);
 			spotShadowRenderPasses[1].renderObject(anim.vb, mesh.indexBuffer, anim.sm, m);
+			pointShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, anim.sm, m);
 		}
 		else
 		{
@@ -426,14 +424,23 @@ void application::update(const user_input& input, float dt)
 				sunShadowRenderPass.renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
 				spotShadowRenderPasses[0].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
 				spotShadowRenderPasses[1].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+				pointShadowRenderPasses[0].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
 			}
 		}
 	});
 
 	renderer->submitRenderPass(&opaqueRenderPass);
 	renderer->submitRenderPass(&sunShadowRenderPass);
-	renderer->submitRenderPass(&spotShadowRenderPasses[0]);
-	renderer->submitRenderPass(&spotShadowRenderPasses[1]);
+
+	for (uint32 i = 0; i < arraysize(spotShadowRenderPasses); ++i)
+	{
+		renderer->submitRenderPass(&spotShadowRenderPasses[i]);
+	}
+
+	for (uint32 i = 0; i < arraysize(pointShadowRenderPasses); ++i)
+	{
+		renderer->submitRenderPass(&pointShadowRenderPasses[i]);
+	}
 }
 
 void application::setEnvironment(const char* filename)

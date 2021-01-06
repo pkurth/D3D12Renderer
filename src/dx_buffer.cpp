@@ -34,7 +34,14 @@ void unmapBuffer(const ref<dx_buffer>& buffer)
 	buffer->resource->Unmap(0, 0);
 }
 
-void uploadBufferData(ref<dx_buffer> buffer, const void* bufferData)
+void updateUploadBufferData(const ref<dx_buffer>& buffer, void* data, uint32 size)
+{
+	void* mapped = mapBuffer(buffer);
+	memcpy(mapped, data, size);
+	unmapBuffer(buffer);
+}
+
+static void uploadBufferData(ref<dx_buffer> buffer, const void* bufferData)
 {
 	dx_command_list* cl = dxContext.getFreeCopyCommandList();
 
@@ -65,7 +72,7 @@ void uploadBufferData(ref<dx_buffer> buffer, const void* bufferData)
 	dxContext.executeCommandList(cl);
 }
 
-void updateBufferDataRange(ref<dx_buffer> buffer, const void* data, uint32 offset, uint32 size)
+static void updateBufferDataRange(ref<dx_buffer> buffer, const void* data, uint32 offset, uint32 size)
 {
 	assert(offset + size <= buffer->totalSize);
 

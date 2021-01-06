@@ -37,6 +37,10 @@
 #define SHADOW_MAP_WIDTH (SUN_SHADOW_DIMENSIONS * MAX_NUM_SUN_SHADOW_CASCADES)
 #define SHADOW_MAP_HEIGHT 8192
 
+#define MAX_NUM_SPOT_LIGHT_SHADOW_PASSES 16
+#define MAX_NUM_POINT_LIGHT_SHADOW_PASSES 16
+
+
 enum aspect_ratio_mode
 {
 	aspect_ratio_free,
@@ -109,6 +113,12 @@ struct dx_renderer
 		spotLightShadowRenderPasses[numSpotLightShadowRenderPasses++] = renderPass;
 	}
 
+	void submitRenderPass(point_shadow_render_pass* renderPass)
+	{
+		assert(numPointLightShadowRenderPasses < MAX_NUM_POINT_LIGHT_SHADOW_PASSES);
+		pointLightShadowRenderPasses[numPointLightShadowRenderPasses++] = renderPass;
+	}
+
 	
 	renderer_settings settings;
 
@@ -157,7 +167,9 @@ private:
 	opaque_render_pass* opaqueRenderPass;
 	sun_shadow_render_pass* sunShadowRenderPass;
 	spot_shadow_render_pass* spotLightShadowRenderPasses[MAX_NUM_SPOT_LIGHT_SHADOW_PASSES];
+	point_shadow_render_pass* pointLightShadowRenderPasses[MAX_NUM_POINT_LIGHT_SHADOW_PASSES];
 	uint32 numSpotLightShadowRenderPasses;
+	uint32 numPointLightShadowRenderPasses;
 
 
 	uint32 windowWidth;
@@ -181,7 +193,8 @@ private:
 
 	ref<dx_buffer> hoveredObjectIDReadbackBuffer[NUM_BUFFERED_FRAMES];
 
-	ref<dx_buffer> shadowInfoBuffer[NUM_BUFFERED_FRAMES];
+	ref<dx_buffer> spotLightShadowInfoBuffer[NUM_BUFFERED_FRAMES];
+	ref<dx_buffer> pointLightShadowInfoBuffer[NUM_BUFFERED_FRAMES];
 
 
 	ref<pbr_environment> environment;
