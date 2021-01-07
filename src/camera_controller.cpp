@@ -9,10 +9,7 @@ void camera_controller::centerCameraOnObject(const bounding_box& aabb)
 
 	vec3 offsetDirection = normalize(camera->position - center);
 
-	camera_projection_extents extents = camera->getProjectionExtents();
-	float minHorizontalExtent = min(extents.left, extents.right);
-	float minVerticalExtent = min(extents.top, extents.bottom);
-	float minExtent = min(minHorizontalExtent, minVerticalExtent);
+	float minExtent = camera->getMinProjectionExtent();
 
 	float scaling = radius / minExtent;
 

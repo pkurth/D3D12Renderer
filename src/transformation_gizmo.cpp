@@ -58,7 +58,6 @@ static gizmo_rectangle rectangles[] =
 	gizmo_rectangle{ vec3(0.f, 1.f, 1.f), vec3(0.f, 1.f, 0.f), vec3(0.f, 0.f, 1.f), vec2(1.f) },
 };
 
-
 static bool dragging;
 static uint32 axisIndex;
 static float anchor;
@@ -95,10 +94,10 @@ struct gizmo_material : material_base
 void initializeTransformationGizmos()
 {
 	cpu_mesh mesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_normals);
-	float shaftLength = 2.f;
-	float headLength = 0.4f;
-	float radius = 0.06f;
-	float headRadius = 0.13f;
+	float shaftLength = 1.f;
+	float headLength = 0.2f;
+	float radius = 0.03f;
+	float headRadius = 0.065f;
 	translationSubmesh = mesh.pushArrow(6, radius, headRadius, shaftLength, headLength);
 	rotationSubmesh = mesh.pushTorus(6, 64, shaftLength, radius);
 	scaleSubmesh = mesh.pushMace(6, radius, headRadius, shaftLength, headLength);
@@ -133,7 +132,7 @@ void initializeTransformationGizmos()
 }
 
 
-static uint32 handleTranslation(trs& transform, ray r, const user_input& input, transformation_space space, float snapping)
+static uint32 handleTranslation(trs& transform, ray r, const user_input& input, transformation_space space, float snapping, float scaling)
 {
 	quat rot = (space == transformation_global) ? quat::identity : transform.rotation;
 
@@ -142,14 +141,14 @@ static uint32 handleTranslation(trs& transform, ray r, const user_input& input, 
 	for (uint32 i = 0; i < 3; ++i)
 	{
 		float t;
-		bounding_cylinder cylinder = { rot * cylinders[i].positionA + transform.position, rot * cylinders[i].positionB + transform.position, cylinders[i].radius };
+		bounding_cylinder cylinder = { rot * cylinders[i].positionA * scaling + transform.position, rot * cylinders[i].positionB * scaling + transform.position, cylinders[i].radius * scaling };
 		if (r.intersectCylinder(cylinder, t) && t < minT)
 		{
 			hoverAxisIndex = i;
 			minT = t;
 		}
 
-		if (r.intersectRectangle(rot * rectangles[i].position + transform.position, rot * rectangles[i].tangent, rot * rectangles[i].bitangent, rectangles[i].radius, t) && t < minT)
+		if (r.intersectRectangle(rot * rectangles[i].position * scaling + transform.position, rot * rectangles[i].tangent, rot * rectangles[i].bitangent, rectangles[i].radius * scaling, t) && t < minT)
 		{
 			hoverAxisIndex = i + 3;
 			minT = t;
@@ -233,7 +232,7 @@ static uint32 handleTranslation(trs& transform, ray r, const user_input& input, 
 	return dragging ? axisIndex : hoverAxisIndex;
 }
 
-static uint32 handleRotation(trs& transform, ray r, const user_input& input, transformation_space space, float snapping)
+static uint32 handleRotation(trs& transform, ray r, const user_input& input, transformation_space space, float snapping, float scaling)
 {
 	quat rot = (space == transformation_global) ? quat::identity : transform.rotation;
 
@@ -242,7 +241,7 @@ static uint32 handleRotation(trs& transform, ray r, const user_input& input, tra
 	for (uint32 i = 0; i < 3; ++i)
 	{
 		float t;
-		bounding_torus torus = { rot * tori[i].position + transform.position, rot * tori[i].upAxis, tori[i].majorRadius, tori[i].tubeRadius };
+		bounding_torus torus = { rot * tori[i].position * scaling + transform.position, rot * tori[i].upAxis, tori[i].majorRadius * scaling, tori[i].tubeRadius * scaling };
 		if (r.intersectTorus(torus, t) && t < minT)
 		{
 			hoverAxisIndex = i;
@@ -300,7 +299,7 @@ static uint32 handleRotation(trs& transform, ray r, const user_input& input, tra
 	return dragging ? axisIndex : hoverAxisIndex;
 }
 
-static uint32 handleScaling(trs& transform, ray r, const user_input& input, transformation_space space)
+static uint32 handleScaling(trs& transform, ray r, const user_input& input, transformation_space space, float scaling)
 {
 	quat rot = (space == transformation_global) ? quat::identity : transform.rotation;
 
@@ -309,7 +308,7 @@ static uint32 handleScaling(trs& transform, ray r, const user_input& input, tran
 	for (uint32 i = 0; i < 3; ++i)
 	{
 		float t;
-		bounding_cylinder cylinder = { rot * cylinders[i].positionA + transform.position, rot * cylinders[i].positionB + transform.position, cylinders[i].radius };
+		bounding_cylinder cylinder = { rot * cylinders[i].positionA * scaling + transform.position, rot * cylinders[i].positionB * scaling + transform.position, cylinders[i].radius * scaling };
 		if (r.intersectCylinder(cylinder, t) && t < minT)
 		{
 			hoverAxisIndex = i;
@@ -388,11 +387,20 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 
 	uint32 highlightAxis = -1;
 
+
+	// Scale gizmos based on distance to camera.
+	float scaling = length(transform.position - camera.position) / camera.getMinProjectionExtent() * 0.1f;
+
 	if (allowInput)
 	{
 		if (input.keyboard['G'].pressEvent)
 		{
 			space = (transformation_space)(1 - space);
+			dragging = false;
+		}
+		if (input.keyboard['Q'].pressEvent)
+		{
+			type = (transformation_type)-1;
 			dragging = false;
 		}
 		if (input.keyboard['W'].pressEvent)
@@ -411,6 +419,11 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 			dragging = false;
 		}
 
+		if (type == -1)
+		{
+			return false;
+		}
+
 		float snapping = input.keyboard[key_ctrl].down ? (type == transformation_type_rotation ? deg2rad(45.f) : 0.5f) : 0.f;
 
 		vec3 originalPosition = transform.position;
@@ -420,12 +433,16 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 
 		switch (type)
 		{
-			case transformation_type_translation: highlightAxis = handleTranslation(transform, r, input, space, snapping); break;
-			case transformation_type_rotation: highlightAxis = handleRotation(transform, r, input, space, snapping); break;
-			case transformation_type_scale: highlightAxis = handleScaling(transform, r, input, space); break; // TODO: Snapping for scale.
+			case transformation_type_translation: highlightAxis = handleTranslation(transform, r, input, space, snapping, scaling); break;
+			case transformation_type_rotation: highlightAxis = handleRotation(transform, r, input, space, snapping, scaling); break;
+			case transformation_type_scale: highlightAxis = handleScaling(transform, r, input, space, scaling); break; // TODO: Snapping for scale.
 		}
 	}
 
+	if (type == -1)
+	{
+		return false;
+	}
 
 
 	// Render.
@@ -454,7 +471,7 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 			overlayRenderPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
 				submeshes[type],
 				materials[i],
-				createModelMatrix(transform.position, rotations[i])
+				createModelMatrix(transform.position, rotations[i], scaling)
 			);
 		}
 	}
@@ -472,7 +489,7 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 		{
 			vec4(1.f, 0.f, 1.f, 1.f),
 			vec4(1.f, 1.f, 0.f, 1.f),
-			vec4(0.f, 1.f, 1.f, 1.f)
+			vec4(0.f, 1.f, 1.f, 1.f),
 		};
 
 		for (uint32 i = 0; i < 3; ++i)
@@ -482,7 +499,7 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 			overlayRenderPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
 				planeSubmesh,
 				materials[i + 3],
-				createModelMatrix(transform.position, rotations[i])
+				createModelMatrix(transform.position, rotations[i], scaling)
 			);
 		}
 	}

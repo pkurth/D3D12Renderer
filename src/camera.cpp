@@ -52,7 +52,7 @@ void render_camera::updateMatrices()
 	invViewProj = invView * invProj;
 }
 
-camera_projection_extents render_camera::getProjectionExtents()
+camera_projection_extents render_camera::getProjectionExtents() const
 {
 	if (type == camera_type_ingame)
 	{
@@ -70,6 +70,15 @@ camera_projection_extents render_camera::getProjectionExtents()
 
 		return camera_projection_extents{ -topLeft.x, bottomRight.x, topLeft.y, -bottomRight.y };
 	}
+}
+
+float render_camera::getMinProjectionExtent() const
+{
+	camera_projection_extents extents = getProjectionExtents();
+	float minHorizontalExtent = min(extents.left, extents.right);
+	float minVerticalExtent = min(extents.top, extents.bottom);
+	float minExtent = min(minHorizontalExtent, minVerticalExtent);
+	return minExtent;
 }
 
 ray render_camera::generateWorldSpaceRay(float relX, float relY) const
