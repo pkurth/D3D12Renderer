@@ -114,7 +114,7 @@ ps_output main(ps_input IN)
 
 					visibility = samplePointLightShadowMapPCF(IN.worldPosition, pl.position,
 						shadowMap,
-						info.viewport, info.viewport2,
+						info.viewport0, info.viewport1,
 						shadowSampler,
 						lighting.shadowMapTexelSize, pl.radius);
 				}
@@ -156,7 +156,7 @@ ps_output main(ps_input IN)
 						if (sl.shadowInfoIndex != -1)
 						{
 							spot_shadow_info info = spotShadowInfos[sl.shadowInfoIndex];
-							visibility = sampleShadowMapPCF(info.vp, IN.worldPosition,
+							visibility = sampleShadowMapPCF(info.viewProj, IN.worldPosition,
 								shadowMap, info.viewport,
 								shadowSampler,
 								lighting.shadowMapTexelSize, info.bias);

@@ -12,7 +12,6 @@ struct dx_index_buffer;
 struct pbr_raytracing_binding_table;
 struct raytracing_tlas;
 
-
 // Base for both opaque and transparent pass.
 struct geometry_render_pass
 {
@@ -184,6 +183,8 @@ protected:
 
 struct sun_shadow_render_pass : shadow_render_pass
 {
+	vec4 viewports[MAX_NUM_SUN_SHADOW_CASCADES];
+
 	// Since each cascade includes the next lower one, if you submit a draw to cascade N, it will also be rendered in N-1 automatically. No need to add it to the lower one.
 	void renderObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
 
@@ -198,7 +199,7 @@ private:
 struct spot_shadow_render_pass : shadow_render_pass
 {
 	mat4 viewProjMatrix;
-	uint32 dimensions;
+	vec4 viewport;
 
 	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
 
@@ -212,8 +213,9 @@ private:
 
 struct point_shadow_render_pass : shadow_render_pass
 {
+	vec4 viewport0;
+	vec4 viewport1;
 	vec3 lightPosition;
-	uint32 dimensions;
 	float maxDistance;
 
 	// TODO: Split this into positive and negative direction for frustum culling.

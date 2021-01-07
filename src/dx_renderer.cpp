@@ -498,14 +498,6 @@ void dx_renderer::setSun(const directional_light& light)
 	sun.numShadowCascades = light.numShadowCascades;
 
 	memcpy(sun.vp, light.vp, sizeof(mat4) * light.numShadowCascades);
-
-	float relWidth = (float)SUN_SHADOW_DIMENSIONS / (float)SHADOW_MAP_WIDTH;
-	float relHeight = (float)SUN_SHADOW_DIMENSIONS / (float)SHADOW_MAP_HEIGHT;
-
-	sun.viewports[0] = vec4(0 * relWidth, 0.f, relWidth, relHeight);
-	sun.viewports[1] = vec4(1 * relWidth, 0.f, relWidth, relHeight);
-	sun.viewports[2] = vec4(2 * relWidth, 0.f, relWidth, relHeight);
-	sun.viewports[3] = vec4(3 * relWidth, 0.f, relWidth, relHeight);
 }
 
 void dx_renderer::setPointLights(const ref<dx_buffer>& lights, uint32 numLights)
@@ -550,57 +542,49 @@ void dx_renderer::endFrame(const user_input& input)
 		recalculateViewport(true);
 	}
 
+	vec4 sunCPUShadowViewports[MAX_NUM_SUN_SHADOW_CASCADES];
+	vec4 spotLightViewports[MAX_NUM_SPOT_LIGHT_SHADOW_PASSES];
+	vec4 pointLightViewports[MAX_NUM_POINT_LIGHT_SHADOW_PASSES][2];
 
-	spot_shadow_info spotLightShadowInfos[16];
-	point_shadow_info pointLightShadowInfos[16];
-
-	// Pack shadow maps.
 	{
-		float relYOffset = (float)SUN_SHADOW_DIMENSIONS / (float)SHADOW_MAP_HEIGHT;
+		spot_shadow_info spotLightShadowInfos[16];
+		point_shadow_info pointLightShadowInfos[16];
 
-		uint32 x = 0;
+		if (sunShadowRenderPass)
+		{
+			for (uint32 i = 0; i < sun.numShadowCascades; ++i)
+			{
+				sunCPUShadowViewports[i] = sunShadowRenderPass->viewports[i];
+				sun.viewports[i] = sunCPUShadowViewports[i] / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
+			}
+		}
 
 		for (uint32 i = 0; i < numSpotLightShadowRenderPasses; ++i)
 		{
-			uint32 dimensions = spotLightShadowRenderPasses[i]->dimensions;
-
-			float relWidth = (float)dimensions / (float)SHADOW_MAP_WIDTH;
-			float relHeight = (float)dimensions / (float)SHADOW_MAP_HEIGHT;
-
-			float relXOffset = (float)x / (float)SHADOW_MAP_WIDTH;
-
 			spot_shadow_info& si = spotLightShadowInfos[i];
-			si.vp = spotLightShadowRenderPasses[i]->viewProjMatrix;
-			si.viewport = vec4(relXOffset, relYOffset, relWidth, relHeight);
+
+			spotLightViewports[i] = spotLightShadowRenderPasses[i]->viewport;
+			si.viewport = spotLightViewports[i] / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
+			si.viewProj = spotLightShadowRenderPasses[i]->viewProjMatrix;
 			si.bias = 0.000005f;
-
-			si.cpuViewport = vec4((float)x, SUN_SHADOW_DIMENSIONS, (float)dimensions, (float)dimensions);
-
-			x += dimensions;
 		}
 
 		for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
 		{
-			uint32 dimensions = pointLightShadowRenderPasses[i]->dimensions;
-
-			float relWidth = (float)dimensions / (float)SHADOW_MAP_WIDTH;
-			float relHeight = (float)dimensions / (float)SHADOW_MAP_HEIGHT;
-
-			float relXOffset = (float)x / (float)SHADOW_MAP_WIDTH;
-
 			point_shadow_info& si = pointLightShadowInfos[i];
-			si.viewport = vec4(relXOffset, relYOffset, relWidth, relHeight);
-			si.viewport2 = vec4(relXOffset + relWidth, relYOffset, relWidth, relHeight);
 
-			si.cpuViewports[0] = vec4((float)x, SUN_SHADOW_DIMENSIONS, (float)dimensions, (float)dimensions);
-			si.cpuViewports[1] = vec4((float)(x + dimensions), SUN_SHADOW_DIMENSIONS, (float)dimensions, (float)dimensions);
+			pointLightViewports[i][0] = pointLightShadowRenderPasses[i]->viewport0;
+			pointLightViewports[i][1] = pointLightShadowRenderPasses[i]->viewport1;
 
-			x += dimensions * 2;
+			si.viewport0 = pointLightViewports[i][0] / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
+			si.viewport1 = pointLightViewports[i][1] / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
 		}
+
 
 		updateUploadBufferData(spotLightShadowInfoBuffer[dxContext.bufferedFrameID], spotLightShadowInfos, (uint32)(sizeof(spot_shadow_info) * numSpotLightShadowRenderPasses));
 		updateUploadBufferData(pointLightShadowInfoBuffer[dxContext.bufferedFrameID], pointLightShadowInfos, (uint32)(sizeof(point_shadow_info) * numPointLightShadowRenderPasses));
 	}
+
 
 	auto cameraCBV = dxContext.uploadDynamicConstantBuffer(camera);
 	auto sunCBV = dxContext.uploadDynamicConstantBuffer(sun);
@@ -838,7 +822,8 @@ void dx_renderer::endFrame(const user_input& input)
 	{
 		for (uint32 i = 0; i < sun.numShadowCascades; ++i)
 		{
-			cl->setViewport((float)(i * SUN_SHADOW_DIMENSIONS), 0.f, SUN_SHADOW_DIMENSIONS, SUN_SHADOW_DIMENSIONS);
+			vec4 vp = sunCPUShadowViewports[i];
+			cl->setViewport(vp.x, vp.y, vp.z, vp.w);
 
 			for (uint32 cascade = 0; cascade <= i; ++cascade)
 			{
@@ -859,10 +844,9 @@ void dx_renderer::endFrame(const user_input& input)
 
 	for (uint32 i = 0; i < numSpotLightShadowRenderPasses; ++i)
 	{
-		spot_shadow_info& si = spotLightShadowInfos[i];
-		const mat4& viewProj = si.vp;
+		const mat4& viewProj = spotLightShadowRenderPasses[i]->viewProjMatrix;
 
-		cl->setViewport(si.cpuViewport.x, si.cpuViewport.y, si.cpuViewport.z, si.cpuViewport.w);
+		cl->setViewport(spotLightViewports[i].x, spotLightViewports[i].y, spotLightViewports[i].z, spotLightViewports[i].w);
 
 		for (const auto& dc : spotLightShadowRenderPasses[i]->drawCalls)
 		{
@@ -882,11 +866,9 @@ void dx_renderer::endFrame(const user_input& input)
 
 	for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
 	{
-		point_shadow_info& si = pointLightShadowInfos[i];
-
 		for (uint32 v = 0; v < 2; ++v)
 		{
-			cl->setViewport(si.cpuViewports[v].x, si.cpuViewports[v].y, si.cpuViewports[v].z, si.cpuViewports[v].w);
+			cl->setViewport(pointLightViewports[i][v].x, pointLightViewports[i][v].y, pointLightViewports[i][v].z, pointLightViewports[i][v].w);
 
 			float flip = (v == 0) ? 1.f : -1.f;
 

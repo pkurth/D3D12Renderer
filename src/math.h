@@ -79,6 +79,11 @@ union vec4
 		vec3 xyz;
 		float w;
 	};
+	struct
+	{
+		vec2 xy;
+		vec2 zw;
+	};
 	floatx4 f4;
 	float data[4];
 

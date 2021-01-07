@@ -8,6 +8,8 @@
 #include "dx_context.h"
 #include "skinning.h"
 
+#define STB_RECT_PACK_IMPLEMENTATION
+#include <imgui/imstb_rectpack.h>
 
 struct raster_component
 {
@@ -164,6 +166,7 @@ void application::initialize(dx_renderer* renderer)
 	sun.intensity = 50.f;
 
 	sun.numShadowCascades = 3;
+	sun.shadowDimensions = 2048;
 	sun.cascadeDistances = vec4(9.f, 39.f, 74.f, 10000.f);
 	sun.bias = vec4(0.000049f, 0.000114f, 0.000082f, 0.0035f);
 	sun.blendDistances = vec4(3.f, 3.f, 10.f, 10.f);
@@ -409,7 +412,7 @@ void application::submitRenderPasses()
 	}
 }
 
-void application::handleUserInput(const user_input& input)
+void application::handleUserInput(const user_input& input, float dt)
 {
 	if (input.keyboard['F'].pressEvent && selectedEntity)
 	{
@@ -451,10 +454,60 @@ void application::handleUserInput(const user_input& input)
 	}
 }
 
+void application::assignShadowMapViewports()
+{
+	stbrp_node* nodes = (stbrp_node*)alloca(sizeof(stbrp_node) * 1024);
+
+	stbrp_context packContext;
+	stbrp_init_target(&packContext, SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, nodes, 1024);
+
+	stbrp_rect rects[4 + arraysize(spotShadowRenderPasses) + 2 * arraysize(pointShadowRenderPasses)];
+
+	uint32 rectIndex = 0;
+	for (uint32 i = 0; i < sun.numShadowCascades; ++i)
+	{
+		stbrp_rect& r = rects[rectIndex++];
+		r.w = r.h = sun.shadowDimensions;
+	}
+	for (uint32 i = 0; i < arraysize(spotShadowRenderPasses); ++i)
+	{
+		stbrp_rect& r = rects[rectIndex++];
+		r.w = r.h = 2048;
+	}
+	for (uint32 i = 0; i < arraysize(pointShadowRenderPasses); ++i)
+	{
+		stbrp_rect& r0 = rects[rectIndex++];
+		stbrp_rect& r1 = rects[rectIndex++];
+		r0.w = r0.h = r1.w = r1.h = 2048;
+	}
+
+	int result = stbrp_pack_rects(&packContext, rects, rectIndex);
+	assert(result);
+
+	rectIndex = 0;
+	for (uint32 i = 0; i < sun.numShadowCascades; ++i)
+	{
+		stbrp_rect& r = rects[rectIndex++];
+		sunShadowRenderPass.viewports[i] = { (float)r.x, (float)r.y, (float)r.w, (float)r.h };
+	}
+	for (uint32 i = 0; i < arraysize(spotShadowRenderPasses); ++i)
+	{
+		stbrp_rect& r = rects[rectIndex++];
+		spotShadowRenderPasses[i].viewport = { (float)r.x, (float)r.y, (float)r.w, (float)r.h };
+	}
+	for (uint32 i = 0; i < arraysize(pointShadowRenderPasses); ++i)
+	{
+		stbrp_rect& r0 = rects[rectIndex++];
+		stbrp_rect& r1 = rects[rectIndex++];
+		pointShadowRenderPasses[i].viewport0 = { (float)r0.x, (float)r0.y, (float)r0.w, (float)r0.h };
+		pointShadowRenderPasses[i].viewport1 = { (float)r1.x, (float)r1.y, (float)r1.w, (float)r1.h };
+	}
+}
+
 void application::update(const user_input& input, float dt)
 {
 	resetRenderPasses();
-	handleUserInput(input);
+	handleUserInput(input, dt);
 
 	drawSceneHierarchy();
 	drawSettings(dt);
@@ -469,14 +522,11 @@ void application::update(const user_input& input, float dt)
 
 
 	spotShadowRenderPasses[0].viewProjMatrix = getSpotLightViewProjectionMatrix(spotLights[0]);
-	spotShadowRenderPasses[0].dimensions = 2048;
-
 	spotShadowRenderPasses[1].viewProjMatrix = getSpotLightViewProjectionMatrix(spotLights[1]);
-	spotShadowRenderPasses[1].dimensions = 2048;
-
 	pointShadowRenderPasses[0].lightPosition = pointLights[0].position;
-	pointShadowRenderPasses[0].dimensions = 2048;
 	pointShadowRenderPasses[0].maxDistance = pointLights[0].radius;
+
+	assignShadowMapViewports();
 	
 
 

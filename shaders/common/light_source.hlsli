@@ -5,7 +5,6 @@
 #define LIGHT_IRRADIANCE_SCALE 1000.f
 
 #define MAX_NUM_SUN_SHADOW_CASCADES 4
-#define SUN_SHADOW_DIMENSIONS 2048
 
 static float getAttenuation(float distance, float maxDistance)
 {
@@ -52,28 +51,19 @@ struct spot_light_cb
 
 struct spot_shadow_info
 {
-	mat4 vp;
+	mat4 viewProj;
 
 	vec4 viewport;
+
 	float bias;
-
 	float padding0[3];
-	vec4 padding1;
-
-	vec4 cpuViewport;
 };
 
 struct point_shadow_info
 {
-	vec4 viewport;
-	vec4 viewport2;
-
-	vec4 cpuViewports[2];
+	vec4 viewport0;
+	vec4 viewport1;
 };
-
-#ifndef HLSL
-static_assert(sizeof(spot_shadow_info) == sizeof(mat4) * 2, "");
-#endif
 
 static float getInnerCutoff(int innerAndOuterCutoff)
 {

@@ -21,6 +21,7 @@ struct directional_light
 	mat4 vp[MAX_NUM_SUN_SHADOW_CASCADES];
 
 	vec4 blendDistances;
+	uint32 shadowDimensions;
 
 
 	// 'preventRotationalShimmering' uses bounding spheres instead of bounding boxes. 

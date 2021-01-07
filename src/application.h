@@ -34,8 +34,9 @@ private:
 
 	void resetRenderPasses();
 	void submitRenderPasses();
-	void handleUserInput(const user_input& input);
+	void handleUserInput(const user_input& input, float dt);
 
+	void assignShadowMapViewports();
 
 	std::vector<raytracing_blas> blas;
 

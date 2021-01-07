@@ -83,10 +83,10 @@ void directional_light::updateMatrices(const render_camera& camera, bool prevent
 		// Move in pixel increments.
 		// https://stackoverflow.com/questions/33499053/cascaded-shadow-map-shimmering
 
-		vec4 shadowOrigin = (vp[i] * vec4(0.f, 0.f, 0.f, 1.f)) * SUN_SHADOW_DIMENSIONS * 0.5f;
+		vec4 shadowOrigin = (vp[i] * vec4(0.f, 0.f, 0.f, 1.f)) * (float)shadowDimensions * 0.5f;
 		vec4 roundedOrigin = round(shadowOrigin);
 		vec4 roundOffset = roundedOrigin - shadowOrigin;
-		roundOffset = roundOffset * 2.f / SUN_SHADOW_DIMENSIONS;
+		roundOffset = roundOffset * 2.f / (float)shadowDimensions;
 		roundOffset.z = 0.f;
 		roundOffset.w = 0.f;
 
