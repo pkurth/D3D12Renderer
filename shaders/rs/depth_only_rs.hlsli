@@ -12,6 +12,7 @@ struct point_shadow_transform_cb
     vec3 lightPosition;
     float maxDistance;
     float flip;
+    float padding[3];
 };
 
 struct depth_only_object_id_cb

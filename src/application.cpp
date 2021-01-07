@@ -42,7 +42,7 @@ void application::initialize(dx_renderer* renderer)
 		.addComponent<raster_component>(loadMeshFromFile("assets/meshes/sponza.obj"));
 
 
-#if 0
+#if 1
 	auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/meshes/stormtrooper.fbx");
 	stormtrooperMesh->submeshes[0].material = createPBRMaterial(
 		"assets/textures/stormtrooper/Stormtrooper_D.png",
@@ -153,7 +153,7 @@ void application::initialize(dx_renderer* renderer)
 	pointLights[0] =
 	{
 		{ 0.f, 8.f, 0.f }, // Position.
-		20, // Max distance.
+		20, // Radius.
 		randomRGB(rng),
 		0 // Shadow info index.
 	};

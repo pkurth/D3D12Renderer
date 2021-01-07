@@ -136,9 +136,9 @@ static float sampleShadowMapPCF(float4x4 vp, float3 worldPosition,
 
 		lightUV = lightUV * viewport.zw + viewport.xy;
 
-		for (float y = -1.5f; y <= 1.5f; y += 1.f)
+		for (float y = -1.5f; y <= 1.6f; y += 1.f)
 		{
-			for (float x = -1.5f; x <= 1.5f; x += 1.f)
+			for (float x = -1.5f; x <= 1.6f; x += 1.f)
 			{
 				visibility += shadowMap.SampleCmpLevelZero(
 					shadowMapSampler,
@@ -183,9 +183,9 @@ static float samplePointLightShadowMapPCF(float3 worldPosition, float3 lightPosi
 		compareDistance - bias);
 #else
 	float visibility = 0.f;
-	for (float y = -1.5f; y <= 1.5f; y += 1.f)
+	for (float y = -1.5f; y <= 1.6f; y += 1.f)
 	{
-		for (float x = -1.5f; x <= 1.5f; x += 1.f)
+		for (float x = -1.5f; x <= 1.6f; x += 1.f)
 		{
 			visibility += shadowMap.SampleCmpLevelZero(
 				shadowMapSampler,
