@@ -358,5 +358,9 @@ ref<composite_mesh> loadMeshFromFile(const char* sceneFilename, uint32 flags)
 	Assimp::Importer importer;
 
 	const aiScene* scene = loadAssimpSceneFile(sceneFilename, importer);
-	return loadMeshFromScene(scene, flags);
+
+	ref<composite_mesh> result = loadMeshFromScene(scene, flags);
+	result->filepath = sceneFilename;
+	result->flags = flags;
+	return result;
 }

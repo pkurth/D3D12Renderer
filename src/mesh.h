@@ -24,6 +24,9 @@ struct composite_mesh
 	animation_skeleton skeleton;
 	dx_mesh mesh;
 	bounding_box aabb;
+
+	std::string filepath;
+	uint32 flags;
 };
 
 

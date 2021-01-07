@@ -400,7 +400,7 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 		}
 		if (input.keyboard['Q'].pressEvent)
 		{
-			type = (transformation_type)-1;
+			type = transformation_type_none;
 			dragging = false;
 		}
 		if (input.keyboard['W'].pressEvent)
@@ -419,7 +419,7 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 			dragging = false;
 		}
 
-		if (type == -1)
+		if (type == transformation_type_none)
 		{
 			return false;
 		}
@@ -439,7 +439,7 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 		}
 	}
 
-	if (type == -1)
+	if (type == transformation_type_none)
 	{
 		return false;
 	}

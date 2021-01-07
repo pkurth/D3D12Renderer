@@ -7,6 +7,7 @@
 
 enum transformation_type
 {
+	transformation_type_none = -1,
 	transformation_type_translation,
 	transformation_type_rotation,
 	transformation_type_scale,
