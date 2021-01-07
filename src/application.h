@@ -28,6 +28,15 @@ struct application
 	bool deserializeFromFile(const char* filename);
 
 private:
+	void setSelectedEntity(scene_entity entity);
+	void drawSceneHierarchy();
+	void drawSettings(float dt);
+
+	void resetRenderPasses();
+	void submitRenderPasses();
+	void handleUserInput(const user_input& input);
+
+
 	std::vector<raytracing_blas> blas;
 
 	pbr_raytracing_binding_table raytracingBindingTable;
@@ -46,8 +55,9 @@ private:
 	render_camera camera;
 	camera_controller cameraController;
 
-	scene scene;
+	scene appScene;
 	scene_entity selectedEntity;
+	vec3 selectedEntityEulerRotation;
 
 
 	opaque_render_pass opaqueRenderPass;

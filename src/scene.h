@@ -85,6 +85,11 @@ struct scene
 			.addComponent<tag_component>(name);
 	}
 
+	void deleteEntity(scene_entity e)
+	{
+		registry.destroy(e.handle);
+	}
+
 	template <typename... component_t>
 	auto view() 
 	{ 

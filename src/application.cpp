@@ -37,7 +37,7 @@ void application::initialize(dx_renderer* renderer)
 
 	
 	// Sponza.
-	scene.createEntity("Sponza")
+	appScene.createEntity("Sponza")
 		.addComponent<trs>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
 		.addComponent<raster_component>(loadMeshFromFile("assets/meshes/sponza.obj"));
 
@@ -63,22 +63,22 @@ void application::initialize(dx_renderer* renderer)
 		0.f
 	);
 
-	scene.createEntity("Stormtrooper 1")
+	appScene.createEntity("Stormtrooper 1")
 		.addComponent<trs>(vec3(-5.f, 0.f, -1.f), quat::identity)
 		.addComponent<raster_component>(stormtrooperMesh)
 		.addComponent<animation_component>(1.5f);
 
-	scene.createEntity("Stormtrooper 2")
+	appScene.createEntity("Stormtrooper 2")
 		.addComponent<trs>(vec3(0.f, 0.f, -2.f), quat::identity)
 		.addComponent<raster_component>(stormtrooperMesh)
 		.addComponent<animation_component>(0.f);
 
-	scene.createEntity("Stormtrooper 3")
+	appScene.createEntity("Stormtrooper 3")
 		.addComponent<trs>(vec3(5.f, 0.f, -1.f), quat::identity)
 		.addComponent<raster_component>(stormtrooperMesh)
 		.addComponent<animation_component>(1.5f);
 
-	scene.createEntity("Pilot")
+	appScene.createEntity("Pilot")
 		.addComponent<trs>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
 		.addComponent<raster_component>(pilotMesh)
 		.addComponent<animation_component>(0.f);
@@ -256,7 +256,128 @@ static bool editSunShadowParameters(directional_light& sun)
 	return result;
 }
 
-void application::update(const user_input& input, float dt)
+void application::setSelectedEntity(scene_entity entity)
+{
+	selectedEntity = entity;
+	if (entity && entity.hasComponent<trs>())
+	{
+		selectedEntityEulerRotation = quatToEuler(entity.getComponent<trs>().rotation);
+	}
+}
+
+template<typename component_t, typename ui_func>
+static void drawComponent(scene_entity entity, const char* componentName, ui_func func)
+{
+	const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding;
+	if (entity.hasComponent<component_t>())
+	{
+		auto& component = entity.getComponent<component_t>();
+		ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
+
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
+		float lineHeight = ImGui::GetIO().Fonts->Fonts[0]->FontSize + ImGui::GetStyle().FramePadding.y * 2.f;
+		ImGui::Separator();
+		bool open = ImGui::TreeNodeEx((void*)typeid(component_t).hash_code(), treeNodeFlags, componentName);
+		ImGui::PopStyleVar();
+
+		if (open)
+		{
+			func(component);
+			ImGui::TreePop();
+		}
+	}
+}
+
+void application::drawSceneHierarchy()
+{
+	if (ImGui::Begin("Scene Hierarchy"))
+	{
+		appScene.view<tag_component>()
+			.each([this](auto entityHandle, auto& tag)
+		{
+			const char* name = tag.name;
+			scene_entity entity = { entityHandle, appScene };
+
+			if (entity == selectedEntity)
+			{
+				ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), name);
+			}
+			else
+			{
+				ImGui::Text(name);
+			}
+
+			if (ImGui::IsItemClicked(0) || ImGui::IsItemClicked(1))
+			{
+				setSelectedEntity(entity);
+			}
+
+			bool entityDeleted = false;
+			if (ImGui::BeginPopupContextItem(name))
+			{
+				if (ImGui::MenuItem("Delete"))
+					entityDeleted = true;
+
+				ImGui::EndPopup();
+			}
+
+			if (entityDeleted)
+			{
+				appScene.deleteEntity(entity);
+				setSelectedEntity({});
+			}
+		});
+
+		ImGui::Separator();
+
+		if (selectedEntity)
+		{
+			ImGui::AlignTextToFramePadding();
+
+			ImGui::Text(selectedEntity.getComponent<tag_component>().name);
+
+			drawComponent<trs>(selectedEntity, "Transform", [this](auto& transform)
+			{
+				ImGui::DragFloat3("Translation", transform.position.data, 0.1f, 0.f, 0.f);
+
+				if (ImGui::DragFloat3("Rotation", selectedEntityEulerRotation.data, 0.1f, 0.f, 0.f))
+				{
+					transform.rotation = eulerToQuat(selectedEntityEulerRotation);
+				}
+
+				ImGui::DragFloat3("Scale", transform.scale.data, 0.1f, 0.f, 0.f);
+			});
+		}
+	}
+	ImGui::End();
+}
+
+void application::drawSettings(float dt)
+{
+	if (ImGui::Begin("Settings"))
+	{
+		ImGui::Text("%.3f ms, %u FPS", dt * 1000.f, (uint32)(1.f / dt));
+
+		dx_memory_usage memoryUsage = dxContext.getMemoryUsage();
+
+		ImGui::Text("Video memory available: %uMB", memoryUsage.available);
+		ImGui::Text("Video memory used: %uMB", memoryUsage.currentlyUsed);
+
+		ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->settings.aspectRatioMode);
+
+		plotAndEditTonemapping(renderer->settings.tonemap);
+		editSunShadowParameters(sun);
+
+		ImGui::SliderFloat("Environment intensity", &renderer->settings.environmentIntensity, 0.f, 2.f);
+		ImGui::SliderFloat("Sky intensity", &renderer->settings.skyIntensity, 0.f, 2.f);
+		ImGui::SliderInt("Raytracing bounces", (int*)&renderer->settings.numRaytracingBounces, 1, MAX_PBR_RAYTRACING_RECURSION_DEPTH - 1);
+		ImGui::SliderInt("Raytracing downsampling", (int*)&renderer->settings.raytracingDownsampleFactor, 1, 4);
+		ImGui::SliderInt("Raytracing blur iteations", (int*)&renderer->settings.blurRaytracingResultIterations, 0, 4);
+	}
+	ImGui::End();
+}
+
+void application::resetRenderPasses()
 {
 	opaqueRenderPass.reset();
 	sunShadowRenderPass.reset();
@@ -270,7 +391,26 @@ void application::update(const user_input& input, float dt)
 	{
 		pointShadowRenderPasses[i].reset();
 	}
+}
 
+void application::submitRenderPasses()
+{
+	renderer->submitRenderPass(&opaqueRenderPass);
+	renderer->submitRenderPass(&sunShadowRenderPass);
+
+	for (uint32 i = 0; i < arraysize(spotShadowRenderPasses); ++i)
+	{
+		renderer->submitRenderPass(&spotShadowRenderPasses[i]);
+	}
+
+	for (uint32 i = 0; i < arraysize(pointShadowRenderPasses); ++i)
+	{
+		renderer->submitRenderPass(&pointShadowRenderPasses[i]);
+	}
+}
+
+void application::handleUserInput(const user_input& input)
+{
 	if (input.keyboard['F'].pressEvent && selectedEntity)
 	{
 		auto& raster = selectedEntity.getComponent<raster_component>();
@@ -301,38 +441,23 @@ void application::update(const user_input& input, float dt)
 	{
 		if (renderer->hoveredObjectID != 0xFFFF)
 		{
-			selectedEntity = { renderer->hoveredObjectID, scene };
+			setSelectedEntity({ renderer->hoveredObjectID, appScene });
 		}
 		else
 		{
-			selectedEntity = {};
+			setSelectedEntity({});
 		}
 		inputCaptured = true;
 	}
+}
 
+void application::update(const user_input& input, float dt)
+{
+	resetRenderPasses();
+	handleUserInput(input);
 
-	ImGui::Begin("Settings");
-	ImGui::Text("%.3f ms, %u FPS", dt * 1000.f, (uint32)(1.f / dt));
-
-	dx_memory_usage memoryUsage = dxContext.getMemoryUsage();
-
-	ImGui::Text("Video memory available: %uMB", memoryUsage.available);
-	ImGui::Text("Video memory used: %uMB", memoryUsage.currentlyUsed);
-
-	ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->settings.aspectRatioMode);
-
-	plotAndEditTonemapping(renderer->settings.tonemap);
-	editSunShadowParameters(sun);
-
-	ImGui::SliderFloat("Environment intensity", &renderer->settings.environmentIntensity, 0.f, 2.f);
-	ImGui::SliderFloat("Sky intensity", &renderer->settings.skyIntensity, 0.f, 2.f);
-	ImGui::SliderInt("Raytracing bounces", (int*)&renderer->settings.numRaytracingBounces, 1, MAX_PBR_RAYTRACING_RECURSION_DEPTH - 1);
-	ImGui::SliderInt("Raytracing downsampling", (int*)&renderer->settings.raytracingDownsampleFactor, 1, 4);
-	ImGui::SliderInt("Raytracing blur iteations", (int*)&renderer->settings.blurRaytracingResultIterations, 0, 4);
-
-	ImGui::Image(renderer->getShadowMap(), 512, 512);
-
-	ImGui::End();
+	drawSceneHierarchy();
+	drawSettings(dt);
 
 
 	sun.updateMatrices(camera);
@@ -369,7 +494,7 @@ void application::update(const user_input& input, float dt)
 
 
 	// Skin animated meshes.
-	scene.group<animation_component>(entt::get<raster_component>)
+	appScene.group<animation_component>(entt::get<raster_component>)
 		.each([dt](auto& anim, auto& raster)
 	{
 		anim.time += dt;
@@ -391,13 +516,13 @@ void application::update(const user_input& input, float dt)
 
 
 	// Submit render calls.
-	scene.group<raster_component>(entt::get<trs>)
+	appScene.group<raster_component>(entt::get<trs>)
 		.each([this](entt::entity entityHandle, auto& raster, auto& transform)
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
 
-		scene_entity entity = { entityHandle, scene };
+		scene_entity entity = { entityHandle, appScene };
 		bool outline = selectedEntity == entity;
 
 		if (entity.hasComponent<animation_component>())
@@ -429,18 +554,7 @@ void application::update(const user_input& input, float dt)
 		}
 	});
 
-	renderer->submitRenderPass(&opaqueRenderPass);
-	renderer->submitRenderPass(&sunShadowRenderPass);
-
-	for (uint32 i = 0; i < arraysize(spotShadowRenderPasses); ++i)
-	{
-		renderer->submitRenderPass(&spotShadowRenderPasses[i]);
-	}
-
-	for (uint32 i = 0; i < arraysize(pointShadowRenderPasses); ++i)
-	{
-		renderer->submitRenderPass(&pointShadowRenderPasses[i]);
-	}
+	submitRenderPasses();
 }
 
 void application::setEnvironment(const char* filename)

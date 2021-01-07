@@ -585,6 +585,57 @@ quat mat3ToQuaternion(mat3 m)
 	return normalize(result);
 }
 
+vec3 quatToEuler(quat q)
+{
+	float roll, pitch, yaw;
+
+	// Roll (x-axis rotation).
+	float sinr_cosp = 2.f * (q.w * q.x + q.y * q.z);
+	float cosr_cosp = 1.f - 2.f * (q.x * q.x + q.y * q.y);
+	yaw = atan2(sinr_cosp, cosr_cosp);
+
+	// Pitch (y-axis rotation).
+	float sinp = 2.f * (q.w * q.y - q.z * q.x);
+	if (abs(sinp) >= 1.f)
+	{
+		roll = copysign(M_PI / 2, sinp); // Use 90 degrees if out of range.
+	}
+	else
+	{
+		roll = asin(sinp);
+	}
+
+	// Yaw (z-axis rotation).
+	float siny_cosp = 2 * (q.w * q.z + q.x * q.y);
+	float cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
+	pitch = atan2(siny_cosp, cosy_cosp);
+
+	return vec3(pitch, yaw, roll);
+}
+
+quat eulerToQuat(vec3 euler)
+{
+	float pitch = euler.x;
+	float yaw = euler.y;
+	float roll = euler.z;
+
+	// Abbreviations for the various angular functions
+	float cy = cos(pitch * 0.5f);
+	float sy = sin(pitch * 0.5f);
+	float cp = cos(roll * 0.5f);
+	float sp = sin(roll * 0.5f);
+	float cr = cos(yaw * 0.5f);
+	float sr = sin(yaw * 0.5f);
+
+	quat q;
+	q.w = cr * cp * cy + sr * sp * sy;
+	q.x = sr * cp * cy - cr * sp * sy;
+	q.y = cr * sp * cy + sr * cp * sy;
+	q.z = cr * cp * sy - sr * sp * cy;
+
+	return q;
+}
+
 mat4 createPerspectiveProjectionMatrix(float fov, float aspect, float nearPlane, float farPlane)
 {
 	mat4 result = mat4::identity;

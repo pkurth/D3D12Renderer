@@ -498,6 +498,9 @@ quat nlerp(quat from, quat to, float t);
 mat3 quaternionToMat3(quat q);
 quat mat3ToQuaternion(mat3 m);
 
+vec3 quatToEuler(quat q);
+quat eulerToQuat(vec3 euler);
+
 mat4 trsToMat4(const trs& transform);
 
 mat4 createPerspectiveProjectionMatrix(float fov, float aspect, float nearPlane, float farPlane);

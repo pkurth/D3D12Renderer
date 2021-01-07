@@ -283,7 +283,7 @@ int main(int argc, char** argv)
 
 		ImGui::SetNextWindowClass(&sceneViewWindowClass);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-		ImGui::Begin("Scene");
+		ImGui::Begin("Scene Viewport");
 		uint32 renderWidth = (uint32)ImGui::GetContentRegionAvail().x;
 		uint32 renderHeight = (uint32)ImGui::GetContentRegionAvail().y;
 		ImGui::Image(renderer.frameResult, renderWidth, renderHeight);
