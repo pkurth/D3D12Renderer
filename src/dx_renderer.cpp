@@ -14,7 +14,6 @@
 #include "sky_rs.hlsli"
 #include "light_culling_rs.hlsli"
 #include "camera.hlsli"
-#include "flat_simple_rs.hlsli"
 #include "transform.hlsli"
 
 #include "raytracing.h"
@@ -40,9 +39,6 @@ static dx_pipeline proceduralSkyPipeline;
 
 static dx_pipeline blitPipeline;
 static dx_pipeline presentPipeline;
-
-static dx_pipeline flatUnlitPipeline;
-static dx_pipeline flatSimplePipeline;
 
 
 static dx_pipeline atmospherePipeline;
@@ -174,28 +170,6 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 			.depthSettings(false, false);
 
 		outlineDrawerPipeline = createReloadablePipeline(drawerDesc, { "fullscreen_triangle_vs", "outline_ps" });
-	}
-
-	// Flat unlit.
-	{
-		auto desc = CREATE_GRAPHICS_PIPELINE
-			.inputLayout(inputLayout_position)
-			.renderTargets(hdrFormat[0], hdrDepthStencilFormat)
-			.cullingOff()
-			.wireframe();
-
-		flatUnlitPipeline = createReloadablePipeline(desc, { "flat_unlit_vs", "flat_unlit_ps" }, rs_in_vertex_shader);
-	}
-
-	// Flat simple.
-	{
-		auto desc = CREATE_GRAPHICS_PIPELINE
-			.inputLayout(inputLayout_position_normal)
-			.renderTargets(hdrFormat[0], hdrDepthStencilFormat)
-			//.depthSettings(false)
-			;
-
-		flatSimplePipeline = createReloadablePipeline(desc, { "flat_simple_vs", "flat_simple_ps" });
 	}
 
 	// Present.
@@ -372,6 +346,7 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 	}
 
 	opaqueRenderPass = 0;
+	overlayRenderPass = 0;
 	sunShadowRenderPass = 0;
 	numSpotLightShadowRenderPasses = 0;
 	numPointLightShadowRenderPasses = 0;
@@ -924,11 +899,11 @@ void dx_renderer::endFrame(const user_input& input)
 	// LIGHT PASS
 	// ----------------------------------------
 
+	cl->setRenderTarget(hdrRenderTarget);
+	cl->setViewport(hdrRenderTarget.viewport);
+
 	if (opaqueRenderPass && opaqueRenderPass->drawCalls.size() > 0)
 	{
-		cl->setRenderTarget(hdrRenderTarget);
-		cl->setViewport(hdrRenderTarget.viewport);
-
 		material_setup_function lastSetupFunc = 0;
 
 		for (const auto& dc : opaqueRenderPass->drawCalls)
@@ -1032,19 +1007,27 @@ void dx_renderer::endFrame(const user_input& input)
 	// HELPER STUFF
 	// ----------------------------------------
 
-#if 0
-	if (visualizationRenderPass.drawCalls.size() > 0)
+#if 1
+	if (overlayRenderPass && overlayRenderPass->drawCalls.size())
 	{
-		cl->setPipelineState(*flatSimplePipeline.pipeline);
-		cl->setGraphicsRootSignature(*flatSimplePipeline.rootSignature);
+		cl->clearDepth(depthStencilBuffer->dsvHandle);
 
-		for (const auto& dc : visualizationRenderPass.drawCalls)
+		material_setup_function lastSetupFunc = 0;
+
+		for (const auto& dc : overlayRenderPass->drawCalls)
 		{
 			const mat4& m = dc.transform;
 			const submesh_info& submesh = dc.submesh;
 
-			cl->setGraphics32BitConstants(0, flat_simple_transform_cb{ camera.viewProj * m, camera.view * m });
-			cl->setGraphics32BitConstants(1, dc.color);
+			if (dc.materialSetupFunc != lastSetupFunc)
+			{
+				dc.materialSetupFunc(cl, materialInfo);
+				lastSetupFunc = dc.materialSetupFunc;
+			}
+
+			dc.material->prepareForRendering(cl);
+
+			cl->setGraphics32BitConstants(0, transform_cb{ camera.viewProj * m, m });
 
 			cl->setVertexBuffer(0, dc.vertexBuffer);
 			cl->setIndexBuffer(dc.indexBuffer);

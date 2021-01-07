@@ -265,6 +265,9 @@ void application::setSelectedEntity(scene_entity entity)
 	if (entity && entity.hasComponent<trs>())
 	{
 		selectedEntityEulerRotation = quatToEuler(entity.getComponent<trs>().rotation);
+		selectedEntityEulerRotation.x = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.x));
+		selectedEntityEulerRotation.y = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.y));
+		selectedEntityEulerRotation.z = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.z));
 	}
 }
 
@@ -345,7 +348,11 @@ void application::drawSceneHierarchy()
 
 				if (ImGui::DragFloat3("Rotation", selectedEntityEulerRotation.data, 0.1f, 0.f, 0.f))
 				{
-					transform.rotation = eulerToQuat(selectedEntityEulerRotation);
+					vec3 euler = selectedEntityEulerRotation;
+					euler.x = deg2rad(euler.x);
+					euler.y = deg2rad(euler.y);
+					euler.z = deg2rad(euler.z);
+					transform.rotation = eulerToQuat(euler);
 				}
 
 				ImGui::DragFloat3("Scale", transform.scale.data, 0.1f, 0.f, 0.f);
@@ -383,6 +390,7 @@ void application::drawSettings(float dt)
 void application::resetRenderPasses()
 {
 	opaqueRenderPass.reset();
+	overlayRenderPass.reset();
 	sunShadowRenderPass.reset();
 
 	for (uint32 i = 0; i < arraysize(spotShadowRenderPasses); ++i)
@@ -399,6 +407,7 @@ void application::resetRenderPasses()
 void application::submitRenderPasses()
 {
 	renderer->submitRenderPass(&opaqueRenderPass);
+	renderer->submitRenderPass(&overlayRenderPass);
 	renderer->submitRenderPass(&sunShadowRenderPass);
 
 	for (uint32 i = 0; i < arraysize(spotShadowRenderPasses); ++i)
@@ -437,7 +446,7 @@ void application::handleUserInput(const user_input& input, float dt)
 
 		static transformation_type type = transformation_type_translation;
 		static transformation_space space = transformation_global;
-		inputCaptured = manipulateTransformation(transform, type, space, camera, input, !inputCaptured, renderer);
+		inputCaptured = manipulateTransformation(transform, type, space, camera, input, !inputCaptured, &overlayRenderPass);
 	}
 
 	if (!inputCaptured && input.mouse.left.clickEvent)

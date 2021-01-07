@@ -65,4 +65,5 @@ private:
 	sun_shadow_render_pass sunShadowRenderPass;
 	spot_shadow_render_pass spotShadowRenderPasses[2];
 	point_shadow_render_pass pointShadowRenderPasses[1];
+	overlay_render_pass overlayRenderPass;
 };

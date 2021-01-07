@@ -1,16 +1,18 @@
 #include "flat_simple_rs.hlsli"
+#include "camera.hlsli"
 
-ConstantBuffer<flat_simple_color_cb> color : register(b1);
+ConstantBuffer<flat_simple_color_cb> cb : register(b1);
+ConstantBuffer<camera_cb> camera		: register(b2);
 
 struct ps_input
 {
-	float3 viewPosition	: VIEW_POSITION;
-	float3 normal		: NORMAL;
+	float3 worldPosition	: WORLD_POSITION;
+	float3 worldNormal		: WORLD_NORMAL;
 };
 
 [RootSignature(FLAT_SIMPLE_RS)]
 float4 main(ps_input IN) : SV_TARGET
 {
-	float ndotv = saturate(-dot(normalize(IN.viewPosition), normalize(IN.normal))) * 0.8 + 0.2;
-	return ndotv * color.color;
+	float ndotv = saturate(dot(normalize(camera.position.xyz - IN.worldPosition), normalize(IN.worldNormal))) * 0.8 + 0.2;
+	return ndotv * cb.color;
 }

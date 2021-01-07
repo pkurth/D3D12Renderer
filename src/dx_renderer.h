@@ -101,6 +101,12 @@ struct dx_renderer
 		opaqueRenderPass = renderPass;
 	}
 
+	void submitRenderPass(overlay_render_pass* renderPass)
+	{
+		assert(!overlayRenderPass);
+		overlayRenderPass = renderPass;
+	}
+
 	void submitRenderPass(sun_shadow_render_pass* renderPass)
 	{
 		assert(!sunShadowRenderPass);
@@ -170,6 +176,7 @@ private:
 	point_shadow_render_pass* pointLightShadowRenderPasses[MAX_NUM_POINT_LIGHT_SHADOW_PASSES];
 	uint32 numSpotLightShadowRenderPasses;
 	uint32 numPointLightShadowRenderPasses;
+	overlay_render_pass* overlayRenderPass;
 
 
 	uint32 windowWidth;

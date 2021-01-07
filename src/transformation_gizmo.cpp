@@ -2,7 +2,10 @@
 #include "transformation_gizmo.h"
 #include "geometry.h"
 #include "bounding_volumes.h"
+#include "dx_command_list.h"
+#include "dx_pipeline.h"
 
+#include "flat_simple_rs.hlsli"
 
 enum gizmo_axis
 {
@@ -66,6 +69,29 @@ static vec3 originalPosition;
 static quat originalRotation;
 static vec3 originalScale;
 
+static dx_pipeline gizmoPipeline;
+
+static ref<struct gizmo_material> materials[6];
+
+struct gizmo_material : material_base
+{
+	vec4 color;
+
+	static void setupPipeline(dx_command_list* cl, const common_material_info& info)
+	{
+		cl->setPipelineState(*gizmoPipeline.pipeline);
+		cl->setGraphicsRootSignature(*gizmoPipeline.rootSignature);
+
+		cl->setGraphicsDynamicConstantBuffer(2, info.cameraCBV);
+	}
+
+	void prepareForRendering(dx_command_list* cl)
+	{
+		cl->setGraphics32BitConstants(1, color);
+	}
+};
+
+
 void initializeTransformationGizmos()
 {
 	cpu_mesh mesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_normals);
@@ -89,6 +115,20 @@ void initializeTransformationGizmos()
 
 		rectangles[i].position *= shaftLength * 0.35f;
 		rectangles[i].radius *= shaftLength * 0.2f;
+	}
+
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.inputLayout(inputLayout_position_normal)
+			.renderTargets(dx_renderer::hdrFormat[0], dx_renderer::hdrDepthStencilFormat)
+			;
+
+		gizmoPipeline = createReloadablePipeline(desc, { "flat_simple_vs", "flat_simple_ps" });
+
+		for (uint32 i = 0; i < 6; ++i)
+		{
+			materials[i] = make_ref<gizmo_material>();
+		}
 	}
 }
 
@@ -339,7 +379,7 @@ static uint32 handleScaling(trs& transform, ray r, const user_input& input, tran
 	return dragging ? axisIndex : hoverAxisIndex;
 }
 
-bool manipulateTransformation(trs& transform, transformation_type& type, transformation_space& space, const render_camera& camera, const user_input& input, bool allowInput, dx_renderer* renderer)
+bool manipulateTransformation(trs& transform, transformation_type& type, transformation_space& space, const render_camera& camera, const user_input& input, bool allowInput, overlay_render_pass* overlayRenderPass)
 {
 	if (!input.mouse.left.down)
 	{
@@ -409,11 +449,13 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 
 		for (uint32 i = 0; i < 3; ++i)
 		{
-			/*renderer->visualizationRenderPass.renderObject(mesh.vertexBuffer, mesh.indexBuffer,
+			materials[i]->color = colors[i] * (highlightAxis == i ? 0.5f : 1.f);
+
+			overlayRenderPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
 				submeshes[type],
-				createModelMatrix(transform.position, rotations[i]),
-				colors[i] * (highlightAxis == i ? 0.5f : 1.f)
-			);*/
+				materials[i],
+				createModelMatrix(transform.position, rotations[i])
+			);
 		}
 	}
 
@@ -435,11 +477,13 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 
 		for (uint32 i = 0; i < 3; ++i)
 		{
-			/*renderer->visualizationRenderPass.renderObject(mesh.vertexBuffer, mesh.indexBuffer,
+			materials[i + 3]->color = colors[i] * (highlightAxis == i + 3 ? 0.5f : 1.f);
+
+			overlayRenderPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
 				planeSubmesh,
-				createModelMatrix(transform.position, rotations[i]),
-				colors[i] * (highlightAxis == (i + 3) ? 0.5f : 1.f)
-			);*/
+				materials[i + 3],
+				createModelMatrix(transform.position, rotations[i])
+			);
 		}
 	}
 	

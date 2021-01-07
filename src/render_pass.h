@@ -164,7 +164,21 @@ struct transparent_render_pass : geometry_render_pass
 	{
 		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 	}
+
+	friend struct dx_renderer;
 };
+
+struct overlay_render_pass : geometry_render_pass
+{
+	template <typename material_t>
+	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform)
+	{
+		common(vertexBuffer, indexBuffer, submesh, material, transform, false);
+	}
+
+	friend struct dx_renderer;
+};
+
 
 // Base for all shadow map passes.
 struct shadow_render_pass
