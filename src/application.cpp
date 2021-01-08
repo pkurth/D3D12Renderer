@@ -20,6 +20,8 @@ struct animation_component
 {
 	float time;
 
+	uint32 animationIndex = 0;
+
 	ref<dx_vertex_buffer> vb;
 	submesh_info sm;
 
@@ -44,7 +46,6 @@ void application::initialize(dx_renderer* renderer)
 		.addComponent<raster_component>(loadMeshFromFile("assets/meshes/sponza.obj"));
 
 
-#if 1
 	auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/meshes/stormtrooper.fbx");
 	stormtrooperMesh->submeshes[0].material = createPBRMaterial(
 		"assets/textures/stormtrooper/Stormtrooper_D.png",
@@ -65,6 +66,9 @@ void application::initialize(dx_renderer* renderer)
 		0.f
 	);
 
+	auto unrealMesh = loadAnimatedMeshFromFile("assets/meshes/unreal_mannequin.fbx");
+	unrealMesh->skeleton.pushAssimpAnimationsInDirectory("assets/animations");
+
 	appScene.createEntity("Stormtrooper 1")
 		.addComponent<trs>(vec3(-5.f, 0.f, -1.f), quat::identity)
 		.addComponent<raster_component>(stormtrooperMesh)
@@ -84,7 +88,11 @@ void application::initialize(dx_renderer* renderer)
 		.addComponent<trs>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
 		.addComponent<raster_component>(pilotMesh)
 		.addComponent<animation_component>(0.f);
-#endif
+
+	appScene.createEntity("Mannequin")
+		.addComponent<trs>(vec3(0.f, 40.f, 0.f), quat::identity, 0.2f)
+		.addComponent<raster_component>(unrealMesh)
+		.addComponent<animation_component>(0.f);
 
 
 
@@ -357,6 +365,23 @@ void application::drawSceneHierarchy()
 
 				ImGui::DragFloat3("Scale", transform.scale.data, 0.1f, 0.f, 0.f);
 			});
+
+			drawComponent<animation_component>(selectedEntity, "Animation", [this](auto& anim)
+			{
+				assert(selectedEntity.hasComponent<raster_component>());
+				raster_component& raster = selectedEntity.getComponent<raster_component>();
+
+				ImGui::Dropdown("Currently playing", [](uint32 index, void* data)
+				{
+					auto& skeleton = *(animation_skeleton*)data;
+					const char* result = 0;
+					if (index < (uint32)skeleton.clips.size())
+					{
+						result = skeleton.clips[index].name.c_str();
+					}
+					return result;
+				}, anim.animationIndex, &raster.mesh->skeleton);
+			});
 		}
 	}
 	ImGui::End();
@@ -563,7 +588,7 @@ void application::update(const user_input& input, float dt)
 
 		trs localTransforms[128];
 		auto [vb, sm, skinningMatrices] = skinObject(mesh.vertexBuffer, info, (uint32)skeleton.joints.size());
-		skeleton.sampleAnimation(skeleton.clips[0].name, anim.time, localTransforms);
+		skeleton.sampleAnimation(skeleton.clips[anim.animationIndex].name, anim.time, localTransforms);
 		skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
 
 		anim.prevFrameVB = anim.vb;

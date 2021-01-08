@@ -59,6 +59,11 @@ struct animation_skeleton
 	std::vector<animation_clip> clips;
 	std::unordered_map<std::string, uint32> nameToClipID;
 
+	void loadFromAssimp(const struct aiScene* scene, float scale = 1.f);
+	void pushAssimpAnimation(const char* suffix, const struct aiAnimation* animation, float scale = 1.f);
+	void pushAssimpAnimations(const char* sceneFilename, float scale = 1.f);
+	void pushAssimpAnimationsInDirectory(const char* directory, float scale = 1.f);
+
 	void sampleAnimation(const std::string& name, float time, trs* outLocalTransforms) const;
 	void getSkinningMatricesFromLocalTransforms(const trs* localTransforms, mat4* outSkinningMatrices, const trs& worldTransform = trs::identity) const;
 };

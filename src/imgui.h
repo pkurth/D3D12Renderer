@@ -21,4 +21,5 @@ namespace ImGui
 	void Image(const ref<dx_texture>& texture, uint32 width, uint32 height);
 
 	bool Dropdown(const char* label, const char** names, uint32 count, uint32& current);
+	bool Dropdown(const char* label, const char* (*name_func)(uint32, void*), uint32& current, void* data = 0);
 }

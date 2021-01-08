@@ -1,6 +1,166 @@
 #include "pch.h"
 #include "animation.h"
 
+#include "assimp.h"
+
+#include <filesystem>
+namespace fs = std::filesystem;
+
+void animation_skeleton::pushAssimpAnimation(const char* suffix, const aiAnimation* animation, float scale)
+{
+	animation_clip& clip = clips.emplace_back();
+
+	clip.name = std::string(animation->mName.C_Str()) + std::string("(") + suffix + ")";
+	clip.ticksPerSecond = (float)animation->mTicksPerSecond;
+	clip.length = (float)animation->mDuration / clip.ticksPerSecond;
+
+	clip.joints.resize(joints.size());
+	clip.positionKeyframes.clear();
+	clip.rotationKeyframes.clear();
+	clip.scaleKeyframes.clear();
+
+	for (uint32 channelID = 0; channelID < animation->mNumChannels; ++channelID)
+	{
+		const aiNodeAnim* channel = animation->mChannels[channelID];
+		std::string jointName = channel->mNodeName.C_Str();
+
+		auto it = nameToJointID.find(jointName);
+		if (it != nameToJointID.end())
+		{
+			animation_joint& joint = clip.joints[it->second];
+
+			joint.firstPositionKeyframe = (uint32)clip.positionKeyframes.size();
+			joint.firstRotationKeyframe = (uint32)clip.rotationKeyframes.size();
+			joint.firstScaleKeyframe = (uint32)clip.scaleKeyframes.size();
+
+			joint.numPositionKeyframes = channel->mNumPositionKeys;
+			joint.numRotationKeyframes = channel->mNumRotationKeys;
+			joint.numScaleKeyframes = channel->mNumScalingKeys;
+
+
+			for (uint32 keyID = 0; keyID < channel->mNumPositionKeys; ++keyID)
+			{
+				clip.positionKeyframes.push_back(readAssimpVector(channel->mPositionKeys[keyID].mValue));
+				clip.positionTimestamps.push_back((float)channel->mPositionKeys[keyID].mTime);
+			}
+
+			for (uint32 keyID = 0; keyID < channel->mNumRotationKeys; ++keyID)
+			{
+				clip.rotationKeyframes.push_back(readAssimpQuaternion(channel->mRotationKeys[keyID].mValue));
+				clip.rotationTimestamps.push_back((float)channel->mRotationKeys[keyID].mTime);
+			}
+
+			for (uint32 keyID = 0; keyID < channel->mNumScalingKeys; ++keyID)
+			{
+				clip.scaleKeyframes.push_back(readAssimpVector(channel->mScalingKeys[keyID].mValue));
+				clip.scaleTimestamps.push_back((float)channel->mScalingKeys[keyID].mTime);
+			}
+
+			joint.isAnimated = true;
+		}
+	}
+
+	for (uint32 i = 0; i < (uint32)joints.size(); ++i)
+	{
+		if (joints[i].parentID == NO_PARENT)
+		{
+			for (uint32 keyID = 0; keyID < clip.joints[i].numPositionKeyframes; ++keyID)
+			{
+				clip.positionKeyframes[clip.joints[i].firstPositionKeyframe + keyID] *= scale;
+			}
+			for (uint32 keyID = 0; keyID < clip.joints[i].numScaleKeyframes; ++keyID)
+			{
+				clip.scaleKeyframes[clip.joints[i].firstScaleKeyframe + keyID] *= scale;
+			}
+		}
+	}
+
+	nameToClipID[clip.name] = (uint32)clips.size() - 1;
+}
+
+void animation_skeleton::pushAssimpAnimations(const char* sceneFilename, float scale)
+{
+	Assimp::Importer importer;
+
+	const aiScene* scene = loadAssimpSceneFile(sceneFilename, importer);
+
+	for (uint32 i = 0; i < scene->mNumAnimations; ++i)
+	{
+		pushAssimpAnimation(sceneFilename, scene->mAnimations[i], scale);
+	}
+}
+
+void animation_skeleton::pushAssimpAnimationsInDirectory(const char* directory, float scale)
+{
+	for (auto& p : fs::directory_iterator(directory))
+	{
+		pushAssimpAnimations(p.path().string().c_str());
+	}
+}
+
+static void readAssimpSkeletonHierarchy(const aiNode* node, animation_skeleton& skeleton, uint32& insertIndex, uint32 parentID = NO_PARENT)
+{
+	std::string name = node->mName.C_Str();
+
+	if (name == "Animation") // TODO: Temporary fix for the pilot.fbx mesh.
+	{
+		return;
+	}
+
+	auto it = skeleton.nameToJointID.find(name);
+	if (it != skeleton.nameToJointID.end())
+	{
+		uint32 jointID = it->second;
+
+		skeleton.joints[jointID].parentID = parentID;
+
+		// This sorts the joints, such that parents are before their children.
+		skeleton.nameToJointID[name] = insertIndex;
+		skeleton.nameToJointID[skeleton.joints[insertIndex].name] = jointID;
+		std::swap(skeleton.joints[jointID], skeleton.joints[insertIndex]);
+
+		parentID = insertIndex;
+
+		++insertIndex;
+	}
+
+	for (uint32 i = 0; i < node->mNumChildren; ++i)
+	{
+		readAssimpSkeletonHierarchy(node->mChildren[i], skeleton, insertIndex, parentID);
+	}
+}
+
+void animation_skeleton::loadFromAssimp(const aiScene* scene, float scale)
+{
+	mat4 scaleMatrix = mat4::identity * (1.f / scale);
+	scaleMatrix.m33 = 1.f;
+
+	for (uint32 meshID = 0; meshID < scene->mNumMeshes; ++meshID)
+	{
+		const aiMesh* mesh = scene->mMeshes[meshID];
+
+		for (uint32 boneID = 0; boneID < mesh->mNumBones; ++boneID)
+		{
+			const aiBone* bone = mesh->mBones[boneID];
+			std::string name = bone->mName.C_Str();
+
+			auto it = nameToJointID.find(name);
+			if (it == nameToJointID.end())
+			{
+				nameToJointID[name] = (uint32)joints.size();
+
+				skeleton_joint& joint = joints.emplace_back();
+				joint.name = std::move(name);
+				joint.invBindMatrix = readAssimpMatrix(bone->mOffsetMatrix) * scaleMatrix;
+				joint.bindTransform = trs(invert(joint.invBindMatrix));
+			}
+		}
+	}
+
+	uint32 insertIndex = 0;
+	readAssimpSkeletonHierarchy(scene->mRootNode, *this, insertIndex);
+}
+
 static vec3 samplePosition(const animation_clip& clip, const animation_joint& animJoint, float tick)
 {
 	if (animJoint.numPositionKeyframes == 1)

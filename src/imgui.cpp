@@ -196,6 +196,30 @@ namespace ImGui
 		}
 		return changed;
 	}
+
+	bool Dropdown(const char* label, const char* (*name_func)(uint32, void*), uint32& current, void* data)
+	{
+		bool changed = false;
+		if (ImGui::BeginCombo(label, name_func(current, data)))
+		{
+			for (uint32 i = 0; ; ++i)
+			{
+				bool selected = i == current;
+				const char* name = name_func(i, data);
+				if (!name)
+				{
+					break;
+				}
+				if (ImGui::Selectable(name, selected))
+				{
+					current = i;
+					changed = true;
+				}
+			}
+			ImGui::EndCombo();
+		}
+		return changed;
+	}
 }
 
 
