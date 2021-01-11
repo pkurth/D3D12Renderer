@@ -70,7 +70,7 @@ void cpu_mesh::alignNextTriangle()
 void cpu_mesh::reserve(uint32 vertexCount, uint32 triangleCount)
 {
 	vertices = (uint8*)_aligned_realloc(vertices, (numVertices + vertexCount) * vertexSize, 64);
-	triangles = (indexed_triangle16*)_aligned_realloc(triangles, (numTriangles + triangleCount + 8) * sizeof(indexed_triangle16), 64); // Allocate 8 more, such that we can align without problems.
+	triangles = (triangle_t*)_aligned_realloc(triangles, (numTriangles + triangleCount + 8) * sizeof(triangle_t), 64); // Allocate 8 more, such that we can align without problems.
 }
 
 #define pushVertex(position, uv, normal, tangent, skin)																							\
@@ -81,7 +81,7 @@ void cpu_mesh::reserve(uint32 vertexCount, uint32 triangleCount)
 	if (flags & mesh_creation_flags_with_skin) { *(skinning_weights*)vertexPtr = skin; vertexPtr += sizeof(skinning_weights); }		\
 	++this->numVertices;
 
-void cpu_mesh::pushTriangle(uint16 a, uint16 b, uint16 c)
+void cpu_mesh::pushTriangle(index_t a, index_t b, index_t c)
 {
 	triangles[this->numTriangles++] = { a, b, c };
 }
@@ -200,7 +200,7 @@ submesh_info cpu_mesh::pushCube(vec3 radius, bool flipWindingOrder, vec3 center)
 	{
 		for (uint32 i = numTriangles - 12; i < numTriangles; ++i)
 		{
-			uint16 tmp = triangles[i].b;
+			index_t tmp = triangles[i].b;
 			triangles[i].b = triangles[i].c;
 			triangles[i].c = tmp;
 		}
@@ -227,8 +227,10 @@ submesh_info cpu_mesh::pushSphere(uint16 slices, uint16 rows, float radius)
 	float vertDeltaAngle = M_PI / (rows + 1);
 	float horzDeltaAngle = 2.f * M_PI / slices;
 
-	assert(slices * rows + 2 <= UINT16_MAX);
-
+	if (sizeof(index_t) == 2)
+	{
+		assert(slices * rows + 2 <= UINT16_MAX);
+	}
 	reserve(slices * rows + 2, 2 * rows * slices);
 
 	uint8* vertexPtr = vertices + vertexSize * numVertices;
@@ -256,26 +258,26 @@ submesh_info cpu_mesh::pushSphere(uint16 slices, uint16 rows, float radius)
 
 	pushVertex(vec3(0.f, radius, 0.f), directionToPanoramaUV(vec3(0.f, 1.f, 0.f)), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
-	uint16 lastVertex = slices * rows + 2;
+	index_t lastVertex = slices * rows + 2;
 
 	// Indices.
-	for (uint16 x = 0; x < slices - 1; ++x)
+	for (index_t x = 0; x < slices - 1u; ++x)
 	{
 		pushTriangle(0, x + 1u, x + 2u);
 	}
 	pushTriangle(0, slices, 1);
 
-	for (uint16 y = 0; y < rows - 1; ++y)
+	for (index_t y = 0; y < rows - 1u; ++y)
 	{
-		for (uint16 x = 0; x < slices - 1; ++x)
+		for (index_t x = 0; x < slices - 1u; ++x)
 		{
 			pushTriangle(y * slices + 1u + x, (y + 1u) * slices + 2u + x, y * slices + 2u + x);
 			pushTriangle(y * slices + 1u + x, (y + 1u) * slices + 1u + x, (y + 1u) * slices + 2u + x);
 		}
-		pushTriangle((uint16)(y * slices + slices), (uint16)((y + 1u) * slices + 1u), (uint16)(y * slices + 1u));
-		pushTriangle((uint16)(y * slices + slices), (uint16)((y + 1u) * slices + slices), (uint16)((y + 1u) * slices + 1u));
+		pushTriangle((index_t)(y * slices + slices), (index_t)((y + 1u) * slices + 1u), (index_t)(y * slices + 1u));
+		pushTriangle((index_t)(y * slices + slices), (index_t)((y + 1u) * slices + slices), (index_t)((y + 1u) * slices + 1u));
 	}
-	for (uint16 x = 0; x < slices - 1; ++x)
+	for (index_t x = 0; x < slices - 1u; ++x)
 	{
 		pushTriangle(lastVertex - 2u - x, lastVertex - 3u - x, lastVertex - 1u);
 	}
@@ -304,7 +306,7 @@ submesh_info cpu_mesh::pushIcoSphere(float radius, uint32 refinement)
 	};
 
 	std::vector<vert> vertices;
-	std::vector<indexed_triangle16> triangles;
+	std::vector<triangle_t> triangles;
 
 	float t = (1.f + sqrt(5.f)) / 2.f;
 
@@ -346,7 +348,7 @@ submesh_info cpu_mesh::pushIcoSphere(float radius, uint32 refinement)
 	triangles.push_back({ 8, 6, 7 });
 	triangles.push_back({ 9, 8, 1 });
 
-	std::unordered_map<uint32, uint16> midpoints;
+	std::unordered_map<uint32, index_t> midpoints;
 
 	auto getMiddlePoint = [&midpoints, &vertices, radius](uint32 a, uint32 b)
 	{
@@ -360,7 +362,7 @@ submesh_info cpu_mesh::pushIcoSphere(float radius, uint32 refinement)
 			vec3 center = 0.5f * (point1 + point2);
 			push_ico_vertex(center);
 
-			uint16 index = (uint16)vertices.size() - 1;
+			index_t index = (index_t)vertices.size() - 1;
 
 			midpoints.insert({ edge, index });
 			return index;
@@ -371,15 +373,15 @@ submesh_info cpu_mesh::pushIcoSphere(float radius, uint32 refinement)
 
 	for (uint32 r = 0; r < refinement; ++r)
 	{
-		std::vector<indexed_triangle16> refinedTriangles;
+		std::vector<triangle_t> refinedTriangles;
 
 		for (uint32 tri = 0; tri < (uint32)triangles.size(); ++tri)
 		{
-			indexed_triangle16& t = triangles[tri];
+			triangle_t& t = triangles[tri];
 
-			uint16 a = getMiddlePoint(t.a, t.b);
-			uint16 b = getMiddlePoint(t.b, t.c);
-			uint16 c = getMiddlePoint(t.c, t.a);
+			index_t a = getMiddlePoint(t.a, t.b);
+			index_t b = getMiddlePoint(t.b, t.c);
+			index_t c = getMiddlePoint(t.c, t.a);
 
 			refinedTriangles.push_back({ t.a, a, c });
 			refinedTriangles.push_back({ t.b, b, a });
@@ -398,7 +400,7 @@ submesh_info cpu_mesh::pushIcoSphere(float radius, uint32 refinement)
 		pushVertex(v.p, {}, v.n, v.t, {});
 	}
 
-	for (indexed_triangle16 t : triangles)
+	for (triangle_t t : triangles)
 	{
 		pushTriangle(t.a, t.b, t.c);
 	}
@@ -429,7 +431,10 @@ submesh_info cpu_mesh::pushCapsule(uint16 slices, uint16 rows, float height, flo
 	float halfHeight = 0.5f * height;
 	float texStretch = radius / (radius + halfHeight);
 
-	assert(slices * (rows + 1) + 2 <= UINT16_MAX);
+	if (sizeof(index_t) == 2)
+	{
+		assert(slices * (rows + 1) + 2 <= UINT16_MAX);
+	}
 
 	reserve(slices * (rows + 1) + 2, 2 * (rows + 1) * slices);
 
@@ -476,7 +481,7 @@ submesh_info cpu_mesh::pushCapsule(uint16 slices, uint16 rows, float height, flo
 	}
 	pushVertex(vec3(0.f, radius + halfHeight, 0.f), directionToPanoramaUV(vec3(0.f, 1.f, 0.f)), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
-	uint16 lastVertex = slices * (rows + 1) + 2;
+	index_t lastVertex = slices * (rows + 1) + 2;
 
 	// Indices.
 	for (uint32 x = 0; x < slices - 1u; ++x)
@@ -576,7 +581,7 @@ submesh_info cpu_mesh::pushCylinder(uint16 slices, float radius, float height)
 
 	pushVertex(vec3(0.f, halfHeight, 0.f), uv, vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
-	uint16 lastVertex = 4 * slices + 2;
+	index_t lastVertex = 4 * slices + 2;
 
 	// Indices.
 	for (uint32 x = 0; x < slices - 1u; ++x)
@@ -775,7 +780,7 @@ submesh_info cpu_mesh::pushTorus(uint16 slices, uint16 segments, float torusRadi
 		}
 	}
 
-	uint16 numVertices = segments * slices;
+	index_t numVertices = segments * slices;
 
 	for (uint32 y = 0; y < segments - 1u; ++y)
 	{
@@ -920,7 +925,7 @@ submesh_info cpu_mesh::pushMace(uint16 slices, float shaftRadius, float headRadi
 
 	pushVertex(vec3(0.f, shaftLength + headLength, 0.f), uv, vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
-	uint16 lastVertex = 8 * slices + 2;
+	index_t lastVertex = 8 * slices + 2;
 
 	// Indices.
 	for (uint32 x = 0; x < slices - 1u; ++x)
@@ -961,7 +966,10 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_
 	uint32 baseVertex = numVertices;
 	uint32 firstTriangle = numTriangles;
 
-	assert(mesh->mNumVertices <= UINT16_MAX);
+	if (sizeof(index_t) == 2)
+	{
+		assert(mesh->mNumVertices <= UINT16_MAX);
+	}
 
 	reserve(mesh->mNumVertices, mesh->mNumFaces);
 
@@ -1008,12 +1016,13 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_
 		pushVertex(position, uv, normal, tangent, {});
 	}
 
-#if 1
 	if ((flags & mesh_creation_flags_with_skin) && skeleton)
 	{
 		assert(mesh->HasBones());
 
 		uint32 numBones = mesh->mNumBones;
+
+		assert(numBones < 256);
 
 		for (uint32 boneID = 0; boneID < numBones; ++boneID)
 		{
@@ -1022,13 +1031,14 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_
 			auto it = skeleton->nameToJointID.find(bone->mName.C_Str());
 			assert(it != skeleton->nameToJointID.end());
 
-			uint32 jointID = it->second;
+			uint8 jointID = (uint8)it->second;
 
 			for (uint32 weightID = 0; weightID < bone->mNumWeights; ++weightID)
 			{
 				uint32 vertexID = bone->mWeights[weightID].mVertexId;
 				float weight = bone->mWeights[weightID].mWeight;
 
+				assert(vertexID < mesh->mNumVertices);
 				assert(vertexID + baseVertex < numVertices);
 
 				vertexID += baseVertex;
@@ -1040,7 +1050,7 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_
 				{
 					if (weights.skinWeights[i] == 0)
 					{
-						weights.skinIndices[i] = (uint8)jointID;
+						weights.skinIndices[i] = jointID;
 						weights.skinWeights[i] = (uint8)clamp(weight * 255.f, 0.f, 255.f);
 						foundFreeSlot = true;
 						break;
@@ -1053,20 +1063,25 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_
 			}
 		}
 
-#if 0
+#if 1
 		for (uint32 i = 0; i < mesh->mNumVertices; ++i)
 		{
-			uint8* vertexBase = vertices + (i * vertexSize);
+			uint8* vertexBase = vertices + ((i + baseVertex) * vertexSize);
 			skinning_weights& weights = *(skinning_weights*)(vertexBase + skinOffset);
+
+			assert(weights.skinWeights[0] > 0);
 
 			vec4 v = { (float)weights.skinWeights[0], (float)weights.skinWeights[1], (float)weights.skinWeights[2], (float)weights.skinWeights[3] };
 			v /= 255.f;
 
 			float sum = dot(v, 1.f);
+			if (abs(sum - 1.f) >= 0.05f)
+			{
+				int a = 0;
+			}
 		}
 #endif
 	}
-#endif
 
 
 	for (uint32 i = 0; i < mesh->mNumFaces; ++i)
@@ -1087,7 +1102,7 @@ dx_mesh cpu_mesh::createDXMesh()
 {
 	dx_mesh result;
 	result.vertexBuffer = createVertexBuffer(vertexSize, numVertices, vertices);
-	result.indexBuffer = createIndexBuffer(sizeof(uint16), numTriangles * 3, triangles);
+	result.indexBuffer = createIndexBuffer(sizeof(index_t), numTriangles * 3, triangles);
 	return result;
 }
 

@@ -39,6 +39,8 @@ static uint32 getVertexSize(uint32 meshFlags)
 
 struct cpu_mesh
 {
+	typedef indexed_triangle32 triangle_t;
+
 	cpu_mesh() {}
 	cpu_mesh(uint32 flags);
 	cpu_mesh(const cpu_mesh& mesh) = delete;
@@ -50,7 +52,7 @@ struct cpu_mesh
 	uint32 skinOffset = 0;
 
 	uint8* vertices = 0;
-	indexed_triangle16* triangles = 0;
+	triangle_t* triangles = 0;
 
 	uint32 numVertices = 0;
 	uint32 numTriangles = 0;
@@ -73,9 +75,11 @@ struct cpu_mesh
 	ref<dx_vertex_buffer> createVertexBufferWithAlternativeLayout(uint32 otherFlags, bool allowUnorderedAccess = false);
 
 private:
+	typedef decltype(triangle_t::a) index_t;
+
 	void alignNextTriangle();
 	void reserve(uint32 vertexCount, uint32 triangleCount);
-	void pushTriangle(uint16 a, uint16 b, uint16 c);
+	void pushTriangle(index_t a, index_t b, index_t c);
 };
 
 

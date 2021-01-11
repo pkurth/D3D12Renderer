@@ -23,10 +23,10 @@ struct animation_component
 	uint32 animationIndex = 0;
 
 	ref<dx_vertex_buffer> vb;
-	submesh_info sm;
+	submesh_info sms[16];
 
 	ref<dx_vertex_buffer> prevFrameVB;
-	submesh_info prevFrameSM;
+	submesh_info prevFrameSMs[16];
 };
 
 static ref<dx_buffer> pointLightBuffer[NUM_BUFFERED_FRAMES];
@@ -90,7 +90,7 @@ void application::initialize(dx_renderer* renderer)
 		.addComponent<animation_component>(0.f);
 
 	appScene.createEntity("Mannequin")
-		.addComponent<trs>(vec3(0.f, 40.f, 0.f), quat::identity, 0.2f)
+		.addComponent<trs>(vec3(0.f, 20.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.2f)
 		.addComponent<raster_component>(unrealMesh)
 		.addComponent<animation_component>(0.f);
 
@@ -584,20 +584,24 @@ void application::update(const user_input& input, float dt)
 		anim.time += dt;
 		const dx_mesh& mesh = raster.mesh->mesh;
 		const animation_skeleton& skeleton = raster.mesh->skeleton;
-		submesh_info info = raster.mesh->submeshes[0].info;
 
 		trs localTransforms[128];
-		auto [vb, sm, skinningMatrices] = skinObject(mesh.vertexBuffer, info, (uint32)skeleton.joints.size());
+		auto [vb, vertexOffset, skinningMatrices] = skinObject(mesh.vertexBuffer, (uint32)skeleton.joints.size());
 		skeleton.sampleAnimation(skeleton.clips[anim.animationIndex].name, anim.time, localTransforms);
 		skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
 
 		anim.prevFrameVB = anim.vb;
-		anim.prevFrameSM = anim.sm;
-
 		anim.vb = vb;
-		anim.sm = sm;
-	});
 
+		uint32 numSubmeshes = (uint32)raster.mesh->submeshes.size();
+		for (uint32 i = 0; i < numSubmeshes; ++i)
+		{
+			anim.prevFrameSMs[i] = anim.sms[i];
+
+			anim.sms[i] = raster.mesh->submeshes[i].info;
+			anim.sms[i].baseVertex += vertexOffset;
+		}
+	});
 
 	// Submit render calls.
 	appScene.group<raster_component>(entt::get<trs>)
@@ -611,16 +615,22 @@ void application::update(const user_input& input, float dt)
 
 		if (entity.hasComponent<animation_component>())
 		{
-			// Currently only one submesh in animated meshes.
-
 			auto& anim = entity.getComponent<animation_component>();
 
-			opaqueRenderPass.renderAnimatedObject(anim.vb, anim.prevFrameVB, mesh.indexBuffer, anim.sm, anim.prevFrameSM, raster.mesh->submeshes[0].material, m, m, 
-				(uint32)entityHandle, outline);
-			sunShadowRenderPass.renderObject(0, anim.vb, mesh.indexBuffer, anim.sm, m);
-			spotShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, anim.sm, m);
-			spotShadowRenderPasses[1].renderObject(anim.vb, mesh.indexBuffer, anim.sm, m);
-			pointShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, anim.sm, m);
+			uint32 numSubmeshes = (uint32)raster.mesh->submeshes.size();
+			
+			for (uint32 i = 0; i < numSubmeshes; ++i)
+			{
+				submesh_info submesh = anim.sms[i];
+				submesh_info prevFrameSubmesh = anim.prevFrameSMs[i];
+
+				opaqueRenderPass.renderAnimatedObject(anim.vb, anim.prevFrameVB, mesh.indexBuffer, submesh, prevFrameSubmesh, raster.mesh->submeshes[i].material, m, m,
+					(uint32)entityHandle, outline);
+				sunShadowRenderPass.renderObject(0, anim.vb, mesh.indexBuffer, submesh, m);
+				spotShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
+				spotShadowRenderPasses[1].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
+				pointShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
+			}
 		}
 		else
 		{

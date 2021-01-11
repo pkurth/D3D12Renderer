@@ -4,6 +4,8 @@
 
 #include <assimp/Exporter.hpp>
 #include <assimp/postprocess.h>
+#include <assimp/LogStream.hpp>
+#include <assimp/DefaultLogger.hpp>
 
 #include <filesystem>
 
@@ -11,8 +13,24 @@ namespace fs = std::filesystem;
 
 #define CACHE_FORMAT "assbin"
 
+struct assimp_logger : public Assimp::LogStream
+{
+	virtual void write(const char* message) override
+	{
+		std::cout << message << std::endl;
+	}
+};
+
 const aiScene* loadAssimpSceneFile(const char* filepathRaw, Assimp::Importer& importer)
 {
+#if 0
+	if (Assimp::DefaultLogger::isNullLogger())
+	{
+		Assimp::DefaultLogger::create("", Assimp::Logger::VERBOSE);
+		Assimp::DefaultLogger::get()->attachStream(new assimp_logger, Assimp::Logger::Err | Assimp::Logger::Warn);
+	}
+#endif
+
 	fs::path filepath = filepathRaw;
 	fs::path extension = filepath.extension();
 
@@ -47,7 +65,7 @@ const aiScene* loadAssimpSceneFile(const char* filepathRaw, Assimp::Importer& im
 	{
 		importer.SetPropertyFloat(AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE, 80.f);
 		importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_POINT | aiPrimitiveType_LINE);
-		importer.SetPropertyInteger(AI_CONFIG_PP_SLM_VERTEX_LIMIT, UINT16_MAX); // So that we can use 16 bit indices.
+		//importer.SetPropertyInteger(AI_CONFIG_PP_SLM_VERTEX_LIMIT, UINT16_MAX); // So that we can use 16 bit indices.
 
 		uint32 importFlags = aiProcessPreset_TargetRealtime_MaxQuality | aiProcess_OptimizeGraph | aiProcess_FlipUVs;
 		uint32 exportFlags = 0;

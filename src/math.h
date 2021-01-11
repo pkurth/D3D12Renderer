@@ -388,6 +388,18 @@ static float dot(vec3 a, vec3 b) { float result = a.x * b.x + a.y * b.y + a.z * 
 static float dot(vec4 a, vec4 b) { floatx4 m = a.f4 * b.f4; return addElements(m); }
 
 
+static bool operator==(mat4 a, mat4 b) 
+{ 
+	for (uint32 i = 0; i < 16; ++i)
+	{
+		if (a.m[i] != b.m[i])
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 static vec3 cross(vec3 a, vec3 b) { vec3 result = { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; return result; }
 
 static float squaredLength(vec2 a) { return dot(a, a); }
@@ -472,10 +484,6 @@ mat2& operator*=(mat2& a, float b);
 mat3& operator*=(mat3& a, float b);
 mat4& operator*=(mat4& a, float b);
 trs operator*(trs a, trs b);
-
-bool operator==(vec2 a, vec2 b);
-bool operator==(vec3 a, vec3 b);
-bool operator==(vec4 a, vec4 b);
 
 mat2 transpose(mat2 a);
 mat3 transpose(mat3 a);

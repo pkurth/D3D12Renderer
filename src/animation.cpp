@@ -11,8 +11,9 @@ void animation_skeleton::pushAssimpAnimation(const char* suffix, const aiAnimati
 	animation_clip& clip = clips.emplace_back();
 
 	clip.name = std::string(animation->mName.C_Str()) + std::string("(") + suffix + ")";
-	clip.ticksPerSecond = (float)animation->mTicksPerSecond;
-	clip.length = (float)animation->mDuration / clip.ticksPerSecond;
+	clip.lengthInSeconds = (float)animation->mDuration * 0.001f;
+
+	float timeNormalization = 1.f / (float)animation->mTicksPerSecond;
 
 	clip.joints.resize(joints.size());
 	clip.positionKeyframes.clear();
@@ -41,19 +42,19 @@ void animation_skeleton::pushAssimpAnimation(const char* suffix, const aiAnimati
 			for (uint32 keyID = 0; keyID < channel->mNumPositionKeys; ++keyID)
 			{
 				clip.positionKeyframes.push_back(readAssimpVector(channel->mPositionKeys[keyID].mValue));
-				clip.positionTimestamps.push_back((float)channel->mPositionKeys[keyID].mTime);
+				clip.positionTimestamps.push_back((float)channel->mPositionKeys[keyID].mTime * 0.001f);
 			}
 
 			for (uint32 keyID = 0; keyID < channel->mNumRotationKeys; ++keyID)
 			{
 				clip.rotationKeyframes.push_back(readAssimpQuaternion(channel->mRotationKeys[keyID].mValue));
-				clip.rotationTimestamps.push_back((float)channel->mRotationKeys[keyID].mTime);
+				clip.rotationTimestamps.push_back((float)channel->mRotationKeys[keyID].mTime * 0.001f);
 			}
 
 			for (uint32 keyID = 0; keyID < channel->mNumScalingKeys; ++keyID)
 			{
 				clip.scaleKeyframes.push_back(readAssimpVector(channel->mScalingKeys[keyID].mValue));
-				clip.scaleTimestamps.push_back((float)channel->mScalingKeys[keyID].mTime);
+				clip.scaleTimestamps.push_back((float)channel->mScalingKeys[keyID].mTime * 0.001f);
 			}
 
 			joint.isAnimated = true;
@@ -154,6 +155,13 @@ void animation_skeleton::loadFromAssimp(const aiScene* scene, float scale)
 				joint.invBindMatrix = readAssimpMatrix(bone->mOffsetMatrix) * scaleMatrix;
 				joint.bindTransform = trs(invert(joint.invBindMatrix));
 			}
+#if 0
+			else
+			{
+				mat4 invBind = readAssimpMatrix(bone->mOffsetMatrix) * scaleMatrix;
+				assert(invBind == joints[it->second].invBindMatrix);
+			}
+#endif
 		}
 	}
 
@@ -161,7 +169,7 @@ void animation_skeleton::loadFromAssimp(const aiScene* scene, float scale)
 	readAssimpSkeletonHierarchy(scene->mRootNode, *this, insertIndex);
 }
 
-static vec3 samplePosition(const animation_clip& clip, const animation_joint& animJoint, float tick)
+static vec3 samplePosition(const animation_clip& clip, const animation_joint& animJoint, float time)
 {
 	if (animJoint.numPositionKeyframes == 1)
 	{
@@ -172,7 +180,7 @@ static vec3 samplePosition(const animation_clip& clip, const animation_joint& an
 	for (uint32 i = 0; i < animJoint.numPositionKeyframes - 1; ++i)
 	{
 		uint32 j = i + animJoint.firstPositionKeyframe;
-		if (tick < clip.positionTimestamps[j + 1])
+		if (time < clip.positionTimestamps[j + 1])
 		{
 			firstKeyframeIndex = j;
 			break;
@@ -182,7 +190,7 @@ static vec3 samplePosition(const animation_clip& clip, const animation_joint& an
 
 	uint32 secondKeyframeIndex = firstKeyframeIndex + 1;
 
-	float t = inverseLerp(clip.positionTimestamps[firstKeyframeIndex], clip.positionTimestamps[secondKeyframeIndex], tick);
+	float t = inverseLerp(clip.positionTimestamps[firstKeyframeIndex], clip.positionTimestamps[secondKeyframeIndex], time);
 
 	vec3 a = clip.positionKeyframes[firstKeyframeIndex];
 	vec3 b = clip.positionKeyframes[secondKeyframeIndex];
@@ -190,7 +198,7 @@ static vec3 samplePosition(const animation_clip& clip, const animation_joint& an
 	return lerp(a, b, t);
 }
 
-static quat sampleRotation(const animation_clip& clip, const animation_joint& animJoint, float tick)
+static quat sampleRotation(const animation_clip& clip, const animation_joint& animJoint, float time)
 {
 	if (animJoint.numRotationKeyframes == 1)
 	{
@@ -201,7 +209,7 @@ static quat sampleRotation(const animation_clip& clip, const animation_joint& an
 	for (uint32 i = 0; i < animJoint.numRotationKeyframes - 1; ++i)
 	{
 		uint32 j = i + animJoint.firstRotationKeyframe;
-		if (tick < clip.rotationTimestamps[j + 1])
+		if (time < clip.rotationTimestamps[j + 1])
 		{
 			firstKeyframeIndex = j;
 			break;
@@ -211,7 +219,7 @@ static quat sampleRotation(const animation_clip& clip, const animation_joint& an
 
 	uint32 secondKeyframeIndex = firstKeyframeIndex + 1;
 
-	float t = inverseLerp(clip.rotationTimestamps[firstKeyframeIndex], clip.rotationTimestamps[secondKeyframeIndex], tick);
+	float t = inverseLerp(clip.rotationTimestamps[firstKeyframeIndex], clip.rotationTimestamps[secondKeyframeIndex], time);
 
 	quat a = clip.rotationKeyframes[firstKeyframeIndex];
 	quat b = clip.rotationKeyframes[secondKeyframeIndex];
@@ -224,7 +232,7 @@ static quat sampleRotation(const animation_clip& clip, const animation_joint& an
 	return lerp(a, b, t);
 }
 
-static vec3 sampleScale(const animation_clip& clip, const animation_joint& animJoint, float tick)
+static vec3 sampleScale(const animation_clip& clip, const animation_joint& animJoint, float time)
 {
 	if (animJoint.numScaleKeyframes == 1)
 	{
@@ -235,7 +243,7 @@ static vec3 sampleScale(const animation_clip& clip, const animation_joint& animJ
 	for (uint32 i = 0; i < animJoint.numScaleKeyframes - 1; ++i)
 	{
 		uint32 j = i + animJoint.firstScaleKeyframe;
-		if (tick < clip.scaleTimestamps[j + 1])
+		if (time < clip.scaleTimestamps[j + 1])
 		{
 			firstKeyframeIndex = j;
 			break;
@@ -245,7 +253,7 @@ static vec3 sampleScale(const animation_clip& clip, const animation_joint& animJ
 
 	uint32 secondKeyframeIndex = firstKeyframeIndex + 1;
 
-	float t = inverseLerp(clip.scaleTimestamps[firstKeyframeIndex], clip.scaleTimestamps[secondKeyframeIndex], tick);
+	float t = inverseLerp(clip.scaleTimestamps[firstKeyframeIndex], clip.scaleTimestamps[secondKeyframeIndex], time);
 
 	vec3 a = clip.scaleKeyframes[firstKeyframeIndex];
 	vec3 b = clip.scaleKeyframes[secondKeyframeIndex];
@@ -261,9 +269,7 @@ void animation_skeleton::sampleAnimation(const std::string& name, float time, tr
 	const animation_clip& clip = clips[clipIndexIt->second];
 	assert(clip.joints.size() == joints.size());
 
-	time = fmod(time, clip.length);
-
-	float tick = time * clip.ticksPerSecond;
+	time = fmod(time, clip.lengthInSeconds);
 
 	uint32 numJoints = (uint32)joints.size();
 	for (uint32 i = 0; i < numJoints; ++i)
@@ -272,9 +278,9 @@ void animation_skeleton::sampleAnimation(const std::string& name, float time, tr
 
 		if (animJoint.isAnimated)
 		{
-			outLocalTransforms[i].position = samplePosition(clip, animJoint, tick);
-			outLocalTransforms[i].rotation = sampleRotation(clip, animJoint, tick);
-			outLocalTransforms[i].scale = sampleScale(clip, animJoint, tick);
+			outLocalTransforms[i].position = samplePosition(clip, animJoint, time);
+			outLocalTransforms[i].rotation = sampleRotation(clip, animJoint, time);
+			outLocalTransforms[i].scale = sampleScale(clip, animJoint, time);
 		}
 		else
 		{
@@ -303,4 +309,21 @@ void animation_skeleton::getSkinningMatricesFromLocalTransforms(const trs* local
 
 		outSkinningMatrices[i] = trsToMat4(globalTransforms[i]) * joints[i].invBindMatrix;
 	}
+}
+
+static void prettyPrint(const animation_skeleton& skeleton, uint32 parent, uint32 indent)
+{
+	for (uint32 i = 0; i < (uint32)skeleton.joints.size(); ++i)
+	{
+		if (skeleton.joints[i].parentID == parent)
+		{
+			std::cout << std::string(indent, ' ') << skeleton.joints[i].name << std::endl;
+			prettyPrint(skeleton, i, indent + 1);
+		}
+	}
+}
+
+void animation_skeleton::prettyPrintHierarchy() const
+{
+	prettyPrint(*this, NO_PARENT, 0);
 }

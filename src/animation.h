@@ -47,8 +47,7 @@ struct animation_clip
 
 	std::vector<animation_joint> joints;
 	
-	float ticksPerSecond;
-	float length;
+	float lengthInSeconds;
 };
 
 struct animation_skeleton
@@ -66,4 +65,6 @@ struct animation_skeleton
 
 	void sampleAnimation(const std::string& name, float time, trs* outLocalTransforms) const;
 	void getSkinningMatricesFromLocalTransforms(const trs* localTransforms, mat4* outSkinningMatrices, const trs& worldTransform = trs::identity) const;
+
+	void prettyPrintHierarchy() const;
 };

@@ -37,6 +37,19 @@ ref<composite_mesh> loadMeshFromFile(const char* sceneFilename, uint32 flags)
 	{
 		result->skeleton.loadFromAssimp(scene, 1.f);
 
+#if 0
+		result->skeleton.prettyPrintHierarchy();
+
+		for (uint32 i = 0; i < (uint32)result->skeleton.joints.size(); ++i)
+		{
+			auto& joint = result->skeleton.joints[i];
+
+			auto it = result->skeleton.nameToJointID.find(joint.name);
+			assert(it != result->skeleton.nameToJointID.end());
+			assert(it->second == i);
+		}
+#endif
+
 		for (uint32 i = 0; i < scene->mNumAnimations; ++i)
 		{
 			result->skeleton.pushAssimpAnimation(sceneFilename, scene->mAnimations[i], 1.f);
