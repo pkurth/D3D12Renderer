@@ -27,6 +27,20 @@ static std::wstring stringToWideString(const std::string& s)
 	return std::wstring(s.begin(), s.end());
 }
 
+enum desc_type
+{
+	desc_type_struct,
+	desc_type_stream,
+};
+
+union graphics_pipeline_desc
+{
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC structDesc;
+	D3D12_PIPELINE_STATE_STREAM_DESC streamDesc;
+
+	graphics_pipeline_desc() = default;
+};
+
 enum pipeline_type
 {
 	pipeline_type_graphics,
@@ -35,13 +49,18 @@ enum pipeline_type
 
 struct reloadable_pipeline_state
 {
-	pipeline_type type;
+	pipeline_type pipelineType;
+	desc_type descriptionType;
 
 	union
 	{
 		struct
 		{
 			D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicsDesc;
+
+			D3D12_PIPELINE_STATE_STREAM_DESC streamDesc;
+			dx_pipeline_stream_base* stream;
+
 			graphics_pipeline_files graphicsFiles;
 		};
 
@@ -59,9 +78,11 @@ struct reloadable_pipeline_state
 
 	reloadable_pipeline_state() {}
 
+
 	void initialize(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files, dx_root_signature* rootSignature)
 	{
-		this->type = pipeline_type_graphics;
+		this->pipelineType = pipeline_type_graphics;
+		this->descriptionType = desc_type_struct;
 		this->graphicsDesc = desc;
 		this->graphicsFiles = files;
 		this->rootSignature = rootSignature;
@@ -77,9 +98,21 @@ struct reloadable_pipeline_state
 		}
 	}
 
+	void initialize(const D3D12_PIPELINE_STATE_STREAM_DESC& desc, dx_pipeline_stream_base* stream, const graphics_pipeline_files& files, dx_root_signature* rootSignature)
+	{
+		this->pipelineType = pipeline_type_graphics;
+		this->descriptionType = desc_type_stream;
+		this->streamDesc = desc;
+		this->stream = stream;
+		this->graphicsFiles = files;
+		this->rootSignature = rootSignature;
+
+		// TODO: Handle input layout. For now we expect the user to use one of the globally defined formats.
+	}
+
 	void initialize(const char* file, dx_root_signature* rootSignature)
 	{
-		this->type = pipeline_type_compute;
+		this->pipelineType = pipeline_type_compute;
 		this->computeDesc = {};
 		this->computeFile = file;
 		this->rootSignature = rootSignature;
@@ -228,6 +261,48 @@ dx_pipeline createReloadablePipeline(const char* csFile)
 	return result;
 }
 
+dx_pipeline createReloadablePipeline(const D3D12_PIPELINE_STATE_STREAM_DESC& desc, dx_pipeline_stream_base* stream, const graphics_pipeline_files& files, 
+	dx_root_signature userRootSignature)
+{
+	pipelines.emplace_back();
+	auto& state = pipelines.back();
+
+	pushBlob(files.vs, &state);
+	pushBlob(files.ps, &state);
+	pushBlob(files.gs, &state);
+	pushBlob(files.ds, &state);
+	pushBlob(files.hs, &state);
+
+	userRootSignatures.push_back(userRootSignature);
+	dx_root_signature* rootSignature = &userRootSignatures.back();
+	userRootSignatures.back() = userRootSignature; // Fuck. You.
+
+	state.initialize(desc, stream, files, rootSignature);
+
+	dx_pipeline result = { &state.pipeline, rootSignature };
+	return result;
+}
+
+dx_pipeline createReloadablePipeline(const D3D12_PIPELINE_STATE_STREAM_DESC& desc, dx_pipeline_stream_base* stream, const graphics_pipeline_files& files, rs_file rootSignatureFile)
+{
+	pipelines.emplace_back();
+	auto& state = pipelines.back();
+
+	reloadable_root_signature* reloadableRS = pushBlob(files.shaders[rootSignatureFile], &state, true);
+	pushBlob(files.vs, &state);
+	pushBlob(files.ps, &state);
+	pushBlob(files.gs, &state);
+	pushBlob(files.ds, &state);
+	pushBlob(files.hs, &state);
+
+	dx_root_signature* rootSignature = &reloadableRS->rootSignature;
+
+	state.initialize(desc, stream, files, rootSignature);
+
+	dx_pipeline result = { &state.pipeline, rootSignature };
+	return result;
+}
+
 static void loadRootSignature(reloadable_root_signature& r)
 {
 	dx_blob rs = shaderBlobs[r.file].blob;
@@ -241,16 +316,31 @@ static void loadPipeline(reloadable_pipeline_state& p)
 {
 	dxContext.retire(p.pipeline);
 
-	if (p.type == pipeline_type_graphics)
+	if (p.pipelineType == pipeline_type_graphics)
 	{
-		if (p.graphicsFiles.vs) { dx_blob shader = shaderBlobs[p.graphicsFiles.vs].blob; p.graphicsDesc.VS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
-		if (p.graphicsFiles.ps) { dx_blob shader = shaderBlobs[p.graphicsFiles.ps].blob; p.graphicsDesc.PS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
-		if (p.graphicsFiles.gs) { dx_blob shader = shaderBlobs[p.graphicsFiles.gs].blob; p.graphicsDesc.GS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
-		if (p.graphicsFiles.ds) { dx_blob shader = shaderBlobs[p.graphicsFiles.ds].blob; p.graphicsDesc.DS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
-		if (p.graphicsFiles.hs) { dx_blob shader = shaderBlobs[p.graphicsFiles.hs].blob; p.graphicsDesc.HS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
+		if (p.descriptionType == desc_type_struct)
+		{
+			if (p.graphicsFiles.vs) { dx_blob shader = shaderBlobs[p.graphicsFiles.vs].blob; p.graphicsDesc.VS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
+			if (p.graphicsFiles.ps) { dx_blob shader = shaderBlobs[p.graphicsFiles.ps].blob; p.graphicsDesc.PS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
+			if (p.graphicsFiles.gs) { dx_blob shader = shaderBlobs[p.graphicsFiles.gs].blob; p.graphicsDesc.GS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
+			if (p.graphicsFiles.ds) { dx_blob shader = shaderBlobs[p.graphicsFiles.ds].blob; p.graphicsDesc.DS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
+			if (p.graphicsFiles.hs) { dx_blob shader = shaderBlobs[p.graphicsFiles.hs].blob; p.graphicsDesc.HS = CD3DX12_SHADER_BYTECODE(shader.Get()); }
 
-		p.graphicsDesc.pRootSignature = p.rootSignature->rootSignature.Get();
-		checkResult(dxContext.device->CreateGraphicsPipelineState(&p.graphicsDesc, IID_PPV_ARGS(&p.pipeline)));
+			p.graphicsDesc.pRootSignature = p.rootSignature->rootSignature.Get();
+			checkResult(dxContext.device->CreateGraphicsPipelineState(&p.graphicsDesc, IID_PPV_ARGS(&p.pipeline)));
+		}
+		else
+		{
+			if (p.graphicsFiles.vs) { dx_blob shader = shaderBlobs[p.graphicsFiles.vs].blob; p.stream->setVertexShader(shader); }
+			if (p.graphicsFiles.ps) { dx_blob shader = shaderBlobs[p.graphicsFiles.ps].blob; p.stream->setPixelShader(shader); }
+			if (p.graphicsFiles.gs) { dx_blob shader = shaderBlobs[p.graphicsFiles.gs].blob; p.stream->setGeometryShader(shader); }
+			if (p.graphicsFiles.ds) { dx_blob shader = shaderBlobs[p.graphicsFiles.ds].blob; p.stream->setDomainShader(shader); }
+			if (p.graphicsFiles.hs) { dx_blob shader = shaderBlobs[p.graphicsFiles.hs].blob; p.stream->setHullShader(shader); }
+			if (p.graphicsFiles.ms) { dx_blob shader = shaderBlobs[p.graphicsFiles.ms].blob; p.stream->setMeshShader(shader); }
+
+			p.stream->setRootSignature(*p.rootSignature);
+			checkResult(dxContext.device->CreatePipelineState(&p.streamDesc, IID_PPV_ARGS(&p.pipeline)));
+		}
 	}
 	else
 	{

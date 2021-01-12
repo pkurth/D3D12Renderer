@@ -253,6 +253,17 @@ struct dx_graphics_pipeline_generator
 	}
 };
 
+struct dx_pipeline_stream_base
+{
+	virtual void setVertexShader(dx_blob blob) {}
+	virtual void setPixelShader(dx_blob blob) {}
+	virtual void setDomainShader(dx_blob blob) {}
+	virtual void setHullShader(dx_blob blob) {}
+	virtual void setGeometryShader(dx_blob blob) {}
+	virtual void setMeshShader(dx_blob blob) {}
+
+	virtual void setRootSignature(dx_root_signature rs) = 0;
+};
 
 
 struct dx_pipeline
@@ -270,8 +281,9 @@ union graphics_pipeline_files
 		const char* ds;
 		const char* hs;
 		const char* gs;
+		const char* ms;
 	};
-	const char* shaders[5] = {};
+	const char* shaders[6] = {};
 };
 
 enum rs_file
@@ -288,6 +300,35 @@ dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& d
 
 dx_pipeline createReloadablePipeline(const char* csFile, dx_root_signature userRootSignature);
 dx_pipeline createReloadablePipeline(const char* csFile);
+
+
+template <typename stream_t>
+inline dx_pipeline createReloadablePipelineFromStream(const stream_t& stream, const graphics_pipeline_files& files, dx_root_signature userRootSignature)
+{
+	static_assert(std::is_base_of<dx_pipeline_stream_base, stream_t>::value, "Stream must inherit from dx_pipeline_stream_base.");
+
+	stream_t* streamCopy = new stream_t(stream); // Dynamically allocated for permanent storage.
+	D3D12_PIPELINE_STATE_STREAM_DESC desc = {
+		sizeof(stream_t) - 8, (uint8*)streamCopy + 8 // Offset for vTable. This seems very broken. TODO: Verify that this always works.
+	};
+
+	dx_pipeline createReloadablePipeline(const D3D12_PIPELINE_STATE_STREAM_DESC& desc, dx_pipeline_stream_base* stream, const graphics_pipeline_files& files, dx_root_signature userRootSignature);
+	return createReloadablePipeline(desc, streamCopy, files, userRootSignature);
+}
+
+template <typename stream_t>
+inline dx_pipeline createReloadablePipelineFromStream(const stream_t& stream, const graphics_pipeline_files& files, rs_file rootSignatureFile = rs_in_pixel_shader)
+{
+	static_assert(std::is_base_of<dx_pipeline_stream_base, stream_t>::value, "Stream must inherit from dx_pipeline_stream_base.");
+
+	stream_t* streamCopy = new stream_t(stream); // Dynamically allocated for permanent storage.
+	D3D12_PIPELINE_STATE_STREAM_DESC desc = {
+		sizeof(stream_t) - 8, (uint8*)streamCopy + 8 // Offset for vTable. This seems very broken. TODO: Verify that this always works.
+	};
+
+	dx_pipeline createReloadablePipeline(const D3D12_PIPELINE_STATE_STREAM_DESC& desc, dx_pipeline_stream_base* stream, const graphics_pipeline_files& files, rs_file rootSignatureFile);
+	return createReloadablePipeline(desc, streamCopy, files, rootSignatureFile);
+}
 
 void createAllPendingReloadablePipelines();
 
