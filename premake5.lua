@@ -149,10 +149,12 @@ project "D3D12ProjectionMapping"
 	filter("files:**_ms.hlsl")
 		removeflags("ExcludeFromBuild")
 		shadertype("Mesh")
+		shadermodel "6.5" -- Required for mesh shaders.
 
 	filter("files:**_as.hlsl")
 		removeflags("ExcludeFromBuild")
 		shadertype("Amplification")
+		shadermodel "6.5" -- Required for amplification shaders.
  
 	filter("files:**_cs.hlsl")
 		removeflags("ExcludeFromBuild")
