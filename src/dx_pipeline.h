@@ -293,6 +293,7 @@ enum rs_file
 	rs_in_domain_shader,
 	rs_in_hull_shader,
 	rs_in_geometry_shader,
+	rs_in_mesh_shader,
 };
 
 dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files, dx_root_signature userRootSignature);
