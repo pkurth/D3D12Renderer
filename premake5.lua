@@ -145,6 +145,14 @@ project "D3D12ProjectionMapping"
 	filter("files:**_ps.hlsl")
 		removeflags("ExcludeFromBuild")
 		shadertype("Pixel")
+
+	filter("files:**_ms.hlsl")
+		removeflags("ExcludeFromBuild")
+		shadertype("Mesh")
+
+	filter("files:**_as.hlsl")
+		removeflags("ExcludeFromBuild")
+		shadertype("Amplification")
  
 	filter("files:**_cs.hlsl")
 		removeflags("ExcludeFromBuild")
