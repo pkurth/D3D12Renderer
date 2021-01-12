@@ -29,8 +29,36 @@ struct animation_component
 	submesh_info prevFrameSMs[16];
 };
 
+struct raytrace_component
+{
+	raytracing_object_type type;
+};
+
 static ref<dx_buffer> pointLightBuffer[NUM_BUFFERED_FRAMES];
 static ref<dx_buffer> spotLightBuffer[NUM_BUFFERED_FRAMES];
+
+static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh, pbr_raytracing_binding_table& raytracingBindingTable)
+{
+	if (dxContext.raytracingSupported)
+	{
+		raytracing_blas_builder blasBuilder;
+		std::vector<ref<pbr_material>> raytracingMaterials;
+
+		for (auto& sm : mesh->submeshes)
+		{
+			blasBuilder.push(mesh->mesh.vertexBuffer, mesh->mesh.indexBuffer, sm.info);
+			raytracingMaterials.push_back(sm.material);
+		}
+
+		auto blas = blasBuilder.finish();
+		raytracing_object_type type = raytracingBindingTable.defineObjectType(blas, raytracingMaterials);
+		return type;
+	}
+	else
+	{
+		return {};
+	}
+}
 
 void application::initialize(dx_renderer* renderer)
 {
@@ -39,11 +67,21 @@ void application::initialize(dx_renderer* renderer)
 	camera.initializeIngame(vec3(0.f, 30.f, 40.f), quat::identity, deg2rad(70.f), 0.1f);
 	cameraController.initialize(&camera);
 
+	if (dxContext.raytracingSupported)
+	{
+		raytracingBindingTable.initialize();
+		raytracingTLAS.initialize();
+	}
+
 	
 	// Sponza.
+	auto sponzaMesh = loadMeshFromFile("assets/meshes/sponza.obj");
+	auto sponzaBlas = defineBlasFromMesh(sponzaMesh, raytracingBindingTable);
+
 	appScene.createEntity("Sponza")
 		.addComponent<trs>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
-		.addComponent<raster_component>(loadMeshFromFile("assets/meshes/sponza.obj"));
+		.addComponent<raster_component>(sponzaMesh)
+		.addComponent<raytrace_component>(sponzaBlas);
 
 
 	auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/meshes/stormtrooper.fbx");
@@ -60,10 +98,7 @@ void application::initialize(dx_renderer* renderer)
 		"assets/textures/pilot/A.png",
 		"assets/textures/pilot/N.png",
 		"assets/textures/pilot/R.png",
-		"assets/textures/pilot/M.png",
-		vec4(1.f, 1.f, 1.f, 1.f),
-		0.f,
-		0.f
+		"assets/textures/pilot/M.png"
 	);
 
 	auto unrealMesh = loadAnimatedMeshFromFile("assets/meshes/unreal_mannequin.fbx");
@@ -90,40 +125,17 @@ void application::initialize(dx_renderer* renderer)
 		.addComponent<animation_component>(0.f);
 
 	appScene.createEntity("Mannequin")
-		.addComponent<trs>(vec3(0.f, 20.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.2f)
+		.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.019f)
 		.addComponent<raster_component>(unrealMesh)
 		.addComponent<animation_component>(0.f);
 
 
 
 	// Raytracing.
-	/*if (dxContext.raytracingSupported)
+	if (dxContext.raytracingSupported)
 	{
-		raytracingBindingTable.initialize();
-		raytracingTLAS.initialize(acceleration_structure_refit);
-
-		std::vector<raytracing_object_handle> types;
-		for (auto& m : meshes)
-		{
-			raytracing_blas_builder blasBuilder;
-			std::vector<ref<pbr_material>> raytracingMaterials;
-
-			for (auto& sm : m.submeshes)
-			{
-				blasBuilder.push(m.mesh.vertexBuffer, m.mesh.indexBuffer, sm.info);
-				raytracingMaterials.push_back(sm.material);
-			}
-
-			blas.push_back(blasBuilder.finish());
-			types.push_back(raytracingBindingTable.defineObjectType(blas.back(), raytracingMaterials));
-		}
-
-		raytracingTLAS.instantiate(types[0], sponzaTransform);
-
-
 		raytracingBindingTable.build();
-		raytracingTLAS.build();
-	}*/
+	}
 
 
 
@@ -649,6 +661,23 @@ void application::update(const user_input& input, float dt)
 	});
 
 	submitRenderPasses();
+
+#if 0
+	if (dxContext.raytracingSupported)
+	{
+		raytracingTLAS.reset();
+
+		appScene.group<raytrace_component>(entt::get<trs>)
+			.each([this](entt::entity entityHandle, auto& raytrace, auto& transform)
+		{
+			raytracingTLAS.instantiate(raytrace.type, transform);
+		});
+
+		raytracingTLAS.build();
+
+		// TODO: Submit for rendering.
+	}
+#endif
 }
 
 void application::setEnvironment(const char* filename)

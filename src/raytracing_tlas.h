@@ -11,9 +11,9 @@ struct raytracing_tlas
 {
 	void initialize(acceleration_structure_rebuild_mode rebuildMode = acceleration_structure_rebuild);
 
-	raytracing_instance_handle instantiate(raytracing_object_handle type, const trs& transform);
-	void updateInstanceTransform(raytracing_instance_handle handle, const trs& transform);
-
+	// Call these each frame to rebuild the structure.
+	void reset();
+	raytracing_instance_handle instantiate(raytracing_object_type type, const trs& transform);
 	void build();
 
 	dx_cpu_descriptor_handle getHandle() const { return tlasSRVs[tlasDescriptorIndex]; }

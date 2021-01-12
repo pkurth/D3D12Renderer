@@ -10,7 +10,7 @@ struct pbr_raytracing_binding_table
 {
     void initialize();
 
-    raytracing_object_handle defineObjectType(const raytracing_blas& blas, const std::vector<ref<pbr_material>>& materials);
+    raytracing_object_type defineObjectType(const ref<raytracing_blas>& blas, const std::vector<ref<pbr_material>>& materials);
     void build();
 
     virtual ~pbr_raytracing_binding_table() { if (bindingTable) { free(bindingTable); } }

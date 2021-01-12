@@ -38,7 +38,6 @@ private:
 
 	void assignShadowMapViewports();
 
-	std::vector<raytracing_blas> blas;
 
 	pbr_raytracing_binding_table raytracingBindingTable;
 	raytracing_tlas raytracingTLAS;

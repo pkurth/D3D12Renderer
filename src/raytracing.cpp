@@ -39,7 +39,7 @@ raytracing_blas_builder& raytracing_blas_builder::push(ref<dx_vertex_buffer> ver
 	return *this;
 }
 
-raytracing_blas raytracing_blas_builder::finish()
+ref<raytracing_blas> raytracing_blas_builder::finish(bool keepScratch)
 {
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
 	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
@@ -59,12 +59,12 @@ raytracing_blas raytracing_blas_builder::finish()
 	info.ScratchDataSizeInBytes = alignTo(info.ScratchDataSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 	info.ResultDataMaxSizeInBytes = alignTo(info.ResultDataMaxSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 
-	raytracing_blas blas = {};
-	blas.scratch = createBuffer((uint32)info.ScratchDataSizeInBytes, 1, 0, true, false, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	blas.blas = createBuffer((uint32)info.ResultDataMaxSizeInBytes, 1, 0, true, false, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
+	ref<raytracing_blas> blas = make_ref<raytracing_blas>();
+	blas->scratch = createBuffer((uint32)info.ScratchDataSizeInBytes, 1, 0, true, false, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	blas->blas = createBuffer((uint32)info.ResultDataMaxSizeInBytes, 1, 0, true, false, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
 
-	SET_NAME(blas.scratch->resource, "BLAS Scratch");
-	SET_NAME(blas.blas->resource, "BLAS Result");
+	SET_NAME(blas->scratch->resource, "BLAS Scratch");
+	SET_NAME(blas->blas->resource, "BLAS Result");
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 	dx_dynamic_constant_buffer localTransformsBuffer;
@@ -85,16 +85,21 @@ raytracing_blas raytracing_blas_builder::finish()
 		}
 	}
 
-	blas.geometries = std::move(geometries);
+	blas->geometries = std::move(geometries);
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
 	asDesc.Inputs = inputs;
-	asDesc.DestAccelerationStructureData = blas.blas->gpuVirtualAddress;
-	asDesc.ScratchAccelerationStructureData = blas.scratch->gpuVirtualAddress;
+	asDesc.DestAccelerationStructureData = blas->blas->gpuVirtualAddress;
+	asDesc.ScratchAccelerationStructureData = blas->scratch->gpuVirtualAddress;
 
 	cl->commandList->BuildRaytracingAccelerationStructure(&asDesc, 0, 0);
-	cl->uavBarrier(blas.blas);
+	cl->uavBarrier(blas->blas);
 	dxContext.executeCommandList(cl);
+
+	if (!keepScratch)
+	{
+		blas->scratch = 0;
+	}
 
 	return blas;
 }

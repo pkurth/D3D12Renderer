@@ -41,11 +41,11 @@ void pbr_raytracing_binding_table::initialize()
     }
 }
 
-raytracing_object_handle pbr_raytracing_binding_table::defineObjectType(const raytracing_blas& blas, const std::vector<ref<pbr_material>>& materials)
+raytracing_object_type pbr_raytracing_binding_table::defineObjectType(const ref<raytracing_blas>& blas, const std::vector<ref<pbr_material>>& materials)
 {
-    assert(blas.geometries.size() == materials.size());
+    assert(blas->geometries.size() == materials.size());
 
-    uint32 numGeometries = (uint32)blas.geometries.size();
+    uint32 numGeometries = (uint32)blas->geometries.size();
 
 
     if (maxNumHitGroups < numHitGroups + numGeometries)
@@ -59,13 +59,13 @@ raytracing_object_handle pbr_raytracing_binding_table::defineObjectType(const ra
 
     for (uint32 i = 0; i < numGeometries; ++i)
     {
-        submesh_info submesh = blas.geometries[i].submesh;
+        submesh_info submesh = blas->geometries[i].submesh;
         const ref<pbr_material>& material = materials[i];
 
         dx_cpu_descriptor_handle base = cpuCurrentDescriptorHandle;
 
-        (cpuCurrentDescriptorHandle++).createBufferSRV(blas.geometries[i].vertexBuffer, { submesh.baseVertex, submesh.numVertices });
-        (cpuCurrentDescriptorHandle++).createRawBufferSRV(blas.geometries[i].indexBuffer, { submesh.firstTriangle * 3, submesh.numTriangles * 3 });
+        (cpuCurrentDescriptorHandle++).createBufferSRV(blas->geometries[i].vertexBuffer, { submesh.baseVertex, submesh.numVertices });
+        (cpuCurrentDescriptorHandle++).createRawBufferSRV(blas->geometries[i].indexBuffer, { submesh.firstTriangle * 3, submesh.numTriangles * 3 });
 
         uint32 flags = 0;
 
@@ -127,7 +127,7 @@ raytracing_object_handle pbr_raytracing_binding_table::defineObjectType(const ra
         ++numHitGroups;
     }
 
-    raytracing_object_handle result = { blas.blas->gpuVirtualAddress, instanceContributionToHitGroupIndex };
+    raytracing_object_type result = { blas, instanceContributionToHitGroupIndex };
 
     instanceContributionToHitGroupIndex += numGeometries * pbr_raytracing_pipeline::numRayTypes;
 

@@ -15,30 +15,26 @@ void raytracing_tlas::initialize(acceleration_structure_rebuild_mode rebuildMode
     }
 }
 
-raytracing_instance_handle raytracing_tlas::instantiate(raytracing_object_handle type, const trs& transform)
+void raytracing_tlas::reset()
 {
-    D3D12_RAYTRACING_INSTANCE_DESC instance;
+    allInstances.clear();
+}
+
+raytracing_instance_handle raytracing_tlas::instantiate(raytracing_object_type type, const trs& transform)
+{
+    uint32 result = (uint32)allInstances.size();
+    D3D12_RAYTRACING_INSTANCE_DESC& instance = allInstances.emplace_back();
 
     instance.Flags = 0;// D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE;
     instance.InstanceContributionToHitGroupIndex = type.instanceContributionToHitGroupIndex;
 
     mat4 m = transpose(trsToMat4(transform));
     memcpy(instance.Transform, &m, sizeof(instance.Transform));
-    instance.AccelerationStructure = type.blas;
+    instance.AccelerationStructure = type.blas->blas->gpuVirtualAddress;
     instance.InstanceMask = 0xFF;
     instance.InstanceID = 0; // This value will be exposed to the shader via InstanceID().
 
-    uint32 result = (uint32)allInstances.size();
-    allInstances.push_back(instance);
-
     return { result };
-}
-
-void raytracing_tlas::updateInstanceTransform(raytracing_instance_handle handle, const trs& transform)
-{
-    D3D12_RAYTRACING_INSTANCE_DESC& instance = allInstances[handle.instanceIndex];
-    mat4 m = transpose(trsToMat4(transform));
-    memcpy(instance.Transform, &m, sizeof(instance.Transform));
 }
 
 void raytracing_tlas::build()
@@ -94,7 +90,7 @@ void raytracing_tlas::build()
 
 
 
-    dx_command_list* cl = dxContext.getFreeRenderCommandList();
+    dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
     dx_dynamic_constant_buffer gpuInstances = cl->uploadDynamicConstantBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalNumInstances, allInstances.data());
 
     inputs.InstanceDescs = gpuInstances.gpuPtr;

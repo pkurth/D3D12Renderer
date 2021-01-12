@@ -29,7 +29,7 @@ struct raytracing_blas
 struct raytracing_blas_builder
 {
 	raytracing_blas_builder& push(ref<dx_vertex_buffer> vertexBuffer, ref<dx_index_buffer> indexBuffer, submesh_info submesh, bool opaque = true, const trs& localTransform = trs::identity);
-	raytracing_blas finish();
+	ref<raytracing_blas> finish(bool keepScratch = false);
 
 private:
 	std::vector<raytracing_blas_geometry> geometries;
@@ -37,9 +37,9 @@ private:
 	std::vector<mat4> localTransforms;
 };
 
-struct raytracing_object_handle
+struct raytracing_object_type
 {
-	D3D12_GPU_VIRTUAL_ADDRESS blas;
+	ref<raytracing_blas> blas;
 	uint32 instanceContributionToHitGroupIndex;
 };
 
