@@ -163,6 +163,10 @@ struct dx_command_list
 	void dispatchIndirect(dx_command_signature commandSignature, uint32 maxNumDispatches, const ref<dx_buffer>& numDispatchesBuffer, const ref<dx_buffer>& commandBuffer);
 
 
+	// Mesh shaders.
+	void dispatchMesh(uint32 numGroupsX, uint32 numGroupsY = 1, uint32 numGroupsZ = 1);
+
+
 	// Raytracing.
 	void raytrace(D3D12_DISPATCH_RAYS_DESC& raytraceDesc);
 

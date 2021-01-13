@@ -152,24 +152,15 @@ static bool checkRaytracingSupport(dx_device device)
 	return options5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_0;
 }
 
-template<typename, typename = void>
-constexpr bool typeComplete = false;
-
-template<typename T>
-constexpr bool typeComplete<T, std::void_t<decltype(sizeof(T))>> = true;
-
-template <typename T = void> // Constexpr-if only works in templated code.
 static bool checkMeshShaderSupport(dx_device device)
 {
-	struct D3D12_FEATURE_DATA_D3D12_OPTIONS7;
-
-	if constexpr (typeComplete<D3D12_FEATURE_DATA_D3D12_OPTIONS7>)
-	{
-		D3D12_FEATURE_DATA_D3D12_OPTIONS7 options7 = {};
-		checkResult(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options7, sizeof(options7)));
-		return options7.MeshShaderTier >= D3D12_MESH_SHADER_TIER_1;
-	}
+#if WIN_SDK_VERSION_2019
+	D3D12_FEATURE_DATA_D3D12_OPTIONS7 options7 = {};
+	checkResult(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options7, sizeof(options7)));
+	return options7.MeshShaderTier >= D3D12_MESH_SHADER_TIER_1;
+#else
 	return false;
+#endif
 }
 
 bool dx_context::initialize()

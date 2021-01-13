@@ -7,6 +7,7 @@
 #include "imgui.h"
 #include "dx_context.h"
 #include "skinning.h"
+#include "mesh_shader.h"
 
 #define STB_RECT_PACK_IMPLEMENTATION
 #include <imgui/imstb_rectpack.h>
@@ -58,6 +59,11 @@ static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh
 	{
 		return {};
 	}
+}
+
+void application::loadCustomShaders()
+{
+	initializeMeshShader();
 }
 
 void application::initialize(dx_renderer* renderer)
@@ -558,6 +564,7 @@ void application::update(const user_input& input, float dt)
 	drawSceneHierarchy();
 	drawSettings(dt);
 
+	testRenderMeshShader(&overlayRenderPass);
 
 	sun.updateMatrices(camera);
 

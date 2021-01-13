@@ -26,16 +26,39 @@ protected:
 
 		material_setup_function setupFunc = material_t::setupPipeline;
 
-		drawCalls.push_back(
-			{
-				transform,
-				vertexBuffer,
-				indexBuffer,
-				material,
-				submesh,
-				setupFunc,
-			}
-		);
+		auto& dc = drawCalls.emplace_back();
+		dc.transform = transform;
+		dc.vertexBuffer = vertexBuffer;
+		dc.indexBuffer = indexBuffer;
+		dc.material = material;
+		dc.submesh = submesh;
+		dc.materialSetupFunc = setupFunc;
+		dc.drawType = draw_type_default;
+
+		if (outline)
+		{
+			outlinedObjects.push_back(
+				{
+					(uint16)(drawCalls.size() - 1)
+				}
+			);
+		}
+	}
+
+	template <typename material_t>
+	void common(uint32 dispatchX, uint32 dispatchY, uint32 dispatchZ, const ref<material_t>& material, const mat4& transform,
+		bool outline)
+	{
+		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
+
+		material_setup_function setupFunc = material_t::setupPipeline;
+
+		auto& dc = drawCalls.emplace_back();
+		dc.transform = transform;
+		dc.material = material;
+		dc.dispatchInfo = { dispatchX, dispatchY, dispatchZ };
+		dc.materialSetupFunc = setupFunc;
+		dc.drawType = draw_type_mesh_shader;
 
 		if (outline)
 		{
@@ -48,14 +71,30 @@ protected:
 	}
 
 private:
+	enum draw_type
+	{
+		draw_type_default,
+		draw_type_mesh_shader,
+	};
+
+	struct dispatch_info 
+	{ 
+		uint32 dispatchX, dispatchY, dispatchZ; 
+	};
+
 	struct draw_call
 	{
-		const mat4 transform;
+		mat4 transform;
 		ref<dx_vertex_buffer> vertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
 		ref<material_base> material;
-		submesh_info submesh;
+		union
+		{
+			submesh_info submesh;
+			dispatch_info dispatchInfo;
+		};
 		material_setup_function materialSetupFunc;
+		draw_type drawType;
 	};
 
 	std::vector<draw_call> drawCalls;
@@ -119,7 +158,7 @@ struct opaque_render_pass : geometry_render_pass
 private:
 	struct static_depth_only_draw_call
 	{
-		const mat4 transform;
+		mat4 transform;
 		ref<dx_vertex_buffer> vertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
 		submesh_info submesh;
@@ -128,8 +167,8 @@ private:
 
 	struct dynamic_depth_only_draw_call
 	{
-		const mat4 transform;
-		const mat4 prevFrameTransform;
+		mat4 transform;
+		mat4 prevFrameTransform;
 		ref<dx_vertex_buffer> vertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
 		submesh_info submesh;
@@ -138,8 +177,8 @@ private:
 
 	struct animated_depth_only_draw_call
 	{
-		const mat4 transform;
-		const mat4 prevFrameTransform;
+		mat4 transform;
+		mat4 prevFrameTransform;
 		ref<dx_vertex_buffer> vertexBuffer;
 		ref<dx_vertex_buffer> prevFrameVertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
@@ -176,6 +215,12 @@ struct overlay_render_pass : geometry_render_pass
 		common(vertexBuffer, indexBuffer, submesh, material, transform, false);
 	}
 
+	template <typename material_t>
+	void renderObjectWithMeshShader(uint32 dispatchX, uint32 dispatchY, uint32 dispatchZ, const ref<material_t>& material, const mat4& transform)
+	{
+		common(dispatchX, dispatchY, dispatchZ, material, transform, false);
+	}
+
 	friend struct dx_renderer;
 };
 
@@ -186,7 +231,7 @@ struct shadow_render_pass
 protected:
 	struct draw_call
 	{
-		const mat4 transform;
+		mat4 transform;
 		ref<dx_vertex_buffer> vertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
 		submesh_info submesh;

@@ -104,7 +104,7 @@ project "D3D12ProjectionMapping"
 
 	
 	filter "files:**.hlsl"
-		shadermodel "5.1" -- 6.0 generates no output message, so I'll stick with 5.1 for now.
+		shadermodel "6.0"
 		flags "ExcludeFromBuild"
 		shaderobjectfileoutput("shaders/bin/%{file.basename}" .. ".cso")
 		shaderincludedirs {

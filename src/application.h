@@ -19,6 +19,7 @@
 
 struct application
 {
+	void loadCustomShaders();
 	void initialize(dx_renderer* renderer);
 	void update(const user_input& input, float dt);
 

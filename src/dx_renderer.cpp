@@ -1004,10 +1004,9 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 	// ----------------------------------------
-	// HELPER STUFF
+	// OVERLAYS
 	// ----------------------------------------
 
-#if 1
 	if (overlayRenderPass && overlayRenderPass->drawCalls.size())
 	{
 		cl->clearDepth(depthStencilBuffer->dsvHandle);
@@ -1017,7 +1016,6 @@ void dx_renderer::endFrame(const user_input& input)
 		for (const auto& dc : overlayRenderPass->drawCalls)
 		{
 			const mat4& m = dc.transform;
-			const submesh_info& submesh = dc.submesh;
 
 			if (dc.materialSetupFunc != lastSetupFunc)
 			{
@@ -1029,12 +1027,20 @@ void dx_renderer::endFrame(const user_input& input)
 
 			cl->setGraphics32BitConstants(0, transform_cb{ camera.viewProj * m, m });
 
-			cl->setVertexBuffer(0, dc.vertexBuffer);
-			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			if (dc.drawType == geometry_render_pass::draw_type_default)
+			{
+				const submesh_info& submesh = dc.submesh;
+
+				cl->setVertexBuffer(0, dc.vertexBuffer);
+				cl->setIndexBuffer(dc.indexBuffer);
+				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			}
+			else
+			{
+				cl->dispatchMesh(dc.dispatchInfo.dispatchX, dc.dispatchInfo.dispatchY, dc.dispatchInfo.dispatchZ);
+			}
 		}
 	}
-#endif
 
 
 

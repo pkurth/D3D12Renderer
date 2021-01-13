@@ -246,6 +246,9 @@ int main(int argc, char** argv)
 	setMainWindow(&window);
 
 
+	application app = {};
+	app.loadCustomShaders();
+
 	initializeTransformationGizmos();
 	dx_renderer::initializeCommon(screenFormat);
 
@@ -255,11 +258,9 @@ int main(int argc, char** argv)
 	sceneViewWindowClass.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_AutoHideTabBar;
 
 
-
 	dx_renderer renderer = {};
 	renderer.initialize(1280, 800, true);
 
-	application app = {};
 	app.initialize(&renderer);
 
 
