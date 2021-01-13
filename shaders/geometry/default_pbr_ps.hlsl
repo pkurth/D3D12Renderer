@@ -66,6 +66,7 @@ ps_output main(ps_input IN)
 	float3 N = (flags & USE_NORMAL_TEXTURE)
 		? mul(normalTex.Sample(wrapSampler, IN.uv).xyz * 2.f - float3(1.f, 1.f, 1.f), IN.tbn)
 		: IN.tbn[2];
+	N = normalize(N);
 
 	float roughness = (flags & USE_ROUGHNESS_TEXTURE)
 		? roughTex.Sample(wrapSampler, IN.uv)
