@@ -498,7 +498,7 @@ void dx_command_list::dispatchIndirect(dx_command_signature commandSignature, ui
 void dx_command_list::dispatchMesh(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ)
 {
 #if WIN_SDK_VERSION_2019
-	dynamicDescriptorHeap.commitStagedDescriptorsForDispatch(this);
+	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
 	commandList->DispatchMesh(numGroupsX, numGroupsY, numGroupsZ);
 #else
 	assert(!"Mesh shaders are not supported with your Windows SDK version.");

@@ -199,6 +199,9 @@ dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& d
 	pushBlob(files.ds, &state);
 	pushBlob(files.hs, &state);
 
+	assert(!files.ms);
+	assert(!files.as);
+
 	userRootSignatures.push_back(userRootSignature);
 	dx_root_signature* rootSignature = &userRootSignatures.back();
 	userRootSignatures.back() = userRootSignature; // Fuck. You.
@@ -220,6 +223,9 @@ dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& d
 	pushBlob(files.gs, &state);
 	pushBlob(files.ds, &state);
 	pushBlob(files.hs, &state);
+
+	assert(!files.ms);
+	assert(!files.as);
 
 	dx_root_signature* rootSignature = &reloadableRS->rootSignature;
 
@@ -272,6 +278,8 @@ dx_pipeline createReloadablePipeline(const D3D12_PIPELINE_STATE_STREAM_DESC& des
 	pushBlob(files.gs, &state);
 	pushBlob(files.ds, &state);
 	pushBlob(files.hs, &state);
+	pushBlob(files.ms, &state);
+	pushBlob(files.as, &state);
 
 	userRootSignatures.push_back(userRootSignature);
 	dx_root_signature* rootSignature = &userRootSignatures.back();
@@ -294,6 +302,8 @@ dx_pipeline createReloadablePipeline(const D3D12_PIPELINE_STATE_STREAM_DESC& des
 	pushBlob(files.gs, &state);
 	pushBlob(files.ds, &state);
 	pushBlob(files.hs, &state);
+	pushBlob(files.ms, &state);
+	pushBlob(files.as, &state);
 
 	dx_root_signature* rootSignature = &reloadableRS->rootSignature;
 
@@ -337,6 +347,7 @@ static void loadPipeline(reloadable_pipeline_state& p)
 			if (p.graphicsFiles.ds) { dx_blob shader = shaderBlobs[p.graphicsFiles.ds].blob; p.stream->setDomainShader(shader); }
 			if (p.graphicsFiles.hs) { dx_blob shader = shaderBlobs[p.graphicsFiles.hs].blob; p.stream->setHullShader(shader); }
 			if (p.graphicsFiles.ms) { dx_blob shader = shaderBlobs[p.graphicsFiles.ms].blob; p.stream->setMeshShader(shader); }
+			if (p.graphicsFiles.as) { dx_blob shader = shaderBlobs[p.graphicsFiles.as].blob; p.stream->setAmplificationShader(shader); }
 
 			p.stream->setRootSignature(*p.rootSignature);
 			checkResult(dxContext.device->CreatePipelineState(&p.streamDesc, IID_PPV_ARGS(&p.pipeline)));

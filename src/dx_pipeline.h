@@ -261,6 +261,7 @@ struct dx_pipeline_stream_base
 	virtual void setHullShader(dx_blob blob) {}
 	virtual void setGeometryShader(dx_blob blob) {}
 	virtual void setMeshShader(dx_blob blob) {}
+	virtual void setAmplificationShader(dx_blob blob) {}
 
 	virtual void setRootSignature(dx_root_signature rs) = 0;
 };
@@ -282,8 +283,9 @@ union graphics_pipeline_files
 		const char* hs;
 		const char* gs;
 		const char* ms;
+		const char* as;
 	};
-	const char* shaders[6] = {};
+	const char* shaders[7] = {};
 };
 
 enum rs_file
@@ -294,6 +296,7 @@ enum rs_file
 	rs_in_hull_shader,
 	rs_in_geometry_shader,
 	rs_in_mesh_shader,
+	rs_in_amplification_shader,
 };
 
 dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files, dx_root_signature userRootSignature);
