@@ -1,4 +1,4 @@
-#include "mesh_shader_v3_common.hlsli"
+#include "mesh_shader_v4_common.hlsli"
 #include "camera.hlsli"
 
 #define MESH_RS \

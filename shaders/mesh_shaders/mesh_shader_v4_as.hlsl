@@ -1,4 +1,4 @@
-#include "mesh_shader_v3_common.hlsli"
+#include "mesh_shader_v4_common.hlsli"
 
 
 groupshared uint values[5][5][5]; // 125 intermediate values for the 5x5x5 corners of 4x4x4 cubes.

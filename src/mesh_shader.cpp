@@ -216,7 +216,7 @@ void initializeMeshShader()
 		stream.rasterizer = defaultRasterizerDesc;
 
 		graphics_pipeline_files files = {};
-		files.ms = "mesh_shader_v1_ms";
+		files.ms = "mesh_shader_v0_ms";
 		files.ps = "mesh_shader_ps";
 
 		cubePipeline = createReloadablePipelineFromStream(stream, files, rs_in_mesh_shader);
@@ -276,9 +276,9 @@ void initializeMeshShader()
 		stream.rasterizer = defaultRasterizerDesc;
 
 		graphics_pipeline_files files = {};
-		files.as = "mesh_shader_v3_as";
-		files.ms = "mesh_shader_v3_ms";
-		files.ps = "mesh_shader_v3_ps";
+		files.as = "mesh_shader_v4_as";
+		files.ms = "mesh_shader_v4_ms";
+		files.ps = "mesh_shader_v4_ps";
 
 		marchingCubesBuffer = createBuffer(sizeof(marching_cubes_lookup), arraysize(marchingCubesLookup), (void*)marchingCubesLookup);
 
@@ -290,11 +290,11 @@ void initializeMeshShader()
 
 void testRenderMeshShader(overlay_render_pass* overlayRenderPass)
 {
-	/*overlayRenderPass->renderObjectWithMeshShader(1, 1, 1,
+	overlayRenderPass->renderObjectWithMeshShader(1, 1, 1,
 		cubeMaterial,
 		createModelMatrix(vec3(0.f, 30.f, 0.f), quat::identity, 1.f),
 		true
-	);*/
+	);
 
 	/*auto& sm = meshMaterial->mesh->submeshes[0];
 	overlayRenderPass->renderObjectWithMeshShader(sm.numMeshlets, 1, 1,
@@ -306,12 +306,12 @@ void testRenderMeshShader(overlay_render_pass* overlayRenderPass)
 
 
 
-	const uint32 grid_size = (1 << blobMaterial->SHIFT);
+	/*const uint32 grid_size = (1 << blobMaterial->SHIFT);
 
 	overlayRenderPass->renderObjectWithMeshShader((grid_size / 4) * (grid_size / 4) * (grid_size / 4), 1, 1,
 		blobMaterial,
 		mat4::identity,
-		false);
+		false);*/
 }
 
 
