@@ -20,7 +20,7 @@ struct geometry_render_pass
 protected:
 	template <typename material_t>
 	void common(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
-		bool outline)
+		bool outline, bool setTransform = true)
 	{
 		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
 
@@ -34,6 +34,7 @@ protected:
 		dc.submesh = submesh;
 		dc.materialSetupFunc = setupFunc;
 		dc.drawType = draw_type_default;
+		dc.setTransform = setTransform;
 
 		if (outline)
 		{
@@ -47,7 +48,7 @@ protected:
 
 	template <typename material_t>
 	void common(uint32 dispatchX, uint32 dispatchY, uint32 dispatchZ, const ref<material_t>& material, const mat4& transform,
-		bool outline)
+		bool outline, bool setTransform = true)
 	{
 		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
 
@@ -59,6 +60,7 @@ protected:
 		dc.dispatchInfo = { dispatchX, dispatchY, dispatchZ };
 		dc.materialSetupFunc = setupFunc;
 		dc.drawType = draw_type_mesh_shader;
+		dc.setTransform = setTransform;
 
 		if (outline)
 		{
@@ -95,6 +97,7 @@ private:
 		};
 		material_setup_function materialSetupFunc;
 		draw_type drawType;
+		bool setTransform;
 	};
 
 	std::vector<draw_call> drawCalls;
@@ -210,15 +213,15 @@ struct transparent_render_pass : geometry_render_pass
 struct overlay_render_pass : geometry_render_pass
 {
 	template <typename material_t>
-	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform)
+	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform, bool setTransform)
 	{
-		common(vertexBuffer, indexBuffer, submesh, material, transform, false);
+		common(vertexBuffer, indexBuffer, submesh, material, transform, false, setTransform);
 	}
 
 	template <typename material_t>
-	void renderObjectWithMeshShader(uint32 dispatchX, uint32 dispatchY, uint32 dispatchZ, const ref<material_t>& material, const mat4& transform)
+	void renderObjectWithMeshShader(uint32 dispatchX, uint32 dispatchY, uint32 dispatchZ, const ref<material_t>& material, const mat4& transform, bool setTransform)
 	{
-		common(dispatchX, dispatchY, dispatchZ, material, transform, false);
+		common(dispatchX, dispatchY, dispatchZ, material, transform, false, setTransform);
 	}
 
 	friend struct dx_renderer;

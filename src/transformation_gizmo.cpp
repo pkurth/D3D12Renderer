@@ -471,7 +471,8 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 			overlayRenderPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
 				submeshes[type],
 				materials[i],
-				createModelMatrix(transform.position, rotations[i], scaling)
+				createModelMatrix(transform.position, rotations[i], scaling),
+				true
 			);
 		}
 	}
@@ -499,7 +500,8 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 			overlayRenderPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
 				planeSubmesh,
 				materials[i + 3],
-				createModelMatrix(transform.position, rotations[i], scaling)
+				createModelMatrix(transform.position, rotations[i], scaling),
+				true
 			);
 		}
 	}

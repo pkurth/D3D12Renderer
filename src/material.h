@@ -8,6 +8,7 @@ struct dx_command_list;
 
 struct common_material_info
 {
+	ref<dx_texture> sky;
 	ref<dx_texture> irradiance;
 	ref<dx_texture> environment;
 	ref<dx_texture> brdf;

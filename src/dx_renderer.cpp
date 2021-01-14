@@ -567,11 +567,13 @@ void dx_renderer::endFrame(const user_input& input)
 	common_material_info materialInfo;
 	if (environment)
 	{
+		materialInfo.sky = environment->sky;
 		materialInfo.environment = environment->environment;
 		materialInfo.irradiance = environment->irradiance;
 	}
 	else
 	{
+		materialInfo.sky = blackCubeTexture;
 		materialInfo.environment = blackCubeTexture;
 		materialInfo.irradiance = blackCubeTexture;
 	}
@@ -1025,7 +1027,10 @@ void dx_renderer::endFrame(const user_input& input)
 
 			dc.material->prepareForRendering(cl);
 
-			cl->setGraphics32BitConstants(0, transform_cb{ camera.viewProj * m, m });
+			if (dc.setTransform)
+			{
+				cl->setGraphics32BitConstants(0, transform_cb{ camera.viewProj * m, m });
+			}
 
 			if (dc.drawType == geometry_render_pass::draw_type_default)
 			{
