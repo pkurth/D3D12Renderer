@@ -43,41 +43,16 @@ StructuredBuffer<uint> uniqueVertexIndices  : register(t2);
 StructuredBuffer<uint> primitiveIndices     : register(t3);
 
 
-static uint3 unpackPrimitive(uint primitive)
-{
-    // Unpacks a 10 bits per index triangle from a 32-bit uint.
-    return uint3(primitive & 0x3FF, (primitive >> 10) & 0x3FF, (primitive >> 20) & 0x3FF);
-}
-
-static uint3 getPrimitive(meshlet_info m, uint index)
-{
-    return unpackPrimitive(primitiveIndices[m.firstPrimitive + index]);
-}
-
-static uint getVertexIndex(meshlet_info m, uint localIndex)
-{
-    return uniqueVertexIndices[m.firstVertex + localIndex];
-}
-
-mesh_output getVertex(uint meshletIndex, uint vertexIndex)
-{
-    mesh_vertex v = vertices[vertexIndex];
-
-    mesh_output OUT;
-
-    OUT.color = float3(
-        float(meshletIndex & 1),
-        float(meshletIndex & 3) / 4,
-        float(meshletIndex & 7) / 8);
-    OUT.pos = mul(transform.mvp, float4(v.position, 1.f));
-
-    return OUT;
-}
 
 [outputtopology("triangle")]
 [numthreads(128, 1, 1)]
 [RootSignature(MESH_RS)]
-void main(in uint groupThreadID : SV_GroupThreadID, in uint groupID : SV_GroupID, out vertices mesh_output outVerts[64], out indices uint3 outIndices[126])
+void main(
+    in uint groupThreadID : SV_GroupThreadID, 
+    in uint groupID : SV_GroupID, 
+    out vertices mesh_output outVerts[64], 
+    out indices uint3 outIndices[126]
+)
 {
     meshlet_info m = meshlets[groupID];
 
@@ -85,12 +60,23 @@ void main(in uint groupThreadID : SV_GroupThreadID, in uint groupID : SV_GroupID
 
     if (groupThreadID < m.numPrimitives)
     {
-        outIndices[groupThreadID] = getPrimitive(m, groupThreadID);
+        uint packedPrimitive = primitiveIndices[m.firstPrimitive + groupThreadID];
+
+        // Unpacks a 10 bits per index triangle from a 32-bit uint.
+        outIndices[groupThreadID] = uint3(packedPrimitive & 0x3FF, (packedPrimitive >> 10) & 0x3FF, (packedPrimitive >> 20) & 0x3FF);
     }
 
     if (groupThreadID < m.numVertices)
     {
-        uint vertexIndex = getVertexIndex(m, groupThreadID);
-        outVerts[groupThreadID] = getVertex(groupID, vertexIndex);
+        uint vertexIndex = uniqueVertexIndices[m.firstVertex + groupThreadID];
+        uint meshletIndex = groupID;
+
+        // Color based on meshlet index for visualization.
+        outVerts[groupThreadID].color = float3(
+            float(meshletIndex & 1),
+            float(meshletIndex & 3) / 4,
+            float(meshletIndex & 7) / 8);
+
+        outVerts[groupThreadID].pos = mul(transform.mvp, float4(vertices[vertexIndex].position, 1.f));
     }
 }

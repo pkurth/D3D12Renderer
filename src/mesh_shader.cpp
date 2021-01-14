@@ -136,7 +136,7 @@ void initializeMeshShader()
 
 	//cubeMaterial = make_ref<mesh_shader_cube_material>();
 	meshMaterial = make_ref<mesh_shader_mesh_material>();
-	meshMaterial->mesh = loadMeshShaderMeshFromFile("assets/meshes/augustus.bin");
+	meshMaterial->mesh = loadMeshShaderMeshFromFile("assets/meshes/Dragon_LOD0.bin");
 }
 
 void testRenderMeshShader(overlay_render_pass* overlayRenderPass)

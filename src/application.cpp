@@ -80,6 +80,7 @@ void application::initialize(dx_renderer* renderer)
 	}
 
 	
+#if 1
 	// Sponza.
 	auto sponzaMesh = loadMeshFromFile("assets/meshes/sponza.obj");
 	auto sponzaBlas = defineBlasFromMesh(sponzaMesh, raytracingBindingTable);
@@ -89,7 +90,7 @@ void application::initialize(dx_renderer* renderer)
 		.addComponent<raster_component>(sponzaMesh)
 		.addComponent<raytrace_component>(sponzaBlas);
 
-
+	// Stormtrooper.
 	auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/meshes/stormtrooper.fbx");
 	stormtrooperMesh->submeshes[0].material = createPBRMaterial(
 		"assets/textures/stormtrooper/Stormtrooper_D.png",
@@ -99,6 +100,7 @@ void application::initialize(dx_renderer* renderer)
 		0.f
 	);
 
+	// Pilot.
 	auto pilotMesh = loadAnimatedMeshFromFile("assets/meshes/pilot.fbx");
 	pilotMesh->submeshes[0].material = createPBRMaterial(
 		"assets/textures/pilot/A.png",
@@ -107,6 +109,7 @@ void application::initialize(dx_renderer* renderer)
 		"assets/textures/pilot/M.png"
 	);
 
+	// Unreal Mannequin.
 	auto unrealMesh = loadAnimatedMeshFromFile("assets/meshes/unreal_mannequin.fbx");
 	unrealMesh->skeleton.pushAssimpAnimationsInDirectory("assets/animations");
 
@@ -134,7 +137,7 @@ void application::initialize(dx_renderer* renderer)
 		.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.019f)
 		.addComponent<raster_component>(unrealMesh)
 		.addComponent<animation_component>(0.f);
-
+#endif
 
 
 	// Raytracing.

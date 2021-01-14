@@ -11,7 +11,7 @@ ConstantBuffer<transform_cb> transform : register(b0);
     "DENY_PIXEL_SHADER_ROOT_ACCESS)," \
     "RootConstants(num32BitConstants=32, b0)"
 
-struct mesh_vertex
+struct mesh_output
 {
 	float4 pos : SV_POSITION;
 	float3 color : COLOR0;
@@ -61,7 +61,10 @@ static uint3 cubeIndices[] =
 [outputtopology("triangle")]
 [numthreads(12, 1, 1)]
 [RootSignature(MESH_RS)]
-void main(in uint groupThreadID : SV_GroupThreadID, out vertices mesh_vertex outVerts[8], out indices uint3 outIndices[12])
+void main(
+	in uint groupThreadID : SV_GroupThreadID, 
+	out vertices mesh_output outVerts[8], 
+	out indices uint3 outIndices[12])
 {
 	const uint numVertices = 8;
 	const uint numPrimitives = 12;
