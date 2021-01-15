@@ -2,7 +2,6 @@
 
 
 groupshared uint values[5][5][5]; // 125 intermediate values for the 5x5x5 corners of 4x4x4 cubes.
-groupshared uint fetch_values[3][3][3]; // 3x3x3 samples, fetching 6x6x6 values of which we use 5x5x5.
 
 [numthreads(32, 1, 1)]
 void main(
@@ -23,8 +22,11 @@ void main(
 		uint y = t - 5 * z;
 
 		float3 pos = float3(miX + x, miY + y, miZ + z) * STEP_SIZE;
-		values[z][y][x] = (field(pos) >= 0.0f) ? 1 : 0;
+		values[z][y][x] = (field(pos) >= 0.f) ? 1 : 0;
 	}
+
+	int a;
+	int b = a;
 
 	// Two loops, all lanes used.
 	uint count = 0;
@@ -38,19 +40,19 @@ void main(
 
 		// Collect the sign bits for the cube corners. If all are zeros or all ones we're either fully inside or outside
 		// the surface, so no triangles will be generated. In all other cases, the isosurface cuts through the cube somewhere.
-		uint cube_index;
-		cube_index = (values[z + 0][y + 0][x + 0] << 0);
-		cube_index |= (values[z + 0][y + 0][x + 1] << 1);
-		cube_index |= (values[z + 0][y + 1][x + 0] << 2);
-		cube_index |= (values[z + 0][y + 1][x + 1] << 3);
-		cube_index |= (values[z + 1][y + 0][x + 0] << 4);
-		cube_index |= (values[z + 1][y + 0][x + 1] << 5);
-		cube_index |= (values[z + 1][y + 1][x + 0] << 6);
-		cube_index |= (values[z + 1][y + 1][x + 1] << 7);
+		uint cubeIndex;
+		cubeIndex  = (values[z + 0][y + 0][x + 0] << 0);
+		cubeIndex |= (values[z + 0][y + 0][x + 1] << 1);
+		cubeIndex |= (values[z + 0][y + 1][x + 0] << 2);
+		cubeIndex |= (values[z + 0][y + 1][x + 1] << 3);
+		cubeIndex |= (values[z + 1][y + 0][x + 0] << 4);
+		cubeIndex |= (values[z + 1][y + 0][x + 1] << 5);
+		cubeIndex |= (values[z + 1][y + 1][x + 0] << 6);
+		cubeIndex |= (values[z + 1][y + 1][x + 1] << 7);
 
 
 		// See if our cube intersects the isosurface.
-		uint accept = (cube_index != 0 && cube_index != 0xFF);
+		uint accept = (cubeIndex != 0 && cubeIndex != 0xFF);
 
 		uint4 ballot = WaveActiveBallot(accept);
 
@@ -59,8 +61,8 @@ void main(
 			uint index = countbits(ballot.x & ((1 << groupThreadID) - 1));
 
 			// Output a linear meshlet ID for the mesh shader.
-			uint meshlet_id = ((((miZ + z) << SHIFT) + miY + y) << SHIFT) + miX + x;
-			payload.meshletIDs[count + index] = meshlet_id;
+			uint meshletID = ((((miZ + z) << SHIFT) + miY + y) << SHIFT) + miX + x;
+			payload.meshletIDs[count + index] = meshletID;
 		}
 
 		count += countbits(ballot.x);

@@ -70,9 +70,9 @@ void main(
 
 	// Grab data from other lanes so we can compute the normal by computing the difference in value in x, y and z directions.
 	float3 normal;
-	normal.x = WaveReadLaneAt(value, (WaveGetLaneIndex() + 8 ) % 32);
-	normal.y = WaveReadLaneAt(value, (WaveGetLaneIndex() + 16) % 32);
-	normal.z = WaveReadLaneAt(value, (WaveGetLaneIndex() + 24) % 32);
+	normal.x = WaveReadLaneAt(value, WaveGetLaneIndex() +  8);
+	normal.y = WaveReadLaneAt(value, WaveGetLaneIndex() + 16);
+	normal.z = WaveReadLaneAt(value, WaveGetLaneIndex() + 24);
 
 	// Save intermediates to LDS. Corner positions can be computed directly from indices, so no need to put in LDS.
 	if (groupThreadID < 8)
@@ -92,12 +92,12 @@ void main(
 
 	SetMeshOutputCounts(vertexCount, triangleCount);
 
-	// Output up to 12 vertices, one lane per vertex
+	// Output up to 12 vertices, one lane per vertex.
 	if (groupThreadID < vertexCount)
 	{
 		// Look up the corner indices for this edge
-		uint lookupWord = groupThreadID / 4;
-		uint lookupID = (groupThreadID % 4);
+		uint lookupWord = groupThreadID >> 2; // Divide by 4.
+		uint lookupID = groupThreadID & 0x3;  // Modulo 4.
 
 		uint word = marchingCubesLookup[index].vertices[lookupWord];
 		uint edge = (word >> (lookupID * 8)) & 0xFF;
@@ -110,18 +110,18 @@ void main(
 		float3 pos1 = float3((i1 & 1) != 0 ? cornerPos1.x : cornerPos0.x, (i1 & 2) != 0 ? cornerPos1.y : cornerPos0.y, (i1 & 4) != 0 ? cornerPos1.z : cornerPos0.z);
 
 		// Interpolate position and normal
-		float mix_f = corners[i0].value / (corners[i0].value - corners[i1].value);
-		float3 pos = lerp(pos0, pos1, mix_f);
-		float3 normal = lerp(corners[i0].normal, corners[i1].normal, mix_f);
+		float t = corners[i0].value / (corners[i0].value - corners[i1].value);
+		float3 pos = lerp(pos0, pos1, t);
+		float3 normal = lerp(corners[i0].normal, corners[i1].normal, t);
 
 		// Output final vertex
 		pos *= 20.f;
-		outVerts[groupThreadID].pos = mul(camera.viewProj, vec4(pos, 1.f));
+		outVerts[groupThreadID].pos = mul(camera.viewProj, float4(pos, 1.f));
 		outVerts[groupThreadID].worldPos = pos;
 		outVerts[groupThreadID].normal = normal;
 	}
 
-	// Output up to 15 indices. 
+	// Output up to 5 triangles, one lane per triangle. 
 	if (groupThreadID < triangleCount)
 	{
 		struct single_unpack
@@ -141,7 +141,7 @@ void main(
 			{ { 0, 24 }, { 1, 0 }, { 1, 8 } },
 			{ { 1, 16 }, { 1, 24 }, { 2, 0 } },
 			{ { 2, 8 }, { 2, 16 }, { 2, 24 } },
-			{ { 3, 0 }, { 3, 8 }, { 3, 16 } }
+			{ { 3, 0 }, { 3, 8 }, { 3, 16 } },
 		};
 
 		unpack_info info = unpack[groupThreadID];

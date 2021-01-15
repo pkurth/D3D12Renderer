@@ -169,13 +169,9 @@ static ref<mesh_shader_blob_material> blobMaterial;
 
 void initializeMeshShader()
 {
-
 	D3D12_RT_FORMAT_ARRAY renderTargetFormat = {};
 	renderTargetFormat.NumRenderTargets = 1;
 	renderTargetFormat.RTFormats[0] = dx_renderer::hdrFormat[0];
-
-	auto defaultRasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	//defaultRasterizerDesc.FrontCounterClockwise = TRUE; // Righthanded coordinate system.
 
 	{
 		struct pipeline_state_stream : dx_pipeline_stream_base
@@ -186,34 +182,17 @@ void initializeMeshShader()
 			CD3DX12_PIPELINE_STATE_STREAM_PS ps;
 
 			// Initialized here.
-			CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT inputLayout;
-			CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY primitiveTopologyType;
 			CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT dsvFormat;
 			CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS rtvFormats;
-			CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER rasterizer;
 
-			void setRootSignature(dx_root_signature rs) override
-			{
-				rootSignature = rs.rootSignature.Get();
-			}
-
-			void setMeshShader(dx_blob blob) override
-			{
-				ms = CD3DX12_SHADER_BYTECODE(blob.Get());
-			}
-
-			void setPixelShader(dx_blob blob) override
-			{
-				ps = CD3DX12_SHADER_BYTECODE(blob.Get());
-			}
+			void setRootSignature(dx_root_signature rs) override { rootSignature = rs.rootSignature.Get(); }
+			void setMeshShader(dx_blob blob) override { ms = CD3DX12_SHADER_BYTECODE(blob.Get()); }
+			void setPixelShader(dx_blob blob) override { ps = CD3DX12_SHADER_BYTECODE(blob.Get()); }
 		};
 
 		pipeline_state_stream stream;
-		stream.inputLayout = { nullptr, 0 };
-		stream.primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		stream.dsvFormat = dx_renderer::hdrDepthStencilFormat;
 		stream.rtvFormats = renderTargetFormat;
-		stream.rasterizer = defaultRasterizerDesc;
 
 		graphics_pipeline_files files = {};
 		files.ms = "mesh_shader_v0_ms";
@@ -238,42 +217,24 @@ void initializeMeshShader()
 			CD3DX12_PIPELINE_STATE_STREAM_PS ps;
 
 			// Initialized here.
-			CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT inputLayout;
-			CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY primitiveTopologyType;
 			CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT dsvFormat;
 			CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS rtvFormats;
 			CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER rasterizer;
 
-			void setRootSignature(dx_root_signature rs) override
-			{
-				rootSignature = rs.rootSignature.Get();
-			}
-
-			void setAmplificationShader(dx_blob blob) override
-			{
-				as = CD3DX12_SHADER_BYTECODE(blob.Get());
-			}
-
-			void setMeshShader(dx_blob blob) override
-			{
-				ms = CD3DX12_SHADER_BYTECODE(blob.Get());
-			}
-
-			void setPixelShader(dx_blob blob) override
-			{
-				ps = CD3DX12_SHADER_BYTECODE(blob.Get());
-			}
+			void setRootSignature(dx_root_signature rs) override { rootSignature = rs.rootSignature.Get(); }
+			void setAmplificationShader(dx_blob blob) override { as = CD3DX12_SHADER_BYTECODE(blob.Get()); }
+			void setMeshShader(dx_blob blob) override { ms = CD3DX12_SHADER_BYTECODE(blob.Get()); }
+			void setPixelShader(dx_blob blob) override { ps = CD3DX12_SHADER_BYTECODE(blob.Get()); }
 		};
 
-		//defaultRasterizerDesc.FillMode = D3D12_FILL_MODE_WIREFRAME;
-		defaultRasterizerDesc.FrontCounterClockwise = TRUE; // Righthanded coordinate system.
+		auto rasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		//rasterizerDesc.FillMode = D3D12_FILL_MODE_WIREFRAME;
+		rasterizerDesc.FrontCounterClockwise = TRUE; // Righthanded coordinate system.
 
 		pipeline_state_stream stream;
-		stream.inputLayout = { nullptr, 0 };
-		stream.primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		stream.dsvFormat = dx_renderer::hdrDepthStencilFormat;
 		stream.rtvFormats = renderTargetFormat;
-		stream.rasterizer = defaultRasterizerDesc;
+		stream.rasterizer = rasterizerDesc;
 
 		graphics_pipeline_files files = {};
 		files.as = "mesh_shader_v4_as";
@@ -290,11 +251,12 @@ void initializeMeshShader()
 
 void testRenderMeshShader(overlay_render_pass* overlayRenderPass)
 {
-	overlayRenderPass->renderObjectWithMeshShader(1, 1, 1,
+	/*overlayRenderPass->renderObjectWithMeshShader(1, 1, 1,
 		cubeMaterial,
 		createModelMatrix(vec3(0.f, 30.f, 0.f), quat::identity, 1.f),
 		true
-	);
+	);*/
+
 
 	/*auto& sm = meshMaterial->mesh->submeshes[0];
 	overlayRenderPass->renderObjectWithMeshShader(sm.numMeshlets, 1, 1,
@@ -306,12 +268,12 @@ void testRenderMeshShader(overlay_render_pass* overlayRenderPass)
 
 
 
-	/*const uint32 grid_size = (1 << blobMaterial->SHIFT);
+	const uint32 gridSize = (1 << blobMaterial->SHIFT);
 
-	overlayRenderPass->renderObjectWithMeshShader((grid_size / 4) * (grid_size / 4) * (grid_size / 4), 1, 1,
+	overlayRenderPass->renderObjectWithMeshShader((gridSize / 4) * (gridSize / 4) * (gridSize / 4), 1, 1,
 		blobMaterial,
 		mat4::identity,
-		false);*/
+		false);
 }
 
 
