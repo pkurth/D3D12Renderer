@@ -97,7 +97,7 @@ void pbr_specular_reflections_raytracing_pipeline::render(struct dx_command_list
         brdf
     };
 
-    dx_gpu_descriptor_handle tlasHandle = bindingTable.setTLASHandle(tlas.getHandle());
+    dx_gpu_descriptor_handle tlasHandle = bindingTable.setTLASHandle(tlas.tlas->raytracingSRV);
     dx_gpu_descriptor_handle outputHandle = bindingTable.setOutputTexture(output);
     dx_gpu_descriptor_handle resourceHandle = bindingTable.setTextures(textures);
 

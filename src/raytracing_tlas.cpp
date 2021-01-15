@@ -8,11 +8,6 @@ void raytracing_tlas::initialize(acceleration_structure_rebuild_mode rebuildMode
 {
     this->rebuildMode = rebuildMode;
     allInstances.reserve(4096); // TODO
-
-    for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
-    {
-        tlasSRVs[i] = dxContext.descriptorAllocatorCPU.getFreeHandle();
-    }
 }
 
 void raytracing_tlas::reset()
@@ -68,7 +63,7 @@ void raytracing_tlas::build()
         }
         else
         {
-            tlas = createBuffer(1, (uint32)info.ResultDataMaxSizeInBytes, 0, true, false, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
+            tlas = createRaytracingTLASBuffer((uint32)info.ResultDataMaxSizeInBytes);
             SET_NAME(tlas->resource, "TLAS Result");
         }
 
@@ -91,7 +86,7 @@ void raytracing_tlas::build()
 
 
     dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
-    dx_dynamic_constant_buffer gpuInstances = cl->uploadDynamicConstantBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalNumInstances, allInstances.data());
+    dx_dynamic_constant_buffer gpuInstances = dxContext.uploadDynamicConstantBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalNumInstances, allInstances.data());
 
     inputs.InstanceDescs = gpuInstances.gpuPtr;
 
@@ -118,7 +113,4 @@ void raytracing_tlas::build()
     cl->uavBarrier(tlas);
 
     dxContext.executeCommandList(cl);
-
-    tlasDescriptorIndex = (tlasDescriptorIndex + 1) % NUM_BUFFERED_FRAMES;
-    tlasSRVs[tlasDescriptorIndex].createRaytracingAccelerationStructureSRV(tlas);
 }

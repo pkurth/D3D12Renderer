@@ -601,7 +601,7 @@ void application::update(const user_input& input, float dt)
 
 	// Skin animated meshes.
 	appScene.group<animation_component>(entt::get<raster_component>)
-		.each([dt](auto& anim, auto& raster)
+		.each([dt](animation_component& anim, raster_component& raster)
 	{
 		anim.time += dt;
 		const dx_mesh& mesh = raster.mesh->mesh;
@@ -627,7 +627,7 @@ void application::update(const user_input& input, float dt)
 
 	// Submit render calls.
 	appScene.group<raster_component>(entt::get<trs>)
-		.each([this](entt::entity entityHandle, auto& raster, auto& transform)
+		.each([this](entt::entity entityHandle, raster_component& raster, trs& transform)
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -672,13 +672,13 @@ void application::update(const user_input& input, float dt)
 
 	submitRenderPasses();
 
-#if 0
+#if 1
 	if (dxContext.raytracingSupported)
 	{
 		raytracingTLAS.reset();
 
 		appScene.group<raytrace_component>(entt::get<trs>)
-			.each([this](entt::entity entityHandle, auto& raytrace, auto& transform)
+			.each([this](entt::entity entityHandle, raytrace_component& raytrace, trs& transform)
 		{
 			raytracingTLAS.instantiate(raytrace.type, transform);
 		});

@@ -103,7 +103,7 @@ static void updateBufferDataRange(ref<dx_buffer> buffer, const void* data, uint3
 	dxContext.executeCommandList(cl);
 }
 
-static void initializeBuffer(ref<dx_buffer> buffer, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing,
+static void initializeBuffer(ref<dx_buffer> buffer, uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing, bool raytracing = false,
 	D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON, D3D12_HEAP_TYPE heapType = D3D12_HEAP_TYPE_DEFAULT)
 {
 	D3D12_RESOURCE_FLAGS flags = allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
@@ -115,11 +115,13 @@ static void initializeBuffer(ref<dx_buffer> buffer, uint32 elementSize, uint32 e
 	buffer->supportsSRV = heapType != D3D12_HEAP_TYPE_READBACK;
 	buffer->supportsUAV = allowUnorderedAccess;
 	buffer->supportsClearing = allowClearing;
+	buffer->raytracing = raytracing;
 
 	buffer->defaultSRV = {};
 	buffer->defaultUAV = {};
 	buffer->cpuClearUAV = {};
 	buffer->gpuClearUAV = {};
+	buffer->raytracingSRV = {};
 
 	checkResult(dxContext.device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(heapType),
@@ -161,26 +163,31 @@ static void initializeBuffer(ref<dx_buffer> buffer, uint32 elementSize, uint32 e
 		dx_cpu_descriptor_handle shaderVisibleCPUHandle = dxContext.descriptorAllocatorGPU.getFreeHandle().createBufferUintUAV(buffer);
 		buffer->gpuClearUAV = dxContext.descriptorAllocatorGPU.getMatchingGPUHandle(shaderVisibleCPUHandle);
 	}
+
+	if (raytracing)
+	{
+		buffer->raytracingSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createRaytracingAccelerationStructureSRV(buffer);
+	}
 }
 
 ref<dx_buffer> createBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing, D3D12_RESOURCE_STATES initialState)
 {
 	ref<dx_buffer> result = make_ref<dx_buffer>();
-	initializeBuffer(result, elementSize, elementCount, data, allowUnorderedAccess, allowClearing, initialState, D3D12_HEAP_TYPE_DEFAULT);
+	initializeBuffer(result, elementSize, elementCount, data, allowUnorderedAccess, allowClearing, false, initialState, D3D12_HEAP_TYPE_DEFAULT);
 	return result;
 }
 
 ref<dx_buffer> createUploadBuffer(uint32 elementSize, uint32 elementCount, void* data)
 {
 	ref<dx_buffer> result = make_ref<dx_buffer>();
-	initializeBuffer(result, elementSize, elementCount, data, false, false, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_HEAP_TYPE_UPLOAD);
+	initializeBuffer(result, elementSize, elementCount, data, false, false, false, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_HEAP_TYPE_UPLOAD);
 	return result;
 }
 
 ref<dx_buffer> createReadbackBuffer(uint32 elementSize, uint32 elementCount, D3D12_RESOURCE_STATES initialState)
 {
 	ref<dx_buffer> result = make_ref<dx_buffer>();
-	initializeBuffer(result, elementSize, elementCount, 0, false, false, initialState, D3D12_HEAP_TYPE_READBACK);
+	initializeBuffer(result, elementSize, elementCount, 0, false, false, false, initialState, D3D12_HEAP_TYPE_READBACK);
 	return result;
 }
 
@@ -197,7 +204,7 @@ ref<dx_vertex_buffer> createVertexBuffer(uint32 elementSize, uint32 elementCount
 ref<dx_vertex_buffer> createUploadVertexBuffer(uint32 elementSize, uint32 elementCount, void* data)
 {
 	ref<dx_vertex_buffer> result = make_ref<dx_vertex_buffer>();
-	initializeBuffer(result, elementSize, elementCount, data, false, false, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_HEAP_TYPE_UPLOAD);
+	initializeBuffer(result, elementSize, elementCount, data, false, false, false, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_HEAP_TYPE_UPLOAD);
 	result->view.BufferLocation = result->gpuVirtualAddress;
 	result->view.SizeInBytes = result->totalSize;
 	result->view.StrideInBytes = elementSize;
@@ -214,13 +221,21 @@ ref<dx_index_buffer> createIndexBuffer(uint32 elementSize, uint32 elementCount, 
 	return result;
 }
 
-static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_descriptor_handle uav, dx_cpu_descriptor_handle clear, dx_gpu_descriptor_handle gpuClear)
+ref<dx_buffer> createRaytracingTLASBuffer(uint32 size)
+{
+	ref<dx_buffer> result = make_ref<dx_buffer>();
+	initializeBuffer(result, size, 1, nullptr, true, false, true, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
+	return result;
+}
+
+static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_descriptor_handle uav, dx_cpu_descriptor_handle clear, dx_gpu_descriptor_handle gpuClear, dx_cpu_descriptor_handle raytracing)
 {
 	buffer_grave grave;
 	grave.resource = resource;
 	grave.srv = srv;
 	grave.uav = uav;
 	grave.clear = clear;
+	grave.raytracing = raytracing;
 	if (gpuClear.gpuHandle.ptr)
 	{
 		grave.gpuClear = dxContext.descriptorAllocatorGPU.getMatchingCPUHandle(gpuClear);
@@ -244,12 +259,12 @@ dx_buffer::~dx_buffer()
 	}
 
 
-	retire(resource, defaultSRV, defaultUAV, cpuClearUAV, gpuClearUAV);
+	retire(resource, defaultSRV, defaultUAV, cpuClearUAV, gpuClearUAV, raytracingSRV);
 }
 
 void resizeBuffer(ref<dx_buffer> buffer, uint32 newElementCount, D3D12_RESOURCE_STATES initialState)
 {
-	retire(buffer->resource, buffer->defaultSRV, buffer->defaultUAV, buffer->cpuClearUAV, buffer->gpuClearUAV);
+	retire(buffer->resource, buffer->defaultSRV, buffer->defaultUAV, buffer->cpuClearUAV, buffer->gpuClearUAV, buffer->raytracingSRV);
 
 	buffer->elementCount = newElementCount;
 	buffer->totalSize = buffer->elementCount * buffer->elementSize;
@@ -282,6 +297,11 @@ void resizeBuffer(ref<dx_buffer> buffer, uint32 newElementCount, D3D12_RESOURCE_
 		dx_cpu_descriptor_handle shaderVisibleCPUHandle = dxContext.descriptorAllocatorGPU.getFreeHandle().createBufferUintUAV(buffer);
 		buffer->gpuClearUAV = dxContext.descriptorAllocatorGPU.getMatchingGPUHandle(shaderVisibleCPUHandle);
 	}
+
+	if (buffer->raytracing)
+	{
+		buffer->raytracingSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createRaytracingAccelerationStructureSRV(buffer);
+	}
 }
 
 buffer_grave::~buffer_grave()
@@ -302,6 +322,10 @@ buffer_grave::~buffer_grave()
 		{
 			dxContext.descriptorAllocatorCPU.freeHandle(clear);
 			dxContext.descriptorAllocatorGPU.freeHandle(gpuClear);
+		}
+		if (raytracing.cpuHandle.ptr)
+		{
+			dxContext.descriptorAllocatorCPU.freeHandle(raytracing);
 		}
 	}
 }

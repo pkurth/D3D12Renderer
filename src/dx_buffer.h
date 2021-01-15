@@ -26,11 +26,14 @@ struct dx_buffer
 	dx_cpu_descriptor_handle cpuClearUAV;
 	dx_gpu_descriptor_handle gpuClearUAV;
 
+	dx_cpu_descriptor_handle raytracingSRV;
+
 	D3D12_GPU_VIRTUAL_ADDRESS gpuVirtualAddress;
 
 	bool supportsUAV;
 	bool supportsSRV;
 	bool supportsClearing;
+	bool raytracing;
 
 	uint32 elementSize = 0;
 	uint32 elementCount = 0;
@@ -62,6 +65,7 @@ struct buffer_grave
 	dx_cpu_descriptor_handle uav;
 	dx_cpu_descriptor_handle clear;
 	dx_cpu_descriptor_handle gpuClear;
+	dx_cpu_descriptor_handle raytracing;
 
 	buffer_grave() {}
 	buffer_grave(const buffer_grave& o) = delete;
@@ -86,5 +90,7 @@ ref<dx_buffer> createReadbackBuffer(uint32 elementSize, uint32 elementCount, D3D
 ref<dx_vertex_buffer> createVertexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, bool allowClearing = false);
 ref<dx_vertex_buffer> createUploadVertexBuffer(uint32 elementSize, uint32 elementCount, void* data);
 ref<dx_index_buffer> createIndexBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, bool allowClearing = false);
+
+ref<dx_buffer> createRaytracingTLASBuffer(uint32 size);
 
 void resizeBuffer(ref<dx_buffer> buffer, uint32 newElementCount, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
