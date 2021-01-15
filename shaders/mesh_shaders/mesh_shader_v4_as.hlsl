@@ -25,9 +25,6 @@ void main(
 		values[z][y][x] = (field(pos) >= 0.f) ? 1 : 0;
 	}
 
-	int a;
-	int b = a;
-
 	// Two loops, all lanes used.
 	uint count = 0;
 	mesh_payload payload;
