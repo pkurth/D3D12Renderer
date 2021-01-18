@@ -154,7 +154,7 @@ static bool checkRaytracingSupport(dx_device device)
 
 static bool checkMeshShaderSupport(dx_device device)
 {
-#if WIN_SDK_VERSION_2019
+#if ADVANCED_GPU_FEATURES_ENABLED
 	D3D12_FEATURE_DATA_D3D12_OPTIONS7 options7 = {};
 	checkResult(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options7, sizeof(options7)));
 	return options7.MeshShaderTier >= D3D12_MESH_SHADER_TIER_1;

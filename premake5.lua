@@ -1,3 +1,15 @@
+
+newoption {
+	trigger     = "no-turing",
+	description = "Use this if your GPU is older than Turing. This disables certain features, such as mesh shaders."
+}
+
+default_shader_model = "6.0"
+
+if _OPTIONS["no-turing"] then
+	default_shader_model = "5.1"
+end
+
 workspace "D3D12ProjectionMapping"
 	architecture "x64"
 	startproject "D3D12ProjectionMapping"
@@ -90,6 +102,11 @@ project "D3D12ProjectionMapping"
 			"UNICODE",
 			"_CRT_SECURE_NO_WARNINGS"
 		}
+		
+		if _OPTIONS["no-turing"] then
+			defines { "NO_TURING_GPU" }
+		end
+
 
 	filter "configurations:Debug"
         runtime "Debug"
@@ -102,9 +119,10 @@ project "D3D12ProjectionMapping"
 
 	os.mkdir("shaders/bin")
 
-	
+
 	filter "files:**.hlsl"
-		shadermodel "6.0"
+		shadermodel(default_shader_model)
+
 		flags "ExcludeFromBuild"
 		shaderobjectfileoutput("shaders/bin/%{file.basename}" .. ".cso")
 		shaderincludedirs {
@@ -145,19 +163,20 @@ project "D3D12ProjectionMapping"
 	filter("files:**_ps.hlsl")
 		removeflags("ExcludeFromBuild")
 		shadertype("Pixel")
-
-	filter("files:**_ms.hlsl")
-		removeflags("ExcludeFromBuild")
-		shadertype("Mesh")
-		shadermodel "6.5" -- Required for mesh shaders.
-
-	filter("files:**_as.hlsl")
-		removeflags("ExcludeFromBuild")
-		shadertype("Amplification")
-		shadermodel "6.5" -- Required for amplification shaders.
  
 	filter("files:**_cs.hlsl")
 		removeflags("ExcludeFromBuild")
 		shadertype("Compute")
 		
+	if not _OPTIONS["no-turing"] then
+		filter("files:**_ms.hlsl")
+			removeflags("ExcludeFromBuild")
+			shadertype("Mesh")
+			shadermodel "6.5" -- Required for mesh shaders.
+
+		filter("files:**_as.hlsl")
+			removeflags("ExcludeFromBuild")
+			shadertype("Amplification")
+			shadermodel "6.5" -- Required for amplification shaders.
+	end
 

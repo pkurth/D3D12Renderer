@@ -9,10 +9,10 @@
 // The newer SDK brings new APIs (e.g. mesh shaders), which can be enabled with this switch.
 // However, you still have to check at runtime for mesh shader support, because older devices
 // can have the newest SDK installed as well.
-#if WDK_NTDDI_VERSION >= NTDDI_WIN10_19H1
-#define WIN_SDK_VERSION_2019 1
+#if !defined(NTDDI_WIN10_19H1) || (WDK_NTDDI_VERSION < NTDDI_WIN10_19H1) || defined(NO_TURING_GPU)
+#define ADVANCED_GPU_FEATURES_ENABLED 0
 #else
-#define WIN_SDK_VERSION_2019 0
+#define ADVANCED_GPU_FEATURES_ENABLED 1
 #endif
 
 
@@ -38,7 +38,7 @@ typedef com<ID3D12CommandSignature> dx_command_signature;
 typedef com<ID3D12Heap> dx_heap;
 typedef com<ID3D12StateObject> dx_raytracing_pipeline_state;
 
-#if WIN_SDK_VERSION_2019
+#if ADVANCED_GPU_FEATURES_ENABLED
 typedef com<ID3D12GraphicsCommandList6> dx_graphics_command_list;
 #else
 typedef com<ID3D12GraphicsCommandList4> dx_graphics_command_list;

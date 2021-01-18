@@ -497,7 +497,7 @@ void dx_command_list::dispatchIndirect(dx_command_signature commandSignature, ui
 
 void dx_command_list::dispatchMesh(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ)
 {
-#if WIN_SDK_VERSION_2019
+#if ADVANCED_GPU_FEATURES_ENABLED
 	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
 	commandList->DispatchMesh(numGroupsX, numGroupsY, numGroupsZ);
 #else

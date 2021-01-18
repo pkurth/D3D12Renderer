@@ -63,7 +63,10 @@ static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh
 
 void application::loadCustomShaders()
 {
-	initializeMeshShader();
+	if (dxContext.meshShaderSupported)
+	{
+		initializeMeshShader();
+	}
 }
 
 void application::initialize(dx_renderer* renderer)
@@ -567,7 +570,10 @@ void application::update(const user_input& input, float dt)
 	drawSceneHierarchy();
 	drawSettings(dt);
 
-	testRenderMeshShader(&overlayRenderPass);
+	if (dxContext.meshShaderSupported)
+	{
+		testRenderMeshShader(&overlayRenderPass);
+	}
 
 	sun.updateMatrices(camera);
 
