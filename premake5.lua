@@ -1,12 +1,33 @@
 
 newoption {
-	trigger     = "no-turing",
-	description = "Use this if your GPU is older than Turing. This disables certain features, such as mesh shaders."
+    trigger     = "no-turing",
+    description = "Use this if your GPU is older than Turing. This disables certain features, such as mesh shaders."
 }
+
+local turing_or_higher = false
+
+if not _OPTIONS["no-turing"] then
+	local handle = io.popen("wmic path win32_VideoController get name")
+	local gpu_string = handle:read("*a")
+	handle:close()
+
+	for str in string.gmatch(gpu_string, "NVIDIA (.-)\n") do
+		for model in string.gmatch(str, "%d%d%d%d") do
+			m = tonumber(model)
+			if m > 1650 then -- Turing is everything higher than GTX 1650.
+				turing_or_higher = true
+			end
+		end
+	end
+end
+
+if turing_or_higher then
+	print("Found NVIDIA Turing GPU or newer. Enabling advanced rendering features (e.g. mesh shaders).")
+end
 
 default_shader_model = "6.0"
 
-if _OPTIONS["no-turing"] then
+if not turing_or_higher then
 	default_shader_model = "5.1"
 end
 
@@ -103,7 +124,7 @@ project "D3D12ProjectionMapping"
 			"_CRT_SECURE_NO_WARNINGS"
 		}
 		
-		if _OPTIONS["no-turing"] then
+		if not turing_or_higher then
 			defines { "NO_TURING_GPU" }
 		end
 
@@ -168,7 +189,7 @@ project "D3D12ProjectionMapping"
 		removeflags("ExcludeFromBuild")
 		shadertype("Compute")
 		
-	if not _OPTIONS["no-turing"] then
+	if turing_or_higher then
 		filter("files:**_ms.hlsl")
 			removeflags("ExcludeFromBuild")
 			shadertype("Mesh")
