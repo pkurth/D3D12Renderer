@@ -15,11 +15,12 @@ static const int selected = (1 << 0); // TODO: This must be the same as in rende
 
 static uint sampleAt(int2 texCoords)
 {
-	if (texCoords.x < 0 || texCoords.y < 0 || texCoords.x >= outline.width || texCoords.y >= outline.height)
+	uint result = 1;
+	if (texCoords.x >= 0 && texCoords.y >= 0 && texCoords.x < outline.width && texCoords.y < outline.height)
 	{
-		return 1;
+		result = (stencil.Load(int3(texCoords, 0)).y & selected) != 0;
 	}
-	return (stencil.Load(int3(texCoords, 0)).y & selected) != 0;
+	return result;
 }
 
 [RootSignature(OUTLINE_DRAWER_RS)]
