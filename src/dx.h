@@ -7,12 +7,14 @@
 #include <sdkddkver.h>
 
 // The newer SDK brings new APIs (e.g. mesh shaders), which can be enabled with this switch.
-// However, you still have to check at runtime for mesh shader support, because older devices
-// can have the newest SDK installed as well.
-#if !defined(NTDDI_WIN10_19H1) || (WDK_NTDDI_VERSION < NTDDI_WIN10_19H1) || defined(NO_TURING_GPU)
-#define ADVANCED_GPU_FEATURES_ENABLED 0
-#else
+// You should still design your program with lower capabilities in mind and switch on certain 
+// features at runtime.
+// For example, wrap all your mesh shader code in a runtime if. The dx_context exposes the actual
+// hardware capabilities.
+#if defined(TURING_GPU_OR_NEWER_AVAILABLE) && defined(WINDOWS_SDK_19041_OR_NEWER_AVAILABLE) && defined(NTDDI_WIN10_19H1) && (WDK_NTDDI_VERSION >= NTDDI_WIN10_19H1)
 #define ADVANCED_GPU_FEATURES_ENABLED 1
+#else
+#define ADVANCED_GPU_FEATURES_ENABLED 0
 #endif
 
 

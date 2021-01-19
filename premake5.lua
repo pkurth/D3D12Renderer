@@ -5,6 +5,8 @@ newoption {
 }
 
 local turing_or_higher = false
+local sdk_exists = false
+local dxc_exists = false
 
 if not _OPTIONS["no-turing"] then
 	local handle = io.popen("wmic path win32_VideoController get name")
@@ -13,23 +15,48 @@ if not _OPTIONS["no-turing"] then
 
 	for str in string.gmatch(gpu_string, "NVIDIA (.-)\n") do
 		for model in string.gmatch(str, "%d%d%d%d") do
-			m = tonumber(model)
-			if m > 1650 then -- Turing is everything higher than GTX 1650.
+			local m = tonumber(model)
+			if m >= 1650 then -- Turing is everything higher than GTX 1650.
 				turing_or_higher = true
 			end
 		end
 	end
 end
 
+local sdk_directory = os.getenv("programfiles(x86)") .. "/Windows Kits/10/bin/"
+local sdk_directory_handle = io.popen('dir "'..sdk_directory..'" /b')
+for filename in sdk_directory_handle:lines() do
+    for version in string.gmatch(filename, "10.0.(%d+).0") do
+		local dxc_exe = sdk_directory .. filename .. "/x64/dxc.exe"
+		local f = io.open(dxc_exe, "r")
+		if f~=nil then 
+			io.close(f)
+			dxc_exists = true
+			
+			local v = tonumber(version)
+			if v >= 19041 then
+				sdk_exists = true
+			end
+		end
+	end
+end
+sdk_directory_handle:close()
+
+
 if turing_or_higher then
-	print("Found NVIDIA Turing GPU or newer. Enabling advanced rendering features (e.g. mesh shaders).")
+	print("Found NVIDIA Turing GPU or newer.")
 end
 
-default_shader_model = "6.0"
-
-if not turing_or_higher then
-	default_shader_model = "5.1"
+if dxc_exists then
+	print("Found DXC compiler.")
 end
+
+if sdk_exists then
+	print("Found Windows SDK version >= 19041.")
+end
+
+local all_exist = turing_or_higher and dxc_exists and sdk_exists
+
 
 workspace "D3D12ProjectionMapping"
 	architecture "x64"
@@ -124,8 +151,12 @@ project "D3D12ProjectionMapping"
 			"_CRT_SECURE_NO_WARNINGS"
 		}
 		
-		if not turing_or_higher then
-			defines { "NO_TURING_GPU" }
+		if turing_or_higher then
+			defines { "TURING_GPU_OR_NEWER_AVAILABLE" }
+		end
+
+		if sdk_exists then
+			defines { "WINDOWS_SDK_19041_OR_NEWER_AVAILABLE" }
 		end
 
 
@@ -142,7 +173,14 @@ project "D3D12ProjectionMapping"
 
 
 	filter "files:**.hlsl"
-		shadermodel(default_shader_model)
+	
+		if turing_or_higher and dxc_exists then
+			shadermodel "6.0"
+		else
+			shadermodel "5.1"
+		end
+
+		
 
 		flags "ExcludeFromBuild"
 		shaderobjectfileoutput("shaders/bin/%{file.basename}" .. ".cso")
@@ -189,7 +227,7 @@ project "D3D12ProjectionMapping"
 		removeflags("ExcludeFromBuild")
 		shadertype("Compute")
 		
-	if turing_or_higher then
+	if all_exist then
 		filter("files:**_ms.hlsl")
 			removeflags("ExcludeFromBuild")
 			shadertype("Mesh")
