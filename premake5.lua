@@ -45,18 +45,27 @@ sdk_directory_handle:close()
 
 if turing_or_higher then
 	print("Found NVIDIA Turing GPU or newer.")
+else
+	print("No NVIDIA Turing or newer GPU found.")
 end
 
 if dxc_exists then
 	print("Found DXC compiler.")
+else
+	print("No DXC compiler found.")
 end
 
 if sdk_exists then
 	print("Found Windows SDK version >= 19041.")
+else
+	print("No Windows SDK version >= 19041 found.")
 end
 
 local all_exist = turing_or_higher and dxc_exists and sdk_exists
 
+if not all_exist then
+	print("Disabling mesh shader compilation, since not all requirements are met.")
+end
 
 workspace "D3D12ProjectionMapping"
 	architecture "x64"
