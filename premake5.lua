@@ -148,6 +148,7 @@ project "D3D12ProjectionMapping"
 
 	dependson {
 		"assimp",
+		"yaml-cpp",
 		"DirectXTex_Desktop_2019_Win10",
 	}
 
