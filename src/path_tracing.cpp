@@ -52,7 +52,7 @@ void path_tracer::initialize()
         .globalRootSignature(globalDesc)
         .raygen(L"rayGen")
         .hitgroup(L"Radiance", L"radianceClosestHit", L"radianceAnyHit", L"radianceMiss", hitDesc)
-        .hitgroup(L"AmbientOcclusion", L"aoClosestHit", L"aoAnyHit", L"aoMiss")
+        .hitgroup(L"Shadow", L"shadowClosestHit", L"shadowAnyHit", L"shadowMiss")
         .finish();
 
     numRayTypes = (uint32)pipeline.shaderBindingTableDesc.hitGroups.size();

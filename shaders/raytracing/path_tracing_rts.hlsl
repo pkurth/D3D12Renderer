@@ -47,7 +47,7 @@ Texture2D<float> metalTex					: register(t5, space1);
 
 
 #define RADIANCE_RAY	0
-#define AO_RAY			1
+#define SHADOW_RAY		1
 
 #define NUM_RAY_TYPES	2
 
@@ -57,18 +57,18 @@ struct radiance_ray_payload
 	uint recursion;
 };
 
-struct ao_ray_payload
+struct shadow_ray_payload
 {
-	float value;
+	float visible;
 };
 
 
-
+#define MAX_RECURSION_DEPTH 3 // 0-based.
 
 
 static float3 traceRadianceRay(float3 origin, float3 direction, uint recursion)
 {
-	if (recursion >= 3)
+	if (recursion >= MAX_RECURSION_DEPTH)
 	{
 		return float3(0, 0, 0);
 	}
@@ -93,26 +93,31 @@ static float3 traceRadianceRay(float3 origin, float3 direction, uint recursion)
 	return payload.color;
 }
 
-static float traceAmbientOcclusionRay(float3 origin, float3 direction)
+static float traceShadowRay(float3 origin, float3 direction, float distance, uint recursion) // This shader type is also used for ambient occlusion. Just set the distance to something small.
 {
+	if (recursion >= MAX_RECURSION_DEPTH)
+	{
+		return 1.f;
+	}
+
 	RayDesc ray;
 	ray.Origin = origin;
 	ray.Direction = direction;
 	ray.TMin = 0.01f;
-	ray.TMax = 1.f;
+	ray.TMax = distance;
 
-	ao_ray_payload payload = { 0.f };
+	shadow_ray_payload payload = { 0.f };
 
 	TraceRay(rtScene,
 		RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, // No need to invoke closest hit shader.
 		0xFF,				// Cull mask.
-		AO_RAY,				// Addend on the hit index.
+		SHADOW_RAY,			// Addend on the hit index.
 		NUM_RAY_TYPES,		// Multiplier on the geometry index within a BLAS.
-		AO_RAY,				// Miss index.
+		SHADOW_RAY,			// Miss index.
 		ray,
 		payload);
 
-	return payload.value;
+	return payload.visible;
 }
 
 
@@ -167,12 +172,14 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float2 uv = interpolateAttribute(uvs, attribs);
 	float3 N = normalize(transformDirectionToWorld(interpolateAttribute(normals, attribs)));
 
-
+	float3 albedo = (float3)1.f;
 
 	uint2 launchIndex = DispatchRaysIndex().xy;
 	uint2 launchDim = DispatchRaysDimensions().xy;
 	uint randSeed = initRand(launchIndex.x + launchIndex.y * launchDim.x, constants.frameCount, 16);
 
+
+#if 0
 	float ambientOcclusion = 0.f;
 
 	const uint numAOSamples = constants.numAOSamples;
@@ -180,12 +187,32 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	for (int i = 0; i < numAOSamples; ++i)
 	{
 		float3 worldDir = getCosHemisphereSample(randSeed, N);
-		ambientOcclusion += traceAmbientOcclusionRay(hitWorldPosition(), worldDir);
+		ambientOcclusion += traceShadowRay(hitWorldPosition(), worldDir, 1.f, payload.recursion);
 	}
 
 	ambientOcclusion /= numAOSamples;
 
 	payload.color = ambientOcclusion.xxx;
+
+#else
+
+	float3 bounceColor = (float3)0.f;
+
+	const uint numSamples = constants.numAOSamples;
+
+	for (int i = 0; i < numSamples; ++i)
+	{
+		float3 bounceDir = getCosHemisphereSample(randSeed, N);
+		float NdotL = saturate(dot(N, bounceDir));
+		float sampleProb = NdotL / pi;
+
+		bounceColor += NdotL * traceRadianceRay(hitWorldPosition(), bounceDir, payload.recursion) / sampleProb;
+	}
+
+	bounceColor /= numSamples;
+	payload.color = (bounceColor * albedo / pi);
+
+#endif
 }
 
 [shader("miss")]
@@ -204,23 +231,23 @@ void radianceAnyHit(inout radiance_ray_payload payload, in BuiltInTriangleInters
 
 
 // ----------------------------------------
-// AMBIENT OCCLUSION
+// SHADOW
 // ----------------------------------------
 
 [shader("closesthit")]
-void aoClosestHit(inout ao_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
+void shadowClosestHit(inout shadow_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
 	// This shader will never be called.
 }
 
 [shader("miss")]
-void aoMiss(inout ao_ray_payload payload)
+void shadowMiss(inout shadow_ray_payload payload)
 {
-	payload.value = 1.f;
+	payload.visible = 1.f;
 }
 
 [shader("anyhit")]
-void aoAnyHit(inout ao_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
+void shadowAnyHit(inout shadow_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
 	AcceptHitAndEndSearch();
 }
