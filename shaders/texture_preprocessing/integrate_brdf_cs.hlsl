@@ -5,6 +5,7 @@
 
 #include "cs.hlsli"
 #include "brdf.hlsli"
+#include "random.hlsli"
 
 #define BLOCK_SIZE 16
 
@@ -51,7 +52,7 @@ void main(cs_input IN)
 
 		if (NdotL > 0.f)
 		{
-			float G = geometrySmith(N, V, L, roughness);
+			float G = geometrySmith(NdotL, NdotV, roughness);
 			float G_Vis = (G * VdotH) / (NdotH * NdotV);
 			float Fc = pow(1.f - VdotH, 5.f);
 

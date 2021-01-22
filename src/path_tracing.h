@@ -18,7 +18,6 @@ struct path_tracer : dx_raytracer
 
     uint32 numAveragedFrames = 0;
     uint32 numSamplesPerPixel = 1;
-    uint32 numAOSamples = 8;
 
 private:
     struct shader_data

@@ -161,6 +161,57 @@ void rayGen()
 // RADIANCE
 // ----------------------------------------
 
+
+static float3 calculateIndirectLighting(inout uint randSeed, float3 position, float3 albedo, float3 F0, float3 N, float3 V, float roughness, float metallic, uint recursion)
+{
+	// We have to decide whether we sample our diffuse or specular/ggx lobe.
+	float probDiffuse = roughness;// probabilityToSampleDiffuse(kD, kS);
+	float chooseDiffuse = (nextRand(randSeed) < probDiffuse);
+
+	if (chooseDiffuse)
+	{
+		// Shoot a randomly selected cosine-sampled diffuse ray.
+		float3 L = getCosHemisphereSample(randSeed, N);
+		float3 bounceColor = traceRadianceRay(position, L, recursion);
+
+		// Accumulate the color: (NdotL * incomingLight * dif / pi) 
+		// Probability of sampling:  (NdotL / pi) * probDiffuse
+		return bounceColor * albedo / probDiffuse;
+	}
+	else
+	{
+		// Randomly sample the NDF to get a microfacet in our BRDF to reflect off of
+		float3 H = importanceSampleGGX(randSeed, N, roughness);
+
+		// Compute the outgoing direction based on this (perfectly reflective) microfacet
+		float3 L = reflect(-V, H);
+
+		// Compute our color by tracing a ray in this direction
+		float3 bounceColor = traceRadianceRay(position, L, recursion);
+
+		float NdotV = saturate(dot(N, V));
+		float NdotL = saturate(dot(N, L));
+		float NdotH = saturate(dot(N, H));
+		float LdotH = saturate(dot(L, H));
+
+		float NDF = distributionGGX(NdotH, roughness);
+		float  G = geometrySmith(NdotL, NdotV, roughness);
+		float3 F = fresnelSchlick(LdotH, F0);
+
+		float3 numerator = NDF * G * F;
+		float denominator = 4.f * NdotV * NdotL;
+		float3 specular = numerator / max(denominator, 0.001f);
+
+		// What's the probability of sampling vector H?
+		float  ggxProb = max(NDF * NdotH / (4.f * LdotH), 0.01f);
+
+		// Accumulate the color:  ggx-BRDF * incomingLight * NdotL / probability-of-sampling
+		//    -> Should really simplify the math above.
+		return NdotL * bounceColor * specular / (ggxProb * (1.f - probDiffuse));
+	}
+}
+
+
 [shader("closesthit")]
 void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
@@ -172,7 +223,31 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float2 uv = interpolateAttribute(uvs, attribs);
 	float3 N = normalize(transformDirectionToWorld(interpolateAttribute(normals, attribs)));
 
+#if 1
 	float3 albedo = (float3)1.f;
+	float roughness = 0.5f;
+	float metallic = 0.f;
+#else
+	uint mipLevel = 0;
+	uint flags = material.flags;
+
+	float4 albedo = ((flags & USE_ALBEDO_TEXTURE)
+		? albedoTex.SampleLevel(wrapSampler, uv, mipLevel)
+		: float4(1.f, 1.f, 1.f, 1.f))
+		* material.albedoTint;
+
+	// We ignore normal maps for now.
+
+	float roughness = (flags & USE_ROUGHNESS_TEXTURE)
+		? roughTex.SampleLevel(wrapSampler, uv, mipLevel)
+		: getRoughnessOverride(material);
+	roughness = clamp(roughness, 0.01f, 0.99f);
+
+	float metallic = (flags & USE_METALLIC_TEXTURE)
+		? metalTex.SampleLevel(wrapSampler, uv, mipLevel)
+		: getMetallicOverride(material);
+#endif
+
 
 	uint2 launchIndex = DispatchRaysIndex().xy;
 	uint2 launchDim = DispatchRaysDimensions().xy;
@@ -180,37 +255,12 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 
 
 #if 0
-	float ambientOcclusion = 0.f;
-
-	const uint numAOSamples = constants.numAOSamples;
-
-	for (int i = 0; i < numAOSamples; ++i)
-	{
-		float3 worldDir = getCosHemisphereSample(randSeed, N);
-		ambientOcclusion += traceShadowRay(hitWorldPosition(), worldDir, 1.f, payload.recursion);
-	}
-
-	ambientOcclusion /= numAOSamples;
-
-	payload.color = ambientOcclusion.xxx;
+	float3 worldDir = getCosHemisphereSample(randSeed, N);
+	payload.color = traceShadowRay(hitWorldPosition(), worldDir, 1.f, payload.recursion).xxx;
 
 #else
-
-	float3 bounceColor = (float3)0.f;
-
-	const uint numSamples = constants.numAOSamples;
-
-	for (int i = 0; i < numSamples; ++i)
-	{
-		float3 bounceDir = getCosHemisphereSample(randSeed, N);
-		float NdotL = saturate(dot(N, bounceDir));
-		float sampleProb = NdotL / pi;
-
-		bounceColor += NdotL * traceRadianceRay(hitWorldPosition(), bounceDir, payload.recursion) / sampleProb;
-	}
-
-	bounceColor /= numSamples;
-	payload.color = (bounceColor * albedo / pi);
+	float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
+	payload.color = calculateIndirectLighting(randSeed, hitWorldPosition(), albedo, F0, N, -WorldRayDirection(), roughness, metallic, payload.recursion);
 
 #endif
 }

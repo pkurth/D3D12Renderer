@@ -2,11 +2,16 @@
 #define BRDF_HLSLI
 
 #include "math.hlsli"
+#include "random.hlsli"
 
 // http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
 // TODO: We should make an optimization pass over this code. Many terms are computed multiple times.
 
 
+
+// ----------------------------------------
+// FRESNEL (surface becomes more reflective when seen from a grazing angle)
+// ----------------------------------------
 
 static float3 fresnelSchlick(float LdotH, float3 F0)
 {
@@ -19,78 +24,72 @@ static float3 fresnelSchlickRoughness(float LdotH, float3 F0, float roughness)
 	return F0 + (max(float3(v, v, v), F0) - F0) * pow(1.f - LdotH, 5.f);
 }
 
-static float distributionGGX(float3 N, float3 H, float roughness)
+
+
+
+// ----------------------------------------
+// DISTRIBUTION (Microfacets orientation based on roughness)
+// ----------------------------------------
+
+#if 0
+static float distributionGGX(float NdotH, float roughness)
+{
+	float a2 = roughness * roughness;
+	float d = (NdotH2 * (a2 - 1.f) + 1.f);
+	return a2 / max(d * d * pi, 0.001f);
+}
+#else
+static float distributionGGX(float NdotH, float roughness)
 {
 	float a = roughness * roughness;
 	float a2 = a * a;
-	float NdotH = max(dot(N, H), 0.f);
 	float NdotH2 = NdotH * NdotH;
 
-	float nom = a2;
-	float denom = (NdotH2 * (a2 - 1.f) + 1.f);
-	denom = pi * denom * denom;
-
-	return nom / max(denom, 0.001f);
+	float d = (NdotH2 * (a2 - 1.f) + 1.f);
+	return a2 / max(d * d * pi, 0.001f);
 }
+#endif
 
-static float geometrySchlickGGX(float NdotV, float roughness)
+
+
+// ----------------------------------------
+// GEOMETRIC MASKING (Microfacets may shadow each-other).
+// ----------------------------------------
+
+static float geometrySmith(float NdotL, float NdotV, float roughness)
 {
-	//float r = (roughness + 1.f);
-	//float k = (r * r) * 0.125;
-	float a = roughness;
-	float k = (a * a) / 2.f;
+	float k = (roughness * roughness) / 2.f;
 
-	float nom = NdotV;
-	float denom = NdotV * (1.f - k) + k;
-
-	return nom / denom;
-}
-
-static float geometrySmith(float3 N, float3 V, float3 L, float roughness)
-{
-	float NdotV = max(dot(N, V), 0.f);
-	float NdotL = max(dot(N, L), 0.f);
-	float ggx2 = geometrySchlickGGX(NdotV, roughness);
-	float ggx1 = geometrySchlickGGX(NdotL, roughness);
+	float ggx2 = NdotV / (NdotV * (1.f - k) + k);
+	float ggx1 = NdotL / (NdotL * (1.f - k) + k);
 
 	return ggx1 * ggx2;
 }
 
-static float radicalInverse_VdC(uint bits)
+
+
+
+// When using this function to sample, the probability density is:
+//      pdf = D * NdotH / (4 * HdotV)
+float3 importanceSampleGGX(inout uint randSeed, float3 N, float roughness)
 {
-	bits = (bits << 16u) | (bits >> 16u);
-	bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
-	bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
-	bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
-	bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
-	return float(bits) * 2.3283064365386963e-10; // / 0x100000000
-}
+	// Get our uniform random numbers.
+	float2 randVal = float2(nextRand(randSeed), nextRand(randSeed));
 
-static float2 hammersley(uint i, uint N)
-{
-	return float2(float(i) / float(N), radicalInverse_VdC(i));
-}
+	// Get an orthonormal basis from the normal.
+	float3 B = getPerpendicularVector(N);
+	float3 T = cross(B, N);
 
-static float3 hemisphereSample_uniform(float2 uv) 
-{
-	const float u = uv.x;
-	const float v = uv.y;
+	// GGX NDF sampling.
+	float a2 = roughness * roughness;
+	float cosThetaH = sqrt(max(0.f, (1.f - randVal.x) / ((a2 - 1.f) * randVal.x + 1.f)));
+	float sinThetaH = sqrt(max(0.f, 1.f - cosThetaH * cosThetaH));
+	float phiH = randVal.y * pi * 2.f;
 
-	float phi = v * 2.f * pi;
-	float cosTheta = 1.f - u;
-	float sinTheta = sqrt(1.f - cosTheta * cosTheta);
-	return float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
-}
-
-static float3 hemisphereSample_cos(float2 uv)
-{
-	const float u = uv.x;
-	const float v = uv.y;
-
-	float phi = v * 2.f * pi;
-	float cosTheta = sqrt(1.f - u);
-	float sinTheta = sqrt(1.f - cosTheta * cosTheta);
-	return float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+	// Get our GGX NDF sample (i.e., the half vector).
+	return T * (sinThetaH * cos(phiH)) +
+		B * (sinThetaH * sin(phiH)) +
+		N * cosThetaH;
 }
 
 static float3 importanceSampleGGX(float2 Xi, float3 N, float roughness)
@@ -121,7 +120,7 @@ static float3 calculateAmbientLighting(float3 albedo, float3 irradiance,
 	float3 N, float3 V, float3 F0, float roughness, float metallic, float ao)
 {
 	// Common.
-	float NdotV = max(dot(N, V), 0.f);
+	float NdotV = saturate(dot(N, V));
 	float3 F = fresnelSchlickRoughness(NdotV, F0, roughness);
 	float3 kS = F;
 	float3 kD = float3(1.f, 1.f, 1.f) - kS;
@@ -156,23 +155,37 @@ static float3 calculateAmbientLighting(float3 albedo,
 static float3 calculateDirectLighting(float3 albedo, float3 radiance, float3 N, float3 L, float3 V, float3 F0, float roughness, float metallic)
 {
 	float3 H = normalize(V + L);
-	float NdotV = max(dot(N, V), 0.f);
+	float NdotV = saturate(dot(N, V));
+	float NdotH = saturate(dot(N, H));
+	float NdotL = saturate(dot(N, L));
+	float HdotV = saturate(dot(H, V));
 
 	// Cook-Torrance BRDF.
-	float NDF = distributionGGX(N, H, roughness);
-	float G = geometrySmith(N, V, L, roughness);
-	float3 F = fresnelSchlick(max(dot(H, V), 0.f), F0);
+	float NDF = distributionGGX(NdotH, roughness);
+	float G = geometrySmith(NdotL, NdotV, roughness);
+	float3 F = fresnelSchlick(HdotV, F0);
 
 	float3 kS = F;
 	float3 kD = float3(1.f, 1.f, 1.f) - kS;
 	kD *= 1.f - metallic;
 
-	float NdotL = max(dot(N, L), 0.f);
 	float3 numerator = NDF * G * F;
 	float denominator = 4.f * NdotV * NdotL;
 	float3 specular = numerator / max(denominator, 0.001f);
 
 	return (kD * albedo * invPI + specular) * radiance * NdotL;
+}
+
+inline float luminance(float3 rgb)
+{
+	return dot(rgb, float3(0.2126f, 0.7152f, 0.0722f));
+}
+
+float probabilityToSampleDiffuse(float3 kD, float3 kS)
+{
+	float lumDiffuse = max(0.01f, luminance(kD));
+	float lumSpecular = max(0.01f, luminance(kS));
+	return lumDiffuse / (lumDiffuse + lumSpecular);
 }
 
 #endif

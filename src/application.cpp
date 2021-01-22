@@ -434,7 +434,6 @@ void application::drawSettings(float dt)
 		ImGui::Separator();
 
 		ImGui::SliderInt("Num samples per pixel", (int*)&pathTracer.numSamplesPerPixel, 1, 32);
-		ImGui::SliderInt("Num AO samples", (int*)&pathTracer.numAOSamples, 1, 32);
 	}
 	ImGui::End();
 }

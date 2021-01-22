@@ -13,6 +13,7 @@
 
 #include "brdf.hlsli"
 #include "cs.hlsli"
+#include "random.hlsli"
 
 
 cbuffer prefilter_environment_cb : register(b0)
@@ -86,7 +87,7 @@ static float4 filter(uint mip, float3 N, float3 V)
 		float HdotV = max(dot(H, V), 0.f);
 		if (NdotL > 0.f)
 		{
-			float D = distributionGGX(N, H, roughness);
+			float D = distributionGGX(NdotH, roughness);
 			float pdf = (D * NdotH / (4.f * HdotV)) + 0.0001f;
 
 			uint resolution = width; // We expect quadratic faces, so width == height.
