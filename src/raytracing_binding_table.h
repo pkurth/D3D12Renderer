@@ -97,7 +97,7 @@ inline void raytracing_binding_table<shader_data>::push(const shader_data* sd)
     }
 
     binding_table_entry* base = hit + (numRayTypes * currentHitGroup);
-    currentHitGroup += numRayTypes;
+    ++currentHitGroup;
 
     for (uint32 i = 0; i < numRayTypes; ++i)
     {
