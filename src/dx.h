@@ -52,9 +52,4 @@ typedef com<ID3D12GraphicsCommandList4> dx_graphics_command_list;
 
 extern struct dx_context dxContext;
 
-enum color_depth
-{
-	color_depth_8,
-	color_depth_10,
-};
 

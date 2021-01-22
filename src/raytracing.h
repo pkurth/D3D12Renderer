@@ -66,6 +66,19 @@ struct dx_raytracing_pipeline
 	raytracing_shader_binding_table_desc shaderBindingTableDesc;
 };
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 struct raytracing_pipeline_builder
 {
 	raytracing_pipeline_builder(const wchar* shaderFilename, uint32 payloadSize, uint32 maxRecursionDepth);

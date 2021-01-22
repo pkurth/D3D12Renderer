@@ -9,7 +9,6 @@
 struct raytracing_blas;
 struct dx_vertex_buffer;
 struct dx_index_buffer;
-struct pbr_raytracing_binding_table;
 struct raytracing_tlas;
 
 // Base for both opaque and transparent pass.

@@ -25,33 +25,32 @@ struct mesh_vertex
 };
 
 
-// Global.
+RWTexture2D<float4> output					: register(u0);
+
 RaytracingAccelerationStructure rtScene		: register(t0);
+Texture2D<float> depthBuffer                : register(t1);
+Texture2D<float2> worldNormals				: register(t2);
+TextureCube<float4> irradianceTexture		: register(t3);
+TextureCube<float4> environmentTexture		: register(t4);
+TextureCube<float4> sky						: register(t5);
+Texture2D<float4> brdf						: register(t6);
+
+
 ConstantBuffer<camera_cb> camera			: register(b0);
 ConstantBuffer<directional_light_cb> sun	: register(b1);
 ConstantBuffer<raytracing_cb> raytracing	: register(b2);
-RWTexture2D<float4> output					: register(u0);
 SamplerState wrapSampler					: register(s0);
 SamplerState clampSampler					: register(s1);
 
-// Gbuffer (global).
-Texture2D<float> depthBuffer                : register(t0, space1);
-Texture2D<float2> worldNormals				: register(t1, space1);
-
-// Environment (global).
-TextureCube<float4> irradianceTexture		: register(t2, space1);
-TextureCube<float4> environmentTexture		: register(t3, space1);
-TextureCube<float4> sky						: register(t4, space1);
-Texture2D<float4> brdf						: register(t5, space1);
 
 // Radiance hit group.
-ConstantBuffer<pbr_material_cb> material	: register(b0, space2);
-StructuredBuffer<mesh_vertex> meshVertices	: register(t0, space2);
-ByteAddressBuffer meshIndices				: register(t1, space2);
-Texture2D<float4> albedoTex					: register(t2, space2);
-Texture2D<float3> normalTex					: register(t3, space2);
-Texture2D<float> roughTex					: register(t4, space2);
-Texture2D<float> metalTex					: register(t5, space2);
+ConstantBuffer<pbr_material_cb> material	: register(b0, space1);
+StructuredBuffer<mesh_vertex> meshVertices	: register(t0, space1);
+ByteAddressBuffer meshIndices				: register(t1, space1);
+Texture2D<float4> albedoTex					: register(t2, space1);
+Texture2D<float3> normalTex					: register(t3, space1);
+Texture2D<float> roughTex					: register(t4, space1);
+Texture2D<float> metalTex					: register(t5, space1);
 
 
 #define RADIANCE_RAY	0
@@ -184,7 +183,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float3 normals[] = { meshVertices[tri.x].normal, meshVertices[tri.y].normal, meshVertices[tri.z].normal };
 
 	float2 uv = interpolateAttribute(uvs, attribs);
-	float3 N = transformDirectionToWorld(interpolateAttribute(normals, attribs));
+	float3 N = normalize(transformDirectionToWorld(interpolateAttribute(normals, attribs)));
 
 	uint mipLevel = 0;
 

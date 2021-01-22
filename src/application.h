@@ -11,8 +11,7 @@
 #include "transformation_gizmo.h"
 #include "raytracing.h"
 
-#include "raytracing_tlas.h"
-#include "pbr_raytracing_binding_table.h"
+#include "path_tracing.h"
 
 #include "scene.h"
 
@@ -40,8 +39,8 @@ private:
 	void assignShadowMapViewports();
 
 
-	pbr_raytracing_binding_table raytracingBindingTable;
 	raytracing_tlas raytracingTLAS;
+	path_tracer pathTracer;
 
 	ref<pbr_environment> environment;
 

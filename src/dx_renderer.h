@@ -8,30 +8,12 @@
 #include "light_source.h"
 #include "pbr.h"
 #include "input.h"
+#include "raytracer.h"
 
 #include "light_source.hlsli"
 #include "camera.hlsli"
 #include "present_rs.hlsli"
 #include "volumetrics_rs.hlsli"
-
-
-/*
-	The layout of our shadow map is:
-	_________________________________
-	|		|		|		|		|
-	| Sun 0 | Sun 1 | Sun 2 | Sun 3 |
-	|_______|_______|_______|_______|
-	|								|
-	|								|
-	|								|
-	|								|
-	|								|
-	|								|
-	|_______________________________|
-
-	Sun 0-3 are the sun cascades.
-	The space at the bottom is free for the application to use for shadow casters other than the sun.
-*/
 
 
 #define SHADOW_MAP_WIDTH 8192
@@ -57,18 +39,18 @@ static const char* aspectRatioNames[] =
 	"16:10",
 };
 
+enum renderer_mode
+{
+	renderer_mode_default,
+	renderer_mode_pathtraced,
+};
+
 
 struct renderer_settings
 {
 	tonemap_cb tonemap = defaultTonemapParameters();
 	float environmentIntensity = 1.f;
 	float skyIntensity = 1.f;
-
-	uint32 raytracingDownsampleFactor = 1;
-	uint32 numRaytracingBounces = 1;
-	uint32 blurRaytracingResultIterations = 1;
-	float raytracingMaxDistance = 100.f;
-	float raytracingFadeoutDistance = 80.f;
 
 	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
 };
@@ -125,6 +107,13 @@ struct dx_renderer
 		pointLightShadowRenderPasses[numPointLightShadowRenderPasses++] = renderPass;
 	}
 
+	void setRaytracer(dx_raytracer* raytracer, raytracing_tlas* tlas)
+	{
+		this->raytracer = raytracer;
+		this->tlas = tlas;
+	}
+
+	renderer_mode mode = renderer_mode_default;
 	
 	renderer_settings settings;
 
@@ -133,8 +122,6 @@ struct dx_renderer
 	ref<dx_texture> frameResult;
 
 	uint16 hoveredObjectID = 0xFFFF;
-
-	static struct pbr_raytracing_pipeline* getRaytracingPipeline();
 
 	static ref<dx_texture> getWhiteTexture();
 	static ref<dx_texture> getBlackTexture();
@@ -151,7 +138,6 @@ struct dx_renderer
 	static constexpr DXGI_FORMAT depthOnlyFormat[] = { DXGI_FORMAT_R16G16_FLOAT, DXGI_FORMAT_R16_UINT }; // Screen velocities, object ID.
 	static constexpr DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM; // TODO: Evaluate whether this is enough.
 	static constexpr DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-	static constexpr DXGI_FORMAT raytracedReflectionsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
 private:
 
@@ -169,6 +155,8 @@ private:
 		uint32 numTilesY;
 	};
 
+	dx_raytracer* raytracer;
+	raytracing_tlas* tlas;
 
 	opaque_render_pass* opaqueRenderPass;
 	sun_shadow_render_pass* sunShadowRenderPass;
@@ -195,14 +183,14 @@ private:
 
 	ref<dx_texture> volumetricsTexture;
 
-	ref<dx_texture> raytracingTexture;
-	ref<dx_texture> raytracingTextureTmpForBlur;
-
 	ref<dx_buffer> hoveredObjectIDReadbackBuffer[NUM_BUFFERED_FRAMES];
 
 	ref<dx_buffer> spotLightShadowInfoBuffer[NUM_BUFFERED_FRAMES];
 	ref<dx_buffer> pointLightShadowInfoBuffer[NUM_BUFFERED_FRAMES];
 
+	ref<dx_texture> blurTempTexture;
+	dx_render_target blurTempRenderTarget;
+	dx_render_target blurOriginalRenderTarget;
 
 	ref<pbr_environment> environment;
 	ref<dx_buffer> pointLights;

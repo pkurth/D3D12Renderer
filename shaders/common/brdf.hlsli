@@ -71,6 +71,28 @@ static float2 hammersley(uint i, uint N)
 	return float2(float(i) / float(N), radicalInverse_VdC(i));
 }
 
+static float3 hemisphereSample_uniform(float2 uv) 
+{
+	const float u = uv.x;
+	const float v = uv.y;
+
+	float phi = v * 2.f * pi;
+	float cosTheta = 1.f - u;
+	float sinTheta = sqrt(1.f - cosTheta * cosTheta);
+	return float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+}
+
+static float3 hemisphereSample_cos(float2 uv)
+{
+	const float u = uv.x;
+	const float v = uv.y;
+
+	float phi = v * 2.f * pi;
+	float cosTheta = sqrt(1.f - u);
+	float sinTheta = sqrt(1.f - cosTheta * cosTheta);
+	return float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+}
+
 static float3 importanceSampleGGX(float2 Xi, float3 N, float roughness)
 {
 	float a = roughness * roughness;

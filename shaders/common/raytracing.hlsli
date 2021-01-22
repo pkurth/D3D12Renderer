@@ -54,7 +54,7 @@ static float4 interpolateAttribute(float4 vertexAttribute[3], BuiltInTriangleInt
 
 static uint3 load3x16BitIndices(ByteAddressBuffer meshIndices)
 {
-	const uint indexSizeInBytes = 2;		// Assuming an index is 16 bit.
+	const uint indexSizeInBytes = 2;
 	const uint indicesPerTriangle = 3;
 	const uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
 	uint baseIndex = PrimitiveIndex() * triangleIndexStride;
@@ -84,6 +84,18 @@ static uint3 load3x16BitIndices(ByteAddressBuffer meshIndices)
 		indices.y = four16BitIndices.y & 0xffff;
 		indices.z = (four16BitIndices.y >> 16) & 0xffff;
 	}
+
+	return indices;
+}
+
+static uint3 load3x32BitIndices(ByteAddressBuffer meshIndices)
+{
+	const uint indexSizeInBytes = 4;
+	const uint indicesPerTriangle = 3;
+	const uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
+	uint baseIndex = PrimitiveIndex() * triangleIndexStride;
+
+	uint3 indices = meshIndices.Load3(baseIndex);
 
 	return indices;
 }

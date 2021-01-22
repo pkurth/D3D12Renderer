@@ -140,3 +140,15 @@ struct dx_frame_descriptor_allocator
 	void newFrame(uint32 bufferedFrameID);
 	dx_descriptor_range allocateContiguousDescriptorRange(uint32 count);
 };
+
+
+
+struct dx_pushable_resource_descriptor_heap
+{
+	void initialize(uint32 maxSize, bool shaderVisible = true);
+	dx_cpu_descriptor_handle push();
+
+	com<ID3D12DescriptorHeap> descriptorHeap;
+	dx_cpu_descriptor_handle currentCPU;
+	dx_gpu_descriptor_handle currentGPU;
+};

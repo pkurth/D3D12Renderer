@@ -253,6 +253,61 @@ struct dx_graphics_pipeline_generator
 	}
 };
 
+
+
+struct root_descriptor_table : CD3DX12_ROOT_PARAMETER
+{
+	root_descriptor_table(uint32 numDescriptorRanges,
+		const D3D12_DESCRIPTOR_RANGE* descriptorRanges,
+		D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL)
+	{
+		InitAsDescriptorTable(numDescriptorRanges, descriptorRanges, visibility);
+	}
+};
+
+template <typename T>
+struct root_constants : CD3DX12_ROOT_PARAMETER
+{
+	root_constants(uint32 shaderRegister,
+		uint32 space = 0,
+		D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL)
+	{
+		InitAsConstants(sizeof(T) / 4, shaderRegister, space, visibility);
+	}
+};
+
+struct root_cbv : CD3DX12_ROOT_PARAMETER
+{
+	root_cbv(uint32 shaderRegister,
+		uint32 space = 0,
+		D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL)
+	{
+		InitAsConstantBufferView(shaderRegister, space, visibility);
+	}
+};
+
+struct root_srv : CD3DX12_ROOT_PARAMETER
+{
+	root_srv(uint32 shaderRegister,
+		uint32 space = 0,
+		D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL)
+	{
+		InitAsShaderResourceView(shaderRegister, space, visibility);
+	}
+};
+
+struct root_uav : CD3DX12_ROOT_PARAMETER
+{
+	root_uav(uint32 shaderRegister,
+		uint32 space = 0,
+		D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL)
+	{
+		InitAsUnorderedAccessView(shaderRegister, space, visibility);
+	}
+};
+
+
+
 struct dx_pipeline_stream_base
 {
 	virtual void setVertexShader(dx_blob blob) {}

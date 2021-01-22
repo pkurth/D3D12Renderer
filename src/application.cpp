@@ -38,7 +38,7 @@ struct raytrace_component
 static ref<dx_buffer> pointLightBuffer[NUM_BUFFERED_FRAMES];
 static ref<dx_buffer> spotLightBuffer[NUM_BUFFERED_FRAMES];
 
-static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh, pbr_raytracing_binding_table& raytracingBindingTable)
+static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh, path_tracer& pathTracer)
 {
 	if (dxContext.raytracingSupported)
 	{
@@ -52,7 +52,7 @@ static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh
 		}
 
 		auto blas = blasBuilder.finish();
-		raytracing_object_type type = raytracingBindingTable.defineObjectType(blas, raytracingMaterials);
+		raytracing_object_type type = pathTracer.defineObjectType(blas, raytracingMaterials);
 		return type;
 	}
 	else
@@ -78,21 +78,21 @@ void application::initialize(dx_renderer* renderer)
 
 	if (dxContext.raytracingSupported)
 	{
-		raytracingBindingTable.initialize();
+		pathTracer.initialize();
 		raytracingTLAS.initialize();
 	}
 
 	
-#if 1
 	// Sponza.
 	auto sponzaMesh = loadMeshFromFile("assets/meshes/sponza.obj");
-	auto sponzaBlas = defineBlasFromMesh(sponzaMesh, raytracingBindingTable);
+	auto sponzaBlas = defineBlasFromMesh(sponzaMesh, pathTracer);
 
 	appScene.createEntity("Sponza")
 		.addComponent<trs>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
 		.addComponent<raster_component>(sponzaMesh)
 		.addComponent<raytrace_component>(sponzaBlas);
 
+#if 0
 	// Stormtrooper.
 	auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/meshes/stormtrooper.fbx");
 	stormtrooperMesh->submeshes[0].material = createPBRMaterial(
@@ -146,7 +146,7 @@ void application::initialize(dx_renderer* renderer)
 	// Raytracing.
 	if (dxContext.raytracingSupported)
 	{
-		raytracingBindingTable.build();
+		pathTracer.finish();
 	}
 
 
@@ -429,9 +429,6 @@ void application::drawSettings(float dt)
 
 		ImGui::SliderFloat("Environment intensity", &renderer->settings.environmentIntensity, 0.f, 2.f);
 		ImGui::SliderFloat("Sky intensity", &renderer->settings.skyIntensity, 0.f, 2.f);
-		ImGui::SliderInt("Raytracing bounces", (int*)&renderer->settings.numRaytracingBounces, 1, MAX_PBR_RAYTRACING_RECURSION_DEPTH - 1);
-		ImGui::SliderInt("Raytracing downsampling", (int*)&renderer->settings.raytracingDownsampleFactor, 1, 4);
-		ImGui::SliderInt("Raytracing blur iteations", (int*)&renderer->settings.blurRaytracingResultIterations, 0, 4);
 	}
 	ImGui::End();
 }
@@ -570,10 +567,10 @@ void application::update(const user_input& input, float dt)
 	drawSceneHierarchy();
 	drawSettings(dt);
 
-	if (dxContext.meshShaderSupported)
-	{
-		testRenderMeshShader(&overlayRenderPass);
-	}
+
+	renderer->mode = renderer_mode_pathtraced;
+
+
 
 	sun.updateMatrices(camera);
 
@@ -583,117 +580,127 @@ void application::update(const user_input& input, float dt)
 	renderer->setEnvironment(environment);
 
 
-	spotShadowRenderPasses[0].viewProjMatrix = getSpotLightViewProjectionMatrix(spotLights[0]);
-	spotShadowRenderPasses[1].viewProjMatrix = getSpotLightViewProjectionMatrix(spotLights[1]);
-	pointShadowRenderPasses[0].lightPosition = pointLights[0].position;
-	pointShadowRenderPasses[0].maxDistance = pointLights[0].radius;
-
-	assignShadowMapViewports();
-	
-
-
-	// Upload and set lights.
-	if (pointLights.size())
+	if (renderer->mode == renderer_mode_default)
 	{
-		updateUploadBufferData(pointLightBuffer[dxContext.bufferedFrameID], pointLights.data(), (uint32)(sizeof(point_light_cb) * pointLights.size()));
-		renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], (uint32)pointLights.size());
-	}
-	if (spotLights.size())
-	{
-		updateUploadBufferData(spotLightBuffer[dxContext.bufferedFrameID], spotLights.data(), (uint32)(sizeof(spot_light_cb) * spotLights.size()));
-		renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], (uint32)spotLights.size());
-	}
-
-
-	// Skin animated meshes.
-	appScene.group<animation_component>(entt::get<raster_component>)
-		.each([dt](animation_component& anim, raster_component& raster)
-	{
-		anim.time += dt;
-		const dx_mesh& mesh = raster.mesh->mesh;
-		const animation_skeleton& skeleton = raster.mesh->skeleton;
-
-		trs localTransforms[128];
-		auto [vb, vertexOffset, skinningMatrices] = skinObject(mesh.vertexBuffer, (uint32)skeleton.joints.size());
-		skeleton.sampleAnimation(skeleton.clips[anim.animationIndex].name, anim.time, localTransforms);
-		skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
-
-		anim.prevFrameVB = anim.vb;
-		anim.vb = vb;
-
-		uint32 numSubmeshes = (uint32)raster.mesh->submeshes.size();
-		for (uint32 i = 0; i < numSubmeshes; ++i)
+		if (dxContext.meshShaderSupported)
 		{
-			anim.prevFrameSMs[i] = anim.sms[i];
-
-			anim.sms[i] = raster.mesh->submeshes[i].info;
-			anim.sms[i].baseVertex += vertexOffset;
+			testRenderMeshShader(&overlayRenderPass);
 		}
-	});
 
-	// Submit render calls.
-	appScene.group<raster_component>(entt::get<trs>)
-		.each([this](entt::entity entityHandle, raster_component& raster, trs& transform)
-	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
 
-		scene_entity entity = { entityHandle, appScene };
-		bool outline = selectedEntity == entity;
+		spotShadowRenderPasses[0].viewProjMatrix = getSpotLightViewProjectionMatrix(spotLights[0]);
+		spotShadowRenderPasses[1].viewProjMatrix = getSpotLightViewProjectionMatrix(spotLights[1]);
+		pointShadowRenderPasses[0].lightPosition = pointLights[0].position;
+		pointShadowRenderPasses[0].maxDistance = pointLights[0].radius;
 
-		if (entity.hasComponent<animation_component>())
+		assignShadowMapViewports();
+
+
+
+		// Upload and set lights.
+		if (pointLights.size())
 		{
-			auto& anim = entity.getComponent<animation_component>();
+			updateUploadBufferData(pointLightBuffer[dxContext.bufferedFrameID], pointLights.data(), (uint32)(sizeof(point_light_cb) * pointLights.size()));
+			renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], (uint32)pointLights.size());
+		}
+		if (spotLights.size())
+		{
+			updateUploadBufferData(spotLightBuffer[dxContext.bufferedFrameID], spotLights.data(), (uint32)(sizeof(spot_light_cb) * spotLights.size()));
+			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], (uint32)spotLights.size());
+		}
+
+
+		// Skin animated meshes.
+		appScene.group<animation_component>(entt::get<raster_component>)
+			.each([dt](animation_component& anim, raster_component& raster)
+		{
+			anim.time += dt;
+			const dx_mesh& mesh = raster.mesh->mesh;
+			const animation_skeleton& skeleton = raster.mesh->skeleton;
+
+			trs localTransforms[128];
+			auto [vb, vertexOffset, skinningMatrices] = skinObject(mesh.vertexBuffer, (uint32)skeleton.joints.size());
+			skeleton.sampleAnimation(skeleton.clips[anim.animationIndex].name, anim.time, localTransforms);
+			skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
+
+			anim.prevFrameVB = anim.vb;
+			anim.vb = vb;
 
 			uint32 numSubmeshes = (uint32)raster.mesh->submeshes.size();
-			
 			for (uint32 i = 0; i < numSubmeshes; ++i)
 			{
-				submesh_info submesh = anim.sms[i];
-				submesh_info prevFrameSubmesh = anim.prevFrameSMs[i];
+				anim.prevFrameSMs[i] = anim.sms[i];
 
-				opaqueRenderPass.renderAnimatedObject(anim.vb, anim.prevFrameVB, mesh.indexBuffer, submesh, prevFrameSubmesh, raster.mesh->submeshes[i].material, m, m,
-					(uint32)entityHandle, outline);
-				sunShadowRenderPass.renderObject(0, anim.vb, mesh.indexBuffer, submesh, m);
-				spotShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
-				spotShadowRenderPasses[1].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
-				pointShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
+				anim.sms[i] = raster.mesh->submeshes[i].info;
+				anim.sms[i].baseVertex += vertexOffset;
 			}
-		}
-		else
-		{
-			for (auto& sm : raster.mesh->submeshes)
-			{
-				submesh_info submesh = sm.info;
-				const ref<pbr_material>& material = sm.material;
-
-				opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, (uint32)entityHandle, outline);
-				sunShadowRenderPass.renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-				spotShadowRenderPasses[0].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-				spotShadowRenderPasses[1].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-				pointShadowRenderPasses[0].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-			}
-		}
-	});
-
-	submitRenderPasses();
-
-#if 1
-	if (dxContext.raytracingSupported)
-	{
-		raytracingTLAS.reset();
-
-		appScene.group<raytrace_component>(entt::get<trs>)
-			.each([this](entt::entity entityHandle, raytrace_component& raytrace, trs& transform)
-		{
-			raytracingTLAS.instantiate(raytrace.type, transform);
 		});
 
-		raytracingTLAS.build();
+		// Submit render calls.
+		appScene.group<raster_component>(entt::get<trs>)
+			.each([this](entt::entity entityHandle, raster_component& raster, trs& transform)
+		{
+			const dx_mesh& mesh = raster.mesh->mesh;
+			mat4 m = trsToMat4(transform);
 
-		// TODO: Submit for rendering.
+			scene_entity entity = { entityHandle, appScene };
+			bool outline = selectedEntity == entity;
+
+			if (entity.hasComponent<animation_component>())
+			{
+				auto& anim = entity.getComponent<animation_component>();
+
+				uint32 numSubmeshes = (uint32)raster.mesh->submeshes.size();
+
+				for (uint32 i = 0; i < numSubmeshes; ++i)
+				{
+					submesh_info submesh = anim.sms[i];
+					submesh_info prevFrameSubmesh = anim.prevFrameSMs[i];
+
+					opaqueRenderPass.renderAnimatedObject(anim.vb, anim.prevFrameVB, mesh.indexBuffer, submesh, prevFrameSubmesh, raster.mesh->submeshes[i].material, m, m,
+						(uint32)entityHandle, outline);
+					sunShadowRenderPass.renderObject(0, anim.vb, mesh.indexBuffer, submesh, m);
+					spotShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
+					spotShadowRenderPasses[1].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
+					pointShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
+				}
+			}
+			else
+			{
+				for (auto& sm : raster.mesh->submeshes)
+				{
+					submesh_info submesh = sm.info;
+					const ref<pbr_material>& material = sm.material;
+
+					opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, (uint32)entityHandle, outline);
+					sunShadowRenderPass.renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+					spotShadowRenderPasses[0].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+					spotShadowRenderPasses[1].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+					pointShadowRenderPasses[0].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+				}
+			}
+		});
+
+		submitRenderPasses();
 	}
-#endif
+	else
+	{
+		if (dxContext.raytracingSupported)
+		{
+			raytracingTLAS.reset();
+
+			appScene.group<raytrace_component>(entt::get<trs>)
+				.each([this](entt::entity entityHandle, raytrace_component& raytrace, trs& transform)
+			{
+				raytracingTLAS.instantiate(raytrace.type, transform);
+			});
+
+			raytracingTLAS.build();
+
+			renderer->setRaytracer(&pathTracer, &raytracingTLAS);
+		}
+	}
+
 }
 
 void application::setEnvironment(const char* filename)

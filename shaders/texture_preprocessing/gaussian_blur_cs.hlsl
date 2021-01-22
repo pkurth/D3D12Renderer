@@ -19,7 +19,7 @@ cbuffer gaussian_blur_cb : register(b0)
     uint width, height;
 };
 
-static const float kernelOffsets[3] = { 0.0f, 1.3846153846f, 3.2307692308f };
+static const float kernelOffsets[3] = { 0.f, 1.3846153846f, 3.2307692308f };
 static const float blurWeights[3] = { 0.2270270270f, 0.3162162162f, 0.0702702703f };
 
 Texture2D<float4> src		        : register(t0);
@@ -42,6 +42,7 @@ void main(cs_input IN)
 
     float4 outColor = src.SampleLevel(linearClampSampler, uv, 0) * blurWeights[0];
 
+    [unroll]
     for (int i = 1; i < 3; ++i)
     {
         float2 normalizedOffset = kernelOffsets[i] * direction;

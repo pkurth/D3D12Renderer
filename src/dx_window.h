@@ -3,6 +3,12 @@
 #include "dx.h"
 #include "window.h"
 
+enum color_depth
+{
+	color_depth_8,
+	color_depth_10,
+};
+
 struct dx_window : win32_window
 {
 	dx_window() = default;

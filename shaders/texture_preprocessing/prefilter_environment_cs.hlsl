@@ -75,7 +75,7 @@ static float4 filter(uint mip, float3 N, float3 V)
 	uint width, height, numMipLevels;
 	srcTexture.GetDimensions(0, width, height, numMipLevels);
 
-	for (uint i = 0u; i < SAMPLE_COUNT; ++i)
+	for (uint i = 0; i < SAMPLE_COUNT; ++i)
 	{
 		float2 Xi = hammersley(i, SAMPLE_COUNT);
 		float3 H = importanceSampleGGX(Xi, N, roughness);

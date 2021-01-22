@@ -76,5 +76,26 @@ dx_descriptor_range dx_frame_descriptor_allocator::allocateContiguousDescriptorR
 	return result;
 }
 
+void dx_pushable_resource_descriptor_heap::initialize(uint32 maxSize, bool shaderVisible)
+{
+	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+	desc.NumDescriptors = maxSize;
+	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	if (shaderVisible)
+	{
+		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	}
+
+	checkResult(dxContext.device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&descriptorHeap)));
+
+	currentCPU = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	currentGPU = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
+}
+
+dx_cpu_descriptor_handle dx_pushable_resource_descriptor_heap::push()
+{
+	++currentGPU;
+	return currentCPU++;
+}
 
 
