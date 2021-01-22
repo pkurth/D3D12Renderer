@@ -5,6 +5,9 @@
 #include "math.h"
 #include "dx_pipeline.h"
 
+// Formula for hit shader index calculation: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#hit-group-table-indexing
+
+
 enum acceleration_structure_rebuild_mode
 {
 	acceleration_structure_rebuild,
