@@ -16,6 +16,10 @@ struct path_tracer : dx_raytracer
         const ref<dx_texture>& output,
         const common_material_info& materialInfo) override;
 
+    uint32 numAveragedFrames = 0;
+    uint32 numSamplesPerPixel = 1;
+    uint32 numAOSamples = 8;
+
 private:
     struct shader_data
     {

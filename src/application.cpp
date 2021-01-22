@@ -429,6 +429,12 @@ void application::drawSettings(float dt)
 
 		ImGui::SliderFloat("Environment intensity", &renderer->settings.environmentIntensity, 0.f, 2.f);
 		ImGui::SliderFloat("Sky intensity", &renderer->settings.skyIntensity, 0.f, 2.f);
+
+
+		ImGui::Separator();
+
+		ImGui::SliderInt("Num samples per pixel", (int*)&pathTracer.numSamplesPerPixel, 1, 32);
+		ImGui::SliderInt("Num AO samples", (int*)&pathTracer.numAOSamples, 1, 32);
 	}
 	ImGui::End();
 }
@@ -485,6 +491,10 @@ void application::handleUserInput(const user_input& input, float dt)
 	}
 
 	bool inputCaptured = cameraController.update(input, renderer->renderWidth, renderer->renderHeight, dt);
+	if (inputCaptured)
+	{
+		pathTracer.numAveragedFrames = 0;
+	}
 
 	if (selectedEntity && selectedEntity.hasComponent<trs>())
 	{

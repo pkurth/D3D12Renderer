@@ -31,6 +31,7 @@ TextureCube<float4> sky						: register(t1);
 RWTexture2D<float4> output					: register(u0);
 
 ConstantBuffer<camera_cb> camera			: register(b0);
+ConstantBuffer<path_tracing_cb> constants	: register(b1);
 
 SamplerState wrapSampler					: register(s0);
 
@@ -46,7 +47,9 @@ Texture2D<float> metalTex					: register(t5, space1);
 
 
 #define RADIANCE_RAY	0
-#define NUM_RAY_TYPES	1
+#define AO_RAY			1
+
+#define NUM_RAY_TYPES	2
 
 struct radiance_ray_payload
 {
@@ -54,10 +57,14 @@ struct radiance_ray_payload
 	uint recursion;
 };
 
-static float3 sampleEnvironment(float3 direction)
+struct ao_ray_payload
 {
-	return sky.SampleLevel(wrapSampler, direction, 0).xyz;
-}
+	float value;
+};
+
+
+
+
 
 static float3 traceRadianceRay(float3 origin, float3 direction, uint recursion)
 {
@@ -86,6 +93,36 @@ static float3 traceRadianceRay(float3 origin, float3 direction, uint recursion)
 	return payload.color;
 }
 
+static float traceAmbientOcclusionRay(float3 origin, float3 direction)
+{
+	RayDesc ray;
+	ray.Origin = origin;
+	ray.Direction = direction;
+	ray.TMin = 0.01f;
+	ray.TMax = 1.f;
+
+	ao_ray_payload payload = { 0.f };
+
+	TraceRay(rtScene,
+		RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, // No need to invoke closest hit shader.
+		0xFF,				// Cull mask.
+		AO_RAY,				// Addend on the hit index.
+		NUM_RAY_TYPES,		// Multiplier on the geometry index within a BLAS.
+		AO_RAY,				// Miss index.
+		ray,
+		payload);
+
+	return payload.value;
+}
+
+
+
+
+
+// ----------------------------------------
+// RAY GENERATION
+// ----------------------------------------
+
 [shader("raygeneration")]
 void rayGen()
 {
@@ -94,19 +131,30 @@ void rayGen()
 
 	float3 origin = camera.position.xyz;
 
-	static const uint numSamples = 1;
-
+	uint numSamples = constants.numSamplesPerPixel;
+	
 	float3 color = (float3)0.f;
 	for (uint i = 0; i < numSamples; ++i)
 	{
-		float2 uv = (float2(launchIndex.xy) + halton23(i)) / float2(launchDim.xy);
+		float2 uv = (float2(launchIndex.xy) + halton23(constants.frameCount + i)) / float2(launchDim.xy);
 		float3 direction = normalize(restoreWorldDirection(camera.invViewProj, uv, origin));
 		color += traceRadianceRay(origin, direction, 0);
 	}
 	color *= 1.f / (float)numSamples;
 
-	output[launchIndex.xy] = float4(color, 1.f);
+	float3 previousColor = output[launchIndex.xy].xyz;
+	float previousCount = (float)constants.numAccumulatedFrames;
+	float3 newColor = (previousCount * previousColor + color) / (previousCount + 1);
+
+	output[launchIndex.xy] = float4(newColor, 1.f);
 }
+
+
+
+
+// ----------------------------------------
+// RADIANCE
+// ----------------------------------------
 
 [shader("closesthit")]
 void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
@@ -119,51 +167,31 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float2 uv = interpolateAttribute(uvs, attribs);
 	float3 N = normalize(transformDirectionToWorld(interpolateAttribute(normals, attribs)));
 
-	uint mipLevel = 0;
-	uint flags = material.flags;
-
-	float4 albedo = ((flags & USE_ALBEDO_TEXTURE)
-		? albedoTex.SampleLevel(wrapSampler, uv, mipLevel)
-		: float4(1.f, 1.f, 1.f, 1.f))
-		* material.albedoTint;
-
-	float roughness = (flags & USE_ROUGHNESS_TEXTURE)
-		? roughTex.SampleLevel(wrapSampler, uv, mipLevel)
-		: getRoughnessOverride(material);
-	roughness = clamp(roughness, 0.01f, 0.99f);
 
 
-	static const uint numSamples = 8;
+	uint2 launchIndex = DispatchRaysIndex().xy;
+	uint2 launchDim = DispatchRaysDimensions().xy;
+	uint randSeed = initRand(launchIndex.x + launchIndex.y * launchDim.x, constants.frameCount, 16);
 
-	float3 newOrigin = hitWorldPosition();
-	float3 seed = float3(DispatchRaysIndex()) + float3(69823.241278f, 613.12371825f, 123.6819243f);
+	float ambientOcclusion = 0.f;
 
-	float3 color = (float3)0.f;
-	for (uint i = 0; i < numSamples; ++i)
+	const uint numAOSamples = constants.numAOSamples;
+
+	for (int i = 0; i < numAOSamples; ++i)
 	{
-		float3 S;
-		float l = 0.f;
-		do
-		{
-			S = float3(random(seed.x), random(seed.y), random(seed.z)) * 2.f - (float3)1.f;
-			l = length(S);
-			seed = S;
-		} while (l >= 1.f);
-
-		float3 newDirection = normalize(N + S / l);
-
-		color += traceRadianceRay(newOrigin, newDirection, payload.recursion);
+		float3 worldDir = getCosHemisphereSample(randSeed, N);
+		ambientOcclusion += traceAmbientOcclusionRay(hitWorldPosition(), worldDir);
 	}
 
-	color /= numSamples;
+	ambientOcclusion /= numAOSamples;
 
-	payload.color = color * albedo.xyz;
+	payload.color = ambientOcclusion.xxx;
 }
 
 [shader("miss")]
 void radianceMiss(inout radiance_ray_payload payload)
 {
-	payload.color = sampleEnvironment(WorldRayDirection());
+	payload.color = sky.SampleLevel(wrapSampler, WorldRayDirection(), 0).xyz;
 }
 
 [shader("anyhit")]
@@ -171,4 +199,30 @@ void radianceAnyHit(inout radiance_ray_payload payload, in BuiltInTriangleInters
 {
 	AcceptHitAndEndSearch();
 }
+
+
+
+
+// ----------------------------------------
+// AMBIENT OCCLUSION
+// ----------------------------------------
+
+[shader("closesthit")]
+void aoClosestHit(inout ao_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
+{
+	// This shader will never be called.
+}
+
+[shader("miss")]
+void aoMiss(inout ao_ray_payload payload)
+{
+	payload.value = 1.f;
+}
+
+[shader("anyhit")]
+void aoAnyHit(inout ao_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
+{
+	AcceptHitAndEndSearch();
+}
+
 

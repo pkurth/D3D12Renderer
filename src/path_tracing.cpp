@@ -1,9 +1,12 @@
 #include "pch.h"
 #include "path_tracing.h"
 
+#include "raytracing.hlsli"
+
 #define PATH_TRACING_RS_SRVS    0
 #define PATH_TRACING_RS_OUTPUT  1
 #define PATH_TRACING_RS_CAMERA  2
+#define PATH_TRACING_RS_CB      3
 
 void path_tracer::initialize()
 {
@@ -17,6 +20,7 @@ void path_tracer::initialize()
         root_descriptor_table(1, &resourceRange),
         root_descriptor_table(1, &outputRange),
         root_cbv(0), // Camera.
+        root_constants<path_tracing_cb>(1),
     };
 
     CD3DX12_STATIC_SAMPLER_DESC globalStaticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
@@ -48,6 +52,7 @@ void path_tracer::initialize()
         .globalRootSignature(globalDesc)
         .raygen(L"rayGen")
         .hitgroup(L"Radiance", L"radianceClosestHit", L"radianceAnyHit", L"radianceMiss", hitDesc)
+        .hitgroup(L"AmbientOcclusion", L"aoClosestHit", L"aoAnyHit", L"aoMiss")
         .finish();
 
     numRayTypes = (uint32)pipeline.shaderBindingTableDesc.hitGroups.size();
@@ -76,6 +81,7 @@ raytracing_object_type path_tracer::defineObjectType(const ref<raytracing_blas>&
 {
     uint32 numGeometries = (uint32)blas->geometries.size();
 
+    shader_data* hitData = (shader_data*)alloca(sizeof(shader_data) * numRayTypes);
 
     for (uint32 i = 0; i < numGeometries; ++i)
     {
@@ -130,16 +136,17 @@ raytracing_object_type path_tracer::defineObjectType(const ref<raytracing_blas>&
             descriptorHeap.push().createNullTextureSRV();
         }
 
-        shader_data hitData;
-        hitData.materialCB = pbr_material_cb
+        hitData[0].materialCB = pbr_material_cb
         {
             material->albedoTint.x, material->albedoTint.y, material->albedoTint.z, material->albedoTint.w,
             packRoughnessAndMetallic(material->roughnessOverride, material->metallicOverride),
             flags
         };
-        hitData.resources = base;
+        hitData[0].resources = base;
 
-        bindingTable.push(&hitData);
+        // The other shader types don't need any data, so we don't set it here.
+
+        bindingTable.push(hitData);
     }
 
 
@@ -192,6 +199,9 @@ void path_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
     cl->setComputeDescriptorTable(PATH_TRACING_RS_SRVS, gr.gpuBase + 1); // Offset for output.
     cl->setComputeDescriptorTable(PATH_TRACING_RS_OUTPUT, gr.gpuBase);
     cl->setComputeDynamicConstantBuffer(PATH_TRACING_RS_CAMERA, materialInfo.cameraCBV);
+    cl->setCompute32BitConstants(PATH_TRACING_RS_CB, path_tracing_cb{ (uint32)dxContext.frameID, numAveragedFrames, numSamplesPerPixel, numAOSamples });
+
+    ++numAveragedFrames;
 
     cl->raytrace(raytraceDesc);
 }
