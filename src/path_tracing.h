@@ -16,7 +16,17 @@ struct path_tracer : dx_raytracer
         const ref<dx_texture>& output,
         const common_material_info& materialInfo) override;
 
+
+
+    const uint32 maxRecursionDepth = 8;
+    const uint32 maxPayloadSize = 5 * sizeof(float); // Radiance-payload is 1 x float3, 2 x uint.
+
+
+
+    // Parameters.
+
     uint32 numAveragedFrames = 0;
+    uint32 recursionDepth = 3; // [0, maxRecursionDepth - 1].
 
     bool useThinLensCamera = false;
     float fNumber = 32.f;
@@ -30,7 +40,7 @@ struct path_tracer : dx_raytracer
 
 
 private:
-    struct shader_data
+    struct shader_data // This struct is 32 bytes large, which together with the 32 byte shader identifier is a nice multiple of the required 32-byte-alignment of the binding table entries.
     {
         pbr_material_cb materialCB;
         dx_cpu_descriptor_handle resources; // Vertex buffer, index buffer, pbr textures.
@@ -61,9 +71,6 @@ private:
 
     uint32 instanceContributionToHitGroupIndex = 0;
     uint32 numRayTypes;
-
-    const uint32 maxRecursionDepth = 4;
-    const uint32 maxPayloadSize = 5 * sizeof(float);
 
     raytracing_binding_table<shader_data> bindingTable;
 

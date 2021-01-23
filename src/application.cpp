@@ -439,6 +439,7 @@ void application::drawSettings(float dt)
 		if (renderer->mode == renderer_mode_pathtraced)
 		{
 			bool pathTracerDirty = false;
+			pathTracerDirty |= ImGui::SliderInt("Max recursion depth", (int*)&pathTracer.recursionDepth, 0, pathTracer.maxRecursionDepth - 1);
 			pathTracerDirty |= ImGui::Checkbox("Use thin lens camera", &pathTracer.useThinLensCamera);
 			if (pathTracer.useThinLensCamera)
 			{

@@ -56,6 +56,7 @@ struct shadow_ray_payload
 
 static const point_light_cb pointLights[NUM_LIGHTS] =
 {
+	// Position, radius, radiance. The last value (-1) is only useful for rasterization, where this is the index into a list of shadow maps (-1 means no shadows).
 	{
 		float3(0.f, 3.f, 0.f),
 		15.f,
@@ -77,12 +78,10 @@ static const point_light_cb pointLights[NUM_LIGHTS] =
 };
 
 
-#define MAX_RECURSION_DEPTH 3 // 0-based.
-
 
 static float3 traceRadianceRay(float3 origin, float3 direction, uint randSeed, uint recursion)
 {
-	if (recursion >= MAX_RECURSION_DEPTH)
+	if (recursion >= constants.maxRecursionDepth)
 	{
 		return float3(0, 0, 0);
 	}
@@ -109,7 +108,7 @@ static float3 traceRadianceRay(float3 origin, float3 direction, uint randSeed, u
 
 static float traceShadowRay(float3 origin, float3 direction, float distance, uint recursion) // This shader type is also used for ambient occlusion. Just set the distance to something small.
 {
-	if (recursion >= MAX_RECURSION_DEPTH)
+	if (recursion >= constants.maxRecursionDepth)
 	{
 		return 1.f;
 	}
@@ -314,6 +313,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 		float3 pointLightL = randomPointOnLight - hitPoint;
 		float distance = length(pointLightL);
 		pointLightL /= distance;
+
 		payload.color +=
 			calculateDirectLighting(albedo, pointLights[lightIndex].radiance * LIGHT_RADIANCE_SCALE * constants.lightIntensityScale, N, pointLightL, -WorldRayDirection(), F0, roughness, metallic)
 			* getAttenuation(distance, pointLights[lightIndex].radius)
@@ -355,7 +355,7 @@ void shadowMiss(inout shadow_ray_payload payload)
 [shader("anyhit")]
 void shadowAnyHit(inout shadow_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-	AcceptHitAndEndSearch();
+	AcceptHitAndEndSearch(); // Actually redundant with the flag we specified in the TraceRay call.
 }
 
 

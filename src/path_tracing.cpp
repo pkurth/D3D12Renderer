@@ -204,6 +204,7 @@ void path_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
         { 
             (uint32)dxContext.frameID, 
             numAveragedFrames, 
+            min(recursionDepth, maxRecursionDepth - 1),
             (uint32)useThinLensCamera, 
             focalLength, 
             focalLength / (2.f * fNumber),
