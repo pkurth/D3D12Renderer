@@ -12,6 +12,8 @@ struct camera_cb
 	mat4 prevFrameViewProj;
 	vec4 position;
 	vec4 forward;
+	vec4 right;
+	vec4 up;
 	vec4 projectionParams; // nearPlane, farPlane, farPlane / nearPlane, 1 - farPlane / nearPlane
 	vec2 screenDims;
 	vec2 invScreenDims;

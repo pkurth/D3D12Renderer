@@ -430,6 +430,8 @@ void dx_renderer::setCamera(const render_camera& camera)
 	this->camera.invProj = camera.invProj;
 	this->camera.position = vec4(camera.position, 1.f);
 	this->camera.forward = vec4(camera.rotation * vec3(0.f, 0.f, -1.f), 0.f);
+	this->camera.right = vec4(camera.rotation * vec3(1.f, 0.f, 0.f), 0.f);
+	this->camera.up = vec4(camera.rotation * vec3(0.f, 1.f, 0.f), 0.f);
 	this->camera.projectionParams = vec4(camera.nearPlane, camera.farPlane, camera.farPlane / camera.nearPlane, 1.f - camera.farPlane / camera.nearPlane);
 	this->camera.screenDims = vec2((float)renderWidth, (float)renderHeight);
 	this->camera.invScreenDims = vec2(1.f / renderWidth, 1.f / renderHeight);

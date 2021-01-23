@@ -18,6 +18,11 @@ struct path_tracer : dx_raytracer
 
     uint32 numAveragedFrames = 0;
 
+    bool useThinLensCamera = false;
+    float fNumber = 32.f;
+    float focalLength = 1.f;
+
+
 private:
     struct shader_data
     {

@@ -434,6 +434,22 @@ void application::drawSettings(float dt)
 
 		ImGui::SliderFloat("Environment intensity", &renderer->settings.environmentIntensity, 0.f, 2.f);
 		ImGui::SliderFloat("Sky intensity", &renderer->settings.skyIntensity, 0.f, 2.f);
+
+
+		if (renderer->mode == renderer_mode_pathtraced)
+		{
+			bool pathTracerDirty = false;
+			pathTracerDirty |= ImGui::Checkbox("Use thin lens camera", &pathTracer.useThinLensCamera);
+			if (pathTracer.useThinLensCamera)
+			{
+				pathTracerDirty |= ImGui::SliderFloat("Focal length", &pathTracer.focalLength, 0.5f, 50.f);
+				pathTracerDirty |= ImGui::SliderFloat("F-Number", &pathTracer.fNumber, 1.f, 128.f);
+			}
+			if (pathTracerDirty)
+			{
+				pathTracer.numAveragedFrames = 0;
+			}
+		}
 	}
 	ImGui::End();
 }

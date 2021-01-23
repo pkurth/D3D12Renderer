@@ -128,13 +128,36 @@ void rayGen()
 
 	uint randSeed = initRand(launchIndex.x + launchIndex.y * launchDim.x, constants.frameCount, 16);
 
-	float3 origin = camera.position.xyz;
 
+	// Jitter for anti-aliasing.
 	float2 pixelOffset = float2(nextRand(randSeed), nextRand(randSeed));
 	float2 uv = (float2(launchIndex.xy) + pixelOffset) / float2(launchDim.xy);
-	float3 direction = normalize(restoreWorldDirection(camera.invViewProj, uv, origin));
+
+	float3 origin = camera.position.xyz;
+	float3 direction = restoreWorldDirection(camera.invViewProj, uv, origin);
+
+
+	if (constants.useThinLensCamera)
+	{
+		direction /= camera.projectionParams.x;
+
+		float3 focalPoint = origin + constants.focalLength * direction;
+
+		float2 rnd = float2(2.f * pi * nextRand(randSeed), constants.lensRadius * nextRand(randSeed));
+		float2 originOffset = float2(cos(rnd.x) * rnd.y, sin(rnd.x) * rnd.y);
+
+		origin += camera.right * originOffset.x + camera.up * originOffset.y;
+		direction = focalPoint - origin;
+	}
+
+	direction = normalize(direction);
+
+
+	// Trace ray.
 	float3 color = traceRadianceRay(origin, direction, randSeed, 0);
 
+
+	// Blend result color with previous frames.
 	float3 previousColor = output[launchIndex.xy].xyz;
 	float previousCount = (float)constants.numAccumulatedFrames;
 	float3 newColor = (previousCount * previousColor + color) / (previousCount + 1);
