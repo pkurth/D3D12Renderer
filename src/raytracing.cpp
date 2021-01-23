@@ -155,6 +155,15 @@ static com<IDxcBlob> compileLibrary(const std::wstring& filename, D3D12_HIT_GROU
 		defines.push_back({ hitGroups[i].HitGroupExport, valueStrings.back().c_str() });
 	}
 
+
+	defines.push_back({ L"HLSL",	0 });
+	defines.push_back({ L"mat4",	L"float4x4" });
+	defines.push_back({ L"vec2",	L"float2" });
+	defines.push_back({ L"vec3",	L"float3" });
+	defines.push_back({ L"vec4",	L"float4" });
+	defines.push_back({ L"uint32",	L"uint" });
+
+
 	// Compile
 	com<IDxcOperationResult> operationResult;
 	checkResult(compiler->Compile(textBlob.Get(), wfilename.c_str(), L"", L"lib_6_3", 0, 0, defines.data(), (uint32)defines.size(), includeHandler.Get(), &operationResult));

@@ -1,11 +1,3 @@
-
-#define HLSL 
-#define mat4 float4x4
-#define vec2 float2
-#define vec3 float3
-#define vec4 float4
-#define uint32 uint
-
 #include "../common/camera.hlsli"
 #include "../common/raytracing.hlsli"
 #include "../common/light_source.hlsli"
