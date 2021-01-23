@@ -569,7 +569,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
-	if (mode == renderer_mode_default)
+	if (mode == renderer_mode_rasterized)
 	{
 		barrier_batcher(cl)
 			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)

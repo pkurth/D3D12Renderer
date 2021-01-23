@@ -92,7 +92,7 @@ void application::initialize(dx_renderer* renderer)
 		.addComponent<raster_component>(sponzaMesh)
 		.addComponent<raytrace_component>(sponzaBlas);
 
-#if 0
+#if 1
 	// Stormtrooper.
 	auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/meshes/stormtrooper.fbx");
 	stormtrooperMesh->submeshes[0].material = createPBRMaterial(
@@ -417,6 +417,11 @@ void application::drawSettings(float dt)
 	{
 		ImGui::Text("%.3f ms, %u FPS", dt * 1000.f, (uint32)(1.f / dt));
 
+		if (ImGui::Dropdown("Renderer mode", rendererModeNames, renderer_mode_count, (uint32&)renderer->mode))
+		{
+			pathTracer.numAveragedFrames = 0;
+		}
+
 		dx_memory_usage memoryUsage = dxContext.getMemoryUsage();
 
 		ImGui::Text("Video memory available: %uMB", memoryUsage.available);
@@ -572,9 +577,6 @@ void application::update(const user_input& input, float dt)
 	drawSettings(dt);
 
 
-	renderer->mode = renderer_mode_pathtraced;
-
-
 
 	sun.updateMatrices(camera);
 
@@ -584,7 +586,7 @@ void application::update(const user_input& input, float dt)
 	renderer->setEnvironment(environment);
 
 
-	if (renderer->mode == renderer_mode_default)
+	if (renderer->mode == renderer_mode_rasterized)
 	{
 		if (dxContext.meshShaderSupported)
 		{
@@ -710,6 +712,7 @@ void application::update(const user_input& input, float dt)
 void application::setEnvironment(const char* filename)
 {
 	environment = createEnvironment(filename); // Currently synchronous (on render queue).
+	pathTracer.numAveragedFrames = 0;
 }
 
 

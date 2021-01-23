@@ -41,8 +41,16 @@ static const char* aspectRatioNames[] =
 
 enum renderer_mode
 {
-	renderer_mode_default,
+	renderer_mode_rasterized,
 	renderer_mode_pathtraced,
+
+	renderer_mode_count,
+};
+
+static const char* rendererModeNames[] =
+{
+	"Rasterized",
+	"Path-traced",
 };
 
 
@@ -113,7 +121,7 @@ struct dx_renderer
 		this->tlas = tlas;
 	}
 
-	renderer_mode mode = renderer_mode_default;
+	renderer_mode mode = renderer_mode_rasterized;
 	
 	renderer_settings settings;
 
