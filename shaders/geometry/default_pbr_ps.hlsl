@@ -77,8 +77,6 @@ ps_output main(ps_input IN)
 		? metalTex.Sample(wrapSampler, IN.uv)
 		: getMetallicOverride(material);
 
-	float ao = 1.f;// (flags & USE_AO_TEXTURE) ? RMAO.z : 1.f;
-
 
 	float3 cameraPosition = camera.position.xyz;
 	float3 camToP = IN.worldPosition - cameraPosition;
@@ -194,7 +192,7 @@ ps_output main(ps_input IN)
 	}
 
 	// Ambient.
-	totalLighting.xyz += calculateAmbientLighting(albedo.xyz, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao) * lighting.environmentIntensity;
+	totalLighting.xyz += calculateAmbientLighting(albedo.xyz, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic) * lighting.environmentIntensity;
 
 	ps_output OUT;
 	OUT.hdrColor = totalLighting;

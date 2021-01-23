@@ -6,11 +6,26 @@
 
 // http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
 // TODO: We should make an optimization pass over this code. Many terms are computed multiple times.
+// Maybe use something like the following struct, which then just gets passed around.
+
+struct lighting_info
+{
+	float3 albedo;
+	float roughness;
+	float3 F0;
+	float roughnessSquared;
+	float3 N;
+	float metallic;
+	float3 V;
+	float NdotV;
+};
+
+
 
 
 
 // ----------------------------------------
-// FRESNEL (surface becomes more reflective when seen from a grazing angle)
+// FRESNEL (Surface becomes more reflective when seen from a grazing angle).
 // ----------------------------------------
 
 static float3 fresnelSchlick(float LdotH, float3 F0)
@@ -28,14 +43,14 @@ static float3 fresnelSchlickRoughness(float LdotH, float3 F0, float roughness)
 
 
 // ----------------------------------------
-// DISTRIBUTION (Microfacets orientation based on roughness)
+// DISTRIBUTION (Microfacets' orientation based on roughness).
 // ----------------------------------------
 
 #if 0
 static float distributionGGX(float NdotH, float roughness)
 {
 	float a2 = roughness * roughness;
-	float d = (NdotH2 * (a2 - 1.f) + 1.f);
+	float d = (NdotH * (a2 - 1.f) + 1.f);
 	return a2 / max(d * d * pi, 0.001f);
 }
 #else
@@ -49,6 +64,7 @@ static float distributionGGX(float NdotH, float roughness)
 	return a2 / max(d * d * pi, 0.001f);
 }
 #endif
+
 
 
 
@@ -68,6 +84,10 @@ static float geometrySmith(float NdotL, float NdotV, float roughness)
 
 
 
+
+// ----------------------------------------
+// IMPORTANCE SAMPLING
+// ----------------------------------------
 
 // When using this function to sample, the probability density is:
 //      pdf = D * NdotH / (4 * HdotV)
@@ -92,6 +112,7 @@ float3 importanceSampleGGX(inout uint randSeed, float3 N, float roughness)
 		N * cosThetaH;
 }
 
+// Call this with a hammersley distribution as Xi.
 static float3 importanceSampleGGX(float2 Xi, float3 N, float roughness)
 {
 	float a = roughness * roughness;
@@ -115,9 +136,16 @@ static float3 importanceSampleGGX(float2 Xi, float3 N, float roughness)
 	return normalize(sampleVec);
 }
 
+
+
+
+// ----------------------------------------
+// LIGHTING COMPUTATION.
+// ----------------------------------------
+
 static float3 calculateAmbientLighting(float3 albedo, float3 irradiance,
 	TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState clampSampler,
-	float3 N, float3 V, float3 F0, float roughness, float metallic, float ao)
+	float3 N, float3 V, float3 F0, float roughness, float metallic)
 {
 	// Common.
 	float NdotV = saturate(dot(N, V));
@@ -139,17 +167,17 @@ static float3 calculateAmbientLighting(float3 albedo, float3 irradiance,
 	float2 envBRDF = brdf.SampleLevel(clampSampler, float2(roughness, NdotV), 0).rg;
 	float3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y);
 
-	float3 ambient = (kD * diffuse + specular) * ao;
+	float3 ambient = kD * diffuse + specular;
 
 	return ambient;
 }
 
 static float3 calculateAmbientLighting(float3 albedo,
 	TextureCube<float4> irradianceTexture, TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState clampSampler,
-	float3 N, float3 V, float3 F0, float roughness, float metallic, float ao)
+	float3 N, float3 V, float3 F0, float roughness, float metallic)
 {
 	float3 irradiance = irradianceTexture.SampleLevel(clampSampler, N, 0).rgb;
-	return calculateAmbientLighting(albedo, irradiance, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao);
+	return calculateAmbientLighting(albedo, irradiance, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic);
 }
 
 static float3 calculateDirectLighting(float3 albedo, float3 radiance, float3 N, float3 L, float3 V, float3 F0, float roughness, float metallic)
@@ -174,18 +202,6 @@ static float3 calculateDirectLighting(float3 albedo, float3 radiance, float3 N, 
 	float3 specular = numerator / max(denominator, 0.001f);
 
 	return (kD * albedo * invPI + specular) * radiance * NdotL;
-}
-
-inline float luminance(float3 rgb)
-{
-	return dot(rgb, float3(0.2126f, 0.7152f, 0.0722f));
-}
-
-float probabilityToSampleDiffuse(float3 kD, float3 kS)
-{
-	float lumDiffuse = max(0.01f, luminance(kD));
-	float lumSpecular = max(0.01f, luminance(kS));
-	return lumDiffuse / (lumDiffuse + lumSpecular);
 }
 
 #endif
