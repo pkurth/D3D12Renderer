@@ -18,7 +18,7 @@ struct path_tracer : dx_raytracer
 
 
 
-    const uint32 maxRecursionDepth = 8;
+    const uint32 maxRecursionDepth = 4;
     const uint32 maxPayloadSize = 5 * sizeof(float); // Radiance-payload is 1 x float3, 2 x uint.
 
 
@@ -27,7 +27,7 @@ struct path_tracer : dx_raytracer
 
     uint32 numAveragedFrames = 0;
     uint32 recursionDepth = maxRecursionDepth - 1; // [0, maxRecursionDepth - 1]. 0 and 1 don't really make sense. 0 means, that no primary ray is shot. 1 means that no bounce is computed, which leads to 0 light reaching the primary hit.
-    uint32 startRussianRouletteAfter = recursionDepth - 1; // [0, recursionDepth].
+    uint32 startRussianRouletteAfter = recursionDepth; // [0, recursionDepth].
 
     bool useThinLensCamera = false;
     float fNumber = 32.f;
@@ -44,7 +44,7 @@ private:
     struct shader_data // This struct is 32 bytes large, which together with the 32 byte shader identifier is a nice multiple of the required 32-byte-alignment of the binding table entries.
     {
         pbr_material_cb materialCB;
-        dx_cpu_descriptor_handle resources; // Vertex buffer, index buffer, pbr textures.
+        dx_cpu_descriptor_handle resources; // Vertex buffer, index buffer, PBR textures.
     };
 
     struct global_resources
@@ -68,6 +68,9 @@ private:
         dx_gpu_descriptor_handle gpuBase;
     };
 
+    // TODO: The descriptor heap shouldn't be a member of this structure. If we have multiple raytracers which use the same object types, they can share the descriptor heap.
+    // For example, this path tracer defines objects with vertex buffer, index buffer and their PBR textures. Other raytracers, which use the same layout (e.g. a specular reflections
+    // raytracer) may very well use the same descriptor heap.
     dx_pushable_resource_descriptor_heap descriptorHeap;
 
     uint32 instanceContributionToHitGroupIndex = 0;

@@ -60,19 +60,19 @@ static const point_light_cb pointLights[NUM_LIGHTS] =
 	{
 		float3(0.f, 3.f, 0.f),
 		15.f,
-		float3(0.8f, 0.2f, 0.1f) * 0.03f,
+		float3(0.8f, 0.2f, 0.1f) * 50.f,
 		-1
 	},
 	{
 		float3(-5.f, 8.f, 0.f),
 		15.f,
-		float3(0.2f, 0.8f, 0.3f) * 0.03f,
+		float3(0.2f, 0.8f, 0.3f) * 50.f,
 		-1
 	},
 	{
 		float3(5.f, 8.f, 0.f),
 		15.f,
-		float3(0.2f, 0.3f, 0.8f) * 0.03f,
+		float3(0.2f, 0.3f, 0.8f) * 50.f,
 		-1
 	},
 };
@@ -221,7 +221,7 @@ void rayGen()
 static float3 calculateIndirectLighting(inout uint randSeed, float3 position, float3 albedo, float3 F0, float3 N, float3 V, float roughness, float metallic, uint recursion)
 {
 	// We have to decide whether we sample our diffuse or specular/ggx lobe.
-	float probDiffuse = roughness;// probabilityToSampleDiffuse(kD, kS);
+	float probDiffuse = roughness; // I don't think this is correct.
 	float chooseDiffuse = (nextRand(randSeed) < probDiffuse);
 
 	if (chooseDiffuse)
@@ -322,7 +322,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	{
 		// Sun light.
 		float3 sunDirection = normalize(float3(-0.6f, -1.f, -0.3f));
-		float3 sunRadiance = float3(1.f, 0.93f, 0.76f) * constants.lightIntensityScale;
+		float3 sunRadiance = float3(1.f, 0.93f, 0.76f) * constants.lightIntensityScale * 2.f;
 
 		payload.color +=
 			calculateDirectLighting(albedo, sunRadiance, N, -sunDirection, -WorldRayDirection(), F0, roughness, metallic)
@@ -333,17 +333,35 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 		// Random point light.
 		uint lightIndex = min(uint(NUM_LIGHTS * nextRand(payload.randSeed)), NUM_LIGHTS - 1);
 
-		float3 randomPointOnLight = pointLights[lightIndex].position + getRandomPointOnSphere(payload.randSeed, constants.pointLightRadius);
+		float pointLightRadius = constants.pointLightRadius;
+		float3 randomPointOnLight = pointLights[lightIndex].position + getRandomPointOnSphere(payload.randSeed, pointLightRadius);
 
 		float3 pointLightL = randomPointOnLight - hitPoint;
 		float distance = length(pointLightL);
 		pointLightL /= distance;
 
-		payload.color +=
+		float pointLightVisibility = traceShadowRay(hitPoint, pointLightL, distance, payload.recursion);
+		float pointLightSolidAngle = solidAngleOfSphere(pointLightRadius, distance) * 0.5f; // Divide by 2, since we are only interested in hemisphere.
+		float3 pointLightColor =
 			calculateDirectLighting(albedo, pointLights[lightIndex].radiance * LIGHT_RADIANCE_SCALE * constants.lightIntensityScale, N, pointLightL, -WorldRayDirection(), F0, roughness, metallic)
 			* getAttenuation(distance, pointLights[lightIndex].radius)
 			* NUM_LIGHTS // Correct for probability of choosing this particular light.
-			* traceShadowRay(hitPoint, pointLightL, distance, payload.recursion);
+			* pointLightVisibility
+			* pointLightSolidAngle; // Correct for probability of "randomly" hitting this light. I *think* this is correct. See https://github.com/NVIDIA/Q2RTX/blob/master/src/refresh/vkpt/shader/light_lists.h#L295
+
+#if 0
+		if (pointLightVisibility > 0.f)
+		{
+			float lightPickPDF = 1.f / NUM_LIGHTS;
+			float lightHitPDF = 1.f; // If I understand correctly, this is the probability of hitting the light. However, since we explicitly sample this light, its probability is 1, isn't it?
+			float lightPDFWeight = lightHitPDF * lightPickPDF;
+			float brdfPDFWeight = ;
+			float misWeight = multipleImportanceSampleWeighting(brdfPDFWeight, lightPDFWeight);
+			pointLightColor *= misWeight;
+		}
+#endif
+
+		payload.color += pointLightColor;
 	}
 }
 
