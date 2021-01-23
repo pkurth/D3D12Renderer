@@ -15,7 +15,6 @@ struct path_tracing_cb
 {
 	uint32 frameCount;
 	uint32 numAccumulatedFrames;
-	uint32 numSamplesPerPixel;
 };
 
 

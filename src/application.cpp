@@ -429,11 +429,6 @@ void application::drawSettings(float dt)
 
 		ImGui::SliderFloat("Environment intensity", &renderer->settings.environmentIntensity, 0.f, 2.f);
 		ImGui::SliderFloat("Sky intensity", &renderer->settings.skyIntensity, 0.f, 2.f);
-
-
-		ImGui::Separator();
-
-		ImGui::SliderInt("Num samples per pixel", (int*)&pathTracer.numSamplesPerPixel, 1, 32);
 	}
 	ImGui::End();
 }

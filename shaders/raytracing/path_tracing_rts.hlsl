@@ -46,15 +46,11 @@ Texture2D<float> roughTex					: register(t4, space1);
 Texture2D<float> metalTex					: register(t5, space1);
 
 
-#define RADIANCE_RAY	0
-#define SHADOW_RAY		1
-
-#define NUM_RAY_TYPES	2
-
 struct radiance_ray_payload
 {
 	float3 color;
 	uint recursion;
+	uint randSeed;
 };
 
 struct shadow_ray_payload
@@ -66,7 +62,7 @@ struct shadow_ray_payload
 #define MAX_RECURSION_DEPTH 3 // 0-based.
 
 
-static float3 traceRadianceRay(float3 origin, float3 direction, uint recursion)
+static float3 traceRadianceRay(float3 origin, float3 direction, uint randSeed, uint recursion)
 {
 	if (recursion >= MAX_RECURSION_DEPTH)
 	{
@@ -79,14 +75,14 @@ static float3 traceRadianceRay(float3 origin, float3 direction, uint recursion)
 	ray.TMin = 0.01f;
 	ray.TMax = 10000.f;
 
-	radiance_ray_payload payload = { float3(0.f, 0.f, 0.f), recursion + 1 };
+	radiance_ray_payload payload = { float3(0.f, 0.f, 0.f), recursion + 1, randSeed };
 
 	TraceRay(rtScene,
 		RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
 		0xFF,				// Cull mask.
-		RADIANCE_RAY,		// Addend on the hit index.
+		RADIANCE,			// Addend on the hit index.
 		NUM_RAY_TYPES,		// Multiplier on the geometry index within a BLAS.
-		RADIANCE_RAY,		// Miss index.
+		RADIANCE,			// Miss index.
 		ray,
 		payload);
 
@@ -100,6 +96,7 @@ static float traceShadowRay(float3 origin, float3 direction, float distance, uin
 		return 1.f;
 	}
 
+#ifdef SHADOW
 	RayDesc ray;
 	ray.Origin = origin;
 	ray.Direction = direction;
@@ -111,13 +108,16 @@ static float traceShadowRay(float3 origin, float3 direction, float distance, uin
 	TraceRay(rtScene,
 		RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, // No need to invoke closest hit shader.
 		0xFF,				// Cull mask.
-		SHADOW_RAY,			// Addend on the hit index.
+		SHADOW,				// Addend on the hit index.
 		NUM_RAY_TYPES,		// Multiplier on the geometry index within a BLAS.
-		SHADOW_RAY,			// Miss index.
+		SHADOW,				// Miss index.
 		ray,
 		payload);
 
 	return payload.visible;
+#else
+	return 1.f;
+#endif
 }
 
 
@@ -134,18 +134,14 @@ void rayGen()
 	uint3 launchIndex = DispatchRaysIndex();
 	uint3 launchDim = DispatchRaysDimensions();
 
+	uint randSeed = initRand(launchIndex.x + launchIndex.y * launchDim.x, constants.frameCount, 16);
+
 	float3 origin = camera.position.xyz;
 
-	uint numSamples = constants.numSamplesPerPixel;
-	
-	float3 color = (float3)0.f;
-	for (uint i = 0; i < numSamples; ++i)
-	{
-		float2 uv = (float2(launchIndex.xy) + halton23(constants.frameCount + i)) / float2(launchDim.xy);
-		float3 direction = normalize(restoreWorldDirection(camera.invViewProj, uv, origin));
-		color += traceRadianceRay(origin, direction, 0);
-	}
-	color *= 1.f / (float)numSamples;
+	float2 pixelOffset = float2(nextRand(randSeed), nextRand(randSeed));
+	float2 uv = (float2(launchIndex.xy) + pixelOffset) / float2(launchDim.xy);
+	float3 direction = normalize(restoreWorldDirection(camera.invViewProj, uv, origin));
+	float3 color = traceRadianceRay(origin, direction, randSeed, 0);
 
 	float3 previousColor = output[launchIndex.xy].xyz;
 	float previousCount = (float)constants.numAccumulatedFrames;
@@ -172,7 +168,7 @@ static float3 calculateIndirectLighting(inout uint randSeed, float3 position, fl
 	{
 		// Shoot a randomly selected cosine-sampled diffuse ray.
 		float3 L = getCosHemisphereSample(randSeed, N);
-		float3 bounceColor = traceRadianceRay(position, L, recursion);
+		float3 bounceColor = traceRadianceRay(position, L, randSeed, recursion);
 
 		// Accumulate the color: (NdotL * incomingLight * dif / pi) 
 		// Probability of sampling:  (NdotL / pi) * probDiffuse
@@ -180,14 +176,14 @@ static float3 calculateIndirectLighting(inout uint randSeed, float3 position, fl
 	}
 	else
 	{
-		// Randomly sample the NDF to get a microfacet in our BRDF to reflect off of
+		// Randomly sample the NDF to get a microfacet in our BRDF to reflect off of.
 		float3 H = importanceSampleGGX(randSeed, N, roughness);
 
-		// Compute the outgoing direction based on this (perfectly reflective) microfacet
+		// Compute the outgoing direction based on this (perfectly reflective) microfacet.
 		float3 L = reflect(-V, H);
 
-		// Compute our color by tracing a ray in this direction
-		float3 bounceColor = traceRadianceRay(position, L, recursion);
+		// Compute our color by tracing a ray in this direction.
+		float3 bounceColor = traceRadianceRay(position, L, randSeed, recursion);
 
 		float NdotV = saturate(dot(N, V));
 		float NdotL = saturate(dot(N, L));
@@ -195,7 +191,7 @@ static float3 calculateIndirectLighting(inout uint randSeed, float3 position, fl
 		float LdotH = saturate(dot(L, H));
 
 		float NDF = distributionGGX(NdotH, roughness);
-		float  G = geometrySmith(NdotL, NdotV, roughness);
+		float G = geometrySmith(NdotL, NdotV, roughness);
 		float3 F = fresnelSchlick(LdotH, F0);
 
 		float3 numerator = NDF * G * F;
@@ -225,7 +221,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 
 #if 1
 	float3 albedo = (float3)1.f;
-	float roughness = 0.5f;
+	float roughness = 1;
 	float metallic = 0.f;
 #else
 	uint mipLevel = 0;
@@ -249,10 +245,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 #endif
 
 
-	uint2 launchIndex = DispatchRaysIndex().xy;
-	uint2 launchDim = DispatchRaysDimensions().xy;
-	uint randSeed = initRand(launchIndex.x + launchIndex.y * launchDim.x, constants.frameCount, 16);
-
+	uint randSeed = payload.randSeed;
 
 #if 0
 	float3 worldDir = getCosHemisphereSample(randSeed, N);
@@ -261,7 +254,6 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 #else
 	float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
 	payload.color = calculateIndirectLighting(randSeed, hitWorldPosition(), albedo, F0, N, -WorldRayDirection(), roughness, metallic, payload.recursion);
-
 #endif
 }
 
@@ -274,7 +266,6 @@ void radianceMiss(inout radiance_ray_payload payload)
 [shader("anyhit")]
 void radianceAnyHit(inout radiance_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-	AcceptHitAndEndSearch();
 }
 
 

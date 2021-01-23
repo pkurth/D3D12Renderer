@@ -17,7 +17,6 @@ struct path_tracer : dx_raytracer
         const common_material_info& materialInfo) override;
 
     uint32 numAveragedFrames = 0;
-    uint32 numSamplesPerPixel = 1;
 
 private:
     struct shader_data
@@ -53,6 +52,7 @@ private:
     uint32 numRayTypes;
 
     const uint32 maxRecursionDepth = 4;
+    const uint32 maxPayloadSize = 5 * sizeof(float);
 
     raytracing_binding_table<shader_data> bindingTable;
 

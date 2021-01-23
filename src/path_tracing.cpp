@@ -48,11 +48,11 @@ void path_tracer::initialize()
 
 
     pipeline =
-        raytracing_pipeline_builder(shaderPath, 4 * sizeof(float), maxRecursionDepth)
+        raytracing_pipeline_builder(shaderPath, maxPayloadSize, maxRecursionDepth)
         .globalRootSignature(globalDesc)
         .raygen(L"rayGen")
-        .hitgroup(L"Radiance", L"radianceClosestHit", L"radianceAnyHit", L"radianceMiss", hitDesc)
-        .hitgroup(L"Shadow", L"shadowClosestHit", L"shadowAnyHit", L"shadowMiss")
+        .hitgroup(L"RADIANCE", L"radianceClosestHit", L"radianceAnyHit", L"radianceMiss", hitDesc)
+        .hitgroup(L"SHADOW", L"shadowClosestHit", L"shadowAnyHit", L"shadowMiss")
         .finish();
 
     numRayTypes = (uint32)pipeline.shaderBindingTableDesc.hitGroups.size();
@@ -199,7 +199,7 @@ void path_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
     cl->setComputeDescriptorTable(PATH_TRACING_RS_SRVS, gr.gpuBase + 1); // Offset for output.
     cl->setComputeDescriptorTable(PATH_TRACING_RS_OUTPUT, gr.gpuBase);
     cl->setComputeDynamicConstantBuffer(PATH_TRACING_RS_CAMERA, materialInfo.cameraCBV);
-    cl->setCompute32BitConstants(PATH_TRACING_RS_CB, path_tracing_cb{ (uint32)dxContext.frameID, numAveragedFrames, numSamplesPerPixel });
+    cl->setCompute32BitConstants(PATH_TRACING_RS_CB, path_tracing_cb{ (uint32)dxContext.frameID, numAveragedFrames });
 
     ++numAveragedFrames;
 

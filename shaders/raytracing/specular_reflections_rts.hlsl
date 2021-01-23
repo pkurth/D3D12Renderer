@@ -53,10 +53,6 @@ Texture2D<float> roughTex					: register(t4, space1);
 Texture2D<float> metalTex					: register(t5, space1);
 
 
-#define RADIANCE_RAY	0
-#define SHADOW_RAY		1
-#define NUM_RAY_TYPES	2
-
 struct radiance_ray_payload
 {
 	float3 color;
@@ -91,9 +87,9 @@ static float3 traceRadianceRay(float3 origin, float3 direction, uint recursion)
 	TraceRay(rtScene,
 		RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
 		0xFF,				// Cull mask.
-		RADIANCE_RAY,		// Addend on the hit index.
+		RADIANCE,			// Addend on the hit index.
 		NUM_RAY_TYPES,		// Multiplier on the geometry index within a BLAS.
-		RADIANCE_RAY,		// Miss index.
+		RADIANCE,			// Miss index.
 		ray,
 		payload);
 
@@ -113,9 +109,9 @@ static bool traceShadowRay(float3 origin, float3 direction, uint recursion)
 	TraceRay(rtScene,
 		RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_FORCE_OPAQUE,
 		0xFF,				// Cull mask.
-		SHADOW_RAY,			// Addend on the hit index.
+		SHADOW,				// Addend on the hit index.
 		NUM_RAY_TYPES,		// Multiplier on the geometry index within a BLAS.
-		SHADOW_RAY,			// Miss index.
+		SHADOW,				// Miss index.
 		ray,
 		payload);
 

@@ -113,7 +113,7 @@ static void reportShaderCompileError(com<IDxcBlobEncoding> blob)
 	std::cerr << "Error: " << infoLog << std::endl;
 }
 
-static com<IDxcBlob> compileLibrary(const std::wstring& filename)
+static com<IDxcBlob> compileLibrary(const std::wstring& filename, D3D12_HIT_GROUP_DESC* hitGroups, uint32 numHitGroups)
 {
 	com<IDxcCompiler> compiler;
 	com<IDxcLibrary> library;
@@ -139,9 +139,25 @@ static com<IDxcBlob> compileLibrary(const std::wstring& filename)
 
 	std::wstring wfilename(filename.begin(), filename.end());
 
+	std::wstring numRayTypesString = std::to_wstring(numHitGroups);
+
+	std::vector<DxcDefine> defines;
+
+	std::vector<std::wstring> valueStrings;
+	valueStrings.reserve(1 + numHitGroups); // Important. We pull out raw char pointers from these, so the vector should not reallocate.
+
+	valueStrings.push_back(std::to_wstring(numHitGroups));
+	defines.push_back({ L"NUM_RAY_TYPES", valueStrings.back().c_str() });
+
+	for (uint32 i = 0; i < numHitGroups; ++i)
+	{
+		valueStrings.push_back(std::to_wstring(i));
+		defines.push_back({ hitGroups[i].HitGroupExport, valueStrings.back().c_str() });
+	}
+
 	// Compile
 	com<IDxcOperationResult> operationResult;
-	checkResult(compiler->Compile(textBlob.Get(), wfilename.c_str(), L"", L"lib_6_3", 0, 0, 0, 0, includeHandler.Get(), &operationResult));
+	checkResult(compiler->Compile(textBlob.Get(), wfilename.c_str(), L"", L"lib_6_3", 0, 0, defines.data(), (uint32)defines.size(), includeHandler.Get(), &operationResult));
 
 	// Verify the result
 	HRESULT resultCode;
@@ -331,7 +347,7 @@ dx_raytracing_pipeline raytracing_pipeline_builder::finish()
 	assert(raygenRS.rootSignature.rootSignature);
 	assert(globalRS.rootSignature.rootSignature);
 
-	auto shaderBlob = compileLibrary(shaderFilename);
+	auto shaderBlob = compileLibrary(shaderFilename, hitGroups, numHitGroups);
 
 	D3D12_DXIL_LIBRARY_DESC dxilLibDesc;
 	dxilLibDesc.DXILLibrary.pShaderBytecode = shaderBlob->GetBufferPointer();
