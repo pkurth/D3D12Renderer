@@ -81,9 +81,29 @@ static const point_light_cb pointLights[NUM_LIGHTS] =
 
 static float3 traceRadianceRay(float3 origin, float3 direction, uint randSeed, uint recursion)
 {
-	if (recursion >= constants.maxRecursionDepth)
+	// This is replaced by the russian roulette below.
+	/*if (recursion >= constants.maxRecursionDepth)
 	{
 		return float3(0, 0, 0);
+	}*/
+
+	// My attempt at writing a russian roulette termination, which guarantees that the recursion depth does not exceed the maximum.
+	// Lower numbers make rays terminate earlier, which improves performance, but hurts the convergence speed.
+	// I think normally you wouldn't want the termination probability to go to 1, but DirectX will remove the device, if you exceed
+	// the recursion limit.
+	float russianRouletteFactor = 1.f;
+	if (recursion >= constants.startRussianRouletteAfter)
+	{
+		uint rouletteSteps = constants.maxRecursionDepth - constants.startRussianRouletteAfter + 1;
+		uint stepsRemaining = recursion - constants.startRussianRouletteAfter + 1;
+		float stopProbability = min(1.f, (float)stepsRemaining / (float)rouletteSteps);
+
+		if (nextRand(randSeed) <= stopProbability)
+		{
+			return (float3)0.f;
+		}
+
+		russianRouletteFactor = 1.f / (1.f - stopProbability);
 	}
 
 	RayDesc ray;
@@ -103,7 +123,7 @@ static float3 traceRadianceRay(float3 origin, float3 direction, uint randSeed, u
 		ray,
 		payload);
 
-	return payload.color;
+	return payload.color * russianRouletteFactor;
 }
 
 static float traceShadowRay(float3 origin, float3 direction, float distance, uint recursion) // This shader type is also used for ambient occlusion. Just set the distance to something small.

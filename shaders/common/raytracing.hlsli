@@ -16,6 +16,7 @@ struct path_tracing_cb
 	uint32 frameCount;
 	uint32 numAccumulatedFrames;
 	uint32 maxRecursionDepth;
+	uint32 startRussianRouletteAfter;
 
 	uint32 useThinLensCamera;
 	float focalLength;

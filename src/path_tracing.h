@@ -26,7 +26,8 @@ struct path_tracer : dx_raytracer
     // Parameters.
 
     uint32 numAveragedFrames = 0;
-    uint32 recursionDepth = 3; // [0, maxRecursionDepth - 1].
+    uint32 recursionDepth = maxRecursionDepth - 1; // [0, maxRecursionDepth - 1]. 0 and 1 don't really make sense. 0 means, that no primary ray is shot. 1 means that no bounce is computed, which leads to 0 light reaching the primary hit.
+    uint32 startRussianRouletteAfter = recursionDepth - 1; // [0, recursionDepth].
 
     bool useThinLensCamera = false;
     float fNumber = 32.f;
