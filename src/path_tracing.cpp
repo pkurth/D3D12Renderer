@@ -199,7 +199,19 @@ void path_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
     cl->setComputeDescriptorTable(PATH_TRACING_RS_SRVS, gr.gpuBase + 1); // Offset for output.
     cl->setComputeDescriptorTable(PATH_TRACING_RS_OUTPUT, gr.gpuBase);
     cl->setComputeDynamicConstantBuffer(PATH_TRACING_RS_CAMERA, materialInfo.cameraCBV);
-    cl->setCompute32BitConstants(PATH_TRACING_RS_CB, path_tracing_cb{ (uint32)dxContext.frameID, numAveragedFrames, (uint32)useThinLensCamera, focalLength, focalLength / (2.f * fNumber) });
+    cl->setCompute32BitConstants(PATH_TRACING_RS_CB, 
+        path_tracing_cb
+        { 
+            (uint32)dxContext.frameID, 
+            numAveragedFrames, 
+            (uint32)useThinLensCamera, 
+            focalLength, 
+            focalLength / (2.f * fNumber),
+            (uint32)useRealMaterials,
+            (uint32)enableDirectLighting,
+            lightIntensityScale,
+            pointLightRadius,
+        });
 
     ++numAveragedFrames;
 

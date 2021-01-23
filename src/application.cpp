@@ -445,6 +445,11 @@ void application::drawSettings(float dt)
 				pathTracerDirty |= ImGui::SliderFloat("Focal length", &pathTracer.focalLength, 0.5f, 50.f);
 				pathTracerDirty |= ImGui::SliderFloat("F-Number", &pathTracer.fNumber, 1.f, 128.f);
 			}
+			pathTracerDirty |= ImGui::Checkbox("Use real materials", &pathTracer.useRealMaterials);
+			pathTracerDirty |= ImGui::Checkbox("Enable direct lighting", &pathTracer.enableDirectLighting);
+			pathTracerDirty |= ImGui::SliderFloat("Light intensity scale", &pathTracer.lightIntensityScale, 0.f, 50.f);
+			pathTracerDirty |= ImGui::SliderFloat("Point light radius", &pathTracer.pointLightRadius, 0.f, 1.f);
+
 			if (pathTracerDirty)
 			{
 				pathTracer.numAveragedFrames = 0;

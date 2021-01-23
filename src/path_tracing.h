@@ -22,6 +22,12 @@ struct path_tracer : dx_raytracer
     float fNumber = 32.f;
     float focalLength = 1.f;
 
+    bool useRealMaterials = false;
+    bool enableDirectLighting = false;
+    float lightIntensityScale = 1.f;
+    float pointLightRadius = 0.1f;
+
+
 
 private:
     struct shader_data

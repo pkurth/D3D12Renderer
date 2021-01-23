@@ -121,7 +121,7 @@ ps_output main(ps_input IN)
 				if (visibility > 0.f)
 				{
 					float3 L = (pl.position - IN.worldPosition) / distanceToLight;
-					float3 radiance = pl.radiance * getAttenuation(distanceToLight, pl.radius) * LIGHT_IRRADIANCE_SCALE;
+					float3 radiance = pl.radiance * getAttenuation(distanceToLight, pl.radius) * LIGHT_RADIANCE_SCALE;
 					totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
 				}
 			}
@@ -165,7 +165,7 @@ ps_output main(ps_input IN)
 						{
 							float totalIntensity = intensity * visibility;
 
-							float3 radiance = sl.radiance * totalIntensity * LIGHT_IRRADIANCE_SCALE;
+							float3 radiance = sl.radiance * totalIntensity * LIGHT_RADIANCE_SCALE;
 							totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
 						}
 					}

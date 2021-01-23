@@ -19,6 +19,11 @@ struct path_tracing_cb
 	uint32 useThinLensCamera;
 	float focalLength;
 	float lensRadius;
+
+	uint32 useRealMaterials;
+	uint32 enableDirectLighting;
+	float lightIntensityScale;
+	float pointLightRadius;
 };
 
 

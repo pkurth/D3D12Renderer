@@ -3,6 +3,7 @@
 #include "../common/brdf.hlsli"
 #include "../common/material.hlsli"
 #include "../common/random.hlsli"
+#include "../common/light_source.hlsli"
 
 // Raytracing intrinsics: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#ray-system-values
 // Ray flags: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#ray-flags
@@ -48,6 +49,31 @@ struct radiance_ray_payload
 struct shadow_ray_payload
 {
 	float visible;
+};
+
+
+#define NUM_LIGHTS 3
+
+static const point_light_cb pointLights[NUM_LIGHTS] =
+{
+	{
+		float3(0.f, 3.f, 0.f),
+		15.f,
+		float3(0.8f, 0.2f, 0.1f) * 0.03f,
+		-1
+	},
+	{
+		float3(-5.f, 8.f, 0.f),
+		15.f,
+		float3(0.2f, 0.8f, 0.3f) * 0.03f,
+		-1
+	},
+	{
+		float3(5.f, 8.f, 0.f),
+		15.f,
+		float3(0.2f, 0.3f, 0.8f) * 0.03f,
+		-1
+	},
 };
 
 
@@ -146,7 +172,7 @@ void rayGen()
 		float2 rnd = float2(2.f * pi * nextRand(randSeed), constants.lensRadius * nextRand(randSeed));
 		float2 originOffset = float2(cos(rnd.x) * rnd.y, sin(rnd.x) * rnd.y);
 
-		origin += camera.right * originOffset.x + camera.up * originOffset.y;
+		origin += camera.right.xyz * originOffset.x + camera.up.xyz * originOffset.y;
 		direction = focalPoint - origin;
 	}
 
@@ -235,37 +261,30 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float2 uv = interpolateAttribute(uvs, attribs);
 	float3 N = normalize(transformDirectionToWorld(interpolateAttribute(normals, attribs)));
 
-#if 0
-	float3 worldDir = getCosHemisphereSample(payload.randSeed, N);
-	float ambientOcclusion = traceShadowRay(hitWorldPosition(), worldDir, 1.f, payload.recursion);
-
-	payload.color = ambientOcclusion.xxx;
-
-#else
-
-#if 1
 	float3 albedo = (float3)1.f;
 	float roughness = 1.f;
 	float metallic = 0.f;
-#else
-	uint mipLevel = 0;
-	uint flags = material.flags;
 
-	float4 albedo = ((flags & USE_ALBEDO_TEXTURE)
-		? albedoTex.SampleLevel(wrapSampler, uv, mipLevel)
-		: float4(1.f, 1.f, 1.f, 1.f))
-		* material.albedoTint;
+	if (constants.useRealMaterials)
+	{
+		uint mipLevel = 0;
+		uint flags = material.flags;
 
-	// We ignore normal maps for now.
+		albedo = (((flags & USE_ALBEDO_TEXTURE)
+			? albedoTex.SampleLevel(wrapSampler, uv, mipLevel)
+			: float4(1.f, 1.f, 1.f, 1.f))
+			* material.albedoTint).xyz;
 
-	float roughness = (flags & USE_ROUGHNESS_TEXTURE)
-		? roughTex.SampleLevel(wrapSampler, uv, mipLevel)
-		: getRoughnessOverride(material);
+		// We ignore normal maps for now.
 
-	float metallic = (flags & USE_METALLIC_TEXTURE)
-		? metalTex.SampleLevel(wrapSampler, uv, mipLevel)
-		: getMetallicOverride(material);
-#endif
+		roughness = (flags & USE_ROUGHNESS_TEXTURE)
+			? roughTex.SampleLevel(wrapSampler, uv, mipLevel)
+			: getRoughnessOverride(material);
+
+		metallic = (flags & USE_METALLIC_TEXTURE)
+			? metalTex.SampleLevel(wrapSampler, uv, mipLevel)
+			: getMetallicOverride(material);
+	}
 
 	roughness = clamp(roughness, 0.01f, 0.99f);
 
@@ -275,11 +294,32 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	payload.color = calculateIndirectLighting(payload.randSeed, hitPoint, albedo, F0, N, -WorldRayDirection(), roughness, metallic, payload.recursion);
 
 
-	float3 sunDirection = normalize(float3(-0.6f, -1.f, -0.3f));
-	float3 sunRadiance = float3(1.f, 0.93f, 0.76f);
-	
-	payload.color += calculateDirectLighting(albedo, sunRadiance, N, -sunDirection, -WorldRayDirection(), F0, roughness, metallic) * traceShadowRay(hitPoint, -sunDirection, 10000.f, payload.recursion);
-#endif
+	if (constants.enableDirectLighting)
+	{
+		// Sun light.
+		float3 sunDirection = normalize(float3(-0.6f, -1.f, -0.3f));
+		float3 sunRadiance = float3(1.f, 0.93f, 0.76f) * constants.lightIntensityScale;
+
+		payload.color +=
+			calculateDirectLighting(albedo, sunRadiance, N, -sunDirection, -WorldRayDirection(), F0, roughness, metallic)
+			* traceShadowRay(hitPoint, -sunDirection, 10000.f, payload.recursion);
+
+
+
+		// Random point light.
+		uint lightIndex = min(uint(NUM_LIGHTS * nextRand(payload.randSeed)), NUM_LIGHTS - 1);
+
+		float3 randomPointOnLight = pointLights[lightIndex].position + getRandomPointOnSphere(payload.randSeed, constants.pointLightRadius);
+
+		float3 pointLightL = randomPointOnLight - hitPoint;
+		float distance = length(pointLightL);
+		pointLightL /= distance;
+		payload.color +=
+			calculateDirectLighting(albedo, pointLights[lightIndex].radiance * LIGHT_RADIANCE_SCALE * constants.lightIntensityScale, N, pointLightL, -WorldRayDirection(), F0, roughness, metallic)
+			* getAttenuation(distance, pointLights[lightIndex].radius)
+			* NUM_LIGHTS // Correct for probability of choosing this particular light.
+			* traceShadowRay(hitPoint, pointLightL, distance, payload.recursion);
+	}
 }
 
 [shader("miss")]

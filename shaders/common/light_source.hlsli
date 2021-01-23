@@ -2,7 +2,7 @@
 #define LIGHT_SOURCE_H
 
 // Used for point and spot lights, because I dislike very high numbers.
-#define LIGHT_IRRADIANCE_SCALE 1000.f
+#define LIGHT_RADIANCE_SCALE 1000.f
 
 #define MAX_NUM_SUN_SHADOW_CASCADES 4
 
