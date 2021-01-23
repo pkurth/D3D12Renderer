@@ -188,10 +188,6 @@ private:
 	ref<dx_buffer> spotLightShadowInfoBuffer[NUM_BUFFERED_FRAMES];
 	ref<dx_buffer> pointLightShadowInfoBuffer[NUM_BUFFERED_FRAMES];
 
-	ref<dx_texture> blurTempTexture;
-	dx_render_target blurTempRenderTarget;
-	dx_render_target blurOriginalRenderTarget;
-
 	ref<pbr_environment> environment;
 	ref<dx_buffer> pointLights;
 	ref<dx_buffer> spotLights;

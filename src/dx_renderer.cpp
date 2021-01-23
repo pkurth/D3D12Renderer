@@ -49,9 +49,6 @@ static dx_pipeline outlineDrawerPipeline;
 static dx_pipeline worldSpaceFrustaPipeline;
 static dx_pipeline lightCullingPipeline;
 
-static dx_pipeline bloomPass1Pipeline;
-static dx_pipeline bloomPass2Pipeline;
-
 
 
 static dx_mesh positionOnlyMesh;
@@ -207,18 +204,6 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		clearObjectIDsPipeline = createReloadablePipeline("clear_object_ids_cs");
 	}
 
-	// Bloom.
-	{
-		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(hdrFormat[0])
-			.depthSettings(false, false);
-
-		bloomPass1Pipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "bloom_ps" });
-
-		desc.additiveBlending(0);
-		bloomPass2Pipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "bloom_ps" });
-	}
-
 
 	pbr_material::initializePipeline();
 
@@ -288,15 +273,6 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 	{
 		volumetricsTexture = createTexture(0, renderWidth, renderHeight, volumetricsFormat, false, false, true);
 		SET_NAME(volumetricsTexture->resource, "Volumetrics");
-	}
-
-	// Blur temp.
-	{
-		blurTempTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[0], false, true);
-		SET_NAME(blurTempTexture->resource, "Blur temporary");
-
-		blurTempRenderTarget.pushColorAttachment(blurTempTexture);
-		blurOriginalRenderTarget.pushColorAttachment(hdrColorTexture);
 	}
 
 	if (renderObjectIDs)
@@ -409,10 +385,6 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		depthOnlyRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
 		
 		resizeTexture(volumetricsTexture, renderWidth, renderHeight);
-
-		resizeTexture(blurTempTexture, renderWidth, renderHeight);
-		blurTempRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
-		blurOriginalRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
 	}
 
 	allocateLightCullingBuffers();
@@ -1032,40 +1004,6 @@ void dx_renderer::endFrame(const user_input& input)
 		}
 
 
-#if 0
-		barrier_batcher(cl)
-			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
-			.transition(blurTempTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-
-		// ----------------------------------------
-		// POST-PROCESSING
-		// ----------------------------------------
-
-		cl->setRenderTarget(blurTempRenderTarget);
-		cl->setViewport(blurTempRenderTarget.viewport);
-
-		cl->setPipelineState(*bloomPass1Pipeline.pipeline);
-		cl->setGraphicsRootSignature(*bloomPass1Pipeline.rootSignature);
-
-		cl->setGraphics32BitConstants(BLOOM_RS_CB, bloom_cb{ vec2(camera.invScreenDims.x, 0.f), 1.f });
-		cl->setDescriptorHeapSRV(BLOOM_RS_SRC_TEXTURE, 0, hdrColorTexture);
-		cl->drawFullscreenTriangle();
-
-		barrier_batcher(cl)
-			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
-			.transition(blurTempTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-		cl->setRenderTarget(blurOriginalRenderTarget);
-		cl->setPipelineState(*bloomPass2Pipeline.pipeline);
-		cl->setGraphicsRootSignature(*bloomPass2Pipeline.rootSignature); // Since the root signature is probably the same as in pass 1, we shouldn't need to switch this. Doesn't really matter though, since we rebind everything anyway.
-
-		cl->setGraphics32BitConstants(BLOOM_RS_CB, bloom_cb{ vec2(0.f, camera.invScreenDims.y), 0.01f });
-		cl->setDescriptorHeapSRV(BLOOM_RS_SRC_TEXTURE, 0, blurTempTexture);
-		cl->drawFullscreenTriangle();
-#endif
-
-
 		barrier_batcher(cl)
 			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
@@ -1116,7 +1054,6 @@ void dx_renderer::endFrame(const user_input& input)
 		.transition(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON)
 		.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
 		.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
-		//.transition(blurTempTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
 		.transition(frameResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON);
 
 	dxContext.executeCommandList(cl);
