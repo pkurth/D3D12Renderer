@@ -133,13 +133,11 @@ static com<IDxcBlob> compileLibrary(const std::wstring& filename, D3D12_HIT_GROU
 	std::string source = ss.str();
 
 
-	// Create blob from the string
+	// Create blob from the string.
 	com<IDxcBlobEncoding> textBlob;
 	checkResult(library->CreateBlobWithEncodingFromPinned((LPBYTE)source.c_str(), (uint32)source.length(), 0, &textBlob));
 
 	std::wstring wfilename(filename.begin(), filename.end());
-
-	std::wstring numRayTypesString = std::to_wstring(numHitGroups);
 
 	std::vector<DxcDefine> defines;
 
@@ -156,7 +154,7 @@ static com<IDxcBlob> compileLibrary(const std::wstring& filename, D3D12_HIT_GROU
 	}
 
 
-	defines.push_back({ L"HLSL",	0 });
+	defines.push_back({ L"HLSL" });
 	defines.push_back({ L"mat4",	L"float4x4" });
 	defines.push_back({ L"vec2",	L"float2" });
 	defines.push_back({ L"vec3",	L"float3" });
@@ -164,11 +162,11 @@ static com<IDxcBlob> compileLibrary(const std::wstring& filename, D3D12_HIT_GROU
 	defines.push_back({ L"uint32",	L"uint" });
 
 
-	// Compile
+	// Compile.
 	com<IDxcOperationResult> operationResult;
 	checkResult(compiler->Compile(textBlob.Get(), wfilename.c_str(), L"", L"lib_6_3", 0, 0, defines.data(), (uint32)defines.size(), includeHandler.Get(), &operationResult));
 
-	// Verify the result
+	// Verify the result.
 	HRESULT resultCode;
 	checkResult(operationResult->GetStatus(&resultCode));
 	if (FAILED(resultCode))
