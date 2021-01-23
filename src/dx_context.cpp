@@ -187,6 +187,12 @@ bool dx_context::initialize()
 		pagePools[i].initialize(MB(2));
 	}
 
+	frameUploadBuffer.reset();
+	frameUploadBuffer.pagePool = &pagePools[bufferedFrameID];
+
+	pagePools[bufferedFrameID].reset();
+
+
 	renderQueue.initialize(device, D3D12_COMMAND_LIST_TYPE_DIRECT);
 	computeQueue.initialize(device, D3D12_COMMAND_LIST_TYPE_COMPUTE);
 	copyQueue.initialize(device, D3D12_COMMAND_LIST_TYPE_COPY);

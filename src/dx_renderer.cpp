@@ -1011,20 +1011,22 @@ void dx_renderer::endFrame(const user_input& input)
 	else
 	{
 		barrier_batcher(cl)
+			.uav(hdrColorTexture)
 			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 			.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 
 		if (dxContext.raytracingSupported && raytracer)
 		{
+			dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // TODO: This is not the way to go here. We should wait for the specific value returned by executeCommandList.
+
 			raytracer->render(cl, *tlas, hdrColorTexture, materialInfo);
 		}
 
 		cl->resetToDynamicDescriptorHeap();
 
-		cl->uavBarrier(hdrColorTexture);
-
 		barrier_batcher(cl)
+			.uav(hdrColorTexture)
 			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	}
 
