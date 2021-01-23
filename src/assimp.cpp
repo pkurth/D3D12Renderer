@@ -117,6 +117,14 @@ ref<pbr_material> loadAssimpMaterial(const aiMaterial* material)
 		albedoTint.z = aiColor.b;
 	}
 
+	vec4 emission(0.f, 0.f, 0.f, 1.f);
+	if (material->Get(AI_MATKEY_COLOR_EMISSIVE, aiColor) == aiReturn_SUCCESS)
+	{
+		emission.x = aiColor.r;
+		emission.y = aiColor.g;
+		emission.z = aiColor.b;
+	}
+
 	float roughnessOverride = 1.f;
 	float metallicOverride = 0.f;
 
@@ -148,5 +156,5 @@ ref<pbr_material> loadAssimpMaterial(const aiMaterial* material)
 		}
 	}
 
-	return createPBRMaterial(albedoName, normalName, roughnessName, metallicName, albedoTint, roughnessOverride, metallicOverride);
+	return createPBRMaterial(albedoName, normalName, roughnessName, metallicName, emission, albedoTint, roughnessOverride, metallicOverride);
 }

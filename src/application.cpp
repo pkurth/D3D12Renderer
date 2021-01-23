@@ -98,7 +98,8 @@ void application::initialize(dx_renderer* renderer)
 	stormtrooperMesh->submeshes[0].material = createPBRMaterial(
 		"assets/textures/stormtrooper/Stormtrooper_D.png",
 		0, 0, 0,
-		vec4(1.f, 1.f, 1.f, 1.f),
+		vec4(0.f),
+		vec4(1.f),
 		0.f,
 		0.f
 	);

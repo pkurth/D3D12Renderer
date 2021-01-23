@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "path_tracing.h"
+#include "color.h"
 
 #include "raytracing.hlsli"
 
@@ -138,7 +139,8 @@ raytracing_object_type path_tracer::defineObjectType(const ref<raytracing_blas>&
 
         hitData[0].materialCB = pbr_material_cb
         {
-            material->albedoTint.x, material->albedoTint.y, material->albedoTint.z, material->albedoTint.w,
+            material->emission.xyz,
+            packColor(material->albedoTint),
             packRoughnessAndMetallic(material->roughnessOverride, material->metallicOverride),
             flags
         };

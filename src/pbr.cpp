@@ -6,6 +6,7 @@
 #include "dx_command_list.h"
 #include "dx_renderer.h"
 #include "geometry.h"
+#include "color.h"
 
 #include "default_pbr_rs.hlsli"
 #include "material.hlsli"
@@ -17,6 +18,7 @@ static dx_pipeline defaultPBRPipeline;
 struct material_key
 {
 	std::string albedoTex, normalTex, roughTex, metallicTex;
+	vec4 emission;
 	vec4 albedoTint;
 	float roughnessOverride, metallicOverride;
 };
@@ -61,6 +63,7 @@ namespace std
 			hash_combine(seed, x.normalTex);
 			hash_combine(seed, x.roughTex);
 			hash_combine(seed, x.metallicTex);
+			hash_combine(seed, x.emission);
 			hash_combine(seed, x.albedoTint);
 			hash_combine(seed, x.roughnessOverride);
 			hash_combine(seed, x.metallicOverride);
@@ -76,12 +79,13 @@ static bool operator==(const material_key& a, const material_key& b)
 		&& a.normalTex == b.normalTex
 		&& a.roughTex == b.roughTex
 		&& a.metallicTex == b.metallicTex
+		&& a.emission == b.emission
 		&& a.albedoTint == b.albedoTint
 		&& a.roughnessOverride == b.roughnessOverride
 		&& a.metallicOverride == b.metallicOverride;
 }
 
-ref<pbr_material> createPBRMaterial(const char* albedoTex, const char* normalTex, const char* roughTex, const char* metallicTex, const vec4& albedoTint, float roughOverride, float metallicOverride)
+ref<pbr_material> createPBRMaterial(const char* albedoTex, const char* normalTex, const char* roughTex, const char* metallicTex, const vec4& emission, const vec4& albedoTint, float roughOverride, float metallicOverride)
 {
 	material_key s =
 	{
@@ -89,6 +93,7 @@ ref<pbr_material> createPBRMaterial(const char* albedoTex, const char* normalTex
 		normalTex ? normalTex : "",
 		roughTex ? roughTex : "",
 		metallicTex ? metallicTex : "",
+		emission,
 		albedoTint,
 		roughTex ? 1.f : roughOverride, // If texture is set, override does not matter, so set it to consistent value.
 		metallicTex ? 0.f : metallicOverride, // If texture is set, override does not matter, so set it to consistent value.
@@ -109,6 +114,7 @@ ref<pbr_material> createPBRMaterial(const char* albedoTex, const char* normalTex
 		if (normalTex) material->normal = loadTextureFromFile(normalTex, texture_load_flags_default | texture_load_flags_noncolor);
 		if (roughTex) material->roughness = loadTextureFromFile(roughTex, texture_load_flags_default | texture_load_flags_noncolor);
 		if (metallicTex) material->metallic = loadTextureFromFile(metallicTex, texture_load_flags_default | texture_load_flags_noncolor);
+		material->emission = emission;
 		material->albedoTint = albedoTint;
 		material->roughnessOverride = roughOverride;
 		material->metallicOverride = metallicOverride;
@@ -122,7 +128,7 @@ ref<pbr_material> createPBRMaterial(const char* albedoTex, const char* normalTex
 
 ref<pbr_material> getDefaultPBRMaterial()
 {
-	static ref<pbr_material> material = make_ref<pbr_material>(nullptr, nullptr, nullptr, nullptr, vec4(1.f, 0.f, 1.f, 1.f), 1.f, 0.f);
+	static ref<pbr_material> material = make_ref<pbr_material>(nullptr, nullptr, nullptr, nullptr, vec4(0.f), vec4(1.f, 0.f, 1.f, 1.f), 1.f, 0.f);
 	return material;
 }
 
@@ -195,7 +201,8 @@ void pbr_material::prepareForRendering(dx_command_list* cl)
 	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_MATERIAL,
 		pbr_material_cb
 		{
-			albedoTint.x, albedoTint.y, albedoTint.z, albedoTint.w,
+			emission.xyz,
+			packColor(albedoTint),
 			packRoughnessAndMetallic(roughnessOverride, metallicOverride),
 			flags
 		});

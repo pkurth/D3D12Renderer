@@ -260,6 +260,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float2 uv = interpolateAttribute(uvs, attribs);
 	float3 N = normalize(transformDirectionToWorld(interpolateAttribute(normals, attribs)));
 
+	float3 emission = (float3)0.f;
 	float3 albedo = (float3)1.f;
 	float roughness = 1.f;
 	float metallic = 0.f;
@@ -272,7 +273,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 		albedo = (((flags & USE_ALBEDO_TEXTURE)
 			? albedoTex.SampleLevel(wrapSampler, uv, mipLevel)
 			: float4(1.f, 1.f, 1.f, 1.f))
-			* material.albedoTint).xyz;
+			* unpackColor(material.albedoTint)).xyz;
 
 		// We ignore normal maps for now.
 
@@ -283,14 +284,18 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 		metallic = (flags & USE_METALLIC_TEXTURE)
 			? metalTex.SampleLevel(wrapSampler, uv, mipLevel)
 			: getMetallicOverride(material);
+
+		emission = material.emission;
 	}
+
+	payload.color = emission;
 
 	roughness = clamp(roughness, 0.01f, 0.99f);
 
 	float3 hitPoint = hitWorldPosition();
 
 	float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
-	payload.color = calculateIndirectLighting(payload.randSeed, hitPoint, albedo, F0, N, -WorldRayDirection(), roughness, metallic, payload.recursion);
+	payload.color += calculateIndirectLighting(payload.randSeed, hitPoint, albedo, F0, N, -WorldRayDirection(), roughness, metallic, payload.recursion);
 
 
 	if (constants.enableDirectLighting)

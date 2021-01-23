@@ -61,7 +61,7 @@ ps_output main(ps_input IN)
 	float4 albedo = ((flags & USE_ALBEDO_TEXTURE)
 		? albedoTex.Sample(wrapSampler, IN.uv)
 		: float4(1.f, 1.f, 1.f, 1.f))
-		* material.albedoTint;
+		* unpackColor(material.albedoTint);
 
 	float3 N = (flags & USE_NORMAL_TEXTURE)
 		? mul(normalTex.Sample(wrapSampler, IN.uv).xyz * 2.f - float3(1.f, 1.f, 1.f), IN.tbn)
@@ -84,6 +84,8 @@ ps_output main(ps_input IN)
 	float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo.xyz, metallic);
 
 	float4 totalLighting = float4(0.f, 0.f, 0.f, albedo.w);
+
+	totalLighting.xyz += material.emission;
 
 	// Point and spot lights.
 	{

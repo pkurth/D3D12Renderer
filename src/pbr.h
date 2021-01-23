@@ -8,14 +8,15 @@ struct pbr_material : material_base
 	static void initializePipeline();
 
 	pbr_material() = default;
-	pbr_material(ref<dx_texture> albedo, ref<dx_texture> normal, ref<dx_texture> roughness, ref<dx_texture> metallic, const vec4& albedoTint, float roughnessOverride, float metallicOverride)
-		: albedo(albedo), normal(normal), roughness(roughness), metallic(metallic), albedoTint(albedoTint), roughnessOverride(roughnessOverride), metallicOverride(metallicOverride) {}
+	pbr_material(ref<dx_texture> albedo, ref<dx_texture> normal, ref<dx_texture> roughness, ref<dx_texture> metallic, const vec4& emission, const vec4& albedoTint, float roughnessOverride, float metallicOverride)
+		: albedo(albedo), normal(normal), roughness(roughness), metallic(metallic), emission(emission), albedoTint(albedoTint), roughnessOverride(roughnessOverride), metallicOverride(metallicOverride) {}
 
 	ref<dx_texture> albedo;
 	ref<dx_texture> normal;
 	ref<dx_texture> roughness;
 	ref<dx_texture> metallic;
 
+	vec4 emission;
 	vec4 albedoTint;
 	float roughnessOverride;
 	float metallicOverride;
@@ -32,7 +33,7 @@ struct pbr_environment
 };
 
 ref<pbr_material> createPBRMaterial(const char* albedoTex, const char* normalTex, const char* roughTex, const char* metallicTex, 
-	const vec4& albedoTint = vec4(1.f, 1.f, 1.f, 1.f), float roughOverride = 1.f, float metallicOverride = 0.f);
+	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f);
 
 ref<pbr_material> getDefaultPBRMaterial();
 

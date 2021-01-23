@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "raytracing_specular.h"
+#include "color.h"
 
 #include "raytracing.hlsli"
 
@@ -144,7 +145,8 @@ raytracing_object_type specular_reflections_raytracer::defineObjectType(const re
         shader_data hitData[2];
         hitData[0].materialCB = pbr_material_cb
         {
-            material->albedoTint.x, material->albedoTint.y, material->albedoTint.z, material->albedoTint.w,
+            material->emission.xyz,
+            packColor(material->albedoTint),
             packRoughnessAndMetallic(material->roughnessOverride, material->metallicOverride),
             flags
         };

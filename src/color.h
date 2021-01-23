@@ -59,6 +59,11 @@ static uint32 packColor(float r, float g, float b, float a)
 		(uint8)clamp(a * 255.f, 0.f, 255.f));
 }
 
+static uint32 packColor(const vec4& rgba)
+{
+	return packColor(rgba.r, rgba.g, rgba.b, rgba.a);
+}
+
 static vec3 randomRGB(random_number_generator& rng)
 {
 	vec3 hsv =

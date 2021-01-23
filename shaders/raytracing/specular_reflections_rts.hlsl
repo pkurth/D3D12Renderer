@@ -181,7 +181,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float4 albedo = ((flags & USE_ALBEDO_TEXTURE)
 		? albedoTex.SampleLevel(wrapSampler, uv, mipLevel)
 		: float4(1.f, 1.f, 1.f, 1.f))
-		* material.albedoTint;
+		* unpackColor(material.albedoTint);
 
 	// We ignore normal maps for now.
 
