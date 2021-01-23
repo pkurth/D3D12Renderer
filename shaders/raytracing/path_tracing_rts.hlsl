@@ -203,17 +203,26 @@ static float3 calculateIndirectLighting(inout uint randSeed, float3 position, fl
 [shader("closesthit")]
 void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-	uint3 tri = load3x32BitIndices(meshIndices);
+	uint3 tri = load3x32BitIndices(meshIndices); // Use load3x16BitIndices, if you have 16-bit indices.
 
+	// Interpolate vertex attributes over triangle.
 	float2 uvs[] = { meshVertices[tri.x].uv, meshVertices[tri.y].uv, meshVertices[tri.z].uv };
 	float3 normals[] = { meshVertices[tri.x].normal, meshVertices[tri.y].normal, meshVertices[tri.z].normal };
 
 	float2 uv = interpolateAttribute(uvs, attribs);
 	float3 N = normalize(transformDirectionToWorld(interpolateAttribute(normals, attribs)));
 
+#if 0
+	float3 worldDir = getCosHemisphereSample(payload.randSeed, N);
+	float ambientOcclusion = traceShadowRay(hitWorldPosition(), worldDir, 1.f, payload.recursion);
+
+	payload.color = ambientOcclusion.xxx;
+
+#else
+
 #if 1
 	float3 albedo = (float3)1.f;
-	float roughness = 1;
+	float roughness = 1.f;
 	float metallic = 0.f;
 #else
 	uint mipLevel = 0;
@@ -229,23 +238,24 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float roughness = (flags & USE_ROUGHNESS_TEXTURE)
 		? roughTex.SampleLevel(wrapSampler, uv, mipLevel)
 		: getRoughnessOverride(material);
-	roughness = clamp(roughness, 0.01f, 0.99f);
 
 	float metallic = (flags & USE_METALLIC_TEXTURE)
 		? metalTex.SampleLevel(wrapSampler, uv, mipLevel)
 		: getMetallicOverride(material);
 #endif
 
+	roughness = clamp(roughness, 0.01f, 0.99f);
 
-	uint randSeed = payload.randSeed;
+	float3 hitPoint = hitWorldPosition();
 
-#if 0
-	float3 worldDir = getCosHemisphereSample(randSeed, N);
-	payload.color = traceShadowRay(hitWorldPosition(), worldDir, 1.f, payload.recursion).xxx;
-
-#else
 	float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
-	payload.color = calculateIndirectLighting(randSeed, hitWorldPosition(), albedo, F0, N, -WorldRayDirection(), roughness, metallic, payload.recursion);
+	payload.color = calculateIndirectLighting(payload.randSeed, hitPoint, albedo, F0, N, -WorldRayDirection(), roughness, metallic, payload.recursion);
+
+
+	float3 sunDirection = normalize(float3(-0.6f, -1.f, -0.3f));
+	float3 sunRadiance = float3(1.f, 0.93f, 0.76f);
+	
+	payload.color += calculateDirectLighting(albedo, sunRadiance, N, -sunDirection, -WorldRayDirection(), F0, roughness, metallic) * traceShadowRay(hitPoint, -sunDirection, 10000.f, payload.recursion);
 #endif
 }
 
