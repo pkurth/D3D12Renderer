@@ -616,7 +616,7 @@ void application::update(const user_input& input, float dt)
 	{
 		if (dxContext.meshShaderSupported)
 		{
-			testRenderMeshShader(&overlayRenderPass);
+			//testRenderMeshShader(&overlayRenderPass);
 		}
 
 
