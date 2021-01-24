@@ -144,29 +144,32 @@ ref<pbr_environment> createEnvironment(const char* filename, uint32 skyResolutio
 	auto sp = cache[s].lock();
 	if (!sp)
 	{
-		ref<pbr_environment> environment = make_ref<pbr_environment>();
-
 		ref<dx_texture> equiSky = loadTextureFromFile(filename,
 			texture_load_flags_noncolor | texture_load_flags_cache_to_dds | texture_load_flags_gen_mips_on_cpu);
 
-		dx_command_list* cl;
-		if (asyncCompute)
+		if (equiSky)
 		{
-			dxContext.computeQueue.waitForOtherQueue(dxContext.copyQueue);
-			cl = dxContext.getFreeComputeCommandList(true);
-		}
-		else
-		{
-			dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
-			cl = dxContext.getFreeRenderCommandList();
-		}
-		//generateMipMapsOnGPU(cl, equiSky);
-		environment->sky = equirectangularToCubemap(cl, equiSky, skyResolution, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
-		environment->environment = prefilterEnvironment(cl, environment->sky, environmentResolution);
-		environment->irradiance = cubemapToIrradiance(cl, environment->sky, irradianceResolution);
-		dxContext.executeCommandList(cl);
+			ref<pbr_environment> environment = make_ref<pbr_environment>();
 
-		cache[s] = sp = environment;
+			dx_command_list* cl;
+			if (asyncCompute)
+			{
+				dxContext.computeQueue.waitForOtherQueue(dxContext.copyQueue);
+				cl = dxContext.getFreeComputeCommandList(true);
+			}
+			else
+			{
+				dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
+				cl = dxContext.getFreeRenderCommandList();
+			}
+			//generateMipMapsOnGPU(cl, equiSky);
+			environment->sky = equirectangularToCubemap(cl, equiSky, skyResolution, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
+			environment->environment = prefilterEnvironment(cl, environment->sky, environmentResolution);
+			environment->irradiance = cubemapToIrradiance(cl, environment->sky, irradianceResolution);
+			dxContext.executeCommandList(cl);
+
+			cache[s] = sp = environment;
+		}
 	}
 
 	mutex.unlock();

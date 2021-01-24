@@ -63,6 +63,12 @@ const aiScene* loadAssimpSceneFile(const char* filepathRaw, Assimp::Importer& im
 
 	if (!scene)
 	{
+		if (!fs::exists(filepathRaw))
+		{
+			std::cerr << "Could not find file '" << filepathRaw << "'." << std::endl;
+			return 0;
+		}
+
 		std::cout << "Preprocessing asset '" << filepathRaw << "' for faster loading next time.";
 #ifdef _DEBUG
 		std::cout << " Consider running in a release build the first time.";

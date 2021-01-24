@@ -632,7 +632,15 @@ void dx_renderer::endFrame(const user_input& input)
 		}
 		else
 		{
-			cl->clearRTV(hdrRenderTarget, 0, 0.f, 0.f, 0.f);
+			cl->setPipelineState(*proceduralSkyPipeline.pipeline);
+			cl->setGraphicsRootSignature(*proceduralSkyPipeline.rootSignature);
+
+			cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
+			cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
+
+			cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
+			cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
+			cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
 		}
 
 

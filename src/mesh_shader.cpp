@@ -258,12 +258,15 @@ void testRenderMeshShader(overlay_render_pass* overlayRenderPass)
 	);*/
 
 
-	/*auto& sm = meshMaterial->mesh->submeshes[0];
-	overlayRenderPass->renderObjectWithMeshShader(sm.numMeshlets, 1, 1,
-		meshMaterial,
-		createModelMatrix(vec3(0.f, 30.f, 0.f), quat::identity, 0.3f),
-		true
-	);*/
+	/*if (meshMaterial->mesh)
+	{
+		auto& sm = meshMaterial->mesh->submeshes[0];
+		overlayRenderPass->renderObjectWithMeshShader(sm.numMeshlets, 1, 1,
+			meshMaterial,
+			createModelMatrix(vec3(0.f, 30.f, 0.f), quat::identity, 0.3f),
+			true
+		);
+	}*/
 
 
 
@@ -367,6 +370,7 @@ static ref<mesh_shader_mesh> loadMeshShaderMeshFromFile(const char* filename)
 	std::ifstream stream(filename, std::ios::binary);
 	if (!stream.is_open())
 	{
+		std::cerr << "Could not find file '" << filename << "'." << std::endl;
 		return 0;
 	}
 

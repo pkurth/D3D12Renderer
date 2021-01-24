@@ -96,6 +96,7 @@ static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::S
 	{
 		if (!fs::exists(filepath))
 		{
+			std::cerr << "Could not find file '" << filepath.string() << "'." << std::endl;
 			return false;
 		}
 

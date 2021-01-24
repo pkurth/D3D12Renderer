@@ -85,9 +85,12 @@ void animation_skeleton::pushAssimpAnimations(const char* sceneFilename, float s
 
 	const aiScene* scene = loadAssimpSceneFile(sceneFilename, importer);
 
-	for (uint32 i = 0; i < scene->mNumAnimations; ++i)
+	if (scene)
 	{
-		pushAssimpAnimation(sceneFilename, scene->mAnimations[i], scale);
+		for (uint32 i = 0; i < scene->mNumAnimations; ++i)
+		{
+			pushAssimpAnimation(sceneFilename, scene->mAnimations[i], scale);
+		}
 	}
 }
 

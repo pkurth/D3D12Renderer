@@ -85,62 +85,83 @@ void application::initialize(dx_renderer* renderer)
 	
 	// Sponza.
 	auto sponzaMesh = loadMeshFromFile("assets/meshes/sponza.obj");
-	auto sponzaBlas = defineBlasFromMesh(sponzaMesh, pathTracer);
+	if (sponzaMesh)
+	{
+		auto sponzaBlas = defineBlasFromMesh(sponzaMesh, pathTracer);
 
-	appScene.createEntity("Sponza")
-		.addComponent<trs>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
-		.addComponent<raster_component>(sponzaMesh)
-		.addComponent<raytrace_component>(sponzaBlas);
+		appScene.createEntity("Sponza")
+			.addComponent<trs>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
+			.addComponent<raster_component>(sponzaMesh)
+			.addComponent<raytrace_component>(sponzaBlas);
+	}
 
 #if 1
 	// Stormtrooper.
 	auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/meshes/stormtrooper.fbx");
-	stormtrooperMesh->submeshes[0].material = createPBRMaterial(
-		"assets/textures/stormtrooper/Stormtrooper_D.png",
-		0, 0, 0,
-		vec4(0.f),
-		vec4(1.f),
-		0.f,
-		0.f
-	);
+	if (stormtrooperMesh)
+	{
+		stormtrooperMesh->submeshes[0].material = createPBRMaterial(
+			"assets/textures/stormtrooper/Stormtrooper_D.png",
+			0, 0, 0,
+			vec4(0.f),
+			vec4(1.f),
+			0.f,
+			0.f
+		);
+	}
 
 	// Pilot.
 	auto pilotMesh = loadAnimatedMeshFromFile("assets/meshes/pilot.fbx");
-	pilotMesh->submeshes[0].material = createPBRMaterial(
-		"assets/textures/pilot/A.png",
-		"assets/textures/pilot/N.png",
-		"assets/textures/pilot/R.png",
-		"assets/textures/pilot/M.png"
-	);
+	if (pilotMesh)
+	{
+		pilotMesh->submeshes[0].material = createPBRMaterial(
+			"assets/textures/pilot/A.png",
+			"assets/textures/pilot/N.png",
+			"assets/textures/pilot/R.png",
+			"assets/textures/pilot/M.png"
+		);
+	}
 
 	// Unreal Mannequin.
 	auto unrealMesh = loadAnimatedMeshFromFile("assets/meshes/unreal_mannequin.fbx");
-	unrealMesh->skeleton.pushAssimpAnimationsInDirectory("assets/animations");
+	if (unrealMesh)
+	{
+		unrealMesh->skeleton.pushAssimpAnimationsInDirectory("assets/animations");
+	}
 
-	appScene.createEntity("Stormtrooper 1")
-		.addComponent<trs>(vec3(-5.f, 0.f, -1.f), quat::identity)
-		.addComponent<raster_component>(stormtrooperMesh)
-		.addComponent<animation_component>(1.5f);
+	if (stormtrooperMesh)
+	{
+		appScene.createEntity("Stormtrooper 1")
+			.addComponent<trs>(vec3(-5.f, 0.f, -1.f), quat::identity)
+			.addComponent<raster_component>(stormtrooperMesh)
+			.addComponent<animation_component>(1.5f);
 
-	appScene.createEntity("Stormtrooper 2")
-		.addComponent<trs>(vec3(0.f, 0.f, -2.f), quat::identity)
-		.addComponent<raster_component>(stormtrooperMesh)
-		.addComponent<animation_component>(0.f);
+		appScene.createEntity("Stormtrooper 2")
+			.addComponent<trs>(vec3(0.f, 0.f, -2.f), quat::identity)
+			.addComponent<raster_component>(stormtrooperMesh)
+			.addComponent<animation_component>(0.f);
 
-	appScene.createEntity("Stormtrooper 3")
-		.addComponent<trs>(vec3(5.f, 0.f, -1.f), quat::identity)
-		.addComponent<raster_component>(stormtrooperMesh)
-		.addComponent<animation_component>(1.5f);
+		appScene.createEntity("Stormtrooper 3")
+			.addComponent<trs>(vec3(5.f, 0.f, -1.f), quat::identity)
+			.addComponent<raster_component>(stormtrooperMesh)
+			.addComponent<animation_component>(1.5f);
+	}
 
-	appScene.createEntity("Pilot")
-		.addComponent<trs>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
-		.addComponent<raster_component>(pilotMesh)
-		.addComponent<animation_component>(0.f);
+	if (pilotMesh)
+	{
+		appScene.createEntity("Pilot")
+			.addComponent<trs>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
+			.addComponent<raster_component>(pilotMesh)
+			.addComponent<animation_component>(0.f);
+	}
 
-	appScene.createEntity("Mannequin")
-		.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.019f)
-		.addComponent<raster_component>(unrealMesh)
-		.addComponent<animation_component>(0.f);
+	if (unrealMesh)
+	{
+		appScene.createEntity("Mannequin")
+			.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.019f)
+			.addComponent<raster_component>(unrealMesh)
+			.addComponent<animation_component>(0.f);
+	}
 #endif
 
 
@@ -332,7 +353,7 @@ void application::drawSceneHierarchy()
 	if (ImGui::Begin("Scene Hierarchy"))
 	{
 		appScene.view<tag_component>()
-			.each([this](auto entityHandle, auto& tag)
+			.each([this](auto entityHandle, tag_component& tag)
 		{
 			const char* name = tag.name;
 			scene_entity entity = { entityHandle, appScene };
@@ -375,7 +396,7 @@ void application::drawSceneHierarchy()
 
 			ImGui::Text(selectedEntity.getComponent<tag_component>().name);
 
-			drawComponent<trs>(selectedEntity, "Transform", [this](auto& transform)
+			drawComponent<trs>(selectedEntity, "Transform", [this](trs& transform)
 			{
 				ImGui::DragFloat3("Translation", transform.position.data, 0.1f, 0.f, 0.f);
 
@@ -391,14 +412,14 @@ void application::drawSceneHierarchy()
 				ImGui::DragFloat3("Scale", transform.scale.data, 0.1f, 0.f, 0.f);
 			});
 
-			drawComponent<animation_component>(selectedEntity, "Animation", [this](auto& anim)
+			drawComponent<animation_component>(selectedEntity, "Animation", [this](animation_component& anim)
 			{
 				assert(selectedEntity.hasComponent<raster_component>());
 				raster_component& raster = selectedEntity.getComponent<raster_component>();
 
-				ImGui::Dropdown("Currently playing", [](uint32 index, void* data)
+				bool animationChanged = ImGui::Dropdown("Currently playing", [](uint32 index, void* data)
 				{
-					auto& skeleton = *(animation_skeleton*)data;
+					animation_skeleton& skeleton = *(animation_skeleton*)data;
 					const char* result = 0;
 					if (index < (uint32)skeleton.clips.size())
 					{
@@ -406,6 +427,11 @@ void application::drawSceneHierarchy()
 					}
 					return result;
 				}, anim.animationIndex, &raster.mesh->skeleton);
+
+				if (animationChanged)
+				{
+					anim.time = 0.f;
+				}
 			});
 		}
 	}
@@ -739,6 +765,11 @@ void application::setEnvironment(const char* filename)
 {
 	environment = createEnvironment(filename); // Currently synchronous (on render queue).
 	pathTracer.numAveragedFrames = 0;
+
+	if (!environment)
+	{
+		std::cout << "Could not load environment '" << filename << "'. Renderer will use procedural sky box. Procedural sky boxes currently cannot contribute to global illumnation, so expect very dark lighting." << std::endl;
+	}
 }
 
 

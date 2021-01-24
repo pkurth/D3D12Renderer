@@ -29,6 +29,11 @@ ref<composite_mesh> loadMeshFromFile(const char* sceneFilename, uint32 flags)
 
 	const aiScene* scene = loadAssimpSceneFile(sceneFilename, importer);
 
+	if (!scene)
+	{
+		return 0;
+	}
+
 	cpu_mesh cpuMesh(flags);
 
 	ref<composite_mesh> result = make_ref<composite_mesh>();
