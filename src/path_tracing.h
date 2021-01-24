@@ -38,6 +38,7 @@ struct path_tracer : dx_raytracer
     float lightIntensityScale = 1.f;
     float pointLightRadius = 0.1f;
 
+    bool multipleImportanceSampling = true;
 
 
 private:

@@ -453,6 +453,8 @@ void application::drawSettings(float dt)
 			pathTracerDirty |= ImGui::SliderFloat("Light intensity scale", &pathTracer.lightIntensityScale, 0.f, 50.f);
 			pathTracerDirty |= ImGui::SliderFloat("Point light radius", &pathTracer.pointLightRadius, 0.f, 1.f);
 
+			pathTracerDirty |= ImGui::Checkbox("Multiple importance sampling", &pathTracer.multipleImportanceSampling);
+
 			if (pathTracerDirty)
 			{
 				pathTracer.numAveragedFrames = 0;

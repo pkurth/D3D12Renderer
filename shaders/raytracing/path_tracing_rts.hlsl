@@ -217,16 +217,20 @@ void rayGen()
 // RADIANCE
 // ----------------------------------------
 
+static float probabilityToSampleDiffuse(float roughness)
+{
+	// I don't know what a good way to choose is. My understanding is that it doesn't really matter, as long as you account for the probability in your results. 
+	// TODO: Test this with more reflective materials and check the convergence speed.
+	return roughness;
+}
 
 static float3 calculateIndirectLighting(inout uint randSeed, float3 position, float3 albedo, float3 F0, float3 N, float3 V, float roughness, float metallic, uint recursion)
 {
-	// We have to decide whether we sample our diffuse or specular/ggx lobe.
-	float probDiffuse = roughness; // I don't think this is correct.
+	float probDiffuse = probabilityToSampleDiffuse(roughness);
 	float chooseDiffuse = (nextRand(randSeed) < probDiffuse);
 
 	if (chooseDiffuse)
 	{
-		// Shoot a randomly selected cosine-sampled diffuse ray.
 		float3 L = getCosHemisphereSample(randSeed, N);
 		float3 bounceColor = traceRadianceRay(position, L, randSeed, recursion);
 
@@ -236,13 +240,9 @@ static float3 calculateIndirectLighting(inout uint randSeed, float3 position, fl
 	}
 	else
 	{
-		// Randomly sample the NDF to get a microfacet in our BRDF to reflect off of.
 		float3 H = importanceSampleGGX(randSeed, N, roughness);
-
-		// Compute the outgoing direction based on this (perfectly reflective) microfacet.
 		float3 L = reflect(-V, H);
 
-		// Compute our color by tracing a ray in this direction.
 		float3 bounceColor = traceRadianceRay(position, L, randSeed, recursion);
 
 		float NdotV = saturate(dot(N, V));
@@ -256,14 +256,13 @@ static float3 calculateIndirectLighting(inout uint randSeed, float3 position, fl
 
 		float3 numerator = NDF * G * F;
 		float denominator = 4.f * NdotV * NdotL;
-		float3 specular = numerator / max(denominator, 0.001f);
+		float3 brdf = numerator / max(denominator, 0.001f);
 
-		// What's the probability of sampling vector H?
-		float  ggxProb = max(NDF * NdotH / (4.f * LdotH), 0.01f);
+		float ggxProb = max(NDF * NdotH / (4.f * LdotH), 0.01f);
 
 		// Accumulate the color:  ggx-BRDF * incomingLight * NdotL / probability-of-sampling
 		//    -> Should really simplify the math above.
-		return NdotL * bounceColor * specular / (ggxProb * (1.f - probDiffuse));
+		return NdotL * bounceColor * brdf / (ggxProb * (1.f - probDiffuse));
 	}
 }
 
@@ -345,21 +344,30 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 		float3 pointLightColor =
 			calculateDirectLighting(albedo, pointLights[lightIndex].radiance * LIGHT_RADIANCE_SCALE * constants.lightIntensityScale, N, pointLightL, -WorldRayDirection(), F0, roughness, metallic)
 			* getAttenuation(distance, pointLights[lightIndex].radius)
-			* NUM_LIGHTS // Correct for probability of choosing this particular light.
-			* pointLightVisibility
-			* pointLightSolidAngle; // Correct for probability of "randomly" hitting this light. I *think* this is correct. See https://github.com/NVIDIA/Q2RTX/blob/master/src/refresh/vkpt/shader/light_lists.h#L295
+			* pointLightVisibility;
 
-#if 0
-		if (pointLightVisibility > 0.f)
+
+
+		//if (DispatchRaysIndex().x < DispatchRaysDimensions().x / 2)
+		if (constants.multipleImportanceSampling)
 		{
-			float lightPickPDF = 1.f / NUM_LIGHTS;
-			float lightHitPDF = 1.f; // If I understand correctly, this is the probability of hitting the light. However, since we explicitly sample this light, its probability is 1, isn't it?
-			float lightPDFWeight = lightHitPDF * lightPickPDF;
-			float brdfPDFWeight = ;
-			float misWeight = multipleImportanceSampleWeighting(brdfPDFWeight, lightPDFWeight);
-			pointLightColor *= misWeight;
+			// Multiple importance sampling. At least if I've done this correctly. See http://www.cs.uu.nl/docs/vakken/magr/2015-2016/slides/lecture%2008%20-%20variance%20reduction.pdf, slide 50.
+			float lightPDF = 1.f / (pointLightSolidAngle * NUM_LIGHTS); // Correct for PDFs, see comment below.
+
+			 // This is the probability that we had randomly hit this direction using our brdf importance sampling. TODO: This is currently ONLY the Lambertian BRDF. I think for specular materials we need to use the specular BRDF.
+			float brdfPDF = dot(N, pointLightL) * invPI; // Cosine-distributed for Lambertian BRDF.
+
+			float t = lightPDF / (lightPDF + brdfPDF);
+			float misPDF = lerp(brdfPDF, lightPDF, t); // Balance heuristic.
+
+			pointLightColor /= misPDF;
 		}
-#endif
+		else
+		{
+			pointLightColor = pointLightColor
+				* NUM_LIGHTS			 // Correct for probability of choosing this particular light.
+				* pointLightSolidAngle;  // Correct for probability of "randomly" hitting this light. I *think* this is correct. See https://github.com/NVIDIA/Q2RTX/blob/master/src/refresh/vkpt/shader/light_lists.h#L295.
+		}
 
 		payload.color += pointLightColor;
 	}

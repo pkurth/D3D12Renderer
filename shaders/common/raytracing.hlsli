@@ -26,6 +26,8 @@ struct path_tracing_cb
 	uint32 enableDirectLighting;
 	float lightIntensityScale;
 	float pointLightRadius;
+
+	uint32 multipleImportanceSampling;
 };
 
 

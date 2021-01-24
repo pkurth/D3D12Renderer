@@ -217,6 +217,7 @@ void path_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
             (uint32)enableDirectLighting,
             lightIntensityScale,
             pointLightRadius,
+            (uint32)multipleImportanceSampling,
         });
 
     ++numAveragedFrames;
