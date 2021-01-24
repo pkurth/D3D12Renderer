@@ -67,9 +67,9 @@ if not all_exist then
 	print("Disabling mesh shader compilation, since not all requirements are met.")
 end
 
-workspace "D3D12ProjectionMapping"
+workspace "D3D12Renderer"
 	architecture "x64"
-	startproject "D3D12ProjectionMapping"
+	startproject "D3D12Renderer"
 
 	configurations {
 		"Debug",
@@ -94,7 +94,7 @@ group "Dependencies"
 
 group ""
 
-project "D3D12ProjectionMapping"
+project "D3D12Renderer"
 	kind "ConsoleApp"
 	language "C++"
 	cppdialect "C++17"
