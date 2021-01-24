@@ -37,7 +37,7 @@ const aiScene* loadAssimpSceneFile(const char* filepathRaw, Assimp::Importer& im
 	fs::path cachedFilename = filepath;
 	cachedFilename.replace_extension(".cache." CACHE_FORMAT);
 
-	fs::path cacheFilepath = L"bin_cache" / cachedFilename;
+	fs::path cacheFilepath = L"asset_cache" / cachedFilename;
 
 	const aiScene* scene = 0;
 
@@ -63,6 +63,12 @@ const aiScene* loadAssimpSceneFile(const char* filepathRaw, Assimp::Importer& im
 
 	if (!scene)
 	{
+		std::cout << "Preprocessing asset '" << filepathRaw << "' for faster loading next time.";
+#ifdef _DEBUG
+		std::cout << " Consider running in a release build the first time.";
+#endif
+		std::cout << std::endl;
+
 		importer.SetPropertyFloat(AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE, 80.f);
 		importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_POINT | aiPrimitiveType_LINE);
 		//importer.SetPropertyInteger(AI_CONFIG_PP_SLM_VERTEX_LIMIT, UINT16_MAX); // So that we can use 16 bit indices.

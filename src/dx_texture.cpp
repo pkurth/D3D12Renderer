@@ -66,7 +66,7 @@ static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::S
 	fs::path cachedFilename = filepath;
 	cachedFilename.replace_extension("." + std::to_string(flags) + ".cache.dds");
 
-	fs::path cacheFilepath = L"bin_cache" / cachedFilename;
+	fs::path cacheFilepath = L"asset_cache" / cachedFilename;
 
 	bool fromCache = false;
 	DirectX::TexMetadata metadata;
@@ -94,6 +94,18 @@ static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::S
 
 	if (!fromCache)
 	{
+		if (!fs::exists(filepath))
+		{
+			return false;
+		}
+
+		std::cout << "Preprocessing asset '" << filepath.string() << "' for faster loading next time.";
+#ifdef _DEBUG
+		std::cout << " Consider running in a release build the first time.";
+#endif
+		std::cout << std::endl;
+
+
 		if (extension == ".dds")
 		{
 			if (FAILED(DirectX::LoadFromDDSFile(filepath.c_str(), DirectX::DDS_FLAGS_NONE, &metadata, scratchImage)))
