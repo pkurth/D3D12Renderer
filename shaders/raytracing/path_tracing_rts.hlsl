@@ -220,7 +220,9 @@ void rayGen()
 static float probabilityToSampleDiffuse(float roughness)
 {
 	// I don't know what a good way to choose is. My understanding is that it doesn't really matter, as long as you account for the probability in your results. 
-	// TODO: Test this with more reflective materials and check the convergence speed.
+	// It has an impact on covergence speed though.
+	// TODO: Can we calculate this using fresnel?
+	return 0.5f;
 	return roughness;
 }
 
@@ -258,6 +260,7 @@ static float3 calculateIndirectLighting(inout uint randSeed, float3 position, fl
 		float denominator = 4.f * NdotV * NdotL;
 		float3 brdf = numerator / max(denominator, 0.001f);
 
+		// Probability of sampling vector H from GGX.
 		float ggxProb = max(NDF * NdotH / (4.f * LdotH), 0.01f);
 
 		// Accumulate the color:  ggx-BRDF * incomingLight * NdotL / probability-of-sampling
@@ -278,6 +281,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 
 	float2 uv = interpolateAttribute(uvs, attribs);
 	float3 N = normalize(transformDirectionToWorld(interpolateAttribute(normals, attribs)));
+	float3 V = -WorldRayDirection();
 
 	float3 emission = (float3)0.f;
 	float3 albedo = (float3)1.f;
@@ -314,7 +318,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float3 hitPoint = hitWorldPosition();
 
 	float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
-	payload.color += calculateIndirectLighting(payload.randSeed, hitPoint, albedo, F0, N, -WorldRayDirection(), roughness, metallic, payload.recursion);
+	payload.color += calculateIndirectLighting(payload.randSeed, hitPoint, albedo, F0, N, V, roughness, metallic, payload.recursion);
 
 
 	if (constants.enableDirectLighting)
@@ -324,7 +328,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 		float3 sunRadiance = float3(1.f, 0.93f, 0.76f) * constants.lightIntensityScale * 2.f;
 
 		payload.color +=
-			calculateDirectLighting(albedo, sunRadiance, N, -sunDirection, -WorldRayDirection(), F0, roughness, metallic)
+			calculateDirectLighting(albedo, sunRadiance, N, -sunDirection, V, F0, roughness, metallic)
 			* traceShadowRay(hitPoint, -sunDirection, 10000.f, payload.recursion);
 
 
@@ -342,7 +346,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 		float pointLightVisibility = traceShadowRay(hitPoint, pointLightL, distance, payload.recursion);
 		float pointLightSolidAngle = solidAngleOfSphere(pointLightRadius, distance) * 0.5f; // Divide by 2, since we are only interested in hemisphere.
 		float3 pointLightColor =
-			calculateDirectLighting(albedo, pointLights[lightIndex].radiance * LIGHT_RADIANCE_SCALE * constants.lightIntensityScale, N, pointLightL, -WorldRayDirection(), F0, roughness, metallic)
+			calculateDirectLighting(albedo, pointLights[lightIndex].radiance * LIGHT_RADIANCE_SCALE * constants.lightIntensityScale, N, pointLightL, V, F0, roughness, metallic)
 			* getAttenuation(distance, pointLights[lightIndex].radius)
 			* pointLightVisibility;
 
@@ -354,9 +358,22 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 			// Multiple importance sampling. At least if I've done this correctly. See http://www.cs.uu.nl/docs/vakken/magr/2015-2016/slides/lecture%2008%20-%20variance%20reduction.pdf, slide 50.
 			float lightPDF = 1.f / (pointLightSolidAngle * NUM_LIGHTS); // Correct for PDFs, see comment below.
 
-			 // This is the probability that we had randomly hit this direction using our brdf importance sampling. TODO: This is currently ONLY the Lambertian BRDF. I think for specular materials we need to use the specular BRDF.
-			float brdfPDF = dot(N, pointLightL) * invPI; // Cosine-distributed for Lambertian BRDF.
+			// Lambertian part.
+			float diffusePDF = dot(N, pointLightL) * invPI; // Cosine-distributed for Lambertian BRDF.
 
+			// Specular part.
+			float3 H = normalize(V + pointLightL);
+			float NdotH = saturate(dot(N, H));
+			float LdotH = saturate(dot(pointLightL, H));
+			float NDF = distributionGGX(NdotH, roughness);
+			float specularPDF = max(NDF * NdotH / (4.f * LdotH), 0.01f);
+
+			float probDiffuse = probabilityToSampleDiffuse(roughness);
+
+			// Total BRDF PDF. This is the probability that we had randomly hit this direction using our brdf importance sampling.
+			float brdfPDF = lerp(specularPDF, diffusePDF, probDiffuse);
+
+			// Blend PDFs.
 			float t = lightPDF / (lightPDF + brdfPDF);
 			float misPDF = lerp(brdfPDF, lightPDF, t); // Balance heuristic.
 
