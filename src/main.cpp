@@ -130,6 +130,9 @@ static void drawHelperWindows()
 
 static bool drawMainMenuBar(application& app)
 {
+	bool controlsClicked = false;
+	bool aboutClicked = false;
+
 	if (ImGui::BeginMainMenuBar())
 	{
 		if (ImGui::BeginMenu(ICON_FA_FILE "  File"))
@@ -167,7 +170,86 @@ static bool drawMainMenuBar(application& app)
 			ImGui::EndMenu();
 		}
 
+		if (ImGui::BeginMenu(ICON_FA_CHILD "  Help"))
+		{
+			if (ImGui::MenuItem(ICON_FA_COMPASS "  Controls"))
+			{
+				controlsClicked = true;
+			}
+
+			if (ImGui::MenuItem(ICON_FA_QUESTION "  About"))
+			{
+				aboutClicked = true;
+			}
+
+			ImGui::EndMenu();
+		}
+
 		ImGui::EndMainMenuBar();
+	}
+
+	if (controlsClicked)
+	{
+		ImGui::OpenPopup("Controls");
+	}
+
+	ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+	ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+	if (ImGui::BeginPopupModal("Controls", 0, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::Text("The camera can be controlled in two modes:");
+		ImGui::BulletText(
+			"Free flying: Hold the right mouse button and move the mouse to turn.\n"
+			"Move with WASD (while holding right mouse). Q & E let you move down and up.\n"
+			"Holding Shift will make you fly faster, Ctrl will make you slower."
+		); 
+		ImGui::BulletText(
+			"Orbit: While holding Alt, press and hold the left mouse button to\n"
+			"orbit around a point in front of the camera."
+		);
+		ImGui::Separator();
+		ImGui::Text(
+			"Left-click on objects to select them. Toggle through gizmos using\n"
+			"Q (no gizmo), W (translate), E (rotate), R (scale).\n"
+			"Press G to toggle between global and local coordinate system.\n"
+			"You can also change the object's properties in the Scene Hierarchy window."
+		);
+		ImGui::Separator();
+		ImGui::Text(
+			"Press F to focus the camera on the selected object. This automatically\n"
+			"sets the orbit distance such that you now orbit around this object."
+		);
+		ImGui::Separator();
+		ImGui::Text(
+			"Press V to toggle Vsync on or off."
+		);
+		ImGui::Separator();
+
+		ImGui::SetCursorPosX((ImGui::GetWindowSize().x - 120) * 0.5f);
+
+		if (ImGui::Button("OK", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+		ImGui::SetItemDefaultFocus();
+		ImGui::EndPopup();
+	}
+
+	if (aboutClicked)
+	{
+		ImGui::OpenPopup("About");
+	}
+
+	ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+	if (ImGui::BeginPopupModal("About", 0, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::Text("Direct3D renderer");
+		ImGui::Separator();
+
+		ImGui::SetCursorPosX((ImGui::GetWindowSize().x - 120) * 0.5f);
+
+		if (ImGui::Button("OK", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+		ImGui::SetItemDefaultFocus();
+		ImGui::EndPopup();
 	}
 
 	return true;

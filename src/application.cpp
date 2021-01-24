@@ -553,7 +553,7 @@ void application::handleUserInput(const user_input& input, float dt)
 
 		static transformation_type type = transformation_type_translation;
 		static transformation_space space = transformation_global;
-		inputCaptured = manipulateTransformation(transform, type, space, camera, input, !inputCaptured, &overlayRenderPass);
+		inputCaptured |= manipulateTransformation(transform, type, space, camera, input, !inputCaptured, &overlayRenderPass);
 	}
 
 	if (!inputCaptured && input.mouse.left.clickEvent)
