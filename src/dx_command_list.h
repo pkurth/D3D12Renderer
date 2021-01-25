@@ -9,6 +9,7 @@
 #include "dx_render_target.h"
 #include "dx_pipeline.h"
 
+
 struct dx_command_list
 {
 	dx_command_list(D3D12_COMMAND_LIST_TYPE type);
@@ -21,6 +22,8 @@ struct dx_command_list
 
 	dx_upload_buffer uploadBuffer;
 	dx_dynamic_descriptor_heap dynamicDescriptorHeap;
+
+	dx_query_heap timeStampQueryHeap;
 
 
 	ID3D12DescriptorHeap* descriptorHeaps[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES] = {};
@@ -169,6 +172,10 @@ struct dx_command_list
 
 	// Raytracing.
 	void raytrace(D3D12_DISPATCH_RAYS_DESC& raytraceDesc);
+
+
+	// Queries.
+	void queryTimestamp(uint32 index);
 
 	void reset();
 };

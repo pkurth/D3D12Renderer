@@ -15,6 +15,8 @@ struct dx_command_queue
 	void flush();
 
 
+	uint64 timeStampFrequency; // In Hz.
+
 	D3D12_COMMAND_LIST_TYPE commandListType;
 	com<ID3D12CommandQueue>	commandQueue;
 	com<ID3D12Fence> fence;

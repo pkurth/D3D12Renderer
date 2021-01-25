@@ -3,6 +3,7 @@
 #include "dx_window.h"
 #include "dx_command_list.h"
 #include "dx_renderer.h"
+#include "dx_profiling.h"
 #include "input.h"
 #include "imgui.h"
 #include "file_browser.h"
@@ -70,6 +71,8 @@ static uint64 renderToMainWindow(dx_window& window)
 	}
 
 	cl->transitionBarrier(backbuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+
+	dxContext.endFrame(cl);
 
 	uint64 result = dxContext.executeCommandList(cl);
 
@@ -165,6 +168,11 @@ static bool drawMainMenuBar(application& app)
 			if (ImGui::MenuItem(ICON_FA_PUZZLE_PIECE "  Show demo window"))
 			{
 				showDemoWindow = true;
+			}
+
+			if (ImGui::MenuItem(profilerWindowOpen ? (ICON_FA_CHART_BAR "  Hide GPU profiler") : (ICON_FA_CHART_BAR "  Show GPU profiler")))
+			{
+				profilerWindowOpen = !profilerWindowOpen;
 			}
 
 			ImGui::EndMenu();

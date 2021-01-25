@@ -6,6 +6,7 @@
 #include "dx_upload_buffer.h"
 #include "dx_descriptor_allocation.h"
 #include "dx_buffer.h"
+#include "dx_query.h"
 
 
 struct dx_memory_usage
@@ -21,6 +22,7 @@ struct dx_context
 	void quit();
 
 	void newFrame(uint64 frameID);
+	void endFrame(dx_command_list* cl);
 	void flushApplication();
 
 	dx_command_list* getFreeCopyCommandList();
@@ -59,6 +61,9 @@ struct dx_context
 	dx_descriptor_heap<dx_rtv_descriptor_handle> rtvAllocator;
 	dx_descriptor_heap<dx_dsv_descriptor_handle> dsvAllocator;
 
+#if ENABLE_DX_PROFILING
+	uint32 timestampQueryIndex[NUM_BUFFERED_FRAMES];
+#endif
 
 	dx_upload_buffer frameUploadBuffer;
 
@@ -74,6 +79,10 @@ struct dx_context
 	void retire(dx_object obj);
 
 private:
+#if ENABLE_DX_PROFILING
+	dx_timestamp_query_heap timestampHeaps[NUM_BUFFERED_FRAMES];
+	ref<dx_buffer> resolvedTimestampBuffers[NUM_BUFFERED_FRAMES];
+#endif
 
 	dx_page_pool pagePools[NUM_BUFFERED_FRAMES];
 

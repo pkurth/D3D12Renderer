@@ -39,6 +39,7 @@ typedef com<ID3D12Resource> dx_resource;
 typedef com<ID3D12CommandSignature> dx_command_signature;
 typedef com<ID3D12Heap> dx_heap;
 typedef com<ID3D12StateObject> dx_raytracing_pipeline_state;
+typedef com<ID3D12QueryHeap> dx_query_heap;
 
 #if ADVANCED_GPU_FEATURES_ENABLED
 typedef com<ID3D12GraphicsCommandList6> dx_graphics_command_list;
@@ -47,6 +48,8 @@ typedef com<ID3D12GraphicsCommandList4> dx_graphics_command_list;
 #endif
 
 #define NUM_BUFFERED_FRAMES 2
+
+#define ENABLE_DX_PROFILING 1
 
 #define SET_NAME(obj, name) checkResult(obj->SetName(L##name));
 

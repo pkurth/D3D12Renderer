@@ -3,6 +3,7 @@
 #include "dx_command_list.h"
 #include "dx_texture.h"
 #include "dx_buffer.h"
+#include "dx_profiling.h"
 
 extern "C"
 {
@@ -11,6 +12,14 @@ extern "C"
 }
 
 dx_context dxContext;
+
+
+#if ENABLE_DX_PROFILING
+// Defined in dx_profiling.cpp.
+void profileFrameMarker(dx_command_list* cl);
+void resolveTimeStampQueries(uint64* timestamps);
+#endif
+
 
 static void enableDebugLayer()
 {
@@ -182,9 +191,23 @@ bool dx_context::initialize()
 
 	bufferedFrameID = NUM_BUFFERED_FRAMES - 1;
 
+	descriptorHandleIncrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+
+	descriptorAllocatorCPU.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096, false);
+	descriptorAllocatorGPU.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
+	rtvAllocator.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1024, false);
+	dsvAllocator.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1024, false);
+	frameDescriptorAllocator.initialize();
+
 	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
 	{
 		pagePools[i].initialize(MB(2));
+
+#if ENABLE_DX_PROFILING
+		timestampHeaps[i].initialize(MAX_NUM_DX_PROFILE_EVENTS);
+		resolvedTimestampBuffers[i] = createReadbackBuffer(sizeof(uint64), MAX_NUM_DX_PROFILE_EVENTS);
+#endif
 	}
 
 	frameUploadBuffer.reset();
@@ -196,15 +219,6 @@ bool dx_context::initialize()
 	renderQueue.initialize(device, D3D12_COMMAND_LIST_TYPE_DIRECT);
 	computeQueue.initialize(device, D3D12_COMMAND_LIST_TYPE_COMPUTE);
 	copyQueue.initialize(device, D3D12_COMMAND_LIST_TYPE_COPY);
-
-	descriptorHandleIncrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-
-	descriptorAllocatorCPU.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096, false);
-	descriptorAllocatorGPU.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
-	rtvAllocator.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1024, false);
-	dsvAllocator.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1024, false);
-	frameDescriptorAllocator.initialize();
 
 	return true;
 }
@@ -218,6 +232,13 @@ void dx_context::flushApplication()
 
 void dx_context::quit()
 {
+#if ENABLE_DX_PROFILING
+	for (uint32 b = 0; b < NUM_BUFFERED_FRAMES; ++b)
+	{
+		resolvedTimestampBuffers[b].reset();
+	}
+#endif
+
 	running = false;
 	flushApplication();
 	WaitForSingleObject(renderQueue.processThreadHandle, INFINITE);
@@ -227,6 +248,8 @@ void dx_context::quit()
 	for (uint32 b = 0; b < NUM_BUFFERED_FRAMES; ++b)
 	{
 		textureGraveyard[b].clear();
+		bufferGraveyard[b].clear();
+		objectGraveyard[b].clear();
 	}
 }
 
@@ -277,6 +300,10 @@ dx_command_list* dx_context::getFreeCommandList(dx_command_queue& queue)
 	mutex.lock();
 	result->uploadBuffer.pagePool = &pagePools[bufferedFrameID];
 	mutex.unlock();
+
+#if ENABLE_DX_PROFILING
+	result->timeStampQueryHeap = timestampHeaps[bufferedFrameID].heap;
+#endif
 
 	return result;
 }
@@ -344,12 +371,29 @@ dx_memory_usage dx_context::getMemoryUsage()
 	return { (uint32)BYTE_TO_MB(memoryInfo.CurrentUsage), (uint32)BYTE_TO_MB(memoryInfo.Budget) };
 }
 
+void dx_context::endFrame(dx_command_list* cl)
+{
+#if ENABLE_DX_PROFILING
+	profileFrameMarker(cl);
+	cl->commandList->ResolveQueryData(timestampHeaps[bufferedFrameID].heap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 0, timestampQueryIndex[bufferedFrameID], resolvedTimestampBuffers[bufferedFrameID]->resource.Get(), 0);
+#endif
+}
+
 void dx_context::newFrame(uint64 frameID)
 {
 	this->frameID = frameID;
 
 	mutex.lock();
 	bufferedFrameID = (uint32)(frameID % NUM_BUFFERED_FRAMES);
+
+#if ENABLE_DX_PROFILING
+	uint64* timestamps = (uint64*)mapBuffer(resolvedTimestampBuffers[bufferedFrameID], true);
+	resolveTimeStampQueries(timestamps);
+	unmapBuffer(resolvedTimestampBuffers[bufferedFrameID], false);
+
+	timestampQueryIndex[bufferedFrameID] = 0;
+#endif
+
 
 	textureGraveyard[bufferedFrameID].clear();
 	bufferGraveyard[bufferedFrameID].clear();

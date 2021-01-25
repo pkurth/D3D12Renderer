@@ -511,6 +511,11 @@ void dx_command_list::raytrace(D3D12_DISPATCH_RAYS_DESC& raytraceDesc)
 	commandList->DispatchRays(&raytraceDesc);
 }
 
+void dx_command_list::queryTimestamp(uint32 index)
+{
+	commandList->EndQuery(timeStampQueryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, index);
+}
+
 void dx_command_list::reset()
 {
 	commandAllocator->Reset();

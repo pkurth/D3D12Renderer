@@ -8,6 +8,7 @@
 #include "texture_preprocessing.h"
 #include "skinning.h"
 #include "dx_context.h"
+#include "dx_profiling.h"
 
 #include "depth_only_rs.hlsli"
 #include "outline_rs.hlsli"
@@ -594,6 +595,8 @@ void dx_renderer::endFrame(const user_input& input)
 
 		if (objectIDsTexture)
 		{
+			DX_PROFILE_BLOCK(cl, "Clear object IDs");
+
 			cl->setPipelineState(*clearObjectIDsPipeline.pipeline);
 			cl->setComputeRootSignature(*clearObjectIDsPipeline.rootSignature);
 
@@ -617,30 +620,34 @@ void dx_renderer::endFrame(const user_input& input)
 		// SKY PASS
 		// ----------------------------------------
 
-		if (environment)
 		{
-			cl->setPipelineState(*textureSkyPipeline.pipeline);
-			cl->setGraphicsRootSignature(*textureSkyPipeline.rootSignature);
+			DX_PROFILE_BLOCK(cl, "Sky");
 
-			cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
-			cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
-			cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment->sky->defaultSRV);
+			if (environment)
+			{
+				cl->setPipelineState(*textureSkyPipeline.pipeline);
+				cl->setGraphicsRootSignature(*textureSkyPipeline.rootSignature);
 
-			cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
-			cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
-			cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
-		}
-		else
-		{
-			cl->setPipelineState(*proceduralSkyPipeline.pipeline);
-			cl->setGraphicsRootSignature(*proceduralSkyPipeline.rootSignature);
+				cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
+				cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
+				cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment->sky->defaultSRV);
 
-			cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
-			cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
+				cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
+				cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
+				cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
+			}
+			else
+			{
+				cl->setPipelineState(*proceduralSkyPipeline.pipeline);
+				cl->setGraphicsRootSignature(*proceduralSkyPipeline.rootSignature);
 
-			cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
-			cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
-			cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
+				cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
+				cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
+
+				cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
+				cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
+				cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
+			}
 		}
 
 
@@ -657,68 +664,78 @@ void dx_renderer::endFrame(const user_input& input)
 		cl->setRenderTarget(depthOnlyRenderTarget);
 		cl->setViewport(depthOnlyRenderTarget.viewport);
 
-		// Static.
-		if (opaqueRenderPass && opaqueRenderPass->staticDepthOnlyDrawCalls.size() > 0)
 		{
-			cl->setPipelineState(*depthOnlyPipeline.pipeline);
-			cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
+			DX_PROFILE_BLOCK(cl, "Depth pre-pass");
 
-			for (const auto& dc : opaqueRenderPass->staticDepthOnlyDrawCalls)
+			// Static.
+			if (opaqueRenderPass && opaqueRenderPass->staticDepthOnlyDrawCalls.size() > 0)
 			{
-				const mat4& m = dc.transform;
-				const submesh_info& submesh = dc.submesh;
+				DX_PROFILE_BLOCK(cl, "Static");
 
-				cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
-				cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ camera.viewProj * m, camera.prevFrameViewProj * m });
+				cl->setPipelineState(*depthOnlyPipeline.pipeline);
+				cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
 
-				cl->setVertexBuffer(0, dc.vertexBuffer);
-				cl->setIndexBuffer(dc.indexBuffer);
-				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+				for (const auto& dc : opaqueRenderPass->staticDepthOnlyDrawCalls)
+				{
+					const mat4& m = dc.transform;
+					const submesh_info& submesh = dc.submesh;
+
+					cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
+					cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ camera.viewProj * m, camera.prevFrameViewProj * m });
+
+					cl->setVertexBuffer(0, dc.vertexBuffer);
+					cl->setIndexBuffer(dc.indexBuffer);
+					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+				}
 			}
-		}
 
-		// Dynamic.
-		if (opaqueRenderPass && opaqueRenderPass->dynamicDepthOnlyDrawCalls.size() > 0)
-		{
-			cl->setPipelineState(*depthOnlyPipeline.pipeline);
-			cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
-
-			for (const auto& dc : opaqueRenderPass->dynamicDepthOnlyDrawCalls)
+			// Dynamic.
+			if (opaqueRenderPass && opaqueRenderPass->dynamicDepthOnlyDrawCalls.size() > 0)
 			{
-				const mat4& m = dc.transform;
-				const mat4& prevFrameM = dc.prevFrameTransform;
-				const submesh_info& submesh = dc.submesh;
+				DX_PROFILE_BLOCK(cl, "Dynamic");
 
-				cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
-				cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ camera.viewProj * m, camera.prevFrameViewProj * prevFrameM });
+				cl->setPipelineState(*depthOnlyPipeline.pipeline);
+				cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
 
-				cl->setVertexBuffer(0, dc.vertexBuffer);
-				cl->setIndexBuffer(dc.indexBuffer);
-				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+				for (const auto& dc : opaqueRenderPass->dynamicDepthOnlyDrawCalls)
+				{
+					const mat4& m = dc.transform;
+					const mat4& prevFrameM = dc.prevFrameTransform;
+					const submesh_info& submesh = dc.submesh;
+
+					cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
+					cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ camera.viewProj * m, camera.prevFrameViewProj * prevFrameM });
+
+					cl->setVertexBuffer(0, dc.vertexBuffer);
+					cl->setIndexBuffer(dc.indexBuffer);
+					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+				}
 			}
-		}
 
-		// Animated.
-		if (opaqueRenderPass && opaqueRenderPass->animatedDepthOnlyDrawCalls.size() > 0)
-		{
-			cl->setPipelineState(*animatedDepthOnlyPipeline.pipeline);
-			cl->setGraphicsRootSignature(*animatedDepthOnlyPipeline.rootSignature);
-
-			for (const auto& dc : opaqueRenderPass->animatedDepthOnlyDrawCalls)
+			// Animated.
+			if (opaqueRenderPass && opaqueRenderPass->animatedDepthOnlyDrawCalls.size() > 0)
 			{
-				const mat4& m = dc.transform;
-				const mat4& prevFrameM = dc.prevFrameTransform;
-				const submesh_info& submesh = dc.submesh;
-				const submesh_info& prevFrameSubmesh = dc.prevFrameSubmesh;
-				const ref<dx_vertex_buffer>& prevFrameVertexBuffer = dc.prevFrameVertexBuffer;
+				DX_PROFILE_BLOCK(cl, "Animated");
 
-				cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
-				cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ camera.viewProj * m, camera.prevFrameViewProj * prevFrameM });
-				cl->setRootGraphicsSRV(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS, prevFrameVertexBuffer->gpuVirtualAddress + prevFrameSubmesh.baseVertex * prevFrameVertexBuffer->elementSize);
+				cl->setPipelineState(*animatedDepthOnlyPipeline.pipeline);
+				cl->setGraphicsRootSignature(*animatedDepthOnlyPipeline.rootSignature);
 
-				cl->setVertexBuffer(0, dc.vertexBuffer);
-				cl->setIndexBuffer(dc.indexBuffer);
-				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+				for (const auto& dc : opaqueRenderPass->animatedDepthOnlyDrawCalls)
+				{
+					const mat4& m = dc.transform;
+					const mat4& prevFrameM = dc.prevFrameTransform;
+					const submesh_info& submesh = dc.submesh;
+					const submesh_info& prevFrameSubmesh = dc.prevFrameSubmesh;
+					const ref<dx_vertex_buffer>& prevFrameVertexBuffer = dc.prevFrameVertexBuffer;
+
+					cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
+					cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ camera.viewProj * m, camera.prevFrameViewProj * prevFrameM });
+					cl->setRootGraphicsSRV(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS, prevFrameVertexBuffer->gpuVirtualAddress + prevFrameSubmesh.baseVertex * prevFrameVertexBuffer->elementSize);
+
+					cl->setVertexBuffer(0, dc.vertexBuffer);
+					cl->setIndexBuffer(dc.indexBuffer);
+					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+				}
 			}
 		}
 
@@ -726,6 +743,8 @@ void dx_renderer::endFrame(const user_input& input)
 		// Copy hovered object id to readback buffer.
 		if (objectIDsTexture)
 		{
+			DX_PROFILE_BLOCK(cl, "Copy hovered object ID");
+
 			barrier_batcher(cl)
 				.transition(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
@@ -742,6 +761,8 @@ void dx_renderer::endFrame(const user_input& input)
 
 		if (numPointLights || numSpotLights)
 		{
+			DX_PROFILE_BLOCK(cl, "Cull lights");
+
 			// Tiled frusta.
 			cl->setPipelineState(*worldSpaceFrustaPipeline.pipeline);
 			cl->setComputeRootSignature(*worldSpaceFrustaPipeline.rootSignature);
@@ -774,28 +795,59 @@ void dx_renderer::endFrame(const user_input& input)
 		// SHADOW MAP PASS
 		// ----------------------------------------
 
-		cl->clearDepth(shadowRenderTarget);
-
-		cl->setPipelineState(*shadowPipeline.pipeline);
-		cl->setGraphicsRootSignature(*shadowPipeline.rootSignature);
-
-		cl->setRenderTarget(shadowRenderTarget);
-		cl->clearDepth(shadowRenderTarget);
-
-		if (sunShadowRenderPass)
 		{
-			for (uint32 i = 0; i < sun.numShadowCascades; ++i)
-			{
-				vec4 vp = sunCPUShadowViewports[i];
-				cl->setViewport(vp.x, vp.y, vp.z, vp.w);
+			DX_PROFILE_BLOCK(cl, "Shadow map pass");
 
-				for (uint32 cascade = 0; cascade <= i; ++cascade)
+			cl->clearDepth(shadowRenderTarget);
+
+			cl->setPipelineState(*shadowPipeline.pipeline);
+			cl->setGraphicsRootSignature(*shadowPipeline.rootSignature);
+
+			cl->setRenderTarget(shadowRenderTarget);
+			cl->clearDepth(shadowRenderTarget);
+
+			{
+				DX_PROFILE_BLOCK(cl, "Sun");
+
+				if (sunShadowRenderPass)
 				{
-					for (const auto& dc : sunShadowRenderPass->drawCalls[cascade])
+					for (uint32 i = 0; i < sun.numShadowCascades; ++i)
+					{
+						vec4 vp = sunCPUShadowViewports[i];
+						cl->setViewport(vp.x, vp.y, vp.z, vp.w);
+
+						for (uint32 cascade = 0; cascade <= i; ++cascade)
+						{
+							for (const auto& dc : sunShadowRenderPass->drawCalls[cascade])
+							{
+								const mat4& m = dc.transform;
+								const submesh_info& submesh = dc.submesh;
+								cl->setGraphics32BitConstants(SHADOW_RS_MVP, sun.vp[i] * m);
+
+								cl->setVertexBuffer(0, dc.vertexBuffer);
+								cl->setIndexBuffer(dc.indexBuffer);
+
+								cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+							}
+						}
+					}
+				}
+			}
+
+			{
+				DX_PROFILE_BLOCK(cl, "Spots lights");
+
+				for (uint32 i = 0; i < numSpotLightShadowRenderPasses; ++i)
+				{
+					const mat4& viewProj = spotLightShadowRenderPasses[i]->viewProjMatrix;
+
+					cl->setViewport(spotLightViewports[i].x, spotLightViewports[i].y, spotLightViewports[i].z, spotLightViewports[i].w);
+
+					for (const auto& dc : spotLightShadowRenderPasses[i]->drawCalls)
 					{
 						const mat4& m = dc.transform;
 						const submesh_info& submesh = dc.submesh;
-						cl->setGraphics32BitConstants(SHADOW_RS_MVP, sun.vp[i] * m);
+						cl->setGraphics32BitConstants(SHADOW_RS_MVP, viewProj * m);
 
 						cl->setVertexBuffer(0, dc.vertexBuffer);
 						cl->setIndexBuffer(dc.indexBuffer);
@@ -804,59 +856,43 @@ void dx_renderer::endFrame(const user_input& input)
 					}
 				}
 			}
-		}
 
-		for (uint32 i = 0; i < numSpotLightShadowRenderPasses; ++i)
-		{
-			const mat4& viewProj = spotLightShadowRenderPasses[i]->viewProjMatrix;
+			cl->setPipelineState(*pointLightShadowPipeline.pipeline);
+			cl->setGraphicsRootSignature(*pointLightShadowPipeline.rootSignature);
 
-			cl->setViewport(spotLightViewports[i].x, spotLightViewports[i].y, spotLightViewports[i].z, spotLightViewports[i].w);
-
-			for (const auto& dc : spotLightShadowRenderPasses[i]->drawCalls)
 			{
-				const mat4& m = dc.transform;
-				const submesh_info& submesh = dc.submesh;
-				cl->setGraphics32BitConstants(SHADOW_RS_MVP, viewProj * m);
+				DX_PROFILE_BLOCK(cl, "Point lights");
 
-				cl->setVertexBuffer(0, dc.vertexBuffer);
-				cl->setIndexBuffer(dc.indexBuffer);
-
-				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-			}
-		}
-
-		cl->setPipelineState(*pointLightShadowPipeline.pipeline);
-		cl->setGraphicsRootSignature(*pointLightShadowPipeline.rootSignature);
-
-		for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
-		{
-			for (uint32 v = 0; v < 2; ++v)
-			{
-				cl->setViewport(pointLightViewports[i][v].x, pointLightViewports[i][v].y, pointLightViewports[i][v].z, pointLightViewports[i][v].w);
-
-				float flip = (v == 0) ? 1.f : -1.f;
-
-				for (const auto& dc : pointLightShadowRenderPasses[i]->drawCalls)
+				for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
 				{
-					const mat4& m = dc.transform;
-					const submesh_info& submesh = dc.submesh;
-					cl->setGraphics32BitConstants(SHADOW_RS_MVP,
-						point_shadow_transform_cb
+					for (uint32 v = 0; v < 2; ++v)
+					{
+						cl->setViewport(pointLightViewports[i][v].x, pointLightViewports[i][v].y, pointLightViewports[i][v].z, pointLightViewports[i][v].w);
+
+						float flip = (v == 0) ? 1.f : -1.f;
+
+						for (const auto& dc : pointLightShadowRenderPasses[i]->drawCalls)
 						{
-							m,
-							pointLightShadowRenderPasses[i]->lightPosition,
-							pointLightShadowRenderPasses[i]->maxDistance,
-							flip
-						});
+							const mat4& m = dc.transform;
+							const submesh_info& submesh = dc.submesh;
+							cl->setGraphics32BitConstants(SHADOW_RS_MVP,
+								point_shadow_transform_cb
+								{
+									m,
+									pointLightShadowRenderPasses[i]->lightPosition,
+									pointLightShadowRenderPasses[i]->maxDistance,
+									flip
+								});
 
-					cl->setVertexBuffer(0, dc.vertexBuffer);
-					cl->setIndexBuffer(dc.indexBuffer);
+							cl->setVertexBuffer(0, dc.vertexBuffer);
+							cl->setIndexBuffer(dc.indexBuffer);
 
-					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+							cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+						}
+					}
 				}
 			}
 		}
-
 
 		barrier_batcher(cl)
 			.transition(shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -893,6 +929,8 @@ void dx_renderer::endFrame(const user_input& input)
 
 		if (opaqueRenderPass && opaqueRenderPass->drawCalls.size() > 0)
 		{
+			DX_PROFILE_BLOCK(cl, "Main light pass");
+
 			material_setup_function lastSetupFunc = 0;
 
 			for (const auto& dc : opaqueRenderPass->drawCalls)
@@ -928,6 +966,8 @@ void dx_renderer::endFrame(const user_input& input)
 
 		if (opaqueRenderPass && opaqueRenderPass->outlinedObjects.size() > 0)
 		{
+			DX_PROFILE_BLOCK(cl, "Outlines");
+
 			cl->setStencilReference(stencil_flag_selected_object);
 
 			cl->setPipelineState(*outlineMarkerPipeline.pipeline);
@@ -977,6 +1017,8 @@ void dx_renderer::endFrame(const user_input& input)
 
 		if (overlayRenderPass && overlayRenderPass->drawCalls.size())
 		{
+			DX_PROFILE_BLOCK(cl, "3D Overlays");
+
 			cl->clearDepth(depthStencilBuffer->dsvHandle);
 
 			material_setup_function lastSetupFunc = 0;
@@ -1028,6 +1070,8 @@ void dx_renderer::endFrame(const user_input& input)
 
 		if (dxContext.raytracingSupported && raytracer)
 		{
+			DX_PROFILE_BLOCK(cl, "Raytracing");
+
 			dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // TODO: This is not the way to go here. We should wait for the specific value returned by executeCommandList.
 
 			raytracer->render(cl, *tlas, hdrColorTexture, materialInfo);
@@ -1045,21 +1089,24 @@ void dx_renderer::endFrame(const user_input& input)
 	// PRESENT
 	// ----------------------------------------
 
-	cl->setRenderTarget(windowRenderTarget);
-	cl->setViewport(windowViewport);
-	if (aspectRatioModeChanged)
 	{
-		cl->clearRTV(windowRenderTarget, 0, 0.f, 0.f, 0.f);
+		DX_PROFILE_BLOCK(cl, "Present");
+
+		cl->setRenderTarget(windowRenderTarget);
+		cl->setViewport(windowViewport);
+		if (aspectRatioModeChanged)
+		{
+			cl->clearRTV(windowRenderTarget, 0, 0.f, 0.f, 0.f);
+		}
+
+		cl->setPipelineState(*presentPipeline.pipeline);
+		cl->setGraphicsRootSignature(*presentPipeline.rootSignature);
+
+		cl->setGraphics32BitConstants(PRESENT_RS_TONEMAP, settings.tonemap);
+		cl->setGraphics32BitConstants(PRESENT_RS_PRESENT, present_cb{ 0, 0.f });
+		cl->setDescriptorHeapSRV(PRESENT_RS_TEX, 0, hdrColorTexture);
+		cl->drawFullscreenTriangle();
 	}
-
-	cl->setPipelineState(*presentPipeline.pipeline);
-	cl->setGraphicsRootSignature(*presentPipeline.rootSignature);
-
-	cl->setGraphics32BitConstants(PRESENT_RS_TONEMAP, settings.tonemap);
-	cl->setGraphics32BitConstants(PRESENT_RS_PRESENT, present_cb{ 0, 0.f });
-	cl->setDescriptorHeapSRV(PRESENT_RS_TEX, 0, hdrColorTexture);
-	cl->drawFullscreenTriangle();
-
 
 	barrier_batcher(cl)
 		.transition(hdrColorTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
