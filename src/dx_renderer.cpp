@@ -813,6 +813,8 @@ void dx_renderer::endFrame(const user_input& input)
 				{
 					for (uint32 i = 0; i < sun.numShadowCascades; ++i)
 					{
+						DX_PROFILE_BLOCK(cl, (i == 0) ? "First cascade" : (i == 1) ? "Second cascade" : (i == 2) ? "Third cascade" : "Fourth cascade");
+
 						vec4 vp = sunCPUShadowViewports[i];
 						cl->setViewport(vp.x, vp.y, vp.z, vp.w);
 
@@ -835,10 +837,12 @@ void dx_renderer::endFrame(const user_input& input)
 			}
 
 			{
-				DX_PROFILE_BLOCK(cl, "Spots lights");
+				DX_PROFILE_BLOCK(cl, "Spot lights");
 
 				for (uint32 i = 0; i < numSpotLightShadowRenderPasses; ++i)
 				{
+					DX_PROFILE_BLOCK(cl, "Single light");
+
 					const mat4& viewProj = spotLightShadowRenderPasses[i]->viewProjMatrix;
 
 					cl->setViewport(spotLightViewports[i].x, spotLightViewports[i].y, spotLightViewports[i].z, spotLightViewports[i].w);
@@ -865,8 +869,12 @@ void dx_renderer::endFrame(const user_input& input)
 
 				for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
 				{
+					DX_PROFILE_BLOCK(cl, "Single light");
+
 					for (uint32 v = 0; v < 2; ++v)
 					{
+						DX_PROFILE_BLOCK(cl, (v == 0) ? "First hemisphere" : "Second hemisphere");
+						
 						cl->setViewport(pointLightViewports[i][v].x, pointLightViewports[i][v].y, pointLightViewports[i][v].z, pointLightViewports[i][v].w);
 
 						float flip = (v == 0) ? 1.f : -1.f;

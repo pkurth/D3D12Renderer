@@ -57,21 +57,26 @@ static uint64 renderToMainWindow(dx_window& window)
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
-	CD3DX12_VIEWPORT viewport = CD3DX12_VIEWPORT(0.f, 0.f, (float)window.clientWidth, (float)window.clientHeight);
-	cl->setViewport(viewport);
-
-	cl->transitionBarrier(backbuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-	cl->clearRTV(rtv, 0.f, 0.f, 0.f);
-	cl->setRenderTarget(&rtv, 1, 0);
-
-	if (win32_window::mainWindow == &window)
 	{
-		renderImGui(cl);
+		DX_PROFILE_BLOCK(cl, "Blit to backbuffer");
+
+		CD3DX12_VIEWPORT viewport = CD3DX12_VIEWPORT(0.f, 0.f, (float)window.clientWidth, (float)window.clientHeight);
+		cl->setViewport(viewport);
+
+		cl->transitionBarrier(backbuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+		cl->clearRTV(rtv, 0.f, 0.f, 0.f);
+		cl->setRenderTarget(&rtv, 1, 0);
+
+		if (win32_window::mainWindow == &window)
+		{
+			DX_PROFILE_BLOCK(cl, "ImGui");
+
+			renderImGui(cl);
+		}
+
+		cl->transitionBarrier(backbuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 	}
-
-	cl->transitionBarrier(backbuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-
 	dxContext.endFrame(cl);
 
 	uint64 result = dxContext.executeCommandList(cl);

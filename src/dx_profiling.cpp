@@ -6,6 +6,7 @@
 #if ENABLE_DX_PROFILING
 
 #include <algorithm>
+#include <fontawesome/IconsFontAwesome5.h>
 
 dx_profile_event profileEvents[NUM_BUFFERED_FRAMES][MAX_NUM_DX_PROFILE_EVENTS];
 bool profilerWindowOpen = false;
@@ -41,7 +42,7 @@ struct dx_profile_frame
 
 static dx_profile_frame profileFrames[MAX_NUM_DX_PROFILE_FRAMES];
 static uint32 profileFrameWriteIndex;
-
+static bool pauseRecording;
 
 void profileFrameMarker(dx_command_list* cl)
 {
@@ -55,132 +56,133 @@ void profileFrameMarker(dx_command_list* cl)
 
 void resolveTimeStampQueries(uint64* timestamps)
 {
-	uint32 numQueries = dxContext.timestampQueryIndex[dxContext.bufferedFrameID];
-	if (numQueries == 0)
-	{
-		return;
-	}
-
-	dx_profile_event* events = profileEvents[dxContext.bufferedFrameID];
-	for (uint32 i = 0; i < numQueries; ++i)
-	{
-		events[i].timestamp = timestamps[i];
-	}
-
-	std::sort(events, events + numQueries, [](const dx_profile_event& a, const dx_profile_event& b)
-	{
-		return a.timestamp < b.timestamp;
-	});
-
-
-
-
-	dx_profile_block* stack[profile_cl_count][1024];
-	uint32 depth[profile_cl_count] = { };
-	uint32 count[profile_cl_count] = { };
-
-	for (uint32 cl = 0; cl < profile_cl_count; ++cl)
-	{
-		stack[cl][0] = 0;
-	}
-	
-
-	dx_profile_frame& frame = profileFrames[profileFrameWriteIndex];
-
-	uint64 frameEndTimestamp = 0;
-
-	for (uint32 i = 0; i < numQueries; ++i)
-	{
-		dx_profile_event* e = events + i;
-		profile_cl_type clType = e->clType;
-		uint32& d = depth[clType];
-
-		switch (e->type)
-		{
-			case profile_event_begin_block:
-			{
-				uint32 index = count[clType]++;
-				dx_profile_block& block = frame.blocks[clType][index];
-
-				block.startClock = e->timestamp;
-				block.parent = (d == 0) ? 0 : stack[clType][d - 1];
-				block.name = e->name;
-				block.firstChild = 0;
-				block.lastChild = 0;
-				block.nextSibling = 0;
-
-				if (block.parent)
-				{
-					if (!block.parent->firstChild)
-					{
-						block.parent->firstChild = &block;
-					}
-					if (block.parent->lastChild)
-					{
-						block.parent->lastChild->nextSibling = &block;
-					}
-					block.parent->lastChild = &block;
-				}
-				else if (stack[clType][d])
-				{
-					stack[clType][d]->nextSibling = &block;
-				}
-
-				stack[clType][d] = &block;
-				++d;
-			} break;
-
-			case profile_event_end_block:
-			{
-				--d;
-
-				dx_profile_block* block = stack[clType][d];
-				assert(block->name == e->name);
-
-				block->endClock = e->timestamp;
-			} break;
-
-			case profile_event_frame_marker:
-			{
-				frameEndTimestamp = e->timestamp;
-			} break;
-		}
-	}
-
 	uint32 currentFrame = profileFrameWriteIndex;
 
-	uint32 previousFrameIndex = (profileFrameWriteIndex == 0) ? (MAX_NUM_DX_PROFILE_FRAMES - 1) : (profileFrameWriteIndex - 1);
-	dx_profile_frame& previousFrame = profileFrames[previousFrameIndex];
-
-	frame.startClock = (previousFrame.endClock == 0) ? frameEndTimestamp : previousFrame.endClock;
-	frame.endClock = frameEndTimestamp;
-	frame.globalFrameID = dxContext.frameID;
-
-	frame.duration = (float)(frame.endClock - frame.startClock) / dxContext.renderQueue.timeStampFrequency * 1000.f;
-
-	for (uint32 cl = 0; cl < profile_cl_count; ++cl)
+	if (!pauseRecording)
 	{
-		frame.count[cl] = count[cl];
-
-		uint64 freq = (cl == profile_cl_graphics) ? dxContext.renderQueue.timeStampFrequency : dxContext.computeQueue.timeStampFrequency;
-
-		for (uint32 i = 0; i < frame.count[cl]; ++i)
+		uint32 numQueries = dxContext.timestampQueryIndex[dxContext.bufferedFrameID];
+		if (numQueries == 0)
 		{
-			dx_profile_block& block = frame.blocks[cl][i];
-			block.relStart = (float)(block.startClock - frame.startClock) / freq * 1000.f;
-			block.duration = (float)(block.endClock - block.startClock) / freq * 1000.f;
+			return;
+		}
+
+		dx_profile_event* events = profileEvents[dxContext.bufferedFrameID];
+		for (uint32 i = 0; i < numQueries; ++i)
+		{
+			events[i].timestamp = timestamps[i];
+		}
+
+		std::sort(events, events + numQueries, [](const dx_profile_event& a, const dx_profile_event& b)
+		{
+			return a.timestamp < b.timestamp;
+		});
+
+
+
+
+		dx_profile_block* stack[profile_cl_count][1024];
+		uint32 depth[profile_cl_count] = { };
+		uint32 count[profile_cl_count] = { };
+
+		for (uint32 cl = 0; cl < profile_cl_count; ++cl)
+		{
+			stack[cl][0] = 0;
+		}
+
+
+		dx_profile_frame& frame = profileFrames[profileFrameWriteIndex];
+
+		uint64 frameEndTimestamp = 0;
+
+		for (uint32 i = 0; i < numQueries; ++i)
+		{
+			dx_profile_event* e = events + i;
+			profile_cl_type clType = e->clType;
+			uint32& d = depth[clType];
+
+			switch (e->type)
+			{
+				case profile_event_begin_block:
+				{
+					uint32 index = count[clType]++;
+					dx_profile_block& block = frame.blocks[clType][index];
+
+					block.startClock = e->timestamp;
+					block.parent = (d == 0) ? 0 : stack[clType][d - 1];
+					block.name = e->name;
+					block.firstChild = 0;
+					block.lastChild = 0;
+					block.nextSibling = 0;
+
+					if (block.parent)
+					{
+						if (!block.parent->firstChild)
+						{
+							block.parent->firstChild = &block;
+						}
+						if (block.parent->lastChild)
+						{
+							block.parent->lastChild->nextSibling = &block;
+						}
+						block.parent->lastChild = &block;
+					}
+					else if (stack[clType][d])
+					{
+						stack[clType][d]->nextSibling = &block;
+					}
+
+					stack[clType][d] = &block;
+					++d;
+				} break;
+
+				case profile_event_end_block:
+				{
+					--d;
+
+					dx_profile_block* block = stack[clType][d];
+					assert(block->name == e->name);
+
+					block->endClock = e->timestamp;
+				} break;
+
+				case profile_event_frame_marker:
+				{
+					frameEndTimestamp = e->timestamp;
+				} break;
+			}
+		}
+
+		uint32 previousFrameIndex = (profileFrameWriteIndex == 0) ? (MAX_NUM_DX_PROFILE_FRAMES - 1) : (profileFrameWriteIndex - 1);
+		dx_profile_frame& previousFrame = profileFrames[previousFrameIndex];
+
+		frame.startClock = (previousFrame.endClock == 0) ? frameEndTimestamp : previousFrame.endClock;
+		frame.endClock = frameEndTimestamp;
+		frame.globalFrameID = dxContext.frameID;
+
+		frame.duration = (float)(frame.endClock - frame.startClock) / dxContext.renderQueue.timeStampFrequency * 1000.f;
+
+		for (uint32 cl = 0; cl < profile_cl_count; ++cl)
+		{
+			frame.count[cl] = count[cl];
+
+			uint64 freq = (cl == profile_cl_graphics) ? dxContext.renderQueue.timeStampFrequency : dxContext.computeQueue.timeStampFrequency;
+
+			for (uint32 i = 0; i < frame.count[cl]; ++i)
+			{
+				dx_profile_block& block = frame.blocks[cl][i];
+				block.relStart = (float)(block.startClock - frame.startClock) / freq * 1000.f;
+				block.duration = (float)(block.endClock - block.startClock) / freq * 1000.f;
+			}
+		}
+
+
+
+		++profileFrameWriteIndex;
+		if (profileFrameWriteIndex >= MAX_NUM_DX_PROFILE_FRAMES)
+		{
+			profileFrameWriteIndex = 0;
 		}
 	}
-
-
-
-	++profileFrameWriteIndex;
-	if (profileFrameWriteIndex >= MAX_NUM_DX_PROFILE_FRAMES)
-	{
-		profileFrameWriteIndex = 0;
-	}
-
-
 
 
 	static uint32 highlightFrameIndex = -1;
@@ -191,6 +193,13 @@ void resolveTimeStampQueries(uint64* timestamps)
 		if (ImGui::Begin("Profiling"), &profilerWindowOpen)
 		{
 			// Timeline.
+
+			if (ImGui::Button(pauseRecording ? (ICON_FA_PLAY "  Resume recording") : (ICON_FA_PAUSE "  Pause recording")))
+			{
+				pauseRecording = !pauseRecording;
+			}
+			ImGui::SameLine();
+			ImGui::Text("The last %u frames are recorded. Click on one frame to get a detailed hierarchical view of all blocks. Zoom into detail view with mouse wheel and click and drag to shift the display.", MAX_NUM_DX_PROFILE_FRAMES);
 
 			const float timelineBottom = 400.f;
 			const float leftPadding = 5.f;
@@ -282,8 +291,8 @@ void resolveTimeStampQueries(uint64* timestamps)
 					ImVec4(0.5f, 0, 1.f, 1.f),
 
 					ImVec4(0.5f, 1.f, 0, 1.f),
-					ImVec4(0, 0.5f, 1.f, 1.f),
 					ImVec4(1.f, 0, 0.5f, 1.f),
+					ImVec4(0, 0.5f, 1.f, 1.f),
 				};
 
 				uint32 colorIndex = 0;
@@ -321,6 +330,10 @@ void resolveTimeStampQueries(uint64* timestamps)
 						{
 							ImGui::SetTooltip("%s: %.3fms", current->name, current->duration);
 						}
+						if (colorIndex >= arraysize(colorTable))
+						{
+							colorIndex = 0;
+						}
 
 
 						// Advance.
@@ -353,35 +366,44 @@ void resolveTimeStampQueries(uint64* timestamps)
 					ImGui::SetCursorPos(ImVec2(callstackLeftPadding, lineTop));
 					ImGui::ColorButton("##0ms", white, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(1, lineHeight));
 
-					ImGui::SetCursorPos(ImVec2(callstackLeftPadding + 2, lineTop));
+					ImGui::SetCursorPos(ImVec2(callstackLeftPadding + 2, lineTop - 5));
 					ImGui::Text("0ms");
 
 					// 16ms.
 					ImGui::SetCursorPos(ImVec2(callstackLeftPadding + frameWidth16ms, lineTop));
 					ImGui::ColorButton("##16ms", white, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(1, lineHeight));
 
-					ImGui::SetCursorPos(ImVec2(callstackLeftPadding + frameWidth16ms + 2, lineTop));
+					ImGui::SetCursorPos(ImVec2(callstackLeftPadding + frameWidth16ms + 2, lineTop - 5));
 					ImGui::Text("16.7ms");
 
 					// 33ms.
 					ImGui::SetCursorPos(ImVec2(callstackLeftPadding + frameWidth33ms, lineTop));
 					ImGui::ColorButton("##33ms", white, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(1, lineHeight));
 
-					ImGui::SetCursorPos(ImVec2(callstackLeftPadding + frameWidth33ms + 2, lineTop));
+					ImGui::SetCursorPos(ImVec2(callstackLeftPadding + frameWidth33ms + 2, lineTop - 5));
 					ImGui::Text("33.3ms");
 
+
 					// 1ms spacings.
-					const ImVec4 normalColor(0.3f, 0.3f, 0.3f, 1.f);
-					const ImVec4 specialColor(0.7f, 0.7f, 0.7f, 1.f);
+					const ImVec4 normalColor(0.2f, 0.2f, 0.2f, 1.f);
+					const ImVec4 specialColor(0.5f, 0.5f, 0.5f, 1.f);
 
 					const float millisecondSpacing = frameWidth33ms / (1000.f / 30.f);
 					for (uint32 i = 1; i <= 33; ++i)
 					{
 						ImVec4 color = (i % 5 == 0) ? specialColor : normalColor;
 
-						ImGui::SetCursorPos(ImVec2(callstackLeftPadding + i * millisecondSpacing, lineTop));
+						ImGui::SetCursorPos(ImVec2(callstackLeftPadding + i * millisecondSpacing, lineTop + 8));
 						ImGui::ColorButton("", color, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(1, lineHeight));
 					}
+
+					// Frame end.
+					ImGui::SetCursorPos(ImVec2(callstackLeftPadding + frame.duration * millisecondSpacing, lineTop));
+					ImGui::ColorButton("##Frame end", blue, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(1, lineHeight));
+
+					ImGui::SetCursorPos(ImVec2(callstackLeftPadding + frame.duration * millisecondSpacing + 2, lineTop - 5));
+					ImGui::Text("Frame end");
+
 
 
 					// Invisible widget to block window dragging in this area.
@@ -404,7 +426,7 @@ void resolveTimeStampQueries(uint64* timestamps)
 						ImGui::SetCursorPos(ImVec2(hoveredX, lineTop));
 						ImGui::ColorButton("", yellow, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(1, lineHeight));
 
-						ImGui::SetCursorPos(ImVec2(hoveredX + 2, lineTop));
+						ImGui::SetCursorPos(ImVec2(hoveredX + 2, lineTop - 5));
 						ImGui::Text("%.3fms", hoveredTime);
 					}
 
@@ -441,7 +463,7 @@ void resolveTimeStampQueries(uint64* timestamps)
 							float t = inverseLerp(callstackLeftPadding, callstackLeftPadding + frameWidth16ms, relMouseX);
 
 							frameWidthMultiplier += zoom * 0.1f;
-							frameWidthMultiplier = clamp(frameWidthMultiplier, 0.2f, 3.f);
+							frameWidthMultiplier = max(frameWidthMultiplier, 0.2f);
 
 							float newFrameWidth16ms = totalWidth * frameWidthMultiplier;
 							callstackLeftPadding = relMouseX - t * newFrameWidth16ms;
