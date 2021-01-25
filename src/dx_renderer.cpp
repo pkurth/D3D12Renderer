@@ -323,9 +323,9 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 
 	if (objectIDsTexture)
 	{
-		uint16* id = (uint16*)mapBuffer(hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID]);
+		uint16* id = (uint16*)mapBuffer(hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID], true);
 		hoveredObjectID = *id;
-		unmapBuffer(hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID]);
+		unmapBuffer(hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID], false);
 	}
 
 	opaqueRenderPass = 0;

@@ -101,9 +101,9 @@ bool performSkinning()
 	{
 		dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
 
-		mat4* mats = (mat4*)mapBuffer(skinningMatricesBuffer[dxContext.bufferedFrameID]);
+		mat4* mats = (mat4*)mapBuffer(skinningMatricesBuffer[dxContext.bufferedFrameID], false);
 		memcpy(mats, skinningMatrices.data(), sizeof(mat4) * skinningMatrices.size());
-		unmapBuffer(skinningMatricesBuffer[dxContext.bufferedFrameID]);
+		unmapBuffer(skinningMatricesBuffer[dxContext.bufferedFrameID], true);
 
 
 		cl->setPipelineState(*skinningPipeline.pipeline);

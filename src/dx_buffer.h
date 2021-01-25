@@ -79,8 +79,15 @@ struct buffer_grave
 
 DXGI_FORMAT getIndexBufferFormat(uint32 elementSize);
 
-void* mapBuffer(const ref<dx_buffer>& buffer);
-void unmapBuffer(const ref<dx_buffer>& buffer);
+struct map_range
+{
+	uint32 firstElement = 0;
+	uint32 numElements = (uint32)-1;
+};
+
+// I think this API could be simplified. I *think* you can only map upload and readback buffers. Upload buffers are only used for writing and readback buffers only for reading.
+void* mapBuffer(const ref<dx_buffer>& buffer, bool intentsReading, map_range readRange = { });
+void unmapBuffer(const ref<dx_buffer>& buffer, bool hasWritten, map_range writtenRange = { });
 
 void updateUploadBufferData(const ref<dx_buffer>& buffer, void* data, uint32 size);
 

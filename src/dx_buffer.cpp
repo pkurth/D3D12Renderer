@@ -22,23 +22,57 @@ DXGI_FORMAT getIndexBufferFormat(uint32 elementSize)
 	return result;
 }
 
-void* mapBuffer(const ref<dx_buffer>& buffer)
+void* mapBuffer(const ref<dx_buffer>& buffer, bool intentsReading, map_range readRange)
 {
+	D3D12_RANGE range = { 0, 0 };
+	D3D12_RANGE* r = 0;
+
+	if (intentsReading)
+	{
+		if (readRange.numElements != -1)
+		{
+			range.Begin = readRange.firstElement * buffer->elementSize;
+			range.End = range.Begin + readRange.numElements * buffer->elementSize;
+			r = &range;
+		}
+	}
+	else
+	{
+		r = &range;
+	}
+
 	void* result;
-	buffer->resource->Map(0, 0, &result);
+	buffer->resource->Map(0, r, &result);
 	return result;
 }
 
-void unmapBuffer(const ref<dx_buffer>& buffer)
+void unmapBuffer(const ref<dx_buffer>& buffer, bool hasWritten, map_range writtenRange)
 {
-	buffer->resource->Unmap(0, 0);
+	D3D12_RANGE range = { 0, 0 };
+	D3D12_RANGE* r = 0;
+
+	if (hasWritten)
+	{
+		if (writtenRange.numElements != -1)
+		{
+			range.Begin = writtenRange.firstElement * buffer->elementSize;
+			range.End = range.Begin + writtenRange.numElements * buffer->elementSize;
+			r = &range;
+		}
+	}
+	else
+	{
+		r = &range;
+	}
+
+	buffer->resource->Unmap(0, r);
 }
 
 void updateUploadBufferData(const ref<dx_buffer>& buffer, void* data, uint32 size)
 {
-	void* mapped = mapBuffer(buffer);
+	void* mapped = mapBuffer(buffer, false);
 	memcpy(mapped, data, size);
-	unmapBuffer(buffer);
+	unmapBuffer(buffer, true);
 }
 
 static void uploadBufferData(ref<dx_buffer> buffer, const void* bufferData)
@@ -141,9 +175,9 @@ static void initializeBuffer(ref<dx_buffer> buffer, uint32 elementSize, uint32 e
 		}
 		else if (heapType == D3D12_HEAP_TYPE_UPLOAD)
 		{
-			void* dataPtr = mapBuffer(buffer);
+			void* dataPtr = mapBuffer(buffer, false);
 			memcpy(dataPtr, data, buffer->totalSize);
-			unmapBuffer(buffer);
+			unmapBuffer(buffer, true);
 		}
 	}
 
