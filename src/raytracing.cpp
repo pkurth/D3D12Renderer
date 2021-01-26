@@ -560,6 +560,7 @@ dx_raytracing_pipeline raytracing_pipeline_builder::finish()
 			shaderBindingTableDesc.miss.push_back(rtsoProps->GetShaderIdentifier(missEntryPoints[i]));
 
 			raytracing_shader& shader = shaderBindingTableDesc.hitGroups.emplace_back();
+			shader = { };
 			if (hasMeshGeometry)
 			{
 				shader.mesh = rtsoProps->GetShaderIdentifier(hitGroups[numGeometryTypes * i].HitGroupExport);
