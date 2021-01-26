@@ -58,8 +58,8 @@ void path_tracer::initialize()
         raytracing_pipeline_builder(shaderPath, maxPayloadSize, maxRecursionDepth)
         .globalRootSignature(globalDesc)
         .raygen(L"rayGen")
-        .hitgroup(L"RADIANCE", L"radianceClosestHit", L"radianceAnyHit", L"radianceMiss", hitDesc)
-        .hitgroup(L"SHADOW", L"shadowClosestHit", L"shadowAnyHit", L"shadowMiss")
+        .hitgroup(L"RADIANCE", L"radianceClosestHit", 0, L"radianceMiss", hitDesc)
+        .hitgroup(L"SHADOW", L"shadowClosestHit", 0, L"shadowMiss")
         .finish();
 
     numRayTypes = (uint32)pipeline.shaderBindingTableDesc.hitGroups.size();

@@ -351,13 +351,16 @@ raytracing_pipeline_builder& raytracing_pipeline_builder::hitgroup(const wchar* 
 
 	for (uint32 i = 0; i < arraysize(entries); ++i)
 	{
-		const wchar* entryPoint = entries[i];
-		D3D12_EXPORT_DESC& exp = exports[numExports++];
-		exp.Name = entryPoint;
-		exp.Flags = D3D12_EXPORT_FLAG_NONE;
-		exp.ExportToRename = 0;
+		if (entries[i])
+		{
+			const wchar* entryPoint = entries[i];
+			D3D12_EXPORT_DESC& exp = exports[numExports++];
+			exp.Name = entryPoint;
+			exp.Flags = D3D12_EXPORT_FLAG_NONE;
+			exp.ExportToRename = 0;
 
-		allExports.push_back(entries[i]);
+			allExports.push_back(entries[i]);
+		}
 	}
 
 	if (rootSignatureDesc.NumParameters > 0)
@@ -379,7 +382,10 @@ raytracing_pipeline_builder& raytracing_pipeline_builder::hitgroup(const wchar* 
 			uint32 numEntryPoints = 0;
 
 			entryPoints[numEntryPoints++] = closestHit;
-			entryPoints[numEntryPoints++] = anyHit;
+			if (anyHit)
+			{
+				entryPoints[numEntryPoints++] = anyHit;
+			}
 
 			numStrings += numEntryPoints;
 
@@ -508,7 +514,7 @@ dx_raytracing_pipeline raytracing_pipeline_builder::finish()
 
 		for (uint32 i = 0; i < numHitGroups; ++i)
 		{
-			shaderBindingTableDesc.miss.push_back({ rtsoProps->GetShaderIdentifier(missEntryPoints[i]) });
+			shaderBindingTableDesc.miss.push_back(rtsoProps->GetShaderIdentifier(missEntryPoints[i]));
 			shaderBindingTableDesc.hitGroups.push_back({ rtsoProps->GetShaderIdentifier(hitGroups[i].HitGroupExport) });
 		}
 
