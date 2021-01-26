@@ -57,7 +57,7 @@ inline void raytracing_binding_table<shader_data>::initialize(dx_raytracing_pipe
     for (uint32 i = 0; i < numRayTypes; ++i)
     {
         binding_table_entry* m = miss + i;
-        memcpy(m->identifier, pipeline->shaderBindingTableDesc.miss[i], D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+        memcpy(m->identifier, pipeline->shaderBindingTableDesc.miss[i].mesh, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
     }
 }
 
@@ -103,7 +103,7 @@ inline void raytracing_binding_table<shader_data>::push(const shader_data* sd)
     {
         binding_table_entry* h = base + i;
 
-        memcpy(h->identifier, pipeline->shaderBindingTableDesc.hitGroups[i], D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+        memcpy(h->identifier, pipeline->shaderBindingTableDesc.hitGroups[i].mesh, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
         h->shaderData = sd[i];
     }
 }

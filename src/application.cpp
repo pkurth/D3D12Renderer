@@ -51,7 +51,7 @@ static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh
 			raytracingMaterials.push_back(sm.material);
 		}
 
-		auto blas = blasBuilder.finish();
+		ref<raytracing_blas> blas = blasBuilder.finish();
 		raytracing_object_type type = pathTracer.defineObjectType(blas, raytracingMaterials);
 		return type;
 	}

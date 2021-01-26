@@ -21,23 +21,35 @@ struct raytracing_blas_geometry
 	submesh_info submesh;
 };
 
+struct raytracing_blas_procedural
+{
+	// A single node in the BLAS can have multiple AABBS.
+	std::vector<bounding_box> boundingBoxes;
+};
+
 struct raytracing_blas
 {
 	ref<dx_buffer> scratch;
 	ref<dx_buffer> blas;
 
 	std::vector<raytracing_blas_geometry> geometries;
+	std::vector<raytracing_blas_procedural> procedurals;
 };
 
 struct raytracing_blas_builder
 {
 	raytracing_blas_builder& push(ref<dx_vertex_buffer> vertexBuffer, ref<dx_index_buffer> indexBuffer, submesh_info submesh, bool opaque = true, const trs& localTransform = trs::identity);
+	raytracing_blas_builder& push(const std::vector<bounding_box>& boundingBoxes, bool opaque);
 	ref<raytracing_blas> finish(bool keepScratch = false);
 
 private:
-	std::vector<raytracing_blas_geometry> geometries;
 	std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDescs;
+
+	std::vector<raytracing_blas_geometry> geometries;
 	std::vector<mat4> localTransforms;
+
+	std::vector<raytracing_blas_procedural> procedurals;
+	std::vector<D3D12_RAYTRACING_AABB> aabbDescs;
 };
 
 struct raytracing_object_type
@@ -47,14 +59,19 @@ struct raytracing_object_type
 };
 
 
+struct raytracing_shader
+{
+	void* mesh;
+	// TODO: Add procedural.
+};
 
 struct raytracing_shader_binding_table_desc
 {
 	uint32 entrySize;
 
 	void* raygen;
-	std::vector<void*> miss;
-	std::vector<void*> hitGroups;
+	std::vector<raytracing_shader> miss;
+	std::vector<raytracing_shader> hitGroups;
 
 	uint32 raygenOffset;
 	uint32 missOffset;

@@ -39,8 +39,77 @@ raytracing_blas_builder& raytracing_blas_builder::push(ref<dx_vertex_buffer> ver
 	return *this;
 }
 
-ref<raytracing_blas> raytracing_blas_builder::finish(bool keepScratch)
+raytracing_blas_builder& raytracing_blas_builder::push(const std::vector<bounding_box>& boundingBoxes, bool opaque)
 {
+	D3D12_RAYTRACING_GEOMETRY_DESC geomDesc;
+
+	geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS;
+	geomDesc.Flags = opaque ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE : D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
+
+	for (uint32 i = 0; i < (uint32)boundingBoxes.size(); ++i)
+	{
+		D3D12_RAYTRACING_AABB& w = aabbDescs.emplace_back();
+		const bounding_box& r = boundingBoxes[i];
+
+		w.MinX = r.minCorner.x;
+		w.MinY = r.minCorner.y;
+		w.MinZ = r.minCorner.z;
+
+		w.MaxX = r.maxCorner.x;
+		w.MaxY = r.maxCorner.y;
+		w.MaxZ = r.maxCorner.z;
+	}
+
+	geomDesc.AABBs.AABBCount = boundingBoxes.size();
+
+	geometryDescs.push_back(geomDesc);
+	procedurals.push_back({ boundingBoxes });
+
+	return *this;
+}
+
+ref<raytracing_blas> raytracing_blas_builder::finish(bool keepScratch)
+{	
+	dx_dynamic_constant_buffer localTransformsBuffer = {};
+	if (localTransforms.size() > 0)
+	{
+		localTransformsBuffer = dxContext.uploadDynamicConstantBuffer(sizeof(mat4) * (uint32)localTransforms.size(), localTransforms.data());
+	}
+
+	dx_dynamic_constant_buffer aabbBuffer = {};
+	if (aabbDescs.size())
+	{
+		aabbBuffer = dxContext.uploadDynamicConstantBuffer(sizeof(D3D12_RAYTRACING_AABB) * (uint32)aabbDescs.size(), aabbDescs.data());
+	}
+
+	uint64 aabbOffset = 0;
+
+	for (auto& desc : geometryDescs)
+	{
+		if (desc.Type == D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES)
+		{
+			if (desc.Triangles.Transform3x4 == UINT64_MAX)
+			{
+				desc.Triangles.Transform3x4 = 0;
+			}
+			else
+			{
+				assert(localTransformsBuffer.cpuPtr);
+				desc.Triangles.Transform3x4 = localTransformsBuffer.gpuPtr + sizeof(mat4) * desc.Triangles.Transform3x4;
+			}
+		}
+		else if (desc.Type == D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS)
+		{
+			assert(aabbBuffer.cpuPtr);
+			desc.AABBs.AABBs.StartAddress = aabbBuffer.gpuPtr + sizeof(D3D12_RAYTRACING_AABB) * aabbOffset;
+			desc.AABBs.AABBs.StrideInBytes = sizeof(D3D12_RAYTRACING_AABB);
+			aabbOffset += desc.AABBs.AABBCount;
+		}
+	}
+
+
+
+
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
 	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 	inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
@@ -66,32 +135,15 @@ ref<raytracing_blas> raytracing_blas_builder::finish(bool keepScratch)
 	SET_NAME(blas->scratch->resource, "BLAS Scratch");
 	SET_NAME(blas->blas->resource, "BLAS Result");
 
-	dx_command_list* cl = dxContext.getFreeRenderCommandList();
-	dx_dynamic_constant_buffer localTransformsBuffer;
-	if (localTransforms.size() > 0)
-	{
-		localTransformsBuffer = cl->uploadDynamicConstantBuffer(sizeof(mat4) * (uint32)localTransforms.size(), localTransforms.data());
-	}
-
-	for (auto& desc : geometryDescs)
-	{
-		if (desc.Triangles.Transform3x4 == UINT64_MAX)
-		{
-			desc.Triangles.Transform3x4 = 0;
-		}
-		else
-		{
-			desc.Triangles.Transform3x4 = localTransformsBuffer.gpuPtr + sizeof(mat4) * desc.Triangles.Transform3x4;
-		}
-	}
-
 	blas->geometries = std::move(geometries);
+	blas->procedurals = std::move(procedurals);
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
 	asDesc.Inputs = inputs;
 	asDesc.DestAccelerationStructureData = blas->blas->gpuVirtualAddress;
 	asDesc.ScratchAccelerationStructureData = blas->scratch->gpuVirtualAddress;
 
+	dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
 	cl->commandList->BuildRaytracingAccelerationStructure(&asDesc, 0, 0);
 	cl->uavBarrier(blas->blas);
 	dxContext.executeCommandList(cl);
@@ -297,7 +349,7 @@ raytracing_pipeline_builder& raytracing_pipeline_builder::hitgroup(const wchar* 
 
 	const wchar* entries[] = { closestHit, anyHit, miss };
 
-	for (uint32 i = 0; i < 3; ++i)
+	for (uint32 i = 0; i < arraysize(entries); ++i)
 	{
 		const wchar* entryPoint = entries[i];
 		D3D12_EXPORT_DESC& exp = exports[numExports++];
@@ -456,8 +508,8 @@ dx_raytracing_pipeline raytracing_pipeline_builder::finish()
 
 		for (uint32 i = 0; i < numHitGroups; ++i)
 		{
-			shaderBindingTableDesc.miss.push_back(rtsoProps->GetShaderIdentifier(missEntryPoints[i]));
-			shaderBindingTableDesc.hitGroups.push_back(rtsoProps->GetShaderIdentifier(hitGroups[i].HitGroupExport));
+			shaderBindingTableDesc.miss.push_back({ rtsoProps->GetShaderIdentifier(missEntryPoints[i]) });
+			shaderBindingTableDesc.hitGroups.push_back({ rtsoProps->GetShaderIdentifier(hitGroups[i].HitGroupExport) });
 		}
 
 
