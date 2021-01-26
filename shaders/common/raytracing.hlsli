@@ -38,6 +38,11 @@ static float3 hitWorldPosition()
 	return WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
 }
 
+// Careful: These two functions transform from BLAS space to TLAS space (world space). 
+// However, if your geometry _inside_ the BLAS has a local transform, this is NOT
+// accounted for here. For some reason, DX requires you to pass this transform in as 
+// a buffer and do the transformation yourself, even though it has this information 
+// already. 
 static float3 transformPositionToWorld(float3 position)
 {
 	float3x4 M = ObjectToWorld3x4();
