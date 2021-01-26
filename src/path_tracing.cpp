@@ -18,6 +18,7 @@ void path_tracer::initialize()
 
     CD3DX12_DESCRIPTOR_RANGE resourceRanges[] =
     {
+        // Must be input first, then output.
         CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numInputResources, 0),
         CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, numOutputResources, 0),
     };
