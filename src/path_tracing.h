@@ -48,26 +48,19 @@ private:
         dx_cpu_descriptor_handle resources; // Vertex buffer, index buffer, PBR textures.
     };
 
-    struct global_resources
+    // Only descriptors in here!
+    struct input_resources
     {
-        union
-        {
-            struct
-            {
-                // Must be first.
-                dx_cpu_descriptor_handle output;
-
-
-                dx_cpu_descriptor_handle tlas;
-                dx_cpu_descriptor_handle sky;
-            };
-
-            dx_cpu_descriptor_handle resources[3];
-        };
-
-        dx_cpu_descriptor_handle cpuBase;
-        dx_gpu_descriptor_handle gpuBase;
+        dx_cpu_descriptor_handle tlas;
+        dx_cpu_descriptor_handle sky;
     };
+
+    struct output_resources
+    {
+        dx_cpu_descriptor_handle output;
+    };
+
+
 
     // TODO: The descriptor heap shouldn't be a member of this structure. If we have multiple raytracers which use the same object types, they can share the descriptor heap.
     // For example, this path tracer defines objects with vertex buffer, index buffer and their PBR textures. Other raytracers, which use the same layout (e.g. a specular reflections
@@ -78,6 +71,4 @@ private:
     uint32 numRayTypes;
 
     raytracing_binding_table<shader_data> bindingTable;
-
-    global_resources globalResources[NUM_BUFFERED_FRAMES];
 };

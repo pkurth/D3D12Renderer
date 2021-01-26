@@ -4,22 +4,27 @@
 
 #include "raytracing.hlsli"
 
-#define PATH_TRACING_RS_SRVS    0
-#define PATH_TRACING_RS_OUTPUT  1
-#define PATH_TRACING_RS_CAMERA  2
-#define PATH_TRACING_RS_CB      3
+#define PATH_TRACING_RS_RESOURCES   0
+#define PATH_TRACING_RS_CAMERA      1
+#define PATH_TRACING_RS_CB          2
 
 void path_tracer::initialize()
 {
     const wchar* shaderPath = L"shaders/raytracing/path_tracing_rts.hlsl";
 
 
-    CD3DX12_DESCRIPTOR_RANGE resourceRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, arraysize(global_resources::resources), 0);
-    CD3DX12_DESCRIPTOR_RANGE outputRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+    const uint32 numInputResources = sizeof(input_resources) / sizeof(dx_cpu_descriptor_handle);
+    const uint32 numOutputResources = sizeof(output_resources) / sizeof(dx_cpu_descriptor_handle);
+
+    CD3DX12_DESCRIPTOR_RANGE resourceRanges[] =
+    {
+        CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numInputResources, 0),
+        CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, numOutputResources, 0),
+    };
+
     CD3DX12_ROOT_PARAMETER globalRootParameters[] =
     {
-        root_descriptor_table(1, &resourceRange),
-        root_descriptor_table(1, &outputRange),
+        root_descriptor_table(arraysize(resourceRanges), resourceRanges),
         root_cbv(0), // Camera.
         root_constants<path_tracing_cb>(1),
     };
@@ -33,7 +38,7 @@ void path_tracer::initialize()
     };
 
 
-
+    // 6 Elements: Vertex buffer, index buffer, albedo texture, normal map, roughness texture, metallic texture.
     CD3DX12_DESCRIPTOR_RANGE hitSRVRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0, 1);
     CD3DX12_ROOT_PARAMETER hitRootParameters[] =
     {
@@ -61,21 +66,7 @@ void path_tracer::initialize()
     bindingTable.initialize(&pipeline);
     descriptorHeap.initialize(2048); // TODO.
 
-
-    // Allocate space in descriptor heap for global resources.
-    // These are not initialized here! This will happen in each frame.
-    for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
-    {
-        global_resources& gr = globalResources[i];
-
-        gr.cpuBase = descriptorHeap.currentCPU;
-        gr.gpuBase = descriptorHeap.currentGPU;
-
-        for (uint32 j = 0; j < arraysize(gr.resources); ++j)
-        {
-            gr.resources[j] = descriptorHeap.push();
-        }
-    }
+    allocateDescriptorHeapSpaceForGlobalResources<input_resources, output_resources>(descriptorHeap);
 }
 
 raytracing_object_type path_tracer::defineObjectType(const ref<raytracing_blas>& blas, const std::vector<ref<pbr_material>>& materials)
@@ -168,31 +159,25 @@ void path_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
     const ref<dx_texture>& output,
     const common_material_info& materialInfo)
 {
-    global_resources& gr = globalResources[dxContext.bufferedFrameID];
+    input_resources in;
+    in.tlas = tlas.tlas->raytracingSRV;
+    in.sky = materialInfo.sky->defaultSRV;
 
-    D3D12_CPU_DESCRIPTOR_HANDLE handles[] =
-    {
-        output->defaultUAV,
-
-        tlas.tlas->raytracingSRV,
-        materialInfo.sky->defaultSRV,
-    };
-
-    static_assert(arraysize(handles) == arraysize(global_resources::resources));
-    uint32 numHandles = arraysize(handles);
-    D3D12_CPU_DESCRIPTOR_HANDLE dst = gr.cpuBase;
-
-    dxContext.device->CopyDescriptors(
-        1, &dst, &numHandles,
-        numHandles, handles, nullptr,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    output_resources out;
+    out.output = output->defaultUAV;
 
 
+    dx_gpu_descriptor_handle gpuHandle = copyGlobalResourcesToDescriptorHeap(in, out);
+
+
+    // Fill out description.
     D3D12_DISPATCH_RAYS_DESC raytraceDesc;
     fillOutRayTracingRenderDesc(bindingTable.getBuffer(), raytraceDesc,
         output->width, output->height, 1,
         numRayTypes, bindingTable.getNumberOfHitGroups());
 
+
+    // Set up pipeline.
     cl->setDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, descriptorHeap.descriptorHeap);
 
     cl->setPipelineState(pipeline.pipeline);
@@ -200,8 +185,7 @@ void path_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
 
     uint32 depth = min(recursionDepth, maxRecursionDepth - 1);
 
-    cl->setComputeDescriptorTable(PATH_TRACING_RS_SRVS, gr.gpuBase + 1); // Offset for output.
-    cl->setComputeDescriptorTable(PATH_TRACING_RS_OUTPUT, gr.gpuBase);
+    cl->setComputeDescriptorTable(PATH_TRACING_RS_RESOURCES, gpuHandle);
     cl->setComputeDynamicConstantBuffer(PATH_TRACING_RS_CAMERA, materialInfo.cameraCBV);
     cl->setCompute32BitConstants(PATH_TRACING_RS_CB, 
         path_tracing_cb
@@ -220,9 +204,9 @@ void path_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
             (uint32)multipleImportanceSampling,
         });
 
-    ++numAveragedFrames;
-
     cl->raytrace(raytraceDesc);
+
+    ++numAveragedFrames;
 }
 
 

@@ -30,30 +30,21 @@ private:
         dx_cpu_descriptor_handle resources; // Vertex buffer, index buffer, pbr textures.
     };
 
-    struct global_resources
+    // Only descriptors in here!
+    struct input_resources
     {
-        union
-        {
-            struct
-            {
-                // Must be first.
-                dx_cpu_descriptor_handle output;
+        dx_cpu_descriptor_handle tlas;
+        dx_cpu_descriptor_handle depthBuffer;
+        dx_cpu_descriptor_handle screenSpaceNormals;
+        dx_cpu_descriptor_handle irradiance;
+        dx_cpu_descriptor_handle environment;
+        dx_cpu_descriptor_handle sky;
+        dx_cpu_descriptor_handle brdf;
+    };
 
-
-                dx_cpu_descriptor_handle tlas;
-                dx_cpu_descriptor_handle depthBuffer;
-                dx_cpu_descriptor_handle screenSpaceNormals;
-                dx_cpu_descriptor_handle irradiance;
-                dx_cpu_descriptor_handle environment;
-                dx_cpu_descriptor_handle sky;
-                dx_cpu_descriptor_handle brdf;
-            };
-
-            dx_cpu_descriptor_handle resources[8];
-        };
-
-        dx_cpu_descriptor_handle cpuBase;
-        dx_gpu_descriptor_handle gpuBase;
+    struct output_resources
+    {
+        dx_cpu_descriptor_handle output;
     };
 
     dx_pushable_resource_descriptor_heap descriptorHeap;
@@ -64,6 +55,4 @@ private:
     const uint32 maxRecursionDepth = 4;
 
     raytracing_binding_table<shader_data> bindingTable;
-
-    global_resources globalResources[NUM_BUFFERED_FRAMES];
 };
