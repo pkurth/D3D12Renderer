@@ -62,7 +62,7 @@ struct raytracing_object_type
 struct raytracing_shader
 {
 	void* mesh;
-	// TODO: Add procedural.
+	void* procedural;
 };
 
 struct raytracing_shader_binding_table_desc
@@ -92,20 +92,32 @@ struct dx_raytracing_pipeline
 
 
 
+struct raytracing_mesh_hitgroup
+{
+	const wchar* closestHit; // Optional.
+	const wchar* anyHit; // Optional.
+};
 
+struct raytracing_procedural_hitgroup
+{
+	const wchar* closestHit; // Optional.
+	const wchar* intersection;
+	const wchar* anyHit; // Optional.
+};
 
 
 struct raytracing_pipeline_builder
 {
-	raytracing_pipeline_builder(const wchar* shaderFilename, uint32 payloadSize, uint32 maxRecursionDepth);
+	raytracing_pipeline_builder(const wchar* shaderFilename, uint32 payloadSize, uint32 maxRecursionDepth, bool hasMeshGeometry, bool hasProceduralGeometry);
 
 	raytracing_pipeline_builder& globalRootSignature(D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc);
 	raytracing_pipeline_builder& raygen(const wchar* entryPoint, D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {});
 
 	// The root signature describes parameters for both hit shaders. Miss will not get any arguments for now.
 	// The any-hit shader is optional. Pass null, if not needed.
-	raytracing_pipeline_builder& hitgroup(const wchar* groupName, const wchar* closestHit, const wchar* anyHit, const wchar* miss, 
-		D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {});
+	raytracing_pipeline_builder& hitgroup(const wchar* groupName, const wchar* miss, 
+		raytracing_mesh_hitgroup mesh, D3D12_ROOT_SIGNATURE_DESC meshRootSignatureDesc = {}, 
+		raytracing_procedural_hitgroup procedural = {}, D3D12_ROOT_SIGNATURE_DESC proceduralRootSignatureDesc = {});
 
 	dx_raytracing_pipeline finish();
 
@@ -129,8 +141,13 @@ private:
 	const wchar* raygenEntryPoint;
 	std::vector<const wchar*> missEntryPoints;
 
+	std::vector<const wchar*> shaderNameDefines;
+
 	uint32 payloadSize;
 	uint32 maxRecursionDepth;
+
+	bool hasMeshGeometry; 
+	bool hasProceduralGeometry;
 
 	uint32 tableEntrySize = 0;
 
@@ -154,4 +171,7 @@ private:
 
 	raytracing_root_signature rootSignatures[8];
 	uint32 numRootSignatures = 0;
+
+	std::wstring groupNameStorage[8];
+	uint32 groupNameStoragePtr = 0;
 };

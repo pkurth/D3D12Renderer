@@ -59,13 +59,15 @@ void specular_reflections_raytracer::initialize()
     };
 
 
+    raytracing_mesh_hitgroup radianceHitgroup = { L"radianceClosestHit" };
+    raytracing_mesh_hitgroup shadowHitgroup = { L"shadowClosestHit" };
 
     pipeline =
-        raytracing_pipeline_builder(shaderPath, 4 * sizeof(float), maxRecursionDepth)
+        raytracing_pipeline_builder(shaderPath, 4 * sizeof(float), maxRecursionDepth, true, false)
         .globalRootSignature(globalDesc)
         .raygen(L"rayGen")
-        .hitgroup(L"Radiance", L"radianceClosestHit", L"radianceAnyHit", L"radianceMiss", hitDesc)
-        .hitgroup(L"Shadow", L"shadowClosestHit", L"shadowAnyHit", L"shadowMiss")
+        .hitgroup(L"RADIANCE", L"radianceMiss", radianceHitgroup, hitDesc)
+        .hitgroup(L"SHADOW", L"shadowMiss", shadowHitgroup)
         .finish();
 
     numRayTypes = (uint32)pipeline.shaderBindingTableDesc.hitGroups.size();

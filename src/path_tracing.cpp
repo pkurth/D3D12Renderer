@@ -53,13 +53,15 @@ void path_tracer::initialize()
     };
 
 
+    raytracing_mesh_hitgroup radianceHitgroup = { L"radianceClosestHit" };
+    raytracing_mesh_hitgroup shadowHitgroup = { };
 
     pipeline =
-        raytracing_pipeline_builder(shaderPath, maxPayloadSize, maxRecursionDepth)
+        raytracing_pipeline_builder(shaderPath, maxPayloadSize, maxRecursionDepth, true, false)
         .globalRootSignature(globalDesc)
         .raygen(L"rayGen")
-        .hitgroup(L"RADIANCE", L"radianceClosestHit", 0, L"radianceMiss", hitDesc)
-        .hitgroup(L"SHADOW", L"shadowClosestHit", 0, L"shadowMiss")
+        .hitgroup(L"RADIANCE", L"radianceMiss", radianceHitgroup, hitDesc)
+        .hitgroup(L"SHADOW", L"shadowMiss", shadowHitgroup)
         .finish();
 
     numRayTypes = (uint32)pipeline.shaderBindingTableDesc.hitGroups.size();

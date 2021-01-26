@@ -165,7 +165,7 @@ static void reportShaderCompileError(com<IDxcBlobEncoding> blob)
 	std::cerr << "Error: " << infoLog << std::endl;
 }
 
-static com<IDxcBlob> compileLibrary(const std::wstring& filename, D3D12_HIT_GROUP_DESC* hitGroups, uint32 numHitGroups)
+static com<IDxcBlob> compileLibrary(const std::wstring& filename, const std::vector<const wchar*>& shaderNameDefines)
 {
 	com<IDxcCompiler> compiler;
 	com<IDxcLibrary> library;
@@ -194,15 +194,15 @@ static com<IDxcBlob> compileLibrary(const std::wstring& filename, D3D12_HIT_GROU
 	std::vector<DxcDefine> defines;
 
 	std::vector<std::wstring> valueStrings;
-	valueStrings.reserve(1 + numHitGroups); // Important. We pull out raw char pointers from these, so the vector should not reallocate.
+	valueStrings.reserve(1 + shaderNameDefines.size()); // Important. We pull out raw char pointers from these, so the vector should not reallocate.
 
-	valueStrings.push_back(std::to_wstring(numHitGroups));
+	valueStrings.push_back(std::to_wstring(shaderNameDefines.size()));
 	defines.push_back({ L"NUM_RAY_TYPES", valueStrings.back().c_str() });
 
-	for (uint32 i = 0; i < numHitGroups; ++i)
+	for (uint32 i = 0; i < shaderNameDefines.size(); ++i)
 	{
 		valueStrings.push_back(std::to_wstring(i));
-		defines.push_back({ hitGroups[i].HitGroupExport, valueStrings.back().c_str() });
+		defines.push_back({ shaderNameDefines[i], valueStrings.back().c_str() });
 	}
 
 
@@ -240,11 +240,15 @@ static com<IDxcBlob> compileLibrary(const std::wstring& filename, D3D12_HIT_GROU
 
 
 
-raytracing_pipeline_builder::raytracing_pipeline_builder(const wchar* shaderFilename, uint32 payloadSize, uint32 maxRecursionDepth)
+raytracing_pipeline_builder::raytracing_pipeline_builder(const wchar* shaderFilename, uint32 payloadSize, uint32 maxRecursionDepth, bool hasMeshGeometry, bool hasProceduralGeometry)
 {
 	this->shaderFilename = shaderFilename;
 	this->payloadSize = payloadSize;
 	this->maxRecursionDepth = maxRecursionDepth;
+	this->hasMeshGeometry = hasMeshGeometry;
+	this->hasProceduralGeometry = hasProceduralGeometry;
+
+	assert(hasMeshGeometry || hasProceduralGeometry);
 }
 
 raytracing_pipeline_builder::raytracing_root_signature raytracing_pipeline_builder::createRaytracingRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
@@ -330,79 +334,113 @@ raytracing_pipeline_builder& raytracing_pipeline_builder::raygen(const wchar* en
 	return *this;
 }
 
-raytracing_pipeline_builder& raytracing_pipeline_builder::hitgroup(const wchar* groupName, const wchar* closestHit, const wchar* anyHit, const wchar* miss,
-	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc)
+raytracing_pipeline_builder& raytracing_pipeline_builder::hitgroup(const wchar* groupName, const wchar* miss,
+	raytracing_mesh_hitgroup mesh, D3D12_ROOT_SIGNATURE_DESC meshRootSignatureDesc,
+	raytracing_procedural_hitgroup procedural, D3D12_ROOT_SIGNATURE_DESC proceduralRootSignatureDesc)
 {
-	D3D12_HIT_GROUP_DESC& hitGroup = hitGroups[numHitGroups++];
-	
-	hitGroup.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
-	hitGroup.AnyHitShaderImport = anyHit;
-	hitGroup.ClosestHitShaderImport = closestHit;
-	hitGroup.HitGroupExport = groupName;
-	hitGroup.IntersectionShaderImport = 0;
-
+	auto exportEntryPoint = [this](const wchar* entryPoint)
 	{
+		D3D12_EXPORT_DESC& exp = exports[numExports++];
+		exp.Name = entryPoint;
+		exp.Flags = D3D12_EXPORT_FLAG_NONE;
+		exp.ExportToRename = 0;
+
+		allExports.push_back(entryPoint);
+	};
+
+	auto createLocalRootSignature = [this](D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc, const wchar* closestHit, const wchar* anyHit, const wchar* intersection)
+	{
+		if (rootSignatureDesc.NumParameters > 0)
+		{
+			rootSignatureDesc.Flags |= D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+			rootSignatures[numRootSignatures++] = createRaytracingRootSignature(rootSignatureDesc);
+
+			{
+				auto& so = subobjects[numSubobjects++];
+				so.pDesc = &rootSignatures[numRootSignatures - 1].rootSignaturePtr;
+				so.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
+			}
+
+			{
+				auto& so = subobjects[numSubobjects++];
+				auto& as = associations[numAssociations++];
+
+				const wchar** entryPoints = &stringBuffer[numStrings];
+				uint32 numEntryPoints = 0;
+
+				if (closestHit) { entryPoints[numEntryPoints++] = closestHit; }
+				if (anyHit) { entryPoints[numEntryPoints++] = anyHit; }
+				if (intersection) { entryPoints[numEntryPoints++] = intersection; }
+
+				numStrings += numEntryPoints;
+
+				as.NumExports = numEntryPoints;
+				as.pExports = entryPoints;
+				as.pSubobjectToAssociate = &subobjects[numSubobjects - 2];
+
+				so.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
+				so.pDesc = &as;
+			}
+
+			uint32 size = getShaderBindingTableSize(rootSignatureDesc);
+			tableEntrySize = max(size, tableEntrySize);
+		}
+	};
+
+	if (hasMeshGeometry)
+	{
+		groupNameStorage[groupNameStoragePtr++] = std::wstring(groupName) + L"_MESH";
+		const wchar* name = groupNameStorage[groupNameStoragePtr - 1].c_str();
+
+		D3D12_HIT_GROUP_DESC& hitGroup = hitGroups[numHitGroups++];
+
+		hitGroup.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
+		hitGroup.AnyHitShaderImport = mesh.anyHit;
+		hitGroup.ClosestHitShaderImport = mesh.closestHit;
+		hitGroup.IntersectionShaderImport = 0;
+		hitGroup.HitGroupExport = name;
+
 		auto& so = subobjects[numSubobjects++];
 		so.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
 		so.pDesc = &hitGroup;
+
+		if (mesh.closestHit) { exportEntryPoint(mesh.closestHit); }
+		if (mesh.anyHit) { exportEntryPoint(mesh.anyHit); }
+
+		createLocalRootSignature(meshRootSignatureDesc, mesh.closestHit, mesh.anyHit, 0);
 	}
 
-	const wchar* entries[] = { closestHit, anyHit, miss };
-
-	for (uint32 i = 0; i < arraysize(entries); ++i)
+	if (hasProceduralGeometry)
 	{
-		if (entries[i])
-		{
-			const wchar* entryPoint = entries[i];
-			D3D12_EXPORT_DESC& exp = exports[numExports++];
-			exp.Name = entryPoint;
-			exp.Flags = D3D12_EXPORT_FLAG_NONE;
-			exp.ExportToRename = 0;
+		groupNameStorage[groupNameStoragePtr++] = std::wstring(groupName) + L"_PROC";
+		const wchar* name = groupNameStorage[groupNameStoragePtr - 1].c_str();
 
-			allExports.push_back(entries[i]);
-		}
+		D3D12_HIT_GROUP_DESC& hitGroup = hitGroups[numHitGroups++];
+
+		hitGroup.Type = D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE;
+		hitGroup.AnyHitShaderImport = procedural.anyHit;
+		hitGroup.ClosestHitShaderImport = procedural.closestHit;
+		hitGroup.IntersectionShaderImport = procedural.intersection;
+		hitGroup.HitGroupExport = name;
+
+		auto& so = subobjects[numSubobjects++];
+		so.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+		so.pDesc = &hitGroup;
+
+		assert(procedural.intersection);
+
+		if (procedural.closestHit) { exportEntryPoint(procedural.closestHit); }
+		if (procedural.intersection) { exportEntryPoint(procedural.intersection); }
+		if (procedural.anyHit) { exportEntryPoint(procedural.anyHit); }
+
+		createLocalRootSignature(meshRootSignatureDesc, procedural.closestHit, procedural.anyHit, procedural.intersection);
 	}
 
-	if (rootSignatureDesc.NumParameters > 0)
-	{
-		rootSignatureDesc.Flags |= D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-		rootSignatures[numRootSignatures++] = createRaytracingRootSignature(rootSignatureDesc);
-
-		{
-			auto& so = subobjects[numSubobjects++];
-			so.pDesc = &rootSignatures[numRootSignatures - 1].rootSignaturePtr;
-			so.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
-		}
-
-		{
-			auto& so = subobjects[numSubobjects++];
-			auto& as = associations[numAssociations++];
-
-			const wchar** entryPoints = &stringBuffer[numStrings];
-			uint32 numEntryPoints = 0;
-
-			entryPoints[numEntryPoints++] = closestHit;
-			if (anyHit)
-			{
-				entryPoints[numEntryPoints++] = anyHit;
-			}
-
-			numStrings += numEntryPoints;
-
-			as.NumExports = numEntryPoints;
-			as.pExports = entryPoints;
-			as.pSubobjectToAssociate = &subobjects[numSubobjects - 2];
-
-			so.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
-			so.pDesc = &as;
-		}
-
-		uint32 size = getShaderBindingTableSize(rootSignatureDesc);
-		tableEntrySize = max(size, tableEntrySize);
-	}
-
+	exportEntryPoint(miss);
 	emptyAssociations.push_back(miss);
 	missEntryPoints.push_back(miss);
+
+	shaderNameDefines.push_back(groupName);
 
 	return *this;
 }
@@ -412,7 +450,7 @@ dx_raytracing_pipeline raytracing_pipeline_builder::finish()
 	assert(raygenRS.rootSignature.rootSignature);
 	assert(globalRS.rootSignature.rootSignature);
 
-	auto shaderBlob = compileLibrary(shaderFilename, hitGroups, numHitGroups);
+	auto shaderBlob = compileLibrary(shaderFilename, shaderNameDefines);
 
 	D3D12_DXIL_LIBRARY_DESC dxilLibDesc;
 	dxilLibDesc.DXILLibrary.pShaderBytecode = shaderBlob->GetBufferPointer();
@@ -507,15 +545,29 @@ dx_raytracing_pipeline raytracing_pipeline_builder::finish()
 		tableEntrySize += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
 		shaderBindingTableDesc.entrySize = (uint32)alignTo(tableEntrySize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
 
+		uint32 numGeometryTypes = hasMeshGeometry + hasProceduralGeometry;
+
 		uint32 numRaygenShaderEntries = 1;
-		uint32 numMissShaderEntries = numHitGroups;
+		uint32 numMissShaderEntries = numHitGroups / numGeometryTypes;
 
 		shaderBindingTableDesc.raygen = rtsoProps->GetShaderIdentifier(raygenEntryPoint);
 
-		for (uint32 i = 0; i < numHitGroups; ++i)
+		uint32 numUniqueGroups = (uint32)missEntryPoints.size();
+		assert(numUniqueGroups * numGeometryTypes == numHitGroups);
+
+		for (uint32 i = 0; i < numUniqueGroups; ++i)
 		{
 			shaderBindingTableDesc.miss.push_back(rtsoProps->GetShaderIdentifier(missEntryPoints[i]));
-			shaderBindingTableDesc.hitGroups.push_back({ rtsoProps->GetShaderIdentifier(hitGroups[i].HitGroupExport) });
+
+			raytracing_shader& shader = shaderBindingTableDesc.hitGroups.emplace_back();
+			if (hasMeshGeometry)
+			{
+				shader.mesh = rtsoProps->GetShaderIdentifier(hitGroups[numGeometryTypes * i].HitGroupExport);
+			}
+			if (hasProceduralGeometry)
+			{
+				shader.procedural = rtsoProps->GetShaderIdentifier(hitGroups[numGeometryTypes * i + numGeometryTypes - 1].HitGroupExport);
+			}
 		}
 
 
