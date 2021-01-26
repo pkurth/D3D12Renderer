@@ -396,10 +396,6 @@ void radianceMiss(inout radiance_ray_payload payload)
 	payload.color = sky.SampleLevel(wrapSampler, WorldRayDirection(), 0).xyz;
 }
 
-[shader("anyhit")]
-void radianceAnyHit(inout radiance_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
-{
-}
 
 
 
@@ -408,22 +404,10 @@ void radianceAnyHit(inout radiance_ray_payload payload, in BuiltInTriangleInters
 // SHADOW
 // ----------------------------------------
 
-[shader("closesthit")]
-void shadowClosestHit(inout shadow_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
-{
-	// This shader will never be called.
-}
-
 [shader("miss")]
 void shadowMiss(inout shadow_ray_payload payload)
 {
 	payload.visible = 1.f;
-}
-
-[shader("anyhit")]
-void shadowAnyHit(inout shadow_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
-{
-	AcceptHitAndEndSearch(); // Actually redundant with the flag we specified in the TraceRay call.
 }
 
 
