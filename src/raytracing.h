@@ -8,23 +8,26 @@
 // Formula for hit shader index calculation: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#hit-group-table-indexing
 
 
-enum acceleration_structure_rebuild_mode
+enum raytracing_as_rebuild_mode
 {
-	acceleration_structure_rebuild,
-	acceleration_structure_refit,
+	raytracing_as_rebuild,
+	raytracing_as_refit,
+};
+
+enum raytracing_geometry_type
+{
+	raytracing_mesh_geometry,
+	raytracing_procedural_geometry,
 };
 
 struct raytracing_blas_geometry
 {
+	raytracing_geometry_type type;
+
+	// Only valid for mesh geometry.
 	ref<dx_vertex_buffer> vertexBuffer;
 	ref<dx_index_buffer> indexBuffer;
 	submesh_info submesh;
-};
-
-struct raytracing_blas_procedural
-{
-	// A single node in the BLAS can have multiple AABBS.
-	std::vector<bounding_box> boundingBoxes;
 };
 
 struct raytracing_blas
@@ -33,7 +36,6 @@ struct raytracing_blas
 	ref<dx_buffer> blas;
 
 	std::vector<raytracing_blas_geometry> geometries;
-	std::vector<raytracing_blas_procedural> procedurals;
 };
 
 struct raytracing_blas_builder
@@ -46,10 +48,9 @@ private:
 	std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDescs;
 
 	std::vector<raytracing_blas_geometry> geometries;
-	std::vector<mat4> localTransforms;
 
-	std::vector<raytracing_blas_procedural> procedurals;
-	std::vector<D3D12_RAYTRACING_AABB> aabbDescs;
+	std::vector<mat4> localTransforms;				// For meshes.
+	std::vector<D3D12_RAYTRACING_AABB> aabbDescs;	// For procedurals.
 };
 
 struct raytracing_object_type
@@ -94,15 +95,15 @@ struct dx_raytracing_pipeline
 
 struct raytracing_mesh_hitgroup
 {
-	const wchar* closestHit; // Optional.
-	const wchar* anyHit; // Optional.
+	const wchar* closestHit;	// Optional.
+	const wchar* anyHit;		// Optional.
 };
 
 struct raytracing_procedural_hitgroup
 {
-	const wchar* closestHit; // Optional.
 	const wchar* intersection;
-	const wchar* anyHit; // Optional.
+	const wchar* closestHit;	// Optional.
+	const wchar* anyHit;		// Optional.
 };
 
 
@@ -114,7 +115,6 @@ struct raytracing_pipeline_builder
 	raytracing_pipeline_builder& raygen(const wchar* entryPoint, D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {});
 
 	// The root signature describes parameters for both hit shaders. Miss will not get any arguments for now.
-	// The any-hit shader is optional. Pass null, if not needed.
 	raytracing_pipeline_builder& hitgroup(const wchar* groupName, const wchar* miss, 
 		raytracing_mesh_hitgroup mesh, D3D12_ROOT_SIGNATURE_DESC meshRootSignatureDesc = {}, 
 		raytracing_procedural_hitgroup procedural = {}, D3D12_ROOT_SIGNATURE_DESC proceduralRootSignatureDesc = {});

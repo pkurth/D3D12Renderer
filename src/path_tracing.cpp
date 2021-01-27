@@ -80,6 +80,8 @@ raytracing_object_type path_tracer::defineObjectType(const ref<raytracing_blas>&
 
     for (uint32 i = 0; i < numGeometries; ++i)
     {
+        assert(blas->geometries[i].type == raytracing_mesh_geometry); // For now we only support meshes, not procedurals.
+
         submesh_info submesh = blas->geometries[i].submesh;
         const ref<pbr_material>& material = materials[i];
 

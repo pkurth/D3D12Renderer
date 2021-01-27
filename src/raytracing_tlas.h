@@ -9,7 +9,7 @@ struct raytracing_instance_handle
 
 struct raytracing_tlas
 {
-	void initialize(acceleration_structure_rebuild_mode rebuildMode = acceleration_structure_rebuild);
+	void initialize(raytracing_as_rebuild_mode rebuildMode = raytracing_as_rebuild);
 
 	// Call these each frame to rebuild the structure.
 	void reset();
@@ -19,7 +19,7 @@ struct raytracing_tlas
 
 	std::vector<D3D12_RAYTRACING_INSTANCE_DESC> allInstances;
 
-	acceleration_structure_rebuild_mode rebuildMode;
+	raytracing_as_rebuild_mode rebuildMode;
 
 	ref<dx_buffer> scratch;
 	ref<dx_buffer> tlas;

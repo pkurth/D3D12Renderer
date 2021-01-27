@@ -34,7 +34,7 @@ raytracing_blas_builder& raytracing_blas_builder::push(ref<dx_vertex_buffer> ver
 	geomDesc.Triangles.IndexCount = submesh.numTriangles * 3;
 
 	geometryDescs.push_back(geomDesc);
-	geometries.push_back({ vertexBuffer, indexBuffer, submesh });
+	geometries.push_back({ raytracing_mesh_geometry, vertexBuffer, indexBuffer, submesh });
 
 	return *this;
 }
@@ -63,7 +63,7 @@ raytracing_blas_builder& raytracing_blas_builder::push(const std::vector<boundin
 	geomDesc.AABBs.AABBCount = boundingBoxes.size();
 
 	geometryDescs.push_back(geomDesc);
-	procedurals.push_back({ boundingBoxes });
+	geometries.push_back({ raytracing_procedural_geometry });
 
 	return *this;
 }
@@ -136,7 +136,6 @@ ref<raytracing_blas> raytracing_blas_builder::finish(bool keepScratch)
 	SET_NAME(blas->blas->resource, "BLAS Result");
 
 	blas->geometries = std::move(geometries);
-	blas->procedurals = std::move(procedurals);
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
 	asDesc.Inputs = inputs;

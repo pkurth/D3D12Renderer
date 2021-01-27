@@ -4,7 +4,7 @@
 #include "dx_command_list.h"
 #include "dx_barrier_batcher.h"
 
-void raytracing_tlas::initialize(acceleration_structure_rebuild_mode rebuildMode)
+void raytracing_tlas::initialize(raytracing_as_rebuild_mode rebuildMode)
 {
     this->rebuildMode = rebuildMode;
     allInstances.reserve(4096); // TODO
@@ -42,7 +42,7 @@ void raytracing_tlas::build()
     inputs.NumDescs = totalNumInstances;
     inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
-    if (rebuildMode == acceleration_structure_refit)
+    if (rebuildMode == raytracing_as_refit)
     {
         inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
     }
@@ -101,7 +101,7 @@ void raytracing_tlas::build()
             .uav(tlas)
             .uav(scratch);
 
-        if (rebuildMode == acceleration_structure_refit)
+        if (rebuildMode == raytracing_as_refit)
         {
             asDesc.Inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
             asDesc.SourceAccelerationStructureData = tlas->gpuVirtualAddress;
