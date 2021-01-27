@@ -1,15 +1,15 @@
 [submodule "ext/imgui"]
 	path = ext/imgui
-	url = git@github.com:ocornut/imgui.git
+	url = ../../ocornut/imgui.git
 [submodule "ext/assimp"]
 	path = ext/assimp
-	url = git@github.com:pkurth/assimp.git
+	url = ../assimp.git
 [submodule "ext/entt"]
 	path = ext/entt
-	url = git@github.com:skypjack/entt.git
+	url = ../../skypjack/entt.git
 [submodule "ext/directxtex"]
 	path = ext/directxtex
-	url = git@github.com:microsoft/DirectXTex.git
+	url = ../../microsoft/DirectXTex.git
 [submodule "ext/yaml-cpp"]
 	path = ext/yaml-cpp
-	url = git@github.com:pkurth/yaml-cpp.git
+	url = ../yaml-cpp.git
