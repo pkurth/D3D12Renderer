@@ -341,10 +341,20 @@ void resolveTimeStampQueries(uint64* timestamps)
 						if (!next)
 						{
 							next = current->nextSibling;
-							if (!next && current->parent)
+
+							if (!next)
 							{
-								next = current->parent->nextSibling;
-								--depth;
+								dx_profile_block* nextAncestor = current->parent;
+								while (nextAncestor)
+								{
+									--depth;
+									if (nextAncestor->nextSibling)
+									{
+										next = nextAncestor->nextSibling;
+										break;
+									}
+									nextAncestor = nextAncestor->parent;
+								}
 							}
 						}
 						else
