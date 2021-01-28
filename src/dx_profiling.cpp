@@ -365,6 +365,8 @@ void resolveTimeStampQueries(uint64* timestamps)
 						current = next;
 					}
 
+					assert(depth == 0);
+
 
 					// Millisecond spacings.
 
