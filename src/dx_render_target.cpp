@@ -3,51 +3,22 @@
 #include "dx_texture.h"
 
 
-uint32 dx_render_target::pushColorAttachment(const ref<dx_texture>& texture)
+dx_render_target::dx_render_target(std::initializer_list<ref<dx_texture>> colorAttachments, ref<dx_texture> depthAttachment)
 {
-	assert(texture->resource);
-	assert(texture->supportsRTV);
-
-	uint32 attachmentPoint = numAttachments++;
-
-	colorAttachments[attachmentPoint] = texture;
-
-	if (width == 0 || height == 0)
+	numAttachments = 0;
+	for (const ref<dx_texture>& t : colorAttachments)
 	{
-		width = texture->width;
-		height = texture->height;
-		viewport = { 0, 0, (float)width, (float)height, 0.f, 1.f };
+		if (t)
+		{
+			this->colorAttachments[numAttachments++] = t;
+		}
 	}
-	else
-	{
-		assert(width == texture->width && height == texture->height);
-	}
+	this->depthAttachment = depthAttachment;
 
-	return attachmentPoint;
-}
+	assert(numAttachments > 0 || depthAttachment != 0);
 
-void dx_render_target::pushDepthStencilAttachment(const ref<dx_texture>& texture, uint32 arraySlice)
-{
-	assert(texture->resource);
+	uint32 width = (numAttachments > 0) ? this->colorAttachments[0]->width : depthAttachment->width;
+	uint32 height = (numAttachments > 0) ? this->colorAttachments[0]->height : depthAttachment->height;
 
-	depthAttachment = texture;
-	depthArraySlice = arraySlice;
-
-	if (width == 0 || height == 0)
-	{
-		width = texture->width;
-		height = texture->height;
-		viewport = { 0, 0, (float)width, (float)height, 0.f, 1.f };
-	}
-	else
-	{
-		assert(width == texture->width && height == texture->height);
-	}
-}
-
-void dx_render_target::notifyOnTextureResize(uint32 width, uint32 height)
-{
-	this->width = width;
-	this->height = height;
-	viewport = { 0, 0, (float)width, (float)height, 0.f, 1.f };
+	viewport = { 0.f, 0.f, (float)width, (float)height, 0.f, 1.f };
 }

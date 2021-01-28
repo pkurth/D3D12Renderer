@@ -1,6 +1,5 @@
 #pragma once
 
-#include "dx_render_target.h"
 #include "dx_command_list.h"
 #include "math.h"
 #include "camera.h"
@@ -179,11 +178,8 @@ private:
 	uint32 windowHeight;
 	D3D12_VIEWPORT windowViewport;
 
-	dx_render_target windowRenderTarget;
-
-	dx_render_target hdrRenderTarget;
-	dx_render_target depthOnlyRenderTarget;
 	ref<dx_texture> hdrColorTexture;
+	ref<dx_texture> prevFrameHDRColorTexture;
 	ref<dx_texture> worldNormalsTexture;
 	ref<dx_texture> screenVelocitiesTexture;
 	ref<dx_texture> objectIDsTexture;

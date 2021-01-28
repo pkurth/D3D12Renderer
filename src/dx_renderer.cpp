@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "dx_renderer.h"
 #include "dx_command_list.h"
+#include "dx_render_target.h"
 #include "dx_pipeline.h"
 #include "geometry.h"
 #include "dx_texture.h"
@@ -26,7 +27,6 @@ static ref<dx_texture> blackTexture;
 static ref<dx_texture> blackCubeTexture;
 
 static ref<dx_texture> shadowMap;
-static dx_render_target shadowRenderTarget;
 
 static dx_pipeline clearObjectIDsPipeline;
 
@@ -104,8 +104,6 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 	shadowMap = createDepthTexture(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, 
 		shadowDepthFormat, 1, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-	shadowRenderTarget.pushDepthStencilAttachment(shadowMap);
 
 
 	// Sky.
@@ -248,32 +246,26 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 			objectIDsTexture = createTexture(0, renderWidth, renderHeight, depthOnlyFormat[1], false, true, true);
 			SET_NAME(objectIDsTexture->resource, "Object IDs");
 		}
-
-		hdrRenderTarget.pushColorAttachment(hdrColorTexture);
-		hdrRenderTarget.pushColorAttachment(worldNormalsTexture);
-		hdrRenderTarget.pushDepthStencilAttachment(depthStencilBuffer);
-
-		depthOnlyRenderTarget.pushColorAttachment(screenVelocitiesTexture);
-
-		if (renderObjectIDs)
-		{
-			depthOnlyRenderTarget.pushColorAttachment(objectIDsTexture);
-		}
-		depthOnlyRenderTarget.pushDepthStencilAttachment(depthStencilBuffer);
 	}
 
 	// Frame result.
 	{
 		frameResult = createTexture(0, windowWidth, windowHeight, screenFormat, false, true);
 		SET_NAME(frameResult->resource, "Frame result");
-
-		windowRenderTarget.pushColorAttachment(frameResult);
 	}
 
 	// Volumetrics.
 	{
-		volumetricsTexture = createTexture(0, renderWidth, renderHeight, volumetricsFormat, false, false, true);
-		SET_NAME(volumetricsTexture->resource, "Volumetrics");
+		//volumetricsTexture = createTexture(0, renderWidth, renderHeight, volumetricsFormat, false, false, true);
+		//SET_NAME(volumetricsTexture->resource, "Volumetrics");
+	}
+
+	// Bloom.
+	{
+		//D3D12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Tex2D(hdrFormat[0], renderWidth, renderHeight,
+		//	1, 4, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+		//bloomTexture = createTexture(desc, 0, 0);
+		//SET_NAME(bloomTexture->resource, "Bloom");
 	}
 
 	if (renderObjectIDs)
@@ -314,10 +306,7 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 		this->windowHeight = windowHeight;
 
 		// Frame result.
-		{
-			resizeTexture(frameResult, windowWidth, windowHeight);
-			windowRenderTarget.notifyOnTextureResize(windowWidth, windowHeight);
-		}
+		resizeTexture(frameResult, windowWidth, windowHeight);
 
 		recalculateViewport(true);
 	}
@@ -376,16 +365,14 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		resizeTexture(hdrColorTexture, renderWidth, renderHeight);
 		resizeTexture(worldNormalsTexture, renderWidth, renderHeight);
 		resizeTexture(depthStencilBuffer, renderWidth, renderHeight);
-		hdrRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
 
 		resizeTexture(screenVelocitiesTexture, renderWidth, renderHeight);
 		if (objectIDsTexture)
 		{
 			resizeTexture(objectIDsTexture, renderWidth, renderHeight);
 		}
-		depthOnlyRenderTarget.notifyOnTextureResize(renderWidth, renderHeight);
 		
-		resizeTexture(volumetricsTexture, renderWidth, renderHeight);
+		//resizeTexture(volumetricsTexture, renderWidth, renderHeight);
 	}
 
 	allocateLightCullingBuffers();
@@ -401,7 +388,7 @@ void dx_renderer::allocateLightCullingBuffers()
 	if (firstAllocation)
 	{
 		lightCullingBuffers.lightGrid = createTexture(0, lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY,
-			DXGI_FORMAT_R32G32B32A32_UINT, false, false, true);
+			DXGI_FORMAT_R16G16B16A16_UINT, false, false, true);
 		SET_NAME(lightCullingBuffers.lightGrid->resource, "Light grid");
 
 		lightCullingBuffers.lightIndexCounter = createBuffer(sizeof(uint32), 2, 0, true, true);
@@ -611,46 +598,6 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 
-
-
-		cl->setRenderTarget(hdrRenderTarget);
-		cl->setViewport(hdrRenderTarget.viewport);
-
-		// ----------------------------------------
-		// SKY PASS
-		// ----------------------------------------
-
-		{
-			DX_PROFILE_BLOCK(cl, "Sky");
-
-			if (environment)
-			{
-				cl->setPipelineState(*textureSkyPipeline.pipeline);
-				cl->setGraphicsRootSignature(*textureSkyPipeline.rootSignature);
-
-				cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
-				cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
-				cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment->sky->defaultSRV);
-
-				cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
-				cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
-				cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
-			}
-			else
-			{
-				cl->setPipelineState(*proceduralSkyPipeline.pipeline);
-				cl->setGraphicsRootSignature(*proceduralSkyPipeline.rootSignature);
-
-				cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
-				cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
-
-				cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
-				cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
-				cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
-			}
-		}
-
-
 		if (performedSkinning)
 		{
 			dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // Wait for GPU skinning.
@@ -660,6 +607,8 @@ void dx_renderer::endFrame(const user_input& input)
 		// ----------------------------------------
 		// DEPTH-ONLY PASS
 		// ----------------------------------------
+
+		dx_render_target depthOnlyRenderTarget({ screenVelocitiesTexture, objectIDsTexture }, depthStencilBuffer);
 
 		cl->setRenderTarget(depthOnlyRenderTarget);
 		cl->setViewport(depthOnlyRenderTarget.viewport);
@@ -798,6 +747,8 @@ void dx_renderer::endFrame(const user_input& input)
 		{
 			DX_PROFILE_BLOCK(cl, "Shadow map pass");
 
+			dx_render_target shadowRenderTarget({}, shadowMap);
+
 			cl->clearDepth(shadowRenderTarget);
 
 			cl->setPipelineState(*shadowPipeline.pipeline);
@@ -928,12 +879,51 @@ void dx_renderer::endFrame(const user_input& input)
 #endif
 
 
-		// ----------------------------------------
-		// LIGHT PASS
-		// ----------------------------------------
+		dx_render_target hdrRenderTarget({ hdrColorTexture, worldNormalsTexture }, depthStencilBuffer);
 
 		cl->setRenderTarget(hdrRenderTarget);
 		cl->setViewport(hdrRenderTarget.viewport);
+
+		// ----------------------------------------
+		// SKY PASS
+		// ----------------------------------------
+
+		{
+			DX_PROFILE_BLOCK(cl, "Sky");
+
+			if (environment)
+			{
+				cl->setPipelineState(*textureSkyPipeline.pipeline);
+				cl->setGraphicsRootSignature(*textureSkyPipeline.rootSignature);
+
+				cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
+				cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
+				cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment->sky->defaultSRV);
+
+				cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
+				cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
+				cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
+			}
+			else
+			{
+				cl->setPipelineState(*proceduralSkyPipeline.pipeline);
+				cl->setGraphicsRootSignature(*proceduralSkyPipeline.rootSignature);
+
+				cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
+				cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
+
+				cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
+				cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
+				cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
+			}
+		}
+
+
+
+
+		// ----------------------------------------
+		// LIGHT PASS
+		// ----------------------------------------
 
 		if (opaqueRenderPass && opaqueRenderPass->drawCalls.size() > 0)
 		{
@@ -1099,6 +1089,8 @@ void dx_renderer::endFrame(const user_input& input)
 
 	{
 		DX_PROFILE_BLOCK(cl, "Present");
+
+		dx_render_target windowRenderTarget = { frameResult };
 
 		cl->setRenderTarget(windowRenderTarget);
 		cl->setViewport(windowViewport);
