@@ -52,6 +52,7 @@ static dx_pipeline outlineDrawerPipeline;
 static dx_pipeline worldSpaceFrustaPipeline;
 static dx_pipeline lightCullingPipeline;
 
+static dx_pipeline taaPipeline;
 
 
 static dx_mesh positionOnlyMesh;
@@ -73,7 +74,6 @@ dx_cpu_descriptor_handle dx_renderer::nullBufferSRV;
 static bool performedSkinning;
 
 static vec2 haltonSequence[128];
-static uint32 haltonIndex;
 
 
 enum stencil_flags
@@ -208,6 +208,11 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		clearObjectIDsPipeline = createReloadablePipeline("clear_object_ids_cs");
 	}
 
+	// TAA.
+	{
+		taaPipeline = createReloadablePipeline("taa_composite_cs");
+	}
+
 
 	pbr_material::initializePipeline();
 
@@ -229,7 +234,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 	for (uint32 i = 0; i < arraysize(haltonSequence); ++i)
 	{
-		haltonSequence[i] = halton23(i);
+		haltonSequence[i] = halton23(i) * 2.f - vec2(1.f);
 	}
 }
 
@@ -249,14 +254,9 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 		screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, depthOnlyFormat[0], false, true);
 
 		SET_NAME(hdrColorTexture->resource, "HDR Color");
+		SET_NAME(prevFrameHDRColorTexture->resource, "HDR Color");
 		SET_NAME(worldNormalsTexture->resource, "World normals");
 		SET_NAME(screenVelocitiesTexture->resource, "Screen velocities");
-
-		if (renderObjectIDs)
-		{
-			objectIDsTexture = createTexture(0, renderWidth, renderHeight, depthOnlyFormat[1], false, true, true);
-			SET_NAME(objectIDsTexture->resource, "Object IDs");
-		}
 	}
 
 	// Frame result.
@@ -277,6 +277,9 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 		{
 			hoveredObjectIDReadbackBuffer[i] = createReadbackBuffer(getFormatSize(depthOnlyFormat[1]), 1);
 		}
+
+		objectIDsTexture = createTexture(0, renderWidth, renderHeight, depthOnlyFormat[1], false, true, true);
+		SET_NAME(objectIDsTexture->resource, "Object IDs");
 	}
 
 	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
@@ -366,6 +369,7 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 	if (resizeTextures)
 	{
 		resizeTexture(hdrColorTexture, renderWidth, renderHeight);
+		resizeTexture(prevFrameHDRColorTexture, renderWidth, renderHeight);
 		resizeTexture(worldNormalsTexture, renderWidth, renderHeight);
 		resizeTexture(depthStencilBuffer, renderWidth, renderHeight);
 
@@ -416,9 +420,8 @@ void dx_renderer::setCamera(const render_camera& camera)
 	render_camera c;
 	if (settings.enableTemporalAntialiasing)
 	{
-		jitterOffset = haltonSequence[haltonIndex];
+		jitterOffset = haltonSequence[dxContext.frameID % arraysize(haltonSequence)] / vec2((float)renderWidth, (float)renderHeight);
 		c = camera.getJitteredVersion(jitterOffset);
-		haltonIndex = (haltonIndex + 1) % arraysize(haltonSequence);
 	}
 	else
 	{
@@ -573,6 +576,9 @@ void dx_renderer::endFrame(const user_input& input)
 
 	materialInfo.depthBuffer = depthStencilBuffer;
 	materialInfo.worldNormals = worldNormalsTexture;
+
+
+	std::swap(hdrColorTexture, prevFrameHDRColorTexture);
 
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
@@ -1078,9 +1084,39 @@ void dx_renderer::endFrame(const user_input& input)
 		}
 
 
-		barrier_batcher(cl)
-			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		if (settings.enableTemporalAntialiasing)
+		{
+			DX_PROFILE_BLOCK(cl, "Temporal anti-aliasing");
 
+			barrier_batcher(cl)
+				.uav(hdrColorTexture)
+				.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+			// ----------------------------------------
+			// TEMPORAL AA
+			// ----------------------------------------
+
+			cl->setPipelineState(*taaPipeline.pipeline);
+			cl->setComputeRootSignature(*taaPipeline.rootSignature);
+
+			cl->setDescriptorHeapUAV(TAA_RS_TEXTURES, 0, hdrColorTexture);
+			cl->setDescriptorHeapSRV(TAA_RS_TEXTURES, 1, prevFrameHDRColorTexture);
+			cl->setDescriptorHeapSRV(TAA_RS_TEXTURES, 2, screenVelocitiesTexture);
+
+			cl->setCompute32BitConstants(TAA_RS_CB, taa_cb{ vec2((float)hdrColorTexture->width, (float)hdrColorTexture->height) });
+
+			cl->dispatch(bucketize(hdrColorTexture->width, 32), bucketize(hdrColorTexture->height, 32));
+
+
+			barrier_batcher(cl)
+				.uav(hdrColorTexture)
+				.transition(hdrColorTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		}
+		else
+		{
+			barrier_batcher(cl)
+				.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		}
 	}
 	else
 	{

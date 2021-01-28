@@ -21,7 +21,7 @@ ps_output main(ps_input IN)
 	float2 ndc = (IN.ndc.xy / IN.ndc.z) - camera.jitter;
 	float2 prevNDC = (IN.prevFrameNDC.xy / IN.prevFrameNDC.z) - camera.prevFrameJitter;
 
-	float2 motion = (prevNDC - ndc) * 0.5f;	
+	float2 motion = (prevNDC - ndc) * float2(0.5f, -0.5f);	
 
 	ps_output OUT;
 	OUT.screenVelocity = motion;

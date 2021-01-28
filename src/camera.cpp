@@ -238,6 +238,7 @@ camera_frustum_corners render_camera::getViewSpaceFrustumCorners(float alternati
 
 render_camera render_camera::getJitteredVersion(vec2 offset) const
 {
+#if 0
 	camera_projection_extents extents = getProjectionExtents();
 	float texelSizeX = (extents.left + extents.right) / width;
 	float texelSizeY = (extents.top + extents.bottom) / height;
@@ -251,11 +252,18 @@ render_camera render_camera::getJitteredVersion(vec2 offset) const
 	float top = jitterY + extents.top;
 
 	mat4 jitteredProj = createPerspectiveProjectionMatrix(right * nearPlane, left * nearPlane, top * nearPlane, bottom * nearPlane, nearPlane, farPlane);
+#else
+	mat4 jitteredProj = proj;
 
+	// Since we have a right-handed coordinate system (where z is negative), this will get multiplied with a negative value.
+	// By negating the offset, we counteract this.
+	jitteredProj.m02 = -offset.x; 
+	jitteredProj.m12 = -offset.y;
+#endif
 	render_camera result = *this;
 
 	result.proj = jitteredProj;
-	result.invProj = invertPerspectiveProjectionMatrix(jitteredProj);
+	result.invProj = invert(jitteredProj);
 	result.viewProj = jitteredProj * view;
 	result.invViewProj = invView * result.invProj;
 
