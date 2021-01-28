@@ -2,12 +2,12 @@
 
 struct ps_input
 {
-	float2 uv	: TEXCOORDS;
+	float2 uv		: TEXCOORDS;
+	float4 position : SV_Position;
 };
 
 ConstantBuffer<tonemap_cb> tonemap	: register(b0);
 ConstantBuffer<present_cb> present	: register(b1);
-SamplerState texSampler				: register(s0);
 Texture2D<float4> tex				: register(t0);
 
 
@@ -76,7 +76,7 @@ static float3 filmicTonemapping(float3 color)
 [RootSignature(PRESENT_RS)]
 float4 main(ps_input IN) : SV_TARGET
 {
-	float4 scene = tex.Sample(texSampler, IN.uv);
+	float4 scene = tex.Load(uint3(IN.position.xy, 0));
 	
 	scene.rgb = filmicTonemapping(scene.rgb);
 

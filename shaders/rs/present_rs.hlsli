@@ -59,12 +59,6 @@ static float filmicTonemapping(float color, tonemap_cb tonemap)
 "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
 "RootConstants(num32BitConstants=8, b0, visibility=SHADER_VISIBILITY_PIXEL),"  \
 "RootConstants(num32BitConstants=2, b1, visibility=SHADER_VISIBILITY_PIXEL),"  \
-"StaticSampler(s0," \
-	"addressU = TEXTURE_ADDRESS_CLAMP," \
-	"addressV = TEXTURE_ADDRESS_CLAMP," \
-	"addressW = TEXTURE_ADDRESS_CLAMP," \
-	"filter = FILTER_MIN_MAG_LINEAR_MIP_POINT,"	\
-	"visibility=SHADER_VISIBILITY_PIXEL)," \
 "DescriptorTable(SRV(t0, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define PRESENT_RS_TONEMAP	0
