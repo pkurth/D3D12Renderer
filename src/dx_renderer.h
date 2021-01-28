@@ -60,6 +60,8 @@ struct renderer_settings
 	float skyIntensity = 1.f;
 
 	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
+
+	bool enableTemporalAntialiasing = false;
 };
 
 struct dx_renderer

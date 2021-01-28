@@ -127,7 +127,7 @@ struct render_camera
 
 
 
-	render_camera getJitteredVersion(vec2 offset);
+	render_camera getJitteredVersion(vec2 offset) const;
 };
 
 

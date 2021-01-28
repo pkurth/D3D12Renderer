@@ -236,7 +236,7 @@ camera_frustum_corners render_camera::getViewSpaceFrustumCorners(float alternati
 	return result;
 }
 
-render_camera render_camera::getJitteredVersion(vec2 offset)
+render_camera render_camera::getJitteredVersion(vec2 offset) const
 {
 	camera_projection_extents extents = getProjectionExtents();
 	float texelSizeX = (extents.left + extents.right) / width;
@@ -251,7 +251,6 @@ render_camera render_camera::getJitteredVersion(vec2 offset)
 	float top = jitterY + extents.top;
 
 	mat4 jitteredProj = createPerspectiveProjectionMatrix(right * nearPlane, left * nearPlane, top * nearPlane, bottom * nearPlane, nearPlane, farPlane);
-
 
 	render_camera result = *this;
 

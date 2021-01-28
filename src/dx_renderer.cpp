@@ -10,6 +10,7 @@
 #include "skinning.h"
 #include "dx_context.h"
 #include "dx_profiling.h"
+#include "random.h"
 
 #include "depth_only_rs.hlsli"
 #include "outline_rs.hlsli"
@@ -18,6 +19,7 @@
 #include "camera.hlsli"
 #include "transform.hlsli"
 #include "post_processing_rs.hlsli"
+#include "random.h"
 
 #include "raytracing.h"
 
@@ -69,6 +71,9 @@ dx_cpu_descriptor_handle dx_renderer::nullBufferSRV;
 
 
 static bool performedSkinning;
+
+static vec2 haltonSequence[128];
+static uint32 haltonIndex;
 
 
 enum stencil_flags
@@ -221,6 +226,11 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		brdfTex = integrateBRDF(cl);
 		dxContext.executeCommandList(cl);
 	}
+
+	for (uint32 i = 0; i < arraysize(haltonSequence); ++i)
+	{
+		haltonSequence[i] = halton23(i);
+	}
 }
 
 void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool renderObjectIDs)
@@ -234,6 +244,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 	{
 		depthStencilBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthStencilFormat);
 		hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[0], false, true, true);
+		prevFrameHDRColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[0], false, true, true);
 		worldNormalsTexture = createTexture(0, renderWidth, renderHeight, hdrFormat[1], false, true);
 		screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, depthOnlyFormat[0], false, true);
 
@@ -258,14 +269,6 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 	{
 		//volumetricsTexture = createTexture(0, renderWidth, renderHeight, volumetricsFormat, false, false, true);
 		//SET_NAME(volumetricsTexture->resource, "Volumetrics");
-	}
-
-	// Bloom.
-	{
-		//D3D12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Tex2D(hdrFormat[0], renderWidth, renderHeight,
-		//	1, 4, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
-		//bloomTexture = createTexture(desc, 0, 0);
-		//SET_NAME(bloomTexture->resource, "Bloom");
 	}
 
 	if (renderObjectIDs)
@@ -409,20 +412,35 @@ void dx_renderer::allocateLightCullingBuffers()
 
 void dx_renderer::setCamera(const render_camera& camera)
 {
+	vec2 jitterOffset(0.f, 0.f);
+	render_camera c;
+	if (settings.enableTemporalAntialiasing)
+	{
+		jitterOffset = haltonSequence[haltonIndex];
+		c = camera.getJitteredVersion(jitterOffset);
+		haltonIndex = (haltonIndex + 1) % arraysize(haltonSequence);
+	}
+	else
+	{
+		c = camera;
+	}
+
 	this->camera.prevFrameViewProj = this->camera.viewProj;
-	this->camera.viewProj = camera.viewProj;
-	this->camera.view = camera.view;
-	this->camera.proj = camera.proj;
-	this->camera.invViewProj = camera.invViewProj;
-	this->camera.invView = camera.invView;
-	this->camera.invProj = camera.invProj;
-	this->camera.position = vec4(camera.position, 1.f);
-	this->camera.forward = vec4(camera.rotation * vec3(0.f, 0.f, -1.f), 0.f);
-	this->camera.right = vec4(camera.rotation * vec3(1.f, 0.f, 0.f), 0.f);
-	this->camera.up = vec4(camera.rotation * vec3(0.f, 1.f, 0.f), 0.f);
-	this->camera.projectionParams = vec4(camera.nearPlane, camera.farPlane, camera.farPlane / camera.nearPlane, 1.f - camera.farPlane / camera.nearPlane);
+	this->camera.viewProj = c.viewProj;
+	this->camera.view = c.view;
+	this->camera.proj = c.proj;
+	this->camera.invViewProj = c.invViewProj;
+	this->camera.invView = c.invView;
+	this->camera.invProj = c.invProj;
+	this->camera.position = vec4(c.position, 1.f);
+	this->camera.forward = vec4(c.rotation * vec3(0.f, 0.f, -1.f), 0.f);
+	this->camera.right = vec4(c.rotation * vec3(1.f, 0.f, 0.f), 0.f);
+	this->camera.up = vec4(c.rotation * vec3(0.f, 1.f, 0.f), 0.f);
+	this->camera.projectionParams = vec4(c.nearPlane, c.farPlane, c.farPlane / c.nearPlane, 1.f - c.farPlane / c.nearPlane);
 	this->camera.screenDims = vec2((float)renderWidth, (float)renderHeight);
 	this->camera.invScreenDims = vec2(1.f / renderWidth, 1.f / renderHeight);
+	this->camera.prevFrameJitter = this->camera.jitter;
+	this->camera.jitter = jitterOffset;
 }
 
 void dx_renderer::setEnvironment(const ref<pbr_environment>& environment)
@@ -624,6 +642,8 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setPipelineState(*depthOnlyPipeline.pipeline);
 				cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
 
+				cl->setGraphicsDynamicConstantBuffer(DEPTH_ONLY_RS_CAMERA, cameraCBV);
+
 				for (const auto& dc : opaqueRenderPass->staticDepthOnlyDrawCalls)
 				{
 					const mat4& m = dc.transform;
@@ -645,6 +665,8 @@ void dx_renderer::endFrame(const user_input& input)
 
 				cl->setPipelineState(*depthOnlyPipeline.pipeline);
 				cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
+
+				cl->setGraphicsDynamicConstantBuffer(DEPTH_ONLY_RS_CAMERA, cameraCBV);
 
 				for (const auto& dc : opaqueRenderPass->dynamicDepthOnlyDrawCalls)
 				{
@@ -668,6 +690,8 @@ void dx_renderer::endFrame(const user_input& input)
 
 				cl->setPipelineState(*animatedDepthOnlyPipeline.pipeline);
 				cl->setGraphicsRootSignature(*animatedDepthOnlyPipeline.rootSignature);
+
+				cl->setGraphicsDynamicConstantBuffer(DEPTH_ONLY_RS_CAMERA, cameraCBV);
 
 				for (const auto& dc : opaqueRenderPass->animatedDepthOnlyDrawCalls)
 				{

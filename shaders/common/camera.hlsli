@@ -17,6 +17,8 @@ struct camera_cb
 	vec4 projectionParams; // nearPlane, farPlane, farPlane / nearPlane, 1 - farPlane / nearPlane
 	vec2 screenDims;
 	vec2 invScreenDims;
+	vec2 jitter;
+	vec2 prevFrameJitter;
 };
 
 #ifdef HLSL
