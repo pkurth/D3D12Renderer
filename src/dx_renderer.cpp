@@ -29,8 +29,6 @@ static ref<dx_texture> blackCubeTexture;
 
 static ref<dx_texture> shadowMap;
 
-static dx_pipeline clearObjectIDsPipeline;
-
 static dx_pipeline depthOnlyPipeline;
 static dx_pipeline animatedDepthOnlyPipeline;
 static dx_pipeline shadowPipeline;
@@ -114,8 +112,8 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position)
-			.renderTargets(hdrFormat)
-			.depthSettings(false, false)
+			.renderTargets(skyPassFormats, arraysize(skyPassFormats), hdrDepthStencilFormat)
+			.depthSettings(true, false)
 			.cullFrontFaces();
 
 		proceduralSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_procedural_ps" });
@@ -195,11 +193,6 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		atmospherePipeline = createReloadablePipeline("atmosphere_cs");
 	}
 
-	// Clear object IDs.
-	{
-		clearObjectIDsPipeline = createReloadablePipeline("clear_object_ids_cs");
-	}
-
 	// Post processing.
 	{
 		taaPipeline = createReloadablePipeline("taa_composite_cs");
@@ -274,7 +267,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 			hoveredObjectIDReadbackBuffer[i] = createReadbackBuffer(getFormatSize(objectIDsFormat), 1);
 		}
 
-		objectIDsTexture = createTexture(0, renderWidth, renderHeight, objectIDsFormat, false, true, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		objectIDsTexture = createTexture(0, renderWidth, renderHeight, objectIDsFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		SET_NAME(objectIDsTexture->resource, "Object IDs");
 	}
 
@@ -376,7 +369,7 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 
 		if (objectIDsTexture)
 		{
-			resizeTexture(objectIDsTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			resizeTexture(objectIDsTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		}
 
 		resizeTexture(taaTextures[taaHistoryIndex], renderWidth, renderHeight, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -646,27 +639,6 @@ void dx_renderer::endFrame(const user_input& input)
 		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 
-		// ----------------------------------------
-		// CLEAR OBJECT IDS
-		// ----------------------------------------
-
-		if (objectIDsTexture)
-		{
-			DX_PROFILE_BLOCK(cl, "Clear object IDs");
-
-			cl->setPipelineState(*clearObjectIDsPipeline.pipeline);
-			cl->setComputeRootSignature(*clearObjectIDsPipeline.rootSignature);
-
-			struct clear_ids_cb { uint32 width, height; };
-			cl->setCompute32BitConstants(0, clear_ids_cb{ objectIDsTexture->width, objectIDsTexture->height });
-			cl->setDescriptorHeapUAV(1, 0, objectIDsTexture);
-			cl->dispatch(bucketize(objectIDsTexture->width, 16), bucketize(objectIDsTexture->height, 16));
-
-			barrier_batcher(cl)
-				.transition(objectIDsTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		}
-
-
 
 		if (performedSkinning)
 		{
@@ -762,24 +734,6 @@ void dx_renderer::endFrame(const user_input& input)
 					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 				}
 			}
-		}
-
-
-		// Copy hovered object id to readback buffer.
-		if (objectIDsTexture)
-		{
-			DX_PROFILE_BLOCK(cl, "Copy hovered object ID");
-
-			barrier_batcher(cl)
-				.transition(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-
-			if (input.overWindow)
-			{
-				cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID], (uint32)input.mouse.x, (uint32)input.mouse.y, 1, 1);
-			}
-
-			barrier_batcher(cl)
-				.transitionBegin(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		}
 
 
@@ -958,14 +912,14 @@ void dx_renderer::endFrame(const user_input& input)
 #endif
 
 
-		dx_render_target hdrRenderTarget({ hdrColorTexture, worldNormalsTexture }, depthStencilBuffer);
-
-		cl->setRenderTarget(hdrRenderTarget);
-		cl->setViewport(hdrRenderTarget.viewport);
-
 		// ----------------------------------------
 		// SKY PASS
 		// ----------------------------------------
+
+		dx_render_target skyRenderTarget({ hdrColorTexture, screenVelocitiesTexture, objectIDsTexture }, depthStencilBuffer);
+
+		cl->setRenderTarget(skyRenderTarget);
+		cl->setViewport(skyRenderTarget.viewport);
 
 		{
 			DX_PROFILE_BLOCK(cl, "Sky");
@@ -999,10 +953,33 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 
+		// Copy hovered object id to readback buffer.
+		if (objectIDsTexture)
+		{
+			DX_PROFILE_BLOCK(cl, "Copy hovered object ID");
+
+			barrier_batcher(cl)
+				.transition(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+			if (input.overWindow)
+			{
+				cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID], (uint32)input.mouse.x, (uint32)input.mouse.y, 1, 1);
+			}
+
+			barrier_batcher(cl)
+				.transitionBegin(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		}
+
+
 
 		// ----------------------------------------
 		// LIGHT PASS
 		// ----------------------------------------
+
+		dx_render_target hdrRenderTarget({ hdrColorTexture, worldNormalsTexture }, depthStencilBuffer);
+
+		cl->setRenderTarget(hdrRenderTarget);
+		cl->setViewport(hdrRenderTarget.viewport);
 
 		if (opaqueRenderPass && opaqueRenderPass->drawCalls.size() > 0)
 		{
@@ -1187,7 +1164,7 @@ void dx_renderer::endFrame(const user_input& input)
 			.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
 			.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
 			.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
-			.transitionEnd(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+			.transitionEnd(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
 			.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 			.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
 

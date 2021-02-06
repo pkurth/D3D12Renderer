@@ -156,6 +156,7 @@ struct dx_renderer
 	static constexpr DXGI_FORMAT ldrPostProcessFormat = DXGI_FORMAT_R11G11B10_FLOAT; // Not really LDR. But I don't like the idea of converting to 8 bit and then to sRGB in separate passes.
 
 	static constexpr DXGI_FORMAT lightPassFormats[] = { hdrFormat, worldNormalsFormat };
+	static constexpr DXGI_FORMAT skyPassFormats[] = { hdrFormat, screenVelocitiesFormat, objectIDsFormat };
 
 private:
 

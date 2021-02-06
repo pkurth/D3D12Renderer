@@ -11,8 +11,19 @@ struct ps_input
 SamplerState texSampler	: register(s0);
 TextureCube<float4> tex	: register(t0);
 
-[RootSignature(SKY_TEXTURE_RS)]
-float4 main(ps_input IN) : SV_TARGET
+struct ps_output
 {
-	return float4((tex.Sample(texSampler, IN.uv) * skyIntensity.intensity).xyz, 0.f);
+	float4 color			: SV_Target0;
+	float2 screenVelocity	: SV_Target1;
+	uint objectID			: SV_Target2;
+};
+
+[RootSignature(SKY_TEXTURE_RS)]
+ps_output main(ps_input IN)
+{
+	ps_output OUT;
+	OUT.color = float4((tex.Sample(texSampler, IN.uv) * skyIntensity.intensity).xyz, 1.f);
+	OUT.screenVelocity = float2(0.f, 0.f); // TODO: This is of course not the correct screen velocity for the sky.
+	OUT.objectID = 0xFFFFFFFF; // -1.
+	return OUT;
 }
