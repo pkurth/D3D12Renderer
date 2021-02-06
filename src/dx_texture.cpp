@@ -171,37 +171,44 @@ static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::S
 
 		if (flags & texture_load_flags_compress)
 		{
-			if (!DirectX::IsCompressed(metadata.format))
+			if (metadata.width % 4 == 0 && metadata.height % 4 == 0)
 			{
-				uint32 numChannels = getNumberOfChannels(metadata.format);
-
-				DXGI_FORMAT compressedFormat;
-
-				switch (numChannels)
+				if (!DirectX::IsCompressed(metadata.format))
 				{
-					case 1: compressedFormat = DXGI_FORMAT_BC4_UNORM; break;
-					case 2: compressedFormat = DXGI_FORMAT_BC5_UNORM; break;
+					uint32 numChannels = getNumberOfChannels(metadata.format);
 
-					case 3:
-					case 4:
+					DXGI_FORMAT compressedFormat;
+
+					switch (numChannels)
 					{
-						if (scratchImage.IsAlphaAllOpaque())
+						case 1: compressedFormat = DXGI_FORMAT_BC4_UNORM; break;
+						case 2: compressedFormat = DXGI_FORMAT_BC5_UNORM; break;
+
+						case 3:
+						case 4:
 						{
-							compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
-						}
-						else
-						{
-							compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;  // 7 would be better, but takes forever to compress.
-						}
-					} break;
+							if (scratchImage.IsAlphaAllOpaque())
+							{
+								compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
+							}
+							else
+							{
+								compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;  // 7 would be better, but takes forever to compress.
+							}
+						} break;
+					}
+
+					DirectX::ScratchImage compressedImage;
+
+					checkResult(DirectX::Compress(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata,
+						compressedFormat, DirectX::TEX_COMPRESS_PARALLEL, DirectX::TEX_THRESHOLD_DEFAULT, compressedImage));
+					scratchImage = std::move(compressedImage);
+					metadata = scratchImage.GetMetadata();
 				}
-
-				DirectX::ScratchImage compressedImage;
-
-				checkResult(DirectX::Compress(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata,
-					compressedFormat, DirectX::TEX_COMPRESS_PARALLEL, DirectX::TEX_THRESHOLD_DEFAULT, compressedImage));
-				scratchImage = std::move(compressedImage);
-				metadata = scratchImage.GetMetadata();
+			}
+			else
+			{
+				std::cerr << "Cannot compress texture '" << filepath << "', since its dimensions are not a multiple of 4." << std::endl;
 			}
 		}
 
