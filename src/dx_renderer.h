@@ -187,7 +187,8 @@ private:
 
 	uint32 windowWidth;
 	uint32 windowHeight;
-	D3D12_VIEWPORT windowViewport;
+	uint32 windowXOffset;
+	uint32 windowYOffset;
 
 	ref<dx_texture> hdrColorTexture;
 	ref<dx_texture> worldNormalsTexture;
@@ -197,6 +198,7 @@ private:
 
 	ref<dx_texture> ldrPostProcessingTexture;
 	ref<dx_texture> taaTextures[2]; // These get flip-flopped from frame to frame.
+	uint32 taaHistoryIndex = 0;
 
 	ref<dx_buffer> hoveredObjectIDReadbackBuffer[NUM_BUFFERED_FRAMES];
 

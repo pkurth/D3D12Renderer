@@ -86,5 +86,5 @@ void main(cs_input IN)
 		scene = linearToST2084(scene * hdrScalar);
 	}
 
-	output[IN.dispatchThreadID.xy] = float4(scene, 1.f);
+	output[IN.dispatchThreadID.xy + int2(present.offset >> 16, present.offset & 0xFFFF)] = float4(scene, 1.f);
 }

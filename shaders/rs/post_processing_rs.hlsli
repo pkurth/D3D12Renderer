@@ -112,6 +112,7 @@ struct present_cb
     uint32 displayMode;
     float standardNits;
     float sharpenStrength;
+    uint32 offset; // x-offset | y-offset.
 };
 
 #define PRESENT_RS \

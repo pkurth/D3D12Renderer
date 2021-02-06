@@ -107,8 +107,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	initializeSkinning();
 
 
-	shadowMap = createDepthTexture(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, 
-		shadowDepthFormat, 1, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	shadowMap = createDepthTexture(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, shadowDepthFormat);
 
 
 	// Sky.
@@ -243,14 +242,14 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 	// HDR render target.
 	{
 		depthStencilBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthStencilFormat);
-		hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat, false, true, true);
-		worldNormalsTexture = createTexture(0, renderWidth, renderHeight, worldNormalsFormat, false, true);
-		screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, screenVelocitiesFormat, false, true);
+		hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat, false, true, true, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		worldNormalsTexture = createTexture(0, renderWidth, renderHeight, worldNormalsFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, screenVelocitiesFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-		taaTextures[0] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, false, true);
-		taaTextures[1] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, false, true);
+		taaTextures[taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		taaTextures[1 - taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		ldrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, ldrPostProcessFormat, false, false, true);
+		ldrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, ldrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		SET_NAME(hdrColorTexture->resource, "HDR Color");
 		SET_NAME(worldNormalsTexture->resource, "World normals");
@@ -264,7 +263,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 
 	// Frame result.
 	{
-		frameResult = createTexture(0, windowWidth, windowHeight, screenFormat, false, false, true);
+		frameResult = createTexture(0, windowWidth, windowHeight, screenFormat, false, true, true);
 		SET_NAME(frameResult->resource, "Frame result");
 	}
 
@@ -275,7 +274,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 			hoveredObjectIDReadbackBuffer[i] = createReadbackBuffer(getFormatSize(objectIDsFormat), 1);
 		}
 
-		objectIDsTexture = createTexture(0, renderWidth, renderHeight, objectIDsFormat, false, true, true);
+		objectIDsTexture = createTexture(0, renderWidth, renderHeight, objectIDsFormat, false, true, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		SET_NAME(objectIDsTexture->resource, "Object IDs");
 	}
 
@@ -339,7 +338,10 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 {
 	if (settings.aspectRatioMode == aspect_ratio_free)
 	{
-		windowViewport = { 0.f, 0.f, (float)windowWidth, (float)windowHeight, 0.f, 1.f };
+		windowXOffset = 0;
+		windowYOffset = 0;
+		renderWidth = windowWidth;
+		renderHeight = windowHeight;
 	}
 	else
 	{
@@ -348,37 +350,39 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		float aspect = (float)windowWidth / (float)windowHeight;
 		if (aspect > targetAspect)
 		{
-			float width = windowHeight * targetAspect;
-			float widthOffset = (windowWidth - width) * 0.5f;
-			windowViewport = { widthOffset, 0.f, width, (float)windowHeight, 0.f, 1.f };
+			renderWidth = (uint32)(windowHeight * targetAspect);
+			renderHeight = windowHeight;
+			windowXOffset = (windowWidth - renderWidth) / 2;
+			windowYOffset = 0;
 		}
 		else
 		{
-			float height = windowWidth / targetAspect;
-			float heightOffset = (windowHeight - height) * 0.5f;
-			windowViewport = { 0.f, heightOffset, (float)windowWidth, height, 0.f, 1.f };
+			renderWidth = windowWidth;
+			renderHeight = (uint32)(windowWidth / targetAspect);
+			windowXOffset = 0;
+			windowYOffset = (windowHeight - renderHeight) / 2;
 		}
 	}
 
-	renderWidth = (uint32)windowViewport.Width;
-	renderHeight = (uint32)windowViewport.Height;
+	//renderWidth = (uint32)windowViewport.Width;
+	//renderHeight = (uint32)windowViewport.Height;
 
 	if (resizeTextures)
 	{
-		resizeTexture(hdrColorTexture, renderWidth, renderHeight);
-		resizeTexture(worldNormalsTexture, renderWidth, renderHeight);
+		resizeTexture(hdrColorTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		resizeTexture(worldNormalsTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		resizeTexture(screenVelocitiesTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		resizeTexture(depthStencilBuffer, renderWidth, renderHeight);
-		resizeTexture(screenVelocitiesTexture, renderWidth, renderHeight);
 
 		if (objectIDsTexture)
 		{
-			resizeTexture(objectIDsTexture, renderWidth, renderHeight);
+			resizeTexture(objectIDsTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		}
 
-		resizeTexture(taaTextures[0], renderWidth, renderHeight);
-		resizeTexture(taaTextures[1], renderWidth, renderHeight);
+		resizeTexture(taaTextures[taaHistoryIndex], renderWidth, renderHeight, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		resizeTexture(taaTextures[1 - taaHistoryIndex], renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		resizeTexture(ldrPostProcessingTexture, renderWidth, renderHeight);
+		resizeTexture(ldrPostProcessingTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	}
 
 	allocateLightCullingBuffers();
@@ -582,22 +586,21 @@ void dx_renderer::endFrame(const user_input& input)
 
 	if (mode == renderer_mode_rasterized)
 	{
-		barrier_batcher(cl)
-			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
-			.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
-			.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET)
-			.transition(objectIDsTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-			.transition(shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-
-
 		cl->clearDepthAndStencil(depthStencilBuffer->dsvHandle);
 
 		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		/*if (aspectRatioModeChanged)
+		D3D12_RESOURCE_STATES frameResultState = D3D12_RESOURCE_STATE_COMMON;
+
+		if (aspectRatioModeChanged)
 		{
+			cl->transitionBarrier(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
 			cl->clearRTV(frameResult, 0.f, 0.f, 0.f);
-		}*/
+			frameResultState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		}
+
+		barrier_batcher(cl)
+			.transitionBegin(frameResult, frameResultState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 
 		// ----------------------------------------
@@ -731,6 +734,9 @@ void dx_renderer::endFrame(const user_input& input)
 			{
 				cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID], (uint32)input.mouse.x, (uint32)input.mouse.y, 1, 1);
 			}
+
+			barrier_batcher(cl)
+				.transitionBegin(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		}
 
 
@@ -982,10 +988,9 @@ void dx_renderer::endFrame(const user_input& input)
 			}
 		}
 
-
 		barrier_batcher(cl)
-			.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-			.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			.transitionBegin(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+			.transitionBegin(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
 
 		// ----------------------------------------
@@ -1091,10 +1096,12 @@ void dx_renderer::endFrame(const user_input& input)
 		// ----------------------------------------
 
 		barrier_batcher(cl)
+			.transitionBegin(shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
 			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 			.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-			.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-			.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			.transitionEnd(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+			.transitionEnd(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+			.transitionEnd(frameResult, frameResultState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		ref<dx_texture> hdrResult = hdrColorTexture;
 
@@ -1102,12 +1109,7 @@ void dx_renderer::endFrame(const user_input& input)
 		{
 			DX_PROFILE_BLOCK(cl, "Temporal anti-aliasing");
 
-			uint32 taaOutputIndex = dxContext.frameID & 1;
-			uint32 taaHistoryIndex = 1 - taaOutputIndex;
-
-			barrier_batcher(cl)
-				.transition(taaTextures[taaOutputIndex], D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-				.transition(taaTextures[taaHistoryIndex], D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			uint32 taaOutputIndex = 1 - taaHistoryIndex;
 
 			cl->setPipelineState(*taaPipeline.pipeline);
 			cl->setComputeRootSignature(*taaPipeline.rootSignature);
@@ -1118,7 +1120,7 @@ void dx_renderer::endFrame(const user_input& input)
 			cl->setDescriptorHeapSRV(TAA_RS_TEXTURES, 3, screenVelocitiesTexture);
 			cl->setDescriptorHeapSRV(TAA_RS_TEXTURES, 4, depthStencilBuffer);
 
-			cl->setCompute32BitConstants(TAA_RS_CB, taa_cb{ camera.projectionParams, vec2((float)hdrColorTexture->width, (float)hdrColorTexture->height) });
+			cl->setCompute32BitConstants(TAA_RS_CB, taa_cb{ camera.projectionParams, vec2((float)renderWidth, (float)renderHeight) });
 
 			cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
 
@@ -1126,9 +1128,11 @@ void dx_renderer::endFrame(const user_input& input)
 
 			barrier_batcher(cl)
 				.uav(taaTextures[taaOutputIndex])
-				.transition(taaTextures[taaOutputIndex], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-				.transition(taaTextures[taaHistoryIndex], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
-				.transition(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON);
+				.transition(taaTextures[taaOutputIndex], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) // Will be read by rest of post processing stack. Can stay in read state, since it is read as history next frame.
+				.transition(taaTextures[taaHistoryIndex], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // Will be used as UAV next frame.
+				.transitionBegin(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET); // Unused for the rest of this frame. Start transition for next frame.
+
+			taaHistoryIndex = 1 - taaHistoryIndex;
 		}
 
 		{
@@ -1143,9 +1147,14 @@ void dx_renderer::endFrame(const user_input& input)
 
 			cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
 
-			barrier_batcher(cl)
-				.uav(ldrPostProcessingTexture)
-				.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			barrier_batcher batcher(cl);
+			batcher.uav(ldrPostProcessingTexture);
+			batcher.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+			if (!settings.enableTemporalAntialiasing)
+			{
+				batcher.transitionBegin(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			}
 		}
 
 		{
@@ -1156,19 +1165,20 @@ void dx_renderer::endFrame(const user_input& input)
 
 			cl->setDescriptorHeapUAV(PRESENT_RS_TEXTURES, 0, frameResult);
 			cl->setDescriptorHeapSRV(PRESENT_RS_TEXTURES, 1, ldrPostProcessingTexture);
-			cl->setCompute32BitConstants(PRESENT_RS_CB, present_cb{ PRESENT_SDR, 0.f, settings.sharpenStrength });
+			cl->setCompute32BitConstants(PRESENT_RS_CB, present_cb{ PRESENT_SDR, 0.f, settings.sharpenStrength, (windowXOffset << 16) | windowYOffset });
 
 			cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
 		}
 
 		barrier_batcher(cl)
 			.uav(frameResult)
-			.transition(hdrResult, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
-			.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
-			.transition(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON)
-			.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
-			.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON)
+			.transitionEnd(shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
+			.transitionEnd(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
+			.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
+			.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
 			.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
+			.transitionEnd(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+			.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 			.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
 
 	}
