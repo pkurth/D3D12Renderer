@@ -313,16 +313,21 @@ static bool editSunShadowParameters(directional_light& sun)
 	return result;
 }
 
-void application::setSelectedEntity(scene_entity entity)
+void application::setSelectedEntityEulerRotation()
 {
-	selectedEntity = entity;
-	if (entity && entity.hasComponent<trs>())
+	if (selectedEntity && selectedEntity.hasComponent<trs>())
 	{
-		selectedEntityEulerRotation = quatToEuler(entity.getComponent<trs>().rotation);
+		selectedEntityEulerRotation = quatToEuler(selectedEntity.getComponent<trs>().rotation);
 		selectedEntityEulerRotation.x = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.x));
 		selectedEntityEulerRotation.y = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.y));
 		selectedEntityEulerRotation.z = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.z));
 	}
+}
+
+void application::setSelectedEntity(scene_entity entity)
+{
+	selectedEntity = entity;
+	setSelectedEntityEulerRotation();
 }
 
 template<typename component_t, typename ui_func>
@@ -561,7 +566,11 @@ void application::handleUserInput(const user_input& input, float dt)
 
 		static transformation_type type = transformation_type_translation;
 		static transformation_space space = transformation_global;
-		inputCaptured |= manipulateTransformation(transform, type, space, camera, input, !inputCaptured, &overlayRenderPass);
+		if (manipulateTransformation(transform, type, space, camera, input, !inputCaptured, &overlayRenderPass))
+		{
+			setSelectedEntityEulerRotation();
+			inputCaptured = true;
+		}
 	}
 
 	if (!inputCaptured && input.mouse.left.clickEvent)

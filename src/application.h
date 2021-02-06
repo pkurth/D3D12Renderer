@@ -28,6 +28,7 @@ struct application
 	bool deserializeFromFile(const char* filename);
 
 private:
+	void setSelectedEntityEulerRotation();
 	void setSelectedEntity(scene_entity entity);
 	void drawSceneHierarchy();
 	void drawSettings(float dt);
