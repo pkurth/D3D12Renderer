@@ -14,5 +14,5 @@ TextureCube<float4> tex	: register(t0);
 [RootSignature(SKY_TEXTURE_RS)]
 float4 main(ps_input IN) : SV_TARGET
 {
-	return tex.Sample(texSampler, IN.uv) * skyIntensity.intensity;
+	return float4((tex.Sample(texSampler, IN.uv) * skyIntensity.intensity).xyz, 0.f);
 }

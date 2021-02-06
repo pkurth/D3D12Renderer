@@ -1,18 +1,11 @@
-#include "present_rs.hlsli"
-
-struct ps_input
-{
-	float2 uv		: TEXCOORDS;
-	float4 position : SV_Position;
-};
-
-ConstantBuffer<tonemap_cb> tonemap	: register(b0);
-ConstantBuffer<present_cb> present	: register(b1);
-Texture2D<float4> tex				: register(t0);
+#include "cs.hlsli"
+#include "post_processing_rs.hlsli"
 
 
-#define SDR 0
-#define HDR 1
+ConstantBuffer<present_cb> present	: register(b0);
+RWTexture2D<float4> output	: register(u0);
+Texture2D<float4>	input	: register(t0);
+
 
 static float3 linearToSRGB(float3 color)
 {
@@ -59,45 +52,39 @@ static float3 linearToST2084(float3 color)
 	return pow((c1 + c2 * cp) / (1.f + c3 * cp), m2);
 }
 
-// https://www.slideshare.net/ozlael/hable-john-uncharted2-hdr-lighting/142
-static float3 acesFilmic(float3 x, float A, float B, float C, float D, float E, float F)
-{
-	return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - (E / F);
-}
 
-static float3 filmicTonemapping(float3 color)
-{
-	color *= exp2(tonemap.exposure);
 
-	return acesFilmic(color, tonemap.A, tonemap.B, tonemap.C, tonemap.D, tonemap.E, tonemap.F) /
-		acesFilmic(tonemap.linearWhite, tonemap.A, tonemap.B, tonemap.C, tonemap.D, tonemap.E, tonemap.F);
-}
-
+[numthreads(POST_PROCESSING_BLOCK_SIZE, POST_PROCESSING_BLOCK_SIZE, 1)]
 [RootSignature(PRESENT_RS)]
-float4 main(ps_input IN) : SV_TARGET
+void main(cs_input IN)
 {
-	float4 scene = tex.Load(uint3(IN.position.xy, 0));
-	
-	scene.rgb = filmicTonemapping(scene.rgb);
+	float3 scene = input[IN.dispatchThreadID.xy + int2(0, 0)].rgb;
 
-	if (present.displayMode == SDR)
+	if (present.sharpenStrength > 0.f)
 	{
-		scene.rgb = linearToSRGB(scene.rgb);
+		float3 top = input[IN.dispatchThreadID.xy + int2(0, -1)].rgb;
+		float3 left = input[IN.dispatchThreadID.xy + int2(-1, 0)].rgb;
+		float3 right = input[IN.dispatchThreadID.xy + int2(1, 0)].rgb;
+		float3 bottom = input[IN.dispatchThreadID.xy + int2(0, 1)].rgb;
+
+		scene = max(scene + (4.f * scene - top - bottom - left - right) * present.sharpenStrength, 0.f);
 	}
-	else if (present.displayMode == HDR)
+
+	if (present.displayMode == PRESENT_SDR)
+	{
+		scene = linearToSRGB(scene);
+	}
+	else if (present.displayMode == PRESENT_HDR)
 	{
 		const float st2084max = 10000.f;
 		const float hdrScalar = present.standardNits / st2084max;
 
 		// The HDR scene is in Rec.709, but the display is Rec.2020.
-		scene.rgb = rec709ToRec2020(scene.rgb);
+		scene = rec709ToRec2020(scene);
 
 		// Apply the ST.2084 curve to the scene.
-		scene.rgb = linearToST2084(scene.rgb * hdrScalar);
+		scene = linearToST2084(scene * hdrScalar);
 	}
 
-	scene.a = 1.f;
-	return scene;
+	output[IN.dispatchThreadID.xy] = float4(scene, 1.f);
 }
-
-

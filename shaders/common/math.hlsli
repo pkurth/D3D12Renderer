@@ -20,4 +20,20 @@ static float solidAngleOfSphere(float radius, float distance)
 	return 2.f * pi * (1.f - sqrt(max(0.f, 1.f - s * s)));
 }
 
+// 2D array index to flattened 1D array index.
+static uint flatten2D(uint2 coord, uint2 dim)
+{
+	return coord.x + coord.y * dim.x;
+}
+// Flattened array index to 2D array index.
+static uint2 unflatten2D(uint idx, uint2 dim)
+{
+	return uint2(idx % dim.x, idx / dim.x);
+}
+
+inline bool isSaturated(float a) { return a == saturate(a); }
+inline bool isSaturated(float2 a) { return isSaturated(a.x) && isSaturated(a.y); }
+inline bool isSaturated(float3 a) { return isSaturated(a.x) && isSaturated(a.y) && isSaturated(a.z); }
+inline bool isSaturated(float4 a) { return isSaturated(a.x) && isSaturated(a.y) && isSaturated(a.z) && isSaturated(a.w); }
+
 #endif

@@ -119,7 +119,7 @@ void initializeTransformationGizmos()
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position_normal)
-			.renderTargets(dx_renderer::hdrFormat[0], dx_renderer::hdrDepthStencilFormat)
+			.renderTargets(dx_renderer::hdrFormat, dx_renderer::hdrDepthStencilFormat)
 			;
 
 		gizmoPipeline = createReloadablePipeline(desc, { "flat_simple_vs", "flat_simple_ps" });

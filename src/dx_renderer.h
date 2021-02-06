@@ -11,8 +11,8 @@
 
 #include "light_source.hlsli"
 #include "camera.hlsli"
-#include "present_rs.hlsli"
 #include "volumetrics_rs.hlsli"
+#include "post_processing_rs.hlsli"
 
 
 #define SHADOW_MAP_WIDTH 8192
@@ -61,7 +61,9 @@ struct renderer_settings
 
 	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
 
-	bool enableTemporalAntialiasing = false;
+	bool enableTemporalAntialiasing = true;
+	float sharpenStrength = 0.5f;
+	float cameraJitterStrength = 1.f;
 };
 
 struct dx_renderer
@@ -142,11 +144,18 @@ struct dx_renderer
 
 	static DXGI_FORMAT screenFormat;
 
-	static constexpr DXGI_FORMAT hdrFormat[] = { DXGI_FORMAT_R32G32B32A32_FLOAT, DXGI_FORMAT_R16G16_FLOAT }; // HDR color, world normals.
+	static constexpr DXGI_FORMAT hdrFormat = DXGI_FORMAT_R32G32B32A32_FLOAT; // TODO: This could be way less. However, for path tracing accumulation over time this was necessary.
+	static constexpr DXGI_FORMAT worldNormalsFormat = DXGI_FORMAT_R16G16_FLOAT;
 	static constexpr DXGI_FORMAT hdrDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	static constexpr DXGI_FORMAT depthOnlyFormat[] = { DXGI_FORMAT_R16G16_FLOAT, DXGI_FORMAT_R16_UINT }; // Screen velocities, object ID.
-	static constexpr DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM; // TODO: Evaluate whether this is enough.
+	static constexpr DXGI_FORMAT screenVelocitiesFormat = DXGI_FORMAT_R16G16_FLOAT;
+	static constexpr DXGI_FORMAT objectIDsFormat = DXGI_FORMAT_R16_UINT;
+	static constexpr DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM;
 	static constexpr DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+
+	static constexpr DXGI_FORMAT hdrPostProcessFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	static constexpr DXGI_FORMAT ldrPostProcessFormat = DXGI_FORMAT_R11G11B10_FLOAT; // Not really LDR. But I don't like the idea of converting to 8 bit and then to sRGB in separate passes.
+
+	static constexpr DXGI_FORMAT lightPassFormats[] = { hdrFormat, worldNormalsFormat };
 
 private:
 
@@ -181,13 +190,13 @@ private:
 	D3D12_VIEWPORT windowViewport;
 
 	ref<dx_texture> hdrColorTexture;
-	ref<dx_texture> prevFrameHDRColorTexture;
 	ref<dx_texture> worldNormalsTexture;
 	ref<dx_texture> screenVelocitiesTexture;
 	ref<dx_texture> objectIDsTexture;
 	ref<dx_texture> depthStencilBuffer;
 
-	ref<dx_texture> volumetricsTexture;
+	ref<dx_texture> ldrPostProcessingTexture;
+	ref<dx_texture> taaTextures[2]; // These get flip-flopped from frame to frame.
 
 	ref<dx_buffer> hoveredObjectIDReadbackBuffer[NUM_BUFFERED_FRAMES];
 
@@ -208,6 +217,7 @@ private:
 	light_culling_buffers lightCullingBuffers;
 
 	renderer_settings oldSettings;
+	renderer_mode oldMode = renderer_mode_rasterized;
 
 	void recalculateViewport(bool resizeTextures);
 	void allocateLightCullingBuffers();

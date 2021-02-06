@@ -32,6 +32,7 @@ struct dx_command_list
 	// Barriers.
 	void barriers(CD3DX12_RESOURCE_BARRIER* barriers, uint32 numBarriers);
 
+	// Avoid calling these. Instead, use the dx_barrier_batcher interface to batch multiple barriers into a single submission.
 	void transitionBarrier(const ref<dx_texture>& texture, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 	void transitionBarrier(const ref<dx_buffer>& buffer, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 	void transitionBarrier(dx_resource resource, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
@@ -43,6 +44,10 @@ struct dx_command_list
 	void aliasingBarrier(const ref<dx_texture>& before, const ref<dx_texture>& after);
 	void aliasingBarrier(const ref<dx_buffer>& before, const ref<dx_buffer>& after);
 	void aliasingBarrier(dx_resource before, dx_resource after);
+
+	void assertResourceState(const ref<dx_texture>& texture, D3D12_RESOURCE_STATES state, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+	void assertResourceState(const ref<dx_buffer>& buffer, D3D12_RESOURCE_STATES state, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+	void assertResourceState(dx_resource resource, D3D12_RESOURCE_STATES state, uint32 subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 
 
 	// Copy.

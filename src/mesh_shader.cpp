@@ -171,7 +171,7 @@ void initializeMeshShader()
 {
 	D3D12_RT_FORMAT_ARRAY renderTargetFormat = {};
 	renderTargetFormat.NumRenderTargets = 1;
-	renderTargetFormat.RTFormats[0] = dx_renderer::hdrFormat[0];
+	renderTargetFormat.RTFormats[0] = dx_renderer::hdrFormat;
 
 	{
 		struct pipeline_state_stream : dx_pipeline_stream_base

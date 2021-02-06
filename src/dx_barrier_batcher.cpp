@@ -41,13 +41,66 @@ barrier_batcher& barrier_batcher::transition(const ref<dx_buffer>& res, D3D12_RE
 	return transition(res->resource, from, to);
 }
 
-barrier_batcher& barrier_batcher::transition(const ref<dx_texture>* res, uint32 count, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
+barrier_batcher& barrier_batcher::transitionBegin(const dx_resource& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
 {
-	for (uint32 i = 0; i < count; ++i)
+	if (numBarriers == arraysize(barriers))
 	{
-		transition(res[i]->resource, from, to, subresource);
+		submit();
 	}
+
+	barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::Transition(res.Get(), from, to, subresource, D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY);
 	return *this;
+}
+
+barrier_batcher& barrier_batcher::transitionBegin(const ref<dx_texture>& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
+{
+	if (!res)
+	{
+		return *this;
+	}
+
+	return transitionBegin(res->resource, from, to, subresource);
+}
+
+barrier_batcher& barrier_batcher::transitionBegin(const ref<dx_buffer>& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to)
+{
+	if (!res)
+	{
+		return *this;
+	}
+
+	return transitionBegin(res->resource, from, to);
+}
+
+barrier_batcher& barrier_batcher::transitionEnd(const dx_resource& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
+{
+	if (numBarriers == arraysize(barriers))
+	{
+		submit();
+	}
+
+	barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::Transition(res.Get(), from, to, subresource, D3D12_RESOURCE_BARRIER_FLAG_END_ONLY);
+	return *this;
+}
+
+barrier_batcher& barrier_batcher::transitionEnd(const ref<dx_texture>& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to, uint32 subresource)
+{
+	if (!res)
+	{
+		return *this;
+	}
+
+	return transitionEnd(res->resource, from, to, subresource);
+}
+
+barrier_batcher& barrier_batcher::transitionEnd(const ref<dx_buffer>& res, D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to)
+{
+	if (!res)
+	{
+		return *this;
+	}
+
+	return transitionEnd(res->resource, from, to);
 }
 
 barrier_batcher& barrier_batcher::uav(const dx_resource& resource)

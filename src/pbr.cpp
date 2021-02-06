@@ -250,7 +250,7 @@ void pbr_material::initializePipeline()
 {
 	auto desc = CREATE_GRAPHICS_PIPELINE
 		.inputLayout(inputLayout_position_uv_normal_tangent)
-		.renderTargets(dx_renderer::hdrFormat, arraysize(dx_renderer::hdrFormat), dx_renderer::hdrDepthStencilFormat)
+		.renderTargets(dx_renderer::lightPassFormats, arraysize(dx_renderer::lightPassFormats), dx_renderer::hdrDepthStencilFormat)
 		.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
 
 	defaultPBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_ps" });

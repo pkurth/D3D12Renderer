@@ -27,5 +27,5 @@ float4 main(ps_input IN) : SV_TARGET
 
 	float intensity = remap((float)(x == y), 0.f, 1.f, 0.05f, 1.f) * skyIntensity.intensity;
 
-	return float4(intensity * float3(0.4f, 0.6f, 0.2f), 1.f);
+	return float4(intensity * float3(0.4f, 0.6f, 0.2f), 0.f);
 }

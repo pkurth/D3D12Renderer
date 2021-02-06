@@ -64,6 +64,27 @@ void dx_command_list::aliasingBarrier(dx_resource before, dx_resource after)
 	commandList->ResourceBarrier(1, &barrier);
 }
 
+void dx_command_list::assertResourceState(const ref<dx_texture>& texture, D3D12_RESOURCE_STATES state, uint32 subresource)
+{
+	assertResourceState(texture->resource, state, subresource);
+}
+
+void dx_command_list::assertResourceState(const ref<dx_buffer>& buffer, D3D12_RESOURCE_STATES state, uint32 subresource)
+{
+	assertResourceState(buffer->resource, state, subresource);
+}
+
+void dx_command_list::assertResourceState(dx_resource resource, D3D12_RESOURCE_STATES state, uint32 subresource)
+{
+#ifdef _DEBUG
+	ID3D12DebugCommandList* debugCL = 0;
+	if (SUCCEEDED(commandList->QueryInterface(IID_PPV_ARGS(&debugCL))))
+	{
+		assert(debugCL->AssertResourceState(resource.Get(), subresource, state));
+	}
+#endif
+}
+
 void dx_command_list::copyResource(dx_resource from, dx_resource to)
 {
 	commandList->CopyResource(to.Get(), from.Get());

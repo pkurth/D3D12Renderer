@@ -463,6 +463,8 @@ void application::drawSettings(float dt)
 		ImGui::SliderFloat("Sky intensity", &renderer->settings.skyIntensity, 0.f, 2.f);
 
 		ImGui::Checkbox("Enable TAA", &renderer->settings.enableTemporalAntialiasing);
+		ImGui::SliderFloat("Jitter strength", &renderer->settings.cameraJitterStrength, 0.f, 1.f);
+		ImGui::SliderFloat("Sharpen strength", &renderer->settings.sharpenStrength, 0.f, 1.f);
 
 
 		if (renderer->mode == renderer_mode_pathtraced)
