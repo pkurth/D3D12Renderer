@@ -5,9 +5,9 @@
 #include "skinning_rs.hlsli"
 
 #define MAX_NUM_SKINNING_MATRICES_PER_FRAME 4096
-#define MAX_NUM_SKINNED_VERTICES_PER_FRAME (1 << 20)
+#define MAX_NUM_SKINNED_VERTICES_PER_FRAME (1024 * 256)
 
-static ref<dx_buffer> skinningMatricesBuffer[NUM_BUFFERED_FRAMES];
+static ref<dx_buffer> skinningMatricesBuffer; // Buffered frames are in a single dx_buffer.
 
 static uint32 currentSkinnedVertexBuffer;
 static ref<dx_vertex_buffer> skinnedVertexBuffer[2]; // We have two of these, so that we can compute screen space velocities.
@@ -31,10 +31,7 @@ static uint32 totalNumVertices;
 
 void initializeSkinning()
 {
-	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
-	{
-		skinningMatricesBuffer[i] = createUploadBuffer(sizeof(mat4), MAX_NUM_SKINNING_MATRICES_PER_FRAME, 0);
-	}
+	skinningMatricesBuffer = createUploadBuffer(sizeof(mat4), MAX_NUM_SKINNING_MATRICES_PER_FRAME * NUM_BUFFERED_FRAMES, 0);
 
 	for (uint32 i = 0; i < 2; ++i)
 	{
@@ -51,7 +48,7 @@ std::tuple<ref<dx_vertex_buffer>, vertex_range, mat4*> skinObject(const ref<dx_v
 {
 	uint32 offset = (uint32)skinningMatrices.size();
 
-	assert(offset + numJoints <= skinningMatrices.capacity());
+	assert(offset + numJoints <= MAX_NUM_SKINNING_MATRICES_PER_FRAME);
 
 	skinningMatrices.resize(skinningMatrices.size() + numJoints);
 
@@ -70,6 +67,8 @@ std::tuple<ref<dx_vertex_buffer>, vertex_range, mat4*> skinObject(const ref<dx_v
 	resultRange.firstVertex = totalNumVertices;
 
 	totalNumVertices += range.numVertices;
+
+	assert(totalNumVertices <= MAX_NUM_SKINNED_VERTICES_PER_FRAME);
 
 	return { skinnedVertexBuffer[currentSkinnedVertexBuffer], resultRange, skinningMatrices.data() + offset };
 }
@@ -101,23 +100,23 @@ bool performSkinning()
 	{
 		dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
 
-		mat4* mats = (mat4*)mapBuffer(skinningMatricesBuffer[dxContext.bufferedFrameID], false);
-		memcpy(mats, skinningMatrices.data(), sizeof(mat4) * skinningMatrices.size());
-		unmapBuffer(skinningMatricesBuffer[dxContext.bufferedFrameID], true);
+		uint32 matrixOffset = dxContext.bufferedFrameID * MAX_NUM_SKINNING_MATRICES_PER_FRAME;
+
+		mat4* mats = (mat4*)mapBuffer(skinningMatricesBuffer, false);
+		memcpy(mats + matrixOffset, skinningMatrices.data(), sizeof(mat4) * skinningMatrices.size());
+		unmapBuffer(skinningMatricesBuffer, true, map_range{ matrixOffset, (uint32)skinningMatrices.size() });
 
 
 		cl->setPipelineState(*skinningPipeline.pipeline);
 		cl->setComputeRootSignature(*skinningPipeline.rootSignature);
 
-		cl->setDescriptorHeapSRV(SKINNING_RS_SRV_UAV, 0, skinningMatricesBuffer[dxContext.bufferedFrameID]);
-		cl->setDescriptorHeapUAV(SKINNING_RS_SRV_UAV, 1, skinnedVertexBuffer[currentSkinnedVertexBuffer]);
+		cl->setRootComputeSRV(SKINNING_RS_MATRICES, skinningMatricesBuffer->gpuVirtualAddress + sizeof(mat4) * matrixOffset);
+		cl->setRootComputeUAV(SKINNING_RS_OUTPUT, skinnedVertexBuffer[currentSkinnedVertexBuffer]);
 
 		for (const auto& c : calls)
 		{
 			cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER, c.vertexBuffer->gpuVirtualAddress);
-
 			cl->setCompute32BitConstants(SKINNING_RS_CB, skinning_cb{ c.jointOffset, c.numJoints, c.range.firstVertex, c.range.numVertices, c.vertexOffset });
-
 			cl->dispatch(bucketize(c.range.numVertices, 512));
 		}
 
