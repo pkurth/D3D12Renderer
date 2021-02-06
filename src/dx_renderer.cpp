@@ -417,6 +417,44 @@ void dx_renderer::allocateLightCullingBuffers()
 	}
 }
 
+void dx_renderer::tonemapAndPresent(dx_command_list* cl, const ref<dx_texture>& hdrResult, bool transitionHdrColor)
+{
+	{
+		DX_PROFILE_BLOCK(cl, "Tonemapping");
+
+		cl->setPipelineState(*tonemapPipeline.pipeline);
+		cl->setComputeRootSignature(*tonemapPipeline.rootSignature);
+
+		cl->setDescriptorHeapUAV(TONEMAP_RS_TEXTURES, 0, ldrPostProcessingTexture);
+		cl->setDescriptorHeapSRV(TONEMAP_RS_TEXTURES, 1, hdrResult);
+		cl->setCompute32BitConstants(TONEMAP_RS_CB, settings.tonemap);
+
+		cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
+
+		barrier_batcher batcher(cl);
+		batcher.uav(ldrPostProcessingTexture);
+		batcher.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+		if (transitionHdrColor)
+		{
+			batcher.transitionBegin(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		}
+	}
+
+	{
+		DX_PROFILE_BLOCK(cl, "Present");
+
+		cl->setPipelineState(*presentPipeline.pipeline);
+		cl->setComputeRootSignature(*presentPipeline.rootSignature);
+
+		cl->setDescriptorHeapUAV(PRESENT_RS_TEXTURES, 0, frameResult);
+		cl->setDescriptorHeapSRV(PRESENT_RS_TEXTURES, 1, ldrPostProcessingTexture);
+		cl->setCompute32BitConstants(PRESENT_RS_CB, present_cb{ PRESENT_SDR, 0.f, settings.sharpenStrength, (windowXOffset << 16) | windowYOffset });
+
+		cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
+	}
+}
+
 void dx_renderer::setCamera(const render_camera& camera)
 {
 	vec2 jitterOffset(0.f, 0.f);
@@ -584,23 +622,28 @@ void dx_renderer::endFrame(const user_input& input)
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
+
+
+	D3D12_RESOURCE_STATES frameResultState = D3D12_RESOURCE_STATE_COMMON;
+
+	if (aspectRatioModeChanged)
+	{
+		cl->transitionBarrier(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		cl->clearRTV(frameResult, 0.f, 0.f, 0.f);
+		frameResultState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	}
+
+	barrier_batcher(cl)
+		.transitionBegin(frameResult, frameResultState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+
+
+
 	if (mode == renderer_mode_rasterized)
 	{
 		cl->clearDepthAndStencil(depthStencilBuffer->dsvHandle);
 
 		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-		D3D12_RESOURCE_STATES frameResultState = D3D12_RESOURCE_STATE_COMMON;
-
-		if (aspectRatioModeChanged)
-		{
-			cl->transitionBarrier(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
-			cl->clearRTV(frameResult, 0.f, 0.f, 0.f);
-			frameResultState = D3D12_RESOURCE_STATE_RENDER_TARGET;
-		}
-
-		barrier_batcher(cl)
-			.transitionBegin(frameResult, frameResultState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 
 		// ----------------------------------------
@@ -1135,40 +1178,7 @@ void dx_renderer::endFrame(const user_input& input)
 			taaHistoryIndex = 1 - taaHistoryIndex;
 		}
 
-		{
-			DX_PROFILE_BLOCK(cl, "Tonemapping");
-
-			cl->setPipelineState(*tonemapPipeline.pipeline);
-			cl->setComputeRootSignature(*tonemapPipeline.rootSignature);
-
-			cl->setDescriptorHeapUAV(TONEMAP_RS_TEXTURES, 0, ldrPostProcessingTexture);
-			cl->setDescriptorHeapSRV(TONEMAP_RS_TEXTURES, 1, hdrResult);
-			cl->setCompute32BitConstants(TONEMAP_RS_CB, settings.tonemap);
-
-			cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
-
-			barrier_batcher batcher(cl);
-			batcher.uav(ldrPostProcessingTexture);
-			batcher.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-
-			if (!settings.enableTemporalAntialiasing)
-			{
-				batcher.transitionBegin(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
-			}
-		}
-
-		{
-			DX_PROFILE_BLOCK(cl, "Present");
-
-			cl->setPipelineState(*presentPipeline.pipeline);
-			cl->setComputeRootSignature(*presentPipeline.rootSignature);
-
-			cl->setDescriptorHeapUAV(PRESENT_RS_TEXTURES, 0, frameResult);
-			cl->setDescriptorHeapSRV(PRESENT_RS_TEXTURES, 1, ldrPostProcessingTexture);
-			cl->setCompute32BitConstants(PRESENT_RS_CB, present_cb{ PRESENT_SDR, 0.f, settings.sharpenStrength, (windowXOffset << 16) | windowYOffset });
-
-			cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
-		}
+		tonemapAndPresent(cl, hdrResult, !settings.enableTemporalAntialiasing);
 
 		barrier_batcher(cl)
 			.uav(frameResult)
@@ -1182,19 +1192,16 @@ void dx_renderer::endFrame(const user_input& input)
 			.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
 
 	}
-	else
+	else if (dxContext.raytracingSupported && raytracer)
 	{
 		barrier_batcher(cl)
-			.uav(hdrColorTexture)
-			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-			.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+			.transitionEnd(frameResult, frameResultState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-
-		if (dxContext.raytracingSupported && raytracer)
 		{
 			DX_PROFILE_BLOCK(cl, "Raytracing");
 
-			dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // TODO: This is not the way to go here. We should wait for the specific value returned by executeCommandList.
+			dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // Wait for AS-rebuilds. TODO: This is not the way to go here. We should wait for the specific value returned by executeCommandList.
 
 			raytracer->render(cl, *tlas, hdrColorTexture, materialInfo);
 		}
@@ -1203,7 +1210,15 @@ void dx_renderer::endFrame(const user_input& input)
 
 		barrier_batcher(cl)
 			.uav(hdrColorTexture)
-			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+
+		tonemapAndPresent(cl, hdrColorTexture, true);
+
+		barrier_batcher(cl)
+			.transitionEnd(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
+			.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+			.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
 	}
 
 

@@ -223,5 +223,7 @@ private:
 
 	void recalculateViewport(bool resizeTextures);
 	void allocateLightCullingBuffers();
+
+	void tonemapAndPresent(dx_command_list* cl, const ref<dx_texture>& hdrResult, bool transitionHdrColor);
 };
 
