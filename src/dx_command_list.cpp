@@ -90,17 +90,20 @@ void dx_command_list::copyResource(dx_resource from, dx_resource to)
 	commandList->CopyResource(to.Get(), from.Get());
 }
 
-void dx_command_list::copyTextureRegionToBuffer(const ref<dx_texture>& from, const ref<dx_buffer>& to, uint32 x, uint32 y, uint32 width, uint32 height)
+void dx_command_list::copyTextureRegionToBuffer(const ref<dx_texture>& from, const ref<dx_buffer>& to, uint32 bufferElementOffset, uint32 x, uint32 y, uint32 width, uint32 height)
 {
-	DXGI_FORMAT format = from->format;
-	uint32 total = width * height;
-	uint32 totalSize = total * getFormatSize(format);
+	assert(to->elementCount >= width * height);
+	assert(to->elementSize == getFormatSize(from->format));
+
+	uint32 totalSize = to->elementCount * to->elementSize;
 
 	D3D12_TEXTURE_COPY_LOCATION destLocation = { to->resource.Get(), D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
-		D3D12_PLACED_SUBRESOURCE_FOOTPRINT { 0, { format, total, 1, 1, alignTo(totalSize, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT) } } };
+		D3D12_PLACED_SUBRESOURCE_FOOTPRINT { 0, D3D12_SUBRESOURCE_FOOTPRINT { from->format, to->elementCount, 1, 1, alignTo(totalSize, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT) } } };
+
 	D3D12_TEXTURE_COPY_LOCATION srcLocation = { from->resource.Get(), D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX, 0 };
+
 	D3D12_BOX srcBox = { x, y, 0, x + width, y + height, 1 };
-	commandList->CopyTextureRegion(&destLocation, 0, 0, 0, &srcLocation, &srcBox);
+	commandList->CopyTextureRegion(&destLocation, bufferElementOffset, 0, 0, &srcLocation, &srcBox);
 }
 
 void dx_command_list::setPipelineState(dx_pipeline_state pipelineState)

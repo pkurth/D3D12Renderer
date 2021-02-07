@@ -262,10 +262,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 
 	if (renderObjectIDs)
 	{
-		for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
-		{
-			hoveredObjectIDReadbackBuffer[i] = createReadbackBuffer(getFormatSize(objectIDsFormat), 1);
-		}
+		hoveredObjectIDReadbackBuffer = createReadbackBuffer(getFormatSize(objectIDsFormat), NUM_BUFFERED_FRAMES);
 
 		objectIDsTexture = createTexture(0, renderWidth, renderHeight, objectIDsFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		SET_NAME(objectIDsTexture->resource, "Object IDs");
@@ -308,9 +305,9 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 
 	if (objectIDsTexture)
 	{
-		uint16* id = (uint16*)mapBuffer(hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID], true);
+		uint16* id = (uint16*)mapBuffer(hoveredObjectIDReadbackBuffer, true, map_range{ dxContext.bufferedFrameID, 1 });
 		hoveredObjectID = *id;
-		unmapBuffer(hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID], false);
+		unmapBuffer(hoveredObjectIDReadbackBuffer, false);
 	}
 
 	opaqueRenderPass = 0;
@@ -963,7 +960,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 			if (input.overWindow)
 			{
-				cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer[dxContext.bufferedFrameID], (uint32)input.mouse.x, (uint32)input.mouse.y, 1, 1);
+				cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer, dxContext.bufferedFrameID, (uint32)input.mouse.x, (uint32)input.mouse.y, 1, 1);
 			}
 
 			barrier_batcher(cl)

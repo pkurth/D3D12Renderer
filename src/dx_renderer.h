@@ -148,7 +148,7 @@ struct dx_renderer
 	static constexpr DXGI_FORMAT worldNormalsFormat = DXGI_FORMAT_R16G16_FLOAT;
 	static constexpr DXGI_FORMAT hdrDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	static constexpr DXGI_FORMAT screenVelocitiesFormat = DXGI_FORMAT_R16G16_FLOAT;
-	static constexpr DXGI_FORMAT objectIDsFormat = DXGI_FORMAT_R16_UINT;
+	static constexpr DXGI_FORMAT objectIDsFormat = DXGI_FORMAT_R16_UINT; // Do not change this. 16 bit is hardcoded at other places.
 	static constexpr DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM;
 	static constexpr DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
@@ -201,7 +201,7 @@ private:
 	ref<dx_texture> taaTextures[2]; // These get flip-flopped from frame to frame.
 	uint32 taaHistoryIndex = 0;
 
-	ref<dx_buffer> hoveredObjectIDReadbackBuffer[NUM_BUFFERED_FRAMES];
+	ref<dx_buffer> hoveredObjectIDReadbackBuffer;
 
 	ref<dx_buffer> spotLightShadowInfoBuffer[NUM_BUFFERED_FRAMES];
 	ref<dx_buffer> pointLightShadowInfoBuffer[NUM_BUFFERED_FRAMES];
