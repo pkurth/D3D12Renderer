@@ -437,6 +437,10 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 {
 	ref<dx_texture> result = make_ref<dx_texture>();
 
+	result->requestedNumMipLevels = textureDesc.MipLevels;
+
+	uint32 maxNumMipLevels = (uint32)log2(max(textureDesc.Width, textureDesc.Height)) + 1;
+	textureDesc.MipLevels = min(maxNumMipLevels, result->requestedNumMipLevels);
 
 	D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport;
 	formatSupport.Format = textureDesc.Format;
@@ -477,7 +481,9 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 		0,
 		IID_PPV_ARGS(&result->resource)));
 
-	result->requestedNumMipLevels = textureDesc.MipLevels;
+
+	result->numMipLevels = result->resource->GetDesc().MipLevels;
+
 	result->format = textureDesc.Format;
 	result->width = (uint32)textureDesc.Width;
 	result->height = textureDesc.Height;
@@ -583,7 +589,7 @@ ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT form
 		IID_PPV_ARGS(&result->resource)
 	));
 
-
+	result->numMipLevels = 1;
 	result->requestedNumMipLevels = 1;
 	result->format = format;
 	result->width = width;
@@ -768,7 +774,7 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 		clearValue = &optimizedClearValue;
 	}
 
-	uint32 maxNumMipLevels = (uint32)log2(max(newWidth, newHeight));
+	uint32 maxNumMipLevels = (uint32)log2(max(newWidth, newHeight)) + 1;
 	desc.MipLevels = min(maxNumMipLevels, texture->requestedNumMipLevels);
 
 	desc.Width = newWidth;
@@ -785,6 +791,8 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 		clearValue,
 		IID_PPV_ARGS(&texture->resource)
 	));
+
+	texture->numMipLevels = texture->resource->GetDesc().MipLevels;
 
 	// RTV.
 	if (texture->supportsRTV)

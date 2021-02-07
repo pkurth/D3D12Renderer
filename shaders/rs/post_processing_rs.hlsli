@@ -3,31 +3,87 @@
 
 #define POST_PROCESSING_BLOCK_SIZE 16
 
-struct bloom_cb
+
+
+// ----------------------------------------
+// BLOOM
+// ----------------------------------------
+
+struct bloom_threshold_cb
 {
-    vec2 direction; // [1, 0] or [0, 1], scaled by inverse screen dimensions.
-    float multiplier;
+    vec2 invDimensions;
+    float threshold;
 };
 
-#define BLOOM_RS \
-    "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
-    "DENY_VERTEX_SHADER_ROOT_ACCESS |" \
-    "DENY_HULL_SHADER_ROOT_ACCESS |" \
-    "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
-    "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=3, b0, visibility=SHADER_VISIBILITY_PIXEL),"  \
+#define BLOOM_THRESHOLD_RS \
+    "RootFlags(0), " \
+    "RootConstants(num32BitConstants=3, b0),"  \
     "StaticSampler(s0," \
 	    "addressU = TEXTURE_ADDRESS_CLAMP," \
 	    "addressV = TEXTURE_ADDRESS_CLAMP," \
 	    "addressW = TEXTURE_ADDRESS_CLAMP," \
-	    "filter = FILTER_MIN_MAG_LINEAR_MIP_POINT,"	\
-	    "visibility=SHADER_VISIBILITY_PIXEL)," \
-    "DescriptorTable(SRV(t0, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL)"
+	    "filter = FILTER_MIN_MAG_MIP_LINEAR)," \
+    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 1) )"
 
 
-#define BLOOM_RS_CB             0
-#define BLOOM_RS_SRC_TEXTURE    1
+#define BLOOM_THRESHOLD_RS_CB           0
+#define BLOOM_THRESHOLD_RS_TEXTURES     1
 
+
+struct bloom_combine_cb
+{
+    vec2 invDimensions;
+    float strength;
+};
+
+#define BLOOM_COMBINE_RS \
+    "RootFlags(0), " \
+    "RootConstants(num32BitConstants=3, b0),"  \
+    "StaticSampler(s0," \
+	    "addressU = TEXTURE_ADDRESS_CLAMP," \
+	    "addressV = TEXTURE_ADDRESS_CLAMP," \
+	    "addressW = TEXTURE_ADDRESS_CLAMP," \
+	    "filter = FILTER_MIN_MAG_MIP_LINEAR)," \
+    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 1) )"
+
+
+#define BLOOM_COMBINE_RS_CB           0
+#define BLOOM_COMBINE_RS_TEXTURES     1
+
+
+
+
+// ----------------------------------------
+// GAUSSIAN BLUR
+// ----------------------------------------
+
+struct gaussian_blur_cb
+{
+    vec2 invDimensions;
+    uint32 direction; // 0 is horizontal, 1 is vertical.
+    uint32 sourceMipLevel;
+};
+
+#define GAUSSIAN_BLUR_RS \
+    "RootFlags(0), " \
+    "RootConstants(b0, num32BitConstants = 4), " \
+    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 1) )," \
+    "StaticSampler(s0," \
+        "addressU = TEXTURE_ADDRESS_CLAMP," \
+        "addressV = TEXTURE_ADDRESS_CLAMP," \
+        "addressW = TEXTURE_ADDRESS_CLAMP," \
+        "filter = FILTER_MIN_MAG_MIP_LINEAR)"
+
+
+#define GAUSSIAN_BLUR_RS_CB           0
+#define GAUSSIAN_BLUR_RS_TEXTURES     1
+
+
+
+
+// ----------------------------------------
+// TEMPORAL ANTI-ALIASING
+// ----------------------------------------
 
 struct taa_cb
 {
@@ -48,6 +104,12 @@ struct taa_cb
 #define TAA_RS_CB               0
 #define TAA_RS_TEXTURES         1
 
+
+
+
+// ----------------------------------------
+// TONEMAPPING
+// ----------------------------------------
 
 struct tonemap_cb
 {
@@ -102,6 +164,11 @@ static float filmicTonemapping(float color, tonemap_cb tonemap)
 #define TONEMAP_RS_TEXTURES         1
 
 
+
+
+// ----------------------------------------
+// PRESENT
+// ----------------------------------------
 
 #define PRESENT_SDR 0
 #define PRESENT_HDR 1

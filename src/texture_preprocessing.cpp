@@ -13,7 +13,6 @@ static dx_pipeline equirectangularToCubemapPipeline;
 static dx_pipeline cubemapToIrradiancePipeline;
 static dx_pipeline prefilterEnvironmentPipeline;
 static dx_pipeline integrateBRDFPipeline;
-static dx_pipeline gaussianBlurPipeline;
 
 
 
@@ -53,13 +52,6 @@ struct integrate_brdf_cb
 	uint32 textureDim;
 };
 
-struct gaussian_blur_cb
-{
-	vec2 direction;					// [1, 0] or [0, 1], scaled by inverse screen dimensions.
-	uint32 width;
-	uint32 height;
-};
-
 void initializeTexturePreprocessing()
 {
 	mipmapPipeline = createReloadablePipeline("generate_mips_cs");
@@ -67,7 +59,6 @@ void initializeTexturePreprocessing()
 	cubemapToIrradiancePipeline = createReloadablePipeline("cubemap_to_irradiance_cs");
 	prefilterEnvironmentPipeline = createReloadablePipeline("prefilter_environment_cs");
 	integrateBRDFPipeline = createReloadablePipeline("integrate_brdf_cs");
-	gaussianBlurPipeline = createReloadablePipeline("gaussian_blur_cs");
 }
 
 void generateMipMapsOnGPU(dx_command_list* cl, ref<dx_texture>& texture)
@@ -603,39 +594,5 @@ ref<dx_texture> integrateBRDF(dx_command_list* cl, uint32 resolution)
 	cl->uavBarrier(brdf);
 
 	return brdf;
-}
-
-void gaussianBlur(dx_command_list* cl, ref<dx_texture> tex, ref<dx_texture> tmpTex, uint32 numIterations)
-{
-	cl->setPipelineState(*gaussianBlurPipeline.pipeline);
-	cl->setComputeRootSignature(*gaussianBlurPipeline.rootSignature);
-
-	float invWidth = 1.f / tex->width;
-	float invHeight = 1.f / tex->height;
-
-	uint32 widthBuckets = bucketize(tex->width, 16);
-	uint32 heightBuckets = bucketize(tex->height, 16);
-
-	for (uint32 i = 0; i < numIterations; ++i)
-	{
-		// Vertical pass.
-		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(0.f, invHeight), tex->width, tex->height });
-		cl->setDescriptorHeapSRV(1, 0, tex);
-		cl->setDescriptorHeapUAV(1, 1, tmpTex);
-
-		cl->dispatch(widthBuckets, heightBuckets, 1);
-
-		cl->uavBarrier(tmpTex);
-
-
-		// Horizontal pass.
-		cl->setCompute32BitConstants(0, gaussian_blur_cb{ vec2(invWidth, 0.f), tex->width, tex->height });
-		cl->setDescriptorHeapSRV(1, 0, tmpTex);
-		cl->setDescriptorHeapUAV(1, 1, tex);
-
-		cl->dispatch(widthBuckets, heightBuckets, 1);
-
-		cl->uavBarrier(tex);
-	}
 }
 

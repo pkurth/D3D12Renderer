@@ -62,8 +62,14 @@ struct renderer_settings
 	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
 
 	bool enableTemporalAntialiasing = true;
-	float sharpenStrength = 0.5f;
 	float cameraJitterStrength = 1.f;
+
+	bool enableBloom = true;
+	float bloomThreshold = 5.f;
+	float bloomStrength = 0.1f;
+
+	bool enableSharpen = true;
+	float sharpenStrength = 0.5f;
 };
 
 struct dx_renderer
@@ -148,7 +154,7 @@ struct dx_renderer
 	static constexpr DXGI_FORMAT worldNormalsFormat = DXGI_FORMAT_R16G16_FLOAT;
 	static constexpr DXGI_FORMAT hdrDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	static constexpr DXGI_FORMAT screenVelocitiesFormat = DXGI_FORMAT_R16G16_FLOAT;
-	static constexpr DXGI_FORMAT objectIDsFormat = DXGI_FORMAT_R16_UINT; // Do not change this. 16 bit is hardcoded at other places.
+	static constexpr DXGI_FORMAT objectIDsFormat = DXGI_FORMAT_R16_UINT; // Do not change this. 16 bit is hardcoded in other places.
 	static constexpr DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM;
 	static constexpr DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
@@ -201,6 +207,9 @@ private:
 	ref<dx_texture> taaTextures[2]; // These get flip-flopped from frame to frame.
 	uint32 taaHistoryIndex = 0;
 
+	ref<dx_texture> bloomTexture;
+	ref<dx_texture> bloomTempTexture;
+
 	ref<dx_buffer> hoveredObjectIDReadbackBuffer;
 
 	ref<dx_buffer> spotLightShadowInfoBuffer[NUM_BUFFERED_FRAMES];
@@ -225,6 +234,7 @@ private:
 	void recalculateViewport(bool resizeTextures);
 	void allocateLightCullingBuffers();
 
+	void gaussianBlur(dx_command_list* cl, ref<dx_texture> inputOutput, ref<dx_texture> temp, uint32 inputMip, uint32 outputMip, uint32 numIterations = 1);
 	void tonemapAndPresent(dx_command_list* cl, const ref<dx_texture>& hdrResult, bool transitionHdrColor);
 };
 

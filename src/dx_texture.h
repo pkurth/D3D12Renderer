@@ -51,6 +51,7 @@ struct dx_texture
 	bool supportsSRV;
 
 	uint32 requestedNumMipLevels;
+	uint32 numMipLevels;
 
 	std::vector<dx_cpu_descriptor_handle> mipUAVs; // UAVs for the mip levels. Attention: These start at level 1, since level 0 is stored in defaultUAV.
 

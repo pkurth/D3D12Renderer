@@ -49,6 +49,9 @@ static dx_pipeline worldSpaceFrustaPipeline;
 static dx_pipeline lightCullingPipeline;
 
 static dx_pipeline taaPipeline;
+static dx_pipeline bloomThresholdPipeline;
+static dx_pipeline bloomCombinePipeline;
+static dx_pipeline gaussianBlurPipeline;
 static dx_pipeline tonemapPipeline;
 static dx_pipeline presentPipeline;
 
@@ -196,6 +199,9 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	// Post processing.
 	{
 		taaPipeline = createReloadablePipeline("taa_cs");
+		bloomThresholdPipeline = createReloadablePipeline("bloom_threshold_cs");
+		bloomCombinePipeline = createReloadablePipeline("bloom_combine_cs");
+		gaussianBlurPipeline = createReloadablePipeline("gaussian_blur_cs");
 		tonemapPipeline = createReloadablePipeline("tonemap_cs");
 		presentPipeline = createReloadablePipeline("present_cs");
 	}
@@ -232,33 +238,42 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 
 	recalculateViewport(false);
 
-	// HDR render target.
-	{
-		depthStencilBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthStencilFormat);
-		hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat, false, true, true, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		worldNormalsTexture = createTexture(0, renderWidth, renderHeight, worldNormalsFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, screenVelocitiesFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	depthStencilBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthStencilFormat);
+	hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat, false, true, true, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	worldNormalsTexture = createTexture(0, renderWidth, renderHeight, worldNormalsFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, screenVelocitiesFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-		taaTextures[taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		taaTextures[1 - taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	taaTextures[taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	taaTextures[1 - taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		ldrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, ldrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	ldrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, ldrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		SET_NAME(hdrColorTexture->resource, "HDR Color");
-		SET_NAME(worldNormalsTexture->resource, "World normals");
-		SET_NAME(screenVelocitiesTexture->resource, "Screen velocities");
+	D3D12_RESOURCE_DESC bloomDesc = CD3DX12_RESOURCE_DESC::Tex2D(hdrPostProcessFormat, renderWidth / 4, renderHeight / 4, 1, 
+		5, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+	bloomTexture = createTexture(bloomDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	bloomTempTexture = createTexture(bloomDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	allocateMipUAVs(bloomTexture);
+	allocateMipUAVs(bloomTempTexture);
 
-		SET_NAME(taaTextures[0]->resource, "TAA 0");
-		SET_NAME(taaTextures[1]->resource, "TAA 1");
+	frameResult = createTexture(0, windowWidth, windowHeight, screenFormat, false, true, true);
 
-		SET_NAME(ldrPostProcessingTexture->resource, "LDR Post processing");
-	}
 
-	// Frame result.
-	{
-		frameResult = createTexture(0, windowWidth, windowHeight, screenFormat, false, true, true);
-		SET_NAME(frameResult->resource, "Frame result");
-	}
+
+	SET_NAME(hdrColorTexture->resource, "HDR Color");
+	SET_NAME(worldNormalsTexture->resource, "World normals");
+	SET_NAME(screenVelocitiesTexture->resource, "Screen velocities");
+
+	SET_NAME(taaTextures[0]->resource, "TAA 0");
+	SET_NAME(taaTextures[1]->resource, "TAA 1");
+
+	SET_NAME(ldrPostProcessingTexture->resource, "LDR Post processing");
+
+	SET_NAME(bloomTexture->resource, "Bloom");
+	SET_NAME(bloomTempTexture->resource, "Bloom Temp");
+
+	SET_NAME(frameResult->resource, "Frame result");
+
+
 
 	if (renderObjectIDs)
 	{
@@ -354,8 +369,6 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		}
 	}
 
-	//renderWidth = (uint32)windowViewport.Width;
-	//renderHeight = (uint32)windowViewport.Height;
 
 	if (resizeTextures)
 	{
@@ -371,6 +384,9 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 
 		resizeTexture(taaTextures[taaHistoryIndex], renderWidth, renderHeight, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		resizeTexture(taaTextures[1 - taaHistoryIndex], renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+		resizeTexture(bloomTexture, renderWidth / 4, renderHeight / 4, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		resizeTexture(bloomTempTexture, renderWidth / 4, renderHeight / 4, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		resizeTexture(ldrPostProcessingTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	}
@@ -407,6 +423,70 @@ void dx_renderer::allocateLightCullingBuffers()
 	}
 }
 
+void dx_renderer::gaussianBlur(dx_command_list* cl, ref<dx_texture> inputOutput, ref<dx_texture> temp, uint32 inputMip, uint32 outputMip, uint32 numIterations)
+{
+	DX_PROFILE_BLOCK(cl, "Gaussian Blur");
+
+	cl->setPipelineState(*gaussianBlurPipeline.pipeline);
+	cl->setComputeRootSignature(*gaussianBlurPipeline.rootSignature);
+
+	uint32 outputWidth = inputOutput->width >> outputMip;
+	uint32 outputHeight = inputOutput->height >> outputMip;
+
+	gaussian_blur_cb cb = { vec2(1.f / outputWidth, 1.f / outputHeight), 0, inputMip };
+
+	uint32 widthBuckets = bucketize(outputWidth, POST_PROCESSING_BLOCK_SIZE);
+	uint32 heightBuckets = bucketize(outputHeight, POST_PROCESSING_BLOCK_SIZE);
+
+	assert((outputMip == 0) || ((uint32)inputOutput->mipUAVs.size() >= outputMip));
+	assert((outputMip == 0) || ((uint32)temp->mipUAVs.size() >= outputMip));
+
+	for (uint32 i = 0; i < numIterations; ++i)
+	{
+		DX_PROFILE_BLOCK(cl, "Iteration");
+
+		{
+			DX_PROFILE_BLOCK(cl, "Vertical");
+
+			dx_cpu_descriptor_handle tempUAV = (outputMip == 0) ? temp->defaultUAV : temp->mipUAVs[outputMip - 1];
+
+			// Vertical pass.
+			cb.direction = 1;
+			cl->setCompute32BitConstants(GAUSSIAN_BLUR_RS_CB, cb);
+			cl->setDescriptorHeapUAV(GAUSSIAN_BLUR_RS_TEXTURES, 0, tempUAV);
+			cl->setDescriptorHeapSRV(GAUSSIAN_BLUR_RS_TEXTURES, 1, inputOutput);
+
+			cl->dispatch(widthBuckets, heightBuckets, 1);
+
+			barrier_batcher(cl)
+				.uav(temp)
+				.transition(temp, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+				.transition(inputOutput, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		}
+
+		cb.sourceMipLevel = outputMip; // From here on we sample from the output mip.
+
+		{
+			DX_PROFILE_BLOCK(cl, "Horizontal");
+
+			dx_cpu_descriptor_handle outputUAV = (outputMip == 0) ? inputOutput->defaultUAV : inputOutput->mipUAVs[outputMip - 1];
+
+			// Horizontal pass.
+			cb.direction = 0;
+			cl->setCompute32BitConstants(GAUSSIAN_BLUR_RS_CB, cb);
+			cl->setDescriptorHeapUAV(GAUSSIAN_BLUR_RS_TEXTURES, 0, outputUAV);
+			cl->setDescriptorHeapSRV(GAUSSIAN_BLUR_RS_TEXTURES, 1, temp);
+
+			cl->dispatch(widthBuckets, heightBuckets, 1);
+
+			barrier_batcher(cl)
+				.uav(inputOutput)
+				.transition(temp, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+				.transition(inputOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		}
+	}
+}
+
 void dx_renderer::tonemapAndPresent(dx_command_list* cl, const ref<dx_texture>& hdrResult, bool transitionHdrColor)
 {
 	{
@@ -439,7 +519,7 @@ void dx_renderer::tonemapAndPresent(dx_command_list* cl, const ref<dx_texture>& 
 
 		cl->setDescriptorHeapUAV(PRESENT_RS_TEXTURES, 0, frameResult);
 		cl->setDescriptorHeapSRV(PRESENT_RS_TEXTURES, 1, ldrPostProcessingTexture);
-		cl->setCompute32BitConstants(PRESENT_RS_CB, present_cb{ PRESENT_SDR, 0.f, settings.sharpenStrength, (windowXOffset << 16) | windowYOffset });
+		cl->setCompute32BitConstants(PRESENT_RS_CB, present_cb{ PRESENT_SDR, 0.f, settings.sharpenStrength * settings.enableSharpen, (windowXOffset << 16) | windowYOffset });
 
 		cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
 	}
@@ -1122,6 +1202,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 		ref<dx_texture> hdrResult = hdrColorTexture;
 
+		// TAA.
 		if (settings.enableTemporalAntialiasing)
 		{
 			DX_PROFILE_BLOCK(cl, "Temporal anti-aliasing");
@@ -1149,7 +1230,59 @@ void dx_renderer::endFrame(const user_input& input)
 				.transition(taaTextures[taaHistoryIndex], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // Will be used as UAV next frame.
 				.transitionBegin(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET); // Unused for the rest of this frame. Start transition for next frame.
 
-			taaHistoryIndex = 1 - taaHistoryIndex;
+			taaHistoryIndex = taaOutputIndex;
+		}
+
+		// Bloom.
+		if (settings.enableBloom)
+		{
+			DX_PROFILE_BLOCK(cl, "Bloom");
+
+			{
+				DX_PROFILE_BLOCK(cl, "Threshold");
+
+				cl->setPipelineState(*bloomThresholdPipeline.pipeline);
+				cl->setComputeRootSignature(*bloomThresholdPipeline.rootSignature);
+
+				cl->setDescriptorHeapUAV(BLOOM_THRESHOLD_RS_TEXTURES, 0, bloomTexture);
+				cl->setDescriptorHeapSRV(BLOOM_THRESHOLD_RS_TEXTURES, 1, hdrResult);
+
+				cl->setCompute32BitConstants(BLOOM_THRESHOLD_RS_CB, bloom_threshold_cb{ vec2(1.f / bloomTexture->width, 1.f / bloomTexture->height), settings.bloomThreshold });
+
+				cl->dispatch(bucketize(bloomTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(bloomTexture->height, POST_PROCESSING_BLOCK_SIZE));
+			}
+
+			barrier_batcher(cl)
+				.uav(bloomTexture)
+				.transition(bloomTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+				.transitionBegin(hdrResult, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+			for (uint32 i = 0; i < bloomTexture->numMipLevels - 1; ++i)
+			{
+				gaussianBlur(cl, bloomTexture, bloomTempTexture, i, i + 1);
+			}
+
+			barrier_batcher(cl)
+				.transitionEnd(hdrResult, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+			{
+				DX_PROFILE_BLOCK(cl, "Combine");
+
+				cl->setPipelineState(*bloomCombinePipeline.pipeline);
+				cl->setComputeRootSignature(*bloomCombinePipeline.rootSignature);
+
+				cl->setDescriptorHeapUAV(BLOOM_COMBINE_RS_TEXTURES, 0, hdrResult);
+				cl->setDescriptorHeapSRV(BLOOM_COMBINE_RS_TEXTURES, 1, bloomTexture);
+
+				cl->setCompute32BitConstants(BLOOM_COMBINE_RS_CB, bloom_combine_cb{ vec2(1.f / renderWidth, 1.f / renderHeight), settings.bloomStrength });
+
+				cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
+			}
+
+			barrier_batcher(cl)
+				.uav(hdrResult)
+				.transition(hdrResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+				.transition(bloomTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.
 		}
 
 		tonemapAndPresent(cl, hdrResult, !settings.enableTemporalAntialiasing);

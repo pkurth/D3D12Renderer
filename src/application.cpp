@@ -313,6 +313,38 @@ static bool editSunShadowParameters(directional_light& sun)
 	return result;
 }
 
+static bool editPostProcessing(renderer_mode mode, renderer_settings& settings)
+{
+	bool result = false;
+	if (ImGui::TreeNode("Post processing"))
+	{
+		if (mode == renderer_mode_rasterized)
+		{
+			result |= ImGui::Checkbox("Enable TAA", &settings.enableTemporalAntialiasing);
+			if (settings.enableTemporalAntialiasing)
+			{
+				result |= ImGui::SliderFloat("Jitter strength", &settings.cameraJitterStrength, 0.f, 1.f);
+			}
+
+			result |= ImGui::Checkbox("Enable bloom", &settings.enableBloom);
+			if (settings.enableBloom)
+			{
+				result |= ImGui::SliderFloat("Bloom threshold", &settings.bloomThreshold, 0.5f, 10.f);
+				result |= ImGui::SliderFloat("Bloom strength", &settings.bloomStrength, 0.f, 1.f);
+			}
+		}
+
+		result |= ImGui::Checkbox("Enable sharpen", &settings.enableSharpen);
+		if (settings.enableSharpen)
+		{
+			result |= ImGui::SliderFloat("Sharpen strength", &settings.sharpenStrength, 0.f, 1.f);
+		}
+
+		ImGui::TreePop();
+	}
+	return result;
+}
+
 void application::setSelectedEntityEulerRotation()
 {
 	if (selectedEntity && selectedEntity.hasComponent<trs>())
@@ -463,18 +495,10 @@ void application::drawSettings(float dt)
 
 		plotAndEditTonemapping(renderer->settings.tonemap);
 		editSunShadowParameters(sun);
+		editPostProcessing(renderer->mode, renderer->settings);
 
 		ImGui::SliderFloat("Environment intensity", &renderer->settings.environmentIntensity, 0.f, 2.f);
 		ImGui::SliderFloat("Sky intensity", &renderer->settings.skyIntensity, 0.f, 2.f);
-
-
-		if (renderer->mode == renderer_mode_rasterized)
-		{
-			ImGui::Checkbox("Enable TAA", &renderer->settings.enableTemporalAntialiasing);
-			ImGui::SliderFloat("Jitter strength", &renderer->settings.cameraJitterStrength, 0.f, 1.f);
-		}
-
-		ImGui::SliderFloat("Sharpen strength", &renderer->settings.sharpenStrength, 0.f, 1.f);
 
 		if (renderer->mode == renderer_mode_pathtraced)
 		{
@@ -500,6 +524,7 @@ void application::drawSettings(float dt)
 			}
 		}
 	}
+
 	ImGui::End();
 }
 
