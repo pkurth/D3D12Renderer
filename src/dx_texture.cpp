@@ -477,7 +477,7 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 		0,
 		IID_PPV_ARGS(&result->resource)));
 
-
+	result->requestedNumMipLevels = textureDesc.MipLevels;
 	result->format = textureDesc.Format;
 	result->width = (uint32)textureDesc.Width;
 	result->height = textureDesc.Height;
@@ -584,6 +584,7 @@ ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT form
 	));
 
 
+	result->requestedNumMipLevels = 1;
 	result->format = format;
 	result->width = width;
 	result->height = height;
@@ -707,7 +708,22 @@ std::wstring dx_texture::getName() const
 	return name;
 }
 
-static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_descriptor_handle uav, dx_cpu_descriptor_handle stencil, dx_rtv_descriptor_handle rtv, dx_dsv_descriptor_handle dsv)
+void allocateMipUAVs(ref<dx_texture> texture)
+{
+	auto desc = texture->resource->GetDesc();
+	assert(texture->supportsUAV);
+	assert(desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D); // Currently only supported for 2D textures.
+
+	uint32 mipLevels = desc.MipLevels;
+	for (uint32 i = 1; i < mipLevels; ++i)
+	{
+		dx_cpu_descriptor_handle h = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureUAV(texture, i);
+		texture->mipUAVs.push_back(h);
+	}
+}
+
+static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_descriptor_handle uav, dx_cpu_descriptor_handle stencil, dx_rtv_descriptor_handle rtv, dx_dsv_descriptor_handle dsv,
+	std::vector<dx_cpu_descriptor_handle>&& mipUAVs)
 {
 	texture_grave grave;
 	grave.resource = resource;
@@ -716,12 +732,13 @@ static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_de
 	grave.stencil = stencil;
 	grave.rtv = rtv;
 	grave.dsv = dsv;
+	grave.mipUAVs = std::move(mipUAVs);
 	dxContext.retire(std::move(grave));
 }
 
 dx_texture::~dx_texture()
 {
-	retire(resource, defaultSRV, defaultUAV, stencilSRV, rtvHandles, dsvHandle);
+	retire(resource, defaultSRV, defaultUAV, stencilSRV, rtvHandles, dsvHandle, std::move(mipUAVs));
 }
 
 void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState)
@@ -731,8 +748,9 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 	texture->resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);
 	name[min(arraysize(name) - 1, size)] = 0;
 
+	bool hasMipUAVs = texture->mipUAVs.size() > 0;
 
-	retire(texture->resource, texture->defaultSRV, texture->defaultUAV, texture->stencilSRV, texture->rtvHandles, texture->dsvHandle);
+	retire(texture->resource, texture->defaultSRV, texture->defaultUAV, texture->stencilSRV, texture->rtvHandles, texture->dsvHandle, std::move(texture->mipUAVs));
 
 	D3D12_RESOURCE_DESC desc = texture->resource->GetDesc();
 	texture->resource.Reset();
@@ -750,15 +768,14 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 		clearValue = &optimizedClearValue;
 	}
 
+	uint32 maxNumMipLevels = (uint32)log2(max(newWidth, newHeight));
+	desc.MipLevels = min(maxNumMipLevels, texture->requestedNumMipLevels);
+
 	desc.Width = newWidth;
 	desc.Height = newHeight;
 	texture->width = newWidth;
 	texture->height = newHeight;
 
-	if (desc.MipLevels != 1)
-	{
-		desc.MipLevels = 0;
-	}
 
 	checkResult(dxContext.device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
@@ -826,6 +843,11 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 		}
 	}
 
+	if (hasMipUAVs)
+	{
+		allocateMipUAVs(texture);
+	}
+
 	texture->setName(name);
 }
 
@@ -861,6 +883,11 @@ texture_grave::~texture_grave()
 		if (dsv.cpuHandle.ptr)
 		{
 			dxContext.dsvAllocator.freeHandle(dsv);
+		}
+
+		for (dx_cpu_descriptor_handle h : mipUAVs)
+		{
+			dxContext.descriptorAllocatorCPU.freeHandle(h);
 		}
 	}
 }

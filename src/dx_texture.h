@@ -34,8 +34,8 @@ struct dx_texture
 
 	dx_resource resource;
 
-	dx_cpu_descriptor_handle defaultSRV;
-	dx_cpu_descriptor_handle defaultUAV;
+	dx_cpu_descriptor_handle defaultSRV; // SRV for the whole texture (all mip levels).
+	dx_cpu_descriptor_handle defaultUAV; // UAV for the first mip level.
 
 	dx_cpu_descriptor_handle stencilSRV; // For depth stencil textures.
 
@@ -50,6 +50,10 @@ struct dx_texture
 	bool supportsUAV;
 	bool supportsSRV;
 
+	uint32 requestedNumMipLevels;
+
+	std::vector<dx_cpu_descriptor_handle> mipUAVs; // UAVs for the mip levels. Attention: These start at level 1, since level 0 is stored in defaultUAV.
+
 	void setName(const wchar* name);
 	std::wstring getName() const;
 };
@@ -63,6 +67,8 @@ struct texture_grave
 	dx_cpu_descriptor_handle stencil;
 	dx_rtv_descriptor_handle rtv;
 	dx_dsv_descriptor_handle dsv;
+
+	std::vector<dx_cpu_descriptor_handle> mipUAVs;
 
 	texture_grave() {}
 	texture_grave(const texture_grave& o) = delete;
@@ -82,7 +88,7 @@ ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT form
 ref<dx_texture> createCubeTexture(const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allocateMips = false, bool allowRenderTarget = false, bool allowUnorderedAccess = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
 ref<dx_texture> createVolumeTexture(const void* data, uint32 width, uint32 height, uint32 depth, DXGI_FORMAT format, bool allowUnorderedAccess, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
 void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
-
+void allocateMipUAVs(ref<dx_texture> texture);
 
 
 // This system caches textures. It does not keep the resource alive (we store weak ptrs).
