@@ -195,7 +195,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 	// Post processing.
 	{
-		taaPipeline = createReloadablePipeline("taa_composite_cs");
+		taaPipeline = createReloadablePipeline("taa_cs");
 		tonemapPipeline = createReloadablePipeline("tonemap_cs");
 		presentPipeline = createReloadablePipeline("present_cs");
 	}

@@ -17,7 +17,7 @@ SamplerState linearSampler			: register(s0);
 #define TILE_BORDER 1
 #define TILE_SIZE (POST_PROCESSING_BLOCK_SIZE + TILE_BORDER * 2)
 
-//#define HDR_CORRECTION
+#define HDR_CORRECTION
 
 groupshared uint tileRedGreen[TILE_SIZE * TILE_SIZE];
 groupshared uint tileBlueDepth[TILE_SIZE * TILE_SIZE];
