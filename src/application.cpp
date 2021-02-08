@@ -7,6 +7,7 @@
 #include "imgui.h"
 #include "dx_context.h"
 #include "skinning.h"
+#include "threading.h"
 #include "mesh_shader.h"
 
 #define STB_RECT_PACK_IMPLEMENTATION
@@ -709,19 +710,25 @@ void application::update(const user_input& input, float dt)
 			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], (uint32)spotLights.size());
 		}
 
+		thread_job_context context;
 
 		// Skin animated meshes.
 		appScene.group<animation_component>(entt::get<raster_component>)
-			.each([dt](animation_component& anim, raster_component& raster)
+			.each([dt, &context](animation_component& anim, raster_component& raster)
 		{
 			anim.time += dt;
 			const dx_mesh& mesh = raster.mesh->mesh;
-			const animation_skeleton& skeleton = raster.mesh->skeleton;
+			animation_skeleton& skeleton = raster.mesh->skeleton;
 
-			trs localTransforms[128];
 			auto [vb, vertexOffset, skinningMatrices] = skinObject(mesh.vertexBuffer, (uint32)skeleton.joints.size());
-			skeleton.sampleAnimation(skeleton.clips[anim.animationIndex].name, anim.time, localTransforms);
-			skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
+
+			mat4* mats = skinningMatrices;
+			addWorkToJobSystem(context, [&skeleton, &anim, mats]()
+			{
+				trs localTransforms[128];
+				skeleton.sampleAnimation(skeleton.clips[anim.animationIndex].name, anim.time, localTransforms);
+				skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, mats);
+			});
 
 			anim.prevFrameVB = anim.vb;
 			anim.vb = vb;
@@ -781,6 +788,7 @@ void application::update(const user_input& input, float dt)
 			}
 		});
 
+		waitForWorkCompletion(context);
 		submitRenderPasses();
 	}
 	else
