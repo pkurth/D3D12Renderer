@@ -88,7 +88,7 @@ void generateMipMapsOnGPU(dx_command_list* cl, ref<dx_texture>& texture)
 	dx_resource uavResource = resource;
 	dx_resource aliasResource; // In case the format of our texture does not support UAVs.
 
-	if (texture->supportsUAV)
+	if (!texture->supportsUAV)
 	{
 		D3D12_RESOURCE_DESC aliasDesc = resourceDesc;
 		// Placed resources can't be render targets or depth-stencil views.

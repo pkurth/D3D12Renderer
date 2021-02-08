@@ -18,10 +18,11 @@ void main(cs_input IN)
 	float3 color = 0.xxx;
 
 	const float2 invDimensions = cb.invDimensions;
-	color += input.SampleLevel(linearClampSampler, (uv + float2(-1, -1)) * invDimensions, 0).rgb;
-	color += input.SampleLevel(linearClampSampler, (uv + float2(1, -1)) * invDimensions, 0).rgb;
-	color += input.SampleLevel(linearClampSampler, (uv + float2(-1, 1)) * invDimensions, 0).rgb;
-	color += input.SampleLevel(linearClampSampler, (uv + float2(1, 1)) * invDimensions, 0).rgb;
+	const float offset = 0.25f;
+	color += input.SampleLevel(linearClampSampler, (uv + float2(-offset, -offset)) * invDimensions, 0).rgb;
+	color += input.SampleLevel(linearClampSampler, (uv + float2(offset, -offset)) * invDimensions, 0).rgb;
+	color += input.SampleLevel(linearClampSampler, (uv + float2(-offset, offset)) * invDimensions, 0).rgb;
+	color += input.SampleLevel(linearClampSampler, (uv + float2(offset, offset)) * invDimensions, 0).rgb;
 
 	color *= 0.25f;
 	color = max(0, color - cb.threshold.xxx);

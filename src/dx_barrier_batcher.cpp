@@ -17,7 +17,10 @@ barrier_batcher& barrier_batcher::transition(const dx_resource& res, D3D12_RESOU
 		submit();
 	}
 
-	barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::Transition(res.Get(), from, to, subresource);
+	if (from != to)
+	{
+		barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::Transition(res.Get(), from, to, subresource);
+	}
 	return *this;
 }
 
@@ -48,7 +51,10 @@ barrier_batcher& barrier_batcher::transitionBegin(const dx_resource& res, D3D12_
 		submit();
 	}
 
-	barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::Transition(res.Get(), from, to, subresource, D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY);
+	if (from != to)
+	{
+		barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::Transition(res.Get(), from, to, subresource, D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY);
+	}
 	return *this;
 }
 
@@ -79,7 +85,10 @@ barrier_batcher& barrier_batcher::transitionEnd(const dx_resource& res, D3D12_RE
 		submit();
 	}
 
-	barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::Transition(res.Get(), from, to, subresource, D3D12_RESOURCE_BARRIER_FLAG_END_ONLY);
+	if (from != to)
+	{
+		barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::Transition(res.Get(), from, to, subresource, D3D12_RESOURCE_BARRIER_FLAG_END_ONLY);
+	}
 	return *this;
 }
 

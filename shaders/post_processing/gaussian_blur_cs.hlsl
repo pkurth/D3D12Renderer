@@ -19,17 +19,20 @@ void main(cs_input IN)
 {
     float2 uv = (IN.dispatchThreadID.xy + float2(0.5f, 0.5f)) * cb.invDimensions;
 
-    float2 direction = (cb.direction == 0) ? float2(1.f, 0.f) : float2(0.f, 1.f);
+    uint directionIndex = cb.directionAndSourceMipLevel >> 16;
+    float2 direction = (directionIndex == 0) ? float2(1.f, 0.f) : float2(0.f, 1.f);
     direction *= cb.invDimensions;
+    direction *= cb.stepScale;
 
-    float4 color = input.SampleLevel(linearClampSampler, uv, cb.sourceMipLevel) * blurWeights[0];
+    uint sourceMipLevel = cb.directionAndSourceMipLevel & 0xFFFF;
+    float4 color = input.SampleLevel(linearClampSampler, uv, sourceMipLevel) * blurWeights[0];
 
     [unroll]
     for (int i = 1; i < 3; ++i)
     {
         float2 normalizedOffset = kernelOffsets[i] * direction;
-        color += input.SampleLevel(linearClampSampler, uv + normalizedOffset, cb.sourceMipLevel) * blurWeights[i];
-        color += input.SampleLevel(linearClampSampler, uv - normalizedOffset, cb.sourceMipLevel) * blurWeights[i];
+        color += input.SampleLevel(linearClampSampler, uv + normalizedOffset, sourceMipLevel) * blurWeights[i];
+        color += input.SampleLevel(linearClampSampler, uv - normalizedOffset, sourceMipLevel) * blurWeights[i];
     }
 
     output[IN.dispatchThreadID.xy] = color;

@@ -44,7 +44,7 @@ struct bloom_combine_cb
 	    "addressV = TEXTURE_ADDRESS_CLAMP," \
 	    "addressW = TEXTURE_ADDRESS_CLAMP," \
 	    "filter = FILTER_MIN_MAG_MIP_LINEAR)," \
-    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 1) )"
+    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 2) )"
 
 
 #define BLOOM_COMBINE_RS_CB           0
@@ -60,8 +60,8 @@ struct bloom_combine_cb
 struct gaussian_blur_cb
 {
     vec2 invDimensions;
-    uint32 direction; // 0 is horizontal, 1 is vertical.
-    uint32 sourceMipLevel;
+    float stepScale;
+    uint32 directionAndSourceMipLevel; // Direction (0 is horizontal, 1 is vertical) | sourceMipLevel.
 };
 
 #define GAUSSIAN_BLUR_RS \

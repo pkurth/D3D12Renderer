@@ -3,8 +3,9 @@
 
 ConstantBuffer<bloom_combine_cb> cb		: register(b0);
 
-RWTexture2D<float4> scene				: register(u0);
-Texture2D<float4> bloom					: register(t0);
+RWTexture2D<float4> output				: register(u0);
+Texture2D<float4> scene					: register(t0);
+Texture2D<float4> bloom					: register(t1);
 
 SamplerState linearClampSampler			: register(s0);
 
@@ -25,5 +26,5 @@ void main(cs_input IN)
 
 	color *= cb.strength;
 
-	scene[IN.dispatchThreadID.xy] = float4(scene[IN.dispatchThreadID.xy].rgb + color, 1.f);
+	output[IN.dispatchThreadID.xy] = float4(scene[IN.dispatchThreadID.xy].rgb + color, 1.f);
 }
