@@ -610,6 +610,7 @@ ref<dx_texture> dx_renderer::getShadowMap()
 void dx_renderer::endFrame(const user_input& input)
 {
 	bool aspectRatioModeChanged = settings.aspectRatioMode != oldSettings.aspectRatioMode;
+	oldSettings = settings;
 
 	if (aspectRatioModeChanged)
 	{
@@ -1344,8 +1345,6 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 	dxContext.executeCommandList(cl);
-
-	oldSettings = settings;
 }
 
 void dx_renderer::blitResultToScreen(dx_command_list* cl, dx_rtv_descriptor_handle rtv)

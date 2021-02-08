@@ -28,6 +28,7 @@ struct dx_cpu_descriptor_handle
 	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle;
 
 	inline operator CD3DX12_CPU_DESCRIPTOR_HANDLE() const { return cpuHandle; }
+	inline operator bool() const { return cpuHandle.ptr != 0; }
 
 	dx_cpu_descriptor_handle& create2DTextureSRV(const ref<dx_texture>& texture, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
 	dx_cpu_descriptor_handle& createCubemapSRV(const ref<dx_texture>& texture, texture_mip_range mipRange = {}, DXGI_FORMAT overrideFormat = DXGI_FORMAT_UNKNOWN);
@@ -67,6 +68,7 @@ struct dx_gpu_descriptor_handle
 	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle;
 
 	inline operator CD3DX12_GPU_DESCRIPTOR_HANDLE() const { return gpuHandle; }
+	inline operator bool() const { return gpuHandle.ptr != 0; }
 
 
 	dx_gpu_descriptor_handle operator+(uint32 i);
@@ -89,6 +91,7 @@ struct dx_rtv_descriptor_handle
 	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle;
 
 	inline operator CD3DX12_CPU_DESCRIPTOR_HANDLE() const { return cpuHandle; }
+	inline operator bool() const { return cpuHandle.ptr != 0; }
 
 
 	dx_rtv_descriptor_handle& create2DTextureRTV(const ref<dx_texture>& texture, uint32 arraySlice = 0, uint32 mipSlice = 0);
@@ -104,6 +107,7 @@ struct dx_dsv_descriptor_handle
 	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle;
 
 	inline operator CD3DX12_CPU_DESCRIPTOR_HANDLE() const { return cpuHandle; }
+	inline operator bool() const { return cpuHandle.ptr != 0; }
 
 
 	dx_dsv_descriptor_handle& create2DTextureDSV(const ref<dx_texture>& texture, uint32 arraySlice = 0, uint32 mipSlice = 0);

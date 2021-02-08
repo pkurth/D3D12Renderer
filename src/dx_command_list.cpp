@@ -360,19 +360,7 @@ void dx_command_list::setRenderTarget(dx_rtv_descriptor_handle* rtvs, uint32 num
 
 void dx_command_list::setRenderTarget(dx_render_target& renderTarget)
 {
-	dx_rtv_descriptor_handle rtv[8];
-	dx_dsv_descriptor_handle* dsv = 0;
-
-	for (uint32 i = 0; i < renderTarget.numAttachments; ++i)
-	{
-		rtv[i] = renderTarget.colorAttachments[i]->rtvHandles;
-	}
-	if (renderTarget.depthAttachment)
-	{
-		dsv = &renderTarget.depthAttachment->dsvHandle;
-	}
-
-	setRenderTarget(rtv, renderTarget.numAttachments, dsv);
+	setRenderTarget(renderTarget.rtv, renderTarget.numAttachments, renderTarget.dsv ? &renderTarget.dsv : 0);
 }
 
 void dx_command_list::clearRTV(dx_rtv_descriptor_handle rtv, float r, float g, float b, float a)
@@ -398,12 +386,12 @@ void dx_command_list::clearRTV(const ref<dx_texture>& texture, const float* clea
 
 void dx_command_list::clearRTV(dx_render_target& renderTarget, uint32 attachment, const float* clearColor)
 {
-	clearRTV(renderTarget.colorAttachments[attachment], clearColor);
+	clearRTV(renderTarget.rtv[attachment], clearColor);
 }
 
 void dx_command_list::clearRTV(dx_render_target& renderTarget, uint32 attachment, float r, float g, float b, float a)
 {
-	clearRTV(renderTarget.colorAttachments[attachment], r, g, b, a);
+	clearRTV(renderTarget.rtv[attachment], r, g, b, a);
 }
 
 void dx_command_list::clearDepth(dx_dsv_descriptor_handle dsv, float depth)
@@ -413,7 +401,7 @@ void dx_command_list::clearDepth(dx_dsv_descriptor_handle dsv, float depth)
 
 void dx_command_list::clearDepth(dx_render_target& renderTarget, float depth)
 {
-	clearDepth(renderTarget.depthAttachment->dsvHandle, depth);
+	clearDepth(renderTarget.dsv, depth);
 }
 
 void dx_command_list::clearStencil(dx_dsv_descriptor_handle dsv, uint32 stencil)
@@ -423,7 +411,7 @@ void dx_command_list::clearStencil(dx_dsv_descriptor_handle dsv, uint32 stencil)
 
 void dx_command_list::clearStencil(dx_render_target& renderTarget, uint32 stencil)
 {
-	clearStencil(renderTarget.depthAttachment->dsvHandle, stencil);
+	clearStencil(renderTarget.dsv, stencil);
 }
 
 void dx_command_list::clearDepthAndStencil(dx_dsv_descriptor_handle dsv, float depth, uint32 stencil)
@@ -433,7 +421,7 @@ void dx_command_list::clearDepthAndStencil(dx_dsv_descriptor_handle dsv, float d
 
 void dx_command_list::clearDepthAndStencil(dx_render_target& renderTarget, float depth, uint32 stencil)
 {
-	clearDepthAndStencil(renderTarget.depthAttachment->dsvHandle, depth, stencil);
+	clearDepthAndStencil(renderTarget.dsv, depth, stencil);
 }
 
 void dx_command_list::setStencilReference(uint32 stencilReference)
