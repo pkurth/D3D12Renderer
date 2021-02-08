@@ -330,7 +330,7 @@ static bool editPostProcessing(renderer_mode mode, renderer_settings& settings)
 			result |= ImGui::Checkbox("Enable bloom", &settings.enableBloom);
 			if (settings.enableBloom)
 			{
-				result |= ImGui::SliderFloat("Bloom threshold", &settings.bloomThreshold, 0.5f, 10.f);
+				result |= ImGui::SliderFloat("Bloom threshold", &settings.bloomThreshold, 0.5f, 100.f);
 				result |= ImGui::SliderFloat("Bloom strength", &settings.bloomStrength, 0.f, 1.f);
 			}
 		}

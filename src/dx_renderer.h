@@ -65,7 +65,7 @@ struct renderer_settings
 	float cameraJitterStrength = 1.f;
 
 	bool enableBloom = true;
-	float bloomThreshold = 5.f;
+	float bloomThreshold = 100.f;
 	float bloomStrength = 0.1f;
 
 	bool enableSharpen = true;
