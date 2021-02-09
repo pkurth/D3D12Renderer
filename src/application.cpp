@@ -514,10 +514,14 @@ void application::drawSettings(float dt)
 			}
 			pathTracerDirty |= ImGui::Checkbox("Use real materials", &pathTracer.useRealMaterials);
 			pathTracerDirty |= ImGui::Checkbox("Enable direct lighting", &pathTracer.enableDirectLighting);
-			pathTracerDirty |= ImGui::SliderFloat("Light intensity scale", &pathTracer.lightIntensityScale, 0.f, 50.f);
-			pathTracerDirty |= ImGui::SliderFloat("Point light radius", &pathTracer.pointLightRadius, 0.f, 1.f);
+			if (pathTracer.enableDirectLighting)
+			{
+				pathTracerDirty |= ImGui::SliderFloat("Light intensity scale", &pathTracer.lightIntensityScale, 0.f, 50.f);
+				pathTracerDirty |= ImGui::SliderFloat("Point light radius", &pathTracer.pointLightRadius, 0.01f, 1.f);
 
-			pathTracerDirty |= ImGui::Checkbox("Multiple importance sampling", &pathTracer.multipleImportanceSampling);
+				pathTracerDirty |= ImGui::Checkbox("Multiple importance sampling", &pathTracer.multipleImportanceSampling);
+			}
+
 
 			if (pathTracerDirty)
 			{

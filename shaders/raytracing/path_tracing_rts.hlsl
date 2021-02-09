@@ -252,16 +252,16 @@ static float3 calculateIndirectLighting(inout uint randSeed, surface_info surfac
 		float NdotH = saturate(dot(surface.N, H));
 		float LdotH = saturate(dot(L, H));
 
-		float NDF = distributionGGX(NdotH, surface.roughness);
+		float D = distributionGGX(NdotH, surface.roughness);
 		float G = geometrySmith(NdotL, NdotV, surface.roughness);
 		float3 F = fresnelSchlick(LdotH, surface.F0);
 
-		float3 numerator = NDF * G * F;
+		float3 numerator = D * G * F;
 		float denominator = 4.f * NdotV * NdotL;
 		float3 brdf = numerator / max(denominator, 0.001f);
 
 		// Probability of sampling vector H from GGX.
-		float ggxProb = max(NDF * NdotH / (4.f * LdotH), 0.01f);
+		float ggxProb = max(D * NdotH / (4.f * LdotH), 0.01f);
 
 		// Accumulate the color:  ggx-BRDF * incomingLight * NdotL / probability-of-sampling
 		//    -> Should really simplify the math above.
