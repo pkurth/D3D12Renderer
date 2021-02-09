@@ -15,10 +15,10 @@ StructuredBuffer<spot_light_cb> spotLights          : register(t2);
 
 StructuredBuffer<light_culling_view_frustum> frusta : register(t3);
 
-RWStructuredBuffer<uint> lightIndexCounter          : register(u0);
-RWStructuredBuffer<uint> pointLightIndexList        : register(u1);
-RWStructuredBuffer<uint> spotLightIndexList         : register(u2);
-RWTexture2D<uint4> lightGrid                        : register(u3);
+RWStructuredBuffer<uint> tiledCullingIndexCounter   : register(u0);
+RWStructuredBuffer<uint> tiledPointLightIndexList   : register(u1);
+RWStructuredBuffer<uint> tiledSpotLightIndexList    : register(u2);
+RWTexture2D<uint4> tiledCullingGrid                 : register(u3);
 
 groupshared uint groupMinDepth;
 groupshared uint groupMaxDepth;
@@ -198,21 +198,25 @@ void main(cs_input IN)
 
     if (IN.groupIndex == 0)
     {
-        InterlockedAdd(lightIndexCounter[0], groupPointLightCount, groupPointLightIndexStartOffset);
-        InterlockedAdd(lightIndexCounter[1], groupSpotLightCount, groupSpotLightIndexStartOffset);
+        InterlockedAdd(tiledCullingIndexCounter[0], groupPointLightCount, groupPointLightIndexStartOffset);
+        InterlockedAdd(tiledCullingIndexCounter[1], groupSpotLightCount, groupSpotLightIndexStartOffset);
 
-        lightGrid[IN.groupID.xy] = uint4(groupPointLightIndexStartOffset, groupPointLightCount, groupSpotLightIndexStartOffset, groupSpotLightCount);
+        tiledCullingGrid[IN.groupID.xy] = uint4(
+            (groupPointLightIndexStartOffset << 16) | groupPointLightCount, 
+            (groupSpotLightIndexStartOffset << 16) | groupSpotLightCount, 
+            0,
+            0);
     }
 
     GroupMemoryBarrierWithGroupSync();
 
     for (i = IN.groupIndex; i < groupPointLightCount; i += BLOCK_SIZE * BLOCK_SIZE)
     {
-        pointLightIndexList[groupPointLightIndexStartOffset + i] = groupPointLightList[i];
+        tiledPointLightIndexList[groupPointLightIndexStartOffset + i] = groupPointLightList[i];
     }
 
     for (i = IN.groupIndex; i < groupSpotLightCount; i += BLOCK_SIZE * BLOCK_SIZE)
     {
-        spotLightIndexList[groupSpotLightIndexStartOffset + i] = groupSpotLightList[i];
+        tiledSpotLightIndexList[groupSpotLightIndexStartOffset + i] = groupSpotLightList[i];
     }
 }

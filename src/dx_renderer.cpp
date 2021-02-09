@@ -402,30 +402,30 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 
 void dx_renderer::allocateLightCullingBuffers()
 {
-	lightCullingBuffers.numTilesX = bucketize(renderWidth, LIGHT_CULLING_TILE_SIZE);
-	lightCullingBuffers.numTilesY = bucketize(renderHeight, LIGHT_CULLING_TILE_SIZE);
+	numCullingTilesX = bucketize(renderWidth, LIGHT_CULLING_TILE_SIZE);
+	numCullingTilesY = bucketize(renderHeight, LIGHT_CULLING_TILE_SIZE);
 
-	bool firstAllocation = lightCullingBuffers.lightGrid == nullptr;
+	bool firstAllocation = tiledCullingGrid == nullptr;
 
 	if (firstAllocation)
 	{
-		lightCullingBuffers.lightGrid = createTexture(0, lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY,
-			DXGI_FORMAT_R16G16B16A16_UINT, false, false, true);
-		SET_NAME(lightCullingBuffers.lightGrid->resource, "Light grid");
+		tiledCullingGrid = createTexture(0, numCullingTilesX, numCullingTilesY,
+			DXGI_FORMAT_R32G32B32A32_UINT, false, false, true);
+		SET_NAME(tiledCullingGrid->resource, "Tiled culling grid");
 
-		lightCullingBuffers.lightIndexCounter = createBuffer(sizeof(uint32), 2, 0, true, true);
-		lightCullingBuffers.pointLightIndexList = createBuffer(sizeof(uint32),
-			lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY * MAX_NUM_LIGHTS_PER_TILE, 0, true);
-		lightCullingBuffers.spotLightIndexList = createBuffer(sizeof(uint32),
-			lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY * MAX_NUM_LIGHTS_PER_TILE, 0, true);
-		lightCullingBuffers.tiledFrusta = createBuffer(sizeof(light_culling_view_frustum), lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY, 0, true);
+		tiledCullingIndexCounter = createBuffer(sizeof(uint32), 4, 0, true, true);
+		tiledPointLightIndexList = createBuffer(sizeof(uint16),
+			numCullingTilesX * numCullingTilesY * MAX_NUM_LIGHTS_PER_TILE, 0, true);
+		tiledSpotLightIndexList = createBuffer(sizeof(uint16),
+			numCullingTilesX * numCullingTilesY * MAX_NUM_LIGHTS_PER_TILE, 0, true);
+		tiledWorldSpaceFrustaBuffer = createBuffer(sizeof(light_culling_view_frustum), numCullingTilesX * numCullingTilesY, 0, true);
 	}
 	else
 	{
-		resizeTexture(lightCullingBuffers.lightGrid, lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY);
-		resizeBuffer(lightCullingBuffers.pointLightIndexList, lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY * MAX_NUM_LIGHTS_PER_TILE);
-		resizeBuffer(lightCullingBuffers.spotLightIndexList, lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY * MAX_NUM_LIGHTS_PER_TILE);
-		resizeBuffer(lightCullingBuffers.tiledFrusta, lightCullingBuffers.numTilesX * lightCullingBuffers.numTilesY);
+		resizeTexture(tiledCullingGrid, numCullingTilesX, numCullingTilesY);
+		resizeBuffer(tiledPointLightIndexList, numCullingTilesX * numCullingTilesY * MAX_NUM_LIGHTS_PER_TILE);
+		resizeBuffer(tiledSpotLightIndexList, numCullingTilesX * numCullingTilesY * MAX_NUM_LIGHTS_PER_TILE);
+		resizeBuffer(tiledWorldSpaceFrustaBuffer, numCullingTilesX * numCullingTilesY);
 	}
 }
 
@@ -680,9 +680,9 @@ void dx_renderer::endFrame(const user_input& input)
 	materialInfo.environmentIntensity = settings.environmentIntensity;
 	materialInfo.skyIntensity = settings.skyIntensity;
 	materialInfo.brdf = brdfTex;
-	materialInfo.lightGrid = lightCullingBuffers.lightGrid;
-	materialInfo.pointLightIndexList = lightCullingBuffers.pointLightIndexList;
-	materialInfo.spotLightIndexList = lightCullingBuffers.spotLightIndexList;
+	materialInfo.tiledCullingGrid = tiledCullingGrid;
+	materialInfo.tiledPointLightIndexList = tiledPointLightIndexList;
+	materialInfo.tiledSpotLightIndexList = tiledSpotLightIndexList;
 	materialInfo.pointLightBuffer = pointLights;
 	materialInfo.spotLightBuffer = spotLights;
 	materialInfo.shadowMap = shadowMap;
@@ -833,26 +833,26 @@ void dx_renderer::endFrame(const user_input& input)
 			cl->setPipelineState(*worldSpaceFrustaPipeline.pipeline);
 			cl->setComputeRootSignature(*worldSpaceFrustaPipeline.rootSignature);
 			cl->setComputeDynamicConstantBuffer(WORLD_SPACE_TILED_FRUSTA_RS_CAMERA, cameraCBV);
-			cl->setCompute32BitConstants(WORLD_SPACE_TILED_FRUSTA_RS_CB, frusta_cb{ lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY });
-			cl->setRootComputeUAV(WORLD_SPACE_TILED_FRUSTA_RS_FRUSTA_UAV, lightCullingBuffers.tiledFrusta);
-			cl->dispatch(bucketize(lightCullingBuffers.numTilesX, 16), bucketize(lightCullingBuffers.numTilesY, 16));
+			cl->setCompute32BitConstants(WORLD_SPACE_TILED_FRUSTA_RS_CB, frusta_cb{ numCullingTilesX, numCullingTilesY });
+			cl->setRootComputeUAV(WORLD_SPACE_TILED_FRUSTA_RS_FRUSTA_UAV, tiledWorldSpaceFrustaBuffer);
+			cl->dispatch(bucketize(numCullingTilesX, 16), bucketize(numCullingTilesY, 16));
 
 			// Light culling.
-			cl->clearUAV(lightCullingBuffers.lightIndexCounter, 0.f);
-			//cl->uavBarrier(lightCullingBuffers.lightIndexCounter); // Is this necessary?
+			cl->clearUAV(tiledCullingIndexCounter, 0.f);
+			//cl->uavBarrier(lightIndexCounter); // Is this necessary?
 			cl->setPipelineState(*lightCullingPipeline.pipeline);
 			cl->setComputeRootSignature(*lightCullingPipeline.rootSignature);
 			cl->setComputeDynamicConstantBuffer(LIGHT_CULLING_RS_CAMERA, cameraCBV);
-			cl->setCompute32BitConstants(LIGHT_CULLING_RS_CB, light_culling_cb{ lightCullingBuffers.numTilesX, numPointLights, numSpotLights });
+			cl->setCompute32BitConstants(LIGHT_CULLING_RS_CB, light_culling_cb{ numCullingTilesX, numPointLights, numSpotLights });
 			cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 0, depthStencilBuffer);
 			cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 1, pointLights ? pointLights->defaultSRV : nullBufferSRV);
 			cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 2, spotLights ? spotLights->defaultSRV : nullBufferSRV);
-			cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 3, lightCullingBuffers.tiledFrusta);
-			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 4, lightCullingBuffers.lightIndexCounter);
-			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 5, lightCullingBuffers.pointLightIndexList);
-			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 6, lightCullingBuffers.spotLightIndexList);
-			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 7, lightCullingBuffers.lightGrid);
-			cl->dispatch(lightCullingBuffers.numTilesX, lightCullingBuffers.numTilesY);
+			cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 3, tiledWorldSpaceFrustaBuffer);
+			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 4, tiledCullingIndexCounter);
+			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 5, tiledPointLightIndexList);
+			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 6, tiledSpotLightIndexList);
+			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 7, tiledCullingGrid);
+			cl->dispatch(numCullingTilesX, numCullingTilesY);
 		}
 
 

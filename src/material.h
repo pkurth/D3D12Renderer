@@ -13,9 +13,9 @@ struct common_material_info
 	ref<dx_texture> environment;
 	ref<dx_texture> brdf;
 
-	ref<dx_texture> lightGrid;
-	ref<dx_buffer> pointLightIndexList;
-	ref<dx_buffer> spotLightIndexList;
+	ref<dx_texture> tiledCullingGrid;
+	ref<dx_buffer> tiledPointLightIndexList;
+	ref<dx_buffer> tiledSpotLightIndexList;
 	ref<dx_buffer> pointLightBuffer;
 	ref<dx_buffer> spotLightBuffer;
 	ref<dx_buffer> pointLightShadowInfoBuffer;

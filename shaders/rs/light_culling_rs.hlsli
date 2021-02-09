@@ -2,7 +2,7 @@
 #define LIGHT_CULLING_H
 
 #define LIGHT_CULLING_TILE_SIZE 16
-#define MAX_NUM_LIGHTS_PER_TILE 1024
+#define MAX_NUM_LIGHTS_PER_TILE 256 // Per light type.
 
 struct light_culling_frustum_plane
 {

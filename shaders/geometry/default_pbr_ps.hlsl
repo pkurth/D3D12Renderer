@@ -38,9 +38,9 @@ TextureCube<float4> environmentTexture					: register(t1, space2);
 
 Texture2D<float4> brdf									: register(t2, space2);
 
-Texture2D<uint4> lightGrid								: register(t3, space2);
-StructuredBuffer<uint> pointLightIndexList				: register(t4, space2);
-StructuredBuffer<uint> spotLightIndexList				: register(t5, space2);
+Texture2D<uint4> tiledCullingGrid						: register(t3, space2);
+StructuredBuffer<uint> tiledPointLightIndexList			: register(t4, space2);
+StructuredBuffer<uint> tiledSpotLightIndexList			: register(t5, space2);
 StructuredBuffer<point_light_cb> pointLights			: register(t6, space2);
 StructuredBuffer<spot_light_cb> spotLights				: register(t7, space2);
 Texture2D<float> shadowMap								: register(t8, space2);
@@ -99,20 +99,20 @@ ps_output main(ps_input IN)
 	// Point and spot lights.
 	{
 		const uint2 tileIndex = uint2(floor(IN.screenPosition.xy / LIGHT_CULLING_TILE_SIZE));
-		const uint4 lightIndexData = lightGrid.Load(int3(tileIndex, 0));
+		const uint4 tiledIndexData = tiledCullingGrid.Load(int3(tileIndex, 0));
 
-		const uint pointLightOffset = lightIndexData.x;
-		const uint pointLightCount = lightIndexData.y;
+		const uint pointLightOffset = tiledIndexData.x >> 16;
+		const uint pointLightCount = tiledIndexData.x & 0xFFFF;
 
-		const uint spotLightOffset = lightIndexData.z;
-		const uint spotLightCount = lightIndexData.w;
+		const uint spotLightOffset = tiledIndexData.y >> 16;
+		const uint spotLightCount = tiledIndexData.y & 0xFFFF;
 
 
 
 		// Point lights.
 		for (uint lightIndex = pointLightOffset; lightIndex < pointLightOffset + pointLightCount; ++lightIndex)
 		{
-			point_light_cb pl = pointLights[pointLightIndexList[lightIndex]];
+			point_light_cb pl = pointLights[tiledPointLightIndexList[lightIndex]];
 
 			light_info light;
 			light.initializeFromPointLight(surface, pl);
@@ -141,7 +141,7 @@ ps_output main(ps_input IN)
 		// Spot lights.
 		for (lightIndex = spotLightOffset; lightIndex < spotLightOffset + spotLightCount; ++lightIndex)
 		{
-			spot_light_cb sl = spotLights[spotLightIndexList[lightIndex]];
+			spot_light_cb sl = spotLights[tiledSpotLightIndexList[lightIndex]];
 
 			light_info light;
 			light.initializeFromSpotLight(surface, sl);

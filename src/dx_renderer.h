@@ -166,20 +166,6 @@ struct dx_renderer
 
 private:
 
-	struct light_culling_buffers
-	{
-		ref<dx_buffer> tiledFrusta;
-
-		ref<dx_buffer> lightIndexCounter;
-		ref<dx_buffer> pointLightIndexList;
-		ref<dx_buffer> spotLightIndexList;
-
-		ref<dx_texture> lightGrid;
-
-		uint32 numTilesX;
-		uint32 numTilesY;
-	};
-
 	dx_raytracer* raytracer;
 	raytracing_tlas* tlas;
 
@@ -227,7 +213,22 @@ private:
 
 
 
-	light_culling_buffers lightCullingBuffers;
+	// Tiled light and decal culling.
+	ref<dx_buffer> tiledWorldSpaceFrustaBuffer;
+
+	ref<dx_buffer> tiledCullingIndexCounter;
+	ref<dx_buffer> tiledPointLightIndexList;
+	ref<dx_buffer> tiledSpotLightIndexList;
+
+	// DXGI_FORMAT_R32G32B32A32_UINT. Each channel contains the offset and the count in the format (offset << 16 | count). The texture currently contains point lights (x) and spot lights (x).
+	// In the future it will also contain lights for transparent geometry and decals.
+	ref<dx_texture> tiledCullingGrid;
+
+	uint32 numCullingTilesX;
+	uint32 numCullingTilesY;
+
+
+
 
 	renderer_settings oldSettings;
 	renderer_mode oldMode = renderer_mode_rasterized;
