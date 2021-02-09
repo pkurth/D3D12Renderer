@@ -845,13 +845,13 @@ void dx_renderer::endFrame(const user_input& input)
 			cl->setComputeDynamicConstantBuffer(LIGHT_CULLING_RS_CAMERA, cameraCBV);
 			cl->setCompute32BitConstants(LIGHT_CULLING_RS_CB, light_culling_cb{ numCullingTilesX, numPointLights, numSpotLights });
 			cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 0, depthStencilBuffer);
-			cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 1, pointLights ? pointLights->defaultSRV : nullBufferSRV);
-			cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 2, spotLights ? spotLights->defaultSRV : nullBufferSRV);
-			cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 3, tiledWorldSpaceFrustaBuffer);
-			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 4, tiledCullingIndexCounter);
-			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 5, tiledPointLightIndexList);
-			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 6, tiledSpotLightIndexList);
-			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 7, tiledCullingGrid);
+			cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 1, tiledWorldSpaceFrustaBuffer);
+			cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 2, pointLights ? pointLights->defaultSRV : nullBufferSRV);
+			cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 3, spotLights ? spotLights->defaultSRV : nullBufferSRV);
+			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 4, tiledCullingGrid);
+			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 5, tiledCullingIndexCounter);
+			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 6, tiledPointLightIndexList);
+			cl->setDescriptorHeapUAV(LIGHT_CULLING_RS_SRV_UAV, 7, tiledSpotLightIndexList);
 			cl->dispatch(numCullingTilesX, numCullingTilesY);
 		}
 

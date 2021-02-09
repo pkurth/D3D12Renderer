@@ -210,7 +210,7 @@ void application::initialize(dx_renderer* renderer)
 	pointLights[0] =
 	{
 		{ 0.f, 8.f, 0.f }, // Position.
-		20, // Radius.
+		10, // Radius.
 		randomRGB(rng),
 		0 // Shadow info index.
 	};

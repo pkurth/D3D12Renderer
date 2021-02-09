@@ -5,20 +5,21 @@
 
 #define BLOCK_SIZE 16
 
-ConstantBuffer<camera_cb> camera	: register(b0);
-ConstantBuffer<light_culling_cb> cb	: register(b1);
+ConstantBuffer<camera_cb> camera	                : register(b0);
+ConstantBuffer<light_culling_cb> cb	                : register(b1);
 
 Texture2D<float> depthBuffer                        : register(t0);
+StructuredBuffer<light_culling_view_frustum> frusta : register(t1);
 
-StructuredBuffer<point_light_cb> pointLights        : register(t1);
-StructuredBuffer<spot_light_cb> spotLights          : register(t2);
+StructuredBuffer<point_light_cb> pointLights        : register(t2);
+StructuredBuffer<spot_light_cb> spotLights          : register(t3);
 
-StructuredBuffer<light_culling_view_frustum> frusta : register(t3);
+RWTexture2D<uint4> tiledCullingGrid                 : register(u0);
+RWStructuredBuffer<uint> tiledCullingIndexCounter   : register(u1);
 
-RWStructuredBuffer<uint> tiledCullingIndexCounter   : register(u0);
-RWStructuredBuffer<uint> tiledPointLightIndexList   : register(u1);
-RWStructuredBuffer<uint> tiledSpotLightIndexList    : register(u2);
-RWTexture2D<uint4> tiledCullingGrid                 : register(u3);
+RWStructuredBuffer<uint> tiledPointLightIndexList   : register(u2);
+RWStructuredBuffer<uint> tiledSpotLightIndexList    : register(u3);
+
 
 groupshared uint groupMinDepth;
 groupshared uint groupMaxDepth;
@@ -26,12 +27,15 @@ groupshared light_culling_view_frustum groupFrustum;
 
 groupshared uint groupPointLightCount;
 groupshared uint groupSpotLightCount;
+groupshared uint groupDecalCount;
 
 groupshared uint groupPointLightIndexStartOffset;
 groupshared uint groupSpotLightIndexStartOffset;
+groupshared uint groupDecalIndexStartOffset;
 
 groupshared uint groupPointLightList[MAX_NUM_LIGHTS_PER_TILE];
 groupshared uint groupSpotLightList[MAX_NUM_LIGHTS_PER_TILE];
+groupshared uint groupDecalList[MAX_NUM_DECALS_PER_TILE];
 
 
 
@@ -51,7 +55,7 @@ static spot_light_bounding_volume getSpotLightBoundingVolume(spot_light_cb sl)
     result.height = sl.maxDistance;
 
     float oc = getOuterCutoff(sl.innerAndOuterCutoff);
-    result.radius = result.height * tan(acos(oc));// sqrt(1.f - oc * oc) / oc; // Same as height * tan(acos(oc)).
+    result.radius = result.height * sqrt(1.f - oc * oc) / oc; // Same as height * tan(acos(oc)).
     return result;
 }
 
@@ -103,7 +107,7 @@ static bool spotLightInsideFrustum(spot_light_bounding_volume sl, light_culling_
         result = false;
     }
 
-    for (int i = 0; i < 4 && result; i++)
+    for (int i = 0; i < 4 && result; ++i)
     {
         if (spotLightOutsidePlane(sl, frustum.planes[i]))
         {
@@ -114,23 +118,66 @@ static bool spotLightInsideFrustum(spot_light_bounding_volume sl, light_culling_
     return result;
 }
 
-static void groupAppendPointLight(uint lightIndex)
+static bool decalOutsidePlane(decal_cb decal, light_culling_frustum_plane plane)
 {
-    uint index;
-    InterlockedAdd(groupPointLightCount, 1, index);
-    if (index < MAX_NUM_LIGHTS_PER_TILE)
+    float x = dot(decal.right, plane.N)     >= 0.f ? 1.f : -1.f;
+    float y = dot(decal.up, plane.N)        >= 0.f ? 1.f : -1.f;
+    float z = dot(decal.forward, plane.N)   >= 0.f ? 1.f : -1.f;
+
+    float3 diag = x * decal.right + y * decal.up + z * decal.forward;
+
+    float3 nPoint = decal.position + diag;
+    return pointOutsidePlane(nPoint, plane);
+}
+
+static bool decalInsideFrustum(decal_cb decal, light_culling_view_frustum frustum, light_culling_frustum_plane nearPlane, light_culling_frustum_plane farPlane)
+{
+    bool result = true;
+
+    if (decalOutsidePlane(decal, nearPlane)
+        || decalOutsidePlane(decal, farPlane))
     {
-        groupPointLightList[index] = lightIndex;
+        result = false;
+    }
+
+    for (int i = 0; i < 4 && result; ++i)
+    {		
+        if (decalOutsidePlane(decal, frustum.planes[i]))
+        {
+            result = false;
+        }
+    }	
+        
+    return result;
+}
+
+static void groupAppendPointLight(uint index)
+{
+    uint i;
+    InterlockedAdd(groupPointLightCount, 1, i);
+    if (i < MAX_NUM_LIGHTS_PER_TILE)
+    {
+        groupPointLightList[i] = index;
     }
 }
 
-static void groupAppendSpotLight(uint lightIndex)
+static void groupAppendSpotLight(uint index)
 {
-    uint index;
-    InterlockedAdd(groupSpotLightCount, 1, index);
-    if (index < MAX_NUM_LIGHTS_PER_TILE)
+    uint i;
+    InterlockedAdd(groupSpotLightCount, 1, i);
+    if (i < MAX_NUM_LIGHTS_PER_TILE)
     {
-        groupSpotLightList[index] = lightIndex;
+        groupSpotLightList[i] = index;
+    }
+}
+
+static void groupAppendDecal(uint index)
+{
+    uint i;
+    InterlockedAdd(groupDecalCount, 1, i);
+    if (i < MAX_NUM_DECALS_PER_TILE)
+    {
+        groupDecalList[i] = index;
     }
 }
 
@@ -193,6 +240,18 @@ void main(cs_input IN)
         }
     }
 
+#if 0
+    const uint numDecals = cb.numDecals;
+    for (i = IN.groupIndex; i < numDecals; i += BLOCK_SIZE * BLOCK_SIZE)
+    {
+        decal_cb d = decals[i];
+        if (decalInsideFrustum(d, groupFrustum, nearPlane, farPlane))
+        {
+            groupAppendDecal(i);
+        }
+    }
+#endif
+
 
     GroupMemoryBarrierWithGroupSync();
 
@@ -200,11 +259,12 @@ void main(cs_input IN)
     {
         InterlockedAdd(tiledCullingIndexCounter[0], groupPointLightCount, groupPointLightIndexStartOffset);
         InterlockedAdd(tiledCullingIndexCounter[1], groupSpotLightCount, groupSpotLightIndexStartOffset);
+        InterlockedAdd(tiledCullingIndexCounter[2], groupDecalCount, groupDecalIndexStartOffset);
 
         tiledCullingGrid[IN.groupID.xy] = uint4(
             (groupPointLightIndexStartOffset << 16) | groupPointLightCount, 
             (groupSpotLightIndexStartOffset << 16) | groupSpotLightCount, 
-            0,
+            (groupDecalIndexStartOffset << 16) | groupDecalCount,
             0);
     }
 
@@ -219,4 +279,11 @@ void main(cs_input IN)
     {
         tiledSpotLightIndexList[groupSpotLightIndexStartOffset + i] = groupSpotLightList[i];
     }
+
+#if 0
+    for (i = IN.groupIndex; i < groupDecalCount; i += BLOCK_SIZE * BLOCK_SIZE)
+    {
+        tiledDecalIndexList[groupDecalIndexStartOffset + i] = groupDecalList[i];
+    }
+#endif
 }

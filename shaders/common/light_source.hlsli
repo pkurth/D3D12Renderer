@@ -82,6 +82,19 @@ static int packInnerAndOuterCutoff(float innerCutoff, float outerCutoff)
 	return (inner << 16) | outer;
 }
 
+struct decal_cb
+{
+	vec3 position;
+	uint32 albedoTint;  // RGBA packed into one uint32.
+	vec3 right;			// Scaled by half dimension.
+	uint32 roughnessOverride_metallicOverride;
+	vec3 up;			// Scaled by half dimension.
+	uint32 textureIndex;
+	vec3 forward;		// Scaled by half dimension.
+
+	uint32 padding;
+};
+
 #ifdef HLSL
 static float sampleShadowMapSimple(float4x4 vp, float3 worldPosition, 
 	Texture2D<float> shadowMap, float4 viewport,

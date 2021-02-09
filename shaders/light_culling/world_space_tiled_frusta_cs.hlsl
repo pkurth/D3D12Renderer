@@ -11,6 +11,8 @@ RWStructuredBuffer<light_culling_view_frustum> outFrusta  : register(u0);
 
 static light_culling_frustum_plane getPlane(float3 p0, float3 p1, float3 p2)
 {
+    // The plane normal points to the inside of the frustum.
+
     light_culling_frustum_plane plane;
 
     float3 v0 = p1 - p0;
