@@ -6,69 +6,6 @@
 #include "light_source.hlsli"
 
 
-
-
-
-// ----------------------------------------
-// FRESNEL (Surface becomes more reflective when seen from a grazing angle).
-// ----------------------------------------
-
-static float3 fresnelSchlick(float LdotH, float3 F0)
-{
-	return F0 + (float3(1.f, 1.f, 1.f) - F0) * pow(1.f - LdotH, 5.f);
-}
-
-static float3 fresnelSchlickRoughness(float LdotH, float3 F0, float roughness)
-{
-	float v = 1.f - roughness;
-	return F0 + (max(float3(v, v, v), F0) - F0) * pow(1.f - LdotH, 5.f);
-}
-
-
-
-
-// ----------------------------------------
-// DISTRIBUTION (Microfacets' orientation based on roughness).
-// ----------------------------------------
-
-#if 0
-static float distributionGGX(float NdotH, float roughness)
-{
-	float a2 = roughness * roughness;
-	float d = (NdotH * (a2 - 1.f) + 1.f);
-	return a2 / max(d * d * pi, 0.001f);
-}
-#else
-static float distributionGGX(float NdotH, float roughness)
-{
-	float a = roughness * roughness;
-	float a2 = a * a;
-	float NdotH2 = NdotH * NdotH;
-
-	float d = (NdotH2 * (a2 - 1.f) + 1.f);
-	return a2 / max(d * d * pi, 0.001f);
-}
-#endif
-
-
-
-
-// ----------------------------------------
-// GEOMETRIC MASKING (Microfacets may shadow each-other).
-// ----------------------------------------
-
-static float geometrySmith(float NdotL, float NdotV, float roughness)
-{
-	float k = (roughness * roughness) / 2.f;
-
-	float ggx2 = NdotV / (NdotV * (1.f - k) + k);
-	float ggx1 = NdotL / (NdotL * (1.f - k) + k);
-
-	return ggx1 * ggx2;
-}
-
-
-
 struct surface_info
 {
 	// Set from outside.
@@ -108,7 +45,6 @@ struct light_info
 	float LdotH;
 	float VdotH;
 
-	float3 F;
 	float3 radiance;
 
 	inline void initialize(surface_info surface, float3 L_, float3 rad)
@@ -120,8 +56,6 @@ struct light_info
 		NdotH = saturate(dot(surface.N, H));
 		LdotH = saturate(dot(L, H));
 		VdotH = saturate(dot(surface.V, H));
-
-		F = fresnelSchlick(VdotH, surface.F0);
 
 		radiance = rad;
 	}
@@ -156,6 +90,78 @@ struct light_info
 
 
 // http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
+
+
+
+
+
+// ----------------------------------------
+// FRESNEL (Surface becomes more reflective when seen from a grazing angle).
+// ----------------------------------------
+
+static float3 fresnelSchlick(float LdotH, float3 F0)
+{
+	return F0 + (float3(1.f, 1.f, 1.f) - F0) * pow(1.f - LdotH, 5.f);
+}
+
+static float3 fresnelSchlickRoughness(float LdotH, float3 F0, float roughness)
+{
+	float v = 1.f - roughness;
+	return F0 + (max(float3(v, v, v), F0) - F0) * pow(1.f - LdotH, 5.f);
+}
+
+
+
+
+// ----------------------------------------
+// DISTRIBUTION (Microfacets' orientation based on roughness).
+// ----------------------------------------
+
+static float distributionGGX(float NdotH, float roughness)
+{
+	float a = roughness * roughness;
+	float a2 = a * a;
+	float NdotH2 = NdotH * NdotH;
+
+	float d = (NdotH2 * (a2 - 1.f) + 1.f);
+	return a2 / max(d * d * pi, 0.001f);
+}
+
+static float distributionGGX(surface_info surface, light_info light)
+{
+	float NdotH = light.NdotH;
+	float NdotH2 = NdotH * NdotH;
+	float a2 = surface.alphaRoughnessSquared;
+	float d = (NdotH2 * (a2 - 1.f) + 1.f);
+	return a2 / max(d * d * pi, 0.001f);
+}
+
+
+
+
+// ----------------------------------------
+// GEOMETRIC MASKING (Microfacets may shadow each-other).
+// ----------------------------------------
+
+static float geometrySmith(float NdotL, float NdotV, float roughness)
+{
+	float k = (roughness * roughness) * 0.5f;
+
+	float ggx2 = NdotV / (NdotV * (1.f - k) + k);
+	float ggx1 = NdotL / (NdotL * (1.f - k) + k);
+
+	return ggx1 * ggx2;
+}
+
+static float geometrySmith(surface_info surface, light_info light)
+{
+	float k = surface.alphaRoughness * 0.5f;
+
+	float ggx2 = surface.NdotV / (surface.NdotV * (1.f - k) + k);
+	float ggx1 = light.NdotL / (light.NdotL * (1.f - k) + k);
+
+	return ggx1 * ggx2;
+}
 
 
 
@@ -259,6 +265,7 @@ static float3 calculateAmbientLighting(float3 albedo,
 
 static float3 calculateDirectLighting(float3 albedo, float3 radiance, float3 N, float3 L, float3 V, float3 F0, float roughness, float metallic)
 {
+#if 0
 	float3 H = normalize(V + L);
 	float NdotV = saturate(dot(N, V));
 	float NdotH = saturate(dot(N, H));
@@ -279,18 +286,22 @@ static float3 calculateDirectLighting(float3 albedo, float3 radiance, float3 N, 
 	float3 specular = numerator / max(denominator, 0.001f);
 
 	return (kD * albedo * invPI + specular) * radiance * NdotL;
+#endif
+
+	return 0.xxx;
 }
 
 static float3 calculateDirectLighting(surface_info surface, light_info light)
 {
-	float3 kD = float3(1.f, 1.f, 1.f) - light.F;
+	float D = distributionGGX(surface, light);
+	float G = geometrySmith(surface, light);
+	float3 F = fresnelSchlick(light.VdotH, surface.F0);
+
+	float3 kD = float3(1.f, 1.f, 1.f) - F;
 	kD *= 1.f - surface.metallic;
 	float3 diffuse = kD * surface.albedo.rgb * invPI;
 
-	float NDF = distributionGGX(light.NdotH, surface.roughness);
-	float G = geometrySmith(light.NdotL, surface.NdotV, surface.roughness);
-
-	float3 numerator = NDF * G * light.F;
+	float3 numerator = D * G * F;
 	float denominator = 4.f * surface.NdotV * light.NdotL;
 	float3 specular = numerator / max(denominator, 0.001f);
 
