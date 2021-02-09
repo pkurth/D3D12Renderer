@@ -3,22 +3,7 @@
 
 #include "math.hlsli"
 #include "random.hlsli"
-
-// http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
-// TODO: We should make an optimization pass over this code. Many terms are computed multiple times.
-// Maybe use something like the following struct, which then just gets passed around.
-
-struct lighting_info
-{
-	float3 albedo;
-	float roughness;
-	float3 F0;
-	float roughnessSquared;
-	float3 N;
-	float metallic;
-	float3 V;
-	float NdotV;
-};
+#include "light_source.hlsli"
 
 
 
@@ -81,6 +66,98 @@ static float geometrySmith(float NdotL, float NdotV, float roughness)
 
 	return ggx1 * ggx2;
 }
+
+
+
+struct surface_info
+{
+	// Set from outside.
+	float3 P;
+	float3 N;
+	float3 V;
+
+	float4 albedo;
+	float roughness;
+	float metallic;
+	float3 emission;
+
+
+
+	// Inferred from properties above.
+	float alphaRoughness;
+	float alphaRoughnessSquared;
+	float NdotV;
+	float3 F0;
+
+
+	inline void inferRemainingProperties()
+	{
+		alphaRoughness = roughness * roughness;
+		alphaRoughnessSquared = alphaRoughness * alphaRoughness;
+		NdotV = saturate(dot(N, V));
+		F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo.xyz, metallic);
+	}
+};
+
+struct light_info
+{
+	float3 L;
+	float3 H;
+	float NdotL;
+	float NdotH;
+	float LdotH;
+	float VdotH;
+
+	float3 F;
+	float3 radiance;
+
+	inline void initialize(surface_info surface, float3 L_, float3 rad)
+	{
+		L = L_;
+		H = normalize(L + surface.V);
+
+		NdotL = saturate(dot(surface.N, L));
+		NdotH = saturate(dot(surface.N, H));
+		LdotH = saturate(dot(L, H));
+		VdotH = saturate(dot(surface.V, H));
+
+		F = fresnelSchlick(VdotH, surface.F0);
+
+		radiance = rad;
+	}
+
+	inline void initializeFromPointLight(surface_info surface, point_light_cb pl)
+	{
+		float3 L = pl.position - surface.P;
+		float distanceToLight = length(L);
+		L /= distanceToLight;
+
+		initialize(surface, L, pl.radiance * getAttenuation(distanceToLight, pl.radius) * LIGHT_RADIANCE_SCALE);
+	}
+
+	inline void initializeFromSpotLight(surface_info surface, spot_light_cb sl)
+	{
+		float3 L = (sl.position - surface.P);
+		float distanceToLight = length(L);
+		L /= distanceToLight;
+
+		float innerCutoff = getInnerCutoff(sl.innerAndOuterCutoff);
+		float outerCutoff = getOuterCutoff(sl.innerAndOuterCutoff);
+		float epsilon = innerCutoff - outerCutoff;
+
+		float theta = dot(-L, sl.direction);
+		float attenuation = getAttenuation(distanceToLight, sl.maxDistance);
+		float intensity = saturate((theta - outerCutoff) / epsilon) * attenuation;
+
+		initialize(surface, L, sl.radiance * intensity * LIGHT_RADIANCE_SCALE);
+	}
+};
+
+
+
+// http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
+
+
 
 
 
@@ -202,6 +279,22 @@ static float3 calculateDirectLighting(float3 albedo, float3 radiance, float3 N, 
 	float3 specular = numerator / max(denominator, 0.001f);
 
 	return (kD * albedo * invPI + specular) * radiance * NdotL;
+}
+
+static float3 calculateDirectLighting(surface_info surface, light_info light)
+{
+	float3 kD = float3(1.f, 1.f, 1.f) - light.F;
+	kD *= 1.f - surface.metallic;
+	float3 diffuse = kD * surface.albedo.rgb * invPI;
+
+	float NDF = distributionGGX(light.NdotH, surface.roughness);
+	float G = geometrySmith(light.NdotL, surface.NdotV, surface.roughness);
+
+	float3 numerator = NDF * G * light.F;
+	float denominator = 4.f * surface.NdotV * light.NdotL;
+	float3 specular = numerator / max(denominator, 0.001f);
+
+	return (diffuse + specular) * light.radiance * light.NdotL;
 }
 
 #endif

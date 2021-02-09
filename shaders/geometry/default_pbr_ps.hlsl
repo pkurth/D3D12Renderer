@@ -58,34 +58,43 @@ ps_output main(ps_input IN)
 {
 	uint flags = material.flags;
 
-	float4 albedo = ((flags & USE_ALBEDO_TEXTURE)
+	surface_info surface;
+
+	surface.albedo = ((flags & USE_ALBEDO_TEXTURE)
 		? albedoTex.Sample(wrapSampler, IN.uv)
 		: float4(1.f, 1.f, 1.f, 1.f))
 		* unpackColor(material.albedoTint);
 
-	float3 N = (flags & USE_NORMAL_TEXTURE)
+	surface.N = (flags & USE_NORMAL_TEXTURE)
 		? mul(normalTex.Sample(wrapSampler, IN.uv).xyz * 2.f - float3(1.f, 1.f, 1.f), IN.tbn)
 		: IN.tbn[2];
-	N = normalize(N);
+	surface.N = normalize(surface.N);
 
-	float roughness = (flags & USE_ROUGHNESS_TEXTURE)
+	surface.roughness = (flags & USE_ROUGHNESS_TEXTURE)
 		? roughTex.Sample(wrapSampler, IN.uv)
 		: getRoughnessOverride(material);
-	roughness = clamp(roughness, 0.01f, 0.99f);
+	surface.roughness = clamp(surface.roughness, 0.01f, 0.99f);
 
-	float metallic = (flags & USE_METALLIC_TEXTURE)
+	surface.metallic = (flags & USE_METALLIC_TEXTURE)
 		? metalTex.Sample(wrapSampler, IN.uv)
 		: getMetallicOverride(material);
 
+	surface.emission = material.emission;
 
-	float3 cameraPosition = camera.position.xyz;
-	float3 camToP = IN.worldPosition - cameraPosition;
-	float3 V = -normalize(camToP);
-	float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo.xyz, metallic);
+	surface.P = IN.worldPosition;
+	float3 camToP = surface.P - camera.position.xyz;
+	surface.V = -normalize(camToP);
 
-	float4 totalLighting = float4(0.f, 0.f, 0.f, albedo.w);
+	float pixelDepth = dot(camera.forward.xyz, camToP);
 
-	totalLighting.xyz += material.emission;
+
+	surface.inferRemainingProperties();
+
+
+
+
+	float4 totalLighting = float4(surface.emission, surface.albedo.w);
+
 
 	// Point and spot lights.
 	{
@@ -103,102 +112,88 @@ ps_output main(ps_input IN)
 		// Point lights.
 		for (uint lightIndex = pointLightOffset; lightIndex < pointLightOffset + pointLightCount; ++lightIndex)
 		{
-			uint index = pointLightIndexList[lightIndex];
-			point_light_cb pl = pointLights[index];
-			float distanceToLight = length(pl.position - IN.worldPosition);
-			if (distanceToLight <= pl.radius)
+			point_light_cb pl = pointLights[pointLightIndexList[lightIndex]];
+
+			light_info light;
+			light.initializeFromPointLight(surface, pl);
+
+			float visibility = 1.f;
+
+			[branch]
+			if (pl.shadowInfoIndex != -1)
 			{
-				float visibility = 1.f;
-				if (pl.shadowInfoIndex != -1)
-				{
-					point_shadow_info info = pointShadowInfos[pl.shadowInfoIndex];
+				point_shadow_info info = pointShadowInfos[pl.shadowInfoIndex];
 
-					visibility = samplePointLightShadowMapPCF(IN.worldPosition, pl.position,
-						shadowMap,
-						info.viewport0, info.viewport1,
-						shadowSampler,
-						lighting.shadowMapTexelSize, pl.radius);
-				}
+				visibility = samplePointLightShadowMapPCF(surface.P, pl.position,
+					shadowMap,
+					info.viewport0, info.viewport1,
+					shadowSampler,
+					lighting.shadowMapTexelSize, pl.radius);
+			}
 
-				if (visibility > 0.f)
-				{
-					float3 L = (pl.position - IN.worldPosition) / distanceToLight;
-					float3 radiance = pl.radiance * getAttenuation(distanceToLight, pl.radius) * LIGHT_RADIANCE_SCALE;
-					totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
-				}
+			[branch]
+			if (visibility > 0.f)
+			{
+				totalLighting.xyz += calculateDirectLighting(surface, light) * visibility;
 			}
 		}
 
 		// Spot lights.
 		for (lightIndex = spotLightOffset; lightIndex < spotLightOffset + spotLightCount; ++lightIndex)
 		{
-			uint index = spotLightIndexList[lightIndex];
-			spot_light_cb sl = spotLights[index];
-			float distanceToLight = length(sl.position - IN.worldPosition);
+			spot_light_cb sl = spotLights[spotLightIndexList[lightIndex]];
 
-			if (distanceToLight <= sl.maxDistance)
+			light_info light;
+			light.initializeFromSpotLight(surface, sl);
+
+			float visibility = 1.f;
+
+			[branch]
+			if (sl.shadowInfoIndex != -1)
 			{
-				float3 L = (sl.position - IN.worldPosition) / distanceToLight;
+				spot_shadow_info info = spotShadowInfos[sl.shadowInfoIndex];
+				visibility = sampleShadowMapPCF(info.viewProj, surface.P,
+					shadowMap, info.viewport,
+					shadowSampler,
+					lighting.shadowMapTexelSize, info.bias);
+			}
 
-				float innerCutoff = getInnerCutoff(sl.innerAndOuterCutoff);
-				float outerCutoff = getOuterCutoff(sl.innerAndOuterCutoff);
-
-				float theta = dot(-L, sl.direction);
-				if (theta > outerCutoff)
-				{
-					float attenuation = getAttenuation(distanceToLight, sl.maxDistance);
-
-					float epsilon = innerCutoff - outerCutoff;
-					float intensity = saturate((theta - outerCutoff) / epsilon) * attenuation;
-
-					if (intensity > 0.f)
-					{
-						float visibility = 1.f;
-						if (sl.shadowInfoIndex != -1)
-						{
-							spot_shadow_info info = spotShadowInfos[sl.shadowInfoIndex];
-							visibility = sampleShadowMapPCF(info.viewProj, IN.worldPosition,
-								shadowMap, info.viewport,
-								shadowSampler,
-								lighting.shadowMapTexelSize, info.bias);
-						}
-
-						if (visibility > 0.f)
-						{
-							float totalIntensity = intensity * visibility;
-
-							float3 radiance = sl.radiance * totalIntensity * LIGHT_RADIANCE_SCALE;
-							totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
-						}
-					}
-				}
+			[branch]
+			if (visibility > 0.f)
+			{
+				totalLighting.xyz += calculateDirectLighting(surface, light) * visibility;
 			}
 		}
 	}
 
 	// Sun.
 	{
-		float pixelDepth = dot(camera.forward.xyz, camToP);
-		float visibility = sampleCascadedShadowMapPCF(sun.vp, IN.worldPosition, 
+		float3 L = -normalize(sun.direction);
+
+		light_info light;
+		light.initialize(surface, L, sun.radiance);
+
+		float visibility = sampleCascadedShadowMapPCF(sun.vp, surface.P, 
 			shadowMap, sun.viewports,
 			shadowSampler, lighting.shadowMapTexelSize, pixelDepth, sun.numShadowCascades,
 			sun.cascadeDistances, sun.bias, sun.blendDistances);
 
+		[branch]
 		if (visibility > 0.f)
 		{
-			float3 radiance = sun.radiance * visibility;
-
-			float3 L = -sun.direction;
-			totalLighting.xyz += calculateDirectLighting(albedo.xyz, radiance, N, L, V, F0, roughness, metallic);
+			totalLighting.xyz += calculateDirectLighting(surface, light) * visibility;
 		}
 	}
 
+#if 1
 	// Ambient.
-	totalLighting.xyz += calculateAmbientLighting(albedo.xyz, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic) * lighting.environmentIntensity;
+	totalLighting.xyz += calculateAmbientLighting(surface.albedo.xyz, irradianceTexture, environmentTexture, brdf, clampSampler, surface.N, surface.V, surface.F0, surface.roughness, surface.metallic)
+		* lighting.environmentIntensity;
+#endif
 
 	ps_output OUT;
 	OUT.hdrColor = totalLighting;
-	OUT.worldNormal = packNormal(N);
+	OUT.worldNormal = packNormal(surface.N);
 
 	return OUT;
 }
