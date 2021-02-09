@@ -25,6 +25,7 @@ struct surface_info
 	float alphaRoughnessSquared;
 	float NdotV;
 	float3 F0;
+	float3 R;
 
 
 	inline void inferRemainingProperties()
@@ -33,6 +34,7 @@ struct surface_info
 		alphaRoughnessSquared = alphaRoughness * alphaRoughness;
 		NdotV = saturate(dot(N, V));
 		F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo.xyz, metallic);
+		R = reflect(-V, N);
 	}
 };
 
@@ -46,6 +48,7 @@ struct light_info
 	float VdotH;
 
 	float3 radiance;
+	float distanceToLight; // Only set if using a specialized initialize function. 
 
 	inline void initialize(surface_info surface, float3 L_, float3 rad)
 	{
@@ -63,7 +66,18 @@ struct light_info
 	inline void initializeFromPointLight(surface_info surface, point_light_cb pl)
 	{
 		float3 L = pl.position - surface.P;
-		float distanceToLight = length(L);
+		distanceToLight = length(L);
+		L /= distanceToLight;
+
+		initialize(surface, L, pl.radiance * getAttenuation(distanceToLight, pl.radius) * LIGHT_RADIANCE_SCALE);
+	}
+
+	inline void initializeFromRandomPointOnSphereLight(surface_info surface, point_light_cb pl, float radius, inout uint randSeed)
+	{
+		float3 randomPointOnLight = pl.position + getRandomPointOnSphere(randSeed, radius);
+
+		float3 L = randomPointOnLight - surface.P;
+		distanceToLight = length(L);
 		L /= distanceToLight;
 
 		initialize(surface, L, pl.radiance * getAttenuation(distanceToLight, pl.radius) * LIGHT_RADIANCE_SCALE);
@@ -72,7 +86,7 @@ struct light_info
 	inline void initializeFromSpotLight(surface_info surface, spot_light_cb sl)
 	{
 		float3 L = (sl.position - surface.P);
-		float distanceToLight = length(L);
+		distanceToLight = length(L);
 		L /= distanceToLight;
 
 		float innerCutoff = getInnerCutoff(sl.innerAndOuterCutoff);
@@ -226,69 +240,29 @@ static float3 importanceSampleGGX(float2 Xi, float3 N, float roughness)
 // LIGHTING COMPUTATION.
 // ----------------------------------------
 
-static float3 calculateAmbientLighting(float3 albedo, float3 irradiance,
-	TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState clampSampler,
-	float3 N, float3 V, float3 F0, float roughness, float metallic)
+static float3 calculateAmbientLighting(surface_info surface, TextureCube<float4> irradianceTexture, TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState clampSampler)
 {
 	// Common.
-	float NdotV = saturate(dot(N, V));
-	float3 F = fresnelSchlickRoughness(NdotV, F0, roughness);
-	float3 kS = F;
-	float3 kD = float3(1.f, 1.f, 1.f) - kS;
-	kD *= 1.f - metallic;
+	float3 F = fresnelSchlickRoughness(surface.NdotV, surface.F0, surface.roughness);
+	float3 kD = float3(1.f, 1.f, 1.f) - F;
+	kD *= 1.f - surface.metallic;
 
 	// Diffuse.
-	float3 diffuse = irradiance * albedo;
+	float3 irradiance = irradianceTexture.SampleLevel(clampSampler, surface.N, 0).rgb;
+	float3 diffuse = irradiance * surface.albedo.rgb;
 
 	// Specular.
-	float3 R = reflect(-V, N);
 	uint width, height, numMipLevels;
 	environmentTexture.GetDimensions(0, width, height, numMipLevels);
-	float lod = roughness * float(numMipLevels - 1);
+	float lod = surface.alphaRoughness * float(numMipLevels - 1);
 
-	float3 prefilteredColor = environmentTexture.SampleLevel(clampSampler, R, lod).rgb;
-	float2 envBRDF = brdf.SampleLevel(clampSampler, float2(roughness, NdotV), 0).rg;
+	float3 prefilteredColor = environmentTexture.SampleLevel(clampSampler, surface.R, lod).rgb;
+	float2 envBRDF = brdf.SampleLevel(clampSampler, float2(surface.roughness, surface.NdotV), 0).rg;
 	float3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y);
 
 	float3 ambient = kD * diffuse + specular;
 
 	return ambient;
-}
-
-static float3 calculateAmbientLighting(float3 albedo,
-	TextureCube<float4> irradianceTexture, TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState clampSampler,
-	float3 N, float3 V, float3 F0, float roughness, float metallic)
-{
-	float3 irradiance = irradianceTexture.SampleLevel(clampSampler, N, 0).rgb;
-	return calculateAmbientLighting(albedo, irradiance, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic);
-}
-
-static float3 calculateDirectLighting(float3 albedo, float3 radiance, float3 N, float3 L, float3 V, float3 F0, float roughness, float metallic)
-{
-#if 0
-	float3 H = normalize(V + L);
-	float NdotV = saturate(dot(N, V));
-	float NdotH = saturate(dot(N, H));
-	float NdotL = saturate(dot(N, L));
-	float HdotV = saturate(dot(H, V));
-
-	// Cook-Torrance BRDF.
-	float NDF = distributionGGX(NdotH, roughness);
-	float G = geometrySmith(NdotL, NdotV, roughness);
-	float3 F = fresnelSchlick(HdotV, F0);
-
-	float3 kS = F;
-	float3 kD = float3(1.f, 1.f, 1.f) - kS;
-	kD *= 1.f - metallic;
-
-	float3 numerator = NDF * G * F;
-	float denominator = 4.f * NdotV * NdotL;
-	float3 specular = numerator / max(denominator, 0.001f);
-
-	return (kD * albedo * invPI + specular) * radiance * NdotL;
-#endif
-
-	return 0.xxx;
 }
 
 static float3 calculateDirectLighting(surface_info surface, light_info light)

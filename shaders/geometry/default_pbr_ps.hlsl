@@ -187,8 +187,7 @@ ps_output main(ps_input IN)
 
 #if 1
 	// Ambient.
-	totalLighting.xyz += calculateAmbientLighting(surface.albedo.xyz, irradianceTexture, environmentTexture, brdf, clampSampler, surface.N, surface.V, surface.F0, surface.roughness, surface.metallic)
-		* lighting.environmentIntensity;
+	totalLighting.xyz += calculateAmbientLighting(surface, irradianceTexture, environmentTexture, brdf, clampSampler) * lighting.environmentIntensity;
 #endif
 
 	ps_output OUT;

@@ -226,35 +226,35 @@ static float probabilityToSampleDiffuse(float roughness)
 	return roughness;
 }
 
-static float3 calculateIndirectLighting(inout uint randSeed, float3 position, float3 albedo, float3 F0, float3 N, float3 V, float roughness, float metallic, uint recursion)
+static float3 calculateIndirectLighting(inout uint randSeed, surface_info surface, uint recursion)
 {
-	float probDiffuse = probabilityToSampleDiffuse(roughness);
+	float probDiffuse = probabilityToSampleDiffuse(surface.roughness);
 	float chooseDiffuse = (nextRand(randSeed) < probDiffuse);
 
 	if (chooseDiffuse)
 	{
-		float3 L = getCosHemisphereSample(randSeed, N);
-		float3 bounceColor = traceRadianceRay(position, L, randSeed, recursion);
+		float3 L = getCosHemisphereSample(randSeed, surface.N);
+		float3 bounceColor = traceRadianceRay(surface.P, L, randSeed, recursion);
 
 		// Accumulate the color: (NdotL * incomingLight * dif / pi) 
 		// Probability of sampling:  (NdotL / pi) * probDiffuse
-		return bounceColor * albedo / probDiffuse;
+		return bounceColor * surface.albedo.rgb / probDiffuse;
 	}
 	else
 	{
-		float3 H = importanceSampleGGX(randSeed, N, roughness);
-		float3 L = reflect(-V, H);
+		float3 H = importanceSampleGGX(randSeed, surface.N, surface.roughness);
+		float3 L = reflect(-surface.V, H);
 
-		float3 bounceColor = traceRadianceRay(position, L, randSeed, recursion);
+		float3 bounceColor = traceRadianceRay(surface.P, L, randSeed, recursion);
 
-		float NdotV = saturate(dot(N, V));
-		float NdotL = saturate(dot(N, L));
-		float NdotH = saturate(dot(N, H));
+		float NdotV = saturate(dot(surface.N, surface.V));
+		float NdotL = saturate(dot(surface.N, L));
+		float NdotH = saturate(dot(surface.N, H));
 		float LdotH = saturate(dot(L, H));
 
-		float NDF = distributionGGX(NdotH, roughness);
-		float G = geometrySmith(NdotL, NdotV, roughness);
-		float3 F = fresnelSchlick(LdotH, F0);
+		float NDF = distributionGGX(NdotH, surface.roughness);
+		float G = geometrySmith(NdotL, NdotV, surface.roughness);
+		float3 F = fresnelSchlick(LdotH, surface.F0);
 
 		float3 numerator = NDF * G * F;
 		float denominator = 4.f * NdotV * NdotL;
@@ -280,113 +280,111 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float3 normals[] = { meshVertices[tri.x].normal, meshVertices[tri.y].normal, meshVertices[tri.z].normal };
 
 	float2 uv = interpolateAttribute(uvs, attribs);
-	float3 N = normalize(transformDirectionToWorld(interpolateAttribute(normals, attribs)));
-	float3 V = -WorldRayDirection();
 
-	float3 emission = (float3)0.f;
-	float3 albedo = (float3)1.f;
-	float roughness = 1.f;
-	float metallic = 0.f;
+	surface_info surface;
+	surface.N = normalize(transformDirectionToWorld(interpolateAttribute(normals, attribs)));
+	surface.V = -WorldRayDirection();
+	surface.P = hitWorldPosition();
+
+	surface.emission = (float3)0.f;
+	surface.albedo = (float4)1.f;
+	surface.roughness = 1.f;
+	surface.metallic = 0.f;
 
 	if (constants.useRealMaterials)
 	{
 		uint mipLevel = 0;
 		uint flags = material.flags;
 
-		albedo = (((flags & USE_ALBEDO_TEXTURE)
+		surface.albedo = (((flags & USE_ALBEDO_TEXTURE)
 			? albedoTex.SampleLevel(wrapSampler, uv, mipLevel)
 			: float4(1.f, 1.f, 1.f, 1.f))
-			* unpackColor(material.albedoTint)).xyz;
+			* unpackColor(material.albedoTint));
 
 		// We ignore normal maps for now.
 
-		roughness = (flags & USE_ROUGHNESS_TEXTURE)
+		surface.roughness = (flags & USE_ROUGHNESS_TEXTURE)
 			? roughTex.SampleLevel(wrapSampler, uv, mipLevel)
 			: getRoughnessOverride(material);
 
-		metallic = (flags & USE_METALLIC_TEXTURE)
+		surface.metallic = (flags & USE_METALLIC_TEXTURE)
 			? metalTex.SampleLevel(wrapSampler, uv, mipLevel)
 			: getMetallicOverride(material);
 
-		emission = material.emission;
+		surface.emission = material.emission;
 	}
 
-	payload.color = emission;
+	surface.roughness = clamp(surface.roughness, 0.01f, 0.99f);
 
-	roughness = clamp(roughness, 0.01f, 0.99f);
+	surface.inferRemainingProperties();
 
-	float3 hitPoint = hitWorldPosition();
-
-	float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
-	payload.color += calculateIndirectLighting(payload.randSeed, hitPoint, albedo, F0, N, V, roughness, metallic, payload.recursion);
+	payload.color = surface.emission;
+	payload.color += calculateIndirectLighting(payload.randSeed, surface, payload.recursion);
 
 
 	if (constants.enableDirectLighting)
 	{
 		// Sun light.
-		float3 sunDirection = normalize(float3(-0.6f, -1.f, -0.3f));
-		float3 sunRadiance = float3(1.f, 0.93f, 0.76f) * constants.lightIntensityScale * 2.f;
+		{
+			float3 sunL = -normalize(float3(-0.6f, -1.f, -0.3f));
+			float3 sunRadiance = float3(1.f, 0.93f, 0.76f) * constants.lightIntensityScale * 2.f;
 
-		payload.color +=
-			calculateDirectLighting(albedo, sunRadiance, N, -sunDirection, V, F0, roughness, metallic)
-			* traceShadowRay(hitPoint, -sunDirection, 10000.f, payload.recursion);
+			light_info light;
+			light.initialize(surface, sunL, sunRadiance);
+
+			payload.color +=
+				calculateDirectLighting(surface, light)
+				* traceShadowRay(surface.P, sunL, 10000.f, payload.recursion);
+		}
 
 
 
 		// Random point light.
-		uint lightIndex = min(uint(NUM_LIGHTS * nextRand(payload.randSeed)), NUM_LIGHTS - 1);
-
-		float pointLightRadius = constants.pointLightRadius;
-		float3 randomPointOnLight = pointLights[lightIndex].position + getRandomPointOnSphere(payload.randSeed, pointLightRadius);
-
-		float3 pointLightL = randomPointOnLight - hitPoint;
-		float distance = length(pointLightL);
-		pointLightL /= distance;
-
-		float pointLightVisibility = traceShadowRay(hitPoint, pointLightL, distance, payload.recursion);
-		float pointLightSolidAngle = solidAngleOfSphere(pointLightRadius, distance) * 0.5f; // Divide by 2, since we are only interested in hemisphere.
-		float3 pointLightColor =
-			calculateDirectLighting(albedo, pointLights[lightIndex].radiance * LIGHT_RADIANCE_SCALE * constants.lightIntensityScale, N, pointLightL, V, F0, roughness, metallic)
-			* getAttenuation(distance, pointLights[lightIndex].radius)
-			* pointLightVisibility;
-
-
-
-		//if (DispatchRaysIndex().x < DispatchRaysDimensions().x / 2)
-		if (constants.multipleImportanceSampling)
 		{
-			// Multiple importance sampling. At least if I've done this correctly. See http://www.cs.uu.nl/docs/vakken/magr/2015-2016/slides/lecture%2008%20-%20variance%20reduction.pdf, slide 50.
-			float lightPDF = 1.f / (pointLightSolidAngle * NUM_LIGHTS); // Correct for PDFs, see comment below.
+			uint lightIndex = min(uint(NUM_LIGHTS * nextRand(payload.randSeed)), NUM_LIGHTS - 1);
 
-			// Lambertian part.
-			float diffusePDF = dot(N, pointLightL) * invPI; // Cosine-distributed for Lambertian BRDF.
+			light_info light;
+			light.initializeFromRandomPointOnSphereLight(surface, pointLights[lightIndex], constants.pointLightRadius, payload.randSeed);
 
-			// Specular part.
-			float3 H = normalize(V + pointLightL);
-			float NdotH = saturate(dot(N, H));
-			float LdotH = saturate(dot(pointLightL, H));
-			float NDF = distributionGGX(NdotH, roughness);
-			float specularPDF = max(NDF * NdotH / (4.f * LdotH), 0.01f);
+			float pointLightVisibility = traceShadowRay(surface.P, light.L, light.distanceToLight, payload.recursion);
 
-			float probDiffuse = probabilityToSampleDiffuse(roughness);
+			float3 pointLightColor =
+				calculateDirectLighting(surface, light)
+				* pointLightVisibility;
 
-			// Total BRDF PDF. This is the probability that we had randomly hit this direction using our brdf importance sampling.
-			float brdfPDF = lerp(specularPDF, diffusePDF, probDiffuse);
+			float pointLightSolidAngle = solidAngleOfSphere(constants.pointLightRadius, light.distanceToLight) * 0.5f; // Divide by 2, since we are only interested in hemisphere.
+			if (constants.multipleImportanceSampling)
+			{
+				// Multiple importance sampling. At least if I've done this correctly. See http://www.cs.uu.nl/docs/vakken/magr/2015-2016/slides/lecture%2008%20-%20variance%20reduction.pdf, slide 50.
+				float lightPDF = 1.f / (pointLightSolidAngle * NUM_LIGHTS); // Correct for PDFs, see comment below.
 
-			// Blend PDFs.
-			float t = lightPDF / (lightPDF + brdfPDF);
-			float misPDF = lerp(brdfPDF, lightPDF, t); // Balance heuristic.
+				// Lambertian part.
+				float diffusePDF = dot(surface.N, light.L) * invPI; // Cosine-distributed for Lambertian BRDF.
 
-			pointLightColor /= misPDF;
+				// Specular part.
+				float D = distributionGGX(surface, light);
+				float specularPDF = max(D * light.NdotH / (4.f * light.LdotH), 0.01f);
+
+				float probDiffuse = probabilityToSampleDiffuse(surface.roughness);
+
+				// Total BRDF PDF. This is the probability that we had randomly hit this direction using our brdf importance sampling.
+				float brdfPDF = lerp(specularPDF, diffusePDF, probDiffuse);
+
+				// Blend PDFs.
+				float t = lightPDF / (lightPDF + brdfPDF);
+				float misPDF = lerp(brdfPDF, lightPDF, t); // Balance heuristic.
+
+				pointLightColor /= misPDF;
+			}
+			else
+			{
+				pointLightColor = pointLightColor
+					* NUM_LIGHTS			 // Correct for probability of choosing this particular light.
+					* pointLightSolidAngle;  // Correct for probability of "randomly" hitting this light. I *think* this is correct. See https://github.com/NVIDIA/Q2RTX/blob/master/src/refresh/vkpt/shader/light_lists.h#L295.
+			}
+
+			payload.color += pointLightColor;
 		}
-		else
-		{
-			pointLightColor = pointLightColor
-				* NUM_LIGHTS			 // Correct for probability of choosing this particular light.
-				* pointLightSolidAngle;  // Correct for probability of "randomly" hitting this light. I *think* this is correct. See https://github.com/NVIDIA/Q2RTX/blob/master/src/refresh/vkpt/shader/light_lists.h#L295.
-		}
-
-		payload.color += pointLightColor;
 	}
 }
 
