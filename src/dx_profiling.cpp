@@ -3,13 +3,15 @@
 #include "imgui.h"
 #include "math.h"
 
+
+bool profilerWindowOpen = false;
+
 #if ENABLE_DX_PROFILING
 
 #include <algorithm>
 #include <fontawesome/IconsFontAwesome5.h>
 
 dx_profile_event profileEvents[NUM_BUFFERED_FRAMES][MAX_NUM_DX_PROFILE_EVENTS];
-bool profilerWindowOpen = false;
 
 struct dx_profile_block
 {

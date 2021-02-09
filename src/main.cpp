@@ -175,7 +175,7 @@ static bool drawMainMenuBar(application& app)
 				showDemoWindow = true;
 			}
 
-			if (ImGui::MenuItem(profilerWindowOpen ? (ICON_FA_CHART_BAR "  Hide GPU profiler") : (ICON_FA_CHART_BAR "  Show GPU profiler")))
+			if (ImGui::MenuItem(profilerWindowOpen ? (ICON_FA_CHART_BAR "  Hide GPU profiler") : (ICON_FA_CHART_BAR "  Show GPU profiler"), nullptr, nullptr, ENABLE_DX_PROFILING))
 			{
 				profilerWindowOpen = !profilerWindowOpen;
 			}

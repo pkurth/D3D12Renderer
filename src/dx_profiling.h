@@ -3,6 +3,7 @@
 #include "dx_command_list.h"
 #include "threading.h"
 
+extern bool profilerWindowOpen;
 #if ENABLE_DX_PROFILING
 
 #define COMPOSITE_VARNAME_(a, b) a##b
@@ -39,7 +40,6 @@ struct dx_profile_event
 };
 
 extern dx_profile_event profileEvents[NUM_BUFFERED_FRAMES][MAX_NUM_DX_PROFILE_EVENTS];
-extern bool profilerWindowOpen;
 
 struct dx_profile_block_recorder
 {
