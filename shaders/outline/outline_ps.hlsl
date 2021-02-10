@@ -18,7 +18,7 @@ static uint sampleAt(int2 texCoords)
 	uint result = 1;
 	if (texCoords.x >= 0 && texCoords.y >= 0 && texCoords.x < outline.width && texCoords.y < outline.height)
 	{
-		result = (stencil.Load(int3(texCoords, 0)).y & selected) != 0;
+		result = (stencil[texCoords].y & selected) != 0;
 	}
 	return result;
 }

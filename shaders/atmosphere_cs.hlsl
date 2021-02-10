@@ -119,7 +119,7 @@ void main(cs_input IN)
 		return;
 	}
 
-	float depth = depthBuffer.Load(uint3(texCoord, 0));
+	float depth = depthBuffer[texCoord];
 
 	float2 screenUV = texCoord * camera.invScreenDims;
 
