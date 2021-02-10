@@ -36,9 +36,6 @@ struct raytrace_component
 	raytracing_object_type type;
 };
 
-static ref<dx_buffer> pointLightBuffer[NUM_BUFFERED_FRAMES];
-static ref<dx_buffer> spotLightBuffer[NUM_BUFFERED_FRAMES];
-
 static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh, path_tracer& pathTracer)
 {
 	if (dxContext.raytracingSupported)
@@ -215,6 +212,43 @@ void application::initialize(dx_renderer* renderer)
 		0 // Shadow info index.
 	};
 
+	decals.resize(64);
+
+	for (uint32 i = 0; i < decals.size(); ++i)
+	{
+		decals[i] =
+		{
+			vec3(-4.f + i * 0.1f, 2.f, 0.f),
+			packColor(vec4(randomRGB(rng), 1.f)),
+			vec3(1.f, 0.f, 0.f),
+			packRoughnessAndMetallic(1.f, 1.f),
+			vec3(0.f, 1.f, 0.f),
+			0,
+			vec3(0.f, 0.f, -5.f),
+		};
+	}
+	/*decals[0] =
+	{
+		vec3(0.f, 2.f, 0.f),
+		packColor(vec4(1.f, 0.f, 0.f, 0.5f)),
+		vec3(1.f, 0.f, 0.f),
+		packRoughnessAndMetallic(1.f, 1.f),
+		vec3(0.f, 1.f, 0.f),
+		0,
+		vec3(0.f, 0.f, -5.f),
+	};
+
+	decals[1] =
+	{
+		vec3(0.5f, 2.f, 0.f),
+		packColor(vec4(0.f, 1.f, 0.f, 0.5f)),
+		vec3(1.f, 0.f, 0.f),
+		packRoughnessAndMetallic(1.f, 1.f),
+		vec3(0.f, 2.f, 0.f),
+		0,
+		vec3(0.f, 0.f, -5.f),
+	};*/
+
 
 	sun.direction = normalize(vec3(-0.6f, -1.f, -0.3f));
 	sun.color = vec3(1.f, 0.93f, 0.76f);
@@ -230,9 +264,11 @@ void application::initialize(dx_renderer* renderer)
 	{
 		pointLightBuffer[i] = createUploadBuffer(sizeof(point_light_cb), 512, 0);
 		spotLightBuffer[i] = createUploadBuffer(sizeof(spot_light_cb), 512, 0);
+		decalBuffer[i] = createUploadBuffer(sizeof(decal_cb), 512, 0);
 
 		SET_NAME(pointLightBuffer[i]->resource, "Point lights");
 		SET_NAME(spotLightBuffer[i]->resource, "Spot lights");
+		SET_NAME(decalBuffer[i]->resource, "Decals");
 	}
 }
 
@@ -712,6 +748,11 @@ void application::update(const user_input& input, float dt)
 		{
 			updateUploadBufferData(spotLightBuffer[dxContext.bufferedFrameID], spotLights.data(), (uint32)(sizeof(spot_light_cb) * spotLights.size()));
 			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], (uint32)spotLights.size());
+		}
+		if (decals.size())
+		{
+			updateUploadBufferData(decalBuffer[dxContext.bufferedFrameID], decals.data(), (uint32)(sizeof(decal_cb) * decals.size()));
+			renderer->setDecals(decalBuffer[dxContext.bufferedFrameID], (uint32)decals.size());
 		}
 
 		thread_job_context context;

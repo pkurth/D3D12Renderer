@@ -46,8 +46,13 @@ private:
 	ref<pbr_environment> environment;
 
 
+	ref<dx_buffer> pointLightBuffer[NUM_BUFFERED_FRAMES];
+	ref<dx_buffer> spotLightBuffer[NUM_BUFFERED_FRAMES];
+	ref<dx_buffer> decalBuffer[NUM_BUFFERED_FRAMES];
+
 	std::vector<point_light_cb> pointLights;
 	std::vector<spot_light_cb> spotLights;
+	std::vector<decal_cb> decals;
 
 	directional_light sun;
 

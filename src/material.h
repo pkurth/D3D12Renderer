@@ -14,10 +14,11 @@ struct common_material_info
 	ref<dx_texture> brdf;
 
 	ref<dx_texture> tiledCullingGrid;
-	ref<dx_buffer> tiledPointLightIndexList;
+	ref<dx_buffer> tiledObjectsIndexList;
 	ref<dx_buffer> tiledSpotLightIndexList;
 	ref<dx_buffer> pointLightBuffer;
 	ref<dx_buffer> spotLightBuffer;
+	ref<dx_buffer> decalBuffer;
 	ref<dx_buffer> pointLightShadowInfoBuffer;
 	ref<dx_buffer> spotLightShadowInfoBuffer;
 

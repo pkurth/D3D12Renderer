@@ -38,11 +38,11 @@ TextureCube<float4> environmentTexture					: register(t1, space2);
 
 Texture2D<float4> brdf									: register(t2, space2);
 
-Texture2D<uint4> tiledCullingGrid						: register(t3, space2);
-StructuredBuffer<uint> tiledPointLightIndexList			: register(t4, space2);
-StructuredBuffer<uint> tiledSpotLightIndexList			: register(t5, space2);
-StructuredBuffer<point_light_cb> pointLights			: register(t6, space2);
-StructuredBuffer<spot_light_cb> spotLights				: register(t7, space2);
+Texture2D<uint2> tiledCullingGrid						: register(t3, space2);
+StructuredBuffer<uint> tiledObjectsIndexList			: register(t4, space2);
+StructuredBuffer<point_light_cb> pointLights			: register(t5, space2);
+StructuredBuffer<spot_light_cb> spotLights				: register(t6, space2);
+StructuredBuffer<decal_cb> decals						: register(t7, space2);
 Texture2D<float> shadowMap								: register(t8, space2);
 StructuredBuffer<point_shadow_info> pointShadowInfos	: register(t9, space2);
 StructuredBuffer<spot_shadow_info> spotShadowInfos		: register(t10, space2);
@@ -96,23 +96,55 @@ ps_output main(ps_input IN)
 	float4 totalLighting = float4(surface.emission, surface.albedo.w);
 
 
-	// Point and spot lights.
+	// Tiled lighting.
 	{
-		const uint2 tileIndex = uint2(floor(IN.screenPosition.xy / LIGHT_CULLING_TILE_SIZE));
-		const uint4 tiledIndexData = tiledCullingGrid.Load(int3(tileIndex, 0));
+		const uint2 tileIndex = uint2(IN.screenPosition.xy / LIGHT_CULLING_TILE_SIZE);
+		const uint2 tiledIndexData = tiledCullingGrid[tileIndex];
 
-		const uint pointLightOffset = tiledIndexData.x >> 16;
-		const uint pointLightCount = tiledIndexData.x & 0xFFFF;
+		const uint pointLightCount = (tiledIndexData.y >> 20) & 0x3FF;
+		const uint spotLightCount = (tiledIndexData.y >> 10) & 0x3FF;
+		const uint decalCount = (tiledIndexData.y >> 0) & 0x3FF;
 
-		const uint spotLightOffset = tiledIndexData.y >> 16;
-		const uint spotLightCount = tiledIndexData.y & 0xFFFF;
+		uint readIndex = tiledIndexData.x; // Offset.
 
+		float4 decalAlbedoAccum = (float4)0.f;
 
+		// Decals.
+		for (uint i = 0; i < decalCount; ++i)
+		{
+			decal_cb decal = decals[tiledObjectsIndexList[readIndex++]];
+
+			float3 offset = surface.P - decal.position;
+			float3 local = float3(
+				dot(decal.right, offset) / (dot(decal.right, decal.right)),
+				dot(decal.up, offset) / (dot(decal.up, decal.up)),
+				dot(decal.forward, offset) / (dot(decal.forward, decal.forward))
+			);
+
+			if (all(local >= -1.f && local <= 1.f) && dot(surface.N, decal.forward) <= 0.f)
+			{
+				float2 uv = local.xy * 0.5f + 0.5f;
+				float4 decalAlbedo = unpackColor(decal.albedoTint); // TODO: Sample texture.
+
+				surface.albedo = decalAlbedo;
+
+				/*decalAlbedoAccum.rgb = (1 - decalAlbedoAccum.a) * (decalAlbedo.a * decalAlbedo.rgb) + decalAlbedoAccum.rgb;
+				decalAlbedoAccum.a = decalAlbedo.a + (1 - decalAlbedo.a) * decalAccumulation.a;
+				[branch]
+				if (decalAlbedoAccum.a >= 1.f)
+				{
+					break;
+				}*/
+
+			}
+		}
+
+		// TODO: Infer remaining surface properties here.
 
 		// Point lights.
-		for (uint lightIndex = pointLightOffset; lightIndex < pointLightOffset + pointLightCount; ++lightIndex)
+		for (i = 0; i < pointLightCount; ++i)
 		{
-			point_light_cb pl = pointLights[tiledPointLightIndexList[lightIndex]];
+			point_light_cb pl = pointLights[tiledObjectsIndexList[readIndex++]];
 
 			light_info light;
 			light.initializeFromPointLight(surface, pl);
@@ -139,9 +171,9 @@ ps_output main(ps_input IN)
 		}
 
 		// Spot lights.
-		for (lightIndex = spotLightOffset; lightIndex < spotLightOffset + spotLightCount; ++lightIndex)
+		for (i = 0; i < spotLightCount; ++i)
 		{
-			spot_light_cb sl = spotLights[tiledSpotLightIndexList[lightIndex]];
+			spot_light_cb sl = spotLights[tiledObjectsIndexList[readIndex++]];
 
 			light_info light;
 			light.initializeFromSpotLight(surface, sl);

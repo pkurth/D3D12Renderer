@@ -93,6 +93,7 @@ struct dx_renderer
 
 	void setPointLights(const ref<dx_buffer>& lights, uint32 numLights);
 	void setSpotLights(const ref<dx_buffer>& lights, uint32 numLights);
+	void setDecals(const ref<dx_buffer>& decals, uint32 numDecals);
 
 	void submitRenderPass(opaque_render_pass* renderPass)
 	{
@@ -205,8 +206,10 @@ private:
 	ref<pbr_environment> environment;
 	ref<dx_buffer> pointLights;
 	ref<dx_buffer> spotLights;
+	ref<dx_buffer> decals;
 	uint32 numPointLights;
 	uint32 numSpotLights;
+	uint32 numDecals;
 
 	camera_cb camera;
 	directional_light_cb sun;
@@ -217,11 +220,9 @@ private:
 	ref<dx_buffer> tiledWorldSpaceFrustaBuffer;
 
 	ref<dx_buffer> tiledCullingIndexCounter;
-	ref<dx_buffer> tiledPointLightIndexList;
-	ref<dx_buffer> tiledSpotLightIndexList;
+	ref<dx_buffer> tiledObjectsIndexList;
 
-	// DXGI_FORMAT_R32G32B32A32_UINT. Each channel contains the offset and the count in the format (offset << 16 | count). The texture currently contains point lights (x) and spot lights (x).
-	// In the future it will also contain lights for transparent geometry and decals.
+	// DXGI_FORMAT_R32G32_UINT. The R channel contains the offset into tiledObjectsIndexList. The G channel contains the number of point lights, spot lights and decals in 10 bit each.
 	ref<dx_texture> tiledCullingGrid;
 
 	uint32 numCullingTilesX;
