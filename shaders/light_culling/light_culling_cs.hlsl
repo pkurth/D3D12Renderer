@@ -32,6 +32,7 @@ groupshared uint groupObjectsStartOffset;
 groupshared uint groupObjectsList[TOTAL_GROUP_LIST_SIZE];
 groupshared uint groupObjectsCount;
 
+// MAX_NUM_DECALS_PER_TILE must equal GROUP_SIZE
 groupshared uint groupE[MAX_NUM_DECALS_PER_TILE];
 groupshared uint groupF[MAX_NUM_DECALS_PER_TILE];
 groupshared uint groupTotalFalses;
@@ -161,9 +162,10 @@ static void groupAppendObject(uint index)
 }
 
 // This assumes that the decal indices are first in the group memory (which is the case).
+// Adapted from here: https://github.com/jakemco/gpu-radix-sort/blob/master/RadixSort.hlsl
 static void sortDecalIndices(uint numDecals, uint groupIndex)
 {
-    const uint numBits = firstbithigh(highestDecalIndex);
+    const uint numBits = 32;// firstbithigh(highestDecalIndex); // This was intended as an optimization. For reasons I am too lazy to investigate right now, this causes a crash.
 
     //[unroll(32)]
     for (int n = 0; n < numBits; ++n)
@@ -190,12 +192,11 @@ static void sortDecalIndices(uint numDecals, uint groupIndex)
             GroupMemoryBarrierWithGroupSync();
             groupF[groupIndex] = t;
             GroupMemoryBarrierWithGroupSync();
-
         }
 
         if (groupIndex == 0) 
         {
-            groupTotalFalses = groupE[numDecals - 1] + groupF[numDecals - 1];
+            groupTotalFalses = groupE[GROUP_SIZE - 1] + groupF[GROUP_SIZE - 1];
         }
 
         GroupMemoryBarrierWithGroupSync();
@@ -261,7 +262,7 @@ void main(cs_input IN)
         if (decalInsideFrustum(d, groupFrustum, nearPlane, farPlane))
         {
             groupAppendObject(i);
-            highestDecalIndex = InterlockedMax(highestDecalIndex, i);
+            InterlockedMax(highestDecalIndex, i);
         }
     }
 
