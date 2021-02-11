@@ -48,6 +48,7 @@ static std::pair<dx_adapter, D3D_FEATURE_LEVEL> getAdapter(dx_factory factory, D
 {
 	com<IDXGIAdapter1> dxgiAdapter1;
 	dx_adapter dxgiAdapter;
+	DXGI_ADAPTER_DESC1 desc;
 
 	D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_9_1;
 
@@ -103,9 +104,12 @@ static std::pair<dx_adapter, D3D_FEATURE_LEVEL> getAdapter(dx_factory factory, D
 				checkResult(dxgiAdapter1.As(&dxgiAdapter));
 				maxDedicatedVideoMemory = dxgiAdapterDesc1.DedicatedVideoMemory;
 				featureLevel = adapterFeatureLevel;
+				desc = dxgiAdapterDesc1;
 			}
 		}
 	}
+
+	printf("Using GPU: %ls\n", desc.Description);
 
 	return { dxgiAdapter, featureLevel };
 }
