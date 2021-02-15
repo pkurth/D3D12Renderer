@@ -477,6 +477,13 @@ void dx_command_list::drawFullscreenTriangle()
 	draw(3, 1, 0, 0);
 }
 
+void dx_command_list::drawCubeTriangleStrip()
+{
+	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
+	setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+	draw(14, 1, 0, 0);
+}
+
 void dx_command_list::dispatch(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ)
 {
 	dynamicDescriptorHeap.commitStagedDescriptorsForDispatch(this);

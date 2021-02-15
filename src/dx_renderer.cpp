@@ -56,12 +56,6 @@ static dx_pipeline tonemapPipeline;
 static dx_pipeline presentPipeline;
 
 
-static dx_mesh positionOnlyMesh;
-
-static submesh_info cubeMesh;
-
-
-
 static ref<dx_texture> brdfTex;
 
 
@@ -115,7 +109,6 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	// Sky.
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
-			.inputLayout(inputLayout_position)
 			.renderTargets(skyPassFormats, arraysize(skyPassFormats), hdrDepthStencilFormat)
 			.depthSettings(true, false)
 			.cullFrontFaces();
@@ -212,13 +205,6 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 	createAllPendingReloadablePipelines();
 
-
-
-	{
-		cpu_mesh mesh(mesh_creation_flags_with_positions);
-		cubeMesh = mesh.pushCube(1.f);
-		positionOnlyMesh = mesh.createDXMesh();
-	}
 
 	{
 		dx_command_list* cl = dxContext.getFreeRenderCommandList();
@@ -1041,9 +1027,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
 				cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment->sky->defaultSRV);
 
-				cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
-				cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
-				cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
+				cl->drawCubeTriangleStrip();
 			}
 			else
 			{
@@ -1053,10 +1037,10 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
 				cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
 
-				cl->setVertexBuffer(0, positionOnlyMesh.vertexBuffer);
-				cl->setIndexBuffer(positionOnlyMesh.indexBuffer);
-				cl->drawIndexed(cubeMesh.numTriangles * 3, 1, cubeMesh.firstTriangle * 3, cubeMesh.baseVertex, 0);
+				cl->drawCubeTriangleStrip();
 			}
+
+			cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // Cube renders a triangle strip, so reset back to triangle list.
 		}
 
 
@@ -1180,7 +1164,7 @@ void dx_renderer::endFrame(const user_input& input)
 		{
 			DX_PROFILE_BLOCK(cl, "3D Overlays");
 
-			cl->clearDepth(depthStencilBuffer->dsvHandle);
+			cl->clearDepth(depthStencilBuffer->dsvHandle); // TODO: This messes up the post processing. Maybe render the 3D overlays in LDR after all post processing?
 
 			material_setup_function lastSetupFunc = 0;
 

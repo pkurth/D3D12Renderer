@@ -163,6 +163,7 @@ struct dx_command_list
 	void drawIndirect(dx_command_signature commandSignature, uint32 numDraws, const ref<dx_buffer>& commandBuffer);
 	void drawIndirect(dx_command_signature commandSignature, uint32 maxNumDraws, const ref<dx_buffer>& numDrawsBuffer, const ref<dx_buffer>& commandBuffer);
 	void drawFullscreenTriangle();
+	void drawCubeTriangleStrip();
 
 
 	// Dispatch.
