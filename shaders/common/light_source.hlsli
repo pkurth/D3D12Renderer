@@ -85,14 +85,13 @@ static int packInnerAndOuterCutoff(float innerCutoff, float outerCutoff)
 struct decal_cb
 {
 	vec3 position;
-	uint32 albedoTint;  // RGBA packed into one uint32.
-	vec3 right;			// Scaled by half dimension.
+	uint32 albedoTint;			// RGBA packed into one uint32.
+	vec3 right;					// Scaled by half dimension.
 	uint32 roughnessOverride_metallicOverride;
-	vec3 up;			// Scaled by half dimension.
-	uint32 textureIndex;
-	vec3 forward;		// Scaled by half dimension.
-
-	uint32 padding;
+	vec3 up;					// Scaled by half dimension.
+	uint32 viewportXY;			// Top left corner packed into 16 bits each.
+	vec3 forward;				// Scaled by half dimension.
+	uint32 viewportWidthHeight; // Width and height packed into 16 bits each.
 };
 
 #ifdef HLSL

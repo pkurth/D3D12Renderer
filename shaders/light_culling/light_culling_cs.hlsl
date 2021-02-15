@@ -3,8 +3,15 @@
 #include "light_culling_rs.hlsli"
 #include "light_source.hlsli"
 
-#define BLOCK_SIZE 16
-#define GROUP_SIZE (BLOCK_SIZE * BLOCK_SIZE)
+/*
+    This shader culls lights and decals against screen space tiles.
+    The emitted indices are handled differently for lights and decals.
+
+    - For lights we simply write a dense list of indices per tile.
+    - For decals we output a bit mask, where a 1 means that this decal influences this surface point. This limits the total number of decals per frame, but this way we don't need
+      a sorting step, to properly draw the decals.
+*/
+
 
 ConstantBuffer<camera_cb> camera	                : register(b0);
 ConstantBuffer<light_culling_cb> cb	                : register(b1);
@@ -28,15 +35,8 @@ groupshared light_culling_view_frustum groupFrustum;
 
 groupshared uint groupObjectsStartOffset;
 
-#define TOTAL_GROUP_LIST_SIZE (MAX_NUM_LIGHTS_PER_TILE + MAX_NUM_DECALS_PER_TILE)
-groupshared uint groupObjectsList[TOTAL_GROUP_LIST_SIZE];
-groupshared uint groupObjectsCount;
-
-// MAX_NUM_DECALS_PER_TILE must equal GROUP_SIZE
-groupshared uint groupE[MAX_NUM_DECALS_PER_TILE];
-groupshared uint groupF[MAX_NUM_DECALS_PER_TILE];
-groupshared uint groupTotalFalses;
-groupshared uint highestDecalIndex;
+groupshared uint groupObjectsList[MAX_NUM_INDICES_PER_TILE];
+groupshared uint groupLightCount;
 
 
 struct spot_light_bounding_volume
@@ -151,90 +151,64 @@ static bool decalInsideFrustum(decal_cb decal, light_culling_view_frustum frustu
     return result;
 }
 
-static void groupAppendObject(uint index)
+static void groupAppendLight(uint index)
 {
     uint i;
-    InterlockedAdd(groupObjectsCount, 1, i);
-    if (i < TOTAL_GROUP_LIST_SIZE)
+    InterlockedAdd(groupLightCount, 1, i);
+    if (i < MAX_NUM_LIGHTS_PER_TILE)
     {
-        groupObjectsList[i] = index;
+        groupObjectsList[TILE_LIGHT_OFFSET + i] = index;
     }
 }
 
-// This assumes that the decal indices are first in the group memory (which is the case).
-// Adapted from here: https://github.com/jakemco/gpu-radix-sort/blob/master/RadixSort.hlsl
-static void sortDecalIndices(uint numDecals, uint groupIndex)
+static void groupAppendDecal(uint index)
 {
-    const uint numBits = 32;// firstbithigh(highestDecalIndex); // This was intended as an optimization. For reasons I am too lazy to investigate right now, this causes a crash.
+#if 1
+    index = MAX_NUM_TOTAL_DECALS - index - 1;   // This way the first set bit corresponds to the front-most decal. We render the decals front to back, such that we can early exit when alpha >= 1.
+#endif
 
-    //[unroll(32)]
-    for (int n = 0; n < numBits; ++n)
-    {
-        // Elements which have a 1 in the E-array will be put first. Therefore we write a 1 for each valid element (index valid), whose bit is a 0.
-        groupE[groupIndex] = (groupIndex < numDecals)
-            && ((groupObjectsList[groupIndex] >> n) == 0);
+    const uint bucket = index >> 5;             // Divide by 32.
+    const uint bit = index & ((1 << 5) - 1);    // Modulo 32.
+    InterlockedOr(groupObjectsList[bucket], 1 << bit);
 
-        GroupMemoryBarrierWithGroupSync();
-
-        groupF[groupIndex] = (groupIndex != 0) 
-            ? groupE[groupIndex - 1] 
-            : 0;
-
-        GroupMemoryBarrierWithGroupSync();
-
-        // Prefix sum -> How many zeros are before me?
-        for (uint i = 1; i < GROUP_SIZE; i <<= 1)
-        {
-            uint t = (groupIndex > i) 
-                ? (groupF[groupIndex] + groupF[groupIndex - i]) 
-                : groupF[groupIndex];
-            
-            GroupMemoryBarrierWithGroupSync();
-            groupF[groupIndex] = t;
-            GroupMemoryBarrierWithGroupSync();
-        }
-
-        if (groupIndex == 0) 
-        {
-            groupTotalFalses = groupE[GROUP_SIZE - 1] + groupF[GROUP_SIZE - 1];
-        }
-
-        GroupMemoryBarrierWithGroupSync();
-
-        uint destination = groupE[groupIndex] 
-            ? groupF[groupIndex] 
-            : (groupIndex - groupF[groupIndex] + groupTotalFalses);
-
-        uint temp = groupObjectsList[groupIndex];
-
-        GroupMemoryBarrierWithGroupSync();
-
-        groupObjectsList[destination] = temp;
-
-        GroupMemoryBarrierWithGroupSync();
-    }
 }
 
 [RootSignature(LIGHT_CULLING_RS)]
-[numthreads(BLOCK_SIZE, BLOCK_SIZE, 1)]
+[numthreads(LIGHT_CULLING_TILE_SIZE, LIGHT_CULLING_TILE_SIZE, 1)]
 void main(cs_input IN)
 {
-    float fDepth = depthBuffer[IN.dispatchThreadID.xy];
-    // Since the depth is between 0 and 1, we can perform min and max operations on the bit pattern as uint. This is because native HLSL does not support floating point atomics.
-    uint uDepth = asuint(fDepth);
+    uint i;
 
+    // Initialize.
     if (IN.groupIndex == 0)
     {
         groupMinDepth = asuint(0.9999999f);
         groupMaxDepth = 0;
 
-        groupObjectsCount = 0;
-        highestDecalIndex = 0;
+        groupLightCount = 0;
 
         groupFrustum = frusta[IN.groupID.y * cb.numThreadGroupsX + IN.groupID.x];
     }
 
+    // Initialize decal masks to zero.
+    for (i = IN.groupIndex; i < NUM_DECAL_BUCKETS; i += LIGHT_CULLING_TILE_SIZE * LIGHT_CULLING_TILE_SIZE)
+    {
+        groupObjectsList[i] = 0;
+    }
+
+
     GroupMemoryBarrierWithGroupSync();
+
+
+
+
+    // Determine minimum and maximum depth.
+    uint2 screenSize;
+    depthBuffer.GetDimensions(screenSize.x, screenSize.y);
+
+    float fDepth = depthBuffer[min(IN.dispatchThreadID.xy, screenSize - 1)];
+    // Since the depth is between 0 and 1, we can perform min and max operations on the bit pattern as uint. This is because native HLSL does not support floating point atomics.
+    uint uDepth = asuint(fDepth);
 
     InterlockedMin(groupMinDepth, uDepth);
     InterlockedMax(groupMaxDepth, uDepth);
@@ -250,76 +224,69 @@ void main(cs_input IN)
     float nearZ = depthBufferDepthToEyeDepth(minDepth, camera.projectionParams); // Positive.
     float farZ  = depthBufferDepthToEyeDepth(maxDepth, camera.projectionParams); // Positive.
 
-    light_culling_frustum_plane cameraNearPlane = { forward, dot(forward, cameraPos + camera.projectionParams.x * forward) };
-    light_culling_frustum_plane nearPlane = { forward, dot(forward, cameraPos + nearZ * forward) };
-    light_culling_frustum_plane farPlane = { -forward, -dot(forward, cameraPos + farZ * forward) };
+    light_culling_frustum_plane cameraNearPlane = {  forward,  dot(forward, cameraPos + camera.projectionParams.x * forward) };
+    light_culling_frustum_plane nearPlane       = {  forward,  dot(forward, cameraPos + nearZ * forward) };
+    light_culling_frustum_plane farPlane        = { -forward, -dot(forward, cameraPos + farZ  * forward) };
+
+
+
 
     // Decals.
     const uint numDecals = cb.numDecals;
-    for (uint i = IN.groupIndex; i < numDecals; i += BLOCK_SIZE * BLOCK_SIZE)
+    for (i = IN.groupIndex; i < numDecals; i += LIGHT_CULLING_TILE_SIZE * LIGHT_CULLING_TILE_SIZE)
     {
         decal_cb d = decals[i];
         if (decalInsideFrustum(d, groupFrustum, nearPlane, farPlane))
         {
-            groupAppendObject(i);
-            InterlockedMax(highestDecalIndex, i);
+            groupAppendDecal(i);
         }
-    }
-
-    GroupMemoryBarrierWithGroupSync();
-    const uint numTileDecals = groupObjectsCount;
-
-    [branch]
-    if (numTileDecals)
-    {
-        sortDecalIndices(numTileDecals, IN.groupIndex);
     }
 
 
     // Point lights.
     const uint numPointLights = cb.numPointLights;
-    for (i = IN.groupIndex; i < numPointLights; i += BLOCK_SIZE * BLOCK_SIZE)
+    for (i = IN.groupIndex; i < numPointLights; i += LIGHT_CULLING_TILE_SIZE * LIGHT_CULLING_TILE_SIZE)
     {
         point_light_cb pl = pointLights[i];
         if (pointLightInsideFrustum(pl, groupFrustum, nearPlane, farPlane))
         {
-            groupAppendObject(i);
+            groupAppendLight(i);
         }
     }
 
     GroupMemoryBarrierWithGroupSync();
-    const uint numTilePointLights = groupObjectsCount - numTileDecals;
+    const uint numTilePointLights = groupLightCount;
 
     // Spot lights.
     const uint numSpotLights = cb.numSpotLights;
-    for (i = IN.groupIndex; i < numSpotLights; i += BLOCK_SIZE * BLOCK_SIZE)
+    for (i = IN.groupIndex; i < numSpotLights; i += LIGHT_CULLING_TILE_SIZE * LIGHT_CULLING_TILE_SIZE)
     {
         spot_light_bounding_volume sl = getSpotLightBoundingVolume(spotLights[i]);
         if (spotLightInsideFrustum(sl, groupFrustum, nearPlane, farPlane))
         {
-            groupAppendObject(i);
+            groupAppendLight(i);
         }
     }
 
     GroupMemoryBarrierWithGroupSync();
-    const uint numTileSpotLights = groupObjectsCount - numTileDecals - numTilePointLights;
+    const uint numTileSpotLights = groupLightCount - numTilePointLights;
 
 
+    const uint totalIndexCount = groupLightCount + NUM_DECAL_BUCKETS;
     if (IN.groupIndex == 0)
     {
-        InterlockedAdd(tiledCullingIndexCounter[0], groupObjectsCount, groupObjectsStartOffset);
+        InterlockedAdd(tiledCullingIndexCounter[0], totalIndexCount, groupObjectsStartOffset);
 
         tiledCullingGrid[IN.groupID.xy] = uint2(
             groupObjectsStartOffset,
-            (numTilePointLights << 20) | (numTileSpotLights << 10) | (numTileDecals << 0)
+            (numTilePointLights << 20) | (numTileSpotLights << 10)
         );
     }
 
     GroupMemoryBarrierWithGroupSync();
 
     const uint offset = groupObjectsStartOffset;
-    const uint count = groupObjectsCount;
-    for (i = IN.groupIndex; i < count; i += BLOCK_SIZE * BLOCK_SIZE)
+    for (i = IN.groupIndex; i < totalIndexCount; i += LIGHT_CULLING_TILE_SIZE * LIGHT_CULLING_TILE_SIZE)
     {
         tiledObjectsIndexList[offset + i] = groupObjectsList[i];
     }

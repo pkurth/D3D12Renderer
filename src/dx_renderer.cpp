@@ -404,13 +404,13 @@ void dx_renderer::allocateLightCullingBuffers()
 
 		tiledCullingIndexCounter = createBuffer(sizeof(uint32), 1, 0, true, true);
 		tiledObjectsIndexList = createBuffer(sizeof(uint16),
-			numCullingTilesX * numCullingTilesY * (MAX_NUM_LIGHTS_PER_TILE + MAX_NUM_DECALS_PER_TILE), 0, true);
+			numCullingTilesX * numCullingTilesY * MAX_NUM_INDICES_PER_TILE, 0, true);
 		tiledWorldSpaceFrustaBuffer = createBuffer(sizeof(light_culling_view_frustum), numCullingTilesX * numCullingTilesY, 0, true);
 	}
 	else
 	{
 		resizeTexture(tiledCullingGrid, numCullingTilesX, numCullingTilesY);
-		resizeBuffer(tiledObjectsIndexList, numCullingTilesX * numCullingTilesY * (MAX_NUM_LIGHTS_PER_TILE + MAX_NUM_DECALS_PER_TILE));
+		resizeBuffer(tiledObjectsIndexList, numCullingTilesX * numCullingTilesY * MAX_NUM_INDICES_PER_TILE);
 		resizeBuffer(tiledWorldSpaceFrustaBuffer, numCullingTilesX * numCullingTilesY);
 	}
 }
@@ -580,6 +580,7 @@ void dx_renderer::setSpotLights(const ref<dx_buffer>& lights, uint32 numLights)
 
 void dx_renderer::setDecals(const ref<dx_buffer>& decals, uint32 numDecals)
 {
+	assert(numDecals < MAX_NUM_TOTAL_DECALS);
 	this->decals = decals;
 	this->numDecals = numDecals;
 }

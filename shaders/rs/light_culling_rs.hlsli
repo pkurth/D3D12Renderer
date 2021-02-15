@@ -2,8 +2,13 @@
 #define LIGHT_CULLING_H
 
 #define LIGHT_CULLING_TILE_SIZE 16
-#define MAX_NUM_LIGHTS_PER_TILE 256 // Total for point and spot lights.
-#define MAX_NUM_DECALS_PER_TILE 256 // This is chosen, because our tiles are 16x16 large (which is 256 in total). This allows efficient sorting of these decals.
+#define MAX_NUM_LIGHTS_PER_TILE 256 // Total for point and spot lights. Per tile.
+#define MAX_NUM_TOTAL_DECALS 256   // Total per frame (not per tile).
+
+#define NUM_DECAL_BUCKETS (MAX_NUM_TOTAL_DECALS / 32)
+#define TILE_LIGHT_OFFSET (NUM_DECAL_BUCKETS)
+
+#define MAX_NUM_INDICES_PER_TILE (MAX_NUM_LIGHTS_PER_TILE + NUM_DECAL_BUCKETS)
 
 struct light_culling_frustum_plane
 {

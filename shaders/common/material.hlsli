@@ -15,14 +15,24 @@ struct pbr_material_cb // 24 bytes.
     uint32 flags;       // See defines above.
 };
 
+static float getRoughnessOverride(uint32 roughnessOverride_metallicOverride)
+{
+    return (roughnessOverride_metallicOverride >> 16) / (float)0xFFFF;
+}
+
+static float getMetallicOverride(uint32 roughnessOverride_metallicOverride)
+{
+    return (roughnessOverride_metallicOverride & 0xFFFF) / (float)0xFFFF;
+}
+
 static float getRoughnessOverride(pbr_material_cb mat)
 {
-    return (mat.roughnessOverride_metallicOverride >> 16) / (float)0xFFFF;
+    return getRoughnessOverride(mat.roughnessOverride_metallicOverride);
 }
 
 static float getMetallicOverride(pbr_material_cb mat)
 {
-    return (mat.roughnessOverride_metallicOverride & 0xFFFF) / (float)0xFFFF;
+    return getMetallicOverride(mat.roughnessOverride_metallicOverride);
 }
 
 static uint32 packRoughnessAndMetallic(float roughness, float metallic)

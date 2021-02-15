@@ -222,7 +222,8 @@ private:
 	ref<dx_buffer> tiledCullingIndexCounter;
 	ref<dx_buffer> tiledObjectsIndexList;
 
-	// DXGI_FORMAT_R32G32_UINT. The R channel contains the offset into tiledObjectsIndexList. The G channel contains the number of point lights, spot lights and decals in 10 bit each.
+	// DXGI_FORMAT_R32G32_UINT. The R channel contains the offset into tiledObjectsIndexList. The G channel contains the number of point lights and spot lights in 10 bit each, so there is space for more info.
+	// For more info, see light_culling_cs.hlsl.
 	ref<dx_texture> tiledCullingGrid;
 
 	uint32 numCullingTilesX;

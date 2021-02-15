@@ -212,6 +212,7 @@ void application::initialize(dx_renderer* renderer)
 		0 // Shadow info index.
 	};
 
+#if 1
 	decals.resize(64);
 
 	for (uint32 i = 0; i < decals.size(); ++i)
@@ -227,27 +228,7 @@ void application::initialize(dx_renderer* renderer)
 			vec3(0.f, 0.f, -5.f),
 		};
 	}
-	/*decals[0] =
-	{
-		vec3(0.f, 2.f, 0.f),
-		packColor(vec4(1.f, 0.f, 0.f, 0.5f)),
-		vec3(1.f, 0.f, 0.f),
-		packRoughnessAndMetallic(1.f, 1.f),
-		vec3(0.f, 1.f, 0.f),
-		0,
-		vec3(0.f, 0.f, -5.f),
-	};
-
-	decals[1] =
-	{
-		vec3(0.5f, 2.f, 0.f),
-		packColor(vec4(0.f, 1.f, 0.f, 0.5f)),
-		vec3(1.f, 0.f, 0.f),
-		packRoughnessAndMetallic(1.f, 1.f),
-		vec3(0.f, 2.f, 0.f),
-		0,
-		vec3(0.f, 0.f, -5.f),
-	};*/
+#endif
 
 
 	sun.direction = normalize(vec3(-0.6f, -1.f, -0.3f));
