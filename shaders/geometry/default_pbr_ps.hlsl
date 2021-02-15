@@ -135,7 +135,7 @@ ps_output main(ps_input IN)
 				dot(decal.forward, offset) / (dot(decal.forward, decal.forward))
 				);
 
-			float decalStrength = saturate(dot(-surface.N, decal.forward)); // TODO: Use this for blending.
+			float decalStrength = saturate(dot(-surface.N, normalize(decal.forward)));
 
 			[branch]
 			if (all(local >= -1.f && local <= 1.f) && decalStrength > 0.f)
@@ -150,7 +150,7 @@ ps_output main(ps_input IN)
 				const float decalRoughness = getRoughnessOverride(decal.roughnessOverride_metallicOverride);
 				const float decalMetallic = getMetallicOverride(decal.roughnessOverride_metallicOverride);
 				
-				const float alpha = decalAlbedo.a;
+				const float alpha = decalAlbedo.a * decalStrength;
 				const float oneMinusDecalAlphaAccum = 1.f - decalAlphaAccum;
 
 				decalAlbedoAccum += oneMinusDecalAlphaAccum * (alpha * decalAlbedo.rgb);
