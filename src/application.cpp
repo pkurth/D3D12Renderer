@@ -213,23 +213,26 @@ void application::initialize(dx_renderer* renderer)
 	};
 
 #if 1
-	decals.resize(1);
-
 	decalTexture = loadTextureFromFile("assets/textures/decals/explosion.png");
 
-	for (uint32 i = 0; i < decals.size(); ++i)
+	if (decalTexture)
 	{
-		decals[i] =
+		decals.resize(5);
+
+		for (uint32 i = 0; i < decals.size(); ++i)
 		{
-			vec3(-4.f + i * 0.1f, 2.f, -3.f),
-			0xFFFFFFFF,
-			vec3(1.f, 0.f, 0.f),
-			packRoughnessAndMetallic(1.f, 1.f),
-			vec3(0.f, 1.f, 0.f),
-			0,
-			vec3(0.f, 0.f, -0.75f),
-			0xFFFFFFFF
-		};
+			decals[i] =
+			{
+				vec3(-7.f + i * 3, 2.f, -3.f),
+				0xFFFFFFFF,
+				vec3(3.f, 0.f, 0.f),
+				packRoughnessAndMetallic(1.f, 1.f),
+				vec3(0.f, 3.f, 0.f),
+				0,
+				vec3(0.f, 0.f, -0.75f),
+				0xFFFFFFFF
+			};
+		}
 	}
 #endif
 

@@ -135,8 +135,10 @@ ps_output main(ps_input IN)
 				dot(decal.forward, offset) / (dot(decal.forward, decal.forward))
 				);
 
+			float decalStrength = saturate(dot(-surface.N, decal.forward)); // TODO: Use this for blending.
+
 			[branch]
-			if (all(local >= -1.f && local <= 1.f) && dot(surface.N, decal.forward) <= 0.f)
+			if (all(local >= -1.f && local <= 1.f) && decalStrength > 0.f)
 			{
 				float2 uv = local.xy * 0.5f + 0.5f;                
 				
@@ -144,19 +146,18 @@ ps_output main(ps_input IN)
 				float2 uvScale = float2(decal.viewportScale >> 16, decal.viewportScale & 0xFFFF) / float(0xFFFF);
 				uv = uvOffset + uv * uvScale;
 
-				float4 decalAlbedo = decalTextureAtlas.Sample(wrapSampler, uv) * unpackColor(decal.albedoTint);
+				const float4 decalAlbedo = decalTextureAtlas.Sample(wrapSampler, uv) * unpackColor(decal.albedoTint);
+				const float decalRoughness = getRoughnessOverride(decal.roughnessOverride_metallicOverride);
+				const float decalMetallic = getMetallicOverride(decal.roughnessOverride_metallicOverride);
+				
+				const float alpha = decalAlbedo.a;
+				const float oneMinusDecalAlphaAccum = 1.f - decalAlphaAccum;
 
+				decalAlbedoAccum += oneMinusDecalAlphaAccum * (alpha * decalAlbedo.rgb);
+				decalRoughnessAccum += oneMinusDecalAlphaAccum * (alpha * decalRoughness);
+				decalMetallicAccum += oneMinusDecalAlphaAccum * (alpha * decalMetallic);
 
-				float decalRoughness = getRoughnessOverride(decal.roughnessOverride_metallicOverride);
-				float decalMetallic = getMetallicOverride(decal.roughnessOverride_metallicOverride);
-
-				float oneMinusDecalAlphaAccum = 1.f - decalAlphaAccum;
-
-				decalAlbedoAccum += oneMinusDecalAlphaAccum * (decalAlbedo.a * decalAlbedo.rgb);
-				decalRoughnessAccum += oneMinusDecalAlphaAccum * (decalAlbedo.a * decalRoughness);
-				decalMetallicAccum += oneMinusDecalAlphaAccum * (decalAlbedo.a * decalMetallic);
-
-				decalAlphaAccum = decalAlbedo.a + (1 - decalAlbedo.a) * decalAlphaAccum;
+				decalAlphaAccum = alpha + (1.f - alpha) * decalAlphaAccum;
 
 				[branch]
 				if (decalAlphaAccum >= 1.f)
