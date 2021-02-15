@@ -16,7 +16,7 @@ void main(cs_input IN)
 {
 	const float2 uv = (IN.dispatchThreadID.xy + float2(0.5f, 0.5f)) * cb.invDimensions;
 
-	float3 color = 0.xxx;
+	float3 color = (float3)0.f;
 
 	color += bloom.SampleLevel(linearClampSampler, uv, 1.5f).rgb;
 	color += bloom.SampleLevel(linearClampSampler, uv, 3.5f).rgb;

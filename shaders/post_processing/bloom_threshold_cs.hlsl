@@ -15,7 +15,7 @@ void main(cs_input IN)
 {
 	const float2 uv = IN.dispatchThreadID.xy + float2(0.5f, 0.5f);
 
-	float3 color = 0.xxx;
+	float3 color = (float3)0.f;
 
 	const float2 invDimensions = cb.invDimensions;
 	const float offset = 0.25f;
