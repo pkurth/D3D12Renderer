@@ -213,19 +213,22 @@ void application::initialize(dx_renderer* renderer)
 	};
 
 #if 1
-	decals.resize(64);
+	decals.resize(1);
+
+	decalTexture = loadTextureFromFile("assets/textures/decals/explosion.png");
 
 	for (uint32 i = 0; i < decals.size(); ++i)
 	{
 		decals[i] =
 		{
-			vec3(-4.f + i * 0.1f, 2.f, 0.f),
-			packColor(vec4(randomRGB(rng), 1.f)),
+			vec3(-4.f + i * 0.1f, 2.f, -3.f),
+			0xFFFFFFFF,
 			vec3(1.f, 0.f, 0.f),
 			packRoughnessAndMetallic(1.f, 1.f),
 			vec3(0.f, 1.f, 0.f),
 			0,
-			vec3(0.f, 0.f, -5.f),
+			vec3(0.f, 0.f, -0.75f),
+			0xFFFFFFFF
 		};
 	}
 #endif
@@ -733,7 +736,7 @@ void application::update(const user_input& input, float dt)
 		if (decals.size())
 		{
 			updateUploadBufferData(decalBuffer[dxContext.bufferedFrameID], decals.data(), (uint32)(sizeof(decal_cb) * decals.size()));
-			renderer->setDecals(decalBuffer[dxContext.bufferedFrameID], (uint32)decals.size());
+			renderer->setDecals(decalBuffer[dxContext.bufferedFrameID], (uint32)decals.size(), decalTexture);
 		}
 
 		thread_job_context context;

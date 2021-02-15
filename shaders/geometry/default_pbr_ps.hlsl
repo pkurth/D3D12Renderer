@@ -47,6 +47,9 @@ Texture2D<float> shadowMap								: register(t8, space2);
 StructuredBuffer<point_shadow_info> pointShadowInfos	: register(t9, space2);
 StructuredBuffer<spot_shadow_info> spotShadowInfos		: register(t10, space2);
 
+Texture2D<float4> decalTextureAtlas                     : register(t11, space2);
+
+
 struct ps_output
 {
 	float4 hdrColor		: SV_Target0;
@@ -135,8 +138,15 @@ ps_output main(ps_input IN)
 			[branch]
 			if (all(local >= -1.f && local <= 1.f) && dot(surface.N, decal.forward) <= 0.f)
 			{
-				float2 uv = local.xy * 0.5f + 0.5f;
-				float4 decalAlbedo = unpackColor(decal.albedoTint); // TODO: Sample texture.
+				float2 uv = local.xy * 0.5f + 0.5f;                
+				
+				float2 uvOffset = float2(decal.viewportXY >> 16, decal.viewportXY & 0xFFFF) / float(0xFFFF);
+				float2 uvScale = float2(decal.viewportScale >> 16, decal.viewportScale & 0xFFFF) / float(0xFFFF);
+				uv = uvOffset + uv * uvScale;
+
+				float4 decalAlbedo = decalTextureAtlas.Sample(wrapSampler, uv) * unpackColor(decal.albedoTint);
+
+
 				float decalRoughness = getRoughnessOverride(decal.roughnessOverride_metallicOverride);
 				float decalMetallic = getMetallicOverride(decal.roughnessOverride_metallicOverride);
 

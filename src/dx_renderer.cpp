@@ -299,6 +299,7 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 	numSpotLights = 0;
 	decals = 0;
 	numDecals = 0;
+	decalTextureAtlas = 0;
 
 	if (this->windowWidth != windowWidth || this->windowHeight != windowHeight)
 	{
@@ -578,11 +579,12 @@ void dx_renderer::setSpotLights(const ref<dx_buffer>& lights, uint32 numLights)
 	numSpotLights = numLights;
 }
 
-void dx_renderer::setDecals(const ref<dx_buffer>& decals, uint32 numDecals)
+void dx_renderer::setDecals(const ref<dx_buffer>& decals, uint32 numDecals, const ref<dx_texture>& textureAtlas)
 {
 	assert(numDecals < MAX_NUM_TOTAL_DECALS);
 	this->decals = decals;
 	this->numDecals = numDecals;
+	this->decalTextureAtlas = textureAtlas;
 }
 
 ref<dx_texture> dx_renderer::getWhiteTexture()
@@ -679,6 +681,7 @@ void dx_renderer::endFrame(const user_input& input)
 	materialInfo.spotLightBuffer = spotLights;
 	materialInfo.decalBuffer = decals;
 	materialInfo.shadowMap = shadowMap;
+	materialInfo.decalTextureAtlas = decalTextureAtlas;
 	materialInfo.pointLightShadowInfoBuffer = pointLightShadowInfoBuffer[dxContext.bufferedFrameID];
 	materialInfo.spotLightShadowInfoBuffer = spotLightShadowInfoBuffer[dxContext.bufferedFrameID];
 	materialInfo.volumetricsTexture = 0;

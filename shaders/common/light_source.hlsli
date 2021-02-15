@@ -91,7 +91,7 @@ struct decal_cb
 	vec3 up;					// Scaled by half dimension.
 	uint32 viewportXY;			// Top left corner packed into 16 bits each.
 	vec3 forward;				// Scaled by half dimension.
-	uint32 viewportWidthHeight; // Width and height packed into 16 bits each.
+	uint32 viewportScale;       // Width and height packed into 16 bits each.
 };
 
 #ifdef HLSL

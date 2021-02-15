@@ -93,7 +93,7 @@ struct dx_renderer
 
 	void setPointLights(const ref<dx_buffer>& lights, uint32 numLights);
 	void setSpotLights(const ref<dx_buffer>& lights, uint32 numLights);
-	void setDecals(const ref<dx_buffer>& decals, uint32 numDecals);
+	void setDecals(const ref<dx_buffer>& decals, uint32 numDecals, const ref<dx_texture>& textureAtlas);
 
 	void submitRenderPass(opaque_render_pass* renderPass)
 	{
@@ -210,6 +210,8 @@ private:
 	uint32 numPointLights;
 	uint32 numSpotLights;
 	uint32 numDecals;
+
+	ref<dx_texture> decalTextureAtlas;
 
 	camera_cb camera;
 	directional_light_cb sun;

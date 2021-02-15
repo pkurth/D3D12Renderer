@@ -54,6 +54,8 @@ private:
 	std::vector<spot_light_cb> spotLights;
 	std::vector<decal_cb> decals;
 
+	ref<dx_texture> decalTexture;
+
 	directional_light sun;
 
 	dx_renderer* renderer;

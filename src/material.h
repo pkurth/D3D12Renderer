@@ -22,6 +22,8 @@ struct common_material_info
 	ref<dx_buffer> pointLightShadowInfoBuffer;
 	ref<dx_buffer> spotLightShadowInfoBuffer;
 
+	ref<dx_texture> decalTextureAtlas;
+
 	ref<dx_texture> shadowMap;
 
 	ref<dx_texture> volumetricsTexture;
