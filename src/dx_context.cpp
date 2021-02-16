@@ -44,7 +44,14 @@ static dx_factory createFactory()
 	return dxgiFactory;
 }
 
-static std::pair<dx_adapter, D3D_FEATURE_LEVEL> getAdapter(dx_factory factory, D3D_FEATURE_LEVEL minimumFeatureLevel = D3D_FEATURE_LEVEL_11_0)
+struct adapter_desc
+{
+	dx_adapter adapter;
+	D3D_FEATURE_LEVEL featureLevel;
+	std::wstring name;
+};
+
+static adapter_desc getAdapter(dx_factory factory, D3D_FEATURE_LEVEL minimumFeatureLevel = D3D_FEATURE_LEVEL_11_0)
 {
 	com<IDXGIAdapter1> dxgiAdapter1;
 	dx_adapter dxgiAdapter;
@@ -111,7 +118,7 @@ static std::pair<dx_adapter, D3D_FEATURE_LEVEL> getAdapter(dx_factory factory, D
 
 	printf("Using GPU: %ls\n", desc.Description);
 
-	return { dxgiAdapter, featureLevel };
+	return { dxgiAdapter, featureLevel, desc.Description };
 }
 
 static dx_device createDevice(dx_adapter adapter, D3D_FEATURE_LEVEL featureLevel)
@@ -161,19 +168,27 @@ static dx_device createDevice(dx_adapter adapter, D3D_FEATURE_LEVEL featureLevel
 static bool checkRaytracingSupport(dx_device device)
 {
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5 = {};
-	checkResult(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5)));
-	return options5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_0;
+	if (SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5))))
+	{
+		return options5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_0;
+	}
+	return false;
 }
 
 static bool checkMeshShaderSupport(dx_device device)
 {
 #if ADVANCED_GPU_FEATURES_ENABLED
 	D3D12_FEATURE_DATA_D3D12_OPTIONS7 options7 = {};
-	checkResult(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options7, sizeof(options7)));
-	return options7.MeshShaderTier >= D3D12_MESH_SHADER_TIER_1;
-#else
-	return false;
+	if (SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options7, sizeof(options7))))
+	{
+		return options7.MeshShaderTier >= D3D12_MESH_SHADER_TIER_1;
+	}
+	else
+	{
+		std::cerr << "Checking support for mesh shader feature failed. Maybe you need to update your Windows version." << std::endl;
+	}
 #endif
+	return false;
 }
 
 bool dx_context::initialize()
@@ -181,15 +196,15 @@ bool dx_context::initialize()
 	enableDebugLayer();
 
 	factory = createFactory();
-	auto [adapter, featureLevel] = getAdapter(factory);
+	adapter_desc adapterDesc = getAdapter(factory);
+	this->adapter = adapterDesc.adapter;
 	if (!adapter)
 	{
 		std::cerr << "No DX12 capable GPU found." << std::endl;
 		return false;
 	}
-	this->adapter = adapter;
 
-	device = createDevice(adapter, featureLevel);
+	device = createDevice(adapter, adapterDesc.featureLevel);
 	raytracingSupported = checkRaytracingSupport(device);
 	meshShaderSupported = checkMeshShaderSupport(device);
 
