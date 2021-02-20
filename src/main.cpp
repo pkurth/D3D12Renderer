@@ -86,25 +86,6 @@ static uint64 renderToMainWindow(dx_window& window)
 	return result;
 }
 
-static uint64 renderToSecondaryWindow(dx_renderer* renderer, dx_window& window)
-{
-	dx_resource backbuffer = window.backBuffers[window.currentBackbufferIndex];
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtv(window.rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), window.currentBackbufferIndex, window.rtvDescriptorSize);
-
-	dx_command_list* cl = dxContext.getFreeRenderCommandList();
-	cl->transitionBarrier(backbuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-	renderer->blitResultToScreen(cl, { rtv });
-
-	cl->transitionBarrier(backbuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-
-	uint64 result = dxContext.executeCommandList(cl);
-
-	window.swapBuffers();
-
-	return result;
-}
-
 static void drawHelperWindows()
 {
 	if (showIconsWindow)

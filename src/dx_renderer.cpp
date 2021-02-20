@@ -37,8 +37,6 @@ static dx_pipeline pointLightShadowPipeline;
 static dx_pipeline textureSkyPipeline;
 static dx_pipeline proceduralSkyPipeline;
 
-static dx_pipeline blitPipeline;
-
 
 static dx_pipeline atmospherePipeline;
 
@@ -54,6 +52,7 @@ static dx_pipeline taaPipeline;
 static dx_pipeline bloomThresholdPipeline;
 static dx_pipeline bloomCombinePipeline;
 static dx_pipeline gaussianBlurPipeline;
+static dx_pipeline blitPipeline;
 static dx_pipeline hierarchicalLinearDepthPipeline;
 static dx_pipeline tonemapPipeline;
 static dx_pipeline presentPipeline;
@@ -173,15 +172,6 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		outlineDrawerPipeline = createReloadablePipeline(drawerDesc, { "fullscreen_triangle_vs", "outline_ps" });
 	}
 
-	// Blit.
-	{
-		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(screenFormat)
-			.depthSettings(false, false);
-
-		blitPipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "blit_ps" });
-	}
-
 	// Light culling.
 	{
 		worldSpaceFrustaPipeline = createReloadablePipeline("world_space_tiled_frusta_cs");
@@ -199,6 +189,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		bloomThresholdPipeline = createReloadablePipeline("bloom_threshold_cs");
 		bloomCombinePipeline = createReloadablePipeline("bloom_combine_cs");
 		gaussianBlurPipeline = createReloadablePipeline("gaussian_blur_cs");
+		blitPipeline = createReloadablePipeline("blit_cs");
 		hierarchicalLinearDepthPipeline = createReloadablePipeline("hierarchical_linear_depth_cs");
 		tonemapPipeline = createReloadablePipeline("tonemap_cs");
 		presentPipeline = createReloadablePipeline("present_cs");
@@ -234,10 +225,14 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 
 	recalculateViewport(false);
 
-	D3D12_RESOURCE_DESC hdrColorDesc = CD3DX12_RESOURCE_DESC::Tex2D(hdrFormat, renderWidth, renderHeight, 1,
-		8, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-	hdrColorTexture = createTexture(hdrColorDesc, 0, 0, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	allocateMipUAVs(hdrColorTexture);
+	hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat, false, true, true, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+	D3D12_RESOURCE_DESC prevFrameHDRColorDesc = CD3DX12_RESOURCE_DESC::Tex2D(hdrFormat, renderWidth / 2, renderHeight / 2, 1,
+		8, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+	prevFrameHDRColorTexture = createTexture(prevFrameHDRColorDesc, 0, 0, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	prevFrameHDRColorTempTexture = createTexture(prevFrameHDRColorDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	allocateMipUAVs(prevFrameHDRColorTexture);
+	allocateMipUAVs(prevFrameHDRColorTempTexture);
 
 	worldNormalsTexture = createTexture(0, renderWidth, renderHeight, worldNormalsFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, screenVelocitiesFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -270,6 +265,8 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 
 
 	SET_NAME(hdrColorTexture->resource, "HDR Color");
+	SET_NAME(prevFrameHDRColorTexture->resource, "Prev frame HDR Color");
+	SET_NAME(prevFrameHDRColorTempTexture->resource, "Prev frame HDR Color Temp");
 	SET_NAME(worldNormalsTexture->resource, "World normals");
 	SET_NAME(screenVelocitiesTexture->resource, "Screen velocities");
 	SET_NAME(reflectanceTexture->resource, "Reflectance");
@@ -390,6 +387,8 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 	if (resizeTextures)
 	{
 		resizeTexture(hdrColorTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		resizeTexture(prevFrameHDRColorTexture, renderWidth / 2, renderHeight / 2, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		resizeTexture(prevFrameHDRColorTempTexture, renderWidth / 2, renderHeight / 2, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		resizeTexture(worldNormalsTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		resizeTexture(screenVelocitiesTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		resizeTexture(reflectanceTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -1293,7 +1292,7 @@ void dx_renderer::endFrame(const user_input& input)
 			cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 2, linearDepthBuffer);
 			cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 3, worldNormalsTexture);
 			cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 4, reflectanceTexture);
-			cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 5, hdrColorTexture);
+			cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 5, prevFrameHDRColorTexture);
 
 			cl->dispatch(bucketize(renderWidth, SSR_BLOCK_SIZE), bucketize(renderHeight, SSR_BLOCK_SIZE));
 
@@ -1306,9 +1305,25 @@ void dx_renderer::endFrame(const user_input& input)
 		{
 			DX_PROFILE_BLOCK(cl, "Downsample scene");
 
-			for (uint32 i = 0; i < hdrColorTexture->numMipLevels - 1; ++i)
+			barrier_batcher(cl)
+				.transition(prevFrameHDRColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+			cl->setPipelineState(*blitPipeline.pipeline);
+			cl->setComputeRootSignature(*blitPipeline.rootSignature);
+
+			cl->setCompute32BitConstants(BLIT_RS_CB, blit_cb{ vec2(1.f / prevFrameHDRColorTexture->width, 1.f / prevFrameHDRColorTexture->height) });
+			cl->setDescriptorHeapUAV(BLIT_RS_TEXTURES, 0, prevFrameHDRColorTexture);
+			cl->setDescriptorHeapSRV(BLIT_RS_TEXTURES, 1, hdrColorTexture);
+
+			cl->dispatch(bucketize(prevFrameHDRColorTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(prevFrameHDRColorTexture->height, POST_PROCESSING_BLOCK_SIZE));
+
+			barrier_batcher(cl)
+				.uav(prevFrameHDRColorTexture)
+				.transition(prevFrameHDRColorTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+			for (uint32 i = 0; i < prevFrameHDRColorTexture->numMipLevels - 1; ++i)
 			{
-				//gaussianBlur(cl, hdrColorTexture, bloomTempTexture, i, i + 1);
+				gaussianBlur(cl, prevFrameHDRColorTexture, prevFrameHDRColorTempTexture, i, i + 1);
 			}
 		}
 
@@ -1454,17 +1469,4 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 	dxContext.executeCommandList(cl);
-}
-
-void dx_renderer::blitResultToScreen(dx_command_list* cl, dx_rtv_descriptor_handle rtv)
-{
-	CD3DX12_VIEWPORT viewport = CD3DX12_VIEWPORT(0.f, 0.f, (float)windowWidth, (float)windowHeight);
-	cl->setViewport(viewport);
-
-	cl->setRenderTarget(&rtv, 1, 0);
-
-	cl->setPipelineState(*blitPipeline.pipeline);
-	cl->setGraphicsRootSignature(*blitPipeline.rootSignature);
-	cl->setDescriptorHeapSRV(0, 0, frameResult);
-	cl->drawFullscreenTriangle();
 }

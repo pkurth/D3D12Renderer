@@ -86,7 +86,6 @@ struct dx_renderer
 
 	void beginFrame(uint32 windowWidth, uint32 windowHeight);	
 	void endFrame(const user_input& input);
-	void blitResultToScreen(dx_command_list* cl, dx_rtv_descriptor_handle rtv);
 
 
 	// Set these with your application.
@@ -190,7 +189,7 @@ private:
 	uint32 windowXOffset;
 	uint32 windowYOffset;
 
-	ref<dx_texture> hdrColorTexture; // The first mip level is the current frame color. The mip levels are downsampled versions from the last frame, used for SSR.
+	ref<dx_texture> hdrColorTexture;
 	ref<dx_texture> worldNormalsTexture;
 	ref<dx_texture> screenVelocitiesTexture;
 	ref<dx_texture> objectIDsTexture;
@@ -198,6 +197,9 @@ private:
 	ref<dx_texture> depthStencilBuffer;
 	ref<dx_texture> linearDepthBuffer;
 	ref<dx_texture> reflectionTexture;
+
+	ref<dx_texture> prevFrameHDRColorTexture; // This is downsampled by a factor of 2 and contains up to 8 mip levels.
+	ref<dx_texture> prevFrameHDRColorTempTexture;
 
 	ref<dx_texture> hdrPostProcessingTexture;
 	ref<dx_texture> ldrPostProcessingTexture;
