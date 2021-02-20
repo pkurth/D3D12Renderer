@@ -80,6 +80,32 @@ struct gaussian_blur_cb
 
 
 
+// ----------------------------------------
+// HIERARCHICAL LINEAR DEPTH
+// ----------------------------------------
+
+struct hierarchical_linear_depth_cb
+{
+    vec2 invDimensions;
+};
+
+#define HIERARCHICAL_LINEAR_DEPTH_RS \
+    "RootFlags(0), " \
+    "RootConstants(b0, num32BitConstants = 2), " \
+    "CBV(b1), " \
+    "DescriptorTable( UAV(u0, numDescriptors = 6), SRV(t0, numDescriptors = 1) )," \
+    "StaticSampler(s0," \
+        "addressU = TEXTURE_ADDRESS_CLAMP," \
+        "addressV = TEXTURE_ADDRESS_CLAMP," \
+        "addressW = TEXTURE_ADDRESS_CLAMP," \
+        "filter = FILTER_MIN_MAG_MIP_LINEAR)"
+
+
+#define HIERARCHICAL_LINEAR_DEPTH_RS_CB           0
+#define HIERARCHICAL_LINEAR_DEPTH_RS_CAMERA       1
+#define HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES     2
+
+
 
 // ----------------------------------------
 // TEMPORAL ANTI-ALIASING

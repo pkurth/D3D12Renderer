@@ -52,6 +52,7 @@ static dx_pipeline taaPipeline;
 static dx_pipeline bloomThresholdPipeline;
 static dx_pipeline bloomCombinePipeline;
 static dx_pipeline gaussianBlurPipeline;
+static dx_pipeline hierarchicalLinearDepthPipeline;
 static dx_pipeline tonemapPipeline;
 static dx_pipeline presentPipeline;
 
@@ -196,6 +197,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		bloomThresholdPipeline = createReloadablePipeline("bloom_threshold_cs");
 		bloomCombinePipeline = createReloadablePipeline("bloom_combine_cs");
 		gaussianBlurPipeline = createReloadablePipeline("gaussian_blur_cs");
+		hierarchicalLinearDepthPipeline = createReloadablePipeline("hierarchical_linear_depth_cs");
 		tonemapPipeline = createReloadablePipeline("tonemap_cs");
 		presentPipeline = createReloadablePipeline("present_cs");
 	}
@@ -225,10 +227,14 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 
 	recalculateViewport(false);
 
-	depthStencilBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthStencilFormat);
 	hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat, false, true, true, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	worldNormalsTexture = createTexture(0, renderWidth, renderHeight, worldNormalsFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, screenVelocitiesFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	depthStencilBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthStencilFormat);
+	D3D12_RESOURCE_DESC linearDepthDesc = CD3DX12_RESOURCE_DESC::Tex2D(linearDepthFormat, renderWidth, renderHeight, 1,
+		6, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+	linearDepthBuffer = createTexture(linearDepthDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	allocateMipUAVs(linearDepthBuffer);
 
 	hdrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
@@ -252,6 +258,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 	SET_NAME(worldNormalsTexture->resource, "World normals");
 	SET_NAME(screenVelocitiesTexture->resource, "Screen velocities");
 	SET_NAME(depthStencilBuffer->resource, "Depth buffer");
+	SET_NAME(linearDepthBuffer->resource, "Linear depth buffer");
 
 	SET_NAME(taaTextures[0]->resource, "TAA 0");
 	SET_NAME(taaTextures[1]->resource, "TAA 1");
@@ -370,6 +377,7 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		resizeTexture(worldNormalsTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		resizeTexture(screenVelocitiesTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		resizeTexture(depthStencilBuffer, renderWidth, renderHeight);
+		resizeTexture(linearDepthBuffer, renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		if (objectIDsTexture)
 		{
@@ -1168,7 +1176,7 @@ void dx_renderer::endFrame(const user_input& input)
 		{
 			DX_PROFILE_BLOCK(cl, "3D Overlays");
 
-			cl->clearDepth(depthStencilBuffer->dsvHandle); // TODO: This messes up the post processing. Maybe render the 3D overlays in LDR after all post processing?
+			//cl->clearDepth(depthStencilBuffer->dsvHandle); // TODO: This messes up the post processing. Maybe render the 3D overlays in LDR after all post processing?
 
 			material_setup_function lastSetupFunc = 0;
 
@@ -1219,6 +1227,33 @@ void dx_renderer::endFrame(const user_input& input)
 			.transitionEnd(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 			.transitionEnd(frameResult, frameResultState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
+
+		// Linear depth pyramid.
+		{
+			DX_PROFILE_BLOCK(cl, "Linear depth pyramid");
+
+			cl->setPipelineState(*hierarchicalLinearDepthPipeline.pipeline);
+			cl->setComputeRootSignature(*hierarchicalLinearDepthPipeline.rootSignature);
+
+			float width = ceilf(renderWidth * 0.5f);
+			float height = ceilf(renderHeight * 0.5f);
+
+			cl->setCompute32BitConstants(HIERARCHICAL_LINEAR_DEPTH_RS_CB, hierarchical_linear_depth_cb{ vec2(1.f / width, 1.f / height) });
+			cl->setComputeDynamicConstantBuffer(HIERARCHICAL_LINEAR_DEPTH_RS_CAMERA, cameraCBV);
+			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 0, linearDepthBuffer->defaultUAV);
+			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 1, linearDepthBuffer->mipUAVs[0]);
+			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 2, linearDepthBuffer->mipUAVs[1]);
+			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 3, linearDepthBuffer->mipUAVs[2]);
+			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 4, linearDepthBuffer->mipUAVs[3]);
+			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 5, linearDepthBuffer->mipUAVs[4]);
+			cl->setDescriptorHeapSRV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 6, depthStencilBuffer);
+
+			cl->dispatch(bucketize((uint32)width, POST_PROCESSING_BLOCK_SIZE), bucketize((uint32)height, POST_PROCESSING_BLOCK_SIZE));
+
+			barrier_batcher(cl)
+				.uav(linearDepthBuffer)
+				.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		}
 		ref<dx_texture> hdrResult = hdrColorTexture;
 
 
@@ -1324,6 +1359,7 @@ void dx_renderer::endFrame(const user_input& input)
 			.transitionEnd(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
 			.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 			.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
+			.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 
 	}
 	else if (dxContext.raytracingSupported && raytracer)
