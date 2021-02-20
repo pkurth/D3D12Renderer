@@ -149,17 +149,10 @@ float render_camera::eyeDepthToDepthBufferDepth(float eyeDepth) const
 
 float render_camera::linearizeDepthBuffer(float depthBufferDepth) const
 {
-	if (farPlane < 0.f) // Infinite far plane.
-	{
-		depthBufferDepth = clamp(depthBufferDepth, 0.f, 1.f - 1e-7f); // A depth of 1 is at infinity.
-		return -1.f / (depthBufferDepth - 1.f);
-	}
-	else
-	{
-		const float c1 = farPlane / nearPlane;
-		const float c0 = 1.f - c1;
-		return 1.f / (c0 * depthBufferDepth + c1);
-	}
+	assert(farPlane > 0.f); // This is not possible with an infinite far plane.
+
+	float eyeDepth = depthBufferDepthToEyeDepth(depthBufferDepth);
+	return (eyeDepth - nearPlane) / farPlane;
 }
 
 camera_frustum_corners render_camera::getWorldSpaceFrustumCorners(float alternativeFarPlane) const

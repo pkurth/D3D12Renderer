@@ -13,6 +13,7 @@
 #include "camera.hlsli"
 #include "volumetrics_rs.hlsli"
 #include "post_processing_rs.hlsli"
+#include "ssr_rs.hlsli"
 
 
 #define SHADOW_MAP_WIDTH 8192
@@ -60,6 +61,8 @@ struct renderer_settings
 	float skyIntensity = 1.f;
 
 	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
+
+	ssr_raycast_cb ssr = defaultSSRParameters();
 
 	bool enableTemporalAntialiasing = true;
 	float cameraJitterStrength = 1.f;
@@ -154,15 +157,18 @@ struct dx_renderer
 	static constexpr DXGI_FORMAT hdrFormat = DXGI_FORMAT_R32G32B32A32_FLOAT; // TODO: This could be way less. However, for path tracing accumulation over time this was necessary.
 	static constexpr DXGI_FORMAT worldNormalsFormat = DXGI_FORMAT_R16G16_FLOAT;
 	static constexpr DXGI_FORMAT hdrDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	static constexpr DXGI_FORMAT linearDepthFormat = DXGI_FORMAT_R32_FLOAT;
 	static constexpr DXGI_FORMAT screenVelocitiesFormat = DXGI_FORMAT_R16G16_FLOAT;
 	static constexpr DXGI_FORMAT objectIDsFormat = DXGI_FORMAT_R16_UINT; // Do not change this. 16 bit is hardcoded in other places.
+	static constexpr DXGI_FORMAT reflectanceFormat = DXGI_FORMAT_R8G8B8A8_UNORM; // Fresnel (xyz), roughness (w).
+	static constexpr DXGI_FORMAT reflectionFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	static constexpr DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM;
 	static constexpr DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
 	static constexpr DXGI_FORMAT hdrPostProcessFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	static constexpr DXGI_FORMAT ldrPostProcessFormat = DXGI_FORMAT_R11G11B10_FLOAT; // Not really LDR. But I don't like the idea of converting to 8 bit and then to sRGB in separate passes.
 
-	static constexpr DXGI_FORMAT lightPassFormats[] = { hdrFormat, worldNormalsFormat };
+	static constexpr DXGI_FORMAT lightPassFormats[] = { hdrFormat, worldNormalsFormat, reflectanceFormat };
 	static constexpr DXGI_FORMAT skyPassFormats[] = { hdrFormat, screenVelocitiesFormat, objectIDsFormat };
 
 private:
@@ -184,11 +190,14 @@ private:
 	uint32 windowXOffset;
 	uint32 windowYOffset;
 
-	ref<dx_texture> hdrColorTexture;
+	ref<dx_texture> hdrColorTexture; // The first mip level is the current frame color. The mip levels are downsampled versions from the last frame, used for SSR.
 	ref<dx_texture> worldNormalsTexture;
 	ref<dx_texture> screenVelocitiesTexture;
 	ref<dx_texture> objectIDsTexture;
+	ref<dx_texture> reflectanceTexture;
 	ref<dx_texture> depthStencilBuffer;
+	ref<dx_texture> linearDepthBuffer;
+	ref<dx_texture> reflectionTexture;
 
 	ref<dx_texture> hdrPostProcessingTexture;
 	ref<dx_texture> ldrPostProcessingTexture;

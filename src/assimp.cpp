@@ -23,7 +23,7 @@ struct assimp_logger : public Assimp::LogStream
 
 const aiScene* loadAssimpSceneFile(const char* filepathRaw, Assimp::Importer& importer)
 {
-#if 0
+#if 1
 	if (Assimp::DefaultLogger::isNullLogger())
 	{
 		Assimp::DefaultLogger::create("", Assimp::Logger::VERBOSE);

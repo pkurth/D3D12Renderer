@@ -93,7 +93,7 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<raytrace_component>(sponzaBlas);
 	}
 
-#if 1
+#if 0
 	// Stormtrooper.
 	auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/meshes/stormtrooper.fbx");
 	if (stormtrooperMesh)
@@ -337,6 +337,21 @@ static bool editSunShadowParameters(directional_light& sun)
 	return result;
 }
 
+static bool editSSR(ssr_raycast_cb& settings)
+{
+	bool result = false;
+	if (ImGui::TreeNode("SSR"))
+	{
+		result |= ImGui::SliderInt("Num iterations", (int*)&settings.numSteps, 1, 1024);
+		result |= ImGui::SliderFloat("Max distance", &settings.maxDistance, 5.f, 1000.f);
+		result |= ImGui::SliderFloat("Min. stride", &settings.minStride, 1.f, 10.f);
+		result |= ImGui::SliderFloat("Max. stride", &settings.maxStride, settings.minStride, 50.f);
+
+		ImGui::TreePop();
+	}
+	return result;
+}
+
 static bool editPostProcessing(renderer_mode mode, renderer_settings& settings)
 {
 	bool result = false;
@@ -519,6 +534,7 @@ void application::drawSettings(float dt)
 
 		plotAndEditTonemapping(renderer->settings.tonemap);
 		editSunShadowParameters(sun);
+		editSSR(renderer->settings.ssr);
 		editPostProcessing(renderer->mode, renderer->settings);
 
 		ImGui::SliderFloat("Environment intensity", &renderer->settings.environmentIntensity, 0.f, 2.f);

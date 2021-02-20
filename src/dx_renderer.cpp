@@ -48,6 +48,8 @@ static dx_pipeline outlineDrawerPipeline;
 static dx_pipeline worldSpaceFrustaPipeline;
 static dx_pipeline lightCullingPipeline;
 
+static dx_pipeline ssrRaycastPipeline;
+
 static dx_pipeline taaPipeline;
 static dx_pipeline bloomThresholdPipeline;
 static dx_pipeline bloomCombinePipeline;
@@ -202,6 +204,11 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		presentPipeline = createReloadablePipeline("present_cs");
 	}
 
+	// SSR.
+	{
+		ssrRaycastPipeline = createReloadablePipeline("ssr_raycast_cs");
+	}
+
 
 	pbr_material::initializePipeline();
 
@@ -227,14 +234,22 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 
 	recalculateViewport(false);
 
-	hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat, false, true, true, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	D3D12_RESOURCE_DESC hdrColorDesc = CD3DX12_RESOURCE_DESC::Tex2D(hdrFormat, renderWidth, renderHeight, 1,
+		8, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+	hdrColorTexture = createTexture(hdrColorDesc, 0, 0, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	allocateMipUAVs(hdrColorTexture);
+
 	worldNormalsTexture = createTexture(0, renderWidth, renderHeight, worldNormalsFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, screenVelocitiesFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	reflectanceTexture = createTexture(0, renderWidth, renderHeight, reflectanceFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
 	depthStencilBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthStencilFormat);
 	D3D12_RESOURCE_DESC linearDepthDesc = CD3DX12_RESOURCE_DESC::Tex2D(linearDepthFormat, renderWidth, renderHeight, 1,
 		6, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 	linearDepthBuffer = createTexture(linearDepthDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	allocateMipUAVs(linearDepthBuffer);
+
+	reflectionTexture = createTexture(0, renderWidth, renderHeight, reflectionFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	hdrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
@@ -257,6 +272,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 	SET_NAME(hdrColorTexture->resource, "HDR Color");
 	SET_NAME(worldNormalsTexture->resource, "World normals");
 	SET_NAME(screenVelocitiesTexture->resource, "Screen velocities");
+	SET_NAME(reflectanceTexture->resource, "Reflectance");
 	SET_NAME(depthStencilBuffer->resource, "Depth buffer");
 	SET_NAME(linearDepthBuffer->resource, "Linear depth buffer");
 
@@ -376,6 +392,7 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		resizeTexture(hdrColorTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		resizeTexture(worldNormalsTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		resizeTexture(screenVelocitiesTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		resizeTexture(reflectanceTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		resizeTexture(depthStencilBuffer, renderWidth, renderHeight);
 		resizeTexture(linearDepthBuffer, renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
@@ -383,6 +400,8 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		{
 			resizeTexture(objectIDsTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		}
+
+		resizeTexture(reflectionTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		resizeTexture(hdrPostProcessingTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
@@ -1080,7 +1099,7 @@ void dx_renderer::endFrame(const user_input& input)
 		// LIGHT PASS
 		// ----------------------------------------
 
-		dx_render_target hdrRenderTarget({ hdrColorTexture, worldNormalsTexture }, depthStencilBuffer);
+		dx_render_target hdrRenderTarget({ hdrColorTexture, worldNormalsTexture, reflectanceTexture }, depthStencilBuffer);
 
 		cl->setRenderTarget(hdrRenderTarget);
 		cl->setViewport(hdrRenderTarget.viewport);
@@ -1225,6 +1244,7 @@ void dx_renderer::endFrame(const user_input& input)
 			.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 			.transitionEnd(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 			.transitionEnd(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+			.transition(reflectanceTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 			.transitionEnd(frameResult, frameResultState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 
@@ -1254,6 +1274,45 @@ void dx_renderer::endFrame(const user_input& input)
 				.uav(linearDepthBuffer)
 				.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		}
+
+		// Screen space reflections.
+		{
+			DX_PROFILE_BLOCK(cl, "Screen space reflections");
+
+			cl->setPipelineState(*ssrRaycastPipeline.pipeline);
+			cl->setComputeRootSignature(*ssrRaycastPipeline.rootSignature);
+
+			settings.ssr.dimensions = vec2((float)renderWidth, (float)renderHeight);
+			settings.ssr.invDimensions = vec2(1.f / renderWidth, 1.f / renderHeight);
+			settings.ssr.frameIndex = (uint32)dxContext.frameID;
+
+			cl->setCompute32BitConstants(SSR_RAYCAST_RS_CB, settings.ssr);
+			cl->setComputeDynamicConstantBuffer(SSR_RAYCAST_RS_CAMERA, cameraCBV);
+			cl->setDescriptorHeapUAV(SSR_RAYCAST_RS_TEXTURES, 0, reflectionTexture);
+			cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 1, depthStencilBuffer);
+			cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 2, linearDepthBuffer);
+			cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 3, worldNormalsTexture);
+			cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 4, reflectanceTexture);
+			cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 5, hdrColorTexture);
+
+			cl->dispatch(bucketize(renderWidth, SSR_BLOCK_SIZE), bucketize(renderHeight, SSR_BLOCK_SIZE));
+
+			barrier_batcher(cl)
+				.uav(reflectionTexture)
+				.transition(reflectionTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		}
+
+		// Downsample scene. This is also the copy used in SSR next frame.
+		{
+			DX_PROFILE_BLOCK(cl, "Downsample scene");
+
+			for (uint32 i = 0; i < hdrColorTexture->numMipLevels - 1; ++i)
+			{
+				//gaussianBlur(cl, hdrColorTexture, bloomTempTexture, i, i + 1);
+			}
+		}
+
+
 		ref<dx_texture> hdrResult = hdrColorTexture;
 
 
@@ -1346,7 +1405,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 		// At this point hdrResult is either the TAA result, the hdrColorTexture, or the hdrPostProcessingTexture. All of these are in read state.
 
-		tonemapAndPresent(cl, hdrResult);
+		tonemapAndPresent(cl, reflectionTexture);
 
 		barrier_batcher(cl)
 			.uav(frameResult)
@@ -1358,8 +1417,10 @@ void dx_renderer::endFrame(const user_input& input)
 			.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
 			.transitionEnd(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
 			.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-			.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
+			.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON)
 			.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+			.transition(reflectanceTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
+			.transition(reflectionTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	}
 	else if (dxContext.raytracingSupported && raytracer)
