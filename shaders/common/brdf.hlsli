@@ -188,7 +188,7 @@ static float geometrySmith(surface_info surface, light_info light)
 
 // When using this function to sample, the probability density is:
 //      pdf = D * NdotH / (4 * HdotV)
-float3 importanceSampleGGX(inout uint randSeed, float3 N, float roughness)
+static float3 importanceSampleGGX(inout uint randSeed, float3 N, float roughness)
 {
 	// Get our uniform random numbers.
 	float2 randVal = float2(nextRand(randSeed), nextRand(randSeed));
@@ -210,12 +210,13 @@ float3 importanceSampleGGX(inout uint randSeed, float3 N, float roughness)
 }
 
 // Call this with a hammersley distribution as Xi.
-static float3 importanceSampleGGX(float2 Xi, float3 N, float roughness)
+static float4 importanceSampleGGX(float2 Xi, float3 N, float roughness)
 {
 	float a = roughness * roughness;
+	float a2 = a * a;
 
 	float phi = 2.f * pi * Xi.x;
-	float cosTheta = sqrt((1.f - Xi.y) / (1.f + (a * a - 1.f) * Xi.y));
+	float cosTheta = sqrt((1.f - Xi.y) / (1.f + (a2 - 1.f) * Xi.y));
 	float sinTheta = sqrt(1.f - cosTheta * cosTheta);
 
 	// From spherical coordinates to cartesian coordinates.
@@ -225,12 +226,16 @@ static float3 importanceSampleGGX(float2 Xi, float3 N, float roughness)
 	H.z = cosTheta;
 
 	// From tangent-space vector to world-space sample vector.
-	float3 up = abs(N.z) < 0.999 ? float3(0.f, 0.f, 1.f) : float3(1.f, 0.f, 0.f);
+	float3 up = abs(N.z) < 0.999f ? float3(0.f, 0.f, 1.f) : float3(1.f, 0.f, 0.f);
 	float3 tangent = normalize(cross(up, N));
 	float3 bitangent = cross(N, tangent);
 
-	float3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
-	return normalize(sampleVec);
+	H = tangent * H.x + bitangent * H.y + N * H.z;
+
+	float d = (cosTheta * a2 - cosTheta) * cosTheta + 1.f;
+	float D = a2 / (pi * d * d);
+	float pdf = D * cosTheta;
+	return float4(normalize(H), pdf);
 }
 
 

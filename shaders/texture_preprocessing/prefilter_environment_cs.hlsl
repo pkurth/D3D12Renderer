@@ -79,7 +79,7 @@ static float4 filter(uint mip, float3 N, float3 V)
 	for (uint i = 0; i < SAMPLE_COUNT; ++i)
 	{
 		float2 Xi = hammersley(i, SAMPLE_COUNT);
-		float3 H = importanceSampleGGX(Xi, N, roughness);
+		float3 H = importanceSampleGGX(Xi, N, roughness).xyz;
 		float3 L = normalize(2.f * dot(V, H) * H - V);
 
 		float NdotL = max(dot(N, L), 0.f);
