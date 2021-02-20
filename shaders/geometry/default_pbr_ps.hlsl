@@ -54,6 +54,7 @@ struct ps_output
 {
 	float4 hdrColor		: SV_Target0;
 	float2 worldNormal	: SV_Target1;
+	float4 reflectance	: SV_Target2;
 };
 
 [RootSignature(DEFAULT_PBR_RS)]
@@ -192,7 +193,7 @@ ps_output main(ps_input IN)
 		if (pl.shadowInfoIndex != -1)
 		{
 			point_shadow_info info = pointShadowInfos[pl.shadowInfoIndex];
-
+			
 			visibility = samplePointLightShadowMapPCF(surface.P, pl.position,
 				shadowMap,
 				info.viewport0, info.viewport1,
@@ -256,12 +257,15 @@ ps_output main(ps_input IN)
 
 #if 1
 	// Ambient.
-	totalLighting.xyz += calculateAmbientLighting(surface, irradianceTexture, environmentTexture, brdf, clampSampler) * lighting.environmentIntensity;
+	totalLighting.xyz += calculateAmbientIBL(surface, irradianceTexture, environmentTexture, brdf, clampSampler) * lighting.environmentIntensity;
 #endif
+
+	ambient_factors factors = getAmbientFactors(surface);
 
 	ps_output OUT;
 	OUT.hdrColor = totalLighting;
 	OUT.worldNormal = packNormal(surface.N);
+	OUT.reflectance = float4(factors.ks, surface.roughness);
 
 	return OUT;
 }

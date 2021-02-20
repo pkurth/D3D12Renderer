@@ -5,13 +5,13 @@
 
 // This is the Method #4: Spheremap Transform
 
-float2 packNormal(float3 n)
+static float2 packNormal(float3 n)
 {
     float p = sqrt(n.z * 8 + 8);
     return float2(n.xy / p + 0.5);
 }
 
-float3 unpackNormal(float2 enc)
+static float3 unpackNormal(float2 enc)
 {
     float2 fenc = enc * 4 - 2;
     float f = dot(fenc, fenc);

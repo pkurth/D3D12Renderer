@@ -67,21 +67,6 @@ static float depthBufferDepthToEyeDepth(float depthBufferDepth, float4 projectio
 	}
 }
 
-static float linearizeDepthBuffer(float depthBufferDepth, float4 projectionParams)
-{
-	if (projectionParams.y < 0.f) // Infinite far plane.
-	{
-		depthBufferDepth = clamp(depthBufferDepth, 0.f, 1.f - 1e-7f); // A depth of 1 is at infinity.
-		return -1.f / (depthBufferDepth - 1.f);
-	}
-	else
-	{
-		const float c1 = projectionParams.z;
-		const float c0 = projectionParams.w;
-		return 1.f / (c0 * depthBufferDepth + c1);
-	}
-}
-
 struct camera_frustum_planes
 {
 	float4 planes[6];

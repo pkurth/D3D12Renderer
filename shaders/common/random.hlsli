@@ -1,7 +1,7 @@
 #ifndef RANDOM_H
 #define RANDOM_H
 
-static float halton(uint32 index, uint32 base)
+static float halton(uint index, uint base)
 {
 	float fraction = 1.f;
 	float result = 0.f;
@@ -14,9 +14,9 @@ static float halton(uint32 index, uint32 base)
 	return result;
 }
 
-static vec2 halton23(uint32 index)
+static float2 halton23(uint index)
 {
-	return vec2(halton(index, 2), halton(index, 3));
+	return float2(halton(index, 2), halton(index, 3));
 }
 
 
@@ -73,6 +73,16 @@ static float2 hammersley(uint i, uint N)
 	return float2(float(i) / float(N), vdc);
 }
 
+// "Next Generation Post Processing in Call of Duty: Advanced Warfare"
+// http://advances.realtimerendering.com/s2014/index.html
+static float interleavedGradientNoise(float2 uv, uint frameCount)
+{
+	const float2 magicFrameScale = float2(47.f, 17.f) * 0.695f;
+	uv += frameCount * magicFrameScale;
+
+	const float3 magic = float3(0.06711056f, 0.00583715f, 52.9829189f);
+	return frac(magic.z * frac(dot(uv, magic.xy)));
+}
 
 
 

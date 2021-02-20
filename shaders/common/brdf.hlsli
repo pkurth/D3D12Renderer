@@ -245,29 +245,51 @@ static float4 importanceSampleGGX(float2 Xi, float3 N, float roughness)
 // LIGHTING COMPUTATION.
 // ----------------------------------------
 
-static float3 calculateAmbientLighting(surface_info surface, TextureCube<float4> irradianceTexture, TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState clampSampler)
+static float3 diffuseIBL(float3 kd, surface_info surface, TextureCube<float4> irradianceTexture, SamplerState clampSampler)
 {
-	// Common.
-	float3 F = fresnelSchlickRoughness(surface.NdotV, surface.F0, surface.roughness);
-	float3 kD = float3(1.f, 1.f, 1.f) - F;
-	kD *= 1.f - surface.metallic;
-
-	// Diffuse.
 	float3 irradiance = irradianceTexture.SampleLevel(clampSampler, surface.N, 0).rgb;
 	float3 diffuse = irradiance * surface.albedo.rgb;
 
-	// Specular.
+	return kd * diffuse;
+}
+
+static float3 specularIBL(float3 F, surface_info surface, TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState clampSampler)
+{
 	uint width, height, numMipLevels;
 	environmentTexture.GetDimensions(0, width, height, numMipLevels);
-	float lod = surface.alphaRoughness * float(numMipLevels - 1);
+	float lod = surface.roughness * float(numMipLevels - 1);
 
 	float3 prefilteredColor = environmentTexture.SampleLevel(clampSampler, surface.R, lod).rgb;
 	float2 envBRDF = brdf.SampleLevel(clampSampler, float2(surface.roughness, surface.NdotV), 0).rg;
 	float3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y);
 
-	float3 ambient = kD * diffuse + specular;
+	return specular;
+}
 
-	return ambient;
+struct ambient_factors
+{
+	float3 kd;
+	float3 ks;
+};
+
+static ambient_factors getAmbientFactors(surface_info surface)
+{
+	float3 F = fresnelSchlickRoughness(surface.NdotV, surface.F0, surface.roughness);
+	float3 kd = float3(1.f, 1.f, 1.f) - F;
+	kd *= 1.f - surface.metallic;
+
+	ambient_factors result = { kd, F };
+	return result;
+}
+
+static float3 calculateAmbientIBL(surface_info surface, TextureCube<float4> irradianceTexture, TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState clampSampler)
+{
+	ambient_factors factors = getAmbientFactors(surface);
+
+	float3 diffuse = diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler);
+	float3 specular = specularIBL(factors.ks, surface, environmentTexture, brdf, clampSampler);
+
+	return diffuse + specular;
 }
 
 static float3 calculateDirectLighting(surface_info surface, light_info light)

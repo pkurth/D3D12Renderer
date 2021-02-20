@@ -170,7 +170,6 @@ static void groupAppendDecal(uint index)
     const uint bucket = index >> 5;             // Divide by 32.
     const uint bit = index & ((1 << 5) - 1);    // Modulo 32.
     InterlockedOr(groupObjectsList[bucket], 1 << bit);
-
 }
 
 [RootSignature(LIGHT_CULLING_RS)]

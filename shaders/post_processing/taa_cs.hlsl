@@ -46,7 +46,7 @@ void main(cs_input IN)
 	for (uint t = IN.groupIndex; t < TILE_SIZE * TILE_SIZE; t += POST_PROCESSING_BLOCK_SIZE * POST_PROCESSING_BLOCK_SIZE)
 	{
 		const uint2 pixel = upperLeft + unflatten2D(t, TILE_SIZE);
-		const float depth = linearizeDepthBuffer(depthBuffer[pixel], cb.projectionParams);
+		const float depth = depthBuffer[pixel];
 		const float3 color = currentFrame[pixel].rgb;
 		tileRedGreen[t] = f32tof16(color.r) | (f32tof16(color.g) << 16);
 		tileBlueDepth[t] = f32tof16(color.b) | (f32tof16(depth) << 16);
