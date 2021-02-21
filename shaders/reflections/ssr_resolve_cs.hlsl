@@ -177,5 +177,5 @@ void main(cs_input IN)
     result /= totalWeight;
     result.rgb /= 1.f - dot(result.rgb, luminanceWeights);
 
-    output[uvInt.xy] = max(1e-5f, result) * result.a;
+    output[uvInt.xy] = max(1e-5f, result);
 }

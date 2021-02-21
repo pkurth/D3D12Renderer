@@ -259,8 +259,8 @@ ps_output main(ps_input IN)
 
 #if 1
 	// Ambient.
-	totalLighting.xyz += calculateAmbientIBL(surface, irradianceTexture, environmentTexture, brdf, clampSampler) * lighting.environmentIntensity;
-	//totalLighting.xyz += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity;
+	//totalLighting.xyz += calculateAmbientIBL(surface, irradianceTexture, environmentTexture, brdf, clampSampler) * lighting.environmentIntensity;
+	totalLighting.xyz += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity;
 #endif
 
 	ps_output OUT;
