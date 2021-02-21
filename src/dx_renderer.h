@@ -260,6 +260,7 @@ private:
 	};
 
 	void gaussianBlur(dx_command_list* cl, ref<dx_texture> inputOutput, ref<dx_texture> temp, uint32 inputMip, uint32 outputMip, gaussian_blur_kernel_size kernel, uint32 numIterations = 1);
+	void specularAmbient(dx_command_list* cl, dx_dynamic_constant_buffer cameraCBV, const ref<dx_texture>& hdrInput, const ref<dx_texture>& ssr, const ref<dx_texture>& output);
 	void tonemapAndPresent(dx_command_list* cl, const ref<dx_texture>& hdrResult);
 };
 
