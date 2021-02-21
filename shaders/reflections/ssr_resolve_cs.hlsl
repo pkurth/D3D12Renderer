@@ -105,7 +105,7 @@ void main(cs_input IN)
 
     raycastResult.z = abs(raycastResult.z); // Remove sign.
 
-    float sourceMip = clamp(log2(coneTangent * max(cb.dimensions.x, cb.dimensions.y)), 0.f, 4.f);
+    float sourceMip = clamp(log2(coneTangent * max(cb.dimensions.x, cb.dimensions.y)), 0.f, 6.f);
 
     const float2 m = motion.SampleLevel(linearSampler, raycastResult.xy, 0);
     float4 sceneColor = hdrColor.SampleLevel(linearSampler, raycastResult.xy + m, sourceMip);
@@ -117,6 +117,12 @@ void main(cs_input IN)
 
     if (IN.groupThreadID.x < SSR_RESOLVE_RAD | IN.groupThreadID.y < SSR_RESOLVE_RAD | IN.groupThreadID.x >= SSR_BLOCK_SIZE + SSR_RESOLVE_RAD || IN.groupThreadID.y >= SSR_BLOCK_SIZE + SSR_RESOLVE_RAD)
     {
+        return;
+    }
+
+    if (depth == 1.f)
+    {
+        output[uvInt.xy] = float4(0.f, 0.f, 0.f, 0.f);
         return;
     }
 

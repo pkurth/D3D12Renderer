@@ -266,7 +266,7 @@ ps_output main(ps_input IN)
 	ps_output OUT;
 	OUT.hdrColor = totalLighting;
 	OUT.worldNormal = packNormal(surface.N);
-	OUT.reflectance = float4(factors.ks, saturate(surface.roughness * (1.01f - surface.N.y)));
+	OUT.reflectance = float4(factors.ks, surface.roughness);
 
 	return OUT;
 }

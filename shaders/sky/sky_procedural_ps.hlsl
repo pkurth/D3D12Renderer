@@ -35,7 +35,7 @@ ps_output main(ps_input IN)
 	float intensity = remap((float)(x == y), 0.f, 1.f, 0.05f, 1.f) * skyIntensity.intensity;
 
 	ps_output OUT;
-	OUT.color = float4(intensity * float3(0.4f, 0.6f, 0.2f), 1.f);
+	OUT.color = float4(intensity * float3(0.4f, 0.6f, 0.2f), 0.f);
 	OUT.screenVelocity = float2(0.f, 0.f); // TODO: This is of course not the correct screen velocity for the sky.
 	OUT.objectID = 0xFFFFFFFF; // -1.
 	return OUT;

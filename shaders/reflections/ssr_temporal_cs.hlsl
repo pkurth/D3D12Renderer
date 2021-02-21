@@ -147,7 +147,7 @@ void main(cs_input IN)
 
 
 
-    float blendFinal = lerp(0.85f, 0.98f, saturate(1.f - length(m) * 100));
+    float blendFinal = lerp(0.85f, 0.98f, saturate(1.f - length(m) * 100.f));
 
     float4 result = lerp(current, prev, blendFinal);
     output[IN.dispatchThreadID.xy] = max(0, result);

@@ -28,23 +28,24 @@ void main(cs_input IN)
 {
 	float2 uv = (IN.dispatchThreadID.xy + 0.5f) * cb.invDimensions;
 
-	float4 refl = reflectance[IN.dispatchThreadID.xy];
-
-	surface_info surface;
-	surface.N = normalize(unpackNormal(worldNormals[IN.dispatchThreadID.xy]));
-	surface.V = -normalize(restoreWorldDirection(camera.invViewProj, uv, camera.position.xyz));
-	surface.roughness = refl.a;
-
-	surface.inferRemainingProperties();
-
-	float4 ssr = reflection.SampleLevel(clampSampler, uv, 0);
-
-	float3 specular = specularIBL(refl.rgb, surface, environmentTexture, brdf, clampSampler);
-	specular = lerp(specular, ssr.rgb, ssr.a);
-
-
 	float4 color = scene[IN.dispatchThreadID.xy];
-	color.rgb += specular;
+	if (color.a > 0.f) // Alpha of 0 indicates sky.
+	{
+		float4 refl = reflectance[IN.dispatchThreadID.xy];
 
+		surface_info surface;
+		surface.N = normalize(unpackNormal(worldNormals[IN.dispatchThreadID.xy]));
+		surface.V = -normalize(restoreWorldDirection(camera.invViewProj, uv, camera.position.xyz));
+		surface.roughness = refl.a;
+
+		surface.inferRemainingProperties();
+
+		float4 ssr = reflection.SampleLevel(clampSampler, uv, 0);
+
+		float3 specular = specularIBL(refl.rgb, surface, environmentTexture, brdf, clampSampler);
+		specular = lerp(specular, ssr.rgb, ssr.a);
+
+		color.rgb += specular;
+	}
 	output[IN.dispatchThreadID.xy] = color;
 }

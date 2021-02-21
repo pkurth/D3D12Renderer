@@ -37,7 +37,6 @@ static dx_pipeline pointLightShadowPipeline;
 static dx_pipeline textureSkyPipeline;
 static dx_pipeline proceduralSkyPipeline;
 
-
 static dx_pipeline atmospherePipeline;
 
 static dx_pipeline outlineMarkerPipeline;
@@ -49,6 +48,7 @@ static dx_pipeline lightCullingPipeline;
 static dx_pipeline ssrRaycastPipeline;
 static dx_pipeline ssrResolvePipeline;
 static dx_pipeline ssrTemporalPipeline;
+static dx_pipeline ssrMedianBlurPipeline;
 
 static dx_pipeline taaPipeline;
 static dx_pipeline bloomThresholdPipeline;
@@ -212,6 +212,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		ssrRaycastPipeline = createReloadablePipeline("ssr_raycast_cs");
 		ssrResolvePipeline = createReloadablePipeline("ssr_resolve_cs");
 		ssrTemporalPipeline = createReloadablePipeline("ssr_temporal_cs");
+		ssrMedianBlurPipeline = createReloadablePipeline("ssr_median_blur_cs");
 	}
 
 
@@ -437,7 +438,7 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 
 		resizeTexture(ldrPostProcessingTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	}
-
+	
 	allocateLightCullingBuffers();
 }
 
@@ -1188,6 +1189,7 @@ void dx_renderer::endFrame(const user_input& input)
 		// OUTLINES
 		// ----------------------------------------
 
+#if 0
 		if (opaqueRenderPass && opaqueRenderPass->outlinedObjects.size() > 0)
 		{
 			DX_PROFILE_BLOCK(cl, "Outlines");
@@ -1231,7 +1233,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 			cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 		}
-
+#endif
 
 
 
@@ -1239,6 +1241,7 @@ void dx_renderer::endFrame(const user_input& input)
 		// OVERLAYS
 		// ----------------------------------------
 
+#if 0
 		if (overlayRenderPass && overlayRenderPass->drawCalls.size())
 		{
 			DX_PROFILE_BLOCK(cl, "3D Overlays");
@@ -1278,6 +1281,7 @@ void dx_renderer::endFrame(const user_input& input)
 				}
 			}
 		}
+#endif
 
 
 
@@ -1406,22 +1410,42 @@ void dx_renderer::endFrame(const user_input& input)
 				barrier_batcher(cl)
 					.uav(ssrTemporalTextures[ssrOutputIndex])
 					.transition(ssrTemporalTextures[ssrOutputIndex], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-					.transition(ssrTemporalTextures[ssrHistoryIndex], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+					.transitionBegin(ssrTemporalTextures[ssrHistoryIndex], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+					.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 			}
 
-			ssrHistoryIndex = ssrOutputIndex;
+			{
+				DX_PROFILE_BLOCK(cl, "Median Blur");
+
+				cl->setPipelineState(*ssrMedianBlurPipeline.pipeline);
+				cl->setComputeRootSignature(*ssrMedianBlurPipeline.rootSignature);
+
+				cl->setCompute32BitConstants(SSR_MEDIAN_BLUR_RS_CB, ssr_median_blur_cb{ vec2(1.f / ssrResolveTexture->width, 1.f / ssrResolveTexture->height) });
+
+				cl->setDescriptorHeapUAV(SSR_MEDIAN_BLUR_RS_TEXTURES, 0, ssrResolveTexture); // We reuse the resolve texture here.
+				cl->setDescriptorHeapSRV(SSR_MEDIAN_BLUR_RS_TEXTURES, 1, ssrTemporalTextures[ssrOutputIndex]);
+
+				cl->dispatch(bucketize(SSR_RESOLVE_WIDTH, SSR_BLOCK_SIZE), bucketize(SSR_RESOLVE_HEIGHT, SSR_BLOCK_SIZE));
+
+				barrier_batcher(cl)
+					.uav(ssrResolveTexture)
+					.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			}
 
 			{
 				DX_PROFILE_BLOCK(cl, "Combine");
 
-				specularAmbient(cl, cameraCBV, hdrResult, ssrTemporalTextures[ssrOutputIndex], hdrPostProcessingTexture);
+				specularAmbient(cl, cameraCBV, hdrResult, ssrResolveTexture, hdrPostProcessingTexture);
 			}
 
 			barrier_batcher(cl)
 				.uav(hdrPostProcessingTexture)
 				.transitionEnd(ssrRaycastTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // For next frame.
+				.transitionEnd(ssrTemporalTextures[ssrHistoryIndex], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // For next frame.
 				.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // For next frame.
 				.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE); // Will be read by rest of post processing stack. 
+
+			ssrHistoryIndex = ssrOutputIndex;
 		}
 		else
 		{

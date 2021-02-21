@@ -172,11 +172,17 @@ void main(cs_input IN)
 {
     float2 uv = (IN.dispatchThreadID.xy + 0.5f) * cb.invDimensions;
 
+    const float depth = depthBuffer.SampleLevel(pointSampler, uv, 0);
+    if (depth == 1.f)
+    {
+        output[IN.dispatchThreadID.xy] = float4(0.f, 0.f, -1.f, 0.f);
+        return;
+    }
+
     const float3 normal = unpackNormal(worldNormals.SampleLevel(linearSampler, uv, 0));
     const float3 viewNormal = mul(camera.view, float4(normal, 0.f)).xyz;
     const float roughness = reflectance.SampleLevel(linearSampler, uv, 0).a;
     
-    const float depth = depthBuffer.SampleLevel(pointSampler, uv, 0);
     const float3 viewPos = restoreViewSpacePosition(camera.invProj, uv, depth);
     const float3 viewDir = normalize(viewPos);
 

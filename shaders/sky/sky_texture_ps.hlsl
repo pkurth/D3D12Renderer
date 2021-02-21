@@ -22,7 +22,7 @@ struct ps_output
 ps_output main(ps_input IN)
 {
 	ps_output OUT;
-	OUT.color = float4((tex.Sample(texSampler, IN.uv) * skyIntensity.intensity).xyz, 1.f);
+	OUT.color = float4((tex.Sample(texSampler, IN.uv) * skyIntensity.intensity).xyz, 0.f);
 	OUT.screenVelocity = float2(0.f, 0.f); // TODO: This is of course not the correct screen velocity for the sky.
 	OUT.objectID = 0xFFFFFFFF; // -1.
 	return OUT;
