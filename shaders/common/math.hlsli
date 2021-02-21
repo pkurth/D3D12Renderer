@@ -20,11 +20,16 @@ static float solidAngleOfSphere(float radius, float distance)
 	return 2.f * pi * (1.f - sqrt(max(0.f, 1.f - s * s)));
 }
 
-// 2D array index to flattened 1D array index.
 static uint flatten2D(uint2 coord, uint2 dim)
 {
 	return coord.x + coord.y * dim.x;
 }
+
+static uint flatten2D(uint2 coord, uint width)
+{
+	return coord.x + coord.y * width;
+}
+
 // Flattened array index to 2D array index.
 static uint2 unflatten2D(uint idx, uint2 dim)
 {

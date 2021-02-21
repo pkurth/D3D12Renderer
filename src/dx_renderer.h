@@ -197,6 +197,7 @@ private:
 	ref<dx_texture> depthStencilBuffer;
 	ref<dx_texture> linearDepthBuffer;
 	ref<dx_texture> reflectionTexture;
+	ref<dx_texture> ssrResolveTexture;
 
 	ref<dx_texture> prevFrameHDRColorTexture; // This is downsampled by a factor of 2 and contains up to 8 mip levels.
 	ref<dx_texture> prevFrameHDRColorTempTexture;
@@ -251,7 +252,13 @@ private:
 	void recalculateViewport(bool resizeTextures);
 	void allocateLightCullingBuffers();
 
-	void gaussianBlur(dx_command_list* cl, ref<dx_texture> inputOutput, ref<dx_texture> temp, uint32 inputMip, uint32 outputMip, uint32 numIterations = 1);
+	enum gaussian_blur_kernel_size
+	{
+		gaussian_blur_5x5,
+		gaussian_blur_9x9,
+	};
+
+	void gaussianBlur(dx_command_list* cl, ref<dx_texture> inputOutput, ref<dx_texture> temp, uint32 inputMip, uint32 outputMip, gaussian_blur_kernel_size kernel, uint32 numIterations = 1);
 	void tonemapAndPresent(dx_command_list* cl, const ref<dx_texture>& hdrResult);
 };
 

@@ -12,15 +12,12 @@ Texture2D<float> depthBuffer		: register(t0);
 Texture2D<float> linearDepthBuffer	: register(t1);
 Texture2D<float2> worldNormals		: register(t2);
 Texture2D<float4> reflectance		: register(t3);
-Texture2D<float4> hdrColor  		: register(t4);
 
 
 RWTexture2D<float4> output			: register(u0);
 
 SamplerState linearSampler			: register(s0);
 SamplerState pointSampler			: register(s1);
-
-#define GGX_IMPORTANCE_SAMPLE_BIAS 0.1f
 
 static float distanceSquared(float2 a, float2 b) 
 {
@@ -175,18 +172,16 @@ void main(cs_input IN)
 {
     float2 uv = (IN.dispatchThreadID.xy + 0.5f) * cb.invDimensions;
 
-    uint mipLevel = 0;
-
-    float3 normal = unpackNormal(worldNormals.SampleLevel(linearSampler, uv, mipLevel));
-    float3 viewNormal = mul(camera.view, float4(normal, 0.f)).xyz;
-    float roughness = reflectance.SampleLevel(linearSampler, uv, mipLevel).a;
-
-    float depth = depthBuffer.SampleLevel(pointSampler, uv, mipLevel);
-    float3 viewPos = restoreViewSpacePosition(camera.invProj, uv, depth);
-    float3 viewDir = normalize(viewPos);
+    const float3 normal = unpackNormal(worldNormals.SampleLevel(linearSampler, uv, 0));
+    const float3 viewNormal = mul(camera.view, float4(normal, 0.f)).xyz;
+    const float roughness = reflectance.SampleLevel(linearSampler, uv, 0).a;
+    
+    const float depth = depthBuffer.SampleLevel(pointSampler, uv, 0);
+    const float3 viewPos = restoreViewSpacePosition(camera.invProj, uv, depth);
+    const float3 viewDir = normalize(viewPos);
 
     float2 Xi = 0.f.xx;
-    Xi.y = lerp(Xi.y, 0.f, GGX_IMPORTANCE_SAMPLE_BIAS);
+    Xi.y = lerp(Xi.y, 0.f, SSR_GGX_IMPORTANCE_SAMPLE_BIAS);
 
     float4 H = importanceSampleGGX(Xi, viewNormal, roughness);
     float3 reflDir = reflect(viewDir, H.xyz);
@@ -197,6 +192,6 @@ void main(cs_input IN)
     bool hit = traceScreenSpaceRay(viewPos + reflDir * 0.02f, reflDir, jitter, roughness, hitPixel);
 
     float hitDepth = depthBuffer.SampleLevel(pointSampler, hitPixel, 0);
-
-    output[IN.dispatchThreadID.xy] = hdrColor.SampleLevel(linearSampler, hitPixel, 0) * hit;
+    float hitMul = hit ? 1.f : -1.f; // We pack the info whether we hit or not in the sign of the depth.
+    output[IN.dispatchThreadID.xy] = float4(hitPixel, hitDepth * hitMul, H.w);
 }
