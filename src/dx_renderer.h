@@ -197,8 +197,11 @@ private:
 	ref<dx_texture> reflectanceTexture;
 	ref<dx_texture> depthStencilBuffer;
 	ref<dx_texture> linearDepthBuffer;
-	ref<dx_texture> reflectionTexture;
+
+	ref<dx_texture> ssrRaycastTexture;
 	ref<dx_texture> ssrResolveTexture;
+	ref<dx_texture> ssrTemporalTextures[2];
+	uint32 ssrHistoryIndex = 0;
 
 	ref<dx_texture> prevFrameHDRColorTexture; // This is downsampled by a factor of 2 and contains up to 8 mip levels.
 	ref<dx_texture> prevFrameHDRColorTempTexture;

@@ -84,8 +84,8 @@ static void getResolveData(uint index, out float4 raycast, out float4 color)
 [RootSignature(SSR_RESOLVE_RS)]
 void main(cs_input IN)
 {
-    uint2 uvInt = (IN.groupID.xy * SSR_BLOCK_SIZE) + IN.groupThreadID.xy - SSR_RESOLVE_RAD;
-    float2 uv = (uvInt.xy + 0.5f) * cb.invDimensions;
+    const uint2 uvInt = (IN.groupID.xy * SSR_BLOCK_SIZE) + IN.groupThreadID.xy - SSR_RESOLVE_RAD;
+    const float2 uv = (uvInt.xy + 0.5f) * cb.invDimensions;
 
     const float3 normal = unpackNormal(worldNormals.SampleLevel(linearSampler, uv, 0));
     const float3 N = normalize(mul(camera.view, float4(normal, 0.f)).xyz);
@@ -107,7 +107,7 @@ void main(cs_input IN)
 
     float sourceMip = clamp(log2(coneTangent * max(cb.dimensions.x, cb.dimensions.y)), 0.f, 4.f);
 
-    float2 m = motion.SampleLevel(linearSampler, raycastResult.xy, 0);
+    const float2 m = motion.SampleLevel(linearSampler, raycastResult.xy, 0);
     float4 sceneColor = hdrColor.SampleLevel(linearSampler, raycastResult.xy + m, sourceMip);
     sceneColor.w = hit; // Store hit result.
 
