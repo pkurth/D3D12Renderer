@@ -337,15 +337,17 @@ static bool editSunShadowParameters(directional_light& sun)
 	return result;
 }
 
-static bool editSSR(ssr_raycast_cb& settings)
+static bool editSSR(renderer_settings& settings)
 {
 	bool result = false;
 	if (ImGui::TreeNode("SSR"))
 	{
-		result |= ImGui::SliderInt("Num iterations", (int*)&settings.numSteps, 1, 1024);
-		result |= ImGui::SliderFloat("Max distance", &settings.maxDistance, 5.f, 1000.f);
-		result |= ImGui::SliderFloat("Min. stride", &settings.minStride, 1.f, 10.f);
-		result |= ImGui::SliderFloat("Max. stride", &settings.maxStride, settings.minStride, 50.f);
+		result |= ImGui::Checkbox("Enable SSR", &settings.enableSSR);
+
+		result |= ImGui::SliderInt("Num iterations", (int*)&settings.ssr.numSteps, 1, 1024);
+		result |= ImGui::SliderFloat("Max distance", &settings.ssr.maxDistance, 5.f, 1000.f);
+		result |= ImGui::SliderFloat("Min. stride", &settings.ssr.minStride, 1.f, 10.f);
+		result |= ImGui::SliderFloat("Max. stride", &settings.ssr.maxStride, settings.ssr.minStride, 50.f);
 
 		ImGui::TreePop();
 	}
@@ -534,7 +536,7 @@ void application::drawSettings(float dt)
 
 		plotAndEditTonemapping(renderer->settings.tonemap);
 		editSunShadowParameters(sun);
-		editSSR(renderer->settings.ssr);
+		editSSR(renderer->settings);
 		editPostProcessing(renderer->mode, renderer->settings);
 
 		ImGui::SliderFloat("Environment intensity", &renderer->settings.environmentIntensity, 0.f, 2.f);

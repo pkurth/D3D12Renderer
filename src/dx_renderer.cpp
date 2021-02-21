@@ -48,6 +48,7 @@ static dx_pipeline lightCullingPipeline;
 
 static dx_pipeline ssrRaycastPipeline;
 static dx_pipeline ssrResolvePipeline;
+static dx_pipeline ssrCombinePipeline;
 
 static dx_pipeline taaPipeline;
 static dx_pipeline bloomThresholdPipeline;
@@ -202,6 +203,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	{
 		ssrRaycastPipeline = createReloadablePipeline("ssr_raycast_cs");
 		ssrResolvePipeline = createReloadablePipeline("ssr_resolve_cs");
+		ssrCombinePipeline = createReloadablePipeline("ssr_combine_cs");
 	}
 
 
@@ -1288,7 +1290,15 @@ void dx_renderer::endFrame(const user_input& input)
 				.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		}
 
+
+		ref<dx_texture> hdrResult = hdrColorTexture;
+		D3D12_RESOURCE_STATES hdrPostProcessingTextureState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+		D3D12_RESOURCE_STATES hdrColorTextureState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+
+
 		// Screen space reflections.
+		if (settings.enableSSR)
 		{
 			DX_PROFILE_BLOCK(cl, "Screen space reflections");
 
@@ -1341,6 +1351,36 @@ void dx_renderer::endFrame(const user_input& input)
 					.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 					.transitionBegin(reflectionTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 			}
+
+			{
+				DX_PROFILE_BLOCK(cl, "Combine");
+
+				cl->setPipelineState(*ssrCombinePipeline.pipeline);
+				cl->setComputeRootSignature(*ssrCombinePipeline.rootSignature);
+
+				cl->setCompute32BitConstants(SSR_COMBINE_RS_CB, ssr_combine_cb{ vec2(1.f / ssrResolveTexture->width, 1.f / ssrResolveTexture->height) });
+				cl->setComputeDynamicConstantBuffer(SSR_COMBINE_RS_CAMERA, cameraCBV);
+
+				cl->setDescriptorHeapUAV(SSR_COMBINE_RS_TEXTURES, 0, hdrPostProcessingTexture);
+				cl->setDescriptorHeapSRV(SSR_COMBINE_RS_TEXTURES, 1, hdrResult);
+				cl->setDescriptorHeapSRV(SSR_COMBINE_RS_TEXTURES, 2, worldNormalsTexture);
+				cl->setDescriptorHeapSRV(SSR_COMBINE_RS_TEXTURES, 3, reflectanceTexture);
+				cl->setDescriptorHeapSRV(SSR_COMBINE_RS_TEXTURES, 4, ssrResolveTexture);
+				cl->setDescriptorHeapSRV(SSR_COMBINE_RS_TEXTURES, 5, environment->environment);
+				cl->setDescriptorHeapSRV(SSR_COMBINE_RS_TEXTURES, 6, brdfTex);
+
+				cl->dispatch(bucketize(renderWidth, SSR_BLOCK_SIZE), bucketize(renderHeight, SSR_BLOCK_SIZE));
+			}
+
+			hdrResult = hdrPostProcessingTexture;
+
+			barrier_batcher(cl)
+				.uav(hdrResult)
+				.transitionEnd(reflectionTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // For next frame.
+				.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // For next frame.
+				.transition(hdrResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE); // Will be read by rest of post processing stack. 
+
+			hdrPostProcessingTextureState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 		}
 
 		// Downsample scene. This is also the copy used in SSR next frame.
@@ -1355,7 +1395,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 			cl->setCompute32BitConstants(BLIT_RS_CB, blit_cb{ vec2(1.f / prevFrameHDRColorTexture->width, 1.f / prevFrameHDRColorTexture->height) });
 			cl->setDescriptorHeapUAV(BLIT_RS_TEXTURES, 0, prevFrameHDRColorTexture);
-			cl->setDescriptorHeapSRV(BLIT_RS_TEXTURES, 1, hdrColorTexture);
+			cl->setDescriptorHeapSRV(BLIT_RS_TEXTURES, 1, hdrResult);
 
 			cl->dispatch(bucketize(prevFrameHDRColorTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(prevFrameHDRColorTexture->height, POST_PROCESSING_BLOCK_SIZE));
 
@@ -1368,9 +1408,6 @@ void dx_renderer::endFrame(const user_input& input)
 				gaussianBlur(cl, prevFrameHDRColorTexture, prevFrameHDRColorTempTexture, i, i + 1, gaussian_blur_5x5);
 			}
 		}
-
-
-		ref<dx_texture> hdrResult = hdrColorTexture;
 
 
 		// TAA.
@@ -1403,9 +1440,7 @@ void dx_renderer::endFrame(const user_input& input)
 			taaHistoryIndex = taaOutputIndex;
 		}
 
-		// At this point hdrResult is either the TAA result or the hdrColorTexture. Both are in read state.
-
-		D3D12_RESOURCE_STATES hdrPostProcessingTextureState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+		// At this point hdrResult is either the TAA result, the hdrColorTexture, or the hdrPostProcessingTexture. All of these are in read state.
 
 		// Bloom.
 		if (settings.enableBloom)
@@ -1426,9 +1461,19 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->dispatch(bucketize(bloomTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(bloomTexture->height, POST_PROCESSING_BLOCK_SIZE));
 			}
 
-			barrier_batcher(cl)
-				.uav(bloomTexture)
-				.transition(bloomTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			ref<dx_texture> bloomResult = (hdrResult == hdrColorTexture) ? hdrPostProcessingTexture : hdrColorTexture;
+			D3D12_RESOURCE_STATES& state = (hdrResult == hdrColorTexture) ? hdrPostProcessingTextureState : hdrColorTextureState;
+
+			{
+				barrier_batcher batcher(cl);
+				batcher.uav(bloomTexture);
+				batcher.transition(bloomTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+				if (state != D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+				{
+					batcher.transition(bloomResult, state, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				}
+			}
 
 			for (uint32 i = 0; i < bloomTexture->numMipLevels - 1; ++i)
 			{
@@ -1441,7 +1486,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setPipelineState(*bloomCombinePipeline.pipeline);
 				cl->setComputeRootSignature(*bloomCombinePipeline.rootSignature);
 
-				cl->setDescriptorHeapUAV(BLOOM_COMBINE_RS_TEXTURES, 0, hdrPostProcessingTexture);
+				cl->setDescriptorHeapUAV(BLOOM_COMBINE_RS_TEXTURES, 0, bloomResult);
 				cl->setDescriptorHeapSRV(BLOOM_COMBINE_RS_TEXTURES, 1, hdrResult);
 				cl->setDescriptorHeapSRV(BLOOM_COMBINE_RS_TEXTURES, 2, bloomTexture);
 
@@ -1450,19 +1495,19 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
 			}
 
-			hdrResult = hdrPostProcessingTexture;
+			hdrResult = bloomResult;
 
 			barrier_batcher(cl)
 				.uav(hdrResult)
-				.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) // Will be read by rest of post processing stack. 
+				.transition(bloomResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) // Will be read by rest of post processing stack. 
 				.transition(bloomTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.
 
-			hdrPostProcessingTextureState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+			state = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 		}
 
 		// At this point hdrResult is either the TAA result, the hdrColorTexture, or the hdrPostProcessingTexture. All of these are in read state.
 
-		tonemapAndPresent(cl, ssrResolveTexture);
+		tonemapAndPresent(cl, hdrResult);
 
 		barrier_batcher(cl)
 			.uav(frameResult)
@@ -1476,9 +1521,7 @@ void dx_renderer::endFrame(const user_input& input)
 			.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 			.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON)
 			.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-			.transition(reflectanceTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
-			.transitionEnd(reflectionTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-			.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			.transition(reflectanceTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	}
 	else if (dxContext.raytracingSupported && raytracer)

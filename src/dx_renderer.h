@@ -62,6 +62,7 @@ struct renderer_settings
 
 	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
 
+	bool enableSSR = true;
 	ssr_raycast_cb ssr = defaultSSRParameters();
 
 	bool enableTemporalAntialiasing = true;

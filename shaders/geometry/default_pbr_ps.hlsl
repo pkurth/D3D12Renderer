@@ -255,12 +255,13 @@ ps_output main(ps_input IN)
 		}
 	}
 
+	ambient_factors factors = getAmbientFactors(surface);
+
 #if 1
 	// Ambient.
 	totalLighting.xyz += calculateAmbientIBL(surface, irradianceTexture, environmentTexture, brdf, clampSampler) * lighting.environmentIntensity;
+	//totalLighting.xyz += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity;
 #endif
-
-	ambient_factors factors = getAmbientFactors(surface);
 
 	ps_output OUT;
 	OUT.hdrColor = totalLighting;
