@@ -48,13 +48,13 @@ static dx_pipeline lightCullingPipeline;
 
 static dx_pipeline ssrRaycastPipeline;
 static dx_pipeline ssrResolvePipeline;
-static dx_pipeline ssrCombinePipeline;
 
 static dx_pipeline taaPipeline;
 static dx_pipeline bloomThresholdPipeline;
 static dx_pipeline bloomCombinePipeline;
 static dx_pipeline gaussianBlur9x9Pipeline;
 static dx_pipeline gaussianBlur5x5Pipeline;
+static dx_pipeline specularAmbientPipeline;
 static dx_pipeline blitPipeline;
 static dx_pipeline hierarchicalLinearDepthPipeline;
 static dx_pipeline tonemapPipeline;
@@ -194,6 +194,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		gaussianBlur9x9Pipeline = createReloadablePipeline("gaussian_blur_9x9_cs");
 		gaussianBlur5x5Pipeline = createReloadablePipeline("gaussian_blur_5x5_cs");
 		blitPipeline = createReloadablePipeline("blit_cs");
+		specularAmbientPipeline = createReloadablePipeline("specular_ambient_cs");
 		hierarchicalLinearDepthPipeline = createReloadablePipeline("hierarchical_linear_depth_cs");
 		tonemapPipeline = createReloadablePipeline("tonemap_cs");
 		presentPipeline = createReloadablePipeline("present_cs");
@@ -203,7 +204,6 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	{
 		ssrRaycastPipeline = createReloadablePipeline("ssr_raycast_cs");
 		ssrResolvePipeline = createReloadablePipeline("ssr_resolve_cs");
-		ssrCombinePipeline = createReloadablePipeline("ssr_combine_cs");
 	}
 
 
@@ -250,8 +250,8 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 	linearDepthBuffer = createTexture(linearDepthDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	allocateMipUAVs(linearDepthBuffer);
 
-	reflectionTexture = createTexture(0, renderWidth / 1, renderHeight / 1, reflectionFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	ssrResolveTexture = createTexture(0, renderWidth / 1, renderHeight / 1, reflectionFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	reflectionTexture = createTexture(0, renderWidth / 4, renderHeight / 4, reflectionFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	ssrResolveTexture = createTexture(0, renderWidth / 2, renderHeight / 2, reflectionFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	hdrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
@@ -410,8 +410,8 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 			resizeTexture(objectIDsTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		}
 
-		resizeTexture(reflectionTexture, renderWidth / 1, renderHeight / 1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		resizeTexture(ssrResolveTexture, renderWidth / 1, renderHeight / 1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		resizeTexture(reflectionTexture, renderWidth / 4, renderHeight / 4, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		resizeTexture(ssrResolveTexture, renderWidth / 2, renderHeight / 2, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		resizeTexture(hdrPostProcessingTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
@@ -525,6 +525,25 @@ void dx_renderer::gaussianBlur(dx_command_list* cl, ref<dx_texture> inputOutput,
 				.transition(inputOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		}
 	}
+}
+
+void dx_renderer::specularAmbient(dx_command_list* cl, dx_dynamic_constant_buffer cameraCBV, const ref<dx_texture>& hdrInput, const ref<dx_texture>& ssr, const ref<dx_texture>& output)
+{
+	cl->setPipelineState(*specularAmbientPipeline.pipeline);
+	cl->setComputeRootSignature(*specularAmbientPipeline.rootSignature);
+
+	cl->setCompute32BitConstants(SPECULAR_AMBIENT_RS_CB, specular_ambient_cb{ vec2(1.f / renderWidth, 1.f / renderHeight) });
+	cl->setComputeDynamicConstantBuffer(SPECULAR_AMBIENT_RS_CAMERA, cameraCBV);
+
+	cl->setDescriptorHeapUAV(SPECULAR_AMBIENT_RS_TEXTURES, 0, output);
+	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 1, hdrInput);
+	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 2, worldNormalsTexture);
+	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 3, reflectanceTexture);
+	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 4, ssr ? ssr->defaultSRV : nullTextureSRV);
+	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 5, environment->environment);
+	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 6, brdfTex);
+
+	cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
 }
 
 void dx_renderer::tonemapAndPresent(dx_command_list* cl, const ref<dx_texture>& hdrResult)
@@ -1355,33 +1374,32 @@ void dx_renderer::endFrame(const user_input& input)
 			{
 				DX_PROFILE_BLOCK(cl, "Combine");
 
-				cl->setPipelineState(*ssrCombinePipeline.pipeline);
-				cl->setComputeRootSignature(*ssrCombinePipeline.rootSignature);
-
-				cl->setCompute32BitConstants(SSR_COMBINE_RS_CB, ssr_combine_cb{ vec2(1.f / ssrResolveTexture->width, 1.f / ssrResolveTexture->height) });
-				cl->setComputeDynamicConstantBuffer(SSR_COMBINE_RS_CAMERA, cameraCBV);
-
-				cl->setDescriptorHeapUAV(SSR_COMBINE_RS_TEXTURES, 0, hdrPostProcessingTexture);
-				cl->setDescriptorHeapSRV(SSR_COMBINE_RS_TEXTURES, 1, hdrResult);
-				cl->setDescriptorHeapSRV(SSR_COMBINE_RS_TEXTURES, 2, worldNormalsTexture);
-				cl->setDescriptorHeapSRV(SSR_COMBINE_RS_TEXTURES, 3, reflectanceTexture);
-				cl->setDescriptorHeapSRV(SSR_COMBINE_RS_TEXTURES, 4, ssrResolveTexture);
-				cl->setDescriptorHeapSRV(SSR_COMBINE_RS_TEXTURES, 5, environment->environment);
-				cl->setDescriptorHeapSRV(SSR_COMBINE_RS_TEXTURES, 6, brdfTex);
-
-				cl->dispatch(bucketize(renderWidth, SSR_BLOCK_SIZE), bucketize(renderHeight, SSR_BLOCK_SIZE));
+				specularAmbient(cl, cameraCBV, hdrResult, ssrResolveTexture, hdrPostProcessingTexture);
 			}
 
-			hdrResult = hdrPostProcessingTexture;
-
 			barrier_batcher(cl)
-				.uav(hdrResult)
+				.uav(hdrPostProcessingTexture)
 				.transitionEnd(reflectionTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // For next frame.
 				.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // For next frame.
-				.transition(hdrResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE); // Will be read by rest of post processing stack. 
-
-			hdrPostProcessingTextureState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+				.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE); // Will be read by rest of post processing stack. 
 		}
+		else
+		{
+			specularAmbient(cl, cameraCBV, hdrResult, 0, hdrPostProcessingTexture);
+
+			barrier_batcher(cl)
+				.uav(hdrPostProcessingTexture)
+				.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE); // Will be read by rest of post processing stack. 
+
+		}
+
+		hdrResult = hdrPostProcessingTexture;
+		hdrPostProcessingTextureState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+
+
+
+
 
 		// Downsample scene. This is also the copy used in SSR next frame.
 		{

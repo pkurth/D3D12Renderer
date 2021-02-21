@@ -1,10 +1,10 @@
-#include "ssr_rs.hlsli"
 #include "cs.hlsli"
+#include "post_processing_rs.hlsli"
 #include "brdf.hlsli"
 #include "normal.hlsli"
 #include "camera.hlsli"
 
-ConstantBuffer<ssr_combine_cb> cb			: register(b0);
+ConstantBuffer<specular_ambient_cb> cb		: register(b0);
 ConstantBuffer<camera_cb> camera			: register(b1);
 
 RWTexture2D<float4> output					: register(u0);
@@ -22,8 +22,8 @@ Texture2D<float4> brdf						: register(t5);
 SamplerState clampSampler					: register(s0);
 
 
-[numthreads(SSR_BLOCK_SIZE, SSR_BLOCK_SIZE, 1)]
-[RootSignature(SSR_COMBINE_RS)]
+[numthreads(POST_PROCESSING_BLOCK_SIZE, POST_PROCESSING_BLOCK_SIZE, 1)]
+[RootSignature(SPECULAR_AMBIENT_RS)]
 void main(cs_input IN)
 {
 	float2 uv = (IN.dispatchThreadID.xy + 0.5f) * cb.invDimensions;
@@ -45,5 +45,6 @@ void main(cs_input IN)
 
 	float4 color = scene[IN.dispatchThreadID.xy];
 	color.rgb += specular;
+
 	output[IN.dispatchThreadID.xy] = color;
 }
