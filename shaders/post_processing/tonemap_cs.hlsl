@@ -24,8 +24,8 @@ static float3 filmicTonemapping(float3 color)
 void main(cs_input IN)
 {
 	output[IN.dispatchThreadID.xy] = float4(
-		//filmicTonemapping(
+		filmicTonemapping(
 			input[IN.dispatchThreadID.xy].rgb
-		//)
+		)
 		, 1.f);
 }
