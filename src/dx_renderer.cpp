@@ -84,10 +84,10 @@ enum stencil_flags
 
 
 #define SSR_RAYCAST_WIDTH (renderWidth / 2)
-#define SSR_RAYCAST_HEIGHT (renderWidth / 2)
+#define SSR_RAYCAST_HEIGHT (renderHeight / 2)
 
 #define SSR_RESOLVE_WIDTH (renderWidth / 2)
-#define SSR_RESOLVE_HEIGHT (renderWidth / 2)
+#define SSR_RESOLVE_HEIGHT (renderHeight / 2)
 
 
 void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
