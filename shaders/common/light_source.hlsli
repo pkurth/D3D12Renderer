@@ -37,6 +37,26 @@ struct point_light_cb
 	float radius; // Maximum distance.
 	vec3 radiance;
 	int shadowInfoIndex; // -1, if light casts no shadows.
+
+
+	void initialize(vec3 position_, vec3 radiance_, float radius_, int shadowInfoIndex_ = -1)
+	{
+		position = position_;
+		radiance = radiance_;
+		radius = radius_;
+		shadowInfoIndex = shadowInfoIndex_;
+	}
+
+#ifndef HLSL
+	point_light_cb() {}
+
+	point_light_cb(vec3 position_, vec3 radiance_, float radius_, int shadowInfoIndex_ = -1)
+	{
+		initialize(position_, radiance_, radius_, shadowInfoIndex_);
+	}
+#endif
+
+
 };
 
 struct spot_light_cb
@@ -47,6 +67,46 @@ struct spot_light_cb
 	float maxDistance;
 	vec3 radiance;
 	int shadowInfoIndex; // -1, if light casts no shadows.
+
+
+	void initialize(vec3 position_, vec3 direction_, vec3 radiance_, float innerAngle_, float outerAngle_, float maxDistance_, int shadowInfoIndex_ = -1)
+	{
+		position = position_;
+		direction = direction_;
+		radiance = radiance_;
+		
+		int inner = (int)(cos(innerAngle_) * ((1 << 15) - 1));
+		int outer = (int)(cos(outerAngle_) * ((1 << 15) - 1));
+		innerAndOuterCutoff = (inner << 16) | outer;
+
+		maxDistance = maxDistance_;
+		shadowInfoIndex = shadowInfoIndex_;
+	}
+
+#ifndef HLSL
+	spot_light_cb() {}
+
+	spot_light_cb(vec3 position_, vec3 direction_, vec3 radiance_, float innerAngle_, float outerAngle_, float maxDistance_, int shadowInfoIndex_ = -1)
+	{
+		initialize(position_, direction_, radiance_, innerAngle_, outerAngle_, maxDistance_, shadowInfoIndex_);
+	}
+#endif
+
+	float getInnerCutoff()
+#ifndef HLSL
+		const
+#endif
+	{
+		return (innerAndOuterCutoff >> 16) / float((1 << 15) - 1);
+	}
+
+	float getOuterCutoff()
+#ifndef HLSL
+		const
+#endif
+	{
+		return (innerAndOuterCutoff & 0xFFFF) / float((1 << 15) - 1);
+	}
 };
 
 struct spot_shadow_info
@@ -64,23 +124,6 @@ struct point_shadow_info
 	vec4 viewport0;
 	vec4 viewport1;
 };
-
-static float getInnerCutoff(int innerAndOuterCutoff)
-{
-	return (innerAndOuterCutoff >> 16) / float((1 << 15) - 1);
-}
-
-static float getOuterCutoff(int innerAndOuterCutoff)
-{
-	return (innerAndOuterCutoff & 0xFFFF) / float((1 << 15) - 1);
-}
-
-static int packInnerAndOuterCutoff(float innerCutoff, float outerCutoff)
-{
-	int inner = (int)(innerCutoff * ((1 << 15) - 1));
-	int outer = (int)(outerCutoff * ((1 << 15) - 1));
-	return (inner << 16) | outer;
-}
 
 #ifdef HLSL
 static float sampleShadowMapSimple(float4x4 vp, float3 worldPosition, 

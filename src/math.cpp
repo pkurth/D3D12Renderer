@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "math.h"
-
+#include <half/half.c>
 
 const mat2 mat2::identity =
 {
@@ -48,6 +48,26 @@ const quat quat::identity = { 0.f, 0.f, 0.f, 1.f };
 
 const trs trs::identity = { vec3(0.f, 0.f, 0.f), quat(0.f, 0.f, 0.f, 1.f), vec3(1.f, 1.f, 1.f) };
 
+
+half::half(float f)
+{
+	h = half_from_float(*(uint32*)&f);
+}
+
+half::operator float()
+{
+	uint32 f = half_to_float(h);
+	return *(float*)&f;
+}
+
+half operator+(half a, half b) { return half_add(a.h, b.h); }
+half& operator+=(half& a, half b) {	a = a + b; return a; }
+half operator-(half a, half b) { return half_sub(a.h, b.h); }
+half& operator-=(half& a, half b) {	a = a - b; return a; }
+half operator*(half a, half b) { return half_mul(a.h, b.h); }
+half& operator*=(half& a, half b) {	a = a * b; return a; }
+half operator/(half a, half b) { return half_div(a.h, b.h); }
+half& operator/=(half& a, half b) { a = a / b; return a; }
 
 
 mat2 operator*(mat2 a, mat2 b)

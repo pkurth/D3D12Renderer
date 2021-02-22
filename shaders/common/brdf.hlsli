@@ -89,8 +89,8 @@ struct light_info
 		distanceToLight = length(L);
 		L /= distanceToLight;
 
-		float innerCutoff = getInnerCutoff(sl.innerAndOuterCutoff);
-		float outerCutoff = getOuterCutoff(sl.innerAndOuterCutoff);
+		float innerCutoff = sl.getInnerCutoff();
+		float outerCutoff = sl.getOuterCutoff();
 		float epsilon = innerCutoff - outerCutoff;
 
 		float theta = dot(-L, sl.direction);

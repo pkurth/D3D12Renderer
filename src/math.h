@@ -29,6 +29,32 @@ static int32 clamp(int32 v, int32 l, int32 u) { return min(u, max(l, v)); }
 static float clamp01(float v) { return clamp(v, 0.f, 1.f); }
 static uint32 bucketize(uint32 problemSize, uint32 bucketSize) { return (problemSize + bucketSize - 1) / bucketSize; }
 
+
+struct half
+{
+	uint16 h;
+
+	half() {}
+	half(uint16 in) : h(in) {}
+	half(float f);
+
+	operator float();
+};
+
+half operator+(half a, half b);
+half& operator+=(half& a, half b);
+
+half operator-(half a, half b);
+half& operator-=(half& a, half b);
+
+half operator*(half a, half b);
+half& operator*=(half& a, half b);
+
+half operator/(half a, half b);
+half& operator/=(half& a, half b);
+
+
+
 struct vec2
 {
 	float x, y;
