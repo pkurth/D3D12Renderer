@@ -182,35 +182,34 @@ void application::initialize(dx_renderer* renderer)
 
 	spotLights.resize(2);
 
-	spotLights[0] =
-	{
-		{ 2.f, 3.f, 0.f }, // Position.
-		packInnerAndOuterCutoff(cos(deg2rad(20.f)), cos(deg2rad(30.f))),
-		{ 1.f, 0.f, 0.f }, // Direction.
-		25.f, // Max distance.
+	spotLights[0].initialize(
+		{ 2.f, 3.f, 0.f },
+		{ 1.f, 0.f, 0.f },
 		randomRGB(rng) * 5.f,
-		0 // Shadow info index.
-	};
-
-	spotLights[1] =
-	{
-		{ -2.f, 3.f, 0.f }, // Position.
-		packInnerAndOuterCutoff(cos(deg2rad(20.f)), cos(deg2rad(30.f))),
-		{ -1.f, 0.f, 0.f }, // Direction.
-		25.f, // Max distance.
+		deg2rad(20.f),
+		deg2rad(30.f),
+		25.f,
+		0
+	);
+	
+	spotLights[1].initialize(
+		{ -2.f, 3.f, 0.f },
+		{ -1.f, 0.f, 0.f },
 		randomRGB(rng) * 5.f,
-		1 // Shadow info index.
-	};
+		deg2rad(20.f),
+		deg2rad(30.f),
+		25.f,
+		1
+	);
 
 	pointLights.resize(1);
 
-	pointLights[0] =
-	{
-		{ 0.f, 8.f, 0.f }, // Position.
-		10, // Radius.
+	pointLights[0].initialize(
+		{ 0.f, 8.f, 0.f },
 		randomRGB(rng),
-		0 // Shadow info index.
-	};
+		10,
+		0
+	);
 
 #if 1
 	decalTexture = loadTextureFromFile("assets/textures/decals/explosion.png");
@@ -250,7 +249,7 @@ void application::initialize(dx_renderer* renderer)
 	{
 		pointLightBuffer[i] = createUploadBuffer(sizeof(point_light_cb), 512, 0);
 		spotLightBuffer[i] = createUploadBuffer(sizeof(spot_light_cb), 512, 0);
-		decalBuffer[i] = createUploadBuffer(sizeof(decal_cb), 512, 0);
+		decalBuffer[i] = createUploadBuffer(sizeof(pbr_decal_cb), 512, 0);
 
 		SET_NAME(pointLightBuffer[i]->resource, "Point lights");
 		SET_NAME(spotLightBuffer[i]->resource, "Spot lights");
@@ -755,7 +754,7 @@ void application::update(const user_input& input, float dt)
 		}
 		if (decals.size())
 		{
-			updateUploadBufferData(decalBuffer[dxContext.bufferedFrameID], decals.data(), (uint32)(sizeof(decal_cb) * decals.size()));
+			updateUploadBufferData(decalBuffer[dxContext.bufferedFrameID], decals.data(), (uint32)(sizeof(pbr_decal_cb) * decals.size()));
 			renderer->setDecals(decalBuffer[dxContext.bufferedFrameID], (uint32)decals.size(), decalTexture);
 		}
 

@@ -22,7 +22,7 @@ StructuredBuffer<light_culling_view_frustum> frusta : register(t1);
 
 StructuredBuffer<point_light_cb> pointLights        : register(t2);
 StructuredBuffer<spot_light_cb> spotLights          : register(t3);
-StructuredBuffer<decal_cb> decals                   : register(t4);
+StructuredBuffer<pbr_decal_cb> decals               : register(t4);
 
 RWTexture2D<uint2> tiledCullingGrid                 : register(u0);
 RWStructuredBuffer<uint> tiledCullingIndexCounter   : register(u1);
@@ -55,7 +55,7 @@ static spot_light_bounding_volume getSpotLightBoundingVolume(spot_light_cb sl)
     result.direction = sl.direction;
     result.height = sl.maxDistance;
 
-    float oc = getOuterCutoff(sl.innerAndOuterCutoff);
+    float oc = sl.getOuterCutoff();
     result.radius = result.height * sqrt(1.f - oc * oc) / oc; // Same as height * tan(acos(oc)).
     return result;
 }
@@ -119,7 +119,7 @@ static bool spotLightInsideFrustum(spot_light_bounding_volume sl, light_culling_
     return result;
 }
 
-static bool decalOutsidePlane(decal_cb decal, light_culling_frustum_plane plane)
+static bool decalOutsidePlane(pbr_decal_cb decal, light_culling_frustum_plane plane)
 {
     float x = dot(decal.right, plane.N)     >= 0.f ? 1.f : -1.f;
     float y = dot(decal.up, plane.N)        >= 0.f ? 1.f : -1.f;
@@ -131,7 +131,7 @@ static bool decalOutsidePlane(decal_cb decal, light_culling_frustum_plane plane)
     return pointOutsidePlane(nPoint, plane);
 }
 
-static bool decalInsideFrustum(decal_cb decal, light_culling_view_frustum frustum, light_culling_frustum_plane nearPlane, light_culling_frustum_plane farPlane)
+static bool decalInsideFrustum(pbr_decal_cb decal, light_culling_view_frustum frustum, light_culling_frustum_plane nearPlane, light_culling_frustum_plane farPlane)
 {
     bool result = true;
 
@@ -235,7 +235,7 @@ void main(cs_input IN)
     const uint numDecals = cb.numDecals;
     for (i = IN.groupIndex; i < numDecals; i += LIGHT_CULLING_TILE_SIZE * LIGHT_CULLING_TILE_SIZE)
     {
-        decal_cb d = decals[i];
+        pbr_decal_cb d = decals[i];
         if (decalInsideFrustum(d, groupFrustum, nearPlane, farPlane))
         {
             groupAppendDecal(i);

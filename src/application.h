@@ -52,7 +52,7 @@ private:
 
 	std::vector<point_light_cb> pointLights;
 	std::vector<spot_light_cb> spotLights;
-	std::vector<decal_cb> decals;
+	std::vector<pbr_decal_cb> decals;
 
 	ref<dx_texture> decalTexture;
 

@@ -90,7 +90,7 @@ struct pbr_material_cb // 24 bytes.
 
 
 
-struct decal_cb
+struct pbr_decal_cb
 {
 	vec3 position;
 	uint32 albedoTint;			// RGBA packed into one uint32.
@@ -124,9 +124,9 @@ struct decal_cb
 	}
 
 #ifndef HLSL
-	decal_cb() {}
+	pbr_decal_cb() {}
 
-	decal_cb(vec3 position_, vec3 right_, vec3 up_, vec3 forward_, vec4 albedo_, float roughness_, float metallic_, vec4 viewport_)
+	pbr_decal_cb(vec3 position_, vec3 right_, vec3 up_, vec3 forward_, vec4 albedo_, float roughness_, float metallic_, vec4 viewport_)
 	{
 		initialize(position_, right_, up_, forward_, albedo_, roughness_, metallic_, viewport_);
 	}

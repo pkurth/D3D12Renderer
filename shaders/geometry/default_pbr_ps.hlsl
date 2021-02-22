@@ -42,7 +42,7 @@ Texture2D<uint2> tiledCullingGrid						: register(t3, space2);
 StructuredBuffer<uint> tiledObjectsIndexList			: register(t4, space2);
 StructuredBuffer<point_light_cb> pointLights			: register(t5, space2);
 StructuredBuffer<spot_light_cb> spotLights				: register(t6, space2);
-StructuredBuffer<decal_cb> decals						: register(t7, space2);
+StructuredBuffer<pbr_decal_cb> decals					: register(t7, space2);
 Texture2D<float> shadowMap								: register(t8, space2);
 StructuredBuffer<point_shadow_info> pointShadowInfos	: register(t9, space2);
 StructuredBuffer<spot_shadow_info> spotShadowInfos		: register(t10, space2);
@@ -127,7 +127,7 @@ ps_output main(ps_input IN)
 
 			uint decalIndex = decalBucketIndex * 32 + indexOfLowestSetBit;
 			decalIndex = MAX_NUM_TOTAL_DECALS - decalIndex - 1; // Reverse of operation in culling shader.
-			decal_cb decal = decals[decalIndex];
+			pbr_decal_cb decal = decals[decalIndex];
 
 			float3 offset = surface.P - decal.position;
 			float3 local = float3(

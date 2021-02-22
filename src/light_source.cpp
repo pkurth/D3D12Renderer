@@ -97,6 +97,6 @@ void directional_light::updateMatrices(const render_camera& camera, bool prevent
 mat4 getSpotLightViewProjectionMatrix(const spot_light_cb& sl)
 {
 	mat4 viewMatrix = lookAt(sl.position, sl.position + sl.direction, vec3(0.f, 1.f, 0.f));
-	mat4 projMatrix = createPerspectiveProjectionMatrix(acos(getOuterCutoff(sl.innerAndOuterCutoff)) * 2.f, 1.f, 0.01f, sl.maxDistance);
+	mat4 projMatrix = createPerspectiveProjectionMatrix(acos(sl.getOuterCutoff()) * 2.f, 1.f, 0.01f, sl.maxDistance);
 	return projMatrix * viewMatrix;
 }
