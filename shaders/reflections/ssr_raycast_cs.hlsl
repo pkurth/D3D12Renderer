@@ -36,7 +36,7 @@ static void swap(inout float a, inout float b)
 static bool intersectsDepthBuffer(float sceneZMax, float rayZMin, float rayZMax)
 {
     // Increase thickness along distance. 
-    float thickness = max(sceneZMax * 0.3f, 0.3f);
+    float thickness = max(sceneZMax * 0.3f, 1.f);
 
     // Effectively remove line/tiny artifacts, mostly caused by Zbuffers precision.
     float depthScale = min(1.f, sceneZMax / 100.f);
