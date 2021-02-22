@@ -1463,35 +1463,6 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 
-
-
-		// Downsample scene. This is also the copy used in SSR next frame.
-		{
-			DX_PROFILE_BLOCK(cl, "Downsample scene");
-
-			barrier_batcher(cl)
-				.transition(prevFrameHDRColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-
-			cl->setPipelineState(*blitPipeline.pipeline);
-			cl->setComputeRootSignature(*blitPipeline.rootSignature);
-
-			cl->setCompute32BitConstants(BLIT_RS_CB, blit_cb{ vec2(1.f / prevFrameHDRColorTexture->width, 1.f / prevFrameHDRColorTexture->height) });
-			cl->setDescriptorHeapUAV(BLIT_RS_TEXTURES, 0, prevFrameHDRColorTexture);
-			cl->setDescriptorHeapSRV(BLIT_RS_TEXTURES, 1, hdrResult);
-
-			cl->dispatch(bucketize(prevFrameHDRColorTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(prevFrameHDRColorTexture->height, POST_PROCESSING_BLOCK_SIZE));
-
-			barrier_batcher(cl)
-				.uav(prevFrameHDRColorTexture)
-				.transition(prevFrameHDRColorTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-
-			for (uint32 i = 0; i < prevFrameHDRColorTexture->numMipLevels - 1; ++i)
-			{
-				gaussianBlur(cl, prevFrameHDRColorTexture, prevFrameHDRColorTempTexture, i, i + 1, gaussian_blur_5x5);
-			}
-		}
-
-
 		// TAA.
 		if (settings.enableTemporalAntialiasing)
 		{
@@ -1523,6 +1494,40 @@ void dx_renderer::endFrame(const user_input& input)
 		}
 
 		// At this point hdrResult is either the TAA result, the hdrColorTexture, or the hdrPostProcessingTexture. All of these are in read state.
+
+
+
+
+
+
+		// Downsample scene. This is also the copy used in SSR next frame.
+		{
+			DX_PROFILE_BLOCK(cl, "Downsample scene");
+
+			barrier_batcher(cl)
+				.transition(prevFrameHDRColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+			cl->setPipelineState(*blitPipeline.pipeline);
+			cl->setComputeRootSignature(*blitPipeline.rootSignature);
+
+			cl->setCompute32BitConstants(BLIT_RS_CB, blit_cb{ vec2(1.f / prevFrameHDRColorTexture->width, 1.f / prevFrameHDRColorTexture->height) });
+			cl->setDescriptorHeapUAV(BLIT_RS_TEXTURES, 0, prevFrameHDRColorTexture);
+			cl->setDescriptorHeapSRV(BLIT_RS_TEXTURES, 1, hdrResult);
+
+			cl->dispatch(bucketize(prevFrameHDRColorTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(prevFrameHDRColorTexture->height, POST_PROCESSING_BLOCK_SIZE));
+
+			barrier_batcher(cl)
+				.uav(prevFrameHDRColorTexture)
+				.transition(prevFrameHDRColorTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+			for (uint32 i = 0; i < prevFrameHDRColorTexture->numMipLevels - 1; ++i)
+			{
+				gaussianBlur(cl, prevFrameHDRColorTexture, prevFrameHDRColorTempTexture, i, i + 1, gaussian_blur_5x5);
+			}
+		}
+
+
+
 
 		// Bloom.
 		if (settings.enableBloom)
