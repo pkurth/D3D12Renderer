@@ -44,30 +44,42 @@ static vec4 unpackColor(uint32 c)
 
 struct pbr_material_cb // 24 bytes.
 {
-    vec3 emission;      // Since emission can be HDR, we require use full precision floats here.
+    vec3 emission;      // Since emission can be HDR, we use full precision floats here.
     uint32 albedoTint;  // RGBA packed into one uint32. Can only be between 0 and 1, which is why we are only using 8 bit per channel.
-    uint32 roughnessOverride_metallicOverride;
-    uint32 flags;       // See defines above.
+    uint32 roughness_metallic_flags_refraction; // 8 bit each.
+	uint32 normalMapStrength; // Packed as a 16 bit float. 16 bit are still free! TODO: Maybe values between 0 and 1 are enough for normal map strength? Then 8 bit would suffice.
 
-
-    void initialize(vec4 albedo_, vec3 emission_, float roughness_, float metallic_, uint32 flags_)
+    void initialize(vec4 albedo_, vec3 emission_, float roughness_, float metallic_, uint32 flags_, float normalMapStrength_ = 1.f, float refractionStrength_ = 0.f)
     {
         emission = emission_;
         albedoTint = packColor(albedo_);
         
-        uint32 r = (uint32)(roughness_ * 0xFFFF);
-        uint32 m = (uint32)(metallic_ * 0xFFFF);
-        roughnessOverride_metallicOverride = (r << 16) | m;
+		roughness_ = clamp(roughness_, 0.f, 1.f);
+		metallic_ = clamp(metallic_, 0.f, 1.f);
+		refractionStrength_ = clamp(refractionStrength_, 0.f, 1.f);
 
-        flags = flags_;
+		roughness_metallic_flags_refraction =
+			((uint32)(roughness_ * 0xFF) << 24) |
+			((uint32)(metallic_ * 0xFF) << 16) |
+			(flags_ << 8) |
+			((uint32)(refractionStrength_ * 0xFF) << 0);
+		
+		uint32 normalStrengthHalf;
+#ifndef HLSL
+		normalStrengthHalf = half(normalMapStrength_).h;
+#else
+		normalStrengthHalf = f32tof16(normalMapStrength_);
+#endif
+
+		normalMapStrength = (normalStrengthHalf << 16);
     }
 
 #ifndef HLSL
     pbr_material_cb() {}
 
-    pbr_material_cb(vec4 albedo_, vec3 emission_, float roughness_, float metallic_, uint32 flags_)
+    pbr_material_cb(vec4 albedo_, vec3 emission_, float roughness_, float metallic_, uint32 flags_, float normalMapStrength_ = 1.f, float refractionStrength_ = 0.f)
     {
-        initialize(albedo_, emission_, roughness_, metallic_, flags_);
+        initialize(albedo_, emission_, roughness_, metallic_, flags_, normalMapStrength_, refractionStrength_);
     }
 #endif
 
@@ -78,13 +90,34 @@ struct pbr_material_cb // 24 bytes.
 
     float getRoughnessOverride()
     {
-        return (roughnessOverride_metallicOverride >> 16) / (float)0xFFFF;
+        return ((roughness_metallic_flags_refraction >> 24) & 0xFF) / (float)0xFF;
     }
 
     float getMetallicOverride()
     {
-        return (roughnessOverride_metallicOverride & 0xFFFF) / (float)0xFFFF;
+        return ((roughness_metallic_flags_refraction >> 16) & 0xFF) / (float)0xFF;
     }
+
+	float getNormalMapStrength()
+	{
+		uint32 normalStrengthHalf = normalMapStrength >> 16;
+
+#ifndef HLSL
+		return half((uint16)normalStrengthHalf);
+#else
+		return f16tof32(normalStrengthHalf);
+#endif
+	}
+
+	float getRefractionStrength()
+	{
+		return ((roughness_metallic_flags_refraction >> 0) & 0xFF) / (float)0xFF;
+	}
+
+	uint32 getFlags()
+	{
+		return (roughness_metallic_flags_refraction >> 8) & 0xFF;
+	}
 };
 
 

@@ -60,7 +60,7 @@ struct ps_output
 [RootSignature(DEFAULT_PBR_RS)]
 ps_output main(ps_input IN)
 {
-	uint flags = material.flags;
+	uint flags = material.getFlags();
 
 	surface_info surface;
 
@@ -69,8 +69,9 @@ ps_output main(ps_input IN)
 		: float4(1.f, 1.f, 1.f, 1.f))
 		* material.getAlbedo();
 
+	const float normalMapStrength = material.getNormalMapStrength();
 	surface.N = (flags & USE_NORMAL_TEXTURE)
-		? mul(normalTex.Sample(wrapSampler, IN.uv).xyz * 2.f - float3(1.f, 1.f, 1.f), IN.tbn)
+		? mul(float3(normalMapStrength, normalMapStrength, 1.f) * (normalTex.Sample(wrapSampler, IN.uv).xyz * 2.f - 1.f), IN.tbn)
 		: IN.tbn[2];
 	surface.N = normalize(surface.N);
 

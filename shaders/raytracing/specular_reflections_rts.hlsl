@@ -176,7 +176,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	uint mipLevel = 0;
 
 
-	uint flags = material.flags;
+	uint flags = material.getFlags();
 
 	float4 albedo = ((flags & USE_ALBEDO_TEXTURE)
 		? albedoTex.SampleLevel(wrapSampler, uv, mipLevel)
