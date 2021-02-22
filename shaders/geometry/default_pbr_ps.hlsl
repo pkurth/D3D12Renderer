@@ -36,7 +36,7 @@ ConstantBuffer<directional_light_cb> sun				: register(b0, space2);
 TextureCube<float4> irradianceTexture					: register(t0, space2);
 TextureCube<float4> environmentTexture					: register(t1, space2);
 
-Texture2D<float4> brdf									: register(t2, space2);
+Texture2D<float2> brdf									: register(t2, space2);
 
 Texture2D<uint2> tiledCullingGrid						: register(t3, space2);
 StructuredBuffer<uint> tiledObjectsIndexList			: register(t4, space2);
@@ -147,7 +147,8 @@ ps_output main(ps_input IN)
 				float2 uvScale = float2(decal.viewportScale >> 16, decal.viewportScale & 0xFFFF) / float(0xFFFF);
 				uv = uvOffset + uv * uvScale;
 
-				const float4 decalAlbedo = decalTextureAtlas.Sample(wrapSampler, uv) * unpackColor(decal.albedoTint);
+				// Since this loop has variable length, we cannot use automatic mip-selection here. Gradients may be undefined.
+				const float4 decalAlbedo = decalTextureAtlas.SampleLevel(wrapSampler, uv, 0) * unpackColor(decal.albedoTint);
 				const float decalRoughness = getRoughnessOverride(decal.roughnessOverride_metallicOverride);
 				const float decalMetallic = getMetallicOverride(decal.roughnessOverride_metallicOverride);
 				
@@ -266,7 +267,7 @@ ps_output main(ps_input IN)
 	ps_output OUT;
 	OUT.hdrColor = totalLighting;
 	OUT.worldNormal = packNormal(surface.N);
-	OUT.reflectance = float4(factors.ks, surface.roughness);
+	OUT.reflectance = float4(factors.ks, surface.roughness * (1.f - surface.N.y));
 
 	return OUT;
 }

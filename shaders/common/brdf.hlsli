@@ -253,14 +253,14 @@ static float3 diffuseIBL(float3 kd, surface_info surface, TextureCube<float4> ir
 	return kd * diffuse;
 }
 
-static float3 specularIBL(float3 F, surface_info surface, TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState clampSampler)
+static float3 specularIBL(float3 F, surface_info surface, TextureCube<float4> environmentTexture, Texture2D<float2> brdf, SamplerState clampSampler)
 {
 	uint width, height, numMipLevels;
 	environmentTexture.GetDimensions(0, width, height, numMipLevels);
 	float lod = surface.roughness * float(numMipLevels - 1);
 
 	float3 prefilteredColor = environmentTexture.SampleLevel(clampSampler, surface.R, lod).rgb;
-	float2 envBRDF = brdf.SampleLevel(clampSampler, float2(surface.roughness, surface.NdotV), 0).rg;
+	float2 envBRDF = brdf.SampleLevel(clampSampler, float2(surface.roughness, surface.NdotV), 0);
 	float3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y);
 
 	return specular;
@@ -282,7 +282,7 @@ static ambient_factors getAmbientFactors(surface_info surface)
 	return result;
 }
 
-static float3 calculateAmbientIBL(surface_info surface, TextureCube<float4> irradianceTexture, TextureCube<float4> environmentTexture, Texture2D<float4> brdf, SamplerState clampSampler)
+static float3 calculateAmbientIBL(surface_info surface, TextureCube<float4> irradianceTexture, TextureCube<float4> environmentTexture, Texture2D<float2> brdf, SamplerState clampSampler)
 {
 	ambient_factors factors = getAmbientFactors(surface);
 
