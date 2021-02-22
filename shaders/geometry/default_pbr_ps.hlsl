@@ -53,8 +53,11 @@ Texture2D<float4> decalTextureAtlas                     : register(t11, space2);
 struct ps_output
 {
 	float4 hdrColor		: SV_Target0;
+
+#ifndef TRANSPARENT
 	float2 worldNormal	: SV_Target1;
 	float4 reflectance	: SV_Target2;
+#endif
 };
 
 [RootSignature(DEFAULT_PBR_RS)]
@@ -95,7 +98,7 @@ ps_output main(ps_input IN)
 
 
 
-	float4 totalLighting = float4(surface.emission, surface.albedo.w);
+	light_contribution totalLighting = { float3(0.f, 0.f, 0.f), float3(0.f, 0.f, 0.f) };
 
 
 	// Tiled lighting.
@@ -205,7 +208,7 @@ ps_output main(ps_input IN)
 		[branch]
 		if (visibility > 0.f)
 		{
-			totalLighting.xyz += calculateDirectLighting(surface, light) * visibility;
+			totalLighting.add(calculateDirectLighting(surface, light), visibility);
 		}
 	}
 
@@ -232,7 +235,7 @@ ps_output main(ps_input IN)
 		[branch]
 		if (visibility > 0.f)
 		{
-			totalLighting.xyz += calculateDirectLighting(surface, light) * visibility;
+			totalLighting.add(calculateDirectLighting(surface, light), visibility);
 		}
 	}
 
@@ -252,21 +255,32 @@ ps_output main(ps_input IN)
 		[branch]
 		if (visibility > 0.f)
 		{
-			totalLighting.xyz += calculateDirectLighting(surface, light) * visibility;
+			totalLighting.add(calculateDirectLighting(surface, light), visibility);
 		}
 	}
 
-	ambient_factors factors = getAmbientFactors(surface);
 
-#if 1
-	// Ambient diffuse. Specular will be set in a later render pass.
-	totalLighting.xyz += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity;
+	// Ambient light.
+	ambient_factors factors = getAmbientFactors(surface);
+	totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity;
+
+#ifdef TRANSPARENT
+	// Only add ambient specular for transparent objects. Opaque objects get their ambient specular in a later render pass.
+	totalLighting.specular += specularIBL(factors.ks, surface, environmentTexture, brdf, clampSampler);
 #endif
 
+
+
+	// Output.
 	ps_output OUT;
-	OUT.hdrColor = totalLighting;
+	OUT.hdrColor = totalLighting.evaluate(surface.albedo);
+	OUT.hdrColor.rgb += surface.emission;
+
+#ifndef TRANSPARENT
+	// Only needed for opaque objects.
 	OUT.worldNormal = packNormal(surface.N);
 	OUT.reflectance = float4(factors.ks, surface.roughness * (1.f - surface.N.y));
+#endif
 
 	return OUT;
 }

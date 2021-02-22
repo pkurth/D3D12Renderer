@@ -333,7 +333,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 			light.initialize(surface, sunL, sunRadiance);
 
 			payload.color +=
-				calculateDirectLighting(surface, light)
+				calculateDirectLighting(surface, light).evaluate(surface.albedo)
 				* traceShadowRay(surface.P, sunL, 10000.f, payload.recursion);
 		}
 
@@ -349,7 +349,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 			float pointLightVisibility = traceShadowRay(surface.P, light.L, light.distanceToLight, payload.recursion);
 
 			float3 pointLightColor =
-				calculateDirectLighting(surface, light)
+				calculateDirectLighting(surface, light).evaluate(surface.albedo)
 				* pointLightVisibility;
 
 			float pointLightSolidAngle = solidAngleOfSphere(constants.pointLightRadius, light.distanceToLight) * 0.5f; // Divide by 2, since we are only interested in hemisphere.

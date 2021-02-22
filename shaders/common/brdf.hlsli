@@ -248,9 +248,7 @@ static float4 importanceSampleGGX(float2 Xi, float3 N, float roughness)
 static float3 diffuseIBL(float3 kd, surface_info surface, TextureCube<float4> irradianceTexture, SamplerState clampSampler)
 {
 	float3 irradiance = irradianceTexture.SampleLevel(clampSampler, surface.N, 0).rgb;
-	float3 diffuse = irradiance * surface.albedo.rgb;
-
-	return kd * diffuse;
+	return kd * irradiance;
 }
 
 static float3 specularIBL(float3 F, surface_info surface, TextureCube<float4> environmentTexture, Texture2D<float2> brdf, SamplerState clampSampler)
@@ -282,17 +280,36 @@ static ambient_factors getAmbientFactors(surface_info surface)
 	return result;
 }
 
-static float3 calculateAmbientIBL(surface_info surface, TextureCube<float4> irradianceTexture, TextureCube<float4> environmentTexture, Texture2D<float2> brdf, SamplerState clampSampler)
+struct light_contribution
+{
+	float3 diffuse;
+	float3 specular;
+
+	void add(light_contribution other, float visibility)
+	{
+		diffuse += other.diffuse * visibility;
+		specular += other.specular * visibility;
+	}
+
+	float4 evaluate(float4 albedo)
+	{
+		float3 c = albedo.rgb * diffuse + specular;
+		return float4(c, albedo.a);
+	}
+};
+
+static light_contribution calculateAmbientIBL(surface_info surface, TextureCube<float4> irradianceTexture, TextureCube<float4> environmentTexture, Texture2D<float2> brdf, SamplerState clampSampler)
 {
 	ambient_factors factors = getAmbientFactors(surface);
 
 	float3 diffuse = diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler);
 	float3 specular = specularIBL(factors.ks, surface, environmentTexture, brdf, clampSampler);
 
-	return diffuse + specular;
+	light_contribution result = { diffuse, specular };
+	return result;
 }
 
-static float3 calculateDirectLighting(surface_info surface, light_info light)
+static light_contribution calculateDirectLighting(surface_info surface, light_info light)
 {
 	float D = distributionGGX(surface, light);
 	float G = geometrySmith(surface, light);
@@ -300,13 +317,15 @@ static float3 calculateDirectLighting(surface_info surface, light_info light)
 
 	float3 kD = float3(1.f, 1.f, 1.f) - F;
 	kD *= 1.f - surface.metallic;
-	float3 diffuse = kD * surface.albedo.rgb * invPI;
+	float3 diffuse = kD * invPI * light.radiance * light.NdotL;
 
 	float3 numerator = D * G * F;
 	float denominator = 4.f * surface.NdotV * light.NdotL;
-	float3 specular = numerator / max(denominator, 0.001f);
+	float3 specular = numerator / max(denominator, 0.001f) * light.radiance * light.NdotL;
 
-	return (diffuse + specular) * light.radiance * light.NdotL;
+	light_contribution result = { diffuse, specular };
+	return result;
 }
+
 
 #endif
