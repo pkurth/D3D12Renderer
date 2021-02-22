@@ -37,7 +37,7 @@ static ssr_raycast_cb defaultSSRParameters()
     "RootFlags(0), " \
     "RootConstants(b0, num32BitConstants = 10), " \
     "CBV(b1), " \
-    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 4) )," \
+    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 5) )," \
     "StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \
         "addressV = TEXTURE_ADDRESS_CLAMP," \

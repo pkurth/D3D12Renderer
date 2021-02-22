@@ -12,6 +12,7 @@ Texture2D<float> depthBuffer		: register(t0);
 Texture2D<float> linearDepthBuffer	: register(t1);
 Texture2D<float2> worldNormals		: register(t2);
 Texture2D<float4> reflectance		: register(t3);
+Texture2D<float2> noise     		: register(t4);
 
 
 RWTexture2D<float4> output			: register(u0);
@@ -35,7 +36,7 @@ static void swap(inout float a, inout float b)
 static bool intersectsDepthBuffer(float sceneZMax, float rayZMin, float rayZMax)
 {
     // Increase thickness along distance. 
-    float thickness = max(sceneZMax, 1.f);
+    float thickness = max(sceneZMax * 0.3f, 0.3f);
 
     // Effectively remove line/tiny artifacts, mostly caused by Zbuffers precision.
     float depthScale = min(1.f, sceneZMax / 100.f);
@@ -195,7 +196,10 @@ void main(cs_input IN)
     const float3 viewPos = restoreViewSpacePosition(camera.invProj, uv, depth);
     const float3 viewDir = normalize(viewPos);
 
-    float2 Xi = 0.f.xx;
+    float2 h = halton23(cb.frameIndex & 1023);
+    uint3 noiseDims;
+    noise.GetDimensions(0, noiseDims.x, noiseDims.y, noiseDims.z);
+    float2 Xi = noise.SampleLevel(linearSampler, (uv + h) * cb.dimensions / float2(noiseDims.xy), 0);
     Xi.y = lerp(Xi.y, 0.f, SSR_GGX_IMPORTANCE_SAMPLE_BIAS);
 
     float4 H = importanceSampleGGX(Xi, viewNormal, roughness);

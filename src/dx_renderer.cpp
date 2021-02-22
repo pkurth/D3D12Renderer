@@ -26,6 +26,7 @@
 static ref<dx_texture> whiteTexture;
 static ref<dx_texture> blackTexture;
 static ref<dx_texture> blackCubeTexture;
+static ref<dx_texture> noiseTexture;
 
 static ref<dx_texture> shadowMap;
 
@@ -106,6 +107,9 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 		blackCubeTexture = createCubeTexture(black, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
 		SET_NAME(blackCubeTexture->resource, "Black cube");
+	}
+	{
+		noiseTexture = loadTextureFromFile("assets/textures/noise/blue_noise.dds", texture_load_flags_noncolor); // Already compressed and in DDS format.
 	}
 
 	nullTextureSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createNullTextureSRV();
@@ -1356,6 +1360,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 2, linearDepthBuffer);
 				cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 3, worldNormalsTexture);
 				cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 4, reflectanceTexture);
+				cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 5, noiseTexture);
 
 				cl->dispatch(bucketize(SSR_RAYCAST_WIDTH, SSR_BLOCK_SIZE), bucketize(SSR_RAYCAST_HEIGHT, SSR_BLOCK_SIZE));
 
