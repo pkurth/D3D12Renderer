@@ -50,12 +50,7 @@ static bool traceScreenSpaceRay(float3 rayOrigin, float3 rayDirection, float jit
 {
     hitPixel = float2(-1.f, -1.f);
 
-    if (rayDirection.z > 0.f)
-    {
-        return false;
-    }
-
-    const float cameraNearPlane = camera.projectionParams.x; // Now negative.
+    const float cameraNearPlane = -camera.projectionParams.x; // Now negative.
     float rayLength = ((rayOrigin.z + rayDirection.z * cb.maxDistance) > cameraNearPlane)
         ? (cameraNearPlane - rayOrigin.z) / rayDirection.z
         : cb.maxDistance;
