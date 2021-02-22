@@ -305,11 +305,11 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 
 		surface.roughness = (flags & USE_ROUGHNESS_TEXTURE)
 			? roughTex.SampleLevel(wrapSampler, uv, mipLevel)
-			: getRoughnessOverride(material);
+			: material.getRoughnessOverride();
 
 		surface.metallic = (flags & USE_METALLIC_TEXTURE)
 			? metalTex.SampleLevel(wrapSampler, uv, mipLevel)
-			: getMetallicOverride(material);
+			: material.getMetallicOverride();
 
 		surface.emission = material.emission;
 	}

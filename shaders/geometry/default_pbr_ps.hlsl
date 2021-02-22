@@ -67,7 +67,7 @@ ps_output main(ps_input IN)
 	surface.albedo = ((flags & USE_ALBEDO_TEXTURE)
 		? albedoTex.Sample(wrapSampler, IN.uv)
 		: float4(1.f, 1.f, 1.f, 1.f))
-		* unpackColor(material.albedoTint);
+		* material.getAlbedo();
 
 	surface.N = (flags & USE_NORMAL_TEXTURE)
 		? mul(normalTex.Sample(wrapSampler, IN.uv).xyz * 2.f - float3(1.f, 1.f, 1.f), IN.tbn)
@@ -76,12 +76,12 @@ ps_output main(ps_input IN)
 
 	surface.roughness = (flags & USE_ROUGHNESS_TEXTURE)
 		? roughTex.Sample(wrapSampler, IN.uv)
-		: getRoughnessOverride(material);
+		: material.getRoughnessOverride();
 	surface.roughness = clamp(surface.roughness, 0.01f, 0.99f);
 
 	surface.metallic = (flags & USE_METALLIC_TEXTURE)
 		? metalTex.Sample(wrapSampler, IN.uv)
-		: getMetallicOverride(material);
+		: material.getMetallicOverride();
 
 	surface.emission = material.emission;
 
@@ -143,14 +143,13 @@ ps_output main(ps_input IN)
 			{
 				float2 uv = local.xy * 0.5f + 0.5f;                
 				
-				float2 uvOffset = float2(decal.viewportXY >> 16, decal.viewportXY & 0xFFFF) / float(0xFFFF);
-				float2 uvScale = float2(decal.viewportScale >> 16, decal.viewportScale & 0xFFFF) / float(0xFFFF);
-				uv = uvOffset + uv * uvScale;
+				float4 viewport = decal.getViewport();
+				uv = viewport.xy + uv * viewport.zw;
 
 				// Since this loop has variable length, we cannot use automatic mip-selection here. Gradients may be undefined.
-				const float4 decalAlbedo = decalTextureAtlas.SampleLevel(wrapSampler, uv, 0) * unpackColor(decal.albedoTint);
-				const float decalRoughness = getRoughnessOverride(decal.roughnessOverride_metallicOverride);
-				const float decalMetallic = getMetallicOverride(decal.roughnessOverride_metallicOverride);
+				const float4 decalAlbedo = decalTextureAtlas.SampleLevel(wrapSampler, uv, 0) * decal.getAlbedo();
+				const float decalRoughness = decal.getRoughnessOverride();
+				const float decalMetallic = decal.getMetallicOverride();
 				
 				const float alpha = decalAlbedo.a * decalStrength;
 				const float oneMinusDecalAlphaAccum = 1.f - decalAlphaAccum;
@@ -259,8 +258,7 @@ ps_output main(ps_input IN)
 	ambient_factors factors = getAmbientFactors(surface);
 
 #if 1
-	// Ambient.
-	//totalLighting.xyz += calculateAmbientIBL(surface, irradianceTexture, environmentTexture, brdf, clampSampler) * lighting.environmentIntensity;
+	// Ambient diffuse. Specular will be set in a later render pass.
 	totalLighting.xyz += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity;
 #endif
 

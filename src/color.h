@@ -45,25 +45,6 @@ static vec3 hsv2rgb(vec3 hsv)
 	return rgb;
 }
 
-static uint32 packColor(uint8 r, uint8 g, uint8 b, uint8 a)
-{
-	return (a << 24) | (b << 16) | (g << 8) | r;
-}
-
-static uint32 packColor(float r, float g, float b, float a)
-{
-	return packColor(
-		(uint8)clamp(r * 255.f, 0.f, 255.f),
-		(uint8)clamp(g * 255.f, 0.f, 255.f),
-		(uint8)clamp(b * 255.f, 0.f, 255.f),
-		(uint8)clamp(a * 255.f, 0.f, 255.f));
-}
-
-static uint32 packColor(const vec4& rgba)
-{
-	return packColor(rgba.r, rgba.g, rgba.b, rgba.a);
-}
-
 static vec3 randomRGB(random_number_generator& rng)
 {
 	vec3 hsv =

@@ -2,6 +2,7 @@
 #include "camera.hlsli"
 #include "light_culling_rs.hlsli"
 #include "light_source.hlsli"
+#include "material.hlsli"
 
 /*
     This shader culls lights and decals against screen space tiles.

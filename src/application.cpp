@@ -93,7 +93,7 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<raytrace_component>(sponzaBlas);
 	}
 
-#if 0
+#if 1
 	// Stormtrooper.
 	auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/meshes/stormtrooper.fbx");
 	if (stormtrooperMesh)
@@ -221,17 +221,16 @@ void application::initialize(dx_renderer* renderer)
 
 		for (uint32 i = 0; i < decals.size(); ++i)
 		{
-			decals[i] =
-			{
+			decals[i].initialize(
 				vec3(-7.f + i * 3, 2.f, -3.f),
-				0xFFFFFFFF,
 				vec3(3.f, 0.f, 0.f),
-				packRoughnessAndMetallic(1.f, 1.f),
 				vec3(0.f, 3.f, 0.f),
-				0,
 				vec3(0.f, 0.f, -0.75f),
-				0xFFFFFFFF
-			};
+				vec4(1.f, 1.f, 1.f, 1.f),
+				1.f,
+				1.f,
+				vec4(0.f, 0.f, 1.f, 1.f)
+			);
 		}
 	}
 #endif

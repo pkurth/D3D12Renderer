@@ -137,13 +137,13 @@ raytracing_object_type specular_reflections_raytracer::defineObjectType(const re
         }
 
         shader_data hitData[2];
-        hitData[0].materialCB = pbr_material_cb
-        {
+        hitData[0].materialCB.initialize(
+            material->albedoTint,
             material->emission.xyz,
-            packColor(material->albedoTint),
-            packRoughnessAndMetallic(material->roughnessOverride, material->metallicOverride),
+            material->roughnessOverride,
+            material->metallicOverride,
             flags
-        };
+        );
         hitData[0].resources = base;
 
         // Shadow ray does not need anything. Therefore we don't set its properties.

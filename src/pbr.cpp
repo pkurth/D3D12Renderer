@@ -202,13 +202,8 @@ void pbr_material::prepareForRendering(dx_command_list* cl)
 	}
 
 	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_MATERIAL,
-		pbr_material_cb
-		{
-			emission.xyz,
-			packColor(albedoTint),
-			packRoughnessAndMetallic(roughnessOverride, metallicOverride),
-			flags
-		});
+		pbr_material_cb(albedoTint, emission.xyz, roughnessOverride, metallicOverride, flags)
+	);
 }
 
 void pbr_material::setupPipeline(dx_command_list* cl, const common_material_info& info)

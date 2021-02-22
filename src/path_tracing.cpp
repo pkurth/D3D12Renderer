@@ -133,13 +133,13 @@ raytracing_object_type path_tracer::defineObjectType(const ref<raytracing_blas>&
             descriptorHeap.push().createNullTextureSRV();
         }
 
-        hitData[0].materialCB = pbr_material_cb
-        {
+        hitData[0].materialCB.initialize(
+            material->albedoTint,
             material->emission.xyz,
-            packColor(material->albedoTint),
-            packRoughnessAndMetallic(material->roughnessOverride, material->metallicOverride),
+            material->roughnessOverride, 
+            material->metallicOverride,
             flags
-        };
+        );
         hitData[0].resources = base;
 
         // The other shader types don't need any data, so we don't set it here.
