@@ -10,15 +10,40 @@ It has an integrated (albeit pretty simple) path tracer (using hardware-accelera
 <img src="assets/samples/path_trace.png" width="512"/> 
 
 
+## Incomprehensive list of features (very much work in progress)
+- Forward+ rendering
+- Physically based rendering
+- Dynamic lights and dynamic shadows
+	- Sun (with cascaded shadow maps)
+	- Point lights
+	- Spot lights
+- Decals
+- Tiled light and decal culling
+- Screen space reflections
+- Post processing stack
+	- Temporal anti-aliasing
+	- Bloom
+	- Filmic tone-mapping
+	- Sharpening
+- Real-time raytracing (DXR)
+- Integrated path tracer
+- Skeletal animation
+- Mesh shaders
+- Editor tools
+- Integrated GPU profiler
+- Hot-reloading of shaders
+
+
 ## Requirements
 
 Since this project uses Direct3D 12 as the only rendering backend, the only supported platform is Windows 10. 
 The project is only tested with Visual Studio 2019, and only on NVIDIA GPUs.
 
-For mesh shaders you will need the Windows 10 SDK version 10.0.19041.0 or higher. 
+For mesh shaders you will need the Windows 10 SDK version 10.0.19041.0 or higher.
 This can be downloaded using the Visual Studio Installer.
 If you only have an older version of the SDK installed, the build system will automatically disable mesh shaders. 
-You should still be able to build and run the program.
+To run you will need the Windows 10 May 2020 Update (20H1) or newer.
+If these requirements are not met, you should still be able to build and run the program, but without mesh shader support.
 
 If you want to use raytracing or mesh shaders, you need a compatible NVIDIA GPU. 
 For raytracing these are the GPUs with the Pascal architecture or newer.
