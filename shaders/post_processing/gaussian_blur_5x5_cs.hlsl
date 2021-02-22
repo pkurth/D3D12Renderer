@@ -1,5 +1,5 @@
 
-#define NUM_WEIGHTS 1 // Temporary. Attention: This is a darkening shader now! The first weight is not 1!
+#define NUM_WEIGHTS 3
 
 // http://dev.theomader.com/gaussian-kernel-calculator/
 // 5x5 kernel with sigma 1.

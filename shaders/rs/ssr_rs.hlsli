@@ -17,9 +17,6 @@ struct ssr_raycast_cb
     float strideCutoff;
     float minStride;
     float maxStride;
-
-    float thicknessOffset;
-    float thicknessBias;
 };
 
 #ifndef HLSL
@@ -29,10 +26,8 @@ static ssr_raycast_cb defaultSSRParameters()
     result.numSteps = 400;
     result.maxDistance = 1000.f;
     result.strideCutoff = 100.f;
-    result.minStride = 1.f;
-    result.maxStride = 10.f;
-    result.thicknessOffset = 0.f;
-    result.thicknessBias = 1.f;
+    result.minStride = 5.f;
+    result.maxStride = 30.f;
     return result;
 }
 #endif
@@ -40,7 +35,7 @@ static ssr_raycast_cb defaultSSRParameters()
 
 #define SSR_RAYCAST_RS \
     "RootFlags(0), " \
-    "RootConstants(b0, num32BitConstants = 12), " \
+    "RootConstants(b0, num32BitConstants = 10), " \
     "CBV(b1), " \
     "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 4) )," \
     "StaticSampler(s0," \

@@ -32,13 +32,13 @@ void main(cs_input IN)
 
 	float2 uv = (dispatchThreadID + float2(0.5f, 0.5f)) * cb.invDimensions;
 
-	//float4 depths = input.Gather(linearClampSampler, uv);
-	float4 depths = float4(
-		input[dispatchThreadID * 2 + uint2(0, 0)],
-		input[dispatchThreadID * 2 + uint2(1, 0)],
-		input[dispatchThreadID * 2 + uint2(0, 1)],
-		input[dispatchThreadID * 2 + uint2(1, 1)]
-	);
+	float4 depths = input.Gather(linearClampSampler, uv);
+	//float4 depths = float4(
+	//	input[dispatchThreadID * 2 + uint2(0, 0)],
+	//	input[dispatchThreadID * 2 + uint2(1, 0)],
+	//	input[dispatchThreadID * 2 + uint2(0, 1)],
+	//	input[dispatchThreadID * 2 + uint2(1, 1)]
+	//);
 	float maxdepth = max(depths.x, max(depths.y, max(depths.z, depths.w)));
 	tile[groupThreadID.x][groupThreadID.y] = maxdepth;
 

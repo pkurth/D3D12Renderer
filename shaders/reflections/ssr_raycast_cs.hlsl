@@ -35,18 +35,25 @@ static void swap(inout float a, inout float b)
 static bool intersectsDepthBuffer(float sceneZMax, float rayZMin, float rayZMax)
 {
     // Increase thickness along distance. 
-    float thickness = max(sceneZMax * cb.thicknessBias + cb.thicknessOffset, 1.f);
+    float thickness = max(sceneZMax, 1.f);
 
     // Effectively remove line/tiny artifacts, mostly caused by Zbuffers precision.
-    float depthScale = min(1.f, sceneZMax / cb.strideCutoff);
+    float depthScale = min(1.f, sceneZMax / 100.f);
     sceneZMax += lerp(0.05f, 0.f, depthScale);
 
     return (rayZMin >= sceneZMax) && (rayZMax - thickness <= sceneZMax);
 }
 
 static bool traceScreenSpaceRay(float3 rayOrigin, float3 rayDirection, float jitter, float roughness,
-    inout float2 hitPixel)
+    out float2 hitPixel)
 {
+    hitPixel = float2(-1.f, -1.f);
+
+    if (rayDirection.z > 0.f)
+    {
+        return false;
+    }
+
     const float cameraNearPlane = camera.projectionParams.x; // Now negative.
     float rayLength = ((rayOrigin.z + rayDirection.z * cb.maxDistance) > cameraNearPlane)
         ? (cameraNearPlane - rayOrigin.z) / rayDirection.z
@@ -126,6 +133,8 @@ static bool traceScreenSpaceRay(float3 rayOrigin, float3 rayDirection, float jit
     uint stepCount = 0;
     float end = P1.x * stepSign;
 
+    hitPixel = float2(0.f, 0.f);
+
     while (((PQk.x * stepSign) <= end) &&
         (stepCount < cb.numSteps) &&
         (!intersectsDepthBuffer(sceneZMax, rayZMin, rayZMax)) &&
@@ -181,7 +190,7 @@ void main(cs_input IN)
 
     const float3 normal = unpackNormal(worldNormals.SampleLevel(linearSampler, uv, 0));
     const float3 viewNormal = mul(camera.view, float4(normal, 0.f)).xyz;
-    const float roughness = reflectance.SampleLevel(linearSampler, uv, 0).a;
+    const float roughness = clamp(reflectance.SampleLevel(linearSampler, uv, 0).a, 0.03f, 0.97f);
     
     const float3 viewPos = restoreViewSpacePosition(camera.invProj, uv, depth);
     const float3 viewDir = normalize(viewPos);
@@ -192,9 +201,9 @@ void main(cs_input IN)
     float4 H = importanceSampleGGX(Xi, viewNormal, roughness);
     float3 reflDir = reflect(viewDir, H.xyz);
 
-    float jitter = 0.f;// interleavedGradientNoise(IN.dispatchThreadID.xy, cb.frameIndex);
+    float jitter = interleavedGradientNoise(IN.dispatchThreadID.xy, cb.frameIndex);
 
-    float2 hitPixel = float2(0.f, 0.f);
+    float2 hitPixel;
     bool hit = traceScreenSpaceRay(viewPos + reflDir * 0.02f, reflDir, jitter, roughness, hitPixel);
 
     float hitDepth = depthBuffer.SampleLevel(pointSampler, hitPixel, 0);

@@ -89,7 +89,7 @@ void main(cs_input IN)
 
     const float3 normal = unpackNormal(worldNormals.SampleLevel(linearSampler, uv, 0));
     const float3 N = normalize(mul(camera.view, float4(normal, 0.f)).xyz);
-    const float roughness = reflectance.SampleLevel(linearSampler, uv, 0).a;
+    const float roughness = clamp(reflectance.SampleLevel(linearSampler, uv, 0).a, 0.03f, 0.97f);
      
     const float depth = depthBuffer.SampleLevel(pointSampler, uv, 0);
     const float3 viewPos = restoreViewSpacePosition(camera.invProj, uv, depth);
@@ -105,10 +105,11 @@ void main(cs_input IN)
 
     raycastResult.z = abs(raycastResult.z); // Remove sign.
 
-    float sourceMip = clamp(log2(coneTangent * max(cb.dimensions.x, cb.dimensions.y)), 0.f, 6.f);
+    float sourceMip = clamp(log2(coneTangent * max(cb.dimensions.x, cb.dimensions.y)), 0.f, 4.f);
 
     const float2 m = motion.SampleLevel(linearSampler, raycastResult.xy, 0);
     float4 sceneColor = hdrColor.SampleLevel(linearSampler, raycastResult.xy + m, sourceMip);
+    sceneColor.rgb *= pow(0.2f, sourceMip); // This makes no sense at all physically. For some reason it helps against light "feedback" where the scene gets very bright.
     sceneColor.w = hit; // Store hit result.
 
     packResolveData(IN.groupIndex, raycastResult, sceneColor);
@@ -171,8 +172,8 @@ void main(cs_input IN)
 
 
         float borderDist = min(1.f - max(neighborUV.x, neighborUV.y), min(neighborUV.x, neighborUV.y));
-        float borderAttenuation = saturate(borderDist > borderAttenuationDistance ? 1.f : (borderDist / borderAttenuationDistance));
-
+        float borderAttenuation = saturate(borderDist / borderAttenuationDistance);
+       
         neighborSceneColor.a = borderAttenuation * neighborHit;
         neighborSceneColor.rgb /= 1.f + dot(neighborSceneColor.rgb, luminanceWeights);
 
@@ -184,4 +185,6 @@ void main(cs_input IN)
     result.rgb /= 1.f - dot(result.rgb, luminanceWeights);
 
     output[uvInt.xy] = max(1e-5f, result);
+
+    //output[uvInt.xy] = float4(raycastResult.xy, 0.f, 1.f);
 }

@@ -17,7 +17,7 @@ Texture2D<float4> reflection				: register(t3);
 
 
 TextureCube<float4> environmentTexture		: register(t4);
-Texture2D<float4> brdf						: register(t5);
+Texture2D<float2> brdf						: register(t5);
 
 SamplerState clampSampler					: register(s0);
 
@@ -36,7 +36,7 @@ void main(cs_input IN)
 		surface_info surface;
 		surface.N = normalize(unpackNormal(worldNormals[IN.dispatchThreadID.xy]));
 		surface.V = -normalize(restoreWorldDirection(camera.invViewProj, uv, camera.position.xyz));
-		surface.roughness = refl.a;
+		surface.roughness = clamp(refl.a, 0.01f, 0.99f);
 
 		surface.inferRemainingProperties();
 
