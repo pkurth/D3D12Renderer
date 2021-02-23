@@ -172,7 +172,7 @@ void specular_reflections_raytracer::render(dx_command_list* cl, const raytracin
 {
     input_resources in;
     in.tlas = tlas.tlas->raytracingSRV;
-    in.depthBuffer = materialInfo.depthBuffer->defaultSRV;
+    in.depthBuffer = materialInfo.opaqueDepth->defaultSRV;
     in.screenSpaceNormals = materialInfo.worldNormals->defaultSRV;
     in.irradiance = materialInfo.irradiance->defaultSRV;
     in.environment = materialInfo.environment->defaultSRV;

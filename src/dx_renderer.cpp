@@ -259,6 +259,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 	reflectanceTexture = createTexture(0, renderWidth, renderHeight, reflectanceFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	depthStencilBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthStencilFormat);
+	opaqueDepthBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthStencilFormat, 1, D3D12_RESOURCE_STATE_COPY_DEST);
 	D3D12_RESOURCE_DESC linearDepthDesc = CD3DX12_RESOURCE_DESC::Tex2D(linearDepthFormat, renderWidth, renderHeight, 1,
 		6, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 	linearDepthBuffer = createTexture(linearDepthDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -294,6 +295,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 	SET_NAME(screenVelocitiesTexture->resource, "Screen velocities");
 	SET_NAME(reflectanceTexture->resource, "Reflectance");
 	SET_NAME(depthStencilBuffer->resource, "Depth buffer");
+	SET_NAME(opaqueDepthBuffer->resource, "Opaque depth buffer");
 	SET_NAME(linearDepthBuffer->resource, "Linear depth buffer");
 
 	SET_NAME(ssrRaycastTexture->resource, "SSR Raycast");
@@ -425,6 +427,7 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 		resizeTexture(screenVelocitiesTexture, renderWidth, renderHeight);
 		resizeTexture(reflectanceTexture, renderWidth, renderHeight);
 		resizeTexture(depthStencilBuffer, renderWidth, renderHeight);
+		resizeTexture(opaqueDepthBuffer, renderWidth, renderHeight);
 		resizeTexture(linearDepthBuffer, renderWidth, renderHeight);
 
 		if (objectIDsTexture)
@@ -800,9 +803,6 @@ void dx_renderer::endFrame(const user_input& input)
 	materialInfo.volumetricsTexture = 0;
 	materialInfo.cameraCBV = jitteredCameraCBV;
 	materialInfo.sunCBV = sunCBV;
-
-	materialInfo.depthBuffer = depthStencilBuffer;
-	materialInfo.worldNormals = worldNormalsTexture;
 
 
 
@@ -1258,7 +1258,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 		barrier_batcher(cl)
 			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-			.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+			.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ)
 			.transitionEnd(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 			.transitionEnd(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 			.transition(reflectanceTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
@@ -1270,6 +1270,13 @@ void dx_renderer::endFrame(const user_input& input)
 		ref<dx_texture> hdrResult = hdrColorTexture;
 		D3D12_RESOURCE_STATES hdrPostProcessingTextureState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 		D3D12_RESOURCE_STATES hdrColorTextureState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+
+
+		cl->copyResource(depthStencilBuffer->resource, opaqueDepthBuffer->resource);
+
+		barrier_batcher(cl)
+			.transitionBegin(opaqueDepthBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
 
 
@@ -1404,8 +1411,15 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 
+		barrier_batcher(cl)
+			.transitionEnd(opaqueDepthBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+
+
 		// After this there is no more camera jittering!
 		materialInfo.cameraCBV = unjitteredCameraCBV;
+		materialInfo.opaqueDepth = opaqueDepthBuffer;
+		materialInfo.worldNormals = worldNormalsTexture;
 
 
 
@@ -1422,7 +1436,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 			barrier_batcher(cl)
 				.transition(hdrResult, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
-				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 			dx_render_target hdrTransparentRenderTarget({ hdrResult }, depthStencilBuffer);
 
@@ -1455,7 +1469,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 			barrier_batcher(cl)
 				.transition(hdrResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ);
 		}
 
 
@@ -1494,7 +1508,7 @@ void dx_renderer::endFrame(const user_input& input)
 			cl->setDescriptorHeapSRV(TAA_RS_TEXTURES, 1, hdrResult);
 			cl->setDescriptorHeapSRV(TAA_RS_TEXTURES, 2, taaTextures[taaHistoryIndex]);
 			cl->setDescriptorHeapSRV(TAA_RS_TEXTURES, 3, screenVelocitiesTexture);
-			cl->setDescriptorHeapSRV(TAA_RS_TEXTURES, 4, depthStencilBuffer);
+			cl->setDescriptorHeapSRV(TAA_RS_TEXTURES, 4, opaqueDepthBuffer);
 
 			cl->setCompute32BitConstants(TAA_RS_CB, taa_cb{ jitteredCamera.projectionParams, vec2((float)renderWidth, (float)renderHeight) });
 
@@ -1634,7 +1648,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 
-		cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+		cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 
 
@@ -1764,6 +1778,7 @@ void dx_renderer::endFrame(const user_input& input)
 			.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 			.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON)
 			.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+			.transition(opaqueDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST)
 			.transition(reflectanceTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	}

@@ -29,7 +29,7 @@ struct common_material_info
 	ref<dx_texture> volumetricsTexture;
 
 	// These two are only set, if the material is rendered after the opaque pass.
-	ref<dx_texture> depthBuffer;
+	ref<dx_texture> opaqueDepth;
 	ref<dx_texture> worldNormals;
 
 	dx_dynamic_constant_buffer cameraCBV;
