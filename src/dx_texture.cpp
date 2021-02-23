@@ -100,11 +100,14 @@ static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::S
 			return false;
 		}
 
-		std::cout << "Preprocessing asset '" << filepath.string() << "' for faster loading next time.";
+		if (flags & texture_load_flags_cache_to_dds)
+		{
+			std::cout << "Preprocessing asset '" << filepath.string() << "' for faster loading next time.";
 #ifdef _DEBUG
-		std::cout << " Consider running in a release build the first time.";
+			std::cout << " Consider running in a release build the first time.";
 #endif
-		std::cout << std::endl;
+			std::cout << std::endl;
+		}
 
 
 		if (extension == ".dds")
