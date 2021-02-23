@@ -268,10 +268,10 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 	ssrTemporalTextures[ssrHistoryIndex] = createTexture(0, SSR_RESOLVE_WIDTH, SSR_RESOLVE_HEIGHT, reflectionFormat, false, false, true, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	ssrTemporalTextures[1 - ssrHistoryIndex] = createTexture(0, SSR_RESOLVE_WIDTH, SSR_RESOLVE_HEIGHT, reflectionFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-	hdrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	hdrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, true, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-	taaTextures[taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	taaTextures[1 - taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	taaTextures[taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, true, true, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	taaTextures[1 - taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, true, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	ldrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, ldrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
@@ -368,6 +368,7 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 
 	opaqueRenderPass = 0;
 	overlayRenderPass = 0;
+	transparentRenderPass = 0;
 	sunShadowRenderPass = 0;
 	numSpotLightShadowRenderPasses = 0;
 	numPointLightShadowRenderPasses = 0;
@@ -612,22 +613,40 @@ void dx_renderer::setCamera(const render_camera& camera)
 		c = camera;
 	}
 
-	this->camera.prevFrameViewProj = this->camera.viewProj;
-	this->camera.viewProj = c.viewProj;
-	this->camera.view = c.view;
-	this->camera.proj = c.proj;
-	this->camera.invViewProj = c.invViewProj;
-	this->camera.invView = c.invView;
-	this->camera.invProj = c.invProj;
-	this->camera.position = vec4(c.position, 1.f);
-	this->camera.forward = vec4(c.rotation * vec3(0.f, 0.f, -1.f), 0.f);
-	this->camera.right = vec4(c.rotation * vec3(1.f, 0.f, 0.f), 0.f);
-	this->camera.up = vec4(c.rotation * vec3(0.f, 1.f, 0.f), 0.f);
-	this->camera.projectionParams = vec4(c.nearPlane, c.farPlane, c.farPlane / c.nearPlane, 1.f - c.farPlane / c.nearPlane);
-	this->camera.screenDims = vec2((float)renderWidth, (float)renderHeight);
-	this->camera.invScreenDims = vec2(1.f / renderWidth, 1.f / renderHeight);
-	this->camera.prevFrameJitter = this->camera.jitter;
-	this->camera.jitter = jitterOffset;
+	this->jitteredCamera.prevFrameViewProj = this->jitteredCamera.viewProj;
+	this->jitteredCamera.viewProj = c.viewProj;
+	this->jitteredCamera.view = c.view;
+	this->jitteredCamera.proj = c.proj;
+	this->jitteredCamera.invViewProj = c.invViewProj;
+	this->jitteredCamera.invView = c.invView;
+	this->jitteredCamera.invProj = c.invProj;
+	this->jitteredCamera.position = vec4(c.position, 1.f);
+	this->jitteredCamera.forward = vec4(c.rotation * vec3(0.f, 0.f, -1.f), 0.f);
+	this->jitteredCamera.right = vec4(c.rotation * vec3(1.f, 0.f, 0.f), 0.f);
+	this->jitteredCamera.up = vec4(c.rotation * vec3(0.f, 1.f, 0.f), 0.f);
+	this->jitteredCamera.projectionParams = vec4(c.nearPlane, c.farPlane, c.farPlane / c.nearPlane, 1.f - c.farPlane / c.nearPlane);
+	this->jitteredCamera.screenDims = vec2((float)renderWidth, (float)renderHeight);
+	this->jitteredCamera.invScreenDims = vec2(1.f / renderWidth, 1.f / renderHeight);
+	this->jitteredCamera.prevFrameJitter = this->jitteredCamera.jitter;
+	this->jitteredCamera.jitter = jitterOffset;
+
+
+	this->unjitteredCamera.prevFrameViewProj = this->unjitteredCamera.viewProj;
+	this->unjitteredCamera.viewProj = camera.viewProj;
+	this->unjitteredCamera.view = camera.view;
+	this->unjitteredCamera.proj = camera.proj;
+	this->unjitteredCamera.invViewProj = camera.invViewProj;
+	this->unjitteredCamera.invView = camera.invView;
+	this->unjitteredCamera.invProj = camera.invProj;
+	this->unjitteredCamera.position = vec4(camera.position, 1.f);
+	this->unjitteredCamera.forward = vec4(camera.rotation * vec3(0.f, 0.f, -1.f), 0.f);
+	this->unjitteredCamera.right = vec4(camera.rotation * vec3(1.f, 0.f, 0.f), 0.f);
+	this->unjitteredCamera.up = vec4(camera.rotation * vec3(0.f, 1.f, 0.f), 0.f);
+	this->unjitteredCamera.projectionParams = vec4(camera.nearPlane, camera.farPlane, camera.farPlane / camera.nearPlane, 1.f - camera.farPlane / camera.nearPlane);
+	this->unjitteredCamera.screenDims = vec2((float)renderWidth, (float)renderHeight);
+	this->unjitteredCamera.invScreenDims = vec2(1.f / renderWidth, 1.f / renderHeight);
+	this->unjitteredCamera.prevFrameJitter = vec2(0.f);
+	this->unjitteredCamera.jitter = vec2(0.f);
 }
 
 void dx_renderer::setEnvironment(const ref<pbr_environment>& environment)
@@ -736,7 +755,8 @@ void dx_renderer::endFrame(const user_input& input)
 	}
 
 
-	auto cameraCBV = dxContext.uploadDynamicConstantBuffer(camera);
+	auto jitteredCameraCBV = dxContext.uploadDynamicConstantBuffer(jitteredCamera);
+	auto unjitteredCameraCBV = dxContext.uploadDynamicConstantBuffer(unjitteredCamera);
 	auto sunCBV = dxContext.uploadDynamicConstantBuffer(sun);
 
 	common_material_info materialInfo;
@@ -765,7 +785,7 @@ void dx_renderer::endFrame(const user_input& input)
 	materialInfo.pointLightShadowInfoBuffer = pointLightShadowInfoBuffer[dxContext.bufferedFrameID];
 	materialInfo.spotLightShadowInfoBuffer = spotLightShadowInfoBuffer[dxContext.bufferedFrameID];
 	materialInfo.volumetricsTexture = 0;
-	materialInfo.cameraCBV = cameraCBV;
+	materialInfo.cameraCBV = jitteredCameraCBV;
 	materialInfo.sunCBV = sunCBV;
 
 	materialInfo.depthBuffer = depthStencilBuffer;
@@ -826,7 +846,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setPipelineState(*depthOnlyPipeline.pipeline);
 				cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
 
-				cl->setGraphicsDynamicConstantBuffer(DEPTH_ONLY_RS_CAMERA, cameraCBV);
+				cl->setGraphicsDynamicConstantBuffer(DEPTH_ONLY_RS_CAMERA, materialInfo.cameraCBV);
 
 				for (const auto& dc : opaqueRenderPass->staticDepthOnlyDrawCalls)
 				{
@@ -834,7 +854,7 @@ void dx_renderer::endFrame(const user_input& input)
 					const submesh_info& submesh = dc.submesh;
 
 					cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
-					cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ camera.viewProj * m, camera.prevFrameViewProj * m });
+					cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ jitteredCamera.viewProj * m, jitteredCamera.prevFrameViewProj * m });
 
 					cl->setVertexBuffer(0, dc.vertexBuffer);
 					cl->setIndexBuffer(dc.indexBuffer);
@@ -850,7 +870,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setPipelineState(*depthOnlyPipeline.pipeline);
 				cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
 
-				cl->setGraphicsDynamicConstantBuffer(DEPTH_ONLY_RS_CAMERA, cameraCBV);
+				cl->setGraphicsDynamicConstantBuffer(DEPTH_ONLY_RS_CAMERA, materialInfo.cameraCBV);
 
 				for (const auto& dc : opaqueRenderPass->dynamicDepthOnlyDrawCalls)
 				{
@@ -859,7 +879,7 @@ void dx_renderer::endFrame(const user_input& input)
 					const submesh_info& submesh = dc.submesh;
 
 					cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
-					cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ camera.viewProj * m, camera.prevFrameViewProj * prevFrameM });
+					cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ jitteredCamera.viewProj * m, jitteredCamera.prevFrameViewProj * prevFrameM });
 
 					cl->setVertexBuffer(0, dc.vertexBuffer);
 					cl->setIndexBuffer(dc.indexBuffer);
@@ -875,7 +895,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setPipelineState(*animatedDepthOnlyPipeline.pipeline);
 				cl->setGraphicsRootSignature(*animatedDepthOnlyPipeline.rootSignature);
 
-				cl->setGraphicsDynamicConstantBuffer(DEPTH_ONLY_RS_CAMERA, cameraCBV);
+				cl->setGraphicsDynamicConstantBuffer(DEPTH_ONLY_RS_CAMERA, materialInfo.cameraCBV);
 
 				for (const auto& dc : opaqueRenderPass->animatedDepthOnlyDrawCalls)
 				{
@@ -886,7 +906,7 @@ void dx_renderer::endFrame(const user_input& input)
 					const ref<dx_vertex_buffer>& prevFrameVertexBuffer = dc.prevFrameVertexBuffer;
 
 					cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
-					cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ camera.viewProj * m, camera.prevFrameViewProj * prevFrameM });
+					cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ jitteredCamera.viewProj * m, jitteredCamera.prevFrameViewProj * prevFrameM });
 					cl->setRootGraphicsSRV(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS, prevFrameVertexBuffer->gpuVirtualAddress + prevFrameSubmesh.baseVertex * prevFrameVertexBuffer->elementSize);
 
 					cl->setVertexBuffer(0, dc.vertexBuffer);
@@ -897,6 +917,11 @@ void dx_renderer::endFrame(const user_input& input)
 		}
 
 
+
+		barrier_batcher(cl)
+			.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+
 		// ----------------------------------------
 		// LIGHT & DECAL CULLING
 		// ----------------------------------------
@@ -905,23 +930,17 @@ void dx_renderer::endFrame(const user_input& input)
 		{
 			DX_PROFILE_BLOCK(cl, "Cull lights & decals");
 
-			barrier_batcher(cl)
-				.transitionBegin(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-
 			// Tiled frusta.
 			{
 				DX_PROFILE_BLOCK(cl, "Create world space frusta");
 
 				cl->setPipelineState(*worldSpaceFrustaPipeline.pipeline);
 				cl->setComputeRootSignature(*worldSpaceFrustaPipeline.rootSignature);
-				cl->setComputeDynamicConstantBuffer(WORLD_SPACE_TILED_FRUSTA_RS_CAMERA, cameraCBV);
+				cl->setComputeDynamicConstantBuffer(WORLD_SPACE_TILED_FRUSTA_RS_CAMERA, materialInfo.cameraCBV);
 				cl->setCompute32BitConstants(WORLD_SPACE_TILED_FRUSTA_RS_CB, frusta_cb{ numCullingTilesX, numCullingTilesY });
 				cl->setRootComputeUAV(WORLD_SPACE_TILED_FRUSTA_RS_FRUSTA_UAV, tiledWorldSpaceFrustaBuffer);
 				cl->dispatch(bucketize(numCullingTilesX, 16), bucketize(numCullingTilesY, 16));
 			}
-
-			barrier_batcher(cl)
-				.transitionEnd(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
 			// Culling.
 			{
@@ -930,7 +949,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->clearUAV(tiledCullingIndexCounter, 0.f);
 				cl->setPipelineState(*lightCullingPipeline.pipeline);
 				cl->setComputeRootSignature(*lightCullingPipeline.rootSignature);
-				cl->setComputeDynamicConstantBuffer(LIGHT_CULLING_RS_CAMERA, cameraCBV);
+				cl->setComputeDynamicConstantBuffer(LIGHT_CULLING_RS_CAMERA, materialInfo.cameraCBV);
 				cl->setCompute32BitConstants(LIGHT_CULLING_RS_CB, light_culling_cb{ numCullingTilesX, numPointLights, numSpotLights, numDecals });
 				cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 0, depthStencilBuffer);
 				cl->setDescriptorHeapSRV(LIGHT_CULLING_RS_SRV_UAV, 1, tiledWorldSpaceFrustaBuffer);
@@ -945,9 +964,41 @@ void dx_renderer::endFrame(const user_input& input)
 
 			barrier_batcher(cl)
 				.uav(tiledCullingGrid)
-				.uav(tiledObjectsIndexList)
+				.uav(tiledObjectsIndexList);
+		}
+
+
+		// ----------------------------------------
+		// LINEAR DEPTH PYRAMID
+		// ----------------------------------------
+
+		{
+			DX_PROFILE_BLOCK(cl, "Linear depth pyramid");
+
+			cl->setPipelineState(*hierarchicalLinearDepthPipeline.pipeline);
+			cl->setComputeRootSignature(*hierarchicalLinearDepthPipeline.rootSignature);
+
+			float width = ceilf(renderWidth * 0.5f);
+			float height = ceilf(renderHeight * 0.5f);
+
+			cl->setCompute32BitConstants(HIERARCHICAL_LINEAR_DEPTH_RS_CB, hierarchical_linear_depth_cb{ vec2(1.f / width, 1.f / height) });
+			cl->setComputeDynamicConstantBuffer(HIERARCHICAL_LINEAR_DEPTH_RS_CAMERA, materialInfo.cameraCBV);
+			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 0, linearDepthBuffer->defaultUAV);
+			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 1, linearDepthBuffer->mipUAVs[0]);
+			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 2, linearDepthBuffer->mipUAVs[1]);
+			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 3, linearDepthBuffer->mipUAVs[2]);
+			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 4, linearDepthBuffer->mipUAVs[3]);
+			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 5, linearDepthBuffer->mipUAVs[4]);
+			cl->setDescriptorHeapSRV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 6, depthStencilBuffer);
+
+			cl->dispatch(bucketize((uint32)width, POST_PROCESSING_BLOCK_SIZE), bucketize((uint32)height, POST_PROCESSING_BLOCK_SIZE));
+
+			barrier_batcher(cl)
+				.uav(linearDepthBuffer)
+				.transitionBegin(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 		}
+
 
 
 
@@ -1107,7 +1158,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setPipelineState(*textureSkyPipeline.pipeline);
 				cl->setGraphicsRootSignature(*textureSkyPipeline.rootSignature);
 
-				cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
+				cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ jitteredCamera.proj * createSkyViewMatrix(jitteredCamera.view) });
 				cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
 				cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment->sky->defaultSRV);
 
@@ -1118,7 +1169,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setPipelineState(*proceduralSkyPipeline.pipeline);
 				cl->setGraphicsRootSignature(*proceduralSkyPipeline.rootSignature);
 
-				cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ camera.proj * createSkyViewMatrix(camera.view) });
+				cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ jitteredCamera.proj * createSkyViewMatrix(jitteredCamera.view) });
 				cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
 
 				cl->drawCubeTriangleStrip();
@@ -1149,17 +1200,17 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 		// ----------------------------------------
-		// LIGHT PASS
+		// OPAQUE LIGHT PASS
 		// ----------------------------------------
 
-		dx_render_target hdrRenderTarget({ hdrColorTexture, worldNormalsTexture, reflectanceTexture }, depthStencilBuffer);
+		dx_render_target hdrOpaqueRenderTarget({ hdrColorTexture, worldNormalsTexture, reflectanceTexture }, depthStencilBuffer);
 
-		cl->setRenderTarget(hdrRenderTarget);
-		cl->setViewport(hdrRenderTarget.viewport);
+		cl->setRenderTarget(hdrOpaqueRenderTarget);
+		cl->setViewport(hdrOpaqueRenderTarget.viewport);
 
 		if (opaqueRenderPass && opaqueRenderPass->drawCalls.size() > 0)
 		{
-			DX_PROFILE_BLOCK(cl, "Main light pass");
+			DX_PROFILE_BLOCK(cl, "Main opaque light pass");
 
 			material_setup_function lastSetupFunc = 0;
 
@@ -1176,7 +1227,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 				dc.material->prepareForRendering(cl);
 
-				cl->setGraphics32BitConstants(0, transform_cb{ camera.viewProj * m, m });
+				cl->setGraphics32BitConstants(0, transform_cb{ jitteredCamera.viewProj * m, m });
 
 				cl->setVertexBuffer(0, dc.vertexBuffer);
 				cl->setIndexBuffer(dc.indexBuffer);
@@ -1193,8 +1244,9 @@ void dx_renderer::endFrame(const user_input& input)
 		// OUTLINES
 		// ----------------------------------------
 
-#if 0
-		if (opaqueRenderPass && opaqueRenderPass->outlinedObjects.size() > 0)
+#if 1
+		if (opaqueRenderPass && opaqueRenderPass->outlinedObjects.size() > 0 ||
+			transparentRenderPass && transparentRenderPass->outlinedObjects.size() > 0)
 		{
 			DX_PROFILE_BLOCK(cl, "Outlines");
 
@@ -1221,8 +1273,8 @@ void dx_renderer::endFrame(const user_input& input)
 				}
 			};
 
-			mark(*opaqueRenderPass, cl, camera.viewProj);
-			//mark(transparentRenderPass, cl, camera.viewProj);
+			mark(*opaqueRenderPass, cl, jitteredCamera.viewProj);
+			//mark(*transparentRenderPass, cl, jitteredCamera.viewProj); // TODO: Which camera?
 
 			// Draw outline.
 			cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ);
@@ -1301,35 +1353,9 @@ void dx_renderer::endFrame(const user_input& input)
 			.transitionEnd(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 			.transitionEnd(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 			.transition(reflectanceTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-			.transitionEnd(frameResult, frameResultState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			.transitionEnd(frameResult, frameResultState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+			.transitionEnd(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
-
-		// Linear depth pyramid.
-		{
-			DX_PROFILE_BLOCK(cl, "Linear depth pyramid");
-
-			cl->setPipelineState(*hierarchicalLinearDepthPipeline.pipeline);
-			cl->setComputeRootSignature(*hierarchicalLinearDepthPipeline.rootSignature);
-
-			float width = ceilf(renderWidth * 0.5f);
-			float height = ceilf(renderHeight * 0.5f);
-
-			cl->setCompute32BitConstants(HIERARCHICAL_LINEAR_DEPTH_RS_CB, hierarchical_linear_depth_cb{ vec2(1.f / width, 1.f / height) });
-			cl->setComputeDynamicConstantBuffer(HIERARCHICAL_LINEAR_DEPTH_RS_CAMERA, cameraCBV);
-			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 0, linearDepthBuffer->defaultUAV);
-			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 1, linearDepthBuffer->mipUAVs[0]);
-			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 2, linearDepthBuffer->mipUAVs[1]);
-			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 3, linearDepthBuffer->mipUAVs[2]);
-			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 4, linearDepthBuffer->mipUAVs[3]);
-			cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 5, linearDepthBuffer->mipUAVs[4]);
-			cl->setDescriptorHeapSRV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 6, depthStencilBuffer);
-
-			cl->dispatch(bucketize((uint32)width, POST_PROCESSING_BLOCK_SIZE), bucketize((uint32)height, POST_PROCESSING_BLOCK_SIZE));
-
-			barrier_batcher(cl)
-				.uav(linearDepthBuffer)
-				.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		}
 
 
 		ref<dx_texture> hdrResult = hdrColorTexture;
@@ -1354,7 +1380,7 @@ void dx_renderer::endFrame(const user_input& input)
 				settings.ssr.frameIndex = (uint32)dxContext.frameID;
 
 				cl->setCompute32BitConstants(SSR_RAYCAST_RS_CB, settings.ssr);
-				cl->setComputeDynamicConstantBuffer(SSR_RAYCAST_RS_CAMERA, cameraCBV);
+				cl->setComputeDynamicConstantBuffer(SSR_RAYCAST_RS_CAMERA, materialInfo.cameraCBV);
 				cl->setDescriptorHeapUAV(SSR_RAYCAST_RS_TEXTURES, 0, ssrRaycastTexture);
 				cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 1, depthStencilBuffer);
 				cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 2, linearDepthBuffer);
@@ -1376,7 +1402,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setComputeRootSignature(*ssrResolvePipeline.rootSignature);
 
 				cl->setCompute32BitConstants(SSR_RESOLVE_RS_CB, ssr_resolve_cb{ vec2((float)ssrResolveTexture->width, (float)ssrResolveTexture->height), vec2(1.f / ssrResolveTexture->width, 1.f / ssrResolveTexture->height) });
-				cl->setComputeDynamicConstantBuffer(SSR_RESOLVE_RS_CAMERA, cameraCBV);
+				cl->setComputeDynamicConstantBuffer(SSR_RESOLVE_RS_CAMERA, materialInfo.cameraCBV);
 
 				cl->setDescriptorHeapUAV(SSR_RESOLVE_RS_TEXTURES, 0, ssrResolveTexture);
 				cl->setDescriptorHeapSRV(SSR_RESOLVE_RS_TEXTURES, 1, depthStencilBuffer);
@@ -1440,7 +1466,7 @@ void dx_renderer::endFrame(const user_input& input)
 			{
 				DX_PROFILE_BLOCK(cl, "Combine");
 
-				specularAmbient(cl, cameraCBV, hdrResult, ssrResolveTexture, hdrPostProcessingTexture);
+				specularAmbient(cl, materialInfo.cameraCBV, hdrResult, ssrResolveTexture, hdrPostProcessingTexture);
 			}
 
 			barrier_batcher(cl)
@@ -1454,7 +1480,7 @@ void dx_renderer::endFrame(const user_input& input)
 		}
 		else
 		{
-			specularAmbient(cl, cameraCBV, hdrResult, 0, hdrPostProcessingTexture);
+			specularAmbient(cl, materialInfo.cameraCBV, hdrResult, 0, hdrPostProcessingTexture);
 
 			barrier_batcher(cl)
 				.uav(hdrPostProcessingTexture)
@@ -1484,7 +1510,7 @@ void dx_renderer::endFrame(const user_input& input)
 			cl->setDescriptorHeapSRV(TAA_RS_TEXTURES, 3, screenVelocitiesTexture);
 			cl->setDescriptorHeapSRV(TAA_RS_TEXTURES, 4, depthStencilBuffer);
 
-			cl->setCompute32BitConstants(TAA_RS_CB, taa_cb{ camera.projectionParams, vec2((float)renderWidth, (float)renderHeight) });
+			cl->setCompute32BitConstants(TAA_RS_CB, taa_cb{ jitteredCamera.projectionParams, vec2((float)renderWidth, (float)renderHeight) });
 
 			cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
 
@@ -1532,6 +1558,67 @@ void dx_renderer::endFrame(const user_input& input)
 		}
 
 
+
+
+		// ----------------------------------------
+		// TRANSPARENT LIGHT PASS
+		// ----------------------------------------
+
+
+		if (transparentRenderPass && transparentRenderPass->drawCalls.size() > 0)
+		{
+			materialInfo.cameraCBV = unjitteredCameraCBV;
+
+			DX_PROFILE_BLOCK(cl, "Transparent light pass");
+
+			barrier_batcher(cl)
+				.transition(hdrResult, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
+				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE); // For this pass and for next frame.
+
+			dx_render_target hdrTransparentRenderTarget({ hdrResult }, depthStencilBuffer);
+
+			cl->setRenderTarget(hdrTransparentRenderTarget);
+			cl->setViewport(hdrTransparentRenderTarget.viewport);
+
+
+			material_setup_function lastSetupFunc = 0;
+
+			for (const auto& dc : transparentRenderPass->drawCalls)
+			{
+				const mat4& m = dc.transform;
+				const submesh_info& submesh = dc.submesh;
+
+				if (dc.materialSetupFunc != lastSetupFunc)
+				{
+					dc.materialSetupFunc(cl, materialInfo);
+					lastSetupFunc = dc.materialSetupFunc;
+				}
+
+				dc.material->prepareForRendering(cl);
+
+				cl->setGraphics32BitConstants(0, transform_cb{ unjitteredCamera.viewProj * m, m });
+
+				cl->setVertexBuffer(0, dc.vertexBuffer);
+				cl->setIndexBuffer(dc.indexBuffer);
+				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			}
+
+
+			barrier_batcher(cl)
+				.transition(hdrResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		}
+		else
+		{
+			cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE); // For next frame.
+		}
+
+
+
+
+
+		// ----------------------------------------
+		// POST PROCESSING CONTINUED
+		// ----------------------------------------
 
 
 		// Bloom.
@@ -1608,7 +1695,6 @@ void dx_renderer::endFrame(const user_input& input)
 			.transition(hdrPostProcessingTexture, hdrPostProcessingTextureState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // If texture is unused, this results in a NOP.
 			.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
 			.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
-			.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
 			.transitionEnd(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
 			.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 			.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON)

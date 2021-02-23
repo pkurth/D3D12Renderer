@@ -104,6 +104,12 @@ struct dx_renderer
 		opaqueRenderPass = renderPass;
 	}
 
+	void submitRenderPass(transparent_render_pass* renderPass)
+	{
+		assert(!opaqueRenderPass);
+		transparentRenderPass = renderPass;
+	}
+
 	void submitRenderPass(overlay_render_pass* renderPass)
 	{
 		assert(!overlayRenderPass);
@@ -177,6 +183,7 @@ private:
 	raytracing_tlas* tlas;
 
 	opaque_render_pass* opaqueRenderPass;
+	transparent_render_pass* transparentRenderPass;
 	sun_shadow_render_pass* sunShadowRenderPass;
 	spot_shadow_render_pass* spotLightShadowRenderPasses[MAX_NUM_SPOT_LIGHT_SHADOW_PASSES];
 	point_shadow_render_pass* pointLightShadowRenderPasses[MAX_NUM_POINT_LIGHT_SHADOW_PASSES];
@@ -229,7 +236,8 @@ private:
 
 	ref<dx_texture> decalTextureAtlas;
 
-	camera_cb camera;
+	camera_cb jitteredCamera;
+	camera_cb unjitteredCamera;
 	directional_light_cb sun;
 
 
