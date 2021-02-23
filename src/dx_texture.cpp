@@ -498,6 +498,8 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 	result->dsvHandle = {};
 	result->stencilSRV = {};
 
+	result->initialState = initialState;
+
 
 	// Upload.
 	if (subresourceData)
@@ -616,6 +618,8 @@ ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT form
 	result->rtvHandles = {};
 	result->dsvHandle = {};
 	result->stencilSRV = {};
+
+	result->initialState = initialState;
 
 	assert(result->supportsDSV);
 
@@ -765,13 +769,12 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 	texture->resource.Reset();
 
 
-	D3D12_RESOURCE_STATES state = initialState;
+	D3D12_RESOURCE_STATES state = (initialState == -1) ? texture->initialState : initialState;
 	D3D12_CLEAR_VALUE optimizedClearValue = {};
 	D3D12_CLEAR_VALUE* clearValue = 0;
 
 	if (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)
 	{
-		state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 		optimizedClearValue.Format = texture->format;
 		optimizedClearValue.DepthStencil = { 1.f, 0 };
 		clearValue = &optimizedClearValue;

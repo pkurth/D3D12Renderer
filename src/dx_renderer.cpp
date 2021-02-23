@@ -418,34 +418,34 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 
 	if (resizeTextures)
 	{
-		resizeTexture(hdrColorTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		resizeTexture(prevFrameHDRColorTexture, renderWidth / 2, renderHeight / 2, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		resizeTexture(prevFrameHDRColorTempTexture, renderWidth / 2, renderHeight / 2, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		resizeTexture(worldNormalsTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		resizeTexture(screenVelocitiesTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		resizeTexture(reflectanceTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		resizeTexture(hdrColorTexture, renderWidth, renderHeight);
+		resizeTexture(prevFrameHDRColorTexture, renderWidth / 2, renderHeight / 2);
+		resizeTexture(prevFrameHDRColorTempTexture, renderWidth / 2, renderHeight / 2);
+		resizeTexture(worldNormalsTexture, renderWidth, renderHeight);
+		resizeTexture(screenVelocitiesTexture, renderWidth, renderHeight);
+		resizeTexture(reflectanceTexture, renderWidth, renderHeight);
 		resizeTexture(depthStencilBuffer, renderWidth, renderHeight);
-		resizeTexture(linearDepthBuffer, renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		resizeTexture(linearDepthBuffer, renderWidth, renderHeight);
 
 		if (objectIDsTexture)
 		{
-			resizeTexture(objectIDsTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			resizeTexture(objectIDsTexture, renderWidth, renderHeight);
 		}
 
-		resizeTexture(ssrRaycastTexture, SSR_RAYCAST_WIDTH, SSR_RAYCAST_HEIGHT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		resizeTexture(ssrResolveTexture, SSR_RESOLVE_WIDTH, SSR_RESOLVE_HEIGHT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		resizeTexture(ssrRaycastTexture, SSR_RAYCAST_WIDTH, SSR_RAYCAST_HEIGHT);
+		resizeTexture(ssrResolveTexture, SSR_RESOLVE_WIDTH, SSR_RESOLVE_HEIGHT);
 		resizeTexture(ssrTemporalTextures[ssrHistoryIndex], SSR_RESOLVE_WIDTH, SSR_RESOLVE_HEIGHT, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		resizeTexture(ssrTemporalTextures[1 - ssrHistoryIndex], SSR_RESOLVE_WIDTH, SSR_RESOLVE_HEIGHT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		resizeTexture(hdrPostProcessingTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		resizeTexture(hdrPostProcessingTexture, renderWidth, renderHeight);
 
 		resizeTexture(taaTextures[taaHistoryIndex], renderWidth, renderHeight, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		resizeTexture(taaTextures[1 - taaHistoryIndex], renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		resizeTexture(bloomTexture, renderWidth / 4, renderHeight / 4, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		resizeTexture(bloomTempTexture, renderWidth / 4, renderHeight / 4, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		resizeTexture(bloomTexture, renderWidth / 4, renderHeight / 4);
+		resizeTexture(bloomTempTexture, renderWidth / 4, renderHeight / 4);
 
-		resizeTexture(ldrPostProcessingTexture, renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		resizeTexture(ldrPostProcessingTexture, renderWidth, renderHeight);
 	}
 	
 	allocateLightCullingBuffers();
