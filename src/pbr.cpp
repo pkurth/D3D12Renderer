@@ -13,7 +13,8 @@
 
 #include <unordered_map>
 
-static dx_pipeline defaultPBRPipeline;
+static dx_pipeline defaultOpaquePBRPipeline;
+static dx_pipeline defaultTransparentPBRPipeline;
 
 struct material_key
 {
@@ -211,13 +212,26 @@ void pbr_material::prepareForRendering(dx_command_list* cl)
 	);
 }
 
-void pbr_material::setupPipeline(dx_command_list* cl, const common_material_info& info)
+void pbr_material::setupOpaquePipeline(dx_command_list* cl, const common_material_info& info)
+{
+	cl->setPipelineState(*defaultOpaquePBRPipeline.pipeline);
+	cl->setGraphicsRootSignature(*defaultOpaquePBRPipeline.rootSignature);
+
+	setupCommon(cl, info);
+}
+
+void pbr_material::setupTransparentPipeline(dx_command_list* cl, const common_material_info& info)
+{
+	cl->setPipelineState(*defaultTransparentPBRPipeline.pipeline);
+	cl->setGraphicsRootSignature(*defaultTransparentPBRPipeline.rootSignature);
+
+	setupCommon(cl, info);
+}
+
+void pbr_material::setupCommon(dx_command_list* cl, const common_material_info& info)
 {
 	dx_cpu_descriptor_handle nullTexture = dx_renderer::nullTextureSRV;
 	dx_cpu_descriptor_handle nullBuffer = dx_renderer::nullBufferSRV;
-
-	cl->setPipelineState(*defaultPBRPipeline.pipeline);
-	cl->setGraphicsRootSignature(*defaultPBRPipeline.rootSignature);
 
 	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_LIGHTING, lighting_cb{ vec2(1.f / info.shadowMap->width, 1.f / info.shadowMap->height), info.environmentIntensity });
 
@@ -250,12 +264,21 @@ void pbr_material::setupPipeline(dx_command_list* cl, const common_material_info
 
 void pbr_material::initializePipeline()
 {
-	auto desc = CREATE_GRAPHICS_PIPELINE
-		.inputLayout(inputLayout_position_uv_normal_tangent)
-		.renderTargets(dx_renderer::lightPassFormats, arraysize(dx_renderer::lightPassFormats), dx_renderer::hdrDepthStencilFormat)
-		.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.inputLayout(inputLayout_position_uv_normal_tangent)
+			.renderTargets(dx_renderer::opaqueLightPassFormats, arraysize(dx_renderer::opaqueLightPassFormats), dx_renderer::hdrDepthStencilFormat)
+			.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
 
-	defaultPBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_ps" });
+		defaultOpaquePBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_ps" });
+	}
 
-	// We are omitting the call to createAllPendingReloadablePipelines here, because this is called from the renderer. In custom materials, you have to call this at some point.
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.inputLayout(inputLayout_position_uv_normal_tangent)
+			.renderTargets(dx_renderer::transparentLightPassFormats, arraysize(dx_renderer::transparentLightPassFormats), dx_renderer::hdrDepthStencilFormat)
+			.alphaBlending(0);
+
+		defaultTransparentPBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_transparent_ps" });
+	}
 }

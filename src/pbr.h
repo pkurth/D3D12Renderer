@@ -22,7 +22,11 @@ struct pbr_material : material_base
 	float metallicOverride;
 
 	void prepareForRendering(struct dx_command_list* cl);
-	static void setupPipeline(dx_command_list* cl, const common_material_info& info);
+	static void setupOpaquePipeline(dx_command_list* cl, const common_material_info& info);
+	static void setupTransparentPipeline(dx_command_list* cl, const common_material_info& info);
+
+private:
+	static void setupCommon(dx_command_list* cl, const common_material_info& info);
 };
 
 struct pbr_environment

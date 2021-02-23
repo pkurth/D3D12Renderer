@@ -1256,12 +1256,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 
-		// ----------------------------------------
-		// POST PROCESSING
-		// ----------------------------------------
-
 		barrier_batcher(cl)
-			.transitionBegin(shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
 			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 			.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 			.transitionEnd(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
@@ -1278,7 +1273,10 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 
-		// Screen space reflections.
+		// ----------------------------------------
+		// SCREEN SPACE REFLECTIONS
+		// ----------------------------------------
+
 		if (settings.enableSSR)
 		{
 			DX_PROFILE_BLOCK(cl, "Screen space reflections");
@@ -1385,12 +1383,8 @@ void dx_renderer::endFrame(const user_input& input)
 
 			barrier_batcher(cl)
 				.uav(hdrPostProcessingTexture)
-				.transitionEnd(ssrRaycastTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // For next frame.
-				.transitionEnd(ssrTemporalTextures[ssrHistoryIndex], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // For next frame.
-				.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // For next frame.
 				.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE); // Will be read by rest of post processing stack. 
 
-			ssrHistoryIndex = ssrOutputIndex;
 		}
 		else
 		{
@@ -1405,6 +1399,84 @@ void dx_renderer::endFrame(const user_input& input)
 		hdrResult = hdrPostProcessingTexture;
 		hdrPostProcessingTextureState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
+
+
+
+
+
+		// After this there is no more camera jittering!
+		materialInfo.cameraCBV = unjitteredCameraCBV;
+
+
+
+
+
+		// ----------------------------------------
+		// TRANSPARENT LIGHT PASS
+		// ----------------------------------------
+
+
+		if (transparentRenderPass && transparentRenderPass->drawCalls.size() > 0)
+		{
+			DX_PROFILE_BLOCK(cl, "Transparent light pass");
+
+			barrier_batcher(cl)
+				.transition(hdrResult, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
+				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+
+			dx_render_target hdrTransparentRenderTarget({ hdrResult }, depthStencilBuffer);
+
+			cl->setRenderTarget(hdrTransparentRenderTarget);
+			cl->setViewport(hdrTransparentRenderTarget.viewport);
+
+
+			material_setup_function lastSetupFunc = 0;
+
+			for (const auto& dc : transparentRenderPass->drawCalls)
+			{
+				const mat4& m = dc.transform;
+				const submesh_info& submesh = dc.submesh;
+
+				if (dc.materialSetupFunc != lastSetupFunc)
+				{
+					dc.materialSetupFunc(cl, materialInfo);
+					lastSetupFunc = dc.materialSetupFunc;
+				}
+
+				dc.material->prepareForRendering(cl);
+
+				cl->setGraphics32BitConstants(0, transform_cb{ unjitteredCamera.viewProj * m, m });
+
+				cl->setVertexBuffer(0, dc.vertexBuffer);
+				cl->setIndexBuffer(dc.indexBuffer);
+				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			}
+
+
+			barrier_batcher(cl)
+				.transition(hdrResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		}
+
+
+
+		if (settings.enableSSR)
+		{
+			barrier_batcher(cl)
+				.transitionEnd(ssrRaycastTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // For next frame.
+				.transitionEnd(ssrTemporalTextures[ssrHistoryIndex], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // For next frame.
+				.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.
+
+			ssrHistoryIndex = 1 - ssrHistoryIndex;
+		}
+
+
+
+
+
+		// ----------------------------------------
+		// POST PROCESSING
+		// ----------------------------------------
 
 
 
@@ -1443,8 +1515,6 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 
-
-
 		// Downsample scene. This is also the copy used in SSR next frame.
 		{
 			DX_PROFILE_BLOCK(cl, "Downsample scene");
@@ -1474,71 +1544,8 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 
-		// After this there is no more camera jittering!
-		materialInfo.cameraCBV = unjitteredCameraCBV;
 
 
-
-
-
-		// ----------------------------------------
-		// TRANSPARENT LIGHT PASS
-		// ----------------------------------------
-
-
-		if (transparentRenderPass && transparentRenderPass->drawCalls.size() > 0)
-		{
-
-			DX_PROFILE_BLOCK(cl, "Transparent light pass");
-
-			barrier_batcher(cl)
-				.transition(hdrResult, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
-				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE); // For this pass and for next frame.
-
-			dx_render_target hdrTransparentRenderTarget({ hdrResult }, depthStencilBuffer);
-
-			cl->setRenderTarget(hdrTransparentRenderTarget);
-			cl->setViewport(hdrTransparentRenderTarget.viewport);
-
-
-			material_setup_function lastSetupFunc = 0;
-
-			for (const auto& dc : transparentRenderPass->drawCalls)
-			{
-				const mat4& m = dc.transform;
-				const submesh_info& submesh = dc.submesh;
-
-				if (dc.materialSetupFunc != lastSetupFunc)
-				{
-					dc.materialSetupFunc(cl, materialInfo);
-					lastSetupFunc = dc.materialSetupFunc;
-				}
-
-				dc.material->prepareForRendering(cl);
-
-				cl->setGraphics32BitConstants(0, transform_cb{ unjitteredCamera.viewProj * m, m });
-
-				cl->setVertexBuffer(0, dc.vertexBuffer);
-				cl->setIndexBuffer(dc.indexBuffer);
-				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-			}
-
-
-			barrier_batcher(cl)
-				.transition(hdrResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		}
-		else
-		{
-			cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE); // For next frame.
-		}
-
-
-
-
-
-		// ----------------------------------------
-		// POST PROCESSING CONTINUED
-		// ----------------------------------------
 
 
 		// Bloom.
@@ -1625,6 +1632,9 @@ void dx_renderer::endFrame(const user_input& input)
 
 		tonemap(cl, hdrResult, ldrPostProcessingTextureState);
 
+
+
+		cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 
 
@@ -1745,7 +1755,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 		barrier_batcher(cl)
 			.uav(frameResult)
-			.transitionEnd(shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
+			.transition(shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
 			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
 			.transition(hdrPostProcessingTexture, hdrPostProcessingTextureState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // If texture is unused, this results in a NOP.
 			.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)

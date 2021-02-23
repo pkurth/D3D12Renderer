@@ -76,7 +76,7 @@ struct gizmo_material : material_base
 {
 	vec4 color;
 
-	static void setupPipeline(dx_command_list* cl, const common_material_info& info)
+	static void setupOpaquePipeline(dx_command_list* cl, const common_material_info& info)
 	{
 		cl->setPipelineState(*gizmoPipeline.pipeline);
 		cl->setGraphicsRootSignature(*gizmoPipeline.rootSignature);

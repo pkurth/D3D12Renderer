@@ -17,13 +17,21 @@ struct geometry_render_pass
 	void reset();
 
 protected:
-	template <typename material_t>
+	template <bool opaque, typename material_t>
 	void common(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
 		bool outline, bool setTransform = true)
 	{
 		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
 
-		material_setup_function setupFunc = material_t::setupPipeline;
+		material_setup_function setupFunc;
+		if constexpr (opaque)
+		{
+			setupFunc = material_t::setupOpaquePipeline;
+		}
+		else
+		{
+			setupFunc = material_t::setupTransparentPipeline;
+		}
 
 		auto& dc = drawCalls.emplace_back();
 		dc.transform = transform;
@@ -45,13 +53,21 @@ protected:
 		}
 	}
 
-	template <typename material_t>
+	template <bool opaque, typename material_t>
 	void common(uint32 dispatchX, uint32 dispatchY, uint32 dispatchZ, const ref<material_t>& material, const mat4& transform,
 		bool outline, bool setTransform = true)
 	{
 		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
 
-		material_setup_function setupFunc = material_t::setupPipeline;
+		material_setup_function setupFunc;
+		if constexpr (opaque)
+		{
+			setupFunc = material_t::setupOpaquePipeline;
+		}
+		else
+		{
+			setupFunc = material_t::setupTransparentPipeline;
+		}
 
 		auto& dc = drawCalls.emplace_back();
 		dc.transform = transform;
@@ -112,7 +128,7 @@ struct opaque_render_pass : geometry_render_pass
 	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
 		uint16 objectID, bool outline = false)
 	{
-		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
+		common<true>(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 
 		staticDepthOnlyDrawCalls.push_back(
 			{
@@ -126,7 +142,7 @@ struct opaque_render_pass : geometry_render_pass
 		const mat4& transform, const mat4& prevFrameTransform,
 		uint16 objectID, bool outline = false)
 	{
-		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
+		common<true>(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 
 		dynamicDepthOnlyDrawCalls.push_back(
 			{
@@ -141,7 +157,7 @@ struct opaque_render_pass : geometry_render_pass
 		const mat4& transform, const mat4& prevFrameTransform,
 		uint16 objectID, bool outline = false)
 	{
-		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
+		common<true>(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 
 		animatedDepthOnlyDrawCalls.push_back(
 			{
@@ -203,7 +219,7 @@ struct transparent_render_pass : geometry_render_pass
 	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
 		bool outline = false)
 	{
-		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
+		common<false>(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 	}
 
 	friend struct dx_renderer;
@@ -214,13 +230,13 @@ struct overlay_render_pass : geometry_render_pass
 	template <typename material_t>
 	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform, bool setTransform)
 	{
-		common(vertexBuffer, indexBuffer, submesh, material, transform, false, setTransform);
+		common<true>(vertexBuffer, indexBuffer, submesh, material, transform, false, setTransform);
 	}
 
 	template <typename material_t>
 	void renderObjectWithMeshShader(uint32 dispatchX, uint32 dispatchY, uint32 dispatchZ, const ref<material_t>& material, const mat4& transform, bool setTransform)
 	{
-		common(dispatchX, dispatchY, dispatchZ, material, transform, false, setTransform);
+		common<true>(dispatchX, dispatchY, dispatchZ, material, transform, false, setTransform);
 	}
 
 	friend struct dx_renderer;

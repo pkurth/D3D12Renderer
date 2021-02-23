@@ -106,7 +106,7 @@ struct dx_renderer
 
 	void submitRenderPass(transparent_render_pass* renderPass)
 	{
-		assert(!opaqueRenderPass);
+		assert(!transparentRenderPass);
 		transparentRenderPass = renderPass;
 	}
 
@@ -177,7 +177,8 @@ struct dx_renderer
 	static constexpr DXGI_FORMAT overlayFormat = ldrPostProcessFormat;
 	static constexpr DXGI_FORMAT overlayDepthFormat = hdrDepthStencilFormat;
 
-	static constexpr DXGI_FORMAT lightPassFormats[] = { hdrFormat, worldNormalsFormat, reflectanceFormat };
+	static constexpr DXGI_FORMAT opaqueLightPassFormats[] = { hdrFormat, worldNormalsFormat, reflectanceFormat };
+	static constexpr DXGI_FORMAT transparentLightPassFormats[] = { hdrPostProcessFormat };
 	static constexpr DXGI_FORMAT skyPassFormats[] = { hdrFormat, screenVelocitiesFormat, objectIDsFormat };
 
 private:

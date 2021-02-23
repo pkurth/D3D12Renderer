@@ -116,7 +116,9 @@ void application::initialize(dx_renderer* renderer)
 			"assets/textures/pilot/A.png",
 			"assets/textures/pilot/N.png",
 			"assets/textures/pilot/R.png",
-			"assets/textures/pilot/M.png"
+			"assets/textures/pilot/M.png",
+			vec4(0.f),
+			vec4(1.f, 1.f, 1.f, 0.3f)
 		);
 	}
 
@@ -577,6 +579,7 @@ void application::drawSettings(float dt)
 void application::resetRenderPasses()
 {
 	opaqueRenderPass.reset();
+	transparentRenderPass.reset();
 	overlayRenderPass.reset();
 	sunShadowRenderPass.reset();
 
@@ -594,6 +597,7 @@ void application::resetRenderPasses()
 void application::submitRenderPasses()
 {
 	renderer->submitRenderPass(&opaqueRenderPass);
+	renderer->submitRenderPass(&transparentRenderPass);
 	renderer->submitRenderPass(&overlayRenderPass);
 	renderer->submitRenderPass(&sunShadowRenderPass);
 
@@ -814,12 +818,21 @@ void application::update(const user_input& input, float dt)
 					submesh_info submesh = anim.sms[i];
 					submesh_info prevFrameSubmesh = anim.prevFrameSMs[i];
 
-					opaqueRenderPass.renderAnimatedObject(anim.vb, anim.prevFrameVB, mesh.indexBuffer, submesh, prevFrameSubmesh, raster.mesh->submeshes[i].material, m, m,
-						(uint32)entityHandle, outline);
-					sunShadowRenderPass.renderObject(0, anim.vb, mesh.indexBuffer, submesh, m);
-					spotShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
-					spotShadowRenderPasses[1].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
-					pointShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
+					const ref<pbr_material>& material = raster.mesh->submeshes[i].material;
+
+					if (material->albedoTint.a < 1.f)
+					{
+						transparentRenderPass.renderObject(anim.vb, mesh.indexBuffer, submesh, material, m, outline);
+					}
+					else
+					{
+						opaqueRenderPass.renderAnimatedObject(anim.vb, anim.prevFrameVB, mesh.indexBuffer, submesh, prevFrameSubmesh, material, m, m,
+							(uint32)entityHandle, outline);
+						sunShadowRenderPass.renderObject(0, anim.vb, mesh.indexBuffer, submesh, m);
+						spotShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
+						spotShadowRenderPasses[1].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
+						pointShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
+					}
 				}
 			}
 			else
@@ -829,14 +842,22 @@ void application::update(const user_input& input, float dt)
 					submesh_info submesh = sm.info;
 					const ref<pbr_material>& material = sm.material;
 
-					opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, (uint32)entityHandle, outline);
-					sunShadowRenderPass.renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-					spotShadowRenderPasses[0].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-					spotShadowRenderPasses[1].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-					pointShadowRenderPasses[0].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+					if (material->albedoTint.a < 1.f)
+					{
+						transparentRenderPass.renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, outline);
+					}
+					else
+					{
+						opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, (uint32)entityHandle, outline);
+						sunShadowRenderPass.renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+						spotShadowRenderPasses[0].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+						spotShadowRenderPasses[1].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+						pointShadowRenderPasses[0].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+					}
 				}
 			}
 		});
+
 
 		waitForWorkCompletion(context);
 		submitRenderPasses();

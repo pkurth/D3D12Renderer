@@ -58,7 +58,7 @@ static ref<mesh_shader_mesh> loadMeshShaderMeshFromFile(const char* filename);
 
 struct mesh_shader_cube_material : material_base
 {
-	static void setupPipeline(dx_command_list* cl, const common_material_info& info)
+	static void setupOpaquePipeline(dx_command_list* cl, const common_material_info& info)
 	{
 		cl->setPipelineState(*cubePipeline.pipeline);
 		cl->setGraphicsRootSignature(*cubePipeline.rootSignature);
@@ -73,7 +73,7 @@ struct mesh_shader_mesh_material : material_base
 {
 	ref<mesh_shader_mesh> mesh;
 
-	static void setupPipeline(dx_command_list* cl, const common_material_info& info)
+	static void setupOpaquePipeline(dx_command_list* cl, const common_material_info& info)
 	{
 		cl->setPipelineState(*meshPipeline.pipeline);
 		cl->setGraphicsRootSignature(*meshPipeline.rootSignature);
@@ -90,7 +90,7 @@ struct mesh_shader_mesh_material : material_base
 
 struct mesh_shader_blob_material : material_base
 {
-	static void setupPipeline(dx_command_list* cl, const common_material_info& info)
+	static void setupOpaquePipeline(dx_command_list* cl, const common_material_info& info)
 	{
 		cl->setPipelineState(*blobPipeline.pipeline);
 		cl->setGraphicsRootSignature(*blobPipeline.rootSignature);
