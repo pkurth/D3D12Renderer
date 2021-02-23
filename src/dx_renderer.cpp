@@ -174,7 +174,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 
 		auto drawerDesc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(hdrFormat, hdrDepthStencilFormat)
+			.renderTargets(ldrPostProcessFormat, hdrDepthStencilFormat)
 			.stencilSettings(D3D12_COMPARISON_FUNC_EQUAL,
 				D3D12_STENCIL_OP_KEEP,
 				D3D12_STENCIL_OP_KEEP,
@@ -273,7 +273,7 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 	taaTextures[taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, true, true, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	taaTextures[1 - taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, true, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-	ldrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, ldrPostProcessFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	ldrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, ldrPostProcessFormat, false, true, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	D3D12_RESOURCE_DESC bloomDesc = CD3DX12_RESOURCE_DESC::Tex2D(hdrPostProcessFormat, renderWidth / 4, renderHeight / 4, 1,
 		5, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
@@ -568,35 +568,40 @@ void dx_renderer::specularAmbient(dx_command_list* cl, dx_dynamic_constant_buffe
 
 void dx_renderer::tonemapAndPresent(dx_command_list* cl, const ref<dx_texture>& hdrResult)
 {
-	{
-		DX_PROFILE_BLOCK(cl, "Tonemapping");
+	tonemap(cl, hdrResult, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	present(cl);
+}
 
-		cl->setPipelineState(*tonemapPipeline.pipeline);
-		cl->setComputeRootSignature(*tonemapPipeline.rootSignature);
+void dx_renderer::tonemap(dx_command_list* cl, const ref<dx_texture>& hdrResult, D3D12_RESOURCE_STATES transitionLDR)
+{
+	DX_PROFILE_BLOCK(cl, "Tonemapping");
 
-		cl->setDescriptorHeapUAV(TONEMAP_RS_TEXTURES, 0, ldrPostProcessingTexture);
-		cl->setDescriptorHeapSRV(TONEMAP_RS_TEXTURES, 1, hdrResult);
-		cl->setCompute32BitConstants(TONEMAP_RS_CB, settings.tonemap);
+	cl->setPipelineState(*tonemapPipeline.pipeline);
+	cl->setComputeRootSignature(*tonemapPipeline.rootSignature);
 
-		cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
+	cl->setDescriptorHeapUAV(TONEMAP_RS_TEXTURES, 0, ldrPostProcessingTexture);
+	cl->setDescriptorHeapSRV(TONEMAP_RS_TEXTURES, 1, hdrResult);
+	cl->setCompute32BitConstants(TONEMAP_RS_CB, settings.tonemap);
 
-		barrier_batcher(cl)
-			.uav(ldrPostProcessingTexture)
-			.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	}
+	cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
 
-	{
-		DX_PROFILE_BLOCK(cl, "Present");
+	barrier_batcher(cl)
+		.uav(ldrPostProcessingTexture)
+		.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, transitionLDR);
+}
 
-		cl->setPipelineState(*presentPipeline.pipeline);
-		cl->setComputeRootSignature(*presentPipeline.rootSignature);
+void dx_renderer::present(dx_command_list* cl)
+{
+	DX_PROFILE_BLOCK(cl, "Present");
 
-		cl->setDescriptorHeapUAV(PRESENT_RS_TEXTURES, 0, frameResult);
-		cl->setDescriptorHeapSRV(PRESENT_RS_TEXTURES, 1, ldrPostProcessingTexture);
-		cl->setCompute32BitConstants(PRESENT_RS_CB, present_cb{ PRESENT_SDR, 0.f, settings.sharpenStrength * settings.enableSharpen, (windowXOffset << 16) | windowYOffset });
+	cl->setPipelineState(*presentPipeline.pipeline);
+	cl->setComputeRootSignature(*presentPipeline.rootSignature);
 
-		cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
-	}
+	cl->setDescriptorHeapUAV(PRESENT_RS_TEXTURES, 0, frameResult);
+	cl->setDescriptorHeapSRV(PRESENT_RS_TEXTURES, 1, ldrPostProcessingTexture);
+	cl->setCompute32BitConstants(PRESENT_RS_CB, present_cb{ PRESENT_SDR, 0.f, settings.sharpenStrength * settings.enableSharpen, (windowXOffset << 16) | windowYOffset });
+
+	cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
 }
 
 void dx_renderer::setCamera(const render_camera& camera)
@@ -1240,105 +1245,6 @@ void dx_renderer::endFrame(const user_input& input)
 			.transitionBegin(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
 
-		// ----------------------------------------
-		// OUTLINES
-		// ----------------------------------------
-
-#if 1
-		if (opaqueRenderPass && opaqueRenderPass->outlinedObjects.size() > 0 ||
-			transparentRenderPass && transparentRenderPass->outlinedObjects.size() > 0)
-		{
-			DX_PROFILE_BLOCK(cl, "Outlines");
-
-			cl->setStencilReference(stencil_flag_selected_object);
-
-			cl->setPipelineState(*outlineMarkerPipeline.pipeline);
-			cl->setGraphicsRootSignature(*outlineMarkerPipeline.rootSignature);
-
-			// Mark object in stencil.
-			auto mark = [](const geometry_render_pass& rp, dx_command_list* cl, const mat4& viewProj)
-			{
-				for (const auto& outlined : rp.outlinedObjects)
-				{
-					const submesh_info& submesh = rp.drawCalls[outlined].submesh;
-					const mat4& m = rp.drawCalls[outlined].transform;
-					const auto& vertexBuffer = rp.drawCalls[outlined].vertexBuffer;
-					const auto& indexBuffer = rp.drawCalls[outlined].indexBuffer;
-
-					cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * m });
-
-					cl->setVertexBuffer(0, vertexBuffer);
-					cl->setIndexBuffer(indexBuffer);
-					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-				}
-			};
-
-			mark(*opaqueRenderPass, cl, jitteredCamera.viewProj);
-			//mark(*transparentRenderPass, cl, jitteredCamera.viewProj); // TODO: Which camera?
-
-			// Draw outline.
-			cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ);
-
-			cl->setPipelineState(*outlineDrawerPipeline.pipeline);
-			cl->setGraphicsRootSignature(*outlineDrawerPipeline.rootSignature);
-
-			cl->setGraphics32BitConstants(OUTLINE_RS_CB, outline_drawer_cb{ (int)renderWidth, (int)renderHeight });
-			cl->setDescriptorHeapResource(OUTLINE_RS_STENCIL, 0, 1, depthStencilBuffer->stencilSRV);
-
-			cl->drawFullscreenTriangle();
-
-			cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-		}
-#endif
-
-
-
-		// ----------------------------------------
-		// OVERLAYS
-		// ----------------------------------------
-
-#if 0
-		if (overlayRenderPass && overlayRenderPass->drawCalls.size())
-		{
-			DX_PROFILE_BLOCK(cl, "3D Overlays");
-
-			//cl->clearDepth(depthStencilBuffer->dsvHandle); // TODO: This messes up the post processing. Maybe render the 3D overlays in LDR after all post processing?
-
-			material_setup_function lastSetupFunc = 0;
-
-			for (const auto& dc : overlayRenderPass->drawCalls)
-			{
-				const mat4& m = dc.transform;
-
-				if (dc.materialSetupFunc != lastSetupFunc)
-				{
-					dc.materialSetupFunc(cl, materialInfo);
-					lastSetupFunc = dc.materialSetupFunc;
-				}
-
-				dc.material->prepareForRendering(cl);
-
-				if (dc.setTransform)
-				{
-					cl->setGraphics32BitConstants(0, transform_cb{ camera.viewProj * m, m });
-				}
-
-				if (dc.drawType == geometry_render_pass::draw_type_default)
-				{
-					const submesh_info& submesh = dc.submesh;
-
-					cl->setVertexBuffer(0, dc.vertexBuffer);
-					cl->setIndexBuffer(dc.indexBuffer);
-					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-				}
-				else
-				{
-					cl->dispatchMesh(dc.dispatchInfo.dispatchX, dc.dispatchInfo.dispatchY, dc.dispatchInfo.dispatchZ);
-				}
-			}
-		}
-#endif
-
 
 
 
@@ -1560,6 +1466,13 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 
+		// After this there is no more camera jittering!
+		materialInfo.cameraCBV = unjitteredCameraCBV;
+
+
+
+
+
 		// ----------------------------------------
 		// TRANSPARENT LIGHT PASS
 		// ----------------------------------------
@@ -1567,7 +1480,6 @@ void dx_renderer::endFrame(const user_input& input)
 
 		if (transparentRenderPass && transparentRenderPass->drawCalls.size() > 0)
 		{
-			materialInfo.cameraCBV = unjitteredCameraCBV;
 
 			DX_PROFILE_BLOCK(cl, "Transparent light pass");
 
@@ -1686,7 +1598,142 @@ void dx_renderer::endFrame(const user_input& input)
 
 		// At this point hdrResult is either the TAA result, the hdrColorTexture, or the hdrPostProcessingTexture. All of these are in read state.
 
-		tonemapAndPresent(cl, hdrResult);
+
+
+
+
+		// ----------------------------------------
+		// LDR RENDERING
+		// ----------------------------------------
+
+
+
+		bool renderingOverlays = overlayRenderPass && overlayRenderPass->drawCalls.size();
+		bool renderingOutlines = opaqueRenderPass && opaqueRenderPass->outlinedObjects.size() > 0 ||
+			transparentRenderPass && transparentRenderPass->outlinedObjects.size() > 0;
+		bool renderingToLDRPostprocessingTexture = renderingOverlays || renderingOutlines;
+
+		D3D12_RESOURCE_STATES ldrPostProcessingTextureState = renderingToLDRPostprocessingTexture ? D3D12_RESOURCE_STATE_RENDER_TARGET : D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+		tonemap(cl, hdrResult, ldrPostProcessingTextureState);
+
+
+
+
+		// ----------------------------------------
+		// OVERLAYS
+		// ----------------------------------------
+
+		dx_render_target ldrRenderTarget({ ldrPostProcessingTexture }, depthStencilBuffer);
+
+		if (renderingOverlays)
+		{
+			DX_PROFILE_BLOCK(cl, "3D Overlays");
+
+			cl->setRenderTarget(ldrRenderTarget);
+			cl->setViewport(ldrRenderTarget.viewport);
+
+			cl->clearDepth(depthStencilBuffer->dsvHandle);
+
+			material_setup_function lastSetupFunc = 0;
+
+			for (const auto& dc : overlayRenderPass->drawCalls)
+			{
+				const mat4& m = dc.transform;
+
+				if (dc.materialSetupFunc != lastSetupFunc)
+				{
+					dc.materialSetupFunc(cl, materialInfo);
+					lastSetupFunc = dc.materialSetupFunc;
+				}
+
+				dc.material->prepareForRendering(cl);
+
+				if (dc.setTransform)
+				{
+					cl->setGraphics32BitConstants(0, transform_cb{ unjitteredCamera.viewProj * m, m });
+				}
+
+				if (dc.drawType == geometry_render_pass::draw_type_default)
+				{
+					const submesh_info& submesh = dc.submesh;
+
+					cl->setVertexBuffer(0, dc.vertexBuffer);
+					cl->setIndexBuffer(dc.indexBuffer);
+					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+				}
+				else
+				{
+					cl->dispatchMesh(dc.dispatchInfo.dispatchX, dc.dispatchInfo.dispatchY, dc.dispatchInfo.dispatchZ);
+				}
+			}
+		}
+
+
+
+		// ----------------------------------------
+		// OUTLINES
+		// ----------------------------------------
+
+		if (renderingOutlines)
+		{
+			DX_PROFILE_BLOCK(cl, "Outlines");
+
+			cl->setRenderTarget(ldrRenderTarget);
+			cl->setViewport(ldrRenderTarget.viewport);
+
+			cl->setStencilReference(stencil_flag_selected_object);
+
+			cl->setPipelineState(*outlineMarkerPipeline.pipeline);
+			cl->setGraphicsRootSignature(*outlineMarkerPipeline.rootSignature);
+
+			// Mark object in stencil.
+			auto mark = [](const geometry_render_pass& rp, dx_command_list* cl, const mat4& viewProj)
+			{
+				for (const auto& outlined : rp.outlinedObjects)
+				{
+					const submesh_info& submesh = rp.drawCalls[outlined].submesh;
+					const mat4& m = rp.drawCalls[outlined].transform;
+					const auto& vertexBuffer = rp.drawCalls[outlined].vertexBuffer;
+					const auto& indexBuffer = rp.drawCalls[outlined].indexBuffer;
+
+					cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * m });
+
+					cl->setVertexBuffer(0, vertexBuffer);
+					cl->setIndexBuffer(indexBuffer);
+					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+				}
+			};
+
+			mark(*opaqueRenderPass, cl, unjitteredCamera.viewProj);
+			//mark(*transparentRenderPass, cl, unjitteredCamera.viewProj);
+
+			// Draw outline.
+			cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ);
+
+			cl->setPipelineState(*outlineDrawerPipeline.pipeline);
+			cl->setGraphicsRootSignature(*outlineDrawerPipeline.rootSignature);
+
+			cl->setGraphics32BitConstants(OUTLINE_RS_CB, outline_drawer_cb{ (int)renderWidth, (int)renderHeight });
+			cl->setDescriptorHeapResource(OUTLINE_RS_STENCIL, 0, 1, depthStencilBuffer->stencilSRV);
+
+			cl->drawFullscreenTriangle();
+
+			cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+		}
+
+
+		barrier_batcher(cl)
+			.transition(ldrPostProcessingTexture, ldrPostProcessingTextureState, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+
+
+
+		// TODO: If we really care we should sharpen before rendering overlays and outlines.
+
+		present(cl);
+
+
 
 		barrier_batcher(cl)
 			.uav(frameResult)

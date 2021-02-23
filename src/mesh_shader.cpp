@@ -171,7 +171,7 @@ void initializeMeshShader()
 {
 	D3D12_RT_FORMAT_ARRAY renderTargetFormat = {};
 	renderTargetFormat.NumRenderTargets = 1;
-	renderTargetFormat.RTFormats[0] = dx_renderer::hdrFormat;
+	renderTargetFormat.RTFormats[0] = dx_renderer::overlayFormat;
 
 	{
 		struct pipeline_state_stream : dx_pipeline_stream_base
@@ -191,7 +191,7 @@ void initializeMeshShader()
 		};
 
 		pipeline_state_stream stream;
-		stream.dsvFormat = dx_renderer::hdrDepthStencilFormat;
+		stream.dsvFormat = dx_renderer::overlayDepthFormat;
 		stream.rtvFormats = renderTargetFormat;
 
 		graphics_pipeline_files files = {};
@@ -232,7 +232,7 @@ void initializeMeshShader()
 		rasterizerDesc.FrontCounterClockwise = TRUE; // Righthanded coordinate system.
 
 		pipeline_state_stream stream;
-		stream.dsvFormat = dx_renderer::hdrDepthStencilFormat;
+		stream.dsvFormat = dx_renderer::overlayDepthFormat;
 		stream.rtvFormats = renderTargetFormat;
 		stream.rasterizer = rasterizerDesc;
 

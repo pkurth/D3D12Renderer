@@ -174,6 +174,9 @@ struct dx_renderer
 	static constexpr DXGI_FORMAT hdrPostProcessFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	static constexpr DXGI_FORMAT ldrPostProcessFormat = DXGI_FORMAT_R11G11B10_FLOAT; // Not really LDR. But I don't like the idea of converting to 8 bit and then to sRGB in separate passes.
 
+	static constexpr DXGI_FORMAT overlayFormat = ldrPostProcessFormat;
+	static constexpr DXGI_FORMAT overlayDepthFormat = hdrDepthStencilFormat;
+
 	static constexpr DXGI_FORMAT lightPassFormats[] = { hdrFormat, worldNormalsFormat, reflectanceFormat };
 	static constexpr DXGI_FORMAT skyPassFormats[] = { hdrFormat, screenVelocitiesFormat, objectIDsFormat };
 
@@ -273,5 +276,7 @@ private:
 	void gaussianBlur(dx_command_list* cl, ref<dx_texture> inputOutput, ref<dx_texture> temp, uint32 inputMip, uint32 outputMip, gaussian_blur_kernel_size kernel, uint32 numIterations = 1);
 	void specularAmbient(dx_command_list* cl, dx_dynamic_constant_buffer cameraCBV, const ref<dx_texture>& hdrInput, const ref<dx_texture>& ssr, const ref<dx_texture>& output);
 	void tonemapAndPresent(dx_command_list* cl, const ref<dx_texture>& hdrResult);
+	void tonemap(dx_command_list* cl, const ref<dx_texture>& hdrResult, D3D12_RESOURCE_STATES transitionLDR);
+	void present(dx_command_list* cl);
 };
 
