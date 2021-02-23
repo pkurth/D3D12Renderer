@@ -231,6 +231,8 @@ void application::initialize(dx_renderer* renderer)
 				vec4(0.f, 0.f, 1.f, 1.f)
 			);
 		}
+
+		SET_NAME(decalTexture->resource, "Decal");
 	}
 #endif
 

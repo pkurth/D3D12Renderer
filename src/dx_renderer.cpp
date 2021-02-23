@@ -120,6 +120,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 
 	shadowMap = createDepthTexture(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, shadowDepthFormat);
+	SET_NAME(shadowMap->resource, "Shadow map");
 
 
 	// Sky.
@@ -325,6 +326,9 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 	{
 		spotLightShadowInfoBuffer[i] = createUploadBuffer(sizeof(spot_shadow_info), 16, 0);
 		pointLightShadowInfoBuffer[i] = createUploadBuffer(sizeof(point_shadow_info), 16, 0);
+
+		SET_NAME(spotLightShadowInfoBuffer[i]->resource, "Spot light shadow infos");
+		SET_NAME(pointLightShadowInfoBuffer[i]->resource, "Point light shadow infos");
 	}
 }
 
@@ -458,12 +462,16 @@ void dx_renderer::allocateLightCullingBuffers()
 	{
 		tiledCullingGrid = createTexture(0, numCullingTilesX, numCullingTilesY,
 			DXGI_FORMAT_R32G32_UINT, false, false, true);
-		SET_NAME(tiledCullingGrid->resource, "Tiled culling grid");
 
 		tiledCullingIndexCounter = createBuffer(sizeof(uint32), 1, 0, true, true);
 		tiledObjectsIndexList = createBuffer(sizeof(uint16),
 			numCullingTilesX * numCullingTilesY * MAX_NUM_INDICES_PER_TILE, 0, true);
 		tiledWorldSpaceFrustaBuffer = createBuffer(sizeof(light_culling_view_frustum), numCullingTilesX * numCullingTilesY, 0, true);
+
+		SET_NAME(tiledCullingGrid->resource, "Tiled culling grid");
+		SET_NAME(tiledCullingIndexCounter->resource, "Tiled index counter");
+		SET_NAME(tiledObjectsIndexList->resource, "Tiled index list");
+		SET_NAME(tiledWorldSpaceFrustaBuffer->resource, "Tiled frusta");
 	}
 	else
 	{

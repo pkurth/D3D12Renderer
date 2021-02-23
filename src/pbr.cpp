@@ -166,6 +166,11 @@ ref<pbr_environment> createEnvironment(const char* filename, uint32 skyResolutio
 			environment->sky = equirectangularToCubemap(cl, equiSky, skyResolution, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
 			environment->environment = prefilterEnvironment(cl, environment->sky, environmentResolution);
 			environment->irradiance = cubemapToIrradiance(cl, environment->sky, irradianceResolution);
+
+			SET_NAME(environment->sky->resource, "Sky");
+			SET_NAME(environment->environment->resource, "Environment");
+			SET_NAME(environment->irradiance->resource, "Irradiance");
+
 			dxContext.executeCommandList(cl);
 
 			cache[s] = sp = environment;
