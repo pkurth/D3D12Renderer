@@ -557,10 +557,10 @@ ref<dx_texture> createTexture(const void* data, uint32 width, uint32 height, DXG
 	uint32 numMips = allocateMips ? 0 : 1;
 	CD3DX12_RESOURCE_DESC textureDesc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, numMips, 1, 0, flags);
 
-	uint32 formatSize = getFormatSize(textureDesc.Format);
-
 	if (data)
 	{
+		uint32 formatSize = getFormatSize(textureDesc.Format);
+
 		D3D12_SUBRESOURCE_DATA subresource;
 		subresource.RowPitch = width * formatSize;
 		subresource.SlicePitch = width * height * formatSize;

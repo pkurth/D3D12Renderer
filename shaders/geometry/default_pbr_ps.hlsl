@@ -38,7 +38,7 @@ TextureCube<float4> environmentTexture					: register(t1, space2);
 
 Texture2D<float2> brdf									: register(t2, space2);
 
-Texture2D<uint2> tiledCullingGrid						: register(t3, space2);
+Texture2D<uint4> tiledCullingGrid						: register(t3, space2);
 StructuredBuffer<uint> tiledObjectsIndexList			: register(t4, space2);
 StructuredBuffer<point_light_cb> pointLights			: register(t5, space2);
 StructuredBuffer<spot_light_cb> spotLights				: register(t6, space2);
@@ -103,13 +103,20 @@ ps_output main(ps_input IN)
 
 	// Tiled lighting.
 	const uint2 tileIndex = uint2(IN.screenPosition.xy / LIGHT_CULLING_TILE_SIZE);
-	const uint2 tiledIndexData = tiledCullingGrid[tileIndex];
+	const uint4 tiledIndexData = tiledCullingGrid[tileIndex];
 
+#ifndef TRANSPARENT
 	const uint pointLightCount = (tiledIndexData.y >> 20) & 0x3FF;
 	const uint spotLightCount = (tiledIndexData.y >> 10) & 0x3FF;
-
-	uint decalReadOffset = tiledIndexData.x;
+	const uint decalReadOffset = tiledIndexData.x;
 	uint lightReadIndex = tiledIndexData.x + TILE_LIGHT_OFFSET;
+#else
+	const uint pointLightCount = (tiledIndexData.w >> 20) & 0x3FF;
+	const uint spotLightCount = (tiledIndexData.w >> 10) & 0x3FF;
+	const uint decalReadOffset = tiledIndexData.z;
+	uint lightReadIndex = tiledIndexData.z + TILE_LIGHT_OFFSET;
+#endif
+
 
 
 	// Decals.
@@ -266,7 +273,7 @@ ps_output main(ps_input IN)
 
 #ifdef TRANSPARENT
 	// Only add ambient specular for transparent objects. Opaque objects get their ambient specular in a later render pass.
-	totalLighting.specular += specularIBL(factors.ks, surface, environmentTexture, brdf, clampSampler);
+	totalLighting.specular += specularIBL(factors.ks, surface, environmentTexture, brdf, clampSampler) * lighting.environmentIntensity;
 #endif
 
 
@@ -279,7 +286,7 @@ ps_output main(ps_input IN)
 	OUT.hdrColor.rgb += surface.emission;
 
 	OUT.worldNormal = packNormal(surface.N);
-	OUT.reflectance = float4(factors.ks, surface.roughness * (1.f - surface.N.y));
+	OUT.reflectance = float4(factors.ks, surface.roughness * (1.f - surface.N.y)); // Temporary: Up-facing surfaces get more reflective.
 #else
 
 	// Alpha-blending performs the following operation: final = alpha * src + (1 - alpha) * dest.

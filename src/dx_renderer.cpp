@@ -464,11 +464,11 @@ void dx_renderer::allocateLightCullingBuffers()
 	if (firstAllocation)
 	{
 		tiledCullingGrid = createTexture(0, numCullingTilesX, numCullingTilesY,
-			DXGI_FORMAT_R32G32_UINT, false, false, true);
+			DXGI_FORMAT_R32G32B32A32_UINT, false, false, true);
 
 		tiledCullingIndexCounter = createBuffer(sizeof(uint32), 1, 0, true, true);
 		tiledObjectsIndexList = createBuffer(sizeof(uint16),
-			numCullingTilesX * numCullingTilesY * MAX_NUM_INDICES_PER_TILE, 0, true);
+			numCullingTilesX * numCullingTilesY * MAX_NUM_INDICES_PER_TILE * 2, 0, true);
 		tiledWorldSpaceFrustaBuffer = createBuffer(sizeof(light_culling_view_frustum), numCullingTilesX * numCullingTilesY, 0, true);
 
 		SET_NAME(tiledCullingGrid->resource, "Tiled culling grid");
@@ -479,7 +479,7 @@ void dx_renderer::allocateLightCullingBuffers()
 	else
 	{
 		resizeTexture(tiledCullingGrid, numCullingTilesX, numCullingTilesY);
-		resizeBuffer(tiledObjectsIndexList, numCullingTilesX * numCullingTilesY * MAX_NUM_INDICES_PER_TILE);
+		resizeBuffer(tiledObjectsIndexList, numCullingTilesX * numCullingTilesY * MAX_NUM_INDICES_PER_TILE * 2);
 		resizeBuffer(tiledWorldSpaceFrustaBuffer, numCullingTilesX * numCullingTilesY);
 	}
 }
