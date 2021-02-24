@@ -103,19 +103,17 @@ ps_output main(ps_input IN)
 
 	// Tiled lighting.
 	const uint2 tileIndex = uint2(IN.screenPosition.xy / LIGHT_CULLING_TILE_SIZE);
-	const uint4 tiledIndexData = tiledCullingGrid[tileIndex];
 
 #ifndef TRANSPARENT
+	const uint2 tiledIndexData = tiledCullingGrid[tileIndex].xy;
+#else
+	const uint2 tiledIndexData = tiledCullingGrid[tileIndex].zw;
+#endif
+
 	const uint pointLightCount = (tiledIndexData.y >> 20) & 0x3FF;
 	const uint spotLightCount = (tiledIndexData.y >> 10) & 0x3FF;
 	const uint decalReadOffset = tiledIndexData.x;
 	uint lightReadIndex = tiledIndexData.x + TILE_LIGHT_OFFSET;
-#else
-	const uint pointLightCount = (tiledIndexData.w >> 20) & 0x3FF;
-	const uint spotLightCount = (tiledIndexData.w >> 10) & 0x3FF;
-	const uint decalReadOffset = tiledIndexData.z;
-	uint lightReadIndex = tiledIndexData.z + TILE_LIGHT_OFFSET;
-#endif
 
 
 
