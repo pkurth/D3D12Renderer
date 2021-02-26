@@ -680,13 +680,13 @@ void application::assignShadowMapViewports()
 	for (uint32 i = 0; i < arraysize(spotShadowRenderPasses); ++i)
 	{
 		stbrp_rect& r = rects[rectIndex++];
-		r.w = r.h = 2048;
+		r.w = r.h = 512;
 	}
 	for (uint32 i = 0; i < arraysize(pointShadowRenderPasses); ++i)
 	{
 		stbrp_rect& r0 = rects[rectIndex++];
 		stbrp_rect& r1 = rects[rectIndex++];
-		r0.w = r0.h = r1.w = r1.h = 2048;
+		r0.w = r0.h = r1.w = r1.h = 512;
 	}
 
 	int result = stbrp_pack_rects(&packContext, rects, rectIndex);
