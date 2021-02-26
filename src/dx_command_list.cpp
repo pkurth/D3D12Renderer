@@ -106,6 +106,15 @@ void dx_command_list::copyTextureRegionToBuffer(const ref<dx_texture>& from, con
 	commandList->CopyTextureRegion(&destLocation, bufferElementOffset, 0, 0, &srcLocation, &srcBox);
 }
 
+void dx_command_list::copyTextureRegionToTexture(const ref<dx_texture>& from, const ref<dx_texture>& to, uint32 sourceX, uint32 sourceY, uint32 destX, uint32 destY, uint32 width, uint32 height)
+{
+	D3D12_TEXTURE_COPY_LOCATION destLocation = { to->resource.Get(), D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX, 0 };
+	D3D12_TEXTURE_COPY_LOCATION srcLocation = { from->resource.Get(), D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX, 0 };
+
+	D3D12_BOX srcBox = { sourceX, sourceY, 0, sourceX + width, sourceY + height, 1 };
+	commandList->CopyTextureRegion(&destLocation, destX, destY, 0, &srcLocation, &srcBox);
+}
+
 void dx_command_list::setPipelineState(dx_pipeline_state pipelineState)
 {
 	commandList->SetPipelineState(pipelineState.Get());
