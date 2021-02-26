@@ -751,7 +751,7 @@ void dx_renderer::endFrame(const user_input& input)
 			spotLightViewports[i] = spotLightShadowRenderPasses[i]->viewport;
 			si.viewport = spotLightViewports[i] / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
 			si.viewProj = spotLightShadowRenderPasses[i]->viewProjMatrix;
-			si.bias = 0.000005f;
+			si.bias = 0.00002f;
 		}
 
 		for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
