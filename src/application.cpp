@@ -9,6 +9,7 @@
 #include "skinning.h"
 #include "threading.h"
 #include "mesh_shader.h"
+#include "shadow_map_cache.h"
 
 #define STB_RECT_PACK_IMPLEMENTATION
 #include <imgui/imstb_rectpack.h>
@@ -61,6 +62,18 @@ static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh
 
 void application::loadCustomShaders()
 {
+	shadow_map_light_info info;
+	info.viewport.cpuVP[0] = 2048;
+	info.viewport.cpuVP[1] = 2048;
+	info.viewport.cpuVP[2] = 4096;
+	info.viewport.cpuVP[3] = 4096;
+
+	info.lightMovedOrAppeared = false;
+	info.geometryInRangeMoved = false;
+
+	testShadowMapCache(&info, 1);
+
+
 	if (dxContext.meshShaderSupported)
 	{
 		initializeMeshShader();
@@ -118,7 +131,7 @@ void application::initialize(dx_renderer* renderer)
 			"assets/textures/pilot/R.png",
 			"assets/textures/pilot/M.png",
 			vec4(0.f),
-			vec4(1.f, 1.f, 1.f, 0.3f)
+			vec4(1.f, 1.f, 1.f, 0.5f)
 		);
 	}
 
