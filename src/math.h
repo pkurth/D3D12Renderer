@@ -29,6 +29,27 @@ static int32 clamp(int32 v, int32 l, int32 u) { return min(u, max(l, v)); }
 static float clamp01(float v) { return clamp(v, 0.f, 1.f); }
 static uint32 bucketize(uint32 problemSize, uint32 bucketSize) { return (problemSize + bucketSize - 1) / bucketSize; }
 
+static constexpr bool isPowerOfTwo(uint32 i)
+{
+	return (i & (i - 1)) == 0;
+}
+
+// Constexpr-version of _BitScanForward.
+static constexpr uint32 indexOfLeastSignificantSetBit(uint32 mask)
+{
+	uint32 count = 0;
+
+	if (mask != 0)
+	{
+		while ((mask & 1) == 0)
+		{
+			mask >>= 1;
+			++count;
+		}
+	}
+	return count;
+}
+
 
 struct half
 {
