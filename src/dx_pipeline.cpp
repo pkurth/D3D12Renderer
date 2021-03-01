@@ -6,7 +6,6 @@
 #include <set>
 #include <deque>
 #include <filesystem>
-#include <ppl.h>
 
 namespace fs = std::filesystem;
 
@@ -367,15 +366,24 @@ void createAllPendingReloadablePipelines()
 	static int rsOffset = 0;
 	static int pipelineOffset = 0;
 
-	concurrency::parallel_for(rsOffset, (int)rootSignaturesFromFiles.size(), [&](int i)
+	thread_job_context context;
+	for (int i = rsOffset; i < rootSignaturesFromFiles.size(); ++i)
 	{
-		loadRootSignature(rootSignaturesFromFiles[i]);
-	});
+		addWorkToJobSystem(context, [i]()
+		{
+			loadRootSignature(rootSignaturesFromFiles[i]);
+		});
+	}
+	waitForWorkCompletion(context);
 
-	concurrency::parallel_for(pipelineOffset, (int)pipelines.size(), [&](int i)
+	for (int i = rsOffset; i < rootSignaturesFromFiles.size(); ++i)
 	{
-		loadPipeline(pipelines[i]);
-	});
+		addWorkToJobSystem(context, [i]()
+		{
+			loadPipeline(pipelines[i]);
+		});
+	}
+	waitForWorkCompletion(context);
 
 	rsOffset = (int)rootSignaturesFromFiles.size();
 	pipelineOffset = (int)pipelines.size();
@@ -386,15 +394,26 @@ void createAllPendingReloadablePipelines()
 void checkForChangedPipelines()
 {
 	mutex.lock();
-	concurrency::parallel_for(0, (int)dirtyRootSignatures.size(), [&](int i)
-	{
-		loadRootSignature(*dirtyRootSignatures[i]);
-	});
 
-	concurrency::parallel_for(0, (int)dirtyPipelines.size(), [&](int i)
+	thread_job_context context;
+	for (uint32 i = 0; i < (uint32)dirtyRootSignatures.size(); ++i)
 	{
-		loadPipeline(*dirtyPipelines[i]);
-	});
+		addWorkToJobSystem(context, [i]()
+		{
+			loadRootSignature(*dirtyRootSignatures[i]);
+		});
+	}
+	waitForWorkCompletion(context);
+
+	for (uint32 i = 0; i < (uint32)dirtyPipelines.size(); ++i)
+	{
+		addWorkToJobSystem(context, [i]()
+		{
+			loadPipeline(*dirtyPipelines[i]);
+		});
+	}
+	waitForWorkCompletion(context);
+
 	dirtyRootSignatures.clear();
 	dirtyPipelines.clear();
 	mutex.unlock();
