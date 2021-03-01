@@ -1025,24 +1025,19 @@ void dx_renderer::endFrame(const user_input& input)
 				}
 				for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
 				{
-					shadow_map_viewport vp0 = pointLightShadowRenderPasses[i]->viewport0;
-					if (pointLightShadowRenderPasses[i]->copyFromStaticCache0)
+					for (uint32 j = 0; j < 2; ++j)
 					{
-						cl->copyTextureRegionToTexture(staticShadowMapCache, shadowMap, vp0.x, vp0.y, vp0.x, vp0.y, vp0.size, vp0.size);
-					}
-					else
-					{
-						clearRects[numClearRects++] = { vp0.x, vp0.y, vp0.size, vp0.size };
-					}
+						shadow_map_viewport vp = (j == 0) ? pointLightShadowRenderPasses[i]->viewport0 : pointLightShadowRenderPasses[i]->viewport1;
+						bool copy = (j == 0) ? pointLightShadowRenderPasses[i]->copyFromStaticCache0 : pointLightShadowRenderPasses[i]->copyFromStaticCache1;
 
-					shadow_map_viewport vp1 = pointLightShadowRenderPasses[i]->viewport1;
-					if (pointLightShadowRenderPasses[i]->copyFromStaticCache1)
-					{
-						cl->copyTextureRegionToTexture(staticShadowMapCache, shadowMap, vp1.x, vp1.y, vp1.x, vp1.y, vp1.size, vp1.size);
-					}
-					else
-					{
-						clearRects[numClearRects++] = { vp1.x, vp1.y, vp1.size, vp1.size };
+						if (copy)
+						{
+							cl->copyTextureRegionToTexture(staticShadowMapCache, shadowMap, vp.x, vp.y, vp.x, vp.y, vp.size, vp.size);
+						}
+						else
+						{
+							clearRects[numClearRects++] = { vp.x, vp.y, vp.size, vp.size };
+						}
 					}
 				}
 			}
@@ -1199,16 +1194,15 @@ void dx_renderer::endFrame(const user_input& input)
 
 				for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
 				{
-					shadow_map_viewport vp0 = pointLightShadowRenderPasses[i]->viewport0;
-					if (pointLightShadowRenderPasses[i]->copyToStaticCache0)
+					for (uint32 j = 0; j < 2; ++j)
 					{
-						cl->copyTextureRegionToTexture(shadowMap, staticShadowMapCache, vp0.x, vp0.y, vp0.x, vp0.y, vp0.size, vp0.size);
-					}
+						shadow_map_viewport vp = (j == 0) ? pointLightShadowRenderPasses[i]->viewport0 : pointLightShadowRenderPasses[i]->viewport1;
+						bool copy = (j == 0) ? pointLightShadowRenderPasses[i]->copyToStaticCache0 : pointLightShadowRenderPasses[i]->copyToStaticCache1;
 
-					shadow_map_viewport vp1 = pointLightShadowRenderPasses[i]->viewport1;
-					if (pointLightShadowRenderPasses[i]->copyToStaticCache1)
-					{
-						cl->copyTextureRegionToTexture(shadowMap, staticShadowMapCache, vp1.x, vp1.y, vp1.x, vp1.y, vp1.size, vp1.size);
+						if (copy)
+						{
+							cl->copyTextureRegionToTexture(shadowMap, staticShadowMapCache, vp.x, vp.y, vp.x, vp.y, vp.size, vp.size);
+						}
 					}
 				}
 			}
