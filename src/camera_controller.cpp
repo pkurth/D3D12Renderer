@@ -2,7 +2,7 @@
 #include "camera_controller.h"
 
 
-void camera_controller::centerCameraOnObject(const bounding_box& aabb)
+bool camera_controller::centerCameraOnObject(const bounding_box& aabb)
 {
 	vec3 center = aabb.getCenter();
 	float radius = length(aabb.getRadius());
@@ -22,6 +22,8 @@ void camera_controller::centerCameraOnObject(const bounding_box& aabb)
 	centeringRotationTarget = lookAtQuaternion(-offsetDirection, vec3(0.f, 1.f, 0.f));
 
 	orbitRadius = scaling;
+
+	return true;
 }
 
 bool camera_controller::update(const user_input& input, uint32 viewportWidth, uint32 viewportHeight, float dt)

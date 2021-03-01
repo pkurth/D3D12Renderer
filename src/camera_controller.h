@@ -9,7 +9,7 @@ struct camera_controller
 	void initialize(render_camera* camera) { this->camera = camera; }
 
 	// Returns true, if camera is moved, and therefore input is captured.
-	void centerCameraOnObject(const bounding_box& aabb);
+	bool centerCameraOnObject(const bounding_box& aabb);
 	bool update(const user_input& input, uint32 viewportWidth, uint32 viewportHeight, float dt);
 
 	render_camera* camera;
