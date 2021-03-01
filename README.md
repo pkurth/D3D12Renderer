@@ -6,9 +6,18 @@ It supports some "new" features like raytracing, mesh shaders etc.
 
 ## Incomprehensive list of features (very much work in progress)
 
-<table style="width:100%">
-<tr>
-<td style="width:50%;vertical-align:top">
+<img align="right" src="assets/samples/raster.png" width="300"/>
+<img align="right" width="100%" />
+
+<img align="right" src="assets/samples/raster2.png" width="300"/>
+<img align="right" width="100%" />
+
+<img align="right" src="assets/samples/raster3.png" width="300"/>
+<img align="right" width="100%" />
+
+<img align="right" src="assets/samples/profiler.png" width="300"/>
+
+<p align="left">
 
 - Forward+ rendering
 - Physically based rendering
@@ -17,13 +26,13 @@ It supports some "new" features like raytracing, mesh shaders etc.
 	- Point lights
 	- Spot lights
 - Decals
-- Tiled light and decal culling
-- Screen space reflections
 - Post processing stack
 	- Temporal anti-aliasing
 	- Bloom
 	- Filmic tone-mapping
 	- Sharpening
+- Tiled light and decal culling
+- Screen space reflections
 - Real-time raytracing (DXR)
 - Integrated path tracer
 - Skeletal animation
@@ -32,18 +41,9 @@ It supports some "new" features like raytracing, mesh shaders etc.
 - Integrated GPU profiler
 - Hot-reloading of shaders
 
-</td>
-<td style="vertical-align:top">
-<img align="right" src="assets/samples/raster.png" width="300"/><br>
-<img align="right" src="assets/samples/raster2.png" width="300"/><br>
-<img align="right" src="assets/samples/raster3.png" width="300"/><br>
-<img align="right" src="assets/samples/profiler.png" width="300"/><br>
+</p>
 
-</td>
-</tr>
-</table>
-
-
+<img width="100%" />
 
 
 
@@ -54,7 +54,7 @@ It supports some "new" features like raytracing, mesh shaders etc.
 
 It has an integrated (albeit pretty simple) path tracer (using hardware-accelerated raytracing), which in the future will be integrated into the real-time pipeline in some form to compute global illumination effects.
 
-<img src="assets/samples/path_trace.png" width="400"/><br>
+<img src="assets/samples/path_trace.png" width="512"/><br>
 
 ## Requirements
 
