@@ -5,7 +5,7 @@
 
 #include "light_source.hlsli"
 
-#define SHADOW_MAP_NEGATIVE_Z_OFFSET 1000.f
+#define SHADOW_MAP_NEGATIVE_Z_OFFSET 200.f
 
 struct directional_light
 {

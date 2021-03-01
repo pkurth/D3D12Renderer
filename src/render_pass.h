@@ -5,6 +5,7 @@
 #include "mesh.h"
 #include "light_source.h"
 #include "material.h"
+#include "shadow_map_cache.h"
 
 struct raytracing_blas;
 struct dx_vertex_buffer;
@@ -260,7 +261,7 @@ protected:
 
 struct sun_shadow_render_pass : shadow_render_pass
 {
-	vec4 viewports[MAX_NUM_SUN_SHADOW_CASCADES];
+	shadow_map_viewport viewports[MAX_NUM_SUN_SHADOW_CASCADES];
 
 	// Since each cascade includes the next lower one, if you submit a draw to cascade N, it will also be rendered in N-1 automatically. No need to add it to the lower one.
 	void renderObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
@@ -276,7 +277,7 @@ private:
 struct spot_shadow_render_pass : shadow_render_pass
 {
 	mat4 viewProjMatrix;
-	vec4 viewport;
+	shadow_map_viewport viewport;
 
 	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
 
@@ -290,8 +291,8 @@ private:
 
 struct point_shadow_render_pass : shadow_render_pass
 {
-	vec4 viewport0;
-	vec4 viewport1;
+	shadow_map_viewport viewport0;
+	shadow_map_viewport viewport1;
 	vec3 lightPosition;
 	float maxDistance;
 

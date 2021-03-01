@@ -62,18 +62,6 @@ static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh
 
 void application::loadCustomShaders()
 {
-	shadow_map_light_info info;
-	info.viewport.cpuVP[0] = 2048;
-	info.viewport.cpuVP[1] = 2048;
-	info.viewport.cpuVP[2] = 4096;
-	info.viewport.cpuVP[3] = 4096;
-
-	info.lightMovedOrAppeared = false;
-	info.geometryInRangeMoved = false;
-
-	testShadowMapCache(&info, 1);
-
-
 	if (dxContext.meshShaderSupported)
 	{
 		initializeMeshShader();
@@ -677,51 +665,42 @@ void application::handleUserInput(const user_input& input, float dt)
 
 void application::assignShadowMapViewports()
 {
-	stbrp_node* nodes = (stbrp_node*)alloca(sizeof(stbrp_node) * 1024);
+	uint32 id = 0;
 
-	stbrp_context packContext;
-	stbrp_init_target(&packContext, SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, nodes, 1024);
-
-	stbrp_rect rects[4 + arraysize(spotShadowRenderPasses) + 2 * arraysize(pointShadowRenderPasses)];
-
-	uint32 rectIndex = 0;
+	uint64 noMovementHash = 0; // TODO: Replace with movement hash of actual light source.
+	uint64 tempAlwaysChangingHash = dxContext.frameID; // TODO: Replace with actual hash of geometry in light volume.
+	
+	// Sun cascades.
 	for (uint32 i = 0; i < sun.numShadowCascades; ++i)
 	{
-		stbrp_rect& r = rects[rectIndex++];
-		r.w = r.h = sun.shadowDimensions;
-	}
-	for (uint32 i = 0; i < arraysize(spotShadowRenderPasses); ++i)
-	{
-		stbrp_rect& r = rects[rectIndex++];
-		r.w = r.h = 512;
-	}
-	for (uint32 i = 0; i < arraysize(pointShadowRenderPasses); ++i)
-	{
-		stbrp_rect& r0 = rects[rectIndex++];
-		stbrp_rect& r1 = rects[rectIndex++];
-		r0.w = r0.h = r1.w = r1.h = 512;
+		uint64 sunMovementHash = getLightMovementHash(sun, i);
+		auto [vp, command] = assignShadowMapViewport(id++, sunMovementHash, tempAlwaysChangingHash, sun.shadowDimensions);
+		sunShadowRenderPass.viewports[i] = vp;
 	}
 
-	int result = stbrp_pack_rects(&packContext, rects, rectIndex);
-	assert(result);
+	id = 4;
 
-	rectIndex = 0;
-	for (uint32 i = 0; i < sun.numShadowCascades; ++i)
-	{
-		stbrp_rect& r = rects[rectIndex++];
-		sunShadowRenderPass.viewports[i] = { (float)r.x, (float)r.y, (float)r.w, (float)r.h };
-	}
+	// Spot lights.
 	for (uint32 i = 0; i < arraysize(spotShadowRenderPasses); ++i)
 	{
-		stbrp_rect& r = rects[rectIndex++];
-		spotShadowRenderPasses[i].viewport = { (float)r.x, (float)r.y, (float)r.w, (float)r.h };
+		auto [vp, command] = assignShadowMapViewport(id++, noMovementHash, tempAlwaysChangingHash, 512);
+		spotShadowRenderPasses[i].viewport = vp;
 	}
+
+	// Point lights.
 	for (uint32 i = 0; i < arraysize(pointShadowRenderPasses); ++i)
 	{
-		stbrp_rect& r0 = rects[rectIndex++];
-		stbrp_rect& r1 = rects[rectIndex++];
-		pointShadowRenderPasses[i].viewport0 = { (float)r0.x, (float)r0.y, (float)r0.w, (float)r0.h };
-		pointShadowRenderPasses[i].viewport1 = { (float)r1.x, (float)r1.y, (float)r1.w, (float)r1.h };
+		// Hemisphere 0.
+		{
+			auto [vp, command] = assignShadowMapViewport(id++, noMovementHash, tempAlwaysChangingHash, 512);
+			pointShadowRenderPasses[i].viewport0 = vp;
+		}
+
+		// Hemisphere 1.
+		{
+			auto [vp, command] = assignShadowMapViewport(id++, noMovementHash, tempAlwaysChangingHash, 512);
+			pointShadowRenderPasses[i].viewport1 = vp;
+		}
 	}
 }
 
@@ -892,7 +871,6 @@ void application::update(const user_input& input, float dt)
 			renderer->setRaytracer(&pathTracer, &raytracingTLAS);
 		}
 	}
-
 }
 
 void application::setEnvironment(const char* filename)

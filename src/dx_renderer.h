@@ -152,7 +152,6 @@ struct dx_renderer
 
 	static ref<dx_texture> getWhiteTexture();
 	static ref<dx_texture> getBlackTexture();
-	static ref<dx_texture> getShadowMap();
 
 	static dx_cpu_descriptor_handle nullTextureSRV;
 	static dx_cpu_descriptor_handle nullBufferSRV;

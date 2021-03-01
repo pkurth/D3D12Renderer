@@ -4,19 +4,23 @@
 
 struct shadow_map_viewport
 {
-	int32 cpuVP[4]; // x, y, width, height.
-	vec4 shaderVP;
+	uint16 x, y;
+	uint16 size;
 };
 
-struct shadow_map_light_info
+enum shadow_map_command
 {
-	shadow_map_viewport viewport; // Previous frame viewport. Gets updated by cache.
-	bool lightMovedOrAppeared;
-	bool geometryInRangeMoved;
-	//uint64 dynamicGeometryHash;
-	//uint64 prevFrameDynamicGeometryHash;
-	//uint64 lightTransformHash;
-	//uint64 prevFrameLightTransformHash;
+	shadow_map_command_use_cached,
+	shadow_map_command_use_static_cache,
+	shadow_map_command_from_scratch,
 };
 
-void testShadowMapCache(shadow_map_light_info* infos, uint32 numInfos);
+// Call after light view-projection-matrices are computed.
+uint64 getLightMovementHash(const struct directional_light& dl); // Whole light.
+uint64 getLightMovementHash(const struct directional_light& dl, uint32 cascadeIndex);
+uint64 getLightMovementHash(const struct spot_light_cb& sl);
+uint64 getLightMovementHash(const struct point_light_cb& pl);
+
+
+std::pair<shadow_map_viewport, shadow_map_command> assignShadowMapViewport(uint32 uniqueLightID, uint64 lightMovementHash, uint64 geometryMovementHash, uint32 size);
+void updateShadowMapAllocationVisualization();

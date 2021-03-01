@@ -29,6 +29,7 @@ static ref<dx_texture> blackCubeTexture;
 static ref<dx_texture> noiseTexture;
 
 static ref<dx_texture> shadowMap;
+static ref<dx_texture> staticShadowMapCache;
 
 static dx_pipeline depthOnlyPipeline;
 static dx_pipeline animatedDepthOnlyPipeline;
@@ -121,6 +122,9 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 	shadowMap = createDepthTexture(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, shadowDepthFormat);
 	SET_NAME(shadowMap->resource, "Shadow map");
+
+	staticShadowMapCache = createDepthTexture(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, shadowDepthFormat);
+	SET_NAME(staticShadowMapCache->resource, "Static shadow map cache");
 
 
 	// Sky.
@@ -467,7 +471,7 @@ void dx_renderer::allocateLightCullingBuffers()
 			DXGI_FORMAT_R32G32B32A32_UINT, false, false, true);
 
 		tiledCullingIndexCounter = createBuffer(sizeof(uint32), 1, 0, true, true);
-		tiledObjectsIndexList = createBuffer(sizeof(uint16),
+		tiledObjectsIndexList = createBuffer(sizeof(uint32),
 			numCullingTilesX * numCullingTilesY * MAX_NUM_INDICES_PER_TILE * 2, 0, true);
 		tiledWorldSpaceFrustaBuffer = createBuffer(sizeof(light_culling_view_frustum), numCullingTilesX * numCullingTilesY, 0, true);
 
@@ -712,11 +716,6 @@ ref<dx_texture> dx_renderer::getBlackTexture()
 	return blackTexture;
 }
 
-ref<dx_texture> dx_renderer::getShadowMap()
-{
-	return shadowMap;
-}
-
 void dx_renderer::endFrame(const user_input& input)
 {
 	bool aspectRatioModeChanged = settings.aspectRatioMode != oldSettings.aspectRatioMode;
@@ -727,10 +726,6 @@ void dx_renderer::endFrame(const user_input& input)
 		recalculateViewport(true);
 	}
 
-	vec4 sunCPUShadowViewports[MAX_NUM_SUN_SHADOW_CASCADES];
-	vec4 spotLightViewports[MAX_NUM_SPOT_LIGHT_SHADOW_PASSES];
-	vec4 pointLightViewports[MAX_NUM_POINT_LIGHT_SHADOW_PASSES][2];
-
 	{
 		spot_shadow_info spotLightShadowInfos[16];
 		point_shadow_info pointLightShadowInfos[16];
@@ -739,8 +734,8 @@ void dx_renderer::endFrame(const user_input& input)
 		{
 			for (uint32 i = 0; i < sun.numShadowCascades; ++i)
 			{
-				sunCPUShadowViewports[i] = sunShadowRenderPass->viewports[i];
-				sun.viewports[i] = sunCPUShadowViewports[i] / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
+				auto vp = sunShadowRenderPass->viewports[i];
+				sun.viewports[i] = vec4(vp.x, vp.y, vp.size, vp.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
 			}
 		}
 
@@ -748,8 +743,8 @@ void dx_renderer::endFrame(const user_input& input)
 		{
 			spot_shadow_info& si = spotLightShadowInfos[i];
 
-			spotLightViewports[i] = spotLightShadowRenderPasses[i]->viewport;
-			si.viewport = spotLightViewports[i] / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
+			auto vp = spotLightShadowRenderPasses[i]->viewport;
+			si.viewport = vec4(vp.x, vp.y, vp.size, vp.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
 			si.viewProj = spotLightShadowRenderPasses[i]->viewProjMatrix;
 			si.bias = 0.00002f;
 		}
@@ -758,11 +753,11 @@ void dx_renderer::endFrame(const user_input& input)
 		{
 			point_shadow_info& si = pointLightShadowInfos[i];
 
-			pointLightViewports[i][0] = pointLightShadowRenderPasses[i]->viewport0;
-			pointLightViewports[i][1] = pointLightShadowRenderPasses[i]->viewport1;
+			auto vp0 = pointLightShadowRenderPasses[i]->viewport0;
+			auto vp1 = pointLightShadowRenderPasses[i]->viewport1;
 
-			si.viewport0 = pointLightViewports[i][0] / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
-			si.viewport1 = pointLightViewports[i][1] / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
+			si.viewport0 = vec4(vp0.x, vp0.y, vp0.size, vp0.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
+			si.viewport1 = vec4(vp1.x, vp1.y, vp1.size, vp1.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
 		}
 
 
@@ -955,11 +950,15 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->dispatch(bucketize(numCullingTilesX, 16), bucketize(numCullingTilesY, 16));
 			}
 
+			barrier_batcher(cl)
+				.uav(tiledWorldSpaceFrustaBuffer);
+
 			// Culling.
 			{
 				DX_PROFILE_BLOCK(cl, "Sort objects into tiles");
 
 				cl->clearUAV(tiledCullingIndexCounter, 0.f);
+				//cl->uavBarrier(tiledCullingIndexCounter);
 				cl->setPipelineState(*lightCullingPipeline.pipeline);
 				cl->setComputeRootSignature(*lightCullingPipeline.rootSignature);
 				cl->setComputeDynamicConstantBuffer(LIGHT_CULLING_RS_CAMERA, materialInfo.cameraCBV);
@@ -1041,8 +1040,8 @@ void dx_renderer::endFrame(const user_input& input)
 					{
 						DX_PROFILE_BLOCK(cl, (i == 0) ? "First cascade" : (i == 1) ? "Second cascade" : (i == 2) ? "Third cascade" : "Fourth cascade");
 
-						vec4 vp = sunCPUShadowViewports[i];
-						cl->setViewport(vp.x, vp.y, vp.z, vp.w);
+						auto vp = sunShadowRenderPass->viewports[i];
+						cl->setViewport(vp.x, vp.y, vp.size, vp.size);
 
 						for (uint32 cascade = 0; cascade <= i; ++cascade)
 						{
@@ -1071,7 +1070,8 @@ void dx_renderer::endFrame(const user_input& input)
 
 					const mat4& viewProj = spotLightShadowRenderPasses[i]->viewProjMatrix;
 
-					cl->setViewport(spotLightViewports[i].x, spotLightViewports[i].y, spotLightViewports[i].z, spotLightViewports[i].w);
+					auto vp = spotLightShadowRenderPasses[i]->viewport;
+					cl->setViewport(vp.x, vp.y, vp.size, vp.size);
 
 					for (const auto& dc : spotLightShadowRenderPasses[i]->drawCalls)
 					{
@@ -1100,8 +1100,9 @@ void dx_renderer::endFrame(const user_input& input)
 					for (uint32 v = 0; v < 2; ++v)
 					{
 						DX_PROFILE_BLOCK(cl, (v == 0) ? "First hemisphere" : "Second hemisphere");
-						
-						cl->setViewport(pointLightViewports[i][v].x, pointLightViewports[i][v].y, pointLightViewports[i][v].z, pointLightViewports[i][v].w);
+
+						auto vp = (v == 0) ? pointLightShadowRenderPasses[i]->viewport0 : pointLightShadowRenderPasses[i]->viewport1;
+						cl->setViewport(vp.x, vp.y, vp.size, vp.size);
 
 						float flip = (v == 0) ? 1.f : -1.f;
 

@@ -7,6 +7,7 @@
 #include "dx_renderer.h"
 #include "geometry.h"
 #include "color.h"
+#include "hash.h"
 
 #include "default_pbr_rs.hlsli"
 #include "material.hlsli"
@@ -26,39 +27,12 @@ struct material_key
 
 namespace std
 {
-	// Source: https://stackoverflow.com/questions/2590677/how-do-i-combine-hash-values-in-c0x
-	template <typename T>
-	inline void hash_combine(std::size_t& seed, const T& v)
-	{
-		std::hash<T> hasher;
-		seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-	}
-}
-
-namespace std
-{
-	template<>
-	struct hash<vec4>
-	{
-		size_t operator()(const vec4& x) const
-		{
-			std::size_t seed = 0;
-
-			hash_combine(seed, x.x);
-			hash_combine(seed, x.y);
-			hash_combine(seed, x.z);
-			hash_combine(seed, x.w);
-
-			return seed;
-		}
-	};
-
 	template<>
 	struct hash<material_key>
 	{
 		size_t operator()(const material_key& x) const
 		{
-			std::size_t seed = 0;
+			size_t seed = 0;
 
 			hash_combine(seed, x.albedoTex);
 			hash_combine(seed, x.normalTex);
