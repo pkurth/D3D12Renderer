@@ -372,35 +372,39 @@ void dx_command_list::setRenderTarget(dx_render_target& renderTarget)
 	setRenderTarget(renderTarget.rtv, renderTarget.numAttachments, renderTarget.dsv ? &renderTarget.dsv : 0);
 }
 
-void dx_command_list::clearRTV(dx_rtv_descriptor_handle rtv, float r, float g, float b, float a)
+void dx_command_list::clearRTV(dx_rtv_descriptor_handle rtv, float r, float g, float b, float a, const clear_rect rect)
 {
 	float clearColor[] = { r, g, b, a };
-	clearRTV(rtv, clearColor);
+	clearRTV(rtv, clearColor, rect);
 }
 
-void dx_command_list::clearRTV(dx_rtv_descriptor_handle rtv, const float* clearColor)
+void dx_command_list::clearRTV(dx_rtv_descriptor_handle rtv, const float* clearColor, const clear_rect rect)
 {
-	commandList->ClearRenderTargetView(rtv, clearColor, 0, 0);
+	D3D12_RECT d3rect = { (LONG)rect.x, (LONG)rect.y, (LONG)rect.x + (LONG)rect.width, (LONG)rect.y + (LONG)rect.height };
+	D3D12_RECT* r = (rect.width > 0) ? &d3rect : 0;
+	uint32 num = (rect.width > 0) ? 1 : 0;
+
+	commandList->ClearRenderTargetView(rtv, clearColor, num, r);
 }
 
-void dx_command_list::clearRTV(const ref<dx_texture>& texture, float r, float g, float b, float a)
+void dx_command_list::clearRTV(const ref<dx_texture>& texture, float r, float g, float b, float a, const clear_rect rect)
 {
-	clearRTV(texture->rtvHandles, r, g, b, a);
+	clearRTV(texture->rtvHandles, r, g, b, a, rect);
 }
 
-void dx_command_list::clearRTV(const ref<dx_texture>& texture, const float* clearColor)
+void dx_command_list::clearRTV(const ref<dx_texture>& texture, const float* clearColor, const clear_rect rect)
 {
-	clearRTV(texture->rtvHandles, clearColor);
+	clearRTV(texture->rtvHandles, clearColor, rect);
 }
 
-void dx_command_list::clearRTV(dx_render_target& renderTarget, uint32 attachment, const float* clearColor)
+void dx_command_list::clearRTV(dx_render_target& renderTarget, uint32 attachment, const float* clearColor, const clear_rect rect)
 {
-	clearRTV(renderTarget.rtv[attachment], clearColor);
+	clearRTV(renderTarget.rtv[attachment], clearColor, rect);
 }
 
-void dx_command_list::clearRTV(dx_render_target& renderTarget, uint32 attachment, float r, float g, float b, float a)
+void dx_command_list::clearRTV(dx_render_target& renderTarget, uint32 attachment, float r, float g, float b, float a, const clear_rect rect)
 {
-	clearRTV(renderTarget.rtv[attachment], r, g, b, a);
+	clearRTV(renderTarget.rtv[attachment], r, g, b, a, rect);
 }
 
 void dx_command_list::clearDepth(dx_dsv_descriptor_handle dsv, float depth)
