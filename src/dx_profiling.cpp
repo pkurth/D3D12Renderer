@@ -319,6 +319,9 @@ void resolveTimeStampQueries(uint64* timestamps)
 
 					uint32 maxDepth = 0;
 
+					ImVec2 mousePos = ImGui::GetMousePos();
+					ImVec2 windowPos = ImGui::GetWindowPos();
+
 					while (current)
 					{
 						// Draw.
@@ -328,10 +331,18 @@ void resolveTimeStampQueries(uint64* timestamps)
 
 						ImGui::SetCursorPos(ImVec2(left, top));
 						ImGui::ColorButton(current->name, colorTable[colorIndex++], ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(width, barHeight));
+
 						if (ImGui::IsItemHovered())
 						{
 							ImGui::SetTooltip("%s: %.3fms", current->name, current->duration);
 						}
+
+						ImGui::PushClipRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), false);
+						ImGui::SetCursorPos(ImVec2(left + ImGui::GetStyle().FramePadding.x, top));
+						ImGui::Text("%s: %.3fms", current->name, current->duration);
+						ImGui::PopClipRect();
+
+
 						if (colorIndex >= arraysize(colorTable))
 						{
 							colorIndex = 0;
@@ -425,8 +436,6 @@ void resolveTimeStampQueries(uint64* timestamps)
 					ImGui::InvisibleButton("Blocker", ImVec2(totalWidth + rightPadding, (maxDepth + 1) * barStride));
 
 
-					ImVec2 windowPos = ImGui::GetWindowPos();
-					ImVec2 mousePos = ImGui::GetMousePos();
 					float relMouseX = mousePos.x - windowPos.x;
 
 					bool overStack = false;
