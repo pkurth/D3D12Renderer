@@ -6,16 +6,16 @@ It supports some "new" features like raytracing, mesh shaders etc.
 
 ## Incomprehensive list of features (very much work in progress)
 
-<img align="right" src="assets/samples/raster.png" width="300"/>
+<img align="right" src="assets/samples/raster.png" width="400"/>
 <img align="right" width="100%" />
 
-<img align="right" src="assets/samples/raster2.png" width="300"/>
+<img align="right" src="assets/samples/raster2.png" width="400"/>
 <img align="right" width="100%" />
 
-<img align="right" src="assets/samples/raster3.png" width="300"/>
+<img align="right" src="assets/samples/raster3.png" width="400"/>
 <img align="right" width="100%" />
 
-<img align="right" src="assets/samples/profiler.png" width="300"/>
+<img align="right" src="assets/samples/profiler.png" width="400"/>
 
 <p align="left">
 
