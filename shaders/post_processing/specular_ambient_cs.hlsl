@@ -34,6 +34,8 @@ void main(cs_input IN)
 		float4 refl = reflectance[IN.dispatchThreadID.xy];
 
 		surface_info surface;
+		surface.albedo = 0.f.xxxx;
+		surface.metallic = 0.f;
 		surface.N = normalize(unpackNormal(worldNormals[IN.dispatchThreadID.xy]));
 		surface.V = -normalize(restoreWorldDirection(camera.invViewProj, uv, camera.position.xyz));
 		surface.roughness = clamp(refl.a, 0.01f, 0.99f);
