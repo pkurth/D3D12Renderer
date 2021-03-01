@@ -1,16 +1,15 @@
 # D3D12Renderer
 
-This project implements a custom rendering engine build from the ground up using Direct3D 12. 
+This project implements a custom rendering engine build from the ground up in C++ using Direct3D 12. 
 It supports some "new" features like raytracing, mesh shaders etc. 
-
-<img src="assets/samples/raster.png" width="512"/> 
-
-It has an integrated (albeit pretty simple) path tracer (using hardware-accelerated raytracing), which in the future will be integrated into the real-time pipeline in some form to compute global illumination effects.
-
-<img src="assets/samples/path_trace.png" width="512"/> 
 
 
 ## Incomprehensive list of features (very much work in progress)
+
+<table style="width:100%">
+<tr>
+<td style="width:50%;vertical-align:top">
+
 - Forward+ rendering
 - Physically based rendering
 - Dynamic lights and dynamic shadows
@@ -33,6 +32,29 @@ It has an integrated (albeit pretty simple) path tracer (using hardware-accelera
 - Integrated GPU profiler
 - Hot-reloading of shaders
 
+</td>
+<td style="vertical-align:top">
+<img align="right" src="assets/samples/raster.png" width="300"/><br>
+<img align="right" src="assets/samples/raster2.png" width="300"/><br>
+<img align="right" src="assets/samples/raster3.png" width="300"/><br>
+<img align="right" src="assets/samples/profiler.png" width="300"/><br>
+
+</td>
+</tr>
+</table>
+
+
+
+
+
+
+
+
+
+
+It has an integrated (albeit pretty simple) path tracer (using hardware-accelerated raytracing), which in the future will be integrated into the real-time pipeline in some form to compute global illumination effects.
+
+<img src="assets/samples/path_trace.png" width="400"/><br>
 
 ## Requirements
 
