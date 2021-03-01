@@ -142,21 +142,21 @@ struct dx_command_list
 	void setRenderTarget(dx_rtv_descriptor_handle* rtvs, uint32 numRTVs, dx_dsv_descriptor_handle* dsv);
 	void setRenderTarget(dx_render_target& renderTarget);
 
-	void clearRTV(dx_rtv_descriptor_handle rtv, float r, float g, float b, float a = 1.f, const clear_rect rect = {});
-	void clearRTV(dx_rtv_descriptor_handle rtv, const float* clearColor, const clear_rect rect = {});
-	void clearRTV(const ref<dx_texture>& texture, float r, float g, float b, float a = 1.f, const clear_rect rect = {});
-	void clearRTV(const ref<dx_texture>& texture, const float* clearColor, const clear_rect rect = {});
-	void clearRTV(dx_render_target& renderTarget, uint32 attachment, const float* clearColor, const clear_rect rect = {});
-	void clearRTV(dx_render_target& renderTarget, uint32 attachment, float r, float g, float b, float a = 1.f, const clear_rect rect = {});
+	void clearRTV(dx_rtv_descriptor_handle rtv, float r, float g, float b, float a = 1.f, const clear_rect* rects = 0, uint32 numRects = 0);
+	void clearRTV(dx_rtv_descriptor_handle rtv, const float* clearColor, const clear_rect* rects = 0, uint32 numRects = 0);
+	void clearRTV(const ref<dx_texture>& texture, float r, float g, float b, float a = 1.f, const clear_rect* rects = 0, uint32 numRects = 0);
+	void clearRTV(const ref<dx_texture>& texture, const float* clearColor, const clear_rect* rects = 0, uint32 numRects = 0);
+	void clearRTV(dx_render_target& renderTarget, uint32 attachment, const float* clearColor, const clear_rect* rects = 0, uint32 numRects = 0);
+	void clearRTV(dx_render_target& renderTarget, uint32 attachment, float r, float g, float b, float a = 1.f, const clear_rect* rects = 0, uint32 numRects = 0);
 
-	void clearDepth(dx_dsv_descriptor_handle dsv, float depth = 1.f);
-	void clearDepth(dx_render_target& renderTarget, float depth = 1.f);
+	void clearDepth(dx_dsv_descriptor_handle dsv, float depth = 1.f, const clear_rect* rects = 0, uint32 numRects = 0);
+	void clearDepth(dx_render_target& renderTarget, float depth = 1.f, const clear_rect* rects = 0, uint32 numRects = 0);
 
-	void clearStencil(dx_dsv_descriptor_handle dsv, uint32 stencil = 0);
-	void clearStencil(dx_render_target& renderTarget, uint32 stencil = 0);
+	void clearStencil(dx_dsv_descriptor_handle dsv, uint32 stencil = 0, const clear_rect* rects = 0, uint32 numRects = 0);
+	void clearStencil(dx_render_target& renderTarget, uint32 stencil = 0, const clear_rect* rects = 0, uint32 numRects = 0);
 
-	void clearDepthAndStencil(dx_dsv_descriptor_handle dsv, float depth = 1.f, uint32 stencil = 0);
-	void clearDepthAndStencil(dx_render_target& renderTarget, float depth = 1.f, uint32 stencil = 0);
+	void clearDepthAndStencil(dx_dsv_descriptor_handle dsv, float depth = 1.f, uint32 stencil = 0, const clear_rect* rects = 0, uint32 numRects = 0);
+	void clearDepthAndStencil(dx_render_target& renderTarget, float depth = 1.f, uint32 stencil = 0, const clear_rect* rects = 0, uint32 numRects = 0);
 
 	void setStencilReference(uint32 stencilReference);
 	void setBlendFactor(const float* blendFactor);

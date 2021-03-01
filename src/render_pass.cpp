@@ -21,9 +21,21 @@ void opaque_render_pass::reset()
 	animatedDepthOnlyDrawCalls.clear();
 }
 
-void sun_shadow_render_pass::renderObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+void sun_shadow_render_pass::renderStaticObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
 {
-	drawCalls[cascadeIndex].push_back(
+	staticDrawCalls[cascadeIndex].push_back(
+		{
+			transform,
+			vertexBuffer,
+			indexBuffer,
+			submesh,
+		}
+	);
+}
+
+void sun_shadow_render_pass::renderDynamicObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+{
+	dynamicDrawCalls[cascadeIndex].push_back(
 		{
 			transform,
 			vertexBuffer,
@@ -35,15 +47,31 @@ void sun_shadow_render_pass::renderObject(uint32 cascadeIndex, const ref<dx_vert
 
 void sun_shadow_render_pass::reset()
 {
-	for (uint32 i = 0; i < arraysize(drawCalls); ++i)
+	for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
 	{
-		drawCalls[i].clear();
+		staticDrawCalls[i].clear();
+		dynamicDrawCalls[i].clear();
 	}
+
+	copyFromStaticCache = false;
+	copyToStaticCache = false;
 }
 
-void spot_shadow_render_pass::renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+void spot_shadow_render_pass::renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
 {
-	drawCalls.push_back(
+	staticDrawCalls.push_back(
+		{
+			transform,
+			vertexBuffer,
+			indexBuffer,
+			submesh,
+		}
+	);
+}
+
+void spot_shadow_render_pass::renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+{
+	dynamicDrawCalls.push_back(
 		{
 			transform,
 			vertexBuffer,
@@ -55,12 +83,28 @@ void spot_shadow_render_pass::renderObject(const ref<dx_vertex_buffer>& vertexBu
 
 void spot_shadow_render_pass::reset()
 {
-	drawCalls.clear();
+	staticDrawCalls.clear();
+	dynamicDrawCalls.clear();
+
+	copyFromStaticCache = false;
+	copyToStaticCache = false;
 }
 
-void point_shadow_render_pass::renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+void point_shadow_render_pass::renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
 {
-	drawCalls.push_back(
+	staticDrawCalls.push_back(
+		{
+			transform,
+			vertexBuffer,
+			indexBuffer,
+			submesh,
+		}
+	);
+}
+
+void point_shadow_render_pass::renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+{
+	dynamicDrawCalls.push_back(
 		{
 			transform,
 			vertexBuffer,
@@ -72,5 +116,12 @@ void point_shadow_render_pass::renderObject(const ref<dx_vertex_buffer>& vertexB
 
 void point_shadow_render_pass::reset()
 {
-	drawCalls.clear();
+	staticDrawCalls.clear();
+	dynamicDrawCalls.clear();
+
+	copyFromStaticCache0 = false;
+	copyToStaticCache0 = false;
+
+	copyFromStaticCache1 = false;
+	copyToStaticCache1 = false;
 }

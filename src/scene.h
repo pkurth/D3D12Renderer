@@ -25,7 +25,7 @@ struct scene_entity
 	template <typename component_t>
 	bool hasComponent()
 	{
-		return registry->has<component_t>(handle);
+		return registry->any_of<component_t>(handle);
 	}
 
 	template <typename component_t, typename... args>

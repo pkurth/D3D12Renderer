@@ -262,14 +262,18 @@ protected:
 struct sun_shadow_render_pass : shadow_render_pass
 {
 	shadow_map_viewport viewports[MAX_NUM_SUN_SHADOW_CASCADES];
+	bool copyFromStaticCache;
+	bool copyToStaticCache;
 
 	// Since each cascade includes the next lower one, if you submit a draw to cascade N, it will also be rendered in N-1 automatically. No need to add it to the lower one.
-	void renderObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+	void renderStaticObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+	void renderDynamicObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
 
 	void reset();
 
 private:
-	std::vector<draw_call> drawCalls[MAX_NUM_SUN_SHADOW_CASCADES];
+	std::vector<draw_call> staticDrawCalls[MAX_NUM_SUN_SHADOW_CASCADES];
+	std::vector<draw_call> dynamicDrawCalls[MAX_NUM_SUN_SHADOW_CASCADES];
 
 	friend struct dx_renderer;
 };
@@ -278,13 +282,17 @@ struct spot_shadow_render_pass : shadow_render_pass
 {
 	mat4 viewProjMatrix;
 	shadow_map_viewport viewport;
+	bool copyFromStaticCache;
+	bool copyToStaticCache;
 
-	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+	void renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
 
 	void reset();
 
 private:
-	std::vector<draw_call> drawCalls;
+	std::vector<draw_call> staticDrawCalls;
+	std::vector<draw_call> dynamicDrawCalls;
 
 	friend struct dx_renderer;
 };
@@ -295,14 +303,20 @@ struct point_shadow_render_pass : shadow_render_pass
 	shadow_map_viewport viewport1;
 	vec3 lightPosition;
 	float maxDistance;
+	bool copyFromStaticCache0;
+	bool copyToStaticCache0;
+	bool copyFromStaticCache1;
+	bool copyToStaticCache1;
 
 	// TODO: Split this into positive and negative direction for frustum culling.
-	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+	void renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
 
 	void reset();
 
 private:
-	std::vector<draw_call> drawCalls;
+	std::vector<draw_call> staticDrawCalls;
+	std::vector<draw_call> dynamicDrawCalls;
 
 	friend struct dx_renderer;
 };

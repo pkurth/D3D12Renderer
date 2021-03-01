@@ -30,7 +30,6 @@ struct shadow_map_cache
 {
 	shadow_map_viewport viewport;
 	uint64 lightMovementHash;
-	uint64 geometryMovementHash;
 };
 
 static std::unordered_map<uint32, shadow_map_cache> cachedAllocations;
@@ -157,25 +156,26 @@ static void visualize(dx_command_list* cl, ref<dx_texture> texture)
 	for (uint32 i = 0; i < numBuckets; ++i)
 	{
 		std::vector<shadow_map_viewport>& nodesInLevel = nodes[i];
-		uint32 nodeSize = 1 << (indexOfLeastSignificantSetBit(maximumSize) - i);
 
-		for (shadow_map_viewport n : nodesInLevel)
+		for (shadow_map_viewport vp : nodesInLevel)
 		{
-			cl->clearRTV(texture, 0.f, 1.f, 0.f, 1.f, { n.x, n.y, nodeSize, nodeSize });
+			clear_rect rect = { vp.x, vp.y, vp.size, vp.size };
+			cl->clearRTV(texture, 0.f, 1.f, 0.f, 1.f, &rect, 1);
 		}
 	}
 
 	for (auto a : cachedAllocations)
 	{
 		auto vp = a.second.viewport;
-		cl->clearRTV(texture, 1.f, 0.f, 0.f, 1.f, { vp.x, vp.y, vp.size, vp.size });
+		clear_rect rect = { vp.x, vp.y, vp.size, vp.size };
+		cl->clearRTV(texture, 1.f, 0.f, 0.f, 1.f, &rect, 1);
 	}
 }
 
 
 static bool init = false;
 
-std::pair<shadow_map_viewport, shadow_map_command> assignShadowMapViewport(uint32 uniqueLightID, uint64 lightMovementHash, uint64 geometryMovementHash, uint32 size)
+std::pair<shadow_map_viewport, bool> assignShadowMapViewport(uint32 uniqueLightID, uint64 lightMovementHash, uint32 size)
 {
 	if (!init)
 	{
@@ -187,7 +187,7 @@ std::pair<shadow_map_viewport, shadow_map_command> assignShadowMapViewport(uint3
 	}
 
 
-	shadow_map_command command;
+	bool staticCacheAvailable = false;
 	shadow_map_viewport vp;
 
 	auto it = cachedAllocations.find(uniqueLightID);
@@ -195,8 +195,7 @@ std::pair<shadow_map_viewport, shadow_map_command> assignShadowMapViewport(uint3
 	{
 		// New light.
 		vp = allocateShadowViewport(size);
-		it = cachedAllocations.insert({ uniqueLightID, { vp, lightMovementHash, geometryMovementHash } }).first;
-		command = shadow_map_command_from_scratch;
+		it = cachedAllocations.insert({ uniqueLightID, { vp, lightMovementHash } }).first;
 	}
 	else
 	{
@@ -206,34 +205,21 @@ std::pair<shadow_map_viewport, shadow_map_command> assignShadowMapViewport(uint3
 			freeShadowViewport(it->second.viewport);
 			vp = allocateShadowViewport(size);
 			it->second.viewport = vp;
-			command = shadow_map_command_from_scratch;
 		}
 		else
 		{
-			if (it->second.lightMovementHash != lightMovementHash)
+			if (it->second.lightMovementHash == lightMovementHash)
 			{
-				// Light moved or changed settings.
-				command = shadow_map_command_from_scratch;
-			}
-			else if (it->second.geometryMovementHash != geometryMovementHash)
-			{
-				// Something in light view changed.
-				command = shadow_map_command_use_static_cache;
-			}
-			else
-			{
-				// Nothing changed -> use last frame's shadow map.
-				command = shadow_map_command_use_cached;
+				staticCacheAvailable = true;
 			}
 
 			vp = it->second.viewport;
 		}
 
 		it->second.lightMovementHash = lightMovementHash;
-		it->second.geometryMovementHash = geometryMovementHash;
 	}
 
-	return { vp, command };
+	return { vp, staticCacheAvailable };
 }
 
 uint64 getLightMovementHash(const directional_light& dl)

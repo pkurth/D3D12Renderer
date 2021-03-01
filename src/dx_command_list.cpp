@@ -372,69 +372,101 @@ void dx_command_list::setRenderTarget(dx_render_target& renderTarget)
 	setRenderTarget(renderTarget.rtv, renderTarget.numAttachments, renderTarget.dsv ? &renderTarget.dsv : 0);
 }
 
-void dx_command_list::clearRTV(dx_rtv_descriptor_handle rtv, float r, float g, float b, float a, const clear_rect rect)
+static void getD3D12Rects(D3D12_RECT* d3rects, const clear_rect* rects, uint32 numRects)
+{
+	for (uint32 i = 0; i < numRects; ++i)
+	{
+		d3rects[i] = { (LONG)rects[i].x, (LONG)rects[i].y, (LONG)rects[i].x + (LONG)rects[i].width, (LONG)rects[i].y + (LONG)rects[i].height };
+	}
+}
+
+void dx_command_list::clearRTV(dx_rtv_descriptor_handle rtv, float r, float g, float b, float a, const clear_rect* rects, uint32 numRects)
 {
 	float clearColor[] = { r, g, b, a };
-	clearRTV(rtv, clearColor, rect);
+	clearRTV(rtv, clearColor, rects, numRects);
 }
 
-void dx_command_list::clearRTV(dx_rtv_descriptor_handle rtv, const float* clearColor, const clear_rect rect)
+void dx_command_list::clearRTV(dx_rtv_descriptor_handle rtv, const float* clearColor, const clear_rect* rects, uint32 numRects)
 {
-	D3D12_RECT d3rect = { (LONG)rect.x, (LONG)rect.y, (LONG)rect.x + (LONG)rect.width, (LONG)rect.y + (LONG)rect.height };
-	D3D12_RECT* r = (rect.width > 0) ? &d3rect : 0;
-	uint32 num = (rect.width > 0) ? 1 : 0;
+	D3D12_RECT* d3rects = 0;
+	if (numRects)
+	{
+		d3rects = (D3D12_RECT*)alloca(sizeof(D3D12_RECT) * numRects);
+		getD3D12Rects(d3rects, rects, numRects);
+	}
 
-	commandList->ClearRenderTargetView(rtv, clearColor, num, r);
+	commandList->ClearRenderTargetView(rtv, clearColor, numRects, d3rects);
 }
 
-void dx_command_list::clearRTV(const ref<dx_texture>& texture, float r, float g, float b, float a, const clear_rect rect)
+void dx_command_list::clearRTV(const ref<dx_texture>& texture, float r, float g, float b, float a, const clear_rect* rects, uint32 numRects)
 {
-	clearRTV(texture->rtvHandles, r, g, b, a, rect);
+	clearRTV(texture->rtvHandles, r, g, b, a, rects, numRects);
 }
 
-void dx_command_list::clearRTV(const ref<dx_texture>& texture, const float* clearColor, const clear_rect rect)
+void dx_command_list::clearRTV(const ref<dx_texture>& texture, const float* clearColor, const clear_rect* rects, uint32 numRects)
 {
-	clearRTV(texture->rtvHandles, clearColor, rect);
+	clearRTV(texture->rtvHandles, clearColor, rects, numRects);
 }
 
-void dx_command_list::clearRTV(dx_render_target& renderTarget, uint32 attachment, const float* clearColor, const clear_rect rect)
+void dx_command_list::clearRTV(dx_render_target& renderTarget, uint32 attachment, const float* clearColor, const clear_rect* rects, uint32 numRects)
 {
-	clearRTV(renderTarget.rtv[attachment], clearColor, rect);
+	clearRTV(renderTarget.rtv[attachment], clearColor, rects, numRects);
 }
 
-void dx_command_list::clearRTV(dx_render_target& renderTarget, uint32 attachment, float r, float g, float b, float a, const clear_rect rect)
+void dx_command_list::clearRTV(dx_render_target& renderTarget, uint32 attachment, float r, float g, float b, float a, const clear_rect* rects, uint32 numRects)
 {
-	clearRTV(renderTarget.rtv[attachment], r, g, b, a, rect);
+	clearRTV(renderTarget.rtv[attachment], r, g, b, a, rects, numRects);
 }
 
-void dx_command_list::clearDepth(dx_dsv_descriptor_handle dsv, float depth)
+void dx_command_list::clearDepth(dx_dsv_descriptor_handle dsv, float depth, const clear_rect* rects, uint32 numRects)
 {
-	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, depth, 0, 0, 0);
+	D3D12_RECT* d3rects = 0;
+	if (numRects)
+	{
+		d3rects = (D3D12_RECT*)alloca(sizeof(D3D12_RECT) * numRects);
+		getD3D12Rects(d3rects, rects, numRects);
+	}
+
+	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, depth, 0, numRects, d3rects);
 }
 
-void dx_command_list::clearDepth(dx_render_target& renderTarget, float depth)
+void dx_command_list::clearDepth(dx_render_target& renderTarget, float depth, const clear_rect* rects, uint32 numRects)
 {
-	clearDepth(renderTarget.dsv, depth);
+	clearDepth(renderTarget.dsv, depth, rects, numRects);
 }
 
-void dx_command_list::clearStencil(dx_dsv_descriptor_handle dsv, uint32 stencil)
+void dx_command_list::clearStencil(dx_dsv_descriptor_handle dsv, uint32 stencil, const clear_rect* rects, uint32 numRects)
 {
-	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_STENCIL, 0.f, stencil, 0, 0);
+	D3D12_RECT* d3rects = 0;
+	if (numRects)
+	{
+		d3rects = (D3D12_RECT*)alloca(sizeof(D3D12_RECT) * numRects);
+		getD3D12Rects(d3rects, rects, numRects);
+	}
+
+	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_STENCIL, 0.f, stencil, numRects, d3rects);
 }
 
-void dx_command_list::clearStencil(dx_render_target& renderTarget, uint32 stencil)
+void dx_command_list::clearStencil(dx_render_target& renderTarget, uint32 stencil, const clear_rect* rects, uint32 numRects)
 {
-	clearStencil(renderTarget.dsv, stencil);
+	clearStencil(renderTarget.dsv, stencil, rects, numRects);
 }
 
-void dx_command_list::clearDepthAndStencil(dx_dsv_descriptor_handle dsv, float depth, uint32 stencil)
+void dx_command_list::clearDepthAndStencil(dx_dsv_descriptor_handle dsv, float depth, uint32 stencil, const clear_rect* rects, uint32 numRects)
 {
-	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth, stencil, 0, 0);
+	D3D12_RECT* d3rects = 0;
+	if (numRects)
+	{
+		d3rects = (D3D12_RECT*)alloca(sizeof(D3D12_RECT) * numRects);
+		getD3D12Rects(d3rects, rects, numRects);
+	}
+
+	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth, stencil, numRects, d3rects);
 }
 
-void dx_command_list::clearDepthAndStencil(dx_render_target& renderTarget, float depth, uint32 stencil)
+void dx_command_list::clearDepthAndStencil(dx_render_target& renderTarget, float depth, uint32 stencil, const clear_rect* rects, uint32 numRects)
 {
-	clearDepthAndStencil(renderTarget.dsv, depth, stencil);
+	clearDepthAndStencil(renderTarget.dsv, depth, stencil, rects, numRects);
 }
 
 void dx_command_list::setStencilReference(uint32 stencilReference)

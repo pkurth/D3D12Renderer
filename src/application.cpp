@@ -202,7 +202,7 @@ void application::initialize(dx_renderer* renderer)
 		deg2rad(20.f),
 		deg2rad(30.f),
 		25.f,
-		1
+		0
 	);
 
 	pointLights.resize(1);
@@ -256,9 +256,15 @@ void application::initialize(dx_renderer* renderer)
 		spotLightBuffer[i] = createUploadBuffer(sizeof(spot_light_cb), 512, 0);
 		decalBuffer[i] = createUploadBuffer(sizeof(pbr_decal_cb), 512, 0);
 
+		spotLightShadowInfoBuffer[i] = createUploadBuffer(sizeof(spot_shadow_info), 512, 0);
+		pointLightShadowInfoBuffer[i] = createUploadBuffer(sizeof(point_shadow_info), 512, 0);
+
 		SET_NAME(pointLightBuffer[i]->resource, "Point lights");
 		SET_NAME(spotLightBuffer[i]->resource, "Spot lights");
 		SET_NAME(decalBuffer[i]->resource, "Decals");
+
+		SET_NAME(spotLightShadowInfoBuffer[i]->resource, "Spot light shadow infos");
+		SET_NAME(pointLightShadowInfoBuffer[i]->resource, "Point light shadow infos");
 	}
 }
 
@@ -584,30 +590,36 @@ void application::resetRenderPasses()
 	overlayRenderPass.reset();
 	sunShadowRenderPass.reset();
 
-	for (uint32 i = 0; i < arraysize(spotShadowRenderPasses); ++i)
+	for (uint32 i = 0; i < numSpotShadowRenderPasses; ++i)
 	{
 		spotShadowRenderPasses[i].reset();
 	}
 
-	for (uint32 i = 0; i < arraysize(pointShadowRenderPasses); ++i)
+	for (uint32 i = 0; i < numPointShadowRenderPasses; ++i)
 	{
 		pointShadowRenderPasses[i].reset();
 	}
+
+	numSpotShadowRenderPasses = 0;
+	numPointShadowRenderPasses = 0;
+
+	spotLightShadowInfos.clear();
+	pointLightShadowInfos.clear();
 }
 
-void application::submitRenderPasses()
+void application::submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 numPointLightShadowPasses)
 {
 	renderer->submitRenderPass(&opaqueRenderPass);
 	renderer->submitRenderPass(&transparentRenderPass);
 	renderer->submitRenderPass(&overlayRenderPass);
 	renderer->submitRenderPass(&sunShadowRenderPass);
 
-	for (uint32 i = 0; i < arraysize(spotShadowRenderPasses); ++i)
+	for (uint32 i = 0; i < numSpotLightShadowPasses; ++i)
 	{
 		renderer->submitRenderPass(&spotShadowRenderPasses[i]);
 	}
 
-	for (uint32 i = 0; i < arraysize(pointShadowRenderPasses); ++i)
+	for (uint32 i = 0; i < numPointLightShadowPasses; ++i)
 	{
 		renderer->submitRenderPass(&pointShadowRenderPasses[i]);
 	}
@@ -663,45 +675,211 @@ void application::handleUserInput(const user_input& input, float dt)
 	}
 }
 
-void application::assignShadowMapViewports()
+void application::renderSunShadowMap()
 {
-	uint32 id = 0;
+	sun_shadow_render_pass& renderPass = sunShadowRenderPass;
 
-	uint64 noMovementHash = 0; // TODO: Replace with movement hash of actual light source.
-	uint64 tempAlwaysChangingHash = dxContext.frameID; // TODO: Replace with actual hash of geometry in light volume.
-	
-	// Sun cascades.
+	bool staticCacheAvailable = true;
+
 	for (uint32 i = 0; i < sun.numShadowCascades; ++i)
 	{
 		uint64 sunMovementHash = getLightMovementHash(sun, i);
-		auto [vp, command] = assignShadowMapViewport(id++, sunMovementHash, tempAlwaysChangingHash, sun.shadowDimensions);
+		auto [vp, cache] = assignShadowMapViewport(i, sunMovementHash, sun.shadowDimensions);
 		sunShadowRenderPass.viewports[i] = vp;
+
+		staticCacheAvailable &= cache;
 	}
 
-	id = 4;
-
-	// Spot lights.
-	for (uint32 i = 0; i < arraysize(spotShadowRenderPasses); ++i)
+	if (staticCacheAvailable)
 	{
-		auto [vp, command] = assignShadowMapViewport(id++, noMovementHash, tempAlwaysChangingHash, 512);
-		spotShadowRenderPasses[i].viewport = vp;
+		renderPass.copyFromStaticCache = true;
 	}
-
-	// Point lights.
-	for (uint32 i = 0; i < arraysize(pointShadowRenderPasses); ++i)
+	else
 	{
-		// Hemisphere 0.
-		{
-			auto [vp, command] = assignShadowMapViewport(id++, noMovementHash, tempAlwaysChangingHash, 512);
-			pointShadowRenderPasses[i].viewport0 = vp;
-		}
-
-		// Hemisphere 1.
-		{
-			auto [vp, command] = assignShadowMapViewport(id++, noMovementHash, tempAlwaysChangingHash, 512);
-			pointShadowRenderPasses[i].viewport1 = vp;
-		}
+		renderStaticGeometryToSunShadowMap();
+		renderPass.copyToStaticCache = true;
 	}
+
+	renderDynamicGeometryToSunShadowMap();
+}
+
+void application::renderShadowMap(spot_light_cb& spotLight, uint32 lightIndex)
+{
+	uint32 uniqueID = lightIndex + 1;
+
+	int32 index = numSpotShadowRenderPasses++;
+	spot_shadow_render_pass& renderPass = spotShadowRenderPasses[index];
+
+	spotLight.shadowInfoIndex = index;
+	renderPass.viewProjMatrix = getSpotLightViewProjectionMatrix(spotLight);
+
+	auto [vp, staticCacheAvailable] = assignShadowMapViewport(uniqueID << 10, 0, 512);
+	renderPass.viewport = vp;
+
+	if (staticCacheAvailable)
+	{
+		renderPass.copyFromStaticCache = true;
+	}
+	else
+	{
+		renderStaticGeometryToShadowMap(renderPass);
+		renderPass.copyToStaticCache = true;
+	}
+
+	renderDynamicGeometryToShadowMap(renderPass);
+
+	spot_shadow_info si;
+	si.viewport = vec4(vp.x, vp.y, vp.size, vp.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
+	si.viewProj = renderPass.viewProjMatrix;
+	si.bias = 0.00002f;
+
+	assert(spotLightShadowInfos.size() == index);
+	spotLightShadowInfos.push_back(si);
+}
+
+void application::renderShadowMap(point_light_cb& pointLight, uint32 lightIndex)
+{
+	uint32 uniqueID = lightIndex + 1;
+
+	int32 index = numPointShadowRenderPasses++;
+	point_shadow_render_pass& renderPass = pointShadowRenderPasses[index];
+
+	pointLight.shadowInfoIndex = index;
+	renderPass.lightPosition = pointLight.position;
+	renderPass.maxDistance = pointLight.radius;
+
+	auto [vp0, staticCacheAvailable0] = assignShadowMapViewport((2 * uniqueID + 0) << 20, 0, 512);
+	auto [vp1, staticCacheAvailable1] = assignShadowMapViewport((2 * uniqueID + 1) << 20, 0, 512);
+	renderPass.viewport0 = vp0;
+	renderPass.viewport1 = vp1;
+
+	if (staticCacheAvailable0 && staticCacheAvailable1) // TODO
+	{
+		renderPass.copyFromStaticCache0 = true;
+		renderPass.copyFromStaticCache1 = true;
+	}
+	else
+	{
+		renderStaticGeometryToShadowMap(renderPass);
+		renderPass.copyToStaticCache0 = true;
+		renderPass.copyToStaticCache1 = true;
+	}
+
+	renderDynamicGeometryToShadowMap(renderPass);
+
+
+	point_shadow_info si;
+	si.viewport0 = vec4(vp0.x, vp0.y, vp0.size, vp0.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
+	si.viewport1 = vec4(vp1.x, vp1.y, vp1.size, vp1.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
+
+	assert(pointLightShadowInfos.size() == index);
+	pointLightShadowInfos.push_back(si);
+}
+
+void application::renderStaticGeometryToSunShadowMap()
+{
+	sun_shadow_render_pass& renderPass = sunShadowRenderPass;
+
+	appScene.group<raster_component>(entt::get<trs>, entt::exclude<animation_component>)
+		.each([&renderPass](entt::entity entityHandle, raster_component& raster, trs& transform)
+	{
+		const dx_mesh& mesh = raster.mesh->mesh;
+		mat4 m = trsToMat4(transform);
+
+		for (auto& sm : raster.mesh->submeshes)
+		{
+			submesh_info submesh = sm.info;
+			const ref<pbr_material>& material = sm.material;
+
+			renderPass.renderStaticObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+		}
+	});
+}
+
+void application::renderStaticGeometryToShadowMap(spot_shadow_render_pass& renderPass)
+{
+	appScene.group<raster_component>(entt::get<trs>, entt::exclude<animation_component>)
+		.each([&renderPass](entt::entity entityHandle, raster_component& raster, trs& transform)
+	{
+		const dx_mesh& mesh = raster.mesh->mesh;
+		mat4 m = trsToMat4(transform);
+
+		for (auto& sm : raster.mesh->submeshes)
+		{
+			submesh_info submesh = sm.info;
+			const ref<pbr_material>& material = sm.material;
+
+			renderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+		}
+	});
+}
+
+void application::renderStaticGeometryToShadowMap(point_shadow_render_pass& renderPass)
+{
+	appScene.group<raster_component>(entt::get<trs>, entt::exclude<animation_component>)
+		.each([&renderPass](entt::entity entityHandle, raster_component& raster, trs& transform)
+	{
+		const dx_mesh& mesh = raster.mesh->mesh;
+		mat4 m = trsToMat4(transform);
+
+		for (auto& sm : raster.mesh->submeshes)
+		{
+			submesh_info submesh = sm.info;
+			const ref<pbr_material>& material = sm.material;
+
+			renderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+		}
+	});
+}
+
+void application::renderDynamicGeometryToSunShadowMap()
+{
+	sun_shadow_render_pass& renderPass = sunShadowRenderPass;
+
+	appScene.group(entt::get<raster_component, trs, animation_component>)
+		.each([&renderPass](entt::entity entityHandle, raster_component& raster, trs& transform, animation_component& anim)
+	{
+		const dx_mesh& mesh = raster.mesh->mesh;
+		mat4 m = trsToMat4(transform);
+
+		for (uint32 i = 0; i < (uint32)raster.mesh->submeshes.size(); ++i)
+		{
+			submesh_info submesh = anim.sms[i];
+			renderPass.renderDynamicObject(0, anim.vb, mesh.indexBuffer, submesh, m);
+		}
+	});
+}
+
+void application::renderDynamicGeometryToShadowMap(spot_shadow_render_pass& renderPass)
+{
+	appScene.group(entt::get<raster_component, trs, animation_component>)
+		.each([&renderPass](entt::entity entityHandle, raster_component& raster, trs& transform, animation_component& anim)
+	{
+		const dx_mesh& mesh = raster.mesh->mesh;
+		mat4 m = trsToMat4(transform);
+
+		for (uint32 i = 0; i < (uint32)raster.mesh->submeshes.size(); ++i)
+		{
+			submesh_info submesh = anim.sms[i];
+			renderPass.renderDynamicObject(anim.vb, mesh.indexBuffer, submesh, m);
+		}
+	});
+}
+
+void application::renderDynamicGeometryToShadowMap(point_shadow_render_pass& renderPass)
+{
+	appScene.group(entt::get<raster_component, trs, animation_component>)
+		.each([&renderPass](entt::entity entityHandle, raster_component& raster, trs& transform, animation_component& anim)
+	{
+		const dx_mesh& mesh = raster.mesh->mesh;
+		mat4 m = trsToMat4(transform);
+
+		for (uint32 i = 0; i < (uint32)raster.mesh->submeshes.size(); ++i)
+		{
+			submesh_info submesh = anim.sms[i];
+			renderPass.renderDynamicObject(anim.vb, mesh.indexBuffer, submesh, m);
+		}
+	});
 }
 
 void application::update(const user_input& input, float dt)
@@ -729,32 +907,6 @@ void application::update(const user_input& input, float dt)
 			//testRenderMeshShader(&overlayRenderPass);
 		}
 
-
-		spotShadowRenderPasses[0].viewProjMatrix = getSpotLightViewProjectionMatrix(spotLights[0]);
-		spotShadowRenderPasses[1].viewProjMatrix = getSpotLightViewProjectionMatrix(spotLights[1]);
-		pointShadowRenderPasses[0].lightPosition = pointLights[0].position;
-		pointShadowRenderPasses[0].maxDistance = pointLights[0].radius;
-
-		assignShadowMapViewports();
-
-
-
-		// Upload and set lights.
-		if (pointLights.size())
-		{
-			updateUploadBufferData(pointLightBuffer[dxContext.bufferedFrameID], pointLights.data(), (uint32)(sizeof(point_light_cb) * pointLights.size()));
-			renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], (uint32)pointLights.size());
-		}
-		if (spotLights.size())
-		{
-			updateUploadBufferData(spotLightBuffer[dxContext.bufferedFrameID], spotLights.data(), (uint32)(sizeof(spot_light_cb) * spotLights.size()));
-			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], (uint32)spotLights.size());
-		}
-		if (decals.size())
-		{
-			updateUploadBufferData(decalBuffer[dxContext.bufferedFrameID], decals.data(), (uint32)(sizeof(pbr_decal_cb) * decals.size()));
-			renderer->setDecals(decalBuffer[dxContext.bufferedFrameID], (uint32)decals.size(), decalTexture);
-		}
 
 		thread_job_context context;
 
@@ -789,6 +941,28 @@ void application::update(const user_input& input, float dt)
 			}
 		});
 
+		renderSunShadowMap();
+
+		for (uint32 i = 0; i < (uint32)spotLights.size(); ++i)
+		{
+			if (spotLights[i].shadowInfoIndex >= 0)
+			{
+				renderShadowMap(spotLights[i], i);
+			}
+		}
+
+		for (uint32 i = 0; i < (uint32)pointLights.size(); ++i)
+		{
+			if (pointLights[i].shadowInfoIndex >= 0)
+			{
+				renderShadowMap(pointLights[i], i);
+			}
+		}
+
+
+
+
+
 		// Submit render calls.
 		appScene.group<raster_component>(entt::get<trs>)
 			.each([this](entt::entity entityHandle, raster_component& raster, trs& transform)
@@ -820,10 +994,6 @@ void application::update(const user_input& input, float dt)
 					{
 						opaqueRenderPass.renderAnimatedObject(anim.vb, anim.prevFrameVB, mesh.indexBuffer, submesh, prevFrameSubmesh, material, m, m,
 							(uint32)entityHandle, outline);
-						sunShadowRenderPass.renderObject(0, anim.vb, mesh.indexBuffer, submesh, m);
-						spotShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
-						spotShadowRenderPasses[1].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
-						pointShadowRenderPasses[0].renderObject(anim.vb, mesh.indexBuffer, submesh, m);
 					}
 				}
 			}
@@ -841,10 +1011,6 @@ void application::update(const user_input& input, float dt)
 					else
 					{
 						opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, (uint32)entityHandle, outline);
-						sunShadowRenderPass.renderObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-						spotShadowRenderPasses[0].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-						spotShadowRenderPasses[1].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-						pointShadowRenderPasses[0].renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
 					}
 				}
 			}
@@ -852,7 +1018,28 @@ void application::update(const user_input& input, float dt)
 
 
 		waitForWorkCompletion(context);
-		submitRenderPasses();
+		submitRenderPasses(numSpotShadowRenderPasses, numPointShadowRenderPasses);
+
+
+
+		// Upload and set lights.
+		if (pointLights.size())
+		{
+			updateUploadBufferData(pointLightBuffer[dxContext.bufferedFrameID], pointLights.data(), (uint32)(sizeof(point_light_cb) * pointLights.size()));
+			updateUploadBufferData(pointLightShadowInfoBuffer[dxContext.bufferedFrameID], pointLightShadowInfos.data(), (uint32)(sizeof(point_shadow_info) * numPointShadowRenderPasses));
+			renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], (uint32)pointLights.size(), pointLightShadowInfoBuffer[dxContext.bufferedFrameID]);
+		}
+		if (spotLights.size())
+		{
+			updateUploadBufferData(spotLightBuffer[dxContext.bufferedFrameID], spotLights.data(), (uint32)(sizeof(spot_light_cb) * spotLights.size()));
+			updateUploadBufferData(spotLightShadowInfoBuffer[dxContext.bufferedFrameID], spotLightShadowInfos.data(), (uint32)(sizeof(spot_shadow_info) * numSpotShadowRenderPasses));
+			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], (uint32)spotLights.size(), spotLightShadowInfoBuffer[dxContext.bufferedFrameID]);
+		}
+		if (decals.size())
+		{
+			updateUploadBufferData(decalBuffer[dxContext.bufferedFrameID], decals.data(), (uint32)(sizeof(pbr_decal_cb) * decals.size()));
+			renderer->setDecals(decalBuffer[dxContext.bufferedFrameID], (uint32)decals.size(), decalTexture);
+		}
 	}
 	else
 	{

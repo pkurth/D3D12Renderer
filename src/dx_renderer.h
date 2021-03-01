@@ -94,8 +94,8 @@ struct dx_renderer
 	void setEnvironment(const ref<pbr_environment>& environment);
 	void setSun(const directional_light& light);
 
-	void setPointLights(const ref<dx_buffer>& lights, uint32 numLights);
-	void setSpotLights(const ref<dx_buffer>& lights, uint32 numLights);
+	void setPointLights(const ref<dx_buffer>& lights, uint32 numLights, const ref<dx_buffer>& shadowInfoBuffer);
+	void setSpotLights(const ref<dx_buffer>& lights, uint32 numLights, const ref<dx_buffer>& shadowInfoBuffer);
 	void setDecals(const ref<dx_buffer>& decals, uint32 numDecals, const ref<dx_texture>& textureAtlas);
 
 	void submitRenderPass(opaque_render_pass* renderPass)
@@ -227,12 +227,11 @@ private:
 
 	ref<dx_buffer> hoveredObjectIDReadbackBuffer;
 
-	ref<dx_buffer> spotLightShadowInfoBuffer[NUM_BUFFERED_FRAMES];
-	ref<dx_buffer> pointLightShadowInfoBuffer[NUM_BUFFERED_FRAMES];
-
 	ref<pbr_environment> environment;
 	ref<dx_buffer> pointLights;
 	ref<dx_buffer> spotLights;
+	ref<dx_buffer> pointLightShadowInfoBuffer;
+	ref<dx_buffer> spotLightShadowInfoBuffer;
 	ref<dx_buffer> decals;
 	uint32 numPointLights;
 	uint32 numSpotLights;
@@ -243,7 +242,6 @@ private:
 	camera_cb jitteredCamera;
 	camera_cb unjitteredCamera;
 	directional_light_cb sun;
-
 
 
 	// Tiled light and decal culling.

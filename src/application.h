@@ -34,11 +34,21 @@ private:
 	void drawSettings(float dt);
 
 	void resetRenderPasses();
-	void submitRenderPasses();
+	void submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 numPointLightShadowPasses);
 	void handleUserInput(const user_input& input, float dt);
 
-	void assignShadowMapViewports();
+	void renderSunShadowMap();
+	void renderShadowMap(spot_light_cb& spotLight, uint32 lightIndex);
+	void renderShadowMap(point_light_cb& pointLight, uint32 lightIndex);
 
+	void renderStaticGeometryToSunShadowMap();
+	void renderStaticGeometryToShadowMap(spot_shadow_render_pass& renderPass);
+	void renderStaticGeometryToShadowMap(point_shadow_render_pass& renderPass);
+
+	void renderDynamicGeometryToSunShadowMap();
+	void renderDynamicGeometryToShadowMap(spot_shadow_render_pass& renderPass);
+	void renderDynamicGeometryToShadowMap(point_shadow_render_pass& renderPass);
+	
 
 	raytracing_tlas raytracingTLAS;
 	path_tracer pathTracer;
@@ -50,9 +60,16 @@ private:
 	ref<dx_buffer> spotLightBuffer[NUM_BUFFERED_FRAMES];
 	ref<dx_buffer> decalBuffer[NUM_BUFFERED_FRAMES];
 
+	ref<dx_buffer> spotLightShadowInfoBuffer[NUM_BUFFERED_FRAMES];
+	ref<dx_buffer> pointLightShadowInfoBuffer[NUM_BUFFERED_FRAMES];
+
+
 	std::vector<point_light_cb> pointLights;
 	std::vector<spot_light_cb> spotLights;
 	std::vector<pbr_decal_cb> decals;
+
+	std::vector<spot_shadow_info> spotLightShadowInfos;
+	std::vector<point_shadow_info> pointLightShadowInfos;
 
 	ref<dx_texture> decalTexture;
 
@@ -68,10 +85,13 @@ private:
 	vec3 selectedEntityEulerRotation;
 
 
+	uint32 numSpotShadowRenderPasses;
+	uint32 numPointShadowRenderPasses;
+
 	opaque_render_pass opaqueRenderPass;
 	transparent_render_pass transparentRenderPass;
 	sun_shadow_render_pass sunShadowRenderPass;
-	spot_shadow_render_pass spotShadowRenderPasses[2];
-	point_shadow_render_pass pointShadowRenderPasses[1];
+	spot_shadow_render_pass spotShadowRenderPasses[16];
+	point_shadow_render_pass pointShadowRenderPasses[16];
 	overlay_render_pass overlayRenderPass;
 };
