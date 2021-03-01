@@ -338,7 +338,7 @@ void resolveTimeStampQueries(uint64* timestamps)
 						}
 
 						ImGui::PushClipRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), false);
-						ImGui::SetCursorPos(ImVec2(left + ImGui::GetStyle().FramePadding.x, top));
+						ImGui::SetCursorPos(ImVec2(left + ImGui::GetStyle().FramePadding.x, top + ImGui::GetStyle().FramePadding.y));
 						ImGui::Text("%s: %.3fms", current->name, current->duration);
 						ImGui::PopClipRect();
 
