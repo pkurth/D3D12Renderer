@@ -34,6 +34,12 @@ groupshared uint groupMinDepth;
 groupshared uint groupMaxDepth;
 groupshared light_culling_view_frustum groupFrustum;
 
+groupshared float3 groupViewSpaceAABBCorners[8];
+groupshared float3 groupViewSpaceAABBCenter;
+groupshared float3 groupViewSpaceAABBExtent;
+
+groupshared uint groupTileDepthMask;
+
 groupshared uint groupObjectsStartOffset;
 
 // Opaque.
@@ -91,6 +97,14 @@ static bool pointLightInsideFrustum(point_light_cb pl, light_culling_view_frustu
     }
 
     return result;
+}
+
+static bool sphereInAABB(vec3 sphereCenter, float sphereRadius, float3 aabbCenter, float3 aabbExtents)
+{
+    float3 delta = max(0, abs(aabbCenter - sphereCenter) - aabbExtents);
+    float distSq = dot(delta, delta);
+
+    return distSq <= sphereRadius * sphereRadius;
 }
 
 static bool pointOutsidePlane(float3 p, light_culling_frustum_plane plane)
@@ -159,6 +173,22 @@ static bool decalInsideFrustum(pbr_decal_cb decal, light_culling_view_frustum fr
     return result;
 }
 
+static uint getLightMask(float sphereCenterDepth, float radius, float depthRangeRecip, float nearZ)
+{
+    // https://wickedengine.net/2018/01/10/optimizing-tile-based-light-culling/
+
+    const float plMin = sphereCenterDepth - radius;
+    const float plMax = sphereCenterDepth + radius;
+    const uint plMaskIndexMin = max(0, min(31, floor((plMin - nearZ) * depthRangeRecip)));
+    const uint plMaskIndexMax = max(0, min(31, floor((plMax - nearZ) * depthRangeRecip)));
+
+    // Set all bits between plMaskIndexMin and (inclusive) plMaskIndexMax.
+    uint lightMask = 0xFFFFFFFF;
+    lightMask >>= 31 - (plMaskIndexMax - plMaskIndexMin);
+    lightMask <<= plMaskIndexMin;
+    return lightMask;
+}
+
 
 
 #define groupAppendLight(type, index)                               \
@@ -201,6 +231,8 @@ void main(cs_input IN)
         groupLightCountOpaque = 0;
         groupLightCountTransparent = 0;
 
+        groupTileDepthMask = 0;
+
         groupFrustum = frusta[IN.groupID.y * cb.numThreadGroupsX + IN.groupID.x];
     }
 
@@ -226,11 +258,13 @@ void main(cs_input IN)
 
     const float fDepth = depthBuffer[min(IN.dispatchThreadID.xy, screenSize - 1)];
     // Since the depth is between 0 and 1, we can perform min and max operations on the bit pattern as uint. This is because native HLSL does not support floating point atomics.
-    const uint uDepth = asuint(fDepth);
+    if (fDepth != 1.f)
+    {
+        const uint uDepth = asuint(fDepth);
 
-    InterlockedMin(groupMinDepth, uDepth);
-    InterlockedMax(groupMaxDepth, uDepth);
-
+        InterlockedMin(groupMinDepth, uDepth);
+        InterlockedMax(groupMaxDepth, uDepth);
+    }
     GroupMemoryBarrierWithGroupSync();
 
     const float minDepth = asfloat(groupMinDepth);
@@ -241,13 +275,48 @@ void main(cs_input IN)
 
     const float nearZ = depthBufferDepthToEyeDepth(minDepth, camera.projectionParams); // Positive.
     const float farZ  = depthBufferDepthToEyeDepth(maxDepth, camera.projectionParams); // Positive.
+    const float myZ   = depthBufferDepthToEyeDepth(fDepth, camera.projectionParams);   // Positive.
+
+    const float depthRangeRecip = 31.f / (farZ - nearZ);
+    const uint depthMaskIndex = max(0, min(31, floor((myZ - nearZ) * depthRangeRecip)));
+    InterlockedOr(groupTileDepthMask, 1 << depthMaskIndex);
+
 
     const light_culling_frustum_plane cameraNearPlane = {  forward,  dot(forward, cameraPos + camera.projectionParams.x * forward) };
     const light_culling_frustum_plane nearPlane       = {  forward,  dot(forward, cameraPos + nearZ * forward) };
     const light_culling_frustum_plane farPlane        = { -forward, -dot(forward, cameraPos + farZ  * forward) };
 
 
+    if (IN.groupIndex < 8)
+    {
+        const uint x = IN.groupIndex & 0x1;
+        const uint y = (IN.groupIndex >> 1) & 0x1;
+        const uint z = (IN.groupIndex >> 2);
 
+        const uint2 coord = (IN.groupID.xy + uint2(x, y)) * LIGHT_CULLING_TILE_SIZE;
+        const float2 uv = (float2(coord) + 0.5f) / screenSize;
+
+        groupViewSpaceAABBCorners[IN.groupIndex] = restoreViewSpacePosition(camera.invProj, uv, lerp(minDepth, maxDepth, z));
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    if (IN.groupIndex == 0)
+    {
+        float3 minAABB = 10000000;
+        float3 maxAABB = -10000000;
+
+        for (uint i = 0; i < 8; ++i)
+        {
+            minAABB = min(minAABB, groupViewSpaceAABBCorners[i]);
+            maxAABB = max(maxAABB, groupViewSpaceAABBCorners[i]);
+        }
+
+        groupViewSpaceAABBCenter = (maxAABB + minAABB) * 0.5f;
+        groupViewSpaceAABBExtent = maxAABB - groupViewSpaceAABBCenter;
+    }
+
+    GroupMemoryBarrierWithGroupSync();
 
     // Decals.
     const uint numDecals = cb.numDecals;
@@ -275,9 +344,16 @@ void main(cs_input IN)
         {
             groupAppendLightTransparent(i);
 
-            if (!pointLightOutsidePlane(pl, nearPlane))
+            pl.position = mul(camera.view, float4(pl.position, 1.f)).xyz;
+
+            if (sphereInAABB(pl.position, pl.radius, groupViewSpaceAABBCenter, groupViewSpaceAABBExtent))
             {
-                groupAppendLightOpaque(i);
+                const uint lightMask = getLightMask(-pl.position.z, pl.radius, depthRangeRecip, nearZ);
+
+                if (lightMask & groupTileDepthMask)
+                {
+                    groupAppendLightOpaque(i);
+                }
             }
         }
     }
@@ -291,14 +367,24 @@ void main(cs_input IN)
     const uint numSpotLights = cb.numSpotLights;
     for (i = IN.groupIndex; i < numSpotLights; i += LIGHT_CULLING_TILE_SIZE * LIGHT_CULLING_TILE_SIZE)
     {
-        spot_light_bounding_volume sl = getSpotLightBoundingVolume(spotLights[i]);
-        if (spotLightInsideFrustum(sl, groupFrustum, cameraNearPlane, farPlane))
+        const spot_light_cb sl = spotLights[i];
+        const spot_light_bounding_volume slBV = getSpotLightBoundingVolume(sl);
+        if (spotLightInsideFrustum(slBV, groupFrustum, cameraNearPlane, farPlane))
         {
             groupAppendLightTransparent(i);
 
-            if (!spotLightOutsidePlane(sl, nearPlane))
+            const float oc = sl.getOuterCutoff();
+            const float radius = sl.maxDistance * 0.5f / (oc * oc);
+            const float3 center = mul(camera.view, float4(sl.position + sl.direction * radius, 1.f)).xyz;
+
+            if (sphereInAABB(center, radius, groupViewSpaceAABBCenter, groupViewSpaceAABBExtent))
             {
-                groupAppendLightOpaque(i);
+                const uint lightMask = getLightMask(-center.z, radius, depthRangeRecip, nearZ);
+
+                if (lightMask & groupTileDepthMask)
+                {
+                    groupAppendLightOpaque(i);
+                }
             }
         }
     }
