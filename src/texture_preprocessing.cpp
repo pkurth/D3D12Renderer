@@ -81,7 +81,7 @@ void generateMipMapsOnGPU(dx_command_list* cl, ref<dx_texture>& texture)
 		resourceDesc.DepthOrArraySize != 1 ||
 		resourceDesc.SampleDesc.Count > 1)
 	{
-		fprintf(stderr, "GenerateMips is only supported for non-multi-sampled 2D Textures.\n");
+		std::cerr << "GenerateMips is only supported for non-multi-sampled 2D Textures.\n";
 		return;
 	}
 
@@ -376,7 +376,7 @@ ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& 
 
 	if (isSRGBFormat(irradianceDesc.Format))
 	{
-		printf("Warning: Irradiance of sRGB-Format!\n");
+		std::cout << "Warning: Irradiance of sRGB-Format!\n";
 	}
 
 	irradianceDesc.Width = irradianceDesc.Height = resolution;

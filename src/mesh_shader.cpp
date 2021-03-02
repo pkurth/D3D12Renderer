@@ -370,7 +370,7 @@ static ref<mesh_shader_mesh> loadMeshShaderMeshFromFile(const char* filename)
 	std::ifstream stream(filename, std::ios::binary);
 	if (!stream.is_open())
 	{
-		std::cerr << "Could not find file '" << filename << "'." << std::endl;
+		std::cerr << "Could not find file '" << filename << "'.\n";
 		return 0;
 	}
 

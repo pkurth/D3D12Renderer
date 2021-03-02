@@ -320,7 +320,7 @@ static void prettyPrint(const animation_skeleton& skeleton, uint32 parent, uint3
 	{
 		if (skeleton.joints[i].parentID == parent)
 		{
-			std::cout << std::string(indent, ' ') << skeleton.joints[i].name << std::endl;
+			std::cout << std::string(indent, ' ') << skeleton.joints[i].name << '\n';
 			prettyPrint(skeleton, i, indent + 1);
 		}
 	}

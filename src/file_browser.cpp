@@ -115,7 +115,7 @@ static DWORD checkForFileChanges(void*)
 
 		if (directoryHandles[i] == INVALID_HANDLE_VALUE)
 		{
-			fprintf(stderr, "Monitor directory failed.\n");
+			std::cerr << "Monitor directory failed.\n";
 			return 1;
 		}
 
@@ -142,7 +142,7 @@ static DWORD checkForFileChanges(void*)
 		DWORD dw;
 		if (!GetOverlappedResult(directoryHandles[eventType], &overlapped[eventType], &dw, FALSE) || dw == 0)
 		{
-			fprintf(stderr, "Get overlapped result failed.\n");
+			std::cerr << "Get overlapped result failed.\n";
 			return 1;
 		}
 
@@ -197,7 +197,7 @@ static DWORD checkForFileChanges(void*)
 					}
 					else
 					{
-						std::cout << "File " << changedPath << " changed!" << std::endl;
+						std::cout << "File " << changedPath << " changed!\n";
 					}
 
 					lastChangedPath = changedPath;
@@ -213,7 +213,7 @@ static DWORD checkForFileChanges(void*)
 
 		if (!ResetEvent(overlapped[eventType].hEvent))
 		{
-			fprintf(stderr, "Reset event failed.\n");
+			std::cerr << "Reset event failed.\n";
 		}
 
 		DWORD error = ReadDirectoryChangesW(directoryHandles[eventType],
@@ -223,7 +223,7 @@ static DWORD checkForFileChanges(void*)
 
 		if (error == 0)
 		{
-			fprintf(stderr, "Read directory failed.\n");
+			std::cerr << "Read directory failed.\n";
 		}
 		
 	}

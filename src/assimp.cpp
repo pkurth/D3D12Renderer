@@ -17,7 +17,7 @@ struct assimp_logger : public Assimp::LogStream
 {
 	virtual void write(const char* message) override
 	{
-		std::cout << message << std::endl;
+		std::cout << message << '\n';
 	}
 };
 
@@ -65,7 +65,7 @@ const aiScene* loadAssimpSceneFile(const char* filepathRaw, Assimp::Importer& im
 	{
 		if (!fs::exists(filepathRaw))
 		{
-			std::cerr << "Could not find file '" << filepathRaw << "'." << std::endl;
+			std::cerr << "Could not find file '" << filepathRaw << "'.\n";
 			return 0;
 		}
 
@@ -73,7 +73,7 @@ const aiScene* loadAssimpSceneFile(const char* filepathRaw, Assimp::Importer& im
 #ifdef _DEBUG
 		std::cout << " Consider running in a release build the first time.";
 #endif
-		std::cout << std::endl;
+		std::cout << '\n';
 
 		importer.SetPropertyFloat(AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE, 80.f);
 		importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_POINT | aiPrimitiveType_LINE);

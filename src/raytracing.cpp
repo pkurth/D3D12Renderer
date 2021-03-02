@@ -161,7 +161,7 @@ static void reportShaderCompileError(com<IDxcBlobEncoding> blob)
 	char infoLog[2048];
 	memcpy(infoLog, blob->GetBufferPointer(), sizeof(infoLog) - 1);
 	infoLog[sizeof(infoLog) - 1] = 0;
-	std::cerr << "Error: " << infoLog << std::endl;
+	std::cerr << "Error: " << infoLog << '\n';
 }
 
 static com<IDxcBlob> compileLibrary(const std::wstring& filename, const std::vector<const wchar*>& shaderNameDefines)
@@ -177,7 +177,7 @@ static com<IDxcBlob> compileLibrary(const std::wstring& filename, const std::vec
 	std::ifstream stream(filename);
 	if (!stream.is_open())
 	{
-		//std::cerr <<  "File " << filename << " not found." << std::endl;
+		//std::cerr <<  "File " << filename << " not found." << '\n';
 		return 0;
 	}
 	std::stringstream ss; ss << stream.rdbuf();

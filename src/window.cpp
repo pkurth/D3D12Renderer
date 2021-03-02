@@ -74,7 +74,7 @@ bool win32_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clie
 
 		if (!RegisterClassEx(&wndClass))
 		{
-			std::cerr << "Failed to create window class." << std::endl;
+			std::cerr << "Failed to create window class.\n";
 			return 1;
 		}
 
@@ -110,7 +110,7 @@ bool win32_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clie
 
 		if (!windowHandle)
 		{
-			std::cerr << "Failed to create window." << std::endl;
+			std::cerr << "Failed to create window.\n";
 			return false;
 		}
 

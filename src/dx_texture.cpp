@@ -96,7 +96,7 @@ static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::S
 	{
 		if (!fs::exists(filepath))
 		{
-			std::cerr << "Could not find file '" << filepath.string() << "'." << std::endl;
+			std::cerr << "Could not find file '" << filepath.string() << "'.\n";
 			return false;
 		}
 
@@ -211,7 +211,7 @@ static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::S
 			}
 			else
 			{
-				std::cerr << "Cannot compress texture '" << filepath << "', since its dimensions are not a multiple of 4." << std::endl;
+				std::cerr << "Cannot compress texture '" << filepath << "', since its dimensions are not a multiple of 4.\n";
 			}
 		}
 
@@ -459,19 +459,19 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 
 	if (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET && !result->supportsRTV)
 	{
-		std::cout << "Warning. Requested RTV, but not supported by format." << std::endl;
+		std::cerr << "Warning. Requested RTV, but not supported by format.\n";
 		__debugbreak();
 	}
 
 	if (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL && !result->supportsDSV)
 	{
-		std::cout << "Warning. Requested DSV, but not supported by format." << std::endl;
+		std::cerr << "Warning. Requested DSV, but not supported by format.\n";
 		__debugbreak();
 	}
 
 	if (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS && !result->supportsUAV)
 	{
-		std::cout << "Warning. Requested UAV, but not supported by format." << std::endl;
+		std::cerr << "Warning. Requested UAV, but not supported by format.\n";
 		__debugbreak();
 	}
 
@@ -874,9 +874,6 @@ texture_grave::~texture_grave()
 		uint32 size = sizeof(name);
 		resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);
 		name[min(arraysize(name) - 1, size)] = 0;
-
-
-		//std::cout << "Finally deleting texture." << std::endl;
 
 		if (srv.cpuHandle.ptr)
 		{

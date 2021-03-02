@@ -44,11 +44,36 @@ static dx_factory createFactory()
 	return dxgiFactory;
 }
 
+// https://codingtidbit.com/2020/02/09/c17-codecvt_utf8-is-deprecated/
+static std::string wstringToString(const std::wstring& wstr)
+{
+	if (wstr.empty())
+	{
+		return std::string();
+	}
+	int size = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
+	std::string result(size, 0);
+	WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &result[0], size, NULL, NULL);
+	return result;
+}
+
+static std::wstring stringToWstring(const std::string& str)
+{
+	if (str.empty()) 
+	{ 
+		return std::wstring(); 
+	}
+	int size = MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), NULL, 0);
+	std::wstring result(size, 0);
+	MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), &result[0], size);
+	return result;
+}
+
 struct adapter_desc
 {
 	dx_adapter adapter;
 	D3D_FEATURE_LEVEL featureLevel;
-	std::wstring name;
+	std::string name;
 };
 
 static adapter_desc getAdapter(dx_factory factory, D3D_FEATURE_LEVEL minimumFeatureLevel = D3D_FEATURE_LEVEL_11_0)
@@ -116,9 +141,10 @@ static adapter_desc getAdapter(dx_factory factory, D3D_FEATURE_LEVEL minimumFeat
 		}
 	}
 
-	printf("Using GPU: %ls\n", desc.Description);
+	std::string gpuName = wstringToString(desc.Description);
+	std::cout << "Using GPU: " << gpuName << '\n';
 
-	return { dxgiAdapter, featureLevel, desc.Description };
+	return { dxgiAdapter, featureLevel, gpuName };
 }
 
 static dx_device createDevice(dx_adapter adapter, D3D_FEATURE_LEVEL featureLevel)
@@ -185,7 +211,7 @@ static bool checkMeshShaderSupport(dx_device device)
 	}
 	else
 	{
-		std::cerr << "Checking support for mesh shader feature failed. Maybe you need to update your Windows version." << std::endl;
+		std::cerr << "Checking support for mesh shader feature failed. Maybe you need to update your Windows version.\n";
 	}
 #endif
 	return false;
@@ -200,7 +226,7 @@ bool dx_context::initialize()
 	this->adapter = adapterDesc.adapter;
 	if (!adapter)
 	{
-		std::cerr << "No DX12 capable GPU found." << std::endl;
+		std::cerr << "No DX12 capable GPU found.\n";
 		return false;
 	}
 

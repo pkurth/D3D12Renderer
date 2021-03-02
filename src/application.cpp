@@ -1067,7 +1067,7 @@ void application::setEnvironment(const char* filename)
 
 	if (!environment)
 	{
-		std::cout << "Could not load environment '" << filename << "'. Renderer will use procedural sky box. Procedural sky boxes currently cannot contribute to global illumnation, so expect very dark lighting." << std::endl;
+		std::cout << "Could not load environment '" << filename << "'. Renderer will use procedural sky box. Procedural sky boxes currently cannot contribute to global illumnation, so expect very dark lighting.\n";
 	}
 }
 
