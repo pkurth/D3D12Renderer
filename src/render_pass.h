@@ -223,6 +223,41 @@ struct transparent_render_pass : geometry_render_pass
 		common<false>(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 	}
 
+	template <typename material_t>
+	void renderParticles(dx_dynamic_vertex_buffer vertexBuffer, dx_dynamic_vertex_buffer instanceBuffer, const mat4& transform, const ref<material_t>& material, uint32 numParticles)
+	{
+		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
+
+		material_setup_function setupFunc = material_t::setupTransparentPipeline;
+
+		particleDrawCalls.push_back(
+			{
+				transform,
+				vertexBuffer,
+				instanceBuffer,
+				material,
+				setupFunc,
+				numParticles,
+			}
+		);
+	}
+
+	void reset();
+
+private:
+
+	struct particle_draw_call
+	{
+		mat4 transform;
+		dx_dynamic_vertex_buffer vertexBuffer;
+		dx_dynamic_vertex_buffer instanceBuffer;
+		ref<material_base> material;
+		material_setup_function materialSetupFunc;
+		uint32 numParticles;
+	};
+
+	std::vector<particle_draw_call> particleDrawCalls;
+
 	friend struct dx_renderer;
 };
 

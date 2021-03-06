@@ -21,6 +21,13 @@ void opaque_render_pass::reset()
 	animatedDepthOnlyDrawCalls.clear();
 }
 
+void transparent_render_pass::reset()
+{
+	geometry_render_pass::reset();
+
+	particleDrawCalls.clear();
+}
+
 void sun_shadow_render_pass::renderStaticObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
 {
 	staticDrawCalls[cascadeIndex].push_back(

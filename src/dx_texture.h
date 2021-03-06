@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dx_descriptor.h"
+#include "math.h"
 
 #include <string>
 
@@ -59,6 +60,34 @@ struct dx_texture
 
 	void setName(const wchar* name);
 	std::wstring getName() const;
+};
+
+struct dx_texture_atlas
+{
+	ref<dx_texture> texture;
+
+	uint32 slicesX;
+	uint32 slicesY;
+
+	std::pair<vec2, vec2> getUVs(uint32 x, uint32 y)
+	{
+		assert(x < slicesX);
+		assert(y < slicesY);
+
+		float width = 1.f / slicesX;
+		float height = 1.f / slicesY;
+		vec2 uv0 = vec2(x * width, y * height);
+		vec2 uv1 = vec2((x + 1) * width, (y + 1) * height);
+
+		return { uv0, uv1 };
+	}
+
+	std::pair<vec2, vec2> getUVs(uint32 i)
+	{
+		uint32 x = i % slicesX;
+		uint32 y = i / slicesX;
+		return getUVs(x, y);
+	}
 };
 
 struct texture_grave

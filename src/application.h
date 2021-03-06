@@ -6,8 +6,8 @@
 #include "mesh.h"
 #include "math.h"
 #include "dx_renderer.h"
-#include "light_source.hlsli" // TODO: For now. The game should only know about the C++ version of lights eventually.
 #include "light_source.h"
+#include "particles.h"
 #include "transformation_gizmo.h"
 #include "raytracing.h"
 
@@ -72,6 +72,8 @@ private:
 	std::vector<point_shadow_info> pointLightShadowInfos;
 
 	ref<dx_texture> decalTexture;
+
+	particle_system particleSystem;
 
 	directional_light sun;
 

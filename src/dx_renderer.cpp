@@ -11,6 +11,7 @@
 #include "dx_context.h"
 #include "dx_profiling.h"
 #include "random.h"
+#include "particles.h"
 
 #include "depth_only_rs.hlsli"
 #include "outline_rs.hlsli"
@@ -226,6 +227,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 
 	pbr_material::initializePipeline();
+	particle_material::initializePipeline();
 
 	createAllPendingReloadablePipelines();
 
@@ -1574,7 +1576,7 @@ void dx_renderer::endFrame(const user_input& input)
 		// ----------------------------------------
 
 
-		if (transparentRenderPass && transparentRenderPass->drawCalls.size() > 0)
+		if (transparentRenderPass && (transparentRenderPass->drawCalls.size() > 0 || transparentRenderPass->particleDrawCalls.size() > 0))
 		{
 			DX_PROFILE_BLOCK(cl, "Transparent light pass");
 
@@ -1590,24 +1592,56 @@ void dx_renderer::endFrame(const user_input& input)
 
 			material_setup_function lastSetupFunc = 0;
 
-			for (const auto& dc : transparentRenderPass->drawCalls)
 			{
-				const mat4& m = dc.transform;
-				const submesh_info& submesh = dc.submesh;
+				DX_PROFILE_BLOCK(cl, "Transparent geometry");
 
-				if (dc.materialSetupFunc != lastSetupFunc)
+				for (const auto& dc : transparentRenderPass->drawCalls)
 				{
-					dc.materialSetupFunc(cl, materialInfo);
-					lastSetupFunc = dc.materialSetupFunc;
+					const mat4& m = dc.transform;
+					const submesh_info& submesh = dc.submesh;
+
+					if (dc.materialSetupFunc != lastSetupFunc)
+					{
+						dc.materialSetupFunc(cl, materialInfo);
+						lastSetupFunc = dc.materialSetupFunc;
+					}
+
+					dc.material->prepareForRendering(cl);
+
+					cl->setGraphics32BitConstants(0, transform_cb{ unjitteredCamera.viewProj * m, m });
+
+					cl->setVertexBuffer(0, dc.vertexBuffer);
+					cl->setIndexBuffer(dc.indexBuffer);
+					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+				}
+			}
+
+			if (transparentRenderPass->particleDrawCalls.size() > 0)
+			{
+				cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+				DX_PROFILE_BLOCK(cl, "Particles");
+
+				for (const auto& dc : transparentRenderPass->particleDrawCalls)
+				{
+					const mat4& m = dc.transform;
+
+					if (dc.materialSetupFunc != lastSetupFunc)
+					{
+						dc.materialSetupFunc(cl, materialInfo);
+						lastSetupFunc = dc.materialSetupFunc;
+					}
+
+					dc.material->prepareForRendering(cl);
+
+					cl->setGraphics32BitConstants(0, unjitteredCamera.viewProj * m);
+
+					cl->setVertexBuffer(0, dc.vertexBuffer);
+					cl->setVertexBuffer(1, dc.instanceBuffer);
+					cl->draw(4, dc.numParticles, 0, 0);
 				}
 
-				dc.material->prepareForRendering(cl);
-
-				cl->setGraphics32BitConstants(0, transform_cb{ unjitteredCamera.viewProj * m, m });
-
-				cl->setVertexBuffer(0, dc.vertexBuffer);
-				cl->setIndexBuffer(dc.indexBuffer);
-				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+				cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			}
 
 
