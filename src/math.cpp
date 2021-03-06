@@ -70,7 +70,7 @@ half operator/(half a, half b) { return half_div(a.h, b.h); }
 half& operator/=(half& a, half b) { a = a / b; return a; }
 
 
-mat2 operator*(mat2 a, mat2 b)
+mat2 operator*(const mat2& a, const mat2& b)
 {
 	vec2 r0 = row(a, 0);
 	vec2 r1 = row(a, 1);
@@ -84,7 +84,7 @@ mat2 operator*(mat2 a, mat2 b)
 	return result;
 }
 
-mat3 operator*(mat3 a, mat3 b)
+mat3 operator*(const mat3& a, const mat3& b)
 {
 	vec3 r0 = row(a, 0);
 	vec3 r1 = row(a, 1);
@@ -101,7 +101,7 @@ mat3 operator*(mat3 a, mat3 b)
 	return result;
 }
 
-mat3 operator+(mat3 a, mat3 b)
+mat3 operator+(const mat3& a, const mat3& b)
 {
 	mat3 result;
 	for (uint32 i = 0; i < 9; ++i)
@@ -111,7 +111,7 @@ mat3 operator+(mat3 a, mat3 b)
 	return result;
 }
 
-mat3& operator+=(mat3& a, mat3 b)
+mat3& operator+=(mat3& a, const mat3& b)
 {
 	for (uint32 i = 0; i < 9; ++i)
 	{
@@ -120,7 +120,7 @@ mat3& operator+=(mat3& a, mat3 b)
 	return a;
 }
 
-mat3 operator-(mat3 a, mat3 b)
+mat3 operator-(const mat3& a, const mat3& b)
 {
 	mat3 result;
 	for (uint32 i = 0; i < 9; ++i)
@@ -151,8 +151,8 @@ mat4 operator*(const mat4& a, const mat4& b)
 }
 
 
-mat2 operator*(mat2 a, float b) { mat2 result; for (uint32 i = 0; i < 4; ++i) { result.m[i] = a.m[i] * b; } return result; }
-mat3 operator*(mat3 a, float b) { mat3 result; for (uint32 i = 0; i < 9; ++i) { result.m[i] = a.m[i] * b; } return result; }
+mat2 operator*(const mat2& a, float b) { mat2 result; for (uint32 i = 0; i < 4; ++i) { result.m[i] = a.m[i] * b; } return result; }
+mat3 operator*(const mat3& a, float b) { mat3 result; for (uint32 i = 0; i < 9; ++i) { result.m[i] = a.m[i] * b; } return result; }
 
 #if ROW_MAJOR
 mat4 operator*(const mat4& a, float b) { mat4 result; for (uint32 i = 0; i < 4; ++i) { result.rows[i] = a.rows[i] * b; } return result; }
@@ -160,16 +160,16 @@ mat4 operator*(const mat4& a, float b) { mat4 result; for (uint32 i = 0; i < 4; 
 mat4 operator*(const mat4& a, float b) { mat4 result; for (uint32 i = 0; i < 4; ++i) { result.cols[i] = a.cols[i] * b; } return result; }
 #endif
 
-mat2 operator*(float a, mat2 b) { return b * a; }
-mat3 operator*(float a, mat3 b) { return b * a; }
-mat4 operator*(float a, mat4 b) { return b * a; }
+mat2 operator*(float a, const mat2& b) { return b * a; }
+mat3 operator*(float a, const mat3& b) { return b * a; }
+mat4 operator*(float a, const mat4& b) { return b * a; }
 
 mat2& operator*=(mat2& a, float b) { a = a * b; return a; }
 mat3& operator*=(mat3& a, float b) { a = a * b; return a; }
 mat4& operator*=(mat4& a, float b) { a = a * b; return a; }
 
 
-mat2 transpose(mat2 a)
+mat2 transpose(const mat2& a)
 {
 	mat2 result;
 	result.m00 = a.m00; result.m01 = a.m10;
@@ -177,7 +177,7 @@ mat2 transpose(mat2 a)
 	return result;
 }
 
-mat3 transpose(mat3 a)
+mat3 transpose(const mat3& a)
 {
 	mat3 result;
 	result.m00 = a.m00; result.m01 = a.m10; result.m02 = a.m20;
@@ -188,11 +188,8 @@ mat3 transpose(mat3 a)
 
 mat4 transpose(const mat4& a)
 {
-	mat4 result;
-	result.m00 = a.m00; result.m01 = a.m10; result.m02 = a.m20; result.m03 = a.m30;
-	result.m10 = a.m01; result.m11 = a.m11; result.m12 = a.m21;	result.m13 = a.m31;
-	result.m20 = a.m02; result.m21 = a.m12; result.m22 = a.m22;	result.m23 = a.m32;
-	result.m30 = a.m03; result.m31 = a.m13; result.m32 = a.m23;	result.m33 = a.m33;
+	mat4 result = a;
+	_MM_TRANSPOSE4_PS(result.f40.f, result.f41.f, result.f42.f, result.f43.f);
 	return result;
 }
 
@@ -377,22 +374,22 @@ vec3 transformDirection(const mat4& m, vec3 dir)
 	return (m * vec4(dir, 0.f)).xyz;
 }
 
-vec3 transformPosition(trs m, vec3 pos)
+vec3 transformPosition(const trs& m, vec3 pos)
 {
 	return m.rotation * (m.scale * pos) + m.position;
 }
 
-vec3 transformDirection(trs m, vec3 dir)
+vec3 transformDirection(const trs& m, vec3 dir)
 {
 	return m.rotation * dir;
 }
 
-vec3 inverseTransformPosition(trs m, vec3 pos)
+vec3 inverseTransformPosition(const trs& m, vec3 pos)
 {
 	return (conjugate(m.rotation) * (pos - m.position)) / m.scale;
 }
 
-vec3 inverseTransformDirection(trs m, vec3 dir)
+vec3 inverseTransformDirection(const trs& m, vec3 dir)
 {
 	return conjugate(m.rotation) * dir;
 }
@@ -556,7 +553,7 @@ mat3 quaternionToMat3(quat q)
 	return result;
 }
 
-quat mat3ToQuaternion(mat3 m)
+quat mat3ToQuaternion(const mat3& m)
 {
 #if 1
 	float tr = m.m00 + m.m11 + m.m22;
@@ -792,7 +789,7 @@ mat4 createOrthographicProjectionMatrix(float r, float l, float t, float b, floa
 	return result;
 }
 
-mat4 invertPerspectiveProjectionMatrix(mat4 m)
+mat4 invertPerspectiveProjectionMatrix(const mat4& m)
 {
 	mat4 inv = mat4::identity;
 	inv.m00 = 1.f / m.m00;
@@ -804,7 +801,7 @@ mat4 invertPerspectiveProjectionMatrix(mat4 m)
 	return inv;
 }
 
-mat4 invertOrthographicProjectionMatrix(mat4 m)
+mat4 invertOrthographicProjectionMatrix(const mat4& m)
 {
 	mat4 inv;
 	inv.m00 = 1.f / m.m00;
@@ -862,10 +859,11 @@ mat4 createViewMatrix(vec3 eye, float pitch, float yaw)
 	return result;
 }
 
-mat4 createSkyViewMatrix(mat4 v)
+mat4 createSkyViewMatrix(const mat4& v)
 {
-	v.m03 = 0.f; v.m13 = 0.f; v.m23 = 0.f;
-	return v;
+	mat4 result = v;
+	result.m03 = 0.f; result.m13 = 0.f; result.m23 = 0.f;
+	return result;
 }
 
 mat4 lookAt(vec3 eye, vec3 target, vec3 up)
@@ -904,7 +902,7 @@ mat4 createViewMatrix(vec3 position, quat rotation)
 	return lookAt(position, target, up);
 }
 
-mat4 invertedAffine(mat4 m)
+mat4 invertedAffine(const mat4& m)
 {
 	vec3 xAxis(m.m00, m.m10, m.m20);
 	vec3 yAxis(m.m01, m.m11, m.m21);

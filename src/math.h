@@ -232,6 +232,13 @@ union mat4
 		vec4 row2;
 		vec4 row3;
 	};
+	struct
+	{
+		floatx4 f40;
+		floatx4 f41;
+		floatx4 f42;
+		floatx4 f43;
+	};
 	vec4 rows[4];
 	float m[16];
 
@@ -323,6 +330,13 @@ union mat4
 		vec4 col2;
 		vec4 col3;
 	};
+	struct
+	{
+		floatx4 f40;
+		floatx4 f41;
+		floatx4 f42;
+		floatx4 f43;
+	};
 	vec4 cols[4];
 	float m[16];
 
@@ -338,13 +352,13 @@ union mat4
 
 static_assert(sizeof(mat4) == 16 * sizeof(float), "");
 
-static vec2 row(mat2 a, uint32 r) { return { a.m[r], a.m[r + 2] }; }
-static vec3 row(mat3 a, uint32 r) { return { a.m[r], a.m[r + 3], a.m[r + 6] }; }
-static vec4 row(mat4 a, uint32 r) { return { a.m[r], a.m[r + 4], a.m[r + 8], a.m[r + 12] }; }
+static vec2 row(const mat2& a, uint32 r) { return { a.m[r], a.m[r + 2] }; }
+static vec3 row(const mat3& a, uint32 r) { return { a.m[r], a.m[r + 3], a.m[r + 6] }; }
+static vec4 row(const mat4& a, uint32 r) { return { a.m[r], a.m[r + 4], a.m[r + 8], a.m[r + 12] }; }
 
-static vec2 col(mat2 a, uint32 c) { return a.cols[c]; }
-static vec3 col(mat3 a, uint32 c) { return a.cols[c]; }
-static vec4 col(mat4 a, uint32 c) { return a.cols[c]; }
+static vec2 col(const mat2& a, uint32 c) { return a.cols[c]; }
+static vec3 col(const mat3& a, uint32 c) { return a.cols[c]; }
+static vec4 col(const mat4& a, uint32 c) { return a.cols[c]; }
 
 #endif
 
@@ -515,25 +529,25 @@ static vec4 lerp(vec4 l, vec4 u, float t) { return l + t * (u - l); }
 static quat lerp(quat l, quat u, float t) { quat result; result.v4 = lerp(l.v4, u.v4, t); return normalize(result); }
 
 
-mat2 operator*(mat2 a, mat2 b);
-mat3 operator*(mat3 a, mat3 b);
-mat3 operator+(mat3 a, mat3 b);
-mat3& operator+=(mat3& a, mat3 b);
-mat3 operator-(mat3 a, mat3 b);
+mat2 operator*(const mat2& a, const mat2& b);
+mat3 operator*(const mat3& a, const mat3& b);
+mat3 operator+(const mat3& a, const mat3& b);
+mat3& operator+=(mat3& a, const mat3& b);
+mat3 operator-(const mat3& a, const mat3& b);
 mat4 operator*(const mat4& a, const mat4& b);
-mat2 operator*(mat2 a, float b);
-mat3 operator*(mat3 a, float b);
+mat2 operator*(const mat2& a, float b);
+mat3 operator*(const mat3& a, float b);
 mat4 operator*(const mat4& a, float b);
-mat2 operator*(float a, mat2 b);
-mat3 operator*(float a, mat3 b);
-mat4 operator*(float a, mat4 b);
+mat2 operator*(float a, const mat2& b);
+mat3 operator*(float a, const mat3& b);
+mat4 operator*(float a, const mat4& b);
 mat2& operator*=(mat2& a, float b);
 mat3& operator*=(mat3& a, float b);
 mat4& operator*=(mat4& a, float b);
 trs operator*(trs a, trs b);
 
-mat2 transpose(mat2 a);
-mat3 transpose(mat3 a);
+mat2 transpose(const mat2& a);
+mat3 transpose(const mat3& a);
 mat4 transpose(const mat4& a);
 
 mat3 invert(const mat3& m);
@@ -541,10 +555,10 @@ mat4 invert(const mat4& m);
 
 vec3 transformPosition(const mat4& m, vec3 pos);
 vec3 transformDirection(const mat4& m, vec3 dir);
-vec3 transformPosition(trs m, vec3 pos);
-vec3 transformDirection(trs m, vec3 dir);
-vec3 inverseTransformPosition(trs m, vec3 pos);
-vec3 inverseTransformDirection(trs m, vec3 dir);
+vec3 transformPosition(const trs& m, vec3 pos);
+vec3 transformDirection(const trs& m, vec3 dir);
+vec3 inverseTransformPosition(const trs& m, vec3 pos);
+vec3 inverseTransformDirection(const trs& m, vec3 dir);
 
 quat rotateFromTo(quat from, quat to);
 quat rotateFromTo(vec3 from, vec3 to);
@@ -556,7 +570,7 @@ quat slerp(quat from, quat to, float t);
 quat nlerp(quat from, quat to, float t);
 
 mat3 quaternionToMat3(quat q);
-quat mat3ToQuaternion(mat3 m);
+quat mat3ToQuaternion(const mat3& m);
 
 vec3 quatToEuler(quat q);
 quat eulerToQuat(vec3 euler);
@@ -567,14 +581,14 @@ mat4 createPerspectiveProjectionMatrix(float fov, float aspect, float nearPlane,
 mat4 createPerspectiveProjectionMatrix(float width, float height, float fx, float fy, float cx, float cy, float nearPlane, float farPlane);
 mat4 createPerspectiveProjectionMatrix(float r, float l, float t, float b, float nearPlane, float farPlane);
 mat4 createOrthographicProjectionMatrix(float r, float l, float t, float b, float nearPlane, float farPlane);
-mat4 invertPerspectiveProjectionMatrix(mat4 m);
-mat4 invertOrthographicProjectionMatrix(mat4 m);
+mat4 invertPerspectiveProjectionMatrix(const mat4& m);
+mat4 invertOrthographicProjectionMatrix(const mat4& m);
 mat4 createModelMatrix(vec3 position, quat rotation, vec3 scale = vec3(1.f, 1.f, 1.f));
 mat4 createViewMatrix(vec3 eye, float pitch, float yaw);
-mat4 createSkyViewMatrix(mat4 v);
+mat4 createSkyViewMatrix(const mat4& v);
 mat4 lookAt(vec3 eye, vec3 target, vec3 up);
 mat4 createViewMatrix(vec3 position, quat rotation);
-mat4 invertedAffine(mat4 m);
+mat4 invertedAffine(const mat4& m);
 
 bool pointInTriangle(vec3 point, vec3 triA, vec3 triB, vec3& triC);
 bool pointInRectangle(vec2 p, vec2 topLeft, vec2 bottomRight);
