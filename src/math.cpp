@@ -492,31 +492,19 @@ quat slerp(quat from, quat to, float t)
 	return normalize(quat(newX, newY, newZ, newW));
 }
 
-quat nlerp(quat from, quat to, float t)
+quat nlerp(quat* qs, float* weights, uint32 count)
 {
-	quat result;
-	float d = dot(from.v4, to.v4);
-	float blendI = 1.f - t;
-	if (d < 0.f)
+	vec4 v0 = qs[0].v4;
+	vec4 result = v0 * weights[0];
+
+	for (uint32 i = 1; i < count; ++i)
 	{
-		quat tmpF;
-		tmpF.w = -to.w;
-		tmpF.x = -to.x;
-		tmpF.y = -to.y;
-		tmpF.z = -to.z;
-		result.w = blendI * from.w + t * tmpF.w;
-		result.x = blendI * from.x + t * tmpF.x;
-		result.y = blendI * from.y + t * tmpF.y;
-		result.z = blendI * from.z + t * tmpF.z;
+		vec4 v1 = qs[i].v4;
+		if (dot(v0, v1) < 0.f) { v1 = -v1; }
+		result += v1 * weights[i];
 	}
-	else
-	{
-		result.w = blendI * from.w + t * to.w;
-		result.x = blendI * from.x + t * to.x;
-		result.y = blendI * from.y + t * to.y;
-		result.z = blendI * from.z + t * to.z;
-	}
-	return normalize(result);
+
+	return { result.f4 };
 }
 
 mat3 quaternionToMat3(quat q)

@@ -567,7 +567,7 @@ void getAxisRotation(quat q, vec3& axis, float& angle);
 void decomposeQuaternionIntoTwistAndSwing(quat q, vec3 normalizedTwistAxis, quat& twist, quat& swing);
 
 quat slerp(quat from, quat to, float t);
-quat nlerp(quat from, quat to, float t);
+quat nlerp(quat* qs, float* weights, uint32 count);
 
 mat3 quaternionToMat3(quat q);
 quat mat3ToQuaternion(const mat3& m);
