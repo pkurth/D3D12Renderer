@@ -24,6 +24,7 @@ struct application
 
 	void setEnvironment(const std::string& filename);
 
+	void handleFileDrop(const std::string& filename);
 	void serializeToFile();
 	bool deserializeFromFile();
 

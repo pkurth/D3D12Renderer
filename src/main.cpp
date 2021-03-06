@@ -327,6 +327,8 @@ int main(int argc, char** argv)
 	application app = {};
 	app.loadCustomShaders();
 
+	window.setFileDropCallback([&app](const std::string& s) { app.handleFileDrop(s); });
+
 	initializeTransformationGizmos();
 	dx_renderer::initializeCommon(screenFormat);
 

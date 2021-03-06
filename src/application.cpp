@@ -15,6 +15,9 @@
 #define STB_RECT_PACK_IMPLEMENTATION
 #include <imgui/imstb_rectpack.h>
 
+#include <filesystem>
+namespace fs = std::filesystem;
+
 struct raster_component
 {
 	ref<composite_mesh> mesh;
@@ -1063,6 +1066,20 @@ void application::setEnvironment(const std::string& filename)
 	}
 }
 
+void application::handleFileDrop(const std::string& filename)
+{
+	fs::path path = filename;
+	fs::path relative = fs::relative(path, fs::current_path());
+
+	auto mesh = loadMeshFromFile(relative.string());
+	if (mesh)
+	{
+		appScene.createEntity("Dropped mesh")
+			.addComponent<trs>(vec3(0.f), quat::identity)
+			.addComponent<raster_component>(mesh);
+	}
+}
+
 
 
 
@@ -1070,8 +1087,6 @@ void application::setEnvironment(const std::string& filename)
 
 #include <yaml-cpp/yaml.h>
 #include <fstream>
-#include <filesystem>
-namespace fs = std::filesystem;
 
 
 static YAML::Emitter& operator<<(YAML::Emitter& out, const vec2& v)

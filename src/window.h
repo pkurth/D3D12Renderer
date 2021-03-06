@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 
 struct win32_window
 {
@@ -14,6 +15,7 @@ struct win32_window
 
 	virtual void swapBuffers() = 0;
 	virtual void toggleFullscreen();
+	void setFileDropCallback(std::function<void(const std::string&)> cb);
 
 	// Internal callbacks.
 	virtual void onResize() {}
@@ -39,6 +41,8 @@ struct win32_window
 	bool fullscreen;
 	bool open;
 	bool visible;
+
+	std::function<void(const std::string&)> fileDropCallback;
 
 	static win32_window* mainWindow;
 };
