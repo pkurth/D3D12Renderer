@@ -79,11 +79,6 @@ private:
 
 struct scene
 {
-	void reset()
-	{
-		registry.clear();
-	}
-
 	scene_entity createEntity(const char* name)
 	{
 		return scene_entity(registry.create(), &registry)
