@@ -10,6 +10,7 @@
 #include "threading.h"
 #include "mesh_shader.h"
 #include "shadow_map_cache.h"
+#include "file_dialog.h"
 
 #define STB_RECT_PACK_IMPLEMENTATION
 #include <imgui/imstb_rectpack.h>
@@ -1051,7 +1052,7 @@ void application::update(const user_input& input, float dt)
 	}
 }
 
-void application::setEnvironment(const char* filename)
+void application::setEnvironment(const std::string& filename)
 {
 	environment = createEnvironment(filename); // Currently synchronous (on render queue).
 	pathTracer.numAveragedFrames = 0;
@@ -1102,46 +1103,61 @@ namespace YAML
 	template<> 
 	struct convert<vec2>
 	{
-		static Node encode(const vec2& v) { Node n; n.push_back(v.x); n.push_back(v.y); return n; }
 		static bool decode(const Node& n, vec2& v) { if (!n.IsSequence() || n.size() != 2) return false; v.x = n[0].as<float>(); v.y = n[1].as<float>(); return true; }
 	};
 
 	template<>
 	struct convert<vec3>
 	{
-		static Node encode(const vec3& v) { Node n; n.push_back(v.x); n.push_back(v.y); n.push_back(v.z); return n; }
 		static bool decode(const Node& n, vec3& v) { if (!n.IsSequence() || n.size() != 3) return false; v.x = n[0].as<float>(); v.y = n[1].as<float>(); v.z = n[2].as<float>(); return true; }
 	};
 
 	template<>
 	struct convert<vec4>
 	{
-		static Node encode(const vec4& v) { Node n; n.push_back(v.x); n.push_back(v.y); n.push_back(v.z); n.push_back(v.w); return n; }
 		static bool decode(const Node& n, vec4& v) { if (!n.IsSequence() || n.size() != 4) return false; v.x = n[0].as<float>(); v.y = n[1].as<float>(); v.z = n[2].as<float>(); v.w = n[3].as<float>(); return true; }
 	};
 
 	template<>
 	struct convert<quat>
 	{
-		static Node encode(const quat& v) { return convert<vec4>::encode(v.v4); }
 		static bool decode(const Node& n, quat& v) { return convert<vec4>::decode(n, v.v4); }
 	};
 }
 
-void application::serializeToFile(const char* filename)
+void application::serializeToFile()
 {
+	std::string filename = saveFileDialog("Scene files", "sc");
+	if (filename.empty())
+	{
+		return;
+	}
+
 	YAML::Emitter out;
 	out << YAML::BeginMap;
 	out << YAML::Key << "Scene" << YAML::Value << "My scene";
 
 	out << YAML::Key << "Camera"
 		<< YAML::Value
-			<< YAML::BeginMap
-				<< YAML::Key << "Position" << YAML::Value << camera.position
-				<< YAML::Key << "Rotation" << YAML::Value << camera.rotation
-				<< YAML::Key << "Near Plane" << YAML::Value << camera.nearPlane
-				<< YAML::Key << "Far Plane" << YAML::Value << camera.farPlane
-			<< YAML::EndMap;
+		<< YAML::BeginMap
+			<< YAML::Key << "Position" << YAML::Value << camera.position
+			<< YAML::Key << "Rotation" << YAML::Value << camera.rotation
+			<< YAML::Key << "Near Plane" << YAML::Value << camera.nearPlane
+			<< YAML::Key << "Far Plane" << YAML::Value << camera.farPlane
+			<< YAML::Key << "Type" << YAML::Value << camera.type;
+	if (camera.type == camera_type_ingame)
+	{
+		out << YAML::Key << "FOV" << YAML::Value << camera.verticalFOV;
+	}
+	else
+	{
+		out << YAML::Key << "Fx" << YAML::Value << camera.fx
+			<< YAML::Key << "Fy" << YAML::Value << camera.fy
+			<< YAML::Key << "Cx" << YAML::Value << camera.cx
+			<< YAML::Key << "Cy" << YAML::Value << camera.cy;
+	}
+	out	<< YAML::EndMap;
+
 
 	out << YAML::Key << "Tone Map"
 		<< YAML::Value
@@ -1156,6 +1172,7 @@ void application::serializeToFile(const char* filename)
 				<< YAML::Key << "Exposure" << YAML::Value << renderer->settings.tonemap.exposure
 			<< YAML::EndMap;
 
+
 	out << YAML::Key << "Sun" 
 		<< YAML::Value 
 			<< YAML::BeginMap
@@ -1168,11 +1185,69 @@ void application::serializeToFile(const char* filename)
 				<< YAML::Key << "Blend Distances" << YAML::Value << sun.blendDistances
 			<< YAML::EndMap;
 
-	out << YAML::Key << "Lighting"
+
+	out << YAML::Key << "Environment"
 		<< YAML::Value
 			<< YAML::BeginMap
-				<< YAML::Key << "Environment Intensity" << renderer->settings.environmentIntensity
+				<< YAML::Key << "Name" << YAML::Value << environment->name
+				<< YAML::Key << "Intensity" << renderer->settings.environmentIntensity
 			<< YAML::EndMap;
+
+	out << YAML::Key << "Entities"
+		<< YAML::Value
+		<< YAML::BeginSeq;
+
+	appScene.forEachEntity([this, &out](entt::entity entityID)
+	{
+		scene_entity entity = { entityID, appScene };
+		
+		out << YAML::BeginMap;
+
+		tag_component& tag = entity.getComponent<tag_component>();
+		out << YAML::Key << "Tag" << YAML::Value << tag.name;
+
+		if (entity.hasComponent<trs>())
+		{
+			trs& transform = entity.getComponent<trs>();
+			out << YAML::Key << "Transform" << YAML::Value
+				<< YAML::BeginMap
+					<< YAML::Key << "Rotation" << YAML::Value << transform.rotation
+					<< YAML::Key << "Position" << YAML::Value << transform.position
+					<< YAML::Key << "Scale" << YAML::Value << transform.scale
+				<< YAML::EndMap;
+		}
+
+		if (entity.hasComponent<raster_component>())
+		{
+			raster_component& raster = entity.getComponent<raster_component>();
+			out << YAML::Key << "Raster" << YAML::Value
+				<< YAML::BeginMap 
+					<< YAML::Key << "Mesh" << YAML::Value << raster.mesh->filepath
+					<< YAML::Key << "Flags" << YAML::Value << raster.mesh->flags
+					<< YAML::Key << "Animation files" << YAML::Value << YAML::BeginSeq;
+
+			for (const std::string& s : raster.mesh->skeleton.files)
+			{
+				out << s;
+			}
+
+			out		<< YAML::EndSeq
+				<< YAML::EndMap;
+		}
+
+		if (entity.hasComponent<animation_component>())
+		{
+			animation_component& anim = entity.getComponent<animation_component>();
+			out << YAML::Key << "Animation" << YAML::Value
+				<< YAML::BeginMap 
+					<< YAML::Key << "Time" << YAML::Value << anim.time
+				<< YAML::EndMap;
+		}
+
+		out << YAML::EndMap;
+	});
+
+	out << YAML::EndSeq;
 
 	out << YAML::EndMap;
 
@@ -1182,14 +1257,22 @@ void application::serializeToFile(const char* filename)
 	fout << out.c_str();
 }
 
-bool application::deserializeFromFile(const char* filename)
+bool application::deserializeFromFile()
 {
+	std::string filename = openFileDialog("Scene files", "sc");
+	if (filename.empty())
+	{
+		return false;
+	}
+
 	std::ifstream stream(filename);
 	YAML::Node data = YAML::Load(stream);
 	if (!data["Scene"])
 	{
 		return false;
 	}
+
+	appScene = scene();
 
 	std::string sceneName = data["Scene"].as<std::string>();
 
@@ -1198,6 +1281,18 @@ bool application::deserializeFromFile(const char* filename)
 	camera.rotation = cameraNode["Rotation"].as<quat>();
 	camera.nearPlane = cameraNode["Near Plane"].as<float>();
 	camera.farPlane = cameraNode["Far Plane"].as<float>();
+	camera.type = (camera_type)cameraNode["Type"].as<int>();
+	if (camera.type == camera_type_ingame)
+	{
+		camera.verticalFOV = cameraNode["FOV"].as<float>();
+	}
+	else
+	{
+		camera.fx = cameraNode["Fx"].as<float>();
+		camera.fy = cameraNode["Fy"].as<float>();
+		camera.cx = cameraNode["Cx"].as<float>();
+		camera.cy = cameraNode["Cy"].as<float>();
+	}
 
 	auto tonemapNode = data["Tone Map"];
 	renderer->settings.tonemap.A = tonemapNode["A"].as<float>();
@@ -1216,10 +1311,44 @@ bool application::deserializeFromFile(const char* filename)
 	sun.numShadowCascades = sunNode["Cascades"].as<decltype(sun.numShadowCascades)>();
 	sun.cascadeDistances = sunNode["Distances"].as<decltype(sun.cascadeDistances)>();
 	sun.bias = sunNode["Bias"].as<decltype(sun.bias)>();
-	sun.blendDistances = sunNode["Blend Area"].as<decltype(sun.blendDistances)>();
+	sun.blendDistances = sunNode["Blend Distances"].as<decltype(sun.blendDistances)>();
 
-	auto lightingNode = data["Lighting"];
-	renderer->settings.environmentIntensity = lightingNode["Environment Intensity"].as<float>();
+	auto environmentNode = data["Environment"];
+	setEnvironment(environmentNode["Name"].as<std::string>());
+	renderer->settings.environmentIntensity = environmentNode["Intensity"].as<float>();
+
+	auto entitiesNode = data["Entities"];
+	for (auto entityNode : entitiesNode)
+	{
+		std::string name = entityNode["Tag"].as<std::string>();
+		scene_entity entity = appScene.createEntity(name.c_str());
+
+		if (entityNode["Transform"])
+		{
+			auto transformNode = entityNode["Transform"];
+			entity.addComponent<trs>(transformNode["Position"].as<vec3>(), transformNode["Rotation"].as<quat>(), transformNode["Scale"].as<vec3>());
+		}
+
+		if (entityNode["Raster"])
+		{
+			auto rasterNode = entityNode["Raster"];
+			auto mesh = loadMeshFromFile(rasterNode["Mesh"].as<std::string>(), rasterNode["Flags"].as<uint32>());
+
+			auto animationsNode = rasterNode["Animation files"];
+			for (auto file : animationsNode)
+			{
+				mesh->skeleton.pushAssimpAnimations(file.as<std::string>());
+			}
+
+			entity.addComponent<raster_component>(mesh);
+		}
+
+		if (entityNode["Animation"])
+		{
+			auto animNode = entityNode["Animation"];
+			entity.addComponent<animation_component>(animNode["Time"].as<float>());
+		}
+	}
 
 	return true;
 }

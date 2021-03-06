@@ -22,10 +22,10 @@ struct application
 	void initialize(dx_renderer* renderer);
 	void update(const user_input& input, float dt);
 
-	void setEnvironment(const char* filename);
+	void setEnvironment(const std::string& filename);
 
-	void serializeToFile(const char* filename);
-	bool deserializeFromFile(const char* filename);
+	void serializeToFile();
+	bool deserializeFromFile();
 
 private:
 	void setSelectedEntityEulerRotation();

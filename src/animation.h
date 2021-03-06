@@ -58,6 +58,8 @@ struct animation_skeleton
 	std::vector<animation_clip> clips;
 	std::unordered_map<std::string, uint32> nameToClipID;
 
+	std::vector<std::string> files;
+
 	void loadFromAssimp(const struct aiScene* scene, float scale = 1.f);
 	void pushAssimpAnimation(const std::string& suffix, const struct aiAnimation* animation, float scale = 1.f);
 	void pushAssimpAnimations(const std::string& sceneFilename, float scale = 1.f);

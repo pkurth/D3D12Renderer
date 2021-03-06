@@ -79,6 +79,11 @@ private:
 
 struct scene
 {
+	void reset()
+	{
+		registry.clear();
+	}
+
 	scene_entity createEntity(const char* name)
 	{
 		return scene_entity(registry.create(), &registry)
@@ -100,6 +105,12 @@ struct scene
 	auto group(entt::get_t<Get...>, entt::exclude_t<Exclude...> = {})
 	{
 		return registry.group<owned_component_t...>(entt::get<Get...>, entt::exclude<Exclude...>);
+	}
+
+	template <typename func_t>
+	void forEachEntity(func_t func)
+	{
+		registry.each(func);
 	}
 
 private:

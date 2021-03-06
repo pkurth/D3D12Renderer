@@ -91,6 +91,8 @@ void animation_skeleton::pushAssimpAnimations(const std::string& sceneFilename, 
 		{
 			pushAssimpAnimation(sceneFilename, scene->mAnimations[i], scale);
 		}
+
+		files.push_back(sceneFilename);
 	}
 }
 

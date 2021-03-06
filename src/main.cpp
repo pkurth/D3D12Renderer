@@ -128,12 +128,12 @@ static bool drawMainMenuBar(application& app)
 		{
 			if (ImGui::MenuItem(ICON_FA_SAVE "  Save scene"))
 			{
-				app.serializeToFile("assets/scenes/scene.sc");
+				app.serializeToFile();
 			}
 
 			if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN "  Load scene"))
 			{
-				app.deserializeFromFile("assets/scenes/scene.sc");
+				app.deserializeFromFile();
 			}
 
 			ImGui::Separator();
@@ -449,7 +449,7 @@ int main(int argc, char** argv)
 			break;
 		}
 
-		drawFileBrowser(app);
+		//drawFileBrowser(app);
 
 		fenceValues[window.currentBackbufferIndex] = renderToMainWindow(window);
 

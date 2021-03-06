@@ -83,7 +83,6 @@ static ref<composite_mesh> loadMeshFromFileInternal(const std::string& sceneFile
 
 	result->mesh = cpuMesh.createDXMesh();
 
-	return result;
 	result->filepath = sceneFilename;
 	result->flags = flags;
 	return result;
@@ -93,12 +92,10 @@ ref<composite_mesh> loadMeshFromFile(const std::string& sceneFilename, uint32 fl
 {
 	mutex.lock();
 
-	const std::string& s = sceneFilename;
-
-	auto sp = meshCache[s].lock();
+	auto sp = meshCache[sceneFilename].lock();
 	if (!sp)
 	{
-		meshCache[s] = sp = loadMeshFromFileInternal(s, flags);
+		meshCache[sceneFilename] = sp = loadMeshFromFileInternal(sceneFilename, flags);
 	}
 
 	mutex.unlock();

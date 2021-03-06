@@ -60,18 +60,18 @@ static bool operator==(const material_key& a, const material_key& b)
 		&& a.metallicOverride == b.metallicOverride;
 }
 
-ref<pbr_material> createPBRMaterial(const char* albedoTex, const char* normalTex, const char* roughTex, const char* metallicTex, const vec4& emission, const vec4& albedoTint, float roughOverride, float metallicOverride)
+ref<pbr_material> createPBRMaterial(const std::string& albedoTex, const std::string& normalTex, const std::string& roughTex, const std::string& metallicTex, const vec4& emission, const vec4& albedoTint, float roughOverride, float metallicOverride)
 {
 	material_key s =
 	{
-		albedoTex	? albedoTex		: "",
-		normalTex	? normalTex		: "",
-		roughTex	? roughTex		: "",
-		metallicTex ? metallicTex	: "",
+		!albedoTex.empty()	? albedoTex		: "",
+		!normalTex.empty() ? normalTex		: "",
+		!roughTex.empty() ? roughTex		: "",
+		!metallicTex.empty() ? metallicTex	: "",
 		emission,
 		albedoTint,
-		roughTex ? 1.f : roughOverride,			// If texture is set, override does not matter, so set it to consistent value.
-		metallicTex ? 0.f : metallicOverride,	// If texture is set, override does not matter, so set it to consistent value.
+		!roughTex.empty() ? 1.f : roughOverride,			// If texture is set, override does not matter, so set it to consistent value.
+		!metallicTex.empty() ? 0.f : metallicOverride,	// If texture is set, override does not matter, so set it to consistent value.
 	};
 
 
@@ -85,10 +85,10 @@ ref<pbr_material> createPBRMaterial(const char* albedoTex, const char* normalTex
 	{
 		ref<pbr_material> material = make_ref<pbr_material>();
 
-		if (albedoTex) material->albedo = loadTextureFromFile(albedoTex);
-		if (normalTex) material->normal = loadTextureFromFile(normalTex, texture_load_flags_default | texture_load_flags_noncolor);
-		if (roughTex) material->roughness = loadTextureFromFile(roughTex, texture_load_flags_default | texture_load_flags_noncolor);
-		if (metallicTex) material->metallic = loadTextureFromFile(metallicTex, texture_load_flags_default | texture_load_flags_noncolor);
+		if (!albedoTex.empty()) material->albedo = loadTextureFromFile(albedoTex);
+		if (!normalTex.empty()) material->normal = loadTextureFromFile(normalTex, texture_load_flags_default | texture_load_flags_noncolor);
+		if (!roughTex.empty()) material->roughness = loadTextureFromFile(roughTex, texture_load_flags_default | texture_load_flags_noncolor);
+		if (!metallicTex.empty()) material->metallic = loadTextureFromFile(metallicTex, texture_load_flags_default | texture_load_flags_noncolor);
 		material->emission = emission;
 		material->albedoTint = albedoTint;
 		material->roughnessOverride = roughOverride;
@@ -107,16 +107,14 @@ ref<pbr_material> getDefaultPBRMaterial()
 	return material;
 }
 
-ref<pbr_environment> createEnvironment(const char* filename, uint32 skyResolution, uint32 environmentResolution, uint32 irradianceResolution, bool asyncCompute)
+ref<pbr_environment> createEnvironment(const std::string& filename, uint32 skyResolution, uint32 environmentResolution, uint32 irradianceResolution, bool asyncCompute)
 {
 	static std::unordered_map<std::string, weakref<pbr_environment>> cache;
 	static std::mutex mutex;
 
 	mutex.lock();
 
-	std::string s = filename;
-
-	auto sp = cache[s].lock();
+	auto sp = cache[filename].lock();
 	if (!sp)
 	{
 		ref<dx_texture> equiSky = loadTextureFromFile(filename,
@@ -146,9 +144,11 @@ ref<pbr_environment> createEnvironment(const char* filename, uint32 skyResolutio
 			SET_NAME(environment->environment->resource, "Environment");
 			SET_NAME(environment->irradiance->resource, "Irradiance");
 
+			environment->name = filename;
+
 			dxContext.executeCommandList(cl);
 
-			cache[s] = sp = environment;
+			cache[filename] = sp = environment;
 		}
 	}
 

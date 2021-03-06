@@ -34,12 +34,14 @@ struct pbr_environment
 	ref<dx_texture> sky;
 	ref<dx_texture> environment;
 	ref<dx_texture> irradiance;
+
+	std::string name;
 };
 
-ref<pbr_material> createPBRMaterial(const char* albedoTex, const char* normalTex, const char* roughTex, const char* metallicTex, 
+ref<pbr_material> createPBRMaterial(const std::string& albedoTex, const std::string& normalTex, const std::string& roughTex, const std::string& metallicTex,
 	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f);
 
 ref<pbr_material> getDefaultPBRMaterial();
 
-ref<pbr_environment> createEnvironment(const char* filename, uint32 skyResolution = 2048, uint32 environmentResolution = 128, uint32 irradianceResolution = 32, bool asyncCompute = false);
+ref<pbr_environment> createEnvironment(const std::string& filename, uint32 skyResolution = 2048, uint32 environmentResolution = 128, uint32 irradianceResolution = 32, bool asyncCompute = false);
 
