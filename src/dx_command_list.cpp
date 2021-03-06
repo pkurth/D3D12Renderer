@@ -147,58 +147,14 @@ void dx_command_list::setCompute32BitConstants(uint32 rootParameterIndex, uint32
 	commandList->SetComputeRoot32BitConstants(rootParameterIndex, numConstants, constants, 0);
 }
 
-dx_allocation dx_command_list::allocateDynamicBuffer(uint32 sizeInBytes, uint32 alignment)
-{
-	dx_allocation allocation = uploadBuffer.allocate(sizeInBytes, alignment);
-	return allocation;
-}
-
-dx_dynamic_constant_buffer dx_command_list::uploadDynamicConstantBuffer(uint32 sizeInBytes, const void* data)
-{
-	dx_allocation allocation = allocateDynamicBuffer(sizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-	memcpy(allocation.cpuPtr, data, sizeInBytes);
-	return { allocation.gpuPtr, allocation.cpuPtr };
-}
-
-dx_dynamic_constant_buffer dx_command_list::uploadAndSetGraphicsDynamicConstantBuffer(uint32 rootParameterIndex, uint32 sizeInBytes, const void* data)
-{
-	dx_dynamic_constant_buffer address = uploadDynamicConstantBuffer(sizeInBytes, data);
-	commandList->SetGraphicsRootConstantBufferView(rootParameterIndex, address.gpuPtr);
-	return address;
-}
-
 void dx_command_list::setGraphicsDynamicConstantBuffer(uint32 rootParameterIndex, dx_dynamic_constant_buffer address)
 {
 	commandList->SetGraphicsRootConstantBufferView(rootParameterIndex, address.gpuPtr);
 }
 
-dx_dynamic_constant_buffer dx_command_list::uploadAndSetComputeDynamicConstantBuffer(uint32 rootParameterIndex, uint32 sizeInBytes, const void* data)
-{
-	dx_dynamic_constant_buffer address = uploadDynamicConstantBuffer(sizeInBytes, data);
-	commandList->SetComputeRootConstantBufferView(rootParameterIndex, address.gpuPtr);
-	return address;
-}
-
 void dx_command_list::setComputeDynamicConstantBuffer(uint32 rootParameterIndex, dx_dynamic_constant_buffer address)
 {
 	commandList->SetComputeRootConstantBufferView(rootParameterIndex, address.gpuPtr);
-}
-
-dx_dynamic_vertex_buffer dx_command_list::createDynamicVertexBuffer(uint32 elementSize, uint32 elementCount, void* data)
-{
-	uint32 sizeInBytes = elementSize * elementCount;
-	dx_allocation allocation = allocateDynamicBuffer(sizeInBytes, elementSize);
-	if (data)
-	{
-		memcpy(allocation.cpuPtr, data, sizeInBytes);
-	}
-
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView = {};
-	vertexBufferView.BufferLocation = allocation.gpuPtr;
-	vertexBufferView.SizeInBytes = sizeInBytes;
-	vertexBufferView.StrideInBytes = elementSize;
-
-	return { vertexBufferView };
 }
 
 void dx_command_list::setRootGraphicsUAV(uint32 rootParameterIndex, const ref<dx_buffer>& buffer)
@@ -590,6 +546,5 @@ void dx_command_list::reset()
 		descriptorHeaps[i] = 0;
 	}
 
-	uploadBuffer.reset();
 	dynamicDescriptorHeap.reset();
 }

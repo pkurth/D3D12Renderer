@@ -342,10 +342,6 @@ dx_command_list* dx_context::getFreeCommandList(dx_command_queue& queue)
 		atomicIncrement(queue.totalNumCommandLists);
 	}
 
-	mutex.lock();
-	result->uploadBuffer.pagePool = &pagePools[bufferedFrameID];
-	mutex.unlock();
-
 #if ENABLE_DX_PROFILING
 	result->timeStampQueryHeap = timestampHeaps[bufferedFrameID].heap;
 #endif
@@ -406,6 +402,23 @@ dx_dynamic_constant_buffer dx_context::uploadDynamicConstantBuffer(uint32 sizeIn
 	dx_allocation allocation = allocateDynamicBuffer(sizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 	memcpy(allocation.cpuPtr, data, sizeInBytes);
 	return { allocation.gpuPtr, allocation.cpuPtr };
+}
+
+dx_dynamic_vertex_buffer dx_context::createDynamicVertexBuffer(uint32 elementSize, uint32 elementCount, const void* data)
+{
+	uint32 sizeInBytes = elementSize * elementCount;
+	dx_allocation allocation = allocateDynamicBuffer(sizeInBytes, elementSize);
+	if (data)
+	{
+		memcpy(allocation.cpuPtr, data, sizeInBytes);
+	}
+
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView = {};
+	vertexBufferView.BufferLocation = allocation.gpuPtr;
+	vertexBufferView.SizeInBytes = sizeInBytes;
+	vertexBufferView.StrideInBytes = elementSize;
+
+	return { vertexBufferView };
 }
 
 dx_memory_usage dx_context::getMemoryUsage()

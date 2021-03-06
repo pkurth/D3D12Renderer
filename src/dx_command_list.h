@@ -24,7 +24,6 @@ struct dx_command_list
 	uint64 lastExecutionFenceValue;
 	dx_command_list* next;
 
-	dx_upload_buffer uploadBuffer;
 	dx_dynamic_descriptor_heap dynamicDescriptorHeap;
 
 	dx_query_heap timeStampQueryHeap;
@@ -74,22 +73,8 @@ struct dx_command_list
 	void setCompute32BitConstants(uint32 rootParameterIndex, uint32 numConstants, const void* constants);
 	template<typename T> void setCompute32BitConstants(uint32 rootParameterIndex, const T& constants);
 
-	dx_allocation allocateDynamicBuffer(uint32 sizeInBytes, uint32 alignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-
-	dx_dynamic_constant_buffer uploadDynamicConstantBuffer(uint32 sizeInBytes, const void* data);
-	template <typename T> dx_dynamic_constant_buffer uploadDynamicConstantBuffer(const T& data);
-
-	dx_dynamic_constant_buffer uploadAndSetGraphicsDynamicConstantBuffer(uint32 rootParameterIndex, uint32 sizeInBytes, const void* data);
-	template <typename T> dx_dynamic_constant_buffer uploadAndSetGraphicsDynamicConstantBuffer(uint32 rootParameterIndex, const T& data);
-
 	void setGraphicsDynamicConstantBuffer(uint32 rootParameterIndex, dx_dynamic_constant_buffer address);
-
-	dx_dynamic_constant_buffer uploadAndSetComputeDynamicConstantBuffer(uint32 rootParameterIndex, uint32 sizeInBytes, const void* data);
-	template <typename T> dx_dynamic_constant_buffer uploadAndSetComputeDynamicConstantBuffer(uint32 rootParameterIndex, const T& data);
-
 	void setComputeDynamicConstantBuffer(uint32 rootParameterIndex, dx_dynamic_constant_buffer address);
-
-	dx_dynamic_vertex_buffer createDynamicVertexBuffer(uint32 elementSize, uint32 elementCount, void* data);
 
 	void setRootGraphicsUAV(uint32 rootParameterIndex, const ref<dx_buffer>& buffer);
 	void setRootGraphicsUAV(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS address);
@@ -223,19 +208,4 @@ void dx_command_list::setCompute32BitConstants(uint32 rootParameterIndex, const 
 {
 	static_assert(sizeof(T) % 4 == 0, "Size of type must be a multiple of 4 bytes.");
 	setCompute32BitConstants(rootParameterIndex, sizeof(T) / 4, &constants);
-}
-
-template <typename T> dx_dynamic_constant_buffer dx_command_list::uploadDynamicConstantBuffer(const T& data)
-{
-	return uploadDynamicConstantBuffer(sizeof(T), &data);
-}
-
-template <typename T> dx_dynamic_constant_buffer dx_command_list::uploadAndSetGraphicsDynamicConstantBuffer(uint32 rootParameterIndex, const T& data)
-{
-	return uploadAndSetGraphicsDynamicConstantBuffer(rootParameterIndex, sizeof(T), &data);
-}
-
-template <typename T> dx_dynamic_constant_buffer dx_command_list::uploadAndSetComputeDynamicConstantBuffer(uint32 rootParameterIndex, const T& data)
-{
-	return uploadAndSetComputeDynamicConstantBuffer(rootParameterIndex, sizeof(T), &data);
 }

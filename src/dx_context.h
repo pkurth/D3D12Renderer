@@ -38,6 +38,12 @@ struct dx_context
 		return uploadDynamicConstantBuffer(sizeof(T), &data);
 	}
 
+	dx_dynamic_vertex_buffer createDynamicVertexBuffer(uint32 elementSize, uint32 elementCount, const void* data);
+	template <typename T> dx_dynamic_vertex_buffer createDynamicVertexBuffer(const T* data, uint32 count)
+	{
+		return createDynamicVertexBuffer((uint32)sizeof(T), count, data);
+	}
+
 	dx_memory_usage getMemoryUsage();
 
 
