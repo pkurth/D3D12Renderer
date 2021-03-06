@@ -111,7 +111,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 		SET_NAME(blackCubeTexture->resource, "Black cube");
 	}
 	{
-		noiseTexture = loadTextureFromFile("assets/textures/noise/blue_noise.dds", texture_load_flags_noncolor); // Already compressed and in DDS format.
+		noiseTexture = loadTextureFromFile("assets/noise/blue_noise.dds", texture_load_flags_noncolor); // Already compressed and in DDS format.
 	}
 
 	nullTextureSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createNullTextureSRV();
