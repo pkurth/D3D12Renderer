@@ -921,7 +921,7 @@ void application::update(const user_input& input, float dt)
 			auto [vb, vertexOffset, skinningMatrices] = skinObject(mesh.vertexBuffer, (uint32)skeleton.joints.size());
 
 			mat4* mats = skinningMatrices;
-			addWorkToJobSystem(context, [&skeleton, &anim, mats]()
+			context.addWork([&skeleton, &anim, mats]()
 			{
 				trs localTransforms[128];
 				skeleton.sampleAnimation(skeleton.clips[anim.animationIndex].name, anim.time, localTransforms);
@@ -1017,7 +1017,7 @@ void application::update(const user_input& input, float dt)
 		});
 
 
-		waitForWorkCompletion(context);
+		context.waitForWorkCompletion();
 		submitRenderPasses(numSpotShadowRenderPasses, numPointShadowRenderPasses);
 
 

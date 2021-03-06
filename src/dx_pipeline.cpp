@@ -369,21 +369,21 @@ void createAllPendingReloadablePipelines()
 	thread_job_context context;
 	for (int i = rsOffset; i < rootSignaturesFromFiles.size(); ++i)
 	{
-		addWorkToJobSystem(context, [i]()
+		context.addWork([i]()
 		{
 			loadRootSignature(rootSignaturesFromFiles[i]);
 		});
 	}
-	waitForWorkCompletion(context);
+	context.waitForWorkCompletion();
 
 	for (int i = rsOffset; i < rootSignaturesFromFiles.size(); ++i)
 	{
-		addWorkToJobSystem(context, [i]()
+		context.addWork([i]()
 		{
 			loadPipeline(pipelines[i]);
 		});
 	}
-	waitForWorkCompletion(context);
+	context.waitForWorkCompletion();
 
 	rsOffset = (int)rootSignaturesFromFiles.size();
 	pipelineOffset = (int)pipelines.size();
@@ -398,21 +398,21 @@ void checkForChangedPipelines()
 	thread_job_context context;
 	for (uint32 i = 0; i < (uint32)dirtyRootSignatures.size(); ++i)
 	{
-		addWorkToJobSystem(context, [i]()
+		context.addWork([i]()
 		{
 			loadRootSignature(*dirtyRootSignatures[i]);
 		});
 	}
-	waitForWorkCompletion(context);
+	context.waitForWorkCompletion();
 
 	for (uint32 i = 0; i < (uint32)dirtyPipelines.size(); ++i)
 	{
-		addWorkToJobSystem(context, [i]()
+		context.addWork([i]()
 		{
 			loadPipeline(*dirtyPipelines[i]);
 		});
 	}
-	waitForWorkCompletion(context);
+	context.waitForWorkCompletion();
 
 	dirtyRootSignatures.clear();
 	dirtyPipelines.clear();

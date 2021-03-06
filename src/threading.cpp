@@ -100,12 +100,12 @@ void initializeJobSystem()
 	}
 }
 
-void addWorkToJobSystem(thread_job_context& context, const std::function<void()>& cb)
+void thread_job_context::addWork(const std::function<void()>& cb)
 {
 	work_queue_entry entry;
 	entry.callback = cb;
-	entry.context = &context;
-	atomicIncrement(context.numJobs);
+	entry.context = this;
+	atomicIncrement(numJobs);
 
 	while (!queue.push_back(entry))
 	{
@@ -115,15 +115,14 @@ void addWorkToJobSystem(thread_job_context& context, const std::function<void()>
 	ReleaseSemaphore(semaphoreHandle, 1, 0);
 }
 
-void waitForWorkCompletion(thread_job_context& context)
+void thread_job_context::waitForWorkCompletion()
 {
-	while (context.numJobs)
+	while (numJobs)
 	{
 		if (!performWork())
 		{
-			while (context.numJobs) {}
+			while (numJobs) {}
 			break;
 		}
 	}
 }
-

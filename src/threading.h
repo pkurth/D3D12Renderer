@@ -41,9 +41,10 @@ static uint64 atomicCompareExchange(volatile uint64& destination, uint64 exchang
 struct thread_job_context
 {
 	volatile uint32 numJobs = 0;
+
+	void addWork(const std::function<void()>& cb);
+	void waitForWorkCompletion();
 };
 
 void initializeJobSystem();
-void addWorkToJobSystem(thread_job_context& context, const std::function<void()>& cb);
-void waitForWorkCompletion(thread_job_context& context);
 
