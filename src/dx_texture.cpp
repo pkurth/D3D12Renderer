@@ -266,11 +266,7 @@ static bool loadImageFromMemory(const void* data, uint32 size, image_format imag
 	}
 
 
-	fs::path extension = cachingFilepath.extension();
-
-	fs::path cachedFilename = cachingFilepath;
-	cachedFilename.replace_extension("." + std::to_string(flags) + ".cache.dds");
-
+	fs::path cachedFilename = cachingFilepath.string() + std::to_string(flags) + ".cache.dds";
 	fs::path cacheFilepath = L"asset_cache" / cachedFilename;
 
 	bool fromCache = false;
