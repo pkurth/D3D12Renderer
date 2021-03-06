@@ -219,6 +219,11 @@ static bool drawMainMenuBar(application& app)
 			"Press V to toggle Vsync on or off."
 		);
 		ImGui::Separator();
+		ImGui::Text(
+			"You can drag and drop meshes from the Windows explorer into the game\n"
+			"window to add it to the scene."
+		);
+		ImGui::Separator();
 
 		ImGui::SetCursorPosX((ImGui::GetWindowSize().x - 120) * 0.5f);
 
