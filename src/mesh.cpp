@@ -23,7 +23,10 @@ static void getMeshNamesAndTransforms(const aiNode* node, ref<composite_mesh>& m
 	}
 }
 
-ref<composite_mesh> loadMeshFromFile(const std::string& sceneFilename, uint32 flags)
+static std::unordered_map<std::string, weakref<composite_mesh>> meshCache; // TODO: Pack flags into key.
+static std::mutex mutex;
+
+static ref<composite_mesh> loadMeshFromFileInternal(const std::string& sceneFilename, uint32 flags)
 {
 	Assimp::Importer importer;
 
@@ -84,4 +87,20 @@ ref<composite_mesh> loadMeshFromFile(const std::string& sceneFilename, uint32 fl
 	result->filepath = sceneFilename;
 	result->flags = flags;
 	return result;
+}
+
+ref<composite_mesh> loadMeshFromFile(const std::string& sceneFilename, uint32 flags)
+{
+	mutex.lock();
+
+	const std::string& s = sceneFilename;
+
+	auto sp = meshCache[s].lock();
+	if (!sp)
+	{
+		meshCache[s] = sp = loadMeshFromFileInternal(s, flags);
+	}
+
+	mutex.unlock();
+	return sp;
 }
