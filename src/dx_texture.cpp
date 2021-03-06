@@ -52,6 +52,115 @@ static DXGI_FORMAT makeLinear(DXGI_FORMAT format)
 	return format;
 }
 
+static void postProcessImage(DirectX::ScratchImage& scratchImage, DirectX::TexMetadata& metadata, uint32 flags, const fs::path& filepath, const fs::path& cacheFilepath)
+{
+	if (flags & texture_load_flags_noncolor)
+	{
+		metadata.format = makeLinear(metadata.format);
+	}
+	else
+	{
+		metadata.format = makeSRGB(metadata.format);
+	}
+
+	scratchImage.OverrideFormat(metadata.format);
+
+	if (flags & texture_load_flags_gen_mips_on_cpu)
+	{
+		DirectX::ScratchImage mipchainImage;
+
+		checkResult(DirectX::GenerateMipMaps(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata, DirectX::TEX_FILTER_DEFAULT, 0, mipchainImage));
+		scratchImage = std::move(mipchainImage);
+		metadata = scratchImage.GetMetadata();
+	}
+	else
+	{
+		metadata.mipLevels = 1;
+	}
+
+	if (flags & texture_load_flags_premultiply_alpha)
+	{
+		DirectX::ScratchImage premultipliedAlphaImage;
+
+		checkResult(DirectX::PremultiplyAlpha(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata, DirectX::TEX_PMALPHA_DEFAULT, premultipliedAlphaImage));
+		scratchImage = std::move(premultipliedAlphaImage);
+		metadata = scratchImage.GetMetadata();
+	}
+
+	if (flags & texture_load_flags_compress)
+	{
+		if (metadata.width % 4 == 0 && metadata.height % 4 == 0)
+		{
+			if (!DirectX::IsCompressed(metadata.format))
+			{
+				uint32 numChannels = getNumberOfChannels(metadata.format);
+
+				DXGI_FORMAT compressedFormat;
+
+				switch (numChannels)
+				{
+					case 1: compressedFormat = DXGI_FORMAT_BC4_UNORM; break;
+					case 2: compressedFormat = DXGI_FORMAT_BC5_UNORM; break;
+
+					case 3:
+					case 4:
+					{
+						if (scratchImage.IsAlphaAllOpaque())
+						{
+							compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
+						}
+						else
+						{
+							compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;  // 7 would be better, but takes forever to compress.
+						}
+					} break;
+				}
+
+				DirectX::ScratchImage compressedImage;
+
+				checkResult(DirectX::Compress(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata,
+					compressedFormat, DirectX::TEX_COMPRESS_PARALLEL, DirectX::TEX_THRESHOLD_DEFAULT, compressedImage));
+				scratchImage = std::move(compressedImage);
+				metadata = scratchImage.GetMetadata();
+			}
+		}
+		else
+		{
+			std::cerr << "Cannot compress texture '" << filepath << "', since its dimensions are not a multiple of 4.\n";
+		}
+	}
+
+	if (flags & texture_load_flags_cache_to_dds)
+	{
+		fs::create_directories(cacheFilepath.parent_path());
+		checkResult(DirectX::SaveToDDSFile(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata, DirectX::DDS_FLAGS_NONE, cacheFilepath.c_str()));
+	}
+}
+
+static void createDesc(DirectX::TexMetadata& metadata, uint32 flags, D3D12_RESOURCE_DESC& textureDesc)
+{
+	if (flags & texture_load_flags_allocate_full_mipchain)
+	{
+		metadata.mipLevels = 0;
+	}
+
+	switch (metadata.dimension)
+	{
+		case DirectX::TEX_DIMENSION_TEXTURE1D:
+			textureDesc = CD3DX12_RESOURCE_DESC::Tex1D(metadata.format, metadata.width, (uint16)metadata.arraySize, (uint16)metadata.mipLevels);
+			break;
+		case DirectX::TEX_DIMENSION_TEXTURE2D:
+			textureDesc = CD3DX12_RESOURCE_DESC::Tex2D(metadata.format, metadata.width, (uint32)metadata.height, (uint16)metadata.arraySize, (uint16)metadata.mipLevels);
+			break;
+		case DirectX::TEX_DIMENSION_TEXTURE3D:
+			textureDesc = CD3DX12_RESOURCE_DESC::Tex3D(metadata.format, metadata.width, (uint32)metadata.height, (uint16)metadata.depth, (uint16)metadata.mipLevels);
+			break;
+		default:
+			assert(false);
+			break;
+	}
+}
+
 static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::ScratchImage& scratchImage, D3D12_RESOURCE_DESC& textureDesc)
 {
 	if (flags & texture_load_flags_gen_mips_on_gpu)
@@ -139,127 +248,101 @@ static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::S
 			}
 		}
 
-		if (flags & texture_load_flags_noncolor)
-		{
-			metadata.format = makeLinear(metadata.format);
-		}
-		else
-		{
-			metadata.format = makeSRGB(metadata.format);
-		}
-
-		scratchImage.OverrideFormat(metadata.format);
-
-		if (flags & texture_load_flags_gen_mips_on_cpu)
-		{
-			DirectX::ScratchImage mipchainImage;
-
-			checkResult(DirectX::GenerateMipMaps(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata, DirectX::TEX_FILTER_DEFAULT, 0, mipchainImage));
-			scratchImage = std::move(mipchainImage);
-			metadata = scratchImage.GetMetadata();
-		}
-		else
-		{
-			metadata.mipLevels = 1;
-		}
-
-		if (flags & texture_load_flags_premultiply_alpha)
-		{
-			DirectX::ScratchImage premultipliedAlphaImage;
-
-			checkResult(DirectX::PremultiplyAlpha(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata, DirectX::TEX_PMALPHA_DEFAULT, premultipliedAlphaImage));
-			scratchImage = std::move(premultipliedAlphaImage);
-			metadata = scratchImage.GetMetadata();
-		}
-
-		if (flags & texture_load_flags_compress)
-		{
-			if (metadata.width % 4 == 0 && metadata.height % 4 == 0)
-			{
-				if (!DirectX::IsCompressed(metadata.format))
-				{
-					uint32 numChannels = getNumberOfChannels(metadata.format);
-
-					DXGI_FORMAT compressedFormat;
-
-					switch (numChannels)
-					{
-						case 1: compressedFormat = DXGI_FORMAT_BC4_UNORM; break;
-						case 2: compressedFormat = DXGI_FORMAT_BC5_UNORM; break;
-
-						case 3:
-						case 4:
-						{
-							if (scratchImage.IsAlphaAllOpaque())
-							{
-								compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
-							}
-							else
-							{
-								compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;  // 7 would be better, but takes forever to compress.
-							}
-						} break;
-					}
-
-					DirectX::ScratchImage compressedImage;
-
-					checkResult(DirectX::Compress(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata,
-						compressedFormat, DirectX::TEX_COMPRESS_PARALLEL, DirectX::TEX_THRESHOLD_DEFAULT, compressedImage));
-					scratchImage = std::move(compressedImage);
-					metadata = scratchImage.GetMetadata();
-				}
-			}
-			else
-			{
-				std::cerr << "Cannot compress texture '" << filepath << "', since its dimensions are not a multiple of 4.\n";
-			}
-		}
-
-		if (flags & texture_load_flags_cache_to_dds)
-		{
-			fs::create_directories(cacheFilepath.parent_path());
-			checkResult(DirectX::SaveToDDSFile(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata, DirectX::DDS_FLAGS_NONE, cacheFilepath.c_str()));
-		}
+		postProcessImage(scratchImage, metadata, flags, filepath, cacheFilepath);
 	}
 
-	if (flags & texture_load_flags_allocate_full_mipchain)
-	{
-		metadata.mipLevels = 0;
-	}
-
-	switch (metadata.dimension)
-	{
-	case DirectX::TEX_DIMENSION_TEXTURE1D:
-		textureDesc = CD3DX12_RESOURCE_DESC::Tex1D(metadata.format, metadata.width, (uint16)metadata.arraySize, (uint16)metadata.mipLevels);
-		break;
-	case DirectX::TEX_DIMENSION_TEXTURE2D:
-		textureDesc = CD3DX12_RESOURCE_DESC::Tex2D(metadata.format, metadata.width, (uint32)metadata.height, (uint16)metadata.arraySize, (uint16)metadata.mipLevels);
-		break;
-	case DirectX::TEX_DIMENSION_TEXTURE3D:
-		textureDesc = CD3DX12_RESOURCE_DESC::Tex3D(metadata.format, metadata.width, (uint32)metadata.height, (uint16)metadata.depth, (uint16)metadata.mipLevels);
-		break;
-	default:
-		assert(false);
-		break;
-	}
+	createDesc(metadata, flags, textureDesc);
 
 	return true;
 }
 
-static ref<dx_texture> loadTextureInternal(const std::string& filename, uint32 flags)
+static bool loadImageFromMemory(const void* data, uint32 size, image_format imageFormat, const fs::path& cachingFilepath, 
+	uint32 flags, DirectX::ScratchImage& scratchImage, D3D12_RESOURCE_DESC& textureDesc)
 {
-	DirectX::ScratchImage scratchImage;
-	D3D12_RESOURCE_DESC textureDesc;
-
-	if (!loadImageFromFile(filename, flags, scratchImage, textureDesc))
+	if (flags & texture_load_flags_gen_mips_on_gpu)
 	{
-		return nullptr;
+		flags &= ~texture_load_flags_gen_mips_on_cpu;
+		flags |= texture_load_flags_allocate_full_mipchain;
 	}
 
+
+	fs::path extension = cachingFilepath.extension();
+
+	fs::path cachedFilename = cachingFilepath;
+	cachedFilename.replace_extension("." + std::to_string(flags) + ".cache.dds");
+
+	fs::path cacheFilepath = L"asset_cache" / cachedFilename;
+
+	bool fromCache = false;
+	DirectX::TexMetadata metadata;
+
+	if (!(flags & texture_load_flags_always_load_from_source))
+	{
+		// Look for cached.
+
+		if (fs::exists(cacheFilepath))
+		{
+			fromCache = SUCCEEDED(DirectX::LoadFromDDSFile(cacheFilepath.c_str(), DirectX::DDS_FLAGS_NONE, &metadata, scratchImage));
+		}
+	}
+
+	if (!fromCache)
+	{
+		if (flags & texture_load_flags_cache_to_dds)
+		{
+			std::cout << "Preprocessing in-memory texture'" << cachingFilepath.string() << "' for faster loading next time.";
+#ifdef _DEBUG
+			std::cout << " Consider running in a release build the first time.";
+#endif
+			std::cout << std::endl;
+		}
+
+
+		if (imageFormat == image_format_dds)
+		{
+			if (FAILED(DirectX::LoadFromDDSMemory(data, size, DirectX::DDS_FLAGS_NONE, &metadata, scratchImage)))
+			{
+				return false;
+			}
+		}
+		else if (imageFormat == image_format_hdr)
+		{
+			if (FAILED(DirectX::LoadFromHDRMemory(data, size, &metadata, scratchImage)))
+			{
+				return false;
+			}
+		}
+		else if (imageFormat == image_format_tga)
+		{
+			if (FAILED(DirectX::LoadFromTGAMemory(data, size, &metadata, scratchImage)))
+			{
+				return false;
+			}
+		}
+		else
+		{
+			assert(imageFormat == image_format_wic);
+
+			if (FAILED(DirectX::LoadFromWICMemory(data, size, DirectX::WIC_FLAGS_FORCE_RGB, &metadata, scratchImage)))
+			{
+				return false;
+			}
+		}
+
+		postProcessImage(scratchImage, metadata, flags, cacheFilepath, cacheFilepath);
+	}
+
+	createDesc(metadata, flags, textureDesc);
+
+	return true;
+}
+
+static ref<dx_texture> uploadImageToGPU(DirectX::ScratchImage& scratchImage, D3D12_RESOURCE_DESC& textureDesc, uint32 flags)
+{
 	const DirectX::Image* images = scratchImage.GetImages();
 	uint32 numImages = (uint32)scratchImage.GetImageCount();
 
-	D3D12_SUBRESOURCE_DATA subresources[64];
+	D3D12_SUBRESOURCE_DATA subresources[128];
 	for (uint32 i = 0; i < numImages; ++i)
 	{
 		D3D12_SUBRESOURCE_DATA& subresource = subresources[i];
@@ -280,6 +363,32 @@ static ref<dx_texture> loadTextureInternal(const std::string& filename, uint32 f
 	}
 
 	return result;
+}
+
+static ref<dx_texture> loadTextureInternal(const std::string& filename, uint32 flags)
+{
+	DirectX::ScratchImage scratchImage;
+	D3D12_RESOURCE_DESC textureDesc;
+
+	if (!loadImageFromFile(filename, flags, scratchImage, textureDesc))
+	{
+		return nullptr;
+	}
+
+	return uploadImageToGPU(scratchImage, textureDesc, flags);
+}
+
+static ref<dx_texture> loadTextureFromMemoryInternal(const void* ptr, uint32 size, image_format imageFormat, const std::string& cacheFilename, uint32 flags)
+{
+	DirectX::ScratchImage scratchImage;
+	D3D12_RESOURCE_DESC textureDesc;
+
+	if (!loadImageFromMemory(ptr, size, imageFormat, cacheFilename, flags, scratchImage, textureDesc))
+	{
+		return nullptr;
+	}
+
+	return uploadImageToGPU(scratchImage, textureDesc, flags);
 }
 
 static ref<dx_texture> loadVolumeTextureInternal(const std::string& dirname, uint32 flags)
@@ -346,11 +455,11 @@ static ref<dx_texture> loadVolumeTextureInternal(const std::string& dirname, uin
 static std::unordered_map<std::string, weakref<dx_texture>> textureCache; // TODO: Pack flags into key.
 static std::mutex mutex;
 
-ref<dx_texture> loadTextureFromFile(const char* filename, uint32 flags)
+ref<dx_texture> loadTextureFromFile(const std::string& filename, uint32 flags)
 {
 	mutex.lock();
 
-	std::string s = filename;
+	const std::string& s = filename;
 	
 	auto sp = textureCache[s].lock();
 	if (!sp)
@@ -362,16 +471,30 @@ ref<dx_texture> loadTextureFromFile(const char* filename, uint32 flags)
 	return sp;
 }
 
-ref<dx_texture> loadVolumeTextureFromDirectory(const char* dirname, uint32 flags)
+ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format imageFormat, const std::string& cacheFilename, uint32 flags)
 {
 	mutex.lock();
 
-	std::string s = dirname;
+	const std::string& s = cacheFilename;
 
 	auto sp = textureCache[s].lock();
 	if (!sp)
 	{
-		textureCache[s] = sp = loadVolumeTextureInternal(s, flags);
+		textureCache[s] = sp = loadTextureFromMemoryInternal(ptr, size, imageFormat, s, flags);
+	}
+
+	mutex.unlock();
+	return sp;
+}
+
+ref<dx_texture> loadVolumeTextureFromDirectory(const std::string& dirname, uint32 flags)
+{
+	mutex.lock();
+
+	auto sp = textureCache[dirname].lock();
+	if (!sp)
+	{
+		textureCache[dirname] = sp = loadVolumeTextureInternal(dirname, flags);
 	}
 
 	mutex.unlock();

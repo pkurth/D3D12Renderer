@@ -30,10 +30,10 @@ struct composite_mesh
 };
 
 
-ref<composite_mesh> loadMeshFromFile(const char* sceneFilename, uint32 flags = mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+ref<composite_mesh> loadMeshFromFile(const std::string& sceneFilename, uint32 flags = mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 
 // Same function but with different default flags (includes skin).
-inline ref<composite_mesh> loadAnimatedMeshFromFile(const char* sceneFilename, uint32 flags = mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents | mesh_creation_flags_with_skin)
+inline ref<composite_mesh> loadAnimatedMeshFromFile(const std::string& sceneFilename, uint32 flags = mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents | mesh_creation_flags_with_skin)
 {
 	return loadMeshFromFile(sceneFilename, flags);
 }

@@ -23,7 +23,7 @@ static void getMeshNamesAndTransforms(const aiNode* node, ref<composite_mesh>& m
 	}
 }
 
-ref<composite_mesh> loadMeshFromFile(const char* sceneFilename, uint32 flags)
+ref<composite_mesh> loadMeshFromFile(const std::string& sceneFilename, uint32 flags)
 {
 	Assimp::Importer importer;
 
@@ -72,7 +72,7 @@ ref<composite_mesh> loadMeshFromFile(const char* sceneFilename, uint32 flags)
 
 		aiMesh* mesh = scene->mMeshes[m];
 		sub.info = cpuMesh.pushAssimpMesh(mesh, 1.f, &sub.aabb, (flags & mesh_creation_flags_with_skin) ? &result->skeleton : 0);
-		sub.material = scene->HasMaterials() ? loadAssimpMaterial(scene->mMaterials[mesh->mMaterialIndex]) : getDefaultPBRMaterial();
+		sub.material = scene->HasMaterials() ? loadAssimpMaterial(scene, sceneFilename, scene->mMaterials[mesh->mMaterialIndex]) : getDefaultPBRMaterial();
 
 		result->aabb.grow(sub.aabb.minCorner);
 		result->aabb.grow(sub.aabb.maxCorner);

@@ -6,7 +6,7 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
-void animation_skeleton::pushAssimpAnimation(const char* suffix, const aiAnimation* animation, float scale)
+void animation_skeleton::pushAssimpAnimation(const std::string& suffix, const aiAnimation* animation, float scale)
 {
 	animation_clip& clip = clips.emplace_back();
 
@@ -79,7 +79,7 @@ void animation_skeleton::pushAssimpAnimation(const char* suffix, const aiAnimati
 	nameToClipID[clip.name] = (uint32)clips.size() - 1;
 }
 
-void animation_skeleton::pushAssimpAnimations(const char* sceneFilename, float scale)
+void animation_skeleton::pushAssimpAnimations(const std::string& sceneFilename, float scale)
 {
 	Assimp::Importer importer;
 
@@ -94,7 +94,7 @@ void animation_skeleton::pushAssimpAnimations(const char* sceneFilename, float s
 	}
 }
 
-void animation_skeleton::pushAssimpAnimationsInDirectory(const char* directory, float scale)
+void animation_skeleton::pushAssimpAnimationsInDirectory(const std::string& directory, float scale)
 {
 	for (auto& p : fs::directory_iterator(directory))
 	{

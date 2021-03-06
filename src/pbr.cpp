@@ -64,14 +64,14 @@ ref<pbr_material> createPBRMaterial(const char* albedoTex, const char* normalTex
 {
 	material_key s =
 	{
-		albedoTex ? albedoTex : "",
-		normalTex ? normalTex : "",
-		roughTex ? roughTex : "",
-		metallicTex ? metallicTex : "",
+		albedoTex	? albedoTex		: "",
+		normalTex	? normalTex		: "",
+		roughTex	? roughTex		: "",
+		metallicTex ? metallicTex	: "",
 		emission,
 		albedoTint,
-		roughTex ? 1.f : roughOverride, // If texture is set, override does not matter, so set it to consistent value.
-		metallicTex ? 0.f : metallicOverride, // If texture is set, override does not matter, so set it to consistent value.
+		roughTex ? 1.f : roughOverride,			// If texture is set, override does not matter, so set it to consistent value.
+		metallicTex ? 0.f : metallicOverride,	// If texture is set, override does not matter, so set it to consistent value.
 	};
 
 

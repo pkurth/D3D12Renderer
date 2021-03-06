@@ -83,51 +83,40 @@ void application::initialize(dx_renderer* renderer)
 
 	
 	// Sponza.
-	auto sponzaMesh = loadMeshFromFile("assets/meshes/sponza.obj");
+	auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj");
 	if (sponzaMesh)
 	{
 		auto sponzaBlas = defineBlasFromMesh(sponzaMesh, pathTracer);
-
+	
 		appScene.createEntity("Sponza")
 			.addComponent<trs>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
 			.addComponent<raster_component>(sponzaMesh)
 			.addComponent<raytrace_component>(sponzaBlas);
 	}
 
+	//auto palmTreeMesh = loadMeshFromFile("assets/meshes/desert/PalmTree.fbx");
+	//auto palmTreeMesh2 = loadMeshFromFile("assets/meshes/desert-environment/Models/Environment/Vegetation/PalmTree2.glb");
+	//
+	//if (palmTreeMesh)
+	//{
+	//	appScene.createEntity("Palm tree")
+	//		.addComponent<trs>(vec3(0.f, 20.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), 0.1f)
+	//		.addComponent<raster_component>(palmTreeMesh);
+	//}
+	//if (palmTreeMesh2)
+	//{
+	//	appScene.createEntity("Palm tree 2")
+	//		.addComponent<trs>(vec3(8.f, 20.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), 0.1f)
+	//		.addComponent<raster_component>(palmTreeMesh2);
+	//}
+
 #if 1
-	// Stormtrooper.
-	auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/meshes/stormtrooper.fbx");
-	if (stormtrooperMesh)
-	{
-		stormtrooperMesh->submeshes[0].material = createPBRMaterial(
-			"assets/textures/stormtrooper/Stormtrooper_D.png",
-			0, 0, 0,
-			vec4(0.f),
-			vec4(1.f),
-			0.f,
-			0.f
-		);
-	}
-
-	// Pilot.
-	auto pilotMesh = loadAnimatedMeshFromFile("assets/meshes/pilot.fbx");
-	if (pilotMesh)
-	{
-		pilotMesh->submeshes[0].material = createPBRMaterial(
-			"assets/textures/pilot/A.png",
-			"assets/textures/pilot/N.png",
-			"assets/textures/pilot/R.png",
-			"assets/textures/pilot/M.png",
-			vec4(0.f),
-			vec4(1.f, 1.f, 1.f, 0.5f)
-		);
-	}
-
-	// Unreal Mannequin.
-	auto unrealMesh = loadAnimatedMeshFromFile("assets/meshes/unreal_mannequin.fbx");
+	auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx");
+	auto pilotMesh = loadAnimatedMeshFromFile("assets/pilot/pilot.fbx");
+	auto unrealMesh = loadAnimatedMeshFromFile("assets/unreal/unreal_mannequin.fbx");
 	if (unrealMesh)
 	{
-		unrealMesh->skeleton.pushAssimpAnimationsInDirectory("assets/animations");
+		unrealMesh->skeleton.pushAssimpAnimationsInDirectory("assets/unreal/animations");
 	}
 
 	if (stormtrooperMesh)
@@ -177,7 +166,7 @@ void application::initialize(dx_renderer* renderer)
 
 
 
-	setEnvironment("assets/textures/hdri/sunset_in_the_chalk_quarry_4k.hdr");
+	setEnvironment("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
 
 
 
@@ -215,7 +204,7 @@ void application::initialize(dx_renderer* renderer)
 	);
 
 #if 1
-	decalTexture = loadTextureFromFile("assets/textures/decals/explosion.png");
+	decalTexture = loadTextureFromFile("assets/decals/explosion.png");
 
 	if (decalTexture)
 	{

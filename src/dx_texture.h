@@ -128,8 +128,17 @@ void allocateMipUAVs(ref<dx_texture> texture);
 // This means you should keep a reference to your textures yourself and not call this every frame.
 // TODO: Maybe we want to keep the texture around for a couple more frames?
 
-ref<dx_texture> loadTextureFromFile(const char* filename, uint32 flags = texture_load_flags_default);
-ref<dx_texture> loadVolumeTextureFromDirectory(const char* dirname, uint32 flags = texture_load_flags_compress | texture_load_flags_cache_to_dds | texture_load_flags_noncolor);
+enum image_format
+{
+	image_format_dds,
+	image_format_hdr,
+	image_format_tga,
+	image_format_wic, // Other formats: png, jpeg, etc.
+};
+
+ref<dx_texture> loadTextureFromFile(const std::string& filename, uint32 flags = texture_load_flags_default);
+ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format imageFormat, const std::string& cacheFilename, uint32 flags = texture_load_flags_default);
+ref<dx_texture> loadVolumeTextureFromDirectory(const std::string& dirname, uint32 flags = texture_load_flags_compress | texture_load_flags_cache_to_dds | texture_load_flags_noncolor);
 
 
 

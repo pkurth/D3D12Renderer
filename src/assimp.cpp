@@ -21,7 +21,7 @@ struct assimp_logger : public Assimp::LogStream
 	}
 };
 
-const aiScene* loadAssimpSceneFile(const char* filepathRaw, Assimp::Importer& importer)
+const aiScene* loadAssimpSceneFile(const std::string& filepathRaw, Assimp::Importer& importer)
 {
 #if 0
 	if (Assimp::DefaultLogger::isNullLogger())
@@ -106,67 +106,147 @@ const aiScene* loadAssimpSceneFile(const char* filepathRaw, Assimp::Importer& im
 	return scene;
 }
 
-ref<pbr_material> loadAssimpMaterial(const aiMaterial* material)
+static ref<dx_texture> loadAssimpTexture(const aiScene* scene, const std::string& sceneFilepath, const std::string& name, uint32 flags = texture_load_flags_default)
 {
-	aiString diffuse, normal, roughness, metallic;
-	bool hasDiffuse = material->GetTexture(aiTextureType_DIFFUSE, 0, &diffuse) == aiReturn_SUCCESS;
-	bool hasNormal = material->GetTexture(aiTextureType_HEIGHT, 0, &normal) == aiReturn_SUCCESS ||
-		material->GetTexture(aiTextureType_NORMALS, 0, &normal) == aiReturn_SUCCESS;
-	bool hasRoughness = material->GetTexture(aiTextureType_SHININESS, 0, &roughness) == aiReturn_SUCCESS;
-	bool hasMetallic = material->GetTexture(aiTextureType_AMBIENT, 0, &metallic) == aiReturn_SUCCESS;
+	ref<dx_texture> texture = 0;
 
-	const char* albedoName = 0;
-	const char* normalName = 0;
-	const char* roughnessName = 0;
-	const char* metallicName = 0;
+	if (!name.empty())
+	{
+		if (name[0] == '*')
+		{
+			uint32 index = std::stoi(name.c_str() + 1);
 
-	aiColor3D aiColor;
+			if (index < scene->mNumTextures)
+			{
+				const aiTexture* assimpTexture = scene->mTextures[index];
+
+				image_format imageFormat;
+				if (assimpTexture->CheckFormat("dds"))
+				{
+					imageFormat = image_format_dds;
+				}
+				else if (assimpTexture->CheckFormat("hdr"))
+				{
+					imageFormat = image_format_hdr;
+				}
+				else if (assimpTexture->CheckFormat("tga"))
+				{
+					imageFormat = image_format_tga;
+				}
+				else if (assimpTexture->CheckFormat("png") || assimpTexture->CheckFormat("jpg"))
+				{
+					imageFormat = image_format_wic;
+				}
+				else
+				{
+					std::cerr << "Unknown format hint '" << assimpTexture->achFormatHint << "' in Assimp texture.\n";
+					return 0;
+				}
+
+				std::string cacheFilepath = sceneFilepath + "_texture" + std::to_string(index);
+
+				texture = loadTextureFromMemory(assimpTexture->pcData, assimpTexture->mWidth * ((assimpTexture->mHeight == 0) ? 1 : assimpTexture->mHeight), imageFormat, cacheFilepath, flags);
+			}
+			else
+			{
+				std::cerr << "Cannot load texture " << index << " from Assimp scene.\n";
+			}
+		}
+		else
+		{
+			fs::path path = sceneFilepath;
+			path = path.parent_path();
+			path /= name;
+			texture = loadTextureFromFile(path.string(), flags);
+		}
+	}
+
+	return texture;
+}
+
+ref<pbr_material> loadAssimpMaterial(const aiScene* scene, const std::string& sceneFilepath, const aiMaterial* material)
+{
+	const char* albedoName = "";
+	const char* normalName = "";
+	const char* roughnessName = "";
+	const char* metallicName = "";
+
 	vec4 albedoTint(1.f);
-	if (material->Get(AI_MATKEY_COLOR_DIFFUSE, aiColor) == aiReturn_SUCCESS)
-	{
-		albedoTint.x = aiColor.r;
-		albedoTint.y = aiColor.g;
-		albedoTint.z = aiColor.b;
-	}
-
 	vec4 emission(0.f, 0.f, 0.f, 1.f);
-	if (material->Get(AI_MATKEY_COLOR_EMISSIVE, aiColor) == aiReturn_SUCCESS)
-	{
-		emission.x = aiColor.r;
-		emission.y = aiColor.g;
-		emission.z = aiColor.b;
-	}
-
 	float roughnessOverride = 1.f;
 	float metallicOverride = 0.f;
 
-	if (hasDiffuse) { albedoName = diffuse.C_Str(); }
-	if (hasNormal) { normalName = normal.C_Str(); }
-	if (hasRoughness)
 	{
-		roughnessName = roughness.C_Str();
-	}
-	else
-	{
-		float shininess;
-		if (material->Get(AI_MATKEY_SHININESS, shininess) != aiReturn_SUCCESS)
+		aiString diffuse, normal, roughness, metallic;
+		bool hasDiffuse = material->GetTexture(aiTextureType_DIFFUSE, 0, &diffuse) == aiReturn_SUCCESS;
+		bool hasNormal = material->GetTexture(aiTextureType_HEIGHT, 0, &normal) == aiReturn_SUCCESS ||
+			material->GetTexture(aiTextureType_NORMALS, 0, &normal) == aiReturn_SUCCESS;
+		bool hasRoughness = material->GetTexture(aiTextureType_SHININESS, 0, &roughness) == aiReturn_SUCCESS;
+		bool hasMetallic = material->GetTexture(aiTextureType_AMBIENT, 0, &metallic) == aiReturn_SUCCESS ||
+			material->GetTexture(aiTextureType_METALNESS, 0, &metallic) == aiReturn_SUCCESS;
+
+
+		aiColor3D aiColor;
+		if (material->Get(AI_MATKEY_COLOR_DIFFUSE, aiColor) == aiReturn_SUCCESS)
 		{
-			shininess = 80.f; // Default value.
+			albedoTint.x = aiColor.r;
+			albedoTint.y = aiColor.g;
+			albedoTint.z = aiColor.b;
 		}
-		roughnessOverride = 1.f - sqrt(shininess * 0.01f);
+
+		if (material->Get(AI_MATKEY_COLOR_EMISSIVE, aiColor) == aiReturn_SUCCESS)
+		{
+			emission.x = aiColor.r;
+			emission.y = aiColor.g;
+			emission.z = aiColor.b;
+		}
+
+		if (hasDiffuse) { albedoName = diffuse.C_Str(); }
+		if (hasNormal) { normalName = normal.C_Str(); }
+		if (hasRoughness)
+		{
+			roughnessName = roughness.C_Str();
+		}
+		else
+		{
+			float shininess;
+			if (material->Get(AI_MATKEY_SHININESS, shininess) != aiReturn_SUCCESS)
+			{
+				shininess = 80.f; // Default value.
+			}
+			roughnessOverride = 1.f - sqrt(shininess * 0.01f);
+		}
+
+		if (hasMetallic)
+		{
+			metallicName = metallic.C_Str();
+		}
+		else
+		{
+			if (material->Get(AI_MATKEY_REFLECTIVITY, metallicOverride) != aiReturn_SUCCESS)
+			{
+				metallicOverride = 0.f;
+			}
+		}
 	}
 
-	if (hasMetallic)
-	{
-		metallicName = metallic.C_Str();
-	}
-	else
-	{
-		if (material->Get(AI_MATKEY_REFLECTIVITY, metallicOverride) != aiReturn_SUCCESS)
-		{
-			metallicOverride = 0.f;
-		}
-	}
+	// TODO: This circumvents the material caching. Do we need the caching?
 
-	return createPBRMaterial(albedoName, normalName, roughnessName, metallicName, emission, albedoTint, roughnessOverride, metallicOverride);
+	ref<dx_texture> albedo = loadAssimpTexture(scene, sceneFilepath, albedoName);
+	ref<dx_texture> normal = loadAssimpTexture(scene, sceneFilepath, normalName, texture_load_flags_default | texture_load_flags_noncolor);
+	ref<dx_texture> roughness = loadAssimpTexture(scene, sceneFilepath, roughnessName, texture_load_flags_default | texture_load_flags_noncolor);
+	ref<dx_texture> metallic = loadAssimpTexture(scene, sceneFilepath, metallicName, texture_load_flags_default | texture_load_flags_noncolor);
+
+	ref<pbr_material> result = make_ref<pbr_material>();
+
+	result->albedo = albedo;
+	result->normal = normal;
+	result->roughness = roughness;
+	result->metallic = metallic;
+	result->emission = emission;
+	result->albedoTint = albedoTint;
+	result->roughnessOverride = roughnessOverride;
+	result->metallicOverride = metallicOverride;
+
+	return result;
 }

@@ -33,5 +33,5 @@ static quat readAssimpQuaternion(const aiQuaternion& q)
 	return result;
 }
 
-const aiScene* loadAssimpSceneFile(const char* filepathRaw, Assimp::Importer& importer);
-ref<struct pbr_material> loadAssimpMaterial(const aiMaterial* material);
+const aiScene* loadAssimpSceneFile(const std::string& filepathRaw, Assimp::Importer& importer);
+ref<struct pbr_material> loadAssimpMaterial(const aiScene* scene, const std::string& sceneFilepath, const aiMaterial* material);
