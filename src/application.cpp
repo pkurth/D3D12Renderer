@@ -94,22 +94,6 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<raytrace_component>(sponzaBlas);
 	}
 
-	//auto palmTreeMesh = loadMeshFromFile("assets/meshes/desert/PalmTree.fbx");
-	//auto palmTreeMesh2 = loadMeshFromFile("assets/meshes/desert-environment/Models/Environment/Vegetation/PalmTree2.glb");
-	//
-	//if (palmTreeMesh)
-	//{
-	//	appScene.createEntity("Palm tree")
-	//		.addComponent<trs>(vec3(0.f, 20.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), 0.1f)
-	//		.addComponent<raster_component>(palmTreeMesh);
-	//}
-	//if (palmTreeMesh2)
-	//{
-	//	appScene.createEntity("Palm tree 2")
-	//		.addComponent<trs>(vec3(8.f, 20.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), 0.1f)
-	//		.addComponent<raster_component>(palmTreeMesh2);
-	//}
-
 #if 1
 	auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx");
 	auto pilotMesh = loadAnimatedMeshFromFile("assets/pilot/pilot.fbx");
