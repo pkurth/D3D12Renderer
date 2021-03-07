@@ -56,7 +56,6 @@ struct half
 	uint16 h;
 
 	half() {}
-	half(uint16 in) : h(in) {}
 	half(float f);
 
 	operator float();

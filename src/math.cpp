@@ -60,13 +60,13 @@ half::operator float()
 	return *(float*)&f;
 }
 
-half operator+(half a, half b) { return half_add(a.h, b.h); }
+half operator+(half a, half b) { half result; result.h = half_add(a.h, b.h); return result; }
 half& operator+=(half& a, half b) {	a = a + b; return a; }
-half operator-(half a, half b) { return half_sub(a.h, b.h); }
+half operator-(half a, half b) { half result; result.h = half_sub(a.h, b.h); return result; }
 half& operator-=(half& a, half b) {	a = a - b; return a; }
-half operator*(half a, half b) { return half_mul(a.h, b.h); }
+half operator*(half a, half b) { half result; result.h = half_mul(a.h, b.h); return result; }
 half& operator*=(half& a, half b) {	a = a * b; return a; }
-half operator/(half a, half b) { return half_div(a.h, b.h); }
+half operator/(half a, half b) { half result; result.h = half_div(a.h, b.h); return result; }
 half& operator/=(half& a, half b) { a = a / b; return a; }
 
 
