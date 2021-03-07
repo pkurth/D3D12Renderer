@@ -371,6 +371,7 @@ static uint32 handleScaling(trs& transform, ray r, const user_input& input, tran
 			float t;
 			r.intersectPlane(plane.xyz, plane.w, t);
 			anchor = dot(r.origin + t * r.direction - transform.position, axis);
+			anchor = max(anchor, 0.0001f);
 			originalScale = transform.scale;
 		}
 		else
@@ -386,6 +387,7 @@ static uint32 handleScaling(trs& transform, ray r, const user_input& input, tran
 			float t;
 			r.intersectPlane(plane.xyz, plane.w, t);
 			anchor = dot(r.origin + t * r.direction - transform.position, camera.rotation * vec3(1.f, 1.f, 0.f));
+			anchor = max(anchor, 0.0001f);
 			originalScale = transform.scale;
 		}
 	}
