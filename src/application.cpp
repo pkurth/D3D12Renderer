@@ -291,7 +291,7 @@ static bool editSunShadowParameters(directional_light& sun)
 
 #define DISTANCE_SETTINGS	"Distance", sun.cascadeDistances.data, 0.f, 300.f
 #define BIAS_SETTINGS		"Bias", sun.bias.data, 0.f, 0.005f, "%.6f"
-#define BLEND_SETTINGS		"Blend distances", sun.blendDistances.data, 0.f, 50.f, "%.6f"
+#define BLEND_SETTINGS		"Blend distances", sun.blendDistances.data, 0.f, 10.f, "%.6f"
 
 		if (sun.numShadowCascades == 1)
 		{
@@ -685,6 +685,12 @@ bool application::handleUserInput(const user_input& input, float dt)
 			setSelectedEntity({});
 		}
 		inputCaptured = true;
+	}
+
+	if (!inputCaptured && input.mouse.left.down && input.keyboard[key_ctrl].down)
+	{
+		vec3 dir = camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY).direction;
+		sun.direction = -dir;
 	}
 
 	return objectMovedByGizmo;
