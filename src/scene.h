@@ -12,6 +12,7 @@ struct tag_component
 	tag_component(const char* n)
 	{
 		strncpy(name, n, sizeof(name));
+		name[sizeof(name) - 1] = 0;
 	}
 };
 
@@ -93,6 +94,25 @@ struct scene
 	bool isEntityValid(scene_entity e)
 	{
 		return registry.valid(e.handle);
+	}
+
+	template <typename component_t>
+	void copyComponentIfExists(scene_entity src, scene_entity dst)
+	{
+		if (src.hasComponent<component_t>())
+		{
+			dst.addComponent<component_t>(src.getComponent<component_t>());
+		}
+	}
+
+	template <typename first_component_t, typename... tail_component_t>
+	void copyComponentsIfExists(scene_entity src, scene_entity dst)
+	{
+		copyComponentIfExists<first_component_t>(src, dst);
+		if constexpr (sizeof...(tail_component_t) > 0)
+		{
+			copyComponentsIfExists<tail_component_t...>(src, dst);
+		}
 	}
 
 	template <typename... component_t>

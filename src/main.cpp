@@ -436,7 +436,7 @@ int main(int argc, char** argv)
 
 		appFocusedLastFrame = ImGui::IsMousePosValid();
 
-		if (input.keyboard['V'].pressEvent) { window.toggleVSync(); }
+		if (input.keyboard['V'].pressEvent && !(input.keyboard[key_ctrl].down || input.keyboard[key_shift].down || input.keyboard[key_alt].down)) { window.toggleVSync(); }
 		if (ImGui::IsKeyPressed(key_esc)) { break; } // Also allowed if not focused on main window.
 		if (ImGui::IsKeyPressed(key_enter) && ImGui::IsKeyDown(key_alt)) { window.toggleFullscreen(); } // Also allowed if not focused on main window.
 

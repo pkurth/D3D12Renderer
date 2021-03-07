@@ -158,7 +158,7 @@ void application::initialize(dx_renderer* renderer)
 
 	random_number_generator rng = { 14878213 };
 
-	spotLights.resize(2);
+	/*spotLights.resize(2);
 
 	spotLights[0].initialize(
 		{ 2.f, 3.f, 0.f },
@@ -187,9 +187,9 @@ void application::initialize(dx_renderer* renderer)
 		randomRGB(rng),
 		10,
 		0
-	);
+	);*/
 
-#if 1
+#if 0
 	decalTexture = loadTextureFromFile("assets/decals/explosion.png");
 
 	if (decalTexture)
@@ -243,12 +243,12 @@ void application::initialize(dx_renderer* renderer)
 	}
 
 
-	particleSystem.initialize(10000);
+	/*particleSystem.initialize(10000);
 	particleSystem.color.initializeAsLinear(vec4(1.f, 0.f, 0.f, 1.f), vec4(0.8f, 0.8f, 0.1f, 1.f));
 	particleSystem.maxLifetime.initializeAsConstant(0.5f);
 	particleSystem.startVelocity.initializeAsRandom(vec3(-1.f, -1.f, -0.3f), vec3(1.f, 1.f, 0.3f));
 	particleSystem.spawnRate = 2000.f;
-	particleSystem.gravityFactor = 0.1f;
+	particleSystem.gravityFactor = 0.1f;*/
 }
 
 static bool plotAndEditTonemapping(tonemap_cb& tonemap)
@@ -466,7 +466,9 @@ bool application::drawSceneHierarchy()
 		{
 			ImGui::AlignTextToFramePadding();
 
+			ImGui::PushID((uint32)selectedEntity);
 			ImGui::InputText("Name", selectedEntity.getComponent<tag_component>().name, sizeof(tag_component::name));
+			ImGui::PopID();
 			ImGui::SameLine();
 			if (ImGui::Button(ICON_FA_TRASH_ALT))
 			{
@@ -654,6 +656,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 	{
 		if (selectedEntity.hasComponent<trs>())
 		{
+			// Transform entity.
 			trs& transform = selectedEntity.getComponent<trs>();
 
 			static transformation_type type = transformation_type_translation;
@@ -666,11 +669,25 @@ bool application::handleUserInput(const user_input& input, float dt)
 			}
 		}
 
-		if (input.keyboard[key_backspace].pressEvent || input.keyboard[key_delete].pressEvent)
+		if (!inputCaptured)
 		{
-			appScene.deleteEntity(selectedEntity);
-			setSelectedEntity({});
-			objectMovedByGizmo = true;
+			if (input.keyboard[key_ctrl].down && input.keyboard['D'].pressEvent)
+			{
+				// Duplicate entity.
+				scene_entity newEntity = appScene.createEntity(selectedEntity.getComponent<tag_component>().name);
+				appScene.copyComponentsIfExists<trs, raster_component, animation_component, raytrace_component>(selectedEntity, newEntity);
+				setSelectedEntity(newEntity);
+				inputCaptured = true;
+				objectMovedByGizmo = true;
+			}
+			else if (input.keyboard[key_backspace].pressEvent || input.keyboard[key_delete].pressEvent)
+			{
+				// Delete entity.
+				appScene.deleteEntity(selectedEntity);
+				setSelectedEntity({});
+				inputCaptured = true;
+				objectMovedByGizmo = true;
+			}
 		}
 	}
 
@@ -691,6 +708,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 	{
 		vec3 dir = camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY).direction;
 		sun.direction = -dir;
+		inputCaptured = true;
 	}
 
 	return objectMovedByGizmo;
@@ -908,13 +926,13 @@ void application::update(const user_input& input, float dt)
 
 
 	// Particles.
-	static float particleSystemTime = 0.f;
+	/*static float particleSystemTime = 0.f;
 	particleSystemTime += dt;
 
 	particleSystem.spawnPosition.x = cos(particleSystemTime) * 5.f;
 	particleSystem.spawnPosition.y = sin(particleSystemTime) * 4.f + 5.f;
 	particleSystem.update(dt);
-	particleSystem.render(camera, &transparentRenderPass);
+	particleSystem.render(camera, &transparentRenderPass);*/
 
 
 
@@ -946,12 +964,13 @@ void application::update(const user_input& input, float dt)
 			auto [vb, vertexOffset, skinningMatrices] = skinObject(mesh.vertexBuffer, (uint32)skeleton.joints.size());
 
 			mat4* mats = skinningMatrices;
-			//context.addWork([&skeleton, &anim, mats]()
-			//{
-			trs localTransforms[128];
-			skeleton.sampleAnimation(skeleton.clips[anim.animationIndex].name, anim.time, localTransforms);
-			skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, mats);
-			//});
+			auto& captureAnim = anim;
+			context.addWork([&skeleton, &captureAnim, mats]()
+			{
+				trs localTransforms[128];
+				skeleton.sampleAnimation(skeleton.clips[captureAnim.animationIndex].name, captureAnim.time, localTransforms);
+				skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, mats);
+			});
 
 			anim.prevFrameVB = anim.vb;
 			anim.vb = vb;
@@ -1101,7 +1120,10 @@ void application::handleFileDrop(const std::string& filename)
 	auto mesh = loadMeshFromFile(relative.string());
 	if (mesh)
 	{
-		appScene.createEntity("Dropped mesh")
+		fs::path path = filename;
+		path = path.stem();
+
+		appScene.createEntity(path.string().c_str())
 			.addComponent<trs>(vec3(0.f), quat::identity)
 			.addComponent<raster_component>(mesh);
 	}
