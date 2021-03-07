@@ -468,7 +468,8 @@ bool application::drawSceneHierarchy()
 		{
 			ImGui::AlignTextToFramePadding();
 
-			ImGui::Text(selectedEntity.getComponent<tag_component>().name);
+			//ImGui::Text(selectedEntity.getComponent<tag_component>().name);
+			ImGui::InputText("Name", selectedEntity.getComponent<tag_component>().name, sizeof(tag_component::name));
 
 			drawComponent<trs>(selectedEntity, "Transform", [this, &objectMovedByWidget](trs& transform)
 			{
