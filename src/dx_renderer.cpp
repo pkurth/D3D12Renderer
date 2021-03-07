@@ -364,7 +364,7 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 
 	if (objectIDsTexture)
 	{
-		uint16* id = (uint16*)mapBuffer(hoveredObjectIDReadbackBuffer, true, map_range{ dxContext.bufferedFrameID, 1 });
+		uint32* id = (uint32*)mapBuffer(hoveredObjectIDReadbackBuffer, true, map_range{ dxContext.bufferedFrameID, 1 });
 		hoveredObjectID = *id;
 		unmapBuffer(hoveredObjectIDReadbackBuffer, false);
 	}

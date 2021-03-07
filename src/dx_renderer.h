@@ -148,7 +148,7 @@ struct dx_renderer
 	uint32 renderHeight;
 	ref<dx_texture> frameResult;
 
-	uint16 hoveredObjectID = 0xFFFF;
+	uint32 hoveredObjectID = -1;
 
 	static ref<dx_texture> getWhiteTexture();
 	static ref<dx_texture> getBlackTexture();
@@ -164,7 +164,7 @@ struct dx_renderer
 	static constexpr DXGI_FORMAT hdrDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	static constexpr DXGI_FORMAT linearDepthFormat = DXGI_FORMAT_R32_FLOAT;
 	static constexpr DXGI_FORMAT screenVelocitiesFormat = DXGI_FORMAT_R16G16_FLOAT;
-	static constexpr DXGI_FORMAT objectIDsFormat = DXGI_FORMAT_R16_UINT; // Do not change this. 16 bit is hardcoded in other places.
+	static constexpr DXGI_FORMAT objectIDsFormat = DXGI_FORMAT_R32_UINT;
 	static constexpr DXGI_FORMAT reflectanceFormat = DXGI_FORMAT_R8G8B8A8_UNORM; // Fresnel (xyz), roughness (w).
 	static constexpr DXGI_FORMAT reflectionFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	static constexpr DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM;

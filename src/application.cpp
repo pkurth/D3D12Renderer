@@ -660,7 +660,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 
 	if (!inputCaptured && input.mouse.left.clickEvent)
 	{
-		if (renderer->hoveredObjectID != 0xFFFF)
+		if (renderer->hoveredObjectID != -1)
 		{
 			setSelectedEntity({ renderer->hoveredObjectID, appScene });
 		}

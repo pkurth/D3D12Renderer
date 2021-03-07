@@ -127,7 +127,7 @@ struct opaque_render_pass : geometry_render_pass
 {
 	template <typename material_t>
 	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
-		uint16 objectID, bool outline = false)
+		uint32 objectID, bool outline = false)
 	{
 		common<true>(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 
@@ -141,7 +141,7 @@ struct opaque_render_pass : geometry_render_pass
 	template <typename material_t>
 	void renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, 
 		const mat4& transform, const mat4& prevFrameTransform,
-		uint16 objectID, bool outline = false)
+		uint32 objectID, bool outline = false)
 	{
 		common<true>(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 
@@ -156,7 +156,7 @@ struct opaque_render_pass : geometry_render_pass
 	void renderAnimatedObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_vertex_buffer>& prevFrameVertexBuffer, 
 		const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, submesh_info prevFrameSubmesh, const ref<material_t>& material,
 		const mat4& transform, const mat4& prevFrameTransform,
-		uint16 objectID, bool outline = false)
+		uint32 objectID, bool outline = false)
 	{
 		common<true>(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 
@@ -181,7 +181,7 @@ private:
 		ref<dx_vertex_buffer> vertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
 		submesh_info submesh;
-		uint16 objectID;
+		uint32 objectID;
 	};
 
 	struct dynamic_depth_only_draw_call
@@ -191,7 +191,7 @@ private:
 		ref<dx_vertex_buffer> vertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
 		submesh_info submesh;
-		uint16 objectID;
+		uint32 objectID;
 	};
 
 	struct animated_depth_only_draw_call
@@ -203,7 +203,7 @@ private:
 		ref<dx_index_buffer> indexBuffer;
 		submesh_info submesh;
 		submesh_info prevFrameSubmesh;
-		uint16 objectID;
+		uint32 objectID;
 	};
 
 	std::vector<static_depth_only_draw_call> staticDepthOnlyDrawCalls;
