@@ -420,8 +420,10 @@ static void drawComponent(scene_entity entity, const char* componentName, ui_fun
 	}
 }
 
-void application::drawSceneHierarchy()
+bool application::drawSceneHierarchy()
 {
+	bool objectMovedByWidget = false;
+
 	if (ImGui::Begin("Scene Hierarchy"))
 	{
 		appScene.view<tag_component>()
@@ -468,9 +470,9 @@ void application::drawSceneHierarchy()
 
 			ImGui::Text(selectedEntity.getComponent<tag_component>().name);
 
-			drawComponent<trs>(selectedEntity, "Transform", [this](trs& transform)
+			drawComponent<trs>(selectedEntity, "Transform", [this, &objectMovedByWidget](trs& transform)
 			{
-				ImGui::DragFloat3("Translation", transform.position.data, 0.1f, 0.f, 0.f);
+				objectMovedByWidget |= ImGui::DragFloat3("Translation", transform.position.data, 0.1f, 0.f, 0.f);
 
 				if (ImGui::DragFloat3("Rotation", selectedEntityEulerRotation.data, 0.1f, 0.f, 0.f))
 				{
@@ -479,9 +481,11 @@ void application::drawSceneHierarchy()
 					euler.y = deg2rad(euler.y);
 					euler.z = deg2rad(euler.z);
 					transform.rotation = eulerToQuat(euler);
+
+					objectMovedByWidget = true;
 				}
 
-				ImGui::DragFloat3("Scale", transform.scale.data, 0.1f, 0.f, 0.f);
+				objectMovedByWidget |= ImGui::DragFloat3("Scale", transform.scale.data, 0.1f, 0.f, 0.f);
 			});
 
 			drawComponent<animation_component>(selectedEntity, "Animation", [this](animation_component& anim)
@@ -508,6 +512,8 @@ void application::drawSceneHierarchy()
 		}
 	}
 	ImGui::End();
+
+	return objectMovedByWidget;
 }
 
 void application::drawSettings(float dt)
@@ -610,8 +616,10 @@ void application::submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 num
 	}
 }
 
-void application::handleUserInput(const user_input& input, float dt)
+bool application::handleUserInput(const user_input& input, float dt)
 {
+	// Returns true, if the user dragged an object using a gizmo.
+
 	if (input.keyboard['F'].pressEvent && selectedEntity)
 	{
 		auto& raster = selectedEntity.getComponent<raster_component>();
@@ -633,6 +641,8 @@ void application::handleUserInput(const user_input& input, float dt)
 		pathTracer.numAveragedFrames = 0;
 	}
 
+	bool objectMovedByGizmo = false;
+
 	if (selectedEntity && selectedEntity.hasComponent<trs>())
 	{
 		trs& transform = selectedEntity.getComponent<trs>();
@@ -643,6 +653,7 @@ void application::handleUserInput(const user_input& input, float dt)
 		{
 			setSelectedEntityEulerRotation();
 			inputCaptured = true;
+			objectMovedByGizmo = true;
 		}
 	}
 
@@ -658,13 +669,15 @@ void application::handleUserInput(const user_input& input, float dt)
 		}
 		inputCaptured = true;
 	}
+
+	return objectMovedByGizmo;
 }
 
-void application::renderSunShadowMap()
+void application::renderSunShadowMap(bool objectDragged)
 {
 	sun_shadow_render_pass& renderPass = sunShadowRenderPass;
 
-	bool staticCacheAvailable = true;
+	bool staticCacheAvailable = !objectDragged;
 
 	for (uint32 i = 0; i < sun.numShadowCascades; ++i)
 	{
@@ -688,7 +701,7 @@ void application::renderSunShadowMap()
 	renderDynamicGeometryToSunShadowMap();
 }
 
-void application::renderShadowMap(spot_light_cb& spotLight, uint32 lightIndex)
+void application::renderShadowMap(spot_light_cb& spotLight, uint32 lightIndex, bool objectDragged)
 {
 	uint32 uniqueID = lightIndex + 1;
 
@@ -701,7 +714,7 @@ void application::renderShadowMap(spot_light_cb& spotLight, uint32 lightIndex)
 	auto [vp, staticCacheAvailable] = assignShadowMapViewport(uniqueID << 10, 0, 512);
 	renderPass.viewport = vp;
 
-	if (staticCacheAvailable)
+	if (staticCacheAvailable && !objectDragged)
 	{
 		renderPass.copyFromStaticCache = true;
 	}
@@ -722,7 +735,7 @@ void application::renderShadowMap(spot_light_cb& spotLight, uint32 lightIndex)
 	spotLightShadowInfos.push_back(si);
 }
 
-void application::renderShadowMap(point_light_cb& pointLight, uint32 lightIndex)
+void application::renderShadowMap(point_light_cb& pointLight, uint32 lightIndex, bool objectDragged)
 {
 	uint32 uniqueID = lightIndex + 1;
 
@@ -738,7 +751,7 @@ void application::renderShadowMap(point_light_cb& pointLight, uint32 lightIndex)
 	renderPass.viewport0 = vp0;
 	renderPass.viewport1 = vp1;
 
-	if (staticCacheAvailable0 && staticCacheAvailable1) // TODO
+	if (staticCacheAvailable0 && staticCacheAvailable1 && !objectDragged) // TODO
 	{
 		renderPass.copyFromStaticCache0 = true;
 		renderPass.copyFromStaticCache1 = true;
@@ -870,9 +883,10 @@ void application::renderDynamicGeometryToShadowMap(point_shadow_render_pass& ren
 void application::update(const user_input& input, float dt)
 {
 	resetRenderPasses();
-	handleUserInput(input, dt);
 
-	drawSceneHierarchy();
+	bool objectDragged = false;
+	objectDragged |= handleUserInput(input, dt);
+	objectDragged |= drawSceneHierarchy();
 	drawSettings(dt);
 
 
@@ -936,13 +950,13 @@ void application::update(const user_input& input, float dt)
 			}
 		});
 
-		renderSunShadowMap();
+		renderSunShadowMap(objectDragged);
 
 		for (uint32 i = 0; i < (uint32)spotLights.size(); ++i)
 		{
 			if (spotLights[i].shadowInfoIndex >= 0)
 			{
-				renderShadowMap(spotLights[i], i);
+				renderShadowMap(spotLights[i], i, objectDragged);
 			}
 		}
 
@@ -950,7 +964,7 @@ void application::update(const user_input& input, float dt)
 		{
 			if (pointLights[i].shadowInfoIndex >= 0)
 			{
-				renderShadowMap(pointLights[i], i);
+				renderShadowMap(pointLights[i], i, objectDragged);
 			}
 		}
 

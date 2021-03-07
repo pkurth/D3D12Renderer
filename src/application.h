@@ -31,16 +31,16 @@ struct application
 private:
 	void setSelectedEntityEulerRotation();
 	void setSelectedEntity(scene_entity entity);
-	void drawSceneHierarchy();
+	bool drawSceneHierarchy();
 	void drawSettings(float dt);
 
 	void resetRenderPasses();
 	void submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 numPointLightShadowPasses);
-	void handleUserInput(const user_input& input, float dt);
+	bool handleUserInput(const user_input& input, float dt);
 
-	void renderSunShadowMap();
-	void renderShadowMap(spot_light_cb& spotLight, uint32 lightIndex);
-	void renderShadowMap(point_light_cb& pointLight, uint32 lightIndex);
+	void renderSunShadowMap(bool objectDragged);
+	void renderShadowMap(spot_light_cb& spotLight, uint32 lightIndex, bool objectDragged);
+	void renderShadowMap(point_light_cb& pointLight, uint32 lightIndex, bool objectDragged);
 
 	void renderStaticGeometryToSunShadowMap();
 	void renderStaticGeometryToShadowMap(spot_shadow_render_pass& renderPass);
