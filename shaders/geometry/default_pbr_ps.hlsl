@@ -284,7 +284,7 @@ ps_output main(ps_input IN)
 	OUT.hdrColor.rgb += surface.emission;
 
 	OUT.worldNormal = packNormal(surface.N);
-	OUT.reflectance = float4(factors.ks, surface.roughness * (1.f - surface.N.y)); // Temporary: Up-facing surfaces get more reflective.
+	OUT.reflectance = float4(factors.ks, surface.roughness); // Temporary: Up-facing surfaces get more reflective:  * (1.f - surface.N.y)
 #else
 
 	// Alpha-blending performs the following operation: final = alpha * src + (1 - alpha) * dest.
