@@ -10,6 +10,7 @@ enum key_code
 	key_space = VK_SPACE,
 	key_enter = VK_RETURN,
 	key_backspace = VK_BACK,
+	key_delete = VK_DELETE,
 	key_tab = VK_TAB,
 	key_left = VK_LEFT,
 	key_right = VK_RIGHT,

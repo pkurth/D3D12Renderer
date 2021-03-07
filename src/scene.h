@@ -90,6 +90,11 @@ struct scene
 		registry.destroy(e.handle);
 	}
 
+	bool isEntityValid(scene_entity e)
+	{
+		return registry.valid(e.handle);
+	}
+
 	template <typename... component_t>
 	auto view() 
 	{ 

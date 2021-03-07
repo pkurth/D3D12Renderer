@@ -84,18 +84,16 @@ void application::initialize(dx_renderer* renderer)
 		pathTracer.initialize();
 		raytracingTLAS.initialize();
 	}
-
 	
-	// Sponza.
 	auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj");
 	if (sponzaMesh)
 	{
-		auto sponzaBlas = defineBlasFromMesh(sponzaMesh, pathTracer);
+		auto blas = defineBlasFromMesh(sponzaMesh, pathTracer);
 	
 		appScene.createEntity("Sponza")
 			.addComponent<trs>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
 			.addComponent<raster_component>(sponzaMesh)
-			.addComponent<raytrace_component>(sponzaBlas);
+			.addComponent<raytrace_component>(blas);
 	}
 
 #if 1
@@ -468,48 +466,56 @@ bool application::drawSceneHierarchy()
 		{
 			ImGui::AlignTextToFramePadding();
 
-			//ImGui::Text(selectedEntity.getComponent<tag_component>().name);
 			ImGui::InputText("Name", selectedEntity.getComponent<tag_component>().name, sizeof(tag_component::name));
-
-			drawComponent<trs>(selectedEntity, "Transform", [this, &objectMovedByWidget](trs& transform)
+			ImGui::SameLine();
+			if (ImGui::Button(ICON_FA_TRASH_ALT))
 			{
-				objectMovedByWidget |= ImGui::DragFloat3("Translation", transform.position.data, 0.1f, 0.f, 0.f);
-
-				if (ImGui::DragFloat3("Rotation", selectedEntityEulerRotation.data, 0.1f, 0.f, 0.f))
-				{
-					vec3 euler = selectedEntityEulerRotation;
-					euler.x = deg2rad(euler.x);
-					euler.y = deg2rad(euler.y);
-					euler.z = deg2rad(euler.z);
-					transform.rotation = eulerToQuat(euler);
-
-					objectMovedByWidget = true;
-				}
-
-				objectMovedByWidget |= ImGui::DragFloat3("Scale", transform.scale.data, 0.1f, 0.f, 0.f);
-			});
-
-			drawComponent<animation_component>(selectedEntity, "Animation", [this](animation_component& anim)
+				appScene.deleteEntity(selectedEntity);
+				setSelectedEntity({});
+				objectMovedByWidget = true;
+			}
+			else
 			{
-				assert(selectedEntity.hasComponent<raster_component>());
-				raster_component& raster = selectedEntity.getComponent<raster_component>();
-
-				bool animationChanged = ImGui::Dropdown("Currently playing", [](uint32 index, void* data)
+				drawComponent<trs>(selectedEntity, "Transform", [this, &objectMovedByWidget](trs& transform)
 				{
-					animation_skeleton& skeleton = *(animation_skeleton*)data;
-					const char* result = 0;
-					if (index < (uint32)skeleton.clips.size())
+					objectMovedByWidget |= ImGui::DragFloat3("Translation", transform.position.data, 0.1f, 0.f, 0.f);
+
+					if (ImGui::DragFloat3("Rotation", selectedEntityEulerRotation.data, 0.1f, 0.f, 0.f))
 					{
-						result = skeleton.clips[index].name.c_str();
-					}
-					return result;
-				}, anim.animationIndex, &raster.mesh->skeleton);
+						vec3 euler = selectedEntityEulerRotation;
+						euler.x = deg2rad(euler.x);
+						euler.y = deg2rad(euler.y);
+						euler.z = deg2rad(euler.z);
+						transform.rotation = eulerToQuat(euler);
 
-				if (animationChanged)
+						objectMovedByWidget = true;
+					}
+
+					objectMovedByWidget |= ImGui::DragFloat3("Scale", transform.scale.data, 0.1f, 0.f, 0.f);
+				});
+
+				drawComponent<animation_component>(selectedEntity, "Animation", [this](animation_component& anim)
 				{
-					anim.time = 0.f;
-				}
-			});
+					assert(selectedEntity.hasComponent<raster_component>());
+					raster_component& raster = selectedEntity.getComponent<raster_component>();
+
+					bool animationChanged = ImGui::Dropdown("Currently playing", [](uint32 index, void* data)
+					{
+						animation_skeleton& skeleton = *(animation_skeleton*)data;
+						const char* result = 0;
+						if (index < (uint32)skeleton.clips.size())
+						{
+							result = skeleton.clips[index].name.c_str();
+						}
+						return result;
+					}, anim.animationIndex, &raster.mesh->skeleton);
+
+					if (animationChanged)
+					{
+						anim.time = 0.f;
+					}
+				});
+			}
 		}
 	}
 	ImGui::End();
@@ -644,16 +650,26 @@ bool application::handleUserInput(const user_input& input, float dt)
 
 	bool objectMovedByGizmo = false;
 
-	if (selectedEntity && selectedEntity.hasComponent<trs>())
+	if (selectedEntity)
 	{
-		trs& transform = selectedEntity.getComponent<trs>();
-
-		static transformation_type type = transformation_type_translation;
-		static transformation_space space = transformation_global;
-		if (manipulateTransformation(transform, type, space, camera, input, !inputCaptured, &overlayRenderPass))
+		if (selectedEntity.hasComponent<trs>())
 		{
-			setSelectedEntityEulerRotation();
-			inputCaptured = true;
+			trs& transform = selectedEntity.getComponent<trs>();
+
+			static transformation_type type = transformation_type_translation;
+			static transformation_space space = transformation_global;
+			if (manipulateTransformation(transform, type, space, camera, input, !inputCaptured, &overlayRenderPass))
+			{
+				setSelectedEntityEulerRotation();
+				inputCaptured = true;
+				objectMovedByGizmo = true;
+			}
+		}
+
+		if (input.keyboard[key_backspace].pressEvent || input.keyboard[key_delete].pressEvent)
+		{
+			appScene.deleteEntity(selectedEntity);
+			setSelectedEntity({});
 			objectMovedByGizmo = true;
 		}
 	}
@@ -779,8 +795,7 @@ void application::renderStaticGeometryToSunShadowMap()
 {
 	sun_shadow_render_pass& renderPass = sunShadowRenderPass;
 
-	appScene.group<raster_component>(entt::get<trs>, entt::exclude<animation_component>)
-		.each([&renderPass](entt::entity entityHandle, raster_component& raster, trs& transform)
+	for (auto [entityHandle, raster, transform] : appScene.group(entt::get<raster_component, trs>, entt::exclude<animation_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -792,13 +807,12 @@ void application::renderStaticGeometryToSunShadowMap()
 
 			renderPass.renderStaticObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
 		}
-	});
+	}
 }
 
 void application::renderStaticGeometryToShadowMap(spot_shadow_render_pass& renderPass)
 {
-	appScene.group<raster_component>(entt::get<trs>, entt::exclude<animation_component>)
-		.each([&renderPass](entt::entity entityHandle, raster_component& raster, trs& transform)
+	for (auto [entityHandle, raster, transform] : appScene.group(entt::get<raster_component, trs>, entt::exclude<animation_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -810,13 +824,12 @@ void application::renderStaticGeometryToShadowMap(spot_shadow_render_pass& rende
 
 			renderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
 		}
-	});
+	}
 }
 
 void application::renderStaticGeometryToShadowMap(point_shadow_render_pass& renderPass)
 {
-	appScene.group<raster_component>(entt::get<trs>, entt::exclude<animation_component>)
-		.each([&renderPass](entt::entity entityHandle, raster_component& raster, trs& transform)
+	for (auto [entityHandle, raster, transform] : appScene.group(entt::get<raster_component, trs>, entt::exclude<animation_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -828,15 +841,14 @@ void application::renderStaticGeometryToShadowMap(point_shadow_render_pass& rend
 
 			renderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
 		}
-	});
+	}
 }
 
 void application::renderDynamicGeometryToSunShadowMap()
 {
 	sun_shadow_render_pass& renderPass = sunShadowRenderPass;
 
-	appScene.group(entt::get<raster_component, trs, animation_component>)
-		.each([&renderPass](entt::entity entityHandle, raster_component& raster, trs& transform, animation_component& anim)
+	for (auto [entityHandle, raster, transform, anim] : appScene.group(entt::get<raster_component, trs, animation_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -846,13 +858,12 @@ void application::renderDynamicGeometryToSunShadowMap()
 			submesh_info submesh = anim.sms[i];
 			renderPass.renderDynamicObject(0, anim.vb, mesh.indexBuffer, submesh, m);
 		}
-	});
+	}
 }
 
 void application::renderDynamicGeometryToShadowMap(spot_shadow_render_pass& renderPass)
 {
-	appScene.group(entt::get<raster_component, trs, animation_component>)
-		.each([&renderPass](entt::entity entityHandle, raster_component& raster, trs& transform, animation_component& anim)
+	for (auto [entityHandle, raster, transform, anim] : appScene.group(entt::get<raster_component, trs, animation_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -862,13 +873,12 @@ void application::renderDynamicGeometryToShadowMap(spot_shadow_render_pass& rend
 			submesh_info submesh = anim.sms[i];
 			renderPass.renderDynamicObject(anim.vb, mesh.indexBuffer, submesh, m);
 		}
-	});
+	}
 }
 
 void application::renderDynamicGeometryToShadowMap(point_shadow_render_pass& renderPass)
 {
-	appScene.group(entt::get<raster_component, trs, animation_component>)
-		.each([&renderPass](entt::entity entityHandle, raster_component& raster, trs& transform, animation_component& anim)
+	for (auto [entityHandle, raster, transform, anim] : appScene.group(entt::get<raster_component, trs, animation_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -878,7 +888,7 @@ void application::renderDynamicGeometryToShadowMap(point_shadow_render_pass& ren
 			submesh_info submesh = anim.sms[i];
 			renderPass.renderDynamicObject(anim.vb, mesh.indexBuffer, submesh, m);
 		}
-	});
+	}
 }
 
 void application::update(const user_input& input, float dt)
@@ -921,8 +931,7 @@ void application::update(const user_input& input, float dt)
 		thread_job_context context;
 
 		// Skin animated meshes.
-		appScene.group<animation_component>(entt::get<raster_component>)
-			.each([dt, &context](animation_component& anim, raster_component& raster)
+		for (auto [entityHandle, anim, raster] : appScene.group(entt::get<animation_component, raster_component>).each())
 		{
 			anim.time += dt;
 			const dx_mesh& mesh = raster.mesh->mesh;
@@ -931,12 +940,12 @@ void application::update(const user_input& input, float dt)
 			auto [vb, vertexOffset, skinningMatrices] = skinObject(mesh.vertexBuffer, (uint32)skeleton.joints.size());
 
 			mat4* mats = skinningMatrices;
-			context.addWork([&skeleton, &anim, mats]()
-			{
-				trs localTransforms[128];
-				skeleton.sampleAnimation(skeleton.clips[anim.animationIndex].name, anim.time, localTransforms);
-				skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, mats);
-			});
+			//context.addWork([&skeleton, &anim, mats]()
+			//{
+			trs localTransforms[128];
+			skeleton.sampleAnimation(skeleton.clips[anim.animationIndex].name, anim.time, localTransforms);
+			skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, mats);
+			//});
 
 			anim.prevFrameVB = anim.vb;
 			anim.vb = vb;
@@ -949,7 +958,8 @@ void application::update(const user_input& input, float dt)
 				anim.sms[i] = raster.mesh->submeshes[i].info;
 				anim.sms[i].baseVertex += vertexOffset;
 			}
-		});
+		}
+
 
 		renderSunShadowMap(objectDragged);
 
@@ -971,11 +981,8 @@ void application::update(const user_input& input, float dt)
 
 
 
-
-
 		// Submit render calls.
-		appScene.group<raster_component>(entt::get<trs>)
-			.each([this](entt::entity entityHandle, raster_component& raster, trs& transform)
+		for (auto [entityHandle, raster, transform] : appScene.group(entt::get<raster_component, trs>).each())
 		{
 			const dx_mesh& mesh = raster.mesh->mesh;
 			mat4 m = trsToMat4(transform);
@@ -1024,7 +1031,7 @@ void application::update(const user_input& input, float dt)
 					}
 				}
 			}
-		});
+		}
 
 
 		context.waitForWorkCompletion();
@@ -1057,11 +1064,10 @@ void application::update(const user_input& input, float dt)
 		{
 			raytracingTLAS.reset();
 
-			appScene.group<raytrace_component>(entt::get<trs>)
-				.each([this](entt::entity entityHandle, raytrace_component& raytrace, trs& transform)
+			for (auto [entityHandle, raytrace, transform] : appScene.group(entt::get<raytrace_component, trs>).each())
 			{
 				raytracingTLAS.instantiate(raytrace.type, transform);
-			});
+			}
 
 			raytracingTLAS.build();
 
