@@ -24,9 +24,10 @@ static union
 		submesh_info rotationSubmesh;
 		submesh_info scaleSubmesh;
 		submesh_info planeSubmesh;
+		submesh_info boxSubmesh;
 	};
 
-	submesh_info submeshes[4];
+	submesh_info submeshes[5];
 };
 
 static bounding_cylinder cylinders[3] =
@@ -102,6 +103,7 @@ void initializeTransformationGizmos()
 	rotationSubmesh = mesh.pushTorus(6, 64, shaftLength, radius);
 	scaleSubmesh = mesh.pushMace(6, radius, headRadius, shaftLength, headLength);
 	planeSubmesh = mesh.pushCube(vec3(shaftLength, 0.01f, shaftLength) * 0.2f, false, vec3(shaftLength, 0.f, shaftLength) * 0.35f);
+	boxSubmesh = mesh.pushCube((shaftLength + headLength) * 0.3f);
 	::mesh = mesh.createDXMesh();
 
 	for (uint32 i = 0; i < 3; ++i)
@@ -299,79 +301,137 @@ static uint32 handleRotation(trs& transform, ray r, const user_input& input, tra
 	return dragging ? axisIndex : hoverAxisIndex;
 }
 
-static uint32 handleScaling(trs& transform, ray r, const user_input& input, transformation_space space, float scaling)
+static uint32 handleScaling(trs& transform, ray r, const user_input& input, transformation_space space, float scaling, const render_camera& camera)
 {
 	quat rot = (space == transformation_global) ? quat::identity : transform.rotation;
 
+	const float cylinderHeight = cylinders[0].positionB.x;
+	const float uniformRadius = cylinderHeight * 0.3f * scaling;
+
+	bounding_box uniformBox = bounding_box::fromCenterRadius(vec3(0.f), uniformRadius);
+
+	ray localRay = r;
+	if (space == transformation_local)
+	{
+		localRay.origin = inverseTransformPosition(transform, r.origin) * transform.scale; // inverseTransformPosition applies scale, but we don't want this.
+		localRay.direction = inverseTransformDirection(transform, r.direction);
+	}
+	else
+	{
+		localRay.origin -= transform.position;
+	}
+
 	uint32 hoverAxisIndex = -1;
 	float minT = FLT_MAX;
-	for (uint32 i = 0; i < 3; ++i)
+	if (localRay.intersectAABB(uniformBox, minT))
 	{
-		float t;
-		bounding_cylinder cylinder = { rot * cylinders[i].positionA * scaling + transform.position, rot * cylinders[i].positionB * scaling + transform.position, cylinders[i].radius * scaling };
-		if (r.intersectCylinder(cylinder, t) && t < minT)
+		hoverAxisIndex = 3;
+	}
+	else
+	{
+		float minT = FLT_MAX;
+		for (uint32 i = 0; i < 3; ++i)
 		{
-			hoverAxisIndex = i;
-			minT = t;
+			float t;
+			bounding_cylinder cylinder = { rot * cylinders[i].positionA * scaling + transform.position, rot * cylinders[i].positionB * scaling + transform.position, cylinders[i].radius * scaling };
+			if (r.intersectCylinder(cylinder, t) && t < minT)
+			{
+				hoverAxisIndex = i;
+				minT = t;
+			}
 		}
 	}
 
+
 	if (input.mouse.left.clickEvent && hoverAxisIndex != -1)
 	{
-		vec3 candidate0(0.f); candidate0.data[(hoverAxisIndex + 1) % 3] = 1.f;
-		vec3 candidate1(0.f); candidate1.data[(hoverAxisIndex + 2) % 3] = 1.f;
-
-		const vec4 axisPlanes[] =
+		if (hoverAxisIndex < 3)
 		{
-			createPlane(transform.position, rot * candidate0),
-			createPlane(transform.position, rot * candidate1),
-		};
+			// Non-uniform scaling.
+			vec3 candidate0(0.f); candidate0.data[(hoverAxisIndex + 1) % 3] = 1.f;
+			vec3 candidate1(0.f); candidate1.data[(hoverAxisIndex + 2) % 3] = 1.f;
 
-		dragging = true;
-		axisIndex = hoverAxisIndex;
+			const vec4 axisPlanes[] =
+			{
+				createPlane(transform.position, rot * candidate0),
+				createPlane(transform.position, rot * candidate1),
+			};
 
-		float a = abs(dot(r.direction, axisPlanes[0].xyz));
-		float b = abs(dot(r.direction, axisPlanes[1].xyz));
+			dragging = true;
+			axisIndex = hoverAxisIndex;
 
-		plane = (a > b) ? axisPlanes[0] : axisPlanes[1];
+			float a = abs(dot(r.direction, axisPlanes[0].xyz));
+			float b = abs(dot(r.direction, axisPlanes[1].xyz));
 
-		vec3 axis(0.f); axis.data[axisIndex] = 1.f;
-		axis = rot * axis;
+			plane = (a > b) ? axisPlanes[0] : axisPlanes[1];
 
-		float t;
-		r.intersectPlane(plane.xyz, plane.w, t);
-		anchor = dot(r.origin + t * r.direction - transform.position, axis);
-		originalScale = transform.scale;
+			vec3 axis(0.f); axis.data[axisIndex] = 1.f;
+			axis = rot * axis;
+
+			float t;
+			r.intersectPlane(plane.xyz, plane.w, t);
+			anchor = dot(r.origin + t * r.direction - transform.position, axis);
+			originalScale = transform.scale;
+		}
+		else
+		{
+			// Uniform scaling.
+			assert(hoverAxisIndex == 3);
+
+			dragging = true;
+			axisIndex = hoverAxisIndex;
+
+			plane = createPlane(transform.position, camera.rotation * vec3(0.f, 0.f, 1.f)); // Backward axis.
+
+			float t;
+			r.intersectPlane(plane.xyz, plane.w, t);
+			anchor = dot(r.origin + t * r.direction - transform.position, camera.rotation * vec3(1.f, 1.f, 0.f));
+			originalScale = transform.scale;
+		}
 	}
 
 	if (dragging)
 	{
-		float t;
-		r.intersectPlane(plane.xyz, plane.w, t);
-
-		vec3 axis(0.f); axis.data[axisIndex] = 1.f;
-		axis = rot * axis;
-
-		vec3 d = (dot(r.origin + t * r.direction - transform.position, axis) / anchor) * axis;
-
-		if (space == transformation_local)
+		if (axisIndex < 3)
 		{
-			d = conjugate(rot) * d;
-			transform.scale.data[axisIndex] = originalScale.data[axisIndex] * d.data[axisIndex];
+			float t;
+			r.intersectPlane(plane.xyz, plane.w, t);
+
+			vec3 axis(0.f); axis.data[axisIndex] = 1.f;
+			axis = rot * axis;
+
+			vec3 d = (dot(r.origin + t * r.direction - transform.position, axis) / anchor) * axis;
+
+			if (space == transformation_local)
+			{
+				d = conjugate(rot) * d;
+				transform.scale.data[axisIndex] = originalScale.data[axisIndex] * d.data[axisIndex];
+			}
+			else
+			{
+				d = conjugate(transform.rotation) * d;
+				axis = conjugate(transform.rotation) * axis;
+
+				d = abs(d);
+				axis = abs(axis);
+
+				float factorX = (d.x > 1.f) ? ((d.x - 1.f) * axis.x + 1.f) : (1.f - (1.f - d.x) * axis.x);
+				float factorY = (d.y > 1.f) ? ((d.y - 1.f) * axis.y + 1.f) : (1.f - (1.f - d.y) * axis.y);
+				float factorZ = (d.z > 1.f) ? ((d.z - 1.f) * axis.z + 1.f) : (1.f - (1.f - d.z) * axis.z);
+
+				transform.scale = originalScale * vec3(factorX, factorY, factorZ);
+			}
 		}
 		else
 		{
-			d = conjugate(transform.rotation) * d;
-			axis = conjugate(transform.rotation) * axis;
+			assert(axisIndex == 3);
 
-			d = abs(d);
-			axis = abs(axis);
+			float t;
+			r.intersectPlane(plane.xyz, plane.w, t);
 
-			float factorX = (d.x > 1.f) ? ((d.x - 1.f) * axis.x + 1.f) : (1.f - (1.f - d.x) * axis.x);
-			float factorY = (d.y > 1.f) ? ((d.y - 1.f) * axis.y + 1.f) : (1.f - (1.f - d.y) * axis.y);
-			float factorZ = (d.z > 1.f) ? ((d.z - 1.f) * axis.z + 1.f) : (1.f - (1.f - d.z) * axis.z);
-
-			transform.scale = originalScale * vec3(factorX, factorY, factorZ);
+			float d = (dot(r.origin + t * r.direction - transform.position, camera.rotation * vec3(1.f, 1.f, 0.f)) / anchor);
+			
+			transform.scale = originalScale * d;
 		}
 	}
 
@@ -435,7 +495,7 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 		{
 			case transformation_type_translation: highlightAxis = handleTranslation(transform, r, input, space, snapping, scaling); break;
 			case transformation_type_rotation: highlightAxis = handleRotation(transform, r, input, space, snapping, scaling); break;
-			case transformation_type_scale: highlightAxis = handleScaling(transform, r, input, space, scaling); break; // TODO: Snapping for scale.
+			case transformation_type_scale: highlightAxis = handleScaling(transform, r, input, space, scaling, camera); break; // TODO: Snapping for scale.
 		}
 	}
 
@@ -472,6 +532,18 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 				submeshes[type],
 				materials[i],
 				createModelMatrix(transform.position, rotations[i], scaling),
+				true
+			);
+		}
+
+		if (type == transformation_type_scale)
+		{
+			materials[3]->color = vec4(0.5f) * (highlightAxis == 3 ? 0.5f : 1.f);
+
+			overlayRenderPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
+				boxSubmesh,
+				materials[3],
+				createModelMatrix(transform.position, rot, scaling),
 				true
 			);
 		}
