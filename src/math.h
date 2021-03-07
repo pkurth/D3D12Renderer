@@ -34,7 +34,27 @@ static constexpr bool isPowerOfTwo(uint32 i)
 	return (i & (i - 1)) == 0;
 }
 
-// Constexpr-version of _BitScanForward.
+static float easeInQuadratic(float t)	 { return t * t; }
+static float easeOutQuadratic(float t)	 { return t * (2.f - t); }
+static float easeInOutQuadratic(float t) { return t < 0.5f ? 2.f * t * t : -1.f + (4.f - 2.f * t) * t; }
+static float easeInCubic(float t)		 { return t * t * t; }
+static float easeOutCubic(float t)		 { float tmin1 = t - 1.f; return tmin1 * tmin1 * tmin1 + 1.f; }
+static float easeInOutCubic(float t)	 { return t < 0.5f ? 4.f * t * t * t : (t - 1.f) * (2.f * t - 2.f) * (2.f * t - 2.f) + 1.f; }
+static float easeInQuartic(float t)		 { return t * t * t * t; }
+static float easeOutQuartic(float t)	 { float tmin1 = t - 1.f; return 1.f - tmin1 * tmin1 * tmin1 * tmin1; }
+static float easeInOutQuartic(float t)	 { float tmin1 = t - 1.f; return t < 0.5f ? 8.f * t * t * t * t : 1.f - 8.f * tmin1 * tmin1 * tmin1 * tmin1; }
+static float easeInQuintic(float t)		 { return t * t * t * t * t; }
+static float easeOutQuintic(float t)	 { float tmin1 = t - 1.f; return 1.f + tmin1 * tmin1 * tmin1 * tmin1 * tmin1; }
+static float easeInOutQuintic(float t)	 { float tmin1 = t - 1.f; return t < 0.5 ? 16.f * t * t * t * t * t : 1.f + 16.f * tmin1 * tmin1 * tmin1 * tmin1 * tmin1; }
+
+
+static float getFramerateIndependentT(float speed, float dt)
+{
+	return 1.f - expf(-speed * dt);
+}
+
+
+// Constexpr-version of _BitScanForward. Does not check whether the mask is 0.
 static constexpr uint32 indexOfLeastSignificantSetBit(uint32 mask)
 {
 	uint32 count = 0;
