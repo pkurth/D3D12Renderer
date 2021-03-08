@@ -10,14 +10,6 @@ RWStructuredBuffer<uint> currentAliveList				: register(u5);
 RWStructuredBuffer<uint> newAliveList					: register(u6);
 
 
-static void simulateParticle(inout particle_data particle, float dt)
-{
-	float3 gravity = float3(0.f, -9.81f * dt, 0.f);
-	particle.position = particle.position + 0.5f * gravity * dt + particle.velocity * dt;
-	particle.velocity = particle.velocity + gravity;
-}
-
-
 [numthreads(PARTICLES_SIMULATE_BLOCK_SIZE, 1, 1)]
 [RootSignature(PARTICLES_COMPUTE_RS)]
 void main(cs_input IN)

@@ -6,3 +6,4 @@ bin_int/
 *.filters
 shaders/bin/
 assets/
+shaders/generated/

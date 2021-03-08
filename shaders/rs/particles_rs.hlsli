@@ -4,14 +4,6 @@
 #include "transform.hlsli"
 
 
-struct particle_data
-{
-	vec3 position;
-	float life;
-	vec3 velocity;
-	uint32 random;
-};
-
 #ifdef HLSL
 struct D3D12_DISPATCH_ARGUMENTS
 {

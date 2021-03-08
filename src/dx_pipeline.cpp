@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "dx_pipeline.h"
 #include "threading.h"
+#include "string.h"
 
 #include <unordered_map>
 #include <set>
@@ -19,12 +20,6 @@ struct shader_file
 
 	struct reloadable_root_signature* rootSignature;
 };
-
-
-static std::wstring stringToWideString(const std::string& s)
-{
-	return std::wstring(s.begin(), s.end());
-}
 
 enum desc_type
 {
@@ -147,7 +142,7 @@ static reloadable_root_signature* pushBlob(const char* filename, reloadable_pipe
 		{
 			// New file.
 
-			std::wstring filepath = shaderDir + stringToWideString(filename) + L".cso";
+			std::wstring filepath = shaderDir + stringToWstring(filename) + L".cso";
 
 			dx_blob blob;
 			checkResult(D3DReadFileToBlob(filepath.c_str(), &blob));

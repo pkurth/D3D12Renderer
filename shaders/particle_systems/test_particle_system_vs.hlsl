@@ -1,4 +1,5 @@
 #include "particles_rs.hlsli"
+#include "test_particle_system.hlsli"
 
 ConstantBuffer<transform_cb> transform		: register(b0);
 StructuredBuffer<particle_data> particles	: register(t0);

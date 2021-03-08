@@ -9,18 +9,6 @@ RWStructuredBuffer<uint> deadList						: register(u4);
 RWStructuredBuffer<uint> currentAliveList				: register(u5);
 
 
-static particle_data emitParticle(uint rng)
-{
-	particle_data particle = {
-		float3(rng * 3, 0.f, 0.f),
-		5.f,
-		float3(0.f, 0.f, 0.f),
-		rng
-	};
-
-	return particle;
-}
-
 [numthreads(PARTICLES_EMIT_BLOCK_SIZE, 1, 1)]
 [RootSignature(PARTICLES_COMPUTE_RS)]
 void main(cs_input IN)

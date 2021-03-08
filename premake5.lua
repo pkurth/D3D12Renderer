@@ -8,6 +8,11 @@ local turing_or_higher = false
 local sdk_exists = false
 local dxc_exists = false
 
+
+-------------------------
+-- CHECK GPU
+-------------------------
+
 if not _OPTIONS["no-turing"] then
 	local handle = io.popen("wmic path win32_VideoController get name")
 	local gpu_string = handle:read("*a")
@@ -22,6 +27,11 @@ if not _OPTIONS["no-turing"] then
 		end
 	end
 end
+
+
+-------------------------
+-- CHECK WINDOWS SDK
+-------------------------
 
 local sdk_directory = os.getenv("programfiles(x86)") .. "/Windows Kits/10/bin/"
 local sdk_directory_handle = io.popen('dir "'..sdk_directory..'" /b')
@@ -66,6 +76,61 @@ local all_exist = turing_or_higher and dxc_exists and sdk_exists
 if not all_exist then
 	print("Disabling mesh shader compilation, since not all requirements are met.")
 end
+
+
+
+-------------------------
+-- GENERATING SHADERS
+-------------------------
+
+print("Generating custom shaders..")
+
+local generated_directory = "shaders/generated/"
+os.mkdir(generated_directory)
+
+local generated_directory_handle = io.popen('dir "'..generated_directory..'" /b')
+for filename in generated_directory_handle:lines() do
+	os.remove(generated_directory..filename)
+end
+
+
+local local_particle_system_directory = "particle_systems/"
+
+local particle_system_directory = "shaders/" .. local_particle_system_directory
+local shader_directory_handle = io.popen('dir "'..particle_system_directory..'" /b')
+
+local emitFile = assert(io.open("shaders/particles/particle_emit_template.hlsl", "r"))
+local emitContent = emitFile:read("*all")
+emitFile:close()
+
+local simFile = assert(io.open("shaders/particles/particle_sim_template.hlsl", "r"))
+local simContent = simFile:read("*all")
+simFile:close()
+
+for filename in shader_directory_handle:lines() do
+	if filename:sub(-string.len(".hlsli")) == ".hlsli" then
+		local stem = filename:match("(.+)%..+")
+		local newEmitContent = '#include "../' .. local_particle_system_directory .. filename .. '"\n\n' .. emitContent
+		local newSimContent = '#include "../' .. local_particle_system_directory .. filename .. '"\n\n' .. simContent
+	
+		local newEmitFile = assert(io.open(generated_directory .. "particle_emit_" .. stem .. "_cs.hlsl", "w"))
+		newEmitFile:write(newEmitContent)
+		newEmitFile:close()
+	
+		local newSimFile = assert(io.open(generated_directory .. "particle_sim_" .. stem .. "_cs.hlsl", "w"))
+		newSimFile:write(newSimContent)
+		newSimFile:close()
+
+		print("- Generated particle system '" .. stem .. "'.")
+	end
+end
+
+
+
+-------------------------
+-- GENERATE SOLUTION
+-------------------------
+
 
 workspace "D3D12Renderer"
 	architecture "x64"

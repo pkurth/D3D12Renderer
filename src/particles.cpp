@@ -23,7 +23,6 @@ static ref<dx_buffer> particleDrawCommandBuffer;
 static uint32 particleSystemCounter = 0;
 
 
-typedef uint32 particle_index_type; // This does not work for other types currently.
 
 void particle_system::initialize(uint32 maxNumParticles, float emitRate)
 {
@@ -31,9 +30,9 @@ void particle_system::initialize(uint32 maxNumParticles, float emitRate)
 	this->emitRate = emitRate;
 	this->index = particleSystemCounter++;
 
-	std::vector<particle_index_type> dead(maxNumParticles);
+	std::vector<uint32> dead(maxNumParticles);
 
-	for (particle_index_type i = 0; i < (particle_index_type)maxNumParticles; ++i)
+	for (uint32 i = 0; i < maxNumParticles; ++i)
 	{
 		dead[i] = i;
 	}
@@ -42,16 +41,16 @@ void particle_system::initialize(uint32 maxNumParticles, float emitRate)
 	counters.numDeadParticles = maxNumParticles;
 
 
-	particlesBuffer = createBuffer(sizeof(particle_data), maxNumParticles, 0, true);
+	particlesBuffer = createBuffer(32, maxNumParticles, 0, true);
 
 
 	// Lists.
 	listBuffer = createBuffer(1, 
 		sizeof(particle_counters)
-		+ maxNumParticles * 3 * sizeof(particle_index_type),
+		+ maxNumParticles * 3 * sizeof(uint32),
 		0, true);
 	updateBufferDataRange(listBuffer, &counters, 0, sizeof(particle_counters));
-	updateBufferDataRange(listBuffer, dead.data(), getDeadListOffset(), maxNumParticles * sizeof(particle_index_type));
+	updateBufferDataRange(listBuffer, dead.data(), getDeadListOffset(), maxNumParticles * sizeof(uint32));
 
 
 
@@ -170,7 +169,7 @@ uint32 particle_system::getAliveListOffset(uint32 alive)
 	assert(alive == 0 || alive == 1);
 
 	return getDeadListOffset() +
-		(1 + alive) * maxNumParticles * (uint32)sizeof(particle_index_type);
+		(1 + alive) * maxNumParticles * (uint32)sizeof(uint32);
 }
 
 uint32 particle_system::getDeadListOffset()
@@ -195,12 +194,12 @@ void initializeParticlePipeline()
 		//.additiveBlending(0)
 		.depthSettings(true, false);
 
-	renderPipeline = createReloadablePipeline(desc, { "particles_vs", "particles_flat_ps" });
+	renderPipeline = createReloadablePipeline(desc, { "test_particle_system_vs", "test_particle_system_ps" });
 
 
 	startPipeline = createReloadablePipeline("particle_start_cs");
-	emitPipeline = createReloadablePipeline("particle_emit_cs");
-	simulatePipeline = createReloadablePipeline("particle_sim_cs");
+	emitPipeline = createReloadablePipeline("particle_emit_test_particle_system_cs");
+	simulatePipeline = createReloadablePipeline("particle_sim_test_particle_system_cs");
 
 	D3D12_INDIRECT_ARGUMENT_DESC argumentDesc;
 	argumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
