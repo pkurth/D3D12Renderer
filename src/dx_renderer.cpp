@@ -536,7 +536,7 @@ void dx_renderer::gaussianBlur(dx_command_list* cl, ref<dx_texture> inputOutput,
 			cl->dispatch(widthBuckets, heightBuckets);
 
 			barrier_batcher(cl)
-				.uav(temp)
+				//.uav(temp)
 				.transition(temp, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 				.transition(inputOutput, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		}
@@ -558,7 +558,7 @@ void dx_renderer::gaussianBlur(dx_command_list* cl, ref<dx_texture> inputOutput,
 			cl->dispatch(widthBuckets, heightBuckets);
 
 			barrier_batcher(cl)
-				.uav(inputOutput)
+				//.uav(inputOutput)
 				.transition(temp, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 				.transition(inputOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		}
@@ -604,7 +604,7 @@ void dx_renderer::tonemap(dx_command_list* cl, const ref<dx_texture>& hdrResult,
 	cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
 
 	barrier_batcher(cl)
-		.uav(ldrPostProcessingTexture)
+		//.uav(ldrPostProcessingTexture)
 		.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, transitionLDR);
 }
 
@@ -981,7 +981,7 @@ void dx_renderer::endFrame(const user_input& input)
 			cl->dispatch(bucketize((uint32)width, POST_PROCESSING_BLOCK_SIZE), bucketize((uint32)height, POST_PROCESSING_BLOCK_SIZE));
 
 			barrier_batcher(cl)
-				.uav(linearDepthBuffer)
+				//.uav(linearDepthBuffer)
 				.transitionBegin(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 		}
@@ -1471,7 +1471,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->dispatch(bucketize(SSR_RAYCAST_WIDTH, SSR_BLOCK_SIZE), bucketize(SSR_RAYCAST_HEIGHT, SSR_BLOCK_SIZE));
 
 				barrier_batcher(cl)
-					.uav(ssrRaycastTexture)
+					//.uav(ssrRaycastTexture)
 					.transition(ssrRaycastTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 			}
 
@@ -1495,7 +1495,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->dispatch(bucketize(SSR_RESOLVE_WIDTH, SSR_BLOCK_SIZE), bucketize(SSR_RESOLVE_HEIGHT, SSR_BLOCK_SIZE));
 
 				barrier_batcher(cl)
-					.uav(ssrResolveTexture)
+					//.uav(ssrResolveTexture)
 					.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 					.transitionBegin(ssrRaycastTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 			}
@@ -1519,7 +1519,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->dispatch(bucketize(SSR_RESOLVE_WIDTH, SSR_BLOCK_SIZE), bucketize(SSR_RESOLVE_HEIGHT, SSR_BLOCK_SIZE));
 
 				barrier_batcher(cl)
-					.uav(ssrTemporalTextures[ssrOutputIndex])
+					//.uav(ssrTemporalTextures[ssrOutputIndex])
 					.transition(ssrTemporalTextures[ssrOutputIndex], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 					.transitionBegin(ssrTemporalTextures[ssrHistoryIndex], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 					.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -1539,7 +1539,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->dispatch(bucketize(SSR_RESOLVE_WIDTH, SSR_BLOCK_SIZE), bucketize(SSR_RESOLVE_HEIGHT, SSR_BLOCK_SIZE));
 
 				barrier_batcher(cl)
-					.uav(ssrResolveTexture)
+					//.uav(ssrResolveTexture)
 					.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 			}
 
@@ -1550,7 +1550,7 @@ void dx_renderer::endFrame(const user_input& input)
 			}
 
 			barrier_batcher(cl)
-				.uav(hdrPostProcessingTexture)
+				//.uav(hdrPostProcessingTexture)
 				.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE); // Will be read by rest of post processing stack. 
 
 		}
@@ -1561,7 +1561,7 @@ void dx_renderer::endFrame(const user_input& input)
 			specularAmbient(cl, materialInfo.cameraCBV, hdrResult, 0, hdrPostProcessingTexture);
 
 			barrier_batcher(cl)
-				.uav(hdrPostProcessingTexture)
+				//.uav(hdrPostProcessingTexture)
 				.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE); // Will be read by rest of post processing stack. 
 
 		}
@@ -1711,7 +1711,7 @@ void dx_renderer::endFrame(const user_input& input)
 			hdrResult = taaTextures[taaOutputIndex];
 
 			barrier_batcher(cl)
-				.uav(taaTextures[taaOutputIndex])
+				//.uav(taaTextures[taaOutputIndex])
 				.transition(taaTextures[taaOutputIndex], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) // Will be read by rest of post processing stack. Can stay in read state, since it is read as history next frame.
 				.transition(taaTextures[taaHistoryIndex], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // Will be used as UAV next frame.
 
@@ -1740,7 +1740,7 @@ void dx_renderer::endFrame(const user_input& input)
 			cl->dispatch(bucketize(prevFrameHDRColorTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(prevFrameHDRColorTexture->height, POST_PROCESSING_BLOCK_SIZE));
 
 			barrier_batcher(cl)
-				.uav(prevFrameHDRColorTexture)
+				//.uav(prevFrameHDRColorTexture)
 				.transition(prevFrameHDRColorTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
 			for (uint32 i = 0; i < prevFrameHDRColorTexture->numMipLevels - 1; ++i)
@@ -1780,7 +1780,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 			{
 				barrier_batcher batcher(cl);
-				batcher.uav(bloomTexture);
+				//batcher.uav(bloomTexture);
 				batcher.transition(bloomTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
 				if (state != D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
@@ -1812,7 +1812,7 @@ void dx_renderer::endFrame(const user_input& input)
 			hdrResult = bloomResult;
 
 			barrier_batcher(cl)
-				.uav(hdrResult)
+				//.uav(bloomResult)
 				.transition(bloomResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) // Will be read by rest of post processing stack. 
 				.transition(bloomTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.
 
@@ -1962,7 +1962,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 		barrier_batcher(cl)
-			.uav(frameResult)
+			//.uav(frameResult)
 			.transition(shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
 			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
 			.transition(hdrPostProcessingTexture, hdrPostProcessingTextureState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) // If texture is unused, this results in a NOP.
@@ -1993,7 +1993,7 @@ void dx_renderer::endFrame(const user_input& input)
 		cl->resetToDynamicDescriptorHeap();
 
 		barrier_batcher(cl)
-			.uav(hdrColorTexture)
+			//.uav(hdrColorTexture)
 			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
 
