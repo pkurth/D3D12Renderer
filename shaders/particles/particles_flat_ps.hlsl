@@ -2,11 +2,11 @@
 
 struct ps_input
 {
-	float4 color			: COLOR;
+	float3 color			: COLOR;
 };
 
 [RootSignature(PARTICLES_RS)]
 float4 main(ps_input IN) : SV_TARGET
 {
-	return IN.color;
+	return float4(IN.color, 1.f);
 }

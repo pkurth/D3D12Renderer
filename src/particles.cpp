@@ -3,149 +3,210 @@
 #include "dx_pipeline.h"
 #include "dx_renderer.h"
 #include "camera.h"
+#include "geometry.h"
 #include "dx_context.h"
-#include "material.hlsli"
+#include "dx_command_list.h"
+#include "dx_barrier_batcher.h"
+#include "dx_profiling.h"
+#include "particles_rs.hlsli"
 
-static dx_pipeline flatPipeline;
+static dx_pipeline renderPipeline;
 
-static D3D12_INPUT_ELEMENT_DESC inputLayout[] = 
+static dx_pipeline startPipeline;
+static dx_pipeline emitPipeline;
+static dx_pipeline simulatePipeline;
+
+static dx_command_signature commandSignature;
+
+static ref<dx_buffer> particleDrawCommandBuffer;
+
+static uint32 particleSystemCounter = 0;
+
+
+typedef uint32 particle_index_type; // This does not work for other types currently.
+
+void particle_system::initialize(uint32 maxNumParticles, float emitRate)
 {
-	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-	{ "TEXCOORDS", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	this->maxNumParticles = maxNumParticles;
+	this->emitRate = emitRate;
+	this->index = particleSystemCounter++;
 
-	{ "INSTANCEPOSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
-	{ "INSTANCECOLOR", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-	// We are using the semantic index here to append 0 or 1 to the name.
-	{ "INSTANCETEXCOORDS", 0, DXGI_FORMAT_R32G32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-	{ "INSTANCETEXCOORDS", 1, DXGI_FORMAT_R32G32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-};
+	std::vector<particle_index_type> dead(maxNumParticles);
 
-struct particle_vertex
-{
-	vec3 position;
-	vec2 uv;
-};
+	for (particle_index_type i = 0; i < (particle_index_type)maxNumParticles; ++i)
+	{
+		dead[i] = i;
+	}
 
-struct particle_instance_data
-{
-	vec3 position;
-	uint32 color;
-	vec2 uv0;
-	vec2 uv1;
-};
+	particle_counters counters = {};
+	counters.numDeadParticles = maxNumParticles;
 
 
-void particle_system::initialize(uint32 numParticles)
-{
-	particles.reserve(numParticles);
-	particleSpawnAccumulator = 0.f;
+	particlesBuffer = createBuffer(sizeof(particle_data), maxNumParticles, 0, true);
 
-	rng = { 512839 };
+
+	// Lists.
+	listBuffer = createBuffer(1, 
+		sizeof(particle_counters)
+		+ maxNumParticles * 3 * sizeof(particle_index_type),
+		0, true);
+	updateBufferDataRange(listBuffer, &counters, 0, sizeof(particle_counters));
+	updateBufferDataRange(listBuffer, dead.data(), getDeadListOffset(), maxNumParticles * sizeof(particle_index_type));
+
+
+
+	// Dispatch.
+	dispatchBuffer = createBuffer((uint32)sizeof(particle_dispatch), 1, 0, true);
+
+
+
+	// Mesh.
+	cpu_mesh cpuMesh(mesh_creation_flags_with_positions);
+	submesh_info cubeSubmesh = cpuMesh.pushCube(1.f);
+	mesh = cpuMesh.createDXMesh();
+
+	particle_draw draw = {};
+	draw.arguments.IndexCountPerInstance = cubeSubmesh.numTriangles * 3;
+	updateBufferDataRange(particleDrawCommandBuffer, &draw, (uint32)sizeof(particle_draw) * index, (uint32)sizeof(particle_draw));
+
+
 
 	material = make_ref<particle_material>();
 }
 
 void particle_system::update(float dt)
 {
-	uint32 numParticles = (uint32)particles.size();
-	for (uint32 i = 0; i < numParticles; ++i)
+	dx_command_list* cl = dxContext.getFreeRenderCommandList();
+
 	{
-		particle_data& p = particles[i];
-		p.timeAlive += dt;
-		if (p.timeAlive >= p.maxLifetime)
+		DX_PROFILE_BLOCK(cl, "Particle system update");
+
+		// Buffers get promoted to D3D12_RESOURCE_STATE_UNORDERED_ACCESS implicitly, so we can omit this.
+		//cl->transitionBarrier(dispatchBuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+
+		// ----------------------------------------
+		// START
+		// ----------------------------------------
+
 		{
-			std::swap(p, particles[numParticles - 1]);
-			--numParticles;
-			--i;
+			DX_PROFILE_BLOCK(cl, "Start");
+
+			cl->setPipelineState(*startPipeline.pipeline);
+			cl->setComputeRootSignature(*startPipeline.rootSignature);
+
+			cl->setRootComputeUAV(0, dispatchBuffer);
+			setResources(cl);
+
+			cl->dispatch(1);
+			barrier_batcher(cl)
+				//.uav(dispatchBuffer)
+				.uav(particleDrawCommandBuffer)
+				.transition(dispatchBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
 		}
+
+		// ----------------------------------------
+		// EMIT
+		// ----------------------------------------
+
+		{
+			DX_PROFILE_BLOCK(cl, "Emit");
+
+			cl->setPipelineState(*emitPipeline.pipeline);
+			cl->setComputeRootSignature(*emitPipeline.rootSignature);
+
+			//setResources(cl); // Already set.
+
+			cl->dispatchIndirect(commandSignature, 1, dispatchBuffer, 0);
+			barrier_batcher(cl)
+				.uav(particleDrawCommandBuffer)
+				.uav(particlesBuffer)
+				.uav(listBuffer);
+		}
+
+		// ----------------------------------------
+		// SIMULATE
+		// ----------------------------------------
+
+		{
+			DX_PROFILE_BLOCK(cl, "Simulate");
+
+			cl->setPipelineState(*simulatePipeline.pipeline);
+			cl->setComputeRootSignature(*simulatePipeline.rootSignature);
+
+			//setResources(cl); // Already set.
+
+			cl->dispatchIndirect(commandSignature, 1, dispatchBuffer, sizeof(D3D12_DISPATCH_ARGUMENTS));
+			barrier_batcher(cl)
+				.uav(particleDrawCommandBuffer)
+				.uav(particlesBuffer)
+				.uav(listBuffer);
+		}
+
+		currentAlive = 1 - currentAlive;
+
+
+		// Buffers decay to D3D12_RESOURCE_STATE_COMMON implicitly, so we can omit this.
+		//cl->transitionBarrier(dispatchBuffer, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_COMMON);
 	}
-	particles.resize(numParticles);
 
-	vec3 gravity(0.f, -9.81f * gravityFactor * dt, 0.f);
-	//uint32 textureSlices = textureAtlas.slicesX * textureAtlas.slicesY;
-	for (uint32 i = 0; i < numParticles; ++i)
-	{
-		particle_data& p = particles[i];
-		p.position = p.position + 0.5f * gravity * dt + p.velocity * dt;
-		p.velocity = p.velocity + gravity;
-		float relLifetime = p.timeAlive / p.maxLifetime;
-		p.color = color.interpolate(relLifetime, p.color);
-		//if (textureAtlas.texture)
-		//{
-		//	uint32 index = (uint32)(relLifetime * textureSlices);
-		//	index = min(index, textureSlices - 1);
-		//	auto [uv0, uv1] = textureAtlas.getUVs(index);
-		//	p.uv0 = uv0;
-		//	p.uv1 = uv1;
-		//}
-	}
-
-	particleSpawnAccumulator += spawnRate * dt;
-	uint32 spaceLeft = (uint32)particles.capacity() - numParticles;
-	uint32 numNewParticles = min((uint32)particleSpawnAccumulator, spaceLeft);
-
-	particleSpawnAccumulator -= numNewParticles;
-
-	for (uint32 i = 0; i < numNewParticles; ++i)
-	{
-		particle_data p;
-		p.position = spawnPosition;
-		p.timeAlive = 0.f;
-		p.velocity = startVelocity.start(rng);
-		p.color = color.start(rng);
-		p.maxLifetime = maxLifetime.start(rng);
-		//if (textureAtlas.texture)
-		//{
-		//	auto [uv0, uv1] = textureAtlas.getUVs(0, 0);
-		//	p.uv0 = uv0;
-		//	p.uv1 = uv1;
-		//}
-
-		particles.push_back(p);
-	}
+	dxContext.executeCommandList(cl);
 }
 
-void particle_system::render(const render_camera& camera, transparent_render_pass* renderPass)
+void particle_system::setResources(dx_command_list* cl)
 {
-	std::vector<particle_instance_data> instanceData(particles.size());
-	for (uint32 i = 0; i < (uint32)particles.size(); ++i)
-	{
-		instanceData[i].position = particles[i].position;
-		instanceData[i].color = packColor(particles[i].color);
-		instanceData[i].uv0 = particles[i].uv0;
-		instanceData[i].uv1 = particles[i].uv1;
-	}
+	uint32 nextAlive = 1 - currentAlive;
 
-	float size = 0.1f;
-	vec3 right = camera.rotation * vec3(0.5f * size, 0.f, 0.f);
-	vec3 up = camera.rotation * vec3(0.f, 0.5f * size, 0.f);
-
-	particle_vertex vertices[] =
-	{
-		{ -right - up, vec2(0.f, 0.f) },
-		{  right - up, vec2(1.f, 0.f) },
-		{ -right + up, vec2(0.f, 1.f) },
-		{  right + up, vec2(1.f, 1.f) },
-	};
-
-	if (particles.size())
-	{
-		dx_dynamic_vertex_buffer tmpVertexBuffer = dxContext.createDynamicVertexBuffer(vertices, arraysize(vertices));
-		dx_dynamic_vertex_buffer tmpInstanceBuffer = dxContext.createDynamicVertexBuffer(instanceData.data(), (uint32)instanceData.size());
-
-		renderPass->renderParticles(tmpVertexBuffer, tmpInstanceBuffer, mat4::identity, material, (uint32)particles.size());
-	}
+	cl->setRootComputeUAV(1, particleDrawCommandBuffer->gpuVirtualAddress + sizeof(particle_draw) * index);
+	cl->setRootComputeUAV(2, listBuffer->gpuVirtualAddress);
+	cl->setRootComputeUAV(3, particlesBuffer);
+	cl->setRootComputeUAV(4, listBuffer->gpuVirtualAddress + getDeadListOffset());
+	cl->setRootComputeUAV(5, listBuffer->gpuVirtualAddress + getAliveListOffset(currentAlive));
+	cl->setRootComputeUAV(6, listBuffer->gpuVirtualAddress + getAliveListOffset(nextAlive));
 }
 
-void particle_material::initializePipeline()
+uint32 particle_system::getAliveListOffset(uint32 alive)
+{
+	assert(alive == 0 || alive == 1);
+
+	return getDeadListOffset() +
+		(1 + alive) * maxNumParticles * (uint32)sizeof(particle_index_type);
+}
+
+uint32 particle_system::getDeadListOffset()
+{
+	return (uint32)sizeof(particle_counters);
+}
+
+void particle_system::testRender(transparent_render_pass* renderPass)
+{
+	renderPass->renderParticles(mesh.vertexBuffer, mesh.indexBuffer, particlesBuffer,
+		listBuffer, getAliveListOffset(currentAlive),
+		particleDrawCommandBuffer, index * particleDrawCommandBuffer->elementSize,
+		createModelMatrix(vec3(0.f, 20.f, 0.f), quat::identity),
+		material);
+}
+
+void initializeParticlePipeline()
 {
 	auto desc = CREATE_GRAPHICS_PIPELINE
-		.inputLayout(inputLayout)
+		.inputLayout(inputLayout_position)
 		.renderTargets(dx_renderer::transparentLightPassFormats, arraysize(dx_renderer::transparentLightPassFormats), dx_renderer::hdrDepthStencilFormat)
-		.additiveBlending(0)
+		//.additiveBlending(0)
 		.depthSettings(true, false);
 
-	flatPipeline = createReloadablePipeline(desc, { "particles_vs", "particles_flat_ps" });
+	renderPipeline = createReloadablePipeline(desc, { "particles_vs", "particles_flat_ps" });
+
+
+	startPipeline = createReloadablePipeline("particle_start_cs");
+	emitPipeline = createReloadablePipeline("particle_emit_cs");
+	simulatePipeline = createReloadablePipeline("particle_sim_cs");
+
+	D3D12_INDIRECT_ARGUMENT_DESC argumentDesc;
+	argumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
+	commandSignature = createCommandSignature({}, &argumentDesc, 1, sizeof(D3D12_DISPATCH_ARGUMENTS));
+
+	particleDrawCommandBuffer = createBuffer(sizeof(particle_draw), 1, 0, true);
 }
 
 void particle_material::prepareForRendering(dx_command_list* cl)
@@ -154,6 +215,6 @@ void particle_material::prepareForRendering(dx_command_list* cl)
 
 void particle_material::setupTransparentPipeline(dx_command_list* cl, const common_material_info& info)
 {
-	cl->setPipelineState(*flatPipeline.pipeline);
-	cl->setGraphicsRootSignature(*flatPipeline.rootSignature);
+	cl->setPipelineState(*renderPipeline.pipeline);
+	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);
 }

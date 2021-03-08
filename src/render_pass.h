@@ -224,7 +224,9 @@ struct transparent_render_pass : geometry_render_pass
 	}
 
 	template <typename material_t>
-	void renderParticles(dx_dynamic_vertex_buffer vertexBuffer, dx_dynamic_vertex_buffer instanceBuffer, const mat4& transform, const ref<material_t>& material, uint32 numParticles)
+	void renderParticles(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer,
+		const ref<dx_buffer>& particleBuffer, const ref<dx_buffer>& aliveList, uint32 aliveListOffset, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset,
+		const mat4& transform, const ref<material_t>& material)
 	{
 		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
 
@@ -234,10 +236,14 @@ struct transparent_render_pass : geometry_render_pass
 			{
 				transform,
 				vertexBuffer,
-				instanceBuffer,
+				indexBuffer,
+				particleBuffer,
+				aliveList,
+				commandBuffer,
 				material,
 				setupFunc,
-				numParticles,
+				aliveListOffset,
+				commandBufferOffset,
 			}
 		);
 	}
@@ -249,11 +255,15 @@ private:
 	struct particle_draw_call
 	{
 		mat4 transform;
-		dx_dynamic_vertex_buffer vertexBuffer;
-		dx_dynamic_vertex_buffer instanceBuffer;
+		ref<dx_vertex_buffer> vertexBuffer;
+		ref<dx_index_buffer> indexBuffer;
+		ref<dx_buffer> particleBuffer;
+		ref<dx_buffer> aliveList;
+		ref<dx_buffer> commandBuffer;
 		ref<material_base> material;
 		material_setup_function materialSetupFunc;
-		uint32 numParticles;
+		uint32 aliveListOffset;
+		uint32 commandBufferOffset;
 	};
 
 	std::vector<particle_draw_call> particleDrawCalls;

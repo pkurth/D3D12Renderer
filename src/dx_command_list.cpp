@@ -447,26 +447,26 @@ void dx_command_list::drawIndexed(uint32 indexCount, uint32 instanceCount, uint3
 	commandList->DrawIndexedInstanced(indexCount, instanceCount, startIndex, baseVertex, startInstance);
 }
 
-void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 numDraws, const ref<dx_buffer>& commandBuffer)
+void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 numCommands, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset)
 {
 	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
 	commandList->ExecuteIndirect(
 		commandSignature.Get(),
-		numDraws,
+		numCommands,
 		commandBuffer->resource.Get(),
-		0,
+		commandBufferOffset,
 		0,
 		0);
 }
 
-void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 maxNumDraws, const ref<dx_buffer>& numDrawsBuffer, const ref<dx_buffer>& commandBuffer)
+void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 maxNumCommands, const ref<dx_buffer>& numDrawsBuffer, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset)
 {
 	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
 	commandList->ExecuteIndirect(
 		commandSignature.Get(),
-		maxNumDraws,
+		maxNumCommands,
 		commandBuffer->resource.Get(),
-		0,
+		commandBufferOffset,
 		numDrawsBuffer->resource.Get(),
 		0);
 }
@@ -491,26 +491,26 @@ void dx_command_list::dispatch(uint32 numGroupsX, uint32 numGroupsY, uint32 numG
 	commandList->Dispatch(numGroupsX, numGroupsY, numGroupsZ);
 }
 
-void dx_command_list::dispatchIndirect(dx_command_signature commandSignature, uint32 numDispatches, const ref<dx_buffer>& commandBuffer)
+void dx_command_list::dispatchIndirect(dx_command_signature commandSignature, uint32 numCommands, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset)
 {
 	dynamicDescriptorHeap.commitStagedDescriptorsForDispatch(this);
 	commandList->ExecuteIndirect(
 		commandSignature.Get(),
-		numDispatches,
+		numCommands,
 		commandBuffer->resource.Get(),
-		0,
+		commandBufferOffset,
 		0,
 		0);
 }
 
-void dx_command_list::dispatchIndirect(dx_command_signature commandSignature, uint32 maxNumDispatches, const ref<dx_buffer>& numDispatchesBuffer, const ref<dx_buffer>& commandBuffer)
+void dx_command_list::dispatchIndirect(dx_command_signature commandSignature, uint32 maxNumCommands, const ref<dx_buffer>& numDispatchesBuffer, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset)
 {
 	dynamicDescriptorHeap.commitStagedDescriptorsForDispatch(this);
 	commandList->ExecuteIndirect(
 		commandSignature.Get(),
-		maxNumDispatches,
+		maxNumCommands,
 		commandBuffer->resource.Get(),
-		0,
+		commandBufferOffset,
 		numDispatchesBuffer->resource.Get(),
 		0);
 }

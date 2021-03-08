@@ -271,6 +271,27 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createBufferUintUAV(const re
 	return *this;
 }
 
+dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createRawBufferUAV(const ref<dx_buffer>& buffer, buffer_range bufferRange)
+{
+	uint32 firstElementByteOffset = bufferRange.firstElement * buffer->elementSize;
+	assert(firstElementByteOffset % 16 == 0);
+
+	uint32 count = (bufferRange.numElements != -1) ? bufferRange.numElements : (buffer->elementCount - bufferRange.firstElement);
+	uint32 totalSize = count * buffer->elementSize;
+
+	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+	uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+	uavDesc.Buffer.FirstElement = firstElementByteOffset / 4;
+	uavDesc.Buffer.NumElements = totalSize / 4;
+	uavDesc.Buffer.StructureByteStride = 0;
+	uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
+
+	dxContext.device->CreateUnorderedAccessView(buffer->resource.Get(), 0, &uavDesc, cpuHandle);
+
+	return *this;
+}
+
 dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createNullBufferUAV()
 {
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};

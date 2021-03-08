@@ -242,13 +242,7 @@ void application::initialize(dx_renderer* renderer)
 		SET_NAME(pointLightShadowInfoBuffer[i]->resource, "Point light shadow infos");
 	}
 
-
-	/*particleSystem.initialize(10000);
-	particleSystem.color.initializeAsLinear(vec4(1.f, 0.f, 0.f, 1.f), vec4(0.8f, 0.8f, 0.1f, 1.f));
-	particleSystem.maxLifetime.initializeAsConstant(0.5f);
-	particleSystem.startVelocity.initializeAsRandom(vec3(-1.f, -1.f, -0.3f), vec3(1.f, 1.f, 0.3f));
-	particleSystem.spawnRate = 2000.f;
-	particleSystem.gravityFactor = 0.1f;*/
+	particleSystem.initialize(10000, 2000.f);
 }
 
 static bool plotAndEditTonemapping(tonemap_cb& tonemap)
@@ -926,13 +920,8 @@ void application::update(const user_input& input, float dt)
 
 
 	// Particles.
-	/*static float particleSystemTime = 0.f;
-	particleSystemTime += dt;
-
-	particleSystem.spawnPosition.x = cos(particleSystemTime) * 5.f;
-	particleSystem.spawnPosition.y = sin(particleSystemTime) * 4.f + 5.f;
 	particleSystem.update(dt);
-	particleSystem.render(camera, &transparentRenderPass);*/
+	particleSystem.testRender(&transparentRenderPass);
 
 
 

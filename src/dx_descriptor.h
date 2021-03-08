@@ -48,6 +48,7 @@ struct dx_cpu_descriptor_handle
 	dx_cpu_descriptor_handle& createNullTextureUAV();
 	dx_cpu_descriptor_handle& createBufferUAV(const ref<dx_buffer>& buffer, buffer_range bufferRange = {});
 	dx_cpu_descriptor_handle& createBufferUintUAV(const ref<dx_buffer>& buffer, buffer_range bufferRange = {});
+	dx_cpu_descriptor_handle& createRawBufferUAV(const ref<dx_buffer>& buffer, buffer_range bufferRange = {});
 	dx_cpu_descriptor_handle& createNullBufferUAV();
 	dx_cpu_descriptor_handle& createRaytracingAccelerationStructureSRV(const ref<dx_buffer>& tlas);
 

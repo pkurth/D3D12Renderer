@@ -19,6 +19,7 @@
 #include "light_culling_rs.hlsli"
 #include "camera.hlsli"
 #include "transform.hlsli"
+#include "particles_rs.hlsli"
 #include "random.h"
 
 #include "raytracing.h"
@@ -67,6 +68,7 @@ static dx_pipeline presentPipeline;
 
 static ref<dx_texture> brdfTex;
 
+static dx_command_signature particleCommandSignature;
 
 
 DXGI_FORMAT dx_renderer::screenFormat;
@@ -227,7 +229,15 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 
 	pbr_material::initializePipeline();
-	particle_material::initializePipeline();
+	initializeParticlePipeline();
+
+
+
+	D3D12_INDIRECT_ARGUMENT_DESC argumentDesc;
+	argumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+	particleCommandSignature = createCommandSignature({}, &argumentDesc, 1, sizeof(particle_draw));
+
+
 
 	createAllPendingReloadablePipelines();
 
@@ -1625,8 +1635,6 @@ void dx_renderer::endFrame(const user_input& input)
 
 			if (transparentRenderPass->particleDrawCalls.size() > 0)
 			{
-				cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-
 				DX_PROFILE_BLOCK(cl, "Particles");
 
 				for (const auto& dc : transparentRenderPass->particleDrawCalls)
@@ -1641,14 +1649,15 @@ void dx_renderer::endFrame(const user_input& input)
 
 					dc.material->prepareForRendering(cl);
 
-					cl->setGraphics32BitConstants(0, unjitteredCamera.viewProj * m);
+					cl->setGraphics32BitConstants(PARTICLES_RS_MVP, unjitteredCamera.viewProj * m);
+					cl->setRootGraphicsSRV(PARTICLES_RS_PARTICLES, dc.particleBuffer->gpuVirtualAddress);
+					cl->setRootGraphicsSRV(PARTICLES_RS_ALIVE_LIST, dc.aliveList->gpuVirtualAddress + dc.aliveListOffset);
 
 					cl->setVertexBuffer(0, dc.vertexBuffer);
-					cl->setVertexBuffer(1, dc.instanceBuffer);
-					cl->draw(4, dc.numParticles, 0, 0);
-				}
+					cl->setIndexBuffer(dc.indexBuffer);
 
-				cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+					cl->drawIndirect(particleCommandSignature, 1, dc.commandBuffer, dc.commandBufferOffset);
+				}
 			}
 
 

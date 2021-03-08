@@ -106,7 +106,7 @@ static void uploadBufferData(ref<dx_buffer> buffer, const void* bufferData)
 	dxContext.executeCommandList(cl);
 }
 
-static void updateBufferDataRange(ref<dx_buffer> buffer, const void* data, uint32 offset, uint32 size)
+void updateBufferDataRange(ref<dx_buffer> buffer, const void* data, uint32 offset, uint32 size)
 {
 	assert(offset + size <= buffer->totalSize);
 

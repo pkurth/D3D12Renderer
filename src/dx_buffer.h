@@ -89,6 +89,7 @@ struct map_range
 void* mapBuffer(const ref<dx_buffer>& buffer, bool intentsReading, map_range readRange = { });
 void unmapBuffer(const ref<dx_buffer>& buffer, bool hasWritten, map_range writtenRange = { });
 
+void updateBufferDataRange(ref<dx_buffer> buffer, const void* data, uint32 offset, uint32 size);
 void updateUploadBufferData(const ref<dx_buffer>& buffer, void* data, uint32 size);
 
 ref<dx_buffer> createBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess = false, bool allowClearing = false, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
