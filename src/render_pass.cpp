@@ -61,7 +61,6 @@ void sun_shadow_render_pass::reset()
 	}
 
 	copyFromStaticCache = false;
-	copyToStaticCache = false;
 }
 
 void spot_shadow_render_pass::renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
@@ -94,7 +93,6 @@ void spot_shadow_render_pass::reset()
 	dynamicDrawCalls.clear();
 
 	copyFromStaticCache = false;
-	copyToStaticCache = false;
 }
 
 void point_shadow_render_pass::renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
@@ -127,8 +125,5 @@ void point_shadow_render_pass::reset()
 	dynamicDrawCalls.clear();
 
 	copyFromStaticCache0 = false;
-	copyToStaticCache0 = false;
-
 	copyFromStaticCache1 = false;
-	copyToStaticCache1 = false;
 }

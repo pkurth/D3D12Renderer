@@ -730,7 +730,6 @@ void application::renderSunShadowMap(bool objectDragged)
 	else
 	{
 		renderStaticGeometryToSunShadowMap();
-		renderPass.copyToStaticCache = true;
 	}
 
 	renderDynamicGeometryToSunShadowMap();
@@ -756,7 +755,6 @@ void application::renderShadowMap(spot_light_cb& spotLight, uint32 lightIndex, b
 	else
 	{
 		renderStaticGeometryToShadowMap(renderPass);
-		renderPass.copyToStaticCache = true;
 	}
 
 	renderDynamicGeometryToShadowMap(renderPass);
@@ -794,8 +792,6 @@ void application::renderShadowMap(point_light_cb& pointLight, uint32 lightIndex,
 	else
 	{
 		renderStaticGeometryToShadowMap(renderPass);
-		renderPass.copyToStaticCache0 = true;
-		renderPass.copyToStaticCache1 = true;
 	}
 
 	renderDynamicGeometryToShadowMap(renderPass);

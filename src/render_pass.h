@@ -308,7 +308,6 @@ struct sun_shadow_render_pass : shadow_render_pass
 {
 	shadow_map_viewport viewports[MAX_NUM_SUN_SHADOW_CASCADES];
 	bool copyFromStaticCache;
-	bool copyToStaticCache;
 
 	// Since each cascade includes the next lower one, if you submit a draw to cascade N, it will also be rendered in N-1 automatically. No need to add it to the lower one.
 	void renderStaticObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
@@ -328,7 +327,6 @@ struct spot_shadow_render_pass : shadow_render_pass
 	mat4 viewProjMatrix;
 	shadow_map_viewport viewport;
 	bool copyFromStaticCache;
-	bool copyToStaticCache;
 
 	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
 	void renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
@@ -349,9 +347,7 @@ struct point_shadow_render_pass : shadow_render_pass
 	vec3 lightPosition;
 	float maxDistance;
 	bool copyFromStaticCache0;
-	bool copyToStaticCache0;
 	bool copyFromStaticCache1;
-	bool copyToStaticCache1;
 
 	// TODO: Split this into positive and negative direction for frustum culling.
 	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
