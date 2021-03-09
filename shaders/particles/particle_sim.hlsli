@@ -1,6 +1,8 @@
 #include "cs.hlsli"
 #include "particles_rs.hlsli"
 
+ConstantBuffer<particles_sim_cb> cb						: register(b0);
+
 RWStructuredBuffer<particle_draw> drawInfo				: register(u1);
 RWStructuredBuffer<particle_counters> counters			: register(u2);
 
@@ -21,15 +23,15 @@ void main(cs_input IN)
 		return;
 	}
 
-	float dt = 1.f / 60.f;
+	float dt = cb.dt;
 
 	uint index = currentAliveList[i];
 
 	particle_data particle = particles[index];
-	particle.life -= dt;
-	if (particle.life > 0)
+
+	bool shouldLive = simulateParticle(particle, dt);
+	if (shouldLive)
 	{
-		simulateParticle(particle, dt);
 		particles[index] = particle;
 
 		uint alive;

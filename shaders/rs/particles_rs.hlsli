@@ -61,7 +61,16 @@ struct particle_counters
 #define PARTICLES_RS_ALIVE_LIST     2
 
 
+struct particles_sim_cb
+{
+	float emitRate;
+	float dt;
+	uint32 frameIndex;
+};
+
+
 #define PARTICLES_COMPUTE_RS \
+	"RootConstants(num32BitConstants=3, b0), " \
     "UAV(u0), " \
     "UAV(u1), " \
     "UAV(u2), " \
@@ -70,6 +79,14 @@ struct particle_counters
     "UAV(u5), " \
     "UAV(u6)"
 
+#define PARTICLES_COMPUTE_RS_CB					0
+#define PARTICLES_COMPUTE_RS_DISPATCH_INFO		1
+#define PARTICLES_COMPUTE_RS_DRAW_INFO			2
+#define PARTICLES_COMPUTE_RS_COUNTERS			3
+#define PARTICLES_COMPUTE_RS_PARTICLES			4
+#define PARTICLES_COMPUTE_RS_DEAD_LIST			5
+#define PARTICLES_COMPUTE_RS_CURRENT_ALIVE		6
+#define PARTICLES_COMPUTE_RS_NEW_ALIVE			7
 
 
 #endif

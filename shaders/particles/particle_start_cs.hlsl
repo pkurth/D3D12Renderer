@@ -1,6 +1,8 @@
 #include "cs.hlsli"
 #include "particles_rs.hlsli"
 
+ConstantBuffer<particles_sim_cb> cb						: register(b0);
+
 RWStructuredBuffer<particle_dispatch> dispatchInfo		: register(u0);
 RWStructuredBuffer<particle_draw> drawInfo				: register(u1);
 RWStructuredBuffer<particle_counters> counters			: register(u2);
@@ -20,8 +22,9 @@ void main(cs_input IN)
 	particle_draw draw = drawInfo[0];
 	particle_dispatch dispatch = dispatchInfo[0];
 
-	float dt = 1.f / 60.f;
-	c.emitRateAccum += 200 * dt; // TODO: How do we prevent this from running to infinity, if the system is saturated?
+	const float dt = cb.dt;
+	const float emitRate = cb.emitRate;
+	c.emitRateAccum += emitRate * dt; // TODO: How do we prevent this from running to infinity, if the system is saturated?
 
 	uint spaceLeft = c.numDeadParticles;
 	uint numNewParticles = min((uint)c.emitRateAccum, spaceLeft);

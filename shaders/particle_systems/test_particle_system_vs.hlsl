@@ -1,4 +1,5 @@
 #include "particles_rs.hlsli"
+#include "random.hlsli" // TODO: Temporary!
 #include "test_particle_system.hlsli"
 
 ConstantBuffer<transform_cb> transform		: register(b0);

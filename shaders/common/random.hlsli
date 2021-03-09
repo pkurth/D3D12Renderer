@@ -1,6 +1,8 @@
 #ifndef RANDOM_H
 #define RANDOM_H
 
+#include "math.hlsli"
+
 static float halton(uint index, uint base)
 {
 	float fraction = 1.f;

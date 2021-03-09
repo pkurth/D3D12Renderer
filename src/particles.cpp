@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "particles.h"
-#include "dx_pipeline.h"
 #include "dx_renderer.h"
 #include "camera.h"
 #include "geometry.h"
@@ -13,22 +12,44 @@
 static dx_pipeline renderPipeline;
 
 static dx_pipeline startPipeline;
-static dx_pipeline emitPipeline;
-static dx_pipeline simulatePipeline;
 
 static dx_command_signature commandSignature;
 
 static ref<dx_buffer> particleDrawCommandBuffer;
 
-static uint32 particleSystemCounter = 0;
+static volatile uint32 particleSystemCounter = 0;
 
 
+static std::unordered_map<std::string, dx_pipeline> pipelineCache;
+static std::mutex mutex;
 
-void particle_system::initialize(uint32 maxNumParticles, float emitRate)
+
+static dx_pipeline getPipeline(const std::string& shaderName, const std::string& type)
 {
+	mutex.lock();
+
+	std::string s = "particle_" + type + "_" + shaderName + "_cs";
+
+	auto it = pipelineCache.find(s);
+	if (it == pipelineCache.end())
+	{
+		std::string* copy = new std::string(s); // Heap-allocated, because the pipeline reloader caches the const char*.
+		it = pipelineCache.insert({ s, createReloadablePipeline(copy->c_str()) }).first;
+
+		createAllPendingReloadablePipelines();
+	}
+
+	mutex.unlock();
+	return it->second;
+}
+
+void particle_system::initialize(const std::string& shaderName, uint32 maxNumParticles, float emitRate)
+{
+	this->emitPipeline = getPipeline(shaderName, "emit");
+	this->simulatePipeline = getPipeline(shaderName, "sim");
 	this->maxNumParticles = maxNumParticles;
 	this->emitRate = emitRate;
-	this->index = particleSystemCounter++;
+	this->index = atomicIncrement(particleSystemCounter);
 
 	std::vector<uint32> dead(maxNumParticles);
 
@@ -83,6 +104,7 @@ void particle_system::update(float dt)
 		// Buffers get promoted to D3D12_RESOURCE_STATE_UNORDERED_ACCESS implicitly, so we can omit this.
 		//cl->transitionBarrier(dispatchBuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
+		particles_sim_cb cb = { emitRate, dt, (uint32)dxContext.frameID };
 
 		// ----------------------------------------
 		// START
@@ -94,7 +116,8 @@ void particle_system::update(float dt)
 			cl->setPipelineState(*startPipeline.pipeline);
 			cl->setComputeRootSignature(*startPipeline.rootSignature);
 
-			cl->setRootComputeUAV(0, dispatchBuffer);
+			cl->setRootComputeUAV(PARTICLES_COMPUTE_RS_DISPATCH_INFO, dispatchBuffer);
+			cl->setCompute32BitConstants(PARTICLES_COMPUTE_RS_CB, cb);
 			setResources(cl);
 
 			cl->dispatch(1);
@@ -133,6 +156,7 @@ void particle_system::update(float dt)
 			cl->setPipelineState(*simulatePipeline.pipeline);
 			cl->setComputeRootSignature(*simulatePipeline.rootSignature);
 
+			cl->setCompute32BitConstants(PARTICLES_COMPUTE_RS_CB, cb);
 			//setResources(cl); // Already set.
 
 			cl->dispatchIndirect(commandSignature, 1, dispatchBuffer, sizeof(D3D12_DISPATCH_ARGUMENTS));
@@ -156,12 +180,12 @@ void particle_system::setResources(dx_command_list* cl)
 {
 	uint32 nextAlive = 1 - currentAlive;
 
-	cl->setRootComputeUAV(1, particleDrawCommandBuffer->gpuVirtualAddress + sizeof(particle_draw) * index);
-	cl->setRootComputeUAV(2, listBuffer->gpuVirtualAddress);
-	cl->setRootComputeUAV(3, particlesBuffer);
-	cl->setRootComputeUAV(4, listBuffer->gpuVirtualAddress + getDeadListOffset());
-	cl->setRootComputeUAV(5, listBuffer->gpuVirtualAddress + getAliveListOffset(currentAlive));
-	cl->setRootComputeUAV(6, listBuffer->gpuVirtualAddress + getAliveListOffset(nextAlive));
+	cl->setRootComputeUAV(PARTICLES_COMPUTE_RS_DRAW_INFO, particleDrawCommandBuffer->gpuVirtualAddress + sizeof(particle_draw) * index);
+	cl->setRootComputeUAV(PARTICLES_COMPUTE_RS_COUNTERS, listBuffer->gpuVirtualAddress);
+	cl->setRootComputeUAV(PARTICLES_COMPUTE_RS_PARTICLES, particlesBuffer);
+	cl->setRootComputeUAV(PARTICLES_COMPUTE_RS_DEAD_LIST, listBuffer->gpuVirtualAddress + getDeadListOffset());
+	cl->setRootComputeUAV(PARTICLES_COMPUTE_RS_CURRENT_ALIVE, listBuffer->gpuVirtualAddress + getAliveListOffset(currentAlive));
+	cl->setRootComputeUAV(PARTICLES_COMPUTE_RS_NEW_ALIVE, listBuffer->gpuVirtualAddress + getAliveListOffset(nextAlive));
 }
 
 uint32 particle_system::getAliveListOffset(uint32 alive)
@@ -177,12 +201,12 @@ uint32 particle_system::getDeadListOffset()
 	return (uint32)sizeof(particle_counters);
 }
 
-void particle_system::testRender(transparent_render_pass* renderPass)
+void particle_system::render(transparent_render_pass* renderPass, const trs& transform)
 {
 	renderPass->renderParticles(mesh.vertexBuffer, mesh.indexBuffer, particlesBuffer,
 		listBuffer, getAliveListOffset(currentAlive),
 		particleDrawCommandBuffer, index * particleDrawCommandBuffer->elementSize,
-		createModelMatrix(vec3(0.f, 20.f, 0.f), quat::identity),
+		trsToMat4(transform),
 		material);
 }
 
@@ -198,15 +222,25 @@ void initializeParticlePipeline()
 
 
 	startPipeline = createReloadablePipeline("particle_start_cs");
-	emitPipeline = createReloadablePipeline("particle_emit_test_particle_system_cs");
-	simulatePipeline = createReloadablePipeline("particle_sim_test_particle_system_cs");
 
 	D3D12_INDIRECT_ARGUMENT_DESC argumentDesc;
 	argumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
 	commandSignature = createCommandSignature({}, &argumentDesc, 1, sizeof(D3D12_DISPATCH_ARGUMENTS));
 
-	particleDrawCommandBuffer = createBuffer(sizeof(particle_draw), 1, 0, true);
+	particleDrawCommandBuffer = createBuffer(sizeof(particle_draw), 1024, 0, true);
 }
+
+
+
+
+
+
+
+struct particle_material : material_base
+{
+	void prepareForRendering(struct dx_command_list* cl);
+	static void setupTransparentPipeline(dx_command_list* cl, const common_material_info& info);
+};
 
 void particle_material::prepareForRendering(dx_command_list* cl)
 {

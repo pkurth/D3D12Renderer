@@ -242,7 +242,7 @@ void application::initialize(dx_renderer* renderer)
 		SET_NAME(pointLightShadowInfoBuffer[i]->resource, "Point light shadow infos");
 	}
 
-	particleSystem.initialize(10000, 2000.f);
+	particleSystem.initialize("test_particle_system", 10000, 2000.f);
 }
 
 static bool plotAndEditTonemapping(tonemap_cb& tonemap)
@@ -917,7 +917,7 @@ void application::update(const user_input& input, float dt)
 
 	// Particles.
 	particleSystem.update(dt);
-	particleSystem.testRender(&transparentRenderPass);
+	particleSystem.render(&transparentRenderPass, trs(vec3(0.f, 20.f, 0.f), quat::identity));
 
 
 

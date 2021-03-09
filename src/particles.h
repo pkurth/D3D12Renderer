@@ -5,19 +5,14 @@
 #include "dx_texture.h"
 #include "material.h"
 #include "render_pass.h"
-
-struct particle_material : material_base
-{
-	void prepareForRendering(struct dx_command_list* cl);
-	static void setupTransparentPipeline(dx_command_list* cl, const common_material_info& info);
-};
+#include "dx_pipeline.h"
 
 struct particle_system
 {
-	void initialize(uint32 maxNumParticles, float emitRate);
+	void initialize(const std::string& shaderName, uint32 maxNumParticles, float emitRate);
 	void update(float dt);
 
-	void testRender(transparent_render_pass* renderPass);
+	void render(transparent_render_pass* renderPass, const trs& transform);
 
 private:
 	void setResources(struct dx_command_list* cl);
@@ -34,12 +29,16 @@ private:
 
 	dx_mesh mesh;
 
-	ref<particle_material> material;
+	ref<struct particle_material> material;
+
+	dx_pipeline emitPipeline;
+	dx_pipeline simulatePipeline;
 
 	uint32 index;
 };
 
 
 
+// Internal.
 void initializeParticlePipeline();
 

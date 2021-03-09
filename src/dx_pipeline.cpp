@@ -362,7 +362,7 @@ void createAllPendingReloadablePipelines()
 	static int pipelineOffset = 0;
 
 	thread_job_context context;
-	for (int i = rsOffset; i < rootSignaturesFromFiles.size(); ++i)
+	for (uint32 i = rsOffset; i < (uint32)rootSignaturesFromFiles.size(); ++i)
 	{
 		context.addWork([i]()
 		{
@@ -371,7 +371,7 @@ void createAllPendingReloadablePipelines()
 	}
 	context.waitForWorkCompletion();
 
-	for (int i = rsOffset; i < rootSignaturesFromFiles.size(); ++i)
+	for (uint32 i = pipelineOffset; i < (uint32)pipelines.size(); ++i)
 	{
 		context.addWork([i]()
 		{

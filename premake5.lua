@@ -105,8 +105,10 @@ local shader_directory_handle = io.popen('dir "'..particle_system_directory..'" 
 for filename in shader_directory_handle:lines() do
 	if filename:sub(-string.len(".hlsli")) == ".hlsli" then
 		local stem = filename:match("(.+)%..+")
-		local new_emit_content = '#include "../' .. local_particle_system_directory .. filename .. '"\n' .. '#include "../' .. local_emit_path .. '"\n'
-		local new_sim_content = '#include "../' .. local_particle_system_directory .. filename .. '"\n' .. '#include "../' .. local_sim_path .. '"\n'
+		local include = '#include "random.hlsli"\n#include "../' .. local_particle_system_directory .. filename .. '"\n'
+
+		local new_emit_content = include .. '#include "../' .. local_emit_path .. '"\n'
+		local new_sim_content = include .. '#include "../' .. local_sim_path .. '"\n'
 	
 		local emit_file = assert(io.open(generated_directory .. "particle_emit_" .. stem .. "_cs.hlsl", "w"))
 		emit_file:write(new_emit_content)
