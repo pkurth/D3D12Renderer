@@ -96,30 +96,25 @@ end
 
 local local_particle_system_directory = "particle_systems/"
 
+local local_emit_path = "particles/particle_emit.hlsli"
+local local_sim_path = "particles/particle_sim.hlsli"
+
 local particle_system_directory = "shaders/" .. local_particle_system_directory
 local shader_directory_handle = io.popen('dir "'..particle_system_directory..'" /b')
-
-local emitFile = assert(io.open("shaders/particles/particle_emit_template.hlsl", "r"))
-local emitContent = emitFile:read("*all")
-emitFile:close()
-
-local simFile = assert(io.open("shaders/particles/particle_sim_template.hlsl", "r"))
-local simContent = simFile:read("*all")
-simFile:close()
 
 for filename in shader_directory_handle:lines() do
 	if filename:sub(-string.len(".hlsli")) == ".hlsli" then
 		local stem = filename:match("(.+)%..+")
-		local newEmitContent = '#include "../' .. local_particle_system_directory .. filename .. '"\n\n' .. emitContent
-		local newSimContent = '#include "../' .. local_particle_system_directory .. filename .. '"\n\n' .. simContent
+		local new_emit_content = '#include "../' .. local_particle_system_directory .. filename .. '"\n' .. '#include "../' .. local_emit_path .. '"\n'
+		local new_sim_content = '#include "../' .. local_particle_system_directory .. filename .. '"\n' .. '#include "../' .. local_sim_path .. '"\n'
 	
-		local newEmitFile = assert(io.open(generated_directory .. "particle_emit_" .. stem .. "_cs.hlsl", "w"))
-		newEmitFile:write(newEmitContent)
-		newEmitFile:close()
+		local emit_file = assert(io.open(generated_directory .. "particle_emit_" .. stem .. "_cs.hlsl", "w"))
+		emit_file:write(new_emit_content)
+		emit_file:close()
 	
-		local newSimFile = assert(io.open(generated_directory .. "particle_sim_" .. stem .. "_cs.hlsl", "w"))
-		newSimFile:write(newSimContent)
-		newSimFile:close()
+		local sim_file = assert(io.open(generated_directory .. "particle_sim_" .. stem .. "_cs.hlsl", "w"))
+		sim_file:write(new_sim_content)
+		sim_file:close()
 
 		print("- Generated particle system '" .. stem .. "'.")
 	end
