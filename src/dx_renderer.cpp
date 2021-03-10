@@ -589,7 +589,7 @@ void dx_renderer::specularAmbient(dx_command_list* cl, dx_dynamic_constant_buffe
 	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 2, worldNormalsTexture);
 	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 3, reflectanceTexture);
 	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 4, ssr ? ssr->defaultSRV : nullTextureSRV);
-	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 5, environment->environment);
+	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 5, environment ? environment->environment : blackCubeTexture);
 	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 6, brdfTex);
 
 	cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
