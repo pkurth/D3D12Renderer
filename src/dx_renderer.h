@@ -156,6 +156,8 @@ struct dx_renderer
 	static dx_cpu_descriptor_handle nullTextureSRV;
 	static dx_cpu_descriptor_handle nullBufferSRV;
 
+	static ref<dx_texture> getShadowMap();
+	static ref<dx_texture> getShadowMapCache();
 
 	static DXGI_FORMAT screenFormat;
 

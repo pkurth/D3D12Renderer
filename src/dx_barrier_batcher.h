@@ -32,6 +32,8 @@ struct barrier_batcher
 	barrier_batcher& uav(const ref<dx_buffer>& res);
 
 	barrier_batcher& aliasing(const dx_resource& before, const dx_resource& after);
+	barrier_batcher& aliasing(const ref<dx_texture>& before, const ref<dx_texture>& after);
+	barrier_batcher& aliasing(const ref<dx_buffer>& before, const ref<dx_buffer>& after);
 
 	void submit();
 

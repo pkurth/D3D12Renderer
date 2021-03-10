@@ -37,6 +37,7 @@ static dx_pipeline depthOnlyPipeline;
 static dx_pipeline animatedDepthOnlyPipeline;
 static dx_pipeline shadowPipeline;
 static dx_pipeline pointLightShadowPipeline;
+static dx_pipeline shadowMapCopyPipeline;
 
 static dx_pipeline textureSkyPipeline;
 static dx_pipeline proceduralSkyPipeline;
@@ -126,7 +127,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	shadowMap = createDepthTexture(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, shadowDepthFormat);
 	SET_NAME(shadowMap->resource, "Shadow map");
 
-	staticShadowMapCache = createDepthTexture(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, shadowDepthFormat, 1, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	staticShadowMapCache = createDepthTexture(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, shadowDepthFormat, 1, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	SET_NAME(staticShadowMapCache->resource, "Static shadow map cache");
 
 
@@ -163,6 +164,16 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 		shadowPipeline = createReloadablePipeline(desc, { "shadow_vs" }, rs_in_vertex_shader);
 		pointLightShadowPipeline = createReloadablePipeline(desc, { "shadow_point_light_vs", "shadow_point_light_ps" }, rs_in_vertex_shader);
+	}
+
+	// Shadow map copy.
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.renderTargets(0, 0, shadowDepthFormat)
+			.depthSettings(true, true, D3D12_COMPARISON_FUNC_ALWAYS)
+			.cullingOff();
+
+		shadowMapCopyPipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "shadow_map_copy_ps" });
 	}
 
 	// Outline.
@@ -721,6 +732,16 @@ ref<dx_texture> dx_renderer::getBlackTexture()
 	return blackTexture;
 }
 
+ref<dx_texture> dx_renderer::getShadowMap()
+{
+	return shadowMap;
+}
+
+ref<dx_texture> dx_renderer::getShadowMapCache()
+{
+	return staticShadowMapCache;
+}
+
 void dx_renderer::endFrame(const user_input& input)
 {
 	bool aspectRatioModeChanged = settings.aspectRatioMode != oldSettings.aspectRatioMode;
@@ -997,7 +1018,6 @@ void dx_renderer::endFrame(const user_input& input)
 		{
 			DX_PROFILE_BLOCK(cl, "Shadow map pass");
 
-			dx_render_target shadowRenderTarget({}, shadowMap);
 
 			clear_rect clearRects[128];
 			uint32 numClearRects = 0;
@@ -1060,27 +1080,30 @@ void dx_renderer::endFrame(const user_input& input)
 				}
 			}
 
+
+			dx_render_target shadowRenderTarget({}, shadowMap);
+
+			cl->setRenderTarget(shadowRenderTarget);
+
 			if (numCopiesFromStaticCache)
 			{
+				// Since copies from or to parts of a depth-stencil texture are not allowed (even though they work on at least some hardware),
+				// we copy to and from the static shadow map cache via a shader, and not via CopyTextureRegion.
+
 				DX_PROFILE_BLOCK(cl, "Copy from static shadow map cache");
 
-				barrier_batcher(cl)
-					.transition(shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_COPY_DEST);
+				cl->setPipelineState(*shadowMapCopyPipeline.pipeline);
+				cl->setGraphicsRootSignature(*shadowMapCopyPipeline.rootSignature);
+
+				cl->setDescriptorHeapSRV(1, 0, staticShadowMapCache);
 
 				for (uint32 i = 0; i < numCopiesFromStaticCache; ++i)
 				{
 					shadow_map_viewport vp = copiesFromStaticCache[i];
-					cl->copyTextureRegionToTexture(staticShadowMapCache, shadowMap, vp.x, vp.y, vp.x, vp.y, vp.size, vp.size);
+					cl->setGraphics32BitConstants(0, vec4((float)vp.x / SHADOW_MAP_WIDTH, (float)vp.y / SHADOW_MAP_HEIGHT, (float)vp.size / SHADOW_MAP_WIDTH, (float)vp.size / SHADOW_MAP_HEIGHT));
+					cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+					cl->drawFullscreenTriangle();
 				}
-
-				barrier_batcher(cl)
-					.transition(shadowMap, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-			}
-
-			if (numCopiesToStaticCache)
-			{
-				barrier_batcher(cl)
-					.transitionBegin(staticShadowMapCache, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
 			}
 
 			if (numClearRects)
@@ -1088,7 +1111,11 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->clearDepth(shadowRenderTarget, 1.f, clearRects, numClearRects);
 			}
 
-			cl->setRenderTarget(shadowRenderTarget);
+			if (numCopiesToStaticCache)
+			{
+				barrier_batcher(cl)
+					.transitionBegin(staticShadowMapCache, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+			}
 
 
 			auto renderSunCascadeShadow = [](dx_command_list* cl, const std::vector<shadow_render_pass::draw_call>& drawCalls, const mat4& viewProj)
@@ -1210,19 +1237,34 @@ void dx_renderer::endFrame(const user_input& input)
 				DX_PROFILE_BLOCK(cl, "Copy to static shadow map cache");
 
 				barrier_batcher(cl)
-					.transition(shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_COPY_SOURCE)
-					.transitionEnd(staticShadowMapCache, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+					.transition(shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
+					.transitionEnd(staticShadowMapCache, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
+
+				dx_render_target shadowCacheRenderTarget({}, staticShadowMapCache);
+				cl->setRenderTarget(shadowCacheRenderTarget);
+
+				cl->setPipelineState(*shadowMapCopyPipeline.pipeline);
+				cl->setGraphicsRootSignature(*shadowMapCopyPipeline.rootSignature);
+				
+				cl->setDescriptorHeapSRV(1, 0, shadowMap);
+				
+				
 				for (uint32 i = 0; i < numCopiesToStaticCache; ++i)
 				{
 					shadow_map_viewport vp = copiesToStaticCache[i];
-					cl->copyTextureRegionToTexture(shadowMap, staticShadowMapCache, vp.x, vp.y, vp.x, vp.y, vp.size, vp.size);
+					cl->setGraphics32BitConstants(0, vec4((float)vp.x / SHADOW_MAP_WIDTH, (float)vp.y / SHADOW_MAP_HEIGHT, (float)vp.size / SHADOW_MAP_WIDTH, (float)vp.size / SHADOW_MAP_HEIGHT));
+					cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+					cl->drawFullscreenTriangle();
 				}
 
 				barrier_batcher(cl)
-					.transition(shadowMap, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
-					.transition(staticShadowMapCache, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
+					.transition(shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
+					.transition(staticShadowMapCache, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			}
+
+
+			cl->setRenderTarget(shadowRenderTarget);
 
 			if (sunShadowRenderPass || numSpotLightShadowRenderPasses)
 			{

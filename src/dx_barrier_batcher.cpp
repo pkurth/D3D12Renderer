@@ -150,8 +150,18 @@ barrier_batcher& barrier_batcher::aliasing(const dx_resource& before, const dx_r
 		submit();
 	}
 
-	barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::Aliasing(before.Get(), after.Get());
+	barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::Aliasing(before ? before.Get() : 0, after ? after.Get() : 0);
 	return *this;
+}
+
+barrier_batcher& barrier_batcher::aliasing(const ref<dx_texture>& before, const ref<dx_texture>& after)
+{
+	return aliasing(before ? before->resource : 0, after ? after->resource : 0);
+}
+
+barrier_batcher& barrier_batcher::aliasing(const ref<dx_buffer>& before, const ref<dx_buffer>& after)
+{
+	return aliasing(before ? before->resource : 0, after ? after->resource : 0);
 }
 
 void barrier_batcher::submit()
