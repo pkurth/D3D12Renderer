@@ -9,8 +9,6 @@ StructuredBuffer<uint> aliveList			: register(t1);
 struct vs_input
 {
 	float3 position			: POSITION;
-
-	uint instanceID			: SV_InstanceID;
 };
 
 struct vs_output
@@ -19,9 +17,9 @@ struct vs_output
 	float4 position			: SV_Position;
 };
 
-vs_output main(vs_input IN)
+vs_output main(vs_input IN, uint instanceID	: SV_InstanceID)
 {
-	uint index = aliveList[IN.instanceID];
+	uint index = aliveList[instanceID];
 	float3 pos = particles[index].position + IN.position;
 
 	vs_output OUT;
