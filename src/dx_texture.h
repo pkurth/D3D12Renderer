@@ -28,12 +28,12 @@ enum texture_load_flags
 };
 
 
-
 struct dx_texture
 {
 	virtual ~dx_texture();
 
 	dx_resource resource;
+	D3D12MA::Allocation* allocation = 0;
 
 	dx_cpu_descriptor_handle defaultSRV; // SRV for the whole texture (all mip levels).
 	dx_cpu_descriptor_handle defaultUAV; // UAV for the first mip level.
@@ -112,6 +112,7 @@ struct texture_grave
 	~texture_grave();
 };
 
+D3D12_RESOURCE_ALLOCATION_INFO getTextureAllocationInfo(uint32 width, uint32 height, DXGI_FORMAT format, bool allocateMips, D3D12_RESOURCE_FLAGS flags);
 
 void uploadTextureSubresourceData(ref<dx_texture> texture, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 firstSubresource, uint32 numSubresources);
 ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON);
@@ -122,6 +123,7 @@ ref<dx_texture> createVolumeTexture(const void* data, uint32 width, uint32 heigh
 void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState = (D3D12_RESOURCE_STATES )-1);
 void allocateMipUAVs(ref<dx_texture> texture);
 
+ref<dx_texture> createPlacedDepthTexture(dx_heap heap, uint64 offset, uint32 width, uint32 height, DXGI_FORMAT format, uint32 arrayLength = 1, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_DEPTH_WRITE, bool allowDepthStencil = true);
 
 // This system caches textures. It does not keep the resource alive (we store weak ptrs).
 // So if no one else has a reference, the texture gets deleted.

@@ -18,6 +18,9 @@
 #endif
 
 
+#define USE_D3D12_BLOCK_ALLOCATOR 0
+namespace D3D12MA { class Allocator; class Allocation; };
+
 template <typename T>
 using com = Microsoft::WRL::ComPtr<T>;
 

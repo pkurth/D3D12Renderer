@@ -6,6 +6,8 @@
 #include "dx_profiling.h"
 #include "string.h"
 
+#include <d3d12memoryallocator/D3D12MemAlloc.cpp>
+
 extern "C"
 {
 	__declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
@@ -207,6 +209,14 @@ bool dx_context::initialize()
 	}
 
 	device = createDevice(adapter, adapterDesc.featureLevel);
+
+#if USE_D3D12_BLOCK_ALLOCATOR
+	D3D12MA::ALLOCATOR_DESC allocatorDesc = {};
+	allocatorDesc.pDevice = device.Get();
+	allocatorDesc.pAdapter = adapter.Get();
+	checkResult(D3D12MA::CreateAllocator(&allocatorDesc, &memoryAllocator));
+#endif
+
 	raytracingSupported = checkRaytracingSupport(device);
 	meshShaderSupported = checkMeshShaderSupport(device);
 
@@ -271,6 +281,12 @@ void dx_context::quit()
 		textureGraveyard[b].clear();
 		bufferGraveyard[b].clear();
 		objectGraveyard[b].clear();
+
+		for (auto allocation : allocationGraveyard[b])
+		{
+			allocation->Release();
+		}
+		allocationGraveyard[b].clear();
 	}
 }
 
@@ -292,6 +308,13 @@ void dx_context::retire(dx_object obj)
 {
 	mutex.lock();
 	objectGraveyard[bufferedFrameID].push_back(obj);
+	mutex.unlock();
+}
+
+void dx_context::retire(D3D12MA::Allocation* allocation)
+{
+	mutex.lock();
+	allocationGraveyard[bufferedFrameID].push_back(allocation);
 	mutex.unlock();
 }
 
@@ -432,6 +455,11 @@ void dx_context::newFrame(uint64 frameID)
 	textureGraveyard[bufferedFrameID].clear();
 	bufferGraveyard[bufferedFrameID].clear();
 	objectGraveyard[bufferedFrameID].clear();
+	for (auto allocation : allocationGraveyard[bufferedFrameID])
+	{
+		allocation->Release();
+	}
+	allocationGraveyard[bufferedFrameID].clear();
 
 
 	frameUploadBuffer.reset();

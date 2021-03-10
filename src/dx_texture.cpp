@@ -5,6 +5,7 @@
 #include "dx_command_list.h"
 
 #include <DirectXTex/DirectXTex.h>
+#include <d3d12memoryallocator/D3D12MemAlloc.h>
 
 #include <filesystem>
 
@@ -529,14 +530,23 @@ static bool formatSupportsUAV(D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport)
 		checkFormatSupport(formatSupport, D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE);
 }
 
+D3D12_RESOURCE_ALLOCATION_INFO getTextureAllocationInfo(uint32 width, uint32 height, DXGI_FORMAT format, bool allocateMips, D3D12_RESOURCE_FLAGS flags)
+{
+	uint32 numMips = allocateMips ? 0 : 1;
+	auto desc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, numMips, 1, 0, flags);
+	return dxContext.device->GetResourceAllocationInfo(0, 1, &desc);
+}
+
 void uploadTextureSubresourceData(ref<dx_texture> texture, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 firstSubresource, uint32 numSubresources)
 {
 	dx_command_list* cl = dxContext.getFreeCopyCommandList();
 	cl->transitionBarrier(texture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
 
-	UINT64 requiredSize = GetRequiredIntermediateSize(texture->resource.Get(), firstSubresource, numSubresources);
+	uint64 requiredSize = GetRequiredIntermediateSize(texture->resource.Get(), firstSubresource, numSubresources);
 
 	dx_resource intermediateResource;
+
+#if !USE_D3D12_BLOCK_ALLOCATOR
 	checkResult(dxContext.device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
@@ -545,6 +555,20 @@ void uploadTextureSubresourceData(ref<dx_texture> texture, D3D12_SUBRESOURCE_DAT
 		0,
 		IID_PPV_ARGS(&intermediateResource)
 	));
+#else
+	D3D12MA::ALLOCATION_DESC allocationDesc = {};
+	allocationDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+
+	D3D12MA::Allocation* allocation;
+	checkResult(dxContext.memoryAllocator->CreateResource(
+		&allocationDesc,
+		&CD3DX12_RESOURCE_DESC::Buffer(requiredSize),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		0,
+		&allocation,
+		IID_PPV_ARGS(&intermediateResource)));
+	dxContext.retire(allocation);
+#endif
 
 	UpdateSubresources<128>(cl->commandList.Get(), texture->resource.Get(), intermediateResource.Get(), 0, firstSubresource, numSubresources, subresourceData);
 	dxContext.retire(intermediateResource);
@@ -596,12 +620,28 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 
 
 	// Create.
+#if !USE_D3D12_BLOCK_ALLOCATOR
 	checkResult(dxContext.device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&textureDesc,
 		initialState,
 		0,
 		IID_PPV_ARGS(&result->resource)));
+#else
+	D3D12MA::ALLOCATION_DESC allocationDesc = {};
+	allocationDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+
+	D3D12MA::Allocation* allocation;
+	checkResult(dxContext.memoryAllocator->CreateResource(
+		&allocationDesc,
+		&textureDesc,
+		initialState,
+		0,
+		&allocation,
+		IID_PPV_ARGS(&result->resource)));
+
+	result->allocation = allocation;
+#endif
 
 
 	result->numMipLevels = result->resource->GetDesc().MipLevels;
@@ -693,26 +733,8 @@ ref<dx_texture> createTexture(const void* data, uint32 width, uint32 height, DXG
 	}
 }
 
-ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format, uint32 arrayLength, D3D12_RESOURCE_STATES initialState)
+static void initializeDepthTexture(ref<dx_texture> result, uint32 width, uint32 height, DXGI_FORMAT format, uint32 arrayLength, D3D12_RESOURCE_STATES initialState, bool allocateDescriptors)
 {
-	ref<dx_texture> result = make_ref<dx_texture>();
-
-	D3D12_CLEAR_VALUE optimizedClearValue = {};
-	optimizedClearValue.Format = format;
-	optimizedClearValue.DepthStencil = { 1.f, 0 };
-
-	D3D12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Tex2D(getTypelessFormat(format), width, height,
-		arrayLength, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
-
-	checkResult(dxContext.device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-		D3D12_HEAP_FLAG_NONE,
-		&desc,
-		initialState,
-		&optimizedClearValue,
-		IID_PPV_ARGS(&result->resource)
-	));
-
 	result->numMipLevels = 1;
 	result->requestedNumMipLevels = 1;
 	result->format = format;
@@ -728,9 +750,9 @@ ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT form
 		sizeof(D3D12_FEATURE_DATA_FORMAT_SUPPORT)));
 
 	result->supportsRTV = false;
-	result->supportsDSV = formatSupportsDSV(formatSupport);
+	result->supportsDSV = allocateDescriptors && formatSupportsDSV(formatSupport);
 	result->supportsUAV = false;
-	result->supportsSRV = formatSupportsSRV(formatSupport);
+	result->supportsSRV = allocateDescriptors && formatSupportsSRV(formatSupport);
 
 	result->defaultSRV = {};
 	result->defaultUAV = {};
@@ -740,22 +762,64 @@ ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT form
 
 	result->initialState = initialState;
 
-	assert(result->supportsDSV);
-
-	result->dsvHandle = dxContext.dsvAllocator.getFreeHandle().create2DTextureDSV(result);
-	if (arrayLength == 1)
+	if (allocateDescriptors)
 	{
-		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureSRV(result);
+		assert(result->supportsDSV);
 
-		if (isStencilFormat(format))
+		result->dsvHandle = dxContext.dsvAllocator.getFreeHandle().create2DTextureDSV(result);
+		if (arrayLength == 1)
 		{
-			result->stencilSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createStencilTextureSRV(result);
+			result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureSRV(result);
+
+			if (isStencilFormat(format))
+			{
+				result->stencilSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createStencilTextureSRV(result);
+			}
+		}
+		else
+		{
+			result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureArraySRV(result);
 		}
 	}
-	else
-	{
-		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureArraySRV(result);
-	}
+}
+
+ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT format, uint32 arrayLength, D3D12_RESOURCE_STATES initialState)
+{
+	ref<dx_texture> result = make_ref<dx_texture>();
+
+	D3D12_CLEAR_VALUE optimizedClearValue = {};
+	optimizedClearValue.Format = format;
+	optimizedClearValue.DepthStencil = { 1.f, 0 };
+
+	D3D12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Tex2D(getTypelessFormat(format), width, height,
+		arrayLength, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+
+#if !USE_D3D12_BLOCK_ALLOCATOR
+	checkResult(dxContext.device->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		D3D12_HEAP_FLAG_NONE,
+		&desc,
+		initialState,
+		&optimizedClearValue,
+		IID_PPV_ARGS(&result->resource)
+	));
+#else
+	D3D12MA::ALLOCATION_DESC allocationDesc = {};
+	allocationDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+
+	D3D12MA::Allocation* allocation;
+	checkResult(dxContext.memoryAllocator->CreateResource(
+		&allocationDesc,
+		&desc,
+		initialState,
+		&optimizedClearValue,
+		&allocation,
+		IID_PPV_ARGS(&result->resource)));
+
+	result->allocation = allocation;
+#endif
+
+	initializeDepthTexture(result, width, height, format, arrayLength, initialState, true);
 
 	return result;
 }
@@ -854,6 +918,31 @@ void allocateMipUAVs(ref<dx_texture> texture)
 	}
 }
 
+ref<dx_texture> createPlacedDepthTexture(dx_heap heap, uint64 offset, uint32 width, uint32 height, DXGI_FORMAT format, uint32 arrayLength, D3D12_RESOURCE_STATES initialState, bool allowDepthStencil)
+{
+	ref<dx_texture> result = make_ref<dx_texture>();
+
+	D3D12_CLEAR_VALUE optimizedClearValue = {};
+	optimizedClearValue.Format = format;
+	optimizedClearValue.DepthStencil = { 1.f, 0 };
+
+	D3D12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Tex2D(getTypelessFormat(format), width, height,
+		arrayLength, 1, 1, 0, allowDepthStencil ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+
+	checkResult(dxContext.device->CreatePlacedResource(
+		heap.Get(),
+		offset,
+		&desc,
+		initialState,
+		allowDepthStencil ? &optimizedClearValue : 0,
+		IID_PPV_ARGS(&result->resource)
+	));
+
+	initializeDepthTexture(result, width, height, format, arrayLength, initialState, allowDepthStencil);
+
+	return result;
+}
+
 static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_descriptor_handle uav, dx_cpu_descriptor_handle stencil, dx_rtv_descriptor_handle rtv, dx_dsv_descriptor_handle dsv,
 	std::vector<dx_cpu_descriptor_handle>&& mipUAVs)
 {
@@ -871,6 +960,10 @@ static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_de
 dx_texture::~dx_texture()
 {
 	retire(resource, defaultSRV, defaultUAV, stencilSRV, rtvHandles, dsvHandle, std::move(mipUAVs));
+	if (allocation)
+	{
+		dxContext.retire(allocation);
+	}
 }
 
 void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState)
@@ -883,6 +976,10 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 	bool hasMipUAVs = texture->mipUAVs.size() > 0;
 
 	retire(texture->resource, texture->defaultSRV, texture->defaultUAV, texture->stencilSRV, texture->rtvHandles, texture->dsvHandle, std::move(texture->mipUAVs));
+	if (texture->allocation)
+	{
+		dxContext.retire(texture->allocation);
+	}
 
 	D3D12_RESOURCE_DESC desc = texture->resource->GetDesc();
 	texture->resource.Reset();
@@ -907,7 +1004,7 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 	texture->width = newWidth;
 	texture->height = newHeight;
 
-
+#if !USE_D3D12_BLOCK_ALLOCATOR
 	checkResult(dxContext.device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
@@ -916,6 +1013,21 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 		clearValue,
 		IID_PPV_ARGS(&texture->resource)
 	));
+#else
+	D3D12MA::ALLOCATION_DESC allocationDesc = {};
+	allocationDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+
+	D3D12MA::Allocation* allocation;
+	checkResult(dxContext.memoryAllocator->CreateResource(
+		&allocationDesc,
+		&desc,
+		state,
+		clearValue,
+		&allocation,
+		IID_PPV_ARGS(&texture->resource)));
+
+	texture->allocation = allocation;
+#endif
 
 	texture->numMipLevels = texture->resource->GetDesc().MipLevels;
 

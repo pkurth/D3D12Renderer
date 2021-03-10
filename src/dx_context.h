@@ -79,10 +79,13 @@ struct dx_context
 
 	uint32 descriptorHandleIncrementSize;
 
+	D3D12MA::Allocator* memoryAllocator;
+
 
 	void retire(struct texture_grave&& texture);
 	void retire(struct buffer_grave&& buffer);
 	void retire(dx_object obj);
+	void retire(D3D12MA::Allocation* allocation);
 
 private:
 #if ENABLE_DX_PROFILING
@@ -97,6 +100,7 @@ private:
 	std::vector<struct texture_grave> textureGraveyard[NUM_BUFFERED_FRAMES];
 	std::vector<struct buffer_grave> bufferGraveyard[NUM_BUFFERED_FRAMES];
 	std::vector<dx_object> objectGraveyard[NUM_BUFFERED_FRAMES];
+	std::vector<D3D12MA::Allocation*> allocationGraveyard[NUM_BUFFERED_FRAMES];
 
 	dx_command_queue& getQueue(D3D12_COMMAND_LIST_TYPE type);
 	dx_command_list* getFreeCommandList(dx_command_queue& queue);

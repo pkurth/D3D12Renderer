@@ -19,6 +19,7 @@ struct dx_buffer
 	virtual ~dx_buffer();
 
 	dx_resource resource;
+	D3D12MA::Allocation* allocation = 0;
 
 	dx_cpu_descriptor_handle defaultSRV;
 	dx_cpu_descriptor_handle defaultUAV;
