@@ -61,23 +61,29 @@ struct particle_counters
 #define PARTICLES_RS_ALIVE_LIST     2
 
 
-struct particles_sim_cb
+struct particle_sim_cb
 {
 	float emitRate;
 	float dt;
-	uint32 frameIndex;
 };
 
+#ifndef USER_PARTICLES_RS
+#define USER_APPEND_PARTICLES_RS ""
+#else
+#define USER_APPEND_PARTICLES_RS USER_PARTICLES_RS ", "
+#endif
 
 #define PARTICLES_COMPUTE_RS \
-	"RootConstants(num32BitConstants=3, b0), " \
-    "UAV(u0), " \
-    "UAV(u1), " \
-    "UAV(u2), " \
-    "UAV(u3), " \
-    "UAV(u4), " \
-    "UAV(u5), " \
-    "UAV(u6)"
+	USER_APPEND_PARTICLES_RS \
+	"RootConstants(num32BitConstants=2, b0, space=1), " \
+    "UAV(u0, space=1), " \
+    "UAV(u1, space=1), " \
+    "UAV(u2, space=1), " \
+    "UAV(u3, space=1), " \
+    "UAV(u4, space=1), " \
+    "UAV(u5, space=1), " \
+    "UAV(u6, space=1)"
+	
 
 #define PARTICLES_COMPUTE_RS_CB					0
 #define PARTICLES_COMPUTE_RS_DISPATCH_INFO		1
@@ -88,6 +94,7 @@ struct particles_sim_cb
 #define PARTICLES_COMPUTE_RS_CURRENT_ALIVE		6
 #define PARTICLES_COMPUTE_RS_NEW_ALIVE			7
 
+#define PARTICLES_COMPUTE_RS_COUNT				(PARTICLES_COMPUTE_RS_NEW_ALIVE + 1)
 
 #endif
 

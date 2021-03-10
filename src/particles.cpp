@@ -94,7 +94,7 @@ void particle_system::initialize(const std::string& shaderName, uint32 maxNumPar
 	material = make_ref<particle_material>();
 }
 
-void particle_system::update(float dt)
+void particle_system::update(float dt, const std::function<void(dx_command_list* cl)>& setUserResourcesFunction)
 {
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
@@ -104,7 +104,7 @@ void particle_system::update(float dt)
 		// Buffers get promoted to D3D12_RESOURCE_STATE_UNORDERED_ACCESS implicitly, so we can omit this.
 		//cl->transitionBarrier(dispatchBuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		particles_sim_cb cb = { emitRate, dt, (uint32)dxContext.frameID };
+		particle_sim_cb cb = { emitRate, dt };
 
 		// ----------------------------------------
 		// START
@@ -117,8 +117,7 @@ void particle_system::update(float dt)
 			cl->setComputeRootSignature(*startPipeline.rootSignature);
 
 			cl->setRootComputeUAV(PARTICLES_COMPUTE_RS_DISPATCH_INFO, dispatchBuffer);
-			cl->setCompute32BitConstants(PARTICLES_COMPUTE_RS_CB, cb);
-			setResources(cl);
+			setResources(cl, cb, 0, {});
 
 			cl->dispatch(1);
 			barrier_batcher(cl)
@@ -137,7 +136,8 @@ void particle_system::update(float dt)
 			cl->setPipelineState(*emitPipeline.pipeline);
 			cl->setComputeRootSignature(*emitPipeline.rootSignature);
 
-			//setResources(cl); // Already set.
+			uint32 numUserRootParameters = emitPipeline.rootSignature->totalNumParameters - PARTICLES_COMPUTE_RS_COUNT;
+			setResources(cl, cb, numUserRootParameters, setUserResourcesFunction);
 
 			cl->dispatchIndirect(commandSignature, 1, dispatchBuffer, 0);
 			barrier_batcher(cl)
@@ -156,8 +156,8 @@ void particle_system::update(float dt)
 			cl->setPipelineState(*simulatePipeline.pipeline);
 			cl->setComputeRootSignature(*simulatePipeline.rootSignature);
 
-			cl->setCompute32BitConstants(PARTICLES_COMPUTE_RS_CB, cb);
-			//setResources(cl); // Already set.
+			uint32 numUserRootParameters = simulatePipeline.rootSignature->totalNumParameters - PARTICLES_COMPUTE_RS_COUNT;
+			setResources(cl, cb, numUserRootParameters, setUserResourcesFunction);
 
 			cl->dispatchIndirect(commandSignature, 1, dispatchBuffer, sizeof(D3D12_DISPATCH_ARGUMENTS));
 			barrier_batcher(cl)
@@ -176,16 +176,22 @@ void particle_system::update(float dt)
 	dxContext.executeCommandList(cl);
 }
 
-void particle_system::setResources(dx_command_list* cl)
+void particle_system::setResources(dx_command_list* cl, const particle_sim_cb& cb, uint32 offset, const std::function<void(dx_command_list* cl)>& setUserResourcesFunction)
 {
 	uint32 nextAlive = 1 - currentAlive;
 
-	cl->setRootComputeUAV(PARTICLES_COMPUTE_RS_DRAW_INFO, particleDrawCommandBuffer->gpuVirtualAddress + sizeof(particle_draw) * index);
-	cl->setRootComputeUAV(PARTICLES_COMPUTE_RS_COUNTERS, listBuffer->gpuVirtualAddress);
-	cl->setRootComputeUAV(PARTICLES_COMPUTE_RS_PARTICLES, particlesBuffer);
-	cl->setRootComputeUAV(PARTICLES_COMPUTE_RS_DEAD_LIST, listBuffer->gpuVirtualAddress + getDeadListOffset());
-	cl->setRootComputeUAV(PARTICLES_COMPUTE_RS_CURRENT_ALIVE, listBuffer->gpuVirtualAddress + getAliveListOffset(currentAlive));
-	cl->setRootComputeUAV(PARTICLES_COMPUTE_RS_NEW_ALIVE, listBuffer->gpuVirtualAddress + getAliveListOffset(nextAlive));
+	cl->setCompute32BitConstants(offset + PARTICLES_COMPUTE_RS_CB, cb);
+	cl->setRootComputeUAV(offset + PARTICLES_COMPUTE_RS_DRAW_INFO, particleDrawCommandBuffer->gpuVirtualAddress + sizeof(particle_draw) * index);
+	cl->setRootComputeUAV(offset + PARTICLES_COMPUTE_RS_COUNTERS, listBuffer->gpuVirtualAddress);
+	cl->setRootComputeUAV(offset + PARTICLES_COMPUTE_RS_PARTICLES, particlesBuffer);
+	cl->setRootComputeUAV(offset + PARTICLES_COMPUTE_RS_DEAD_LIST, listBuffer->gpuVirtualAddress + getDeadListOffset());
+	cl->setRootComputeUAV(offset + PARTICLES_COMPUTE_RS_CURRENT_ALIVE, listBuffer->gpuVirtualAddress + getAliveListOffset(currentAlive));
+	cl->setRootComputeUAV(offset + PARTICLES_COMPUTE_RS_NEW_ALIVE, listBuffer->gpuVirtualAddress + getAliveListOffset(nextAlive));
+
+	if (setUserResourcesFunction)
+	{
+		setUserResourcesFunction(cl);
+	}
 }
 
 uint32 particle_system::getAliveListOffset(uint32 alive)

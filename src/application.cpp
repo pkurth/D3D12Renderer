@@ -12,6 +12,8 @@
 #include "shadow_map_cache.h"
 #include "file_dialog.h"
 
+#include "test_particle_system.hlsli"
+
 #define STB_RECT_PACK_IMPLEMENTATION
 #include <imgui/imstb_rectpack.h>
 
@@ -916,8 +918,12 @@ void application::update(const user_input& input, float dt)
 
 
 	// Particles.
-	particleSystem.update(dt);
-	particleSystem.render(&transparentRenderPass, trs(vec3(0.f, 20.f, 0.f), quat::identity));
+
+	particleSystem.update(dt, [](dx_command_list* cl)
+	{
+		cl->setCompute32BitConstants(TEST_PARTICLE_SYSTEM_RS_CBV, test_particle_cb{ vec3(0.f, 20.f, -10.f), (uint32)dxContext.frameID });
+	});
+	particleSystem.render(&transparentRenderPass, trs::identity);
 
 
 

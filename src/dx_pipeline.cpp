@@ -568,6 +568,8 @@ static DWORD checkForFileChanges(void*)
 
 static void copyRootSignatureDesc(const D3D12_ROOT_SIGNATURE_DESC* desc, dx_root_signature& result)
 {
+	result.totalNumParameters = desc->NumParameters;
+
 	uint32 numDescriptorTables = 0;
 	for (uint32 i = 0; i < desc->NumParameters; ++i)
 	{
@@ -599,6 +601,8 @@ static void copyRootSignatureDesc(const D3D12_ROOT_SIGNATURE_DESC* desc, dx_root
 
 static void copyRootSignatureDesc(const D3D12_ROOT_SIGNATURE_DESC1* desc, dx_root_signature& result)
 {
+	result.totalNumParameters = desc->NumParameters;
+
 	uint32 numDescriptorTables = 0;
 	for (uint32 i = 0; i < desc->NumParameters; ++i)
 	{

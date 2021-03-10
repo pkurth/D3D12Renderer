@@ -184,6 +184,7 @@ project "D3D12Renderer"
 	includedirs {
 		"shaders/rs",
 		"shaders/common",
+		"shaders/particle_systems",
 	}
 
 	files {

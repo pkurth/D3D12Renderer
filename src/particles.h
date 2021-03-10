@@ -7,15 +7,17 @@
 #include "render_pass.h"
 #include "dx_pipeline.h"
 
+struct dx_command_list;
+
 struct particle_system
 {
 	void initialize(const std::string& shaderName, uint32 maxNumParticles, float emitRate);
-	void update(float dt);
+	void update(float dt, const std::function<void(dx_command_list* cl)>& setUserResourcesFunction);
 
 	void render(transparent_render_pass* renderPass, const trs& transform);
 
 private:
-	void setResources(struct dx_command_list* cl);
+	void setResources(dx_command_list* cl, const struct particle_sim_cb& cb, uint32 offset, const std::function<void(dx_command_list* cl)>& setUserResourcesFunction);
 	uint32 getAliveListOffset(uint32 alive);
 	uint32 getDeadListOffset();
 

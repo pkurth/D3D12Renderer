@@ -1,11 +1,11 @@
 #include "cs.hlsli"
 #include "particles_rs.hlsli"
 
-ConstantBuffer<particles_sim_cb> cb						: register(b0);
+ConstantBuffer<particle_sim_cb> cb						: register(b0, space1);
 
-RWStructuredBuffer<particle_dispatch> dispatchInfo		: register(u0);
-RWStructuredBuffer<particle_draw> drawInfo				: register(u1);
-RWStructuredBuffer<particle_counters> counters			: register(u2);
+RWStructuredBuffer<particle_dispatch> dispatchInfo		: register(u0, space1);
+RWStructuredBuffer<particle_draw> drawInfo				: register(u1, space1);
+RWStructuredBuffer<particle_counters> counters			: register(u2, space1);
 
 
 static uint bucketize(uint problemSize, uint bucketSize) 

@@ -7,10 +7,22 @@ struct particle_data
 	uint32 random;
 };
 
-static particle_data emitParticle(uint rng)
+struct test_particle_cb
 {
+	vec3 emitPosition;
+	uint32 frameIndex;
+};
+
+#ifdef HLSL
+
+ConstantBuffer<test_particle_cb> cb		: register(b0);
+
+static particle_data emitParticle(uint emitIndex)
+{
+	uint rng = initRand(emitIndex, cb.frameIndex);
+
 	particle_data particle = {
-		float3(nextRand(rng), nextRand(rng), nextRand(rng)) * 15.f - 7.5f,
+		cb.emitPosition + float3(nextRand(rng), nextRand(rng), nextRand(rng)) * 15.f - 7.5f,
 		nextRand(rng) * 5.f,
 		float3(nextRand(rng), nextRand(rng), nextRand(rng)) * 15.f - 7.5f,
 		rng
@@ -33,4 +45,11 @@ static bool simulateParticle(inout particle_data particle, float dt)
 
 	return true;
 }
+
+#endif
+
+#define USER_PARTICLES_RS \
+	"RootConstants(num32BitConstants=4, b0)"
+
+#define TEST_PARTICLE_SYSTEM_RS_CBV		0
 

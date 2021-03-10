@@ -1,15 +1,14 @@
 #include "cs.hlsli"
 #include "particles_rs.hlsli"
-#include "random.hlsli"
 
-ConstantBuffer<particles_sim_cb> cb						: register(b0);
+ConstantBuffer<particle_sim_cb> simCB					: register(b0, space1);
 
-RWStructuredBuffer<particle_draw> drawInfo				: register(u1);
-RWStructuredBuffer<particle_counters> counters			: register(u2);
+RWStructuredBuffer<particle_draw> drawInfo				: register(u1, space1);
+RWStructuredBuffer<particle_counters> counters			: register(u2, space1);
 
-RWStructuredBuffer<particle_data> particles				: register(u3);
-RWStructuredBuffer<uint> deadList						: register(u4);
-RWStructuredBuffer<uint> currentAliveList				: register(u5);
+RWStructuredBuffer<particle_data> particles				: register(u3, space1);
+RWStructuredBuffer<uint> deadList						: register(u4, space1);
+RWStructuredBuffer<uint> currentAliveList				: register(u5, space1);
 
 
 [numthreads(PARTICLES_EMIT_BLOCK_SIZE, 1, 1)]
@@ -28,8 +27,7 @@ void main(cs_input IN)
 	
 	uint index = deadList[dead - 1];
 
-	uint rand = initRand(i, cb.frameIndex);
-	particles[index] = emitParticle(rand);
+	particles[index] = emitParticle(i);
 
 	uint alive;
 	InterlockedAdd(counters[0].numAliveParticlesThisFrame, 1, alive);

@@ -1,15 +1,15 @@
 #include "cs.hlsli"
 #include "particles_rs.hlsli"
 
-ConstantBuffer<particles_sim_cb> cb						: register(b0);
+ConstantBuffer<particle_sim_cb> simCB					: register(b0, space1);
 
-RWStructuredBuffer<particle_draw> drawInfo				: register(u1);
-RWStructuredBuffer<particle_counters> counters			: register(u2);
+RWStructuredBuffer<particle_draw> drawInfo				: register(u1, space1);
+RWStructuredBuffer<particle_counters> counters			: register(u2, space1);
 
-RWStructuredBuffer<particle_data> particles				: register(u3);
-RWStructuredBuffer<uint> deadList						: register(u4);
-RWStructuredBuffer<uint> currentAliveList				: register(u5);
-RWStructuredBuffer<uint> newAliveList					: register(u6);
+RWStructuredBuffer<particle_data> particles				: register(u3, space1);
+RWStructuredBuffer<uint> deadList						: register(u4, space1);
+RWStructuredBuffer<uint> currentAliveList				: register(u5, space1);
+RWStructuredBuffer<uint> newAliveList					: register(u6, space1);
 
 
 [numthreads(PARTICLES_SIMULATE_BLOCK_SIZE, 1, 1)]
@@ -23,7 +23,7 @@ void main(cs_input IN)
 		return;
 	}
 
-	float dt = cb.dt;
+	float dt = simCB.dt;
 
 	uint index = currentAliveList[i];
 
