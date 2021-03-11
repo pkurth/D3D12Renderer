@@ -31,10 +31,10 @@ struct animation_component
 
 	uint32 animationIndex = 0;
 
-	ref<dx_vertex_buffer> vb;
+	vertex_buffer_group vb;
 	submesh_info sms[16];
 
-	ref<dx_vertex_buffer> prevFrameVB;
+	vertex_buffer_group prevFrameVB;
 	submesh_info prevFrameSMs[16];
 };
 
@@ -919,11 +919,11 @@ void application::update(const user_input& input, float dt)
 
 	// Particles.
 
-	particleSystem.update(dt, [](dx_command_list* cl)
-	{
-		cl->setCompute32BitConstants(TEST_PARTICLE_SYSTEM_RS_CBV, test_particle_cb{ vec3(0.f, 20.f, -10.f), (uint32)dxContext.frameID });
-	});
-	particleSystem.render(&transparentRenderPass, trs::identity);
+	//particleSystem.update(dt, [](dx_command_list* cl)
+	//{
+	//	cl->setCompute32BitConstants(TEST_PARTICLE_SYSTEM_RS_CBV, test_particle_cb{ vec3(0.f, 20.f, -10.f), (uint32)dxContext.frameID });
+	//});
+	//particleSystem.render(&transparentRenderPass, trs::identity);
 
 
 
@@ -1326,6 +1326,8 @@ bool application::deserializeFromFile()
 	{
 		return false;
 	}
+
+	setSelectedEntity({});
 
 	appScene = scene();
 

@@ -11,7 +11,7 @@ struct vertex_range
 };
 
 void initializeSkinning();
-std::tuple<ref<dx_vertex_buffer>, vertex_range, mat4*> skinObject(const ref<dx_vertex_buffer>& vertexBuffer, vertex_range range, uint32 numJoints);
-std::tuple<ref<dx_vertex_buffer>, uint32, mat4*> skinObject(const ref<dx_vertex_buffer>& vertexBuffer, uint32 numJoints);
-std::tuple<ref<dx_vertex_buffer>, submesh_info, mat4*> skinObject(const ref<dx_vertex_buffer>& vertexBuffer, submesh_info submesh, uint32 numJoints);
+std::tuple<vertex_buffer_group, vertex_range, mat4*> skinObject(const vertex_buffer_group& vertexBuffer, vertex_range range, uint32 numJoints);
+std::tuple<vertex_buffer_group, uint32, mat4*> skinObject(const vertex_buffer_group& vertexBuffer, uint32 numJoints);
+std::tuple<vertex_buffer_group, submesh_info, mat4*> skinObject(const vertex_buffer_group& vertexBuffer, submesh_info submesh, uint32 numJoints);
 bool performSkinning();

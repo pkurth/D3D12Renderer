@@ -28,24 +28,24 @@ void transparent_render_pass::reset()
 	particleDrawCalls.clear();
 }
 
-void sun_shadow_render_pass::renderStaticObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+void sun_shadow_render_pass::renderStaticObject(uint32 cascadeIndex, const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
 {
 	staticDrawCalls[cascadeIndex].push_back(
 		{
 			transform,
-			vertexBuffer,
+			vertexBuffer.positions,
 			indexBuffer,
 			submesh,
 		}
 	);
 }
 
-void sun_shadow_render_pass::renderDynamicObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+void sun_shadow_render_pass::renderDynamicObject(uint32 cascadeIndex, const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
 {
 	dynamicDrawCalls[cascadeIndex].push_back(
 		{
 			transform,
-			vertexBuffer,
+			vertexBuffer.positions,
 			indexBuffer,
 			submesh,
 		}
@@ -63,24 +63,24 @@ void sun_shadow_render_pass::reset()
 	copyFromStaticCache = false;
 }
 
-void spot_shadow_render_pass::renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+void spot_shadow_render_pass::renderStaticObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
 {
 	staticDrawCalls.push_back(
 		{
 			transform,
-			vertexBuffer,
+			vertexBuffer.positions,
 			indexBuffer,
 			submesh,
 		}
 	);
 }
 
-void spot_shadow_render_pass::renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+void spot_shadow_render_pass::renderDynamicObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
 {
 	dynamicDrawCalls.push_back(
 		{
 			transform,
-			vertexBuffer,
+			vertexBuffer.positions,
 			indexBuffer,
 			submesh,
 		}
@@ -95,24 +95,24 @@ void spot_shadow_render_pass::reset()
 	copyFromStaticCache = false;
 }
 
-void point_shadow_render_pass::renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+void point_shadow_render_pass::renderStaticObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
 {
 	staticDrawCalls.push_back(
 		{
 			transform,
-			vertexBuffer,
+			vertexBuffer.positions,
 			indexBuffer,
 			submesh,
 		}
 	);
 }
 
-void point_shadow_render_pass::renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+void point_shadow_render_pass::renderDynamicObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
 {
 	dynamicDrawCalls.push_back(
 		{
 			transform,
-			vertexBuffer,
+			vertexBuffer.positions,
 			indexBuffer,
 			submesh,
 		}

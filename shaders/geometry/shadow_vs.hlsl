@@ -6,9 +6,6 @@ ConstantBuffer<shadow_transform_cb> transform : register(b0);
 struct vs_input
 {
 	float3 position		: POSITION;
-	float2 uv			: TEXCOORDS;
-	float3 normal		: NORMAL;
-	float3 tangent		: TANGENT;
 };
 
 struct vs_output

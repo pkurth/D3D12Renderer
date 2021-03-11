@@ -52,9 +52,15 @@ struct dx_index_buffer : dx_buffer
 	D3D12_INDEX_BUFFER_VIEW view;
 };
 
+struct vertex_buffer_group
+{
+	ref<dx_vertex_buffer> positions;
+	ref<dx_vertex_buffer> others; // Uvs, normals, tangents, etc.
+};
+
 struct dx_mesh
 {
-	ref<dx_vertex_buffer> vertexBuffer;
+	vertex_buffer_group vertexBuffer;
 	ref<dx_index_buffer> indexBuffer;
 };
 

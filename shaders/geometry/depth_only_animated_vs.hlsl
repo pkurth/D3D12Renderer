@@ -3,23 +3,16 @@
 
 ConstantBuffer<depth_only_transform_cb> transform	: register(b0);
 
-struct mesh_vertex
+struct mesh_position
 {
 	float3 position;
-	float2 uv;
-	float3 normal;
-	float3 tangent;
 };
 
-StructuredBuffer<mesh_vertex> prevFrameVertices		: register(t0);
+StructuredBuffer<mesh_position> prevFramePositions	: register(t0);
 
 struct vs_input
 {
 	float3 position		: POSITION;
-	float2 uv			: TEXCOORDS;
-	float3 normal		: NORMAL;
-	float3 tangent		: TANGENT;
-
 	uint vertexID       : SV_VertexID;
 };
 
@@ -38,7 +31,7 @@ vs_output main(vs_input IN)
 	OUT.position = mul(transform.mvp, float4(IN.position, 1.f));
 	OUT.ndc = OUT.position.xyw;
 
-	float3 prevFramePosition = prevFrameVertices[IN.vertexID].position;
+	float3 prevFramePosition = prevFramePositions[IN.vertexID].position;
 	OUT.prevFrameNDC = mul(transform.prevFrameMVP, float4(prevFramePosition, 1.f)).xyw;
 	return OUT;
 }

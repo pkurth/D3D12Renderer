@@ -19,7 +19,7 @@ struct geometry_render_pass
 
 protected:
 	template <bool opaque, typename material_t>
-	void common(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
+	void common(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
 		bool outline, bool setTransform = true)
 	{
 		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
@@ -103,7 +103,7 @@ private:
 	struct draw_call
 	{
 		mat4 transform;
-		ref<dx_vertex_buffer> vertexBuffer;
+		vertex_buffer_group vertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
 		ref<material_base> material;
 		union
@@ -126,20 +126,20 @@ private:
 struct opaque_render_pass : geometry_render_pass
 {
 	template <typename material_t>
-	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
+	void renderStaticObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
 		uint32 objectID, bool outline = false)
 	{
 		common<true>(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 
 		staticDepthOnlyDrawCalls.push_back(
 			{
-				transform, vertexBuffer, indexBuffer, submesh, objectID
+				transform, vertexBuffer.positions, indexBuffer, submesh, objectID
 			}
 		);
 	}
 
 	template <typename material_t>
-	void renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, 
+	void renderDynamicObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material,
 		const mat4& transform, const mat4& prevFrameTransform,
 		uint32 objectID, bool outline = false)
 	{
@@ -147,13 +147,13 @@ struct opaque_render_pass : geometry_render_pass
 
 		dynamicDepthOnlyDrawCalls.push_back(
 			{
-				transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh, objectID
+				transform, prevFrameTransform, vertexBuffer.positions, indexBuffer, submesh, objectID
 			}
 		);
 	}
 
 	template <typename material_t>
-	void renderAnimatedObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_vertex_buffer>& prevFrameVertexBuffer, 
+	void renderAnimatedObject(const vertex_buffer_group& vertexBuffer, const vertex_buffer_group& prevFrameVertexBuffer,
 		const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, submesh_info prevFrameSubmesh, const ref<material_t>& material,
 		const mat4& transform, const mat4& prevFrameTransform,
 		uint32 objectID, bool outline = false)
@@ -162,11 +162,11 @@ struct opaque_render_pass : geometry_render_pass
 
 		animatedDepthOnlyDrawCalls.push_back(
 			{
-				transform, prevFrameTransform, vertexBuffer, 
-				prevFrameVertexBuffer ? prevFrameVertexBuffer : vertexBuffer, 
+				transform, prevFrameTransform, vertexBuffer.positions, 
+				prevFrameVertexBuffer.positions ? prevFrameVertexBuffer.positions : vertexBuffer.positions,
 				indexBuffer, 
 				submesh, 
-				prevFrameVertexBuffer ? prevFrameSubmesh : submesh, 
+				prevFrameVertexBuffer.positions ? prevFrameSubmesh : submesh,
 				objectID
 			}
 		);
@@ -217,14 +217,14 @@ private:
 struct transparent_render_pass : geometry_render_pass
 {
 	template <typename material_t>
-	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
+	void renderObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
 		bool outline = false)
 	{
 		common<false>(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 	}
 
 	template <typename material_t>
-	void renderParticles(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer,
+	void renderParticles(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer,
 		const ref<dx_buffer>& particleBuffer, const ref<dx_buffer>& aliveList, uint32 aliveListOffset, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset,
 		const mat4& transform, const ref<material_t>& material)
 	{
@@ -255,7 +255,7 @@ private:
 	struct particle_draw_call
 	{
 		mat4 transform;
-		ref<dx_vertex_buffer> vertexBuffer;
+		vertex_buffer_group vertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
 		ref<dx_buffer> particleBuffer;
 		ref<dx_buffer> aliveList;
@@ -274,7 +274,7 @@ private:
 struct overlay_render_pass : geometry_render_pass
 {
 	template <typename material_t>
-	void renderObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform, bool setTransform)
+	void renderObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform, bool setTransform)
 	{
 		common<true>(vertexBuffer, indexBuffer, submesh, material, transform, false, setTransform);
 	}
@@ -310,8 +310,8 @@ struct sun_shadow_render_pass : shadow_render_pass
 	bool copyFromStaticCache;
 
 	// Since each cascade includes the next lower one, if you submit a draw to cascade N, it will also be rendered in N-1 automatically. No need to add it to the lower one.
-	void renderStaticObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
-	void renderDynamicObject(uint32 cascadeIndex, const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+	void renderStaticObject(uint32 cascadeIndex, const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+	void renderDynamicObject(uint32 cascadeIndex, const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
 
 	void reset();
 
@@ -328,8 +328,8 @@ struct spot_shadow_render_pass : shadow_render_pass
 	shadow_map_viewport viewport;
 	bool copyFromStaticCache;
 
-	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
-	void renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+	void renderStaticObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+	void renderDynamicObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
 
 	void reset();
 
@@ -350,8 +350,8 @@ struct point_shadow_render_pass : shadow_render_pass
 	bool copyFromStaticCache1;
 
 	// TODO: Split this into positive and negative direction for frustum culling.
-	void renderStaticObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
-	void renderDynamicObject(const ref<dx_vertex_buffer>& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+	void renderStaticObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+	void renderDynamicObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
 
 	void reset();
 

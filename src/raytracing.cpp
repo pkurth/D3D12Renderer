@@ -7,7 +7,7 @@
 #include <fstream>
 #include <sstream>
 
-raytracing_blas_builder& raytracing_blas_builder::push(ref<dx_vertex_buffer> vertexBuffer, ref<dx_index_buffer> indexBuffer, submesh_info submesh, bool opaque, const trs& localTransform)
+raytracing_blas_builder& raytracing_blas_builder::push(vertex_buffer_group vertexBuffer, ref<dx_index_buffer> indexBuffer, submesh_info submesh, bool opaque, const trs& localTransform)
 {
 	D3D12_RAYTRACING_GEOMETRY_DESC geomDesc;
 
@@ -24,8 +24,8 @@ raytracing_blas_builder& raytracing_blas_builder::push(ref<dx_vertex_buffer> ver
 		localTransforms.push_back(transpose(trsToMat4(localTransform)));
 	}
 
-	geomDesc.Triangles.VertexBuffer.StartAddress = vertexBuffer->gpuVirtualAddress + (vertexBuffer->elementSize * submesh.baseVertex);
-	geomDesc.Triangles.VertexBuffer.StrideInBytes = vertexBuffer->elementSize;
+	geomDesc.Triangles.VertexBuffer.StartAddress = vertexBuffer.positions->gpuVirtualAddress + (vertexBuffer.positions->elementSize * submesh.baseVertex);
+	geomDesc.Triangles.VertexBuffer.StrideInBytes = vertexBuffer.positions->elementSize;
 	geomDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 	geomDesc.Triangles.VertexCount = submesh.numVertices;
 

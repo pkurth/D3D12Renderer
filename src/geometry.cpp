@@ -7,23 +7,17 @@
 
 struct vertex_info
 {
-	uint32 vertexSize;
-
-	uint32 positionOffset;
-	uint32 uvOffset;
-	uint32 normalOffset;
-	uint32 tangentOffset;
+	uint32 othersSize;
 	uint32 skinOffset;
 };
 
 static vertex_info getVertexInfo(uint32 flags)
 {
 	vertex_info result = {};
-	if (flags & mesh_creation_flags_with_positions) { result.positionOffset = result.vertexSize;		result.vertexSize += sizeof(vec3); }
-	if (flags & mesh_creation_flags_with_uvs) { result.uvOffset = result.vertexSize;			result.vertexSize += sizeof(vec2); }
-	if (flags & mesh_creation_flags_with_normals) { result.normalOffset = result.vertexSize;		result.vertexSize += sizeof(vec3); }
-	if (flags & mesh_creation_flags_with_tangents) { result.tangentOffset = result.vertexSize;		result.vertexSize += sizeof(vec3); }
-	if (flags & mesh_creation_flags_with_skin) { result.skinOffset = result.vertexSize;			result.vertexSize += sizeof(skinning_weights); }
+	if (flags & mesh_creation_flags_with_uvs) { result.othersSize += sizeof(vec2); }
+	if (flags & mesh_creation_flags_with_normals) { result.othersSize += sizeof(vec3); }
+	if (flags & mesh_creation_flags_with_tangents) { result.othersSize += sizeof(vec3); }
+	if (flags & mesh_creation_flags_with_skin) { result.skinOffset = result.othersSize;	result.othersSize += sizeof(skinning_weights); }
 	return result;
 }
 
@@ -31,29 +25,37 @@ cpu_mesh::cpu_mesh(uint32 flags)
 {
 	this->flags = flags;
 	vertex_info info = getVertexInfo(flags);
-	vertexSize = info.vertexSize;
+	othersSize = info.othersSize;
 	skinOffset = info.skinOffset;
+	positionSize = sizeof(vec3);
 }
 
 cpu_mesh::cpu_mesh(cpu_mesh&& mesh)
 {
 	flags = mesh.flags;
-	vertexSize = mesh.vertexSize;
+	positionSize = mesh.positionSize;
+	othersSize = mesh.othersSize;
 	skinOffset = mesh.skinOffset;
-	vertices = mesh.vertices;
+	vertexPositions = mesh.vertexPositions;
+	vertexOthers = mesh.vertexOthers;
 	triangles = mesh.triangles;
 	numVertices = mesh.numVertices;
 	numTriangles = mesh.numTriangles;
 
-	mesh.vertices = 0;
+	mesh.vertexPositions = 0;
+	mesh.vertexOthers = 0;
 	mesh.triangles = 0;
 }
 
 cpu_mesh::~cpu_mesh()
 {
-	if (vertices)
+	if (vertexPositions)
 	{
-		_aligned_free(vertices);
+		_aligned_free(vertexPositions);
+	}
+	if (vertexOthers)
+	{
+		_aligned_free(vertexOthers);
 	}
 	if (triangles)
 	{
@@ -69,16 +71,17 @@ void cpu_mesh::alignNextTriangle()
 
 void cpu_mesh::reserve(uint32 vertexCount, uint32 triangleCount)
 {
-	vertices = (uint8*)_aligned_realloc(vertices, (numVertices + vertexCount) * vertexSize, 64);
+	vertexPositions = (uint8*)_aligned_realloc(vertexPositions, (numVertices + vertexCount) * positionSize, 64);
+	vertexOthers = (uint8*)_aligned_realloc(vertexOthers, (numVertices + vertexCount) * othersSize, 64);
 	triangles = (triangle_t*)_aligned_realloc(triangles, (numTriangles + triangleCount + 8) * sizeof(triangle_t), 64); // Allocate 8 more, such that we can align without problems.
 }
 
 #define pushVertex(position, uv, normal, tangent, skin)																							\
-	if (flags & mesh_creation_flags_with_positions) { *(vec3*)vertexPtr = position; vertexPtr += sizeof(vec3); }								\
-	if (flags & mesh_creation_flags_with_uvs) { *(vec2*)vertexPtr = uv; vertexPtr += sizeof(vec2); }											\
-	if (flags & mesh_creation_flags_with_normals) { *(vec3*)vertexPtr = normal; vertexPtr += sizeof(vec3); }									\
-	if (flags & mesh_creation_flags_with_tangents) { *(vec3*)vertexPtr = tangent; vertexPtr += sizeof(vec3); }									\
-	if (flags & mesh_creation_flags_with_skin) { *(skinning_weights*)vertexPtr = skin; vertexPtr += sizeof(skinning_weights); }		\
+	if (flags & mesh_creation_flags_with_positions) { *(vec3*)vertexPositionPtr = position; vertexPositionPtr += sizeof(vec3); }				\
+	if (flags & mesh_creation_flags_with_uvs) { *(vec2*)vertexOthersPtr = uv; vertexOthersPtr += sizeof(vec2); }								\
+	if (flags & mesh_creation_flags_with_normals) { *(vec3*)vertexOthersPtr = normal; vertexOthersPtr += sizeof(vec3); }						\
+	if (flags & mesh_creation_flags_with_tangents) { *(vec3*)vertexOthersPtr = tangent; vertexOthersPtr += sizeof(vec3); }						\
+	if (flags & mesh_creation_flags_with_skin) { *(skinning_weights*)vertexOthersPtr = skin; vertexOthersPtr += sizeof(skinning_weights); }		\
 	++this->numVertices;
 
 void cpu_mesh::pushTriangle(index_t a, index_t b, index_t c)
@@ -95,7 +98,8 @@ submesh_info cpu_mesh::pushQuad(vec2 radius)
 
 	reserve(4, 2);
 
-	uint8* vertexPtr = vertices + vertexSize * numVertices;
+	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
 	pushVertex(vec3(-radius.x, -radius.y, 0.f), vec2(0.f, 0.f), vec3(0.f, 0.f, 1.f), vec3(0.f, 1.f, 0.f), {});
 	pushVertex(vec3(radius.x, -radius.y, 0.f), vec2(1.f, 0.f), vec3(0.f, 0.f, 1.f), vec3(0.f, 1.f, 0.f), {});
@@ -127,7 +131,8 @@ submesh_info cpu_mesh::pushCube(vec3 radius, bool flipWindingOrder, vec3 center)
 	{
 		reserve(8, 12);
 
-		uint8* vertexPtr = vertices + vertexSize * numVertices;
+		uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+		uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
 		pushVertex(center + vec3(-radius.x, -radius.y, radius.z), {}, {}, {}, {});  // 0
 		pushVertex(center + vec3(radius.x, -radius.y, radius.z), {}, {}, {}, {});   // x
@@ -155,7 +160,8 @@ submesh_info cpu_mesh::pushCube(vec3 radius, bool flipWindingOrder, vec3 center)
 	{
 		reserve(24, 12);
 
-		uint8* vertexPtr = vertices + vertexSize * numVertices;
+		uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+		uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
 		pushVertex(center + vec3(-radius.x, -radius.y, radius.z), vec2(0.f, 0.f), vec3(0.f, 0.f, 1.f), vec3(0.f, 1.f, 0.f), {});
 		pushVertex(center + vec3(radius.x, -radius.y, radius.z), vec2(1.f, 0.f), vec3(0.f, 0.f, 1.f), vec3(0.f, 1.f, 0.f), {});
@@ -233,7 +239,8 @@ submesh_info cpu_mesh::pushSphere(uint16 slices, uint16 rows, float radius)
 	}
 	reserve(slices * rows + 2, 2 * rows * slices);
 
-	uint8* vertexPtr = vertices + vertexSize * numVertices;
+	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
 	// Vertices.
 	pushVertex(vec3(0.f, -radius, 0.f), directionToPanoramaUV(vec3(0.f, -1.f, 0.f)), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
@@ -394,7 +401,8 @@ submesh_info cpu_mesh::pushIcoSphere(float radius, uint32 refinement)
 
 	reserve((uint32)vertices.size(), (uint32)triangles.size());
 
-	uint8* vertexPtr = this->vertices + vertexSize * numVertices;
+	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 	for (const vert& v : vertices)
 	{
 		pushVertex(v.p, {}, v.n, v.t, {});
@@ -438,7 +446,8 @@ submesh_info cpu_mesh::pushCapsule(uint16 slices, uint16 rows, float height, flo
 
 	reserve(slices * (rows + 1) + 2, 2 * (rows + 1) * slices);
 
-	uint8* vertexPtr = vertices + vertexSize * numVertices;
+	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
 	// Vertices.
 	pushVertex(vec3(0.f, -radius - halfHeight, 0.f), directionToPanoramaUV(vec3(0.f, -1.f, 0.f)), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
@@ -527,7 +536,8 @@ submesh_info cpu_mesh::pushCylinder(uint16 slices, float radius, float height)
 
 	reserve(4 * slices + 2, 4 * slices);
 
-	uint8* vertexPtr = vertices + vertexSize * numVertices;
+	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 	vec2 uv(0.f, 0.f);
 	pushVertex(vec3(0.f, -halfHeight, 0.f), uv, vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
@@ -625,7 +635,8 @@ submesh_info cpu_mesh::pushArrow(uint16 slices, float shaftRadius, float headRad
 
 	reserve(7 * slices + 1, 7 * slices);
 
-	uint8* vertexPtr = vertices + vertexSize * numVertices;
+	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 	vec2 uv(0.f, 0.f);
 	pushVertex(vec3(0.f, 0.f, 0.f), uv, vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
@@ -756,7 +767,8 @@ submesh_info cpu_mesh::pushTorus(uint16 slices, uint16 segments, float torusRadi
 
 	reserve(segments * slices, segments * slices * 2);
 
-	uint8* vertexPtr = vertices + vertexSize * numVertices;
+	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 	vec2 uv(0.f, 0.f);
 
 	quat torusRotation(vec3(1.f, 0.f, 0.f), deg2rad(90.f));
@@ -823,7 +835,8 @@ submesh_info cpu_mesh::pushMace(uint16 slices, float shaftRadius, float headRadi
 
 	reserve(8 * slices + 2, 8 * slices);
 
-	uint8* vertexPtr = vertices + vertexSize * numVertices;
+	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 	vec2 uv(0.f, 0.f);
 	pushVertex(vec3(0.f, 0.f, 0.f), uv, vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
@@ -973,7 +986,8 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_
 
 	reserve(mesh->mNumVertices, mesh->mNumFaces);
 
-	uint8* vertexPtr = vertices + vertexSize * numVertices;
+	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
 	vec3 position(0.f, 0.f, 0.f);
 	vec3 normal(0.f, 0.f, 0.f);
@@ -1042,7 +1056,8 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_
 				assert(vertexID + baseVertex < numVertices);
 
 				vertexID += baseVertex;
-				uint8* vertexBase = vertices + (vertexID * vertexSize);
+
+				uint8* vertexBase = vertexOthers + (vertexID * othersSize);
 				skinning_weights& weights = *(skinning_weights*)(vertexBase + skinOffset);
 
 				bool foundFreeSlot = false;
@@ -1066,7 +1081,7 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_
 #if 1
 		for (uint32 i = 0; i < mesh->mNumVertices; ++i)
 		{
-			uint8* vertexBase = vertices + ((i + baseVertex) * vertexSize);
+			uint8* vertexBase = vertexOthers + ((i + baseVertex) * othersSize);
 			skinning_weights& weights = *(skinning_weights*)(vertexBase + skinOffset);
 
 			assert(weights.skinWeights[0] > 0);
@@ -1101,49 +1116,15 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_
 dx_mesh cpu_mesh::createDXMesh()
 {
 	dx_mesh result;
-	result.vertexBuffer = createVertexBuffer(vertexSize, numVertices, vertices);
+	result.vertexBuffer.positions = createVertexBuffer(positionSize, numVertices, vertexPositions);
+	if (flags != mesh_creation_flags_with_positions)
+	{
+		result.vertexBuffer.others = createVertexBuffer(othersSize, numVertices, vertexOthers);
+	}
 	result.indexBuffer = createIndexBuffer(sizeof(index_t), numTriangles * 3, triangles);
 	return result;
 }
 
-#define getVertexProperty(prop, base, info, type) *(type*)(base + info.prop##Offset) 
-
-ref<dx_vertex_buffer> cpu_mesh::createVertexBufferWithAlternativeLayout(uint32 otherFlags, bool allowUnorderedAccess)
-{
-#ifdef _DEBUG
-	for (uint32 i = 0; i < 31; ++i)
-	{
-		uint32 testFlag = (1 << i);
-		if (otherFlags & testFlag)
-		{
-			assert(flags & testFlag); // We can only remove flags, not set new flags.
-		}
-	}
-#endif
-
-	vertex_info ownInfo = getVertexInfo(flags);
-	vertex_info newInfo = getVertexInfo(otherFlags);
-
-	uint8* newVertices = (uint8*)malloc(newInfo.vertexSize * numVertices);
-
-	for (uint32 i = 0; i < numVertices; ++i)
-	{
-		uint8* ownBase = vertices + i * ownInfo.vertexSize;
-		uint8* newBase = newVertices + i * newInfo.vertexSize;
-
-		if (otherFlags & mesh_creation_flags_with_positions) { getVertexProperty(position, newBase, newInfo, vec3) = getVertexProperty(position, ownBase, ownInfo, vec3); }
-		if (otherFlags & mesh_creation_flags_with_uvs) { getVertexProperty(uv, newBase, newInfo, vec2) = getVertexProperty(uv, ownBase, ownInfo, vec2); }
-		if (otherFlags & mesh_creation_flags_with_normals) { getVertexProperty(normal, newBase, newInfo, vec3) = getVertexProperty(normal, ownBase, ownInfo, vec3); }
-		if (otherFlags & mesh_creation_flags_with_tangents) { getVertexProperty(tangent, newBase, newInfo, vec3) = getVertexProperty(tangent, ownBase, ownInfo, vec3); }
-		if (otherFlags & mesh_creation_flags_with_skin) { getVertexProperty(skin, newBase, newInfo, skinning_weights) = getVertexProperty(skin, ownBase, ownInfo, skinning_weights); }
-	}
-
-	ref<dx_vertex_buffer> vertexBuffer = createVertexBuffer(newInfo.vertexSize, numVertices, newVertices, allowUnorderedAccess);
-	free(newVertices);
-	return vertexBuffer;
-}
-
-#undef getVertexProperty
 #undef pushVertex
 
 

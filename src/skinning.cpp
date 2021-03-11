@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "skinning.h"
 #include "dx_command_list.h"
+#include "dx_barrier_batcher.h"
 
 #include "skinning_rs.hlsli"
 
@@ -10,14 +11,14 @@
 static ref<dx_buffer> skinningMatricesBuffer; // Buffered frames are in a single dx_buffer.
 
 static uint32 currentSkinnedVertexBuffer;
-static ref<dx_vertex_buffer> skinnedVertexBuffer[2]; // We have two of these, so that we can compute screen space velocities.
+static vertex_buffer_group skinnedVertexBuffer[2]; // We have two of these, so that we can compute screen space velocities.
 
 static dx_pipeline skinningPipeline;
 
 
 struct skinning_call
 {
-	ref<dx_vertex_buffer> vertexBuffer;
+	vertex_buffer_group vertexBuffer;
 	vertex_range range;
 	uint32 jointOffset;
 	uint32 numJoints;
@@ -35,8 +36,8 @@ void initializeSkinning()
 
 	for (uint32 i = 0; i < 2; ++i)
 	{
-		skinnedVertexBuffer[i] = createVertexBuffer(getVertexSize(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents),
-			MAX_NUM_SKINNED_VERTICES_PER_FRAME, 0, true);
+		skinnedVertexBuffer[i].positions = createVertexBuffer(sizeof(vec3), MAX_NUM_SKINNED_VERTICES_PER_FRAME, 0, true);
+		skinnedVertexBuffer[i].others = createVertexBuffer(getVertexSize(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents), MAX_NUM_SKINNED_VERTICES_PER_FRAME, 0, true);
 	}
 
 	skinningPipeline = createReloadablePipeline("skinning_cs");
@@ -44,7 +45,7 @@ void initializeSkinning()
 	skinningMatrices.reserve(MAX_NUM_SKINNING_MATRICES_PER_FRAME);
 }
 
-std::tuple<ref<dx_vertex_buffer>, vertex_range, mat4*> skinObject(const ref<dx_vertex_buffer>& vertexBuffer, vertex_range range, uint32 numJoints)
+std::tuple<vertex_buffer_group, vertex_range, mat4*> skinObject(const vertex_buffer_group& vertexBuffer, vertex_range range, uint32 numJoints)
 {
 	uint32 offset = (uint32)skinningMatrices.size();
 
@@ -73,14 +74,14 @@ std::tuple<ref<dx_vertex_buffer>, vertex_range, mat4*> skinObject(const ref<dx_v
 	return { skinnedVertexBuffer[currentSkinnedVertexBuffer], resultRange, skinningMatrices.data() + offset };
 }
 
-std::tuple<ref<dx_vertex_buffer>, uint32, mat4*> skinObject(const ref<dx_vertex_buffer>& vertexBuffer, uint32 numJoints)
+std::tuple<vertex_buffer_group, uint32, mat4*> skinObject(const vertex_buffer_group& vertexBuffer, uint32 numJoints)
 {
-	auto [vb, range, mats] = skinObject(vertexBuffer, vertex_range{ 0, vertexBuffer->elementCount }, numJoints);
+	auto [vb, range, mats] = skinObject(vertexBuffer, vertex_range{ 0, vertexBuffer.positions->elementCount }, numJoints);
 
 	return { vb, range.firstVertex, mats };
 }
 
-std::tuple<ref<dx_vertex_buffer>, submesh_info, mat4*> skinObject(const ref<dx_vertex_buffer>& vertexBuffer, submesh_info submesh, uint32 numJoints)
+std::tuple<vertex_buffer_group, submesh_info, mat4*> skinObject(const vertex_buffer_group& vertexBuffer, submesh_info submesh, uint32 numJoints)
 {
 	auto [vb, range, mats] = skinObject(vertexBuffer, vertex_range{ submesh.baseVertex, submesh.numVertices }, numJoints);
 
@@ -111,16 +112,21 @@ bool performSkinning()
 		cl->setComputeRootSignature(*skinningPipeline.rootSignature);
 
 		cl->setRootComputeSRV(SKINNING_RS_MATRICES, skinningMatricesBuffer->gpuVirtualAddress + sizeof(mat4) * matrixOffset);
-		cl->setRootComputeUAV(SKINNING_RS_OUTPUT, skinnedVertexBuffer[currentSkinnedVertexBuffer]);
+		cl->setRootComputeUAV(SKINNING_RS_OUTPUT0, skinnedVertexBuffer[currentSkinnedVertexBuffer].positions);
+		cl->setRootComputeUAV(SKINNING_RS_OUTPUT1, skinnedVertexBuffer[currentSkinnedVertexBuffer].others);
 
 		for (const auto& c : calls)
 		{
-			cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER, c.vertexBuffer->gpuVirtualAddress);
+			cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER0, c.vertexBuffer.positions->gpuVirtualAddress);
+			cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER1, c.vertexBuffer.others->gpuVirtualAddress);
 			cl->setCompute32BitConstants(SKINNING_RS_CB, skinning_cb{ c.jointOffset, c.numJoints, c.range.firstVertex, c.range.numVertices, c.vertexOffset });
 			cl->dispatch(bucketize(c.range.numVertices, 512));
 		}
 
-		cl->uavBarrier(skinnedVertexBuffer[currentSkinnedVertexBuffer]);
+		// Not necessary, since the command list ends here.
+		barrier_batcher(cl)
+			.uav(skinnedVertexBuffer[currentSkinnedVertexBuffer].positions)
+			.uav(skinnedVertexBuffer[currentSkinnedVertexBuffer].others);
 
 		dxContext.executeCommandList(cl);
 

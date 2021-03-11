@@ -25,7 +25,7 @@ struct raytracing_blas_geometry
 	raytracing_geometry_type type;
 
 	// Only valid for mesh geometry.
-	ref<dx_vertex_buffer> vertexBuffer;
+	vertex_buffer_group vertexBuffer;
 	ref<dx_index_buffer> indexBuffer;
 	submesh_info submesh;
 };
@@ -40,7 +40,7 @@ struct raytracing_blas
 
 struct raytracing_blas_builder
 {
-	raytracing_blas_builder& push(ref<dx_vertex_buffer> vertexBuffer, ref<dx_index_buffer> indexBuffer, submesh_info submesh, bool opaque = true, const trs& localTransform = trs::identity);
+	raytracing_blas_builder& push(vertex_buffer_group vertexBuffer, ref<dx_index_buffer> indexBuffer, submesh_info submesh, bool opaque = true, const trs& localTransform = trs::identity);
 	raytracing_blas_builder& push(const std::vector<bounding_box>& boundingBoxes, bool opaque);
 	ref<raytracing_blas> finish(bool keepScratch = false);
 

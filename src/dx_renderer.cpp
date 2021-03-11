@@ -148,7 +148,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.renderTargets(depthOnlyFormat, arraysize(depthOnlyFormat), hdrDepthStencilFormat)
-			.inputLayout(inputLayout_position_uv_normal_tangent);
+			.inputLayout(inputLayout_position);
 
 		depthOnlyPipeline = createReloadablePipeline(desc, { "depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
 		animatedDepthOnlyPipeline = createReloadablePipeline(desc, { "depth_only_animated_vs", "depth_only_ps" }, rs_in_vertex_shader);
@@ -158,7 +158,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.renderTargets(0, 0, shadowDepthFormat)
-			.inputLayout(inputLayout_position_uv_normal_tangent)
+			.inputLayout(inputLayout_position)
 			//.cullFrontFaces()
 			;
 
@@ -179,7 +179,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	// Outline.
 	{
 		auto markerDesc = CREATE_GRAPHICS_PIPELINE
-			.inputLayout(inputLayout_position_uv_normal_tangent)
+			.inputLayout(inputLayout_position)
 			.renderTargets(0, 0, hdrDepthStencilFormat)
 			.stencilSettings(D3D12_COMPARISON_FUNC_ALWAYS, 
 				D3D12_STENCIL_OP_REPLACE, 
@@ -1444,7 +1444,8 @@ void dx_renderer::endFrame(const user_input& input)
 
 				cl->setGraphics32BitConstants(0, transform_cb{ jitteredCamera.viewProj * m, m });
 
-				cl->setVertexBuffer(0, dc.vertexBuffer);
+				cl->setVertexBuffer(0, dc.vertexBuffer.positions);
+				cl->setVertexBuffer(1, dc.vertexBuffer.others);
 				cl->setIndexBuffer(dc.indexBuffer);
 				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 			}
@@ -1673,7 +1674,8 @@ void dx_renderer::endFrame(const user_input& input)
 
 					cl->setGraphics32BitConstants(0, transform_cb{ unjitteredCamera.viewProj * m, m });
 
-					cl->setVertexBuffer(0, dc.vertexBuffer);
+					cl->setVertexBuffer(0, dc.vertexBuffer.positions);
+					cl->setVertexBuffer(1, dc.vertexBuffer.others);
 					cl->setIndexBuffer(dc.indexBuffer);
 					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 				}
@@ -1699,7 +1701,11 @@ void dx_renderer::endFrame(const user_input& input)
 					cl->setRootGraphicsSRV(PARTICLES_RS_PARTICLES, dc.particleBuffer->gpuVirtualAddress);
 					cl->setRootGraphicsSRV(PARTICLES_RS_ALIVE_LIST, dc.aliveList->gpuVirtualAddress + dc.aliveListOffset);
 
-					cl->setVertexBuffer(0, dc.vertexBuffer);
+					cl->setVertexBuffer(0, dc.vertexBuffer.positions);
+					if (dc.vertexBuffer.others)
+					{
+						cl->setVertexBuffer(1, dc.vertexBuffer.others);
+					}
 					cl->setIndexBuffer(dc.indexBuffer);
 
 					cl->drawIndirect(particleCommandSignature, 1, dc.commandBuffer, dc.commandBufferOffset);
@@ -1930,7 +1936,8 @@ void dx_renderer::endFrame(const user_input& input)
 				{
 					const submesh_info& submesh = dc.submesh;
 
-					cl->setVertexBuffer(0, dc.vertexBuffer);
+					cl->setVertexBuffer(0, dc.vertexBuffer.positions);
+					cl->setVertexBuffer(1, dc.vertexBuffer.others);
 					cl->setIndexBuffer(dc.indexBuffer);
 					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 				}
@@ -1971,7 +1978,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 					cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * m });
 
-					cl->setVertexBuffer(0, vertexBuffer);
+					cl->setVertexBuffer(0, vertexBuffer.positions);
 					cl->setIndexBuffer(indexBuffer);
 					cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 				}
