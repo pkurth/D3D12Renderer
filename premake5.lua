@@ -143,6 +143,7 @@ workspace "D3D12Renderer"
 	}
 
 outputdir = "%{cfg.buildcfg}_%{cfg.architecture}"
+shaderoutputdir = "shaders/bin/%{cfg.buildcfg}/"
 
 group "Dependencies"
 	include "ext/assimp"
@@ -232,6 +233,7 @@ project "D3D12Renderer"
 			defines { "WINDOWS_SDK_19041_OR_NEWER_AVAILABLE" }
 		end
 
+		defines { "SHADER_BIN_DIR=L\"" .. shaderoutputdir .. "\"" }
 
 	filter "configurations:Debug"
         runtime "Debug"
@@ -242,13 +244,11 @@ project "D3D12Renderer"
 		optimize "On"
 
 
-	os.mkdir("shaders/bin")
-
 
 	filter "files:**.hlsl"
 	
 		if turing_or_higher and dxc_exists then
-			shadermodel "6.0"
+			shadermodel "6.5"
 		else
 			shadermodel "5.1"
 		end
@@ -256,7 +256,7 @@ project "D3D12Renderer"
 		
 
 		flags "ExcludeFromBuild"
-		shaderobjectfileoutput("shaders/bin/%{file.basename}" .. ".cso")
+		shaderobjectfileoutput(shaderoutputdir .. "%{file.basename}.cso")
 		shaderincludedirs {
 			"shaders/rs",
 			"shaders/common"

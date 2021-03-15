@@ -10,7 +10,6 @@
 
 namespace fs = std::filesystem;
 
-static const wchar* shaderDir = L"shaders/bin/";
 static DWORD checkForFileChanges(void*);
 
 struct shader_file
@@ -142,7 +141,7 @@ static reloadable_root_signature* pushBlob(const char* filename, reloadable_pipe
 		{
 			// New file.
 
-			std::wstring filepath = shaderDir + stringToWstring(filename) + L".cso";
+			std::wstring filepath = SHADER_BIN_DIR + stringToWstring(filename) + L".cso";
 
 			dx_blob blob;
 			checkResult(D3DReadFileToBlob(filepath.c_str(), &blob));
@@ -433,7 +432,7 @@ static DWORD checkForFileChanges(void*)
 	uint8 buffer[1024] = {};
 
 	directoryHandle = CreateFileW(
-		shaderDir,
+		SHADER_BIN_DIR,
 		FILE_LIST_DIRECTORY,
 		FILE_SHARE_READ,
 		NULL,
@@ -488,7 +487,7 @@ static DWORD checkForFileChanges(void*)
 
 				filename[filenotify->FileNameLength / sizeof(WCHAR)] = 0;
 
-				fs::path changedPath = (shaderDir / fs::path(filename)).lexically_normal();
+				fs::path changedPath = (SHADER_BIN_DIR / fs::path(filename)).lexically_normal();
 				auto changedPathWriteTime = fs::last_write_time(changedPath);
 
 				// The filesystem usually sends multiple notifications for changed files, since the file is first written, then metadata is changed etc.
