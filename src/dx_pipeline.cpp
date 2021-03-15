@@ -355,6 +355,8 @@ static void loadPipeline(reloadable_pipeline_state& p)
 	}
 }
 
+#define MULTI_THREADED_CREATION 0
+
 void createAllPendingReloadablePipelines()
 {
 	static int rsOffset = 0;
@@ -363,19 +365,27 @@ void createAllPendingReloadablePipelines()
 	thread_job_context context;
 	for (uint32 i = rsOffset; i < (uint32)rootSignaturesFromFiles.size(); ++i)
 	{
+#if MULTI_THREADED_CREATION
 		context.addWork([i]()
 		{
+#endif
 			loadRootSignature(rootSignaturesFromFiles[i]);
+#if MULTI_THREADED_CREATION
 		});
+#endif
 	}
 	context.waitForWorkCompletion();
 
 	for (uint32 i = pipelineOffset; i < (uint32)pipelines.size(); ++i)
 	{
+#if MULTI_THREADED_CREATION
 		context.addWork([i]()
 		{
+#endif
 			loadPipeline(pipelines[i]);
+#if MULTI_THREADED_CREATION
 		});
+#endif
 	}
 	context.waitForWorkCompletion();
 
@@ -392,19 +402,27 @@ void checkForChangedPipelines()
 	thread_job_context context;
 	for (uint32 i = 0; i < (uint32)dirtyRootSignatures.size(); ++i)
 	{
+#if MULTI_THREADED_CREATION
 		context.addWork([i]()
 		{
+#endif
 			loadRootSignature(*dirtyRootSignatures[i]);
+#if MULTI_THREADED_CREATION
 		});
+#endif
 	}
 	context.waitForWorkCompletion();
 
 	for (uint32 i = 0; i < (uint32)dirtyPipelines.size(); ++i)
 	{
+#if MULTI_THREADED_CREATION
 		context.addWork([i]()
 		{
+#endif
 			loadPipeline(*dirtyPipelines[i]);
+#if MULTI_THREADED_CREATION
 		});
+#endif
 	}
 	context.waitForWorkCompletion();
 
