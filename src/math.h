@@ -48,6 +48,37 @@ static float easeOutQuintic(float t)	 { float tmin1 = t - 1.f; return 1.f + tmin
 static float easeInOutQuintic(float t)	 { float tmin1 = t - 1.f; return t < 0.5 ? 16.f * t * t * t * t * t : 1.f + 16.f * tmin1 * tmin1 * tmin1 * tmin1 * tmin1; }
 
 
+template <typename T>
+static T spline(float* ts, T* values, int32 num, float t)
+{
+	// Find key.
+	int32 k = 0;
+	while (ts[k] < t)
+	{
+		++k;
+	}
+
+	// Interpolant.
+	const float h1 = inverseLerp(ts[k - 1], ts[k], t);
+	const float h2 = h1 * h1;
+	const float h3 = h2 * h1;
+	const vec4 h(h3, h2, h1, 1.f);
+
+	T result = 0;
+
+	int32 m = num - 1;
+	result += values[clamp(k - 2, 0, m)] * dot(vec4(-1, 2, -1, 0), h);
+	result += values[clamp(k - 1, 0, m)] * dot(vec4(3, -5, 0, 2), h);
+	result += values[k] * dot(vec4(-3, 4, 1, 0), h);
+	result += values[clamp(k + 1, 0, m)] * dot(vec4(1, -1, 0, 0), h);
+
+	result *= 0.5f;
+
+	return result;
+}
+
+
+
 static float getFramerateIndependentT(float speed, float dt)
 {
 	return 1.f - expf(-speed * dt);
