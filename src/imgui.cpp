@@ -767,6 +767,7 @@ namespace ImGui
 		}
 
 		// Draw lines.
+#if 0
 		for (int i = 1; i < max; i++)
 		{
 			ImVec2 a = points[i - 1];
@@ -775,8 +776,9 @@ namespace ImGui
 			b.y = 1 - b.y;
 			a = a * (bb.Max - bb.Min) + bb.Min;
 			b = b * (bb.Max - bb.Min) + bb.Min;
-			//window->DrawList->AddLine(a, b, GetColorU32(ImGuiCol_PlotLinesHovered));
+			window->DrawList->AddLine(a, b, GetColorU32(ImGuiCol_PlotLinesHovered));
 		}
+#endif
 
 		if (hovered)
 		{
