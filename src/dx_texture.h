@@ -66,16 +66,16 @@ struct dx_texture_atlas
 {
 	ref<dx_texture> texture;
 
-	uint32 slicesX;
-	uint32 slicesY;
+	uint32 cols;
+	uint32 rows;
 
 	std::pair<vec2, vec2> getUVs(uint32 x, uint32 y)
 	{
-		assert(x < slicesX);
-		assert(y < slicesY);
+		assert(x < cols);
+		assert(y < rows);
 
-		float width = 1.f / slicesX;
-		float height = 1.f / slicesY;
+		float width = 1.f / cols;
+		float height = 1.f / rows;
 		vec2 uv0 = vec2(x * width, y * height);
 		vec2 uv1 = vec2((x + 1) * width, (y + 1) * height);
 
@@ -84,8 +84,8 @@ struct dx_texture_atlas
 
 	std::pair<vec2, vec2> getUVs(uint32 i)
 	{
-		uint32 x = i % slicesX;
-		uint32 y = i / slicesX;
+		uint32 x = i % cols;
+		uint32 y = i / cols;
 		return getUVs(x, y);
 	}
 };

@@ -9,14 +9,28 @@
 
 struct dx_command_list;
 
+
+enum particle_render_mode
+{
+	particle_render_mode_billboard,
+	particle_render_mode_mesh,
+};
+
 struct particle_system
 {
-	void initialize(const std::string& shaderName, uint32 maxNumParticles, float emitRate);
+	void initializeAsBillboard(const std::string& shaderName, uint32 particleStructSize, uint32 maxNumParticles, float emitRate);
+	void initializeAsMesh(const std::string& shaderName, uint32 particleStructSize, dx_mesh mesh, submesh_info submesh, uint32 maxNumParticles, float emitRate, uint32 flags);
+
 	void update(float dt, const std::function<void(dx_command_list* cl)>& setUserResourcesFunction);
 
-	void render(transparent_render_pass* renderPass, const trs& transform);
+	template <typename material_t>
+	void render(transparent_render_pass* renderPass, const ref<material_t>& material);
 
 private:
+	static void initializePipeline();
+
+	void initialize(const std::string& shaderName, uint32 particleStructSize, uint32 maxNumParticles, float emitRate, submesh_info submesh);
+
 	void setResources(dx_command_list* cl, const struct particle_sim_cb& cb, uint32 offset, const std::function<void(dx_command_list* cl)>& setUserResourcesFunction);
 	uint32 getAliveListOffset(uint32 alive);
 	uint32 getDeadListOffset();
@@ -31,16 +45,44 @@ private:
 
 	dx_mesh mesh;
 
-	ref<struct particle_material> material;
+	particle_render_mode renderMode;
 
 	dx_pipeline emitPipeline;
 	dx_pipeline simulatePipeline;
 
 	uint32 index;
+
+
+
+	static dx_command_signature commandSignature;
+	static ref<dx_buffer> particleDrawCommandBuffer;
+	static dx_mesh billboardMesh;
+
+	friend struct dx_renderer;
 };
 
+template<typename material_t>
+inline void particle_system::render(transparent_render_pass* renderPass, const ref<material_t>& material)
+{
+	auto& m = (renderMode == particle_render_mode_billboard) ? billboardMesh : mesh;
+
+	renderPass->renderParticles(m.vertexBuffer, m.indexBuffer, particlesBuffer,
+		listBuffer, getAliveListOffset(currentAlive),
+		particleDrawCommandBuffer, index * particleDrawCommandBuffer->elementSize,
+		material);
+}
 
 
-// Internal.
-void initializeParticlePipeline();
+
+struct particle_billboard_material : material_base
+{
+	static dx_pipeline pipeline; // Static for now.
+
+	dx_texture_atlas atlas;
+
+	particle_billboard_material(const std::string& textureFilename, uint32 cols, uint32 rows);
+
+	static void setupTransparentPipeline(dx_command_list* cl, const common_material_info& materialInfo);
+	void prepareForRendering(dx_command_list* cl);
+};
 

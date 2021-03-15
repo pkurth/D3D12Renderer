@@ -9,13 +9,13 @@
 #include "dx_profiling.h"
 #include "particles_rs.hlsli"
 
-static dx_pipeline renderPipeline;
+dx_command_signature particle_system::commandSignature;
+ref<dx_buffer> particle_system::particleDrawCommandBuffer;
+dx_mesh particle_system::billboardMesh;
+
+dx_pipeline particle_billboard_material::pipeline;
 
 static dx_pipeline startPipeline;
-
-static dx_command_signature commandSignature;
-
-static ref<dx_buffer> particleDrawCommandBuffer;
 
 static volatile uint32 particleSystemCounter = 0;
 
@@ -43,7 +43,23 @@ static dx_pipeline getPipeline(const std::string& shaderName, const std::string&
 	return it->second;
 }
 
-void particle_system::initialize(const std::string& shaderName, uint32 maxNumParticles, float emitRate)
+void particle_system::initializePipeline()
+{
+	startPipeline = createReloadablePipeline("particle_start_cs");
+
+	D3D12_INDIRECT_ARGUMENT_DESC argumentDesc;
+	argumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
+	commandSignature = createCommandSignature({}, &argumentDesc, 1, sizeof(D3D12_DISPATCH_ARGUMENTS));
+
+	particleDrawCommandBuffer = createBuffer(sizeof(particle_draw), 1024, 0, true);
+
+
+	cpu_mesh cpuMesh(mesh_creation_flags_with_positions);
+	submesh_info submesh = cpuMesh.pushQuad(1.f);
+	billboardMesh = cpuMesh.createDXMesh();
+}
+
+void particle_system::initialize(const std::string& shaderName, uint32 particleStructSize, uint32 maxNumParticles, float emitRate, submesh_info submesh)
 {
 	this->emitPipeline = getPipeline(shaderName, "emit");
 	this->simulatePipeline = getPipeline(shaderName, "sim");
@@ -62,7 +78,7 @@ void particle_system::initialize(const std::string& shaderName, uint32 maxNumPar
 	counters.numDeadParticles = maxNumParticles;
 
 
-	particlesBuffer = createBuffer(32, maxNumParticles, 0, true);
+	particlesBuffer = createBuffer(particleStructSize, maxNumParticles, 0, true);
 
 
 	// Lists.
@@ -78,20 +94,28 @@ void particle_system::initialize(const std::string& shaderName, uint32 maxNumPar
 	// Dispatch.
 	dispatchBuffer = createBuffer((uint32)sizeof(particle_dispatch), 1, 0, true);
 
-
-
-	// Mesh.
-	cpu_mesh cpuMesh(mesh_creation_flags_with_positions);
-	submesh_info cubeSubmesh = cpuMesh.pushCube(1.f);
-	mesh = cpuMesh.createDXMesh();
-
+	
 	particle_draw draw = {};
-	draw.arguments.IndexCountPerInstance = cubeSubmesh.numTriangles * 3;
+	draw.arguments.BaseVertexLocation = submesh.baseVertex;
+	draw.arguments.IndexCountPerInstance = submesh.numTriangles * 3;
+	draw.arguments.StartIndexLocation = submesh.firstTriangle * 3;
 	updateBufferDataRange(particleDrawCommandBuffer, &draw, (uint32)sizeof(particle_draw) * index, (uint32)sizeof(particle_draw));
+}
 
+void particle_system::initializeAsBillboard(const std::string& shaderName, uint32 particleStructSize, uint32 maxNumParticles, float emitRate)
+{
+	renderMode = particle_render_mode_billboard;
 
+	submesh_info submesh = { 2, 0, 0, 6 };
+	initialize(shaderName, particleStructSize, maxNumParticles, emitRate, submesh);
+}
 
-	material = make_ref<particle_material>();
+void particle_system::initializeAsMesh(const std::string& shaderName, uint32 particleStructSize, dx_mesh mesh, submesh_info submesh, uint32 maxNumParticles, float emitRate, uint32 flags)
+{
+	renderMode = particle_render_mode_mesh;
+
+	this->mesh = mesh;
+	initialize(shaderName, particleStructSize, maxNumParticles, emitRate, submesh);
 }
 
 void particle_system::update(float dt, const std::function<void(dx_command_list* cl)>& setUserResourcesFunction)
@@ -207,53 +231,35 @@ uint32 particle_system::getDeadListOffset()
 	return (uint32)sizeof(particle_counters);
 }
 
-void particle_system::render(transparent_render_pass* renderPass, const trs& transform)
+particle_billboard_material::particle_billboard_material(const std::string& textureFilename, uint32 cols, uint32 rows)
 {
-	renderPass->renderParticles(mesh.vertexBuffer, mesh.indexBuffer, particlesBuffer,
-		listBuffer, getAliveListOffset(currentAlive),
-		particleDrawCommandBuffer, index * particleDrawCommandBuffer->elementSize,
-		trsToMat4(transform),
-		material);
+	if (!pipeline.pipeline)
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.inputLayout(inputLayout_position)
+			.renderTargets(dx_renderer::transparentLightPassFormats, arraysize(dx_renderer::transparentLightPassFormats), dx_renderer::hdrDepthStencilFormat)
+			.additiveBlending(0)
+			.depthSettings(true, false);
+
+		pipeline = createReloadablePipeline(desc, { "test_particle_system_vs", "test_particle_system_ps" });
+
+		createAllPendingReloadablePipelines();
+	}
+
+	atlas.texture = loadTextureFromFile(textureFilename);
+	atlas.cols = cols;
+	atlas.rows = rows;
 }
 
-void initializeParticlePipeline()
+void particle_billboard_material::setupTransparentPipeline(dx_command_list* cl, const common_material_info& materialInfo)
 {
-	auto desc = CREATE_GRAPHICS_PIPELINE
-		.inputLayout(inputLayout_position)
-		.renderTargets(dx_renderer::transparentLightPassFormats, arraysize(dx_renderer::transparentLightPassFormats), dx_renderer::hdrDepthStencilFormat)
-		//.additiveBlending(0)
-		.depthSettings(true, false);
-
-	renderPipeline = createReloadablePipeline(desc, { "test_particle_system_vs", "test_particle_system_ps" });
-
-
-	startPipeline = createReloadablePipeline("particle_start_cs");
-
-	D3D12_INDIRECT_ARGUMENT_DESC argumentDesc;
-	argumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
-	commandSignature = createCommandSignature({}, &argumentDesc, 1, sizeof(D3D12_DISPATCH_ARGUMENTS));
-
-	particleDrawCommandBuffer = createBuffer(sizeof(particle_draw), 1024, 0, true);
+	cl->setPipelineState(*pipeline.pipeline);
+	cl->setGraphicsRootSignature(*pipeline.rootSignature);
+	cl->setGraphicsDynamicConstantBuffer(PARTICLES_RS_CAMERA, materialInfo.cameraCBV);
 }
 
-
-
-
-
-
-
-struct particle_material : material_base
+void particle_billboard_material::prepareForRendering(dx_command_list* cl)
 {
-	void prepareForRendering(struct dx_command_list* cl);
-	static void setupTransparentPipeline(dx_command_list* cl, const common_material_info& info);
-};
-
-void particle_material::prepareForRendering(dx_command_list* cl)
-{
-}
-
-void particle_material::setupTransparentPipeline(dx_command_list* cl, const common_material_info& info)
-{
-	cl->setPipelineState(*renderPipeline.pipeline);
-	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);
+	cl->setGraphics32BitConstants(PARTICLES_RS_BILLBOARD, particle_atlas_cb{ atlas.cols * atlas.rows, atlas.cols, 1.f / atlas.cols, 1.f / atlas.rows });
+	cl->setDescriptorHeapSRV(PARTICLES_RS_ATLAS, 0, atlas.texture);
 }

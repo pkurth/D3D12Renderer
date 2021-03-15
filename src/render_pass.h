@@ -12,6 +12,7 @@ struct dx_vertex_buffer;
 struct dx_index_buffer;
 struct raytracing_tlas;
 
+
 // Base for both opaque and transparent pass.
 struct geometry_render_pass
 {
@@ -226,7 +227,7 @@ struct transparent_render_pass : geometry_render_pass
 	template <typename material_t>
 	void renderParticles(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer,
 		const ref<dx_buffer>& particleBuffer, const ref<dx_buffer>& aliveList, uint32 aliveListOffset, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset,
-		const mat4& transform, const ref<material_t>& material)
+		const ref<material_t>& material)
 	{
 		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
 
@@ -234,7 +235,6 @@ struct transparent_render_pass : geometry_render_pass
 
 		particleDrawCalls.push_back(
 			{
-				transform,
 				vertexBuffer,
 				indexBuffer,
 				particleBuffer,
@@ -254,7 +254,6 @@ private:
 
 	struct particle_draw_call
 	{
-		mat4 transform;
 		vertex_buffer_group vertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
 		ref<dx_buffer> particleBuffer;

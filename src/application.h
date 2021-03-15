@@ -75,6 +75,7 @@ private:
 	ref<dx_texture> decalTexture;
 
 	particle_system particleSystem;
+	ref<particle_billboard_material> particleMaterial;
 
 	directional_light sun;
 

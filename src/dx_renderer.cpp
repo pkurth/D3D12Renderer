@@ -240,7 +240,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 
 	pbr_material::initializePipeline();
-	initializeParticlePipeline();
+	particle_system::initializePipeline();
 
 
 
@@ -1687,8 +1687,6 @@ void dx_renderer::endFrame(const user_input& input)
 
 				for (const auto& dc : transparentRenderPass->particleDrawCalls)
 				{
-					const mat4& m = dc.transform;
-
 					if (dc.materialSetupFunc != lastSetupFunc)
 					{
 						dc.materialSetupFunc(cl, materialInfo);
@@ -1697,7 +1695,6 @@ void dx_renderer::endFrame(const user_input& input)
 
 					dc.material->prepareForRendering(cl);
 
-					cl->setGraphics32BitConstants(PARTICLES_RS_MVP, unjitteredCamera.viewProj * m);
 					cl->setRootGraphicsSRV(PARTICLES_RS_PARTICLES, dc.particleBuffer->gpuVirtualAddress);
 					cl->setRootGraphicsSRV(PARTICLES_RS_ALIVE_LIST, dc.aliveList->gpuVirtualAddress + dc.aliveListOffset);
 

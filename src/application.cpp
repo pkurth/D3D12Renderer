@@ -244,7 +244,8 @@ void application::initialize(dx_renderer* renderer)
 		SET_NAME(pointLightShadowInfoBuffer[i]->resource, "Point light shadow infos");
 	}
 
-	particleSystem.initialize("test_particle_system", 10000, 2000.f);
+	particleSystem.initializeAsBillboard("test_particle_system", sizeof(test_particle_data), 10000, 500.f);
+	particleMaterial = make_ref<particle_billboard_material>("assets/particles/fire1.png", 8, 6);
 }
 
 static bool plotAndEditTonemapping(tonemap_cb& tonemap)
@@ -919,11 +920,12 @@ void application::update(const user_input& input, float dt)
 
 	// Particles.
 
-	//particleSystem.update(dt, [](dx_command_list* cl)
-	//{
-	//	cl->setCompute32BitConstants(TEST_PARTICLE_SYSTEM_RS_CBV, test_particle_cb{ vec3(0.f, 20.f, -10.f), (uint32)dxContext.frameID });
-	//});
-	//particleSystem.render(&transparentRenderPass, trs::identity);
+	particleSystem.update(dt, [](dx_command_list* cl)
+	{
+		cl->setCompute32BitConstants(TEST_PARTICLE_SYSTEM_RS_CBV, test_particle_cb{ vec3(0.f, 20.f, -10.f), (uint32)dxContext.frameID });
+	});
+
+	particleSystem.render(&transparentRenderPass, particleMaterial);
 
 
 
