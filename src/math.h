@@ -11,6 +11,7 @@
 #include "simd.h"
 
 #define M_PI 3.14159265359f
+#define M_PI_OVER_2 (M_PI * 0.5f)
 #define M_PI_OVER_180 (M_PI / 180.f)
 #define M_180_OVER_PI (180.f / M_PI)
 #define M_TAU 6.28318530718f
@@ -34,18 +35,57 @@ static constexpr bool isPowerOfTwo(uint32 i)
 	return (i & (i - 1)) == 0;
 }
 
-static float easeInQuadratic(float t)	 { return t * t; }
-static float easeOutQuadratic(float t)	 { return t * (2.f - t); }
-static float easeInOutQuadratic(float t) { return t < 0.5f ? 2.f * t * t : -1.f + (4.f - 2.f * t) * t; }
-static float easeInCubic(float t)		 { return t * t * t; }
-static float easeOutCubic(float t)		 { float tmin1 = t - 1.f; return tmin1 * tmin1 * tmin1 + 1.f; }
-static float easeInOutCubic(float t)	 { return t < 0.5f ? 4.f * t * t * t : (t - 1.f) * (2.f * t - 2.f) * (2.f * t - 2.f) + 1.f; }
-static float easeInQuartic(float t)		 { return t * t * t * t; }
-static float easeOutQuartic(float t)	 { float tmin1 = t - 1.f; return 1.f - tmin1 * tmin1 * tmin1 * tmin1; }
-static float easeInOutQuartic(float t)	 { float tmin1 = t - 1.f; return t < 0.5f ? 8.f * t * t * t * t : 1.f - 8.f * tmin1 * tmin1 * tmin1 * tmin1; }
-static float easeInQuintic(float t)		 { return t * t * t * t * t; }
-static float easeOutQuintic(float t)	 { float tmin1 = t - 1.f; return 1.f + tmin1 * tmin1 * tmin1 * tmin1 * tmin1; }
-static float easeInOutQuintic(float t)	 { float tmin1 = t - 1.f; return t < 0.5 ? 16.f * t * t * t * t * t : 1.f + 16.f * tmin1 * tmin1 * tmin1 * tmin1 * tmin1; }
+static float easeInQuadratic(float t)		{ return t * t; }
+static float easeOutQuadratic(float t)		{ return t * (2.f - t); }
+static float easeInOutQuadratic(float t)	{ return (t < 0.5f) ? (2.f * t * t) : (-1.f + (4.f - 2.f * t) * t); }
+
+static float easeInCubic(float t)			{ return t * t * t; }
+static float easeOutCubic(float t)			{ float tmin1 = t - 1.f; return tmin1 * tmin1 * tmin1 + 1.f; }
+static float easeInOutCubic(float t)		{ return (t < 0.5f) ? (4.f * t * t * t) : ((t - 1.f) * (2.f * t - 2.f) * (2.f * t - 2.f) + 1.f); }
+
+static float easeInQuartic(float t)			{ return t * t * t * t; }
+static float easeOutQuartic(float t)		{ float tmin1 = t - 1.f; return 1.f - tmin1 * tmin1 * tmin1 * tmin1; }
+static float easeInOutQuartic(float t)		{ float tmin1 = t - 1.f; return (t < 0.5f) ? (8.f * t * t * t * t) : (1.f - 8.f * tmin1 * tmin1 * tmin1 * tmin1); }
+
+static float easeInQuintic(float t)			{ return t * t * t * t * t; }
+static float easeOutQuintic(float t)		{ float tmin1 = t - 1.f; return 1.f + tmin1 * tmin1 * tmin1 * tmin1 * tmin1; }
+static float easeInOutQuintic(float t)		{ float tmin1 = t - 1.f; return t < 0.5 ? 16.f * t * t * t * t * t : 1.f + 16.f * tmin1 * tmin1 * tmin1 * tmin1 * tmin1; }
+
+static float easeInSine(float t)			{ return sin((t - 1.f) * M_PI_OVER_2) + 1.f; }
+static float easeOutSine(float t)			{ return sin(t * M_PI_OVER_2); }
+static float easeInOutSine(float t)			{ return 0.5f * (1 - cos(t * M_PI)); }
+
+static float easeInCircular(float t)		{ return 1.f - sqrt(1.f - (t * t)); }
+static float easeOutCircular(float t)		{ return sqrt((2.f - t) * t); }
+static float easeInOutCircular(float t)		{ return (t < 0.5f) ? (0.5f * (1.f - sqrt(1.f - 4.f * (t * t)))) : (0.5f * (sqrt(-((2.f * t) - 3.f) * ((2.f * t) - 1.f)) + 1.f)); }
+
+static float easeInExponential(float t)		{ return (t == 0.f) ? t : powf(2.f, 10.f * (t - 1.f)); }
+static float easeOutExponential(float t)	{ return (t == 1.f) ? t : 1.f - powf(2.f, -10.f * t); }
+static float easeInOutExponential(float t)	{ if (t == 0.f || t == 1.f) { return t; } return (t < 0.5f) ? (0.5f * powf(2.f, (20.f * t) - 10.f)) : (-0.5f * powf(2.f, (-20.f * t) + 10.f) + 1.f); }
+
+static float inElastic(float t)				{ return sin(13.f * M_PI_OVER_2 * t) * powf(2.f, 10.f * (t - 1.f)); }
+static float outElastic(float t)			{ return sin(-13.f * M_PI_OVER_2 * (t + 1.f)) * powf(2.f, -10.f * t) + 1.f; }
+static float inOutElastic(float t)			{ return (t < 0.5f) ? (0.5f * sin(13.f * M_PI_OVER_2 * (2.f * t)) * powf(2.f, 10.f * ((2.f * t) - 1.f))) : (0.5f * (sin(-13.f * M_PI_OVER_2 * ((2.f * t - 1.f) + 1.f)) * powf(2.f, -10.f * (2.f * t - 1.f)) + 2.f)); }
+
+static float inBack(float t)				{ const float s = 1.70158f; return t * t * ((s + 1.f) * t - s); }
+static float outBack(float t)				{ const float s = 1.70158f; return --t, 1.f * (t * t * ((s + 1.f) * t + s) + 1.f); }
+static float inOutBack(float t)				{ const float s = 1.70158f * 1.525f; return (t < 0.5f) ? (t *= 2.f, 0.5f * t * t * (t * s + t - s)) : (t = t * 2.f - 2.f, 0.5f * (2.f + t * t * (t * s + t + s))); }
+
+
+#define bounceout(p) ( \
+    (t) < 4.f/11.f ? (121.f * (t) * (t))/16.f : \
+    (t) < 8.f/11.f ? (363.f/40.f * (t) * (t)) - (99.f/10.f * (t)) + 17.f/5.f : \
+    (t) < 9.f/10.f ? (4356.f/361.f * (t) * (t)) - (35442.f/1805.f * (t)) + 16061.f/1805.f \
+                : (54.f/5.f * (t) * (t)) - (513.f/25.f * (t)) + 268.f/25.f )
+
+
+static float inBounce(float t)				{ return 1.f - bounceout(1.f - t); }
+static float outBounce(float t)				{ return bounceout(t); }
+static float inOutBounce(float t)			{ return (t < 0.5f) ? (0.5f * (1.f - bounceout(1.f - t * 2.f))) : (0.5f * bounceout((t * 2.f - 1.f)) + 0.5f); }
+
+#undef bounceout
+
+
 
 
 template <typename T>
@@ -68,7 +108,7 @@ static T spline(float* ts, T* values, int32 num, float t)
 
 	int32 m = num - 1;
 	result += values[clamp(k - 2, 0, m)] * dot(vec4(-1, 2, -1, 0), h);
-	result += values[clamp(k - 1, 0, m)] * dot(vec4(3, -5, 0, 2), h);
+	result += values[k - 1] * dot(vec4(3, -5, 0, 2), h);
 	result += values[k] * dot(vec4(-3, 4, 1, 0), h);
 	result += values[clamp(k + 1, 0, m)] * dot(vec4(1, -1, 0, 0), h);
 

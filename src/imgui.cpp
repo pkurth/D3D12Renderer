@@ -234,328 +234,74 @@ namespace tween {
 	{
 		LINEAR,
 
-		QUADIN,          // t^2
+		QUADIN,
 		QUADOUT,
 		QUADINOUT,
-		CUBICIN,         // t^3
+		CUBICIN,
 		CUBICOUT,
 		CUBICINOUT,
-		QUARTIN,         // t^4
+		QUARTIN,
 		QUARTOUT,
 		QUARTINOUT,
-		QUINTIN,         // t^5
+		QUINTIN,
 		QUINTOUT,
 		QUINTINOUT,
-		SINEIN,          // sin(t)
+		SINEIN,
 		SINEOUT,
 		SINEINOUT,
-		EXPOIN,          // 2^t
+		EXPOIN,
 		EXPOOUT,
 		EXPOINOUT,
-		CIRCIN,          // sqrt(1-t^2)
+		CIRCIN,
 		CIRCOUT,
 		CIRCINOUT,
-		ELASTICIN,       // exponentially decaying sine wave
+		ELASTICIN,
 		ELASTICOUT,
 		ELASTICINOUT,
-		BACKIN,          // overshooting cubic easing: (s+1)*t^3 - s*t^2
+		BACKIN,
 		BACKOUT,
 		BACKINOUT,
-		BOUNCEIN,        // exponentially decaying parabolic bounce
+		BOUNCEIN,
 		BOUNCEOUT,
 		BOUNCEINOUT,
-
-		SINESQUARE,      // gapjumper's
-		EXPONENTIAL,     // gapjumper's
-		SCHUBRING1,      // terry schubring's formula 1
-		SCHUBRING2,      // terry schubring's formula 2
-		SCHUBRING3,      // terry schubring's formula 3
-
-		SINPI2,          // tomas cepeda's
-		SWING,           // tomas cepeda's & lquery's
 	};
 
 	static float ease(int easetype, float t)
 	{
-		using namespace std;
-
-		const float d = 1.f;
-		const float pi = M_PI;
-		const float pi2 = M_PI / 2;
-
-		float p = t / d;
-
 		switch (easetype)
 		{
-			// Modeled after the line y = x
 			default:
-			case TYPE::LINEAR: {
-				return p;
-			}
-
-							 // Modeled after the parabola y = x^2
-			case TYPE::QUADIN: {
-				return p * p;
-			}
-
-							 // Modeled after the parabola y = -x^2 + 2x
-			case TYPE::QUADOUT: {
-				return -(p * (p - 2));
-			}
-
-							  // Modeled after the piecewise quadratic
-							  // y = (1/2)((2x)^2)             ; [0, 0.5)
-							  // y = -(1/2)((2x-1)*(2x-3) - 1) ; [0.5, 1]
-			case TYPE::QUADINOUT: {
-				if (p < 0.5f) {
-					return 2 * p * p;
-				}
-				else {
-					return (-2 * p * p) + (4 * p) - 1;
-				}
-			}
-
-								// Modeled after the cubic y = x^3
-			case TYPE::CUBICIN: {
-				return p * p * p;
-			}
-
-							  // Modeled after the cubic y = (x - 1)^3 + 1
-			case TYPE::CUBICOUT: {
-				float f = (p - 1);
-				return f * f * f + 1;
-			}
-
-							   // Modeled after the piecewise cubic
-							   // y = (1/2)((2x)^3)       ; [0, 0.5)
-							   // y = (1/2)((2x-2)^3 + 2) ; [0.5, 1]
-			case TYPE::CUBICINOUT: {
-				if (p < 0.5f) {
-					return 4 * p * p * p;
-				}
-				else {
-					float f = ((2 * p) - 2);
-					return 0.5f * f * f * f + 1;
-				}
-			}
-
-								 // Modeled after the quartic x^4
-			case TYPE::QUARTIN: {
-				return p * p * p * p;
-			}
-
-							  // Modeled after the quartic y = 1 - (x - 1)^4
-			case TYPE::QUARTOUT: {
-				float f = (p - 1);
-				return f * f * f * (1 - p) + 1;
-			}
-
-							   // Modeled after the piecewise quartic
-							   // y = (1/2)((2x)^4)        ; [0, 0.5)
-							   // y = -(1/2)((2x-2)^4 - 2) ; [0.5, 1]
-			case TYPE::QUARTINOUT: {
-				if (p < 0.5) {
-					return 8 * p * p * p * p;
-				}
-				else {
-					float f = (p - 1);
-					return -8 * f * f * f * f + 1;
-				}
-			}
-
-								 // Modeled after the quintic y = x^5
-			case TYPE::QUINTIN: {
-				return p * p * p * p * p;
-			}
-
-							  // Modeled after the quintic y = (x - 1)^5 + 1
-			case TYPE::QUINTOUT: {
-				float f = (p - 1);
-				return f * f * f * f * f + 1;
-			}
-
-							   // Modeled after the piecewise quintic
-							   // y = (1/2)((2x)^5)       ; [0, 0.5)
-							   // y = (1/2)((2x-2)^5 + 2) ; [0.5, 1]
-			case TYPE::QUINTINOUT: {
-				if (p < 0.5) {
-					return 16 * p * p * p * p * p;
-				}
-				else {
-					float f = ((2 * p) - 2);
-					return  0.5f * f * f * f * f * f + 1;
-				}
-			}
-
-								 // Modeled after quarter-cycle of sine wave
-			case TYPE::SINEIN: {
-				return sin((p - 1) * pi2) + 1;
-			}
-
-							 // Modeled after quarter-cycle of sine wave (different phase)
-			case TYPE::SINEOUT: {
-				return sin(p * pi2);
-			}
-
-							  // Modeled after half sine wave
-			case TYPE::SINEINOUT: {
-				return 0.5f * (1 - cos(p * pi));
-			}
-
-								// Modeled after shifted quadrant IV of unit circle
-			case TYPE::CIRCIN: {
-				return 1 - sqrt(1 - (p * p));
-			}
-
-							 // Modeled after shifted quadrant II of unit circle
-			case TYPE::CIRCOUT: {
-				return sqrt((2 - p) * p);
-			}
-
-							  // Modeled after the piecewise circular function
-							  // y = (1/2)(1 - sqrt(1 - 4x^2))           ; [0, 0.5)
-							  // y = (1/2)(sqrt(-(2x - 3)*(2x - 1)) + 1) ; [0.5, 1]
-			case TYPE::CIRCINOUT: {
-				if (p < 0.5f) {
-					return 0.5f * (1 - sqrt(1 - 4 * (p * p)));
-				}
-				else {
-					return 0.5f * (sqrt(-((2 * p) - 3) * ((2 * p) - 1)) + 1);
-				}
-			}
-
-								// Modeled after the exponential function y = 2^(10(x - 1))
-			case TYPE::EXPOIN: {
-				return (p == 0.f) ? p : powf(2, 10 * (p - 1));
-			}
-
-							 // Modeled after the exponential function y = -2^(-10x) + 1
-			case TYPE::EXPOOUT: {
-				return (p == 1.f) ? p : 1 - powf(2, -10 * p);
-			}
-
-							  // Modeled after the piecewise exponential
-							  // y = (1/2)2^(10(2x - 1))         ; [0,0.5)
-							  // y = -(1/2)*2^(-10(2x - 1))) + 1 ; [0.5,1]
-			case TYPE::EXPOINOUT: {
-				if (p == 0.f || p == 1.f) return p;
-
-				if (p < 0.5f) {
-					return 0.5f * powf(2, (20 * p) - 10);
-				}
-				else {
-					return -0.5f * powf(2, (-20 * p) + 10) + 1;
-				}
-			}
-
-								// Modeled after the damped sine wave y = sin(13pi/2*x)*powf(2, 10 * (x - 1))
-			case TYPE::ELASTICIN: {
-				return sin(13 * pi2 * p) * powf(2, 10 * (p - 1));
-			}
-
-								// Modeled after the damped sine wave y = sin(-13pi/2*(x + 1))*powf(2, -10x) + 1
-			case TYPE::ELASTICOUT: {
-				return sin(-13 * pi2 * (p + 1)) * powf(2, -10 * p) + 1;
-			}
-
-								 // Modeled after the piecewise exponentially-damped sine wave:
-								 // y = (1/2)*sin(13pi/2*(2*x))*powf(2, 10 * ((2*x) - 1))      ; [0,0.5)
-								 // y = (1/2)*(sin(-13pi/2*((2x-1)+1))*powf(2,-10(2*x-1)) + 2) ; [0.5, 1]
-			case TYPE::ELASTICINOUT: {
-				if (p < 0.5) {
-					return 0.5f * sin(13 * pi2 * (2 * p)) * powf(2, 10 * ((2 * p) - 1));
-				}
-				else {
-					return 0.5f * (sin(-13 * pi2 * ((2 * p - 1) + 1)) * powf(2, -10 * (2 * p - 1)) + 2);
-				}
-			}
-
-								   // Modeled (originally) after the overshooting cubic y = x^3-x*sin(x*pi)
-			case TYPE::BACKIN: { /*
-				return p * p * p - p * sin(p * pi); */
-				float s = 1.70158f;
-				return p * p * ((s + 1) * p - s);
-			}
-
-							 // Modeled (originally) after overshooting cubic y = 1-((1-x)^3-(1-x)*sin((1-x)*pi))
-			case TYPE::BACKOUT: { /*
-				float f = (1 - p);
-				return 1 - (f * f * f - f * sin(f * pi)); */
-				float s = 1.70158f;
-				return --p, 1.f * (p * p * ((s + 1) * p + s) + 1);
-			}
-
-							  // Modeled (originally) after the piecewise overshooting cubic function:
-							  // y = (1/2)*((2x)^3-(2x)*sin(2*x*pi))           ; [0, 0.5)
-							  // y = (1/2)*(1-((1-x)^3-(1-x)*sin((1-x)*pi))+1) ; [0.5, 1]
-			case TYPE::BACKINOUT: {
-				float s = 1.70158f * 1.525f;
-				if (p < 0.5f) {
-					return p *= 2, 0.5f * p * p * (p * s + p - s);
-				}
-				else {
-					return p = p * 2 - 2, 0.5f * (2 + p * p * (p * s + p + s));
-				}
-			}
-
-#           define tween$bounceout(p) ( \
-                (p) < 4/11.f ? (121 * (p) * (p))/16.f : \
-                (p) < 8/11.f ? (363/40.f * (p) * (p)) - (99/10.f * (p)) + 17/5.f : \
-                (p) < 9/10.f ? (4356/361.f * (p) * (p)) - (35442/1805.f * (p)) + 16061/1805.f \
-                           : (54/5.f * (p) * (p)) - (513/25.f * (p)) + 268/25.f )
-
-			case TYPE::BOUNCEIN: {
-				return 1 - tween$bounceout(1 - p);
-			}
-
-			case TYPE::BOUNCEOUT: {
-				return tween$bounceout(p);
-			}
-
-			case TYPE::BOUNCEINOUT: {
-				if (p < 0.5) {
-					return 0.5f * (1 - tween$bounceout(1 - p * 2));
-				}
-				else {
-					return 0.5f * tween$bounceout((p * 2 - 1)) + 0.5f;
-				}
-			}
-
-#           undef tween$bounceout
-
-			case TYPE::SINESQUARE: {
-				float A = sin((p)*pi2);
-				return A * A;
-			}
-
-			case TYPE::EXPONENTIAL: {
-				return 1 / (1 + exp(6 - 12 * (p)));
-			}
-
-			case TYPE::SCHUBRING1: {
-				return 2 * (p + (0.5f - p) * abs(0.5f - p)) - 0.5f;
-			}
-
-			case TYPE::SCHUBRING2: {
-				float p1pass = 2 * (p + (0.5f - p) * abs(0.5f - p)) - 0.5f;
-				float p2pass = 2 * (p1pass + (0.5f - p1pass) * abs(0.5f - p1pass)) - 0.5f;
-				float pAvg = (p1pass + p2pass) / 2;
-				return pAvg;
-			}
-
-			case TYPE::SCHUBRING3: {
-				float p1pass = 2 * (p + (0.5f - p) * abs(0.5f - p)) - 0.5f;
-				float p2pass = 2 * (p1pass + (0.5f - p1pass) * abs(0.5f - p1pass)) - 0.5f;
-				return p2pass;
-			}
-
-			case TYPE::SWING: {
-				return ((-cos(pi * p) * 0.5f) + 0.5f);
-			}
-
-			case TYPE::SINPI2: {
-				return sin(p * pi2);
-			}
+			case LINEAR: return t;
+			case QUADIN: return easeInQuadratic(t);
+			case QUADOUT: return easeOutQuadratic(t);
+			case QUADINOUT: return easeInOutQuadratic(t);
+			case CUBICIN: return easeInCubic(t);
+			case CUBICOUT: return easeOutCubic(t);
+			case CUBICINOUT: return easeInOutCubic(t);
+			case QUARTIN: return easeInQuartic(t);
+			case QUARTOUT: return easeOutQuartic(t);
+			case QUARTINOUT: return easeInOutQuartic(t);
+			case QUINTIN: return easeInQuintic(t);
+			case QUINTOUT: return easeOutQuintic(t);
+			case QUINTINOUT: return easeInOutQuintic(t);
+			case SINEIN: return easeInSine(t);
+			case SINEOUT: return easeOutSine(t);
+			case SINEINOUT: return easeInOutSine(t);
+			case CIRCIN: return easeInCircular(t);
+			case CIRCOUT: return easeOutCircular(t);
+			case CIRCINOUT: return easeInOutCircular(t);
+			case EXPOIN: return easeInExponential(t);
+			case EXPOOUT: return easeOutExponential(t);
+			case EXPOINOUT: return easeInOutExponential(t);
+			case ELASTICIN: return inElastic(t);
+			case ELASTICOUT: return outElastic(t);
+			case ELASTICINOUT: return inOutElastic(t);
+			case BACKIN: return inBack(t);
+			case BACKOUT: return outBack(t);
+			case BACKINOUT: return inOutBack(t);
+			case BOUNCEIN: return inBounce(t);
+			case BOUNCEOUT: return outBounce(t);
+			case BOUNCEINOUT: return inOutBounce(t);
 		}
 	}
 }
@@ -825,53 +571,43 @@ namespace ImGui
 			"Choose preset",
 
 			"Linear",
-			"Quad in",
-			"Quad out",
-			"Quad in  out",
+			"Quadratic in",
+			"Quadratic out",
+			"Quadratic in out",
 			"Cubic in",
 			"Cubic out",
-			"Cubic in  out",
-			"Quart in",
-			"Quart out",
-			"Quart in  out",
-			"Quint in",
-			"Quint out",
-			"Quint in  out",
+			"Cubic in out",
+			"Quartic in",
+			"Quartic out",
+			"Quartic in out",
+			"Quintic in",
+			"Quintic out",
+			"Quintic in out",
 			"Sine in",
 			"Sine out",
-			"Sine in  out",
-			"Expo in",
-			"Expo out",
-			"Expo in  out",
-			"Circ in",
-			"Circ out",
-			"Circ in  out",
+			"Sine in out",
+			"Exponetial in",
+			"Exponetial out",
+			"Exponetial in out",
+			"Circular in",
+			"Circular out",
+			"Circular in out",
 			"Elastic in",
 			"Elastic out",
-			"Elastic in  out",
+			"Elastic in out",
 			"Back in",
 			"Back out",
-			"Back in  out",
+			"Back in out",
 			"Bounce in",
 			"Bounce out",
 			"Bounce in out",
-
-			"Sine square",
-			"Exponential",
-
-			"Schubring1",
-			"Schubring2",
-			"Schubring3",
-
-			"SinPi2",
-			"Swing"
 		};
 		int item = 0;
 		if (modified) 
 		{
 			item = 0;
 		}
-		if (ImGui::Combo("##preset", &item, items, IM_ARRAYSIZE(items))) 
+		if (ImGui::Combo("##preset", &item, items, arraysize(items))) 
 		{
 			max = maxpoints;
 			if (item > 0) 
