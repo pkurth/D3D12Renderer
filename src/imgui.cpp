@@ -560,7 +560,7 @@ namespace ImGui
 			}
 			if (max % 2 == 1)
 			{
-				points[max / 2 + 1].x = 1 - points[max / 2 + 1].x;
+				points[max / 2].x = 1 - points[max / 2].x;
 			}
 		}
 		ImGui::SameLine();
@@ -603,10 +603,6 @@ namespace ImGui
 			"Bounce in out",
 		};
 		int item = 0;
-		if (modified) 
-		{
-			item = 0;
-		}
 		if (ImGui::Combo("##preset", &item, items, arraysize(items))) 
 		{
 			max = maxpoints;
@@ -632,7 +628,7 @@ namespace ImGui
 			str = buf;
 		}
 
-		RenderTextClipped(ImVec2(bb.Min.x, bb.Min.y + style.FramePadding.y), bb.Max, str, NULL, NULL);
+		RenderTextClipped(ImVec2(bb.Min.x, bb.Min.y + style.FramePadding.y), bb.Max, str, 0, 0);
 
 		return modified;
 	}
