@@ -42,20 +42,29 @@ inline bool isSaturated(float3 a) { return isSaturated(a.x) && isSaturated(a.y) 
 inline bool isSaturated(float4 a) { return isSaturated(a.x) && isSaturated(a.y) && isSaturated(a.z) && isSaturated(a.w); }
 
 
+#define pack_float	4
+#define pack_vec4	1
+#define pack_float4	1
+
+#define pack(num, data_type) num / pack_##data_type
+
 // maxNumPoints must be a multiple of 4!
-// TODO: values is currently not of type data_type!
+// data_type can currently be either float or vec4.
+// The values are internally stored packed. This is because HLSL packs arrays in constant buffers
+// in float4s. See https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-packing-rules.
+// In order to conform to C++'s packing rules, we declare an array of float4s and cast it to an array of floats.
 #define spline(data_type, maxNumPoints) catmull_rom_spline_##data_type##_##maxNumPoints
 
 #define defineSpline(data_type, maxNumPoints)															\
 struct spline(data_type, maxNumPoints)																	\
 {																										\
 	float4 packedTs[maxNumPoints / 4];																	\
-	float4 packedValues[maxNumPoints / 4];																\
+	float4 packedValues[pack(maxNumPoints, data_type)];													\
 																										\
 	inline data_type evaluate(int numActualPoints, float t)												\
 	{																									\
 		float ts[maxNumPoints] = (float[maxNumPoints])packedTs;											\
-		float values[maxNumPoints] = (float[maxNumPoints])packedValues;									\
+		data_type values[maxNumPoints] = (data_type[maxNumPoints])packedValues;							\
 																										\
 		int k = 0;																						\
 		while (ts[k] < t)																				\

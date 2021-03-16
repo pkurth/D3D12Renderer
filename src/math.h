@@ -117,9 +117,10 @@ static T evaluateSpline(const float* ts, const T* values, int32 num, float t)
 	return result;
 }
 
-// maxNumPoints should be a multiple of 4, so that the values are properly aligned to 16-byte-boundaries.
+// maxNumPoints must be a multiple of 4!
+// If you want to use this in a shader constant buffer, data_type can currently be either float or vec4.
 template <typename data_type, uint32 maxNumPoints>
-struct catmull_rom_spline
+struct alignas(16) catmull_rom_spline
 {
 	float ts[maxNumPoints];
 	data_type values[maxNumPoints];
