@@ -12,8 +12,6 @@
 #include "shadow_map_cache.h"
 #include "file_dialog.h"
 
-#include "test_particle_system.hlsli"
-
 #define STB_RECT_PACK_IMPLEMENTATION
 #include <imgui/imstb_rectpack.h>
 
@@ -246,6 +244,8 @@ void application::initialize(dx_renderer* renderer)
 
 	particleSystem.initializeAsBillboard("test_particle_system", sizeof(test_particle_data), 10000, 500.f);
 	particleMaterial = make_ref<particle_billboard_material>("assets/particles/fire1.png", 8, 6);
+
+	particleCBV.emitPosition = vec3(0.f, 20.f, -10.f);
 }
 
 static bool plotAndEditTonemapping(tonemap_cb& tonemap)
@@ -916,13 +916,18 @@ void application::update(const user_input& input, float dt)
 	objectDragged |= handleUserInput(input, dt);
 	objectDragged |= drawSceneHierarchy();
 	drawSettings(dt);
-
-
+	
+	
 	// Particles.
+	particleCBV.frameIndex = (uint32)dxContext.frameID;
+	
+	ImGui::Begin("Settings");
+	ImGui::Spline("Scale life based on distance", ImVec2(200, 200), particleCBV.lifeScaleFromDistance);
+	ImGui::End();
 
-	particleSystem.update(dt, [](dx_command_list* cl)
+	particleSystem.update(dt, [this](dx_command_list* cl)
 	{
-		cl->setCompute32BitConstants(TEST_PARTICLE_SYSTEM_RS_CBV, test_particle_cb{ vec3(0.f, 20.f, -10.f), (uint32)dxContext.frameID });
+		cl->setComputeDynamicConstantBuffer(TEST_PARTICLE_SYSTEM_RS_CBV, dxContext.uploadDynamicConstantBuffer(particleCBV));
 	});
 
 	particleSystem.render(&transparentRenderPass, particleMaterial);

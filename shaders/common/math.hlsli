@@ -41,4 +41,45 @@ inline bool isSaturated(float2 a) { return isSaturated(a.x) && isSaturated(a.y);
 inline bool isSaturated(float3 a) { return isSaturated(a.x) && isSaturated(a.y) && isSaturated(a.z); }
 inline bool isSaturated(float4 a) { return isSaturated(a.x) && isSaturated(a.y) && isSaturated(a.z) && isSaturated(a.w); }
 
+
+// maxNumPoints must be a multiple of 4!
+// TODO: values is currently not of type data_type!
+#define spline(data_type, maxNumPoints) catmull_rom_spline_##data_type##_##maxNumPoints
+
+#define defineSpline(data_type, maxNumPoints)															\
+struct spline(data_type, maxNumPoints)																	\
+{																										\
+	float4 packedTs[maxNumPoints / 4];																	\
+	float4 packedValues[maxNumPoints / 4];																\
+																										\
+	inline data_type evaluate(int numActualPoints, float t)												\
+	{																									\
+		float ts[maxNumPoints] = (float[maxNumPoints])packedTs;											\
+		float values[maxNumPoints] = (float[maxNumPoints])packedValues;									\
+																										\
+		int k = 0;																						\
+		while (ts[k] < t)																				\
+		{																								\
+			++k;																						\
+		}																								\
+																										\
+		const float h1 = inverseLerp(ts[k - 1], ts[k], t);												\
+		const float h2 = h1 * h1;																		\
+		const float h3 = h2 * h1;																		\
+		const float4 h = float4(h3, h2, h1, 1.f);														\
+																										\
+		data_type result = (data_type)0;																\
+																										\
+		int m = numActualPoints - 1;																	\
+		result += values[clamp(k - 2, 0, m)] * dot(float4(-1, 2, -1, 0), h);							\
+		result += values[k - 1] * dot(float4(3, -5, 0, 2), h);											\
+		result += values[k] * dot(float4(-3, 4, 1, 0), h);												\
+		result += values[clamp(k + 1, 0, m)] * dot(float4(1, -1, 0, 0), h);								\
+																										\
+		result *= 0.5f;																					\
+																										\
+		return result;																					\
+	}																									\
+};
+
 #endif

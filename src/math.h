@@ -89,7 +89,7 @@ static float inOutBounce(float t)			{ return (t < 0.5f) ? (0.5f * (1.f - bounceo
 
 
 template <typename T>
-static T spline(float* ts, T* values, int32 num, float t)
+static T evaluateSpline(const float* ts, const T* values, int32 num, float t)
 {
 	// Find key.
 	int32 k = 0;
@@ -116,6 +116,30 @@ static T spline(float* ts, T* values, int32 num, float t)
 
 	return result;
 }
+
+// maxNumPoints should be a multiple of 4, so that the values are properly aligned to 16-byte-boundaries.
+template <typename data_type, uint32 maxNumPoints>
+struct catmull_rom_spline
+{
+	float ts[maxNumPoints];
+	data_type values[maxNumPoints];
+
+	enum { maxNumPoints };
+
+	catmull_rom_spline()
+	{
+		ts[0] = -1.f;
+	}
+
+	inline data_type evaluate(uint32 numActualPoints, float t)								
+	{
+		return evaluateSpline(ts, values, numActualPoints, t);
+	}
+};
+
+// Interop for shaders.
+#define spline(data_type, maxNumPoints) catmull_rom_spline<data_type, maxNumPoints>
+#define defineSpline(data_type, maxNumPoints) template struct spline(data_type, maxNumPoints);
 
 
 

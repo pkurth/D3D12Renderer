@@ -23,6 +23,14 @@ namespace ImGui
 	bool Dropdown(const char* label, const char** names, uint32 count, uint32& current);
 	bool Dropdown(const char* label, const char* (*name_func)(uint32, void*), uint32& current, void* data = 0);
 
-	bool Spline(const char* label, const ImVec2& size, uint32 maxpoints, ImVec2* points, uint32 drawResolution = 256);
-	float SplineValue(float p, uint32 maxpoints, const ImVec2* points);
+	float SplineValue(float p, const float* x, const float* y, uint32 numPoints);
+	bool Spline(const char* label, const ImVec2& size, uint32 maxNumPoints, float* x, float* y, uint32 drawResolution = 256);
+
+#ifdef spline
+	template <uint32 maxNumPoints> bool Spline(const char* label, const ImVec2& size, struct spline(float, maxNumPoints)& s, uint32 drawResolution = 256)
+	{
+		return Spline(label, size, maxNumPoints, s.ts, s.values, drawResolution);
+	}
+#endif
+
 }

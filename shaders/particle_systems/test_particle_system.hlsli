@@ -7,14 +7,17 @@ struct test_particle_data
 	float maxLife;
 };
 
+defineSpline(float, 8)
+
 struct test_particle_cb
 {
 	vec3 emitPosition;
 	uint32 frameIndex;
+	spline(float, 8) lifeScaleFromDistance;
 };
 
 #define USER_PARTICLES_RS \
-	"RootConstants(num32BitConstants=4, b0)"
+	"CBV(b0)"
 
 #define TEST_PARTICLE_SYSTEM_RS_CBV		0
 
@@ -35,8 +38,8 @@ static particle_data emitParticle(uint emitIndex)
 	float3 position = cb.emitPosition + offset;
 	float3 velocity = float3(nextRand(rng), nextRand(rng) * 2.f + 4.f, nextRand(rng));
 
-	float distance = saturate(1.f - length(offset.xz) / radius);
-	float lifeScale = distance * distance * distance;
+	float distance = saturate(length(offset.xz) / radius);
+	float lifeScale = cb.lifeScaleFromDistance.evaluate(8, distance);
 
 	float maxLife = nextRand(rng) * 5.f * lifeScale + 3.f;
 

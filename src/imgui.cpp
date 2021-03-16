@@ -308,47 +308,38 @@ namespace tween {
 
 namespace ImGui
 {
-	float SplineValue(float p, uint32 maxpoints, const ImVec2* points)
+	float SplineValue(float p, const float* x, const float* y, uint32 numPoints)
 	{
-		if (maxpoints < 2 || !points)
+		if (numPoints < 2 || !x || !y)
 		{
 			return 0;
 		}
 
 		if (p < 0.f)
 		{
-			return points[0].y;
+			return y[0];
 		}
 
-		float* input = (float*)alloca(sizeof(float) * maxpoints * 2);
-		float* ts = input;
-		float* values = input + maxpoints;
-		for (uint32 i = 0; i < maxpoints; ++i)
-		{
-			ts[i] = points[i].x;
-			values[i] = points[i].y;
-		}
-
-		float output = spline(ts, values, maxpoints, p);
+		float output = evaluateSpline(x, y, numPoints, p);
 
 		return output;
 	}
 
-	bool Spline(const char* label, const ImVec2& size, uint32 maxpoints, ImVec2* points, uint32 drawResolution)
+	bool Spline(const char* label, const ImVec2& size, uint32 maxpoints, float* x, float* y, uint32 drawResolution)
 	{
 		bool modified = false;
-		if (maxpoints < 2 || points == 0)
+		if (maxpoints < 2 || !x || !y)
 		{
 			return false;
 		}
 
-		if (points[0].x < 0)
+		if (x[0] < 0)
 		{
-			points[0].x = 0;
-			points[0].y = 0;
-			points[1].x = 1;
-			points[1].y = 1;
-			points[2].x = -1;
+			x[0] = 0;
+			y[0] = 0;
+			x[1] = 1;
+			y[1] = 1;
+			x[2] = -1;
 		}
 
 		ImGuiWindow* window = GetCurrentWindow();
@@ -369,7 +360,7 @@ namespace ImGui
 		const bool hovered = IsItemHovered();
 
 		int max = 0;
-		while (max < (int)maxpoints && points[max].x >= 0)
+		while (max < (int)maxpoints && x[max] >= 0)
 		{
 			++max;
 		}
@@ -392,7 +383,7 @@ namespace ImGui
 				pos.y = 1 - pos.y;
 
 				int left = 0;
-				while (left < max && points[left].x < pos.x)
+				while (left < max && x[left] < pos.x)
 				{
 					++left;
 				}
@@ -401,9 +392,9 @@ namespace ImGui
 					--left;
 				}
 
-				ImVec2 p = points[left] - pos;
+				ImVec2 p = ImVec2(x[left], y[left]) - pos;
 				float p1d = sqrt(p.x * p.x + p.y * p.y);
-				p = points[left + 1] - pos;
+				p = ImVec2(x[left + 1], y[left + 1]) - pos;
 				float p2d = sqrt(p.x * p.x + p.y * p.y);
 				int sel = -1;
 				if (p1d < (1 / 10.f)) { sel = left; }
@@ -417,7 +408,8 @@ namespace ImGui
 					}
 					else
 					{
-						points[sel] = pos;
+						x[sel] = pos.x;
+						y[sel] = pos.y;
 					}
 				}
 				else if (io.MouseClicked[0] && !io.KeyCtrl)
@@ -427,26 +419,28 @@ namespace ImGui
 						++max;
 						for (int i = max; i > left; i--)
 						{
-							points[i] = points[i - 1];
+							x[i] = x[i - 1];
+							y[i] = y[i - 1];
 						}
-						points[left + 1] = pos;
+						x[left + 1] = pos.x;
+						y[left + 1] = pos.y;
 					}
 					if (max < (int)maxpoints)
 					{
-						points[max].x = -1;
+						x[max] = -1;
 					}
 				}
 
 				// Snap first/last to min/max.
-				if (points[0].x < points[max - 1].x) 
+				if (x[0] < x[max - 1]) 
 				{
-					points[0].x = 0;
-					points[max - 1].x = 1;
+					x[0] = 0;
+					x[max - 1] = 1;
 				}
 				else 
 				{
-					points[0].x = 1;
-					points[max - 1].x = 0;
+					x[0] = 1;
+					x[max - 1] = 0;
 				}
 			}
 		}
@@ -458,16 +452,17 @@ namespace ImGui
 				modified = true;
 				for (int i = kill + 1; i < max; ++i)
 				{
-					points[i - 1] = points[i];
+					x[i - 1] = x[i];
+					y[i - 1] = y[i];
 				}
 				--max;
-				points[max].x = -1;
+				x[max] = -1;
 				kill = 0;
 			}
 
 			for (int i = 1; i < max - 1; ++i)
 			{
-				if (points[i].x < points[i - 1].x)
+				if (x[i] < x[i - 1])
 				{
 					kill = i;
 				}
@@ -505,8 +500,8 @@ namespace ImGui
 		{
 			float px = (i + 0) / float(drawResolution);
 			float qx = (i + 1) / float(drawResolution);
-			float py = 1 - SplineValue(px, max, points);
-			float qy = 1 - SplineValue(qx, max, points);
+			float py = 1 - SplineValue(px, x, y, max);
+			float qy = 1 - SplineValue(qx, x, y, max);
 			ImVec2 p(px * (bb.Max.x - bb.Min.x) + bb.Min.x, py * (bb.Max.y - bb.Min.y) + bb.Min.y);
 			ImVec2 q(qx * (bb.Max.x - bb.Min.x) + bb.Min.x, qy * (bb.Max.y - bb.Min.y) + bb.Min.y);
 			window->DrawList->AddLine(p, q, GetColorU32(ImGuiCol_PlotLines));
@@ -531,7 +526,7 @@ namespace ImGui
 			// Draw control points.
 			for (int i = 0; i < max; i++)
 			{
-				ImVec2 p = points[i];
+				ImVec2 p(x[i], y[i]);
 				p.y = 1 - p.y;
 				p = p * (bb.Max - bb.Min) + bb.Min;
 				ImVec2 a = p - ImVec2(2, 2);
@@ -544,7 +539,7 @@ namespace ImGui
 		{
 			for (int i = 0; i < max; ++i)
 			{
-				points[i].y = 1 - points[i].y;
+				y[i] = 1 - y[i];
 			}
 		}
 		ImGui::SameLine();
@@ -554,13 +549,14 @@ namespace ImGui
 			for (int i = 0; i < max / 2; ++i)
 			{
 				int j = max - 1 - i;
-				points[i].x = 1 - points[i].x;
-				points[j].x = 1 - points[j].x;
-				std::swap(points[i], points[j]);
+				x[i] = 1 - x[i];
+				x[j] = 1 - x[j];
+				std::swap(x[i], x[j]);
+				std::swap(y[i], y[j]);
 			}
 			if (max % 2 == 1)
 			{
-				points[max / 2].x = 1 - points[max / 2].x;
+				x[max / 2] = 1 - x[max / 2];
 			}
 		}
 		ImGui::SameLine();
@@ -610,8 +606,8 @@ namespace ImGui
 			{
 				for (int i = 0; i < max; ++i)
 				{
-					points[i].x = i / float(max - 1);
-					points[i].y = float(tween::ease(item - 1, points[i].x));
+					x[i] = i / float(max - 1);
+					y[i] = float(tween::ease(item - 1, x[i]));
 				}
 			}
 		}

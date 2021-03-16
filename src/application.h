@@ -16,6 +16,9 @@
 #include "scene.h"
 
 
+#include "test_particle_system.hlsli"
+
+
 struct application
 {
 	void loadCustomShaders();
@@ -76,6 +79,7 @@ private:
 
 	particle_system particleSystem;
 	ref<particle_billboard_material> particleMaterial;
+	test_particle_cb particleCBV;
 
 	directional_light sun;
 
