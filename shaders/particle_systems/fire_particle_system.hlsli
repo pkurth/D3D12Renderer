@@ -4,9 +4,9 @@
 struct fire_particle_data
 {
 	vec3 position;
-	float life;
+	uint32 maxLife_life;
 	vec3 velocity;
-	float maxLife;
+	uint32 padding;
 };
 
 defineSpline(float, 4)
@@ -41,10 +41,10 @@ static particle_data emitParticle(uint emitIndex)
 
 	const float radius = 4.f;
 
-	float3 offset = float3(nextRand(rng), 0.f, nextRand(rng)) * (radius * 2.f) - radius;
-	offset.y = nextRand(rng) * 0.5f;
+	float2 offset2D = getRandomPointOnDisk(rng, radius);
+	float3 offset = float3(offset2D.x, nextRand(rng) * 0.5f, offset2D.y);
 	float3 position = cb.emitPosition + offset;
-	float3 velocity = float3(nextRand(rng), nextRand(rng) * 2.f + 4.f, nextRand(rng));
+	float3 velocity = float3(nextRand(rng), nextRand(rng) * 3.f + 4.f, nextRand(rng));
 
 	float distance = saturate(length(offset.xz) / radius);
 	float lifeScale = cb.lifeScaleFromDistance.evaluate(8, distance);
@@ -53,9 +53,9 @@ static particle_data emitParticle(uint emitIndex)
 
 	particle_data particle = {
 		position,
-		maxLife,
+		packHalfs(maxLife, maxLife),
 		velocity,
-		maxLife
+		0
 	};
 
 	return particle;
@@ -63,8 +63,9 @@ static particle_data emitParticle(uint emitIndex)
 
 static bool simulateParticle(inout particle_data particle, float dt)
 {
-	particle.life -= dt;
-	if (particle.life <= 0)
+	float life = unpackHalfsRight(particle.maxLife_life);
+	life -= dt;
+	if (life <= 0)
 	{
 		return false;
 	}
@@ -73,6 +74,8 @@ static bool simulateParticle(inout particle_data particle, float dt)
 		float3 gravity = float3(0.f, -1.f * dt, 0.f);
 		particle.position = particle.position + 0.5f * gravity * dt + particle.velocity * dt;
 		particle.velocity = particle.velocity + gravity;
+		float maxLife = unpackHalfsLeft(particle.maxLife_life);
+		particle.maxLife_life = packHalfs(maxLife, life);
 
 		return true;
 	}
@@ -120,15 +123,18 @@ static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> parti
 {
 	float3 pos = particles[index].position;
 
-	float relLife = 1.f - saturate(particles[index].life / particles[index].maxLife);
+	float maxLife_life = particles[index].maxLife_life;
+	float life = unpackHalfsRight(maxLife_life);
+	float maxLife = unpackHalfsLeft(maxLife_life);
+	float relLife = clamp(1.f - life / maxLife, 0.01f, 0.99f);
 	relLife = sqrt(relLife);
 
 	texture_atlas_cb atlas = cb.atlas;
-	uint atlasIndex = relLife * atlas.getTotalNumCells();
+	uint atlasIndex = relLife * (atlas.getTotalNumCells() - 1);
 	uint x = atlas.getX(atlasIndex);
 	uint y = atlas.getY(atlasIndex);
 
-	float2 localPosition = IN.position.xy / saturate(smoothstep(relLife, 0.f, 0.3f) + 0.8f);
+	float2 localPosition = IN.position.xy * 1.f;
 	pos += localPosition.x * camera.right.xyz + localPosition.y * camera.up.xyz;
 
 	float invCols = atlas.getInvNumCols();
@@ -140,7 +146,7 @@ static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> parti
 	vs_output OUT;
 	OUT.position = mul(camera.viewProj, float4(pos, 1.f));
 	OUT.uv = lerp(uv0, uv1, IN.position.xy * 0.5f + 0.5f);
-	OUT.intensity = cb.intensityOverLifetime.evaluate(4, relLife); // smoothstep(relLife, 0.f, 0.1f);
+	OUT.intensity = cb.intensityOverLifetime.evaluate(4, relLife);
 	return OUT;
 }
 

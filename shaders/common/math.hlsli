@@ -92,4 +92,19 @@ struct spline(data_type, maxNumPoints)																	\
 	}																									\
 };
 
+static inline uint packHalfs(float left, float right)
+{
+	return (f32tof16(left) << 16) | f32tof16(right);
+}
+
+static inline float unpackHalfsLeft(uint x)
+{
+	return f16tof32(x >> 16);
+}
+
+static inline float unpackHalfsRight(uint x)
+{
+	return f16tof32(x);
+}
+
 #endif

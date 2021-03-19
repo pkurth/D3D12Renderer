@@ -70,11 +70,11 @@ void main(cs_input IN)
 		scene = max(scene + (4.f * scene - top - bottom - left - right) * present.sharpenStrength, 0.f);
 	}
 
-	if (present.displayMode == PRESENT_SDR)
+	if (present.displayMode == present_sdr)
 	{
 		scene = linearToSRGB(scene);
 	}
-	else if (present.displayMode == PRESENT_HDR)
+	else if (present.displayMode == present_hdr)
 	{
 		const float st2084max = 10000.f;
 		const float hdrScalar = present.standardNits / st2084max;

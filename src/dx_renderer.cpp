@@ -631,7 +631,7 @@ void dx_renderer::present(dx_command_list* cl)
 
 	cl->setDescriptorHeapUAV(PRESENT_RS_TEXTURES, 0, frameResult);
 	cl->setDescriptorHeapSRV(PRESENT_RS_TEXTURES, 1, ldrPostProcessingTexture);
-	cl->setCompute32BitConstants(PRESENT_RS_CB, present_cb{ PRESENT_SDR, 0.f, settings.sharpenStrength * settings.enableSharpen, (windowXOffset << 16) | windowYOffset });
+	cl->setCompute32BitConstants(PRESENT_RS_CB, present_cb{ present_sdr, 0.f, settings.sharpenStrength * settings.enableSharpen, (windowXOffset << 16) | windowYOffset });
 
 	cl->dispatch(bucketize(renderWidth, POST_PROCESSING_BLOCK_SIZE), bucketize(renderHeight, POST_PROCESSING_BLOCK_SIZE));
 }
