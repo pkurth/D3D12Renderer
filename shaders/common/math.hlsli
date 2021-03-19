@@ -67,6 +67,7 @@ struct spline(data_type, maxNumPoints)																	\
 		data_type values[maxNumPoints] = (data_type[maxNumPoints])packedValues;							\
 																										\
 		int k = 0;																						\
+		[unroll(maxNumPoints)]																			\
 		while (ts[k] < t)																				\
 		{																								\
 			++k;																						\

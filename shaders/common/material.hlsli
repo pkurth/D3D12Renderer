@@ -32,6 +32,66 @@ static vec4 unpackColor(uint32 c)
 }
 
 
+struct texture_atlas_cb
+{
+	uint32 totalNumCells_numCols; // Each 16 bit.
+	uint32 invCols_invRows; // Each 16 bit halfs.
+
+	void initialize(uint32 rows, uint32 cols)
+	{
+		totalNumCells_numCols = ((rows * cols) << 16) | cols;
+
+#ifndef HLSL
+		uint32 invCols = half(1.f / cols).h;
+		uint32 invRows = half(1.f / rows).h;
+#else
+		uint32 invCols = f32tof16(1.f / cols);
+		uint32 invRows = f32tof16(1.f / rows);
+#endif
+
+		invCols_invRows = (invCols << 16) | invRows;
+	}
+
+	uint32 getTotalNumCells()
+	{
+		return totalNumCells_numCols >> 16;
+	}
+
+	uint32 getNumCols()
+	{
+		return totalNumCells_numCols & 0xFFFF;
+	}
+
+	float getInvNumCols()
+	{
+		uint32 i = invCols_invRows >> 16;
+#ifndef HLSL
+		return half((uint16)i);
+#else
+		return f16tof32(i);
+#endif
+	}
+
+	float getInvNumRows()
+	{
+		uint32 i = invCols_invRows;
+#ifndef HLSL
+		return half((uint16)i);
+#else
+		return f16tof32(i);
+#endif
+	}
+
+	uint32 getX(uint32 i)
+	{
+		return i % getNumCols();
+	}
+
+	uint32 getY(uint32 i)
+	{
+		return i / getNumCols();
+	}
+};
 
 
 
@@ -64,11 +124,10 @@ struct pbr_material_cb // 24 bytes.
 			(flags_ << 8) |
 			((uint32)(refractionStrength_ * 0xFF) << 0);
 		
-		uint32 normalStrengthHalf;
 #ifndef HLSL
-		normalStrengthHalf = half(normalMapStrength_).h;
+		uint32 normalStrengthHalf = half(normalMapStrength_).h;
 #else
-		normalStrengthHalf = f32tof16(normalMapStrength_);
+		uint32 normalStrengthHalf = f32tof16(normalMapStrength_);
 #endif
 
 		normalMapStrength = (normalStrengthHalf << 16);

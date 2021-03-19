@@ -15,7 +15,7 @@ static uint bucketize(uint problemSize, uint bucketSize)
 
 
 [numthreads(1, 1, 1)]
-[RootSignature(PARTICLES_COMPUTE_RS)]
+[RootSignature(PARTICLE_COMPUTE_RS)]
 void main(cs_input IN)
 {
 	particle_counters c = counters[0];

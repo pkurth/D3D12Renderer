@@ -29,12 +29,11 @@ private:
 	struct fire_material : material_base
 	{
 		dx_texture_atlas atlas;
+		dx_dynamic_constant_buffer settingsCBV;
 
 		static void setupTransparentPipeline(dx_command_list* cl, const common_material_info& materialInfo);
 		void prepareForRendering(dx_command_list* cl);
 	};
 
 	ref<fire_material> material;
-
-	dx_dynamic_constant_buffer settingsCBV;
 };

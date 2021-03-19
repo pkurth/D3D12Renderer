@@ -54,6 +54,11 @@ half::half(float f)
 	h = half_from_float(*(uint32*)&f);
 }
 
+half::half(uint16 i)
+{
+	h = i;
+}
+
 half::operator float()
 {
 	uint32 f = half_to_float(h);

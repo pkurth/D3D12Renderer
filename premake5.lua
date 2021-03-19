@@ -98,6 +98,8 @@ local local_particle_system_directory = "particle_systems/"
 
 local local_emit_path = "particles/particle_emit.hlsli"
 local local_sim_path = "particles/particle_sim.hlsli"
+local local_vs_path = "particles/particle_vs.hlsli"
+local local_ps_path = "particles/particle_ps.hlsli"
 
 local particle_system_directory = "shaders/" .. local_particle_system_directory
 local shader_directory_handle = io.popen('dir "'..particle_system_directory..'" /b')
@@ -105,18 +107,30 @@ local shader_directory_handle = io.popen('dir "'..particle_system_directory..'" 
 for filename in shader_directory_handle:lines() do
 	if filename:sub(-string.len(".hlsli")) == ".hlsli" then
 		local stem = filename:match("(.+)%..+")
-		local include = '#include "random.hlsli"\n#include "../' .. local_particle_system_directory .. filename .. '"\n'
+		local compute_header = '#define PARTICLE_SIMULATION\n#include "random.hlsli"\n#include "../' .. local_particle_system_directory .. filename .. '"\n'
+		local render_header = '#define PARTICLE_RENDERING\n#include "random.hlsli"\n#include "../' .. local_particle_system_directory .. filename .. '"\n'
 
-		local new_emit_content = include .. '#include "../' .. local_emit_path .. '"\n'
-		local new_sim_content = include .. '#include "../' .. local_sim_path .. '"\n'
+
+		local new_emit_content = compute_header .. '#include "../' .. local_emit_path .. '"\n'
+		local new_sim_content = compute_header .. '#include "../' .. local_sim_path .. '"\n'
+		local new_vs_content = render_header .. '#include "../' .. local_vs_path .. '"\n'
+		local new_ps_content = render_header .. '#include "../' .. local_ps_path .. '"\n'
 	
-		local emit_file = assert(io.open(generated_directory .. "emit_" .. stem .. "_cs.hlsl", "w"))
+		local emit_file = assert(io.open(generated_directory .. stem .. "_emit_cs.hlsl", "w"))
 		emit_file:write(new_emit_content)
 		emit_file:close()
 	
-		local sim_file = assert(io.open(generated_directory .. "sim_" .. stem .. "_cs.hlsl", "w"))
+		local sim_file = assert(io.open(generated_directory .. stem .. "_sim_cs.hlsl", "w"))
 		sim_file:write(new_sim_content)
 		sim_file:close()
+		
+		local vs_file = assert(io.open(generated_directory .. stem .. "_vs.hlsl", "w"))
+		vs_file:write(new_vs_content)
+		vs_file:close()
+		
+		local ps_file = assert(io.open(generated_directory .. stem .. "_ps.hlsl", "w"))
+		ps_file:write(new_ps_content)
+		ps_file:close()
 
 		print("- Generated particle system '" .. stem .. "'.")
 	end

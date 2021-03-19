@@ -1,3 +1,5 @@
+#include "material.hlsli"
+#include "camera.hlsli"
 
 struct fire_particle_data
 {
@@ -11,19 +13,23 @@ defineSpline(float, 8)
 
 struct fire_particle_cb
 {
+	// Simulation.
 	vec3 emitPosition;
-	uint32 frameIndex;
+	uint32 frameIndex; 
 	spline(float, 8) lifeScaleFromDistance;
+
+	// Rendering.
+	texture_atlas_cb atlas;
 };
 
-#define USER_PARTICLES_RS \
-	"CBV(b0)"
-
-#define FIRE_PARTICLE_SYSTEM_RS_CBV		0
-
 #ifdef HLSL
-
 #define particle_data fire_particle_data
+#endif
+
+#ifdef PARTICLE_SIMULATION
+
+#define USER_PARTICLE_SIMULATION_RS \
+	"CBV(b0)"
 
 ConstantBuffer<fire_particle_cb> cb		: register(b0);
 
@@ -71,4 +77,86 @@ static bool simulateParticle(inout particle_data particle, float dt)
 }
 
 #endif
+
+
+
+
+#ifdef PARTICLE_RENDERING
+
+#define USER_PARTICLE_RENDERING_RS \
+    "CBV(b0, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "CBV(b1, visibility=SHADER_VISIBILITY_VERTEX), " \
+	"DescriptorTable(SRV(t0, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL), " \
+	"StaticSampler(s0," \
+        "addressU = TEXTURE_ADDRESS_WRAP," \
+        "addressV = TEXTURE_ADDRESS_WRAP," \
+        "addressW = TEXTURE_ADDRESS_WRAP," \
+        "filter = FILTER_MIN_MAG_MIP_LINEAR," \
+        "visibility=SHADER_VISIBILITY_PIXEL)"
+
+
+struct vs_input
+{
+	float3 position			: POSITION;
+};
+
+struct vs_output
+{
+	float relLife			: RELLIFE;
+	float2 uv				: TEXCOORDS;
+	float4 position			: SV_Position;
+};
+
+ConstantBuffer<fire_particle_cb> cb		: register(b0);
+ConstantBuffer<camera_cb> camera		: register(b1);
+
+Texture2D<float4> tex					: register(t0);
+SamplerState texSampler					: register(s0);
+
+
+static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> particles, uint index)
+{
+	float3 pos = particles[index].position;
+
+	float relLife = 1.f - saturate(particles[index].life / particles[index].maxLife);
+	relLife = sqrt(relLife);
+
+	texture_atlas_cb atlas = cb.atlas;
+	uint atlasIndex = relLife * atlas.getTotalNumCells();
+	uint x = atlas.getX(atlasIndex);
+	uint y = atlas.getY(atlasIndex);
+
+	float2 localPosition = IN.position.xy / saturate(smoothstep(relLife, 0.f, 0.3f) + 0.8f);
+	pos += localPosition.x * camera.right.xyz + localPosition.y * camera.up.xyz;
+
+	float invCols = atlas.getInvNumCols();
+	float invRows = atlas.getInvNumRows();
+	float2 uv0 = float2(x * invCols, y * invRows);
+	float2 uv1 = float2((x + 1) * invCols, (y + 1) * invRows);
+
+
+	vs_output OUT;
+	OUT.position = mul(camera.viewProj, float4(pos, 1.f));
+	OUT.uv = lerp(uv0, uv1, IN.position.xy * 0.5f + 0.5f);
+	OUT.relLife = relLife;
+	return OUT;
+}
+
+static float4 pixelShader(vs_output IN)
+{
+	float4 color = tex.Sample(texSampler, IN.uv);
+	return color * color.a * smoothstep(IN.relLife, 0.f, 0.1f) * 1.f;
+}
+
+#endif
+
+
+// Simulation.
+#define FIRE_PARTICLE_SYSTEM_COMPUTE_RS_CBV			0
+
+// Rendering.
+#define FIRE_PARTICLE_SYSTEM_RENDERING_RS_CBV		0
+#define FIRE_PARTICLE_SYSTEM_RENDERING_RS_CAMERA	1
+#define FIRE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE	2
+
 

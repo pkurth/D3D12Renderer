@@ -13,7 +13,7 @@ protected:
 
 	void update(float dt, const struct dx_pipeline& emitPipeline, const struct dx_pipeline& simulatePipeline);
 
-	particle_draw_info getDrawInfo();
+	particle_draw_info getDrawInfo(const struct dx_pipeline& renderPipeline);
 
 	virtual void setSimulationParameters(dx_command_list* cl) = 0;
 

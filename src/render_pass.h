@@ -20,6 +20,7 @@ struct particle_draw_info
 	ref<dx_buffer> commandBuffer;
 	uint32 aliveListOffset;
 	uint32 commandBufferOffset;
+	uint32 rootParameterOffset;
 };
 
 

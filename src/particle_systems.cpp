@@ -3,14 +3,13 @@
 #include "dx_pipeline.h"
 #include "dx_renderer.h"
 
-#include "particles_rs.hlsli"
 
-#define BUILD_PARTICLE_SHADER_NAME(prefix, name, suffix) prefix##name##suffix
+#define BUILD_PARTICLE_SHADER_NAME(name, suffix) name##suffix
 
-#define EMIT_PIPELINE_NAME(name) BUILD_PARTICLE_SHADER_NAME("emit_", name, "_cs")
-#define SIMULATE_PIPELINE_NAME(name) BUILD_PARTICLE_SHADER_NAME("sim_", name, "_cs")
-#define VERTEX_SHADER_NAME(name) BUILD_PARTICLE_SHADER_NAME("", name, "_vs")
-#define PIXEL_SHADER_NAME(name) BUILD_PARTICLE_SHADER_NAME("", name, "_ps")
+#define EMIT_PIPELINE_NAME(name) BUILD_PARTICLE_SHADER_NAME(name, "_emit_cs")
+#define SIMULATE_PIPELINE_NAME(name) BUILD_PARTICLE_SHADER_NAME(name, "_sim_cs")
+#define VERTEX_SHADER_NAME(name) BUILD_PARTICLE_SHADER_NAME(name, "_vs")
+#define PIXEL_SHADER_NAME(name) BUILD_PARTICLE_SHADER_NAME(name, "_ps")
 
 
 
@@ -48,26 +47,27 @@ void fire_particle_system::initialize(uint32 maxNumParticles, float emitRate, co
 	material->atlas.rows = rows;
 
 	settings.emitPosition = vec3(0.f, 20.f, -10.f); // TEMPORARY.
-}
-
-void fire_particle_system::setSimulationParameters(dx_command_list* cl)
-{
-	cl->setComputeDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_RS_CBV, settingsCBV);
+	settings.atlas.initialize(rows, cols);
 }
 
 void fire_particle_system::update(float dt)
 {
 	settings.frameIndex = (uint32)dxContext.frameID;
 
-	settingsCBV = dxContext.uploadDynamicConstantBuffer(settings);
+	material->settingsCBV = dxContext.uploadDynamicConstantBuffer(settings);
 
 	particle_system::update(dt, emitPipeline, simulatePipeline);
+}
+
+void fire_particle_system::setSimulationParameters(dx_command_list* cl)
+{
+	cl->setComputeDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_COMPUTE_RS_CBV, material->settingsCBV);
 }
 
 void fire_particle_system::render(transparent_render_pass* renderPass)
 {
 	renderPass->renderParticles(billboardMesh.vertexBuffer, billboardMesh.indexBuffer,
-		getDrawInfo(),
+		getDrawInfo(renderPipeline),
 		material);
 }
 
@@ -75,13 +75,13 @@ void fire_particle_system::fire_material::setupTransparentPipeline(dx_command_li
 {
 	cl->setPipelineState(*fire_particle_system::renderPipeline.pipeline);
 	cl->setGraphicsRootSignature(*fire_particle_system::renderPipeline.rootSignature);
-	cl->setGraphicsDynamicConstantBuffer(PARTICLES_RS_CAMERA, materialInfo.cameraCBV);
+	cl->setGraphicsDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_RENDERING_RS_CAMERA, materialInfo.cameraCBV);
 }
 
 void fire_particle_system::fire_material::prepareForRendering(dx_command_list* cl)
 {
-	cl->setGraphics32BitConstants(PARTICLES_RS_BILLBOARD, particle_atlas_cb{ atlas.cols * atlas.rows, atlas.cols, 1.f / atlas.cols, 1.f / atlas.rows });
-	cl->setDescriptorHeapSRV(PARTICLES_RS_ATLAS, 0, atlas.texture);
+	cl->setGraphicsDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_RENDERING_RS_CBV, settingsCBV);
+	cl->setDescriptorHeapSRV(FIRE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE, 0, atlas.texture);
 }
 
 void loadAllParticleSystemPipelines()

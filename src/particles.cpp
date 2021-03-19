@@ -86,7 +86,7 @@ void particle_system::initializeAsMesh(uint32 particleStructSize, dx_mesh mesh, 
 	initializeInternal(particleStructSize, maxNumParticles, emitRate, submesh);
 }
 
-particle_draw_info particle_system::getDrawInfo()
+particle_draw_info particle_system::getDrawInfo(const struct dx_pipeline& renderPipeline)
 {
 	particle_draw_info result;
 	result.particleBuffer = particlesBuffer;
@@ -94,6 +94,7 @@ particle_draw_info particle_system::getDrawInfo()
 	result.aliveListOffset = getAliveListOffset(currentAlive);
 	result.commandBuffer = particleDrawCommandBuffer;
 	result.commandBufferOffset = index * particleDrawCommandBuffer->elementSize;
+	result.rootParameterOffset = renderPipeline.rootSignature->totalNumParameters - PARTICLE_RENDERING_RS_COUNT;
 	return result;
 }
 
@@ -119,7 +120,7 @@ void particle_system::update(float dt, const dx_pipeline& emitPipeline, const dx
 			cl->setPipelineState(*startPipeline.pipeline);
 			cl->setComputeRootSignature(*startPipeline.rootSignature);
 
-			cl->setRootComputeUAV(PARTICLES_COMPUTE_RS_DISPATCH_INFO, dispatchBuffer);
+			cl->setRootComputeUAV(PARTICLE_COMPUTE_RS_DISPATCH_INFO, dispatchBuffer);
 			setResources(cl, cb, 0, false);
 
 			cl->dispatch(1);
@@ -139,7 +140,7 @@ void particle_system::update(float dt, const dx_pipeline& emitPipeline, const dx
 			cl->setPipelineState(*emitPipeline.pipeline);
 			cl->setComputeRootSignature(*emitPipeline.rootSignature);
 
-			uint32 numUserRootParameters = emitPipeline.rootSignature->totalNumParameters - PARTICLES_COMPUTE_RS_COUNT;
+			uint32 numUserRootParameters = emitPipeline.rootSignature->totalNumParameters - PARTICLE_COMPUTE_RS_COUNT;
 			setResources(cl, cb, numUserRootParameters, true);
 
 			cl->dispatchIndirect(commandSignature, 1, dispatchBuffer, 0);
@@ -159,7 +160,7 @@ void particle_system::update(float dt, const dx_pipeline& emitPipeline, const dx
 			cl->setPipelineState(*simulatePipeline.pipeline);
 			cl->setComputeRootSignature(*simulatePipeline.rootSignature);
 
-			uint32 numUserRootParameters = simulatePipeline.rootSignature->totalNumParameters - PARTICLES_COMPUTE_RS_COUNT;
+			uint32 numUserRootParameters = simulatePipeline.rootSignature->totalNumParameters - PARTICLE_COMPUTE_RS_COUNT;
 			setResources(cl, cb, numUserRootParameters, true);
 
 			cl->dispatchIndirect(commandSignature, 1, dispatchBuffer, sizeof(D3D12_DISPATCH_ARGUMENTS));
@@ -183,13 +184,13 @@ void particle_system::setResources(dx_command_list* cl, const particle_sim_cb& c
 {
 	uint32 nextAlive = 1 - currentAlive;
 
-	cl->setCompute32BitConstants(offset + PARTICLES_COMPUTE_RS_CB, cb);
-	cl->setRootComputeUAV(offset + PARTICLES_COMPUTE_RS_DRAW_INFO, particleDrawCommandBuffer->gpuVirtualAddress + sizeof(particle_draw) * index);
-	cl->setRootComputeUAV(offset + PARTICLES_COMPUTE_RS_COUNTERS, listBuffer->gpuVirtualAddress);
-	cl->setRootComputeUAV(offset + PARTICLES_COMPUTE_RS_PARTICLES, particlesBuffer);
-	cl->setRootComputeUAV(offset + PARTICLES_COMPUTE_RS_DEAD_LIST, listBuffer->gpuVirtualAddress + getDeadListOffset());
-	cl->setRootComputeUAV(offset + PARTICLES_COMPUTE_RS_CURRENT_ALIVE, listBuffer->gpuVirtualAddress + getAliveListOffset(currentAlive));
-	cl->setRootComputeUAV(offset + PARTICLES_COMPUTE_RS_NEW_ALIVE, listBuffer->gpuVirtualAddress + getAliveListOffset(nextAlive));
+	cl->setCompute32BitConstants(offset + PARTICLE_COMPUTE_RS_CB, cb);
+	cl->setRootComputeUAV(offset + PARTICLE_COMPUTE_RS_DRAW_INFO, particleDrawCommandBuffer->gpuVirtualAddress + sizeof(particle_draw) * index);
+	cl->setRootComputeUAV(offset + PARTICLE_COMPUTE_RS_COUNTERS, listBuffer->gpuVirtualAddress);
+	cl->setRootComputeUAV(offset + PARTICLE_COMPUTE_RS_PARTICLES, particlesBuffer);
+	cl->setRootComputeUAV(offset + PARTICLE_COMPUTE_RS_DEAD_LIST, listBuffer->gpuVirtualAddress + getDeadListOffset());
+	cl->setRootComputeUAV(offset + PARTICLE_COMPUTE_RS_CURRENT_ALIVE, listBuffer->gpuVirtualAddress + getAliveListOffset(currentAlive));
+	cl->setRootComputeUAV(offset + PARTICLE_COMPUTE_RS_NEW_ALIVE, listBuffer->gpuVirtualAddress + getAliveListOffset(nextAlive));
 
 	if (setUserResources)
 	{

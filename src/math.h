@@ -179,6 +179,7 @@ struct half
 
 	half() {}
 	half(float f);
+	half(uint16 i);
 
 	operator float();
 };

@@ -12,7 +12,7 @@ RWStructuredBuffer<uint> currentAliveList				: register(u5, space1);
 
 
 [numthreads(PARTICLES_EMIT_BLOCK_SIZE, 1, 1)]
-[RootSignature(PARTICLES_COMPUTE_RS)]
+[RootSignature(PARTICLE_COMPUTE_RS)]
 void main(cs_input IN)
 {
 	const uint i = IN.dispatchThreadID.x;
