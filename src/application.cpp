@@ -242,10 +242,7 @@ void application::initialize(dx_renderer* renderer)
 		SET_NAME(pointLightShadowInfoBuffer[i]->resource, "Point light shadow infos");
 	}
 
-	particleSystem.initializeAsBillboard("test_particle_system", sizeof(test_particle_data), 10000, 500.f);
-	particleMaterial = make_ref<particle_billboard_material>("assets/particles/fire1.png", 8, 6);
-
-	particleCBV.emitPosition = vec3(0.f, 20.f, -10.f);
+	fireParticleSystem.initialize(10000, 500.f, "assets/particles/fire1.png", 8, 6);
 }
 
 static bool plotAndEditTonemapping(tonemap_cb& tonemap)
@@ -919,18 +916,13 @@ void application::update(const user_input& input, float dt)
 	
 	
 	// Particles.
-	particleCBV.frameIndex = (uint32)dxContext.frameID;
 	
 	ImGui::Begin("Settings");
-	ImGui::Spline("Scale life based on distance", ImVec2(200, 200), particleCBV.lifeScaleFromDistance);
+	ImGui::Spline("Scale life based on distance", ImVec2(200, 200), fireParticleSystem.settings.lifeScaleFromDistance);
 	ImGui::End();
 
-	particleSystem.update(dt, [this](dx_command_list* cl)
-	{
-		cl->setComputeDynamicConstantBuffer(TEST_PARTICLE_SYSTEM_RS_CBV, dxContext.uploadDynamicConstantBuffer(particleCBV));
-	});
-
-	particleSystem.render(&transparentRenderPass, particleMaterial);
+	fireParticleSystem.update(dt);
+	fireParticleSystem.render(&transparentRenderPass);
 
 
 

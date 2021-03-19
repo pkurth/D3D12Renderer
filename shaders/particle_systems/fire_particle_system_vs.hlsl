@@ -1,6 +1,6 @@
 #include "particles_rs.hlsli"
 #include "random.hlsli" // TODO: Temporary!
-#include "test_particle_system.hlsli"
+#include "fire_particle_system.hlsli"
 #include "camera.hlsli"
 
 ConstantBuffer<particle_atlas_cb> atlas				: register(b0);

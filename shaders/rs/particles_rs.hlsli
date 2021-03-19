@@ -67,7 +67,7 @@ struct particle_atlas_cb
         "addressV = TEXTURE_ADDRESS_WRAP," \
         "addressW = TEXTURE_ADDRESS_WRAP," \
         "filter = FILTER_MIN_MAG_MIP_LINEAR," \
-        "visibility=SHADER_VISIBILITY_PIXEL)," \
+        "visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define PARTICLES_RS_BILLBOARD      0
 #define PARTICLES_RS_CAMERA         1

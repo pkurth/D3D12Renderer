@@ -7,7 +7,7 @@
 #include "math.h"
 #include "dx_renderer.h"
 #include "light_source.h"
-#include "particles.h"
+#include "particle_systems.h"
 #include "transformation_gizmo.h"
 #include "raytracing.h"
 
@@ -15,8 +15,6 @@
 
 #include "scene.h"
 
-
-#include "test_particle_system.hlsli"
 
 
 struct application
@@ -77,9 +75,7 @@ private:
 
 	ref<dx_texture> decalTexture;
 
-	particle_system particleSystem;
-	ref<particle_billboard_material> particleMaterial;
-	test_particle_cb particleCBV;
+	fire_particle_system fireParticleSystem;
 
 	directional_light sun;
 

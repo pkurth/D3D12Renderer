@@ -13,6 +13,16 @@ struct dx_index_buffer;
 struct raytracing_tlas;
 
 
+struct particle_draw_info
+{
+	ref<dx_buffer> particleBuffer;
+	ref<dx_buffer> aliveList;
+	ref<dx_buffer> commandBuffer;
+	uint32 aliveListOffset;
+	uint32 commandBufferOffset;
+};
+
+
 // Base for both opaque and transparent pass.
 struct geometry_render_pass
 {
@@ -226,7 +236,7 @@ struct transparent_render_pass : geometry_render_pass
 
 	template <typename material_t>
 	void renderParticles(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer,
-		const ref<dx_buffer>& particleBuffer, const ref<dx_buffer>& aliveList, uint32 aliveListOffset, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset,
+		const particle_draw_info& drawInfo,
 		const ref<material_t>& material)
 	{
 		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
@@ -237,13 +247,9 @@ struct transparent_render_pass : geometry_render_pass
 			{
 				vertexBuffer,
 				indexBuffer,
-				particleBuffer,
-				aliveList,
-				commandBuffer,
+				drawInfo,
 				material,
 				setupFunc,
-				aliveListOffset,
-				commandBufferOffset,
 			}
 		);
 	}
@@ -256,13 +262,9 @@ private:
 	{
 		vertex_buffer_group vertexBuffer;
 		ref<dx_index_buffer> indexBuffer;
-		ref<dx_buffer> particleBuffer;
-		ref<dx_buffer> aliveList;
-		ref<dx_buffer> commandBuffer;
+		particle_draw_info drawInfo;
 		ref<material_base> material;
 		material_setup_function materialSetupFunc;
-		uint32 aliveListOffset;
-		uint32 commandBufferOffset;
 	};
 
 	std::vector<particle_draw_call> particleDrawCalls;

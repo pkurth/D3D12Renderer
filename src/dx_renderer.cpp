@@ -239,8 +239,11 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 	}
 
 
+	void loadAllParticleSystemPipelines();
+
 	pbr_material::initializePipeline();
 	particle_system::initializePipeline();
+	loadAllParticleSystemPipelines();
 
 
 
@@ -1695,8 +1698,10 @@ void dx_renderer::endFrame(const user_input& input)
 
 					dc.material->prepareForRendering(cl);
 
-					cl->setRootGraphicsSRV(PARTICLES_RS_PARTICLES, dc.particleBuffer->gpuVirtualAddress);
-					cl->setRootGraphicsSRV(PARTICLES_RS_ALIVE_LIST, dc.aliveList->gpuVirtualAddress + dc.aliveListOffset);
+					const particle_draw_info& info = dc.drawInfo;
+
+					cl->setRootGraphicsSRV(PARTICLES_RS_PARTICLES, info.particleBuffer->gpuVirtualAddress);
+					cl->setRootGraphicsSRV(PARTICLES_RS_ALIVE_LIST, info.aliveList->gpuVirtualAddress + info.aliveListOffset);
 
 					cl->setVertexBuffer(0, dc.vertexBuffer.positions);
 					if (dc.vertexBuffer.others)
@@ -1705,7 +1710,7 @@ void dx_renderer::endFrame(const user_input& input)
 					}
 					cl->setIndexBuffer(dc.indexBuffer);
 
-					cl->drawIndirect(particleCommandSignature, 1, dc.commandBuffer, dc.commandBufferOffset);
+					cl->drawIndirect(particleCommandSignature, 1, info.commandBuffer, info.commandBufferOffset);
 				}
 			}
 

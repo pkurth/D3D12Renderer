@@ -110,11 +110,11 @@ for filename in shader_directory_handle:lines() do
 		local new_emit_content = include .. '#include "../' .. local_emit_path .. '"\n'
 		local new_sim_content = include .. '#include "../' .. local_sim_path .. '"\n'
 	
-		local emit_file = assert(io.open(generated_directory .. "particle_emit_" .. stem .. "_cs.hlsl", "w"))
+		local emit_file = assert(io.open(generated_directory .. "emit_" .. stem .. "_cs.hlsl", "w"))
 		emit_file:write(new_emit_content)
 		emit_file:close()
 	
-		local sim_file = assert(io.open(generated_directory .. "particle_sim_" .. stem .. "_cs.hlsl", "w"))
+		local sim_file = assert(io.open(generated_directory .. "sim_" .. stem .. "_cs.hlsl", "w"))
 		sim_file:write(new_sim_content)
 		sim_file:close()
 

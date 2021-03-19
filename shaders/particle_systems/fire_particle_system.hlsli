@@ -1,5 +1,5 @@
 
-struct test_particle_data
+struct fire_particle_data
 {
 	vec3 position;
 	float life;
@@ -9,7 +9,7 @@ struct test_particle_data
 
 defineSpline(float, 8)
 
-struct test_particle_cb
+struct fire_particle_cb
 {
 	vec3 emitPosition;
 	uint32 frameIndex;
@@ -19,13 +19,13 @@ struct test_particle_cb
 #define USER_PARTICLES_RS \
 	"CBV(b0)"
 
-#define TEST_PARTICLE_SYSTEM_RS_CBV		0
+#define FIRE_PARTICLE_SYSTEM_RS_CBV		0
 
 #ifdef HLSL
 
-#define particle_data test_particle_data
+#define particle_data fire_particle_data
 
-ConstantBuffer<test_particle_cb> cb		: register(b0);
+ConstantBuffer<fire_particle_cb> cb		: register(b0);
 
 static particle_data emitParticle(uint emitIndex)
 {

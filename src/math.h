@@ -122,6 +122,8 @@ static T evaluateSpline(const float* ts, const T* values, int32 num, float t)
 template <typename data_type, uint32 maxNumPoints>
 struct alignas(16) catmull_rom_spline
 {
+	static_assert(maxNumPoints > 0 && maxNumPoints % 4 == 0, "Spline max num points must be divisible by 4.");
+
 	float ts[maxNumPoints];
 	data_type values[maxNumPoints];
 
@@ -129,7 +131,11 @@ struct alignas(16) catmull_rom_spline
 
 	catmull_rom_spline()
 	{
-		ts[0] = -1.f;
+		ts[0] = 0;
+		values[0] = data_type(0);
+		ts[1] = 1;
+		values[1] = data_type(1);
+		ts[2] = -1;
 	}
 
 	inline data_type evaluate(uint32 numActualPoints, float t)								
