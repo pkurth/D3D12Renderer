@@ -357,6 +357,8 @@ namespace ImGui
 			return false;
 		}
 
+		PushID(label);
+
 		const bool hovered = IsItemHovered();
 
 		int max = 0;
@@ -417,7 +419,7 @@ namespace ImGui
 					if (max < (int)maxpoints)
 					{
 						++max;
-						for (int i = max; i > left; i--)
+						for (int i = max - 1; i > left; i--)
 						{
 							x[i] = x[i - 1];
 							y[i] = y[i - 1];
@@ -625,6 +627,8 @@ namespace ImGui
 		}
 
 		RenderTextClipped(ImVec2(bb.Min.x, bb.Min.y + style.FramePadding.y), bb.Max, str, 0, 0);
+
+		PopID();
 
 		return modified;
 	}

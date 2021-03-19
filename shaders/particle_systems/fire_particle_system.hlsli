@@ -9,6 +9,7 @@ struct fire_particle_data
 	float maxLife;
 };
 
+defineSpline(float, 4)
 defineSpline(float, 8)
 
 struct fire_particle_cb
@@ -19,6 +20,7 @@ struct fire_particle_cb
 	spline(float, 8) lifeScaleFromDistance;
 
 	// Rendering.
+	spline(float, 4) intensityOverLifetime;
 	texture_atlas_cb atlas;
 };
 
@@ -102,7 +104,7 @@ struct vs_input
 
 struct vs_output
 {
-	float relLife			: RELLIFE;
+	float intensity			: INTENSITY;
 	float2 uv				: TEXCOORDS;
 	float4 position			: SV_Position;
 };
@@ -138,14 +140,14 @@ static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> parti
 	vs_output OUT;
 	OUT.position = mul(camera.viewProj, float4(pos, 1.f));
 	OUT.uv = lerp(uv0, uv1, IN.position.xy * 0.5f + 0.5f);
-	OUT.relLife = relLife;
+	OUT.intensity = cb.intensityOverLifetime.evaluate(4, relLife); // smoothstep(relLife, 0.f, 0.1f);
 	return OUT;
 }
 
 static float4 pixelShader(vs_output IN)
 {
 	float4 color = tex.Sample(texSampler, IN.uv);
-	return color * color.a * smoothstep(IN.relLife, 0.f, 0.1f) * 1.f;
+	return color * color.a * IN.intensity;
 }
 
 #endif

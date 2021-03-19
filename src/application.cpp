@@ -919,6 +919,7 @@ void application::update(const user_input& input, float dt)
 	
 	ImGui::Begin("Settings");
 	ImGui::Spline("Scale life based on distance", ImVec2(200, 200), fireParticleSystem.settings.lifeScaleFromDistance);
+	ImGui::Spline("Intensity over lifetime", ImVec2(200, 200), fireParticleSystem.settings.intensityOverLifetime);
 	ImGui::End();
 
 	fireParticleSystem.update(dt);
