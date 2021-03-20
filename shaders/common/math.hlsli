@@ -107,4 +107,10 @@ static inline float unpackHalfsRight(uint x)
 	return f16tof32(x);
 }
 
+static inline void unpackHalfs(uint x, out float left, out float right)
+{
+	left = unpackHalfsLeft(x);
+	right = unpackHalfsRight(x);
+}
+
 #endif

@@ -6,7 +6,7 @@ struct fire_particle_data
 	vec3 position;
 	uint32 maxLife_life;
 	vec3 velocity;
-	uint32 padding;
+	uint32 sinAngle_cosAngle;
 };
 
 defineSpline(float, 4)
@@ -21,6 +21,7 @@ struct fire_particle_cb
 
 	// Rendering.
 	spline(float, 4) intensityOverLifetime;
+	spline(float, 4) atlasProgressionOverLifetime;
 	texture_atlas_cb atlas;
 };
 
@@ -51,11 +52,15 @@ static particle_data emitParticle(uint emitIndex)
 
 	float maxLife = nextRand(rng) * 5.f * lifeScale + 3.f;
 
+	float angle = nextRand(rng) * 2.f * pi;
+	float sinAngle, cosAngle;
+	sincos(angle, sinAngle, cosAngle);
+
 	particle_data particle = {
 		position,
 		packHalfs(maxLife, maxLife),
 		velocity,
-		0
+		packHalfs(sinAngle, cosAngle)
 	};
 
 	return particle;
@@ -123,19 +128,22 @@ static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> parti
 {
 	float3 pos = particles[index].position;
 
-	float maxLife_life = particles[index].maxLife_life;
+	uint maxLife_life = particles[index].maxLife_life;
 	float life = unpackHalfsRight(maxLife_life);
 	float maxLife = unpackHalfsLeft(maxLife_life);
 	float relLife = clamp(1.f - life / maxLife, 0.01f, 0.99f);
-	relLife = sqrt(relLife);
 
-	texture_atlas_cb atlas = cb.atlas;
-	uint atlasIndex = relLife * (atlas.getTotalNumCells() - 1);
-	uint x = atlas.getX(atlasIndex);
-	uint y = atlas.getY(atlasIndex);
+	float2 rotation; // Sin(angle), cos(angle).
+	unpackHalfs(particles[index].sinAngle_cosAngle, rotation.x, rotation.y);
 
 	float2 localPosition = IN.position.xy * 1.f;
+	localPosition = float2(dot(localPosition, float2(rotation.y, -rotation.x)), dot(localPosition, rotation));
 	pos += localPosition.x * camera.right.xyz + localPosition.y * camera.up.xyz;
+
+	texture_atlas_cb atlas = cb.atlas;
+	uint atlasIndex = cb.atlasProgressionOverLifetime.evaluate(4, relLife) * (atlas.getTotalNumCells() - 1);
+	uint x = atlas.getX(atlasIndex);
+	uint y = atlas.getY(atlasIndex);
 
 	float invCols = atlas.getInvNumCols();
 	float invRows = atlas.getInvNumRows();
