@@ -49,6 +49,9 @@ struct particle_sim_cb
 {
 	float emitRate;
 	float dt;
+	uint32 indexCount;
+	uint32 startIndex;
+	uint32 baseVertex;
 };
 
 #ifndef USER_PARTICLE_SIMULATION_RS
@@ -59,7 +62,7 @@ struct particle_sim_cb
 
 #define PARTICLE_COMPUTE_RS \
 	USER_APPEND_PARTICLE_SIMULATION_RS \
-	"RootConstants(num32BitConstants=2, b0, space=1), " \
+	"RootConstants(num32BitConstants=5, b0, space=1), " \
     "UAV(u0, space=1), " \
     "UAV(u1, space=1), " \
     "UAV(u2, space=1), " \

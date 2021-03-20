@@ -42,6 +42,12 @@ inline bool isSaturated(float3 a) { return isSaturated(a.x) && isSaturated(a.y) 
 inline bool isSaturated(float4 a) { return isSaturated(a.x) && isSaturated(a.y) && isSaturated(a.z) && isSaturated(a.w); }
 
 
+static float2 quadFromVertexID(uint vertexID)
+{
+	return float2((vertexID << 1) & 2, vertexID & 2) - 1.f;
+}
+
+
 #define pack_float	4
 #define pack_vec4	1
 #define pack_float4	1

@@ -243,6 +243,7 @@ void application::initialize(dx_renderer* renderer)
 	}
 
 	fireParticleSystem.initialize(10000, 500.f, "assets/particles/fire1.png", 8, 6);
+	boidParticleSystem.initialize(500, 50);
 }
 
 static bool plotAndEditTonemapping(tonemap_cb& tonemap)
@@ -926,6 +927,8 @@ void application::update(const user_input& input, float dt)
 	fireParticleSystem.update(dt);
 	fireParticleSystem.render(&transparentRenderPass);
 
+	boidParticleSystem.update(dt);
+	boidParticleSystem.render(&transparentRenderPass);
 
 
 	sun.updateMatrices(camera);

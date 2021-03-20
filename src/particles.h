@@ -19,6 +19,8 @@ protected:
 
 	static dx_mesh billboardMesh;
 
+	submesh_info submesh;
+
 private:
 	static void initializePipeline();
 

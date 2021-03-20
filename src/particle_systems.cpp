@@ -2,6 +2,7 @@
 #include "particle_systems.h"
 #include "dx_pipeline.h"
 #include "dx_renderer.h"
+#include "skinning.h"
 
 
 #define BUILD_PARTICLE_SHADER_NAME(name, suffix) name##suffix
@@ -12,6 +13,12 @@
 #define PIXEL_SHADER_NAME(name) BUILD_PARTICLE_SHADER_NAME(name, "_ps")
 
 
+
+
+
+// ----------------------------------------
+// FIRE
+// ----------------------------------------
 
 
 dx_pipeline fire_particle_system::emitPipeline;
@@ -73,8 +80,8 @@ void fire_particle_system::render(transparent_render_pass* renderPass)
 
 void fire_particle_system::fire_material::setupTransparentPipeline(dx_command_list* cl, const common_material_info& materialInfo)
 {
-	cl->setPipelineState(*fire_particle_system::renderPipeline.pipeline);
-	cl->setGraphicsRootSignature(*fire_particle_system::renderPipeline.rootSignature);
+	cl->setPipelineState(*renderPipeline.pipeline);
+	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);
 	cl->setGraphicsDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_RENDERING_RS_CAMERA, materialInfo.cameraCBV);
 }
 
@@ -84,7 +91,128 @@ void fire_particle_system::fire_material::prepareForRendering(dx_command_list* c
 	cl->setDescriptorHeapSRV(FIRE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE, 0, atlas.texture);
 }
 
+
+
+
+
+
+// ----------------------------------------
+// BOID
+// ----------------------------------------
+
+
+dx_pipeline boid_particle_system::emitPipeline;
+dx_pipeline boid_particle_system::simulatePipeline;
+dx_pipeline boid_particle_system::renderPipeline;
+
+
+void boid_particle_system::initializePipeline()
+{
+#define name "boid_particle_system"
+
+	emitPipeline = createReloadablePipeline(EMIT_PIPELINE_NAME(name));
+	simulatePipeline = createReloadablePipeline(SIMULATE_PIPELINE_NAME(name));
+
+	auto desc = CREATE_GRAPHICS_PIPELINE
+		.inputLayout(inputLayout_position_uv_normal_tangent)
+		.renderTargets(dx_renderer::transparentLightPassFormats, arraysize(dx_renderer::transparentLightPassFormats), dx_renderer::hdrDepthStencilFormat)
+		.depthSettings(true, true);
+
+	renderPipeline = createReloadablePipeline(desc, { VERTEX_SHADER_NAME(name), PIXEL_SHADER_NAME(name) });
+
+#undef name
+}
+
+void boid_particle_system::initialize(uint32 maxNumParticles, float emitRate)
+{
+	cartoonMesh = loadAnimatedMeshFromFile("assets/cartoon/cartoon.fbx"); // TODO: Animated!
+
+	particle_system::initializeAsMesh(sizeof(boid_particle_data), cartoonMesh->mesh, cartoonMesh->submeshes[0].info, maxNumParticles, emitRate);
+
+	material = make_ref<boid_material>();
+
+	settings.emitPosition = vec3(-30.f, 20.f, -10.f); // TEMPORARY.
+}
+
+void boid_particle_system::update(float dt)
+{
+	time += dt;
+	const dx_mesh& mesh = cartoonMesh->mesh;
+	animation_skeleton& skeleton = cartoonMesh->skeleton;
+
+	auto [skinnedVertexBuffer, skinnedSubmesh, skinningMatrices] = skinObject(mesh.vertexBuffer, cartoonMesh->submeshes[0].info, (uint32)skeleton.joints.size());
+
+	mat4* mats = skinningMatrices;
+
+	trs localTransforms[128];
+	skeleton.sampleAnimation(skeleton.clips[0].name, time, localTransforms);
+	skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, mats);
+
+
+	this->submesh = skinnedSubmesh;
+	this->skinnedVertexBuffer = skinnedVertexBuffer;
+
+
+	settings.frameIndex = (uint32)dxContext.frameID;
+
+	material->settingsCBV = dxContext.uploadDynamicConstantBuffer(settings);
+
+	particle_system::update(dt, emitPipeline, simulatePipeline);
+}
+
+void boid_particle_system::setSimulationParameters(dx_command_list* cl)
+{
+	cl->setComputeDynamicConstantBuffer(BOID_PARTICLE_SYSTEM_COMPUTE_RS_CBV, material->settingsCBV);
+}
+
+void boid_particle_system::render(transparent_render_pass* renderPass)
+{
+	renderPass->renderParticles(skinnedVertexBuffer, cartoonMesh->mesh.indexBuffer,
+		getDrawInfo(renderPipeline),
+		material);
+}
+
+void boid_particle_system::boid_material::setupTransparentPipeline(dx_command_list* cl, const common_material_info& materialInfo)
+{
+	cl->setPipelineState(*renderPipeline.pipeline);
+	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);
+	cl->setGraphicsDynamicConstantBuffer(BOID_PARTICLE_SYSTEM_RENDERING_RS_CAMERA, materialInfo.cameraCBV);
+
+	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 0, materialInfo.irradiance);
+	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 1, materialInfo.environment);
+	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 2, materialInfo.brdf);
+}
+
+void boid_particle_system::boid_material::prepareForRendering(dx_command_list* cl)
+{
+	cl->setGraphicsDynamicConstantBuffer(BOID_PARTICLE_SYSTEM_RENDERING_RS_CBV, settingsCBV);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ----------------------------------------
+// COMMON
+// ----------------------------------------
+
+
 void loadAllParticleSystemPipelines()
 {
 	fire_particle_system::initializePipeline();
+	boid_particle_system::initializePipeline();
 }
+

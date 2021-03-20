@@ -43,6 +43,9 @@ void main(cs_input IN)
 
 	c.numAliveParticlesThisFrame = numAliveParticlesInLastFrame;
 	draw.arguments.InstanceCount = 0;
+	draw.arguments.IndexCountPerInstance = cb.indexCount;
+	draw.arguments.StartIndexLocation = cb.startIndex;
+	draw.arguments.BaseVertexLocation = cb.baseVertex;
 	c.newParticles = numNewParticles;
 
 	dispatchInfo[0] = dispatch;
