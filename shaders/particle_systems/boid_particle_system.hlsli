@@ -5,7 +5,7 @@ struct boid_particle_data
 	vec3 position;
 	uint32 maxLife_life;
 	vec3 velocity;
-	uint32 padding;
+	uint32 color;
 };
 
 struct boid_particle_cb
@@ -13,12 +13,15 @@ struct boid_particle_cb
 	// Simulation.
 	vec3 emitPosition;
 	uint32 frameIndex;
+	float radius;
 
 	// Rendering.
 };
 
 #ifdef HLSL
 #define particle_data boid_particle_data
+
+#include "material.hlsli"
 #endif
 
 #ifdef PARTICLE_SIMULATION
@@ -32,13 +35,13 @@ static particle_data emitParticle(uint emitIndex)
 {
 	uint rng = initRand(emitIndex, cb.frameIndex);
 
-	const float radius = 15.f;
+	const float radius = cb.radius;
 
 	float2 offset2D = getRandomPointOnDisk(rng, radius);
 	float height = nextRand(rng) * 2.f + 3.f;
 	float3 position = cb.emitPosition + float3(offset2D.x, height, offset2D.y);
 
-	float maxLife = 5.f;
+	float maxLife = nextRand(rng) + 4.5f;
 
 	float2 velocity = getRandomPointOnUnitDisk(rng) * (5.f + nextRand(rng) * 1.5f);
 
@@ -46,7 +49,7 @@ static particle_data emitParticle(uint emitIndex)
 		position,
 		packHalfs(maxLife, maxLife),
 		float3(velocity.x, 0.f, velocity.y),
-		0
+		packColor(0, 0, 255, 255)  //packColor(nextRand(rng), nextRand(rng), nextRand(rng), 1.f)
 	};
 
 	return particle;
@@ -99,17 +102,18 @@ static bool simulateParticle(inout particle_data particle, float dt)
 
 struct vs_input
 {
-	float3 position			: POSITION;
-	float2 uv				: TEXCOORDS;
-	float3 normal			: NORMAL;
-	float3 tangent			: TANGENT;
+	float3 position				: POSITION;
+	float2 uv					: TEXCOORDS;
+	float3 normal				: NORMAL;
+	float3 tangent				: TANGENT;
 };
 
 struct vs_output
 {
-	float3 worldPosition	: POSITION;
-	float3 normal			: NORMAL;
-	float4 position			: SV_Position;
+	float3 worldPosition		: POSITION;
+	float3 normal				: NORMAL;
+	nointerpolation uint color	: COLOR;
+	float4 position				: SV_Position;
 };
 
 ConstantBuffer<boid_particle_cb> cb		: register(b0);
@@ -151,6 +155,7 @@ static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> parti
 	OUT.worldPosition = pos;
 	OUT.position = mul(camera.viewProj, float4(pos, 1.f));
 	OUT.normal = rotatedNormal;
+	OUT.color = particles[index].color;
 	return OUT;
 }
 
@@ -158,7 +163,7 @@ static float4 pixelShader(vs_output IN)
 {
 	surface_info surface;
 
-	surface.albedo = float4(0.f, 0.f, 1.f, 1.f);
+	surface.albedo = unpackColor(IN.color);
 	surface.N = normalize(IN.normal);
 
 	surface.roughness = 0.6f;

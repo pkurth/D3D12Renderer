@@ -148,6 +148,7 @@ void boid_particle_system::initialize(uint32 maxNumParticles, float emitRate)
 		material = make_ref<boid_material>();
 
 		settings.emitPosition = vec3(-30.f, 20.f, -10.f); // TEMPORARY.
+		settings.radius = 15.f;
 	}
 	else
 	{
@@ -165,11 +166,9 @@ void boid_particle_system::update(float dt)
 
 		auto [skinnedVertexBuffer, skinnedSubmesh, skinningMatrices] = skinObject(mesh.vertexBuffer, cartoonMesh->submeshes[0].info, (uint32)skeleton.joints.size());
 
-		mat4* mats = skinningMatrices;
-
 		trs localTransforms[128];
 		skeleton.sampleAnimation(skeleton.clips[0].name, time, localTransforms);
-		skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, mats);
+		skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
 
 
 		this->submesh = skinnedSubmesh;

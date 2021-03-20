@@ -7,6 +7,8 @@ struct dx_command_list;
 
 struct particle_system
 {
+	float emitRate;
+
 protected:
 	void initializeAsBillboard(uint32 particleStructSize, uint32 maxNumParticles, float emitRate);
 	void initializeAsMesh(uint32 particleStructSize, dx_mesh mesh, submesh_info submesh, uint32 maxNumParticles, float emitRate);
@@ -31,7 +33,6 @@ private:
 	uint32 getDeadListOffset();
 
 	uint32 maxNumParticles;
-	float emitRate;
 	uint32 currentAlive = 0;
 
 	ref<dx_buffer> particlesBuffer;

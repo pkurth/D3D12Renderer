@@ -243,7 +243,7 @@ void application::initialize(dx_renderer* renderer)
 	}
 
 	fireParticleSystem.initialize(10000, 500.f, "assets/particles/fire1.png", 8, 6);
-	boidParticleSystem.initialize(500, 50);
+	boidParticleSystem.initialize(10000, 2000.f);
 }
 
 static bool plotAndEditTonemapping(tonemap_cb& tonemap)
@@ -367,6 +367,34 @@ static bool editPostProcessing(renderer_mode mode, renderer_settings& settings)
 		{
 			result |= ImGui::SliderFloat("Sharpen strength", &settings.sharpenStrength, 0.f, 1.f);
 		}
+
+		ImGui::TreePop();
+	}
+	return result;
+}
+
+static bool editFireParticleSystem(fire_particle_system& particleSystem)
+{
+	bool result = false;
+	if (ImGui::TreeNode("Fire particles"))
+	{
+		result |= ImGui::SliderFloat("Emit rate", &particleSystem.emitRate, 0.f, 1000.f);
+		result |= ImGui::Spline("Scale life based on distance", ImVec2(200, 200), particleSystem.settings.lifeScaleFromDistance);
+		result |= ImGui::Spline("Atlas progression over lifetime", ImVec2(200, 200), particleSystem.settings.atlasProgressionOverLifetime);
+		result |= ImGui::Spline("Intensity over lifetime", ImVec2(200, 200), particleSystem.settings.intensityOverLifetime);
+
+		ImGui::TreePop();
+	}
+	return result;
+}
+
+static bool editBoidParticleSystem(boid_particle_system& particleSystem)
+{
+	bool result = false;
+	if (ImGui::TreeNode("Boid particles"))
+	{
+		result |= ImGui::SliderFloat("Emit rate", &particleSystem.emitRate, 0.f, 5000.f);
+		result |= ImGui::SliderFloat("Emit radius", &particleSystem.settings.radius, 5.f, 100.f);
 
 		ImGui::TreePop();
 	}
@@ -572,6 +600,11 @@ void application::drawSettings(float dt)
 			{
 				pathTracer.numAveragedFrames = 0;
 			}
+		}
+		else
+		{
+			editFireParticleSystem(fireParticleSystem);
+			editBoidParticleSystem(boidParticleSystem);
 		}
 	}
 
@@ -917,12 +950,6 @@ void application::update(const user_input& input, float dt)
 	
 	
 	// Particles.
-	
-	ImGui::Begin("Settings");
-	ImGui::Spline("Scale life based on distance", ImVec2(200, 200), fireParticleSystem.settings.lifeScaleFromDistance);
-	ImGui::Spline("Atlas progression over lifetime", ImVec2(200, 200), fireParticleSystem.settings.atlasProgressionOverLifetime);
-	ImGui::Spline("Intensity over lifetime", ImVec2(200, 200), fireParticleSystem.settings.intensityOverLifetime);
-	ImGui::End();
 
 	boidParticleSystem.update(dt);
 	boidParticleSystem.render(&transparentRenderPass);
