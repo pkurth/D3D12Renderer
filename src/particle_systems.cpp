@@ -46,24 +46,36 @@ void fire_particle_system::initializePipeline()
 
 void fire_particle_system::initialize(uint32 maxNumParticles, float emitRate, const std::string& textureFilename, uint32 cols, uint32 rows)
 {
-	particle_system::initializeAsBillboard(sizeof(fire_particle_data), maxNumParticles, emitRate);
+	auto tex = loadTextureFromFile(textureFilename);
 
-	material = make_ref<fire_material>();
-	material->atlas.texture = loadTextureFromFile(textureFilename);
-	material->atlas.cols = cols;
-	material->atlas.rows = rows;
+	if (tex)
+	{
+		particle_system::initializeAsBillboard(sizeof(fire_particle_data), maxNumParticles, emitRate);
 
-	settings.emitPosition = vec3(0.f, 20.f, -10.f); // TEMPORARY.
-	settings.atlas.initialize(rows, cols);
+		material = make_ref<fire_material>();
+		material->atlas.texture = tex;
+		material->atlas.cols = cols;
+		material->atlas.rows = rows;
+
+		settings.emitPosition = vec3(0.f, 20.f, -10.f); // TEMPORARY.
+		settings.atlas.initialize(rows, cols);
+	}
+	else
+	{
+		std::cerr << "Cannot create particle system, since texture was not found\n";
+	}
 }
 
 void fire_particle_system::update(float dt)
 {
-	settings.frameIndex = (uint32)dxContext.frameID;
+	if (material)
+	{
+		settings.frameIndex = (uint32)dxContext.frameID;
 
-	material->settingsCBV = dxContext.uploadDynamicConstantBuffer(settings);
+		material->settingsCBV = dxContext.uploadDynamicConstantBuffer(settings);
 
-	particle_system::update(dt, emitPipeline, simulatePipeline);
+		particle_system::update(dt, emitPipeline, simulatePipeline);
+	}
 }
 
 void fire_particle_system::setSimulationParameters(dx_command_list* cl)
@@ -73,9 +85,12 @@ void fire_particle_system::setSimulationParameters(dx_command_list* cl)
 
 void fire_particle_system::render(transparent_render_pass* renderPass)
 {
-	renderPass->renderParticles(billboardMesh.vertexBuffer, billboardMesh.indexBuffer,
-		getDrawInfo(renderPipeline),
-		material);
+	if (material)
+	{
+		renderPass->renderParticles(billboardMesh.vertexBuffer, billboardMesh.indexBuffer,
+			getDrawInfo(renderPipeline),
+			material);
+	}
 }
 
 void fire_particle_system::fire_material::setupTransparentPipeline(dx_command_list* cl, const common_material_info& materialInfo)
@@ -125,39 +140,48 @@ void boid_particle_system::initializePipeline()
 
 void boid_particle_system::initialize(uint32 maxNumParticles, float emitRate)
 {
-	cartoonMesh = loadAnimatedMeshFromFile("assets/cartoon/cartoon.fbx"); // TODO: Animated!
+	cartoonMesh = loadAnimatedMeshFromFile("assets/cartoon/cartoon.fbx");
+	if (cartoonMesh)
+	{
+		particle_system::initializeAsMesh(sizeof(boid_particle_data), cartoonMesh->mesh, cartoonMesh->submeshes[0].info, maxNumParticles, emitRate);
 
-	particle_system::initializeAsMesh(sizeof(boid_particle_data), cartoonMesh->mesh, cartoonMesh->submeshes[0].info, maxNumParticles, emitRate);
+		material = make_ref<boid_material>();
 
-	material = make_ref<boid_material>();
-
-	settings.emitPosition = vec3(-30.f, 20.f, -10.f); // TEMPORARY.
+		settings.emitPosition = vec3(-30.f, 20.f, -10.f); // TEMPORARY.
+	}
+	else
+	{
+		std::cerr << "Cannot create particle system, since mesh was not found\n";
+	}
 }
 
 void boid_particle_system::update(float dt)
 {
-	time += dt;
-	const dx_mesh& mesh = cartoonMesh->mesh;
-	animation_skeleton& skeleton = cartoonMesh->skeleton;
+	if (cartoonMesh)
+	{
+		time += dt;
+		const dx_mesh& mesh = cartoonMesh->mesh;
+		animation_skeleton& skeleton = cartoonMesh->skeleton;
 
-	auto [skinnedVertexBuffer, skinnedSubmesh, skinningMatrices] = skinObject(mesh.vertexBuffer, cartoonMesh->submeshes[0].info, (uint32)skeleton.joints.size());
+		auto [skinnedVertexBuffer, skinnedSubmesh, skinningMatrices] = skinObject(mesh.vertexBuffer, cartoonMesh->submeshes[0].info, (uint32)skeleton.joints.size());
 
-	mat4* mats = skinningMatrices;
+		mat4* mats = skinningMatrices;
 
-	trs localTransforms[128];
-	skeleton.sampleAnimation(skeleton.clips[0].name, time, localTransforms);
-	skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, mats);
-
-
-	this->submesh = skinnedSubmesh;
-	this->skinnedVertexBuffer = skinnedVertexBuffer;
+		trs localTransforms[128];
+		skeleton.sampleAnimation(skeleton.clips[0].name, time, localTransforms);
+		skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, mats);
 
 
-	settings.frameIndex = (uint32)dxContext.frameID;
+		this->submesh = skinnedSubmesh;
+		this->skinnedVertexBuffer = skinnedVertexBuffer;
 
-	material->settingsCBV = dxContext.uploadDynamicConstantBuffer(settings);
 
-	particle_system::update(dt, emitPipeline, simulatePipeline);
+		settings.frameIndex = (uint32)dxContext.frameID;
+
+		material->settingsCBV = dxContext.uploadDynamicConstantBuffer(settings);
+
+		particle_system::update(dt, emitPipeline, simulatePipeline);
+	}
 }
 
 void boid_particle_system::setSimulationParameters(dx_command_list* cl)
@@ -167,9 +191,12 @@ void boid_particle_system::setSimulationParameters(dx_command_list* cl)
 
 void boid_particle_system::render(transparent_render_pass* renderPass)
 {
-	renderPass->renderParticles(skinnedVertexBuffer, cartoonMesh->mesh.indexBuffer,
-		getDrawInfo(renderPipeline),
-		material);
+	if (cartoonMesh)
+	{
+		renderPass->renderParticles(skinnedVertexBuffer, cartoonMesh->mesh.indexBuffer,
+			getDrawInfo(renderPipeline),
+			material);
+	}
 }
 
 void boid_particle_system::boid_material::setupTransparentPipeline(dx_command_list* cl, const common_material_info& materialInfo)
