@@ -39,6 +39,13 @@ void particle_system::initializeInternal(uint32 particleStructSize, uint32 maxNu
 	this->maxNumParticles = maxNumParticles;
 	this->emitRate = emitRate;
 	this->index = atomicIncrement(particleSystemCounter);
+	this->submesh = submesh;
+	this->requiresSorting = requiresSorting;
+
+	if (requiresSorting)
+	{
+		assert(maxNumParticles <= 0xFFFF); // If sorting, 16 bit are reserved for the sort key. TODO: If this becomes a problem, we could dynamically switch to a 64 bit version here or smth else.
+	}
 
 	std::vector<uint32> dead(maxNumParticles);
 
@@ -63,12 +70,6 @@ void particle_system::initializeInternal(uint32 particleStructSize, uint32 maxNu
 	updateBufferDataRange(listBuffer, dead.data(), getDeadListOffset(), maxNumParticles * sizeof(uint32));
 
 
-	if (requiresSorting)
-	{
-		sortBuffer = createBuffer(sizeof(float), maxNumParticles, 0, true);
-	}
-
-
 	// Dispatch.
 	dispatchBuffer = createBuffer((uint32)sizeof(particle_dispatch), 1, 0, true);
 
@@ -78,8 +79,6 @@ void particle_system::initializeInternal(uint32 particleStructSize, uint32 maxNu
 	draw.arguments.IndexCountPerInstance = submesh.numTriangles * 3;
 	draw.arguments.StartIndexLocation = submesh.firstTriangle * 3;
 	updateBufferDataRange(particleDrawCommandBuffer, &draw, (uint32)sizeof(particle_draw) * index, (uint32)sizeof(particle_draw));
-
-	this->submesh = submesh;
 }
 
 void particle_system::initializeAsBillboard(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, bool requiresSorting)
@@ -116,7 +115,6 @@ void particle_system::update(float dt, const dx_pipeline& emitPipeline, const dx
 		//cl->transitionBarrier(dispatchBuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		particle_sim_cb cb = { emitRate, dt, submesh.numTriangles * 3, submesh.firstTriangle * 3, submesh.baseVertex };
-		bool requiresSorting = sortBuffer != 0;
 
 		// ----------------------------------------
 		// START
@@ -200,11 +198,6 @@ void particle_system::setResources(dx_command_list* cl, const particle_sim_cb& c
 	cl->setRootComputeUAV(offset + PARTICLE_COMPUTE_RS_CURRENT_ALIVE, listBuffer->gpuVirtualAddress + getAliveListOffset(currentAlive));
 	cl->setRootComputeUAV(offset + PARTICLE_COMPUTE_RS_NEW_ALIVE, listBuffer->gpuVirtualAddress + getAliveListOffset(nextAlive));
 
-	if (sortBuffer && setUserResources)
-	{
-		cl->setRootComputeUAV(offset + PARTICLE_COMPUTE_RS_SORTING, sortBuffer->gpuVirtualAddress);
-	}
-
 	if (setUserResources)
 	{
 		setSimulationParameters(cl);
@@ -226,7 +219,7 @@ uint32 particle_system::getDeadListOffset()
 
 uint32 particle_system::getNumUserRootParameters(const dx_pipeline& pipeline, bool requiresSorting)
 {
-	uint32 numSimulationRootParameters = PARTICLE_COMPUTE_RS_COUNT_WITHOUT_SORTING + requiresSorting;
+	uint32 numSimulationRootParameters = PARTICLE_COMPUTE_RS_COUNT;
 	uint32 numUserRootParameters = pipeline.rootSignature->totalNumParameters - numSimulationRootParameters;
 	return numUserRootParameters;
 }

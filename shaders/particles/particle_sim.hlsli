@@ -11,10 +11,6 @@ RWStructuredBuffer<uint> deadList						: register(u4, space1);
 RWStructuredBuffer<uint> currentAliveList				: register(u5, space1);
 RWStructuredBuffer<uint> newAliveList					: register(u6, space1);
 
-#ifdef REQUIRES_SORTING
-RWStructuredBuffer<float> sortingList					: register(u7, space1);
-#endif
-
 
 
 [numthreads(PARTICLES_SIMULATE_BLOCK_SIZE, 1, 1)]
@@ -30,7 +26,7 @@ void main(cs_input IN)
 
 	float dt = simCB.dt;
 
-	uint index = currentAliveList[i];
+	uint index = currentAliveList[i] & 0xFFFF; // Mask out sort key.
 
 	particle_data particle = particles[index];
 
@@ -47,11 +43,14 @@ void main(cs_input IN)
 
 		uint alive;
 		InterlockedAdd(drawInfo[0].arguments.InstanceCount, 1, alive);
-		newAliveList[alive] = index;
 
 #ifdef REQUIRES_SORTING
-		sortingList[alive] = sortKey;
+		uint output = index | (f32tof16(sortKey) << 16);
+#else
+		uint output = index;
 #endif
+
+		newAliveList[alive] = output;
 	}
 	else
 	{

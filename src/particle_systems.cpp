@@ -36,7 +36,8 @@ void fire_particle_system::initializePipeline()
 	auto desc = CREATE_GRAPHICS_PIPELINE
 		.inputLayout(inputLayout_position)
 		.renderTargets(dx_renderer::transparentLightPassFormats, arraysize(dx_renderer::transparentLightPassFormats), dx_renderer::hdrDepthStencilFormat)
-		.alphaBlending(0)
+		.additiveBlending(0)
+		//.alphaBlending(0)
 		.depthSettings(true, false);
 
 	renderPipeline = createReloadablePipeline(desc, { VERTEX_SHADER_NAME(name), PIXEL_SHADER_NAME(name) });

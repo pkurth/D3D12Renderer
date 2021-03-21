@@ -6,6 +6,6 @@ StructuredBuffer<uint> aliveList					: register(t1, space1);
 
 vs_output main(vs_input IN, uint instanceID	: SV_InstanceID)
 {
-	uint index = aliveList[instanceID];
+	uint index = aliveList[instanceID] & 0xFFFF; // Mask out sort key.
 	return vertexShader(IN, particles, index);
 }

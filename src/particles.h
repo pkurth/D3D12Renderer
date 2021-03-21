@@ -39,8 +39,8 @@ private:
 	ref<dx_buffer> particlesBuffer;
 	ref<dx_buffer> listBuffer; // Counters, dead, alive 0, alive 1.
 	ref<dx_buffer> dispatchBuffer;
-	ref<dx_buffer> sortBuffer;
 
+	bool requiresSorting;
 
 	uint32 index;
 
