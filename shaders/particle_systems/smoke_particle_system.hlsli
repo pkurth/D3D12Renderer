@@ -1,7 +1,7 @@
 #include "material.hlsli"
 #include "camera.hlsli"
 
-struct fire_particle_data
+struct smoke_particle_data
 {
 	vec3 position;
 	uint32 maxLife_life;
@@ -12,13 +12,11 @@ struct fire_particle_data
 defineSpline(float, 4)
 defineSpline(float, 8)
 
-struct fire_particle_cb
+struct smoke_particle_cb
 {
 	// Simulation.
 	vec3 emitPosition;
-	uint32 frameIndex; 
-	vec3 cameraPosition;
-	uint32 padding;
+	uint32 frameIndex;
 	spline(float, 8) lifeScaleFromDistance;
 
 	// Rendering.
@@ -28,17 +26,15 @@ struct fire_particle_cb
 };
 
 #ifdef HLSL
-#define particle_data fire_particle_data
+#define particle_data smoke_particle_data
 #endif
 
 #ifdef PARTICLE_SIMULATION
 
-#define REQUIRES_SORTING
-
 #define USER_PARTICLE_SIMULATION_RS \
 	"CBV(b0)"
 
-ConstantBuffer<fire_particle_cb> cb		: register(b0);
+ConstantBuffer<smoke_particle_cb> cb		: register(b0);
 
 static particle_data emitParticle(uint emitIndex)
 {
@@ -70,7 +66,7 @@ static particle_data emitParticle(uint emitIndex)
 	return particle;
 }
 
-static bool simulateParticle(inout particle_data particle, float dt, out float sortKey)
+static bool simulateParticle(inout particle_data particle, float dt)
 {
 	float life = unpackHalfsRight(particle.maxLife_life);
 	life -= dt;
@@ -85,9 +81,6 @@ static bool simulateParticle(inout particle_data particle, float dt, out float s
 		particle.velocity = particle.velocity + gravity;
 		float maxLife = unpackHalfsLeft(particle.maxLife_life);
 		particle.maxLife_life = packHalfs(maxLife, life);
-
-		float3 toCamera = cb.cameraPosition - particle.position;
-		sortKey = dot(toCamera, toCamera);
 
 		return true;
 	}
@@ -119,12 +112,12 @@ struct vs_input
 
 struct vs_output
 {
-	float intensity			: INTENSITY;
+	float intensity : INTENSITY;
 	float2 uv				: TEXCOORDS;
 	float4 position			: SV_Position;
 };
 
-ConstantBuffer<fire_particle_cb> cb		: register(b0);
+ConstantBuffer<smoke_particle_cb> cb		: register(b0);
 ConstantBuffer<camera_cb> camera		: register(b1);
 
 Texture2D<float4> tex					: register(t0);
@@ -161,7 +154,7 @@ static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> parti
 	vs_output OUT;
 	OUT.position = mul(camera.viewProj, float4(pos, 1.f));
 	OUT.uv = lerp(uv0, uv1, IN.position.xy * 0.5f + 0.5f);
-	OUT.intensity = cb.intensityOverLifetime.evaluate(4, relLife);
+	OUT.intensity = 10.f;// cb.intensityOverLifetime.evaluate(4, relLife);
 	return OUT;
 }
 
@@ -176,11 +169,11 @@ static float4 pixelShader(vs_output IN)
 
 
 // Simulation.
-#define FIRE_PARTICLE_SYSTEM_COMPUTE_RS_CBV			0
+#define SMOKE_PARTICLE_SYSTEM_COMPUTE_RS_CBV		0
 
 // Rendering.
-#define FIRE_PARTICLE_SYSTEM_RENDERING_RS_CBV		0
-#define FIRE_PARTICLE_SYSTEM_RENDERING_RS_CAMERA	1
-#define FIRE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE	2
+#define SMOKE_PARTICLE_SYSTEM_RENDERING_RS_CBV		0
+#define SMOKE_PARTICLE_SYSTEM_RENDERING_RS_CAMERA	1
+#define SMOKE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE	2
 
 

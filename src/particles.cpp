@@ -34,7 +34,7 @@ void particle_system::initializePipeline()
 	billboardMesh = cpuMesh.createDXMesh();
 }
 
-void particle_system::initializeInternal(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, submesh_info submesh)
+void particle_system::initializeInternal(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, submesh_info submesh, bool requiresSorting)
 {
 	this->maxNumParticles = maxNumParticles;
 	this->emitRate = emitRate;
@@ -63,6 +63,11 @@ void particle_system::initializeInternal(uint32 particleStructSize, uint32 maxNu
 	updateBufferDataRange(listBuffer, dead.data(), getDeadListOffset(), maxNumParticles * sizeof(uint32));
 
 
+	if (requiresSorting)
+	{
+		sortBuffer = createBuffer(sizeof(float), maxNumParticles, 0, true);
+	}
+
 
 	// Dispatch.
 	dispatchBuffer = createBuffer((uint32)sizeof(particle_dispatch), 1, 0, true);
@@ -77,15 +82,15 @@ void particle_system::initializeInternal(uint32 particleStructSize, uint32 maxNu
 	this->submesh = submesh;
 }
 
-void particle_system::initializeAsBillboard(uint32 particleStructSize, uint32 maxNumParticles, float emitRate)
+void particle_system::initializeAsBillboard(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, bool requiresSorting)
 {
 	submesh_info submesh = { 2, 0, 0, 6 };
-	initializeInternal(particleStructSize, maxNumParticles, emitRate, submesh);
+	initializeInternal(particleStructSize, maxNumParticles, emitRate, submesh, requiresSorting);
 }
 
-void particle_system::initializeAsMesh(uint32 particleStructSize, dx_mesh mesh, submesh_info submesh, uint32 maxNumParticles, float emitRate)
+void particle_system::initializeAsMesh(uint32 particleStructSize, dx_mesh mesh, submesh_info submesh, uint32 maxNumParticles, float emitRate, bool requiresSorting)
 {
-	initializeInternal(particleStructSize, maxNumParticles, emitRate, submesh);
+	initializeInternal(particleStructSize, maxNumParticles, emitRate, submesh, requiresSorting);
 }
 
 particle_draw_info particle_system::getDrawInfo(const struct dx_pipeline& renderPipeline)
@@ -111,6 +116,7 @@ void particle_system::update(float dt, const dx_pipeline& emitPipeline, const dx
 		//cl->transitionBarrier(dispatchBuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		particle_sim_cb cb = { emitRate, dt, submesh.numTriangles * 3, submesh.firstTriangle * 3, submesh.baseVertex };
+		bool requiresSorting = sortBuffer != 0;
 
 		// ----------------------------------------
 		// START
@@ -142,7 +148,7 @@ void particle_system::update(float dt, const dx_pipeline& emitPipeline, const dx
 			cl->setPipelineState(*emitPipeline.pipeline);
 			cl->setComputeRootSignature(*emitPipeline.rootSignature);
 
-			uint32 numUserRootParameters = emitPipeline.rootSignature->totalNumParameters - PARTICLE_COMPUTE_RS_COUNT;
+			uint32 numUserRootParameters = getNumUserRootParameters(emitPipeline, requiresSorting);
 			setResources(cl, cb, numUserRootParameters, true);
 
 			cl->dispatchIndirect(commandSignature, 1, dispatchBuffer, 0);
@@ -162,7 +168,7 @@ void particle_system::update(float dt, const dx_pipeline& emitPipeline, const dx
 			cl->setPipelineState(*simulatePipeline.pipeline);
 			cl->setComputeRootSignature(*simulatePipeline.rootSignature);
 
-			uint32 numUserRootParameters = simulatePipeline.rootSignature->totalNumParameters - PARTICLE_COMPUTE_RS_COUNT;
+			uint32 numUserRootParameters = getNumUserRootParameters(simulatePipeline, requiresSorting);
 			setResources(cl, cb, numUserRootParameters, true);
 
 			cl->dispatchIndirect(commandSignature, 1, dispatchBuffer, sizeof(D3D12_DISPATCH_ARGUMENTS));
@@ -194,6 +200,11 @@ void particle_system::setResources(dx_command_list* cl, const particle_sim_cb& c
 	cl->setRootComputeUAV(offset + PARTICLE_COMPUTE_RS_CURRENT_ALIVE, listBuffer->gpuVirtualAddress + getAliveListOffset(currentAlive));
 	cl->setRootComputeUAV(offset + PARTICLE_COMPUTE_RS_NEW_ALIVE, listBuffer->gpuVirtualAddress + getAliveListOffset(nextAlive));
 
+	if (sortBuffer && setUserResources)
+	{
+		cl->setRootComputeUAV(offset + PARTICLE_COMPUTE_RS_SORTING, sortBuffer->gpuVirtualAddress);
+	}
+
 	if (setUserResources)
 	{
 		setSimulationParameters(cl);
@@ -211,4 +222,11 @@ uint32 particle_system::getAliveListOffset(uint32 alive)
 uint32 particle_system::getDeadListOffset()
 {
 	return (uint32)sizeof(particle_counters);
+}
+
+uint32 particle_system::getNumUserRootParameters(const dx_pipeline& pipeline, bool requiresSorting)
+{
+	uint32 numSimulationRootParameters = PARTICLE_COMPUTE_RS_COUNT_WITHOUT_SORTING + requiresSorting;
+	uint32 numUserRootParameters = pipeline.rootSignature->totalNumParameters - numSimulationRootParameters;
+	return numUserRootParameters;
 }

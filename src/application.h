@@ -76,6 +76,7 @@ private:
 	ref<dx_texture> decalTexture;
 
 	fire_particle_system fireParticleSystem;
+	smoke_particle_system smokeParticleSystem;
 	boid_particle_system boidParticleSystem;
 
 	directional_light sun;

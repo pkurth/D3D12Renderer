@@ -242,7 +242,8 @@ void application::initialize(dx_renderer* renderer)
 		SET_NAME(pointLightShadowInfoBuffer[i]->resource, "Point light shadow infos");
 	}
 
-	fireParticleSystem.initialize(10000, 500.f, "assets/particles/fire1.png", 8, 6);
+	fireParticleSystem.initialize(10000, 500.f, "assets/particles/fire_explosion.tif", 6, 6);
+	//smokeParticleSystem.initialize(10000, 500.f, "assets/particles/smoke1.tif", 5, 5);
 	boidParticleSystem.initialize(10000, 2000.f);
 }
 
@@ -951,11 +952,16 @@ void application::update(const user_input& input, float dt)
 	
 	// Particles.
 
+	fireParticleSystem.settings.cameraPosition = camera.position;
+
 	boidParticleSystem.update(dt);
 	boidParticleSystem.render(&transparentRenderPass);
 
 	fireParticleSystem.update(dt);
 	fireParticleSystem.render(&transparentRenderPass);
+
+	//smokeParticleSystem.update(dt);
+	//smokeParticleSystem.render(&transparentRenderPass);
 
 
 	sun.updateMatrices(camera);

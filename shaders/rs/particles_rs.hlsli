@@ -60,6 +60,12 @@ struct particle_sim_cb
 #define USER_APPEND_PARTICLE_SIMULATION_RS USER_PARTICLE_SIMULATION_RS ", "
 #endif
 
+#ifndef REQUIRES_SORTING
+#define PARTICLE_APPEND_SORTING_RS ""
+#else
+#define PARTICLE_APPEND_SORTING_RS ", UAV(u7, space=1)"
+#endif
+
 #define PARTICLE_COMPUTE_RS \
 	USER_APPEND_PARTICLE_SIMULATION_RS \
 	"RootConstants(num32BitConstants=5, b0, space=1), " \
@@ -69,7 +75,8 @@ struct particle_sim_cb
     "UAV(u3, space=1), " \
     "UAV(u4, space=1), " \
     "UAV(u5, space=1), " \
-    "UAV(u6, space=1)"
+    "UAV(u6, space=1)" \
+	PARTICLE_APPEND_SORTING_RS
 	
 
 #define PARTICLE_COMPUTE_RS_CB					0
@@ -80,8 +87,10 @@ struct particle_sim_cb
 #define PARTICLE_COMPUTE_RS_DEAD_LIST			5
 #define PARTICLE_COMPUTE_RS_CURRENT_ALIVE		6
 #define PARTICLE_COMPUTE_RS_NEW_ALIVE			7
+#define PARTICLE_COMPUTE_RS_SORTING				8
 
-#define PARTICLE_COMPUTE_RS_COUNT				(PARTICLE_COMPUTE_RS_NEW_ALIVE + 1)
+#define PARTICLE_COMPUTE_RS_COUNT_WITHOUT_SORTING		(PARTICLE_COMPUTE_RS_NEW_ALIVE + 1)
+
 
 
 
