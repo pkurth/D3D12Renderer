@@ -9,7 +9,6 @@
 #include "dx_profiling.h"
 #include "particles_rs.hlsli"
 
-dx_command_signature particle_system::commandSignature;
 ref<dx_buffer> particle_system::particleDrawCommandBuffer;
 dx_mesh particle_system::billboardMesh;
 
@@ -21,10 +20,6 @@ static volatile uint32 particleSystemCounter = 0;
 void particle_system::initializePipeline()
 {
 	startPipeline = createReloadablePipeline("particle_start_cs");
-
-	D3D12_INDIRECT_ARGUMENT_DESC argumentDesc;
-	argumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
-	commandSignature = createCommandSignature({}, &argumentDesc, 1, sizeof(D3D12_DISPATCH_ARGUMENTS));
 
 	particleDrawCommandBuffer = createBuffer(sizeof(particle_draw), 1024, 0, true);
 
@@ -149,7 +144,7 @@ void particle_system::update(float dt, const dx_pipeline& emitPipeline, const dx
 			uint32 numUserRootParameters = getNumUserRootParameters(emitPipeline, requiresSorting);
 			setResources(cl, cb, numUserRootParameters, true);
 
-			cl->dispatchIndirect(commandSignature, 1, dispatchBuffer, 0);
+			cl->dispatchIndirect(1, dispatchBuffer, 0);
 			barrier_batcher(cl)
 				.uav(particleDrawCommandBuffer)
 				.uav(particlesBuffer)
@@ -169,7 +164,7 @@ void particle_system::update(float dt, const dx_pipeline& emitPipeline, const dx
 			uint32 numUserRootParameters = getNumUserRootParameters(simulatePipeline, requiresSorting);
 			setResources(cl, cb, numUserRootParameters, true);
 
-			cl->dispatchIndirect(commandSignature, 1, dispatchBuffer, sizeof(D3D12_DISPATCH_ARGUMENTS));
+			cl->dispatchIndirect(1, dispatchBuffer, sizeof(D3D12_DISPATCH_ARGUMENTS));
 			barrier_batcher(cl)
 				.uav(particleDrawCommandBuffer)
 				.uav(particlesBuffer)

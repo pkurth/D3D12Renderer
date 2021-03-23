@@ -1,24 +1,7 @@
 #ifndef PARTICLES_RS_HLSLI
 #define PARTICLES_RS_HLSLI
 
-
-#ifdef HLSL
-struct D3D12_DISPATCH_ARGUMENTS
-{
-	uint32 ThreadGroupCountX;
-	uint32 ThreadGroupCountY;
-	uint32 ThreadGroupCountZ;
-};
-
-struct D3D12_DRAW_INDEXED_ARGUMENTS
-{
-	uint32 IndexCountPerInstance;
-	uint32 InstanceCount;
-	uint32 StartIndexLocation;
-	int BaseVertexLocation;
-	uint32 StartInstanceLocation;
-};
-#endif
+#include "indirect.hlsli"
 
 struct particle_dispatch
 {

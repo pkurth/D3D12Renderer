@@ -3,6 +3,7 @@
 #include "dx_command_list.h"
 #include "dx_render_target.h"
 #include "dx_pipeline.h"
+#include "dx_bitonic_sort.h"
 #include "geometry.h"
 #include "dx_texture.h"
 #include "dx_barrier_batcher.h"
@@ -243,6 +244,7 @@ void dx_renderer::initializeCommon(DXGI_FORMAT screenFormat)
 
 	pbr_material::initializePipeline();
 	particle_system::initializePipeline();
+	initializeBitonicSort();
 	loadAllParticleSystemPipelines();
 
 

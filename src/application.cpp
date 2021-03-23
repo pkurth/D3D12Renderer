@@ -11,6 +11,7 @@
 #include "mesh_shader.h"
 #include "shadow_map_cache.h"
 #include "file_dialog.h"
+#include "dx_bitonic_sort.h"
 
 #define STB_RECT_PACK_IMPLEMENTATION
 #include <imgui/imstb_rectpack.h>
@@ -158,7 +159,7 @@ void application::initialize(dx_renderer* renderer)
 
 	random_number_generator rng = { 14878213 };
 
-	/*spotLights.resize(2);
+	spotLights.resize(2);
 
 	spotLights[0].initialize(
 		{ 2.f, 3.f, 0.f },
@@ -187,9 +188,9 @@ void application::initialize(dx_renderer* renderer)
 		randomRGB(rng),
 		10,
 		0
-	);*/
+	);
 
-#if 0
+#if 1
 	decalTexture = loadTextureFromFile("assets/decals/explosion.png");
 
 	if (decalTexture)

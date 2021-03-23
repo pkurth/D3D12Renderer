@@ -251,6 +251,11 @@ bool dx_context::initialize()
 	computeQueue.initialize(device, D3D12_COMMAND_LIST_TYPE_COMPUTE);
 	copyQueue.initialize(device, D3D12_COMMAND_LIST_TYPE_COPY);
 
+
+	D3D12_INDIRECT_ARGUMENT_DESC argumentDesc;
+	argumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
+	defaultDispatchCommandSignature = createCommandSignature({}, &argumentDesc, 1, sizeof(D3D12_DISPATCH_ARGUMENTS));
+
 	return true;
 }
 

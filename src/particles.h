@@ -46,7 +46,6 @@ private:
 
 
 
-	static dx_command_signature commandSignature;
 	static ref<dx_buffer> particleDrawCommandBuffer;
 
 	friend struct dx_renderer;

@@ -160,6 +160,8 @@ struct dx_command_list
 	void dispatch(uint32 numGroupsX, uint32 numGroupsY = 1, uint32 numGroupsZ = 1);
 	void dispatchIndirect(dx_command_signature commandSignature, uint32 numCommands, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset = 0);
 	void dispatchIndirect(dx_command_signature commandSignature, uint32 maxNumCommands, const ref<dx_buffer>& numDispatchesBuffer, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset = 0);
+	void dispatchIndirect(uint32 numCommands, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset = 0);
+	void dispatchIndirect(uint32 maxNumCommands, const ref<dx_buffer>& numDispatchesBuffer, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset = 0);
 
 
 	// Mesh shaders.

@@ -87,6 +87,8 @@ struct dx_context
 	void retire(dx_object obj);
 	void retire(D3D12MA::Allocation* allocation);
 
+	dx_command_signature defaultDispatchCommandSignature;
+
 private:
 #if ENABLE_DX_PROFILING
 	dx_timestamp_query_heap timestampHeaps[NUM_BUFFERED_FRAMES];

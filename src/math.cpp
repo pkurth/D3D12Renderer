@@ -2,6 +2,9 @@
 #include "math.h"
 #include <half/half.c>
 
+const half half::minValue = (uint16)0b1111101111111111;
+const half half::maxValue = (uint16)0b0111101111111111;
+
 const mat2 mat2::identity =
 {
 	1.f, 0.f,

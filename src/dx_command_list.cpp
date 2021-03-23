@@ -515,6 +515,16 @@ void dx_command_list::dispatchIndirect(dx_command_signature commandSignature, ui
 		0);
 }
 
+void dx_command_list::dispatchIndirect(uint32 numCommands, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset)
+{
+	dispatchIndirect(dxContext.defaultDispatchCommandSignature, numCommands, commandBuffer, commandBufferOffset);
+}
+
+void dx_command_list::dispatchIndirect(uint32 maxNumCommands, const ref<dx_buffer>& numDispatchesBuffer, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset)
+{
+	dispatchIndirect(dxContext.defaultDispatchCommandSignature, maxNumCommands, numDispatchesBuffer, commandBuffer, commandBufferOffset);
+}
+
 void dx_command_list::dispatchMesh(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ)
 {
 #if ADVANCED_GPU_FEATURES_ENABLED

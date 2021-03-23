@@ -76,7 +76,6 @@
 
 #include "int_insn.h"
 #include "half.h"
-#include <stdio.h>
 
 uint32_t
 half_to_float( uint16_t h )
@@ -530,14 +529,8 @@ half_div( uint16_t x, uint16_t y )
 
   uint16_t z_e = x_e-y_e+(0x0d);
 
-  printf("x_e=0x%04x, y_e=0x%04x\n",x_e-h_e_bias,y_e-h_e_bias);
-  printf("z_e=0x%04x\n",z_e);
-
   x_f = ( x_f | h_m_hidden )<<4;
   y_f = ( y_f | h_m_hidden )<<5;
-
-printf("y_f=0x%04x\n",y_f);
-printf("x_f+x_f=0x%04x\n",x_f+x_f);
 
   if ( y_f <= ( x_f + x_f ) ) 
   {
@@ -553,8 +546,6 @@ printf("x_f+x_f=0x%04x\n",x_f+x_f);
   }
 
   uint16_t r = (z_f >> 4) | (z_e << h_e_pos) | (z_s << h_s_pos);
-
-  printf("z_s=%d z_e=0x%04x (0x%04x) z_f=0x%04x\n",z_s,z_e,(z_e-h_e_bias),z_f>>3);
 
   return (r);
 

@@ -21,18 +21,90 @@
 #define deg2rad(deg) ((deg) * M_PI_OVER_180)
 #define rad2deg(rad) ((rad) * M_180_OVER_PI)
 
-static float lerp(float l, float u, float t) { return l + t * (u - l); }
-static float inverseLerp(float l, float u, float v) { return (v - l) / (u - l); }
-static float remap(float v, float oldL, float oldU, float newL, float newU) { return lerp(newL, newU, inverseLerp(oldL, oldU, v)); }
-static float clamp(float v, float l, float u) { return min(u, max(l, v)); }
-static uint32 clamp(uint32 v, uint32 l, uint32 u) { return min(u, max(l, v)); }
-static int32 clamp(int32 v, int32 l, int32 u) { return min(u, max(l, v)); }
-static float clamp01(float v) { return clamp(v, 0.f, 1.f); }
-static uint32 bucketize(uint32 problemSize, uint32 bucketSize) { return (problemSize + bucketSize - 1) / bucketSize; }
+static constexpr float lerp(float l, float u, float t) { return l + t * (u - l); }
+static constexpr float inverseLerp(float l, float u, float v) { return (v - l) / (u - l); }
+static constexpr float remap(float v, float oldL, float oldU, float newL, float newU) { return lerp(newL, newU, inverseLerp(oldL, oldU, v)); }
+static constexpr float clamp(float v, float l, float u) { return min(u, max(l, v)); }
+static constexpr uint32 clamp(uint32 v, uint32 l, uint32 u) { return min(u, max(l, v)); }
+static constexpr int32 clamp(int32 v, int32 l, int32 u) { return min(u, max(l, v)); }
+static constexpr float clamp01(float v) { return clamp(v, 0.f, 1.f); }
+static constexpr uint32 bucketize(uint32 problemSize, uint32 bucketSize) { return (problemSize + bucketSize - 1) / bucketSize; }
+
+
+// Constexpr-version of _BitScanForward. Returns -1 if mask is zero.
+static constexpr uint32 indexOfLeastSignificantSetBit(uint32 i)
+{
+	if (i == 0)
+	{
+		return -1;
+	}
+
+	uint32 count = 0;
+
+	while ((i & 1) == 0)
+	{
+		i >>= 1;
+		++count;
+	}
+	return count;
+}
+
+// Constexpr-version of _BitScanReverse. Returns -1 if mask is zero.
+static constexpr uint32 indexOfMostSignificantSetBit(uint32 i)
+{
+	if (i == 0)
+	{
+		return -1;
+	}
+
+	uint32 count = 0;
+
+	while (i != 1)
+	{
+		i >>= 1;
+		++count;
+	}
+	return count;
+}
+
+static constexpr int32 log2(int32 i)
+{
+	uint32 mssb = indexOfMostSignificantSetBit(i);
+	uint32 lssb = indexOfLeastSignificantSetBit(i);
+
+	if (mssb == -1 || lssb == -1)
+	{
+		return 0;
+	}
+
+	// If perfect power of two (only one set bit), return index of bit.  Otherwise round up
+	// fractional log by adding 1 to most signicant set bit's index.
+	return mssb + (mssb == lssb ? 0 : 1);
+}
+
+static constexpr uint32 log2(uint32 i) 
+{ 
+	uint32 mssb = indexOfMostSignificantSetBit(i);
+	uint32 lssb = indexOfLeastSignificantSetBit(i);
+
+	if (mssb == -1 || lssb == -1)
+	{
+		return 0;
+	}
+
+	// If perfect power of two (only one set bit), return index of bit.  Otherwise round up
+	// fractional log by adding 1 to most signicant set bit's index.
+	return mssb + (mssb == lssb ? 0 : 1);
+}
 
 static constexpr bool isPowerOfTwo(uint32 i)
 {
 	return (i & (i - 1)) == 0;
+}
+
+static constexpr uint32 alignToPowerOfTwo(uint32 i)
+{
+	return i == 0 ? 0 : 1 << log2(i);
 }
 
 static float easeInQuadratic(float t)		{ return t * t; }
@@ -156,23 +228,6 @@ static float getFramerateIndependentT(float speed, float dt)
 }
 
 
-// Constexpr-version of _BitScanForward. Does not check whether the mask is 0.
-static constexpr uint32 indexOfLeastSignificantSetBit(uint32 mask)
-{
-	uint32 count = 0;
-
-	if (mask != 0)
-	{
-		while ((mask & 1) == 0)
-		{
-			mask >>= 1;
-			++count;
-		}
-	}
-	return count;
-}
-
-
 struct half
 {
 	uint16 h;
@@ -182,6 +237,9 @@ struct half
 	half(uint16 i);
 
 	operator float();
+
+	static const half minValue; // Smallest possible half. Not the smallest positive, but the smallest total, so essentially -maxValue.
+	static const half maxValue;
 };
 
 half operator+(half a, half b);
