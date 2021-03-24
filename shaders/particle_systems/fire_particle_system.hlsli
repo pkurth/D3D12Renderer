@@ -86,8 +86,8 @@ static bool simulateParticle(inout particle_data particle, float dt, out float s
 		float maxLife = unpackHalfsLeft(particle.maxLife_life);
 		particle.maxLife_life = packHalfs(maxLife, life);
 
-		float3 toCamera = cb.cameraPosition - particle.position;
-		sortKey = dot(toCamera, toCamera);
+		float3 V = particle.position - cb.cameraPosition;
+		sortKey = dot(V, V);
 
 		return true;
 	}
@@ -138,7 +138,7 @@ static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> parti
 	uint maxLife_life = particles[index].maxLife_life;
 	float life = unpackHalfsRight(maxLife_life);
 	float maxLife = unpackHalfsLeft(maxLife_life);
-	float relLife = clamp(1.f - life / maxLife, 0.01f, 0.99f);
+	float relLife = clamp((maxLife - life) / 3, 0.01f, 0.99f);
 
 	float2 rotation; // Sin(angle), cos(angle).
 	unpackHalfs(particles[index].sinAngle_cosAngle, rotation.x, rotation.y);
@@ -161,7 +161,7 @@ static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> parti
 	vs_output OUT;
 	OUT.position = mul(camera.viewProj, float4(pos, 1.f));
 	OUT.uv = lerp(uv0, uv1, IN.position.xy * 0.5f + 0.5f);
-	OUT.intensity = cb.intensityOverLifetime.evaluate(4, relLife);
+	OUT.intensity = 20 * cb.intensityOverLifetime.evaluate(4, relLife);
 	return OUT;
 }
 

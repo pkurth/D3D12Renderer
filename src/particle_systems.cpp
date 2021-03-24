@@ -36,8 +36,8 @@ void fire_particle_system::initializePipeline()
 	auto desc = CREATE_GRAPHICS_PIPELINE
 		.inputLayout(inputLayout_position)
 		.renderTargets(dx_renderer::transparentLightPassFormats, arraysize(dx_renderer::transparentLightPassFormats), dx_renderer::hdrDepthStencilFormat)
-		.additiveBlending(0)
-		//.alphaBlending(0)
+		//.additiveBlending(0)
+		.alphaBlending(0)
 		.depthSettings(true, false);
 
 	renderPipeline = createReloadablePipeline(desc, { VERTEX_SHADER_NAME(name), PIXEL_SHADER_NAME(name) });
@@ -54,7 +54,7 @@ void fire_particle_system::initialize(uint32 maxNumParticles, float emitRate, co
 		tex = dx_renderer::getWhiteTexture();
 	}
 	
-	particle_system::initializeAsBillboard(sizeof(fire_particle_data), maxNumParticles, emitRate, true);
+	particle_system::initializeAsBillboard(sizeof(fire_particle_data), maxNumParticles, emitRate, sort_mode_back_to_front);
 
 	material = make_ref<fire_material>();
 	material->atlas.texture = tex;
@@ -140,7 +140,7 @@ void smoke_particle_system::initialize(uint32 maxNumParticles, float emitRate, c
 		tex = dx_renderer::getWhiteTexture();
 	}
 
-	particle_system::initializeAsBillboard(sizeof(smoke_particle_data), maxNumParticles, emitRate, true);
+	particle_system::initializeAsBillboard(sizeof(smoke_particle_data), maxNumParticles, emitRate, sort_mode_back_to_front);
 
 	material = make_ref<smoke_material>();
 	material->atlas.texture = tex;
@@ -222,7 +222,7 @@ void boid_particle_system::initialize(uint32 maxNumParticles, float emitRate)
 	cartoonMesh = loadAnimatedMeshFromFile("assets/cartoon/cartoon.fbx");
 	if (cartoonMesh)
 	{
-		particle_system::initializeAsMesh(sizeof(boid_particle_data), cartoonMesh->mesh, cartoonMesh->submeshes[0].info, maxNumParticles, emitRate, false);
+		particle_system::initializeAsMesh(sizeof(boid_particle_data), cartoonMesh->mesh, cartoonMesh->submeshes[0].info, maxNumParticles, emitRate, sort_mode_none);
 
 		material = make_ref<boid_material>();
 

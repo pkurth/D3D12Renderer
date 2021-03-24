@@ -3,6 +3,7 @@
 #include "dx_pipeline.h"
 #include "dx_command_list.h"
 #include "dx_barrier_batcher.h"
+#include "dx_profiling.h"
 #include "random.h"
 
 #include "bitonic_sort_rs.hlsli"
@@ -75,26 +76,33 @@ static std::pair<uint32, uint32> getAlignedMaxNumElementsAndNumIterations(uint32
 	return { alignedMaxNumElements, maxNumIterations };
 }
 
-static void bitonicSortInternal(dx_command_list* cl, const ref<dx_buffer>& sortBuffer, const ref<dx_buffer>& comparisonBuffer, 
+static void bitonicSortInternal(dx_command_list* cl,
+	const ref<dx_buffer>& sortBuffer, uint32 sortBufferOffset,
+	const ref<dx_buffer>& comparisonBuffer, uint32 comparisonBufferOffset, 
 	const ref<dx_buffer>& counterBuffer, bitonic_sort_cb cb, uint32 alignedMaxNumElements,
 	const dx_pipeline& preSortPipeline, const dx_pipeline& outerSortPipeline, const dx_pipeline& innerSortPipeline)
 {
+	DX_PROFILE_BLOCK(cl, "Bitonic sort");
+
 	// ----------------------------------------
 	// START
 	// ----------------------------------------
 
-	cl->setPipelineState(*startSortPipeline.pipeline);
-	cl->setComputeRootSignature(*startSortPipeline.rootSignature);
+	{
+		DX_PROFILE_BLOCK(cl, "Start");
 
-	cl->setCompute32BitConstants(BITONIC_SORT_RS_CB, cb);
-	cl->setRootComputeUAV(BITONIC_SORT_RS_DISPATCH, dispatchBuffer);
-	cl->setRootComputeSRV(BITONIC_SORT_RS_COUNTER_BUFFER, counterBuffer);
+		cl->setPipelineState(*startSortPipeline.pipeline);
+		cl->setComputeRootSignature(*startSortPipeline.rootSignature);
 
-	cl->dispatch(1);
-	barrier_batcher(cl)
-		//.uav(dispatchBuffer)
-		.transition(dispatchBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
+		cl->setCompute32BitConstants(BITONIC_SORT_RS_CB, cb);
+		cl->setRootComputeUAV(BITONIC_SORT_RS_DISPATCH, dispatchBuffer);
+		cl->setRootComputeSRV(BITONIC_SORT_RS_COUNTER_BUFFER, counterBuffer);
 
+		cl->dispatch(1);
+		barrier_batcher(cl)
+			//.uav(dispatchBuffer)
+			.transition(dispatchBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
+	}
 
 
 	// ----------------------------------------
@@ -107,17 +115,23 @@ static void bitonicSortInternal(dx_command_list* cl, const ref<dx_buffer>& sortB
 	// Since the root signatures between all stages are identical, we don't need to switch between them and don't need to rebind the root arguments.
 	// The only thing we need to bind here is the sort buffer, since this is not needed in the start stage.
 
-	cl->setPipelineState(*preSortPipeline.pipeline);
-
-	cl->setRootComputeUAV(BITONIC_SORT_RS_SORT_BUFFER, sortBuffer);
-	if (comparisonBuffer)
 	{
-		cl->setRootComputeUAV(BITONIC_SORT_RS_COMPARISON_BUFFER, comparisonBuffer);
+		DX_PROFILE_BLOCK(cl, "Pre sort");
+
+		cl->setPipelineState(*preSortPipeline.pipeline);
+
+		cl->setRootComputeUAV(BITONIC_SORT_RS_SORT_BUFFER, sortBuffer->gpuVirtualAddress + sortBufferOffset);
+		if (comparisonBuffer)
+		{
+			cl->setRootComputeUAV(BITONIC_SORT_RS_COMPARISON_BUFFER, comparisonBuffer->gpuVirtualAddress + comparisonBufferOffset);
+		}
+
+		cl->dispatchIndirect(1, dispatchBuffer, 0);
+
+		barrier_batcher(cl)
+			.uav(sortBuffer)
+			.uav(comparisonBuffer);
 	}
-
-	cl->dispatchIndirect(1, dispatchBuffer, 0);
-	cl->uavBarrier(sortBuffer);
-
 
 
 
@@ -129,55 +143,73 @@ static void bitonicSortInternal(dx_command_list* cl, const ref<dx_buffer>& sortB
 
 	for (uint32 k = 4096; k <= alignedMaxNumElements; k *= 2)
 	{
+		DX_PROFILE_BLOCK(cl, "Outer sort");
+
 		cl->setPipelineState(*outerSortPipeline.pipeline);
 
 		for (uint32 j = k / 2; j >= 2048; j /= 2)
 		{
 			cl->setCompute32BitConstants(BITONIC_SORT_RS_KJ, bitonic_sort_kj_cb{ k, j });
 			cl->dispatchIndirect(1, dispatchBuffer, indirectArgsOffset);
-			cl->uavBarrier(sortBuffer);
+			
+			barrier_batcher(cl)
+				.uav(sortBuffer)
+				.uav(comparisonBuffer);
+
 			indirectArgsOffset += 12;
 		}
+
+
+		DX_PROFILE_BLOCK(cl, "Inner sort");
 
 		cl->setPipelineState(*innerSortPipeline.pipeline);
 
 		cl->dispatchIndirect(1, dispatchBuffer, indirectArgsOffset);
-		cl->uavBarrier(sortBuffer);
+
+		barrier_batcher(cl)
+			.uav(sortBuffer)
+			.uav(comparisonBuffer);
+
 		indirectArgsOffset += 12;
 	}
 
 	cl->transitionBarrier(dispatchBuffer, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 }
 
-void bitonicSortUint(dx_command_list* cl, const ref<dx_buffer>& sortBuffer, const ref<dx_buffer>& counterBuffer, uint32 counterBufferOffset, bool sortAscending)
+void bitonicSortUint(dx_command_list* cl,
+	const ref<dx_buffer>& sortKeysAndValues, uint32 sortOffset, uint32 maxNumElements,
+	const ref<dx_buffer>& counterBuffer, uint32 counterBufferOffset, bool sortAscending)
 {
-	assert(sortBuffer->elementSize == 4);
-
-	uint32 maxNumElements = sortBuffer->elementCount;
+	assert(sortOffset % sizeof(uint32) == 0);
+	assert(counterBufferOffset % sizeof(uint32) == 0);
 
 	auto [alignedMaxNumElements, maxNumIterations] = getAlignedMaxNumElementsAndNumIterations(maxNumElements);
 	bitonic_sort_cb cb;
 	cb.maxNumIterations = maxNumIterations;
-	cb.counterOffset = counterBufferOffset;
+	cb.counterOffset = counterBufferOffset / sizeof(uint32);
 	cb.nullUint = sortAscending ? 0xffffffff : 0;
 
-	bitonicSortInternal(cl, sortBuffer, 0, counterBuffer, cb, alignedMaxNumElements, preSortUintPipeline, outerSortUintPipeline, innerSortUintPipeline);
+	bitonicSortInternal(cl, sortKeysAndValues, sortOffset, 0, 0, 
+		counterBuffer, cb, alignedMaxNumElements, preSortUintPipeline, outerSortUintPipeline, innerSortUintPipeline);
 }
 
-void bitonicSortFloat(dx_command_list* cl, const ref<dx_buffer>& sortBuffer, const ref<dx_buffer>& comparisonBuffer, const ref<dx_buffer>& counterBuffer, uint32 counterBufferOffset, bool sortAscending)
+void bitonicSortFloat(dx_command_list* cl,
+	const ref<dx_buffer>& sortKeys, uint32 sortKeyOffset,
+	const ref<dx_buffer>& sortValues, uint32 sortValueOffset, uint32 maxNumElements,
+	const ref<dx_buffer>& counterBuffer, uint32 counterBufferOffset, bool sortAscending)
 {
-	assert(sortBuffer->elementSize == 4);
-	assert(comparisonBuffer->elementSize == 4);
-
-	uint32 maxNumElements = max(sortBuffer->elementCount, comparisonBuffer->elementCount);
+	assert(sortKeyOffset % sizeof(float) == 0);
+	assert(sortValueOffset % sizeof(uint32) == 0);
+	assert(counterBufferOffset % sizeof(uint32) == 0);
 
 	auto [alignedMaxNumElements, maxNumIterations] = getAlignedMaxNumElementsAndNumIterations(maxNumElements);
 	bitonic_sort_cb cb;
 	cb.maxNumIterations = maxNumIterations;
-	cb.counterOffset = counterBufferOffset;
+	cb.counterOffset = counterBufferOffset / sizeof(uint32);
 	cb.nullFloat = sortAscending ? FLT_MAX : -FLT_MAX;
 
-	bitonicSortInternal(cl, sortBuffer, comparisonBuffer, counterBuffer, cb, alignedMaxNumElements, preSortFloatPipeline, outerSortFloatPipeline, innerSortFloatPipeline);
+	bitonicSortInternal(cl, sortValues, sortValueOffset, sortKeys, sortKeyOffset, 
+		counterBuffer, cb, alignedMaxNumElements, preSortFloatPipeline, outerSortFloatPipeline, innerSortFloatPipeline);
 }
 
 void testBitonicSortUint(uint32 numElements, bool ascending)
@@ -202,7 +234,7 @@ void testBitonicSortUint(uint32 numElements, bool ascending)
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 	
-	bitonicSortUint(cl, list, counter, 0, ascending);
+	bitonicSortUint(cl, list, 0, numElements, counter, 0, ascending);
 	cl->transitionBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
 	cl->transitionBarrier(dispatchBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
 	cl->copyResource(dispatchBuffer->resource, dispatchReadback->resource);
@@ -269,7 +301,7 @@ void testBitonicSortFloat(uint32 numElements, bool ascending)
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
-	bitonicSortFloat(cl, valuesList, keysList, counter, 0, ascending);
+	bitonicSortFloat(cl, keysList, 0, valuesList, 0, numElements, counter, 0, ascending);
 	cl->transitionBarrier(valuesList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
 	cl->transitionBarrier(keysList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
 	cl->transitionBarrier(dispatchBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);

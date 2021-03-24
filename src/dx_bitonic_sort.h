@@ -5,15 +5,25 @@ struct dx_buffer;
 
 void initializeBitonicSort();
 
-// With the variant 'bitonicSortUint' you can sort a uint-buffer. This way you can for example pack your key (the thing you want to sort by) in the upper
-// bits and the value (e.g. the index to your item) in the lower bits. Note that this requires that the keys are ints, since the sorting is done on the whole
-// uint. You cannot e.g. pack a half into the upper bits.
-// With 'bitonicSortFloat' you provide a sortBuffer and a comparisonBuffer. The comparisonBuffer contains the values to sort, while the sortBuffer contains 
-// the corresponding values. 
+// These functions sort a buffer of values based on a key. The currently supported variants are:
+// - bitonicSortUint: Key and value are packed into a single uint. The sorting algorithm will simply sort this buffer. The user must pack the key into
+//	 the most significant and the value into the least significant bits (how many bits the two take is up to you). 
+//   Since the values are sorted as uints, you have to make sure that your key is sortable when interpreted as a uint.
+// - bitonicSortFloat: Here you provide two buffers, one with the values (32 bit indices) and one with the keys (32 bit floats). The buffers will be sorted
+//   based on the keys.
+// 
+// The input buffers for keys and values are expected to be in the resource state D3D12_RESOURCE_STATE_UNORDERED_ACCESS. They also return in this state.
+// It is expected that you have a GPU-visible buffer containing the number of elements to sort (counterBuffer). counterBufferOffset is a byte-offset into this
+// buffer to the location where the count sits.
+// The count does not need to be a power of two.
 
-// sortBuffer is the buffer to sort. It is expected that this buffer is in state D3D12_RESOURCE_STATE_UNORDERED_ACCESS.
-void bitonicSortUint(dx_command_list* cl, const ref<dx_buffer>& sortBuffer, const ref<dx_buffer>& counterBuffer, uint32 counterBufferOffset, bool sortAscending);
-void bitonicSortFloat(dx_command_list* cl, const ref<dx_buffer>& sortBuffer, const ref<dx_buffer>& comparisonBuffer, const ref<dx_buffer>& counterBuffer, uint32 counterBufferOffset, bool sortAscending);
+void bitonicSortUint(dx_command_list* cl, 
+	const ref<dx_buffer>& sortKeysAndValues, uint32 sortOffset, uint32 maxNumElements, 
+	const ref<dx_buffer>& counterBuffer, uint32 counterBufferOffset, bool sortAscending);
+void bitonicSortFloat(dx_command_list* cl, 
+	const ref<dx_buffer>& sortKeys, uint32 sortKeyOffset, 
+	const ref<dx_buffer>& sortValues, uint32 sortValueOffset, uint32 maxNumElements, 
+	const ref<dx_buffer>& counterBuffer, uint32 counterBufferOffset, bool sortAscending);
 
 // Internal test functions.
 void testBitonicSortUint(uint32 numElements, bool ascending);

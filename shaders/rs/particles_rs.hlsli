@@ -52,7 +52,8 @@ struct particle_sim_cb
     "UAV(u3, space=1), " \
     "UAV(u4, space=1), " \
     "UAV(u5, space=1), " \
-    "UAV(u6, space=1)"
+    "UAV(u6, space=1), " \
+    "UAV(u7, space=1)"
 	
 
 #define PARTICLE_COMPUTE_RS_CB					0
@@ -63,8 +64,9 @@ struct particle_sim_cb
 #define PARTICLE_COMPUTE_RS_DEAD_LIST			5
 #define PARTICLE_COMPUTE_RS_CURRENT_ALIVE		6
 #define PARTICLE_COMPUTE_RS_NEW_ALIVE			7
+#define PARTICLE_COMPUTE_RS_SORT_KEY			8
 
-#define PARTICLE_COMPUTE_RS_COUNT				(PARTICLE_COMPUTE_RS_NEW_ALIVE + 1)
+#define PARTICLE_COMPUTE_RS_COUNT				(PARTICLE_COMPUTE_RS_SORT_KEY + 1)
 
 
 

@@ -5,13 +5,20 @@
 
 struct dx_command_list;
 
+enum sort_mode
+{
+	sort_mode_none,
+	sort_mode_front_to_back,
+	sort_mode_back_to_front,
+};
+
 struct particle_system
 {
 	float emitRate;
 
 protected:
-	void initializeAsBillboard(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, bool requiresSorting);
-	void initializeAsMesh(uint32 particleStructSize, dx_mesh mesh, submesh_info submesh, uint32 maxNumParticles, float emitRate, bool requiresSorting);
+	void initializeAsBillboard(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, sort_mode sortMode = sort_mode_none);
+	void initializeAsMesh(uint32 particleStructSize, dx_mesh mesh, submesh_info submesh, uint32 maxNumParticles, float emitRate, sort_mode sortMode = sort_mode_none);
 
 	void update(float dt, const struct dx_pipeline& emitPipeline, const struct dx_pipeline& simulatePipeline);
 
@@ -26,12 +33,12 @@ protected:
 private:
 	static void initializePipeline();
 
-	void initializeInternal(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, submesh_info submesh, bool requiresSorting);
+	void initializeInternal(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, submesh_info submesh, sort_mode sortMode);
 
 	void setResources(dx_command_list* cl, const struct particle_sim_cb& cb, uint32 offset, bool setUserResources);
 	uint32 getAliveListOffset(uint32 alive);
 	uint32 getDeadListOffset();
-	uint32 getNumUserRootParameters(const struct dx_pipeline& pipeline, bool requiresSorting);
+	uint32 getNumUserRootParameters(const struct dx_pipeline& pipeline);
 
 	uint32 maxNumParticles;
 	uint32 currentAlive = 0;
@@ -39,8 +46,9 @@ private:
 	ref<dx_buffer> particlesBuffer;
 	ref<dx_buffer> listBuffer; // Counters, dead, alive 0, alive 1.
 	ref<dx_buffer> dispatchBuffer;
+	ref<dx_buffer> sortBuffer;
 
-	bool requiresSorting;
+	sort_mode sortMode;
 
 	uint32 index;
 
