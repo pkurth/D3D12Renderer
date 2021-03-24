@@ -30,7 +30,7 @@ void main(cs_input IN)
 
 	float dt = simCB.dt;
 
-	uint index = currentAliveList[i] & 0xFFFF; // Mask out sort key.
+	uint index = currentAliveList[i];
 
 	particle_data particle = particles[index];
 

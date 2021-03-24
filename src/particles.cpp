@@ -39,10 +39,6 @@ void particle_system::initializeInternal(uint32 particleStructSize, uint32 maxNu
 	this->submesh = submesh;
 	this->sortMode = sortMode;
 
-	if (sortMode != sort_mode_none)
-	{
-		assert(maxNumParticles <= 0xFFFF); // If sorting, 16 bit are reserved for the sort key. TODO: If this becomes a problem, we could dynamically switch to a 64 bit version here or smth else.
-	}
 
 	std::vector<uint32> dead(maxNumParticles);
 
