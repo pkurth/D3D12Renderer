@@ -17,6 +17,8 @@ struct smoke_particle_cb
 	// Simulation.
 	vec3 emitPosition;
 	uint32 frameIndex;
+	vec3 cameraPosition;
+	uint32 padding;
 	spline(float, 8) lifeScaleFromDistance;
 
 	// Rendering.
@@ -30,6 +32,8 @@ struct smoke_particle_cb
 #endif
 
 #ifdef PARTICLE_SIMULATION
+
+#define REQUIRES_SORTING
 
 #define USER_PARTICLE_SIMULATION_RS \
 	"CBV(b0)"
@@ -66,7 +70,7 @@ static particle_data emitParticle(uint emitIndex)
 	return particle;
 }
 
-static bool simulateParticle(inout particle_data particle, float dt)
+static bool simulateParticle(inout particle_data particle, float dt, out float sortKey)
 {
 	float life = unpackHalfsRight(particle.maxLife_life);
 	life -= dt;
@@ -81,6 +85,9 @@ static bool simulateParticle(inout particle_data particle, float dt)
 		particle.velocity = particle.velocity + gravity;
 		float maxLife = unpackHalfsLeft(particle.maxLife_life);
 		particle.maxLife_life = packHalfs(maxLife, life);
+
+		float3 V = particle.position - cb.cameraPosition;
+		sortKey = dot(V, V);
 
 		return true;
 	}

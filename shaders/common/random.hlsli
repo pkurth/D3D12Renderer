@@ -104,11 +104,17 @@ static uint initRand(uint val0, uint val1, uint backoff = 16)
 	return v0;
 }
 
-// Takes our seed, updates it, and returns a pseudorandom float in [0..1].
+// Returns a pseudorandom float in [0..1].
 static float nextRand(inout uint s)
 {
 	s = (1664525u * s + 1013904223u);
 	return float(s & 0x00FFFFFF) / float(0x01000000);
+}
+
+// Returns a pseudorandom float in [lo..hi].
+static float nextRandBetween(inout uint s, float lo, float hi)
+{
+	return nextRand(s) * (hi - lo) + lo;
 }
 
 // Utility function to get a vector perpendicular to an input vector 

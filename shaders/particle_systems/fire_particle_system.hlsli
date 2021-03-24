@@ -5,7 +5,7 @@ struct fire_particle_data
 {
 	vec3 position;
 	uint32 maxLife_life;
-	vec3 velocity;
+	vec3 startVelocity;
 	uint32 sinAngle_cosAngle;
 };
 
@@ -19,9 +19,9 @@ struct fire_particle_cb
 	uint32 frameIndex; 
 	vec3 cameraPosition;
 	uint32 padding;
-	spline(float, 8) lifeScaleFromDistance;
 
 	// Rendering.
+	spline(float, 4) sizeOverLifetime;
 	spline(float, 4) intensityOverLifetime;
 	spline(float, 4) atlasProgressionOverLifetime;
 	texture_atlas_cb atlas;
@@ -29,6 +29,13 @@ struct fire_particle_cb
 
 #ifdef HLSL
 #define particle_data fire_particle_data
+
+static float getRelLife(float life, float maxLife)
+{
+	float relLife = saturate((maxLife - life) / maxLife);
+	return relLife;
+}
+
 #endif
 
 #ifdef PARTICLE_SIMULATION
@@ -44,17 +51,14 @@ static particle_data emitParticle(uint emitIndex)
 {
 	uint rng = initRand(emitIndex, cb.frameIndex);
 
-	const float radius = 4.f;
+	float radiusAtDistanceOne = 0.1f;
+	float2 diskPoint = getRandomPointOnDisk(rng, radiusAtDistanceOne);
 
-	float2 offset2D = getRandomPointOnDisk(rng, radius);
-	float3 offset = float3(offset2D.x, nextRand(rng) * 0.5f, offset2D.y);
-	float3 position = cb.emitPosition + offset;
-	float3 velocity = float3(nextRand(rng), nextRand(rng) * 3.f + 4.f, nextRand(rng));
+	float3 position = cb.emitPosition;
+	float3 velocity = normalize(float3(1.f, diskPoint.x, diskPoint.y)) * 2.f;
+	velocity.z *= 3.f;
 
-	float distance = saturate(length(offset.xz) / radius);
-	float lifeScale = cb.lifeScaleFromDistance.evaluate(8, distance);
-
-	float maxLife = nextRand(rng) * 5.f * lifeScale + 3.f;
+	float maxLife = nextRandBetween(rng, 1.5f, 2.5f);
 
 	float angle = nextRand(rng) * 2.f * pi;
 	float sinAngle, cosAngle;
@@ -80,10 +84,14 @@ static bool simulateParticle(inout particle_data particle, float dt, out float s
 	}
 	else
 	{
-		float3 gravity = float3(0.f, -1.f * dt, 0.f);
-		particle.position = particle.position + 0.5f * gravity * dt + particle.velocity * dt;
-		particle.velocity = particle.velocity + gravity;
 		float maxLife = unpackHalfsLeft(particle.maxLife_life);
+		float relLife = getRelLife(life, maxLife);
+
+		float3 velocity = particle.startVelocity;
+		velocity.y += smoothstep(0.45f, 0.6f, relLife) * 4.f;
+		velocity.x += smoothstep(0.8f, 0.f, relLife) * 8.f;
+
+		particle.position = particle.position + velocity * dt;
 		particle.maxLife_life = packHalfs(maxLife, life);
 
 		float3 V = particle.position - cb.cameraPosition;
@@ -120,7 +128,10 @@ struct vs_input
 struct vs_output
 {
 	float intensity			: INTENSITY;
-	float2 uv				: TEXCOORDS;
+	float2 uv0				: TEXCOORDS0;
+	float2 uv1				: TEXCOORDS1;
+	float uvBlend			: BLEND;
+	float alphaScale		: ALPHASCALE;
 	float4 position			: SV_Position;
 };
 
@@ -130,25 +141,8 @@ ConstantBuffer<camera_cb> camera		: register(b1);
 Texture2D<float4> tex					: register(t0);
 SamplerState texSampler					: register(s0);
 
-
-static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> particles, uint index)
+static float2 getUVs(texture_atlas_cb atlas, uint atlasIndex, float2 originalUV)
 {
-	float3 pos = particles[index].position;
-
-	uint maxLife_life = particles[index].maxLife_life;
-	float life = unpackHalfsRight(maxLife_life);
-	float maxLife = unpackHalfsLeft(maxLife_life);
-	float relLife = clamp((maxLife - life) / 3, 0.01f, 0.99f);
-
-	float2 rotation; // Sin(angle), cos(angle).
-	unpackHalfs(particles[index].sinAngle_cosAngle, rotation.x, rotation.y);
-
-	float2 localPosition = IN.position.xy * 1.f;
-	localPosition = float2(dot(localPosition, float2(rotation.y, -rotation.x)), dot(localPosition, rotation));
-	pos += localPosition.x * camera.right.xyz + localPosition.y * camera.up.xyz;
-
-	texture_atlas_cb atlas = cb.atlas;
-	uint atlasIndex = cb.atlasProgressionOverLifetime.evaluate(4, relLife) * (atlas.getTotalNumCells() - 1);
 	uint x = atlas.getX(atlasIndex);
 	uint y = atlas.getY(atlasIndex);
 
@@ -157,19 +151,49 @@ static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> parti
 	float2 uv0 = float2(x * invCols, y * invRows);
 	float2 uv1 = float2((x + 1) * invCols, (y + 1) * invRows);
 
+	return lerp(uv0, uv1, originalUV);
+}
+
+static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> particles, uint index)
+{
+	float3 pos = particles[index].position;
+
+	uint maxLife_life = particles[index].maxLife_life;
+	float life, maxLife;
+	unpackHalfs(maxLife_life, maxLife, life);
+	float relLife = getRelLife(life, maxLife);
+
+	float2 rotation; // Sin(angle), cos(angle).
+	unpackHalfs(particles[index].sinAngle_cosAngle, rotation.x, rotation.y);
+
+	float size = cb.sizeOverLifetime.evaluate(4, relLife);
+	float2 localPosition = IN.position.xy * size;
+	localPosition = float2(dot(localPosition, float2(rotation.y, -rotation.x)), dot(localPosition, rotation));
+	pos += localPosition.x * camera.right.xyz + localPosition.y * camera.up.xyz;
+
+	texture_atlas_cb atlas = cb.atlas;
+	float atlasProgression = cb.atlasProgressionOverLifetime.evaluate(4, relLife);
+	float atlasIndex = atlasProgression * (atlas.getTotalNumCells() - 1);
+	float2 originalUV = IN.position.xy * 0.5f + 0.5f;
 
 	vs_output OUT;
 	OUT.position = mul(camera.viewProj, float4(pos, 1.f));
-	OUT.uv = lerp(uv0, uv1, IN.position.xy * 0.5f + 0.5f);
 	OUT.intensity = 20 * cb.intensityOverLifetime.evaluate(4, relLife);
+
+	OUT.uv0 = getUVs(atlas, (uint)atlasIndex, originalUV);
+	OUT.uv1 = getUVs(atlas, (uint)atlasIndex + 1, originalUV);
+	OUT.uvBlend = 1.f - frac(atlasIndex);
+
+	OUT.alphaScale = 1.f - smoothstep(0.9f, 1.f, atlasProgression);
+
 	return OUT;
 }
 
 static float4 pixelShader(vs_output IN)
 {
-	float4 color = tex.Sample(texSampler, IN.uv);
-	color.rgb *= IN.intensity;
-	return color;
+	float4 color = lerp(tex.Sample(texSampler, IN.uv0), tex.Sample(texSampler, IN.uv1), IN.uvBlend);
+	float3 emission = color.rgb * float3(0.75f, 0.25f, 0.09f) * IN.intensity;
+	return mergeAlphaBlended(color.rgb, (float3)0.f, emission, color.a * IN.alphaScale);
 }
 
 #endif

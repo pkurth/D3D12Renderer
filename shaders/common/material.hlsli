@@ -250,5 +250,15 @@ struct pbr_decal_cb
 };
 
 
+// Alpha-blending performs the following operation: final = alpha * src + (1 - alpha) * dest.
+// The factor on the destination-color is correct, and so is the factor on the diffuse part of the source-color.
+// However emission and specular light should not be modulated by alpha, since these components are not affected by transparency.
+// To counteract the hardware alpha-blending for these components, we pre-divide them by alpha.
+
+static vec4 mergeAlphaBlended(vec3 diffuse, vec3 specular, vec3 emission, float alpha)
+{
+	return vec4((emission + specular) * (1.f / max(alpha, 1e-5f)) + diffuse, alpha);
+}
+
 
 #endif

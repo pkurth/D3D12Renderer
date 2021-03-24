@@ -243,8 +243,8 @@ void application::initialize(dx_renderer* renderer)
 		SET_NAME(pointLightShadowInfoBuffer[i]->resource, "Point light shadow infos");
 	}
 
-	fireParticleSystem.initialize(10000, 500.f, "assets/particles/fire_explosion.tif", 6, 6);
-	//smokeParticleSystem.initialize(10000, 500.f, "assets/particles/smoke1.tif", 5, 5);
+	fireParticleSystem.initialize(10000, 50.f, "assets/particles/fire_explosion.tif", 6, 6);
+	smokeParticleSystem.initialize(10000, 500.f, "assets/particles/smoke1.tif", 5, 5);
 	boidParticleSystem.initialize(10000, 2000.f);
 }
 
@@ -381,7 +381,7 @@ static bool editFireParticleSystem(fire_particle_system& particleSystem)
 	if (ImGui::TreeNode("Fire particles"))
 	{
 		result |= ImGui::SliderFloat("Emit rate", &particleSystem.emitRate, 0.f, 1000.f);
-		result |= ImGui::Spline("Scale life based on distance", ImVec2(200, 200), particleSystem.settings.lifeScaleFromDistance);
+		result |= ImGui::Spline("Size over lifetime", ImVec2(200, 200), particleSystem.settings.sizeOverLifetime);
 		result |= ImGui::Spline("Atlas progression over lifetime", ImVec2(200, 200), particleSystem.settings.atlasProgressionOverLifetime);
 		result |= ImGui::Spline("Intensity over lifetime", ImVec2(200, 200), particleSystem.settings.intensityOverLifetime);
 
@@ -954,6 +954,7 @@ void application::update(const user_input& input, float dt)
 	// Particles.
 
 	fireParticleSystem.settings.cameraPosition = camera.position;
+	smokeParticleSystem.settings.cameraPosition = camera.position;
 
 	boidParticleSystem.update(dt);
 	boidParticleSystem.render(&transparentRenderPass);
@@ -961,8 +962,8 @@ void application::update(const user_input& input, float dt)
 	fireParticleSystem.update(dt);
 	fireParticleSystem.render(&transparentRenderPass);
 
-	//smokeParticleSystem.update(dt);
-	//smokeParticleSystem.render(&transparentRenderPass);
+	smokeParticleSystem.update(dt);
+	smokeParticleSystem.render(&transparentRenderPass);
 
 
 	sun.updateMatrices(camera);

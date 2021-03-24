@@ -61,8 +61,21 @@ void fire_particle_system::initialize(uint32 maxNumParticles, float emitRate, co
 	material->atlas.cols = cols;
 	material->atlas.rows = rows;
 
-	settings.emitPosition = vec3(0.f, 20.f, -10.f); // TEMPORARY.
 	settings.atlas.initialize(rows, cols);
+
+	settings.emitPosition = vec3(0.f, 20.f, -10.f); // TEMPORARY.
+
+	settings.sizeOverLifetime.values[0] = 0.25f;
+	settings.sizeOverLifetime.values[1] = 0.7f;
+
+	settings.intensityOverLifetime.ts[0] = 0.f;
+	settings.intensityOverLifetime.ts[1] = 0.1f;
+	settings.intensityOverLifetime.ts[2] = 0.25f;
+	settings.intensityOverLifetime.ts[3] = 1.f;
+	settings.intensityOverLifetime.values[0] = 0.f;
+	settings.intensityOverLifetime.values[1] = 0.8f;
+	settings.intensityOverLifetime.values[2] = 0.9f;
+	settings.intensityOverLifetime.values[3] = 1.f;
 }
 
 void fire_particle_system::update(float dt)

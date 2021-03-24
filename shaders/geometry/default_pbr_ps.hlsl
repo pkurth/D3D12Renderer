@@ -284,16 +284,10 @@ ps_output main(ps_input IN)
 	OUT.hdrColor.rgb += surface.emission;
 
 	OUT.worldNormal = packNormal(surface.N);
-	OUT.reflectance = float4(factors.ks, surface.roughness); // Temporary: Up-facing surfaces get more reflective:  * (1.f - surface.N.y)
+	OUT.reflectance = float4(factors.ks, surface.roughness);
 #else
 
-	// Alpha-blending performs the following operation: final = alpha * src + (1 - alpha) * dest.
-	// The factor on the destination-color is correct, and so is the factor on the diffuse part of the source-color.
-	// However emission and specular light should not be modulated by alpha, since these components are not affected by transparency.
-	// To counteract the hardware alpha-blending for these components, we pre-divide them by alpha.
-	OUT.hdrColor.rgb = (totalLighting.specular + surface.emission) * (1.f / max(surface.albedo.a, 1e-5f));
-	OUT.hdrColor.rgb += totalLighting.diffuse * surface.albedo.rgb;
-	OUT.hdrColor.a = surface.albedo.a;
+	OUT.hdrColor = mergeAlphaBlended(totalLighting.diffuse * surface.albedo.rgb, totalLighting.specular, surface.emission, surface.albedo.a);
 
 	// Normal and reflectance are not needed for transparent surfaces.
 #endif
