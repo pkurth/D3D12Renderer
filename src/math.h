@@ -191,15 +191,15 @@ static T evaluateSpline(const float* ts, const T* values, int32 num, float t)
 
 // maxNumPoints must be a multiple of 4!
 // If you want to use this in a shader constant buffer, data_type can currently be either float or vec4.
-template <typename data_type, uint32 maxNumPoints>
+template <typename data_type, uint32 maxNumPoints_>
 struct alignas(16) catmull_rom_spline
 {
-	static_assert(maxNumPoints > 0 && maxNumPoints % 4 == 0, "Spline max num points must be divisible by 4.");
+	static_assert(maxNumPoints_ > 0 && maxNumPoints_ % 4 == 0, "Spline max num points must be divisible by 4.");
 
-	float ts[maxNumPoints];
-	data_type values[maxNumPoints];
+	float ts[maxNumPoints_];
+	data_type values[maxNumPoints_];
 
-	enum { maxNumPoints };
+	enum { maxNumPoints = maxNumPoints_ };
 
 	catmull_rom_spline()
 	{
