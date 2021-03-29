@@ -649,6 +649,25 @@ quat eulerToQuat(vec3 euler)
 	return q;
 }
 
+mat3 outerProduct(vec3 a, vec3 b)
+{
+	vec3 col0 = a * b.x;
+	vec3 col1 = a * b.y;
+	vec3 col2 = a * b.z;
+
+	mat3 result;
+	result.m00 = col0.x;
+	result.m10 = col0.y;
+	result.m20 = col0.z;
+	result.m01 = col1.x;
+	result.m11 = col1.y;
+	result.m21 = col1.z;
+	result.m02 = col2.x;
+	result.m12 = col2.y;
+	result.m22 = col2.z;
+	return result;
+}
+
 mat4 createPerspectiveProjectionMatrix(float fov, float aspect, float nearPlane, float farPlane)
 {
 	mat4 result = mat4::identity;

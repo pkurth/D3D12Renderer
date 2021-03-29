@@ -31,6 +31,14 @@ struct bounding_sphere
 {
 	vec3 center;
 	float radius;
+
+	float volume()
+	{
+		float sqRadius = radius * radius;
+		float sqRadiusPI = M_PI * sqRadius;
+		float sphereVolume = 4.f / 3.f * sqRadiusPI * radius;
+		return sphereVolume;
+	}
 };
 
 struct bounding_capsule
@@ -38,6 +46,16 @@ struct bounding_capsule
 	vec3 positionA;
 	vec3 positionB;
 	float radius;
+
+	float volume()
+	{
+		float sqRadius = radius * radius;
+		float sqRadiusPI = M_PI * sqRadius;
+		float sphereVolume = 4.f / 3.f * sqRadiusPI * radius;
+		float height = length(positionA - positionB);
+		float cylinderVolume = sqRadiusPI * height;
+		return sphereVolume + cylinderVolume;
+	}
 };
 
 struct bounding_cylinder
@@ -90,6 +108,12 @@ struct bounding_box
 	static bounding_box negativeInfinity();
 	static bounding_box fromMinMax(vec3 minCorner, vec3 maxCorner);
 	static bounding_box fromCenterRadius(vec3 center, vec3 radius);
+
+	float volume()
+	{
+		vec3 extents = getRadius() * 2.f;
+		return extents.x * extents.y * extents.z;
+	}
 };
 
 struct bounding_hull

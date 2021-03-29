@@ -755,6 +755,8 @@ quat mat3ToQuaternion(const mat3& m);
 vec3 quatToEuler(quat q);
 quat eulerToQuat(vec3 euler);
 
+mat3 outerProduct(vec3 a, vec3 b);
+
 mat4 trsToMat4(const trs& transform);
 
 mat4 createPerspectiveProjectionMatrix(float fov, float aspect, float nearPlane, float farPlane);

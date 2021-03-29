@@ -4,7 +4,6 @@
 //#include <entt/entt.hpp>
 #include <entt/entity/registry.hpp>
 
-
 struct tag_component
 {
 	char name[16];
@@ -21,6 +20,7 @@ struct scene_entity
 	scene_entity() = default;
 	inline scene_entity(entt::entity handle, struct scene& scene);
 	inline scene_entity(uint32 id, struct scene& scene);
+	scene_entity(entt::entity handle, entt::registry* registry) : handle(handle), registry(registry) {}
 	scene_entity(const scene_entity&) = default;
 
 	template <typename component_t>
@@ -32,7 +32,42 @@ struct scene_entity
 	template <typename component_t, typename... args>
 	scene_entity& addComponent(args&&... a)
 	{
-		registry->emplace<component_t>(handle, std::forward<args>(a)...);
+		if constexpr (std::is_same_v<component_t, struct collider_component>)
+		{
+			if (!hasComponent<collider_reference_component>())
+			{
+				addComponent<collider_reference_component>(registry);
+			}
+
+			collider_reference_component& reference = getComponent<collider_reference_component>();
+			++reference.numColliders;
+
+			entt::entity child = registry->create();
+			collider_component& collider = registry->emplace<collider_component>(child, std::forward<args>(a)...);
+
+			collider.parentEntity = handle;
+			collider.nextColliderEntity = reference.firstColliderEntity;
+			reference.firstColliderEntity = child;
+
+
+			if (hasComponent<rigid_body_component>())
+			{
+				getComponent<rigid_body_component>().recalculateProperties(reference);
+			}
+		}
+		else
+		{
+			auto& component = registry->emplace<component_t>(handle, std::forward<args>(a)...);
+
+			if constexpr (std::is_same_v<component_t, struct rigid_body_component>)
+			{
+				if (hasComponent<collider_reference_component>())
+				{
+					component.recalculateProperties(getComponent<collider_reference_component>());
+				}
+			}
+		}
+
 		return *this;
 	}
 
@@ -73,9 +108,10 @@ private:
 	entt::registry* registry;
 
 
-	scene_entity(entt::entity handle, entt::registry* registry) : handle(handle), registry(registry) {}
+	scene_entity(uint32 id, entt::registry* reg) : handle((entt::entity)id), registry(reg) {}
 
 	friend struct scene;
+	friend void onColliderAdded(entt::registry& registry, entt::entity entityHandle);
 };
 
 struct scene
@@ -133,6 +169,12 @@ struct scene
 		registry.each(func);
 	}
 
+	template <typename component_t>
+	uint32 numberOfComponentsOfType()
+	{
+		return (uint32)registry.size<component_t>();
+	}
+
 private:
 	entt::registry registry;
 
@@ -141,6 +183,3 @@ private:
 
 inline scene_entity::scene_entity(entt::entity handle, struct scene& scene) : handle(handle), registry(&scene.registry) {}
 inline scene_entity::scene_entity(uint32 id, struct scene& scene) : handle((entt::entity)id), registry(&scene.registry) {}
-
-
-

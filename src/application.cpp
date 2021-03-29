@@ -7,6 +7,7 @@
 #include "imgui.h"
 #include "dx_context.h"
 #include "skinning.h"
+#include "physics.h"
 #include "threading.h"
 #include "mesh_shader.h"
 #include "shadow_map_cache.h"
@@ -141,6 +142,10 @@ void application::initialize(dx_renderer* renderer)
 	}
 #endif
 
+
+#if 1
+
+#endif
 
 	// Raytracing.
 	if (dxContext.raytracingSupported)
@@ -950,6 +955,7 @@ void application::update(const user_input& input, float dt)
 	objectDragged |= drawSceneHierarchy();
 	drawSettings(dt);
 	
+	physicsStep(appScene, dt);
 	
 	// Particles.
 
