@@ -76,6 +76,7 @@ static bool simulateParticle(inout particle_data particle, float dt, out float s
 	life -= dt;
 	if (life <= 0)
 	{
+		sortKey = 0;
 		return false;
 	}
 	else

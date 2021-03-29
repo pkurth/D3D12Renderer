@@ -88,7 +88,7 @@ void main(cs_input IN)
     // This is better unrolled because it reduces ALU and because some
     // architectures can load/store two LDS items in a single instruction
     // as long as their separation is a compile-time constant.
-    [unroll]
+    //[unroll]
     for (k = 2; k <= 2048; k <<= 1)
     {
         //[unroll] // This produces a compile-time error with DXC.

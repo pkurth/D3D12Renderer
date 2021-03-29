@@ -249,11 +249,8 @@ static float filmicTonemapping(float color, tonemap_cb tonemap)
 // PRESENT
 // ----------------------------------------
 
-enum present_dynamic_range
-{
-    present_sdr,
-    present_hdr,
-};
+#define present_sdr 0
+#define present_hdr 1
 
 
 struct present_cb
