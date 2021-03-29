@@ -10,6 +10,7 @@ struct rigid_body_component
 {
 	rigid_body_component(bool kinematic, float gravityFactor = 1.f);
 	void recalculateProperties(const struct collider_reference_component& colliderReference);
+	vec3 getGlobalCOGPosition(const trs& transform) const;
 
 	// In entity's local space.
 	vec3 localCOGPosition;
@@ -99,4 +100,5 @@ struct collider_reference_component
 	entt::entity firstColliderEntity = entt::null;
 };
 
+void testPhysicsInteraction(scene& appScene, ray r);
 void physicsStep(scene& appScene, float dt);

@@ -254,6 +254,29 @@ bool ray::intersectCylinder(const bounding_cylinder& cylinder, float& outT) cons
 	return y > -epsilon && y < height + epsilon;
 }
 
+bool ray::intersectCapsule(const bounding_capsule& capsule, float& outT) const
+{
+	outT = FLT_MAX;
+	float t;
+	bool result = false;
+	if (intersectCylinder(bounding_cylinder{ capsule.positionA, capsule.positionB, capsule.radius }, t))
+	{
+		outT = t;
+		result = true;
+	}
+	if (intersectSphere(bounding_sphere{ capsule.positionA, capsule.radius }, t))
+	{
+		outT = min(outT, t);
+		result = true;
+	}
+	if (intersectSphere(bounding_sphere{ capsule.positionB, capsule.radius }, t))
+	{
+		outT = min(outT, t);
+		result = true;
+	}
+	return result;
+}
+
 bool ray::intersectDisk(vec3 pos, vec3 normal, float radius, float& outT) const
 {
 	bool intersectsPlane = intersectPlane(normal, pos, outT);

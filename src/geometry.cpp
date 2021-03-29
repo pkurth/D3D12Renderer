@@ -220,7 +220,7 @@ submesh_info cpu_mesh::pushCube(vec3 radius, bool flipWindingOrder, vec3 center)
 	return result;
 }
 
-submesh_info cpu_mesh::pushSphere(uint16 slices, uint16 rows, float radius)
+submesh_info cpu_mesh::pushSphere(uint16 slices, uint16 rows, float radius, vec3 center)
 {
 	alignNextTriangle();
 
@@ -243,7 +243,7 @@ submesh_info cpu_mesh::pushSphere(uint16 slices, uint16 rows, float radius)
 	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
 	// Vertices.
-	pushVertex(vec3(0.f, -radius, 0.f), directionToPanoramaUV(vec3(0.f, -1.f, 0.f)), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+	pushVertex(center + vec3(0.f, -radius, 0.f), directionToPanoramaUV(vec3(0.f, -1.f, 0.f)), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
 	for (uint32 y = 0; y < rows; ++y)
 	{
@@ -259,11 +259,11 @@ submesh_info cpu_mesh::pushSphere(uint16 slices, uint16 rows, float radius)
 			vec3 nor(vertexX, vertexY, vertexZ);
 
 			vec2 uv = directionToPanoramaUV(nor);
-			pushVertex(pos, uv, normalize(nor), normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+			pushVertex(center + pos, uv, normalize(nor), normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
 		}
 	}
 
-	pushVertex(vec3(0.f, radius, 0.f), directionToPanoramaUV(vec3(0.f, 1.f, 0.f)), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+	pushVertex(center + vec3(0.f, radius, 0.f), directionToPanoramaUV(vec3(0.f, 1.f, 0.f)), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
 	index_t lastVertex = slices * rows + 2;
 

@@ -144,7 +144,21 @@ void application::initialize(dx_renderer* renderer)
 
 
 #if 1
+	{
+		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 
+		auto testMesh = make_ref<composite_mesh>();
+		testMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 1.f, 0.1f), {}, trs::identity, getDefaultPBRMaterial() });
+		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 0.4f, vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f)), {}, trs::identity, getDefaultPBRMaterial() });
+		testMesh->mesh = primitiveMesh.createDXMesh();
+
+		appScene.createEntity("Test")
+			.addComponent<trs>(vec3(20.f, 5.f, 0.f), quat::identity)
+			.addComponent<raster_component>(testMesh)
+			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
+			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
+			.addComponent<rigid_body_component>(false, 0.f);
+	}
 #endif
 
 	// Raytracing.
@@ -728,13 +742,22 @@ bool application::handleUserInput(const user_input& input, float dt)
 
 	if (!inputCaptured && input.mouse.left.clickEvent)
 	{
-		if (renderer->hoveredObjectID != -1)
+		// Temporary.
+		if (input.keyboard[key_shift].down)
 		{
-			setSelectedEntity({ renderer->hoveredObjectID, appScene });
+			testPhysicsInteraction(appScene, camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY));
+			objectMovedByGizmo = true;
 		}
 		else
 		{
-			setSelectedEntity({});
+			if (renderer->hoveredObjectID != -1)
+			{
+				setSelectedEntity({ renderer->hoveredObjectID, appScene });
+			}
+			else
+			{
+				setSelectedEntity({});
+			}
 		}
 		inputCaptured = true;
 	}

@@ -9,6 +9,54 @@ struct rigid_body_update
 	mat3 globalInvInertia;
 };
 
+void testPhysicsInteraction(scene& appScene, ray r)
+{
+	for (auto [entityHandle, collider] : appScene.view<collider_component>().each())
+	{
+		scene_entity rbEntity = { collider.parentEntity, appScene };
+		if (rbEntity.hasComponent<rigid_body_component>())
+		{
+			rigid_body_component& rb = rbEntity.getComponent<rigid_body_component>();
+			trs& transform = rbEntity.getComponent<trs>();
+
+			ray localR = { inverseTransformPosition(transform, r.origin), inverseTransformDirection(transform, r.direction) };
+			float t;
+			bool hit = false;
+
+			switch (collider.type)
+			{
+				case collider_type_sphere:
+				{
+					hit = localR.intersectSphere(collider.sphere, t);
+				} break;
+
+				case collider_type_capsule:
+				{
+					hit = localR.intersectCapsule(collider.capsule, t);
+				} break;
+
+				case collider_type_box:
+				{
+					hit = localR.intersectAABB(collider.box, t);
+				} break;
+			}
+
+			if (hit)
+			{
+				vec3 localHit = localR.origin + t * localR.direction;
+				vec3 globalHit = transformPosition(transform, localHit);
+
+				vec3 cogPosition = rb.getGlobalCOGPosition(transform);
+
+				vec3 force = r.direction * 300.f;
+				vec3 torque = cross(globalHit - cogPosition, force);
+				rb.torqueAccumulator += torque;
+				rb.forceAccumulator += force;
+			}
+		}
+	}
+}
+
 void physicsStep(scene& appScene, float dt)
 {
 	std::vector<rigid_body_update> rbUpdate;
@@ -23,11 +71,17 @@ void physicsStep(scene& appScene, float dt)
 		const float airDensity = 1.2f;
 		const float dragCoefficient = 0.2f;
 		float sqLinearVelocityLength = squaredLength(rb.linearVelocity);
+		float sqAngularVelocityLength = squaredLength(rb.angularVelocity);
 
-		const float area = 2.f; // TODO!
+		const float area = 1.f; // TODO!
 		if (sqLinearVelocityLength > 0.f)
 		{
 			rb.forceAccumulator -= 0.5f * airDensity * dragCoefficient * area * sqLinearVelocityLength * normalize(rb.linearVelocity);
+		}
+		if (sqAngularVelocityLength > 0.f)
+		{
+			// This part is not correct!
+			rb.torqueAccumulator -= 0.5f * airDensity * dragCoefficient * area * sqAngularVelocityLength * normalize(rb.angularVelocity);
 		}
 
 		// TODO: Apply air resistance to angular velocity.
@@ -142,6 +196,11 @@ void rigid_body_component::recalculateProperties(const collider_reference_compon
 	}
 
 	invInertia = invert(inertia);
+}
+
+vec3 rigid_body_component::getGlobalCOGPosition(const trs& transform) const
+{
+	return transform.position + transform.rotation * localCOGPosition;
 }
 
 // This function returns the inertia tensors with respect to the center of gravity, so with a coordinate system centered at the COG.
