@@ -116,6 +116,8 @@ private:
 
 struct scene
 {
+	scene();
+
 	scene_entity createEntity(const char* name)
 	{
 		return scene_entity(registry.create(), &registry)
@@ -158,7 +160,7 @@ struct scene
 	}
 
 	template<typename... owned_component_t, typename... Get, typename... Exclude>
-	auto group(entt::get_t<Get...>, entt::exclude_t<Exclude...> = {})
+	auto group(entt::get_t<Get...> = {}, entt::exclude_t<Exclude...> = {})
 	{
 		return registry.group<owned_component_t...>(entt::get<Get...>, entt::exclude<Exclude...>);
 	}

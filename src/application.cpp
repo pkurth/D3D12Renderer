@@ -152,8 +152,15 @@ void application::initialize(dx_renderer* renderer)
 		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 0.4f, vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f)), {}, trs::identity, getDefaultPBRMaterial() });
 		testMesh->mesh = primitiveMesh.createDXMesh();
 
-		appScene.createEntity("Test")
+		appScene.createEntity("Test 1")
 			.addComponent<trs>(vec3(20.f, 5.f, 0.f), quat::identity)
+			.addComponent<raster_component>(testMesh)
+			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
+			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
+			.addComponent<rigid_body_component>(false, 0.f);
+
+		appScene.createEntity("Test 2")
+			.addComponent<trs>(vec3(20.f, 5.f, -2.f), quat::identity)
 			.addComponent<raster_component>(testMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
 			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)

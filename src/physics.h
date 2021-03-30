@@ -8,7 +8,7 @@
 
 struct rigid_body_component
 {
-	rigid_body_component(bool kinematic, float gravityFactor = 1.f);
+	rigid_body_component(bool kinematic, float gravityFactor = 1.f, float linearDamping = 0.4f, float angularDamping = 0.4f);
 	void recalculateProperties(const struct collider_reference_component& colliderReference);
 	vec3 getGlobalCOGPosition(const trs& transform) const;
 
@@ -18,6 +18,8 @@ struct rigid_body_component
 	mat3 invInertia;
 
 	float gravityFactor;
+	float linearDamping;
+	float angularDamping;
 
 	// In global space.
 	vec3 linearVelocity;
@@ -26,7 +28,7 @@ struct rigid_body_component
 	vec3 forceAccumulator;
 	vec3 torqueAccumulator;
 
-	uint16 updateIndex;
+	uint16 globalStateIndex;
 };
 
 struct physics_properties
@@ -43,14 +45,43 @@ struct collider_properties
 	float density;
 };
 
-enum collider_type
+enum collider_type : uint16
 {
+	// The order here is important. See collision_narrow.cpp.
 	collider_type_sphere,
 	collider_type_capsule,
 	collider_type_box,
 };
 
-struct collider_component
+struct collider_union
+{
+	collider_union() {}
+	physics_properties calculatePhysicsProperties();
+
+	collider_type type;
+	uint16 rigidBodyIndex;
+
+	union
+	{
+		bounding_sphere sphere;
+		bounding_capsule capsule;
+		bounding_box box;
+	};
+
+	collider_properties properties;
+};
+
+struct rigid_body_global_state
+{
+	quat rotation;
+	vec3 position;
+	vec3 linearVelocity;
+	vec3 angularVelocity;
+	mat3 invInertia;
+	float invMass;
+};
+
+struct collider_component : collider_union
 {
 	collider_component(bounding_sphere s, float restitution, float friction, float density)
 	{
@@ -75,19 +106,6 @@ struct collider_component
 		this->properties.friction = friction;
 		this->properties.density = density;
 	}
-
-	physics_properties calculatePhysicsProperties();
-
-	collider_type type;
-
-	union
-	{
-		bounding_sphere sphere;
-		bounding_capsule capsule;
-		bounding_box box;
-	};
-
-	collider_properties properties;
 
 	entt::entity parentEntity;
 	entt::entity nextColliderEntity;

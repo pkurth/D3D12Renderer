@@ -1,13 +1,9 @@
 #include "pch.h"
 #include "physics.h"
+#include "collision_broad.h"
+#include "collision_narrow.h"
 
 
-struct rigid_body_update
-{
-	quat globalRotation;
-	vec3 globalPosition;
-	mat3 globalInvInertia;
-};
 
 void testPhysicsInteraction(scene& appScene, ray r)
 {
@@ -57,76 +53,156 @@ void testPhysicsInteraction(scene& appScene, ray r)
 	}
 }
 
+static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceAABBs, collider_union* outWorldSpaceColliders)
+{
+	uint32 pushIndex = 0;
+
+	auto rbView = appScene.view<rigid_body_component>();
+	rigid_body_component* rbBase = rbView.raw();
+
+	for (auto [entityHandle, collider] : appScene.view<collider_component>().each())
+	{
+		bounding_box& bb = outWorldspaceAABBs[pushIndex];
+		collider_union& col = outWorldSpaceColliders[pushIndex];
+		++pushIndex;
+
+		scene_entity entity = { collider.parentEntity, appScene };
+		trs& transform = entity.getComponent<trs>();
+
+		rigid_body_component& rb = entity.getComponent<rigid_body_component>();
+
+		col.type = collider.type;
+		col.properties = collider.properties;
+		col.rigidBodyIndex = (uint16)(&rb - rbBase);
+
+		switch (collider.type)
+		{
+			case collider_type_sphere:
+			{
+				vec3 center = transform.position + transform.rotation * collider.sphere.center;
+				bb = bounding_box::fromCenterRadius(center, collider.sphere.radius);
+				col.sphere = { center, collider.sphere.radius };
+			} break;
+
+			case collider_type_capsule:
+			{
+				vec3 posA = transform.rotation * collider.capsule.positionA + transform.position;
+				vec3 posB = transform.rotation * collider.capsule.positionB + transform.position;
+
+				float radius = collider.capsule.radius;
+				vec3 radius3(radius);
+
+				bb = bounding_box::negativeInfinity();
+				bb.grow(posA + radius3);
+				bb.grow(posA - radius3);
+				bb.grow(posB + radius3);
+				bb.grow(posB - radius3);
+
+				col.capsule = { posA, posB, radius };
+			} break;
+
+			case collider_type_box:
+			{
+				bb = bounding_box::negativeInfinity();
+				bb.grow(transform.rotation * collider.box.minCorner + transform.position);
+				bb.grow(transform.rotation * vec3(collider.box.maxCorner.x, collider.box.minCorner.y, collider.box.minCorner.z) + transform.position);
+				bb.grow(transform.rotation * vec3(collider.box.minCorner.x, collider.box.maxCorner.y, collider.box.minCorner.z) + transform.position);
+				bb.grow(transform.rotation * vec3(collider.box.maxCorner.x, collider.box.maxCorner.y, collider.box.minCorner.z) + transform.position);
+				bb.grow(transform.rotation * vec3(collider.box.minCorner.x, collider.box.minCorner.y, collider.box.maxCorner.z) + transform.position);
+				bb.grow(transform.rotation * vec3(collider.box.maxCorner.x, collider.box.minCorner.y, collider.box.maxCorner.z) + transform.position);
+				bb.grow(transform.rotation * vec3(collider.box.minCorner.x, collider.box.maxCorner.y, collider.box.maxCorner.z) + transform.position);
+				bb.grow(transform.rotation * collider.box.maxCorner + transform.position);
+
+				col.box = bb; // TODO: Output OBB here.
+			} break;
+		}
+	}
+}
+
 void physicsStep(scene& appScene, float dt)
 {
-	std::vector<rigid_body_update> rbUpdate;
-	rbUpdate.reserve(appScene.numberOfComponentsOfType<rigid_body_component>());
+	// TODO:
+	static void* scratchMemory = malloc(1024 * 1024);
+	static broadphase_collision* possibleCollisions = new broadphase_collision[1024];
+	static rigid_body_global_state* rbGlobal = new rigid_body_global_state[1024];
+	static bounding_box* worldSpaceAABBs = new bounding_box[1024];
+	static collider_union* worldSpaceColliders = new collider_union[1024];
+	static collision_constraint* collisionConstraints = new collision_constraint[1024];
+
+
+	uint16 rbIndex = 0;
 
 	// Apply gravity and air drag and integrate forces.
 	for (auto [entityHandle, rb, transform] : appScene.group(entt::get<rigid_body_component, trs>).each())
 	{
+		uint16 globalStateIndex = rbIndex++;
+		auto& global = rbGlobal[globalStateIndex];
+		global.rotation = transform.rotation;
+		global.position = transform.position + transform.rotation * rb.localCOGPosition;
+
+		mat3 rot = quaternionToMat3(global.rotation);
+		global.invInertia = rot * rb.invInertia * transpose(rot);
+		global.invMass = rb.invMass;
+
+
+
 		rb.forceAccumulator.y += (GRAVITY / rb.invMass * rb.gravityFactor);
 
-		// Air resistance.
-		const float airDensity = 1.2f;
-		const float dragCoefficient = 0.2f;
-		float sqLinearVelocityLength = squaredLength(rb.linearVelocity);
-		float sqAngularVelocityLength = squaredLength(rb.angularVelocity);
-
-		const float area = 1.f; // TODO!
-		if (sqLinearVelocityLength > 0.f)
-		{
-			rb.forceAccumulator -= 0.5f * airDensity * dragCoefficient * area * sqLinearVelocityLength * normalize(rb.linearVelocity);
-		}
-		if (sqAngularVelocityLength > 0.f)
-		{
-			// This part is not correct!
-			rb.torqueAccumulator -= 0.5f * airDensity * dragCoefficient * area * sqAngularVelocityLength * normalize(rb.angularVelocity);
-		}
-
-		// TODO: Apply air resistance to angular velocity.
-
-		uint16 updateIndex = (uint16)rbUpdate.size();
-		auto& update = rbUpdate.emplace_back();
-		update.globalRotation = transform.rotation;
-		update.globalPosition = transform.position + transform.rotation * rb.localCOGPosition;
-		
-		mat3 rot = quaternionToMat3(update.globalRotation);
-		update.globalInvInertia = rot * rb.invInertia * transpose(rot);
-
 		vec3 linearAcceleration = rb.forceAccumulator * rb.invMass;
-		vec3 angularAcceleration = update.globalInvInertia * rb.torqueAccumulator;
+		vec3 angularAcceleration = global.invInertia * rb.torqueAccumulator;
 
+		// Semi-implicit Euler integration.
 		rb.linearVelocity += linearAcceleration * dt;
 		rb.angularVelocity += angularAcceleration * dt;
-		rb.updateIndex = updateIndex;
+
+		rb.linearVelocity *= 1.f / (1.f + dt * rb.linearDamping);
+		rb.angularVelocity *= 1.f / (1.f + dt * rb.angularDamping);
+
+
+		global.linearVelocity = rb.linearVelocity;
+		global.angularVelocity = rb.angularVelocity;
+
+		rb.globalStateIndex = globalStateIndex;
 	}
+	
+	getWorldSpaceColliders(appScene, worldSpaceAABBs, worldSpaceColliders);
+	uint32 numPossibleCollisions = broadphase(appScene, 0, worldSpaceAABBs, possibleCollisions, scratchMemory);
+	uint32 numCollisionConstraints = narrowphase(worldSpaceColliders, rbGlobal, possibleCollisions, numPossibleCollisions, dt, collisionConstraints);
 
-	// TODO: Handle constraints.
-
+	const uint32 numSolverIterations = 10;
+	for (uint32 it = 0; it < numSolverIterations; ++it)
+	{
+		for (uint32 i = 0; i < numCollisionConstraints; ++i)
+		{
+			solveCollisionConstraint(collisionConstraints[i], rbGlobal);
+		}
+	}
 
 
 	// Integrate velocities.
 	for (auto [entityHandle, rb, transform] : appScene.group(entt::get<rigid_body_component, trs>).each())
 	{
-		auto& update = rbUpdate[rb.updateIndex];
+		auto& global = rbGlobal[rb.globalStateIndex];
+
+		rb.linearVelocity = global.linearVelocity;
+		rb.angularVelocity = global.angularVelocity;
 
 		quat deltaRot(0.5f * rb.angularVelocity.x, 0.5f * rb.angularVelocity.y, 0.5f * rb.angularVelocity.z, 0.f);
-		deltaRot = deltaRot * update.globalRotation;
+		deltaRot = deltaRot * global.rotation;
 
-		update.globalRotation = normalize(update.globalRotation + (deltaRot * dt));
-		update.globalPosition += rb.linearVelocity * dt;
+		global.rotation = normalize(global.rotation + (deltaRot * dt));
+		global.position += rb.linearVelocity * dt;
 
 		rb.forceAccumulator = vec3(0.f, 0.f, 0.f);
 		rb.torqueAccumulator = vec3(0.f, 0.f, 0.f);
 
-		transform.rotation = update.globalRotation;
-		transform.position = update.globalPosition - update.globalRotation * rb.localCOGPosition;
+		transform.rotation = global.rotation;
+		transform.position = global.position - global.rotation * rb.localCOGPosition;
 	}
 
 }
 
-rigid_body_component::rigid_body_component(bool kinematic, float gravityFactor)
+rigid_body_component::rigid_body_component(bool kinematic, float gravityFactor, float linearDamping, float angularDamping)
 {
 	if (kinematic)
 	{
@@ -140,6 +216,8 @@ rigid_body_component::rigid_body_component(bool kinematic, float gravityFactor)
 	}
 
 	this->gravityFactor = gravityFactor;
+	this->linearDamping = linearDamping;
+	this->angularDamping = angularDamping;
 	this->localCOGPosition = vec3(0.f);
 	this->linearVelocity = vec3(0.f);
 	this->angularVelocity = vec3(0.f);
@@ -204,7 +282,7 @@ vec3 rigid_body_component::getGlobalCOGPosition(const trs& transform) const
 }
 
 // This function returns the inertia tensors with respect to the center of gravity, so with a coordinate system centered at the COG.
-physics_properties collider_component::calculatePhysicsProperties()
+physics_properties collider_union::calculatePhysicsProperties()
 {
 	physics_properties result;
 	switch (type)
