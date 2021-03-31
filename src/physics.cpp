@@ -7,6 +7,11 @@
 
 void testPhysicsInteraction(scene& appScene, ray r)
 {
+	float minT = FLT_MAX;
+	rigid_body_component* minRB = 0;
+	vec3 force;
+	vec3 torque;
+
 	for (auto [entityHandle, collider] : appScene.view<collider_component>().each())
 	{
 		scene_entity rbEntity = { collider.parentEntity, appScene };
@@ -37,19 +42,26 @@ void testPhysicsInteraction(scene& appScene, ray r)
 				} break;
 			}
 
-			if (hit)
+			if (hit && t < minT)
 			{
+				minT = t;
+				minRB = &rb;
+
 				vec3 localHit = localR.origin + t * localR.direction;
 				vec3 globalHit = transformPosition(transform, localHit);
 
 				vec3 cogPosition = rb.getGlobalCOGPosition(transform);
 
-				vec3 force = r.direction * 300.f;
-				vec3 torque = cross(globalHit - cogPosition, force);
-				rb.torqueAccumulator += torque;
-				rb.forceAccumulator += force;
+				force = r.direction * 300.f;
+				torque = cross(globalHit - cogPosition, force);
 			}
 		}
+	}
+
+	if (minRB)
+	{
+		minRB->torqueAccumulator += torque;
+		minRB->forceAccumulator += force;
 	}
 }
 
@@ -113,6 +125,7 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 				bb.grow(transform.rotation * vec3(collider.box.minCorner.x, collider.box.maxCorner.y, collider.box.maxCorner.z) + transform.position);
 				bb.grow(transform.rotation * collider.box.maxCorner + transform.position);
 
+				assert(transform.rotation == quat::identity);
 				col.box = bb; // TODO: Output OBB here.
 			} break;
 		}
@@ -145,8 +158,10 @@ void physicsStep(scene& appScene, float dt)
 		global.invMass = rb.invMass;
 
 
-
-		rb.forceAccumulator.y += (GRAVITY / rb.invMass * rb.gravityFactor);
+		if (rb.invMass > 0.f)
+		{
+			rb.forceAccumulator.y += (GRAVITY / rb.invMass * rb.gravityFactor);
+		}
 
 		vec3 linearAcceleration = rb.forceAccumulator * rb.invMass;
 		vec3 angularAcceleration = global.invInertia * rb.torqueAccumulator;
@@ -169,12 +184,15 @@ void physicsStep(scene& appScene, float dt)
 	uint32 numPossibleCollisions = broadphase(appScene, 0, worldSpaceAABBs, possibleCollisions, scratchMemory);
 	uint32 numCollisionConstraints = narrowphase(worldSpaceColliders, rbGlobal, possibleCollisions, numPossibleCollisions, dt, collisionConstraints);
 
-	const uint32 numSolverIterations = 10;
-	for (uint32 it = 0; it < numSolverIterations; ++it)
+	if (numCollisionConstraints)
 	{
-		for (uint32 i = 0; i < numCollisionConstraints; ++i)
+		const uint32 numSolverIterations = 10;
+		for (uint32 it = 0; it < numSolverIterations; ++it)
 		{
-			solveCollisionConstraint(collisionConstraints[i], rbGlobal);
+			for (uint32 i = 0; i < numCollisionConstraints; ++i)
+			{
+				solveCollisionConstraint(collisionConstraints[i], rbGlobal);
+			}
 		}
 	}
 
