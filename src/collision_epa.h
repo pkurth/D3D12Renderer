@@ -76,7 +76,7 @@ struct epa_result
 };
 
 template <typename shapeA_t, typename shapeB_t>
-static bool epaCollisionInfo(const gjk_simplex& gjkSimplex, const shapeA_t& shapeA, const shapeB_t& shapeB, epa_result& outResult)
+static bool epaCollisionInfo(const gjk_simplex& gjkSimplex, const shapeA_t& shapeA, const shapeB_t& shapeB, epa_result& outResult, uint32 maxNumIterations = 20)
 {
 	// http://www.dyn4j.org/2010/05/epa-expanding-polytope-algorithm/
 	// http://uu.diva-portal.org/smash/get/diva2:343820/FULLTEXT01 page 23+
@@ -110,9 +110,9 @@ static bool epaCollisionInfo(const gjk_simplex& gjkSimplex, const shapeA_t& shap
 	uint32 closestIndex = 0;
 	float d = 0.f;
 
-	bool success = true;
+	bool success = false;
 
-	for (;;)
+	for (uint32 iteration = 0; iteration < maxNumIterations; ++iteration)
 	{
 		closestIndex = epaSimplex.findTriangleClosestToOrigin();
 		epa_triangle& tri = epaSimplex.triangles[closestIndex];
@@ -123,12 +123,12 @@ static bool epaCollisionInfo(const gjk_simplex& gjkSimplex, const shapeA_t& shap
 		if (d - tri.distanceToOrigin < 0.01f)
 		{
 			// Success.
+			success = true;
 			break;
 		}
 
 		if (!epaSimplex.addNewPointAndUpdate(a))
 		{
-			success = false;
 			//std::cout << "EPA out of memory.\n";
 			break;
 		}
