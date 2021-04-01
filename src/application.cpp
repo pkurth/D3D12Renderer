@@ -159,19 +159,19 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<raster_component>(testMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
 			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
-			.addComponent<rigid_body_component>(false, 0.1f);
+			.addComponent<rigid_body_component>(false);
 
 		appScene.createEntity("Test 2")
 			.addComponent<trs>(vec3(20.f, 5.f, -2.f), quat::identity)
 			.addComponent<raster_component>(testMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
 			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
-			.addComponent<rigid_body_component>(false, 0.1f);
+			.addComponent<rigid_body_component>(false);
 
 		appScene.createEntity("Test ground")
 			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat::identity)
 			.addComponent<raster_component>(groundMesh)
-			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.2f, 0.5f, 4.f)
+			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 0.5f, 4.f)
 			.addComponent<rigid_body_component>(true);
 
 
@@ -807,6 +807,8 @@ void application::renderSunShadowMap(bool objectDragged)
 		staticCacheAvailable &= cache;
 	}
 
+	staticCacheAvailable = false; // TODO: REMOVE!!!
+
 	if (staticCacheAvailable)
 	{
 		renderPass.copyFromStaticCache = true;
@@ -991,6 +993,8 @@ void application::renderDynamicGeometryToShadowMap(point_shadow_render_pass& ren
 
 void application::update(const user_input& input, float dt)
 {
+	dt = min(dt, 1.f / 60.f);
+
 	resetRenderPasses();
 
 	bool objectDragged = false;

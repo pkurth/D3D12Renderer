@@ -2,6 +2,10 @@
 #include "collision_narrow.h"
 #include "physics.h"
 #include "collision_broad.h"
+#include "collision_gjk.h"
+#include "collision_epa.h"
+
+#include "imgui.h"
 
 
 static void getTangents(vec3 normal, vec3& outTangent, vec3& outBitangent)
@@ -23,6 +27,7 @@ static void getTangents(vec3 normal, vec3& outTangent, vec3& outBitangent)
 
 static bool intersection(const bounding_sphere& s1, const bounding_sphere& s2, contact_manifold& outContact)
 {
+#if 0
 	vec3 n = s2.center - s1.center;
 	float radiusSum = s2.radius + s1.radius;
 	float sqDistance = squaredLength(n);
@@ -48,23 +53,98 @@ static bool intersection(const bounding_sphere& s1, const bounding_sphere& s2, c
 		return true;
 	}
 	return false;
+#else
+	sphere_support_fn sphereSupport1{ s1 };
+	sphere_support_fn sphereSupport2{ s2 };
+
+	gjk_simplex gjkSimplex;
+	if (!gjkIntersectionTest(sphereSupport1, sphereSupport2, gjkSimplex))
+	{
+		return false;
+	}
+
+	epa_result epa;
+	if (!epaCollisionInfo(gjkSimplex, sphereSupport1, sphereSupport2, epa))
+	{
+		return false;
+	}
+
+	outContact.collisionNormal = epa.normal;
+	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
+	outContact.numContacts = 1;
+	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
+	outContact.contacts[0].point = epa.point;
+
+	return true;
+#endif
 }
 
 static bool intersection(const bounding_sphere& s, const bounding_capsule& c, contact_manifold& outContact)
 {
+#if 0
 	vec3 closestPoint = closestPoint_PointSegment(s.center, line_segment{ c.positionA, c.positionB });
 	return intersection(s, bounding_sphere{ closestPoint, c.radius }, outContact);
+#else
+	sphere_support_fn sphereSupport{ s };
+	capsule_support_fn capsuleSupport{ c };
+
+	gjk_simplex gjkSimplex;
+	if (!gjkIntersectionTest(sphereSupport, capsuleSupport, gjkSimplex))
+	{
+		return false;
+	}
+
+	epa_result epa;
+	if (!epaCollisionInfo(gjkSimplex, sphereSupport, capsuleSupport, epa))
+	{
+		return false;
+	}
+
+	outContact.collisionNormal = epa.normal;
+	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
+	outContact.numContacts = 1;
+	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
+	outContact.contacts[0].point = epa.point;
+
+	return true;
+#endif
 }
 
 static bool intersection(const bounding_capsule& c1, const bounding_capsule& c2, contact_manifold& outContact)
 {
+#if 0
 	vec3 closestPoint1, closestPoint2;
 	closestPoint_SegmentSegment(line_segment{ c1.positionA, c1.positionB }, line_segment{ c2.positionA, c2.positionB }, closestPoint1, closestPoint2);
 	return intersection(bounding_sphere{ closestPoint1, c1.radius }, bounding_sphere{ closestPoint2, c2.radius }, outContact);
+#else
+	capsule_support_fn capsuleSupport1{ c1 };
+	capsule_support_fn capsuleSupport2{ c2 };
+
+	gjk_simplex gjkSimplex;
+	if (!gjkIntersectionTest(capsuleSupport1, capsuleSupport2, gjkSimplex))
+	{
+		return false;
+	}
+
+	epa_result epa;
+	if (!epaCollisionInfo(gjkSimplex, capsuleSupport1, capsuleSupport2, epa))
+	{
+		return false;
+	}
+
+	outContact.collisionNormal = epa.normal;
+	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
+	outContact.numContacts = 1;
+	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
+	outContact.contacts[0].point = epa.point;
+
+	return true;
+#endif
 }
 
 static bool intersection(const bounding_sphere& s, const bounding_box& a, contact_manifold& outContact)
 {
+#if 0
 	vec3 p = closestPoint_PointAABB(s.center, a);
 	vec3 n = p - s.center;
 
@@ -85,17 +165,42 @@ static bool intersection(const bounding_sphere& s, const bounding_box& a, contac
 		outContact.numContacts = 1;
 
 		outContact.collisionNormal = n;
-		outContact.contacts[0].penetrationDepth = dist - s.radius;
+		outContact.contacts[0].penetrationDepth = s.radius - dist; // Flipped to change sign.
 		outContact.contacts[0].point = 0.5f * (p + s.center + n * s.radius);
 		getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
 
 		return true;
 	}
 	return false;
+#else
+	sphere_support_fn sphereSupport{ s };
+	box_support_fn boxSupport{ a };
+
+	gjk_simplex gjkSimplex;
+	if (!gjkIntersectionTest(sphereSupport, boxSupport, gjkSimplex))
+	{
+		return false;
+	}
+
+	epa_result epa;
+	if (!epaCollisionInfo(gjkSimplex, sphereSupport, boxSupport, epa))
+	{
+		return false;
+	}
+
+	outContact.collisionNormal = epa.normal;
+	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
+	outContact.numContacts = 1;
+	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
+	outContact.contacts[0].point = epa.point;
+
+	return true;
+#endif
 }
 
 static bool intersection(const bounding_capsule& c, const bounding_box& a, contact_manifold& outContact)
 {
+#if 0
 	outContact.numContacts = 0;
 
 	contact_manifold helperManifold;
@@ -116,12 +221,62 @@ static bool intersection(const bounding_capsule& c, const bounding_box& a, conta
 		return true;
 	}
 	return false;
+#else
+
+	capsule_support_fn capsuleSupport{ c };
+	box_support_fn boxSupport{ a };
+
+	gjk_simplex gjkSimplex;
+	if (!gjkIntersectionTest(capsuleSupport, boxSupport, gjkSimplex))
+	{
+		return false;
+	}
+
+	epa_result epa;
+	if (!epaCollisionInfo(gjkSimplex, capsuleSupport, boxSupport, epa))
+	{
+		return false;
+	}
+
+	outContact.collisionNormal = epa.normal;
+	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
+	outContact.numContacts = 1;
+	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
+	outContact.contacts[0].point = epa.point;
+
+	return true;
+#endif
+}
+
+static void imguiDisplay(collider_union* colliderA, collider_union* colliderB, contact_manifold& contact)
+{
+	if (ImGui::TreeNodeEx("Collision", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		ImGui::Text(colliderTypeNames[colliderA->type]);
+		ImGui::Text(colliderTypeNames[colliderB->type]);
+
+		collider_properties propsA = colliderA->properties;
+		collider_properties propsB = colliderB->properties;
+
+		float friction = sqrt(propsA.friction * propsB.friction);
+		ImGui::Value("Friction", friction);
+
+		ImGui::Value("# Contacts", contact.numContacts);
+		for (uint32 i = 0; i < contact.numContacts; ++i)
+		{
+			ImGui::Value("Depth", contact.contacts[i].penetrationDepth);
+		}
+		
+		ImGui::TreePop();
+	}
 }
 
 uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state* rbs, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions, float dt,
 	collision_constraint* outCollisionConstraints)
 {
 	uint32 numContacts = 0;
+
+	ImGui::Begin("Collisions");
 	
 	for (uint32 i = 0; i < numPossibleCollisions; ++i)
 	{
@@ -174,6 +329,7 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 				c.rbB = colliderB->rigidBodyIndex;
 
 
+				imguiDisplay(colliderA, colliderB, contact);
 
 
 				for (uint32 contactID = 0; contactID < contact.numContacts; ++contactID)
@@ -223,10 +379,10 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 						float restitution = max(propsA.restitution, propsB.restitution);
 
 						float vRel = dot(c.contact.collisionNormal, anchorVelocityB - anchorVelocityA);
-						const float slop = -0.01f;
-						if (-contact.penetrationDepth < slop && vRel < 0.f)
+						//const float slop = -0.005f;
+						if (/*-contact.penetrationDepth < slop && */vRel < 0.f)
 						{
-							point.bias = -restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) / dt;
+							point.bias = -restitution * vRel;// -0.1f * (-contact.penetrationDepth - slop) / dt;
 						}
 					}
 				}
@@ -236,6 +392,8 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 			}
 		}
 	}
+
+	ImGui::End();
 
 	return numContacts;
 }

@@ -53,6 +53,13 @@ enum collider_type : uint16
 	collider_type_box,
 };
 
+static const char* colliderTypeNames[] =
+{
+	"Sphere",
+	"Capsule",
+	"Box",
+};
+
 struct collider_union
 {
 	collider_union() {}
