@@ -44,13 +44,13 @@ struct epa_triangle_info
 
 struct epa_simplex
 {
+	// TODO: Find better array sizes.
 	gjk_support_point points[1024];
 	epa_triangle triangles[1024];
 	epa_edge edges[1024];
 
 	uint32 activeTrianglesMask[1024 / 32];
 	uint16 numTriangles;
-	uint16 numActiveTriangles;
 	uint16 numPoints;
 	uint16 numEdges;
 
@@ -85,7 +85,6 @@ static bool epaCollisionInfo(const gjk_simplex& gjkSimplex, const shapeA_t& shap
 
 	epa_simplex epaSimplex;
 	epaSimplex.numTriangles = 0;
-	epaSimplex.numActiveTriangles = 0;
 	epaSimplex.numPoints = 0;
 	epaSimplex.numEdges = 0;
 	memset(epaSimplex.activeTrianglesMask, 0, sizeof(epaSimplex.activeTrianglesMask));

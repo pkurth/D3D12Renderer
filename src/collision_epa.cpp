@@ -25,7 +25,6 @@ void epa_simplex::setTriangleActive(uint32 index)
 	uint32 wordIndex = index / 32;
 	uint32 bitIndex = index % 32;
 
-	++numActiveTriangles;
 	activeTrianglesMask[wordIndex] |= (1 << bitIndex);
 }
 
@@ -36,7 +35,6 @@ void epa_simplex::setTriangleInactive(uint32 index)
 	uint32 wordIndex = index / 32;
 	uint32 bitIndex = index % 32;
 
-	--numActiveTriangles;
 	activeTrianglesMask[wordIndex] &= ~(1 << bitIndex);
 }
 
@@ -145,10 +143,7 @@ bool epa_simplex::addNewPointAndUpdate(const gjk_support_point& newPoint)
 
 	for (uint32 i = 0; i < numEdges; ++i)
 	{
-		if (edgeReferences[i] > 2) 
-		{
-			std::cerr << "Edge references: " << (uint32)edgeReferences[i] << "!\n";
-		}
+		assert(edgeReferences[i] <= 2);
 
 		if (edgeReferences[i] == 1)
 		{
