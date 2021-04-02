@@ -10,7 +10,7 @@
 
 static void getTangents(vec3 normal, vec3& outTangent, vec3& outBitangent)
 {
-	if (fabsf(normal.x) >= 0.57735f)
+	if (abs(normal.x) >= 0.57735f)
 	{
 		outTangent = vec3(normal.y, -normal.x, 0.f);
 	}
@@ -275,20 +275,14 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 						point.effectiveMassInNormalDir = (invMassInNormalDir != 0.f) ? (1.f / invMassInNormalDir) : 0.f;
 
 						point.bias = 0.f;
-						float restitution = max(propsA.restitution, propsB.restitution);
 
 						float vRel = dot(c.contact.collisionNormal, anchorVelocityB - anchorVelocityA);
 						const float slop = -0.001f;
 						if (-contact.penetrationDepth < slop && vRel < 0.f)
 						{
+							float restitution = max(propsA.restitution, propsB.restitution);
 							point.bias = -restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) / dt;
 						}
-						//if (vRel < -1.f)
-						//{
-						//	float b0 = -restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) / dt;
-						//	float b1 = -restitution * vRel;
-						//	point.bias = max(b0, b1);
-						//}
 					}
 				}
 
