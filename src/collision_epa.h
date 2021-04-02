@@ -75,8 +75,26 @@ struct epa_result
 	float penetrationDepth;
 };
 
+enum epa_status
+{
+	epa_none, // Not returned from EPA. Only for debug output (signals that function was not called).
+	epa_success,
+	epa_out_of_memory,
+	epa_max_num_iterations_reached,
+};
+
+static const char* epaReturnNames[] =
+{
+	"None",
+	"Success",
+	"Out of memory",
+	"Max num iterations reached",
+};
+
+// Regardless of the return type, this function always returns the best approximation of the collision info in outResult.
+// The caller can decide whether to use the result or not.
 template <typename shapeA_t, typename shapeB_t>
-static bool epaCollisionInfo(const gjk_simplex& gjkSimplex, const shapeA_t& shapeA, const shapeB_t& shapeB, epa_result& outResult, uint32 maxNumIterations = 20)
+static epa_status epaCollisionInfo(const gjk_simplex& gjkSimplex, const shapeA_t& shapeA, const shapeB_t& shapeB, epa_result& outResult, uint32 maxNumIterations = 20)
 {
 	// http://www.dyn4j.org/2010/05/epa-expanding-polytope-algorithm/
 	// http://uu.diva-portal.org/smash/get/diva2:343820/FULLTEXT01 page 23+
@@ -107,9 +125,8 @@ static bool epaCollisionInfo(const gjk_simplex& gjkSimplex, const shapeA_t& shap
 	epaSimplex.pushEdge(2, 3, 1, 2);
 
 	uint32 closestIndex = 0;
-	float d = 0.f;
 
-	bool success = false;
+	epa_status returnCode = epa_max_num_iterations_reached;
 
 	for (uint32 iteration = 0; iteration < maxNumIterations; ++iteration)
 	{
@@ -118,28 +135,23 @@ static bool epaCollisionInfo(const gjk_simplex& gjkSimplex, const shapeA_t& shap
 
 		gjk_support_point a = support(shapeA, shapeB, tri.normal);
 
-		d = dot(a.minkowski, tri.normal);
+		float d = dot(a.minkowski, tri.normal);
 		if (d - tri.distanceToOrigin < 0.01f)
 		{
 			// Success.
-			success = true;
+			returnCode = epa_success;
 			break;
 		}
 
 		if (!epaSimplex.addNewPointAndUpdate(a))
 		{
 			//std::cout << "EPA out of memory.\n";
+			returnCode = epa_out_of_memory;
 			break;
 		}
 	}
 
 	epa_triangle& tri = epaSimplex.triangles[closestIndex];
-
-	if (!success && (d - tri.distanceToOrigin > 0.02f)) // Maybe that's still ok?
-	{
-		//std::cout << "Still ok!\n";
-		return false;
-	}
 
 	gjk_support_point& a = epaSimplex.points[tri.a];
 	gjk_support_point& b = epaSimplex.points[tri.b];
@@ -151,8 +163,8 @@ static bool epaCollisionInfo(const gjk_simplex& gjkSimplex, const shapeA_t& shap
 
 	outResult.point = 0.5f * (pointA + pointB);
 	outResult.normal = tri.normal;
-	outResult.penetrationDepth = d;
-	return true;
+	outResult.penetrationDepth = tri.distanceToOrigin;
+	return returnCode;
 }
 
 
