@@ -24,10 +24,15 @@ static void getTangents(vec3 normal, vec3& outTangent, vec3& outBitangent)
 }
 
 
+struct collision_info
+{
+	bool gjkSuccess;
+	epa_status epaSuccess = epa_none;
+	bool collides;
+};
 
 static bool intersection(const bounding_sphere& s1, const bounding_sphere& s2, contact_manifold& outContact)
 {
-#if 0
 	vec3 n = s2.center - s1.center;
 	float radiusSum = s2.radius + s1.radius;
 	float sqDistance = squaredLength(n);
@@ -53,98 +58,23 @@ static bool intersection(const bounding_sphere& s1, const bounding_sphere& s2, c
 		return true;
 	}
 	return false;
-#else
-	sphere_support_fn sphereSupport1{ s1 };
-	sphere_support_fn sphereSupport2{ s2 };
-
-	gjk_simplex gjkSimplex;
-	if (!gjkIntersectionTest(sphereSupport1, sphereSupport2, gjkSimplex))
-	{
-		return false;
-	}
-
-	epa_result epa;
-	if (!epaCollisionInfo(gjkSimplex, sphereSupport1, sphereSupport2, epa))
-	{
-		return false;
-	}
-
-	outContact.collisionNormal = epa.normal;
-	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
-	outContact.numContacts = 1;
-	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
-	outContact.contacts[0].point = epa.point;
-
-	return true;
-#endif
 }
 
 static bool intersection(const bounding_sphere& s, const bounding_capsule& c, contact_manifold& outContact)
 {
-#if 0
 	vec3 closestPoint = closestPoint_PointSegment(s.center, line_segment{ c.positionA, c.positionB });
 	return intersection(s, bounding_sphere{ closestPoint, c.radius }, outContact);
-#else
-	sphere_support_fn sphereSupport{ s };
-	capsule_support_fn capsuleSupport{ c };
-
-	gjk_simplex gjkSimplex;
-	if (!gjkIntersectionTest(sphereSupport, capsuleSupport, gjkSimplex))
-	{
-		return false;
-	}
-
-	epa_result epa;
-	if (!epaCollisionInfo(gjkSimplex, sphereSupport, capsuleSupport, epa))
-	{
-		return false;
-	}
-
-	outContact.collisionNormal = epa.normal;
-	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
-	outContact.numContacts = 1;
-	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
-	outContact.contacts[0].point = epa.point;
-
-	return true;
-#endif
 }
 
 static bool intersection(const bounding_capsule& c1, const bounding_capsule& c2, contact_manifold& outContact)
 {
-#if 0
 	vec3 closestPoint1, closestPoint2;
 	closestPoint_SegmentSegment(line_segment{ c1.positionA, c1.positionB }, line_segment{ c2.positionA, c2.positionB }, closestPoint1, closestPoint2);
 	return intersection(bounding_sphere{ closestPoint1, c1.radius }, bounding_sphere{ closestPoint2, c2.radius }, outContact);
-#else
-	capsule_support_fn capsuleSupport1{ c1 };
-	capsule_support_fn capsuleSupport2{ c2 };
-
-	gjk_simplex gjkSimplex;
-	if (!gjkIntersectionTest(capsuleSupport1, capsuleSupport2, gjkSimplex))
-	{
-		return false;
-	}
-
-	epa_result epa;
-	if (!epaCollisionInfo(gjkSimplex, capsuleSupport1, capsuleSupport2, epa))
-	{
-		return false;
-	}
-
-	outContact.collisionNormal = epa.normal;
-	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
-	outContact.numContacts = 1;
-	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
-	outContact.contacts[0].point = epa.point;
-
-	return true;
-#endif
 }
 
 static bool intersection(const bounding_sphere& s, const bounding_box& a, contact_manifold& outContact)
 {
-#if 0
 	vec3 p = closestPoint_PointAABB(s.center, a);
 	vec3 n = p - s.center;
 
@@ -172,57 +102,10 @@ static bool intersection(const bounding_sphere& s, const bounding_box& a, contac
 		return true;
 	}
 	return false;
-#else
-	sphere_support_fn sphereSupport{ s };
-	box_support_fn boxSupport{ a };
-
-	gjk_simplex gjkSimplex;
-	if (!gjkIntersectionTest(sphereSupport, boxSupport, gjkSimplex))
-	{
-		return false;
-	}
-
-	epa_result epa;
-	if (!epaCollisionInfo(gjkSimplex, sphereSupport, boxSupport, epa))
-	{
-		return false;
-	}
-
-	outContact.collisionNormal = epa.normal;
-	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
-	outContact.numContacts = 1;
-	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
-	outContact.contacts[0].point = epa.point;
-
-	return true;
-#endif
 }
 
-static bool intersection(const bounding_capsule& c, const bounding_box& a, contact_manifold& outContact)
+static bool intersection(const bounding_capsule& c, const bounding_box& a, contact_manifold& outContact, collision_info& outInfo)
 {
-#if 0
-	outContact.numContacts = 0;
-
-	contact_manifold helperManifold;
-
-	if (intersection(bounding_sphere{ c.positionA, c.radius }, a, helperManifold))
-	{
-		outContact.collisionNormal = helperManifold.collisionNormal;
-		outContact.contacts[outContact.numContacts++] = helperManifold.contacts[0];
-	}
-	if (intersection(bounding_sphere{ c.positionB, c.radius }, a, helperManifold))
-	{
-		outContact.collisionNormal = helperManifold.collisionNormal;
-		outContact.contacts[outContact.numContacts++] = helperManifold.contacts[0];
-	}
-	if (outContact.numContacts > 0)
-	{
-		getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
-		return true;
-	}
-	return false;
-#else
-
 	capsule_support_fn capsuleSupport{ c };
 	box_support_fn boxSupport{ a };
 
@@ -232,10 +115,13 @@ static bool intersection(const bounding_capsule& c, const bounding_box& a, conta
 		return false;
 	}
 
+	outInfo.gjkSuccess = true;
+
 	epa_result epa;
-	if (!epaCollisionInfo(gjkSimplex, capsuleSupport, boxSupport, epa))
+	outInfo.epaSuccess = epaCollisionInfo(gjkSimplex, capsuleSupport, boxSupport, epa);
+	if (outInfo.epaSuccess != epa_success)
 	{
-		return false;
+		//return false;
 	}
 
 	outContact.collisionNormal = epa.normal;
@@ -245,15 +131,26 @@ static bool intersection(const bounding_capsule& c, const bounding_box& a, conta
 	outContact.contacts[0].point = epa.point;
 
 	return true;
-#endif
 }
 
-static void imguiDisplay(collider_union* colliderA, collider_union* colliderB, contact_manifold& contact)
+static void imguiDisplay(collider_union* colliderA, collider_union* colliderB, contact_manifold& contact, collision_info& info)
 {
+	if (colliderA->type == collider_type_sphere && colliderB->type == collider_type_capsule)
+	{
+		ImGui::Value("Collides", info.collides);
+	}
+	return;
 	if (ImGui::TreeNodeEx("Collision", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		ImGui::Text(colliderTypeNames[colliderA->type]);
 		ImGui::Text(colliderTypeNames[colliderB->type]);
+
+		ImGui::Value("Collides", info.collides);
+		ImGui::Value("GJK", info.gjkSuccess);
+		ImGui::Text("EPA: %s", epaReturnNames[info.epaSuccess]);
+
+
+#if 0
 
 		collider_properties propsA = colliderA->properties;
 		collider_properties propsB = colliderB->properties;
@@ -266,6 +163,7 @@ static void imguiDisplay(collider_union* colliderA, collider_union* colliderB, c
 		{
 			ImGui::Value("Depth", contact.contacts[i].penetrationDepth);
 		}
+#endif
 		
 		ImGui::TreePop();
 	}
@@ -288,6 +186,7 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 		{
 			contact_manifold& contact = outCollisionConstraints[numContacts].contact;
 			bool collides = false;
+			collision_info info = {};
 
 			collider_union* colliderA = (colliderAInitial->type < colliderBInitial->type) ? colliderAInitial : colliderBInitial;
 			collider_union* colliderB = (colliderAInitial->type < colliderBInitial->type) ? colliderBInitial : colliderAInitial;
@@ -306,12 +205,15 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 			}
 			else if (colliderA->type == collider_type_capsule && colliderB->type == collider_type_box)
 			{
-				collides = intersection(colliderA->capsule, colliderB->box, contact);
+				collides = intersection(colliderA->capsule, colliderB->box, contact, info);
 			}
 			else if (colliderA->type == collider_type_capsule && colliderB->type == collider_type_capsule)
 			{
 				collides = intersection(colliderA->capsule, colliderB->capsule, contact);
 			}
+
+			info.collides = collides;
+			imguiDisplay(colliderA, colliderB, contact, info);
 
 			if (collides)
 			{
@@ -327,9 +229,6 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 				c.friction = friction;
 				c.rbA = colliderA->rigidBodyIndex;
 				c.rbB = colliderB->rigidBodyIndex;
-
-
-				imguiDisplay(colliderA, colliderB, contact);
 
 
 				for (uint32 contactID = 0; contactID < contact.numContacts; ++contactID)
@@ -379,11 +278,17 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 						float restitution = max(propsA.restitution, propsB.restitution);
 
 						float vRel = dot(c.contact.collisionNormal, anchorVelocityB - anchorVelocityA);
-						//const float slop = -0.005f;
-						if (/*-contact.penetrationDepth < slop && */vRel < 0.f)
+						const float slop = -0.001f;
+						if (-contact.penetrationDepth < slop && vRel < 0.f)
 						{
-							point.bias = -restitution * vRel;// -0.1f * (-contact.penetrationDepth - slop) / dt;
+							point.bias = -restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) / dt;
 						}
+						//if (vRel < -1.f)
+						//{
+						//	float b0 = -restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) / dt;
+						//	float b1 = -restitution * vRel;
+						//	point.bias = max(b0, b1);
+						//}
 					}
 				}
 
@@ -408,11 +313,6 @@ void solveCollisionConstraint(collision_constraint& c, rigid_body_global_state* 
 	vec3 vB = rbB.linearVelocity;
 	vec3 wB = rbB.angularVelocity;
 
-	vec3 newVA = vA;
-	vec3 newWA = wA;
-	vec3 newVB = vB;
-	vec3 newWB = wB;
-
 	for (uint32 contactID = 0; contactID < c.contact.numContacts; ++contactID)
 	{
 		collision_point& point = c.points[contactID];
@@ -433,10 +333,10 @@ void solveCollisionConstraint(collision_constraint& c, rigid_body_global_state* 
 			point.impulseInTangentDir = newImpulse;
 
 			vec3 P = lambda * point.tangent;
-			newVA -= rbA.invMass * P;
-			newWA -= rbA.invInertia * cross(point.relGlobalAnchorA, P);
-			newVB += rbB.invMass * P;
-			newWB += rbB.invInertia * cross(point.relGlobalAnchorB, P);
+			vA -= rbA.invMass * P;
+			wA -= rbA.invInertia * cross(point.relGlobalAnchorA, P);
+			vB += rbB.invMass * P;
+			wB += rbB.invInertia * cross(point.relGlobalAnchorB, P);
 		}
 
 		{ // Normal dir
@@ -451,15 +351,15 @@ void solveCollisionConstraint(collision_constraint& c, rigid_body_global_state* 
 			point.impulseInNormalDir = impulse;
 
 			vec3 P = lambda * c.contact.collisionNormal;
-			newVA -= rbA.invMass * P;
-			newWA -= rbA.invInertia * cross(point.relGlobalAnchorA, P);
-			newVB += rbB.invMass * P;
-			newWB += rbB.invInertia * cross(point.relGlobalAnchorB, P);
+			vA -= rbA.invMass * P;
+			wA -= rbA.invInertia * cross(point.relGlobalAnchorA, P);
+			vB += rbB.invMass * P;
+			wB += rbB.invInertia * cross(point.relGlobalAnchorB, P);
 		}
 	}
 
-	rbA.linearVelocity = newVA;
-	rbA.angularVelocity = newWA;
-	rbB.linearVelocity = newVB;
-	rbB.angularVelocity = newWB;
+	rbA.linearVelocity = vA;
+	rbA.angularVelocity = wA;
+	rbB.linearVelocity = vB;
+	rbB.angularVelocity = wB;
 }
