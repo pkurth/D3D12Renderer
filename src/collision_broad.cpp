@@ -69,6 +69,36 @@ uint32 broadphase(scene& appScene, uint32 sortingAxis, bounding_box* worldSpaceA
 
 	assert(numEndpoints == endpoints.size());
 
+	uint32 numCollisions = 0;
+
+#if 0
+	// Disable broadphase.
+
+	uint16 collider0Index = 0;
+	for (auto [entityHandle0, collider0] : appScene.view<collider_component>().each())
+	{
+		uint16 collider1Index = 0;
+		for (auto [entityHandle1, collider1] : appScene.view<collider_component>().each())
+		{
+			if (entityHandle0 == entityHandle1)
+			{
+				break;
+			}
+			if (collider0.parentEntity != collider1.parentEntity)
+			{
+				outCollisions[numCollisions++] = { collider0Index, collider1Index };
+			}
+
+			++collider1Index;
+		}
+		++collider0Index;
+	}
+	return numCollisions;
+
+#endif
+
+
+
 	// Index of each collider in the scene. 
 	// We iterate over the endpoint indirections, which are sorted the exact same way as the colliders.
 	uint16 index = 0;
@@ -118,8 +148,6 @@ uint32 broadphase(scene& appScene, uint32 sortingAxis, bounding_box* worldSpaceA
 	// Determine overlaps.
 	uint16* activeList = (uint16*)scratchMemory;
 	uint32 numActive = 0;
-
-	uint32 numCollisions = 0;
 
 	for (uint32 i = 0; i < numEndpoints; ++i)
 	{

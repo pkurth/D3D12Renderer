@@ -86,7 +86,8 @@ void application::initialize(dx_renderer* renderer)
 		pathTracer.initialize();
 		raytracingTLAS.initialize();
 	}
-	
+
+#if 1
 	auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj");
 	if (sponzaMesh)
 	{
@@ -98,7 +99,6 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<raytrace_component>(blas);
 	}
 
-#if 1
 	auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx");
 	auto pilotMesh = loadAnimatedMeshFromFile("assets/pilot/pilot.fbx");
 	auto unrealMesh = loadAnimatedMeshFromFile("assets/unreal/unreal_mannequin.fbx");
@@ -159,14 +159,14 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<raster_component>(testMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
 			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
-			.addComponent<rigid_body_component>(false);
+			.addComponent<rigid_body_component>(false, 1.f);
 
 		appScene.createEntity("Test 2")
 			.addComponent<trs>(vec3(20.f, 5.f, -2.f), quat::identity)
 			.addComponent<raster_component>(testMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
 			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
-			.addComponent<rigid_body_component>(false);
+			.addComponent<rigid_body_component>(false, 1.f);
 
 		appScene.createEntity("Test ground")
 			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat::identity)
@@ -198,6 +198,7 @@ void application::initialize(dx_renderer* renderer)
 
 	random_number_generator rng = { 14878213 };
 
+#if 1
 	spotLights.resize(2);
 
 	spotLights[0].initialize(
@@ -228,6 +229,7 @@ void application::initialize(dx_renderer* renderer)
 		10,
 		0
 	);
+#endif
 
 #if 1
 	decalTexture = loadTextureFromFile("assets/decals/explosion.png");
@@ -282,9 +284,11 @@ void application::initialize(dx_renderer* renderer)
 		SET_NAME(pointLightShadowInfoBuffer[i]->resource, "Point light shadow infos");
 	}
 
+#if 1
 	fireParticleSystem.initialize(10000, 50.f, "assets/particles/fire_explosion.tif", 6, 6);
 	smokeParticleSystem.initialize(10000, 500.f, "assets/particles/smoke1.tif", 5, 5);
 	boidParticleSystem.initialize(10000, 2000.f);
+#endif
 }
 
 static bool plotAndEditTonemapping(tonemap_cb& tonemap)
@@ -993,7 +997,7 @@ void application::renderDynamicGeometryToShadowMap(point_shadow_render_pass& ren
 
 void application::update(const user_input& input, float dt)
 {
-	dt = min(dt, 1.f / 60.f);
+	dt = min(dt, 1.f / 30.f);
 
 	resetRenderPasses();
 
@@ -1006,6 +1010,7 @@ void application::update(const user_input& input, float dt)
 	
 	// Particles.
 
+#if 1
 	fireParticleSystem.settings.cameraPosition = camera.position;
 	smokeParticleSystem.settings.cameraPosition = camera.position;
 
@@ -1017,7 +1022,7 @@ void application::update(const user_input& input, float dt)
 
 	smokeParticleSystem.update(dt);
 	smokeParticleSystem.render(&transparentRenderPass);
-
+#endif
 
 	sun.updateMatrices(camera);
 
