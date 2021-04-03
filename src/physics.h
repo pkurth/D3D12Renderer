@@ -9,7 +9,7 @@
 struct rigid_body_component
 {
 	rigid_body_component(bool kinematic, float gravityFactor = 1.f, float linearDamping = 0.4f, float angularDamping = 0.4f);
-	void recalculateProperties(const struct collider_reference_component& colliderReference);
+	void recalculateProperties(const struct physics_reference_component& reference);
 	vec3 getGlobalCOGPosition(const trs& transform) const;
 
 	// In entity's local space.
@@ -115,10 +115,10 @@ struct collider_component : collider_union
 	}
 
 	entt::entity parentEntity;
-	entt::entity nextColliderEntity;
+	entt::entity nextEntity;
 };
 
-struct collider_reference_component
+struct physics_reference_component
 {
 	entt::registry* registry;
 	uint32 numColliders = 0;

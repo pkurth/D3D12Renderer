@@ -31,25 +31,22 @@ void onColliderAdded(entt::registry& registry, entt::entity entityHandle)
 
 static void removeEndpoint(uint16 endpointIndex, entt::registry& registry)
 {
-	if (endpoints.size() > 1 && endpointIndex < (uint16)endpoints.size() - 1)
-	{
-		sap_endpoint last = endpoints.back();
-		endpoints[endpointIndex] = last;
+	sap_endpoint last = endpoints.back();
+	endpoints[endpointIndex] = last;
 
-		// Point moved entity to correct slot.
-		sap_endpoint_indirection_component& in = registry.get<sap_endpoint_indirection_component>(last.entity);
+	// Point moved entity to correct slot.
+	sap_endpoint_indirection_component& in = registry.get<sap_endpoint_indirection_component>(last.entity);
 		
-		if (last.start) 
-		{ 
-			in.startEndpoint = endpointIndex; 
-		}
-		else 
-		{ 
-			in.endEndpoint = endpointIndex; 
-		}
-
-		endpoints.pop_back();
+	if (last.start) 
+	{ 
+		in.startEndpoint = endpointIndex; 
 	}
+	else 
+	{ 
+		in.endEndpoint = endpointIndex; 
+	}
+
+	endpoints.pop_back();
 }
 
 void onColliderRemoved(entt::registry& registry, entt::entity entityHandle)
@@ -59,7 +56,7 @@ void onColliderRemoved(entt::registry& registry, entt::entity entityHandle)
 	removeEndpoint(endpointIndirection.startEndpoint, registry);
 	removeEndpoint(endpointIndirection.endEndpoint, registry);
 
-	registry.remove<sap_endpoint_indirection_component>(entityHandle);
+	registry.remove_if_exists<sap_endpoint_indirection_component>(entityHandle);
 }
 
 uint32 broadphase(scene& appScene, uint32 sortingAxis, bounding_box* worldSpaceAABBs, broadphase_collision* outCollisions, void* scratchMemory)

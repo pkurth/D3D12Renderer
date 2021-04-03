@@ -34,19 +34,19 @@ struct scene_entity
 	{
 		if constexpr (std::is_same_v<component_t, struct collider_component>)
 		{
-			if (!hasComponent<collider_reference_component>())
+			if (!hasComponent<physics_reference_component>())
 			{
-				addComponent<collider_reference_component>(registry);
+				addComponent<physics_reference_component>(registry);
 			}
 
-			collider_reference_component& reference = getComponent<collider_reference_component>();
+			physics_reference_component& reference = getComponent<physics_reference_component>();
 			++reference.numColliders;
 
 			entt::entity child = registry->create();
 			collider_component& collider = registry->emplace<collider_component>(child, std::forward<args>(a)...);
 
 			collider.parentEntity = handle;
-			collider.nextColliderEntity = reference.firstColliderEntity;
+			collider.nextEntity = reference.firstColliderEntity;
 			reference.firstColliderEntity = child;
 
 
@@ -59,11 +59,12 @@ struct scene_entity
 		{
 			auto& component = registry->emplace<component_t>(handle, std::forward<args>(a)...);
 
+			// If component is rigid body, recalculate properties.
 			if constexpr (std::is_same_v<component_t, struct rigid_body_component>)
 			{
-				if (hasComponent<collider_reference_component>())
+				if (hasComponent<physics_reference_component>())
 				{
-					component.recalculateProperties(getComponent<collider_reference_component>());
+					component.recalculateProperties(getComponent<physics_reference_component>());
 				}
 			}
 		}
@@ -124,10 +125,7 @@ struct scene
 			.addComponent<tag_component>(name);
 	}
 
-	void deleteEntity(scene_entity e)
-	{
-		registry.destroy(e.handle);
-	}
+	void deleteEntity(scene_entity e);
 
 	bool isEntityValid(scene_entity e)
 	{

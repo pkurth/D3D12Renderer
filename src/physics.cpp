@@ -72,7 +72,9 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 	auto rbView = appScene.view<rigid_body_component>();
 	rigid_body_component* rbBase = rbView.raw();
 
-	for (auto [entityHandle, collider] : appScene.view<collider_component>().each())
+	auto colliderView = appScene.view<collider_component>();
+
+	for (auto [entityHandle, collider] : colliderView.each())
 	{
 		bounding_box& bb = outWorldspaceAABBs[pushIndex];
 		collider_union& col = outWorldSpaceColliders[pushIndex];
@@ -245,26 +247,31 @@ rigid_body_component::rigid_body_component(bool kinematic, float gravityFactor, 
 	this->torqueAccumulator = vec3(0.f);
 }
 
-void rigid_body_component::recalculateProperties(const collider_reference_component& colliderReference)
+void rigid_body_component::recalculateProperties(const physics_reference_component& reference)
 {
 	if (invMass == 0.f)
 	{
 		return; // Kinematic.
 	}
 
-	uint32 numColliders = colliderReference.numColliders;
+	uint32 numColliders = reference.numColliders;
+	if (!numColliders)
+	{
+		return;
+	}
+
 	physics_properties* properties = (physics_properties*)alloca(numColliders * (sizeof(physics_properties)));
 
-	entt::registry* registry = colliderReference.registry;
+	entt::registry* registry = reference.registry;
 
 	uint32 i = 0;
 
-	scene_entity colliderEntity = { colliderReference.firstColliderEntity, registry };
+	scene_entity colliderEntity = { reference.firstColliderEntity, registry };
 	while (colliderEntity)
 	{
 		collider_component& collider = colliderEntity.getComponent<collider_component>();
 		properties[i++] = collider.calculatePhysicsProperties();
-		colliderEntity = { collider.nextColliderEntity, registry };
+		colliderEntity = { collider.nextEntity, registry };
 	}
 
 	assert(i == numColliders);
