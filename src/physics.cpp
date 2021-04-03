@@ -143,12 +143,14 @@ void physicsStep(scene& appScene, float dt)
 	static collision_constraint* collisionConstraints = new collision_constraint[1024];
 
 
-	uint16 rbIndex = 0;
+	  
+	auto rbView = appScene.view<rigid_body_component>();
+	rigid_body_component* rbBase = rbView.raw();
 
 	// Apply gravity and air drag and integrate forces.
 	for (auto [entityHandle, rb, transform] : appScene.group(entt::get<rigid_body_component, trs>).each())
 	{
-		uint16 globalStateIndex = rbIndex++;
+		uint16 globalStateIndex = (uint16)(&rb - rbBase);
 		auto& global = rbGlobal[globalStateIndex];
 		global.rotation = transform.rotation;
 		global.position = transform.position + transform.rotation * rb.localCOGPosition;

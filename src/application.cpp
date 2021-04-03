@@ -74,6 +74,8 @@ void application::loadCustomShaders()
 	}
 }
 
+auto testMesh = make_ref<composite_mesh>();
+
 void application::initialize(dx_renderer* renderer)
 {
 	this->renderer = renderer;
@@ -147,7 +149,6 @@ void application::initialize(dx_renderer* renderer)
 	{
 		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 
-		auto testMesh = make_ref<composite_mesh>();
 		testMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 1.f, 0.1f), {}, trs::identity, getDefaultPBRMaterial() });
 		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 0.4f, vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f)), {}, trs::identity, getDefaultPBRMaterial() });
 
@@ -770,7 +771,6 @@ bool application::handleUserInput(const user_input& input, float dt)
 		if (input.keyboard[key_shift].down)
 		{
 			testPhysicsInteraction(appScene, camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY));
-			objectMovedByGizmo = true;
 		}
 		else
 		{
@@ -791,6 +791,16 @@ bool application::handleUserInput(const user_input& input, float dt)
 		vec3 dir = camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY).direction;
 		sun.direction = -dir;
 		inputCaptured = true;
+	}
+
+	if (!inputCaptured && input.keyboard['N'].pressEvent)
+	{
+		appScene.createEntity("Test 1")
+			.addComponent<trs>(vec3(20.f, 5.f, 0.f), quat::identity)
+			.addComponent<raster_component>(testMesh)
+			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
+			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
+			.addComponent<rigid_body_component>(false, 1.f);
 	}
 
 	return objectMovedByGizmo;
