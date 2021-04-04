@@ -36,7 +36,7 @@ struct scene_entity
 		{
 			if (!hasComponent<physics_reference_component>())
 			{
-				addComponent<physics_reference_component>(registry);
+				addComponent<physics_reference_component>();
 			}
 
 			physics_reference_component& reference = getComponent<physics_reference_component>();
@@ -52,19 +52,19 @@ struct scene_entity
 
 			if (hasComponent<rigid_body_component>())
 			{
-				getComponent<rigid_body_component>().recalculateProperties(reference);
+				getComponent<rigid_body_component>().recalculateProperties(registry, reference);
 			}
 		}
 		else
 		{
 			auto& component = registry->emplace<component_t>(handle, std::forward<args>(a)...);
 
-			// If component is rigid body, recalculate properties.
+			// If component is rigid body, calculate properties.
 			if constexpr (std::is_same_v<component_t, struct rigid_body_component>)
 			{
 				if (hasComponent<physics_reference_component>())
 				{
-					component.recalculateProperties(getComponent<physics_reference_component>());
+					component.recalculateProperties(registry, getComponent<physics_reference_component>());
 				}
 			}
 		}
@@ -104,7 +104,6 @@ struct scene_entity
 		return handle == o;
 	}
 
-private:
 	entt::entity handle = entt::null;
 	entt::registry* registry;
 

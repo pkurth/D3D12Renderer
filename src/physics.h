@@ -3,13 +3,14 @@
 #include "math.h"
 #include "bounding_volumes.h"
 #include "scene.h"
+#include "constraints.h"
 
 #define GRAVITY -9.81f
 
 struct rigid_body_component
 {
 	rigid_body_component(bool kinematic, float gravityFactor = 1.f, float linearDamping = 0.4f, float angularDamping = 0.4f);
-	void recalculateProperties(const struct physics_reference_component& reference);
+	void recalculateProperties(entt::registry* registry, const struct physics_reference_component& reference);
 	vec3 getGlobalCOGPosition(const trs& transform) const;
 
 	// In entity's local space.
@@ -120,10 +121,13 @@ struct collider_component : collider_union
 
 struct physics_reference_component
 {
-	entt::registry* registry;
 	uint32 numColliders = 0;
 	entt::entity firstColliderEntity = entt::null;
+
+	uint16 firstConstraintEdge = INVALID_CONSTRAINT_EDGE;
 };
 
+void addDistanceConstraint(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB, float distance);
+
 void testPhysicsInteraction(scene& appScene, ray r);
-void physicsStep(scene& appScene, float dt);
+void physicsStep(scene& appScene, float dt, uint32 numSolverIterations = 30);

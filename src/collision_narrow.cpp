@@ -297,63 +297,68 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 	return numContacts;
 }
 
-void solveCollisionConstraint(collision_constraint& c, rigid_body_global_state* rbs)
+void solveCollisionConstraints(collision_constraint* constraints, uint32 count, rigid_body_global_state* rbs)
 {
-	auto& rbA = rbs[c.rbA];
-	auto& rbB = rbs[c.rbB];
-
-	vec3 vA = rbA.linearVelocity;
-	vec3 wA = rbA.angularVelocity;
-	vec3 vB = rbB.linearVelocity;
-	vec3 wB = rbB.angularVelocity;
-
-	for (uint32 contactID = 0; contactID < c.contact.numContacts; ++contactID)
+	for (uint32 i = 0; i < count; ++i)
 	{
-		collision_point& point = c.points[contactID];
-		contact_info& contact = c.contact.contacts[contactID];
+		collision_constraint& c = constraints[i];
 
-		{ // Tangent dir
-			vec3 anchorVelocityA = vA + cross(wA, point.relGlobalAnchorA);
-			vec3 anchorVelocityB = vB + cross(wB, point.relGlobalAnchorB);
+		auto& rbA = rbs[c.rbA];
+		auto& rbB = rbs[c.rbB];
 
-			vec3 relVelocity = anchorVelocityB - anchorVelocityA;
-			float vt = dot(relVelocity, point.tangent);
-			float lambda = -point.effectiveMassInTangentDir * vt;
+		vec3 vA = rbA.linearVelocity;
+		vec3 wA = rbA.angularVelocity;
+		vec3 vB = rbB.linearVelocity;
+		vec3 wB = rbB.angularVelocity;
 
-			float maxFriction = c.friction * point.impulseInNormalDir;
-			assert(maxFriction >= 0.f);
-			float newImpulse = clamp(point.impulseInTangentDir + lambda, -maxFriction, maxFriction);
-			lambda = newImpulse - point.impulseInTangentDir;
-			point.impulseInTangentDir = newImpulse;
+		for (uint32 contactID = 0; contactID < c.contact.numContacts; ++contactID)
+		{
+			collision_point& point = c.points[contactID];
+			contact_info& contact = c.contact.contacts[contactID];
 
-			vec3 P = lambda * point.tangent;
-			vA -= rbA.invMass * P;
-			wA -= rbA.invInertia * cross(point.relGlobalAnchorA, P);
-			vB += rbB.invMass * P;
-			wB += rbB.invInertia * cross(point.relGlobalAnchorB, P);
+			{ // Tangent dir
+				vec3 anchorVelocityA = vA + cross(wA, point.relGlobalAnchorA);
+				vec3 anchorVelocityB = vB + cross(wB, point.relGlobalAnchorB);
+
+				vec3 relVelocity = anchorVelocityB - anchorVelocityA;
+				float vt = dot(relVelocity, point.tangent);
+				float lambda = -point.effectiveMassInTangentDir * vt;
+
+				float maxFriction = c.friction * point.impulseInNormalDir;
+				assert(maxFriction >= 0.f);
+				float newImpulse = clamp(point.impulseInTangentDir + lambda, -maxFriction, maxFriction);
+				lambda = newImpulse - point.impulseInTangentDir;
+				point.impulseInTangentDir = newImpulse;
+
+				vec3 P = lambda * point.tangent;
+				vA -= rbA.invMass * P;
+				wA -= rbA.invInertia * cross(point.relGlobalAnchorA, P);
+				vB += rbB.invMass * P;
+				wB += rbB.invInertia * cross(point.relGlobalAnchorB, P);
+			}
+
+			{ // Normal dir
+				vec3 anchorVelocityA = vA + cross(wA, point.relGlobalAnchorA);
+				vec3 anchorVelocityB = vB + cross(wB, point.relGlobalAnchorB);
+
+				vec3 relVelocity = anchorVelocityB - anchorVelocityA;
+				float vn = dot(relVelocity, c.contact.collisionNormal);
+				float lambda = -point.effectiveMassInNormalDir * (vn - point.bias);
+				float impulse = max(point.impulseInNormalDir + lambda, 0.f);
+				lambda = impulse - point.impulseInNormalDir;
+				point.impulseInNormalDir = impulse;
+
+				vec3 P = lambda * c.contact.collisionNormal;
+				vA -= rbA.invMass * P;
+				wA -= rbA.invInertia * cross(point.relGlobalAnchorA, P);
+				vB += rbB.invMass * P;
+				wB += rbB.invInertia * cross(point.relGlobalAnchorB, P);
+			}
 		}
 
-		{ // Normal dir
-			vec3 anchorVelocityA = vA + cross(wA, point.relGlobalAnchorA);
-			vec3 anchorVelocityB = vB + cross(wB, point.relGlobalAnchorB);
-
-			vec3 relVelocity = anchorVelocityB - anchorVelocityA;
-			float vn = dot(relVelocity, c.contact.collisionNormal);
-			float lambda = -point.effectiveMassInNormalDir * (vn - point.bias);
-			float impulse = max(point.impulseInNormalDir + lambda, 0.f);
-			lambda = impulse - point.impulseInNormalDir;
-			point.impulseInNormalDir = impulse;
-
-			vec3 P = lambda * c.contact.collisionNormal;
-			vA -= rbA.invMass * P;
-			wA -= rbA.invInertia * cross(point.relGlobalAnchorA, P);
-			vB += rbB.invMass * P;
-			wB += rbB.invInertia * cross(point.relGlobalAnchorB, P);
-		}
+		rbA.linearVelocity = vA;
+		rbA.angularVelocity = wA;
+		rbB.linearVelocity = vB;
+		rbB.angularVelocity = wB;
 	}
-
-	rbA.linearVelocity = vA;
-	rbA.angularVelocity = wA;
-	rbB.linearVelocity = vB;
-	rbB.angularVelocity = wB;
 }

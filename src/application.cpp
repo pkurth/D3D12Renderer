@@ -155,14 +155,14 @@ void application::initialize(dx_renderer* renderer)
 		auto groundMesh = make_ref<composite_mesh>();
 		groundMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(20.f, 4.f, 20.f)), {}, trs::identity, getDefaultPBRMaterial() });
 
-		appScene.createEntity("Test 1")
+		auto test1 = appScene.createEntity("Test 1")
 			.addComponent<trs>(vec3(20.f, 5.f, 0.f), quat::identity)
 			.addComponent<raster_component>(testMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
 			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
 			.addComponent<rigid_body_component>(false, 1.f);
 
-		appScene.createEntity("Test 2")
+		auto test2 = appScene.createEntity("Test 2")
 			.addComponent<trs>(vec3(20.f, 5.f, -2.f), quat::identity)
 			.addComponent<raster_component>(testMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
@@ -175,6 +175,8 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 0.5f, 4.f)
 			.addComponent<rigid_body_component>(true);
 
+
+		addDistanceConstraint(test1, test2, vec3(0.f, -0.5f, 0.f), vec3(0.f, -0.5f, 0.f), 2.f);
 
 		testMesh->mesh = 
 		groundMesh->mesh = 
@@ -651,6 +653,8 @@ void application::drawSettings(float dt)
 		{
 			editFireParticleSystem(fireParticleSystem);
 			editBoidParticleSystem(boidParticleSystem);
+
+			ImGui::SliderInt("Physics solver iterations", (int*)&numPhysicsSolverIterations, 1, 200);
 		}
 	}
 
@@ -1016,7 +1020,7 @@ void application::update(const user_input& input, float dt)
 	objectDragged |= drawSceneHierarchy();
 	drawSettings(dt);
 	
-	physicsStep(appScene, dt);
+	physicsStep(appScene, dt, numPhysicsSolverIterations);
 	
 	// Particles.
 

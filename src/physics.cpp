@@ -4,6 +4,58 @@
 #include "collision_narrow.h"
 
 
+static std::vector<distance_constraint> distanceConstraints;
+
+static std::vector<constraint_edge> constraintEdges;
+
+
+static void addConstraintEdge(scene_entity& e, physics_constraint& constraint, uint16 constraintIndex, constraint_type type)
+{
+	if (!e.hasComponent<physics_reference_component>())
+	{
+		e.addComponent<physics_reference_component>();
+	}
+
+	physics_reference_component& reference = e.getComponent<physics_reference_component>();
+
+	uint16 edgeIndex = (uint16)constraintEdges.size();
+	constraint_edge& edge = constraintEdges.emplace_back();
+	edge.constraint = constraintIndex;
+	edge.type = type;
+	edge.prevConstraintEdge = INVALID_CONSTRAINT_EDGE;
+	edge.nextConstraintEdge = reference.firstConstraintEdge;
+
+	if (reference.firstConstraintEdge != INVALID_CONSTRAINT_EDGE)
+	{
+		constraintEdges[reference.firstConstraintEdge].prevConstraintEdge = edgeIndex;
+	}
+
+	reference.firstConstraintEdge = edgeIndex;
+
+	if (constraint.edgeA == INVALID_CONSTRAINT_EDGE)
+	{
+		constraint.edgeA = edgeIndex;
+		constraint.entityA = e.handle;
+	}
+	else
+	{
+		assert(constraint.edgeB == INVALID_CONSTRAINT_EDGE);
+		constraint.edgeB = INVALID_CONSTRAINT_EDGE;
+		constraint.entityB = e.handle;
+	}
+}
+
+void addDistanceConstraint(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB, float distance)
+{
+	uint16 constraintIndex = (uint16)distanceConstraints.size();
+	distance_constraint& constraint = distanceConstraints.emplace_back();
+	constraint.localAnchorA = localAnchorA;
+	constraint.localAnchorB = localAnchorB;
+	constraint.globalLength = distance;
+
+	addConstraintEdge(a, constraint, constraintIndex, constraint_type_distance);
+	addConstraintEdge(b, constraint, constraintIndex, constraint_type_distance);
+}
 
 void testPhysicsInteraction(scene& appScene, ray r)
 {
@@ -134,7 +186,7 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 	}
 }
 
-void physicsStep(scene& appScene, float dt)
+void physicsStep(scene& appScene, float dt, uint32 numSolverIterations)
 {
 	// TODO:
 	static void* scratchMemory = malloc(1024 * 1024);
@@ -143,6 +195,8 @@ void physicsStep(scene& appScene, float dt)
 	static bounding_box* worldSpaceAABBs = new bounding_box[1024];
 	static collider_union* worldSpaceColliders = new collider_union[1024];
 	static collision_constraint* collisionConstraints = new collision_constraint[1024];
+	
+	static distance_constraint_update* distanceConstraintUpdates = new distance_constraint_update[1024];
 
 
 	  
@@ -187,17 +241,13 @@ void physicsStep(scene& appScene, float dt)
 	getWorldSpaceColliders(appScene, worldSpaceAABBs, worldSpaceColliders);
 	uint32 numPossibleCollisions = broadphase(appScene, 0, worldSpaceAABBs, possibleCollisions, scratchMemory);
 	uint32 numCollisionConstraints = narrowphase(worldSpaceColliders, rbGlobal, possibleCollisions, numPossibleCollisions, dt, collisionConstraints);
+	
+	initializeDistanceConstraints(appScene, rbGlobal, distanceConstraints.data(), distanceConstraintUpdates, (uint32)distanceConstraints.size(), dt);
 
-	if (numCollisionConstraints)
+	for (uint32 it = 0; it < numSolverIterations; ++it)
 	{
-		const uint32 numSolverIterations = 10;
-		for (uint32 it = 0; it < numSolverIterations; ++it)
-		{
-			for (uint32 i = 0; i < numCollisionConstraints; ++i)
-			{
-				solveCollisionConstraint(collisionConstraints[i], rbGlobal);
-			}
-		}
+		solveDistanceConstraints(distanceConstraintUpdates, (uint32)distanceConstraints.size(), rbGlobal);
+		solveCollisionConstraints(collisionConstraints, numCollisionConstraints, rbGlobal);
 	}
 
 
@@ -247,7 +297,7 @@ rigid_body_component::rigid_body_component(bool kinematic, float gravityFactor, 
 	this->torqueAccumulator = vec3(0.f);
 }
 
-void rigid_body_component::recalculateProperties(const physics_reference_component& reference)
+void rigid_body_component::recalculateProperties(entt::registry* registry, const physics_reference_component& reference)
 {
 	if (invMass == 0.f)
 	{
@@ -261,8 +311,6 @@ void rigid_body_component::recalculateProperties(const physics_reference_compone
 	}
 
 	physics_properties* properties = (physics_properties*)alloca(numColliders * (sizeof(physics_properties)));
-
-	entt::registry* registry = reference.registry;
 
 	uint32 i = 0;
 

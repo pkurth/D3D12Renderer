@@ -94,6 +94,8 @@ private:
 	uint32 numSpotShadowRenderPasses;
 	uint32 numPointShadowRenderPasses;
 
+	uint32 numPhysicsSolverIterations = 30;
+
 	opaque_render_pass opaqueRenderPass;
 	transparent_render_pass transparentRenderPass;
 	sun_shadow_render_pass sunShadowRenderPass;

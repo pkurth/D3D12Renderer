@@ -50,4 +50,4 @@ struct collision_constraint
 uint32 narrowphase(struct collider_union* worldSpaceColliders, struct rigid_body_global_state* rbs, struct broadphase_collision* possibleCollisions, uint32 numPossibleCollisions, float dt,
 	collision_constraint* outCollisionConstraints);
 
-void solveCollisionConstraint(collision_constraint& c, rigid_body_global_state* rbs);
+void solveCollisionConstraints(collision_constraint* constraints, uint32 count, rigid_body_global_state* rbs);
