@@ -5,6 +5,7 @@
 
 
 static std::vector<distance_constraint> distanceConstraints;
+static std::vector<ball_joint_constraint> ballJointConstraints;
 
 static std::vector<constraint_edge> constraintEdges;
 
@@ -55,6 +56,17 @@ void addDistanceConstraint(scene_entity& a, scene_entity& b, vec3 localAnchorA, 
 
 	addConstraintEdge(a, constraint, constraintIndex, constraint_type_distance);
 	addConstraintEdge(b, constraint, constraintIndex, constraint_type_distance);
+}
+
+void addBallJointConstraint(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB)
+{
+	uint16 constraintIndex = (uint16)distanceConstraints.size();
+	ball_joint_constraint& constraint = ballJointConstraints.emplace_back();
+	constraint.localAnchorA = localAnchorA;
+	constraint.localAnchorB = localAnchorB;
+
+	addConstraintEdge(a, constraint, constraintIndex, constraint_type_ball_joint);
+	addConstraintEdge(b, constraint, constraintIndex, constraint_type_ball_joint);
 }
 
 void testPhysicsInteraction(scene& appScene, ray r)
@@ -197,6 +209,7 @@ void physicsStep(scene& appScene, float dt, uint32 numSolverIterations)
 	static collision_constraint* collisionConstraints = new collision_constraint[1024];
 	
 	static distance_constraint_update* distanceConstraintUpdates = new distance_constraint_update[1024];
+	static ball_joint_constraint_update* ballJointConstraintUpdates = new ball_joint_constraint_update[1024];
 
 
 	  
@@ -243,10 +256,12 @@ void physicsStep(scene& appScene, float dt, uint32 numSolverIterations)
 	uint32 numCollisionConstraints = narrowphase(worldSpaceColliders, rbGlobal, possibleCollisions, numPossibleCollisions, dt, collisionConstraints);
 	
 	initializeDistanceConstraints(appScene, rbGlobal, distanceConstraints.data(), distanceConstraintUpdates, (uint32)distanceConstraints.size(), dt);
+	initializeBallJointConstraints(appScene, rbGlobal, ballJointConstraints.data(), ballJointConstraintUpdates, (uint32)ballJointConstraints.size(), dt);
 
 	for (uint32 it = 0; it < numSolverIterations; ++it)
 	{
 		solveDistanceConstraints(distanceConstraintUpdates, (uint32)distanceConstraints.size(), rbGlobal);
+		solveBallJointConstraints(ballJointConstraintUpdates, (uint32)ballJointConstraints.size(), rbGlobal);
 		solveCollisionConstraints(collisionConstraints, numCollisionConstraints, rbGlobal);
 	}
 

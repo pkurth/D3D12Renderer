@@ -668,6 +668,21 @@ mat3 outerProduct(vec3 a, vec3 b)
 	return result;
 }
 
+mat3 getSkewMatrix(vec3 r)
+{
+	mat3 result;
+	result.m00 = 0.f;
+	result.m01 = -r.z;
+	result.m02 = r.y;
+	result.m10 = r.z;
+	result.m11 = 0.f;
+	result.m12 = -r.x;
+	result.m20 = -r.y;
+	result.m21 = r.x;
+	result.m22 = 0.f;
+	return result;
+}
+
 mat4 createPerspectiveProjectionMatrix(float fov, float aspect, float nearPlane, float farPlane)
 {
 	mat4 result = mat4::identity;
@@ -1028,6 +1043,37 @@ float angleToNegPiToPi(float angle)
 		angle -= M_TAU;
 	}
 	return angle;
+}
+
+vec2 solveLinearSystem(const mat2& A, vec2 b)
+{
+	float a11 = A.m00, a12 = A.m01, a21 = A.m10, a22 = A.m11;
+	float det = a11 * a22 - a12 * a21;
+	if (det != 0.f)
+	{
+		det = 1.f / det;
+	}
+	vec2 x;
+	x.x = det * (a22 * b.x - a12 * b.y);
+	x.y = det * (a11 * b.y - a21 * b.x);
+	return x;
+}
+
+vec3 solveLinearSystem(const mat3& A, vec3 b)
+{
+	vec3 ex(A.m00, A.m10, A.m20);
+	vec3 ey(A.m01, A.m11, A.m21);
+	vec3 ez(A.m02, A.m12, A.m22);
+	float det = dot(ex, cross(ey, ez));
+	if (det != 0.f)
+	{
+		det = 1.f / det;
+	}
+	vec3 x;
+	x.x = det * dot(b, cross(ey, ez));
+	x.y = det * dot(ex, cross(b, ez));
+	x.z = det * dot(ex, cross(ey, b));
+	return x;
 }
 
 vec3 getBarycentricCoordinates(vec2 a, vec2 b, vec2 c, vec2 p)

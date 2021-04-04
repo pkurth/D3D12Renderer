@@ -757,6 +757,7 @@ vec3 quatToEuler(quat q);
 quat eulerToQuat(vec3 euler);
 
 mat3 outerProduct(vec3 a, vec3 b);
+mat3 getSkewMatrix(vec3 r);
 
 mat4 trsToMat4(const trs& transform);
 
@@ -780,6 +781,9 @@ vec2 directionToPanoramaUV(vec3 dir);
 
 float angleToZeroToTwoPi(float angle);
 float angleToNegPiToPi(float angle);
+
+vec2 solveLinearSystem(const mat2& A, vec2 b);
+vec3 solveLinearSystem(const mat3& A, vec3 b);
 
 vec3 getBarycentricCoordinates(vec2 a, vec2 b, vec2 c, vec2 p);
 vec3 getBarycentricCoordinates(vec3 a, vec3 b, vec3 c, vec3 p);

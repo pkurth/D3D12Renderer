@@ -6,6 +6,7 @@
 enum constraint_type : uint16
 {
 	constraint_type_distance,
+	constraint_type_ball_joint,
 };
 
 #define INVALID_CONSTRAINT_EDGE UINT16_MAX
@@ -71,3 +72,6 @@ struct rigid_body_global_state;
 
 void initializeDistanceConstraints(scene& appScene, rigid_body_global_state* rbs, const distance_constraint* input, distance_constraint_update* output, uint32 count, float dt);
 void solveDistanceConstraints(distance_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);
+
+void initializeBallJointConstraints(scene& appScene, rigid_body_global_state* rbs, const ball_joint_constraint* input, ball_joint_constraint_update* output, uint32 count, float dt);
+void solveBallJointConstraints(ball_joint_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);

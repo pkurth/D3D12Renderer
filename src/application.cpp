@@ -176,7 +176,8 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<rigid_body_component>(true);
 
 
-		addDistanceConstraint(test1, test2, vec3(0.f, -0.5f, 0.f), vec3(0.f, -0.5f, 0.f), 2.f);
+		//addDistanceConstraint(test1, test2, vec3(0.f, -0.5f, 0.f), vec3(0.f, -0.5f, 0.f), 2.f);
+		addBallJointConstraint(test1, test2, vec3(0.f, -0.5f, 0.f), vec3(0.f, -0.5f, 0.f));
 
 		testMesh->mesh = 
 		groundMesh->mesh = 

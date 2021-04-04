@@ -128,6 +128,7 @@ struct physics_reference_component
 };
 
 void addDistanceConstraint(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB, float distance);
+void addBallJointConstraint(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB);
 
 void testPhysicsInteraction(scene& appScene, ray r);
 void physicsStep(scene& appScene, float dt, uint32 numSolverIterations = 30);
