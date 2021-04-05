@@ -276,12 +276,15 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 
 						point.bias = 0.f;
 
-						float vRel = dot(c.contact.collisionNormal, anchorVelocityB - anchorVelocityA);
-						const float slop = -0.001f;
-						if (-contact.penetrationDepth < slop && vRel < 0.f)
+						if (dt > 0.f)
 						{
-							float restitution = max(propsA.restitution, propsB.restitution);
-							point.bias = -restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) / dt;
+							float vRel = dot(c.contact.collisionNormal, anchorVelocityB - anchorVelocityA);
+							const float slop = -0.001f;
+							if (-contact.penetrationDepth < slop && vRel < 0.f)
+							{
+								float restitution = max(propsA.restitution, propsB.restitution);
+								point.bias = -restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) / dt;
+							}
 						}
 					}
 				}
