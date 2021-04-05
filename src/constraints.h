@@ -11,20 +11,24 @@ enum constraint_type : uint16
 
 #define INVALID_CONSTRAINT_EDGE UINT16_MAX
 
-struct physics_constraint
-{
-	entt::entity entityA = entt::null;
-	entt::entity entityB = entt::null;
-	uint16 edgeA = INVALID_CONSTRAINT_EDGE;
-	uint16 edgeB = INVALID_CONSTRAINT_EDGE;
-};
-
 struct constraint_edge
 {
 	uint16 constraint;
 	constraint_type type;
 	uint16 prevConstraintEdge;
 	uint16 nextConstraintEdge;
+};
+
+
+
+
+
+struct physics_constraint
+{
+	entt::entity entityA = entt::null;
+	entt::entity entityB = entt::null;
+	uint16 edgeA = INVALID_CONSTRAINT_EDGE;
+	uint16 edgeB = INVALID_CONSTRAINT_EDGE;
 };
 
 
@@ -70,8 +74,8 @@ struct ball_joint_constraint_update
 
 struct rigid_body_global_state;
 
-void initializeDistanceConstraints(scene& appScene, rigid_body_global_state* rbs, const distance_constraint* input, distance_constraint_update* output, uint32 count, float dt);
-void solveDistanceConstraints(distance_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);
+void initializeDistanceVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const distance_constraint* input, distance_constraint_update* output, uint32 count, float dt);
+void solveDistanceVelocityConstraints(distance_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);
 
-void initializeBallJointConstraints(scene& appScene, rigid_body_global_state* rbs, const ball_joint_constraint* input, ball_joint_constraint_update* output, uint32 count, float dt);
-void solveBallJointConstraints(ball_joint_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);
+void initializeBallJointVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const ball_joint_constraint* input, ball_joint_constraint_update* output, uint32 count, float dt);
+void solveBallJointVelocityConstraints(ball_joint_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);

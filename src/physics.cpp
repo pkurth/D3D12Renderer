@@ -255,14 +255,14 @@ void physicsStep(scene& appScene, float dt, uint32 numSolverIterations)
 	uint32 numPossibleCollisions = broadphase(appScene, 0, worldSpaceAABBs, possibleCollisions, scratchMemory);
 	uint32 numCollisionConstraints = narrowphase(worldSpaceColliders, rbGlobal, possibleCollisions, numPossibleCollisions, dt, collisionConstraints);
 	
-	initializeDistanceConstraints(appScene, rbGlobal, distanceConstraints.data(), distanceConstraintUpdates, (uint32)distanceConstraints.size(), dt);
-	initializeBallJointConstraints(appScene, rbGlobal, ballJointConstraints.data(), ballJointConstraintUpdates, (uint32)ballJointConstraints.size(), dt);
+	initializeDistanceVelocityConstraints(appScene, rbGlobal, distanceConstraints.data(), distanceConstraintUpdates, (uint32)distanceConstraints.size(), dt);
+	initializeBallJointVelocityConstraints(appScene, rbGlobal, ballJointConstraints.data(), ballJointConstraintUpdates, (uint32)ballJointConstraints.size(), dt);
 
 	for (uint32 it = 0; it < numSolverIterations; ++it)
 	{
-		solveDistanceConstraints(distanceConstraintUpdates, (uint32)distanceConstraints.size(), rbGlobal);
-		solveBallJointConstraints(ballJointConstraintUpdates, (uint32)ballJointConstraints.size(), rbGlobal);
-		solveCollisionConstraints(collisionConstraints, numCollisionConstraints, rbGlobal);
+		solveDistanceVelocityConstraints(distanceConstraintUpdates, (uint32)distanceConstraints.size(), rbGlobal);
+		solveBallJointVelocityConstraints(ballJointConstraintUpdates, (uint32)ballJointConstraints.size(), rbGlobal);
+		solveCollisionVelocityConstraints(collisionConstraints, numCollisionConstraints, rbGlobal);
 	}
 
 

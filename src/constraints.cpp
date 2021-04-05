@@ -5,7 +5,7 @@
 #define DISTANCE_CONSTRAINT_BETA 0.1f
 #define BALL_JOINT_CONSTRAINT_BETA 0.1f
 
-void initializeDistanceConstraints(scene& appScene, rigid_body_global_state* rbs, const distance_constraint* input, distance_constraint_update* output, uint32 count, float dt)
+void initializeDistanceVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const distance_constraint* input, distance_constraint_update* output, uint32 count, float dt)
 {
 	auto rbView = appScene.view<rigid_body_component>();
 	rigid_body_component* rbBase = rbView.raw();
@@ -62,7 +62,7 @@ void initializeDistanceConstraints(scene& appScene, rigid_body_global_state* rbs
 	}
 }
 
-void solveDistanceConstraints(distance_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs)
+void solveDistanceVelocityConstraints(distance_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs)
 {
 	for (uint32 i = 0; i < count; ++i)
 	{
@@ -84,7 +84,7 @@ void solveDistanceConstraints(distance_constraint_update* constraints, uint32 co
 	}
 }
 
-void initializeBallJointConstraints(scene& appScene, rigid_body_global_state* rbs, const ball_joint_constraint* input, ball_joint_constraint_update* output, uint32 count, float dt)
+void initializeBallJointVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const ball_joint_constraint* input, ball_joint_constraint_update* output, uint32 count, float dt)
 {
 	auto rbView = appScene.view<rigid_body_component>();
 	rigid_body_component* rbBase = rbView.raw();
@@ -131,7 +131,7 @@ void initializeBallJointConstraints(scene& appScene, rigid_body_global_state* rb
 	}
 }
 
-void solveBallJointConstraints(ball_joint_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs)
+void solveBallJointVelocityConstraints(ball_joint_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs)
 {
 	for (uint32 i = 0; i < count; ++i)
 	{

@@ -297,7 +297,7 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 	return numContacts;
 }
 
-void solveCollisionConstraints(collision_constraint* constraints, uint32 count, rigid_body_global_state* rbs)
+void solveCollisionVelocityConstraints(collision_constraint* constraints, uint32 count, rigid_body_global_state* rbs)
 {
 	for (uint32 i = 0; i < count; ++i)
 	{
