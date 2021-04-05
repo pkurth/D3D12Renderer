@@ -58,7 +58,12 @@ void initializeDistanceVelocityConstraints(scene& appScene, rigid_body_global_st
 		float invMass = globalA.invMass + dot(crAu, globalA.invInertia * crAu)
 					  + globalB.invMass + dot(crBu, globalB.invInertia * crBu);
 		out.effectiveMass = (invMass != 0.f) ? (1.f / invMass) : 0.f;
-		out.bias = (l - in.globalLength) * DISTANCE_CONSTRAINT_BETA / dt;
+
+		out.bias = 0.f;
+		if (dt > 0.f)
+		{
+			out.bias = (l - in.globalLength) * DISTANCE_CONSTRAINT_BETA / dt;
+		}
 	}
 }
 
@@ -127,7 +132,11 @@ void initializeBallJointVelocityConstraints(scene& appScene, rigid_body_global_s
 		out.invEffectiveMass = mat3::identity * globalA.invMass + skewMatA * globalA.invInertia * transpose(skewMatA)
 							 + mat3::identity * globalB.invMass + skewMatB * globalB.invInertia * transpose(skewMatB);
 
-		out.bias = (globalAnchorB - globalAnchorA) * BALL_JOINT_CONSTRAINT_BETA / dt;
+		out.bias = 0.f;
+		if (dt > 0.f)
+		{
+			out.bias = (globalAnchorB - globalAnchorA) * BALL_JOINT_CONSTRAINT_BETA / dt;
+		}
 	}
 }
 
