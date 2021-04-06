@@ -13,7 +13,7 @@ struct sphere_support_fn
 	}
 };
 
-struct box_support_fn
+struct aabb_support_fn
 {
 	const bounding_box& b;
 

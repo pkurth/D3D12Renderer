@@ -100,9 +100,9 @@ void testPhysicsInteraction(scene& appScene, ray r)
 					hit = localR.intersectCapsule(collider.capsule, t);
 				} break;
 
-				case collider_type_box:
+				case collider_type_aabb:
 				{
-					hit = localR.intersectAABB(collider.box, t);
+					hit = localR.intersectAABB(collider.aabb, t);
 				} break;
 			}
 
@@ -179,20 +179,29 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 				col.capsule = { posA, posB, radius };
 			} break;
 
-			case collider_type_box:
+			case collider_type_aabb:
 			{
 				bb = bounding_box::negativeInfinity();
-				bb.grow(transform.rotation * collider.box.minCorner + transform.position);
-				bb.grow(transform.rotation * vec3(collider.box.maxCorner.x, collider.box.minCorner.y, collider.box.minCorner.z) + transform.position);
-				bb.grow(transform.rotation * vec3(collider.box.minCorner.x, collider.box.maxCorner.y, collider.box.minCorner.z) + transform.position);
-				bb.grow(transform.rotation * vec3(collider.box.maxCorner.x, collider.box.maxCorner.y, collider.box.minCorner.z) + transform.position);
-				bb.grow(transform.rotation * vec3(collider.box.minCorner.x, collider.box.minCorner.y, collider.box.maxCorner.z) + transform.position);
-				bb.grow(transform.rotation * vec3(collider.box.maxCorner.x, collider.box.minCorner.y, collider.box.maxCorner.z) + transform.position);
-				bb.grow(transform.rotation * vec3(collider.box.minCorner.x, collider.box.maxCorner.y, collider.box.maxCorner.z) + transform.position);
-				bb.grow(transform.rotation * collider.box.maxCorner + transform.position);
+				bb.grow(transform.rotation * collider.aabb.minCorner + transform.position);
+				bb.grow(transform.rotation * vec3(collider.aabb.maxCorner.x, collider.aabb.minCorner.y, collider.aabb.minCorner.z) + transform.position);
+				bb.grow(transform.rotation * vec3(collider.aabb.minCorner.x, collider.aabb.maxCorner.y, collider.aabb.minCorner.z) + transform.position);
+				bb.grow(transform.rotation * vec3(collider.aabb.maxCorner.x, collider.aabb.maxCorner.y, collider.aabb.minCorner.z) + transform.position);
+				bb.grow(transform.rotation * vec3(collider.aabb.minCorner.x, collider.aabb.minCorner.y, collider.aabb.maxCorner.z) + transform.position);
+				bb.grow(transform.rotation * vec3(collider.aabb.maxCorner.x, collider.aabb.minCorner.y, collider.aabb.maxCorner.z) + transform.position);
+				bb.grow(transform.rotation * vec3(collider.aabb.minCorner.x, collider.aabb.maxCorner.y, collider.aabb.maxCorner.z) + transform.position);
+				bb.grow(transform.rotation * collider.aabb.maxCorner + transform.position);
 
-				assert(transform.rotation == quat::identity);
-				col.box = bb; // TODO: Output OBB here.
+				if (transform.rotation == quat::identity)
+				{
+					col.aabb = bb;
+				}
+				else
+				{
+					col.type = collider_type_obb;
+					col.obb.center = transform.rotation * collider.aabb.getCenter() + transform.position;
+					col.obb.radius = collider.aabb.getRadius();
+					col.obb.rotation = transform.rotation;
+				}
 			} break;
 		}
 	}
@@ -422,12 +431,12 @@ physics_properties collider_union::calculatePhysicsProperties()
 			result.inertia = rot * result.inertia;
 		} break;
 
-		case collider_type_box:
+		case collider_type_aabb:
 		{
-			result.mass = box.volume() * properties.density;
-			result.cog = box.getCenter();
+			result.mass = aabb.volume() * properties.density;
+			result.cog = aabb.getCenter();
 
-			vec3 diameter = box.getRadius() * 2.f;
+			vec3 diameter = aabb.getRadius() * 2.f;
 			result.inertia = mat3::zero;
 			result.inertia.m00 = 1.f / 12.f * result.mass * (diameter.y * diameter.y + diameter.z * diameter.z);
 			result.inertia.m11 = 1.f / 12.f * result.mass * (diameter.x * diameter.x + diameter.z * diameter.z);

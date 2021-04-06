@@ -24,13 +24,7 @@ static void getTangents(vec3 normal, vec3& outTangent, vec3& outBitangent)
 }
 
 
-struct collision_info
-{
-	bool gjkSuccess;
-	epa_status epaSuccess = epa_none;
-	bool collides;
-};
-
+// Sphere tests.
 static bool intersection(const bounding_sphere& s1, const bounding_sphere& s2, contact_manifold& outContact)
 {
 	vec3 n = s2.center - s1.center;
@@ -46,7 +40,7 @@ static bool intersection(const bounding_sphere& s1, const bounding_sphere& s2, c
 		}
 		else
 		{
-			distance = sqrtf(sqDistance);
+			distance = sqrt(sqDistance);
 			outContact.collisionNormal = n / distance;
 		}
 
@@ -66,25 +60,17 @@ static bool intersection(const bounding_sphere& s, const bounding_capsule& c, co
 	return intersection(s, bounding_sphere{ closestPoint, c.radius }, outContact);
 }
 
-static bool intersection(const bounding_capsule& c1, const bounding_capsule& c2, contact_manifold& outContact)
-{
-	vec3 closestPoint1, closestPoint2;
-	closestPoint_SegmentSegment(line_segment{ c1.positionA, c1.positionB }, line_segment{ c2.positionA, c2.positionB }, closestPoint1, closestPoint2);
-	return intersection(bounding_sphere{ closestPoint1, c1.radius }, bounding_sphere{ closestPoint2, c2.radius }, outContact);
-}
-
 static bool intersection(const bounding_sphere& s, const bounding_box& a, contact_manifold& outContact)
 {
 	vec3 p = closestPoint_PointAABB(s.center, a);
 	vec3 n = p - s.center;
-
-	float sqDistance = dot(n, n);
+	float sqDistance = squaredLength(n);
 	if (sqDistance <= s.radius * s.radius)
 	{
 		float dist = 0.f;
 		if (sqDistance > 0.f)
 		{
-			dist = sqrtf(sqDistance);
+			dist = sqrt(sqDistance);
 			n /= dist;
 		}
 		else
@@ -104,10 +90,36 @@ static bool intersection(const bounding_sphere& s, const bounding_box& a, contac
 	return false;
 }
 
-static bool intersection(const bounding_capsule& c, const bounding_box& a, contact_manifold& outContact, collision_info& outInfo)
+static bool intersection(const bounding_sphere& s, const bounding_oriented_box& o, contact_manifold& outContact)
+{
+	bounding_box aabb = bounding_box::fromCenterRadius(o.center, o.radius);
+	bounding_sphere s_ = { 
+		conjugate(o.rotation)* (s.center - o.center) + o.center,
+		s.radius };
+	
+	if (intersection(s_, aabb, outContact))
+	{
+		outContact.collisionNormal = o.rotation * outContact.collisionNormal;
+		outContact.collisionTangent = o.rotation * outContact.collisionTangent;
+		outContact.collisionBitangent = o.rotation * outContact.collisionBitangent;
+		outContact.contacts[0].point = o.rotation * (outContact.contacts[0].point - o.center) + o.center;
+		return true;
+	}
+	return false;
+}
+
+// Capsule tests.
+static bool intersection(const bounding_capsule& c1, const bounding_capsule& c2, contact_manifold& outContact)
+{
+	vec3 closestPoint1, closestPoint2;
+	closestPoint_SegmentSegment(line_segment{ c1.positionA, c1.positionB }, line_segment{ c2.positionA, c2.positionB }, closestPoint1, closestPoint2);
+	return intersection(bounding_sphere{ closestPoint1, c1.radius }, bounding_sphere{ closestPoint2, c2.radius }, outContact);
+}
+
+static bool intersection(const bounding_capsule& c, const bounding_box& a, contact_manifold& outContact)
 {
 	capsule_support_fn capsuleSupport{ c };
-	box_support_fn boxSupport{ a };
+	aabb_support_fn boxSupport{ a };
 
 	gjk_simplex gjkSimplex;
 	if (!gjkIntersectionTest(capsuleSupport, boxSupport, gjkSimplex))
@@ -115,11 +127,9 @@ static bool intersection(const bounding_capsule& c, const bounding_box& a, conta
 		return false;
 	}
 
-	outInfo.gjkSuccess = true;
-
 	epa_result epa;
-	outInfo.epaSuccess = epaCollisionInfo(gjkSimplex, capsuleSupport, boxSupport, epa);
-	if (outInfo.epaSuccess != epa_success)
+	auto epaSuccess = epaCollisionInfo(gjkSimplex, capsuleSupport, boxSupport, epa);
+	if (epaSuccess != epa_success)
 	{
 		//return false;
 	}
@@ -133,49 +143,36 @@ static bool intersection(const bounding_capsule& c, const bounding_box& a, conta
 	return true;
 }
 
-static void imguiDisplay(collider_union* colliderA, collider_union* colliderB, contact_manifold& contact, collision_info& info)
+static bool intersection(const bounding_capsule& c, const bounding_oriented_box& o, contact_manifold& outContact)
 {
-	if (colliderA->type == collider_type_sphere && colliderB->type == collider_type_capsule)
+	bounding_box aabb = bounding_box::fromCenterRadius(o.center, o.radius);
+	bounding_capsule c_ = { 
+		conjugate(o.rotation) * (c.positionA - o.center) + o.center, 
+		conjugate(o.rotation) * (c.positionB - o.center) + o.center,
+		c.radius };
+
+	if (intersection(c_, aabb, outContact))
 	{
-		ImGui::Value("Collides", info.collides);
-	}
-	return;
-	if (ImGui::TreeNodeEx("Collision", ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		ImGui::Text(colliderTypeNames[colliderA->type]);
-		ImGui::Text(colliderTypeNames[colliderB->type]);
+		outContact.collisionNormal = o.rotation * outContact.collisionNormal;
+		outContact.collisionTangent = o.rotation * outContact.collisionTangent;
+		outContact.collisionBitangent = o.rotation * outContact.collisionBitangent;
 
-		ImGui::Value("Collides", info.collides);
-		ImGui::Value("GJK", info.gjkSuccess);
-		ImGui::Text("EPA: %s", epaReturnNames[info.epaSuccess]);
-
-
-#if 0
-
-		collider_properties propsA = colliderA->properties;
-		collider_properties propsB = colliderB->properties;
-
-		float friction = sqrt(propsA.friction * propsB.friction);
-		ImGui::Value("Friction", friction);
-
-		ImGui::Value("# Contacts", contact.numContacts);
-		for (uint32 i = 0; i < contact.numContacts; ++i)
+		for (uint32 i = 0; i < outContact.numContacts; ++i)
 		{
-			ImGui::Value("Depth", contact.contacts[i].penetrationDepth);
+			outContact.contacts[i].point = o.rotation * (outContact.contacts[i].point - o.center) + o.center;
 		}
-#endif
-		
-		ImGui::TreePop();
+		return true;
 	}
+	return false;
 }
+
+// AABB tests.
 
 uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state* rbs, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions, float dt,
 	collision_constraint* outCollisionConstraints)
 {
 	uint32 numContacts = 0;
 
-	ImGui::Begin("Collisions");
-	
 	for (uint32 i = 0; i < numPossibleCollisions; ++i)
 	{
 		broadphase_collision overlap = possibleCollisions[i];
@@ -186,11 +183,12 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 		{
 			contact_manifold& contact = outCollisionConstraints[numContacts].contact;
 			bool collides = false;
-			collision_info info = {};
 
 			collider_union* colliderA = (colliderAInitial->type < colliderBInitial->type) ? colliderAInitial : colliderBInitial;
 			collider_union* colliderB = (colliderAInitial->type < colliderBInitial->type) ? colliderBInitial : colliderAInitial;
 
+
+			// Sphere tests.
 			if (colliderA->type == collider_type_sphere && colliderB->type == collider_type_sphere)
 			{
 				collides = intersection(colliderA->sphere, colliderB->sphere, contact);
@@ -199,21 +197,32 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 			{
 				collides = intersection(colliderA->sphere, colliderB->capsule, contact);
 			}
-			else if (colliderA->type == collider_type_sphere && colliderB->type == collider_type_box)
+			else if (colliderA->type == collider_type_sphere && colliderB->type == collider_type_aabb)
 			{
-				collides = intersection(colliderA->sphere, colliderB->box, contact);
+				collides = intersection(colliderA->sphere, colliderB->aabb, contact);
 			}
-			else if (colliderA->type == collider_type_capsule && colliderB->type == collider_type_box)
+			else if (colliderA->type == collider_type_sphere && colliderB->type == collider_type_obb)
 			{
-				collides = intersection(colliderA->capsule, colliderB->box, contact, info);
+				collides = intersection(colliderA->sphere, colliderB->obb, contact);
 			}
+			
+			// Capsule tests.
 			else if (colliderA->type == collider_type_capsule && colliderB->type == collider_type_capsule)
 			{
 				collides = intersection(colliderA->capsule, colliderB->capsule, contact);
 			}
+			else if (colliderA->type == collider_type_capsule && colliderB->type == collider_type_aabb)
+			{
+				collides = intersection(colliderA->capsule, colliderB->aabb, contact);
+			}
+			else if (colliderA->type == collider_type_capsule && colliderB->type == collider_type_obb)
+			{
+				collides = intersection(colliderA->capsule, colliderB->obb, contact);
+			}
 
-			info.collides = collides;
-			imguiDisplay(colliderA, colliderB, contact, info);
+			// AABB tests.
+
+
 
 			if (collides)
 			{
@@ -294,8 +303,6 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 			}
 		}
 	}
-
-	ImGui::End();
 
 	return numContacts;
 }

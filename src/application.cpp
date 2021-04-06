@@ -170,14 +170,14 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<rigid_body_component>(false, 1.f);
 
 		appScene.createEntity("Test ground")
-			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat::identity)
+			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-20.f)))
 			.addComponent<raster_component>(groundMesh)
 			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 0.5f, 4.f)
 			.addComponent<rigid_body_component>(true);
 
 
 		//addDistanceConstraint(test1, test2, vec3(0.f, -0.5f, 0.f), vec3(0.f, -0.5f, 0.f), 2.f);
-		addBallJointConstraint(test1, test2, vec3(0.f, -0.5f, 0.f), vec3(0.f, -0.5f, 0.f));
+		//addBallJointConstraint(test1, test2, vec3(0.f, -0.5f, 0.f), vec3(0.f, -0.5f, 0.f));
 
 		testMesh->mesh = 
 		groundMesh->mesh = 

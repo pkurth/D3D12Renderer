@@ -111,17 +111,22 @@ struct bounding_box
 
 	float volume()
 	{
-		vec3 extents = getRadius() * 2.f;
-		return extents.x * extents.y * extents.z;
+		vec3 diameter = maxCorner - minCorner;
+		return diameter.x * diameter.y * diameter.z;
 	}
 };
 
-struct bounding_hull
+struct bounding_oriented_box
 {
-	vec3* vertices;
-	indexed_triangle16* triangles;
-	uint32 numVertices;
-	uint32 numTriangles;
+	vec3 center;
+	vec3 radius;
+	quat rotation;
+
+	float volume()
+	{
+		vec3 diameter = radius * 2.f;
+		return diameter.x * diameter.y * diameter.z;
+	}
 };
 
 struct ray

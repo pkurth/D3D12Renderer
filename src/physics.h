@@ -51,7 +51,10 @@ enum collider_type : uint16
 	// The order here is important. See collision_narrow.cpp.
 	collider_type_sphere,
 	collider_type_capsule,
-	collider_type_box,
+	collider_type_aabb,
+	collider_type_obb,
+
+	collider_type_count,
 };
 
 static const char* colliderTypeNames[] =
@@ -73,7 +76,8 @@ struct collider_union
 	{
 		bounding_sphere sphere;
 		bounding_capsule capsule;
-		bounding_box box;
+		bounding_box aabb;
+		bounding_oriented_box obb;
 	};
 
 	collider_properties properties;
@@ -103,8 +107,8 @@ struct collider_component : collider_union
 	}
 	collider_component(bounding_box b, float restitution, float friction, float density)
 	{
-		box = b;
-		initialize(collider_type_box, restitution, friction, density);
+		aabb = b;
+		initialize(collider_type_aabb, restitution, friction, density);
 	}
 
 	void initialize(collider_type type, float restitution, float friction, float density)
