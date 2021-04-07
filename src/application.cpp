@@ -89,7 +89,7 @@ void application::initialize(dx_renderer* renderer)
 		raytracingTLAS.initialize();
 	}
 
-#if 1
+#if 0
 	auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj");
 	if (sponzaMesh)
 	{
@@ -155,6 +155,9 @@ void application::initialize(dx_renderer* renderer)
 		auto groundMesh = make_ref<composite_mesh>();
 		groundMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(20.f, 4.f, 20.f)), {}, trs::identity, getDefaultPBRMaterial() });
 
+		auto boxMesh = make_ref<composite_mesh>();
+		boxMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(1.f)), {}, trs::identity, getDefaultPBRMaterial() });
+
 		auto test1 = appScene.createEntity("Test 1")
 			.addComponent<trs>(vec3(20.f, 5.f, 0.f), quat::identity)
 			.addComponent<raster_component>(testMesh)
@@ -169,8 +172,20 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
 			.addComponent<rigid_body_component>(false, 1.f);
 
+		appScene.createEntity("Test 3")
+			.addComponent<trs>(vec3(20.f, 5.f, -5.f), quat::identity)
+			.addComponent<raster_component>(boxMesh)
+			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
+			.addComponent<rigid_body_component>(false, 1.f);
+
+		appScene.createEntity("Test 4")
+			.addComponent<trs>(vec3(20.1f, 10.f, -5.f), quat::identity)
+			.addComponent<raster_component>(boxMesh)
+			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
+			.addComponent<rigid_body_component>(false, 1.f);
+
 		appScene.createEntity("Test ground")
-			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-20.f)))
+			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat::identity)
 			.addComponent<raster_component>(groundMesh)
 			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 0.5f, 4.f)
 			.addComponent<rigid_body_component>(true);
@@ -181,6 +196,7 @@ void application::initialize(dx_renderer* renderer)
 
 		testMesh->mesh = 
 		groundMesh->mesh = 
+		boxMesh->mesh = 
 			primitiveMesh.createDXMesh();
 	}
 #endif
@@ -193,7 +209,8 @@ void application::initialize(dx_renderer* renderer)
 
 
 
-
+	void initializeCollisionDebugDraw();
+	initializeCollisionDebugDraw();
 
 
 	setEnvironment("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
@@ -202,7 +219,7 @@ void application::initialize(dx_renderer* renderer)
 
 	random_number_generator rng = { 14878213 };
 
-#if 1
+#if 0
 	spotLights.resize(2);
 
 	spotLights[0].initialize(
@@ -235,7 +252,7 @@ void application::initialize(dx_renderer* renderer)
 	);
 #endif
 
-#if 1
+#if 0
 	decalTexture = loadTextureFromFile("assets/decals/explosion.png");
 
 	if (decalTexture)
@@ -1025,7 +1042,7 @@ void application::update(const user_input& input, float dt)
 	
 	// Particles.
 
-#if 1
+#if 0
 	fireParticleSystem.settings.cameraPosition = camera.position;
 	smokeParticleSystem.settings.cameraPosition = camera.position;
 
@@ -1160,6 +1177,9 @@ void application::update(const user_input& input, float dt)
 				}
 			}
 		}
+
+		void collisionDebugDraw(transparent_render_pass* renderPass);
+		collisionDebugDraw(&transparentRenderPass);
 
 
 		context.waitForWorkCompletion();

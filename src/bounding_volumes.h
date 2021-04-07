@@ -19,7 +19,7 @@ struct indexed_line16
 
 struct indexed_line32
 {
-	uint32 a, b, c;
+	uint32 a, b;
 };
 
 struct line_segment
@@ -100,6 +100,7 @@ struct bounding_box
 	void pad(vec3 p);
 	vec3 getCenter() const;
 	vec3 getRadius() const;
+	bool contains(vec3 p) const;
 
 	bounding_box transform(quat rotation, vec3 translation) const;
 	bounding_box_corners getCorners() const;
@@ -127,6 +128,58 @@ struct bounding_oriented_box
 		vec3 diameter = radius * 2.f;
 		return diameter.x * diameter.y * diameter.z;
 	}
+
+	bounding_box_corners getCorners() const
+	{
+		bounding_box bb = { -radius, radius };
+		return bb.getCorners(rotation, center);
+	}
+};
+
+struct bounding_rectangle
+{
+	vec2 minCorner;
+	vec2 maxCorner;
+
+	void grow(vec2 o);
+	void pad(vec2 p);
+	vec2 getCenter() const;
+	vec2 getRadius() const;
+	bool contains(vec2 p) const;
+
+	static bounding_rectangle negativeInfinity();
+	static bounding_rectangle fromMinMax(vec2 minCorner, vec2 maxCorner);
+	static bounding_rectangle fromCenterRadius(vec2 center, vec2 radius);
+};
+
+inline vec4 createPlane(vec3 point, vec3 normal)
+{
+	float d = -dot(normal, point);
+	return vec4(normal, d);
+}
+
+inline vec3 createLine(vec2 point, vec2 normal)
+{
+	float d = -dot(normal, point);
+	return vec3(normal, d);
+}
+
+float signedDistanceToPlane(const vec3& p, const vec4& plane);
+
+struct bounding_plane
+{
+	vec4 plane;
+
+	bounding_plane() {}
+	bounding_plane(vec3 point, vec3 normal)
+	{
+		plane = createPlane(point, normal);
+	}
+
+	float signedDistance(vec3 p)
+	{
+		return signedDistanceToPlane(p, plane);
+	}
 };
 
 struct ray
@@ -146,14 +199,6 @@ struct ray
 	bool intersectRectangle(vec3 pos, vec3 tangent, vec3 bitangent, vec2 radius, float& outT) const;
 	bool intersectTorus(const bounding_torus& torus, float& outT) const;
 };
-
-inline vec4 createPlane(vec3 point, vec3 normal)
-{
-	float d = -dot(normal, point);
-	return vec4(normal, d);
-}
-
-float signedDistanceToPlane(const vec3& p, const vec4& plane);
 
 bool aabbVSAABB(const bounding_box& a, const bounding_box& b);
 bool sphereVSSphere(const bounding_sphere& a, const bounding_sphere& b);

@@ -7,7 +7,7 @@ struct sphere_support_fn
 {
 	const bounding_sphere& s;
 
-	vec3 operator()(const vec3& dir) const
+	vec3 operator()(vec3 dir) const
 	{
 		return normalize(dir) * s.radius + s.center;
 	}
@@ -17,13 +17,30 @@ struct aabb_support_fn
 {
 	const bounding_box& b;
 
-	vec3 operator()(const vec3& dir) const
+	vec3 operator()(vec3 dir) const
 	{
 		return vec3(
 			(dir.x < 0.f) ? b.minCorner.x : b.maxCorner.x,
 			(dir.y < 0.f) ? b.minCorner.y : b.maxCorner.y,
 			(dir.z < 0.f) ? b.minCorner.z : b.maxCorner.z
 		);
+	}
+};
+
+struct obb_support_fn
+{
+	const bounding_oriented_box& b;
+
+	vec3 operator()(vec3 dir) const
+	{
+		dir = conjugate(b.rotation) * dir;
+		vec3 r(
+			dir.x < 0.f ? -b.radius.x : b.radius.x,
+			dir.y < 0.f ? -b.radius.y : b.radius.y,
+			dir.z < 0.f ? -b.radius.z : b.radius.z
+		);
+
+		return b.center + b.rotation * r;
 	}
 };
 

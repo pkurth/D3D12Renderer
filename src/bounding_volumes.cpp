@@ -45,6 +45,13 @@ vec3 bounding_box::getRadius() const
 	return (maxCorner - minCorner) * 0.5f;
 }
 
+bool bounding_box::contains(vec3 p) const
+{
+	return p.x >= minCorner.x && p.x <= maxCorner.x
+		&& p.y >= minCorner.y && p.y <= maxCorner.y
+		&& p.z >= minCorner.z && p.z <= maxCorner.z;
+}
+
 bounding_box bounding_box::transform(quat rotation, vec3 translation) const
 {
 	bounding_box result = bounding_box::negativeInfinity();
@@ -100,6 +107,51 @@ bounding_box bounding_box::fromMinMax(vec3 minCorner, vec3 maxCorner)
 bounding_box bounding_box::fromCenterRadius(vec3 center, vec3 radius)
 {
 	return bounding_box{ center - radius, center + radius };
+}
+
+void bounding_rectangle::grow(vec2 o)
+{
+	minCorner.x = min(minCorner.x, o.x);
+	minCorner.y = min(minCorner.y, o.y);
+	maxCorner.x = max(maxCorner.x, o.x);
+	maxCorner.y = max(maxCorner.y, o.y);
+}
+
+void bounding_rectangle::pad(vec2 p)
+{
+	minCorner -= p;
+	maxCorner += p;
+}
+
+vec2 bounding_rectangle::getCenter() const
+{
+	return (minCorner + maxCorner) * 0.5f;
+}
+
+vec2 bounding_rectangle::getRadius() const
+{
+	return (maxCorner - minCorner) * 0.5f;
+}
+
+bool bounding_rectangle::contains(vec2 p) const
+{
+	return p.x >= minCorner.x && p.x <= maxCorner.x
+		&& p.y >= minCorner.y && p.y <= maxCorner.y;
+}
+
+bounding_rectangle bounding_rectangle::negativeInfinity()
+{
+	return bounding_rectangle{ vec2(FLT_MAX, FLT_MAX), vec2(-FLT_MAX, -FLT_MAX) };
+}
+
+bounding_rectangle bounding_rectangle::fromMinMax(vec2 minCorner, vec2 maxCorner)
+{
+	return bounding_rectangle{ minCorner, maxCorner };
+}
+
+bounding_rectangle bounding_rectangle::fromCenterRadius(vec2 center, vec2 radius)
+{
+	return bounding_rectangle{ center - radius, center + radius };
 }
 
 bool ray::intersectPlane(vec3 normal, float d, float& outT) const
