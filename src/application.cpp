@@ -149,8 +149,14 @@ void application::initialize(dx_renderer* renderer)
 	{
 		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 
-		testMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 1.f, 0.1f), {}, trs::identity, getDefaultPBRMaterial() });
-		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 0.4f, vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f)), {}, trs::identity, getDefaultPBRMaterial() });
+		auto lollipopMaterial = createPBRMaterial(
+			"assets/sphere/Tiles074_2K_Color.jpg",
+			"assets/sphere/Tiles074_2K_Normal.jpg",
+			"assets/sphere/Tiles074_2K_Roughness.jpg",
+			{}, vec4(0.f), vec4(1.f), 1.f, 1.f);
+
+		testMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 1.f, 0.1f), {}, trs::identity, lollipopMaterial });
+		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 0.4f, vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f)), {}, trs::identity, lollipopMaterial });
 
 		auto groundMesh = make_ref<composite_mesh>();
 		groundMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(20.f, 4.f, 20.f)), {}, trs::identity, createPBRMaterial(
@@ -168,43 +174,31 @@ void application::initialize(dx_renderer* renderer)
 				{}, {})
 			});
 
-		auto test1 = appScene.createEntity("Test 1")
+		auto test1 = appScene.createEntity("Lollipop 1")
 			.addComponent<trs>(vec3(20.f, 5.f, 0.f), quat::identity)
 			.addComponent<raster_component>(testMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
 			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
 			.addComponent<rigid_body_component>(true, 1.f);
 
-		auto test2 = appScene.createEntity("Test 2")
+		auto test2 = appScene.createEntity("Lollipop 2")
 			.addComponent<trs>(vec3(20.f, 5.f, -2.f), quat::identity)
 			.addComponent<raster_component>(testMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
 			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
 			.addComponent<rigid_body_component>(true, 1.f);
 
-		appScene.createEntity("Test 3")
-			.addComponent<trs>(vec3(20.f, 5.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
-			.addComponent<raster_component>(boxMesh)
-			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
-			.addComponent<rigid_body_component>(false, 1.f);
-
-		appScene.createEntity("Test 4")
-			.addComponent<trs>(vec3(20.1f, 10.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
-			.addComponent<raster_component>(boxMesh)
-			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
-			.addComponent<rigid_body_component>(false, 1.f);
-
 		for (uint32 i = 0; i < 30; ++i)
 		{
-			appScene.createEntity("Cube 4")
-				.addComponent<trs>(vec3(20.1f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+			appScene.createEntity("Cube")
+				.addComponent<trs>(vec3(20.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
 				.addComponent<raster_component>(boxMesh)
 				.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
 				.addComponent<rigid_body_component>(false, 1.f);
 		}
 
 		appScene.createEntity("Test ground")
-			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(10.f)))
+			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
 			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 0.5f, 4.f)
 			.addComponent<rigid_body_component>(true);
