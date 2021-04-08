@@ -163,29 +163,29 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<raster_component>(testMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
 			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
-			.addComponent<rigid_body_component>(false, 1.f);
+			.addComponent<rigid_body_component>(true, 1.f);
 
 		auto test2 = appScene.createEntity("Test 2")
 			.addComponent<trs>(vec3(20.f, 5.f, -2.f), quat::identity)
 			.addComponent<raster_component>(testMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
 			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
-			.addComponent<rigid_body_component>(false, 1.f);
+			.addComponent<rigid_body_component>(true, 1.f);
 
 		appScene.createEntity("Test 3")
-			.addComponent<trs>(vec3(20.f, 5.f, -5.f), quat::identity)
+			.addComponent<trs>(vec3(20.f, 5.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
 			.addComponent<raster_component>(boxMesh)
 			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
 			.addComponent<rigid_body_component>(false, 1.f);
 
-		appScene.createEntity("Test 4")
-			.addComponent<trs>(vec3(20.1f, 10.f, -5.f), quat::identity)
-			.addComponent<raster_component>(boxMesh)
-			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
-			.addComponent<rigid_body_component>(false, 1.f);
+		//appScene.createEntity("Test 4")
+		//	.addComponent<trs>(vec3(20.1f, 10.f, -5.f), quat::identity)
+		//	.addComponent<raster_component>(boxMesh)
+		//	.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
+		//	.addComponent<rigid_body_component>(false, 1.f);
 
 		appScene.createEntity("Test ground")
-			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat::identity)
+			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(10.f)))
 			.addComponent<raster_component>(groundMesh)
 			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 0.5f, 4.f)
 			.addComponent<rigid_body_component>(true);

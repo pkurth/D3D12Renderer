@@ -436,6 +436,8 @@ static bool intersection(const bounding_box& a, const bounding_box& b, contact_m
 
 static bool intersection(const bounding_box& a, const bounding_oriented_box& b, contact_manifold& outContact)
 {
+	// Test OBB against AABB faces.
+
 	vec4 aabbPlanes[] =
 	{
 		createPlane(a.minCorner, vec3(-1.f, 0.f, 0.f)),
@@ -449,14 +451,17 @@ static bool intersection(const bounding_box& a, const bounding_oriented_box& b, 
 	aabb_support_fn aabbSupport{ a };
 	obb_support_fn obbSupport{ b };
 
+	bool aabbFace = true;
+
 	sat_result sat;
-	sat_status first = satIntersectionTest(aabbPlanes, arraysize(aabbPlanes), obbSupport, sat);
+	sat_status first = satFaceIntersectionTest(aabbPlanes, arraysize(aabbPlanes), obbSupport, sat);
 	if (first == sat_no_intersection)
 	{
 		return false;
 	}
 
-	bool aabbFace = true;
+
+	// Test OBB against AABB faces.
 
 	vec3 obbMinCorner = b.center - b.rotation * b.radius;
 	vec3 obbMaxCorner = b.center + b.rotation * b.radius;
@@ -475,7 +480,7 @@ static bool intersection(const bounding_box& a, const bounding_oriented_box& b, 
 		createPlane(obbMaxCorner, obbAxisZ),
 	};
 
-	sat_status second = satIntersectionTest(obbPlanes, arraysize(obbPlanes), aabbSupport, sat);
+	sat_status second = satFaceIntersectionTest(obbPlanes, arraysize(obbPlanes), aabbSupport, sat);
 	if (second == sat_no_intersection)
 	{
 		return false;
@@ -487,14 +492,13 @@ static bool intersection(const bounding_box& a, const bounding_oriented_box& b, 
 
 	bool faceContact = true;
 
+
+
+
+	// Test edges.
+#if 0
 	bounding_box_corners aabbCorners = a.getCorners();
 	bounding_box_corners obbCorners = b.getCorners();
-
-#if 0
-	for (uint32 i = 0; i < 8; ++i)
-	{
-		obbCorners.corners[i] = b.rotation * (obbCorners.corners[i] - b.center) + b.center;
-	}
 
 	static const indexed_line32 edgeIndices[] =
 	{
@@ -512,14 +516,8 @@ static bool intersection(const bounding_box& a, const bounding_oriented_box& b, 
 		{ 3, 7 },
 	};
 
-	struct edge
-	{
-		vec3 start;
-		vec3 direction;
-	};
-
-	edge aabbEdges[12];
-	edge obbEdges[12];
+	sat_edge aabbEdges[12];
+	sat_edge obbEdges[12];
 
 	for (uint32 i = 0; i < 12; ++i)
 	{
@@ -530,40 +528,20 @@ static bool intersection(const bounding_box& a, const bounding_oriented_box& b, 
 		obbEdges[i].direction = obbCorners.corners[edgeIndices[i].b] - obbEdges[i].start;
 	}
 
-
-	aabb_support_fn aabbSupport{ a };
-	for (uint32 aEdgeIndex = 0; aEdgeIndex < 12; ++aEdgeIndex)
+	sat_status third = satEdgeIntersectionTest(obbEdges, 12, b.center, aabbEdges, 12, aabbSupport, sat);
+	if (third == sat_no_intersection)
 	{
-		for (uint32 bEdgeIndex = 0; bEdgeIndex < 12; ++bEdgeIndex)
-		{
-			vec3 axis = cross(aabbEdges[aEdgeIndex].direction, obbEdges[bEdgeIndex].direction);
-			if (dot(axis, obbEdges[bEdgeIndex].start - b.center) < 0.f)
-			{
-				axis = -axis;
-			}
-
-			vec4 plane = createPlane(aabbEdges[bEdgeIndex].start, axis);
-			vec3 normal = plane.xyz;
-
-			vec3 farthest = aabbSupport(-normal);
-
-			float sd = signedDistanceToPlane(farthest, plane);
-			if (sd > 0.f)
-			{
-				return false;
-			}
-
-			float penetration = -sd;
-			if (penetration < sat.minPenetration)
-			{
-				sat.minPenetration = penetration;
-				sat.normal = normal;
-				sat.faceIndex = (aEdgeIndex << 16) | bEdgeIndex;
-				faceContact = false;
-			}
-		}
+		return false;
+	}
+	if (third == sat_better_intersection)
+	{
+		faceContact = false;
 	}
 #endif
+
+
+	// Create contacts.
+	outContact.numContacts = 0;
 
 	if (faceContact)
 	{
@@ -606,6 +584,7 @@ static bool intersection(const bounding_box& a, const bounding_oriented_box& b, 
 		{
 			vec3 p = abs(normal);
 			vec3 radius = aabb.getRadius();
+			vec3 center = aabb.getCenter();
 
 			uint32 maxElement = (p.x > p.y) ? ((p.x > p.z) ? 0 : 2) : ((p.y > p.z) ? 1 : 2);
 			float s = normal.data[maxElement] < 0.f ? 1.f : -1.f; // Flipped sign.
@@ -623,18 +602,22 @@ static bool intersection(const bounding_box& a, const bounding_oriented_box& b, 
 			polygon.points[0].vertex.data[maxElement] = d;
 			polygon.points[0].vertex.data[axis0] = min0;
 			polygon.points[0].vertex.data[axis1] = min1;
+			polygon.points[0].vertex += center;
 
 			polygon.points[1].vertex.data[maxElement] = d;
 			polygon.points[1].vertex.data[axis0] = max0;
 			polygon.points[1].vertex.data[axis1] = min1;
+			polygon.points[1].vertex += center;
 
 			polygon.points[2].vertex.data[maxElement] = d;
 			polygon.points[2].vertex.data[axis0] = max0;
 			polygon.points[2].vertex.data[axis1] = max1;
+			polygon.points[2].vertex += center;
 
 			polygon.points[3].vertex.data[maxElement] = d;
 			polygon.points[3].vertex.data[axis0] = min0;
 			polygon.points[3].vertex.data[axis1] = max1;
+			polygon.points[3].vertex += center;
 		};
 
 		vec3 clipPlanePoints[4];
@@ -699,16 +682,436 @@ static bool intersection(const bounding_box& a, const bounding_oriented_box& b, 
 		}
 
 		findStableContactManifold(clippedPolygon.points, clippedPolygon.numPoints, normal, outContact.collisionTangent, outContact);
+	}
+	else
+	{
+#if 0
+		debugSphere(obbEdges[sat.edgeIndexA].start, 0.1f, redMaterial);
+		debugSphere(obbEdges[sat.edgeIndexA].start + obbEdges[sat.edgeIndexA].direction, 0.1f, redMaterial);
 
-		for (uint32 i = 0; i < outContact.numContacts; ++i)
-		{
-			debugSphere(outContact.contacts[i].point, 0.1f, blueMaterial);
-		}
+		debugSphere(aabbEdges[sat.edgeIndexB].start, 0.1f, greenMaterial);
+		debugSphere(aabbEdges[sat.edgeIndexB].start + aabbEdges[sat.edgeIndexB].direction, 0.1f, greenMaterial);
 
-		return true;
+		//line_segment lineA = { aabbEdges[edgeA].start, aabbEdges[edgeA].start + aabbEdges[edgeA].direction };
+		//line_segment lineB = { aabbEdges[edgeB].start, aabbEdges[edgeB].start + aabbEdges[edgeB].direction };
+		//
+		//vec3 pa, pb;
+		//float penetration = closestPoint_SegmentSegment(lineA, lineB, pa, pb);
+		//
+		//vec3 normal = sat.plane.xyz;
+		//
+		//if (dot(normal, b.center - a.getCenter()) < 0.f)
+		//{
+		//	normal = -normal;
+		//}
+		//
+		//outContact.collisionNormal = normal;
+		//getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
+		//
+		//outContact.numContacts = 1;
+		//outContact.contacts[0].penetrationDepth = penetration;
+		//outContact.contacts[0].point = (pa + pb) * 0.5f;
+#endif
 	}
 
-	return false; // TODO: Edge contact.
+	for (uint32 i = 0; i < outContact.numContacts; ++i)
+	{
+		debugSphere(outContact.contacts[i].point, 0.1f, blueMaterial);
+	}
+
+	return true;
+}
+
+// OBB tests.
+static bool intersection(const bounding_oriented_box& a, const bounding_oriented_box& b, contact_manifold& outContact)
+{
+	union obb_axes
+	{
+		struct
+		{
+			vec3 x, y, z;
+		};
+		vec3 u[3];
+	};
+
+	obb_axes axesA = {
+		a.rotation * vec3(1.f, 0.f, 0.f),
+		a.rotation * vec3(0.f, 1.f, 0.f),
+		a.rotation * vec3(0.f, 0.f, 1.f),
+	};
+
+	obb_axes axesB = {
+		b.rotation * vec3(1.f, 0.f, 0.f),
+		b.rotation * vec3(0.f, 1.f, 0.f),
+		b.rotation * vec3(0.f, 0.f, 1.f),
+	};
+
+	mat3 r;
+	r.m00 = dot(axesA.x, axesB.x);
+	r.m10 = dot(axesA.y, axesB.x);
+	r.m20 = dot(axesA.z, axesB.x);
+	r.m01 = dot(axesA.x, axesB.y);
+	r.m11 = dot(axesA.y, axesB.y);
+	r.m21 = dot(axesA.z, axesB.y);
+	r.m02 = dot(axesA.x, axesB.z);
+	r.m12 = dot(axesA.y, axesB.z);
+	r.m22 = dot(axesA.z, axesB.z);
+
+	vec3 tw = b.center - a.center;
+	vec3 t = conjugate(a.rotation) * tw;
+
+	bool parallel = false;
+
+	mat3 absR;
+	for (uint32 i = 0; i < 9; ++i)
+	{
+		absR.m[i] = abs(r.m[i]) + EPSILON; // Add in an epsilon term to counteract arithmetic errors when two edges are parallel and their cross product is (near) 0.
+		if (absR.m[i] >= 1.f)
+		{
+			parallel = true;
+		}
+	}
+
+	float ra, rb;
+
+	float minPenetration = FLT_MAX;
+	vec3 normal;
+	bool bFace = false;
+
+	// Test a's faces.
+	for (uint32 i = 0; i < 3; ++i)
+	{
+		ra = a.radius.data[i];
+		rb = dot(row(absR, i), b.radius);
+		float d = t.data[i];
+		float penetration = ra + rb - abs(d);
+		if (penetration < 0.f) { return false; }
+		if (penetration < minPenetration)
+		{
+			minPenetration = penetration;
+			normal = vec3(0.f); normal.data[i] = d;
+		}
+	}
+
+	// Test b's faces.
+	for (uint32 i = 0; i < 3; ++i)
+	{
+		ra = dot(col(absR, i), a.radius);
+		rb = b.radius.data[i];
+		float d = dot(col(r, i), t);
+		float penetration = ra + rb - abs(d);
+		if (penetration < 0.f) { return false; }
+		if (penetration < minPenetration)
+		{
+			minPenetration = penetration;
+			normal = vec3(0.f); normal.data[i] = d;
+			bFace = true;
+		}
+	}
+
+	uint32 edgeIndex = -1;
+
+	float penetration;
+
+	parallel = true; // TODO: REMOVE.
+	if (!parallel)
+	{
+		// Test a.x x b.x.
+		ra = a.radius.y * absR.m20 + a.radius.z * absR.m10;
+		rb = b.radius.y * absR.m02 + b.radius.z * absR.m01;
+		penetration = ra + rb - abs(t.z * r.m10 - t.y * r.m20);
+		if (penetration < 0.f) { return false; }
+		else if (penetration < minPenetration)
+		{
+			edgeIndex = 0;
+			minPenetration = penetration;
+		}
+
+		// Test a.x x b.y.
+		ra = a.radius.y * absR.m21 + a.radius.z * absR.m11;
+		rb = b.radius.x * absR.m02 + b.radius.z * absR.m00;
+		penetration = ra + rb - abs(t.z * r.m11 - t.y * r.m21);
+		if (penetration < 0.f) { return false; }
+		else if (penetration < minPenetration)
+		{
+			edgeIndex = 1;
+			minPenetration = penetration;
+		}
+
+		// Test a.x x b.z.
+		ra = a.radius.y * absR.m22 + a.radius.z * absR.m12;
+		rb = b.radius.x * absR.m01 + b.radius.y * absR.m00;
+		penetration = ra + rb - abs(t.z * r.m12 - t.y * r.m22);
+		if (penetration < 0.f) { return false; }
+		else if (penetration < minPenetration)
+		{
+			edgeIndex = 2;
+			minPenetration = penetration;
+		}
+
+		// Test a.y x b.x.
+		ra = a.radius.x * absR.m20 + a.radius.z * absR.m00;
+		rb = b.radius.y * absR.m12 + b.radius.z * absR.m11;
+		penetration = ra + rb - abs(t.x * r.m20 - t.z * r.m00);
+		if (penetration < 0.f) { return false; }
+		else if (penetration < minPenetration)
+		{
+			edgeIndex = 3;
+			minPenetration = penetration;
+		}
+
+		// Test a.y x b.y.
+		ra = a.radius.x * absR.m21 + a.radius.z * absR.m01;
+		rb = b.radius.x * absR.m12 + b.radius.z * absR.m10;
+		penetration = ra + rb - abs(t.x * r.m21 - t.z * r.m01);
+		if (penetration < 0.f) { return false; }
+		else if (penetration < minPenetration)
+		{
+			edgeIndex = 4;
+			minPenetration = penetration;
+		}
+
+		// Test a.y x b.z.
+		ra = a.radius.x * absR.m22 + a.radius.z * absR.m02;
+		rb = b.radius.x * absR.m11 + b.radius.y * absR.m10;
+		penetration = ra + rb - abs(t.x * r.m22 - t.z * r.m02);
+		if (penetration < 0.f) { return false; }
+		else if (penetration < minPenetration)
+		{
+			edgeIndex = 5;
+			minPenetration = penetration;
+		}
+
+		// Test a.z x b.x.
+		ra = a.radius.x * absR.m10 + a.radius.y * absR.m00;
+		rb = b.radius.y * absR.m22 + b.radius.z * absR.m21;
+		penetration = ra + rb - abs(t.y * r.m00 - t.x * r.m10);
+		if (penetration < 0.f) { return false; }
+		else if (penetration < minPenetration)
+		{
+			edgeIndex = 6;
+			minPenetration = penetration;
+		}
+
+		// Test a.z x b.y.
+		ra = a.radius.x * absR.m11 + a.radius.y * absR.m01;
+		rb = b.radius.x * absR.m22 + b.radius.z * absR.m20;
+		penetration = ra + rb - abs(t.y * r.m01 - t.x * r.m11);
+		if (penetration < 0.f) { return false; }
+		else if (penetration < minPenetration)
+		{
+			edgeIndex = 7;
+			minPenetration = penetration;
+		}
+
+		// Test a.z x b.z.
+		ra = a.radius.x * absR.m12 + a.radius.y * absR.m02;
+		rb = b.radius.x * absR.m21 + b.radius.y * absR.m20;
+		penetration = ra + rb - abs(t.y * r.m02 - t.x * r.m12);
+		if (penetration < 0.f) { return false; }
+		else if (penetration < minPenetration)
+		{
+			edgeIndex = 8;
+			minPenetration = penetration;
+		}
+	}
+
+
+	bool faceCollision = true;
+	if (edgeIndex != -1)
+	{
+		uint32 aIndex = edgeIndex / 3;
+		uint32 bIndex = edgeIndex % 3;
+
+		normal = cross(axesA.u[aIndex], axesB.u[bIndex]);
+
+		faceCollision = false;
+	} 
+	else
+	{
+		if (bFace)
+		{
+			normal = r * normal;
+		}
+		normal = a.rotation * normal;
+	}
+
+	normal = normalize(normal);
+
+	if (dot(normal, tw) < 0.f)
+	{
+		normal = -normal;
+	}
+
+	// Normal is now in world space and points from a to b.
+
+	outContact.collisionNormal = normal;
+	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
+
+	auto getClippingPlanes = [](const bounding_box& aabb, vec3 normal, vec3* clipPlanePoints, vec3* clipPlaneNormals)
+	{
+		vec3 p = abs(normal);
+
+		uint32 maxElement = (p.x > p.y) ? ((p.x > p.z) ? 0 : 2) : ((p.y > p.z) ? 1 : 2);
+
+		uint32 axis0 = (maxElement + 1) % 3;
+		uint32 axis1 = (maxElement + 2) % 3;
+
+		{
+			vec3 planeNormal(0.f); planeNormal.data[axis0] = 1.f;
+			clipPlaneNormals[0] = planeNormal;
+			clipPlanePoints[0] = aabb.minCorner;
+		}
+		{
+			vec3 planeNormal(0.f); planeNormal.data[axis1] = 1.f;
+			clipPlaneNormals[1] = planeNormal;
+			clipPlanePoints[1] = aabb.minCorner;
+		}
+		{
+			vec3 planeNormal(0.f); planeNormal.data[axis0] = -1.f;
+			clipPlaneNormals[2] = planeNormal;
+			clipPlanePoints[2] = aabb.maxCorner;
+		}
+		{
+			vec3 planeNormal(0.f); planeNormal.data[axis1] = -1.f;
+			clipPlaneNormals[3] = planeNormal;
+			clipPlanePoints[3] = aabb.maxCorner;
+		}
+	};
+	auto getIncidentVertices = [](const bounding_box& aabb, vec3 normal, clipping_polygon& polygon)
+	{
+		vec3 p = abs(normal);
+		vec3 radius = aabb.getRadius();
+
+		uint32 maxElement = (p.x > p.y) ? ((p.x > p.z) ? 0 : 2) : ((p.y > p.z) ? 1 : 2);
+		float s = normal.data[maxElement] < 0.f ? 1.f : -1.f; // Flipped sign.
+
+		uint32 axis0 = (maxElement + 1) % 3;
+		uint32 axis1 = (maxElement + 2) % 3;
+
+		float d = radius.data[maxElement] * s;
+		float min0 = -radius.data[axis0];
+		float min1 = -radius.data[axis1];
+		float max0 = radius.data[axis0];
+		float max1 = radius.data[axis1];
+
+		polygon.numPoints = 4;
+		polygon.points[0].vertex.data[maxElement] = d;
+		polygon.points[0].vertex.data[axis0] = min0;
+		polygon.points[0].vertex.data[axis1] = min1;
+
+		polygon.points[1].vertex.data[maxElement] = d;
+		polygon.points[1].vertex.data[axis0] = max0;
+		polygon.points[1].vertex.data[axis1] = min1;
+
+		polygon.points[2].vertex.data[maxElement] = d;
+		polygon.points[2].vertex.data[axis0] = max0;
+		polygon.points[2].vertex.data[axis1] = max1;
+
+		polygon.points[3].vertex.data[maxElement] = d;
+		polygon.points[3].vertex.data[axis0] = min0;
+		polygon.points[3].vertex.data[axis1] = max1;
+	};
+
+	if (faceCollision)
+	{
+		vec3 clipPlanePoints[4];
+		vec3 clipPlaneNormals[4];
+
+		clipping_polygon polygon;
+
+		vec4 plane;
+
+		bounding_box aLocal = bounding_box::fromCenterRadius(0.f, a.radius);
+		bounding_box bLocal = bounding_box::fromCenterRadius(0.f, b.radius);
+
+		if (!bFace)
+		{
+			// A's face -> A is reference and B is incidence.
+
+			getClippingPlanes(aLocal, conjugate(a.rotation) * normal, clipPlanePoints, clipPlaneNormals);
+			getIncidentVertices(bLocal, conjugate(b.rotation) * normal, polygon);
+
+			for (uint32 i = 0; i < 4; ++i)
+			{
+				clipPlanePoints[i] = a.rotation * clipPlanePoints[i] + a.center;
+				clipPlaneNormals[i] = a.rotation * clipPlaneNormals[i];
+				polygon.points[i].vertex = b.rotation * polygon.points[i].vertex + b.center;
+			}
+
+			obb_support_fn support{ a };
+			vec3 referencePlanePoint = support(normal);
+			plane = createPlane(referencePlanePoint, normal);
+		}
+		else
+		{
+			// B's face -> B is reference and A is incidence.
+
+			getClippingPlanes(bLocal, conjugate(b.rotation) * -normal, clipPlanePoints, clipPlaneNormals);
+			getIncidentVertices(aLocal, conjugate(a.rotation) * -normal, polygon);
+
+			for (uint32 i = 0; i < 4; ++i)
+			{
+				clipPlanePoints[i] = b.rotation * clipPlanePoints[i] + b.center;
+				clipPlaneNormals[i] = b.rotation * clipPlaneNormals[i];
+				polygon.points[i].vertex = a.rotation * polygon.points[i].vertex + a.center;
+			}
+
+			obb_support_fn support{ b };
+			vec3 referencePlanePoint = support(-normal);
+			plane = createPlane(referencePlanePoint, -normal);
+		}
+
+		vec4 clipPlanes[4];
+		for (uint32 i = 0; i < 4; ++i)
+		{
+			clipPlanes[i] = createPlane(clipPlanePoints[i], clipPlaneNormals[i]);
+			polygon.points[i].penetrationDepth = -signedDistanceToPlane(polygon.points[i].vertex, plane);
+		}
+
+		clipping_polygon clippedPolygon;
+		sutherlandHodgmanClipping(polygon, clipPlanes, 4, clippedPolygon);
+
+		assert(clippedPolygon.numPoints > 0);
+
+		// Project onto plane and remove everything below plane.
+		for (uint32 i = 0; i < clippedPolygon.numPoints; ++i)
+		{
+			if (clippedPolygon.points[i].penetrationDepth < 0.f)
+			{
+				clippedPolygon.points[i] = clippedPolygon.points[clippedPolygon.numPoints - 1];
+				--clippedPolygon.numPoints;
+				--i;
+			}
+			else
+			{
+				clippedPolygon.points[i].vertex += plane.xyz * clippedPolygon.points[i].penetrationDepth;
+			}
+		}
+
+		if (clippedPolygon.numPoints == 0)
+		{
+			return false;
+		}
+
+		findStableContactManifold(clippedPolygon.points, clippedPolygon.numPoints, normal, outContact.collisionTangent, outContact);
+	}
+	else
+	{
+		outContact.numContacts = 0;
+		std::cout << "EDGE SHIT\n";
+	}
+
+
+	for (uint32 i = 0; i < outContact.numContacts; ++i)
+	{
+		debugSphere(outContact.contacts[i].point, 0.1f, blueMaterial);
+	}
+
+	//std::cout << "Intersection\n";
+	//std::cout << minPenetration << "     " << normal << '\n';
+
+	return true;
 }
 
 uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state* rbs, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions, float dt,
@@ -771,6 +1174,12 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 			else if (colliderA->type == collider_type_aabb && colliderB->type == collider_type_obb)
 			{
 				collides = intersection(colliderA->aabb, colliderB->obb, contact);
+			}
+
+			// OBB tests.
+			else if (colliderA->type == collider_type_obb && colliderB->type == collider_type_obb)
+			{
+				collides = intersection(colliderA->obb, colliderB->obb, contact);
 			}
 
 
