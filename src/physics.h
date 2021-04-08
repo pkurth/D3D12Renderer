@@ -61,8 +61,11 @@ static const char* colliderTypeNames[] =
 {
 	"Sphere",
 	"Capsule",
-	"Box",
+	"AABB",
+	"OBB",
 };
+
+static_assert(arraysize(colliderTypeNames) == collider_type_count, "Missing collider name");
 
 struct collider_union
 {
@@ -109,6 +112,11 @@ struct collider_component : collider_union
 	{
 		aabb = b;
 		initialize(collider_type_aabb, restitution, friction, density);
+	}
+	collider_component(bounding_oriented_box b, float restitution, float friction, float density)
+	{
+		obb = b;
+		initialize(collider_type_obb, restitution, friction, density);
 	}
 
 	void initialize(collider_type type, float restitution, float friction, float density)
