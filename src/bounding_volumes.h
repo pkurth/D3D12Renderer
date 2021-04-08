@@ -182,6 +182,30 @@ struct bounding_plane
 	}
 };
 
+struct bounding_hull_edge
+{
+	uint16 from, to;
+	uint16 faceA, faceB;
+};
+
+struct bounding_hull_face
+{
+	uint16 a, b, c;
+	vec3 normal;
+};
+
+struct bounding_hull
+{
+	bounding_box aabb;
+
+	std::vector<vec3> vertices;
+	std::vector<bounding_hull_edge> edges;
+	std::vector<bounding_hull_face> faces;
+
+	ref<bounding_hull> fromMesh(void* vertexData, uint32 numVertices, uint32 positionOffset, uint32 vertexStride,
+		indexed_triangle32* triangles, uint32 numTriangles);
+};
+
 struct ray
 {
 	vec3 origin;
