@@ -181,16 +181,7 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 
 			case collider_type_aabb:
 			{
-				bb = bounding_box::negativeInfinity();
-				bb.grow(transform.rotation * collider.aabb.minCorner + transform.position);
-				bb.grow(transform.rotation * vec3(collider.aabb.maxCorner.x, collider.aabb.minCorner.y, collider.aabb.minCorner.z) + transform.position);
-				bb.grow(transform.rotation * vec3(collider.aabb.minCorner.x, collider.aabb.maxCorner.y, collider.aabb.minCorner.z) + transform.position);
-				bb.grow(transform.rotation * vec3(collider.aabb.maxCorner.x, collider.aabb.maxCorner.y, collider.aabb.minCorner.z) + transform.position);
-				bb.grow(transform.rotation * vec3(collider.aabb.minCorner.x, collider.aabb.minCorner.y, collider.aabb.maxCorner.z) + transform.position);
-				bb.grow(transform.rotation * vec3(collider.aabb.maxCorner.x, collider.aabb.minCorner.y, collider.aabb.maxCorner.z) + transform.position);
-				bb.grow(transform.rotation * vec3(collider.aabb.minCorner.x, collider.aabb.maxCorner.y, collider.aabb.maxCorner.z) + transform.position);
-				bb.grow(transform.rotation * collider.aabb.maxCorner + transform.position);
-
+				bb = collider.aabb.transformToAABB(transform.rotation, transform.position);
 				if (transform.rotation == quat::identity)
 				{
 					col.aabb = bb;
@@ -198,31 +189,14 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 				else
 				{
 					col.type = collider_type_obb;
-					col.obb.center = transform.rotation * collider.aabb.getCenter() + transform.position;
-					col.obb.radius = collider.aabb.getRadius();
-					col.obb.rotation = transform.rotation;
+					col.obb = collider.aabb.transformToOBB(transform.rotation, transform.position);
 				}
 			} break;
 
 			case collider_type_obb:
 			{
-				vec3 entityLocalAxes = collider.obb.rotation * collider.obb.radius;
-				vec3 minCorner = collider.obb.center - entityLocalAxes;
-				vec3 maxCorner = collider.obb.center + entityLocalAxes;
-
-				bb = bounding_box::negativeInfinity();
-				bb.grow(transform.rotation * minCorner + transform.position);
-				bb.grow(transform.rotation * vec3(maxCorner.x, minCorner.y, minCorner.z) + transform.position);
-				bb.grow(transform.rotation * vec3(minCorner.x, maxCorner.y, minCorner.z) + transform.position);
-				bb.grow(transform.rotation * vec3(maxCorner.x, maxCorner.y, minCorner.z) + transform.position);
-				bb.grow(transform.rotation * vec3(minCorner.x, minCorner.y, maxCorner.z) + transform.position);
-				bb.grow(transform.rotation * vec3(maxCorner.x, minCorner.y, maxCorner.z) + transform.position);
-				bb.grow(transform.rotation * vec3(minCorner.x, maxCorner.y, maxCorner.z) + transform.position);
-				bb.grow(transform.rotation * maxCorner + transform.position);
-
-				col.obb.center = transform.rotation * collider.obb.center + transform.position;
-				col.obb.radius = collider.obb.radius;
-				col.obb.rotation = transform.rotation * collider.obb.rotation;
+				bb = collider.obb.transformToAABB(transform.rotation, transform.position);
+				col.obb = collider.obb.transformToOBB(transform.rotation, transform.position);
 			} break;
 		}
 	}

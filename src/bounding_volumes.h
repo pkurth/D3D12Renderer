@@ -91,6 +91,8 @@ union bounding_box_corners
 	bounding_box_corners() {}
 };
 
+struct bounding_oriented_box;
+
 struct bounding_box
 {
 	vec3 minCorner;
@@ -102,7 +104,8 @@ struct bounding_box
 	vec3 getRadius() const;
 	bool contains(vec3 p) const;
 
-	bounding_box transform(quat rotation, vec3 translation) const;
+	bounding_box transformToAABB(quat rotation, vec3 translation) const;
+	bounding_oriented_box transformToOBB(quat rotation, vec3 translation) const;
 	bounding_box_corners getCorners() const;
 	bounding_box_corners getCorners(quat rotation, vec3 translation) const;
 
@@ -129,11 +132,10 @@ struct bounding_oriented_box
 		return diameter.x * diameter.y * diameter.z;
 	}
 
-	bounding_box_corners getCorners() const
-	{
-		bounding_box bb = { -radius, radius };
-		return bb.getCorners(rotation, center);
-	}
+	bounding_box getAABB() const;
+	bounding_box transformToAABB(quat rotation, vec3 translation) const;
+	bounding_oriented_box transformToOBB(quat rotation, vec3 translation) const;
+	bounding_box_corners getCorners() const;
 };
 
 struct bounding_rectangle

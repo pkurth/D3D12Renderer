@@ -54,7 +54,7 @@ bool bounding_box::contains(vec3 p) const
 		&& p.z >= minCorner.z && p.z <= maxCorner.z;
 }
 
-bounding_box bounding_box::transform(quat rotation, vec3 translation) const
+bounding_box bounding_box::transformToAABB(quat rotation, vec3 translation) const
 {
 	bounding_box result = bounding_box::negativeInfinity();
 	result.grow(rotation * minCorner + translation);
@@ -66,6 +66,15 @@ bounding_box bounding_box::transform(quat rotation, vec3 translation) const
 	result.grow(rotation * vec3(minCorner.x, maxCorner.y, maxCorner.z) + translation);
 	result.grow(rotation * maxCorner + translation);
 	return result;
+}
+
+bounding_oriented_box bounding_box::transformToOBB(quat rotation, vec3 translation) const
+{
+	bounding_oriented_box obb;
+	obb.center = rotation * getCenter() + translation;
+	obb.radius = getRadius();
+	obb.rotation = rotation;
+	return obb;
 }
 
 bounding_box_corners bounding_box::getCorners() const
@@ -109,6 +118,29 @@ bounding_box bounding_box::fromMinMax(vec3 minCorner, vec3 maxCorner)
 bounding_box bounding_box::fromCenterRadius(vec3 center, vec3 radius)
 {
 	return bounding_box{ center - radius, center + radius };
+}
+
+bounding_box bounding_oriented_box::getAABB() const
+{
+	bounding_box bb = { -radius, radius };
+	return bb.transformToAABB(rotation, center);
+}
+
+bounding_box bounding_oriented_box::transformToAABB(quat rotation, vec3 translation) const
+{
+	bounding_box bb = { -radius, radius };
+	return bb.transformToAABB(rotation * this->rotation, rotation * center + translation);
+}
+
+bounding_oriented_box bounding_oriented_box::transformToOBB(quat rotation, vec3 translation) const
+{
+	return bounding_oriented_box{ rotation * center + translation, radius, rotation * this->rotation };
+}
+
+bounding_box_corners bounding_oriented_box::getCorners() const
+{
+	bounding_box bb = { -radius, radius };
+	return bb.getCorners(rotation, center);
 }
 
 void bounding_rectangle::grow(vec2 o)
