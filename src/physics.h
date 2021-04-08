@@ -53,6 +53,7 @@ enum collider_type : uint16
 	collider_type_capsule,
 	collider_type_aabb,
 	collider_type_obb,
+	collider_type_hull,
 
 	collider_type_count,
 };
@@ -63,6 +64,7 @@ static const char* colliderTypeNames[] =
 	"Capsule",
 	"AABB",
 	"OBB",
+	"Hull",
 };
 
 static_assert(arraysize(colliderTypeNames) == collider_type_count, "Missing collider name");
@@ -81,6 +83,7 @@ struct collider_union
 		bounding_capsule capsule;
 		bounding_box aabb;
 		bounding_oriented_box obb;
+		bounding_hull* hull; // Currently as pointer.
 	};
 
 	collider_properties properties;

@@ -363,6 +363,40 @@ mat4 invert(const mat4& m)
 	return inv;
 }
 
+float determinant(const mat3& m)
+{
+	return m.m00 * (m.m11 * m.m22 - m.m21 * m.m12)
+		- m.m01 * (m.m10 * m.m22 - m.m20 * m.m12)
+		+ m.m02 * (m.m10 * m.m21 - m.m20 * m.m11);
+}
+
+float determinant(const mat4& m)
+{
+	return
+		m.m03 * m.m12 * m.m21 * m.m30 - m.m02 * m.m13 * m.m21 * m.m30 -
+		m.m03 * m.m11 * m.m22 * m.m30 + m.m01 * m.m13 * m.m22 * m.m30 +
+		m.m02 * m.m11 * m.m23 * m.m30 - m.m01 * m.m12 * m.m23 * m.m30 -
+		m.m03 * m.m12 * m.m20 * m.m31 + m.m02 * m.m13 * m.m20 * m.m31 +
+		m.m03 * m.m10 * m.m22 * m.m31 - m.m00 * m.m13 * m.m22 * m.m31 -
+		m.m02 * m.m10 * m.m23 * m.m31 + m.m00 * m.m12 * m.m23 * m.m31 +
+		m.m03 * m.m11 * m.m20 * m.m32 - m.m01 * m.m13 * m.m20 * m.m32 -
+		m.m03 * m.m10 * m.m21 * m.m32 + m.m00 * m.m13 * m.m21 * m.m32 +
+		m.m01 * m.m10 * m.m23 * m.m32 - m.m00 * m.m11 * m.m23 * m.m32 -
+		m.m02 * m.m11 * m.m20 * m.m33 + m.m01 * m.m12 * m.m20 * m.m33 +
+		m.m02 * m.m10 * m.m21 * m.m33 - m.m00 * m.m12 * m.m21 * m.m33 -
+		m.m01 * m.m10 * m.m22 * m.m33 + m.m00 * m.m11 * m.m22 * m.m33;
+}
+
+float trace(const mat3& m)
+{
+	return m.m00 + m.m11 + m.m22;
+}
+
+float trace(const mat4& m)
+{
+	return m.m00 + m.m11 + m.m22 + m.m33;
+}
+
 trs operator*(trs a, trs b)
 {
 	trs result;

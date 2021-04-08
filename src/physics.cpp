@@ -437,6 +437,89 @@ physics_properties collider_union::calculatePhysicsProperties()
 			result.inertia.m11 = 1.f / 12.f * result.mass * (diameter.x * diameter.x + diameter.z * diameter.z);
 			result.inertia.m22 = 1.f / 12.f * result.mass * (diameter.x * diameter.x + diameter.y * diameter.y);
 		} break;
+
+		case collider_type_obb:
+		{
+			result.mass = obb.volume() * properties.density;
+			result.cog = obb.center;
+
+			vec3 diameter = obb.radius * 2.f;
+			result.inertia = mat3::zero;
+			result.inertia.m00 = 1.f / 12.f * result.mass * (diameter.y * diameter.y + diameter.z * diameter.z);
+			result.inertia.m11 = 1.f / 12.f * result.mass * (diameter.x * diameter.x + diameter.z * diameter.z);
+			result.inertia.m22 = 1.f / 12.f * result.mass * (diameter.x * diameter.x + diameter.y * diameter.y);
+
+			mat3 rot = quaternionToMat3(obb.rotation);
+			result.inertia = transpose(rot) * result.inertia * rot;
+		} break;
+
+		case collider_type_hull:
+		{
+			// http://number-none.com/blow/inertia/
+			// http://number-none.com/blow/inertia/bb_inertia.doc
+
+			const float s60 = 1.f / 60.f;
+			const float s120 = 1.f / 120.f;
+
+			// Covariance-matrix of a tetrahedron with v0 = (0, 0, 0), v1 = (1, 0, 0), v2 = (0, 1, 0), v3 = (0, 0, 1).
+			const mat3 Ccanonical(
+				s60, s120, s120,
+				s120, s60, s120,
+				s120, s120, s60
+			);
+
+			uint32 numFaces = (uint32)hull->faces.size();
+
+			physics_properties* tetProperties = (physics_properties*)alloca(numFaces * (sizeof(physics_properties)));
+
+			float totalMass = 0.f;
+			mat3 totalCovariance = mat3::zero;
+			vec3 totalCOG(0.f);
+
+			for (uint32 i = 0; i < numFaces; ++i)
+			{
+				auto& face = hull->faces[i];
+
+				//vec3 w0 = 0.f;
+				vec3 w1 = hull->vertices[face.a];
+				vec3 w2 = hull->vertices[face.b];
+				vec3 w3 = hull->vertices[face.c];
+
+				mat3 A(
+					w1.x, w2.x, w3.x,
+					w1.y, w2.y, w3.y,
+					w1.z, w2.z, w3.z
+				);
+
+
+				physics_properties& p = tetProperties[i];
+
+				float detA = determinant(A);
+				p.inertia = detA * A * Ccanonical * transpose(A); // Actually the covariance, but reused here.
+
+				float volume = 1.f / 6.f * detA;
+				p.mass = volume * properties.density;
+				p.cog = (w1 + w2 + w3) * 0.25f;
+
+				totalMass += p.mass;
+				totalCovariance += p.inertia;
+				totalCOG += p.cog * p.mass;
+			}
+
+			totalCOG /= totalMass;
+
+			vec3 translation = -totalCOG;
+			mat3 CprimeTotal = totalCovariance + totalMass * outerProduct(translation, translation);
+
+			result.cog = totalCOG;
+			result.mass = totalMass;
+			result.inertia = mat3::identity * trace(CprimeTotal) - CprimeTotal;
+		} break;
+
+		default:
+		{
+			assert(false);
+		} break;
 	}
 	return result;
 }

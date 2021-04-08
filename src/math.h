@@ -734,6 +734,12 @@ mat4 transpose(const mat4& a);
 mat3 invert(const mat3& m);
 mat4 invert(const mat4& m);
 
+float determinant(const mat3& m);
+float determinant(const mat4& m);
+
+float trace(const mat3& m);
+float trace(const mat4& m);
+
 vec3 transformPosition(const mat4& m, vec3 pos);
 vec3 transformDirection(const mat4& m, vec3 dir);
 vec3 transformPosition(const trs& m, vec3 pos);
