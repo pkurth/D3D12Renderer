@@ -174,10 +174,16 @@ static void sutherlandHodgmanClipping(clipping_polygon& input, vec4* clipPlanes,
 	clipping_polygon* in = &input;
 	clipping_polygon* out = &output;
 
-	for (uint32 clipIndex = 0; clipIndex < numClipPlanes; ++clipIndex)
+	uint32 clipIndex = 0;
+	for (; clipIndex < numClipPlanes; ++clipIndex)
 	{
 		vec4 clipPlane = clipPlanes[clipIndex];
 		out->numPoints = 0;
+
+		if (in->numPoints == 0)
+		{
+			break;
+		}
 
 		vertex_penetration_pair startPoint = in->points[in->numPoints - 1];
 		for (uint32 i = 0; i < in->numPoints; ++i)
@@ -211,7 +217,7 @@ static void sutherlandHodgmanClipping(clipping_polygon& input, vec4* clipPlanes,
 		out = tmp;
 	}
 
-	if (numClipPlanes % 2 == 0)
+	if (clipIndex % 2 == 0)
 	{
 		for (uint32 i = 0; i < input.numPoints; ++i)
 		{
@@ -219,6 +225,110 @@ static void sutherlandHodgmanClipping(clipping_polygon& input, vec4* clipPlanes,
 		}
 		output.numPoints = input.numPoints;
 	}
+}
+
+// Returns points and normals in AABB's local space. The caller must transform them to world space if needed.
+static void getAABBClippingPlanes(vec3 aabbRadius, vec3 normal, vec3* clipPlanePoints, vec3* clipPlaneNormals)
+{
+	vec3 p = abs(normal);
+
+	uint32 maxElement = (p.x > p.y) ? ((p.x > p.z) ? 0 : 2) : ((p.y > p.z) ? 1 : 2);
+
+	uint32 axis0 = (maxElement + 1) % 3;
+	uint32 axis1 = (maxElement + 2) % 3;
+
+	{
+		vec3 planeNormal(0.f); planeNormal.data[axis0] = 1.f;
+		clipPlaneNormals[0] = planeNormal;
+		clipPlanePoints[0] = -aabbRadius;
+	}
+	{
+		vec3 planeNormal(0.f); planeNormal.data[axis1] = 1.f;
+		clipPlaneNormals[1] = planeNormal;
+		clipPlanePoints[1] = -aabbRadius;
+	}
+	{
+		vec3 planeNormal(0.f); planeNormal.data[axis0] = -1.f;
+		clipPlaneNormals[2] = planeNormal;
+		clipPlanePoints[2] = aabbRadius;
+	}
+	{
+		vec3 planeNormal(0.f); planeNormal.data[axis1] = -1.f;
+		clipPlaneNormals[3] = planeNormal;
+		clipPlanePoints[3] = aabbRadius;
+	}
+}
+
+// Returns points in AABB's local space. The caller must transform them to world space if needed.
+static void getAABBIncidentVertices(vec3 aabbRadius, vec3 normal, clipping_polygon& polygon)
+{
+	vec3 p = abs(normal);
+
+	uint32 maxElement = (p.x > p.y) ? ((p.x > p.z) ? 0 : 2) : ((p.y > p.z) ? 1 : 2);
+	float s = normal.data[maxElement] < 0.f ? 1.f : -1.f; // Flipped sign.
+
+	uint32 axis0 = (maxElement + 1) % 3;
+	uint32 axis1 = (maxElement + 2) % 3;
+
+	float d = aabbRadius.data[maxElement] * s;
+	float min0 = -aabbRadius.data[axis0];
+	float min1 = -aabbRadius.data[axis1];
+	float max0 = aabbRadius.data[axis0];
+	float max1 = aabbRadius.data[axis1];
+
+	polygon.numPoints = 4;
+	polygon.points[0].vertex.data[maxElement] = d;
+	polygon.points[0].vertex.data[axis0] = min0;
+	polygon.points[0].vertex.data[axis1] = min1;
+
+	polygon.points[1].vertex.data[maxElement] = d;
+	polygon.points[1].vertex.data[axis0] = max0;
+	polygon.points[1].vertex.data[axis1] = min1;
+
+	polygon.points[2].vertex.data[maxElement] = d;
+	polygon.points[2].vertex.data[axis0] = max0;
+	polygon.points[2].vertex.data[axis1] = max1;
+
+	polygon.points[3].vertex.data[maxElement] = d;
+	polygon.points[3].vertex.data[axis0] = min0;
+	polygon.points[3].vertex.data[axis1] = max1;
+}
+
+static void getAABBIncidentEdge(vec3 aabbRadius, vec3 normal, vec3& outA, vec3& outB)
+{
+	vec3 p = abs(normal);
+
+	outA = vec3(aabbRadius.x, aabbRadius.y, aabbRadius.z);
+
+	if (p.x > p.y)
+	{
+		if (p.y > p.z)
+		{
+			outB = vec3(aabbRadius.x, aabbRadius.y, -aabbRadius.z);
+		}
+		else
+		{
+			outB = vec3(aabbRadius.x, -aabbRadius.y, aabbRadius.z);
+		}
+	}
+	else
+	{
+		if (p.x > p.z)
+		{
+			outB = vec3(aabbRadius.x, aabbRadius.y, -aabbRadius.z);
+		}
+		else
+		{
+			outB = vec3(-aabbRadius.x, aabbRadius.y, aabbRadius.z);
+		}
+	}
+
+	float sx = normal.x < 0.f ? -1.f : 1.f;
+	float sy = normal.y < 0.f ? -1.f : 1.f;
+	float sz = normal.z < 0.f ? -1.f : 1.f;
+
+	outA *= vec3(sx, sy, sz);
+	outB *= vec3(sx, sy, sz);
 }
 
 
@@ -550,87 +660,15 @@ static bool intersection(const bounding_box& a, const bounding_oriented_box& b, 
 
 		getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
 
-		auto getClippingPlanes = [](const bounding_box& aabb, vec3 normal, vec3* clipPlanePoints, vec3* clipPlaneNormals)
-		{
-			vec3 p = abs(normal);
-
-			uint32 maxElement = (p.x > p.y) ? ((p.x > p.z) ? 0 : 2) : ((p.y > p.z) ? 1 : 2);
-
-			uint32 axis0 = (maxElement + 1) % 3;
-			uint32 axis1 = (maxElement + 2) % 3;
-
-			{
-				vec3 planeNormal(0.f); planeNormal.data[axis0] = 1.f;
-				clipPlaneNormals[0] = planeNormal;
-				clipPlanePoints[0] = aabb.minCorner;
-			}
-			{
-				vec3 planeNormal(0.f); planeNormal.data[axis1] = 1.f;
-				clipPlaneNormals[1] = planeNormal;
-				clipPlanePoints[1] = aabb.minCorner;
-			}
-			{
-				vec3 planeNormal(0.f); planeNormal.data[axis0] = -1.f;
-				clipPlaneNormals[2] = planeNormal;
-				clipPlanePoints[2] = aabb.maxCorner;
-			}
-			{
-				vec3 planeNormal(0.f); planeNormal.data[axis1] = -1.f;
-				clipPlaneNormals[3] = planeNormal;
-				clipPlanePoints[3] = aabb.maxCorner;
-			}
-		};
-		auto getIncidentVertices = [](const bounding_box& aabb, vec3 normal, clipping_polygon& polygon)
-		{
-			vec3 p = abs(normal);
-			vec3 radius = aabb.getRadius();
-			vec3 center = aabb.getCenter();
-
-			uint32 maxElement = (p.x > p.y) ? ((p.x > p.z) ? 0 : 2) : ((p.y > p.z) ? 1 : 2);
-			float s = normal.data[maxElement] < 0.f ? 1.f : -1.f; // Flipped sign.
-
-			uint32 axis0 = (maxElement + 1) % 3;
-			uint32 axis1 = (maxElement + 2) % 3;
-
-			float d = radius.data[maxElement] * s;
-			float min0 = -radius.data[axis0];
-			float min1 = -radius.data[axis1];
-			float max0 = radius.data[axis0];
-			float max1 = radius.data[axis1];
-
-			polygon.numPoints = 4;
-			polygon.points[0].vertex.data[maxElement] = d;
-			polygon.points[0].vertex.data[axis0] = min0;
-			polygon.points[0].vertex.data[axis1] = min1;
-			polygon.points[0].vertex += center;
-
-			polygon.points[1].vertex.data[maxElement] = d;
-			polygon.points[1].vertex.data[axis0] = max0;
-			polygon.points[1].vertex.data[axis1] = min1;
-			polygon.points[1].vertex += center;
-
-			polygon.points[2].vertex.data[maxElement] = d;
-			polygon.points[2].vertex.data[axis0] = max0;
-			polygon.points[2].vertex.data[axis1] = max1;
-			polygon.points[2].vertex += center;
-
-			polygon.points[3].vertex.data[maxElement] = d;
-			polygon.points[3].vertex.data[axis0] = min0;
-			polygon.points[3].vertex.data[axis1] = max1;
-			polygon.points[3].vertex += center;
-		};
-
 		vec3 clipPlanePoints[4];
 		vec3 clipPlaneNormals[4];
 
 		clipping_polygon polygon;
 
-		bounding_box obbLocal = bounding_box::fromCenterRadius(0.f, b.radius);
-
 		if (aabbFace)
 		{
-			getClippingPlanes(a, normal, clipPlanePoints, clipPlaneNormals);
-			getIncidentVertices(obbLocal, conjugate(b.rotation) * normal, polygon);
+			getAABBClippingPlanes(a.getRadius(), normal, clipPlanePoints, clipPlaneNormals);
+			getAABBIncidentVertices(b.radius, conjugate(b.rotation) * normal, polygon);
 
 			for (uint32 i = 0; i < 4; ++i)
 			{
@@ -639,8 +677,8 @@ static bool intersection(const bounding_box& a, const bounding_oriented_box& b, 
 		}
 		else
 		{
-			getClippingPlanes(obbLocal, conjugate(b.rotation) * normal, clipPlanePoints, clipPlaneNormals);
-			getIncidentVertices(a, normal, polygon);
+			getAABBClippingPlanes(b.radius, conjugate(b.rotation) * normal, clipPlanePoints, clipPlaneNormals);
+			getAABBIncidentVertices(a.getRadius(), normal, polygon);
 
 			for (uint32 i = 0; i < 4; ++i)
 			{
@@ -766,7 +804,7 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 	for (uint32 i = 0; i < 9; ++i)
 	{
 		absR.m[i] = abs(r.m[i]) + EPSILON; // Add in an epsilon term to counteract arithmetic errors when two edges are parallel and their cross product is (near) 0.
-		if (absR.m[i] >= 1.f)
+		if (absR.m[i] >= 0.99f)
 		{
 			parallel = true;
 		}
@@ -777,6 +815,7 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 	float minPenetration = FLT_MAX;
 	vec3 normal;
 	bool bFace = false;
+
 
 	// Test a's faces.
 	for (uint32 i = 0; i < 3; ++i)
@@ -789,7 +828,7 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 		if (penetration < minPenetration)
 		{
 			minPenetration = penetration;
-			normal = vec3(0.f); normal.data[i] = d;
+			normal = vec3(0.f); normal.data[i] = 1.f;
 		}
 	}
 
@@ -804,27 +843,33 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 		if (penetration < minPenetration)
 		{
 			minPenetration = penetration;
-			normal = vec3(0.f); normal.data[i] = d;
+			normal = vec3(0.f); normal.data[i] = 1.f;
 			bFace = true;
 		}
 	}
 
-	uint32 edgeIndex = -1;
+	bool edgeCollision = false;
+	vec3 edgeNormal;
 
-	float penetration;
-
-	parallel = true; // TODO: REMOVE.
 	if (!parallel)
 	{
+		float penetration;
+		vec3 normal;
+		float l;
+
 		// Test a.x x b.x.
 		ra = a.radius.y * absR.m20 + a.radius.z * absR.m10;
 		rb = b.radius.y * absR.m02 + b.radius.z * absR.m01;
 		penetration = ra + rb - abs(t.z * r.m10 - t.y * r.m20);
 		if (penetration < 0.f) { return false; }
-		else if (penetration < minPenetration)
+		normal = vec3(0.f, -r.m20, r.m10);
+		l = 1.f / length(normal);
+		penetration *= l;
+		if (penetration < minPenetration)
 		{
-			edgeIndex = 0;
 			minPenetration = penetration;
+			edgeNormal = normal * l;
+			edgeCollision = true;
 		}
 
 		// Test a.x x b.y.
@@ -832,10 +877,14 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 		rb = b.radius.x * absR.m02 + b.radius.z * absR.m00;
 		penetration = ra + rb - abs(t.z * r.m11 - t.y * r.m21);
 		if (penetration < 0.f) { return false; }
-		else if (penetration < minPenetration)
+		normal = vec3(0.f, -r.m21, r.m11);
+		l = 1.f / length(normal);
+		penetration *= l;
+		if (penetration < minPenetration)
 		{
-			edgeIndex = 1;
 			minPenetration = penetration;
+			edgeNormal = normal * l;
+			edgeCollision = true;
 		}
 
 		// Test a.x x b.z.
@@ -843,10 +892,14 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 		rb = b.radius.x * absR.m01 + b.radius.y * absR.m00;
 		penetration = ra + rb - abs(t.z * r.m12 - t.y * r.m22);
 		if (penetration < 0.f) { return false; }
-		else if (penetration < minPenetration)
+		normal = vec3(0.f, -r.m22, r.m12);
+		l = 1.f / length(normal);
+		penetration *= l;
+		if (penetration < minPenetration)
 		{
-			edgeIndex = 2;
 			minPenetration = penetration;
+			edgeNormal = normal * l;
+			edgeCollision = true;
 		}
 
 		// Test a.y x b.x.
@@ -854,10 +907,14 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 		rb = b.radius.y * absR.m12 + b.radius.z * absR.m11;
 		penetration = ra + rb - abs(t.x * r.m20 - t.z * r.m00);
 		if (penetration < 0.f) { return false; }
-		else if (penetration < minPenetration)
+		normal = vec3(r.m20, 0.f, -r.m00);
+		l = 1.f / length(normal);
+		penetration *= l;
+		if (penetration < minPenetration)
 		{
-			edgeIndex = 3;
 			minPenetration = penetration;
+			edgeNormal = normal * l;
+			edgeCollision = true;
 		}
 
 		// Test a.y x b.y.
@@ -865,10 +922,14 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 		rb = b.radius.x * absR.m12 + b.radius.z * absR.m10;
 		penetration = ra + rb - abs(t.x * r.m21 - t.z * r.m01);
 		if (penetration < 0.f) { return false; }
-		else if (penetration < minPenetration)
+		normal = vec3(r.m21, 0.f, -r.m01);
+		l = 1.f / length(normal);
+		penetration *= l;
+		if (penetration < minPenetration)
 		{
-			edgeIndex = 4;
 			minPenetration = penetration;
+			edgeNormal = normal * l;
+			edgeCollision = true;
 		}
 
 		// Test a.y x b.z.
@@ -876,10 +937,14 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 		rb = b.radius.x * absR.m11 + b.radius.y * absR.m10;
 		penetration = ra + rb - abs(t.x * r.m22 - t.z * r.m02);
 		if (penetration < 0.f) { return false; }
-		else if (penetration < minPenetration)
+		normal = vec3(r.m22, 0.f, -r.m02);
+		l = 1.f / length(normal);
+		penetration *= l;
+		if (penetration < minPenetration)
 		{
-			edgeIndex = 5;
 			minPenetration = penetration;
+			edgeNormal = normal * l;
+			edgeCollision = true;
 		}
 
 		// Test a.z x b.x.
@@ -887,10 +952,14 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 		rb = b.radius.y * absR.m22 + b.radius.z * absR.m21;
 		penetration = ra + rb - abs(t.y * r.m00 - t.x * r.m10);
 		if (penetration < 0.f) { return false; }
-		else if (penetration < minPenetration)
+		normal = vec3(-r.m10, r.m00, 0.f);
+		l = 1.f / length(normal);
+		penetration *= l;
+		if (penetration < minPenetration)
 		{
-			edgeIndex = 6;
 			minPenetration = penetration;
+			edgeNormal = normal * l;
+			edgeCollision = true;
 		}
 
 		// Test a.z x b.y.
@@ -898,10 +967,14 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 		rb = b.radius.x * absR.m22 + b.radius.z * absR.m20;
 		penetration = ra + rb - abs(t.y * r.m01 - t.x * r.m11);
 		if (penetration < 0.f) { return false; }
-		else if (penetration < minPenetration)
+		normal = vec3(-r.m11, r.m01, 0.f);
+		l = 1.f / length(normal);
+		penetration *= l;
+		if (penetration < minPenetration)
 		{
-			edgeIndex = 7;
 			minPenetration = penetration;
+			edgeNormal = normal * l;
+			edgeCollision = true;
 		}
 
 		// Test a.z x b.z.
@@ -909,34 +982,34 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 		rb = b.radius.x * absR.m21 + b.radius.y * absR.m20;
 		penetration = ra + rb - abs(t.y * r.m02 - t.x * r.m12);
 		if (penetration < 0.f) { return false; }
-		else if (penetration < minPenetration)
+		normal = vec3(-r.m12, r.m02, 0.f);
+		l = 1.f / length(normal);
+		penetration *= l;
+		if (penetration < minPenetration)
 		{
-			edgeIndex = 8;
 			minPenetration = penetration;
+			edgeNormal = normal * l;
+			edgeCollision = true;
 		}
 	}
 
 
-	bool faceCollision = true;
-	if (edgeIndex != -1)
-	{
-		uint32 aIndex = edgeIndex / 3;
-		uint32 bIndex = edgeIndex % 3;
-
-		normal = cross(axesA.u[aIndex], axesB.u[bIndex]);
-
-		faceCollision = false;
-	} 
-	else
+	bool faceCollision = !edgeCollision;
+	if (faceCollision)
 	{
 		if (bFace)
 		{
 			normal = r * normal;
 		}
-		normal = a.rotation * normal;
+	}
+	else
+	{
+		normal = edgeNormal;
 	}
 
-	normal = normalize(normal);
+	normal = a.rotation * normal;
+
+	//normal = normalize(normal);
 
 	if (dot(normal, tw) < 0.f)
 	{
@@ -948,73 +1021,10 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 	outContact.collisionNormal = normal;
 	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
 
-	auto getClippingPlanes = [](const bounding_box& aabb, vec3 normal, vec3* clipPlanePoints, vec3* clipPlaneNormals)
-	{
-		vec3 p = abs(normal);
-
-		uint32 maxElement = (p.x > p.y) ? ((p.x > p.z) ? 0 : 2) : ((p.y > p.z) ? 1 : 2);
-
-		uint32 axis0 = (maxElement + 1) % 3;
-		uint32 axis1 = (maxElement + 2) % 3;
-
-		{
-			vec3 planeNormal(0.f); planeNormal.data[axis0] = 1.f;
-			clipPlaneNormals[0] = planeNormal;
-			clipPlanePoints[0] = aabb.minCorner;
-		}
-		{
-			vec3 planeNormal(0.f); planeNormal.data[axis1] = 1.f;
-			clipPlaneNormals[1] = planeNormal;
-			clipPlanePoints[1] = aabb.minCorner;
-		}
-		{
-			vec3 planeNormal(0.f); planeNormal.data[axis0] = -1.f;
-			clipPlaneNormals[2] = planeNormal;
-			clipPlanePoints[2] = aabb.maxCorner;
-		}
-		{
-			vec3 planeNormal(0.f); planeNormal.data[axis1] = -1.f;
-			clipPlaneNormals[3] = planeNormal;
-			clipPlanePoints[3] = aabb.maxCorner;
-		}
-	};
-	auto getIncidentVertices = [](const bounding_box& aabb, vec3 normal, clipping_polygon& polygon)
-	{
-		vec3 p = abs(normal);
-		vec3 radius = aabb.getRadius();
-
-		uint32 maxElement = (p.x > p.y) ? ((p.x > p.z) ? 0 : 2) : ((p.y > p.z) ? 1 : 2);
-		float s = normal.data[maxElement] < 0.f ? 1.f : -1.f; // Flipped sign.
-
-		uint32 axis0 = (maxElement + 1) % 3;
-		uint32 axis1 = (maxElement + 2) % 3;
-
-		float d = radius.data[maxElement] * s;
-		float min0 = -radius.data[axis0];
-		float min1 = -radius.data[axis1];
-		float max0 = radius.data[axis0];
-		float max1 = radius.data[axis1];
-
-		polygon.numPoints = 4;
-		polygon.points[0].vertex.data[maxElement] = d;
-		polygon.points[0].vertex.data[axis0] = min0;
-		polygon.points[0].vertex.data[axis1] = min1;
-
-		polygon.points[1].vertex.data[maxElement] = d;
-		polygon.points[1].vertex.data[axis0] = max0;
-		polygon.points[1].vertex.data[axis1] = min1;
-
-		polygon.points[2].vertex.data[maxElement] = d;
-		polygon.points[2].vertex.data[axis0] = max0;
-		polygon.points[2].vertex.data[axis1] = max1;
-
-		polygon.points[3].vertex.data[maxElement] = d;
-		polygon.points[3].vertex.data[axis0] = min0;
-		polygon.points[3].vertex.data[axis1] = max1;
-	};
-
 	if (faceCollision)
 	{
+		//std::cout << "FACE SHIT " << normal << "\n";
+
 		vec3 clipPlanePoints[4];
 		vec3 clipPlaneNormals[4];
 
@@ -1022,15 +1032,12 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 
 		vec4 plane;
 
-		bounding_box aLocal = bounding_box::fromCenterRadius(0.f, a.radius);
-		bounding_box bLocal = bounding_box::fromCenterRadius(0.f, b.radius);
-
 		if (!bFace)
 		{
 			// A's face -> A is reference and B is incidence.
 
-			getClippingPlanes(aLocal, conjugate(a.rotation) * normal, clipPlanePoints, clipPlaneNormals);
-			getIncidentVertices(bLocal, conjugate(b.rotation) * normal, polygon);
+			getAABBClippingPlanes(a.radius, conjugate(a.rotation) * normal, clipPlanePoints, clipPlaneNormals);
+			getAABBIncidentVertices(b.radius, conjugate(b.rotation) * normal, polygon);
 
 			for (uint32 i = 0; i < 4; ++i)
 			{
@@ -1047,8 +1054,8 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 		{
 			// B's face -> B is reference and A is incidence.
 
-			getClippingPlanes(bLocal, conjugate(b.rotation) * -normal, clipPlanePoints, clipPlaneNormals);
-			getIncidentVertices(aLocal, conjugate(a.rotation) * -normal, polygon);
+			getAABBClippingPlanes(b.radius, conjugate(b.rotation) * -normal, clipPlanePoints, clipPlaneNormals);
+			getAABBIncidentVertices(a.radius, conjugate(a.rotation) * -normal, polygon);
 
 			for (uint32 i = 0; i < 4; ++i)
 			{
@@ -1072,7 +1079,10 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 		clipping_polygon clippedPolygon;
 		sutherlandHodgmanClipping(polygon, clipPlanes, 4, clippedPolygon);
 
-		assert(clippedPolygon.numPoints > 0);
+		if (clippedPolygon.numPoints == 0)
+		{
+			return false;
+		}
 
 		// Project onto plane and remove everything below plane.
 		for (uint32 i = 0; i < clippedPolygon.numPoints; ++i)
@@ -1098,8 +1108,29 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 	}
 	else
 	{
-		outContact.numContacts = 0;
-		std::cout << "EDGE SHIT\n";
+		//std::cout << "EDGE SHIT " << normal << "\n";
+
+		vec3 a0, a1, b0, b1;
+		getAABBIncidentEdge(a.radius, conjugate(a.rotation) * normal, a0, a1);
+		getAABBIncidentEdge(b.radius, conjugate(b.rotation) * -normal, b0, b1);
+
+		a0 = a.rotation * a0 + a.center;
+		a1 = a.rotation * a1 + a.center;
+		b0 = b.rotation * b0 + b.center;
+		b1 = b.rotation * b1 + b.center;
+
+		debugSphere(a0, 0.1f, greenMaterial);
+		debugSphere(a1, 0.1f, greenMaterial);
+
+		debugSphere(b0, 0.1f, redMaterial);
+		debugSphere(b1, 0.1f, redMaterial);
+
+		vec3 pa, pb;
+		float sqDistance = closestPoint_SegmentSegment(line_segment{ a0, a1 }, line_segment{ b0, b1 }, pa, pb);
+
+		outContact.numContacts = 1;
+		outContact.contacts[0].penetrationDepth = sqrt(sqDistance);
+		outContact.contacts[0].point = (pa + pb) * 0.5f;
 	}
 
 

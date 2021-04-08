@@ -153,10 +153,20 @@ void application::initialize(dx_renderer* renderer)
 		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 0.4f, vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f)), {}, trs::identity, getDefaultPBRMaterial() });
 
 		auto groundMesh = make_ref<composite_mesh>();
-		groundMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(20.f, 4.f, 20.f)), {}, trs::identity, getDefaultPBRMaterial() });
+		groundMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(20.f, 4.f, 20.f)), {}, trs::identity, createPBRMaterial(
+				"assets/desert/textures/BlueContainer_Albedo.png",
+				"assets/desert/textures/Container_Normal.png",
+				{}, 
+				"assets/desert/textures/Container_Metallic.png", vec4(0.f), vec4(1.f), 0.2f)
+			});
 
 		auto boxMesh = make_ref<composite_mesh>();
-		boxMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(1.f)), {}, trs::identity, getDefaultPBRMaterial() });
+		boxMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(1.f)), {}, trs::identity, 
+			createPBRMaterial(
+				"assets/desert/textures/WoodenCrate2_Albedo.png", 
+				"assets/desert/textures/WoodenCrate2_Normal.png", 
+				{}, {})
+			});
 
 		auto test1 = appScene.createEntity("Test 1")
 			.addComponent<trs>(vec3(20.f, 5.f, 0.f), quat::identity)
@@ -178,11 +188,20 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
 			.addComponent<rigid_body_component>(false, 1.f);
 
-		//appScene.createEntity("Test 4")
-		//	.addComponent<trs>(vec3(20.1f, 10.f, -5.f), quat::identity)
-		//	.addComponent<raster_component>(boxMesh)
-		//	.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
-		//	.addComponent<rigid_body_component>(false, 1.f);
+		appScene.createEntity("Test 4")
+			.addComponent<trs>(vec3(20.1f, 10.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+			.addComponent<raster_component>(boxMesh)
+			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
+			.addComponent<rigid_body_component>(false, 1.f);
+
+		for (uint32 i = 0; i < 30; ++i)
+		{
+			appScene.createEntity("Cube 4")
+				.addComponent<trs>(vec3(20.1f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+				.addComponent<raster_component>(boxMesh)
+				.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
+				.addComponent<rigid_body_component>(false, 1.f);
+		}
 
 		appScene.createEntity("Test ground")
 			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(10.f)))
