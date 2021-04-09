@@ -31,11 +31,13 @@ const aiScene* loadAssimpSceneFile(const std::string& filepathRaw, Assimp::Impor
 	}
 #endif
 
+	int removeFlags = importer.GetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS);
+
 	fs::path filepath = filepathRaw;
 	fs::path extension = filepath.extension();
 
 	fs::path cachedFilename = filepath;
-	cachedFilename.replace_extension(".cache." CACHE_FORMAT);
+	cachedFilename.replace_extension(".cache." + std::to_string(removeFlags) + CACHE_FORMAT);
 
 	fs::path cacheFilepath = L"asset_cache" / cachedFilename;
 
@@ -75,12 +77,32 @@ const aiScene* loadAssimpSceneFile(const std::string& filepathRaw, Assimp::Impor
 #endif
 		std::cout << '\n';
 
-		importer.SetPropertyFloat(AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE, 80.f);
-		importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_POINT | aiPrimitiveType_LINE);
 		//importer.SetPropertyInteger(AI_CONFIG_PP_SLM_VERTEX_LIMIT, UINT16_MAX); // So that we can use 16 bit indices.
 
 		uint32 importFlags = aiProcessPreset_TargetRealtime_MaxQuality | aiProcess_OptimizeGraph | aiProcess_FlipUVs;
 		uint32 exportFlags = 0;
+
+		if (removeFlags != -1)
+		{
+			if (removeFlags & aiComponent_TEXCOORDS)
+			{
+				importFlags &= ~aiProcess_GenUVCoords;
+			}
+			if (removeFlags & aiComponent_NORMALS)
+			{
+				importFlags &= ~aiProcess_GenSmoothNormals;
+			}
+			if (removeFlags & aiComponent_TANGENTS_AND_BITANGENTS)
+			{
+				importFlags &= ~aiProcess_CalcTangentSpace;
+			}
+			importFlags |= aiProcess_RemoveComponent;
+		}
+		else
+		{
+			importer.SetPropertyFloat(AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE, 80.f);
+			importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_POINT | aiPrimitiveType_LINE);
+		}
 
 		scene = importer.ReadFile(filepath.string(), importFlags);
 
