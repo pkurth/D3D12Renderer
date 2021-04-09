@@ -447,6 +447,8 @@ static bool intersection(const bounding_sphere& s, const bounding_hull& h, conta
 // Capsule tests.
 static bool intersection(const bounding_capsule& c1, const bounding_capsule& c2, contact_manifold& outContact)
 {
+	// TODO: Handle multiple-contact-points case.
+
 	vec3 closestPoint1, closestPoint2;
 	closestPoint_SegmentSegment(line_segment{ c1.positionA, c1.positionB }, line_segment{ c2.positionA, c2.positionB }, closestPoint1, closestPoint2);
 	return intersection(bounding_sphere{ closestPoint1, c1.radius }, bounding_sphere{ closestPoint2, c2.radius }, outContact);
@@ -454,6 +456,8 @@ static bool intersection(const bounding_capsule& c1, const bounding_capsule& c2,
 
 static bool intersection(const bounding_capsule& c, const bounding_box& a, contact_manifold& outContact)
 {
+	// TODO: Handle multiple-contact-points case.
+
 	capsule_support_fn capsuleSupport{ c };
 	aabb_support_fn boxSupport{ a };
 
@@ -504,6 +508,8 @@ static bool intersection(const bounding_capsule& c, const bounding_oriented_box&
 
 static bool intersection(const bounding_capsule& c, const bounding_hull& h, contact_manifold& outContact)
 {
+	// TODO: Handle multiple-contact-points case.
+
 	capsule_support_fn capsuleSupport{ c };
 	hull_support_fn hullSupport{ h };
 
@@ -609,6 +615,8 @@ static bool intersection(const bounding_box& a, const bounding_oriented_box& b, 
 
 static bool intersection(const bounding_box& a, const bounding_hull& h, contact_manifold& outContact)
 {
+	// TODO: Handle multiple-contact-points case.
+
 	aabb_support_fn aabbSupport{ a };
 	hull_support_fn hullSupport{ h };
 
@@ -1021,6 +1029,8 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 
 static bool intersection(const bounding_oriented_box& o, const bounding_hull& h, contact_manifold& outContact)
 {
+	// TODO: Handle multiple-contact-points case.
+
 	obb_support_fn obbSupport{ o };
 	hull_support_fn hullSupport{ h };
 
@@ -1032,6 +1042,36 @@ static bool intersection(const bounding_oriented_box& o, const bounding_hull& h,
 
 	epa_result epa;
 	auto epaSuccess = epaCollisionInfo(gjkSimplex, obbSupport, hullSupport, epa);
+	if (epaSuccess != epa_success)
+	{
+		//return false;
+	}
+
+	outContact.collisionNormal = epa.normal;
+	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
+	outContact.numContacts = 1;
+	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
+	outContact.contacts[0].point = epa.point;
+
+	return true;
+}
+
+// Hull tests.
+static bool intersection(const bounding_hull& a, const bounding_hull& b, contact_manifold& outContact)
+{
+	// TODO: Handle multiple-contact-points case.
+
+	hull_support_fn hullSupport1{ a };
+	hull_support_fn hullSupport2{ b };
+
+	gjk_simplex gjkSimplex;
+	if (!gjkIntersectionTest(hullSupport1, hullSupport2, gjkSimplex))
+	{
+		return false;
+	}
+
+	epa_result epa;
+	auto epaSuccess = epaCollisionInfo(gjkSimplex, hullSupport1, hullSupport2, epa);
 	if (epaSuccess != epa_success)
 	{
 		//return false;
@@ -1066,71 +1106,63 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 			collider_union* colliderB = (colliderAInitial->type < colliderBInitial->type) ? colliderBInitial : colliderAInitial;
 
 
-			// Sphere tests.
-			if (colliderA->type == collider_type_sphere && colliderB->type == collider_type_sphere)
+			switch (colliderA->type)
 			{
-				collides = intersection(colliderA->sphere, colliderB->sphere, contact);
-			}
-			else if (colliderA->type == collider_type_sphere && colliderB->type == collider_type_capsule)
-			{
-				collides = intersection(colliderA->sphere, colliderB->capsule, contact);
-			}
-			else if (colliderA->type == collider_type_sphere && colliderB->type == collider_type_aabb)
-			{
-				collides = intersection(colliderA->sphere, colliderB->aabb, contact);
-			}
-			else if (colliderA->type == collider_type_sphere && colliderB->type == collider_type_obb)
-			{
-				collides = intersection(colliderA->sphere, colliderB->obb, contact);
-			}
-			else if (colliderA->type == collider_type_sphere && colliderB->type == collider_type_hull)
-			{
-				collides = intersection(colliderA->sphere, colliderB->hull, contact);
-			}
-			
-			// Capsule tests.
-			else if (colliderA->type == collider_type_capsule && colliderB->type == collider_type_capsule)
-			{
-				collides = intersection(colliderA->capsule, colliderB->capsule, contact);
-			}
-			else if (colliderA->type == collider_type_capsule && colliderB->type == collider_type_aabb)
-			{
-				collides = intersection(colliderA->capsule, colliderB->aabb, contact);
-			}
-			else if (colliderA->type == collider_type_capsule && colliderB->type == collider_type_obb)
-			{
-				collides = intersection(colliderA->capsule, colliderB->obb, contact);
-			}
-			else if (colliderA->type == collider_type_capsule && colliderB->type == collider_type_hull)
-			{
-				collides = intersection(colliderA->capsule, colliderB->hull, contact);
-			}
+				// Sphere tests.
+				case collider_type_sphere:
+				{
+					switch (colliderB->type)
+					{
+						case collider_type_sphere: collides = intersection(colliderA->sphere, colliderB->sphere, contact); break;
+						case collider_type_capsule: collides = intersection(colliderA->sphere, colliderB->capsule, contact); break;
+						case collider_type_aabb: collides = intersection(colliderA->sphere, colliderB->aabb, contact); break;
+						case collider_type_obb: collides = intersection(colliderA->sphere, colliderB->obb, contact); break;
+						case collider_type_hull: collides = intersection(colliderA->sphere, colliderB->hull, contact); break;
+					}
+				} break;
 
-			// AABB tests.
-			else if (colliderA->type == collider_type_aabb && colliderB->type == collider_type_aabb)
-			{
-				collides = intersection(colliderA->aabb, colliderB->aabb, contact);
-			}
-			else if (colliderA->type == collider_type_aabb && colliderB->type == collider_type_obb)
-			{
-				collides = intersection(colliderA->aabb, colliderB->obb, contact);
-			}
-			else if (colliderA->type == collider_type_aabb && colliderB->type == collider_type_hull)
-			{
-				collides = intersection(colliderA->aabb, colliderB->hull, contact);
-			}
+				// Capsule tests.
+				case collider_type_capsule:
+				{
+					switch (colliderB->type)
+					{
+						case collider_type_capsule: collides = intersection(colliderA->capsule, colliderB->capsule, contact); break;
+						case collider_type_aabb: collides = intersection(colliderA->capsule, colliderB->aabb, contact); break;
+						case collider_type_obb: collides = intersection(colliderA->capsule, colliderB->obb, contact); break;
+						case collider_type_hull: collides = intersection(colliderA->capsule, colliderB->hull, contact); break;
+					}
+				} break;
 
-			// OBB tests.
-			else if (colliderA->type == collider_type_obb && colliderB->type == collider_type_obb)
-			{
-				collides = intersection(colliderA->obb, colliderB->obb, contact);
-			}
-			else if (colliderA->type == collider_type_obb && colliderB->type == collider_type_hull)
-			{
-				collides = intersection(colliderA->obb, colliderB->hull, contact);
-			}
+				// AABB tests.
+				case collider_type_aabb:
+				{
+					switch (colliderB->type)
+					{
+						case collider_type_aabb: collides = intersection(colliderA->aabb, colliderB->aabb, contact); break;
+						case collider_type_obb: collides = intersection(colliderA->aabb, colliderB->obb, contact); break;
+						case collider_type_hull: collides = intersection(colliderA->aabb, colliderB->hull, contact); break;
+					}
+				} break;
 
+				// OBB tests.
+				case collider_type_obb:
+				{
+					switch (colliderB->type)
+					{
+						case collider_type_obb: collides = intersection(colliderA->obb, colliderB->obb, contact); break;
+						case collider_type_hull: collides = intersection(colliderA->obb, colliderB->hull, contact); break;
+					}
+				} break;
 
+				// Hull tests.
+				case collider_type_hull:
+				{
+					switch (colliderB->type)
+					{
+						case collider_type_hull: collides = intersection(colliderA->hull, colliderB->hull, contact); break;
+					}
+				} break;
+			}
 
 			if (collides)
 			{
