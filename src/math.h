@@ -795,6 +795,9 @@ vec3 getBarycentricCoordinates(vec2 a, vec2 b, vec2 c, vec2 p);
 vec3 getBarycentricCoordinates(vec3 a, vec3 b, vec3 c, vec3 p);
 bool insideTriangle(vec3 barycentrics);
 
+void getTangents(vec3 normal, vec3& outTangent, vec3& outBitangent);
+
+
 inline std::ostream& operator<<(std::ostream& s, vec2 v)
 {
 	s << "[" << v.x << ", " << v.y << "]";

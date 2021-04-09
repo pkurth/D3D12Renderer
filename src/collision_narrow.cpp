@@ -39,21 +39,6 @@ static void debugSphere(vec3 position, float radius, ref<pbr_material> material)
 
 static bool intersection(const bounding_oriented_box& a, const bounding_oriented_box& b, contact_manifold& outContact);
 
-static void getTangents(vec3 normal, vec3& outTangent, vec3& outBitangent)
-{
-	if (abs(normal.x) >= 0.57735f)
-	{
-		outTangent = vec3(normal.y, -normal.x, 0.f);
-	}
-	else
-	{
-		outTangent = vec3(0.f, normal.z, -normal.y);
-	}
-
-	outTangent = normalize(outTangent);
-	outBitangent = cross(normal, outTangent);
-}
-
 struct vertex_penetration_pair
 {
 	vec3 vertex;

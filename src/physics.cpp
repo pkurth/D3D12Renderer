@@ -260,11 +260,11 @@ void physicsStep(scene& appScene, float dt, uint32 numSolverIterations)
 {
 	// TODO:
 	static void* scratchMemory = malloc(1024 * 1024);
-	static broadphase_collision* possibleCollisions = new broadphase_collision[1024];
+	static broadphase_collision* possibleCollisions = new broadphase_collision[10000];
 	static rigid_body_global_state* rbGlobal = new rigid_body_global_state[1024];
 	static bounding_box* worldSpaceAABBs = new bounding_box[1024];
 	static collider_union* worldSpaceColliders = new collider_union[1024];
-	static collision_constraint* collisionConstraints = new collision_constraint[1024];
+	static collision_constraint* collisionConstraints = new collision_constraint[10000];
 	
 	static distance_constraint_update* distanceConstraintUpdates = new distance_constraint_update[1024];
 	static ball_joint_constraint_update* ballJointConstraintUpdates = new ball_joint_constraint_update[1024];
@@ -477,7 +477,7 @@ physics_properties collider_union::calculatePhysicsProperties()
 			result.inertia.m22 += temp2 * 2.f;
 			result.inertia.m01 = result.inertia.m02 = result.inertia.m10 = result.inertia.m12 = result.inertia.m20 = result.inertia.m21 = 0.f;
 
-			result.inertia = rot * result.inertia;
+			result.inertia = transpose(rot) * result.inertia * rot;
 		} break;
 
 		case collider_type_aabb:

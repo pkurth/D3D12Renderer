@@ -1151,6 +1151,21 @@ bool insideTriangle(vec3 barycentrics)
 		&& barycentrics.z >= 0.f;
 }
 
+void getTangents(vec3 normal, vec3& outTangent, vec3& outBitangent)
+{
+	if (abs(normal.x) >= 0.57735f)
+	{
+		outTangent = vec3(normal.y, -normal.x, 0.f);
+	}
+	else
+	{
+		outTangent = vec3(0.f, normal.z, -normal.y);
+	}
+
+	outTangent = normalize(outTangent);
+	outBitangent = cross(normal, outTangent);
+}
+
 trs::trs(const mat4& m)
 {
 	vec3 c0(m.m00, m.m10, m.m20);
