@@ -423,7 +423,7 @@ submesh_info cpu_mesh::pushIcoSphere(float radius, uint32 refinement)
 #undef push_ico_vertex
 }
 
-submesh_info cpu_mesh::pushCapsule(uint16 slices, uint16 rows, float height, float radius)
+submesh_info cpu_mesh::pushCapsule(uint16 slices, uint16 rows, float height, float radius, vec3 center, vec3 upAxis)
 {
 	alignNextTriangle();
 
@@ -449,8 +449,10 @@ submesh_info cpu_mesh::pushCapsule(uint16 slices, uint16 rows, float height, flo
 	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
 	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
+	quat rotation = rotateFromTo(vec3(0.f, 1.f, 0.f), upAxis);
+
 	// Vertices.
-	pushVertex(vec3(0.f, -radius - halfHeight, 0.f), directionToPanoramaUV(vec3(0.f, -1.f, 0.f)), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+	pushVertex(rotation * vec3(0.f, -radius - halfHeight, 0.f) + center, directionToPanoramaUV(vec3(0.f, -1.f, 0.f)), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
 	for (uint32 y = 0; y < rows / 2u + 1u; ++y)
 	{
@@ -467,7 +469,7 @@ submesh_info cpu_mesh::pushCapsule(uint16 slices, uint16 rows, float height, flo
 
 			vec2 uv = directionToPanoramaUV(nor);
 			uv.y *= texStretch;
-			pushVertex(pos, uv, normalize(nor), normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+			pushVertex(rotation * pos + center, uv, normalize(nor), normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
 		}
 	}
 	for (uint32 y = 0; y < rows / 2u + 1u; ++y)
@@ -485,10 +487,10 @@ submesh_info cpu_mesh::pushCapsule(uint16 slices, uint16 rows, float height, flo
 
 			vec2 uv = directionToPanoramaUV(nor);
 			uv.y *= texStretch;
-			pushVertex(pos, uv, normalize(nor), normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+			pushVertex(rotation * pos + center, uv, normalize(nor), normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
 		}
 	}
-	pushVertex(vec3(0.f, radius + halfHeight, 0.f), directionToPanoramaUV(vec3(0.f, 1.f, 0.f)), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+	pushVertex(rotation * vec3(0.f, radius + halfHeight, 0.f) + center, directionToPanoramaUV(vec3(0.f, 1.f, 0.f)), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
 	index_t lastVertex = slices * (rows + 1) + 2;
 

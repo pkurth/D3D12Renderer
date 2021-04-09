@@ -217,12 +217,121 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<rigid_body_component>(true);
 
 
+
+		// Ragdoll.
+
+		auto ragdollMaterial = createPBRMaterial(
+			{}, {}, {},	{}, vec4(0.f), vec4(161.f, 102.f, 94.f, 255.f) / 255.f, 1.f, 0.f);
+
+		auto ragdollTorsoMesh = make_ref<composite_mesh>();
+		ragdollTorsoMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.4f, 0.25f, vec3(0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, ragdollMaterial });
+		ragdollTorsoMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.32f, 0.2f, vec3(0.f, 0.32f, 0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, ragdollMaterial });
+		ragdollTorsoMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.28f, 0.22f, vec3(0.f, 0.62f, 0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, ragdollMaterial });
+		ragdollTorsoMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.28f, 0.2f, vec3(0.f, 0.92f, 0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, ragdollMaterial });
+
+		auto ragdollHeadMesh = make_ref<composite_mesh>();
+		ragdollHeadMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.15f, 0.25f, vec3(0.f)), {}, trs::identity, ragdollMaterial });
+
+		auto ragdollArmMesh = make_ref<composite_mesh>();
+		ragdollArmMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.4f, 0.15f, vec3(0.f)), {}, trs::identity, ragdollMaterial });
+
+		auto ragdollUpperLegMesh = make_ref<composite_mesh>();
+		ragdollUpperLegMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.6f, 0.25f, vec3(0.f)), {}, trs::identity, ragdollMaterial });
+
+		auto ragdollLowerLegMesh = make_ref<composite_mesh>();
+		ragdollLowerLegMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.6f, 0.18f, vec3(0.f)), {}, trs::identity, ragdollMaterial });
+
+		bool ragdollKinematic = false;
+		float ragdollGravityFactor = 1.f;
+		float ragdollDensity = 10.f;
+		float ragdollFriction = 0.9f;
+
+		auto torso = appScene.createEntity("Torso")
+			.addComponent<trs>(vec3(30.f, 5.f, -2.f), quat::identity)
+			.addComponent<raster_component>(ragdollTorsoMesh)
+			.addComponent<collider_component>(bounding_capsule{ vec3(-0.2f, 0.f, 0.f), vec3(0.2f, 0.f, 0.f), 0.25f }, 0.2f, 0.5f, ragdollDensity)
+			.addComponent<collider_component>(bounding_capsule{ vec3(-0.16f, 0.32f, 0.f), vec3(0.16f, 0.32f, 0.f), 0.2f }, 0.2f, 0.5f, ragdollDensity)
+			.addComponent<collider_component>(bounding_capsule{ vec3(-0.14f, 0.62f, 0.f), vec3(0.14f, 0.62f, 0.f), 0.22f }, 0.2f, 0.5f, ragdollDensity)
+			.addComponent<collider_component>(bounding_capsule{ vec3(-0.14f, 0.92f, 0.f), vec3(0.14f, 0.92f, 0.f), 0.2f }, 0.2f, 0.5f, ragdollDensity)
+			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
+
+		auto head = appScene.createEntity("Head")
+			.addComponent<trs>(vec3(30.f, 6.45f, -2.f), quat::identity)
+			.addComponent<raster_component>(ragdollHeadMesh)
+			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.075f, 0.f), vec3(0.f, 0.075f, 0.f), 0.25f }, 0.2f, ragdollFriction, ragdollDensity)
+			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
+
+		auto leftUpperArm = appScene.createEntity("Left upper arm")
+			.addComponent<trs>(vec3(29.4f, 5.75f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-30.f)))
+			.addComponent<raster_component>(ragdollArmMesh)
+			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.2f, 0.f), vec3(0.f, 0.2f, 0.f), 0.15f }, 0.2f, ragdollFriction, ragdollDensity)
+			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
+
+		auto leftLowerArm = appScene.createEntity("Left lower arm")
+			.addComponent<trs>(vec3(29.135f, 5.092f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-20.f)))
+			.addComponent<raster_component>(ragdollArmMesh)
+			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.2f, 0.f), vec3(0.f, 0.2f, 0.f), 0.15f }, 0.2f, ragdollFriction, ragdollDensity)
+			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
+
+		auto rightUpperArm = appScene.createEntity("Right upper arm")
+			.addComponent<trs>(vec3(30.6f, 5.75f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(30.f)))
+			.addComponent<raster_component>(ragdollArmMesh)
+			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.2f, 0.f), vec3(0.f, 0.2f, 0.f), 0.15f }, 0.2f, ragdollFriction, ragdollDensity)
+			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
+
+		auto rightLowerArm = appScene.createEntity("Right lower arm")
+			.addComponent<trs>(vec3(30.865f, 5.092f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(20.f)))
+			.addComponent<raster_component>(ragdollArmMesh)
+			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.2f, 0.f), vec3(0.f, 0.2f, 0.f), 0.15f }, 0.2f, ragdollFriction, ragdollDensity)
+			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
+
+		auto leftUpperLeg = appScene.createEntity("Left upper leg")
+			.addComponent<trs>(vec3(29.629f, 4.188f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-10.f)))
+			.addComponent<raster_component>(ragdollUpperLegMesh)
+			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.3f, 0.f), vec3(0.f, 0.3f, 0.f), 0.25f }, 0.2f, ragdollFriction, ragdollDensity)
+			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
+
+		auto leftLowerLeg = appScene.createEntity("Left lower leg")
+			.addComponent<trs>(vec3(29.548f, 3.045f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-3.5f)))
+			.addComponent<raster_component>(ragdollLowerLegMesh)
+			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.3f, 0.f), vec3(0.f, 0.3f, 0.f), 0.18f }, 0.2f, ragdollFriction, ragdollDensity)
+			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
+
+		auto rightUpperLeg = appScene.createEntity("Right upper leg")
+			.addComponent<trs>(vec3(30.371f, 4.188f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(10.f)))
+			.addComponent<raster_component>(ragdollUpperLegMesh)
+			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.3f, 0.f), vec3(0.f, 0.3f, 0.f), 0.25f }, 0.2f, ragdollFriction, ragdollDensity)
+			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
+
+		auto rightLowerLeg = appScene.createEntity("Right lower leg")
+			.addComponent<trs>(vec3(30.452f, 3.045f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(3.5f)))
+			.addComponent<raster_component>(ragdollLowerLegMesh)
+			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.3f, 0.f), vec3(0.f, 0.3f, 0.f), 0.18f }, 0.2f, ragdollFriction, ragdollDensity)
+			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
+
+		addBallJointConstraint(torso, head, vec3(0.f, 1.2f, 0.f), vec3(0.f, -0.33f, 0.f));
+		addBallJointConstraint(torso, leftUpperArm, vec3(-0.4f, 1.f, 0.f), vec3(0.f, 0.38f, 0.f));
+		addBallJointConstraint(leftUpperArm, leftLowerArm, vec3(0.f, -0.42f, 0.f), vec3(0.f, 0.42f, 0.f));
+		addBallJointConstraint(torso, rightUpperArm, vec3(0.4f, 1.f, 0.f), vec3(0.f, 0.38f, 0.f));
+		addBallJointConstraint(rightUpperArm, rightLowerArm, vec3(0.f, -0.42f, 0.f), vec3(0.f, 0.42f, 0.f));
+		addBallJointConstraint(torso, leftUpperLeg, vec3(-0.3f, -0.25f, 0.f), vec3(0.f, 0.6f, 0.f));
+		addBallJointConstraint(leftUpperLeg, leftLowerLeg, vec3(0.f, -0.6f, 0.f), vec3(0.f, 0.6f, 0.f));
+		addBallJointConstraint(torso, rightUpperLeg, vec3(0.3f, -0.25f, 0.f), vec3(0.f, 0.6f, 0.f));
+		addBallJointConstraint(rightUpperLeg, rightLowerLeg, vec3(0.f, -0.6f, 0.f), vec3(0.f, 0.6f, 0.f));
+
+
+
 		//addDistanceConstraint(test1, test2, vec3(0.f, -0.5f, 0.f), vec3(0.f, -0.5f, 0.f), 2.f);
 		//addBallJointConstraint(test1, test2, vec3(0.f, -0.5f, 0.f), vec3(0.f, -0.5f, 0.f));
 
 		testMesh->mesh = 
 		groundMesh->mesh = 
 		boxMesh->mesh = 
+		ragdollTorsoMesh->mesh =
+		ragdollHeadMesh->mesh =
+		ragdollArmMesh->mesh =
+		ragdollUpperLegMesh->mesh =
+		ragdollLowerLegMesh->mesh =
 			primitiveMesh.createDXMesh();
 	}
 #endif
@@ -845,7 +954,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 	if (!inputCaptured && input.keyboard['N'].pressEvent)
 	{
 		appScene.createEntity("Test 1")
-			.addComponent<trs>(vec3(20.f, 5.f, 0.f), quat::identity)
+			.addComponent<trs>(vec3(20.f, 15.f, 0.f), quat::identity)
 			.addComponent<raster_component>(testMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
 			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
