@@ -154,7 +154,7 @@ static void findStableContactManifold(vertex_penetration_pair* vertices, uint32 
 
 struct clipping_polygon
 {
-	vertex_penetration_pair points[64];
+	vertex_penetration_pair points[16];
 	uint32 numPoints = 0;
 };
 
@@ -170,7 +170,7 @@ static vertex_penetration_pair clipAgainstPlane(vertex_penetration_pair a, verte
 }
 
 // Planes must point inside.
-static void sutherlandHodgmanClipping(clipping_polygon& input, vec4* clipPlanes, uint32 numClipPlanes, clipping_polygon& output)
+static void sutherlandHodgmanClipping(clipping_polygon& input, const vec4* clipPlanes, uint32 numClipPlanes, clipping_polygon& output)
 {
 	clipping_polygon* in = &input;
 	clipping_polygon* out = &output;
@@ -295,6 +295,16 @@ static void getAABBIncidentVertices(vec3 aabbRadius, vec3 normal, clipping_polyg
 	polygon.points[3].vertex.data[axis1] = max1;
 }
 
+static vec4 getAABBReferencePlane(const bounding_box& b, vec3 normal)
+{
+	vec3 point(
+		(normal.x < 0.f) ? b.minCorner.x : b.maxCorner.x,
+		(normal.y < 0.f) ? b.minCorner.y : b.maxCorner.y,
+		(normal.z < 0.f) ? b.minCorner.z : b.maxCorner.z
+	);
+	return createPlane(point, normal);
+}
+
 static void getAABBIncidentEdge(vec3 aabbRadius, vec3 normal, vec3& outA, vec3& outB)
 {
 	vec3 p = abs(normal);
@@ -332,6 +342,38 @@ static void getAABBIncidentEdge(vec3 aabbRadius, vec3 normal, vec3& outA, vec3& 
 	outB *= vec3(sx, sy, sz);
 }
 
+// Expects that normal and tangents are already set in contact.
+static bool clipPointsAndBuildContact(clipping_polygon& polygon, const vec4* clipPlanes, uint32 numClipPlanes, const vec4& referencePlane, contact_manifold& outContact)
+{
+	clipping_polygon clippedPolygon;
+	sutherlandHodgmanClipping(polygon, clipPlanes, numClipPlanes, clippedPolygon);
+
+	if (clippedPolygon.numPoints > 0)
+	{
+		// Project onto plane and remove everything below plane.
+		for (uint32 i = 0; i < clippedPolygon.numPoints; ++i)
+		{
+			if (clippedPolygon.points[i].penetrationDepth < 0.f)
+			{
+				clippedPolygon.points[i] = clippedPolygon.points[clippedPolygon.numPoints - 1];
+				--clippedPolygon.numPoints;
+				--i;
+			}
+			else
+			{
+				clippedPolygon.points[i].vertex += referencePlane.xyz * clippedPolygon.points[i].penetrationDepth;
+			}
+		}
+
+		if (clippedPolygon.numPoints > 0)
+		{
+			findStableContactManifold(clippedPolygon.points, clippedPolygon.numPoints, outContact.collisionNormal, outContact.collisionTangent, outContact);
+			return true;
+		}
+	}
+
+	return false;
+}
 
 // Sphere tests.
 static bool intersection(const bounding_sphere& s1, const bounding_sphere& s2, contact_manifold& outContact)
@@ -530,8 +572,6 @@ static bool intersection(const bounding_capsule& a, const bounding_capsule& b, c
 
 static bool intersection(const bounding_capsule& c, const bounding_box& a, contact_manifold& outContact)
 {
-	// TODO: Handle multiple-contact-points case.
-
 	capsule_support_fn capsuleSupport{ c };
 	aabb_support_fn boxSupport{ a };
 
@@ -548,11 +588,51 @@ static bool intersection(const bounding_capsule& c, const bounding_box& a, conta
 		//return false;
 	}
 
-	outContact.collisionNormal = epa.normal;
+	vec3 normal = epa.normal;
+	vec3 point = epa.point;
+
+	outContact.collisionNormal = normal;
 	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
 	outContact.numContacts = 1;
 	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
-	outContact.contacts[0].point = epa.point;
+	outContact.contacts[0].point = point;
+
+	if (abs(normal.x) > 0.99f || abs(normal.y) > 0.99f || abs(normal.z) > 0.99f)
+	{
+		// Probably AABB face.
+
+		vec3 axis = normalize(c.positionB - c.positionA);
+		if (abs(dot(normal, axis)) < 0.01f)
+		{
+			// Capsule is parallel to AABB face (perpendicular to normal).
+
+			vec3 clipPlanePoints[4];
+			vec3 clipPlaneNormals[4];
+			vec4 clipPlanes[4];
+
+			vec3 aabbNormal = -normal;
+
+			vec4 referencePlane = getAABBReferencePlane(a, aabbNormal);
+
+			clipping_polygon polygon;
+			polygon.numPoints = 2;
+			vec3 pa = c.positionA + normal * c.radius;
+			vec3 pb = c.positionB + normal * c.radius;
+			polygon.points[0] = { pa, -signedDistanceToPlane(pa, referencePlane) };
+			polygon.points[1] = { pb, -signedDistanceToPlane(pb, referencePlane) };
+
+			vec3 aCenter = a.getCenter();
+			getAABBClippingPlanes(a.getRadius(), aabbNormal, clipPlanePoints, clipPlaneNormals);
+			for (uint32 i = 0; i < 4; ++i)
+			{
+				clipPlanePoints[i] = clipPlanePoints[i] + aCenter;
+				clipPlaneNormals[i] = clipPlaneNormals[i];
+				clipPlanes[i] = createPlane(clipPlanePoints[i], clipPlaneNormals[i]);
+			}
+
+			clipPointsAndBuildContact(polygon, clipPlanes, 4, referencePlane, outContact);
+		}
+	}
 
 	return true;
 }
@@ -1032,35 +1112,10 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 			polygon.points[i].penetrationDepth = -signedDistanceToPlane(polygon.points[i].vertex, plane);
 		}
 
-		clipping_polygon clippedPolygon;
-		sutherlandHodgmanClipping(polygon, clipPlanes, 4, clippedPolygon);
-
-		if (clippedPolygon.numPoints == 0)
+		if (!clipPointsAndBuildContact(polygon, clipPlanes, 4, plane, outContact))
 		{
 			return false;
 		}
-
-		// Project onto plane and remove everything below plane.
-		for (uint32 i = 0; i < clippedPolygon.numPoints; ++i)
-		{
-			if (clippedPolygon.points[i].penetrationDepth < 0.f)
-			{
-				clippedPolygon.points[i] = clippedPolygon.points[clippedPolygon.numPoints - 1];
-				--clippedPolygon.numPoints;
-				--i;
-			}
-			else
-			{
-				clippedPolygon.points[i].vertex += plane.xyz * clippedPolygon.points[i].penetrationDepth;
-			}
-		}
-
-		if (clippedPolygon.numPoints == 0)
-		{
-			return false;
-		}
-
-		findStableContactManifold(clippedPolygon.points, clippedPolygon.numPoints, normal, outContact.collisionTangent, outContact);
 	}
 	else
 	{
