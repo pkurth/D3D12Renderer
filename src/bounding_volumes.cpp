@@ -766,25 +766,46 @@ float closestPoint_SegmentSegment(const line_segment& l1, const line_segment& l2
 	return squaredLength(c1 - c2);
 }
 
-ref<bounding_hull> bounding_hull::fromMesh(void* vertexData, uint32 numVertices, uint32 positionOffset, uint32 vertexStride, indexed_triangle32* triangles, uint32 numTriangles)
+static void addBoundingHullEdge(uint32 a, uint32 b, uint32 face, std::unordered_map<uint32, bounding_hull_edge*>& edgeMap, std::vector<bounding_hull_edge>& edges, uint32& edgeIndex)
 {
-	bounding_hull hull;
+	uint32 from = min(a, b);
+	uint32 to = max(a, b);
+	uint32 edge = (from << 16) | to;
+
+	auto it = edgeMap.find(edge);
+	if (it == edgeMap.end())
+	{
+		auto& newEdge = edges[edgeIndex++];
+		newEdge.from = from;
+		newEdge.to = to;
+		newEdge.faceA = face;
+		edgeMap.insert({ edge, &newEdge });
+	}
+	else
+	{
+		assert(it->second->from == from);
+		assert(it->second->to == to);
+		assert(it->second->faceA != UINT16_MAX);
+		assert(it->second->faceB == UINT16_MAX);
+		it->second->faceB = face;
+	}
+}
+
+bounding_hull_geometry boundingHullFromMesh(vec3* vertices, uint32 numVertices, indexed_triangle32* triangles, uint32 numTriangles)
+{
+	bounding_hull_geometry hull;
 
 	uint32 numEdges = numVertices + numTriangles - 2; // Euler characteristic for convex polyhedra.
 
 	hull.vertices.resize(numVertices);
 	hull.faces.resize(numTriangles);
-	hull.edges.resize(numEdges, { UINT16_MAX, UINT16_MAX });
+	hull.edges.resize(numEdges, { UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX });
 	hull.aabb = bounding_box::negativeInfinity();
-
-	uint8* positionPtr = (uint8*)vertexData + positionOffset;
 
 	for (uint32 i = 0; i < numVertices; ++i)
 	{
-		hull.vertices[i] = *(vec3*)positionPtr;
-		positionPtr += vertexStride;
-
-		hull.aabb.grow(hull.vertices[i]);
+		hull.vertices[i] = vertices[i];
+		hull.aabb.grow(vertices[i]);
 	}
 
 	std::unordered_map<uint32, bounding_hull_edge*> edgeMap;
@@ -799,9 +820,9 @@ ref<bounding_hull> bounding_hull::fromMesh(void* vertexData, uint32 numVertices,
 		uint32 b = tri.b;
 		uint32 c = tri.c;
 
-		vec3 va = hull.vertices[a];
-		vec3 vb = hull.vertices[b];
-		vec3 vc = hull.vertices[c];
+		vec3 va = vertices[a];
+		vec3 vb = vertices[b];
+		vec3 vc = vertices[c];
 		vec3 normal = cross(vb - va, vc - va);
 
 		hull.faces[i].a = a;
@@ -809,32 +830,12 @@ ref<bounding_hull> bounding_hull::fromMesh(void* vertexData, uint32 numVertices,
 		hull.faces[i].c = c;
 		hull.faces[i].normal = normal;
 
-		{
-			uint32 from = min(a, b);
-			uint32 to = max(a, b);
-			uint32 edge = (from << 16) | to;
-
-			auto it = edgeMap.find(edge);
-			if (it == edgeMap.end())
-			{
-				auto& newEdge = hull.edges[edgeIndex++];
-				newEdge.from = from;
-				newEdge.to = to;
-				newEdge.faceA = i;
-				edgeMap.insert({ edge, &newEdge });
-			}
-			else
-			{
-				assert(it->second->from == from);
-				assert(it->second->to == to);
-				assert(it->second->faceA != UINT16_MAX);
-				assert(it->second->faceB == UINT16_MAX);
-				it->second->faceB = i;
-			}
-		}
+		addBoundingHullEdge(a, b, i, edgeMap, hull.edges, edgeIndex);
+		addBoundingHullEdge(b, c, i, edgeMap, hull.edges, edgeIndex);
+		addBoundingHullEdge(a, c, i, edgeMap, hull.edges, edgeIndex);
 	}
 
 	assert(edgeIndex == numEdges);
 
-	return make_ref<bounding_hull>(std::move(hull));
+	return hull;
 }

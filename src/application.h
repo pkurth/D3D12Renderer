@@ -94,6 +94,7 @@ private:
 	uint32 numSpotShadowRenderPasses;
 	uint32 numPointShadowRenderPasses;
 
+	float testPhysicsForce = 300.f;
 	uint32 numPhysicsSolverIterations = 30;
 
 	opaque_render_pass opaqueRenderPass;

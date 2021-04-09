@@ -197,6 +197,19 @@ void application::initialize(dx_renderer* renderer)
 				.addComponent<rigid_body_component>(false, 1.f);
 		}
 
+		bounding_hull hull =
+		{
+			quat::identity,
+			vec3(0.f),
+			allocateBoundingHullGeometry("assets/colliders/hull.fbx")
+		};
+
+		appScene.createEntity("Hull")
+			.addComponent<trs>(vec3(24.f, 10.f, -5.f), quat::identity)
+			.addComponent<raster_component>(loadMeshFromFile("assets/colliders/hull.fbx"))
+			.addComponent<collider_component>(hull, 0.1f, 0.5f, 0.1f)
+			.addComponent<rigid_body_component>(false, 1.f);
+
 		appScene.createEntity("Test ground")
 			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
@@ -686,6 +699,7 @@ void application::drawSettings(float dt)
 			editBoidParticleSystem(boidParticleSystem);
 
 			ImGui::SliderInt("Physics solver iterations", (int*)&numPhysicsSolverIterations, 1, 200);
+			ImGui::SliderFloat("Physics test force", &testPhysicsForce, 1.f, 10000.f);
 		}
 	}
 
@@ -805,7 +819,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 		// Temporary.
 		if (input.keyboard[key_shift].down)
 		{
-			testPhysicsInteraction(appScene, camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY));
+			testPhysicsInteraction(appScene, camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY), testPhysicsForce);
 		}
 		else
 		{

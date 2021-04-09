@@ -196,17 +196,24 @@ struct bounding_hull_face
 	vec3 normal;
 };
 
-struct bounding_hull
+struct bounding_hull_geometry
 {
-	bounding_box aabb;
-
 	std::vector<vec3> vertices;
 	std::vector<bounding_hull_edge> edges;
 	std::vector<bounding_hull_face> faces;
 
-	ref<bounding_hull> fromMesh(void* vertexData, uint32 numVertices, uint32 positionOffset, uint32 vertexStride,
-		indexed_triangle32* triangles, uint32 numTriangles);
+	bounding_box aabb;
 };
+
+struct bounding_hull
+{
+	quat rotation;
+	vec3 position;
+
+	uint32 geometryIndex;
+};
+
+bounding_hull_geometry boundingHullFromMesh(vec3* vertices, uint32 numVertices, indexed_triangle32* triangles, uint32 numTriangles);
 
 struct ray
 {

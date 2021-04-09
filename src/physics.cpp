@@ -2,6 +2,8 @@
 #include "physics.h"
 #include "collision_broad.h"
 #include "collision_narrow.h"
+#include "geometry.h"
+#include "assimp.h"
 
 
 static std::vector<distance_constraint> distanceConstraints;
@@ -9,6 +11,35 @@ static std::vector<ball_joint_constraint> ballJointConstraints;
 
 static std::vector<constraint_edge> constraintEdges;
 
+
+static std::vector<bounding_hull_geometry> boundingHullGeometries;
+
+uint32 allocateBoundingHullGeometry(const cpu_mesh& mesh)
+{
+	uint32 index = (uint32)boundingHullGeometries.size();
+	boundingHullGeometries.push_back(boundingHullFromMesh((vec3*)mesh.vertexPositions, mesh.numVertices, mesh.triangles, mesh.numTriangles));
+	return index;
+}
+
+uint32 allocateBoundingHullGeometry(const std::string& meshFilepath)
+{
+	Assimp::Importer importer;
+	importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, aiComponent_TEXCOORDS | aiComponent_NORMALS | aiComponent_TANGENTS_AND_BITANGENTS | aiComponent_COLORS);
+
+	const aiScene* scene = loadAssimpSceneFile(meshFilepath, importer);
+
+	if (!scene)
+	{
+		return 0;
+	}
+
+	cpu_mesh cpuMesh(mesh_creation_flags_with_positions);
+
+	assert(scene->mNumMeshes == 1);
+	cpuMesh.pushAssimpMesh(scene->mMeshes[0], 1.f);
+
+	return allocateBoundingHullGeometry(cpuMesh);
+}
 
 static void addConstraintEdge(scene_entity& e, physics_constraint& constraint, uint16 constraintIndex, constraint_type type)
 {
@@ -69,7 +100,7 @@ void addBallJointConstraint(scene_entity& a, scene_entity& b, vec3 localAnchorA,
 	addConstraintEdge(b, constraint, constraintIndex, constraint_type_ball_joint);
 }
 
-void testPhysicsInteraction(scene& appScene, ray r)
+void testPhysicsInteraction(scene& appScene, ray r, float forceAmount)
 {
 	float minT = FLT_MAX;
 	rigid_body_component* minRB = 0;
@@ -116,7 +147,7 @@ void testPhysicsInteraction(scene& appScene, ray r)
 
 				vec3 cogPosition = rb.getGlobalCOGPosition(transform);
 
-				force = r.direction * 300.f;
+				force = r.direction * forceAmount;
 				torque = cross(globalHit - cogPosition, force);
 			}
 		}
@@ -458,6 +489,8 @@ physics_properties collider_union::calculatePhysicsProperties()
 			// http://number-none.com/blow/inertia/
 			// http://number-none.com/blow/inertia/bb_inertia.doc
 
+			const bounding_hull_geometry& geom = boundingHullGeometries[hull.geometryIndex];
+
 			const float s60 = 1.f / 60.f;
 			const float s120 = 1.f / 120.f;
 
@@ -468,9 +501,7 @@ physics_properties collider_union::calculatePhysicsProperties()
 				s120, s120, s60
 			);
 
-			uint32 numFaces = (uint32)hull->faces.size();
-
-			physics_properties* tetProperties = (physics_properties*)alloca(numFaces * (sizeof(physics_properties)));
+			uint32 numFaces = (uint32)geom.faces.size();
 
 			float totalMass = 0.f;
 			mat3 totalCovariance = mat3::zero;
@@ -478,12 +509,12 @@ physics_properties collider_union::calculatePhysicsProperties()
 
 			for (uint32 i = 0; i < numFaces; ++i)
 			{
-				auto& face = hull->faces[i];
+				auto& face = geom.faces[i];
 
 				//vec3 w0 = 0.f;
-				vec3 w1 = hull->vertices[face.a];
-				vec3 w2 = hull->vertices[face.b];
-				vec3 w3 = hull->vertices[face.c];
+				vec3 w1 = hull.position + hull.rotation * geom.vertices[face.a];
+				vec3 w2 = hull.position + hull.rotation * geom.vertices[face.b];
+				vec3 w3 = hull.position + hull.rotation * geom.vertices[face.c];
 
 				mat3 A(
 					w1.x, w2.x, w3.x,
@@ -492,28 +523,27 @@ physics_properties collider_union::calculatePhysicsProperties()
 				);
 
 
-				physics_properties& p = tetProperties[i];
-
 				float detA = determinant(A);
-				p.inertia = detA * A * Ccanonical * transpose(A); // Actually the covariance, but reused here.
+				mat3 covariance = detA * A * Ccanonical * transpose(A);
 
 				float volume = 1.f / 6.f * detA;
-				p.mass = volume * properties.density;
-				p.cog = (w1 + w2 + w3) * 0.25f;
+				float mass = volume;
+				vec3 cog = (w1 + w2 + w3) * 0.25f;
 
-				totalMass += p.mass;
-				totalCovariance += p.inertia;
-				totalCOG += p.cog * p.mass;
+				totalMass += mass;
+				totalCovariance += covariance;
+				totalCOG += cog * mass;
 			}
 
 			totalCOG /= totalMass;
 
-			vec3 translation = -totalCOG;
-			mat3 CprimeTotal = totalCovariance + totalMass * outerProduct(translation, translation);
+			// This is actually different in the Blow-paper, but this one is correct.
+			mat3 CprimeTotal = totalCovariance - totalMass * outerProduct(totalCOG, totalCOG);
 
 			result.cog = totalCOG;
-			result.mass = totalMass;
+			result.mass = totalMass * properties.density;
 			result.inertia = mat3::identity * trace(CprimeTotal) - CprimeTotal;
+			result.inertia *= properties.density;
 		} break;
 
 		default:

@@ -83,7 +83,7 @@ struct collider_union
 		bounding_capsule capsule;
 		bounding_box aabb;
 		bounding_oriented_box obb;
-		bounding_hull* hull; // Currently as pointer.
+		bounding_hull hull;
 	};
 
 	collider_properties properties;
@@ -121,6 +121,11 @@ struct collider_component : collider_union
 		obb = b;
 		initialize(collider_type_obb, restitution, friction, density);
 	}
+	collider_component(bounding_hull h, float restitution, float friction, float density)
+	{
+		hull = h;
+		initialize(collider_type_hull, restitution, friction, density);
+	}
 
 	void initialize(collider_type type, float restitution, float friction, float density)
 	{
@@ -142,8 +147,11 @@ struct physics_reference_component
 	uint16 firstConstraintEdge = INVALID_CONSTRAINT_EDGE;
 };
 
+uint32 allocateBoundingHullGeometry(const struct cpu_mesh& mesh);
+uint32 allocateBoundingHullGeometry(const std::string& meshFilepath);
+
 void addDistanceConstraint(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB, float distance);
 void addBallJointConstraint(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB);
 
-void testPhysicsInteraction(scene& appScene, ray r);
+void testPhysicsInteraction(scene& appScene, ray r, float forceAmount);
 void physicsStep(scene& appScene, float dt, uint32 numSolverIterations = 30);
