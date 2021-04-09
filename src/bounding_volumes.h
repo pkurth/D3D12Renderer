@@ -205,12 +205,17 @@ struct bounding_hull_geometry
 	bounding_box aabb;
 };
 
+// MUST be convex.
 struct bounding_hull
 {
 	quat rotation;
 	vec3 position;
 
-	uint32 geometryIndex;
+	union
+	{
+		uint32 geometryIndex;						// For permanent colliders.
+		const bounding_hull_geometry* geometryPtr;	// For world space colliders, which only exist for one frame.
+	};
 };
 
 bounding_hull_geometry boundingHullFromMesh(vec3* vertices, uint32 numVertices, indexed_triangle32* triangles, uint32 numTriangles);
@@ -223,6 +228,7 @@ struct ray
 	bool intersectPlane(vec3 normal, float d, float& outT) const;
 	bool intersectPlane(vec3 normal, vec3 point, float& outT) const;
 	bool intersectAABB(const bounding_box& a, float& outT) const;
+	bool intersectOBB(const bounding_oriented_box& a, float& outT) const;
 	bool intersectTriangle(vec3 a, vec3 b, vec3 c, float& outT, bool& outFrontFacing) const;
 	bool intersectSphere(vec3 center, float radius, float& outT) const;
 	bool intersectSphere(const bounding_sphere& sphere, float& outT) const { return intersectSphere(sphere.center, sphere.radius, outT); }
@@ -231,6 +237,7 @@ struct ray
 	bool intersectDisk(vec3 pos, vec3 normal, float radius, float& outT) const;
 	bool intersectRectangle(vec3 pos, vec3 tangent, vec3 bitangent, vec2 radius, float& outT) const;
 	bool intersectTorus(const bounding_torus& torus, float& outT) const;
+	bool intersectHull(const bounding_hull& hull, const bounding_hull_geometry& geometry, float& outT) const;
 };
 
 bool aabbVSAABB(const bounding_box& a, const bounding_box& b);

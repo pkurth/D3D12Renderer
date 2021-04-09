@@ -233,6 +233,13 @@ bool ray::intersectAABB(const bounding_box& a, float& outT) const
 	return result;
 }
 
+bool ray::intersectOBB(const bounding_oriented_box& a, float& outT) const
+{
+	//return (conjugate(m.rotation) * (pos - m.position)) / m.scale;
+	ray localR = { conjugate(a.rotation) * (origin - a.center), conjugate(a.rotation) * direction };
+	return localR.intersectAABB(bounding_box::fromCenterRadius(0.f, a.radius), outT);
+}
+
 bool ray::intersectTriangle(vec3 a, vec3 b, vec3 c, float& outT, bool& outFrontFacing) const
 {
 	vec3 normal = noz(cross(b - a, c - a));
@@ -652,6 +659,33 @@ bool ray::intersectTorus(const bounding_torus& torus, float& outT) const
 	}
 	outT = minT;
 	return true;
+}
+
+bool ray::intersectHull(const bounding_hull& hull, const bounding_hull_geometry& geometry, float& outT) const
+{
+	ray localR = { conjugate(hull.rotation) * (origin - hull.position), conjugate(hull.rotation) * direction };
+
+	float minT = FLT_MAX;
+	bool result = false;
+
+	for (uint32 i = 0; i < (uint32)geometry.faces.size(); ++i)
+	{
+		auto tri = geometry.faces[i];
+		vec3 a = geometry.vertices[tri.a];
+		vec3 b = geometry.vertices[tri.b];
+		vec3 c = geometry.vertices[tri.c];
+
+		float t;
+		bool ff;
+		if (localR.intersectTriangle(a, b, c, t, ff) && t < minT)
+		{
+			minT = t;
+			result = true;
+		}
+	}
+
+	outT = minT;
+	return result;
 }
 
 float signedDistanceToPlane(const vec3& p, const vec4& plane)

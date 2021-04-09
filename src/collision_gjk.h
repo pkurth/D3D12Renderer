@@ -13,6 +13,19 @@ struct sphere_support_fn
 	}
 };
 
+struct capsule_support_fn
+{
+	const bounding_capsule& c;
+
+	vec3 operator()(const vec3& dir) const
+	{
+		float distA = dot(dir, c.positionA);
+		float distB = dot(dir, c.positionB);
+		vec3 fartherPoint = distA > distB ? c.positionA : c.positionB;
+		return normalize(dir) * c.radius + fartherPoint;
+	}
+};
+
 struct aabb_support_fn
 {
 	const bounding_box& b;
@@ -44,17 +57,29 @@ struct obb_support_fn
 	}
 };
 
-struct capsule_support_fn
+struct hull_support_fn
 {
-	const bounding_capsule& c;
+	const bounding_hull& h;
 
-	vec3 operator()(const vec3& dir) const
+	vec3 operator()(vec3 dir) const
 	{
-		float distA = dot(dir, c.positionA);
-		float distB = dot(dir, c.positionB);
-		vec3 fartherPoint = distA > distB ? c.positionA : c.positionB;
-		return normalize(dir) * c.radius + fartherPoint;
-	}
+		dir = conjugate(h.rotation) * dir;
+		vec3 result;
+
+		float maxDist = -FLT_MAX;
+
+		for (const vec3& v : h.geometryPtr->vertices)
+		{
+			float d = dot(dir, v);
+			if (d > maxDist)
+			{
+				maxDist = d;
+				result = v;
+			}
+		}
+
+		return h.position + h.rotation * result;
+	};
 };
 
 

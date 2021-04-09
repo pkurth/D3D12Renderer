@@ -135,6 +135,16 @@ void testPhysicsInteraction(scene& appScene, ray r, float forceAmount)
 				{
 					hit = localR.intersectAABB(collider.aabb, t);
 				} break;
+
+				case collider_type_obb:
+				{
+					hit = localR.intersectOBB(collider.obb, t);
+				} break;
+
+				case collider_type_hull:
+				{
+					hit = localR.intersectHull(collider.hull, boundingHullGeometries[collider.hull.geometryIndex], t);
+				} break;
 			}
 
 			if (hit && t < minT)
@@ -228,6 +238,19 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 			{
 				bb = collider.obb.transformToAABB(transform.rotation, transform.position);
 				col.obb = collider.obb.transformToOBB(transform.rotation, transform.position);
+			} break;
+
+			case collider_type_hull:
+			{
+				const bounding_hull_geometry& geometry = boundingHullGeometries[collider.hull.geometryIndex];
+
+				quat rotation = transform.rotation * collider.hull.rotation;
+				vec3 position = transform.rotation * collider.hull.position + transform.position;
+
+				bb = geometry.aabb.transformToAABB(rotation, position);
+				col.hull.rotation = rotation;
+				col.hull.position = position;
+				col.hull.geometryPtr = &geometry;
 			} break;
 		}
 	}

@@ -417,6 +417,33 @@ static bool intersection(const bounding_sphere& s, const bounding_oriented_box& 
 	return false;
 }
 
+static bool intersection(const bounding_sphere& s, const bounding_hull& h, contact_manifold& outContact)
+{
+	sphere_support_fn sphereSupport{ s };
+	hull_support_fn hullSupport{ h };
+
+	gjk_simplex gjkSimplex;
+	if (!gjkIntersectionTest(sphereSupport, hullSupport, gjkSimplex))
+	{
+		return false;
+	}
+
+	epa_result epa;
+	auto epaSuccess = epaCollisionInfo(gjkSimplex, sphereSupport, hullSupport, epa);
+	if (epaSuccess != epa_success)
+	{
+		//return false;
+	}
+
+	outContact.collisionNormal = epa.normal;
+	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
+	outContact.numContacts = 1;
+	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
+	outContact.contacts[0].point = epa.point;
+
+	return true;
+}
+
 // Capsule tests.
 static bool intersection(const bounding_capsule& c1, const bounding_capsule& c2, contact_manifold& outContact)
 {
@@ -473,6 +500,33 @@ static bool intersection(const bounding_capsule& c, const bounding_oriented_box&
 		return true;
 	}
 	return false;
+}
+
+static bool intersection(const bounding_capsule& c, const bounding_hull& h, contact_manifold& outContact)
+{
+	capsule_support_fn capsuleSupport{ c };
+	hull_support_fn hullSupport{ h };
+
+	gjk_simplex gjkSimplex;
+	if (!gjkIntersectionTest(capsuleSupport, hullSupport, gjkSimplex))
+	{
+		return false;
+	}
+
+	epa_result epa;
+	auto epaSuccess = epaCollisionInfo(gjkSimplex, capsuleSupport, hullSupport, epa);
+	if (epaSuccess != epa_success)
+	{
+		//return false;
+	}
+
+	outContact.collisionNormal = epa.normal;
+	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
+	outContact.numContacts = 1;
+	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
+	outContact.contacts[0].point = epa.point;
+
+	return true;
 }
 
 // AABB tests.
@@ -551,6 +605,33 @@ static bool intersection(const bounding_box& a, const bounding_oriented_box& b, 
 	// to one OOB.
 	// However, I don't expect this function to be called very often, as AABBs are uncommon, so this is probably fine.
 	return intersection(bounding_oriented_box{ a.getCenter(), a.getRadius(), quat::identity }, b, outContact);
+}
+
+static bool intersection(const bounding_box& a, const bounding_hull& h, contact_manifold& outContact)
+{
+	aabb_support_fn aabbSupport{ a };
+	hull_support_fn hullSupport{ h };
+
+	gjk_simplex gjkSimplex;
+	if (!gjkIntersectionTest(aabbSupport, hullSupport, gjkSimplex))
+	{
+		return false;
+	}
+
+	epa_result epa;
+	auto epaSuccess = epaCollisionInfo(gjkSimplex, aabbSupport, hullSupport, epa);
+	if (epaSuccess != epa_success)
+	{
+		//return false;
+	}
+
+	outContact.collisionNormal = epa.normal;
+	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
+	outContact.numContacts = 1;
+	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
+	outContact.contacts[0].point = epa.point;
+
+	return true;
 }
 
 // OBB tests.
@@ -938,6 +1019,33 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 	return true;
 }
 
+static bool intersection(const bounding_oriented_box& o, const bounding_hull& h, contact_manifold& outContact)
+{
+	obb_support_fn obbSupport{ o };
+	hull_support_fn hullSupport{ h };
+
+	gjk_simplex gjkSimplex;
+	if (!gjkIntersectionTest(obbSupport, hullSupport, gjkSimplex))
+	{
+		return false;
+	}
+
+	epa_result epa;
+	auto epaSuccess = epaCollisionInfo(gjkSimplex, obbSupport, hullSupport, epa);
+	if (epaSuccess != epa_success)
+	{
+		//return false;
+	}
+
+	outContact.collisionNormal = epa.normal;
+	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
+	outContact.numContacts = 1;
+	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
+	outContact.contacts[0].point = epa.point;
+
+	return true;
+}
+
 uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state* rbs, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions, float dt,
 	collision_constraint* outCollisionConstraints)
 {
@@ -975,6 +1083,10 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 			{
 				collides = intersection(colliderA->sphere, colliderB->obb, contact);
 			}
+			else if (colliderA->type == collider_type_sphere && colliderB->type == collider_type_hull)
+			{
+				collides = intersection(colliderA->sphere, colliderB->hull, contact);
+			}
 			
 			// Capsule tests.
 			else if (colliderA->type == collider_type_capsule && colliderB->type == collider_type_capsule)
@@ -989,6 +1101,10 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 			{
 				collides = intersection(colliderA->capsule, colliderB->obb, contact);
 			}
+			else if (colliderA->type == collider_type_capsule && colliderB->type == collider_type_hull)
+			{
+				collides = intersection(colliderA->capsule, colliderB->hull, contact);
+			}
 
 			// AABB tests.
 			else if (colliderA->type == collider_type_aabb && colliderB->type == collider_type_aabb)
@@ -999,11 +1115,19 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 			{
 				collides = intersection(colliderA->aabb, colliderB->obb, contact);
 			}
+			else if (colliderA->type == collider_type_aabb && colliderB->type == collider_type_hull)
+			{
+				collides = intersection(colliderA->aabb, colliderB->hull, contact);
+			}
 
 			// OBB tests.
 			else if (colliderA->type == collider_type_obb && colliderB->type == collider_type_obb)
 			{
 				collides = intersection(colliderA->obb, colliderB->obb, contact);
+			}
+			else if (colliderA->type == collider_type_obb && colliderB->type == collider_type_hull)
+			{
+				collides = intersection(colliderA->obb, colliderB->hull, contact);
 			}
 
 

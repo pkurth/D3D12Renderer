@@ -205,10 +205,10 @@ void application::initialize(dx_renderer* renderer)
 		};
 
 		appScene.createEntity("Hull")
-			.addComponent<trs>(vec3(24.f, 10.f, -5.f), quat::identity)
+			.addComponent<trs>(vec3(20.f, 15.f, 0.f), quat::identity)
 			.addComponent<raster_component>(loadMeshFromFile("assets/colliders/hull.fbx"))
 			.addComponent<collider_component>(hull, 0.1f, 0.5f, 0.1f)
-			.addComponent<rigid_body_component>(false, 1.f);
+			.addComponent<rigid_body_component>(false, 0.f);
 
 		appScene.createEntity("Test ground")
 			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
