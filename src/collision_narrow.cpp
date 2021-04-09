@@ -445,13 +445,87 @@ static bool intersection(const bounding_sphere& s, const bounding_hull& h, conta
 }
 
 // Capsule tests.
-static bool intersection(const bounding_capsule& c1, const bounding_capsule& c2, contact_manifold& outContact)
+static bool intersection(const bounding_capsule& a, const bounding_capsule& b, contact_manifold& outContact)
 {
-	// TODO: Handle multiple-contact-points case.
+	vec3 aDir = a.positionB - a.positionA;
+	vec3 bDir = normalize(b.positionB - b.positionA);
 
-	vec3 closestPoint1, closestPoint2;
-	closestPoint_SegmentSegment(line_segment{ c1.positionA, c1.positionB }, line_segment{ c2.positionA, c2.positionB }, closestPoint1, closestPoint2);
-	return intersection(bounding_sphere{ closestPoint1, c1.radius }, bounding_sphere{ closestPoint2, c2.radius }, outContact);
+	float aDirLength = length(aDir);
+	aDir *= 1.f / aDirLength;
+
+	float parallel = dot(aDir, bDir);
+	if (abs(parallel) > 0.99f)
+	{
+		// Parallel case.
+
+		vec3 pAa = a.positionA;
+		vec3 pAb = a.positionB;
+		vec3 pBa = b.positionA;
+		vec3 pBb = b.positionB;
+
+		if (parallel < 0.f)
+		{
+			std::swap(pBa, pBb);
+		}
+
+		vec3 referencePoint = a.positionA;
+
+		float a0 = 0.f;
+		float a1 = aDirLength;
+
+		float b0 = dot(aDir, pBa - referencePoint);
+		float b1 = dot(aDir, pBb - referencePoint);
+		assert(b1 > b0);
+
+		float left = max(a0, b0);
+		float right = min(a1, b1);
+
+		if (right < left)
+		{
+			if (a0 > b1)
+			{
+				return intersection(bounding_sphere{ pAa, a.radius }, bounding_sphere{ pBb, b.radius }, outContact);
+			}
+			else
+			{
+				return intersection(bounding_sphere{ pAb, a.radius }, bounding_sphere{ pBa, b.radius }, outContact);
+			}
+		}
+
+		vec3 contactA0 = referencePoint + left * aDir;
+		vec3 contactA1 = referencePoint + right * aDir;
+
+		vec3 contactB0 = closestPoint_PointSegment(contactA0, line_segment{ pBa, pBb });
+		vec3 contactB1 = contactB0 + (right - left) * aDir;
+
+		vec3 normal = contactB0 - contactA0;
+		float d = length(normal);
+		normal /= d;
+
+		float radiusSum = a.radius + b.radius;
+
+		float penetration = radiusSum - d;
+		if (penetration < 0.f)
+		{
+			return false;
+		}
+
+		outContact.collisionNormal = normal;
+		getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
+		outContact.numContacts = 2;
+		outContact.contacts[0].penetrationDepth = penetration;
+		outContact.contacts[0].point = (contactA0 + contactB0) * 0.5f;
+		outContact.contacts[1].penetrationDepth = penetration;
+		outContact.contacts[1].point = (contactA1 + contactB1) * 0.5f;
+
+		return true;
+	}
+	else
+	{
+		vec3 closestPoint1, closestPoint2;
+		closestPoint_SegmentSegment(line_segment{ a.positionA, a.positionB }, line_segment{ b.positionA, b.positionB }, closestPoint1, closestPoint2);
+		return intersection(bounding_sphere{ closestPoint1, a.radius }, bounding_sphere{ closestPoint2, b.radius }, outContact);
+	}
 }
 
 static bool intersection(const bounding_capsule& c, const bounding_box& a, contact_manifold& outContact)
