@@ -118,7 +118,7 @@ void addBallJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, ve
 	addBallJointConstraintFromLocalPoints(a, b, localAnchorA, localAnchorB);
 }
 
-void addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalRotationAxis)
+void addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalRotationAxis, float minLimit, float maxLimit)
 {
 	uint16 constraintIndex = (uint16)hingeJointConstraints.size();
 	hinge_joint_constraint& constraint = hingeJointConstraints.emplace_back();
@@ -130,6 +130,10 @@ void addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, v
 	constraint.localAnchorB = inverseTransformPosition(transformB, globalAnchor);
 	constraint.localAxisA = inverseTransformDirection(transformA, globalRotationAxis);
 	constraint.localAxisB = inverseTransformDirection(transformB, globalRotationAxis);
+
+	constraint.initialRelativeRotation = rotateFromTo(transformA.rotation, transformB.rotation);
+	constraint.minRotationLimit = -minLimit;
+	constraint.maxRotationLimit = maxLimit;
 
 	addConstraintEdge(a, constraint, constraintIndex, constraint_type_hinge_joint);
 	addConstraintEdge(b, constraint, constraintIndex, constraint_type_hinge_joint);

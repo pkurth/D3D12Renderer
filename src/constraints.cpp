@@ -5,6 +5,7 @@
 #define DISTANCE_CONSTRAINT_BETA 0.1f
 #define BALL_JOINT_CONSTRAINT_BETA 0.1f
 #define HINGE_ROTATION_CONSTRAINT_BETA 0.3f
+#define HINGE_LIMIT_CONSTRAINT_BETA 0.1f
 
 #define DT_THRESHOLD 1e-5f
 
@@ -247,6 +248,51 @@ void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_
 		{
 			out.rotationBias = vec2(dot(globalRotationAxisA, globalTangentB), dot(globalRotationAxisA, globalBitangentB)) * HINGE_ROTATION_CONSTRAINT_BETA / dt;
 		}
+
+
+		// Limits
+		out.solveLimit = false;
+
+		if (in.minRotationLimit <= 0.f || in.maxRotationLimit >= 0.f)
+		{
+			quat currentRelRotation = rotateFromTo(globalA.rotation, globalB.rotation);
+			quat rotationDifference = normalize(rotateFromTo(in.initialRelativeRotation, currentRelRotation));
+
+			vec3 axis; float angle;
+			getAxisRotation(rotationDifference, axis, angle);
+			if (dot(axis, globalRotationAxisA) < 0.f)
+			{
+				angle *= -1.f;
+			}
+
+			angle = angleToNegPiToPi(angle);
+
+			bool minLimitViolated = in.minRotationLimit <= 0.f && angle <= in.minRotationLimit;
+			bool maxLimitViolated = in.maxRotationLimit >= 0.f && angle >= in.maxRotationLimit;
+
+			assert(!(minLimitViolated && maxLimitViolated));
+
+			bool solveLimit = minLimitViolated || maxLimitViolated;
+			if (solveLimit)
+			{
+				out.globalRotationAxis = globalRotationAxisA;
+				out.limitImpulse = 0.f;
+
+				float invEffectiveLimitMass = dot(globalRotationAxisA, globalA.invInertia * globalRotationAxisA)
+											+ dot(globalRotationAxisA, globalB.invInertia * globalRotationAxisA);
+
+				out.effectiveLimitMass = (invEffectiveLimitMass != 0.f) ? (1.f / invEffectiveLimitMass) : 0.f;
+				out.limitSign = minLimitViolated ? 1.f : -1.f;
+
+				out.limitBias = 0.f;
+				if (dt > DT_THRESHOLD)
+				{
+					float d = minLimitViolated ? (angle - in.minRotationLimit) : (in.maxRotationLimit - angle);
+					out.limitBias = d * HINGE_LIMIT_CONSTRAINT_BETA / dt;
+				}
+			}
+			out.solveLimit = solveLimit;
+		}
 	}
 }
 
@@ -259,31 +305,69 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 		rigid_body_global_state& rbA = rbs[con.rigidBodyIndexA];
 		rigid_body_global_state& rbB = rbs[con.rigidBodyIndexB];
 
+		vec3 vA = rbA.linearVelocity;
+		vec3 wA = rbA.angularVelocity;
+		vec3 vB = rbB.linearVelocity;
+		vec3 wB = rbB.angularVelocity;
 
-		// Position part.
+		// Solve in order of importance (most important last): Limits -> Rotation -> Position.
 
-		vec3 anchorVelocityA = rbA.linearVelocity + cross(rbA.angularVelocity, con.relGlobalAnchorA);
-		vec3 anchorVelocityB = rbB.linearVelocity + cross(rbB.angularVelocity, con.relGlobalAnchorB);
-		vec3 translationCdot = anchorVelocityB - anchorVelocityA + con.translationBias;
+		// Limits.
+		if (con.solveLimit)
+		{
+			vec3 globalRotationAxis = con.globalRotationAxis;
+			float aDotWA = dot(globalRotationAxis, wA); // How fast are we turning about the axis.
+			float aDotWB = dot(globalRotationAxis, wB);
 
-		vec3 translationP = solveLinearSystem(con.invEffectiveTranslationMass, -translationCdot);
+			float limitSign = con.limitSign;
 
+			float relAngularVelocity = limitSign * (aDotWB - aDotWA);
+
+			float limitCdot = relAngularVelocity + con.limitBias;
+			float limitLambda = -con.effectiveLimitMass * limitCdot;
+
+			float impulse = max(con.limitImpulse + limitLambda, 0.f);
+			limitLambda = impulse - con.limitImpulse;
+			con.limitImpulse = impulse;
+
+			limitLambda *= limitSign;
+
+			vec3 P = globalRotationAxis * limitLambda;
+			wA -= rbA.invInertia * P;
+			wB += rbB.invInertia * P;
+		}
 
 		// Rotation part.
+		{
+			vec3 deltaAngularVelocity = wB - wA;
 
-		vec3 deltaAngularVelocity = rbB.angularVelocity - rbA.angularVelocity;
+			vec2 rotationCdot(dot(con.bxa, deltaAngularVelocity),
+				dot(con.cxa, deltaAngularVelocity));
+			vec2 rotLambda = solveLinearSystem(con.invEffectiveRotationMass, -(rotationCdot + con.rotationBias));
 
-		vec2 rotationCdot(dot(con.bxa, deltaAngularVelocity),
-			dot(con.cxa, deltaAngularVelocity));
-		vec2 rotLambda = solveLinearSystem(con.invEffectiveRotationMass, -(rotationCdot + con.rotationBias));
+			vec3 rotationP = con.bxa * rotLambda.x + con.cxa * rotLambda.y;
 
-		vec3 rotationP = con.bxa * rotLambda.x + con.cxa * rotLambda.y;
+			wA -= rbA.invInertia * rotationP;
+			wB += rbB.invInertia * rotationP;
+		}
 
+		// Position part.
+		{
+			vec3 anchorVelocityA = vA + cross(wA, con.relGlobalAnchorA);
+			vec3 anchorVelocityB = vB + cross(wB, con.relGlobalAnchorB);
+			vec3 translationCdot = anchorVelocityB - anchorVelocityA + con.translationBias;
 
+			vec3 translationP = solveLinearSystem(con.invEffectiveTranslationMass, -translationCdot);
 
-		rbA.linearVelocity -= rbA.invMass * translationP;
-		rbA.angularVelocity -= rbA.invInertia * (cross(con.relGlobalAnchorA, translationP) + rotationP);
-		rbB.linearVelocity += rbB.invMass * translationP;
-		rbB.angularVelocity += rbB.invInertia * (cross(con.relGlobalAnchorB, translationP) + rotationP);
+			vA -= rbA.invMass * translationP;
+			wA -= rbA.invInertia * cross(con.relGlobalAnchorA, translationP);
+			vB += rbB.invMass * translationP;
+			wB += rbB.invInertia * cross(con.relGlobalAnchorB, translationP);
+		}
+
+		rbA.linearVelocity = vA;
+		rbA.angularVelocity = wA;
+		rbB.linearVelocity = vB;
+		rbB.angularVelocity = wB;
 	}
 }

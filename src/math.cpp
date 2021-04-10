@@ -438,9 +438,7 @@ vec3 inverseTransformDirection(const trs& m, vec3 dir)
 
 quat rotateFromTo(quat from, quat to)
 {
-	quat invFrom = conjugate(from);
-	quat result = to * invFrom;
-	return normalize(result);
+	return to * conjugate(from);
 }
 
 quat rotateFromTo(vec3 _from, vec3 _to)

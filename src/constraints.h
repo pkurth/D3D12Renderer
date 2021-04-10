@@ -84,6 +84,11 @@ struct hinge_joint_constraint : physics_constraint
 	vec3 localAnchorB;
 	vec3 localAxisA;
 	vec3 localAxisB;
+
+	// Limits. The rotation limits are the allowed deviations in radians from the initial relative rotation.
+	float minRotationLimit; // [-2pi, 0]
+	float maxRotationLimit; // [0, 2pi]
+	quat initialRelativeRotation;
 };
 
 struct hinge_joint_constraint_update
@@ -101,6 +106,15 @@ struct hinge_joint_constraint_update
 	mat2 invEffectiveRotationMass;
 	vec3 bxa;
 	vec3 cxa;
+
+	vec3 globalRotationAxis;
+	float effectiveLimitMass; // Same for min and max limit.
+
+	// Since at a single time, only one limit constraint can be violated, we only store this stuff once. 'limitSign' is positive for min- and negative for max-limit-violations.
+	float limitImpulse;
+	float limitBias;
+	bool solveLimit;
+	float limitSign;
 };
 
 
