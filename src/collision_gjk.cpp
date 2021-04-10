@@ -3,7 +3,7 @@
 
 
 
-bool updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a, vec3& dir)
+gjk_internal_success updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a, vec3& dir)
 {
 	if (s.numPoints == 2)
 	{
@@ -18,14 +18,14 @@ bool updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a, vec3& dir)
 		{
 			s.c = a;
 			dir = crossABA(ab, ao);
-			return false;
+			return gjk_dont_stop;
 		}
 		vec3 acp = cross(abc, ac);
 		if (dot(ao, acp) > 0.f)
 		{
 			s.b = a;
 			dir = crossABA(ac, ao);
-			return false;
+			return gjk_dont_stop;
 		}
 
 		// Sort so that normal abc of triangle points outside (negative new search dir).
@@ -35,7 +35,7 @@ bool updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a, vec3& dir)
 			s.b = a;
 			s.numPoints = 3;
 			dir = abc;
-			return false;
+			return gjk_dont_stop;
 		}
 		if (dot(ao, -abc) >= 0.f)
 		{
@@ -44,10 +44,11 @@ bool updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a, vec3& dir)
 			s.b = a;
 			s.numPoints = 3;
 			dir = -abc;
-			return false;
+			return gjk_dont_stop;
 		}
-		assert(false);
-		return false;
+
+		//assert(false);
+		return gjk_unexpected_error;
 	}
 	if (s.numPoints == 3)
 	{
@@ -79,7 +80,7 @@ bool updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a, vec3& dir)
 
 		if (flags == 0)
 		{
-			return true;
+			return gjk_stop;
 		}
 
 		if (flags == overABCFlag)
@@ -91,7 +92,7 @@ bool updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a, vec3& dir)
 				s.c = a;
 				s.numPoints = 2;
 				dir = crossABA(ab, ao);
-				return false;
+				return gjk_dont_stop;
 			}
 		overABC2:
 			if (dot(cross(ac, abc), ao) > 0.f)
@@ -100,13 +101,13 @@ bool updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a, vec3& dir)
 				s.b = a;
 				s.numPoints = 2;
 				dir = crossABA(ac, ao);
-				return false;
+				return gjk_dont_stop;
 			}
 
 			// Stay in triangle case: bca
 			s.d = a;
 			dir = abc;
-			return false;
+			return gjk_dont_stop;
 		}
 
 		if (flags == overABDFlag)
@@ -119,7 +120,7 @@ bool updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a, vec3& dir)
 				s.c = a;
 				s.numPoints = 2;
 				dir = crossABA(ad, ao);
-				return false;
+				return gjk_dont_stop;
 			}
 		overABD2:
 			if (dot(cross(ab, abd), ao) > 0.f)
@@ -128,13 +129,13 @@ bool updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a, vec3& dir)
 				s.c = a;
 				s.numPoints = 2;
 				dir = crossABA(ab, ao);
-				return false;
+				return gjk_dont_stop;
 			}
 
 			// Stay in triangle case: bad
 			s.c = a;
 			dir = abd;
-			return false;
+			return gjk_dont_stop;
 		}
 
 		if (flags == overADCFlag)
@@ -146,7 +147,7 @@ bool updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a, vec3& dir)
 				s.b = a;
 				s.numPoints = 2;
 				dir = crossABA(ac, ao);
-				return false;
+				return gjk_dont_stop;
 			}
 		overADC2:
 			if (dot(cross(ad, adc), ao) > 0.f)
@@ -156,13 +157,13 @@ bool updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a, vec3& dir)
 				s.c = s.d;
 				s.numPoints = 2;
 				dir = crossABA(ad, ao);
-				return false;
+				return gjk_dont_stop;
 			}
 
 			// Stay in triangle case: acd
 			s.b = a;
 			dir = adc;
-			return false;
+			return gjk_dont_stop;
 		}
 
 		if (flags == (overABCFlag | overABDFlag))
@@ -192,11 +193,11 @@ bool updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a, vec3& dir)
 			goto overADC2;
 		}
 
-		assert(false);
-		return false;
+		//assert(false);
+		return gjk_unexpected_error;
 	}
 
-	assert(false);
-	return false;
+	//assert(false);
+	return gjk_unexpected_error;
 }
 

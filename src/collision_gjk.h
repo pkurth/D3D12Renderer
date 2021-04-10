@@ -122,12 +122,19 @@ static inline vec3 crossABA(const vec3& a, const vec3& b)
 	return cross(cross(a, b), a);
 }
 
+enum gjk_internal_success
+{
+	gjk_stop,
+	gjk_dont_stop,
+	gjk_unexpected_error, // Happens very very seldom. I don't know the reason yet, but instead of asserting we return this. I figure it's better than crashing.
+};
+
 template <typename shapeA_t, typename shapeB_t>
 static bool gjkIntersectionTest(const shapeA_t& shapeA, const shapeB_t& shapeB, gjk_simplex& outSimplex)
 {
 	// http://www.dyn4j.org/2010/04/gjk-gilbert-johnson-keerthi/
 
-	bool updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a, vec3& dir);
+	gjk_internal_success updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a, vec3& dir);
 
 	vec3 dir(1.f, 0.1f, -0.2f); // Arbitrary.
 
@@ -156,12 +163,18 @@ static bool gjkIntersectionTest(const shapeA_t& shapeA, const shapeB_t& shapeB, 
 		{
 			return false;
 		}
-		if (updateGJKSimplex(outSimplex, a, dir))
+
+		gjk_internal_success success = updateGJKSimplex(outSimplex, a, dir);
+		if (success == gjk_stop)
 		{
 			assert(outSimplex.numPoints == 3);
 			outSimplex.a = a;
 			outSimplex.numPoints = 4;
 			break;
+		}
+		else if (success == gjk_unexpected_error)
+		{
+			return false; // Return 'no collision' in the case of an unexpected error.
 		}
 	}
 
