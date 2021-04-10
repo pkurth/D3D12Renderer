@@ -7,6 +7,7 @@ enum constraint_type : uint16
 {
 	constraint_type_distance,
 	constraint_type_ball_joint,
+	constraint_type_hinge_joint,
 };
 
 #define INVALID_CONSTRAINT_EDGE UINT16_MAX
@@ -43,12 +44,14 @@ struct distance_constraint : physics_constraint
 
 struct distance_constraint_update
 {
-	vec3 u;
 	uint16 rigidBodyIndexA;
 	uint16 rigidBodyIndexB;
+
 	vec3 relGlobalAnchorA;
-	float bias;
 	vec3 relGlobalAnchorB;
+
+	vec3 u;
+	float bias;
 	float effectiveMass;
 };
 
@@ -63,12 +66,41 @@ struct ball_joint_constraint : physics_constraint
 
 struct ball_joint_constraint_update
 {
-	vec3 bias;
 	uint16 rigidBodyIndexA;
 	uint16 rigidBodyIndexB;
 	vec3 relGlobalAnchorA;
 	vec3 relGlobalAnchorB;
+
+	vec3 bias;
 	mat3 invEffectiveMass;
+};
+
+
+// Hinge-joint constraint.
+
+struct hinge_joint_constraint : physics_constraint
+{
+	vec3 localAnchorA;
+	vec3 localAnchorB;
+	vec3 localAxisA;
+	vec3 localAxisB;
+};
+
+struct hinge_joint_constraint_update
+{
+	uint16 rigidBodyIndexA;
+	uint16 rigidBodyIndexB;
+
+	vec3 relGlobalAnchorA;
+	vec3 relGlobalAnchorB;
+
+	vec3 translationBias;
+	mat3 invEffectiveTranslationMass;
+
+	vec2 rotationBias;
+	mat2 invEffectiveRotationMass;
+	vec3 bxa;
+	vec3 cxa;
 };
 
 
@@ -79,3 +111,6 @@ void solveDistanceVelocityConstraints(distance_constraint_update* constraints, u
 
 void initializeBallJointVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const ball_joint_constraint* input, ball_joint_constraint_update* output, uint32 count, float dt);
 void solveBallJointVelocityConstraints(ball_joint_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);
+
+void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const hinge_joint_constraint* input, hinge_joint_constraint_update* output, uint32 count, float dt);
+void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);

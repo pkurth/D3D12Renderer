@@ -188,14 +188,14 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
 			.addComponent<rigid_body_component>(true, 1.f);
 
-		for (uint32 i = 0; i < 30; ++i)
-		{
-			appScene.createEntity("Cube")
-				.addComponent<trs>(vec3(20.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
-				.addComponent<raster_component>(boxMesh)
-				.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
-				.addComponent<rigid_body_component>(false, 1.f);
-		}
+		//for (uint32 i = 0; i < 30; ++i)
+		//{
+		//	appScene.createEntity("Cube")
+		//		.addComponent<trs>(vec3(20.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+		//		.addComponent<raster_component>(boxMesh)
+		//		.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
+		//		.addComponent<rigid_body_component>(false, 1.f);
+		//}
 
 		bounding_hull hull =
 		{
@@ -221,7 +221,8 @@ void application::initialize(dx_renderer* renderer)
 		// Ragdoll.
 
 		auto ragdollMaterial = createPBRMaterial(
-			{}, {}, {},	{}, vec4(0.f), vec4(161.f, 102.f, 94.f, 255.f) / 255.f, 1.f, 0.f);
+			{}, {}, {}, {}, vec4(0.f), vec4(161.f, 102.f, 94.f, 255.f) / 255.f, 1.f, 0.f);
+#if 0
 
 		auto ragdollTorsoMesh = make_ref<composite_mesh>();
 		ragdollTorsoMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.4f, 0.25f, vec3(0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, ragdollMaterial });
@@ -309,29 +310,57 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.3f, 0.f), vec3(0.f, 0.3f, 0.f), 0.18f }, 0.2f, ragdollFriction, ragdollDensity)
 			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-		addBallJointConstraint(torso, head, vec3(0.f, 1.2f, 0.f), vec3(0.f, -0.33f, 0.f));
-		addBallJointConstraint(torso, leftUpperArm, vec3(-0.4f, 1.f, 0.f), vec3(0.f, 0.38f, 0.f));
-		addBallJointConstraint(leftUpperArm, leftLowerArm, vec3(0.f, -0.42f, 0.f), vec3(0.f, 0.42f, 0.f));
-		addBallJointConstraint(torso, rightUpperArm, vec3(0.4f, 1.f, 0.f), vec3(0.f, 0.38f, 0.f));
-		addBallJointConstraint(rightUpperArm, rightLowerArm, vec3(0.f, -0.42f, 0.f), vec3(0.f, 0.42f, 0.f));
-		addBallJointConstraint(torso, leftUpperLeg, vec3(-0.3f, -0.25f, 0.f), vec3(0.f, 0.6f, 0.f));
-		addBallJointConstraint(leftUpperLeg, leftLowerLeg, vec3(0.f, -0.6f, 0.f), vec3(0.f, 0.6f, 0.f));
-		addBallJointConstraint(torso, rightUpperLeg, vec3(0.3f, -0.25f, 0.f), vec3(0.f, 0.6f, 0.f));
-		addBallJointConstraint(rightUpperLeg, rightLowerLeg, vec3(0.f, -0.6f, 0.f), vec3(0.f, 0.6f, 0.f));
+		addBallJointConstraintFromLocalPoints(torso, head, vec3(0.f, 1.2f, 0.f), vec3(0.f, -0.33f, 0.f));
+		addBallJointConstraintFromLocalPoints(torso, leftUpperArm, vec3(-0.4f, 1.f, 0.f), vec3(0.f, 0.38f, 0.f));
+		addBallJointConstraintFromLocalPoints(leftUpperArm, leftLowerArm, vec3(0.f, -0.42f, 0.f), vec3(0.f, 0.42f, 0.f));
+		addBallJointConstraintFromLocalPoints(torso, rightUpperArm, vec3(0.4f, 1.f, 0.f), vec3(0.f, 0.38f, 0.f));
+		addBallJointConstraintFromLocalPoints(rightUpperArm, rightLowerArm, vec3(0.f, -0.42f, 0.f), vec3(0.f, 0.42f, 0.f));
+		addBallJointConstraintFromLocalPoints(torso, leftUpperLeg, vec3(-0.3f, -0.25f, 0.f), vec3(0.f, 0.6f, 0.f));
+		addBallJointConstraintFromLocalPoints(leftUpperLeg, leftLowerLeg, vec3(0.f, -0.6f, 0.f), vec3(0.f, 0.6f, 0.f));
+		addBallJointConstraintFromLocalPoints(torso, rightUpperLeg, vec3(0.3f, -0.25f, 0.f), vec3(0.f, 0.6f, 0.f));
+		addBallJointConstraintFromLocalPoints(rightUpperLeg, rightLowerLeg, vec3(0.f, -0.6f, 0.f), vec3(0.f, 0.6f, 0.f));
+#endif
 
 
 
-		//addDistanceConstraint(test1, test2, vec3(0.f, -0.5f, 0.f), vec3(0.f, -0.5f, 0.f), 2.f);
-		//addBallJointConstraint(test1, test2, vec3(0.f, -0.5f, 0.f), vec3(0.f, -0.5f, 0.f));
+
+
+		auto hingeMesh = make_ref<composite_mesh>();
+		hingeMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 2.f, 0.18f, vec3(0.f)), {}, trs::identity, lollipopMaterial });
+
+		auto fixed = appScene.createEntity("Fixed")
+			.addComponent<trs>(vec3(37.f, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))
+			.addComponent<raster_component>(hingeMesh)
+			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, 0.2f, 0.5f, 1.f)
+			.addComponent<rigid_body_component>(true, 1.f);
+
+		auto prev = fixed;
+
+		for (uint32 i = 0; i < 75; ++i)
+		{
+			float xPrev = 37.f + 2.5f * i;
+			float xCurr = 37.f + 2.5f * (i + 1);
+
+			auto chain = appScene.createEntity("Chain")
+				.addComponent<trs>(vec3(xCurr, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))
+				.addComponent<raster_component>(hingeMesh)
+				.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, 0.2f, 0.5f, 1.f)
+				.addComponent<rigid_body_component>(false, 1.f);
+
+			addHingeJointConstraintFromGlobalPoints(prev, chain, vec3(xPrev + 1.18f, 15.f, -2.f), vec3(0.f, 0.f, 1.f));
+
+			prev = chain;
+		}
 
 		testMesh->mesh = 
 		groundMesh->mesh = 
 		boxMesh->mesh = 
-		ragdollTorsoMesh->mesh =
-		ragdollHeadMesh->mesh =
-		ragdollArmMesh->mesh =
-		ragdollUpperLegMesh->mesh =
-		ragdollLowerLegMesh->mesh =
+		//ragdollTorsoMesh->mesh =
+		//ragdollHeadMesh->mesh =
+		//ragdollArmMesh->mesh =
+		//ragdollUpperLegMesh->mesh =
+		//ragdollLowerLegMesh->mesh =
+		hingeMesh->mesh =
 			primitiveMesh.createDXMesh();
 	}
 #endif

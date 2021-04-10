@@ -150,8 +150,16 @@ struct physics_reference_component
 uint32 allocateBoundingHullGeometry(const struct cpu_mesh& mesh);
 uint32 allocateBoundingHullGeometry(const std::string& meshFilepath);
 
-void addDistanceConstraint(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB, float distance);
-void addBallJointConstraint(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB);
+
+// Local anchors are always in the space of the entities.
+void addDistanceConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB, float distance);
+void addDistanceConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchorA, vec3 globalAnchorB); // Calculates distance from current configuration.
+
+void addBallJointConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB);
+void addBallJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor); // Calculates local anchors from current configuration.
+
+void addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalRotationAxis);
+
 
 void testPhysicsInteraction(scene& appScene, ray r, float forceAmount);
 void physicsStep(scene& appScene, float dt, uint32 numSolverIterations = 30);
