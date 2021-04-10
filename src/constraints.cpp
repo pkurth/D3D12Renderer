@@ -5,6 +5,8 @@
 #define DISTANCE_CONSTRAINT_BETA 0.1f
 #define BALL_JOINT_CONSTRAINT_BETA 0.1f
 
+#define DT_THRESHOLD 1e-5f
+
 void initializeDistanceVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const distance_constraint* input, distance_constraint_update* output, uint32 count, float dt)
 {
 	auto rbView = appScene.view<rigid_body_component>();
@@ -60,7 +62,7 @@ void initializeDistanceVelocityConstraints(scene& appScene, rigid_body_global_st
 		out.effectiveMass = (invMass != 0.f) ? (1.f / invMass) : 0.f;
 
 		out.bias = 0.f;
-		if (dt > 0.f)
+		if (dt > DT_THRESHOLD)
 		{
 			out.bias = (l - in.globalLength) * DISTANCE_CONSTRAINT_BETA / dt;
 		}
@@ -133,7 +135,7 @@ void initializeBallJointVelocityConstraints(scene& appScene, rigid_body_global_s
 							 + mat3::identity * globalB.invMass + skewMatB * globalB.invInertia * transpose(skewMatB);
 
 		out.bias = 0.f;
-		if (dt > 0.f)
+		if (dt > DT_THRESHOLD)
 		{
 			out.bias = (globalAnchorB - globalAnchorA) * BALL_JOINT_CONSTRAINT_BETA / dt;
 		}

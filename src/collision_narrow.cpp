@@ -1339,7 +1339,7 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 
 						point.bias = 0.f;
 
-						if (dt > 0.f)
+						if (dt > 1e-5f)
 						{
 							float vRel = dot(c.contact.collisionNormal, anchorVelocityB - anchorVelocityA);
 							const float slop = -0.001f;
