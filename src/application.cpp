@@ -344,10 +344,6 @@ void application::initialize(dx_renderer* renderer)
 
 
 
-	void initializeCollisionDebugDraw();
-	initializeCollisionDebugDraw();
-
-
 	setEnvironment("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
 
 

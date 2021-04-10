@@ -11,16 +11,11 @@
 
 struct debug_draw_call
 {
-	submesh_info submesh;
 	ref<pbr_material> material;
 	mat4 transform;
 };
 
 static std::vector<debug_draw_call> debugDrawCalls;
-
-static dx_mesh debugMesh;
-
-static submesh_info sphereMesh;
 
 static ref<pbr_material> redMaterial;
 static ref<pbr_material> greenMaterial;
@@ -29,7 +24,6 @@ static ref<pbr_material> blueMaterial;
 static void debugSphere(vec3 position, float radius, ref<pbr_material> material)
 {
 	debugDrawCalls.push_back({
-		sphereMesh,
 		material,
 		createModelMatrix(position, quat::identity, radius),
 	});
@@ -1426,26 +1420,28 @@ void solveCollisionVelocityConstraints(collision_constraint* constraints, uint32
 		rbB.angularVelocity = wB;
 	}
 }
-
-void initializeCollisionDebugDraw()
-{
-	cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
-	sphereMesh = primitiveMesh.pushSphere(15, 15, 1.f);
-
-	debugMesh = primitiveMesh.createDXMesh();
-
-	std::string empty;
-	redMaterial = createPBRMaterial(empty, empty, empty, empty, vec4(1.f, 0.f, 0.f, 1.f), vec4(0.f, 0.f, 0.f, 1.f));
-	greenMaterial = createPBRMaterial(empty, empty, empty, empty, vec4(0.f, 1.f, 0.f, 1.f), vec4(0.f, 0.f, 0.f, 1.f));
-	blueMaterial = createPBRMaterial(empty, empty, empty, empty, vec4(0.f, 0.f, 1.f, 1.f), vec4(0.f, 0.f, 0.f, 1.f));
-}
-
 void collisionDebugDraw(transparent_render_pass* renderPass)
 {
-	for (auto& dc : debugDrawCalls)
+	static dx_mesh debugMesh;
+	static submesh_info sphereMesh;
+
+	if (!redMaterial)
 	{
-		renderPass->renderObject(debugMesh.vertexBuffer, debugMesh.indexBuffer, dc.submesh, dc.material, dc.transform);
+		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+		sphereMesh = primitiveMesh.pushSphere(15, 15, 1.f);
+
+		debugMesh = primitiveMesh.createDXMesh();
+		
+		std::string empty;
+		redMaterial = createPBRMaterial(empty, empty, empty, empty, vec4(1.f, 0.f, 0.f, 1.f), vec4(0.f, 0.f, 0.f, 1.f));
+		greenMaterial = createPBRMaterial(empty, empty, empty, empty, vec4(0.f, 1.f, 0.f, 1.f), vec4(0.f, 0.f, 0.f, 1.f));
+		blueMaterial = createPBRMaterial(empty, empty, empty, empty, vec4(0.f, 0.f, 1.f, 1.f), vec4(0.f, 0.f, 0.f, 1.f));
 	}
 
+	for (auto& dc : debugDrawCalls)
+	{
+		renderPass->renderObject(debugMesh.vertexBuffer, debugMesh.indexBuffer, sphereMesh, dc.material, dc.transform);
+	}
+	
 	debugDrawCalls.clear();
 }
