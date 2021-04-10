@@ -1137,6 +1137,8 @@ vec3 getBarycentricCoordinates(vec3 a, vec3 b, vec3 c, vec3 p)
 	float d21 = dot(v2, v1);
 	float denom = d00 * d11 - d01 * d01;
 
+	denom = (abs(denom) < EPSILON) ? 1.f : denom;
+
 	float v = (d11 * d20 - d01 * d21) / denom;
 	float w = (d00 * d21 - d01 * d20) / denom;
 	float u = 1.0f - v - w;
