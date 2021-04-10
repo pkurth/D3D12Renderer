@@ -222,7 +222,7 @@ void application::initialize(dx_renderer* renderer)
 
 		auto ragdollMaterial = createPBRMaterial(
 			{}, {}, {}, {}, vec4(0.f), vec4(161.f, 102.f, 94.f, 255.f) / 255.f, 1.f, 0.f);
-#if 0
+#if 1
 
 		auto ragdollTorsoMesh = make_ref<composite_mesh>();
 		ragdollTorsoMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.4f, 0.25f, vec3(0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, ragdollMaterial });
@@ -325,25 +325,25 @@ void application::initialize(dx_renderer* renderer)
 
 
 
-		auto hingeMesh = make_ref<composite_mesh>();
-		hingeMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 2.f, 0.18f, vec3(0.f)), {}, trs::identity, lollipopMaterial });
+		auto chainMesh = make_ref<composite_mesh>();
+		chainMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 2.f, 0.18f, vec3(0.f)), {}, trs::identity, lollipopMaterial });
 
 		auto fixed = appScene.createEntity("Fixed")
 			.addComponent<trs>(vec3(37.f, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))
-			.addComponent<raster_component>(hingeMesh)
+			.addComponent<raster_component>(chainMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, 0.2f, 0.5f, 1.f)
 			.addComponent<rigid_body_component>(true, 1.f);
 
 		auto prev = fixed;
 
-		for (uint32 i = 0; i < 75; ++i)
+		for (uint32 i = 0; i < 2; ++i)
 		{
 			float xPrev = 37.f + 2.5f * i;
 			float xCurr = 37.f + 2.5f * (i + 1);
 
 			auto chain = appScene.createEntity("Chain")
 				.addComponent<trs>(vec3(xCurr, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))
-				.addComponent<raster_component>(hingeMesh)
+				.addComponent<raster_component>(chainMesh)
 				.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, 0.2f, 0.5f, 1.f)
 				.addComponent<rigid_body_component>(false, 1.f);
 
@@ -355,12 +355,12 @@ void application::initialize(dx_renderer* renderer)
 		testMesh->mesh = 
 		groundMesh->mesh = 
 		boxMesh->mesh = 
-		//ragdollTorsoMesh->mesh =
-		//ragdollHeadMesh->mesh =
-		//ragdollArmMesh->mesh =
-		//ragdollUpperLegMesh->mesh =
-		//ragdollLowerLegMesh->mesh =
-		hingeMesh->mesh =
+		ragdollTorsoMesh->mesh =
+		ragdollHeadMesh->mesh =
+		ragdollArmMesh->mesh =
+		ragdollUpperLegMesh->mesh =
+		ragdollLowerLegMesh->mesh =
+		chainMesh->mesh =
 			primitiveMesh.createDXMesh();
 	}
 #endif
@@ -916,6 +916,11 @@ bool application::handleUserInput(const user_input& input, float dt)
 			// Transform entity.
 			trs& transform = selectedEntity.getComponent<trs>();
 
+			// Saved rigid-body properties. When a RB is dragged, we make it kinematic.
+			static bool saved = false;
+			static float invMass;
+			static mat3 invInertia;
+
 			static transformation_type type = transformation_type_translation;
 			static transformation_space space = transformation_global;
 			if (manipulateTransformation(transform, type, space, camera, input, !inputCaptured, &overlayRenderPass))
@@ -923,6 +928,29 @@ bool application::handleUserInput(const user_input& input, float dt)
 				setSelectedEntityEulerRotation();
 				inputCaptured = true;
 				objectMovedByGizmo = true;
+
+				if (!saved && selectedEntity.hasComponent<rigid_body_component>())
+				{
+					rigid_body_component& rb = selectedEntity.getComponent<rigid_body_component>();
+					invMass = rb.invMass;
+					invInertia = rb.invInertia;
+
+					rb.invMass = 0.f;
+					rb.invInertia = mat3::zero;
+					rb.linearVelocity = 0.f;
+					rb.angularVelocity = 0.f;
+
+					saved = true;
+				}
+			}
+			else if (saved)
+			{
+				assert(selectedEntity.hasComponent<rigid_body_component>());
+				rigid_body_component& rb = selectedEntity.getComponent<rigid_body_component>();
+
+				rb.invMass = invMass;
+				rb.invInertia = invInertia;
+				saved = false;
 			}
 		}
 
