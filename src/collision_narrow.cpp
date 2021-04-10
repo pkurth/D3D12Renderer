@@ -1429,6 +1429,7 @@ void solveCollisionVelocityConstraints(collision_constraint* constraints, uint32
 		rbB.angularVelocity = wB;
 	}
 }
+
 void collisionDebugDraw(transparent_render_pass* renderPass)
 {
 	static dx_mesh debugMesh;

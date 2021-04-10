@@ -748,7 +748,6 @@ vec3 transformDirection(const trs& m, vec3 dir);
 vec3 inverseTransformPosition(const trs& m, vec3 pos);
 vec3 inverseTransformDirection(const trs& m, vec3 dir);
 
-quat rotateFromTo(quat from, quat to);
 quat rotateFromTo(vec3 from, vec3 to);
 quat lookAtQuaternion(vec3 forward, vec3 up);
 void getAxisRotation(quat q, vec3& axis, float& angle);

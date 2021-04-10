@@ -162,6 +162,8 @@ void addBallJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, ve
 // Usually both limits should be a lot smaller than pi.
 void addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalHingeAxis, float minLimit = -1.f, float maxLimit = -1.f);
 
+void addConeTwistConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis, float coneLimit, float twistLimit);
+
 
 void testPhysicsInteraction(scene& appScene, ray r, float forceAmount);
 void physicsStep(scene& appScene, float dt, uint32 numSolverIterations = 30);

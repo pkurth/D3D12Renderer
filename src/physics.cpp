@@ -9,6 +9,7 @@
 static std::vector<distance_constraint> distanceConstraints;
 static std::vector<ball_joint_constraint> ballJointConstraints;
 static std::vector<hinge_joint_constraint> hingeJointConstraints;
+static std::vector<cone_twist_constraint> coneTwistConstraints;
 
 static std::vector<constraint_edge> constraintEdges;
 
@@ -140,6 +141,29 @@ void addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, v
 
 	addConstraintEdge(a, constraint, constraintIndex, constraint_type_hinge_joint);
 	addConstraintEdge(b, constraint, constraintIndex, constraint_type_hinge_joint);
+}
+
+void addConeTwistConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis, float coneLimit, float twistLimit)
+{
+	uint16 constraintIndex = (uint16)coneTwistConstraints.size();
+	cone_twist_constraint& constraint = coneTwistConstraints.emplace_back();
+
+	const trs& transformA = a.getComponent<trs>();
+	const trs& transformB = b.getComponent<trs>();
+
+	constraint.localAnchorA = inverseTransformPosition(transformA, globalAnchor);
+	constraint.localAnchorB = inverseTransformPosition(transformB, globalAnchor);
+
+	constraint.coneLimit = coneLimit;
+	constraint.twistLimit = twistLimit;
+	constraint.localLimitAxisA = inverseTransformDirection(transformA, globalAxis);
+	constraint.localLimitAxisB = inverseTransformDirection(transformB, globalAxis);
+
+	getTangents(constraint.localLimitAxisA, constraint.localLimitTangentA, constraint.localLimitBitangentA);
+	constraint.localLimitTangentB = conjugate(transformB.rotation) * (transformA.rotation * constraint.localLimitTangentA);
+
+	addConstraintEdge(a, constraint, constraintIndex, constraint_type_cone_twist);
+	addConstraintEdge(b, constraint, constraintIndex, constraint_type_cone_twist);
 }
 
 
@@ -312,6 +336,7 @@ void physicsStep(scene& appScene, float dt, uint32 numSolverIterations)
 	static distance_constraint_update* distanceConstraintUpdates = new distance_constraint_update[1024];
 	static ball_joint_constraint_update* ballJointConstraintUpdates = new ball_joint_constraint_update[1024];
 	static hinge_joint_constraint_update* hingeJointConstraintUpdates = new hinge_joint_constraint_update[1024];
+	static cone_twist_constraint_update* coneTwistConstraintUpdates = new cone_twist_constraint_update[1024];
 
 	  
 	auto rbView = appScene.view<rigid_body_component>();
@@ -359,12 +384,14 @@ void physicsStep(scene& appScene, float dt, uint32 numSolverIterations)
 	initializeDistanceVelocityConstraints(appScene, rbGlobal, distanceConstraints.data(), distanceConstraintUpdates, (uint32)distanceConstraints.size(), dt);
 	initializeBallJointVelocityConstraints(appScene, rbGlobal, ballJointConstraints.data(), ballJointConstraintUpdates, (uint32)ballJointConstraints.size(), dt);
 	initializeHingeJointVelocityConstraints(appScene, rbGlobal, hingeJointConstraints.data(), hingeJointConstraintUpdates, (uint32)hingeJointConstraints.size(), dt);
+	initializeConeTwistVelocityConstraints(appScene, rbGlobal, coneTwistConstraints.data(), coneTwistConstraintUpdates, (uint32)coneTwistConstraints.size(), dt);
 
 	for (uint32 it = 0; it < numSolverIterations; ++it)
 	{
 		solveDistanceVelocityConstraints(distanceConstraintUpdates, (uint32)distanceConstraints.size(), rbGlobal);
 		solveBallJointVelocityConstraints(ballJointConstraintUpdates, (uint32)ballJointConstraints.size(), rbGlobal);
 		solveHingeJointVelocityConstraints(hingeJointConstraintUpdates, (uint32)hingeJointConstraints.size(), rbGlobal);
+		solveConeTwistVelocityConstraints(coneTwistConstraintUpdates, (uint32)coneTwistConstraints.size(), rbGlobal);
 		solveCollisionVelocityConstraints(collisionConstraints, numCollisionConstraints, rbGlobal);
 	}
 

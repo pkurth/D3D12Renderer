@@ -8,6 +8,7 @@ enum constraint_type : uint16
 	constraint_type_distance,
 	constraint_type_ball_joint,
 	constraint_type_hinge_joint,
+	constraint_type_cone_twist,
 };
 
 #define INVALID_CONSTRAINT_EDGE UINT16_MAX
@@ -120,6 +121,52 @@ struct hinge_joint_constraint_update
 };
 
 
+// Cone-twist constraint.
+
+struct cone_twist_constraint : physics_constraint
+{
+	vec3 localAnchorA;
+	vec3 localAnchorB;
+
+	float coneLimit;
+	float twistLimit;
+
+	vec3 localLimitAxisA;
+	vec3 localLimitAxisB;
+
+	vec3 localLimitTangentA;
+	vec3 localLimitBitangentA;
+	vec3 localLimitTangentB;
+};
+
+struct cone_twist_constraint_update
+{
+	uint16 rigidBodyIndexA;
+	uint16 rigidBodyIndexB;
+	vec3 relGlobalAnchorA;
+	vec3 relGlobalAnchorB;
+
+	vec3 bias;
+	mat3 invEffectiveMass;
+
+	// Limits.
+	bool solveConeLimit;
+	bool solveTwistLimit;
+
+	vec3 globalSwingAxis;
+	float swingImpulse;
+	float effectiveSwingLimitMass;
+	float swingLimitBias;
+	
+	vec3 globalTwistAxis;
+	float twistImpulse;
+	float twistLimitSign;
+	float effectiveTwistLimitMass;
+	float twistLimitBias;
+};
+
+
+
 struct rigid_body_global_state;
 
 void initializeDistanceVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const distance_constraint* input, distance_constraint_update* output, uint32 count, float dt);
@@ -130,3 +177,6 @@ void solveBallJointVelocityConstraints(ball_joint_constraint_update* constraints
 
 void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const hinge_joint_constraint* input, hinge_joint_constraint_update* output, uint32 count, float dt);
 void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);
+
+void initializeConeTwistVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const cone_twist_constraint* input, cone_twist_constraint_update* output, uint32 count, float dt);
+void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);

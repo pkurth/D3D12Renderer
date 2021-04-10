@@ -441,11 +441,6 @@ vec3 inverseTransformDirection(const trs& m, vec3 dir)
 	return conjugate(m.rotation) * dir;
 }
 
-quat rotateFromTo(quat from, quat to)
-{
-	return to * conjugate(from);
-}
-
 quat rotateFromTo(vec3 _from, vec3 _to)
 {
 	vec3 from = normalize(_from);

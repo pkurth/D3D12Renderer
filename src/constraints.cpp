@@ -6,6 +6,7 @@
 #define BALL_JOINT_CONSTRAINT_BETA 0.1f
 #define HINGE_ROTATION_CONSTRAINT_BETA 0.3f
 #define HINGE_LIMIT_CONSTRAINT_BETA 0.1f
+#define TWIST_LIMIT_CONSTRAINT_BETA 0.1f
 
 #define DT_THRESHOLD 1e-5f
 
@@ -349,6 +350,203 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 			vec3 translationCdot = anchorVelocityB - anchorVelocityA + con.translationBias;
 
 			vec3 translationP = solveLinearSystem(con.invEffectiveTranslationMass, -translationCdot);
+
+			vA -= rbA.invMass * translationP;
+			wA -= rbA.invInertia * cross(con.relGlobalAnchorA, translationP);
+			vB += rbB.invMass * translationP;
+			wB += rbB.invInertia * cross(con.relGlobalAnchorB, translationP);
+		}
+
+		rbA.linearVelocity = vA;
+		rbA.angularVelocity = wA;
+		rbB.linearVelocity = vB;
+		rbB.angularVelocity = wB;
+	}
+}
+
+void initializeConeTwistVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const cone_twist_constraint* input, cone_twist_constraint_update* output, uint32 count, float dt)
+{
+	auto rbView = appScene.view<rigid_body_component>();
+	rigid_body_component* rbBase = rbView.raw();
+
+	for (uint32 i = 0; i < count; ++i)
+	{
+		const cone_twist_constraint& in = input[i];
+		cone_twist_constraint_update& out = output[i];
+
+		scene_entity entityA = { in.entityA, appScene };
+		scene_entity entityB = { in.entityB, appScene };
+
+		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
+		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
+
+		trs& transformA = entityA.getComponent<trs>();
+		trs& transformB = entityB.getComponent<trs>();
+
+		out.rigidBodyIndexA = (uint16)(&rbA - rbBase);
+		out.rigidBodyIndexB = (uint16)(&rbB - rbBase);
+
+		rigid_body_global_state& globalA = rbs[out.rigidBodyIndexA];
+		rigid_body_global_state& globalB = rbs[out.rigidBodyIndexB];
+
+		// Relative to entity's origin.
+		vec3 relGlobalAnchorA = transformA.rotation * in.localAnchorA;
+		vec3 relGlobalAnchorB = transformB.rotation * in.localAnchorB;
+
+		// Global.
+		vec3 globalAnchorA = transformA.position + relGlobalAnchorA;
+		vec3 globalAnchorB = transformB.position + relGlobalAnchorB;
+
+		// Relative to COG.
+		out.relGlobalAnchorA = transformA.rotation * (in.localAnchorA - rbA.localCOGPosition);
+		out.relGlobalAnchorB = transformB.rotation * (in.localAnchorB - rbB.localCOGPosition);
+
+		mat3 skewMatA = getSkewMatrix(out.relGlobalAnchorA);
+		mat3 skewMatB = getSkewMatrix(out.relGlobalAnchorB);
+
+		out.invEffectiveMass = mat3::identity * globalA.invMass + skewMatA * globalA.invInertia * transpose(skewMatA)
+							 + mat3::identity * globalB.invMass + skewMatB * globalB.invInertia * transpose(skewMatB);
+
+		out.bias = 0.f;
+		if (dt > DT_THRESHOLD)
+		{
+			out.bias = (globalAnchorB - globalAnchorA) * BALL_JOINT_CONSTRAINT_BETA / dt;
+		}
+
+
+		// Limits.
+
+		quat btoa = conjugate(transformA.rotation) * transformB.rotation;
+
+		vec3 localLimitAxisA = in.localLimitAxisA;
+		vec3 localLimitAxisCompareA = btoa * in.localLimitAxisB;
+
+		quat swingRotation = rotateFromTo(localLimitAxisA, localLimitAxisCompareA);
+
+		vec3 twistTangentA = swingRotation * in.localLimitTangentA;
+		vec3 twistBitangentA = swingRotation * in.localLimitBitangentA;
+		vec3 localLimitTangentCompareA = btoa * in.localLimitTangentB;
+		float twistAngle = atan2(dot(localLimitTangentCompareA, twistBitangentA), dot(localLimitTangentCompareA, twistTangentA));
+
+
+
+		// Cone limit.
+		vec3 swingAxis; float swingAngle;
+		getAxisRotation(swingRotation, swingAxis, swingAngle);
+		if (swingAngle < 0.f)
+		{
+			swingAngle *= -1.f;
+			swingAxis *= -1.f;
+		}
+
+		out.solveConeLimit = swingAngle >= in.coneLimit;
+		if (out.solveConeLimit)
+		{
+			out.swingImpulse = 0.f;
+			out.globalSwingAxis = transformA.rotation * swingAxis;
+			float invEffectiveLimitMass = dot(out.globalSwingAxis, globalA.invInertia * out.globalSwingAxis)
+										+ dot(out.globalSwingAxis, globalB.invInertia * out.globalSwingAxis);
+			out.effectiveSwingLimitMass = (invEffectiveLimitMass != 0.f) ? (1.f / invEffectiveLimitMass) : 0.f;
+
+			out.swingLimitBias = 0.f;
+			if (dt > DT_THRESHOLD)
+			{
+				out.swingLimitBias = (in.coneLimit - swingAngle) * HINGE_LIMIT_CONSTRAINT_BETA / dt;
+			}
+		}
+
+		// Twist limit.
+		bool minTwistLimitViolated = in.twistLimit >= 0.f && twistAngle <= -in.twistLimit;
+		bool maxTwistLimitViolated = in.twistLimit >= 0.f && twistAngle >= in.twistLimit; 
+		assert(!(minTwistLimitViolated && maxTwistLimitViolated));
+
+		out.solveTwistLimit = minTwistLimitViolated || maxTwistLimitViolated;
+		if (out.solveTwistLimit)
+		{
+			out.twistImpulse = 0.f;
+			out.globalTwistAxis = transformA.rotation * localLimitAxisA;
+			float invEffectiveLimitMass = dot(out.globalTwistAxis, globalA.invInertia * out.globalTwistAxis)
+										+ dot(out.globalTwistAxis, globalB.invInertia * out.globalTwistAxis);
+			out.effectiveTwistLimitMass = (invEffectiveLimitMass != 0.f) ? (1.f / invEffectiveLimitMass) : 0.f;
+
+			out.twistLimitSign = minTwistLimitViolated ? 1.f : -1.f;
+
+			out.twistLimitBias = 0.f;
+			if (dt > DT_THRESHOLD)
+			{
+				float d = minTwistLimitViolated ? (in.twistLimit + twistAngle) : (in.twistLimit - twistAngle);
+				out.twistLimitBias = d * TWIST_LIMIT_CONSTRAINT_BETA / dt;
+			}
+		}
+	}
+}
+
+void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs)
+{
+	for (uint32 i = 0; i < count; ++i)
+	{
+		cone_twist_constraint_update& con = constraints[i];
+
+		rigid_body_global_state& rbA = rbs[con.rigidBodyIndexA];
+		rigid_body_global_state& rbB = rbs[con.rigidBodyIndexB];
+
+		vec3 vA = rbA.linearVelocity;
+		vec3 wA = rbA.angularVelocity;
+		vec3 vB = rbB.linearVelocity;
+		vec3 wB = rbB.angularVelocity;
+
+		// Solve in order of importance (most important last): Limits -> Position.
+
+		// Twist.
+		if (con.solveTwistLimit)
+		{
+			vec3 globalRotationAxis = con.globalTwistAxis;
+			float aDotWA = dot(globalRotationAxis, wA); // How fast are we turning about the axis.
+			float aDotWB = dot(globalRotationAxis, wB);
+
+			float limitSign = con.twistLimitSign;
+
+			float relAngularVelocity = limitSign * (aDotWB - aDotWA);
+
+			float limitCdot = relAngularVelocity + con.twistLimitBias;
+			float limitLambda = -con.effectiveTwistLimitMass * limitCdot;
+
+			float impulse = max(con.twistImpulse + limitLambda, 0.f);
+			limitLambda = impulse - con.twistImpulse;
+			con.twistImpulse = impulse;
+
+			limitLambda *= limitSign;
+
+			vec3 P = globalRotationAxis * limitLambda;
+			wA -= rbA.invInertia * P;
+			wB += rbB.invInertia * P;
+		}
+
+		// Cone.
+		if (con.solveConeLimit)
+		{
+			float axisDotWA = dot(con.globalSwingAxis, wA);
+			float axisDotWB = dot(con.globalSwingAxis, wB);
+			float swingLimitCdot = axisDotWA - axisDotWB + con.swingLimitBias;
+			float swingLimitLambda = -con.effectiveSwingLimitMass * swingLimitCdot;
+
+			float impulse = max(con.swingImpulse + swingLimitLambda, 0.f);
+			swingLimitLambda = impulse - con.swingImpulse;
+			con.swingImpulse = impulse;
+
+			vec3 P = con.globalSwingAxis * swingLimitLambda;
+			wA += rbA.invInertia * P;
+			wB -= rbB.invInertia * P;
+		}
+
+
+		// Position part.
+		{
+			vec3 anchorVelocityA = vA + cross(wA, con.relGlobalAnchorA);
+			vec3 anchorVelocityB = vB + cross(wB, con.relGlobalAnchorB);
+			vec3 translationCdot = anchorVelocityB - anchorVelocityA + con.bias;
+
+			vec3 translationP = solveLinearSystem(con.invEffectiveMass, -translationCdot);
 
 			vA -= rbA.invMass * translationP;
 			wA -= rbA.invInertia * cross(con.relGlobalAnchorA, translationP);
