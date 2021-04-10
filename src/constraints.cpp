@@ -205,7 +205,7 @@ void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_
 
 
 
-		// Position part.
+		// Position part. Identical to ball joint.
 
 		mat3 skewMatA = getSkewMatrix(out.relGlobalAnchorA);
 		mat3 skewMatB = getSkewMatrix(out.relGlobalAnchorB);
@@ -222,14 +222,14 @@ void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_
 
 
 		// Rotation part.
-		vec3 globalRotationAxisA = transformA.rotation * in.localAxisA;
-		vec3 globalRotationAxisB = transformB.rotation * in.localAxisB;
+		vec3 globalHingeAxisA = transformA.rotation * in.localHingeAxisA;
+		vec3 globalHingeAxisB = transformB.rotation * in.localHingeAxisB;
 
 		vec3 globalTangentB, globalBitangentB;
-		getTangents(globalRotationAxisB, globalTangentB, globalBitangentB);
+		getTangents(globalHingeAxisB, globalTangentB, globalBitangentB);
 
-		vec3 bxa = cross(globalTangentB, globalRotationAxisA);
-		vec3 cxa = cross(globalBitangentB, globalRotationAxisA);
+		vec3 bxa = cross(globalTangentB, globalHingeAxisA);
+		vec3 cxa = cross(globalBitangentB, globalHingeAxisA);
 		vec3 iAbxa = globalA.invInertia * bxa;
 		vec3 iBbxa = globalB.invInertia * bxa;
 		vec3 iAcxa = globalA.invInertia * cxa;
@@ -246,7 +246,7 @@ void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_
 		out.rotationBias = vec2(0.f, 0.f);
 		if (dt > DT_THRESHOLD)
 		{
-			out.rotationBias = vec2(dot(globalRotationAxisA, globalTangentB), dot(globalRotationAxisA, globalBitangentB)) * HINGE_ROTATION_CONSTRAINT_BETA / dt;
+			out.rotationBias = vec2(dot(globalHingeAxisA, globalTangentB), dot(globalHingeAxisA, globalBitangentB)) * HINGE_ROTATION_CONSTRAINT_BETA / dt;
 		}
 
 
@@ -255,17 +255,8 @@ void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_
 
 		if (in.minRotationLimit <= 0.f || in.maxRotationLimit >= 0.f)
 		{
-			quat currentRelRotation = rotateFromTo(globalA.rotation, globalB.rotation);
-			quat rotationDifference = normalize(rotateFromTo(in.initialRelativeRotation, currentRelRotation));
-
-			vec3 axis; float angle;
-			getAxisRotation(rotationDifference, axis, angle);
-			if (dot(axis, globalRotationAxisA) < 0.f)
-			{
-				angle *= -1.f;
-			}
-
-			angle = angleToNegPiToPi(angle);
+			vec3 localHingeCompareA = conjugate(transformA.rotation) * (transformB.rotation * in.localHingeTangentB);
+			float angle = atan2(dot(localHingeCompareA, in.localHingeBitangentA), dot(localHingeCompareA, in.localHingeTangentA));
 
 			bool minLimitViolated = in.minRotationLimit <= 0.f && angle <= in.minRotationLimit;
 			bool maxLimitViolated = in.maxRotationLimit >= 0.f && angle >= in.maxRotationLimit;
@@ -275,11 +266,11 @@ void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_
 			bool solveLimit = minLimitViolated || maxLimitViolated;
 			if (solveLimit)
 			{
-				out.globalRotationAxis = globalRotationAxisA;
+				out.globalRotationAxis = globalHingeAxisA;
 				out.limitImpulse = 0.f;
 
-				float invEffectiveLimitMass = dot(globalRotationAxisA, globalA.invInertia * globalRotationAxisA)
-											+ dot(globalRotationAxisA, globalB.invInertia * globalRotationAxisA);
+				float invEffectiveLimitMass = dot(globalHingeAxisA, globalA.invInertia * globalHingeAxisA)
+											+ dot(globalHingeAxisA, globalB.invInertia * globalHingeAxisA);
 
 				out.effectiveLimitMass = (invEffectiveLimitMass != 0.f) ? (1.f / invEffectiveLimitMass) : 0.f;
 				out.limitSign = minLimitViolated ? 1.f : -1.f;

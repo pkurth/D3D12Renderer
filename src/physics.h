@@ -159,7 +159,8 @@ void addBallJointConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec
 void addBallJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor); // Calculates local anchors from current configuration.
 
 // If the passed limits are < 0, there are no limits. Limits are specified as allowed deviations from the initial relative rotation.
-void addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalRotationAxis, float minLimit = -1.f, float maxLimit = -1.f);
+// Usually both limits should be a lot smaller than pi.
+void addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalHingeAxis, float minLimit = -1.f, float maxLimit = -1.f);
 
 
 void testPhysicsInteraction(scene& appScene, ray r, float forceAmount);
