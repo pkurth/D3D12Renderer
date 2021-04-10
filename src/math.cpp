@@ -363,6 +363,11 @@ mat4 invert(const mat4& m)
 	return inv;
 }
 
+float determinant(const mat2& m)
+{
+	return m.m00 * m.m11 - m.m10 * m.m01;
+}
+
 float determinant(const mat3& m)
 {
 	return m.m00 * (m.m11 * m.m22 - m.m21 * m.m12)

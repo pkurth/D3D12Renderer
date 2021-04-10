@@ -734,6 +734,7 @@ mat4 transpose(const mat4& a);
 mat3 invert(const mat3& m);
 mat4 invert(const mat4& m);
 
+float determinant(const mat2& m);
 float determinant(const mat3& m);
 float determinant(const mat4& m);
 
