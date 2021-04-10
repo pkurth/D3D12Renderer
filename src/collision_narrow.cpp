@@ -521,7 +521,16 @@ static bool intersection(const bounding_capsule& a, const bounding_capsule& b, c
 
 		vec3 normal = contactB0 - contactA0;
 		float d = length(normal);
-		normal /= d;
+
+		if (d < EPSILON)
+		{
+			d = 0.f;
+			normal = vec3(0.f, 1.f, 0.f);
+		}
+		else
+		{
+			normal /= d;
+		}
 
 		float radiusSum = a.radius + b.radius;
 
