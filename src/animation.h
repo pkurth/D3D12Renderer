@@ -67,6 +67,7 @@ struct animation_skeleton
 
 	void sampleAnimation(const std::string& name, float time, trs* outLocalTransforms) const;
 	void getSkinningMatricesFromLocalTransforms(const trs* localTransforms, mat4* outSkinningMatrices, const trs& worldTransform = trs::identity) const;
+	void getSkinningMatricesFromGlobalTransforms(const trs* globalTransforms, mat4* outSkinningMatrices) const;
 
 	void prettyPrintHierarchy() const;
 };

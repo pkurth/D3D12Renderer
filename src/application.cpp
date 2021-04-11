@@ -43,6 +43,11 @@ struct raytrace_component
 	raytracing_object_type type;
 };
 
+struct ragdoll_component
+{
+	std::vector<scene_entity> rigidbodies;
+};
+
 static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh, path_tracer& pathTracer)
 {
 	if (dxContext.raytracingSupported)
@@ -219,11 +224,10 @@ void application::initialize(dx_renderer* renderer)
 
 
 		// Ragdoll.
-
+#if 1
 		auto ragdollMaterial = createPBRMaterial(
 			{}, {}, {}, {}, vec4(0.f), vec4(161.f, 102.f, 94.f, 255.f) / 255.f, 1.f, 0.f);
 		//auto ragdollMaterial = lollipopMaterial;
-#if 1
 
 		auto ragdollTorsoMesh = make_ref<composite_mesh>();
 		ragdollTorsoMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.4f, 0.25f, vec3(0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, ragdollMaterial });
@@ -340,9 +344,51 @@ void application::initialize(dx_renderer* renderer)
 #endif
 
 
+		auto ragdollMesh = loadAnimatedMeshFromFile("assets/ragdoll/ragdoll.fbx");
+		//auto ragdollMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx");
+		auto ragdollPartMesh = make_ref<composite_mesh>();
+		ragdollPartMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.7f, 0.2f, vec3(0.f, 0.55f, 0.f)), {}, trs::identity, ragdollMaterial });
 
 
+		if (ragdollMesh)
+		{
+			auto ragdollEntity = appScene.createEntity("Ragdoll")
+				.addComponent<trs>(vec3(0.f, 0.f, 0.f), quat::identity)
+				.addComponent<raster_component>(ragdollMesh)
+				.addComponent<animation_component>(0.f)
+				;
 
+			std::vector<scene_entity> ragdollEntities;
+
+			for (auto& joint : ragdollMesh->skeleton.joints)
+			{
+				trs transform = joint.bindTransform;
+				//transform.position += vec3(4.f, 3.f, 0.f);
+				transform.position += vec3(2.2f, 0.f, 0.f);
+				auto entity = appScene.createEntity(joint.name.c_str())
+					.addComponent<trs>(transform)
+					.addComponent<raster_component>(ragdollPartMesh)
+					.addComponent<collider_component>(bounding_capsule{ vec3(0.f, 0.2f, 0.f), vec3(0.f, 0.9f, 0.f), 0.2f }, 0.2f, ragdollFriction, ragdollDensity)
+					.addComponent<rigid_body_component>(false, 1.f);
+
+				ragdollEntities.push_back(entity);
+
+				if (joint.parentID != NO_PARENT)
+				{
+					auto parent = ragdollEntities[joint.parentID];
+					if (parent)
+					{
+						//addBallJointConstraintFromGlobalPoints(parent, entity, transform.position);
+						addConeTwistConstraintFromGlobalPoints(parent, entity, transform.position, parent.getComponent<trs>().rotation * vec3(0.f, 1.f, 0.f), -1.f, deg2rad(30.f));
+					}
+				}
+			}
+
+			ragdollEntity.addComponent<ragdoll_component>(std::move(ragdollEntities));
+		}
+
+
+#if 1
 		auto chainMesh = make_ref<composite_mesh>();
 		chainMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 2.f, 0.18f, vec3(0.f)), {}, trs::identity, lollipopMaterial });
 
@@ -373,7 +419,7 @@ void application::initialize(dx_renderer* renderer)
 
 			prev = chain;
 		}
-
+#endif
 
 
 		//auto angleMesh = make_ref<composite_mesh>();
@@ -391,6 +437,7 @@ void application::initialize(dx_renderer* renderer)
 		ragdollUpperLegMesh->mesh =
 		ragdollLowerLegMesh->mesh =
 		chainMesh->mesh =
+		ragdollPartMesh->mesh =
 		//angleMesh->mesh =
 			primitiveMesh.createDXMesh();
 	}
@@ -919,10 +966,9 @@ bool application::handleUserInput(const user_input& input, float dt)
 
 	if (input.keyboard['F'].pressEvent && selectedEntity)
 	{
-		auto& raster = selectedEntity.getComponent<raster_component>();
 		auto& transform = selectedEntity.getComponent<trs>();
 
-		auto aabb = raster.mesh->aabb;
+		auto aabb = selectedEntity.hasComponent<raster_component>() ? selectedEntity.getComponent<raster_component>().mesh->aabb : bounding_box::fromCenterRadius(0.f, 0.f);
 		aabb.minCorner *= transform.scale;
 		aabb.maxCorner *= transform.scale;
 
@@ -1297,6 +1343,8 @@ void application::update(const user_input& input, float dt)
 		// Skin animated meshes.
 		for (auto [entityHandle, anim, raster] : appScene.group(entt::get<animation_component, raster_component>).each())
 		{
+			scene_entity entity = { entityHandle, appScene };
+
 			anim.time += dt;
 			const dx_mesh& mesh = raster.mesh->mesh;
 			animation_skeleton& skeleton = raster.mesh->skeleton;
@@ -1304,13 +1352,32 @@ void application::update(const user_input& input, float dt)
 			auto [vb, vertexOffset, skinningMatrices] = skinObject(mesh.vertexBuffer, (uint32)skeleton.joints.size());
 
 			mat4* mats = skinningMatrices;
-			auto& captureAnim = anim;
-			context.addWork([&skeleton, &captureAnim, mats]()
+			if (entity.hasComponent<ragdoll_component>())
 			{
-				trs localTransforms[128];
-				skeleton.sampleAnimation(skeleton.clips[captureAnim.animationIndex].name, captureAnim.time, localTransforms);
-				skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, mats);
-			});
+				auto& ragdoll = entity.getComponent<ragdoll_component>();
+				context.addWork([&skeleton, &ragdoll, mats]()
+				{
+					trs* rbTransforms = (trs*)alloca(ragdoll.rigidbodies.size() * sizeof(trs));
+
+					for (uint32 i = 0; i < (uint32)ragdoll.rigidbodies.size(); ++i)
+					{
+						scene_entity& rbEntity = ragdoll.rigidbodies[i];
+						rbTransforms[i] = rbEntity.getComponent<trs>();
+					}
+
+					skeleton.getSkinningMatricesFromGlobalTransforms(rbTransforms, mats);
+				});
+			}
+			else
+			{
+				auto& captureAnim = anim;
+				context.addWork([&skeleton, &captureAnim, mats]()
+				{
+					trs localTransforms[128];
+					skeleton.sampleAnimation(skeleton.clips[captureAnim.animationIndex].name, captureAnim.time, localTransforms);
+					skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, mats);
+				});
+			}
 
 			anim.prevFrameVB = anim.vb;
 			anim.vb = vb;

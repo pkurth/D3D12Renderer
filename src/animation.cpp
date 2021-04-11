@@ -316,6 +316,16 @@ void animation_skeleton::getSkinningMatricesFromLocalTransforms(const trs* local
 	}
 }
 
+void animation_skeleton::getSkinningMatricesFromGlobalTransforms(const trs* globalTransforms, mat4* outSkinningMatrices) const
+{
+	uint32 numJoints = (uint32)joints.size();
+
+	for (uint32 i = 0; i < numJoints; ++i)
+	{
+		outSkinningMatrices[i] = trsToMat4(globalTransforms[i]) * joints[i].invBindMatrix;
+	}
+}
+
 static void prettyPrint(const animation_skeleton& skeleton, uint32 parent, uint32 indent)
 {
 	for (uint32 i = 0; i < (uint32)skeleton.joints.size(); ++i)
