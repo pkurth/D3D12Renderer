@@ -188,14 +188,14 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
 			.addComponent<rigid_body_component>(true, 1.f);
 
-		//for (uint32 i = 0; i < 30; ++i)
-		//{
-		//	appScene.createEntity("Cube")
-		//		.addComponent<trs>(vec3(20.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
-		//		.addComponent<raster_component>(boxMesh)
-		//		.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
-		//		.addComponent<rigid_body_component>(false, 1.f);
-		//}
+		for (uint32 i = 0; i < 10; ++i)
+		{
+			appScene.createEntity("Cube")
+				.addComponent<trs>(vec3(20.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+				.addComponent<raster_component>(boxMesh)
+				.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
+				.addComponent<rigid_body_component>(false, 1.f);
+		}
 
 		bounding_hull hull =
 		{
@@ -222,6 +222,7 @@ void application::initialize(dx_renderer* renderer)
 
 		auto ragdollMaterial = createPBRMaterial(
 			{}, {}, {}, {}, vec4(0.f), vec4(161.f, 102.f, 94.f, 255.f) / 255.f, 1.f, 0.f);
+		//auto ragdollMaterial = lollipopMaterial;
 #if 1
 
 		auto ragdollTorsoMesh = make_ref<composite_mesh>();
@@ -247,8 +248,9 @@ void application::initialize(dx_renderer* renderer)
 		float ragdollDensity = 10.f;
 		float ragdollFriction = 0.9f;
 
+		trs torsoTransform(vec3(30.f, 5.f, -2.f), quat::identity);
 		auto torso = appScene.createEntity("Torso")
-			.addComponent<trs>(vec3(30.f, 5.f, -2.f), quat::identity)
+			.addComponent<trs>(torsoTransform)
 			.addComponent<raster_component>(ragdollTorsoMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(-0.2f, 0.f, 0.f), vec3(0.2f, 0.f, 0.f), 0.25f }, 0.2f, 0.5f, ragdollDensity)
 			.addComponent<collider_component>(bounding_capsule{ vec3(-0.16f, 0.32f, 0.f), vec3(0.16f, 0.32f, 0.f), 0.2f }, 0.2f, 0.5f, ragdollDensity)
@@ -262,18 +264,20 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.075f, 0.f), vec3(0.f, 0.075f, 0.f), 0.25f }, 0.2f, ragdollFriction, ragdollDensity)
 			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
+		trs leftUpperArmTransform(vec3(29.4f, 5.75f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-30.f)));
 		auto leftUpperArm = appScene.createEntity("Left upper arm")
-			.addComponent<trs>(vec3(29.4f, 5.75f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-30.f)))
+			.addComponent<trs>(leftUpperArmTransform)
 			.addComponent<raster_component>(ragdollArmMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.2f, 0.f), vec3(0.f, 0.2f, 0.f), 0.15f }, 0.2f, ragdollFriction, ragdollDensity)
 			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
 		auto leftLowerArm = appScene.createEntity("Left lower arm")
-			.addComponent<trs>(vec3(29.135f, 5.092f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-20.f)))
+			.addComponent<trs>(vec3(29.116f, 5.044f, -2.043f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-20.f)))
 			.addComponent<raster_component>(ragdollArmMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.2f, 0.f), vec3(0.f, 0.2f, 0.f), 0.15f }, 0.2f, ragdollFriction, ragdollDensity)
 			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
+		trs rightUpperArmTransform(vec3(30.6f, 5.75f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(30.f)));
 		auto rightUpperArm = appScene.createEntity("Right upper arm")
 			.addComponent<trs>(vec3(30.6f, 5.75f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(30.f)))
 			.addComponent<raster_component>(ragdollArmMesh)
@@ -281,13 +285,14 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
 		auto rightLowerArm = appScene.createEntity("Right lower arm")
-			.addComponent<trs>(vec3(30.865f, 5.092f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(20.f)))
+			.addComponent<trs>(vec3(30.884f, 5.044f, -2.043f), quat(vec3(0.f, 0.f, 1.f), deg2rad(20.f)))
 			.addComponent<raster_component>(ragdollArmMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.2f, 0.f), vec3(0.f, 0.2f, 0.f), 0.15f }, 0.2f, ragdollFriction, ragdollDensity)
 			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
+		trs leftUpperLegTransform(vec3(29.629f, 4.188f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-10.f)));
 		auto leftUpperLeg = appScene.createEntity("Left upper leg")
-			.addComponent<trs>(vec3(29.629f, 4.188f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-10.f)))
+			.addComponent<trs>(leftUpperLegTransform)
 			.addComponent<raster_component>(ragdollUpperLegMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.3f, 0.f), vec3(0.f, 0.3f, 0.f), 0.25f }, 0.2f, ragdollFriction, ragdollDensity)
 			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
@@ -298,8 +303,9 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.3f, 0.f), vec3(0.f, 0.3f, 0.f), 0.18f }, 0.2f, ragdollFriction, ragdollDensity)
 			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
+		trs rightUpperLegTransform(vec3(30.371f, 4.188f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(10.f)));
 		auto rightUpperLeg = appScene.createEntity("Right upper leg")
-			.addComponent<trs>(vec3(30.371f, 4.188f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(10.f)))
+			.addComponent<trs>(rightUpperLegTransform)
 			.addComponent<raster_component>(ragdollUpperLegMesh)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.3f, 0.f), vec3(0.f, 0.3f, 0.f), 0.25f }, 0.2f, ragdollFriction, ragdollDensity)
 			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
@@ -310,6 +316,7 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.3f, 0.f), vec3(0.f, 0.3f, 0.f), 0.18f }, 0.2f, ragdollFriction, ragdollDensity)
 			.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
+#if 0
 		addBallJointConstraintFromLocalPoints(torso, head, vec3(0.f, 1.2f, 0.f), vec3(0.f, -0.33f, 0.f));
 		addBallJointConstraintFromLocalPoints(torso, leftUpperArm, vec3(-0.4f, 1.f, 0.f), vec3(0.f, 0.38f, 0.f));
 		addBallJointConstraintFromLocalPoints(leftUpperArm, leftLowerArm, vec3(0.f, -0.42f, 0.f), vec3(0.f, 0.42f, 0.f));
@@ -319,6 +326,17 @@ void application::initialize(dx_renderer* renderer)
 		addBallJointConstraintFromLocalPoints(leftUpperLeg, leftLowerLeg, vec3(0.f, -0.6f, 0.f), vec3(0.f, 0.6f, 0.f));
 		addBallJointConstraintFromLocalPoints(torso, rightUpperLeg, vec3(0.3f, -0.25f, 0.f), vec3(0.f, 0.6f, 0.f));
 		addBallJointConstraintFromLocalPoints(rightUpperLeg, rightLowerLeg, vec3(0.f, -0.6f, 0.f), vec3(0.f, 0.6f, 0.f));
+#else
+		addConeTwistConstraintFromGlobalPoints(torso, head, transformPosition(torsoTransform, vec3(0.f, 1.2f, 0.f)), vec3(0.f, 1.f, 0.f), deg2rad(50.f), deg2rad(90.f));
+		addConeTwistConstraintFromGlobalPoints(torso, leftUpperArm, transformPosition(torsoTransform, vec3(-0.4f, 1.f, 0.f)), vec3(-1.f, 0.f, 0.f), deg2rad(130.f), deg2rad(90.f));
+		addHingeJointConstraintFromGlobalPoints(leftUpperArm, leftLowerArm, transformPosition(leftUpperArmTransform, vec3(0.f, -0.42f, 0.f)), normalize(vec3(1.f, 0.f, 1.f)), deg2rad(5.f), deg2rad(85.f));
+		addConeTwistConstraintFromGlobalPoints(torso, rightUpperArm, transformPosition(torsoTransform, vec3(0.4f, 1.f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(130.f), deg2rad(90.f));
+		addHingeJointConstraintFromGlobalPoints(rightUpperArm, rightLowerArm, transformPosition(rightUpperArmTransform, vec3(0.f, -0.42f, 0.f)), normalize(vec3(1.f, 0.f, -1.f)), deg2rad(5.f), deg2rad(85.f));
+		addConeTwistConstraintFromGlobalPoints(torso, leftUpperLeg, transformPosition(torsoTransform, vec3(-0.3f, -0.25f, 0.f)), transformDirection(leftUpperLegTransform, vec3(0.f, -1.f, 0.f)), -1.f, deg2rad(30.f));
+		addHingeJointConstraintFromGlobalPoints(leftUpperLeg, leftLowerLeg, transformPosition(leftUpperLegTransform, vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(90.f), deg2rad(5.f));
+		addConeTwistConstraintFromGlobalPoints(torso, rightUpperLeg, transformPosition(torsoTransform, vec3(0.3f, -0.25f, 0.f)), transformDirection(rightUpperLegTransform, vec3(0.f, -1.f, 0.f)), -1.f, deg2rad(30.f));
+		addHingeJointConstraintFromGlobalPoints(rightUpperLeg, rightLowerLeg, transformPosition(rightUpperLegTransform, vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(90.f), deg2rad(5.f));
+#endif
 #endif
 
 
@@ -334,9 +352,12 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, 0.2f, 0.5f, 1.f)
 			.addComponent<rigid_body_component>(true, 1.f);
 
+		//fixed.getComponent<rigid_body_component>().angularVelocity = vec3(0.f, 0.1f, 0.f);
+		//fixed.getComponent<rigid_body_component>().angularDamping = 0.f;
+
 		auto prev = fixed;
 
-		for (uint32 i = 0; i < 2; ++i)
+		for (uint32 i = 0; i < 10; ++i)
 		{
 			float xPrev = 37.f + 2.5f * i;
 			float xCurr = 37.f + 2.5f * (i + 1);
@@ -347,10 +368,19 @@ void application::initialize(dx_renderer* renderer)
 				.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, 0.2f, 0.5f, 1.f)
 				.addComponent<rigid_body_component>(false, 1.f);
 
-			addHingeJointConstraintFromGlobalPoints(prev, chain, vec3(xPrev + 1.18f, 15.f, -2.f), vec3(0.f, 0.f, 1.f));
+			//addHingeJointConstraintFromGlobalPoints(prev, chain, vec3(xPrev + 1.18f, 15.f, -2.f), vec3(0.f, 0.f, 1.f), deg2rad(5.f), deg2rad(20.f));
+			addConeTwistConstraintFromGlobalPoints(prev, chain, vec3(xPrev + 1.18f, 15.f, -2.f), vec3(1.f, 0.f, 0.f), deg2rad(20.f), deg2rad(30.f));
 
 			prev = chain;
 		}
+
+
+
+		//auto angleMesh = make_ref<composite_mesh>();
+		//angleMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 2.f, 0.18f, vec3(0.f)), {}, trs::identity, lollipopMaterial });
+		//angleMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 2.f, 0.18f, vec3(1.2f, 0.f, 0.f), v), {}, trs::identity, lollipopMaterial });
+
+
 
 		testMesh->mesh = 
 		groundMesh->mesh = 
@@ -361,6 +391,7 @@ void application::initialize(dx_renderer* renderer)
 		ragdollUpperLegMesh->mesh =
 		ragdollLowerLegMesh->mesh =
 		chainMesh->mesh =
+		//angleMesh->mesh =
 			primitiveMesh.createDXMesh();
 	}
 #endif
@@ -919,7 +950,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 			// Saved rigid-body properties. When a RB is dragged, we make it kinematic.
 			static bool saved = false;
 			static float invMass;
-			static mat3 invInertia;
+			//static mat3 invInertia;
 
 			static transformation_type type = transformation_type_translation;
 			static transformation_space space = transformation_global;
@@ -933,12 +964,12 @@ bool application::handleUserInput(const user_input& input, float dt)
 				{
 					rigid_body_component& rb = selectedEntity.getComponent<rigid_body_component>();
 					invMass = rb.invMass;
-					invInertia = rb.invInertia;
+					//invInertia = rb.invInertia;
 
 					rb.invMass = 0.f;
-					rb.invInertia = mat3::zero;
+					//rb.invInertia = mat3::zero;
 					rb.linearVelocity = 0.f;
-					rb.angularVelocity = 0.f;
+					//rb.angularVelocity = 0.f;
 
 					saved = true;
 				}
@@ -949,7 +980,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 				rigid_body_component& rb = selectedEntity.getComponent<rigid_body_component>();
 
 				rb.invMass = invMass;
-				rb.invInertia = invInertia;
+				//rb.invInertia = invInertia;
 				saved = false;
 			}
 		}

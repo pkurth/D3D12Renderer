@@ -439,7 +439,7 @@ void initializeConeTwistVelocityConstraints(scene& appScene, rigid_body_global_s
 			swingAxis *= -1.f;
 		}
 
-		out.solveConeLimit = swingAngle >= in.coneLimit;
+		out.solveConeLimit = in.coneLimit >= 0.f && swingAngle >= in.coneLimit;
 		if (out.solveConeLimit)
 		{
 			out.swingImpulse = 0.f;
