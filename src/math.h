@@ -30,6 +30,8 @@ static constexpr int32 clamp(int32 v, int32 l, int32 u) { return min(u, max(l, v
 static constexpr float clamp01(float v) { return clamp(v, 0.f, 1.f); }
 static constexpr uint32 bucketize(uint32 problemSize, uint32 bucketSize) { return (problemSize + bucketSize - 1) / bucketSize; }
 
+static void copySign(float from, float& to) { if (signbit(from) != signbit(to)) { to = -to; } }
+
 
 // Constexpr-version of _BitScanForward. Returns -1 if mask is zero.
 static constexpr uint32 indexOfLeastSignificantSetBit(uint32 i)
@@ -659,6 +661,10 @@ static vec2 normalize(vec2 a) { float l = length(a); return a * (1.f / l); }
 static vec3 normalize(vec3 a) { float l = length(a); return a * (1.f / l); }
 static vec4 normalize(vec4 a) { float l = length(a); return a * (1.f / l); }
 
+static void copySign(vec2 from, vec2& to) { copySign(from.x, to.x); copySign(from.y, to.y); }
+static void copySign(vec3 from, vec3& to) { copySign(from.x, to.x); copySign(from.y, to.y); copySign(from.z, to.z); }
+static void copySign(vec4 from, vec4& to) { copySign(from.x, to.x); copySign(from.y, to.y); copySign(from.z, to.z); copySign(from.w, to.w); }
+
 static vec2 abs(vec2 a) { return vec2(abs(a.x), abs(a.y)); }
 static vec3 abs(vec3 a) { return vec3(abs(a.x), abs(a.y), abs(a.z)); }
 static vec4 abs(vec4 a) { return vec4(abs(a.f4)); }
@@ -733,6 +739,7 @@ mat4 transpose(const mat4& a);
 
 mat3 invert(const mat3& m);
 mat4 invert(const mat4& m);
+trs invert(const trs& t);
 
 float determinant(const mat2& m);
 float determinant(const mat3& m);
@@ -778,7 +785,7 @@ mat4 createViewMatrix(vec3 eye, float pitch, float yaw);
 mat4 createSkyViewMatrix(const mat4& v);
 mat4 lookAt(vec3 eye, vec3 target, vec3 up);
 mat4 createViewMatrix(vec3 position, quat rotation);
-mat4 invertedAffine(const mat4& m);
+mat4 invertAffine(const mat4& m);
 
 bool pointInTriangle(vec3 point, vec3 triA, vec3 triB, vec3& triC);
 bool pointInRectangle(vec2 p, vec2 topLeft, vec2 bottomRight);

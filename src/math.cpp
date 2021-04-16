@@ -416,6 +416,19 @@ vec3 transformPosition(const mat4& m, vec3 pos)
 	return (m * vec4(pos, 1.f)).xyz;
 }
 
+trs invert(const trs& t)
+{
+	quat invRotation = conjugate(t.rotation);
+	vec3 invScale = 1.f / t.scale;
+
+	trs result;
+	result.scale = invRotation * invScale;
+	copySign(t.scale, result.scale);
+	result.rotation = invRotation;
+	result.position = invScale * (invRotation * (-t.position));
+	return result;
+}
+
 vec3 transformDirection(const mat4& m, vec3 dir)
 {
 	return (m * vec4(dir, 0.f)).xyz;
@@ -964,7 +977,7 @@ mat4 createViewMatrix(vec3 position, quat rotation)
 	return lookAt(position, target, up);
 }
 
-mat4 invertedAffine(const mat4& m)
+mat4 invertAffine(const mat4& m)
 {
 	vec3 xAxis(m.m00, m.m10, m.m20);
 	vec3 yAxis(m.m01, m.m11, m.m21);

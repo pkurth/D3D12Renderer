@@ -47,7 +47,7 @@ void render_camera::updateMatrices()
 
 	invProj = invertPerspectiveProjectionMatrix(proj);
 	view = createViewMatrix(position, rotation);
-	invView = invertedAffine(view);
+	invView = invertAffine(view);
 	viewProj = proj * view;
 	invViewProj = invView * invProj;
 }

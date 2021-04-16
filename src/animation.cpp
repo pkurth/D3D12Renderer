@@ -157,8 +157,8 @@ void animation_skeleton::loadFromAssimp(const aiScene* scene, float scale)
 
 				skeleton_joint& joint = joints.emplace_back();
 				joint.name = std::move(name);
-				joint.invBindMatrix = readAssimpMatrix(bone->mOffsetMatrix) * scaleMatrix;
-				joint.bindTransform = trs(invert(joint.invBindMatrix));
+				joint.invBindTransform = readAssimpMatrix(bone->mOffsetMatrix) * scaleMatrix;
+				joint.bindTransform = invert(joint.invBindTransform);
 			}
 #if 0
 			else
@@ -312,7 +312,7 @@ void animation_skeleton::getSkinningMatricesFromLocalTransforms(const trs* local
 			globalTransforms[i] = worldTransform * localTransforms[i];
 		}
 
-		outSkinningMatrices[i] = trsToMat4(globalTransforms[i]) * joints[i].invBindMatrix;
+		outSkinningMatrices[i] = trsToMat4(globalTransforms[i] * joints[i].invBindTransform);
 	}
 }
 
@@ -322,7 +322,7 @@ void animation_skeleton::getSkinningMatricesFromGlobalTransforms(const trs* glob
 
 	for (uint32 i = 0; i < numJoints; ++i)
 	{
-		outSkinningMatrices[i] = trsToMat4(globalTransforms[i]) * joints[i].invBindMatrix;
+		outSkinningMatrices[i] = trsToMat4(globalTransforms[i] * joints[i].invBindTransform);
 	}
 }
 
