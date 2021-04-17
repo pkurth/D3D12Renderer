@@ -251,10 +251,11 @@ void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_
 		}
 
 
-		// Limits
+		// Limits and motor.
 		out.solveLimit = false;
+		out.solveMotor = false;
 
-		if (in.minRotationLimit <= 0.f || in.maxRotationLimit >= 0.f)
+		if (in.minRotationLimit <= 0.f || in.maxRotationLimit >= 0.f || in.maxMotorTorque > 0.f)
 		{
 			vec3 localHingeCompareA = conjugate(transformA.rotation) * (transformB.rotation * in.localHingeTangentB);
 			float angle = atan2(dot(localHingeCompareA, in.localHingeBitangentA), dot(localHingeCompareA, in.localHingeTangentA));
@@ -264,17 +265,22 @@ void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_
 
 			assert(!(minLimitViolated && maxLimitViolated));
 
-			bool solveLimit = minLimitViolated || maxLimitViolated;
-			if (solveLimit)
+			out.solveLimit = minLimitViolated || maxLimitViolated;
+			out.solveMotor = in.maxMotorTorque > 0.f;
+			if (out.solveLimit || out.solveMotor)
 			{
 				out.globalRotationAxis = globalHingeAxisA;
 				out.limitImpulse = 0.f;
 
-				float invEffectiveLimitMass = dot(globalHingeAxisA, globalA.invInertia * globalHingeAxisA)
+				float invEffectiveAxialMass = dot(globalHingeAxisA, globalA.invInertia * globalHingeAxisA)
 											+ dot(globalHingeAxisA, globalB.invInertia * globalHingeAxisA);
 
-				out.effectiveLimitMass = (invEffectiveLimitMass != 0.f) ? (1.f / invEffectiveLimitMass) : 0.f;
+				out.effectiveAxialMass = (invEffectiveAxialMass != 0.f) ? (1.f / invEffectiveAxialMass) : 0.f;
 				out.limitSign = minLimitViolated ? 1.f : -1.f;
+
+				out.motorVelocity = in.motorVelocity;
+				out.maxMotorImpulse = in.maxMotorTorque * dt;
+				out.motorImpulse = 0.f;
 
 				out.limitBias = 0.f;
 				if (dt > DT_THRESHOLD)
@@ -282,8 +288,13 @@ void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_
 					float d = minLimitViolated ? (angle - in.minRotationLimit) : (in.maxRotationLimit - angle);
 					out.limitBias = d * HINGE_LIMIT_CONSTRAINT_BETA / dt;
 				}
+
+				if (minLimitViolated && in.motorVelocity < 0.f
+					|| maxLimitViolated && in.motorVelocity > 0.f)
+				{
+					out.solveMotor = false;
+				}
 			}
-			out.solveLimit = solveLimit;
 		}
 	}
 }
@@ -302,21 +313,37 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 		vec3 vB = rbB.linearVelocity;
 		vec3 wB = rbB.angularVelocity;
 
-		// Solve in order of importance (most important last): Limits -> Rotation -> Position.
+		// Solve in order of importance (most important last): Motor -> Limits -> Rotation -> Position.
+
+		vec3 globalRotationAxis = con.globalRotationAxis;
+		float aDotWA = dot(globalRotationAxis, wA); // How fast are we turning about the axis.
+		float aDotWB = dot(globalRotationAxis, wB);
+
+		// Motor.
+		if (con.solveMotor)
+		{
+			float relAngularVelocity = (aDotWB - aDotWA);
+			float motorCdot = relAngularVelocity - con.motorVelocity;
+
+			float motorLambda = -con.effectiveAxialMass * motorCdot;
+			float oldImpulse = con.motorImpulse;
+			con.motorImpulse = clamp(con.motorImpulse + motorLambda, -con.maxMotorImpulse, con.maxMotorImpulse);
+			motorLambda = con.motorImpulse - oldImpulse;
+
+			vec3 P = globalRotationAxis * motorLambda;
+			wA -= rbA.invInertia * P;
+			wB += rbB.invInertia * P;
+		}
 
 		// Limits.
 		if (con.solveLimit)
 		{
-			vec3 globalRotationAxis = con.globalRotationAxis;
-			float aDotWA = dot(globalRotationAxis, wA); // How fast are we turning about the axis.
-			float aDotWB = dot(globalRotationAxis, wB);
-
 			float limitSign = con.limitSign;
 
 			float relAngularVelocity = limitSign * (aDotWB - aDotWA);
 
 			float limitCdot = relAngularVelocity + con.limitBias;
-			float limitLambda = -con.effectiveLimitMass * limitCdot;
+			float limitLambda = -con.effectiveAxialMass * limitCdot;
 
 			float impulse = max(con.limitImpulse + limitLambda, 0.f);
 			limitLambda = impulse - con.limitImpulse;

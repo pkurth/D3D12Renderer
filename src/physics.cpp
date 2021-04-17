@@ -79,7 +79,7 @@ static void addConstraintEdge(scene_entity& e, physics_constraint& constraint, u
 	}
 }
 
-void addDistanceConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB, float distance)
+constraint_handle addDistanceConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB, float distance)
 {
 	uint16 constraintIndex = (uint16)distanceConstraints.size();
 	distance_constraint& constraint = distanceConstraints.emplace_back();
@@ -89,18 +89,20 @@ void addDistanceConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3
 
 	addConstraintEdge(a, constraint, constraintIndex, constraint_type_distance);
 	addConstraintEdge(b, constraint, constraintIndex, constraint_type_distance);
+
+	return { constraint_type_distance, constraintIndex };
 }
 
-void addDistanceConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchorA, vec3 globalAnchorB)
+constraint_handle addDistanceConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchorA, vec3 globalAnchorB)
 {
 	vec3 localAnchorA = inverseTransformPosition(a.getComponent<trs>(), globalAnchorA);
 	vec3 localAnchorB = inverseTransformPosition(b.getComponent<trs>(), globalAnchorB);
 	float distance = length(globalAnchorA - globalAnchorB);
 
-	addDistanceConstraintFromLocalPoints(a, b, localAnchorA, localAnchorB, distance);
+	return addDistanceConstraintFromLocalPoints(a, b, localAnchorA, localAnchorB, distance);
 }
 
-void addBallJointConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB)
+constraint_handle addBallJointConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB)
 {
 	uint16 constraintIndex = (uint16)ballJointConstraints.size();
 	ball_joint_constraint& constraint = ballJointConstraints.emplace_back();
@@ -109,17 +111,20 @@ void addBallJointConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec
 
 	addConstraintEdge(a, constraint, constraintIndex, constraint_type_ball_joint);
 	addConstraintEdge(b, constraint, constraintIndex, constraint_type_ball_joint);
+
+	return { constraint_type_ball_joint, constraintIndex };
 }
 
-void addBallJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor)
+constraint_handle addBallJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor)
 {
 	vec3 localAnchorA = inverseTransformPosition(a.getComponent<trs>(), globalAnchor);
 	vec3 localAnchorB = inverseTransformPosition(b.getComponent<trs>(), globalAnchor);
 
-	addBallJointConstraintFromLocalPoints(a, b, localAnchorA, localAnchorB);
+	return addBallJointConstraintFromLocalPoints(a, b, localAnchorA, localAnchorB);
 }
 
-void addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalHingeAxis, float minLimit, float maxLimit)
+constraint_handle addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalHingeAxis, 
+	float minLimit, float maxLimit, float motorVelocity, float maxMotorTorque)
 {
 	uint16 constraintIndex = (uint16)hingeJointConstraints.size();
 	hinge_joint_constraint& constraint = hingeJointConstraints.emplace_back();
@@ -132,18 +137,24 @@ void addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, v
 	constraint.localHingeAxisA = inverseTransformDirection(transformA, globalHingeAxis);
 	constraint.localHingeAxisB = inverseTransformDirection(transformB, globalHingeAxis);
 
-	// Limits.
 	getTangents(constraint.localHingeAxisA, constraint.localHingeTangentA, constraint.localHingeBitangentA);
 	constraint.localHingeTangentB = conjugate(transformB.rotation) * (transformA.rotation * constraint.localHingeTangentA);
 
+	// Limits.
 	constraint.minRotationLimit = -minLimit;
 	constraint.maxRotationLimit = maxLimit;
 
+	// Motor.
+	constraint.motorVelocity = motorVelocity;
+	constraint.maxMotorTorque = maxMotorTorque;
+
 	addConstraintEdge(a, constraint, constraintIndex, constraint_type_hinge_joint);
 	addConstraintEdge(b, constraint, constraintIndex, constraint_type_hinge_joint);
+
+	return { constraint_type_hinge_joint, constraintIndex };
 }
 
-void addConeTwistConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis, float coneLimit, float twistLimit)
+constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis, float coneLimit, float twistLimit)
 {
 	uint16 constraintIndex = (uint16)coneTwistConstraints.size();
 	cone_twist_constraint& constraint = coneTwistConstraints.emplace_back();
@@ -164,6 +175,36 @@ void addConeTwistConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, ve
 
 	addConstraintEdge(a, constraint, constraintIndex, constraint_type_cone_twist);
 	addConstraintEdge(b, constraint, constraintIndex, constraint_type_cone_twist);
+
+	return { constraint_type_cone_twist, constraintIndex };
+}
+
+distance_constraint& getDistanceConstraint(constraint_handle handle)
+{
+	assert(handle.type == constraint_type_distance);
+	assert(handle.index < distanceConstraints.size());
+	return distanceConstraints[handle.index];
+}
+
+ball_joint_constraint& getBallJointConstraint(constraint_handle handle)
+{
+	assert(handle.type == constraint_type_ball_joint);
+	assert(handle.index < ballJointConstraints.size());
+	return ballJointConstraints[handle.index];
+}
+
+hinge_joint_constraint& getHingeJointConstraint(constraint_handle handle)
+{
+	assert(handle.type == constraint_type_hinge_joint);
+	assert(handle.index < hingeJointConstraints.size());
+	return hingeJointConstraints[handle.index];
+}
+
+cone_twist_constraint& geConeTwistJointConstraint(constraint_handle handle)
+{
+	assert(handle.type == constraint_type_cone_twist);
+	assert(handle.index < coneTwistConstraints.size());
+	return coneTwistConstraints[handle.index];
 }
 
 

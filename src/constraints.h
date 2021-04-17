@@ -86,12 +86,19 @@ struct hinge_joint_constraint : physics_constraint
 	vec3 localHingeAxisA;
 	vec3 localHingeAxisB;
 
-	// Limits. The rotation limits are the allowed deviations in radians from the initial relative rotation.
-	float minRotationLimit; // [-pi, 0]
-	float maxRotationLimit; // [0, pi]
+	// Used for limits and motor.
 	vec3 localHingeTangentA;
 	vec3 localHingeBitangentA;
 	vec3 localHingeTangentB;
+
+	// Limits. The rotation limits are the allowed deviations in radians from the initial relative rotation.
+	// If the limits are not in the specified range, they are disabled.
+	float minRotationLimit; // [-pi, 0]
+	float maxRotationLimit; // [0, pi]
+
+	// Motor. Motor velocity is the desired relative velocity about the hinge axis (signed). If max motor force is negative, the motor is disabled.
+	float motorVelocity;
+	float maxMotorTorque;
 };
 
 struct hinge_joint_constraint_update
@@ -111,13 +118,18 @@ struct hinge_joint_constraint_update
 	vec3 cxa;
 
 	vec3 globalRotationAxis;
-	float effectiveLimitMass; // Same for min and max limit.
+	float effectiveAxialMass; // Same for min and max limit and for motor.
 
 	// Since at a single time, only one limit constraint can be violated, we only store this stuff once. 'limitSign' is positive for min- and negative for max-limit-violations.
 	float limitImpulse;
 	float limitBias;
 	bool solveLimit;
+	bool solveMotor;
 	float limitSign;
+
+	float motorImpulse;
+	float motorVelocity;
+	float maxMotorImpulse;
 };
 
 

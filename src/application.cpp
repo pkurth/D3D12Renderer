@@ -340,7 +340,7 @@ void application::initialize(dx_renderer* renderer)
 		addConeTwistConstraintFromGlobalPoints(torso, rightUpperArm, transformPosition(torsoTransform, vec3(0.4f, 1.f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(130.f), deg2rad(90.f));
 		addHingeJointConstraintFromGlobalPoints(rightUpperArm, rightLowerArm, transformPosition(rightUpperArmTransform, vec3(0.f, -0.42f, 0.f)), normalize(vec3(1.f, 0.f, -1.f)), deg2rad(5.f), deg2rad(85.f));
 		addConeTwistConstraintFromGlobalPoints(torso, leftUpperLeg, transformPosition(torsoTransform, vec3(-0.3f, -0.25f, 0.f)), transformDirection(leftUpperLegTransform, vec3(0.f, -1.f, 0.f)), -1.f, deg2rad(30.f));
-		addHingeJointConstraintFromGlobalPoints(leftUpperLeg, leftLowerLeg, transformPosition(leftUpperLegTransform, vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(90.f), deg2rad(5.f));
+		addHingeJointConstraintFromGlobalPoints(leftUpperLeg, leftLowerLeg, transformPosition(leftUpperLegTransform, vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(90.f), deg2rad(5.f), -1.f, 10.f);
 		addConeTwistConstraintFromGlobalPoints(torso, rightUpperLeg, transformPosition(torsoTransform, vec3(0.3f, -0.25f, 0.f)), transformDirection(rightUpperLegTransform, vec3(0.f, -1.f, 0.f)), -1.f, deg2rad(30.f));
 		addHingeJointConstraintFromGlobalPoints(rightUpperLeg, rightLowerLeg, transformPosition(rightUpperLegTransform, vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(90.f), deg2rad(5.f));
 #endif
