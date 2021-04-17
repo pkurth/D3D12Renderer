@@ -147,6 +147,8 @@ struct physics_reference_component
 	uint16 firstConstraintEdge = INVALID_CONSTRAINT_EDGE;
 };
 
+#define INVALID_BOUNDING_HULL_INDEX -1
+
 uint32 allocateBoundingHullGeometry(const struct cpu_mesh& mesh);
 uint32 allocateBoundingHullGeometry(const std::string& meshFilepath);
 

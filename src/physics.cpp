@@ -32,7 +32,7 @@ uint32 allocateBoundingHullGeometry(const std::string& meshFilepath)
 
 	if (!scene)
 	{
-		return 0;
+		return INVALID_BOUNDING_HULL_INDEX;
 	}
 
 	cpu_mesh cpuMesh(mesh_creation_flags_with_positions);
