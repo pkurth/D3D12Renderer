@@ -152,33 +152,32 @@ struct physics_reference_component
 uint32 allocateBoundingHullGeometry(const struct cpu_mesh& mesh);
 uint32 allocateBoundingHullGeometry(const std::string& meshFilepath);
 
-struct constraint_handle
-{
-	constraint_type type;
-	uint16 index;
-};
+struct distance_constraint_handle { uint16 index; };
+struct ball_joint_constraint_handle { uint16 index; };
+struct hinge_joint_constraint_handle { uint16 index; };
+struct cone_twist_constraint_handle { uint16 index; };
 
 // Local anchors are always in the space of the entities.
-constraint_handle addDistanceConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB, float distance);
-constraint_handle addDistanceConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchorA, vec3 globalAnchorB); // Calculates distance from current configuration.
+distance_constraint_handle addDistanceConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB, float distance);
+distance_constraint_handle addDistanceConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchorA, vec3 globalAnchorB); // Calculates distance from current configuration.
 
-constraint_handle addBallJointConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB);
-constraint_handle addBallJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor); // Calculates local anchors from current configuration.
+ball_joint_constraint_handle addBallJointConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB);
+ball_joint_constraint_handle addBallJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor); // Calculates local anchors from current configuration.
 
 // The min limit is in the range [-pi, 0], the max limit in the range [0, pi]. 
 // If the specified values are not in this range, the limits are disabled.
 // Limits are specified as allowed deviations from the initial relative rotation.
 // Usually the absolute of each limit should be a lot smaller than pi.
-constraint_handle addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalHingeAxis, 
+hinge_joint_constraint_handle addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalHingeAxis,
 	float minLimit = 1.f, float maxLimit = -1.f, float motorVelocity = 0.f, float maxMotorTorque = -1.f);
 
-constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis, float coneLimit, float twistLimit);
+cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis, float coneLimit, float twistLimit);
 
 
-distance_constraint& getDistanceConstraint(constraint_handle handle);
-ball_joint_constraint& getBallJointConstraint(constraint_handle handle);
-hinge_joint_constraint& getHingeJointConstraint(constraint_handle handle);
-cone_twist_constraint& getConeTwistConstraint(constraint_handle handle);
+distance_constraint& getConstraint(distance_constraint_handle handle);
+ball_joint_constraint& getConstraint(ball_joint_constraint_handle handle);
+hinge_joint_constraint& getConstraint(hinge_joint_constraint_handle handle);
+cone_twist_constraint& getConstraint(cone_twist_constraint_handle handle);
 
 
 void testPhysicsInteraction(scene& appScene, ray r, float forceAmount);

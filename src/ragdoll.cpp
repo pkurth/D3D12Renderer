@@ -125,13 +125,13 @@ void humanoid_ragdoll::initialize(scene& appScene)
 		primitiveMesh.createDXMesh();
 }
 
-static bool editHingeConstraint(const char* label, constraint_handle handle)
+static bool editHingeConstraint(const char* label, hinge_joint_constraint_handle handle)
 {
 	bool result = false;
 
 	if (ImGui::TreeNode(label))
 	{
-		hinge_joint_constraint& con = getHingeJointConstraint(handle);
+		hinge_joint_constraint& con = getConstraint(handle);
 
 		bool minLimitActive = con.minRotationLimit <= 0.f;
 		if (ImGui::Checkbox("Lower limit active", &minLimitActive))
@@ -175,13 +175,13 @@ static bool editHingeConstraint(const char* label, constraint_handle handle)
 	return result;
 }
 
-static bool editConeTwistConstraint(const char* label, constraint_handle handle)
+static bool editConeTwistConstraint(const char* label, cone_twist_constraint_handle handle)
 {
 	bool result = false;
 
 	if (ImGui::TreeNode(label))
 	{
-		cone_twist_constraint& con = getConeTwistConstraint(handle);
+		cone_twist_constraint& con = getConstraint(handle);
 
 		bool coneLimitActive = con.coneLimit >= 0.f;
 		if (ImGui::Checkbox("Cone limit active", &coneLimitActive))
