@@ -10,6 +10,7 @@
 #include "particle_systems.h"
 #include "transformation_gizmo.h"
 #include "raytracing.h"
+#include "ragdoll.h"
 
 #include "path_tracing.h"
 
@@ -94,6 +95,7 @@ private:
 	uint32 numSpotShadowRenderPasses;
 	uint32 numPointShadowRenderPasses;
 
+	humanoid_ragdoll ragdoll;
 	float testPhysicsForce = 300.f;
 	uint32 numPhysicsSolverIterations = 30;
 

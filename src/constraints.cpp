@@ -289,11 +289,17 @@ void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_
 					out.limitBias = d * HINGE_LIMIT_CONSTRAINT_BETA / dt;
 				}
 
-				if (minLimitViolated && in.motorVelocity < 0.f
+				/*if (in.minRotationLimit <= 0.f && angle <= in.minRotationLimit + deg2rad(5.f))
+				{
+					float t = clamp01(inverseLerp(in.minRotationLimit, in.minRotationLimit + deg2rad(5.f), angle));
+					out.motorVelocity *= t;
+				}*/
+
+				/*if (minLimitViolated && in.motorVelocity < 0.f
 					|| maxLimitViolated && in.motorVelocity > 0.f)
 				{
 					out.solveMotor = false;
-				}
+				}*/
 			}
 		}
 	}

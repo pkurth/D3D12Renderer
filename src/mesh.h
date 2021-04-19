@@ -37,3 +37,8 @@ inline ref<composite_mesh> loadAnimatedMeshFromFile(const std::string& sceneFile
 {
 	return loadMeshFromFile(sceneFilename, flags);
 }
+
+struct raster_component
+{
+	ref<composite_mesh> mesh;
+};

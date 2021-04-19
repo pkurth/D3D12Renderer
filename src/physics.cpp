@@ -141,7 +141,7 @@ constraint_handle addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene
 	constraint.localHingeTangentB = conjugate(transformB.rotation) * (transformA.rotation * constraint.localHingeTangentA);
 
 	// Limits.
-	constraint.minRotationLimit = -minLimit;
+	constraint.minRotationLimit = minLimit;
 	constraint.maxRotationLimit = maxLimit;
 
 	// Motor.
@@ -200,7 +200,7 @@ hinge_joint_constraint& getHingeJointConstraint(constraint_handle handle)
 	return hingeJointConstraints[handle.index];
 }
 
-cone_twist_constraint& geConeTwistJointConstraint(constraint_handle handle)
+cone_twist_constraint& getConeTwistConstraint(constraint_handle handle)
 {
 	assert(handle.type == constraint_type_cone_twist);
 	assert(handle.index < coneTwistConstraints.size());
