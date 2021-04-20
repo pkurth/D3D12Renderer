@@ -124,7 +124,7 @@ ball_joint_constraint_handle addBallJointConstraintFromGlobalPoints(scene_entity
 }
 
 hinge_joint_constraint_handle addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalHingeAxis,
-	float minLimit, float maxLimit, float motorVelocity, float maxMotorTorque)
+	float minLimit, float maxLimit)
 {
 	uint16 constraintIndex = (uint16)hingeJointConstraints.size();
 	hinge_joint_constraint& constraint = hingeJointConstraints.emplace_back();
@@ -145,8 +145,9 @@ hinge_joint_constraint_handle addHingeJointConstraintFromGlobalPoints(scene_enti
 	constraint.maxRotationLimit = maxLimit;
 
 	// Motor.
-	constraint.motorVelocity = motorVelocity;
-	constraint.maxMotorTorque = maxMotorTorque;
+	constraint.motorType = constraint_velocity_motor;
+	constraint.motorVelocity = 0.f;
+	constraint.maxMotorTorque = -1.f; // Disabled by default.
 
 	addConstraintEdge(a, constraint, constraintIndex, constraint_type_hinge_joint);
 	addConstraintEdge(b, constraint, constraintIndex, constraint_type_hinge_joint);

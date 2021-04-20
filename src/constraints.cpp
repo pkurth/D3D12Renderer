@@ -7,6 +7,7 @@
 #define HINGE_ROTATION_CONSTRAINT_BETA 0.3f
 #define HINGE_LIMIT_CONSTRAINT_BETA 0.1f
 #define TWIST_LIMIT_CONSTRAINT_BETA 0.1f
+#define POSITION_MOTOR_CONSTRAINT_BETA 0.1f
 
 #define DT_THRESHOLD 1e-5f
 
@@ -85,8 +86,8 @@ void solveDistanceVelocityConstraints(distance_constraint_update* constraints, u
 		vec3 anchorVelocityB = rbB.linearVelocity + cross(rbB.angularVelocity, con.relGlobalAnchorB);
 		float Cdot = dot(con.u, anchorVelocityB - anchorVelocityA) + con.bias;
 
-		float impulse = -con.effectiveMass * Cdot;
-		vec3 P = impulse * con.u;
+		float lambda = -con.effectiveMass * Cdot;
+		vec3 P = lambda * con.u;
 		rbA.linearVelocity -= rbA.invMass * P;
 		rbA.angularVelocity -= rbA.invInertia * cross(con.relGlobalAnchorA, P);
 		rbB.linearVelocity += rbB.invMass * P;
@@ -278,28 +279,25 @@ void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_
 				out.effectiveAxialMass = (invEffectiveAxialMass != 0.f) ? (1.f / invEffectiveAxialMass) : 0.f;
 				out.limitSign = minLimitViolated ? 1.f : -1.f;
 
-				out.motorVelocity = in.motorVelocity;
+				out.motorType = in.motorType;
 				out.maxMotorImpulse = in.maxMotorTorque * dt;
 				out.motorImpulse = 0.f;
 
 				out.limitBias = 0.f;
+				out.motorBias = 0.f;
 				if (dt > DT_THRESHOLD)
 				{
 					float d = minLimitViolated ? (angle - in.minRotationLimit) : (in.maxRotationLimit - angle);
 					out.limitBias = d * HINGE_LIMIT_CONSTRAINT_BETA / dt;
+
+					out.motorBias = (angle - in.motorTargetAngle) * POSITION_MOTOR_CONSTRAINT_BETA / dt;
 				}
 
-				/*if (in.minRotationLimit <= 0.f && angle <= in.minRotationLimit + deg2rad(5.f))
+				// Overwrite in case of velocity constraint.
+				if (in.motorType == constraint_velocity_motor)
 				{
-					float t = clamp01(inverseLerp(in.minRotationLimit, in.minRotationLimit + deg2rad(5.f), angle));
-					out.motorVelocity *= t;
-				}*/
-
-				/*if (minLimitViolated && in.motorVelocity < 0.f
-					|| maxLimitViolated && in.motorVelocity > 0.f)
-				{
-					out.solveMotor = false;
-				}*/
+					out.motorBias = -in.motorVelocity;
+				}
 			}
 		}
 	}
@@ -329,7 +327,7 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 		if (con.solveMotor)
 		{
 			float relAngularVelocity = (aDotWB - aDotWA);
-			float motorCdot = relAngularVelocity - con.motorVelocity;
+			float motorCdot = relAngularVelocity + con.motorBias;
 
 			float motorLambda = -con.effectiveAxialMass * motorCdot;
 			float oldImpulse = con.motorImpulse;
@@ -366,8 +364,7 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 		{
 			vec3 deltaAngularVelocity = wB - wA;
 
-			vec2 rotationCdot(dot(con.bxa, deltaAngularVelocity),
-				dot(con.cxa, deltaAngularVelocity));
+			vec2 rotationCdot(dot(con.bxa, deltaAngularVelocity), dot(con.cxa, deltaAngularVelocity));
 			vec2 rotLambda = solveLinearSystem(con.invEffectiveRotationMass, -(rotationCdot + con.rotationBias));
 
 			vec3 rotationP = con.bxa * rotLambda.x + con.cxa * rotLambda.y;

@@ -34,7 +34,7 @@ void humanoid_ragdoll::initialize(scene& appScene)
 
 	bool ragdollKinematic = false;
 	float ragdollGravityFactor = 1.f;
-	float ragdollDensity = 10.f;
+	float ragdollDensity = 998.f;
 	float ragdollFriction = 0.9f;
 
 	trs torsoTransform(vec3(30.f, 5.f, -2.f), quat::identity);
@@ -165,8 +165,20 @@ static bool editHingeConstraint(const char* label, hinge_joint_constraint_handle
 		}
 		if (motorActive)
 		{
-			result |= ImGui::SliderAngle("Motor velocity", &con.motorVelocity, -360.f, 360.f);
-			result |= ImGui::SliderFloat("Max motor torque", &con.maxMotorTorque, 0.001f, 100.f);
+			result |= ImGui::Dropdown("Motor type", constraintMotorTypeNames, arraysize(constraintMotorTypeNames), (uint32&)con.motorType);
+
+			if (con.motorType == constraint_velocity_motor)
+			{
+				result |= ImGui::SliderAngle("Motor velocity", &con.motorVelocity, -360.f, 360.f);
+			}
+			else
+			{
+				float lo = minLimitActive ? con.minRotationLimit : -M_PI;
+				float hi = maxLimitActive ? con.maxRotationLimit : M_PI;
+				result |= ImGui::SliderAngle("Motor target angle", &con.motorTargetAngle, rad2deg(lo), rad2deg(hi));
+			}
+
+			result |= ImGui::SliderFloat("Max motor torque", &con.maxMotorTorque, 0.001f, 1000.f);
 		}
 
 		ImGui::TreePop();

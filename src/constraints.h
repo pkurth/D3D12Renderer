@@ -22,6 +22,17 @@ struct constraint_edge
 };
 
 
+enum constraint_motor_type
+{
+	constraint_velocity_motor,
+	constraint_position_motor,
+};
+
+static const char* constraintMotorTypeNames[] =
+{
+	"Velocity",
+	"Position",
+};
 
 
 
@@ -96,8 +107,13 @@ struct hinge_joint_constraint : physics_constraint
 	float minRotationLimit; // [-pi, 0]
 	float maxRotationLimit; // [0, pi]
 
-	// Motor. Motor velocity is the desired relative velocity about the hinge axis (signed). If max motor force is negative, the motor is disabled.
-	float motorVelocity;
+	// Motor.
+	constraint_motor_type motorType;
+	union
+	{
+		float motorVelocity;
+		float motorTargetAngle;
+	};
 	float maxMotorTorque;
 };
 
@@ -128,8 +144,9 @@ struct hinge_joint_constraint_update
 	float limitSign;
 
 	float motorImpulse;
-	float motorVelocity;
+	constraint_motor_type motorType;
 	float maxMotorImpulse;
+	float motorBias;
 };
 
 
