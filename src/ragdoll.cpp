@@ -34,7 +34,9 @@ void humanoid_ragdoll::initialize(scene& appScene)
 
 	bool ragdollKinematic = false;
 	float ragdollGravityFactor = 1.f;
-	float ragdollDensity = 998.f;
+	// Yes this density is completely bogus. The actual density of the human body is around 985kg/m3. 
+	// This is because our ragdoll is currently WAY too large (about 4 meters high or so).
+	float ragdollDensity = 80.f;
 	float ragdollFriction = 0.9f;
 
 	trs torsoTransform(vec3(30.f, 5.f, -2.f), quat::identity);
@@ -105,6 +107,18 @@ void humanoid_ragdoll::initialize(scene& appScene)
 		.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.3f, 0.f), vec3(0.f, 0.3f, 0.f), 0.18f }, 0.2f, ragdollFriction, ragdollDensity)
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
+	float totalMass = 1.f / torso.getComponent<rigid_body_component>().invMass +
+		1.f / head.getComponent<rigid_body_component>().invMass +
+		1.f / leftUpperArm.getComponent<rigid_body_component>().invMass +
+		1.f / leftLowerArm.getComponent<rigid_body_component>().invMass +
+		1.f / rightUpperArm.getComponent<rigid_body_component>().invMass +
+		1.f / rightLowerArm.getComponent<rigid_body_component>().invMass +
+		1.f / leftUpperLeg.getComponent<rigid_body_component>().invMass +
+		1.f / leftLowerLeg.getComponent<rigid_body_component>().invMass +
+		1.f / rightUpperLeg.getComponent<rigid_body_component>().invMass +
+		1.f / rightLowerLeg.getComponent<rigid_body_component>().invMass;
+
+	std::cout << totalMass << '\n';
 
 	neckConstraint = addConeTwistConstraintFromGlobalPoints(torso, head, transformPosition(torsoTransform, vec3(0.f, 1.2f, 0.f)), vec3(0.f, 1.f, 0.f), deg2rad(50.f), deg2rad(90.f));
 	leftShoulderConstraint = addConeTwistConstraintFromGlobalPoints(torso, leftUpperArm, transformPosition(torsoTransform, vec3(-0.4f, 1.f, 0.f)), vec3(-1.f, 0.f, 0.f), deg2rad(130.f), deg2rad(90.f));

@@ -136,17 +136,18 @@ struct hinge_joint_constraint_update
 	vec3 globalRotationAxis;
 	float effectiveAxialMass; // Same for min and max limit and for motor.
 
-	// Since at a single time, only one limit constraint can be violated, we only store this stuff once. 'limitSign' is positive for min- and negative for max-limit-violations.
-	float limitImpulse;
-	float limitBias;
 	bool solveLimit;
 	bool solveMotor;
+
+	// Since at a single time, only one limit constraint can be violated, we only store this stuff once. 
+	// 'limitSign' is positive for min- and negative for max-limit-violations.
+	float limitImpulse;
+	float limitBias;
 	float limitSign;
 
 	float motorImpulse;
-	constraint_motor_type motorType;
 	float maxMotorImpulse;
-	float motorBias;
+	float motorVelocity;
 };
 
 

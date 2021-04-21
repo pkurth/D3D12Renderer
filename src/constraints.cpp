@@ -7,7 +7,6 @@
 #define HINGE_ROTATION_CONSTRAINT_BETA 0.3f
 #define HINGE_LIMIT_CONSTRAINT_BETA 0.1f
 #define TWIST_LIMIT_CONSTRAINT_BETA 0.1f
-#define POSITION_MOTOR_CONSTRAINT_BETA 0.1f
 
 #define DT_THRESHOLD 1e-5f
 
@@ -279,24 +278,25 @@ void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_
 				out.effectiveAxialMass = (invEffectiveAxialMass != 0.f) ? (1.f / invEffectiveAxialMass) : 0.f;
 				out.limitSign = minLimitViolated ? 1.f : -1.f;
 
-				out.motorType = in.motorType;
 				out.maxMotorImpulse = in.maxMotorTorque * dt;
 				out.motorImpulse = 0.f;
 
+				out.motorVelocity = in.motorVelocity;
+				if (in.motorType == constraint_position_motor)
+				{
+					// Inspired by Bullet Engine. We set the velocity such that the target angle is reached within one frame.
+					// This will later get clamped to the maximum motor impulse.
+					float minLimit = (in.minRotationLimit <= 0.f) ? in.minRotationLimit : -M_PI;
+					float maxLimit = (in.maxRotationLimit >= 0.f) ? in.maxRotationLimit : M_PI;
+					float targetAngle = clamp(in.motorTargetAngle, minLimit, maxLimit);
+					out.motorVelocity = (dt > DT_THRESHOLD) ? ((targetAngle - angle) / dt) : 0.f;
+				}
+
 				out.limitBias = 0.f;
-				out.motorBias = 0.f;
 				if (dt > DT_THRESHOLD)
 				{
 					float d = minLimitViolated ? (angle - in.minRotationLimit) : (in.maxRotationLimit - angle);
 					out.limitBias = d * HINGE_LIMIT_CONSTRAINT_BETA / dt;
-
-					out.motorBias = (angle - in.motorTargetAngle) * POSITION_MOTOR_CONSTRAINT_BETA / dt;
-				}
-
-				// Overwrite in case of velocity constraint.
-				if (in.motorType == constraint_velocity_motor)
-				{
-					out.motorBias = -in.motorVelocity;
 				}
 			}
 		}
@@ -320,14 +320,15 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 		// Solve in order of importance (most important last): Motor -> Limits -> Rotation -> Position.
 
 		vec3 globalRotationAxis = con.globalRotationAxis;
-		float aDotWA = dot(globalRotationAxis, wA); // How fast are we turning about the axis.
-		float aDotWB = dot(globalRotationAxis, wB);
 
 		// Motor.
 		if (con.solveMotor)
 		{
+			float aDotWA = dot(globalRotationAxis, wA); // How fast are we turning about the axis.
+			float aDotWB = dot(globalRotationAxis, wB);
+
 			float relAngularVelocity = (aDotWB - aDotWA);
-			float motorCdot = relAngularVelocity + con.motorBias;
+			float motorCdot = relAngularVelocity - con.motorVelocity;
 
 			float motorLambda = -con.effectiveAxialMass * motorCdot;
 			float oldImpulse = con.motorImpulse;
@@ -344,6 +345,8 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 		{
 			float limitSign = con.limitSign;
 
+			float aDotWA = dot(globalRotationAxis, wA); // How fast are we turning about the axis.
+			float aDotWB = dot(globalRotationAxis, wB);
 			float relAngularVelocity = limitSign * (aDotWB - aDotWA);
 
 			float limitCdot = relAngularVelocity + con.limitBias;
