@@ -209,15 +209,15 @@ static bool editConeTwistConstraint(const char* label, cone_twist_constraint_han
 	{
 		cone_twist_constraint& con = getConstraint(handle);
 
-		bool coneLimitActive = con.coneLimit >= 0.f;
-		if (ImGui::Checkbox("Cone limit active", &coneLimitActive))
+		bool coneLimitActive = con.swingLimit >= 0.f;
+		if (ImGui::Checkbox("Swing limit active", &coneLimitActive))
 		{
 			result = true;
-			con.coneLimit = -con.coneLimit;
+			con.swingLimit = -con.swingLimit;
 		}
 		if (coneLimitActive)
 		{
-			result |= ImGui::SliderAngle("Cone limit", &con.coneLimit, 0.f, 180.f);
+			result |= ImGui::SliderAngle("Cone limit", &con.swingLimit, 0.f, 180.f);
 		}
 
 		bool twistLimitActive = con.twistLimit >= 0.f;
@@ -229,6 +229,29 @@ static bool editConeTwistConstraint(const char* label, cone_twist_constraint_han
 		if (twistLimitActive)
 		{
 			result |= ImGui::SliderAngle("Twist limit", &con.twistLimit, 0.f, 180.f);
+		}
+
+		bool twistMotorActive = con.maxTwistMotorTorque > 0.f;
+		if (ImGui::Checkbox("Twist motor active", &twistMotorActive))
+		{
+			result = true;
+			con.maxTwistMotorTorque = -con.maxTwistMotorTorque;
+		}
+		if (twistMotorActive)
+		{
+			result |= ImGui::Dropdown("Twist motor type", constraintMotorTypeNames, arraysize(constraintMotorTypeNames), (uint32&)con.twistMotorType);
+
+			if (con.twistMotorType == constraint_velocity_motor)
+			{
+				result |= ImGui::SliderAngle("Twist motor velocity", &con.twistMotorVelocity, -360.f, 360.f);
+			}
+			else
+			{
+				float li = twistLimitActive ? con.twistLimit : -M_PI;
+				result |= ImGui::SliderAngle("Twist motor target angle", &con.twistMotorTargetAngle, rad2deg(-li), rad2deg(li));
+			}
+
+			result |= ImGui::SliderFloat("Max twist motor torque", &con.maxTwistMotorTorque, 0.001f, 1000.f);
 		}
 		
 		ImGui::TreePop();

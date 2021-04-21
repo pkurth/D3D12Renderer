@@ -447,7 +447,7 @@ void initializeConeTwistVelocityConstraints(scene& appScene, rigid_body_global_s
 		}
 
 
-		// Limits.
+		// Limits and motors.
 
 		quat btoa = conjugate(transformA.rotation) * transformB.rotation;
 
@@ -472,8 +472,8 @@ void initializeConeTwistVelocityConstraints(scene& appScene, rigid_body_global_s
 			swingAxis *= -1.f;
 		}
 
-		out.solveConeLimit = in.coneLimit >= 0.f && swingAngle >= in.coneLimit;
-		if (out.solveConeLimit)
+		out.solveSwingLimit = in.swingLimit >= 0.f && swingAngle >= in.swingLimit;
+		if (out.solveSwingLimit)
 		{
 			out.swingImpulse = 0.f;
 			out.globalSwingAxis = transformA.rotation * swingAxis;
@@ -484,17 +484,18 @@ void initializeConeTwistVelocityConstraints(scene& appScene, rigid_body_global_s
 			out.swingLimitBias = 0.f;
 			if (dt > DT_THRESHOLD)
 			{
-				out.swingLimitBias = (in.coneLimit - swingAngle) * HINGE_LIMIT_CONSTRAINT_BETA / dt;
+				out.swingLimitBias = (in.swingLimit - swingAngle) * HINGE_LIMIT_CONSTRAINT_BETA / dt;
 			}
 		}
 
-		// Twist limit.
+		// Twist limit and motor.
 		bool minTwistLimitViolated = in.twistLimit >= 0.f && twistAngle <= -in.twistLimit;
 		bool maxTwistLimitViolated = in.twistLimit >= 0.f && twistAngle >= in.twistLimit; 
 		assert(!(minTwistLimitViolated && maxTwistLimitViolated));
 
 		out.solveTwistLimit = minTwistLimitViolated || maxTwistLimitViolated;
-		if (out.solveTwistLimit)
+		out.solveTwistMotor = in.maxTwistMotorTorque > 0.f;
+		if (out.solveTwistLimit || out.solveTwistMotor)
 		{
 			out.twistImpulse = 0.f;
 			out.globalTwistAxis = transformA.rotation * localLimitAxisA;
@@ -503,6 +504,19 @@ void initializeConeTwistVelocityConstraints(scene& appScene, rigid_body_global_s
 			out.effectiveTwistLimitMass = (invEffectiveLimitMass != 0.f) ? (1.f / invEffectiveLimitMass) : 0.f;
 
 			out.twistLimitSign = minTwistLimitViolated ? 1.f : -1.f;
+
+			out.maxTwistMotorImpulse = in.maxTwistMotorTorque * dt;
+			out.twistMotorImpulse = 0.f;
+
+			out.twistMotorVelocity = in.twistMotorVelocity;
+			if (in.twistMotorType == constraint_position_motor)
+			{
+				// Inspired by Bullet Engine. We set the velocity such that the target angle is reached within one frame.
+				// This will later get clamped to the maximum motor impulse.
+				float limit = (in.twistLimit >= 0.f) ? in.twistLimit : M_PI;
+				float targetAngle = clamp(in.twistMotorTargetAngle, -limit, limit);
+				out.twistMotorVelocity = (dt > DT_THRESHOLD) ? ((targetAngle - twistAngle) / dt) : 0.f;
+			}
 
 			out.twistLimitBias = 0.f;
 			if (dt > DT_THRESHOLD)
@@ -528,17 +542,36 @@ void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints
 		vec3 vB = rbB.linearVelocity;
 		vec3 wB = rbB.angularVelocity;
 
-		// Solve in order of importance (most important last): Limits -> Position.
+		// Solve in order of importance (most important last): Motors -> Limits -> Position.
+
+		vec3 globalTwistAxis = con.globalTwistAxis;
+
+		// Motor.
+		if (con.solveTwistMotor)
+		{
+			float aDotWA = dot(globalTwistAxis, wA); // How fast are we turning about the axis.
+			float aDotWB = dot(globalTwistAxis, wB);
+			float relAngularVelocity = (aDotWB - aDotWA);
+
+			float motorCdot = relAngularVelocity - con.twistMotorVelocity;
+
+			float motorLambda = -con.effectiveTwistLimitMass * motorCdot;
+			float oldImpulse = con.twistMotorImpulse;
+			con.twistMotorImpulse = clamp(con.twistMotorImpulse + motorLambda, -con.maxTwistMotorImpulse, con.maxTwistMotorImpulse);
+			motorLambda = con.twistMotorImpulse - oldImpulse;
+
+			vec3 P = globalTwistAxis * motorLambda;
+			wA -= rbA.invInertia * P;
+			wB += rbB.invInertia * P;
+		}
 
 		// Twist.
 		if (con.solveTwistLimit)
 		{
-			vec3 globalRotationAxis = con.globalTwistAxis;
-			float aDotWA = dot(globalRotationAxis, wA); // How fast are we turning about the axis.
-			float aDotWB = dot(globalRotationAxis, wB);
-
 			float limitSign = con.twistLimitSign;
 
+			float aDotWA = dot(globalTwistAxis, wA); // How fast are we turning about the axis.
+			float aDotWB = dot(globalTwistAxis, wB);
 			float relAngularVelocity = limitSign * (aDotWB - aDotWA);
 
 			float limitCdot = relAngularVelocity + con.twistLimitBias;
@@ -550,13 +583,13 @@ void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints
 
 			limitLambda *= limitSign;
 
-			vec3 P = globalRotationAxis * limitLambda;
+			vec3 P = globalTwistAxis * limitLambda;
 			wA -= rbA.invInertia * P;
 			wB += rbB.invInertia * P;
 		}
 
 		// Cone.
-		if (con.solveConeLimit)
+		if (con.solveSwingLimit)
 		{
 			float axisDotWA = dot(con.globalSwingAxis, wA);
 			float axisDotWB = dot(con.globalSwingAxis, wB);

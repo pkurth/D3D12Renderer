@@ -155,7 +155,8 @@ hinge_joint_constraint_handle addHingeJointConstraintFromGlobalPoints(scene_enti
 	return { constraintIndex };
 }
 
-cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis, float coneLimit, float twistLimit)
+cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis, 
+	float swingLimit, float twistLimit)
 {
 	uint16 constraintIndex = (uint16)coneTwistConstraints.size();
 	cone_twist_constraint& constraint = coneTwistConstraints.emplace_back();
@@ -166,13 +167,19 @@ cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity
 	constraint.localAnchorA = inverseTransformPosition(transformA, globalAnchor);
 	constraint.localAnchorB = inverseTransformPosition(transformB, globalAnchor);
 
-	constraint.coneLimit = coneLimit;
+	// Limits.
+	constraint.swingLimit = swingLimit;
 	constraint.twistLimit = twistLimit;
 	constraint.localLimitAxisA = inverseTransformDirection(transformA, globalAxis);
 	constraint.localLimitAxisB = inverseTransformDirection(transformB, globalAxis);
 
 	getTangents(constraint.localLimitAxisA, constraint.localLimitTangentA, constraint.localLimitBitangentA);
 	constraint.localLimitTangentB = conjugate(transformB.rotation) * (transformA.rotation * constraint.localLimitTangentA);
+
+	// Motor.
+	constraint.twistMotorType = constraint_velocity_motor;
+	constraint.twistMotorVelocity = 0.f;
+	constraint.maxTwistMotorTorque = -1.f; // Disabled by default.
 
 	addConstraintEdge(a, constraint, constraintIndex, constraint_type_cone_twist);
 	addConstraintEdge(b, constraint, constraintIndex, constraint_type_cone_twist);
