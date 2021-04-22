@@ -169,6 +169,15 @@ struct cone_twist_constraint : physics_constraint
 	vec3 localLimitTangentB;
 
 	// Motor.
+	constraint_motor_type swingMotorType;
+	union
+	{
+		float swingMotorVelocity;
+		float swingMotorTargetAngle;
+	};
+	float maxSwingMotorTorque;
+	float swingMotorAxis;
+
 	constraint_motor_type twistMotorType;
 	union
 	{
@@ -202,10 +211,16 @@ struct cone_twist_constraint_update
 	vec3 globalTwistAxis;
 	float twistImpulse;
 	float twistLimitSign;
-	float effectiveTwistLimitMass;
+	float effectiveTwistMass;
 	float twistLimitBias;
 
 	// Motors.
+	float swingMotorImpulse;
+	float maxSwingMotorImpulse;
+	float swingMotorVelocity;
+	vec3 globalSwingMotorAxis;
+	float effectiveSwingMotorMass;
+
 	float twistMotorImpulse;
 	float maxTwistMotorImpulse;
 	float twistMotorVelocity;

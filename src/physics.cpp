@@ -177,6 +177,11 @@ cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity
 	constraint.localLimitTangentB = conjugate(transformB.rotation) * (transformA.rotation * constraint.localLimitTangentA);
 
 	// Motor.
+	constraint.swingMotorType = constraint_velocity_motor;
+	constraint.swingMotorVelocity = 0.f;
+	constraint.maxSwingMotorTorque = -1.f; // Disabled by default.
+	constraint.swingMotorAxis = 0.f;
+
 	constraint.twistMotorType = constraint_velocity_motor;
 	constraint.twistMotorVelocity = 0.f;
 	constraint.maxTwistMotorTorque = -1.f; // Disabled by default.
