@@ -1,6 +1,9 @@
 #include "pch.h"
 #include "assimp.h"
+
+#ifndef PHYSICS_ONLY
 #include "pbr.h"
+#endif
 
 #include <assimp/Exporter.hpp>
 #include <assimp/postprocess.h>
@@ -128,6 +131,7 @@ const aiScene* loadAssimpSceneFile(const std::string& filepathRaw, Assimp::Impor
 	return scene;
 }
 
+#ifndef PHYSICS_ONLY
 static ref<dx_texture> loadAssimpTexture(const aiScene* scene, const std::string& sceneFilepath, const std::string& name, uint32 flags = texture_load_flags_default)
 {
 	ref<dx_texture> texture = 0;
@@ -272,3 +276,4 @@ ref<pbr_material> loadAssimpMaterial(const aiScene* scene, const std::string& sc
 
 	return result;
 }
+#endif

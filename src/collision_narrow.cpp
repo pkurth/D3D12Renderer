@@ -6,6 +6,8 @@
 #include "collision_epa.h"
 #include "collision_sat.h"
 
+
+#ifndef PHYSICS_ONLY
 #include "render_pass.h"
 #include "pbr.h"
 
@@ -28,7 +30,7 @@ static void debugSphere(vec3 position, float radius, ref<pbr_material> material)
 		createModelMatrix(position, quat::identity, radius),
 	});
 }
-
+#endif
 
 
 static bool intersection(const bounding_oriented_box& a, const bounding_oriented_box& b, contact_manifold& outContact);
@@ -1422,6 +1424,7 @@ void solveCollisionVelocityConstraints(collision_constraint* constraints, uint32
 	}
 }
 
+#ifndef PHYSICS_ONLY
 void collisionDebugDraw(transparent_render_pass* renderPass)
 {
 	static dx_mesh debugMesh;
@@ -1447,3 +1450,4 @@ void collisionDebugDraw(transparent_render_pass* renderPass)
 	
 	debugDrawCalls.clear();
 }
+#endif

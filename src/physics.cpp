@@ -3,7 +3,6 @@
 #include "collision_broad.h"
 #include "collision_narrow.h"
 #include "geometry.h"
-#include "assimp.h"
 
 
 static std::vector<distance_constraint> distanceConstraints;
@@ -16,6 +15,11 @@ static std::vector<constraint_edge> constraintEdges;
 
 static std::vector<bounding_hull_geometry> boundingHullGeometries;
 
+
+#ifndef PHYSICS_ONLY
+// This is a bit dirty. PHYSICS_ONLY is defined when building the learning DLL, where we don't need bounding hulls.
+
+#include "assimp.h"
 uint32 allocateBoundingHullGeometry(const cpu_mesh& mesh)
 {
 	uint32 index = (uint32)boundingHullGeometries.size();
@@ -42,6 +46,7 @@ uint32 allocateBoundingHullGeometry(const std::string& meshFilepath)
 
 	return allocateBoundingHullGeometry(cpuMesh);
 }
+#endif
 
 static void addConstraintEdge(scene_entity& e, physics_constraint& constraint, uint16 constraintIndex, constraint_type type)
 {
