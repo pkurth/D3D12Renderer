@@ -362,6 +362,7 @@ project "Physics-Lib"
 		"src/collision_narrow.*",
 		"src/collision_sat.*",
 		"src/constraints.*",
+		"src/locomotion_learning.*",
 		"src/math.*",
 		"src/pch.*",
 		"src/physics.*",
