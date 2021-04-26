@@ -1,112 +1,97 @@
 #include "pch.h"
 #include "ragdoll.h"
+
+#ifndef PHYSICS_ONLY
 #include "pbr.h"
 #include "mesh.h"
 #include "geometry.h"
-#include "scene.h"
 #include "imgui.h"
+#endif
 
-void humanoid_ragdoll::initialize(scene& appScene)
+void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition)
 {
-	cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
-
-	auto ragdollMaterial = createPBRMaterial(
-		{}, {}, {}, {}, vec4(0.f), vec4(161.f, 102.f, 94.f, 255.f) / 255.f, 1.f, 0.f);
-	//auto ragdollMaterial = lollipopMaterial;
-
-	auto ragdollTorsoMesh = make_ref<composite_mesh>();
-	ragdollTorsoMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.4f, 0.25f, vec3(0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, ragdollMaterial });
-	ragdollTorsoMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.32f, 0.2f, vec3(0.f, 0.32f, 0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, ragdollMaterial });
-	ragdollTorsoMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.28f, 0.22f, vec3(0.f, 0.62f, 0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, ragdollMaterial });
-	ragdollTorsoMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.28f, 0.2f, vec3(0.f, 0.92f, 0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, ragdollMaterial });
-
-	auto ragdollHeadMesh = make_ref<composite_mesh>();
-	ragdollHeadMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.15f, 0.25f, vec3(0.f)), {}, trs::identity, ragdollMaterial });
-
-	auto ragdollArmMesh = make_ref<composite_mesh>();
-	ragdollArmMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.4f, 0.15f, vec3(0.f)), {}, trs::identity, ragdollMaterial });
-
-	auto ragdollUpperLegMesh = make_ref<composite_mesh>();
-	ragdollUpperLegMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.6f, 0.25f, vec3(0.f)), {}, trs::identity, ragdollMaterial });
-
-	auto ragdollLowerLegMesh = make_ref<composite_mesh>();
-	ragdollLowerLegMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.6f, 0.18f, vec3(0.f)), {}, trs::identity, ragdollMaterial });
+	float scale = 0.42f; // This file is completely hardcoded. I initially screwed up the scaling a bit, so this factor brings everything to the correct scale (and therefore weight).
 
 	bool ragdollKinematic = false;
 	float ragdollGravityFactor = 1.f;
-	// Yes this density is completely bogus. The actual density of the human body is around 985kg/m3. 
-	// This is because our ragdoll is currently WAY too large (about 4 meters high or so).
-	float ragdollDensity = 80.f;
+	float ragdollDensity = 985.f; // Average density of human body in kg/m3.
 	float ragdollFriction = 0.9f;
 
-	trs torsoTransform(vec3(30.f, 5.f, -2.f), quat::identity);
-	auto torso = appScene.createEntity("Torso")
+	trs torsoTransform(initialHipPosition + scale * vec3(0.f, 0.f, 0.f), quat::identity);
+	trs headTransform(initialHipPosition + scale * vec3(0.f, 1.45f, 0.f), quat::identity);
+	trs leftUpperArmTransform(initialHipPosition + scale * vec3(-0.6f, 0.75f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-30.f)));
+	trs leftLowerArmTransform(initialHipPosition + scale * vec3(-0.884f, 0.044f, -0.043f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-20.f)));
+	trs rightUpperArmTransform(initialHipPosition + scale * vec3(0.6f, 0.75f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(30.f)));
+	trs rightLowerArmTransform(initialHipPosition + scale * vec3(0.884f, 0.044f, -0.043f), quat(vec3(0.f, 0.f, 1.f), deg2rad(20.f)));
+	trs leftUpperLegTransform(initialHipPosition + scale * vec3(-0.371f, -0.812f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-10.f)));
+	trs leftLowerLegTransform(initialHipPosition + scale * vec3(-0.452f, -1.955f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-3.5f)));
+	trs rightUpperLegTransform(initialHipPosition + scale * vec3(0.371f, -0.812f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(10.f)));
+	trs rightLowerLegTransform(initialHipPosition + scale * vec3(0.452f, -1.955f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(3.5f)));
+
+	torso = appScene.createEntity("Torso")
 		.addComponent<trs>(torsoTransform)
-		.addComponent<raster_component>(ragdollTorsoMesh)
-		.addComponent<collider_component>(bounding_capsule{ vec3(-0.2f, 0.f, 0.f), vec3(0.2f, 0.f, 0.f), 0.25f }, 0.2f, 0.5f, ragdollDensity)
-		.addComponent<collider_component>(bounding_capsule{ vec3(-0.16f, 0.32f, 0.f), vec3(0.16f, 0.32f, 0.f), 0.2f }, 0.2f, 0.5f, ragdollDensity)
-		.addComponent<collider_component>(bounding_capsule{ vec3(-0.14f, 0.62f, 0.f), vec3(0.14f, 0.62f, 0.f), 0.22f }, 0.2f, 0.5f, ragdollDensity)
-		.addComponent<collider_component>(bounding_capsule{ vec3(-0.14f, 0.92f, 0.f), vec3(0.14f, 0.92f, 0.f), 0.2f }, 0.2f, 0.5f, ragdollDensity)
+		.addComponent<collider_component>(bounding_capsule{ scale * vec3(-0.2f, 0.f, 0.f),    scale *  vec3(0.2f, 0.f, 0.f),    scale * 0.25f }, 0.2f, 0.5f, ragdollDensity)
+		.addComponent<collider_component>(bounding_capsule{ scale * vec3(-0.16f, 0.32f, 0.f), scale *  vec3(0.16f, 0.32f, 0.f), scale * 0.2f }, 0.2f, 0.5f, ragdollDensity)
+		.addComponent<collider_component>(bounding_capsule{ scale * vec3(-0.14f, 0.62f, 0.f), scale *  vec3(0.14f, 0.62f, 0.f), scale * 0.22f }, 0.2f, 0.5f, ragdollDensity)
+		.addComponent<collider_component>(bounding_capsule{ scale * vec3(-0.14f, 0.92f, 0.f), scale *  vec3(0.14f, 0.92f, 0.f), scale * 0.2f }, 0.2f, 0.5f, ragdollDensity)
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	auto head = appScene.createEntity("Head")
-		.addComponent<trs>(vec3(30.f, 6.45f, -2.f), quat::identity)
-		.addComponent<raster_component>(ragdollHeadMesh)
-		.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.075f, 0.f), vec3(0.f, 0.075f, 0.f), 0.25f }, 0.2f, ragdollFriction, ragdollDensity)
+	head = appScene.createEntity("Head")
+		.addComponent<trs>(headTransform)
+		.addComponent<collider_component>(bounding_capsule{ scale * vec3(0.f, -0.075f, 0.f), scale * vec3(0.f, 0.075f, 0.f), scale * 0.25f }, 0.2f, ragdollFriction, ragdollDensity)
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	trs leftUpperArmTransform(vec3(29.4f, 5.75f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-30.f)));
-	auto leftUpperArm = appScene.createEntity("Left upper arm")
+	leftUpperArm = appScene.createEntity("Left upper arm")
 		.addComponent<trs>(leftUpperArmTransform)
-		.addComponent<raster_component>(ragdollArmMesh)
-		.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.2f, 0.f), vec3(0.f, 0.2f, 0.f), 0.15f }, 0.2f, ragdollFriction, ragdollDensity)
+		.addComponent<collider_component>(bounding_capsule{ scale * vec3(0.f, -0.2f, 0.f), scale * vec3(0.f, 0.2f, 0.f), scale * 0.15f }, 0.2f, ragdollFriction, ragdollDensity)
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	auto leftLowerArm = appScene.createEntity("Left lower arm")
-		.addComponent<trs>(vec3(29.116f, 5.044f, -2.043f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-20.f)))
-		.addComponent<raster_component>(ragdollArmMesh)
-		.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.2f, 0.f), vec3(0.f, 0.2f, 0.f), 0.15f }, 0.2f, ragdollFriction, ragdollDensity)
+	leftLowerArm = appScene.createEntity("Left lower arm")
+		.addComponent<trs>(leftLowerArmTransform)
+		.addComponent<collider_component>(bounding_capsule{ scale * vec3(0.f, -0.2f, 0.f), scale * vec3(0.f, 0.2f, 0.f), scale * 0.15f }, 0.2f, ragdollFriction, ragdollDensity)
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	trs rightUpperArmTransform(vec3(30.6f, 5.75f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(30.f)));
-	auto rightUpperArm = appScene.createEntity("Right upper arm")
-		.addComponent<trs>(vec3(30.6f, 5.75f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(30.f)))
-		.addComponent<raster_component>(ragdollArmMesh)
-		.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.2f, 0.f), vec3(0.f, 0.2f, 0.f), 0.15f }, 0.2f, ragdollFriction, ragdollDensity)
+	rightUpperArm = appScene.createEntity("Right upper arm")
+		.addComponent<trs>(rightUpperArmTransform)
+		.addComponent<collider_component>(bounding_capsule{ scale * vec3(0.f, -0.2f, 0.f), scale * vec3(0.f, 0.2f, 0.f), scale * 0.15f }, 0.2f, ragdollFriction, ragdollDensity)
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	auto rightLowerArm = appScene.createEntity("Right lower arm")
-		.addComponent<trs>(vec3(30.884f, 5.044f, -2.043f), quat(vec3(0.f, 0.f, 1.f), deg2rad(20.f)))
-		.addComponent<raster_component>(ragdollArmMesh)
-		.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.2f, 0.f), vec3(0.f, 0.2f, 0.f), 0.15f }, 0.2f, ragdollFriction, ragdollDensity)
+	rightLowerArm = appScene.createEntity("Right lower arm")
+		.addComponent<trs>(rightLowerArmTransform)
+		.addComponent<collider_component>(bounding_capsule{ scale * vec3(0.f, -0.2f, 0.f), scale * vec3(0.f, 0.2f, 0.f), scale * 0.15f }, 0.2f, ragdollFriction, ragdollDensity)
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	trs leftUpperLegTransform(vec3(29.629f, 4.188f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-10.f)));
-	auto leftUpperLeg = appScene.createEntity("Left upper leg")
+	leftUpperLeg = appScene.createEntity("Left upper leg")
 		.addComponent<trs>(leftUpperLegTransform)
-		.addComponent<raster_component>(ragdollUpperLegMesh)
-		.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.3f, 0.f), vec3(0.f, 0.3f, 0.f), 0.25f }, 0.2f, ragdollFriction, ragdollDensity)
+		.addComponent<collider_component>(bounding_capsule{ scale * vec3(0.f, -0.3f, 0.f), scale * vec3(0.f, 0.3f, 0.f), scale * 0.25f }, 0.2f, ragdollFriction, ragdollDensity)
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	auto leftLowerLeg = appScene.createEntity("Left lower leg")
-		.addComponent<trs>(vec3(29.548f, 3.045f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-3.5f)))
-		.addComponent<raster_component>(ragdollLowerLegMesh)
-		.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.3f, 0.f), vec3(0.f, 0.3f, 0.f), 0.18f }, 0.2f, ragdollFriction, ragdollDensity)
+	leftLowerLeg = appScene.createEntity("Left lower leg")
+		.addComponent<trs>(leftLowerLegTransform)
+		.addComponent<collider_component>(bounding_capsule{ scale * vec3(0.f, -0.3f, 0.f), scale * vec3(0.f, 0.3f, 0.f), scale * 0.18f }, 0.2f, ragdollFriction, ragdollDensity)
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	trs rightUpperLegTransform(vec3(30.371f, 4.188f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(10.f)));
-	auto rightUpperLeg = appScene.createEntity("Right upper leg")
+	rightUpperLeg = appScene.createEntity("Right upper leg")
 		.addComponent<trs>(rightUpperLegTransform)
-		.addComponent<raster_component>(ragdollUpperLegMesh)
-		.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.3f, 0.f), vec3(0.f, 0.3f, 0.f), 0.25f }, 0.2f, ragdollFriction, ragdollDensity)
+		.addComponent<collider_component>(bounding_capsule{ scale * vec3(0.f, -0.3f, 0.f), scale * vec3(0.f, 0.3f, 0.f), scale * 0.25f }, scale * 0.2f, ragdollFriction, ragdollDensity)
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	auto rightLowerLeg = appScene.createEntity("Right lower leg")
-		.addComponent<trs>(vec3(30.452f, 3.045f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(3.5f)))
-		.addComponent<raster_component>(ragdollLowerLegMesh)
-		.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.3f, 0.f), vec3(0.f, 0.3f, 0.f), 0.18f }, 0.2f, ragdollFriction, ragdollDensity)
+	rightLowerLeg = appScene.createEntity("Right lower leg")
+		.addComponent<trs>(rightLowerLegTransform)
+		.addComponent<collider_component>(bounding_capsule{ scale * vec3(0.f, -0.3f, 0.f), scale * vec3(0.f, 0.3f, 0.f), scale * 0.18f }, 0.2f, ragdollFriction, ragdollDensity)
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
+	neckConstraint = addConeTwistConstraintFromGlobalPoints(torso, head, transformPosition(torsoTransform, scale * vec3(0.f, 1.2f, 0.f)), vec3(0.f, 1.f, 0.f), deg2rad(50.f), deg2rad(90.f));
+	leftShoulderConstraint = addConeTwistConstraintFromGlobalPoints(torso, leftUpperArm, transformPosition(torsoTransform, scale * vec3(-0.4f, 1.f, 0.f)), vec3(-1.f, 0.f, 0.f), deg2rad(130.f), deg2rad(90.f));
+	leftElbowConstraint = addHingeJointConstraintFromGlobalPoints(leftUpperArm, leftLowerArm, transformPosition(leftUpperArmTransform, scale * vec3(0.f, -0.42f, 0.f)), normalize(vec3(1.f, 0.f, 1.f)), deg2rad(-5.f), deg2rad(85.f));
+	rightShoulderConstraint = addConeTwistConstraintFromGlobalPoints(torso, rightUpperArm, transformPosition(torsoTransform, scale * vec3(0.4f, 1.f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(130.f), deg2rad(90.f));
+	rightElbowConstraint = addHingeJointConstraintFromGlobalPoints(rightUpperArm, rightLowerArm, transformPosition(rightUpperArmTransform, scale * vec3(0.f, -0.42f, 0.f)), normalize(vec3(1.f, 0.f, -1.f)), deg2rad(-5.f), deg2rad(85.f));
+	leftHipConstraint = addConeTwistConstraintFromGlobalPoints(torso, leftUpperLeg, transformPosition(torsoTransform, scale * vec3(-0.3f, -0.25f, 0.f)), transformDirection(leftUpperLegTransform, vec3(0.f, -1.f, 0.f)), -1.f, deg2rad(30.f));
+	leftKneeConstraint = addHingeJointConstraintFromGlobalPoints(leftUpperLeg, leftLowerLeg, transformPosition(leftUpperLegTransform, scale * vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(-90.f), deg2rad(5.f));
+	rightHipConstraint = addConeTwistConstraintFromGlobalPoints(torso, rightUpperLeg, transformPosition(torsoTransform, scale * vec3(0.3f, -0.25f, 0.f)), transformDirection(rightUpperLegTransform, vec3(0.f, -1.f, 0.f)), -1.f, deg2rad(30.f));
+	rightKneeConstraint = addHingeJointConstraintFromGlobalPoints(rightUpperLeg, rightLowerLeg, transformPosition(rightUpperLegTransform, scale * vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(-90.f), deg2rad(5.f));
+
+#if 1
 	float totalMass = 1.f / torso.getComponent<rigid_body_component>().invMass +
 		1.f / head.getComponent<rigid_body_component>().invMass +
 		1.f / leftUpperArm.getComponent<rigid_body_component>().invMass +
@@ -119,17 +104,49 @@ void humanoid_ragdoll::initialize(scene& appScene)
 		1.f / rightLowerLeg.getComponent<rigid_body_component>().invMass;
 
 	std::cout << totalMass << '\n';
+#endif
 
-	neckConstraint = addConeTwistConstraintFromGlobalPoints(torso, head, transformPosition(torsoTransform, vec3(0.f, 1.2f, 0.f)), vec3(0.f, 1.f, 0.f), deg2rad(50.f), deg2rad(90.f));
-	leftShoulderConstraint = addConeTwistConstraintFromGlobalPoints(torso, leftUpperArm, transformPosition(torsoTransform, vec3(-0.4f, 1.f, 0.f)), vec3(-1.f, 0.f, 0.f), deg2rad(130.f), deg2rad(90.f));
-	leftElbowConstraint = addHingeJointConstraintFromGlobalPoints(leftUpperArm, leftLowerArm, transformPosition(leftUpperArmTransform, vec3(0.f, -0.42f, 0.f)), normalize(vec3(1.f, 0.f, 1.f)), deg2rad(-5.f), deg2rad(85.f));
-	rightShoulderConstraint = addConeTwistConstraintFromGlobalPoints(torso, rightUpperArm, transformPosition(torsoTransform, vec3(0.4f, 1.f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(130.f), deg2rad(90.f));
-	rightElbowConstraint = addHingeJointConstraintFromGlobalPoints(rightUpperArm, rightLowerArm, transformPosition(rightUpperArmTransform, vec3(0.f, -0.42f, 0.f)), normalize(vec3(1.f, 0.f, -1.f)), deg2rad(-5.f), deg2rad(85.f));
-	leftHipConstraint = addConeTwistConstraintFromGlobalPoints(torso, leftUpperLeg, transformPosition(torsoTransform, vec3(-0.3f, -0.25f, 0.f)), transformDirection(leftUpperLegTransform, vec3(0.f, -1.f, 0.f)), -1.f, deg2rad(30.f));
-	leftKneeConstraint = addHingeJointConstraintFromGlobalPoints(leftUpperLeg, leftLowerLeg, transformPosition(leftUpperLegTransform, vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(-90.f), deg2rad(5.f));
-	rightHipConstraint = addConeTwistConstraintFromGlobalPoints(torso, rightUpperLeg, transformPosition(torsoTransform, vec3(0.3f, -0.25f, 0.f)), transformDirection(rightUpperLegTransform, vec3(0.f, -1.f, 0.f)), -1.f, deg2rad(30.f));
-	rightKneeConstraint = addHingeJointConstraintFromGlobalPoints(rightUpperLeg, rightLowerLeg, transformPosition(rightUpperLegTransform, vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(-90.f), deg2rad(5.f));
 
+
+	// Graphics.
+
+
+#ifndef PHYSICS_ONLY
+
+	cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+
+	auto ragdollMaterial = createPBRMaterial(
+		{}, {}, {}, {}, vec4(0.f), vec4(161.f, 102.f, 94.f, 255.f) / 255.f, 1.f, 0.f);
+	//auto ragdollMaterial = lollipopMaterial;
+
+	auto ragdollTorsoMesh = make_ref<composite_mesh>();
+	ragdollTorsoMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, scale * 0.4f,  scale * 0.25f, scale * vec3(0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, ragdollMaterial });
+	ragdollTorsoMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, scale * 0.32f, scale * 0.2f, scale * vec3(0.f, 0.32f, 0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, ragdollMaterial });
+	ragdollTorsoMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, scale * 0.28f, scale * 0.22f, scale * vec3(0.f, 0.62f, 0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, ragdollMaterial });
+	ragdollTorsoMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, scale * 0.28f, scale * 0.2f, scale * vec3(0.f, 0.92f, 0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, ragdollMaterial });
+
+	auto ragdollHeadMesh = make_ref<composite_mesh>();
+	ragdollHeadMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, scale * 0.15f, scale * 0.25f, scale * vec3(0.f)), {}, trs::identity, ragdollMaterial });
+
+	auto ragdollArmMesh = make_ref<composite_mesh>();
+	ragdollArmMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, scale * 0.4f, scale * 0.15f, scale * vec3(0.f)), {}, trs::identity, ragdollMaterial });
+
+	auto ragdollUpperLegMesh = make_ref<composite_mesh>();
+	ragdollUpperLegMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, scale * 0.6f, scale * 0.25f, scale * vec3(0.f)), {}, trs::identity, ragdollMaterial });
+
+	auto ragdollLowerLegMesh = make_ref<composite_mesh>();
+	ragdollLowerLegMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, scale * 0.6f, scale * 0.18f, scale * vec3(0.f)), {}, trs::identity, ragdollMaterial });
+
+	torso.addComponent<raster_component>(ragdollTorsoMesh);
+	head.addComponent<raster_component>(ragdollHeadMesh);
+	leftUpperArm.addComponent<raster_component>(ragdollArmMesh);
+	leftLowerArm.addComponent<raster_component>(ragdollArmMesh);
+	rightUpperArm.addComponent<raster_component>(ragdollArmMesh);
+	rightLowerArm.addComponent<raster_component>(ragdollArmMesh);
+	leftUpperLeg.addComponent<raster_component>(ragdollUpperLegMesh);
+	leftLowerLeg.addComponent<raster_component>(ragdollLowerLegMesh);
+	rightUpperLeg.addComponent<raster_component>(ragdollUpperLegMesh);
+	rightLowerLeg.addComponent<raster_component>(ragdollLowerLegMesh);
 
 	ragdollTorsoMesh->mesh =
 		ragdollHeadMesh->mesh =
@@ -137,8 +154,11 @@ void humanoid_ragdoll::initialize(scene& appScene)
 		ragdollUpperLegMesh->mesh =
 		ragdollLowerLegMesh->mesh =
 		primitiveMesh.createDXMesh();
+
+#endif
 }
 
+#ifndef PHYSICS_ONLY
 static bool editHingeConstraint(const char* label, hinge_joint_constraint_handle handle)
 {
 	bool result = false;
@@ -284,6 +304,7 @@ static bool editConeTwistConstraint(const char* label, cone_twist_constraint_han
 	return result;
 }
 
+
 bool humanoid_ragdoll::edit()
 {
 	bool result = false;
@@ -303,3 +324,10 @@ bool humanoid_ragdoll::edit()
 	}
 	return result;
 }
+
+#else
+bool humanoid_ragdoll::edit()
+{
+	return false;
+}
+#endif

@@ -265,7 +265,7 @@ void application::initialize(dx_renderer* renderer)
 		}
 #endif
 
-		ragdoll.initialize(appScene);
+		ragdoll.initialize(appScene, vec3(30.f, 5.f, -2.f));
 
 #if 1
 		auto chainMesh = make_ref<composite_mesh>();
