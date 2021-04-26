@@ -164,7 +164,7 @@ void application::initialize(dx_renderer* renderer)
 			});
 
 		auto boxMesh = make_ref<composite_mesh>();
-		boxMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(1.f)), {}, trs::identity, 
+		boxMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(1.f, 1.f, 2.f)), {}, trs::identity, 
 			createPBRMaterial(
 				"assets/desert/textures/WoodenCrate2_Albedo.png", 
 				"assets/desert/textures/WoodenCrate2_Normal.png", 
@@ -190,7 +190,7 @@ void application::initialize(dx_renderer* renderer)
 			appScene.createEntity("Cube")
 				.addComponent<trs>(vec3(20.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
 				.addComponent<raster_component>(boxMesh)
-				.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f)), 0.1f, 0.5f, 0.1f)
+				.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 0.1f)
 				.addComponent<rigid_body_component>(false, 1.f);
 		}
 
@@ -265,8 +265,6 @@ void application::initialize(dx_renderer* renderer)
 		}
 #endif
 
-		ragdoll.initialize(appScene, vec3(30.f, 5.f, -2.f));
-
 #if 1
 		auto chainMesh = make_ref<composite_mesh>();
 		chainMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 2.f, 0.18f, vec3(0.f)), {}, trs::identity, lollipopMaterial });
@@ -301,21 +299,16 @@ void application::initialize(dx_renderer* renderer)
 #endif
 
 
-		//auto angleMesh = make_ref<composite_mesh>();
-		//angleMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 2.f, 0.18f, vec3(0.f)), {}, trs::identity, lollipopMaterial });
-		//angleMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 2.f, 0.18f, vec3(1.2f, 0.f, 0.f), v), {}, trs::identity, lollipopMaterial });
-
-
-
 		testMesh->mesh = 
 		groundMesh->mesh = 
 		boxMesh->mesh = 
 		chainMesh->mesh =
-		//ragdollPartMesh->mesh =
-		//angleMesh->mesh =
 			primitiveMesh.createDXMesh();
 	}
 #endif
+
+	ragdoll.initialize(appScene, vec3(30.f, 5.f, -2.f));
+
 
 	// Raytracing.
 	if (dxContext.raytracingSupported)

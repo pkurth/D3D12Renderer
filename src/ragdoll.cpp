@@ -25,8 +25,10 @@ void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition)
 	trs rightLowerArmTransform(initialHipPosition + scale * vec3(0.884f, 0.044f, -0.043f), quat(vec3(0.f, 0.f, 1.f), deg2rad(20.f)));
 	trs leftUpperLegTransform(initialHipPosition + scale * vec3(-0.371f, -0.812f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-10.f)));
 	trs leftLowerLegTransform(initialHipPosition + scale * vec3(-0.452f, -1.955f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-3.5f)));
+	trs leftFootTransform(initialHipPosition + scale * vec3(-0.498f, -2.585f, -0.18f), quat::identity);
 	trs rightUpperLegTransform(initialHipPosition + scale * vec3(0.371f, -0.812f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(10.f)));
 	trs rightLowerLegTransform(initialHipPosition + scale * vec3(0.452f, -1.955f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(3.5f)));
+	trs rightFootTransform(initialHipPosition + scale * vec3(0.498f, -2.585f, -0.18f), quat::identity);
 
 	torso = appScene.createEntity("Torso")
 		.addComponent<trs>(torsoTransform)
@@ -71,6 +73,11 @@ void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition)
 		.addComponent<collider_component>(bounding_capsule{ scale * vec3(0.f, -0.3f, 0.f), scale * vec3(0.f, 0.3f, 0.f), scale * 0.18f }, 0.2f, ragdollFriction, ragdollDensity)
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
+	leftFoot = appScene.createEntity("Left foot")
+		.addComponent<trs>(leftFootTransform)
+		.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f), scale * vec3(0.1587f, 0.1f, 0.3424f)), 0.2f, ragdollFriction, ragdollDensity)
+		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
+
 	rightUpperLeg = appScene.createEntity("Right upper leg")
 		.addComponent<trs>(rightUpperLegTransform)
 		.addComponent<collider_component>(bounding_capsule{ scale * vec3(0.f, -0.3f, 0.f), scale * vec3(0.f, 0.3f, 0.f), scale * 0.25f }, scale * 0.2f, ragdollFriction, ragdollDensity)
@@ -81,6 +88,11 @@ void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition)
 		.addComponent<collider_component>(bounding_capsule{ scale * vec3(0.f, -0.3f, 0.f), scale * vec3(0.f, 0.3f, 0.f), scale * 0.18f }, 0.2f, ragdollFriction, ragdollDensity)
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
+	rightFoot = appScene.createEntity("Right foot")
+		.addComponent<trs>(rightFootTransform)
+		.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f), scale * vec3(0.1587f, 0.1f, 0.3424f)), 0.2f, ragdollFriction, ragdollDensity)
+		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
+
 	neckConstraint = addConeTwistConstraintFromGlobalPoints(torso, head, transformPosition(torsoTransform, scale * vec3(0.f, 1.2f, 0.f)), vec3(0.f, 1.f, 0.f), deg2rad(50.f), deg2rad(90.f));
 	leftShoulderConstraint = addConeTwistConstraintFromGlobalPoints(torso, leftUpperArm, transformPosition(torsoTransform, scale * vec3(-0.4f, 1.f, 0.f)), vec3(-1.f, 0.f, 0.f), deg2rad(130.f), deg2rad(90.f));
 	leftElbowConstraint = addHingeJointConstraintFromGlobalPoints(leftUpperArm, leftLowerArm, transformPosition(leftUpperArmTransform, scale * vec3(0.f, -0.42f, 0.f)), normalize(vec3(1.f, 0.f, 1.f)), deg2rad(-5.f), deg2rad(85.f));
@@ -88,8 +100,10 @@ void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition)
 	rightElbowConstraint = addHingeJointConstraintFromGlobalPoints(rightUpperArm, rightLowerArm, transformPosition(rightUpperArmTransform, scale * vec3(0.f, -0.42f, 0.f)), normalize(vec3(1.f, 0.f, -1.f)), deg2rad(-5.f), deg2rad(85.f));
 	leftHipConstraint = addConeTwistConstraintFromGlobalPoints(torso, leftUpperLeg, transformPosition(torsoTransform, scale * vec3(-0.3f, -0.25f, 0.f)), transformDirection(leftUpperLegTransform, vec3(0.f, -1.f, 0.f)), -1.f, deg2rad(30.f));
 	leftKneeConstraint = addHingeJointConstraintFromGlobalPoints(leftUpperLeg, leftLowerLeg, transformPosition(leftUpperLegTransform, scale * vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(-90.f), deg2rad(5.f));
+	leftAnkleConstraint = addConeTwistConstraintFromGlobalPoints(leftLowerLeg, leftFoot, transformPosition(leftLowerLegTransform, scale * vec3(0.f, -0.52f, 0.f)), transformDirection(leftLowerLegTransform, vec3(0.f, -1.f, 0.f)), deg2rad(75.f), deg2rad(20.f));
 	rightHipConstraint = addConeTwistConstraintFromGlobalPoints(torso, rightUpperLeg, transformPosition(torsoTransform, scale * vec3(0.3f, -0.25f, 0.f)), transformDirection(rightUpperLegTransform, vec3(0.f, -1.f, 0.f)), -1.f, deg2rad(30.f));
 	rightKneeConstraint = addHingeJointConstraintFromGlobalPoints(rightUpperLeg, rightLowerLeg, transformPosition(rightUpperLegTransform, scale * vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(-90.f), deg2rad(5.f));
+	rightAnkleConstraint = addConeTwistConstraintFromGlobalPoints(rightLowerLeg, rightFoot, transformPosition(rightLowerLegTransform, scale * vec3(0.f, -0.52f, 0.f)), transformDirection(rightLowerLegTransform, vec3(0.f, -1.f, 0.f)), deg2rad(75.f), deg2rad(20.f));
 
 #if 1
 	float totalMass = 1.f / torso.getComponent<rigid_body_component>().invMass +
@@ -137,6 +151,9 @@ void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition)
 	auto ragdollLowerLegMesh = make_ref<composite_mesh>();
 	ragdollLowerLegMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, scale * 0.6f, scale * 0.18f, scale * vec3(0.f)), {}, trs::identity, ragdollMaterial });
 
+	auto ragdollFootMesh = make_ref<composite_mesh>();
+	ragdollFootMesh->submeshes.push_back({ primitiveMesh.pushCube(scale * vec3(0.1587f, 0.1f, 0.3424f)), {}, trs::identity, ragdollMaterial });
+
 	torso.addComponent<raster_component>(ragdollTorsoMesh);
 	head.addComponent<raster_component>(ragdollHeadMesh);
 	leftUpperArm.addComponent<raster_component>(ragdollArmMesh);
@@ -145,14 +162,17 @@ void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition)
 	rightLowerArm.addComponent<raster_component>(ragdollArmMesh);
 	leftUpperLeg.addComponent<raster_component>(ragdollUpperLegMesh);
 	leftLowerLeg.addComponent<raster_component>(ragdollLowerLegMesh);
+	leftFoot.addComponent<raster_component>(ragdollFootMesh);
 	rightUpperLeg.addComponent<raster_component>(ragdollUpperLegMesh);
 	rightLowerLeg.addComponent<raster_component>(ragdollLowerLegMesh);
+	rightFoot.addComponent<raster_component>(ragdollFootMesh);
 
 	ragdollTorsoMesh->mesh =
 		ragdollHeadMesh->mesh =
 		ragdollArmMesh->mesh =
 		ragdollUpperLegMesh->mesh =
 		ragdollLowerLegMesh->mesh =
+		ragdollFootMesh->mesh =
 		primitiveMesh.createDXMesh();
 
 #endif
@@ -317,8 +337,10 @@ bool humanoid_ragdoll::edit()
 		result |= editHingeConstraint("Right Elbow", rightElbowConstraint);
 		result |= editConeTwistConstraint("Left hip", leftHipConstraint);
 		result |= editHingeConstraint("Left knee", leftKneeConstraint);
+		result |= editConeTwistConstraint("Left ankle", leftAnkleConstraint);
 		result |= editConeTwistConstraint("Right hip", rightHipConstraint);
 		result |= editHingeConstraint("Right knee", rightKneeConstraint);
+		result |= editConeTwistConstraint("Right ankle", rightAnkleConstraint);
 
 		ImGui::TreePop();
 	}
