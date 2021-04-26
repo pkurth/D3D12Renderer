@@ -139,7 +139,7 @@ end
 
 
 -----------------------------------------
--- GENERATE MAIN SOLUTION
+-- GENERATE SOLUTION
 -----------------------------------------
 
 
@@ -329,23 +329,8 @@ project "D3D12Renderer"
 
 
 -----------------------------------------
--- GENERATE PHYSICS ONLY SOLUTION
+-- GENERATE PHYSICS ONLY DLL
 -----------------------------------------
-
-workspace "Physics-Lib"
-	architecture "x64"
-	startproject "Physics-Lib"
-
-	configurations {
-		"Debug",
-		"Release"
-	}
-
-	flags {
-		"MultiProcessorCompile"
-	}
-
-outputdir = "%{cfg.buildcfg}_%{cfg.architecture}"
 
 project "Physics-Lib"
 	kind "SharedLib"
