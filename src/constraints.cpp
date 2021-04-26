@@ -212,7 +212,7 @@ void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_
 		mat3 skewMatB = getSkewMatrix(out.relGlobalAnchorB);
 
 		out.invEffectiveTranslationMass = mat3::identity * globalA.invMass + skewMatA * globalA.invInertia * transpose(skewMatA)
-			+ mat3::identity * globalB.invMass + skewMatB * globalB.invInertia * transpose(skewMatB);
+										+ mat3::identity * globalB.invMass + skewMatB * globalB.invInertia * transpose(skewMatB);
 
 		out.translationBias = 0.f;
 		if (dt > DT_THRESHOLD)

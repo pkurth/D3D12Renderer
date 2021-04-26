@@ -1047,8 +1047,6 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 
 	if (faceCollision)
 	{
-		//std::cout << "FACE SHIT " << normal << "\n";
-
 		vec3 clipPlanePoints[4];
 		vec3 clipPlaneNormals[4];
 
@@ -1107,8 +1105,6 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 	}
 	else
 	{
-		//std::cout << "EDGE SHIT " << normal << "\n";
-
 		vec3 a0, a1, b0, b1;
 		getAABBIncidentEdge(a.radius, conjugate(a.rotation) * normal, a0, a1);
 		getAABBIncidentEdge(b.radius, conjugate(b.rotation) * -normal, b0, b1);
@@ -1137,9 +1133,6 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 	{
 		debugSphere(outContact.contacts[i].point, 0.1f, blueMaterial);
 	}
-
-	//std::cout << "Intersection\n";
-	//std::cout << minPenetration << "     " << normal << '\n';
 
 	return true;
 }
@@ -1329,7 +1322,7 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 						vec3 crAt = cross(point.relGlobalAnchorA, point.tangent);
 						vec3 crBt = cross(point.relGlobalAnchorB, point.tangent);
 						float invMassInTangentDir = rbA.invMass + dot(crAt, rbA.invInertia * crAt)
-							+ rbB.invMass + dot(crBt, rbB.invMass * crBt);
+												  + rbB.invMass + dot(crBt, rbB.invInertia * crBt);
 						point.effectiveMassInTangentDir = (invMassInTangentDir != 0.f) ? (1.f / invMassInTangentDir) : 0.f;
 					}
 
@@ -1337,7 +1330,7 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 						vec3 crAn = cross(point.relGlobalAnchorA, c.contact.collisionNormal);
 						vec3 crBn = cross(point.relGlobalAnchorB, c.contact.collisionNormal);
 						float invMassInNormalDir = rbA.invMass + dot(crAn, rbA.invInertia * crAn)
-							+ rbB.invMass + dot(crBn, rbB.invMass * crBn);
+												 + rbB.invMass + dot(crBn, rbB.invInertia * crBn);
 						point.effectiveMassInNormalDir = (invMassInNormalDir != 0.f) ? (1.f / invMassInNormalDir) : 0.f;
 
 						point.bias = 0.f;
