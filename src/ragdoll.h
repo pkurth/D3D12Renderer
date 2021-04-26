@@ -17,9 +17,11 @@ struct humanoid_ragdoll
 	scene_entity leftUpperLeg;
 	scene_entity leftLowerLeg;
 	scene_entity leftFoot;
+	scene_entity leftToes;
 	scene_entity rightUpperLeg;
 	scene_entity rightLowerLeg;
 	scene_entity rightFoot;
+	scene_entity rightToes;
 
 	cone_twist_constraint_handle neckConstraint;
 	cone_twist_constraint_handle leftShoulderConstraint;
@@ -29,7 +31,9 @@ struct humanoid_ragdoll
 	cone_twist_constraint_handle leftHipConstraint;
 	hinge_joint_constraint_handle leftKneeConstraint;
 	cone_twist_constraint_handle leftAnkleConstraint;
+	hinge_joint_constraint_handle leftToesConstraint;
 	cone_twist_constraint_handle rightHipConstraint;
 	hinge_joint_constraint_handle rightKneeConstraint;
 	cone_twist_constraint_handle rightAnkleConstraint;
+	hinge_joint_constraint_handle rightToesConstraint;
 };

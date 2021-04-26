@@ -190,7 +190,7 @@ void application::initialize(dx_renderer* renderer)
 			appScene.createEntity("Cube")
 				.addComponent<trs>(vec3(20.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
 				.addComponent<raster_component>(boxMesh)
-				.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 0.1f)
+				.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 10.f)
 				.addComponent<rigid_body_component>(false, 1.f);
 		}
 
