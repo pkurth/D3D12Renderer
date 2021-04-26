@@ -739,10 +739,10 @@ static bool intersection(const bounding_box& a, const bounding_box& b, contact_m
 	outContact.contacts[3].point.data[axis1] = max1;
 	outContact.contacts[3].point.data[minElement] = depth;
 
-	debugSphere(outContact.contacts[0].point, 0.1f, blueMaterial);
-	debugSphere(outContact.contacts[1].point, 0.1f, blueMaterial);
-	debugSphere(outContact.contacts[2].point, 0.1f, blueMaterial);
-	debugSphere(outContact.contacts[3].point, 0.1f, blueMaterial);
+	//debugSphere(outContact.contacts[0].point, 0.1f, blueMaterial);
+	//debugSphere(outContact.contacts[1].point, 0.1f, blueMaterial);
+	//debugSphere(outContact.contacts[2].point, 0.1f, blueMaterial);
+	//debugSphere(outContact.contacts[3].point, 0.1f, blueMaterial);
 
 	return true;
 }
@@ -1114,11 +1114,10 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 		b0 = b.rotation * b0 + b.center;
 		b1 = b.rotation * b1 + b.center;
 
-		debugSphere(a0, 0.1f, greenMaterial);
-		debugSphere(a1, 0.1f, greenMaterial);
-
-		debugSphere(b0, 0.1f, redMaterial);
-		debugSphere(b1, 0.1f, redMaterial);
+		//debugSphere(a0, 0.1f, greenMaterial);
+		//debugSphere(a1, 0.1f, greenMaterial);
+		//debugSphere(b0, 0.1f, redMaterial);
+		//debugSphere(b1, 0.1f, redMaterial);
 
 		vec3 pa, pb;
 		float sqDistance = closestPoint_SegmentSegment(line_segment{ a0, a1 }, line_segment{ b0, b1 }, pa, pb);
@@ -1129,10 +1128,10 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 	}
 
 
-	for (uint32 i = 0; i < outContact.numContacts; ++i)
-	{
-		debugSphere(outContact.contacts[i].point, 0.1f, blueMaterial);
-	}
+	//for (uint32 i = 0; i < outContact.numContacts; ++i)
+	//{
+	//	debugSphere(outContact.contacts[i].point, 0.1f, blueMaterial);
+	//}
 
 	return true;
 }
