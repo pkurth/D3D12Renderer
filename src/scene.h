@@ -125,6 +125,7 @@ struct scene
 	}
 
 	void deleteEntity(scene_entity e);
+	void clearAll();
 
 	bool isEntityValid(scene_entity e)
 	{

@@ -181,5 +181,8 @@ hinge_joint_constraint& getConstraint(hinge_joint_constraint_handle handle);
 cone_twist_constraint& getConstraint(cone_twist_constraint_handle handle);
 
 
+void deleteAllConstraints();
+
+
 void testPhysicsInteraction(scene& appScene, ray r, float forceAmount);
 void physicsStep(scene& appScene, float dt, uint32 numSolverIterations = 30);

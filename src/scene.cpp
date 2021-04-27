@@ -11,6 +11,11 @@ scene::scene()
 	registry.on_destroy<collider_component>().connect<&onColliderRemoved>();
 }
 
+void scene::clearAll()
+{
+	registry.clear();
+}
+
 void scene::deleteEntity(scene_entity e)
 {
 	if (e.hasComponent<physics_reference_component>())

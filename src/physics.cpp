@@ -221,6 +221,14 @@ cone_twist_constraint& getConstraint(cone_twist_constraint_handle handle)
 	return coneTwistConstraints[handle.index];
 }
 
+void deleteAllConstraints()
+{
+	distanceConstraints.clear();
+	ballJointConstraints.clear();
+	hingeJointConstraints.clear();
+	coneTwistConstraints.clear();
+}
+
 
 void testPhysicsInteraction(scene& appScene, ray r, float forceAmount)
 {
