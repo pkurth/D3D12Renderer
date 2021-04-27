@@ -6,12 +6,11 @@ import ctypes
 
 class PhysicsDLL() :
     def __init__(self):
-        self._physics = ctypes.CDLL('PhysicsDLL.dll')
+        self._physics = ctypes.CDLL('bin/Release_x86_64/Physics-Lib.dll')
 
         print(self._physics)
         
         self._physics.updatePhysics.argtypes = (ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float))
-        
         self._physics.resetPhysics.argtypes = (ctypes.POINTER(ctypes.c_float),)
 
         self.state_size = self._physics.getPhysicsStateSize()

@@ -7,3 +7,7 @@ bin_int/
 shaders/bin/
 assets/
 shaders/generated/
+learning/gym-loco/gym_loco.egg-info/
+learning/gym-loco/gym_loco/__pycache__/
+learning/gym-loco/gym_loco/envs/__pycache__/
+trained_models/ppo/loco-v0.pt

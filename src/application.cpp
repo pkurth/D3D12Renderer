@@ -69,6 +69,9 @@ void application::loadCustomShaders()
 	{
 		initializeMeshShader();
 	}
+
+	//void testLearning();
+	//testLearning();
 }
 
 auto testMesh = make_ref<composite_mesh>();
