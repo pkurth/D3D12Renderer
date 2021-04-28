@@ -2,95 +2,102 @@
 #include "light_source.h"
 
 
-void directional_light::updateMatrices(const render_camera& camera, bool preventRotationalShimmering)
+void directional_light::updateMatrices(const render_camera& camera)
 {
-	mat4 viewMatrix = lookAt(vec3(0.f, 0.f, 0.f), direction, vec3(0.f, 1.f, 0.f));
+	camera_frustum_corners worldFrustum = camera.getWorldSpaceFrustumCorners(cascadeDistances.w);
 
-	camera_frustum_corners viewFrustum = camera.getViewSpaceFrustumCorners(cascadeDistances.w);
+	vec3 bottomLeftRay = worldFrustum.farBottomLeft - worldFrustum.nearBottomLeft;
+	vec3 bottomRightRay = worldFrustum.farBottomRight - worldFrustum.nearBottomRight;
+	vec3 topLeftRay = worldFrustum.farTopLeft - worldFrustum.nearTopLeft;
+	vec3 topRightRay = worldFrustum.farTopRight - worldFrustum.nearTopRight;
 
-	// View space.
-	vec4 viewBottomLeft(viewFrustum.farBottomLeft - viewFrustum.nearBottomLeft, 0.f);
-	vec4 viewBottomRight(viewFrustum.farBottomRight - viewFrustum.nearBottomRight, 0.f);
-	vec4 viewTopLeft(viewFrustum.farTopLeft - viewFrustum.nearTopLeft, 0.f);
-	vec4 viewTopRight(viewFrustum.farTopRight - viewFrustum.nearTopRight, 0.f);
+	vec3 cameraForward = camera.rotation * vec3(0.f, 0.f, -1.f);
 
-	// Normalize to z == -1.
-	viewBottomLeft /= -viewBottomLeft.z;
-	viewBottomRight /= -viewBottomRight.z;
-	viewTopLeft /= -viewTopLeft.z;
-	viewTopRight /= -viewTopRight.z;
+	bottomLeftRay /= dot(bottomLeftRay, cameraForward);
+	bottomRightRay /= dot(bottomRightRay, cameraForward);
+	topLeftRay /= dot(topLeftRay, cameraForward);
+	topRightRay /= dot(topRightRay, cameraForward);
 
-	bounding_box initialViewSpaceBB = bounding_box::negativeInfinity();
-	initialViewSpaceBB.grow((camera.nearPlane * viewBottomLeft).xyz);
-	initialViewSpaceBB.grow((camera.nearPlane * viewBottomRight).xyz);
-	initialViewSpaceBB.grow((camera.nearPlane * viewTopLeft).xyz);
-	initialViewSpaceBB.grow((camera.nearPlane * viewTopRight).xyz);
-
-
-	// World space.
-	vec4 worldBottomLeft = vec4(camera.rotation * viewBottomLeft.xyz, 0.f);
-	vec4 worldBottomRight = vec4(camera.rotation * viewBottomRight.xyz, 0.f);
-	vec4 worldTopLeft = vec4(camera.rotation * viewTopLeft.xyz, 0.f);
-	vec4 worldTopRight = vec4(camera.rotation * viewTopRight.xyz, 0.f);
-
-	vec4 worldEye = vec4(camera.position, 1.f);
-
-	bounding_box initialWorldSpaceBB = bounding_box::negativeInfinity();
-	initialWorldSpaceBB.grow((viewMatrix * (worldEye + camera.nearPlane * worldBottomLeft)).xyz);
-	initialWorldSpaceBB.grow((viewMatrix * (worldEye + camera.nearPlane * worldBottomRight)).xyz);
-	initialWorldSpaceBB.grow((viewMatrix * (worldEye + camera.nearPlane * worldTopLeft)).xyz);
-	initialWorldSpaceBB.grow((viewMatrix * (worldEye + camera.nearPlane * worldTopRight)).xyz);
-
-
-	for (uint32 i = 0; i < numShadowCascades; ++i)
+	for (uint32 cascade = 0; cascade < numShadowCascades; ++cascade)
 	{
-		float distance = cascadeDistances.data[i];
+		float distance = cascadeDistances.data[cascade];
+		float prevDistance = (cascade == 0) ? camera.nearPlane : cascadeDistances.data[cascade - 1];
 
-		bounding_box worldBB = initialWorldSpaceBB;
-		worldBB.grow((viewMatrix * (worldEye + distance * worldBottomLeft)).xyz);
-		worldBB.grow((viewMatrix * (worldEye + distance * worldBottomRight)).xyz);
-		worldBB.grow((viewMatrix * (worldEye + distance * worldTopLeft)).xyz);
-		worldBB.grow((viewMatrix * (worldEye + distance * worldTopRight)).xyz);
-		worldBB.pad(0.1f);
+		vec3 corners[8];
+		corners[0] = camera.position + bottomLeftRay * prevDistance;
+		corners[1] = camera.position + bottomRightRay * prevDistance;
+		corners[2] = camera.position + topLeftRay * prevDistance;
+		corners[3] = camera.position + topRightRay * prevDistance;
+		corners[4] = camera.position + bottomLeftRay * distance;
+		corners[5] = camera.position + bottomRightRay * distance;
+		corners[6] = camera.position + topLeftRay * distance;
+		corners[7] = camera.position + topRightRay * distance;
 
-		mat4 projMatrix;
-
-		if (!preventRotationalShimmering)
+		vec3 center(0.f);
+		for (uint32 i = 0; i < 8; ++i)
 		{
-			projMatrix = createOrthographicProjectionMatrix(worldBB.minCorner.x, worldBB.maxCorner.x, worldBB.maxCorner.y, worldBB.minCorner.y,
-				-worldBB.maxCorner.z - SHADOW_MAP_NEGATIVE_Z_OFFSET, -worldBB.minCorner.z);
+			center += corners[i];
+		}
+		center /= 8.f;
+
+		vec3 upDir = stabilize ? vec3(0.f, 1.f, 0.f) : (camera.rotation * vec3(1.f, 0.f, 1.f));
+
+		mat4 viewMatrix = lookAt(center, center + direction, upDir);
+
+		vec3 minExtents, maxExtents;
+		if (stabilize)
+		{
+			float sphereRadius = 0.f;
+			for (uint32 i = 0; i < 8; ++i)
+			{
+				float d = length(corners[i] - center);
+				sphereRadius = max(sphereRadius, d);
+			}
+
+			sphereRadius = ceil(sphereRadius * 16.f) / 16.f;
+			minExtents = -sphereRadius;
+			maxExtents = sphereRadius;
 		}
 		else
 		{
-			bounding_box viewBB = initialViewSpaceBB;
-			viewBB.grow((distance * viewBottomLeft).xyz);
-			viewBB.grow((distance * viewBottomRight).xyz);
-			viewBB.grow((distance * viewTopLeft).xyz);
-			viewBB.grow((distance * viewTopRight).xyz);
-			viewBB.pad(0.1f);
+			bounding_box extents = bounding_box::negativeInfinity();
+			for (uint32 i = 0; i < 8; ++i)
+			{
+				vec3 c = transformPosition(viewMatrix, corners[i]);
+				extents.grow(c);
+			}
 
-			vec3 viewSpaceCenter = viewBB.getCenter();
-			float radius = length(viewBB.getRadius());
+			minExtents = extents.minCorner;
+			maxExtents = extents.maxCorner;
 
-			vec3 center = (viewMatrix * vec4(camera.rotation * viewSpaceCenter + camera.position, 1.f)).xyz;
-
-			projMatrix = createOrthographicProjectionMatrix(center.x + radius, center.x - radius, center.y + radius, center.y - radius,
-				-worldBB.maxCorner.z - SHADOW_MAP_NEGATIVE_Z_OFFSET, -worldBB.minCorner.z);
+			float scale = (shadowDimensions + 9.f) / shadowDimensions;
+			minExtents.xy *= scale;
+			maxExtents.xy *= scale;
 		}
 
-		vp[i] = projMatrix * viewMatrix;
+		vec3 cascadeExtents = maxExtents - minExtents;
+		vec3 shadowCamPos = center + direction * minExtents.z;
 
-		// Move in pixel increments.
-		// https://stackoverflow.com/questions/33499053/cascaded-shadow-map-shimmering
+		viewMatrix = lookAt(shadowCamPos, shadowCamPos + direction, upDir);
 
-		vec4 shadowOrigin = (vp[i] * vec4(0.f, 0.f, 0.f, 1.f)) * (float)shadowDimensions * 0.5f;
-		vec4 roundedOrigin = round(shadowOrigin);
-		vec4 roundOffset = roundedOrigin - shadowOrigin;
-		roundOffset = roundOffset * 2.f / (float)shadowDimensions;
-		roundOffset.z = 0.f;
-		roundOffset.w = 0.f;
+		mat4 projMatrix = createOrthographicProjectionMatrix(maxExtents.x, minExtents.x, maxExtents.y, minExtents.y, -SHADOW_MAP_NEGATIVE_Z_OFFSET, cascadeExtents.z);
 
-		vp[i].col3 += roundOffset;
+		if (stabilize)
+		{
+			mat4 matrix = projMatrix * viewMatrix;
+			vec3 shadowOrigin(0.f);
+			shadowOrigin = (matrix * vec4(shadowOrigin, 1.f)).xyz;
+			shadowOrigin *= (shadowDimensions * 0.5f);
+
+			vec3 roundedOrigin = round(shadowOrigin);
+			vec3 roundOffset = roundedOrigin - shadowOrigin;
+			roundOffset = roundOffset * (2.f / shadowDimensions);
+
+			projMatrix.m03 += roundOffset.x;
+			projMatrix.m13 += roundOffset.y;
+		}
+
+		vp[cascade] = projMatrix * viewMatrix;
 	}
 }
 

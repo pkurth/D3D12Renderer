@@ -669,6 +669,8 @@ static vec2 abs(vec2 a) { return vec2(abs(a.x), abs(a.y)); }
 static vec3 abs(vec3 a) { return vec3(abs(a.x), abs(a.y), abs(a.z)); }
 static vec4 abs(vec4 a) { return vec4(abs(a.f4)); }
 
+static vec2 round(vec2 a) { return vec2(round(a.x), round(a.y)); }
+static vec3 round(vec3 a) { return vec3(round(a.x), round(a.y), round(a.z)); }
 static vec4 round(vec4 a) { return vec4(round(a.f4)); }
 
 static quat normalize(quat a) { return { normalize(a.v4).f4 }; }

@@ -23,11 +23,9 @@ struct directional_light
 	vec4 blendDistances;
 	uint32 shadowDimensions;
 
+	bool stabilize;
 
-	// 'preventRotationalShimmering' uses bounding spheres instead of bounding boxes. 
-	// This prevents shimmering along shadow edges, when the camera rotates.
-	// It slightly reduces shadow map resolution though.
-	void updateMatrices(const render_camera& camera, bool preventRotationalShimmering = true);
+	void updateMatrices(const render_camera& camera);
 };
 
 mat4 getSpotLightViewProjectionMatrix(const spot_light_cb& sl);

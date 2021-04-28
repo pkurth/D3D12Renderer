@@ -395,6 +395,7 @@ void application::initialize(dx_renderer* renderer)
 	sun.cascadeDistances = vec4(9.f, 39.f, 74.f, 10000.f);
 	sun.bias = vec4(0.000049f, 0.000114f, 0.000082f, 0.0035f);
 	sun.blendDistances = vec4(3.f, 3.f, 10.f, 10.f);
+	sun.stabilize = true;
 
 	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
 	{
