@@ -64,12 +64,11 @@ struct learning_environment
 	humanoid_ragdoll ragdoll;
 
 	learning_action lastSmoothedAction;
+
+	uint32 numIterations;
 };
 
 static learning_environment* env = 0;
-
-extern "C" __declspec(dllexport) int getPhysicsStateSize() { return sizeof(learning_state) / 4; }
-extern "C" __declspec(dllexport) int getPhysicsActionSize() { return sizeof(learning_action) / 4; }
 
 static void readBodyPartState(const trs& transform, scene_entity entity, vec3& position, vec3& velocity)
 {
@@ -97,11 +96,32 @@ static void updateConstraint(cone_twist_constraint_handle handle, cone_twist_act
 	c.swingMotorAxis = action.swingAxisAngle;
 }
 
+static void getLimits(hinge_joint_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
+{
+	hinge_joint_constraint& c = getConstraint(handle);
+	minPtr[minPushIndex++] = c.minRotationLimit <= 0.f ? c.minRotationLimit : -FLT_MAX;
+	maxPtr[maxPushIndex++] = c.maxRotationLimit >= 0.f ? c.maxRotationLimit : FLT_MAX;
+}
+
+static void getLimits(cone_twist_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
+{
+	cone_twist_constraint& c = getConstraint(handle);
+
+	minPtr[minPushIndex++] = c.twistLimit >= 0.f ? -c.twistLimit : -FLT_MAX;
+	minPtr[minPushIndex++] = c.swingLimit >= 0.f ? -c.swingLimit : -FLT_MAX;
+	minPtr[minPushIndex++] = -M_PI;
+
+	maxPtr[maxPushIndex++] = c.twistLimit >= 0.f ? c.twistLimit : FLT_MAX;
+	maxPtr[maxPushIndex++] = c.swingLimit >= 0.f ? c.swingLimit : FLT_MAX;
+	maxPtr[maxPushIndex++] = M_PI;
+}
+
 // Returns true, if simulation has ended.
 static bool readState(float* outState)
 {
 	learning_state* s = (learning_state*)outState;
 
+	// Create coordinate system centered at the torso's location (projected onto the ground), with axes constructed from the horizontal heading and global up vector.
 	quat rotation = env->ragdoll.torso.getComponent<trs>().rotation;
 	vec3 forward = rotation * vec3(0.f, 0.f, -1.f);
 	forward.y = 0.f;
@@ -134,7 +154,47 @@ static bool readState(float* outState)
 
 static float readReward()
 {
-	return 1.f;
+	return 1.f; // TODO
+}
+
+extern "C" __declspec(dllexport) int getPhysicsStateSize() { return sizeof(learning_state) / 4; }
+extern "C" __declspec(dllexport) int getPhysicsActionSize() { return sizeof(learning_action) / 4; }
+
+extern "C" __declspec(dllexport) void getPhysicsRanges(float* stateMin, float* stateMax, float* actionMin, float* actionMax)
+{
+	scene tmpScene;
+	humanoid_ragdoll tmpRagdoll;
+	tmpRagdoll.initialize(tmpScene, vec3(0.f));
+
+	// No limits for state.
+	for (uint32 i = 0; i < (uint32)getPhysicsStateSize(); ++i)
+	{
+		stateMin[i] = -FLT_MAX;
+		stateMax[i] = FLT_MAX;
+	}
+
+	uint32 minPushIndex = 0;
+	uint32 maxPushIndex = 0;
+
+	getLimits(tmpRagdoll.neckConstraint, actionMin, minPushIndex, actionMax, maxPushIndex);
+	getLimits(tmpRagdoll.leftShoulderConstraint, actionMin, minPushIndex, actionMax, maxPushIndex);
+	getLimits(tmpRagdoll.leftElbowConstraint, actionMin, minPushIndex, actionMax, maxPushIndex);
+	getLimits(tmpRagdoll.rightShoulderConstraint, actionMin, minPushIndex, actionMax, maxPushIndex);
+	getLimits(tmpRagdoll.rightElbowConstraint, actionMin, minPushIndex, actionMax, maxPushIndex);
+	getLimits(tmpRagdoll.leftHipConstraint, actionMin, minPushIndex, actionMax, maxPushIndex);
+	getLimits(tmpRagdoll.leftKneeConstraint, actionMin, minPushIndex, actionMax, maxPushIndex);
+	getLimits(tmpRagdoll.leftAnkleConstraint, actionMin, minPushIndex, actionMax, maxPushIndex);
+	getLimits(tmpRagdoll.leftToesConstraint, actionMin, minPushIndex, actionMax, maxPushIndex);
+	getLimits(tmpRagdoll.rightHipConstraint, actionMin, minPushIndex, actionMax, maxPushIndex);
+	getLimits(tmpRagdoll.rightKneeConstraint, actionMin, minPushIndex, actionMax, maxPushIndex);
+	getLimits(tmpRagdoll.rightAnkleConstraint, actionMin, minPushIndex, actionMax, maxPushIndex);
+	getLimits(tmpRagdoll.rightToesConstraint, actionMin, minPushIndex, actionMax, maxPushIndex);
+
+	assert(minPushIndex == getPhysicsActionSize());
+	assert(maxPushIndex == getPhysicsActionSize());
+
+	deleteAllConstraints();
+	tmpScene.clearAll();
 }
 
 extern "C" __declspec(dllexport) int updatePhysics(float* action, float* outState, float* outReward)
@@ -162,14 +222,21 @@ extern "C" __declspec(dllexport) int updatePhysics(float* action, float* outStat
 	updateConstraint(env->ragdoll.rightHipConstraint, a.rightHipConstraint);
 	updateConstraint(env->ragdoll.rightKneeConstraint, a.rightKneeConstraint);
 	updateConstraint(env->ragdoll.rightAnkleConstraint, a.rightAnkleConstraint);
+	updateConstraint(env->ragdoll.rightToesConstraint, a.rightToesConstraint);
 
 
 	physicsStep(env->appScene, 1.f / 60.f);
+
 	bool failure = readState(outState);
 	*outReward = 0.f;
 	if (!failure)
 	{
 		*outReward = readReward();
+		++env->numIterations;
+	}
+	else
+	{
+		//std::cout << "Dead after " << env->numIterations << " iterations.\n";
 	}
 	return failure;
 }
@@ -183,6 +250,7 @@ extern "C" __declspec(dllexport) void resetPhysics(float* outState)
 
 	deleteAllConstraints();
 	env->appScene.clearAll();
+	env->numIterations = 0;
 	
 
 	env->appScene.createEntity("Test ground")
@@ -205,6 +273,7 @@ extern "C" __declspec(dllexport) void resetPhysics(float* outState)
 	updateConstraint(env->ragdoll.rightHipConstraint);
 	updateConstraint(env->ragdoll.rightKneeConstraint);
 	updateConstraint(env->ragdoll.rightAnkleConstraint);
+	updateConstraint(env->ragdoll.rightToesConstraint);
 
 	env->lastSmoothedAction = {};
 
@@ -218,6 +287,12 @@ void testLearning()
 	float* state = new float[getPhysicsStateSize()];
 	float* action = new float[getPhysicsActionSize()];
 
+	float* stateMin = new float[getPhysicsStateSize()];
+	float* stateMax = new float[getPhysicsStateSize()];
+	float* actionMin = new float[getPhysicsActionSize()];
+	float* actionMax = new float[getPhysicsActionSize()];
+
+	getPhysicsRanges(stateMin, stateMax, actionMin, actionMax);
 
 	for (int i = 0; i < 10; ++i)
 	{
@@ -236,6 +311,10 @@ void testLearning()
 		int asdau7s = 0;
 	}
 
-	int aasd = 0;
+	deleteAllConstraints();
+	env->appScene.clearAll();
+	env->numIterations = 0;
+
+	delete env;
 }
 #endif
