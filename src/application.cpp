@@ -42,7 +42,7 @@ struct ragdoll_component
 
 static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh, path_tracer& pathTracer)
 {
-	if (dxContext.raytracingSupported)
+	if (dxContext.featureSupport.raytracing())
 	{
 		raytracing_blas_builder blasBuilder;
 		std::vector<ref<pbr_material>> raytracingMaterials;
@@ -65,7 +65,7 @@ static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh
 
 void application::loadCustomShaders()
 {
-	if (dxContext.meshShaderSupported)
+	if (dxContext.featureSupport.meshShaders())
 	{
 		initializeMeshShader();
 	}
@@ -83,7 +83,7 @@ void application::initialize(dx_renderer* renderer)
 	camera.initializeIngame(vec3(0.f, 30.f, 40.f), quat::identity, deg2rad(70.f), 0.1f);
 	cameraController.initialize(&camera);
 
-	if (dxContext.raytracingSupported)
+	if (dxContext.featureSupport.raytracing())
 	{
 		pathTracer.initialize();
 		raytracingTLAS.initialize();
@@ -314,7 +314,7 @@ void application::initialize(dx_renderer* renderer)
 
 
 	// Raytracing.
-	if (dxContext.raytracingSupported)
+	if (dxContext.featureSupport.raytracing())
 	{
 		pathTracer.finish();
 	}
@@ -1203,7 +1203,7 @@ void application::update(const user_input& input, float dt)
 
 	if (renderer->mode == renderer_mode_rasterized)
 	{
-		if (dxContext.meshShaderSupported)
+		if (dxContext.featureSupport.meshShaders())
 		{
 			//testRenderMeshShader(&overlayRenderPass);
 		}
@@ -1366,7 +1366,7 @@ void application::update(const user_input& input, float dt)
 	}
 	else
 	{
-		if (dxContext.raytracingSupported)
+		if (dxContext.featureSupport.raytracing())
 		{
 			raytracingTLAS.reset();
 

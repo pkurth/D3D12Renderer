@@ -2033,7 +2033,7 @@ void dx_renderer::endFrame(const user_input& input)
 			.transition(reflectanceTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	}
-	else if (dxContext.raytracingSupported && raytracer)
+	else if (dxContext.featureSupport.raytracing() && raytracer)
 	{
 		barrier_batcher(cl)
 			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)

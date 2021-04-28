@@ -169,14 +169,33 @@ static dx_device createDevice(dx_adapter adapter, D3D_FEATURE_LEVEL featureLevel
 	return device;
 }
 
-static bool checkRaytracingSupport(dx_device device)
+static dx_feature_support checkFeatureSupport(dx_device device)
 {
+	dx_feature_support result = {};
+
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5 = {};
 	if (SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5))))
 	{
-		return options5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_0;
+		result.raytracingTier = (dx_raytracing_tier)options5.RaytracingTier;
 	}
-	return false;
+
+#if ADVANCED_GPU_FEATURES_ENABLED
+	D3D12_FEATURE_DATA_D3D12_OPTIONS7 options7 = {};
+	if (SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options7, sizeof(options7))))
+	{
+		result.meshShaderTier = (dx_mesh_shader_tier)options7.MeshShaderTier;
+	}
+	else
+	{
+		std::cerr << "Checking support for mesh shader feature failed. Maybe you need to update your Windows version.\n";
+	}
+#endif
+
+	return result;
+}
+
+static bool checkRaytracingSupport(dx_device device)
+{
 }
 
 static bool checkMeshShaderSupport(dx_device device)
@@ -217,8 +236,7 @@ bool dx_context::initialize()
 	checkResult(D3D12MA::CreateAllocator(&allocatorDesc, &memoryAllocator));
 #endif
 
-	raytracingSupported = checkRaytracingSupport(device);
-	meshShaderSupported = checkMeshShaderSupport(device);
+	featureSupport = checkFeatureSupport(device);
 
 	bufferedFrameID = NUM_BUFFERED_FRAMES - 1;
 

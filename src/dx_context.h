@@ -16,6 +16,28 @@ struct dx_memory_usage
 	uint32 available;
 };
 
+enum dx_raytracing_tier
+{
+	dx_raytracing_not_available,
+	dx_raytracing_1_0,
+	dx_raytracing_1_1,
+};
+
+enum dx_mesh_shader_tier
+{
+	dx_mesh_shader_not_available,
+	dx_mesh_shader_1_0,
+};
+
+struct dx_feature_support
+{
+	dx_raytracing_tier raytracingTier;
+	dx_mesh_shader_tier meshShaderTier;
+
+	bool raytracing() { return raytracingTier >= dx_raytracing_1_0; }
+	bool meshShaders() { return meshShaderTier >= dx_mesh_shader_1_0; }
+};
+
 struct dx_context
 {
 	bool initialize();
@@ -55,8 +77,7 @@ struct dx_context
 	dx_command_queue computeQueue;
 	dx_command_queue copyQueue;
 
-	bool raytracingSupported;
-	bool meshShaderSupported;
+	dx_feature_support featureSupport;
 
 	uint64 frameID;
 	uint32 bufferedFrameID;
