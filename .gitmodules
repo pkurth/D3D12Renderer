@@ -13,6 +13,3 @@
 [submodule "ext/yaml-cpp"]
 	path = ext/yaml-cpp
 	url = ../yaml-cpp.git
-[submodule "learning/pytorch-a2c-ppo-acktr-gail"]
-	path = learning/pytorch-a2c-ppo-acktr-gail
-	url = ../pytorch-a2c-ppo-acktr-gail.git
