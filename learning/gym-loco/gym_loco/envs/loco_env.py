@@ -12,9 +12,22 @@ class PhysicsDLL() :
         
         self._physics.updatePhysics.argtypes = (ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float))
         self._physics.resetPhysics.argtypes = (ctypes.POINTER(ctypes.c_float),)
+        self._physics.getPhysicsRanges.argtypes = (ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float))
 
         self.state_size = self._physics.getPhysicsStateSize()
         self.action_size = self._physics.getPhysicsActionSize()
+        
+        state_min = (ctypes.c_float * self.state_size)(*([0] * self.state_size))
+        state_max = (ctypes.c_float * self.state_size)(*([0] * self.state_size))
+        action_min = (ctypes.c_float * self.action_size)(*([0] * self.action_size))
+        action_max = (ctypes.c_float * self.action_size)(*([0] * self.action_size))
+        self._physics.getPhysicsRanges(state_min, state_max, action_min, action_max)
+        
+        self.state_min = np.array([ state_min[i] if abs(state_min[i]) < 9999.0 else -np.inf      for i in range(self.state_size) ])
+        self.state_max = np.array([ state_max[i] if abs(state_max[i]) < 9999.0 else np.inf       for i in range(self.state_size) ])
+        self.action_min = np.array([ action_min[i] if abs(action_min[i]) < 9999.0 else -np.inf   for i in range(self.action_size) ])
+        self.action_max = np.array([ action_max[i] if abs(action_max[i]) < 9999.0 else np.inf    for i in range(self.action_size) ])
+
 
     def reset(self):
         out_state = (ctypes.c_float * self.state_size)(*([0] * self.state_size))
@@ -45,11 +58,8 @@ class LocoEnv(gym.Env):
 
         self.dll = PhysicsDLL()
 
-        obs_high = np.array([np.inf] * self.dll.state_size)
-        act_high = np.array([1] * self.dll.action_size)
-
-        self.observation_space = spaces.Box(-obs_high, obs_high, dtype=np.float32)
-        self.action_space = spaces.Box(-act_high, act_high, dtype=np.float32)
+        self.observation_space = spaces.Box(self.dll.state_min, self.dll.state_max, dtype=np.float32)
+        self.action_space = spaces.Box(self.dll.action_min, self.dll.action_max, dtype=np.float32)
 
         self.reset()
 
