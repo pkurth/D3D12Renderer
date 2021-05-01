@@ -121,7 +121,7 @@ void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition)
 	rightAnkleConstraint = addConeTwistConstraintFromGlobalPoints(rightLowerLeg, rightFoot, transformPosition(rightLowerLegTransform, scale * vec3(0.f, -0.52f, 0.f)), transformDirection(rightLowerLegTransform, vec3(0.f, -1.f, 0.f)), deg2rad(75.f), deg2rad(20.f));
 	rightToesConstraint = addHingeJointConstraintFromGlobalPoints(rightFoot, rightToes, transformPosition(rightFootTransform, scale * vec3(0.f, 0.f, -0.36f)), vec3(1.f, 0.f, 0.f), deg2rad(-45.f), deg2rad(45.f));
 
-#if 1
+#if 0
 	float totalMass = 1.f / torso.getComponent<rigid_body_component>().invMass +
 		1.f / head.getComponent<rigid_body_component>().invMass +
 		1.f / leftUpperArm.getComponent<rigid_body_component>().invMass +

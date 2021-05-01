@@ -8,8 +8,6 @@ class PhysicsDLL() :
     def __init__(self):
         self._physics = ctypes.CDLL('bin/Release_x86_64/Physics-Lib.dll')
 
-        print(self._physics)
-        
         self._physics.updatePhysics.argtypes = (ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float))
         self._physics.resetPhysics.argtypes = (ctypes.POINTER(ctypes.c_float),)
         self._physics.getPhysicsRanges.argtypes = (ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float))
@@ -58,8 +56,8 @@ class LocoEnv(gym.Env):
 
         self.dll = PhysicsDLL()
 
-        self.observation_space = spaces.Box(self.dll.state_min, self.dll.state_max, dtype=np.float32)
-        self.action_space = spaces.Box(self.dll.action_min, self.dll.action_max, dtype=np.float32)
+        self.observation_space = spaces.Box(np.float32(self.dll.state_min), np.float32(self.dll.state_max))
+        self.action_space = spaces.Box(np.float32(self.dll.action_min), np.float32(self.dll.action_max))
 
         self.reset()
 

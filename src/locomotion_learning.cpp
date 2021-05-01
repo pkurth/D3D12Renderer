@@ -99,20 +99,20 @@ static void updateConstraint(cone_twist_constraint_handle handle, cone_twist_act
 static void getLimits(hinge_joint_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
 {
 	hinge_joint_constraint& c = getConstraint(handle);
-	minPtr[minPushIndex++] = c.minRotationLimit <= 0.f ? c.minRotationLimit : -FLT_MAX;
-	maxPtr[maxPushIndex++] = c.maxRotationLimit >= 0.f ? c.maxRotationLimit : FLT_MAX;
+	minPtr[minPushIndex++] = c.minRotationLimit <= 0.f ? c.minRotationLimit : -M_PI;
+	maxPtr[maxPushIndex++] = c.maxRotationLimit >= 0.f ? c.maxRotationLimit : M_PI;
 }
 
 static void getLimits(cone_twist_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
 {
 	cone_twist_constraint& c = getConstraint(handle);
 
-	minPtr[minPushIndex++] = c.twistLimit >= 0.f ? -c.twistLimit : -FLT_MAX;
-	minPtr[minPushIndex++] = c.swingLimit >= 0.f ? -c.swingLimit : -FLT_MAX;
+	minPtr[minPushIndex++] = c.twistLimit >= 0.f ? -c.twistLimit : -M_PI;
+	minPtr[minPushIndex++] = c.swingLimit >= 0.f ? -c.swingLimit : -M_PI;
 	minPtr[minPushIndex++] = -M_PI;
 
-	maxPtr[maxPushIndex++] = c.twistLimit >= 0.f ? c.twistLimit : FLT_MAX;
-	maxPtr[maxPushIndex++] = c.swingLimit >= 0.f ? c.swingLimit : FLT_MAX;
+	maxPtr[maxPushIndex++] = c.twistLimit >= 0.f ? c.twistLimit : M_PI;
+	maxPtr[maxPushIndex++] = c.swingLimit >= 0.f ? c.swingLimit : M_PI;
 	maxPtr[maxPushIndex++] = M_PI;
 }
 
