@@ -79,6 +79,12 @@ struct scene_entity
 	}
 
 	template <typename component_t>
+	const component_t& getComponent() const
+	{
+		return registry->get<component_t>(handle);
+	}
+
+	template <typename component_t>
 	void removeComponent()
 	{
 		registry->remove<component_t>(handle);

@@ -3,7 +3,6 @@
 #include "ragdoll.h"
 #include "physics.h"
 
-
 struct hinge_action
 {
 	float targetAngle;
@@ -117,44 +116,42 @@ static void getLimits(cone_twist_constraint_handle handle, float* minPtr, uint32
 }
 
 // Returns true, if simulation has ended.
-static bool readState(float* outState)
+static bool readState(const humanoid_ragdoll& ragdoll, learning_state& outState, const learning_action& lastSmoothedAction)
 {
-	learning_state* s = (learning_state*)outState;
-
 	// Create coordinate system centered at the torso's location (projected onto the ground), with axes constructed from the horizontal heading and global up vector.
-	quat rotation = env->ragdoll.torso.getComponent<trs>().rotation;
+	quat rotation = ragdoll.torso.getComponent<trs>().rotation;
 	vec3 forward = rotation * vec3(0.f, 0.f, -1.f);
 	forward.y = 0.f;
 	forward = normalize(forward);
 
-	vec3 cog = env->ragdoll.torso.getComponent<rigid_body_component>().getGlobalCOGPosition(env->ragdoll.torso.getComponent<trs>());
+	vec3 cog = ragdoll.torso.getComponent<rigid_body_component>().getGlobalCOGPosition(ragdoll.torso.getComponent<trs>());
 	cog.y = 0;
 
 	trs transform(cog, rotateFromTo(vec3(0.f, 0.f, -1.f), forward));
 
 
-	readBodyPartState(transform, env->ragdoll.head, s->headPosition, s->headVelocity);
-	if (s->headPosition.y < 1.f)
+	readBodyPartState(transform, ragdoll.head, outState.headPosition, outState.headVelocity);
+	if (outState.headPosition.y < 1.f)
 	{
 		return true; // Consider the ragdoll fallen.
 	}
 
-	s->cogVelocity = inverseTransformDirection(transform, env->ragdoll.torso.getComponent<rigid_body_component>().linearVelocity);
+	outState.cogVelocity = inverseTransformDirection(transform, ragdoll.torso.getComponent<rigid_body_component>().linearVelocity);
 	
-	readBodyPartState(transform, env->ragdoll.leftToes, s->leftToesPosition, s->leftToesVelocity);
-	readBodyPartState(transform, env->ragdoll.rightToes, s->rightToesPosition, s->rightToesVelocity);
-	readBodyPartState(transform, env->ragdoll.torso, s->torsoPosition, s->torsoVelocity);
-	readBodyPartState(transform, env->ragdoll.leftLowerArm, s->leftLowerArmPosition, s->leftLowerArmVelocity);
-	readBodyPartState(transform, env->ragdoll.rightLowerArm, s->rightLowerArmPosition, s->rightLowerArmVelocity);
+	readBodyPartState(transform, ragdoll.leftToes, outState.leftToesPosition, outState.leftToesVelocity);
+	readBodyPartState(transform, ragdoll.rightToes, outState.rightToesPosition, outState.rightToesVelocity);
+	readBodyPartState(transform, ragdoll.torso, outState.torsoPosition, outState.torsoVelocity);
+	readBodyPartState(transform, ragdoll.leftLowerArm, outState.leftLowerArmPosition, outState.leftLowerArmVelocity);
+	readBodyPartState(transform, ragdoll.rightLowerArm, outState.rightLowerArmPosition, outState.rightLowerArmVelocity);
 
-	s->lastSmoothedAction = env->lastSmoothedAction;
+	outState.lastSmoothedAction = lastSmoothedAction;
 
 	return false;
 }
 
 static float readReward()
 {
-	return 1.f; // TODO
+	return env->ragdoll.head.getComponent<trs>().position.y; // TODO
 }
 
 extern "C" __declspec(dllexport) int getPhysicsStateSize() { return sizeof(learning_state) / 4; }
@@ -197,6 +194,23 @@ extern "C" __declspec(dllexport) void getPhysicsRanges(float* stateMin, float* s
 	tmpScene.clearAll();
 }
 
+static void applyAction(humanoid_ragdoll& ragdoll, const learning_action& action)
+{
+	updateConstraint(ragdoll.neckConstraint, action.neckConstraint);
+	updateConstraint(ragdoll.leftShoulderConstraint, action.leftShoulderConstraint);
+	updateConstraint(ragdoll.leftElbowConstraint, action.leftElbowConstraint);
+	updateConstraint(ragdoll.rightShoulderConstraint, action.rightShoulderConstraint);
+	updateConstraint(ragdoll.rightElbowConstraint, action.rightElbowConstraint);
+	updateConstraint(ragdoll.leftHipConstraint, action.leftHipConstraint);
+	updateConstraint(ragdoll.leftKneeConstraint, action.leftKneeConstraint);
+	updateConstraint(ragdoll.leftAnkleConstraint, action.leftAnkleConstraint);
+	updateConstraint(ragdoll.leftToesConstraint, action.leftToesConstraint);
+	updateConstraint(ragdoll.rightHipConstraint, action.rightHipConstraint);
+	updateConstraint(ragdoll.rightKneeConstraint, action.rightKneeConstraint);
+	updateConstraint(ragdoll.rightAnkleConstraint, action.rightAnkleConstraint);
+	updateConstraint(ragdoll.rightToesConstraint, action.rightToesConstraint);
+}
+
 extern "C" __declspec(dllexport) int updatePhysics(float* action, float* outState, float* outReward)
 {
 	// Smooth action.
@@ -209,25 +223,11 @@ extern "C" __declspec(dllexport) int updatePhysics(float* action, float* outStat
 		p[i] = lerp(p[i], action[i], beta);
 	}
 
-	// Apply action.
-	updateConstraint(env->ragdoll.neckConstraint, a.neckConstraint);
-	updateConstraint(env->ragdoll.leftShoulderConstraint, a.leftShoulderConstraint);
-	updateConstraint(env->ragdoll.leftElbowConstraint, a.leftElbowConstraint);
-	updateConstraint(env->ragdoll.rightShoulderConstraint, a.rightShoulderConstraint);
-	updateConstraint(env->ragdoll.rightElbowConstraint, a.rightElbowConstraint);
-	updateConstraint(env->ragdoll.leftHipConstraint, a.leftHipConstraint);
-	updateConstraint(env->ragdoll.leftKneeConstraint, a.leftKneeConstraint);
-	updateConstraint(env->ragdoll.leftAnkleConstraint, a.leftAnkleConstraint);
-	updateConstraint(env->ragdoll.leftToesConstraint, a.leftToesConstraint);
-	updateConstraint(env->ragdoll.rightHipConstraint, a.rightHipConstraint);
-	updateConstraint(env->ragdoll.rightKneeConstraint, a.rightKneeConstraint);
-	updateConstraint(env->ragdoll.rightAnkleConstraint, a.rightAnkleConstraint);
-	updateConstraint(env->ragdoll.rightToesConstraint, a.rightToesConstraint);
-
+	applyAction(env->ragdoll, a);
 
 	physicsStep(env->appScene, 1.f / 60.f);
 
-	bool failure = readState(outState);
+	bool failure = readState(env->ragdoll, *(learning_state*)outState, env->lastSmoothedAction);
 	*outReward = 0.f;
 	if (!failure)
 	{
@@ -277,7 +277,7 @@ extern "C" __declspec(dllexport) void resetPhysics(float* outState)
 
 	env->lastSmoothedAction = {};
 
-	bool failure = readState(outState);
+	bool failure = readState(env->ragdoll, *(learning_state*)outState, env->lastSmoothedAction);
 	assert(!failure);
 }
 
@@ -317,4 +317,78 @@ void testLearning()
 
 	delete env;
 }
+#endif
+
+
+
+
+#ifndef PHYSICS_ONLY
+#undef min
+#undef max
+#undef rad2deg
+#undef deg2rad
+#undef M_PI
+#pragma warning( disable : 4067 4624 4275 4251 4244 4996 4267 )
+#include <torch/torch.h>
+#include <torch/script.h>
+
+struct locomotion_nn
+{
+	torch::jit::script::Module network;
+	learning_action lastSmoothedAction;
+
+	void initialize()
+	{
+		try
+		{
+			network = torch::jit::load("tmp/testexport.pt");
+		}
+		catch (c10::Error e)
+		{
+			std::cout << e.what() << '\n';
+		}
+		lastSmoothedAction = {};
+	}
+
+	void update(humanoid_ragdoll& ragdoll)
+	{
+		learning_state state;
+		readState(ragdoll, state, lastSmoothedAction);
+
+		std::vector<torch::jit::IValue> inputs;
+		auto options = torch::TensorOptions().dtype(torch::kFloat32);
+		inputs.push_back(torch::from_blob(&state, { sizeof(state) / 4 }, options).unsqueeze(0));
+
+		try
+		{
+			auto output = network.forward(inputs);
+			auto outputTuple = output.toTuple();
+			auto elem0 = outputTuple->elements()[0];
+			auto outputTensor = elem0.toTensor();
+
+			float* result = outputTensor.data_ptr<float>();
+
+			learning_action& action = *(learning_action*)result;
+
+			applyAction(ragdoll, action);
+		}
+		catch (c10::Error e)
+		{
+			std::cout << e.what() << '\n';
+		}
+	}
+};
+
+static locomotion_nn nn;
+
+void initializeLocomotionEval()
+{
+	nn.initialize();
+}
+
+void stepLocomotionEval(humanoid_ragdoll& ragdoll)
+{
+	nn.update(ragdoll);
+}
+
 #endif
