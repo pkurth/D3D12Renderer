@@ -564,6 +564,13 @@ vec3 rigid_body_component::getGlobalCOGPosition(const trs& transform) const
 	return transform.position + transform.rotation * localCOGPosition;
 }
 
+vec3 rigid_body_component::getGlobalPointVelocity(const trs& transform, vec3 localP) const
+{
+	vec3 globalP = transformPosition(transform, localP);
+	vec3 globalCOG = getGlobalCOGPosition(transform);
+	return linearVelocity + cross(angularVelocity, globalP - globalCOG);
+}
+
 // This function returns the inertia tensors with respect to the center of gravity, so with a coordinate system centered at the COG.
 physics_properties collider_union::calculatePhysicsProperties()
 {

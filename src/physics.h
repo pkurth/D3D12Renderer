@@ -12,6 +12,7 @@ struct rigid_body_component
 	rigid_body_component(bool kinematic, float gravityFactor = 1.f, float linearDamping = 0.4f, float angularDamping = 0.4f);
 	void recalculateProperties(entt::registry* registry, const struct physics_reference_component& reference);
 	vec3 getGlobalCOGPosition(const trs& transform) const;
+	vec3 getGlobalPointVelocity(const trs& transform, vec3 localP) const;
 
 	// In entity's local space.
 	vec3 localCOGPosition;

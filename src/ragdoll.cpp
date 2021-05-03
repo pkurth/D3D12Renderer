@@ -141,6 +141,21 @@ void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition)
 #endif
 
 
+	torsoParent = {};
+	headParent = torso;
+	leftUpperArmParent = torso;
+	leftLowerArmParent = leftUpperArm;
+	rightUpperArmParent = torso;
+	rightLowerArmParent = rightUpperArm;
+	leftUpperLegParent = torso;
+	leftLowerLegParent = leftUpperLeg;
+	leftFootParent = leftLowerLeg;
+	leftToesParent = leftFoot;
+	rightUpperLegParent = torso;
+	rightLowerLegParent = rightUpperLeg;
+	rightFootParent = rightLowerLeg;
+	rightToesParent = rightFoot;
+
 
 	// Graphics.
 

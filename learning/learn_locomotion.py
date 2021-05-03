@@ -37,13 +37,39 @@ def make_env(env_id, rank, seed=0):
     return _init
 
 
+def trace_model(model, env, log_dir) :
+    network = model.policy
+
+    example = torch.Tensor(env.observation_space.sample()).unsqueeze(0)
+    #print("Example input", example)
+
+    device = model.device
+    network = network.cpu()
+    network.force_deterministic = True
+    network = network.eval()
+
+    #print("Example output", network(example))
+
+    path = log_dir + "testexport.pt"
+
+    traced_script_module = torch.jit.trace(network, example)
+    traced_script_module.save(path)
+
+    network.force_deterministic = False
+    network = network.to(device)
+
+    print("Model traced to", path)
+
+
 class SaveOnBestTrainingRewardCallback(BaseCallback):
-    def __init__(self, check_freq: int, log_dir: str, verbose=1):
+    def __init__(self, check_freq: int, trace_freq: int, log_dir: str, verbose=1):
         super(SaveOnBestTrainingRewardCallback, self).__init__(verbose)
         self.check_freq = check_freq
+        self.trace_freq = trace_freq
         self.log_dir = log_dir
         self.save_path = os.path.join(log_dir, 'best_model')
         self.best_mean_reward = -np.inf
+        self.best_counter = 0
 
     def _init_callback(self) -> None:
         # Create folder if needed
@@ -69,6 +95,10 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
                   if self.verbose > 0:
                     print("Saving new best model to {}".format(self.save_path))
                   self.model.save(self.save_path)
+                  self.best_counter += 1
+                  
+                  if self.best_counter % self.trace_freq == 0:
+                      trace_model(self.model, self.model.get_env(), log_dir)
 
 
 class CustomActorCriticPolicy(ActorCriticPolicy):
@@ -113,7 +143,11 @@ if __name__ == '__main__':
     env = VecMonitor(env, log_dir)
     #env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=100.)
     
-    callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=log_dir)
+    callback = SaveOnBestTrainingRewardCallback(
+        check_freq=1000, 
+        trace_freq=5, 
+        log_dir=log_dir
+    )
 
     policy_kwargs = dict(activation_fn=torch.nn.Tanh,
                      net_arch=[dict(pi=[128, 128], vf=[128, 128])])
@@ -138,10 +172,17 @@ if __name__ == '__main__':
             learning_rate = 2.5e-5,
             device="auto"
         )
+
+        def init_weights(m):
+            m.weight.data.uniform_(-0.01, 0.01)
+            m.bias.data.fill_(0.0)
+
+        #print(model.policy)
+        model.policy.action_net.apply(init_weights)
     
     model.learn(
         callback=callback,
-        total_timesteps=1e7,
+        total_timesteps=1e8,
     )
 
 
@@ -149,21 +190,6 @@ if __name__ == '__main__':
 
     model = PPO.load(os.path.join(log_dir, 'best_model.zip'), env=env, policy=CustomActorCriticPolicy)
 
-    network = model.policy
-
-    #print(network)
-    #print(network.state_dict())
-
-    example = torch.Tensor(env.observation_space.sample()).unsqueeze(0)
-    print("Example input", example)
-
-    network = network.cpu()
-    network.force_deterministic = True
-    network = network.eval()
-
-    print("Example output", network(example))
-
-    traced_script_module = torch.jit.trace(network, example)
-    traced_script_module.save(log_dir + "testexport.pt")
+    trace_model(model, env, log_dir)
 
 

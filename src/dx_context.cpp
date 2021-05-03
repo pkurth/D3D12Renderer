@@ -138,20 +138,21 @@ static dx_device createDevice(dx_adapter adapter, D3D_FEATURE_LEVEL featureLevel
 		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
 		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, TRUE);
 
-		// Suppress whole categories of messages
+		// Suppress whole categories of messages.
 		//D3D12_MESSAGE_CATEGORY categories[] = {};
 
-		// Suppress messages based on their severity level
+		// Suppress messages based on their severity level.
 		D3D12_MESSAGE_SEVERITY severities[] =
 		{
 			D3D12_MESSAGE_SEVERITY_INFO
 		};
 
-		// Suppress individual messages by their ID
+		// Suppress individual messages by their ID.
 		D3D12_MESSAGE_ID ids[] = {
 			D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE,   // I'm really not sure how to avoid this message.
 			D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,                         // This warning occurs when using capture frame while graphics debugging.
 			D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE,                       // This warning occurs when using capture frame while graphics debugging.
+			D3D12_MESSAGE_ID_OBJECT_ACCESSED_WHILE_STILL_IN_USE,			// Disabled to allow OBS to capture the window.
 		};
 
 		D3D12_INFO_QUEUE_FILTER filter = {};

@@ -1316,7 +1316,7 @@ uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state*
 					}
 					else
 					{
-						point.tangent = vec3(1.f, 0.f, 0.f);
+						point.tangent = vec3(-1.f, 0.f, 0.f);
 					}
 
 					{ // Tangent direction.
