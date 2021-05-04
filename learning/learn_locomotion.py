@@ -37,28 +37,43 @@ def make_env(env_id, rank, seed=0):
     return _init
 
 
+class ExportPolicy(torch.nn.Module):
+    def __init__(self, policy) :
+        super(ExportPolicy, self).__init__()
+        self.policy = policy
+
+    def forward(self, obs) :
+        # This is what the ActorCriticPolicy does internally to compute the actions.
+
+        # policies.py -> forward -> _get_latent
+        features = self.policy.extract_features(obs)
+
+        # policies.py -> forward -> _get_latent -> mlp_extractor -> forward
+        shared_latent = self.policy.mlp_extractor.shared_net(features)
+        latent_pi = self.policy.mlp_extractor.policy_net(shared_latent)
+
+        # policies.py -> forward -> distribution.get_actions(deterministic=true) -> distribution.mode (do not sample).
+        actions = self.policy.action_net(latent_pi)
+        return actions
+
+
 def trace_model(model, env, log_dir) :
-    network = model.policy
-
-    example = torch.Tensor(env.observation_space.sample()).unsqueeze(0)
-    #print("Example input", example)
-
-    device = model.device
-    network = network.cpu()
-    network.force_deterministic = True
-    network = network.eval()
-
-    #print("Example output", network(example))
-
+    
     path = log_dir + "testexport.pt"
+    
+    example = torch.Tensor(env.observation_space.sample()).unsqueeze(0)
+    
+    policy = model.policy
+    policy = ExportPolicy(policy)
+    
+    #print("Example input", example)
+    #print("Example output", policy(example))
 
-    traced_script_module = torch.jit.trace(network, example)
+    traced_script_module = torch.jit.trace(policy, example)
     traced_script_module.save(path)
 
-    network.force_deterministic = False
-    network = network.to(device)
-
     print("Model traced to", path)
+
 
 
 class SaveOnBestTrainingRewardCallback(BaseCallback):
@@ -101,31 +116,6 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
                       trace_model(self.model, self.model.get_env(), log_dir)
 
 
-class CustomActorCriticPolicy(ActorCriticPolicy):
-    def __init__(self, 
-        observation_space,
-        action_space,
-        lr_schedule,
-        net_arch = None,
-        activation_fn = torch.nn.Tanh,
-        *args,
-        **kwargs,
-    ):
-        # Just pass arguments to super class.
-        super(CustomActorCriticPolicy, self).__init__(
-            observation_space,
-            action_space,
-            lr_schedule,
-            net_arch,
-            activation_fn,
-            *args,
-            **kwargs,
-        )
-        self.force_deterministic = False
-
-    def forward(self, obs, deterministic = False) :
-        return super().forward(obs, deterministic or self.force_deterministic)
- 
 if __name__ == '__main__':
 
     #env_id = "LunarLander-v2"
@@ -136,7 +126,7 @@ if __name__ == '__main__':
     log_dir = "tmp/"
     os.makedirs(log_dir, exist_ok=True)
     
-    num_cpu = 16
+    num_cpu = 8
     torch.set_num_threads(num_cpu)
 
     env = SubprocVecEnv([make_env(env_id, i) for i in range(num_cpu)])
@@ -154,13 +144,15 @@ if __name__ == '__main__':
     
     start_from_pretrained = True
 
+    device = "cpu"
+
     if start_from_pretrained :
         print("Starting from pretrained.")
-        model = PPO.load(os.path.join(log_dir, 'best_model.zip'), env=env, policy=CustomActorCriticPolicy)
+        model = PPO.load(os.path.join(log_dir, 'best_model.zip'), env=env, policy=ActorCriticPolicy, device=device)
     else :
         # https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
         model = PPO(
-            CustomActorCriticPolicy, 
+            ActorCriticPolicy, 
             env, 
             verbose=2, 
             tensorboard_log=log_dir, 
@@ -170,7 +162,7 @@ if __name__ == '__main__':
             n_epochs = 10,
             n_steps=2048, 
             learning_rate = 2.5e-5,
-            device="auto"
+            device=device
         )
 
         def init_weights(m):
@@ -180,15 +172,15 @@ if __name__ == '__main__':
         #print(model.policy)
         model.policy.action_net.apply(init_weights)
     
-    model.learn(
-        callback=callback,
-        total_timesteps=1e8,
-    )
+    #model.learn(
+    #    callback=callback,
+    #    total_timesteps=1e8,
+    #)
 
 
     # Export.
 
-    model = PPO.load(os.path.join(log_dir, 'best_model.zip'), env=env, policy=CustomActorCriticPolicy)
+    model = PPO.load(os.path.join(log_dir, 'best_model.zip'), env=env, policy=ActorCriticPolicy, device=device)
 
     trace_model(model, env, log_dir)
 

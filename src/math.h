@@ -733,7 +733,7 @@ mat4 operator*(float a, const mat4& b);
 mat2& operator*=(mat2& a, float b);
 mat3& operator*=(mat3& a, float b);
 mat4& operator*=(mat4& a, float b);
-trs operator*(trs a, trs b);
+trs operator*(const trs& a, const trs& b);
 
 mat2 transpose(const mat2& a);
 mat3 transpose(const mat3& a);

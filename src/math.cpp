@@ -402,7 +402,7 @@ float trace(const mat4& m)
 	return m.m00 + m.m11 + m.m22 + m.m33;
 }
 
-trs operator*(trs a, trs b)
+trs operator*(const trs& a, const trs& b)
 {
 	trs result;
 	result.rotation = a.rotation * b.rotation;

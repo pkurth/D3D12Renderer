@@ -8,7 +8,7 @@
 #include "imgui.h"
 #endif
 
-void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition)
+void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition, float initialRotation)
 {
 	float scale = 0.42f; // This file is completely hardcoded. I initially screwed up the scaling a bit, so this factor brings everything to the correct scale (and therefore weight).
 
@@ -120,6 +120,19 @@ void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition)
 	rightKneeConstraint = addHingeJointConstraintFromGlobalPoints(rightUpperLeg, rightLowerLeg, transformPosition(rightUpperLegTransform, scale * vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(-90.f), deg2rad(5.f));
 	rightAnkleConstraint = addConeTwistConstraintFromGlobalPoints(rightLowerLeg, rightFoot, transformPosition(rightLowerLegTransform, scale * vec3(0.f, -0.52f, 0.f)), transformDirection(rightLowerLegTransform, vec3(0.f, -1.f, 0.f)), deg2rad(75.f), deg2rad(20.f));
 	rightToesConstraint = addHingeJointConstraintFromGlobalPoints(rightFoot, rightToes, transformPosition(rightFootTransform, scale * vec3(0.f, 0.f, -0.36f)), vec3(1.f, 0.f, 0.f), deg2rad(-45.f), deg2rad(45.f));
+
+
+	quat rotation(vec3(0.f, 1.f, 0.f), initialRotation);
+	auto rotateTransform = [rotation](trs& transform)
+	{
+		transform.rotation = rotation * transform.rotation;
+		transform.position = rotation * transform.position;
+	};
+
+	for (uint32 i = 0; i < arraysize(bodyParts); ++i)
+	{
+		rotateTransform(bodyParts[i].getComponent<trs>());
+	}
 
 #if 0
 	float totalMass = 1.f / torso.getComponent<rigid_body_component>().invMass +

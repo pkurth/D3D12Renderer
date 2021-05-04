@@ -534,20 +534,15 @@ void initializeLocomotionEval(scene& appScene, humanoid_ragdoll& ragdoll)
 
 void stepLocomotionEval()
 {
-	static bool finished = false;
-
-	if (finished)
-	{
-		return;
-	}
-
 	learning_state state;
 	if (evaluationEnv->getState(state))
 	{
 		std::string out = "Rew: " + std::to_string(evaluationEnv->totalReward) + ",  EpLen: " + std::to_string(evaluationEnv->episodeLength) + '\n';
 		std::cout << out;
-		finished = true;
-		return;
+		evaluationEnv->episodeLength = 0;
+		evaluationEnv->totalReward = 0.f;
+		evaluationEnv->lastSmoothedAction = {};
+		evaluationEnv->applyAction({});
 	}
 
 	std::vector<torch::jit::IValue> inputs;
@@ -557,9 +552,7 @@ void stepLocomotionEval()
 	try
 	{
 		auto output = nn.forward(inputs);
-		auto outputTuple = output.toTuple();
-		auto elem0 = outputTuple->elements()[0];
-		auto outputTensor = elem0.toTensor();
+		auto outputTensor = output.toTensor();
 
 		float* action = outputTensor.data_ptr<float>();
 
