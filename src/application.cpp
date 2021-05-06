@@ -65,13 +65,13 @@ static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh
 
 void application::loadCustomShaders()
 {
+	//void testLearning();
+	//testLearning();
+
 	if (dxContext.featureSupport.meshShaders())
 	{
 		initializeMeshShader();
 	}
-
-	//void testLearning();
-	//testLearning();
 }
 
 auto testMesh = make_ref<composite_mesh>();
@@ -80,7 +80,7 @@ void application::initialize(dx_renderer* renderer)
 {
 	this->renderer = renderer;
 
-	camera.initializeIngame(vec3(0.f, 30.f, 40.f), quat::identity, deg2rad(70.f), 0.1f);
+	camera.initializeIngame(vec3(0.f, 1.f, 5.f), quat::identity, deg2rad(70.f), 0.1f);
 	cameraController.initialize(&camera);
 
 	if (dxContext.featureSupport.raytracing())
@@ -214,10 +214,16 @@ void application::initialize(dx_renderer* renderer)
 		}
 
 		appScene.createEntity("Test ground")
+			.addComponent<trs>(vec3(0.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
+			.addComponent<raster_component>(groundMesh)
+			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f)
+			.addComponent<rigid_body_component>(true);
+
+		/*appScene.createEntity("Test ground")
 			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
 			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 0.5f, 4.f)
-			.addComponent<rigid_body_component>(true);
+			.addComponent<rigid_body_component>(true);*/
 
 
 
@@ -310,8 +316,11 @@ void application::initialize(dx_renderer* renderer)
 	}
 #endif
 
-	ragdoll.initialize(appScene, vec3(30.f, 5.f, -2.f));
+	//ragdoll.initialize(appScene, vec3(30.f, 1.25f, -2.f));
+	ragdoll.initialize(appScene, vec3(0.f, 1.25f, 0.f));
 
+	void initializeLocomotionEval(scene& appScene, humanoid_ragdoll& ragdoll);
+	initializeLocomotionEval(appScene, ragdoll);
 
 	// Raytracing.
 	if (dxContext.featureSupport.raytracing())
@@ -1167,7 +1176,12 @@ void application::renderDynamicGeometryToShadowMap(point_shadow_render_pass& ren
 
 void application::update(const user_input& input, float dt)
 {
-	dt = min(dt, 1.f / 30.f);
+	//dt = min(dt, 1.f / 30.f);
+	dt = 1.f / 60.f;
+
+	void stepLocomotionEval();
+	stepLocomotionEval();
+
 
 	resetRenderPasses();
 
