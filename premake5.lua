@@ -1,30 +1,34 @@
 
 newoption {
-    trigger     = "no-turing",
-    description = "Use this if your GPU is older than Turing. This disables certain features, such as mesh shaders."
+    trigger     = "torch-debug",
+    description = "Specify the root directory of Libtorch (Debug build)."
 }
 
-local turing_or_higher = false
-local sdk_exists = false
-local dxc_exists = false
+newoption {
+    trigger     = "torch-release",
+    description = "Specify the root directory of Libtorch (Release build)."
+}
+
+
+
+local gpu_name = ""
+local gpu_model_number = 0
+local sdk_version = 0
+local win_version = 0
 
 
 -------------------------
 -- CHECK GPU
 -------------------------
 
-if not _OPTIONS["no-turing"] then
-	local handle = io.popen("wmic path win32_VideoController get name")
-	local gpu_string = handle:read("*a")
-	handle:close()
+local gpu_handle = io.popen("wmic path win32_VideoController get name")
+local gpu_string = gpu_handle:read("*a")
+gpu_handle:close()
 
-	for str in string.gmatch(gpu_string, "NVIDIA (.-)\n") do
-		for model in string.gmatch(str, "%d%d%d%d") do
-			local m = tonumber(model)
-			if m >= 1650 then -- Turing is everything higher than GTX 1650.
-				turing_or_higher = true
-			end
-		end
+for str in string.gmatch(gpu_string, "NVIDIA (.-)\n") do
+	for model in string.gmatch(str, "%d%d%d%d") do
+		gpu_model_number = tonumber(model)
+		gpu_name = str
 	end
 end
 
@@ -37,46 +41,51 @@ local sdk_directory = os.getenv("programfiles(x86)") .. "/Windows Kits/10/bin/"
 local sdk_directory_handle = io.popen('dir "'..sdk_directory..'" /b')
 for filename in sdk_directory_handle:lines() do
     for version in string.gmatch(filename, "10.0.(%d+).0") do
-		local dxc_exe = sdk_directory .. filename .. "/x64/dxc.exe"
-		local f = io.open(dxc_exe, "r")
-		if f~=nil then 
-			io.close(f)
-			dxc_exists = true
-			
-			local v = tonumber(version)
-			if v >= 19041 then
-				sdk_exists = true
-			end
+		local v = tonumber(version)
+		if v > sdk_version then
+			sdk_version = v
 		end
 	end
 end
 sdk_directory_handle:close()
 
 
-if turing_or_higher then
-	print("Found NVIDIA Turing GPU or newer.")
-else
-	print("No NVIDIA Turing or newer GPU found.")
+-------------------------
+-- CHECK WINDOWS VERSION
+-------------------------
+
+local win_ver_handle = io.popen("ver")
+local win_ver_string = win_ver_handle:read("*a")
+win_ver_handle:close()
+for version in string.gmatch(win_ver_string, "10.0.(%d+).%d+") do
+	local v = tonumber(version)
+	if v > win_version then
+		win_version = v
+	end
 end
 
-if dxc_exists then
-	print("Found DXC compiler.")
-else
-	print("No DXC compiler found.")
+
+print("Windows version: ", win_version)
+print("Windows SDK version: ", sdk_version)
+print("Installed GPU: ", gpu_name)
+
+
+if win_version < sdk_version then
+	print("Your Windows SDK is newer than your Windows OS. Consider updating your OS or there might be compatability issues.")
 end
 
-if sdk_exists then
-	print("Found Windows SDK version >= 19041.")
-else
-	print("No Windows SDK version >= 19041 found.")
-end
+local turing_or_higher = gpu_model_number >= 1650
 
-local all_exist = turing_or_higher and dxc_exists and sdk_exists
+local new_sdk_version = 19041
+local new_sdk_available = sdk_version >= new_sdk_version
+local mesh_shaders_supported = turing_or_higher and new_sdk_available and win_version >= new_sdk_version
 
-if not all_exist then
+if not mesh_shaders_supported then
 	print("Disabling mesh shader compilation, since not all requirements are met.")
 end
 
+
+print("\n")
 
 
 -------------------------
@@ -137,6 +146,32 @@ for filename in shader_directory_handle:lines() do
 end
 
 
+print("\n")
+
+
+
+-----------------------------------------
+-- CHECK PYTORCH
+-----------------------------------------
+
+local torch_debug_dir = nil
+local torch_release_dir = nil
+
+if _OPTIONS["torch-debug"] then
+	torch_debug_dir = _OPTIONS["torch-debug"]
+end
+if _OPTIONS["torch-release"] then
+	torch_release_dir = _OPTIONS["torch-release"]
+end
+
+local torch_rel_include_dir_1 = "/include/"
+local torch_rel_include_dir_2 = "/include/torch/csrc/api/include/"
+local torch_rel_lib_1 = "/lib/c10.lib"
+local torch_rel_lib_2 = "/lib/torch.lib"
+local torch_rel_lib_3 = "/lib/torch_cpu.lib"
+local torch_rel_bin_dir = "/lib/"
+
+
 
 -----------------------------------------
 -- GENERATE SOLUTION
@@ -171,6 +206,7 @@ group "Dependencies"
 
 group ""
 
+
 project "D3D12Renderer"
 	kind "ConsoleApp"
 	language "C++"
@@ -180,6 +216,7 @@ project "D3D12Renderer"
 	targetdir ("./bin/" .. outputdir)
 	objdir ("./bin_int/" .. outputdir ..  "/%{prj.name}")
 
+
 	debugdir "."
 	debugenvs {
 		"PATH=ext/bin;%PATH%;"
@@ -187,20 +224,6 @@ project "D3D12Renderer"
 
 	pchheader "pch.h"
 	pchsource "src/pch.cpp"
-
-	sysincludedirs {
-		"ext/assimp/include",
-		"ext/yaml-cpp/include",
-		"ext/entt/src",
-		"ext/directxtex",
-		"ext",
-	}
-
-	includedirs {
-		"shaders/rs",
-		"shaders/common",
-		"shaders/particle_systems",
-	}
 
 	files {
 		"src/*",
@@ -230,6 +253,59 @@ project "D3D12Renderer"
 		"DirectXTex_Desktop_2019_Win10",
 	}
 
+	includedirs {
+		"shaders/rs",
+		"shaders/common",
+		"shaders/particle_systems",
+	}
+
+	sysincludedirs {
+		"ext/assimp/include",
+		"ext/yaml-cpp/include",
+		"ext/entt/src",
+		"ext/directxtex",
+		"ext",
+	}
+
+	filter "configurations:Debug"
+        runtime "Debug"
+		symbols "On"
+
+		if torch_debug_dir then
+			sysincludedirs {
+				torch_debug_dir .. torch_rel_include_dir_1,
+				torch_debug_dir .. torch_rel_include_dir_2,
+			}
+			links {
+				torch_debug_dir .. torch_rel_lib_1,
+				torch_debug_dir .. torch_rel_lib_2,
+				torch_debug_dir .. torch_rel_lib_3,
+			}
+			debugenvs {
+				torch_debug_dir .. torch_rel_bin_dir
+			}
+		end
+		
+	filter "configurations:Release"
+        runtime "Release"
+		optimize "On"
+
+		if torch_release_dir then
+			sysincludedirs {
+				torch_release_dir .. torch_rel_include_dir_1,
+				torch_release_dir .. torch_rel_include_dir_2,
+			}
+			links {
+				torch_release_dir .. torch_rel_lib_1,
+				torch_release_dir .. torch_rel_lib_2,
+				torch_release_dir .. torch_rel_lib_3,
+			}
+			debugenvs {
+				torch_release_dir .. torch_rel_bin_dir
+			}
+		end
+
+
 	filter "system:windows"
 		systemversion "latest"
 
@@ -243,31 +319,21 @@ project "D3D12Renderer"
 			defines { "TURING_GPU_OR_NEWER_AVAILABLE" }
 		end
 
-		if sdk_exists then
+		if new_sdk_available then
 			defines { "WINDOWS_SDK_19041_OR_NEWER_AVAILABLE" }
 		end
 
 		defines { "SHADER_BIN_DIR=L\"" .. shaderoutputdir .. "\"" }
 
-	filter "configurations:Debug"
-        runtime "Debug"
-		symbols "On"
-		
-	filter "configurations:Release"
-        runtime "Release"
-		optimize "On"
-
-
 
 	filter "files:**.hlsl"
-	
-		if turing_or_higher and dxc_exists then
+		if turing_or_higher and new_sdk_available then
 			shadermodel "6.5"
+		elseif turing_or_higher then
+			shadermodel "6.1"
 		else
 			shadermodel "5.1"
 		end
-
-		
 
 		flags "ExcludeFromBuild"
 		shaderobjectfileoutput(shaderoutputdir .. "%{file.basename}.cso")
@@ -314,7 +380,7 @@ project "D3D12Renderer"
 		removeflags("ExcludeFromBuild")
 		shadertype("Compute")
 		
-	if all_exist then
+	if mesh_shaders_supported then
 		filter("files:**_ms.hlsl")
 			removeflags("ExcludeFromBuild")
 			shadertype("Mesh")
