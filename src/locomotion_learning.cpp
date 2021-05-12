@@ -505,6 +505,7 @@ void testLearning()
 
 
 #ifndef PHYSICS_ONLY
+#if __has_include(<torch/torch.h>)
 #undef min
 #undef max
 #undef rad2deg
@@ -514,6 +515,7 @@ void testLearning()
 #include <torch/torch.h>
 #include <torch/script.h>
 
+
 static torch::jit::script::Module nn;
 static locomotion_environment* evaluationEnv;
 
@@ -522,18 +524,23 @@ void initializeLocomotionEval(scene& appScene, humanoid_ragdoll& ragdoll)
 	try
 	{
 		nn = torch::jit::load("tmp/testexport.pt");
+
+		evaluationEnv = new locomotion_environment{ appScene, ragdoll };
+		evaluationEnv->resetForEvaluation();
 	}
 	catch (c10::Error e)
 	{
 		std::cout << e.what() << '\n';
 	}
-
-	evaluationEnv = new locomotion_environment{ appScene, ragdoll };
-	evaluationEnv->resetForEvaluation();
 }
 
 void stepLocomotionEval()
 {
+	if (!evaluationEnv)
+	{
+		return;
+	}
+
 	learning_state state;
 	if (evaluationEnv->getState(state))
 	{
@@ -564,5 +571,9 @@ void stepLocomotionEval()
 		std::cout << e.what() << '\n';
 	}
 }
+#else
+void initializeLocomotionEval(scene& appScene, humanoid_ragdoll& ragdoll) {}
+void stepLocomotionEval() {}
+#endif
 
 #endif

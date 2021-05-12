@@ -13,6 +13,7 @@
 #include "shadow_map_cache.h"
 #include "file_dialog.h"
 #include "yaml.h"
+#include "locomotion_learning.h"
 
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -65,9 +66,6 @@ static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh
 
 void application::loadCustomShaders()
 {
-	//void testLearning();
-	//testLearning();
-
 	if (dxContext.featureSupport.meshShaders())
 	{
 		initializeMeshShader();
@@ -319,7 +317,6 @@ void application::initialize(dx_renderer* renderer)
 	//ragdoll.initialize(appScene, vec3(30.f, 1.25f, -2.f));
 	ragdoll.initialize(appScene, vec3(0.f, 1.25f, 0.f));
 
-	void initializeLocomotionEval(scene& appScene, humanoid_ragdoll& ragdoll);
 	initializeLocomotionEval(appScene, ragdoll);
 
 	// Raytracing.
@@ -1179,7 +1176,6 @@ void application::update(const user_input& input, float dt)
 	//dt = min(dt, 1.f / 30.f);
 	dt = 1.f / 60.f;
 
-	void stepLocomotionEval();
 	stepLocomotionEval();
 
 

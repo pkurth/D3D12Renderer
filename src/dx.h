@@ -14,6 +14,9 @@
 #if defined(TURING_GPU_OR_NEWER_AVAILABLE) && defined(WINDOWS_SDK_19041_OR_NEWER_AVAILABLE) && defined(NTDDI_WIN10_19H1) && (WDK_NTDDI_VERSION >= NTDDI_WIN10_19H1)
 #define ADVANCED_GPU_FEATURES_ENABLED 1
 #else
+#if defined(WINDOWS_SDK_19041_OR_NEWER_AVAILABLE) && (!defined(NTDDI_WIN10_19H1) || (WDK_NTDDI_VERSION < NTDDI_WIN10_19H1))
+#warning Your Windows SDK is newer than your Windows OS.Consider updating your OS or there might be compatability issues.
+#endif
 #define ADVANCED_GPU_FEATURES_ENABLED 0
 #endif
 

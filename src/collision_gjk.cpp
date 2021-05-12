@@ -48,6 +48,7 @@ gjk_internal_success updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a
 		}
 
 		//assert(false);
+		std::cerr << "GJK ERROR 0\n";
 		return gjk_unexpected_error;
 	}
 	if (s.numPoints == 3)
@@ -194,10 +195,12 @@ gjk_internal_success updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a
 		}
 
 		//assert(false);
+		std::cerr << "GJK ERROR 1\n";
 		return gjk_unexpected_error;
 	}
 
 	//assert(false);
+	std::cerr << "GJK ERROR 2\n";
 	return gjk_unexpected_error;
 }
 
