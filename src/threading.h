@@ -2,6 +2,8 @@
 
 #include <functional>
 
+// All functions return the original value.
+
 static uint32 atomicAdd(volatile uint32& a, uint32 b)
 {
 	return InterlockedAdd((volatile LONG*)&a, b) - b;

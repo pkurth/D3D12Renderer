@@ -18,16 +18,20 @@ static dx_pipeline skinningPipeline;
 
 struct skinning_call
 {
-	vertex_buffer_group vertexBuffer;
+	dx_vertex_buffer* positions; // Raw pointers, so that we don't keep references around.
+	dx_vertex_buffer* others;
 	vertex_range range;
 	uint32 jointOffset;
 	uint32 numJoints;
 	uint32 vertexOffset;
 };
 
-static std::vector<skinning_call> calls;
-static std::vector<mat4> skinningMatrices;
-static uint32 totalNumVertices;
+static mat4 skinningMatrices[MAX_NUM_SKINNING_MATRICES_PER_FRAME];
+static volatile uint32 numSkinningMatricesThisFrame;
+
+static skinning_call calls[1024];
+static volatile uint32 numCalls;
+static volatile uint32 totalNumVertices;
 
 
 void initializeSkinning()
@@ -41,37 +45,34 @@ void initializeSkinning()
 	}
 
 	skinningPipeline = createReloadablePipeline("skinning_cs");
-
-	skinningMatrices.reserve(MAX_NUM_SKINNING_MATRICES_PER_FRAME);
 }
 
 std::tuple<vertex_buffer_group, vertex_range, mat4*> skinObject(const vertex_buffer_group& vertexBuffer, vertex_range range, uint32 numJoints)
 {
-	uint32 offset = (uint32)skinningMatrices.size();
+	uint32 jointOffset = atomicAdd(numSkinningMatricesThisFrame, numJoints);
+	assert(jointOffset + numJoints <= MAX_NUM_SKINNING_MATRICES_PER_FRAME);
 
-	assert(offset + numJoints <= MAX_NUM_SKINNING_MATRICES_PER_FRAME);
+	uint32 vertexOffset = atomicAdd(totalNumVertices, range.numVertices);
+	assert(vertexOffset + range.numVertices <= MAX_NUM_SKINNED_VERTICES_PER_FRAME);
 
-	skinningMatrices.resize(skinningMatrices.size() + numJoints);
+	uint32 callIndex = atomicIncrement(numCalls);
+	assert(callIndex < arraysize(calls));
 
-	calls.push_back(
-		{
-			vertexBuffer,
-			range,
-			offset,
-			numJoints,
-			totalNumVertices
-		}
-	);
+	auto& c = calls[callIndex];
+	c = {
+		vertexBuffer.positions.get(),
+		vertexBuffer.others.get(),
+		range,
+		jointOffset,
+		numJoints,
+		vertexOffset
+	};
 
 	vertex_range resultRange;
 	resultRange.numVertices = range.numVertices;
-	resultRange.firstVertex = totalNumVertices;
+	resultRange.firstVertex = vertexOffset;
 
-	totalNumVertices += range.numVertices;
-
-	assert(totalNumVertices <= MAX_NUM_SKINNED_VERTICES_PER_FRAME);
-
-	return { skinnedVertexBuffer[currentSkinnedVertexBuffer], resultRange, skinningMatrices.data() + offset };
+	return { skinnedVertexBuffer[currentSkinnedVertexBuffer], resultRange, skinningMatrices + jointOffset };
 }
 
 std::tuple<vertex_buffer_group, uint32, mat4*> skinObject(const vertex_buffer_group& vertexBuffer, uint32 numJoints)
@@ -97,15 +98,16 @@ std::tuple<vertex_buffer_group, submesh_info, mat4*> skinObject(const vertex_buf
 bool performSkinning()
 {
 	bool result = false;
-	if (calls.size() > 0)
+	uint32 numCalls = ::numCalls;
+	if (numCalls > 0)
 	{
 		dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
 
 		uint32 matrixOffset = dxContext.bufferedFrameID * MAX_NUM_SKINNING_MATRICES_PER_FRAME;
 
 		mat4* mats = (mat4*)mapBuffer(skinningMatricesBuffer, false);
-		memcpy(mats + matrixOffset, skinningMatrices.data(), sizeof(mat4) * skinningMatrices.size());
-		unmapBuffer(skinningMatricesBuffer, true, map_range{ matrixOffset, (uint32)skinningMatrices.size() });
+		memcpy(mats + matrixOffset, skinningMatrices, sizeof(mat4) * numSkinningMatricesThisFrame);
+		unmapBuffer(skinningMatricesBuffer, true, map_range{ matrixOffset, numSkinningMatricesThisFrame });
 
 
 		cl->setPipelineState(*skinningPipeline.pipeline);
@@ -115,18 +117,19 @@ bool performSkinning()
 		cl->setRootComputeUAV(SKINNING_RS_OUTPUT0, skinnedVertexBuffer[currentSkinnedVertexBuffer].positions);
 		cl->setRootComputeUAV(SKINNING_RS_OUTPUT1, skinnedVertexBuffer[currentSkinnedVertexBuffer].others);
 
-		for (const auto& c : calls)
+		for (uint32 i = 0; i < numCalls; ++i)
 		{
-			cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER0, c.vertexBuffer.positions->gpuVirtualAddress);
-			cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER1, c.vertexBuffer.others->gpuVirtualAddress);
+			auto& c = calls[i];
+			cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER0, c.positions->gpuVirtualAddress);
+			cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER1, c.others->gpuVirtualAddress);
 			cl->setCompute32BitConstants(SKINNING_RS_CB, skinning_cb{ c.jointOffset, c.numJoints, c.range.firstVertex, c.range.numVertices, c.vertexOffset });
 			cl->dispatch(bucketize(c.range.numVertices, 512));
 		}
 
 		// Not necessary, since the command list ends here.
-		barrier_batcher(cl)
-			.uav(skinnedVertexBuffer[currentSkinnedVertexBuffer].positions)
-			.uav(skinnedVertexBuffer[currentSkinnedVertexBuffer].others);
+		//barrier_batcher(cl)
+		//	.uav(skinnedVertexBuffer[currentSkinnedVertexBuffer].positions)
+		//	.uav(skinnedVertexBuffer[currentSkinnedVertexBuffer].others);
 
 		dxContext.executeCommandList(cl);
 
@@ -134,8 +137,8 @@ bool performSkinning()
 	}
 
 	currentSkinnedVertexBuffer = 1 - currentSkinnedVertexBuffer;
-	calls.clear();
-	skinningMatrices.clear();
+	::numCalls = 0;
+	numSkinningMatricesThisFrame = 0;
 	totalNumVertices = 0;
 
 	return result;
