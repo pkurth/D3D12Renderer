@@ -463,45 +463,6 @@ extern "C" __declspec(dllexport) void resetPhysics(float* outState)
 	assert(!failure);
 }
 
-#if 0
-void testLearning()
-{
-	float* state = new float[getPhysicsStateSize()];
-	float* action = new float[getPhysicsActionSize()];
-
-	float* stateMin = new float[getPhysicsStateSize()];
-	float* stateMax = new float[getPhysicsStateSize()];
-	float* actionMin = new float[getPhysicsActionSize()];
-	float* actionMax = new float[getPhysicsActionSize()];
-
-	getPhysicsRanges(stateMin, stateMax, actionMin, actionMax);
-
-	for (int i = 0; i < 10; ++i)
-	{
-		resetPhysics(state);
-		memset(action, 0, sizeof(float) * getPhysicsActionSize());
-
-		float totalReward = 0.f;
-		float reward;
-		while (!updatePhysics(action, state, &reward))
-		{
-			totalReward += reward;
-			break;
-		}
-
-		std::cout << totalReward << '\n';
-		int asdau7s = 0;
-	}
-
-	deleteAllConstraints();
-	env->appScene.clearAll();
-	env->numIterations = 0;
-
-	delete env;
-}
-#endif
-
-
 
 
 #ifndef PHYSICS_ONLY

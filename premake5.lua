@@ -172,10 +172,14 @@ local torch_rel_lib_3 = "/lib/torch_cpu.lib"
 local torch_rel_bin_dir = "/lib/"
 
 
+os.remove("D3D12Renderer.sln") -- This causes VS to reload the .vcxuser file, where the debug environment is stored.
+
 
 -----------------------------------------
 -- GENERATE SOLUTION
 -----------------------------------------
+
+local debug_env = "PATH=ext/bin;%PATH%;"
 
 
 workspace "D3D12Renderer"
@@ -218,9 +222,6 @@ project "D3D12Renderer"
 
 
 	debugdir "."
-	debugenvs {
-		"PATH=ext/bin;%PATH%;"
-	}
 
 	pchheader "pch.h"
 	pchsource "src/pch.cpp"
@@ -282,7 +283,11 @@ project "D3D12Renderer"
 				torch_debug_dir .. torch_rel_lib_3,
 			}
 			debugenvs {
-				torch_debug_dir .. torch_rel_bin_dir
+				debug_env .. torch_debug_dir .. torch_rel_bin_dir
+			}
+		else
+			debugenvs {
+				debug_env
 			}
 		end
 		
@@ -301,7 +306,11 @@ project "D3D12Renderer"
 				torch_release_dir .. torch_rel_lib_3,
 			}
 			debugenvs {
-				torch_release_dir .. torch_rel_bin_dir
+				debug_env .. torch_release_dir .. torch_rel_bin_dir
+			}
+		else
+			debugenvs {
+				debug_env
 			}
 		end
 
