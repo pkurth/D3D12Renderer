@@ -327,7 +327,7 @@ int main(int argc, char** argv)
 	dx_window window;
 	window.initialize(TEXT("Main Window"), 1280, 800, colorDepth);
 	setMainWindow(&window);
-	window.toggleVSync();
+	//window.toggleVSync();
 
 	application app = {};
 	app.loadCustomShaders();

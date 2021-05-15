@@ -6,7 +6,7 @@
 #include "color.h"
 #include "imgui.h"
 #include "dx_context.h"
-#include "skinning.h"
+#include "animation_controller.h"
 #include "physics.h"
 #include "threading.h"
 #include "mesh_shader.h"
@@ -18,27 +18,9 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
-struct animation_component
-{
-	float time;
-
-	uint32 animationIndex = 0;
-
-	vertex_buffer_group vb;
-	submesh_info sms[16];
-
-	vertex_buffer_group prevFrameVB;
-	submesh_info prevFrameSMs[16];
-};
-
 struct raytrace_component
 {
 	raytracing_object_type type;
-};
-
-struct ragdoll_component
-{
-	std::vector<scene_entity> rigidbodies;
 };
 
 static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh, path_tracer& pathTracer)
@@ -87,7 +69,7 @@ void application::initialize(dx_renderer* renderer)
 		raytracingTLAS.initialize();
 	}
 
-#if 0
+#if 1
 	auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj");
 	if (sponzaMesh)
 	{
@@ -112,17 +94,17 @@ void application::initialize(dx_renderer* renderer)
 		appScene.createEntity("Stormtrooper 1")
 			.addComponent<trs>(vec3(-5.f, 0.f, -1.f), quat::identity)
 			.addComponent<raster_component>(stormtrooperMesh)
-			.addComponent<animation_component>(1.5f);
+			.addComponent<animation_component>(createAnimationController(animation_controller_type_simple));
 
 		appScene.createEntity("Stormtrooper 2")
 			.addComponent<trs>(vec3(0.f, 0.f, -2.f), quat::identity)
 			.addComponent<raster_component>(stormtrooperMesh)
-			.addComponent<animation_component>(0.f);
+			.addComponent<animation_component>(createAnimationController(animation_controller_type_simple));
 
 		appScene.createEntity("Stormtrooper 3")
 			.addComponent<trs>(vec3(5.f, 0.f, -1.f), quat::identity)
 			.addComponent<raster_component>(stormtrooperMesh)
-			.addComponent<animation_component>(1.5f);
+			.addComponent<animation_component>(createAnimationController(animation_controller_type_simple));
 	}
 
 	if (pilotMesh)
@@ -130,7 +112,7 @@ void application::initialize(dx_renderer* renderer)
 		appScene.createEntity("Pilot")
 			.addComponent<trs>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
 			.addComponent<raster_component>(pilotMesh)
-			.addComponent<animation_component>(0.f);
+			.addComponent<animation_component>(createAnimationController(animation_controller_type_simple));
 	}
 
 	if (unrealMesh)
@@ -138,7 +120,7 @@ void application::initialize(dx_renderer* renderer)
 		appScene.createEntity("Mannequin")
 			.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.019f)
 			.addComponent<raster_component>(unrealMesh)
-			.addComponent<animation_component>(0.f);
+			.addComponent<animation_component>(createAnimationController(animation_controller_type_simple));
 	}
 #endif
 
@@ -702,24 +684,7 @@ bool application::drawSceneHierarchy()
 
 				drawComponent<animation_component>(selectedEntity, "Animation", [this](animation_component& anim)
 				{
-					assert(selectedEntity.hasComponent<raster_component>());
-					raster_component& raster = selectedEntity.getComponent<raster_component>();
-
-					bool animationChanged = ImGui::Dropdown("Currently playing", [](uint32 index, void* data)
-					{
-						animation_skeleton& skeleton = *(animation_skeleton*)data;
-						const char* result = 0;
-						if (index < (uint32)skeleton.clips.size())
-						{
-							result = skeleton.clips[index].name.c_str();
-						}
-						return result;
-					}, anim.animationIndex, &raster.mesh->skeleton);
-
-					if (animationChanged)
-					{
-						anim.time = 0.f;
-					}
+					anim.controller->edit(selectedEntity);
 				});
 			}
 		}
@@ -1135,8 +1100,8 @@ void application::renderDynamicGeometryToSunShadowMap()
 
 		for (uint32 i = 0; i < (uint32)raster.mesh->submeshes.size(); ++i)
 		{
-			submesh_info submesh = anim.sms[i];
-			renderPass.renderDynamicObject(0, anim.vb, mesh.indexBuffer, submesh, m);
+			submesh_info submesh = anim.controller->currentSubmeshes[i];
+			renderPass.renderDynamicObject(0, anim.controller->currentVertexBuffer, mesh.indexBuffer, submesh, m);
 		}
 	}
 }
@@ -1150,8 +1115,8 @@ void application::renderDynamicGeometryToShadowMap(spot_shadow_render_pass& rend
 
 		for (uint32 i = 0; i < (uint32)raster.mesh->submeshes.size(); ++i)
 		{
-			submesh_info submesh = anim.sms[i];
-			renderPass.renderDynamicObject(anim.vb, mesh.indexBuffer, submesh, m);
+			submesh_info submesh = anim.controller->currentSubmeshes[i];
+			renderPass.renderDynamicObject(anim.controller->currentVertexBuffer, mesh.indexBuffer, submesh, m);
 		}
 	}
 }
@@ -1165,8 +1130,8 @@ void application::renderDynamicGeometryToShadowMap(point_shadow_render_pass& ren
 
 		for (uint32 i = 0; i < (uint32)raster.mesh->submeshes.size(); ++i)
 		{
-			submesh_info submesh = anim.sms[i];
-			renderPass.renderDynamicObject(anim.vb, mesh.indexBuffer, submesh, m);
+			submesh_info submesh = anim.controller->currentSubmeshes[i];
+			renderPass.renderDynamicObject(anim.controller->currentVertexBuffer, mesh.indexBuffer, submesh, m);
 		}
 	}
 }
@@ -1174,7 +1139,7 @@ void application::renderDynamicGeometryToShadowMap(point_shadow_render_pass& ren
 void application::update(const user_input& input, float dt)
 {
 	//dt = min(dt, 1.f / 30.f);
-	dt = 1.f / 60.f;
+	//dt = 1.f / 60.f;
 
 	stepLocomotionEval();
 
@@ -1222,59 +1187,24 @@ void application::update(const user_input& input, float dt)
 
 		thread_job_context context;
 
-		// Skin animated meshes.
+		// Update animated meshes.
 		for (auto [entityHandle, anim, raster] : appScene.group(entt::get<animation_component, raster_component>).each())
 		{
 			scene_entity entity = { entityHandle, appScene };
 
-			anim.time += dt;
-			const dx_mesh& mesh = raster.mesh->mesh;
-			animation_skeleton& skeleton = raster.mesh->skeleton;
-
-			auto [vb, vertexOffset, skinningMatrices] = skinObject(mesh.vertexBuffer, (uint32)skeleton.joints.size());
-
-			mat4* mats = skinningMatrices;
-			if (entity.hasComponent<ragdoll_component>())
+			auto controller = anim.controller;
+			context.addWork([controller, entity, dt]()
 			{
-				auto& ragdoll = entity.getComponent<ragdoll_component>();
-				context.addWork([&skeleton, &ragdoll, mats]()
-				{
-					trs* rbTransforms = (trs*)alloca(ragdoll.rigidbodies.size() * sizeof(trs));
-
-					for (uint32 i = 0; i < (uint32)ragdoll.rigidbodies.size(); ++i)
-					{
-						scene_entity& rbEntity = ragdoll.rigidbodies[i];
-						rbTransforms[i] = rbEntity.getComponent<trs>();
-					}
-
-					skeleton.getSkinningMatricesFromGlobalTransforms(rbTransforms, mats);
-				});
-			}
-			else
-			{
-				auto& captureAnim = anim;
-				context.addWork([&skeleton, &captureAnim, mats]()
-				{
-					trs localTransforms[128];
-					skeleton.sampleAnimation(skeleton.clips[captureAnim.animationIndex].name, captureAnim.time, localTransforms);
-					skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, mats);
-				});
-			}
-
-			anim.prevFrameVB = anim.vb;
-			anim.vb = vb;
-
-			uint32 numSubmeshes = (uint32)raster.mesh->submeshes.size();
-			for (uint32 i = 0; i < numSubmeshes; ++i)
-			{
-				anim.prevFrameSMs[i] = anim.sms[i];
-
-				anim.sms[i] = raster.mesh->submeshes[i].info;
-				anim.sms[i].baseVertex += vertexOffset;
-			}
+				controller->update(entity, dt);
+			});
 		}
 
+		context.waitForWorkCompletion();
 
+
+
+
+		// Render shadow maps.
 		renderSunShadowMap(objectDragged);
 
 		for (uint32 i = 0; i < (uint32)spotLights.size(); ++i)
@@ -1307,23 +1237,24 @@ void application::update(const user_input& input, float dt)
 			if (entity.hasComponent<animation_component>())
 			{
 				auto& anim = entity.getComponent<animation_component>();
+				auto controller = anim.controller;
 
 				uint32 numSubmeshes = (uint32)raster.mesh->submeshes.size();
 
 				for (uint32 i = 0; i < numSubmeshes; ++i)
 				{
-					submesh_info submesh = anim.sms[i];
-					submesh_info prevFrameSubmesh = anim.prevFrameSMs[i];
+					submesh_info submesh = controller->currentSubmeshes[i];
+					submesh_info prevFrameSubmesh = controller->prevFrameSubmeshes[i];
 
 					const ref<pbr_material>& material = raster.mesh->submeshes[i].material;
 
 					if (material->albedoTint.a < 1.f)
 					{
-						transparentRenderPass.renderObject(anim.vb, mesh.indexBuffer, submesh, material, m, outline);
+						transparentRenderPass.renderObject(controller->currentVertexBuffer, mesh.indexBuffer, submesh, material, m, outline);
 					}
 					else
 					{
-						opaqueRenderPass.renderAnimatedObject(anim.vb, anim.prevFrameVB, mesh.indexBuffer, submesh, prevFrameSubmesh, material, m, m,
+						opaqueRenderPass.renderAnimatedObject(controller->currentVertexBuffer, controller->prevFrameVertexBuffer, mesh.indexBuffer, submesh, prevFrameSubmesh, material, m, m,
 							(uint32)entityHandle, outline);
 					}
 				}
@@ -1350,8 +1281,6 @@ void application::update(const user_input& input, float dt)
 		void collisionDebugDraw(transparent_render_pass* renderPass);
 		collisionDebugDraw(&transparentRenderPass);
 
-
-		context.waitForWorkCompletion();
 		submitRenderPasses(numSpotShadowRenderPasses, numPointShadowRenderPasses);
 
 
@@ -1541,7 +1470,7 @@ void application::serializeToFile()
 			animation_component& anim = entity.getComponent<animation_component>();
 			out << YAML::Key << "Animation" << YAML::Value
 				<< YAML::BeginMap 
-					<< YAML::Key << "Time" << YAML::Value << anim.time
+					<< YAML::Key << "Type" << YAML::Value << (uint32)anim.controller->type
 				<< YAML::EndMap;
 		}
 
@@ -1649,7 +1578,7 @@ bool application::deserializeFromFile()
 		if (entityNode["Animation"])
 		{
 			auto animNode = entityNode["Animation"];
-			entity.addComponent<animation_component>(animNode["Time"].as<float>());
+			entity.addComponent<animation_component>(createAnimationController((animation_controller_type)animNode["Type"].as<uint32>()));
 		}
 	}
 
