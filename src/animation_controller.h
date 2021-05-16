@@ -36,6 +36,7 @@ struct animation_controller
 
 protected:
 	mat4* allocateSkin(ref<composite_mesh> mesh);
+	void defaultVertexBuffer(ref<composite_mesh> mesh);
 };
 
 struct simple_animation_controller : animation_controller

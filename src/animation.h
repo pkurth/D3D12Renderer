@@ -46,6 +46,8 @@ struct animation_clip
 	std::vector<vec3> scaleKeyframes;
 
 	std::vector<animation_joint> joints;
+
+	animation_joint rootMotionJoint;
 	
 	float lengthInSeconds;
 };
@@ -55,17 +57,20 @@ struct animation_skeleton
 	std::vector<skeleton_joint> joints;
 	std::unordered_map<std::string, uint32> nameToJointID;
 
+	//trs rootBindTransform;
+
 	std::vector<animation_clip> clips;
 	std::unordered_map<std::string, uint32> nameToClipID;
 
 	std::vector<std::string> files;
 
 	void loadFromAssimp(const struct aiScene* scene, float scale = 1.f);
-	void pushAssimpAnimation(const std::string& suffix, const struct aiAnimation* animation, float scale = 1.f);
-	void pushAssimpAnimations(const std::string& sceneFilename, float scale = 1.f);
-	void pushAssimpAnimationsInDirectory(const std::string& directory, float scale = 1.f);
+	void pushAssimpAnimation(const std::string& suffix, const struct aiAnimation* animation, float scale = 1.f, bool rootMotion = false);
+	void pushAssimpAnimations(const std::string& sceneFilename, float scale = 1.f, bool rootMotion = false);
+	void pushAssimpAnimationsInDirectory(const std::string& directory, float scale = 1.f, bool rootMotion = false);
 
-	void sampleAnimation(const std::string& name, float time, trs* outLocalTransforms) const;
+	void sampleAnimation(uint32 index, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
+	void sampleAnimation(const std::string& name, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
 	void getSkinningMatricesFromLocalTransforms(const trs* localTransforms, mat4* outSkinningMatrices, const trs& worldTransform = trs::identity) const;
 	void getSkinningMatricesFromGlobalTransforms(const trs* globalTransforms, mat4* outSkinningMatrices) const;
 

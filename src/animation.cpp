@@ -6,11 +6,49 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
-void animation_skeleton::pushAssimpAnimation(const std::string& suffix, const aiAnimation* animation, float scale)
+static void readJointAnimation(animation_clip& clip, animation_joint& joint, const aiNodeAnim* channel)
+{
+	joint.firstPositionKeyframe = (uint32)clip.positionKeyframes.size();
+	joint.firstRotationKeyframe = (uint32)clip.rotationKeyframes.size();
+	joint.firstScaleKeyframe = (uint32)clip.scaleKeyframes.size();
+
+	joint.numPositionKeyframes = channel->mNumPositionKeys;
+	joint.numRotationKeyframes = channel->mNumRotationKeys;
+	joint.numScaleKeyframes = channel->mNumScalingKeys;
+
+
+	for (uint32 keyID = 0; keyID < channel->mNumPositionKeys; ++keyID)
+	{
+		clip.positionKeyframes.push_back(readAssimpVector(channel->mPositionKeys[keyID].mValue));
+		clip.positionTimestamps.push_back((float)channel->mPositionKeys[keyID].mTime * 0.001f);
+	}
+
+	for (uint32 keyID = 0; keyID < channel->mNumRotationKeys; ++keyID)
+	{
+		clip.rotationKeyframes.push_back(readAssimpQuaternion(channel->mRotationKeys[keyID].mValue));
+		clip.rotationTimestamps.push_back((float)channel->mRotationKeys[keyID].mTime * 0.001f);
+	}
+
+	for (uint32 keyID = 0; keyID < channel->mNumScalingKeys; ++keyID)
+	{
+		clip.scaleKeyframes.push_back(readAssimpVector(channel->mScalingKeys[keyID].mValue));
+		clip.scaleTimestamps.push_back((float)channel->mScalingKeys[keyID].mTime * 0.001f);
+	}
+
+	joint.isAnimated = true;
+}
+
+void animation_skeleton::pushAssimpAnimation(const std::string& suffix, const aiAnimation* animation, float scale, bool rootMotion)
 {
 	animation_clip& clip = clips.emplace_back();
 
-	clip.name = std::string(animation->mName.C_Str()) + std::string("(") + suffix + ")";
+	clip.name = std::string(animation->mName.C_Str()) + " (" + suffix + ")";
+	size_t posOfFirstOr = clip.name.find('|');
+	if (posOfFirstOr != std::string::npos)
+	{
+		clip.name = clip.name.substr(posOfFirstOr + 1);
+	}
+
 	clip.lengthInSeconds = (float)animation->mDuration * 0.001f;
 
 	float timeNormalization = 1.f / (float)animation->mTicksPerSecond;
@@ -29,35 +67,11 @@ void animation_skeleton::pushAssimpAnimation(const std::string& suffix, const ai
 		if (it != nameToJointID.end())
 		{
 			animation_joint& joint = clip.joints[it->second];
-
-			joint.firstPositionKeyframe = (uint32)clip.positionKeyframes.size();
-			joint.firstRotationKeyframe = (uint32)clip.rotationKeyframes.size();
-			joint.firstScaleKeyframe = (uint32)clip.scaleKeyframes.size();
-
-			joint.numPositionKeyframes = channel->mNumPositionKeys;
-			joint.numRotationKeyframes = channel->mNumRotationKeys;
-			joint.numScaleKeyframes = channel->mNumScalingKeys;
-
-
-			for (uint32 keyID = 0; keyID < channel->mNumPositionKeys; ++keyID)
-			{
-				clip.positionKeyframes.push_back(readAssimpVector(channel->mPositionKeys[keyID].mValue));
-				clip.positionTimestamps.push_back((float)channel->mPositionKeys[keyID].mTime * 0.001f);
-			}
-
-			for (uint32 keyID = 0; keyID < channel->mNumRotationKeys; ++keyID)
-			{
-				clip.rotationKeyframes.push_back(readAssimpQuaternion(channel->mRotationKeys[keyID].mValue));
-				clip.rotationTimestamps.push_back((float)channel->mRotationKeys[keyID].mTime * 0.001f);
-			}
-
-			for (uint32 keyID = 0; keyID < channel->mNumScalingKeys; ++keyID)
-			{
-				clip.scaleKeyframes.push_back(readAssimpVector(channel->mScalingKeys[keyID].mValue));
-				clip.scaleTimestamps.push_back((float)channel->mScalingKeys[keyID].mTime * 0.001f);
-			}
-
-			joint.isAnimated = true;
+			readJointAnimation(clip, joint, channel);
+		}
+		else if (jointName == "root")
+		{
+			readJointAnimation(clip, clip.rootMotionJoint, channel);
 		}
 	}
 
@@ -79,7 +93,7 @@ void animation_skeleton::pushAssimpAnimation(const std::string& suffix, const ai
 	nameToClipID[clip.name] = (uint32)clips.size() - 1;
 }
 
-void animation_skeleton::pushAssimpAnimations(const std::string& sceneFilename, float scale)
+void animation_skeleton::pushAssimpAnimations(const std::string& sceneFilename, float scale, bool rootMotion)
 {
 	Assimp::Importer importer;
 
@@ -89,18 +103,18 @@ void animation_skeleton::pushAssimpAnimations(const std::string& sceneFilename, 
 	{
 		for (uint32 i = 0; i < scene->mNumAnimations; ++i)
 		{
-			pushAssimpAnimation(sceneFilename, scene->mAnimations[i], scale);
+			pushAssimpAnimation(sceneFilename, scene->mAnimations[i], scale, rootMotion);
 		}
 
 		files.push_back(sceneFilename);
 	}
 }
 
-void animation_skeleton::pushAssimpAnimationsInDirectory(const std::string& directory, float scale)
+void animation_skeleton::pushAssimpAnimationsInDirectory(const std::string& directory, float scale, bool rootMotion)
 {
 	for (auto& p : fs::directory_iterator(directory))
 	{
-		pushAssimpAnimations(p.path().string().c_str());
+		pushAssimpAnimations(p.path().string().c_str(), scale, rootMotion);
 	}
 }
 
@@ -266,12 +280,9 @@ static vec3 sampleScale(const animation_clip& clip, const animation_joint& animJ
 	return lerp(a, b, t);
 }
 
-void animation_skeleton::sampleAnimation(const std::string& name, float time, trs* outLocalTransforms) const
+void animation_skeleton::sampleAnimation(uint32 index, float time, trs* outLocalTransforms, trs* outRootMotion) const
 {
-	auto clipIndexIt = nameToClipID.find(name);
-	assert(clipIndexIt != nameToClipID.end());
-
-	const animation_clip& clip = clips[clipIndexIt->second];
+	const animation_clip& clip = clips[index];
 	assert(clip.joints.size() == joints.size());
 
 	time = fmod(time, clip.lengthInSeconds);
@@ -292,6 +303,35 @@ void animation_skeleton::sampleAnimation(const std::string& name, float time, tr
 			outLocalTransforms[i] = trs::identity;
 		}
 	}
+
+	trs rootMotion;
+	if (clip.rootMotionJoint.isAnimated)
+	{
+		rootMotion.position = samplePosition(clip, clip.rootMotionJoint, time);
+		rootMotion.rotation = sampleRotation(clip, clip.rootMotionJoint, time);
+		rootMotion.scale = sampleScale(clip, clip.rootMotionJoint, time);
+	}
+	else
+	{
+		rootMotion = trs::identity;
+	}
+
+	if (outRootMotion)
+	{
+		*outRootMotion = rootMotion;
+	}
+	else
+	{
+		outLocalTransforms[0] = rootMotion * outLocalTransforms[0];
+	}
+}
+
+void animation_skeleton::sampleAnimation(const std::string& name, float time, trs* outLocalTransforms, trs* outRootMotion) const
+{
+	auto clipIndexIt = nameToClipID.find(name);
+	assert(clipIndexIt != nameToClipID.end());
+
+	sampleAnimation(clipIndexIt->second, time, outLocalTransforms, outRootMotion);
 }
 
 void animation_skeleton::getSkinningMatricesFromLocalTransforms(const trs* localTransforms, mat4* outSkinningMatrices, const trs& worldTransform) const

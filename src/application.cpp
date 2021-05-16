@@ -69,7 +69,7 @@ void application::initialize(dx_renderer* renderer)
 		raytracingTLAS.initialize();
 	}
 
-#if 1
+#if 0
 	auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj");
 	if (sponzaMesh)
 	{
@@ -124,6 +124,17 @@ void application::initialize(dx_renderer* renderer)
 	}
 #endif
 
+	auto ragdollMesh = loadAnimatedMeshFromFile("assets/ragdoll/skin.fbx");
+	if (ragdollMesh)
+	{
+		//ragdollMesh->skeleton.prettyPrintHierarchy();
+		ragdollMesh->skeleton.pushAssimpAnimationsInDirectory("assets/ragdoll/animations", 1.f, false);
+
+		appScene.createEntity("Ragdoll")
+			.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat::identity, 0.01f)
+			.addComponent<raster_component>(ragdollMesh)
+			.addComponent<animation_component>(createAnimationController(animation_controller_type_simple));
+	}
 
 #if 1
 	{
@@ -206,54 +217,6 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<rigid_body_component>(true);*/
 
 
-
-		// Ragdoll.
-
-#if 0
-		auto ragdollMesh = loadAnimatedMeshFromFile("assets/ragdoll/ragdoll.fbx");
-		//auto ragdollMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx");
-		auto ragdollPartMesh = make_ref<composite_mesh>();
-		ragdollPartMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 0.7f, 0.2f, vec3(0.f, 0.55f, 0.f)), {}, trs::identity, ragdollMaterial });
-
-
-		if (ragdollMesh)
-		{
-			auto ragdollEntity = appScene.createEntity("Ragdoll")
-				.addComponent<trs>(vec3(0.f, 0.f, 0.f), quat::identity)
-				.addComponent<raster_component>(ragdollMesh)
-				.addComponent<animation_component>(0.f)
-				;
-
-			std::vector<scene_entity> ragdollEntities;
-
-			for (auto& joint : ragdollMesh->skeleton.joints)
-			{
-				trs transform = joint.bindTransform;
-				//transform.position += vec3(4.f, 3.f, 0.f);
-				transform.position += vec3(2.2f, 0.f, 0.f);
-				auto entity = appScene.createEntity(joint.name.c_str())
-					.addComponent<trs>(transform)
-					.addComponent<raster_component>(ragdollPartMesh)
-					.addComponent<collider_component>(bounding_capsule{ vec3(0.f, 0.2f, 0.f), vec3(0.f, 0.9f, 0.f), 0.2f }, 0.2f, ragdollFriction, ragdollDensity)
-					.addComponent<rigid_body_component>(false, 1.f);
-
-				ragdollEntities.push_back(entity);
-
-				if (joint.parentID != NO_PARENT)
-				{
-					auto parent = ragdollEntities[joint.parentID];
-					if (parent)
-					{
-						//addBallJointConstraintFromGlobalPoints(parent, entity, transform.position);
-						addConeTwistConstraintFromGlobalPoints(parent, entity, transform.position, parent.getComponent<trs>().rotation * vec3(0.f, 1.f, 0.f), -1.f, deg2rad(30.f));
-					}
-				}
-			}
-
-			ragdollEntity.addComponent<ragdoll_component>(std::move(ragdollEntities));
-		}
-#endif
-
 #if 1
 		auto chainMesh = make_ref<composite_mesh>();
 		chainMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 2.f, 0.18f, vec3(0.f)), {}, trs::identity, lollipopMaterial });
@@ -297,9 +260,9 @@ void application::initialize(dx_renderer* renderer)
 #endif
 
 	//ragdoll.initialize(appScene, vec3(30.f, 1.25f, -2.f));
-	ragdoll.initialize(appScene, vec3(0.f, 1.25f, 0.f));
+	//ragdoll.initialize(appScene, vec3(0.f, 1.25f, 0.f));
 
-	initializeLocomotionEval(appScene, ragdoll);
+	//initializeLocomotionEval(appScene, ragdoll);
 
 	// Raytracing.
 	if (dxContext.featureSupport.raytracing())
@@ -752,7 +715,7 @@ void application::drawSettings(float dt)
 			editFireParticleSystem(fireParticleSystem);
 			editBoidParticleSystem(boidParticleSystem);
 
-			ragdoll.edit();
+			//ragdoll.edit();
 			ImGui::SliderInt("Physics solver iterations", (int*)&numPhysicsSolverIterations, 1, 200);
 			ImGui::SliderFloat("Physics test force", &testPhysicsForce, 1.f, 10000.f);
 		}
@@ -1141,7 +1104,7 @@ void application::update(const user_input& input, float dt)
 	//dt = min(dt, 1.f / 30.f);
 	//dt = 1.f / 60.f;
 
-	stepLocomotionEval();
+	//stepLocomotionEval();
 
 
 	resetRenderPasses();

@@ -26,16 +26,46 @@ mat4* animation_controller::allocateSkin(ref<composite_mesh> mesh)
 	return skinningMatrices;
 }
 
+void animation_controller::defaultVertexBuffer(ref<composite_mesh> mesh)
+{
+	const dx_mesh& dxMesh = mesh->mesh;
+
+	prevFrameVertexBuffer = dxMesh.vertexBuffer;
+	this->currentVertexBuffer = dxMesh.vertexBuffer;
+
+	uint32 numSubmeshes = (uint32)mesh->submeshes.size();
+	for (uint32 i = 0; i < numSubmeshes; ++i)
+	{
+		prevFrameSubmeshes[i] = mesh->submeshes[i].info;
+		currentSubmeshes[i] = mesh->submeshes[i].info;
+	}
+}
+
 void simple_animation_controller::update(scene_entity entity, float dt)
 {
 	ref<composite_mesh> mesh = entity.getComponent<raster_component>().mesh;
 	animation_skeleton& skeleton = mesh->skeleton;
-	mat4* skinningMatrices = allocateSkin(mesh);
+	if (animationIndex < (uint32)skeleton.clips.size())
+	{
+		mat4* skinningMatrices = allocateSkin(mesh);
 
-	time += dt;
-	trs localTransforms[128];
-	skeleton.sampleAnimation(skeleton.clips[animationIndex].name, time, localTransforms);
-	skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
+		time += dt;
+		
+		trs localTransforms[128];
+		trs rootMotion;
+
+		skeleton.sampleAnimation(animationIndex, time, localTransforms, &rootMotion);
+		skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
+
+		if (entity.hasComponent<trs>())
+		{
+			entity.getComponent<trs>() = trs(vec3(0.f), quat::identity, 0.01f) * rootMotion;
+		}
+	}
+	else
+	{
+		defaultVertexBuffer(mesh);
+	}
 }
 
 void simple_animation_controller::edit(scene_entity entity)
