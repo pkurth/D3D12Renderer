@@ -128,7 +128,7 @@ void application::initialize(dx_renderer* renderer)
 	if (ragdollMesh)
 	{
 		//ragdollMesh->skeleton.prettyPrintHierarchy();
-		ragdollMesh->skeleton.pushAssimpAnimationsInDirectory("assets/ragdoll/animations", 1.f, false);
+		ragdollMesh->skeleton.pushAssimpAnimationsInDirectory("assets/ragdoll/animations", 1.f);
 
 		appScene.createEntity("Ragdoll")
 			.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat::identity, 0.01f)

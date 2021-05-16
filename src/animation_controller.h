@@ -46,7 +46,10 @@ struct simple_animation_controller : animation_controller
 	virtual void edit(scene_entity entity) override;
 
 	float time = 0.f;
-	uint32 animationIndex = 0;
+	float timeScale = 1.f;
+	uint32 animationIndex = -1;
+
+	trs lastRootMotion = trs::identity;
 };
 
 struct ragdoll_animation_controller : animation_controller

@@ -38,7 +38,19 @@ static void readJointAnimation(animation_clip& clip, animation_joint& joint, con
 	joint.isAnimated = true;
 }
 
-void animation_skeleton::pushAssimpAnimation(const std::string& suffix, const aiAnimation* animation, float scale, bool rootMotion)
+static void scaleKeyframes(animation_clip& clip, animation_joint& joint, float scale)
+{
+	for (uint32 keyID = 0; keyID < joint.numPositionKeyframes; ++keyID)
+	{
+		clip.positionKeyframes[joint.firstPositionKeyframe + keyID] *= scale;
+	}
+	for (uint32 keyID = 0; keyID < joint.numScaleKeyframes; ++keyID)
+	{
+		clip.scaleKeyframes[joint.firstScaleKeyframe + keyID] *= scale;
+	}
+}
+
+void animation_skeleton::pushAssimpAnimation(const std::string& suffix, const aiAnimation* animation, float scale)
 {
 	animation_clip& clip = clips.emplace_back();
 
@@ -75,17 +87,17 @@ void animation_skeleton::pushAssimpAnimation(const std::string& suffix, const ai
 		}
 	}
 
-	for (uint32 i = 0; i < (uint32)joints.size(); ++i)
+	if (clip.rootMotionJoint.isAnimated)
 	{
-		if (joints[i].parentID == NO_PARENT)
+		scaleKeyframes(clip, clip.rootMotionJoint, scale);
+	}
+	else
+	{
+		for (uint32 i = 0; i < (uint32)joints.size(); ++i)
 		{
-			for (uint32 keyID = 0; keyID < clip.joints[i].numPositionKeyframes; ++keyID)
+			if (joints[i].parentID == NO_PARENT)
 			{
-				clip.positionKeyframes[clip.joints[i].firstPositionKeyframe + keyID] *= scale;
-			}
-			for (uint32 keyID = 0; keyID < clip.joints[i].numScaleKeyframes; ++keyID)
-			{
-				clip.scaleKeyframes[clip.joints[i].firstScaleKeyframe + keyID] *= scale;
+				scaleKeyframes(clip, clip.joints[i], scale);
 			}
 		}
 	}
@@ -93,7 +105,7 @@ void animation_skeleton::pushAssimpAnimation(const std::string& suffix, const ai
 	nameToClipID[clip.name] = (uint32)clips.size() - 1;
 }
 
-void animation_skeleton::pushAssimpAnimations(const std::string& sceneFilename, float scale, bool rootMotion)
+void animation_skeleton::pushAssimpAnimations(const std::string& sceneFilename, float scale)
 {
 	Assimp::Importer importer;
 
@@ -103,18 +115,18 @@ void animation_skeleton::pushAssimpAnimations(const std::string& sceneFilename, 
 	{
 		for (uint32 i = 0; i < scene->mNumAnimations; ++i)
 		{
-			pushAssimpAnimation(sceneFilename, scene->mAnimations[i], scale, rootMotion);
+			pushAssimpAnimation(sceneFilename, scene->mAnimations[i], scale);
 		}
 
 		files.push_back(sceneFilename);
 	}
 }
 
-void animation_skeleton::pushAssimpAnimationsInDirectory(const std::string& directory, float scale, bool rootMotion)
+void animation_skeleton::pushAssimpAnimationsInDirectory(const std::string& directory, float scale)
 {
 	for (auto& p : fs::directory_iterator(directory))
 	{
-		pushAssimpAnimations(p.path().string().c_str(), scale, rootMotion);
+		pushAssimpAnimations(p.path().string().c_str(), scale);
 	}
 }
 
@@ -285,7 +297,7 @@ void animation_skeleton::sampleAnimation(uint32 index, float time, trs* outLocal
 	const animation_clip& clip = clips[index];
 	assert(clip.joints.size() == joints.size());
 
-	time = fmod(time, clip.lengthInSeconds);
+	time = clamp(time, 0.f, clip.lengthInSeconds);
 
 	uint32 numJoints = (uint32)joints.size();
 	for (uint32 i = 0; i < numJoints; ++i)

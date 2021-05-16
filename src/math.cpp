@@ -411,11 +411,6 @@ trs operator*(const trs& a, const trs& b)
 	return result;
 }
 
-vec3 transformPosition(const mat4& m, vec3 pos)
-{
-	return (m * vec4(pos, 1.f)).xyz;
-}
-
 trs invert(const trs& t)
 {
 	quat invRotation = conjugate(t.rotation);
@@ -427,6 +422,11 @@ trs invert(const trs& t)
 	result.rotation = invRotation;
 	result.position = invScale * (invRotation * (-t.position));
 	return result;
+}
+
+vec3 transformPosition(const mat4& m, vec3 pos)
+{
+	return (m * vec4(pos, 1.f)).xyz;
 }
 
 vec3 transformDirection(const mat4& m, vec3 dir)
