@@ -50,6 +50,13 @@ struct animation_clip
 	animation_joint rootMotionJoint;
 	
 	float lengthInSeconds;
+	bool bakeRootRotationIntoPose = true;
+	bool bakeRootXZTranslationIntoPose = false;
+
+
+	void edit();
+	trs getFirstRootTransform();
+	trs getLastRootTransform();
 };
 
 struct animation_skeleton

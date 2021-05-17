@@ -55,13 +55,7 @@ void simple_animation_controller::update(scene_entity entity, float dt)
 		{
 			time = fmod(time, clip.lengthInSeconds);
 
-			trs t;
-			t.position = clip.positionKeyframes[clip.rootMotionJoint.firstPositionKeyframe + clip.rootMotionJoint.numPositionKeyframes - 1];
-			t.rotation = clip.rotationKeyframes[clip.rootMotionJoint.firstRotationKeyframe + clip.rootMotionJoint.numRotationKeyframes - 1];
-			t.scale = clip.scaleKeyframes[clip.rootMotionJoint.firstScaleKeyframe + clip.rootMotionJoint.numScaleKeyframes - 1];
-			lastRootMotion = invertAffine(trsToMat4(lastRootMotion)) * trsToMat4(t);
-			//lastRootMotion = trs::identity;
-			//lastRootMotion.rotation = t.rotation;
+			lastRootMotion = clip.getFirstRootTransform();
 		}
 		
 		trs localTransforms[128];
@@ -73,9 +67,8 @@ void simple_animation_controller::update(scene_entity entity, float dt)
 		if (entity.hasComponent<trs>())
 		{
 			trs& transform = entity.getComponent<trs>();
-			mat4 t = trsToMat4(transform);
-			t = t * invertAffine(trsToMat4(lastRootMotion)) * trsToMat4(rootMotion);
-			transform = t;
+			transform = transform * invert(lastRootMotion) * rootMotion;
+			transform.rotation = normalize(transform.rotation);
 		}
 		lastRootMotion = rootMotion;
 	}
@@ -104,12 +97,15 @@ void simple_animation_controller::edit(scene_entity entity)
 	if (animationChanged)
 	{
 		time = 0.f;
+		lastRootMotion = skeleton.clips[animationIndex].getFirstRootTransform();
 	}
 
 	ImGui::SliderFloat("Time scale", &timeScale, 0.f, 1.f);
 	if (animationIndex < (uint32)skeleton.clips.size())
 	{
 		ImGui::SliderFloat("Time", &time, 0.f, skeleton.clips[animationIndex].lengthInSeconds);
+
+		skeleton.clips[animationIndex].edit();
 	}
 }
 

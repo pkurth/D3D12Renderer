@@ -2,6 +2,7 @@
 #include "animation.h"
 
 #include "assimp.h"
+#include "imgui.h"
 
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -330,6 +331,20 @@ void animation_skeleton::sampleAnimation(uint32 index, float time, trs* outLocal
 
 	if (outRootMotion)
 	{
+		if (clip.bakeRootRotationIntoPose)
+		{
+			outLocalTransforms[0] = trs(0.f, rootMotion.rotation) * outLocalTransforms[0];
+			rootMotion.rotation = quat::identity;
+		}
+
+		if (clip.bakeRootXZTranslationIntoPose)
+		{
+			outLocalTransforms[0].position.x += rootMotion.position.x;
+			outLocalTransforms[0].position.z += rootMotion.position.z;
+			rootMotion.position.x = 0.f;
+			rootMotion.position.z = 0.f;
+		}
+
 		*outRootMotion = rootMotion;
 	}
 	else
@@ -393,4 +408,58 @@ static void prettyPrint(const animation_skeleton& skeleton, uint32 parent, uint3
 void animation_skeleton::prettyPrintHierarchy() const
 {
 	prettyPrint(*this, NO_PARENT, 0);
+}
+
+void animation_clip::edit()
+{
+	ImGui::Checkbox("Bake root rotation into pose", &bakeRootRotationIntoPose);
+	ImGui::Checkbox("Bake xz translation into pose", &bakeRootXZTranslationIntoPose);
+}
+
+trs animation_clip::getFirstRootTransform()
+{
+	if (rootMotionJoint.isAnimated)
+	{
+		trs t;
+		t.position = positionKeyframes[rootMotionJoint.firstPositionKeyframe];
+		t.rotation = rotationKeyframes[rootMotionJoint.firstRotationKeyframe];
+		t.scale = scaleKeyframes[rootMotionJoint.firstScaleKeyframe];
+
+		if (bakeRootRotationIntoPose)
+		{
+			t.rotation = quat::identity;
+		}
+		if (bakeRootXZTranslationIntoPose)
+		{
+			t.position.x = 0.f;
+			t.position.z = 0.f;
+		}
+
+		return t;
+	}
+	return trs::identity;
+}
+
+trs animation_clip::getLastRootTransform()
+{
+	if (rootMotionJoint.isAnimated)
+	{
+		trs t;
+		t.position = positionKeyframes[rootMotionJoint.firstPositionKeyframe + rootMotionJoint.numPositionKeyframes - 1];
+		t.rotation = rotationKeyframes[rootMotionJoint.firstRotationKeyframe + rootMotionJoint.numRotationKeyframes - 1];
+		t.scale = scaleKeyframes[rootMotionJoint.firstScaleKeyframe + rootMotionJoint.numScaleKeyframes - 1];
+
+		if (bakeRootRotationIntoPose)
+		{
+			t.rotation = quat::identity;
+		}
+		if (bakeRootXZTranslationIntoPose)
+		{
+			t.position.x = 0.f;
+			t.position.z = 0.f;
+		}
+
+		return t;
+	}
+	return trs::identity;
 }
