@@ -560,9 +560,6 @@ struct trs
 
 
 
-
-
-
 // Vec2 operators.
 static vec2 operator+(vec2 a, vec2 b) { vec2 result = { a.x + b.x, a.y + b.y }; return result; }
 static vec2& operator+=(vec2& a, vec2 b) { a = a + b; return a; }
@@ -717,7 +714,6 @@ static vec3 lerp(vec3 l, vec3 u, float t) { return l + t * (u - l); }
 static vec4 lerp(vec4 l, vec4 u, float t) { return l + t * (u - l); }
 static quat lerp(quat l, quat u, float t) { quat result; result.v4 = lerp(l.v4, u.v4, t); return normalize(result); }
 
-
 mat2 operator*(const mat2& a, const mat2& b);
 mat3 operator*(const mat3& a, const mat3& b);
 mat3 operator+(const mat3& a, const mat3& b);
@@ -806,6 +802,55 @@ bool insideTriangle(vec3 barycentrics);
 
 void getTangents(vec3 normal, vec3& outTangent, vec3& outBitangent);
 
+static bool fuzzyEquals(float a, float b, float threshold = 1e-4f) { return abs(a - b) < threshold; }
+static bool fuzzyEquals(vec2 a, vec2 b, float threshold = 1e-4f) { return fuzzyEquals(a.x, b.x, threshold) && fuzzyEquals(a.y, b.y, threshold); }
+static bool fuzzyEquals(vec3 a, vec3 b, float threshold = 1e-4f) { return fuzzyEquals(a.x, b.x, threshold) && fuzzyEquals(a.y, b.y, threshold) && fuzzyEquals(a.z, b.z, threshold); }
+static bool fuzzyEquals(vec4 a, vec4 b, float threshold = 1e-4f) { return fuzzyEquals(a.x, b.x, threshold) && fuzzyEquals(a.y, b.y, threshold) && fuzzyEquals(a.z, b.z, threshold) && fuzzyEquals(a.w, b.w, threshold); }
+static bool fuzzyEquals(quat a, quat b, float threshold = 1e-4f) { if (dot(a.v4, b.v4) < 0.f) { a.v4 *= -1.f; } return fuzzyEquals(a.x, b.x, threshold) && fuzzyEquals(a.y, b.y, threshold) && fuzzyEquals(a.z, b.z, threshold) && fuzzyEquals(a.w, b.w, threshold); }
+
+static bool fuzzyEquals(const mat2& a, const mat2& b, float threshold = 1e-4f)
+{
+	bool result = true;
+	for (uint32 i = 0; i < 4; ++i)
+	{
+		result &= fuzzyEquals(a.m[i], b.m[i], threshold);
+	}
+	return result;
+}
+
+static bool fuzzyEquals(const mat3& a, const mat3& b, float threshold = 1e-4f)
+{
+	bool result = true;
+	for (uint32 i = 0; i < 9; ++i)
+	{
+		result &= fuzzyEquals(a.m[i], b.m[i], threshold);
+	}
+	return result;
+}
+
+static bool fuzzyEquals(const mat4& a, const mat4& b, float threshold = 1e-4f)
+{
+	bool result = true;
+	for (uint32 i = 0; i < 16; ++i)
+	{
+		result &= fuzzyEquals(a.m[i], b.m[i], threshold);
+	}
+	return result;
+}
+
+static bool fuzzyEquals(const trs& a, const trs& b, float threshold = 1e-4f)
+{
+	bool result = true;
+	result &= fuzzyEquals(a.position, b.position, threshold);
+	result &= fuzzyEquals(a.rotation, b.rotation, threshold);
+	result &= fuzzyEquals(a.scale, b.scale, threshold);
+	return result;
+}
+
+static bool isUniform(vec2 v) { return fuzzyEquals(v.x, v.y); }
+static bool isUniform(vec3 v) { return fuzzyEquals(v.x, v.y) && fuzzyEquals(v.x, v.z); }
+static bool isUniform(vec4 v) { return fuzzyEquals(v.x, v.y) && fuzzyEquals(v.x, v.z) && fuzzyEquals(v.x, v.w); }
+
 
 inline std::ostream& operator<<(std::ostream& s, vec2 v)
 {
@@ -828,6 +873,38 @@ inline std::ostream& operator<<(std::ostream& s, vec4 v)
 inline std::ostream& operator<<(std::ostream& s, quat v)
 {
 	s << "[" << v.x << ", " << v.y << ", " << v.z << ", " << v.w << "]";
+	return s;
+}
+
+inline std::ostream& operator<<(std::ostream& s, const mat2& m)
+{
+	s << "[" << m.m00 << ", " << m.m01 << "]\n";
+	s << "[" << m.m10 << ", " << m.m11 << "]";
+	return s;
+}
+
+inline std::ostream& operator<<(std::ostream& s, const mat3& m)
+{
+	s << "[" << m.m00 << ", " << m.m01 << ", " << m.m02 << "]\n";
+	s << "[" << m.m10 << ", " << m.m11 << ", " << m.m12 << "]\n";
+	s << "[" << m.m20 << ", " << m.m21 << ", " << m.m22 << "]";
+	return s;
+}
+
+inline std::ostream& operator<<(std::ostream& s, const mat4& m)
+{
+	s << "[" << m.m00 << ", " << m.m01 << ", " << m.m02 << ", " << m.m03 << "]\n";
+	s << "[" << m.m10 << ", " << m.m11 << ", " << m.m12 << ", " << m.m13 << "]\n";
+	s << "[" << m.m20 << ", " << m.m21 << ", " << m.m22 << ", " << m.m23 << "]\n";
+	s << "[" << m.m30 << ", " << m.m31 << ", " << m.m32 << ", " << m.m33 << "]";
+	return s;
+}
+
+inline std::ostream& operator<<(std::ostream& s, const trs& m)
+{
+	s << "Position: " << m.position << '\n';
+	s << "Rotation: " << m.rotation << '\n';
+	s << "Scale: " << m.scale << '\n';
 	return s;
 }
 

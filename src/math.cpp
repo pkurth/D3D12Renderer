@@ -404,6 +404,11 @@ float trace(const mat4& m)
 
 trs operator*(const trs& a, const trs& b)
 {
+	if (!isUniform(a.scale) || !isUniform(b.scale))
+	{
+		return trsToMat4(a) * trsToMat4(b);
+	}
+
 	trs result;
 	result.rotation = a.rotation * b.rotation;
 	result.position = a.rotation * (a.scale * b.position) + a.position;
@@ -413,15 +418,19 @@ trs operator*(const trs& a, const trs& b)
 
 trs invert(const trs& t)
 {
+	if (!isUniform(t.scale))
+	{
+		mat4 m = trsToMat4(t);
+		mat4 invM = invert(m);
+		trs result = invM;
+		return result;
+	}
+
 	quat invRotation = conjugate(t.rotation);
 	vec3 invScale = 1.f / t.scale;
+	vec3 invTranslation = invRotation * (invScale * -t.position);
 
-	trs result;
-	result.scale = invRotation * invScale;
-	copySign(t.scale, result.scale);
-	result.rotation = invRotation;
-	result.position = invScale * (invRotation * (-t.position));
-	return result;
+	return trs(invTranslation, invRotation, invScale);
 }
 
 vec3 transformPosition(const mat4& m, vec3 pos)
@@ -891,6 +900,7 @@ mat4 invertOrthographicProjectionMatrix(const mat4& m)
 mat4 createModelMatrix(vec3 position, quat rotation, vec3 scale)
 {
 	mat4 result;
+#if 0
 	result.m03 = position.x;
 	result.m13 = position.y;
 	result.m23 = position.z;
@@ -906,6 +916,50 @@ mat4 createModelMatrix(vec3 position, quat rotation, vec3 scale)
 	result.m22 = rot.m22 * scale.z;
 	result.m30 = result.m31 = result.m32 = 0.f;
 	result.m33 = 1.f;
+#else
+	result.m03 = position.x;
+	result.m13 = position.y;
+	result.m23 = position.z;
+
+	const float x2 = rotation.x + rotation.x;
+	const float y2 = rotation.y + rotation.y;
+	const float z2 = rotation.z + rotation.z;
+	{
+		const float xx2 = rotation.x * x2;
+		const float yy2 = rotation.y * y2;
+		const float zz2 = rotation.z * z2;
+
+		result.m00 = (1.f - (yy2 + zz2)) * scale.x;
+		result.m11 = (1.f - (xx2 + zz2)) * scale.y;
+		result.m22 = (1.f - (xx2 + yy2)) * scale.z;
+	}
+	{
+		const float yz2 = rotation.y * z2;
+		const float wx2 = rotation.w * x2;
+
+		result.m12 = (yz2 - wx2) * scale.z;
+		result.m21 = (yz2 + wx2) * scale.y;
+	}
+	{
+		const float xy2 = rotation.x * y2;
+		const float wz2 = rotation.w * z2;
+
+		result.m01 = (xy2 - wz2) * scale.y;
+		result.m10 = (xy2 + wz2) * scale.x;
+	}
+	{
+		const float xz2 = rotation.x * z2;
+		const float wy2 = rotation.w * y2;
+
+		result.m02 = (xz2 + wy2) * scale.z;
+		result.m20 = (xz2 - wy2) * scale.x;
+	}
+
+	result.m30 = 0.f;
+	result.m31 = 0.f;
+	result.m32 = 0.f;
+	result.m33 = 1.f;
+#endif
 	return result;
 }
 
@@ -1179,11 +1233,11 @@ void getTangents(vec3 normal, vec3& outTangent, vec3& outBitangent)
 	outBitangent = cross(normal, outTangent);
 }
 
-trs::trs(const mat4& m)
+trs::trs(const mat4& in)
 {
-	vec3 c0(m.m00, m.m10, m.m20);
-	vec3 c1(m.m01, m.m11, m.m21);
-	vec3 c2(m.m02, m.m12, m.m22);
+	vec3 c0(in.m00, in.m10, in.m20);
+	vec3 c1(in.m01, in.m11, in.m21);
+	vec3 c2(in.m02, in.m12, in.m22);
 	scale.x = sqrt(dot(c0, c0));
 	scale.y = sqrt(dot(c1, c1));
 	scale.z = sqrt(dot(c2, c2));
@@ -1191,23 +1245,23 @@ trs::trs(const mat4& m)
 
 	vec3 invScale = 1.f / scale;
 
-	position.x = m.m03;
-	position.y = m.m13;
-	position.z = m.m23;
+	position.x = in.m03;
+	position.y = in.m13;
+	position.z = in.m23;
 
 	mat3 R;
 
-	R.m00 = m.m00 * invScale.x;
-	R.m10 = m.m10 * invScale.x;
-	R.m20 = m.m20 * invScale.x;
+	R.m00 = in.m00 * invScale.x;
+	R.m10 = in.m10 * invScale.x;
+	R.m20 = in.m20 * invScale.x;
 			
-	R.m01 = m.m01 * invScale.y;
-	R.m11 = m.m11 * invScale.y;
-	R.m21 = m.m21 * invScale.y;
+	R.m01 = in.m01 * invScale.y;
+	R.m11 = in.m11 * invScale.y;
+	R.m21 = in.m21 * invScale.y;
 			
-	R.m02 = m.m02 * invScale.z;
-	R.m12 = m.m12 * invScale.z;
-	R.m22 = m.m22 * invScale.z;
+	R.m02 = in.m02 * invScale.z;
+	R.m12 = in.m12 * invScale.z;
+	R.m22 = in.m22 * invScale.z;
 
 	rotation = mat3ToQuaternion(R);
 }
