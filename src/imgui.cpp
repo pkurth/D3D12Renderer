@@ -223,6 +223,38 @@ namespace ImGui
 		}
 		return changed;
 	}
+
+	bool DisableableButton(const char* label, bool enabled)
+	{
+		if (!enabled)
+		{
+			ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+			ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+		}
+		bool result = ImGui::Button(label);
+		if (!enabled)
+		{
+			ImGui::PopItemFlag();
+			ImGui::PopStyleVar();
+		}
+		return result;
+	}
+
+	bool DisableableCheckbox(const char* label, bool* v, bool enabled)
+	{
+		if (!enabled)
+		{
+			ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+			ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+		}
+		bool result = ImGui::Checkbox(label, v);
+		if (!enabled)
+		{
+			ImGui::PopItemFlag();
+			ImGui::PopStyleVar();
+		}
+		return result;
+	}
 }
 
 

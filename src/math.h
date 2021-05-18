@@ -713,6 +713,14 @@ static vec2 lerp(vec2 l, vec2 u, float t) { return l + t * (u - l); }
 static vec3 lerp(vec3 l, vec3 u, float t) { return l + t * (u - l); }
 static vec4 lerp(vec4 l, vec4 u, float t) { return l + t * (u - l); }
 static quat lerp(quat l, quat u, float t) { quat result; result.v4 = lerp(l.v4, u.v4, t); return normalize(result); }
+static trs lerp(const trs& l, const trs& u, float t)
+{
+	trs result;
+	result.position = lerp(l.position, u.position, t);
+	result.rotation = lerp(l.rotation, u.rotation, t);
+	result.scale = lerp(l.scale, u.scale, t);
+	return result;
+}
 
 mat2 operator*(const mat2& a, const mat2& b);
 mat3 operator*(const mat3& a, const mat3& b);

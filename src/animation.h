@@ -77,6 +77,7 @@ struct animation_skeleton
 	void sampleAnimation(const animation_clip& clip, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
 	void sampleAnimation(uint32 index, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
 	void sampleAnimation(const std::string& name, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
+	void blendLocalTransforms(const trs* localTransforms1, const trs* localTransforms2, float t, trs* outBlendedLocalTransforms) const;
 	void getSkinningMatricesFromLocalTransforms(const trs* localTransforms, mat4* outSkinningMatrices, const trs& worldTransform = trs::identity) const;
 	void getSkinningMatricesFromGlobalTransforms(const trs* globalTransforms, mat4* outSkinningMatrices) const;
 
@@ -90,9 +91,54 @@ struct animation_instance
 
 	void update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion);
 
+	operator bool() const { return clip != 0; }
+
+private:
 	animation_clip* clip = 0;
 	float time = 0.f;
 
 	trs lastRootMotion;
 };
+
+struct animation_player
+{
+	animation_player() { }
+	animation_player(animation_clip* clip);
+
+	void transitionTo(animation_clip* clip, float transitionTime);
+	void update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion);
+
+	operator bool() const { return to; }
+	bool transitioning() const;
+
+private:
+	animation_instance from; 
+	animation_instance to;
+
+	float transitionProgress = 0.f;
+	float transitionTime = 0.f;
+};
+
+#if 0
+struct animation_blend_tree_1d
+{
+	animation_blend_tree_1d() { }
+	animation_blend_tree_1d(std::initializer_list<animation_clip*> clips, float startRelTime = 0.f, float startBlendValue = 0.f);
+
+	void setBlendValue(float blendValue);
+	void update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion);
+
+private:
+	animation_clip* clips[8];
+	uint32 numClips = 0;
+
+	float value;
+	uint32 first;
+	uint32 second;
+	float relTime;
+	float blendValue;
+
+	trs lastRootMotion;
+};
+#endif
 

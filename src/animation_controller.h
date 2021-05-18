@@ -46,9 +46,10 @@ struct simple_animation_controller : animation_controller
 	virtual void edit(scene_entity entity) override;
 
 	float timeScale = 1.f;
-	uint32 clipIndex = -1;
+	uint32 selectedClipIndex = -1;
+	float transitionTime = 0.1f;
 
-	animation_instance animationInstance;
+	animation_player animationPlayer;
 };
 
 struct ragdoll_animation_controller : animation_controller

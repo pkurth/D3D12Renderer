@@ -366,6 +366,15 @@ void animation_skeleton::sampleAnimation(const std::string& name, float time, tr
 	sampleAnimation(clipIndexIt->second, time, outLocalTransforms, outRootMotion);
 }
 
+void animation_skeleton::blendLocalTransforms(const trs* localTransforms1, const trs* localTransforms2, float t, trs* outBlendedLocalTransforms) const
+{
+	t = clamp01(t);
+	for (uint32 jointID = 0; jointID < (uint32)joints.size(); ++jointID)
+	{
+		outBlendedLocalTransforms[jointID] = lerp(localTransforms1[jointID], localTransforms2[jointID], t);
+	}
+}
+
 void animation_skeleton::getSkinningMatricesFromLocalTransforms(const trs* localTransforms, mat4* outSkinningMatrices, const trs& worldTransform) const
 {
 	uint32 numJoints = (uint32)joints.size();
@@ -472,8 +481,8 @@ trs animation_clip::getLastRootTransform()
 animation_instance::animation_instance(animation_clip* clip, float startTime)
 {
 	this->clip = clip;
-	this->time = startTime;
-	this->lastRootMotion = clip->getFirstRootTransform();
+	time = startTime;
+	lastRootMotion = clip->getFirstRootTransform();
 }
 
 void animation_instance::update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion)
@@ -491,4 +500,135 @@ void animation_instance::update(const animation_skeleton& skeleton, float dt, tr
 
 	outDeltaRootMotion = invert(lastRootMotion) * rootMotion;
 	lastRootMotion = rootMotion;
+}
+
+#if 0
+animation_blend_tree_1d::animation_blend_tree_1d(std::initializer_list<animation_clip*> clips, float startBlendValue, float startRelTime)
+{
+	assert(clips.size() <= arraysize(this->clips));
+	assert(clips.size() > 1);
+
+	numClips = 0;
+	for (animation_clip* clip : clips)
+	{
+		this->clips[numClips++] = clip;
+	}
+
+	first = 0;
+	second = 1;
+	relTime = startRelTime;
+
+	setBlendValue(startBlendValue);
+
+	lastRootMotion = lerp(this->clips[first]->getFirstRootTransform(), this->clips[second]->getFirstRootTransform(), blendValue);
+}
+
+void animation_blend_tree_1d::update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion)
+{
+	const animation_clip* first = clips[this->first];
+	const animation_clip* second = clips[this->second];
+
+	float firstLength = first->lengthInSeconds;
+	float secondLength = second->lengthInSeconds;
+
+	float lengthDist = secondLength - firstLength;
+	float targetLength = firstLength + lengthDist * blendValue;
+
+	float start = relTime;
+	relTime += dt / targetLength;
+	relTime = fmodf(relTime, 1.f);
+
+
+	trs* totalLocalTransforms = (trs*)alloca(sizeof(trs) * skeleton.joints.size() * 2);
+	trs* localTransforms1 = totalLocalTransforms;
+	trs* localTransforms2 = totalLocalTransforms + skeleton.joints.size();
+
+	trs rootMotion1, rootMotion2;
+	skeleton.sampleAnimation(*first, first->lengthInSeconds * relTime, localTransforms1, &rootMotion1);
+	skeleton.sampleAnimation(*second, second->lengthInSeconds * relTime, localTransforms2, &rootMotion2);
+
+	skeleton.blendLocalTransforms(localTransforms1, localTransforms2, blendValue, outLocalTransforms);
+	
+	trs rootMotion = lerp(rootMotion1, rootMotion2, blendValue);
+
+	outDeltaRootMotion = invert(lastRootMotion) * rootMotion;
+	lastRootMotion = rootMotion;
+}
+
+void animation_blend_tree_1d::setBlendValue(float value)
+{
+	value = clamp01(value);
+
+	float step = 1.f / (numClips - 1);
+
+	uint32 newFirstAnimationIndex = numClips - 2, newSecondAnimationIndex = numClips - 1;
+	if (value < 1.f)
+	{
+		newFirstAnimationIndex = (uint32)(value / step);
+		newSecondAnimationIndex = newFirstAnimationIndex + 1;
+	}
+
+	first = newFirstAnimationIndex;
+	second = newSecondAnimationIndex;
+
+	float begin = newFirstAnimationIndex * step;
+	this->blendValue = (value - begin) / step;
+	this->value = value;
+}
+#endif
+
+animation_player::animation_player(animation_clip* clip)
+{
+	to = animation_instance(clip);
+}
+
+void animation_player::transitionTo(animation_clip* clip, float transitionTime)
+{
+	if (!to)
+	{
+		to = animation_instance(clip);
+	}
+	else
+	{
+		from = to;
+		to = animation_instance(clip);
+
+		transitionProgress = 0.f;
+		this->transitionTime = transitionTime;
+	}
+}
+
+void animation_player::update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion)
+{
+	if (transitioning())
+	{
+		transitionProgress += dt;
+		if (transitionProgress > transitionTime)
+		{
+			from = animation_instance();
+			transitionTime = 0.f;
+		}
+	}
+
+	if (!transitioning())
+	{
+		return to.update(skeleton, dt, outLocalTransforms, outDeltaRootMotion);
+	}
+
+	trs* totalLocalTransforms = (trs*)alloca(sizeof(trs) * skeleton.joints.size() * 2);
+	trs* localTransforms1 = totalLocalTransforms;
+	trs* localTransforms2 = totalLocalTransforms + skeleton.joints.size();
+
+	trs deltaRootMotion1, deltaRootMotion2;
+	from.update(skeleton, dt, localTransforms1, deltaRootMotion1);
+	to.update(skeleton, dt, localTransforms2, deltaRootMotion2);
+
+	float blend = clamp01(transitionProgress / transitionTime);
+	skeleton.blendLocalTransforms(localTransforms1, localTransforms2, blend, outLocalTransforms);
+	outDeltaRootMotion = lerp(deltaRootMotion1, deltaRootMotion2, blend);
+}
+
+bool animation_player::transitioning() const
+{
+	return from;
 }

@@ -45,13 +45,13 @@ void simple_animation_controller::update(scene_entity entity, float dt)
 {
 	ref<composite_mesh> mesh = entity.getComponent<raster_component>().mesh;
 	animation_skeleton& skeleton = mesh->skeleton;
-	if (animationInstance.clip)
+	if (animationPlayer)
 	{
 		mat4* skinningMatrices = allocateSkin(mesh);
 
 		trs localTransforms[128];
 		trs deltaRootMotion;
-		animationInstance.update(skeleton, dt * timeScale, localTransforms, deltaRootMotion);
+		animationPlayer.update(skeleton, dt * timeScale, localTransforms, deltaRootMotion);
 		
 		skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
 
@@ -82,19 +82,16 @@ void simple_animation_controller::edit(scene_entity entity)
 			result = skeleton.clips[index].name.c_str();
 		}
 		return result;
-	}, clipIndex, &skeleton);
+	}, selectedClipIndex, &skeleton);
 
-	if (clipChanged)
+	ImGui::SliderFloat("Transition time", &transitionTime, 0.f, 1.f);
+
+	if (ImGui::DisableableButton("Transition", !animationPlayer.transitioning() && selectedClipIndex < (uint32)skeleton.clips.size()))
 	{
-		animationInstance = animation_instance(&skeleton.clips[clipIndex]);
+		animationPlayer.transitionTo(&skeleton.clips[selectedClipIndex], transitionTime);
 	}
 
 	ImGui::SliderFloat("Time scale", &timeScale, 0.f, 1.f);
-	if (animationInstance.clip)
-	{
-		ImGui::SliderFloat("Time", &animationInstance.time, 0.f, animationInstance.clip->lengthInSeconds);
-		skeleton.clips[clipIndex].edit();
-	}
 }
 
 void ragdoll_animation_controller::update(scene_entity entity, float dt)
