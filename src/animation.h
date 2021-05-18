@@ -64,8 +64,6 @@ struct animation_skeleton
 	std::vector<skeleton_joint> joints;
 	std::unordered_map<std::string, uint32> nameToJointID;
 
-	//trs rootBindTransform;
-
 	std::vector<animation_clip> clips;
 	std::unordered_map<std::string, uint32> nameToClipID;
 
@@ -76,6 +74,7 @@ struct animation_skeleton
 	void pushAssimpAnimations(const std::string& sceneFilename, float scale = 1.f);
 	void pushAssimpAnimationsInDirectory(const std::string& directory, float scale = 1.f);
 
+	void sampleAnimation(const animation_clip& clip, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
 	void sampleAnimation(uint32 index, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
 	void sampleAnimation(const std::string& name, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
 	void getSkinningMatricesFromLocalTransforms(const trs* localTransforms, mat4* outSkinningMatrices, const trs& worldTransform = trs::identity) const;
@@ -83,3 +82,17 @@ struct animation_skeleton
 
 	void prettyPrintHierarchy() const;
 };
+
+struct animation_instance
+{
+	animation_instance() { }
+	animation_instance(animation_clip* clip, float startTime = 0.f);
+
+	void update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion);
+
+	animation_clip* clip = 0;
+	float time = 0.f;
+
+	trs lastRootMotion;
+};
+

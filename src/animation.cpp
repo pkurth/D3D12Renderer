@@ -293,9 +293,8 @@ static vec3 sampleScale(const animation_clip& clip, const animation_joint& animJ
 	return lerp(a, b, t);
 }
 
-void animation_skeleton::sampleAnimation(uint32 index, float time, trs* outLocalTransforms, trs* outRootMotion) const
+void animation_skeleton::sampleAnimation(const animation_clip& clip, float time, trs* outLocalTransforms, trs* outRootMotion) const
 {
-	const animation_clip& clip = clips[index];
 	assert(clip.joints.size() == joints.size());
 
 	time = clamp(time, 0.f, clip.lengthInSeconds);
@@ -351,6 +350,12 @@ void animation_skeleton::sampleAnimation(uint32 index, float time, trs* outLocal
 	{
 		outLocalTransforms[0] = rootMotion * outLocalTransforms[0];
 	}
+}
+
+void animation_skeleton::sampleAnimation(uint32 index, float time, trs* outLocalTransforms, trs* outRootMotion) const
+{
+	const animation_clip& clip = clips[index];
+	sampleAnimation(clip, time, outLocalTransforms, outRootMotion);
 }
 
 void animation_skeleton::sampleAnimation(const std::string& name, float time, trs* outLocalTransforms, trs* outRootMotion) const
@@ -462,4 +467,28 @@ trs animation_clip::getLastRootTransform()
 		return t;
 	}
 	return trs::identity;
+}
+
+animation_instance::animation_instance(animation_clip* clip, float startTime)
+{
+	this->clip = clip;
+	this->time = startTime;
+	this->lastRootMotion = clip->getFirstRootTransform();
+}
+
+void animation_instance::update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion)
+{
+	time += dt;
+	if (time >= clip->lengthInSeconds)
+	{
+		time = fmod(time, clip->lengthInSeconds);
+
+		lastRootMotion = clip->getFirstRootTransform();
+	}
+
+	trs rootMotion;
+	skeleton.sampleAnimation(*clip, time, outLocalTransforms, &rootMotion);
+
+	outDeltaRootMotion = invert(lastRootMotion) * rootMotion;
+	lastRootMotion = rootMotion;
 }

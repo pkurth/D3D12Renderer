@@ -45,33 +45,22 @@ void simple_animation_controller::update(scene_entity entity, float dt)
 {
 	ref<composite_mesh> mesh = entity.getComponent<raster_component>().mesh;
 	animation_skeleton& skeleton = mesh->skeleton;
-	if (animationIndex < (uint32)skeleton.clips.size())
+	if (animationInstance.clip)
 	{
 		mat4* skinningMatrices = allocateSkin(mesh);
-		
-		animation_clip& clip = skeleton.clips[animationIndex];
-		time += dt * timeScale;
-		if (time >= clip.lengthInSeconds)
-		{
-			time = fmod(time, clip.lengthInSeconds);
 
-			lastRootMotion = clip.getFirstRootTransform();
-		}
-		
 		trs localTransforms[128];
-		trs rootMotion;
-
-		skeleton.sampleAnimation(animationIndex, time, localTransforms, &rootMotion);
+		trs deltaRootMotion;
+		animationInstance.update(skeleton, dt * timeScale, localTransforms, deltaRootMotion);
+		
 		skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
 
 		if (entity.hasComponent<trs>())
 		{
 			trs& transform = entity.getComponent<trs>();
-			trs deltaTransform = invert(lastRootMotion) * rootMotion;
-			transform = transform * deltaTransform;
+			transform = transform * deltaRootMotion;
 			transform.rotation = normalize(transform.rotation);
 		}
-		lastRootMotion = rootMotion;
 	}
 	else
 	{
@@ -84,7 +73,7 @@ void simple_animation_controller::edit(scene_entity entity)
 	ref<composite_mesh> mesh = entity.getComponent<raster_component>().mesh;
 	animation_skeleton& skeleton = mesh->skeleton;
 
-	bool animationChanged = ImGui::Dropdown("Currently playing", [](uint32 index, void* data)
+	bool clipChanged = ImGui::Dropdown("Currently playing", [](uint32 index, void* data)
 	{
 		animation_skeleton& skeleton = *(animation_skeleton*)data;
 		const char* result = 0;
@@ -93,20 +82,18 @@ void simple_animation_controller::edit(scene_entity entity)
 			result = skeleton.clips[index].name.c_str();
 		}
 		return result;
-	}, animationIndex, &skeleton);
+	}, clipIndex, &skeleton);
 
-	if (animationChanged)
+	if (clipChanged)
 	{
-		time = 0.f;
-		lastRootMotion = skeleton.clips[animationIndex].getFirstRootTransform();
+		animationInstance = animation_instance(&skeleton.clips[clipIndex]);
 	}
 
 	ImGui::SliderFloat("Time scale", &timeScale, 0.f, 1.f);
-	if (animationIndex < (uint32)skeleton.clips.size())
+	if (animationInstance.clip)
 	{
-		ImGui::SliderFloat("Time", &time, 0.f, skeleton.clips[animationIndex].lengthInSeconds);
-
-		skeleton.clips[animationIndex].edit();
+		ImGui::SliderFloat("Time", &animationInstance.time, 0.f, animationInstance.clip->lengthInSeconds);
+		skeleton.clips[clipIndex].edit();
 	}
 }
 
