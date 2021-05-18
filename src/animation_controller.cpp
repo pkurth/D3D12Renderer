@@ -67,7 +67,8 @@ void simple_animation_controller::update(scene_entity entity, float dt)
 		if (entity.hasComponent<trs>())
 		{
 			trs& transform = entity.getComponent<trs>();
-			transform = transform * invert(lastRootMotion) * rootMotion;
+			trs deltaTransform = invert(lastRootMotion) * rootMotion;
+			transform = transform * deltaTransform;
 			transform.rotation = normalize(transform.rotation);
 		}
 		lastRootMotion = rootMotion;

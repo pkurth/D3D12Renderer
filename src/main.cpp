@@ -316,7 +316,7 @@ int main(int argc, char** argv)
 
 	if (!dxContext.initialize())
 	{
-		return 1;
+		return EXIT_FAILURE;
 	}
 
 	initializeJobSystem();
@@ -467,4 +467,6 @@ int main(int argc, char** argv)
 	dxContext.flushApplication();
 
 	dxContext.quit();
+
+	return EXIT_SUCCESS;
 }
