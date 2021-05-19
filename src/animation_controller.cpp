@@ -11,8 +11,8 @@ mat4* animation_controller::allocateSkin(ref<composite_mesh> mesh)
 
 	auto [vb, vertexOffset, skinningMatrices] = skinObject(dxMesh.vertexBuffer, (uint32)skeleton.joints.size());
 
-	prevFrameVertexBuffer = this->currentVertexBuffer;
-	this->currentVertexBuffer = vb;
+	prevFrameVertexBuffer = currentVertexBuffer;
+	currentVertexBuffer = vb;
 
 	uint32 numSubmeshes = (uint32)mesh->submeshes.size();
 	for (uint32 i = 0; i < numSubmeshes; ++i)
@@ -31,7 +31,7 @@ void animation_controller::defaultVertexBuffer(ref<composite_mesh> mesh)
 	const dx_mesh& dxMesh = mesh->mesh;
 
 	prevFrameVertexBuffer = dxMesh.vertexBuffer;
-	this->currentVertexBuffer = dxMesh.vertexBuffer;
+	currentVertexBuffer = dxMesh.vertexBuffer;
 
 	uint32 numSubmeshes = (uint32)mesh->submeshes.size();
 	for (uint32 i = 0; i < numSubmeshes; ++i)
@@ -49,7 +49,7 @@ void simple_animation_controller::update(scene_entity entity, float dt)
 	{
 		mat4* skinningMatrices = allocateSkin(mesh);
 
-		trs localTransforms[128];
+		trs* localTransforms = (trs*)alloca(sizeof(trs) * skeleton.joints.size());
 		trs deltaRootMotion;
 		animationPlayer.update(skeleton, dt * timeScale, localTransforms, deltaRootMotion);
 		
