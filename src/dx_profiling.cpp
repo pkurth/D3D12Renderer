@@ -74,7 +74,8 @@ void resolveTimeStampQueries(uint64* timestamps)
 			events[i].timestamp = timestamps[i];
 		}
 
-		std::sort(events, events + numQueries, [](const dx_profile_event& a, const dx_profile_event& b)
+		// Stable sort is important here, since occasionally two time stamps will have the exact same value.
+		std::stable_sort(events, events + numQueries, [](const dx_profile_event& a, const dx_profile_event& b)
 		{
 			return a.timestamp < b.timestamp;
 		});

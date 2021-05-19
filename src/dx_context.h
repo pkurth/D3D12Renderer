@@ -89,7 +89,7 @@ struct dx_context
 	dx_descriptor_heap<dx_dsv_descriptor_handle> dsvAllocator;
 
 #if ENABLE_DX_PROFILING
-	uint32 timestampQueryIndex[NUM_BUFFERED_FRAMES];
+	volatile uint32 timestampQueryIndex[NUM_BUFFERED_FRAMES];
 #endif
 
 	dx_upload_buffer frameUploadBuffer;
