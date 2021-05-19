@@ -1,16 +1,3 @@
-
-newoption {
-    trigger     = "torch-debug",
-    description = "Specify the root directory of Libtorch (Debug build)."
-}
-
-newoption {
-    trigger     = "torch-release",
-    description = "Specify the root directory of Libtorch (Release build)."
-}
-
-
-
 local gpu_name = ""
 local gpu_model_number = 0
 local sdk_version = 0
@@ -149,38 +136,9 @@ end
 print("\n")
 
 
-
------------------------------------------
--- CHECK PYTORCH
------------------------------------------
-
-local torch_debug_dir = nil
-local torch_release_dir = nil
-
-if _OPTIONS["torch-debug"] then
-	torch_debug_dir = _OPTIONS["torch-debug"]
-end
-if _OPTIONS["torch-release"] then
-	torch_release_dir = _OPTIONS["torch-release"]
-end
-
-local torch_rel_include_dir_1 = "/include/"
-local torch_rel_include_dir_2 = "/include/torch/csrc/api/include/"
-local torch_rel_lib_1 = "/lib/c10.lib"
-local torch_rel_lib_2 = "/lib/torch.lib"
-local torch_rel_lib_3 = "/lib/torch_cpu.lib"
-local torch_rel_bin_dir = "/lib/"
-
-
-os.remove("D3D12Renderer.sln") -- This causes VS to reload the .vcxuser file, where the debug environment is stored.
-
-
 -----------------------------------------
 -- GENERATE SOLUTION
 -----------------------------------------
-
-local debug_env = "PATH=ext/bin;%PATH%;"
-
 
 workspace "D3D12Renderer"
 	architecture "x64"
@@ -220,7 +178,9 @@ project "D3D12Renderer"
 	targetdir ("./bin/" .. outputdir)
 	objdir ("./bin_int/" .. outputdir ..  "/%{prj.name}")
 
-
+	debugenvs {
+		"PATH=ext/bin;%PATH%;"
+	}
 	debugdir "."
 
 	pchheader "pch.h"
@@ -271,49 +231,10 @@ project "D3D12Renderer"
 	filter "configurations:Debug"
         runtime "Debug"
 		symbols "On"
-
-		if torch_debug_dir then
-			sysincludedirs {
-				torch_debug_dir .. torch_rel_include_dir_1,
-				torch_debug_dir .. torch_rel_include_dir_2,
-			}
-			links {
-				torch_debug_dir .. torch_rel_lib_1,
-				torch_debug_dir .. torch_rel_lib_2,
-				torch_debug_dir .. torch_rel_lib_3,
-			}
-			debugenvs {
-				debug_env .. torch_debug_dir .. torch_rel_bin_dir
-			}
-		else
-			debugenvs {
-				debug_env
-			}
-		end
 		
 	filter "configurations:Release"
         runtime "Release"
 		optimize "On"
-
-		if torch_release_dir then
-			sysincludedirs {
-				torch_release_dir .. torch_rel_include_dir_1,
-				torch_release_dir .. torch_rel_include_dir_2,
-			}
-			links {
-				torch_release_dir .. torch_rel_lib_1,
-				torch_release_dir .. torch_rel_lib_2,
-				torch_release_dir .. torch_rel_lib_3,
-			}
-			debugenvs {
-				debug_env .. torch_release_dir .. torch_rel_bin_dir
-			}
-		else
-			debugenvs {
-				debug_env
-			}
-		end
-
 
 	filter "system:windows"
 		systemversion "latest"

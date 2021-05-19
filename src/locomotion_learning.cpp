@@ -465,34 +465,36 @@ extern "C" __declspec(dllexport) void resetPhysics(float* outState)
 
 
 
-#ifndef PHYSICS_ONLY
-#if __has_include(<torch/torch.h>)
-#undef min
-#undef max
-#undef rad2deg
-#undef deg2rad
-#undef M_PI
-#pragma warning( disable : 4067 4624 4275 4251 4244 4996 4267 )
-#include <torch/torch.h>
-#include <torch/script.h>
 
 
-static torch::jit::script::Module nn;
+
+
+template <uint32 inputSize, uint32 outputSize>
+static void applyLayer(const float(&weights)[outputSize][inputSize], const float(&bias)[outputSize], const float* from, float* to, bool activation)
+{
+	for (uint32 y = 0; y < outputSize; ++y)
+	{
+		const float* row = weights[y];
+
+		float sum = 0.f;
+		for (uint32 x = 0; x < inputSize; ++x)
+		{
+			sum += row[x] * from[x];
+		}
+		sum += bias[y];
+		to[y] = activation ? tanh(sum) : sum;
+	}
+}
+
+#if __has_include("../tmp/network.h")
+#include "../tmp/network.h"
+
 static locomotion_environment* evaluationEnv;
 
 void initializeLocomotionEval(scene& appScene, humanoid_ragdoll& ragdoll)
 {
-	try
-	{
-		nn = torch::jit::load("tmp/testexport.pt");
-
-		evaluationEnv = new locomotion_environment{ appScene, ragdoll };
-		evaluationEnv->resetForEvaluation();
-	}
-	catch (c10::Error e)
-	{
-		std::cout << e.what() << '\n';
-	}
+	evaluationEnv = new locomotion_environment{ appScene, ragdoll };
+	evaluationEnv->resetForEvaluation();
 }
 
 void stepLocomotionEval()
@@ -513,28 +515,29 @@ void stepLocomotionEval()
 		evaluationEnv->applyAction({});
 	}
 
-	std::vector<torch::jit::IValue> inputs;
-	auto options = torch::TensorOptions().dtype(torch::kFloat32);
-	inputs.push_back(torch::from_blob(&state, { sizeof(state) / 4 }, options).unsqueeze(0));
+	learning_action action;
 
-	try
-	{
-		auto output = nn.forward(inputs);
-		auto outputTensor = output.toTensor();
+	float* buffers = (float*)alloca(sizeof(float) * HIDDEN_LAYER_SIZE * 2);
 
-		float* action = outputTensor.data_ptr<float>();
+	float* a = buffers;
+	float* b = buffers + HIDDEN_LAYER_SIZE;
 
-		evaluationEnv->applyAction(*(learning_action*)action);
-		evaluationEnv->getLastActionReward();
-	}
-	catch (c10::Error e)
-	{
-		std::cout << e.what() << '\n';
-	}
+	// State to a.
+	applyLayer(policyWeights1, policyBias1, (const float*)&state, a, true);
+
+	// a to b.
+	applyLayer(policyWeights2, policyBias2, a, b, true);
+
+	// b to action.
+	applyLayer(actionWeights, actionBias, b, (float*)&action, false);
+
+
+	evaluationEnv->applyAction(action);
+	evaluationEnv->getLastActionReward();
 }
 #else
 void initializeLocomotionEval(scene& appScene, humanoid_ragdoll& ragdoll) {}
 void stepLocomotionEval() {}
 #endif
 
-#endif
+
