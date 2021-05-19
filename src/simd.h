@@ -202,6 +202,21 @@ static floatx4 pow(floatx4 x, floatx4 y)
 	return exp2(log2(x) * y);
 }
 
+static floatx4 exp(floatx4 x)
+{
+	floatx4 a = 12102203.f; // (1 << 23) / log(2).
+	intx4 b = 127 * (1 << 23) - 298765;
+	intx4 t = convertFloatToInt(a * x) + b;
+	return reinterpretIntAsFloat(t);
+}
+
+static floatx4 tanh(floatx4 x)
+{
+	floatx4 a = exp(x);
+	floatx4 b = exp(-x);
+	return (a - b) / (a + b);
+}
+
 #endif
 
 #if defined(SIMD_AVX_2)
@@ -411,6 +426,21 @@ static floatx8 pow(floatx8 x, floatx8 y)
 	return exp2(log2(x) * y);
 }
 
+static floatx8 exp(floatx8 x)
+{
+	floatx8 a = 12102203.f; // (1 << 23) / log(2).
+	intx8 b = 127 * (1 << 23) - 298765;
+	intx8 t = convertFloatToInt(a * x) + b;
+	return reinterpretIntAsFloat(t);
+}
+
+static floatx8 tanh(floatx8 x)
+{
+	floatx8 a = exp(x);
+	floatx8 b = exp(-x);
+	return (a - b) / (a + b);
+}
+
 
 #endif
 
@@ -588,6 +618,21 @@ static floatx16 log2(floatx16 x)
 static floatx16 pow(floatx16 x, floatx16 y)
 {
 	return exp2(log2(x) * y);
+}
+
+static floatx16 exp(floatx16 x)
+{
+	floatx16 a = 12102203.f; // (1 << 23) / log(2).
+	intx16 b = 127 * (1 << 23) - 298765;
+	intx16 t = convertFloatToInt(a * x) + b;
+	return reinterpretIntAsFloat(t);
+}
+
+static floatx16 tanh(floatx16 x)
+{
+	floatx16 a = exp(x);
+	floatx16 b = exp(-x);
+	return (a - b) / (a + b);
 }
 
 
