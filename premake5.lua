@@ -228,6 +228,8 @@ project "D3D12Renderer"
 		"ext",
 	}
 
+	vectorextensions "AVX2"
+
 	filter "configurations:Debug"
         runtime "Debug"
 		symbols "On"
