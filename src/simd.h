@@ -33,9 +33,10 @@ struct floatx4
 {
 	__m128 f;
 
+	floatx4() {}
 	floatx4(float f_) { f = _mm_set1_ps(f_); }
 	floatx4(__m128 f_) { f = f_; }
-	floatx4(float* f_) { f = _mm_loadu_ps(f_); }
+	floatx4(const float* f_) { f = _mm_loadu_ps(f_); }
 
 	operator __m128() { return f; }
 
@@ -46,6 +47,7 @@ struct intx4
 {
 	__m128i i;
 
+	intx4() {}
 	intx4(int i_) { i = _mm_set1_epi32(i_); }
 	intx4(__m128i i_) { i = i_; }
 	//intx4(int* i_) { i = _mm_loadu_epi32(i_); } // TODO: Give non-AVX512 alternative.
@@ -231,9 +233,10 @@ struct floatx8
 {
 	__m256 f;
 
+	floatx8() {}
 	floatx8(float f_) { f = _mm256_set1_ps(f_); }
 	floatx8(__m256 f_) { f = f_; }
-	floatx8(float* f_) { f = _mm256_loadu_ps(f_); }
+	floatx8(const float* f_) { f = _mm256_loadu_ps(f_); }
 
 	operator __m256() { return f; }
 
@@ -244,9 +247,10 @@ struct intx8
 {
 	__m256i i;
 
+	intx8() {}
 	intx8(int i_) { i = _mm256_set1_epi32(i_); }
 	intx8(__m256i i_) { i = i_; }
-	intx8(int* i_) { i = _mm256_loadu_epi32(i_); }
+	intx8(const int* i_) { i = _mm256_loadu_epi32(i_); }
 
 	operator __m256i() { return i; }
 
@@ -452,9 +456,10 @@ struct floatx16
 {
 	__m512 f;
 
+	floatx16() {}
 	floatx16(float f_) { f = _mm512_set1_ps(f_); }
 	floatx16(__m512 f_) { f = f_; }
-	floatx16(float* f_) { f = _mm512_loadu_ps(f_); }
+	floatx16(const float* f_) { f = _mm512_loadu_ps(f_); }
 
 	operator __m512() { return f; }
 
@@ -465,9 +470,10 @@ struct intx16
 {
 	__m512i i;
 
+	intx16() {}
 	intx16(int i_) { i = _mm512_set1_epi32(i_); }
 	intx16(__m512i i_) { i = i_; }
-	intx16(int* i_) { i = _mm512_loadu_epi32(i_); }
+	intx16(const int* i_) { i = _mm512_loadu_epi32(i_); }
 
 	operator __m512i() { return i; }
 

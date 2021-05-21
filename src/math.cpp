@@ -140,6 +140,8 @@ mat3 operator-(const mat3& a, const mat3& b)
 
 mat4 operator*(const mat4& a, const mat4& b)
 {
+#ifndef SIMD_AVX_2
+	mat4 result;
 	vec4 r0 = row(a, 0);
 	vec4 r1 = row(a, 1);
 	vec4 r2 = row(a, 2);
@@ -150,12 +152,61 @@ mat4 operator*(const mat4& a, const mat4& b)
 	vec4 c2 = col(b, 2);
 	vec4 c3 = col(b, 3);
 
-	mat4 result;
 	result.m00 = dot(r0, c0); result.m01 = dot(r0, c1); result.m02 = dot(r0, c2); result.m03 = dot(r0, c3);
 	result.m10 = dot(r1, c0); result.m11 = dot(r1, c1); result.m12 = dot(r1, c2); result.m13 = dot(r1, c3);
 	result.m20 = dot(r2, c0); result.m21 = dot(r2, c1); result.m22 = dot(r2, c2); result.m23 = dot(r2, c3);
 	result.m30 = dot(r3, c0); result.m31 = dot(r3, c1); result.m32 = dot(r3, c2); result.m33 = dot(r3, c3);
 	return result;
+#else
+	floatx8 a0, a1, b0, b1;
+	floatx8 c0, c1, c2, c3, c4, c5, c6, c7;
+
+#if ROW_MAJOR
+	floatx8 u0 = b.m;
+	floatx8 u1 = b.m + 8;
+	floatx8 t0 = a.m;
+	floatx8 t1 = a.m + 8;
+#else
+	floatx8 t0 = b.m;
+	floatx8 t1 = b.m + 8;
+	floatx8 u0 = a.m;
+	floatx8 u1 = a.m + 8;
+#endif
+
+	a0 = _mm256_shuffle_ps(t0, t0, _MM_SHUFFLE(0, 0, 0, 0));
+	a1 = _mm256_shuffle_ps(t1, t1, _MM_SHUFFLE(0, 0, 0, 0));
+	b0 = _mm256_permute2f128_ps(u0, u0, 0x00);
+	c0 = a0 * b0;
+	c1 = a1 * b0;
+
+	a0 = _mm256_shuffle_ps(t0, t0, _MM_SHUFFLE(1, 1, 1, 1));
+	a1 = _mm256_shuffle_ps(t1, t1, _MM_SHUFFLE(1, 1, 1, 1));
+	b0 = _mm256_permute2f128_ps(u0, u0, 0x11);
+	c2 = a0 * b0;
+	c3 = a1 * b0;
+
+	a0 = _mm256_shuffle_ps(t0, t0, _MM_SHUFFLE(2, 2, 2, 2));
+	a1 = _mm256_shuffle_ps(t1, t1, _MM_SHUFFLE(2, 2, 2, 2));
+	b1 = _mm256_permute2f128_ps(u1, u1, 0x00);
+	c4 = a0 * b1;
+	c5 = a1 * b1;
+
+	a0 = _mm256_shuffle_ps(t0, t0, _MM_SHUFFLE(3, 3, 3, 3));
+	a1 = _mm256_shuffle_ps(t1, t1, _MM_SHUFFLE(3, 3, 3, 3));
+	b1 = _mm256_permute2f128_ps(u1, u1, 0x11);
+	c6 = a0 * b1;
+	c7 = a1 * b1;
+
+	c0 = c0 + c2;
+	c4 = c4 + c6;
+	c1 = c1 + c3;
+	c5 = c5 + c7;
+
+	mat4 result;
+	(c0 + c4).store(result.m);
+	(c1 + c5).store(result.m + 8);
+	return result;
+#endif
 }
 
 
