@@ -94,17 +94,17 @@ void application::initialize(dx_renderer* renderer)
 		appScene.createEntity("Stormtrooper 1")
 			.addComponent<trs>(vec3(-5.f, 0.f, -1.f), quat::identity)
 			.addComponent<raster_component>(stormtrooperMesh)
-			.addComponent<animation_component>(createAnimationController(animation_controller_type_simple));
+			.addComponent<animation_component>(make_ref<simple_animation_controller>());
 
 		appScene.createEntity("Stormtrooper 2")
 			.addComponent<trs>(vec3(0.f, 0.f, -2.f), quat::identity)
 			.addComponent<raster_component>(stormtrooperMesh)
-			.addComponent<animation_component>(createAnimationController(animation_controller_type_simple));
+			.addComponent<animation_component>(make_ref<simple_animation_controller>());
 
 		appScene.createEntity("Stormtrooper 3")
 			.addComponent<trs>(vec3(5.f, 0.f, -1.f), quat::identity)
 			.addComponent<raster_component>(stormtrooperMesh)
-			.addComponent<animation_component>(createAnimationController(animation_controller_type_simple));
+			.addComponent<animation_component>(make_ref<simple_animation_controller>());
 	}
 
 	if (pilotMesh)
@@ -112,7 +112,7 @@ void application::initialize(dx_renderer* renderer)
 		appScene.createEntity("Pilot")
 			.addComponent<trs>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
 			.addComponent<raster_component>(pilotMesh)
-			.addComponent<animation_component>(createAnimationController(animation_controller_type_simple));
+			.addComponent<animation_component>(make_ref<simple_animation_controller>());
 	}
 
 	if (unrealMesh)
@@ -120,21 +120,24 @@ void application::initialize(dx_renderer* renderer)
 		appScene.createEntity("Mannequin")
 			.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.019f)
 			.addComponent<raster_component>(unrealMesh)
-			.addComponent<animation_component>(createAnimationController(animation_controller_type_simple));
+			.addComponent<animation_component>(make_ref<simple_animation_controller>());
 	}
 #endif
 
+#if 1
 	auto ragdollMesh = loadAnimatedMeshFromFile("assets/ragdoll/skin.fbx");
 	if (ragdollMesh)
 	{
 		//ragdollMesh->skeleton.prettyPrintHierarchy();
-		ragdollMesh->skeleton.pushAssimpAnimationsInDirectory("assets/ragdoll/animations", 1.f);
+		ragdollMesh->skeleton.pushAssimpAnimationsInDirectory("assets/ragdoll/animations");
+		ragdollMesh->skeleton.readAnimationPropertiesFromFile("assets/ragdoll/transitions.yaml");
 
 		appScene.createEntity("Ragdoll")
 			.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat::identity, 0.01f)
 			.addComponent<raster_component>(ragdollMesh)
-			.addComponent<animation_component>(createAnimationController(animation_controller_type_simple));
+			.addComponent<animation_component>(make_ref<random_path_animation_controller>());
 	}
+#endif
 
 #if 1
 	{
@@ -182,9 +185,9 @@ void application::initialize(dx_renderer* renderer)
 		for (uint32 i = 0; i < 10; ++i)
 		{
 			appScene.createEntity("Cube")
-				.addComponent<trs>(vec3(20.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+				.addComponent<trs>(vec3(50.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
 				.addComponent<raster_component>(boxMesh)
-				.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 10.f)
+				.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 1.f)
 				.addComponent<rigid_body_component>(false, 1.f);
 		}
 
@@ -259,7 +262,7 @@ void application::initialize(dx_renderer* renderer)
 	}
 #endif
 
-	//ragdoll.initialize(appScene, vec3(30.f, 1.25f, -2.f));
+	ragdoll.initialize(appScene, vec3(60.f, 1.25f, -2.f));
 	//ragdoll.initialize(appScene, vec3(0.f, 1.25f, 0.f));
 
 	//initializeLocomotionEval(appScene, ragdoll);
@@ -1128,8 +1131,8 @@ void application::update(const user_input& input, float dt)
 	fireParticleSystem.update(dt);
 	fireParticleSystem.render(&transparentRenderPass);
 
-	smokeParticleSystem.update(dt);
-	smokeParticleSystem.render(&transparentRenderPass);
+	//smokeParticleSystem.update(dt);
+	//smokeParticleSystem.render(&transparentRenderPass);
 #endif
 
 	sun.updateMatrices(camera);
@@ -1541,7 +1544,7 @@ bool application::deserializeFromFile()
 		if (entityNode["Animation"])
 		{
 			auto animNode = entityNode["Animation"];
-			entity.addComponent<animation_component>(createAnimationController((animation_controller_type)animNode["Type"].as<uint32>()));
+			//entity.addComponent<animation_component>(createAnimationController((animation_controller_type)animNode["Type"].as<uint32>()));
 		}
 	}
 

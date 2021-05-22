@@ -24,6 +24,7 @@ void render_camera::initializeCalibrated(vec3 position, quat rotation, uint32 wi
 	this->height = height;
 	this->nearPlane = nearPlane;
 	this->farPlane = farPlane;
+	this->aspect = (float)width / (float)height;
 }
 
 void render_camera::setViewport(uint32 width, uint32 height)

@@ -18,6 +18,7 @@ enum animation_controller_type
 {
 	animation_controller_type_simple,
 	animation_controller_type_ragdoll,
+	animation_controller_type_random_path,
 };
 
 
@@ -42,11 +43,12 @@ protected:
 struct simple_animation_controller : animation_controller
 {
 	simple_animation_controller() { type = animation_controller_type_simple; }
+
 	virtual void update(scene_entity entity, float dt) override;
 	virtual void edit(scene_entity entity) override;
 
 	float timeScale = 1.f;
-	uint32 selectedClipIndex = -1;
+	uint32 selectedClipIndex = 0;
 	float transitionTime = 0.1f;
 
 	animation_player animationPlayer;
@@ -58,5 +60,13 @@ struct ragdoll_animation_controller : animation_controller
 	virtual void update(scene_entity entity, float dt) override;
 };
 
-ref<animation_controller> createAnimationController(animation_controller_type type);
+struct random_path_animation_controller : animation_controller 
+{
+	random_path_animation_controller() { type = animation_controller_type_random_path; }
+
+	virtual void update(scene_entity entity, float dt) override;
+	float timeScale = 1.f;
+
+	animation_player animationPlayer;
+};
 

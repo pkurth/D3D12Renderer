@@ -19,6 +19,28 @@ struct skeleton_joint
 	uint32 parentID;
 };
 
+struct animation_transition_event
+{
+	uint32 transitionIndex;
+	float transitionTime;
+};
+
+enum animation_event_type
+{
+	animation_event_type_transition,
+};
+
+struct animation_event
+{
+	float time;
+	animation_event_type type;
+
+	union
+	{
+		animation_transition_event transition;
+	};
+};
+
 struct animation_joint
 {
 	bool isAnimated = false;
@@ -47,11 +69,13 @@ struct animation_clip
 
 	std::vector<animation_joint> joints;
 
+	std::vector<animation_event> events;
+
 	animation_joint rootMotionJoint;
 	
 	float lengthInSeconds;
 	bool bakeRootRotationIntoPose = true;
-	bool bakeRootXZTranslationIntoPose = false;
+	bool bakeRootXZTranslationIntoPose = true;
 
 
 	void edit();
@@ -74,6 +98,8 @@ struct animation_skeleton
 	void pushAssimpAnimations(const std::string& sceneFilename, float scale = 1.f);
 	void pushAssimpAnimationsInDirectory(const std::string& directory, float scale = 1.f);
 
+	void readAnimationPropertiesFromFile(const std::string& filename);
+
 	void sampleAnimation(const animation_clip& clip, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
 	void sampleAnimation(uint32 index, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
 	void sampleAnimation(const std::string& name, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
@@ -91,9 +117,8 @@ struct animation_instance
 
 	void update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion);
 
-	operator bool() const { return clip != 0; }
+	bool valid() const { return clip != 0; }
 
-private:
 	animation_clip* clip = 0;
 	float time = 0.f;
 
@@ -108,10 +133,9 @@ struct animation_player
 	void transitionTo(animation_clip* clip, float transitionTime);
 	void update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion);
 
-	operator bool() const { return to; }
-	bool transitioning() const;
+	bool playing() const { return to.valid(); }
+	bool transitioning() const { return from.valid(); }
 
-private:
 	animation_instance from; 
 	animation_instance to;
 

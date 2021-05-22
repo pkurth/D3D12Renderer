@@ -45,7 +45,7 @@ void simple_animation_controller::update(scene_entity entity, float dt)
 {
 	ref<composite_mesh> mesh = entity.getComponent<raster_component>().mesh;
 	animation_skeleton& skeleton = mesh->skeleton;
-	if (animationPlayer)
+	if (animationPlayer.playing())
 	{
 		mat4* skinningMatrices = allocateSkin(mesh);
 
@@ -92,6 +92,7 @@ void simple_animation_controller::edit(scene_entity entity)
 	}
 
 	ImGui::SliderFloat("Time scale", &timeScale, 0.f, 1.f);
+	ImGui::Value("Time", animationPlayer.to.time);
 }
 
 void ragdoll_animation_controller::update(scene_entity entity, float dt)
@@ -115,13 +116,42 @@ void ragdoll_animation_controller::update(scene_entity entity, float dt)
 	skeleton.getSkinningMatricesFromGlobalTransforms(rbTransforms, skinningMatrices);
 }
 
-ref<animation_controller> createAnimationController(animation_controller_type type)
+void random_path_animation_controller::update(scene_entity entity, float dt)
 {
-	switch (type)
+	ref<composite_mesh> mesh = entity.getComponent<raster_component>().mesh;
+	animation_skeleton& skeleton = mesh->skeleton;
+	if (animationPlayer.playing())
 	{
-		case animation_controller_type_simple: return make_ref<simple_animation_controller>();
-		case animation_controller_type_ragdoll: return make_ref<ragdoll_animation_controller>();
-		default: assert(false);
+		if (!animationPlayer.transitioning())
+		{
+			float time = animationPlayer.to.time;
+
+
+		}
+
+
+
+
+
+
+
+		mat4* skinningMatrices = allocateSkin(mesh);
+
+		trs* localTransforms = (trs*)alloca(sizeof(trs) * skeleton.joints.size());
+		trs deltaRootMotion;
+		animationPlayer.update(skeleton, dt * timeScale, localTransforms, deltaRootMotion);
+
+		skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
+
+		if (entity.hasComponent<trs>())
+		{
+			trs& transform = entity.getComponent<trs>();
+			transform = transform * deltaRootMotion;
+			transform.rotation = normalize(transform.rotation);
+		}
 	}
-	return 0;
+	else
+	{
+		defaultVertexBuffer(mesh);
+	}
 }

@@ -1,8 +1,8 @@
 #include "pch.h"
 #include "animation.h"
-
 #include "assimp.h"
 #include "imgui.h"
+#include "yaml.h"
 
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -56,7 +56,7 @@ void animation_skeleton::pushAssimpAnimation(const std::string& suffix, const ai
 	animation_clip& clip = clips.emplace_back();
 
 	clip.name = std::string(animation->mName.C_Str()) + " (" + suffix + ")";
-	size_t posOfFirstOr = clip.name.find('|');
+	size_t posOfFirstOr = clip.name.find_last_of('|');
 	if (posOfFirstOr != std::string::npos)
 	{
 		clip.name = clip.name.substr(posOfFirstOr + 1);
@@ -118,7 +118,6 @@ void animation_skeleton::pushAssimpAnimations(const std::string& sceneFilename, 
 		{
 			pushAssimpAnimation(sceneFilename, scene->mAnimations[i], scale);
 		}
-
 		files.push_back(sceneFilename);
 	}
 }
@@ -199,6 +198,57 @@ void animation_skeleton::loadFromAssimp(const aiScene* scene, float scale)
 
 	uint32 insertIndex = 0;
 	readAssimpSkeletonHierarchy(scene->mRootNode, *this, insertIndex);
+}
+
+void animation_skeleton::readAnimationPropertiesFromFile(const std::string& filename)
+{
+	std::ifstream stream(filename);
+	YAML::Node data = YAML::Load(stream);
+
+	auto animationsNode = data["Animations"];
+	if (animationsNode)
+	{
+		for (auto animNode : animationsNode)
+		{
+			std::string name = animNode["Name"].as<std::string>();
+
+			auto it = nameToClipID.find(name);
+			if (it == nameToClipID.end())
+			{
+				std::cerr << "Could not find animation '" << name << "' in skeleton. Ignoring properties.\n";
+				continue;
+			}
+
+			animation_clip& clip = clips[it->second];
+
+			clip.bakeRootRotationIntoPose = animNode["Bake rotation"].as<bool>();
+			clip.bakeRootXZTranslationIntoPose = animNode["Bake xz"].as<bool>();
+
+
+			auto transitionsNode = animNode["Transitions"];
+			for (auto trans : transitionsNode)
+			{
+				std::string target = trans["Target"].as<std::string>();
+
+				auto it = nameToClipID.find(target);
+				if (it == nameToClipID.end())
+				{
+					std::cerr << "Animation '" << name << "'specifies a transition to '" << target << "', but '" << target << "' does not exist in skeleton. Ignoring transition.\n";
+					continue;
+				}
+
+				float time = trans["Time"].as<float>();
+				float transitionTime = trans["Transition time"].as<float>();
+
+				animation_event e;
+				e.time = time;
+				e.type = animation_event_type_transition;
+				e.transition.transitionIndex = it->second;
+				e.transition.transitionTime = transitionTime;
+				clip.events.push_back(e);
+			}
+		}
+	}
 }
 
 static vec3 samplePosition(const animation_clip& clip, const animation_joint& animJoint, float time)
@@ -584,7 +634,7 @@ animation_player::animation_player(animation_clip* clip)
 
 void animation_player::transitionTo(animation_clip* clip, float transitionTime)
 {
-	if (!to)
+	if (!to.valid())
 	{
 		to = animation_instance(clip);
 	}
@@ -626,9 +676,4 @@ void animation_player::update(const animation_skeleton& skeleton, float dt, trs*
 	float blend = clamp01(transitionProgress / transitionTime);
 	skeleton.blendLocalTransforms(localTransforms1, localTransforms2, blend, outLocalTransforms);
 	outDeltaRootMotion = lerp(deltaRootMotion1, deltaRootMotion2, blend);
-}
-
-bool animation_player::transitioning() const
-{
-	return from;
 }
