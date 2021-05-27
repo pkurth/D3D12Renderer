@@ -58,13 +58,6 @@ struct dx_graphics_pipeline_generator
 		desc.SampleMask = 0xFFFFFFFF;
 	}
 
-	dx_pipeline_state create(dx_context& dxContext)
-	{
-		dx_pipeline_state result;
-		checkResult(dxContext.device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&result)));
-		return result;
-	}
-
 	dx_graphics_pipeline_generator& rootSignature(const dx_root_signature& rootSignature)
 	{
 		desc.pRootSignature = rootSignature.rootSignature.Get();
@@ -365,7 +358,7 @@ dx_pipeline createReloadablePipeline(const char* csFile);
 template <typename stream_t>
 inline dx_pipeline createReloadablePipelineFromStream(const stream_t& stream, const graphics_pipeline_files& files, dx_root_signature userRootSignature)
 {
-	static_assert(std::is_base_of<dx_pipeline_stream_base, stream_t>::value, "Stream must inherit from dx_pipeline_stream_base.");
+	static_assert(std::is_base_of_v<dx_pipeline_stream_base, stream_t>, "Stream must inherit from dx_pipeline_stream_base.");
 
 	stream_t* streamCopy = new stream_t(stream); // Dynamically allocated for permanent storage.
 	D3D12_PIPELINE_STATE_STREAM_DESC desc = {
@@ -379,7 +372,7 @@ inline dx_pipeline createReloadablePipelineFromStream(const stream_t& stream, co
 template <typename stream_t>
 inline dx_pipeline createReloadablePipelineFromStream(const stream_t& stream, const graphics_pipeline_files& files, rs_file rootSignatureFile = rs_in_pixel_shader)
 {
-	static_assert(std::is_base_of<dx_pipeline_stream_base, stream_t>::value, "Stream must inherit from dx_pipeline_stream_base.");
+	static_assert(std::is_base_of_v<dx_pipeline_stream_base, stream_t>, "Stream must inherit from dx_pipeline_stream_base.");
 
 	stream_t* streamCopy = new stream_t(stream); // Dynamically allocated for permanent storage.
 	D3D12_PIPELINE_STATE_STREAM_DESC desc = {

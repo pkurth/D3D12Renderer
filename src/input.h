@@ -41,6 +41,7 @@ struct input_mouse_button
 	bool down;
 	bool clickEvent;
 	bool doubleClickEvent;
+	bool padding;
 };
 
 struct mouse_input
@@ -66,5 +67,6 @@ struct user_input
 	input_key keyboard[128];
 	mouse_input mouse;
 	bool overWindow;
+	bool padding[3];
 };
 

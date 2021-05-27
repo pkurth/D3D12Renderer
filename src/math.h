@@ -38,7 +38,7 @@ static constexpr uint32 indexOfLeastSignificantSetBit(uint32 i)
 {
 	if (i == 0)
 	{
-		return -1;
+		return (uint32)-1;
 	}
 
 	uint32 count = 0;
@@ -56,7 +56,7 @@ static constexpr uint32 indexOfMostSignificantSetBit(uint32 i)
 {
 	if (i == 0)
 	{
-		return -1;
+		return (uint32)-1;
 	}
 
 	uint32 count = 0;
@@ -71,17 +71,19 @@ static constexpr uint32 indexOfMostSignificantSetBit(uint32 i)
 
 static constexpr int32 log2(int32 i)
 {
-	uint32 mssb = indexOfMostSignificantSetBit(i);
-	uint32 lssb = indexOfLeastSignificantSetBit(i);
+	assert(i >= 0);
 
-	if (mssb == -1 || lssb == -1)
+	uint32 mssb = indexOfMostSignificantSetBit((uint32)i);
+	uint32 lssb = indexOfLeastSignificantSetBit((uint32)i);
+
+	if (mssb == (uint32)-1 || lssb == (uint32)-1)
 	{
 		return 0;
 	}
 
 	// If perfect power of two (only one set bit), return index of bit.  Otherwise round up
 	// fractional log by adding 1 to most signicant set bit's index.
-	return mssb + (mssb == lssb ? 0 : 1);
+	return (int32)mssb + (mssb == lssb ? 0 : 1);
 }
 
 static constexpr uint32 log2(uint32 i) 
@@ -89,7 +91,7 @@ static constexpr uint32 log2(uint32 i)
 	uint32 mssb = indexOfMostSignificantSetBit(i);
 	uint32 lssb = indexOfLeastSignificantSetBit(i);
 
-	if (mssb == -1 || lssb == -1)
+	if (mssb == (uint32)-1 || lssb == (uint32)-1)
 	{
 		return 0;
 	}
@@ -106,7 +108,7 @@ static constexpr bool isPowerOfTwo(uint32 i)
 
 static constexpr uint32 alignToPowerOfTwo(uint32 i)
 {
-	return i == 0 ? 0 : 1 << log2(i);
+	return i == 0u ? 0u : 1u << log2(i);
 }
 
 static float easeInQuadratic(float t)		{ return t * t; }
