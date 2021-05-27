@@ -120,21 +120,14 @@ void random_path_animation_controller::update(scene_entity entity, float dt)
 {
 	ref<composite_mesh> mesh = entity.getComponent<raster_component>().mesh;
 	animation_skeleton& skeleton = mesh->skeleton;
+
+	if (!animationPlayer.playing())
+	{
+		animationPlayer.transitionTo(&skeleton.clips[skeleton.getClipsByName("Idle")[0]], 0.f);
+	}
+
 	if (animationPlayer.playing())
 	{
-		if (!animationPlayer.transitioning())
-		{
-			float time = animationPlayer.to.time;
-
-
-		}
-
-
-
-
-
-
-
 		mat4* skinningMatrices = allocateSkin(mesh);
 
 		trs* localTransforms = (trs*)alloca(sizeof(trs) * skeleton.joints.size());

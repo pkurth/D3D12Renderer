@@ -51,16 +51,18 @@ static void scaleKeyframes(animation_clip& clip, animation_joint& joint, float s
 	}
 }
 
-void animation_skeleton::pushAssimpAnimation(const std::string& suffix, const aiAnimation* animation, float scale)
+void animation_skeleton::pushAssimpAnimation(const std::string& sceneFilename, const aiAnimation* animation, float scale)
 {
 	animation_clip& clip = clips.emplace_back();
 
-	clip.name = std::string(animation->mName.C_Str()) + " (" + suffix + ")";
+	clip.name = animation->mName.C_Str();
 	size_t posOfFirstOr = clip.name.find_last_of('|');
 	if (posOfFirstOr != std::string::npos)
 	{
 		clip.name = clip.name.substr(posOfFirstOr + 1);
 	}
+
+	clip.filename = sceneFilename;
 
 	clip.lengthInSeconds = (float)animation->mDuration * 0.001f;
 
@@ -102,8 +104,6 @@ void animation_skeleton::pushAssimpAnimation(const std::string& suffix, const ai
 			}
 		}
 	}
-
-	nameToClipID[clip.name] = (uint32)clips.size() - 1;
 }
 
 void animation_skeleton::pushAssimpAnimations(const std::string& sceneFilename, float scale)
@@ -211,15 +211,19 @@ void animation_skeleton::readAnimationPropertiesFromFile(const std::string& file
 		for (auto animNode : animationsNode)
 		{
 			std::string name = animNode["Name"].as<std::string>();
-
-			auto it = nameToClipID.find(name);
-			if (it == nameToClipID.end())
+			std::vector<uint32> possibleClipIndices = getClipsByName(name);
+			if (possibleClipIndices.size() == 0)
 			{
-				std::cerr << "Could not find animation '" << name << "' in skeleton. Ignoring properties.\n";
+				std::cout << "Could not find animation '" << name << "' in skeleton. Ignoring properties.\n";
+				continue;
+			}
+			if (possibleClipIndices.size() > 1)
+			{
+				std::cout << "Found more than one animation by the name of '" << name << "' in skeleton. Ignoring properties.\n";
 				continue;
 			}
 
-			animation_clip& clip = clips[it->second];
+			animation_clip& clip = clips[possibleClipIndices[0]];
 
 			clip.bakeRootRotationIntoPose = animNode["Bake rotation"].as<bool>();
 			clip.bakeRootXZTranslationIntoPose = animNode["Bake xz"].as<bool>();
@@ -228,23 +232,31 @@ void animation_skeleton::readAnimationPropertiesFromFile(const std::string& file
 			auto transitionsNode = animNode["Transitions"];
 			for (auto trans : transitionsNode)
 			{
-				std::string target = trans["Target"].as<std::string>();
-
-				auto it = nameToClipID.find(target);
-				if (it == nameToClipID.end())
+				std::string targetName = trans["Target"].as<std::string>();
+				std::vector<uint32> possibleTargetClipIndices = getClipsByName(targetName);
+				if (possibleTargetClipIndices.size() == 0)
 				{
-					std::cerr << "Animation '" << name << "'specifies a transition to '" << target << "', but '" << target << "' does not exist in skeleton. Ignoring transition.\n";
+					std::cout << "Animation '" << name << "'specifies a transition to '" << targetName << "', but '" << targetName << "' does not exist in skeleton. Ignoring transition.\n";
+					continue;
+				}
+				if (possibleTargetClipIndices.size() > 1)
+				{
+					std::cout << "Animation '" << name << "'specifies a transition to '" << targetName << "', but there exist more than one animation by the name of '" << targetName << "' in skeleton. Ignoring transition.\n";
 					continue;
 				}
 
+				uint32 targetIndex = possibleTargetClipIndices[0];
+
 				float time = trans["Time"].as<float>();
 				float transitionTime = trans["Transition time"].as<float>();
+				float probability = trans["Probability"].as<float>();
 
 				animation_event e;
 				e.time = time;
 				e.type = animation_event_type_transition;
-				e.transition.transitionIndex = it->second;
+				e.transition.transitionIndex = targetIndex;
 				e.transition.transitionTime = transitionTime;
+				e.transition.automaticProbability = probability;
 				clip.events.push_back(e);
 			}
 		}
@@ -343,11 +355,67 @@ static vec3 sampleScale(const animation_clip& clip, const animation_joint& animJ
 	return lerp(a, b, t);
 }
 
-void animation_skeleton::sampleAnimation(const animation_clip& clip, float time, trs* outLocalTransforms, trs* outRootMotion) const
+static animation_event_indices getEvents(const animation_clip& clip, float from, float to)
+{
+	from = clamp(from, 0.f, clip.lengthInSeconds);
+	to = clamp(to, 0.f, clip.lengthInSeconds);
+
+	uint32 numEvents = (uint32)clip.events.size();
+	if (!numEvents)
+	{
+		return {};
+	}
+
+	if (from < to)
+	{
+		animation_event_indices result = { (uint32)-1, 0 };
+		for (uint32 i = 0; i < numEvents; ++i)
+		{
+			const animation_event& e = clip.events[i];
+			if (e.time >= from && e.time < to)
+			{
+				result.first = min(result.first, i);
+				++result.count;
+			}
+		}
+		return result;
+	}
+	else
+	{
+		animation_event_indices result = { (uint32)-1, 0 };
+		float minDist = FLT_MAX;
+
+		for (uint32 i = 0; i < numEvents; ++i)
+		{
+			const animation_event& e = clip.events[i];
+			if (e.time >= from || e.time < to)
+			{
+				float t = e.time;
+				if (t < from)
+				{
+					t += clip.lengthInSeconds;
+				}
+				float dist = t - from;
+				assert(dist >= 0.f);
+
+				if (dist < minDist)
+				{
+					result.first = i;
+					minDist = dist;
+				}
+
+				++result.count;
+			}
+		}
+		return result;
+	}
+}
+
+void animation_skeleton::sampleAnimation(const animation_clip& clip, float timeNow, trs* outLocalTransforms, trs* outRootMotion) const
 {
 	assert(clip.joints.size() == joints.size());
 
-	time = clamp(time, 0.f, clip.lengthInSeconds);
+	timeNow = clamp(timeNow, 0.f, clip.lengthInSeconds);
 
 	uint32 numJoints = (uint32)joints.size();
 	for (uint32 i = 0; i < numJoints; ++i)
@@ -356,9 +424,9 @@ void animation_skeleton::sampleAnimation(const animation_clip& clip, float time,
 
 		if (animJoint.isAnimated)
 		{
-			outLocalTransforms[i].position = samplePosition(clip, animJoint, time);
-			outLocalTransforms[i].rotation = sampleRotation(clip, animJoint, time);
-			outLocalTransforms[i].scale = sampleScale(clip, animJoint, time);
+			outLocalTransforms[i].position = samplePosition(clip, animJoint, timeNow);
+			outLocalTransforms[i].rotation = sampleRotation(clip, animJoint, timeNow);
+			outLocalTransforms[i].scale = sampleScale(clip, animJoint, timeNow);
 		}
 		else
 		{
@@ -369,9 +437,9 @@ void animation_skeleton::sampleAnimation(const animation_clip& clip, float time,
 	trs rootMotion;
 	if (clip.rootMotionJoint.isAnimated)
 	{
-		rootMotion.position = samplePosition(clip, clip.rootMotionJoint, time);
-		rootMotion.rotation = sampleRotation(clip, clip.rootMotionJoint, time);
-		rootMotion.scale = sampleScale(clip, clip.rootMotionJoint, time);
+		rootMotion.position = samplePosition(clip, clip.rootMotionJoint, timeNow);
+		rootMotion.rotation = sampleRotation(clip, clip.rootMotionJoint, timeNow);
+		rootMotion.scale = sampleScale(clip, clip.rootMotionJoint, timeNow);
 	}
 	else
 	{
@@ -402,18 +470,20 @@ void animation_skeleton::sampleAnimation(const animation_clip& clip, float time,
 	}
 }
 
-void animation_skeleton::sampleAnimation(uint32 index, float time, trs* outLocalTransforms, trs* outRootMotion) const
+void animation_skeleton::sampleAnimation(uint32 index, float timeNow, trs* outLocalTransforms, trs* outRootMotion) const
 {
-	const animation_clip& clip = clips[index];
-	sampleAnimation(clip, time, outLocalTransforms, outRootMotion);
+	sampleAnimation(clips[index], timeNow, outLocalTransforms, outRootMotion);
 }
 
-void animation_skeleton::sampleAnimation(const std::string& name, float time, trs* outLocalTransforms, trs* outRootMotion) const
+animation_event_indices animation_skeleton::sampleAnimation(const animation_clip& clip, float prevTime, float timeNow, trs* outLocalTransforms, trs* outRootMotion) const
 {
-	auto clipIndexIt = nameToClipID.find(name);
-	assert(clipIndexIt != nameToClipID.end());
+	sampleAnimation(clip, timeNow, outLocalTransforms, outRootMotion);
+	return getEvents(clip, prevTime, timeNow);
+}
 
-	sampleAnimation(clipIndexIt->second, time, outLocalTransforms, outRootMotion);
+animation_event_indices animation_skeleton::sampleAnimation(uint32 index, float prevTime, float timeNow, trs* outLocalTransforms, trs* outRootMotion) const
+{
+	return sampleAnimation(clips[index], prevTime, timeNow, outLocalTransforms, outRootMotion);
 }
 
 void animation_skeleton::blendLocalTransforms(const trs* localTransforms1, const trs* localTransforms2, float t, trs* outBlendedLocalTransforms) const
@@ -457,6 +527,19 @@ void animation_skeleton::getSkinningMatricesFromGlobalTransforms(const trs* glob
 	}
 }
 
+std::vector<uint32> animation_skeleton::getClipsByName(const std::string& name)
+{
+	std::vector<uint32> result;
+	for (uint32 i = 0; i < (uint32)clips.size(); ++i)
+	{
+		if (clips[i].name == name)
+		{
+			result.push_back(i);
+		}
+	}
+	return result;
+}
+
 static void prettyPrint(const animation_skeleton& skeleton, uint32 parent, uint32 indent)
 {
 	for (uint32 i = 0; i < (uint32)skeleton.joints.size(); ++i)
@@ -480,7 +563,7 @@ void animation_clip::edit()
 	ImGui::Checkbox("Bake xz translation into pose", &bakeRootXZTranslationIntoPose);
 }
 
-trs animation_clip::getFirstRootTransform()
+trs animation_clip::getFirstRootTransform() const
 {
 	if (rootMotionJoint.isAnimated)
 	{
@@ -504,7 +587,7 @@ trs animation_clip::getFirstRootTransform()
 	return trs::identity;
 }
 
-trs animation_clip::getLastRootTransform()
+trs animation_clip::getLastRootTransform() const
 {
 	if (rootMotionJoint.isAnimated)
 	{
@@ -528,28 +611,31 @@ trs animation_clip::getLastRootTransform()
 	return trs::identity;
 }
 
-animation_instance::animation_instance(animation_clip* clip, float startTime)
+animation_instance::animation_instance(const animation_clip* clip, float startTime)
 {
 	this->clip = clip;
 	time = startTime;
 	lastRootMotion = clip->getFirstRootTransform();
 }
 
-void animation_instance::update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion)
+animation_event_indices animation_instance::update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion)
 {
+	float prevTime = time;
+
 	time += dt;
 	if (time >= clip->lengthInSeconds)
 	{
 		time = fmod(time, clip->lengthInSeconds);
-
 		lastRootMotion = clip->getFirstRootTransform();
 	}
 
 	trs rootMotion;
-	skeleton.sampleAnimation(*clip, time, outLocalTransforms, &rootMotion);
+	animation_event_indices result = skeleton.sampleAnimation(*clip, prevTime, time, outLocalTransforms, &rootMotion);
 
 	outDeltaRootMotion = invert(lastRootMotion) * rootMotion;
 	lastRootMotion = rootMotion;
+
+	return result;
 }
 
 #if 0
@@ -632,7 +718,7 @@ animation_player::animation_player(animation_clip* clip)
 	to = animation_instance(clip);
 }
 
-void animation_player::transitionTo(animation_clip* clip, float transitionTime)
+void animation_player::transitionTo(const animation_clip* clip, float transitionTime)
 {
 	if (!to.valid())
 	{
@@ -662,18 +748,34 @@ void animation_player::update(const animation_skeleton& skeleton, float dt, trs*
 
 	if (!transitioning())
 	{
-		return to.update(skeleton, dt, outLocalTransforms, outDeltaRootMotion);
+		animation_event_indices eventIndices = to.update(skeleton, dt, outLocalTransforms, outDeltaRootMotion);
+		for (uint32 i = 0; i < eventIndices.count; ++i)
+		{
+			uint32 eventIndex = i + eventIndices.first;
+			const animation_event& e = to.clip->events[eventIndex];
+
+			assert(e.type == animation_event_type_transition);
+
+			float random = rng.randomFloat01();
+			if (random <= e.transition.automaticProbability)
+			{
+				transitionTo(&skeleton.clips[e.transition.transitionIndex], e.transition.transitionTime);
+				break;
+			}
+		}
 	}
+	else
+	{
+		trs* totalLocalTransforms = (trs*)alloca(sizeof(trs) * skeleton.joints.size() * 2);
+		trs* localTransforms1 = totalLocalTransforms;
+		trs* localTransforms2 = totalLocalTransforms + skeleton.joints.size();
 
-	trs* totalLocalTransforms = (trs*)alloca(sizeof(trs) * skeleton.joints.size() * 2);
-	trs* localTransforms1 = totalLocalTransforms;
-	trs* localTransforms2 = totalLocalTransforms + skeleton.joints.size();
+		trs deltaRootMotion1, deltaRootMotion2;
+		from.update(skeleton, dt, localTransforms1, deltaRootMotion1);
+		to.update(skeleton, dt, localTransforms2, deltaRootMotion2);
 
-	trs deltaRootMotion1, deltaRootMotion2;
-	from.update(skeleton, dt, localTransforms1, deltaRootMotion1);
-	to.update(skeleton, dt, localTransforms2, deltaRootMotion2);
-
-	float blend = clamp01(transitionProgress / transitionTime);
-	skeleton.blendLocalTransforms(localTransforms1, localTransforms2, blend, outLocalTransforms);
-	outDeltaRootMotion = lerp(deltaRootMotion1, deltaRootMotion2, blend);
+		float blend = clamp01(transitionProgress / transitionTime);
+		skeleton.blendLocalTransforms(localTransforms1, localTransforms2, blend, outLocalTransforms);
+		outDeltaRootMotion = lerp(deltaRootMotion1, deltaRootMotion2, blend);
+	}
 }
