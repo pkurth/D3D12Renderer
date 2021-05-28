@@ -65,6 +65,7 @@ struct random_path_animation_controller : animation_controller
 	random_path_animation_controller() { type = animation_controller_type_random_path; }
 
 	virtual void update(scene_entity entity, float dt) override;
+	virtual void edit(scene_entity entity) override;
 	float timeScale = 1.f;
 
 	animation_player animationPlayer;

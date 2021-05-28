@@ -26,7 +26,7 @@ static void getMeshNamesAndTransforms(const aiNode* node, ref<composite_mesh>& m
 static std::unordered_map<std::string, weakref<composite_mesh>> meshCache; // TODO: Pack flags into key.
 static std::mutex mutex;
 
-static ref<composite_mesh> loadMeshFromFileInternal(const std::string& sceneFilename, uint32 flags)
+static ref<composite_mesh> loadMeshFromFileInternal(const std::string& sceneFilename, bool loadSkeleton, bool loadAnimations, uint32 flags)
 {
 	Assimp::Importer importer;
 
@@ -41,7 +41,7 @@ static ref<composite_mesh> loadMeshFromFileInternal(const std::string& sceneFile
 
 	ref<composite_mesh> result = make_ref<composite_mesh>();
 
-	if (flags & mesh_creation_flags_with_skin)
+	if (loadSkeleton && (flags & mesh_creation_flags_with_skin))
 	{
 		result->skeleton.loadFromAssimp(scene, 1.f);
 
@@ -58,9 +58,12 @@ static ref<composite_mesh> loadMeshFromFileInternal(const std::string& sceneFile
 		}
 #endif
 
-		for (uint32 i = 0; i < scene->mNumAnimations; ++i)
+		if (loadAnimations)
 		{
-			result->skeleton.pushAssimpAnimation(sceneFilename, scene->mAnimations[i], 1.f);
+			for (uint32 i = 0; i < scene->mNumAnimations; ++i)
+			{
+				result->skeleton.pushAssimpAnimation(sceneFilename, scene->mAnimations[i], 1.f);
+			}
 		}
 	}
 
@@ -88,14 +91,14 @@ static ref<composite_mesh> loadMeshFromFileInternal(const std::string& sceneFile
 	return result;
 }
 
-ref<composite_mesh> loadMeshFromFile(const std::string& sceneFilename, uint32 flags)
+ref<composite_mesh> loadMeshFromFile(const std::string& sceneFilename, bool loadSkeleton, bool loadAnimations, uint32 flags)
 {
 	mutex.lock();
 
 	auto sp = meshCache[sceneFilename].lock();
 	if (!sp)
 	{
-		meshCache[sceneFilename] = sp = loadMeshFromFileInternal(sceneFilename, flags);
+		meshCache[sceneFilename] = sp = loadMeshFromFileInternal(sceneFilename, loadSkeleton, loadAnimations, flags);
 	}
 
 	mutex.unlock();

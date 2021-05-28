@@ -123,7 +123,7 @@ void random_path_animation_controller::update(scene_entity entity, float dt)
 
 	if (!animationPlayer.playing())
 	{
-		animationPlayer.transitionTo(&skeleton.clips[skeleton.getClipsByName("Idle")[0]], 0.f);
+		animationPlayer.transitionTo(&skeleton.clips[skeleton.getClipsByName("idle")[0]], 0.f);
 	}
 
 	if (animationPlayer.playing())
@@ -147,4 +147,9 @@ void random_path_animation_controller::update(scene_entity entity, float dt)
 	{
 		defaultVertexBuffer(mesh);
 	}
+}
+
+void random_path_animation_controller::edit(scene_entity entity)
+{
+	ImGui::SliderFloat("Time scale", &timeScale, 0.f, 1.f);
 }

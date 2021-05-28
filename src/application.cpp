@@ -125,12 +125,12 @@ void application::initialize(dx_renderer* renderer)
 #endif
 
 #if 1
-	auto ragdollMesh = loadAnimatedMeshFromFile("assets/ragdoll/skin.fbx");
+	auto ragdollMesh = loadAnimatedMeshFromFile("assets/ragdoll/locomotion_pack/xbot.fbx", true, false);
 	if (ragdollMesh)
 	{
 		//ragdollMesh->skeleton.prettyPrintHierarchy();
-		ragdollMesh->skeleton.pushAssimpAnimationsInDirectory("assets/ragdoll/animations");
-		ragdollMesh->skeleton.readAnimationPropertiesFromFile("assets/ragdoll/transitions.yaml");
+		ragdollMesh->skeleton.pushAssimpAnimationsInDirectory("assets/ragdoll/locomotion_pack/animations");
+		ragdollMesh->skeleton.readAnimationPropertiesFromFile("assets/ragdoll/animation_properties.yaml");
 
 		appScene.createEntity("Ragdoll")
 			.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat::identity, 0.01f)

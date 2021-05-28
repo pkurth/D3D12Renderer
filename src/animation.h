@@ -22,7 +22,8 @@ struct skeleton_joint
 
 struct animation_transition_event
 {
-	uint32 transitionIndex;
+	uint32 targetIndex;
+	float targetStartTime;
 	float transitionTime;
 	float automaticProbability;
 };
@@ -83,6 +84,7 @@ struct animation_clip
 	animation_joint rootMotionJoint;
 	
 	float lengthInSeconds;
+	bool looping = true;
 	bool bakeRootRotationIntoPose = false;
 	bool bakeRootXZTranslationIntoPose = false;
 
@@ -140,7 +142,7 @@ struct animation_player
 	animation_player() { }
 	animation_player(animation_clip* clip);
 
-	void transitionTo(const animation_clip* clip, float transitionTime);
+	void transitionTo(const animation_clip* clip, float transitionTime, float startTime = 0.f);
 	void update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion);
 
 	bool playing() const { return to.valid(); }

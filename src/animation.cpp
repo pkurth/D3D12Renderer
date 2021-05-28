@@ -227,6 +227,10 @@ void animation_skeleton::readAnimationPropertiesFromFile(const std::string& file
 
 			clip.bakeRootRotationIntoPose = animNode["Bake rotation"].as<bool>();
 			clip.bakeRootXZTranslationIntoPose = animNode["Bake xz"].as<bool>();
+			if (animNode["Looping"])
+			{
+				clip.looping = animNode["Looping"].as<bool>();
+			}
 
 
 			auto transitionsNode = animNode["Transitions"];
@@ -246,25 +250,51 @@ void animation_skeleton::readAnimationPropertiesFromFile(const std::string& file
 				}
 
 				uint32 targetIndex = possibleTargetClipIndices[0];
+				animation_clip& targetClip = clips[targetIndex];
 
 				float time = trans["Time"].as<float>();
+				if (time < 0.f)
+				{
+					time = clip.lengthInSeconds + time;
+				}
+				time = clamp(time, 0.f, clip.lengthInSeconds);
+
+				float targetStartTime = 0.f;
+				if (trans["Target time"])
+				{
+					trans["Target time"].as<float>();
+					if (targetStartTime < 0.f)
+					{
+						targetStartTime = targetClip.lengthInSeconds + targetStartTime;
+					}
+					targetStartTime = clamp(targetStartTime, 0.f, targetClip.lengthInSeconds);
+				}
+
 				float transitionTime = trans["Transition time"].as<float>();
 				float probability = trans["Probability"].as<float>();
 
 				animation_event e;
 				e.time = time;
 				e.type = animation_event_type_transition;
-				e.transition.transitionIndex = targetIndex;
+				e.transition.targetIndex = targetIndex;
 				e.transition.transitionTime = transitionTime;
+				e.transition.targetStartTime = targetStartTime;
 				e.transition.automaticProbability = probability;
 				clip.events.push_back(e);
 			}
+
+			std::sort(clip.events.begin(), clip.events.end(), [](animation_event& e0, animation_event& e1) { return e0.time < e1.time; });
 		}
 	}
 }
 
 static vec3 samplePosition(const animation_clip& clip, const animation_joint& animJoint, float time)
 {
+	if (time >= clip.lengthInSeconds)
+	{
+		return clip.positionKeyframes[animJoint.firstPositionKeyframe + animJoint.numPositionKeyframes - 1];
+	}
+
 	if (animJoint.numPositionKeyframes == 1)
 	{
 		return clip.positionKeyframes[animJoint.firstPositionKeyframe];
@@ -294,6 +324,11 @@ static vec3 samplePosition(const animation_clip& clip, const animation_joint& an
 
 static quat sampleRotation(const animation_clip& clip, const animation_joint& animJoint, float time)
 {
+	if (time >= clip.lengthInSeconds)
+	{
+		return clip.rotationKeyframes[animJoint.firstRotationKeyframe + animJoint.numRotationKeyframes - 1];
+	}
+
 	if (animJoint.numRotationKeyframes == 1)
 	{
 		return clip.rotationKeyframes[animJoint.firstRotationKeyframe];
@@ -328,6 +363,11 @@ static quat sampleRotation(const animation_clip& clip, const animation_joint& an
 
 static vec3 sampleScale(const animation_clip& clip, const animation_joint& animJoint, float time)
 {
+	if (time >= clip.lengthInSeconds)
+	{
+		return clip.scaleKeyframes[animJoint.firstScaleKeyframe + animJoint.numScaleKeyframes - 1];
+	}
+
 	if (animJoint.numScaleKeyframes == 1)
 	{
 		return clip.scaleKeyframes[animJoint.firstScaleKeyframe];
@@ -625,8 +665,15 @@ animation_event_indices animation_instance::update(const animation_skeleton& ske
 	time += dt;
 	if (time >= clip->lengthInSeconds)
 	{
-		time = fmod(time, clip->lengthInSeconds);
-		lastRootMotion = clip->getFirstRootTransform();
+		if (clip->looping)
+		{
+			time = fmod(time, clip->lengthInSeconds);
+			lastRootMotion = clip->getFirstRootTransform();
+		}
+		else
+		{
+			time = clip->lengthInSeconds;
+		}
 	}
 
 	trs rootMotion;
@@ -718,16 +765,16 @@ animation_player::animation_player(animation_clip* clip)
 	to = animation_instance(clip);
 }
 
-void animation_player::transitionTo(const animation_clip* clip, float transitionTime)
+void animation_player::transitionTo(const animation_clip* clip, float transitionTime, float startTime)
 {
 	if (!to.valid())
 	{
-		to = animation_instance(clip);
+		to = animation_instance(clip, startTime);
 	}
 	else
 	{
 		from = to;
-		to = animation_instance(clip);
+		to = animation_instance(clip, startTime);
 
 		transitionProgress = 0.f;
 		this->transitionTime = transitionTime;
@@ -759,7 +806,7 @@ void animation_player::update(const animation_skeleton& skeleton, float dt, trs*
 			float random = rng.randomFloat01();
 			if (random <= e.transition.automaticProbability)
 			{
-				transitionTo(&skeleton.clips[e.transition.transitionIndex], e.transition.transitionTime);
+				transitionTo(&skeleton.clips[e.transition.targetIndex], e.transition.transitionTime, e.transition.targetStartTime);
 				break;
 			}
 		}

@@ -189,11 +189,13 @@ namespace ImGui
 			for (uint32 i = 0; i < count; ++i)
 			{
 				bool selected = i == current;
+				ImGui::PushID(i);
 				if (ImGui::Selectable(names[i], selected))
 				{
 					current = i;
 					changed = true;
 				}
+				ImGui::PopID();
 			}
 			ImGui::EndCombo();
 		}
@@ -213,11 +215,13 @@ namespace ImGui
 				{
 					break;
 				}
+				ImGui::PushID(i);
 				if (ImGui::Selectable(name, selected))
 				{
 					current = i;
 					changed = true;
 				}
+				ImGui::PopID();
 			}
 			ImGui::EndCombo();
 		}
