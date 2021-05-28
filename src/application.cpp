@@ -23,6 +23,11 @@ struct raytrace_component
 	raytracing_object_type type;
 };
 
+struct dynamic_geometry_component
+{
+	trs lastFrameTransform = trs::identity;
+};
+
 static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh, path_tracer& pathTracer)
 {
 	if (dxContext.featureSupport.raytracing())
@@ -135,7 +140,8 @@ void application::initialize(dx_renderer* renderer)
 		appScene.createEntity("Ragdoll")
 			.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat::identity, 0.01f)
 			.addComponent<raster_component>(ragdollMesh)
-			.addComponent<animation_component>(make_ref<random_path_animation_controller>());
+			.addComponent<animation_component>(make_ref<random_path_animation_controller>())
+			.addComponent<dynamic_geometry_component>();
 	}
 #endif
 
@@ -1006,7 +1012,7 @@ void application::renderStaticGeometryToSunShadowMap()
 {
 	sun_shadow_render_pass& renderPass = sunShadowRenderPass;
 
-	for (auto [entityHandle, raster, transform] : appScene.group(entt::get<raster_component, trs>, entt::exclude<animation_component>).each())
+	for (auto [entityHandle, raster, transform] : appScene.group(entt::get<raster_component, trs>, entt::exclude<dynamic_geometry_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -1023,7 +1029,7 @@ void application::renderStaticGeometryToSunShadowMap()
 
 void application::renderStaticGeometryToShadowMap(spot_shadow_render_pass& renderPass)
 {
-	for (auto [entityHandle, raster, transform] : appScene.group(entt::get<raster_component, trs>, entt::exclude<animation_component>).each())
+	for (auto [entityHandle, raster, transform] : appScene.group(entt::get<raster_component, trs>, entt::exclude<dynamic_geometry_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -1040,7 +1046,7 @@ void application::renderStaticGeometryToShadowMap(spot_shadow_render_pass& rende
 
 void application::renderStaticGeometryToShadowMap(point_shadow_render_pass& renderPass)
 {
-	for (auto [entityHandle, raster, transform] : appScene.group(entt::get<raster_component, trs>, entt::exclude<animation_component>).each())
+	for (auto [entityHandle, raster, transform] : appScene.group(entt::get<raster_component, trs>, entt::exclude<dynamic_geometry_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -1059,7 +1065,21 @@ void application::renderDynamicGeometryToSunShadowMap()
 {
 	sun_shadow_render_pass& renderPass = sunShadowRenderPass;
 
-	for (auto [entityHandle, raster, transform, anim] : appScene.group(entt::get<raster_component, trs, animation_component>).each())
+	for (auto [entityHandle, raster, transform, dynamic] : appScene.group(entt::get<raster_component, trs, dynamic_geometry_component>, entt::exclude< animation_component>).each())
+	{
+		const dx_mesh& mesh = raster.mesh->mesh;
+		mat4 m = trsToMat4(transform);
+
+		for (auto& sm : raster.mesh->submeshes)
+		{
+			submesh_info submesh = sm.info;
+			const ref<pbr_material>& material = sm.material;
+
+			renderPass.renderDynamicObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+		}
+	}
+
+	for (auto [entityHandle, raster, anim, transform, dynamic] : appScene.group(entt::get<raster_component, animation_component, trs, dynamic_geometry_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -1074,7 +1094,21 @@ void application::renderDynamicGeometryToSunShadowMap()
 
 void application::renderDynamicGeometryToShadowMap(spot_shadow_render_pass& renderPass)
 {
-	for (auto [entityHandle, raster, transform, anim] : appScene.group(entt::get<raster_component, trs, animation_component>).each())
+	for (auto [entityHandle, raster, transform, dynamic] : appScene.group(entt::get<raster_component, trs, dynamic_geometry_component>, entt::exclude< animation_component>).each())
+	{
+		const dx_mesh& mesh = raster.mesh->mesh;
+		mat4 m = trsToMat4(transform);
+
+		for (auto& sm : raster.mesh->submeshes)
+		{
+			submesh_info submesh = sm.info;
+			const ref<pbr_material>& material = sm.material;
+
+			renderPass.renderDynamicObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+		}
+	}
+
+	for (auto [entityHandle, raster, anim, transform, dynamic] : appScene.group(entt::get<raster_component, animation_component, trs, dynamic_geometry_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -1089,7 +1123,21 @@ void application::renderDynamicGeometryToShadowMap(spot_shadow_render_pass& rend
 
 void application::renderDynamicGeometryToShadowMap(point_shadow_render_pass& renderPass)
 {
-	for (auto [entityHandle, raster, transform, anim] : appScene.group(entt::get<raster_component, trs, animation_component>).each())
+	for (auto [entityHandle, raster, transform, dynamic] : appScene.group(entt::get<raster_component, trs, dynamic_geometry_component>, entt::exclude< animation_component>).each())
+	{
+		const dx_mesh& mesh = raster.mesh->mesh;
+		mat4 m = trsToMat4(transform);
+
+		for (auto& sm : raster.mesh->submeshes)
+		{
+			submesh_info submesh = sm.info;
+			const ref<pbr_material>& material = sm.material;
+
+			renderPass.renderDynamicObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
+		}
+	}
+
+	for (auto [entityHandle, raster, anim, transform, dynamic] : appScene.group(entt::get<raster_component, animation_component, trs, dynamic_geometry_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -1200,6 +1248,9 @@ void application::update(const user_input& input, float dt)
 			scene_entity entity = { entityHandle, appScene };
 			bool outline = selectedEntity == entity;
 
+			bool dynamic = entity.hasComponent<dynamic_geometry_component>();
+			mat4 lastM = dynamic ? trsToMat4(entity.getComponent<dynamic_geometry_component>().lastFrameTransform) : m;
+
 			if (entity.hasComponent<animation_component>())
 			{
 				auto& anim = entity.getComponent<animation_component>();
@@ -1220,7 +1271,7 @@ void application::update(const user_input& input, float dt)
 					}
 					else
 					{
-						opaqueRenderPass.renderAnimatedObject(controller->currentVertexBuffer, controller->prevFrameVertexBuffer, mesh.indexBuffer, submesh, prevFrameSubmesh, material, m, m,
+						opaqueRenderPass.renderAnimatedObject(controller->currentVertexBuffer, controller->prevFrameVertexBuffer, mesh.indexBuffer, submesh, prevFrameSubmesh, material, m, lastM,
 							(uint32)entityHandle, outline);
 					}
 				}
@@ -1238,7 +1289,14 @@ void application::update(const user_input& input, float dt)
 					}
 					else
 					{
-						opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, (uint32)entityHandle, outline);
+						if (dynamic)
+						{
+							opaqueRenderPass.renderDynamicObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, lastM, (uint32)entityHandle, outline);
+						}
+						else
+						{
+							opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, (uint32)entityHandle, outline);
+						}
 					}
 				}
 			}
@@ -1285,6 +1343,11 @@ void application::update(const user_input& input, float dt)
 
 			renderer->setRaytracer(&pathTracer, &raytracingTLAS);
 		}
+	}
+
+	for (auto [entityHandle, transform, dynamic] : appScene.group(entt::get<trs, dynamic_geometry_component>).each())
+	{
+		dynamic.lastFrameTransform = transform;
 	}
 }
 
