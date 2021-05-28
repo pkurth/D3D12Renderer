@@ -75,8 +75,7 @@ void application::initialize(dx_renderer* renderer)
 	}
 
 #if 0
-	auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj");
-	if (sponzaMesh)
+	if (auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj"))
 	{
 		auto blas = defineBlasFromMesh(sponzaMesh, pathTracer);
 	
@@ -86,15 +85,7 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<raytrace_component>(blas);
 	}
 
-	auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx");
-	auto pilotMesh = loadAnimatedMeshFromFile("assets/pilot/pilot.fbx");
-	auto unrealMesh = loadAnimatedMeshFromFile("assets/unreal/unreal_mannequin.fbx");
-	if (unrealMesh)
-	{
-		unrealMesh->skeleton.pushAssimpAnimationsInDirectory("assets/unreal/animations");
-	}
-
-	if (stormtrooperMesh)
+	if (auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx"))
 	{
 		appScene.createEntity("Stormtrooper 1")
 			.addComponent<trs>(vec3(-5.f, 0.f, -1.f), quat::identity)
@@ -112,7 +103,7 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<animation_component>(make_ref<simple_animation_controller>());
 	}
 
-	if (pilotMesh)
+	if (auto pilotMesh = loadAnimatedMeshFromFile("assets/pilot/pilot.fbx"))
 	{
 		appScene.createEntity("Pilot")
 			.addComponent<trs>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
@@ -120,8 +111,10 @@ void application::initialize(dx_renderer* renderer)
 			.addComponent<animation_component>(make_ref<simple_animation_controller>());
 	}
 
-	if (unrealMesh)
+	if (auto unrealMesh = loadAnimatedMeshFromFile("assets/unreal/unreal_mannequin.fbx"))
 	{
+		unrealMesh->skeleton.pushAssimpAnimationsInDirectory("assets/unreal/animations");
+
 		appScene.createEntity("Mannequin")
 			.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.019f)
 			.addComponent<raster_component>(unrealMesh)
@@ -130,8 +123,7 @@ void application::initialize(dx_renderer* renderer)
 #endif
 
 #if 1
-	auto ragdollMesh = loadAnimatedMeshFromFile("assets/ragdoll/locomotion_pack/xbot.fbx", true, false);
-	if (ragdollMesh)
+	if (auto ragdollMesh = loadAnimatedMeshFromFile("assets/ragdoll/locomotion_pack/xbot.fbx", true, false))
 	{
 		//ragdollMesh->skeleton.prettyPrintHierarchy();
 		ragdollMesh->skeleton.pushAssimpAnimationsInDirectory("assets/ragdoll/locomotion_pack/animations");
