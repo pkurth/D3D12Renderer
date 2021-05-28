@@ -225,11 +225,21 @@ void animation_skeleton::readAnimationPropertiesFromFile(const std::string& file
 
 			animation_clip& clip = clips[possibleClipIndices[0]];
 
-			clip.bakeRootRotationIntoPose = animNode["Bake rotation"].as<bool>();
-			clip.bakeRootXZTranslationIntoPose = animNode["Bake xz"].as<bool>();
-			if (animNode["Looping"])
+			if (auto rotationNode = animNode["Bake rotation"])
 			{
-				clip.looping = animNode["Looping"].as<bool>();
+				clip.bakeRootRotationIntoPose = rotationNode.as<bool>();
+			}
+			if (auto xzNode = animNode["Bake xz"])
+			{
+				clip.bakeRootXZTranslationIntoPose = xzNode.as<bool>();
+			}
+			if (auto yNode = animNode["Bake y"])
+			{
+				clip.bakeRootYTranslationIntoPose = yNode.as<bool>();
+			}
+			if (auto loopingNode = animNode["Looping"])
+			{
+				clip.looping = loopingNode.as<bool>();
 			}
 
 
@@ -260,9 +270,9 @@ void animation_skeleton::readAnimationPropertiesFromFile(const std::string& file
 				time = clamp(time, 0.f, clip.lengthInSeconds);
 
 				float targetStartTime = 0.f;
-				if (trans["Target time"])
+				if (auto targetTimeNode = trans["Target time"])
 				{
-					targetStartTime = trans["Target time"].as<float>();
+					targetStartTime = targetTimeNode.as<float>();
 					if (targetStartTime < 0.f)
 					{
 						targetStartTime = targetClip.lengthInSeconds + targetStartTime;
@@ -502,6 +512,12 @@ void animation_skeleton::sampleAnimation(const animation_clip& clip, float timeN
 			rootMotion.position.z = 0.f;
 		}
 
+		if (clip.bakeRootYTranslationIntoPose)
+		{
+			outLocalTransforms[0].position.y += rootMotion.position.y;
+			rootMotion.position.y = 0.f;
+		}
+
 		*outRootMotion = rootMotion;
 	}
 	else
@@ -601,6 +617,7 @@ void animation_clip::edit()
 {
 	ImGui::Checkbox("Bake root rotation into pose", &bakeRootRotationIntoPose);
 	ImGui::Checkbox("Bake xz translation into pose", &bakeRootXZTranslationIntoPose);
+	ImGui::Checkbox("Bake y translation into pose", &bakeRootYTranslationIntoPose);
 }
 
 trs animation_clip::getFirstRootTransform() const
@@ -620,6 +637,10 @@ trs animation_clip::getFirstRootTransform() const
 		{
 			t.position.x = 0.f;
 			t.position.z = 0.f;
+		}
+		if (bakeRootYTranslationIntoPose)
+		{
+			t.position.y = 0.f;
 		}
 
 		return t;
@@ -644,6 +665,10 @@ trs animation_clip::getLastRootTransform() const
 		{
 			t.position.x = 0.f;
 			t.position.z = 0.f;
+		}
+		if (bakeRootYTranslationIntoPose)
+		{
+			t.position.y = 0.f;
 		}
 
 		return t;

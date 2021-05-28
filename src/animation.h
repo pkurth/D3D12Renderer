@@ -87,6 +87,7 @@ struct animation_clip
 	bool looping = true;
 	bool bakeRootRotationIntoPose = false;
 	bool bakeRootXZTranslationIntoPose = false;
+	bool bakeRootYTranslationIntoPose = false;
 
 
 	void edit();
