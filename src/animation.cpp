@@ -262,7 +262,7 @@ void animation_skeleton::readAnimationPropertiesFromFile(const std::string& file
 				float targetStartTime = 0.f;
 				if (trans["Target time"])
 				{
-					trans["Target time"].as<float>();
+					targetStartTime = trans["Target time"].as<float>();
 					if (targetStartTime < 0.f)
 					{
 						targetStartTime = targetClip.lengthInSeconds + targetStartTime;
@@ -283,7 +283,7 @@ void animation_skeleton::readAnimationPropertiesFromFile(const std::string& file
 				clip.events.push_back(e);
 			}
 
-			std::sort(clip.events.begin(), clip.events.end(), [](animation_event& e0, animation_event& e1) { return e0.time < e1.time; });
+			std::sort(clip.events.begin(), clip.events.end(), [](const animation_event& e0, const animation_event& e1) { return e0.time < e1.time; });
 		}
 	}
 }
@@ -781,7 +781,7 @@ void animation_player::transitionTo(const animation_clip* clip, float transition
 	}
 }
 
-void animation_player::update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion)
+void animation_player::update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion, bool ignoreEvents)
 {
 	if (transitioning())
 	{
@@ -796,18 +796,21 @@ void animation_player::update(const animation_skeleton& skeleton, float dt, trs*
 	if (!transitioning())
 	{
 		animation_event_indices eventIndices = to.update(skeleton, dt, outLocalTransforms, outDeltaRootMotion);
-		for (uint32 i = 0; i < eventIndices.count; ++i)
+		if (!ignoreEvents)
 		{
-			uint32 eventIndex = i + eventIndices.first;
-			const animation_event& e = to.clip->events[eventIndex];
-
-			assert(e.type == animation_event_type_transition);
-
-			float random = rng.randomFloat01();
-			if (random <= e.transition.automaticProbability)
+			for (uint32 i = 0; i < eventIndices.count; ++i)
 			{
-				transitionTo(&skeleton.clips[e.transition.targetIndex], e.transition.transitionTime, e.transition.targetStartTime);
-				break;
+				uint32 eventIndex = i + eventIndices.first;
+				const animation_event& e = to.clip->events[eventIndex];
+
+				assert(e.type == animation_event_type_transition);
+
+				float random = rng.randomFloat01();
+				if (random <= e.transition.automaticProbability)
+				{
+					transitionTo(&skeleton.clips[e.transition.targetIndex], e.transition.transitionTime, e.transition.targetStartTime);
+					break;
+				}
 			}
 		}
 	}

@@ -51,7 +51,7 @@ void simple_animation_controller::update(scene_entity entity, float dt)
 
 		trs* localTransforms = (trs*)alloca(sizeof(trs) * skeleton.joints.size());
 		trs deltaRootMotion;
-		animationPlayer.update(skeleton, dt * timeScale, localTransforms, deltaRootMotion);
+		animationPlayer.update(skeleton, dt * timeScale, localTransforms, deltaRootMotion, true);
 		
 		skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
 

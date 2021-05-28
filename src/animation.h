@@ -143,7 +143,7 @@ struct animation_player
 	animation_player(animation_clip* clip);
 
 	void transitionTo(const animation_clip* clip, float transitionTime, float startTime = 0.f);
-	void update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion);
+	void update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion, bool ignoreEvents = false);
 
 	bool playing() const { return to.valid(); }
 	bool transitioning() const { return from.valid(); }
