@@ -79,6 +79,7 @@ static float2 hammersley(uint i, uint N)
 // http://advances.realtimerendering.com/s2014/index.html
 static float interleavedGradientNoise(float2 uv, uint frameCount)
 {
+	frameCount &= 1023;
 	const float2 magicFrameScale = float2(47.f, 17.f) * 0.695f;
 	uv += frameCount * magicFrameScale;
 

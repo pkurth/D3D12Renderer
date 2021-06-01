@@ -72,7 +72,7 @@ ps_output main(ps_input IN)
 		: float4(1.f, 1.f, 1.f, 1.f))
 		* material.getAlbedo();
 
-	const float normalMapStrength = material.getNormalMapStrength();
+	const float normalMapStrength = material.getNormalMapStrength() * 0.2f;
 	surface.N = (flags & USE_NORMAL_TEXTURE)
 		? mul(float3(normalMapStrength, normalMapStrength, 1.f) * (normalTex.Sample(wrapSampler, IN.uv).xyz * 2.f - 1.f), IN.tbn)
 		: IN.tbn[2];

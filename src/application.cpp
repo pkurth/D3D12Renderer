@@ -460,7 +460,7 @@ static bool editSSR(renderer_settings& settings)
 
 		result |= ImGui::SliderInt("Num iterations", (int*)&settings.ssr.numSteps, 1, 1024);
 		result |= ImGui::SliderFloat("Max distance", &settings.ssr.maxDistance, 5.f, 1000.f);
-		result |= ImGui::SliderFloat("Min. stride", &settings.ssr.minStride, 1.f, 10.f);
+		result |= ImGui::SliderFloat("Min. stride", &settings.ssr.minStride, 1.f, 50.f);
 		result |= ImGui::SliderFloat("Max. stride", &settings.ssr.maxStride, settings.ssr.minStride, 50.f);
 
 		ImGui::TreePop();
@@ -1345,7 +1345,7 @@ void application::update(const user_input& input, float dt)
 
 void application::setEnvironment(const std::string& filename)
 {
-	environment = createEnvironment(filename); // Currently synchronous (on render queue).
+	environment = createEnvironment(filename, 2048, 1024); // Currently synchronous (on render queue).
 	pathTracer.numAveragedFrames = 0;
 
 	if (!environment)

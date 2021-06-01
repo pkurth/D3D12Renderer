@@ -89,7 +89,7 @@ void main(cs_input IN)
 
     const float3 normal = unpackNormal(worldNormals.SampleLevel(linearSampler, uv, 0));
     const float3 N = normalize(mul(camera.view, float4(normal, 0.f)).xyz);
-    const float roughness = clamp(reflectance.SampleLevel(linearSampler, uv, 0).a, 0.03f, 0.97f);
+    const float roughness = clamp(reflectance.SampleLevel(linearSampler, uv, 0).a, 0.01f, 0.99f);
      
     const float depth = depthBuffer.SampleLevel(pointSampler, uv, 0);
     const float3 viewPos = restoreViewSpacePosition(camera.invProj, uv, depth);

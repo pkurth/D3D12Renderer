@@ -36,7 +36,7 @@ static void swap(inout float a, inout float b)
 static bool intersectsDepthBuffer(float sceneZMax, float rayZMin, float rayZMax)
 {
     // Increase thickness along distance. 
-    float thickness = max(sceneZMax * 0.3f, 1.f);
+    float thickness = max(sceneZMax * 0.2f, 1.f);
 
     // Effectively remove line/tiny artifacts, mostly caused by Zbuffers precision.
     float depthScale = min(1.f, sceneZMax / 100.f);
@@ -191,7 +191,7 @@ void main(cs_input IN)
     const float3 viewPos = restoreViewSpacePosition(camera.invProj, uv, depth);
     const float3 viewDir = normalize(viewPos);
 
-    float2 h = halton23(cb.frameIndex & 1023);
+    float2 h = halton23(cb.frameIndex & 31);
     uint3 noiseDims;
     noise.GetDimensions(0, noiseDims.x, noiseDims.y, noiseDims.z);
     float2 Xi = noise.SampleLevel(linearSampler, (uv + h) * cb.dimensions / float2(noiseDims.xy), 0);
@@ -203,7 +203,7 @@ void main(cs_input IN)
     float jitter = interleavedGradientNoise(IN.dispatchThreadID.xy, cb.frameIndex);
 
     float2 hitPixel;
-    bool hit = traceScreenSpaceRay(viewPos + reflDir * 0.02f, reflDir, jitter, roughness, hitPixel);
+    bool hit = traceScreenSpaceRay(viewPos + reflDir * 0.001f, reflDir, jitter, roughness, hitPixel);
 
     float hitDepth = depthBuffer.SampleLevel(pointSampler, hitPixel, 0);
     float hitMul = hit ? 1.f : -1.f; // We pack the info whether we hit or not in the sign of the depth.

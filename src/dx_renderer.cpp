@@ -1507,8 +1507,8 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setPipelineState(*ssrRaycastPipeline.pipeline);
 				cl->setComputeRootSignature(*ssrRaycastPipeline.rootSignature);
 
-				settings.ssr.dimensions = vec2((float)ssrRaycastTexture->width, (float)ssrRaycastTexture->height);
-				settings.ssr.invDimensions = vec2(1.f / ssrRaycastTexture->width, 1.f / ssrRaycastTexture->height);
+				settings.ssr.dimensions = vec2((float)SSR_RAYCAST_WIDTH, (float)SSR_RAYCAST_HEIGHT);
+				settings.ssr.invDimensions = vec2(1.f / SSR_RAYCAST_WIDTH, 1.f / SSR_RAYCAST_HEIGHT);
 				settings.ssr.frameIndex = (uint32)dxContext.frameID;
 
 				cl->setCompute32BitConstants(SSR_RAYCAST_RS_CB, settings.ssr);
@@ -1533,7 +1533,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setPipelineState(*ssrResolvePipeline.pipeline);
 				cl->setComputeRootSignature(*ssrResolvePipeline.rootSignature);
 
-				cl->setCompute32BitConstants(SSR_RESOLVE_RS_CB, ssr_resolve_cb{ vec2((float)ssrResolveTexture->width, (float)ssrResolveTexture->height), vec2(1.f / ssrResolveTexture->width, 1.f / ssrResolveTexture->height) });
+				cl->setCompute32BitConstants(SSR_RESOLVE_RS_CB, ssr_resolve_cb{ vec2((float)SSR_RESOLVE_WIDTH, (float)SSR_RESOLVE_HEIGHT), vec2(1.f / SSR_RESOLVE_WIDTH, 1.f / SSR_RESOLVE_HEIGHT) });
 				cl->setComputeDynamicConstantBuffer(SSR_RESOLVE_RS_CAMERA, materialInfo.cameraCBV);
 
 				cl->setDescriptorHeapUAV(SSR_RESOLVE_RS_TEXTURES, 0, ssrResolveTexture);
@@ -1561,7 +1561,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setPipelineState(*ssrTemporalPipeline.pipeline);
 				cl->setComputeRootSignature(*ssrTemporalPipeline.rootSignature);
 
-				cl->setCompute32BitConstants(SSR_TEMPORAL_RS_CB, ssr_temporal_cb{ vec2(1.f / ssrResolveTexture->width, 1.f / ssrResolveTexture->height) });
+				cl->setCompute32BitConstants(SSR_TEMPORAL_RS_CB, ssr_temporal_cb{ vec2(1.f / SSR_RESOLVE_WIDTH, 1.f / SSR_RESOLVE_HEIGHT) });
 
 				cl->setDescriptorHeapUAV(SSR_TEMPORAL_RS_TEXTURES, 0, ssrTemporalTextures[ssrOutputIndex]);
 				cl->setDescriptorHeapSRV(SSR_TEMPORAL_RS_TEXTURES, 1, ssrResolveTexture);
@@ -1583,7 +1583,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setPipelineState(*ssrMedianBlurPipeline.pipeline);
 				cl->setComputeRootSignature(*ssrMedianBlurPipeline.rootSignature);
 
-				cl->setCompute32BitConstants(SSR_MEDIAN_BLUR_RS_CB, ssr_median_blur_cb{ vec2(1.f / ssrResolveTexture->width, 1.f / ssrResolveTexture->height) });
+				cl->setCompute32BitConstants(SSR_MEDIAN_BLUR_RS_CB, ssr_median_blur_cb{ vec2(1.f / SSR_RESOLVE_WIDTH, 1.f / SSR_RESOLVE_HEIGHT) });
 
 				cl->setDescriptorHeapUAV(SSR_MEDIAN_BLUR_RS_TEXTURES, 0, ssrResolveTexture); // We reuse the resolve texture here.
 				cl->setDescriptorHeapSRV(SSR_MEDIAN_BLUR_RS_TEXTURES, 1, ssrTemporalTextures[ssrOutputIndex]);
