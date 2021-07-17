@@ -13,7 +13,7 @@ local gpu_string = gpu_handle:read("*a")
 gpu_handle:close()
 
 for str in string.gmatch(gpu_string, "NVIDIA (.-)\n") do
-	for model in string.gmatch(str, "%d%d%d%d") do
+	for model in string.gmatch(str, "%d%d%d%d?") do
 		gpu_model_number = tonumber(model)
 		gpu_name = str
 	end
