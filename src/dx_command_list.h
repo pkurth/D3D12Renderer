@@ -144,7 +144,7 @@ struct dx_command_list
 	void clearDepthAndStencil(dx_render_target& renderTarget, float depth = 1.f, uint32 stencil = 0, const clear_rect* rects = 0, uint32 numRects = 0);
 
 	void setStencilReference(uint32 stencilReference);
-	void setBlendFactor(const float* blendFactor);
+	void setBlendFactor(float blendR, float blendG, float blendB, float blendA);
 
 
 	// Draw.

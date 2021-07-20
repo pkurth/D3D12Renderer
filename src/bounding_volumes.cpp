@@ -196,7 +196,7 @@ bool ray::intersectPlane(vec3 normal, float d, float& outT) const
 		return false;
 	}
 
-	outT = -(dot(origin, normal) + d) / dot(direction, normal);
+	outT = -(dot(origin, normal) + d) / ndotd;
 	return true;
 }
 

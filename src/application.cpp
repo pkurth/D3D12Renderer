@@ -122,7 +122,7 @@ void application::initialize(dx_renderer* renderer)
 	}
 #endif
 
-#if 1
+#if 0
 	if (auto ragdollMesh = loadAnimatedMeshFromFile("assets/ragdoll/locomotion_pack/xbot.fbx", true, false))
 	{
 		//ragdollMesh->skeleton.prettyPrintHierarchy();
@@ -137,7 +137,7 @@ void application::initialize(dx_renderer* renderer)
 	}
 #endif
 
-#if 1
+#if 0
 	{
 		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 
@@ -260,7 +260,7 @@ void application::initialize(dx_renderer* renderer)
 	}
 #endif
 
-	ragdoll.initialize(appScene, vec3(60.f, 1.25f, -2.f));
+	//ragdoll.initialize(appScene, vec3(60.f, 1.25f, -2.f));
 	//ragdoll.initialize(appScene, vec3(0.f, 1.25f, 0.f));
 
 	//initializeLocomotionEval(appScene, ragdoll);

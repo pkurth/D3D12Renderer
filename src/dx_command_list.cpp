@@ -430,8 +430,9 @@ void dx_command_list::setStencilReference(uint32 stencilReference)
 	commandList->OMSetStencilRef(stencilReference);
 }
 
-void dx_command_list::setBlendFactor(const float* blendFactor)
+void dx_command_list::setBlendFactor(float blendR, float blendG, float blendB, float blendA)
 {
+	const float blendFactor[] = { blendR, blendG, blendB, blendA };
 	commandList->OMSetBlendFactor(blendFactor);
 }
 
