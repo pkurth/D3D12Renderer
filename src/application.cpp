@@ -23,11 +23,6 @@ struct raytrace_component
 	raytracing_object_type type;
 };
 
-struct dynamic_geometry_component
-{
-	trs lastFrameTransform = trs::identity;
-};
-
 static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh, path_tracer& pathTracer)
 {
 	if (dxContext.featureSupport.raytracing())
@@ -1345,7 +1340,7 @@ void application::update(const user_input& input, float dt)
 
 void application::setEnvironment(const std::string& filename)
 {
-	environment = createEnvironment(filename, 2048, 1024); // Currently synchronous (on render queue).
+	environment = createEnvironment(filename); // Currently synchronous (on render queue).
 	pathTracer.numAveragedFrames = 0;
 
 	if (!environment)

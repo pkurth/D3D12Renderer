@@ -3,6 +3,7 @@
 //#define ENTT_ID_TYPE uint64
 //#include <entt/entt.hpp>
 #include <entt/entity/registry.hpp>
+#include "math.h"
 
 struct tag_component
 {
@@ -13,6 +14,11 @@ struct tag_component
 		strncpy(name, n, sizeof(name));
 		name[sizeof(name) - 1] = 0;
 	}
+};
+
+struct dynamic_geometry_component
+{
+	trs lastFrameTransform = trs::identity;
 };
 
 struct scene_entity
@@ -65,6 +71,10 @@ struct scene_entity
 				if (hasComponent<physics_reference_component>())
 				{
 					component.recalculateProperties(registry, getComponent<physics_reference_component>());
+				}
+				if (!hasComponent<dynamic_geometry_component>())
+				{
+					addComponent<dynamic_geometry_component>();
 				}
 			}
 		}
