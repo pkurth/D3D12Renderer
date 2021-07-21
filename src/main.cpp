@@ -190,7 +190,7 @@ int main(int argc, char** argv)
 
 			for (uint32 i = 0; i < arraysize(user_input::keyboard); ++i)
 			{
-				if (input.keyboard[i].down && !ImGui::IsKeyDown(i)) { input.keyboard[i].down = false; }
+				if (!ImGui::IsKeyDown(i)) { input.keyboard[i].down = false; }
 				input.keyboard[i].pressEvent = false;
 			}
 

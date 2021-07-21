@@ -586,18 +586,18 @@ void application::drawMainMenuBar()
 			}
 			ImGui::Separator();
 
-			if (ImGui::MenuItem(ICON_FA_SAVE "  Save scene"))
+			if (ImGui::MenuItem(ICON_FA_SAVE "  Save scene", "Ctrl+S"))
 			{
 				serializeToFile();
 			}
 
-			if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN "  Load scene"))
+			if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN "  Load scene", "Ctrl+O"))
 			{
 				deserializeFromFile();
 			}
 
 			ImGui::Separator();
-			if (ImGui::MenuItem(ICON_FA_TIMES "  Exit"))
+			if (ImGui::MenuItem(ICON_FA_TIMES "  Exit", "Esc"))
 			{
 				PostQuitMessage(0);
 			}
@@ -1099,18 +1099,34 @@ bool application::handleUserInput(const user_input& input, float dt)
 				inputCaptured = true;
 				objectMovedByGizmo = true;
 			}
-			if (input.keyboard[key_ctrl].down && input.keyboard['Z'].pressEvent)
-			{
-				undoStack.undo();
-				inputCaptured = true;
-				objectMovedByGizmo = true;
-			}
-			if (input.keyboard[key_ctrl].down && input.keyboard['Y'].pressEvent)
-			{
-				undoStack.redo();
-				inputCaptured = true;
-				objectMovedByGizmo = true;
-			}
+		}
+	}
+
+	if (!inputCaptured)
+	{
+		if (input.keyboard[key_ctrl].down && input.keyboard['Z'].pressEvent)
+		{
+			undoStack.undo();
+			inputCaptured = true;
+			objectMovedByGizmo = true;
+		}
+		if (input.keyboard[key_ctrl].down && input.keyboard['Y'].pressEvent)
+		{
+			undoStack.redo();
+			inputCaptured = true;
+			objectMovedByGizmo = true;
+		}
+		if (input.keyboard[key_ctrl].down && input.keyboard['S'].pressEvent)
+		{
+			serializeToFile();
+			inputCaptured = true;
+			ImGui::GetIO().KeysDown['S'] = false; // Hack: Window does not get notified of inputs due to the file dialog.
+		}
+		if (input.keyboard[key_ctrl].down && input.keyboard['O'].pressEvent)
+		{
+			deserializeFromFile();
+			inputCaptured = true;
+			ImGui::GetIO().KeysDown['O'] = false; // Hack: Window does not get notified of inputs due to the file dialog.
 		}
 	}
 
