@@ -11,6 +11,7 @@
 #include "transformation_gizmo.h"
 #include "raytracing.h"
 #include "ragdoll.h"
+#include "undo_stack.h"
 
 #include "path_tracing.h"
 
@@ -33,6 +34,7 @@ struct application
 private:
 	void setSelectedEntityEulerRotation();
 	void setSelectedEntity(scene_entity entity);
+	void drawMainMenuBar();
 	bool drawSceneHierarchy();
 	void drawSettings(float dt);
 
@@ -52,6 +54,8 @@ private:
 	void renderDynamicGeometryToShadowMap(spot_shadow_render_pass& renderPass);
 	void renderDynamicGeometryToShadowMap(point_shadow_render_pass& renderPass);
 	
+
+	undo_stack undoStack;
 
 	raytracing_tlas raytracingTLAS;
 	path_tracer pathTracer;

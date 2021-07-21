@@ -38,6 +38,8 @@ struct dx_feature_support
 	bool meshShaders() { return meshShaderTier >= dx_mesh_shader_1_0; }
 };
 
+extern bool profilerWindowOpen;
+
 struct dx_context
 {
 	bool initialize();

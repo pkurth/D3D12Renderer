@@ -18,10 +18,31 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
+#include <fontawesome/list.h>
+
 struct raytrace_component
 {
 	raytracing_object_type type;
 };
+
+struct transform_undo
+{
+	scene_entity entity;
+	trs before;
+	trs after;
+};
+
+static void undoTransform(void* d)
+{
+	transform_undo& t = *(transform_undo*)d;
+	t.entity.getComponent<trs>() = t.before;
+}
+
+static void redoTransform(void* d)
+{
+	transform_undo& t = *(transform_undo*)d;
+	t.entity.getComponent<trs>() = t.after;
+}
 
 static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh, path_tracer& pathTracer)
 {
@@ -539,6 +560,187 @@ void application::setSelectedEntity(scene_entity entity)
 	setSelectedEntityEulerRotation();
 }
 
+void application::drawMainMenuBar()
+{
+	static bool showIconsWindow = false;
+	static bool showDemoWindow = false;
+
+	bool controlsClicked = false;
+	bool aboutClicked = false;
+
+	if (ImGui::BeginMainMenuBar())
+	{
+		if (ImGui::BeginMenu(ICON_FA_FILE "  File"))
+		{
+			char textBuffer[128];
+			snprintf(textBuffer, sizeof(textBuffer), ICON_FA_UNDO " Undo %s", undoStack.undoPossible() ? undoStack.getUndoName() : "");
+			if (ImGui::MenuItem(textBuffer, "Ctrl+Z", false, undoStack.undoPossible()))
+			{
+				undoStack.undo();
+			}
+
+			snprintf(textBuffer, sizeof(textBuffer), ICON_FA_REDO " Redo %s", undoStack.redoPossible() ? undoStack.getRedoName() : "");
+			if (ImGui::MenuItem(textBuffer, "Ctrl+Y", false, undoStack.redoPossible()))
+			{
+				undoStack.redo();
+			}
+			ImGui::Separator();
+
+			if (ImGui::MenuItem(ICON_FA_SAVE "  Save scene"))
+			{
+				serializeToFile();
+			}
+
+			if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN "  Load scene"))
+			{
+				deserializeFromFile();
+			}
+
+			ImGui::Separator();
+			if (ImGui::MenuItem(ICON_FA_TIMES "  Exit"))
+			{
+				PostQuitMessage(0);
+			}
+			ImGui::EndMenu();
+		}
+
+		if (ImGui::BeginMenu(ICON_FA_TOOLS "  Developer"))
+		{
+			if (ImGui::MenuItem(ICON_FA_ICONS "  Show available icons"))
+			{
+				showIconsWindow = true;
+			}
+
+			if (ImGui::MenuItem(ICON_FA_PUZZLE_PIECE "  Show demo window"))
+			{
+				showDemoWindow = true;
+			}
+
+			if (ImGui::MenuItem(profilerWindowOpen ? (ICON_FA_CHART_BAR "  Hide GPU profiler") : (ICON_FA_CHART_BAR "  Show GPU profiler"), nullptr, nullptr, ENABLE_DX_PROFILING))
+			{
+				profilerWindowOpen = !profilerWindowOpen;
+			}
+
+			ImGui::EndMenu();
+		}
+
+		if (ImGui::BeginMenu(ICON_FA_CHILD "  Help"))
+		{
+			if (ImGui::MenuItem(ICON_FA_COMPASS "  Controls"))
+			{
+				controlsClicked = true;
+			}
+
+			if (ImGui::MenuItem(ICON_FA_QUESTION "  About"))
+			{
+				aboutClicked = true;
+			}
+
+			ImGui::EndMenu();
+		}
+
+		ImGui::EndMainMenuBar();
+	}
+
+	if (controlsClicked)
+	{
+		ImGui::OpenPopup("Controls");
+	}
+
+	ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+	ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+	if (ImGui::BeginPopupModal("Controls", 0, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::Text("The camera can be controlled in two modes:");
+		ImGui::BulletText(
+			"Free flying: Hold the right mouse button and move the mouse to turn.\n"
+			"Move with WASD (while holding right mouse). Q & E let you move down and up.\n"
+			"Holding Shift will make you fly faster, Ctrl will make you slower."
+		);
+		ImGui::BulletText(
+			"Orbit: While holding Alt, press and hold the left mouse button to\n"
+			"orbit around a point in front of the camera."
+		);
+		ImGui::Separator();
+		ImGui::Text(
+			"Left-click on objects to select them. Toggle through gizmos using\n"
+			"Q (no gizmo), W (translate), E (rotate), R (scale).\n"
+			"Press G to toggle between global and local coordinate system.\n"
+			"You can also change the object's properties in the Scene Hierarchy window."
+		);
+		ImGui::Separator();
+		ImGui::Text(
+			"Press F to focus the camera on the selected object. This automatically\n"
+			"sets the orbit distance such that you now orbit around this object."
+		);
+		ImGui::Separator();
+		ImGui::Text(
+			"Press V to toggle Vsync on or off."
+		);
+		ImGui::Separator();
+		ImGui::Text(
+			"You can drag and drop meshes from the Windows explorer into the game\n"
+			"window to add it to the scene."
+		);
+		ImGui::Separator();
+
+		ImGui::SetCursorPosX((ImGui::GetWindowSize().x - 120) * 0.5f);
+
+		if (ImGui::Button("OK", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+		ImGui::SetItemDefaultFocus();
+		ImGui::EndPopup();
+	}
+
+	if (aboutClicked)
+	{
+		ImGui::OpenPopup("About");
+	}
+
+	ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+	if (ImGui::BeginPopupModal("About", 0, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::Text("Direct3D renderer");
+		ImGui::Separator();
+
+		ImGui::SetCursorPosX((ImGui::GetWindowSize().x - 120) * 0.5f);
+
+		if (ImGui::Button("OK", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+		ImGui::SetItemDefaultFocus();
+		ImGui::EndPopup();
+	}
+
+
+	if (showIconsWindow)
+	{
+		ImGui::Begin("Icons", &showIconsWindow);
+
+		static ImGuiTextFilter filter;
+		filter.Draw();
+		for (uint32 i = 0; i < arraysize(awesomeIcons); ++i)
+		{
+			ImGui::PushID(i);
+			if (filter.PassFilter(awesomeIconNames[i]))
+			{
+				ImGui::Text("%s: %s", awesomeIconNames[i], awesomeIcons[i]);
+				ImGui::SameLine();
+				if (ImGui::Button("Copy to clipboard"))
+				{
+					ImGui::SetClipboardText(awesomeIconNames[i]);
+				}
+			}
+			ImGui::PopID();
+		}
+		ImGui::End();
+	}
+
+	if (showDemoWindow)
+	{
+		ImGui::ShowDemoWindow(&showDemoWindow);
+	}
+}
+
 template<typename component_t, typename ui_func>
 static void drawComponent(scene_entity entity, const char* componentName, ui_func func)
 {
@@ -832,33 +1034,49 @@ bool application::handleUserInput(const user_input& input, float dt)
 			static bool saved = false;
 			static float invMass;
 
+			static bool dragging = false;
+			static trs previousTransform;
+
+			if (!dragging)
+			{
+				previousTransform = transform;
+			}
+
 			if (manipulateTransformation(transform, transformationType, transformationSpace, camera, input, !inputCaptured, &overlayRenderPass))
 			{
 				setSelectedEntityEulerRotation();
 				inputCaptured = true;
 				objectMovedByGizmo = true;
 
+				dragging = true;
+
 				if (!saved && selectedEntity.hasComponent<rigid_body_component>())
 				{
 					rigid_body_component& rb = selectedEntity.getComponent<rigid_body_component>();
 					invMass = rb.invMass;
-					//invInertia = rb.invInertia;
 
 					rb.invMass = 0.f;
-					//rb.invInertia = mat3::zero;
 					rb.linearVelocity = 0.f;
-					//rb.angularVelocity = 0.f;
 
 					saved = true;
 				}
 			}
-			else if (saved)
+			else
 			{
-				assert(selectedEntity.hasComponent<rigid_body_component>());
-				rigid_body_component& rb = selectedEntity.getComponent<rigid_body_component>();
+				if (dragging)
+				{
+					dragging = false;
+					undoStack.pushAction("transform entity", undoTransform, redoTransform, transform_undo{ selectedEntity, previousTransform, transform });
+				}
 
-				rb.invMass = invMass;
-				saved = false;
+				if (saved)
+				{
+					assert(selectedEntity.hasComponent<rigid_body_component>());
+					rigid_body_component& rb = selectedEntity.getComponent<rigid_body_component>();
+
+					rb.invMass = invMass;
+					saved = false;
+				}
 			}
 		}
 
@@ -878,6 +1096,18 @@ bool application::handleUserInput(const user_input& input, float dt)
 				// Delete entity.
 				appScene.deleteEntity(selectedEntity);
 				setSelectedEntity({});
+				inputCaptured = true;
+				objectMovedByGizmo = true;
+			}
+			if (input.keyboard[key_ctrl].down && input.keyboard['Z'].pressEvent)
+			{
+				undoStack.undo();
+				inputCaptured = true;
+				objectMovedByGizmo = true;
+			}
+			if (input.keyboard[key_ctrl].down && input.keyboard['Y'].pressEvent)
+			{
+				undoStack.redo();
 				inputCaptured = true;
 				objectMovedByGizmo = true;
 			}
@@ -1170,6 +1400,10 @@ void application::update(const user_input& input, float dt)
 	objectDragged |= handleUserInput(input, dt);
 	objectDragged |= drawSceneHierarchy();
 	drawSettings(dt);
+	drawMainMenuBar();
+
+	//undoStack.verify();
+	//undoStack.display();
 	
 	physicsStep(appScene, dt, numPhysicsSolverIterations);
 	

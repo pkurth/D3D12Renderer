@@ -32,6 +32,18 @@ static void* alignTo(void* currentAddress, uint64 alignment)
 	return (uint8*)currentAddress + adjustment;
 }
 
+static bool rangesOverlap(uint64 fromA, uint64 toA, uint64 fromB, uint64 toB)
+{
+	if (toA <= fromB || fromA >= toA) return false;
+	return true;
+}
+
+static bool rangesOverlap(void* fromA, void* toA, void* fromB, void* toB)
+{
+	if (toA <= fromB || fromA >= toB) return false;
+	return true;
+}
+
 struct memory_block
 {
 	uint8* start;

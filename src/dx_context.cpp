@@ -24,6 +24,59 @@ void resolveTimeStampQueries(uint64* timestamps);
 #endif
 
 
+LONG NTAPI handleVectoredException(PEXCEPTION_POINTERS exceptionInfo)
+{
+	PEXCEPTION_RECORD exceptionRecord = exceptionInfo->ExceptionRecord;
+
+	switch (exceptionRecord->ExceptionCode)
+	{
+		case DBG_PRINTEXCEPTION_WIDE_C:
+		case DBG_PRINTEXCEPTION_C:
+
+			if (exceptionRecord->NumberParameters >= 2)
+			{
+				ULONG len = (ULONG)exceptionRecord->ExceptionInformation[0];
+
+				union
+				{
+					ULONG_PTR up;
+					PCWSTR pwz;
+					PCSTR psz;
+				};
+
+				up = exceptionRecord->ExceptionInformation[1];
+
+				HANDLE hOut = GetStdHandle(STD_ERROR_HANDLE);
+
+				if (exceptionRecord->ExceptionCode == DBG_PRINTEXCEPTION_C)
+				{
+					// Localized text will be incorrect displayed, if used not CP_OEMCP encoding.
+					// WriteConsoleA(hOut, psz, len, &len, 0);
+
+					// assume CP_ACP encoding
+					if (ULONG n = MultiByteToWideChar(CP_ACP, 0, psz, len, 0, 0))
+					{
+						PWSTR wz = (PWSTR)alloca(n * sizeof(WCHAR));
+
+						if (len = MultiByteToWideChar(CP_ACP, 0, psz, len, wz, n))
+						{
+							pwz = wz;
+						}
+					}
+				}
+
+				if (len)
+				{
+					WriteConsoleW(hOut, pwz, len - 1, &len, 0);
+				}
+
+			}
+			return EXCEPTION_CONTINUE_EXECUTION;
+	}
+
+	return EXCEPTION_CONTINUE_SEARCH;
+}
+
 static void enableDebugLayer()
 {
 #if defined(_DEBUG)
@@ -197,6 +250,12 @@ static dx_feature_support checkFeatureSupport(dx_device device)
 
 bool dx_context::initialize()
 {
+	SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+	AddVectoredExceptionHandler(TRUE, handleVectoredException);
+
+	checkResult(CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE));
+
+
 	enableDebugLayer();
 
 	factory = createFactory();
