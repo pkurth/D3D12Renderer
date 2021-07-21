@@ -17,14 +17,16 @@
 #include "dx_command_list.h"
 
 
+#define MAX_NUM_IMGUI_IMAGES_PER_FRAME 128
+
 static com<ID3D12DescriptorHeap> imguiDescriptorHeap;
 static CD3DX12_CPU_DESCRIPTOR_HANDLE startCPUDescriptor;
 static CD3DX12_GPU_DESCRIPTOR_HANDLE startGPUDescriptor;
 static uint32 descriptorHandleIncrementSize;
 static uint32 numImagesThisFrame;
 
-#define MAX_NUM_IMGUI_IMAGES_PER_FRAME 16
-
+static ref<dx_texture> iconsTexture;
+static ImTextureID iconsTextureID;
 
 static void setStyle()
 {
@@ -95,7 +97,7 @@ ImGuiContext* initializeImGui(DXGI_FORMAT screenFormat)
 
 
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-	desc.NumDescriptors = NUM_BUFFERED_FRAMES * MAX_NUM_IMGUI_IMAGES_PER_FRAME + 1;
+	desc.NumDescriptors = NUM_BUFFERED_FRAMES * MAX_NUM_IMGUI_IMAGES_PER_FRAME + 2;
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
@@ -110,6 +112,16 @@ ImGuiContext* initializeImGui(DXGI_FORMAT screenFormat)
 		screenFormat, imguiDescriptorHeap.Get(),
 		startCPUDescriptor,
 		startGPUDescriptor);
+
+	{
+		iconsTexture = loadTextureFromFile("assets/icons/icons.png", texture_load_flags_gen_mips_on_cpu | texture_load_flags_cache_to_dds);
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(startCPUDescriptor, 1, descriptorHandleIncrementSize);
+		CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(startGPUDescriptor, 1, descriptorHandleIncrementSize);
+		dxContext.device->CopyDescriptorsSimple(1, cpuHandle, iconsTexture->defaultSRV.cpuHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		iconsTextureID = (ImTextureID)gpuHandle.ptr;
+	}
 
 	return imguiContext;
 }
@@ -148,21 +160,33 @@ LRESULT handleImGuiInput(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	return ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
 }
 
+static ImTextureID pushTexture(dx_cpu_descriptor_handle handle)
+{
+	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(startCPUDescriptor, 2 + dxContext.bufferedFrameID * MAX_NUM_IMGUI_IMAGES_PER_FRAME + numImagesThisFrame, descriptorHandleIncrementSize);
+	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(startGPUDescriptor, 2 + dxContext.bufferedFrameID * MAX_NUM_IMGUI_IMAGES_PER_FRAME + numImagesThisFrame, descriptorHandleIncrementSize);
+
+	dxContext.device->CopyDescriptorsSimple(1, cpuHandle, handle.cpuHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	++numImagesThisFrame;
+
+	return (ImTextureID)gpuHandle.ptr;
+}
 
 namespace ImGui
 {
+	bool BeginWindowHiddenTabBar(const char* name, bool* open, ImGuiWindowFlags flags)
+	{
+		ImGuiWindowClass windowClass;
+		windowClass.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_AutoHideTabBar;
+		ImGui::SetNextWindowClass(&windowClass);
+		return ImGui::Begin(name, open, flags);
+	}
+
 	void Image(::dx_cpu_descriptor_handle& handle, ImVec2 size)
 	{
 		if (numImagesThisFrame < MAX_NUM_IMGUI_IMAGES_PER_FRAME)
 		{
-			CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(startCPUDescriptor, 1 + dxContext.bufferedFrameID * MAX_NUM_IMGUI_IMAGES_PER_FRAME + numImagesThisFrame, descriptorHandleIncrementSize);
-			CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(startGPUDescriptor, 1 + dxContext.bufferedFrameID * MAX_NUM_IMGUI_IMAGES_PER_FRAME + numImagesThisFrame, descriptorHandleIncrementSize);
-
-			dxContext.device->CopyDescriptorsSimple(1, cpuHandle, handle.cpuHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-			++numImagesThisFrame;
-
-			ImGui::Image((ImTextureID)gpuHandle.ptr, size);
+			ImGui::Image(pushTexture(handle), size);
 		}
 	}
 
@@ -179,6 +203,103 @@ namespace ImGui
 	void Image(const ref<dx_texture>& texture, uint32 width, uint32 height)
 	{
 		ImGui::Image(texture->defaultSRV, width, height);
+	}
+
+	bool ImageButton(::dx_cpu_descriptor_handle& handle, ImVec2 size, ImVec2 uvTopLeft, ImVec2 uvBottomRight)
+	{
+		if (numImagesThisFrame < MAX_NUM_IMGUI_IMAGES_PER_FRAME)
+		{
+			return ImGui::ImageButton(pushTexture(handle), size, uvTopLeft, uvBottomRight);
+		}
+		return false;
+	}
+
+	bool ImageButton(::dx_cpu_descriptor_handle& handle, uint32 width, uint32 height, ImVec2 uvTopLeft, ImVec2 uvBottomRight)
+	{
+		return ImGui::ImageButton(handle, ImVec2((float)width, (float)height), uvTopLeft, uvBottomRight);
+	}
+
+	bool ImageButton(const ref<dx_texture>& texture, ImVec2 size, ImVec2 uvTopLeft, ImVec2 uvBottomRight)
+	{
+		return ImGui::ImageButton(texture->defaultSRV, size, uvTopLeft, uvBottomRight);
+	}
+
+	bool ImageButton(const ref<dx_texture>& texture, uint32 width, uint32 height, ImVec2 uvTopLeft, ImVec2 uvBottomRight)
+	{
+		return ImGui::ImageButton(texture->defaultSRV, ImVec2((float)width, (float)height), uvTopLeft, uvBottomRight);
+	}
+
+	void Icon(imgui_icon icon, uint32 size)
+	{
+		const uint32 numColumns = iconsTexture->width / IMGUI_ICON_SIZE;
+		const uint32 numRows = iconsTexture->height / IMGUI_ICON_SIZE;
+		float row = (float)(icon / numColumns);
+		float col = (float)(icon % numColumns);
+
+		float left = col / numColumns;
+		float right = (col + 1) / numColumns;
+		float top = row / numRows;
+		float bottom = (row + 1) / numRows;
+
+		ImGui::Image(iconsTextureID, ImVec2((float)size, (float)size), ImVec2(left, top), ImVec2(right, bottom));
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip(imguiIconNames[icon]);
+		}
+	}
+
+	bool IconButton(uint32 id, imgui_icon icon, uint32 size)
+	{
+		const uint32 numColumns = iconsTexture->width / IMGUI_ICON_SIZE;
+		const uint32 numRows = iconsTexture->height / IMGUI_ICON_SIZE;
+		float row = (float)(icon / numColumns);
+		float col = (float)(icon % numColumns);
+
+		float left = col / numColumns;
+		float right = (col + 1) / numColumns;
+		float top = row / numRows;
+		float bottom = (row + 1) / numRows;
+
+		ImGui::PushID(id);
+		bool result = ImGui::ImageButton(iconsTextureID, ImVec2((float)size, (float)size), ImVec2(left, top), ImVec2(right, bottom));
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip(imguiIconNames[icon]);
+		}
+		ImGui::PopID();
+		return result;
+	}
+
+	bool IconRadioButton(imgui_icon icon, int* current, int value, uint32 size)
+	{
+		const uint32 numColumns = iconsTexture->width / IMGUI_ICON_SIZE;
+		const uint32 numRows = iconsTexture->height / IMGUI_ICON_SIZE;
+		float row = (float)(icon / numColumns);
+		float col = (float)(icon % numColumns);
+
+		float left = col / numColumns;
+		float right = (col + 1) / numColumns;
+		float top = row / numRows;
+		float bottom = (row + 1) / numRows;
+
+		bool active = value == *current;
+
+		ImGui::PushID(value);
+		bool clicked = ImGui::ImageButton(iconsTextureID, ImVec2((float)size, (float)size), ImVec2(left, top), ImVec2(right, bottom),
+			-1, active ? ImVec4(1, 1, 1, 0.4f) : ImVec4(0, 0, 0, 0));
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip(imguiIconNames[icon]);
+		}
+		ImGui::PopID();
+
+		int old = *current;
+		if (clicked)
+		{
+			*current = value;
+		}
+
+		return old != *current;
 	}
 
 	bool Dropdown(const char* label, const char** names, uint32 count, uint32& current)

@@ -54,8 +54,6 @@ void application::loadCustomShaders()
 	}
 }
 
-auto testMesh = make_ref<composite_mesh>();
-
 void application::initialize(dx_renderer* renderer)
 {
 	this->renderer = renderer;
@@ -142,6 +140,7 @@ void application::initialize(dx_renderer* renderer)
 			"assets/sphere/Tiles074_2K_Roughness.jpg",
 			{}, vec4(0.f), vec4(1.f), 1.f, 1.f);
 
+		auto testMesh = make_ref<composite_mesh>();
 		testMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 1.f, 0.1f), {}, trs::identity, lollipopMaterial });
 		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 0.4f, vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f)), {}, trs::identity, lollipopMaterial });
 
@@ -788,6 +787,40 @@ bool application::handleUserInput(const user_input& input, float dt)
 
 	bool objectMovedByGizmo = false;
 
+
+	static transformation_type transformationType = transformation_type_translation;
+	static transformation_space transformationSpace = transformation_global;
+
+	{
+		int iconSize = 40;
+
+		if (ImGui::BeginWindowHiddenTabBar("Controls", 0, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+		{
+			ImGui::PushID(&transformationSpace);
+			ImGui::IconRadioButton(imgui_icon_global, (int*)&transformationSpace, transformation_global, iconSize);
+			ImGui::SameLine(0, 0);
+			ImGui::IconRadioButton(imgui_icon_local, (int*)&transformationSpace, transformation_local, iconSize);
+			ImGui::PopID();
+
+			ImGui::SameLine(0.f, (float)iconSize);
+
+
+			ImGui::PushID(&transformationType);
+			ImGui::IconRadioButton(imgui_icon_translate, (int*)&transformationType, transformation_type_translation, iconSize);
+			ImGui::SameLine(0, 0);
+			ImGui::IconRadioButton(imgui_icon_rotate, (int*)&transformationType, transformation_type_rotation, iconSize);
+			ImGui::SameLine(0, 0);
+			ImGui::IconRadioButton(imgui_icon_scale, (int*)&transformationType, transformation_type_scale, iconSize);
+			ImGui::SameLine(0, 0);
+			ImGui::IconRadioButton(imgui_icon_cross, (int*)&transformationType, transformation_type_none, iconSize);
+			ImGui::PopID();
+
+			ImGui::SameLine(0.f, (float)iconSize);
+		}
+
+		ImGui::End();
+	}
+
 	if (selectedEntity)
 	{
 		if (selectedEntity.hasComponent<trs>())
@@ -798,11 +831,8 @@ bool application::handleUserInput(const user_input& input, float dt)
 			// Saved rigid-body properties. When a RB is dragged, we make it kinematic.
 			static bool saved = false;
 			static float invMass;
-			//static mat3 invInertia;
 
-			static transformation_type type = transformation_type_translation;
-			static transformation_space space = transformation_global;
-			if (manipulateTransformation(transform, type, space, camera, input, !inputCaptured, &overlayRenderPass))
+			if (manipulateTransformation(transform, transformationType, transformationSpace, camera, input, !inputCaptured, &overlayRenderPass))
 			{
 				setSelectedEntityEulerRotation();
 				inputCaptured = true;
@@ -828,7 +858,6 @@ bool application::handleUserInput(const user_input& input, float dt)
 				rigid_body_component& rb = selectedEntity.getComponent<rigid_body_component>();
 
 				rb.invMass = invMass;
-				//rb.invInertia = invInertia;
 				saved = false;
 			}
 		}
@@ -881,16 +910,6 @@ bool application::handleUserInput(const user_input& input, float dt)
 		vec3 dir = camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY).direction;
 		sun.direction = -dir;
 		inputCaptured = true;
-	}
-
-	if (!inputCaptured && input.keyboard['N'].pressEvent)
-	{
-		appScene.createEntity("Test 1")
-			.addComponent<trs>(vec3(20.f, 15.f, 0.f), quat::identity)
-			.addComponent<raster_component>(testMesh)
-			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
-			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
-			.addComponent<rigid_body_component>(false, 1.f);
 	}
 
 	return objectMovedByGizmo;
