@@ -248,6 +248,8 @@ static bool loadSVGFromFile(const fs::path& filepath, uint32 flags, DirectX::Scr
 		metadata = scratchImage.GetMetadata();
 
 		postProcessImage(scratchImage, metadata, flags, filepath, cacheFilepath);
+
+		delete[] rawImage;
 	}
 
 	createDesc(metadata, flags, textureDesc);
