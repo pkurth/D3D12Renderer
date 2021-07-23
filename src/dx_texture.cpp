@@ -236,7 +236,7 @@ static bool loadSVGFromFile(const fs::path& filepath, uint32 flags, DirectX::Scr
 
 		uint8* rawImage = new uint8[width * height * 4];
 
-		struct NSVGrasterizer* rasterizer = nsvgCreateRasterizer();
+		NSVGrasterizer* rasterizer = nsvgCreateRasterizer();
 		nsvgRasterize(rasterizer, svg, 0, 0, 1, rawImage, width, height, width * 4);
 		nsvgDeleteRasterizer(rasterizer);
 
