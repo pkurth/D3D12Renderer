@@ -14,8 +14,6 @@ enum gizmo_axis
 	gizmo_axis_z,
 };
 
-static dx_mesh mesh;
-
 static union
 {
 	struct
@@ -59,18 +57,8 @@ static gizmo_rectangle rectangles[] =
 	gizmo_rectangle{ vec3(0.f, 1.f, 1.f), vec3(0.f, 1.f, 0.f), vec3(0.f, 0.f, 1.f), vec2(1.f) },
 };
 
-static bool dragging;
-static uint32 axisIndex;
-static float anchor;
-static vec3 anchor3;
-static vec4 plane;
-
-static vec3 originalPosition;
-static quat originalRotation;
-static vec3 originalScale;
-
+static dx_mesh mesh;
 static dx_pipeline gizmoPipeline;
-
 static ref<struct gizmo_material> materials[6];
 
 struct gizmo_material : material_base
@@ -134,7 +122,7 @@ void initializeTransformationGizmos()
 }
 
 
-static uint32 handleTranslation(trs& transform, ray r, const user_input& input, transformation_space space, float snapping, float scaling)
+uint32 transformation_gizmo::handleTranslation(trs& transform, ray r, const user_input& input, float snapping, float scaling)
 {
 	quat rot = (space == transformation_global) ? quat::identity : transform.rotation;
 
@@ -191,6 +179,8 @@ static uint32 handleTranslation(trs& transform, ray r, const user_input& input, 
 			anchor3 = r.origin + minT * r.direction - transform.position;
 		}
 		originalPosition = transform.position;
+
+		originalTransform = transform;
 	}
 
 	if (dragging)
@@ -234,7 +224,7 @@ static uint32 handleTranslation(trs& transform, ray r, const user_input& input, 
 	return dragging ? axisIndex : hoverAxisIndex;
 }
 
-static uint32 handleRotation(trs& transform, ray r, const user_input& input, transformation_space space, float snapping, float scaling)
+uint32 transformation_gizmo::handleRotation(trs& transform, ray r, const user_input& input, float snapping, float scaling)
 {
 	quat rot = (space == transformation_global) ? quat::identity : transform.rotation;
 
@@ -270,6 +260,8 @@ static uint32 handleRotation(trs& transform, ray r, const user_input& input, tra
 
 		anchor = atan2(y, x);
 		originalRotation = quat(planeNormal, anchor);
+
+		originalTransform = transform;
 	}
 
 	if (dragging)
@@ -301,9 +293,10 @@ static uint32 handleRotation(trs& transform, ray r, const user_input& input, tra
 	return dragging ? axisIndex : hoverAxisIndex;
 }
 
-static uint32 handleScaling(trs& transform, ray r, const user_input& input, transformation_space space, float scaling, const render_camera& camera)
+uint32 transformation_gizmo::handleScaling(trs& transform, ray r, const user_input& input, float scaling, const render_camera& camera)
 {
-	quat rot = (space == transformation_global) ? quat::identity : transform.rotation;
+	// We only allow scaling in local space.
+	quat rot = transform.rotation;
 
 	const float cylinderHeight = cylinders[0].positionB.x;
 	const float uniformRadius = cylinderHeight * 0.3f * scaling;
@@ -311,15 +304,8 @@ static uint32 handleScaling(trs& transform, ray r, const user_input& input, tran
 	bounding_box uniformBox = bounding_box::fromCenterRadius(vec3(0.f), uniformRadius);
 
 	ray localRay = r;
-	if (space == transformation_local)
-	{
-		localRay.origin = inverseTransformPosition(transform, r.origin) * transform.scale; // inverseTransformPosition applies scale, but we don't want this.
-		localRay.direction = inverseTransformDirection(transform, r.direction);
-	}
-	else
-	{
-		localRay.origin -= transform.position;
-	}
+	localRay.origin = inverseTransformPosition(transform, r.origin) * transform.scale; // inverseTransformPosition applies scale, but we don't want this.
+	localRay.direction = inverseTransformDirection(transform, r.direction);
 
 	uint32 hoverAxisIndex = -1;
 	float minT = FLT_MAX;
@@ -373,6 +359,8 @@ static uint32 handleScaling(trs& transform, ray r, const user_input& input, tran
 			anchor = dot(r.origin + t * r.direction - transform.position, axis);
 			anchor = max(anchor, 0.0001f);
 			originalScale = transform.scale;
+
+			originalTransform = transform;
 		}
 		else
 		{
@@ -404,25 +392,8 @@ static uint32 handleScaling(trs& transform, ray r, const user_input& input, tran
 
 			vec3 d = (dot(r.origin + t * r.direction - transform.position, axis) / anchor) * axis;
 
-			if (space == transformation_local)
-			{
-				d = conjugate(rot) * d;
-				transform.scale.data[axisIndex] = originalScale.data[axisIndex] * d.data[axisIndex];
-			}
-			else
-			{
-				d = conjugate(transform.rotation) * d;
-				axis = conjugate(transform.rotation) * axis;
-
-				d = abs(d);
-				axis = abs(axis);
-
-				float factorX = (d.x > 1.f) ? ((d.x - 1.f) * axis.x + 1.f) : (1.f - (1.f - d.x) * axis.x);
-				float factorY = (d.y > 1.f) ? ((d.y - 1.f) * axis.y + 1.f) : (1.f - (1.f - d.y) * axis.y);
-				float factorZ = (d.z > 1.f) ? ((d.z - 1.f) * axis.z + 1.f) : (1.f - (1.f - d.z) * axis.z);
-
-				transform.scale = originalScale * vec3(factorX, factorY, factorZ);
-			}
+			d = conjugate(rot) * d;
+			transform.scale.data[axisIndex] = originalScale.data[axisIndex] * d.data[axisIndex];
 		}
 		else
 		{
@@ -440,11 +411,57 @@ static uint32 handleScaling(trs& transform, ray r, const user_input& input, tran
 	return dragging ? axisIndex : hoverAxisIndex;
 }
 
-bool manipulateTransformation(trs& transform, transformation_type& type, transformation_space& space, const render_camera& camera, const user_input& input, bool allowInput, overlay_render_pass* overlayRenderPass)
+bool transformation_gizmo::handleKeyboardInput(const user_input& input)
 {
-	if (!input.mouse.left.down)
+	bool result = false;
+
+	if (type != transformation_type_scale)
+	{
+		if (input.keyboard['G'].pressEvent)
+		{
+			space = (transformation_space)(1 - space);
+			dragging = false;
+			result = true;
+		}
+		if (input.keyboard['Q'].pressEvent)
+		{
+			type = transformation_type_none;
+			dragging = false;
+			result = true;
+		}
+	}
+	if (input.keyboard['W'].pressEvent)
+	{
+		type = transformation_type_translation;
+		dragging = false;
+		result = true;
+	}
+	if (input.keyboard['E'].pressEvent)
+	{
+		type = transformation_type_rotation;
+		dragging = false;
+		result = true;
+	}
+	if (input.keyboard['R'].pressEvent)
+	{
+		type = transformation_type_scale;
+		dragging = false;
+		result = true;
+	}
+
+	return result;
+}
+
+bool transformation_gizmo::manipulateTransformation(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, overlay_render_pass* overlayRenderPass)
+{
+	if (!input.mouse.left.down || !allowInput)
 	{
 		dragging = false;
+	}
+
+	if (type == transformation_type_none)
+	{
+		return false;
 	}
 
 	uint32 highlightAxis = -1;
@@ -455,61 +472,22 @@ bool manipulateTransformation(trs& transform, transformation_type& type, transfo
 
 	if (allowInput)
 	{
-		if (input.keyboard['G'].pressEvent)
-		{
-			space = (transformation_space)(1 - space);
-			dragging = false;
-		}
-		if (input.keyboard['Q'].pressEvent)
-		{
-			type = transformation_type_none;
-			dragging = false;
-		}
-		if (input.keyboard['W'].pressEvent)
-		{
-			type = transformation_type_translation;
-			dragging = false;
-		}
-		if (input.keyboard['E'].pressEvent)
-		{
-			type = transformation_type_rotation;
-			dragging = false;
-		}
-		if (input.keyboard['R'].pressEvent)
-		{
-			type = transformation_type_scale;
-			dragging = false;
-		}
-
-		if (type == transformation_type_none)
-		{
-			return false;
-		}
-
 		float snapping = input.keyboard[key_ctrl].down ? (type == transformation_type_rotation ? deg2rad(45.f) : 0.5f) : 0.f;
-
-		vec3 originalPosition = transform.position;
 
 		ray r = camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY);
 
-
 		switch (type)
 		{
-			case transformation_type_translation: highlightAxis = handleTranslation(transform, r, input, space, snapping, scaling); break;
-			case transformation_type_rotation: highlightAxis = handleRotation(transform, r, input, space, snapping, scaling); break;
-			case transformation_type_scale: highlightAxis = handleScaling(transform, r, input, space, scaling, camera); break; // TODO: Snapping for scale.
+			case transformation_type_translation: highlightAxis = handleTranslation(transform, r, input, snapping, scaling); break;
+			case transformation_type_rotation: highlightAxis = handleRotation(transform, r, input, snapping, scaling); break;
+			case transformation_type_scale: highlightAxis = handleScaling(transform, r, input, scaling, camera); break; // TODO: Snapping for scale.
 		}
-	}
-
-	if (type == transformation_type_none)
-	{
-		return false;
 	}
 
 
 	// Render.
 
-	quat rot = (space == transformation_global) ? quat::identity : transform.rotation;
+	quat rot = (space == transformation_global && type != transformation_type_scale) ? quat::identity : transform.rotation;
 
 	{
 		const quat rotations[] =

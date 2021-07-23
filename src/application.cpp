@@ -990,37 +990,46 @@ bool application::handleUserInput(const user_input& input, float dt)
 	bool objectMovedByGizmo = false;
 
 
-	static transformation_type transformationType = transformation_type_translation;
-	static transformation_space transformationSpace = transformation_global;
-
 	{
 		int iconSize = 40;
 
 		if (ImGui::BeginWindowHiddenTabBar("Controls", 0, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
 		{
-			ImGui::PushID(&transformationSpace);
-			ImGui::IconRadioButton(imgui_icon_global, (int*)&transformationSpace, transformation_global, iconSize);
+			transformation_space constantLocal = transformation_local;
+			transformation_space& space = (gizmo.type == transformation_type_scale) ? constantLocal : gizmo.space;
+
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+
+			ImGui::PushID(&gizmo.space);
+			ImGui::IconRadioButton(imgui_icon_global, (int*)&space, transformation_global, gizmo.type != transformation_type_scale, iconSize);
 			ImGui::SameLine(0, 0);
-			ImGui::IconRadioButton(imgui_icon_local, (int*)&transformationSpace, transformation_local, iconSize);
+			ImGui::IconRadioButton(imgui_icon_local, (int*)&space, transformation_local, gizmo.type != transformation_type_scale, iconSize);
 			ImGui::PopID();
 
 			ImGui::SameLine(0.f, (float)iconSize);
 
 
-			ImGui::PushID(&transformationType);
-			ImGui::IconRadioButton(imgui_icon_translate, (int*)&transformationType, transformation_type_translation, iconSize);
+			ImGui::PushID(&gizmo.type);
+			ImGui::IconRadioButton(imgui_icon_translate, (int*)&gizmo.type, transformation_type_translation, true, iconSize);
 			ImGui::SameLine(0, 0);
-			ImGui::IconRadioButton(imgui_icon_rotate, (int*)&transformationType, transformation_type_rotation, iconSize);
+			ImGui::IconRadioButton(imgui_icon_rotate, (int*)&gizmo.type, transformation_type_rotation, true, iconSize);
 			ImGui::SameLine(0, 0);
-			ImGui::IconRadioButton(imgui_icon_scale, (int*)&transformationType, transformation_type_scale, iconSize);
+			ImGui::IconRadioButton(imgui_icon_scale, (int*)&gizmo.type, transformation_type_scale, true, iconSize);
 			ImGui::SameLine(0, 0);
-			ImGui::IconRadioButton(imgui_icon_cross, (int*)&transformationType, transformation_type_none, iconSize);
+			ImGui::IconRadioButton(imgui_icon_cross, (int*)&gizmo.type, transformation_type_none, true, iconSize);
 			ImGui::PopID();
 
 			ImGui::SameLine(0.f, (float)iconSize);
+
+			ImGui::PopStyleColor();
 		}
 
 		ImGui::End();
+	}
+
+	if (!inputCaptured)
+	{
+		inputCaptured = gizmo.handleKeyboardInput(input);
 	}
 
 	if (selectedEntity)
@@ -1034,21 +1043,13 @@ bool application::handleUserInput(const user_input& input, float dt)
 			static bool saved = false;
 			static float invMass;
 
-			static bool dragging = false;
-			static trs previousTransform;
+			bool draggingBefore = gizmo.dragging;
 
-			if (!dragging)
-			{
-				previousTransform = transform;
-			}
-
-			if (manipulateTransformation(transform, transformationType, transformationSpace, camera, input, !inputCaptured, &overlayRenderPass))
+			if (gizmo.manipulateTransformation(transform, camera, input, !inputCaptured, &overlayRenderPass))
 			{
 				setSelectedEntityEulerRotation();
 				inputCaptured = true;
 				objectMovedByGizmo = true;
-
-				dragging = true;
 
 				if (!saved && selectedEntity.hasComponent<rigid_body_component>())
 				{
@@ -1063,10 +1064,9 @@ bool application::handleUserInput(const user_input& input, float dt)
 			}
 			else
 			{
-				if (dragging)
+				if (draggingBefore)
 				{
-					dragging = false;
-					undoStack.pushAction("transform entity", undoTransform, redoTransform, transform_undo{ selectedEntity, previousTransform, transform });
+					undoStack.pushAction("transform entity", undoTransform, redoTransform, transform_undo{ selectedEntity, gizmo.originalTransform, transform });
 				}
 
 				if (saved)

@@ -19,19 +19,33 @@ enum transformation_space
 	transformation_local,
 };
 
-static const char* transformationTypeNames[] =
+struct transformation_gizmo
 {
-	"Translation",
-	"Rotation",
-	"Scale",
-};
+	bool handleKeyboardInput(const user_input& input);
+	bool manipulateTransformation(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, overlay_render_pass* overlayRenderPass);
 
-static const char* transformationSpaceNames[] =
-{
-	"Global",
-	"Local",
+	transformation_type type = transformation_type_translation;
+	transformation_space space = transformation_global;
+
+	bool dragging = false;
+
+	// Transform before start of dragging. Only valid if object was dragged.
+	trs originalTransform;
+
+private:
+	uint32 handleTranslation(trs& transform, ray r, const user_input& input, float snapping, float scaling);
+	uint32 handleRotation(trs& transform, ray r, const user_input& input, float snapping, float scaling);
+	uint32 handleScaling(trs& transform, ray r, const user_input& input, float scaling, const render_camera& camera);
+
+	uint32 axisIndex;
+	float anchor;
+	vec3 anchor3;
+	vec4 plane;
+
+	vec3 originalPosition;
+	quat originalRotation;
+	vec3 originalScale;
 };
 
 void initializeTransformationGizmos();
-bool manipulateTransformation(trs& transform, transformation_type& type, transformation_space& space, const render_camera& camera, const user_input& input, bool allowInput, overlay_render_pass* overlayRenderPass);
 

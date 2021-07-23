@@ -57,6 +57,8 @@ private:
 
 	undo_stack undoStack;
 
+	transformation_gizmo gizmo;
+
 	raytracing_tlas raytracingTLAS;
 	path_tracer pathTracer;
 

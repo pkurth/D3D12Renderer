@@ -248,7 +248,7 @@ namespace ImGui
 		}
 	}
 
-	bool IconButton(uint32 id, imgui_icon icon, uint32 size)
+	bool IconButton(uint32 id, imgui_icon icon, bool enabled, uint32 size)
 	{
 		const uint32 numColumns = iconsTexture->width / IMGUI_ICON_SIZE;
 		const uint32 numRows = iconsTexture->height / IMGUI_ICON_SIZE;
@@ -261,16 +261,26 @@ namespace ImGui
 		float bottom = (row + 1) / numRows;
 
 		ImGui::PushID(id);
+		if (!enabled)
+		{
+			ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+			ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+		}
 		bool result = ImGui::ImageButton(iconsTextureID, ImVec2((float)size, (float)size), ImVec2(left, top), ImVec2(right, bottom));
 		if (ImGui::IsItemHovered())
 		{
 			ImGui::SetTooltip(imguiIconNames[icon]);
 		}
+		if (!enabled)
+		{
+			ImGui::PopItemFlag();
+			ImGui::PopStyleVar();
+		}
 		ImGui::PopID();
 		return result;
 	}
 
-	bool IconRadioButton(imgui_icon icon, int* current, int value, uint32 size)
+	bool IconRadioButton(imgui_icon icon, int* current, int value, bool enabled, uint32 size)
 	{
 		const uint32 numColumns = iconsTexture->width / IMGUI_ICON_SIZE;
 		const uint32 numRows = iconsTexture->height / IMGUI_ICON_SIZE;
@@ -285,11 +295,21 @@ namespace ImGui
 		bool active = value == *current;
 
 		ImGui::PushID(value);
+		if (!enabled)
+		{
+			ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+			ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+		}
 		bool clicked = ImGui::ImageButton(iconsTextureID, ImVec2((float)size, (float)size), ImVec2(left, top), ImVec2(right, bottom),
 			-1, active ? ImVec4(1, 1, 1, 0.4f) : ImVec4(0, 0, 0, 0));
 		if (ImGui::IsItemHovered())
 		{
 			ImGui::SetTooltip(imguiIconNames[icon]);
+		}
+		if (!enabled)
+		{
+			ImGui::PopItemFlag();
+			ImGui::PopStyleVar();
 		}
 		ImGui::PopID();
 

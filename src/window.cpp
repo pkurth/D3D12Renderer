@@ -393,11 +393,11 @@ static LRESULT CALLBACK windowCallBack(
 		{
 			if (wParam)
 			{
-				std::cout << "Activated\n";
+				//std::cout << "Activated\n";
 			}
 			else
 			{
-				std::cout << "Deactivated\n";
+				//std::cout << "Deactivated\n";
 			}
 		} break;
 
