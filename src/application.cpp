@@ -32,6 +32,13 @@ struct transform_undo
 	trs after;
 };
 
+struct selection_undo
+{
+	application* app;
+	scene_entity before;
+	scene_entity after;
+};
+
 static void undoTransform(void* d)
 {
 	transform_undo& t = *(transform_undo*)d;
@@ -42,6 +49,18 @@ static void redoTransform(void* d)
 {
 	transform_undo& t = *(transform_undo*)d;
 	t.entity.getComponent<trs>() = t.after;
+}
+
+static void undoSelection(void* d)
+{
+	selection_undo& t = *(selection_undo*)d;
+	t.app->setSelectedEntityNoUndo(t.before);
+}
+
+static void redoSelection(void* d)
+{
+	selection_undo& t = *(selection_undo*)d;
+	t.app->setSelectedEntityNoUndo(t.after);
 }
 
 static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh, path_tracer& pathTracer)
@@ -556,6 +575,16 @@ void application::setSelectedEntityEulerRotation()
 
 void application::setSelectedEntity(scene_entity entity)
 {
+	if (selectedEntity != entity)
+	{
+		undoStack.pushAction("selection", undoSelection, redoSelection, selection_undo{ this, selectedEntity, entity });
+	}
+
+	setSelectedEntityNoUndo(entity);
+}
+
+void application::setSelectedEntityNoUndo(scene_entity entity)
+{
 	selectedEntity = entity;
 	setSelectedEntityEulerRotation();
 }
@@ -802,7 +831,7 @@ bool application::drawSceneHierarchy()
 			if (entityDeleted)
 			{
 				appScene.deleteEntity(entity);
-				setSelectedEntity({});
+				setSelectedEntityNoUndo({});
 			}
 		});
 
@@ -819,7 +848,7 @@ bool application::drawSceneHierarchy()
 			if (ImGui::Button(ICON_FA_TRASH_ALT))
 			{
 				appScene.deleteEntity(selectedEntity);
-				setSelectedEntity({});
+				setSelectedEntityNoUndo({});
 				objectMovedByWidget = true;
 			}
 			else
@@ -1787,7 +1816,7 @@ bool application::deserializeFromFile()
 		return false;
 	}
 
-	setSelectedEntity({});
+	setSelectedEntityNoUndo({});
 
 	appScene = scene();
 

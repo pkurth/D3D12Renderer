@@ -115,6 +115,11 @@ struct scene_entity
 		return handle == o.handle && registry == o.registry;
 	}
 
+	inline bool operator!=(const scene_entity& o)
+	{
+		return !(*this == o);
+	}
+
 	inline bool operator==(entt::entity o)
 	{
 		return handle == o;

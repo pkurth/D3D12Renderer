@@ -34,6 +34,7 @@ struct application
 private:
 	void setSelectedEntityEulerRotation();
 	void setSelectedEntity(scene_entity entity);
+	void setSelectedEntityNoUndo(scene_entity entity);
 	void drawMainMenuBar();
 	bool drawSceneHierarchy();
 	void drawSettings(float dt);
@@ -111,4 +112,9 @@ private:
 	spot_shadow_render_pass spotShadowRenderPasses[16];
 	point_shadow_render_pass pointShadowRenderPasses[16];
 	overlay_render_pass overlayRenderPass;
+
+
+
+	friend void undoSelection(void* d);
+	friend void redoSelection(void* d);
 };
