@@ -7,6 +7,12 @@
 #include <DirectXTex/DirectXTex.h>
 #include <d3d12memoryallocator/D3D12MemAlloc.h>
 
+#define NANOSVG_IMPLEMENTATION
+#include <nanosvg/nanosvg.h>
+
+#define NANOSVGRAST_IMPLEMENTATION
+#include <nanosvg/nanosvgrast.h>
+
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -162,24 +168,14 @@ static void createDesc(DirectX::TexMetadata& metadata, uint32 flags, D3D12_RESOU
 	}
 }
 
-static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::ScratchImage& scratchImage, D3D12_RESOURCE_DESC& textureDesc)
+static bool tryLoadFromCache(const fs::path& filepath, uint32 flags, fs::path& cacheFilepath, DirectX::ScratchImage& scratchImage, DirectX::TexMetadata& metadata)
 {
-	if (flags & texture_load_flags_gen_mips_on_gpu)
-	{
-		flags &= ~texture_load_flags_gen_mips_on_cpu;
-		flags |= texture_load_flags_allocate_full_mipchain;
-	}
-
-
-	fs::path extension = filepath.extension();
-
 	fs::path cachedFilename = filepath;
 	cachedFilename.replace_extension("." + std::to_string(flags) + ".cache.dds");
 
-	fs::path cacheFilepath = L"asset_cache" / cachedFilename;
+	cacheFilepath = L"asset_cache" / cachedFilename;
 
 	bool fromCache = false;
-	DirectX::TexMetadata metadata;
 
 	if (!(flags & texture_load_flags_always_load_from_source))
 	{
@@ -201,6 +197,78 @@ static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::S
 			}
 		}
 	}
+
+	return fromCache;
+}
+
+static bool loadSVGFromFile(const fs::path& filepath, uint32 flags, DirectX::ScratchImage& scratchImage, D3D12_RESOURCE_DESC& textureDesc)
+{
+	if (flags & texture_load_flags_gen_mips_on_gpu)
+	{
+		flags &= ~texture_load_flags_gen_mips_on_cpu;
+		flags |= texture_load_flags_allocate_full_mipchain;
+	}
+
+	fs::path cacheFilepath;
+	DirectX::TexMetadata metadata;
+	bool fromCache = tryLoadFromCache(filepath, flags, cacheFilepath, scratchImage, metadata);
+
+	if (!fromCache)
+	{
+		if (!fs::exists(filepath))
+		{
+			std::cerr << "Could not find file '" << filepath.string() << "'.\n";
+			return false;
+		}
+
+		if (flags & texture_load_flags_cache_to_dds)
+		{
+			std::cout << "Preprocessing asset '" << filepath.string() << "' for faster loading next time.";
+#ifdef _DEBUG
+			std::cout << " Consider running in a release build the first time.";
+#endif
+			std::cout << std::endl;
+		}
+
+		NSVGimage* svg = nsvgParseFromFile(filepath.string().c_str(), "px", 96);
+		uint32 width = (uint32)ceil(svg->width);
+		uint32 height = (uint32)ceil(svg->height);
+
+		uint8* rawImage = new uint8[width * height * 4];
+
+		struct NSVGrasterizer* rasterizer = nsvgCreateRasterizer();
+		nsvgRasterize(rasterizer, svg, 0, 0, 1, rawImage, width, height, width * 4);
+		nsvgDeleteRasterizer(rasterizer);
+
+		nsvgDelete(svg);
+
+
+		DirectX::Image dxImage = { width, height, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, width * 4, width * height * 4, rawImage };
+		scratchImage.InitializeFromImage(dxImage);
+		metadata = scratchImage.GetMetadata();
+
+		postProcessImage(scratchImage, metadata, flags, filepath, cacheFilepath);
+	}
+
+	createDesc(metadata, flags, textureDesc);
+
+	return true;
+}
+
+static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::ScratchImage& scratchImage, D3D12_RESOURCE_DESC& textureDesc)
+{
+	if (flags & texture_load_flags_gen_mips_on_gpu)
+	{
+		flags &= ~texture_load_flags_gen_mips_on_cpu;
+		flags |= texture_load_flags_allocate_full_mipchain;
+	}
+
+
+	fs::path extension = filepath.extension();
+
+	fs::path cacheFilepath;
+	DirectX::TexMetadata metadata;
+	bool fromCache = tryLoadFromCache(filepath, flags, cacheFilepath, scratchImage, metadata);
 
 	if (!fromCache)
 	{
@@ -367,9 +435,18 @@ static ref<dx_texture> loadTextureInternal(const std::string& filename, uint32 f
 	DirectX::ScratchImage scratchImage;
 	D3D12_RESOURCE_DESC textureDesc;
 
-	if (!loadImageFromFile(filename, flags, scratchImage, textureDesc))
+	fs::path path = filename;
+
+	if (path.extension() == ".svg")
 	{
-		return nullptr;
+		if (!loadSVGFromFile(path, flags, scratchImage, textureDesc))
+		{
+			return 0;
+		}
+	}
+	else if (!loadImageFromFile(path, flags, scratchImage, textureDesc))
+	{
+		return 0;
 	}
 
 	return uploadImageToGPU(scratchImage, textureDesc, flags);
