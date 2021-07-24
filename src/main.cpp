@@ -168,7 +168,7 @@ int main(int argc, char** argv)
 
 			for (uint32 i = 0; i < arraysize(user_input::keyboard); ++i)
 			{
-				input.keyboard[i] = { ImGui::IsKeyDown(i), ImGui::IsKeyPressed(i) };
+				input.keyboard[i] = { ImGui::IsKeyDown(i), ImGui::IsKeyPressed(i, false) };
 			}
 
 			input.overWindow = true;
