@@ -4,9 +4,6 @@
 #include "imgui.h"
 #include "yaml.h"
 
-#include <filesystem>
-namespace fs = std::filesystem;
-
 static void readJointAnimation(animation_clip& clip, animation_joint& joint, const aiNodeAnim* channel)
 {
 	joint.firstPositionKeyframe = (uint32)clip.positionKeyframes.size();

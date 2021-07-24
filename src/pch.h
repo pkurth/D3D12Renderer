@@ -14,6 +14,9 @@
 #include <iostream>
 #include <memory>
 
+#include <filesystem>
+namespace fs = std::filesystem;
+
 #include <mutex>
 
 typedef char int8;

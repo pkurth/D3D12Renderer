@@ -13,10 +13,6 @@
 #define NANOSVGRAST_IMPLEMENTATION
 #include <nanosvg/nanosvgrast.h>
 
-#include <filesystem>
-
-namespace fs = std::filesystem;
-
 
 
 static DXGI_FORMAT makeSRGB(DXGI_FORMAT format)
@@ -203,12 +199,6 @@ static bool tryLoadFromCache(const fs::path& filepath, uint32 flags, fs::path& c
 
 static bool loadSVGFromFile(const fs::path& filepath, uint32 flags, DirectX::ScratchImage& scratchImage, D3D12_RESOURCE_DESC& textureDesc)
 {
-	if (flags & texture_load_flags_gen_mips_on_gpu)
-	{
-		flags &= ~texture_load_flags_gen_mips_on_cpu;
-		flags |= texture_load_flags_allocate_full_mipchain;
-	}
-
 	fs::path cacheFilepath;
 	DirectX::TexMetadata metadata;
 	bool fromCache = tryLoadFromCache(filepath, flags, cacheFilepath, scratchImage, metadata);
@@ -227,7 +217,7 @@ static bool loadSVGFromFile(const fs::path& filepath, uint32 flags, DirectX::Scr
 #ifdef _DEBUG
 			std::cout << " Consider running in a release build the first time.";
 #endif
-			std::cout << std::endl;
+			std::cout << '\n';
 		}
 
 		NSVGimage* svg = nsvgParseFromFile(filepath.string().c_str(), "px", 96);
@@ -259,15 +249,6 @@ static bool loadSVGFromFile(const fs::path& filepath, uint32 flags, DirectX::Scr
 
 static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::ScratchImage& scratchImage, D3D12_RESOURCE_DESC& textureDesc)
 {
-	if (flags & texture_load_flags_gen_mips_on_gpu)
-	{
-		flags &= ~texture_load_flags_gen_mips_on_cpu;
-		flags |= texture_load_flags_allocate_full_mipchain;
-	}
-
-
-	fs::path extension = filepath.extension();
-
 	fs::path cacheFilepath;
 	DirectX::TexMetadata metadata;
 	bool fromCache = tryLoadFromCache(filepath, flags, cacheFilepath, scratchImage, metadata);
@@ -286,9 +267,10 @@ static bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::S
 #ifdef _DEBUG
 			std::cout << " Consider running in a release build the first time.";
 #endif
-			std::cout << std::endl;
+			std::cout << '\n';
 		}
 
+		fs::path extension = filepath.extension();
 
 		if (extension == ".dds")
 		{
@@ -361,7 +343,7 @@ static bool loadImageFromMemory(const void* data, uint32 size, image_format imag
 #ifdef _DEBUG
 			std::cout << " Consider running in a release build the first time.";
 #endif
-			std::cout << std::endl;
+			std::cout << '\n';
 		}
 
 
@@ -434,6 +416,12 @@ static ref<dx_texture> uploadImageToGPU(DirectX::ScratchImage& scratchImage, D3D
 
 static ref<dx_texture> loadTextureInternal(const std::string& filename, uint32 flags)
 {
+	if (flags & texture_load_flags_gen_mips_on_gpu)
+	{
+		flags &= ~texture_load_flags_gen_mips_on_cpu;
+		flags |= texture_load_flags_allocate_full_mipchain;
+	}
+
 	DirectX::ScratchImage scratchImage;
 	D3D12_RESOURCE_DESC textureDesc;
 

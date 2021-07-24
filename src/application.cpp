@@ -15,9 +15,6 @@
 #include "yaml.h"
 #include "locomotion_learning.h"
 
-#include <filesystem>
-namespace fs = std::filesystem;
-
 #include <fontawesome/list.h>
 
 struct raytrace_component

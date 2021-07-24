@@ -10,9 +10,6 @@
 #include <assimp/LogStream.hpp>
 #include <assimp/DefaultLogger.hpp>
 
-#include <filesystem>
-
-namespace fs = std::filesystem;
 
 #define CACHE_FORMAT "assbin"
 

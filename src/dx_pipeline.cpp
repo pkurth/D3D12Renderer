@@ -6,9 +6,6 @@
 #include <unordered_map>
 #include <set>
 #include <deque>
-#include <filesystem>
-
-namespace fs = std::filesystem;
 
 static DWORD checkForFileChanges(void*);
 
