@@ -565,6 +565,24 @@ ref<dx_texture> loadVolumeTextureFromDirectory(const std::string& dirname, uint3
 	return sp;
 }
 
+bool isImageExtension(const fs::path& extension)
+{
+	return extension == ".jpg" ||
+		extension == ".png" ||
+		extension == ".tga" ||
+		extension == ".hdr" ||
+		extension == ".dds";
+}
+
+bool isImageExtension(const std::string& extension)
+{
+	return extension == ".jpg" ||
+		extension == ".png" ||
+		extension == ".tga" ||
+		extension == ".hdr" ||
+		extension == ".dds";
+}
+
 static bool checkFormatSupport(D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport, D3D12_FORMAT_SUPPORT1 support)
 {
 	return (formatSupport.Support1 & support) != 0;

@@ -143,6 +143,8 @@ ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format
 ref<dx_texture> loadVolumeTextureFromDirectory(const std::string& dirname, uint32 flags = texture_load_flags_compress | texture_load_flags_cache_to_dds | texture_load_flags_noncolor);
 
 
+bool isImageExtension(const fs::path& extension);
+bool isImageExtension(const std::string& extension);
 
 
 

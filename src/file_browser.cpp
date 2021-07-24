@@ -2,6 +2,7 @@
 #include "file_browser.h"
 #include "imgui.h"
 #include "assimp.h"
+#include "dx_texture.h"
 
 #include <shellapi.h>
 #include <fontawesome/IconsFontAwesome5.h>
@@ -11,12 +12,19 @@ file_browser::file_browser()
 	changeCurrentPath("assets");
 }
 
+static const char* getTypeString(file_browser::dir_entry_type type)
+{
+	if (type == file_browser::dir_entry_type_directory) return ICON_FA_FOLDER_OPEN "  %s";
+	if (type == file_browser::dir_entry_type_empty_directory) return ICON_FA_FOLDER "  %s";
+	if (type == file_browser::dir_entry_type_mesh) return ICON_FA_CUBE "  %s";
+	if (type == file_browser::dir_entry_type_image) return ICON_FA_FILE_IMAGE "  %s";
+	if (type == file_browser::dir_entry_type_font) return ICON_FA_FONT "  %s";
+
+	return ICON_FA_FILE "  %s";
+}
+
 void file_browser::draw()
 {
-	const char* directoryString = ICON_FA_FOLDER_OPEN "  %s";
-	const char* emptyDirectoryString = ICON_FA_FOLDER "  %s";
-	const char* fileString = ICON_FA_FILE "  %s";
-
 	if (ImGui::Begin("Assets"))
 	{
 		if (ImGui::DisableableButton(ICON_FA_LEVEL_UP_ALT, currentPath.has_parent_path())) { changeCurrentPath(currentPath.parent_path()); }
@@ -61,7 +69,7 @@ void file_browser::draw()
 
 					char buffer[256];
 
-					snprintf(buffer, sizeof(buffer), !p.isDirectory ? fileString : p.numChildren ? directoryString : emptyDirectoryString, filename.c_str());
+					snprintf(buffer, sizeof(buffer), getTypeString(p.type), filename.c_str());
 
 					ImGui::SelectableWrapped(buffer, entryWidth, false);
 
@@ -70,7 +78,7 @@ void file_browser::draw()
 						if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 						{
 							fs::path fullPath = currentPath / p.filename;
-							if (p.isDirectory)
+							if (p.type == dir_entry_type_directory || p.type == dir_entry_type_empty_directory)
 							{
 								changeCurrentPath(fullPath);
 							}
@@ -79,7 +87,7 @@ void file_browser::draw()
 								ShellExecuteW(0, 0, fullPath.c_str(), 0, 0, SW_SHOWNORMAL);
 							}
 						}
-						else if (isMeshExtension(p.filename))
+						else if (p.type == dir_entry_type_mesh)
 						{
 							ImGui::SetTooltip("Drag&drop into scene to instantiate.");
 
@@ -107,9 +115,31 @@ void file_browser::refresh()
 	currentPathEntries.clear();
 	for (auto p : fs::directory_iterator(currentPath))
 	{
-		bool isDirectory = fs::is_directory(p.path());
-		uint32 numChildren = isDirectory ? (uint32)(std::distance(std::filesystem::directory_iterator{ p.path() }, std::filesystem::directory_iterator{})) : 0;
-		currentPathEntries.push_back({ p.path().filename(), isDirectory, numChildren });
+		dir_entry_type type = dir_entry_type_unknown;
+
+		if (fs::is_directory(p.path()))
+		{
+			uint32 numChildren = (uint32)(std::distance(std::filesystem::directory_iterator{ p.path() }, std::filesystem::directory_iterator{}));
+			type = numChildren ? dir_entry_type_directory : dir_entry_type_empty_directory;
+		}
+		else
+		{
+			fs::path extension = p.path().extension();
+			if (isMeshExtension(extension))
+			{
+				type = dir_entry_type_mesh;
+			}
+			else if (isImageExtension(extension))
+			{
+				type = dir_entry_type_image;
+			}
+			else if (extension == ".ttf")
+			{
+				type = dir_entry_type_font;
+			}
+		}
+		
+		currentPathEntries.push_back({ p.path().filename(), type });
 	}
 }
 

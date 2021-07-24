@@ -128,14 +128,13 @@ const aiScene* loadAssimpSceneFile(const std::string& filepathRaw, Assimp::Impor
 	return scene;
 }
 
-bool isMeshExtension(const fs::path& path)
+bool isMeshExtension(const fs::path& extension)
 {
-	return Assimp::Importer().IsExtensionSupported(path.extension().u8string());
+	return Assimp::Importer().IsExtensionSupported(extension.u8string());
 }
 
-bool isMeshExtension(const std::string& path)
+bool isMeshExtension(const std::string& extension)
 {
-	std::string extension = path.substr(path.find_last_of('.'));
 	return Assimp::Importer().IsExtensionSupported(extension);
 }
 
