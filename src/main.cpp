@@ -114,6 +114,7 @@ int main(int argc, char** argv)
 
 	app.initialize(&renderer);
 
+	file_browser fileBrowser;
 
 	user_input input = {};
 
@@ -138,6 +139,16 @@ int main(int argc, char** argv)
 		uint32 renderWidth = (uint32)ImGui::GetContentRegionAvail().x;
 		uint32 renderHeight = (uint32)ImGui::GetContentRegionAvail().y;
 		ImGui::Image(renderer.frameResult, renderWidth, renderHeight);
+
+		if (ImGui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("content_browser_file"))
+			{
+				std::string str = (const char*)payload->Data;
+				app.handleFileDrop(str);
+			}
+			ImGui::EndDragDropTarget();
+		}
 
 		ImGuiIO& io = ImGui::GetIO();
 		if (ImGui::IsItemHovered())
@@ -214,7 +225,7 @@ int main(int argc, char** argv)
 		dx_renderer::endFrameCommon();
 		renderer.endFrame(input);
 
-		//drawFileBrowser(app);
+		fileBrowser.draw();
 
 		fenceValues[window.currentBackbufferIndex] = renderToMainWindow(window);
 

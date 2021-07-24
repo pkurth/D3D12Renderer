@@ -33,5 +33,8 @@ static quat readAssimpQuaternion(const aiQuaternion& q)
 	return result;
 }
 
+bool isMeshExtension(const fs::path& path);
+bool isMeshExtension(const std::string& path);
+
 const aiScene* loadAssimpSceneFile(const std::string& filepathRaw, Assimp::Importer& importer);
 ref<struct pbr_material> loadAssimpMaterial(const aiScene* scene, const std::string& sceneFilepath, const aiMaterial* material);

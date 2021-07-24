@@ -128,6 +128,17 @@ const aiScene* loadAssimpSceneFile(const std::string& filepathRaw, Assimp::Impor
 	return scene;
 }
 
+bool isMeshExtension(const fs::path& path)
+{
+	return Assimp::Importer().IsExtensionSupported(path.extension().u8string());
+}
+
+bool isMeshExtension(const std::string& path)
+{
+	std::string extension = path.substr(path.find_last_of('.'));
+	return Assimp::Importer().IsExtensionSupported(extension);
+}
+
 #ifndef PHYSICS_ONLY
 static ref<dx_texture> loadAssimpTexture(const aiScene* scene, const std::string& sceneFilepath, const std::string& name, uint32 flags = texture_load_flags_default)
 {

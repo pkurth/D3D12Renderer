@@ -400,6 +400,17 @@ namespace ImGui
 		}
 		return result;
 	}
+
+	bool SelectableWrapped(const char* label, int width, bool selected, ImGuiSelectableFlags flags)
+	{
+		ImVec2 padding = ImGui::GetStyle().FramePadding;
+		float textWidth = width - padding.x * 2;
+
+		ImVec2 textSize = ImGui::CalcTextSize(label, 0, false, textWidth);
+		bool result = ImGui::Selectable("##label", selected, flags, textSize + padding * 2);
+		ImGui::RenderTextWrapped(ImGui::GetItemRectMin() + padding, label, 0, textWidth);
+		return result;
+	}
 }
 
 

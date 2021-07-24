@@ -59,6 +59,7 @@ namespace ImGui
 	bool DisableableButton(const char* label, bool enabled);
 	bool DisableableCheckbox(const char* label, bool* v, bool enabled);
 
+	bool SelectableWrapped(const char* label, int width, bool selected = false, ImGuiSelectableFlags flags = 0);
 
 	float SplineValue(float p, const float* x, const float* y, uint32 numPoints);
 	bool Spline(const char* label, const ImVec2& size, uint32 maxNumPoints, float* x, float* y, uint32 drawResolution = 256);
