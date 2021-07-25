@@ -12,15 +12,25 @@ file_browser::file_browser()
 	changeCurrentPath("assets");
 }
 
-static const char* getTypeString(file_browser::dir_entry_type type)
+static const char* getTypeIcon(file_browser::dir_entry_type type)
 {
-	if (type == file_browser::dir_entry_type_directory) return ICON_FA_FOLDER_OPEN "  %s";
-	if (type == file_browser::dir_entry_type_empty_directory) return ICON_FA_FOLDER "  %s";
-	if (type == file_browser::dir_entry_type_mesh) return ICON_FA_CUBE "  %s";
-	if (type == file_browser::dir_entry_type_image) return ICON_FA_FILE_IMAGE "  %s";
-	if (type == file_browser::dir_entry_type_font) return ICON_FA_FONT "  %s";
+	if (type == file_browser::dir_entry_type_directory) return ICON_FA_FOLDER_OPEN;
+	if (type == file_browser::dir_entry_type_empty_directory) return ICON_FA_FOLDER;
+	if (type == file_browser::dir_entry_type_mesh) return ICON_FA_CUBE;
+	if (type == file_browser::dir_entry_type_image) return ICON_FA_FILE_IMAGE;
+	if (type == file_browser::dir_entry_type_font) return ICON_FA_FONT;
 
-	return ICON_FA_FILE "  %s";
+	return ICON_FA_FILE;
+}
+
+static bool isDirectory(file_browser::dir_entry_type type)
+{
+	return type == file_browser::dir_entry_type_directory || type == file_browser::dir_entry_type_empty_directory;
+}
+
+static bool isFile(file_browser::dir_entry_type type)
+{
+	return !isDirectory(type);
 }
 
 void file_browser::draw()
@@ -70,26 +80,17 @@ void file_browser::draw()
 					std::string filename = p.filename.u8string();
 
 					char buffer[256];
-
-					snprintf(buffer, sizeof(buffer), getTypeString(p.type), filename.c_str());
-
+					snprintf(buffer, sizeof(buffer), "%s  %s", getTypeIcon(p.type), filename.c_str());
 					ImGui::SelectableWrapped(buffer, entryWidth, false);
 
+					// Tooltip and directory navigation.
 					if (ImGui::IsItemHovered())
 					{
-						if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+						if (isDirectory(p.type) && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 						{
-							fs::path fullPath = currentPath / p.filename;
-							if (p.type == dir_entry_type_directory || p.type == dir_entry_type_empty_directory)
-							{
-								changeCurrentPath(fullPath);
-								ImGui::PopID();
-								break;
-							}
-							else
-							{
-								ShellExecuteW(0, 0, fullPath.c_str(), 0, 0, SW_SHOWNORMAL);
-							}
+							changeCurrentPath(currentPath / p.filename);
+							ImGui::PopID();
+							break;
 						}
 						else if (p.type == dir_entry_type_mesh)
 						{
@@ -97,6 +98,29 @@ void file_browser::draw()
 						}
 					}
 
+					// Context menu.
+					if (ImGui::BeginPopupContextItem(0, ImGuiPopupFlags_MouseButtonRight))
+					{
+						if (p.type == dir_entry_type_mesh && ImGui::MenuItem("Edit"))
+						{
+
+						}
+
+						if (ImGui::MenuItem("Reveal in Windows Explorer"))
+						{
+							fs::path fullPath = currentPath / p.filename;
+							ShellExecuteW(0, 0, L"explorer.exe", (L"/select," + fullPath.wstring()).c_str(), 0, SW_SHOWNORMAL);
+						}
+
+						if (isFile(p.type) && ImGui::MenuItem("Open in default program"))
+						{
+							fs::path fullPath = currentPath / p.filename;
+							ShellExecuteW(0, 0, fullPath.c_str(), 0, 0, SW_SHOWNORMAL);
+						}
+						ImGui::EndPopup();
+					}
+
+					// Drag&drop.
 					if (p.type == dir_entry_type_mesh)
 					{
 						if (ImGui::BeginDragDropSource())
@@ -150,6 +174,15 @@ void file_browser::refresh()
 		
 		currentPathEntries.push_back({ p.path().filename(), type });
 	}
+
+	std::sort(currentPathEntries.begin(), currentPathEntries.end(), [](const dir_entry& a, const dir_entry& b)
+	{
+		if (isDirectory(a.type) == isDirectory(b.type))
+		{
+			return a.filename < b.filename;
+		}
+		return isDirectory(a.type);
+	});
 }
 
 void file_browser::changeCurrentPath(const fs::path& path)
