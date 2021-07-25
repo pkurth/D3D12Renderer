@@ -63,6 +63,8 @@ void file_browser::draw()
 		{
 			for (auto& p : currentPathEntries)
 			{
+				ImGui::PushID(&p);
+
 				if (ImGui::TableNextColumn())
 				{
 					std::string filename = p.filename.u8string();
@@ -81,6 +83,8 @@ void file_browser::draw()
 							if (p.type == dir_entry_type_directory || p.type == dir_entry_type_empty_directory)
 							{
 								changeCurrentPath(fullPath);
+								ImGui::PopID();
+								break;
 							}
 							else
 							{
@@ -90,18 +94,23 @@ void file_browser::draw()
 						else if (p.type == dir_entry_type_mesh)
 						{
 							ImGui::SetTooltip("Drag&drop into scene to instantiate.");
+						}
+					}
 
-							if (ImGui::BeginDragDropSource())
-							{
-								fs::path fullPath = currentPath / p.filename;
-								std::string str = fullPath.string();
-								ImGui::SetDragDropPayload("content_browser_file", str.c_str(), str.length() + 1);
-								ImGui::Text("Drop into scene to instantiate.");
-								ImGui::EndDragDropSource();
-							}
+					if (p.type == dir_entry_type_mesh)
+					{
+						if (ImGui::BeginDragDropSource())
+						{
+							fs::path fullPath = currentPath / p.filename;
+							std::string str = fullPath.string();
+							ImGui::SetDragDropPayload("content_browser_file", str.c_str(), str.length() + 1, ImGuiCond_Once);
+							ImGui::Text("Drop into scene to instantiate.");
+							ImGui::EndDragDropSource();
 						}
 					}
 				}
+
+				ImGui::PopID();
 			}
 
 			ImGui::EndTable();

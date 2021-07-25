@@ -140,6 +140,11 @@ int main(int argc, char** argv)
 		uint32 renderHeight = (uint32)ImGui::GetContentRegionAvail().y;
 		ImGui::Image(renderer.frameResult, renderWidth, renderHeight);
 
+		// The drag&drop outline is rendered around the drop target. Since the image fills the frame, the outline is outside the window 
+		// and thus invisible. So instead this Dummy acts as the drop target.
+		ImGui::SetCursorPos(ImVec2(4.5f, 4.5f));
+		ImGui::Dummy(ImVec2(renderWidth - 9.f, renderHeight - 9.f));
+
 		if (ImGui::BeginDragDropTarget())
 		{
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("content_browser_file"))
