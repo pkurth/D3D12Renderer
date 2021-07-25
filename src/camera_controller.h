@@ -21,9 +21,6 @@ private:
 	float centeringTime = -1.f;
 
 	vec3 centeringPositionStart;
-	quat centeringRotationStart;
-
 	vec3 centeringPositionTarget;
-	quat centeringRotationTarget;
 };
 

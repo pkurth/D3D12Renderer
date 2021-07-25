@@ -7,7 +7,7 @@ bool camera_controller::centerCameraOnObject(const bounding_box& aabb)
 	vec3 center = aabb.getCenter();
 	float radius = length(aabb.getRadius());
 
-	vec3 offsetDirection = normalize(camera->position - center);
+	vec3 offsetDirection = camera->rotation * vec3(0.f, 0.f, 1.f); // Camera backward axis.
 
 	float minExtent = camera->getMinProjectionExtent();
 
@@ -16,10 +16,7 @@ bool camera_controller::centerCameraOnObject(const bounding_box& aabb)
 	centeringTime = 0.f;
 
 	centeringPositionStart = camera->position;
-	centeringRotationStart = camera->rotation;
-
 	centeringPositionTarget = center + scaling * offsetDirection;
-	centeringRotationTarget = lookAtQuaternion(-offsetDirection, vec3(0.f, 1.f, 0.f));
 
 	orbitRadius = scaling;
 
@@ -42,7 +39,6 @@ bool camera_controller::update(const user_input& input, uint32 viewportWidth, ui
 
 		float relativeTime = min(centeringTime / CAMERA_CENTERING_TIME, 1.f);
 		camera->position = lerp(centeringPositionStart, centeringPositionTarget, relativeTime);
-		camera->rotation = slerp(centeringRotationStart, centeringRotationTarget, relativeTime);
 
 		if (relativeTime == 1.f)
 		{
