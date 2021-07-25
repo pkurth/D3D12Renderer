@@ -140,21 +140,6 @@ int main(int argc, char** argv)
 		uint32 renderHeight = (uint32)ImGui::GetContentRegionAvail().y;
 		ImGui::Image(renderer.frameResult, renderWidth, renderHeight);
 
-		// The drag&drop outline is rendered around the drop target. Since the image fills the frame, the outline is outside the window 
-		// and thus invisible. So instead this Dummy acts as the drop target.
-		ImGui::SetCursorPos(ImVec2(4.5f, 4.5f));
-		ImGui::Dummy(ImVec2(renderWidth - 9.f, renderHeight - 9.f));
-
-		if (ImGui::BeginDragDropTarget())
-		{
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("content_browser_file"))
-			{
-				std::string str = (const char*)payload->Data;
-				app.handleFileDrop(str);
-			}
-			ImGui::EndDragDropTarget();
-		}
-
 		ImGuiIO& io = ImGui::GetIO();
 		if (ImGui::IsItemHovered())
 		{
@@ -212,6 +197,24 @@ int main(int argc, char** argv)
 
 			input.overWindow = false;
 		}
+
+
+		// The drag&drop outline is rendered around the drop target. Since the image fills the frame, the outline is outside the window 
+		// and thus invisible. So instead this Dummy acts as the drop target.
+		// Important: This is under the input processing, so that we don't override the current element id.
+		ImGui::SetCursorPos(ImVec2(4.5f, 4.5f));
+		ImGui::Dummy(ImVec2(renderWidth - 9.f, renderHeight - 9.f));
+
+		if (ImGui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("content_browser_file"))
+			{
+				std::string str = (const char*)payload->Data;
+				app.handleFileDrop(str);
+			}
+			ImGui::EndDragDropTarget();
+		}
+
 		ImGui::End();
 		ImGui::PopStyleVar();
 
