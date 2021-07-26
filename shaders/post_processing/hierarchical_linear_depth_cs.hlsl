@@ -5,7 +5,6 @@
 // This shader outputs the depth in world units!
 
 ConstantBuffer<hierarchical_linear_depth_cb> cb	    : register(b0);
-ConstantBuffer<camera_cb> camera					: register(b1);
 
 RWTexture2D<float> outputMip0						: register(u0);
 RWTexture2D<float> outputMip1						: register(u1);
@@ -57,10 +56,10 @@ void main(cs_input IN)
 
 	const float4 lineardepths = float4
 	(
-		depthBufferDepthToEyeDepth(depths.x, camera.projectionParams),
-		depthBufferDepthToEyeDepth(depths.y, camera.projectionParams),
-		depthBufferDepthToEyeDepth(depths.z, camera.projectionParams),
-		depthBufferDepthToEyeDepth(depths.w, camera.projectionParams)
+		depthBufferDepthToEyeDepth(depths.x, cb.projectionParams),
+		depthBufferDepthToEyeDepth(depths.y, cb.projectionParams),
+		depthBufferDepthToEyeDepth(depths.z, cb.projectionParams),
+		depthBufferDepthToEyeDepth(depths.w, cb.projectionParams)
 	);
 
 	outputMip0[dispatchThreadID.xy * 2 + uint2(0, 0)] = lineardepths.x;

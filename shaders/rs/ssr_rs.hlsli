@@ -10,6 +10,7 @@ struct ssr_raycast_cb
     vec2 dimensions;
     vec2 invDimensions;
     uint32 frameIndex;
+
     uint32 numSteps;
 
     float maxDistance;
@@ -18,19 +19,6 @@ struct ssr_raycast_cb
     float minStride;
     float maxStride;
 };
-
-#ifndef HLSL
-static ssr_raycast_cb defaultSSRParameters()
-{
-    ssr_raycast_cb result;
-    result.numSteps = 400;
-    result.maxDistance = 1000.f;
-    result.strideCutoff = 100.f;
-    result.minStride = 5.f;
-    result.maxStride = 30.f;
-    return result;
-}
-#endif
 
 
 #define SSR_RAYCAST_RS \

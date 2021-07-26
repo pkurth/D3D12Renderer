@@ -4,6 +4,7 @@
 #include "dx_texture.h"
 #include "dx_command_list.h"
 #include "hash.h"
+#include "render_resources.h"
 
 #include "light_source.h"
 #include "camera.h"

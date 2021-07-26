@@ -120,17 +120,20 @@ void application::initialize(dx_renderer* renderer)
 		appScene.createEntity("Stormtrooper 1")
 			.addComponent<trs>(vec3(-5.f, 0.f, -1.f), quat::identity)
 			.addComponent<raster_component>(stormtrooperMesh)
-			.addComponent<animation_component>(make_ref<simple_animation_controller>());
+			.addComponent<animation_component>(make_ref<simple_animation_controller>())
+			.addComponent<dynamic_geometry_component>();
 
 		appScene.createEntity("Stormtrooper 2")
 			.addComponent<trs>(vec3(0.f, 0.f, -2.f), quat::identity)
 			.addComponent<raster_component>(stormtrooperMesh)
-			.addComponent<animation_component>(make_ref<simple_animation_controller>());
+			.addComponent<animation_component>(make_ref<simple_animation_controller>())
+			.addComponent<dynamic_geometry_component>();
 
 		appScene.createEntity("Stormtrooper 3")
 			.addComponent<trs>(vec3(5.f, 0.f, -1.f), quat::identity)
 			.addComponent<raster_component>(stormtrooperMesh)
-			.addComponent<animation_component>(make_ref<simple_animation_controller>());
+			.addComponent<animation_component>(make_ref<simple_animation_controller>())
+			.addComponent<dynamic_geometry_component>();
 	}
 
 	if (auto pilotMesh = loadAnimatedMeshFromFile("assets/pilot/pilot.fbx"))
@@ -138,7 +141,8 @@ void application::initialize(dx_renderer* renderer)
 		appScene.createEntity("Pilot")
 			.addComponent<trs>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
 			.addComponent<raster_component>(pilotMesh)
-			.addComponent<animation_component>(make_ref<simple_animation_controller>());
+			.addComponent<animation_component>(make_ref<simple_animation_controller>())
+			.addComponent<dynamic_geometry_component>();
 	}
 
 	if (auto unrealMesh = loadAnimatedMeshFromFile("assets/unreal/unreal_mannequin.fbx"))
@@ -148,7 +152,8 @@ void application::initialize(dx_renderer* renderer)
 		appScene.createEntity("Mannequin")
 			.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.019f)
 			.addComponent<raster_component>(unrealMesh)
-			.addComponent<animation_component>(make_ref<simple_animation_controller>());
+			.addComponent<animation_component>(make_ref<simple_animation_controller>())
+			.addComponent<dynamic_geometry_component>();
 	}
 #endif
 
@@ -404,7 +409,7 @@ void application::initialize(dx_renderer* renderer)
 #endif
 }
 
-static bool plotAndEditTonemapping(tonemap_cb& tonemap)
+static bool plotAndEditTonemapping(tonemap_settings& tonemap)
 {
 	bool result = false;
 	if (ImGui::TreeNode("Tonemapping"))
@@ -413,9 +418,8 @@ static bool plotAndEditTonemapping(tonemap_cb& tonemap)
 			[](void* data, int idx)
 			{
 				float t = idx * 0.01f;
-				tonemap_cb& aces = *(tonemap_cb*)data;
-
-				return filmicTonemapping(t, aces);
+				tonemap_settings& aces = *(tonemap_settings*)data;
+				return aces.tonemap(t);
 			},
 			&tonemap, 100, 0, 0, 0.f, 1.f, ImVec2(100.f, 100.f));
 

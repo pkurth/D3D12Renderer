@@ -51,7 +51,7 @@ void fire_particle_system::initialize(uint32 maxNumParticles, float emitRate, co
 
 	if (!tex)
 	{
-		tex = dx_renderer::getWhiteTexture();
+		tex = render_resources::whiteTexture;
 	}
 	
 	particle_system::initializeAsBillboard(sizeof(fire_particle_data), maxNumParticles, emitRate, sort_mode_back_to_front);
@@ -150,7 +150,7 @@ void smoke_particle_system::initialize(uint32 maxNumParticles, float emitRate, c
 
 	if (!tex)
 	{
-		tex = dx_renderer::getWhiteTexture();
+		tex = render_resources::whiteTexture;
 	}
 
 	particle_system::initializeAsBillboard(sizeof(smoke_particle_data), maxNumParticles, emitRate, sort_mode_back_to_front);

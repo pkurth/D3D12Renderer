@@ -8,6 +8,10 @@
 #include "material.h"
 
 
+void loadAllParticleSystemPipelines();
+
+
+
 struct fire_particle_system : particle_system
 {
 	static void initializePipeline();

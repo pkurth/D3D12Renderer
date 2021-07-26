@@ -111,13 +111,13 @@ struct gaussian_blur_cb
 
 struct hierarchical_linear_depth_cb
 {
+    vec4 projectionParams;
     vec2 invDimensions;
 };
 
 #define HIERARCHICAL_LINEAR_DEPTH_RS \
     "RootFlags(0), " \
-    "RootConstants(b0, num32BitConstants = 2), " \
-    "CBV(b1), " \
+    "RootConstants(b0, num32BitConstants = 8), " \
     "DescriptorTable( UAV(u0, numDescriptors = 6), SRV(t0, numDescriptors = 1) )," \
     "StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \
@@ -127,8 +127,7 @@ struct hierarchical_linear_depth_cb
 
 
 #define HIERARCHICAL_LINEAR_DEPTH_RS_CB           0
-#define HIERARCHICAL_LINEAR_DEPTH_RS_CAMERA       1
-#define HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES     2
+#define HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES     1
 
 
 
@@ -202,37 +201,18 @@ struct tonemap_cb
     float linearWhite;
 
     float exposure;
+
+    vec3 evaluate(vec3 x)
+    {
+        return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - (E / F);
+    }
+
+    vec3 tonemap(vec3 color)
+    {
+        color *= exp2(exposure);
+        return evaluate(color) / evaluate(linearWhite);
+    }
 };
-
-static tonemap_cb defaultTonemapParameters()
-{
-    tonemap_cb result;
-    result.exposure = 0.2f;
-    result.A = 0.22f;
-    result.B = 0.3f;
-    result.C = 0.1f;
-    result.D = 0.2f;
-    result.E = 0.01f;
-    result.F = 0.3f;
-    result.linearWhite = 11.2f;
-    return result;
-}
-
-static float acesFilmic(float x, float A, float B, float C, float D, float E, float F)
-{
-    return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - (E / F);
-}
-
-static float filmicTonemapping(float color, tonemap_cb tonemap)
-{
-    float expExposure = exp2(tonemap.exposure);
-    color *= expExposure;
-
-    float r = acesFilmic(color, tonemap.A, tonemap.B, tonemap.C, tonemap.D, tonemap.E, tonemap.F) /
-        acesFilmic(tonemap.linearWhite, tonemap.A, tonemap.B, tonemap.C, tonemap.D, tonemap.E, tonemap.F);
-
-    return r;
-}
 
 #define TONEMAP_RS \
     "RootFlags(0), " \

@@ -8,16 +8,13 @@
 #include "pbr.h"
 #include "input.h"
 #include "raytracer.h"
+#include "render_algorithms.h"
+#include "render_resources.h"
 
 #include "light_source.hlsli"
 #include "camera.hlsli"
-#include "volumetrics_rs.hlsli"
-#include "post_processing_rs.hlsli"
-#include "ssr_rs.hlsli"
 
 
-#define SHADOW_MAP_WIDTH 6144
-#define SHADOW_MAP_HEIGHT 6144
 
 #define MAX_NUM_SPOT_LIGHT_SHADOW_PASSES 16
 #define MAX_NUM_POINT_LIGHT_SHADOW_PASSES 16
@@ -53,17 +50,16 @@ static const char* rendererModeNames[] =
 	"Path-traced",
 };
 
-
 struct renderer_settings
 {
-	tonemap_cb tonemap = defaultTonemapParameters();
+	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
+
+	tonemap_settings tonemap;
 	float environmentIntensity = 1.f;
 	float skyIntensity = 1.f;
 
-	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
-
 	bool enableSSR = true;
-	ssr_raycast_cb ssr = defaultSSRParameters();
+	ssr_settings ssr;
 
 	bool enableTemporalAntialiasing = true;
 	float cameraJitterStrength = 1.f;
@@ -78,7 +74,7 @@ struct renderer_settings
 
 struct dx_renderer
 {
-	static void initializeCommon(DXGI_FORMAT screenFormat);
+	static void initializeCommon(DXGI_FORMAT outputFormat);
 	
 	void initialize(uint32 windowWidth, uint32 windowHeight, bool renderObjectIDs);
 
@@ -103,37 +99,31 @@ struct dx_renderer
 		assert(!opaqueRenderPass);
 		opaqueRenderPass = renderPass;
 	}
-
 	void submitRenderPass(transparent_render_pass* renderPass)
 	{
 		assert(!transparentRenderPass);
 		transparentRenderPass = renderPass;
 	}
-
 	void submitRenderPass(overlay_render_pass* renderPass)
 	{
 		assert(!overlayRenderPass);
 		overlayRenderPass = renderPass;
 	}
-
 	void submitRenderPass(sun_shadow_render_pass* renderPass)
 	{
 		assert(!sunShadowRenderPass);
 		sunShadowRenderPass = renderPass;
 	}
-
 	void submitRenderPass(spot_shadow_render_pass* renderPass)
 	{
 		assert(numSpotLightShadowRenderPasses < MAX_NUM_SPOT_LIGHT_SHADOW_PASSES);
 		spotLightShadowRenderPasses[numSpotLightShadowRenderPasses++] = renderPass;
 	}
-
 	void submitRenderPass(point_shadow_render_pass* renderPass)
 	{
 		assert(numPointLightShadowRenderPasses < MAX_NUM_POINT_LIGHT_SHADOW_PASSES);
 		pointLightShadowRenderPasses[numPointLightShadowRenderPasses++] = renderPass;
 	}
-
 	void setRaytracer(dx_raytracer* raytracer, raytracing_tlas* tlas)
 	{
 		this->raytracer = raytracer;
@@ -150,18 +140,10 @@ struct dx_renderer
 
 	uint32 hoveredObjectID = -1;
 
-	static ref<dx_texture> getWhiteTexture();
-	static ref<dx_texture> getBlackTexture();
+	static DXGI_FORMAT outputFormat;
 
-	static dx_cpu_descriptor_handle nullTextureSRV;
-	static dx_cpu_descriptor_handle nullBufferSRV;
 
-	static ref<dx_texture> getShadowMap();
-	static ref<dx_texture> getShadowMapCache();
-
-	static DXGI_FORMAT screenFormat;
-
-	static constexpr DXGI_FORMAT hdrFormat = DXGI_FORMAT_R32G32B32A32_FLOAT; // TODO: This could be way less. However, for path tracing accumulation over time this was necessary.
+	static constexpr DXGI_FORMAT hdrFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	static constexpr DXGI_FORMAT worldNormalsFormat = DXGI_FORMAT_R16G16_FLOAT;
 	static constexpr DXGI_FORMAT hdrDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	static constexpr DXGI_FORMAT linearDepthFormat = DXGI_FORMAT_R32_FLOAT;
@@ -169,8 +151,6 @@ struct dx_renderer
 	static constexpr DXGI_FORMAT objectIDsFormat = DXGI_FORMAT_R32_UINT;
 	static constexpr DXGI_FORMAT reflectanceFormat = DXGI_FORMAT_R8G8B8A8_UNORM; // Fresnel (xyz), roughness (w).
 	static constexpr DXGI_FORMAT reflectionFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-	static constexpr DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM;
-	static constexpr DXGI_FORMAT volumetricsFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
 	static constexpr DXGI_FORMAT hdrPostProcessFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	static constexpr DXGI_FORMAT ldrPostProcessFormat = DXGI_FORMAT_R11G11B10_FLOAT; // Not really LDR. But I don't like the idea of converting to 8 bit and then to sRGB in separate passes.
@@ -246,42 +226,12 @@ private:
 	directional_light_cb sun;
 
 
-	// Tiled light and decal culling.
-	ref<dx_buffer> tiledWorldSpaceFrustaBuffer;
-
-	ref<dx_buffer> tiledCullingIndexCounter;
-	ref<dx_buffer> tiledObjectsIndexList;
-
-	// DXGI_FORMAT_R32G32B32A32_UINT. 
-	// The R&B channel contains the offset into tiledObjectsIndexList. 
-	// The G&A channel contains the number of point lights and spot lights in 10 bit each, so there is space for more info.
-	// Opaque is in R,G.
-	// Transparent is in B,A.
-	// For more info, see light_culling_cs.hlsl.
-	ref<dx_texture> tiledCullingGrid;
-
-	uint32 numCullingTilesX;
-	uint32 numCullingTilesY;
-
-
+	light_culling culling;
 
 
 	renderer_settings oldSettings;
 	renderer_mode oldMode = renderer_mode_rasterized;
 
 	void recalculateViewport(bool resizeTextures);
-	void allocateLightCullingBuffers();
-
-	enum gaussian_blur_kernel_size
-	{
-		gaussian_blur_5x5,
-		gaussian_blur_9x9,
-	};
-
-	void gaussianBlur(dx_command_list* cl, ref<dx_texture> inputOutput, ref<dx_texture> temp, uint32 inputMip, uint32 outputMip, gaussian_blur_kernel_size kernel, uint32 numIterations = 1);
-	void specularAmbient(dx_command_list* cl, dx_dynamic_constant_buffer cameraCBV, const ref<dx_texture>& hdrInput, const ref<dx_texture>& ssr, const ref<dx_texture>& output);
-	void tonemapAndPresent(dx_command_list* cl, const ref<dx_texture>& hdrResult);
-	void tonemap(dx_command_list* cl, const ref<dx_texture>& hdrResult, D3D12_RESOURCE_STATES transitionLDR);
-	void present(dx_command_list* cl);
 };
 

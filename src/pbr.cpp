@@ -204,8 +204,8 @@ void pbr_material::setupTransparentPipeline(dx_command_list* cl, const common_ma
 
 void pbr_material::setupCommon(dx_command_list* cl, const common_material_info& info)
 {
-	dx_cpu_descriptor_handle nullTexture = dx_renderer::nullTextureSRV;
-	dx_cpu_descriptor_handle nullBuffer = dx_renderer::nullBufferSRV;
+	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
+	dx_cpu_descriptor_handle nullBuffer = render_resources::nullBufferSRV;
 
 	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_LIGHTING, lighting_cb{ vec2(1.f / info.shadowMap->width, 1.f / info.shadowMap->height), info.environmentIntensity });
 

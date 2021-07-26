@@ -1003,6 +1003,126 @@ void allocateMipUAVs(ref<dx_texture> texture)
 	}
 }
 
+ref<dx_texture> createPlacedTexture(dx_heap heap, uint64 offset, uint32 width, uint32 height, DXGI_FORMAT format, bool allocateMips, bool allowRenderTarget, bool allowUnorderedAccess, D3D12_RESOURCE_STATES initialState)
+{
+	D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE
+		| (allowRenderTarget ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE)
+		| (allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE)
+		;
+
+	uint32 numMips = allocateMips ? 0 : 1;
+	CD3DX12_RESOURCE_DESC textureDesc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, numMips, 1, 0, flags);
+	
+	return createPlacedTexture(heap, offset, textureDesc, initialState);
+}
+
+ref<dx_texture> createPlacedTexture(dx_heap heap, uint64 offset, D3D12_RESOURCE_DESC textureDesc, D3D12_RESOURCE_STATES initialState)
+{
+	ref<dx_texture> result = make_ref<dx_texture>();
+
+	result->requestedNumMipLevels = textureDesc.MipLevels;
+
+	uint32 maxNumMipLevels = (uint32)log2(max(textureDesc.Width, textureDesc.Height)) + 1;
+	textureDesc.MipLevels = min(maxNumMipLevels, result->requestedNumMipLevels);
+
+	D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport;
+	formatSupport.Format = textureDesc.Format;
+	checkResult(dxContext.device->CheckFeatureSupport(
+		D3D12_FEATURE_FORMAT_SUPPORT,
+		&formatSupport,
+		sizeof(D3D12_FEATURE_DATA_FORMAT_SUPPORT)));
+
+	result->supportsRTV = (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) && formatSupportsRTV(formatSupport);
+	result->supportsDSV = (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) && formatSupportsDSV(formatSupport);
+	result->supportsUAV = (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) && formatSupportsUAV(formatSupport);
+	result->supportsSRV = formatSupportsSRV(formatSupport);
+
+	if (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET && !result->supportsRTV)
+	{
+		std::cerr << "Warning. Requested RTV, but not supported by format.\n";
+		__debugbreak();
+	}
+
+	if (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL && !result->supportsDSV)
+	{
+		std::cerr << "Warning. Requested DSV, but not supported by format.\n";
+		__debugbreak();
+	}
+
+	if (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS && !result->supportsUAV)
+	{
+		std::cerr << "Warning. Requested UAV, but not supported by format.\n";
+		__debugbreak();
+	}
+
+
+	// Create.
+	checkResult(dxContext.device->CreatePlacedResource(
+		heap.Get(),
+		offset,
+		&textureDesc,
+		initialState,
+		0,
+		IID_PPV_ARGS(&result->resource)
+	));
+
+
+	result->numMipLevels = result->resource->GetDesc().MipLevels;
+
+	result->format = textureDesc.Format;
+	result->width = (uint32)textureDesc.Width;
+	result->height = textureDesc.Height;
+	result->depth = textureDesc.DepthOrArraySize;
+
+	result->defaultSRV = {};
+	result->defaultUAV = {};
+	result->rtvHandles = {};
+	result->dsvHandle = {};
+	result->stencilSRV = {};
+
+	result->initialState = initialState;
+
+
+	// SRV.
+	if (textureDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+	{
+		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createVolumeTextureSRV(result);
+	}
+	else if (textureDesc.DepthOrArraySize == 6)
+	{
+		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapSRV(result);
+	}
+	else
+	{
+		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureSRV(result);
+	}
+
+	// RTV.
+	if (result->supportsRTV)
+	{
+		result->rtvHandles = dxContext.rtvAllocator.getFreeHandle().create2DTextureRTV(result);
+	}
+
+	// UAV.
+	if (result->supportsUAV)
+	{
+		if (textureDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+		{
+			result->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createVolumeTextureUAV(result);
+		}
+		else if (textureDesc.DepthOrArraySize == 6)
+		{
+			result->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapUAV(result);
+		}
+		else
+		{
+			result->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureUAV(result);
+		}
+	}
+
+	return result;
+}
+
 ref<dx_texture> createPlacedDepthTexture(dx_heap heap, uint64 offset, uint32 width, uint32 height, DXGI_FORMAT format, uint32 arrayLength, D3D12_RESOURCE_STATES initialState, bool allowDepthStencil)
 {
 	ref<dx_texture> result = make_ref<dx_texture>();
@@ -1024,6 +1144,28 @@ ref<dx_texture> createPlacedDepthTexture(dx_heap heap, uint64 offset, uint32 wid
 	));
 
 	initializeDepthTexture(result, width, height, format, arrayLength, initialState, allowDepthStencil);
+
+	return result;
+}
+
+ref<dx_texture> createPlacedDepthTexture(dx_heap heap, uint64 offset, D3D12_RESOURCE_DESC textureDesc, D3D12_RESOURCE_STATES initialState)
+{
+	ref<dx_texture> result = make_ref<dx_texture>();
+
+	D3D12_CLEAR_VALUE optimizedClearValue = {};
+	optimizedClearValue.Format = textureDesc.Format;
+	optimizedClearValue.DepthStencil = { 1.f, 0 };
+
+	checkResult(dxContext.device->CreatePlacedResource(
+		heap.Get(),
+		offset,
+		&textureDesc,
+		initialState,
+		&optimizedClearValue,
+		IID_PPV_ARGS(&result->resource)
+	));
+
+	initializeDepthTexture(result, (uint32)textureDesc.Width, textureDesc.Height, textureDesc.Format, textureDesc.DepthOrArraySize, initialState, true);
 
 	return result;
 }
