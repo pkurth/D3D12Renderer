@@ -22,6 +22,22 @@ struct ssr_settings
 	float maxStride = 30.f;
 };
 
+struct taa_settings
+{
+	float cameraJitterStrength = 1.f;
+};
+
+struct bloom_settings
+{
+	float threshold = 100.f;
+	float strength = 0.1f;
+};
+
+struct sharpen_settings
+{
+	float strength = 0.5f;
+};
+
 struct tonemap_settings
 {
 	float A = 0.22f; // Shoulder strength.
@@ -149,8 +165,7 @@ void bloom(dx_command_list* cl,
 	ref<dx_texture> output,						// Input as UNORDERED_ACCESS. After call NON_PIXEL_SHADER_RESOURCE.
 	ref<dx_texture> bloomTexture,				// UNORDERED_ACCESS
 	ref<dx_texture> bloomTempTexture,			// UNORDERED_ACCESS
-	float threshold,
-	float strength);
+	bloom_settings settings);
 
 void tonemap(dx_command_list* cl,
 	ref<dx_texture> hdrInput,					// NON_PIXEL_SHADER_RESOURCE
@@ -160,5 +175,4 @@ void tonemap(dx_command_list* cl,
 void present(dx_command_list* cl,
 	ref<dx_texture> ldrInput,					// NON_PIXEL_SHADER_RESOURCE
 	ref<dx_texture> output,						// UNORDERED_ACCESS
-	bool sharpen,
-	float sharpenStrength);
+	sharpen_settings sharpenSettings);

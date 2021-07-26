@@ -306,7 +306,7 @@ void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 
 void dx_renderer::recalculateViewport(bool resizeTextures)
 {
-	if (settings.aspectRatioMode == aspect_ratio_free)
+	if (aspectRatioMode == aspect_ratio_free)
 	{
 		windowXOffset = 0;
 		windowYOffset = 0;
@@ -315,7 +315,7 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 	}
 	else
 	{
-		const float targetAspect = settings.aspectRatioMode == aspect_ratio_fix_16_9 ? (16.f / 9.f) : (16.f / 10.f);
+		const float targetAspect = aspectRatioMode == aspect_ratio_fix_16_9 ? (16.f / 9.f) : (16.f / 10.f);
 
 		float aspect = (float)windowWidth / (float)windowHeight;
 		if (aspect > targetAspect)
@@ -375,9 +375,9 @@ void dx_renderer::setCamera(const render_camera& camera)
 {
 	vec2 jitterOffset(0.f, 0.f);
 	render_camera c;
-	if (settings.enableTemporalAntialiasing)
+	if (enableTAA)
 	{
-		jitterOffset = haltonSequence[dxContext.frameID % arraysize(haltonSequence)] / vec2((float)renderWidth, (float)renderHeight) * settings.cameraJitterStrength;
+		jitterOffset = haltonSequence[dxContext.frameID % arraysize(haltonSequence)] / vec2((float)renderWidth, (float)renderHeight) * taaSettings.cameraJitterStrength;
 		c = camera.getJitteredVersion(jitterOffset);
 	}
 	else
@@ -462,8 +462,8 @@ void dx_renderer::setDecals(const ref<dx_buffer>& decals, uint32 numDecals, cons
 
 void dx_renderer::endFrame(const user_input& input)
 {
-	bool aspectRatioModeChanged = settings.aspectRatioMode != oldSettings.aspectRatioMode;
-	oldSettings = settings;
+	bool aspectRatioModeChanged = aspectRatioMode != oldAspectRatioMode;
+	oldAspectRatioMode = aspectRatioMode;
 
 	if (aspectRatioModeChanged)
 	{
@@ -497,8 +497,8 @@ void dx_renderer::endFrame(const user_input& input)
 		materialInfo.environment = render_resources::blackCubeTexture;
 		materialInfo.irradiance = render_resources::blackCubeTexture;
 	}
-	materialInfo.environmentIntensity = settings.environmentIntensity;
-	materialInfo.skyIntensity = settings.skyIntensity;
+	materialInfo.environmentIntensity = environmentIntensity;
+	materialInfo.skyIntensity = skyIntensity;
 	materialInfo.brdf = render_resources::brdfTex;
 	materialInfo.tiledCullingGrid = culling.tiledCullingGrid;
 	materialInfo.tiledObjectsIndexList = culling.tiledObjectsIndexList;
@@ -976,7 +976,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setGraphicsRootSignature(*textureSkyPipeline.rootSignature);
 
 				cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ jitteredCamera.proj * createSkyViewMatrix(jitteredCamera.view) });
-				cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
+				cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ skyIntensity });
 				cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, environment->sky->defaultSRV);
 
 				cl->drawCubeTriangleStrip();
@@ -987,7 +987,7 @@ void dx_renderer::endFrame(const user_input& input)
 				cl->setGraphicsRootSignature(*proceduralSkyPipeline.rootSignature);
 
 				cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ jitteredCamera.proj * createSkyViewMatrix(jitteredCamera.view) });
-				cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ settings.skyIntensity });
+				cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ skyIntensity });
 
 				cl->drawCubeTriangleStrip();
 			}
@@ -1089,11 +1089,11 @@ void dx_renderer::endFrame(const user_input& input)
 		// SCREEN SPACE REFLECTIONS
 		// ----------------------------------------
 
-		if (settings.enableSSR)
+		if (enableSSR)
 		{
 			screenSpaceReflections(cl, hdrColorTexture, prevFrameHDRColorTexture, depthStencilBuffer, linearDepthBuffer, worldNormalsTexture,
 				reflectanceTexture, screenVelocitiesTexture, ssrRaycastTexture, ssrResolveTexture, ssrTemporalTextures[ssrHistoryIndex],
-				ssrTemporalTextures[1 - ssrHistoryIndex], settings.ssr, materialInfo.cameraCBV);
+				ssrTemporalTextures[1 - ssrHistoryIndex], ssrSettings, materialInfo.cameraCBV);
 
 			ssrHistoryIndex = 1 - ssrHistoryIndex;
 		}
@@ -1101,14 +1101,14 @@ void dx_renderer::endFrame(const user_input& input)
 		{
 			DX_PROFILE_BLOCK(cl, "Specular ambient");
 
-			specularAmbient(cl, hdrColorTexture, settings.enableSSR ? ssrResolveTexture : 0, worldNormalsTexture, reflectanceTexture, 
+			specularAmbient(cl, hdrColorTexture, enableSSR ? ssrResolveTexture : 0, worldNormalsTexture, reflectanceTexture, 
 				environment ? environment->environment : 0, hdrPostProcessingTexture, materialInfo.cameraCBV);
 
 			barrier_batcher(cl)
 				//.uav(hdrPostProcessingTexture)
 				.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE); // Will be read by rest of post processing stack. 
 
-			if (settings.enableSSR)
+			if (enableSSR)
 			{
 				barrier_batcher(cl)
 					.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.
@@ -1224,7 +1224,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 		// TAA.
-		if (settings.enableTemporalAntialiasing)
+		if (enableTAA)
 		{
 			uint32 taaOutputIndex = 1 - taaHistoryIndex;
 			temporalAntiAliasing(cl, hdrResult, screenVelocitiesTexture, opaqueDepthBuffer, taaTextures[taaHistoryIndex], taaTextures[taaOutputIndex], jitteredCamera.projectionParams);
@@ -1241,12 +1241,12 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 		// Bloom.
-		if (settings.enableBloom)
+		if (enableBloom)
 		{
 			barrier_batcher(cl)
 				.transition(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-			bloom(cl, hdrResult, hdrColorTexture, bloomTexture, bloomTempTexture, settings.bloomThreshold, settings.bloomStrength);
+			bloom(cl, hdrResult, hdrColorTexture, bloomTexture, bloomTempTexture, bloomSettings);
 			hdrResult = hdrColorTexture;
 		}
 
@@ -1254,7 +1254,7 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 
-		tonemap(cl, hdrResult, ldrPostProcessingTexture, settings.tonemap);
+		tonemap(cl, hdrResult, ldrPostProcessingTexture, tonemapSettings);
 
 
 		// ----------------------------------------
@@ -1386,9 +1386,9 @@ void dx_renderer::endFrame(const user_input& input)
 
 
 
-		// TODO: If we really care we should sharpen before rendering overlays and outlines.
+		// TODO: If we really care we should sharpenSettings before rendering overlays and outlines.
 
-		present(cl, ldrPostProcessingTexture, frameResult, settings.enableSharpen, settings.sharpenStrength);
+		present(cl, ldrPostProcessingTexture, frameResult, enableSharpen ? sharpenSettings : sharpen_settings{ 0.f });
 
 
 
@@ -1427,12 +1427,12 @@ void dx_renderer::endFrame(const user_input& input)
 			//.uav(hdrColorTexture)
 			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
-		tonemap(cl, hdrColorTexture, ldrPostProcessingTexture, settings.tonemap);
+		tonemap(cl, hdrColorTexture, ldrPostProcessingTexture, tonemapSettings);
 
 		barrier_batcher(cl)
 			.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
-		present(cl, ldrPostProcessingTexture, frameResult, false, 0);
+		present(cl, ldrPostProcessingTexture, frameResult, { 0.f });
 
 		barrier_batcher(cl)
 			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)

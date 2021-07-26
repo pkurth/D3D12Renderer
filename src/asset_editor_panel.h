@@ -2,7 +2,7 @@
 
 #include "dx_texture.h"
 
-struct asset_editor_window
+struct asset_editor_panel
 {
 	virtual void setAsset(const fs::path& path) = 0;
 
@@ -19,9 +19,9 @@ private:
 };
 
 
-struct mesh_editor_window : asset_editor_window
+struct mesh_editor_panel : asset_editor_panel
 {
-	mesh_editor_window();
+	mesh_editor_panel();
 
 	virtual void setAsset(const fs::path& path) override;
 

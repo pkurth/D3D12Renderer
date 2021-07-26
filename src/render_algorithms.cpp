@@ -474,8 +474,7 @@ void bloom(dx_command_list* cl,
 	ref<dx_texture> output,
 	ref<dx_texture> bloomTexture,
 	ref<dx_texture> bloomTempTexture,
-	float threshold,
-	float strength)
+	bloom_settings settings)
 {
 	DX_PROFILE_BLOCK(cl, "Bloom");
 
@@ -488,7 +487,7 @@ void bloom(dx_command_list* cl,
 		cl->setDescriptorHeapUAV(BLOOM_THRESHOLD_RS_TEXTURES, 0, bloomTexture);
 		cl->setDescriptorHeapSRV(BLOOM_THRESHOLD_RS_TEXTURES, 1, hdrInput);
 
-		cl->setCompute32BitConstants(BLOOM_THRESHOLD_RS_CB, bloom_threshold_cb{ vec2(1.f / bloomTexture->width, 1.f / bloomTexture->height), threshold });
+		cl->setCompute32BitConstants(BLOOM_THRESHOLD_RS_CB, bloom_threshold_cb{ vec2(1.f / bloomTexture->width, 1.f / bloomTexture->height), settings.threshold });
 
 		cl->dispatch(bucketize(bloomTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(bloomTexture->height, POST_PROCESSING_BLOCK_SIZE));
 	}
@@ -511,7 +510,7 @@ void bloom(dx_command_list* cl,
 		cl->setDescriptorHeapSRV(BLOOM_COMBINE_RS_TEXTURES, 1, hdrInput);
 		cl->setDescriptorHeapSRV(BLOOM_COMBINE_RS_TEXTURES, 2, bloomTexture);
 
-		cl->setCompute32BitConstants(BLOOM_COMBINE_RS_CB, bloom_combine_cb{ vec2(1.f / hdrInput->width, 1.f / hdrInput->height), strength });
+		cl->setCompute32BitConstants(BLOOM_COMBINE_RS_CB, bloom_combine_cb{ vec2(1.f / hdrInput->width, 1.f / hdrInput->height), settings.strength });
 
 		cl->dispatch(bucketize(hdrInput->width, POST_PROCESSING_BLOCK_SIZE), bucketize(hdrInput->height, POST_PROCESSING_BLOCK_SIZE));
 	}
@@ -542,8 +541,7 @@ void tonemap(dx_command_list* cl,
 void present(dx_command_list* cl,
 	ref<dx_texture> ldrInput,
 	ref<dx_texture> output,
-	bool sharpen,
-	float sharpenStrength)
+	sharpen_settings sharpenSettings)
 {
 	DX_PROFILE_BLOCK(cl, "Present");
 
@@ -552,7 +550,7 @@ void present(dx_command_list* cl,
 
 	cl->setDescriptorHeapUAV(PRESENT_RS_TEXTURES, 0, output);
 	cl->setDescriptorHeapSRV(PRESENT_RS_TEXTURES, 1, ldrInput);
-	cl->setCompute32BitConstants(PRESENT_RS_CB, present_cb{ present_sdr, 0.f, sharpenStrength * sharpen, 0 });
+	cl->setCompute32BitConstants(PRESENT_RS_CB, present_cb{ present_sdr, 0.f, sharpenSettings.strength, 0 });
 
 	cl->dispatch(bucketize(output->width, POST_PROCESSING_BLOCK_SIZE), bucketize(output->height, POST_PROCESSING_BLOCK_SIZE));
 }

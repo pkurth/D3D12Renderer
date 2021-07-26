@@ -486,51 +486,50 @@ static bool editSunShadowParameters(directional_light& sun)
 	return result;
 }
 
-static bool editSSR(renderer_settings& settings)
+static bool editSSR(bool& enable, ssr_settings& settings)
 {
 	bool result = false;
-	if (ImGui::TreeNode("SSR"))
+	result |= ImGui::Checkbox("Enable SSR", &enable);
+	if (enable)
 	{
-		result |= ImGui::Checkbox("Enable SSR", &settings.enableSSR);
-
-		result |= ImGui::SliderInt("Num iterations", (int*)&settings.ssr.numSteps, 1, 1024);
-		result |= ImGui::SliderFloat("Max distance", &settings.ssr.maxDistance, 5.f, 1000.f);
-		result |= ImGui::SliderFloat("Min. stride", &settings.ssr.minStride, 1.f, 50.f);
-		result |= ImGui::SliderFloat("Max. stride", &settings.ssr.maxStride, settings.ssr.minStride, 50.f);
-
-		ImGui::TreePop();
+		result |= ImGui::SliderInt("Num iterations", (int*)&settings.numSteps, 1, 1024);
+		result |= ImGui::SliderFloat("Max distance", &settings.maxDistance, 5.f, 1000.f);
+		result |= ImGui::SliderFloat("Min. stride", &settings.minStride, 1.f, 50.f);
+		result |= ImGui::SliderFloat("Max. stride", &settings.maxStride, settings.minStride, 50.f);
 	}
 	return result;
 }
 
-static bool editPostProcessing(renderer_mode mode, renderer_settings& settings)
+static bool editTAA(bool& enable, taa_settings& settings)
 {
 	bool result = false;
-	if (ImGui::TreeNode("Post processing"))
+	result |= ImGui::Checkbox("Enable TAA", &enable);
+	if (enable)
 	{
-		if (mode == renderer_mode_rasterized)
-		{
-			result |= ImGui::Checkbox("Enable TAA", &settings.enableTemporalAntialiasing);
-			if (settings.enableTemporalAntialiasing)
-			{
-				result |= ImGui::SliderFloat("Jitter strength", &settings.cameraJitterStrength, 0.f, 1.f);
-			}
+		result |= ImGui::SliderFloat("Jitter strength", &settings.cameraJitterStrength, 0.f, 1.f);
+	}
+	return result;
+}
 
-			result |= ImGui::Checkbox("Enable bloom", &settings.enableBloom);
-			if (settings.enableBloom)
-			{
-				result |= ImGui::SliderFloat("Bloom threshold", &settings.bloomThreshold, 0.5f, 100.f);
-				result |= ImGui::SliderFloat("Bloom strength", &settings.bloomStrength, 0.f, 1.f);
-			}
-		}
+static bool editBloom(bool& enable, bloom_settings& settings)
+{
+	bool result = false;
+	result |= ImGui::Checkbox("Enable bloom", &enable);
+	if (enable)
+	{
+		result |= ImGui::SliderFloat("Bloom threshold", &settings.threshold, 0.5f, 100.f);
+		result |= ImGui::SliderFloat("Bloom strength", &settings.strength, 0.f, 1.f);
+	}
+	return result;
+}
 
-		result |= ImGui::Checkbox("Enable sharpen", &settings.enableSharpen);
-		if (settings.enableSharpen)
-		{
-			result |= ImGui::SliderFloat("Sharpen strength", &settings.sharpenStrength, 0.f, 1.f);
-		}
-
-		ImGui::TreePop();
+static bool editSharpen(bool& enable, sharpen_settings& settings)
+{
+	bool result = false;
+	result |= ImGui::Checkbox("Enable sharpen", &enable);
+	if (enable)
+	{
+		result |= ImGui::SliderFloat("Sharpen strength", &settings.strength, 0.f, 1.f);
 	}
 	return result;
 }
@@ -900,15 +899,23 @@ void application::drawSettings(float dt)
 		ImGui::Text("Video memory available: %uMB", memoryUsage.available);
 		ImGui::Text("Video memory used: %uMB", memoryUsage.currentlyUsed);
 
-		ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->settings.aspectRatioMode);
+		ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->aspectRatioMode);
 
-		plotAndEditTonemapping(renderer->settings.tonemap);
+		plotAndEditTonemapping(renderer->tonemapSettings);
 		editSunShadowParameters(sun);
-		editSSR(renderer->settings);
-		editPostProcessing(renderer->mode, renderer->settings);
 
-		ImGui::SliderFloat("Environment intensity", &renderer->settings.environmentIntensity, 0.f, 2.f);
-		ImGui::SliderFloat("Sky intensity", &renderer->settings.skyIntensity, 0.f, 2.f);
+		if (ImGui::TreeNode("Post processing"))
+		{
+			editSSR(renderer->enableSSR, renderer->ssrSettings);
+			editTAA(renderer->enableTAA, renderer->taaSettings);
+			editBloom(renderer->enableBloom, renderer->bloomSettings);
+			editSharpen(renderer->enableSharpen, renderer->sharpenSettings);
+
+			ImGui::TreePop();
+		}
+
+		ImGui::SliderFloat("Environment intensity", &renderer->environmentIntensity, 0.f, 2.f);
+		ImGui::SliderFloat("Sky intensity", &renderer->skyIntensity, 0.f, 2.f);
 
 		if (renderer->mode == renderer_mode_pathtraced)
 		{
@@ -1707,14 +1714,14 @@ void application::serializeToFile()
 	out << YAML::Key << "Tone Map"
 		<< YAML::Value
 			<< YAML::BeginMap
-				<< YAML::Key << "A" << YAML::Value << renderer->settings.tonemap.A
-				<< YAML::Key << "B" << YAML::Value << renderer->settings.tonemap.B
-				<< YAML::Key << "C" << YAML::Value << renderer->settings.tonemap.C
-				<< YAML::Key << "D" << YAML::Value << renderer->settings.tonemap.D
-				<< YAML::Key << "E" << YAML::Value << renderer->settings.tonemap.E
-				<< YAML::Key << "F" << YAML::Value << renderer->settings.tonemap.F
-				<< YAML::Key << "Linear White" << YAML::Value << renderer->settings.tonemap.linearWhite
-				<< YAML::Key << "Exposure" << YAML::Value << renderer->settings.tonemap.exposure
+				<< YAML::Key << "A" << YAML::Value << renderer->tonemapSettings.A
+				<< YAML::Key << "B" << YAML::Value << renderer->tonemapSettings.B
+				<< YAML::Key << "C" << YAML::Value << renderer->tonemapSettings.C
+				<< YAML::Key << "D" << YAML::Value << renderer->tonemapSettings.D
+				<< YAML::Key << "E" << YAML::Value << renderer->tonemapSettings.E
+				<< YAML::Key << "F" << YAML::Value << renderer->tonemapSettings.F
+				<< YAML::Key << "Linear White" << YAML::Value << renderer->tonemapSettings.linearWhite
+				<< YAML::Key << "Exposure" << YAML::Value << renderer->tonemapSettings.exposure
 			<< YAML::EndMap;
 
 
@@ -1735,7 +1742,7 @@ void application::serializeToFile()
 		<< YAML::Value
 			<< YAML::BeginMap
 				<< YAML::Key << "Name" << YAML::Value << environment->name
-				<< YAML::Key << "Intensity" << renderer->settings.environmentIntensity
+				<< YAML::Key << "Intensity" << renderer->environmentIntensity
 			<< YAML::EndMap;
 
 	out << YAML::Key << "Entities"
@@ -1842,14 +1849,14 @@ bool application::deserializeFromFile()
 	}
 
 	auto tonemapNode = data["Tone Map"];
-	renderer->settings.tonemap.A = tonemapNode["A"].as<float>();
-	renderer->settings.tonemap.B = tonemapNode["B"].as<float>();
-	renderer->settings.tonemap.C = tonemapNode["C"].as<float>();
-	renderer->settings.tonemap.D = tonemapNode["D"].as<float>();
-	renderer->settings.tonemap.E = tonemapNode["E"].as<float>();
-	renderer->settings.tonemap.F = tonemapNode["F"].as<float>();
-	renderer->settings.tonemap.linearWhite = tonemapNode["Linear White"].as<float>();
-	renderer->settings.tonemap.exposure = tonemapNode["Exposure"].as<float>();
+	renderer->tonemapSettings.A = tonemapNode["A"].as<float>();
+	renderer->tonemapSettings.B = tonemapNode["B"].as<float>();
+	renderer->tonemapSettings.C = tonemapNode["C"].as<float>();
+	renderer->tonemapSettings.D = tonemapNode["D"].as<float>();
+	renderer->tonemapSettings.E = tonemapNode["E"].as<float>();
+	renderer->tonemapSettings.F = tonemapNode["F"].as<float>();
+	renderer->tonemapSettings.linearWhite = tonemapNode["Linear White"].as<float>();
+	renderer->tonemapSettings.exposure = tonemapNode["Exposure"].as<float>();
 
 	auto sunNode = data["Sun"];
 	sun.color = sunNode["Color"].as<decltype(sun.color)>();
@@ -1862,7 +1869,7 @@ bool application::deserializeFromFile()
 
 	auto environmentNode = data["Environment"];
 	setEnvironment(environmentNode["Name"].as<std::string>());
-	renderer->settings.environmentIntensity = environmentNode["Intensity"].as<float>();
+	renderer->environmentIntensity = environmentNode["Intensity"].as<float>();
 
 	auto entitiesNode = data["Entities"];
 	for (auto entityNode : entitiesNode)

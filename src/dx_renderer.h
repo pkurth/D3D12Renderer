@@ -50,28 +50,6 @@ static const char* rendererModeNames[] =
 	"Path-traced",
 };
 
-struct renderer_settings
-{
-	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
-
-	tonemap_settings tonemap;
-	float environmentIntensity = 1.f;
-	float skyIntensity = 1.f;
-
-	bool enableSSR = true;
-	ssr_settings ssr;
-
-	bool enableTemporalAntialiasing = true;
-	float cameraJitterStrength = 1.f;
-
-	bool enableBloom = true;
-	float bloomThreshold = 100.f;
-	float bloomStrength = 0.1f;
-
-	bool enableSharpen = true;
-	float sharpenStrength = 0.5f;
-};
-
 struct dx_renderer
 {
 	static void initializeCommon(DXGI_FORMAT outputFormat);
@@ -130,9 +108,32 @@ struct dx_renderer
 		this->tlas = tlas;
 	}
 
+
+
+	// Settings.
 	renderer_mode mode = renderer_mode_rasterized;
-	
-	renderer_settings settings;
+	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
+
+	tonemap_settings tonemapSettings;
+	float environmentIntensity = 1.f;
+	float skyIntensity = 1.f;
+
+	bool enableSSR = true;
+	ssr_settings ssrSettings;
+
+	bool enableTAA = true;
+	taa_settings taaSettings;
+
+	bool enableBloom = true;
+	bloom_settings bloomSettings;
+
+	bool enableSharpen = true;
+	sharpen_settings sharpenSettings;
+
+
+
+
+
 
 	uint32 renderWidth;
 	uint32 renderHeight;
@@ -193,7 +194,7 @@ private:
 
 	ref<dx_texture> ssrRaycastTexture;
 	ref<dx_texture> ssrResolveTexture;
-	ref<dx_texture> ssrTemporalTextures[2];
+	ref<dx_texture> ssrTemporalTextures[2]; // These get flip-flopped from frame to frame.
 	uint32 ssrHistoryIndex = 0;
 
 	ref<dx_texture> prevFrameHDRColorTexture; // This is downsampled by a factor of 2 and contains up to 8 mip levels.
@@ -229,7 +230,7 @@ private:
 	light_culling culling;
 
 
-	renderer_settings oldSettings;
+	aspect_ratio_mode oldAspectRatioMode = aspect_ratio_free;
 	renderer_mode oldMode = renderer_mode_rasterized;
 
 	void recalculateViewport(bool resizeTextures);

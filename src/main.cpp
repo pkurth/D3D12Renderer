@@ -8,7 +8,7 @@
 #include "imgui.h"
 #include "file_browser.h"
 #include "application.h"
-#include "asset_editor_window.h"
+#include "asset_editor_panel.h"
 
 
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -116,7 +116,7 @@ int main(int argc, char** argv)
 	app.initialize(&renderer);
 
 	file_browser fileBrowser;
-	mesh_editor_window meshEditor;
+	mesh_editor_panel meshEditor;
 
 	user_input input = {};
 

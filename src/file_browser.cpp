@@ -33,7 +33,7 @@ static bool isFile(file_browser::dir_entry_type type)
 	return !isDirectory(type);
 }
 
-void file_browser::draw(mesh_editor_window& meshEditorWindow)
+void file_browser::draw(mesh_editor_panel& meshEditor)
 {
 	if (ImGui::Begin("Assets"))
 	{
@@ -104,7 +104,7 @@ void file_browser::draw(mesh_editor_window& meshEditorWindow)
 						if (p.type == dir_entry_type_mesh && ImGui::MenuItem("Edit"))
 						{
 							fs::path fullPath = currentPath / p.filename;
-							meshEditorWindow.setAsset(fullPath);
+							meshEditor.setAsset(fullPath);
 						}
 
 						if (ImGui::MenuItem("Reveal in Windows Explorer"))

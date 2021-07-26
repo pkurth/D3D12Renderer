@@ -1,9 +1,9 @@
 #include "pch.h"
-#include "asset_editor_window.h"
+#include "asset_editor_panel.h"
 #include "imgui.h"
 
 
-void asset_editor_window::draw()
+void asset_editor_panel::draw()
 {
 	if (open)
 	{
@@ -37,17 +37,17 @@ void asset_editor_window::draw()
 }
 
 
-mesh_editor_window::mesh_editor_window()
+mesh_editor_panel::mesh_editor_panel()
 {
 	title = "Mesh editor";
 }
 
-void mesh_editor_window::setAsset(const fs::path& path)
+void mesh_editor_panel::setAsset(const fs::path& path)
 {
 	open = true;
 }
 
-void mesh_editor_window::edit(uint32 renderWidth, uint32 renderHeight)
+void mesh_editor_panel::edit(uint32 renderWidth, uint32 renderHeight)
 {
 	if (ImGui::BeginTabBar("Tabs"))
 	{
@@ -77,7 +77,7 @@ void mesh_editor_window::edit(uint32 renderWidth, uint32 renderHeight)
 	}
 }
 
-ref<dx_texture> mesh_editor_window::getRendering()
+ref<dx_texture> mesh_editor_panel::getRendering()
 {
 	return 0;
 }
