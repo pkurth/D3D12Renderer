@@ -56,9 +56,6 @@ struct dx_renderer
 	
 	void initialize(uint32 windowWidth, uint32 windowHeight, bool renderObjectIDs);
 
-	static void beginFrameCommon();
-	static void endFrameCommon();
-
 	void beginFrame(uint32 windowWidth, uint32 windowHeight);	
 	void endFrame(const user_input& input);
 

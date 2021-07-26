@@ -545,12 +545,15 @@ void present(dx_command_list* cl,
 {
 	DX_PROFILE_BLOCK(cl, "Present");
 
+	uint32 xOffset = (output->width - ldrInput->width) / 2;
+	uint32 yOffset = (output->height - ldrInput->height) / 2;
+
 	cl->setPipelineState(*presentPipeline.pipeline);
 	cl->setComputeRootSignature(*presentPipeline.rootSignature);
 
 	cl->setDescriptorHeapUAV(PRESENT_RS_TEXTURES, 0, output);
 	cl->setDescriptorHeapSRV(PRESENT_RS_TEXTURES, 1, ldrInput);
-	cl->setCompute32BitConstants(PRESENT_RS_CB, present_cb{ present_sdr, 0.f, sharpenSettings.strength, 0 });
+	cl->setCompute32BitConstants(PRESENT_RS_CB, present_cb{ present_sdr, 0.f, sharpenSettings.strength, (xOffset << 16) | yOffset });
 
 	cl->dispatch(bucketize(output->width, POST_PROCESSING_BLOCK_SIZE), bucketize(output->height, POST_PROCESSING_BLOCK_SIZE));
 }

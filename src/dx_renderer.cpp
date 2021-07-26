@@ -3,17 +3,12 @@
 #include "dx_command_list.h"
 #include "dx_render_target.h"
 #include "dx_pipeline.h"
-#include "dx_bitonic_sort.h"
 #include "geometry.h"
 #include "dx_texture.h"
 #include "dx_barrier_batcher.h"
-#include "texture_preprocessing.h"
-#include "skinning.h"
 #include "dx_context.h"
 #include "dx_profiling.h"
-#include "random.h"
-#include "particle_systems.h"
-#include "render_resources.h"
+#include "render_utils.h"
 
 #include "depth_only_rs.hlsli"
 #include "outline_rs.hlsli"
@@ -48,8 +43,6 @@ DXGI_FORMAT dx_renderer::outputFormat;
 
 static bool performedSkinning;
 
-static vec2 haltonSequence[128];
-
 
 enum stencil_flags
 {
@@ -67,11 +60,6 @@ enum stencil_flags
 void dx_renderer::initializeCommon(DXGI_FORMAT outputFormat)
 {
 	dx_renderer::outputFormat = outputFormat;
-
-
-	initializeTexturePreprocessing();
-	initializeSkinning();
-
 
 
 	// Sky.
@@ -139,29 +127,9 @@ void dx_renderer::initializeCommon(DXGI_FORMAT outputFormat)
 	}
 
 
-	loadCommonShaders();
-
-	pbr_material::initializePipeline();
-	particle_system::initializePipeline();
-	initializeBitonicSort();
-	loadAllParticleSystemPipelines();
-
-
-
 	D3D12_INDIRECT_ARGUMENT_DESC argumentDesc;
 	argumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
 	particleCommandSignature = createCommandSignature({}, &argumentDesc, 1, sizeof(particle_draw));
-
-
-
-	createAllPendingReloadablePipelines();
-
-	render_resources::initializeGlobalResources();
-
-	for (uint32 i = 0; i < arraysize(haltonSequence); ++i)
-	{
-		haltonSequence[i] = halton23(i) * 2.f - vec2(1.f);
-	}
 }
 
 void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool renderObjectIDs)
@@ -249,16 +217,6 @@ void dx_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool rende
 		objectIDsTexture = createTexture(0, renderWidth, renderHeight, objectIDsFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		SET_NAME(objectIDsTexture->resource, "Object IDs");
 	}
-}
-
-void dx_renderer::beginFrameCommon()
-{
-	checkForChangedPipelines();
-}
-
-void dx_renderer::endFrameCommon()
-{
-	performedSkinning = performSkinning();
 }
 
 void dx_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
@@ -373,52 +331,8 @@ void dx_renderer::recalculateViewport(bool resizeTextures)
 
 void dx_renderer::setCamera(const render_camera& camera)
 {
-	vec2 jitterOffset(0.f, 0.f);
-	render_camera c;
-	if (enableTAA)
-	{
-		jitterOffset = haltonSequence[dxContext.frameID % arraysize(haltonSequence)] / vec2((float)renderWidth, (float)renderHeight) * taaSettings.cameraJitterStrength;
-		c = camera.getJitteredVersion(jitterOffset);
-	}
-	else
-	{
-		c = camera;
-	}
-
-	this->jitteredCamera.prevFrameViewProj = this->jitteredCamera.viewProj;
-	this->jitteredCamera.viewProj = c.viewProj;
-	this->jitteredCamera.view = c.view;
-	this->jitteredCamera.proj = c.proj;
-	this->jitteredCamera.invViewProj = c.invViewProj;
-	this->jitteredCamera.invView = c.invView;
-	this->jitteredCamera.invProj = c.invProj;
-	this->jitteredCamera.position = vec4(c.position, 1.f);
-	this->jitteredCamera.forward = vec4(c.rotation * vec3(0.f, 0.f, -1.f), 0.f);
-	this->jitteredCamera.right = vec4(c.rotation * vec3(1.f, 0.f, 0.f), 0.f);
-	this->jitteredCamera.up = vec4(c.rotation * vec3(0.f, 1.f, 0.f), 0.f);
-	this->jitteredCamera.projectionParams = vec4(c.nearPlane, c.farPlane, c.farPlane / c.nearPlane, 1.f - c.farPlane / c.nearPlane);
-	this->jitteredCamera.screenDims = vec2((float)renderWidth, (float)renderHeight);
-	this->jitteredCamera.invScreenDims = vec2(1.f / renderWidth, 1.f / renderHeight);
-	this->jitteredCamera.prevFrameJitter = this->jitteredCamera.jitter;
-	this->jitteredCamera.jitter = jitterOffset;
-
-
-	this->unjitteredCamera.prevFrameViewProj = this->unjitteredCamera.viewProj;
-	this->unjitteredCamera.viewProj = camera.viewProj;
-	this->unjitteredCamera.view = camera.view;
-	this->unjitteredCamera.proj = camera.proj;
-	this->unjitteredCamera.invViewProj = camera.invViewProj;
-	this->unjitteredCamera.invView = camera.invView;
-	this->unjitteredCamera.invProj = camera.invProj;
-	this->unjitteredCamera.position = vec4(camera.position, 1.f);
-	this->unjitteredCamera.forward = vec4(camera.rotation * vec3(0.f, 0.f, -1.f), 0.f);
-	this->unjitteredCamera.right = vec4(camera.rotation * vec3(1.f, 0.f, 0.f), 0.f);
-	this->unjitteredCamera.up = vec4(camera.rotation * vec3(0.f, 1.f, 0.f), 0.f);
-	this->unjitteredCamera.projectionParams = vec4(camera.nearPlane, camera.farPlane, camera.farPlane / camera.nearPlane, 1.f - camera.farPlane / camera.nearPlane);
-	this->unjitteredCamera.screenDims = vec2((float)renderWidth, (float)renderHeight);
-	this->unjitteredCamera.invScreenDims = vec2(1.f / renderWidth, 1.f / renderHeight);
-	this->unjitteredCamera.prevFrameJitter = vec2(0.f);
-	this->unjitteredCamera.jitter = vec2(0.f);
+	buildCameraConstantBuffer(camera, taaSettings.cameraJitterStrength * enableTAA, this->jitteredCamera);
+	buildCameraConstantBuffer(camera, 0.f, this->unjitteredCamera);
 }
 
 void dx_renderer::setEnvironment(const ref<pbr_environment>& environment)
@@ -1005,9 +919,13 @@ void dx_renderer::endFrame(const user_input& input)
 			barrier_batcher(cl)
 				.transition(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-			if (input.overWindow)
+			if (input.overWindow 
+				&& (input.mouse.x - (int32)windowXOffset >= 0)
+				&& (input.mouse.x - (int32)windowXOffset < (int32)renderWidth)
+				&& (input.mouse.y - (int32)windowYOffset >= 0)
+				&& (input.mouse.y - (int32)windowYOffset < (int32)renderHeight))
 			{
-				cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer, dxContext.bufferedFrameID, (uint32)input.mouse.x, (uint32)input.mouse.y, 1, 1);
+				cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer, dxContext.bufferedFrameID, (uint32)input.mouse.x - windowXOffset, (uint32)input.mouse.y - windowYOffset, 1, 1);
 			}
 
 			barrier_batcher(cl)

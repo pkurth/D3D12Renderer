@@ -56,6 +56,6 @@ private:
 
 	static ref<dx_buffer> particleDrawCommandBuffer;
 
-	friend struct dx_renderer;
+	friend void initializeRenderUtils();
 };
 

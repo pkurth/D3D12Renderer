@@ -8,6 +8,7 @@
 #include "imgui.h"
 #include "file_browser.h"
 #include "application.h"
+#include "render_utils.h"
 #include "asset_editor_panel.h"
 
 
@@ -107,6 +108,7 @@ int main(int argc, char** argv)
 
 	initializeTransformationGizmos();
 	dx_renderer::initializeCommon(screenFormat);
+	initializeRenderUtils();
 
 	initializeImGui(screenFormat);
 
@@ -227,12 +229,11 @@ int main(int argc, char** argv)
 		if (ImGui::IsKeyPressed(key_enter) && ImGui::IsKeyDown(key_alt)) { window.toggleFullscreen(); } // Also allowed if not focused on main window.
 
 
-		dx_renderer::beginFrameCommon();
 		renderer.beginFrame(renderWidth, renderHeight);
 		
 		app.update(input, dt);
 
-		dx_renderer::endFrameCommon();
+		endFrameCommon();
 		renderer.endFrame(input);
 
 		fileBrowser.draw(meshEditor);

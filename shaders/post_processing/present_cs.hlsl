@@ -58,14 +58,19 @@ static float3 linearToST2084(float3 color)
 [RootSignature(PRESENT_RS)]
 void main(cs_input IN)
 {
-	float3 scene = input[IN.dispatchThreadID.xy + int2(0, 0)].rgb;
+	int xOffset = present.offset >> 16;
+	int yOffset = present.offset & 0xFFFF;
+
+	int2 center = IN.dispatchThreadID.xy - int2(xOffset, yOffset);
+
+	float3 scene = input[center + int2(0, 0)].rgb;
 
 	if (present.sharpenStrength > 0.f)
 	{
-		float3 top = input[IN.dispatchThreadID.xy + int2(0, -1)].rgb;
-		float3 left = input[IN.dispatchThreadID.xy + int2(-1, 0)].rgb;
-		float3 right = input[IN.dispatchThreadID.xy + int2(1, 0)].rgb;
-		float3 bottom = input[IN.dispatchThreadID.xy + int2(0, 1)].rgb;
+		float3 top = input[center + int2(0, -1)].rgb;
+		float3 left = input[center + int2(-1, 0)].rgb;
+		float3 right = input[center + int2(1, 0)].rgb;
+		float3 bottom = input[center + int2(0, 1)].rgb;
 
 		scene = max(scene + (4.f * scene - top - bottom - left - right) * present.sharpenStrength, 0.f);
 	}
@@ -86,5 +91,5 @@ void main(cs_input IN)
 		scene = linearToST2084(scene * hdrScalar);
 	}
 
-	output[IN.dispatchThreadID.xy + int2(present.offset >> 16, present.offset & 0xFFFF)] = float4(scene, 1.f);
+	output[IN.dispatchThreadID.xy] = float4(scene, 1.f);
 }
