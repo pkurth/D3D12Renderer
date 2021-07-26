@@ -1,9 +1,11 @@
 #pragma once
 
+#include "asset_editor_window.h"
+
 struct file_browser
 {
 	file_browser();
-	void draw();
+	void draw(mesh_editor_window& meshEditorWindow);
 
 	enum dir_entry_type
 	{

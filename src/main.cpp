@@ -8,6 +8,7 @@
 #include "imgui.h"
 #include "file_browser.h"
 #include "application.h"
+#include "asset_editor_window.h"
 
 
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -115,6 +116,7 @@ int main(int argc, char** argv)
 	app.initialize(&renderer);
 
 	file_browser fileBrowser;
+	mesh_editor_window meshEditor;
 
 	user_input input = {};
 
@@ -233,7 +235,8 @@ int main(int argc, char** argv)
 		dx_renderer::endFrameCommon();
 		renderer.endFrame(input);
 
-		fileBrowser.draw();
+		fileBrowser.draw(meshEditor);
+		meshEditor.draw();
 
 		fenceValues[window.currentBackbufferIndex] = renderToMainWindow(window);
 
