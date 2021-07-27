@@ -394,7 +394,8 @@ void main_renderer::endFrame(const user_input& input)
 		}
 		else
 		{
-			proceduralSky(cl, skyRenderTarget, textureSkyPipeline, jitteredCamera.proj, jitteredCamera.view, skyIntensity);
+			//proceduralSky(cl, skyRenderTarget, textureSkyPipeline, jitteredCamera.proj, jitteredCamera.view, skyIntensity);
+			preethamSky(cl, skyRenderTarget, preethamSkyPipeline, jitteredCamera.proj, jitteredCamera.view, sun.direction, skyIntensity);
 		}
 
 		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // Sky renders a triangle strip, so reset back to triangle list.

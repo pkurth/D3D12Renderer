@@ -1,7 +1,7 @@
 #include "sky_rs.hlsli"
 
 
-ConstantBuffer<sky_intensity_cb> skyIntensity : register(b1);
+ConstantBuffer<sky_cb> skyIntensity : register(b1);
 
 struct ps_input
 {

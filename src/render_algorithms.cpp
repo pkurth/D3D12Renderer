@@ -190,8 +190,8 @@ void texturedSky(dx_command_list* cl,
 	cl->setPipelineState(*skyPipeline.pipeline);
 	cl->setGraphicsRootSignature(*skyPipeline.rootSignature);
 
-	cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ proj * createSkyViewMatrix(view) });
-	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ skyIntensity });
+	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
+	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, skyIntensity);
 	cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, sky);
 
 	cl->drawCubeTriangleStrip();
@@ -211,8 +211,24 @@ void proceduralSky(dx_command_list* cl,
 	cl->setPipelineState(*skyPipeline.pipeline);
 	cl->setGraphicsRootSignature(*skyPipeline.rootSignature);
 
-	cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ proj * createSkyViewMatrix(view) });
-	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ skyIntensity });
+	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
+	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, skyIntensity);
+
+	cl->drawCubeTriangleStrip();
+}
+
+void preethamSky(dx_command_list* cl, const dx_render_target& skyRenderTarget, const dx_pipeline& skyPipeline, const mat4& proj, const mat4& view, vec3 sunDirection, float skyIntensity)
+{
+	DX_PROFILE_BLOCK(cl, "Sky");
+
+	cl->setRenderTarget(skyRenderTarget);
+	cl->setViewport(skyRenderTarget.viewport);
+
+	cl->setPipelineState(*skyPipeline.pipeline);
+	cl->setGraphicsRootSignature(*skyPipeline.rootSignature);
+
+	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
+	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_cb{ skyIntensity, sunDirection });
 
 	cl->drawCubeTriangleStrip();
 }

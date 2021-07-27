@@ -37,41 +37,13 @@ struct main_renderer : renderer_base
 	void setSpotLights(const ref<dx_buffer>& lights, uint32 numLights, const ref<dx_buffer>& shadowInfoBuffer);
 	void setDecals(const ref<dx_buffer>& decals, uint32 numDecals, const ref<dx_texture>& textureAtlas);
 
-	void submitRenderPass(opaque_render_pass* renderPass)
-	{
-		assert(!opaqueRenderPass);
-		opaqueRenderPass = renderPass;
-	}
-	void submitRenderPass(transparent_render_pass* renderPass)
-	{
-		assert(!transparentRenderPass);
-		transparentRenderPass = renderPass;
-	}
-	void submitRenderPass(overlay_render_pass* renderPass)
-	{
-		assert(!overlayRenderPass);
-		overlayRenderPass = renderPass;
-	}
-	void submitRenderPass(sun_shadow_render_pass* renderPass)
-	{
-		assert(!sunShadowRenderPass);
-		sunShadowRenderPass = renderPass;
-	}
-	void submitRenderPass(spot_shadow_render_pass* renderPass)
-	{
-		assert(numSpotLightShadowRenderPasses < MAX_NUM_SPOT_LIGHT_SHADOW_PASSES);
-		spotLightShadowRenderPasses[numSpotLightShadowRenderPasses++] = renderPass;
-	}
-	void submitRenderPass(point_shadow_render_pass* renderPass)
-	{
-		assert(numPointLightShadowRenderPasses < MAX_NUM_POINT_LIGHT_SHADOW_PASSES);
-		pointLightShadowRenderPasses[numPointLightShadowRenderPasses++] = renderPass;
-	}
-	void setRaytracer(dx_raytracer* raytracer, raytracing_tlas* tlas)
-	{
-		this->raytracer = raytracer;
-		this->tlas = tlas;
-	}
+	void submitRenderPass(opaque_render_pass* renderPass) {	assert(!opaqueRenderPass); opaqueRenderPass = renderPass; }
+	void submitRenderPass(transparent_render_pass* renderPass) { assert(!transparentRenderPass); transparentRenderPass = renderPass; }
+	void submitRenderPass(overlay_render_pass* renderPass) { assert(!overlayRenderPass); overlayRenderPass = renderPass; }
+	void submitRenderPass(sun_shadow_render_pass* renderPass) {	assert(!sunShadowRenderPass); sunShadowRenderPass = renderPass; }
+	void submitRenderPass(spot_shadow_render_pass* renderPass) { assert(numSpotLightShadowRenderPasses < MAX_NUM_SPOT_LIGHT_SHADOW_PASSES);	spotLightShadowRenderPasses[numSpotLightShadowRenderPasses++] = renderPass; }
+	void submitRenderPass(point_shadow_render_pass* renderPass) { assert(numPointLightShadowRenderPasses < MAX_NUM_POINT_LIGHT_SHADOW_PASSES); pointLightShadowRenderPasses[numPointLightShadowRenderPasses++] = renderPass; }
+	void setRaytracer(dx_raytracer* raytracer, raytracing_tlas* tlas) {	this->raytracer = raytracer; this->tlas = tlas;	}
 
 
 

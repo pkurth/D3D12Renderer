@@ -1,6 +1,6 @@
 #include "sky_rs.hlsli"
 
-ConstantBuffer<sky_cb> sky : register(b0);
+ConstantBuffer<sky_transform_cb> sky : register(b0);
 
 struct vs_input
 {

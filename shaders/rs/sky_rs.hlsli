@@ -1,14 +1,15 @@
 #ifndef SKY_RS_HLSLI
 #define SKY_RS_HLSLI
 
-struct sky_cb
+struct sky_transform_cb
 {
 	mat4 vp;
 };
 
-struct sky_intensity_cb
+struct sky_cb
 {
 	float intensity;
+	vec3 sunDirection; // Only used (and passed in) for Preetham-sky.
 };
 
 #define SKY_PROCEDURAL_RS \
@@ -18,6 +19,14 @@ struct sky_intensity_cb
 	"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
 	"RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX)," \
 	"RootConstants(num32BitConstants=1, b1, visibility=SHADER_VISIBILITY_PIXEL)"
+
+#define SKY_PREETHAM_RS \
+	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
+	"DENY_HULL_SHADER_ROOT_ACCESS |" \
+	"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
+	"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
+	"RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX)," \
+	"RootConstants(num32BitConstants=4, b1, visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define SKY_TEXTURE_RS \
 	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \

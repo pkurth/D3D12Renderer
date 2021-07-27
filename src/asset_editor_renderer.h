@@ -19,11 +19,8 @@ struct asset_editor_renderer : renderer_base
 	void setEnvironment(const ref<pbr_environment>& environment);
 	void setSun(const directional_light& light);
 
-	void submitRenderPass(opaque_render_pass* renderPass)
-	{
-		assert(!opaqueRenderPass);
-		opaqueRenderPass = renderPass;
-	}
+	void submitRenderPass(opaque_render_pass* renderPass) { assert(!opaqueRenderPass); opaqueRenderPass = renderPass; }
+
 
 	// Settings.
 	tonemap_settings tonemapSettings;

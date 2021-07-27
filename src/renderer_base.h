@@ -54,6 +54,7 @@ struct renderer_base
 
 	static dx_pipeline textureSkyPipeline;
 	static dx_pipeline proceduralSkyPipeline;
+	static dx_pipeline preethamSkyPipeline;
 
 	static dx_pipeline outlineMarkerPipeline;
 	static dx_pipeline outlineDrawerPipeline;

@@ -13,6 +13,7 @@ dx_pipeline renderer_base::pointLightShadowPipeline;
 		   
 dx_pipeline renderer_base::textureSkyPipeline;
 dx_pipeline renderer_base::proceduralSkyPipeline;
+dx_pipeline renderer_base::preethamSkyPipeline;
 		   
 dx_pipeline renderer_base::outlineMarkerPipeline;
 dx_pipeline renderer_base::outlineDrawerPipeline;
@@ -37,8 +38,9 @@ void renderer_base::initializeCommon(DXGI_FORMAT outputFormat)
 			.depthSettings(true, false)
 			.cullFrontFaces();
 
-		proceduralSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_procedural_ps" });
 		textureSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_texture_ps" });
+		proceduralSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_procedural_ps" });
+		preethamSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_preetham_ps" });
 	}
 
 	// Depth prepass.

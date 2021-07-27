@@ -309,7 +309,7 @@ void application::initialize(main_renderer* renderer)
 
 
 
-	setEnvironment("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
+	//setEnvironment("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
 
 
 

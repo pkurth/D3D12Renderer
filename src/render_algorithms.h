@@ -119,6 +119,12 @@ void proceduralSky(dx_command_list* cl,
 	const mat4& proj, const mat4& view,
 	float skyIntensity);
 
+void preethamSky(dx_command_list* cl,
+	const dx_render_target& skyRenderTarget,
+	const dx_pipeline& skyPipeline,
+	const mat4& proj, const mat4& view,
+	vec3 sunDirection, float skyIntensity);
+
 void shadowPasses(dx_command_list* cl,
 	const dx_pipeline& shadowPipeline,
 	const dx_pipeline& pointLightShadowPipeline,
