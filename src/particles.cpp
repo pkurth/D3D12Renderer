@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "particles.h"
-#include "dx_renderer.h"
 #include "camera.h"
 #include "geometry.h"
 #include "dx_context.h"

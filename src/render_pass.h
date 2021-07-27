@@ -100,7 +100,7 @@ protected:
 		}
 	}
 
-private:
+public:
 	enum draw_type
 	{
 		draw_type_default,
@@ -130,8 +130,6 @@ private:
 
 	std::vector<draw_call> drawCalls;
 	std::vector<uint16> outlinedObjects;
-
-	friend struct dx_renderer;
 };
 
 // Renders opaque objects. It also generates screen space velocities, which is why there are three methods for static, dynamic and animated objects.
@@ -186,7 +184,6 @@ struct opaque_render_pass : geometry_render_pass
 
 	void reset();
 
-private:
 	struct static_depth_only_draw_call
 	{
 		mat4 transform;
@@ -221,8 +218,6 @@ private:
 	std::vector<static_depth_only_draw_call> staticDepthOnlyDrawCalls;
 	std::vector<dynamic_depth_only_draw_call> dynamicDepthOnlyDrawCalls;
 	std::vector<animated_depth_only_draw_call> animatedDepthOnlyDrawCalls;
-
-	friend struct dx_renderer;
 };
 
 // Transparent pass currently generates no screen velocities and no object ids.
@@ -257,8 +252,6 @@ struct transparent_render_pass : geometry_render_pass
 
 	void reset();
 
-private:
-
 	struct particle_draw_call
 	{
 		vertex_buffer_group vertexBuffer;
@@ -269,8 +262,6 @@ private:
 	};
 
 	std::vector<particle_draw_call> particleDrawCalls;
-
-	friend struct dx_renderer;
 };
 
 struct overlay_render_pass : geometry_render_pass
@@ -286,15 +277,12 @@ struct overlay_render_pass : geometry_render_pass
 	{
 		common<true>(dispatchX, dispatchY, dispatchZ, material, transform, false, setTransform);
 	}
-
-	friend struct dx_renderer;
 };
 
 
 // Base for all shadow map passes.
 struct shadow_render_pass
 {
-protected:
 	struct draw_call
 	{
 		mat4 transform;
@@ -302,8 +290,6 @@ protected:
 		ref<dx_index_buffer> indexBuffer;
 		submesh_info submesh;
 	};
-
-	friend struct dx_renderer;
 };
 
 struct sun_shadow_render_pass : shadow_render_pass
@@ -317,11 +303,8 @@ struct sun_shadow_render_pass : shadow_render_pass
 
 	void reset();
 
-private:
 	std::vector<draw_call> staticDrawCalls[MAX_NUM_SUN_SHADOW_CASCADES];
 	std::vector<draw_call> dynamicDrawCalls[MAX_NUM_SUN_SHADOW_CASCADES];
-
-	friend struct dx_renderer;
 };
 
 struct spot_shadow_render_pass : shadow_render_pass
@@ -335,11 +318,8 @@ struct spot_shadow_render_pass : shadow_render_pass
 
 	void reset();
 
-private:
 	std::vector<draw_call> staticDrawCalls;
 	std::vector<draw_call> dynamicDrawCalls;
-
-	friend struct dx_renderer;
 };
 
 struct point_shadow_render_pass : shadow_render_pass
@@ -357,11 +337,8 @@ struct point_shadow_render_pass : shadow_render_pass
 
 	void reset();
 
-private:
 	std::vector<draw_call> staticDrawCalls;
 	std::vector<draw_call> dynamicDrawCalls;
-
-	friend struct dx_renderer;
 };
 
 

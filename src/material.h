@@ -45,7 +45,7 @@ typedef void (*material_setup_function)(dx_command_list*, const common_material_
 // All materials must conform to the following standards:
 // - Have a static function setupOpaquePipeline and/or setupTransparentPipeline of type material_setup_function, which binds the shader and initializes common stuff.
 // - Have a function void prepareForRendering, which sets up uniforms specific to this material instance.
-// - Initialize the shader to the dx_renderer's HDR render target and have the depth test to EQUAL.
+// - Initialize the shader to the main renderer's HDR render target and have the depth test to EQUAL.
 // - Currently all materials must use the default_vs vertex shader and have the transform bound to root parameter 0.
 
 

@@ -2,13 +2,13 @@
 #include "dx_context.h"
 #include "dx_window.h"
 #include "dx_command_list.h"
-#include "dx_renderer.h"
 #include "dx_profiling.h"
 #include "input.h"
 #include "imgui.h"
 #include "file_browser.h"
 #include "application.h"
 #include "render_utils.h"
+#include "main_renderer.h"
 #include "asset_editor_panel.h"
 
 
@@ -107,12 +107,12 @@ int main(int argc, char** argv)
 	window.setFileDropCallback([&app](const std::string& s) { app.handleFileDrop(s); });
 
 	initializeTransformationGizmos();
-	dx_renderer::initializeCommon(screenFormat);
+	renderer_base::initializeCommon(screenFormat);
 	initializeRenderUtils();
 
 	initializeImGui(screenFormat);
 
-	dx_renderer renderer = {};
+	main_renderer renderer = {};
 	renderer.initialize(1280, 800, true);
 
 	app.initialize(&renderer);

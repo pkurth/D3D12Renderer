@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dx_command_list.h"
+#include "renderer_base.h"
 #include "math.h"
 #include "camera.h"
 #include "render_pass.h"
@@ -20,40 +20,8 @@
 #define MAX_NUM_POINT_LIGHT_SHADOW_PASSES 16
 
 
-enum aspect_ratio_mode
+struct main_renderer : renderer_base
 {
-	aspect_ratio_free,
-	aspect_ratio_fix_16_9,
-	aspect_ratio_fix_16_10,
-
-	aspect_ratio_mode_count,
-};
-
-static const char* aspectRatioNames[] =
-{
-	"Free",
-	"16:9",
-	"16:10",
-};
-
-enum renderer_mode
-{
-	renderer_mode_rasterized,
-	renderer_mode_pathtraced,
-
-	renderer_mode_count,
-};
-
-static const char* rendererModeNames[] =
-{
-	"Rasterized",
-	"Path-traced",
-};
-
-struct dx_renderer
-{
-	static void initializeCommon(DXGI_FORMAT outputFormat);
-	
 	void initialize(uint32 windowWidth, uint32 windowHeight, bool renderObjectIDs);
 
 	void beginFrame(uint32 windowWidth, uint32 windowHeight);	
@@ -138,38 +106,17 @@ struct dx_renderer
 
 	uint32 hoveredObjectID = -1;
 
-	static DXGI_FORMAT outputFormat;
-
-
-	static constexpr DXGI_FORMAT hdrFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-	static constexpr DXGI_FORMAT worldNormalsFormat = DXGI_FORMAT_R16G16_FLOAT;
-	static constexpr DXGI_FORMAT hdrDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	static constexpr DXGI_FORMAT linearDepthFormat = DXGI_FORMAT_R32_FLOAT;
-	static constexpr DXGI_FORMAT screenVelocitiesFormat = DXGI_FORMAT_R16G16_FLOAT;
-	static constexpr DXGI_FORMAT objectIDsFormat = DXGI_FORMAT_R32_UINT;
-	static constexpr DXGI_FORMAT reflectanceFormat = DXGI_FORMAT_R8G8B8A8_UNORM; // Fresnel (xyz), roughness (w).
-	static constexpr DXGI_FORMAT reflectionFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-
-	static constexpr DXGI_FORMAT hdrPostProcessFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-	static constexpr DXGI_FORMAT ldrPostProcessFormat = DXGI_FORMAT_R11G11B10_FLOAT; // Not really LDR. But I don't like the idea of converting to 8 bit and then to sRGB in separate passes.
-
-	static constexpr DXGI_FORMAT overlayFormat = ldrPostProcessFormat;
-	static constexpr DXGI_FORMAT overlayDepthFormat = hdrDepthStencilFormat;
-
-	static constexpr DXGI_FORMAT opaqueLightPassFormats[] = { hdrFormat, worldNormalsFormat, reflectanceFormat };
-	static constexpr DXGI_FORMAT transparentLightPassFormats[] = { hdrPostProcessFormat };
-	static constexpr DXGI_FORMAT skyPassFormats[] = { hdrFormat, screenVelocitiesFormat, objectIDsFormat };
 
 private:
 
 	dx_raytracer* raytracer;
 	raytracing_tlas* tlas;
 
-	opaque_render_pass* opaqueRenderPass;
-	transparent_render_pass* transparentRenderPass;
-	sun_shadow_render_pass* sunShadowRenderPass;
-	spot_shadow_render_pass* spotLightShadowRenderPasses[MAX_NUM_SPOT_LIGHT_SHADOW_PASSES];
-	point_shadow_render_pass* pointLightShadowRenderPasses[MAX_NUM_POINT_LIGHT_SHADOW_PASSES];
+	const opaque_render_pass* opaqueRenderPass;
+	const transparent_render_pass* transparentRenderPass;
+	const sun_shadow_render_pass* sunShadowRenderPass;
+	const spot_shadow_render_pass* spotLightShadowRenderPasses[MAX_NUM_SPOT_LIGHT_SHADOW_PASSES];
+	const point_shadow_render_pass* pointLightShadowRenderPasses[MAX_NUM_POINT_LIGHT_SHADOW_PASSES];
 	uint32 numSpotLightShadowRenderPasses;
 	uint32 numPointLightShadowRenderPasses;
 	overlay_render_pass* overlayRenderPass;

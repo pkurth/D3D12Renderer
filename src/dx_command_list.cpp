@@ -318,12 +318,12 @@ void dx_command_list::setScissor(const D3D12_RECT& scissor)
 	commandList->RSSetScissorRects(1, &scissor);
 }
 
-void dx_command_list::setRenderTarget(dx_rtv_descriptor_handle* rtvs, uint32 numRTVs, dx_dsv_descriptor_handle* dsv)
+void dx_command_list::setRenderTarget(const dx_rtv_descriptor_handle* rtvs, uint32 numRTVs, const dx_dsv_descriptor_handle* dsv)
 {
 	commandList->OMSetRenderTargets(numRTVs, (D3D12_CPU_DESCRIPTOR_HANDLE*)rtvs, FALSE, (D3D12_CPU_DESCRIPTOR_HANDLE*)dsv);
 }
 
-void dx_command_list::setRenderTarget(dx_render_target& renderTarget)
+void dx_command_list::setRenderTarget(const dx_render_target& renderTarget)
 {
 	setRenderTarget(renderTarget.rtv, renderTarget.numAttachments, renderTarget.dsv ? &renderTarget.dsv : 0);
 }
@@ -364,12 +364,12 @@ void dx_command_list::clearRTV(const ref<dx_texture>& texture, const float* clea
 	clearRTV(texture->rtvHandles, clearColor, rects, numRects);
 }
 
-void dx_command_list::clearRTV(dx_render_target& renderTarget, uint32 attachment, const float* clearColor, const clear_rect* rects, uint32 numRects)
+void dx_command_list::clearRTV(const dx_render_target& renderTarget, uint32 attachment, const float* clearColor, const clear_rect* rects, uint32 numRects)
 {
 	clearRTV(renderTarget.rtv[attachment], clearColor, rects, numRects);
 }
 
-void dx_command_list::clearRTV(dx_render_target& renderTarget, uint32 attachment, float r, float g, float b, float a, const clear_rect* rects, uint32 numRects)
+void dx_command_list::clearRTV(const dx_render_target& renderTarget, uint32 attachment, float r, float g, float b, float a, const clear_rect* rects, uint32 numRects)
 {
 	clearRTV(renderTarget.rtv[attachment], r, g, b, a, rects, numRects);
 }
@@ -386,7 +386,7 @@ void dx_command_list::clearDepth(dx_dsv_descriptor_handle dsv, float depth, cons
 	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, depth, 0, numRects, d3rects);
 }
 
-void dx_command_list::clearDepth(dx_render_target& renderTarget, float depth, const clear_rect* rects, uint32 numRects)
+void dx_command_list::clearDepth(const dx_render_target& renderTarget, float depth, const clear_rect* rects, uint32 numRects)
 {
 	clearDepth(renderTarget.dsv, depth, rects, numRects);
 }
@@ -403,7 +403,7 @@ void dx_command_list::clearStencil(dx_dsv_descriptor_handle dsv, uint32 stencil,
 	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_STENCIL, 0.f, stencil, numRects, d3rects);
 }
 
-void dx_command_list::clearStencil(dx_render_target& renderTarget, uint32 stencil, const clear_rect* rects, uint32 numRects)
+void dx_command_list::clearStencil(const dx_render_target& renderTarget, uint32 stencil, const clear_rect* rects, uint32 numRects)
 {
 	clearStencil(renderTarget.dsv, stencil, rects, numRects);
 }
@@ -420,7 +420,7 @@ void dx_command_list::clearDepthAndStencil(dx_dsv_descriptor_handle dsv, float d
 	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth, stencil, numRects, d3rects);
 }
 
-void dx_command_list::clearDepthAndStencil(dx_render_target& renderTarget, float depth, uint32 stencil, const clear_rect* rects, uint32 numRects)
+void dx_command_list::clearDepthAndStencil(const dx_render_target& renderTarget, float depth, uint32 stencil, const clear_rect* rects, uint32 numRects)
 {
 	clearDepthAndStencil(renderTarget.dsv, depth, stencil, rects, numRects);
 }

@@ -4,10 +4,11 @@
 #include "texture_preprocessing.h"
 #include "dx_context.h"
 #include "dx_command_list.h"
-#include "dx_renderer.h"
+#include "renderer_base.h"
 #include "geometry.h"
 #include "color.h"
 #include "hash.h"
+#include "render_resources.h"
 
 #include "default_pbr_rs.hlsli"
 #include "material.hlsli"
@@ -207,13 +208,15 @@ void pbr_material::setupCommon(dx_command_list* cl, const common_material_info& 
 	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
 	dx_cpu_descriptor_handle nullBuffer = render_resources::nullBufferSRV;
 
+	assert(info.brdf);
+
 	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_LIGHTING, lighting_cb{ vec2(1.f / info.shadowMap->width, 1.f / info.shadowMap->height), info.environmentIntensity });
 
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 0, info.irradiance);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 1, info.environment);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 0, info.irradiance ? info.irradiance->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 1, info.environment ? info.environment->defaultSRV : nullTexture);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 2, info.brdf);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 3, info.tiledCullingGrid);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 4, info.tiledObjectsIndexList);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 3, info.tiledCullingGrid ? info.tiledCullingGrid->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 4, info.tiledObjectsIndexList ? info.tiledObjectsIndexList->defaultSRV : nullBuffer);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 5, info.pointLightBuffer ? info.pointLightBuffer->defaultSRV : nullBuffer);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 6, info.spotLightBuffer ? info.spotLightBuffer->defaultSRV : nullBuffer);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 7, info.decalBuffer ? info.decalBuffer->defaultSRV : nullBuffer);
@@ -241,7 +244,7 @@ void pbr_material::initializePipeline()
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position_uv_normal_tangent)
-			.renderTargets(dx_renderer::opaqueLightPassFormats, arraysize(dx_renderer::opaqueLightPassFormats), dx_renderer::hdrDepthStencilFormat)
+			.renderTargets(renderer_base::opaqueLightPassFormats, arraysize(renderer_base::opaqueLightPassFormats), renderer_base::hdrDepthStencilFormat)
 			.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
 
 		defaultOpaquePBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_ps" });
@@ -250,7 +253,7 @@ void pbr_material::initializePipeline()
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position_uv_normal_tangent)
-			.renderTargets(dx_renderer::transparentLightPassFormats, arraysize(dx_renderer::transparentLightPassFormats), dx_renderer::hdrDepthStencilFormat)
+			.renderTargets(renderer_base::transparentLightPassFormats, arraysize(renderer_base::transparentLightPassFormats), renderer_base::hdrDepthStencilFormat)
 			.alphaBlending(0);
 
 		defaultTransparentPBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_transparent_ps" });

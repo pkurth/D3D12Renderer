@@ -1,8 +1,8 @@
 #include "depth_only_rs.hlsli"
 #include "camera.hlsli"
 
-ConstantBuffer<depth_only_object_id_cb> id	: register(b1);
-ConstantBuffer<camera_cb> camera			: register(b2);
+ConstantBuffer<depth_only_object_id_cb> id			: register(b1);
+ConstantBuffer<depth_only_camera_jitter_cb> jitter	: register(b2);
 
 struct ps_input
 {
@@ -18,8 +18,8 @@ struct ps_output
 
 ps_output main(ps_input IN)
 {
-	float2 ndc = (IN.ndc.xy / IN.ndc.z) - camera.jitter;
-	float2 prevNDC = (IN.prevFrameNDC.xy / IN.prevFrameNDC.z) - camera.prevFrameJitter;
+	float2 ndc = (IN.ndc.xy / IN.ndc.z) - jitter.jitter;
+	float2 prevNDC = (IN.prevFrameNDC.xy / IN.prevFrameNDC.z) - jitter.prevFrameJitter;
 
 	float2 motion = (prevNDC - ndc) * float2(0.5f, -0.5f);	
 

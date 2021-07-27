@@ -1,4 +1,6 @@
 #pragma once
 
+#include "render_pass.h"
+
 void initializeMeshShader();
-void testRenderMeshShader(struct overlay_render_pass* overlayRenderPass);
+void testRenderMeshShader(overlay_render_pass* overlayRenderPass);

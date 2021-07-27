@@ -8,6 +8,11 @@
 #include "post_processing_rs.hlsli"
 #include "ssr_rs.hlsli"
 #include "light_culling_rs.hlsli"
+#include "depth_only_rs.hlsli"
+#include "sky_rs.hlsli"
+#include "outline_rs.hlsli"
+#include "particles_rs.hlsli"
+#include "transform.hlsli"
 
 static dx_pipeline shadowMapCopyPipeline;
 
@@ -74,6 +79,646 @@ void loadCommonShaders()
 
 	tonemapPipeline = createReloadablePipeline("tonemap_cs");
 	presentPipeline = createReloadablePipeline("present_cs");
+}
+
+
+void depthPrePass(dx_command_list* cl,
+	const dx_render_target& depthOnlyRenderTarget,
+	const dx_pipeline& rigidPipeline,
+	const dx_pipeline& animatedPipeline,
+	const opaque_render_pass* opaqueRenderPass,
+	const mat4& viewProj, const mat4& prevFrameViewProj,
+	vec2 jitter, vec2 prevFrameJitter)
+{
+	DX_PROFILE_BLOCK(cl, "Depth pre-pass");
+
+	cl->setRenderTarget(depthOnlyRenderTarget);
+	cl->setViewport(depthOnlyRenderTarget.viewport);
+
+	depth_only_camera_jitter_cb jitterCB = { jitter, prevFrameJitter };
+
+	// Static.
+	if (opaqueRenderPass && opaqueRenderPass->staticDepthOnlyDrawCalls.size() > 0)
+	{
+		DX_PROFILE_BLOCK(cl, "Static");
+
+		cl->setPipelineState(*rigidPipeline.pipeline);
+		cl->setGraphicsRootSignature(*rigidPipeline.rootSignature);
+
+		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
+
+		for (const auto& dc : opaqueRenderPass->staticDepthOnlyDrawCalls)
+		{
+			const mat4& m = dc.transform;
+			const submesh_info& submesh = dc.submesh;
+
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * m, prevFrameViewProj * m });
+
+			cl->setVertexBuffer(0, dc.vertexBuffer);
+			cl->setIndexBuffer(dc.indexBuffer);
+			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		}
+	}
+
+	// Dynamic.
+	if (opaqueRenderPass && opaqueRenderPass->dynamicDepthOnlyDrawCalls.size() > 0)
+	{
+		DX_PROFILE_BLOCK(cl, "Dynamic");
+
+		cl->setPipelineState(*rigidPipeline.pipeline);
+		cl->setGraphicsRootSignature(*rigidPipeline.rootSignature);
+
+		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
+
+		for (const auto& dc : opaqueRenderPass->dynamicDepthOnlyDrawCalls)
+		{
+			const mat4& m = dc.transform;
+			const mat4& prevFrameM = dc.prevFrameTransform;
+			const submesh_info& submesh = dc.submesh;
+
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * m, prevFrameViewProj * prevFrameM });
+
+			cl->setVertexBuffer(0, dc.vertexBuffer);
+			cl->setIndexBuffer(dc.indexBuffer);
+			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		}
+	}
+
+	// Animated.
+	if (opaqueRenderPass && opaqueRenderPass->animatedDepthOnlyDrawCalls.size() > 0)
+	{
+		DX_PROFILE_BLOCK(cl, "Animated");
+
+		cl->setPipelineState(*animatedPipeline.pipeline);
+		cl->setGraphicsRootSignature(*animatedPipeline.rootSignature);
+
+		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
+
+		for (const auto& dc : opaqueRenderPass->animatedDepthOnlyDrawCalls)
+		{
+			const mat4& m = dc.transform;
+			const mat4& prevFrameM = dc.prevFrameTransform;
+			const submesh_info& submesh = dc.submesh;
+			const submesh_info& prevFrameSubmesh = dc.prevFrameSubmesh;
+			const ref<dx_vertex_buffer>& prevFrameVertexBuffer = dc.prevFrameVertexBuffer;
+
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * m, prevFrameViewProj * prevFrameM });
+			cl->setRootGraphicsSRV(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS, prevFrameVertexBuffer->gpuVirtualAddress + prevFrameSubmesh.baseVertex * prevFrameVertexBuffer->elementSize);
+
+			cl->setVertexBuffer(0, dc.vertexBuffer);
+			cl->setIndexBuffer(dc.indexBuffer);
+			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		}
+	}
+}
+
+void texturedSky(dx_command_list* cl,
+	const dx_render_target& skyRenderTarget,
+	const dx_pipeline& skyPipeline, 
+	const mat4& proj, const mat4& view,
+	ref<dx_texture> sky,
+	float skyIntensity)
+{
+	DX_PROFILE_BLOCK(cl, "Sky");
+
+	cl->setRenderTarget(skyRenderTarget);
+	cl->setViewport(skyRenderTarget.viewport);
+
+	cl->setPipelineState(*skyPipeline.pipeline);
+	cl->setGraphicsRootSignature(*skyPipeline.rootSignature);
+
+	cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ proj * createSkyViewMatrix(view) });
+	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ skyIntensity });
+	cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, sky);
+
+	cl->drawCubeTriangleStrip();
+}
+
+void proceduralSky(dx_command_list* cl,
+	const dx_render_target& skyRenderTarget,
+	const dx_pipeline& skyPipeline,
+	const mat4& proj, const mat4& view,
+	float skyIntensity)
+{
+	DX_PROFILE_BLOCK(cl, "Sky");
+
+	cl->setRenderTarget(skyRenderTarget);
+	cl->setViewport(skyRenderTarget.viewport);
+
+	cl->setPipelineState(*skyPipeline.pipeline);
+	cl->setGraphicsRootSignature(*skyPipeline.rootSignature);
+
+	cl->setGraphics32BitConstants(SKY_RS_VP, sky_cb{ proj * createSkyViewMatrix(view) });
+	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_intensity_cb{ skyIntensity });
+
+	cl->drawCubeTriangleStrip();
+}
+
+void shadowPasses(dx_command_list* cl,
+	const dx_pipeline& shadowPipeline,
+	const dx_pipeline& pointLightShadowPipeline,
+	const sun_shadow_render_pass* sunShadowRenderPass, const directional_light_cb& sun,
+	const spot_shadow_render_pass** spotLightShadowRenderPasses, uint32 numSpotLightShadowRenderPasses,
+	const point_shadow_render_pass** pointLightShadowRenderPasses, uint32 numPointLightShadowRenderPasses)
+{
+	if (sunShadowRenderPass || numSpotLightShadowRenderPasses || numPointLightShadowRenderPasses)
+	{
+		DX_PROFILE_BLOCK(cl, "Shadow map pass");
+
+		clear_rect clearRects[128];
+		uint32 numClearRects = 0;
+
+		shadow_map_viewport copiesFromStaticCache[128];
+		uint32 numCopiesFromStaticCache = 0;
+
+		shadow_map_viewport copiesToStaticCache[128];
+		uint32 numCopiesToStaticCache = 0;
+
+		{
+			if (sunShadowRenderPass)
+			{
+				for (uint32 i = 0; i < sun.numShadowCascades; ++i)
+				{
+					shadow_map_viewport vp = sunShadowRenderPass->viewports[i];
+					if (sunShadowRenderPass->copyFromStaticCache)
+					{
+						copiesFromStaticCache[numCopiesFromStaticCache++] = vp;
+					}
+					else
+					{
+						clearRects[numClearRects++] = { vp.x, vp.y, vp.size, vp.size };
+						copiesToStaticCache[numCopiesToStaticCache++] = vp;
+					}
+				}
+			}
+
+			for (uint32 i = 0; i < numSpotLightShadowRenderPasses; ++i)
+			{
+				shadow_map_viewport vp = spotLightShadowRenderPasses[i]->viewport;
+				if (spotLightShadowRenderPasses[i]->copyFromStaticCache)
+				{
+					copiesFromStaticCache[numCopiesFromStaticCache++] = vp;
+				}
+				else
+				{
+					clearRects[numClearRects++] = { vp.x, vp.y, vp.size, vp.size };
+					copiesToStaticCache[numCopiesToStaticCache++] = vp;
+				}
+			}
+
+			for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
+			{
+				for (uint32 j = 0; j < 2; ++j)
+				{
+					shadow_map_viewport vp = (j == 0) ? pointLightShadowRenderPasses[i]->viewport0 : pointLightShadowRenderPasses[i]->viewport1;
+					bool copy = (j == 0) ? pointLightShadowRenderPasses[i]->copyFromStaticCache0 : pointLightShadowRenderPasses[i]->copyFromStaticCache1;
+
+					if (copy)
+					{
+						copiesFromStaticCache[numCopiesFromStaticCache++] = vp;
+					}
+					else
+					{
+						clearRects[numClearRects++] = { vp.x, vp.y, vp.size, vp.size };
+						copiesToStaticCache[numCopiesToStaticCache++] = vp;
+					}
+				}
+			}
+		}
+
+		if (numCopiesFromStaticCache)
+		{
+			DX_PROFILE_BLOCK(cl, "Copy from static shadow map cache");
+			copyShadowMapParts(cl, render_resources::staticShadowMapCache, render_resources::shadowMap, copiesFromStaticCache, numCopiesFromStaticCache);
+		}
+
+		if (numClearRects)
+		{
+			cl->clearDepth(render_resources::shadowMap->dsvHandle, 1.f, clearRects, numClearRects);
+		}
+
+		if (numCopiesToStaticCache)
+		{
+			barrier_batcher(cl)
+				.transitionBegin(render_resources::staticShadowMapCache, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+		}
+
+
+		auto renderSunCascadeShadow = [](dx_command_list* cl, const std::vector<shadow_render_pass::draw_call>& drawCalls, const mat4& viewProj)
+		{
+			for (const auto& dc : drawCalls)
+			{
+				const mat4& m = dc.transform;
+				const submesh_info& submesh = dc.submesh;
+				cl->setGraphics32BitConstants(SHADOW_RS_MVP, viewProj * m);
+
+				cl->setVertexBuffer(0, dc.vertexBuffer);
+				cl->setIndexBuffer(dc.indexBuffer);
+
+				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			}
+		};
+		auto renderSpotShadow = [](dx_command_list* cl, const std::vector<shadow_render_pass::draw_call>& drawCalls, const mat4& viewProj)
+		{
+			for (const auto& dc : drawCalls)
+			{
+				const mat4& m = dc.transform;
+				const submesh_info& submesh = dc.submesh;
+				cl->setGraphics32BitConstants(SHADOW_RS_MVP, viewProj * m);
+
+				cl->setVertexBuffer(0, dc.vertexBuffer);
+				cl->setIndexBuffer(dc.indexBuffer);
+
+				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			}
+		};
+		auto renderPointShadow = [](dx_command_list* cl, const std::vector<shadow_render_pass::draw_call>& drawCalls, vec3 lightPosition, float maxDistance, float flip)
+		{
+			for (const auto& dc : drawCalls)
+			{
+				const mat4& m = dc.transform;
+				const submesh_info& submesh = dc.submesh;
+				cl->setGraphics32BitConstants(SHADOW_RS_MVP,
+					point_shadow_transform_cb
+					{
+						m,
+						lightPosition,
+						maxDistance,
+						flip
+					});
+
+				cl->setVertexBuffer(0, dc.vertexBuffer);
+				cl->setIndexBuffer(dc.indexBuffer);
+
+				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			}
+		};
+
+
+		dx_render_target shadowRenderTarget({}, render_resources::shadowMap);
+		cl->setRenderTarget(shadowRenderTarget);
+
+		if (sunShadowRenderPass || numSpotLightShadowRenderPasses)
+		{
+			cl->setPipelineState(*shadowPipeline.pipeline);
+			cl->setGraphicsRootSignature(*shadowPipeline.rootSignature);
+		}
+
+		if (sunShadowRenderPass)
+		{
+			DX_PROFILE_BLOCK(cl, "Sun static geometry");
+
+			for (uint32 i = 0; i < sun.numShadowCascades; ++i)
+			{
+				DX_PROFILE_BLOCK(cl, (i == 0) ? "First cascade" : (i == 1) ? "Second cascade" : (i == 2) ? "Third cascade" : "Fourth cascade");
+
+				shadow_map_viewport vp = sunShadowRenderPass->viewports[i];
+				clear_rect rect = { vp.x, vp.y, vp.size, vp.size };
+				cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+
+				for (uint32 cascade = 0; cascade <= i; ++cascade)
+				{
+					renderSunCascadeShadow(cl, sunShadowRenderPass->staticDrawCalls[cascade], sun.vp[i]);
+				}
+			}
+		}
+
+		if (numSpotLightShadowRenderPasses)
+		{
+			DX_PROFILE_BLOCK(cl, "Spot lights static geometry");
+
+			for (uint32 i = 0; i < numSpotLightShadowRenderPasses; ++i)
+			{
+				DX_PROFILE_BLOCK(cl, "Single light");
+
+				shadow_map_viewport vp = spotLightShadowRenderPasses[i]->viewport;
+				cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+
+				renderSpotShadow(cl, spotLightShadowRenderPasses[i]->staticDrawCalls, spotLightShadowRenderPasses[i]->viewProjMatrix);
+			}
+		}
+
+		if (numPointLightShadowRenderPasses)
+		{
+			DX_PROFILE_BLOCK(cl, "Point lights static geometry");
+
+			cl->setPipelineState(*pointLightShadowPipeline.pipeline);
+			cl->setGraphicsRootSignature(*pointLightShadowPipeline.rootSignature);
+
+			for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
+			{
+				DX_PROFILE_BLOCK(cl, "Single light");
+
+				for (uint32 v = 0; v < 2; ++v)
+				{
+					DX_PROFILE_BLOCK(cl, (v == 0) ? "First hemisphere" : "Second hemisphere");
+
+					shadow_map_viewport vp = (v == 0) ? pointLightShadowRenderPasses[i]->viewport0 : pointLightShadowRenderPasses[i]->viewport1;
+					cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+
+					renderPointShadow(cl, pointLightShadowRenderPasses[i]->staticDrawCalls, pointLightShadowRenderPasses[i]->lightPosition, pointLightShadowRenderPasses[i]->maxDistance, (v == 0) ? 1.f : -1.f);
+				}
+			}
+		}
+
+		if (numCopiesToStaticCache)
+		{
+			DX_PROFILE_BLOCK(cl, "Copy to static shadow map cache");
+
+			barrier_batcher(cl)
+				.transition(render_resources::shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
+				.transitionEnd(render_resources::staticShadowMapCache, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+
+			copyShadowMapParts(cl, render_resources::shadowMap, render_resources::staticShadowMapCache, copiesToStaticCache, numCopiesToStaticCache);
+
+			barrier_batcher(cl)
+				.transition(render_resources::shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
+				.transition(render_resources::staticShadowMapCache, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		}
+
+
+		cl->setRenderTarget(shadowRenderTarget);
+
+		if (sunShadowRenderPass || numSpotLightShadowRenderPasses)
+		{
+			cl->setPipelineState(*shadowPipeline.pipeline);
+			cl->setGraphicsRootSignature(*shadowPipeline.rootSignature);
+		}
+
+		if (sunShadowRenderPass)
+		{
+			DX_PROFILE_BLOCK(cl, "Sun dynamic geometry");
+
+			for (uint32 i = 0; i < sun.numShadowCascades; ++i)
+			{
+				DX_PROFILE_BLOCK(cl, (i == 0) ? "First cascade" : (i == 1) ? "Second cascade" : (i == 2) ? "Third cascade" : "Fourth cascade");
+
+				shadow_map_viewport vp = sunShadowRenderPass->viewports[i];
+				clear_rect rect = { vp.x, vp.y, vp.size, vp.size };
+				cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+
+				for (uint32 cascade = 0; cascade <= i; ++cascade)
+				{
+					renderSunCascadeShadow(cl, sunShadowRenderPass->dynamicDrawCalls[cascade], sun.vp[i]);
+				}
+			}
+		}
+
+		if (numSpotLightShadowRenderPasses)
+		{
+			DX_PROFILE_BLOCK(cl, "Spot lights dynamic geometry");
+
+			for (uint32 i = 0; i < numSpotLightShadowRenderPasses; ++i)
+			{
+				DX_PROFILE_BLOCK(cl, "Single light");
+
+				shadow_map_viewport vp = spotLightShadowRenderPasses[i]->viewport;
+				cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+
+				renderSpotShadow(cl, spotLightShadowRenderPasses[i]->dynamicDrawCalls, spotLightShadowRenderPasses[i]->viewProjMatrix);
+			}
+		}
+
+		if (numPointLightShadowRenderPasses)
+		{
+			DX_PROFILE_BLOCK(cl, "Point lights dynamic geometry");
+
+			cl->setPipelineState(*pointLightShadowPipeline.pipeline);
+			cl->setGraphicsRootSignature(*pointLightShadowPipeline.rootSignature);
+
+			for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
+			{
+				DX_PROFILE_BLOCK(cl, "Single light");
+
+				for (uint32 v = 0; v < 2; ++v)
+				{
+					DX_PROFILE_BLOCK(cl, (v == 0) ? "First hemisphere" : "Second hemisphere");
+
+					shadow_map_viewport vp = (v == 0) ? pointLightShadowRenderPasses[i]->viewport0 : pointLightShadowRenderPasses[i]->viewport1;
+					cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+
+					renderPointShadow(cl, pointLightShadowRenderPasses[i]->dynamicDrawCalls, pointLightShadowRenderPasses[i]->lightPosition, pointLightShadowRenderPasses[i]->maxDistance, (v == 0) ? 1.f : -1.f);
+				}
+			}
+		}
+	}
+}
+
+void opaqueLightPass(dx_command_list* cl,
+	const dx_render_target& renderTarget,
+	const opaque_render_pass* opaqueRenderPass,
+	const common_material_info& materialInfo, 
+	const mat4& viewProj)
+{
+	if (opaqueRenderPass && opaqueRenderPass->drawCalls.size() > 0)
+	{
+		DX_PROFILE_BLOCK(cl, "Main opaque light pass");
+
+		cl->setRenderTarget(renderTarget);
+		cl->setViewport(renderTarget.viewport);
+
+		material_setup_function lastSetupFunc = 0;
+
+		for (const auto& dc : opaqueRenderPass->drawCalls)
+		{
+			const mat4& m = dc.transform;
+			const submesh_info& submesh = dc.submesh;
+
+			if (dc.materialSetupFunc != lastSetupFunc)
+			{
+				dc.materialSetupFunc(cl, materialInfo);
+				lastSetupFunc = dc.materialSetupFunc;
+			}
+
+			dc.material->prepareForRendering(cl);
+
+			cl->setGraphics32BitConstants(0, transform_cb{ viewProj * m, m });
+
+			cl->setVertexBuffer(0, dc.vertexBuffer.positions);
+			cl->setVertexBuffer(1, dc.vertexBuffer.others);
+			cl->setIndexBuffer(dc.indexBuffer);
+			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		}
+	}
+}
+
+void transparentLightPass(dx_command_list* cl,
+	const dx_render_target& renderTarget, 
+	const transparent_render_pass* transparentRenderPass,
+	const common_material_info& materialInfo, 
+	const dx_command_signature& particleCommandSignature,
+	const mat4& viewProj)
+{
+	if (transparentRenderPass && (transparentRenderPass->drawCalls.size() > 0 || transparentRenderPass->particleDrawCalls.size() > 0))
+	{
+		DX_PROFILE_BLOCK(cl, "Transparent light pass");
+
+		cl->setRenderTarget(renderTarget);
+		cl->setViewport(renderTarget.viewport);
+
+
+		material_setup_function lastSetupFunc = 0;
+
+		{
+			DX_PROFILE_BLOCK(cl, "Transparent geometry");
+
+			for (const auto& dc : transparentRenderPass->drawCalls)
+			{
+				const mat4& m = dc.transform;
+				const submesh_info& submesh = dc.submesh;
+
+				if (dc.materialSetupFunc != lastSetupFunc)
+				{
+					dc.materialSetupFunc(cl, materialInfo);
+					lastSetupFunc = dc.materialSetupFunc;
+				}
+
+				dc.material->prepareForRendering(cl);
+
+				cl->setGraphics32BitConstants(0, transform_cb{ viewProj * m, m });
+
+				cl->setVertexBuffer(0, dc.vertexBuffer.positions);
+				cl->setVertexBuffer(1, dc.vertexBuffer.others);
+				cl->setIndexBuffer(dc.indexBuffer);
+				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			}
+		}
+
+		if (transparentRenderPass->particleDrawCalls.size() > 0)
+		{
+			DX_PROFILE_BLOCK(cl, "Particles");
+
+			for (const auto& dc : transparentRenderPass->particleDrawCalls)
+			{
+				if (dc.materialSetupFunc != lastSetupFunc)
+				{
+					dc.materialSetupFunc(cl, materialInfo);
+					lastSetupFunc = dc.materialSetupFunc;
+				}
+
+				dc.material->prepareForRendering(cl);
+
+				const particle_draw_info& info = dc.drawInfo;
+
+				cl->setRootGraphicsSRV(info.rootParameterOffset + PARTICLE_RENDERING_RS_PARTICLES, info.particleBuffer->gpuVirtualAddress);
+				cl->setRootGraphicsSRV(info.rootParameterOffset + PARTICLE_RENDERING_RS_ALIVE_LIST, info.aliveList->gpuVirtualAddress + info.aliveListOffset);
+
+				cl->setVertexBuffer(0, dc.vertexBuffer.positions);
+				if (dc.vertexBuffer.others)
+				{
+					cl->setVertexBuffer(1, dc.vertexBuffer.others);
+				}
+				cl->setIndexBuffer(dc.indexBuffer);
+
+				cl->drawIndirect(particleCommandSignature, 1, info.commandBuffer, info.commandBufferOffset);
+			}
+		}
+	}
+}
+
+void overlays(dx_command_list* cl,
+	const dx_render_target& ldrRenderTarget,
+	overlay_render_pass* overlayRenderPass,
+	const common_material_info& materialInfo,
+	const mat4& viewProj)
+{
+	DX_PROFILE_BLOCK(cl, "3D Overlays");
+
+	cl->setRenderTarget(ldrRenderTarget);
+	cl->setViewport(ldrRenderTarget.viewport);
+
+	cl->clearDepth(ldrRenderTarget.dsv);
+
+	material_setup_function lastSetupFunc = 0;
+
+	for (const auto& dc : overlayRenderPass->drawCalls)
+	{
+		const mat4& m = dc.transform;
+
+		if (dc.materialSetupFunc != lastSetupFunc)
+		{
+			dc.materialSetupFunc(cl, materialInfo);
+			lastSetupFunc = dc.materialSetupFunc;
+		}
+
+		dc.material->prepareForRendering(cl);
+
+		if (dc.setTransform)
+		{
+			cl->setGraphics32BitConstants(0, transform_cb{ viewProj * m, m });
+		}
+
+		if (dc.drawType == geometry_render_pass::draw_type_default)
+		{
+			const submesh_info& submesh = dc.submesh;
+
+			cl->setVertexBuffer(0, dc.vertexBuffer.positions);
+			cl->setVertexBuffer(1, dc.vertexBuffer.others);
+			cl->setIndexBuffer(dc.indexBuffer);
+			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		}
+		else
+		{
+			cl->dispatchMesh(dc.dispatchInfo.dispatchX, dc.dispatchInfo.dispatchY, dc.dispatchInfo.dispatchZ);
+		}
+	}
+}
+
+void outlines(dx_command_list* cl, 
+	const dx_render_target& ldrRenderTarget, 
+	ref<dx_texture> depthStencilBuffer,
+	const dx_pipeline& outlineMarkerPipeline,
+	const dx_pipeline& outlineDrawerPipeline,
+	const opaque_render_pass* opaqueRenderPass,
+	const mat4& viewProj,
+	uint32 stencilBit)
+{
+	DX_PROFILE_BLOCK(cl, "Outlines");
+
+	cl->setRenderTarget(ldrRenderTarget);
+	cl->setViewport(ldrRenderTarget.viewport);
+
+	cl->setStencilReference(stencilBit);
+
+	cl->setPipelineState(*outlineMarkerPipeline.pipeline);
+	cl->setGraphicsRootSignature(*outlineMarkerPipeline.rootSignature);
+
+	// Mark object in stencil.
+	auto mark = [](const geometry_render_pass& rp, dx_command_list* cl, const mat4& viewProj)
+	{
+		for (const auto& outlined : rp.outlinedObjects)
+		{
+			const submesh_info& submesh = rp.drawCalls[outlined].submesh;
+			const mat4& m = rp.drawCalls[outlined].transform;
+			const auto& vertexBuffer = rp.drawCalls[outlined].vertexBuffer;
+			const auto& indexBuffer = rp.drawCalls[outlined].indexBuffer;
+
+			cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * m });
+
+			cl->setVertexBuffer(0, vertexBuffer.positions);
+			cl->setIndexBuffer(indexBuffer);
+			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		}
+	};
+
+	mark(*opaqueRenderPass, cl, viewProj);
+	//mark(*transparentRenderPass, cl, unjitteredCamera.viewProj);
+
+	// Draw outline.
+	cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ);
+
+	cl->setPipelineState(*outlineDrawerPipeline.pipeline);
+	cl->setGraphicsRootSignature(*outlineDrawerPipeline.rootSignature);
+
+	cl->setGraphics32BitConstants(OUTLINE_RS_CB, outline_drawer_cb{ (int)depthStencilBuffer->width, (int)depthStencilBuffer->height });
+	cl->setDescriptorHeapResource(OUTLINE_RS_STENCIL, 0, 1, depthStencilBuffer->stencilSRV);
+
+	cl->drawFullscreenTriangle();
+
+	cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 }
 
 void copyShadowMapParts(dx_command_list* cl, 
@@ -391,6 +1036,8 @@ void specularAmbient(dx_command_list* cl,
 	ref<dx_texture> output,
 	dx_dynamic_constant_buffer cameraCBV)
 {
+	DX_PROFILE_BLOCK(cl, "Specular ambient");
+
 	cl->setPipelineState(*specularAmbientPipeline.pipeline);
 	cl->setComputeRootSignature(*specularAmbientPipeline.rootSignature);
 

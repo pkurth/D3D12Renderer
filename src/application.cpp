@@ -91,7 +91,7 @@ void application::loadCustomShaders()
 	}
 }
 
-void application::initialize(dx_renderer* renderer)
+void application::initialize(main_renderer* renderer)
 {
 	this->renderer = renderer;
 

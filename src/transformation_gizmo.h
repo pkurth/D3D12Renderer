@@ -3,7 +3,7 @@
 #include "math.h"
 #include "input.h"
 #include "camera.h"
-#include "dx_renderer.h"
+#include "render_pass.h"
 
 enum transformation_type
 {

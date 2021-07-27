@@ -1,6 +1,9 @@
 #include "pch.h"
+#include "mesh_shader.h"
 #include "dx_pipeline.h"
-#include "dx_renderer.h"
+#include "dx_command_list.h"
+#include "material.h"
+#include "renderer_base.h"
 
 static dx_pipeline cubePipeline;
 static dx_pipeline meshPipeline;
@@ -171,7 +174,7 @@ void initializeMeshShader()
 {
 	D3D12_RT_FORMAT_ARRAY renderTargetFormat = {};
 	renderTargetFormat.NumRenderTargets = 1;
-	renderTargetFormat.RTFormats[0] = dx_renderer::overlayFormat;
+	renderTargetFormat.RTFormats[0] = renderer_base::overlayFormat;
 
 	{
 		struct pipeline_state_stream : dx_pipeline_stream_base
@@ -191,7 +194,7 @@ void initializeMeshShader()
 		};
 
 		pipeline_state_stream stream;
-		stream.dsvFormat = dx_renderer::overlayDepthFormat;
+		stream.dsvFormat = renderer_base::overlayDepthFormat;
 		stream.rtvFormats = renderTargetFormat;
 
 		graphics_pipeline_files files = {};
@@ -232,7 +235,7 @@ void initializeMeshShader()
 		rasterizerDesc.FrontCounterClockwise = TRUE; // Righthanded coordinate system.
 
 		pipeline_state_stream stream;
-		stream.dsvFormat = dx_renderer::overlayDepthFormat;
+		stream.dsvFormat = renderer_base::overlayDepthFormat;
 		stream.rtvFormats = renderTargetFormat;
 		stream.rasterizer = rasterizerDesc;
 

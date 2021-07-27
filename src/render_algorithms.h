@@ -3,6 +3,10 @@
 #include "dx_command_list.h"
 #include "dx_texture.h"
 #include "shadow_map_cache.h"
+#include "render_pass.h"
+#include "material.h"
+#include "light_source.h"
+#include "dx_render_target.h"
 
 #define MAX_NUM_TOTAL_DECALS 256   // Total per frame (not per tile). MUST MATCH light_culling_rs.hlsli
 
@@ -89,11 +93,70 @@ struct light_culling
 void loadCommonShaders();
 
 
+// ----------------------------------------
+// GRAPHICS SHADERS. Since the pipelines depend on the render-target format, we pass the pipelines in.
+// ----------------------------------------
 
+
+void depthPrePass(dx_command_list* cl,
+	const dx_render_target& depthOnlyRenderTarget,
+	const dx_pipeline& rigidPipeline,
+	const dx_pipeline& animatedPipeline,
+	const opaque_render_pass* opaqueRenderPass,
+	const mat4& viewProj, const mat4& prevFrameViewProj,
+	vec2 jitter, vec2 prevFrameJitter);
+
+void texturedSky(dx_command_list* cl,
+	const dx_render_target& skyRenderTarget,
+	const dx_pipeline& skyPipeline,
+	const mat4& proj, const mat4& view,
+	ref<dx_texture> sky,
+	float skyIntensity);
+
+void proceduralSky(dx_command_list* cl,
+	const dx_render_target& skyRenderTarget,
+	const dx_pipeline& skyPipeline,
+	const mat4& proj, const mat4& view,
+	float skyIntensity);
+
+void shadowPasses(dx_command_list* cl,
+	const dx_pipeline& shadowPipeline,
+	const dx_pipeline& pointLightShadowPipeline,
+	const sun_shadow_render_pass* sunShadowRenderPass, const directional_light_cb& sun,
+	const spot_shadow_render_pass** spotLightShadowRenderPasses, uint32 numSpotLightShadowRenderPasses,
+	const point_shadow_render_pass** pointLightShadowRenderPasses, uint32 numPointLightShadowRenderPasses);
+
+void opaqueLightPass(dx_command_list* cl,
+	const dx_render_target& renderTarget,
+	const opaque_render_pass* opaqueRenderPass,
+	const common_material_info& materialInfo,
+	const mat4& viewProj);
+
+void transparentLightPass(dx_command_list* cl,
+	const dx_render_target& renderTarget,
+	const transparent_render_pass* transparentRenderPass,
+	const common_material_info& materialInfo,
+	const dx_command_signature& particleCommandSignature,
+	const mat4& viewProj);
+
+void overlays(dx_command_list* cl,
+	const dx_render_target& ldrRenderTarget,
+	overlay_render_pass* overlayRenderPass,
+	const common_material_info& materialInfo,
+	const mat4& viewProj);
+
+void outlines(dx_command_list* cl,
+	const dx_render_target& ldrRenderTarget,
+	ref<dx_texture> depthStencilBuffer,			// DEPTH_WRITE. Must be same as DSV bound to render-target.
+	const dx_pipeline& outlineMarkerPipeline,
+	const dx_pipeline& outlineDrawerPipeline,
+	const opaque_render_pass* opaqueRenderPass,
+	const mat4& viewProj,
+	uint32 stencilBit);
 
 void copyShadowMapParts(dx_command_list* cl,
 	ref<dx_texture> from,						// PIXEL_SHADER_RESOURCE
-	ref<dx_texture> to,							// D3D12_RESOURCE_STATE_DEPTH_WRITE
+	ref<dx_texture> to,							// DEPTH_WRITE
 	shadow_map_viewport* copies, uint32 numCopies);
 
 

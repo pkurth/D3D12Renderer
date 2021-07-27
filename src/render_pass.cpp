@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "render_pass.h"
 #include "camera.h"
-#include "dx_renderer.h"
 #include "dx_context.h"
 
 

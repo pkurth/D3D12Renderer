@@ -5,7 +5,7 @@
 #include "camera_controller.h"
 #include "mesh.h"
 #include "math.h"
-#include "dx_renderer.h"
+#include "main_renderer.h"
 #include "light_source.h"
 #include "particle_systems.h"
 #include "transformation_gizmo.h"
@@ -22,7 +22,7 @@
 struct application
 {
 	void loadCustomShaders();
-	void initialize(dx_renderer* renderer);
+	void initialize(main_renderer* renderer);
 	void update(const user_input& input, float dt);
 
 	void setEnvironment(const std::string& filename);
@@ -89,7 +89,7 @@ private:
 
 	directional_light sun;
 
-	dx_renderer* renderer;
+	main_renderer* renderer;
 
 	render_camera camera;
 	camera_controller cameraController;

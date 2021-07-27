@@ -3,6 +3,7 @@
 #include "geometry.h"
 #include "bounding_volumes.h"
 #include "dx_command_list.h"
+#include "renderer_base.h"
 #include "dx_pipeline.h"
 
 #include "flat_simple_rs.hlsli"
@@ -109,7 +110,7 @@ void initializeTransformationGizmos()
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position_normal)
-			.renderTargets(dx_renderer::overlayFormat, dx_renderer::overlayDepthFormat)
+			.renderTargets(renderer_base::overlayFormat, renderer_base::overlayDepthFormat)
 			;
 
 		gizmoPipeline = createReloadablePipeline(desc, { "flat_simple_vs", "flat_simple_ps" });

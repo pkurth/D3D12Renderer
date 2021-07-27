@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "shadow_map_cache.h"
-#include "dx_renderer.h"
 #include "dx_texture.h"
 #include "dx_command_list.h"
 #include "hash.h"

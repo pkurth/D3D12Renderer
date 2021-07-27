@@ -95,9 +95,10 @@ std::tuple<vertex_buffer_group, submesh_info, mat4*> skinObject(const vertex_buf
 	return { vb, resultInfo, mats };
 }
 
-bool performSkinning()
+uint64 performSkinning()
 {
-	bool result = false;
+	bool result = 0;
+
 	uint32 numCalls = ::numCalls;
 	if (numCalls > 0)
 	{
@@ -131,9 +132,7 @@ bool performSkinning()
 		//	.uav(skinnedVertexBuffer[currentSkinnedVertexBuffer].positions)
 		//	.uav(skinnedVertexBuffer[currentSkinnedVertexBuffer].others);
 
-		dxContext.executeCommandList(cl);
-
-		result = true;
+		result = dxContext.executeCommandList(cl);
 	}
 
 	currentSkinnedVertexBuffer = 1 - currentSkinnedVertexBuffer;

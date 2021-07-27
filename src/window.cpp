@@ -441,20 +441,23 @@ static LRESULT CALLBACK windowCallBack(
 
 		case WM_DROPFILES:
 		{
-			HDROP hdrop = (HDROP)wParam;
-
-			char nextFile[MAX_PATH];
-			uint32 numFiles = DragQueryFileA(hdrop, -1, NULL, 0);
-
-			for (uint32 i = 0; i < numFiles; ++i)
+			if (window->fileDropCallback)
 			{
-				if (DragQueryFileA(hdrop, i, nextFile, MAX_PATH) > 0)
-				{
-					window->fileDropCallback(nextFile);
-				}
-			}
+				HDROP hdrop = (HDROP)wParam;
 
-			DragFinish(hdrop);
+				char nextFile[MAX_PATH];
+				uint32 numFiles = DragQueryFileA(hdrop, -1, NULL, 0);
+
+				for (uint32 i = 0; i < numFiles; ++i)
+				{
+					if (DragQueryFileA(hdrop, i, nextFile, MAX_PATH) > 0)
+					{
+						window->fileDropCallback(nextFile);
+					}
+				}
+
+				DragFinish(hdrop);
+			}
 		} break;
 
 		default:
