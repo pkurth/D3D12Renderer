@@ -99,6 +99,8 @@ private:
 	uint32 windowXOffset;
 	uint32 windowYOffset;
 
+	bool windowHoveredInThePast = false;
+
 	ref<dx_texture> hdrColorTexture;
 	ref<dx_texture> worldNormalsTexture;
 	ref<dx_texture> screenVelocitiesTexture;

@@ -127,7 +127,7 @@ void main_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 		recalculateViewport(true);
 	}
 
-	if (objectIDsTexture)
+	if (objectIDsTexture && windowHoveredInThePast)
 	{
 		uint32* id = (uint32*)mapBuffer(hoveredObjectIDReadbackBuffer, true, map_range{ dxContext.bufferedFrameID, 1 });
 		hoveredObjectID = *id;
@@ -417,6 +417,7 @@ void main_renderer::endFrame(const user_input& input)
 				&& (input.mouse.y - (int32)windowYOffset < (int32)renderHeight))
 			{
 				cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer, dxContext.bufferedFrameID, (uint32)input.mouse.x - windowXOffset, (uint32)input.mouse.y - windowYOffset, 1, 1);
+				windowHoveredInThePast = true;
 			}
 
 			barrier_batcher(cl)
