@@ -6,6 +6,7 @@
 
 #include <shellapi.h>
 #include <fontawesome/IconsFontAwesome5.h>
+#include <imgui/imgui_internal.h>
 
 file_browser::file_browser()
 {
@@ -35,6 +36,9 @@ static bool isFile(file_browser::dir_entry_type type)
 
 void file_browser::draw(mesh_editor_panel& meshEditor)
 {
+	static ImGuiTextFilter filter;
+	static bool showOnlyPassingItems = true;
+
 	if (ImGui::Begin("Assets"))
 	{
 		if (ImGui::DisableableButton(ICON_FA_LEVEL_UP_ALT, currentPath.has_parent_path())) { changeCurrentPath(currentPath.parent_path()); }
@@ -63,7 +67,12 @@ void file_browser::draw(mesh_editor_panel& meshEditor)
 		}
 		ImGui::PopStyleColor();
 
-		static ImGuiTextFilter filter;
+		// Some attempts to align the selectable and the text input vertically.
+		ImGui::Dummy(ImVec2(0.f, ImGui::GetStyle().FramePadding.y));
+		ImGui::Selectable(ICON_FA_FILTER, &showOnlyPassingItems, 0, ImGui::CalcTextSize(ICON_FA_FILTER));
+		if (ImGui::IsItemHovered()) { ImGui::SetTooltip("Show only items passing the filter search"); }
+		ImGui::SameLine();
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().FramePadding.y);
 		filter.Draw("Search...");
 
 		ImGui::Separator();
@@ -74,20 +83,45 @@ void file_browser::draw(mesh_editor_panel& meshEditor)
 
 		if (ImGui::BeginTable("#direntries", numColumns))
 		{
+			bool skipNextTableColumn = false;
+
 			for (auto& p : currentPathEntries)
 			{
 				ImGui::PushID(&p);
 
-				std::string filename = p.filename.u8string();
-
-				if (filter.PassFilter(filename.c_str()))
+				if (skipNextTableColumn || ImGui::TableNextColumn())
 				{
-					if (ImGui::TableNextColumn())
-					{
-						char buffer[256];
-						snprintf(buffer, sizeof(buffer), "%s  %s", getTypeIcon(p.type), filename.c_str());
-						ImGui::SelectableWrapped(buffer, entryWidth, false);
+					std::string filename = p.filename.u8string();
 
+					bool passesSearch = filter.PassFilter(filename.c_str());
+					bool shouldDisplay = passesSearch || !showOnlyPassingItems;
+
+					if (!shouldDisplay)
+					{
+						skipNextTableColumn = true;
+						ImGui::PopID();
+						continue;
+					}
+					skipNextTableColumn = false;
+
+					if (!passesSearch)
+					{
+						ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+						ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.2f);
+					}
+
+					char buffer[256];
+					snprintf(buffer, sizeof(buffer), "%s  %s", getTypeIcon(p.type), filename.c_str());
+					ImGui::SelectableWrapped(buffer, entryWidth, false);
+
+					if (!passesSearch)
+					{
+						ImGui::PopItemFlag();
+						ImGui::PopStyleVar();
+					}
+
+					if (passesSearch)
+					{
 						// Tooltip and directory navigation.
 						if (ImGui::IsItemHovered())
 						{

@@ -38,7 +38,7 @@ inline ref<T> make_ref(Args&&... args)
 	return std::make_shared<T>(std::forward<Args>(args)...); 
 }
 
-#define arraysize(arr) (sizeof(arr) / sizeof(arr[0]))
+#define arraysize(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 #ifndef min
 #define min(a, b) ((a) < (b) ? (a) : (b))
