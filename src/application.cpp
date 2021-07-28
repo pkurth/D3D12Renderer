@@ -1213,8 +1213,6 @@ void application::renderSunShadowMap(bool objectDragged)
 		staticCacheAvailable &= cache;
 	}
 
-	staticCacheAvailable = false; // TODO: REMOVE!!!
-
 	if (staticCacheAvailable)
 	{
 		renderPass.copyFromStaticCache = true;
@@ -1354,7 +1352,7 @@ void application::renderDynamicGeometryToSunShadowMap()
 {
 	sun_shadow_render_pass& renderPass = sunShadowRenderPass;
 
-	for (auto [entityHandle, raster, transform, dynamic] : appScene.group(entt::get<raster_component, trs, dynamic_geometry_component>, entt::exclude< animation_component>).each())
+	for (auto [entityHandle, raster, transform, dynamic] : appScene.group(entt::get<raster_component, trs, dynamic_geometry_component>, entt::exclude<animation_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -1383,7 +1381,7 @@ void application::renderDynamicGeometryToSunShadowMap()
 
 void application::renderDynamicGeometryToShadowMap(spot_shadow_render_pass& renderPass)
 {
-	for (auto [entityHandle, raster, transform, dynamic] : appScene.group(entt::get<raster_component, trs, dynamic_geometry_component>, entt::exclude< animation_component>).each())
+	for (auto [entityHandle, raster, transform, dynamic] : appScene.group(entt::get<raster_component, trs, dynamic_geometry_component>, entt::exclude<animation_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -1412,7 +1410,7 @@ void application::renderDynamicGeometryToShadowMap(spot_shadow_render_pass& rend
 
 void application::renderDynamicGeometryToShadowMap(point_shadow_render_pass& renderPass)
 {
-	for (auto [entityHandle, raster, transform, dynamic] : appScene.group(entt::get<raster_component, trs, dynamic_geometry_component>, entt::exclude< animation_component>).each())
+	for (auto [entityHandle, raster, transform, dynamic] : appScene.group(entt::get<raster_component, trs, dynamic_geometry_component>, entt::exclude<animation_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
