@@ -310,7 +310,7 @@ void main_renderer::endFrame(const user_input& input)
 
 	if (mode == renderer_mode_rasterized)
 	{
-		dx_command_list* cls[2];
+		dx_command_list* cls[3];
 
 
 		thread_job_context context;
@@ -319,13 +319,12 @@ void main_renderer::endFrame(const user_input& input)
 		{
 			dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
-			D3D12_RESOURCE_STATES frameResultState = D3D12_RESOURCE_STATE_COMMON;
 
 			if (aspectRatioModeChanged)
 			{
 				cl->transitionBarrier(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
 				cl->clearRTV(frameResult, 0.f, 0.f, 0.f);
-				frameResultState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+				cl->transitionBarrier(frameResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON);
 			}
 
 
@@ -384,6 +383,12 @@ void main_renderer::endFrame(const user_input& input)
 				.transition(render_resources::shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 
+			cls[0] = cl;
+		});
+
+		context.addWork([&]()
+		{
+			dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
 
 			// ----------------------------------------
@@ -446,7 +451,7 @@ void main_renderer::endFrame(const user_input& input)
 					.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 					.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 					.transition(reflectanceTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-					.transition(frameResult, frameResultState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+					.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 					.transitionEnd(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 			}
 
@@ -456,7 +461,7 @@ void main_renderer::endFrame(const user_input& input)
 				cl->copyResource(depthStencilBuffer->resource, opaqueDepthBuffer->resource);
 			}
 
-			cls[0] = cl;
+			cls[1] = cl;
 		});
 		
 
@@ -635,7 +640,7 @@ void main_renderer::endFrame(const user_input& input)
 				.transition(opaqueDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST)
 				.transition(reflectanceTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-			cls[1] = cl;
+			cls[2] = cl;
 		});
 
 		context.waitForWorkCompletion();
