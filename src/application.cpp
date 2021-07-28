@@ -635,14 +635,14 @@ void application::drawMainMenuBar()
 
 		if (ImGui::BeginMenu(ICON_FA_TOOLS "  Developer"))
 		{
-			if (ImGui::MenuItem(ICON_FA_ICONS "  Show available icons"))
+			if (ImGui::MenuItem(showIconsWindow ? (ICON_FA_ICONS "  Hide available icons") : (ICON_FA_ICONS "  Show available icons")))
 			{
-				showIconsWindow = true;
+				showIconsWindow = !showIconsWindow;
 			}
 
-			if (ImGui::MenuItem(ICON_FA_PUZZLE_PIECE "  Show demo window"))
+			if (ImGui::MenuItem(showDemoWindow ? (ICON_FA_PUZZLE_PIECE "  Hide demo window") : (ICON_FA_PUZZLE_PIECE "  Show demo window")))
 			{
-				showDemoWindow = true;
+				showDemoWindow = !showDemoWindow;
 			}
 
 			if (ImGui::MenuItem(profilerWindowOpen ? (ICON_FA_CHART_BAR "  Hide GPU profiler") : (ICON_FA_CHART_BAR "  Show GPU profiler"), nullptr, nullptr, ENABLE_DX_PROFILING))
