@@ -118,6 +118,12 @@ void resolveTimeStampQueries(uint64* timestamps)
 					rehandleEvent:
 					uint64 timestamp = e->timestamp;
 
+
+					// The end event of one block often has the exact same timestamp as the begin event of the next block(s).
+					// When rendering multithreaded, the order of these events in the CPU-side array may not be correct.
+					// We thus search for possible end blocks with the same timestamp here and - if we already saw a matching 
+					// begin block earlier - process them first.
+
 					if (d > 0)
 					{
 						for (uint32 j = i + 1; j < numQueries && events[j].timestamp == timestamp; ++j)
