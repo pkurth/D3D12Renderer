@@ -81,6 +81,14 @@ void resolveTimeStampQueries(uint64* timestamps)
 		});
 
 
+#if 0
+		for (uint32 i = 0; i < numQueries; ++i)
+		{
+			dx_profile_event* e = events + i;
+			std::cout << i << ") " << (e->type == profile_event_begin_block ? "BEGIN: " : "END  : ") << e->name << " (" << e->timestamp << ")\n";
+		}
+#endif
+
 
 
 		dx_profile_block* stack[profile_cl_count][1024];
@@ -107,10 +115,29 @@ void resolveTimeStampQueries(uint64* timestamps)
 			{
 				case profile_event_begin_block:
 				{
+					rehandleEvent:
+					uint64 timestamp = e->timestamp;
+
+					if (d > 0)
+					{
+						for (uint32 j = i + 1; j < numQueries && events[j].timestamp == timestamp; ++j)
+						{
+							if (events[j].type == profile_event_end_block && events[j].clType == clType && events[j].name == stack[clType][d - 1]->name)
+							{
+								--d;
+								dx_profile_block* block = stack[clType][d];
+								block->endClock = timestamp;
+
+								events[j].type = profile_event_none; // Mark as handled.
+								goto rehandleEvent;
+							}
+						}
+					}
+
 					uint32 index = count[clType]++;
 					dx_profile_block& block = frame.blocks[clType][index];
 
-					block.startClock = e->timestamp;
+					block.startClock = timestamp;
 					block.parent = (d == 0) ? 0 : stack[clType][d - 1];
 					block.name = e->name;
 					block.firstChild = 0;
@@ -193,7 +220,7 @@ void resolveTimeStampQueries(uint64* timestamps)
 
 	if (profilerWindowOpen)
 	{
-		if (ImGui::Begin("Profiling"), &profilerWindowOpen)
+		if (ImGui::Begin("Profiling", &profilerWindowOpen))
 		{
 			// Timeline.
 
