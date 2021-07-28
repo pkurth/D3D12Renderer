@@ -44,7 +44,7 @@ void file_browser::draw(mesh_editor_panel& meshEditor)
 		if (ImGui::Button(ICON_FA_REDO_ALT)) { refresh(); }
 		if (ImGui::IsItemHovered()) { ImGui::SetTooltip("Refresh"); }
 		ImGui::SameLine();
-			
+
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 		ImGui::Text("Current path: ");
 		fs::path accPath;
@@ -63,6 +63,9 @@ void file_browser::draw(mesh_editor_panel& meshEditor)
 		}
 		ImGui::PopStyleColor();
 
+		static ImGuiTextFilter filter;
+		filter.Draw("Search...");
+
 		ImGui::Separator();
 
 		int width = (int)ImGui::GetContentRegionAvail().x;
@@ -75,62 +78,65 @@ void file_browser::draw(mesh_editor_panel& meshEditor)
 			{
 				ImGui::PushID(&p);
 
-				if (ImGui::TableNextColumn())
+				std::string filename = p.filename.u8string();
+
+				if (filter.PassFilter(filename.c_str()))
 				{
-					std::string filename = p.filename.u8string();
-
-					char buffer[256];
-					snprintf(buffer, sizeof(buffer), "%s  %s", getTypeIcon(p.type), filename.c_str());
-					ImGui::SelectableWrapped(buffer, entryWidth, false);
-
-					// Tooltip and directory navigation.
-					if (ImGui::IsItemHovered())
+					if (ImGui::TableNextColumn())
 					{
-						if (isDirectory(p.type) && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-						{
-							changeCurrentPath(currentPath / p.filename);
-							ImGui::PopID();
-							break;
-						}
-						else if (p.type == dir_entry_type_mesh)
-						{
-							ImGui::SetTooltip("Drag&drop into scene to instantiate.");
-						}
-					}
+						char buffer[256];
+						snprintf(buffer, sizeof(buffer), "%s  %s", getTypeIcon(p.type), filename.c_str());
+						ImGui::SelectableWrapped(buffer, entryWidth, false);
 
-					// Context menu.
-					if (ImGui::BeginPopupContextItem(0, ImGuiPopupFlags_MouseButtonRight))
-					{
-						if (p.type == dir_entry_type_mesh && ImGui::MenuItem("Edit"))
+						// Tooltip and directory navigation.
+						if (ImGui::IsItemHovered())
 						{
-							fs::path fullPath = currentPath / p.filename;
-							meshEditor.setAsset(fullPath);
+							if (isDirectory(p.type) && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+							{
+								changeCurrentPath(currentPath / p.filename);
+								ImGui::PopID();
+								break;
+							}
+							else if (p.type == dir_entry_type_mesh)
+							{
+								ImGui::SetTooltip("Drag&drop into scene to instantiate.");
+							}
 						}
 
-						if (ImGui::MenuItem("Reveal in Windows Explorer"))
+						// Context menu.
+						if (ImGui::BeginPopupContextItem(0, ImGuiPopupFlags_MouseButtonRight))
 						{
-							fs::path fullPath = currentPath / p.filename;
-							ShellExecuteW(0, 0, L"explorer.exe", (L"/select," + fullPath.wstring()).c_str(), 0, SW_SHOWNORMAL);
+							if (p.type == dir_entry_type_mesh && ImGui::MenuItem("Edit"))
+							{
+								fs::path fullPath = currentPath / p.filename;
+								meshEditor.setAsset(fullPath);
+							}
+
+							if (ImGui::MenuItem("Reveal in Windows Explorer"))
+							{
+								fs::path fullPath = currentPath / p.filename;
+								ShellExecuteW(0, 0, L"explorer.exe", (L"/select," + fullPath.wstring()).c_str(), 0, SW_SHOWNORMAL);
+							}
+
+							if (isFile(p.type) && ImGui::MenuItem("Open in default program"))
+							{
+								fs::path fullPath = currentPath / p.filename;
+								ShellExecuteW(0, 0, fullPath.c_str(), 0, 0, SW_SHOWNORMAL);
+							}
+							ImGui::EndPopup();
 						}
 
-						if (isFile(p.type) && ImGui::MenuItem("Open in default program"))
+						// Drag&drop.
+						if (p.type == dir_entry_type_mesh)
 						{
-							fs::path fullPath = currentPath / p.filename;
-							ShellExecuteW(0, 0, fullPath.c_str(), 0, 0, SW_SHOWNORMAL);
-						}
-						ImGui::EndPopup();
-					}
-
-					// Drag&drop.
-					if (p.type == dir_entry_type_mesh)
-					{
-						if (ImGui::BeginDragDropSource())
-						{
-							fs::path fullPath = currentPath / p.filename;
-							std::string str = fullPath.string();
-							ImGui::SetDragDropPayload("content_browser_file", str.c_str(), str.length() + 1, ImGuiCond_Once);
-							ImGui::Text("Drop into scene to instantiate.");
-							ImGui::EndDragDropSource();
+							if (ImGui::BeginDragDropSource())
+							{
+								fs::path fullPath = currentPath / p.filename;
+								std::string str = fullPath.string();
+								ImGui::SetDragDropPayload("content_browser_file", str.c_str(), str.length() + 1, ImGuiCond_Once);
+								ImGui::Text("Drop into scene to instantiate.");
+								ImGui::EndDragDropSource();
+							}
 						}
 					}
 				}
@@ -172,7 +178,7 @@ void file_browser::refresh()
 				type = dir_entry_type_font;
 			}
 		}
-		
+
 		currentPathEntries.push_back({ p.path().filename(), type });
 	}
 
