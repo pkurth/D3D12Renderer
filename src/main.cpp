@@ -131,13 +131,10 @@ int main(int argc, char** argv)
 
 	dxContext.flushApplication();
 
+
 	float dt;
 	while (newFrame(dt))
 	{
-		dxContext.renderQueue.waitForFence(fenceValues[window.currentBackbufferIndex]);
-		dxContext.newFrame(frameID);
-
-
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 		ImGui::BeginWindowHiddenTabBar("Scene Viewport");
 		uint32 renderWidth = (uint32)ImGui::GetContentRegionAvail().x;
@@ -228,6 +225,10 @@ int main(int argc, char** argv)
 		if (ImGui::IsKeyPressed(key_esc)) { break; } // Also allowed if not focused on main window.
 		if (ImGui::IsKeyPressed(key_enter) && ImGui::IsKeyDown(key_alt)) { window.toggleFullscreen(); } // Also allowed if not focused on main window.
 
+
+
+		dxContext.renderQueue.waitForFence(fenceValues[window.currentBackbufferIndex]);
+		dxContext.newFrame(frameID);
 
 		renderer.beginFrame(renderWidth, renderHeight);
 		

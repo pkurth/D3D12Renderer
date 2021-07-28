@@ -306,327 +306,356 @@ void main_renderer::endFrame(const user_input& input)
 
 
 
-	dx_command_list* cl = dxContext.getFreeRenderCommandList();
-
-
-
-	D3D12_RESOURCE_STATES frameResultState = D3D12_RESOURCE_STATE_COMMON;
-
-	if (aspectRatioModeChanged)
-	{
-		cl->transitionBarrier(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		cl->clearRTV(frameResult, 0.f, 0.f, 0.f);
-		frameResultState = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	}
-
-	barrier_batcher(cl)
-		.transitionBegin(frameResult, frameResultState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-
-
 
 
 	if (mode == renderer_mode_rasterized)
 	{
-		cl->clearDepthAndStencil(depthStencilBuffer->dsvHandle);
-		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-		waitForSkinningToFinish();
+		dx_command_list* cls[2];
 
 
-		// ----------------------------------------
-		// DEPTH-ONLY PASS
-		// ----------------------------------------
+		thread_job_context context;
 
-		dx_render_target depthOnlyRenderTarget({ screenVelocitiesTexture, objectIDsTexture }, depthStencilBuffer);
-		depthPrePass(cl, depthOnlyRenderTarget, depthOnlyPipeline, animatedDepthOnlyPipeline, opaqueRenderPass,
-			jitteredCamera.viewProj, jitteredCamera.prevFrameViewProj, jitteredCamera.jitter, jitteredCamera.prevFrameJitter);
-
-
-		barrier_batcher(cl)
-			.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-
-
-		// ----------------------------------------
-		// LIGHT & DECAL CULLING
-		// ----------------------------------------
-
-		lightAndDecalCulling(cl, depthStencilBuffer, pointLights, spotLights, decals, culling, numPointLights, numSpotLights, numDecals, materialInfo.cameraCBV);
-
-
-		// ----------------------------------------
-		// LINEAR DEPTH PYRAMID
-		// ----------------------------------------
-
-		linearDepthPyramid(cl, depthStencilBuffer, linearDepthBuffer, jitteredCamera.projectionParams);
-
-		barrier_batcher(cl)
-			//.uav(linearDepthBuffer)
-			.transitionBegin(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-			.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-
-
-		// ----------------------------------------
-		// SHADOW MAP PASS
-		// ----------------------------------------
-
-		shadowPasses(cl, shadowPipeline, pointLightShadowPipeline,
-			sunShadowRenderPass, sun,
-			spotLightShadowRenderPasses, numSpotLightShadowRenderPasses,
-			pointLightShadowRenderPasses, numPointLightShadowRenderPasses);
-
-
-
-
-		barrier_batcher(cl)
-			.transition(render_resources::shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-
-
-
-		// ----------------------------------------
-		// SKY PASS
-		// ----------------------------------------
-
-		dx_render_target skyRenderTarget({ hdrColorTexture, screenVelocitiesTexture, objectIDsTexture }, depthStencilBuffer);
-		if (environment)
+		context.addWork([&]()
 		{
-			texturedSky(cl, skyRenderTarget, textureSkyPipeline, jitteredCamera.proj, jitteredCamera.view, environment->sky, skyIntensity);
-		}
-		else
-		{
-			//proceduralSky(cl, skyRenderTarget, textureSkyPipeline, jitteredCamera.proj, jitteredCamera.view, skyIntensity);
-			preethamSky(cl, skyRenderTarget, preethamSkyPipeline, jitteredCamera.proj, jitteredCamera.view, sun.direction, skyIntensity);
-		}
+			dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
-		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // Sky renders a triangle strip, so reset back to triangle list.
+			D3D12_RESOURCE_STATES frameResultState = D3D12_RESOURCE_STATE_COMMON;
 
-
-
-		// Copy hovered object id to readback buffer.
-		if (objectIDsTexture)
-		{
-			DX_PROFILE_BLOCK(cl, "Copy hovered object ID");
-
-			barrier_batcher(cl)
-				.transition(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-
-			if (input.overWindow 
-				&& (input.mouse.x - (int32)windowXOffset >= 0)
-				&& (input.mouse.x - (int32)windowXOffset < (int32)renderWidth)
-				&& (input.mouse.y - (int32)windowYOffset >= 0)
-				&& (input.mouse.y - (int32)windowYOffset < (int32)renderHeight))
+			if (aspectRatioModeChanged)
 			{
-				cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer, dxContext.bufferedFrameID, (uint32)input.mouse.x - windowXOffset, (uint32)input.mouse.y - windowYOffset, 1, 1);
-				windowHoveredInThePast = true;
+				cl->transitionBarrier(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
+				cl->clearRTV(frameResult, 0.f, 0.f, 0.f);
+				frameResultState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 			}
 
-			barrier_batcher(cl)
-				.transitionBegin(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		}
 
 
+			cl->clearDepthAndStencil(depthStencilBuffer->dsvHandle);
+			cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		// ----------------------------------------
-		// OPAQUE LIGHT PASS
-		// ----------------------------------------
-
-		dx_render_target hdrOpaqueRenderTarget({ hdrColorTexture, worldNormalsTexture, reflectanceTexture }, depthStencilBuffer);
-		opaqueLightPass(cl, hdrOpaqueRenderTarget, opaqueRenderPass, materialInfo, jitteredCamera.viewProj);
+			waitForSkinningToFinish();
 
 
-		{
-			DX_PROFILE_BLOCK(cl, "Transition textures");
+			// ----------------------------------------
+			// DEPTH-ONLY PASS
+			// ----------------------------------------
 
-			barrier_batcher(cl)
-				.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ)
-				.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-				.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-				.transition(reflectanceTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-				.transitionEnd(frameResult, frameResultState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-				.transitionEnd(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		}
+			dx_render_target depthOnlyRenderTarget({ screenVelocitiesTexture, objectIDsTexture }, depthStencilBuffer);
+			depthPrePass(cl, depthOnlyRenderTarget, depthOnlyPipeline, animatedDepthOnlyPipeline, opaqueRenderPass,
+				jitteredCamera.viewProj, jitteredCamera.prevFrameViewProj, jitteredCamera.jitter, jitteredCamera.prevFrameJitter);
 
-
-
-		{
-			DX_PROFILE_BLOCK(cl, "Copy depth buffer");
-			cl->copyResource(depthStencilBuffer->resource, opaqueDepthBuffer->resource);
-		}
-
-		barrier_batcher(cl)
-			.transitionBegin(opaqueDepthBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-
-
-
-		// ----------------------------------------
-		// SCREEN SPACE REFLECTIONS
-		// ----------------------------------------
-
-		if (enableSSR)
-		{
-			screenSpaceReflections(cl, hdrColorTexture, prevFrameHDRColorTexture, depthStencilBuffer, linearDepthBuffer, worldNormalsTexture,
-				reflectanceTexture, screenVelocitiesTexture, ssrRaycastTexture, ssrResolveTexture, ssrTemporalTextures[ssrHistoryIndex],
-				ssrTemporalTextures[1 - ssrHistoryIndex], ssrSettings, materialInfo.cameraCBV);
-
-			ssrHistoryIndex = 1 - ssrHistoryIndex;
-		}
-
-
-		// ----------------------------------------
-		// SPECULAR AMBIENT
-		// ----------------------------------------
-
-		specularAmbient(cl, hdrColorTexture, enableSSR ? ssrResolveTexture : 0, worldNormalsTexture, reflectanceTexture, 
-			environment ? environment->environment : 0, hdrPostProcessingTexture, materialInfo.cameraCBV);
-
-		barrier_batcher(cl)
-			//.uav(hdrPostProcessingTexture)
-			.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) // Will be read by rest of post processing stack. 
-			.transitionEnd(opaqueDepthBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-
-		if (enableSSR)
-		{
-			barrier_batcher(cl)
-				.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.
-		}
-
-
-
-
-
-		// After this there is no more camera jittering!
-		materialInfo.cameraCBV = unjitteredCameraCBV;
-		materialInfo.opaqueDepth = opaqueDepthBuffer;
-		materialInfo.worldNormals = worldNormalsTexture;
-
-
-
-
-		ref<dx_texture> hdrResult = hdrPostProcessingTexture; // Specular highlights have been rendered to this texture. It's in read state.
-
-
-		// ----------------------------------------
-		// TRANSPARENT LIGHT PASS
-		// ----------------------------------------
-
-
-		if (transparentRenderPass && (transparentRenderPass->drawCalls.size() > 0 || transparentRenderPass->particleDrawCalls.size() > 0))
-		{
-			barrier_batcher(cl)
-				.transition(hdrResult, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
-				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-
-			dx_render_target hdrTransparentRenderTarget({ hdrResult }, depthStencilBuffer);
-
-			transparentLightPass(cl, hdrTransparentRenderTarget, transparentRenderPass, materialInfo, particleCommandSignature, unjitteredCamera.viewProj);
 
 			barrier_batcher(cl)
-				.transition(hdrResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ);
-		}
+				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
 
+			// ----------------------------------------
+			// LIGHT & DECAL CULLING
+			// ----------------------------------------
+
+			lightAndDecalCulling(cl, depthStencilBuffer, pointLights, spotLights, decals, culling, numPointLights, numSpotLights, numDecals, materialInfo.cameraCBV);
 
 
+			// ----------------------------------------
+			// LINEAR DEPTH PYRAMID
+			// ----------------------------------------
 
-		// ----------------------------------------
-		// POST PROCESSING
-		// ----------------------------------------
+			linearDepthPyramid(cl, depthStencilBuffer, linearDepthBuffer, jitteredCamera.projectionParams);
 
-
-		// TAA.
-		if (enableTAA)
-		{
-			uint32 taaOutputIndex = 1 - taaHistoryIndex;
-			temporalAntiAliasing(cl, hdrResult, screenVelocitiesTexture, opaqueDepthBuffer, taaTextures[taaHistoryIndex], taaTextures[taaOutputIndex], jitteredCamera.projectionParams);
-			hdrResult = taaTextures[taaOutputIndex];
-			taaHistoryIndex = taaOutputIndex;
-		}
-
-		// At this point hdrResult is either the TAA result or the hdrPostProcessingTexture. Either one is in read state.
-
-
-		// Downsample scene. This is also the copy used in SSR next frame.
-		downsample(cl, hdrResult, prevFrameHDRColorTexture, prevFrameHDRColorTempTexture);
-
-
-
-		// Bloom.
-		if (enableBloom)
-		{
 			barrier_batcher(cl)
-				.transition(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-
-			bloom(cl, hdrResult, hdrColorTexture, bloomTexture, bloomTempTexture, bloomSettings);
-			hdrResult = hdrColorTexture;
-		}
-
-		// At this point hdrResult is either the TAA result, the hdrColorTexture, or the hdrPostProcessingTexture. Either one is in read state.
+				//.uav(linearDepthBuffer)
+				.transitionBegin(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 
+			// ----------------------------------------
+			// SHADOW MAP PASS
+			// ----------------------------------------
 
-		tonemap(cl, hdrResult, ldrPostProcessingTexture, tonemapSettings);
+			shadowPasses(cl, shadowPipeline, pointLightShadowPipeline,
+				sunShadowRenderPass, sun,
+				spotLightShadowRenderPasses, numSpotLightShadowRenderPasses,
+				pointLightShadowRenderPasses, numPointLightShadowRenderPasses);
 
 
-		// ----------------------------------------
-		// LDR RENDERING
-		// ----------------------------------------
 
-		bool renderingOverlays = overlayRenderPass && overlayRenderPass->drawCalls.size();
-		bool renderingOutlines = opaqueRenderPass && opaqueRenderPass->outlinedObjects.size() > 0 ||
-			transparentRenderPass && transparentRenderPass->outlinedObjects.size() > 0;
-		if (renderingOverlays || renderingOutlines)
-		{
+
 			barrier_batcher(cl)
-				//.uav(ldrPostProcessingTexture)
-				.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RENDER_TARGET)
-				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+				.transition(render_resources::shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-			dx_render_target ldrRenderTarget({ ldrPostProcessingTexture }, depthStencilBuffer);
-			if (renderingOverlays)
+
+
+
+			// ----------------------------------------
+			// SKY PASS
+			// ----------------------------------------
+
+			dx_render_target skyRenderTarget({ hdrColorTexture, screenVelocitiesTexture, objectIDsTexture }, depthStencilBuffer);
+			if (environment)
 			{
-				overlays(cl, ldrRenderTarget, overlayRenderPass, materialInfo, unjitteredCamera.viewProj);
+				texturedSky(cl, skyRenderTarget, textureSkyPipeline, jitteredCamera.proj, jitteredCamera.view, environment->sky, skyIntensity);
 			}
-			if (renderingOutlines)
+			else
 			{
-				outlines(cl, ldrRenderTarget, depthStencilBuffer, outlineMarkerPipeline, outlineDrawerPipeline, opaqueRenderPass, unjitteredCamera.viewProj, stencil_flag_selected_object);
+				//proceduralSky(cl, skyRenderTarget, textureSkyPipeline, jitteredCamera.proj, jitteredCamera.view, skyIntensity);
+				preethamSky(cl, skyRenderTarget, preethamSkyPipeline, jitteredCamera.proj, jitteredCamera.view, sun.direction, skyIntensity);
 			}
 
-			barrier_batcher(cl)
-				.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		}
-		else
+			cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // Sky renders a triangle strip, so reset back to triangle list.
+
+
+
+			// Copy hovered object id to readback buffer.
+			if (objectIDsTexture)
+			{
+				DX_PROFILE_BLOCK(cl, "Copy hovered object ID");
+
+				barrier_batcher(cl)
+					.transition(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+				if (input.overWindow
+					&& (input.mouse.x - (int32)windowXOffset >= 0)
+					&& (input.mouse.x - (int32)windowXOffset < (int32)renderWidth)
+					&& (input.mouse.y - (int32)windowYOffset >= 0)
+					&& (input.mouse.y - (int32)windowYOffset < (int32)renderHeight))
+				{
+					cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer, dxContext.bufferedFrameID, (uint32)input.mouse.x - windowXOffset, (uint32)input.mouse.y - windowYOffset, 1, 1);
+					windowHoveredInThePast = true;
+				}
+
+				barrier_batcher(cl)
+					.transition(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			}
+
+
+
+			// ----------------------------------------
+			// OPAQUE LIGHT PASS
+			// ----------------------------------------
+
+			dx_render_target hdrOpaqueRenderTarget({ hdrColorTexture, worldNormalsTexture, reflectanceTexture }, depthStencilBuffer);
+			opaqueLightPass(cl, hdrOpaqueRenderTarget, opaqueRenderPass, materialInfo, jitteredCamera.viewProj);
+
+
+			{
+				DX_PROFILE_BLOCK(cl, "Transition textures");
+
+				barrier_batcher(cl)
+					.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ)
+					.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+					.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+					.transition(reflectanceTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+					.transition(frameResult, frameResultState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+					.transitionEnd(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			}
+
+
+			{
+				DX_PROFILE_BLOCK(cl, "Copy depth buffer");
+				cl->copyResource(depthStencilBuffer->resource, opaqueDepthBuffer->resource);
+			}
+
+			cls[0] = cl;
+		});
+		
+
+
+		context.addWork([&]()
 		{
+			dx_command_list* cl = dxContext.getFreeRenderCommandList();
+
+
 			barrier_batcher(cl)
-				.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-		}
-
-
-		// TODO: If we really care we should sharpen before rendering overlays and outlines.
-
-		present(cl, ldrPostProcessingTexture, frameResult, enableSharpen ? sharpenSettings : sharpen_settings{ 0.f });
+				.transitionBegin(opaqueDepthBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
 
 
-		barrier_batcher(cl)
-			//.uav(frameResult)
-			.transition(render_resources::shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
-			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
-			.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-			.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
-			.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
-			.transitionEnd(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
-			.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-			.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON)
-			.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-			.transition(opaqueDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST)
-			.transition(reflectanceTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			// ----------------------------------------
+			// SCREEN SPACE REFLECTIONS
+			// ----------------------------------------
 
+			if (enableSSR)
+			{
+				screenSpaceReflections(cl, hdrColorTexture, prevFrameHDRColorTexture, depthStencilBuffer, linearDepthBuffer, worldNormalsTexture,
+					reflectanceTexture, screenVelocitiesTexture, ssrRaycastTexture, ssrResolveTexture, ssrTemporalTextures[ssrHistoryIndex],
+					ssrTemporalTextures[1 - ssrHistoryIndex], ssrSettings, materialInfo.cameraCBV);
+
+				ssrHistoryIndex = 1 - ssrHistoryIndex;
+			}
+
+
+			// ----------------------------------------
+			// SPECULAR AMBIENT
+			// ----------------------------------------
+
+			specularAmbient(cl, hdrColorTexture, enableSSR ? ssrResolveTexture : 0, worldNormalsTexture, reflectanceTexture,
+				environment ? environment->environment : 0, hdrPostProcessingTexture, materialInfo.cameraCBV);
+
+			barrier_batcher(cl)
+				//.uav(hdrPostProcessingTexture)
+				.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) // Will be read by rest of post processing stack. 
+				.transitionEnd(opaqueDepthBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+			if (enableSSR)
+			{
+				barrier_batcher(cl)
+					.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.
+			}
+
+
+
+
+
+			// After this there is no more camera jittering!
+			materialInfo.cameraCBV = unjitteredCameraCBV;
+			materialInfo.opaqueDepth = opaqueDepthBuffer;
+			materialInfo.worldNormals = worldNormalsTexture;
+
+
+
+
+			ref<dx_texture> hdrResult = hdrPostProcessingTexture; // Specular highlights have been rendered to this texture. It's in read state.
+
+
+			// ----------------------------------------
+			// TRANSPARENT LIGHT PASS
+			// ----------------------------------------
+
+
+			if (transparentRenderPass && (transparentRenderPass->drawCalls.size() > 0 || transparentRenderPass->particleDrawCalls.size() > 0))
+			{
+				barrier_batcher(cl)
+					.transition(hdrResult, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
+					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+
+				dx_render_target hdrTransparentRenderTarget({ hdrResult }, depthStencilBuffer);
+
+				transparentLightPass(cl, hdrTransparentRenderTarget, transparentRenderPass, materialInfo, particleCommandSignature, unjitteredCamera.viewProj);
+
+				barrier_batcher(cl)
+					.transition(hdrResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ);
+			}
+
+
+
+
+
+			// ----------------------------------------
+			// POST PROCESSING
+			// ----------------------------------------
+
+
+			// TAA.
+			if (enableTAA)
+			{
+				uint32 taaOutputIndex = 1 - taaHistoryIndex;
+				temporalAntiAliasing(cl, hdrResult, screenVelocitiesTexture, opaqueDepthBuffer, taaTextures[taaHistoryIndex], taaTextures[taaOutputIndex], jitteredCamera.projectionParams);
+				hdrResult = taaTextures[taaOutputIndex];
+				taaHistoryIndex = taaOutputIndex;
+			}
+
+			// At this point hdrResult is either the TAA result or the hdrPostProcessingTexture. Either one is in read state.
+
+
+			// Downsample scene. This is also the copy used in SSR next frame.
+			downsample(cl, hdrResult, prevFrameHDRColorTexture, prevFrameHDRColorTempTexture);
+
+
+
+			// Bloom.
+			if (enableBloom)
+			{
+				barrier_batcher(cl)
+					.transition(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+				bloom(cl, hdrResult, hdrColorTexture, bloomTexture, bloomTempTexture, bloomSettings);
+				hdrResult = hdrColorTexture;
+			}
+
+			// At this point hdrResult is either the TAA result, the hdrColorTexture, or the hdrPostProcessingTexture. Either one is in read state.
+
+
+
+			tonemap(cl, hdrResult, ldrPostProcessingTexture, tonemapSettings);
+
+
+			// ----------------------------------------
+			// LDR RENDERING
+			// ----------------------------------------
+
+			bool renderingOverlays = overlayRenderPass && overlayRenderPass->drawCalls.size();
+			bool renderingOutlines = opaqueRenderPass && opaqueRenderPass->outlinedObjects.size() > 0 ||
+				transparentRenderPass && transparentRenderPass->outlinedObjects.size() > 0;
+			if (renderingOverlays || renderingOutlines)
+			{
+				barrier_batcher(cl)
+					//.uav(ldrPostProcessingTexture)
+					.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RENDER_TARGET)
+					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+
+				dx_render_target ldrRenderTarget({ ldrPostProcessingTexture }, depthStencilBuffer);
+				if (renderingOverlays)
+				{
+					overlays(cl, ldrRenderTarget, overlayRenderPass, materialInfo, unjitteredCamera.viewProj);
+				}
+				if (renderingOutlines)
+				{
+					outlines(cl, ldrRenderTarget, depthStencilBuffer, outlineMarkerPipeline, outlineDrawerPipeline, opaqueRenderPass, unjitteredCamera.viewProj, stencil_flag_selected_object);
+				}
+
+				barrier_batcher(cl)
+					.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			}
+			else
+			{
+				barrier_batcher(cl)
+					.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+			}
+
+
+			// TODO: If we really care we should sharpen before rendering overlays and outlines.
+
+			present(cl, ldrPostProcessingTexture, frameResult, enableSharpen ? sharpenSettings : sharpen_settings{ 0.f });
+
+
+
+			barrier_batcher(cl)
+				//.uav(frameResult)
+				.transition(render_resources::shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
+				.transition(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
+				.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+				.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
+				.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
+				.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+				.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON)
+				.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+				.transition(opaqueDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST)
+				.transition(reflectanceTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+			cls[1] = cl;
+		});
+
+		context.waitForWorkCompletion();
+
+		dxContext.executeCommandLists(cls, arraysize(cls));
 	}
 	else if (dxContext.featureSupport.raytracing() && raytracer)
 	{
+		dx_command_list* cl = dxContext.getFreeRenderCommandList();
+
+
+		D3D12_RESOURCE_STATES frameResultState = D3D12_RESOURCE_STATE_COMMON;
+
+		if (aspectRatioModeChanged)
+		{
+			cl->transitionBarrier(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			cl->clearRTV(frameResult, 0.f, 0.f, 0.f);
+			frameResultState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		}
+
 		barrier_batcher(cl)
 			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 			.transitionEnd(frameResult, frameResultState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -656,8 +685,8 @@ void main_renderer::endFrame(const user_input& input)
 			.transition(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
 			.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 			.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
+
+
+		dxContext.executeCommandList(cl);
 	}
-
-
-	dxContext.executeCommandList(cl);
 }

@@ -453,6 +453,41 @@ uint64 dx_context::executeCommandList(dx_command_list* commandList)
 	return fenceValue;
 }
 
+uint64 dx_context::executeCommandLists(dx_command_list** commandLists, uint32 count)
+{
+	dx_command_queue& queue = getQueue(commandLists[0]->type);
+
+	ID3D12CommandList* d3d12Lists[16];
+
+	for (uint32 i = 0; i < count; ++i)
+	{
+		checkResult(commandLists[i]->commandList->Close());
+		d3d12Lists[i] = commandLists[i]->commandList.Get();
+	}
+
+	queue.commandQueue->ExecuteCommandLists(count, d3d12Lists);
+
+	uint64 fenceValue = queue.signal();
+
+	for (uint32 i = 0; i < count; ++i)
+	{
+		commandLists[i]->lastExecutionFenceValue = fenceValue;
+	}
+
+	queue.commandListMutex.lock();
+
+	for (uint32 i = 0; i < count; ++i)
+	{
+		commandLists[i]->next = queue.runningCommandLists;
+		queue.runningCommandLists = commandLists[i];
+	}
+	atomicAdd(queue.numRunningCommandLists, count);
+
+	queue.commandListMutex.unlock();
+
+	return fenceValue;
+}
+
 dx_allocation dx_context::allocateDynamicBuffer(uint32 sizeInBytes, uint32 alignment)
 {
 	dx_allocation allocation = frameUploadBuffer.allocate(sizeInBytes, alignment);

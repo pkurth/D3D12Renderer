@@ -53,6 +53,7 @@ struct dx_context
 	dx_command_list* getFreeComputeCommandList(bool async);
 	dx_command_list* getFreeRenderCommandList();
 	uint64 executeCommandList(dx_command_list* commandList);
+	uint64 executeCommandLists(dx_command_list** commandLists, uint32 count);
 
 	// Careful with these functions. They are not thread safe.
 	dx_allocation allocateDynamicBuffer(uint32 sizeInBytes, uint32 alignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
