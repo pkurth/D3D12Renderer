@@ -859,8 +859,8 @@ void gaussianBlur(dx_command_list* cl,
 	cl->setPipelineState(*pipeline.pipeline);
 	cl->setComputeRootSignature(*pipeline.rootSignature);
 
-	uint32 outputWidth = inputOutput->width >> outputMip;
-	uint32 outputHeight = inputOutput->height >> outputMip;
+	uint32 outputWidth = max(1, inputOutput->width >> outputMip);
+	uint32 outputHeight = max(1, inputOutput->height >> outputMip);
 
 	uint32 widthBuckets = bucketize(outputWidth, POST_PROCESSING_BLOCK_SIZE);
 	uint32 heightBuckets = bucketize(outputHeight, POST_PROCESSING_BLOCK_SIZE);
