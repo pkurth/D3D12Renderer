@@ -1,19 +1,20 @@
 #include "pch.h"
 #include "application.h"
-#include "geometry.h"
-#include "dx_texture.h"
-#include "random.h"
-#include "color.h"
-#include "imgui.h"
-#include "dx_context.h"
-#include "animation_controller.h"
-#include "physics.h"
-#include "threading.h"
-#include "mesh_shader.h"
-#include "shadow_map_cache.h"
-#include "file_dialog.h"
-#include "yaml.h"
-#include "locomotion_learning.h"
+#include "geometry/geometry.h"
+#include "dx/dx_texture.h"
+#include "core/random.h"
+#include "core/color.h"
+#include "core/imgui.h"
+#include "dx/dx_context.h"
+#include "dx/dx_profiling.h"
+#include "animation/animation_controller.h"
+#include "physics/physics.h"
+#include "core/threading.h"
+#include "rendering/mesh_shader.h"
+#include "rendering/shadow_map_cache.h"
+#include "editor/file_dialog.h"
+#include "core/yaml.h"
+#include "learning/locomotion_learning.h"
 
 #include <fontawesome/list.h>
 
@@ -1481,7 +1482,7 @@ void application::update(const user_input& input, float dt)
 	renderer->setSun(sun);
 	renderer->setEnvironment(environment);
 
-
+#if 1
 	if (renderer->mode == renderer_mode_rasterized)
 	{
 		if (dxContext.featureSupport.meshShaders())
@@ -1635,6 +1636,7 @@ void application::update(const user_input& input, float dt)
 			renderer->setRaytracer(&pathTracer, &raytracingTLAS);
 		}
 	}
+#endif
 
 	for (auto [entityHandle, transform, dynamic] : appScene.group(entt::get<trs, dynamic_geometry_component>).each())
 	{

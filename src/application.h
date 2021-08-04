@@ -1,21 +1,21 @@
 #pragma once
 
-#include "input.h"
-#include "camera.h"
-#include "camera_controller.h"
-#include "mesh.h"
-#include "math.h"
-#include "main_renderer.h"
-#include "light_source.h"
-#include "particle_systems.h"
-#include "transformation_gizmo.h"
-#include "raytracing.h"
-#include "ragdoll.h"
-#include "undo_stack.h"
+#include "core/input.h"
+#include "core/camera.h"
+#include "core/camera_controller.h"
+#include "geometry/mesh.h"
+#include "core/math.h"
+#include "rendering/main_renderer.h"
+#include "rendering/light_source.h"
+#include "scene/particle_systems.h"
+#include "editor/transformation_gizmo.h"
+#include "rendering/raytracing.h"
+#include "physics/ragdoll.h"
+#include "editor/undo_stack.h"
 
-#include "path_tracing.h"
+#include "rendering/path_tracing.h"
 
-#include "scene.h"
+#include "scene/scene.h"
 
 
 

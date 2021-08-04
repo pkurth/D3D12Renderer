@@ -187,13 +187,14 @@ project "D3D12Renderer"
 	pchsource "src/pch.cpp"
 
 	files {
-		"src/*",
+		"src/**.h",
+		"src/**.cpp",
 		"shaders/**.hlsl*",
 	}
 
 	vpaths {
-		["Headers"] = { "src/*.h" },
-		["Sources"] = { "src/*.cpp" },
+		["Headers/*"] = { "src/**.h" },
+		["Sources/*"] = { "src/**.cpp" },
 		["Shaders"] = { "shaders/*.hlsl" },
 	}
 
@@ -215,6 +216,7 @@ project "D3D12Renderer"
 	}
 
 	includedirs {
+		"src",
 		"shaders/rs",
 		"shaders/common",
 		"shaders/particle_systems",
