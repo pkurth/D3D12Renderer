@@ -75,9 +75,6 @@ static float3 calculateSkyLuminanceRGB(float3 L, float3 V, float turbidity)
 	return YxyToRGB(Yp);
 }
 
-
-#include "light_source.hlsli"
-
 [RootSignature(SKY_PREETHAM_RS)]
 ps_output main(ps_input IN)
 {
