@@ -6,7 +6,7 @@
 #include "dx/dx_command_list.h"
 #include "dx/dx_barrier_batcher.h"
 #include "dx/dx_profiling.h"
-#include "dx/dx_bitonic_sort.h"
+#include "bitonic_sort.h"
 
 #include "particles_rs.hlsli"
 

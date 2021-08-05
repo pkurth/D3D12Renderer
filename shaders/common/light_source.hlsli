@@ -1,6 +1,8 @@
 #ifndef LIGHT_SOURCE_H
 #define LIGHT_SOURCE_H
 
+#define M_SQRT_PI 1.77245385090f
+
 // Used for point and spot lights, because I dislike very high numbers.
 #define LIGHT_RADIANCE_SCALE 1000.f
 
@@ -124,6 +126,115 @@ struct point_shadow_info
 	vec4 viewport0;
 	vec4 viewport1;
 };
+
+struct spherical_harmonics
+{
+	vec4 coefficients[7];
+
+	void initialize(float r[9], float g[9], float b[9])
+	{
+		// Pack the SH coefficients in a way that makes applying the lighting use the least shader instructions
+		// This has the diffuse convolution coefficients baked in. See "Stupid Spherical Harmonics (SH) Tricks", Appendix A10.
+		const float c0 = 1.f / (2.f * M_SQRT_PI);
+		const float c1 = sqrt(3.f) / (3.f * M_SQRT_PI);
+		const float c2 = sqrt(15.f) / (8.f * M_SQRT_PI);
+		const float c3 = sqrt(5.f) / (16.f * M_SQRT_PI);
+		const float c4 = 0.5f * c2;
+
+		coefficients[0].x = -c1 * r[3];
+		coefficients[0].y = -c1 * r[1];
+		coefficients[0].z = c1 * r[2];
+		coefficients[0].w = c0 * r[0] - c3 * r[6];
+
+		coefficients[1].x = -c1 * g[3];
+		coefficients[1].y = -c1 * g[1];
+		coefficients[1].z = c1 * g[2];
+		coefficients[1].w = c0 * g[0] - c3 * g[6];
+
+		coefficients[2].x = -c1 * b[3];
+		coefficients[2].y = -c1 * b[1];
+		coefficients[2].z = c1 * b[2];
+		coefficients[2].w = c0 * b[0] - c3 * b[6];
+
+		coefficients[3].x = c2 * r[4];
+		coefficients[3].y = -c2 * r[5];
+		coefficients[3].z = 3.f * c3 * r[6];
+		coefficients[3].w = -c2 * r[7];
+
+		coefficients[4].x = c2 * g[4];
+		coefficients[4].y = -c2 * g[5];
+		coefficients[4].z = 3.f * c3 * g[6];
+		coefficients[4].w = -c2 * g[7];
+
+		coefficients[5].x = c2 * b[4];
+		coefficients[5].y = -c2 * b[5];
+		coefficients[5].z = 3.f * c3 * b[6];
+		coefficients[5].w = -c2 * b[7];
+
+		coefficients[6].x = c4 * r[8];
+		coefficients[6].y = c4 * g[8];
+		coefficients[6].z = c4 * b[8];
+		coefficients[6].w = 1.f;
+	}
+
+#ifndef HLSL
+	spherical_harmonics() {}
+
+	spherical_harmonics(float r[9], float g[9], float b[9])
+	{
+		initialize(r, g, b);
+	}
+#endif
+
+#ifdef HLSL
+	vec3 evaluate(vec3 normal)
+	{
+		// See "Stupid Spherical Harmonics (SH) Tricks", Appendix A10.
+		vec4 N = vec4(normal, 1.f);
+
+		vec3 x1, x2, x3;
+
+		// Linear + constant polynomial terms.
+		x1.x = dot(coefficients[0], N);
+		x1.y = dot(coefficients[1], N);
+		x1.z = dot(coefficients[2], N);
+
+		// 4 of the quadratic polynomials.
+		vec4 vB = N.xyzz * N.yzzx;
+
+		x2.x = dot(coefficients[3], vB);
+		x2.y = dot(coefficients[4], vB);
+		x2.z = dot(coefficients[5], vB);
+
+		// Final quadratic polynomial.
+		float vC = N.x * N.x - N.y * N.y;
+		x3 = coefficients[6].xyz * vC;
+
+		return max(0, x1 + x2 + x3);
+	}
+#endif
+};
+
+struct spherical_harmonics_basis
+{
+	float v[9];
+};
+
+static spherical_harmonics_basis getSHBasis(vec3 dir)
+{
+	spherical_harmonics_basis result;
+	result.v[0] = 0.282095f;
+	result.v[1] = 0.488603f * dir.y;
+	result.v[2] = 0.488603f * dir.z;
+	result.v[3] = 0.488603f * dir.x;
+	result.v[4] = 1.092548f * dir.x * dir.y;
+	result.v[5] = 1.092548f * dir.y * dir.z;
+	result.v[6] = 0.315392f * (3.f * dir.z * dir.z - 1.f);
+	result.v[7] = 1.092548f * dir.z * dir.x;
+	result.v[8] = 0.546274f * (dir.x * dir.x - dir.y * dir.y);
+	return result;
+}
+
 
 #ifdef HLSL
 static float sampleShadowMapSimple(float4x4 vp, float3 worldPosition, 

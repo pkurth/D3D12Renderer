@@ -14,6 +14,7 @@
 #define M_PI_OVER_2 (M_PI * 0.5f)
 #define M_PI_OVER_180 (M_PI / 180.f)
 #define M_180_OVER_PI (180.f / M_PI)
+#define SQRT_PI	1.77245385090f
 #define M_TAU 6.28318530718f
 
 #define EPSILON 1e-6f
@@ -28,6 +29,7 @@ static constexpr float clamp(float v, float l, float u) { return min(u, max(l, v
 static constexpr uint32 clamp(uint32 v, uint32 l, uint32 u) { return min(u, max(l, v)); }
 static constexpr int32 clamp(int32 v, int32 l, int32 u) { return min(u, max(l, v)); }
 static constexpr float clamp01(float v) { return clamp(v, 0.f, 1.f); }
+static constexpr float saturate(float v) { return clamp01(v); }
 static constexpr uint32 bucketize(uint32 problemSize, uint32 bucketSize) { return (problemSize + bucketSize - 1) / bucketSize; }
 
 static void copySign(float from, float& to) { to = copysign(to, from); }
@@ -724,6 +726,14 @@ static trs lerp(const trs& l, const trs& u, float t)
 	return result;
 }
 
+static vec2 exp(vec2 v) { return vec2(exp(v.x), exp(v.y)); }
+static vec3 exp(vec3 v) { return vec3(exp(v.x), exp(v.y), exp(v.z)); }
+static vec4 exp(vec4 v) { return vec4(exp(v.f4)); }
+
+static vec2 pow(vec2 v, float e) { return vec2(pow(v.x, e), pow(v.y, e)); }
+static vec3 pow(vec3 v, float e) { return vec3(pow(v.x, e), pow(v.y, e), pow(v.z, e)); }
+static vec4 pow(vec4 v, float e) { return vec4(pow(v.f4, e)); }
+
 mat2 operator*(const mat2& a, const mat2& b);
 mat3 operator*(const mat3& a, const mat3& b);
 mat3 operator+(const mat3& a, const mat3& b);
@@ -811,6 +821,9 @@ vec3 getBarycentricCoordinates(vec3 a, vec3 b, vec3 c, vec3 p);
 bool insideTriangle(vec3 barycentrics);
 
 void getTangents(vec3 normal, vec3& outTangent, vec3& outBitangent);
+
+// W = PDF = 1 / 4pi
+vec4 uniformSampleSphere(vec2 E);
 
 static bool fuzzyEquals(float a, float b, float threshold = 1e-4f) { return abs(a - b) < threshold; }
 static bool fuzzyEquals(vec2 a, vec2 b, float threshold = 1e-4f) { return fuzzyEquals(a.x, b.x, threshold) && fuzzyEquals(a.y, b.y, threshold); }

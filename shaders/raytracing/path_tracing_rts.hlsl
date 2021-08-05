@@ -187,7 +187,7 @@ void rayGen()
 
 		float3 focalPoint = origin + constants.focalLength * direction;
 
-		float2 rnd = float2(2.f * pi * nextRand(randSeed), constants.lensRadius * nextRand(randSeed));
+		float2 rnd = float2(2.f * M_PI * nextRand(randSeed), constants.lensRadius * nextRand(randSeed));
 		float2 originOffset = float2(cos(rnd.x) * rnd.y, sin(rnd.x) * rnd.y);
 
 		origin += camera.right.xyz * originOffset.x + camera.up.xyz * originOffset.y;
@@ -358,7 +358,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 				float lightPDF = 1.f / (pointLightSolidAngle * NUM_LIGHTS); // Correct for PDFs, see comment below.
 
 				// Lambertian part.
-				float diffusePDF = dot(surface.N, light.L) * invPI; // Cosine-distributed for Lambertian BRDF.
+				float diffusePDF = dot(surface.N, light.L) * M_INV_PI; // Cosine-distributed for Lambertian BRDF.
 
 				// Specular part.
 				float D = distributionGGX(surface, light);

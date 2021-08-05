@@ -204,6 +204,11 @@ static floatx4 pow(floatx4 x, floatx4 y)
 	return exp2(log2(x) * y);
 }
 
+static floatx4 pow(floatx4 x, float y)
+{
+	return exp2(log2(x) * floatx4(y));
+}
+
 static floatx4 exp(floatx4 x)
 {
 	floatx4 a = 12102203.f; // (1 << 23) / log(2).

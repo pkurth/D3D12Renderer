@@ -138,7 +138,7 @@ static float distributionGGX(float NdotH, float roughness)
 	float NdotH2 = NdotH * NdotH;
 
 	float d = (NdotH2 * (a2 - 1.f) + 1.f);
-	return a2 / max(d * d * pi, 0.001f);
+	return a2 / max(d * d * M_PI, 0.001f);
 }
 
 static float distributionGGX(surface_info surface, light_info light)
@@ -147,7 +147,7 @@ static float distributionGGX(surface_info surface, light_info light)
 	float NdotH2 = NdotH * NdotH;
 	float a2 = surface.alphaRoughnessSquared;
 	float d = (NdotH2 * (a2 - 1.f) + 1.f);
-	return a2 / max(d * d * pi, 0.001f);
+	return a2 / max(d * d * M_PI, 0.001f);
 }
 
 
@@ -201,7 +201,7 @@ static float3 importanceSampleGGX(inout uint randSeed, float3 N, float roughness
 	float a2 = roughness * roughness;
 	float cosThetaH = sqrt(max(0.f, (1.f - randVal.x) / ((a2 - 1.f) * randVal.x + 1.f)));
 	float sinThetaH = sqrt(max(0.f, 1.f - cosThetaH * cosThetaH));
-	float phiH = randVal.y * pi * 2.f;
+	float phiH = randVal.y * M_PI * 2.f;
 
 	// Get our GGX NDF sample (i.e., the half vector).
 	return T * (sinThetaH * cos(phiH)) +
@@ -215,7 +215,7 @@ static float4 importanceSampleGGX(float2 Xi, float3 N, float roughness)
 	float a = roughness * roughness;
 	float a2 = a * a;
 
-	float phi = 2.f * pi * Xi.x;
+	float phi = 2.f * M_PI * Xi.x;
 	float cosTheta = sqrt((1.f - Xi.y) / (1.f + (a2 - 1.f) * Xi.y));
 	float sinTheta = sqrt(1.f - cosTheta * cosTheta);
 
@@ -233,9 +233,26 @@ static float4 importanceSampleGGX(float2 Xi, float3 N, float roughness)
 	H = tangent * H.x + bitangent * H.y + N * H.z;
 
 	float d = (cosTheta * a2 - cosTheta) * cosTheta + 1.f;
-	float D = a2 / (pi * d * d);
+	float D = a2 / (M_PI * d * d);
 	float pdf = D * cosTheta;
 	return float4(normalize(H), pdf);
+}
+
+// W = PDF = 1 / 4pi
+static float4 uniformSampleSphere(float2 E)
+{
+	float phi = 2 * M_PI * E.x;
+	float cosTheta = 1.f - 2.f * E.y;
+	float sinTheta = sqrt(1.f - cosTheta * cosTheta);
+
+	float3 H;
+	H.x = sinTheta * cos(phi);
+	H.y = sinTheta * sin(phi);
+	H.z = cosTheta;
+
+	float PDF = 1.f / (4.f * M_PI);
+
+	return float4(H, PDF);
 }
 
 
@@ -243,7 +260,7 @@ static float4 importanceSampleGGX(float2 Xi, float3 N, float roughness)
 
 // ----------------------------------------
 // LIGHTING COMPUTATION.
-// ----------------------------------------
+// 
 
 static float3 diffuseIBL(float3 kd, surface_info surface, TextureCube<float4> irradianceTexture, SamplerState clampSampler)
 {
@@ -317,7 +334,7 @@ static light_contribution calculateDirectLighting(surface_info surface, light_in
 
 	float3 kD = float3(1.f, 1.f, 1.f) - F;
 	kD *= 1.f - surface.metallic;
-	float3 diffuse = kD * invPI * light.radiance * light.NdotL;
+	float3 diffuse = kD * M_INV_PI * light.radiance * light.NdotL;
 
 	float3 numerator = D * G * F;
 	float denominator = 4.f * surface.NdotV * light.NdotL;

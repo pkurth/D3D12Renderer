@@ -1,10 +1,17 @@
 #ifndef MATH_H
 #define MATH_H
 
-static const float pi = 3.14159265359f;
-static const float invPI = 0.31830988618379067153776752674503f;
-static const float inv2PI = 0.15915494309189533576888376337251f;
-static const float2 invAtan = float2(inv2PI, invPI);
+
+#define M_PI 3.14159265359f
+#define M_PI_OVER_2 (M_PI * 0.5f)
+#define M_PI_OVER_180 (M_PI / 180.f)
+#define M_180_OVER_PI (180.f / M_PI)
+#define M_SQRT_PI 1.77245385090f
+#define M_TAU 6.28318530718f
+
+#define M_INV_PI 0.3183098861837906f
+#define M_INV_2_PI 0.1591549430918953f
+#define M_INV_ATAN float2(M_INV_2_PI, M_INV_PI)
 
 
 static float inverseLerp(float l, float u, float v) { return (v - l) / (u - l); }
@@ -17,7 +24,7 @@ static float solidAngleOfSphere(float radius, float distance)
 	// cos(arcsin(x)) = sqrt(1 - x*x)
 
 	float s = radius / distance;
-	return 2.f * pi * (1.f - sqrt(max(0.f, 1.f - s * s)));
+	return 2.f * M_PI * (1.f - sqrt(max(0.f, 1.f - s * s)));
 }
 
 static uint flatten2D(uint2 coord, uint2 dim)

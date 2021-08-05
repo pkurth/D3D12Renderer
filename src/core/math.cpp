@@ -1284,6 +1284,22 @@ void getTangents(vec3 normal, vec3& outTangent, vec3& outBitangent)
 	outBitangent = cross(normal, outTangent);
 }
 
+vec4 uniformSampleSphere(vec2 E)
+{
+	float phi = 2 * M_PI * E.x;
+	float cosTheta = 1.f - 2.f * E.y;
+	float sinTheta = sqrt(1.f - cosTheta * cosTheta);
+
+	vec3 H;
+	H.x = sinTheta * cos(phi);
+	H.y = sinTheta * sin(phi);
+	H.z = cosTheta;
+
+	float PDF = 1.f / (4.f * M_PI);
+
+	return vec4(H, PDF);
+}
+
 trs::trs(const mat4& in)
 {
 	vec3 c0(in.m00, in.m10, in.m20);

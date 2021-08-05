@@ -263,10 +263,19 @@ project "D3D12Renderer"
 	filter "files:**.hlsl"
 		if turing_or_higher and new_sdk_available then
 			shadermodel "6.5"
+			shaderdefines {
+				"SHADERMODEL=65"
+			}
 		elseif turing_or_higher then
 			shadermodel "6.1"
+			shaderdefines {
+				"SHADERMODEL=61"
+			}
 		else
 			shadermodel "5.1"
+			shaderdefines {
+				"SHADERMODEL=51"
+			}
 		end
 
 		flags "ExcludeFromBuild"

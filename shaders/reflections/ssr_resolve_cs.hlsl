@@ -164,7 +164,7 @@ void main(cs_input IN)
 
         float G = geometrySmith(NdotL, NdotV, roughness);
         float D = distributionGGX(NdotH, roughness);
-        float specularLight = G * D * pi / 4.f;
+        float specularLight = G * D * M_PI / 4.f;
 
         float weight = specularLight / max(neighborPDF, 0.00001f);
 

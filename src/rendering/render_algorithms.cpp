@@ -217,7 +217,32 @@ void proceduralSky(dx_command_list* cl,
 	cl->drawCubeTriangleStrip();
 }
 
-void preethamSky(dx_command_list* cl, const dx_render_target& skyRenderTarget, const dx_pipeline& skyPipeline, const mat4& proj, const mat4& view, vec3 sunDirection, float skyIntensity)
+void sphericalHarmonicsSky(dx_command_list* cl, 
+	const dx_render_target& skyRenderTarget, 
+	const dx_pipeline& skyPipeline, 
+	const mat4& proj, const mat4& view, 
+	const dx_dynamic_constant_buffer& shCBV, float skyIntensity)
+{
+	DX_PROFILE_BLOCK(cl, "Sky");
+
+	cl->setRenderTarget(skyRenderTarget);
+	cl->setViewport(skyRenderTarget.viewport);
+
+	cl->setPipelineState(*skyPipeline.pipeline);
+	cl->setGraphicsRootSignature(*skyPipeline.rootSignature);
+
+	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
+	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, skyIntensity);
+	cl->setGraphics32BitConstants(SKY_RS_SH, shCBV);
+
+	cl->drawCubeTriangleStrip();
+}
+
+void preethamSky(dx_command_list* cl, 
+	const dx_render_target& skyRenderTarget, 
+	const dx_pipeline& skyPipeline, 
+	const mat4& proj, const mat4& view, 
+	vec3 sunDirection, float skyIntensity)
 {
 	DX_PROFILE_BLOCK(cl, "Sky");
 

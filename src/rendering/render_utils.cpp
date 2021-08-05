@@ -9,7 +9,7 @@
 #include "render_algorithms.h"
 #include "pbr.h"
 #include "scene/particle_systems.h"
-#include "dx/dx_bitonic_sort.h"
+#include "bitonic_sort.h"
 
 
 static vec2 haltonSequence[128];

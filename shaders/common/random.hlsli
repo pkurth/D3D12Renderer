@@ -147,7 +147,7 @@ static float3 getCosHemisphereSample(inout uint randSeed, float3 hitNorm)
 
 static float3 getRandomPointOnUnitSphere(inout uint randSeed)
 {
-	float2 h = float2(nextRand(randSeed), nextRand(randSeed)) * float2(2.f, 2.f * pi) - float2(1.f, 0.f);
+	float2 h = float2(nextRand(randSeed), nextRand(randSeed)) * float2(2.f, 2.f * M_PI) - float2(1.f, 0.f);
 	float phi = h.y;
 	return normalize(float3(sqrt(1.f - h.x * h.x) * float2(sin(phi), cos(phi)), h.x));
 }

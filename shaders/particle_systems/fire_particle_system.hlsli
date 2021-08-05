@@ -60,7 +60,7 @@ static particle_data emitParticle(uint emitIndex)
 
 	float maxLife = nextRandBetween(rng, 1.5f, 2.5f);
 
-	float angle = nextRand(rng) * 2.f * pi;
+	float angle = nextRand(rng) * 2.f * M_PI;
 	float sinAngle, cosAngle;
 	sincos(angle, sinAngle, cosAngle);
 
