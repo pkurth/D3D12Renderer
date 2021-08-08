@@ -36,6 +36,7 @@ static float2 packNormal(float3 n)
 {
     float2 enc = n.xy / (n.z + 1.f);
 
+    // This scaling would be necessary, if we store the normal in a UNORM-format.
     //const float scale = 1.f / 1.7777f;
     //enc *= scale;
     //enc = enc * 0.5f + 0.5f;
@@ -51,15 +52,8 @@ static float3 unpackNormal(float2 enc)
 
     float3 nn = float3(enc, 1.f);
     float g = 2.f / dot(nn, nn);
-    if (g != g)
-    {
-        return float3(0.f, 0.f, -1.f);
-    }
 
-    float3 n;
-    n.xy = g * nn.xy;
-    n.z = g - 1.f;
-    return n;
+    return (g != g) ? float3(0.f, 0.f, -1.f) : float3(g * nn.xy, g - 1.f);
 }
 
 #endif

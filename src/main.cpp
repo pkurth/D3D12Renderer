@@ -107,13 +107,12 @@ int main(int argc, char** argv)
 	window.setFileDropCallback([&app](const std::string& s) { app.handleFileDrop(s); });
 
 	initializeTransformationGizmos();
-	renderer_base::initializeCommon(screenFormat);
 	initializeRenderUtils();
 
 	initializeImGui(screenFormat);
 
 	main_renderer renderer = {};
-	renderer.initialize(1280, 800, true);
+	renderer.initialize(screenFormat, 1280, 800, true);
 
 	app.initialize(&renderer);
 

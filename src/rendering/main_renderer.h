@@ -1,6 +1,5 @@
 #pragma once
 
-#include "renderer_base.h"
 #include "core/math.h"
 #include "core/camera.h"
 #include "render_pass.h"
@@ -16,15 +15,51 @@
 
 
 
+
+
+
+enum aspect_ratio_mode
+{
+	aspect_ratio_free,
+	aspect_ratio_fix_16_9,
+	aspect_ratio_fix_16_10,
+
+	aspect_ratio_mode_count,
+};
+
+static const char* aspectRatioNames[] =
+{
+	"Free",
+	"16:9",
+	"16:10",
+};
+
+enum renderer_mode
+{
+	renderer_mode_rasterized,
+	renderer_mode_pathtraced,
+
+	renderer_mode_count,
+};
+
+static const char* rendererModeNames[] =
+{
+	"Rasterized",
+	"Path-traced",
+};
+
+
+
+
 #define MAX_NUM_SPOT_LIGHT_SHADOW_PASSES 16
 #define MAX_NUM_POINT_LIGHT_SHADOW_PASSES 16
 
 
-struct main_renderer : renderer_base
+struct main_renderer
 {
-	void initialize(uint32 windowWidth, uint32 windowHeight, bool renderObjectIDs);
+	void initialize(DXGI_FORMAT outputFormat, uint32 windowWidth, uint32 windowHeight, bool renderObjectIDs);
 
-	void beginFrame(uint32 windowWidth, uint32 windowHeight);	
+	void beginFrame(uint32 windowWidth, uint32 windowHeight);
 	void endFrame(const user_input& input);
 
 

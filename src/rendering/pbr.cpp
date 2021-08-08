@@ -4,11 +4,11 @@
 #include "texture_preprocessing.h"
 #include "dx/dx_context.h"
 #include "dx/dx_command_list.h"
-#include "renderer_base.h"
 #include "geometry/geometry.h"
 #include "core/color.h"
 #include "core/hash.h"
 #include "render_resources.h"
+#include "render_utils.h"
 
 #include "default_pbr_rs.hlsli"
 #include "material.hlsli"
@@ -244,7 +244,7 @@ void pbr_material::initializePipeline()
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position_uv_normal_tangent)
-			.renderTargets(renderer_base::opaqueLightPassFormats, arraysize(renderer_base::opaqueLightPassFormats), renderer_base::hdrDepthStencilFormat)
+			.renderTargets(opaqueLightPassFormats, arraysize(opaqueLightPassFormats), hdrDepthStencilFormat)
 			.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
 
 		defaultOpaquePBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_ps" });
@@ -253,7 +253,7 @@ void pbr_material::initializePipeline()
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position_uv_normal_tangent)
-			.renderTargets(renderer_base::transparentLightPassFormats, arraysize(renderer_base::transparentLightPassFormats), renderer_base::hdrDepthStencilFormat)
+			.renderTargets(transparentLightPassFormats, arraysize(transparentLightPassFormats), hdrDepthStencilFormat)
 			.alphaBlending(0);
 
 		defaultTransparentPBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_transparent_ps" });

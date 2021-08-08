@@ -11,6 +11,7 @@
 #include "raytracing.h"
 
 
+
 #define SSR_RAYCAST_WIDTH (renderWidth / 2)
 #define SSR_RAYCAST_HEIGHT (renderHeight / 2)
 
@@ -19,7 +20,7 @@
 
 
 
-void main_renderer::initialize(uint32 windowWidth, uint32 windowHeight, bool renderObjectIDs)
+void main_renderer::initialize(DXGI_FORMAT outputFormat, uint32 windowWidth, uint32 windowHeight, bool renderObjectIDs)
 {
 	this->windowWidth = windowWidth;
 	this->windowHeight = windowHeight;

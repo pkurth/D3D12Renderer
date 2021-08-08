@@ -1,8 +1,8 @@
 #include "pch.h"
 #include "particle_systems.h"
 #include "dx/dx_pipeline.h"
-#include "rendering/renderer_base.h"
 #include "rendering/render_resources.h"
+#include "rendering/render_utils.h"
 #include "animation/skinning.h"
 
 
@@ -36,7 +36,7 @@ void fire_particle_system::initializePipeline()
 
 	auto desc = CREATE_GRAPHICS_PIPELINE
 		.inputLayout(inputLayout_position)
-		.renderTargets(renderer_base::transparentLightPassFormats, arraysize(renderer_base::transparentLightPassFormats), renderer_base::hdrDepthStencilFormat)
+		.renderTargets(transparentLightPassFormats, arraysize(transparentLightPassFormats), hdrDepthStencilFormat)
 		//.additiveBlending(0)
 		.alphaBlending(0)
 		.depthSettings(true, false);
@@ -136,7 +136,7 @@ void smoke_particle_system::initializePipeline()
 
 	auto desc = CREATE_GRAPHICS_PIPELINE
 		.inputLayout(inputLayout_position)
-		.renderTargets(renderer_base::transparentLightPassFormats, arraysize(renderer_base::transparentLightPassFormats), renderer_base::hdrDepthStencilFormat)
+		.renderTargets(transparentLightPassFormats, arraysize(transparentLightPassFormats), hdrDepthStencilFormat)
 		.alphaBlending(0)
 		.depthSettings(true, false);
 
@@ -223,7 +223,7 @@ void boid_particle_system::initializePipeline()
 
 	auto desc = CREATE_GRAPHICS_PIPELINE
 		.inputLayout(inputLayout_position_uv_normal_tangent)
-		.renderTargets(renderer_base::transparentLightPassFormats, arraysize(renderer_base::transparentLightPassFormats), renderer_base::hdrDepthStencilFormat)
+		.renderTargets(transparentLightPassFormats, arraysize(transparentLightPassFormats), hdrDepthStencilFormat)
 		.depthSettings(true, true);
 
 	renderPipeline = createReloadablePipeline(desc, { VERTEX_SHADER_NAME(name), PIXEL_SHADER_NAME(name) });
