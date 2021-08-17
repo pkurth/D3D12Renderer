@@ -1,5 +1,6 @@
 #define RS \
     "RootFlags(0), " \
+    "RootConstants(b0, num32BitConstants = 1), " \
     "DescriptorTable( SRV(t0, numDescriptors = 1, flags = DESCRIPTORS_VOLATILE) )," \
     "DescriptorTable( UAV(u0, numDescriptors = 1, flags = DESCRIPTORS_VOLATILE) )," \
     "StaticSampler(s0," \
@@ -12,6 +13,10 @@
 #include "brdf.hlsli"
 #include "light_source.hlsli"
 
+cbuffer cubemap_to_irradiance_sh_cb : register(b0)
+{
+	uint mipLevel;
+};
 
 TextureCube<float4> srcTexture : register(t0);
 SamplerState linearRepeatSampler : register(s0);
@@ -74,7 +79,6 @@ groupshared spherical_harmonics_rgb g_sh[BLOCK_SIZE * BLOCK_SIZE];
 void main(cs_input IN)
 {
 	const uint sampleCount = BLOCK_SIZE * BLOCK_SIZE;
-	const uint mipLevel = 3;
 
 	const float uniformSampleSolidAngle = 4.f * M_PI / sampleCount;
 	const float3 dir = uniformSampleSphere((float2(IN.dispatchThreadID.xy) + 0.5f) / float2(BLOCK_SIZE, BLOCK_SIZE)).xyz;

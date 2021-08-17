@@ -1,6 +1,6 @@
 #define RS \
     "RootFlags(0), " \
-    "RootConstants(b0, num32BitConstants = 2), " \
+    "RootConstants(b0, num32BitConstants = 1), " \
     "DescriptorTable( SRV(t0, numDescriptors = 1, flags = DESCRIPTORS_VOLATILE) )," \
     "DescriptorTable( UAV(u0, numDescriptors = 1, flags = DESCRIPTORS_VOLATILE) )," \
     "StaticSampler(s0," \
@@ -15,8 +15,7 @@
 
 cbuffer cubemap_to_irradiance_cb : register(b0)
 {
-	uint irradianceMapSize;				// Size of the cubemap face in pixels.
-	float uvzScale;
+	uint irradianceMapSize;
 };
 
 TextureCube<float4> srcTexture : register(t0);
@@ -98,8 +97,6 @@ void main(cs_input IN)
 			float3 tangentSample = float3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
 			// Tangent space to world.
 			float3 sampleVec = tangentSample.x * right + tangentSample.y * up + tangentSample.z * dir;
-
-			sampleVec.z *= uvzScale;
 
 			float4 color = srcTexture.SampleLevel(linearRepeatSampler, sampleVec, sampleMipLevel);
 			irradiance += color.xyz * cosTheta * sinTheta;

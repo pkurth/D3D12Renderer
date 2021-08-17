@@ -11,6 +11,7 @@
 static dx_pipeline mipmapPipeline;
 static dx_pipeline equirectangularToCubemapPipeline;
 static dx_pipeline cubemapToIrradiancePipeline;
+static dx_pipeline cubemapToIrradianceSHPipeline;
 static dx_pipeline prefilterEnvironmentPipeline;
 static dx_pipeline integrateBRDFPipeline;
 
@@ -36,7 +37,11 @@ struct equirectangular_to_cubemap_cb
 struct cubemap_to_irradiance_cb
 {
 	uint32 irradianceMapSize;
-	float uvzScale;
+};
+
+struct cubemap_to_irradiance_sh_cb
+{
+	uint32 mipLevel;
 };
 
 struct prefilter_environment_cb
@@ -57,6 +62,7 @@ void initializeTexturePreprocessing()
 	mipmapPipeline = createReloadablePipeline("generate_mips_cs");
 	equirectangularToCubemapPipeline = createReloadablePipeline("equirectangular_to_cubemap_cs");
 	cubemapToIrradiancePipeline = createReloadablePipeline("cubemap_to_irradiance_cs");
+	cubemapToIrradianceSHPipeline = createReloadablePipeline("cubemap_to_irradiance_sh_cs");
 	prefilterEnvironmentPipeline = createReloadablePipeline("prefilter_environment_cs");
 	integrateBRDFPipeline = createReloadablePipeline("integrate_brdf_cs");
 }
@@ -368,7 +374,7 @@ ref<dx_texture> equirectangularToCubemap(dx_command_list* cl, const ref<dx_textu
 	return cubemap;
 }
 
-ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& environment, uint32 resolution, uint32 sourceSlice, float uvzScale)
+ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& environment, uint32 resolution, uint32 sourceSlice)
 {
 	assert(environment->resource);
 
@@ -424,10 +430,7 @@ ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& 
 	cl->setComputeRootSignature(*cubemapToIrradiancePipeline.rootSignature);
 
 	cubemap_to_irradiance_cb cubemapToIrradianceCB;
-
-
 	cubemapToIrradianceCB.irradianceMapSize = resolution;
-	cubemapToIrradianceCB.uvzScale = uvzScale;
 
 
 	dx_descriptor_range descriptors = dxContext.frameDescriptorAllocator.allocateContiguousDescriptorRange(2);
@@ -461,6 +464,31 @@ ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& 
 	}
 
 	return irradiance;
+}
+
+ref<dx_buffer> cubemapToIrradianceSH(dx_command_list* cl, const ref<dx_texture>& environment)
+{
+	ref<dx_buffer> sh = createBuffer(sizeof(spherical_harmonics), 1, 0, true);
+
+	cl->setPipelineState(*cubemapToIrradianceSHPipeline.pipeline);
+	cl->setComputeRootSignature(*cubemapToIrradianceSHPipeline.rootSignature);
+
+	assert(environment->width == environment->height);
+	assert(environment->width >= 64);
+	assert(environment->depth == 6);
+
+	cubemap_to_irradiance_sh_cb cb;
+	cb.mipLevel = environment->numMipLevels == 1 ? 0 : (environment->numMipLevels - 7);
+
+	cl->setCompute32BitConstants(0, cb);
+	cl->setDescriptorHeapSRV(1, 0, environment);
+	cl->setDescriptorHeapSRV(2, 0, sh);
+
+	cl->dispatch(1, 1);
+
+	cl->uavBarrier(sh);
+
+	return sh;
 }
 
 ref<dx_texture> prefilterEnvironment(dx_command_list* cl, const ref<dx_texture>& environment, uint32 resolution)
