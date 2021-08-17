@@ -221,7 +221,8 @@ void sphericalHarmonicsSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget, 
 	const dx_pipeline& skyPipeline, 
 	const mat4& proj, const mat4& view, 
-	const dx_dynamic_constant_buffer& shCBV, float skyIntensity)
+	const ref<dx_buffer>& sh, uint32 shIndex, 
+	float skyIntensity)
 {
 	DX_PROFILE_BLOCK(cl, "Sky");
 
@@ -233,7 +234,7 @@ void sphericalHarmonicsSky(dx_command_list* cl,
 
 	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
 	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, skyIntensity);
-	cl->setGraphics32BitConstants(SKY_RS_SH, shCBV);
+	cl->setRootGraphicsSRV(SKY_RS_SH, sh->gpuVirtualAddress + sizeof(spherical_harmonics) * shIndex);
 
 	cl->drawCubeTriangleStrip();
 }

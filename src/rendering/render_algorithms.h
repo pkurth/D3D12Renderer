@@ -123,7 +123,7 @@ void sphericalHarmonicsSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
 	const dx_pipeline& skyPipeline,
 	const mat4& proj, const mat4& view,
-	const dx_dynamic_constant_buffer& shCBV,
+	const ref<dx_buffer>& sh, uint32 shIndex,
 	float skyIntensity);
 
 void preethamSky(dx_command_list* cl,

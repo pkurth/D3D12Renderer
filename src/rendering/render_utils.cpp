@@ -25,6 +25,7 @@ dx_pipeline pointLightShadowPipeline;
 dx_pipeline textureSkyPipeline;
 dx_pipeline proceduralSkyPipeline;
 dx_pipeline preethamSkyPipeline;
+dx_pipeline sphericalHarmonicsSkyPipeline;
 
 dx_pipeline outlineMarkerPipeline;
 dx_pipeline outlineDrawerPipeline;
@@ -47,6 +48,7 @@ void initializeRenderUtils()
 		textureSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_texture_ps" });
 		proceduralSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_procedural_ps" });
 		preethamSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_preetham_ps" });
+		sphericalHarmonicsSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_sh_ps" });
 	}
 
 	// Depth prepass.

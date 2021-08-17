@@ -2,7 +2,7 @@
     "RootFlags(0), " \
     "RootConstants(b0, num32BitConstants = 1), " \
     "DescriptorTable( SRV(t0, numDescriptors = 1, flags = DESCRIPTORS_VOLATILE) )," \
-    "DescriptorTable( UAV(u0, numDescriptors = 1, flags = DESCRIPTORS_VOLATILE) )," \
+    "UAV(u0)," \
     "StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_WRAP," \
         "addressV = TEXTURE_ADDRESS_WRAP," \
@@ -23,7 +23,7 @@ SamplerState linearRepeatSampler : register(s0);
 
 RWStructuredBuffer<spherical_harmonics> outSphericalHarmonics : register(u0);
 
-#define BLOCK_SIZE 8
+#define BLOCK_SIZE 16
 
 
 struct spherical_harmonics_vector
@@ -81,7 +81,7 @@ void main(cs_input IN)
 	const uint sampleCount = BLOCK_SIZE * BLOCK_SIZE;
 
 	const float uniformSampleSolidAngle = 4.f * M_PI / sampleCount;
-	const float3 dir = uniformSampleSphere((float2(IN.dispatchThreadID.xy) + 0.5f) / float2(BLOCK_SIZE, BLOCK_SIZE)).xyz;
+	float3 dir = uniformSampleSphere((float2(IN.dispatchThreadID.xy) + 0.5f) / float2(BLOCK_SIZE, BLOCK_SIZE)).xyz;
 
 	const uint linearIndex = BLOCK_SIZE * IN.dispatchThreadID.y + IN.dispatchThreadID.x;
 
@@ -91,6 +91,15 @@ void main(cs_input IN)
 
 	g_sh[linearIndex].initialize(dir, weightedRadiance);
 	GroupMemoryBarrierWithGroupSync();
+
+	if (sampleCount >= 256)
+	{
+		if (linearIndex < 128) { g_sh[linearIndex].add(g_sh[linearIndex + 128]); }
+		GroupMemoryBarrierWithGroupSync();
+
+		if (linearIndex < 64) { g_sh[linearIndex].add(g_sh[linearIndex + 64]); }
+		GroupMemoryBarrierWithGroupSync();
+	}
 
 	if (linearIndex < 32) {	g_sh[linearIndex].add(g_sh[linearIndex + 32]); }
 	GroupMemoryBarrierWithGroupSync();

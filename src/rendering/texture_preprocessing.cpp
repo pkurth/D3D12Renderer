@@ -466,31 +466,6 @@ ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& 
 	return irradiance;
 }
 
-ref<dx_buffer> cubemapToIrradianceSH(dx_command_list* cl, const ref<dx_texture>& environment)
-{
-	ref<dx_buffer> sh = createBuffer(sizeof(spherical_harmonics), 1, 0, true);
-
-	cl->setPipelineState(*cubemapToIrradianceSHPipeline.pipeline);
-	cl->setComputeRootSignature(*cubemapToIrradianceSHPipeline.rootSignature);
-
-	assert(environment->width == environment->height);
-	assert(environment->width >= 64);
-	assert(environment->depth == 6);
-
-	cubemap_to_irradiance_sh_cb cb;
-	cb.mipLevel = environment->numMipLevels == 1 ? 0 : (environment->numMipLevels - 7);
-
-	cl->setCompute32BitConstants(0, cb);
-	cl->setDescriptorHeapSRV(1, 0, environment);
-	cl->setDescriptorHeapSRV(2, 0, sh);
-
-	cl->dispatch(1, 1);
-
-	cl->uavBarrier(sh);
-
-	return sh;
-}
-
 ref<dx_texture> prefilterEnvironment(dx_command_list* cl, const ref<dx_texture>& environment, uint32 resolution)
 {
 	assert(environment->resource);
@@ -622,5 +597,33 @@ ref<dx_texture> integrateBRDF(dx_command_list* cl, uint32 resolution)
 	cl->uavBarrier(brdf);
 
 	return brdf;
+}
+
+void cubemapToIrradianceSH(dx_command_list* cl, const ref<dx_texture>& environment, ref<dx_buffer> shBuffer, uint32 shIndex)
+{
+	cl->setPipelineState(*cubemapToIrradianceSHPipeline.pipeline);
+	cl->setComputeRootSignature(*cubemapToIrradianceSHPipeline.rootSignature);
+
+	assert(environment->width == environment->height);
+	assert(environment->width >= 64);
+	assert(environment->depth == 6);
+	assert(shBuffer->elementCount > shIndex);
+
+	cubemap_to_irradiance_sh_cb cb;
+	cb.mipLevel = environment->numMipLevels == 1 ? 0 : (environment->numMipLevels - 6);
+
+	cl->setCompute32BitConstants(0, cb);
+	cl->setDescriptorHeapSRV(1, 0, environment);
+	cl->setRootComputeUAV(2, shBuffer->gpuVirtualAddress + sizeof(spherical_harmonics) * shIndex);
+
+	cl->dispatch(1, 1);
+	cl->uavBarrier(shBuffer);
+}
+
+ref<dx_buffer> cubemapToIrradianceSH(dx_command_list* cl, const ref<dx_texture>& environment)
+{
+	ref<dx_buffer> buffer = createBuffer(sizeof(spherical_harmonics), 1, 0, true);
+	cubemapToIrradianceSH(cl, environment, buffer, 0);
+	return buffer;
 }
 

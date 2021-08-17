@@ -35,7 +35,7 @@ struct sky_cb
 	"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
 	"RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX)," \
 	"RootConstants(num32BitConstants=1, b1, visibility=SHADER_VISIBILITY_PIXEL), " \
-	"CBV(b2, visibility=SHADER_VISIBILITY_PIXEL)"
+	"SRV(t0, visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define SKY_TEXTURE_RS \
 	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \

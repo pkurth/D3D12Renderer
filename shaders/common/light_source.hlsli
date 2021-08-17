@@ -224,13 +224,13 @@ static spherical_harmonics_basis getSHBasis(vec3 dir)
 {
 	spherical_harmonics_basis result;
 	result.v[0] = 0.282095f;
-	result.v[1] = 0.488603f * dir.y;
+	result.v[1] = -0.488603f * dir.y;
 	result.v[2] = 0.488603f * dir.z;
-	result.v[3] = 0.488603f * dir.x;
+	result.v[3] = -0.488603f * dir.x;
 	result.v[4] = 1.092548f * dir.x * dir.y;
-	result.v[5] = 1.092548f * dir.y * dir.z;
+	result.v[5] = -1.092548f * dir.y * dir.z;
 	result.v[6] = 0.315392f * (3.f * dir.z * dir.z - 1.f);
-	result.v[7] = 1.092548f * dir.z * dir.x;
+	result.v[7] = -1.092548f * dir.z * dir.x;
 	result.v[8] = 0.546274f * (dir.x * dir.x - dir.y * dir.y);
 	return result;
 }

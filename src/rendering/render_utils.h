@@ -36,6 +36,7 @@ extern dx_pipeline pointLightShadowPipeline;
 extern dx_pipeline textureSkyPipeline;
 extern dx_pipeline proceduralSkyPipeline;
 extern dx_pipeline preethamSkyPipeline;
+extern dx_pipeline sphericalHarmonicsSkyPipeline;
 
 extern dx_pipeline outlineMarkerPipeline;
 extern dx_pipeline outlineDrawerPipeline;

@@ -3,7 +3,7 @@
 
 
 ConstantBuffer<sky_cb> skyIntensity : register(b1);
-ConstantBuffer<spherical_harmonics> sh : register(b2);
+StructuredBuffer<spherical_harmonics> sh : register(t0);
 
 struct ps_input
 {
@@ -21,7 +21,7 @@ struct ps_output
 ps_output main(ps_input IN)
 {
 	ps_output OUT;
-	OUT.color = float4(sh.evaluate(normalize(IN.uv)) * skyIntensity.intensity, 0.f);
+	OUT.color = float4(sh[0].evaluate(normalize(IN.uv)) * skyIntensity.intensity, 0.f);
 	OUT.screenVelocity = float2(0.f, 0.f); // TODO: This is of course not the correct screen velocity for the sky.
 	OUT.objectID = 0xFFFFFFFF; // -1.
 	return OUT;
