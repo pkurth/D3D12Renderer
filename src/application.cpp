@@ -907,9 +907,9 @@ void application::drawSettings(float dt)
 
 		if (ImGui::TreeNode("Post processing"))
 		{
-			editSSR(renderer->enableSSR, renderer->ssrSettings);
-			editTAA(renderer->enableTAA, renderer->taaSettings);
-			editBloom(renderer->enableBloom, renderer->bloomSettings);
+			if (renderer->spec.allowSSR) { editSSR(renderer->enableSSR, renderer->ssrSettings); }
+			if (renderer->spec.allowTAA) { editTAA(renderer->enableTAA, renderer->taaSettings); }
+			if (renderer->spec.allowBloom) { editBloom(renderer->enableBloom, renderer->bloomSettings); }
 			editSharpen(renderer->enableSharpen, renderer->sharpenSettings);
 
 			ImGui::TreePop();

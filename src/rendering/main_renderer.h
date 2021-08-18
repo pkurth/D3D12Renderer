@@ -55,9 +55,18 @@ static const char* rendererModeNames[] =
 #define MAX_NUM_POINT_LIGHT_SHADOW_PASSES 16
 
 
+struct renderer_spec
+{
+	bool allowObjectPicking = true; // This currently can only be true, if ALL other flags are also set to true.
+	bool allowSSR = true;
+	bool allowTAA = true;
+	bool allowBloom = true;
+};
+
 struct main_renderer
 {
-	void initialize(DXGI_FORMAT outputFormat, uint32 windowWidth, uint32 windowHeight, bool renderObjectIDs);
+	main_renderer() {}
+	void initialize(DXGI_FORMAT outputFormat, uint32 windowWidth, uint32 windowHeight, renderer_spec spec);
 
 	void beginFrame(uint32 windowWidth, uint32 windowHeight);
 	void endFrame(const user_input& input);
@@ -113,8 +122,10 @@ struct main_renderer
 
 	uint32 hoveredObjectID = -1;
 
+	const renderer_spec spec;
 
 private:
+
 
 	dx_raytracer* raytracer;
 	raytracing_tlas* tlas;

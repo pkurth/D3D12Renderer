@@ -1195,6 +1195,11 @@ dx_texture::~dx_texture()
 
 void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D3D12_RESOURCE_STATES initialState)
 {
+	if (!texture)
+	{
+		return;
+	}
+
 	wchar name[128];
 	uint32 size = sizeof(name);
 	texture->resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);

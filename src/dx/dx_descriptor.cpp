@@ -368,7 +368,6 @@ dx_rtv_descriptor_handle& dx_rtv_descriptor_handle::create2DTextureRTV(const ref
 	assert(texture->supportsRTV);
 
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc;
-	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
 	rtvDesc.Format = texture->format;
 
 	if (texture->depth == 1)

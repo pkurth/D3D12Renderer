@@ -20,25 +20,46 @@
 
 
 
-void main_renderer::initialize(DXGI_FORMAT outputFormat, uint32 windowWidth, uint32 windowHeight, bool renderObjectIDs)
+void main_renderer::initialize(DXGI_FORMAT outputFormat, uint32 windowWidth, uint32 windowHeight, renderer_spec spec)
 {
 	this->windowWidth = windowWidth;
 	this->windowHeight = windowHeight;
+	const_cast<renderer_spec&>(this->spec) = spec;
+
+	enableSharpen = spec.allowTAA;
 
 	recalculateViewport(false);
 
 	hdrColorTexture = createTexture(0, renderWidth, renderHeight, hdrFormat, false, true, true, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	SET_NAME(hdrColorTexture->resource, "HDR Color");
 
-	D3D12_RESOURCE_DESC prevFrameHDRColorDesc = CD3DX12_RESOURCE_DESC::Tex2D(hdrFormat, renderWidth / 2, renderHeight / 2, 1,
-		8, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-	prevFrameHDRColorTexture = createTexture(prevFrameHDRColorDesc, 0, 0, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	prevFrameHDRColorTempTexture = createTexture(prevFrameHDRColorDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	allocateMipUAVs(prevFrameHDRColorTexture);
-	allocateMipUAVs(prevFrameHDRColorTempTexture);
+	if (spec.allowSSR)
+	{
+		D3D12_RESOURCE_DESC prevFrameHDRColorDesc = CD3DX12_RESOURCE_DESC::Tex2D(hdrFormat, renderWidth / 2, renderHeight / 2, 1,
+			8, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		prevFrameHDRColorTexture = createTexture(prevFrameHDRColorDesc, 0, 0, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		prevFrameHDRColorTempTexture = createTexture(prevFrameHDRColorDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		allocateMipUAVs(prevFrameHDRColorTexture);
+		allocateMipUAVs(prevFrameHDRColorTempTexture);
+
+		SET_NAME(prevFrameHDRColorTexture->resource, "Prev frame HDR Color");
+		SET_NAME(prevFrameHDRColorTempTexture->resource, "Prev frame HDR Color Temp");
+	}
+
+	if (spec.allowSSR || spec.allowTAA)
+	{
+		screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, screenVelocitiesFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		SET_NAME(screenVelocitiesTexture->resource, "Screen velocities");
+	}
+
 
 	worldNormalsTexture = createTexture(0, renderWidth, renderHeight, worldNormalsFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, screenVelocitiesFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	SET_NAME(worldNormalsTexture->resource, "World normals");
+
+
 	reflectanceTexture = createTexture(0, renderWidth, renderHeight, reflectanceFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	SET_NAME(reflectanceTexture->resource, "Reflectance");
+
 
 	depthStencilBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthStencilFormat);
 	opaqueDepthBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthStencilFormat, 1, D3D12_RESOURCE_STATE_COPY_DEST);
@@ -46,59 +67,62 @@ void main_renderer::initialize(DXGI_FORMAT outputFormat, uint32 windowWidth, uin
 		6, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 	linearDepthBuffer = createTexture(linearDepthDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	allocateMipUAVs(linearDepthBuffer);
-
-	ssrRaycastTexture = createTexture(0, SSR_RAYCAST_WIDTH, SSR_RAYCAST_HEIGHT, reflectionFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	ssrResolveTexture = createTexture(0, SSR_RESOLVE_WIDTH, SSR_RESOLVE_HEIGHT, reflectionFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	ssrTemporalTextures[ssrHistoryIndex] = createTexture(0, SSR_RESOLVE_WIDTH, SSR_RESOLVE_HEIGHT, reflectionFormat, false, false, true, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	ssrTemporalTextures[1 - ssrHistoryIndex] = createTexture(0, SSR_RESOLVE_WIDTH, SSR_RESOLVE_HEIGHT, reflectionFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-
-	hdrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, true, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-
-	taaTextures[taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, true, true, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	taaTextures[1 - taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, true, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-
-	ldrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, ldrPostProcessFormat, false, true, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-
-	D3D12_RESOURCE_DESC bloomDesc = CD3DX12_RESOURCE_DESC::Tex2D(hdrPostProcessFormat, renderWidth / 4, renderHeight / 4, 1,
-		5, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-	bloomTexture = createTexture(bloomDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	bloomTempTexture = createTexture(bloomDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	allocateMipUAVs(bloomTexture);
-	allocateMipUAVs(bloomTempTexture);
-
-	frameResult = createTexture(0, windowWidth, windowHeight, outputFormat, false, true, true);
-
-
-
-	SET_NAME(hdrColorTexture->resource, "HDR Color");
-	SET_NAME(prevFrameHDRColorTexture->resource, "Prev frame HDR Color");
-	SET_NAME(prevFrameHDRColorTempTexture->resource, "Prev frame HDR Color Temp");
-	SET_NAME(worldNormalsTexture->resource, "World normals");
-	SET_NAME(screenVelocitiesTexture->resource, "Screen velocities");
-	SET_NAME(reflectanceTexture->resource, "Reflectance");
 	SET_NAME(depthStencilBuffer->resource, "Depth buffer");
 	SET_NAME(opaqueDepthBuffer->resource, "Opaque depth buffer");
 	SET_NAME(linearDepthBuffer->resource, "Linear depth buffer");
 
-	SET_NAME(ssrRaycastTexture->resource, "SSR Raycast");
-	SET_NAME(ssrResolveTexture->resource, "SSR Resolve");
-	SET_NAME(ssrTemporalTextures[0]->resource, "SSR Temporal 0");
-	SET_NAME(ssrTemporalTextures[1]->resource, "SSR Temporal 1");
 
-	SET_NAME(taaTextures[0]->resource, "TAA 0");
-	SET_NAME(taaTextures[1]->resource, "TAA 1");
+	if (spec.allowSSR)
+	{
+		ssrRaycastTexture = createTexture(0, SSR_RAYCAST_WIDTH, SSR_RAYCAST_HEIGHT, reflectionFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		ssrResolveTexture = createTexture(0, SSR_RESOLVE_WIDTH, SSR_RESOLVE_HEIGHT, reflectionFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		ssrTemporalTextures[ssrHistoryIndex] = createTexture(0, SSR_RESOLVE_WIDTH, SSR_RESOLVE_HEIGHT, reflectionFormat, false, false, true, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		ssrTemporalTextures[1 - ssrHistoryIndex] = createTexture(0, SSR_RESOLVE_WIDTH, SSR_RESOLVE_HEIGHT, reflectionFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
+		SET_NAME(ssrRaycastTexture->resource, "SSR Raycast");
+		SET_NAME(ssrResolveTexture->resource, "SSR Resolve");
+		SET_NAME(ssrTemporalTextures[0]->resource, "SSR Temporal 0");
+		SET_NAME(ssrTemporalTextures[1]->resource, "SSR Temporal 1");
+	}
+
+
+	hdrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, true, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	SET_NAME(hdrPostProcessingTexture->resource, "HDR Post processing");
+
+
+	ldrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, ldrPostProcessFormat, false, true, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	SET_NAME(ldrPostProcessingTexture->resource, "LDR Post processing");
 
-	SET_NAME(bloomTexture->resource, "Bloom");
-	SET_NAME(bloomTempTexture->resource, "Bloom Temp");
 
+	if (spec.allowTAA)
+	{
+		taaTextures[taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, true, true, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		taaTextures[1 - taaHistoryIndex] = createTexture(0, renderWidth, renderHeight, hdrPostProcessFormat, false, true, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+		SET_NAME(taaTextures[0]->resource, "TAA 0");
+		SET_NAME(taaTextures[1]->resource, "TAA 1");
+	}
+
+	if (spec.allowBloom)
+	{
+		D3D12_RESOURCE_DESC bloomDesc = CD3DX12_RESOURCE_DESC::Tex2D(hdrPostProcessFormat, renderWidth / 4, renderHeight / 4, 1,
+			5, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		bloomTexture = createTexture(bloomDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		bloomTempTexture = createTexture(bloomDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		allocateMipUAVs(bloomTexture);
+		allocateMipUAVs(bloomTempTexture);
+
+		SET_NAME(bloomTexture->resource, "Bloom");
+		SET_NAME(bloomTempTexture->resource, "Bloom Temp");
+	}
+
+
+	frameResult = createTexture(0, windowWidth, windowHeight, outputFormat, false, true, true);
 	SET_NAME(frameResult->resource, "Frame result");
 
 
 
-	if (renderObjectIDs)
+	if (spec.allowObjectPicking)
 	{
 		hoveredObjectIDReadbackBuffer = createReadbackBuffer(getFormatSize(objectIDsFormat), NUM_BUFFERED_FRAMES);
 
@@ -191,10 +215,7 @@ void main_renderer::recalculateViewport(bool resizeTextures)
 		resizeTexture(opaqueDepthBuffer, renderWidth, renderHeight);
 		resizeTexture(linearDepthBuffer, renderWidth, renderHeight);
 
-		if (objectIDsTexture)
-		{
-			resizeTexture(objectIDsTexture, renderWidth, renderHeight);
-		}
+		resizeTexture(objectIDsTexture, renderWidth, renderHeight);
 
 		resizeTexture(ssrRaycastTexture, SSR_RAYCAST_WIDTH, SSR_RAYCAST_HEIGHT);
 		resizeTexture(ssrResolveTexture, SSR_RESOLVE_WIDTH, SSR_RESOLVE_HEIGHT);
@@ -307,6 +328,9 @@ void main_renderer::endFrame(const user_input& input)
 
 
 
+	enableSSR &= spec.allowSSR;
+	enableBloom &= spec.allowBloom;
+	enableTAA &= spec.allowTAA;
 
 
 	if (mode == renderer_mode_rasterized)
@@ -565,7 +589,10 @@ void main_renderer::endFrame(const user_input& input)
 
 
 			// Downsample scene. This is also the copy used in SSR next frame.
-			downsample(cl, hdrResult, prevFrameHDRColorTexture, prevFrameHDRColorTempTexture);
+			if (prevFrameHDRColorTexture)
+			{
+				downsample(cl, hdrResult, prevFrameHDRColorTexture, prevFrameHDRColorTempTexture);
+			}
 
 
 

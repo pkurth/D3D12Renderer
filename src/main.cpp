@@ -111,8 +111,10 @@ int main(int argc, char** argv)
 
 	initializeImGui(screenFormat);
 
-	main_renderer renderer = {};
-	renderer.initialize(screenFormat, 1280, 800, true);
+	renderer_spec spec = { true, true, true, true };
+
+	main_renderer renderer;
+	renderer.initialize(screenFormat, 1280, 800, spec);
 
 	app.initialize(&renderer);
 
