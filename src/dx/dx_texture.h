@@ -7,11 +7,8 @@
 #include <string>
 
 // If the texture_load_flags_cache_to_dds flags is set, the system will cache the texture as DDS to disk for faster loading next time.
-// This is not done if the original file has a newer write time.
-// It is also not done if the cache was created with different flags.
-// Therefore: If you change these flags, delete the texture cache!
-
-// If you want the mip chain to be computed on the GPU, you must call this yourself. This system only supports CPU mip levels for now.
+// Loading from cache is not done if the original file has a newer write time or if the cache was created with different flags.
+// Therefore: If you change these flags in code, delete the texture cache!
 
 enum texture_load_flags
 {
@@ -45,7 +42,7 @@ struct dx_texture
 
 	dx_cpu_descriptor_handle defaultSRV; // SRV for the whole texture (all mip levels).
 	dx_cpu_descriptor_handle defaultUAV; // UAV for the first mip level.
-	dx_cpu_descriptor_handle uavAt(uint32 index) { return srvUavAllocation.cpuAt(1 + index); } // UAV for the first mip level.
+	dx_cpu_descriptor_handle uavAt(uint32 index) { return srvUavAllocation.cpuAt(1 + index); }
 
 	dx_cpu_descriptor_handle stencilSRV; // For depth stencil textures.
 
