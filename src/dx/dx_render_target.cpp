@@ -15,10 +15,10 @@ dx_render_target::dx_render_target(std::initializer_list<ref<dx_texture>> colorA
 		{
 			width = t->width;
 			height = t->height;
-			rtv[numAttachments++] = t->rtvHandles;
+			rtv[numAttachments++] = t->defaultRTV;
 		}
 	}
-	dsv = depthAttachment ? depthAttachment->dsvHandle : dx_dsv_descriptor_handle{ { 0 } };
+	dsv = depthAttachment ? depthAttachment->defaultDSV : dx_dsv_descriptor_handle{ { 0 } };
 
 	assert(numAttachments > 0 || depthAttachment != 0);
 

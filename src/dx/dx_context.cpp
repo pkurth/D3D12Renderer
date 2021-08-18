@@ -284,10 +284,10 @@ bool dx_context::initialize()
 	descriptorHandleIncrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 
-	descriptorAllocatorCPU.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096, false);
-	descriptorAllocatorGPU.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
-	rtvAllocator.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1024, false);
-	dsvAllocator.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1024, false);
+	srvUavAllocator.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, false, 4096);
+	srvUavAllocatorShaderVisible.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true, 128);
+	rtvAllocator.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, false, 1024);
+	dsvAllocator.initialize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, false, 1024);
 	frameDescriptorAllocator.initialize();
 
 	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)

@@ -47,7 +47,7 @@ private:
         dx_cpu_descriptor_handle output;
     };
 
-    dx_pushable_resource_descriptor_heap descriptorHeap;
+    dx_pushable_descriptor_heap descriptorHeap;
 
     uint32 instanceContributionToHitGroupIndex = 0;
     uint32 numRayTypes;

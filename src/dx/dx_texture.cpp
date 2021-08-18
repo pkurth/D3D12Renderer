@@ -664,7 +664,7 @@ void uploadTextureSubresourceData(ref<dx_texture> texture, D3D12_SUBRESOURCE_DAT
 	dxContext.executeCommandList(cl);
 }
 
-ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState)
+ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState, bool mipUAVs)
 {
 	ref<dx_texture> result = make_ref<dx_texture>();
 
@@ -736,11 +736,6 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 	result->height = textureDesc.Height;
 	result->depth = textureDesc.DepthOrArraySize;
 
-	result->defaultSRV = {};
-	result->defaultUAV = {};
-	result->rtvHandles = {};
-	result->dsvHandle = {};
-	result->stencilSRV = {};
 
 	result->initialState = initialState;
 
@@ -751,47 +746,60 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 		uploadTextureSubresourceData(result, subresourceData, 0, numSubresources);
 	}
 
+	uint32 numUAVMips = 0;
+	if (result->supportsUAV)
+	{
+		numUAVMips = (mipUAVs ? result->numMipLevels : 1);
+	}
+	result->srvUavAllocation = dxContext.srvUavAllocator.allocate(1 + numUAVMips);
+
 	// SRV.
 	if (textureDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
 	{
-		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createVolumeTextureSRV(result);
+		result->defaultSRV = dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(0)).createVolumeTextureSRV(result);
 	}
 	else if (textureDesc.DepthOrArraySize == 6)
 	{
-		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapSRV(result);
+		result->defaultSRV = dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(0)).createCubemapSRV(result);
 	}
 	else
 	{
-		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureSRV(result);
+		result->defaultSRV = dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(0)).create2DTextureSRV(result);
 	}
 
 	// RTV.
 	if (result->supportsRTV)
 	{
-		result->rtvHandles = dxContext.rtvAllocator.getFreeHandle().create2DTextureRTV(result);
+		result->rtvAllocation = dxContext.rtvAllocator.allocate();
+		result->defaultRTV = dx_rtv_descriptor_handle(result->rtvAllocation.cpuAt(0)).create2DTextureRTV(result);
 	}
 
 	// UAV.
 	if (result->supportsUAV)
 	{
-		if (textureDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+		result->defaultUAV = result->srvUavAllocation.cpuAt(1);
+
+		for (uint32 i = 0; i < numUAVMips; ++i)
 		{
-			result->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createVolumeTextureUAV(result);
-		}
-		else if (textureDesc.DepthOrArraySize == 6)
-		{
-			result->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapUAV(result);
-		}
-		else
-		{
-			result->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureUAV(result);
+			if (textureDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+			{
+				dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(1 + i)).createVolumeTextureUAV(result, i);
+			}
+			else if (textureDesc.DepthOrArraySize == 6)
+			{
+				dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(1 + i)).createCubemapUAV(result, i);
+			}
+			else
+			{
+				dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(1 + i)).create2DTextureUAV(result, i);
+			}
 		}
 	}
 
 	return result;
 }
 
-ref<dx_texture> createTexture(const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allocateMips, bool allowRenderTarget, bool allowUnorderedAccess, D3D12_RESOURCE_STATES initialState)
+ref<dx_texture> createTexture(const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allocateMips, bool allowRenderTarget, bool allowUnorderedAccess, D3D12_RESOURCE_STATES initialState, bool mipUAVs)
 {
 	D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE
 		| (allowRenderTarget ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE)
@@ -810,11 +818,11 @@ ref<dx_texture> createTexture(const void* data, uint32 width, uint32 height, DXG
 		subresource.SlicePitch = width * height * formatSize;
 		subresource.pData = data;
 
-		return createTexture(textureDesc, &subresource, 1, initialState);
+		return createTexture(textureDesc, &subresource, 1, initialState, mipUAVs);
 	}
 	else
 	{
-		return createTexture(textureDesc, 0, 0, initialState);
+		return createTexture(textureDesc, 0, 0, initialState, mipUAVs);
 	}
 }
 
@@ -839,11 +847,6 @@ static void initializeDepthTexture(ref<dx_texture> result, uint32 width, uint32 
 	result->supportsUAV = false;
 	result->supportsSRV = allocateDescriptors && formatSupportsSRV(formatSupport);
 
-	result->defaultSRV = {};
-	result->defaultUAV = {};
-	result->rtvHandles = {};
-	result->dsvHandle = {};
-	result->stencilSRV = {};
 
 	result->initialState = initialState;
 
@@ -851,19 +854,23 @@ static void initializeDepthTexture(ref<dx_texture> result, uint32 width, uint32 
 	{
 		assert(result->supportsDSV);
 
-		result->dsvHandle = dxContext.dsvAllocator.getFreeHandle().create2DTextureDSV(result);
+		result->dsvAllocation = dxContext.dsvAllocator.allocate();
+		result->defaultDSV = dx_dsv_descriptor_handle(result->dsvAllocation.cpuAt(0)).create2DTextureDSV(result);
+
 		if (arrayLength == 1)
 		{
-			result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureSRV(result);
+			result->srvUavAllocation = dxContext.srvUavAllocator.allocate(1 + isStencilFormat(format));
+			result->defaultSRV = dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(0)).createDepthTextureSRV(result);
 
 			if (isStencilFormat(format))
 			{
-				result->stencilSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createStencilTextureSRV(result);
+				result->stencilSRV = dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(1)).createStencilTextureSRV(result);
 			}
 		}
 		else
 		{
-			result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureArraySRV(result);
+			result->srvUavAllocation = dxContext.srvUavAllocator.allocate();
+			result->defaultSRV = dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(0)).createDepthTextureArraySRV(result);
 		}
 	}
 }
@@ -909,7 +916,7 @@ ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT form
 	return result;
 }
 
-ref<dx_texture> createCubeTexture(const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allocateMips, bool allowRenderTarget, bool allowUnorderedAccess, D3D12_RESOURCE_STATES initialState)
+ref<dx_texture> createCubeTexture(const void* data, uint32 width, uint32 height, DXGI_FORMAT format, bool allocateMips, bool allowRenderTarget, bool allowUnorderedAccess, D3D12_RESOURCE_STATES initialState, bool mipUAVs)
 {
 	D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE
 		| (allowRenderTarget ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE)
@@ -932,11 +939,11 @@ ref<dx_texture> createCubeTexture(const void* data, uint32 width, uint32 height,
 			subresource.pData = data;
 		}
 
-		return createTexture(textureDesc, subresources, 6, initialState);
+		return createTexture(textureDesc, subresources, 6, initialState, mipUAVs);
 	}
 	else
 	{
-		return createTexture(textureDesc, 0, 0, initialState);
+		return createTexture(textureDesc, 0, 0, initialState, mipUAVs);
 	}
 }
 
@@ -989,21 +996,7 @@ std::wstring dx_texture::getName() const
 	return name;
 }
 
-void allocateMipUAVs(ref<dx_texture> texture)
-{
-	auto desc = texture->resource->GetDesc();
-	assert(texture->supportsUAV);
-	assert(desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D); // Currently only supported for 2D textures.
-
-	uint32 mipLevels = desc.MipLevels;
-	for (uint32 i = 1; i < mipLevels; ++i)
-	{
-		dx_cpu_descriptor_handle h = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureUAV(texture, i);
-		texture->mipUAVs.push_back(h);
-	}
-}
-
-ref<dx_texture> createPlacedTexture(dx_heap heap, uint64 offset, uint32 width, uint32 height, DXGI_FORMAT format, bool allocateMips, bool allowRenderTarget, bool allowUnorderedAccess, D3D12_RESOURCE_STATES initialState)
+ref<dx_texture> createPlacedTexture(dx_heap heap, uint64 offset, uint32 width, uint32 height, DXGI_FORMAT format, bool allocateMips, bool allowRenderTarget, bool allowUnorderedAccess, D3D12_RESOURCE_STATES initialState, bool mipUAVs)
 {
 	D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE
 		| (allowRenderTarget ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE)
@@ -1013,10 +1006,10 @@ ref<dx_texture> createPlacedTexture(dx_heap heap, uint64 offset, uint32 width, u
 	uint32 numMips = allocateMips ? 0 : 1;
 	CD3DX12_RESOURCE_DESC textureDesc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, numMips, 1, 0, flags);
 	
-	return createPlacedTexture(heap, offset, textureDesc, initialState);
+	return createPlacedTexture(heap, offset, textureDesc, initialState, mipUAVs);
 }
 
-ref<dx_texture> createPlacedTexture(dx_heap heap, uint64 offset, D3D12_RESOURCE_DESC textureDesc, D3D12_RESOURCE_STATES initialState)
+ref<dx_texture> createPlacedTexture(dx_heap heap, uint64 offset, D3D12_RESOURCE_DESC textureDesc, D3D12_RESOURCE_STATES initialState, bool mipUAVs)
 {
 	ref<dx_texture> result = make_ref<dx_texture>();
 
@@ -1074,49 +1067,56 @@ ref<dx_texture> createPlacedTexture(dx_heap heap, uint64 offset, D3D12_RESOURCE_
 	result->height = textureDesc.Height;
 	result->depth = textureDesc.DepthOrArraySize;
 
-	result->defaultSRV = {};
-	result->defaultUAV = {};
-	result->rtvHandles = {};
-	result->dsvHandle = {};
-	result->stencilSRV = {};
-
 	result->initialState = initialState;
 
+
+	uint32 numUAVMips = 0;
+	if (result->supportsUAV)
+	{
+		numUAVMips = (mipUAVs ? result->numMipLevels : 1);
+	}
+	result->srvUavAllocation = dxContext.srvUavAllocator.allocate(1 + numUAVMips);
 
 	// SRV.
 	if (textureDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
 	{
-		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createVolumeTextureSRV(result);
+		result->defaultSRV = dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(0)).createVolumeTextureSRV(result);
 	}
 	else if (textureDesc.DepthOrArraySize == 6)
 	{
-		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapSRV(result);
+		result->defaultSRV = dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(0)).createCubemapSRV(result);
 	}
 	else
 	{
-		result->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureSRV(result);
+		result->defaultSRV = dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(0)).create2DTextureSRV(result);
 	}
 
 	// RTV.
 	if (result->supportsRTV)
 	{
-		result->rtvHandles = dxContext.rtvAllocator.getFreeHandle().create2DTextureRTV(result);
+		result->rtvAllocation = dxContext.rtvAllocator.allocate();
+		result->defaultRTV = dx_rtv_descriptor_handle(result->rtvAllocation.cpuAt(0)).create2DTextureRTV(result);
 	}
 
 	// UAV.
 	if (result->supportsUAV)
 	{
-		if (textureDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+		result->defaultUAV = result->srvUavAllocation.cpuAt(1);
+
+		for (uint32 i = 0; i < numUAVMips; ++i)
 		{
-			result->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createVolumeTextureUAV(result);
-		}
-		else if (textureDesc.DepthOrArraySize == 6)
-		{
-			result->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapUAV(result);
-		}
-		else
-		{
-			result->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureUAV(result);
+			if (textureDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+			{
+				dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(1 + i)).createVolumeTextureUAV(result, i);
+			}
+			else if (textureDesc.DepthOrArraySize == 6)
+			{
+				dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(1 + i)).createCubemapUAV(result, i);
+			}
+			else
+			{
+				dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(1 + i)).create2DTextureUAV(result, i);
+			}
 		}
 	}
 
@@ -1170,23 +1170,19 @@ ref<dx_texture> createPlacedDepthTexture(dx_heap heap, uint64 offset, D3D12_RESO
 	return result;
 }
 
-static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_descriptor_handle uav, dx_cpu_descriptor_handle stencil, dx_rtv_descriptor_handle rtv, dx_dsv_descriptor_handle dsv,
-	std::vector<dx_cpu_descriptor_handle>&& mipUAVs)
+static void retire(dx_resource resource, dx_descriptor_allocation srvUavAllocation, dx_descriptor_allocation rtvAllocation, dx_descriptor_allocation dsvAllocation)
 {
 	texture_grave grave;
 	grave.resource = resource;
-	grave.srv = srv;
-	grave.uav = uav;
-	grave.stencil = stencil;
-	grave.rtv = rtv;
-	grave.dsv = dsv;
-	grave.mipUAVs = std::move(mipUAVs);
+	grave.srvUavAllocation = srvUavAllocation;
+	grave.rtvAllocation = rtvAllocation;
+	grave.dsvAllocation = dsvAllocation;
 	dxContext.retire(std::move(grave));
 }
 
 dx_texture::~dx_texture()
 {
-	retire(resource, defaultSRV, defaultUAV, stencilSRV, rtvHandles, dsvHandle, std::move(mipUAVs));
+	retire(resource, srvUavAllocation, rtvAllocation, dsvAllocation);
 	if (allocation)
 	{
 		dxContext.retire(allocation);
@@ -1205,9 +1201,9 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 	texture->resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);
 	name[min(arraysize(name) - 1, size)] = 0;
 
-	bool hasMipUAVs = texture->mipUAVs.size() > 0;
+	bool hasMipUAVs = texture->srvUavAllocation.count > 2;
 
-	retire(texture->resource, texture->defaultSRV, texture->defaultUAV, texture->stencilSRV, texture->rtvHandles, texture->dsvHandle, std::move(texture->mipUAVs));
+	retire(texture->resource, texture->srvUavAllocation, texture->rtvAllocation, texture->dsvAllocation);
 	if (texture->allocation)
 	{
 		dxContext.retire(texture->allocation);
@@ -1263,66 +1259,82 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 
 	texture->numMipLevels = texture->resource->GetDesc().MipLevels;
 
+
+	uint32 numUAVMips = 0;
+	if (texture->supportsUAV)
+	{
+		numUAVMips = (hasMipUAVs ? texture->numMipLevels : 1);
+	}
+
+
+
 	// RTV.
 	if (texture->supportsRTV)
 	{
-		texture->rtvHandles = dxContext.rtvAllocator.getFreeHandle().create2DTextureRTV(texture);
+		texture->rtvAllocation = dxContext.rtvAllocator.allocate();
+		texture->defaultRTV = dx_rtv_descriptor_handle(texture->rtvAllocation.cpuAt(0)).create2DTextureRTV(texture);
 	}
 
 	// DSV & SRV.
 	if (texture->supportsDSV)
 	{
-		texture->dsvHandle = dxContext.dsvAllocator.getFreeHandle().create2DTextureDSV(texture);
+		texture->dsvAllocation = dxContext.dsvAllocator.allocate(1);
+		texture->defaultDSV = dx_dsv_descriptor_handle(texture->dsvAllocation.cpuAt(0)).create2DTextureDSV(texture);
+
+		texture->srvUavAllocation = dxContext.srvUavAllocator.allocate(1 + isStencilFormat(texture->format));
 		if (texture->depth == 1)
 		{
-			texture->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureSRV(texture);
+			texture->defaultSRV = dx_cpu_descriptor_handle(texture->srvUavAllocation.cpuAt(0)).createDepthTextureSRV(texture);
 		}
 		else
 		{
-			texture->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createDepthTextureArraySRV(texture);
+			texture->defaultSRV = dx_cpu_descriptor_handle(texture->srvUavAllocation.cpuAt(0)).createDepthTextureArraySRV(texture);
 		}
 
 		if (isStencilFormat(texture->format))
 		{
-			texture->stencilSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createStencilTextureSRV(texture);
+			texture->stencilSRV = dx_cpu_descriptor_handle(texture->srvUavAllocation.cpuAt(1)).createStencilTextureSRV(texture);
 		}
 	}
 	else
 	{
+		texture->srvUavAllocation = dxContext.srvUavAllocator.allocate(1 + numUAVMips);
+
 		if (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
 		{
-			texture->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createVolumeTextureSRV(texture);
+			texture->defaultSRV = dx_cpu_descriptor_handle(texture->srvUavAllocation.cpuAt(0)).createVolumeTextureSRV(texture);
 		}
 		else if (texture->depth == 6)
 		{
-			texture->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapSRV(texture);
+			texture->defaultSRV = dx_cpu_descriptor_handle(texture->srvUavAllocation.cpuAt(0)).createCubemapSRV(texture);
 		}
 		else
 		{
-			texture->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureSRV(texture);
+			texture->defaultSRV = dx_cpu_descriptor_handle(texture->srvUavAllocation.cpuAt(0)).create2DTextureSRV(texture);
 		}
-	}
 
-	// UAV.
-	if (texture->supportsUAV)
-	{
-		if (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
-		{
-			texture->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createVolumeTextureUAV(texture);
-		}
-		else if (texture->depth == 6)
-		{
-			texture->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createCubemapUAV(texture);
-		}
-		else
-		{
-			texture->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().create2DTextureUAV(texture);
-		}
-	}
 
-	if (hasMipUAVs)
-	{
-		allocateMipUAVs(texture);
+		// UAV.
+		if (texture->supportsUAV)
+		{
+			texture->defaultUAV = texture->srvUavAllocation.cpuAt(1);
+
+			for (uint32 i = 0; i < numUAVMips; ++i)
+			{
+				if (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+				{
+					dx_cpu_descriptor_handle(texture->srvUavAllocation.cpuAt(1 + i)).createVolumeTextureUAV(texture, i);
+				}
+				else if (desc.DepthOrArraySize == 6)
+				{
+					dx_cpu_descriptor_handle(texture->srvUavAllocation.cpuAt(1 + i)).createCubemapUAV(texture, i);
+				}
+				else
+				{
+					dx_cpu_descriptor_handle(texture->srvUavAllocation.cpuAt(1 + i)).create2DTextureUAV(texture, i);
+				}
+			}
+		}
 	}
 
 	texture->setName(name);
@@ -1338,31 +1350,9 @@ texture_grave::~texture_grave()
 		resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);
 		name[min(arraysize(name) - 1, size)] = 0;
 
-		if (srv.cpuHandle.ptr)
-		{
-			dxContext.descriptorAllocatorCPU.freeHandle(srv);
-		}
-		if (uav.cpuHandle.ptr)
-		{
-			dxContext.descriptorAllocatorCPU.freeHandle(uav);
-		}
-		if (stencil.cpuHandle.ptr)
-		{
-			dxContext.descriptorAllocatorCPU.freeHandle(stencil);
-		}
-		if (rtv.cpuHandle.ptr)
-		{
-			dxContext.rtvAllocator.freeHandle(rtv);
-		}
-		if (dsv.cpuHandle.ptr)
-		{
-			dxContext.dsvAllocator.freeHandle(dsv);
-		}
-
-		for (dx_cpu_descriptor_handle h : mipUAVs)
-		{
-			dxContext.descriptorAllocatorCPU.freeHandle(h);
-		}
+		dxContext.srvUavAllocator.free(srvUavAllocation);
+		dxContext.rtvAllocator.free(rtvAllocation);
+		dxContext.dsvAllocator.free(dsvAllocation);
 	}
 }
 

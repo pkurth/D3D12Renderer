@@ -231,27 +231,36 @@ static void initializeBuffer(ref<dx_buffer> buffer, uint32 elementSize, uint32 e
 		}
 	}
 
+	uint32 numDescriptors = buffer->supportsSRV + buffer->supportsUAV + buffer->supportsClearing + raytracing;
+	buffer->descriptorAllocation = dxContext.srvUavAllocator.allocate(numDescriptors);
+
+	uint32 index = 0;
+
 	if (buffer->supportsSRV)
 	{
-		buffer->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createBufferSRV(buffer);
+		buffer->defaultSRV = dx_cpu_descriptor_handle(buffer->descriptorAllocation.cpuAt(index++)).createBufferSRV(buffer);
 	}
 
 	if (buffer->supportsUAV)
 	{
-		buffer->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createBufferUAV(buffer);
+		buffer->defaultUAV = dx_cpu_descriptor_handle(buffer->descriptorAllocation.cpuAt(index++)).createBufferUAV(buffer);
 	}
 
 	if (buffer->supportsClearing)
 	{
-		buffer->cpuClearUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createBufferUintUAV(buffer);
-		dx_cpu_descriptor_handle shaderVisibleCPUHandle = dxContext.descriptorAllocatorGPU.getFreeHandle().createBufferUintUAV(buffer);
-		buffer->gpuClearUAV = dxContext.descriptorAllocatorGPU.getMatchingGPUHandle(shaderVisibleCPUHandle);
+		buffer->cpuClearUAV = dx_cpu_descriptor_handle(buffer->descriptorAllocation.cpuAt(index++)).createBufferUintUAV(buffer);
+
+		buffer->shaderVisibleDescriptorAllocation = dxContext.srvUavAllocatorShaderVisible.allocate(1);
+		dx_cpu_descriptor_handle(buffer->shaderVisibleDescriptorAllocation.cpuAt(0)).createBufferUintUAV(buffer);
+		buffer->gpuClearUAV = buffer->shaderVisibleDescriptorAllocation.gpuAt(0);
 	}
 
 	if (raytracing)
 	{
-		buffer->raytracingSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createRaytracingAccelerationStructureSRV(buffer);
+		buffer->raytracingSRV = dx_cpu_descriptor_handle(buffer->descriptorAllocation.cpuAt(index++)).createRaytracingAccelerationStructureSRV(buffer);
 	}
+
+	assert(index == numDescriptors);
 }
 
 ref<dx_buffer> createBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing, D3D12_RESOURCE_STATES initialState)
@@ -312,28 +321,18 @@ ref<dx_buffer> createRaytracingTLASBuffer(uint32 size)
 	return result;
 }
 
-static void retire(dx_resource resource, dx_cpu_descriptor_handle srv, dx_cpu_descriptor_handle uav, dx_cpu_descriptor_handle clear, dx_gpu_descriptor_handle gpuClear, dx_cpu_descriptor_handle raytracing)
+static void retire(dx_resource resource, dx_descriptor_allocation descriptorAllocation, dx_descriptor_allocation shaderVisibleDescriptorAllocation)
 {
 	buffer_grave grave;
 	grave.resource = resource;
-	grave.srv = srv;
-	grave.uav = uav;
-	grave.clear = clear;
-	grave.raytracing = raytracing;
-	if (gpuClear.gpuHandle.ptr)
-	{
-		grave.gpuClear = dxContext.descriptorAllocatorGPU.getMatchingCPUHandle(gpuClear);
-	}
-	else
-	{
-		grave.gpuClear = {};
-	}
+	grave.descriptorAllocation = descriptorAllocation;
+	grave.shaderVisibleDescriptorAllocation = shaderVisibleDescriptorAllocation;
 	dxContext.retire(std::move(grave));
 }
 
 dx_buffer::~dx_buffer()
 {
-	retire(resource, defaultSRV, defaultUAV, cpuClearUAV, gpuClearUAV, raytracingSRV);
+	retire(resource, descriptorAllocation, shaderVisibleDescriptorAllocation);
 	if (allocation)
 	{
 		dxContext.retire(allocation);
@@ -342,7 +341,7 @@ dx_buffer::~dx_buffer()
 
 void resizeBuffer(ref<dx_buffer> buffer, uint32 newElementCount, D3D12_RESOURCE_STATES initialState)
 {
-	retire(buffer->resource, buffer->defaultSRV, buffer->defaultUAV, buffer->cpuClearUAV, buffer->gpuClearUAV, buffer->raytracingSRV);
+	retire(buffer->resource, buffer->descriptorAllocation, buffer->shaderVisibleDescriptorAllocation);
 	if (buffer->allocation)
 	{
 		dxContext.retire(buffer->allocation);
@@ -380,49 +379,43 @@ void resizeBuffer(ref<dx_buffer> buffer, uint32 newElementCount, D3D12_RESOURCE_
 	buffer->gpuVirtualAddress = buffer->resource->GetGPUVirtualAddress();
 
 
+	uint32 numDescriptors = buffer->supportsSRV + buffer->supportsUAV + buffer->supportsClearing + buffer->raytracing;
+	buffer->descriptorAllocation = dxContext.srvUavAllocator.allocate(numDescriptors);
+
+	uint32 index = 0;
+
 	if (buffer->supportsSRV)
 	{
-		buffer->defaultSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createBufferSRV(buffer);
+		buffer->defaultSRV = dx_cpu_descriptor_handle(buffer->descriptorAllocation.cpuAt(index++)).createBufferSRV(buffer);
 	}
 
 	if (buffer->supportsUAV)
 	{
-		buffer->defaultUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createBufferUAV(buffer);
+		buffer->defaultUAV = dx_cpu_descriptor_handle(buffer->descriptorAllocation.cpuAt(index++)).createBufferUAV(buffer);
 	}
 
 	if (buffer->supportsClearing)
 	{
-		buffer->cpuClearUAV = dxContext.descriptorAllocatorCPU.getFreeHandle().createBufferUintUAV(buffer);
-		dx_cpu_descriptor_handle shaderVisibleCPUHandle = dxContext.descriptorAllocatorGPU.getFreeHandle().createBufferUintUAV(buffer);
-		buffer->gpuClearUAV = dxContext.descriptorAllocatorGPU.getMatchingGPUHandle(shaderVisibleCPUHandle);
+		buffer->cpuClearUAV = dx_cpu_descriptor_handle(buffer->descriptorAllocation.cpuAt(index++)).createBufferUintUAV(buffer);
+
+		buffer->shaderVisibleDescriptorAllocation = dxContext.srvUavAllocatorShaderVisible.allocate(1);
+		dx_cpu_descriptor_handle(buffer->shaderVisibleDescriptorAllocation.cpuAt(0)).createBufferUintUAV(buffer);
+		buffer->gpuClearUAV = buffer->shaderVisibleDescriptorAllocation.gpuAt(0);
 	}
 
 	if (buffer->raytracing)
 	{
-		buffer->raytracingSRV = dxContext.descriptorAllocatorCPU.getFreeHandle().createRaytracingAccelerationStructureSRV(buffer);
+		buffer->raytracingSRV = dx_cpu_descriptor_handle(buffer->descriptorAllocation.cpuAt(index++)).createRaytracingAccelerationStructureSRV(buffer);
 	}
+
+	assert(index == numDescriptors);
 }
 
 buffer_grave::~buffer_grave()
 {
 	if (resource)
 	{
-		if (srv.cpuHandle.ptr)
-		{
-			dxContext.descriptorAllocatorCPU.freeHandle(srv);
-		}
-		if (uav.cpuHandle.ptr)
-		{
-			dxContext.descriptorAllocatorCPU.freeHandle(uav);
-		}
-		if (clear.cpuHandle.ptr)
-		{
-			dxContext.descriptorAllocatorCPU.freeHandle(clear);
-			dxContext.descriptorAllocatorGPU.freeHandle(gpuClear);
-		}
-		if (raytracing.cpuHandle.ptr)
-		{
-			dxContext.descriptorAllocatorCPU.freeHandle(raytracing);
-		}
+		dxContext.srvUavAllocator.free(descriptorAllocation);
+		dxContext.srvUavAllocatorShaderVisible.free(shaderVisibleDescriptorAllocation);
 	}
 }

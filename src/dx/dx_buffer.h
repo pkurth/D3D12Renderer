@@ -1,7 +1,7 @@
 #pragma once
 
 #include "dx_descriptor.h"
-
+#include "dx_descriptor_allocation.h"
 
 struct dx_dynamic_constant_buffer
 {
@@ -20,6 +20,11 @@ struct dx_buffer
 
 	dx_resource resource;
 	D3D12MA::Allocation* allocation = 0;
+
+
+	dx_descriptor_allocation descriptorAllocation = {};
+	dx_descriptor_allocation shaderVisibleDescriptorAllocation = {};
+
 
 	dx_cpu_descriptor_handle defaultSRV;
 	dx_cpu_descriptor_handle defaultUAV;
@@ -68,11 +73,8 @@ struct buffer_grave
 {
 	dx_resource resource;
 
-	dx_cpu_descriptor_handle srv;
-	dx_cpu_descriptor_handle uav;
-	dx_cpu_descriptor_handle clear;
-	dx_cpu_descriptor_handle gpuClear;
-	dx_cpu_descriptor_handle raytracing;
+	dx_descriptor_allocation descriptorAllocation = {};
+	dx_descriptor_allocation shaderVisibleDescriptorAllocation = {};
 
 	buffer_grave() {}
 	buffer_grave(const buffer_grave& o) = delete;

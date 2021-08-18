@@ -25,7 +25,7 @@ protected:
 	dx_gpu_descriptor_handle copyGlobalResourcesToDescriptorHeap(const input_resources& in, const output_resources& out);
 
 	template <typename input_resources, typename output_resources>
-	void allocateDescriptorHeapSpaceForGlobalResources(dx_pushable_resource_descriptor_heap& descriptorHeap);
+	void allocateDescriptorHeapSpaceForGlobalResources(dx_pushable_descriptor_heap& descriptorHeap);
 
 	dx_raytracing_pipeline pipeline;
 
@@ -58,7 +58,7 @@ inline dx_gpu_descriptor_handle dx_raytracer::copyGlobalResourcesToDescriptorHea
 }
 
 template<typename input_resources, typename output_resources>
-inline void dx_raytracer::allocateDescriptorHeapSpaceForGlobalResources(dx_pushable_resource_descriptor_heap& descriptorHeap)
+inline void dx_raytracer::allocateDescriptorHeapSpaceForGlobalResources(dx_pushable_descriptor_heap& descriptorHeap)
 {
 	const uint32 numInputResources = sizeof(input_resources) / sizeof(dx_cpu_descriptor_handle);
 	const uint32 numOutputResources = sizeof(output_resources) / sizeof(dx_cpu_descriptor_handle);

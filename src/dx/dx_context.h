@@ -83,11 +83,11 @@ struct dx_context
 	uint64 frameID;
 	uint32 bufferedFrameID;
 
-	dx_descriptor_heap<dx_cpu_descriptor_handle> descriptorAllocatorCPU;
-	dx_descriptor_heap<dx_cpu_descriptor_handle> descriptorAllocatorGPU; // Used for resources, which can be UAV cleared.
+	dx_descriptor_heap srvUavAllocator;
+	dx_descriptor_heap srvUavAllocatorShaderVisible; // Used for resources, which can be UAV cleared.
 
-	dx_descriptor_heap<dx_rtv_descriptor_handle> rtvAllocator;
-	dx_descriptor_heap<dx_dsv_descriptor_handle> dsvAllocator;
+	dx_descriptor_heap rtvAllocator;
+	dx_descriptor_heap dsvAllocator;
 
 #if ENABLE_DX_PROFILING
 	volatile uint32 timestampQueryIndex[NUM_BUFFERED_FRAMES];

@@ -356,12 +356,12 @@ void dx_command_list::clearRTV(dx_rtv_descriptor_handle rtv, const float* clearC
 
 void dx_command_list::clearRTV(const ref<dx_texture>& texture, float r, float g, float b, float a, const clear_rect* rects, uint32 numRects)
 {
-	clearRTV(texture->rtvHandles, r, g, b, a, rects, numRects);
+	clearRTV(texture->defaultRTV, r, g, b, a, rects, numRects);
 }
 
 void dx_command_list::clearRTV(const ref<dx_texture>& texture, const float* clearColor, const clear_rect* rects, uint32 numRects)
 {
-	clearRTV(texture->rtvHandles, clearColor, rects, numRects);
+	clearRTV(texture->defaultRTV, clearColor, rects, numRects);
 }
 
 void dx_command_list::clearRTV(const dx_render_target& renderTarget, uint32 attachment, const float* clearColor, const clear_rect* rects, uint32 numRects)
@@ -386,6 +386,11 @@ void dx_command_list::clearDepth(dx_dsv_descriptor_handle dsv, float depth, cons
 	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, depth, 0, numRects, d3rects);
 }
 
+void dx_command_list::clearDepth(const ref<dx_texture>& texture, float depth, const clear_rect* rects, uint32 numRects)
+{
+	clearDepth(texture->defaultDSV, depth, rects, numRects);
+}
+
 void dx_command_list::clearDepth(const dx_render_target& renderTarget, float depth, const clear_rect* rects, uint32 numRects)
 {
 	clearDepth(renderTarget.dsv, depth, rects, numRects);
@@ -403,6 +408,11 @@ void dx_command_list::clearStencil(dx_dsv_descriptor_handle dsv, uint32 stencil,
 	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_STENCIL, 0.f, stencil, numRects, d3rects);
 }
 
+void dx_command_list::clearStencil(const ref<dx_texture>& texture, uint32 stencil, const clear_rect* rects, uint32 numRects)
+{
+	clearStencil(texture->defaultDSV, stencil, rects, numRects);
+}
+
 void dx_command_list::clearStencil(const dx_render_target& renderTarget, uint32 stencil, const clear_rect* rects, uint32 numRects)
 {
 	clearStencil(renderTarget.dsv, stencil, rects, numRects);
@@ -418,6 +428,11 @@ void dx_command_list::clearDepthAndStencil(dx_dsv_descriptor_handle dsv, float d
 	}
 
 	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth, stencil, numRects, d3rects);
+}
+
+void dx_command_list::clearDepthAndStencil(const ref<dx_texture>& texture, float depth, uint32 stencil, const clear_rect* rects, uint32 numRects)
+{
+	clearDepthAndStencil(texture->defaultDSV, depth, stencil, rects, numRects);
 }
 
 void dx_command_list::clearDepthAndStencil(const dx_render_target& renderTarget, float depth, uint32 stencil, const clear_rect* rects, uint32 numRects)

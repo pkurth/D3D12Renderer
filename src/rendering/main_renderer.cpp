@@ -36,10 +36,8 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 	{
 		D3D12_RESOURCE_DESC prevFrameHDRColorDesc = CD3DX12_RESOURCE_DESC::Tex2D(hdrFormat, renderWidth / 2, renderHeight / 2, 1,
 			8, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		prevFrameHDRColorTexture = createTexture(prevFrameHDRColorDesc, 0, 0, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		prevFrameHDRColorTempTexture = createTexture(prevFrameHDRColorDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		allocateMipUAVs(prevFrameHDRColorTexture);
-		allocateMipUAVs(prevFrameHDRColorTempTexture);
+		prevFrameHDRColorTexture = createTexture(prevFrameHDRColorDesc, 0, 0, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, true);
+		prevFrameHDRColorTempTexture = createTexture(prevFrameHDRColorDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
 
 		SET_NAME(prevFrameHDRColorTexture->resource, "Prev frame HDR Color");
 		SET_NAME(prevFrameHDRColorTempTexture->resource, "Prev frame HDR Color Temp");
@@ -64,8 +62,7 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 	opaqueDepthBuffer = createDepthTexture(renderWidth, renderHeight, hdrDepthStencilFormat, 1, D3D12_RESOURCE_STATE_COPY_DEST);
 	D3D12_RESOURCE_DESC linearDepthDesc = CD3DX12_RESOURCE_DESC::Tex2D(linearDepthFormat, renderWidth, renderHeight, 1,
 		6, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-	linearDepthBuffer = createTexture(linearDepthDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	allocateMipUAVs(linearDepthBuffer);
+	linearDepthBuffer = createTexture(linearDepthDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
 	SET_NAME(depthStencilBuffer->resource, "Depth buffer");
 	SET_NAME(opaqueDepthBuffer->resource, "Opaque depth buffer");
 	SET_NAME(linearDepthBuffer->resource, "Linear depth buffer");
@@ -106,10 +103,8 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 	{
 		D3D12_RESOURCE_DESC bloomDesc = CD3DX12_RESOURCE_DESC::Tex2D(hdrPostProcessFormat, renderWidth / 4, renderHeight / 4, 1,
 			5, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		bloomTexture = createTexture(bloomDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		bloomTempTexture = createTexture(bloomDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		allocateMipUAVs(bloomTexture);
-		allocateMipUAVs(bloomTempTexture);
+		bloomTexture = createTexture(bloomDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
+		bloomTempTexture = createTexture(bloomDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
 
 		SET_NAME(bloomTexture->resource, "Bloom");
 		SET_NAME(bloomTempTexture->resource, "Bloom Temp");
@@ -357,7 +352,7 @@ void main_renderer::endFrame(const user_input& input)
 
 
 
-			cl->clearDepthAndStencil(depthStencilBuffer->dsvHandle);
+			cl->clearDepthAndStencil(depthStencilBuffer);
 			cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 			waitForSkinningToFinish();

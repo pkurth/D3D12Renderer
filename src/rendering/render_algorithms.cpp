@@ -339,7 +339,7 @@ void shadowPasses(dx_command_list* cl,
 
 		if (numClearRects)
 		{
-			cl->clearDepth(render_resources::shadowMap->dsvHandle, 1.f, clearRects, numClearRects);
+			cl->clearDepth(render_resources::shadowMap->defaultDSV, 1.f, clearRects, numClearRects);
 		}
 
 		if (numCopiesToStaticCache)
@@ -858,12 +858,12 @@ void linearDepthPyramid(dx_command_list* cl,
 	float height = ceilf(depthStencilBuffer->height * 0.5f);
 
 	cl->setCompute32BitConstants(HIERARCHICAL_LINEAR_DEPTH_RS_CB, hierarchical_linear_depth_cb{ projectionParams, vec2(1.f / width, 1.f / height) });
-	cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 0, linearDepthBuffer->defaultUAV);
-	cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 1, linearDepthBuffer->mipUAVs[0]);
-	cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 2, linearDepthBuffer->mipUAVs[1]);
-	cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 3, linearDepthBuffer->mipUAVs[2]);
-	cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 4, linearDepthBuffer->mipUAVs[3]);
-	cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 5, linearDepthBuffer->mipUAVs[4]);
+	cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 0, linearDepthBuffer->uavAt(0));
+	cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 1, linearDepthBuffer->uavAt(0));
+	cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 2, linearDepthBuffer->uavAt(1));
+	cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 3, linearDepthBuffer->uavAt(2));
+	cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 4, linearDepthBuffer->uavAt(3));
+	cl->setDescriptorHeapUAV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 5, linearDepthBuffer->uavAt(4));
 	cl->setDescriptorHeapSRV(HIERARCHICAL_LINEAR_DEPTH_RS_TEXTURES, 6, depthStencilBuffer);
 
 	cl->dispatch(bucketize((uint32)width, POST_PROCESSING_BLOCK_SIZE), bucketize((uint32)height, POST_PROCESSING_BLOCK_SIZE));
@@ -891,8 +891,6 @@ void gaussianBlur(dx_command_list* cl,
 	uint32 widthBuckets = bucketize(outputWidth, POST_PROCESSING_BLOCK_SIZE);
 	uint32 heightBuckets = bucketize(outputHeight, POST_PROCESSING_BLOCK_SIZE);
 
-	assert((outputMip == 0) || ((uint32)inputOutput->mipUAVs.size() >= outputMip));
-	assert((outputMip == 0) || ((uint32)temp->mipUAVs.size() >= outputMip));
 	assert(inputMip <= outputMip); // Currently only downsampling supported.
 
 	float scale = 1.f / (1 << (outputMip - inputMip));
@@ -907,7 +905,7 @@ void gaussianBlur(dx_command_list* cl,
 		{
 			DX_PROFILE_BLOCK(cl, "Vertical");
 
-			dx_cpu_descriptor_handle tempUAV = (outputMip == 0) ? temp->defaultUAV : temp->mipUAVs[outputMip - 1];
+			dx_cpu_descriptor_handle tempUAV = temp->uavAt(outputMip);
 
 			// Vertical pass.
 			cb.directionAndSourceMipLevel = (1 << 16) | sourceMip;
@@ -929,7 +927,7 @@ void gaussianBlur(dx_command_list* cl,
 		{
 			DX_PROFILE_BLOCK(cl, "Horizontal");
 
-			dx_cpu_descriptor_handle outputUAV = (outputMip == 0) ? inputOutput->defaultUAV : inputOutput->mipUAVs[outputMip - 1];
+			dx_cpu_descriptor_handle outputUAV = inputOutput->uavAt(outputMip);
 
 			// Horizontal pass.
 			cb.directionAndSourceMipLevel = (0 << 16) | sourceMip;

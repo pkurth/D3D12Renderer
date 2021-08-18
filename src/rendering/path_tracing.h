@@ -65,7 +65,7 @@ private:
     // TODO: The descriptor heap shouldn't be a member of this structure. If we have multiple raytracers which use the same object types, they can share the descriptor heap.
     // For example, this path tracer defines objects with vertex buffer, index buffer and their PBR textures. Other raytracers, which use the same layout (e.g. a specular reflections
     // raytracer) may very well use the same descriptor heap.
-    dx_pushable_resource_descriptor_heap descriptorHeap;
+    dx_pushable_descriptor_heap descriptorHeap;
 
     uint32 instanceContributionToHitGroupIndex = 0;
     uint32 numRayTypes;

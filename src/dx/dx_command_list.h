@@ -96,7 +96,6 @@ struct dx_command_list
 
 
 	// Shader resources.
-	template <typename T> void setDescriptorHeap(dx_descriptor_heap<T>& descriptorHeap);
 	void setDescriptorHeap(dx_descriptor_range& descriptorRange);
 	void setDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, com<ID3D12DescriptorHeap> descriptorHeap);
 	void resetToDynamicDescriptorHeap();
@@ -135,12 +134,15 @@ struct dx_command_list
 	void clearRTV(const dx_render_target& renderTarget, uint32 attachment, float r, float g, float b, float a = 1.f, const clear_rect* rects = 0, uint32 numRects = 0);
 
 	void clearDepth(dx_dsv_descriptor_handle dsv, float depth = 1.f, const clear_rect* rects = 0, uint32 numRects = 0);
+	void clearDepth(const ref<dx_texture>& texture, float depth = 1.f, const clear_rect* rects = 0, uint32 numRects = 0);
 	void clearDepth(const dx_render_target& renderTarget, float depth = 1.f, const clear_rect* rects = 0, uint32 numRects = 0);
 
 	void clearStencil(dx_dsv_descriptor_handle dsv, uint32 stencil = 0, const clear_rect* rects = 0, uint32 numRects = 0);
+	void clearStencil(const ref<dx_texture>& texture, uint32 stencil = 0, const clear_rect* rects = 0, uint32 numRects = 0);
 	void clearStencil(const dx_render_target& renderTarget, uint32 stencil = 0, const clear_rect* rects = 0, uint32 numRects = 0);
 
 	void clearDepthAndStencil(dx_dsv_descriptor_handle dsv, float depth = 1.f, uint32 stencil = 0, const clear_rect* rects = 0, uint32 numRects = 0);
+	void clearDepthAndStencil(const ref<dx_texture>& texture, float depth = 1.f, uint32 stencil = 0, const clear_rect* rects = 0, uint32 numRects = 0);
 	void clearDepthAndStencil(const dx_render_target& renderTarget, float depth = 1.f, uint32 stencil = 0, const clear_rect* rects = 0, uint32 numRects = 0);
 
 	void setStencilReference(uint32 stencilReference);
@@ -177,26 +179,6 @@ struct dx_command_list
 
 	void reset();
 };
-
-template<typename T>
-void dx_command_list::setDescriptorHeap(dx_descriptor_heap<T>& descriptorHeap)
-{
-	descriptorHeaps[descriptorHeap.type] = descriptorHeap.descriptorHeap.Get();
-
-	uint32 numDescriptorHeaps = 0;
-	ID3D12DescriptorHeap* heaps[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES] = {};
-
-	for (uint32_t i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
-	{
-		ID3D12DescriptorHeap* heap = descriptorHeaps[i];
-		if (heap)
-		{
-			heaps[numDescriptorHeaps++] = heap;
-		}
-	}
-
-	commandList->SetDescriptorHeaps(numDescriptorHeaps, heaps);
-}
 
 template<typename T>
 void dx_command_list::setGraphics32BitConstants(uint32 rootParameterIndex, const T& constants)
