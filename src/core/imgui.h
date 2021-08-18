@@ -5,7 +5,7 @@
 
 #include "dx/dx.h"
 
-ImGuiContext* initializeImGui(DXGI_FORMAT screenFormat);
+ImGuiContext* initializeImGui(struct dx_window& window);
 void newImGuiFrame(float dt);
 void renderImGui(struct dx_command_list* cl);
 

@@ -6,7 +6,6 @@
 #include "dx/dx_texture.h"
 #include "dx/dx_barrier_batcher.h"
 #include "dx/dx_profiling.h"
-#include "render_utils.h"
 
 #include "raytracing.h"
 
@@ -20,7 +19,7 @@
 
 
 
-void main_renderer::initialize(DXGI_FORMAT outputFormat, uint32 windowWidth, uint32 windowHeight, renderer_spec spec)
+void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint32 windowHeight, renderer_spec spec)
 {
 	this->windowWidth = windowWidth;
 	this->windowHeight = windowHeight;
@@ -117,7 +116,7 @@ void main_renderer::initialize(DXGI_FORMAT outputFormat, uint32 windowWidth, uin
 	}
 
 
-	frameResult = createTexture(0, windowWidth, windowHeight, outputFormat, false, true, true);
+	frameResult = createTexture(0, windowWidth, windowHeight, colorDepthToFormat(colorDepth), false, true, true);
 	SET_NAME(frameResult->resource, "Frame result");
 
 

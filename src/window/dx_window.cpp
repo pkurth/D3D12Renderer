@@ -35,15 +35,7 @@ static dx_swapchain createSwapChain(HWND windowHandle,
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 	swapChainDesc.Width = width;
 	swapChainDesc.Height = height;
-	if (colorDepth == color_depth_8)
-	{
-		swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	}
-	else
-	{
-		assert(colorDepth == color_depth_10);
-		swapChainDesc.Format = DXGI_FORMAT_R10G10B10A2_UNORM;
-	}
+	swapChainDesc.Format = colorDepthToFormat(colorDepth);
 	swapChainDesc.Stereo = FALSE;
 	swapChainDesc.SampleDesc = { 1, 0 };
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -192,22 +184,23 @@ static void setSwapChainColorSpace(dx_swapchain swapchain, color_depth colorDept
 	checkResult(swapchain->SetHDRMetaData(DXGI_HDR_METADATA_TYPE_HDR10, sizeof(DXGI_HDR_METADATA_HDR10), &hdr10MetaData));
 }
 
-static void updateRenderTargetViews(dx_window& window, dx_device device)
+void dx_window::updateRenderTargetViews()
 {
-	uint32 rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	uint32 rtvDescriptorSize = dxContext.device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(window.rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
 	for (int i = 0; i < NUM_BUFFERED_FRAMES; ++i)
 	{
 		dx_resource backBuffer;
-		checkResult(window.swapchain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
+		checkResult(swapchain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
 
-		device->CreateRenderTargetView(backBuffer.Get(), 0, rtvHandle);
+		dxContext.device->CreateRenderTargetView(backBuffer.Get(), 0, rtvHandle);
 
-		window.backBuffers[i] = backBuffer;
+		backBuffers[i] = backBuffer;
+		backBufferRTVs[i] = rtvHandle;
 
-		SET_NAME(window.backBuffers[i], "Backbuffer");
+		SET_NAME(backBuffers[i], "Backbuffer");
 
 		rtvHandle.Offset(rtvDescriptorSize);
 	}
@@ -218,15 +211,6 @@ dx_window::~dx_window()
 	dxContext.flushApplication();
 
 	shutdown();
-	/*for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
-	{
-		dxContext.retireObject(backBuffers[i]);
-	}
-	dxContext.retireObject(rtvDescriptorHeap);
-	if (depthBuffer)
-	{
-		dxContext.retireObject(depthBuffer->resource);
-	}*/
 }
 
 bool dx_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clientHeight, color_depth colorDepth, bool exclusiveFullscreen)
@@ -250,7 +234,6 @@ bool dx_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clientH
 	descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 
 	checkResult(dxContext.device->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&rtvDescriptorHeap)));
-	rtvDescriptorSize = dxContext.device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 	RECT windowRect = { 0, 0, (LONG)clientWidth, (LONG)clientHeight };
 	AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
@@ -258,7 +241,7 @@ bool dx_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clientH
 	hdrSupport = checkForHDRSupport(dxContext.factory, windowRect, colorDepth);
 	setSwapChainColorSpace(swapchain, colorDepth, hdrSupport);
 
-	updateRenderTargetViews(*this, dxContext.device);
+	updateRenderTargetViews();
 
 	initialized = true;
 
@@ -296,7 +279,7 @@ void dx_window::onResize()
 
 		currentBackbufferIndex = swapchain->GetCurrentBackBufferIndex();
 
-		updateRenderTargetViews(*this, dxContext.device);
+		updateRenderTargetViews();
 	}
 }
 

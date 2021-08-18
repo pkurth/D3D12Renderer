@@ -12,9 +12,10 @@
 #include <imgui/backends/imgui_impl_dx12.cpp>
 
 #include "imgui.h"
-#include "window/window.h"
 #include "dx/dx_context.h"
 #include "dx/dx_command_list.h"
+#include "dx/dx_profiling.h"
+#include "window/dx_window.h"
 
 
 #define MAX_NUM_IMGUI_IMAGES_PER_FRAME 128
@@ -62,7 +63,7 @@ static void setStyle()
 }
 
 
-ImGuiContext* initializeImGui(DXGI_FORMAT screenFormat)
+ImGuiContext* initializeImGui(struct dx_window& window)
 {
 	IMGUI_CHECKVERSION();
 	auto imguiContext = ImGui::CreateContext();
@@ -107,7 +108,9 @@ ImGuiContext* initializeImGui(DXGI_FORMAT screenFormat)
 	startGPUDescriptor = imguiDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
 	descriptorHandleIncrementSize = dxContext.device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-	ImGui_ImplWin32_Init(win32_window::mainWindow->windowHandle);
+	DXGI_FORMAT screenFormat = (window.colorDepth == color_depth_8) ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R10G10B10A2_UNORM;
+
+	ImGui_ImplWin32_Init(window.windowHandle);
 	ImGui_ImplDX12_Init(dxContext.device.Get(), NUM_BUFFERED_FRAMES,
 		screenFormat, imguiDescriptorHeap.Get(),
 		startCPUDescriptor,
@@ -135,6 +138,8 @@ void newImGuiFrame(float dt)
 
 void renderImGui(dx_command_list* cl)
 {
+	DX_PROFILE_BLOCK(cl, "ImGui");
+
 	ImGui::Render();
 	if (cl)
 	{

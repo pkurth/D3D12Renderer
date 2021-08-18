@@ -14,6 +14,11 @@ enum stencil_flags
 	stencil_flag_selected_object = (1 << 0),
 };
 
+enum color_depth
+{
+	color_depth_8,
+	color_depth_10,
+};
 
 void initializeRenderUtils();
 void endFrameCommon();
@@ -66,5 +71,9 @@ static constexpr DXGI_FORMAT transparentLightPassFormats[] = { hdrPostProcessFor
 static constexpr DXGI_FORMAT skyPassFormats[] = { hdrFormat, screenVelocitiesFormat, objectIDsFormat };
 
 
+static constexpr DXGI_FORMAT colorDepthToFormat(color_depth colorDepth)
+{
+	return (colorDepth == color_depth_8) ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R10G10B10A2_UNORM;
+}
 
 

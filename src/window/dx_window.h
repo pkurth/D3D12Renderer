@@ -1,13 +1,9 @@
 #pragma once
 
 #include "dx/dx.h"
+#include "dx/dx_descriptor.h"
+#include "rendering/render_utils.h"
 #include "window.h"
-
-enum color_depth
-{
-	color_depth_8,
-	color_depth_10,
-};
 
 struct dx_window : win32_window
 {
@@ -30,16 +26,18 @@ struct dx_window : win32_window
 	virtual void onWindowDisplayChange();
 
 
-
-	dx_swapchain swapchain;
 	dx_resource backBuffers[NUM_BUFFERED_FRAMES];
-	com<ID3D12DescriptorHeap> rtvDescriptorHeap;
-	uint32 rtvDescriptorSize;
+	dx_rtv_descriptor_handle backBufferRTVs[NUM_BUFFERED_FRAMES];
 	uint32 currentBackbufferIndex;
 
 	color_depth colorDepth;
 
-	RECT windowRectBeforeFullscreen;
+private:
+	void updateRenderTargetViews();
+
+	dx_swapchain swapchain;
+	com<ID3D12DescriptorHeap> rtvDescriptorHeap;
+
 
 	bool tearingSupported;
 	bool exclusiveFullscreen;

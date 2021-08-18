@@ -9,6 +9,7 @@
 #include "raytracer.h"
 #include "render_algorithms.h"
 #include "render_resources.h"
+#include "render_utils.h"
 
 #include "light_source.hlsli"
 #include "camera.hlsli"
@@ -66,7 +67,7 @@ struct renderer_spec
 struct main_renderer
 {
 	main_renderer() {}
-	void initialize(DXGI_FORMAT outputFormat, uint32 windowWidth, uint32 windowHeight, renderer_spec spec);
+	void initialize(color_depth colorDepth, uint32 windowWidth, uint32 windowHeight, renderer_spec spec);
 
 	void beginFrame(uint32 windowWidth, uint32 windowHeight);
 	void endFrame(const user_input& input);

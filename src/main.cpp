@@ -51,7 +51,7 @@ static bool newFrame(float& dt)
 static uint64 renderToMainWindow(dx_window& window)
 {
 	dx_resource backbuffer = window.backBuffers[window.currentBackbufferIndex];
-	dx_rtv_descriptor_handle rtv = { CD3DX12_CPU_DESCRIPTOR_HANDLE(window.rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), window.currentBackbufferIndex, window.rtvDescriptorSize) };
+	dx_rtv_descriptor_handle rtv = window.backBufferRTVs[window.currentBackbufferIndex];
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
@@ -66,12 +66,7 @@ static uint64 renderToMainWindow(dx_window& window)
 		cl->clearRTV(rtv, 0.f, 0.f, 0.f);
 		cl->setRenderTarget(&rtv, 1, 0);
 
-		if (win32_window::mainWindow == &window)
-		{
-			DX_PROFILE_BLOCK(cl, "ImGui");
-
-			renderImGui(cl);
-		}
+		renderImGui(cl);
 
 		cl->transitionBarrier(backbuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 	}
@@ -94,7 +89,6 @@ int main(int argc, char** argv)
 	initializeJobSystem();
 
 	const color_depth colorDepth = color_depth_8;
-	DXGI_FORMAT screenFormat = (colorDepth == color_depth_8) ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R10G10B10A2_UNORM;
 
 	dx_window window;
 	window.initialize(TEXT("Main Window"), 1280, 800, colorDepth);
@@ -109,12 +103,12 @@ int main(int argc, char** argv)
 	initializeTransformationGizmos();
 	initializeRenderUtils();
 
-	initializeImGui(screenFormat);
+	initializeImGui(window);
 
 	renderer_spec spec = { true, true, true, true };
 
 	main_renderer renderer;
-	renderer.initialize(screenFormat, 1280, 800, spec);
+	renderer.initialize(colorDepth, 1280, 800, spec);
 
 	app.initialize(&renderer);
 
