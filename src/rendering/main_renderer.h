@@ -50,12 +50,6 @@ static const char* rendererModeNames[] =
 };
 
 
-
-
-#define MAX_NUM_SPOT_LIGHT_SHADOW_PASSES 16
-#define MAX_NUM_POINT_LIGHT_SHADOW_PASSES 16
-
-
 struct renderer_spec
 {
 	bool allowObjectPicking = true; // This currently can only be true, if ALL other flags are also set to true.
@@ -85,9 +79,6 @@ struct main_renderer
 	void submitRenderPass(opaque_render_pass* renderPass) {	assert(!opaqueRenderPass); opaqueRenderPass = renderPass; }
 	void submitRenderPass(transparent_render_pass* renderPass) { assert(!transparentRenderPass); transparentRenderPass = renderPass; }
 	void submitRenderPass(overlay_render_pass* renderPass) { assert(!overlayRenderPass); overlayRenderPass = renderPass; }
-	void submitRenderPass(sun_shadow_render_pass* renderPass) {	assert(!sunShadowRenderPass); sunShadowRenderPass = renderPass; }
-	void submitRenderPass(spot_shadow_render_pass* renderPass) { assert(numSpotLightShadowRenderPasses < MAX_NUM_SPOT_LIGHT_SHADOW_PASSES);	spotLightShadowRenderPasses[numSpotLightShadowRenderPasses++] = renderPass; }
-	void submitRenderPass(point_shadow_render_pass* renderPass) { assert(numPointLightShadowRenderPasses < MAX_NUM_POINT_LIGHT_SHADOW_PASSES); pointLightShadowRenderPasses[numPointLightShadowRenderPasses++] = renderPass; }
 	void setRaytracer(dx_raytracer* raytracer, raytracing_tlas* tlas) {	this->raytracer = raytracer; this->tlas = tlas;	}
 
 
@@ -133,11 +124,6 @@ private:
 
 	const opaque_render_pass* opaqueRenderPass;
 	const transparent_render_pass* transparentRenderPass;
-	const sun_shadow_render_pass* sunShadowRenderPass;
-	const spot_shadow_render_pass* spotLightShadowRenderPasses[MAX_NUM_SPOT_LIGHT_SHADOW_PASSES];
-	const point_shadow_render_pass* pointLightShadowRenderPasses[MAX_NUM_POINT_LIGHT_SHADOW_PASSES];
-	uint32 numSpotLightShadowRenderPasses;
-	uint32 numPointLightShadowRenderPasses;
 	overlay_render_pass* overlayRenderPass;
 
 

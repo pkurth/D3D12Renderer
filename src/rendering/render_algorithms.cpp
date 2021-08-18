@@ -262,11 +262,11 @@ void preethamSky(dx_command_list* cl,
 void shadowPasses(dx_command_list* cl,
 	const dx_pipeline& shadowPipeline,
 	const dx_pipeline& pointLightShadowPipeline,
-	const sun_shadow_render_pass* sunShadowRenderPass, const directional_light_cb& sun,
+	const sun_shadow_render_pass** sunShadowRenderPasses, uint32 numSunLightShadowRenderPasses,
 	const spot_shadow_render_pass** spotLightShadowRenderPasses, uint32 numSpotLightShadowRenderPasses,
 	const point_shadow_render_pass** pointLightShadowRenderPasses, uint32 numPointLightShadowRenderPasses)
 {
-	if (sunShadowRenderPass || numSpotLightShadowRenderPasses || numPointLightShadowRenderPasses)
+	if (numSunLightShadowRenderPasses || numSpotLightShadowRenderPasses || numPointLightShadowRenderPasses)
 	{
 		DX_PROFILE_BLOCK(cl, "Shadow map pass");
 
@@ -280,12 +280,16 @@ void shadowPasses(dx_command_list* cl,
 		uint32 numCopiesToStaticCache = 0;
 
 		{
-			if (sunShadowRenderPass)
+			for (uint32 passIndex = 0; passIndex < numSunLightShadowRenderPasses; ++passIndex)
 			{
-				for (uint32 i = 0; i < sun.numShadowCascades; ++i)
+				auto pass = sunShadowRenderPasses[passIndex];
+
+				for (uint32 cascadeIndex = 0; cascadeIndex < pass->numCascades; ++cascadeIndex)
 				{
-					shadow_map_viewport vp = sunShadowRenderPass->viewports[i];
-					if (sunShadowRenderPass->copyFromStaticCache)
+					const sun_cascade_render_pass& cascade = pass->cascades[cascadeIndex];
+					shadow_map_viewport vp = cascade.viewport;
+
+					if (pass->copyFromStaticCache)
 					{
 						copiesFromStaticCache[numCopiesFromStaticCache++] = vp;
 					}
@@ -403,27 +407,33 @@ void shadowPasses(dx_command_list* cl,
 		dx_render_target shadowRenderTarget({}, render_resources::shadowMap);
 		cl->setRenderTarget(shadowRenderTarget);
 
-		if (sunShadowRenderPass || numSpotLightShadowRenderPasses)
+		if (numSunLightShadowRenderPasses || numSpotLightShadowRenderPasses)
 		{
 			cl->setPipelineState(*shadowPipeline.pipeline);
 			cl->setGraphicsRootSignature(*shadowPipeline.rootSignature);
 		}
 
-		if (sunShadowRenderPass)
+		if (numSunLightShadowRenderPasses)
 		{
 			DX_PROFILE_BLOCK(cl, "Sun static geometry");
 
-			for (uint32 i = 0; i < sun.numShadowCascades; ++i)
+			for (uint32 passIndex = 0; passIndex < numSunLightShadowRenderPasses; ++passIndex)
 			{
-				DX_PROFILE_BLOCK(cl, (i == 0) ? "First cascade" : (i == 1) ? "Second cascade" : (i == 2) ? "Third cascade" : "Fourth cascade");
+				auto pass = sunShadowRenderPasses[passIndex];
 
-				shadow_map_viewport vp = sunShadowRenderPass->viewports[i];
-				clear_rect rect = { vp.x, vp.y, vp.size, vp.size };
-				cl->setViewport(vp.x, vp.y, vp.size, vp.size);
-
-				for (uint32 cascade = 0; cascade <= i; ++cascade)
+				for (uint32 renderCascadeIndex = 0; renderCascadeIndex < pass->numCascades; ++renderCascadeIndex)
 				{
-					renderSunCascadeShadow(cl, sunShadowRenderPass->staticDrawCalls[cascade], sun.vp[i]);
+					const sun_cascade_render_pass& cascade = pass->cascades[renderCascadeIndex];
+
+					DX_PROFILE_BLOCK(cl, (renderCascadeIndex == 0) ? "First cascade" : (renderCascadeIndex == 1) ? "Second cascade" : (renderCascadeIndex == 2) ? "Third cascade" : "Fourth cascade");
+
+					shadow_map_viewport vp = cascade.viewport;
+					cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+
+					for (uint32 i = 0; i <= renderCascadeIndex; ++i)
+					{
+						renderSunCascadeShadow(cl, pass->cascades[i].staticDrawCalls, cascade.viewProj);
+					}
 				}
 			}
 		}
@@ -484,27 +494,33 @@ void shadowPasses(dx_command_list* cl,
 
 		cl->setRenderTarget(shadowRenderTarget);
 
-		if (sunShadowRenderPass || numSpotLightShadowRenderPasses)
+		if (numSunLightShadowRenderPasses || numSpotLightShadowRenderPasses)
 		{
 			cl->setPipelineState(*shadowPipeline.pipeline);
 			cl->setGraphicsRootSignature(*shadowPipeline.rootSignature);
 		}
 
-		if (sunShadowRenderPass)
+		if (numSunLightShadowRenderPasses)
 		{
 			DX_PROFILE_BLOCK(cl, "Sun dynamic geometry");
 
-			for (uint32 i = 0; i < sun.numShadowCascades; ++i)
+			for (uint32 passIndex = 0; passIndex < numSunLightShadowRenderPasses; ++passIndex)
 			{
-				DX_PROFILE_BLOCK(cl, (i == 0) ? "First cascade" : (i == 1) ? "Second cascade" : (i == 2) ? "Third cascade" : "Fourth cascade");
+				auto pass = sunShadowRenderPasses[passIndex];
 
-				shadow_map_viewport vp = sunShadowRenderPass->viewports[i];
-				clear_rect rect = { vp.x, vp.y, vp.size, vp.size };
-				cl->setViewport(vp.x, vp.y, vp.size, vp.size);
-
-				for (uint32 cascade = 0; cascade <= i; ++cascade)
+				for (uint32 renderCascadeIndex = 0; renderCascadeIndex < 4; ++renderCascadeIndex)
 				{
-					renderSunCascadeShadow(cl, sunShadowRenderPass->dynamicDrawCalls[cascade], sun.vp[i]);
+					const sun_cascade_render_pass& cascade = pass->cascades[renderCascadeIndex];
+
+					DX_PROFILE_BLOCK(cl, (renderCascadeIndex == 0) ? "First cascade" : (renderCascadeIndex == 1) ? "Second cascade" : (renderCascadeIndex == 2) ? "Third cascade" : "Fourth cascade");
+
+					shadow_map_viewport vp = cascade.viewport;
+					cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+
+					for (uint32 i = 0; i <= renderCascadeIndex; ++i)
+					{
+						renderSunCascadeShadow(cl, pass->cascades[i].dynamicDrawCalls, cascade.viewProj);
+					}
 				}
 			}
 		}

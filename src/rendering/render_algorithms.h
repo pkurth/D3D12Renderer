@@ -135,7 +135,7 @@ void preethamSky(dx_command_list* cl,
 void shadowPasses(dx_command_list* cl,
 	const dx_pipeline& shadowPipeline,
 	const dx_pipeline& pointLightShadowPipeline,
-	const sun_shadow_render_pass* sunShadowRenderPass, const directional_light_cb& sun,
+	const sun_shadow_render_pass** sunShadowRenderPasses, uint32 numSunLightShadowRenderPasses,
 	const spot_shadow_render_pass** spotLightShadowRenderPasses, uint32 numSpotLightShadowRenderPasses,
 	const point_shadow_render_pass** pointLightShadowRenderPasses, uint32 numPointLightShadowRenderPasses);
 

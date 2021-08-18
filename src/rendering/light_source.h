@@ -18,7 +18,8 @@ struct directional_light
 	vec4 cascadeDistances;
 	vec4 bias;
 
-	mat4 vp[MAX_NUM_SUN_SHADOW_CASCADES];
+	vec4 shadowMapViewports[MAX_NUM_SUN_SHADOW_CASCADES];
+	mat4 viewProjs[MAX_NUM_SUN_SHADOW_CASCADES];
 
 	vec4 blendDistances;
 	uint32 shadowDimensions;

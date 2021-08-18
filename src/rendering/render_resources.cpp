@@ -42,7 +42,7 @@ void render_resources::initializeGlobalResources()
 
 	noiseTexture = loadTextureFromFile("assets/noise/blue_noise.dds", texture_load_flags_noncolor); // Already compressed and in DDS format.
 
-	shadowMap = createDepthTexture(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, shadowDepthFormat);
+	shadowMap = createDepthTexture(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, shadowDepthFormat, 1, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	SET_NAME(shadowMap->resource, "Shadow map");
 
 	staticShadowMapCache = createDepthTexture(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, shadowDepthFormat, 1, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);

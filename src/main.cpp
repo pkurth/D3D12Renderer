@@ -9,6 +9,7 @@
 #include "application.h"
 #include "rendering/render_utils.h"
 #include "rendering/main_renderer.h"
+#include "rendering/shadow_map_renderer.h"
 #include "editor/asset_editor_panel.h"
 
 
@@ -222,11 +223,13 @@ int main(int argc, char** argv)
 		dxContext.renderQueue.waitForFence(fenceValues[window.currentBackbufferIndex]);
 		dxContext.newFrame(frameID);
 
+		shadow_map_renderer::beginFrame();
 		renderer.beginFrame(renderWidth, renderHeight);
 		
 		app.update(input, dt);
 
 		endFrameCommon();
+		shadow_map_renderer::endFrame();
 		renderer.endFrame(input);
 
 		fileBrowser.draw(meshEditor);

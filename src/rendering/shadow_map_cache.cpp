@@ -227,15 +227,8 @@ uint64 getLightMovementHash(const directional_light& dl)
 	size_t seed = 0;
 	for (uint32 i = 0; i < dl.numShadowCascades; ++i)
 	{
-		hash_combine(seed, dl.vp[i]);
+		hash_combine(seed, dl.viewProjs[i]);
 	}
-	return seed;
-}
-
-uint64 getLightMovementHash(const struct directional_light& dl, uint32 cascadeIndex)
-{
-	size_t seed = 0;
-	hash_combine(seed, dl.vp[cascadeIndex]);
 	return seed;
 }
 

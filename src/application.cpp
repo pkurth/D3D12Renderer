@@ -12,6 +12,7 @@
 #include "core/threading.h"
 #include "rendering/mesh_shader.h"
 #include "rendering/shadow_map_cache.h"
+#include "rendering/shadow_map_renderer.h"
 #include "editor/file_dialog.h"
 #include "core/yaml.h"
 #include "learning/locomotion_learning.h"
@@ -988,16 +989,17 @@ void application::submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 num
 	renderer->submitRenderPass(&opaqueRenderPass);
 	renderer->submitRenderPass(&transparentRenderPass);
 	renderer->submitRenderPass(&overlayRenderPass);
-	renderer->submitRenderPass(&sunShadowRenderPass);
+
+	shadow_map_renderer::submitRenderPass(&sunShadowRenderPass);
 
 	for (uint32 i = 0; i < numSpotLightShadowPasses; ++i)
 	{
-		renderer->submitRenderPass(&spotShadowRenderPasses[i]);
+		shadow_map_renderer::submitRenderPass(&spotShadowRenderPasses[i]);
 	}
 
 	for (uint32 i = 0; i < numPointLightShadowPasses; ++i)
 	{
-		renderer->submitRenderPass(&pointShadowRenderPasses[i]);
+		shadow_map_renderer::submitRenderPass(&pointShadowRenderPasses[i]);
 	}
 }
 
@@ -1205,12 +1207,20 @@ void application::renderSunShadowMap(bool objectDragged)
 
 	bool staticCacheAvailable = !objectDragged;
 
+	sunShadowRenderPass.numCascades = sun.numShadowCascades;
+
+	uint64 sunMovementHash = getLightMovementHash(sun);
+
 	for (uint32 i = 0; i < sun.numShadowCascades; ++i)
 	{
-		uint64 sunMovementHash = getLightMovementHash(sun, i);
 		auto [vp, cache] = assignShadowMapViewport(i, sunMovementHash, sun.shadowDimensions);
-		sunShadowRenderPass.viewports[i] = vp;
+		
+		sun.shadowMapViewports[i] = vec4(vp.x, vp.y, vp.size, vp.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
 
+		sun_cascade_render_pass& cascadePass = sunShadowRenderPass.cascades[i];
+		cascadePass.viewport = vp;
+		cascadePass.viewProj = sun.viewProjs[i];
+		
 		staticCacheAvailable &= cache;
 	}
 

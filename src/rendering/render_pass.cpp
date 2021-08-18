@@ -27,9 +27,9 @@ void transparent_render_pass::reset()
 	particleDrawCalls.clear();
 }
 
-void sun_shadow_render_pass::renderStaticObject(uint32 cascadeIndex, const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+void sun_cascade_render_pass::renderStaticObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
 {
-	staticDrawCalls[cascadeIndex].push_back(
+	staticDrawCalls.push_back(
 		{
 			transform,
 			vertexBuffer.positions,
@@ -39,9 +39,9 @@ void sun_shadow_render_pass::renderStaticObject(uint32 cascadeIndex, const verte
 	);
 }
 
-void sun_shadow_render_pass::renderDynamicObject(uint32 cascadeIndex, const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+void sun_cascade_render_pass::renderDynamicObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
 {
-	dynamicDrawCalls[cascadeIndex].push_back(
+	dynamicDrawCalls.push_back(
 		{
 			transform,
 			vertexBuffer.positions,
@@ -49,14 +49,29 @@ void sun_shadow_render_pass::renderDynamicObject(uint32 cascadeIndex, const vert
 			submesh,
 		}
 	);
+}
+
+void sun_cascade_render_pass::reset()
+{
+	staticDrawCalls.clear();
+	dynamicDrawCalls.clear();
+}
+
+void sun_shadow_render_pass::renderStaticObject(uint32 cascadeIndex, const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+{
+	cascades[cascadeIndex].renderStaticObject(vertexBuffer, indexBuffer, submesh, transform);
+}
+
+void sun_shadow_render_pass::renderDynamicObject(uint32 cascadeIndex, const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
+{
+	cascades[cascadeIndex].renderDynamicObject(vertexBuffer, indexBuffer, submesh, transform);
 }
 
 void sun_shadow_render_pass::reset()
 {
 	for (uint32 i = 0; i < MAX_NUM_SUN_SHADOW_CASCADES; ++i)
 	{
-		staticDrawCalls[i].clear();
-		dynamicDrawCalls[i].clear();
+		cascades[i].reset();
 	}
 
 	copyFromStaticCache = false;

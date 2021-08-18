@@ -10,7 +10,6 @@ struct shadow_map_viewport
 
 // Call after light view-projection-matrices are computed.
 uint64 getLightMovementHash(const struct directional_light& dl); // Whole light.
-uint64 getLightMovementHash(const struct directional_light& dl, uint32 cascadeIndex);
 uint64 getLightMovementHash(const struct spot_light_cb& sl);
 uint64 getLightMovementHash(const struct point_light_cb& pl);
 

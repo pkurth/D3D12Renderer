@@ -160,9 +160,6 @@ void main_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 	opaqueRenderPass = 0;
 	overlayRenderPass = 0;
 	transparentRenderPass = 0;
-	sunShadowRenderPass = 0;
-	numSpotLightShadowRenderPasses = 0;
-	numPointLightShadowRenderPasses = 0;
 
 	pointLights = 0;
 	spotLights = 0;
@@ -254,7 +251,8 @@ void main_renderer::setSun(const directional_light& light)
 	sun.radiance = light.color * light.intensity;
 	sun.numShadowCascades = light.numShadowCascades;
 
-	memcpy(sun.vp, light.vp, sizeof(mat4) * light.numShadowCascades);
+	memcpy(sun.viewProjs, light.viewProjs, sizeof(mat4) * light.numShadowCascades);
+	memcpy(sun.viewports, light.shadowMapViewports, sizeof(vec4) * light.numShadowCascades);
 }
 
 void main_renderer::setPointLights(const ref<dx_buffer>& lights, uint32 numLights, const ref<dx_buffer>& shadowInfoBuffer)
@@ -288,8 +286,6 @@ void main_renderer::endFrame(const user_input& input)
 	{
 		recalculateViewport(true);
 	}
-
-	assignSunShadowMapViewports(sunShadowRenderPass, sun);
 
 	auto jitteredCameraCBV = dxContext.uploadDynamicConstantBuffer(jitteredCamera);
 	auto unjitteredCameraCBV = dxContext.uploadDynamicConstantBuffer(unjitteredCamera);
@@ -390,22 +386,6 @@ void main_renderer::endFrame(const user_input& input)
 				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 
-			// ----------------------------------------
-			// SHADOW MAP PASS
-			// ----------------------------------------
-
-			shadowPasses(cl, shadowPipeline, pointLightShadowPipeline,
-				sunShadowRenderPass, sun,
-				spotLightShadowRenderPasses, numSpotLightShadowRenderPasses,
-				pointLightShadowRenderPasses, numPointLightShadowRenderPasses);
-
-
-
-
-			barrier_batcher(cl)
-				.transition(render_resources::shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-
 			cls[0] = cl;
 		});
 
@@ -474,7 +454,6 @@ void main_renderer::endFrame(const user_input& input)
 					.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 					.transitionEnd(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 			}
-
 
 			{
 				DX_PROFILE_BLOCK(cl, "Copy depth buffer");
@@ -651,7 +630,6 @@ void main_renderer::endFrame(const user_input& input)
 
 			barrier_batcher(cl)
 				//.uav(frameResult)
-				.transition(render_resources::shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
 				.transition(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
 				.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 				.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)

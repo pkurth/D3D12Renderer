@@ -171,18 +171,6 @@ void buildCameraConstantBuffer(const render_camera& camera, vec2 jitter, camera_
 	outCB.jitter = jitter;
 }
 
-void assignSunShadowMapViewports(const sun_shadow_render_pass* sunShadowRenderPass, directional_light_cb& sun)
-{
-	if (sunShadowRenderPass)
-	{
-		for (uint32 i = 0; i < sun.numShadowCascades; ++i)
-		{
-			auto vp = sunShadowRenderPass->viewports[i];
-			sun.viewports[i] = vec4(vp.x, vp.y, vp.size, vp.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
-		}
-	}
-}
-
 void waitForSkinningToFinish()
 {
 	if (skinningFence)

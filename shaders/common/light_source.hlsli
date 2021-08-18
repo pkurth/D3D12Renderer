@@ -20,7 +20,7 @@ static float getAttenuation(float distance, float maxDistance)
 
 struct directional_light_cb
 {
-	mat4 vp[MAX_NUM_SUN_SHADOW_CASCADES];
+	mat4 viewProjs[MAX_NUM_SUN_SHADOW_CASCADES];
 	vec4 viewports[MAX_NUM_SUN_SHADOW_CASCADES];
 
 	vec4 cascadeDistances;

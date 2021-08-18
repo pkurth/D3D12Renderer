@@ -292,19 +292,31 @@ struct shadow_render_pass
 	};
 };
 
-struct sun_shadow_render_pass : shadow_render_pass
+struct sun_cascade_render_pass : shadow_render_pass
 {
-	shadow_map_viewport viewports[MAX_NUM_SUN_SHADOW_CASCADES];
-	bool copyFromStaticCache;
+	void renderStaticObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
+	void renderDynamicObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
 
+	void reset();
+
+
+	mat4 viewProj;
+	shadow_map_viewport viewport;
+	std::vector<draw_call> staticDrawCalls;
+	std::vector<draw_call> dynamicDrawCalls;
+};
+
+struct sun_shadow_render_pass
+{
 	// Since each cascade includes the next lower one, if you submit a draw to cascade N, it will also be rendered in N-1 automatically. No need to add it to the lower one.
 	void renderStaticObject(uint32 cascadeIndex, const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
 	void renderDynamicObject(uint32 cascadeIndex, const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform);
 
 	void reset();
 
-	std::vector<draw_call> staticDrawCalls[MAX_NUM_SUN_SHADOW_CASCADES];
-	std::vector<draw_call> dynamicDrawCalls[MAX_NUM_SUN_SHADOW_CASCADES];
+	sun_cascade_render_pass cascades[MAX_NUM_SUN_SHADOW_CASCADES];
+	uint32 numCascades;
+	bool copyFromStaticCache;
 };
 
 struct spot_shadow_render_pass : shadow_render_pass

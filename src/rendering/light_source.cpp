@@ -97,7 +97,7 @@ void directional_light::updateMatrices(const render_camera& camera)
 			projMatrix.m13 += roundOffset.y;
 		}
 
-		vp[cascade] = projMatrix * viewMatrix;
+		viewProjs[cascade] = projMatrix * viewMatrix;
 	}
 }
 

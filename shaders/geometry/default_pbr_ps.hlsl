@@ -252,7 +252,7 @@ ps_output main(ps_input IN)
 		light_info light;
 		light.initialize(surface, L, sun.radiance);
 
-		float visibility = sampleCascadedShadowMapPCF(sun.vp, surface.P,
+		float visibility = sampleCascadedShadowMapPCF(sun.viewProjs, surface.P,
 			shadowMap, sun.viewports,
 			shadowSampler, lighting.shadowMapTexelSize, pixelDepth, sun.numShadowCascades,
 			sun.cascadeDistances, sun.bias, sun.blendDistances);

@@ -164,7 +164,7 @@ void main(cs_input IN)
 #if 1 // Cascaded vs single.
 		float pixelDepth = dot(camera.forward.xyz, inScatterPoint - O);
 #if 1 // Simple vs PCF
-		float visibility = sampleCascadedShadowMapSimple(sun.vp, inScatterPoint, 
+		float visibility = sampleCascadedShadowMapSimple(sun.viewProjs, inScatterPoint, 
 			shadowMap, sun.viewports,
 			shadowSampler, pixelDepth, sun.numShadowCascades,
 			sun.cascadeDistances, sun.bias, sun.blendDistances);
@@ -177,7 +177,7 @@ void main(cs_input IN)
 #else
 		uint currentCascadeIndex = sun.numShadowCascades - 1;
 		float4 bias = sun.bias;
-		float visibility = sampleShadowMapPCF(sun.vp[currentCascadeIndex], inScatterPoint, 
+		float visibility = sampleShadowMapPCF(sun.viewProjs[currentCascadeIndex], inScatterPoint,
 			shadowMap, sun.viewports[currentCascadeIndex],
 			shadowSampler, sun.texelSize, bias[currentCascadeIndex]);
 #endif
