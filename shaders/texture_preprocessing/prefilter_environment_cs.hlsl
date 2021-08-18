@@ -108,10 +108,7 @@ static float4 filter(uint mip, float3 N, float3 V)
 [numthreads(BLOCK_SIZE, BLOCK_SIZE, 1)]
 void main(cs_input IN)
 {
-	// Cubemap texture coords.
 	uint3 texCoord = IN.dispatchThreadID;
-
-	// First check if the thread is in the cubemap dimensions.
 	if (texCoord.x >= cubemapSize || texCoord.y >= cubemapSize) return;
 
 	// Map the UV coords of the cubemap face to a direction

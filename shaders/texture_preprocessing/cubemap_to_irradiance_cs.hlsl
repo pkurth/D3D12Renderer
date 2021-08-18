@@ -59,10 +59,7 @@ static const float3x3 rotateUV[6] = {
 [numthreads(BLOCK_SIZE, BLOCK_SIZE, 1)]
 void main(cs_input IN)
 {
-	// Cubemap texture coords.
 	uint3 texCoord = IN.dispatchThreadID;
-
-	// First check if the thread is in the cubemap dimensions.
 	if (texCoord.x >= irradianceMapSize || texCoord.y >= irradianceMapSize) return;
 
 	// Map the UV coords of the cubemap face to a direction.

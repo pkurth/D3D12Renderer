@@ -95,17 +95,14 @@ float4 packColor(float4 x)
 [numthreads(BLOCK_SIZE, BLOCK_SIZE, 1)]
 void main(cs_input IN)
 {
-	// Cubemap texture coords.
 	uint3 texCoord = IN.dispatchThreadID;
-
-	// First check if the thread is in the cubemap dimensions.
 	if (texCoord.x >= cubemapSize || texCoord.y >= cubemapSize) return;
 
 	// Map the UV coords of the cubemap face to a direction
 	// [(0, 0), (1, 1)] => [(-0.5, -0.5), (0.5, 0.5)]
 	float3 dir = float3(texCoord.xy / float(cubemapSize) - 0.5f, 0.5f);
 
-	// Rotate to cubemap face
+	// Rotate to cubemap face.
 	dir = normalize(mul(rotateUV[texCoord.z], dir));
 	dir.z *= -1.f;
 
