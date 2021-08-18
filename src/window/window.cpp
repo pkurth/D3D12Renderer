@@ -137,6 +137,10 @@ void win32_window::shutdown()
 		windowHandle = 0;
 		DestroyWindow(handle);
 	}
+
+	fullscreen = false;
+	open = false;
+	visible = false;
 }
 
 void win32_window::toggleFullscreen()

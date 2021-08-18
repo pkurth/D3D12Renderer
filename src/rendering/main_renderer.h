@@ -143,10 +143,10 @@ private:
 
 	uint32 windowWidth;
 	uint32 windowHeight;
-	uint32 windowXOffset;
-	uint32 windowYOffset;
+	int32 windowXOffset = 0;
+	int32 windowYOffset = 0;
 
-	bool windowHoveredInThePast = false;
+	bool windowHovered = false;
 
 	ref<dx_texture> hdrColorTexture;
 	ref<dx_texture> worldNormalsTexture;
@@ -181,9 +181,9 @@ private:
 	ref<dx_buffer> pointLightShadowInfoBuffer;
 	ref<dx_buffer> spotLightShadowInfoBuffer;
 	ref<dx_buffer> decals;
-	uint32 numPointLights;
-	uint32 numSpotLights;
-	uint32 numDecals;
+	uint32 numPointLights = 0;
+	uint32 numSpotLights = 0;
+	uint32 numDecals = 0;
 
 	ref<dx_texture> decalTextureAtlas;
 

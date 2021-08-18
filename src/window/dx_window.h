@@ -13,7 +13,7 @@ struct dx_window : win32_window
 
 	virtual ~dx_window();
 
-	bool initialize(const TCHAR* name, uint32 initialWidth, uint32 initialHeight, color_depth colorDepth, bool exclusiveFullscreen = false);
+	bool initialize(const TCHAR* name, uint32 initialWidth, uint32 initialHeight, color_depth colorDepth = color_depth_8, bool exclusiveFullscreen = false);
 
 	virtual void shutdown();
 
@@ -42,8 +42,6 @@ private:
 	bool tearingSupported;
 	bool exclusiveFullscreen;
 	bool hdrSupport;
-	bool fullscreen = false;
 	bool vSync = false;
-	bool open = true;
 	bool initialized = false;
 };

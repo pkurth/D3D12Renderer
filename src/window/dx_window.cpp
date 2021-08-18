@@ -250,6 +250,14 @@ bool dx_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clientH
 
 void dx_window::shutdown()
 {
+	dxContext.retire(rtvDescriptorHeap);
+	rtvDescriptorHeap.Reset();
+	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
+	{
+		dxContext.retire(backBuffers[i]);
+		backBuffers[i].Reset();
+	}
+
 	initialized = false;
 	win32_window::shutdown();
 }

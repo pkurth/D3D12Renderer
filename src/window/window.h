@@ -38,9 +38,9 @@ struct win32_window
 
 	WINDOWPLACEMENT windowPosition;
 
-	bool fullscreen;
-	bool open;
-	bool visible;
+	bool fullscreen = false;
+	bool open = false;
+	bool visible = false;
 
 	std::function<void(const std::string&)> fileDropCallback;
 

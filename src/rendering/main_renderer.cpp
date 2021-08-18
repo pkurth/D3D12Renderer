@@ -151,11 +151,15 @@ void main_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 		recalculateViewport(true);
 	}
 
-	if (objectIDsTexture && windowHoveredInThePast)
+	if (objectIDsTexture && windowHovered)
 	{
 		uint32* id = (uint32*)mapBuffer(hoveredObjectIDReadbackBuffer, true, map_range{ dxContext.bufferedFrameID, 1 });
 		hoveredObjectID = *id;
 		unmapBuffer(hoveredObjectIDReadbackBuffer, false);
+	}
+	else
+	{
+		hoveredObjectID = -1;
 	}
 
 	opaqueRenderPass = 0;
@@ -189,7 +193,7 @@ void main_renderer::recalculateViewport(bool resizeTextures)
 		{
 			renderWidth = (uint32)(windowHeight * targetAspect);
 			renderHeight = windowHeight;
-			windowXOffset = (windowWidth - renderWidth) / 2;
+			windowXOffset = (int32)(windowWidth - renderWidth) / 2;
 			windowYOffset = 0;
 		}
 		else
@@ -197,7 +201,7 @@ void main_renderer::recalculateViewport(bool resizeTextures)
 			renderWidth = windowWidth;
 			renderHeight = (uint32)(windowWidth / targetAspect);
 			windowXOffset = 0;
-			windowYOffset = (windowHeight - renderHeight) / 2;
+			windowYOffset = (int32)(windowHeight - renderHeight) / 2;
 		}
 	}
 
@@ -437,23 +441,20 @@ void main_renderer::endFrame(const user_input& input)
 			// Copy hovered object id to readback buffer.
 			if (objectIDsTexture)
 			{
-				DX_PROFILE_BLOCK(cl, "Copy hovered object ID");
+				windowHovered = input.overWindow
+					&& (input.mouse.x - windowXOffset >= 0)
+					&& (input.mouse.x - windowXOffset < (int32)renderWidth)
+					&& (input.mouse.y - windowYOffset >= 0)
+					&& (input.mouse.y - windowYOffset < (int32)renderHeight);
 
-				barrier_batcher(cl)
-					.transition(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-
-				if (input.overWindow
-					&& (input.mouse.x - (int32)windowXOffset >= 0)
-					&& (input.mouse.x - (int32)windowXOffset < (int32)renderWidth)
-					&& (input.mouse.y - (int32)windowYOffset >= 0)
-					&& (input.mouse.y - (int32)windowYOffset < (int32)renderHeight))
+				if (windowHovered)
 				{
-					cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer, dxContext.bufferedFrameID, (uint32)input.mouse.x - windowXOffset, (uint32)input.mouse.y - windowYOffset, 1, 1);
-					windowHoveredInThePast = true;
-				}
+					DX_PROFILE_BLOCK(cl, "Copy hovered object ID");
 
-				barrier_batcher(cl)
-					.transition(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+					cl->transitionBarrier(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+					cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer, dxContext.bufferedFrameID, input.mouse.x - windowXOffset, input.mouse.y - windowYOffset, 1, 1);
+					cl->transitionBarrier(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+				}
 			}
 
 
