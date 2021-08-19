@@ -1,4 +1,3 @@
-#include "flat_simple_rs.hlsli"
 #include "transform.hlsli"
 
 ConstantBuffer<transform_cb> transform : register(b0);

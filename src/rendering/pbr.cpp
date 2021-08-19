@@ -14,6 +14,7 @@
 #include "material.hlsli"
 
 #include <unordered_map>
+#include <memory>
 
 static dx_pipeline defaultOpaquePBRPipeline;
 static dx_pipeline defaultTransparentPBRPipeline;
@@ -61,7 +62,25 @@ static bool operator==(const material_key& a, const material_key& b)
 		&& a.metallicOverride == b.metallicOverride;
 }
 
-ref<pbr_material> createPBRMaterial(const std::string& albedoTex, const std::string& normalTex, const std::string& roughTex, const std::string& metallicTex, const vec4& emission, const vec4& albedoTint, float roughOverride, float metallicOverride)
+ref<opaque_pbr_material> asOpaque(const ref<pbr_material>& material)
+{
+	return std::static_pointer_cast<opaque_pbr_material>(material);
+}
+
+ref<transparent_pbr_material> asTransparent(const ref<pbr_material>& material)
+{
+	return std::static_pointer_cast<transparent_pbr_material>(material);
+}
+
+ref<pbr_material> createPBRMaterial(
+	const std::string& albedoTex, 
+	const std::string& normalTex, 
+	const std::string& roughTex, 
+	const std::string& metallicTex, 
+	const vec4& emission, 
+	const vec4& albedoTint, 
+	float roughOverride, 
+	float metallicOverride)
 {
 	material_key s =
 	{
@@ -72,7 +91,7 @@ ref<pbr_material> createPBRMaterial(const std::string& albedoTex, const std::str
 		emission,
 		albedoTint,
 		!roughTex.empty() ? 1.f : roughOverride,			// If texture is set, override does not matter, so set it to consistent value.
-		!metallicTex.empty() ? 0.f : metallicOverride,	// If texture is set, override does not matter, so set it to consistent value.
+		!metallicTex.empty() ? 0.f : metallicOverride,		// If texture is set, override does not matter, so set it to consistent value.
 	};
 
 
@@ -157,53 +176,7 @@ ref<pbr_environment> createEnvironment(const std::string& filename, uint32 skyRe
 	return sp;
 }
 
-void pbr_material::prepareForRendering(dx_command_list* cl)
-{
-	uint32 flags = 0;
-
-	if (albedo)
-	{
-		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 0, albedo);
-		flags |= USE_ALBEDO_TEXTURE;
-	}
-	if (normal)
-	{
-		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 1, normal);
-		flags |= USE_NORMAL_TEXTURE;
-	}
-	if (roughness)
-	{
-		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 2, roughness);
-		flags |= USE_ROUGHNESS_TEXTURE;
-	}
-	if (metallic)
-	{
-		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 3, metallic);
-		flags |= USE_METALLIC_TEXTURE;
-	}
-
-	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_MATERIAL,
-		pbr_material_cb(albedoTint, emission.xyz, roughnessOverride, metallicOverride, flags)
-	);
-}
-
-void pbr_material::setupOpaquePipeline(dx_command_list* cl, const common_material_info& info)
-{
-	cl->setPipelineState(*defaultOpaquePBRPipeline.pipeline);
-	cl->setGraphicsRootSignature(*defaultOpaquePBRPipeline.rootSignature);
-
-	setupCommon(cl, info);
-}
-
-void pbr_material::setupTransparentPipeline(dx_command_list* cl, const common_material_info& info)
-{
-	cl->setPipelineState(*defaultTransparentPBRPipeline.pipeline);
-	cl->setGraphicsRootSignature(*defaultTransparentPBRPipeline.rootSignature);
-
-	setupCommon(cl, info);
-}
-
-void pbr_material::setupCommon(dx_command_list* cl, const common_material_info& info)
+static void setupCommon(dx_command_list* cl, const common_material_info& info)
 {
 	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
 	dx_cpu_descriptor_handle nullBuffer = render_resources::nullBufferSRV;
@@ -239,12 +212,58 @@ void pbr_material::setupCommon(dx_command_list* cl, const common_material_info& 
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 3, nullTexture);
 }
 
+void pbr_material::prepareForRendering(dx_command_list* cl)
+{
+	uint32 flags = 0;
+
+	if (albedo)
+	{
+		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 0, albedo);
+		flags |= USE_ALBEDO_TEXTURE;
+	}
+	if (normal)
+	{
+		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 1, normal);
+		flags |= USE_NORMAL_TEXTURE;
+	}
+	if (roughness)
+	{
+		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 2, roughness);
+		flags |= USE_ROUGHNESS_TEXTURE;
+	}
+	if (metallic)
+	{
+		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 3, metallic);
+		flags |= USE_METALLIC_TEXTURE;
+	}
+
+	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_MATERIAL,
+		pbr_material_cb(albedoTint, emission.xyz, roughnessOverride, metallicOverride, flags)
+	);
+}
+
+void opaque_pbr_material::setupPipeline(dx_command_list* cl, const common_material_info& info)
+{
+	cl->setPipelineState(*defaultOpaquePBRPipeline.pipeline);
+	cl->setGraphicsRootSignature(*defaultOpaquePBRPipeline.rootSignature);
+
+	setupCommon(cl, info);
+}
+
+void transparent_pbr_material::setupPipeline(dx_command_list* cl, const common_material_info& info)
+{
+	cl->setPipelineState(*defaultTransparentPBRPipeline.pipeline);
+	cl->setGraphicsRootSignature(*defaultTransparentPBRPipeline.rootSignature);
+
+	setupCommon(cl, info);
+}
+
 void pbr_material::initializePipeline()
 {
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position_uv_normal_tangent)
-			.renderTargets(opaqueLightPassFormats, arraysize(opaqueLightPassFormats), hdrDepthStencilFormat)
+			.renderTargets(opaqueLightPassFormats, arraysize(opaqueLightPassFormats), depthStencilFormat)
 			.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
 
 		defaultOpaquePBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_ps" });
@@ -253,7 +272,7 @@ void pbr_material::initializePipeline()
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position_uv_normal_tangent)
-			.renderTargets(transparentLightPassFormats, arraysize(transparentLightPassFormats), hdrDepthStencilFormat)
+			.renderTargets(transparentLightPassFormats, arraysize(transparentLightPassFormats), depthStencilFormat)
 			.alphaBlending(0);
 
 		defaultTransparentPBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_transparent_ps" });

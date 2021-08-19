@@ -3,6 +3,8 @@
 #include "core/math.h"
 #include "material.h"
 
+struct dx_command_list;
+
 struct pbr_material : material_base
 {
 	static void initializePipeline();
@@ -21,13 +23,26 @@ struct pbr_material : material_base
 	float roughnessOverride;
 	float metallicOverride;
 
-	void prepareForRendering(struct dx_command_list* cl);
-	static void setupOpaquePipeline(dx_command_list* cl, const common_material_info& info);
-	static void setupTransparentPipeline(dx_command_list* cl, const common_material_info& info);
-
-private:
-	static void setupCommon(dx_command_list* cl, const common_material_info& info);
+	void prepareForRendering(dx_command_list* cl) override;
 };
+
+struct opaque_pbr_material : pbr_material
+{
+	static void setupPipeline(dx_command_list* cl, const common_material_info& info);
+};
+
+struct transparent_pbr_material : pbr_material
+{
+	static void setupPipeline(dx_command_list* cl, const common_material_info& info);
+};
+
+ref<opaque_pbr_material> asOpaque(const ref<pbr_material>& material);
+ref<transparent_pbr_material> asTransparent(const ref<pbr_material>& material);
+
+
+
+
+
 
 struct pbr_environment
 {
@@ -40,7 +55,6 @@ struct pbr_environment
 
 ref<pbr_material> createPBRMaterial(const std::string& albedoTex, const std::string& normalTex, const std::string& roughTex, const std::string& metallicTex,
 	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f);
-
 ref<pbr_material> getDefaultPBRMaterial();
 
 ref<pbr_environment> createEnvironment(const std::string& filename, uint32 skyResolution = 2048, uint32 environmentResolution = 128, uint32 irradianceResolution = 32, bool asyncCompute = false);

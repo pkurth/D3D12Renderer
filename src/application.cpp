@@ -1569,11 +1569,12 @@ void application::update(const user_input& input, float dt)
 
 					if (material->albedoTint.a < 1.f)
 					{
-						transparentRenderPass.renderObject(controller->currentVertexBuffer, mesh.indexBuffer, submesh, material, m, outline);
+						transparentRenderPass.renderObject(controller->currentVertexBuffer, mesh.indexBuffer, submesh, asTransparent(material), m, outline);
 					}
 					else
 					{
-						opaqueRenderPass.renderAnimatedObject(controller->currentVertexBuffer, controller->prevFrameVertexBuffer, mesh.indexBuffer, submesh, prevFrameSubmesh, material, m, lastM,
+						opaqueRenderPass.renderAnimatedObject(controller->currentVertexBuffer, controller->prevFrameVertexBuffer, mesh.indexBuffer, submesh, prevFrameSubmesh, asOpaque(material), 
+							m, lastM,
 							(uint32)entityHandle, outline);
 					}
 				}
@@ -1587,17 +1588,17 @@ void application::update(const user_input& input, float dt)
 
 					if (material->albedoTint.a < 1.f)
 					{
-						transparentRenderPass.renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, outline);
+						transparentRenderPass.renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, asTransparent(material), m, outline);
 					}
 					else
 					{
 						if (dynamic)
 						{
-							opaqueRenderPass.renderDynamicObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, lastM, (uint32)entityHandle, outline);
+							opaqueRenderPass.renderDynamicObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, asOpaque(material), m, lastM, (uint32)entityHandle, outline);
 						}
 						else
 						{
-							opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, m, (uint32)entityHandle, outline);
+							opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, asOpaque(material), m, (uint32)entityHandle, outline);
 						}
 					}
 				}

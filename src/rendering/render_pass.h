@@ -30,21 +30,13 @@ struct geometry_render_pass
 	void reset();
 
 protected:
-	template <bool opaque, typename material_t>
+	template <typename material_t>
 	void common(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
 		bool outline, bool setTransform = true)
 	{
 		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
 
-		material_setup_function setupFunc;
-		if constexpr (opaque)
-		{
-			setupFunc = material_t::setupOpaquePipeline;
-		}
-		else
-		{
-			setupFunc = material_t::setupTransparentPipeline;
-		}
+		material_setup_function setupFunc = material_t::setupPipeline;
 
 		auto& dc = drawCalls.emplace_back();
 		dc.transform = transform;
@@ -66,21 +58,13 @@ protected:
 		}
 	}
 
-	template <bool opaque, typename material_t>
+	template <typename material_t>
 	void common(uint32 dispatchX, uint32 dispatchY, uint32 dispatchZ, const ref<material_t>& material, const mat4& transform,
 		bool outline, bool setTransform = true)
 	{
 		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
 
-		material_setup_function setupFunc;
-		if constexpr (opaque)
-		{
-			setupFunc = material_t::setupOpaquePipeline;
-		}
-		else
-		{
-			setupFunc = material_t::setupTransparentPipeline;
-		}
+		material_setup_function setupFunc = material_t::setupPipeline;
 
 		auto& dc = drawCalls.emplace_back();
 		dc.transform = transform;
@@ -139,7 +123,7 @@ struct opaque_render_pass : geometry_render_pass
 	void renderStaticObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
 		uint32 objectID, bool outline = false)
 	{
-		common<true>(vertexBuffer, indexBuffer, submesh, material, transform, outline);
+		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 
 		staticDepthOnlyDrawCalls.push_back(
 			{
@@ -153,7 +137,7 @@ struct opaque_render_pass : geometry_render_pass
 		const mat4& transform, const mat4& prevFrameTransform,
 		uint32 objectID, bool outline = false)
 	{
-		common<true>(vertexBuffer, indexBuffer, submesh, material, transform, outline);
+		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 
 		dynamicDepthOnlyDrawCalls.push_back(
 			{
@@ -168,7 +152,7 @@ struct opaque_render_pass : geometry_render_pass
 		const mat4& transform, const mat4& prevFrameTransform,
 		uint32 objectID, bool outline = false)
 	{
-		common<true>(vertexBuffer, indexBuffer, submesh, material, transform, outline);
+		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 
 		animatedDepthOnlyDrawCalls.push_back(
 			{
@@ -227,7 +211,7 @@ struct transparent_render_pass : geometry_render_pass
 	void renderObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
 		bool outline = false)
 	{
-		common<false>(vertexBuffer, indexBuffer, submesh, material, transform, outline);
+		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
 	}
 
 	template <typename material_t>
@@ -235,9 +219,7 @@ struct transparent_render_pass : geometry_render_pass
 		const particle_draw_info& drawInfo,
 		const ref<material_t>& material)
 	{
-		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
-
-		material_setup_function setupFunc = material_t::setupTransparentPipeline;
+		material_setup_function setupFunc = material_t::setupPipeline;
 
 		particleDrawCalls.push_back(
 			{
@@ -269,13 +251,13 @@ struct overlay_render_pass : geometry_render_pass
 	template <typename material_t>
 	void renderObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform, bool setTransform)
 	{
-		common<true>(vertexBuffer, indexBuffer, submesh, material, transform, false, setTransform);
+		common(vertexBuffer, indexBuffer, submesh, material, transform, false, setTransform);
 	}
 
 	template <typename material_t>
 	void renderObjectWithMeshShader(uint32 dispatchX, uint32 dispatchY, uint32 dispatchZ, const ref<material_t>& material, const mat4& transform, bool setTransform)
 	{
-		common<true>(dispatchX, dispatchY, dispatchZ, material, transform, false, setTransform);
+		common(dispatchX, dispatchY, dispatchZ, material, transform, false, setTransform);
 	}
 };
 

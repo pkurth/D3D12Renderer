@@ -93,7 +93,7 @@ struct mesh_shader_mesh_material : material_base
 
 struct mesh_shader_blob_material : material_base
 {
-	static void setupOpaquePipeline(dx_command_list* cl, const common_material_info& info)
+	static void setupPipeline(dx_command_list* cl, const common_material_info& info)
 	{
 		cl->setPipelineState(*blobPipeline.pipeline);
 		cl->setGraphicsRootSignature(*blobPipeline.rootSignature);
@@ -174,7 +174,7 @@ void initializeMeshShader()
 {
 	D3D12_RT_FORMAT_ARRAY renderTargetFormat = {};
 	renderTargetFormat.NumRenderTargets = 1;
-	renderTargetFormat.RTFormats[0] = overlayFormat;
+	renderTargetFormat.RTFormats[0] = ldrFormat;
 
 	{
 		struct pipeline_state_stream : dx_pipeline_stream_base
@@ -194,7 +194,7 @@ void initializeMeshShader()
 		};
 
 		pipeline_state_stream stream;
-		stream.dsvFormat = overlayDepthFormat;
+		stream.dsvFormat = ldrFormat;
 		stream.rtvFormats = renderTargetFormat;
 
 		graphics_pipeline_files files = {};
@@ -235,7 +235,7 @@ void initializeMeshShader()
 		rasterizerDesc.FrontCounterClockwise = TRUE; // Righthanded coordinate system.
 
 		pipeline_state_stream stream;
-		stream.dsvFormat = overlayDepthFormat;
+		stream.dsvFormat = ldrFormat;
 		stream.rtvFormats = renderTargetFormat;
 		stream.rasterizer = rasterizerDesc;
 

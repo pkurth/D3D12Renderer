@@ -36,7 +36,7 @@ void fire_particle_system::initializePipeline()
 
 	auto desc = CREATE_GRAPHICS_PIPELINE
 		.inputLayout(inputLayout_position)
-		.renderTargets(transparentLightPassFormats, arraysize(transparentLightPassFormats), hdrDepthStencilFormat)
+		.renderTargets(transparentLightPassFormats, arraysize(transparentLightPassFormats), depthStencilFormat)
 		//.additiveBlending(0)
 		.alphaBlending(0)
 		.depthSettings(true, false);
@@ -100,7 +100,7 @@ void fire_particle_system::render(transparent_render_pass* renderPass)
 		material);
 }
 
-void fire_particle_system::fire_material::setupTransparentPipeline(dx_command_list* cl, const common_material_info& materialInfo)
+void fire_particle_system::fire_material::setupPipeline(dx_command_list* cl, const common_material_info& materialInfo)
 {
 	cl->setPipelineState(*renderPipeline.pipeline);
 	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);
@@ -136,7 +136,7 @@ void smoke_particle_system::initializePipeline()
 
 	auto desc = CREATE_GRAPHICS_PIPELINE
 		.inputLayout(inputLayout_position)
-		.renderTargets(transparentLightPassFormats, arraysize(transparentLightPassFormats), hdrDepthStencilFormat)
+		.renderTargets(transparentLightPassFormats, arraysize(transparentLightPassFormats), depthStencilFormat)
 		.alphaBlending(0)
 		.depthSettings(true, false);
 
@@ -186,7 +186,7 @@ void smoke_particle_system::render(transparent_render_pass* renderPass)
 		material);
 }
 
-void smoke_particle_system::smoke_material::setupTransparentPipeline(dx_command_list* cl, const common_material_info& materialInfo)
+void smoke_particle_system::smoke_material::setupPipeline(dx_command_list* cl, const common_material_info& materialInfo)
 {
 	cl->setPipelineState(*renderPipeline.pipeline);
 	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);
@@ -223,7 +223,7 @@ void boid_particle_system::initializePipeline()
 
 	auto desc = CREATE_GRAPHICS_PIPELINE
 		.inputLayout(inputLayout_position_uv_normal_tangent)
-		.renderTargets(transparentLightPassFormats, arraysize(transparentLightPassFormats), hdrDepthStencilFormat)
+		.renderTargets(transparentLightPassFormats, arraysize(transparentLightPassFormats), depthStencilFormat)
 		.depthSettings(true, true);
 
 	renderPipeline = createReloadablePipeline(desc, { VERTEX_SHADER_NAME(name), PIXEL_SHADER_NAME(name) });
@@ -293,7 +293,7 @@ void boid_particle_system::render(transparent_render_pass* renderPass)
 	}
 }
 
-void boid_particle_system::boid_material::setupTransparentPipeline(dx_command_list* cl, const common_material_info& materialInfo)
+void boid_particle_system::boid_material::setupPipeline(dx_command_list* cl, const common_material_info& materialInfo)
 {
 	cl->setPipelineState(*renderPipeline.pipeline);
 	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);

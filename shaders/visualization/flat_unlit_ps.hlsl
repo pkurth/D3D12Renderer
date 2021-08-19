@@ -1,4 +1,9 @@
+#include "visualization_rs.hlsli"
+
+ConstantBuffer<visualization_cb> cb		: register(b1);
+
+[RootSignature(FLAT_UNLIT_RS)]
 float4 main() : SV_TARGET
 {
-	return float4(1.f, 1.f, 1.f, 1.f);
+	return cb.color;
 }

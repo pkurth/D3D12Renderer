@@ -1,7 +1,7 @@
-#include "flat_simple_rs.hlsli"
+#include "visualization_rs.hlsli"
 #include "camera.hlsli"
 
-ConstantBuffer<flat_simple_color_cb> cb : register(b1);
+ConstantBuffer<visualization_cb> cb		: register(b1);
 ConstantBuffer<camera_cb> camera		: register(b2);
 
 struct ps_input

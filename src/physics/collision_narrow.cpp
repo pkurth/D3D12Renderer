@@ -1445,7 +1445,7 @@ void collisionDebugDraw(transparent_render_pass* renderPass)
 
 	for (auto& dc : debugDrawCalls)
 	{
-		renderPass->renderObject(debugMesh.vertexBuffer, debugMesh.indexBuffer, sphereMesh, dc.material, dc.transform);
+		renderPass->renderObject(debugMesh.vertexBuffer, debugMesh.indexBuffer, sphereMesh, asTransparent(dc.material), dc.transform);
 	}
 	
 	debugDrawCalls.clear();

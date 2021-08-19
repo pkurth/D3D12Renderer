@@ -5,8 +5,8 @@
 #include "geometry/geometry.h"
 #include "physics/bounding_volumes.h"
 #include "rendering/render_utils.h"
+#include "rendering/debug_visualization.h"
 
-#include "flat_simple_rs.hlsli"
 
 enum gizmo_axis
 {
@@ -59,26 +59,7 @@ static gizmo_rectangle rectangles[] =
 };
 
 static dx_mesh mesh;
-static dx_pipeline gizmoPipeline;
-static ref<struct gizmo_material> materials[6];
-
-struct gizmo_material : material_base
-{
-	vec4 color;
-
-	static void setupOpaquePipeline(dx_command_list* cl, const common_material_info& info)
-	{
-		cl->setPipelineState(*gizmoPipeline.pipeline);
-		cl->setGraphicsRootSignature(*gizmoPipeline.rootSignature);
-
-		cl->setGraphicsDynamicConstantBuffer(2, info.cameraCBV);
-	}
-
-	void prepareForRendering(dx_command_list* cl)
-	{
-		cl->setGraphics32BitConstants(1, color);
-	}
-};
+static ref<flat_simple_material> materials[6];
 
 
 void initializeTransformationGizmos()
@@ -106,19 +87,10 @@ void initializeTransformationGizmos()
 		rectangles[i].position *= shaftLength * 0.35f;
 		rectangles[i].radius *= shaftLength * 0.2f;
 	}
-
+	
+	for (uint32 i = 0; i < 6; ++i)
 	{
-		auto desc = CREATE_GRAPHICS_PIPELINE
-			.inputLayout(inputLayout_position_normal)
-			.renderTargets(overlayFormat, overlayDepthFormat)
-			;
-
-		gizmoPipeline = createReloadablePipeline(desc, { "flat_simple_vs", "flat_simple_ps" });
-
-		for (uint32 i = 0; i < 6; ++i)
-		{
-			materials[i] = make_ref<gizmo_material>();
-		}
+		materials[i] = make_ref<flat_simple_material>();
 	}
 }
 

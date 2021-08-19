@@ -30,6 +30,10 @@ dx_pipeline sphericalHarmonicsSkyPipeline;
 dx_pipeline outlineMarkerPipeline;
 dx_pipeline outlineDrawerPipeline;
 
+dx_pipeline flatSimplePipeline;
+dx_pipeline flatUnlitTrianglePipeline;
+dx_pipeline flatUnlitLinePipeline;
+
 dx_command_signature particleCommandSignature;
 
 
@@ -41,7 +45,7 @@ void initializeRenderUtils()
 	// Sky.
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(skyPassFormats, arraysize(skyPassFormats), hdrDepthStencilFormat)
+			.renderTargets(skyPassFormats, arraysize(skyPassFormats), depthStencilFormat)
 			.depthSettings(true, false)
 			.cullFrontFaces();
 
@@ -56,7 +60,7 @@ void initializeRenderUtils()
 		DXGI_FORMAT depthOnlyFormat[] = { screenVelocitiesFormat, objectIDsFormat };
 
 		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(depthOnlyFormat, arraysize(depthOnlyFormat), hdrDepthStencilFormat)
+			.renderTargets(depthOnlyFormat, arraysize(depthOnlyFormat), depthStencilFormat)
 			.inputLayout(inputLayout_position);
 
 		depthOnlyPipeline = createReloadablePipeline(desc, { "depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
@@ -79,7 +83,7 @@ void initializeRenderUtils()
 	{
 		auto markerDesc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position)
-			.renderTargets(0, 0, hdrDepthStencilFormat)
+			.renderTargets(0, 0, depthStencilFormat)
 			.stencilSettings(D3D12_COMPARISON_FUNC_ALWAYS,
 				D3D12_STENCIL_OP_REPLACE,
 				D3D12_STENCIL_OP_REPLACE,
@@ -92,7 +96,7 @@ void initializeRenderUtils()
 
 
 		auto drawerDesc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(ldrPostProcessFormat, hdrDepthStencilFormat)
+			.renderTargets(ldrFormat, depthStencilFormat)
 			.stencilSettings(D3D12_COMPARISON_FUNC_EQUAL,
 				D3D12_STENCIL_OP_KEEP,
 				D3D12_STENCIL_OP_KEEP,
@@ -102,6 +106,30 @@ void initializeRenderUtils()
 			.depthSettings(false, false);
 
 		outlineDrawerPipeline = createReloadablePipeline(drawerDesc, { "fullscreen_triangle_vs", "outline_ps" });
+	}
+
+	// Flat simple.
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.inputLayout(inputLayout_position_normal)
+			.renderTargets(ldrFormat, depthStencilFormat)
+			;
+
+		flatSimplePipeline = createReloadablePipeline(desc, { "flat_simple_vs", "flat_simple_ps" });
+	}
+
+	// Flat unlit.
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.inputLayout(inputLayout_position)
+			.renderTargets(ldrFormat, depthStencilFormat)
+			;
+
+		flatUnlitTrianglePipeline = createReloadablePipeline(desc, { "flat_unlit_vs", "flat_unlit_ps" });
+
+
+		desc.primitiveTopology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
+		flatUnlitLinePipeline = createReloadablePipeline(desc, { "flat_unlit_vs", "flat_unlit_ps" });
 	}
 
 
