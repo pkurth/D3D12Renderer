@@ -670,7 +670,7 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 
 	result->requestedNumMipLevels = textureDesc.MipLevels;
 
-	uint32 maxNumMipLevels = (uint32)log2(max(textureDesc.Width, textureDesc.Height)) + 1;
+	uint32 maxNumMipLevels = (uint32)log2((float)max(textureDesc.Width, textureDesc.Height)) + 1;
 	textureDesc.MipLevels = min(maxNumMipLevels, result->requestedNumMipLevels);
 
 	D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport;
@@ -1015,7 +1015,7 @@ ref<dx_texture> createPlacedTexture(dx_heap heap, uint64 offset, D3D12_RESOURCE_
 
 	result->requestedNumMipLevels = textureDesc.MipLevels;
 
-	uint32 maxNumMipLevels = (uint32)log2(max(textureDesc.Width, textureDesc.Height)) + 1;
+	uint32 maxNumMipLevels = (uint32)log2((float)max(textureDesc.Width, textureDesc.Height)) + 1;
 	textureDesc.MipLevels = min(maxNumMipLevels, result->requestedNumMipLevels);
 
 	D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport;
@@ -1224,7 +1224,7 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 		clearValue = &optimizedClearValue;
 	}
 
-	uint32 maxNumMipLevels = (uint32)log2(max(newWidth, newHeight)) + 1;
+	uint32 maxNumMipLevels = (uint32)log2((float)max(newWidth, newHeight)) + 1;
 	desc.MipLevels = min(maxNumMipLevels, texture->requestedNumMipLevels);
 
 	desc.Width = newWidth;
