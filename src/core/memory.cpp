@@ -1,107 +1,66 @@
 #include "pch.h"
 #include "memory.h"
+#include "math.h"
 
-
-static memory_block* allocateMemoryBlock(uint64 size)
+void memory_arena::initialize(uint64 minimumBlockSize, uint64 reserveSize)
 {
-	uint64 blockSize = alignTo(sizeof(memory_block), 64);
-	void* data = _aligned_malloc(blockSize + size, 64);
+	reset(true);
 
-	memory_block* result = (memory_block*)data;
-	result->start = (uint8*)data + blockSize;
-	result->size = size;
-	return result;
+	memory = (uint8*)VirtualAlloc(0, reserveSize, MEM_RESERVE, PAGE_READWRITE);
+
+	SYSTEM_INFO systemInfo;
+	GetSystemInfo(&systemInfo);
+
+	pageSize = systemInfo.dwPageSize;
+	sizeLeftTotal = reserveSize;
+	this->minimumBlockSize = minimumBlockSize;
 }
 
-memory_block* memory_arena::getFreeBlock(uint64 size)
+void* memory_arena::allocate(uint64 size, uint64 alignment, bool clearToZero)
 {
-	if (size < minimumBlockSize)
+	uint64 mask = alignment - 1;
+	uint64 misalignment = current & mask;
+	uint64 adjustment = (misalignment == 0) ? 0 : (alignment - misalignment);
+	current += adjustment;
+
+	sizeLeftCurrent -= adjustment;
+	sizeLeftTotal -= adjustment;
+
+	assert(sizeLeftTotal >= size);
+
+	if (sizeLeftCurrent < size)
 	{
-		size = minimumBlockSize;
+		uint64 allocationSize = max(size, minimumBlockSize);
+		allocationSize = pageSize * bucketize(allocationSize, pageSize); // Round up to next page boundary.
+		VirtualAlloc(memory + committedMemory, allocationSize, MEM_COMMIT, PAGE_READWRITE);
+
+		sizeLeftTotal += allocationSize;
+		sizeLeftCurrent += allocationSize;
+		committedMemory += allocationSize;
 	}
 
-	memory_block* result = 0;
-
-	for (memory_block* block = freeBlocks, *prev = 0; block; prev = block, block = block->next)
-	{
-		if (block->size >= size)
-		{
-			if (prev)
-			{
-				prev->next = block->next;
-			}
-			else
-			{
-				freeBlocks = block->next;
-			}
-
-			result = block;
-			break;
-		}
-	}
-
-	if (!result)
-	{
-		result = allocateMemoryBlock(size);
-	}
-
-	result->next = 0;
-	result->current = result->start;
-
-	return result;
-}
-
-static uint64 getRemainingSize(memory_block* block)
-{
-	return block->size - (uint64)(block->current - block->size);
-}
-
-void* memory_arena::allocate(uint64 size, bool clearToZero)
-{
-	if (!currentBlock ||
-		getRemainingSize(currentBlock) < size)
-	{
-		memory_block* block = getFreeBlock(size);
-		block->next = currentBlock;
-
-		if (!lastActiveBlock)
-		{
-			lastActiveBlock = block;
-		}
-
-		currentBlock = block;
-	}
-
-	void* result = currentBlock->current;
-	currentBlock->current += size;
-
+	uint8* result = memory + current;
 	if (clearToZero)
 	{
 		memset(result, 0, size);
 	}
+	current += size;
+	sizeLeftCurrent -= size;
+	sizeLeftTotal -= size;
 
 	return result;
 }
 
-void memory_arena::reset()
+void memory_arena::reset(bool freeMemory)
 {
-	if (lastActiveBlock)
+	if (memory && freeMemory)
 	{
-		lastActiveBlock->next = freeBlocks;
+		VirtualFree(memory, 0, MEM_RELEASE);
+		memory = 0;
+		committedMemory = 0;
 	}
-	freeBlocks = currentBlock;
-	currentBlock = 0;
-	lastActiveBlock = 0;
-}
 
-void memory_arena::free()
-{
-	reset();
-	for (memory_block* block = freeBlocks; block; )
-	{
-		memory_block* next = block->next;
-		_aligned_free(block);
-		block = next;
-	}
-	*this = {};
+	current = 0;
+	sizeLeftCurrent = committedMemory;
+	sizeLeftTotal = committedMemory;
 }

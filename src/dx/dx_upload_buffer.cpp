@@ -6,7 +6,7 @@
 dx_page* dx_page_pool::allocateNewPage()
 {
 	mutex.lock();
-	dx_page* result = (dx_page*)arena.allocate(sizeof(dx_page), true);
+	dx_page* result = arena.allocate<dx_page>(true);
 	mutex.unlock();
 
 	checkResult(dxContext.device->CreateCommittedResource(
@@ -111,5 +111,6 @@ void dx_upload_buffer::reset()
 void dx_page_pool::initialize(uint32 sizeInBytes)
 {
 	pageSize = sizeInBytes;
+	arena.initialize(0, sizeof(dx_page) * 512);
 }
 

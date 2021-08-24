@@ -1,8 +1,8 @@
 #pragma once
 
-#define KB(n) (1024 * (n))
-#define MB(n) (1024 * KB(n))
-#define GB(n) (1024 * MB(n))
+#define KB(n) (1024ull * (n))
+#define MB(n) (1024ull * KB(n))
+#define GB(n) (1024ull * MB(n))
 
 #define BYTE_TO_KB(b) ((b) / 1024)
 #define BYTE_TO_MB(b) ((b) / (1024 * 1024))
@@ -44,25 +44,37 @@ static bool rangesOverlap(void* fromA, void* toA, void* fromB, void* toB)
 	return true;
 }
 
-struct memory_block
-{
-	uint8* start;
-	uint8* current;
-	uint64 size;
-	memory_block* next;
-};
-
 struct memory_arena
 {
-	memory_block* currentBlock;
-	memory_block* lastActiveBlock;
-	memory_block* freeBlocks;
+	memory_arena() {}
+	memory_arena(const memory_arena&) = delete;
+	memory_arena(memory_arena&&) = default;
+	~memory_arena() { reset(true); }
+
+	void initialize(uint64 minimumBlockSize = 0, uint64 reserveSize = GB(8));
+
+	void* allocate(uint64 size, uint64 alignment = 1, bool clearToZero = false);
+
+	template <typename T>
+	T* allocate(bool clearToZero = false)
+	{
+		return (T*)allocate(sizeof(T), alignof(T), clearToZero);
+	}
+
+	void reset(bool freeMemory = false);
+
+	uint8* base() { return memory; }
+
+private:
+	uint8* memory;
+	uint64 committedMemory;
+
+	uint64 current;
+	uint64 sizeLeftCurrent;
+
+	uint64 sizeLeftTotal;
+
+	uint64 pageSize;
 	uint64 minimumBlockSize;
-
-	void* allocate(uint64 size, bool clearToZero = false);
-	void reset();
-	void free();
-
-	memory_block* getFreeBlock(uint64 size = 0);
 };
 

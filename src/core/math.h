@@ -31,6 +31,7 @@ static constexpr int32 clamp(int32 v, int32 l, int32 u) { return min(u, max(l, v
 static constexpr float clamp01(float v) { return clamp(v, 0.f, 1.f); }
 static constexpr float saturate(float v) { return clamp01(v); }
 static constexpr uint32 bucketize(uint32 problemSize, uint32 bucketSize) { return (problemSize + bucketSize - 1) / bucketSize; }
+static constexpr uint64 bucketize(uint64 problemSize, uint64 bucketSize) { return (problemSize + bucketSize - 1) / bucketSize; }
 
 static void copySign(float from, float& to) { to = copysign(to, from); }
 
