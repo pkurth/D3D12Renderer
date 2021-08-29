@@ -6,6 +6,7 @@
 #include "light_source.h"
 #include "material.h"
 #include "shadow_map_cache.h"
+#include "render_command_buffer.h"
 
 struct raytracing_blas;
 struct dx_vertex_buffer;
@@ -24,242 +25,280 @@ struct particle_draw_info
 };
 
 
-// Base for both opaque and transparent pass.
-struct geometry_render_pass
+
+template <typename pipeline_t_>
+struct default_render_command
 {
-	void reset();
+	using pipeline_t = pipeline_t_;
 
-protected:
-	template <typename material_t>
-	void common(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
-		bool outline, bool setTransform = true)
-	{
-		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
+	mat4 transform;
+	vertex_buffer_group vertexBuffer;
+	ref<dx_index_buffer> indexBuffer;
+	submesh_info submesh;
 
-		material_setup_function setupFunc = material_t::setupPipeline;
-
-		auto& dc = drawCalls.emplace_back();
-		dc.transform = transform;
-		dc.vertexBuffer = vertexBuffer;
-		dc.indexBuffer = indexBuffer;
-		dc.material = material;
-		dc.submesh = submesh;
-		dc.materialSetupFunc = setupFunc;
-		dc.drawType = draw_type_default;
-		dc.setTransform = setTransform;
-
-		if (outline)
-		{
-			outlinedObjects.push_back(
-				{
-					(uint16)(drawCalls.size() - 1)
-				}
-			);
-		}
-	}
-
-	template <typename material_t>
-	void common(uint32 dispatchX, uint32 dispatchY, uint32 dispatchZ, const ref<material_t>& material, const mat4& transform,
-		bool outline, bool setTransform = true)
-	{
-		static_assert(std::is_base_of<material_base, material_t>::value, "Material must inherit from material_base.");
-
-		material_setup_function setupFunc = material_t::setupPipeline;
-
-		auto& dc = drawCalls.emplace_back();
-		dc.transform = transform;
-		dc.material = material;
-		dc.dispatchInfo = { dispatchX, dispatchY, dispatchZ };
-		dc.materialSetupFunc = setupFunc;
-		dc.drawType = draw_type_mesh_shader;
-		dc.setTransform = setTransform;
-
-		if (outline)
-		{
-			outlinedObjects.push_back(
-				{
-					(uint16)(drawCalls.size() - 1)
-				}
-			);
-		}
-	}
-
-public:
-	enum draw_type
-	{
-		draw_type_default,
-		draw_type_mesh_shader,
-	};
-
-	struct dispatch_info 
-	{ 
-		uint32 dispatchX, dispatchY, dispatchZ; 
-	};
-
-	struct draw_call
-	{
-		mat4 transform;
-		vertex_buffer_group vertexBuffer;
-		ref<dx_index_buffer> indexBuffer;
-		ref<material_base> material;
-		union
-		{
-			submesh_info submesh;
-			dispatch_info dispatchInfo;
-		};
-		material_setup_function materialSetupFunc;
-		draw_type drawType;
-		bool setTransform;
-	};
-
-	std::vector<draw_call> drawCalls;
-	std::vector<uint16> outlinedObjects;
+	typename pipeline_t_::material_t material;
 };
 
-// Renders opaque objects. It also generates screen space velocities, which is why there are three methods for static, dynamic and animated objects.
-struct opaque_render_pass : geometry_render_pass
+template <typename pipeline_t_>
+struct particle_render_command
 {
-	template <typename material_t>
-	void renderStaticObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
-		uint32 objectID, bool outline = false)
-	{
-		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
+	using pipeline_t = pipeline_t_;
 
-		staticDepthOnlyDrawCalls.push_back(
-			{
-				transform, vertexBuffer.positions, indexBuffer, submesh, objectID
-			}
-		);
-	}
+	vertex_buffer_group vertexBuffer;
+	ref<dx_index_buffer> indexBuffer;
+	particle_draw_info drawInfo;
 
-	template <typename material_t>
-	void renderDynamicObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material,
-		const mat4& transform, const mat4& prevFrameTransform,
-		uint32 objectID, bool outline = false)
-	{
-		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
-
-		dynamicDepthOnlyDrawCalls.push_back(
-			{
-				transform, prevFrameTransform, vertexBuffer.positions, indexBuffer, submesh, objectID
-			}
-		);
-	}
-
-	template <typename material_t>
-	void renderAnimatedObject(const vertex_buffer_group& vertexBuffer, const vertex_buffer_group& prevFrameVertexBuffer,
-		const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, submesh_info prevFrameSubmesh, const ref<material_t>& material,
-		const mat4& transform, const mat4& prevFrameTransform,
-		uint32 objectID, bool outline = false)
-	{
-		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
-
-		animatedDepthOnlyDrawCalls.push_back(
-			{
-				transform, prevFrameTransform, vertexBuffer.positions, 
-				prevFrameVertexBuffer.positions ? prevFrameVertexBuffer.positions : vertexBuffer.positions,
-				indexBuffer, 
-				submesh, 
-				prevFrameVertexBuffer.positions ? prevFrameSubmesh : submesh,
-				objectID
-			}
-		);
-	}
-
-	void reset();
-
-	struct static_depth_only_draw_call
-	{
-		mat4 transform;
-		ref<dx_vertex_buffer> vertexBuffer;
-		ref<dx_index_buffer> indexBuffer;
-		submesh_info submesh;
-		uint32 objectID;
-	};
-
-	struct dynamic_depth_only_draw_call
-	{
-		mat4 transform;
-		mat4 prevFrameTransform;
-		ref<dx_vertex_buffer> vertexBuffer;
-		ref<dx_index_buffer> indexBuffer;
-		submesh_info submesh;
-		uint32 objectID;
-	};
-
-	struct animated_depth_only_draw_call
-	{
-		mat4 transform;
-		mat4 prevFrameTransform;
-		ref<dx_vertex_buffer> vertexBuffer;
-		ref<dx_vertex_buffer> prevFrameVertexBuffer;
-		ref<dx_index_buffer> indexBuffer;
-		submesh_info submesh;
-		submesh_info prevFrameSubmesh;
-		uint32 objectID;
-	};
-
-	std::vector<static_depth_only_draw_call> staticDepthOnlyDrawCalls;
-	std::vector<dynamic_depth_only_draw_call> dynamicDepthOnlyDrawCalls;
-	std::vector<animated_depth_only_draw_call> animatedDepthOnlyDrawCalls;
+	typename pipeline_t_::material_t material;
 };
 
-// Transparent pass currently generates no screen velocities and no object ids.
-struct transparent_render_pass : geometry_render_pass
+struct static_depth_only_render_command
 {
-	template <typename material_t>
-	void renderObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform,
-		bool outline = false)
+	mat4 transform;
+	ref<dx_vertex_buffer> vertexBuffer;
+	ref<dx_index_buffer> indexBuffer;
+	submesh_info submesh;
+	uint32 objectID;
+};
+
+struct dynamic_depth_only_render_command
+{
+	mat4 transform;
+	mat4 prevFrameTransform;
+	ref<dx_vertex_buffer> vertexBuffer;
+	ref<dx_index_buffer> indexBuffer;
+	submesh_info submesh;
+	uint32 objectID;
+};
+
+struct animated_depth_only_render_command
+{
+	mat4 transform;
+	mat4 prevFrameTransform;
+	ref<dx_vertex_buffer> vertexBuffer;
+	ref<dx_vertex_buffer> prevFrameVertexBuffer;
+	ref<dx_index_buffer> indexBuffer;
+	submesh_info submesh;
+	submesh_info prevFrameSubmesh;
+	uint32 objectID;
+};
+
+struct outline_render_command
+{
+	mat4 transform;
+	ref<dx_vertex_buffer> vertexBuffer;
+	ref<dx_index_buffer> indexBuffer;
+	submesh_info submesh;
+};
+
+struct opaque_render_pass
+{
+	void sort()
 	{
-		common(vertexBuffer, indexBuffer, submesh, material, transform, outline);
+		staticDepthPrepass.sort();
+		dynamicDepthPrepass.sort();
+		animatedDepthPrepass.sort();
+		pass.sort();
 	}
 
-	template <typename material_t>
-	void renderParticles(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer,
+	void reset()
+	{
+		staticDepthPrepass.clear();
+		dynamicDepthPrepass.clear();
+		animatedDepthPrepass.clear();
+		pass.clear();
+	}
+
+	template <typename pipeline_t>
+	void renderStaticObject(const mat4& transform,
+		const vertex_buffer_group& vertexBuffer,
+		const ref<dx_index_buffer>& indexBuffer,
+		submesh_info submesh,
+		const typename pipeline_t::material_t& material,
+		uint32 objectID = -1)
+	{
+		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, material);
+
+		float depth = 0.f; // TODO
+		auto& depthCommand = staticDepthPrepass.emplace_back(depth);
+		depthCommand.transform = transform;
+		depthCommand.vertexBuffer = vertexBuffer.positions;
+		depthCommand.indexBuffer = indexBuffer;
+		depthCommand.submesh = submesh;
+		depthCommand.objectID = objectID;
+	}
+
+	template <typename pipeline_t>
+	void renderDynamicObject(const mat4& transform,
+		const mat4& prevFrameTransform,
+		const vertex_buffer_group& vertexBuffer,
+		const ref<dx_index_buffer>& indexBuffer,
+		submesh_info submesh,
+		const typename pipeline_t::material_t& material,
+		uint32 objectID = -1)
+	{
+		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, material);
+
+		float depth = 0.f; // TODO
+		auto& depthCommand = dynamicDepthPrepass.emplace_back(depth);
+		depthCommand.transform = transform;
+		depthCommand.prevFrameTransform = prevFrameTransform;
+		depthCommand.vertexBuffer = vertexBuffer.positions;
+		depthCommand.indexBuffer = indexBuffer;
+		depthCommand.submesh = submesh;
+		depthCommand.objectID = objectID;
+	}
+
+	template <typename pipeline_t>
+	void renderAnimatedObject(const mat4& transform,
+		const mat4& prevFrameTransform,
+		const vertex_buffer_group& vertexBuffer,
+		const vertex_buffer_group& prevFrameVertexBuffer,
+		const ref<dx_index_buffer>& indexBuffer,
+		submesh_info submesh,
+		submesh_info prevFrameSubmesh,
+		const typename pipeline_t::material_t& material,
+		uint32 objectID = -1)
+	{
+		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, material);
+
+		float depth = 0.f; // TODO
+		auto& depthCommand = animatedDepthPrepass.emplace_back(depth);
+		depthCommand.transform = transform;
+		depthCommand.prevFrameTransform = prevFrameTransform;
+		depthCommand.vertexBuffer = vertexBuffer.positions;
+		depthCommand.prevFrameVertexBuffer = prevFrameVertexBuffer.positions ? prevFrameVertexBuffer.positions : vertexBuffer.positions;
+		depthCommand.indexBuffer = indexBuffer;
+		depthCommand.submesh = submesh;
+		depthCommand.prevFrameSubmesh = prevFrameVertexBuffer.positions ? prevFrameSubmesh : submesh;
+		depthCommand.objectID = objectID;
+	}
+
+	sort_key_vector<float, static_depth_only_render_command> staticDepthPrepass;
+	sort_key_vector<float, dynamic_depth_only_render_command> dynamicDepthPrepass;
+	sort_key_vector<float, animated_depth_only_render_command> animatedDepthPrepass;
+	render_command_buffer<uint64> pass;
+
+private:
+	template <typename pipeline_t>
+	void renderObjectCommon(const mat4& transform,
+		const vertex_buffer_group& vertexBuffer,
+		const ref<dx_index_buffer>& indexBuffer,
+		submesh_info submesh,
+		const typename pipeline_t::material_t& material)
+	{
+		uint64 sortKey = (uint64)pipeline_t::setupCommon;
+		auto& command = pass.emplace_back<default_render_command<pipeline_t>>(sortKey);
+		command.transform = transform;
+		command.vertexBuffer = vertexBuffer;
+		command.indexBuffer = indexBuffer;
+		command.submesh = submesh;
+		command.material = material;
+	}
+};
+
+struct transparent_render_pass
+{
+	void sort()
+	{
+		pass.sort();
+	}
+
+	void reset()
+	{
+		pass.clear();
+	}
+
+	template <typename pipeline_t>
+	void renderObject(const mat4& transform,
+		const vertex_buffer_group& vertexBuffer,
+		const ref<dx_index_buffer>& indexBuffer,
+		submesh_info submesh,
+		const typename pipeline_t::material_t& material)
+	{
+		float depth = 0.f; // TODO
+		auto& command = pass.emplace_back<default_render_command<pipeline_t>>(-depth); // Negative depth -> sort from back to front.
+		command.transform = transform;
+		command.vertexBuffer = vertexBuffer;
+		command.indexBuffer = indexBuffer;
+		command.submesh = submesh;
+		command.material = material;
+	}
+
+	template <typename pipeline_t>
+	void renderParticles(const vertex_buffer_group& vertexBuffer,
+		const ref<dx_index_buffer>& indexBuffer,
 		const particle_draw_info& drawInfo,
-		const ref<material_t>& material)
+		const typename pipeline_t::material_t& material)
 	{
-		material_setup_function setupFunc = material_t::setupPipeline;
-
-		particleDrawCalls.push_back(
-			{
-				vertexBuffer,
-				indexBuffer,
-				drawInfo,
-				material,
-				setupFunc,
-			}
-		);
+		float depth = 0.f; // TODO
+		auto& command = pass.emplace_back<particle_render_command<pipeline_t>>(-depth); // Negative depth -> sort from back to front.
+		command.vertexBuffer = vertexBuffer;
+		command.indexBuffer = indexBuffer;
+		command.drawInfo = drawInfo;
+		command.material = material;
 	}
 
-	void reset();
-
-	struct particle_draw_call
-	{
-		vertex_buffer_group vertexBuffer;
-		ref<dx_index_buffer> indexBuffer;
-		particle_draw_info drawInfo;
-		ref<material_base> material;
-		material_setup_function materialSetupFunc;
-	};
-
-	std::vector<particle_draw_call> particleDrawCalls;
+	render_command_buffer<float> pass;
 };
 
-struct overlay_render_pass : geometry_render_pass
+struct overlay_render_pass
 {
-	template <typename material_t>
-	void renderObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const ref<material_t>& material, const mat4& transform, bool setTransform)
+	void sort()
 	{
-		common(vertexBuffer, indexBuffer, submesh, material, transform, false, setTransform);
+		pass.sort();
 	}
 
-	template <typename material_t>
-	void renderObjectWithMeshShader(uint32 dispatchX, uint32 dispatchY, uint32 dispatchZ, const ref<material_t>& material, const mat4& transform, bool setTransform)
+	void reset()
 	{
-		common(dispatchX, dispatchY, dispatchZ, material, transform, false, setTransform);
+		pass.clear();
 	}
+
+	template <typename pipeline_t>
+	void renderObject(const mat4& transform,
+		const vertex_buffer_group& vertexBuffer,
+		const ref<dx_index_buffer>& indexBuffer,
+		submesh_info submesh,
+		const typename pipeline_t::material_t& material)
+	{
+		float depth = 0.f; // TODO
+		auto& command = pass.emplace_back<default_render_command<pipeline_t>>(depth);
+		command.transform = transform;
+		command.vertexBuffer = vertexBuffer;
+		command.indexBuffer = indexBuffer;
+		command.submesh = submesh;
+		command.material = material;
+	}
+
+	render_command_buffer<float> pass;
 };
+
+struct outline_render_pass
+{
+	void reset()
+	{
+		pass.clear();
+	}
+
+	void renderOutline(const mat4& transform,
+		const vertex_buffer_group& vertexBuffer,
+		const ref<dx_index_buffer>& indexBuffer,
+		submesh_info submesh)
+	{
+		auto& command = pass.emplace_back();
+		command.transform = transform;
+		command.vertexBuffer = vertexBuffer.positions;
+		command.indexBuffer = indexBuffer;
+		command.submesh = submesh;
+	}
+
+	std::vector<outline_render_command> pass;
+};
+
+
+
+
+
+
 
 
 // Base for all shadow map passes.

@@ -112,6 +112,7 @@ private:
 	spot_shadow_render_pass spotShadowRenderPasses[16];
 	point_shadow_render_pass pointShadowRenderPasses[16];
 	overlay_render_pass overlayRenderPass;
+	outline_render_pass outlineRenderPass;
 
 
 

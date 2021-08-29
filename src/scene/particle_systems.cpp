@@ -57,10 +57,9 @@ void fire_particle_system::initialize(uint32 maxNumParticles, float emitRate, co
 	
 	particle_system::initializeAsBillboard(sizeof(fire_particle_data), maxNumParticles, emitRate, sort_mode_back_to_front);
 
-	material = make_ref<fire_material>();
-	material->atlas.texture = tex;
-	material->atlas.cols = cols;
-	material->atlas.rows = rows;
+	material.atlas.texture = tex;
+	material.atlas.cols = cols;
+	material.atlas.rows = rows;
 
 	settings.atlas.initialize(rows, cols);
 
@@ -83,36 +82,37 @@ void fire_particle_system::update(float dt)
 {
 	settings.frameIndex = (uint32)dxContext.frameID;
 
-	material->settingsCBV = dxContext.uploadDynamicConstantBuffer(settings);
+	material.settingsCBV = dxContext.uploadDynamicConstantBuffer(settings);
 
 	particle_system::update(dt, emitPipeline, simulatePipeline);
 }
 
 void fire_particle_system::setSimulationParameters(dx_command_list* cl)
 {
-	cl->setComputeDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_COMPUTE_RS_CBV, material->settingsCBV);
+	cl->setComputeDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_COMPUTE_RS_CBV, material.settingsCBV);
 }
 
 void fire_particle_system::render(transparent_render_pass* renderPass)
 {
-	renderPass->renderParticles(billboardMesh.vertexBuffer, billboardMesh.indexBuffer,
+	renderPass->renderParticles<fire_pipeline>(billboardMesh.vertexBuffer, billboardMesh.indexBuffer,
 		getDrawInfo(renderPipeline),
 		material);
 }
 
-void fire_particle_system::fire_material::setupPipeline(dx_command_list* cl, const common_material_info& materialInfo)
+void fire_particle_system::fire_pipeline::setupCommon(dx_command_list* cl, const common_material_info& materialInfo)
 {
 	cl->setPipelineState(*renderPipeline.pipeline);
 	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);
 	cl->setGraphicsDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_RENDERING_RS_CAMERA, materialInfo.cameraCBV);
 }
 
-void fire_particle_system::fire_material::prepareForRendering(dx_command_list* cl)
+void fire_particle_system::fire_pipeline::render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<fire_pipeline>& rc)
 {
-	cl->setGraphicsDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_RENDERING_RS_CBV, settingsCBV);
-	cl->setDescriptorHeapSRV(FIRE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE, 0, atlas.texture);
-}
+	cl->setGraphicsDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_RENDERING_RS_CBV, rc.material.settingsCBV);
+	cl->setDescriptorHeapSRV(FIRE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE, 0, rc.material.atlas.texture);
 
+	particle_render_pipeline::render(cl, viewProj, rc);
+}
 
 
 
@@ -156,10 +156,9 @@ void smoke_particle_system::initialize(uint32 maxNumParticles, float emitRate, c
 
 	particle_system::initializeAsBillboard(sizeof(smoke_particle_data), maxNumParticles, emitRate, sort_mode_back_to_front);
 
-	material = make_ref<smoke_material>();
-	material->atlas.texture = tex;
-	material->atlas.cols = cols;
-	material->atlas.rows = rows;
+	material.atlas.texture = tex;
+	material.atlas.cols = cols;
+	material.atlas.rows = rows;
 
 	settings.emitPosition = vec3(20.f, 20.f, -10.f); // TEMPORARY.
 	settings.atlas.initialize(rows, cols);
@@ -169,34 +168,36 @@ void smoke_particle_system::update(float dt)
 {
 	settings.frameIndex = (uint32)dxContext.frameID;
 
-	material->settingsCBV = dxContext.uploadDynamicConstantBuffer(settings);
+	material.settingsCBV = dxContext.uploadDynamicConstantBuffer(settings);
 
 	particle_system::update(dt, emitPipeline, simulatePipeline);
 }
 
 void smoke_particle_system::setSimulationParameters(dx_command_list* cl)
 {
-	cl->setComputeDynamicConstantBuffer(SMOKE_PARTICLE_SYSTEM_COMPUTE_RS_CBV, material->settingsCBV);
+	cl->setComputeDynamicConstantBuffer(SMOKE_PARTICLE_SYSTEM_COMPUTE_RS_CBV, material.settingsCBV);
 }
 
 void smoke_particle_system::render(transparent_render_pass* renderPass)
 {
-	renderPass->renderParticles(billboardMesh.vertexBuffer, billboardMesh.indexBuffer,
+	renderPass->renderParticles<smoke_pipeline>(billboardMesh.vertexBuffer, billboardMesh.indexBuffer,
 		getDrawInfo(renderPipeline),
 		material);
 }
 
-void smoke_particle_system::smoke_material::setupPipeline(dx_command_list* cl, const common_material_info& materialInfo)
+void smoke_particle_system::smoke_pipeline::setupCommon(dx_command_list* cl, const common_material_info& materialInfo)
 {
 	cl->setPipelineState(*renderPipeline.pipeline);
 	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);
 	cl->setGraphicsDynamicConstantBuffer(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_CAMERA, materialInfo.cameraCBV);
 }
 
-void smoke_particle_system::smoke_material::prepareForRendering(dx_command_list* cl)
+void smoke_particle_system::smoke_pipeline::render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<smoke_pipeline>& rc)
 {
-	cl->setGraphicsDynamicConstantBuffer(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_CBV, settingsCBV);
-	cl->setDescriptorHeapSRV(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE, 0, atlas.texture);
+	cl->setGraphicsDynamicConstantBuffer(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_CBV, rc.material.settingsCBV);
+	cl->setDescriptorHeapSRV(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE, 0, rc.material.atlas.texture);
+
+	particle_render_pipeline::render(cl, viewProj, rc);
 }
 
 
@@ -238,8 +239,6 @@ void boid_particle_system::initialize(uint32 maxNumParticles, float emitRate)
 	{
 		particle_system::initializeAsMesh(sizeof(boid_particle_data), cartoonMesh->mesh, cartoonMesh->submeshes[0].info, maxNumParticles, emitRate, sort_mode_none);
 
-		material = make_ref<boid_material>();
-
 		settings.emitPosition = vec3(-30.f, 20.f, -10.f); // TEMPORARY.
 		settings.radius = 15.f;
 	}
@@ -272,7 +271,7 @@ void boid_particle_system::update(float dt)
 
 		settings.frameIndex = (uint32)dxContext.frameID;
 
-		material->settingsCBV = dxContext.uploadDynamicConstantBuffer(settings);
+		material.settingsCBV = dxContext.uploadDynamicConstantBuffer(settings);
 
 		particle_system::update(dt, emitPipeline, simulatePipeline);
 	}
@@ -280,20 +279,20 @@ void boid_particle_system::update(float dt)
 
 void boid_particle_system::setSimulationParameters(dx_command_list* cl)
 {
-	cl->setComputeDynamicConstantBuffer(BOID_PARTICLE_SYSTEM_COMPUTE_RS_CBV, material->settingsCBV);
+	cl->setComputeDynamicConstantBuffer(BOID_PARTICLE_SYSTEM_COMPUTE_RS_CBV, material.settingsCBV);
 }
 
 void boid_particle_system::render(transparent_render_pass* renderPass)
 {
 	if (cartoonMesh)
 	{
-		renderPass->renderParticles(skinnedVertexBuffer, cartoonMesh->mesh.indexBuffer,
+		renderPass->renderParticles<boid_pipeline>(skinnedVertexBuffer, cartoonMesh->mesh.indexBuffer,
 			getDrawInfo(renderPipeline),
 			material);
 	}
 }
 
-void boid_particle_system::boid_material::setupPipeline(dx_command_list* cl, const common_material_info& materialInfo)
+void boid_particle_system::boid_pipeline::setupCommon(dx_command_list* cl, const common_material_info& materialInfo)
 {
 	cl->setPipelineState(*renderPipeline.pipeline);
 	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);
@@ -304,9 +303,11 @@ void boid_particle_system::boid_material::setupPipeline(dx_command_list* cl, con
 	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 2, materialInfo.brdf);
 }
 
-void boid_particle_system::boid_material::prepareForRendering(dx_command_list* cl)
+void boid_particle_system::boid_pipeline::render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<boid_pipeline>& rc)
 {
-	cl->setGraphicsDynamicConstantBuffer(BOID_PARTICLE_SYSTEM_RENDERING_RS_CBV, settingsCBV);
+	cl->setGraphicsDynamicConstantBuffer(BOID_PARTICLE_SYSTEM_RENDERING_RS_CBV, rc.material.settingsCBV);
+
+	particle_render_pipeline::render(cl, viewProj, rc);
 }
 
 
@@ -337,4 +338,3 @@ void loadAllParticleSystemPipelines()
 	smoke_particle_system::initializePipeline();
 	boid_particle_system::initializePipeline();
 }
-

@@ -311,7 +311,7 @@ void application::initialize(main_renderer* renderer)
 
 
 
-	//setEnvironment("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
+	setEnvironment("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
 
 
 
@@ -965,6 +965,7 @@ void application::resetRenderPasses()
 	opaqueRenderPass.reset();
 	transparentRenderPass.reset();
 	overlayRenderPass.reset();
+	outlineRenderPass.reset();
 	sunShadowRenderPass.reset();
 
 	for (uint32 i = 0; i < numSpotShadowRenderPasses; ++i)
@@ -989,6 +990,7 @@ void application::submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 num
 	renderer->submitRenderPass(&opaqueRenderPass);
 	renderer->submitRenderPass(&transparentRenderPass);
 	renderer->submitRenderPass(&overlayRenderPass);
+	renderer->submitRenderPass(&outlineRenderPass);
 
 	shadow_map_renderer::submitRenderPass(&sunShadowRenderPass);
 
@@ -1569,13 +1571,19 @@ void application::update(const user_input& input, float dt)
 
 					if (material->albedoTint.a < 1.f)
 					{
-						transparentRenderPass.renderObject(controller->currentVertexBuffer, mesh.indexBuffer, submesh, asTransparent(material), m, outline);
+						transparentRenderPass.renderObject<transparent_pbr_pipeline>(m, controller->currentVertexBuffer, mesh.indexBuffer, submesh, material);
 					}
 					else
 					{
-						opaqueRenderPass.renderAnimatedObject(controller->currentVertexBuffer, controller->prevFrameVertexBuffer, mesh.indexBuffer, submesh, prevFrameSubmesh, asOpaque(material), 
-							m, lastM,
-							(uint32)entityHandle, outline);
+						opaqueRenderPass.renderAnimatedObject<opaque_pbr_pipeline>(m, lastM, 
+							controller->currentVertexBuffer, controller->prevFrameVertexBuffer, mesh.indexBuffer, 
+							submesh, prevFrameSubmesh, material,
+							(uint32)entityHandle);
+					}
+
+					if (outline)
+					{
+						outlineRenderPass.renderOutline(m, controller->currentVertexBuffer, mesh.indexBuffer, submesh);
 					}
 				}
 			}
@@ -1588,18 +1596,23 @@ void application::update(const user_input& input, float dt)
 
 					if (material->albedoTint.a < 1.f)
 					{
-						transparentRenderPass.renderObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, asTransparent(material), m, outline);
+						transparentRenderPass.renderObject<transparent_pbr_pipeline>(m, mesh.vertexBuffer, mesh.indexBuffer, submesh, material);
 					}
 					else
 					{
 						if (dynamic)
 						{
-							opaqueRenderPass.renderDynamicObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, asOpaque(material), m, lastM, (uint32)entityHandle, outline);
+							opaqueRenderPass.renderDynamicObject<opaque_pbr_pipeline>(m, lastM, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
 						}
 						else
 						{
-							opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, asOpaque(material), m, (uint32)entityHandle, outline);
+							opaqueRenderPass.renderStaticObject<opaque_pbr_pipeline>(m, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
 						}
+					}
+
+					if (outline)
+					{
+						outlineRenderPass.renderOutline(m, mesh.vertexBuffer, mesh.indexBuffer, submesh);
 					}
 				}
 			}

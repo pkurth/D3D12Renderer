@@ -76,5 +76,7 @@ private:
 
 	uint64 pageSize;
 	uint64 minimumBlockSize;
+
+	uint64 reserveSize;
 };
 

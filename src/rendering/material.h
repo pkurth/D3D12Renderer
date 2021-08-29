@@ -39,10 +39,3 @@ struct common_material_info
 	float skyIntensity;
 };
 
-
-typedef void (*material_setup_function)(dx_command_list*, const common_material_info&);
-
-struct material_base
-{
-	virtual void prepareForRendering(dx_command_list* cl) = 0;
-};

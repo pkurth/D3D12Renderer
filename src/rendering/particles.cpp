@@ -8,7 +8,6 @@
 #include "dx/dx_profiling.h"
 #include "bitonic_sort.h"
 
-#include "particles_rs.hlsli"
 
 ref<dx_buffer> particle_system::particleDrawCommandBuffer;
 dx_mesh particle_system::billboardMesh;

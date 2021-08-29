@@ -4,29 +4,6 @@
 #include "dx/dx_context.h"
 
 
-
-void geometry_render_pass::reset()
-{
-	drawCalls.clear();
-	outlinedObjects.clear();
-}
-
-void opaque_render_pass::reset()
-{
-	geometry_render_pass::reset();
-
-	staticDepthOnlyDrawCalls.clear();
-	dynamicDepthOnlyDrawCalls.clear();
-	animatedDepthOnlyDrawCalls.clear();
-}
-
-void transparent_render_pass::reset()
-{
-	geometry_render_pass::reset();
-
-	particleDrawCalls.clear();
-}
-
 void sun_cascade_render_pass::renderStaticObject(const vertex_buffer_group& vertexBuffer, const ref<dx_index_buffer>& indexBuffer, submesh_info submesh, const mat4& transform)
 {
 	staticDrawCalls.push_back(

@@ -32,16 +32,21 @@ private:
 	static dx_pipeline renderPipeline;
 
 
-	struct fire_material : material_base
+	struct fire_material
 	{
 		dx_texture_atlas atlas;
 		dx_dynamic_constant_buffer settingsCBV;
-
-		static void setupPipeline(dx_command_list* cl, const common_material_info& materialInfo);
-		void prepareForRendering(dx_command_list* cl);
 	};
 
-	ref<fire_material> material;
+	struct fire_pipeline : particle_render_pipeline<fire_pipeline>
+	{
+		using material_t = fire_material;
+
+		static void setupCommon(dx_command_list* cl, const common_material_info& materialInfo);
+		static void render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<fire_pipeline>& rc);
+	};
+
+	fire_material material;
 };
 
 
@@ -66,16 +71,21 @@ private:
 	static dx_pipeline renderPipeline;
 
 
-	struct smoke_material : material_base
+	struct smoke_material
 	{
 		dx_texture_atlas atlas;
 		dx_dynamic_constant_buffer settingsCBV;
-
-		static void setupPipeline(dx_command_list* cl, const common_material_info& materialInfo);
-		void prepareForRendering(dx_command_list* cl);
 	};
 
-	ref<smoke_material> material;
+	struct smoke_pipeline : particle_render_pipeline<smoke_pipeline>
+	{
+		using material_t = smoke_material;
+
+		static void setupCommon(dx_command_list* cl, const common_material_info& materialInfo);
+		static void render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<smoke_pipeline>& rc);
+	};
+
+	smoke_material material;
 };
 
 
@@ -103,13 +113,18 @@ private:
 	vertex_buffer_group skinnedVertexBuffer;
 	float time = 0.f;
 
-	struct boid_material : material_base
+	struct boid_material
 	{
 		dx_dynamic_constant_buffer settingsCBV;
-
-		static void setupPipeline(dx_command_list* cl, const common_material_info& materialInfo);
-		void prepareForRendering(dx_command_list* cl);
 	};
 
-	ref<boid_material> material;
+	struct boid_pipeline : particle_render_pipeline<boid_pipeline>
+	{
+		using material_t = boid_material;
+
+		static void setupCommon(dx_command_list* cl, const common_material_info& materialInfo);
+		static void render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<boid_pipeline>& rc);
+	};
+
+	boid_material material;
 };

@@ -154,7 +154,7 @@ void transparentLightPass(dx_command_list* cl,
 
 void overlays(dx_command_list* cl,
 	const dx_render_target& ldrRenderTarget,
-	overlay_render_pass* overlayRenderPass,
+	const overlay_render_pass* overlayRenderPass,
 	const common_material_info& materialInfo,
 	const mat4& viewProj);
 
@@ -163,7 +163,7 @@ void outlines(dx_command_list* cl,
 	ref<dx_texture> depthStencilBuffer,			// DEPTH_WRITE. Must be same as DSV bound to render-target.
 	const dx_pipeline& outlineMarkerPipeline,
 	const dx_pipeline& outlineDrawerPipeline,
-	const opaque_render_pass* opaqueRenderPass,
+	const outline_render_pass* outlineRenderPass,
 	const mat4& viewProj,
 	uint32 stencilBit);
 

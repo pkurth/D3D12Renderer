@@ -98,7 +98,7 @@ void depthPrePass(dx_command_list* cl,
 	depth_only_camera_jitter_cb jitterCB = { jitter, prevFrameJitter };
 
 	// Static.
-	if (opaqueRenderPass && opaqueRenderPass->staticDepthOnlyDrawCalls.size() > 0)
+	if (opaqueRenderPass && opaqueRenderPass->staticDepthPrepass.size() > 0)
 	{
 		DX_PROFILE_BLOCK(cl, "Static");
 
@@ -107,7 +107,7 @@ void depthPrePass(dx_command_list* cl,
 
 		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
 
-		for (const auto& dc : opaqueRenderPass->staticDepthOnlyDrawCalls)
+		for (const auto& dc : opaqueRenderPass->staticDepthPrepass)
 		{
 			const mat4& m = dc.transform;
 			const submesh_info& submesh = dc.submesh;
@@ -122,7 +122,7 @@ void depthPrePass(dx_command_list* cl,
 	}
 
 	// Dynamic.
-	if (opaqueRenderPass && opaqueRenderPass->dynamicDepthOnlyDrawCalls.size() > 0)
+	if (opaqueRenderPass && opaqueRenderPass->dynamicDepthPrepass.size() > 0)
 	{
 		DX_PROFILE_BLOCK(cl, "Dynamic");
 
@@ -131,7 +131,7 @@ void depthPrePass(dx_command_list* cl,
 
 		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
 
-		for (const auto& dc : opaqueRenderPass->dynamicDepthOnlyDrawCalls)
+		for (const auto& dc : opaqueRenderPass->dynamicDepthPrepass)
 		{
 			const mat4& m = dc.transform;
 			const mat4& prevFrameM = dc.prevFrameTransform;
@@ -147,7 +147,7 @@ void depthPrePass(dx_command_list* cl,
 	}
 
 	// Animated.
-	if (opaqueRenderPass && opaqueRenderPass->animatedDepthOnlyDrawCalls.size() > 0)
+	if (opaqueRenderPass && opaqueRenderPass->animatedDepthPrepass.size() > 0)
 	{
 		DX_PROFILE_BLOCK(cl, "Animated");
 
@@ -156,7 +156,7 @@ void depthPrePass(dx_command_list* cl,
 
 		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
 
-		for (const auto& dc : opaqueRenderPass->animatedDepthOnlyDrawCalls)
+		for (const auto& dc : opaqueRenderPass->animatedDepthPrepass)
 		{
 			const mat4& m = dc.transform;
 			const mat4& prevFrameM = dc.prevFrameTransform;
@@ -571,34 +571,23 @@ void opaqueLightPass(dx_command_list* cl,
 	const common_material_info& materialInfo, 
 	const mat4& viewProj)
 {
-	if (opaqueRenderPass && opaqueRenderPass->drawCalls.size() > 0)
+	if (opaqueRenderPass && opaqueRenderPass->pass.size() > 0)
 	{
 		DX_PROFILE_BLOCK(cl, "Main opaque light pass");
 
 		cl->setRenderTarget(renderTarget);
 		cl->setViewport(renderTarget.viewport);
 
-		material_setup_function lastSetupFunc = 0;
+		render_command_setup_func lastSetupFunc = 0;
 
-		for (const auto& dc : opaqueRenderPass->drawCalls)
+		for (auto dc : opaqueRenderPass->pass)
 		{
-			const mat4& m = dc.transform;
-			const submesh_info& submesh = dc.submesh;
-
-			if (dc.materialSetupFunc != lastSetupFunc)
+			if (dc.setupCommon != lastSetupFunc)
 			{
-				dc.materialSetupFunc(cl, materialInfo);
-				lastSetupFunc = dc.materialSetupFunc;
+				dc.setupCommon(cl, materialInfo);
+				lastSetupFunc = dc.setupCommon;
 			}
-
-			dc.material->prepareForRendering(cl);
-
-			cl->setGraphics32BitConstants(0, transform_cb{ viewProj * m, m });
-
-			cl->setVertexBuffer(0, dc.vertexBuffer.positions);
-			cl->setVertexBuffer(1, dc.vertexBuffer.others);
-			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			dc.render(cl, viewProj, dc.data);
 		}
 	}
 }
@@ -610,76 +599,30 @@ void transparentLightPass(dx_command_list* cl,
 	const dx_command_signature& particleCommandSignature,
 	const mat4& viewProj)
 {
-	if (transparentRenderPass && (transparentRenderPass->drawCalls.size() > 0 || transparentRenderPass->particleDrawCalls.size() > 0))
+	if (transparentRenderPass && transparentRenderPass->pass.size() > 0)
 	{
 		DX_PROFILE_BLOCK(cl, "Transparent light pass");
 
 		cl->setRenderTarget(renderTarget);
 		cl->setViewport(renderTarget.viewport);
 
+		render_command_setup_func lastSetupFunc = 0;
 
-		material_setup_function lastSetupFunc = 0;
-
+		for (auto dc : transparentRenderPass->pass)
 		{
-			DX_PROFILE_BLOCK(cl, "Transparent geometry");
-
-			for (const auto& dc : transparentRenderPass->drawCalls)
+			if (dc.setupCommon != lastSetupFunc)
 			{
-				const mat4& m = dc.transform;
-				const submesh_info& submesh = dc.submesh;
-
-				if (dc.materialSetupFunc != lastSetupFunc)
-				{
-					dc.materialSetupFunc(cl, materialInfo);
-					lastSetupFunc = dc.materialSetupFunc;
-				}
-
-				dc.material->prepareForRendering(cl);
-
-				cl->setGraphics32BitConstants(0, transform_cb{ viewProj * m, m });
-
-				cl->setVertexBuffer(0, dc.vertexBuffer.positions);
-				cl->setVertexBuffer(1, dc.vertexBuffer.others);
-				cl->setIndexBuffer(dc.indexBuffer);
-				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+				dc.setupCommon(cl, materialInfo);
+				lastSetupFunc = dc.setupCommon;
 			}
-		}
-
-		if (transparentRenderPass->particleDrawCalls.size() > 0)
-		{
-			DX_PROFILE_BLOCK(cl, "Particles");
-
-			for (const auto& dc : transparentRenderPass->particleDrawCalls)
-			{
-				if (dc.materialSetupFunc != lastSetupFunc)
-				{
-					dc.materialSetupFunc(cl, materialInfo);
-					lastSetupFunc = dc.materialSetupFunc;
-				}
-
-				dc.material->prepareForRendering(cl);
-
-				const particle_draw_info& info = dc.drawInfo;
-
-				cl->setRootGraphicsSRV(info.rootParameterOffset + PARTICLE_RENDERING_RS_PARTICLES, info.particleBuffer->gpuVirtualAddress);
-				cl->setRootGraphicsSRV(info.rootParameterOffset + PARTICLE_RENDERING_RS_ALIVE_LIST, info.aliveList->gpuVirtualAddress + info.aliveListOffset);
-
-				cl->setVertexBuffer(0, dc.vertexBuffer.positions);
-				if (dc.vertexBuffer.others)
-				{
-					cl->setVertexBuffer(1, dc.vertexBuffer.others);
-				}
-				cl->setIndexBuffer(dc.indexBuffer);
-
-				cl->drawIndirect(particleCommandSignature, 1, info.commandBuffer, info.commandBufferOffset);
-			}
+			dc.render(cl, viewProj, dc.data);
 		}
 	}
 }
 
 void overlays(dx_command_list* cl,
 	const dx_render_target& ldrRenderTarget,
-	overlay_render_pass* overlayRenderPass,
+	const overlay_render_pass* overlayRenderPass,
 	const common_material_info& materialInfo,
 	const mat4& viewProj)
 {
@@ -690,38 +633,16 @@ void overlays(dx_command_list* cl,
 
 	cl->clearDepth(ldrRenderTarget.dsv);
 
-	material_setup_function lastSetupFunc = 0;
+	render_command_setup_func lastSetupFunc = 0;
 
-	for (const auto& dc : overlayRenderPass->drawCalls)
+	for (auto dc : overlayRenderPass->pass)
 	{
-		const mat4& m = dc.transform;
-
-		if (dc.materialSetupFunc != lastSetupFunc)
+		if (dc.setupCommon != lastSetupFunc)
 		{
-			dc.materialSetupFunc(cl, materialInfo);
-			lastSetupFunc = dc.materialSetupFunc;
+			dc.setupCommon(cl, materialInfo);
+			lastSetupFunc = dc.setupCommon;
 		}
-
-		dc.material->prepareForRendering(cl);
-
-		if (dc.setTransform)
-		{
-			cl->setGraphics32BitConstants(0, transform_cb{ viewProj * m, m });
-		}
-
-		if (dc.drawType == geometry_render_pass::draw_type_default)
-		{
-			const submesh_info& submesh = dc.submesh;
-
-			cl->setVertexBuffer(0, dc.vertexBuffer.positions);
-			cl->setVertexBuffer(1, dc.vertexBuffer.others);
-			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-		}
-		else
-		{
-			cl->dispatchMesh(dc.dispatchInfo.dispatchX, dc.dispatchInfo.dispatchY, dc.dispatchInfo.dispatchZ);
-		}
+		dc.render(cl, viewProj, dc.data);
 	}
 }
 
@@ -730,7 +651,7 @@ void outlines(dx_command_list* cl,
 	ref<dx_texture> depthStencilBuffer,
 	const dx_pipeline& outlineMarkerPipeline,
 	const dx_pipeline& outlineDrawerPipeline,
-	const opaque_render_pass* opaqueRenderPass,
+	const outline_render_pass* outlineRenderPass,
 	const mat4& viewProj,
 	uint32 stencilBit)
 {
@@ -744,26 +665,16 @@ void outlines(dx_command_list* cl,
 	cl->setPipelineState(*outlineMarkerPipeline.pipeline);
 	cl->setGraphicsRootSignature(*outlineMarkerPipeline.rootSignature);
 
-	// Mark object in stencil.
-	auto mark = [](const geometry_render_pass& rp, dx_command_list* cl, const mat4& viewProj)
+
+	// Mark objects in stencil.
+	for (const auto& outlined : outlineRenderPass->pass)
 	{
-		for (const auto& outlined : rp.outlinedObjects)
-		{
-			const submesh_info& submesh = rp.drawCalls[outlined].submesh;
-			const mat4& m = rp.drawCalls[outlined].transform;
-			const auto& vertexBuffer = rp.drawCalls[outlined].vertexBuffer;
-			const auto& indexBuffer = rp.drawCalls[outlined].indexBuffer;
+		cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * outlined.transform});
 
-			cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * m });
-
-			cl->setVertexBuffer(0, vertexBuffer.positions);
-			cl->setIndexBuffer(indexBuffer);
-			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-		}
-	};
-
-	mark(*opaqueRenderPass, cl, viewProj);
-	//mark(*transparentRenderPass, cl, unjitteredCamera.viewProj);
+		cl->setVertexBuffer(0, outlined.vertexBuffer);
+		cl->setIndexBuffer(outlined.indexBuffer);
+		cl->drawIndexed(outlined.submesh.numTriangles * 3, 1, outlined.submesh.firstTriangle * 3, outlined.submesh.baseVertex, 0);
+	}
 
 	// Draw outline.
 	cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ);

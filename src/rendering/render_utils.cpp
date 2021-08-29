@@ -9,6 +9,7 @@
 #include "pbr.h"
 #include "scene/particle_systems.h"
 #include "bitonic_sort.h"
+#include "debug_visualization.h"
 
 #include "particles_rs.hlsli"
 
@@ -29,10 +30,6 @@ dx_pipeline sphericalHarmonicsSkyPipeline;
 
 dx_pipeline outlineMarkerPipeline;
 dx_pipeline outlineDrawerPipeline;
-
-dx_pipeline flatSimplePipeline;
-dx_pipeline flatUnlitTrianglePipeline;
-dx_pipeline flatUnlitLinePipeline;
 
 dx_command_signature particleCommandSignature;
 
@@ -108,30 +105,6 @@ void initializeRenderUtils()
 		outlineDrawerPipeline = createReloadablePipeline(drawerDesc, { "fullscreen_triangle_vs", "outline_ps" });
 	}
 
-	// Flat simple.
-	{
-		auto desc = CREATE_GRAPHICS_PIPELINE
-			.inputLayout(inputLayout_position_normal)
-			.renderTargets(ldrFormat, depthStencilFormat)
-			;
-
-		flatSimplePipeline = createReloadablePipeline(desc, { "flat_simple_vs", "flat_simple_ps" });
-	}
-
-	// Flat unlit.
-	{
-		auto desc = CREATE_GRAPHICS_PIPELINE
-			.inputLayout(inputLayout_position)
-			.renderTargets(ldrFormat, depthStencilFormat)
-			;
-
-		flatUnlitTrianglePipeline = createReloadablePipeline(desc, { "flat_unlit_vs", "flat_unlit_ps" });
-
-
-		desc.primitiveTopology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
-		flatUnlitLinePipeline = createReloadablePipeline(desc, { "flat_unlit_vs", "flat_unlit_ps" });
-	}
-
 
 	D3D12_INDIRECT_ARGUMENT_DESC argumentDesc;
 	argumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
@@ -145,7 +118,10 @@ void initializeRenderUtils()
 	initializeSkinning();
 	loadCommonShaders();
 
-	pbr_material::initializePipeline();
+	debug_simple_pipeline::initialize();
+	debug_unlit_pipeline::initialize();
+	opaque_pbr_pipeline::initialize();
+	transparent_pbr_pipeline::initialize();
 	particle_system::initializePipeline();
 	initializeBitonicSort();
 	loadAllParticleSystemPipelines();

@@ -14,6 +14,7 @@ void memory_arena::initialize(uint64 minimumBlockSize, uint64 reserveSize)
 	pageSize = systemInfo.dwPageSize;
 	sizeLeftTotal = reserveSize;
 	this->minimumBlockSize = minimumBlockSize;
+	this->reserveSize = reserveSize;
 }
 
 void* memory_arena::allocate(uint64 size, uint64 alignment, bool clearToZero)
@@ -62,5 +63,5 @@ void memory_arena::reset(bool freeMemory)
 
 	current = 0;
 	sizeLeftCurrent = committedMemory;
-	sizeLeftTotal = committedMemory;
+	sizeLeftTotal = reserveSize;
 }

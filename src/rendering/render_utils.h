@@ -44,11 +44,6 @@ extern dx_pipeline sphericalHarmonicsSkyPipeline;
 extern dx_pipeline outlineMarkerPipeline;
 extern dx_pipeline outlineDrawerPipeline;
 
-extern dx_pipeline flatSimplePipeline;
-extern dx_pipeline flatUnlitTrianglePipeline;
-extern dx_pipeline flatUnlitLinePipeline;
-
-
 extern dx_command_signature particleCommandSignature;
 
 

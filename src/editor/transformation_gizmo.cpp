@@ -59,7 +59,6 @@ static gizmo_rectangle rectangles[] =
 };
 
 static dx_mesh mesh;
-static ref<flat_simple_material> materials[6];
 
 
 void initializeTransformationGizmos()
@@ -86,11 +85,6 @@ void initializeTransformationGizmos()
 
 		rectangles[i].position *= shaftLength * 0.35f;
 		rectangles[i].radius *= shaftLength * 0.2f;
-	}
-	
-	for (uint32 i = 0; i < 6; ++i)
-	{
-		materials[i] = make_ref<flat_simple_material>();
 	}
 }
 
@@ -479,25 +473,19 @@ bool transformation_gizmo::manipulateTransformation(trs& transform, const render
 
 		for (uint32 i = 0; i < 3; ++i)
 		{
-			materials[i]->color = colors[i] * (highlightAxis == i ? 0.5f : 1.f);
-
-			overlayRenderPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
+			overlayRenderPass->renderObject<debug_simple_pipeline>(createModelMatrix(transform.position, rotations[i], scaling), 
+				mesh.vertexBuffer, mesh.indexBuffer,
 				submeshes[type],
-				materials[i],
-				createModelMatrix(transform.position, rotations[i], scaling),
-				true
+				debug_material{ colors[i] * (highlightAxis == i ? 0.5f : 1.f) }
 			);
 		}
 
 		if (type == transformation_type_scale)
 		{
-			materials[3]->color = vec4(0.5f) * (highlightAxis == 3 ? 0.5f : 1.f);
-
-			overlayRenderPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
+			overlayRenderPass->renderObject<debug_simple_pipeline>(createModelMatrix(transform.position, rot, scaling), 
+				mesh.vertexBuffer, mesh.indexBuffer,
 				boxSubmesh,
-				materials[3],
-				createModelMatrix(transform.position, rot, scaling),
-				true
+				debug_material{ vec4(0.5f) * (highlightAxis == 3 ? 0.5f : 1.f) }
 			);
 		}
 	}
@@ -520,13 +508,10 @@ bool transformation_gizmo::manipulateTransformation(trs& transform, const render
 
 		for (uint32 i = 0; i < 3; ++i)
 		{
-			materials[i + 3]->color = colors[i] * (highlightAxis == i + 3 ? 0.5f : 1.f);
-
-			overlayRenderPass->renderObject(mesh.vertexBuffer, mesh.indexBuffer,
+			overlayRenderPass->renderObject<debug_simple_pipeline>(createModelMatrix(transform.position, rotations[i], scaling), 
+				mesh.vertexBuffer, mesh.indexBuffer,
 				planeSubmesh,
-				materials[i + 3],
-				createModelMatrix(transform.position, rotations[i], scaling),
-				true
+				debug_material{ colors[i] * (highlightAxis == i + 3 ? 0.5f : 1.f) }
 			);
 		}
 	}

@@ -1,37 +1,34 @@
 #pragma once
 
-#include "render_utils.h"
 #include "render_pass.h"
 #include "dx/dx_command_list.h"
 #include "core/camera.h"
 
 #include "visualization_rs.hlsli"
 
-struct flat_simple_material : material_base
+struct debug_material
 {
 	vec4 color;
-
-	static void setupPipeline(dx_command_list* cl, const common_material_info& info);
-	void prepareForRendering(dx_command_list* cl);
 };
 
-
-struct flat_unlit_material : material_base
+struct debug_simple_pipeline
 {
-	vec4 color;
+	using material_t = debug_material;
 
-	void prepareForRendering(dx_command_list* cl);
+	static void initialize();
+	static void setupCommon(dx_command_list* cl, const common_material_info& materialInfo);
+	static void render(dx_command_list* cl, const mat4& viewProj, const default_render_command<debug_simple_pipeline>& rc);
 };
 
-struct flat_unlit_triangle_material : flat_unlit_material
+struct debug_unlit_pipeline
 {
-	static void setupPipeline(dx_command_list* cl, const common_material_info& info);
+	using material_t = debug_material;
+
+	static void initialize();
+	static void setupCommon(dx_command_list* cl, const common_material_info& materialInfo);
+	static void render(dx_command_list* cl, const mat4& viewProj, const default_render_command<debug_unlit_pipeline>& rc);
 };
 
-struct flat_unlit_line_material : flat_unlit_material
-{
-	static void setupPipeline(dx_command_list* cl, const common_material_info& info);
-};
 
 
 

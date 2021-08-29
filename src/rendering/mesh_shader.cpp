@@ -5,6 +5,10 @@
 #include "material.h"
 #include "render_utils.h"
 
+void initializeMeshShader() {}
+
+#if 0
+
 static dx_pipeline cubePipeline;
 static dx_pipeline meshPipeline;
 static dx_pipeline blobPipeline;
@@ -925,5 +929,5 @@ const marching_cubes_lookup marchingCubesLookup[256] =
 	{ { 0x00000000, 0x00000000, 0x00000000, 0x00000000 }, { 000, 000, 000, 000, 000, 000, 000, 000, 000, 000, 000, 000 }, 0, 0 },
 };
 
-
+#endif
 

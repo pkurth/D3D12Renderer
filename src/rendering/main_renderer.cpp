@@ -158,8 +158,9 @@ void main_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 	}
 
 	opaqueRenderPass = 0;
-	overlayRenderPass = 0;
 	transparentRenderPass = 0;
+	overlayRenderPass = 0;
+	outlineRenderPass = 0;
 
 	pointLights = 0;
 	spotLights = 0;
@@ -526,7 +527,7 @@ void main_renderer::endFrame(const user_input& input)
 			// ----------------------------------------
 
 
-			if (transparentRenderPass && (transparentRenderPass->drawCalls.size() > 0 || transparentRenderPass->particleDrawCalls.size() > 0))
+			if (transparentRenderPass && transparentRenderPass->pass.size() > 0)
 			{
 				barrier_batcher(cl)
 					.transition(hdrResult, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
@@ -591,9 +592,8 @@ void main_renderer::endFrame(const user_input& input)
 			// LDR RENDERING
 			// ----------------------------------------
 
-			bool renderingOverlays = overlayRenderPass && overlayRenderPass->drawCalls.size();
-			bool renderingOutlines = opaqueRenderPass && opaqueRenderPass->outlinedObjects.size() > 0 ||
-				transparentRenderPass && transparentRenderPass->outlinedObjects.size() > 0;
+			bool renderingOverlays = overlayRenderPass && overlayRenderPass->pass.size();
+			bool renderingOutlines = outlineRenderPass && outlineRenderPass->pass.size();
 			if (renderingOverlays || renderingOutlines)
 			{
 				barrier_batcher(cl)
@@ -608,7 +608,7 @@ void main_renderer::endFrame(const user_input& input)
 				}
 				if (renderingOutlines)
 				{
-					outlines(cl, ldrRenderTarget, depthStencilBuffer, outlineMarkerPipeline, outlineDrawerPipeline, opaqueRenderPass, unjitteredCamera.viewProj, stencil_flag_selected_object);
+					outlines(cl, ldrRenderTarget, depthStencilBuffer, outlineMarkerPipeline, outlineDrawerPipeline, outlineRenderPass, unjitteredCamera.viewProj, stencil_flag_selected_object);
 				}
 
 				barrier_batcher(cl)
