@@ -93,6 +93,8 @@ dx_allocation dx_upload_buffer::allocate(uint64 size, uint64 alignment)
 	dx_allocation result;
 	result.cpuPtr = page->cpuBasePtr + alignedOffset;
 	result.gpuPtr = page->gpuBasePtr + alignedOffset;
+	result.resource = page->buffer;
+	result.offsetInResource = (uint32)alignedOffset;
 
 	page->currentOffset = alignedOffset + size;
 

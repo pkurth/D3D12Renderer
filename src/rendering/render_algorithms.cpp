@@ -4,6 +4,7 @@
 #include "dx/dx_barrier_batcher.h"
 
 #include "render_resources.h"
+#include "render_utils.h"
 
 #include "post_processing_rs.hlsli"
 #include "ssr_rs.hlsli"
@@ -11,8 +12,20 @@
 #include "depth_only_rs.hlsli"
 #include "sky_rs.hlsli"
 #include "outline_rs.hlsli"
-#include "particles_rs.hlsli"
 #include "transform.hlsli"
+
+static dx_pipeline depthOnlyPipeline;
+static dx_pipeline animatedDepthOnlyPipeline;
+static dx_pipeline shadowPipeline;
+static dx_pipeline pointLightShadowPipeline;
+
+static dx_pipeline textureSkyPipeline;
+static dx_pipeline proceduralSkyPipeline;
+static dx_pipeline preethamSkyPipeline;
+static dx_pipeline sphericalHarmonicsSkyPipeline;
+
+static dx_pipeline outlineMarkerPipeline;
+static dx_pipeline outlineDrawerPipeline;
 
 static dx_pipeline shadowMapCopyPipeline;
 
@@ -42,9 +55,102 @@ static dx_pipeline bloomCombinePipeline;
 static dx_pipeline tonemapPipeline;
 static dx_pipeline presentPipeline;
 
+static dx_command_signature rigidDepthPrepassCommandSignature;
+static dx_command_signature animatedDepthPrepassCommandSignature;
+
+
+#pragma pack(push, 1)
+struct indirect_rigid_depth_prepass_command
+{
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView;		// 16 bytes.
+	D3D12_INDEX_BUFFER_VIEW indexBufferView;		// 16 bytes -> 32 bytes total.
+	depth_only_transform_cb transform;				// 128 bytes -> 160 bytes total.
+	uint32 objectID;								// 4 bytes -> 164 bytes total.
+	D3D12_DRAW_INDEXED_ARGUMENTS drawArguments;		// 20 bytes -> 184 bytes total.
+	uint32 padding[2];								// 8 bytes -> 192 bytes total (divisible by 16).
+};
+
+struct indirect_animated_depth_prepass_command
+{
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView;		// 16 bytes.
+	D3D12_INDEX_BUFFER_VIEW indexBufferView;		// 16 bytes -> 32 bytes total.
+	depth_only_transform_cb transform;				// 128 bytes -> 160 bytes total.
+	uint32 objectID;								// 4 bytes -> 164 bytes total.
+	D3D12_GPU_VIRTUAL_ADDRESS prevFramePositions;	// 8 bytes -> 172 bytes total.
+	D3D12_DRAW_INDEXED_ARGUMENTS drawArguments;		// 20 bytes -> 192 bytes total (divisible by 16).
+};
+#pragma pack(pop)
+
 
 void loadCommonShaders()
 {
+	// Sky.
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.renderTargets(skyPassFormats, arraysize(skyPassFormats), depthStencilFormat)
+			.depthSettings(true, false)
+			.cullFrontFaces();
+
+		textureSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_texture_ps" });
+		proceduralSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_procedural_ps" });
+		preethamSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_preetham_ps" });
+		sphericalHarmonicsSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_sh_ps" });
+	}
+
+	// Depth prepass.
+	{
+		DXGI_FORMAT depthOnlyFormat[] = { screenVelocitiesFormat, objectIDsFormat };
+
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.renderTargets(depthOnlyFormat, arraysize(depthOnlyFormat), depthStencilFormat)
+			.inputLayout(inputLayout_position);
+
+		depthOnlyPipeline = createReloadablePipeline(desc, { "depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
+		animatedDepthOnlyPipeline = createReloadablePipeline(desc, { "depth_only_animated_vs", "depth_only_ps" }, rs_in_vertex_shader);
+	}
+
+	// Shadow.
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.renderTargets(0, 0, render_resources::shadowDepthFormat)
+			.inputLayout(inputLayout_position)
+			//.cullFrontFaces()
+			;
+
+		shadowPipeline = createReloadablePipeline(desc, { "shadow_vs" }, rs_in_vertex_shader);
+		pointLightShadowPipeline = createReloadablePipeline(desc, { "shadow_point_light_vs", "shadow_point_light_ps" }, rs_in_vertex_shader);
+	}
+
+	// Outline.
+	{
+		auto markerDesc = CREATE_GRAPHICS_PIPELINE
+			.inputLayout(inputLayout_position)
+			.renderTargets(0, 0, depthStencilFormat)
+			.stencilSettings(D3D12_COMPARISON_FUNC_ALWAYS,
+				D3D12_STENCIL_OP_REPLACE,
+				D3D12_STENCIL_OP_REPLACE,
+				D3D12_STENCIL_OP_KEEP,
+				D3D12_DEFAULT_STENCIL_READ_MASK,
+				stencil_flag_selected_object) // Mark selected object.
+			.depthSettings(false, false);
+
+		outlineMarkerPipeline = createReloadablePipeline(markerDesc, { "outline_vs" }, rs_in_vertex_shader);
+
+
+		auto drawerDesc = CREATE_GRAPHICS_PIPELINE
+			.renderTargets(ldrFormat, depthStencilFormat)
+			.stencilSettings(D3D12_COMPARISON_FUNC_EQUAL,
+				D3D12_STENCIL_OP_KEEP,
+				D3D12_STENCIL_OP_KEEP,
+				D3D12_STENCIL_OP_KEEP,
+				stencil_flag_selected_object, // Read only selected object bit.
+				0)
+			.depthSettings(false, false);
+
+		outlineDrawerPipeline = createReloadablePipeline(drawerDesc, { "fullscreen_triangle_vs", "outline_ps" });
+	}
+
+	// Shadow map copy.
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.renderTargets(0, 0, render_resources::shadowDepthFormat)
@@ -81,11 +187,68 @@ void loadCommonShaders()
 	presentPipeline = createReloadablePipeline("present_cs");
 }
 
+void loadRemainingRenderResources()
+{
+	D3D12_INDIRECT_ARGUMENT_DESC rigidDepthPrepassDescs[] =
+	{
+		indirect_vertex_buffer(0),
+		indirect_index_buffer(),
+		indirect_root_constants<depth_only_transform_cb>(DEPTH_ONLY_RS_MVP),
+		indirect_root_constants<uint32>(DEPTH_ONLY_RS_OBJECT_ID),
+		indirect_draw_indexed(),
+	};
+
+	rigidDepthPrepassCommandSignature = createCommandSignature(*depthOnlyPipeline.rootSignature,
+		rigidDepthPrepassDescs, arraysize(rigidDepthPrepassDescs),
+		sizeof(indirect_rigid_depth_prepass_command));
+
+	D3D12_INDIRECT_ARGUMENT_DESC animatedDepthPrepassDescs[] =
+	{
+		indirect_vertex_buffer(0),
+		indirect_index_buffer(),
+		indirect_root_constants<depth_only_transform_cb>(DEPTH_ONLY_RS_MVP),
+		indirect_root_constants<uint32>(DEPTH_ONLY_RS_OBJECT_ID),
+		indirect_srv(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS),
+		indirect_draw_indexed(),
+	};
+
+	animatedDepthPrepassCommandSignature = createCommandSignature(*animatedDepthOnlyPipeline.rootSignature,
+		animatedDepthPrepassDescs, arraysize(animatedDepthPrepassDescs),
+		sizeof(indirect_animated_depth_prepass_command));
+}
+
+static void batchRenderRigidDepthPrepass(dx_command_list* cl,
+	const sort_key_vector<float, static_depth_only_render_command>& commands,
+	const mat4& viewProj, const mat4& prevFrameViewProj)
+{
+	DX_PROFILE_BLOCK(cl, "Batch depth pre-pass");
+
+	dx_allocation allocation = dxContext.allocateDynamicBuffer(
+		(uint32)(commands.size() * sizeof(indirect_rigid_depth_prepass_command)));
+	indirect_rigid_depth_prepass_command* ptr = (indirect_rigid_depth_prepass_command*)allocation.cpuPtr;
+
+	for (const auto& dc : commands)
+	{
+		ptr->vertexBufferView = dc.vertexBuffer->view;
+		ptr->indexBufferView = dc.indexBuffer->view;
+		ptr->transform = depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.transform };
+		ptr->objectID = dc.objectID;
+		ptr->drawArguments.StartInstanceLocation = 0;
+		ptr->drawArguments.InstanceCount = 1;
+		ptr->drawArguments.BaseVertexLocation = dc.submesh.baseVertex;
+		ptr->drawArguments.IndexCountPerInstance = dc.submesh.numTriangles * 3;
+		ptr->drawArguments.StartIndexLocation = dc.submesh.firstTriangle * 3;
+
+		++ptr;
+	}
+
+	cl->drawIndirect(rigidDepthPrepassCommandSignature, (uint32)commands.size(), 
+		allocation.resource,
+		allocation.offsetInResource);
+}
 
 void depthPrePass(dx_command_list* cl,
 	const dx_render_target& depthOnlyRenderTarget,
-	const dx_pipeline& rigidPipeline,
-	const dx_pipeline& animatedPipeline,
 	const opaque_render_pass* opaqueRenderPass,
 	const mat4& viewProj, const mat4& prevFrameViewProj,
 	vec2 jitter, vec2 prevFrameJitter)
@@ -102,23 +265,24 @@ void depthPrePass(dx_command_list* cl,
 	{
 		DX_PROFILE_BLOCK(cl, "Static");
 
-		cl->setPipelineState(*rigidPipeline.pipeline);
-		cl->setGraphicsRootSignature(*rigidPipeline.rootSignature);
+		cl->setPipelineState(*depthOnlyPipeline.pipeline);
+		cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
 
 		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
 
+#if 0
 		for (const auto& dc : opaqueRenderPass->staticDepthPrepass)
 		{
-			const mat4& m = dc.transform;
-			const submesh_info& submesh = dc.submesh;
-
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * m, prevFrameViewProj * m });
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, dc.objectID);
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.transform });
 
 			cl->setVertexBuffer(0, dc.vertexBuffer);
 			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			cl->drawIndexed(dc.submesh.numTriangles * 3, 1, dc.submesh.firstTriangle * 3, dc.submesh.baseVertex, 0);
 		}
+#else
+		batchRenderRigidDepthPrepass(cl, opaqueRenderPass->staticDepthPrepass, viewProj, prevFrameViewProj);
+#endif
 	}
 
 	// Dynamic.
@@ -126,23 +290,19 @@ void depthPrePass(dx_command_list* cl,
 	{
 		DX_PROFILE_BLOCK(cl, "Dynamic");
 
-		cl->setPipelineState(*rigidPipeline.pipeline);
-		cl->setGraphicsRootSignature(*rigidPipeline.rootSignature);
+		cl->setPipelineState(*depthOnlyPipeline.pipeline);
+		cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
 
 		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
 
 		for (const auto& dc : opaqueRenderPass->dynamicDepthPrepass)
 		{
-			const mat4& m = dc.transform;
-			const mat4& prevFrameM = dc.prevFrameTransform;
-			const submesh_info& submesh = dc.submesh;
-
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * m, prevFrameViewProj * prevFrameM });
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, dc.objectID);
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.prevFrameTransform });
 
 			cl->setVertexBuffer(0, dc.vertexBuffer);
 			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			cl->drawIndexed(dc.submesh.numTriangles * 3, 1, dc.submesh.firstTriangle * 3, dc.submesh.baseVertex, 0);
 		}
 	}
 
@@ -151,33 +311,26 @@ void depthPrePass(dx_command_list* cl,
 	{
 		DX_PROFILE_BLOCK(cl, "Animated");
 
-		cl->setPipelineState(*animatedPipeline.pipeline);
-		cl->setGraphicsRootSignature(*animatedPipeline.rootSignature);
+		cl->setPipelineState(*animatedDepthOnlyPipeline.pipeline);
+		cl->setGraphicsRootSignature(*animatedDepthOnlyPipeline.rootSignature);
 
 		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
 
 		for (const auto& dc : opaqueRenderPass->animatedDepthPrepass)
 		{
-			const mat4& m = dc.transform;
-			const mat4& prevFrameM = dc.prevFrameTransform;
-			const submesh_info& submesh = dc.submesh;
-			const submesh_info& prevFrameSubmesh = dc.prevFrameSubmesh;
-			const ref<dx_vertex_buffer>& prevFrameVertexBuffer = dc.prevFrameVertexBuffer;
-
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, (uint32)dc.objectID);
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * m, prevFrameViewProj * prevFrameM });
-			cl->setRootGraphicsSRV(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS, prevFrameVertexBuffer->gpuVirtualAddress + prevFrameSubmesh.baseVertex * prevFrameVertexBuffer->elementSize);
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, dc.objectID);
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.prevFrameTransform });
+			cl->setRootGraphicsSRV(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS, dc.prevFrameVertexBuffer->gpuVirtualAddress + dc.prevFrameSubmesh.baseVertex * dc.prevFrameVertexBuffer->elementSize);
 
 			cl->setVertexBuffer(0, dc.vertexBuffer);
 			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+			cl->drawIndexed(dc.submesh.numTriangles * 3, 1, dc.submesh.firstTriangle * 3, dc.submesh.baseVertex, 0);
 		}
 	}
 }
 
 void texturedSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const dx_pipeline& skyPipeline, 
 	const mat4& proj, const mat4& view,
 	ref<dx_texture> sky,
 	float skyIntensity)
@@ -187,8 +340,8 @@ void texturedSky(dx_command_list* cl,
 	cl->setRenderTarget(skyRenderTarget);
 	cl->setViewport(skyRenderTarget.viewport);
 
-	cl->setPipelineState(*skyPipeline.pipeline);
-	cl->setGraphicsRootSignature(*skyPipeline.rootSignature);
+	cl->setPipelineState(*textureSkyPipeline.pipeline);
+	cl->setGraphicsRootSignature(*textureSkyPipeline.rootSignature);
 
 	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
 	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, skyIntensity);
@@ -199,7 +352,6 @@ void texturedSky(dx_command_list* cl,
 
 void proceduralSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const dx_pipeline& skyPipeline,
 	const mat4& proj, const mat4& view,
 	float skyIntensity)
 {
@@ -208,8 +360,8 @@ void proceduralSky(dx_command_list* cl,
 	cl->setRenderTarget(skyRenderTarget);
 	cl->setViewport(skyRenderTarget.viewport);
 
-	cl->setPipelineState(*skyPipeline.pipeline);
-	cl->setGraphicsRootSignature(*skyPipeline.rootSignature);
+	cl->setPipelineState(*proceduralSkyPipeline.pipeline);
+	cl->setGraphicsRootSignature(*proceduralSkyPipeline.rootSignature);
 
 	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
 	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, skyIntensity);
@@ -219,7 +371,6 @@ void proceduralSky(dx_command_list* cl,
 
 void sphericalHarmonicsSky(dx_command_list* cl, 
 	const dx_render_target& skyRenderTarget, 
-	const dx_pipeline& skyPipeline, 
 	const mat4& proj, const mat4& view, 
 	const ref<dx_buffer>& sh, uint32 shIndex, 
 	float skyIntensity)
@@ -229,8 +380,8 @@ void sphericalHarmonicsSky(dx_command_list* cl,
 	cl->setRenderTarget(skyRenderTarget);
 	cl->setViewport(skyRenderTarget.viewport);
 
-	cl->setPipelineState(*skyPipeline.pipeline);
-	cl->setGraphicsRootSignature(*skyPipeline.rootSignature);
+	cl->setPipelineState(*sphericalHarmonicsSkyPipeline.pipeline);
+	cl->setGraphicsRootSignature(*sphericalHarmonicsSkyPipeline.rootSignature);
 
 	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
 	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, skyIntensity);
@@ -241,7 +392,6 @@ void sphericalHarmonicsSky(dx_command_list* cl,
 
 void preethamSky(dx_command_list* cl, 
 	const dx_render_target& skyRenderTarget, 
-	const dx_pipeline& skyPipeline, 
 	const mat4& proj, const mat4& view, 
 	vec3 sunDirection, float skyIntensity)
 {
@@ -250,8 +400,8 @@ void preethamSky(dx_command_list* cl,
 	cl->setRenderTarget(skyRenderTarget);
 	cl->setViewport(skyRenderTarget.viewport);
 
-	cl->setPipelineState(*skyPipeline.pipeline);
-	cl->setGraphicsRootSignature(*skyPipeline.rootSignature);
+	cl->setPipelineState(*preethamSkyPipeline.pipeline);
+	cl->setGraphicsRootSignature(*preethamSkyPipeline.rootSignature);
 
 	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
 	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_cb{ skyIntensity, sunDirection });
@@ -260,8 +410,6 @@ void preethamSky(dx_command_list* cl,
 }
 
 void shadowPasses(dx_command_list* cl,
-	const dx_pipeline& shadowPipeline,
-	const dx_pipeline& pointLightShadowPipeline,
 	const sun_shadow_render_pass** sunShadowRenderPasses, uint32 numSunLightShadowRenderPasses,
 	const spot_shadow_render_pass** spotLightShadowRenderPasses, uint32 numSpotLightShadowRenderPasses,
 	const point_shadow_render_pass** pointLightShadowRenderPasses, uint32 numPointLightShadowRenderPasses)
@@ -596,7 +744,6 @@ void transparentLightPass(dx_command_list* cl,
 	const dx_render_target& renderTarget, 
 	const transparent_render_pass* transparentRenderPass,
 	const common_material_info& materialInfo, 
-	const dx_command_signature& particleCommandSignature,
 	const mat4& viewProj)
 {
 	if (transparentRenderPass && transparentRenderPass->pass.size() > 0)
@@ -649,18 +796,15 @@ void overlays(dx_command_list* cl,
 void outlines(dx_command_list* cl, 
 	const dx_render_target& ldrRenderTarget, 
 	ref<dx_texture> depthStencilBuffer,
-	const dx_pipeline& outlineMarkerPipeline,
-	const dx_pipeline& outlineDrawerPipeline,
 	const outline_render_pass* outlineRenderPass,
-	const mat4& viewProj,
-	uint32 stencilBit)
+	const mat4& viewProj)
 {
 	DX_PROFILE_BLOCK(cl, "Outlines");
 
 	cl->setRenderTarget(ldrRenderTarget);
 	cl->setViewport(ldrRenderTarget.viewport);
 
-	cl->setStencilReference(stencilBit);
+	cl->setStencilReference(stencil_flag_selected_object);
 
 	cl->setPipelineState(*outlineMarkerPipeline.pipeline);
 	cl->setGraphicsRootSignature(*outlineMarkerPipeline.rootSignature);

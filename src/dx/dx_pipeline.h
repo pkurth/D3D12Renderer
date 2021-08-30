@@ -302,6 +302,103 @@ struct root_uav : CD3DX12_ROOT_PARAMETER
 
 
 
+
+struct indirect_vertex_buffer : D3D12_INDIRECT_ARGUMENT_DESC
+{
+	indirect_vertex_buffer(uint32 slot)
+	{
+		Type = D3D12_INDIRECT_ARGUMENT_TYPE_VERTEX_BUFFER_VIEW;
+		VertexBuffer.Slot = slot;
+	}
+};
+
+struct indirect_index_buffer : D3D12_INDIRECT_ARGUMENT_DESC
+{
+	indirect_index_buffer()
+	{
+		Type = D3D12_INDIRECT_ARGUMENT_TYPE_INDEX_BUFFER_VIEW;
+	}
+};
+
+template <typename T>
+struct indirect_root_constants : D3D12_INDIRECT_ARGUMENT_DESC
+{
+	indirect_root_constants(uint32 rootParameterIndex, uint32 destOffsetIn32BitValues = 0)
+	{
+		Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT;
+		Constant.Num32BitValuesToSet = sizeof(T) / 4;
+		Constant.RootParameterIndex = rootParameterIndex;
+		Constant.DestOffsetIn32BitValues = destOffsetIn32BitValues;
+	}
+};
+
+struct indirect_cbv : D3D12_INDIRECT_ARGUMENT_DESC
+{
+	indirect_cbv(uint32 rootParameterIndex)
+	{
+		Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT_BUFFER_VIEW;
+		ConstantBufferView.RootParameterIndex = rootParameterIndex;
+	}
+};
+
+struct indirect_srv : D3D12_INDIRECT_ARGUMENT_DESC
+{
+	indirect_srv(uint32 rootParameterIndex)
+	{
+		Type = D3D12_INDIRECT_ARGUMENT_TYPE_SHADER_RESOURCE_VIEW;
+		ConstantBufferView.RootParameterIndex = rootParameterIndex;
+	}
+};
+
+struct indirect_uav : D3D12_INDIRECT_ARGUMENT_DESC
+{
+	indirect_uav(uint32 rootParameterIndex)
+	{
+		Type = D3D12_INDIRECT_ARGUMENT_TYPE_UNORDERED_ACCESS_VIEW;
+		ConstantBufferView.RootParameterIndex = rootParameterIndex;
+	}
+};
+
+struct indirect_draw : D3D12_INDIRECT_ARGUMENT_DESC
+{
+	indirect_draw()
+	{
+		Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+	}
+};
+
+struct indirect_draw_indexed : D3D12_INDIRECT_ARGUMENT_DESC
+{
+	indirect_draw_indexed()
+	{
+		Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+	}
+};
+
+struct indirect_dispatch : D3D12_INDIRECT_ARGUMENT_DESC
+{
+	indirect_dispatch()
+	{
+		Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
+	}
+};
+
+struct indirect_raytrace : D3D12_INDIRECT_ARGUMENT_DESC
+{
+	indirect_raytrace()
+	{
+		Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH_RAYS;
+	}
+};
+
+struct indirect_mesh_shader : D3D12_INDIRECT_ARGUMENT_DESC
+{
+	indirect_mesh_shader()
+	{
+		Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH_MESH;
+	}
+};
+
 struct dx_pipeline_stream_base
 {
 	virtual void setVertexShader(dx_blob blob) {}

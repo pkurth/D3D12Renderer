@@ -11,7 +11,7 @@ struct particle_dispatch
 
 struct particle_draw
 {
-	// If you add stuff here, update the command signature creation in the renderer.
+	// If you add stuff here, update the command signature creation.
 	D3D12_DRAW_INDEXED_ARGUMENTS arguments;
 };
 

@@ -53,8 +53,8 @@ struct depth_only_transform_cb
     "DENY_HULL_SHADER_ROOT_ACCESS |" \
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=1, b1, visibility=SHADER_VISIBILITY_PIXEL), " \
     "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "RootConstants(num32BitConstants=1, b1, visibility=SHADER_VISIBILITY_PIXEL), " \
     "RootConstants(num32BitConstants=4, b2, visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define ANIMATED_DEPTH_ONLY_RS \
@@ -62,13 +62,13 @@ struct depth_only_transform_cb
     "DENY_HULL_SHADER_ROOT_ACCESS |" \
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=1, b1, visibility=SHADER_VISIBILITY_PIXEL), " \
     "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "RootConstants(num32BitConstants=1, b1, visibility=SHADER_VISIBILITY_PIXEL), " \
     "RootConstants(num32BitConstants=4, b2, visibility=SHADER_VISIBILITY_PIXEL), " \
     "SRV(t0)"
 
-#define DEPTH_ONLY_RS_OBJECT_ID             0
-#define DEPTH_ONLY_RS_MVP                   1
+#define DEPTH_ONLY_RS_MVP                   0
+#define DEPTH_ONLY_RS_OBJECT_ID             1
 #define DEPTH_ONLY_RS_CAMERA_JITTER         2
 #define DEPTH_ONLY_RS_PREV_FRAME_POSITIONS  3
 

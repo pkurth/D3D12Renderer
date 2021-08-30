@@ -152,6 +152,8 @@ struct dx_command_list
 	// Draw.
 	void draw(uint32 vertexCount, uint32 instanceCount, uint32 startVertex, uint32 startInstance);
 	void drawIndexed(uint32 indexCount, uint32 instanceCount, uint32 startIndex, int32 baseVertex, uint32 startInstance);
+	void drawIndirect(dx_command_signature commandSignature, uint32 numCommands, const dx_resource& commandBuffer, uint32 commandBufferOffset = 0);
+	void drawIndirect(dx_command_signature commandSignature, uint32 maxNumCommands, const dx_resource& numDrawsBuffer, const dx_resource& commandBuffer, uint32 commandBufferOffset = 0);
 	void drawIndirect(dx_command_signature commandSignature, uint32 numCommands, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset = 0);
 	void drawIndirect(dx_command_signature commandSignature, uint32 maxNumCommands, const ref<dx_buffer>& numDrawsBuffer, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset = 0);
 	void drawFullscreenTriangle();

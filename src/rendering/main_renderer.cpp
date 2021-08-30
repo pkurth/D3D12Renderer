@@ -360,7 +360,7 @@ void main_renderer::endFrame(const user_input& input)
 			// ----------------------------------------
 
 			dx_render_target depthOnlyRenderTarget({ screenVelocitiesTexture, objectIDsTexture }, depthStencilBuffer);
-			depthPrePass(cl, depthOnlyRenderTarget, depthOnlyPipeline, animatedDepthOnlyPipeline, opaqueRenderPass,
+			depthPrePass(cl, depthOnlyRenderTarget, opaqueRenderPass,
 				jitteredCamera.viewProj, jitteredCamera.prevFrameViewProj, jitteredCamera.jitter, jitteredCamera.prevFrameJitter);
 
 
@@ -402,12 +402,12 @@ void main_renderer::endFrame(const user_input& input)
 			dx_render_target skyRenderTarget({ hdrColorTexture, screenVelocitiesTexture, objectIDsTexture }, depthStencilBuffer);
 			if (environment)
 			{
-				texturedSky(cl, skyRenderTarget, textureSkyPipeline, jitteredCamera.proj, jitteredCamera.view, environment->sky, skyIntensity);
+				texturedSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, environment->sky, skyIntensity);
 			}
 			else
 			{
 				//proceduralSky(cl, skyRenderTarget, textureSkyPipeline, jitteredCamera.proj, jitteredCamera.view, skyIntensity);
-				preethamSky(cl, skyRenderTarget, preethamSkyPipeline, jitteredCamera.proj, jitteredCamera.view, sun.direction, skyIntensity);
+				preethamSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, sun.direction, skyIntensity);
 			}
 
 			cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // Sky renders a triangle strip, so reset back to triangle list.
@@ -535,7 +535,7 @@ void main_renderer::endFrame(const user_input& input)
 
 				dx_render_target hdrTransparentRenderTarget({ hdrResult }, depthStencilBuffer);
 
-				transparentLightPass(cl, hdrTransparentRenderTarget, transparentRenderPass, materialInfo, particleCommandSignature, unjitteredCamera.viewProj);
+				transparentLightPass(cl, hdrTransparentRenderTarget, transparentRenderPass, materialInfo, unjitteredCamera.viewProj);
 
 				barrier_batcher(cl)
 					.transition(hdrResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
@@ -608,7 +608,7 @@ void main_renderer::endFrame(const user_input& input)
 				}
 				if (renderingOutlines)
 				{
-					outlines(cl, ldrRenderTarget, depthStencilBuffer, outlineMarkerPipeline, outlineDrawerPipeline, outlineRenderPass, unjitteredCamera.viewProj, stencil_flag_selected_object);
+					outlines(cl, ldrRenderTarget, depthStencilBuffer, outlineRenderPass, unjitteredCamera.viewProj);
 				}
 
 				barrier_batcher(cl)

@@ -10,6 +10,7 @@
 
 
 ref<dx_buffer> particle_system::particleDrawCommandBuffer;
+dx_command_signature particle_system::particleCommandSignature;
 dx_mesh particle_system::billboardMesh;
 
 static dx_pipeline startPipeline;
@@ -23,6 +24,9 @@ void particle_system::initializePipeline()
 
 	particleDrawCommandBuffer = createBuffer(sizeof(particle_draw), 1024, 0, true);
 
+	D3D12_INDIRECT_ARGUMENT_DESC argumentDesc;
+	argumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+	particleCommandSignature = createCommandSignature({}, &argumentDesc, 1, sizeof(particle_draw));
 
 	cpu_mesh cpuMesh(mesh_creation_flags_with_positions);
 	submesh_info submesh = cpuMesh.pushQuad(1.f);

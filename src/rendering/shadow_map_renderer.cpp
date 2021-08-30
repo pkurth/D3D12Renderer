@@ -28,8 +28,7 @@ void shadow_map_renderer::endFrame()
 
 	cl->transitionBarrier(render_resources::shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
-	shadowPasses(cl, shadowPipeline, pointLightShadowPipeline,
-		sunShadowRenderPasses, numSunLightShadowRenderPasses,
+	shadowPasses(cl, sunShadowRenderPasses, numSunLightShadowRenderPasses,
 		spotLightShadowRenderPasses, numSpotLightShadowRenderPasses,
 		pointLightShadowRenderPasses, numPointLightShadowRenderPasses);
 

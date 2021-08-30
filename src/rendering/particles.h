@@ -57,8 +57,10 @@ private:
 
 
 	static ref<dx_buffer> particleDrawCommandBuffer;
+	static dx_command_signature particleCommandSignature;
 
 	friend void initializeRenderUtils();
+	template <typename T> friend struct particle_render_pipeline;
 };
 
 template <typename derived_pipeline_t>
@@ -82,5 +84,5 @@ inline void particle_render_pipeline<derived_pipeline_t>::render(dx_command_list
 	}
 	cl->setIndexBuffer(rc.indexBuffer);
 
-	cl->drawIndirect(particleCommandSignature, 1, info.commandBuffer, info.commandBufferOffset);
+	cl->drawIndirect(particle_system::particleCommandSignature, 1, info.commandBuffer, info.commandBufferOffset);
 }

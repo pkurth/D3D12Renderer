@@ -7,6 +7,9 @@ struct dx_allocation
 {
 	void* cpuPtr;
 	D3D12_GPU_VIRTUAL_ADDRESS gpuPtr;
+
+	dx_resource resource;
+	uint32 offsetInResource;
 };
 
 struct dx_page

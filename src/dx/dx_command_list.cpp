@@ -463,28 +463,38 @@ void dx_command_list::drawIndexed(uint32 indexCount, uint32 instanceCount, uint3
 	commandList->DrawIndexedInstanced(indexCount, instanceCount, startIndex, baseVertex, startInstance);
 }
 
-void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 numCommands, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset)
+void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 numCommands, const dx_resource& commandBuffer, uint32 commandBufferOffset)
 {
 	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
 	commandList->ExecuteIndirect(
 		commandSignature.Get(),
 		numCommands,
-		commandBuffer->resource.Get(),
+		commandBuffer.Get(),
 		commandBufferOffset,
 		0,
 		0);
 }
 
-void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 maxNumCommands, const ref<dx_buffer>& numDrawsBuffer, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset)
+void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 maxNumCommands, const dx_resource& numDrawsBuffer, const dx_resource& commandBuffer, uint32 commandBufferOffset)
 {
 	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
 	commandList->ExecuteIndirect(
 		commandSignature.Get(),
 		maxNumCommands,
-		commandBuffer->resource.Get(),
+		commandBuffer.Get(),
 		commandBufferOffset,
-		numDrawsBuffer->resource.Get(),
+		numDrawsBuffer.Get(),
 		0);
+}
+
+void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 numCommands, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset)
+{
+	drawIndirect(commandSignature, numCommands, commandBuffer->resource, commandBufferOffset);
+}
+
+void dx_command_list::drawIndirect(dx_command_signature commandSignature, uint32 maxNumCommands, const ref<dx_buffer>& numDrawsBuffer, const ref<dx_buffer>& commandBuffer, uint32 commandBufferOffset)
+{
+	drawIndirect(commandSignature, maxNumCommands, numDrawsBuffer->resource, commandBuffer->resource, commandBufferOffset);
 }
 
 void dx_command_list::drawFullscreenTriangle()

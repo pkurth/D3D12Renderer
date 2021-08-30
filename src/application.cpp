@@ -176,6 +176,35 @@ void application::initialize(main_renderer* renderer)
 
 #if 0
 	{
+		auto lollipopMaterial = createPBRMaterial(
+			"assets/sphere/Tiles074_2K_Color.jpg",
+			"assets/sphere/Tiles074_2K_Normal.jpg",
+			"assets/sphere/Tiles074_2K_Roughness.jpg",
+			{}, vec4(0.f), vec4(1.f), 1.f, 1.f);
+
+		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+		auto testMesh = make_ref<composite_mesh>();
+		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 5.f, vec3(0.f, 0.f, 0.f)), {}, trs::identity, lollipopMaterial });
+		testMesh->mesh = primitiveMesh.createDXMesh();
+
+		float extents = 100.f;
+		for (float z = -extents; z < extents; z += 10.f)
+		{
+			for (float y = -extents; y < extents; y += 10.f)
+			{
+				for (float x = -extents; x < extents; x += 10.f)
+				{
+					appScene.createEntity("Ball")
+						.addComponent<trs>(vec3(x, y, z), quat::identity, 1.f)
+						.addComponent<raster_component>(testMesh);
+				}
+			}
+		}
+	}
+#endif
+
+#if 0
+	{
 		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 
 		auto lollipopMaterial = createPBRMaterial(

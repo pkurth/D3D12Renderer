@@ -90,51 +90,43 @@ struct light_culling
 };
 
 
-void loadCommonShaders();
 
+enum stencil_flags
+{
+	stencil_flag_selected_object = (1 << 0),
+};
 
-// ----------------------------------------
-// GRAPHICS SHADERS. Since the pipelines depend on the render-target format, we pass the pipelines in.
-// ----------------------------------------
 
 
 void depthPrePass(dx_command_list* cl,
 	const dx_render_target& depthOnlyRenderTarget,
-	const dx_pipeline& rigidPipeline,
-	const dx_pipeline& animatedPipeline,
 	const opaque_render_pass* opaqueRenderPass,
 	const mat4& viewProj, const mat4& prevFrameViewProj,
 	vec2 jitter, vec2 prevFrameJitter);
 
 void texturedSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const dx_pipeline& skyPipeline,
 	const mat4& proj, const mat4& view,
 	ref<dx_texture> sky,
 	float skyIntensity);
 
 void proceduralSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const dx_pipeline& skyPipeline,
 	const mat4& proj, const mat4& view,
 	float skyIntensity);
 
 void sphericalHarmonicsSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const dx_pipeline& skyPipeline,
 	const mat4& proj, const mat4& view,
 	const ref<dx_buffer>& sh, uint32 shIndex,
 	float skyIntensity);
 
 void preethamSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const dx_pipeline& skyPipeline,
 	const mat4& proj, const mat4& view,
 	vec3 sunDirection, float skyIntensity);
 
 void shadowPasses(dx_command_list* cl,
-	const dx_pipeline& shadowPipeline,
-	const dx_pipeline& pointLightShadowPipeline,
 	const sun_shadow_render_pass** sunShadowRenderPasses, uint32 numSunLightShadowRenderPasses,
 	const spot_shadow_render_pass** spotLightShadowRenderPasses, uint32 numSpotLightShadowRenderPasses,
 	const point_shadow_render_pass** pointLightShadowRenderPasses, uint32 numPointLightShadowRenderPasses);
@@ -149,7 +141,6 @@ void transparentLightPass(dx_command_list* cl,
 	const dx_render_target& renderTarget,
 	const transparent_render_pass* transparentRenderPass,
 	const common_material_info& materialInfo,
-	const dx_command_signature& particleCommandSignature,
 	const mat4& viewProj);
 
 void overlays(dx_command_list* cl,
@@ -161,11 +152,8 @@ void overlays(dx_command_list* cl,
 void outlines(dx_command_list* cl,
 	const dx_render_target& ldrRenderTarget,
 	ref<dx_texture> depthStencilBuffer,			// DEPTH_WRITE. Must be same as DSV bound to render-target.
-	const dx_pipeline& outlineMarkerPipeline,
-	const dx_pipeline& outlineDrawerPipeline,
 	const outline_render_pass* outlineRenderPass,
-	const mat4& viewProj,
-	uint32 stencilBit);
+	const mat4& viewProj);
 
 void copyShadowMapParts(dx_command_list* cl,
 	ref<dx_texture> from,						// PIXEL_SHADER_RESOURCE
@@ -174,10 +162,6 @@ void copyShadowMapParts(dx_command_list* cl,
 
 
 
-
-// ----------------------------------------
-// COMPUTE SHADERS. These don't care about the texture formats.
-// ----------------------------------------
 
 
 void lightAndDecalCulling(dx_command_list* cl,

@@ -9,17 +9,6 @@
 
 
 
-enum stencil_flags
-{
-	stencil_flag_selected_object = (1 << 0),
-};
-
-enum color_depth
-{
-	color_depth_8,
-	color_depth_10,
-};
-
 void initializeRenderUtils();
 void endFrameCommon();
 
@@ -27,24 +16,6 @@ void buildCameraConstantBuffer(const render_camera& camera, float cameraJitterSt
 void buildCameraConstantBuffer(const render_camera& camera, vec2 jitter, camera_cb& outCB);
 
 void waitForSkinningToFinish();
-
-
-
-
-extern dx_pipeline depthOnlyPipeline;
-extern dx_pipeline animatedDepthOnlyPipeline;
-extern dx_pipeline shadowPipeline;
-extern dx_pipeline pointLightShadowPipeline;
-
-extern dx_pipeline textureSkyPipeline;
-extern dx_pipeline proceduralSkyPipeline;
-extern dx_pipeline preethamSkyPipeline;
-extern dx_pipeline sphericalHarmonicsSkyPipeline;
-
-extern dx_pipeline outlineMarkerPipeline;
-extern dx_pipeline outlineDrawerPipeline;
-
-extern dx_command_signature particleCommandSignature;
 
 
 
@@ -63,6 +34,11 @@ static constexpr DXGI_FORMAT opaqueLightPassFormats[] = { hdrFormat, worldNormal
 static constexpr DXGI_FORMAT transparentLightPassFormats[] = { hdrFormat };
 static constexpr DXGI_FORMAT skyPassFormats[] = { hdrFormat, screenVelocitiesFormat, objectIDsFormat };
 
+enum color_depth
+{
+	color_depth_8,
+	color_depth_10,
+};
 
 static constexpr DXGI_FORMAT colorDepthToFormat(color_depth colorDepth)
 {
