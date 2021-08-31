@@ -386,8 +386,10 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 	}
 }
 
-void physicsStep(scene& appScene, float dt, uint32 numSolverIterations)
+void physicsStep(scene& appScene, float dt, physics_settings settings)
 {
+	dt = min(dt, 1.f / 30.f);
+
 	// TODO:
 	static void* scratchMemory = malloc(1024 * 1024);
 	static broadphase_collision* possibleCollisions = new broadphase_collision[10000];
@@ -409,34 +411,8 @@ void physicsStep(scene& appScene, float dt, uint32 numSolverIterations)
 	for (auto [entityHandle, rb, transform] : appScene.group(entt::get<rigid_body_component, trs>).each())
 	{
 		uint16 globalStateIndex = (uint16)(&rb - rbBase);
-		auto& global = rbGlobal[globalStateIndex];
-		global.rotation = transform.rotation;
-		global.position = transform.position + transform.rotation * rb.localCOGPosition;
-
-		mat3 rot = quaternionToMat3(global.rotation);
-		global.invInertia = rot * rb.invInertia * transpose(rot);
-		global.invMass = rb.invMass;
-
-
-		if (rb.invMass > 0.f)
-		{
-			rb.forceAccumulator.y += (GRAVITY / rb.invMass * rb.gravityFactor);
-		}
-
-		vec3 linearAcceleration = rb.forceAccumulator * rb.invMass;
-		vec3 angularAcceleration = global.invInertia * rb.torqueAccumulator;
-
-		// Semi-implicit Euler integration.
-		rb.linearVelocity += linearAcceleration * dt;
-		rb.angularVelocity += angularAcceleration * dt;
-
-		rb.linearVelocity *= 1.f / (1.f + dt * rb.linearDamping);
-		rb.angularVelocity *= 1.f / (1.f + dt * rb.angularDamping);
-
-
-		global.linearVelocity = rb.linearVelocity;
-		global.angularVelocity = rb.angularVelocity;
-
+		rigid_body_global_state& global = rbGlobal[globalStateIndex];
+		rb.applyGravityAndIntegrateForces(global, transform, dt);
 		rb.globalStateIndex = globalStateIndex;
 	}
 	
@@ -449,7 +425,7 @@ void physicsStep(scene& appScene, float dt, uint32 numSolverIterations)
 	initializeHingeJointVelocityConstraints(appScene, rbGlobal, hingeJointConstraints.data(), hingeJointConstraintUpdates, (uint32)hingeJointConstraints.size(), dt);
 	initializeConeTwistVelocityConstraints(appScene, rbGlobal, coneTwistConstraints.data(), coneTwistConstraintUpdates, (uint32)coneTwistConstraints.size(), dt);
 
-	for (uint32 it = 0; it < numSolverIterations; ++it)
+	for (uint32 it = 0; it < settings.numRigidSolverIterations; ++it)
 	{
 		solveDistanceVelocityConstraints(distanceConstraintUpdates, (uint32)distanceConstraints.size(), rbGlobal);
 		solveBallJointVelocityConstraints(ballJointConstraintUpdates, (uint32)ballJointConstraints.size(), rbGlobal);
@@ -462,113 +438,16 @@ void physicsStep(scene& appScene, float dt, uint32 numSolverIterations)
 	// Integrate velocities.
 	for (auto [entityHandle, rb, transform] : appScene.group(entt::get<rigid_body_component, trs>).each())
 	{
-		auto& global = rbGlobal[rb.globalStateIndex];
-
-		rb.linearVelocity = global.linearVelocity;
-		rb.angularVelocity = global.angularVelocity;
-
-		quat deltaRot(0.5f * rb.angularVelocity.x, 0.5f * rb.angularVelocity.y, 0.5f * rb.angularVelocity.z, 0.f);
-		deltaRot = deltaRot * global.rotation;
-
-		global.rotation = normalize(global.rotation + (deltaRot * dt));
-		global.position += rb.linearVelocity * dt;
-
-		rb.forceAccumulator = vec3(0.f, 0.f, 0.f);
-		rb.torqueAccumulator = vec3(0.f, 0.f, 0.f);
-
-		transform.rotation = global.rotation;
-		transform.position = global.position - global.rotation * rb.localCOGPosition;
+		rigid_body_global_state& global = rbGlobal[rb.globalStateIndex];
+		rb.integrateVelocity(global, transform, dt);
 	}
 
-}
 
-rigid_body_component::rigid_body_component(bool kinematic, float gravityFactor, float linearDamping, float angularDamping)
-{
-	if (kinematic)
+	// Cloth. This needs to get integrated with the rest of the system.
+	for (auto [entityHandle, cloth] : appScene.view<cloth_component>().each())
 	{
-		invMass = 0.f;
-		invInertia = mat3::zero;
+		cloth.simulate(settings.numClothVelocityIterations, settings.numClothPositionIterations, settings.numClothDriftIterations, dt);
 	}
-	else
-	{
-		invMass = 1.f;
-		invInertia = mat3::identity;
-	}
-
-	this->gravityFactor = gravityFactor;
-	this->linearDamping = linearDamping;
-	this->angularDamping = angularDamping;
-	this->localCOGPosition = vec3(0.f);
-	this->linearVelocity = vec3(0.f);
-	this->angularVelocity = vec3(0.f);
-	this->forceAccumulator = vec3(0.f);
-	this->torqueAccumulator = vec3(0.f);
-}
-
-void rigid_body_component::recalculateProperties(entt::registry* registry, const physics_reference_component& reference)
-{
-	if (invMass == 0.f)
-	{
-		return; // Kinematic.
-	}
-
-	uint32 numColliders = reference.numColliders;
-	if (!numColliders)
-	{
-		return;
-	}
-
-	physics_properties* properties = (physics_properties*)alloca(numColliders * (sizeof(physics_properties)));
-
-	uint32 i = 0;
-
-	scene_entity colliderEntity = { reference.firstColliderEntity, registry };
-	while (colliderEntity)
-	{
-		collider_component& collider = colliderEntity.getComponent<collider_component>();
-		properties[i++] = collider.calculatePhysicsProperties();
-		colliderEntity = { collider.nextEntity, registry };
-	}
-
-	assert(i == numColliders);
-
-	mat3 inertia = mat3::zero;
-	vec3 cog(0.f);
-	float mass = 0.f;
-
-	for (uint32 i = 0; i < numColliders; ++i)
-	{
-		mass += properties[i].mass;
-		cog += properties[i].cog * properties[i].mass;
-	}
-
-	invMass = 1.f / mass;
-	localCOGPosition = cog = cog * invMass; // TODO: Update linear velocity, since thats given at the COG.
-
-	// Combine inertia tensors: https://pybullet.org/Bullet/phpBB3/viewtopic.php?t=246
-	// This assumes that all shapes have the same orientation, which is true in our case, since all shapes are given 
-	// in the entity's local coordinate system.
-	for (uint32 i = 0; i < numColliders; ++i)
-	{
-		vec3& localCOG = properties[i].cog;
-		mat3& localInertia = properties[i].inertia;
-		vec3 r = localCOG - cog;
-		inertia += localInertia + (dot(r, r) * mat3::identity - outerProduct(r, r)) * properties[i].mass;
-	}
-
-	invInertia = invert(inertia);
-}
-
-vec3 rigid_body_component::getGlobalCOGPosition(const trs& transform) const
-{
-	return transform.position + transform.rotation * localCOGPosition;
-}
-
-vec3 rigid_body_component::getGlobalPointVelocity(const trs& transform, vec3 localP) const
-{
-	vec3 globalP = transformPosition(transform, localP);
-	vec3 globalCOG = getGlobalCOGPosition(transform);
-	return linearVelocity + cross(angularVelocity, globalP - globalCOG);
 }
 
 // This function returns the inertia tensors with respect to the center of gravity, so with a coordinate system centered at the COG.

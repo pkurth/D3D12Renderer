@@ -93,6 +93,8 @@ void application::loadCustomShaders()
 	}
 }
 
+auto testMesh = make_ref<composite_mesh>();
+
 void application::initialize(main_renderer* renderer)
 {
 	this->renderer = renderer;
@@ -105,6 +107,10 @@ void application::initialize(main_renderer* renderer)
 		pathTracer.initialize();
 		raytracingTLAS.initialize();
 	}
+
+	appScene.createEntity("Cloth")
+		.addComponent<cloth_component>(10.f, 10.f, 20, 20, 8.f);
+
 
 #if 0
 	if (auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj"))
@@ -174,7 +180,7 @@ void application::initialize(main_renderer* renderer)
 	}
 #endif
 
-#if 0
+#if 1
 	{
 		auto lollipopMaterial = createPBRMaterial(
 			"assets/sphere/Tiles074_2K_Color.jpg",
@@ -183,10 +189,10 @@ void application::initialize(main_renderer* renderer)
 			{}, vec4(0.f), vec4(1.f), 1.f, 1.f);
 
 		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
-		auto testMesh = make_ref<composite_mesh>();
-		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 5.f, vec3(0.f, 0.f, 0.f)), {}, trs::identity, lollipopMaterial });
+		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 1.f, vec3(0.f, 0.f, 0.f)), {}, trs::identity, lollipopMaterial });
 		testMesh->mesh = primitiveMesh.createDXMesh();
 
+#if 0
 		float extents = 100.f;
 		for (float z = -extents; z < extents; z += 10.f)
 		{
@@ -200,6 +206,7 @@ void application::initialize(main_renderer* renderer)
 				}
 			}
 		}
+#endif
 	}
 #endif
 
@@ -273,7 +280,7 @@ void application::initialize(main_renderer* renderer)
 		}
 
 		appScene.createEntity("Test ground")
-			.addComponent<trs>(vec3(0.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
+			.addComponent<trs>(vec3(30.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
 			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f)
 			.addComponent<rigid_body_component>(true);
@@ -981,7 +988,12 @@ void application::drawSettings(float dt)
 			editBoidParticleSystem(boidParticleSystem);
 
 			//ragdoll.edit();
-			ImGui::SliderInt("Physics solver iterations", (int*)&numPhysicsSolverIterations, 1, 200);
+			ImGui::SliderInt("Physics rigid solver iterations", (int*)&physicsSettings.numRigidSolverIterations, 1, 200);
+
+			ImGui::SliderInt("Physics cloth velocity iterations", (int*)&physicsSettings.numClothVelocityIterations, 0, 10);
+			ImGui::SliderInt("Physics cloth position iterations", (int*)&physicsSettings.numClothPositionIterations, 0, 10);
+			ImGui::SliderInt("Physics cloth drift iterations", (int*)&physicsSettings.numClothDriftIterations, 0, 10);
+
 			ImGui::SliderFloat("Physics test force", &testPhysicsForce, 1.f, 10000.f);
 		}
 	}
@@ -1498,7 +1510,7 @@ void application::update(const user_input& input, float dt)
 	//undoStack.verify();
 	//undoStack.display();
 	
-	physicsStep(appScene, dt, numPhysicsSolverIterations);
+	physicsStep(appScene, dt, physicsSettings);
 	
 	// Particles.
 
@@ -1644,6 +1656,16 @@ void application::update(const user_input& input, float dt)
 						outlineRenderPass.renderOutline(m, mesh.vertexBuffer, mesh.indexBuffer, submesh);
 					}
 				}
+			}
+		}
+
+		for (auto [entityHandle, cloth] : appScene.view<cloth_component>().each())
+		{
+			for (const auto& p : cloth.particles)
+			{
+				mat4 m = createModelMatrix(p.position, quat::identity, 0.1f);
+				opaqueRenderPass.renderStaticObject<opaque_pbr_pipeline>(m, testMesh->mesh.vertexBuffer, testMesh->mesh.indexBuffer, testMesh->submeshes[0].info, testMesh->submeshes[0].material,
+					(uint32)entityHandle);
 			}
 		}
 

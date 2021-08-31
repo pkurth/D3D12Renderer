@@ -7,25 +7,22 @@ struct cloth_particle
 {
 	vec3 position;
 	vec3 prevPosition;
-	bool locked;
+	vec3 velocity;
+	vec3 forceAccumulator;
+	float invMass;
 };
 
 struct cloth_constraint
 {
 	uint32 a, b;
 	float restDistance;
-};
-
-struct cloth_collider
-{
-	bounding_sphere sphere;
+	float inverseMassSum;
 };
 
 struct cloth_component
 {
-	cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float thickness = 0.1f, float gravityFactor = 1.f, float damping = 0.05f);
-	void simulate(uint32 iterations, float dt);
-	void collide(cloth_collider c);
+	cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float thickness = 0.1f, float damping = 0.3f, float gravityFactor = 1.f);
+	void simulate(uint32 velocityIterations, uint32 positionIterations, uint32 driftIterations, float dt);
 
 	std::vector<cloth_particle> particles;
 	std::vector<cloth_constraint> constraints;
@@ -33,10 +30,13 @@ struct cloth_component
 	float gravityFactor;
 	float damping;
 	float thickness;
+	float stiffness = 0.5f;
 
 private:
 	uint32 gridSizeX, gridSizeY;
-	uint32 numStretchConstraints;
+
+	void solveVelocities(const std::vector<struct cloth_constraint_temp>& constraintsTemp);
+	void solvePositions();
 
 	void addConstraint(uint32 a, uint32 b);
 };

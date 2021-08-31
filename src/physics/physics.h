@@ -4,34 +4,10 @@
 #include "bounding_volumes.h"
 #include "scene/scene.h"
 #include "constraints.h"
+#include "rigid_body.h"
+#include "cloth.h"
 
 #define GRAVITY -9.81f
-
-struct rigid_body_component
-{
-	rigid_body_component(bool kinematic, float gravityFactor = 1.f, float linearDamping = 0.4f, float angularDamping = 0.4f);
-	void recalculateProperties(entt::registry* registry, const struct physics_reference_component& reference);
-	vec3 getGlobalCOGPosition(const trs& transform) const;
-	vec3 getGlobalPointVelocity(const trs& transform, vec3 localP) const;
-
-	// In entity's local space.
-	vec3 localCOGPosition;
-	float invMass;
-	mat3 invInertia;
-
-	float gravityFactor;
-	float linearDamping;
-	float angularDamping;
-
-	// In global space.
-	vec3 linearVelocity;
-	vec3 angularVelocity;
-
-	vec3 forceAccumulator;
-	vec3 torqueAccumulator;
-
-	uint16 globalStateIndex;
-};
 
 struct physics_properties
 {
@@ -88,16 +64,6 @@ struct collider_union
 	};
 
 	collider_properties properties;
-};
-
-struct rigid_body_global_state
-{
-	quat rotation;
-	vec3 position;
-	vec3 linearVelocity;
-	vec3 angularVelocity;
-	mat3 invInertia;
-	float invMass;
 };
 
 struct collider_component : collider_union
@@ -185,5 +151,14 @@ cone_twist_constraint& getConstraint(cone_twist_constraint_handle handle);
 void deleteAllConstraints();
 
 
+struct physics_settings
+{
+	uint32 numRigidSolverIterations = 30;
+
+	uint32 numClothVelocityIterations = 0;
+	uint32 numClothPositionIterations = 1;
+	uint32 numClothDriftIterations = 0;
+};
+
 void testPhysicsInteraction(scene& appScene, ray r, float forceAmount);
-void physicsStep(scene& appScene, float dt, uint32 numSolverIterations = 30);
+void physicsStep(scene& appScene, float dt, physics_settings settings = {});

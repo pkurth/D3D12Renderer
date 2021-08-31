@@ -104,7 +104,8 @@ private:
 
 	humanoid_ragdoll ragdoll;
 	float testPhysicsForce = 300.f;
-	uint32 numPhysicsSolverIterations = 30;
+
+	physics_settings physicsSettings;
 
 	opaque_render_pass opaqueRenderPass;
 	transparent_render_pass transparentRenderPass;
