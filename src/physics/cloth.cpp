@@ -76,6 +76,43 @@ cloth_component::cloth_component(float width, float height, uint32 gridSizeX, ui
 	}
 }
 
+void cloth_component::applyWindForce(vec3 force)
+{
+	for (uint32 y = 0; y < gridSizeY - 1; ++y)
+	{
+		for (uint32 x = 0; x < gridSizeX - 1; ++x)
+		{
+			uint32 tlIndex = y * gridSizeX + x;
+			uint32 trIndex = tlIndex + 1;
+			uint32 blIndex = tlIndex + gridSizeX;
+			uint32 brIndex = blIndex + 1;
+
+			cloth_particle& tl = particles[tlIndex];
+			cloth_particle& tr = particles[trIndex];
+			cloth_particle& bl = particles[blIndex];
+			cloth_particle& br = particles[brIndex];
+
+			{
+				vec3 normal = cross(tr.position - tl.position, bl.position - tl.position);
+				vec3 forceInNormalDir = normal * dot(normalize(normal), force);
+				forceInNormalDir *= 1.f / 3.f;
+				tl.forceAccumulator += forceInNormalDir;
+				tr.forceAccumulator += forceInNormalDir;
+				bl.forceAccumulator += forceInNormalDir;
+			}
+
+			{
+				vec3 normal = cross(tr.position - br.position, bl.position - br.position);
+				vec3 forceInNormalDir = normal * dot(normalize(normal), force);
+				forceInNormalDir *= 1.f / 3.f;
+				br.forceAccumulator += forceInNormalDir;
+				tr.forceAccumulator += forceInNormalDir;
+				bl.forceAccumulator += forceInNormalDir;
+			}
+		}
+	}
+}
+
 struct cloth_constraint_temp
 {
 	vec3 gradient;
@@ -92,7 +129,7 @@ void cloth_component::simulate(uint32 velocityIterations, uint32 positionIterati
 			p.velocity.y += gravityVelocity;
 		}
 
-		// TODO: Apply external forces.
+		p.velocity += p.forceAccumulator * (p.invMass * dt);
 
 		p.prevPosition = p.position;
 		p.position = p.prevPosition + p.velocity * dt;

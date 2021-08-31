@@ -446,6 +446,7 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 	// Cloth. This needs to get integrated with the rest of the system.
 	for (auto [entityHandle, cloth] : appScene.view<cloth_component>().each())
 	{
+		cloth.applyWindForce(vec3(0.f, 0.f, -1.f));
 		cloth.simulate(settings.numClothVelocityIterations, settings.numClothPositionIterations, settings.numClothDriftIterations, dt);
 	}
 }
