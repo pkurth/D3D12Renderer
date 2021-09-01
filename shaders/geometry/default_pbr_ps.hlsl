@@ -13,6 +13,7 @@ struct ps_input
 	float3 worldPosition	: POSITION;
 
 	float4 screenPosition	: SV_POSITION;
+	bool isFrontFace		: SV_IsFrontFace;
 };
 
 ConstantBuffer<pbr_material_cb> material				: register(b0, space1);
@@ -77,6 +78,10 @@ ps_output main(ps_input IN)
 		? mul(float3(normalMapStrength, normalMapStrength, 1.f) * (normalTex.Sample(wrapSampler, IN.uv).xyz * 2.f - 1.f), IN.tbn)
 		: IN.tbn[2];
 	surface.N = normalize(surface.N);
+	if (material.doubleSided() && !IN.isFrontFace)
+	{
+		surface.N = -surface.N;
+	}
 
 	surface.roughness = (flags & USE_ROUGHNESS_TEXTURE)
 		? roughTex.Sample(wrapSampler, IN.uv)

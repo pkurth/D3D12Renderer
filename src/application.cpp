@@ -186,7 +186,7 @@ void application::initialize(main_renderer* renderer)
 			"assets/sphere/Tiles074_2K_Color.jpg",
 			"assets/sphere/Tiles074_2K_Normal.jpg",
 			"assets/sphere/Tiles074_2K_Roughness.jpg",
-			{}, vec4(0.f), vec4(1.f), 1.f, 1.f);
+			{}, vec4(0.f), vec4(1.f), 1.f, 1.f, true);
 
 		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 1.f, vec3(0.f, 0.f, 0.f)), {}, trs::identity, lollipopMaterial });
