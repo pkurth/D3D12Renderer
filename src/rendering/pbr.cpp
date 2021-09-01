@@ -257,7 +257,8 @@ void opaque_pbr_pipeline::initialize()
 	auto desc = CREATE_GRAPHICS_PIPELINE
 		.inputLayout(inputLayout_position_uv_normal_tangent)
 		.renderTargets(opaqueLightPassFormats, arraysize(opaqueLightPassFormats), depthStencilFormat)
-		.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
+		.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL)
+		.cullingOff();
 
 	opaquePBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_ps" });
 }

@@ -1661,12 +1661,22 @@ void application::update(const user_input& input, float dt)
 
 		for (auto [entityHandle, cloth] : appScene.view<cloth_component>().each())
 		{
-			for (const auto& p : cloth.particles)
-			{
-				mat4 m = createModelMatrix(p.position, quat::identity, 0.1f);
-				opaqueRenderPass.renderStaticObject<opaque_pbr_pipeline>(m, testMesh->mesh.vertexBuffer, testMesh->mesh.indexBuffer, testMesh->submeshes[0].info, testMesh->submeshes[0].material,
-					(uint32)entityHandle);
-			}
+			uint32 numVertices = cloth.getRenderableVertexCount();
+			auto [positionVertexBuffer, positionPtr] = dxContext.createDynamicVertexBuffer(sizeof(vec3), numVertices);
+			auto [otherVertexBuffer, otherPtr] = dxContext.createDynamicVertexBuffer(sizeof(vertex_uv_normal_tangent), numVertices);
+			auto [indexBuffer, indexPtr] = dxContext.createDynamicIndexBuffer(sizeof(uint16), cloth.getRenderableTriangleCount() * 3);
+
+			submesh_info submesh = cloth.getRenderData((vec3*)positionPtr, (vertex_uv_normal_tangent*)otherPtr, (indexed_triangle16*)indexPtr);
+
+			opaqueRenderPass.renderStaticObject<opaque_pbr_pipeline>(mat4::identity, material_vertex_buffer_group_view{ positionVertexBuffer, otherVertexBuffer }, indexBuffer, 
+				submesh, testMesh->submeshes[0].material, (uint32)entityHandle);
+
+			//for (const auto& p : cloth.particles)
+			//{
+			//	mat4 m = createModelMatrix(p.position, quat::identity, 0.1f);
+			//	opaqueRenderPass.renderStaticObject<opaque_pbr_pipeline>(m, testMesh->mesh.vertexBuffer, testMesh->mesh.indexBuffer, testMesh->submeshes[0].info, testMesh->submeshes[0].material,
+			//		(uint32)entityHandle);
+			//}
 		}
 
 		void collisionDebugDraw(transparent_render_pass* renderPass);
