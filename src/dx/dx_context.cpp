@@ -495,28 +495,37 @@ dx_allocation dx_context::allocateDynamicBuffer(uint32 sizeInBytes, uint32 align
 	return allocation;
 }
 
-dx_dynamic_constant_buffer dx_context::uploadDynamicConstantBuffer(uint32 sizeInBytes, const void* data)
+std::pair<dx_dynamic_constant_buffer, void*> dx_context::uploadDynamicConstantBuffer(uint32 sizeInBytes, const void* data)
 {
 	dx_allocation allocation = allocateDynamicBuffer(sizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 	memcpy(allocation.cpuPtr, data, sizeInBytes);
-	return { allocation.gpuPtr, allocation.cpuPtr };
+	return { { allocation.gpuPtr }, allocation.cpuPtr };
 }
 
-dx_dynamic_vertex_buffer dx_context::createDynamicVertexBuffer(uint32 elementSize, uint32 elementCount, const void* data)
+std::pair<dx_dynamic_vertex_buffer, void*> dx_context::createDynamicVertexBuffer(uint32 elementSize, uint32 elementCount)
 {
 	uint32 sizeInBytes = elementSize * elementCount;
 	dx_allocation allocation = allocateDynamicBuffer(sizeInBytes, elementSize);
-	if (data)
-	{
-		memcpy(allocation.cpuPtr, data, sizeInBytes);
-	}
 
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView = {};
 	vertexBufferView.BufferLocation = allocation.gpuPtr;
 	vertexBufferView.SizeInBytes = sizeInBytes;
 	vertexBufferView.StrideInBytes = elementSize;
 
-	return { vertexBufferView };
+	return { { vertexBufferView }, allocation.cpuPtr };
+}
+
+std::pair<dx_dynamic_index_buffer, void*> dx_context::createDynamicIndexBuffer(uint32 elementSize, uint32 elementCount)
+{
+	uint32 sizeInBytes = elementSize * elementCount;
+	dx_allocation allocation = allocateDynamicBuffer(sizeInBytes, elementSize);
+
+	D3D12_INDEX_BUFFER_VIEW indexBufferView = {};
+	indexBufferView.BufferLocation = allocation.gpuPtr;
+	indexBufferView.SizeInBytes = sizeInBytes;
+	indexBufferView.Format = getIndexBufferFormat(elementSize);
+
+	return { { indexBufferView }, allocation.cpuPtr };
 }
 
 dx_memory_usage dx_context::getMemoryUsage()

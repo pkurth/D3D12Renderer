@@ -6,12 +6,16 @@
 struct dx_dynamic_constant_buffer
 {
 	D3D12_GPU_VIRTUAL_ADDRESS gpuPtr;
-	void* cpuPtr;
 };
 
 struct dx_dynamic_vertex_buffer
 {
 	D3D12_VERTEX_BUFFER_VIEW view;
+};
+
+struct dx_dynamic_index_buffer
+{
+	D3D12_INDEX_BUFFER_VIEW view;
 };
 
 struct dx_buffer

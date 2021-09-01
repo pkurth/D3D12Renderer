@@ -103,7 +103,8 @@ void loadCommonShaders()
 
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.renderTargets(depthOnlyFormat, arraysize(depthOnlyFormat), depthStencilFormat)
-			.inputLayout(inputLayout_position);
+			.inputLayout(inputLayout_position)
+			.cullingOff();
 
 		depthOnlyPipeline = createReloadablePipeline(desc, { "depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
 		animatedDepthOnlyPipeline = createReloadablePipeline(desc, { "depth_only_animated_vs", "depth_only_ps" }, rs_in_vertex_shader);
@@ -229,8 +230,8 @@ static void batchRenderRigidDepthPrepass(dx_command_list* cl,
 
 	for (const auto& dc : commands)
 	{
-		ptr->vertexBufferView = dc.vertexBuffer->view;
-		ptr->indexBufferView = dc.indexBuffer->view;
+		ptr->vertexBufferView = dc.vertexBuffer.view;
+		ptr->indexBufferView = dc.indexBuffer.view;
 		ptr->transform = depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.transform };
 		ptr->objectID = dc.objectID;
 		ptr->drawArguments.StartInstanceLocation = 0;
@@ -320,7 +321,7 @@ void depthPrePass(dx_command_list* cl,
 		{
 			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, dc.objectID);
 			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.prevFrameTransform });
-			cl->setRootGraphicsSRV(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS, dc.prevFrameVertexBuffer->gpuVirtualAddress + dc.prevFrameSubmesh.baseVertex * dc.prevFrameVertexBuffer->elementSize);
+			cl->setRootGraphicsSRV(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS, dc.prevFrameVertexBufferAddress + dc.prevFrameSubmesh.baseVertex * dc.vertexSize);
 
 			cl->setVertexBuffer(0, dc.vertexBuffer);
 			cl->setIndexBuffer(dc.indexBuffer);

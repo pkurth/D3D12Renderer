@@ -73,13 +73,13 @@ ref<raytracing_blas> raytracing_blas_builder::finish(bool keepScratch)
 	dx_dynamic_constant_buffer localTransformsBuffer = {};
 	if (localTransforms.size() > 0)
 	{
-		localTransformsBuffer = dxContext.uploadDynamicConstantBuffer(sizeof(mat4) * (uint32)localTransforms.size(), localTransforms.data());
+		localTransformsBuffer = dxContext.uploadDynamicConstantBuffer(sizeof(mat4) * (uint32)localTransforms.size(), localTransforms.data()).first;
 	}
 
 	dx_dynamic_constant_buffer aabbBuffer = {};
 	if (aabbDescs.size())
 	{
-		aabbBuffer = dxContext.uploadDynamicConstantBuffer(sizeof(D3D12_RAYTRACING_AABB) * (uint32)aabbDescs.size(), aabbDescs.data());
+		aabbBuffer = dxContext.uploadDynamicConstantBuffer(sizeof(D3D12_RAYTRACING_AABB) * (uint32)aabbDescs.size(), aabbDescs.data()).first;
 	}
 
 	uint64 aabbOffset = 0;
@@ -94,13 +94,11 @@ ref<raytracing_blas> raytracing_blas_builder::finish(bool keepScratch)
 			}
 			else
 			{
-				assert(localTransformsBuffer.cpuPtr);
 				desc.Triangles.Transform3x4 = localTransformsBuffer.gpuPtr + sizeof(mat4) * desc.Triangles.Transform3x4;
 			}
 		}
 		else if (desc.Type == D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS)
 		{
-			assert(aabbBuffer.cpuPtr);
 			desc.AABBs.AABBs.StartAddress = aabbBuffer.gpuPtr + sizeof(D3D12_RAYTRACING_AABB) * aabbOffset;
 			desc.AABBs.AABBs.StrideInBytes = sizeof(D3D12_RAYTRACING_AABB);
 			aabbOffset += desc.AABBs.AABBCount;

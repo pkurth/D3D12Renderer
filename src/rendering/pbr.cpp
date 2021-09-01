@@ -172,6 +172,42 @@ ref<pbr_environment> createEnvironment(const std::string& filename, uint32 skyRe
 	return sp;
 }
 
+static void setupPBRCommon(dx_command_list* cl, const common_material_info& info)
+{
+	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
+	dx_cpu_descriptor_handle nullBuffer = render_resources::nullBufferSRV;
+
+	assert(info.brdf);
+
+	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_LIGHTING, lighting_cb{ vec2(1.f / info.shadowMap->width, 1.f / info.shadowMap->height), info.environmentIntensity });
+
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 0, info.irradiance ? info.irradiance->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 1, info.environment ? info.environment->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 2, info.brdf);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 3, info.tiledCullingGrid ? info.tiledCullingGrid->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 4, info.tiledObjectsIndexList ? info.tiledObjectsIndexList->defaultSRV : nullBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 5, info.pointLightBuffer ? info.pointLightBuffer->defaultSRV : nullBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 6, info.spotLightBuffer ? info.spotLightBuffer->defaultSRV : nullBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 7, info.decalBuffer ? info.decalBuffer->defaultSRV : nullBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 8, info.shadowMap ? info.shadowMap->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 9, info.pointLightShadowInfoBuffer ? info.pointLightShadowInfoBuffer->defaultSRV : nullBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 10, info.spotLightShadowInfoBuffer ? info.spotLightShadowInfoBuffer->defaultSRV : nullBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 11, info.decalTextureAtlas ? info.decalTextureAtlas->defaultSRV : nullTexture);
+
+	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_SUN, info.sunCBV);
+
+	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_CAMERA, info.cameraCBV);
+
+
+	// Default material properties. This is JUST to make the dynamic descriptor heap happy.
+	// These textures will NEVER be read.
+
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 0, nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 1, nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 2, nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 3, nullTexture);
+}
+
 template <typename pipeline_t>
 static void renderPBRCommon(dx_command_list* cl, const mat4& viewProj, const default_render_command<pipeline_t>& rc)
 {
@@ -214,42 +250,6 @@ static void renderPBRCommon(dx_command_list* cl, const mat4& viewProj, const def
 	cl->setVertexBuffer(1, rc.vertexBuffer.others);
 	cl->setIndexBuffer(rc.indexBuffer);
 	cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-}
-
-static void setupPBRCommon(dx_command_list* cl, const common_material_info& info)
-{
-	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
-	dx_cpu_descriptor_handle nullBuffer = render_resources::nullBufferSRV;
-
-	assert(info.brdf);
-
-	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_LIGHTING, lighting_cb{ vec2(1.f / info.shadowMap->width, 1.f / info.shadowMap->height), info.environmentIntensity });
-
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 0, info.irradiance ? info.irradiance->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 1, info.environment ? info.environment->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 2, info.brdf);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 3, info.tiledCullingGrid ? info.tiledCullingGrid->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 4, info.tiledObjectsIndexList ? info.tiledObjectsIndexList->defaultSRV : nullBuffer);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 5, info.pointLightBuffer ? info.pointLightBuffer->defaultSRV : nullBuffer);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 6, info.spotLightBuffer ? info.spotLightBuffer->defaultSRV : nullBuffer);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 7, info.decalBuffer ? info.decalBuffer->defaultSRV : nullBuffer);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 8, info.shadowMap ? info.shadowMap->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 9, info.pointLightShadowInfoBuffer ? info.pointLightShadowInfoBuffer->defaultSRV : nullBuffer);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 10, info.spotLightShadowInfoBuffer ? info.spotLightShadowInfoBuffer->defaultSRV : nullBuffer);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 11, info.decalTextureAtlas ? info.decalTextureAtlas->defaultSRV : nullTexture);
-
-	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_SUN, info.sunCBV);
-
-	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_CAMERA, info.cameraCBV);
-
-
-	// Default material properties. This is JUST to make the dynamic descriptor heap happy.
-	// These textures will NEVER be read.
-
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 0, nullTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 1, nullTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 2, nullTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 3, nullTexture);
 }
 
 void opaque_pbr_pipeline::initialize()

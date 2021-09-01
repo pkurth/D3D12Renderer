@@ -86,7 +86,7 @@ void raytracing_tlas::build()
 
 
     dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
-    dx_dynamic_constant_buffer gpuInstances = dxContext.uploadDynamicConstantBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalNumInstances, allInstances.data());
+    dx_dynamic_constant_buffer gpuInstances = dxContext.uploadDynamicConstantBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalNumInstances, allInstances.data()).first;
 
     inputs.InstanceDescs = gpuInstances.gpuPtr;
 

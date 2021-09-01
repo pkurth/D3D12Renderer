@@ -9,6 +9,7 @@
 #include "dx_render_target.h"
 #include "dx_pipeline.h"
 
+
 struct clear_rect
 {
 	uint32 x, y, width, height;
@@ -110,10 +111,11 @@ struct dx_command_list
 	// Input assembly.
 	void setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY topology);
 	void setVertexBuffer(uint32 slot, const ref<dx_vertex_buffer>& buffer);
-	void setVertexBuffer(uint32 slot, dx_dynamic_vertex_buffer buffer);
-	void setVertexBuffer(uint32 slot, D3D12_VERTEX_BUFFER_VIEW& buffer);
+	void setVertexBuffer(uint32 slot, const dx_dynamic_vertex_buffer& buffer);
+	void setVertexBuffer(uint32 slot, const D3D12_VERTEX_BUFFER_VIEW& buffer);
 	void setIndexBuffer(const ref<dx_index_buffer>& buffer);
-	void setIndexBuffer(D3D12_INDEX_BUFFER_VIEW& buffer);
+	void setIndexBuffer(const dx_dynamic_index_buffer& buffer);
+	void setIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& buffer);
 
 
 	// Rasterizer.

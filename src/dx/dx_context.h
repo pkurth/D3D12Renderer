@@ -55,17 +55,15 @@ struct dx_context
 
 	// Careful with these functions. They are not thread safe.
 	dx_allocation allocateDynamicBuffer(uint32 sizeInBytes, uint32 alignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-	dx_dynamic_constant_buffer uploadDynamicConstantBuffer(uint32 sizeInBytes, const void* data);
+	
+	std::pair<dx_dynamic_constant_buffer, void*> uploadDynamicConstantBuffer(uint32 sizeInBytes, const void* data);
 	template <typename T> dx_dynamic_constant_buffer uploadDynamicConstantBuffer(const T& data)
 	{
-		return uploadDynamicConstantBuffer(sizeof(T), &data);
+		return uploadDynamicConstantBuffer(sizeof(T), &data).first;
 	}
 
-	dx_dynamic_vertex_buffer createDynamicVertexBuffer(uint32 elementSize, uint32 elementCount, const void* data);
-	template <typename T> dx_dynamic_vertex_buffer createDynamicVertexBuffer(const T* data, uint32 count)
-	{
-		return createDynamicVertexBuffer((uint32)sizeof(T), count, data);
-	}
+	std::pair<dx_dynamic_vertex_buffer, void*> createDynamicVertexBuffer(uint32 elementSize, uint32 elementCount);
+	std::pair<dx_dynamic_index_buffer, void*> createDynamicIndexBuffer(uint32 elementSize, uint32 elementCount);
 
 	dx_memory_usage getMemoryUsage();
 

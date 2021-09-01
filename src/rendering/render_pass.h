@@ -32,8 +32,8 @@ struct default_render_command
 	using pipeline_t = pipeline_t_;
 
 	mat4 transform;
-	vertex_buffer_group vertexBuffer;
-	ref<dx_index_buffer> indexBuffer;
+	material_vertex_buffer_group_view vertexBuffer;
+	material_index_buffer_view indexBuffer;
 	submesh_info submesh;
 
 	typename pipeline_t_::material_t material;
@@ -44,8 +44,8 @@ struct particle_render_command
 {
 	using pipeline_t = pipeline_t_;
 
-	vertex_buffer_group vertexBuffer;
-	ref<dx_index_buffer> indexBuffer;
+	material_vertex_buffer_group_view vertexBuffer;
+	material_index_buffer_view indexBuffer;
 	particle_draw_info drawInfo;
 
 	typename pipeline_t_::material_t material;
@@ -54,8 +54,8 @@ struct particle_render_command
 struct static_depth_only_render_command
 {
 	mat4 transform;
-	ref<dx_vertex_buffer> vertexBuffer;
-	ref<dx_index_buffer> indexBuffer;
+	material_vertex_buffer_view vertexBuffer;
+	material_index_buffer_view indexBuffer;
 	submesh_info submesh;
 	uint32 objectID;
 };
@@ -64,8 +64,8 @@ struct dynamic_depth_only_render_command
 {
 	mat4 transform;
 	mat4 prevFrameTransform;
-	ref<dx_vertex_buffer> vertexBuffer;
-	ref<dx_index_buffer> indexBuffer;
+	material_vertex_buffer_view vertexBuffer;
+	material_index_buffer_view indexBuffer;
 	submesh_info submesh;
 	uint32 objectID;
 };
@@ -74,9 +74,10 @@ struct animated_depth_only_render_command
 {
 	mat4 transform;
 	mat4 prevFrameTransform;
-	ref<dx_vertex_buffer> vertexBuffer;
-	ref<dx_vertex_buffer> prevFrameVertexBuffer;
-	ref<dx_index_buffer> indexBuffer;
+	material_vertex_buffer_view vertexBuffer;
+	D3D12_GPU_VIRTUAL_ADDRESS prevFrameVertexBufferAddress;
+	material_index_buffer_view indexBuffer;
+	uint32 vertexSize;
 	submesh_info submesh;
 	submesh_info prevFrameSubmesh;
 	uint32 objectID;
@@ -110,8 +111,8 @@ struct opaque_render_pass
 
 	template <typename pipeline_t>
 	void renderStaticObject(const mat4& transform,
-		const vertex_buffer_group& vertexBuffer,
-		const ref<dx_index_buffer>& indexBuffer,
+		const material_vertex_buffer_group_view& vertexBuffer,
+		const material_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material,
 		uint32 objectID = -1)
@@ -130,8 +131,8 @@ struct opaque_render_pass
 	template <typename pipeline_t>
 	void renderDynamicObject(const mat4& transform,
 		const mat4& prevFrameTransform,
-		const vertex_buffer_group& vertexBuffer,
-		const ref<dx_index_buffer>& indexBuffer,
+		const material_vertex_buffer_group_view& vertexBuffer,
+		const material_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material,
 		uint32 objectID = -1)
@@ -153,7 +154,7 @@ struct opaque_render_pass
 		const mat4& prevFrameTransform,
 		const vertex_buffer_group& vertexBuffer,
 		const vertex_buffer_group& prevFrameVertexBuffer,
-		const ref<dx_index_buffer>& indexBuffer,
+		const material_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		submesh_info prevFrameSubmesh,
 		const typename pipeline_t::material_t& material,
@@ -166,7 +167,8 @@ struct opaque_render_pass
 		depthCommand.transform = transform;
 		depthCommand.prevFrameTransform = prevFrameTransform;
 		depthCommand.vertexBuffer = vertexBuffer.positions;
-		depthCommand.prevFrameVertexBuffer = prevFrameVertexBuffer.positions ? prevFrameVertexBuffer.positions : vertexBuffer.positions;
+		depthCommand.prevFrameVertexBufferAddress = prevFrameVertexBuffer.positions ? prevFrameVertexBuffer.positions->gpuVirtualAddress : vertexBuffer.positions->gpuVirtualAddress;
+		depthCommand.vertexSize = vertexBuffer.positions->elementSize;
 		depthCommand.indexBuffer = indexBuffer;
 		depthCommand.submesh = submesh;
 		depthCommand.prevFrameSubmesh = prevFrameVertexBuffer.positions ? prevFrameSubmesh : submesh;
@@ -181,8 +183,8 @@ struct opaque_render_pass
 private:
 	template <typename pipeline_t>
 	void renderObjectCommon(const mat4& transform,
-		const vertex_buffer_group& vertexBuffer,
-		const ref<dx_index_buffer>& indexBuffer,
+		const material_vertex_buffer_group_view& vertexBuffer,
+		const material_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material)
 	{
@@ -210,8 +212,8 @@ struct transparent_render_pass
 
 	template <typename pipeline_t>
 	void renderObject(const mat4& transform,
-		const vertex_buffer_group& vertexBuffer,
-		const ref<dx_index_buffer>& indexBuffer,
+		const material_vertex_buffer_group_view& vertexBuffer,
+		const material_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material)
 	{
@@ -225,8 +227,8 @@ struct transparent_render_pass
 	}
 
 	template <typename pipeline_t>
-	void renderParticles(const vertex_buffer_group& vertexBuffer,
-		const ref<dx_index_buffer>& indexBuffer,
+	void renderParticles(const material_vertex_buffer_group_view& vertexBuffer,
+		const material_index_buffer_view& indexBuffer,
 		const particle_draw_info& drawInfo,
 		const typename pipeline_t::material_t& material)
 	{
@@ -255,8 +257,8 @@ struct overlay_render_pass
 
 	template <typename pipeline_t>
 	void renderObject(const mat4& transform,
-		const vertex_buffer_group& vertexBuffer,
-		const ref<dx_index_buffer>& indexBuffer,
+		const material_vertex_buffer_group_view& vertexBuffer,
+		const material_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material)
 	{

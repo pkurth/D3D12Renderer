@@ -282,12 +282,12 @@ void dx_command_list::setVertexBuffer(uint32 slot, const ref<dx_vertex_buffer>& 
 	commandList->IASetVertexBuffers(slot, 1, &buffer->view);
 }
 
-void dx_command_list::setVertexBuffer(uint32 slot, dx_dynamic_vertex_buffer buffer)
+void dx_command_list::setVertexBuffer(uint32 slot, const dx_dynamic_vertex_buffer& buffer)
 {
 	commandList->IASetVertexBuffers(slot, 1, &buffer.view);
 }
 
-void dx_command_list::setVertexBuffer(uint32 slot, D3D12_VERTEX_BUFFER_VIEW& buffer)
+void dx_command_list::setVertexBuffer(uint32 slot, const D3D12_VERTEX_BUFFER_VIEW& buffer)
 {
 	commandList->IASetVertexBuffers(slot, 1, &buffer);
 }
@@ -297,7 +297,12 @@ void dx_command_list::setIndexBuffer(const ref<dx_index_buffer>& buffer)
 	commandList->IASetIndexBuffer(&buffer->view);
 }
 
-void dx_command_list::setIndexBuffer(D3D12_INDEX_BUFFER_VIEW& buffer)
+void dx_command_list::setIndexBuffer(const dx_dynamic_index_buffer& buffer)
+{
+	commandList->IASetIndexBuffer(&buffer.view);
+}
+
+void dx_command_list::setIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& buffer)
 {
 	commandList->IASetIndexBuffer(&buffer);
 }
