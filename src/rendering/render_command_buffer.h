@@ -6,8 +6,8 @@
 struct dx_command_list;
 struct common_material_info;
 
-typedef void (*render_command_setup_func)(dx_command_list*, const common_material_info&);
-typedef void (*render_command_render_func)(dx_command_list*, const mat4&, void*);
+typedef void (*pipeline_setup_func)(dx_command_list*, const common_material_info&);
+typedef void (*pipeline_render_func)(dx_command_list*, const mat4&, void*);
 
 template <typename key_t>
 struct render_command_buffer
@@ -21,8 +21,8 @@ private:
 
 	struct command_header
 	{
-		render_command_setup_func setup;
-		render_command_render_func render;
+		pipeline_setup_func setup;
+		pipeline_render_func render;
 	};
 
 	struct command_wrapper_base

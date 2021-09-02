@@ -2,7 +2,7 @@
 
 #include "core/math.h"
 #include "material.h"
-#include "render_pass.h"
+#include "render_command.h"
 
 struct dx_command_list;
 

@@ -219,6 +219,7 @@ void loadRemainingRenderResources()
 		sizeof(indirect_animated_depth_prepass_command));
 }
 
+#if 0
 static void batchRenderRigidDepthPrepass(dx_command_list* cl,
 	const sort_key_vector<float, static_depth_only_render_command>& commands,
 	const mat4& viewProj, const mat4& prevFrameViewProj)
@@ -248,6 +249,7 @@ static void batchRenderRigidDepthPrepass(dx_command_list* cl,
 		allocation.resource,
 		allocation.offsetInResource);
 }
+#endif
 
 void depthPrePass(dx_command_list* cl,
 	const dx_render_target& depthOnlyRenderTarget,
@@ -272,7 +274,6 @@ void depthPrePass(dx_command_list* cl,
 
 		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
 
-#if 0
 		for (const auto& dc : opaqueRenderPass->staticDepthPrepass)
 		{
 			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, dc.objectID);
@@ -282,9 +283,6 @@ void depthPrePass(dx_command_list* cl,
 			cl->setIndexBuffer(dc.indexBuffer);
 			cl->drawIndexed(dc.submesh.numTriangles * 3, 1, dc.submesh.firstTriangle * 3, dc.submesh.baseVertex, 0);
 		}
-#else
-		batchRenderRigidDepthPrepass(cl, opaqueRenderPass->staticDepthPrepass, viewProj, prevFrameViewProj);
-#endif
 	}
 
 	// Dynamic.
@@ -728,7 +726,7 @@ void opaqueLightPass(dx_command_list* cl,
 		cl->setRenderTarget(renderTarget);
 		cl->setViewport(renderTarget.viewport);
 
-		render_command_setup_func lastSetupFunc = 0;
+		pipeline_setup_func lastSetupFunc = 0;
 
 		for (auto dc : opaqueRenderPass->pass)
 		{
@@ -755,7 +753,7 @@ void transparentLightPass(dx_command_list* cl,
 		cl->setRenderTarget(renderTarget);
 		cl->setViewport(renderTarget.viewport);
 
-		render_command_setup_func lastSetupFunc = 0;
+		pipeline_setup_func lastSetupFunc = 0;
 
 		for (auto dc : transparentRenderPass->pass)
 		{
@@ -782,7 +780,7 @@ void overlays(dx_command_list* cl,
 
 	cl->clearDepth(ldrRenderTarget.dsv);
 
-	render_command_setup_func lastSetupFunc = 0;
+	pipeline_setup_func lastSetupFunc = 0;
 
 	for (auto dc : overlayRenderPass->pass)
 	{

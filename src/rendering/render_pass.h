@@ -1,96 +1,39 @@
 #pragma once
 
 #include "core/math.h"
-#include "physics/bounding_volumes.h"
-#include "geometry/mesh.h"
-#include "light_source.h"
 #include "material.h"
-#include "shadow_map_cache.h"
+#include "render_command.h"
 #include "render_command_buffer.h"
+#include "pbr.h"
 
-
-struct particle_draw_info
+enum depth_prepass_pipeline : uint16
 {
-	ref<dx_buffer> particleBuffer;
-	ref<dx_buffer> aliveList;
-	ref<dx_buffer> commandBuffer;
-	uint32 aliveListOffset;
-	uint32 commandBufferOffset;
-	uint32 rootParameterOffset;
+	depth_render_pipeline_standard,
+	depth_render_pipeline_animated,
 };
 
-
-template <typename material_t>
-struct default_render_command
+struct depth_sort_key
 {
-	mat4 transform;
-	material_vertex_buffer_group_view vertexBuffer;
-	material_index_buffer_view indexBuffer;
-	submesh_info submesh;
+	depth_sort_key() {}
+	depth_sort_key(depth_prepass_pipeline pipeline, bool doubleSided, float depth) : pipeline(pipeline), doubleSided(doubleSided), depth(depth) {}
 
-	material_t material;
+	union
+	{
+		struct
+		{
+			depth_prepass_pipeline pipeline;
+			uint16 doubleSided;
+		};
+		uint32 firstPart;
+	};
+
+	float depth;
+
+	bool operator<(depth_sort_key o)
+	{
+		return firstPart < o.firstPart || depth < o.depth;
+	}
 };
-
-template <typename material_t>
-struct particle_render_command
-{
-	material_vertex_buffer_group_view vertexBuffer;
-	material_index_buffer_view indexBuffer;
-	particle_draw_info drawInfo;
-
-	material_t material;
-};
-
-struct static_depth_only_render_command
-{
-	mat4 transform;
-	material_vertex_buffer_view vertexBuffer;
-	material_index_buffer_view indexBuffer;
-	submesh_info submesh;
-	uint32 objectID;
-};
-
-struct dynamic_depth_only_render_command
-{
-	mat4 transform;
-	mat4 prevFrameTransform;
-	material_vertex_buffer_view vertexBuffer;
-	material_index_buffer_view indexBuffer;
-	submesh_info submesh;
-	uint32 objectID;
-};
-
-struct animated_depth_only_render_command
-{
-	mat4 transform;
-	mat4 prevFrameTransform;
-	material_vertex_buffer_view vertexBuffer;
-	D3D12_GPU_VIRTUAL_ADDRESS prevFrameVertexBufferAddress;
-	material_index_buffer_view indexBuffer;
-	uint32 vertexSize;
-	submesh_info submesh;
-	submesh_info prevFrameSubmesh;
-	uint32 objectID;
-};
-
-struct outline_render_command
-{
-	mat4 transform;
-	material_vertex_buffer_view vertexBuffer;
-	material_index_buffer_view indexBuffer;
-	submesh_info submesh;
-};
-
-struct shadow_render_command
-{
-	mat4 transform;
-	material_vertex_buffer_view vertexBuffer;
-	material_index_buffer_view indexBuffer;
-	submesh_info submesh;
-};
-
-
-
 
 struct opaque_render_pass
 {
@@ -116,7 +59,8 @@ struct opaque_render_pass
 		const material_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material,
-		uint32 objectID = -1)
+		uint32 objectID = -1,
+		bool doubleSided = false)
 	{
 		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, material);
 
@@ -136,7 +80,8 @@ struct opaque_render_pass
 		const material_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material,
-		uint32 objectID = -1)
+		uint32 objectID = -1,
+		bool doubleSided = false)
 	{
 		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, material);
 
@@ -159,7 +104,8 @@ struct opaque_render_pass
 		submesh_info submesh,
 		submesh_info prevFrameSubmesh,
 		const typename pipeline_t::material_t& material,
-		uint32 objectID = -1)
+		uint32 objectID = -1,
+		bool doubleSided = false)
 	{
 		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, material);
 
@@ -174,6 +120,64 @@ struct opaque_render_pass
 		depthCommand.submesh = submesh;
 		depthCommand.prevFrameSubmesh = prevFrameVertexBuffer.positions ? prevFrameSubmesh : submesh;
 		depthCommand.objectID = objectID;
+	}
+
+
+	// Specializations for PBR materials, since these are the common ones.
+
+	void renderStaticObject(const mat4& transform,
+		const material_vertex_buffer_group_view& vertexBuffer,
+		const material_index_buffer_view& indexBuffer,
+		submesh_info submesh,
+		const ref<pbr_material>& material,
+		uint32 objectID = -1)
+	{
+		if (material->doubleSided)
+		{
+			renderStaticObject<opaque_pbr_pipeline::double_sided>(transform, vertexBuffer, indexBuffer, submesh, material, objectID, true);
+		}
+		else
+		{
+			renderStaticObject<opaque_pbr_pipeline::standard>(transform, vertexBuffer, indexBuffer, submesh, material, objectID, false);
+		}
+	}
+
+	void renderDynamicObject(const mat4& transform,
+		const mat4& prevFrameTransform,
+		const material_vertex_buffer_group_view& vertexBuffer,
+		const material_index_buffer_view& indexBuffer,
+		submesh_info submesh,
+		const ref<pbr_material>& material,
+		uint32 objectID = -1)
+	{
+		if (material->doubleSided)
+		{
+			renderDynamicObject<opaque_pbr_pipeline::double_sided>(transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh, material, objectID, true);
+		}
+		else
+		{
+			renderDynamicObject<opaque_pbr_pipeline::standard>(transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh, material, objectID, false);
+		}
+	}
+
+	void renderAnimatedObject(const mat4& transform,
+		const mat4& prevFrameTransform,
+		const vertex_buffer_group& vertexBuffer,
+		const vertex_buffer_group& prevFrameVertexBuffer,
+		const material_index_buffer_view& indexBuffer,
+		submesh_info submesh,
+		submesh_info prevFrameSubmesh,
+		const ref<pbr_material>& material,
+		uint32 objectID = -1)
+	{
+		if (material->doubleSided)
+		{
+			renderAnimatedObject<opaque_pbr_pipeline::double_sided>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, prevFrameSubmesh, material, objectID, true);
+		}
+		else
+		{
+			renderAnimatedObject<opaque_pbr_pipeline::standard>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, prevFrameSubmesh, material, objectID, false);
+		}
 	}
 
 	sort_key_vector<float, static_depth_only_render_command> staticDepthPrepass;
@@ -245,6 +249,15 @@ struct transparent_render_pass
 		command.indexBuffer = indexBuffer;
 		command.drawInfo = drawInfo;
 		command.material = material;
+	}
+
+	void renderObject(const mat4& transform,
+		const material_vertex_buffer_group_view& vertexBuffer,
+		const material_index_buffer_view& indexBuffer,
+		submesh_info submesh,
+		const ref<pbr_material>& material)
+	{
+		renderObject<transparent_pbr_pipeline>(transform, vertexBuffer, indexBuffer, submesh, material);
 	}
 
 	render_command_buffer<float> pass;

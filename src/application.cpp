@@ -1028,6 +1028,10 @@ void application::resetRenderPasses()
 
 void application::submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 numPointLightShadowPasses)
 {
+	opaqueRenderPass.sort();
+	transparentRenderPass.sort();
+	overlayRenderPass.sort();
+
 	renderer->submitRenderPass(&opaqueRenderPass);
 	renderer->submitRenderPass(&transparentRenderPass);
 	renderer->submitRenderPass(&overlayRenderPass);
@@ -1369,11 +1373,11 @@ void application::update(const user_input& input, float dt)
 
 					if (material->albedoTint.a < 1.f)
 					{
-						transparentRenderPass.renderObject<transparent_pbr_pipeline>(m, controller->currentVertexBuffer, mesh.indexBuffer, submesh, material);
+						transparentRenderPass.renderObject(m, controller->currentVertexBuffer, mesh.indexBuffer, submesh, material);
 					}
 					else
 					{
-						opaqueRenderPass.renderAnimatedObject<opaque_pbr_pipeline::standard>(m, lastM, 
+						opaqueRenderPass.renderAnimatedObject(m, lastM, 
 							controller->currentVertexBuffer, controller->prevFrameVertexBuffer, mesh.indexBuffer, 
 							submesh, prevFrameSubmesh, material,
 							(uint32)entityHandle);
@@ -1394,17 +1398,17 @@ void application::update(const user_input& input, float dt)
 
 					if (material->albedoTint.a < 1.f)
 					{
-						transparentRenderPass.renderObject<transparent_pbr_pipeline>(m, mesh.vertexBuffer, mesh.indexBuffer, submesh, material);
+						transparentRenderPass.renderObject(m, mesh.vertexBuffer, mesh.indexBuffer, submesh, material);
 					}
 					else
 					{
 						if (dynamic)
 						{
-							opaqueRenderPass.renderDynamicObject<opaque_pbr_pipeline::standard>(m, lastM, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
+							opaqueRenderPass.renderDynamicObject(m, lastM, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
 						}
 						else
 						{
-							opaqueRenderPass.renderStaticObject<opaque_pbr_pipeline::standard>(m, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
+							opaqueRenderPass.renderStaticObject(m, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
 						}
 					}
 
@@ -1425,7 +1429,7 @@ void application::update(const user_input& input, float dt)
 
 			submesh_info submesh = cloth.getRenderData((vec3*)positionPtr, (vertex_uv_normal_tangent*)otherPtr, (indexed_triangle16*)indexPtr);
 
-			opaqueRenderPass.renderStaticObject<opaque_pbr_pipeline::double_sided>(mat4::identity, material_vertex_buffer_group_view{ positionVertexBuffer, otherVertexBuffer }, indexBuffer,
+			opaqueRenderPass.renderStaticObject(mat4::identity, material_vertex_buffer_group_view{ positionVertexBuffer, otherVertexBuffer }, indexBuffer,
 				submesh, testMesh->submeshes[0].material, (uint32)entityHandle);
 
 			scene_entity entity = { entityHandle, appScene };
@@ -1439,7 +1443,7 @@ void application::update(const user_input& input, float dt)
 			//for (const auto& p : cloth.particles)
 			//{
 			//	mat4 m = createModelMatrix(p.position, quat::identity, 0.1f);
-			//	opaqueRenderPass.renderStaticObject<opaque_pbr_pipeline::standard>(m, testMesh->mesh.vertexBuffer, testMesh->mesh.indexBuffer, testMesh->submeshes[0].info, testMesh->submeshes[0].material,
+			//	opaqueRenderPass.renderStaticObject(m, testMesh->mesh.vertexBuffer, testMesh->mesh.indexBuffer, testMesh->submeshes[0].info, testMesh->submeshes[0].material,
 			//		(uint32)entityHandle);
 			//}
 		}
