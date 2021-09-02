@@ -99,14 +99,14 @@ void fire_particle_system::render(transparent_render_pass* renderPass)
 		material);
 }
 
-void fire_particle_system::fire_pipeline::setupCommon(dx_command_list* cl, const common_material_info& materialInfo)
+PIPELINE_SETUP_IMPL(fire_particle_system::fire_pipeline)
 {
 	cl->setPipelineState(*renderPipeline.pipeline);
 	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);
 	cl->setGraphicsDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_RENDERING_RS_CAMERA, materialInfo.cameraCBV);
 }
 
-void fire_particle_system::fire_pipeline::render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<fire_pipeline>& rc)
+PARTICLE_PIPELINE_RENDER_IMPL(fire_particle_system::fire_pipeline)
 {
 	cl->setGraphicsDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_RENDERING_RS_CBV, rc.material.settingsCBV);
 	cl->setDescriptorHeapSRV(FIRE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE, 0, rc.material.atlas.texture);
@@ -185,14 +185,14 @@ void smoke_particle_system::render(transparent_render_pass* renderPass)
 		material);
 }
 
-void smoke_particle_system::smoke_pipeline::setupCommon(dx_command_list* cl, const common_material_info& materialInfo)
+PIPELINE_SETUP_IMPL(smoke_particle_system::smoke_pipeline)
 {
 	cl->setPipelineState(*renderPipeline.pipeline);
 	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);
 	cl->setGraphicsDynamicConstantBuffer(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_CAMERA, materialInfo.cameraCBV);
 }
 
-void smoke_particle_system::smoke_pipeline::render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<smoke_pipeline>& rc)
+PARTICLE_PIPELINE_RENDER_IMPL(smoke_particle_system::smoke_pipeline)
 {
 	cl->setGraphicsDynamicConstantBuffer(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_CBV, rc.material.settingsCBV);
 	cl->setDescriptorHeapSRV(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE, 0, rc.material.atlas.texture);
@@ -292,7 +292,7 @@ void boid_particle_system::render(transparent_render_pass* renderPass)
 	}
 }
 
-void boid_particle_system::boid_pipeline::setupCommon(dx_command_list* cl, const common_material_info& materialInfo)
+PIPELINE_SETUP_IMPL(boid_particle_system::boid_pipeline)
 {
 	cl->setPipelineState(*renderPipeline.pipeline);
 	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);
@@ -303,7 +303,7 @@ void boid_particle_system::boid_pipeline::setupCommon(dx_command_list* cl, const
 	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 2, materialInfo.brdf);
 }
 
-void boid_particle_system::boid_pipeline::render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<boid_pipeline>& rc)
+PARTICLE_PIPELINE_RENDER_IMPL(boid_particle_system::boid_pipeline)
 {
 	cl->setGraphicsDynamicConstantBuffer(BOID_PARTICLE_SYSTEM_RENDERING_RS_CBV, rc.material.settingsCBV);
 

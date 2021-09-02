@@ -17,6 +17,7 @@
 #include <memory>
 
 static dx_pipeline opaquePBRPipeline;
+static dx_pipeline opaqueDoubleSidedPBRPipeline;
 static dx_pipeline transparentPBRPipeline;
 
 struct material_key
@@ -257,23 +258,12 @@ void opaque_pbr_pipeline::initialize()
 	auto desc = CREATE_GRAPHICS_PIPELINE
 		.inputLayout(inputLayout_position_uv_normal_tangent)
 		.renderTargets(opaqueLightPassFormats, arraysize(opaqueLightPassFormats), depthStencilFormat)
-		.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL)
-		.cullingOff();
+		.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
 
 	opaquePBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_ps" });
-}
 
-void opaque_pbr_pipeline::setupCommon(dx_command_list* cl, const common_material_info& materialInfo)
-{
-	cl->setPipelineState(*opaquePBRPipeline.pipeline);
-	cl->setGraphicsRootSignature(*opaquePBRPipeline.rootSignature);
-
-	setupPBRCommon(cl, materialInfo);
-}
-
-void opaque_pbr_pipeline::render(dx_command_list* cl, const mat4& viewProj, const default_render_command<opaque_pbr_pipeline>& rc)
-{
-	renderPBRCommon(cl, viewProj, rc);
+	desc.cullingOff();
+	opaqueDoubleSidedPBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_ps" });
 }
 
 void transparent_pbr_pipeline::initialize()
@@ -286,7 +276,31 @@ void transparent_pbr_pipeline::initialize()
 	transparentPBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_transparent_ps" });
 }
 
-void transparent_pbr_pipeline::setupCommon(dx_command_list* cl, const common_material_info& materialInfo)
+
+
+
+PIPELINE_SETUP_IMPL(opaque_pbr_pipeline::standard)
+{
+	cl->setPipelineState(*opaquePBRPipeline.pipeline);
+	cl->setGraphicsRootSignature(*opaquePBRPipeline.rootSignature);
+
+	setupPBRCommon(cl, materialInfo);
+}
+
+PIPELINE_SETUP_IMPL(opaque_pbr_pipeline::double_sided)
+{
+	cl->setPipelineState(*opaqueDoubleSidedPBRPipeline.pipeline);
+	cl->setGraphicsRootSignature(*opaqueDoubleSidedPBRPipeline.rootSignature);
+
+	setupPBRCommon(cl, materialInfo);
+}
+
+PIPELINE_RENDER_IMPL(opaque_pbr_pipeline)
+{
+	renderPBRCommon(cl, viewProj, rc);
+}
+
+PIPELINE_SETUP_IMPL(transparent_pbr_pipeline)
 {
 	cl->setPipelineState(*transparentPBRPipeline.pipeline);
 	cl->setGraphicsRootSignature(*transparentPBRPipeline.rootSignature);
@@ -294,7 +308,7 @@ void transparent_pbr_pipeline::setupCommon(dx_command_list* cl, const common_mat
 	setupPBRCommon(cl, materialInfo);
 }
 
-void transparent_pbr_pipeline::render(dx_command_list* cl, const mat4& viewProj, const default_render_command<transparent_pbr_pipeline>& rc)
+PIPELINE_RENDER_IMPL(transparent_pbr_pipeline)
 {
 	renderPBRCommon(cl, viewProj, rc);
 }

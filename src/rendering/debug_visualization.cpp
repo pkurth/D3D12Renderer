@@ -18,7 +18,7 @@ void debug_simple_pipeline::initialize()
 	flatSimplePipeline = createReloadablePipeline(desc, { "flat_simple_vs", "flat_simple_ps" });
 }
 
-void debug_simple_pipeline::setupCommon(dx_command_list* cl, const common_material_info& materialInfo)
+PIPELINE_SETUP_IMPL(debug_simple_pipeline)
 {
 	cl->setPipelineState(*flatSimplePipeline.pipeline);
 	cl->setGraphicsRootSignature(*flatSimplePipeline.rootSignature);
@@ -26,7 +26,7 @@ void debug_simple_pipeline::setupCommon(dx_command_list* cl, const common_materi
 	cl->setGraphicsDynamicConstantBuffer(2, materialInfo.cameraCBV);
 }
 
-void debug_simple_pipeline::render(dx_command_list* cl, const mat4& viewProj, const default_render_command<debug_simple_pipeline>& rc)
+PIPELINE_RENDER_IMPL(debug_simple_pipeline)
 {
 	cl->setGraphics32BitConstants(0, transform_cb{ viewProj * rc.transform, rc.transform });
 	cl->setGraphics32BitConstants(1, rc.material.color);
@@ -50,13 +50,13 @@ void debug_unlit_pipeline::initialize()
 	flatUnlitPipeline = createReloadablePipeline(desc, { "flat_unlit_vs", "flat_unlit_ps" });
 }
 
-void debug_unlit_pipeline::setupCommon(dx_command_list* cl, const common_material_info& materialInfo)
+PIPELINE_SETUP_IMPL(debug_unlit_pipeline)
 {
 	cl->setPipelineState(*flatUnlitPipeline.pipeline);
 	cl->setGraphicsRootSignature(*flatUnlitPipeline.rootSignature);
 }
 
-void debug_unlit_pipeline::render(dx_command_list* cl, const mat4& viewProj, const default_render_command<debug_unlit_pipeline>& rc)
+PIPELINE_RENDER_IMPL(debug_unlit_pipeline)
 {
 	cl->setGraphics32BitConstants(0, rc.transform);
 	cl->setGraphics32BitConstants(1, rc.material.color);

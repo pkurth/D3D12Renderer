@@ -16,8 +16,9 @@ struct debug_simple_pipeline
 	using material_t = debug_material;
 
 	static void initialize();
-	static void setupCommon(dx_command_list* cl, const common_material_info& materialInfo);
-	static void render(dx_command_list* cl, const mat4& viewProj, const default_render_command<debug_simple_pipeline>& rc);
+
+	PIPELINE_SETUP_DECL;
+	PIPELINE_RENDER_DECL;
 };
 
 struct debug_unlit_pipeline
@@ -25,8 +26,9 @@ struct debug_unlit_pipeline
 	using material_t = debug_material;
 
 	static void initialize();
-	static void setupCommon(dx_command_list* cl, const common_material_info& materialInfo);
-	static void render(dx_command_list* cl, const mat4& viewProj, const default_render_command<debug_unlit_pipeline>& rc);
+
+	PIPELINE_SETUP_DECL;
+	PIPELINE_RENDER_DECL;
 };
 
 

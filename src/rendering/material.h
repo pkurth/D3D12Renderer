@@ -76,3 +76,12 @@ struct material_index_buffer_view
 	operator const D3D12_INDEX_BUFFER_VIEW& () const { return view; }
 };
 
+#define PIPELINE_SETUP_DECL					static void setup(dx_command_list* cl, const common_material_info& materialInfo)
+#define PIPELINE_SETUP_IMPL(name)			void name::setup(dx_command_list* cl, const common_material_info& materialInfo)
+
+#define PIPELINE_RENDER_DECL				static void render(dx_command_list* cl, const mat4& viewProj, const default_render_command<material_t>& rc)
+#define PIPELINE_RENDER_IMPL(name)			void name::render(dx_command_list* cl, const mat4& viewProj, const default_render_command<material_t>& rc)
+
+#define PARTICLE_PIPELINE_RENDER_DECL		static void render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<material_t>& rc)
+#define PARTICLE_PIPELINE_RENDER_IMPL(name)	void name::render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<material_t>& rc)
+

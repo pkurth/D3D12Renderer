@@ -1373,7 +1373,7 @@ void application::update(const user_input& input, float dt)
 					}
 					else
 					{
-						opaqueRenderPass.renderAnimatedObject<opaque_pbr_pipeline>(m, lastM, 
+						opaqueRenderPass.renderAnimatedObject<opaque_pbr_pipeline::standard>(m, lastM, 
 							controller->currentVertexBuffer, controller->prevFrameVertexBuffer, mesh.indexBuffer, 
 							submesh, prevFrameSubmesh, material,
 							(uint32)entityHandle);
@@ -1400,11 +1400,11 @@ void application::update(const user_input& input, float dt)
 					{
 						if (dynamic)
 						{
-							opaqueRenderPass.renderDynamicObject<opaque_pbr_pipeline>(m, lastM, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
+							opaqueRenderPass.renderDynamicObject<opaque_pbr_pipeline::standard>(m, lastM, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
 						}
 						else
 						{
-							opaqueRenderPass.renderStaticObject<opaque_pbr_pipeline>(m, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
+							opaqueRenderPass.renderStaticObject<opaque_pbr_pipeline::standard>(m, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
 						}
 					}
 
@@ -1425,13 +1425,21 @@ void application::update(const user_input& input, float dt)
 
 			submesh_info submesh = cloth.getRenderData((vec3*)positionPtr, (vertex_uv_normal_tangent*)otherPtr, (indexed_triangle16*)indexPtr);
 
-			opaqueRenderPass.renderStaticObject<opaque_pbr_pipeline>(mat4::identity, material_vertex_buffer_group_view{ positionVertexBuffer, otherVertexBuffer }, indexBuffer, 
+			opaqueRenderPass.renderStaticObject<opaque_pbr_pipeline::double_sided>(mat4::identity, material_vertex_buffer_group_view{ positionVertexBuffer, otherVertexBuffer }, indexBuffer,
 				submesh, testMesh->submeshes[0].material, (uint32)entityHandle);
+
+			scene_entity entity = { entityHandle, appScene };
+			bool outline = selectedEntity == entity;
+
+			if (outline)
+			{
+				outlineRenderPass.renderOutline(mat4::identity, positionVertexBuffer, indexBuffer, submesh);
+			}
 
 			//for (const auto& p : cloth.particles)
 			//{
 			//	mat4 m = createModelMatrix(p.position, quat::identity, 0.1f);
-			//	opaqueRenderPass.renderStaticObject<opaque_pbr_pipeline>(m, testMesh->mesh.vertexBuffer, testMesh->mesh.indexBuffer, testMesh->submeshes[0].info, testMesh->submeshes[0].material,
+			//	opaqueRenderPass.renderStaticObject<opaque_pbr_pipeline::standard>(m, testMesh->mesh.vertexBuffer, testMesh->mesh.indexBuffer, testMesh->submeshes[0].info, testMesh->submeshes[0].material,
 			//		(uint32)entityHandle);
 			//}
 		}

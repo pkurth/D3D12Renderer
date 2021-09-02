@@ -45,8 +45,21 @@ struct opaque_pbr_pipeline
 	using material_t = ref<pbr_material>;
 
 	static void initialize();
-	static void setupCommon(dx_command_list* cl, const common_material_info& materialInfo);
-	static void render(dx_command_list* cl, const mat4& viewProj, const default_render_command<opaque_pbr_pipeline>& rc);
+
+	PIPELINE_RENDER_DECL;
+
+	struct standard;
+	struct double_sided;
+};
+
+struct opaque_pbr_pipeline::standard : opaque_pbr_pipeline
+{
+	PIPELINE_SETUP_DECL;
+};
+
+struct opaque_pbr_pipeline::double_sided : opaque_pbr_pipeline
+{
+	PIPELINE_SETUP_DECL;
 };
 
 struct transparent_pbr_pipeline
@@ -54,8 +67,9 @@ struct transparent_pbr_pipeline
 	using material_t = ref<pbr_material>;
 
 	static void initialize();
-	static void setupCommon(dx_command_list* cl, const common_material_info& materialInfo);
-	static void render(dx_command_list* cl, const mat4& viewProj, const default_render_command<transparent_pbr_pipeline>& rc);
+
+	PIPELINE_SETUP_DECL;
+	PIPELINE_RENDER_DECL;
 };
 
 

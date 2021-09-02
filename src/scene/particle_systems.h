@@ -38,12 +38,12 @@ private:
 		dx_dynamic_constant_buffer settingsCBV;
 	};
 
-	struct fire_pipeline : particle_render_pipeline<fire_pipeline>
+	struct fire_pipeline : particle_render_pipeline<fire_material>
 	{
 		using material_t = fire_material;
-
-		static void setupCommon(dx_command_list* cl, const common_material_info& materialInfo);
-		static void render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<fire_pipeline>& rc);
+		
+		PIPELINE_SETUP_DECL;
+		PARTICLE_PIPELINE_RENDER_DECL;
 	};
 
 	fire_material material;
@@ -77,12 +77,12 @@ private:
 		dx_dynamic_constant_buffer settingsCBV;
 	};
 
-	struct smoke_pipeline : particle_render_pipeline<smoke_pipeline>
+	struct smoke_pipeline : particle_render_pipeline<smoke_material>
 	{
 		using material_t = smoke_material;
 
-		static void setupCommon(dx_command_list* cl, const common_material_info& materialInfo);
-		static void render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<smoke_pipeline>& rc);
+		PIPELINE_SETUP_DECL;
+		PARTICLE_PIPELINE_RENDER_DECL;
 	};
 
 	smoke_material material;
@@ -118,12 +118,12 @@ private:
 		dx_dynamic_constant_buffer settingsCBV;
 	};
 
-	struct boid_pipeline : particle_render_pipeline<boid_pipeline>
+	struct boid_pipeline : particle_render_pipeline<boid_material>
 	{
 		using material_t = boid_material;
 
-		static void setupCommon(dx_command_list* cl, const common_material_info& materialInfo);
-		static void render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<boid_pipeline>& rc);
+		PIPELINE_SETUP_DECL;
+		PARTICLE_PIPELINE_RENDER_DECL;
 	};
 
 	boid_material material;

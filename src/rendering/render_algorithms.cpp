@@ -133,7 +133,8 @@ void loadCommonShaders()
 				D3D12_STENCIL_OP_KEEP,
 				D3D12_DEFAULT_STENCIL_READ_MASK,
 				stencil_flag_selected_object) // Mark selected object.
-			.depthSettings(false, false);
+			.depthSettings(false, false)
+			.cullingOff(); // Since this is fairly light-weight, we only render double sided.
 
 		outlineMarkerPipeline = createReloadablePipeline(markerDesc, { "outline_vs" }, rs_in_vertex_shader);
 
@@ -502,7 +503,7 @@ void shadowPasses(dx_command_list* cl,
 		}
 
 
-		auto renderSunCascadeShadow = [](dx_command_list* cl, const std::vector<shadow_render_pass::draw_call>& drawCalls, const mat4& viewProj)
+		auto renderSunCascadeShadow = [](dx_command_list* cl, const std::vector<shadow_render_command>& drawCalls, const mat4& viewProj)
 		{
 			for (const auto& dc : drawCalls)
 			{
@@ -516,7 +517,7 @@ void shadowPasses(dx_command_list* cl,
 				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 			}
 		};
-		auto renderSpotShadow = [](dx_command_list* cl, const std::vector<shadow_render_pass::draw_call>& drawCalls, const mat4& viewProj)
+		auto renderSpotShadow = [](dx_command_list* cl, const std::vector<shadow_render_command>& drawCalls, const mat4& viewProj)
 		{
 			for (const auto& dc : drawCalls)
 			{
@@ -530,7 +531,7 @@ void shadowPasses(dx_command_list* cl,
 				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
 			}
 		};
-		auto renderPointShadow = [](dx_command_list* cl, const std::vector<shadow_render_pass::draw_call>& drawCalls, vec3 lightPosition, float maxDistance, float flip)
+		auto renderPointShadow = [](dx_command_list* cl, const std::vector<shadow_render_command>& drawCalls, vec3 lightPosition, float maxDistance, float flip)
 		{
 			for (const auto& dc : drawCalls)
 			{
@@ -731,10 +732,10 @@ void opaqueLightPass(dx_command_list* cl,
 
 		for (auto dc : opaqueRenderPass->pass)
 		{
-			if (dc.setupCommon != lastSetupFunc)
+			if (dc.setup != lastSetupFunc)
 			{
-				dc.setupCommon(cl, materialInfo);
-				lastSetupFunc = dc.setupCommon;
+				dc.setup(cl, materialInfo);
+				lastSetupFunc = dc.setup;
 			}
 			dc.render(cl, viewProj, dc.data);
 		}
@@ -758,10 +759,10 @@ void transparentLightPass(dx_command_list* cl,
 
 		for (auto dc : transparentRenderPass->pass)
 		{
-			if (dc.setupCommon != lastSetupFunc)
+			if (dc.setup != lastSetupFunc)
 			{
-				dc.setupCommon(cl, materialInfo);
-				lastSetupFunc = dc.setupCommon;
+				dc.setup(cl, materialInfo);
+				lastSetupFunc = dc.setup;
 			}
 			dc.render(cl, viewProj, dc.data);
 		}
@@ -785,10 +786,10 @@ void overlays(dx_command_list* cl,
 
 	for (auto dc : overlayRenderPass->pass)
 	{
-		if (dc.setupCommon != lastSetupFunc)
+		if (dc.setup != lastSetupFunc)
 		{
-			dc.setupCommon(cl, materialInfo);
-			lastSetupFunc = dc.setupCommon;
+			dc.setup(cl, materialInfo);
+			lastSetupFunc = dc.setup;
 		}
 		dc.render(cl, viewProj, dc.data);
 	}
