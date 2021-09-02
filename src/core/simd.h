@@ -36,6 +36,7 @@ struct floatx4
 	floatx4() {}
 	floatx4(float f_) { f = _mm_set1_ps(f_); }
 	floatx4(__m128 f_) { f = f_; }
+	floatx4(float a, float b, float c, float d) { f = _mm_setr_ps(a, b, c, d); }
 	floatx4(const float* f_) { f = _mm_loadu_ps(f_); }
 
 	operator __m128() { return f; }
@@ -50,11 +51,12 @@ struct intx4
 	intx4() {}
 	intx4(int i_) { i = _mm_set1_epi32(i_); }
 	intx4(__m128i i_) { i = i_; }
-	//intx4(int* i_) { i = _mm_loadu_epi32(i_); } // TODO: Give non-AVX512 alternative.
+	intx4(int a, int b, int c, int d) { i = _mm_setr_epi32(a, b, c, d); }
+	intx4(int* i_) { i = _mm_loadu_si128((const __m128i*)i_); }
 
 	operator __m128i() { return i; }
 
-	//void store(int* i_) { _mm_storeu_epi32(i_, i); }
+	void store(int* i_) { _mm_storeu_si128((__m128i*)i_, i); }
 };
 
 static floatx4 truex4() { const float nnan = (const float&)0xFFFFFFFF; return nnan; }
@@ -241,6 +243,7 @@ struct floatx8
 	floatx8() {}
 	floatx8(float f_) { f = _mm256_set1_ps(f_); }
 	floatx8(__m256 f_) { f = f_; }
+	floatx8(float a, float b, float c, float d, float e, float f, float g, float h) { this->f = _mm256_setr_ps(a, b, c, d, e, f, g, h); }
 	floatx8(const float* f_) { f = _mm256_loadu_ps(f_); }
 
 	operator __m256() { return f; }
@@ -255,6 +258,7 @@ struct intx8
 	intx8() {}
 	intx8(int i_) { i = _mm256_set1_epi32(i_); }
 	intx8(__m256i i_) { i = i_; }
+	intx8(int a, int b, int c, int d, int e, int f, int g, int h) { this->i = _mm256_setr_epi32(a, b, c, d, e, f, g, h); }
 	intx8(const int* i_) { i = _mm256_loadu_epi32(i_); }
 
 	operator __m256i() { return i; }
@@ -464,6 +468,7 @@ struct floatx16
 	floatx16() {}
 	floatx16(float f_) { f = _mm512_set1_ps(f_); }
 	floatx16(__m512 f_) { f = f_; }
+	floatx16(float a, float b, float c, float d, float e, float f, float g, float h, float i, float j, float k, float l, float m, float n, float o, float p) { this->f = _mm512_setr_ps(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p); }
 	floatx16(const float* f_) { f = _mm512_loadu_ps(f_); }
 
 	operator __m512() { return f; }
@@ -478,6 +483,7 @@ struct intx16
 	intx16() {}
 	intx16(int i_) { i = _mm512_set1_epi32(i_); }
 	intx16(__m512i i_) { i = i_; }
+	intx16(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) { this->i = _mm512_setr_epi32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p); }
 	intx16(const int* i_) { i = _mm512_loadu_epi32(i_); }
 
 	operator __m512i() { return i; }
