@@ -11,7 +11,7 @@
 #include "physics/physics.h"
 #include "core/threading.h"
 #include "rendering/mesh_shader.h"
-#include "rendering/shadow_map_cache.h"
+#include "rendering/shadow_map.h"
 #include "rendering/shadow_map_renderer.h"
 #include "editor/file_dialog.h"
 #include "core/yaml.h"
@@ -1244,253 +1244,6 @@ bool application::handleUserInput(const user_input& input, float dt)
 	return objectMovedByGizmo;
 }
 
-void application::renderSunShadowMap(bool objectDragged)
-{
-	sun_shadow_render_pass& renderPass = sunShadowRenderPass;
-
-	bool staticCacheAvailable = !objectDragged;
-
-	sunShadowRenderPass.numCascades = sun.numShadowCascades;
-
-	uint64 sunMovementHash = getLightMovementHash(sun);
-
-	for (uint32 i = 0; i < sun.numShadowCascades; ++i)
-	{
-		auto [vp, cache] = assignShadowMapViewport(i, sunMovementHash, sun.shadowDimensions);
-		
-		sun.shadowMapViewports[i] = vec4(vp.x, vp.y, vp.size, vp.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
-
-		sun_cascade_render_pass& cascadePass = sunShadowRenderPass.cascades[i];
-		cascadePass.viewport = vp;
-		cascadePass.viewProj = sun.viewProjs[i];
-		
-		staticCacheAvailable &= cache;
-	}
-
-	if (staticCacheAvailable)
-	{
-		renderPass.copyFromStaticCache = true;
-	}
-	else
-	{
-		renderStaticGeometryToSunShadowMap();
-	}
-
-	renderDynamicGeometryToSunShadowMap();
-}
-
-void application::renderShadowMap(spot_light_cb& spotLight, uint32 lightIndex, bool objectDragged)
-{
-	uint32 uniqueID = lightIndex + 1;
-
-	int32 index = numSpotShadowRenderPasses++;
-	spot_shadow_render_pass& renderPass = spotShadowRenderPasses[index];
-
-	spotLight.shadowInfoIndex = index;
-	renderPass.viewProjMatrix = getSpotLightViewProjectionMatrix(spotLight);
-
-	auto [vp, staticCacheAvailable] = assignShadowMapViewport(uniqueID << 10, 0, 512);
-	renderPass.viewport = vp;
-
-	if (staticCacheAvailable && !objectDragged)
-	{
-		renderPass.copyFromStaticCache = true;
-	}
-	else
-	{
-		renderStaticGeometryToShadowMap(renderPass);
-	}
-
-	renderDynamicGeometryToShadowMap(renderPass);
-
-	spot_shadow_info si;
-	si.viewport = vec4(vp.x, vp.y, vp.size, vp.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
-	si.viewProj = renderPass.viewProjMatrix;
-	si.bias = 0.00002f;
-
-	assert(spotLightShadowInfos.size() == index);
-	spotLightShadowInfos.push_back(si);
-}
-
-void application::renderShadowMap(point_light_cb& pointLight, uint32 lightIndex, bool objectDragged)
-{
-	uint32 uniqueID = lightIndex + 1;
-
-	int32 index = numPointShadowRenderPasses++;
-	point_shadow_render_pass& renderPass = pointShadowRenderPasses[index];
-
-	pointLight.shadowInfoIndex = index;
-	renderPass.lightPosition = pointLight.position;
-	renderPass.maxDistance = pointLight.radius;
-
-	auto [vp0, staticCacheAvailable0] = assignShadowMapViewport((2 * uniqueID + 0) << 20, 0, 512);
-	auto [vp1, staticCacheAvailable1] = assignShadowMapViewport((2 * uniqueID + 1) << 20, 0, 512);
-	renderPass.viewport0 = vp0;
-	renderPass.viewport1 = vp1;
-
-	if (staticCacheAvailable0 && staticCacheAvailable1 && !objectDragged) // TODO
-	{
-		renderPass.copyFromStaticCache0 = true;
-		renderPass.copyFromStaticCache1 = true;
-	}
-	else
-	{
-		renderStaticGeometryToShadowMap(renderPass);
-	}
-
-	renderDynamicGeometryToShadowMap(renderPass);
-
-
-	point_shadow_info si;
-	si.viewport0 = vec4(vp0.x, vp0.y, vp0.size, vp0.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
-	si.viewport1 = vec4(vp1.x, vp1.y, vp1.size, vp1.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
-
-	assert(pointLightShadowInfos.size() == index);
-	pointLightShadowInfos.push_back(si);
-}
-
-void application::renderStaticGeometryToSunShadowMap()
-{
-	sun_shadow_render_pass& renderPass = sunShadowRenderPass;
-
-	for (auto [entityHandle, raster, transform] : appScene.group(entt::get<raster_component, trs>, entt::exclude<dynamic_geometry_component>).each())
-	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (auto& sm : raster.mesh->submeshes)
-		{
-			submesh_info submesh = sm.info;
-			const ref<pbr_material>& material = sm.material;
-
-			renderPass.renderStaticObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-		}
-	}
-}
-
-void application::renderStaticGeometryToShadowMap(spot_shadow_render_pass& renderPass)
-{
-	for (auto [entityHandle, raster, transform] : appScene.group(entt::get<raster_component, trs>, entt::exclude<dynamic_geometry_component>).each())
-	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (auto& sm : raster.mesh->submeshes)
-		{
-			submesh_info submesh = sm.info;
-			const ref<pbr_material>& material = sm.material;
-
-			renderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-		}
-	}
-}
-
-void application::renderStaticGeometryToShadowMap(point_shadow_render_pass& renderPass)
-{
-	for (auto [entityHandle, raster, transform] : appScene.group(entt::get<raster_component, trs>, entt::exclude<dynamic_geometry_component>).each())
-	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (auto& sm : raster.mesh->submeshes)
-		{
-			submesh_info submesh = sm.info;
-			const ref<pbr_material>& material = sm.material;
-
-			renderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-		}
-	}
-}
-
-void application::renderDynamicGeometryToSunShadowMap()
-{
-	sun_shadow_render_pass& renderPass = sunShadowRenderPass;
-
-	for (auto [entityHandle, raster, transform, dynamic] : appScene.group(entt::get<raster_component, trs, dynamic_geometry_component>, entt::exclude<animation_component>).each())
-	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (auto& sm : raster.mesh->submeshes)
-		{
-			submesh_info submesh = sm.info;
-			const ref<pbr_material>& material = sm.material;
-
-			renderPass.renderDynamicObject(0, mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-		}
-	}
-
-	for (auto [entityHandle, raster, anim, transform, dynamic] : appScene.group(entt::get<raster_component, animation_component, trs, dynamic_geometry_component>).each())
-	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (uint32 i = 0; i < (uint32)raster.mesh->submeshes.size(); ++i)
-		{
-			submesh_info submesh = anim.controller->currentSubmeshes[i];
-			renderPass.renderDynamicObject(0, anim.controller->currentVertexBuffer, mesh.indexBuffer, submesh, m);
-		}
-	}
-}
-
-void application::renderDynamicGeometryToShadowMap(spot_shadow_render_pass& renderPass)
-{
-	for (auto [entityHandle, raster, transform, dynamic] : appScene.group(entt::get<raster_component, trs, dynamic_geometry_component>, entt::exclude<animation_component>).each())
-	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (auto& sm : raster.mesh->submeshes)
-		{
-			submesh_info submesh = sm.info;
-			const ref<pbr_material>& material = sm.material;
-
-			renderPass.renderDynamicObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-		}
-	}
-
-	for (auto [entityHandle, raster, anim, transform, dynamic] : appScene.group(entt::get<raster_component, animation_component, trs, dynamic_geometry_component>).each())
-	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (uint32 i = 0; i < (uint32)raster.mesh->submeshes.size(); ++i)
-		{
-			submesh_info submesh = anim.controller->currentSubmeshes[i];
-			renderPass.renderDynamicObject(anim.controller->currentVertexBuffer, mesh.indexBuffer, submesh, m);
-		}
-	}
-}
-
-void application::renderDynamicGeometryToShadowMap(point_shadow_render_pass& renderPass)
-{
-	for (auto [entityHandle, raster, transform, dynamic] : appScene.group(entt::get<raster_component, trs, dynamic_geometry_component>, entt::exclude<animation_component>).each())
-	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (auto& sm : raster.mesh->submeshes)
-		{
-			submesh_info submesh = sm.info;
-			const ref<pbr_material>& material = sm.material;
-
-			renderPass.renderDynamicObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, m);
-		}
-	}
-
-	for (auto [entityHandle, raster, anim, transform, dynamic] : appScene.group(entt::get<raster_component, animation_component, trs, dynamic_geometry_component>).each())
-	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (uint32 i = 0; i < (uint32)raster.mesh->submeshes.size(); ++i)
-		{
-			submesh_info submesh = anim.controller->currentSubmeshes[i];
-			renderPass.renderDynamicObject(anim.controller->currentVertexBuffer, mesh.indexBuffer, submesh, m);
-		}
-	}
-}
-
 void application::update(const user_input& input, float dt)
 {
 	//dt = min(dt, 1.f / 30.f);
@@ -1564,13 +1317,15 @@ void application::update(const user_input& input, float dt)
 
 
 		// Render shadow maps.
-		renderSunShadowMap(objectDragged);
+		renderSunShadowMap(sun, &sunShadowRenderPass, appScene, objectDragged);
 
 		for (uint32 i = 0; i < (uint32)spotLights.size(); ++i)
 		{
 			if (spotLights[i].shadowInfoIndex >= 0)
 			{
-				renderShadowMap(spotLights[i], i, objectDragged);
+				uint32 renderPassIndex = numSpotShadowRenderPasses++;
+				spot_shadow_info shadowInfo = renderSpotShadowMap(spotLights[i], i, &spotShadowRenderPasses[renderPassIndex], renderPassIndex, appScene, objectDragged);
+				spotLightShadowInfos.push_back(shadowInfo);
 			}
 		}
 
@@ -1578,7 +1333,9 @@ void application::update(const user_input& input, float dt)
 		{
 			if (pointLights[i].shadowInfoIndex >= 0)
 			{
-				renderShadowMap(pointLights[i], i, objectDragged);
+				uint32 renderPassIndex = numPointShadowRenderPasses++;
+				point_shadow_info shadowInfo = renderPointShadowMap(pointLights[i], i, &pointShadowRenderPasses[renderPassIndex], renderPassIndex, appScene, objectDragged);
+				pointLightShadowInfos.push_back(shadowInfo);
 			}
 		}
 

@@ -43,19 +43,6 @@ private:
 	void submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 numPointLightShadowPasses);
 	bool handleUserInput(const user_input& input, float dt);
 
-	void renderSunShadowMap(bool objectDragged);
-	void renderShadowMap(spot_light_cb& spotLight, uint32 lightIndex, bool objectDragged);
-	void renderShadowMap(point_light_cb& pointLight, uint32 lightIndex, bool objectDragged);
-
-	void renderStaticGeometryToSunShadowMap();
-	void renderStaticGeometryToShadowMap(spot_shadow_render_pass& renderPass);
-	void renderStaticGeometryToShadowMap(point_shadow_render_pass& renderPass);
-
-	void renderDynamicGeometryToSunShadowMap();
-	void renderDynamicGeometryToShadowMap(spot_shadow_render_pass& renderPass);
-	void renderDynamicGeometryToShadowMap(point_shadow_render_pass& renderPass);
-	
-
 	undo_stack undoStack;
 
 	transformation_gizmo gizmo;
