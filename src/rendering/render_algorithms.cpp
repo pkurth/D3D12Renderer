@@ -14,8 +14,12 @@
 #include "outline_rs.hlsli"
 #include "transform.hlsli"
 
-static dx_pipeline depthOnlyPipeline;
-static dx_pipeline animatedDepthOnlyPipeline;
+static dx_pipeline depthPrePassPipeline;
+static dx_pipeline animatedDepthPrePassPipeline;
+
+static dx_pipeline doubleSidedDepthPrePassPipeline;
+static dx_pipeline doubleSidedAnimatedDepthPrePassPipeline;
+
 static dx_pipeline shadowPipeline;
 static dx_pipeline pointLightShadowPipeline;
 
@@ -55,8 +59,8 @@ static dx_pipeline bloomCombinePipeline;
 static dx_pipeline tonemapPipeline;
 static dx_pipeline presentPipeline;
 
-static dx_command_signature rigidDepthPrepassCommandSignature;
-static dx_command_signature animatedDepthPrepassCommandSignature;
+static dx_command_signature rigidDepthPrePassCommandSignature;
+static dx_command_signature animatedDepthPrePassCommandSignature;
 
 
 #pragma pack(push, 1)
@@ -103,11 +107,14 @@ void loadCommonShaders()
 
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.renderTargets(depthOnlyFormat, arraysize(depthOnlyFormat), depthStencilFormat)
-			.inputLayout(inputLayout_position)
-			.cullingOff();
+			.inputLayout(inputLayout_position);
 
-		depthOnlyPipeline = createReloadablePipeline(desc, { "depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
-		animatedDepthOnlyPipeline = createReloadablePipeline(desc, { "depth_only_animated_vs", "depth_only_ps" }, rs_in_vertex_shader);
+		depthPrePassPipeline = createReloadablePipeline(desc, { "depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
+		animatedDepthPrePassPipeline = createReloadablePipeline(desc, { "depth_only_animated_vs", "depth_only_ps" }, rs_in_vertex_shader);
+
+		desc.cullingOff();
+		doubleSidedDepthPrePassPipeline = createReloadablePipeline(desc, { "depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
+		doubleSidedAnimatedDepthPrePassPipeline = createReloadablePipeline(desc, { "depth_only_animated_vs", "depth_only_ps" }, rs_in_vertex_shader);
 	}
 
 	// Shadow.
@@ -200,7 +207,7 @@ void loadRemainingRenderResources()
 		indirect_draw_indexed(),
 	};
 
-	rigidDepthPrepassCommandSignature = createCommandSignature(*depthOnlyPipeline.rootSignature,
+	rigidDepthPrePassCommandSignature = createCommandSignature(*depthPrePassPipeline.rootSignature,
 		rigidDepthPrepassDescs, arraysize(rigidDepthPrepassDescs),
 		sizeof(indirect_rigid_depth_prepass_command));
 
@@ -214,7 +221,7 @@ void loadRemainingRenderResources()
 		indirect_draw_indexed(),
 	};
 
-	animatedDepthPrepassCommandSignature = createCommandSignature(*animatedDepthOnlyPipeline.rootSignature,
+	animatedDepthPrePassCommandSignature = createCommandSignature(*animatedDepthPrePassPipeline.rootSignature,
 		animatedDepthPrepassDescs, arraysize(animatedDepthPrepassDescs),
 		sizeof(indirect_animated_depth_prepass_command));
 }
@@ -245,11 +252,87 @@ static void batchRenderRigidDepthPrepass(dx_command_list* cl,
 		++ptr;
 	}
 
-	cl->drawIndirect(rigidDepthPrepassCommandSignature, (uint32)commands.size(), 
+	cl->drawIndirect(rigidDepthPrePassCommandSignature, (uint32)commands.size(), 
 		allocation.resource,
 		allocation.offsetInResource);
 }
 #endif
+
+static void depthPrePassInternal(dx_command_list* cl, 
+	dx_pipeline& pipeline,
+	const sort_key_vector<float, static_depth_only_render_command>& staticCommands, 
+	const sort_key_vector<float, dynamic_depth_only_render_command>& dynamicCommands,
+	const mat4& viewProj, const mat4& prevFrameViewProj,
+	depth_only_camera_jitter_cb jitterCB)
+{
+	if (staticCommands.size() > 0 || dynamicCommands.size() > 0)
+	{
+		cl->setPipelineState(*pipeline.pipeline);
+		cl->setGraphicsRootSignature(*pipeline.rootSignature);
+
+		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
+	}
+
+	// Static.
+	if (staticCommands.size() > 0)
+	{
+		DX_PROFILE_BLOCK(cl, "Static");
+
+		for (const auto& dc : staticCommands)
+		{
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, dc.objectID);
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.transform });
+
+			cl->setVertexBuffer(0, dc.vertexBuffer);
+			cl->setIndexBuffer(dc.indexBuffer);
+			cl->drawIndexed(dc.submesh.numTriangles * 3, 1, dc.submesh.firstTriangle * 3, dc.submesh.baseVertex, 0);
+		}
+	}
+
+	// Dynamic.
+	if (dynamicCommands.size() > 0)
+	{
+		DX_PROFILE_BLOCK(cl, "Dynamic");
+
+		for (const auto& dc : dynamicCommands)
+		{
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, dc.objectID);
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.prevFrameTransform });
+
+			cl->setVertexBuffer(0, dc.vertexBuffer);
+			cl->setIndexBuffer(dc.indexBuffer);
+			cl->drawIndexed(dc.submesh.numTriangles * 3, 1, dc.submesh.firstTriangle * 3, dc.submesh.baseVertex, 0);
+		}
+	}
+}
+
+static void depthPrePassInternal(dx_command_list* cl,
+	dx_pipeline& pipeline,
+	const sort_key_vector<float, animated_depth_only_render_command>& animatedCommands,
+	const mat4& viewProj, const mat4& prevFrameViewProj,
+	depth_only_camera_jitter_cb jitterCB)
+{
+	if (animatedCommands.size() > 0)
+	{
+		DX_PROFILE_BLOCK(cl, "Animated");
+
+		cl->setPipelineState(*pipeline.pipeline);
+		cl->setGraphicsRootSignature(*pipeline.rootSignature);
+
+		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
+
+		for (const auto& dc : animatedCommands)
+		{
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, dc.objectID);
+			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.prevFrameTransform });
+			cl->setRootGraphicsSRV(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS, dc.prevFrameVertexBufferAddress + dc.prevFrameSubmesh.baseVertex * dc.vertexSize);
+
+			cl->setVertexBuffer(0, dc.vertexBuffer);
+			cl->setIndexBuffer(dc.indexBuffer);
+			cl->drawIndexed(dc.submesh.numTriangles * 3, 1, dc.submesh.firstTriangle * 3, dc.submesh.baseVertex, 0);
+		}
+	}
+}
 
 void depthPrePass(dx_command_list* cl,
 	const dx_render_target& depthOnlyRenderTarget,
@@ -264,69 +347,11 @@ void depthPrePass(dx_command_list* cl,
 
 	depth_only_camera_jitter_cb jitterCB = { jitter, prevFrameJitter };
 
-	// Static.
-	if (opaqueRenderPass && opaqueRenderPass->staticDepthPrepass.size() > 0)
-	{
-		DX_PROFILE_BLOCK(cl, "Static");
-
-		cl->setPipelineState(*depthOnlyPipeline.pipeline);
-		cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
-
-		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
-
-		for (const auto& dc : opaqueRenderPass->staticDepthPrepass)
-		{
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, dc.objectID);
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.transform });
-
-			cl->setVertexBuffer(0, dc.vertexBuffer);
-			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(dc.submesh.numTriangles * 3, 1, dc.submesh.firstTriangle * 3, dc.submesh.baseVertex, 0);
-		}
-	}
-
-	// Dynamic.
-	if (opaqueRenderPass && opaqueRenderPass->dynamicDepthPrepass.size() > 0)
-	{
-		DX_PROFILE_BLOCK(cl, "Dynamic");
-
-		cl->setPipelineState(*depthOnlyPipeline.pipeline);
-		cl->setGraphicsRootSignature(*depthOnlyPipeline.rootSignature);
-
-		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
-
-		for (const auto& dc : opaqueRenderPass->dynamicDepthPrepass)
-		{
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, dc.objectID);
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.prevFrameTransform });
-
-			cl->setVertexBuffer(0, dc.vertexBuffer);
-			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(dc.submesh.numTriangles * 3, 1, dc.submesh.firstTriangle * 3, dc.submesh.baseVertex, 0);
-		}
-	}
-
-	// Animated.
-	if (opaqueRenderPass && opaqueRenderPass->animatedDepthPrepass.size() > 0)
-	{
-		DX_PROFILE_BLOCK(cl, "Animated");
-
-		cl->setPipelineState(*animatedDepthOnlyPipeline.pipeline);
-		cl->setGraphicsRootSignature(*animatedDepthOnlyPipeline.rootSignature);
-
-		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
-
-		for (const auto& dc : opaqueRenderPass->animatedDepthPrepass)
-		{
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, dc.objectID);
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.prevFrameTransform });
-			cl->setRootGraphicsSRV(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS, dc.prevFrameVertexBufferAddress + dc.prevFrameSubmesh.baseVertex * dc.vertexSize);
-
-			cl->setVertexBuffer(0, dc.vertexBuffer);
-			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(dc.submesh.numTriangles * 3, 1, dc.submesh.firstTriangle * 3, dc.submesh.baseVertex, 0);
-		}
-	}
+	depthPrePassInternal(cl, depthPrePassPipeline, opaqueRenderPass->staticDepthPrepass, opaqueRenderPass->dynamicDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
+	depthPrePassInternal(cl, doubleSidedDepthPrePassPipeline, opaqueRenderPass->staticDoublesidedDepthPrepass, opaqueRenderPass->dynamicDoublesidedDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
+	
+	depthPrePassInternal(cl, animatedDepthPrePassPipeline, opaqueRenderPass->animatedDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
+	depthPrePassInternal(cl, doubleSidedAnimatedDepthPrePassPipeline, opaqueRenderPass->animatedDoublesidedDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
 }
 
 void texturedSky(dx_command_list* cl,

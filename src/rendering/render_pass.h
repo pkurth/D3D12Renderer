@@ -6,34 +6,6 @@
 #include "render_command_buffer.h"
 #include "pbr.h"
 
-enum depth_prepass_pipeline : uint16
-{
-	depth_render_pipeline_standard,
-	depth_render_pipeline_animated,
-};
-
-struct depth_sort_key
-{
-	depth_sort_key() {}
-	depth_sort_key(depth_prepass_pipeline pipeline, bool doubleSided, float depth) : pipeline(pipeline), doubleSided(doubleSided), depth(depth) {}
-
-	union
-	{
-		struct
-		{
-			depth_prepass_pipeline pipeline;
-			uint16 doubleSided;
-		};
-		uint32 firstPart;
-	};
-
-	float depth;
-
-	bool operator<(depth_sort_key o)
-	{
-		return firstPart < o.firstPart || depth < o.depth;
-	}
-};
 
 struct opaque_render_pass
 {
@@ -42,6 +14,11 @@ struct opaque_render_pass
 		staticDepthPrepass.sort();
 		dynamicDepthPrepass.sort();
 		animatedDepthPrepass.sort();
+
+		staticDoublesidedDepthPrepass.sort();
+		dynamicDoublesidedDepthPrepass.sort();
+		animatedDoublesidedDepthPrepass.sort();
+
 		pass.sort();
 	}
 
@@ -50,6 +27,11 @@ struct opaque_render_pass
 		staticDepthPrepass.clear();
 		dynamicDepthPrepass.clear();
 		animatedDepthPrepass.clear();
+
+		staticDoublesidedDepthPrepass.clear();
+		dynamicDoublesidedDepthPrepass.clear();
+		animatedDoublesidedDepthPrepass.clear();
+
 		pass.clear();
 	}
 
@@ -65,7 +47,8 @@ struct opaque_render_pass
 		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, material);
 
 		float depth = 0.f; // TODO
-		auto& depthCommand = staticDepthPrepass.emplace_back(depth);
+		auto& buffer = doubleSided ? staticDoublesidedDepthPrepass : staticDepthPrepass;
+		auto& depthCommand = buffer.emplace_back(depth);
 		depthCommand.transform = transform;
 		depthCommand.vertexBuffer = vertexBuffer.positions;
 		depthCommand.indexBuffer = indexBuffer;
@@ -86,7 +69,8 @@ struct opaque_render_pass
 		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, material);
 
 		float depth = 0.f; // TODO
-		auto& depthCommand = dynamicDepthPrepass.emplace_back(depth);
+		auto& buffer = doubleSided ? dynamicDoublesidedDepthPrepass : dynamicDepthPrepass;
+		auto& depthCommand = buffer.emplace_back(depth);
 		depthCommand.transform = transform;
 		depthCommand.prevFrameTransform = prevFrameTransform;
 		depthCommand.vertexBuffer = vertexBuffer.positions;
@@ -110,7 +94,8 @@ struct opaque_render_pass
 		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, material);
 
 		float depth = 0.f; // TODO
-		auto& depthCommand = animatedDepthPrepass.emplace_back(depth);
+		auto& buffer = doubleSided ? animatedDoublesidedDepthPrepass : animatedDepthPrepass;
+		auto& depthCommand = buffer.emplace_back(depth);
 		depthCommand.transform = transform;
 		depthCommand.prevFrameTransform = prevFrameTransform;
 		depthCommand.vertexBuffer = vertexBuffer.positions;
@@ -183,6 +168,11 @@ struct opaque_render_pass
 	sort_key_vector<float, static_depth_only_render_command> staticDepthPrepass;
 	sort_key_vector<float, dynamic_depth_only_render_command> dynamicDepthPrepass;
 	sort_key_vector<float, animated_depth_only_render_command> animatedDepthPrepass;
+
+	sort_key_vector<float, static_depth_only_render_command> staticDoublesidedDepthPrepass;
+	sort_key_vector<float, dynamic_depth_only_render_command> dynamicDoublesidedDepthPrepass;
+	sort_key_vector<float, animated_depth_only_render_command> animatedDoublesidedDepthPrepass;
+
 	render_command_buffer<uint64> pass;
 
 private:
