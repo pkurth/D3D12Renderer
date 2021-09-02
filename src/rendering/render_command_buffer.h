@@ -46,10 +46,7 @@ private:
 		command_wrapper* commandWrapper = arena.allocate<command_wrapper>();
 		new (commandWrapper) command_wrapper;
 
-		commandWrapper->header.setup = [](dx_command_list* cl, const common_material_info& materialInfo)
-		{
-			pipeline_t::setup(cl, materialInfo);
-		};
+		commandWrapper->header.setup = pipeline_t::setup;
 		commandWrapper->header.render = [](dx_command_list* cl, const mat4& viewProj, void* data)
 		{
 			command_wrapper* wrapper = (command_wrapper*)data;
