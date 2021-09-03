@@ -256,15 +256,15 @@ void application::initialize(main_renderer* renderer)
 		auto test1 = appScene.createEntity("Lollipop 1")
 			.addComponent<trs>(vec3(20.f, 5.f, 0.f), quat::identity)
 			.addComponent<raster_component>(testMesh)
-			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
-			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
+			.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f))
+			.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f))
 			.addComponent<rigid_body_component>(true, 1.f);
 
 		auto test2 = appScene.createEntity("Lollipop 2")
 			.addComponent<trs>(vec3(20.f, 5.f, -2.f), quat::identity)
 			.addComponent<raster_component>(testMesh)
-			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f)
-			.addComponent<collider_component>(bounding_sphere{ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f)
+			.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f))
+			.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f))
 			.addComponent<rigid_body_component>(true, 1.f);
 
 		for (uint32 i = 0; i < 10; ++i)
@@ -272,7 +272,7 @@ void application::initialize(main_renderer* renderer)
 			appScene.createEntity("Cube")
 				.addComponent<trs>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
 				.addComponent<raster_component>(boxMesh)
-				.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 1.f)
+				.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 1.f))
 				.addComponent<rigid_body_component>(false, 1.f);
 		}
 
@@ -288,20 +288,20 @@ void application::initialize(main_renderer* renderer)
 			appScene.createEntity("Hull")
 				.addComponent<trs>(vec3(20.f, 15.f, 0.f), quat::identity)
 				.addComponent<raster_component>(loadMeshFromFile("assets/colliders/hull.fbx"))
-				.addComponent<collider_component>(hull, 0.1f, 0.5f, 0.1f)
+				.addComponent<collider_component>(collider_component::asHull(hull, 0.1f, 0.5f, 0.1f))
 				.addComponent<rigid_body_component>(false, 0.f);
 		}
 
 		appScene.createEntity("Test ground")
 			.addComponent<trs>(vec3(30.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
-			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f)
+			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f))
 			.addComponent<rigid_body_component>(true);
 
 		/*appScene.createEntity("Test ground")
 			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
-			.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 0.5f, 4.f)
+			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f))
 			.addComponent<rigid_body_component>(true);*/
 
 
@@ -312,7 +312,7 @@ void application::initialize(main_renderer* renderer)
 		auto fixed = appScene.createEntity("Fixed")
 			.addComponent<trs>(vec3(37.f, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))
 			.addComponent<raster_component>(chainMesh)
-			.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, 0.2f, 0.5f, 1.f)
+			.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, 0.2f, 0.5f, 1.f))
 			.addComponent<rigid_body_component>(true, 1.f);
 
 		//fixed.getComponent<rigid_body_component>().angularVelocity = vec3(0.f, 0.1f, 0.f);
@@ -328,7 +328,7 @@ void application::initialize(main_renderer* renderer)
 			auto chain = appScene.createEntity("Chain")
 				.addComponent<trs>(vec3(xCurr, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))
 				.addComponent<raster_component>(chainMesh)
-				.addComponent<collider_component>(bounding_capsule{ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, 0.2f, 0.5f, 1.f)
+				.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, 0.2f, 0.5f, 1.f))
 				.addComponent<rigid_body_component>(false, 1.f);
 
 			//addHingeJointConstraintFromGlobalPoints(prev, chain, vec3(xPrev + 1.18f, 15.f, -2.f), vec3(0.f, 0.f, 1.f), deg2rad(5.f), deg2rad(20.f));
@@ -348,7 +348,7 @@ void application::initialize(main_renderer* renderer)
 #endif
 
 	//ragdoll.initialize(appScene, vec3(60.f, 1.25f, -2.f));
-	//ragdoll.initialize(appScene, vec3(0.f, 1.25f, 0.f));
+	ragdoll.initialize(appScene, vec3(20.f, 1.25f, 0.f));
 
 	//initializeLocomotionEval(appScene, ragdoll);
 

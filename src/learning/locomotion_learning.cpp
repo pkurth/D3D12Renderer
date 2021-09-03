@@ -420,7 +420,7 @@ void locomotion_environment::resetForLearning()
 
 	appScene.createEntity("Test ground")
 		.addComponent<trs>(vec3(0.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
-		.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f)
+		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f))
 		.addComponent<rigid_body_component>(true);
 
 	ragdoll.initialize(appScene, vec3(0.f, 1.25f, 0.f));
