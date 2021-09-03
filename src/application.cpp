@@ -221,10 +221,9 @@ void application::initialize(main_renderer* renderer)
 
 #if 1
 	{
-
-		appScene.createEntity("Solo collider")
-			.addComponent<trs>(vec3(26.f, 10.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
-			.addComponent<collider_component>(bounding_capsule{ vec3(-1.f, 0.f, 0.f), vec3(1.f, 0.f, 0.f), 0.3f }, 0.1f, 0.5f, 1.f);
+		appScene.createEntity("Force field")
+			.addComponent<trs>(vec3(0.f), quat::identity)
+			.addComponent<force_field_component>(vec3(0.f, 0.f, -1.f));
 
 		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 

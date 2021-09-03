@@ -6,6 +6,7 @@
 #include "constraints.h"
 #include "rigid_body.h"
 #include "cloth.h"
+#include "force_field.h"
 
 #define GRAVITY -9.81f
 

@@ -423,12 +423,27 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 
 	uint32 numCollisions = narrowPhaseResult.numCollisions;
 
+	
+	vec3 globalForceField(0.f);
+	for (auto [entityHandle, forceField] : appScene.view<force_field_component>().each())
+	{
+		vec3 force = forceField.force;
+		scene_entity entity = { entityHandle, appScene };
+		if (entity.hasComponent<trs>())
+		{
+			force = entity.getComponent<trs>().rotation * force;
+		}
+		globalForceField += force;
+	}
+
+
 
 	// Apply gravity and air drag and integrate forces.
 	for (auto [entityHandle, rb, transform] : appScene.group(entt::get<rigid_body_component, trs>).each())
 	{
 		uint16 globalStateIndex = (uint16)(&rb - rbBase);
 		rigid_body_global_state& global = rbGlobal[globalStateIndex];
+		rb.forceAccumulator += globalForceField;
 		rb.applyGravityAndIntegrateForces(global, transform, dt);
 		rb.globalStateIndex = globalStateIndex;
 	}
@@ -471,7 +486,7 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 	// For all cloth strips (with and without transform), simulate.
 	for (auto [entityHandle, cloth] : appScene.view<cloth_component>().each())
 	{
-		cloth.applyWindForce(vec3(0.f, 0.f, -1.f));
+		cloth.applyWindForce(globalForceField);
 		cloth.simulate(settings.numClothVelocityIterations, settings.numClothPositionIterations, settings.numClothDriftIterations, dt);
 	}
 }
