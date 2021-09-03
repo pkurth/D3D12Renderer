@@ -93,7 +93,7 @@ void application::loadCustomShaders()
 	}
 }
 
-static ref<pbr_material> lollipopMaterial;
+static ref<pbr_material> clothMaterial;
 
 void application::initialize(main_renderer* renderer)
 {
@@ -112,6 +112,18 @@ void application::initialize(main_renderer* renderer)
 		.addComponent<trs>(trs::identity)
 		.addComponent<cloth_component>(10.f, 10.f, 20, 20, 8.f);
 
+	//clothMaterial = createPBRMaterial(
+	//	"assets/sphere/Tiles074_2K_Color.jpg",
+	//	"assets/sphere/Tiles074_2K_Normal.jpg",
+	//	"assets/sphere/Tiles074_2K_Roughness.jpg",
+	//	{}, vec4(0.f), vec4(1.f), 1.f, 1.f, true);
+
+	clothMaterial = createPBRMaterial(
+		"assets/sponza/textures/Sponza_Curtain_Red_diffuse.tga",
+		"assets/sponza/textures/Sponza_Curtain_Red_normal.tga",
+		"assets/sponza/textures/Sponza_Curtain_roughness.tga",
+		"assets/sponza/textures/Sponza_Curtain_metallic.tga",
+		vec4(0.f), vec4(1.f), 1.f, 1.f, true);
 
 #if 0
 	if (auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj"))
@@ -178,44 +190,6 @@ void application::initialize(main_renderer* renderer)
 			.addComponent<raster_component>(ragdollMesh)
 			.addComponent<animation_component>(make_ref<random_path_animation_controller>())
 			.addComponent<dynamic_geometry_component>();
-	}
-#endif
-
-#if 1
-	{
-		//lollipopMaterial = createPBRMaterial(
-		//	"assets/sphere/Tiles074_2K_Color.jpg",
-		//	"assets/sphere/Tiles074_2K_Normal.jpg",
-		//	"assets/sphere/Tiles074_2K_Roughness.jpg",
-		//	{}, vec4(0.f), vec4(1.f), 1.f, 1.f, true);
-
-		lollipopMaterial = createPBRMaterial(
-			"assets/sponza/textures/Sponza_Curtain_Red_diffuse.tga",
-			"assets/sponza/textures/Sponza_Curtain_Red_normal.tga",
-			"assets/sponza/textures/Sponza_Curtain_roughness.tga",
-			"assets/sponza/textures/Sponza_Curtain_metallic.tga",
-			vec4(0.f), vec4(1.f), 1.f, 1.f, true);
-
-#if 0
-		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
-		auto testMesh = make_ref<composite_mesh>();
-		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 1.f, vec3(0.f, 0.f, 0.f)), {}, trs::identity, lollipopMaterial });
-		testMesh->mesh = primitiveMesh.createDXMesh();
-
-		float extents = 100.f;
-		for (float z = -extents; z < extents; z += 10.f)
-		{
-			for (float y = -extents; y < extents; y += 10.f)
-			{
-				for (float x = -extents; x < extents; x += 10.f)
-				{
-					appScene.createEntity("Ball")
-						.addComponent<trs>(vec3(x, y, z), quat::identity, 1.f)
-						.addComponent<raster_component>(testMesh);
-				}
-			}
-		}
-#endif
 	}
 #endif
 
@@ -1443,7 +1417,7 @@ void application::update(const user_input& input, float dt)
 			submesh_info submesh = cloth.getRenderData((vec3*)positionPtr, (vertex_uv_normal_tangent*)otherPtr, (indexed_triangle16*)indexPtr);
 
 			opaqueRenderPass.renderStaticObject(mat4::identity, material_vertex_buffer_group_view{ positionVertexBuffer, otherVertexBuffer }, indexBuffer,
-				submesh, lollipopMaterial, (uint32)entityHandle);
+				submesh, clothMaterial, (uint32)entityHandle);
 
 			scene_entity entity = { entityHandle, appScene };
 			bool outline = selectedEntity == entity;
