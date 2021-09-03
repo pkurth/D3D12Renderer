@@ -16,6 +16,13 @@ static std::vector<constraint_edge> constraintEdges;
 static std::vector<bounding_hull_geometry> boundingHullGeometries;
 
 
+struct force_field_global_state
+{
+	vec3 force;
+};
+
+
+
 #ifndef PHYSICS_ONLY
 // This is a bit dirty. PHYSICS_ONLY is defined when building the learning DLL, where we don't need bounding hulls.
 
@@ -403,14 +410,46 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 	}
 }
 
+// Returns the accumulated force from all global force fields and writes localized forces (from force fields with colliders) in outLocalizedForceFields.
+// The second return value is the number of these localized force fields.
+static std::pair<vec3, uint32> getForceFieldStates(scene& appScene, force_field_global_state* outLocalForceFields)
+{
+	vec3 globalForceField(0.f);
+	uint32 numLocalForceFields = 0;
+
+	for (auto [entityHandle, forceField] : appScene.view<force_field_component>().each())
+	{
+		scene_entity entity = { entityHandle, appScene };
+
+		vec3 force = forceField.force; 
+		if (entity.hasComponent<trs>())
+		{
+			force = entity.getComponent<trs>().rotation * force;
+		}
+
+		if (entity.hasComponent<collider_component>())
+		{
+			// Localized force field.
+			outLocalForceFields[numLocalForceFields++].force = force;
+		}
+		else
+		{
+			// Global force field.
+			globalForceField += force;
+		}
+	}
+
+	return { globalForceField, numLocalForceFields };
+}
+
 void physicsStep(scene& appScene, float dt, physics_settings settings)
 {
 	dt = min(dt, 1.f / 30.f);
 
 	// TODO:
-	static void* scratchMemory = malloc(1024 * 1024);
 	static broadphase_collision* possibleCollisions = new broadphase_collision[10000];
 	static rigid_body_global_state* rbGlobal = new rigid_body_global_state[1024];
+	static force_field_global_state* ffGlobal = new force_field_global_state[64];
 	static bounding_box* worldSpaceAABBs = new bounding_box[1024];
 	static collider_union* worldSpaceColliders = new collider_union[1024];
 	static collision_constraint* collisionConstraints = new collision_constraint[10000];
@@ -421,35 +460,38 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 	static hinge_joint_constraint_update* hingeJointConstraintUpdates = new hinge_joint_constraint_update[1024];
 	static cone_twist_constraint_update* coneTwistConstraintUpdates = new cone_twist_constraint_update[1024];
 
-	  
+
+	// Collision detection.
+	getWorldSpaceColliders(appScene, worldSpaceAABBs, worldSpaceColliders);
+	uint32 numPossibleCollisions = broadphase(appScene, 0, worldSpaceAABBs, possibleCollisions);
+	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, possibleCollisions, numPossibleCollisions, collisionConstraints, nonCollisionInteractions);
+
+
+	auto [globalForceField, numLocalForceFields] = getForceFieldStates(appScene, ffGlobal);
+
+
+	// Handle non-collision interactions (triggers, force fields etc).
 	auto rbView = appScene.view<rigid_body_component>();
 	rigid_body_component* rbBase = rbView.raw();
 
-
-
-	getWorldSpaceColliders(appScene, worldSpaceAABBs, worldSpaceColliders);
-	uint32 numPossibleCollisions = broadphase(appScene, 0, worldSpaceAABBs, possibleCollisions, scratchMemory);
-	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, possibleCollisions, numPossibleCollisions, collisionConstraints, nonCollisionInteractions);
-
-	uint32 numCollisions = narrowPhaseResult.numCollisions;
-
-	
-	vec3 globalForceField(0.f);
-	for (auto [entityHandle, forceField] : appScene.view<force_field_component>().each())
+	for (uint32 i = 0; i < narrowPhaseResult.numNonCollisionInteractions; ++i)
 	{
-		vec3 force = forceField.force;
-		scene_entity entity = { entityHandle, appScene };
-		if (entity.hasComponent<trs>())
+		non_collision_interaction interaction = nonCollisionInteractions[i];
+		rigid_body_component& rb = rbBase[interaction.rigidBodyIndex];
+
+		switch (interaction.otherType)
 		{
-			force = entity.getComponent<trs>().rotation * force;
+			case physics_object_type_force_field:
+			{
+				const force_field_global_state& ff = ffGlobal[interaction.otherIndex];
+				rb.forceAccumulator += ff.force;
+			} break;
 		}
-		globalForceField += force;
 	}
 
 
-
-	// Apply external forces (including gravity) and air drag and integrate forces.
-	for (auto [entityHandle, rb, transform] : appScene.group(entt::get<rigid_body_component, trs>).each())
+	//  Apply global forces (including gravity) and air drag and integrate forces.
+	for (auto [entityHandle, rb, transform] : appScene.group<rigid_body_component, trs>().each())
 	{
 		uint16 globalStateIndex = (uint16)(&rb - rbBase);
 		rigid_body_global_state& global = rbGlobal[globalStateIndex];
@@ -460,7 +502,7 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 
 
 	// Solve constraints.
-	finalizeCollisionVelocityConstraintInitialization(worldSpaceColliders, rbGlobal, collisionConstraints, numCollisions, dt);
+	finalizeCollisionVelocityConstraintInitialization(worldSpaceColliders, rbGlobal, collisionConstraints, narrowPhaseResult.numCollisions, dt);
 	
 	initializeDistanceVelocityConstraints(appScene, rbGlobal, distanceConstraints.data(), distanceConstraintUpdates, (uint32)distanceConstraints.size(), dt);
 	initializeBallJointVelocityConstraints(appScene, rbGlobal, ballJointConstraints.data(), ballJointConstraintUpdates, (uint32)ballJointConstraints.size(), dt);
@@ -473,12 +515,12 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 		solveBallJointVelocityConstraints(ballJointConstraintUpdates, (uint32)ballJointConstraints.size(), rbGlobal);
 		solveHingeJointVelocityConstraints(hingeJointConstraintUpdates, (uint32)hingeJointConstraints.size(), rbGlobal);
 		solveConeTwistVelocityConstraints(coneTwistConstraintUpdates, (uint32)coneTwistConstraints.size(), rbGlobal);
-		solveCollisionVelocityConstraints(collisionConstraints, numCollisions, rbGlobal);
+		solveCollisionVelocityConstraints(collisionConstraints, narrowPhaseResult.numCollisions, rbGlobal);
 	}
 
 
 	// Integrate velocities.
-	for (auto [entityHandle, rb, transform] : appScene.group(entt::get<rigid_body_component, trs>).each())
+	for (auto [entityHandle, rb, transform] : appScene.group<rigid_body_component, trs>().each())
 	{
 		rigid_body_global_state& global = rbGlobal[rb.globalStateIndex];
 		rb.integrateVelocity(global, transform, dt);

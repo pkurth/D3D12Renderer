@@ -59,8 +59,12 @@ void onColliderRemoved(entt::registry& registry, entt::entity entityHandle)
 	registry.remove_if_exists<sap_endpoint_indirection_component>(entityHandle);
 }
 
-uint32 broadphase(scene& appScene, uint32 sortingAxis, bounding_box* worldSpaceAABBs, broadphase_collision* outCollisions, void* scratchMemory)
+uint32 broadphase(scene& appScene, uint32 sortingAxis, bounding_box* worldSpaceAABBs, broadphase_collision* outCollisions)
 {
+	// TODO:
+	static uint16* activeList = new uint16[10000];
+
+
 	uint32 numColliders = appScene.numberOfComponentsOfType<collider_component>();
 	uint32 numEndpoints = numColliders * 2;
 
@@ -143,7 +147,6 @@ uint32 broadphase(scene& appScene, uint32 sortingAxis, bounding_box* worldSpaceA
 
 
 	// Determine overlaps.
-	uint16* activeList = (uint16*)scratchMemory;
 	uint32 numActive = 0;
 
 	for (uint32 i = 0; i < numEndpoints; ++i)

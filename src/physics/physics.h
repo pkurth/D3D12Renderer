@@ -6,7 +6,6 @@
 #include "constraints.h"
 #include "rigid_body.h"
 #include "cloth.h"
-#include "force_field.h"
 
 #define GRAVITY -9.81f
 
@@ -123,6 +122,11 @@ struct physics_reference_component
 	entt::entity firstColliderEntity = entt::null;
 
 	uint16 firstConstraintEdge = INVALID_CONSTRAINT_EDGE;
+};
+
+struct force_field_component
+{
+	vec3 force;
 };
 
 #define INVALID_BOUNDING_HULL_INDEX -1

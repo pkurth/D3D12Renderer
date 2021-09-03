@@ -96,7 +96,7 @@ vec3 cloth_component::getParticlePosition(float relX, float relY)
 {
 	vec3 position = vec3(relX * width, -relY * height, 0.f);
 	position.x -= width * 0.5f;
-	//std::swap(position.y, position.z);
+	std::swap(position.y, position.z);
 	return position;
 }
 
