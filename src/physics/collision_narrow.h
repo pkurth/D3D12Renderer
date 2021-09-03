@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/math.h"
-
+#include "physics.h"
 
 struct collider_union;
 struct rigid_body_global_state;
@@ -51,20 +51,21 @@ struct collision_constraint
 	float friction;
 };
 
-struct force_field_interaction
+struct non_collision_interaction
 {
 	uint16 rigidBodyIndex;
-	uint16 forceFieldIndex;
+	uint16 otherIndex;
+	physics_object_type otherType;
 };
 
 struct narrowphase_result
 {
 	uint32 numCollisions;
-	uint32 numForceFieldInteractions;
+	uint32 numNonCollisionInteractions;
 };
 
 narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions,
-	collision_constraint* outCollisionConstraints, force_field_interaction* outForceFieldInteractions);
+	collision_constraint* outCollisionConstraints, non_collision_interaction* outNonCollisionInteractions);
 
 void finalizeCollisionVelocityConstraintInitialization(collider_union* worldSpaceColliders, rigid_body_global_state* rbs,
 	collision_constraint* collisionConstraints, uint32 numCollisionConstraints, float dt);

@@ -63,7 +63,7 @@ struct collider_union
 
 	collider_type type;
 	physics_object_type objectType;
-	uint16 rigidBodyIndex;
+	uint16 objectIndex; // Depending on objectType: Rigid body index, force field index, ...
 
 	union
 	{

@@ -156,7 +156,7 @@ uint32 broadphase(scene& appScene, uint32 sortingAxis, bounding_box* worldSpaceA
 				bounding_box& a = worldSpaceAABBs[ep.colliderIndex];
 				bounding_box& b = worldSpaceAABBs[activeList[active]];
 
-				if (aabbVSAABB(a, b))
+				if (aabbVsAABB(a, b))
 				{
 					outCollisions[numCollisions++] = { ep.colliderIndex, activeList[active] };
 				}

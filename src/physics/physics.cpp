@@ -307,6 +307,9 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 	auto rbView = appScene.view<rigid_body_component>();
 	rigid_body_component* rbBase = rbView.raw();
 
+	auto ffView = appScene.view<force_field_component>();
+	force_field_component* ffBase = ffView.raw();
+
 	for (auto [entityHandle, collider] : appScene.view<collider_component>().each())
 	{
 		bounding_box& bb = outWorldspaceAABBs[pushIndex];
@@ -314,6 +317,7 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 		++pushIndex;
 
 		scene_entity entity = { collider.parentEntity, appScene };
+		assert(entity.hasComponent<trs>());
 		trs& transform = entity.getComponent<trs>();
 
 		col.type = collider.type;
@@ -322,12 +326,18 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 		if (entity.hasComponent<rigid_body_component>())
 		{
 			rigid_body_component& rb = entity.getComponent<rigid_body_component>();
-			col.rigidBodyIndex = (uint16)(&rb - rbBase);
+			col.objectIndex = (uint16)(&rb - rbBase);
 			col.objectType = physics_object_type_rigid_body;
+		}
+		else if (entity.hasComponent<force_field_component>())
+		{
+			force_field_component& ff = entity.getComponent<force_field_component>();
+			col.objectIndex = (uint16)(&ff - ffBase);
+			col.objectType = physics_object_type_force_field;
 		}
 		else
 		{
-			col.rigidBodyIndex = UINT16_MAX;
+			col.objectIndex = UINT16_MAX;
 			col.objectType = physics_object_type_none;
 		}
 
@@ -404,7 +414,7 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 	static bounding_box* worldSpaceAABBs = new bounding_box[1024];
 	static collider_union* worldSpaceColliders = new collider_union[1024];
 	static collision_constraint* collisionConstraints = new collision_constraint[10000];
-	static force_field_interaction* forceFieldInteractions = new force_field_interaction[1024];
+	static non_collision_interaction* nonCollisionInteractions = new non_collision_interaction[1024];
 	
 	static distance_constraint_update* distanceConstraintUpdates = new distance_constraint_update[1024];
 	static ball_joint_constraint_update* ballJointConstraintUpdates = new ball_joint_constraint_update[1024];
@@ -419,7 +429,7 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 
 	getWorldSpaceColliders(appScene, worldSpaceAABBs, worldSpaceColliders);
 	uint32 numPossibleCollisions = broadphase(appScene, 0, worldSpaceAABBs, possibleCollisions, scratchMemory);
-	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, possibleCollisions, numPossibleCollisions, collisionConstraints, forceFieldInteractions);
+	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, possibleCollisions, numPossibleCollisions, collisionConstraints, nonCollisionInteractions);
 
 	uint32 numCollisions = narrowPhaseResult.numCollisions;
 
@@ -438,7 +448,7 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 
 
 
-	// Apply gravity and air drag and integrate forces.
+	// Apply external forces (including gravity) and air drag and integrate forces.
 	for (auto [entityHandle, rb, transform] : appScene.group(entt::get<rigid_body_component, trs>).each())
 	{
 		uint16 globalStateIndex = (uint16)(&rb - rbBase);

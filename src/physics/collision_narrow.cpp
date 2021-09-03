@@ -1275,16 +1275,103 @@ static bool collisionCheck(collider_union* worldSpaceColliders, broadphase_colli
 	return false;
 }
 
-static bool intersectionCheck(collider_union* worldSpaceColliders, broadphase_collision overlap, force_field_interaction& interaction)
+static bool overlapCheck(collider_union* worldSpaceColliders, broadphase_collision overlap, non_collision_interaction& interaction)
 {
+	collider_union* colliderAInitial = worldSpaceColliders + overlap.colliderA;
+	collider_union* colliderBInitial = worldSpaceColliders + overlap.colliderB;
+
+	bool keepOrder = (colliderAInitial->type < colliderBInitial->type);
+	collider_union* colliderA = keepOrder ? colliderAInitial : colliderBInitial;
+	collider_union* colliderB = keepOrder ? colliderBInitial : colliderAInitial;
+
+	assert(colliderA->type == physics_object_type_rigid_body || colliderB->type == physics_object_type_rigid_body);
+	assert(colliderA->type != physics_object_type_rigid_body || colliderB->type != physics_object_type_rigid_body);
+
+	bool overlaps = false;
+
+	switch (colliderA->type)
+	{
+		// Sphere tests.
+		case collider_type_sphere:
+		{
+			switch (colliderB->type)
+			{
+				case collider_type_sphere: overlaps = sphereVsSphere(colliderA->sphere, colliderB->sphere); break;
+				case collider_type_capsule: overlaps = sphereVsCapsule(colliderA->sphere, colliderB->capsule); break;
+				case collider_type_aabb: overlaps = sphereVsAABB(colliderA->sphere, colliderB->aabb); break;
+				case collider_type_obb: overlaps = sphereVsOBB(colliderA->sphere, colliderB->obb); break;
+				case collider_type_hull: overlaps = sphereVsHull(colliderA->sphere, colliderB->hull); break;
+			}
+		} break;
+
+		// Capsule tests.
+		case collider_type_capsule:
+		{
+			switch (colliderB->type)
+			{
+				case collider_type_capsule: overlaps = capsuleVsCapsule(colliderA->capsule, colliderB->capsule); break;
+				case collider_type_aabb: overlaps = capsuleVsAABB(colliderA->capsule, colliderB->aabb); break;
+				case collider_type_obb: overlaps = capsuleVsOBB(colliderA->capsule, colliderB->obb); break;
+				case collider_type_hull: overlaps = capsuleVsHull(colliderA->capsule, colliderB->hull); break;
+			}
+		} break;
+
+		// AABB tests.
+		case collider_type_aabb:
+		{
+			switch (colliderB->type)
+			{
+				case collider_type_aabb: overlaps = aabbVsAABB(colliderA->aabb, colliderB->aabb); break;
+				case collider_type_obb: overlaps = aabbVsOBB(colliderA->aabb, colliderB->obb); break;
+				case collider_type_hull: overlaps = aabbVsHull(colliderA->aabb, colliderB->hull); break;
+			}
+		} break;
+
+		// OBB tests.
+		case collider_type_obb:
+		{
+			switch (colliderB->type)
+			{
+				case collider_type_obb: overlaps = obbVsOBB(colliderA->obb, colliderB->obb); break;
+				case collider_type_hull: overlaps = obbVsHull(colliderA->obb, colliderB->hull); break;
+			}
+		} break;
+
+		// Hull tests.
+		case collider_type_hull:
+		{
+			switch (colliderB->type)
+			{
+				case collider_type_hull: overlaps = hullVsHull(colliderA->hull, colliderB->hull); break;
+			}
+		} break;
+	}
+
+	if (overlaps)
+	{
+		if (colliderA->type == physics_object_type_rigid_body)
+		{
+			interaction.rigidBodyIndex = colliderA->objectIndex;
+			interaction.otherIndex = colliderB->objectIndex;
+			interaction.otherType = colliderB->objectType;
+		}
+		else
+		{
+			interaction.rigidBodyIndex = colliderB->objectIndex;
+			interaction.otherIndex = colliderA->objectIndex;
+			interaction.otherType = colliderA->objectType;
+		}
+
+		return true;
+	}
 	return false;
 }
 
 narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions,
-	collision_constraint* outCollisionConstraints, force_field_interaction* outForceFieldInteractions)
+	collision_constraint* outCollisionConstraints, non_collision_interaction* outNonCollisionInteractions)
 {
 	uint32 numCollisions = 0;
-	uint32 numForceFieldInteractions = 0;
+	uint32 numNonCollisionInteractions = 0;
 
 	for (uint32 i = 0; i < numPossibleCollisions; ++i)
 	{
@@ -1299,7 +1386,7 @@ narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_c
 		}
 
 		if (colliderA->objectType == physics_object_type_rigid_body && colliderB->objectType == physics_object_type_rigid_body
-			&& colliderA->rigidBodyIndex == colliderB->rigidBodyIndex)
+			&& colliderA->objectIndex == colliderB->objectIndex)
 		{
 			// If both colliders belong to the same rigid body, no collision is generated.
 			continue;
@@ -1309,8 +1396,8 @@ narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_c
 
 		if (colliderA->objectType == physics_object_type_force_field || colliderB->objectType == physics_object_type_force_field)
 		{
-			force_field_interaction& interaction = outForceFieldInteractions[numForceFieldInteractions];
-			numForceFieldInteractions += intersectionCheck(worldSpaceColliders, overlap, interaction);
+			non_collision_interaction& interaction = outNonCollisionInteractions[numNonCollisionInteractions];
+			numNonCollisionInteractions += overlapCheck(worldSpaceColliders, overlap, interaction);
 		}
 		else
 		{
@@ -1319,7 +1406,7 @@ narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_c
 		}
 	}
 
-	return narrowphase_result{ numCollisions, numForceFieldInteractions };
+	return narrowphase_result{ numCollisions, numNonCollisionInteractions };
 }
 
 static rigid_body_global_state dummyRigidBody =
@@ -1347,8 +1434,8 @@ void finalizeCollisionVelocityConstraintInitialization(collider_union* worldSpac
 		collider_properties propsB = colliderB->properties;
 
 		c.friction = sqrt(propsA.friction * propsB.friction);
-		c.rbA = (colliderA->objectType == physics_object_type_rigid_body) ? colliderA->rigidBodyIndex : UINT16_MAX;
-		c.rbB = (colliderB->objectType == physics_object_type_rigid_body) ? colliderB->rigidBodyIndex : UINT16_MAX;
+		c.rbA = (colliderA->objectType == physics_object_type_rigid_body) ? colliderA->objectIndex : UINT16_MAX;
+		c.rbB = (colliderB->objectType == physics_object_type_rigid_body) ? colliderB->objectIndex : UINT16_MAX;
 
 		auto& rbA = c.rbA != UINT16_MAX ? rbs[c.rbA] : dummyRigidBody;
 		auto& rbB = c.rbB != UINT16_MAX ? rbs[c.rbB] : dummyRigidBody;
