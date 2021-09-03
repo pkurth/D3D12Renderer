@@ -1197,165 +1197,218 @@ static bool intersection(const bounding_hull& a, const bounding_hull& b, contact
 	return true;
 }
 
-uint32 narrowphase(collider_union* worldSpaceColliders, rigid_body_global_state* rbs, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions, float dt,
-	collision_constraint* outCollisionConstraints)
+static bool collisionCheck(collider_union* worldSpaceColliders, broadphase_collision overlap, contact_manifold& contact)
 {
-	uint32 numContacts = 0;
+	collider_union* colliderAInitial = worldSpaceColliders + overlap.colliderA;
+	collider_union* colliderBInitial = worldSpaceColliders + overlap.colliderB;
+
+	bool keepOrder = (colliderAInitial->type < colliderBInitial->type);
+	collider_union* colliderA = keepOrder ? colliderAInitial : colliderBInitial;
+	collider_union* colliderB = keepOrder ? colliderBInitial : colliderAInitial;
+
+	bool collides = false;
+
+	switch (colliderA->type)
+	{
+		// Sphere tests.
+		case collider_type_sphere:
+		{
+			switch (colliderB->type)
+			{
+				case collider_type_sphere: collides = intersection(colliderA->sphere, colliderB->sphere, contact); break;
+				case collider_type_capsule: collides = intersection(colliderA->sphere, colliderB->capsule, contact); break;
+				case collider_type_aabb: collides = intersection(colliderA->sphere, colliderB->aabb, contact); break;
+				case collider_type_obb: collides = intersection(colliderA->sphere, colliderB->obb, contact); break;
+				case collider_type_hull: collides = intersection(colliderA->sphere, colliderB->hull, contact); break;
+			}
+		} break;
+
+		// Capsule tests.
+		case collider_type_capsule:
+		{
+			switch (colliderB->type)
+			{
+				case collider_type_capsule: collides = intersection(colliderA->capsule, colliderB->capsule, contact); break;
+				case collider_type_aabb: collides = intersection(colliderA->capsule, colliderB->aabb, contact); break;
+				case collider_type_obb: collides = intersection(colliderA->capsule, colliderB->obb, contact); break;
+				case collider_type_hull: collides = intersection(colliderA->capsule, colliderB->hull, contact); break;
+			}
+		} break;
+
+		// AABB tests.
+		case collider_type_aabb:
+		{
+			switch (colliderB->type)
+			{
+				case collider_type_aabb: collides = intersection(colliderA->aabb, colliderB->aabb, contact); break;
+				case collider_type_obb: collides = intersection(colliderA->aabb, colliderB->obb, contact); break;
+				case collider_type_hull: collides = intersection(colliderA->aabb, colliderB->hull, contact); break;
+			}
+		} break;
+
+		// OBB tests.
+		case collider_type_obb:
+		{
+			switch (colliderB->type)
+			{
+				case collider_type_obb: collides = intersection(colliderA->obb, colliderB->obb, contact); break;
+				case collider_type_hull: collides = intersection(colliderA->obb, colliderB->hull, contact); break;
+			}
+		} break;
+
+		// Hull tests.
+		case collider_type_hull:
+		{
+			switch (colliderB->type)
+			{
+				case collider_type_hull: collides = intersection(colliderA->hull, colliderB->hull, contact); break;
+			}
+		} break;
+	}
+
+	if (collides)
+	{
+		contact.colliderA = keepOrder ? overlap.colliderA : overlap.colliderB;
+		contact.colliderB = keepOrder ? overlap.colliderB : overlap.colliderA;
+		return true;
+	}
+	return false;
+}
+
+static bool intersectionCheck(collider_union* worldSpaceColliders, broadphase_collision overlap, force_field_interaction& interaction)
+{
+	return false;
+}
+
+narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions,
+	collision_constraint* outCollisionConstraints, force_field_interaction* outForceFieldInteractions)
+{
+	uint32 numCollisions = 0;
+	uint32 numForceFieldInteractions = 0;
 
 	for (uint32 i = 0; i < numPossibleCollisions; ++i)
 	{
 		broadphase_collision overlap = possibleCollisions[i];
-		collider_union* colliderAInitial = worldSpaceColliders + overlap.colliderA;
-		collider_union* colliderBInitial = worldSpaceColliders + overlap.colliderB;
+		collider_union* colliderA = worldSpaceColliders + overlap.colliderA;
+		collider_union* colliderB = worldSpaceColliders + overlap.colliderB;
 
-		if (colliderAInitial->rigidBodyIndex != colliderBInitial->rigidBodyIndex)
+		if (colliderA->objectType != physics_object_type_rigid_body && colliderB->objectType != physics_object_type_rigid_body)
 		{
-			contact_manifold& contact = outCollisionConstraints[numContacts].contact;
-			bool collides = false;
+			// If none of the objects is a rigid body, no collision is generated.
+			continue;
+		}
 
-			collider_union* colliderA = (colliderAInitial->type < colliderBInitial->type) ? colliderAInitial : colliderBInitial;
-			collider_union* colliderB = (colliderAInitial->type < colliderBInitial->type) ? colliderBInitial : colliderAInitial;
+		if (colliderA->objectType == physics_object_type_rigid_body && colliderB->objectType == physics_object_type_rigid_body
+			&& colliderA->rigidBodyIndex == colliderB->rigidBodyIndex)
+		{
+			// If both colliders belong to the same rigid body, no collision is generated.
+			continue;
+		}
 
+		// At this point, either one or both colliders belong to a rigid body. One of them could be a force field or a solo collider still.
 
-			switch (colliderA->type)
-			{
-				// Sphere tests.
-				case collider_type_sphere:
-				{
-					switch (colliderB->type)
-					{
-						case collider_type_sphere: collides = intersection(colliderA->sphere, colliderB->sphere, contact); break;
-						case collider_type_capsule: collides = intersection(colliderA->sphere, colliderB->capsule, contact); break;
-						case collider_type_aabb: collides = intersection(colliderA->sphere, colliderB->aabb, contact); break;
-						case collider_type_obb: collides = intersection(colliderA->sphere, colliderB->obb, contact); break;
-						case collider_type_hull: collides = intersection(colliderA->sphere, colliderB->hull, contact); break;
-					}
-				} break;
-
-				// Capsule tests.
-				case collider_type_capsule:
-				{
-					switch (colliderB->type)
-					{
-						case collider_type_capsule: collides = intersection(colliderA->capsule, colliderB->capsule, contact); break;
-						case collider_type_aabb: collides = intersection(colliderA->capsule, colliderB->aabb, contact); break;
-						case collider_type_obb: collides = intersection(colliderA->capsule, colliderB->obb, contact); break;
-						case collider_type_hull: collides = intersection(colliderA->capsule, colliderB->hull, contact); break;
-					}
-				} break;
-
-				// AABB tests.
-				case collider_type_aabb:
-				{
-					switch (colliderB->type)
-					{
-						case collider_type_aabb: collides = intersection(colliderA->aabb, colliderB->aabb, contact); break;
-						case collider_type_obb: collides = intersection(colliderA->aabb, colliderB->obb, contact); break;
-						case collider_type_hull: collides = intersection(colliderA->aabb, colliderB->hull, contact); break;
-					}
-				} break;
-
-				// OBB tests.
-				case collider_type_obb:
-				{
-					switch (colliderB->type)
-					{
-						case collider_type_obb: collides = intersection(colliderA->obb, colliderB->obb, contact); break;
-						case collider_type_hull: collides = intersection(colliderA->obb, colliderB->hull, contact); break;
-					}
-				} break;
-
-				// Hull tests.
-				case collider_type_hull:
-				{
-					switch (colliderB->type)
-					{
-						case collider_type_hull: collides = intersection(colliderA->hull, colliderB->hull, contact); break;
-					}
-				} break;
-			}
-
-			if (collides)
-			{
-				collider_properties propsA = colliderA->properties;
-				collider_properties propsB = colliderB->properties;
-
-				float friction = sqrt(propsA.friction * propsB.friction);
-
-				contact.colliderA = overlap.colliderA;
-				contact.colliderB = overlap.colliderB;
-
-				collision_constraint& c = outCollisionConstraints[numContacts];
-				c.friction = friction;
-				c.rbA = colliderA->rigidBodyIndex;
-				c.rbB = colliderB->rigidBodyIndex;
-
-
-				for (uint32 contactID = 0; contactID < contact.numContacts; ++contactID)
-				{
-					collision_point& point = c.points[contactID];
-					contact_info& contact = c.contact.contacts[contactID];
-
-					point.impulseInNormalDir = 0.f;
-					point.impulseInTangentDir = 0.f;
-
-					auto& rbA = rbs[c.rbA];
-					auto& rbB = rbs[c.rbB];
-
-					point.relGlobalAnchorA = contact.point - rbA.position;
-					point.relGlobalAnchorB = contact.point - rbB.position;
-
-					vec3 anchorVelocityA = rbA.linearVelocity + cross(rbA.angularVelocity, point.relGlobalAnchorA);
-					vec3 anchorVelocityB = rbB.linearVelocity + cross(rbB.angularVelocity, point.relGlobalAnchorB);
-
-					vec3 relVelocity = anchorVelocityB - anchorVelocityA;
-					point.tangent = relVelocity - dot(c.contact.collisionNormal, relVelocity) * c.contact.collisionNormal;
-					if (squaredLength(point.tangent) > 0.f)
-					{
-						point.tangent = normalize(point.tangent);
-					}
-					else
-					{
-						point.tangent = vec3(-1.f, 0.f, 0.f);
-					}
-
-					{ // Tangent direction.
-						vec3 crAt = cross(point.relGlobalAnchorA, point.tangent);
-						vec3 crBt = cross(point.relGlobalAnchorB, point.tangent);
-						float invMassInTangentDir = rbA.invMass + dot(crAt, rbA.invInertia * crAt)
-												  + rbB.invMass + dot(crBt, rbB.invInertia * crBt);
-						point.effectiveMassInTangentDir = (invMassInTangentDir != 0.f) ? (1.f / invMassInTangentDir) : 0.f;
-					}
-
-					{ // Normal direction.
-						vec3 crAn = cross(point.relGlobalAnchorA, c.contact.collisionNormal);
-						vec3 crBn = cross(point.relGlobalAnchorB, c.contact.collisionNormal);
-						float invMassInNormalDir = rbA.invMass + dot(crAn, rbA.invInertia * crAn)
-												 + rbB.invMass + dot(crBn, rbB.invInertia * crBn);
-						point.effectiveMassInNormalDir = (invMassInNormalDir != 0.f) ? (1.f / invMassInNormalDir) : 0.f;
-
-						point.bias = 0.f;
-
-						if (dt > 1e-5f)
-						{
-							float vRel = dot(c.contact.collisionNormal, anchorVelocityB - anchorVelocityA);
-							const float slop = -0.001f;
-							if (-contact.penetrationDepth < slop && vRel < 0.f)
-							{
-								float restitution = max(propsA.restitution, propsB.restitution);
-								point.bias = -restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) / dt;
-							}
-						}
-					}
-				}
-
-
-				++numContacts;
-			}
+		if (colliderA->objectType == physics_object_type_force_field || colliderB->objectType == physics_object_type_force_field)
+		{
+			force_field_interaction& interaction = outForceFieldInteractions[numForceFieldInteractions];
+			numForceFieldInteractions += intersectionCheck(worldSpaceColliders, overlap, interaction);
+		}
+		else
+		{
+			contact_manifold& contact = outCollisionConstraints[numCollisions].contact;
+			numCollisions += collisionCheck(worldSpaceColliders, overlap, contact);
 		}
 	}
 
-	return numContacts;
+	return narrowphase_result{ numCollisions, numForceFieldInteractions };
+}
+
+static rigid_body_global_state dummyRigidBody =
+{
+	quat::identity,
+	vec3(0.f),
+	vec3(0.f),
+	vec3(0.f),
+	mat3::zero,
+	0.f,
+};
+
+void finalizeCollisionVelocityConstraintInitialization(collider_union* worldSpaceColliders, rigid_body_global_state* rbs, 
+	collision_constraint* collisionConstraints, uint32 numCollisionConstraints, float dt)
+{
+	for (uint32 collisionID = 0; collisionID < numCollisionConstraints; ++collisionID)
+	{
+		collision_constraint& c = collisionConstraints[collisionID];
+		contact_manifold& contact = c.contact;
+
+		collider_union* colliderA = worldSpaceColliders + contact.colliderA;
+		collider_union* colliderB = worldSpaceColliders + contact.colliderB;
+
+		collider_properties propsA = colliderA->properties;
+		collider_properties propsB = colliderB->properties;
+
+		c.friction = sqrt(propsA.friction * propsB.friction);
+		c.rbA = (colliderA->objectType == physics_object_type_rigid_body) ? colliderA->rigidBodyIndex : UINT16_MAX;
+		c.rbB = (colliderB->objectType == physics_object_type_rigid_body) ? colliderB->rigidBodyIndex : UINT16_MAX;
+
+		auto& rbA = c.rbA != UINT16_MAX ? rbs[c.rbA] : dummyRigidBody;
+		auto& rbB = c.rbB != UINT16_MAX ? rbs[c.rbB] : dummyRigidBody;
+
+		float restitution = max(propsA.restitution, propsB.restitution);
+
+		for (uint32 contactID = 0; contactID < contact.numContacts; ++contactID)
+		{
+			collision_point& point = c.points[contactID];
+			contact_info& contact = c.contact.contacts[contactID];
+
+			point.impulseInNormalDir = 0.f;
+			point.impulseInTangentDir = 0.f;
+
+			point.relGlobalAnchorA = contact.point - rbA.position;
+			point.relGlobalAnchorB = contact.point - rbB.position;
+
+			vec3 anchorVelocityA = rbA.linearVelocity + cross(rbA.angularVelocity, point.relGlobalAnchorA);
+			vec3 anchorVelocityB = rbB.linearVelocity + cross(rbB.angularVelocity, point.relGlobalAnchorB);
+
+			vec3 relVelocity = anchorVelocityB - anchorVelocityA;
+			point.tangent = relVelocity - dot(c.contact.collisionNormal, relVelocity) * c.contact.collisionNormal;
+			if (squaredLength(point.tangent) > 0.f)
+			{
+				point.tangent = normalize(point.tangent);
+			}
+			else
+			{
+				point.tangent = vec3(-1.f, 0.f, 0.f);
+			}
+
+			{ // Tangent direction.
+				vec3 crAt = cross(point.relGlobalAnchorA, point.tangent);
+				vec3 crBt = cross(point.relGlobalAnchorB, point.tangent);
+				float invMassInTangentDir = rbA.invMass + dot(crAt, rbA.invInertia * crAt)
+					+ rbB.invMass + dot(crBt, rbB.invInertia * crBt);
+				point.effectiveMassInTangentDir = (invMassInTangentDir != 0.f) ? (1.f / invMassInTangentDir) : 0.f;
+			}
+
+			{ // Normal direction.
+				vec3 crAn = cross(point.relGlobalAnchorA, c.contact.collisionNormal);
+				vec3 crBn = cross(point.relGlobalAnchorB, c.contact.collisionNormal);
+				float invMassInNormalDir = rbA.invMass + dot(crAn, rbA.invInertia * crAn)
+					+ rbB.invMass + dot(crBn, rbB.invInertia * crBn);
+				point.effectiveMassInNormalDir = (invMassInNormalDir != 0.f) ? (1.f / invMassInNormalDir) : 0.f;
+
+				point.bias = 0.f;
+
+				if (dt > 1e-5f)
+				{
+					float vRel = dot(c.contact.collisionNormal, anchorVelocityB - anchorVelocityA);
+					const float slop = -0.001f;
+					if (-contact.penetrationDepth < slop && vRel < 0.f)
+					{
+						point.bias = -restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) / dt;
+					}
+				}
+			}
+		}
+	}
 }
 
 void solveCollisionVelocityConstraints(collision_constraint* constraints, uint32 count, rigid_body_global_state* rbs)
@@ -1364,8 +1417,13 @@ void solveCollisionVelocityConstraints(collision_constraint* constraints, uint32
 	{
 		collision_constraint& c = constraints[i];
 
-		auto& rbA = rbs[c.rbA];
-		auto& rbB = rbs[c.rbB];
+		auto& rbA = c.rbA != UINT16_MAX ? rbs[c.rbA] : dummyRigidBody;
+		auto& rbB = c.rbB != UINT16_MAX ? rbs[c.rbB] : dummyRigidBody;
+
+		if (rbA.invMass == 0.f && rbB.invMass == 0.f)
+		{
+			continue;
+		}
 
 		vec3 vA = rbA.linearVelocity;
 		vec3 wA = rbA.angularVelocity;

@@ -3,6 +3,10 @@
 #include "core/math.h"
 
 
+struct collider_union;
+struct rigid_body_global_state;
+struct broadphase_collision;
+
 struct contact_info
 {
 	vec3 point; // In world space.
@@ -47,7 +51,22 @@ struct collision_constraint
 	float friction;
 };
 
-uint32 narrowphase(struct collider_union* worldSpaceColliders, struct rigid_body_global_state* rbs, struct broadphase_collision* possibleCollisions, uint32 numPossibleCollisions, float dt,
-	collision_constraint* outCollisionConstraints);
+struct force_field_interaction
+{
+	uint16 rigidBodyIndex;
+	uint16 forceFieldIndex;
+};
+
+struct narrowphase_result
+{
+	uint32 numCollisions;
+	uint32 numForceFieldInteractions;
+};
+
+narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions,
+	collision_constraint* outCollisionConstraints, force_field_interaction* outForceFieldInteractions);
+
+void finalizeCollisionVelocityConstraintInitialization(collider_union* worldSpaceColliders, rigid_body_global_state* rbs,
+	collision_constraint* collisionConstraints, uint32 numCollisionConstraints, float dt);
 
 void solveCollisionVelocityConstraints(collision_constraint* constraints, uint32 count, rigid_body_global_state* rbs);

@@ -23,7 +23,16 @@ struct collider_properties
 	float density;
 };
 
-enum collider_type : uint16
+enum physics_object_type : uint8
+{
+	physics_object_type_none,
+	physics_object_type_rigid_body,
+	physics_object_type_force_field,
+
+	physics_object_type_count,
+};
+
+enum collider_type : uint8
 {
 	// The order here is important. See collision_narrow.cpp.
 	collider_type_sphere,
@@ -52,6 +61,7 @@ struct collider_union
 	physics_properties calculatePhysicsProperties();
 
 	collider_type type;
+	physics_object_type objectType;
 	uint16 rigidBodyIndex;
 
 	union

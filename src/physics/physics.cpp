@@ -307,9 +307,7 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 	auto rbView = appScene.view<rigid_body_component>();
 	rigid_body_component* rbBase = rbView.raw();
 
-	auto colliderView = appScene.view<collider_component>();
-
-	for (auto [entityHandle, collider] : colliderView.each())
+	for (auto [entityHandle, collider] : appScene.view<collider_component>().each())
 	{
 		bounding_box& bb = outWorldspaceAABBs[pushIndex];
 		collider_union& col = outWorldSpaceColliders[pushIndex];
@@ -318,11 +316,20 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 		scene_entity entity = { collider.parentEntity, appScene };
 		trs& transform = entity.getComponent<trs>();
 
-		rigid_body_component& rb = entity.getComponent<rigid_body_component>();
-
 		col.type = collider.type;
 		col.properties = collider.properties;
-		col.rigidBodyIndex = (uint16)(&rb - rbBase);
+
+		if (entity.hasComponent<rigid_body_component>())
+		{
+			rigid_body_component& rb = entity.getComponent<rigid_body_component>();
+			col.rigidBodyIndex = (uint16)(&rb - rbBase);
+			col.objectType = physics_object_type_rigid_body;
+		}
+		else
+		{
+			col.rigidBodyIndex = UINT16_MAX;
+			col.objectType = physics_object_type_none;
+		}
 
 		switch (collider.type)
 		{
@@ -397,6 +404,7 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 	static bounding_box* worldSpaceAABBs = new bounding_box[1024];
 	static collider_union* worldSpaceColliders = new collider_union[1024];
 	static collision_constraint* collisionConstraints = new collision_constraint[10000];
+	static force_field_interaction* forceFieldInteractions = new force_field_interaction[1024];
 	
 	static distance_constraint_update* distanceConstraintUpdates = new distance_constraint_update[1024];
 	static ball_joint_constraint_update* ballJointConstraintUpdates = new ball_joint_constraint_update[1024];
@@ -407,6 +415,15 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 	auto rbView = appScene.view<rigid_body_component>();
 	rigid_body_component* rbBase = rbView.raw();
 
+
+
+	getWorldSpaceColliders(appScene, worldSpaceAABBs, worldSpaceColliders);
+	uint32 numPossibleCollisions = broadphase(appScene, 0, worldSpaceAABBs, possibleCollisions, scratchMemory);
+	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, possibleCollisions, numPossibleCollisions, collisionConstraints, forceFieldInteractions);
+
+	uint32 numCollisions = narrowPhaseResult.numCollisions;
+
+
 	// Apply gravity and air drag and integrate forces.
 	for (auto [entityHandle, rb, transform] : appScene.group(entt::get<rigid_body_component, trs>).each())
 	{
@@ -415,10 +432,10 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 		rb.applyGravityAndIntegrateForces(global, transform, dt);
 		rb.globalStateIndex = globalStateIndex;
 	}
-	
-	getWorldSpaceColliders(appScene, worldSpaceAABBs, worldSpaceColliders);
-	uint32 numPossibleCollisions = broadphase(appScene, 0, worldSpaceAABBs, possibleCollisions, scratchMemory);
-	uint32 numCollisionConstraints = narrowphase(worldSpaceColliders, rbGlobal, possibleCollisions, numPossibleCollisions, dt, collisionConstraints);
+
+
+	// Solve constraints.
+	finalizeCollisionVelocityConstraintInitialization(worldSpaceColliders, rbGlobal, collisionConstraints, numCollisions, dt);
 	
 	initializeDistanceVelocityConstraints(appScene, rbGlobal, distanceConstraints.data(), distanceConstraintUpdates, (uint32)distanceConstraints.size(), dt);
 	initializeBallJointVelocityConstraints(appScene, rbGlobal, ballJointConstraints.data(), ballJointConstraintUpdates, (uint32)ballJointConstraints.size(), dt);
@@ -431,7 +448,7 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 		solveBallJointVelocityConstraints(ballJointConstraintUpdates, (uint32)ballJointConstraints.size(), rbGlobal);
 		solveHingeJointVelocityConstraints(hingeJointConstraintUpdates, (uint32)hingeJointConstraints.size(), rbGlobal);
 		solveConeTwistVelocityConstraints(coneTwistConstraintUpdates, (uint32)coneTwistConstraints.size(), rbGlobal);
-		solveCollisionVelocityConstraints(collisionConstraints, numCollisionConstraints, rbGlobal);
+		solveCollisionVelocityConstraints(collisionConstraints, numCollisions, rbGlobal);
 	}
 
 

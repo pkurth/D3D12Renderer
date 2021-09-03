@@ -219,8 +219,13 @@ void application::initialize(main_renderer* renderer)
 	}
 #endif
 
-#if 0
+#if 1
 	{
+
+		appScene.createEntity("Solo collider")
+			.addComponent<trs>(vec3(26.f, 10.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+			.addComponent<collider_component>(bounding_capsule{ vec3(-1.f, 0.f, 0.f), vec3(1.f, 0.f, 0.f), 0.3f }, 0.1f, 0.5f, 1.f);
+
 		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 
 		auto lollipopMaterial = createPBRMaterial(
@@ -266,7 +271,7 @@ void application::initialize(main_renderer* renderer)
 		for (uint32 i = 0; i < 10; ++i)
 		{
 			appScene.createEntity("Cube")
-				.addComponent<trs>(vec3(50.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+				.addComponent<trs>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
 				.addComponent<raster_component>(boxMesh)
 				.addComponent<collider_component>(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 1.f)
 				.addComponent<rigid_body_component>(false, 1.f);
