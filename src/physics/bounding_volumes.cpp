@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "bounding_volumes.h"
+#include "collision_gjk.h"
 
 #include <unordered_map>
 
@@ -693,15 +694,7 @@ float signedDistanceToPlane(const vec3& p, const vec4& plane)
 	return dot(vec4(p, 1.f), plane);
 }
 
-bool aabbVSAABB(const bounding_box& a, const bounding_box& b)
-{
-	if (a.maxCorner.x < b.minCorner.x || a.minCorner.x > b.maxCorner.x) return false;
-	if (a.maxCorner.z < b.minCorner.z || a.minCorner.z > b.maxCorner.z) return false;
-	if (a.maxCorner.y < b.minCorner.y || a.minCorner.y > b.maxCorner.y) return false;
-	return true;
-}
-
-bool sphereVSSphere(const bounding_sphere& a, const bounding_sphere& b)
+bool sphereVsSphere(const bounding_sphere& a, const bounding_sphere& b)
 {
 	vec3 d = a.center - b.center;
 	float dist2 = dot(d, d);
@@ -709,10 +702,247 @@ bool sphereVSSphere(const bounding_sphere& a, const bounding_sphere& b)
 	return dist2 <= radiusSum * radiusSum;
 }
 
-bool sphereVSPlane(const bounding_sphere& s, const vec4& p)
+bool sphereVsPlane(const bounding_sphere& s, const vec4& p)
 {
 	return abs(signedDistanceToPlane(s.center, p)) <= s.radius;
 }
+
+bool sphereVsCapsule(const bounding_sphere& s, const bounding_capsule& c)
+{
+	vec3 closestPoint = closestPoint_PointSegment(s.center, line_segment{ c.positionA, c.positionB });
+	return sphereVsSphere(s, bounding_sphere{ closestPoint, c.radius });
+}
+
+bool sphereVsAABB(const bounding_sphere& s, const bounding_box& a)
+{
+	vec3 p = closestPoint_PointAABB(s.center, a);
+	vec3 n = p - s.center;
+	float sqDistance = squaredLength(n);
+	return sqDistance <= s.radius * s.radius;
+}
+
+bool sphereVsOBB(const bounding_sphere& s, const bounding_oriented_box& o)
+{
+	bounding_box aabb = bounding_box::fromCenterRadius(o.center, o.radius);
+	bounding_sphere s_ = {
+		conjugate(o.rotation) * (s.center - o.center) + o.center,
+		s.radius };
+
+	return sphereVsAABB(s_, aabb);
+}
+
+bool sphereVsHull(const bounding_sphere& s, const bounding_hull& h)
+{
+	sphere_support_fn sphereSupport{ s };
+	hull_support_fn hullSupport{ h };
+
+	gjk_simplex gjkSimplex;
+	return gjkIntersectionTest(sphereSupport, hullSupport, gjkSimplex);
+}
+
+bool capsuleVsCapsule(const bounding_capsule& a, const bounding_capsule& b)
+{
+	vec3 closestPoint1, closestPoint2;
+	closestPoint_SegmentSegment(line_segment{ a.positionA, a.positionB }, line_segment{ b.positionA, b.positionB }, closestPoint1, closestPoint2);
+	return sphereVsSphere(bounding_sphere{ closestPoint1, a.radius }, bounding_sphere{ closestPoint2, b.radius });
+}
+
+bool capsuleVsAABB(const bounding_capsule& c, const bounding_box& b)
+{
+	capsule_support_fn capsuleSupport{ c };
+	aabb_support_fn boxSupport{ b };
+
+	gjk_simplex gjkSimplex;
+	return gjkIntersectionTest(capsuleSupport, boxSupport, gjkSimplex);
+}
+
+bool capsuleVsOBB(const bounding_capsule& c, const bounding_oriented_box& o)
+{
+	bounding_box aabb = bounding_box::fromCenterRadius(o.center, o.radius);
+	bounding_capsule c_ = {
+		conjugate(o.rotation) * (c.positionA - o.center) + o.center,
+		conjugate(o.rotation) * (c.positionB - o.center) + o.center,
+		c.radius };
+
+	return capsuleVsAABB(c_, aabb);
+}
+
+bool capsuleVsHull(const bounding_capsule& c, const bounding_hull& h)
+{
+	capsule_support_fn capsuleSupport{ c };
+	hull_support_fn hullSupport{ h };
+
+	gjk_simplex gjkSimplex;
+	return gjkIntersectionTest(capsuleSupport, hullSupport, gjkSimplex);
+}
+
+bool aabbVsAABB(const bounding_box& a, const bounding_box& b)
+{
+	if (a.maxCorner.x < b.minCorner.x || a.minCorner.x > b.maxCorner.x) return false;
+	if (a.maxCorner.z < b.minCorner.z || a.minCorner.z > b.maxCorner.z) return false;
+	if (a.maxCorner.y < b.minCorner.y || a.minCorner.y > b.maxCorner.y) return false;
+	return true;
+}
+
+bool aabbVsOBB(const bounding_box& a, const bounding_oriented_box& o)
+{
+	return obbVsOBB(bounding_oriented_box{ a.getCenter(), a.getRadius(), quat::identity }, o);
+}
+
+bool aabbVsHull(const bounding_box& a, const bounding_hull& h)
+{
+	aabb_support_fn aabbSupport{ a };
+	hull_support_fn hullSupport{ h };
+
+	gjk_simplex gjkSimplex;
+	return gjkIntersectionTest(aabbSupport, hullSupport, gjkSimplex);
+}
+
+bool obbVsOBB(const bounding_oriented_box& a, const bounding_oriented_box& b)
+{
+	union obb_axes
+	{
+		struct
+		{
+			vec3 x, y, z;
+		};
+		vec3 u[3];
+	};
+
+	float ra, rb, penetration;
+
+	obb_axes axesA = {
+		a.rotation * vec3(1.f, 0.f, 0.f),
+		a.rotation * vec3(0.f, 1.f, 0.f),
+		a.rotation * vec3(0.f, 0.f, 1.f),
+	};
+
+	obb_axes axesB = {
+		b.rotation * vec3(1.f, 0.f, 0.f),
+		b.rotation * vec3(0.f, 1.f, 0.f),
+		b.rotation * vec3(0.f, 0.f, 1.f),
+	};
+
+	mat3 r;
+	r.m00 = dot(axesA.x, axesB.x);
+	r.m10 = dot(axesA.y, axesB.x);
+	r.m20 = dot(axesA.z, axesB.x);
+	r.m01 = dot(axesA.x, axesB.y);
+	r.m11 = dot(axesA.y, axesB.y);
+	r.m21 = dot(axesA.z, axesB.y);
+	r.m02 = dot(axesA.x, axesB.z);
+	r.m12 = dot(axesA.y, axesB.z);
+	r.m22 = dot(axesA.z, axesB.z);
+
+	vec3 tw = b.center - a.center;
+	vec3 t = conjugate(a.rotation) * tw;
+
+	mat3 absR;
+	for (uint32 i = 0; i < 9; ++i)
+	{
+		absR.m[i] = abs(r.m[i]) + EPSILON; // Add in an epsilon term to counteract arithmetic errors when two edges are parallel and their cross product is (near) 0.
+	}
+
+	// Test a's faces.
+	for (uint32 i = 0; i < 3; ++i)
+	{
+		ra = a.radius.data[i];
+		rb = dot(row(absR, i), b.radius);
+		float d = t.data[i];
+		penetration = ra + rb - abs(d);
+		if (penetration < 0.f) { return false; }
+	}
+
+	// Test b's faces.
+	for (uint32 i = 0; i < 3; ++i)
+	{
+		ra = dot(col(absR, i), a.radius);
+		rb = b.radius.data[i];
+		float d = dot(col(r, i), t);
+		penetration = ra + rb - abs(d);
+		if (penetration < 0.f) { return false; }
+	}
+
+	// Test a.x x b.x.
+	ra = a.radius.y * absR.m20 + a.radius.z * absR.m10;
+	rb = b.radius.y * absR.m02 + b.radius.z * absR.m01;
+	penetration = ra + rb - abs(t.z * r.m10 - t.y * r.m20);
+	if (penetration < 0.f) { return false; }
+
+	// Test a.x x b.y.
+	ra = a.radius.y * absR.m21 + a.radius.z * absR.m11;
+	rb = b.radius.x * absR.m02 + b.radius.z * absR.m00;
+	penetration = ra + rb - abs(t.z * r.m11 - t.y * r.m21);
+	if (penetration < 0.f) { return false; }
+
+	// Test a.x x b.z.
+	ra = a.radius.y * absR.m22 + a.radius.z * absR.m12;
+	rb = b.radius.x * absR.m01 + b.radius.y * absR.m00;
+	penetration = ra + rb - abs(t.z * r.m12 - t.y * r.m22);
+	if (penetration < 0.f) { return false; }
+
+	// Test a.y x b.x.
+	ra = a.radius.x * absR.m20 + a.radius.z * absR.m00;
+	rb = b.radius.y * absR.m12 + b.radius.z * absR.m11;
+	penetration = ra + rb - abs(t.x * r.m20 - t.z * r.m00);
+	if (penetration < 0.f) { return false; }
+
+	// Test a.y x b.y.
+	ra = a.radius.x * absR.m21 + a.radius.z * absR.m01;
+	rb = b.radius.x * absR.m12 + b.radius.z * absR.m10;
+	penetration = ra + rb - abs(t.x * r.m21 - t.z * r.m01);
+	if (penetration < 0.f) { return false; }
+
+	// Test a.y x b.z.
+	ra = a.radius.x * absR.m22 + a.radius.z * absR.m02;
+	rb = b.radius.x * absR.m11 + b.radius.y * absR.m10;
+	penetration = ra + rb - abs(t.x * r.m22 - t.z * r.m02);
+	if (penetration < 0.f) { return false; }
+
+	// Test a.z x b.x.
+	ra = a.radius.x * absR.m10 + a.radius.y * absR.m00;
+	rb = b.radius.y * absR.m22 + b.radius.z * absR.m21;
+	penetration = ra + rb - abs(t.y * r.m00 - t.x * r.m10);
+	if (penetration < 0.f) { return false; }
+
+	// Test a.z x b.y.
+	ra = a.radius.x * absR.m11 + a.radius.y * absR.m01;
+	rb = b.radius.x * absR.m22 + b.radius.z * absR.m20;
+	penetration = ra + rb - abs(t.y * r.m01 - t.x * r.m11);
+	if (penetration < 0.f) { return false; }
+
+	// Test a.z x b.z.
+	ra = a.radius.x * absR.m12 + a.radius.y * absR.m02;
+	rb = b.radius.x * absR.m21 + b.radius.y * absR.m20;
+	penetration = ra + rb - abs(t.y * r.m02 - t.x * r.m12);
+	if (penetration < 0.f) { return false; }
+
+	return true;
+}
+
+bool obbVsHull(const bounding_oriented_box& o, const bounding_hull& h)
+{
+	obb_support_fn obbSupport{ o };
+	hull_support_fn hullSupport{ h };
+
+	gjk_simplex gjkSimplex;
+	return gjkIntersectionTest(obbSupport, hullSupport, gjkSimplex);
+}
+
+bool hullVsHull(const bounding_hull& a, const bounding_hull& b)
+{
+	hull_support_fn hullSupport1{ a };
+	hull_support_fn hullSupport2{ b };
+
+	gjk_simplex gjkSimplex;
+	return gjkIntersectionTest(hullSupport1, hullSupport2, gjkSimplex);
+}
+
+
+
+
+
+
 
 vec3 closestPoint_PointSegment(const vec3& q, const line_segment& l)
 {

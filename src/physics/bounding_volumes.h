@@ -240,9 +240,27 @@ struct ray
 	bool intersectHull(const bounding_hull& hull, const bounding_hull_geometry& geometry, float& outT) const;
 };
 
-bool aabbVSAABB(const bounding_box& a, const bounding_box& b);
-bool sphereVSSphere(const bounding_sphere& a, const bounding_sphere& b);
-bool sphereVSPlane(const bounding_sphere& s, const vec4& p);
+bool sphereVsSphere(const bounding_sphere& a, const bounding_sphere& b);
+bool sphereVsPlane(const bounding_sphere& s, const vec4& p);
+bool sphereVsCapsule(const bounding_sphere& s, const bounding_capsule& c);
+bool sphereVsAABB(const bounding_sphere& s, const bounding_box& a);
+bool sphereVsOBB(const bounding_sphere& s, const bounding_oriented_box& o);
+bool sphereVsHull(const bounding_sphere& s, const bounding_hull& h);
+
+bool capsuleVsCapsule(const bounding_capsule& a, const bounding_capsule& b);
+bool capsuleVsAABB(const bounding_capsule& c, const bounding_box& b);
+bool capsuleVsOBB(const bounding_capsule& c, const bounding_oriented_box& o);
+bool capsuleVsHull(const bounding_capsule& c, const bounding_hull& h);
+
+bool aabbVsAABB(const bounding_box& a, const bounding_box& b);
+bool aabbVsOBB(const bounding_box& a, const bounding_oriented_box& o);
+bool aabbVsHull(const bounding_box& a, const bounding_hull& h);
+
+bool obbVsOBB(const bounding_oriented_box& a, const bounding_oriented_box& b);
+bool obbVsHull(const bounding_oriented_box& o, const bounding_hull& h);
+
+bool hullVsHull(const bounding_hull& a, const bounding_hull& b);
+
 vec3 closestPoint_PointSegment(const vec3& q, const line_segment& l);
 vec3 closestPoint_PointAABB(const vec3& q, const bounding_box& aabb);
 float closestPoint_SegmentSegment(const line_segment& l1, const line_segment& l2, vec3& c1, vec3& c2);
