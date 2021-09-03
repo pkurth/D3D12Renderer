@@ -444,6 +444,14 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 
 
 	// Cloth. This needs to get integrated with the rest of the system.
+
+	// For all cloth strips, which have a transform, apply it.
+	for (auto [entityHandle, cloth, transform] : appScene.group(entt::get<cloth_component, trs>).each())
+	{
+		cloth.setWorldPositionOfFixedVertices(transform);
+	}
+
+	// For all cloth strips (with and without transform), simulate.
 	for (auto [entityHandle, cloth] : appScene.view<cloth_component>().each())
 	{
 		cloth.applyWindForce(vec3(0.f, 0.f, -1.f));

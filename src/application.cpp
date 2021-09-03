@@ -93,7 +93,7 @@ void application::loadCustomShaders()
 	}
 }
 
-auto testMesh = make_ref<composite_mesh>();
+static ref<pbr_material> lollipopMaterial;
 
 void application::initialize(main_renderer* renderer)
 {
@@ -109,6 +109,7 @@ void application::initialize(main_renderer* renderer)
 	}
 
 	appScene.createEntity("Cloth")
+		.addComponent<trs>(trs::identity)
 		.addComponent<cloth_component>(10.f, 10.f, 20, 20, 8.f);
 
 
@@ -182,17 +183,25 @@ void application::initialize(main_renderer* renderer)
 
 #if 1
 	{
-		auto lollipopMaterial = createPBRMaterial(
-			"assets/sphere/Tiles074_2K_Color.jpg",
-			"assets/sphere/Tiles074_2K_Normal.jpg",
-			"assets/sphere/Tiles074_2K_Roughness.jpg",
-			{}, vec4(0.f), vec4(1.f), 1.f, 1.f, true);
+		//lollipopMaterial = createPBRMaterial(
+		//	"assets/sphere/Tiles074_2K_Color.jpg",
+		//	"assets/sphere/Tiles074_2K_Normal.jpg",
+		//	"assets/sphere/Tiles074_2K_Roughness.jpg",
+		//	{}, vec4(0.f), vec4(1.f), 1.f, 1.f, true);
 
+		lollipopMaterial = createPBRMaterial(
+			"assets/sponza/textures/Sponza_Curtain_Red_diffuse.tga",
+			"assets/sponza/textures/Sponza_Curtain_Red_normal.tga",
+			"assets/sponza/textures/Sponza_Curtain_roughness.tga",
+			"assets/sponza/textures/Sponza_Curtain_metallic.tga",
+			vec4(0.f), vec4(1.f), 1.f, 1.f, true);
+
+#if 0
 		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+		auto testMesh = make_ref<composite_mesh>();
 		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 1.f, vec3(0.f, 0.f, 0.f)), {}, trs::identity, lollipopMaterial });
 		testMesh->mesh = primitiveMesh.createDXMesh();
 
-#if 0
 		float extents = 100.f;
 		for (float z = -extents; z < extents; z += 10.f)
 		{
@@ -1054,11 +1063,11 @@ bool application::handleUserInput(const user_input& input, float dt)
 {
 	// Returns true, if the user dragged an object using a gizmo.
 
-	if (input.keyboard['F'].pressEvent && selectedEntity)
+	if (input.keyboard['F'].pressEvent && selectedEntity && selectedEntity.hasComponent<trs>())
 	{
 		auto& transform = selectedEntity.getComponent<trs>();
 
-		auto aabb = selectedEntity.hasComponent<raster_component>() ? selectedEntity.getComponent<raster_component>().mesh->aabb : bounding_box::fromCenterRadius(0.f, 0.f);
+		auto aabb = selectedEntity.hasComponent<raster_component>() ? selectedEntity.getComponent<raster_component>().mesh->aabb : bounding_box::fromCenterRadius(0.f, 1.f);
 		aabb.minCorner *= transform.scale;
 		aabb.maxCorner *= transform.scale;
 
@@ -1430,7 +1439,7 @@ void application::update(const user_input& input, float dt)
 			submesh_info submesh = cloth.getRenderData((vec3*)positionPtr, (vertex_uv_normal_tangent*)otherPtr, (indexed_triangle16*)indexPtr);
 
 			opaqueRenderPass.renderStaticObject(mat4::identity, material_vertex_buffer_group_view{ positionVertexBuffer, otherVertexBuffer }, indexBuffer,
-				submesh, testMesh->submeshes[0].material, (uint32)entityHandle);
+				submesh, lollipopMaterial, (uint32)entityHandle);
 
 			scene_entity entity = { entityHandle, appScene };
 			bool outline = selectedEntity == entity;

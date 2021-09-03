@@ -22,6 +22,8 @@ struct cloth_constraint
 struct cloth_component
 {
 	cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float thickness = 0.1f, float damping = 0.3f, float gravityFactor = 1.f);
+
+	void setWorldPositionOfFixedVertices(const trs& transform);
 	void applyWindForce(vec3 force);
 	void simulate(uint32 velocityIterations, uint32 positionIterations, uint32 driftIterations, float dt);
 
@@ -39,9 +41,12 @@ struct cloth_component
 
 private:
 	uint32 gridSizeX, gridSizeY;
+	float width, height;
 
 	void solveVelocities(const std::vector<struct cloth_constraint_temp>& constraintsTemp);
 	void solvePositions();
+
+	vec3 getParticlePosition(float relX, float relY);
 
 	void addConstraint(uint32 a, uint32 b);
 };

@@ -10,6 +10,8 @@ cloth_component::cloth_component(float width, float height, uint32 gridSizeX, ui
 	this->damping = damping;
 	this->gridSizeX = gridSizeX;
 	this->gridSizeY = gridSizeY;
+	this->width = width;
+	this->height = height;
 
 	float invMassPerParticle = (gridSizeX * gridSizeY) / totalMass;
 
@@ -25,8 +27,7 @@ cloth_component::cloth_component(float width, float height, uint32 gridSizeX, ui
 			float relX = x / (float)(gridSizeX - 1);
 			float relY = y / (float)(gridSizeY - 1);
 			
-			p.position = vec3(relX * width, -relY * height, 0.f);
-			std::swap(p.position.y, p.position.z);
+			p.position = getParticlePosition(relX, relY);
 			p.prevPosition = p.position;
 
 			p.invMass = invMassPerParticle;
@@ -74,6 +75,29 @@ cloth_component::cloth_component(float width, float height, uint32 gridSizeX, ui
 			}
 		}
 	}
+}
+
+void cloth_component::setWorldPositionOfFixedVertices(const trs& transform)
+{
+	// Currently the top row is fixed, so transform this.
+	for (uint32 x = 0; x < gridSizeX; ++x)
+	{
+		cloth_particle& p = particles[x];
+		assert(p.invMass == 0.f);
+
+		float relX = x / (float)(gridSizeX - 1);
+		float relY = 0.f;
+		vec3 localPosition = getParticlePosition(relX, relY);
+		p.position = transformPosition(transform, localPosition);
+	}
+}
+
+vec3 cloth_component::getParticlePosition(float relX, float relY)
+{
+	vec3 position = vec3(relX * width, -relY * height, 0.f);
+	position.x -= width * 0.5f;
+	//std::swap(position.y, position.z);
+	return position;
 }
 
 static vec3 calculateNormal(vec3 a, vec3 b, vec3 c)
@@ -210,11 +234,13 @@ submesh_info cloth_component::getRenderData(vec3* positions, vertex_uv_normal_ta
 		}
 	}
 
+	/* Will get normalized in shader anyway.
 	for (uint32 i = 0; i < gridSizeX * gridSizeY; ++i)
 	{
 		others[i].normal = normalize(others[i].normal);
 		others[i].tangent = normalize(others[i].tangent);
 	}
+	*/
 
 	for (uint32 y = 0; y < gridSizeY - 1; ++y)
 	{
@@ -257,7 +283,7 @@ void cloth_component::simulate(uint32 velocityIterations, uint32 positionIterati
 		p.velocity += p.forceAccumulator * (p.invMass * dt);
 
 		p.prevPosition = p.position;
-		p.position = p.prevPosition + p.velocity * dt;
+		p.position += p.velocity * dt;
 		p.forceAccumulator = vec3(0.f);
 	}
 
