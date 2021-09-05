@@ -13,31 +13,31 @@ cloth_component::cloth_component(float width, float height, uint32 gridSizeX, ui
 	this->width = width;
 	this->height = height;
 
-	float invMassPerParticle = (gridSizeX * gridSizeY) / totalMass;
+	uint32 numParticles = gridSizeX * gridSizeY;
 
-	particles.reserve(gridSizeX * gridSizeY);
+	float invMassPerParticle = numParticles / totalMass;
+
+	positions.reserve(numParticles);
+	prevPositions.reserve(numParticles);
+	invMasses.reserve(numParticles);
+	velocities.resize(numParticles, vec3(0.f));
+	forceAccumulators.resize(numParticles, vec3(0.f));
 
 	random_number_generator rng = { 1578123 };
 
 	for (uint32 y = 0; y < gridSizeY; ++y)
 	{
+		float invMass = (y == 0) ? 0.f : invMassPerParticle; // Lock upper row.
+
 		for (uint32 x = 0; x < gridSizeX; ++x)
 		{
-			cloth_particle& p = particles.emplace_back();
 			float relX = x / (float)(gridSizeX - 1);
 			float relY = y / (float)(gridSizeY - 1);
 			
-			p.position = getParticlePosition(relX, relY);
-			p.prevPosition = p.position;
-
-			p.invMass = invMassPerParticle;
-			p.velocity = vec3(0.f);
-			p.forceAccumulator = vec3(0.f);
-
-			if (y == 0)
-			{
-				p.invMass = 0.f; // Lock.
-			}
+			vec3 position = getParticlePosition(relX, relY);
+			positions.push_back(position);
+			prevPositions.push_back(position);
+			invMasses.push_back(invMass);
 		}
 	}
 
@@ -82,13 +82,10 @@ void cloth_component::setWorldPositionOfFixedVertices(const trs& transform)
 	// Currently the top row is fixed, so transform this.
 	for (uint32 x = 0; x < gridSizeX; ++x)
 	{
-		cloth_particle& p = particles[x];
-		assert(p.invMass == 0.f);
-
 		float relX = x / (float)(gridSizeX - 1);
 		float relY = 0.f;
 		vec3 localPosition = getParticlePosition(relX, relY);
-		p.position = transformPosition(transform, localPosition);
+		positions[x] = transformPosition(transform, localPosition);
 	}
 }
 
@@ -105,11 +102,6 @@ static vec3 calculateNormal(vec3 a, vec3 b, vec3 c)
 	return cross(b - a, c - a);
 }
 
-static vec3 calculateNormal(const cloth_particle& a, const cloth_particle& b, const cloth_particle& c)
-{
-	return calculateNormal(a.position, b.position, c.position);
-}
-
 void cloth_component::applyWindForce(vec3 force)
 {
 	for (uint32 y = 0; y < gridSizeY - 1; ++y)
@@ -121,27 +113,27 @@ void cloth_component::applyWindForce(vec3 force)
 			uint32 blIndex = tlIndex + gridSizeX;
 			uint32 brIndex = blIndex + 1;
 
-			cloth_particle& tl = particles[tlIndex];
-			cloth_particle& tr = particles[trIndex];
-			cloth_particle& bl = particles[blIndex];
-			cloth_particle& br = particles[brIndex];
+			vec3& tlForce = forceAccumulators[tlIndex];
+			vec3& trForce = forceAccumulators[trIndex];
+			vec3& blForce = forceAccumulators[blIndex];
+			vec3& brForce = forceAccumulators[brIndex];
 
 			{
-				vec3 normal = calculateNormal(tl, bl, tr);
+				vec3 normal = calculateNormal(positions[tlIndex], positions[blIndex], positions[trIndex]);
 				vec3 forceInNormalDir = normal * dot(normalize(normal), force);
 				forceInNormalDir *= 1.f / 3.f;
-				tl.forceAccumulator += forceInNormalDir;
-				tr.forceAccumulator += forceInNormalDir;
-				bl.forceAccumulator += forceInNormalDir;
+				tlForce += forceInNormalDir;
+				trForce += forceInNormalDir;
+				blForce += forceInNormalDir;
 			}
 
 			{
-				vec3 normal = calculateNormal(br, tr, bl);
+				vec3 normal = calculateNormal(positions[brIndex], positions[trIndex], positions[blIndex]);
 				vec3 forceInNormalDir = normal * dot(normalize(normal), force);
 				forceInNormalDir *= 1.f / 3.f;
-				br.forceAccumulator += forceInNormalDir;
-				tr.forceAccumulator += forceInNormalDir;
-				bl.forceAccumulator += forceInNormalDir;
+				brForce += forceInNormalDir;
+				trForce += forceInNormalDir;
+				blForce += forceInNormalDir;
 			}
 		}
 	}
@@ -163,12 +155,10 @@ submesh_info cloth_component::getRenderData(vec3* positions, vertex_uv_normal_ta
 	{
 		for (uint32 x = 0; x < gridSizeX; ++x, ++i)
 		{
-			const cloth_particle& p = particles[i];
-			
 			float u = x / (float)(gridSizeX - 1);
 			float v = y / (float)(gridSizeY - 1);
 
-			positions[i] = p.position;
+			positions[i] = this->positions[i];
 			others[i].normal = vec3(0.f);
 			others[i].tangent = vec3(0.f);
 			others[i].uv = vec2(u, v);
@@ -273,18 +263,26 @@ struct cloth_constraint_temp
 void cloth_component::simulate(uint32 velocityIterations, uint32 positionIterations, uint32 driftIterations, float dt)
 {
 	float gravityVelocity = GRAVITY * dt * gravityFactor;
-	for (cloth_particle& p : particles)
+	uint32 numParticles = gridSizeX * gridSizeY;
+
+	for (uint32 i = 0; i < numParticles; ++i)
 	{
-		if (p.invMass > 0.f)
+		vec3& position = positions[i];
+		vec3& prevPosition = prevPositions[i];
+		float invMass = invMasses[i];
+		vec3& velocity = velocities[i];
+		vec3& force = forceAccumulators[i];
+
+		if (invMass > 0.f)
 		{
-			p.velocity.y += gravityVelocity;
+			velocity.y += gravityVelocity;
 		}
 
-		p.velocity += p.forceAccumulator * (p.invMass * dt);
+		velocity += force * (invMass * dt);
 
-		p.prevPosition = p.position;
-		p.position += p.velocity * dt;
-		p.forceAccumulator = vec3(0.f);
+		prevPosition = position;
+		position += velocity * dt;
+		force = vec3(0.f);
 	}
 
 	float invDt = (dt > 1e-5f) ? (1.f / dt) : 1.f;
@@ -297,11 +295,11 @@ void cloth_component::simulate(uint32 velocityIterations, uint32 positionIterati
 
 		for (cloth_constraint& c : constraints)
 		{
-			cloth_particle& a = particles[c.a];
-			cloth_particle& b = particles[c.b];
+			vec3 prevPositionA = prevPositions[c.a];
+			vec3 prevPositionB = prevPositions[c.b];
 
 			cloth_constraint_temp temp;
-			temp.gradient = b.prevPosition - a.prevPosition;
+			temp.gradient = prevPositionB - prevPositionA;
 			temp.inverseScaledGradientSquared = (c.inverseMassSum == 0.f) ? 0.f : (1.f / (squaredLength(temp.gradient) * c.inverseMassSum));
 			constraintsTemp.push_back(temp);
 		}
@@ -312,9 +310,9 @@ void cloth_component::simulate(uint32 velocityIterations, uint32 positionIterati
 			solveVelocities(constraintsTemp);
 		}
 
-		for (cloth_particle& p : particles)
+		for (uint32 i = 0; i < numParticles; ++i)
 		{
-			p.position = p.prevPosition + p.velocity * dt;
+			positions[i] = prevPositions[i] + velocities[i] * dt;
 		}
 	}
 
@@ -326,18 +324,18 @@ void cloth_component::simulate(uint32 velocityIterations, uint32 positionIterati
 			solvePositions();
 		}
 
-		for (cloth_particle& p : particles)
+		for (uint32 i = 0; i < numParticles; ++i)
 		{
-			p.velocity = (p.position - p.prevPosition) * invDt;
+			velocities[i] = (positions[i] - prevPositions[i]) * invDt;
 		}
 	}
 
 	// Solve drift.
 	if (driftIterations > 0)
 	{
-		for (cloth_particle& p : particles)
+		for (uint32 i = 0; i < numParticles; ++i)
 		{
-			p.prevPosition = p.position;
+			prevPositions[i] = positions[i];
 		}
 
 		for (uint32 it = 0; it < driftIterations; ++it)
@@ -345,17 +343,17 @@ void cloth_component::simulate(uint32 velocityIterations, uint32 positionIterati
 			solvePositions();
 		}
 
-		for (cloth_particle& p : particles)
+		for (uint32 i = 0; i < numParticles; ++i)
 		{
-			p.velocity += (p.position - p.prevPosition) * invDt;
+			velocities[i] += (positions[i] - prevPositions[i]) * invDt;
 		}
 	}
 
 	// Damping.
 	float dampingFactor = 1.f / (1.f + dt * damping);
-	for (cloth_particle& p : particles)
+	for (uint32 i = 0; i < numParticles; ++i)
 	{
-		p.velocity *= dampingFactor;
+		velocities[i] *= dampingFactor;
 	}
 }
 
@@ -365,12 +363,9 @@ void cloth_component::solveVelocities(const std::vector<cloth_constraint_temp>& 
 	{
 		cloth_constraint& c = constraints[i];
 		const cloth_constraint_temp& temp = constraintsTemp[i];
-		cloth_particle& a = particles[c.a];
-		cloth_particle& b = particles[c.b];
-
-		float j = -dot(temp.gradient, a.velocity - b.velocity) * temp.inverseScaledGradientSquared;
-		a.velocity += temp.gradient * (j * a.invMass);
-		b.velocity -= temp.gradient * (j * b.invMass);
+		float j = -dot(temp.gradient, velocities[c.a] - velocities[c.b]) * temp.inverseScaledGradientSquared;
+		velocities[c.a] += temp.gradient * (j * invMasses[c.a]);
+		velocities[c.b] -= temp.gradient * (j * invMasses[c.b]);
 	}
 }
 
@@ -380,18 +375,15 @@ void cloth_component::solvePositions()
 	{
 		if (c.inverseMassSum > 0.f)
 		{
-			cloth_particle& a = particles[c.a];
-			cloth_particle& b = particles[c.b];
-
-			vec3 delta = b.position - a.position;
+			vec3 delta = positions[c.b] - positions[c.a];
 			float len = squaredLength(delta);
 
 			float sqRestDistance = c.restDistance * c.restDistance;
 			if (sqRestDistance + len > 1e-5f)
 			{
 				float k = ((sqRestDistance - len) / (c.inverseMassSum * (sqRestDistance + len)));
-				a.position -= delta * (k * a.invMass);
-				b.position += delta * (k * b.invMass);
+				positions[c.a] -= delta * (k * invMasses[c.a]);
+				positions[c.b] += delta * (k * invMasses[c.b]);
 			}
 		}
 	}
@@ -399,14 +391,12 @@ void cloth_component::solvePositions()
 
 void cloth_component::addConstraint(uint32 indexA, uint32 indexB)
 {
-	const cloth_particle& a = particles[indexA];
-	const cloth_particle& b = particles[indexB];
 	constraints.push_back(cloth_constraint
 		{ 
 			indexA, 
 			indexB, 
-			length(a.position - b.position),
-			(a.invMass + b.invMass) / stiffness,
+			length(positions[indexA] - positions[indexB]),
+			(invMasses[indexA] + invMasses[indexB]) / stiffness,
 		});
 }
 

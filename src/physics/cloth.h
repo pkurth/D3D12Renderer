@@ -3,15 +3,6 @@
 #include "bounding_volumes.h"
 #include "geometry/geometry.h"
 
-struct cloth_particle
-{
-	vec3 position;
-	vec3 prevPosition;
-	vec3 velocity;
-	vec3 forceAccumulator;
-	float invMass;
-};
-
 struct cloth_constraint
 {
 	uint32 a, b;
@@ -31,15 +22,19 @@ struct cloth_component
 	uint32 getRenderableTriangleCount() const;
 	submesh_info getRenderData(vec3* positions, vertex_uv_normal_tangent* others, indexed_triangle16* triangles) const;
 
-	std::vector<cloth_particle> particles;
-	std::vector<cloth_constraint> constraints;
-
 	float gravityFactor;
 	float damping;
 	float thickness;
 	float stiffness = 0.5f;
 
 private:
+	std::vector<vec3> positions;
+	std::vector<vec3> prevPositions;
+	std::vector<vec3> velocities;
+	std::vector<vec3> forceAccumulators;
+	std::vector<float> invMasses;
+	std::vector<cloth_constraint> constraints;
+
 	uint32 gridSizeX, gridSizeY;
 	float width, height;
 
