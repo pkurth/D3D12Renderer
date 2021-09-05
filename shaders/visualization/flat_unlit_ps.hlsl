@@ -2,8 +2,17 @@
 
 ConstantBuffer<visualization_cb> cb		: register(b1);
 
-[RootSignature(FLAT_UNLIT_RS)]
-float4 main() : SV_TARGET
+Texture2D<float4> tex					: register(t0);
+SamplerState texSampler					: register(s0);
+
+struct ps_input
 {
-	return cb.color;
+	float2 uv				: TEXCOORDS;
+};
+
+[RootSignature(FLAT_UNLIT_RS)]
+float4 main(ps_input IN) : SV_TARGET
+{
+	float2 uv = lerp(cb.uv0, cb.uv1, IN.uv);
+	return cb.color * tex.Sample(texSampler, uv);
 }
