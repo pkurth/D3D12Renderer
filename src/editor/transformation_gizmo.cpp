@@ -519,3 +519,19 @@ bool transformation_gizmo::manipulateTransformation(trs& transform, const render
 	return dragging;
 }
 
+bool transformation_gizmo::manipulatePosition(vec3& position, const render_camera& camera, const user_input& input, bool allowInput, overlay_render_pass* overlayRenderPass)
+{
+	if (type == transformation_type_rotation || type == transformation_type_scale)
+	{
+		type = transformation_type_translation;
+	}
+
+	trs transform = { position, quat::identity, vec3(1.f, 1.f, 1.f) };
+	bool result = manipulateTransformation(transform, camera, input, allowInput, overlayRenderPass);
+	if (result)
+	{
+		position = transform.position;
+	}
+	return result;
+}
+

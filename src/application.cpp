@@ -1153,6 +1153,14 @@ bool application::handleUserInput(const user_input& input, float dt)
 				}
 			}
 		}
+		else if (selectedEntity.hasComponent<point_light_component>())
+		{
+			point_light_component& pl = selectedEntity.getComponent<point_light_component>();
+			if (gizmo.manipulatePosition(pl.position, camera, input, !inputCaptured, &overlayRenderPass))
+			{
+				inputCaptured = true;
+			}
+		}
 
 		if (!inputCaptured)
 		{

@@ -23,6 +23,7 @@ struct transformation_gizmo
 {
 	bool handleKeyboardInput(const user_input& input);
 	bool manipulateTransformation(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, overlay_render_pass* overlayRenderPass);
+	bool manipulatePosition(vec3& position, const render_camera& camera, const user_input& input, bool allowInput, overlay_render_pass* overlayRenderPass);
 
 	transformation_type type = transformation_type_translation;
 	transformation_space space = transformation_global;
