@@ -1014,6 +1014,43 @@ mat4 createModelMatrix(vec3 position, quat rotation, vec3 scale)
 	return result;
 }
 
+mat4 createBillboardModelMatrix(vec3 position, vec3 eye, vec3 scale)
+{
+	vec3 up(0.f, 1.f, 0.f);
+	vec3 forward = normalize(eye - position);
+	vec3 right = normalize(cross(up, forward));
+	up = cross(forward, right);
+
+	right *= scale.x;
+	up *= scale.y;
+	forward *= scale.z;
+
+	mat4 result;
+
+	result.m00 = right.x;
+	result.m10 = right.y;
+	result.m20 = right.z;
+	result.m30 = 0.f;
+
+	result.m01 = up.x;
+	result.m11 = up.y;
+	result.m21 = up.z;
+	result.m31 = 0.f;
+
+	result.m02 = forward.x;
+	result.m12 = forward.y;
+	result.m22 = forward.z;
+	result.m32 = 0.f;
+
+	result.m03 = position.x;
+	result.m13 = position.y;
+	result.m23 = position.z;
+	result.m33 = 1.f;
+
+	return result;
+
+}
+
 mat4 trsToMat4(const trs& transform)
 {
 	return createModelMatrix(transform.position, transform.rotation, transform.scale);
