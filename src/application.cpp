@@ -1075,22 +1075,22 @@ bool application::handleUserInput(const user_input& input, float dt)
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 
 			ImGui::PushID(&gizmo.space);
-			ImGui::IconRadioButton(imgui_icon_global, (int*)&space, transformation_global, gizmo.type != transformation_type_scale, iconSize);
+			ImGui::IconRadioButton(imgui_icon_global, (int*)&space, transformation_global, iconSize, gizmo.type != transformation_type_scale);
 			ImGui::SameLine(0, 0);
-			ImGui::IconRadioButton(imgui_icon_local, (int*)&space, transformation_local, gizmo.type != transformation_type_scale, iconSize);
+			ImGui::IconRadioButton(imgui_icon_local, (int*)&space, transformation_local, iconSize, gizmo.type != transformation_type_scale);
 			ImGui::PopID();
 
 			ImGui::SameLine(0.f, (float)iconSize);
 
 
 			ImGui::PushID(&gizmo.type);
-			ImGui::IconRadioButton(imgui_icon_translate, (int*)&gizmo.type, transformation_type_translation, true, iconSize);
+			ImGui::IconRadioButton(imgui_icon_translate, (int*)&gizmo.type, transformation_type_translation, iconSize, true);
 			ImGui::SameLine(0, 0);
-			ImGui::IconRadioButton(imgui_icon_rotate, (int*)&gizmo.type, transformation_type_rotation, true, iconSize);
+			ImGui::IconRadioButton(imgui_icon_rotate, (int*)&gizmo.type, transformation_type_rotation, iconSize, true);
 			ImGui::SameLine(0, 0);
-			ImGui::IconRadioButton(imgui_icon_scale, (int*)&gizmo.type, transformation_type_scale, true, iconSize);
+			ImGui::IconRadioButton(imgui_icon_scale, (int*)&gizmo.type, transformation_type_scale, iconSize, true);
 			ImGui::SameLine(0, 0);
-			ImGui::IconRadioButton(imgui_icon_cross, (int*)&gizmo.type, transformation_type_none, true, iconSize);
+			ImGui::IconRadioButton(imgui_icon_cross, (int*)&gizmo.type, transformation_type_none, iconSize, true);
 			ImGui::PopID();
 
 			ImGui::SameLine(0.f, (float)iconSize);

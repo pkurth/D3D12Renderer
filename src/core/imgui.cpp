@@ -117,7 +117,7 @@ ImGuiContext* initializeImGui(struct dx_window& window)
 		startGPUDescriptor);
 
 	{
-		iconsTexture = loadTextureFromFile("assets/icons/icons.svg", texture_load_flags_gen_mips_on_cpu | texture_load_flags_cache_to_dds);
+		iconsTexture = loadTextureFromFile("assets/icons/ui_icons.svg", texture_load_flags_gen_mips_on_cpu | texture_load_flags_cache_to_dds);
 
 		CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(startCPUDescriptor, 1, descriptorHandleIncrementSize);
 		CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(startGPUDescriptor, 1, descriptorHandleIncrementSize);
@@ -236,15 +236,13 @@ namespace ImGui
 
 	void Icon(imgui_icon icon, uint32 size)
 	{
-		const uint32 numColumns = iconsTexture->width / IMGUI_ICON_SIZE;
-		const uint32 numRows = iconsTexture->height / IMGUI_ICON_SIZE;
-		float row = (float)(icon / numColumns);
-		float col = (float)(icon % numColumns);
+		float row = (float)(icon / IMGUI_ICON_COLS);
+		float col = (float)(icon % IMGUI_ICON_COLS);
 
-		float left = col / numColumns;
-		float right = (col + 1) / numColumns;
-		float top = row / numRows;
-		float bottom = (row + 1) / numRows;
+		float left = col / IMGUI_ICON_COLS;
+		float right = (col + 1) / IMGUI_ICON_COLS;
+		float top = row / IMGUI_ICON_ROWS;
+		float bottom = (row + 1) / IMGUI_ICON_ROWS;
 
 		ImGui::Image(iconsTextureID, ImVec2((float)size, (float)size), ImVec2(left, top), ImVec2(right, bottom));
 		if (ImGui::IsItemHovered())
@@ -253,17 +251,15 @@ namespace ImGui
 		}
 	}
 
-	bool IconButton(uint32 id, imgui_icon icon, bool enabled, uint32 size)
+	bool IconButton(uint32 id, imgui_icon icon, uint32 size, bool enabled)
 	{
-		const uint32 numColumns = iconsTexture->width / IMGUI_ICON_SIZE;
-		const uint32 numRows = iconsTexture->height / IMGUI_ICON_SIZE;
-		float row = (float)(icon / numColumns);
-		float col = (float)(icon % numColumns);
+		float row = (float)(icon / IMGUI_ICON_COLS);
+		float col = (float)(icon % IMGUI_ICON_COLS);
 
-		float left = col / numColumns;
-		float right = (col + 1) / numColumns;
-		float top = row / numRows;
-		float bottom = (row + 1) / numRows;
+		float left = col / IMGUI_ICON_COLS;
+		float right = (col + 1) / IMGUI_ICON_COLS;
+		float top = row / IMGUI_ICON_ROWS;
+		float bottom = (row + 1) / IMGUI_ICON_ROWS;
 
 		ImGui::PushID(id);
 		if (!enabled)
@@ -285,17 +281,15 @@ namespace ImGui
 		return result;
 	}
 
-	bool IconRadioButton(imgui_icon icon, int* current, int value, bool enabled, uint32 size)
+	bool IconRadioButton(imgui_icon icon, int* current, int value, uint32 size, bool enabled)
 	{
-		const uint32 numColumns = iconsTexture->width / IMGUI_ICON_SIZE;
-		const uint32 numRows = iconsTexture->height / IMGUI_ICON_SIZE;
-		float row = (float)(icon / numColumns);
-		float col = (float)(icon % numColumns);
+		float row = (float)(icon / IMGUI_ICON_COLS);
+		float col = (float)(icon % IMGUI_ICON_COLS);
 
-		float left = col / numColumns;
-		float right = (col + 1) / numColumns;
-		float top = row / numRows;
-		float bottom = (row + 1) / numRows;
+		float left = col / IMGUI_ICON_COLS;
+		float right = (col + 1) / IMGUI_ICON_COLS;
+		float top = row / IMGUI_ICON_ROWS;
+		float bottom = (row + 1) / IMGUI_ICON_ROWS;
 
 		bool active = value == *current;
 
