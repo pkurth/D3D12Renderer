@@ -12,8 +12,7 @@
 
 void initializeDistanceVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const distance_constraint* input, distance_constraint_update* output, uint32 count, float dt)
 {
-	auto rbView = appScene.view<rigid_body_component>();
-	rigid_body_component* rbBase = rbView.raw();
+	rigid_body_component* rbBase = appScene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
 	{
@@ -96,8 +95,7 @@ void solveDistanceVelocityConstraints(distance_constraint_update* constraints, u
 
 void initializeBallJointVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const ball_joint_constraint* input, ball_joint_constraint_update* output, uint32 count, float dt)
 {
-	auto rbView = appScene.view<rigid_body_component>();
-	rigid_body_component* rbBase = rbView.raw();
+	rigid_body_component* rbBase = appScene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
 	{
@@ -168,8 +166,7 @@ void solveBallJointVelocityConstraints(ball_joint_constraint_update* constraints
 
 void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const hinge_joint_constraint* input, hinge_joint_constraint_update* output, uint32 count, float dt)
 {
-	auto rbView = appScene.view<rigid_body_component>();
-	rigid_body_component* rbBase = rbView.raw();
+	rigid_body_component* rbBase = appScene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
 	{
@@ -399,8 +396,7 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 
 void initializeConeTwistVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const cone_twist_constraint* input, cone_twist_constraint_update* output, uint32 count, float dt)
 {
-	auto rbView = appScene.view<rigid_body_component>();
-	rigid_body_component* rbBase = rbView.raw();
+	rigid_body_component* rbBase = appScene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
 	{

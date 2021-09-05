@@ -311,11 +311,8 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 {
 	uint32 pushIndex = 0;
 
-	auto rbView = appScene.view<rigid_body_component>();
-	rigid_body_component* rbBase = rbView.raw();
-
-	auto ffView = appScene.view<force_field_component>();
-	force_field_component* ffBase = ffView.raw();
+	rigid_body_component* rbBase = appScene.raw<rigid_body_component>();
+	force_field_component* ffBase = appScene.raw<force_field_component>();
 
 	for (auto [entityHandle, collider] : appScene.view<collider_component>().each())
 	{
@@ -471,8 +468,7 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 
 
 	// Handle non-collision interactions (triggers, force fields etc).
-	auto rbView = appScene.view<rigid_body_component>();
-	rigid_body_component* rbBase = rbView.raw();
+	rigid_body_component* rbBase = appScene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < narrowPhaseResult.numNonCollisionInteractions; ++i)
 	{

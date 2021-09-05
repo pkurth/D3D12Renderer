@@ -13,6 +13,7 @@
 #include "rendering/mesh_shader.h"
 #include "rendering/shadow_map.h"
 #include "rendering/shadow_map_renderer.h"
+#include "rendering/debug_visualization.h"
 #include "editor/file_dialog.h"
 #include "core/yaml.h"
 #include "learning/locomotion_learning.h"
@@ -340,37 +341,36 @@ void application::initialize(main_renderer* renderer)
 
 	random_number_generator rng = { 14878213 };
 
-#if 0
-	spotLights.resize(2);
-
-	spotLights[0].initialize(
-		{ 2.f, 3.f, 0.f },
-		{ 1.f, 0.f, 0.f },
-		randomRGB(rng) * 5.f,
-		deg2rad(20.f),
-		deg2rad(30.f),
-		25.f,
-		0
-	);
+#if 1
+	appScene.createEntity("Spot light 0")
+		.addComponent<spot_light_component>(
+			vec3(2.f, 3.f, 0.f),
+			vec3(1.f, 0.f, 0.f),
+			randomRGB(rng) * 5.f,
+			deg2rad(20.f),
+			deg2rad(30.f),
+			25.f,
+			0
+		);
 	
-	spotLights[1].initialize(
-		{ -2.f, 3.f, 0.f },
-		{ -1.f, 0.f, 0.f },
-		randomRGB(rng) * 5.f,
-		deg2rad(20.f),
-		deg2rad(30.f),
-		25.f,
-		0
-	);
+	appScene.createEntity("Spot light 1")
+		.addComponent<spot_light_component>(
+			vec3(-2.f, 3.f, 0.f),
+			vec3(-1.f, 0.f, 0.f),
+			randomRGB(rng) * 5.f,
+			deg2rad(20.f),
+			deg2rad(30.f),
+			25.f,
+			0
+		);
 
-	pointLights.resize(1);
-
-	pointLights[0].initialize(
-		{ 0.f, 8.f, 0.f },
-		randomRGB(rng),
-		10,
-		0
-	);
+	appScene.createEntity("Point light 0")
+		.addComponent<point_light_component>(
+			vec3(0.f, 8.f, 0.f),
+			randomRGB(rng),
+			10.f,
+			0
+		);
 #endif
 
 #if 0
@@ -1310,22 +1310,22 @@ void application::update(const user_input& input, float dt)
 		// Render shadow maps.
 		renderSunShadowMap(sun, &sunShadowRenderPass, appScene, objectDragged);
 
-		for (uint32 i = 0; i < (uint32)spotLights.size(); ++i)
+		for (auto [entityHandle, sl] : appScene.view<spot_light_component>().each())
 		{
-			if (spotLights[i].shadowInfoIndex >= 0)
+			if (sl.shadowInfoIndex >= 0)
 			{
 				uint32 renderPassIndex = numSpotShadowRenderPasses++;
-				spot_shadow_info shadowInfo = renderSpotShadowMap(spotLights[i], i, &spotShadowRenderPasses[renderPassIndex], renderPassIndex, appScene, objectDragged);
+				spot_shadow_info shadowInfo = renderSpotShadowMap(sl, (uint32)entityHandle, &spotShadowRenderPasses[renderPassIndex], renderPassIndex, appScene, objectDragged);
 				spotLightShadowInfos.push_back(shadowInfo);
 			}
 		}
 
-		for (uint32 i = 0; i < (uint32)pointLights.size(); ++i)
+		for (auto [entityHandle, pl] : appScene.view<point_light_component>().each())
 		{
-			if (pointLights[i].shadowInfoIndex >= 0)
+			if (pl.shadowInfoIndex >= 0)
 			{
 				uint32 renderPassIndex = numPointShadowRenderPasses++;
-				point_shadow_info shadowInfo = renderPointShadowMap(pointLights[i], i, &pointShadowRenderPasses[renderPassIndex], renderPassIndex, appScene, objectDragged);
+				point_shadow_info shadowInfo = renderPointShadowMap(pl, (uint32)entityHandle, &pointShadowRenderPasses[renderPassIndex], renderPassIndex, appScene, objectDragged);
 				pointLightShadowInfos.push_back(shadowInfo);
 			}
 		}
@@ -1426,40 +1426,39 @@ void application::update(const user_input& input, float dt)
 			{
 				outlineRenderPass.renderOutline(mat4::identity, positionVertexBuffer, indexBuffer, submesh);
 			}
-
-			//for (const auto& p : cloth.particles)
-			//{
-			//	mat4 m = createModelMatrix(p.position, quat::identity, 0.1f);
-			//	opaqueRenderPass.renderStaticObject(m, testMesh->mesh.vertexBuffer, testMesh->mesh.indexBuffer, testMesh->submeshes[0].info, testMesh->submeshes[0].material,
-			//		(uint32)entityHandle);
-			//}
 		}
 
 		void collisionDebugDraw(transparent_render_pass* renderPass);
 		collisionDebugDraw(&transparentRenderPass);
 
-		submitRenderPasses(numSpotShadowRenderPasses, numPointShadowRenderPasses);
 
+		uint32 numPointLights = appScene.numberOfComponentsOfType<point_light_component>();
+		uint32 numSpotLights = appScene.numberOfComponentsOfType<spot_light_component>();
 
 
 		// Upload and set lights.
-		if (pointLights.size())
+		if (numPointLights > 0)
 		{
-			updateUploadBufferData(pointLightBuffer[dxContext.bufferedFrameID], pointLights.data(), (uint32)(sizeof(point_light_cb) * pointLights.size()));
+			updateUploadBufferData(pointLightBuffer[dxContext.bufferedFrameID], appScene.raw<point_light_component>(), (uint32)(sizeof(point_light_component) * numPointLights));
 			updateUploadBufferData(pointLightShadowInfoBuffer[dxContext.bufferedFrameID], pointLightShadowInfos.data(), (uint32)(sizeof(point_shadow_info) * numPointShadowRenderPasses));
-			renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], (uint32)pointLights.size(), pointLightShadowInfoBuffer[dxContext.bufferedFrameID]);
+			renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], numPointLights, pointLightShadowInfoBuffer[dxContext.bufferedFrameID]);
 		}
-		if (spotLights.size())
+		if (numSpotLights > 0)
 		{
-			updateUploadBufferData(spotLightBuffer[dxContext.bufferedFrameID], spotLights.data(), (uint32)(sizeof(spot_light_cb) * spotLights.size()));
+			updateUploadBufferData(spotLightBuffer[dxContext.bufferedFrameID], appScene.raw<spot_light_component>(), (uint32)(sizeof(spot_light_component) * numSpotLights));
 			updateUploadBufferData(spotLightShadowInfoBuffer[dxContext.bufferedFrameID], spotLightShadowInfos.data(), (uint32)(sizeof(spot_shadow_info) * numSpotShadowRenderPasses));
-			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], (uint32)spotLights.size(), spotLightShadowInfoBuffer[dxContext.bufferedFrameID]);
+			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], numSpotLights, spotLightShadowInfoBuffer[dxContext.bufferedFrameID]);
 		}
+
+
 		if (decals.size())
 		{
 			updateUploadBufferData(decalBuffer[dxContext.bufferedFrameID], decals.data(), (uint32)(sizeof(pbr_decal_cb) * decals.size()));
 			renderer->setDecals(decalBuffer[dxContext.bufferedFrameID], (uint32)decals.size(), decalTexture);
 		}
+
+
+		submitRenderPasses(numSpotShadowRenderPasses, numPointShadowRenderPasses);
 	}
 	else
 	{

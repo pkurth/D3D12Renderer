@@ -184,6 +184,12 @@ struct scene
 		return registry.group<owned_component_t...>(entt::get<Get...>, entt::exclude<Exclude...>);
 	}
 
+	template <typename component_t>
+	auto raw()
+	{
+		return registry.view<component_t>().raw();
+	}
+
 	template <typename func_t>
 	void forEachEntity(func_t func)
 	{

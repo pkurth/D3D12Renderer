@@ -29,5 +29,18 @@ struct directional_light
 	void updateMatrices(const render_camera& camera);
 };
 
+// Simple wrappers around CBs. Don't add additional data here!
+struct point_light_component : point_light_cb
+{
+	point_light_component(vec3 position, vec3 radiance, float radius, int shadowInfoIndex = -1)
+		: point_light_cb(position, radiance, radius, shadowInfoIndex) {}
+};
+
+struct spot_light_component : spot_light_cb
+{
+	spot_light_component(vec3 position, vec3 direction, vec3 radiance, float innerAngle, float outerAngle, float maxDistance, int shadowInfoIndex = -1)
+		: spot_light_cb(position, direction, radiance, innerAngle, outerAngle, maxDistance, shadowInfoIndex) {}
+};
+
 mat4 getSpotLightViewProjectionMatrix(const spot_light_cb& sl);
 

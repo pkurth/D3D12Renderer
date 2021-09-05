@@ -60,9 +60,6 @@ private:
 	ref<dx_buffer> spotLightShadowInfoBuffer[NUM_BUFFERED_FRAMES];
 	ref<dx_buffer> pointLightShadowInfoBuffer[NUM_BUFFERED_FRAMES];
 
-
-	std::vector<point_light_cb> pointLights;
-	std::vector<spot_light_cb> spotLights;
 	std::vector<pbr_decal_cb> decals;
 
 	std::vector<spot_shadow_info> spotLightShadowInfos;
