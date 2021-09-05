@@ -61,9 +61,7 @@ struct animated_depth_only_render_command
 	material_vertex_buffer_view vertexBuffer;
 	D3D12_GPU_VIRTUAL_ADDRESS prevFrameVertexBufferAddress;
 	material_index_buffer_view indexBuffer;
-	uint32 vertexSize;
 	submesh_info submesh;
-	submesh_info prevFrameSubmesh;
 	uint32 objectID;
 };
 

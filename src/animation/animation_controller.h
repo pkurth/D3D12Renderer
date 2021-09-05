@@ -3,6 +3,7 @@
 #include "animation.h"
 #include "scene/scene.h"
 #include "geometry/mesh.h"
+#include "rendering/material.h"
 
 struct animation_component
 {
@@ -27,11 +28,8 @@ struct animation_controller
 	virtual void update(scene_entity entity, float dt) = 0;
 	virtual void edit(scene_entity entity) {}
 
-	vertex_buffer_group currentVertexBuffer;
-	submesh_info currentSubmeshes[16];
-
-	vertex_buffer_group prevFrameVertexBuffer;
-	submesh_info prevFrameSubmeshes[16];
+	material_vertex_buffer_group_view currentVertexBuffer;
+	material_vertex_buffer_group_view prevFrameVertexBuffer;
 
 	animation_controller_type type;
 

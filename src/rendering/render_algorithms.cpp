@@ -325,7 +325,7 @@ static void depthPrePassInternal(dx_command_list* cl,
 		{
 			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, dc.objectID);
 			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.prevFrameTransform });
-			cl->setRootGraphicsSRV(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS, dc.prevFrameVertexBufferAddress + dc.prevFrameSubmesh.baseVertex * dc.vertexSize);
+			cl->setRootGraphicsSRV(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS, dc.prevFrameVertexBufferAddress);
 
 			cl->setVertexBuffer(0, dc.vertexBuffer);
 			cl->setIndexBuffer(dc.indexBuffer);

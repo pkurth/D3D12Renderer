@@ -43,6 +43,11 @@ static uint2 unflatten2D(uint idx, uint2 dim)
 	return uint2(idx % dim.x, idx / dim.x);
 }
 
+static uint2 unflatten2D(uint idx, uint width)
+{
+	return uint2(idx % width, idx / width);
+}
+
 inline bool isSaturated(float a) { return a == saturate(a); }
 inline bool isSaturated(float2 a) { return isSaturated(a.x) && isSaturated(a.y); }
 inline bool isSaturated(float3 a) { return isSaturated(a.x) && isSaturated(a.y) && isSaturated(a.z); }
@@ -124,6 +129,11 @@ static inline void unpackHalfs(uint x, out float left, out float right)
 {
 	left = unpackHalfsLeft(x);
 	right = unpackHalfsRight(x);
+}
+
+static inline float cross2(float2 a, float2 b)
+{ 
+	return a.x * b.y - a.y * b.x; 
 }
 
 #endif

@@ -5,32 +5,6 @@
 #define BLOCK_SIZE 512
 
 
-struct mesh_position
-{
-	float3 position;
-};
-
-struct mesh_others
-{
-	float2 uv;
-	float3 normal;
-	float3 tangent;
-};
-
-struct skinned_mesh_position
-{
-	float3 position;
-};
-
-struct skinned_mesh_others
-{
-	float2 uv;
-	float3 normal;
-	float3 tangent;
-	uint skinIndices;
-	uint skinWeights;
-};
-
 ConstantBuffer<skinning_cb> skinningCB					: register(b0);
 
 StructuredBuffer<skinned_mesh_position> inputPositions	: register(t0);

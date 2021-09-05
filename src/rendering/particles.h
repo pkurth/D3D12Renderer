@@ -29,7 +29,6 @@ protected:
 	virtual void setSimulationParameters(dx_command_list* cl) = 0;
 
 	static dx_mesh billboardMesh;
-
 	submesh_info submesh;
 
 private:

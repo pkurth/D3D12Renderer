@@ -38,7 +38,9 @@ static void renderDynamicGeometryToSunShadowMap(sun_shadow_render_pass* renderPa
 
 		for (uint32 i = 0; i < (uint32)raster.mesh->submeshes.size(); ++i)
 		{
-			renderPass->renderDynamicObject(0, m, anim.controller->currentVertexBuffer, mesh.indexBuffer, anim.controller->currentSubmeshes[i]);
+			auto submesh = raster.mesh->submeshes[i].info;
+			submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
+			renderPass->renderDynamicObject(0, m, anim.controller->currentVertexBuffer, mesh.indexBuffer, submesh);
 		}
 	}
 }
@@ -77,7 +79,9 @@ static void renderDynamicGeometryToSpotShadowMap(spot_shadow_render_pass* render
 
 		for (uint32 i = 0; i < (uint32)raster.mesh->submeshes.size(); ++i)
 		{
-			renderPass->renderDynamicObject(m, anim.controller->currentVertexBuffer, mesh.indexBuffer, anim.controller->currentSubmeshes[i]);
+			auto submesh = raster.mesh->submeshes[i].info;
+			submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
+			renderPass->renderDynamicObject(m, anim.controller->currentVertexBuffer, mesh.indexBuffer, submesh);
 		}
 	}
 }
@@ -116,7 +120,9 @@ static void renderDynamicGeometryToPointShadowMap(point_shadow_render_pass* rend
 
 		for (uint32 i = 0; i < (uint32)raster.mesh->submeshes.size(); ++i)
 		{
-			renderPass->renderDynamicObject(m, anim.controller->currentVertexBuffer, mesh.indexBuffer, anim.controller->currentSubmeshes[i]);
+			auto submesh = raster.mesh->submeshes[i].info;
+			submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
+			renderPass->renderDynamicObject(m, anim.controller->currentVertexBuffer, mesh.indexBuffer, submesh);
 		}
 	}
 }

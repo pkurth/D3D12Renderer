@@ -45,7 +45,7 @@ struct material_vertex_buffer_view
 	D3D12_VERTEX_BUFFER_VIEW view;
 
 	material_vertex_buffer_view() { view.SizeInBytes = 0; }
-	material_vertex_buffer_view(const ref<dx_vertex_buffer>& vb) : view(vb->view) {}
+	material_vertex_buffer_view(const ref<dx_vertex_buffer>& vb) : view(vb ? vb->view : D3D12_VERTEX_BUFFER_VIEW{0}) {}
 	material_vertex_buffer_view(const dx_dynamic_vertex_buffer& vb) : view(vb.view) {}
 
 	operator bool() const { return view.SizeInBytes > 0; }

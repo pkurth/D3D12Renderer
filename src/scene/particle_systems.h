@@ -110,7 +110,7 @@ private:
 	static dx_pipeline renderPipeline;
 
 	ref<composite_mesh> cartoonMesh;
-	vertex_buffer_group skinnedVertexBuffer;
+	material_vertex_buffer_group_view skinnedVertexBuffer;
 	float time = 0.f;
 
 	struct boid_material

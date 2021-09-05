@@ -82,11 +82,10 @@ struct opaque_render_pass
 	template <typename pipeline_t>
 	void renderAnimatedObject(const mat4& transform,
 		const mat4& prevFrameTransform,
-		const vertex_buffer_group& vertexBuffer,
-		const vertex_buffer_group& prevFrameVertexBuffer,
+		material_vertex_buffer_group_view& vertexBuffer,
+		material_vertex_buffer_group_view& prevFrameVertexBuffer,
 		const material_index_buffer_view& indexBuffer,
 		submesh_info submesh,
-		submesh_info prevFrameSubmesh,
 		const typename pipeline_t::material_t& material,
 		uint32 objectID = -1,
 		bool doubleSided = false)
@@ -99,11 +98,9 @@ struct opaque_render_pass
 		depthCommand.transform = transform;
 		depthCommand.prevFrameTransform = prevFrameTransform;
 		depthCommand.vertexBuffer = vertexBuffer.positions;
-		depthCommand.prevFrameVertexBufferAddress = prevFrameVertexBuffer.positions ? prevFrameVertexBuffer.positions->gpuVirtualAddress : vertexBuffer.positions->gpuVirtualAddress;
-		depthCommand.vertexSize = vertexBuffer.positions->elementSize;
+		depthCommand.prevFrameVertexBufferAddress = prevFrameVertexBuffer.positions ? prevFrameVertexBuffer.positions.view.BufferLocation : vertexBuffer.positions.view.BufferLocation;
 		depthCommand.indexBuffer = indexBuffer;
 		depthCommand.submesh = submesh;
-		depthCommand.prevFrameSubmesh = prevFrameVertexBuffer.positions ? prevFrameSubmesh : submesh;
 		depthCommand.objectID = objectID;
 	}
 
@@ -147,21 +144,20 @@ struct opaque_render_pass
 
 	void renderAnimatedObject(const mat4& transform,
 		const mat4& prevFrameTransform,
-		const vertex_buffer_group& vertexBuffer,
-		const vertex_buffer_group& prevFrameVertexBuffer,
+		material_vertex_buffer_group_view& vertexBuffer,
+		material_vertex_buffer_group_view& prevFrameVertexBuffer,
 		const material_index_buffer_view& indexBuffer,
 		submesh_info submesh,
-		submesh_info prevFrameSubmesh,
 		const ref<pbr_material>& material,
 		uint32 objectID = -1)
 	{
 		if (material->doubleSided)
 		{
-			renderAnimatedObject<opaque_pbr_pipeline::double_sided>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, prevFrameSubmesh, material, objectID, true);
+			renderAnimatedObject<opaque_pbr_pipeline::double_sided>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, material, objectID, true);
 		}
 		else
 		{
-			renderAnimatedObject<opaque_pbr_pipeline::standard>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, prevFrameSubmesh, material, objectID, false);
+			renderAnimatedObject<opaque_pbr_pipeline::standard>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, material, objectID, false);
 		}
 	}
 

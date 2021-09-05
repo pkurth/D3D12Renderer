@@ -258,16 +258,14 @@ void boid_particle_system::update(float dt)
 		time += dt;
 		time = fmod(time, skeleton.clips[0].lengthInSeconds);
 
-		auto [skinnedVertexBuffer, skinnedSubmesh, skinningMatrices] = skinObject(mesh.vertexBuffer, cartoonMesh->submeshes[0].info, (uint32)skeleton.joints.size());
+		auto [skinnedVertexBuffer, skinningMatrices] = skinObject(mesh.vertexBuffer, cartoonMesh->submeshes[0].info, (uint32)skeleton.joints.size());
 
 		trs localTransforms[128];
 		skeleton.sampleAnimation(0, time, localTransforms);
 		skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
 
-
-		this->submesh = skinnedSubmesh;
 		this->skinnedVertexBuffer = skinnedVertexBuffer;
-
+		this->submesh.baseVertex = 0;
 
 		settings.frameIndex = (uint32)dxContext.frameID;
 

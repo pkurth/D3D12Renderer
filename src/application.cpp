@@ -1361,8 +1361,8 @@ void application::update(const user_input& input, float dt)
 
 				for (uint32 i = 0; i < numSubmeshes; ++i)
 				{
-					submesh_info submesh = controller->currentSubmeshes[i];
-					submesh_info prevFrameSubmesh = controller->prevFrameSubmeshes[i];
+					submesh_info submesh = raster.mesh->submeshes[i].info;
+					submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
 
 					const ref<pbr_material>& material = raster.mesh->submeshes[i].material;
 
@@ -1374,7 +1374,7 @@ void application::update(const user_input& input, float dt)
 					{
 						opaqueRenderPass.renderAnimatedObject(m, lastM, 
 							controller->currentVertexBuffer, controller->prevFrameVertexBuffer, mesh.indexBuffer, 
-							submesh, prevFrameSubmesh, material,
+							submesh, material,
 							(uint32)entityHandle);
 					}
 
