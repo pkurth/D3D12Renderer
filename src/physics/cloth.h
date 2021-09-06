@@ -2,6 +2,7 @@
 
 #include "bounding_volumes.h"
 #include "geometry/geometry.h"
+#include "rendering/material.h"
 
 struct cloth_constraint
 {
@@ -20,7 +21,8 @@ struct cloth_component
 
 	uint32 getRenderableVertexCount() const;
 	uint32 getRenderableTriangleCount() const;
-	submesh_info getRenderData(vec3* positions, vertex_uv_normal_tangent* others, indexed_triangle16* triangles) const;
+	//submesh_info getRenderData(vec3* positions, vertex_uv_normal_tangent* others, indexed_triangle16* triangles) const;
+	std::tuple<material_vertex_buffer_group_view, material_vertex_buffer_group_view, material_index_buffer_view, submesh_info> getRenderData();
 
 	float gravityFactor;
 	float damping;
@@ -44,4 +46,7 @@ private:
 	vec3 getParticlePosition(float relX, float relY);
 
 	void addConstraint(uint32 a, uint32 b);
+
+	ref<dx_index_buffer> indexBuffer;
+	material_vertex_buffer_group_view prevFrameVB;
 };

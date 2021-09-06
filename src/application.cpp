@@ -1415,22 +1415,17 @@ void application::update(const user_input& input, float dt)
 
 		for (auto [entityHandle, cloth] : appScene.view<cloth_component>().each())
 		{
-			uint32 numVertices = cloth.getRenderableVertexCount();
-			auto [positionVertexBuffer, positionPtr] = dxContext.createDynamicVertexBuffer(sizeof(vec3), numVertices);
-			auto [otherVertexBuffer, otherPtr] = dxContext.createDynamicVertexBuffer(sizeof(vertex_uv_normal_tangent), numVertices);
-			auto [indexBuffer, indexPtr] = dxContext.createDynamicIndexBuffer(sizeof(uint16), cloth.getRenderableTriangleCount() * 3);
+			auto [vb, prevFrameVB, ib, sm] = cloth.getRenderData();
 
-			submesh_info submesh = cloth.getRenderData((vec3*)positionPtr, (vertex_uv_normal_tangent*)otherPtr, (indexed_triangle16*)indexPtr);
-
-			opaqueRenderPass.renderStaticObject(mat4::identity, material_vertex_buffer_group_view{ positionVertexBuffer, otherVertexBuffer }, indexBuffer,
-				submesh, clothMaterial, (uint32)entityHandle);
+			//opaqueRenderPass.renderStaticObject(mat4::identity, vb, ib, sm, clothMaterial, (uint32)entityHandle);
+			opaqueRenderPass.renderAnimatedObject(mat4::identity, mat4::identity, vb, prevFrameVB, ib, sm, clothMaterial, (uint32)entityHandle);
 
 			scene_entity entity = { entityHandle, appScene };
 			bool outline = selectedEntity == entity;
 
 			if (outline)
 			{
-				ldrRenderPass.renderOutline(mat4::identity, positionVertexBuffer, indexBuffer, submesh);
+				ldrRenderPass.renderOutline(mat4::identity, vb, ib, sm);
 			}
 		}
 

@@ -39,11 +39,13 @@ struct cloth_skinning_cb
 #define CLOTH_SKINNING_RS \
     "RootConstants(b0, num32BitConstants = 3), " \
     "SRV(t0), " \
-    "UAV(u0)"
+    "UAV(u0), " \
+    "UAV(u1)"
     
 #define CLOTH_SKINNING_RS_CB                    0
 #define CLOTH_SKINNING_RS_INPUT                 1
-#define CLOTH_SKINNING_RS_OUTPUT                2
+#define CLOTH_SKINNING_RS_OUTPUT0               2
+#define CLOTH_SKINNING_RS_OUTPUT1               3
 
 
 struct mesh_position

@@ -2,6 +2,8 @@
 #include "cloth.h"
 #include "physics.h"
 #include "core/random.h"
+#include "animation/skinning.h"
+#include "dx/dx_context.h"
 
 cloth_component::cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float thickness, float damping, float gravityFactor)
 {
@@ -75,6 +77,25 @@ cloth_component::cloth_component(float width, float height, uint32 gridSizeX, ui
 			}
 		}
 	}
+
+
+	std::vector<indexed_triangle16> triangles;
+	triangles.reserve(getRenderableTriangleCount());
+	for (uint32 y = 0; y < gridSizeY - 1; ++y)
+	{
+		for (uint32 x = 0; x < gridSizeX - 1; ++x)
+		{
+			uint16 tlIndex = y * gridSizeX + x;
+			uint16 trIndex = tlIndex + 1;
+			uint16 blIndex = tlIndex + gridSizeX;
+			uint16 brIndex = blIndex + 1;
+
+			triangles.push_back({ tlIndex, blIndex, brIndex });
+			triangles.push_back({ tlIndex, brIndex, trIndex });
+		}
+	}
+
+	indexBuffer = createIndexBuffer(sizeof(uint16), (uint32)triangles.size() * 3, triangles.data());
 }
 
 void cloth_component::setWorldPositionOfFixedVertices(const trs& transform)
@@ -146,112 +167,26 @@ uint32 cloth_component::getRenderableVertexCount() const
 
 uint32 cloth_component::getRenderableTriangleCount() const
 {
-	return (gridSizeX - 1)* (gridSizeY - 1) * 2;
+	return (gridSizeX - 1) * (gridSizeY - 1) * 2;
 }
 
-submesh_info cloth_component::getRenderData(vec3* positions, vertex_uv_normal_tangent* others, indexed_triangle16* triangles) const
+std::tuple<material_vertex_buffer_group_view, material_vertex_buffer_group_view, material_index_buffer_view, submesh_info> cloth_component::getRenderData()
 {
-	for (uint32 y = 0, i = 0; y < gridSizeY; ++y)
-	{
-		for (uint32 x = 0; x < gridSizeX; ++x, ++i)
-		{
-			float u = x / (float)(gridSizeX - 1);
-			float v = y / (float)(gridSizeY - 1);
+	uint32 numVertices = getRenderableVertexCount();
+	auto [positionVertexBuffer, positionPtr] = dxContext.createDynamicVertexBuffer(sizeof(vec3), numVertices);
+	memcpy(positionPtr, positions.data(), numVertices * sizeof(vec3));
 
-			positions[i] = this->positions[i];
-			others[i].normal = vec3(0.f);
-			others[i].tangent = vec3(0.f);
-			others[i].uv = vec2(u, v);
-		}
-	}
+	material_vertex_buffer_group_view vb = skinCloth(positionVertexBuffer, gridSizeX, gridSizeY);
+	submesh_info sm;
+	sm.baseVertex = 0;
+	sm.firstTriangle = 0;
+	sm.numTriangles = getRenderableTriangleCount();
+	sm.numVertices = numVertices;
 
-	for (uint32 y = 0; y < gridSizeY - 1; ++y)
-	{
-		for (uint32 x = 0; x < gridSizeX - 1; ++x)
-		{
-			uint32 tlIndex = y * gridSizeX + x;
-			uint32 trIndex = tlIndex + 1;
-			uint32 blIndex = tlIndex + gridSizeX;
-			uint32 brIndex = blIndex + 1;
+	material_vertex_buffer_group_view prev = prevFrameVB;
+	prevFrameVB = vb;
 
-			vec3 tl = positions[tlIndex];
-			vec3 tr = positions[trIndex];
-			vec3 bl = positions[blIndex];
-			vec3 br = positions[brIndex];
-
-			// Normal.
-			{
-				vec3 normal = calculateNormal(tl, bl, tr);
-				others[tlIndex].normal += normal;
-				others[trIndex].normal += normal;
-				others[blIndex].normal += normal;
-			}
-
-			{
-				vec3 normal = calculateNormal(br, tr, bl);
-				others[brIndex].normal += normal;
-				others[trIndex].normal += normal;
-				others[blIndex].normal += normal;
-			}
-
-
-			// Tangent.
-			{
-				vec3 edge0 = tr - tl;
-				vec3 edge1 = bl - tl;
-				vec2 deltaUV0 = others[trIndex].uv - others[tlIndex].uv;
-				vec2 deltaUV1 = others[blIndex].uv - others[tlIndex].uv;
-
-				float f = 1.f / cross(deltaUV0, deltaUV1);
-				vec3 tangent = f * (deltaUV1.y * edge0 - deltaUV0.y * edge1);
-				others[tlIndex].tangent += tangent;
-				others[trIndex].tangent += tangent;
-				others[blIndex].tangent += tangent;
-			}
-
-			{
-				vec3 edge0 = tr - br;
-				vec3 edge1 = bl - br;
-				vec2 deltaUV0 = others[trIndex].uv - others[brIndex].uv;
-				vec2 deltaUV1 = others[blIndex].uv - others[brIndex].uv;
-
-				float f = 1.f / cross(deltaUV0, deltaUV1);
-				vec3 tangent = f * (deltaUV1.y * edge0 - deltaUV0.y * edge1);
-				others[brIndex].tangent += tangent;
-				others[trIndex].tangent += tangent;
-				others[blIndex].tangent += tangent;
-			}
-		}
-	}
-
-	/* Will get normalized in shader anyway.
-	for (uint32 i = 0; i < gridSizeX * gridSizeY; ++i)
-	{
-		others[i].normal = normalize(others[i].normal);
-		others[i].tangent = normalize(others[i].tangent);
-	}
-	*/
-
-	for (uint32 y = 0; y < gridSizeY - 1; ++y)
-	{
-		for (uint32 x = 0; x < gridSizeX - 1; ++x)
-		{
-			uint16 tlIndex = y * gridSizeX + x;
-			uint16 trIndex = tlIndex + 1;
-			uint16 blIndex = tlIndex + gridSizeX;
-			uint16 brIndex = blIndex + 1;
-
-			*triangles++ = { tlIndex, blIndex, brIndex };
-			*triangles++ = { tlIndex, brIndex, trIndex };
-		}
-	}
-
-	submesh_info result;
-	result.baseVertex = 0;
-	result.firstTriangle = 0;
-	result.numTriangles = getRenderableTriangleCount();
-	result.numVertices = gridSizeX * gridSizeY;
-	return result;
+	return { vb, prev, indexBuffer, sm };
 }
 
 struct cloth_constraint_temp

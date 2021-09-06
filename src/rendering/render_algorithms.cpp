@@ -753,7 +753,7 @@ void opaqueLightPass(dx_command_list* cl,
 
 		pipeline_setup_func lastSetupFunc = 0;
 
-		for (auto dc : opaqueRenderPass->pass)
+		for (const auto& dc : opaqueRenderPass->pass)
 		{
 			if (dc.setup != lastSetupFunc)
 			{
@@ -780,7 +780,7 @@ void transparentLightPass(dx_command_list* cl,
 
 		pipeline_setup_func lastSetupFunc = 0;
 
-		for (auto dc : transparentRenderPass->pass)
+		for (const auto& dc : transparentRenderPass->pass)
 		{
 			if (dc.setup != lastSetupFunc)
 			{
@@ -805,7 +805,22 @@ void ldrPass(dx_command_list* cl,
 	cl->setViewport(ldrRenderTarget.viewport);
 
 
+	if (ldrRenderPass->ldrPass.size())
+	{
+		DX_PROFILE_BLOCK(cl, "LDR Objects");
 
+		pipeline_setup_func lastSetupFunc = 0;
+
+		for (const auto& dc : ldrRenderPass->ldrPass)
+		{
+			if (dc.setup != lastSetupFunc)
+			{
+				dc.setup(cl, materialInfo);
+				lastSetupFunc = dc.setup;
+			}
+			dc.render(cl, viewProj, dc.data);
+		}
+	}
 
 	if (ldrRenderPass->overlays.size())
 	{
@@ -815,7 +830,7 @@ void ldrPass(dx_command_list* cl,
 
 		pipeline_setup_func lastSetupFunc = 0;
 
-		for (auto dc : ldrRenderPass->overlays)
+		for (const auto& dc : ldrRenderPass->overlays)
 		{
 			if (dc.setup != lastSetupFunc)
 			{
@@ -837,13 +852,13 @@ void ldrPass(dx_command_list* cl,
 
 
 		// Mark objects in stencil.
-		for (const auto& outlined : ldrRenderPass->outlines)
+		for (const auto& dc : ldrRenderPass->outlines)
 		{
-			cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * outlined.transform });
+			cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * dc.transform });
 
-			cl->setVertexBuffer(0, outlined.vertexBuffer);
-			cl->setIndexBuffer(outlined.indexBuffer);
-			cl->drawIndexed(outlined.submesh.numTriangles * 3, 1, outlined.submesh.firstTriangle * 3, outlined.submesh.baseVertex, 0);
+			cl->setVertexBuffer(0, dc.vertexBuffer);
+			cl->setIndexBuffer(dc.indexBuffer);
+			cl->drawIndexed(dc.submesh.numTriangles * 3, 1, dc.submesh.firstTriangle * 3, dc.submesh.baseVertex, 0);
 		}
 
 		// Draw outline.

@@ -2,6 +2,7 @@
 #include "skinning.h"
 #include "dx/dx_command_list.h"
 #include "dx/dx_barrier_batcher.h"
+#include "dx/dx_profiling.h"
 
 #include "skinning_rs.hlsli"
 
@@ -109,7 +110,7 @@ std::tuple<material_vertex_buffer_group_view, mat4*> skinObject(const material_v
 	return { vb, mats };
 }
 
-material_vertex_buffer_group_view skinCloth(const material_vertex_buffer_view& positions, uint32 gridSizeX, uint32 gridSizeY)
+material_vertex_buffer_group_view skinCloth(const material_vertex_buffer_view& inpositions, uint32 gridSizeX, uint32 gridSizeY)
 {
 	uint32 numVertices = gridSizeX * gridSizeY;
 	uint32 vertexOffset = atomicAdd(totalNumVertices, numVertices);
@@ -119,19 +120,22 @@ material_vertex_buffer_group_view skinCloth(const material_vertex_buffer_view& p
 	assert(callIndex < arraysize(clothCalls));
 
 	clothCalls[callIndex] = {
-		positions,
+		inpositions,
 		gridSizeX,
 		gridSizeY,
 		vertexOffset
 	};
 
-	auto vb = skinnedVertexBuffer[currentSkinnedVertexBuffer].others;
+	auto positions = skinnedVertexBuffer[currentSkinnedVertexBuffer].positions;
+	auto others = skinnedVertexBuffer[currentSkinnedVertexBuffer].others;
 
 	material_vertex_buffer_group_view result;
-	result.positions = positions;
-	result.others.view.BufferLocation = vb->gpuVirtualAddress + vb->elementSize * vertexOffset;
-	result.others.view.SizeInBytes = vb->elementSize * numVertices;
-	result.others.view.StrideInBytes = vb->elementSize;
+	result.positions.view.BufferLocation = positions->gpuVirtualAddress + positions->elementSize * vertexOffset;
+	result.positions.view.SizeInBytes = positions->elementSize * numVertices;
+	result.positions.view.StrideInBytes = positions->elementSize;
+	result.others.view.BufferLocation = others->gpuVirtualAddress + others->elementSize * vertexOffset;
+	result.others.view.SizeInBytes = others->elementSize * numVertices;
+	result.others.view.StrideInBytes = others->elementSize;
 	return result;
 }
 
@@ -141,53 +145,63 @@ uint64 performSkinning()
 
 	if (numCalls > 0 || numClothCalls > 0)
 	{
-		dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
+		//dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
+		dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
-		if (numCalls)
 		{
-			uint32 matrixOffset = dxContext.bufferedFrameID * MAX_NUM_SKINNING_MATRICES_PER_FRAME;
+			DX_PROFILE_BLOCK(cl, "Skinning");
 
-			mat4* mats = (mat4*)mapBuffer(skinningMatricesBuffer, false);
-			memcpy(mats + matrixOffset, skinningMatrices, sizeof(mat4) * numSkinningMatricesThisFrame);
-			unmapBuffer(skinningMatricesBuffer, true, map_range{ matrixOffset, numSkinningMatricesThisFrame });
-
-
-			cl->setPipelineState(*skinningPipeline.pipeline);
-			cl->setComputeRootSignature(*skinningPipeline.rootSignature);
-
-			cl->setRootComputeSRV(SKINNING_RS_MATRICES, skinningMatricesBuffer->gpuVirtualAddress + sizeof(mat4) * matrixOffset);
-			cl->setRootComputeUAV(SKINNING_RS_OUTPUT0, skinnedVertexBuffer[currentSkinnedVertexBuffer].positions);
-			cl->setRootComputeUAV(SKINNING_RS_OUTPUT1, skinnedVertexBuffer[currentSkinnedVertexBuffer].others);
-
-			for (uint32 i = 0; i < numCalls; ++i)
+			if (numCalls)
 			{
-				auto& c = calls[i];
-				cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER0, c.vertexBuffer.positions.view.BufferLocation);
-				cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER1, c.vertexBuffer.others.view.BufferLocation);
-				cl->setCompute32BitConstants(SKINNING_RS_CB, skinning_cb{ c.jointOffset, c.numJoints, c.range.firstVertex, c.range.numVertices, c.vertexOffset });
-				cl->dispatch(bucketize(c.range.numVertices, 512));
+				DX_PROFILE_BLOCK(cl, "Skeletal");
+
+				uint32 matrixOffset = dxContext.bufferedFrameID * MAX_NUM_SKINNING_MATRICES_PER_FRAME;
+
+				mat4* mats = (mat4*)mapBuffer(skinningMatricesBuffer, false);
+				memcpy(mats + matrixOffset, skinningMatrices, sizeof(mat4) * numSkinningMatricesThisFrame);
+				unmapBuffer(skinningMatricesBuffer, true, map_range{ matrixOffset, numSkinningMatricesThisFrame });
+
+
+				cl->setPipelineState(*skinningPipeline.pipeline);
+				cl->setComputeRootSignature(*skinningPipeline.rootSignature);
+
+				cl->setRootComputeSRV(SKINNING_RS_MATRICES, skinningMatricesBuffer->gpuVirtualAddress + sizeof(mat4) * matrixOffset);
+				cl->setRootComputeUAV(SKINNING_RS_OUTPUT0, skinnedVertexBuffer[currentSkinnedVertexBuffer].positions);
+				cl->setRootComputeUAV(SKINNING_RS_OUTPUT1, skinnedVertexBuffer[currentSkinnedVertexBuffer].others);
+
+				for (uint32 i = 0; i < numCalls; ++i)
+				{
+					auto& c = calls[i];
+					cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER0, c.vertexBuffer.positions.view.BufferLocation);
+					cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER1, c.vertexBuffer.others.view.BufferLocation);
+					cl->setCompute32BitConstants(SKINNING_RS_CB, skinning_cb{ c.jointOffset, c.numJoints, c.range.firstVertex, c.range.numVertices, c.vertexOffset });
+					cl->dispatch(bucketize(c.range.numVertices, 512));
+				}
 			}
-		}
-		if (numClothCalls)
-		{
-			cl->setPipelineState(*clothSkinningPipeline.pipeline);
-			cl->setComputeRootSignature(*clothSkinningPipeline.rootSignature);
-
-			cl->setRootComputeUAV(CLOTH_SKINNING_RS_OUTPUT, skinnedVertexBuffer[currentSkinnedVertexBuffer].others);
-
-			for (uint32 i = 0; i < numClothCalls; ++i)
+			if (numClothCalls)
 			{
-				auto& c = clothCalls[i];
-				cl->setRootComputeSRV(CLOTH_SKINNING_RS_INPUT, c.vertexBuffer.view.BufferLocation);
-				cl->setCompute32BitConstants(CLOTH_SKINNING_RS_CB, cloth_skinning_cb{ c.gridSizeX, c.gridSizeY, c.vertexOffset });
-				cl->dispatch(bucketize(c.gridSizeX, 16), bucketize(c.gridSizeY, 16));
-			}
-		}
+				DX_PROFILE_BLOCK(cl, "Cloth");
 
-		// Not necessary, since the command list ends here.
-		//barrier_batcher(cl)
-		//	.uav(skinnedVertexBuffer[currentSkinnedVertexBuffer].positions)
-		//	.uav(skinnedVertexBuffer[currentSkinnedVertexBuffer].others);
+				cl->setPipelineState(*clothSkinningPipeline.pipeline);
+				cl->setComputeRootSignature(*clothSkinningPipeline.rootSignature);
+
+				cl->setRootComputeUAV(CLOTH_SKINNING_RS_OUTPUT0, skinnedVertexBuffer[currentSkinnedVertexBuffer].positions);
+				cl->setRootComputeUAV(CLOTH_SKINNING_RS_OUTPUT1, skinnedVertexBuffer[currentSkinnedVertexBuffer].others);
+
+				for (uint32 i = 0; i < numClothCalls; ++i)
+				{
+					auto& c = clothCalls[i];
+					cl->setRootComputeSRV(CLOTH_SKINNING_RS_INPUT, c.vertexBuffer.view.BufferLocation);
+					cl->setCompute32BitConstants(CLOTH_SKINNING_RS_CB, cloth_skinning_cb{ c.gridSizeX, c.gridSizeY, c.vertexOffset });
+					cl->dispatch(bucketize(c.gridSizeX, 16), bucketize(c.gridSizeY, 16));
+				}
+			}
+
+			// Not necessary, since the command list ends here.
+			//barrier_batcher(cl)
+			//	.uav(skinnedVertexBuffer[currentSkinnedVertexBuffer].positions)
+			//	.uav(skinnedVertexBuffer[currentSkinnedVertexBuffer].others);
+		}
 
 		result = dxContext.executeCommandList(cl);
 	}

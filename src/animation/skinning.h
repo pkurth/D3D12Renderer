@@ -16,6 +16,6 @@ std::tuple<material_vertex_buffer_group_view, mat4*> skinObject(const material_v
 std::tuple<material_vertex_buffer_group_view, mat4*> skinObject(const material_vertex_buffer_group_view& vertexBuffer, uint32 numVertices, uint32 numJoints);
 std::tuple<material_vertex_buffer_group_view, mat4*> skinObject(const material_vertex_buffer_group_view& vertexBuffer, submesh_info submesh, uint32 numJoints);
 
-
+material_vertex_buffer_group_view skinCloth(const material_vertex_buffer_view& positions, uint32 gridSizeX, uint32 gridSizeY);
 
 uint64 performSkinning();
