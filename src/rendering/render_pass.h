@@ -332,9 +332,10 @@ struct ldr_render_pass
 
 struct shadow_render_pass_base
 {
-	void renderStaticObject(const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
+	void renderStaticObject(const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
-		staticDrawCalls.push_back(
+		auto& dcs = doubleSided ? doubleSidedStaticDrawCalls : staticDrawCalls;
+		dcs.push_back(
 			{
 				transform,
 				vertexBuffer,
@@ -344,9 +345,10 @@ struct shadow_render_pass_base
 		);
 	}
 
-	void renderDynamicObject(const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
+	void renderDynamicObject(const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
-		dynamicDrawCalls.push_back(
+		auto& dcs = doubleSided ? doubleSidedDynamicDrawCalls : dynamicDrawCalls;
+		dcs.push_back(
 			{
 				transform,
 				vertexBuffer,
@@ -356,12 +358,12 @@ struct shadow_render_pass_base
 		);
 	}
 
-	void renderStaticObject(const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
+	void renderStaticObject(const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
 		renderStaticObject(transform, vertexBuffer.positions, indexBuffer, submesh);
 	}
 
-	void renderDynamicObject(const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
+	void renderDynamicObject(const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
 		renderDynamicObject(transform, vertexBuffer.positions, indexBuffer, submesh);
 	}
@@ -370,10 +372,15 @@ struct shadow_render_pass_base
 	{
 		staticDrawCalls.clear();
 		dynamicDrawCalls.clear();
+		doubleSidedStaticDrawCalls.clear();
+		doubleSidedDynamicDrawCalls.clear();
 	}
 
 	std::vector<shadow_render_command> staticDrawCalls;
 	std::vector<shadow_render_command> dynamicDrawCalls;
+
+	std::vector<shadow_render_command> doubleSidedStaticDrawCalls;
+	std::vector<shadow_render_command> doubleSidedDynamicDrawCalls;
 };
 
 struct sun_cascade_render_pass : shadow_render_pass_base
@@ -385,24 +392,24 @@ struct sun_cascade_render_pass : shadow_render_pass_base
 struct sun_shadow_render_pass
 {
 	// Since each cascade includes the next lower one, if you submit a draw to cascade N, it will also be rendered in N-1 automatically. No need to add it to the lower one.
-	void renderStaticObject(uint32 cascadeIndex, const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
+	void renderStaticObject(uint32 cascadeIndex, const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
-		cascades[cascadeIndex].renderStaticObject(transform, vertexBuffer, indexBuffer, submesh);
+		cascades[cascadeIndex].renderStaticObject(transform, vertexBuffer, indexBuffer, submesh, doubleSided);
 	}
 
-	void renderStaticObject(uint32 cascadeIndex, const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
+	void renderStaticObject(uint32 cascadeIndex, const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
-		renderStaticObject(cascadeIndex, transform, vertexBuffer.positions, indexBuffer, submesh);
+		renderStaticObject(cascadeIndex, transform, vertexBuffer.positions, indexBuffer, submesh, doubleSided);
 	}
 
-	void renderDynamicObject(uint32 cascadeIndex, const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
+	void renderDynamicObject(uint32 cascadeIndex, const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
-		cascades[cascadeIndex].renderDynamicObject(transform, vertexBuffer, indexBuffer, submesh);
+		cascades[cascadeIndex].renderDynamicObject(transform, vertexBuffer, indexBuffer, submesh, doubleSided);
 	}
 
-	void renderDynamicObject(uint32 cascadeIndex, const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
+	void renderDynamicObject(uint32 cascadeIndex, const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
-		renderDynamicObject(cascadeIndex, transform, vertexBuffer.positions, indexBuffer, submesh);
+		renderDynamicObject(cascadeIndex, transform, vertexBuffer.positions, indexBuffer, submesh, doubleSided);
 	}
 
 	void reset()

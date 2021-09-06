@@ -23,6 +23,9 @@ static dx_pipeline doubleSidedAnimatedDepthPrePassPipeline;
 static dx_pipeline shadowPipeline;
 static dx_pipeline pointLightShadowPipeline;
 
+static dx_pipeline doubleSidedShadowPipeline;
+static dx_pipeline doubleSidedPointLightShadowPipeline;
+
 static dx_pipeline textureSkyPipeline;
 static dx_pipeline proceduralSkyPipeline;
 static dx_pipeline preethamSkyPipeline;
@@ -127,6 +130,10 @@ void loadCommonShaders()
 
 		shadowPipeline = createReloadablePipeline(desc, { "shadow_vs" }, rs_in_vertex_shader);
 		pointLightShadowPipeline = createReloadablePipeline(desc, { "shadow_point_light_vs", "shadow_point_light_ps" }, rs_in_vertex_shader);
+
+		desc.cullingOff();
+		doubleSidedShadowPipeline = createReloadablePipeline(desc, { "shadow_vs" }, rs_in_vertex_shader);
+		doubleSidedPointLightShadowPipeline = createReloadablePipeline(desc, { "shadow_point_light_vs", "shadow_point_light_ps" }, rs_in_vertex_shader);
 	}
 
 	// Outline.
@@ -434,6 +441,154 @@ void preethamSky(dx_command_list* cl,
 	cl->drawCubeTriangleStrip();
 }
 
+static void renderSunCascadeShadow(dx_command_list* cl, const std::vector<shadow_render_command>& drawCalls, const mat4& viewProj)
+{
+	for (const auto& dc : drawCalls)
+	{
+		const mat4& m = dc.transform;
+		const submesh_info& submesh = dc.submesh;
+		cl->setGraphics32BitConstants(SHADOW_RS_MVP, viewProj * m);
+
+		cl->setVertexBuffer(0, dc.vertexBuffer);
+		cl->setIndexBuffer(dc.indexBuffer);
+
+		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+	}
+}
+
+static void renderSpotShadow(dx_command_list* cl, const std::vector<shadow_render_command>& drawCalls, const mat4& viewProj)
+{
+	for (const auto& dc : drawCalls)
+	{
+		const mat4& m = dc.transform;
+		const submesh_info& submesh = dc.submesh;
+		cl->setGraphics32BitConstants(SHADOW_RS_MVP, viewProj * m);
+
+		cl->setVertexBuffer(0, dc.vertexBuffer);
+		cl->setIndexBuffer(dc.indexBuffer);
+
+		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+	}
+}
+
+static void renderPointShadow(dx_command_list* cl, const std::vector<shadow_render_command>& drawCalls, vec3 lightPosition, float maxDistance, float flip)
+{
+	for (const auto& dc : drawCalls)
+	{
+		const mat4& m = dc.transform;
+		const submesh_info& submesh = dc.submesh;
+		cl->setGraphics32BitConstants(SHADOW_RS_MVP,
+			point_shadow_transform_cb
+			{
+				m,
+				lightPosition,
+				maxDistance,
+				flip
+			});
+
+		cl->setVertexBuffer(0, dc.vertexBuffer);
+		cl->setIndexBuffer(dc.indexBuffer);
+
+		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+	}
+}
+
+static void sunShadowPassInternal(dx_command_list* cl,
+	const sun_shadow_render_pass** sunShadowRenderPasses, uint32 numSunLightShadowRenderPasses,
+	bool staticGeom, bool doubleSided)
+{
+	if (!numSunLightShadowRenderPasses)
+	{
+		return;
+	}
+
+	DX_PROFILE_BLOCK(cl, "Sun geometry");
+
+	for (uint32 passIndex = 0; passIndex < numSunLightShadowRenderPasses; ++passIndex)
+	{
+		auto pass = sunShadowRenderPasses[passIndex];
+
+		for (uint32 renderCascadeIndex = 0; renderCascadeIndex < pass->numCascades; ++renderCascadeIndex)
+		{
+			const sun_cascade_render_pass& cascade = pass->cascades[renderCascadeIndex];
+
+			DX_PROFILE_BLOCK(cl, (renderCascadeIndex == 0) ? "First cascade" : (renderCascadeIndex == 1) ? "Second cascade" : (renderCascadeIndex == 2) ? "Third cascade" : "Fourth cascade");
+
+			shadow_map_viewport vp = cascade.viewport;
+			cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+
+			for (uint32 i = 0; i <= renderCascadeIndex; ++i)
+			{
+				auto& dcs = 
+					staticGeom 
+						? (doubleSided ? pass->cascades[i].doubleSidedStaticDrawCalls : pass->cascades[i].staticDrawCalls)
+						: (doubleSided ? pass->cascades[i].doubleSidedDynamicDrawCalls : pass->cascades[i].dynamicDrawCalls);
+
+				renderSunCascadeShadow(cl, dcs, cascade.viewProj);
+			}
+		}
+	}
+}
+
+static void spotShadowPassInternal(dx_command_list* cl, 
+	const spot_shadow_render_pass** spotLightShadowRenderPasses, uint32 numSpotLightShadowRenderPasses,
+	bool staticGeom, bool doubleSided)
+{
+	if (!numSpotLightShadowRenderPasses)
+	{
+		return;
+	}
+
+	DX_PROFILE_BLOCK(cl, "Spot lights geometry");
+
+	for (uint32 i = 0; i < numSpotLightShadowRenderPasses; ++i)
+	{
+		DX_PROFILE_BLOCK(cl, "Single light");
+
+		shadow_map_viewport vp = spotLightShadowRenderPasses[i]->viewport;
+		cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+
+		auto& dcs = 
+			staticGeom 
+				? (doubleSided ? spotLightShadowRenderPasses[i]->doubleSidedStaticDrawCalls : spotLightShadowRenderPasses[i]->staticDrawCalls)
+				: (doubleSided ? spotLightShadowRenderPasses[i]->doubleSidedDynamicDrawCalls : spotLightShadowRenderPasses[i]->dynamicDrawCalls);
+
+		renderSpotShadow(cl, spotLightShadowRenderPasses[i]->staticDrawCalls, spotLightShadowRenderPasses[i]->viewProjMatrix);
+	}
+}
+
+static void pointShadowPassInternal(dx_command_list* cl, 
+	const point_shadow_render_pass** pointLightShadowRenderPasses, uint32 numPointLightShadowRenderPasses,
+	bool staticGeom, bool doubleSided)
+{
+	if (!numPointLightShadowRenderPasses)
+	{
+		return;
+	}
+
+	DX_PROFILE_BLOCK(cl, "Point lights geometry");
+
+	for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
+	{
+		DX_PROFILE_BLOCK(cl, "Single light");
+
+		for (uint32 v = 0; v < 2; ++v)
+		{
+			DX_PROFILE_BLOCK(cl, (v == 0) ? "First hemisphere" : "Second hemisphere");
+
+			shadow_map_viewport vp = (v == 0) ? pointLightShadowRenderPasses[i]->viewport0 : pointLightShadowRenderPasses[i]->viewport1;
+			cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+
+			auto& dcs =
+				staticGeom
+					? (doubleSided ? pointLightShadowRenderPasses[i]->doubleSidedStaticDrawCalls : pointLightShadowRenderPasses[i]->staticDrawCalls)
+					: (doubleSided ? pointLightShadowRenderPasses[i]->doubleSidedDynamicDrawCalls : pointLightShadowRenderPasses[i]->dynamicDrawCalls);
+
+			renderPointShadow(cl, dcs, pointLightShadowRenderPasses[i]->lightPosition, pointLightShadowRenderPasses[i]->maxDistance, (v == 0) ? 1.f : -1.f);
+		}
+	}
+}
+
 void shadowPasses(dx_command_list* cl,
 	const sun_shadow_render_pass** sunShadowRenderPasses, uint32 numSunLightShadowRenderPasses,
 	const spot_shadow_render_pass** spotLightShadowRenderPasses, uint32 numSpotLightShadowRenderPasses,
@@ -526,126 +681,41 @@ void shadowPasses(dx_command_list* cl,
 		}
 
 
-		auto renderSunCascadeShadow = [](dx_command_list* cl, const std::vector<shadow_render_command>& drawCalls, const mat4& viewProj)
-		{
-			for (const auto& dc : drawCalls)
-			{
-				const mat4& m = dc.transform;
-				const submesh_info& submesh = dc.submesh;
-				cl->setGraphics32BitConstants(SHADOW_RS_MVP, viewProj * m);
-
-				cl->setVertexBuffer(0, dc.vertexBuffer);
-				cl->setIndexBuffer(dc.indexBuffer);
-
-				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-			}
-		};
-		auto renderSpotShadow = [](dx_command_list* cl, const std::vector<shadow_render_command>& drawCalls, const mat4& viewProj)
-		{
-			for (const auto& dc : drawCalls)
-			{
-				const mat4& m = dc.transform;
-				const submesh_info& submesh = dc.submesh;
-				cl->setGraphics32BitConstants(SHADOW_RS_MVP, viewProj * m);
-
-				cl->setVertexBuffer(0, dc.vertexBuffer);
-				cl->setIndexBuffer(dc.indexBuffer);
-
-				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-			}
-		};
-		auto renderPointShadow = [](dx_command_list* cl, const std::vector<shadow_render_command>& drawCalls, vec3 lightPosition, float maxDistance, float flip)
-		{
-			for (const auto& dc : drawCalls)
-			{
-				const mat4& m = dc.transform;
-				const submesh_info& submesh = dc.submesh;
-				cl->setGraphics32BitConstants(SHADOW_RS_MVP,
-					point_shadow_transform_cb
-					{
-						m,
-						lightPosition,
-						maxDistance,
-						flip
-					});
-
-				cl->setVertexBuffer(0, dc.vertexBuffer);
-				cl->setIndexBuffer(dc.indexBuffer);
-
-				cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
-			}
-		};
-
 
 		dx_render_target shadowRenderTarget({}, render_resources::shadowMap);
 		cl->setRenderTarget(shadowRenderTarget);
 
-		if (numSunLightShadowRenderPasses || numSpotLightShadowRenderPasses)
 		{
-			cl->setPipelineState(*shadowPipeline.pipeline);
-			cl->setGraphicsRootSignature(*shadowPipeline.rootSignature);
-		}
+			DX_PROFILE_BLOCK(cl, "Static geometry");
 
-		if (numSunLightShadowRenderPasses)
-		{
-			DX_PROFILE_BLOCK(cl, "Sun static geometry");
-
-			for (uint32 passIndex = 0; passIndex < numSunLightShadowRenderPasses; ++passIndex)
+			if (numSunLightShadowRenderPasses || numSpotLightShadowRenderPasses)
 			{
-				auto pass = sunShadowRenderPasses[passIndex];
+				cl->setPipelineState(*shadowPipeline.pipeline);
+				cl->setGraphicsRootSignature(*shadowPipeline.rootSignature);
 
-				for (uint32 renderCascadeIndex = 0; renderCascadeIndex < pass->numCascades; ++renderCascadeIndex)
-				{
-					const sun_cascade_render_pass& cascade = pass->cascades[renderCascadeIndex];
+				sunShadowPassInternal(cl, sunShadowRenderPasses, numSunLightShadowRenderPasses, true, false);
+				spotShadowPassInternal(cl, spotLightShadowRenderPasses, numSpotLightShadowRenderPasses, true, false);
 
-					DX_PROFILE_BLOCK(cl, (renderCascadeIndex == 0) ? "First cascade" : (renderCascadeIndex == 1) ? "Second cascade" : (renderCascadeIndex == 2) ? "Third cascade" : "Fourth cascade");
 
-					shadow_map_viewport vp = cascade.viewport;
-					cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+				cl->setPipelineState(*doubleSidedShadowPipeline.pipeline);
+				cl->setGraphicsRootSignature(*doubleSidedShadowPipeline.rootSignature);
 
-					for (uint32 i = 0; i <= renderCascadeIndex; ++i)
-					{
-						renderSunCascadeShadow(cl, pass->cascades[i].staticDrawCalls, cascade.viewProj);
-					}
-				}
+				sunShadowPassInternal(cl, sunShadowRenderPasses, numSunLightShadowRenderPasses, true, true);
+				spotShadowPassInternal(cl, spotLightShadowRenderPasses, numSpotLightShadowRenderPasses, true, true);
 			}
-		}
 
-		if (numSpotLightShadowRenderPasses)
-		{
-			DX_PROFILE_BLOCK(cl, "Spot lights static geometry");
-
-			for (uint32 i = 0; i < numSpotLightShadowRenderPasses; ++i)
+			if (numPointLightShadowRenderPasses)
 			{
-				DX_PROFILE_BLOCK(cl, "Single light");
+				cl->setPipelineState(*pointLightShadowPipeline.pipeline);
+				cl->setGraphicsRootSignature(*pointLightShadowPipeline.rootSignature);
 
-				shadow_map_viewport vp = spotLightShadowRenderPasses[i]->viewport;
-				cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+				pointShadowPassInternal(cl, pointLightShadowRenderPasses, numPointLightShadowRenderPasses, true, false);
 
-				renderSpotShadow(cl, spotLightShadowRenderPasses[i]->staticDrawCalls, spotLightShadowRenderPasses[i]->viewProjMatrix);
-			}
-		}
 
-		if (numPointLightShadowRenderPasses)
-		{
-			DX_PROFILE_BLOCK(cl, "Point lights static geometry");
+				cl->setPipelineState(*doubleSidedPointLightShadowPipeline.pipeline);
+				cl->setGraphicsRootSignature(*doubleSidedPointLightShadowPipeline.rootSignature);
 
-			cl->setPipelineState(*pointLightShadowPipeline.pipeline);
-			cl->setGraphicsRootSignature(*pointLightShadowPipeline.rootSignature);
-
-			for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
-			{
-				DX_PROFILE_BLOCK(cl, "Single light");
-
-				for (uint32 v = 0; v < 2; ++v)
-				{
-					DX_PROFILE_BLOCK(cl, (v == 0) ? "First hemisphere" : "Second hemisphere");
-
-					shadow_map_viewport vp = (v == 0) ? pointLightShadowRenderPasses[i]->viewport0 : pointLightShadowRenderPasses[i]->viewport1;
-					cl->setViewport(vp.x, vp.y, vp.size, vp.size);
-
-					renderPointShadow(cl, pointLightShadowRenderPasses[i]->staticDrawCalls, pointLightShadowRenderPasses[i]->lightPosition, pointLightShadowRenderPasses[i]->maxDistance, (v == 0) ? 1.f : -1.f);
-				}
+				pointShadowPassInternal(cl, pointLightShadowRenderPasses, numPointLightShadowRenderPasses, true, true);
 			}
 		}
 
@@ -667,72 +737,37 @@ void shadowPasses(dx_command_list* cl,
 
 		cl->setRenderTarget(shadowRenderTarget);
 
-		if (numSunLightShadowRenderPasses || numSpotLightShadowRenderPasses)
 		{
-			cl->setPipelineState(*shadowPipeline.pipeline);
-			cl->setGraphicsRootSignature(*shadowPipeline.rootSignature);
-		}
+			DX_PROFILE_BLOCK(cl, "Dynamic geometry");
 
-		if (numSunLightShadowRenderPasses)
-		{
-			DX_PROFILE_BLOCK(cl, "Sun dynamic geometry");
-
-			for (uint32 passIndex = 0; passIndex < numSunLightShadowRenderPasses; ++passIndex)
+			if (numSunLightShadowRenderPasses || numSpotLightShadowRenderPasses)
 			{
-				auto pass = sunShadowRenderPasses[passIndex];
+				cl->setPipelineState(*shadowPipeline.pipeline);
+				cl->setGraphicsRootSignature(*shadowPipeline.rootSignature);
 
-				for (uint32 renderCascadeIndex = 0; renderCascadeIndex < 4; ++renderCascadeIndex)
-				{
-					const sun_cascade_render_pass& cascade = pass->cascades[renderCascadeIndex];
+				sunShadowPassInternal(cl, sunShadowRenderPasses, numSunLightShadowRenderPasses, false, false);
+				spotShadowPassInternal(cl, spotLightShadowRenderPasses, numSpotLightShadowRenderPasses, false, false);
 
-					DX_PROFILE_BLOCK(cl, (renderCascadeIndex == 0) ? "First cascade" : (renderCascadeIndex == 1) ? "Second cascade" : (renderCascadeIndex == 2) ? "Third cascade" : "Fourth cascade");
 
-					shadow_map_viewport vp = cascade.viewport;
-					cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+				cl->setPipelineState(*doubleSidedShadowPipeline.pipeline);
+				cl->setGraphicsRootSignature(*doubleSidedShadowPipeline.rootSignature);
 
-					for (uint32 i = 0; i <= renderCascadeIndex; ++i)
-					{
-						renderSunCascadeShadow(cl, pass->cascades[i].dynamicDrawCalls, cascade.viewProj);
-					}
-				}
+				sunShadowPassInternal(cl, sunShadowRenderPasses, numSunLightShadowRenderPasses, false, true);
+				spotShadowPassInternal(cl, spotLightShadowRenderPasses, numSpotLightShadowRenderPasses, false, true);
 			}
-		}
 
-		if (numSpotLightShadowRenderPasses)
-		{
-			DX_PROFILE_BLOCK(cl, "Spot lights dynamic geometry");
-
-			for (uint32 i = 0; i < numSpotLightShadowRenderPasses; ++i)
+			if (numPointLightShadowRenderPasses)
 			{
-				DX_PROFILE_BLOCK(cl, "Single light");
+				cl->setPipelineState(*pointLightShadowPipeline.pipeline);
+				cl->setGraphicsRootSignature(*pointLightShadowPipeline.rootSignature);
 
-				shadow_map_viewport vp = spotLightShadowRenderPasses[i]->viewport;
-				cl->setViewport(vp.x, vp.y, vp.size, vp.size);
+				pointShadowPassInternal(cl, pointLightShadowRenderPasses, numPointLightShadowRenderPasses, false, false);
 
-				renderSpotShadow(cl, spotLightShadowRenderPasses[i]->dynamicDrawCalls, spotLightShadowRenderPasses[i]->viewProjMatrix);
-			}
-		}
 
-		if (numPointLightShadowRenderPasses)
-		{
-			DX_PROFILE_BLOCK(cl, "Point lights dynamic geometry");
+				cl->setPipelineState(*doubleSidedPointLightShadowPipeline.pipeline);
+				cl->setGraphicsRootSignature(*doubleSidedPointLightShadowPipeline.rootSignature);
 
-			cl->setPipelineState(*pointLightShadowPipeline.pipeline);
-			cl->setGraphicsRootSignature(*pointLightShadowPipeline.rootSignature);
-
-			for (uint32 i = 0; i < numPointLightShadowRenderPasses; ++i)
-			{
-				DX_PROFILE_BLOCK(cl, "Single light");
-
-				for (uint32 v = 0; v < 2; ++v)
-				{
-					DX_PROFILE_BLOCK(cl, (v == 0) ? "First hemisphere" : "Second hemisphere");
-
-					shadow_map_viewport vp = (v == 0) ? pointLightShadowRenderPasses[i]->viewport0 : pointLightShadowRenderPasses[i]->viewport1;
-					cl->setViewport(vp.x, vp.y, vp.size, vp.size);
-
-					renderPointShadow(cl, pointLightShadowRenderPasses[i]->dynamicDrawCalls, pointLightShadowRenderPasses[i]->lightPosition, pointLightShadowRenderPasses[i]->maxDistance, (v == 0) ? 1.f : -1.f);
-				}
+				pointShadowPassInternal(cl, pointLightShadowRenderPasses, numPointLightShadowRenderPasses, false, true);
 			}
 		}
 	}
