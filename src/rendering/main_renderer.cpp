@@ -159,8 +159,7 @@ void main_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 
 	opaqueRenderPass = 0;
 	transparentRenderPass = 0;
-	overlayRenderPass = 0;
-	outlineRenderPass = 0;
+	ldrRenderPass = 0;
 
 	pointLights = 0;
 	spotLights = 0;
@@ -592,8 +591,9 @@ void main_renderer::endFrame(const user_input& input)
 			// LDR RENDERING
 			// ----------------------------------------
 
-			bool renderingOverlays = overlayRenderPass && overlayRenderPass->pass.size();
-			bool renderingOutlines = outlineRenderPass && outlineRenderPass->pass.size();
+			bool renderingLDR = ldrRenderPass && ldrRenderPass->ldrPass.size();
+			bool renderingOverlays = ldrRenderPass && ldrRenderPass->overlays.size();
+			bool renderingOutlines = ldrRenderPass && ldrRenderPass->outlines.size();
 			if (renderingOverlays || renderingOutlines)
 			{
 				barrier_batcher(cl)
@@ -602,14 +602,7 @@ void main_renderer::endFrame(const user_input& input)
 					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 				dx_render_target ldrRenderTarget({ ldrPostProcessingTexture }, depthStencilBuffer);
-				if (renderingOverlays)
-				{
-					overlays(cl, ldrRenderTarget, overlayRenderPass, materialInfo, unjitteredCamera.viewProj);
-				}
-				if (renderingOutlines)
-				{
-					outlines(cl, ldrRenderTarget, depthStencilBuffer, outlineRenderPass, unjitteredCamera.viewProj);
-				}
+				ldrPass(cl, ldrRenderTarget, depthStencilBuffer, ldrRenderPass, materialInfo, unjitteredCamera.viewProj);
 
 				barrier_batcher(cl)
 					.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);

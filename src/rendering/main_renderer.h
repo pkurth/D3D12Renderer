@@ -78,8 +78,7 @@ struct main_renderer
 
 	void submitRenderPass(opaque_render_pass* renderPass) {	assert(!opaqueRenderPass); opaqueRenderPass = renderPass; }
 	void submitRenderPass(transparent_render_pass* renderPass) { assert(!transparentRenderPass); transparentRenderPass = renderPass; }
-	void submitRenderPass(overlay_render_pass* renderPass) { assert(!overlayRenderPass); overlayRenderPass = renderPass; }
-	void submitRenderPass(outline_render_pass* renderPass) { assert(!outlineRenderPass); outlineRenderPass = renderPass; }
+	void submitRenderPass(ldr_render_pass* renderPass) { assert(!ldrRenderPass); ldrRenderPass = renderPass; }
 	void setRaytracer(dx_raytracer* raytracer, raytracing_tlas* tlas) {	this->raytracer = raytracer; this->tlas = tlas;	}
 
 
@@ -125,8 +124,7 @@ private:
 
 	const opaque_render_pass* opaqueRenderPass;
 	const transparent_render_pass* transparentRenderPass;
-	const overlay_render_pass* overlayRenderPass;
-	const outline_render_pass* outlineRenderPass;
+	const ldr_render_pass* ldrRenderPass;
 
 
 	uint32 windowWidth;

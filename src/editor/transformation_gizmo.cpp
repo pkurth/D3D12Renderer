@@ -419,7 +419,7 @@ bool transformation_gizmo::handleKeyboardInput(const user_input& input)
 	return result;
 }
 
-bool transformation_gizmo::manipulateTransformation(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, overlay_render_pass* overlayRenderPass)
+bool transformation_gizmo::manipulateTransformation(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
 {
 	if (!input.mouse.left.down || !allowInput)
 	{
@@ -473,7 +473,7 @@ bool transformation_gizmo::manipulateTransformation(trs& transform, const render
 
 		for (uint32 i = 0; i < 3; ++i)
 		{
-			overlayRenderPass->renderObject<debug_simple_pipeline>(createModelMatrix(transform.position, rotations[i], scaling), 
+			ldrRenderPass->renderOverlay<debug_simple_pipeline>(createModelMatrix(transform.position, rotations[i], scaling), 
 				mesh.vertexBuffer, mesh.indexBuffer,
 				submeshes[type],
 				debug_material{ colors[i] * (highlightAxis == i ? 0.5f : 1.f) }
@@ -482,7 +482,7 @@ bool transformation_gizmo::manipulateTransformation(trs& transform, const render
 
 		if (type == transformation_type_scale)
 		{
-			overlayRenderPass->renderObject<debug_simple_pipeline>(createModelMatrix(transform.position, rot, scaling), 
+			ldrRenderPass->renderOverlay<debug_simple_pipeline>(createModelMatrix(transform.position, rot, scaling),
 				mesh.vertexBuffer, mesh.indexBuffer,
 				boxSubmesh,
 				debug_material{ vec4(0.5f) * (highlightAxis == 3 ? 0.5f : 1.f) }
@@ -508,7 +508,7 @@ bool transformation_gizmo::manipulateTransformation(trs& transform, const render
 
 		for (uint32 i = 0; i < 3; ++i)
 		{
-			overlayRenderPass->renderObject<debug_simple_pipeline>(createModelMatrix(transform.position, rotations[i], scaling), 
+			ldrRenderPass->renderOverlay<debug_simple_pipeline>(createModelMatrix(transform.position, rotations[i], scaling),
 				mesh.vertexBuffer, mesh.indexBuffer,
 				planeSubmesh,
 				debug_material{ colors[i] * (highlightAxis == i + 3 ? 0.5f : 1.f) }
@@ -519,7 +519,7 @@ bool transformation_gizmo::manipulateTransformation(trs& transform, const render
 	return dragging;
 }
 
-bool transformation_gizmo::manipulatePosition(vec3& position, const render_camera& camera, const user_input& input, bool allowInput, overlay_render_pass* overlayRenderPass)
+bool transformation_gizmo::manipulatePosition(vec3& position, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
 {
 	if (type == transformation_type_rotation || type == transformation_type_scale)
 	{
@@ -527,7 +527,7 @@ bool transformation_gizmo::manipulatePosition(vec3& position, const render_camer
 	}
 
 	trs transform = { position, quat::identity, vec3(1.f, 1.f, 1.f) };
-	bool result = manipulateTransformation(transform, camera, input, allowInput, overlayRenderPass);
+	bool result = manipulateTransformation(transform, camera, input, allowInput, ldrRenderPass);
 	if (result)
 	{
 		position = transform.position;

@@ -249,16 +249,20 @@ struct transparent_render_pass
 	render_command_buffer<float> pass;
 };
 
-struct overlay_render_pass
+struct ldr_render_pass
 {
 	void sort()
 	{
-		pass.sort();
+		ldrPass.clear();
+		overlays.sort();
+		// We don't sort the outlines.
 	}
 
 	void reset()
 	{
-		pass.clear();
+		ldrPass.clear();
+		overlays.clear();
+		outlines.clear();
 	}
 
 	template <typename pipeline_t>
@@ -271,7 +275,7 @@ struct overlay_render_pass
 		using material_t = typename pipeline_t::material_t;
 
 		float depth = 0.f; // TODO
-		auto& command = pass.emplace_back<pipeline_t, default_render_command<material_t>>(depth);
+		auto& command = ldrPass.emplace_back<pipeline_t, default_render_command<material_t>>(depth);
 		command.transform = transform;
 		command.vertexBuffer = vertexBuffer;
 		command.indexBuffer = indexBuffer;
@@ -279,17 +283,22 @@ struct overlay_render_pass
 		command.material = material;
 	}
 
-	render_command_buffer<float> pass;
-};
-
-
-
-
-struct outline_render_pass
-{
-	void reset()
+	template <typename pipeline_t>
+	void renderOverlay(const mat4& transform,
+		const material_vertex_buffer_group_view& vertexBuffer,
+		const material_index_buffer_view& indexBuffer,
+		submesh_info submesh,
+		const typename pipeline_t::material_t& material)
 	{
-		pass.clear();
+		using material_t = typename pipeline_t::material_t;
+
+		float depth = 0.f; // TODO
+		auto& command = overlays.emplace_back<pipeline_t, default_render_command<material_t>>(depth);
+		command.transform = transform;
+		command.vertexBuffer = vertexBuffer;
+		command.indexBuffer = indexBuffer;
+		command.submesh = submesh;
+		command.material = material;
 	}
 
 	void renderOutline(const mat4& transform,
@@ -297,7 +306,7 @@ struct outline_render_pass
 		const material_index_buffer_view& indexBuffer,
 		submesh_info submesh)
 	{
-		auto& command = pass.emplace_back();
+		auto& command = outlines.emplace_back();
 		command.transform = transform;
 		command.vertexBuffer = vertexBuffer;
 		command.indexBuffer = indexBuffer;
@@ -312,8 +321,11 @@ struct outline_render_pass
 		renderOutline(transform, vertexBuffer.positions, indexBuffer, submesh);
 	}
 
-	std::vector<outline_render_command> pass;
+	render_command_buffer<float> ldrPass;
+	render_command_buffer<float> overlays;
+	std::vector<outline_render_command> outlines;
 };
+
 
 
 

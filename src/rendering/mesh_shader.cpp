@@ -256,7 +256,7 @@ void initializeMeshShader()
 	}
 }
 
-void testRenderMeshShader(overlay_render_pass* overlayRenderPass)
+void testRenderMeshShader(ldr_render_pass* ldrRenderPass)
 {
 	/*overlayRenderPass->renderObjectWithMeshShader(1, 1, 1,
 		cubeMaterial,

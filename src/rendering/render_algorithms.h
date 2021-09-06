@@ -143,16 +143,11 @@ void transparentLightPass(dx_command_list* cl,
 	const common_material_info& materialInfo,
 	const mat4& viewProj);
 
-void overlays(dx_command_list* cl,
-	const dx_render_target& ldrRenderTarget,
-	const overlay_render_pass* overlayRenderPass,
-	const common_material_info& materialInfo,
-	const mat4& viewProj);
-
-void outlines(dx_command_list* cl,
+void ldrPass(dx_command_list* cl,
 	const dx_render_target& ldrRenderTarget,
 	ref<dx_texture> depthStencilBuffer,			// DEPTH_WRITE. Must be same as DSV bound to render-target.
-	const outline_render_pass* outlineRenderPass,
+	const ldr_render_pass* ldrRenderPass,
+	const common_material_info& materialInfo,
 	const mat4& viewProj);
 
 void copyShadowMapParts(dx_command_list* cl,

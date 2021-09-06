@@ -992,8 +992,7 @@ void application::resetRenderPasses()
 {
 	opaqueRenderPass.reset();
 	transparentRenderPass.reset();
-	overlayRenderPass.reset();
-	outlineRenderPass.reset();
+	ldrRenderPass.reset();
 	sunShadowRenderPass.reset();
 
 	for (uint32 i = 0; i < numSpotShadowRenderPasses; ++i)
@@ -1017,12 +1016,11 @@ void application::submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 num
 {
 	opaqueRenderPass.sort();
 	transparentRenderPass.sort();
-	overlayRenderPass.sort();
+	ldrRenderPass.sort();
 
 	renderer->submitRenderPass(&opaqueRenderPass);
 	renderer->submitRenderPass(&transparentRenderPass);
-	renderer->submitRenderPass(&overlayRenderPass);
-	renderer->submitRenderPass(&outlineRenderPass);
+	renderer->submitRenderPass(&ldrRenderPass);
 
 	shadow_map_renderer::submitRenderPass(&sunShadowRenderPass);
 
@@ -1119,7 +1117,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 
 			bool draggingBefore = gizmo.dragging;
 
-			if (gizmo.manipulateTransformation(transform, camera, input, !inputCaptured, &overlayRenderPass))
+			if (gizmo.manipulateTransformation(transform, camera, input, !inputCaptured, &ldrRenderPass))
 			{
 				setSelectedEntityEulerRotation();
 				inputCaptured = true;
@@ -1156,7 +1154,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 		else if (selectedEntity.hasComponent<point_light_component>())
 		{
 			point_light_component& pl = selectedEntity.getComponent<point_light_component>();
-			if (gizmo.manipulatePosition(pl.position, camera, input, !inputCaptured, &overlayRenderPass))
+			if (gizmo.manipulatePosition(pl.position, camera, input, !inputCaptured, &ldrRenderPass))
 			{
 				inputCaptured = true;
 			}
@@ -1380,7 +1378,7 @@ void application::update(const user_input& input, float dt)
 
 					if (outline)
 					{
-						outlineRenderPass.renderOutline(m, controller->currentVertexBuffer, mesh.indexBuffer, submesh);
+						ldrRenderPass.renderOutline(m, controller->currentVertexBuffer, mesh.indexBuffer, submesh);
 					}
 				}
 			}
@@ -1409,7 +1407,7 @@ void application::update(const user_input& input, float dt)
 
 					if (outline)
 					{
-						outlineRenderPass.renderOutline(m, mesh.vertexBuffer, mesh.indexBuffer, submesh);
+						ldrRenderPass.renderOutline(m, mesh.vertexBuffer, mesh.indexBuffer, submesh);
 					}
 				}
 			}
@@ -1432,7 +1430,7 @@ void application::update(const user_input& input, float dt)
 
 			if (outline)
 			{
-				outlineRenderPass.renderOutline(mat4::identity, positionVertexBuffer, indexBuffer, submesh);
+				ldrRenderPass.renderOutline(mat4::identity, positionVertexBuffer, indexBuffer, submesh);
 			}
 		}
 

@@ -792,71 +792,73 @@ void transparentLightPass(dx_command_list* cl,
 	}
 }
 
-void overlays(dx_command_list* cl,
+void ldrPass(dx_command_list* cl,
 	const dx_render_target& ldrRenderTarget,
-	const overlay_render_pass* overlayRenderPass,
+	ref<dx_texture> depthStencilBuffer,
+	const ldr_render_pass* ldrRenderPass,
 	const common_material_info& materialInfo,
 	const mat4& viewProj)
 {
-	DX_PROFILE_BLOCK(cl, "3D Overlays");
+	DX_PROFILE_BLOCK(cl, "LDR pass");
 
 	cl->setRenderTarget(ldrRenderTarget);
 	cl->setViewport(ldrRenderTarget.viewport);
 
-	cl->clearDepth(ldrRenderTarget.dsv);
 
-	pipeline_setup_func lastSetupFunc = 0;
 
-	for (auto dc : overlayRenderPass->pass)
+
+	if (ldrRenderPass->overlays.size())
 	{
-		if (dc.setup != lastSetupFunc)
+		DX_PROFILE_BLOCK(cl, "3D Overlays");
+
+		cl->clearDepth(ldrRenderTarget.dsv);
+
+		pipeline_setup_func lastSetupFunc = 0;
+
+		for (auto dc : ldrRenderPass->overlays)
 		{
-			dc.setup(cl, materialInfo);
-			lastSetupFunc = dc.setup;
+			if (dc.setup != lastSetupFunc)
+			{
+				dc.setup(cl, materialInfo);
+				lastSetupFunc = dc.setup;
+			}
+			dc.render(cl, viewProj, dc.data);
 		}
-		dc.render(cl, viewProj, dc.data);
 	}
-}
 
-void outlines(dx_command_list* cl, 
-	const dx_render_target& ldrRenderTarget, 
-	ref<dx_texture> depthStencilBuffer,
-	const outline_render_pass* outlineRenderPass,
-	const mat4& viewProj)
-{
-	DX_PROFILE_BLOCK(cl, "Outlines");
-
-	cl->setRenderTarget(ldrRenderTarget);
-	cl->setViewport(ldrRenderTarget.viewport);
-
-	cl->setStencilReference(stencil_flag_selected_object);
-
-	cl->setPipelineState(*outlineMarkerPipeline.pipeline);
-	cl->setGraphicsRootSignature(*outlineMarkerPipeline.rootSignature);
-
-
-	// Mark objects in stencil.
-	for (const auto& outlined : outlineRenderPass->pass)
+	if (ldrRenderPass->outlines.size())
 	{
-		cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * outlined.transform});
+		DX_PROFILE_BLOCK(cl, "Outlines");
 
-		cl->setVertexBuffer(0, outlined.vertexBuffer);
-		cl->setIndexBuffer(outlined.indexBuffer);
-		cl->drawIndexed(outlined.submesh.numTriangles * 3, 1, outlined.submesh.firstTriangle * 3, outlined.submesh.baseVertex, 0);
+		cl->setStencilReference(stencil_flag_selected_object);
+
+		cl->setPipelineState(*outlineMarkerPipeline.pipeline);
+		cl->setGraphicsRootSignature(*outlineMarkerPipeline.rootSignature);
+
+
+		// Mark objects in stencil.
+		for (const auto& outlined : ldrRenderPass->outlines)
+		{
+			cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * outlined.transform });
+
+			cl->setVertexBuffer(0, outlined.vertexBuffer);
+			cl->setIndexBuffer(outlined.indexBuffer);
+			cl->drawIndexed(outlined.submesh.numTriangles * 3, 1, outlined.submesh.firstTriangle * 3, outlined.submesh.baseVertex, 0);
+		}
+
+		// Draw outline.
+		cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ);
+
+		cl->setPipelineState(*outlineDrawerPipeline.pipeline);
+		cl->setGraphicsRootSignature(*outlineDrawerPipeline.rootSignature);
+
+		cl->setGraphics32BitConstants(OUTLINE_RS_CB, outline_drawer_cb{ (int)depthStencilBuffer->width, (int)depthStencilBuffer->height });
+		cl->setDescriptorHeapResource(OUTLINE_RS_STENCIL, 0, 1, depthStencilBuffer->stencilSRV);
+
+		cl->drawFullscreenTriangle();
+
+		cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 	}
-
-	// Draw outline.
-	cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ);
-
-	cl->setPipelineState(*outlineDrawerPipeline.pipeline);
-	cl->setGraphicsRootSignature(*outlineDrawerPipeline.rootSignature);
-
-	cl->setGraphics32BitConstants(OUTLINE_RS_CB, outline_drawer_cb{ (int)depthStencilBuffer->width, (int)depthStencilBuffer->height });
-	cl->setDescriptorHeapResource(OUTLINE_RS_STENCIL, 0, 1, depthStencilBuffer->stencilSRV);
-
-	cl->drawFullscreenTriangle();
-
-	cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 }
 
 void copyShadowMapParts(dx_command_list* cl, 
