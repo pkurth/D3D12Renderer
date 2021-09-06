@@ -193,7 +193,7 @@ uint64 performSkinning()
 					auto& c = clothCalls[i];
 					cl->setRootComputeSRV(CLOTH_SKINNING_RS_INPUT, c.vertexBuffer.view.BufferLocation);
 					cl->setCompute32BitConstants(CLOTH_SKINNING_RS_CB, cloth_skinning_cb{ c.gridSizeX, c.gridSizeY, c.vertexOffset });
-					cl->dispatch(bucketize(c.gridSizeX, 16), bucketize(c.gridSizeY, 16));
+					cl->dispatch(bucketize(c.gridSizeX, 15), bucketize(c.gridSizeY, 15)); // 15 is correct here.
 				}
 			}
 
