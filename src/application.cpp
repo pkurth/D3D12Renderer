@@ -900,6 +900,53 @@ bool application::drawSceneHierarchy()
 				{
 					anim.controller->edit(selectedEntity);
 				});
+
+				drawComponent<rigid_body_component>(selectedEntity, "Rigid body", [this](rigid_body_component& rb)
+				{
+					bool kinematic = rb.invMass == 0;
+					if (ImGui::Checkbox("Kinematic", &kinematic))
+					{
+						if (kinematic)
+						{
+							rb.invMass = 0.f;
+							rb.invInertia = mat3::zero;
+							rb.linearVelocity = vec3(0.f);
+							rb.angularVelocity = vec3(0.f);
+							rb.forceAccumulator = vec3(0.f);
+							rb.torqueAccumulator = vec3(0.f);
+						}
+						else
+						{
+							rb.invMass = 1.f;
+							rb.invInertia = mat3::identity;
+
+							if (selectedEntity.hasComponent<physics_reference_component>())
+							{
+								rb.recalculateProperties(&appScene.registry, selectedEntity.getComponent<physics_reference_component>());
+							}
+						}
+					}
+
+					ImGui::SliderFloat("Linear velocity damping", &rb.linearDamping, 0.f, 1.f);
+					ImGui::SliderFloat("Angular velocity damping", &rb.angularDamping, 0.f, 1.f);
+					ImGui::SliderFloat("Gravity factor", &rb.gravityFactor, 0.f, 1.f);
+				});
+
+				drawComponent<cloth_component>(selectedEntity, "Cloth", [](cloth_component& cloth)
+				{
+					bool dirty = false;
+					dirty |= ImGui::InputFloat("Total mass", &cloth.totalMass);
+					dirty |= ImGui::SliderFloat("Stiffness", &cloth.stiffness, 0.01f, 0.7f);
+
+					// These two don't need to notify the cloth on change.
+					ImGui::SliderFloat("Velocity damping", &cloth.damping, 0.f, 1.f);
+					ImGui::SliderFloat("Gravity factor", &cloth.gravityFactor, 0.f, 1.f);
+
+					if (dirty)
+					{
+						cloth.recalculateProperties();
+					}
+				});
 			}
 		}
 	}

@@ -5,11 +5,12 @@
 #include "animation/skinning.h"
 #include "dx/dx_context.h"
 
-cloth_component::cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float thickness, float damping, float gravityFactor)
+cloth_component::cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float stiffness, float damping, float gravityFactor)
 {
-	this->thickness = thickness;
 	this->gravityFactor = gravityFactor;
 	this->damping = damping;
+	this->totalMass = totalMass;
+	this->stiffness = stiffness;
 	this->gridSizeX = gridSizeX;
 	this->gridSizeY = gridSizeY;
 	this->width = width;
@@ -333,5 +334,22 @@ void cloth_component::addConstraint(uint32 indexA, uint32 indexB)
 			length(positions[indexA] - positions[indexB]),
 			(invMasses[indexA] + invMasses[indexB]) / stiffness,
 		});
+}
+
+void cloth_component::recalculateProperties()
+{
+	uint32 numParticles = gridSizeX * gridSizeY;
+	float invMassPerParticle = numParticles / totalMass;
+	for (float& invMass : invMasses)
+	{
+		invMass = (invMass != 0.f) ? invMassPerParticle : 0.f;
+	}
+
+	stiffness = clamp(stiffness, 0.01f, 1.f);
+	float invStiffness = 1.f / stiffness;
+	for (cloth_constraint& c : constraints)
+	{
+		c.inverseMassSum = (invMasses[c.a] + invMasses[c.b]) * invStiffness;
+	}
 }
 

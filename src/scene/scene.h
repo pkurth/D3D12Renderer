@@ -202,10 +202,7 @@ struct scene
 		return (uint32)registry.size<component_t>();
 	}
 
-private:
 	entt::registry registry;
-
-	friend scene_entity;
 };
 
 inline scene_entity::scene_entity(entt::entity handle, struct scene& scene) : handle(handle), registry(&scene.registry) {}

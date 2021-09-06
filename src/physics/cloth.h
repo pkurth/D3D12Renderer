@@ -13,21 +13,23 @@ struct cloth_constraint
 
 struct cloth_component
 {
-	cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float thickness = 0.1f, float damping = 0.3f, float gravityFactor = 1.f);
+	cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float stiffness = 0.5f, float damping = 0.3f, float gravityFactor = 1.f);
 
 	void setWorldPositionOfFixedVertices(const trs& transform);
 	void applyWindForce(vec3 force);
 	void simulate(uint32 velocityIterations, uint32 positionIterations, uint32 driftIterations, float dt);
+
+	void recalculateProperties(); // Call if stiffness or total mass changed. No need for changes in damping or gravity factor.
 
 	uint32 getRenderableVertexCount() const;
 	uint32 getRenderableTriangleCount() const;
 	//submesh_info getRenderData(vec3* positions, vertex_uv_normal_tangent* others, indexed_triangle16* triangles) const;
 	std::tuple<material_vertex_buffer_group_view, material_vertex_buffer_group_view, material_index_buffer_view, submesh_info> getRenderData();
 
+	float totalMass;
 	float gravityFactor;
 	float damping;
-	float thickness;
-	float stiffness = 0.5f;
+	float stiffness;
 
 private:
 	std::vector<vec3> positions;
