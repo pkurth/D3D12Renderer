@@ -330,8 +330,7 @@ struct ldr_render_pass
 
 
 
-
-struct sun_cascade_render_pass
+struct shadow_render_pass_base
 {
 	void renderStaticObject(const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
 	{
@@ -373,11 +372,14 @@ struct sun_cascade_render_pass
 		dynamicDrawCalls.clear();
 	}
 
-
-	mat4 viewProj;
-	shadow_map_viewport viewport;
 	std::vector<shadow_render_command> staticDrawCalls;
 	std::vector<shadow_render_command> dynamicDrawCalls;
+};
+
+struct sun_cascade_render_pass : shadow_render_pass_base
+{
+	mat4 viewProj;
+	shadow_map_viewport viewport;
 };
 
 struct sun_shadow_render_pass
@@ -418,60 +420,21 @@ struct sun_shadow_render_pass
 	bool copyFromStaticCache;
 };
 
-struct spot_shadow_render_pass
+struct spot_shadow_render_pass : shadow_render_pass_base
 {
 	mat4 viewProjMatrix;
 	shadow_map_viewport viewport;
 	bool copyFromStaticCache;
 
-
-	void renderStaticObject(const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
-	{
-		staticDrawCalls.push_back(
-			{
-				transform,
-				vertexBuffer,
-				indexBuffer,
-				submesh,
-			}
-		);
-	}
-
-	void renderStaticObject(const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
-	{
-		renderStaticObject(transform, vertexBuffer.positions, indexBuffer, submesh);
-	}
-
-	void renderDynamicObject(const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
-	{
-		dynamicDrawCalls.push_back(
-			{
-				transform,
-				vertexBuffer,
-				indexBuffer,
-				submesh,
-			}
-		);
-	}
-
-	void renderDynamicObject(const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
-	{
-		renderDynamicObject(transform, vertexBuffer.positions, indexBuffer, submesh);
-	}
-
 	void reset()
 	{
-		staticDrawCalls.clear();
-		dynamicDrawCalls.clear();
-
+		shadow_render_pass_base::reset();
 		copyFromStaticCache = false;
 	}
-
-	std::vector<shadow_render_command> staticDrawCalls;
-	std::vector<shadow_render_command> dynamicDrawCalls;
 };
 
-struct point_shadow_render_pass
+// TODO: Split this into positive and negative direction for frustum culling.
+struct point_shadow_render_pass : shadow_render_pass_base
 {
 	shadow_map_viewport viewport0;
 	shadow_map_viewport viewport1;
@@ -480,52 +443,13 @@ struct point_shadow_render_pass
 	bool copyFromStaticCache0;
 	bool copyFromStaticCache1;
 
-	// TODO: Split this into positive and negative direction for frustum culling.
-	void renderStaticObject(const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
-	{
-		staticDrawCalls.push_back(
-			{
-				transform,
-				vertexBuffer,
-				indexBuffer,
-				submesh,
-			}
-		);
-	}
-
-	void renderStaticObject(const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
-	{
-		renderStaticObject(transform, vertexBuffer.positions, indexBuffer, submesh);
-	}
-
-	void renderDynamicObject(const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
-	{
-		dynamicDrawCalls.push_back(
-			{
-				transform,
-				vertexBuffer,
-				indexBuffer,
-				submesh,
-			}
-		);
-	}
-
-	void renderDynamicObject(const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh)
-	{
-		renderDynamicObject(transform, vertexBuffer.positions, indexBuffer, submesh);
-	}
-
 	void reset()
 	{
-		staticDrawCalls.clear();
-		dynamicDrawCalls.clear();
+		shadow_render_pass_base::reset();
 
 		copyFromStaticCache0 = false;
 		copyFromStaticCache1 = false;
 	}
-
-	std::vector<shadow_render_command> staticDrawCalls;
-	std::vector<shadow_render_command> dynamicDrawCalls;
 };
 
 
