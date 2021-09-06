@@ -13,7 +13,8 @@ struct cloth_constraint
 
 struct cloth_component
 {
-	cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float stiffness = 0.5f, float damping = 0.3f, float gravityFactor = 1.f);
+	cloth_component(vec3 localPosition, quat localRotation, float width, float height, uint32 gridSizeX, uint32 gridSizeY, 
+		float totalMass, float stiffness = 0.5f, float damping = 0.3f, float gravityFactor = 1.f);
 
 	void setWorldPositionOfFixedVertices(const trs& transform);
 	void applyWindForce(vec3 force);
@@ -38,6 +39,10 @@ private:
 	std::vector<vec3> forceAccumulators;
 	std::vector<float> invMasses;
 	std::vector<cloth_constraint> constraints;
+
+	// In entity's local space.
+	vec3 localPosition;
+	quat localRotation;
 
 	uint32 gridSizeX, gridSizeY;
 	float width, height;

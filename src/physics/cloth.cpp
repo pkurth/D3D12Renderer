@@ -5,7 +5,7 @@
 #include "animation/skinning.h"
 #include "dx/dx_context.h"
 
-cloth_component::cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float stiffness, float damping, float gravityFactor)
+cloth_component::cloth_component(vec3 localPosition, quat localRotation, float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float stiffness, float damping, float gravityFactor)
 {
 	this->gravityFactor = gravityFactor;
 	this->damping = damping;
@@ -15,6 +15,8 @@ cloth_component::cloth_component(float width, float height, uint32 gridSizeX, ui
 	this->gridSizeY = gridSizeY;
 	this->width = width;
 	this->height = height;
+	this->localPosition = localPosition;
+	this->localRotation = localRotation;
 
 	uint32 numParticles = gridSizeX * gridSizeY;
 
@@ -116,6 +118,7 @@ vec3 cloth_component::getParticlePosition(float relX, float relY)
 	vec3 position = vec3(relX * width, -relY * height, 0.f);
 	position.x -= width * 0.5f;
 	std::swap(position.y, position.z);
+	position = localRotation * position + localPosition;
 	return position;
 }
 
