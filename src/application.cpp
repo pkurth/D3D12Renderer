@@ -111,7 +111,7 @@ void application::initialize(main_renderer* renderer)
 
 	appScene.createEntity("Cloth")
 		.addComponent<trs>(trs::identity)
-		.addComponent<cloth_component>(10.f, 10.f, 20, 20, 8.f);
+		.addComponent<cloth_component>(vec3(0.f, 0.f, 0.f), quat::identity, 10.f, 10.f, 20, 20, 8.f);
 
 	//clothMaterial = createPBRMaterial(
 	//	"assets/sphere/Tiles074_2K_Color.jpg",
