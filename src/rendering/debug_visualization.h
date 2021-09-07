@@ -14,6 +14,11 @@ struct debug_material
 	vec2 uv1 = vec2(1.f, 1.f);
 };
 
+struct debug_line_material
+{
+	vec4 color;
+};
+
 struct debug_simple_pipeline
 {
 	using material_t = debug_material;
@@ -34,8 +39,16 @@ struct debug_unlit_pipeline
 	PIPELINE_RENDER_DECL;
 };
 
+struct debug_unlit_line_pipeline
+{
+	using material_t = debug_line_material;
+
+	static void initialize();
+
+	PIPELINE_SETUP_DECL;
+	PIPELINE_RENDER_DECL;
 
 
-
-
+	static void renderCameraFrustum(const render_camera& frustum, vec4 color, ldr_render_pass* renderPass, float alternativeFarPlane = -1.f);
+};
 

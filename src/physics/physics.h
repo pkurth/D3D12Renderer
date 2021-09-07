@@ -144,7 +144,6 @@ struct force_field_component
 
 #define INVALID_BOUNDING_HULL_INDEX -1
 
-uint32 allocateBoundingHullGeometry(const struct cpu_mesh& mesh);
 uint32 allocateBoundingHullGeometry(const std::string& meshFilepath);
 
 struct distance_constraint_handle { uint16 index; };

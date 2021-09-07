@@ -27,24 +27,6 @@ cpu_mesh::cpu_mesh(uint32 flags)
 	vertex_info info = getVertexInfo(flags);
 	othersSize = info.othersSize;
 	skinOffset = info.skinOffset;
-	positionSize = sizeof(vec3);
-}
-
-cpu_mesh::cpu_mesh(cpu_mesh&& mesh)
-{
-	flags = mesh.flags;
-	positionSize = mesh.positionSize;
-	othersSize = mesh.othersSize;
-	skinOffset = mesh.skinOffset;
-	vertexPositions = mesh.vertexPositions;
-	vertexOthers = mesh.vertexOthers;
-	triangles = mesh.triangles;
-	numVertices = mesh.numVertices;
-	numTriangles = mesh.numTriangles;
-
-	mesh.vertexPositions = 0;
-	mesh.vertexOthers = 0;
-	mesh.triangles = 0;
 }
 
 cpu_mesh::~cpu_mesh()
@@ -71,13 +53,13 @@ void cpu_mesh::alignNextTriangle()
 
 void cpu_mesh::reserve(uint32 vertexCount, uint32 triangleCount)
 {
-	vertexPositions = (uint8*)_aligned_realloc(vertexPositions, (numVertices + vertexCount) * positionSize, 64);
+	vertexPositions = (vec3*)_aligned_realloc(vertexPositions, (numVertices + vertexCount) * sizeof(vec3), 64);
 	vertexOthers = (uint8*)_aligned_realloc(vertexOthers, (numVertices + vertexCount) * othersSize, 64);
 	triangles = (triangle_t*)_aligned_realloc(triangles, (numTriangles + triangleCount + 8) * sizeof(triangle_t), 64); // Allocate 8 more, such that we can align without problems.
 }
 
 #define pushVertex(position, uv, normal, tangent, skin)																							\
-	if (flags & mesh_creation_flags_with_positions) { *(vec3*)vertexPositionPtr = position; vertexPositionPtr += sizeof(vec3); }				\
+	if (flags & mesh_creation_flags_with_positions) { *vertexPositionPtr++ = position; }														\
 	if (flags & mesh_creation_flags_with_uvs) { *(vec2*)vertexOthersPtr = uv; vertexOthersPtr += sizeof(vec2); }								\
 	if (flags & mesh_creation_flags_with_normals) { *(vec3*)vertexOthersPtr = normal; vertexOthersPtr += sizeof(vec3); }						\
 	if (flags & mesh_creation_flags_with_tangents) { *(vec3*)vertexOthersPtr = tangent; vertexOthersPtr += sizeof(vec3); }						\
@@ -98,7 +80,7 @@ submesh_info cpu_mesh::pushQuad(vec2 radius)
 
 	reserve(4, 2);
 
-	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	vec3* vertexPositionPtr = vertexPositions + numVertices;
 	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
 	pushVertex(vec3(-radius.x, -radius.y, 0.f), vec2(0.f, 0.f), vec3(0.f, 0.f, 1.f), vec3(0.f, 1.f, 0.f), {});
@@ -110,8 +92,8 @@ submesh_info cpu_mesh::pushQuad(vec2 radius)
 	pushTriangle(1, 3, 2);
 
 	submesh_info result;
-	result.firstTriangle = firstTriangle;
-	result.numTriangles = 2;
+	result.firstIndex = firstTriangle * 3;
+	result.numIndices = 2 * 3;
 	result.baseVertex = baseVertex;
 	result.numVertices = 4;
 	return result;
@@ -131,7 +113,7 @@ submesh_info cpu_mesh::pushCube(vec3 radius, bool flipWindingOrder, vec3 center)
 	{
 		reserve(8, 12);
 
-		uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+		vec3* vertexPositionPtr = vertexPositions + numVertices;
 		uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
 		pushVertex(center + vec3(-radius.x, -radius.y, radius.z), {}, {}, {}, {});  // 0
@@ -160,7 +142,7 @@ submesh_info cpu_mesh::pushCube(vec3 radius, bool flipWindingOrder, vec3 center)
 	{
 		reserve(24, 12);
 
-		uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+		vec3* vertexPositionPtr = vertexPositions + numVertices;
 		uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
 		pushVertex(center + vec3(-radius.x, -radius.y, radius.z), vec2(0.f, 0.f), vec3(0.f, 0.f, 1.f), vec3(0.f, 1.f, 0.f), {});
@@ -213,8 +195,8 @@ submesh_info cpu_mesh::pushCube(vec3 radius, bool flipWindingOrder, vec3 center)
 	}
 
 	submesh_info result;
-	result.firstTriangle = firstTriangle;
-	result.numTriangles = 12;
+	result.firstIndex = firstTriangle * 3;
+	result.numIndices = 12 * 3;
 	result.baseVertex = baseVertex;
 	result.numVertices = numVertices - baseVertex;
 	return result;
@@ -239,7 +221,7 @@ submesh_info cpu_mesh::pushSphere(uint16 slices, uint16 rows, float radius, vec3
 	}
 	reserve(slices * rows + 2, 2 * rows * slices);
 
-	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	vec3* vertexPositionPtr = vertexPositions + numVertices;
 	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
 	// Vertices.
@@ -291,8 +273,8 @@ submesh_info cpu_mesh::pushSphere(uint16 slices, uint16 rows, float radius, vec3
 	pushTriangle(lastVertex - 1u - slices, lastVertex - 2u, lastVertex - 1u);
 
 	submesh_info result;
-	result.firstTriangle = firstTriangle;
-	result.numTriangles = 2 * rows * slices;
+	result.firstIndex = firstTriangle * 3;
+	result.numIndices = 2 * rows * slices * 3;
 	result.baseVertex = baseVertex;
 	result.numVertices = numVertices - baseVertex;
 	return result;
@@ -401,7 +383,7 @@ submesh_info cpu_mesh::pushIcoSphere(float radius, uint32 refinement)
 
 	reserve((uint32)vertices.size(), (uint32)triangles.size());
 
-	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	vec3* vertexPositionPtr = vertexPositions + numVertices;
 	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 	for (const vert& v : vertices)
 	{
@@ -414,8 +396,8 @@ submesh_info cpu_mesh::pushIcoSphere(float radius, uint32 refinement)
 	}
 
 	submesh_info result;
-	result.firstTriangle = firstTriangle;
-	result.numTriangles = (uint32)triangles.size();
+	result.firstIndex = firstTriangle * 3;
+	result.numIndices = (uint32)triangles.size() * 3;
 	result.baseVertex = baseVertex;
 	result.numVertices = (uint32)vertices.size();
 	return result;
@@ -446,7 +428,7 @@ submesh_info cpu_mesh::pushCapsule(uint16 slices, uint16 rows, float height, flo
 
 	reserve(slices * (rows + 1) + 2, 2 * (rows + 1) * slices);
 
-	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	vec3* vertexPositionPtr = vertexPositions + numVertices;
 	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
 	quat rotation = rotateFromTo(vec3(0.f, 1.f, 0.f), upAxis);
@@ -517,8 +499,8 @@ submesh_info cpu_mesh::pushCapsule(uint16 slices, uint16 rows, float height, flo
 	pushTriangle(lastVertex - 1 - slices, lastVertex - 2, lastVertex - 1);
 
 	submesh_info result;
-	result.firstTriangle = firstTriangle;
-	result.numTriangles = 2 * (rows + 1) * slices;
+	result.firstIndex = firstTriangle * 3;
+	result.numIndices = 2 * (rows + 1) * slices * 3;
 	result.baseVertex = baseVertex;
 	result.numVertices = numVertices - baseVertex;
 	return result;
@@ -538,7 +520,7 @@ submesh_info cpu_mesh::pushCylinder(uint16 slices, float radius, float height)
 
 	reserve(4 * slices + 2, 4 * slices);
 
-	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	vec3* vertexPositionPtr = vertexPositions + numVertices;
 	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 	vec2 uv(0.f, 0.f);
 	pushVertex(vec3(0.f, -halfHeight, 0.f), uv, vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
@@ -617,8 +599,8 @@ submesh_info cpu_mesh::pushCylinder(uint16 slices, float radius, float height)
 	pushTriangle(lastVertex - 1 - slices, lastVertex - 2, lastVertex - 1);
 
 	submesh_info result;
-	result.firstTriangle = firstTriangle;
-	result.numTriangles = 4 * slices;
+	result.firstIndex = firstTriangle * 3;
+	result.numIndices = 4 * slices * 3;
 	result.baseVertex = baseVertex;
 	result.numVertices = numVertices - baseVertex;
 	return result;
@@ -637,7 +619,7 @@ submesh_info cpu_mesh::pushArrow(uint16 slices, float shaftRadius, float headRad
 
 	reserve(7 * slices + 1, 7 * slices);
 
-	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	vec3* vertexPositionPtr = vertexPositions + numVertices;
 	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 	vec2 uv(0.f, 0.f);
 	pushVertex(vec3(0.f, 0.f, 0.f), uv, vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
@@ -747,8 +729,8 @@ submesh_info cpu_mesh::pushArrow(uint16 slices, float shaftRadius, float headRad
 	}
 
 	submesh_info result;
-	result.firstTriangle = firstTriangle;
-	result.numTriangles = 7 * slices;
+	result.firstIndex = firstTriangle * 3;
+	result.numIndices = 7 * slices * 3;
 	result.baseVertex = baseVertex;
 	result.numVertices = numVertices - baseVertex;
 	return result;
@@ -769,7 +751,7 @@ submesh_info cpu_mesh::pushTorus(uint16 slices, uint16 segments, float torusRadi
 
 	reserve(segments * slices, segments * slices * 2);
 
-	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	vec3* vertexPositionPtr = vertexPositions + numVertices;
 	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 	vec2 uv(0.f, 0.f);
 
@@ -817,8 +799,8 @@ submesh_info cpu_mesh::pushTorus(uint16 slices, uint16 segments, float torusRadi
 	pushTriangle(y * slices + slices - 1, slices - 1, 0);
 
 	submesh_info result;
-	result.firstTriangle = firstTriangle;
-	result.numTriangles = segments * slices * 2;
+	result.firstIndex = firstTriangle * 3;
+	result.numIndices = segments * slices * 2 * 3;
 	result.baseVertex = baseVertex;
 	result.numVertices = numVertices - baseVertex;
 	return result;
@@ -837,7 +819,7 @@ submesh_info cpu_mesh::pushMace(uint16 slices, float shaftRadius, float headRadi
 
 	reserve(8 * slices + 2, 8 * slices);
 
-	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	vec3* vertexPositionPtr = vertexPositions + numVertices;
 	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 	vec2 uv(0.f, 0.f);
 	pushVertex(vec3(0.f, 0.f, 0.f), uv, vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
@@ -967,8 +949,8 @@ submesh_info cpu_mesh::pushMace(uint16 slices, float shaftRadius, float headRadi
 	pushTriangle(lastVertex - 1 - slices, lastVertex - 2, lastVertex - 1);
 
 	submesh_info result;
-	result.firstTriangle = firstTriangle;
-	result.numTriangles = 8 * slices;
+	result.firstIndex = firstTriangle * 3;
+	result.numIndices = 8 * slices * 3;
 	result.baseVertex = baseVertex;
 	result.numVertices = numVertices - baseVertex;
 	return result;
@@ -988,7 +970,7 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_
 
 	reserve(mesh->mNumVertices, mesh->mNumFaces);
 
-	uint8* vertexPositionPtr = vertexPositions + positionSize * numVertices;
+	vec3* vertexPositionPtr = vertexPositions + numVertices;
 	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
 	vec3 position(0.f, 0.f, 0.f);
@@ -1108,8 +1090,8 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_
 	}
 
 	submesh_info result;
-	result.firstTriangle = firstTriangle;
-	result.numTriangles = mesh->mNumFaces;
+	result.firstIndex = firstTriangle * 3;
+	result.numIndices = mesh->mNumFaces * 3;
 	result.baseVertex = baseVertex;
 	result.numVertices = mesh->mNumVertices;
 	return result;
@@ -1118,7 +1100,7 @@ submesh_info cpu_mesh::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_
 dx_mesh cpu_mesh::createDXMesh()
 {
 	dx_mesh result;
-	result.vertexBuffer.positions = createVertexBuffer(positionSize, numVertices, vertexPositions);
+	result.vertexBuffer.positions = createVertexBuffer(sizeof(vec3), numVertices, vertexPositions);
 	if (flags != mesh_creation_flags_with_positions)
 	{
 		result.vertexBuffer.others = createVertexBuffer(othersSize, numVertices, vertexOthers);

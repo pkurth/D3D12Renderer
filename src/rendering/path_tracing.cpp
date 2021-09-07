@@ -88,7 +88,7 @@ raytracing_object_type path_tracer::defineObjectType(const ref<raytracing_blas>&
         dx_cpu_descriptor_handle base = descriptorHeap.currentCPU;
 
         descriptorHeap.push().createBufferSRV(blas->geometries[i].vertexBuffer.others, { submesh.baseVertex, submesh.numVertices });
-        descriptorHeap.push().createRawBufferSRV(blas->geometries[i].indexBuffer, { submesh.firstTriangle * 3, submesh.numTriangles * 3 });
+        descriptorHeap.push().createRawBufferSRV(blas->geometries[i].indexBuffer, { submesh.firstIndex, submesh.numIndices });
 
 
         uint32 flags = 0;

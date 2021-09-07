@@ -29,9 +29,9 @@ raytracing_blas_builder& raytracing_blas_builder::push(vertex_buffer_group verte
 	geomDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 	geomDesc.Triangles.VertexCount = submesh.numVertices;
 
-	geomDesc.Triangles.IndexBuffer = indexBuffer->gpuVirtualAddress + (indexBuffer->elementSize * submesh.firstTriangle * 3);
+	geomDesc.Triangles.IndexBuffer = indexBuffer->gpuVirtualAddress + (indexBuffer->elementSize * submesh.firstIndex);
 	geomDesc.Triangles.IndexFormat = getIndexBufferFormat(indexBuffer->elementSize);
-	geomDesc.Triangles.IndexCount = submesh.numTriangles * 3;
+	geomDesc.Triangles.IndexCount = submesh.numIndices;
 
 	geometryDescs.push_back(geomDesc);
 	geometries.push_back({ raytracing_mesh_geometry, vertexBuffer, indexBuffer, submesh });

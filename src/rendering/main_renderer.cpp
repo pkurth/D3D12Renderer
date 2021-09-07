@@ -349,7 +349,6 @@ void main_renderer::endFrame(const user_input& input)
 
 
 			cl->clearDepthAndStencil(depthStencilBuffer);
-			cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 			waitForSkinningToFinish();
 
@@ -409,8 +408,6 @@ void main_renderer::endFrame(const user_input& input)
 				preethamSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, sun.direction, skyIntensity);
 			}
 
-			cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // Sky renders a triangle strip, so reset back to triangle list.
-
 
 
 			// Copy hovered object id to readback buffer.
@@ -466,8 +463,6 @@ void main_renderer::endFrame(const user_input& input)
 		context.addWork([&]()
 		{
 			dx_command_list* cl = dxContext.getFreeRenderCommandList();
-
-			cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 			barrier_batcher(cl)
 				.transitionBegin(opaqueDepthBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -594,7 +589,7 @@ void main_renderer::endFrame(const user_input& input)
 			bool renderingLDR = ldrRenderPass && ldrRenderPass->ldrPass.size();
 			bool renderingOverlays = ldrRenderPass && ldrRenderPass->overlays.size();
 			bool renderingOutlines = ldrRenderPass && ldrRenderPass->outlines.size();
-			if (renderingOverlays || renderingOutlines)
+			if (renderingLDR || renderingOverlays || renderingOutlines)
 			{
 				barrier_batcher(cl)
 					//.uav(ldrPostProcessingTexture)

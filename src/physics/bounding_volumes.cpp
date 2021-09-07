@@ -1055,7 +1055,8 @@ static void addBoundingHullEdge(uint32 a, uint32 b, uint32 face, std::unordered_
 	}
 }
 
-bounding_hull_geometry boundingHullFromMesh(vec3* vertices, uint32 numVertices, indexed_triangle32* triangles, uint32 numTriangles)
+template <typename triangle_t>
+static bounding_hull_geometry hullFromMesh(vec3* vertices, uint32 numVertices, triangle_t* triangles, uint32 numTriangles)
 {
 	bounding_hull_geometry hull;
 
@@ -1078,7 +1079,7 @@ bounding_hull_geometry boundingHullFromMesh(vec3* vertices, uint32 numVertices, 
 
 	for (uint32 i = 0; i < numTriangles; ++i)
 	{
-		indexed_triangle32 tri = triangles[i];
+		triangle_t tri = triangles[i];
 
 		uint32 a = tri.a;
 		uint32 b = tri.b;
@@ -1102,4 +1103,14 @@ bounding_hull_geometry boundingHullFromMesh(vec3* vertices, uint32 numVertices, 
 	assert(edgeIndex == numEdges);
 
 	return hull;
+}
+
+bounding_hull_geometry bounding_hull_geometry::fromMesh(vec3* vertices, uint32 numVertices, indexed_triangle16* triangles, uint32 numTriangles)
+{
+	return hullFromMesh(vertices, numVertices, triangles, numTriangles);
+}
+
+bounding_hull_geometry bounding_hull_geometry::fromMesh(vec3* vertices, uint32 numVertices, indexed_triangle32* triangles, uint32 numTriangles)
+{
+	return hullFromMesh(vertices, numVertices, triangles, numTriangles);
 }

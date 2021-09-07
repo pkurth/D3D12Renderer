@@ -292,7 +292,7 @@ static void depthPrePassInternal(dx_command_list* cl,
 
 			cl->setVertexBuffer(0, dc.vertexBuffer);
 			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(dc.submesh.numTriangles * 3, 1, dc.submesh.firstTriangle * 3, dc.submesh.baseVertex, 0);
+			cl->drawIndexed(dc.submesh.numIndices, 1, dc.submesh.firstIndex, dc.submesh.baseVertex, 0);
 		}
 	}
 
@@ -308,7 +308,7 @@ static void depthPrePassInternal(dx_command_list* cl,
 
 			cl->setVertexBuffer(0, dc.vertexBuffer);
 			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(dc.submesh.numTriangles * 3, 1, dc.submesh.firstTriangle * 3, dc.submesh.baseVertex, 0);
+			cl->drawIndexed(dc.submesh.numIndices, 1, dc.submesh.firstIndex, dc.submesh.baseVertex, 0);
 		}
 	}
 }
@@ -336,7 +336,7 @@ static void depthPrePassInternal(dx_command_list* cl,
 
 			cl->setVertexBuffer(0, dc.vertexBuffer);
 			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(dc.submesh.numTriangles * 3, 1, dc.submesh.firstTriangle * 3, dc.submesh.baseVertex, 0);
+			cl->drawIndexed(dc.submesh.numIndices, 1, dc.submesh.firstIndex, dc.submesh.baseVertex, 0);
 		}
 	}
 }
@@ -351,6 +351,7 @@ void depthPrePass(dx_command_list* cl,
 
 	cl->setRenderTarget(depthOnlyRenderTarget);
 	cl->setViewport(depthOnlyRenderTarget.viewport);
+	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	depth_only_camera_jitter_cb jitterCB = { jitter, prevFrameJitter };
 
@@ -452,7 +453,7 @@ static void renderSunCascadeShadow(dx_command_list* cl, const std::vector<shadow
 		cl->setVertexBuffer(0, dc.vertexBuffer);
 		cl->setIndexBuffer(dc.indexBuffer);
 
-		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		cl->drawIndexed(submesh.numIndices, 1, submesh.firstIndex, submesh.baseVertex, 0);
 	}
 }
 
@@ -467,7 +468,7 @@ static void renderSpotShadow(dx_command_list* cl, const std::vector<shadow_rende
 		cl->setVertexBuffer(0, dc.vertexBuffer);
 		cl->setIndexBuffer(dc.indexBuffer);
 
-		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		cl->drawIndexed(submesh.numIndices, 1, submesh.firstIndex, submesh.baseVertex, 0);
 	}
 }
 
@@ -489,7 +490,7 @@ static void renderPointShadow(dx_command_list* cl, const std::vector<shadow_rend
 		cl->setVertexBuffer(0, dc.vertexBuffer);
 		cl->setIndexBuffer(dc.indexBuffer);
 
-		cl->drawIndexed(submesh.numTriangles * 3, 1, submesh.firstTriangle * 3, submesh.baseVertex, 0);
+		cl->drawIndexed(submesh.numIndices, 1, submesh.firstIndex, submesh.baseVertex, 0);
 	}
 }
 
@@ -893,7 +894,7 @@ void ldrPass(dx_command_list* cl,
 
 			cl->setVertexBuffer(0, dc.vertexBuffer);
 			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(dc.submesh.numTriangles * 3, 1, dc.submesh.firstTriangle * 3, dc.submesh.baseVertex, 0);
+			cl->drawIndexed(dc.submesh.numIndices, 1, dc.submesh.firstIndex, dc.submesh.baseVertex, 0);
 		}
 
 		// Draw outline.

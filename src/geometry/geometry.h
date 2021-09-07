@@ -8,8 +8,8 @@
 
 struct submesh_info
 {
-	uint32 numTriangles;
-	uint32 firstTriangle;
+	uint32 numIndices;
+	uint32 firstIndex;
 	uint32 baseVertex;
 	uint32 numVertices;
 };
@@ -39,20 +39,19 @@ static uint32 getVertexSize(uint32 meshFlags)
 
 struct cpu_mesh
 {
-	typedef indexed_triangle32 triangle_t;
+	typedef indexed_triangle16 triangle_t;
 
 	cpu_mesh() {}
 	cpu_mesh(uint32 flags);
 	cpu_mesh(const cpu_mesh& mesh) = delete;
-	cpu_mesh(cpu_mesh&& mesh);
+	cpu_mesh(cpu_mesh&& mesh) = default;
 	~cpu_mesh();
 
 	uint32 flags = 0;
-	uint32 positionSize = 0;
 	uint32 othersSize = 0;
 	uint32 skinOffset = 0;
 
-	uint8* vertexPositions = 0;
+	vec3* vertexPositions = 0;
 	uint8* vertexOthers = 0;
 	triangle_t* triangles = 0;
 
@@ -60,9 +59,7 @@ struct cpu_mesh
 	uint32 numTriangles = 0;
 
 	submesh_info pushQuad(vec2 radius);
-	submesh_info pushQuad(float radius) { return pushQuad(vec2(radius, radius)); }
 	submesh_info pushCube(vec3 radius, bool flipWindingOrder = false, vec3 center = vec3(0.f, 0.f, 0.f));
-	submesh_info pushCube(float radius, bool flipWindingOrder = false, vec3 center = vec3(0.f, 0.f, 0.f)) { return pushCube(vec3(radius, radius, radius), flipWindingOrder, center); }
 	submesh_info pushSphere(uint16 slices, uint16 rows, float radius, vec3 center = vec3(0.f, 0.f, 0.f));
 	submesh_info pushIcoSphere(float radius, uint32 refinement);
 	submesh_info pushCapsule(uint16 slices, uint16 rows, float height, float radius, vec3 center = vec3(0.f, 0.f, 0.f), vec3 upAxis = vec3(0.f, 1.f, 0.f));

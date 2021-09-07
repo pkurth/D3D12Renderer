@@ -27,12 +27,6 @@ struct force_field_global_state
 // This is a bit dirty. PHYSICS_ONLY is defined when building the learning DLL, where we don't need bounding hulls.
 
 #include "core/assimp.h"
-uint32 allocateBoundingHullGeometry(const cpu_mesh& mesh)
-{
-	uint32 index = (uint32)boundingHullGeometries.size();
-	boundingHullGeometries.push_back(boundingHullFromMesh((vec3*)mesh.vertexPositions, mesh.numVertices, mesh.triangles, mesh.numTriangles));
-	return index;
-}
 
 uint32 allocateBoundingHullGeometry(const std::string& meshFilepath)
 {
@@ -51,7 +45,10 @@ uint32 allocateBoundingHullGeometry(const std::string& meshFilepath)
 	assert(scene->mNumMeshes == 1);
 	cpuMesh.pushAssimpMesh(scene->mMeshes[0], 1.f);
 
-	return allocateBoundingHullGeometry(cpuMesh);
+
+	uint32 index = (uint32)boundingHullGeometries.size();
+	boundingHullGeometries.push_back(bounding_hull_geometry::fromMesh(cpuMesh.vertexPositions, cpuMesh.numVertices, cpuMesh.triangles, cpuMesh.numTriangles));
+	return index;
 }
 #endif
 

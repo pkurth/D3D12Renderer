@@ -1476,8 +1476,8 @@ void application::update(const user_input& input, float dt)
 			}
 		}
 
-		void collisionDebugDraw(transparent_render_pass* renderPass);
-		collisionDebugDraw(&transparentRenderPass);
+		void collisionDebugDraw(ldr_render_pass* renderPass);
+		collisionDebugDraw(&ldrRenderPass);
 
 
 		uint32 numPointLights = appScene.numberOfComponentsOfType<point_light_component>();

@@ -9,25 +9,22 @@
 
 #ifndef PHYSICS_ONLY
 #include "rendering/render_pass.h"
+#include "rendering/debug_visualization.h"
 #include "rendering/pbr.h"
 
 struct debug_draw_call
 {
-	ref<pbr_material> material;
 	mat4 transform;
+	vec4 color;
 };
 
 static std::vector<debug_draw_call> debugDrawCalls;
 
-static ref<pbr_material> redMaterial;
-static ref<pbr_material> greenMaterial;
-static ref<pbr_material> blueMaterial;
-
-static void debugSphere(vec3 position, float radius, ref<pbr_material> material)
+static void debugSphere(vec3 position, float radius, vec4 color)
 {
 	debugDrawCalls.push_back({
-		material,
 		createModelMatrix(position, quat::identity, radius),
+		color,
 	});
 }
 #endif
@@ -741,10 +738,10 @@ static bool intersection(const bounding_box& a, const bounding_box& b, contact_m
 	outContact.contacts[3].point.data[axis1] = max1;
 	outContact.contacts[3].point.data[minElement] = depth;
 
-	//debugSphere(outContact.contacts[0].point, 0.1f, blueMaterial);
-	//debugSphere(outContact.contacts[1].point, 0.1f, blueMaterial);
-	//debugSphere(outContact.contacts[2].point, 0.1f, blueMaterial);
-	//debugSphere(outContact.contacts[3].point, 0.1f, blueMaterial);
+	//debugSphere(outContact.contacts[0].point, 0.1f, { 0.f, 0.f, 1.f, 0.f });
+	//debugSphere(outContact.contacts[1].point, 0.1f, { 0.f, 0.f, 1.f, 0.f });
+	//debugSphere(outContact.contacts[2].point, 0.1f, { 0.f, 0.f, 1.f, 0.f });
+	//debugSphere(outContact.contacts[3].point, 0.1f, { 0.f, 0.f, 1.f, 0.f });
 
 	return true;
 }
@@ -1116,10 +1113,10 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 		b0 = b.rotation * b0 + b.center;
 		b1 = b.rotation * b1 + b.center;
 
-		//debugSphere(a0, 0.1f, greenMaterial);
-		//debugSphere(a1, 0.1f, greenMaterial);
-		//debugSphere(b0, 0.1f, redMaterial);
-		//debugSphere(b1, 0.1f, redMaterial);
+		//debugSphere(a0, 0.1f, { 0.f, 1.f, 0.f, 1.f });
+		//debugSphere(a1, 0.1f, { 0.f, 1.f, 0.f, 1.f });
+		//debugSphere(b0, 0.1f, { 1.f, 0.f, 0.f, 1.f });
+		//debugSphere(b1, 0.1f, { 1.f, 0.f, 0.f, 1.f });
 
 		vec3 pa, pb;
 		float sqDistance = closestPoint_SegmentSegment(line_segment{ a0, a1 }, line_segment{ b0, b1 }, pa, pb);
@@ -1132,7 +1129,7 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 
 	//for (uint32 i = 0; i < outContact.numContacts; ++i)
 	//{
-	//	debugSphere(outContact.contacts[i].point, 0.1f, blueMaterial);
+	//	debugSphere(outContact.contacts[i].point, 0.1f, { 0.f, 0.f, 1.f, 0.f });
 	//}
 
 	return true;
@@ -1570,27 +1567,21 @@ void solveCollisionVelocityConstraints(collision_constraint* constraints, uint32
 }
 
 #ifndef PHYSICS_ONLY
-void collisionDebugDraw(transparent_render_pass* renderPass)
+void collisionDebugDraw(ldr_render_pass* renderPass)
 {
 	static dx_mesh debugMesh;
 	static submesh_info sphereMesh;
 
-	if (!redMaterial)
+	if (!debugMesh.vertexBuffer.positions)
 	{
-		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals);
 		sphereMesh = primitiveMesh.pushSphere(15, 15, 1.f);
-
-		debugMesh = primitiveMesh.createDXMesh();
-		
-		std::string empty;
-		redMaterial = createPBRMaterial(empty, empty, empty, empty, vec4(1.f, 0.f, 0.f, 1.f), vec4(0.f, 0.f, 0.f, 1.f));
-		greenMaterial = createPBRMaterial(empty, empty, empty, empty, vec4(0.f, 1.f, 0.f, 1.f), vec4(0.f, 0.f, 0.f, 1.f));
-		blueMaterial = createPBRMaterial(empty, empty, empty, empty, vec4(0.f, 0.f, 1.f, 1.f), vec4(0.f, 0.f, 0.f, 1.f));
+		debugMesh = primitiveMesh.createDXMesh();		
 	}
 
 	for (auto& dc : debugDrawCalls)
 	{
-		renderPass->renderObject<transparent_pbr_pipeline>(dc.transform, debugMesh.vertexBuffer, debugMesh.indexBuffer, sphereMesh, dc.material);
+		renderPass->renderObject<debug_unlit_pipeline>(dc.transform, debugMesh.vertexBuffer, debugMesh.indexBuffer, sphereMesh, { dc.color });
 	}
 	
 	debugDrawCalls.clear();

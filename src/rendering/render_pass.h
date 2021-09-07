@@ -253,7 +253,7 @@ struct ldr_render_pass
 {
 	void sort()
 	{
-		ldrPass.clear();
+		ldrPass.sort();
 		overlays.sort();
 		// We don't sort the outlines.
 	}

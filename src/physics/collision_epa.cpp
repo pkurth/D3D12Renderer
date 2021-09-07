@@ -147,6 +147,10 @@ bool epa_simplex::addNewPointAndUpdate(const gjk_support_point& newPoint)
 
 		if (edgeReferences[i] == 1)
 		{
+			if (numBorderEdges >= arraysize(borderEdgeIndices))
+			{
+				return false;
+			}
 			borderEdgeIndices[numBorderEdges++] = i;
 		}
 	}

@@ -183,8 +183,8 @@ std::tuple<material_vertex_buffer_group_view, material_vertex_buffer_group_view,
 	material_vertex_buffer_group_view vb = skinCloth(positionVertexBuffer, gridSizeX, gridSizeY);
 	submesh_info sm;
 	sm.baseVertex = 0;
-	sm.firstTriangle = 0;
-	sm.numTriangles = getRenderableTriangleCount();
+	sm.firstIndex = 0;
+	sm.numIndices = getRenderableTriangleCount() * 3;
 	sm.numVertices = numVertices;
 
 	material_vertex_buffer_group_view prev = prevFrameVB;

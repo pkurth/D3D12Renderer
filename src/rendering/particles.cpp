@@ -77,8 +77,8 @@ void particle_system::initializeInternal(uint32 particleStructSize, uint32 maxNu
 	
 	particle_draw draw = {};
 	draw.arguments.BaseVertexLocation = submesh.baseVertex;
-	draw.arguments.IndexCountPerInstance = submesh.numTriangles * 3;
-	draw.arguments.StartIndexLocation = submesh.firstTriangle * 3;
+	draw.arguments.IndexCountPerInstance = submesh.numIndices;
+	draw.arguments.StartIndexLocation = submesh.firstIndex;
 	updateBufferDataRange(particleDrawCommandBuffer, &draw, (uint32)sizeof(particle_draw) * index, (uint32)sizeof(particle_draw));
 }
 
@@ -115,7 +115,7 @@ void particle_system::update(float dt, const dx_pipeline& emitPipeline, const dx
 		// Buffers get promoted to D3D12_RESOURCE_STATE_UNORDERED_ACCESS implicitly, so we can omit this.
 		//cl->transitionBarrier(dispatchBuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		particle_sim_cb cb = { emitRate, dt, submesh.numTriangles * 3, submesh.firstTriangle * 3, submesh.baseVertex };
+		particle_sim_cb cb = { emitRate, dt, submesh.numIndices, submesh.firstIndex, submesh.baseVertex };
 
 		// ----------------------------------------
 		// START

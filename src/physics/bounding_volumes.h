@@ -203,6 +203,9 @@ struct bounding_hull_geometry
 	std::vector<bounding_hull_face> faces;
 
 	bounding_box aabb;
+
+	static bounding_hull_geometry fromMesh(vec3* vertices, uint32 numVertices, indexed_triangle16* triangles, uint32 numTriangles);
+	static bounding_hull_geometry fromMesh(vec3* vertices, uint32 numVertices, indexed_triangle32* triangles, uint32 numTriangles);
 };
 
 // MUST be convex.
@@ -217,8 +220,6 @@ struct bounding_hull
 		const bounding_hull_geometry* geometryPtr;	// For world space colliders, which only exist for one frame.
 	};
 };
-
-bounding_hull_geometry boundingHullFromMesh(vec3* vertices, uint32 numVertices, indexed_triangle32* triangles, uint32 numTriangles);
 
 struct ray
 {
