@@ -770,8 +770,12 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 	// RTV.
 	if (result->supportsRTV)
 	{
-		result->rtvAllocation = dxContext.rtvAllocator.allocate();
-		result->defaultRTV = dx_rtv_descriptor_handle(result->rtvAllocation.cpuAt(0)).create2DTextureRTV(result);
+		result->rtvAllocation = dxContext.rtvAllocator.allocate(textureDesc.DepthOrArraySize);
+		for (uint32 i = 0; i < textureDesc.DepthOrArraySize; ++i)
+		{
+			dx_rtv_descriptor_handle(result->rtvAllocation.cpuAt(i)).create2DTextureRTV(result, i);
+		}
+		result->defaultRTV = result->rtvAllocation.cpuAt(0);
 	}
 
 	// UAV.
@@ -1094,8 +1098,12 @@ ref<dx_texture> createPlacedTexture(dx_heap heap, uint64 offset, D3D12_RESOURCE_
 	// RTV.
 	if (result->supportsRTV)
 	{
-		result->rtvAllocation = dxContext.rtvAllocator.allocate();
-		result->defaultRTV = dx_rtv_descriptor_handle(result->rtvAllocation.cpuAt(0)).create2DTextureRTV(result);
+		result->rtvAllocation = dxContext.rtvAllocator.allocate(textureDesc.DepthOrArraySize);
+		for (uint32 i = 0; i < textureDesc.DepthOrArraySize; ++i)
+		{
+			dx_rtv_descriptor_handle(result->rtvAllocation.cpuAt(i)).create2DTextureRTV(result, i);
+		}
+		result->defaultRTV = result->rtvAllocation.cpuAt(0);
 	}
 
 	// UAV.

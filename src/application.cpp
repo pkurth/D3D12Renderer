@@ -1506,6 +1506,17 @@ void application::update(const user_input& input, float dt)
 		}
 
 
+		if (selectedEntity && selectedEntity.hasComponent<point_light_component>())
+		{
+			point_light_component& pl = selectedEntity.getComponent<point_light_component>();
+			renderWireSphere(pl.position, pl.radius, vec4(pl.radiance, 1.f), &ldrRenderPass);
+		}
+		else if (selectedEntity && selectedEntity.hasComponent<spot_light_component>())
+		{
+			spot_light_component& sl = selectedEntity.getComponent<spot_light_component>();
+			renderWireCone(sl.position, sl.direction, sl.maxDistance, acos(sl.getOuterCutoff()) * 2.f, vec4(sl.radiance, 1.f), &ldrRenderPass);
+		}
+
 		submitRenderPasses(numSpotShadowRenderPasses, numPointShadowRenderPasses);
 	}
 	else

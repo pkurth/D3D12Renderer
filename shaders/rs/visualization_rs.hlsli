@@ -14,15 +14,15 @@ struct visualization_textured_cb
 };
 
 #define FLAT_SIMPLE_TEXTURED_RS \
-"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
-"DENY_HULL_SHADER_ROOT_ACCESS |" \
-"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
-"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-"RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
-"RootConstants(num32BitConstants=8, b1, visibility=SHADER_VISIBILITY_PIXEL), " \
-"DescriptorTable(SRV(t0, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL), " \
-"StaticSampler(s0, visibility=SHADER_VISIBILITY_PIXEL), " \
-"CBV(b2, visibility=SHADER_VISIBILITY_PIXEL)"
+	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
+	"DENY_HULL_SHADER_ROOT_ACCESS |" \
+	"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
+	"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
+	"RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
+	"RootConstants(num32BitConstants=8, b1, visibility=SHADER_VISIBILITY_PIXEL), " \
+	"DescriptorTable(SRV(t0, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL), " \
+	"StaticSampler(s0, visibility=SHADER_VISIBILITY_PIXEL), " \
+	"CBV(b2, visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define FLAT_SIMPLE_RS_TRANFORM			0
 #define FLAT_SIMPLE_RS_CB				1
@@ -31,27 +31,53 @@ struct visualization_textured_cb
 
 
 #define FLAT_UNLIT_TEXTURED_RS \
-"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
-"DENY_HULL_SHADER_ROOT_ACCESS |" \
-"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
-"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-"RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX)," \
-"RootConstants(num32BitConstants=8, b1, visibility=SHADER_VISIBILITY_PIXEL), " \
-"DescriptorTable(SRV(t0, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL), " \
-"StaticSampler(s0, visibility=SHADER_VISIBILITY_PIXEL)"
+	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
+	"DENY_HULL_SHADER_ROOT_ACCESS |" \
+	"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
+	"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
+	"RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX)," \
+	"RootConstants(num32BitConstants=8, b1, visibility=SHADER_VISIBILITY_PIXEL), " \
+	"DescriptorTable(SRV(t0, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL), " \
+	"StaticSampler(s0, visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define FLAT_UNLIT_RS \
-"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
-"DENY_HULL_SHADER_ROOT_ACCESS |" \
-"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
-"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-"RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX)," \
-"RootConstants(num32BitConstants=4, b1, visibility=SHADER_VISIBILITY_PIXEL)"
+	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
+	"DENY_HULL_SHADER_ROOT_ACCESS |" \
+	"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
+	"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
+	"RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX)," \
+	"RootConstants(num32BitConstants=4, b1, visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define FLAT_UNLIT_RS_TRANFORM			0
 #define FLAT_UNLIT_RS_CB				1
 #define FLAT_UNLIT_RS_TEXTURE			2
 
+
+
+
+#define PROBE_CUBEMAP_VIS_RS \
+	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
+	"DENY_HULL_SHADER_ROOT_ACCESS |" \
+	"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
+	"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
+	"RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX)," \
+	"StaticSampler(s0, visibility=SHADER_VISIBILITY_PIXEL)," \
+	"DescriptorTable(SRV(t0, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL)"
+
+#define PROBE_CUBEMAP_VIS_RS_TRANSFORM	0
+#define PROBE_CUBEMAP_VIS_RS_TEXTURE	1
+
+
+#define PROBE_SH_VIS_RS \
+	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
+	"DENY_HULL_SHADER_ROOT_ACCESS |" \
+	"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
+	"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
+	"RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX)," \
+	"SRV(t0, visibility=SHADER_VISIBILITY_PIXEL)"
+
+#define PROBE_SH_VIS_RS_TRANSFORM		0
+#define PROBE_SH_VIS_RS_SH				1
 
 
 #endif
