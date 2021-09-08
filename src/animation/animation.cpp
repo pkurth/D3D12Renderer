@@ -651,5 +651,9 @@ void animation_component::update(const ref<composite_mesh>& mesh, float dt, trs*
 	else
 	{
 		currentVertexBuffer = dxMesh.vertexBuffer;
+		if (!prevFrameVertexBuffer)
+		{
+			prevFrameVertexBuffer = currentVertexBuffer;
+		}
 	}
 }
