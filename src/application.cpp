@@ -7,7 +7,6 @@
 #include "core/imgui.h"
 #include "dx/dx_context.h"
 #include "dx/dx_profiling.h"
-#include "animation/animation_controller.h"
 #include "physics/physics.h"
 #include "core/threading.h"
 #include "rendering/mesh_shader.h"
@@ -142,19 +141,19 @@ void application::initialize(main_renderer* renderer)
 		appScene.createEntity("Stormtrooper 1")
 			.addComponent<trs>(vec3(-5.f, 0.f, -1.f), quat::identity)
 			.addComponent<raster_component>(stormtrooperMesh)
-			.addComponent<animation_component>(make_ref<simple_animation_controller>())
+			.addComponent<animation_component>()
 			.addComponent<dynamic_geometry_component>();
 
 		appScene.createEntity("Stormtrooper 2")
 			.addComponent<trs>(vec3(0.f, 0.f, -2.f), quat::identity)
 			.addComponent<raster_component>(stormtrooperMesh)
-			.addComponent<animation_component>(make_ref<simple_animation_controller>())
+			.addComponent<animation_component>()
 			.addComponent<dynamic_geometry_component>();
 
 		appScene.createEntity("Stormtrooper 3")
 			.addComponent<trs>(vec3(5.f, 0.f, -1.f), quat::identity)
 			.addComponent<raster_component>(stormtrooperMesh)
-			.addComponent<animation_component>(make_ref<simple_animation_controller>())
+			.addComponent<animation_component>()
 			.addComponent<dynamic_geometry_component>();
 	}
 
@@ -163,7 +162,7 @@ void application::initialize(main_renderer* renderer)
 		appScene.createEntity("Pilot")
 			.addComponent<trs>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
 			.addComponent<raster_component>(pilotMesh)
-			.addComponent<animation_component>(make_ref<simple_animation_controller>())
+			.addComponent<animation_component>()
 			.addComponent<dynamic_geometry_component>();
 	}
 
@@ -174,7 +173,7 @@ void application::initialize(main_renderer* renderer)
 		appScene.createEntity("Mannequin")
 			.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.019f)
 			.addComponent<raster_component>(unrealMesh)
-			.addComponent<animation_component>(make_ref<simple_animation_controller>())
+			.addComponent<animation_component>()
 			.addComponent<dynamic_geometry_component>();
 	}
 #endif
@@ -189,7 +188,7 @@ void application::initialize(main_renderer* renderer)
 		appScene.createEntity("Ragdoll")
 			.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat::identity, 0.01f)
 			.addComponent<raster_component>(ragdollMesh)
-			.addComponent<animation_component>(make_ref<random_path_animation_controller>())
+			.addComponent<animation_component>()
 			.addComponent<dynamic_geometry_component>();
 	}
 #endif
@@ -898,7 +897,30 @@ bool application::drawSceneHierarchy()
 
 				drawComponent<animation_component>(selectedEntity, "Animation", [this](animation_component& anim)
 				{
-					anim.controller->edit(selectedEntity);
+					if (selectedEntity.hasComponent<raster_component>())
+					{
+						raster_component& raster = selectedEntity.getComponent<raster_component>();
+
+						uint32 animationIndex = anim.animation.clip ? (uint32)(anim.animation.clip - raster.mesh->skeleton.clips.data()) : -1;
+
+						bool animationChanged = ImGui::Dropdown("Currently playing", [](uint32 index, void* data)
+						{
+							if (index == -1) { return "---"; }
+
+							animation_skeleton& skeleton = *(animation_skeleton*)data;
+							const char* result = 0;
+							if (index < (uint32)skeleton.clips.size())
+							{
+								result = skeleton.clips[index].name.c_str();
+							}
+							return result;
+						}, animationIndex, &raster.mesh->skeleton);
+
+						if (animationChanged)
+						{
+							anim.animation.set(&raster.mesh->skeleton.clips[animationIndex]);
+						}
+					}
 				});
 
 				drawComponent<rigid_body_component>(selectedEntity, "Rigid body", [this](rigid_body_component& rb)
@@ -1340,24 +1362,18 @@ void application::update(const user_input& input, float dt)
 			//testRenderMeshShader(&overlayRenderPass);
 		}
 
-
 		thread_job_context context;
 
 		// Update animated meshes.
-		for (auto [entityHandle, anim, raster] : appScene.group(entt::get<animation_component, raster_component>).each())
+		for (auto [entityHandle, anim, raster, transform] : appScene.group(entt::get<animation_component, raster_component, trs>).each())
 		{
-			scene_entity entity = { entityHandle, appScene };
-
-			auto controller = anim.controller;
-			context.addWork([controller, entity, dt]()
+			context.addWork([&anim = anim, mesh = raster.mesh, &transform = transform, dt]()
 			{
-				controller->update(entity, dt);
+				anim.update(mesh, dt, &transform);
 			});
 		}
 
 		context.waitForWorkCompletion();
-
-
 
 
 		// Render shadow maps.
@@ -1400,7 +1416,6 @@ void application::update(const user_input& input, float dt)
 			if (entity.hasComponent<animation_component>())
 			{
 				auto& anim = entity.getComponent<animation_component>();
-				auto controller = anim.controller;
 
 				uint32 numSubmeshes = (uint32)raster.mesh->submeshes.size();
 
@@ -1413,19 +1428,19 @@ void application::update(const user_input& input, float dt)
 
 					if (material->albedoTint.a < 1.f)
 					{
-						transparentRenderPass.renderObject(m, controller->currentVertexBuffer, mesh.indexBuffer, submesh, material);
+						transparentRenderPass.renderObject(m, anim.currentVertexBuffer, mesh.indexBuffer, submesh, material);
 					}
 					else
 					{
 						opaqueRenderPass.renderAnimatedObject(m, lastM, 
-							controller->currentVertexBuffer, controller->prevFrameVertexBuffer, mesh.indexBuffer, 
+							anim.currentVertexBuffer, anim.prevFrameVertexBuffer, mesh.indexBuffer,
 							submesh, material,
 							(uint32)entityHandle);
 					}
 
 					if (outline)
 					{
-						ldrRenderPass.renderOutline(m, controller->currentVertexBuffer, mesh.indexBuffer, submesh);
+						ldrRenderPass.renderOutline(m, anim.currentVertexBuffer, mesh.indexBuffer, submesh);
 					}
 				}
 			}
@@ -1689,10 +1704,6 @@ void application::serializeToFile()
 		if (entity.hasComponent<animation_component>())
 		{
 			animation_component& anim = entity.getComponent<animation_component>();
-			out << YAML::Key << "Animation" << YAML::Value
-				<< YAML::BeginMap 
-					<< YAML::Key << "Type" << YAML::Value << (uint32)anim.controller->type
-				<< YAML::EndMap;
 		}
 
 		out << YAML::EndMap;

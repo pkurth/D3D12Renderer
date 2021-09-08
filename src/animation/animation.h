@@ -2,6 +2,7 @@
 
 #include "core/math.h"
 #include "core/random.h"
+#include "rendering/material.h"
 #include <unordered_map>
 
 #define NO_PARENT 0xFFFFFFFF
@@ -18,36 +19,6 @@ struct skeleton_joint
 	trs invBindTransform; // Transforms from model space to joint space.
 	trs bindTransform;	  // Position of joint relative to model space.
 	uint32 parentID;
-};
-
-struct animation_transition_event
-{
-	uint32 targetIndex;
-	float targetStartTime;
-	float transitionTime;
-	float automaticProbability;
-};
-
-enum animation_event_type
-{
-	animation_event_type_transition,
-};
-
-struct animation_event
-{
-	float time;
-	animation_event_type type;
-
-	union
-	{
-		animation_transition_event transition;
-	};
-};
-
-struct animation_event_indices
-{
-	uint32 first;
-	uint32 count;
 };
 
 struct animation_joint
@@ -79,8 +50,6 @@ struct animation_clip
 
 	std::vector<animation_joint> joints;
 
-	std::vector<animation_event> events;
-
 	animation_joint rootMotionJoint;
 	
 	float lengthInSeconds;
@@ -108,12 +77,8 @@ struct animation_skeleton
 	void pushAssimpAnimations(const std::string& sceneFilename, float scale = 1.f);
 	void pushAssimpAnimationsInDirectory(const std::string& directory, float scale = 1.f);
 
-	void readAnimationPropertiesFromFile(const std::string& filename);
-
-	void sampleAnimation(const animation_clip& clip, float timeNow, trs* outLocalTransforms, trs* outRootMotion = 0) const;
-	void sampleAnimation(uint32 index, float timeNow, trs* outLocalTransforms, trs* outRootMotion = 0) const;
-	animation_event_indices sampleAnimation(const animation_clip& clip, float prevTime, float timeNow, trs* outLocalTransforms, trs* outRootMotion = 0) const;
-	animation_event_indices sampleAnimation(uint32 index, float prevTime, float timeNow, trs* outLocalTransforms, trs* outRootMotion = 0) const;
+	void sampleAnimation(const animation_clip& clip, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
+	void sampleAnimation(uint32 index, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
 	void blendLocalTransforms(const trs* localTransforms1, const trs* localTransforms2, float t, trs* outBlendedLocalTransforms) const;
 	void getSkinningMatricesFromLocalTransforms(const trs* localTransforms, mat4* outSkinningMatrices, const trs& worldTransform = trs::identity) const;
 	void getSkinningMatricesFromGlobalTransforms(const trs* globalTransforms, mat4* outSkinningMatrices) const;
@@ -128,7 +93,8 @@ struct animation_instance
 	animation_instance() { }
 	animation_instance(const animation_clip* clip, float startTime = 0.f);
 
-	animation_event_indices update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion);
+	void set(const animation_clip* clip, float startTime = 0.f);
+	void update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion);
 
 	bool valid() const { return clip != 0; }
 
@@ -180,4 +146,15 @@ private:
 	trs lastRootMotion;
 };
 #endif
+
+struct animation_component
+{
+	animation_instance animation;
+	float timeScale = 1.f;
+
+	material_vertex_buffer_group_view currentVertexBuffer;
+	material_vertex_buffer_group_view prevFrameVertexBuffer;
+
+	void update(const ref<struct composite_mesh>& mesh, float dt, trs* transform = 0);
+};
 
