@@ -183,7 +183,6 @@ void application::initialize(main_renderer* renderer)
 	{
 		//ragdollMesh->skeleton.prettyPrintHierarchy();
 		ragdollMesh->skeleton.pushAssimpAnimationsInDirectory("assets/ragdoll/locomotion_pack/animations");
-		ragdollMesh->skeleton.readAnimationPropertiesFromFile("assets/ragdoll/animation_properties.yaml");
 
 		appScene.createEntity("Ragdoll")
 			.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat::identity, 0.01f)
@@ -436,27 +435,31 @@ void application::initialize(main_renderer* renderer)
 static bool plotAndEditTonemapping(tonemap_settings& tonemap)
 {
 	bool result = false;
-	if (ImGui::TreeNode("Tonemapping"))
+	if (ImGui::BeginTree("Tonemapping"))
 	{
-		ImGui::PlotLines("Tone map",
+		ImGui::PlotLines("",
 			[](void* data, int idx)
 			{
 				float t = idx * 0.01f;
 				tonemap_settings& aces = *(tonemap_settings*)data;
 				return aces.tonemap(t);
 			},
-			&tonemap, 100, 0, 0, 0.f, 1.f, ImVec2(100.f, 100.f));
+			&tonemap, 100, 0, 0, 0.f, 1.f, ImVec2(250.f, 250.f));
 
-		result |= ImGui::SliderFloat("[ACES] Shoulder strength", &tonemap.A, 0.f, 1.f);
-		result |= ImGui::SliderFloat("[ACES] Linear strength", &tonemap.B, 0.f, 1.f);
-		result |= ImGui::SliderFloat("[ACES] Linear angle", &tonemap.C, 0.f, 1.f);
-		result |= ImGui::SliderFloat("[ACES] Toe strength", &tonemap.D, 0.f, 1.f);
-		result |= ImGui::SliderFloat("[ACES] Tone numerator", &tonemap.E, 0.f, 1.f);
-		result |= ImGui::SliderFloat("[ACES] Toe denominator", &tonemap.F, 0.f, 1.f);
-		result |= ImGui::SliderFloat("[ACES] Linear white", &tonemap.linearWhite, 0.f, 100.f);
-		result |= ImGui::SliderFloat("[ACES] Exposure", &tonemap.exposure, -3.f, 3.f);
+		if (ImGui::BeginProperties())
+		{
+			result |= ImGui::PropertySlider("Shoulder strength", tonemap.A, 0.f, 1.f);
+			result |= ImGui::PropertySlider("Linear strength", tonemap.B, 0.f, 1.f);
+			result |= ImGui::PropertySlider("Linear angle", tonemap.C, 0.f, 1.f);
+			result |= ImGui::PropertySlider("Toe strength", tonemap.D, 0.f, 1.f);
+			result |= ImGui::PropertySlider("Tone numerator", tonemap.E, 0.f, 1.f);
+			result |= ImGui::PropertySlider("Toe denominator", tonemap.F, 0.f, 1.f);
+			result |= ImGui::PropertySlider("Linear white", tonemap.linearWhite, 0.f, 100.f);
+			result |= ImGui::PropertySlider("Exposure", tonemap.exposure, -3.f, 3.f);
+			ImGui::EndProperties();
+		}
 
-		ImGui::TreePop();
+		ImGui::EndTree();
 	}
 	return result;
 }
@@ -464,48 +467,46 @@ static bool plotAndEditTonemapping(tonemap_settings& tonemap)
 static bool editSunShadowParameters(directional_light& sun)
 {
 	bool result = false;
-	if (ImGui::TreeNode("Sun"))
+	if (ImGui::BeginTree("Sun"))
 	{
-		result |= ImGui::SliderFloat("Intensity", &sun.intensity, 50.f, 1000.f);
-		result |= ImGui::ColorEdit3("Color", sun.color.data);
-		result |= ImGui::SliderInt("# Cascades", (int*)&sun.numShadowCascades, 1, 4);
-
-#define DISTANCE_SETTINGS	"Distance", sun.cascadeDistances.data, 0.f, 300.f
-#define BIAS_SETTINGS		"Bias", sun.bias.data, 0.f, 0.005f, "%.6f"
-#define BLEND_SETTINGS		"Blend distances", sun.blendDistances.data, 0.f, 10.f, "%.6f"
-
-		if (sun.numShadowCascades == 1)
+		if (ImGui::BeginProperties())
 		{
-			result |= ImGui::SliderFloat(DISTANCE_SETTINGS);
-			result |= ImGui::SliderFloat(BIAS_SETTINGS);
-			result |= ImGui::SliderFloat(BLEND_SETTINGS);
-		}
-		else if (sun.numShadowCascades == 2)
-		{
-			result |= ImGui::SliderFloat2(DISTANCE_SETTINGS);
-			result |= ImGui::SliderFloat2(BIAS_SETTINGS);
-			result |= ImGui::SliderFloat2(BLEND_SETTINGS);
-		}
-		else if (sun.numShadowCascades == 3)
-		{
-			result |= ImGui::SliderFloat3(DISTANCE_SETTINGS);
-			result |= ImGui::SliderFloat3(BIAS_SETTINGS);
-			result |= ImGui::SliderFloat3(BLEND_SETTINGS);
-		}
-		else if (sun.numShadowCascades == 4)
-		{
-			result |= ImGui::SliderFloat4(DISTANCE_SETTINGS);
-			result |= ImGui::SliderFloat4(BIAS_SETTINGS);
-			result |= ImGui::SliderFloat4(BLEND_SETTINGS);
+			result |= ImGui::PropertySlider("Intensity", sun.intensity, 50.f, 1000.f);
+			result |= ImGui::PropertyColorEdit("Color", sun.color);
+			result |= ImGui::PropertySlider("# Cascades", sun.numShadowCascades, 1, 4);
+
+			const float minCascadeDistance = 0.f, maxCascadeDistance = 300.f;
+			const float minBias = 0.f, maxBias = 0.005f;
+			const float minBlend = 0.f, maxBlend = 10.f;
+			if (sun.numShadowCascades == 1)
+			{
+				result |= ImGui::PropertySlider("Distance", sun.cascadeDistances.x, minCascadeDistance, maxCascadeDistance);
+				result |= ImGui::PropertySlider("Bias", sun.bias.x, minBias, maxBias, "%.6f");
+				result |= ImGui::PropertySlider("Blend distances", sun.blendDistances.x, minBlend, maxBlend, "%.6f");
+			}
+			else if (sun.numShadowCascades == 2)
+			{
+				result |= ImGui::PropertySlider("Distance", sun.cascadeDistances.xy, minCascadeDistance, maxCascadeDistance);
+				result |= ImGui::PropertySlider("Bias", sun.bias.xy, minBias, maxBias, "%.6f");
+				result |= ImGui::PropertySlider("Blend distances", sun.blendDistances.xy, minBlend, maxBlend, "%.6f");
+			}
+			else if (sun.numShadowCascades == 3)
+			{
+				result |= ImGui::PropertySlider("Distance", sun.cascadeDistances.xyz, minCascadeDistance, maxCascadeDistance);
+				result |= ImGui::PropertySlider("Bias", sun.bias.xyz, minBias, maxBias, "%.6f");
+				result |= ImGui::PropertySlider("Blend distances", sun.blendDistances.xyz, minBlend, maxBlend, "%.6f");
+			}
+			else if (sun.numShadowCascades == 4)
+			{
+				result |= ImGui::PropertySlider("Distance", sun.cascadeDistances, minCascadeDistance, maxCascadeDistance);
+				result |= ImGui::PropertySlider("Bias", sun.bias, minBias, maxBias, "%.6f");
+				result |= ImGui::PropertySlider("Blend distances", sun.blendDistances, minBlend, maxBlend, "%.6f");
+			}
+
+			ImGui::EndProperties();
 		}
 
-#undef DISTANCE_SETTINGS
-#undef BIAS_SETTINGS
-#undef BLEND_SETTINGS
-
-		result |= ImGui::SliderFloat4("Blend distances", sun.blendDistances.data, 0.f, 50.f, "%.6f");
-
-		ImGui::TreePop();
+		ImGui::EndTree();
 	}
 	return result;
 }
@@ -513,13 +514,17 @@ static bool editSunShadowParameters(directional_light& sun)
 static bool editSSR(bool& enable, ssr_settings& settings)
 {
 	bool result = false;
-	result |= ImGui::Checkbox("Enable SSR", &enable);
-	if (enable)
+	if (ImGui::BeginProperties())
 	{
-		result |= ImGui::SliderInt("Num iterations", (int*)&settings.numSteps, 1, 1024);
-		result |= ImGui::SliderFloat("Max distance", &settings.maxDistance, 5.f, 1000.f);
-		result |= ImGui::SliderFloat("Min. stride", &settings.minStride, 1.f, 50.f);
-		result |= ImGui::SliderFloat("Max. stride", &settings.maxStride, settings.minStride, 50.f);
+		result |= ImGui::PropertyCheckbox("Enable SSR", enable);
+		if (enable)
+		{
+			result |= ImGui::PropertySlider("Num iterations", settings.numSteps, 1, 1024);
+			result |= ImGui::PropertySlider("Max distance", settings.maxDistance, 5.f, 1000.f);
+			result |= ImGui::PropertySlider("Min. stride", settings.minStride, 1.f, 50.f);
+			result |= ImGui::PropertySlider("Max. stride", settings.maxStride, settings.minStride, 50.f);
+		}
+		ImGui::EndProperties();
 	}
 	return result;
 }
@@ -527,10 +532,14 @@ static bool editSSR(bool& enable, ssr_settings& settings)
 static bool editTAA(bool& enable, taa_settings& settings)
 {
 	bool result = false;
-	result |= ImGui::Checkbox("Enable TAA", &enable);
-	if (enable)
+	if (ImGui::BeginProperties())
 	{
-		result |= ImGui::SliderFloat("Jitter strength", &settings.cameraJitterStrength, 0.f, 1.f);
+		result |= ImGui::PropertyCheckbox("Enable TAA", enable);
+		if (enable)
+		{
+			result |= ImGui::PropertySlider("Jitter strength", settings.cameraJitterStrength);
+		}
+		ImGui::EndProperties();
 	}
 	return result;
 }
@@ -538,11 +547,15 @@ static bool editTAA(bool& enable, taa_settings& settings)
 static bool editBloom(bool& enable, bloom_settings& settings)
 {
 	bool result = false;
-	result |= ImGui::Checkbox("Enable bloom", &enable);
-	if (enable)
+	if (ImGui::BeginProperties())
 	{
-		result |= ImGui::SliderFloat("Bloom threshold", &settings.threshold, 0.5f, 100.f);
-		result |= ImGui::SliderFloat("Bloom strength", &settings.strength, 0.f, 1.f);
+		result |= ImGui::PropertyCheckbox("Enable bloom", enable);
+		if (enable)
+		{
+			result |= ImGui::PropertySlider("Bloom threshold", settings.threshold, 0.5f, 100.f);
+			result |= ImGui::PropertySlider("Bloom strength", settings.strength);
+		}
+		ImGui::EndProperties();
 	}
 	return result;
 }
@@ -550,10 +563,14 @@ static bool editBloom(bool& enable, bloom_settings& settings)
 static bool editSharpen(bool& enable, sharpen_settings& settings)
 {
 	bool result = false;
-	result |= ImGui::Checkbox("Enable sharpen", &enable);
-	if (enable)
+	if (ImGui::BeginProperties())
 	{
-		result |= ImGui::SliderFloat("Sharpen strength", &settings.strength, 0.f, 1.f);
+		result |= ImGui::PropertyCheckbox("Enable sharpen", enable);
+		if (enable)
+		{
+			result |= ImGui::PropertySlider("Sharpen strength", settings.strength);
+		}
+		ImGui::EndProperties();
 	}
 	return result;
 }
@@ -561,14 +578,21 @@ static bool editSharpen(bool& enable, sharpen_settings& settings)
 static bool editFireParticleSystem(fire_particle_system& particleSystem)
 {
 	bool result = false;
-	if (ImGui::TreeNode("Fire particles"))
+	if (ImGui::BeginTree("Fire particles"))
 	{
-		result |= ImGui::SliderFloat("Emit rate", &particleSystem.emitRate, 0.f, 1000.f);
+		if (ImGui::BeginProperties())
+		{
+			result |= ImGui::PropertySlider("Emit rate", particleSystem.emitRate, 0.f, 1000.f);
+			ImGui::EndProperties();
+		}
+
 		result |= ImGui::Spline("Size over lifetime", ImVec2(200, 200), particleSystem.settings.sizeOverLifetime);
+		ImGui::Separator();
 		result |= ImGui::Spline("Atlas progression over lifetime", ImVec2(200, 200), particleSystem.settings.atlasProgressionOverLifetime);
+		ImGui::Separator();
 		result |= ImGui::Spline("Intensity over lifetime", ImVec2(200, 200), particleSystem.settings.intensityOverLifetime);
 
-		ImGui::TreePop();
+		ImGui::EndTree();
 	}
 	return result;
 }
@@ -576,12 +600,16 @@ static bool editFireParticleSystem(fire_particle_system& particleSystem)
 static bool editBoidParticleSystem(boid_particle_system& particleSystem)
 {
 	bool result = false;
-	if (ImGui::TreeNode("Boid particles"))
+	if (ImGui::BeginTree("Boid particles"))
 	{
-		result |= ImGui::SliderFloat("Emit rate", &particleSystem.emitRate, 0.f, 5000.f);
-		result |= ImGui::SliderFloat("Emit radius", &particleSystem.settings.radius, 5.f, 100.f);
+		if (ImGui::BeginProperties())
+		{
+			result |= ImGui::PropertySlider("Emit rate", particleSystem.emitRate, 0.f, 5000.f);
+			result |= ImGui::PropertySlider("Emit radius", particleSystem.settings.radius, 5.f, 100.f);
+			ImGui::EndProperties();
+		}
 
-		ImGui::TreePop();
+		ImGui::EndTree();
 	}
 	return result;
 }
@@ -899,70 +927,85 @@ bool application::drawSceneHierarchy()
 				{
 					if (selectedEntity.hasComponent<raster_component>())
 					{
-						raster_component& raster = selectedEntity.getComponent<raster_component>();
-
-						uint32 animationIndex = anim.animation.clip ? (uint32)(anim.animation.clip - raster.mesh->skeleton.clips.data()) : -1;
-
-						bool animationChanged = ImGui::Dropdown("Currently playing", [](uint32 index, void* data)
+						if (ImGui::BeginProperties())
 						{
-							if (index == -1) { return "---"; }
+							raster_component& raster = selectedEntity.getComponent<raster_component>();
 
-							animation_skeleton& skeleton = *(animation_skeleton*)data;
-							const char* result = 0;
-							if (index < (uint32)skeleton.clips.size())
+							uint32 animationIndex = anim.animation.clip ? (uint32)(anim.animation.clip - raster.mesh->skeleton.clips.data()) : -1;
+
+							bool animationChanged = ImGui::PropertyDropdown("Currently playing", [](uint32 index, void* data)
 							{
-								result = skeleton.clips[index].name.c_str();
-							}
-							return result;
-						}, animationIndex, &raster.mesh->skeleton);
+								if (index == -1) { return "---"; }
 
-						if (animationChanged)
-						{
-							anim.animation.set(&raster.mesh->skeleton.clips[animationIndex]);
+								animation_skeleton& skeleton = *(animation_skeleton*)data;
+								const char* result = 0;
+								if (index < (uint32)skeleton.clips.size())
+								{
+									result = skeleton.clips[index].name.c_str();
+								}
+								return result;
+							}, animationIndex, &raster.mesh->skeleton);
+
+							if (animationChanged)
+							{
+								anim.animation.set(&raster.mesh->skeleton.clips[animationIndex]);
+							}
+
+							ImGui::EndProperties();
 						}
 					}
 				});
 
 				drawComponent<rigid_body_component>(selectedEntity, "Rigid body", [this](rigid_body_component& rb)
 				{
-					bool kinematic = rb.invMass == 0;
-					if (ImGui::Checkbox("Kinematic", &kinematic))
+					if (ImGui::BeginProperties())
 					{
-						if (kinematic)
+						bool kinematic = rb.invMass == 0;
+						if (ImGui::PropertyCheckbox("Kinematic", kinematic))
 						{
-							rb.invMass = 0.f;
-							rb.invInertia = mat3::zero;
-							rb.linearVelocity = vec3(0.f);
-							rb.angularVelocity = vec3(0.f);
-							rb.forceAccumulator = vec3(0.f);
-							rb.torqueAccumulator = vec3(0.f);
-						}
-						else
-						{
-							rb.invMass = 1.f;
-							rb.invInertia = mat3::identity;
-
-							if (selectedEntity.hasComponent<physics_reference_component>())
+							if (kinematic)
 							{
-								rb.recalculateProperties(&appScene.registry, selectedEntity.getComponent<physics_reference_component>());
+								rb.invMass = 0.f;
+								rb.invInertia = mat3::zero;
+								rb.linearVelocity = vec3(0.f);
+								rb.angularVelocity = vec3(0.f);
+								rb.forceAccumulator = vec3(0.f);
+								rb.torqueAccumulator = vec3(0.f);
+							}
+							else
+							{
+								rb.invMass = 1.f;
+								rb.invInertia = mat3::identity;
+
+								if (selectedEntity.hasComponent<physics_reference_component>())
+								{
+									rb.recalculateProperties(&appScene.registry, selectedEntity.getComponent<physics_reference_component>());
+								}
 							}
 						}
-					}
 
-					ImGui::SliderFloat("Linear velocity damping", &rb.linearDamping, 0.f, 1.f);
-					ImGui::SliderFloat("Angular velocity damping", &rb.angularDamping, 0.f, 1.f);
-					ImGui::SliderFloat("Gravity factor", &rb.gravityFactor, 0.f, 1.f);
+						ImGui::PropertySlider("Linear velocity damping", rb.linearDamping);
+						ImGui::PropertySlider("Angular velocity damping", rb.angularDamping);
+						ImGui::PropertySlider("Gravity factor", rb.gravityFactor);
+
+						ImGui::EndProperties();
+					}
 				});
 
 				drawComponent<cloth_component>(selectedEntity, "Cloth", [](cloth_component& cloth)
 				{
 					bool dirty = false;
-					dirty |= ImGui::InputFloat("Total mass", &cloth.totalMass);
-					dirty |= ImGui::SliderFloat("Stiffness", &cloth.stiffness, 0.01f, 0.7f);
+					if (ImGui::BeginProperties())
+					{
+						dirty |= ImGui::PropertyInput("Total mass", cloth.totalMass);
+						dirty |= ImGui::PropertySlider("Stiffness", cloth.stiffness, 0.01f, 0.7f);
 
-					// These two don't need to notify the cloth on change.
-					ImGui::SliderFloat("Velocity damping", &cloth.damping, 0.f, 1.f);
-					ImGui::SliderFloat("Gravity factor", &cloth.gravityFactor, 0.f, 1.f);
+						// These two don't need to notify the cloth on change.
+						ImGui::PropertySlider("Velocity damping", cloth.damping, 0.f, 1.f);
+						ImGui::PropertySlider("Gravity factor", cloth.gravityFactor, 0.f, 1.f);
+
+						ImGui::EndProperties();
+					}
 
 					if (dirty)
 					{
@@ -990,46 +1033,59 @@ void application::drawSettings(float dt)
 
 		dx_memory_usage memoryUsage = dxContext.getMemoryUsage();
 
-		ImGui::Text("Video memory available: %uMB", memoryUsage.available);
-		ImGui::Text("Video memory used: %uMB", memoryUsage.currentlyUsed);
+		ImGui::Text("Video memory usage: %u / %uMB", memoryUsage.currentlyUsed, memoryUsage.available);
 
 		ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->aspectRatioMode);
 
 		plotAndEditTonemapping(renderer->tonemapSettings);
 		editSunShadowParameters(sun);
 
-		if (ImGui::TreeNode("Post processing"))
+		if (ImGui::BeginTree("Post processing"))
 		{
-			if (renderer->spec.allowSSR) { editSSR(renderer->enableSSR, renderer->ssrSettings); }
-			if (renderer->spec.allowTAA) { editTAA(renderer->enableTAA, renderer->taaSettings); }
-			if (renderer->spec.allowBloom) { editBloom(renderer->enableBloom, renderer->bloomSettings); }
+			if (renderer->spec.allowSSR) { editSSR(renderer->enableSSR, renderer->ssrSettings); ImGui::Separator(); }
+			if (renderer->spec.allowTAA) { editTAA(renderer->enableTAA, renderer->taaSettings); ImGui::Separator(); }
+			if (renderer->spec.allowBloom) { editBloom(renderer->enableBloom, renderer->bloomSettings); ImGui::Separator(); }
 			editSharpen(renderer->enableSharpen, renderer->sharpenSettings);
 
-			ImGui::TreePop();
+			ImGui::EndTree();
 		}
 
-		ImGui::SliderFloat("Environment intensity", &renderer->environmentIntensity, 0.f, 2.f);
-		ImGui::SliderFloat("Sky intensity", &renderer->skyIntensity, 0.f, 2.f);
+		if (ImGui::BeginTree("Environment"))
+		{
+			if (ImGui::BeginProperties())
+			{
+				ImGui::PropertySlider("Environment intensity", renderer->environmentIntensity, 0.f, 2.f);
+				ImGui::PropertySlider("Sky intensity", renderer->skyIntensity, 0.f, 2.f);
+				ImGui::EndProperties();
+			}
+
+			ImGui::EndTree();
+		}
 
 		if (renderer->mode == renderer_mode_pathtraced)
 		{
 			bool pathTracerDirty = false;
-			pathTracerDirty |= ImGui::SliderInt("Max recursion depth", (int*)&pathTracer.recursionDepth, 0, pathTracer.maxRecursionDepth - 1);
-			pathTracerDirty |= ImGui::SliderInt("Start russian roulette after", (int*)&pathTracer.startRussianRouletteAfter, 0, pathTracer.recursionDepth);
-			pathTracerDirty |= ImGui::Checkbox("Use thin lens camera", &pathTracer.useThinLensCamera);
-			if (pathTracer.useThinLensCamera)
+			if (ImGui::BeginProperties())
 			{
-				pathTracerDirty |= ImGui::SliderFloat("Focal length", &pathTracer.focalLength, 0.5f, 50.f);
-				pathTracerDirty |= ImGui::SliderFloat("F-Number", &pathTracer.fNumber, 1.f, 128.f);
-			}
-			pathTracerDirty |= ImGui::Checkbox("Use real materials", &pathTracer.useRealMaterials);
-			pathTracerDirty |= ImGui::Checkbox("Enable direct lighting", &pathTracer.enableDirectLighting);
-			if (pathTracer.enableDirectLighting)
-			{
-				pathTracerDirty |= ImGui::SliderFloat("Light intensity scale", &pathTracer.lightIntensityScale, 0.f, 50.f);
-				pathTracerDirty |= ImGui::SliderFloat("Point light radius", &pathTracer.pointLightRadius, 0.01f, 1.f);
+				pathTracerDirty |= ImGui::PropertySlider("Max recursion depth", pathTracer.recursionDepth, 0, pathTracer.maxRecursionDepth - 1);
+				pathTracerDirty |= ImGui::PropertySlider("Start russian roulette after", pathTracer.startRussianRouletteAfter, 0, pathTracer.recursionDepth);
+				pathTracerDirty |= ImGui::PropertyCheckbox("Use thin lens camera", pathTracer.useThinLensCamera);
+				if (pathTracer.useThinLensCamera)
+				{
+					pathTracerDirty |= ImGui::PropertySlider("Focal length", pathTracer.focalLength, 0.5f, 50.f);
+					pathTracerDirty |= ImGui::PropertySlider("F-Number", pathTracer.fNumber, 1.f, 128.f);
+				}
+				pathTracerDirty |= ImGui::PropertyCheckbox("Use real materials", pathTracer.useRealMaterials);
+				pathTracerDirty |= ImGui::PropertyCheckbox("Enable direct lighting", pathTracer.enableDirectLighting);
+				if (pathTracer.enableDirectLighting)
+				{
+					pathTracerDirty |= ImGui::PropertySlider("Light intensity scale", pathTracer.lightIntensityScale, 0.f, 50.f);
+					pathTracerDirty |= ImGui::PropertySlider("Point light radius", pathTracer.pointLightRadius, 0.01f, 1.f);
 
-				pathTracerDirty |= ImGui::Checkbox("Multiple importance sampling", &pathTracer.multipleImportanceSampling);
+					pathTracerDirty |= ImGui::PropertyCheckbox("Multiple importance sampling", pathTracer.multipleImportanceSampling);
+				}
+
+				ImGui::EndProperties();
 			}
 
 
@@ -1040,17 +1096,31 @@ void application::drawSettings(float dt)
 		}
 		else
 		{
-			editFireParticleSystem(fireParticleSystem);
-			editBoidParticleSystem(boidParticleSystem);
+			if (ImGui::BeginTree("Particle systems"))
+			{
+				editFireParticleSystem(fireParticleSystem);
+				editBoidParticleSystem(boidParticleSystem);
 
-			//ragdoll.edit();
-			ImGui::SliderInt("Physics rigid solver iterations", (int*)&physicsSettings.numRigidSolverIterations, 1, 200);
+				ImGui::EndTree();
+			}
 
-			ImGui::SliderInt("Physics cloth velocity iterations", (int*)&physicsSettings.numClothVelocityIterations, 0, 10);
-			ImGui::SliderInt("Physics cloth position iterations", (int*)&physicsSettings.numClothPositionIterations, 0, 10);
-			ImGui::SliderInt("Physics cloth drift iterations", (int*)&physicsSettings.numClothDriftIterations, 0, 10);
+			if (ImGui::BeginTree("Physics"))
+			{
+				if (ImGui::BeginProperties())
+				{
+					//ragdoll.edit();
+					ImGui::PropertySlider("Rigid solver iterations", physicsSettings.numRigidSolverIterations, 1, 200);
 
-			ImGui::SliderFloat("Physics test force", &testPhysicsForce, 1.f, 10000.f);
+					ImGui::PropertySlider("Cloth velocity iterations", physicsSettings.numClothVelocityIterations, 0, 10);
+					ImGui::PropertySlider("Cloth position iterations", physicsSettings.numClothPositionIterations, 0, 10);
+					ImGui::PropertySlider("Cloth drift iterations", physicsSettings.numClothDriftIterations, 0, 10);
+
+					ImGui::PropertySlider("Test force", testPhysicsForce, 1.f, 10000.f);
+
+					ImGui::EndProperties();
+				}
+				ImGui::EndTree();
+			}
 		}
 	}
 

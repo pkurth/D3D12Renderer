@@ -4,6 +4,7 @@
 #include <fontawesome/IconsFontAwesome5.h>
 
 #include "dx/dx.h"
+#include "core/math.h"
 
 ImGuiContext* initializeImGui(struct dx_window& window);
 void newImGuiFrame(float dt);
@@ -58,9 +59,39 @@ namespace ImGui
 	bool Dropdown(const char* label, const char* (*name_func)(uint32, void*), uint32& current, void* data = 0);
 
 	bool DisableableButton(const char* label, bool enabled);
-	bool DisableableCheckbox(const char* label, bool* v, bool enabled);
+	bool DisableableCheckbox(const char* label, bool& v, bool enabled);
 
 	bool SelectableWrapped(const char* label, int width, bool selected = false, ImGuiSelectableFlags flags = 0);
+
+	bool BeginTree(const char* label, bool defaultOpen = false);
+	void EndTree();
+
+
+
+
+	bool BeginProperties();
+	void EndProperties();
+
+	bool PropertyCheckbox(const char* label, bool& v);
+
+	bool PropertySlider(const char* label, float& f, float minValue = 0.f, float maxValue = 1.f, const char* format = "%.3f");
+	bool PropertySlider(const char* label, vec2& f, float minValue = 0.f, float maxValue = 1.f, const char* format = "%.3f");
+	bool PropertySlider(const char* label, vec3& f, float minValue = 0.f, float maxValue = 1.f, const char* format = "%.3f");
+	bool PropertySlider(const char* label, vec4& f, float minValue = 0.f, float maxValue = 1.f, const char* format = "%.3f");
+
+	bool PropertySlider(const char* label, int32& v, int minValue, int maxValue, const char* format = "%d");
+	bool PropertySlider(const char* label, uint32& v, uint32 minValue, uint32 maxValue, const char* format = "%d");
+
+	bool PropertyInput(const char* label, float& f, const char* format = "%.3f");
+
+	bool PropertyDropdown(const char* label, const char** names, uint32 count, uint32& current);
+	bool PropertyDropdown(const char* label, const char* (*name_func)(uint32, void*), uint32& current, void* data = 0);
+
+	bool PropertyColorEdit(const char* label, vec3& f);
+
+
+
+
 
 	float SplineValue(float p, const float* x, const float* y, uint32 numPoints);
 	bool Spline(const char* label, const ImVec2& size, uint32 maxNumPoints, float* x, float* y, uint32 drawResolution = 256);

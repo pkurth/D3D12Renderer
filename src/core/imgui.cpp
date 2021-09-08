@@ -384,14 +384,14 @@ namespace ImGui
 		return result;
 	}
 
-	bool DisableableCheckbox(const char* label, bool* v, bool enabled)
+	bool DisableableCheckbox(const char* label, bool& v, bool enabled)
 	{
 		if (!enabled)
 		{
 			ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
 			ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
 		}
-		bool result = ImGui::Checkbox(label, v);
+		bool result = ImGui::Checkbox(label, &v);
 		if (!enabled)
 		{
 			ImGui::PopItemFlag();
@@ -408,6 +408,146 @@ namespace ImGui
 		ImVec2 textSize = ImGui::CalcTextSize(label, 0, false, textWidth);
 		bool result = ImGui::Selectable("##label", selected, flags, textSize + padding * 2);
 		ImGui::RenderTextWrapped(ImGui::GetItemRectMin() + padding, label, 0, textWidth);
+		return result;
+	}
+
+	bool BeginTree(const char* label, bool defaultOpen)
+	{
+		return ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_FramePadding | (defaultOpen ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None));
+	}
+
+	void EndTree()
+	{
+		ImGui::TreePop();
+	}
+
+
+
+
+
+
+	static void pre(const char* label)
+	{
+		ImGui::TableNextColumn();
+		ImGui::Text(label);
+		ImGui::TableNextColumn();
+		ImGui::PushItemWidth(-1);
+		ImGui::PushID(label);
+	}
+
+	static void post()
+	{
+		ImGui::PopID();
+		ImGui::PopItemWidth();
+	}
+
+
+	bool BeginProperties()
+	{
+		return ImGui::BeginTable("", 2, ImGuiTableFlags_Resizable);
+	}
+
+	void EndProperties()
+	{
+		ImGui::EndTable();
+	}
+
+	bool PropertyCheckbox(const char* label, bool& v)
+	{
+		pre(label);
+		bool result = ImGui::Checkbox("", &v);
+		post();
+		return result;
+	}
+
+	static bool SliderInternal(ImGuiDataType_ type, int32 count, const char* label, void* f, void* minValue, void* maxValue, const char* format)
+	{
+		pre(label);
+		bool result;
+		if (count == 1)
+		{
+			result = ImGui::SliderScalar("", type, f, minValue, maxValue, format);
+		}
+		else
+		{
+			result = ImGui::SliderScalarN("", type, f, count, minValue, maxValue, format);
+		}
+		post();
+		return result;
+	}
+
+	bool PropertySlider(const char* label, float& f, float minValue, float maxValue, const char* format)
+	{
+		return SliderInternal(ImGuiDataType_Float, 1, label, &f, &minValue, &maxValue, format);
+	}
+
+	bool PropertySlider(const char* label, vec2& f, float minValue, float maxValue, const char* format)
+	{
+		return SliderInternal(ImGuiDataType_Float, 2, label, f.data, &minValue, &maxValue, format);
+	}
+
+	bool PropertySlider(const char* label, vec3& f, float minValue, float maxValue, const char* format)
+	{
+		return SliderInternal(ImGuiDataType_Float, 3, label, f.data, &minValue, &maxValue, format);
+	}
+
+	bool PropertySlider(const char* label, vec4& f, float minValue, float maxValue, const char* format)
+	{
+		return SliderInternal(ImGuiDataType_Float, 4, label, f.data, &minValue, &maxValue, format);
+	}
+
+	bool PropertySlider(const char* label, int32& v, int minValue, int maxValue, const char* format)
+	{
+		return SliderInternal(ImGuiDataType_S32, 1, label, &v, &minValue, &maxValue, format);
+	}
+
+	bool PropertySlider(const char* label, uint32& v, uint32 minValue, uint32 maxValue, const char* format)
+	{
+		return SliderInternal(ImGuiDataType_U32, 1, label, &v, &minValue, &maxValue, format);
+	}
+
+	static bool InputInternal(ImGuiDataType_ type, int32 count, const char* label, void* f, const char* format)
+	{
+		pre(label);
+		bool result;
+		if (count == 1)
+		{
+			result = ImGui::InputScalar("", type, f, 0, 0, format);
+		}
+		else
+		{
+			result = ImGui::InputScalarN("", type, f, count, 0, 0, format);
+		}
+		post();
+		return result;
+	}
+
+	bool PropertyInput(const char* label, float& f, const char* format)
+	{
+		return ImGui::InputInternal(ImGuiDataType_Float, 1, label, &f, format);
+	}
+
+	bool PropertyDropdown(const char* label, const char** names, uint32 count, uint32& current)
+	{
+		pre(label);
+		bool result = ImGui::Dropdown("", names, count, current);
+		post();
+		return result;
+	}
+
+	bool PropertyDropdown(const char* label, const char* (*name_func)(uint32, void*), uint32& current, void* data)
+	{
+		pre(label);
+		bool result = ImGui::Dropdown("", name_func, current, data);
+		post();
+		return result;
+	}
+
+	bool PropertyColorEdit(const char* label, vec3& f)
+	{
+		pre(label);
+		bool result = ImGui::ColorEdit3("", f.data, ImGuiColorEditFlags_NoInputs);
+		post();
 		return result;
 	}
 }

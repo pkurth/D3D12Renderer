@@ -263,9 +263,13 @@ half& operator/=(half& a, half b);
 
 
 
-struct vec2
+union vec2
 {
-	float x, y;
+	struct
+	{
+		float x, y;
+	};
+	float data[2];
 
 	vec2() {}
 	vec2(float v) : vec2(v, v) {}
@@ -287,10 +291,7 @@ union vec3
 		vec2 xy;
 		float z;
 	};
-	struct
-	{
-		float data[3];
-	};
+	float data[3];
 
 	vec3() {}
 	vec3(float v) : vec3(v, v, v) {}
