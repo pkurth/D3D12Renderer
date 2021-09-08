@@ -184,7 +184,7 @@ void renderWireCone(vec3 position, vec3 direction, float distance, float angle, 
 	renderPass->renderObject<debug_unlit_line_pipeline>(mat4::identity, material_vertex_buffer_group_view(vb, {}), ib, sm, debug_line_material{ color });
 }
 
-void renderWireCube(vec3 position, vec3 radius, quat rotation, vec4 color, ldr_render_pass* renderPass)
+void renderWireBox(vec3 position, vec3 radius, quat rotation, vec4 color, ldr_render_pass* renderPass)
 {
 	auto [vb, vertexPtr] = dxContext.createDynamicVertexBuffer(sizeof(vec3), 8);
 	auto [ib, indexPtr] = dxContext.createDynamicIndexBuffer(sizeof(uint16), 12 * 2);
