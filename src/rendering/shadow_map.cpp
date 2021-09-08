@@ -137,11 +137,11 @@ void renderSunShadowMap(directional_light& sun, sun_shadow_render_pass* renderPa
 
 	renderPass->numCascades = sun.numShadowCascades;
 
-	uint64 sunMovementHash = getLightMovementHash(sun);
+	uint64 movementHash = getLightMovementHash(sun);
 
 	for (uint32 i = 0; i < sun.numShadowCascades; ++i)
 	{
-		auto [vp, cache] = assignShadowMapViewport(i, sunMovementHash, sun.shadowDimensions);
+		auto [vp, cache] = assignShadowMapViewport(i, movementHash, sun.shadowDimensions);
 
 		sun.shadowMapViewports[i] = vec4(vp.x, vp.y, vp.size, vp.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
 
@@ -171,7 +171,9 @@ spot_shadow_info renderSpotShadowMap(spot_light_cb& spotLight, uint32 lightIndex
 	spotLight.shadowInfoIndex = renderPassIndex;
 	renderPass->viewProjMatrix = getSpotLightViewProjectionMatrix(spotLight);
 
-	auto [vp, staticCacheAvailable] = assignShadowMapViewport(uniqueID << 10, 0, 512);
+	uint64 movementHash = getLightMovementHash(spotLight);
+
+	auto [vp, staticCacheAvailable] = assignShadowMapViewport(uniqueID << 10, movementHash, 512);
 	renderPass->viewport = vp;
 
 	if (staticCacheAvailable && !invalidateCache)
@@ -200,8 +202,10 @@ point_shadow_info renderPointShadowMap(point_light_cb& pointLight, uint32 lightI
 	renderPass->lightPosition = pointLight.position;
 	renderPass->maxDistance = pointLight.radius;
 
-	auto [vp0, staticCacheAvailable0] = assignShadowMapViewport((2 * uniqueID + 0) << 20, 0, 512);
-	auto [vp1, staticCacheAvailable1] = assignShadowMapViewport((2 * uniqueID + 1) << 20, 0, 512);
+	uint64 movementHash = getLightMovementHash(pointLight);
+
+	auto [vp0, staticCacheAvailable0] = assignShadowMapViewport((2 * uniqueID + 0) << 20, movementHash, 512);
+	auto [vp1, staticCacheAvailable1] = assignShadowMapViewport((2 * uniqueID + 1) << 20, movementHash, 512);
 	renderPass->viewport0 = vp0;
 	renderPass->viewport1 = vp1;
 
