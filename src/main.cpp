@@ -90,7 +90,7 @@ int main(int argc, char** argv)
 	initializeJobSystem();
 
 	dx_window window;
-	window.initialize(TEXT("Main Window"), 1280, 800);
+	window.initialize(TEXT("Main Window"), 1920, 1080);
 	setMainWindow(&window);
 
 	application app = {};
