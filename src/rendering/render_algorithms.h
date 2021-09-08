@@ -55,14 +55,13 @@ struct tonemap_settings
 
 	float exposure = 0.2f;
 
-	float tonemap(float color)
+	float tonemap(float color) const
 	{
 		color *= exp2(exposure);
 		return evaluate(color) / evaluate(linearWhite);
 	}
 
-private:
-	float evaluate(float x)
+	float evaluate(float x) const
 	{
 		return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - (E / F);
 	}

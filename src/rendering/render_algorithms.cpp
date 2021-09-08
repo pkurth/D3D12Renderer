@@ -1365,12 +1365,22 @@ void tonemap(dx_command_list* cl,
 {
 	DX_PROFILE_BLOCK(cl, "Tonemapping");
 
+	tonemap_cb cb;
+	cb.A = settings.A;
+	cb.B = settings.B;
+	cb.C = settings.C;
+	cb.D = settings.D;
+	cb.E = settings.E;
+	cb.F = settings.F;
+	cb.invEvaluatedLinearWhite = 1.f / settings.evaluate(settings.linearWhite);
+	cb.expExposure = exp2(settings.exposure);
+
 	cl->setPipelineState(*tonemapPipeline.pipeline);
 	cl->setComputeRootSignature(*tonemapPipeline.rootSignature);
 
 	cl->setDescriptorHeapUAV(TONEMAP_RS_TEXTURES, 0, ldrOutput);
 	cl->setDescriptorHeapSRV(TONEMAP_RS_TEXTURES, 1, hdrInput);
-	cl->setCompute32BitConstants(TONEMAP_RS_CB, settings); // Settings struct is identical to tonemap_cb.
+	cl->setCompute32BitConstants(TONEMAP_RS_CB, cb);
 
 	cl->dispatch(bucketize(ldrOutput->width, POST_PROCESSING_BLOCK_SIZE), bucketize(ldrOutput->height, POST_PROCESSING_BLOCK_SIZE));
 }

@@ -191,16 +191,14 @@ struct specular_ambient_cb
 
 struct tonemap_cb
 {
-    float A; // Shoulder strength.
-    float B; // Linear strength.
-    float C; // Linear angle.
-    float D; // Toe strength.
-    float E; // Toe Numerator.
-    float F; // Toe denominator.
-    // Note E/F = Toe angle.
-    float linearWhite;
-
-    float exposure;
+    float A;
+    float B;
+    float C;
+    float D;
+    float E;
+    float F;
+    float invEvaluatedLinearWhite;
+    float expExposure;
 
     vec3 evaluate(vec3 x)
     {
@@ -209,8 +207,8 @@ struct tonemap_cb
 
     vec3 tonemap(vec3 color)
     {
-        color *= exp2(exposure);
-        return evaluate(color) / evaluate(linearWhite);
+        color *= expExposure;
+        return evaluate(color) * invEvaluatedLinearWhite;
     }
 };
 
