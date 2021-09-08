@@ -25,15 +25,15 @@ struct composite_mesh
 	dx_mesh mesh;
 	bounding_box aabb;
 
-	std::string filepath;
+	fs::path filepath;
 	uint32 flags;
 };
 
 
-ref<composite_mesh> loadMeshFromFile(const std::string& sceneFilename, bool loadSkeleton = true, bool loadAnimations = true, uint32 flags = mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+ref<composite_mesh> loadMeshFromFile(const fs::path& sceneFilename, bool loadSkeleton = true, bool loadAnimations = true, uint32 flags = mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 
 // Same function but with different default flags (includes skin).
-inline ref<composite_mesh> loadAnimatedMeshFromFile(const std::string& sceneFilename, bool loadSkeleton = true, bool loadAnimations = true, uint32 flags = mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents | mesh_creation_flags_with_skin)
+inline ref<composite_mesh> loadAnimatedMeshFromFile(const fs::path& sceneFilename, bool loadSkeleton = true, bool loadAnimations = true, uint32 flags = mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents | mesh_creation_flags_with_skin)
 {
 	return loadMeshFromFile(sceneFilename, loadSkeleton, loadAnimations, flags);
 }

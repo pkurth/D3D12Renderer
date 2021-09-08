@@ -38,7 +38,7 @@ struct animation_joint
 struct animation_clip
 {
 	std::string name;
-	std::string filename;
+	fs::path filename;
 
 	std::vector<float> positionTimestamps;
 	std::vector<float> rotationTimestamps;
@@ -70,12 +70,12 @@ struct animation_skeleton
 	std::unordered_map<std::string, uint32> nameToJointID;
 
 	std::vector<animation_clip> clips;
-	std::vector<std::string> files;
+	std::vector<fs::path> files;
 
 	void loadFromAssimp(const struct aiScene* scene, float scale = 1.f);
-	void pushAssimpAnimation(const std::string& sceneFilename, const struct aiAnimation* animation, float scale = 1.f);
-	void pushAssimpAnimations(const std::string& sceneFilename, float scale = 1.f);
-	void pushAssimpAnimationsInDirectory(const std::string& directory, float scale = 1.f);
+	void pushAssimpAnimation(const fs::path& sceneFilename, const struct aiAnimation* animation, float scale = 1.f);
+	void pushAssimpAnimations(const fs::path& sceneFilename, float scale = 1.f);
+	void pushAssimpAnimationsInDirectory(const fs::path& directory, float scale = 1.f);
 
 	void sampleAnimation(const animation_clip& clip, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
 	void sampleAnimation(uint32 index, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
@@ -102,26 +102,6 @@ struct animation_instance
 	float time = 0.f;
 
 	trs lastRootMotion;
-};
-
-struct animation_player
-{
-	animation_player() { }
-	animation_player(animation_clip* clip);
-
-	void transitionTo(const animation_clip* clip, float transitionTime, float startTime = 0.f);
-	void update(const animation_skeleton& skeleton, float dt, trs* outLocalTransforms, trs& outDeltaRootMotion, bool ignoreEvents = false);
-
-	bool playing() const { return to.valid(); }
-	bool transitioning() const { return from.valid(); }
-
-	animation_instance from; 
-	animation_instance to;
-
-	float transitionProgress = 0.f;
-	float transitionTime = 0.f;
-
-	random_number_generator rng = { 51293 };
 };
 
 #if 0

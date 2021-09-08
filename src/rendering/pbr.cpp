@@ -22,7 +22,7 @@ static dx_pipeline transparentPBRPipeline;
 
 struct material_key
 {
-	std::string albedoTex, normalTex, roughTex, metallicTex;
+	fs::path albedoTex, normalTex, roughTex, metallicTex;
 	vec4 emission;
 	vec4 albedoTint;
 	float roughnessOverride, metallicOverride;
@@ -67,10 +67,10 @@ static bool operator==(const material_key& a, const material_key& b)
 }
 
 ref<pbr_material> createPBRMaterial(
-	const std::string& albedoTex, 
-	const std::string& normalTex, 
-	const std::string& roughTex, 
-	const std::string& metallicTex, 
+	const fs::path& albedoTex, 
+	const fs::path& normalTex, 
+	const fs::path& roughTex, 
+	const fs::path& metallicTex, 
 	const vec4& emission, 
 	const vec4& albedoTint, 
 	float roughOverride, 
@@ -124,9 +124,9 @@ ref<pbr_material> getDefaultPBRMaterial()
 	return material;
 }
 
-ref<pbr_environment> createEnvironment(const std::string& filename, uint32 skyResolution, uint32 environmentResolution, uint32 irradianceResolution, bool asyncCompute)
+ref<pbr_environment> createEnvironment(const fs::path& filename, uint32 skyResolution, uint32 environmentResolution, uint32 irradianceResolution, bool asyncCompute)
 {
-	static std::unordered_map<std::string, weakref<pbr_environment>> cache;
+	static std::unordered_map<fs::path, weakref<pbr_environment>> cache;
 	static std::mutex mutex;
 
 	mutex.lock();

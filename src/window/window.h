@@ -15,7 +15,7 @@ struct win32_window
 
 	virtual void swapBuffers() = 0;
 	virtual void toggleFullscreen();
-	void setFileDropCallback(std::function<void(const std::string&)> cb);
+	void setFileDropCallback(std::function<void(const fs::path&)> cb);
 
 	// Internal callbacks.
 	virtual void onResize() {}
@@ -42,7 +42,7 @@ struct win32_window
 	bool open = false;
 	bool visible = false;
 
-	std::function<void(const std::string&)> fileDropCallback;
+	std::function<void(const fs::path&)> fileDropCallback;
 
 	static win32_window* mainWindow;
 };

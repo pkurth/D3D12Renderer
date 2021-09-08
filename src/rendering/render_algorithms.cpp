@@ -881,6 +881,7 @@ void ldrPass(dx_command_list* cl,
 	{
 		DX_PROFILE_BLOCK(cl, "Outlines");
 
+		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		cl->setStencilReference(stencil_flag_selected_object);
 
 		cl->setPipelineState(*outlineMarkerPipeline.pipeline);

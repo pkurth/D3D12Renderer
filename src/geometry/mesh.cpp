@@ -2,6 +2,7 @@
 #include "mesh.h"
 #include "geometry.h"
 #include "rendering/pbr.h"
+#include "core/hash.h"
 
 #include "core/assimp.h"
 
@@ -23,10 +24,10 @@ static void getMeshNamesAndTransforms(const aiNode* node, ref<composite_mesh>& m
 	}
 }
 
-static std::unordered_map<std::string, weakref<composite_mesh>> meshCache; // TODO: Pack flags into key.
+static std::unordered_map<fs::path, weakref<composite_mesh>> meshCache; // TODO: Pack flags into key.
 static std::mutex mutex;
 
-static ref<composite_mesh> loadMeshFromFileInternal(const std::string& sceneFilename, bool loadSkeleton, bool loadAnimations, uint32 flags)
+static ref<composite_mesh> loadMeshFromFileInternal(const fs::path& sceneFilename, bool loadSkeleton, bool loadAnimations, uint32 flags)
 {
 	Assimp::Importer importer;
 
@@ -91,7 +92,7 @@ static ref<composite_mesh> loadMeshFromFileInternal(const std::string& sceneFile
 	return result;
 }
 
-ref<composite_mesh> loadMeshFromFile(const std::string& sceneFilename, bool loadSkeleton, bool loadAnimations, uint32 flags)
+ref<composite_mesh> loadMeshFromFile(const fs::path& sceneFilename, bool loadSkeleton, bool loadAnimations, uint32 flags)
 {
 	mutex.lock();
 

@@ -25,9 +25,9 @@ struct application
 	void initialize(main_renderer* renderer);
 	void update(const user_input& input, float dt);
 
-	void setEnvironment(const std::string& filename);
+	void setEnvironment(const fs::path& filename);
 
-	void handleFileDrop(const std::string& filename);
+	void handleFileDrop(const fs::path& filename);
 	void serializeToFile();
 	bool deserializeFromFile();
 

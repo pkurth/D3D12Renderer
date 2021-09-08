@@ -1558,7 +1558,7 @@ void application::update(const user_input& input, float dt)
 	}
 }
 
-void application::setEnvironment(const std::string& filename)
+void application::setEnvironment(const fs::path& filename)
 {
 	environment = createEnvironment(filename); // Currently synchronous (on render queue).
 	pathTracer.numAveragedFrames = 0;
@@ -1569,7 +1569,7 @@ void application::setEnvironment(const std::string& filename)
 	}
 }
 
-void application::handleFileDrop(const std::string& filename)
+void application::handleFileDrop(const fs::path& filename)
 {
 	fs::path path = filename;
 	fs::path relative = fs::relative(path, fs::current_path());
@@ -1692,7 +1692,7 @@ void application::serializeToFile()
 					<< YAML::Key << "Flags" << YAML::Value << raster.mesh->flags
 					<< YAML::Key << "Animation files" << YAML::Value << YAML::BeginSeq;
 
-			for (const std::string& s : raster.mesh->skeleton.files)
+			for (const fs::path& s : raster.mesh->skeleton.files)
 			{
 				out << s;
 			}
@@ -1778,7 +1778,7 @@ bool application::deserializeFromFile()
 	sun.blendDistances = sunNode["Blend Distances"].as<decltype(sun.blendDistances)>();
 
 	auto environmentNode = data["Environment"];
-	setEnvironment(environmentNode["Name"].as<std::string>());
+	setEnvironment(environmentNode["Name"].as<fs::path>());
 	renderer->environmentIntensity = environmentNode["Intensity"].as<float>();
 
 	auto entitiesNode = data["Entities"];
@@ -1796,12 +1796,12 @@ bool application::deserializeFromFile()
 		if (entityNode["Raster"])
 		{
 			auto rasterNode = entityNode["Raster"];
-			auto mesh = loadMeshFromFile(rasterNode["Mesh"].as<std::string>(), rasterNode["Flags"].as<uint32>());
+			auto mesh = loadMeshFromFile(rasterNode["Mesh"].as<fs::path>(), rasterNode["Flags"].as<uint32>());
 
 			auto animationsNode = rasterNode["Animation files"];
 			for (auto file : animationsNode)
 			{
-				mesh->skeleton.pushAssimpAnimations(file.as<std::string>());
+				mesh->skeleton.pushAssimpAnimations(file.as<fs::path>());
 			}
 
 			entity.addComponent<raster_component>(mesh);

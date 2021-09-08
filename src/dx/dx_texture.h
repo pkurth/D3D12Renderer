@@ -145,9 +145,9 @@ enum image_format
 	image_format_wic, // Other formats: png, jpeg, etc.
 };
 
-ref<dx_texture> loadTextureFromFile(const std::string& filename, uint32 flags = texture_load_flags_default);
-ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format imageFormat, const std::string& cacheFilename, uint32 flags = texture_load_flags_default);
-ref<dx_texture> loadVolumeTextureFromDirectory(const std::string& dirname, uint32 flags = texture_load_flags_compress | texture_load_flags_cache_to_dds | texture_load_flags_noncolor);
+ref<dx_texture> loadTextureFromFile(const fs::path& filename, uint32 flags = texture_load_flags_default);
+ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format imageFormat, const fs::path& cacheFilename, uint32 flags = texture_load_flags_default);
+ref<dx_texture> loadVolumeTextureFromDirectory(const fs::path& dirname, uint32 flags = texture_load_flags_compress | texture_load_flags_cache_to_dds | texture_load_flags_noncolor);
 
 
 bool isImageExtension(const fs::path& extension);

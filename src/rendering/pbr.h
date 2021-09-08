@@ -82,12 +82,12 @@ struct pbr_environment
 	ref<dx_texture> environment;
 	ref<dx_texture> irradiance;
 
-	std::string name;
+	fs::path name;
 };
 
-ref<pbr_material> createPBRMaterial(const std::string& albedoTex, const std::string& normalTex, const std::string& roughTex, const std::string& metallicTex,
+ref<pbr_material> createPBRMaterial(const fs::path& albedoTex, const fs::path& normalTex, const fs::path& roughTex, const fs::path& metallicTex,
 	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f, bool doubleSided = false);
 ref<pbr_material> getDefaultPBRMaterial();
 
-ref<pbr_environment> createEnvironment(const std::string& filename, uint32 skyResolution = 2048, uint32 environmentResolution = 128, uint32 irradianceResolution = 32, bool asyncCompute = false);
+ref<pbr_environment> createEnvironment(const fs::path& filename, uint32 skyResolution = 2048, uint32 environmentResolution = 128, uint32 irradianceResolution = 32, bool asyncCompute = false);
 

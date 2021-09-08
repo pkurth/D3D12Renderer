@@ -2,6 +2,7 @@
 #include "dx_texture.h"
 #include "dx_context.h"
 #include "dx_command_list.h"
+#include "core/hash.h"
 #include "rendering/texture_preprocessing.h"
 
 #include <DirectXTex/DirectXTex.h>
@@ -414,7 +415,7 @@ static ref<dx_texture> uploadImageToGPU(DirectX::ScratchImage& scratchImage, D3D
 	return result;
 }
 
-static ref<dx_texture> loadTextureInternal(const std::string& filename, uint32 flags)
+static ref<dx_texture> loadTextureInternal(const fs::path& path, uint32 flags)
 {
 	if (flags & texture_load_flags_gen_mips_on_gpu)
 	{
@@ -424,8 +425,6 @@ static ref<dx_texture> loadTextureInternal(const std::string& filename, uint32 f
 
 	DirectX::ScratchImage scratchImage;
 	D3D12_RESOURCE_DESC textureDesc;
-
-	fs::path path = filename;
 
 	if (path.extension() == ".svg")
 	{
@@ -442,12 +441,12 @@ static ref<dx_texture> loadTextureInternal(const std::string& filename, uint32 f
 	return uploadImageToGPU(scratchImage, textureDesc, flags);
 }
 
-static ref<dx_texture> loadTextureFromMemoryInternal(const void* ptr, uint32 size, image_format imageFormat, const std::string& cacheFilename, uint32 flags)
+static ref<dx_texture> loadTextureFromMemoryInternal(const void* ptr, uint32 size, image_format imageFormat, const fs::path& cachePath, uint32 flags)
 {
 	DirectX::ScratchImage scratchImage;
 	D3D12_RESOURCE_DESC textureDesc;
 
-	if (!loadImageFromMemory(ptr, size, imageFormat, cacheFilename, flags, scratchImage, textureDesc))
+	if (!loadImageFromMemory(ptr, size, imageFormat, cachePath, flags, scratchImage, textureDesc))
 	{
 		return nullptr;
 	}
@@ -455,7 +454,7 @@ static ref<dx_texture> loadTextureFromMemoryInternal(const void* ptr, uint32 siz
 	return uploadImageToGPU(scratchImage, textureDesc, flags);
 }
 
-static ref<dx_texture> loadVolumeTextureInternal(const std::string& dirname, uint32 flags)
+static ref<dx_texture> loadVolumeTextureInternal(const fs::path& dirname, uint32 flags)
 {
 	// No mip maps allowed for now!
 	assert(!(flags & texture_load_flags_allocate_full_mipchain));
@@ -516,42 +515,38 @@ static ref<dx_texture> loadVolumeTextureInternal(const std::string& dirname, uin
 	return result;
 }
 
-static std::unordered_map<std::string, weakref<dx_texture>> textureCache; // TODO: Pack flags into key.
+static std::unordered_map<fs::path, weakref<dx_texture>> textureCache; // TODO: Pack flags into key.
 static std::mutex mutex;
 
-ref<dx_texture> loadTextureFromFile(const std::string& filename, uint32 flags)
+ref<dx_texture> loadTextureFromFile(const fs::path& filename, uint32 flags)
 {
 	mutex.lock();
 
-	const std::string& s = filename;
-	
-	auto sp = textureCache[s].lock();
+	auto sp = textureCache[filename].lock();
 	if (!sp)
 	{
-		textureCache[s] = sp = loadTextureInternal(s, flags);
+		textureCache[filename] = sp = loadTextureInternal(filename, flags);
 	}
 
 	mutex.unlock();
 	return sp;
 }
 
-ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format imageFormat, const std::string& cacheFilename, uint32 flags)
+ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format imageFormat, const fs::path& cacheFilename, uint32 flags)
 {
 	mutex.lock();
 
-	const std::string& s = cacheFilename;
-
-	auto sp = textureCache[s].lock();
+	auto sp = textureCache[cacheFilename].lock();
 	if (!sp)
 	{
-		textureCache[s] = sp = loadTextureFromMemoryInternal(ptr, size, imageFormat, s, flags);
+		textureCache[cacheFilename] = sp = loadTextureFromMemoryInternal(ptr, size, imageFormat, cacheFilename, flags);
 	}
 
 	mutex.unlock();
 	return sp;
 }
 
-ref<dx_texture> loadVolumeTextureFromDirectory(const std::string& dirname, uint32 flags)
+ref<dx_texture> loadVolumeTextureFromDirectory(const fs::path& dirname, uint32 flags)
 {
 	mutex.lock();
 

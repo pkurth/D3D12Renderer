@@ -31,6 +31,12 @@ static YAML::Emitter& operator<<(YAML::Emitter& out, const quat& v)
 	return out;
 }
 
+static YAML::Emitter& operator<<(YAML::Emitter& out, const fs::path& p)
+{
+	out << p.string(); // TODO: This should really output wstrings.
+	return out;
+}
+
 namespace YAML
 {
 	template<>
@@ -55,6 +61,12 @@ namespace YAML
 	struct convert<quat>
 	{
 		static bool decode(const Node& n, quat& v) { return convert<vec4>::decode(n, v.v4); }
+	};
+
+	template<>
+	struct convert<fs::path>
+	{
+		static bool decode(const Node& n, fs::path& v) { v = n.as<std::string>(); return true; }
 	};
 }
 

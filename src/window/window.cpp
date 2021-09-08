@@ -149,7 +149,7 @@ void win32_window::toggleFullscreen()
 	setFullscreen(windowHandle, fullscreen, windowPosition);
 }
 
-void win32_window::setFileDropCallback(std::function<void(const std::string&)> cb)
+void win32_window::setFileDropCallback(std::function<void(const fs::path&)> cb)
 {
 	if (!fileDropCallback)
 	{
@@ -449,12 +449,12 @@ static LRESULT CALLBACK windowCallBack(
 			{
 				HDROP hdrop = (HDROP)wParam;
 
-				char nextFile[MAX_PATH];
-				uint32 numFiles = DragQueryFileA(hdrop, -1, NULL, 0);
+				wchar nextFile[MAX_PATH];
+				uint32 numFiles = DragQueryFileW(hdrop, -1, NULL, 0);
 
 				for (uint32 i = 0; i < numFiles; ++i)
 				{
-					if (DragQueryFileA(hdrop, i, nextFile, MAX_PATH) > 0)
+					if (DragQueryFileW(hdrop, i, nextFile, MAX_PATH) > 0)
 					{
 						window->fileDropCallback(nextFile);
 					}

@@ -49,7 +49,7 @@ static void scaleKeyframes(animation_clip& clip, animation_joint& joint, float s
 	}
 }
 
-void animation_skeleton::pushAssimpAnimation(const std::string& sceneFilename, const aiAnimation* animation, float scale)
+void animation_skeleton::pushAssimpAnimation(const fs::path& sceneFilename, const aiAnimation* animation, float scale)
 {
 	animation_clip& clip = clips.emplace_back();
 
@@ -59,6 +59,8 @@ void animation_skeleton::pushAssimpAnimation(const std::string& sceneFilename, c
 	{
 		clip.name = clip.name.substr(posOfFirstOr + 1);
 	}
+
+	clip.name += " (" + sceneFilename.filename().string() + ")";
 
 	clip.filename = sceneFilename;
 
@@ -104,7 +106,7 @@ void animation_skeleton::pushAssimpAnimation(const std::string& sceneFilename, c
 	}
 }
 
-void animation_skeleton::pushAssimpAnimations(const std::string& sceneFilename, float scale)
+void animation_skeleton::pushAssimpAnimations(const fs::path& sceneFilename, float scale)
 {
 	Assimp::Importer importer;
 
@@ -120,11 +122,11 @@ void animation_skeleton::pushAssimpAnimations(const std::string& sceneFilename, 
 	}
 }
 
-void animation_skeleton::pushAssimpAnimationsInDirectory(const std::string& directory, float scale)
+void animation_skeleton::pushAssimpAnimationsInDirectory(const fs::path& directory, float scale)
 {
 	for (auto& p : fs::directory_iterator(directory))
 	{
-		pushAssimpAnimations(p.path().string().c_str(), scale);
+		pushAssimpAnimations(p.path(), scale);
 	}
 }
 

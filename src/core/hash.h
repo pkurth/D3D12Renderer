@@ -88,5 +88,14 @@ namespace std
 			return seed;
 		}
 	};
+
+	template <>
+	struct hash<fs::path>
+	{
+		size_t operator()(const fs::path& p) const
+		{
+			return std::hash<fs::path::string_type>{}(p.native());
+		}
+	};
 }
 

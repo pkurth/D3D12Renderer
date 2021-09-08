@@ -96,7 +96,7 @@ int main(int argc, char** argv)
 	application app = {};
 	app.loadCustomShaders();
 
-	window.setFileDropCallback([&app](const std::string& s) { app.handleFileDrop(s); });
+	window.setFileDropCallback([&app](const fs::path& s) { app.handleFileDrop(s); });
 
 	initializeTransformationGizmos();
 	initializeRenderUtils();

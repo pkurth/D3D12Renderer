@@ -39,7 +39,7 @@ static uint32 getVertexSize(uint32 meshFlags)
 
 struct cpu_mesh
 {
-	typedef indexed_triangle16 triangle_t;
+	typedef indexed_triangle32 triangle_t;
 
 	cpu_mesh() {}
 	cpu_mesh(uint32 flags);
