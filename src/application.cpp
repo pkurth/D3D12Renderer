@@ -107,7 +107,7 @@ void application::initialize(main_renderer* renderer)
 		"assets/sponza/textures/Sponza_Curtain_metallic.tga",
 		vec4(0.f), vec4(1.f), 1.f, 1.f, true);
 
-#if 0
+#if 1
 	if (auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj"))
 	{
 		auto blas = defineBlasFromMesh(sponzaMesh, pathTracer);
@@ -1183,47 +1183,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 	bool objectMovedByGizmo = false;
 
 
-	{
-		int iconSize = 40;
-
-		if (ImGui::BeginWindowHiddenTabBar("Controls", 0, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
-		{
-			transformation_space constantLocal = transformation_local;
-			transformation_space& space = (gizmo.type == transformation_type_scale) ? constantLocal : gizmo.space;
-
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-
-			ImGui::PushID(&gizmo.space);
-			ImGui::IconRadioButton(imgui_icon_global, (int*)&space, transformation_global, iconSize, gizmo.type != transformation_type_scale);
-			ImGui::SameLine(0, 0);
-			ImGui::IconRadioButton(imgui_icon_local, (int*)&space, transformation_local, iconSize, gizmo.type != transformation_type_scale);
-			ImGui::PopID();
-
-			ImGui::SameLine(0.f, (float)iconSize);
-
-
-			ImGui::PushID(&gizmo.type);
-			ImGui::IconRadioButton(imgui_icon_translate, (int*)&gizmo.type, transformation_type_translation, iconSize, true);
-			ImGui::SameLine(0, 0);
-			ImGui::IconRadioButton(imgui_icon_rotate, (int*)&gizmo.type, transformation_type_rotation, iconSize, true);
-			ImGui::SameLine(0, 0);
-			ImGui::IconRadioButton(imgui_icon_scale, (int*)&gizmo.type, transformation_type_scale, iconSize, true);
-			ImGui::SameLine(0, 0);
-			ImGui::IconRadioButton(imgui_icon_cross, (int*)&gizmo.type, transformation_type_none, iconSize, true);
-			ImGui::PopID();
-
-			ImGui::SameLine(0.f, (float)iconSize);
-
-			ImGui::PopStyleColor();
-		}
-
-		ImGui::End();
-	}
-
-	if (!inputCaptured)
-	{
-		inputCaptured = gizmo.handleKeyboardInput(input);
-	}
+	inputCaptured = gizmo.handleUserInput(input, !inputCaptured);
 
 	if (selectedEntity)
 	{
@@ -1232,7 +1192,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 			// Transform entity.
 			trs& transform = selectedEntity.getComponent<trs>();
 
-			// Saved rigid-body properties. When a RB is dragged, we make it kinematic.
+			// Saved rigid-body properties. When an RB is dragged, we make it kinematic.
 			static bool saved = false;
 			static float invMass;
 

@@ -267,7 +267,7 @@ namespace ImGui
 			ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
 			ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
 		}
-		bool result = ImGui::ImageButton(iconsTextureID, ImVec2((float)size, (float)size), ImVec2(left, top), ImVec2(right, bottom));
+		bool result = ImGui::ImageButton(iconsTextureID, ImVec2((float)size, (float)size), ImVec2(left, top), ImVec2(right, bottom), 0);
 		if (ImGui::IsItemHovered())
 		{
 			ImGui::SetTooltip(imguiIconNames[icon]);
@@ -300,7 +300,7 @@ namespace ImGui
 			ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
 		}
 		bool clicked = ImGui::ImageButton(iconsTextureID, ImVec2((float)size, (float)size), ImVec2(left, top), ImVec2(right, bottom),
-			-1, active ? ImVec4(1, 1, 1, 0.4f) : ImVec4(0, 0, 0, 0));
+			0, active ? ImVec4(1, 1, 1, 0.4f) : ImVec4(0, 0, 0, 0));
 		if (ImGui::IsItemHovered())
 		{
 			ImGui::SetTooltip(imguiIconNames[icon]);

@@ -6,6 +6,7 @@
 #include "physics/bounding_volumes.h"
 #include "rendering/render_utils.h"
 #include "rendering/debug_visualization.h"
+#include "core/imgui.h"
 
 
 enum gizmo_axis
@@ -378,43 +379,85 @@ uint32 transformation_gizmo::handleScaling(trs& transform, ray r, const user_inp
 	return dragging ? axisIndex : hoverAxisIndex;
 }
 
-bool transformation_gizmo::handleKeyboardInput(const user_input& input)
+bool transformation_gizmo::handleUserInput(const user_input& input, bool allowKeyboardInput)
 {
 	bool result = false;
 
-	if (type != transformation_type_scale)
+	if (allowKeyboardInput)
 	{
-		if (input.keyboard['G'].pressEvent)
+		if (type != transformation_type_scale)
 		{
-			space = (transformation_space)(1 - space);
+			if (input.keyboard['G'].pressEvent)
+			{
+				space = (transformation_space)(1 - space);
+				dragging = false;
+				result = true;
+			}
+			if (input.keyboard['Q'].pressEvent)
+			{
+				type = transformation_type_none;
+				dragging = false;
+				result = true;
+			}
+		}
+		if (input.keyboard['W'].pressEvent)
+		{
+			type = transformation_type_translation;
 			dragging = false;
 			result = true;
 		}
-		if (input.keyboard['Q'].pressEvent)
+		if (input.keyboard['E'].pressEvent)
 		{
-			type = transformation_type_none;
+			type = transformation_type_rotation;
+			dragging = false;
+			result = true;
+		}
+		if (input.keyboard['R'].pressEvent)
+		{
+			type = transformation_type_scale;
 			dragging = false;
 			result = true;
 		}
 	}
-	if (input.keyboard['W'].pressEvent)
+
+	const uint32 iconSize = 35;
+	const float iconSpacing = 3.f;
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.f);
+	ImGui::SetNextWindowSize(ImVec2(0.f, 0.f)); // Auto-resize to content.
+	if (ImGui::Begin("##GizmoControls", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove))
 	{
-		type = transformation_type_translation;
-		dragging = false;
-		result = true;
+		transformation_space constantLocal = transformation_local;
+		transformation_space& space = (type == transformation_type_scale) ? constantLocal : this->space;
+
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+
+		ImGui::PushID(&this->space);
+		ImGui::IconRadioButton(imgui_icon_global, (int*)&space, transformation_global, iconSize, type != transformation_type_scale);
+		ImGui::SameLine(0.f, iconSpacing);
+		ImGui::IconRadioButton(imgui_icon_local, (int*)&space, transformation_local, iconSize, type != transformation_type_scale);
+		ImGui::PopID();
+
+		ImGui::SameLine(0.f, (float)iconSize);
+
+
+		ImGui::PushID(&type);
+		ImGui::IconRadioButton(imgui_icon_translate, (int*)&type, transformation_type_translation, iconSize, true);
+		ImGui::SameLine(0.f, iconSpacing);
+		ImGui::IconRadioButton(imgui_icon_rotate, (int*)&type, transformation_type_rotation, iconSize, true);
+		ImGui::SameLine(0.f, iconSpacing);
+		ImGui::IconRadioButton(imgui_icon_scale, (int*)&type, transformation_type_scale, iconSize, true);
+		ImGui::SameLine(0.f, iconSpacing);
+		ImGui::IconRadioButton(imgui_icon_cross, (int*)&type, transformation_type_none, iconSize, true);
+		ImGui::PopID();
+
+		ImGui::SameLine(0.f, (float)iconSize);
+
+		ImGui::PopStyleColor();
 	}
-	if (input.keyboard['E'].pressEvent)
-	{
-		type = transformation_type_rotation;
-		dragging = false;
-		result = true;
-	}
-	if (input.keyboard['R'].pressEvent)
-	{
-		type = transformation_type_scale;
-		dragging = false;
-		result = true;
-	}
+
+	ImGui::End();
+	ImGui::PopStyleVar(1);
 
 	return result;
 }
