@@ -21,13 +21,11 @@ void scene::clearAll()
 
 void scene::deleteEntity(scene_entity e)
 {
-	if (e.hasComponent<physics_reference_component>())
+	if (physics_reference_component* reference = e.getComponentIfExists<physics_reference_component>())
 	{
 		auto colliderView = view<collider_component>();
 
-		physics_reference_component& reference = e.getComponent<physics_reference_component>();
-
-		scene_entity colliderEntity = { reference.firstColliderEntity, &registry };
+		scene_entity colliderEntity = { reference->firstColliderEntity, &registry };
 		while (colliderEntity)
 		{
 			collider_component& collider = colliderEntity.getComponent<collider_component>();

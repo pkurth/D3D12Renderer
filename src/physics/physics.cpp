@@ -244,9 +244,8 @@ void testPhysicsInteraction(scene& appScene, ray r, float forceAmount)
 	for (auto [entityHandle, collider] : appScene.view<collider_component>().each())
 	{
 		scene_entity rbEntity = { collider.parentEntity, appScene };
-		if (rbEntity.hasComponent<rigid_body_component>())
+		if (rigid_body_component* rb = rbEntity.getComponentIfExists<rigid_body_component>())
 		{
-			rigid_body_component& rb = rbEntity.getComponent<rigid_body_component>();
 			trs& transform = rbEntity.getComponent<trs>();
 
 			ray localR = { inverseTransformPosition(transform, r.origin), inverseTransformDirection(transform, r.direction) };
@@ -284,12 +283,12 @@ void testPhysicsInteraction(scene& appScene, ray r, float forceAmount)
 			if (hit && t < minT)
 			{
 				minT = t;
-				minRB = &rb;
+				minRB = rb;
 
 				vec3 localHit = localR.origin + t * localR.direction;
 				vec3 globalHit = transformPosition(transform, localHit);
 
-				vec3 cogPosition = rb.getGlobalCOGPosition(transform);
+				vec3 cogPosition = rb->getGlobalCOGPosition(transform);
 
 				force = r.direction * forceAmount;
 				torque = cross(globalHit - cogPosition, force);
@@ -324,16 +323,14 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 		col.type = collider.type;
 		col.properties = collider.properties;
 
-		if (entity.hasComponent<rigid_body_component>())
+		if (rigid_body_component* rb = entity.getComponentIfExists<rigid_body_component>())
 		{
-			rigid_body_component& rb = entity.getComponent<rigid_body_component>();
-			col.objectIndex = (uint16)(&rb - rbBase);
+			col.objectIndex = (uint16)(rb - rbBase);
 			col.objectType = physics_object_type_rigid_body;
 		}
-		else if (entity.hasComponent<force_field_component>())
+		else if (force_field_component* ff = entity.getComponentIfExists<force_field_component>())
 		{
-			force_field_component& ff = entity.getComponent<force_field_component>();
-			col.objectIndex = (uint16)(&ff - ffBase);
+			col.objectIndex = (uint16)(ff - ffBase);
 			col.objectType = physics_object_type_force_field;
 		}
 		else
@@ -416,9 +413,9 @@ static std::pair<vec3, uint32> getForceFieldStates(scene& appScene, force_field_
 		scene_entity entity = { entityHandle, appScene };
 
 		vec3 force = forceField.force; 
-		if (entity.hasComponent<trs>())
+		if (trs* transform = entity.getComponentIfExists<trs>())
 		{
-			force = entity.getComponent<trs>().rotation * force;
+			force = transform->rotation * force;
 		}
 
 		if (entity.hasComponent<collider_component>())

@@ -90,9 +90,9 @@ void application::initialize(main_renderer* renderer)
 		raytracingTLAS.initialize();
 	}
 
-	appScene.createEntity("Cloth")
-		.addComponent<trs>(trs::identity)
-		.addComponent<cloth_component>(vec3(0.f, 0.f, 0.f), quat::identity, 10.f, 10.f, 20, 20, 8.f);
+	//appScene.createEntity("Cloth")
+	//	.addComponent<trs>(trs::identity)
+	//	.addComponent<cloth_component>(vec3(0.f, 0.f, 0.f), quat::identity, 10.f, 10.f, 20, 20, 8.f);
 
 	//clothMaterial = createPBRMaterial(
 	//	"assets/sphere/Tiles074_2K_Color.jpg",
@@ -107,7 +107,7 @@ void application::initialize(main_renderer* renderer)
 		"assets/sponza/textures/Sponza_Curtain_metallic.tga",
 		vec4(0.f), vec4(1.f), 1.f, 1.f, true);
 
-#if 1
+#if 0
 	if (auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj"))
 	{
 		auto blas = defineBlasFromMesh(sponzaMesh, pathTracer);
@@ -598,9 +598,9 @@ static bool editBoidParticleSystem(boid_particle_system& particleSystem)
 
 void application::setSelectedEntityEulerRotation()
 {
-	if (selectedEntity && selectedEntity.hasComponent<trs>())
+	if (trs* transform = (selectedEntity) ? selectedEntity.getComponentIfExists<trs>() : 0)
 	{
-		selectedEntityEulerRotation = quatToEuler(selectedEntity.getComponent<trs>().rotation);
+		selectedEntityEulerRotation = quatToEuler(transform->rotation);
 		selectedEntityEulerRotation.x = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.x));
 		selectedEntityEulerRotation.y = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.y));
 		selectedEntityEulerRotation.z = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.z));
@@ -808,9 +808,8 @@ template<typename component_t, typename ui_func>
 static void drawComponent(scene_entity entity, const char* componentName, ui_func func)
 {
 	const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding;
-	if (entity.hasComponent<component_t>())
+	if (auto* component = entity.getComponentIfExists<component_t>())
 	{
-		auto& component = entity.getComponent<component_t>();
 		ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
 
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
@@ -821,7 +820,7 @@ static void drawComponent(scene_entity entity, const char* componentName, ui_fun
 
 		if (open)
 		{
-			func(component);
+			func(*component);
 			ImGui::TreePop();
 		}
 	}
@@ -907,13 +906,11 @@ bool application::drawSceneHierarchy()
 
 				drawComponent<animation_component>(selectedEntity, "Animation", [this](animation_component& anim)
 				{
-					if (selectedEntity.hasComponent<raster_component>())
+					if (raster_component* raster = selectedEntity.getComponentIfExists<raster_component>())
 					{
 						if (ImGui::BeginProperties())
 						{
-							raster_component& raster = selectedEntity.getComponent<raster_component>();
-
-							uint32 animationIndex = anim.animation.clip ? (uint32)(anim.animation.clip - raster.mesh->skeleton.clips.data()) : -1;
+							uint32 animationIndex = anim.animation.clip ? (uint32)(anim.animation.clip - raster->mesh->skeleton.clips.data()) : -1;
 
 							bool animationChanged = ImGui::PropertyDropdown("Currently playing", [](uint32 index, void* data)
 							{
@@ -926,11 +923,11 @@ bool application::drawSceneHierarchy()
 									result = skeleton.clips[index].name.c_str();
 								}
 								return result;
-							}, animationIndex, &raster.mesh->skeleton);
+							}, animationIndex, &raster->mesh->skeleton);
 
 							if (animationChanged)
 							{
-								anim.animation.set(&raster.mesh->skeleton.clips[animationIndex]);
+								anim.animation.set(&raster->mesh->skeleton.clips[animationIndex]);
 							}
 
 							ImGui::EndProperties();
@@ -959,9 +956,9 @@ bool application::drawSceneHierarchy()
 								rb.invMass = 1.f;
 								rb.invInertia = mat3::identity;
 
-								if (selectedEntity.hasComponent<physics_reference_component>())
+								if (physics_reference_component* ref = selectedEntity.getComponentIfExists<physics_reference_component>())
 								{
-									rb.recalculateProperties(&appScene.registry, selectedEntity.getComponent<physics_reference_component>());
+									rb.recalculateProperties(&appScene.registry, *ref);
 								}
 							}
 						}
@@ -1187,18 +1184,15 @@ bool application::handleUserInput(const user_input& input, float dt)
 
 	if (selectedEntity)
 	{
-		if (selectedEntity.hasComponent<trs>())
+		if (trs* transform = selectedEntity.getComponentIfExists<trs>())
 		{
-			// Transform entity.
-			trs& transform = selectedEntity.getComponent<trs>();
-
 			// Saved rigid-body properties. When an RB is dragged, we make it kinematic.
 			static bool saved = false;
 			static float invMass;
 
 			bool draggingBefore = gizmo.dragging;
 
-			if (gizmo.manipulateTransformation(transform, camera, input, !inputCaptured, &ldrRenderPass))
+			if (gizmo.manipulateTransformation(*transform, camera, input, !inputCaptured, &ldrRenderPass))
 			{
 				setSelectedEntityEulerRotation();
 				inputCaptured = true;
@@ -1219,7 +1213,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 			{
 				if (draggingBefore)
 				{
-					undoStack.pushAction("transform entity", transform_undo{ selectedEntity, gizmo.originalTransform, transform });
+					undoStack.pushAction("transform entity", transform_undo{ selectedEntity, gizmo.originalTransform, *transform });
 				}
 
 				if (saved)
@@ -1232,10 +1226,9 @@ bool application::handleUserInput(const user_input& input, float dt)
 				}
 			}
 		}
-		else if (selectedEntity.hasComponent<point_light_component>())
+		else if (point_light_component* pl = selectedEntity.getComponentIfExists<point_light_component>())
 		{
-			point_light_component& pl = selectedEntity.getComponent<point_light_component>();
-			if (gizmo.manipulatePosition(pl.position, camera, input, !inputCaptured, &ldrRenderPass))
+			if (gizmo.manipulatePosition(pl->position, camera, input, !inputCaptured, &ldrRenderPass))
 			{
 				inputCaptured = true;
 			}
@@ -1422,13 +1415,11 @@ void application::update(const user_input& input, float dt)
 			scene_entity entity = { entityHandle, appScene };
 			bool outline = selectedEntity == entity;
 
-			bool dynamic = entity.hasComponent<dynamic_geometry_component>();
-			mat4 lastM = dynamic ? trsToMat4(entity.getComponent<dynamic_geometry_component>().lastFrameTransform) : m;
+			dynamic_geometry_component* dynamic = entity.getComponentIfExists<dynamic_geometry_component>();
+			mat4 lastM = dynamic ? trsToMat4(dynamic->lastFrameTransform) : m;
 
-			if (entity.hasComponent<animation_component>())
+			if (animation_component* anim = entity.getComponentIfExists<animation_component>())
 			{
-				auto& anim = entity.getComponent<animation_component>();
-
 				uint32 numSubmeshes = (uint32)raster.mesh->submeshes.size();
 
 				for (uint32 i = 0; i < numSubmeshes; ++i)
@@ -1440,19 +1431,19 @@ void application::update(const user_input& input, float dt)
 
 					if (material->albedoTint.a < 1.f)
 					{
-						transparentRenderPass.renderObject(m, anim.currentVertexBuffer, mesh.indexBuffer, submesh, material);
+						transparentRenderPass.renderObject(m, anim->currentVertexBuffer, mesh.indexBuffer, submesh, material);
 					}
 					else
 					{
 						opaqueRenderPass.renderAnimatedObject(m, lastM, 
-							anim.currentVertexBuffer, anim.prevFrameVertexBuffer, mesh.indexBuffer,
+							anim->currentVertexBuffer, anim->prevFrameVertexBuffer, mesh.indexBuffer,
 							submesh, material,
 							(uint32)entityHandle);
 					}
 
 					if (outline)
 					{
-						ldrRenderPass.renderOutline(m, anim.currentVertexBuffer, mesh.indexBuffer, submesh);
+						ldrRenderPass.renderOutline(m, anim->currentVertexBuffer, mesh.indexBuffer, submesh);
 					}
 				}
 			}
@@ -1530,16 +1521,16 @@ void application::update(const user_input& input, float dt)
 			renderer->setDecals(decalBuffer[dxContext.bufferedFrameID], (uint32)decals.size(), decalTexture);
 		}
 
-
-		if (selectedEntity && selectedEntity.hasComponent<point_light_component>())
+		if (selectedEntity)
 		{
-			point_light_component& pl = selectedEntity.getComponent<point_light_component>();
-			renderWireSphere(pl.position, pl.radius, vec4(pl.radiance, 1.f), &ldrRenderPass);
-		}
-		else if (selectedEntity && selectedEntity.hasComponent<spot_light_component>())
-		{
-			spot_light_component& sl = selectedEntity.getComponent<spot_light_component>();
-			renderWireCone(sl.position, sl.direction, sl.maxDistance, acos(sl.getOuterCutoff()) * 2.f, vec4(sl.radiance, 1.f), &ldrRenderPass);
+			if (point_light_component* pl = selectedEntity.getComponentIfExists<point_light_component>())
+			{
+				renderWireSphere(pl->position, pl->radius, vec4(pl->radiance, 1.f), &ldrRenderPass);
+			}
+			else if (spot_light_component* sl = selectedEntity.getComponentIfExists<spot_light_component>())
+			{
+				renderWireCone(sl->position, sl->direction, sl->maxDistance, acos(sl->getOuterCutoff()) * 2.f, vec4(sl->radiance, 1.f), &ldrRenderPass);
+			}
 		}
 
 		submitRenderPasses(numSpotShadowRenderPasses, numPointShadowRenderPasses);
@@ -1682,27 +1673,25 @@ void application::serializeToFile()
 		tag_component& tag = entity.getComponent<tag_component>();
 		out << YAML::Key << "Tag" << YAML::Value << tag.name;
 
-		if (entity.hasComponent<trs>())
+		if (trs* transform = entity.getComponentIfExists<trs>())
 		{
-			trs& transform = entity.getComponent<trs>();
 			out << YAML::Key << "Transform" << YAML::Value
 				<< YAML::BeginMap
-					<< YAML::Key << "Rotation" << YAML::Value << transform.rotation
-					<< YAML::Key << "Position" << YAML::Value << transform.position
-					<< YAML::Key << "Scale" << YAML::Value << transform.scale
+					<< YAML::Key << "Rotation" << YAML::Value << transform->rotation
+					<< YAML::Key << "Position" << YAML::Value << transform->position
+					<< YAML::Key << "Scale" << YAML::Value << transform->scale
 				<< YAML::EndMap;
 		}
 
-		if (entity.hasComponent<raster_component>())
+		if (raster_component* raster = entity.getComponentIfExists<raster_component>())
 		{
-			raster_component& raster = entity.getComponent<raster_component>();
 			out << YAML::Key << "Raster" << YAML::Value
 				<< YAML::BeginMap 
-					<< YAML::Key << "Mesh" << YAML::Value << raster.mesh->filepath
-					<< YAML::Key << "Flags" << YAML::Value << raster.mesh->flags
+					<< YAML::Key << "Mesh" << YAML::Value << raster->mesh->filepath
+					<< YAML::Key << "Flags" << YAML::Value << raster->mesh->flags
 					<< YAML::Key << "Animation files" << YAML::Value << YAML::BeginSeq;
 
-			for (const fs::path& s : raster.mesh->skeleton.files)
+			for (const fs::path& s : raster->mesh->skeleton.files)
 			{
 				out << s;
 			}
@@ -1711,9 +1700,9 @@ void application::serializeToFile()
 				<< YAML::EndMap;
 		}
 
-		if (entity.hasComponent<animation_component>())
+		if (animation_component* anim = entity.getComponentIfExists<animation_component>())
 		{
-			animation_component& anim = entity.getComponent<animation_component>();
+
 		}
 
 		out << YAML::EndMap;
