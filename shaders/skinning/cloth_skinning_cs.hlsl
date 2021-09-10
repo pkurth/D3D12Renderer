@@ -115,13 +115,13 @@ void main(cs_input IN)
 
 	for (t = IN.groupIndex; t < NUM_TOTAL_VERTS_TO_WRITE; t += NUM_THREADS)
 	{
-		int2 blockIndex2D = unflatten2D(t, NUM_VERTS_TO_WRITE_PER_DIM);
-		int2 globalIndex2D = blockIndex2D + firstVertexToProcess;
+		uint2 blockIndex2D = unflatten2D(t, NUM_VERTS_TO_WRITE_PER_DIM);
+		uint2 globalIndex2D = blockIndex2D + firstVertexToProcess;
 
 		if (globalIndex2D.x < skinningCB.gridSizeX && globalIndex2D.y < skinningCB.gridSizeY)
 		{
-			int globalIndex = flatten2D(globalIndex2D, skinningCB.gridSizeX);
-			int readIndex = (blockIndex2D.y + 1) * NUM_VERTS_TO_LOAD_PER_DIM + blockIndex2D.x + 1;
+			uint globalIndex = flatten2D(globalIndex2D, skinningCB.gridSizeX);
+			uint readIndex = (blockIndex2D.y + 1) * NUM_VERTS_TO_LOAD_PER_DIM + blockIndex2D.x + 1;
 
 			mesh_position position;
 			position.position = g_positions[readIndex];
