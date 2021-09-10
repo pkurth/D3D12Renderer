@@ -393,12 +393,12 @@ bool transformation_gizmo::handleUserInput(const user_input& input, bool allowKe
 				dragging = false;
 				result = true;
 			}
-			if (input.keyboard['Q'].pressEvent)
-			{
-				type = transformation_type_none;
-				dragging = false;
-				result = true;
-			}
+		}
+		if (input.keyboard['Q'].pressEvent)
+		{
+			type = transformation_type_none;
+			dragging = false;
+			result = true;
 		}
 		if (input.keyboard['W'].pressEvent)
 		{
