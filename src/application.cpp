@@ -1548,8 +1548,6 @@ void application::update(const user_input& input, float dt)
 		for (auto [entityHandle, cloth] : appScene.view<cloth_component>().each())
 		{
 			auto [vb, prevFrameVB, ib, sm] = cloth.getRenderData();
-
-			//opaqueRenderPass.renderStaticObject(mat4::identity, vb, ib, sm, clothMaterial, (uint32)entityHandle);
 			opaqueRenderPass.renderAnimatedObject(mat4::identity, mat4::identity, vb, prevFrameVB, ib, sm, clothMaterial, (uint32)entityHandle);
 
 			scene_entity entity = { entityHandle, appScene };
@@ -1610,7 +1608,7 @@ void application::update(const user_input& input, float dt)
 		{
 			raytracingTLAS.reset();
 
-			for (auto [entityHandle, raytrace, transform] : appScene.group(entt::get<raytrace_component, trs>).each())
+			for (auto [entityHandle, transform, raytrace] : appScene.group(entt::get<trs, raytrace_component>).each())
 			{
 				raytracingTLAS.instantiate(raytrace.type, transform);
 			}

@@ -5,8 +5,11 @@
 
 scene::scene()
 {
-	auto _ = registry.group<collider_component, sap_endpoint_indirection_component>(); // Colliders and SAP endpoints are always sorted in the same order.
-	
+	// Construct groups early. Ingore the return types.
+	(void) registry.group<collider_component, sap_endpoint_indirection_component>(); // Colliders and SAP endpoints are always sorted in the same order.
+	(void) registry.group<trs, dynamic_geometry_component, rigid_body_component>();
+	(void) registry.group<trs, rigid_body_component>();
+
 	registry.on_construct<collider_component>().connect<&onColliderAdded>();
 	registry.on_destroy<collider_component>().connect<&onColliderRemoved>();
 }
