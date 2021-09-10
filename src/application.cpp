@@ -29,6 +29,9 @@ struct transform_undo
 	scene_entity entity;
 	trs before;
 	trs after;
+
+	void undo() { entity.getComponent<trs>() = before; }
+	void redo() { entity.getComponent<trs>() = after; }
 };
 
 struct selection_undo
@@ -36,31 +39,10 @@ struct selection_undo
 	application* app;
 	scene_entity before;
 	scene_entity after;
+
+	void undo() { app->setSelectedEntityNoUndo(before); }
+	void redo() { app->setSelectedEntityNoUndo(after); }
 };
-
-static void undoTransform(void* d)
-{
-	transform_undo& t = *(transform_undo*)d;
-	t.entity.getComponent<trs>() = t.before;
-}
-
-static void redoTransform(void* d)
-{
-	transform_undo& t = *(transform_undo*)d;
-	t.entity.getComponent<trs>() = t.after;
-}
-
-static void undoSelection(void* d)
-{
-	selection_undo& t = *(selection_undo*)d;
-	t.app->setSelectedEntityNoUndo(t.before);
-}
-
-static void redoSelection(void* d)
-{
-	selection_undo& t = *(selection_undo*)d;
-	t.app->setSelectedEntityNoUndo(t.after);
-}
 
 static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh, path_tracer& pathTracer)
 {
@@ -629,7 +611,7 @@ void application::setSelectedEntity(scene_entity entity)
 {
 	if (selectedEntity != entity)
 	{
-		undoStack.pushAction("selection", undoSelection, redoSelection, selection_undo{ this, selectedEntity, entity });
+		undoStack.pushAction("selection", selection_undo{ this, selectedEntity, entity });
 	}
 
 	setSelectedEntityNoUndo(entity);
@@ -1277,7 +1259,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 			{
 				if (draggingBefore)
 				{
-					undoStack.pushAction("transform entity", undoTransform, redoTransform, transform_undo{ selectedEntity, gizmo.originalTransform, transform });
+					undoStack.pushAction("transform entity", transform_undo{ selectedEntity, gizmo.originalTransform, transform });
 				}
 
 				if (saved)

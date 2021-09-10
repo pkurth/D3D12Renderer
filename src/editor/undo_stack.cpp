@@ -11,7 +11,7 @@ undo_stack::undo_stack()
 	newest = 0;
 }
 
-void undo_stack::pushAction(const char* name, undo_func undo, redo_func redo, const void* userData, uint64 dataSize)
+void undo_stack::pushAction(const char* name, const void* entry, uint64 dataSize, undo_func undo, redo_func redo)
 {
 	uint64 requiredSpace = dataSize + sizeof(entry_header);
 	uint64 availableSpaceAtEnd = memory + memorySize - nextToWrite;
@@ -80,7 +80,7 @@ void undo_stack::pushAction(const char* name, undo_func undo, redo_func redo, co
 	header->name = name;
 	header->dataSize = dataSize;
 
-	memcpy(data, userData, dataSize);
+	memcpy(data, entry, dataSize);
 
 	nextToWrite = end;
 }
@@ -109,7 +109,7 @@ void undo_stack::undo()
 {
 	if (newest)
 	{
-		void* data = (void*)(newest + 1);
+		void* data = (newest + 1);
 		newest->undo(data);
 
 		newest = newest->older;
@@ -132,7 +132,7 @@ void undo_stack::redo()
 	{
 		newest = newest->newer;
 
-		void* data = (void*)(newest + 1);
+		void* data = (newest + 1);
 		newest->redo(data);
 
 		nextToWrite = (uint8*)alignTo(((uint8*)data + newest->dataSize), 16);
@@ -140,7 +140,7 @@ void undo_stack::redo()
 
 	if (!newest && oldest)
 	{
-		void* data = (void*)(oldest + 1);
+		void* data = (oldest + 1);
 		oldest->redo(data);
 
 		nextToWrite = (uint8*)alignTo(((uint8*)data + oldest->dataSize), 16);

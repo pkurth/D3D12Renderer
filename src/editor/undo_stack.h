@@ -2,16 +2,13 @@
 
 #include "core/memory.h"
 
-typedef void(*undo_func)(void*);
-typedef void(*redo_func)(void*);
 
 struct undo_stack
 {
 	undo_stack();
 
 	template <typename T>
-	void pushAction(const char* name, undo_func undo, redo_func redo, const T& userData);
-	void pushAction(const char* name, undo_func undo, redo_func redo, const void* userData, uint64 dataSize);
+	void pushAction(const char* name, const T& entry); // Type T must have member functions void undo() and void redo().
 
 	bool undoPossible();
 	bool redoPossible();
@@ -26,6 +23,11 @@ struct undo_stack
 	void verify();
 
 private:
+	typedef void (*undo_func)(void*);
+	typedef void (*redo_func)(void*);
+
+	void pushAction(const char* name, const void* entry, uint64 dataSize, undo_func undo, redo_func redo);
+
 	struct alignas(16) entry_header
 	{
 		undo_func undo;
@@ -47,10 +49,22 @@ private:
 };
 
 template<typename T>
-inline void undo_stack::pushAction(const char* name, undo_func undo, redo_func redo, const T& userData)
+inline void undo_stack::pushAction(const char* name, const T& entry)
 {
 	static_assert(std::is_trivially_copyable_v<T>, "Undo entries must be trivially copyable.");
 	static_assert(std::is_trivially_destructible_v<T>, "Undo entries must be trivially destructible.");
 
-	pushAction(name, undo, redo, &userData, sizeof(T));
+	undo_func undo = [](void* data)
+	{
+		T* t = (T*)data;
+		t->undo();
+	};
+
+	redo_func redo = [](void* data)
+	{
+		T* t = (T*)data;
+		t->redo();
+	};
+
+	pushAction(name, &entry, sizeof(T), undo, redo);
 }

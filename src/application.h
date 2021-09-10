@@ -99,7 +99,5 @@ private:
 	ldr_render_pass ldrRenderPass;
 
 
-
-	friend void undoSelection(void* d);
-	friend void redoSelection(void* d);
+	friend struct selection_undo;
 };
