@@ -12,11 +12,15 @@ software_window::software_window(software_window&& o)
 	o.buffer = 0;
 }
 
-bool software_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clientHeight, uint8* buffer, uint32 numChannels, uint32 bufferWidth, uint32 bufferHeight)
+bool software_window::initialize(const TCHAR* name, uint32 requestedClientWidth, uint32 requestedClientHeight, 
+	uint8* buffer, uint32 numChannels, uint32 bufferWidth, uint32 bufferHeight)
 {
 	assert(numChannels == 1 || numChannels == 3 || numChannels == 4);
 
-	win32_window::initialize(name, clientWidth, clientHeight);
+	if (!win32_window::initialize(name, requestedClientWidth, requestedClientHeight))
+	{
+		return false;
+	}
 
 	if (!bitmapInfo)
 	{

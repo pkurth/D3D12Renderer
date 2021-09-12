@@ -106,7 +106,7 @@ int main(int argc, char** argv)
 	renderer_spec spec = { true, true, true, true };
 
 	main_renderer renderer;
-	renderer.initialize(window.colorDepth, 1280, 800, spec);
+	renderer.initialize(window.colorDepth, window.clientWidth, window.clientHeight, spec);
 
 	app.initialize(&renderer);
 

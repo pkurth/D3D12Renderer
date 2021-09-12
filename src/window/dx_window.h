@@ -13,7 +13,7 @@ struct dx_window : win32_window
 
 	virtual ~dx_window();
 
-	bool initialize(const TCHAR* name, uint32 initialWidth, uint32 initialHeight, color_depth colorDepth = color_depth_8, bool exclusiveFullscreen = false);
+	bool initialize(const TCHAR* name, uint32 requestedClientWidth, uint32 requestedClientHeight, color_depth colorDepth = color_depth_8, bool exclusiveFullscreen = false);
 
 	virtual void shutdown();
 

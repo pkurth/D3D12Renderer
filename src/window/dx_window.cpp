@@ -213,10 +213,9 @@ dx_window::~dx_window()
 	shutdown();
 }
 
-bool dx_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clientHeight, color_depth colorDepth, bool exclusiveFullscreen)
+bool dx_window::initialize(const TCHAR* name, uint32 requestedClientWidth, uint32 requestedClientHeight, color_depth colorDepth, bool exclusiveFullscreen)
 {
-	bool result = win32_window::initialize(name, clientWidth, clientHeight);
-	if (!result)
+	if (!win32_window::initialize(name, requestedClientWidth, requestedClientHeight))
 	{
 		return false;
 	}
