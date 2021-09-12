@@ -379,44 +379,46 @@ uint32 transformation_gizmo::handleScaling(trs& transform, ray r, const user_inp
 	return dragging ? axisIndex : hoverAxisIndex;
 }
 
-bool transformation_gizmo::handleUserInput(const user_input& input, bool allowKeyboardInput)
+bool transformation_gizmo::handleUserInput(const user_input& input, bool allowKeyboardInput, 
+	bool allowTranslation, bool allowRotation, bool allowScaling, bool allowSpaceChange)
 {
-	bool result = false;
+	bool keyboardInteraction = false;
+	bool uiInteraction = false;
 
 	if (allowKeyboardInput)
 	{
 		if (type != transformation_type_scale)
 		{
-			if (input.keyboard['G'].pressEvent)
+			if (input.keyboard['G'].pressEvent && allowSpaceChange)
 			{
 				space = (transformation_space)(1 - space);
 				dragging = false;
-				result = true;
+				keyboardInteraction = true;
 			}
 		}
 		if (input.keyboard['Q'].pressEvent)
 		{
 			type = transformation_type_none;
 			dragging = false;
-			result = true;
+			keyboardInteraction = true;
 		}
-		if (input.keyboard['W'].pressEvent)
+		if (input.keyboard['W'].pressEvent && allowTranslation)
 		{
 			type = transformation_type_translation;
 			dragging = false;
-			result = true;
+			keyboardInteraction = true;
 		}
-		if (input.keyboard['E'].pressEvent)
+		if (input.keyboard['E'].pressEvent && allowRotation)
 		{
 			type = transformation_type_rotation;
 			dragging = false;
-			result = true;
+			keyboardInteraction = true;
 		}
-		if (input.keyboard['R'].pressEvent)
+		if (input.keyboard['R'].pressEvent && allowScaling)
 		{
 			type = transformation_type_scale;
 			dragging = false;
-			result = true;
+			keyboardInteraction = true;
 		}
 	}
 
@@ -432,23 +434,30 @@ bool transformation_gizmo::handleUserInput(const user_input& input, bool allowKe
 
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 
+		bool allowGlobal = space == transformation_global || allowSpaceChange;
+		bool allowLocal = space == transformation_local || allowSpaceChange;
+		if (type == transformation_type_scale)
+		{
+			allowGlobal = false;
+		}
+
 		ImGui::PushID(&this->space);
-		ImGui::IconRadioButton(imgui_icon_global, (int*)&space, transformation_global, iconSize, type != transformation_type_scale);
+		uiInteraction |= ImGui::IconRadioButton(imgui_icon_global, (int*)&space, transformation_global, iconSize, allowGlobal);
 		ImGui::SameLine(0.f, iconSpacing);
-		ImGui::IconRadioButton(imgui_icon_local, (int*)&space, transformation_local, iconSize, type != transformation_type_scale);
+		uiInteraction |= ImGui::IconRadioButton(imgui_icon_local, (int*)&space, transformation_local, iconSize, allowLocal);
 		ImGui::PopID();
 
 		ImGui::SameLine(0.f, (float)iconSize);
 
 
 		ImGui::PushID(&type);
-		ImGui::IconRadioButton(imgui_icon_translate, (int*)&type, transformation_type_translation, iconSize, true);
+		uiInteraction |= ImGui::IconRadioButton(imgui_icon_cross, (int*)&type, transformation_type_none, iconSize, true);
 		ImGui::SameLine(0.f, iconSpacing);
-		ImGui::IconRadioButton(imgui_icon_rotate, (int*)&type, transformation_type_rotation, iconSize, true);
+		uiInteraction |= ImGui::IconRadioButton(imgui_icon_translate, (int*)&type, transformation_type_translation, iconSize, allowTranslation);
 		ImGui::SameLine(0.f, iconSpacing);
-		ImGui::IconRadioButton(imgui_icon_scale, (int*)&type, transformation_type_scale, iconSize, true);
+		uiInteraction |= ImGui::IconRadioButton(imgui_icon_rotate, (int*)&type, transformation_type_rotation, iconSize, allowRotation);
 		ImGui::SameLine(0.f, iconSpacing);
-		ImGui::IconRadioButton(imgui_icon_cross, (int*)&type, transformation_type_none, iconSize, true);
+		uiInteraction |= ImGui::IconRadioButton(imgui_icon_scale, (int*)&type, transformation_type_scale, iconSize, allowScaling);
 		ImGui::PopID();
 
 		ImGui::SameLine(0.f, (float)iconSize);
@@ -459,10 +468,10 @@ bool transformation_gizmo::handleUserInput(const user_input& input, bool allowKe
 	ImGui::End();
 	ImGui::PopStyleVar(1);
 
-	return result;
+	return keyboardInteraction || uiInteraction;
 }
 
-bool transformation_gizmo::manipulateTransformation(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
+void transformation_gizmo::manipulateInternal(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
 {
 	if (!input.mouse.left.down || !allowInput)
 	{
@@ -471,7 +480,7 @@ bool transformation_gizmo::manipulateTransformation(trs& transform, const render
 
 	if (type == transformation_type_none)
 	{
-		return false;
+		return;
 	}
 
 	uint32 highlightAxis = -1;
@@ -516,7 +525,7 @@ bool transformation_gizmo::manipulateTransformation(trs& transform, const render
 
 		for (uint32 i = 0; i < 3; ++i)
 		{
-			ldrRenderPass->renderOverlay<debug_simple_pipeline>(createModelMatrix(transform.position, rotations[i], scaling), 
+			ldrRenderPass->renderOverlay<debug_simple_pipeline>(createModelMatrix(transform.position, rotations[i], scaling),
 				mesh.vertexBuffer, mesh.indexBuffer,
 				submeshes[type],
 				debug_material{ colors[i] * (highlightAxis == i ? 0.5f : 1.f) }
@@ -558,7 +567,12 @@ bool transformation_gizmo::manipulateTransformation(trs& transform, const render
 			);
 		}
 	}
-	
+}
+
+bool transformation_gizmo::manipulateTransformation(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
+{
+	bool inputCaptured = handleUserInput(input, allowInput, true, true, true, true);
+	manipulateInternal(transform, camera, input, allowInput, ldrRenderPass);
 	return dragging;
 }
 
@@ -568,13 +582,34 @@ bool transformation_gizmo::manipulatePosition(vec3& position, const render_camer
 	{
 		type = transformation_type_translation;
 	}
+	space = transformation_global;
 
+	bool inputCaptured = handleUserInput(input, allowInput, true, false, false, false);
 	trs transform = { position, quat::identity, vec3(1.f, 1.f, 1.f) };
-	bool result = manipulateTransformation(transform, camera, input, allowInput, ldrRenderPass);
-	if (result)
+	manipulateInternal(transform, camera, input, allowInput, ldrRenderPass);
+	position = transform.position;
+	return dragging;
+}
+
+bool transformation_gizmo::manipulatePositionRotation(vec3& position, quat& rotation, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
+{
+	if (type == transformation_type_scale)
 	{
-		position = transform.position;
+		type = transformation_type_translation;
 	}
-	return result;
+
+	bool inputCaptured = handleUserInput(input, allowInput, true, true, false, true);
+	trs transform = { position, rotation, vec3(1.f, 1.f, 1.f) };
+	manipulateInternal(transform, camera, input, allowInput, ldrRenderPass);
+	position = transform.position;
+	rotation = transform.rotation;
+	return dragging;
+}
+
+bool transformation_gizmo::manipulateNothing(const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
+{
+	dragging = false;
+	bool inputCaptured = handleUserInput(input, allowInput, true, true, true, true);
+	return false;
 }
 

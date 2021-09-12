@@ -596,14 +596,27 @@ static bool editBoidParticleSystem(boid_particle_system& particleSystem)
 	return result;
 }
 
-void application::setSelectedEntityEulerRotation()
+void application::updateSelectedEntityUIRotation()
 {
-	if (trs* transform = (selectedEntity) ? selectedEntity.getComponentIfExists<trs>() : 0)
+	if (selectedEntity)
 	{
-		selectedEntityEulerRotation = quatToEuler(transform->rotation);
+		quat rotation = quat::identity;
+
+		if (trs* transform = selectedEntity.getComponentIfExists<trs>())
+		{
+			rotation = transform->rotation;
+		}
+		else if (spot_light_component* sl = selectedEntity.getComponentIfExists<spot_light_component>())
+		{
+			rotation = lookAtQuaternion(sl->direction, vec3(0.f, 1.f, 0.f));
+		}
+
+		selectedEntityEulerRotation = quatToEuler(rotation);
 		selectedEntityEulerRotation.x = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.x));
 		selectedEntityEulerRotation.y = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.y));
 		selectedEntityEulerRotation.z = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.z));
+
+		selectedEntityRotationQuat = rotation;
 	}
 }
 
@@ -620,7 +633,7 @@ void application::setSelectedEntity(scene_entity entity)
 void application::setSelectedEntityNoUndo(scene_entity entity)
 {
 	selectedEntity = entity;
-	setSelectedEntityEulerRotation();
+	updateSelectedEntityUIRotation();
 }
 
 void application::drawMainMenuBar()
@@ -1180,8 +1193,6 @@ bool application::handleUserInput(const user_input& input, float dt)
 	bool objectMovedByGizmo = false;
 
 
-	inputCaptured = gizmo.handleUserInput(input, !inputCaptured);
-
 	if (selectedEntity)
 	{
 		if (trs* transform = selectedEntity.getComponentIfExists<trs>())
@@ -1194,7 +1205,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 
 			if (gizmo.manipulateTransformation(*transform, camera, input, !inputCaptured, &ldrRenderPass))
 			{
-				setSelectedEntityEulerRotation();
+				updateSelectedEntityUIRotation();
 				inputCaptured = true;
 				objectMovedByGizmo = true;
 
@@ -1233,6 +1244,18 @@ bool application::handleUserInput(const user_input& input, float dt)
 				inputCaptured = true;
 			}
 		}
+		else if (spot_light_component* sl = selectedEntity.getComponentIfExists<spot_light_component>())
+		{
+			if (gizmo.manipulatePositionRotation(sl->position, selectedEntityRotationQuat, camera, input, !inputCaptured, &ldrRenderPass))
+			{
+				inputCaptured = true;
+				sl->direction = selectedEntityRotationQuat * vec3(0.f, 0.f, -1.f);
+			}
+		}
+		else
+		{
+			gizmo.manipulateNothing(camera, input, !inputCaptured, &ldrRenderPass);
+		}
 
 		if (!inputCaptured)
 		{
@@ -1254,6 +1277,10 @@ bool application::handleUserInput(const user_input& input, float dt)
 				objectMovedByGizmo = true;
 			}
 		}
+	}
+	else
+	{
+		gizmo.manipulateNothing(camera, input, !inputCaptured, &ldrRenderPass);
 	}
 
 	if (!inputCaptured)

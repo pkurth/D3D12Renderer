@@ -5,11 +5,13 @@
 #include "core/camera.h"
 #include "rendering/render_pass.h"
 
+
 struct transformation_gizmo
 {
-	bool handleUserInput(const user_input& input, bool allowKeyboardInput);
 	bool manipulateTransformation(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
 	bool manipulatePosition(vec3& position, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
+	bool manipulatePositionRotation(vec3& position, quat& rotation, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
+	bool manipulateNothing(const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
 
 	// Transform before start of dragging. Only valid if object was dragged.
 	trs originalTransform;
@@ -17,6 +19,9 @@ struct transformation_gizmo
 	bool dragging = false;
 
 private:
+	bool handleUserInput(const user_input& input, bool allowKeyboardInput, bool allowTranslation, bool allowRotation, bool allowScaling, bool allowSpaceChange);
+	void manipulateInternal(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
+
 	enum transformation_type
 	{
 		transformation_type_none = -1,

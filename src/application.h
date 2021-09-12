@@ -32,7 +32,7 @@ struct application
 	bool deserializeFromFile();
 
 private:
-	void setSelectedEntityEulerRotation();
+	void updateSelectedEntityUIRotation();
 	void setSelectedEntity(scene_entity entity);
 	void setSelectedEntityNoUndo(scene_entity entity);
 	void drawMainMenuBar();
@@ -81,6 +81,7 @@ private:
 	scene appScene;
 	scene_entity selectedEntity;
 	vec3 selectedEntityEulerRotation;
+	quat selectedEntityRotationQuat;
 
 
 	uint32 numSpotShadowRenderPasses;
