@@ -554,7 +554,7 @@ static void spotShadowPassInternal(dx_command_list* cl,
 				? (doubleSided ? spotLightShadowRenderPasses[i]->doubleSidedStaticDrawCalls : spotLightShadowRenderPasses[i]->staticDrawCalls)
 				: (doubleSided ? spotLightShadowRenderPasses[i]->doubleSidedDynamicDrawCalls : spotLightShadowRenderPasses[i]->dynamicDrawCalls);
 
-		renderSpotShadow(cl, spotLightShadowRenderPasses[i]->staticDrawCalls, spotLightShadowRenderPasses[i]->viewProjMatrix);
+		renderSpotShadow(cl, dcs, spotLightShadowRenderPasses[i]->viewProjMatrix);
 	}
 }
 
