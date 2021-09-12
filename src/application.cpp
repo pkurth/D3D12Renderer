@@ -30,8 +30,8 @@ struct transform_undo
 	trs before;
 	trs after;
 
-	void undo() { entity.getComponent<trs>() = before; }
-	void redo() { entity.getComponent<trs>() = after; }
+	void undo() { entity.getComponent<transform_component>() = before; }
+	void redo() { entity.getComponent<transform_component>() = after; }
 };
 
 struct selection_undo
@@ -91,7 +91,7 @@ void application::initialize(main_renderer* renderer)
 	}
 
 	//appScene.createEntity("Cloth")
-	//	.addComponent<trs>(trs::identity)
+	//	.addComponent<transform_component>(trs::identity)
 	//	.addComponent<cloth_component>(vec3(0.f, 0.f, 0.f), quat::identity, 10.f, 10.f, 20, 20, 8.f);
 
 	//clothMaterial = createPBRMaterial(
@@ -107,13 +107,13 @@ void application::initialize(main_renderer* renderer)
 		"assets/sponza/textures/Sponza_Curtain_metallic.tga",
 		vec4(0.f), vec4(1.f), 1.f, 1.f, true);
 
-#if 0
+#if 1
 	if (auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj"))
 	{
 		auto blas = defineBlasFromMesh(sponzaMesh, pathTracer);
 	
 		appScene.createEntity("Sponza")
-			.addComponent<trs>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
+			.addComponent<transform_component>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
 			.addComponent<raster_component>(sponzaMesh)
 			.addComponent<raytrace_component>(blas);
 	}
@@ -121,31 +121,31 @@ void application::initialize(main_renderer* renderer)
 	if (auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx"))
 	{
 		appScene.createEntity("Stormtrooper 1")
-			.addComponent<trs>(vec3(-5.f, 0.f, -1.f), quat::identity)
+			.addComponent<transform_component>(vec3(-5.f, 0.f, -1.f), quat::identity)
 			.addComponent<raster_component>(stormtrooperMesh)
 			.addComponent<animation_component>()
-			.addComponent<dynamic_geometry_component>();
+			.addComponent<dynamic_transform_component>();
 
 		appScene.createEntity("Stormtrooper 2")
-			.addComponent<trs>(vec3(0.f, 0.f, -2.f), quat::identity)
+			.addComponent<transform_component>(vec3(0.f, 0.f, -2.f), quat::identity)
 			.addComponent<raster_component>(stormtrooperMesh)
 			.addComponent<animation_component>()
-			.addComponent<dynamic_geometry_component>();
+			.addComponent<dynamic_transform_component>();
 
 		appScene.createEntity("Stormtrooper 3")
-			.addComponent<trs>(vec3(5.f, 0.f, -1.f), quat::identity)
+			.addComponent<transform_component>(vec3(5.f, 0.f, -1.f), quat::identity)
 			.addComponent<raster_component>(stormtrooperMesh)
 			.addComponent<animation_component>()
-			.addComponent<dynamic_geometry_component>();
+			.addComponent<dynamic_transform_component>();
 	}
 
 	if (auto pilotMesh = loadAnimatedMeshFromFile("assets/pilot/pilot.fbx"))
 	{
 		appScene.createEntity("Pilot")
-			.addComponent<trs>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
+			.addComponent<transform_component>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
 			.addComponent<raster_component>(pilotMesh)
 			.addComponent<animation_component>()
-			.addComponent<dynamic_geometry_component>();
+			.addComponent<dynamic_transform_component>();
 	}
 
 	if (auto unrealMesh = loadAnimatedMeshFromFile("assets/unreal/unreal_mannequin.fbx"))
@@ -153,10 +153,10 @@ void application::initialize(main_renderer* renderer)
 		unrealMesh->skeleton.pushAssimpAnimationsInDirectory("assets/unreal/animations");
 
 		appScene.createEntity("Mannequin")
-			.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.019f)
+			.addComponent<transform_component>(vec3(-2.5f, 0.f, -1.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.019f)
 			.addComponent<raster_component>(unrealMesh)
 			.addComponent<animation_component>()
-			.addComponent<dynamic_geometry_component>();
+			.addComponent<dynamic_transform_component>();
 	}
 #endif
 
@@ -167,17 +167,17 @@ void application::initialize(main_renderer* renderer)
 		ragdollMesh->skeleton.pushAssimpAnimationsInDirectory("assets/ragdoll/locomotion_pack/animations");
 
 		appScene.createEntity("Ragdoll")
-			.addComponent<trs>(vec3(-2.5f, 0.f, -1.f), quat::identity, 0.01f)
+			.addComponent<transform_component>(vec3(-2.5f, 0.f, -1.f), quat::identity, 0.01f)
 			.addComponent<raster_component>(ragdollMesh)
 			.addComponent<animation_component>()
 			.addComponent<dynamic_geometry_component>();
 	}
 #endif
 
-#if 1
+#if 0
 	{
 		appScene.createEntity("Force field")
-			.addComponent<trs>(vec3(0.f), quat::identity)
+			.addComponent<transform_component>(vec3(0.f), quat::identity)
 			.addComponent<force_field_component>(vec3(0.f, 0.f, -1.f));
 
 		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
@@ -197,7 +197,7 @@ void application::initialize(main_renderer* renderer)
 				"assets/desert/textures/BlueContainer_Albedo.png",
 				"assets/desert/textures/Container_Normal.png",
 				{}, 
-				"assets/desert/textures/Container_Metallic.png", vec4(0.f), vec4(1.f), 0.2f)
+				"assets/desert/textures/Container_Metallic.png", vec4(0.f), vec4(1.f), 1.f)
 			});
 
 		auto boxMesh = make_ref<composite_mesh>();
@@ -209,14 +209,14 @@ void application::initialize(main_renderer* renderer)
 			});
 
 		auto test1 = appScene.createEntity("Lollipop 1")
-			.addComponent<trs>(vec3(20.f, 5.f, 0.f), quat::identity)
+			.addComponent<transform_component>(vec3(20.f, 5.f, 0.f), quat::identity)
 			.addComponent<raster_component>(testMesh)
 			.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f))
 			.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f))
 			.addComponent<rigid_body_component>(true, 1.f);
 
 		auto test2 = appScene.createEntity("Lollipop 2")
-			.addComponent<trs>(vec3(20.f, 5.f, -2.f), quat::identity)
+			.addComponent<transform_component>(vec3(20.f, 5.f, -2.f), quat::identity)
 			.addComponent<raster_component>(testMesh)
 			.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f))
 			.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f))
@@ -225,7 +225,7 @@ void application::initialize(main_renderer* renderer)
 		for (uint32 i = 0; i < 10; ++i)
 		{
 			appScene.createEntity("Cube")
-				.addComponent<trs>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+				.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
 				.addComponent<raster_component>(boxMesh)
 				.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 1.f))
 				.addComponent<rigid_body_component>(false, 1.f);
@@ -241,20 +241,20 @@ void application::initialize(main_renderer* renderer)
 		if (hull.geometryIndex != INVALID_BOUNDING_HULL_INDEX)
 		{
 			appScene.createEntity("Hull")
-				.addComponent<trs>(vec3(20.f, 15.f, 0.f), quat::identity)
+				.addComponent<transform_component>(vec3(20.f, 15.f, 0.f), quat::identity)
 				.addComponent<raster_component>(loadMeshFromFile("assets/colliders/hull.fbx"))
 				.addComponent<collider_component>(collider_component::asHull(hull, 0.1f, 0.5f, 0.1f))
 				.addComponent<rigid_body_component>(false, 0.f);
 		}
 
 		appScene.createEntity("Test ground")
-			.addComponent<trs>(vec3(30.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
+			.addComponent<transform_component>(vec3(30.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
 			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f))
 			.addComponent<rigid_body_component>(true);
 
 		/*appScene.createEntity("Test ground")
-			.addComponent<trs>(vec3(20.f, -5.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
+			.addComponent<transform_component>(vec3(20.f, -5.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
 			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f))
 			.addComponent<rigid_body_component>(true);*/
@@ -265,7 +265,7 @@ void application::initialize(main_renderer* renderer)
 		chainMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 2.f, 0.18f, vec3(0.f)), {}, trs::identity, lollipopMaterial });
 
 		auto fixed = appScene.createEntity("Fixed")
-			.addComponent<trs>(vec3(37.f, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))
+			.addComponent<transform_component>(vec3(37.f, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))
 			.addComponent<raster_component>(chainMesh)
 			.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, 0.2f, 0.5f, 1.f))
 			.addComponent<rigid_body_component>(true, 1.f);
@@ -281,7 +281,7 @@ void application::initialize(main_renderer* renderer)
 			float xCurr = 37.f + 2.5f * (i + 1);
 
 			auto chain = appScene.createEntity("Chain")
-				.addComponent<trs>(vec3(xCurr, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))
+				.addComponent<transform_component>(vec3(xCurr, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))
 				.addComponent<raster_component>(chainMesh)
 				.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, 0.2f, 0.5f, 1.f))
 				.addComponent<rigid_body_component>(false, 1.f);
@@ -303,7 +303,7 @@ void application::initialize(main_renderer* renderer)
 #endif
 
 	//ragdoll.initialize(appScene, vec3(60.f, 1.25f, -2.f));
-	ragdoll.initialize(appScene, vec3(20.f, 1.25f, 0.f));
+	//ragdoll.initialize(appScene, vec3(20.f, 1.25f, 0.f));
 
 	//initializeLocomotionEval(appScene, ragdoll);
 
@@ -323,33 +323,34 @@ void application::initialize(main_renderer* renderer)
 
 #if 1
 	appScene.createEntity("Spot light 0")
+		.addComponent<position_rotation_component>(vec3(2.f, 3.f, 0.f), lookAtQuaternion(vec3(1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f)))
 		.addComponent<spot_light_component>(
-			vec3(2.f, 3.f, 0.f),
-			vec3(1.f, 0.f, 0.f),
-			randomRGB(rng) * 5.f,
+			randomRGB(rng),
+			5.f,
+			25.f,
 			deg2rad(20.f),
 			deg2rad(30.f),
-			25.f,
-			0
+			true
 		);
 	
 	appScene.createEntity("Spot light 1")
+		.addComponent<position_rotation_component>(vec3(-2.f, 3.f, 0.f), lookAtQuaternion(vec3(-1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f)))
 		.addComponent<spot_light_component>(
-			vec3(-2.f, 3.f, 0.f),
-			vec3(-1.f, 0.f, 0.f),
-			randomRGB(rng) * 5.f,
+			randomRGB(rng),
+			5.f,
+			25.f,
 			deg2rad(20.f),
 			deg2rad(30.f),
-			25.f,
-			0
+			true
 		);
 
 	appScene.createEntity("Point light 0")
+		.addComponent<position_component>(vec3(0.f, 8.f, 0.f))
 		.addComponent<point_light_component>(
-			vec3(0.f, 8.f, 0.f),
 			randomRGB(rng),
+			1.f,
 			10.f,
-			0
+			true
 		);
 #endif
 
@@ -453,7 +454,7 @@ static bool editSunShadowParameters(directional_light& sun)
 	{
 		if (ImGui::BeginProperties())
 		{
-			result |= ImGui::PropertySlider("Intensity", sun.intensity, 50.f, 1000.f);
+			result |= ImGui::PropertySlider("Intensity", sun.intensity, 0.f, 1000.f);
 			result |= ImGui::PropertyColorEdit("Color", sun.color);
 			result |= ImGui::PropertySlider("# Cascades", sun.numShadowCascades, 1, 4);
 
@@ -602,21 +603,19 @@ void application::updateSelectedEntityUIRotation()
 	{
 		quat rotation = quat::identity;
 
-		if (trs* transform = selectedEntity.getComponentIfExists<trs>())
+		if (transform_component* transform = selectedEntity.getComponentIfExists<transform_component>())
 		{
 			rotation = transform->rotation;
 		}
-		else if (spot_light_component* sl = selectedEntity.getComponentIfExists<spot_light_component>())
+		else if (position_rotation_component* prc = selectedEntity.getComponentIfExists<position_rotation_component>())
 		{
-			rotation = lookAtQuaternion(sl->direction, vec3(0.f, 1.f, 0.f));
+			rotation = prc->rotation;
 		}
 
 		selectedEntityEulerRotation = quatToEuler(rotation);
 		selectedEntityEulerRotation.x = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.x));
 		selectedEntityEulerRotation.y = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.y));
 		selectedEntityEulerRotation.z = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.z));
-
-		selectedEntityRotationQuat = rotation;
 	}
 }
 
@@ -899,9 +898,9 @@ bool application::drawSceneHierarchy()
 			}
 			else
 			{
-				drawComponent<trs>(selectedEntity, "Transform", [this, &objectMovedByWidget](trs& transform)
+				drawComponent<transform_component>(selectedEntity, "Transform", [this, &objectMovedByWidget](transform_component& transform)
 				{
-					objectMovedByWidget |= ImGui::DragFloat3("Translation", transform.position.data, 0.1f, 0.f, 0.f);
+					objectMovedByWidget |= ImGui::DragFloat3("Position", transform.position.data, 0.1f, 0.f, 0.f);
 
 					if (ImGui::DragFloat3("Rotation", selectedEntityEulerRotation.data, 0.1f, 0.f, 0.f))
 					{
@@ -915,6 +914,31 @@ bool application::drawSceneHierarchy()
 					}
 
 					objectMovedByWidget |= ImGui::DragFloat3("Scale", transform.scale.data, 0.1f, 0.f, 0.f);
+				});
+
+				drawComponent<position_component>(selectedEntity, "Transform", [&objectMovedByWidget](position_component& position)
+				{
+					objectMovedByWidget |= ImGui::DragFloat3("Position", position.position.data, 0.1f, 0.f, 0.f);
+				});
+
+				drawComponent<position_rotation_component>(selectedEntity, "Transform", [this, &objectMovedByWidget](position_rotation_component& pr)
+				{
+					objectMovedByWidget |= ImGui::DragFloat3("Translation", pr.position.data, 0.1f, 0.f, 0.f); 
+					if (ImGui::DragFloat3("Rotation", selectedEntityEulerRotation.data, 0.1f, 0.f, 0.f))
+					{
+						vec3 euler = selectedEntityEulerRotation;
+						euler.x = deg2rad(euler.x);
+						euler.y = deg2rad(euler.y);
+						euler.z = deg2rad(euler.z);
+						pr.rotation = eulerToQuat(euler);
+
+						objectMovedByWidget = true;
+					}
+				});
+
+				drawComponent<dynamic_transform_component>(selectedEntity, "Dynamic", [](dynamic_transform_component& dynamic)
+				{
+					ImGui::Text("Dynamic");
 				});
 
 				drawComponent<animation_component>(selectedEntity, "Animation", [this](animation_component& anim)
@@ -1002,6 +1026,40 @@ bool application::drawSceneHierarchy()
 					if (dirty)
 					{
 						cloth.recalculateProperties();
+					}
+				});
+
+				drawComponent<point_light_component>(selectedEntity, "Point light", [](point_light_component& pl)
+				{
+					if (ImGui::BeginProperties())
+					{
+						ImGui::PropertyColorEdit("Color", pl.color);
+						ImGui::PropertySlider("Intensity", pl.intensity, 0.f, 10.f);
+						ImGui::PropertySlider("Radius", pl.radius, 0.f, 100.f);
+						ImGui::PropertyCheckbox("Casts shadow", pl.castsShadow);
+
+						ImGui::EndProperties();
+					}
+				});
+
+				drawComponent<spot_light_component>(selectedEntity, "Spot light", [](spot_light_component& sl)
+				{
+					if (ImGui::BeginProperties())
+					{
+						float inner = rad2deg(sl.innerAngle);
+						float outer = rad2deg(sl.outerAngle);
+
+						ImGui::PropertyColorEdit("Color", sl.color);
+						ImGui::PropertySlider("Intensity", sl.intensity, 0.f, 10.f);
+						ImGui::PropertySlider("Distance", sl.distance, 0.f, 100.f);
+						ImGui::PropertySlider("Inner angle", inner, 0.1f, 80.f);
+						ImGui::PropertySlider("Outer angle", outer, 0.2f, 85.f);
+						ImGui::PropertyCheckbox("Casts shadow", sl.castsShadow);
+
+						sl.innerAngle = deg2rad(inner);
+						sl.outerAngle = deg2rad(outer);
+
+						ImGui::EndProperties();
 					}
 				});
 			}
@@ -1138,9 +1196,6 @@ void application::resetRenderPasses()
 
 	numSpotShadowRenderPasses = 0;
 	numPointShadowRenderPasses = 0;
-
-	spotLightShadowInfos.clear();
-	pointLightShadowInfos.clear();
 }
 
 void application::submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 numPointLightShadowPasses)
@@ -1170,9 +1225,9 @@ bool application::handleUserInput(const user_input& input, float dt)
 {
 	// Returns true, if the user dragged an object using a gizmo.
 
-	if (input.keyboard['F'].pressEvent && selectedEntity && selectedEntity.hasComponent<trs>())
+	if (input.keyboard['F'].pressEvent && selectedEntity && selectedEntity.hasComponent<transform_component>())
 	{
-		auto& transform = selectedEntity.getComponent<trs>();
+		auto& transform = selectedEntity.getComponent<transform_component>();
 
 		auto aabb = selectedEntity.hasComponent<raster_component>() ? selectedEntity.getComponent<raster_component>().mesh->aabb : bounding_box::fromCenterRadius(0.f, 1.f);
 		aabb.minCorner *= transform.scale;
@@ -1195,7 +1250,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 
 	if (selectedEntity)
 	{
-		if (trs* transform = selectedEntity.getComponentIfExists<trs>())
+		if (transform_component* transform = selectedEntity.getComponentIfExists<transform_component>())
 		{
 			// Saved rigid-body properties. When an RB is dragged, we make it kinematic.
 			static bool saved = false;
@@ -1237,19 +1292,18 @@ bool application::handleUserInput(const user_input& input, float dt)
 				}
 			}
 		}
-		else if (point_light_component* pl = selectedEntity.getComponentIfExists<point_light_component>())
+		else if (position_component* pc = selectedEntity.getComponentIfExists<position_component>())
 		{
-			if (gizmo.manipulatePosition(pl->position, camera, input, !inputCaptured, &ldrRenderPass))
+			if (gizmo.manipulatePosition(pc->position, camera, input, !inputCaptured, &ldrRenderPass))
 			{
 				inputCaptured = true;
 			}
 		}
-		else if (spot_light_component* sl = selectedEntity.getComponentIfExists<spot_light_component>())
+		else if (position_rotation_component* prc = selectedEntity.getComponentIfExists<position_rotation_component>())
 		{
-			if (gizmo.manipulatePositionRotation(sl->position, selectedEntityRotationQuat, camera, input, !inputCaptured, &ldrRenderPass))
+			if (gizmo.manipulatePositionRotation(prc->position, prc->rotation, camera, input, !inputCaptured, &ldrRenderPass))
 			{
 				inputCaptured = true;
-				sl->direction = selectedEntityRotationQuat * vec3(0.f, 0.f, -1.f);
 			}
 		}
 		else
@@ -1263,7 +1317,7 @@ bool application::handleUserInput(const user_input& input, float dt)
 			{
 				// Duplicate entity.
 				scene_entity newEntity = appScene.createEntity(selectedEntity.getComponent<tag_component>().name);
-				appScene.copyComponentsIfExists<trs, raster_component, animation_component, raytrace_component>(selectedEntity, newEntity);
+				appScene.copyComponentsIfExists<transform_component, raster_component, animation_component, raytrace_component>(selectedEntity, newEntity);
 				setSelectedEntity(newEntity);
 				inputCaptured = true;
 				objectMovedByGizmo = true;
@@ -1397,7 +1451,7 @@ void application::update(const user_input& input, float dt)
 		thread_job_context context;
 
 		// Update animated meshes.
-		for (auto [entityHandle, anim, raster, transform] : appScene.group(entt::get<animation_component, raster_component, trs>).each())
+		for (auto [entityHandle, anim, raster, transform] : appScene.group(entt::get<animation_component, raster_component, transform_component>).each())
 		{
 			context.addWork([&anim = anim, mesh = raster.mesh, &transform = transform, dt]()
 			{
@@ -1411,30 +1465,62 @@ void application::update(const user_input& input, float dt)
 		// Render shadow maps.
 		renderSunShadowMap(sun, &sunShadowRenderPass, appScene, objectDragged);
 
-		for (auto [entityHandle, sl] : appScene.view<spot_light_component>().each())
+		uint32 numPointLights = appScene.numberOfComponentsOfType<point_light_component>();
+		if (numPointLights)
 		{
-			if (sl.shadowInfoIndex >= 0)
+			auto* plPtr = (point_light_cb*)mapBuffer(pointLightBuffer[dxContext.bufferedFrameID], false);
+			auto* siPtr = (point_shadow_info*)mapBuffer(pointLightShadowInfoBuffer[dxContext.bufferedFrameID], false);
+
+			for (auto [entityHandle, position, pl] : appScene.group<position_component, point_light_component>().each())
 			{
-				uint32 renderPassIndex = numSpotShadowRenderPasses++;
-				spot_shadow_info shadowInfo = renderSpotShadowMap(sl, (uint32)entityHandle, &spotShadowRenderPasses[renderPassIndex], renderPassIndex, appScene, objectDragged);
-				spotLightShadowInfos.push_back(shadowInfo);
+				point_light_cb cb;
+				cb.initialize(position.position, pl.color * pl.intensity, pl.radius);
+
+				if (pl.castsShadow)
+				{
+					cb.shadowInfoIndex = numPointShadowRenderPasses++;
+					*siPtr++ = renderPointShadowMap(cb, (uint32)entityHandle, &pointShadowRenderPasses[cb.shadowInfoIndex], appScene, objectDragged);
+				}
+
+				*plPtr++ = cb;
 			}
+
+			unmapBuffer(pointLightBuffer[dxContext.bufferedFrameID], true, { 0, numPointLights });
+			unmapBuffer(pointLightShadowInfoBuffer[dxContext.bufferedFrameID], true, { 0, numPointShadowRenderPasses });
+
+			renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], numPointLights, pointLightShadowInfoBuffer[dxContext.bufferedFrameID]);
 		}
 
-		for (auto [entityHandle, pl] : appScene.view<point_light_component>().each())
+		uint32 numSpotLights = appScene.numberOfComponentsOfType<spot_light_component>();
+		if (numSpotLights)
 		{
-			if (pl.shadowInfoIndex >= 0)
+			auto* slPtr = (spot_light_cb*)mapBuffer(spotLightBuffer[dxContext.bufferedFrameID], false);
+			auto* siPtr = (spot_shadow_info*)mapBuffer(spotLightShadowInfoBuffer[dxContext.bufferedFrameID], false);
+
+			for (auto [entityHandle, transform, sl] : appScene.group<position_rotation_component, spot_light_component>().each())
 			{
-				uint32 renderPassIndex = numPointShadowRenderPasses++;
-				point_shadow_info shadowInfo = renderPointShadowMap(pl, (uint32)entityHandle, &pointShadowRenderPasses[renderPassIndex], renderPassIndex, appScene, objectDragged);
-				pointLightShadowInfos.push_back(shadowInfo);
+				spot_light_cb cb;
+				cb.initialize(transform.position, transform.rotation * vec3(0.f, 0.f, -1.f), sl.color * sl.intensity, sl.innerAngle, sl.outerAngle, sl.distance);
+
+				if (sl.castsShadow)
+				{
+					cb.shadowInfoIndex = numSpotShadowRenderPasses++;
+					*siPtr++ = renderSpotShadowMap(cb, (uint32)entityHandle, &spotShadowRenderPasses[cb.shadowInfoIndex], appScene, objectDragged);
+				}
+
+				*slPtr++ = cb;
 			}
+
+			unmapBuffer(spotLightBuffer[dxContext.bufferedFrameID], true, { 0, numSpotLights });
+			unmapBuffer(spotLightShadowInfoBuffer[dxContext.bufferedFrameID], true, { 0, numSpotShadowRenderPasses });
+
+			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], numSpotLights, spotLightShadowInfoBuffer[dxContext.bufferedFrameID]);
 		}
 
 
 
 		// Submit render calls.
-		for (auto [entityHandle, raster, transform] : appScene.group(entt::get<raster_component, trs>).each())
+		for (auto [entityHandle, raster, transform] : appScene.group(entt::get<raster_component, transform_component>).each())
 		{
 			const dx_mesh& mesh = raster.mesh->mesh;
 			mat4 m = trsToMat4(transform);
@@ -1442,8 +1528,8 @@ void application::update(const user_input& input, float dt)
 			scene_entity entity = { entityHandle, appScene };
 			bool outline = selectedEntity == entity;
 
-			dynamic_geometry_component* dynamic = entity.getComponentIfExists<dynamic_geometry_component>();
-			mat4 lastM = dynamic ? trsToMat4(dynamic->lastFrameTransform) : m;
+			dynamic_transform_component* dynamic = entity.getComponentIfExists<dynamic_transform_component>();
+			mat4 lastM = dynamic ? trsToMat4(*dynamic) : m;
 
 			if (animation_component* anim = entity.getComponentIfExists<animation_component>())
 			{
@@ -1523,25 +1609,6 @@ void application::update(const user_input& input, float dt)
 		collisionDebugDraw(&ldrRenderPass);
 
 
-		uint32 numPointLights = appScene.numberOfComponentsOfType<point_light_component>();
-		uint32 numSpotLights = appScene.numberOfComponentsOfType<spot_light_component>();
-
-
-		// Upload and set lights.
-		if (numPointLights > 0)
-		{
-			updateUploadBufferData(pointLightBuffer[dxContext.bufferedFrameID], appScene.raw<point_light_component>(), (uint32)(sizeof(point_light_component) * numPointLights));
-			updateUploadBufferData(pointLightShadowInfoBuffer[dxContext.bufferedFrameID], pointLightShadowInfos.data(), (uint32)(sizeof(point_shadow_info) * numPointShadowRenderPasses));
-			renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], numPointLights, pointLightShadowInfoBuffer[dxContext.bufferedFrameID]);
-		}
-		if (numSpotLights > 0)
-		{
-			updateUploadBufferData(spotLightBuffer[dxContext.bufferedFrameID], appScene.raw<spot_light_component>(), (uint32)(sizeof(spot_light_component) * numSpotLights));
-			updateUploadBufferData(spotLightShadowInfoBuffer[dxContext.bufferedFrameID], spotLightShadowInfos.data(), (uint32)(sizeof(spot_shadow_info) * numSpotShadowRenderPasses));
-			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], numSpotLights, spotLightShadowInfoBuffer[dxContext.bufferedFrameID]);
-		}
-
-
 		if (decals.size())
 		{
 			updateUploadBufferData(decalBuffer[dxContext.bufferedFrameID], decals.data(), (uint32)(sizeof(pbr_decal_cb) * decals.size()));
@@ -1552,11 +1619,16 @@ void application::update(const user_input& input, float dt)
 		{
 			if (point_light_component* pl = selectedEntity.getComponentIfExists<point_light_component>())
 			{
-				renderWireSphere(pl->position, pl->radius, vec4(pl->radiance, 1.f), &ldrRenderPass);
+				position_component& pc = selectedEntity.getComponent<position_component>();
+
+				renderWireSphere(pc.position, pl->radius, vec4(pl->color, 1.f), &ldrRenderPass);
 			}
 			else if (spot_light_component* sl = selectedEntity.getComponentIfExists<spot_light_component>())
 			{
-				renderWireCone(sl->position, sl->direction, sl->maxDistance, acos(sl->getOuterCutoff()) * 2.f, vec4(sl->radiance, 1.f), &ldrRenderPass);
+				position_rotation_component& prc = selectedEntity.getComponent<position_rotation_component>();
+
+				renderWireCone(prc.position, prc.rotation * vec3(0.f, 0.f, -1.f), 
+					sl->distance, sl->outerAngle * 2.f, vec4(sl->color, 1.f), &ldrRenderPass);
 			}
 		}
 
@@ -1568,7 +1640,7 @@ void application::update(const user_input& input, float dt)
 		{
 			raytracingTLAS.reset();
 
-			for (auto [entityHandle, transform, raytrace] : appScene.group(entt::get<trs, raytrace_component>).each())
+			for (auto [entityHandle, transform, raytrace] : appScene.group(entt::get<transform_component, raytrace_component>).each())
 			{
 				raytracingTLAS.instantiate(raytrace.type, transform);
 			}
@@ -1580,9 +1652,9 @@ void application::update(const user_input& input, float dt)
 	}
 #endif
 
-	for (auto [entityHandle, transform, dynamic] : appScene.group(entt::get<trs, dynamic_geometry_component>).each())
+	for (auto [entityHandle, transform, dynamic] : appScene.group(entt::get<transform_component, dynamic_transform_component>).each())
 	{
-		dynamic.lastFrameTransform = transform;
+		dynamic = transform;
 	}
 }
 
@@ -1609,7 +1681,7 @@ void application::handleFileDrop(const fs::path& filename)
 		path = path.stem();
 
 		appScene.createEntity(path.string().c_str())
-			.addComponent<trs>(vec3(0.f), quat::identity)
+			.addComponent<transform_component>(vec3(0.f), quat::identity)
 			.addComponent<raster_component>(mesh);
 	}
 }
@@ -1700,7 +1772,7 @@ void application::serializeToFile()
 		tag_component& tag = entity.getComponent<tag_component>();
 		out << YAML::Key << "Tag" << YAML::Value << tag.name;
 
-		if (trs* transform = entity.getComponentIfExists<trs>())
+		if (transform_component* transform = entity.getComponentIfExists<transform_component>())
 		{
 			out << YAML::Key << "Transform" << YAML::Value
 				<< YAML::BeginMap
@@ -1816,7 +1888,7 @@ bool application::deserializeFromFile()
 		if (entityNode["Transform"])
 		{
 			auto transformNode = entityNode["Transform"];
-			entity.addComponent<trs>(transformNode["Position"].as<vec3>(), transformNode["Rotation"].as<quat>(), transformNode["Scale"].as<vec3>());
+			entity.addComponent<transform_component>(transformNode["Position"].as<vec3>(), transformNode["Rotation"].as<quat>(), transformNode["Scale"].as<vec3>());
 		}
 
 		if (entityNode["Raster"])

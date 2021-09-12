@@ -105,7 +105,7 @@ static locomotion_environment* learningEnv = 0;
 
 static void readBodyPartState(const trs& transform, scene_entity entity, vec3& position, vec3& velocity)
 {
-	position = inverseTransformPosition(transform, entity.getComponent<trs>().position);
+	position = inverseTransformPosition(transform, entity.getComponent<transform_component>().position);
 	velocity = inverseTransformDirection(transform, entity.getComponent<rigid_body_component>().linearVelocity);
 }
 
@@ -152,12 +152,12 @@ static void getLimits(cone_twist_constraint_handle handle, float* minPtr, uint32
 bool locomotion_environment::getState(learning_state& outState)
 {
 	// Create coordinate system centered at the torso's location (projected onto the ground), with axes constructed from the horizontal heading and global up vector.
-	//quat rotation = ragdoll.torso.getComponent<trs>().rotation;
+	//quat rotation = ragdoll.torso.getComponent<transform_component>().rotation;
 	//vec3 forward = rotation * vec3(0.f, 0.f, -1.f);
 	//forward.y = 0.f;
 	//forward = normalize(forward);
 	//
-	vec3 cog = ragdoll.torso.getComponent<rigid_body_component>().getGlobalCOGPosition(ragdoll.torso.getComponent<trs>());
+	vec3 cog = ragdoll.torso.getComponent<rigid_body_component>().getGlobalCOGPosition(ragdoll.torso.getComponent<transform_component>());
 	cog.y = 0;
 	//
 	//trs transform(cog, rotateFromTo(vec3(0.f, 0.f, -1.f), forward));
@@ -246,7 +246,7 @@ static void getLocalPositions(scene_entity entity, learning_positions& outPositi
 
 static void getBodyPartTarget(scene_entity entity, scene_entity parent, learning_target& outTarget, const learning_positions& localPositions)
 {
-	trs& transform = entity.getComponent<trs>();
+	transform_component& transform = entity.getComponent<transform_component>();
 	rigid_body_component& rb = entity.getComponent<rigid_body_component>();
 
 	for (uint32 i = 0; i < 6; ++i)
@@ -258,14 +258,14 @@ static void getBodyPartTarget(scene_entity entity, scene_entity parent, learning
 		outTarget.targetVelocities[i] = globalVelocity;
 	}
 
-	quat parentRotation = parent ? parent.getComponent<trs>().rotation : quat::identity;
+	quat parentRotation = parent ? parent.getComponent<transform_component>().rotation : quat::identity;
 	quat localRotation = transform.rotation * conjugate(parentRotation);
 	outTarget.localTargetRotation = localRotation;
 }
 
 static body_part_error readPartDifference(scene_entity entity, scene_entity parent, const learning_target& target, const learning_positions& localPositions)
 {
-	trs& transform = entity.getComponent<trs>();
+	transform_component& transform = entity.getComponent<transform_component>();
 	rigid_body_component& rb = entity.getComponent<rigid_body_component>();
 
 
@@ -281,7 +281,7 @@ static body_part_error readPartDifference(scene_entity entity, scene_entity pare
 		velocityError += length(globalVelocity - target.targetVelocities[i]);
 	}
 
-	quat parentRotation = parent ? parent.getComponent<trs>().rotation : quat::identity;
+	quat parentRotation = parent ? parent.getComponent<transform_component>().rotation : quat::identity;
 	quat localRotation = transform.rotation * conjugate(parentRotation);
 	quat rotationDifference = target.localTargetRotation * conjugate(localRotation);
 
@@ -292,7 +292,7 @@ static body_part_error readPartDifference(scene_entity entity, scene_entity pare
 
 float locomotion_environment::getLastActionReward()
 {
-	//return env->ragdoll.head.getComponent<trs>().position.y;
+	//return env->ragdoll.head.getComponent<transform_component>().position.y;
 
 	float positionError = 0.f;
 	float velocityError = 0.f;
@@ -313,7 +313,7 @@ float locomotion_environment::getLastActionReward()
 	float rlocal = exp(-10.f / NUM_BODY_PARTS * rotationError);
 	float rvcm = exp(-vcmError);
 
-	float headHeight = ragdoll.head.getComponent<trs>().position.y;
+	float headHeight = ragdoll.head.getComponent<transform_component>().position.y;
 	float fall = clamp01(1.3f - 1.4f * (headTargetHeight - headHeight));
 
 	float result = fall * (rp + rv + rlocal + rvcm);
@@ -387,7 +387,7 @@ extern "C" __declspec(dllexport) int updatePhysics(float* action, float* outStat
 	{
 		uint32 bodyPartIndex = learningEnv->rng.randomUintBetween(0, NUM_BODY_PARTS - 1);
 
-		vec3 part = learningEnv->ragdoll.bodyParts[bodyPartIndex].getComponent<trs>().position + vec3(0.f, 0.2f, 0.f);
+		vec3 part = learningEnv->ragdoll.bodyParts[bodyPartIndex].getComponent<transform_component>().position + vec3(0.f, 0.2f, 0.f);
 		vec3 direction = normalize(vec3(learningEnv->rng.randomFloatBetween(-1.f, 1.f), 0.f, learningEnv->rng.randomFloatBetween(-1.f, 1.f)));
 		vec3 origin = part - direction * 5.f;
 	
@@ -419,7 +419,7 @@ void locomotion_environment::resetForLearning()
 	rng = { seed };
 
 	appScene.createEntity("Test ground")
-		.addComponent<trs>(vec3(0.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
+		.addComponent<transform_component>(vec3(0.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f))
 		.addComponent<rigid_body_component>(true);
 
@@ -440,7 +440,7 @@ void locomotion_environment::resetCommon()
 	lastSmoothedAction = {};
 	applyAction({});
 
-	headTargetHeight = ragdoll.head.getComponent<trs>().position.y;
+	headTargetHeight = ragdoll.head.getComponent<transform_component>().position.y;
 	torsoVelocityTarget = vec3(0.f);
 
 	for (uint32 i = 0; i < NUM_BODY_PARTS; ++i)

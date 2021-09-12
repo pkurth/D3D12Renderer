@@ -174,20 +174,20 @@ uint32 cloth_component::getRenderableTriangleCount() const
 	return (gridSizeX - 1) * (gridSizeY - 1) * 2;
 }
 
-std::tuple<material_vertex_buffer_group_view, material_vertex_buffer_group_view, material_index_buffer_view, submesh_info> cloth_component::getRenderData()
+std::tuple<dx_vertex_buffer_group_view, dx_vertex_buffer_group_view, dx_index_buffer_view, submesh_info> cloth_component::getRenderData()
 {
 	uint32 numVertices = getRenderableVertexCount();
 	auto [positionVertexBuffer, positionPtr] = dxContext.createDynamicVertexBuffer(sizeof(vec3), numVertices);
 	memcpy(positionPtr, positions.data(), numVertices * sizeof(vec3));
 
-	material_vertex_buffer_group_view vb = skinCloth(positionVertexBuffer, gridSizeX, gridSizeY);
+	dx_vertex_buffer_group_view vb = skinCloth(positionVertexBuffer, gridSizeX, gridSizeY);
 	submesh_info sm;
 	sm.baseVertex = 0;
 	sm.firstIndex = 0;
 	sm.numIndices = getRenderableTriangleCount() * 3;
 	sm.numVertices = numVertices;
 
-	material_vertex_buffer_group_view prev = prevFrameVB;
+	dx_vertex_buffer_group_view prev = prevFrameVB;
 	prevFrameVB = vb;
 
 	return { vb, prev, indexBuffer, sm };

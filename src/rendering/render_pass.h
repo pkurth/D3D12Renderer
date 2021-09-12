@@ -37,8 +37,8 @@ struct opaque_render_pass
 
 	template <typename pipeline_t>
 	void renderStaticObject(const mat4& transform,
-		const material_vertex_buffer_group_view& vertexBuffer,
-		const material_index_buffer_view& indexBuffer,
+		const dx_vertex_buffer_group_view& vertexBuffer,
+		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material,
 		uint32 objectID = -1,
@@ -59,8 +59,8 @@ struct opaque_render_pass
 	template <typename pipeline_t>
 	void renderDynamicObject(const mat4& transform,
 		const mat4& prevFrameTransform,
-		const material_vertex_buffer_group_view& vertexBuffer,
-		const material_index_buffer_view& indexBuffer,
+		const dx_vertex_buffer_group_view& vertexBuffer,
+		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material,
 		uint32 objectID = -1,
@@ -82,9 +82,9 @@ struct opaque_render_pass
 	template <typename pipeline_t>
 	void renderAnimatedObject(const mat4& transform,
 		const mat4& prevFrameTransform,
-		material_vertex_buffer_group_view& vertexBuffer,
-		material_vertex_buffer_group_view& prevFrameVertexBuffer,
-		const material_index_buffer_view& indexBuffer,
+		dx_vertex_buffer_group_view& vertexBuffer,
+		dx_vertex_buffer_group_view& prevFrameVertexBuffer,
+		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material,
 		uint32 objectID = -1,
@@ -108,8 +108,8 @@ struct opaque_render_pass
 	// Specializations for PBR materials, since these are the common ones.
 
 	void renderStaticObject(const mat4& transform,
-		const material_vertex_buffer_group_view& vertexBuffer,
-		const material_index_buffer_view& indexBuffer,
+		const dx_vertex_buffer_group_view& vertexBuffer,
+		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const ref<pbr_material>& material,
 		uint32 objectID = -1)
@@ -126,8 +126,8 @@ struct opaque_render_pass
 
 	void renderDynamicObject(const mat4& transform,
 		const mat4& prevFrameTransform,
-		const material_vertex_buffer_group_view& vertexBuffer,
-		const material_index_buffer_view& indexBuffer,
+		const dx_vertex_buffer_group_view& vertexBuffer,
+		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const ref<pbr_material>& material,
 		uint32 objectID = -1)
@@ -144,9 +144,9 @@ struct opaque_render_pass
 
 	void renderAnimatedObject(const mat4& transform,
 		const mat4& prevFrameTransform,
-		material_vertex_buffer_group_view& vertexBuffer,
-		material_vertex_buffer_group_view& prevFrameVertexBuffer,
-		const material_index_buffer_view& indexBuffer,
+		dx_vertex_buffer_group_view& vertexBuffer,
+		dx_vertex_buffer_group_view& prevFrameVertexBuffer,
+		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const ref<pbr_material>& material,
 		uint32 objectID = -1)
@@ -174,8 +174,8 @@ struct opaque_render_pass
 private:
 	template <typename pipeline_t>
 	void renderObjectCommon(const mat4& transform,
-		const material_vertex_buffer_group_view& vertexBuffer,
-		const material_index_buffer_view& indexBuffer,
+		const dx_vertex_buffer_group_view& vertexBuffer,
+		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material)
 	{
@@ -205,8 +205,8 @@ struct transparent_render_pass
 
 	template <typename pipeline_t>
 	void renderObject(const mat4& transform,
-		const material_vertex_buffer_group_view& vertexBuffer,
-		const material_index_buffer_view& indexBuffer,
+		const dx_vertex_buffer_group_view& vertexBuffer,
+		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material)
 	{
@@ -222,8 +222,8 @@ struct transparent_render_pass
 	}
 
 	template <typename pipeline_t>
-	void renderParticles(const material_vertex_buffer_group_view& vertexBuffer,
-		const material_index_buffer_view& indexBuffer,
+	void renderParticles(const dx_vertex_buffer_group_view& vertexBuffer,
+		const dx_index_buffer_view& indexBuffer,
 		const particle_draw_info& drawInfo,
 		const typename pipeline_t::material_t& material)
 	{
@@ -238,8 +238,8 @@ struct transparent_render_pass
 	}
 
 	void renderObject(const mat4& transform,
-		const material_vertex_buffer_group_view& vertexBuffer,
-		const material_index_buffer_view& indexBuffer,
+		const dx_vertex_buffer_group_view& vertexBuffer,
+		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const ref<pbr_material>& material)
 	{
@@ -267,8 +267,8 @@ struct ldr_render_pass
 
 	template <typename pipeline_t>
 	void renderObject(const mat4& transform,
-		const material_vertex_buffer_group_view& vertexBuffer,
-		const material_index_buffer_view& indexBuffer,
+		const dx_vertex_buffer_group_view& vertexBuffer,
+		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material)
 	{
@@ -285,8 +285,8 @@ struct ldr_render_pass
 
 	template <typename pipeline_t>
 	void renderOverlay(const mat4& transform,
-		const material_vertex_buffer_group_view& vertexBuffer,
-		const material_index_buffer_view& indexBuffer,
+		const dx_vertex_buffer_group_view& vertexBuffer,
+		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material)
 	{
@@ -302,8 +302,8 @@ struct ldr_render_pass
 	}
 
 	void renderOutline(const mat4& transform,
-		const material_vertex_buffer_view& vertexBuffer,
-		const material_index_buffer_view& indexBuffer,
+		const dx_vertex_buffer_view& vertexBuffer,
+		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh)
 	{
 		auto& command = outlines.emplace_back();
@@ -314,8 +314,8 @@ struct ldr_render_pass
 	}
 
 	void renderOutline(const mat4& transform,
-		const material_vertex_buffer_group_view& vertexBuffer,
-		const material_index_buffer_view& indexBuffer,
+		const dx_vertex_buffer_group_view& vertexBuffer,
+		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh)
 	{
 		renderOutline(transform, vertexBuffer.positions, indexBuffer, submesh);
@@ -332,7 +332,7 @@ struct ldr_render_pass
 
 struct shadow_render_pass_base
 {
-	void renderStaticObject(const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
+	void renderStaticObject(const mat4& transform, const dx_vertex_buffer_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
 		auto& dcs = doubleSided ? doubleSidedStaticDrawCalls : staticDrawCalls;
 		dcs.push_back(
@@ -345,7 +345,7 @@ struct shadow_render_pass_base
 		);
 	}
 
-	void renderDynamicObject(const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
+	void renderDynamicObject(const mat4& transform, const dx_vertex_buffer_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
 		auto& dcs = doubleSided ? doubleSidedDynamicDrawCalls : dynamicDrawCalls;
 		dcs.push_back(
@@ -358,12 +358,12 @@ struct shadow_render_pass_base
 		);
 	}
 
-	void renderStaticObject(const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
+	void renderStaticObject(const mat4& transform, const dx_vertex_buffer_group_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
 		renderStaticObject(transform, vertexBuffer.positions, indexBuffer, submesh);
 	}
 
-	void renderDynamicObject(const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
+	void renderDynamicObject(const mat4& transform, const dx_vertex_buffer_group_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
 		renderDynamicObject(transform, vertexBuffer.positions, indexBuffer, submesh);
 	}
@@ -392,22 +392,22 @@ struct sun_cascade_render_pass : shadow_render_pass_base
 struct sun_shadow_render_pass
 {
 	// Since each cascade includes the next lower one, if you submit a draw to cascade N, it will also be rendered in N-1 automatically. No need to add it to the lower one.
-	void renderStaticObject(uint32 cascadeIndex, const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
+	void renderStaticObject(uint32 cascadeIndex, const mat4& transform, const dx_vertex_buffer_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
 		cascades[cascadeIndex].renderStaticObject(transform, vertexBuffer, indexBuffer, submesh, doubleSided);
 	}
 
-	void renderStaticObject(uint32 cascadeIndex, const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
+	void renderStaticObject(uint32 cascadeIndex, const mat4& transform, const dx_vertex_buffer_group_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
 		renderStaticObject(cascadeIndex, transform, vertexBuffer.positions, indexBuffer, submesh, doubleSided);
 	}
 
-	void renderDynamicObject(uint32 cascadeIndex, const mat4& transform, const material_vertex_buffer_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
+	void renderDynamicObject(uint32 cascadeIndex, const mat4& transform, const dx_vertex_buffer_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
 		cascades[cascadeIndex].renderDynamicObject(transform, vertexBuffer, indexBuffer, submesh, doubleSided);
 	}
 
-	void renderDynamicObject(uint32 cascadeIndex, const mat4& transform, const material_vertex_buffer_group_view& vertexBuffer, const material_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
+	void renderDynamicObject(uint32 cascadeIndex, const mat4& transform, const dx_vertex_buffer_group_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
 	{
 		renderDynamicObject(cascadeIndex, transform, vertexBuffer.positions, indexBuffer, submesh, doubleSided);
 	}

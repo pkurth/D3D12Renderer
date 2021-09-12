@@ -6,9 +6,11 @@
 scene::scene()
 {
 	// Construct groups early. Ingore the return types.
-	(void) registry.group<collider_component, sap_endpoint_indirection_component>(); // Colliders and SAP endpoints are always sorted in the same order.
-	(void) registry.group<trs, dynamic_geometry_component, rigid_body_component>();
-	(void) registry.group<trs, rigid_body_component>();
+	(void)registry.group<collider_component, sap_endpoint_indirection_component>(); // Colliders and SAP endpoints are always sorted in the same order.
+	(void)registry.group<transform_component, dynamic_transform_component, rigid_body_component>();
+	(void)registry.group<transform_component, rigid_body_component>();
+	(void)registry.group<position_component, point_light_component>();
+	(void)registry.group<position_rotation_component, spot_light_component>();
 
 	registry.on_construct<collider_component>().connect<&onColliderAdded>();
 	registry.on_destroy<collider_component>().connect<&onColliderRemoved>();

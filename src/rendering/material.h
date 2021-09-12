@@ -40,42 +40,6 @@ struct common_material_info
 };
 
 
-struct material_vertex_buffer_view
-{
-	D3D12_VERTEX_BUFFER_VIEW view;
-
-	material_vertex_buffer_view() { view.SizeInBytes = 0; }
-	material_vertex_buffer_view(const ref<dx_vertex_buffer>& vb) : view(vb ? vb->view : D3D12_VERTEX_BUFFER_VIEW{0}) {}
-	material_vertex_buffer_view(const dx_dynamic_vertex_buffer& vb) : view(vb.view) {}
-
-	operator bool() const { return view.SizeInBytes > 0; }
-	operator const D3D12_VERTEX_BUFFER_VIEW& () const { return view; }
-};
-
-struct material_vertex_buffer_group_view
-{
-	material_vertex_buffer_view positions;
-	material_vertex_buffer_view others;
-
-	material_vertex_buffer_group_view() { positions.view.SizeInBytes = 0; others.view.SizeInBytes = 0; }
-	material_vertex_buffer_group_view(const material_vertex_buffer_view& positions, const material_vertex_buffer_view& others) : positions(positions), others(others) {}
-	material_vertex_buffer_group_view(const vertex_buffer_group& vb) : positions(vb.positions), others(vb.others) {}
-
-	operator bool() const { return positions && others; }
-};
-
-struct material_index_buffer_view
-{
-	D3D12_INDEX_BUFFER_VIEW view;
-
-	material_index_buffer_view() { view.SizeInBytes = 0; }
-	material_index_buffer_view(const ref<dx_index_buffer>& vb) : view(vb->view) {}
-	material_index_buffer_view(const dx_dynamic_index_buffer& vb) : view(vb.view) {}
-
-	operator bool() const { return view.SizeInBytes > 0; }
-	operator const D3D12_INDEX_BUFFER_VIEW& () const { return view; }
-};
-
 #define PIPELINE_SETUP_DECL					static void setup(dx_command_list* cl, const common_material_info& materialInfo)
 #define PIPELINE_SETUP_IMPL(name)			void name::setup(dx_command_list* cl, const common_material_info& materialInfo)
 

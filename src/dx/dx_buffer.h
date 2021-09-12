@@ -67,6 +67,42 @@ struct vertex_buffer_group
 	ref<dx_vertex_buffer> others; // Uvs, normals, tangents, etc.
 };
 
+struct dx_vertex_buffer_view
+{
+	D3D12_VERTEX_BUFFER_VIEW view;
+
+	dx_vertex_buffer_view() { view.SizeInBytes = 0; }
+	dx_vertex_buffer_view(const ref<dx_vertex_buffer>& vb) : view(vb ? vb->view : D3D12_VERTEX_BUFFER_VIEW{ 0 }) {}
+	dx_vertex_buffer_view(const dx_dynamic_vertex_buffer& vb) : view(vb.view) {}
+
+	operator bool() const { return view.SizeInBytes > 0; }
+	operator const D3D12_VERTEX_BUFFER_VIEW& () const { return view; }
+};
+
+struct dx_vertex_buffer_group_view
+{
+	dx_vertex_buffer_view positions;
+	dx_vertex_buffer_view others;
+
+	dx_vertex_buffer_group_view() { positions.view.SizeInBytes = 0; others.view.SizeInBytes = 0; }
+	dx_vertex_buffer_group_view(const dx_vertex_buffer_view& positions, const dx_vertex_buffer_view& others) : positions(positions), others(others) {}
+	dx_vertex_buffer_group_view(const vertex_buffer_group& vb) : positions(vb.positions), others(vb.others) {}
+
+	operator bool() const { return positions && others; }
+};
+
+struct dx_index_buffer_view
+{
+	D3D12_INDEX_BUFFER_VIEW view;
+
+	dx_index_buffer_view() { view.SizeInBytes = 0; }
+	dx_index_buffer_view(const ref<dx_index_buffer>& vb) : view(vb->view) {}
+	dx_index_buffer_view(const dx_dynamic_index_buffer& vb) : view(vb.view) {}
+
+	operator bool() const { return view.SizeInBytes > 0; }
+	operator const D3D12_INDEX_BUFFER_VIEW& () const { return view; }
+};
+
 struct dx_mesh
 {
 	vertex_buffer_group vertexBuffer;

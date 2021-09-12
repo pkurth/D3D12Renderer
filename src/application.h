@@ -62,9 +62,6 @@ private:
 
 	std::vector<pbr_decal_cb> decals;
 
-	std::vector<spot_shadow_info> spotLightShadowInfos;
-	std::vector<point_shadow_info> pointLightShadowInfos;
-
 	ref<dx_texture> decalTexture;
 
 	fire_particle_system fireParticleSystem;
@@ -81,7 +78,6 @@ private:
 	scene appScene;
 	scene_entity selectedEntity;
 	vec3 selectedEntityEulerRotation;
-	quat selectedEntityRotationQuat;
 
 
 	uint32 numSpotShadowRenderPasses;

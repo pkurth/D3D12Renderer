@@ -25,8 +25,8 @@ void initializeDistanceVelocityConstraints(scene& appScene, rigid_body_global_st
 		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
 		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
 
-		trs& transformA = entityA.getComponent<trs>();
-		trs& transformB = entityB.getComponent<trs>();
+		transform_component& transformA = entityA.getComponent<transform_component>();
+		transform_component& transformB = entityB.getComponent<transform_component>();
 
 		out.rigidBodyIndexA = (uint16)(&rbA - rbBase);
 		out.rigidBodyIndexB = (uint16)(&rbB - rbBase);
@@ -108,8 +108,8 @@ void initializeBallJointVelocityConstraints(scene& appScene, rigid_body_global_s
 		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
 		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
 
-		trs& transformA = entityA.getComponent<trs>();
-		trs& transformB = entityB.getComponent<trs>();
+		transform_component& transformA = entityA.getComponent<transform_component>();
+		transform_component& transformB = entityB.getComponent<transform_component>();
 
 		out.rigidBodyIndexA = (uint16)(&rbA - rbBase);
 		out.rigidBodyIndexB = (uint16)(&rbB - rbBase);
@@ -179,8 +179,8 @@ void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_
 		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
 		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
 
-		trs& transformA = entityA.getComponent<trs>();
-		trs& transformB = entityB.getComponent<trs>();
+		transform_component& transformA = entityA.getComponent<transform_component>();
+		transform_component& transformB = entityB.getComponent<transform_component>();
 
 		out.rigidBodyIndexA = (uint16)(&rbA - rbBase);
 		out.rigidBodyIndexB = (uint16)(&rbB - rbBase);
@@ -409,8 +409,8 @@ void initializeConeTwistVelocityConstraints(scene& appScene, rigid_body_global_s
 		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
 		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
 
-		trs& transformA = entityA.getComponent<trs>();
-		trs& transformB = entityB.getComponent<trs>();
+		transform_component& transformA = entityA.getComponent<transform_component>();
+		transform_component& transformB = entityB.getComponent<transform_component>();
 
 		out.rigidBodyIndexA = (uint16)(&rbA - rbBase);
 		out.rigidBodyIndexB = (uint16)(&rbB - rbBase);

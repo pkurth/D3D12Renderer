@@ -132,8 +132,8 @@ struct animation_component
 	animation_instance animation;
 	float timeScale = 1.f;
 
-	material_vertex_buffer_group_view currentVertexBuffer;
-	material_vertex_buffer_group_view prevFrameVertexBuffer;
+	dx_vertex_buffer_group_view currentVertexBuffer;
+	dx_vertex_buffer_group_view prevFrameVertexBuffer;
 
 	void update(const ref<struct composite_mesh>& mesh, float dt, trs* transform = 0);
 };

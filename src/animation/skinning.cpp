@@ -20,7 +20,7 @@ static dx_pipeline clothSkinningPipeline;
 
 struct skinning_call
 {
-	material_vertex_buffer_group_view vertexBuffer;
+	dx_vertex_buffer_group_view vertexBuffer;
 	vertex_range range;
 	uint32 jointOffset;
 	uint32 numJoints;
@@ -29,7 +29,7 @@ struct skinning_call
 
 struct cloth_skinning_call
 {
-	material_vertex_buffer_view vertexBuffer;
+	dx_vertex_buffer_view vertexBuffer;
 	uint32 gridSizeX;
 	uint32 gridSizeY;
 	uint32 vertexOffset;
@@ -62,7 +62,7 @@ void initializeSkinning()
 	clothSkinningPipeline = createReloadablePipeline("cloth_skinning_cs");
 }
 
-std::tuple<material_vertex_buffer_group_view, mat4*> skinObject(const material_vertex_buffer_group_view& vertexBuffer, vertex_range range, uint32 numJoints)
+std::tuple<dx_vertex_buffer_group_view, mat4*> skinObject(const dx_vertex_buffer_group_view& vertexBuffer, vertex_range range, uint32 numJoints)
 {
 	uint32 jointOffset = atomicAdd(numSkinningMatricesThisFrame, numJoints);
 	assert(jointOffset + numJoints <= MAX_NUM_SKINNING_MATRICES_PER_FRAME);
@@ -86,7 +86,7 @@ std::tuple<material_vertex_buffer_group_view, mat4*> skinObject(const material_v
 	auto positions = skinnedVertexBuffer[currentSkinnedVertexBuffer].positions;
 	auto others = skinnedVertexBuffer[currentSkinnedVertexBuffer].others;
 
-	material_vertex_buffer_group_view result;
+	dx_vertex_buffer_group_view result;
 	result.positions.view.BufferLocation = positions->gpuVirtualAddress + positions->elementSize * vertexOffset;
 	result.positions.view.SizeInBytes = positions->elementSize * numVertices;
 	result.positions.view.StrideInBytes = positions->elementSize;
@@ -97,20 +97,20 @@ std::tuple<material_vertex_buffer_group_view, mat4*> skinObject(const material_v
 	return { result, skinningMatrices + jointOffset };
 }
 
-std::tuple<material_vertex_buffer_group_view, mat4*> skinObject(const material_vertex_buffer_group_view& vertexBuffer, uint32 numVertices, uint32 numJoints)
+std::tuple<dx_vertex_buffer_group_view, mat4*> skinObject(const dx_vertex_buffer_group_view& vertexBuffer, uint32 numVertices, uint32 numJoints)
 {
 	auto [vb, mats] = skinObject(vertexBuffer, vertex_range{ 0, numVertices }, numJoints);
 	return { vb, mats };
 }
 
-std::tuple<material_vertex_buffer_group_view, mat4*> skinObject(const material_vertex_buffer_group_view& vertexBuffer, submesh_info submesh, uint32 numJoints)
+std::tuple<dx_vertex_buffer_group_view, mat4*> skinObject(const dx_vertex_buffer_group_view& vertexBuffer, submesh_info submesh, uint32 numJoints)
 {
 	auto [vb, mats] = skinObject(vertexBuffer, vertex_range{ submesh.baseVertex, submesh.numVertices }, numJoints);
 
 	return { vb, mats };
 }
 
-material_vertex_buffer_group_view skinCloth(const material_vertex_buffer_view& inpositions, uint32 gridSizeX, uint32 gridSizeY)
+dx_vertex_buffer_group_view skinCloth(const dx_vertex_buffer_view& inpositions, uint32 gridSizeX, uint32 gridSizeY)
 {
 	uint32 numVertices = gridSizeX * gridSizeY;
 	uint32 vertexOffset = atomicAdd(totalNumVertices, numVertices);
@@ -129,7 +129,7 @@ material_vertex_buffer_group_view skinCloth(const material_vertex_buffer_view& i
 	auto positions = skinnedVertexBuffer[currentSkinnedVertexBuffer].positions;
 	auto others = skinnedVertexBuffer[currentSkinnedVertexBuffer].others;
 
-	material_vertex_buffer_group_view result;
+	dx_vertex_buffer_group_view result;
 	result.positions.view.BufferLocation = positions->gpuVirtualAddress + positions->elementSize * vertexOffset;
 	result.positions.view.SizeInBytes = positions->elementSize * numVertices;
 	result.positions.view.StrideInBytes = positions->elementSize;
