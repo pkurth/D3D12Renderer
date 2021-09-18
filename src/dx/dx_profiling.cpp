@@ -364,14 +364,16 @@ void resolveTimeStampQueries(uint64* timestamps)
 						float width = current->duration / (1000.f / 60.f) * frameWidth16ms;
 
 						ImGui::SetCursorPos(ImVec2(left, top));
-						ImGui::ColorButton(current->name, colorTable[colorIndex++], ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(width, barHeight));
+						ImGui::ColorButton(current->name, colorTable[colorIndex++], 
+							ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder | ImGuiColorEditFlags_NoDragDrop, 
+							ImVec2(width, barHeight));
 
 						if (ImGui::IsItemHovered())
 						{
 							ImGui::SetTooltip("%s: %.3fms", current->name, current->duration);
 						}
 
-						ImGui::PushClipRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), false);
+						ImGui::PushClipRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), true);
 						ImGui::SetCursorPos(ImVec2(left + ImGui::GetStyle().FramePadding.x, top + ImGui::GetStyle().FramePadding.y));
 						ImGui::Text("%s: %.3fms", current->name, current->duration);
 						ImGui::PopClipRect();

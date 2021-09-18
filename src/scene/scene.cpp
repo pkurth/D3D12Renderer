@@ -25,8 +25,6 @@ void scene::deleteEntity(scene_entity e)
 {
 	if (physics_reference_component* reference = e.getComponentIfExists<physics_reference_component>())
 	{
-		auto colliderView = view<collider_component>();
-
 		scene_entity colliderEntity = { reference->firstColliderEntity, &registry };
 		while (colliderEntity)
 		{
