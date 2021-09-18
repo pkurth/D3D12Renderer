@@ -15,5 +15,5 @@ uint64 getLightMovementHash(const struct point_light_cb& pl);
 
 
 // Returns true, if static cache is available.
-std::pair<shadow_map_viewport, bool> assignShadowMapViewport(uint32 uniqueLightID, uint64 lightMovementHash, uint32 size);
+std::pair<shadow_map_viewport, bool> assignShadowMapViewport(uint64 uniqueLightID, uint64 lightMovementHash, uint32 size);
 void updateShadowMapAllocationVisualization();

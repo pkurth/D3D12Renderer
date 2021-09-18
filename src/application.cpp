@@ -330,7 +330,8 @@ void application::initialize(main_renderer* renderer)
 			25.f,
 			deg2rad(20.f),
 			deg2rad(30.f),
-			true
+			true,
+			512u
 		);
 	
 	appScene.createEntity("Spot light 1")
@@ -341,7 +342,8 @@ void application::initialize(main_renderer* renderer)
 			25.f,
 			deg2rad(20.f),
 			deg2rad(30.f),
-			true
+			true,
+			512u
 		);
 
 	appScene.createEntity("Point light 0")
@@ -350,7 +352,8 @@ void application::initialize(main_renderer* renderer)
 			randomRGB(rng),
 			1.f,
 			10.f,
-			true
+			true,
+			512u
 		);
 #endif
 
@@ -1037,6 +1040,10 @@ bool application::drawSceneHierarchy()
 						ImGui::PropertySlider("Intensity", pl.intensity, 0.f, 10.f);
 						ImGui::PropertySlider("Radius", pl.radius, 0.f, 100.f);
 						ImGui::PropertyCheckbox("Casts shadow", pl.castsShadow);
+						if (pl.castsShadow)
+						{
+							ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, pl.shadowMapResolution);
+						}
 
 						ImGui::EndProperties();
 					}
@@ -1055,6 +1062,10 @@ bool application::drawSceneHierarchy()
 						ImGui::PropertySlider("Inner angle", inner, 0.1f, 80.f);
 						ImGui::PropertySlider("Outer angle", outer, 0.2f, 85.f);
 						ImGui::PropertyCheckbox("Casts shadow", sl.castsShadow);
+						if (sl.castsShadow)
+						{
+							ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, sl.shadowMapResolution);
+						}
 
 						sl.innerAngle = deg2rad(inner);
 						sl.outerAngle = deg2rad(outer);
@@ -1479,7 +1490,7 @@ void application::update(const user_input& input, float dt)
 				if (pl.castsShadow)
 				{
 					cb.shadowInfoIndex = numPointShadowRenderPasses++;
-					*siPtr++ = renderPointShadowMap(cb, (uint32)entityHandle, &pointShadowRenderPasses[cb.shadowInfoIndex], appScene, objectDragged);
+					*siPtr++ = renderPointShadowMap(cb, (uint32)entityHandle, &pointShadowRenderPasses[cb.shadowInfoIndex], appScene, objectDragged, pl.shadowMapResolution);
 				}
 
 				*plPtr++ = cb;
@@ -1505,7 +1516,7 @@ void application::update(const user_input& input, float dt)
 				if (sl.castsShadow)
 				{
 					cb.shadowInfoIndex = numSpotShadowRenderPasses++;
-					*siPtr++ = renderSpotShadowMap(cb, (uint32)entityHandle, &spotShadowRenderPasses[cb.shadowInfoIndex], appScene, objectDragged);
+					*siPtr++ = renderSpotShadowMap(cb, (uint32)entityHandle, &spotShadowRenderPasses[cb.shadowInfoIndex], appScene, objectDragged, sl.shadowMapResolution);
 				}
 
 				*slPtr++ = cb;

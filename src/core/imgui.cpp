@@ -543,6 +543,33 @@ namespace ImGui
 		return result;
 	}
 
+	bool PropertyDropdownPowerOfTwo(const char* label, uint32 from, uint32 to, uint32& current)
+	{
+		assert(isPowerOfTwo(current));
+		assert(isPowerOfTwo(from));
+		assert(isPowerOfTwo(to));
+		uint32 logCurrent = log2(current);
+		uint32 logFrom = log2(from);
+		uint32 logTo = log2(to);
+		uint32 count = logTo - logFrom + 1;
+
+		logCurrent -= logFrom;
+
+		static const char* names[] =
+		{
+			"1", "2", "4", "8", "16", "32", "64", "128", "256", "512", "1,024", "2,048", "4,096", "8,192", "16,384", "32,768", "65,536",
+			"131,072", "262,144", "524,288", "1,048,576", "2,097,152", "4,194,304", "8,388,608", "16,777,216", "33,554,432", 
+			"67,108,864", "134,217,728", "268,435,456", "536,870,912", "1,073,741,824", "2,147,483,648"
+		};
+
+		pre(label);
+		bool result = ImGui::Dropdown("", names + logFrom, count, logCurrent);
+		logCurrent += logFrom;
+		current = 1 << logCurrent;
+		post();
+		return result;
+	}
+
 	bool PropertyColorEdit(const char* label, vec3& f)
 	{
 		pre(label);

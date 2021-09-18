@@ -32,7 +32,7 @@ struct shadow_map_cache
 	uint64 lightMovementHash;
 };
 
-static std::unordered_map<uint32, shadow_map_cache> cachedAllocations;
+static std::unordered_map<uint64, shadow_map_cache> cachedAllocations;
 
 static ref<dx_texture> visTexture;
 
@@ -175,7 +175,7 @@ static void visualize(dx_command_list* cl, ref<dx_texture> texture)
 
 static bool init = false;
 
-std::pair<shadow_map_viewport, bool> assignShadowMapViewport(uint32 uniqueLightID, uint64 lightMovementHash, uint32 size)
+std::pair<shadow_map_viewport, bool> assignShadowMapViewport(uint64 uniqueLightID, uint64 lightMovementHash, uint32 size)
 {
 	if (!init)
 	{

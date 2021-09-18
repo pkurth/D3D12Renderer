@@ -35,10 +35,11 @@ struct point_light_component
 	float intensity; // Final radiance is color * intensity.
 	float radius;
 	bool castsShadow;
+	uint32 shadowMapResolution;
 
 	point_light_component() {}
-	point_light_component(vec3 color, float intensity, float radius, bool castsShadow = false)
-		: color(color), intensity(intensity), radius(radius), castsShadow(castsShadow) {}
+	point_light_component(vec3 color, float intensity, float radius, bool castsShadow = false, uint32 shadowMapResolution = 512)
+		: color(color), intensity(intensity), radius(radius), castsShadow(castsShadow), shadowMapResolution(shadowMapResolution) {}
 };
 
 struct spot_light_component
@@ -49,10 +50,11 @@ struct spot_light_component
 	float innerAngle;
 	float outerAngle;
 	bool castsShadow;
+	uint32 shadowMapResolution;
 
 	spot_light_component() {}
-	spot_light_component(vec3 color, float intensity, float distance, float innerAngle, float outerAngle, bool castsShadow = false)
-		: color(color), intensity(intensity), distance(distance), innerAngle(innerAngle), outerAngle(outerAngle), castsShadow(castsShadow) {}
+	spot_light_component(vec3 color, float intensity, float distance, float innerAngle, float outerAngle, bool castsShadow = false, uint32 shadowMapResolution = 512)
+		: color(color), intensity(intensity), distance(distance), innerAngle(innerAngle), outerAngle(outerAngle), castsShadow(castsShadow), shadowMapResolution(shadowMapResolution) {}
 };
 
 mat4 getSpotLightViewProjectionMatrix(const spot_light_cb& sl);

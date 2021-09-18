@@ -86,6 +86,7 @@ namespace ImGui
 
 	bool PropertyDropdown(const char* label, const char** names, uint32 count, uint32& current);
 	bool PropertyDropdown(const char* label, const char* (*name_func)(uint32, void*), uint32& current, void* data = 0);
+	bool PropertyDropdownPowerOfTwo(const char* label, uint32 from, uint32 to, uint32& current);
 
 	bool PropertyColorEdit(const char* label, vec3& f);
 

@@ -172,15 +172,15 @@ void renderSunShadowMap(directional_light& sun, sun_shadow_render_pass* renderPa
 	renderDynamicGeometryToSunShadowMap(renderPass, appScene);
 }
 
-spot_shadow_info renderSpotShadowMap(const spot_light_cb& spotLight, uint32 lightIndex, spot_shadow_render_pass* renderPass, scene& appScene, bool invalidateCache)
+spot_shadow_info renderSpotShadowMap(const spot_light_cb& spotLight, uint32 lightID, spot_shadow_render_pass* renderPass, scene& appScene, bool invalidateCache, uint32 resolution)
 {
-	uint32 uniqueID = lightIndex + 1;
+	uint64 uniqueID = ((uint64)(lightID + 1) << 32);
 
 	renderPass->viewProjMatrix = getSpotLightViewProjectionMatrix(spotLight);
 
 	uint64 movementHash = getLightMovementHash(spotLight);
 
-	auto [vp, staticCacheAvailable] = assignShadowMapViewport(uniqueID << 10, movementHash, 512);
+	auto [vp, staticCacheAvailable] = assignShadowMapViewport(uniqueID, movementHash, resolution);
 	renderPass->viewport = vp;
 
 	if (staticCacheAvailable && !invalidateCache)
@@ -201,17 +201,17 @@ spot_shadow_info renderSpotShadowMap(const spot_light_cb& spotLight, uint32 ligh
 	return si;
 }
 
-point_shadow_info renderPointShadowMap(const point_light_cb& pointLight, uint32 lightIndex, point_shadow_render_pass* renderPass, scene& appScene, bool invalidateCache)
+point_shadow_info renderPointShadowMap(const point_light_cb& pointLight, uint32 lightID, point_shadow_render_pass* renderPass, scene& appScene, bool invalidateCache, uint32 resolution)
 {
-	uint32 uniqueID = lightIndex + 1;
+	uint64 uniqueID = ((uint64)(lightID + 1) << 32);
 
 	renderPass->lightPosition = pointLight.position;
 	renderPass->maxDistance = pointLight.radius;
 
 	uint64 movementHash = getLightMovementHash(pointLight);
 
-	auto [vp0, staticCacheAvailable0] = assignShadowMapViewport((2 * uniqueID + 0) << 20, movementHash, 512);
-	auto [vp1, staticCacheAvailable1] = assignShadowMapViewport((2 * uniqueID + 1) << 20, movementHash, 512);
+	auto [vp0, staticCacheAvailable0] = assignShadowMapViewport(uniqueID, movementHash, resolution);
+	auto [vp1, staticCacheAvailable1] = assignShadowMapViewport(uniqueID + 1, movementHash, resolution);
 	renderPass->viewport0 = vp0;
 	renderPass->viewport1 = vp1;
 
