@@ -40,6 +40,7 @@ static const char* imguiIconNames[] =
 namespace ImGui
 {
 	bool BeginWindowHiddenTabBar(const char* name, bool* open = 0, ImGuiWindowFlags flags = 0);
+	bool BeginControlsWindow(const char* name);
 
 	void Image(struct dx_cpu_descriptor_handle& handle, ImVec2 size);
 	void Image(struct dx_cpu_descriptor_handle& handle, uint32 width, uint32 height);
@@ -88,7 +89,8 @@ namespace ImGui
 	bool PropertyDropdown(const char* label, const char* (*name_func)(uint32, void*), uint32& current, void* data = 0);
 	bool PropertyDropdownPowerOfTwo(const char* label, uint32 from, uint32 to, uint32& current);
 
-	bool PropertyColorEdit(const char* label, vec3& f);
+	bool PropertyColor(const char* label, vec3& f);
+	bool PropertyColor(const char* label, vec4& f);
 
 
 

@@ -458,7 +458,7 @@ static bool editSunShadowParameters(directional_light& sun)
 		if (ImGui::BeginProperties())
 		{
 			result |= ImGui::PropertySlider("Intensity", sun.intensity, 0.f, 1000.f);
-			result |= ImGui::PropertyColorEdit("Color", sun.color);
+			result |= ImGui::PropertyColor("Color", sun.color);
 			result |= ImGui::PropertySlider("# Cascades", sun.numShadowCascades, 1, 4);
 
 			const float minCascadeDistance = 0.f, maxCascadeDistance = 300.f;
@@ -1036,7 +1036,7 @@ bool application::drawSceneHierarchy()
 				{
 					if (ImGui::BeginProperties())
 					{
-						ImGui::PropertyColorEdit("Color", pl.color);
+						ImGui::PropertyColor("Color", pl.color);
 						ImGui::PropertySlider("Intensity", pl.intensity, 0.f, 10.f);
 						ImGui::PropertySlider("Radius", pl.radius, 0.f, 100.f);
 						ImGui::PropertyCheckbox("Casts shadow", pl.castsShadow);
@@ -1056,7 +1056,7 @@ bool application::drawSceneHierarchy()
 						float inner = rad2deg(sl.innerAngle);
 						float outer = rad2deg(sl.outerAngle);
 
-						ImGui::PropertyColorEdit("Color", sl.color);
+						ImGui::PropertyColor("Color", sl.color);
 						ImGui::PropertySlider("Intensity", sl.intensity, 0.f, 10.f);
 						ImGui::PropertySlider("Distance", sl.distance, 0.f, 100.f);
 						ImGui::PropertySlider("Inner angle", inner, 0.1f, 80.f);

@@ -187,6 +187,15 @@ namespace ImGui
 		return ImGui::Begin(name, open, flags);
 	}
 
+	bool BeginControlsWindow(const char* name)
+	{
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.f);
+		ImGui::SetNextWindowSize(ImVec2(0.f, 0.f)); // Auto-resize to content.
+		bool result = ImGui::Begin(name, 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove);
+		ImGui::PopStyleVar();	
+		return result;
+	}
+
 	void Image(::dx_cpu_descriptor_handle& handle, ImVec2 size)
 	{
 		if (numImagesThisFrame < MAX_NUM_IMGUI_IMAGES_PER_FRAME)
@@ -570,10 +579,21 @@ namespace ImGui
 		return result;
 	}
 
-	bool PropertyColorEdit(const char* label, vec3& f)
+	static constexpr int32 colorEditFlags = ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel | 
+		ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoDragDrop | ImGuiColorEditFlags_PickerHueWheel;
+
+	bool PropertyColor(const char* label, vec3& f)
 	{
 		pre(label);
-		bool result = ImGui::ColorEdit3("", f.data, ImGuiColorEditFlags_NoInputs);
+		bool result = ImGui::ColorPicker3("", f.data, colorEditFlags | ImGuiColorEditFlags_Float);
+		post();
+		return result;
+	}
+
+	bool PropertyColor(const char* label, vec4& f)
+	{
+		pre(label);
+		bool result = ImGui::ColorPicker4("", f.data, colorEditFlags | ImGuiColorEditFlags_Float);
 		post();
 		return result;
 	}

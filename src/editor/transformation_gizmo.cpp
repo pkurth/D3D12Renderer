@@ -425,9 +425,7 @@ bool transformation_gizmo::handleUserInput(const user_input& input, bool allowKe
 	const uint32 iconSize = 35;
 	const float iconSpacing = 3.f;
 
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.f);
-	ImGui::SetNextWindowSize(ImVec2(0.f, 0.f)); // Auto-resize to content.
-	if (ImGui::Begin("##GizmoControls", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove))
+	if (ImGui::BeginControlsWindow("##GizmoControls"))
 	{
 		transformation_space constantLocal = transformation_local;
 		transformation_space& space = (type == transformation_type_scale) ? constantLocal : this->space;
@@ -466,7 +464,6 @@ bool transformation_gizmo::handleUserInput(const user_input& input, bool allowKe
 	}
 
 	ImGui::End();
-	ImGui::PopStyleVar(1);
 
 	return keyboardInteraction || uiInteraction;
 }
