@@ -31,6 +31,7 @@ struct win32_window
 
 	void makeActive();
 
+	void setIcon(const fs::path& filepath);
 	void changeTitle(const TCHAR* format, ...);
 
 	uint32 clientWidth, clientHeight;

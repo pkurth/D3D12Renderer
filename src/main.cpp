@@ -90,8 +90,9 @@ int main(int argc, char** argv)
 	initializeJobSystem();
 
 	dx_window window;
-	window.initialize(TEXT("Main Window"), 1920, 1080);
+	window.initialize(TEXT("D3D12 Renderer"), 1920, 1080);
 	setMainWindow(&window);
+	window.setIcon("assets/icons/project_icon.png");
 
 	application app = {};
 	app.loadCustomShaders();

@@ -8,6 +8,7 @@
 #include "software_window.h"
 #include "core/imgui.h"
 #include "core/string.h"
+#include "core/image.h"
 
 
 
@@ -61,6 +62,84 @@ static void setFullscreen(HWND windowHandle, bool fullscreen, WINDOWPLACEMENT& w
 	}
 }
 
+static bool isMaximized(HWND hwnd) 
+{
+	WINDOWPLACEMENT placement = { 0 };
+	placement.length = sizeof(WINDOWPLACEMENT);
+	if (GetWindowPlacement(hwnd, &placement)) {
+		return placement.showCmd == SW_SHOWMAXIMIZED;
+	}
+	return false;
+}
+
+static HICON createIcon(const uint8* image, uint32 width, uint32 height)
+{
+	BITMAPV5HEADER bi;
+
+	ZeroMemory(&bi, sizeof(bi));
+	bi.bV5Size = sizeof(bi);
+	bi.bV5Width = width;
+	bi.bV5Height = -(int32)height;
+	bi.bV5Planes = 1;
+	bi.bV5BitCount = 32;
+	bi.bV5Compression = BI_BITFIELDS;
+	bi.bV5RedMask = 0x00ff0000;
+	bi.bV5GreenMask = 0x0000ff00;
+	bi.bV5BlueMask = 0x000000ff;
+	bi.bV5AlphaMask = 0xff000000;
+
+	uint8* target = NULL;
+	HDC dc = GetDC(NULL);
+	HBITMAP color = CreateDIBSection(dc,
+		(BITMAPINFO*)&bi,
+		DIB_RGB_COLORS,
+		(void**)&target,
+		NULL,
+		(DWORD)0);
+	ReleaseDC(NULL, dc);
+
+	if (!color)
+	{
+		std::cerr << "Win32: Failed to create RGBA bitmap.\n";
+		return NULL;
+	}
+
+	HBITMAP mask = CreateBitmap(width, height, 1, 1, NULL);
+	if (!mask)
+	{
+		std::cerr << "Failed to create mask bitmap.\n";
+		DeleteObject(color);
+		return NULL;
+	}
+
+	for (uint32 i = 0; i < width * height; ++i)
+	{
+		target[0] = image[2];
+		target[1] = image[1];
+		target[2] = image[0];
+		target[3] = image[3];
+		target += 4;
+		image += 4;
+	}
+
+	ICONINFO ii = {};
+	ii.fIcon = true;
+	ii.hbmMask = mask;
+	ii.hbmColor = color;
+
+	HICON handle = CreateIconIndirect(&ii);
+
+	DeleteObject(color);
+	DeleteObject(mask);
+
+	if (!handle)
+	{
+		std::cerr << "Failed to create icon.\n";
+	}
+
+	return handle;
+}
+
 bool win32_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clientHeight, bool visible)
 {
 	if (!windowClassInitialized)
@@ -70,7 +149,7 @@ bool win32_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clie
 		wndClass.cbSize = sizeof(WNDCLASSEX);
 		wndClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
 		wndClass.lpfnWndProc = windowCallBack;
-		//wndClass.hInstance = instance;
+		wndClass.hInstance = GetModuleHandle(NULL);
 		wndClass.hCursor = LoadCursor(NULL, IDC_ARROW);
 		wndClass.lpszClassName = windowClassName;
 
@@ -188,6 +267,26 @@ win32_window::~win32_window()
 void win32_window::makeActive()
 {
 	SetForegroundWindow(windowHandle);
+}
+
+void win32_window::setIcon(const fs::path& filepath)
+{
+	DirectX::ScratchImage scratchImage;
+	D3D12_RESOURCE_DESC desc;
+
+	if (loadImageFromFile(filepath, image_load_flags_cache_to_dds, scratchImage, desc) && scratchImage.GetImageCount() > 0)
+	{
+		const auto& image = scratchImage.GetImages()[0];
+		assert(getNumberOfChannels(image.format) == 4);
+		uint8* pixels = image.pixels;
+		uint32 width = (uint32)image.width;
+		uint32 height = (uint32)image.height;
+
+		HICON icon = createIcon(pixels, width, height);
+
+		SendMessage(windowHandle, WM_SETICON, ICON_BIG, (LPARAM)icon);
+		SendMessage(windowHandle, WM_SETICON, ICON_SMALL, (LPARAM)icon);
+	}
 }
 
 void win32_window::changeTitle(const TCHAR* format, ...)
@@ -405,11 +504,11 @@ static LRESULT CALLBACK windowCallBack(
 			}
 		} break;
 
-		// For software windows.
 		case WM_PAINT:
 		{
 			if (window)
 			{
+				// For software windows, we draw the content in the client area.
 				software_window* sWindow = dynamic_cast<software_window*>(window);
 
 				if (sWindow)
@@ -418,7 +517,6 @@ static LRESULT CALLBACK windowCallBack(
 					if (image)
 					{
 						PAINTSTRUCT ps;
-
 						HDC hdc = BeginPaint(hwnd, &ps);
 						StretchDIBits(hdc,
 #if 0
@@ -433,7 +531,7 @@ static LRESULT CALLBACK windowCallBack(
 					}
 					else
 					{
-						result = DefWindowProcW(hwnd, msg, wParam, lParam);
+						result = DefWindowProc(hwnd, msg, wParam, lParam);
 					}
 				}
 				else
@@ -445,7 +543,7 @@ static LRESULT CALLBACK windowCallBack(
 
 		case WM_DROPFILES:
 		{
-			if (window->fileDropCallback)
+			if (window && window->fileDropCallback)
 			{
 				HDROP hdrop = (HDROP)wParam;
 
