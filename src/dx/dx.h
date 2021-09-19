@@ -27,10 +27,6 @@ namespace D3D12MA { class Allocator; class Allocation; };
 template <typename T>
 using com = Microsoft::WRL::ComPtr<T>;
 
-static void checkResult(HRESULT hr)
-{
-	assert(SUCCEEDED(hr));
-}
 
 typedef com<ID3D12Object> dx_object;
 typedef com<IDXGIAdapter4> dx_adapter;

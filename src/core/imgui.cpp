@@ -117,7 +117,7 @@ ImGuiContext* initializeImGui(struct dx_window& window)
 		startGPUDescriptor);
 
 	{
-		iconsTexture = loadTextureFromFile("assets/icons/icons_ui.svg", texture_load_flags_gen_mips_on_cpu | texture_load_flags_cache_to_dds);
+		iconsTexture = loadTextureFromFile("assets/icons/icons_ui.svg", image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
 
 		CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(startCPUDescriptor, 1, descriptorHandleIncrementSize);
 		CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(startGPUDescriptor, 1, descriptorHandleIncrementSize);

@@ -51,4 +51,8 @@ inline ref<T> make_ref(Args&&... args)
 #define setBit(mask, bit) mask |= (1 << (bit))
 #define unsetBit(mask, bit) mask ^= (1 << (bit))
 
+static void checkResult(HRESULT hr)
+{
+	assert(SUCCEEDED(hr));
+}
 

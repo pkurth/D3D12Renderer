@@ -102,9 +102,9 @@ ref<pbr_material> createPBRMaterial(
 		ref<pbr_material> material = make_ref<pbr_material>();
 
 		if (!albedoTex.empty()) material->albedo = loadTextureFromFile(albedoTex);
-		if (!normalTex.empty()) material->normal = loadTextureFromFile(normalTex, texture_load_flags_default | texture_load_flags_noncolor);
-		if (!roughTex.empty()) material->roughness = loadTextureFromFile(roughTex, texture_load_flags_default | texture_load_flags_noncolor);
-		if (!metallicTex.empty()) material->metallic = loadTextureFromFile(metallicTex, texture_load_flags_default | texture_load_flags_noncolor);
+		if (!normalTex.empty()) material->normal = loadTextureFromFile(normalTex, image_load_flags_default | image_load_flags_noncolor);
+		if (!roughTex.empty()) material->roughness = loadTextureFromFile(roughTex, image_load_flags_default | image_load_flags_noncolor);
+		if (!metallicTex.empty()) material->metallic = loadTextureFromFile(metallicTex, image_load_flags_default | image_load_flags_noncolor);
 		material->emission = emission;
 		material->albedoTint = albedoTint;
 		material->roughnessOverride = roughOverride;
@@ -135,7 +135,7 @@ ref<pbr_environment> createEnvironment(const fs::path& filename, uint32 skyResol
 	if (!sp)
 	{
 		ref<dx_texture> equiSky = loadTextureFromFile(filename,
-			texture_load_flags_noncolor | texture_load_flags_cache_to_dds | texture_load_flags_gen_mips_on_cpu);
+			image_load_flags_noncolor | image_load_flags_cache_to_dds | image_load_flags_gen_mips_on_cpu);
 
 		if (equiSky)
 		{
