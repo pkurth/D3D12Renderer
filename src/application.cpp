@@ -174,7 +174,7 @@ void application::initialize(main_renderer* renderer)
 	}
 #endif
 
-#if 0
+#if 1
 	{
 		appScene.createEntity("Force field")
 			.addComponent<transform_component>(vec3(0.f), quat::identity)
@@ -1008,6 +1008,93 @@ bool application::drawSceneHierarchy()
 						ImGui::PropertySlider("Gravity factor", rb.gravityFactor);
 
 						ImGui::EndProperties();
+					}
+				});
+
+				drawComponent<physics_reference_component>(selectedEntity, "Colliders", [this](physics_reference_component& reference)
+				{
+					uint32 numColliders = reference.numColliders;
+					if (!numColliders)
+					{
+						return;
+					}
+
+					bool dirty = false;
+
+					scene_entity colliderEntity = { reference.firstColliderEntity, appScene };
+					while (colliderEntity)
+					{
+						ImGui::PushID((int)colliderEntity.handle);
+
+						drawComponent<collider_component>(colliderEntity, "Collider", [&colliderEntity, &dirty, this](collider_component& collider)
+						{
+							switch (collider.type)
+							{
+								case collider_type_sphere:
+								{
+									if (ImGui::BeginTree("Shape: Sphere"))
+									{
+										if (ImGui::BeginProperties())
+										{
+											dirty |= ImGui::PropertyInput("Local center", collider.sphere.center);
+											dirty |= ImGui::PropertyInput("Radius", collider.sphere.radius);
+											ImGui::EndProperties();
+										}
+										ImGui::EndTree();
+									}
+								} break;
+								case collider_type_capsule:
+								{
+									if (ImGui::BeginTree("Shape: Capsule"))
+									{
+										if (ImGui::BeginProperties())
+										{
+											dirty |= ImGui::PropertyInput("Local point A", collider.capsule.positionA);
+											dirty |= ImGui::PropertyInput("Local point B", collider.capsule.positionB);
+											dirty |= ImGui::PropertyInput("Radius", collider.capsule.radius);
+											ImGui::EndProperties();
+										}
+										ImGui::EndTree();
+									}
+								} break;
+								case collider_type_aabb:
+								{
+									if (ImGui::BeginTree("Shape: AABB"))
+									{
+										if (ImGui::BeginProperties())
+										{
+											dirty |= ImGui::PropertyInput("Local min", collider.aabb.minCorner);
+											dirty |= ImGui::PropertyInput("Local max", collider.aabb.maxCorner);
+											ImGui::EndProperties();
+										}
+										ImGui::EndTree();
+									}
+								} break;
+
+								// TODO: UI for remaining collider types.
+							}
+
+							if (ImGui::BeginProperties())
+							{
+								ImGui::PropertySlider("Restitution", collider.properties.restitution);
+								ImGui::PropertySlider("Friction", collider.properties.friction);
+								dirty |= ImGui::PropertyInput("Density", collider.properties.density);
+
+								ImGui::EndProperties();
+							}
+						});
+
+						ImGui::PopID();
+
+						colliderEntity = { colliderEntity.getComponent<collider_component>().nextEntity, appScene };
+					}
+
+					if (dirty)
+					{
+						if (rigid_body_component* rb = selectedEntity.getComponentIfExists<rigid_body_component>())
+						{
+							rb->recalculateProperties(&appScene.registry, reference);
+						}
 					}
 				});
 

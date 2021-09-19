@@ -73,6 +73,8 @@ namespace ImGui
 	bool BeginProperties();
 	void EndProperties();
 
+	void PropertyValue(const char* label, const char* format, ...);
+
 	bool PropertyCheckbox(const char* label, bool& v);
 
 	bool PropertySlider(const char* label, float& f, float minValue = 0.f, float maxValue = 1.f, const char* format = "%.3f");
@@ -84,6 +86,9 @@ namespace ImGui
 	bool PropertySlider(const char* label, uint32& v, uint32 minValue, uint32 maxValue, const char* format = "%d");
 
 	bool PropertyInput(const char* label, float& f, const char* format = "%.3f");
+	bool PropertyInput(const char* label, vec2& f, const char* format = "%.3f");
+	bool PropertyInput(const char* label, vec3& f, const char* format = "%.3f");
+	bool PropertyInput(const char* label, vec4& f, const char* format = "%.3f");
 
 	bool PropertyDropdown(const char* label, const char** names, uint32 count, uint32& current);
 	bool PropertyDropdown(const char* label, const char* (*name_func)(uint32, void*), uint32& current, void* data = 0);

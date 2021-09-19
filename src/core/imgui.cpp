@@ -461,6 +461,16 @@ namespace ImGui
 		ImGui::EndTable();
 	}
 
+	void PropertyValue(const char* label, const char* format, ...)
+	{
+		pre(label);
+		va_list args;
+		va_start(args, format);
+		ImGui::TextV(format, args);
+		va_end(args);
+		post();
+	}
+
 	bool PropertyCheckbox(const char* label, bool& v)
 	{
 		pre(label);
@@ -534,6 +544,21 @@ namespace ImGui
 	bool PropertyInput(const char* label, float& f, const char* format)
 	{
 		return ImGui::InputInternal(ImGuiDataType_Float, 1, label, &f, format);
+	}
+
+	bool PropertyInput(const char* label, vec2& f, const char* format)
+	{
+		return ImGui::InputInternal(ImGuiDataType_Float, 2, label, f.data, format);
+	}
+
+	bool PropertyInput(const char* label, vec3& f, const char* format)
+	{
+		return ImGui::InputInternal(ImGuiDataType_Float, 3, label, f.data, format);
+	}
+
+	bool PropertyInput(const char* label, vec4& f, const char* format)
+	{
+		return ImGui::InputInternal(ImGuiDataType_Float, 4, label, f.data, format);
 	}
 
 	bool PropertyDropdown(const char* label, const char** names, uint32 count, uint32& current)
