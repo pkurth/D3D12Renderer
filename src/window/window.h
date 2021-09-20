@@ -58,6 +58,7 @@ struct win32_window
 	uint32 clientWidth, clientHeight;
 	HWND windowHandle = 0;
 
+protected:
 	// Internal callbacks.
 	virtual void onResize() {}
 	virtual void onMove() {}
@@ -82,6 +83,11 @@ struct win32_window
 	bool trackingMouse = false;
 
 	static win32_window* mainWindow;
+
+	friend static int hitTest(POINT point, win32_window* window);
+	friend static LRESULT CALLBACK windowCallBack(_In_ HWND hwnd, _In_ UINT msg, _In_ WPARAM wParam, _In_ LPARAM lParam);
+	friend void setMainWindow(win32_window* window);
+	friend bool handleWindowsMessages();
 };
 
 
