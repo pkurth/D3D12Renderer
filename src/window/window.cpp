@@ -2,6 +2,8 @@
 #include "window.h"
 #include <Windowsx.h>
 #include <shellapi.h>
+#include <uxtheme.h>
+#include <vssym32.h>
 
 #include <algorithm>
 
@@ -11,6 +13,7 @@
 #include "core/image.h"
 
 
+bool handleWindowsMessages();
 
 static bool running = true;
 win32_window* win32_window::mainWindow = 0;
@@ -62,14 +65,151 @@ static void setFullscreen(HWND windowHandle, bool fullscreen, WINDOWPLACEMENT& w
 	}
 }
 
-static bool isMaximized(HWND hwnd) 
+static int dpiScale(int value, UINT dpi) 
 {
-	WINDOWPLACEMENT placement = { 0 };
-	placement.length = sizeof(WINDOWPLACEMENT);
-	if (GetWindowPlacement(hwnd, &placement)) {
-		return placement.showCmd == SW_SHOWMAXIMIZED;
+	return (int)((float)value * dpi / 96);
+}
+
+static int getDefaultTitleBarHeight(HWND handle)
+{
+	SIZE titleBarSize = { };
+	const int topAndBottomBorders = 2;
+	HTHEME theme = OpenThemeData(handle, L"WINDOW");
+	UINT dpi = GetDpiForWindow(handle);
+	GetThemePartSize(theme, NULL, WP_CAPTION, CS_ACTIVE, NULL, TS_TRUE, &titleBarSize);
+	CloseThemeData(theme);
+
+	int height = dpiScale(titleBarSize.cy, dpi) + topAndBottomBorders;
+	
+	return height;
+}
+
+static RECT getTitleBarRect(HWND handle, int32 titleBarHeight)
+{
+	RECT rect;
+	GetClientRect(handle, &rect);
+	rect.bottom = rect.top + titleBarHeight;
+	return rect;
+}
+
+static void centerRectInRect(RECT& to_center, const RECT& outer_rect) 
+{
+	int toWidth = to_center.right - to_center.left;
+	int toHeight = to_center.bottom - to_center.top;
+	int outerWidth = outer_rect.right - outer_rect.left;
+	int outerHeight = outer_rect.bottom - outer_rect.top;
+
+	int paddingX = (outerWidth - toWidth) / 2;
+	int paddingY = (outerHeight - toHeight) / 2;
+
+	to_center.left = outer_rect.left + paddingX;
+	to_center.top = outer_rect.top + paddingY;
+	to_center.right = to_center.left + toWidth;
+	to_center.bottom = to_center.top + toHeight;
+}
+
+struct custom_titlebar_button_rects 
+{
+	RECT close;
+	RECT maximize;
+	RECT minimize;
+};
+
+enum titlebar_button_name
+{
+	titlebar_button_none = -1,
+	titlebar_button_close,
+	titlebar_button_minimize,
+	titlebar_button_maximize,
+};
+
+static custom_titlebar_button_rects getTitleBarButtonRects(HWND handle, int32 buttonHeight) 
+{
+	UINT dpi = GetDpiForWindow(handle);
+	custom_titlebar_button_rects result;
+	int buttonWidth = dpiScale(47, dpi);
+	result.close = getTitleBarRect(handle, buttonHeight);
+
+	result.close.left = result.close.right - buttonWidth;
+	result.maximize = result.close;
+	result.maximize.left -= buttonWidth;
+	result.maximize.right -= buttonWidth;
+	result.minimize = result.maximize;
+	result.minimize.left -= buttonWidth;
+	result.minimize.right -= buttonWidth;
+	return result;
+}
+
+static int hitTest(POINT point, win32_window* window)
+{
+	if (!window->fullscreen)
+	{
+		RECT frameRect;
+		GetWindowRect(window->windowHandle, &frameRect);
+
+		int32 border = 5;
+		int32 corner = 10;
+
+		if (point.x < frameRect.left + border)
+		{
+			if (point.y < frameRect.top + corner) { return HTTOPLEFT; }
+			if (point.y > frameRect.bottom - corner) { return HTBOTTOMLEFT; }
+			return HTLEFT;
+		}
+		if (point.x > frameRect.right - border)
+		{
+			if (point.y < frameRect.top + corner) { return HTTOPRIGHT; }
+			if (point.y > frameRect.bottom - corner) { return HTBOTTOMRIGHT; }
+			return HTRIGHT;
+		}
+		if (point.y < frameRect.top + border)
+		{
+			if (point.x < frameRect.left + corner) { return HTTOPLEFT; }
+			if (point.x > frameRect.right - corner) { return HTTOPRIGHT; }
+			return HTTOP;
+		}
+		if (point.y > frameRect.bottom - border)
+		{
+			if (point.x < frameRect.left + corner) { return HTBOTTOMLEFT; }
+			if (point.x > frameRect.right - corner) { return HTBOTTOMRIGHT; }
+			return HTBOTTOM;
+		}
+
+		custom_titlebar_button_rects buttonRects = getTitleBarButtonRects(window->windowHandle, window->style.buttonHeight);
+		OffsetRect(&buttonRects.close, frameRect.left, frameRect.top);
+		OffsetRect(&buttonRects.minimize, frameRect.left, frameRect.top);
+		OffsetRect(&buttonRects.maximize, frameRect.left, frameRect.top);
+
+		if (PtInRect(&buttonRects.close, point))
+		{
+			return HTCLOSE;
+		}
+		else if (PtInRect(&buttonRects.maximize, point))
+		{
+			return HTMAXBUTTON;
+		}
+		else if (PtInRect(&buttonRects.minimize, point))
+		{
+			return HTMINBUTTON;
+		}
+
+		if (point.y < frameRect.top + window->style.titleBarHeight)
+		{
+			int32 iconPadding = window->style.iconPadding;
+			int32 iconSize = window->style.titleBarHeight - iconPadding * 2;
+
+			RECT iconRect = { iconPadding, iconPadding, iconPadding + iconSize, iconPadding + iconSize };
+			OffsetRect(&iconRect, frameRect.left, frameRect.top);
+			if (PtInRect(&iconRect, point))
+			{
+				return HTSYSMENU;
+			}
+
+			return HTCAPTION;
+		}
 	}
-	return false;
+
+	return HTCLIENT;
 }
 
 static HICON createIcon(const uint8* image, uint32 width, uint32 height)
@@ -269,6 +409,58 @@ void win32_window::makeActive()
 	SetForegroundWindow(windowHandle);
 }
 
+static void redrawWindowFrame(HWND windowHandle)
+{
+	RECT rect;
+	GetClientRect(windowHandle, &rect);
+
+	AdjustWindowRectExForDpi(&rect, GetWindowLong(windowHandle, GWL_STYLE), FALSE,
+		0,
+		GetDpiForWindow(windowHandle));
+
+	ClientToScreen(windowHandle, (POINT*)&rect.left);
+	ClientToScreen(windowHandle, (POINT*)&rect.right);
+	SetWindowPos(windowHandle, HWND_TOP,
+		rect.left, rect.top,
+		rect.right - rect.left, rect.bottom - rect.top,
+		SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOZORDER);
+
+	handleWindowsMessages(); // Handle messages, so that frame is custom right from the start.
+}
+
+void win32_window::setCustomWindowStyle(custom_window_style style)
+{
+	customWindowStyle = true;
+
+	if (style.titleBarHeight == -1)
+	{
+		style.titleBarHeight = getDefaultTitleBarHeight(windowHandle);
+	}
+	if (style.buttonHeight == -1)
+	{
+		style.buttonHeight = style.titleBarHeight;
+	}
+	if (style.borderWidthLeftAndRight == -1)
+	{
+		UINT dpi = GetDpiForWindow(windowHandle);
+		style.borderWidthLeftAndRight = GetSystemMetricsForDpi(SM_CXFRAME, dpi);
+	}
+	if (style.borderWidthBottom == -1)
+	{
+		UINT dpi = GetDpiForWindow(windowHandle);
+		style.borderWidthBottom = GetSystemMetricsForDpi(SM_CYFRAME, dpi);
+	}
+	this->style = style;
+
+	redrawWindowFrame(windowHandle);
+}
+
+void win32_window::resetToDefaultWindowStyle()
+{
+	customWindowStyle = false;
+	redrawWindowFrame(windowHandle);
+}
+
 void win32_window::setIcon(const fs::path& filepath)
 {
 	DirectX::ScratchImage scratchImage;
@@ -283,6 +475,10 @@ void win32_window::setIcon(const fs::path& filepath)
 		uint32 height = (uint32)image.height;
 
 		HICON icon = createIcon(pixels, width, height);
+
+		if (customIcon)
+			DestroyIcon(customIcon);
+		customIcon = icon;
 
 		SendMessage(windowHandle, WM_SETICON, ICON_BIG, (LPARAM)icon);
 		SendMessage(windowHandle, WM_SETICON, ICON_SMALL, (LPARAM)icon);
@@ -312,6 +508,12 @@ void win32_window::toggleVisibility()
 	{
 		ShowWindow(windowHandle, SW_HIDE);
 	}
+}
+
+void win32_window::setMinimumSize(int32 minimumWidth, int32 minimumHeight)
+{
+	this->minimumWidth = minimumWidth;
+	this->minimumHeight = minimumHeight;
 }
 
 void win32_window::moveTo(int x, int y)
@@ -455,12 +657,24 @@ static LRESULT CALLBACK windowCallBack(
 {
 	LRESULT result = 0;
 
+	win32_window* window = (win32_window*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+
+	if ((msg == WM_MOUSELEAVE || msg == WM_NCMOUSELEAVE || msg == WM_MOUSEMOVE) 
+		&& window && window->customWindowStyle)
+	{
+		if (window->hoveredButton != titlebar_button_none)
+		{
+			window->hoveredButton = titlebar_button_none;
+			InvalidateRect(0, 0, FALSE);
+		}
+
+		window->trackingMouse = false;
+	}
+
 	if (handleImGuiInput(hwnd, msg, wParam, lParam))
 	{
 		return true;
 	}
-
-	win32_window* window = (win32_window*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
 	switch (msg)
 	{
@@ -476,6 +690,23 @@ static LRESULT CALLBACK windowCallBack(
 				window->clientWidth = LOWORD(lParam);
 				window->clientHeight = HIWORD(lParam);
 				window->onResize();
+
+				if (window->customWindowStyle)
+				{
+					if (IsZoomed(hwnd))
+					{
+						SetWindowRgn(hwnd, 0, true);
+					}
+					else
+					{
+						RECT frameRect;
+						GetWindowRect(hwnd, &frameRect);
+
+						HRGN region = CreateRectRgn(0, 0, frameRect.right - frameRect.left, frameRect.bottom - frameRect.top);
+						SetWindowRgn(hwnd, region, true);
+						DeleteObject(region);
+					}
+				}
 			}
 		} break;
 		case WM_CLOSE:
@@ -501,6 +732,10 @@ static LRESULT CALLBACK windowCallBack(
 			else
 			{
 				//std::cout << "Deactivated\n";
+			}
+			if (window && window->customWindowStyle)
+			{
+				InvalidateRect(0, 0, FALSE);
 			}
 		} break;
 
@@ -539,6 +774,343 @@ static LRESULT CALLBACK windowCallBack(
 					result = DefWindowProc(hwnd, msg, wParam, lParam);
 				}
 			}
+		} break;
+
+
+		// Custom window rendering is inspired by Allen Webster's video: https://www.youtube.com/watch?v=qZZePCNLBuQ
+		// and Dmitriy Kubyshkin's blog post: https://kubyshkin.name/posts/win32-window-custom-title-bar-caption/
+
+		case WM_GETMINMAXINFO:
+		{
+			MINMAXINFO* info = (MINMAXINFO*)lParam;
+		
+			if (window)
+			{
+				if (window->minimumWidth != -1) { info->ptMinTrackSize.x = window->minimumWidth; }
+				if (window->minimumHeight != -1) { info->ptMinTrackSize.y = window->minimumHeight; }
+			}
+			return 0;
+		} break;
+
+		case WM_NCACTIVATE:
+		case WM_NCPAINT:
+		{
+			if (!window || !window->customWindowStyle)
+			{
+				return DefWindowProc(hwnd, msg, wParam, lParam);
+			}
+
+			HDC hdc = GetDCEx(hwnd, 0, DCX_WINDOW);
+
+			// Render bars and buttons.
+			RECT frameRect;
+			GetWindowRect(hwnd, &frameRect);
+
+			RECT clientRect;
+			GetClientRect(hwnd, &clientRect);
+
+			ClientToScreen(hwnd, (POINT*)&clientRect.left);
+			ClientToScreen(hwnd, (POINT*)&clientRect.right);
+
+			OffsetRect(&clientRect, -frameRect.left, -frameRect.top);
+			OffsetRect(&frameRect, -frameRect.left, -frameRect.top);
+
+			bool hasFocus = GetActiveWindow() == hwnd;
+			bool isMaximized = IsZoomed(hwnd);
+
+			COLORREF titleBarColor = hasFocus
+				? RGB(window->style.titleBarRGB[0], window->style.titleBarRGB[1], window->style.titleBarRGB[2])
+				: RGB(window->style.titleBarUnfocusedRGB[0], window->style.titleBarUnfocusedRGB[1], window->style.titleBarUnfocusedRGB[2]);
+			HBRUSH titleBarBrush = CreateSolidBrush(titleBarColor);
+			HPEN titleBarPen = CreatePen(PS_SOLID, 0, titleBarColor);
+
+			SelectObject(hdc, titleBarBrush);
+			SelectObject(hdc, titleBarPen);
+
+			Rectangle(hdc, frameRect.left, frameRect.top, frameRect.right, clientRect.top);			// Top bar.
+			Rectangle(hdc, frameRect.left, clientRect.top, clientRect.left, clientRect.bottom);		// Left bar.
+			Rectangle(hdc, clientRect.right, clientRect.top, frameRect.right, clientRect.bottom);	// Right bar.
+			Rectangle(hdc, frameRect.left, clientRect.bottom, frameRect.right, frameRect.bottom);	// Bottom bar.
+
+			COLORREF itemColor = RGB(window->style.titleTextRGB[0], window->style.titleTextRGB[1], window->style.titleTextRGB[2]);
+
+			HBRUSH buttonIconBrush = CreateSolidBrush(itemColor);
+			HPEN buttonIconPen = CreatePen(PS_SOLID, 1, itemColor);
+
+			HBRUSH hoverBrush = CreateSolidBrush(RGB(window->style.buttonHoverRGB[0], window->style.buttonHoverRGB[1], window->style.buttonHoverRGB[2]));
+
+			custom_titlebar_button_rects buttonRects = getTitleBarButtonRects(hwnd, window->style.buttonHeight);
+
+			UINT dpi = GetDpiForWindow(hwnd);
+			int iconDimension = dpiScale(10, dpi);
+
+			// Minimize button.
+			{
+				if (window->hoveredButton == titlebar_button_minimize) 
+				{
+					FillRect(hdc, &buttonRects.minimize, hoverBrush);
+				}
+				RECT iconRect = { 0 };
+				iconRect.right = iconDimension;
+				iconRect.bottom = 1;
+				centerRectInRect(iconRect, buttonRects.minimize);
+				FillRect(hdc, &iconRect, buttonIconBrush);
+			}
+
+			// Maximize button.
+			{
+				HBRUSH frontBrush = titleBarBrush;
+				if (window->hoveredButton == titlebar_button_maximize) 
+				{
+					FillRect(hdc, &buttonRects.maximize, hoverBrush);
+					frontBrush = hoverBrush;
+				}
+				RECT iconRect = { 0 };
+				iconRect.right = iconDimension;
+				iconRect.bottom = iconDimension;
+				centerRectInRect(iconRect, buttonRects.maximize);
+				SelectObject(hdc, buttonIconPen);
+				SelectObject(hdc, GetStockObject(HOLLOW_BRUSH));
+				Rectangle(hdc, iconRect.left, iconRect.top, iconRect.right, iconRect.bottom);
+
+				if (isMaximized)
+				{
+					SelectObject(hdc, frontBrush);
+					Rectangle(hdc, iconRect.left - 2, iconRect.top + 2, iconRect.right - 2, iconRect.bottom + 2);
+				}
+			}
+
+			// Close button.
+			{
+				HPEN customPen = 0;
+				if (window->hoveredButton == titlebar_button_close)
+				{
+					// Highlight button on hover.
+					HBRUSH fillBrush = CreateSolidBrush(RGB(window->style.closeButtonHoverRGB[0], window->style.closeButtonHoverRGB[1], window->style.closeButtonHoverRGB[2]));
+					FillRect(hdc, &buttonRects.close, fillBrush);
+					DeleteObject(fillBrush);
+					customPen = CreatePen(PS_SOLID, 1, RGB(window->style.closeButtonHoverStrokeRGB[0], window->style.closeButtonHoverStrokeRGB[1], window->style.closeButtonHoverStrokeRGB[2]));
+					SelectObject(hdc, customPen);
+				}
+				RECT iconRect = { 0, 0, iconDimension, iconDimension };
+				centerRectInRect(iconRect, buttonRects.close);
+				MoveToEx(hdc, iconRect.left, iconRect.top, NULL);
+				LineTo(hdc, iconRect.right + 1, iconRect.bottom + 1);
+				MoveToEx(hdc, iconRect.left, iconRect.bottom, NULL);
+				LineTo(hdc, iconRect.right + 1, iconRect.top - 1);
+				if (customPen)
+				{
+					DeleteObject(customPen);
+				}
+			}
+
+			DeleteObject(titleBarBrush);
+			DeleteObject(titleBarPen);
+
+			DeleteObject(hoverBrush);
+			DeleteObject(buttonIconPen);
+			DeleteObject(buttonIconBrush);
+
+
+			// Extra padding for title and icon if window is maximized.
+			int32 leftAndTopPadding = 0;
+			if (isMaximized)
+			{
+				leftAndTopPadding = 5;
+			}
+
+
+			HTHEME theme = OpenThemeData(hwnd, L"WINDOW");
+
+			// Draw window title.
+			LOGFONT logicalFont;
+			HFONT oldFont = NULL;
+			if (SUCCEEDED(GetThemeSysFont(theme, TMT_CAPTIONFONT, &logicalFont))) 
+			{
+				HFONT themeFont = CreateFontIndirect(&logicalFont);
+				oldFont = (HFONT)SelectObject(hdc, themeFont);
+			}
+
+			wchar_t titleTextBuffer[255] = { 0 };
+			GetWindowTextW(hwnd, titleTextBuffer, arraysize(titleTextBuffer));
+			RECT titleBarTextRect = { window->style.titleLeftOffset + leftAndTopPadding, leftAndTopPadding, buttonRects.minimize.left - 10 + leftAndTopPadding, window->style.titleBarHeight };
+			DTTOPTS drawThemeOptions = { sizeof(drawThemeOptions) };
+			drawThemeOptions.dwFlags = DTT_TEXTCOLOR;
+			drawThemeOptions.crText = itemColor;
+			DrawThemeTextEx(
+				theme,
+				hdc,
+				0, 0,
+				titleTextBuffer,
+				-1,
+				DT_VCENTER | DT_SINGLELINE | DT_WORD_ELLIPSIS,
+				&titleBarTextRect,
+				&drawThemeOptions
+			);
+
+			if (oldFont)
+			{
+				SelectObject(hdc, oldFont);
+			}
+			CloseThemeData(theme);
+
+
+
+
+			// Draw window icon.
+			HICON icon = window->customIcon;
+			if (!icon) 
+			{ 
+				icon = LoadIcon(NULL, IDI_APPLICATION); 
+			}
+
+			if (icon)
+			{
+				int32 iconPadding = window->style.iconPadding;
+				int32 iconSize = window->style.titleBarHeight - iconPadding * 2;
+
+				DrawIconEx(hdc, iconPadding + leftAndTopPadding, iconPadding + leftAndTopPadding, icon, iconSize, iconSize, 0, NULL, DI_NORMAL);
+			}
+
+
+
+			ReleaseDC(hwnd, hdc);
+
+			return true;
+		} break;
+
+		case WM_NCHITTEST:
+		{
+			if (!window || !window->customWindowStyle)
+			{
+				return DefWindowProc(hwnd, msg, wParam, lParam);
+			}
+
+			POINT point = { LOWORD(lParam), HIWORD(lParam) };
+			return hitTest(point, window);
+		} break;
+
+		case WM_NCCALCSIZE: 
+		{
+			if (!window || !window->customWindowStyle)
+			{
+				return DefWindowProc(hwnd, msg, wParam, lParam);
+			}
+			
+			RECT* rect = (RECT*)lParam;
+			if (rect->top > -10000) // Minimized windows seem to have a top of -32000.
+			{
+				rect->left += window->style.borderWidthLeftAndRight;
+				rect->right -= window->style.borderWidthLeftAndRight;
+				rect->bottom -= window->style.borderWidthBottom;
+
+				if (!window->fullscreen)
+				{
+					rect->top += window->style.titleBarHeight;
+				}
+				else
+				{
+					rect->top += window->style.borderWidthBottom;
+				}
+			}
+		} break;
+
+		case WM_NCMOUSEMOVE: 
+		{
+			if (window && window->customWindowStyle)
+			{
+				POINT cursorPoint = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+
+				int hoveredButton = titlebar_button_none;
+				int hit = hitTest(cursorPoint, window);
+
+				if (hit == HTCLOSE)
+				{
+					hoveredButton = titlebar_button_close;
+				}
+				else if (hit == HTMAXBUTTON)
+				{
+					hoveredButton = titlebar_button_maximize;
+				}
+				else if (hit == HTMINBUTTON)
+				{
+					hoveredButton = titlebar_button_minimize;
+				}
+				
+				if (hoveredButton != window->hoveredButton)
+				{
+					window->hoveredButton = hoveredButton;
+					InvalidateRect(0, 0, FALSE);
+				}
+
+				if (!window->trackingMouse)
+				{
+					TRACKMOUSEEVENT eventTrack = { sizeof(TRACKMOUSEEVENT) };
+					eventTrack.dwFlags = TME_NONCLIENT;
+					eventTrack.hwndTrack = hwnd;
+					eventTrack.dwHoverTime = HOVER_DEFAULT;
+
+					TrackMouseEvent(&eventTrack);
+
+					window->trackingMouse = true;
+				}
+				return 0;
+			}
+			return DefWindowProc(hwnd, msg, wParam, lParam);
+		}
+
+		case WM_NCLBUTTONDOWN: 
+		{
+			// Clicks on buttons will be handled in WM_NCLBUTTONUP, but we still need
+			// to remove default handling of the click to avoid it counting as drag.
+			if (window && window->customWindowStyle && window->hoveredButton != titlebar_button_none) 
+			{
+				return 0;
+			}
+			// Default handling allows for dragging and double click to maximize
+			return DefWindowProc(hwnd, msg, wParam, lParam);
+		}
+
+		case WM_NCLBUTTONUP: 
+		{
+			if (window && window->customWindowStyle)
+			{
+				if (window->hoveredButton == titlebar_button_close) 
+				{
+					window->hoveredButton = titlebar_button_none;
+					PostMessage(hwnd, WM_CLOSE, 0, 0);
+					return 0;
+				}
+				else if (window->hoveredButton == titlebar_button_minimize) 
+				{
+					window->hoveredButton = titlebar_button_none;
+					ShowWindow(hwnd, SW_MINIMIZE);
+					return 0;
+				}
+				else if (window->hoveredButton == titlebar_button_maximize) 
+				{
+					window->hoveredButton = titlebar_button_none;
+					int mode = IsZoomed(hwnd) ? SW_NORMAL : SW_MAXIMIZE;
+					ShowWindow(hwnd, mode);
+					return 0;
+				}
+			}
+			return DefWindowProc(hwnd, msg, wParam, lParam);
+		}
+
+		case WM_CREATE:
+		{
+			RECT rect;
+			GetWindowRect(hwnd, &rect);
+
+			// Inform the application of the frame change to force redrawing with the new
+			// client area that is extended into the title bar
+			SetWindowPos(
+				hwnd, NULL,
+				rect.left, rect.top,
+				rect.right - rect.left, rect.bottom - rect.top,
+				SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE
+			);
 		} break;
 
 		case WM_DROPFILES:

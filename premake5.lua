@@ -204,6 +204,7 @@ project "D3D12Renderer"
 		"DXGI",
 		"dxguid",
 		"dxcompiler",
+		"uxtheme",
 		"assimp",
 		"yaml-cpp",
 		"DirectXTex_Desktop_2019_Win10",
