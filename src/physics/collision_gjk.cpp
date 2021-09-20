@@ -60,8 +60,8 @@ gjk_internal_success updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a
 		vec3 ad = s.d.minkowski - a.minkowski;
 
 		vec3 bcd = cross(s.c.minkowski - s.b.minkowski, s.d.minkowski - s.b.minkowski);
-		assert(dot(bcd, dir) <= 0.000001f);
-		assert(dot(bcd, s.b.minkowski) >= -0.000001f);
+		assert(dot(bcd, dir) <= 0.00001f);
+		assert(dot(bcd, s.b.minkowski) >= -0.00001f);
 
 		// Normals of faces (point outside).
 		vec3 abc = cross(ac, ab);
