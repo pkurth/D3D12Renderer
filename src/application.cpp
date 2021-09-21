@@ -825,11 +825,8 @@ static void drawComponent(scene_entity entity, const char* componentName, ui_fun
 	const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding;
 	if (auto* component = entity.getComponentIfExists<component_t>())
 	{
-		ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
-
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
-		float lineHeight = ImGui::GetIO().Fonts->Fonts[0]->FontSize + ImGui::GetStyle().FramePadding.y * 2.f;
-		bool open = ImGui::TreeNodeEx((void*)typeid(component_t).hash_code(), treeNodeFlags, componentName);
+		bool open = ImGui::TreeNodeEx(componentName, treeNodeFlags, componentName);
 		ImGui::PopStyleVar();
 
 		if (open)
@@ -872,7 +869,9 @@ bool application::drawSceneHierarchy()
 				if (ImGui::BeginPopupContextItem(name))
 				{
 					if (ImGui::MenuItem("Delete"))
+					{
 						entityDeleted = true;
+					}
 
 					ImGui::EndPopup();
 				}
@@ -908,9 +907,14 @@ bool application::drawSceneHierarchy()
 					setSelectedEntityNoUndo({});
 					objectMovedByWidget = true;
 				}
-				else
+				if (ImGui::IsItemHovered())
 				{
-					drawComponent<transform_component>(selectedEntity, "Transform", [this, &objectMovedByWidget](transform_component& transform)
+					ImGui::SetTooltip("Delete entity");
+				}
+				
+				if (selectedEntity)
+				{
+					drawComponent<transform_component>(selectedEntity, "TRANSFORM", [this, &objectMovedByWidget](transform_component& transform)
 					{
 						objectMovedByWidget |= ImGui::DragFloat3("Position", transform.position.data, 0.1f, 0.f, 0.f);
 
@@ -928,12 +932,12 @@ bool application::drawSceneHierarchy()
 						objectMovedByWidget |= ImGui::DragFloat3("Scale", transform.scale.data, 0.1f, 0.f, 0.f);
 					});
 
-					drawComponent<position_component>(selectedEntity, "Transform", [&objectMovedByWidget](position_component& position)
+					drawComponent<position_component>(selectedEntity, "TRANSFORM", [&objectMovedByWidget](position_component& position)
 					{
 						objectMovedByWidget |= ImGui::DragFloat3("Position", position.position.data, 0.1f, 0.f, 0.f);
 					});
 
-					drawComponent<position_rotation_component>(selectedEntity, "Transform", [this, &objectMovedByWidget](position_rotation_component& pr)
+					drawComponent<position_rotation_component>(selectedEntity, "TRANSFORM", [this, &objectMovedByWidget](position_rotation_component& pr)
 					{
 						objectMovedByWidget |= ImGui::DragFloat3("Translation", pr.position.data, 0.1f, 0.f, 0.f);
 						if (ImGui::DragFloat3("Rotation", selectedEntityEulerRotation.data, 0.1f, 0.f, 0.f))
@@ -948,12 +952,12 @@ bool application::drawSceneHierarchy()
 						}
 					});
 
-					drawComponent<dynamic_transform_component>(selectedEntity, "Dynamic", [](dynamic_transform_component& dynamic)
+					drawComponent<dynamic_transform_component>(selectedEntity, "DYNAMIC", [](dynamic_transform_component& dynamic)
 					{
 						ImGui::Text("Dynamic");
 					});
 
-					drawComponent<animation_component>(selectedEntity, "Animation", [this](animation_component& anim)
+					drawComponent<animation_component>(selectedEntity, "ANIMATION", [this](animation_component& anim)
 					{
 						if (raster_component* raster = selectedEntity.getComponentIfExists<raster_component>())
 						{
@@ -984,7 +988,7 @@ bool application::drawSceneHierarchy()
 						}
 					});
 
-					drawComponent<rigid_body_component>(selectedEntity, "Rigid body", [this](rigid_body_component& rb)
+					drawComponent<rigid_body_component>(selectedEntity, "RIGID BODY", [this](rigid_body_component& rb)
 					{
 						if (ImGui::BeginProperties())
 						{
@@ -1020,7 +1024,7 @@ bool application::drawSceneHierarchy()
 						}
 					});
 
-					drawComponent<physics_reference_component>(selectedEntity, "Colliders", [this](physics_reference_component& reference)
+					drawComponent<physics_reference_component>(selectedEntity, "COLLIDERS", [this](physics_reference_component& reference)
 					{
 						bool dirty = false;
 
@@ -1098,7 +1102,7 @@ bool application::drawSceneHierarchy()
 						}
 					});
 
-					drawComponent<physics_reference_component>(selectedEntity, "Constraints", [this](physics_reference_component& reference)
+					drawComponent<physics_reference_component>(selectedEntity, "CONSTRAINTS", [this](physics_reference_component& reference)
 					{
 						for (auto [constraintEntity, constraintType] : constraint_entity_iterator(selectedEntity))
 						{
@@ -1288,7 +1292,7 @@ bool application::drawSceneHierarchy()
 						}
 					});
 
-					drawComponent<cloth_component>(selectedEntity, "Cloth", [](cloth_component& cloth)
+					drawComponent<cloth_component>(selectedEntity, "CLOTH", [](cloth_component& cloth)
 					{
 						bool dirty = false;
 						if (ImGui::BeginProperties())
@@ -1309,7 +1313,7 @@ bool application::drawSceneHierarchy()
 						}
 					});
 
-					drawComponent<point_light_component>(selectedEntity, "Point light", [](point_light_component& pl)
+					drawComponent<point_light_component>(selectedEntity, "POINT LIGHT", [](point_light_component& pl)
 					{
 						if (ImGui::BeginProperties())
 						{
@@ -1326,7 +1330,7 @@ bool application::drawSceneHierarchy()
 						}
 					});
 
-					drawComponent<spot_light_component>(selectedEntity, "Spot light", [](spot_light_component& sl)
+					drawComponent<spot_light_component>(selectedEntity, "SPOT LIGHT", [](spot_light_component& sl)
 					{
 						if (ImGui::BeginProperties())
 						{
