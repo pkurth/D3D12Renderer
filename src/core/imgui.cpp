@@ -515,6 +515,14 @@ namespace ImGui
 		return SliderInternal(ImGuiDataType_Float, 4, label, f.data, &minValue, &maxValue, format);
 	}
 
+	bool PropertySliderAngle(const char* label, float& fRad, float minValueDeg, float maxValueDeg, const char* format)
+	{
+		pre(label);
+		bool result = ImGui::SliderAngle("", &fRad, minValueDeg, maxValueDeg, format);
+		post();
+		return result;
+	}
+
 	bool PropertySlider(const char* label, int32& v, int minValue, int maxValue, const char* format)
 	{
 		return SliderInternal(ImGuiDataType_S32, 1, label, &v, &minValue, &maxValue, format);
@@ -622,13 +630,26 @@ namespace ImGui
 		post();
 		return result;
 	}
+
+	bool PropertyButton(const char* label, const char* buttonText, const char* hoverText, ImVec2 size)
+	{
+		pre(label);
+		bool result = ImGui::Button(buttonText, size);
+		if (hoverText && ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip(hoverText);
+		}
+		post();
+		return result;
+	}
 }
 
 
 
 // Curve editing from https://gist.githubusercontent.com/r-lyeh-archived/40d4fd0ea157ab3a58a4/raw/b80af5cc39438aa40c0170eb2b0111faf4971fc6/curve.hpp.
 
-namespace tween {
+namespace tween 
+{
 	enum TYPE
 	{
 		LINEAR,

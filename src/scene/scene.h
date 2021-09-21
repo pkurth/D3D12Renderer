@@ -96,27 +96,27 @@ struct scene_entity
 		registry->remove<component_t>(handle);
 	}
 
-	inline operator uint32()
+	inline operator uint32() const
 	{
 		return (uint32)handle;
 	}
 
-	inline operator bool()
+	inline operator bool() const
 	{
 		return handle != entt::null;
 	}
 
-	inline bool operator==(const scene_entity& o)
+	inline bool operator==(const scene_entity& o) const
 	{
 		return handle == o.handle && registry == o.registry;
 	}
 
-	inline bool operator!=(const scene_entity& o)
+	inline bool operator!=(const scene_entity& o) const
 	{
 		return !(*this == o);
 	}
 
-	inline bool operator==(entt::entity o)
+	inline bool operator==(entt::entity o) const
 	{
 		return handle == o;
 	}
@@ -143,6 +143,12 @@ struct scene
 
 	void deleteEntity(scene_entity e);
 	void clearAll();
+
+	template <typename component_t>
+	void deleteAllComponents()
+	{
+		registry.clear<component_t>();
+	}
 
 	bool isEntityValid(scene_entity e)
 	{
@@ -196,6 +202,30 @@ struct scene
 	uint32 numberOfComponentsOfType()
 	{
 		return (uint32)registry.size<component_t>();
+	}
+
+	template <typename context_t, typename... args>
+	context_t& createOrGetContextVariable(args&&... a)
+	{
+		return registry.ctx_or_set<context_t>(std::forward<args>(a)...);
+	}
+
+	template <typename context_t>
+	context_t& getContextVariable()
+	{
+		return registry.ctx<context_t>();
+	}
+
+	template <typename context_t>
+	bool doesContextVariableExist()
+	{
+		return registry.try_ctx<context_t>() != 0;
+	}
+
+	template <typename context_t>
+	void deleteContextVariable()
+	{
+		registry.unset<context_T>();
 	}
 
 	entt::registry registry;

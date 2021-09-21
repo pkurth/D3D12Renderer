@@ -3,19 +3,23 @@
 #include "core/math.h"
 #include "scene/scene.h"
 
-enum constraint_type : uint16
+enum constraint_type
 {
+	constraint_type_none = -1,
+
 	constraint_type_distance,
 	constraint_type_ball_joint,
 	constraint_type_hinge_joint,
 	constraint_type_cone_twist,
+
+	constraint_type_count,
 };
 
 #define INVALID_CONSTRAINT_EDGE UINT16_MAX
 
 struct constraint_edge
 {
-	uint16 constraint;
+	entt::entity constraintEntity;
 	constraint_type type;
 	uint16 prevConstraintEdge;
 	uint16 nextConstraintEdge;

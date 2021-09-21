@@ -146,10 +146,10 @@ struct force_field_component
 
 uint32 allocateBoundingHullGeometry(const std::string& meshFilepath);
 
-struct distance_constraint_handle { uint16 index; };
-struct ball_joint_constraint_handle { uint16 index; };
-struct hinge_joint_constraint_handle { uint16 index; };
-struct cone_twist_constraint_handle { uint16 index; };
+struct distance_constraint_handle { entt::entity entity; };
+struct ball_joint_constraint_handle { entt::entity entity; };
+struct hinge_joint_constraint_handle { entt::entity entity; };
+struct cone_twist_constraint_handle { entt::entity entity; };
 
 // Local anchors are always in the space of the entities.
 distance_constraint_handle addDistanceConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB, float distance);
@@ -169,13 +169,80 @@ cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity
 	float swingLimit, float twistLimit);
 
 
-distance_constraint& getConstraint(distance_constraint_handle handle);
-ball_joint_constraint& getConstraint(ball_joint_constraint_handle handle);
-hinge_joint_constraint& getConstraint(hinge_joint_constraint_handle handle);
-cone_twist_constraint& getConstraint(cone_twist_constraint_handle handle);
+distance_constraint& getConstraint(scene& appScene, distance_constraint_handle handle);
+ball_joint_constraint& getConstraint(scene& appScene, ball_joint_constraint_handle handle);
+hinge_joint_constraint& getConstraint(scene& appScene, hinge_joint_constraint_handle handle);
+cone_twist_constraint& getConstraint(scene& appScene, cone_twist_constraint_handle handle);
 
 
-void deleteAllConstraints();
+void deleteAllConstraints(scene& appScene);
+
+void deleteConstraint(scene& appScene, distance_constraint_handle handle);
+void deleteConstraint(scene& appScene, ball_joint_constraint_handle handle);
+void deleteConstraint(scene& appScene, hinge_joint_constraint_handle handle);
+void deleteConstraint(scene& appScene, cone_twist_constraint_handle handle);
+
+void deleteAllConstraintsFromEntity(scene_entity& entity);
+
+static scene_entity getOtherEntity(physics_constraint& constraint, scene_entity first)
+{
+	entt::entity result = (first == constraint.entityA) ? constraint.entityB : constraint.entityA;
+	return { result, first.registry };
+}
+
+
+struct collider_entity_iterator
+{
+	collider_entity_iterator(scene_entity entity)
+	{
+		if (physics_reference_component* ref = entity.getComponentIfExists<physics_reference_component>())
+		{
+			firstColliderEntity = { ref->firstColliderEntity, entity.registry };
+		}
+	}
+
+	struct iterator
+	{
+		scene_entity entity;
+
+		friend bool operator!=(const iterator& a, const iterator& b) { return a.entity != b.entity; }
+		iterator& operator++() { entity = { entity.getComponent<collider_component>().nextEntity, entity.registry }; return *this; }
+		scene_entity operator*() { return entity; }
+	};
+
+	iterator begin() { return iterator{ firstColliderEntity }; }
+	iterator end() { return iterator{ { entt::entity(entt::null), firstColliderEntity.registry } }; }
+
+	scene_entity firstColliderEntity = {};
+};
+
+struct constraint_entity_iterator
+{
+	constraint_entity_iterator(scene_entity entity)
+		: registry(entity.registry)
+	{
+		if (physics_reference_component* ref = entity.getComponentIfExists<physics_reference_component>())
+		{
+			firstConstraintEdgeIndex = ref->firstConstraintEdge;
+		}
+	}
+
+	struct iterator
+	{
+		uint16 constraintEdgeIndex;
+		entt::registry* registry;
+
+		friend bool operator!=(const iterator& a, const iterator& b) { return a.constraintEdgeIndex != b.constraintEdgeIndex; }
+		iterator& operator++();
+		std::pair<scene_entity, constraint_type> operator*();
+	};
+
+	iterator begin() { return iterator{ firstConstraintEdgeIndex, registry }; }
+	iterator end() { return iterator{ INVALID_CONSTRAINT_EDGE, registry }; }
+
+	uint16 firstConstraintEdgeIndex = INVALID_CONSTRAINT_EDGE;
+	entt::registry* registry;
+};
 
 
 struct physics_settings

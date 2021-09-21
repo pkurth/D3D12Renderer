@@ -18,6 +18,7 @@ scene::scene()
 
 void scene::clearAll()
 {
+	deleteAllConstraints(*this);
 	registry.clear();
 }
 
@@ -35,6 +36,8 @@ void scene::deleteEntity(scene_entity e)
 		
 			colliderEntity = { next, &registry };
 		}
+
+		deleteAllConstraintsFromEntity(e);
 	}
 
 	registry.destroy(e.handle);

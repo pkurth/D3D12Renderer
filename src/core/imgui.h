@@ -82,6 +82,8 @@ namespace ImGui
 	bool PropertySlider(const char* label, vec3& f, float minValue = 0.f, float maxValue = 1.f, const char* format = "%.3f");
 	bool PropertySlider(const char* label, vec4& f, float minValue = 0.f, float maxValue = 1.f, const char* format = "%.3f");
 
+	bool PropertySliderAngle(const char* label, float& fRad, float minValueDeg = -360.f, float maxValueDeg = 360.f, const char* format = "%.0f deg");
+
 	bool PropertySlider(const char* label, int32& v, int minValue, int maxValue, const char* format = "%d");
 	bool PropertySlider(const char* label, uint32& v, uint32 minValue, uint32 maxValue, const char* format = "%d");
 
@@ -96,6 +98,8 @@ namespace ImGui
 
 	bool PropertyColor(const char* label, vec3& f);
 	bool PropertyColor(const char* label, vec4& f);
+
+	bool PropertyButton(const char* label, const char* buttonText, const char* hoverText = 0, ImVec2 size = ImVec2(0, 0));
 
 
 

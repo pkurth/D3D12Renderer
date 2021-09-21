@@ -109,17 +109,17 @@ static void readBodyPartState(const trs& transform, scene_entity entity, vec3& p
 	velocity = inverseTransformDirection(transform, entity.getComponent<rigid_body_component>().linearVelocity);
 }
 
-static void updateConstraint(hinge_joint_constraint_handle handle, hinge_action action = {})
+static void updateConstraint(scene& appScene, hinge_joint_constraint_handle handle, hinge_action action = {})
 {
-	hinge_joint_constraint& c = getConstraint(handle);
+	hinge_joint_constraint& c = getConstraint(appScene, handle);
 	c.maxMotorTorque = 200.f;
 	c.motorType = constraint_position_motor;
 	c.motorTargetAngle = action.targetAngle;
 }
 
-static void updateConstraint(cone_twist_constraint_handle handle, cone_twist_action action = {})
+static void updateConstraint(scene& appScene, cone_twist_constraint_handle handle, cone_twist_action action = {})
 {
-	cone_twist_constraint& c = getConstraint(handle);
+	cone_twist_constraint& c = getConstraint(appScene, handle);
 	c.maxSwingMotorTorque = 200.f;
 	c.maxTwistMotorTorque = 200.f;
 	c.swingMotorType = constraint_position_motor;
@@ -129,16 +129,16 @@ static void updateConstraint(cone_twist_constraint_handle handle, cone_twist_act
 	c.swingMotorAxis = action.swingAxisAngle;
 }
 
-static void getLimits(hinge_joint_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
+static void getLimits(scene& appScene, hinge_joint_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
 {
-	hinge_joint_constraint& c = getConstraint(handle);
+	hinge_joint_constraint& c = getConstraint(appScene, handle);
 	minPtr[minPushIndex++] = c.minRotationLimit <= 0.f ? c.minRotationLimit : -M_PI;
 	maxPtr[maxPushIndex++] = c.maxRotationLimit >= 0.f ? c.maxRotationLimit : M_PI;
 }
 
-static void getLimits(cone_twist_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
+static void getLimits(scene& appScene, cone_twist_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
 {
-	cone_twist_constraint& c = getConstraint(handle);
+	cone_twist_constraint& c = getConstraint(appScene, handle);
 
 	minPtr[minPushIndex++] = c.twistLimit >= 0.f ? -c.twistLimit : -M_PI;
 	minPtr[minPushIndex++] = c.swingLimit >= 0.f ? -c.swingLimit : -M_PI;
@@ -342,17 +342,16 @@ extern "C" __declspec(dllexport) void getPhysicsRanges(float* stateMin, float* s
 
 	for (uint32 i = 0; i < NUM_CONE_TWIST_CONSTRAINTS; ++i)
 	{
-		getLimits(tmpRagdoll.coneTwistConstraints[i], actionMin, minPushIndex, actionMax, maxPushIndex);
+		getLimits(tmpScene, tmpRagdoll.coneTwistConstraints[i], actionMin, minPushIndex, actionMax, maxPushIndex);
 	}
 	for (uint32 i = 0; i < NUM_HINGE_JOINT_CONSTRAINTS; ++i)
 	{
-		getLimits(tmpRagdoll.hingeJointConstraints[i], actionMin, minPushIndex, actionMax, maxPushIndex);
+		getLimits(tmpScene, tmpRagdoll.hingeJointConstraints[i], actionMin, minPushIndex, actionMax, maxPushIndex);
 	}
 
 	assert(minPushIndex == getPhysicsActionSize());
 	assert(maxPushIndex == getPhysicsActionSize());
 
-	deleteAllConstraints();
 	tmpScene.clearAll();
 }
 
@@ -369,11 +368,11 @@ void locomotion_environment::applyAction(const learning_action& action)
 
 	for (uint32 i = 0; i < NUM_CONE_TWIST_CONSTRAINTS; ++i)
 	{
-		updateConstraint(ragdoll.coneTwistConstraints[i], lastSmoothedAction.coneTwistActions[i]);
+		updateConstraint(appScene, ragdoll.coneTwistConstraints[i], lastSmoothedAction.coneTwistActions[i]);
 	}
 	for (uint32 i = 0; i < NUM_HINGE_JOINT_CONSTRAINTS; ++i)
 	{
-		updateConstraint(ragdoll.hingeJointConstraints[i], lastSmoothedAction.hingeJointActions[i]);
+		updateConstraint(appScene, ragdoll.hingeJointConstraints[i], lastSmoothedAction.hingeJointActions[i]);
 	}
 
 	++episodeLength;
@@ -412,7 +411,6 @@ extern "C" __declspec(dllexport) int updatePhysics(float* action, float* outStat
 
 void locomotion_environment::resetForLearning()
 {
-	deleteAllConstraints();
 	appScene.clearAll();
 
 	uint32 seed = (uint32)time(0);
