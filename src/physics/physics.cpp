@@ -5,6 +5,9 @@
 #include "geometry/geometry.h"
 
 
+extern physics_settings physicsSettings = {};
+static std::vector<bounding_hull_geometry> boundingHullGeometries;
+
 struct constraint_context
 {
 	std::vector<constraint_edge> constraintEdges;
@@ -36,16 +39,10 @@ struct constraint_context
 	}
 };
 
-
-static std::vector<bounding_hull_geometry> boundingHullGeometries;
-
-
 struct force_field_global_state
 {
 	vec3 force;
 };
-
-
 
 #ifndef PHYSICS_ONLY
 // This is a bit dirty. PHYSICS_ONLY is defined when building the learning DLL, where we don't need bounding hulls.
@@ -246,32 +243,32 @@ cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity
 	return { constraintEntity };
 }
 
-distance_constraint& getConstraint(scene& appScene, distance_constraint_handle handle)
+distance_constraint& getConstraint(game_scene& scene, distance_constraint_handle handle)
 {
-	return scene_entity{ handle.entity, appScene }.getComponent<distance_constraint>();
+	return scene_entity{ handle.entity, scene }.getComponent<distance_constraint>();
 }
 
-ball_joint_constraint& getConstraint(scene& appScene, ball_joint_constraint_handle handle)
+ball_joint_constraint& getConstraint(game_scene& scene, ball_joint_constraint_handle handle)
 {
-	return scene_entity{ handle.entity, appScene }.getComponent<ball_joint_constraint>();
+	return scene_entity{ handle.entity, scene }.getComponent<ball_joint_constraint>();
 }
 
-hinge_joint_constraint& getConstraint(scene& appScene, hinge_joint_constraint_handle handle)
+hinge_joint_constraint& getConstraint(game_scene& scene, hinge_joint_constraint_handle handle)
 {
-	return scene_entity{ handle.entity, appScene }.getComponent<hinge_joint_constraint>();
+	return scene_entity{ handle.entity, scene }.getComponent<hinge_joint_constraint>();
 }
 
-cone_twist_constraint& getConstraint(scene& appScene, cone_twist_constraint_handle handle)
+cone_twist_constraint& getConstraint(game_scene& scene, cone_twist_constraint_handle handle)
 {
-	return scene_entity{ handle.entity, appScene }.getComponent<cone_twist_constraint>();
+	return scene_entity{ handle.entity, scene }.getComponent<cone_twist_constraint>();
 }
 
-void deleteAllConstraints(scene& appScene)
+void deleteAllConstraints(game_scene& scene)
 {
-	appScene.deleteAllComponents<distance_constraint>();
-	appScene.deleteAllComponents<ball_joint_constraint>();
-	appScene.deleteAllComponents<hinge_joint_constraint>();
-	appScene.deleteAllComponents<cone_twist_constraint>();
+	scene.deleteAllComponents<distance_constraint>();
+	scene.deleteAllComponents<ball_joint_constraint>();
+	scene.deleteAllComponents<hinge_joint_constraint>();
+	scene.deleteAllComponents<cone_twist_constraint>();
 }
 
 static void removeConstraintEdge(scene_entity entity, constraint_edge& edge, constraint_context& context)
@@ -314,24 +311,24 @@ static void deleteConstraint(entt::registry* registry, entt::entity constraintEn
 	registry->destroy(constraintEntity.handle);
 }
 
-void deleteConstraint(scene& appScene, distance_constraint_handle handle)
+void deleteConstraint(game_scene& scene, distance_constraint_handle handle)
 {
-	deleteConstraint<distance_constraint>(&appScene.registry, handle.entity);
+	deleteConstraint<distance_constraint>(&scene.registry, handle.entity);
 }
 
-void deleteConstraint(scene& appScene, ball_joint_constraint_handle handle)
+void deleteConstraint(game_scene& scene, ball_joint_constraint_handle handle)
 {
-	deleteConstraint<ball_joint_constraint>(&appScene.registry, handle.entity);
+	deleteConstraint<ball_joint_constraint>(&scene.registry, handle.entity);
 }
 
-void deleteConstraint(scene& appScene, hinge_joint_constraint_handle handle)
+void deleteConstraint(game_scene& scene, hinge_joint_constraint_handle handle)
 {
-	deleteConstraint<hinge_joint_constraint>(&appScene.registry, handle.entity);
+	deleteConstraint<hinge_joint_constraint>(&scene.registry, handle.entity);
 }
 
-void deleteConstraint(scene& appScene, cone_twist_constraint_handle handle)
+void deleteConstraint(game_scene& scene, cone_twist_constraint_handle handle)
 {
-	deleteConstraint<cone_twist_constraint>(&appScene.registry, handle.entity);
+	deleteConstraint<cone_twist_constraint>(&scene.registry, handle.entity);
 }
 
 void deleteAllConstraintsFromEntity(scene_entity& entity)
@@ -372,16 +369,16 @@ std::pair<scene_entity, constraint_type> constraint_entity_iterator::iterator::o
 }
 
 
-void testPhysicsInteraction(scene& appScene, ray r, float forceAmount)
+void testPhysicsInteraction(game_scene& scene, ray r)
 {
 	float minT = FLT_MAX;
 	rigid_body_component* minRB = 0;
 	vec3 force;
 	vec3 torque;
 
-	for (auto [entityHandle, collider] : appScene.view<collider_component>().each())
+	for (auto [entityHandle, collider] : scene.view<collider_component>().each())
 	{
-		scene_entity rbEntity = { collider.parentEntity, appScene };
+		scene_entity rbEntity = { collider.parentEntity, scene };
 		if (rigid_body_component* rb = rbEntity.getComponentIfExists<rigid_body_component>())
 		{
 			transform_component& transform = rbEntity.getComponent<transform_component>();
@@ -428,7 +425,7 @@ void testPhysicsInteraction(scene& appScene, ray r, float forceAmount)
 
 				vec3 cogPosition = rb->getGlobalCOGPosition(transform);
 
-				force = r.direction * forceAmount;
+				force = r.direction * physicsSettings.testForce;
 				torque = cross(globalHit - cogPosition, force);
 			}
 		}
@@ -441,20 +438,20 @@ void testPhysicsInteraction(scene& appScene, ray r, float forceAmount)
 	}
 }
 
-static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceAABBs, collider_union* outWorldSpaceColliders)
+static void getWorldSpaceColliders(game_scene& scene, bounding_box* outWorldspaceAABBs, collider_union* outWorldSpaceColliders)
 {
 	uint32 pushIndex = 0;
 
-	rigid_body_component* rbBase = appScene.raw<rigid_body_component>();
-	force_field_component* ffBase = appScene.raw<force_field_component>();
+	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
+	force_field_component* ffBase = scene.raw<force_field_component>();
 
-	for (auto [entityHandle, collider] : appScene.view<collider_component>().each())
+	for (auto [entityHandle, collider] : scene.view<collider_component>().each())
 	{
 		bounding_box& bb = outWorldspaceAABBs[pushIndex];
 		collider_union& col = outWorldSpaceColliders[pushIndex];
 		++pushIndex;
 
-		scene_entity entity = { collider.parentEntity, appScene };
+		scene_entity entity = { collider.parentEntity, scene };
 		assert(entity.hasComponent<transform_component>());
 		transform_component& transform = entity.getComponent<transform_component>();
 
@@ -541,14 +538,14 @@ static void getWorldSpaceColliders(scene& appScene, bounding_box* outWorldspaceA
 
 // Returns the accumulated force from all global force fields and writes localized forces (from force fields with colliders) in outLocalizedForceFields.
 // The second return value is the number of these localized force fields.
-static std::pair<vec3, uint32> getForceFieldStates(scene& appScene, force_field_global_state* outLocalForceFields)
+static std::pair<vec3, uint32> getForceFieldStates(game_scene& scene, force_field_global_state* outLocalForceFields)
 {
 	vec3 globalForceField(0.f);
 	uint32 numLocalForceFields = 0;
 
-	for (auto [entityHandle, forceField] : appScene.view<force_field_component>().each())
+	for (auto [entityHandle, forceField] : scene.view<force_field_component>().each())
 	{
-		scene_entity entity = { entityHandle, appScene };
+		scene_entity entity = { entityHandle, scene };
 
 		vec3 force = forceField.force; 
 		if (transform_component* transform = entity.getComponentIfExists<transform_component>())
@@ -571,7 +568,7 @@ static std::pair<vec3, uint32> getForceFieldStates(scene& appScene, force_field_
 	return { globalForceField, numLocalForceFields };
 }
 
-void physicsStep(scene& appScene, float dt, physics_settings settings)
+void physicsStep(game_scene& scene, float dt)
 {
 	dt = min(dt, 1.f / 30.f);
 
@@ -591,16 +588,16 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 
 
 	// Collision detection.
-	getWorldSpaceColliders(appScene, worldSpaceAABBs, worldSpaceColliders);
-	uint32 numPossibleCollisions = broadphase(appScene, 0, worldSpaceAABBs, possibleCollisions);
+	getWorldSpaceColliders(scene, worldSpaceAABBs, worldSpaceColliders);
+	uint32 numPossibleCollisions = broadphase(scene, 0, worldSpaceAABBs, possibleCollisions);
 	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, possibleCollisions, numPossibleCollisions, collisionConstraints, nonCollisionInteractions);
 
 
-	auto [globalForceField, numLocalForceFields] = getForceFieldStates(appScene, ffGlobal);
+	auto [globalForceField, numLocalForceFields] = getForceFieldStates(scene, ffGlobal);
 
 
 	// Handle non-collision interactions (triggers, force fields etc).
-	rigid_body_component* rbBase = appScene.raw<rigid_body_component>();
+	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < narrowPhaseResult.numNonCollisionInteractions; ++i)
 	{
@@ -619,7 +616,7 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 
 
 	//  Apply global forces (including gravity) and air drag and integrate forces.
-	for (auto [entityHandle, rb, transform] : appScene.group<rigid_body_component, transform_component>().each())
+	for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, transform_component>().each())
 	{
 		uint16 globalStateIndex = (uint16)(&rb - rbBase);
 		rigid_body_global_state& global = rbGlobal[globalStateIndex];
@@ -632,17 +629,17 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 	// Solve constraints.
 	finalizeCollisionVelocityConstraintInitialization(worldSpaceColliders, rbGlobal, collisionConstraints, narrowPhaseResult.numCollisions, dt);
 	
-	uint32 numDistanceConstraints = appScene.numberOfComponentsOfType<distance_constraint>();
-	uint32 numBallJointConstraints = appScene.numberOfComponentsOfType<ball_joint_constraint>();
-	uint32 numHingeJointConstraints = appScene.numberOfComponentsOfType<hinge_joint_constraint>();
-	uint32 numConeTwistConstraints = appScene.numberOfComponentsOfType<cone_twist_constraint>();
+	uint32 numDistanceConstraints = scene.numberOfComponentsOfType<distance_constraint>();
+	uint32 numBallJointConstraints = scene.numberOfComponentsOfType<ball_joint_constraint>();
+	uint32 numHingeJointConstraints = scene.numberOfComponentsOfType<hinge_joint_constraint>();
+	uint32 numConeTwistConstraints = scene.numberOfComponentsOfType<cone_twist_constraint>();
 
-	initializeDistanceVelocityConstraints(appScene, rbGlobal, appScene.raw<distance_constraint>(), distanceConstraintUpdates, numDistanceConstraints, dt);
-	initializeBallJointVelocityConstraints(appScene, rbGlobal, appScene.raw<ball_joint_constraint>(), ballJointConstraintUpdates, numBallJointConstraints, dt);
-	initializeHingeJointVelocityConstraints(appScene, rbGlobal, appScene.raw<hinge_joint_constraint>(), hingeJointConstraintUpdates, numHingeJointConstraints, dt);
-	initializeConeTwistVelocityConstraints(appScene, rbGlobal, appScene.raw<cone_twist_constraint>(), coneTwistConstraintUpdates, numConeTwistConstraints, dt);
+	initializeDistanceVelocityConstraints(scene, rbGlobal, scene.raw<distance_constraint>(), distanceConstraintUpdates, numDistanceConstraints, dt);
+	initializeBallJointVelocityConstraints(scene, rbGlobal, scene.raw<ball_joint_constraint>(), ballJointConstraintUpdates, numBallJointConstraints, dt);
+	initializeHingeJointVelocityConstraints(scene, rbGlobal, scene.raw<hinge_joint_constraint>(), hingeJointConstraintUpdates, numHingeJointConstraints, dt);
+	initializeConeTwistVelocityConstraints(scene, rbGlobal, scene.raw<cone_twist_constraint>(), coneTwistConstraintUpdates, numConeTwistConstraints, dt);
 
-	for (uint32 it = 0; it < settings.numRigidSolverIterations; ++it)
+	for (uint32 it = 0; it < physicsSettings.numRigidSolverIterations; ++it)
 	{
 		solveDistanceVelocityConstraints(distanceConstraintUpdates, numDistanceConstraints, rbGlobal);
 		solveBallJointVelocityConstraints(ballJointConstraintUpdates, numBallJointConstraints, rbGlobal);
@@ -653,7 +650,7 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 
 
 	// Integrate velocities.
-	for (auto [entityHandle, rb, transform] : appScene.group<rigid_body_component, transform_component>().each())
+	for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, transform_component>().each())
 	{
 		rigid_body_global_state& global = rbGlobal[rb.globalStateIndex];
 		rb.integrateVelocity(global, transform, dt);
@@ -663,16 +660,16 @@ void physicsStep(scene& appScene, float dt, physics_settings settings)
 	// Cloth. This needs to get integrated with the rest of the system.
 
 	// For all cloth strips, which have a transform, apply it.
-	for (auto [entityHandle, cloth, transform] : appScene.group(entt::get<cloth_component, transform_component>).each())
+	for (auto [entityHandle, cloth, transform] : scene.group(entt::get<cloth_component, transform_component>).each())
 	{
 		cloth.setWorldPositionOfFixedVertices(transform);
 	}
 
 	// For all cloth strips (with and without transform), simulate.
-	for (auto [entityHandle, cloth] : appScene.view<cloth_component>().each())
+	for (auto [entityHandle, cloth] : scene.view<cloth_component>().each())
 	{
 		cloth.applyWindForce(globalForceField);
-		cloth.simulate(settings.numClothVelocityIterations, settings.numClothPositionIterations, settings.numClothDriftIterations, dt);
+		cloth.simulate(physicsSettings.numClothVelocityIterations, physicsSettings.numClothPositionIterations, physicsSettings.numClothDriftIterations, dt);
 	}
 }
 

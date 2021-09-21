@@ -169,18 +169,18 @@ cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity
 	float swingLimit, float twistLimit);
 
 
-distance_constraint& getConstraint(scene& appScene, distance_constraint_handle handle);
-ball_joint_constraint& getConstraint(scene& appScene, ball_joint_constraint_handle handle);
-hinge_joint_constraint& getConstraint(scene& appScene, hinge_joint_constraint_handle handle);
-cone_twist_constraint& getConstraint(scene& appScene, cone_twist_constraint_handle handle);
+distance_constraint& getConstraint(game_scene& scene, distance_constraint_handle handle);
+ball_joint_constraint& getConstraint(game_scene& scene, ball_joint_constraint_handle handle);
+hinge_joint_constraint& getConstraint(game_scene& scene, hinge_joint_constraint_handle handle);
+cone_twist_constraint& getConstraint(game_scene& scene, cone_twist_constraint_handle handle);
 
 
-void deleteAllConstraints(scene& appScene);
+void deleteAllConstraints(game_scene& scene);
 
-void deleteConstraint(scene& appScene, distance_constraint_handle handle);
-void deleteConstraint(scene& appScene, ball_joint_constraint_handle handle);
-void deleteConstraint(scene& appScene, hinge_joint_constraint_handle handle);
-void deleteConstraint(scene& appScene, cone_twist_constraint_handle handle);
+void deleteConstraint(game_scene& scene, distance_constraint_handle handle);
+void deleteConstraint(game_scene& scene, ball_joint_constraint_handle handle);
+void deleteConstraint(game_scene& scene, hinge_joint_constraint_handle handle);
+void deleteConstraint(game_scene& scene, cone_twist_constraint_handle handle);
 
 void deleteAllConstraintsFromEntity(scene_entity& entity);
 
@@ -252,7 +252,11 @@ struct physics_settings
 	uint32 numClothVelocityIterations = 0;
 	uint32 numClothPositionIterations = 1;
 	uint32 numClothDriftIterations = 0;
+
+	float testForce = 1000.f;
 };
 
-void testPhysicsInteraction(scene& appScene, ray r, float forceAmount);
-void physicsStep(scene& appScene, float dt, physics_settings settings = {});
+extern physics_settings physicsSettings;
+
+void testPhysicsInteraction(game_scene& scene, ray r);
+void physicsStep(game_scene& scene, float dt);

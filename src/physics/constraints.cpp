@@ -10,17 +10,17 @@
 
 #define DT_THRESHOLD 1e-5f
 
-void initializeDistanceVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const distance_constraint* input, distance_constraint_update* output, uint32 count, float dt)
+void initializeDistanceVelocityConstraints(game_scene& scene, rigid_body_global_state* rbs, const distance_constraint* input, distance_constraint_update* output, uint32 count, float dt)
 {
-	rigid_body_component* rbBase = appScene.raw<rigid_body_component>();
+	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
 	{
 		const distance_constraint& in = input[i];
 		distance_constraint_update& out = output[i];
 
-		scene_entity entityA = { in.entityA, appScene };
-		scene_entity entityB = { in.entityB, appScene };
+		scene_entity entityA = { in.entityA, scene };
+		scene_entity entityB = { in.entityB, scene };
 
 		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
 		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
@@ -93,17 +93,17 @@ void solveDistanceVelocityConstraints(distance_constraint_update* constraints, u
 	}
 }
 
-void initializeBallJointVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const ball_joint_constraint* input, ball_joint_constraint_update* output, uint32 count, float dt)
+void initializeBallJointVelocityConstraints(game_scene& scene, rigid_body_global_state* rbs, const ball_joint_constraint* input, ball_joint_constraint_update* output, uint32 count, float dt)
 {
-	rigid_body_component* rbBase = appScene.raw<rigid_body_component>();
+	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
 	{
 		const ball_joint_constraint& in = input[i];
 		ball_joint_constraint_update& out = output[i];
 
-		scene_entity entityA = { in.entityA, appScene };
-		scene_entity entityB = { in.entityB, appScene };
+		scene_entity entityA = { in.entityA, scene };
+		scene_entity entityB = { in.entityB, scene };
 
 		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
 		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
@@ -164,17 +164,17 @@ void solveBallJointVelocityConstraints(ball_joint_constraint_update* constraints
 	}
 }
 
-void initializeHingeJointVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const hinge_joint_constraint* input, hinge_joint_constraint_update* output, uint32 count, float dt)
+void initializeHingeJointVelocityConstraints(game_scene& scene, rigid_body_global_state* rbs, const hinge_joint_constraint* input, hinge_joint_constraint_update* output, uint32 count, float dt)
 {
-	rigid_body_component* rbBase = appScene.raw<rigid_body_component>();
+	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
 	{
 		const hinge_joint_constraint& in = input[i];
 		hinge_joint_constraint_update& out = output[i];
 
-		scene_entity entityA = { in.entityA, appScene };
-		scene_entity entityB = { in.entityB, appScene };
+		scene_entity entityA = { in.entityA, scene };
+		scene_entity entityB = { in.entityB, scene };
 
 		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
 		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
@@ -394,17 +394,17 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 	}
 }
 
-void initializeConeTwistVelocityConstraints(scene& appScene, rigid_body_global_state* rbs, const cone_twist_constraint* input, cone_twist_constraint_update* output, uint32 count, float dt)
+void initializeConeTwistVelocityConstraints(game_scene& scene, rigid_body_global_state* rbs, const cone_twist_constraint* input, cone_twist_constraint_update* output, uint32 count, float dt)
 {
-	rigid_body_component* rbBase = appScene.raw<rigid_body_component>();
+	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
 	{
 		const cone_twist_constraint& in = input[i];
 		cone_twist_constraint_update& out = output[i];
 
-		scene_entity entityA = { in.entityA, appScene };
-		scene_entity entityB = { in.entityB, appScene };
+		scene_entity entityA = { in.entityA, scene };
+		scene_entity entityB = { in.entityB, scene };
 
 		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
 		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();

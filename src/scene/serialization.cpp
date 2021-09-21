@@ -320,7 +320,7 @@ namespace YAML
 	};
 }
 
-void serializeSceneToDisk(scene& appScene, const render_camera& camera, const directional_light& sun, const renderer_settings& rendererSettings, const ref<pbr_environment>& environment)
+void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSettings)
 {
 	std::string filename = saveFileDialog("Scene files", "sc");
 	if (filename.empty())
@@ -332,19 +332,19 @@ void serializeSceneToDisk(scene& appScene, const render_camera& camera, const di
 	out << YAML::BeginMap;
 
 	out << YAML::Key << "Scene" << YAML::Value << "My scene";
-	out << YAML::Key << "Camera" << YAML::Value << camera;
+	out << YAML::Key << "Camera" << YAML::Value << scene.camera;
 	out << YAML::Key << "Rendering" << YAML::Value << rendererSettings;
-	out << YAML::Key << "Sun" << YAML::Value << sun;
-	out << YAML::Key << "Environment" << environment->name;
+	out << YAML::Key << "Sun" << YAML::Value << scene.sun;
+	out << YAML::Key << "Environment" << (scene.environment ? scene.environment->name : fs::path());
 
 	out << YAML::Key << "Entities"
 		<< YAML::Value
 		<< YAML::BeginSeq;
 
 
-	appScene.forEachEntity([&out, &appScene](entt::entity entityID)
+	scene.forEachEntity([&out, &scene](entt::entity entityID)
 	{
-		scene_entity entity = { entityID, appScene };
+		scene_entity entity = { entityID, scene };
 
 		// Only entities with tags are valid top level entities. All others are helpers like colliders and constraints.
 		if (tag_component* tag = entity.getComponentIfExists<tag_component>())
@@ -372,7 +372,7 @@ void serializeSceneToDisk(scene& appScene, const render_camera& camera, const di
 	fout << out.c_str();
 }
 
-bool deserializeSceneFromDisk(scene& appScene, render_camera& camera, directional_light& sun, renderer_settings& rendererSettings, std::string& environmentName)
+bool deserializeSceneFromDisk(game_scene& scene, renderer_settings& rendererSettings, std::string& environmentName)
 {
 	std::string filename = openFileDialog("Scene files", "sc");
 	if (filename.empty())
@@ -387,13 +387,13 @@ bool deserializeSceneFromDisk(scene& appScene, render_camera& camera, directiona
 		return false;
 	}
 
-	appScene = scene();
+	scene = game_scene();
 
 	std::string sceneName = n["Scene"].as<std::string>();
 
-	LOAD(camera, "Camera");
+	LOAD(scene.camera, "Camera");
 	LOAD(rendererSettings, "Rendering");
-	LOAD(sun, "Sun");
+	LOAD(scene.sun, "Sun");
 
 	LOAD(environmentName, "Environment");
 
@@ -401,7 +401,7 @@ bool deserializeSceneFromDisk(scene& appScene, render_camera& camera, directiona
 	for (auto entityNode : entitiesNode)
 	{
 		std::string name = entityNode["Tag"].as<std::string>();
-		scene_entity entity = appScene.createEntity(name.c_str());
+		scene_entity entity = scene.createEntity(name.c_str());
 
 		if (entityNode["Transform"])
 		{

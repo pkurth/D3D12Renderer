@@ -7,7 +7,8 @@ struct humanoid_ragdoll
 {
 	humanoid_ragdoll() {}
 
-	void initialize(scene& appScene, vec3 initialHipPosition, float initialRotation = 0.f);
+	void initialize(game_scene& scene, vec3 initialHipPosition, float initialRotation = 0.f);
+	static humanoid_ragdoll create(game_scene& scene, vec3 initialHipPosition, float initialRotation = 0.f);
 
 	union
 	{

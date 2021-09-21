@@ -8,7 +8,7 @@
 #include "core/imgui.h"
 #endif
 
-void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition, float initialRotation)
+void humanoid_ragdoll::initialize(game_scene& scene, vec3 initialHipPosition, float initialRotation)
 {
 	float scale = 0.42f; // This file is completely hardcoded. I initially screwed up the scaling a bit, so this factor brings everything to the correct scale (and therefore weight).
 
@@ -32,7 +32,7 @@ void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition, floa
 	trs rightFootTransform(initialHipPosition + scale * vec3(0.498f, -2.585f, -0.18f), quat::identity);
 	trs rightToesTransform(initialHipPosition + scale * vec3(0.498f, -2.585f, -0.637f), quat::identity);
 
-	torso = appScene.createEntity("Torso")
+	torso = scene.createEntity("Torso")
 		.addComponent<transform_component>(torsoTransform)
 		.addComponent<collider_component>(collider_component::asCapsule({ scale * vec3(-0.2f, 0.f, 0.f),    scale *  vec3(0.2f, 0.f, 0.f),    scale * 0.25f }, 0.2f, 0.5f, ragdollDensity))
 		.addComponent<collider_component>(collider_component::asCapsule({ scale * vec3(-0.16f, 0.32f, 0.f), scale *  vec3(0.16f, 0.32f, 0.f), scale * 0.2f }, 0.2f, 0.5f, ragdollDensity))
@@ -40,67 +40,67 @@ void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition, floa
 		.addComponent<collider_component>(collider_component::asCapsule({ scale * vec3(-0.14f, 0.92f, 0.f), scale *  vec3(0.14f, 0.92f, 0.f), scale * 0.2f }, 0.2f, 0.5f, ragdollDensity))
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	head = appScene.createEntity("Head")
+	head = scene.createEntity("Head")
 		.addComponent<transform_component>(headTransform)
 		.addComponent<collider_component>(collider_component::asCapsule({ scale * vec3(0.f, -0.075f, 0.f), scale * vec3(0.f, 0.075f, 0.f), scale * 0.25f }, 0.2f, ragdollFriction, ragdollDensity))
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	leftUpperArm = appScene.createEntity("Left upper arm")
+	leftUpperArm = scene.createEntity("Left upper arm")
 		.addComponent<transform_component>(leftUpperArmTransform)
 		.addComponent<collider_component>(collider_component::asCapsule({ scale * vec3(0.f, -0.2f, 0.f), scale * vec3(0.f, 0.2f, 0.f), scale * 0.15f }, 0.2f, ragdollFriction, ragdollDensity))
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	leftLowerArm = appScene.createEntity("Left lower arm")
+	leftLowerArm = scene.createEntity("Left lower arm")
 		.addComponent<transform_component>(leftLowerArmTransform)
 		.addComponent<collider_component>(collider_component::asCapsule({ scale * vec3(0.f, -0.2f, 0.f), scale * vec3(0.f, 0.2f, 0.f), scale * 0.15f }, 0.2f, ragdollFriction, ragdollDensity))
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	rightUpperArm = appScene.createEntity("Right upper arm")
+	rightUpperArm = scene.createEntity("Right upper arm")
 		.addComponent<transform_component>(rightUpperArmTransform)
 		.addComponent<collider_component>(collider_component::asCapsule({ scale * vec3(0.f, -0.2f, 0.f), scale * vec3(0.f, 0.2f, 0.f), scale * 0.15f }, 0.2f, ragdollFriction, ragdollDensity))
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	rightLowerArm = appScene.createEntity("Right lower arm")
+	rightLowerArm = scene.createEntity("Right lower arm")
 		.addComponent<transform_component>(rightLowerArmTransform)
 		.addComponent<collider_component>(collider_component::asCapsule({ scale * vec3(0.f, -0.2f, 0.f), scale * vec3(0.f, 0.2f, 0.f), scale * 0.15f }, 0.2f, ragdollFriction, ragdollDensity))
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	leftUpperLeg = appScene.createEntity("Left upper leg")
+	leftUpperLeg = scene.createEntity("Left upper leg")
 		.addComponent<transform_component>(leftUpperLegTransform)
 		.addComponent<collider_component>(collider_component::asCapsule({ scale * vec3(0.f, -0.3f, 0.f), scale * vec3(0.f, 0.3f, 0.f), scale * 0.25f }, 0.2f, ragdollFriction, ragdollDensity))
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	leftLowerLeg = appScene.createEntity("Left lower leg")
+	leftLowerLeg = scene.createEntity("Left lower leg")
 		.addComponent<transform_component>(leftLowerLegTransform)
 		.addComponent<collider_component>(collider_component::asCapsule({ scale * vec3(0.f, -0.3f, 0.f), scale * vec3(0.f, 0.3f, 0.f), scale * 0.18f }, 0.2f, ragdollFriction, ragdollDensity))
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	leftFoot = appScene.createEntity("Left foot")
+	leftFoot = scene.createEntity("Left foot")
 		.addComponent<transform_component>(leftFootTransform)
 		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(scale * vec3(0.f), scale * vec3(0.1587f, 0.1f, 0.3424f)), 0.2f, ragdollFriction, ragdollDensity))
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	leftToes = appScene.createEntity("Left toes")
+	leftToes = scene.createEntity("Left toes")
 		.addComponent<transform_component>(leftToesTransform)
 		.addComponent<collider_component>(collider_component::asCapsule({ scale * vec3(-0.0587f, 0.f, 0.f), scale * vec3(0.0587f, 0.f, 0.f), scale * 0.1f }, 0.2f, ragdollFriction, ragdollDensity))
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	rightUpperLeg = appScene.createEntity("Right upper leg")
+	rightUpperLeg = scene.createEntity("Right upper leg")
 		.addComponent<transform_component>(rightUpperLegTransform)
 		.addComponent<collider_component>(collider_component::asCapsule({ scale * vec3(0.f, -0.3f, 0.f), scale * vec3(0.f, 0.3f, 0.f), scale * 0.25f }, scale * 0.2f, ragdollFriction, ragdollDensity))
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	rightLowerLeg = appScene.createEntity("Right lower leg")
+	rightLowerLeg = scene.createEntity("Right lower leg")
 		.addComponent<transform_component>(rightLowerLegTransform)
 		.addComponent<collider_component>(collider_component::asCapsule({ scale * vec3(0.f, -0.3f, 0.f), scale * vec3(0.f, 0.3f, 0.f), scale * 0.18f }, 0.2f, ragdollFriction, ragdollDensity))
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	rightFoot = appScene.createEntity("Right foot")
+	rightFoot = scene.createEntity("Right foot")
 		.addComponent<transform_component>(rightFootTransform)
 		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(scale * vec3(0.f), scale * vec3(0.1587f, 0.1f, 0.3424f)), 0.2f, ragdollFriction, ragdollDensity))
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
 
-	rightToes = appScene.createEntity("Right toes")
+	rightToes = scene.createEntity("Right toes")
 		.addComponent<transform_component>(rightToesTransform)
 		.addComponent<collider_component>(collider_component::asCapsule({ scale * vec3(-0.0587f, 0.f, 0.f), scale * vec3(0.0587f, 0.f, 0.f), scale * 0.1f }, 0.2f, ragdollFriction, ragdollDensity))
 		.addComponent<rigid_body_component>(ragdollKinematic, ragdollGravityFactor);
@@ -230,4 +230,11 @@ void humanoid_ragdoll::initialize(scene& appScene, vec3 initialHipPosition, floa
 		primitiveMesh.createDXMesh();
 
 #endif
+}
+
+humanoid_ragdoll humanoid_ragdoll::create(game_scene& scene, vec3 initialHipPosition, float initialRotation)
+{
+	humanoid_ragdoll ragdoll;
+	ragdoll.initialize(scene, initialHipPosition, initialRotation);
+	return ragdoll;
 }

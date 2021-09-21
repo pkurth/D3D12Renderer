@@ -85,7 +85,7 @@ struct locomotion_environment
 
 
 
-	scene& appScene;
+	game_scene& scene;
 	humanoid_ragdoll ragdoll;
 
 	uint32 episodeLength;
@@ -109,17 +109,17 @@ static void readBodyPartState(const trs& transform, scene_entity entity, vec3& p
 	velocity = inverseTransformDirection(transform, entity.getComponent<rigid_body_component>().linearVelocity);
 }
 
-static void updateConstraint(scene& appScene, hinge_joint_constraint_handle handle, hinge_action action = {})
+static void updateConstraint(game_scene& scene, hinge_joint_constraint_handle handle, hinge_action action = {})
 {
-	hinge_joint_constraint& c = getConstraint(appScene, handle);
+	hinge_joint_constraint& c = getConstraint(scene, handle);
 	c.maxMotorTorque = 200.f;
 	c.motorType = constraint_position_motor;
 	c.motorTargetAngle = action.targetAngle;
 }
 
-static void updateConstraint(scene& appScene, cone_twist_constraint_handle handle, cone_twist_action action = {})
+static void updateConstraint(game_scene& scene, cone_twist_constraint_handle handle, cone_twist_action action = {})
 {
-	cone_twist_constraint& c = getConstraint(appScene, handle);
+	cone_twist_constraint& c = getConstraint(scene, handle);
 	c.maxSwingMotorTorque = 200.f;
 	c.maxTwistMotorTorque = 200.f;
 	c.swingMotorType = constraint_position_motor;
@@ -129,16 +129,16 @@ static void updateConstraint(scene& appScene, cone_twist_constraint_handle handl
 	c.swingMotorAxis = action.swingAxisAngle;
 }
 
-static void getLimits(scene& appScene, hinge_joint_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
+static void getLimits(game_scene& scene, hinge_joint_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
 {
-	hinge_joint_constraint& c = getConstraint(appScene, handle);
+	hinge_joint_constraint& c = getConstraint(scene, handle);
 	minPtr[minPushIndex++] = c.minRotationLimit <= 0.f ? c.minRotationLimit : -M_PI;
 	maxPtr[maxPushIndex++] = c.maxRotationLimit >= 0.f ? c.maxRotationLimit : M_PI;
 }
 
-static void getLimits(scene& appScene, cone_twist_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
+static void getLimits(game_scene& scene, cone_twist_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
 {
-	cone_twist_constraint& c = getConstraint(appScene, handle);
+	cone_twist_constraint& c = getConstraint(scene, handle);
 
 	minPtr[minPushIndex++] = c.twistLimit >= 0.f ? -c.twistLimit : -M_PI;
 	minPtr[minPushIndex++] = c.swingLimit >= 0.f ? -c.swingLimit : -M_PI;
@@ -326,7 +326,7 @@ extern "C" __declspec(dllexport) int getPhysicsActionSize() { return sizeof(lear
 
 extern "C" __declspec(dllexport) void getPhysicsRanges(float* stateMin, float* stateMax, float* actionMin, float* actionMax)
 {
-	scene tmpScene;
+	game_scene tmpScene;
 	humanoid_ragdoll tmpRagdoll;
 	tmpRagdoll.initialize(tmpScene, vec3(0.f));
 
@@ -368,11 +368,11 @@ void locomotion_environment::applyAction(const learning_action& action)
 
 	for (uint32 i = 0; i < NUM_CONE_TWIST_CONSTRAINTS; ++i)
 	{
-		updateConstraint(appScene, ragdoll.coneTwistConstraints[i], lastSmoothedAction.coneTwistActions[i]);
+		updateConstraint(scene, ragdoll.coneTwistConstraints[i], lastSmoothedAction.coneTwistActions[i]);
 	}
 	for (uint32 i = 0; i < NUM_HINGE_JOINT_CONSTRAINTS; ++i)
 	{
-		updateConstraint(appScene, ragdoll.hingeJointConstraints[i], lastSmoothedAction.hingeJointActions[i]);
+		updateConstraint(scene, ragdoll.hingeJointConstraints[i], lastSmoothedAction.hingeJointActions[i]);
 	}
 
 	++episodeLength;
@@ -390,10 +390,10 @@ extern "C" __declspec(dllexport) int updatePhysics(float* action, float* outStat
 		vec3 direction = normalize(vec3(learningEnv->rng.randomFloatBetween(-1.f, 1.f), 0.f, learningEnv->rng.randomFloatBetween(-1.f, 1.f)));
 		vec3 origin = part - direction * 5.f;
 	
-		testPhysicsInteraction(learningEnv->appScene, ray{ origin, direction }, 1000.f);
+		testPhysicsInteraction(learningEnv->scene, ray{ origin, direction });
 	}
 
-	physicsStep(learningEnv->appScene, 1.f / 60.f);
+	physicsStep(learningEnv->scene, 1.f / 60.f);
 	
 	bool failure = learningEnv->getState(*(learning_state*)outState);
 	*outReward = 0.f;
@@ -411,17 +411,17 @@ extern "C" __declspec(dllexport) int updatePhysics(float* action, float* outStat
 
 void locomotion_environment::resetForLearning()
 {
-	appScene.clearAll();
+	scene.clearAll();
 
 	uint32 seed = (uint32)time(0);
 	rng = { seed };
 
-	appScene.createEntity("Test ground")
+	scene.createEntity("Test ground")
 		.addComponent<transform_component>(vec3(0.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f))
 		.addComponent<rigid_body_component>(true);
 
-	ragdoll.initialize(appScene, vec3(0.f, 1.25f, 0.f));
+	ragdoll.initialize(scene, vec3(0.f, 1.25f, 0.f));
 
 	resetCommon();
 }
@@ -450,10 +450,10 @@ void locomotion_environment::resetCommon()
 
 extern "C" __declspec(dllexport) void resetPhysics(float* outState)
 {
-	static scene appScene;
+	static game_scene scene;
 	if (!learningEnv)
 	{
-		learningEnv = new locomotion_environment{ appScene };
+		learningEnv = new locomotion_environment{ scene };
 	}
 
 	learningEnv->resetForLearning();
@@ -490,9 +490,9 @@ static void applyLayer(const float(&weights)[outputSize][inputSize], const float
 
 static locomotion_environment* evaluationEnv;
 
-void initializeLocomotionEval(scene& appScene, humanoid_ragdoll& ragdoll)
+void initializeLocomotionEval(game_scene& scene, humanoid_ragdoll& ragdoll)
 {
-	evaluationEnv = new locomotion_environment{ appScene, ragdoll };
+	evaluationEnv = new locomotion_environment{ scene, ragdoll };
 	evaluationEnv->resetForEvaluation();
 }
 
@@ -535,7 +535,7 @@ void stepLocomotionEval()
 	evaluationEnv->getLastActionReward();
 }
 #else
-void initializeLocomotionEval(scene& appScene, humanoid_ragdoll& ragdoll) {}
+void initializeLocomotionEval(scene& scene, humanoid_ragdoll& ragdoll) {}
 void stepLocomotionEval() {}
 #endif
 

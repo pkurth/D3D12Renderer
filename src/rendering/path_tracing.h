@@ -10,12 +10,13 @@ struct path_tracer : dx_raytracer
     void initialize();
     raytracing_object_type defineObjectType(const ref<raytracing_blas>& blas, const std::vector<ref<pbr_material>>& materials);
 
-    void finish();
+    void rebuildBindingTable();
 
     void render(dx_command_list* cl, const raytracing_tlas& tlas,
         const ref<dx_texture>& output,
         const common_material_info& materialInfo) override;
 
+    void resetRendering();
 
 
     const uint32 maxRecursionDepth = 4;
@@ -60,7 +61,7 @@ private:
         dx_cpu_descriptor_handle output;
     };
 
-
+    bool dirty = false;
 
     // TODO: The descriptor heap shouldn't be a member of this structure. If we have multiple raytracers which use the same object types, they can share the descriptor heap.
     // For example, this path tracer defines objects with vertex buffer, index buffer and their PBR textures. Other raytracers, which use the same layout (e.g. a specular reflections

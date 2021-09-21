@@ -10,9 +10,11 @@
 #include "render_algorithms.h"
 #include "render_resources.h"
 #include "render_utils.h"
+#include "path_tracing.h"
 
 #include "light_source.hlsli"
 #include "camera.hlsli"
+#include "path_tracing.h"
 
 
 
@@ -97,7 +99,7 @@ struct main_renderer
 	void submitRenderPass(opaque_render_pass* renderPass) {	assert(!opaqueRenderPass); opaqueRenderPass = renderPass; }
 	void submitRenderPass(transparent_render_pass* renderPass) { assert(!transparentRenderPass); transparentRenderPass = renderPass; }
 	void submitRenderPass(ldr_render_pass* renderPass) { assert(!ldrRenderPass); ldrRenderPass = renderPass; }
-	void setRaytracer(dx_raytracer* raytracer, raytracing_tlas* tlas) {	this->raytracer = raytracer; this->tlas = tlas;	}
+	void setRaytracingScene(raytracing_tlas* tlas) { this->tlas = tlas;	}
 
 
 
@@ -119,10 +121,10 @@ struct main_renderer
 
 	const renderer_spec spec;
 
+	path_tracer pathTracer;
+
 private:
 
-
-	dx_raytracer* raytracer;
 	raytracing_tlas* tlas;
 
 	const opaque_render_pass* opaqueRenderPass;

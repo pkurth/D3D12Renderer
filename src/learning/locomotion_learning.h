@@ -1,4 +1,4 @@
 #pragma once
 
-void initializeLocomotionEval(struct scene& appScene, struct humanoid_ragdoll& ragdoll);
+void initializeLocomotionEval(struct game_scene& scene, struct humanoid_ragdoll& ragdoll);
 void stepLocomotionEval();

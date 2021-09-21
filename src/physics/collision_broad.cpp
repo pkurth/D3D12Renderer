@@ -66,9 +66,9 @@ void onColliderRemoved(entt::registry& registry, entt::entity entityHandle)
 	registry.remove_if_exists<sap_endpoint_indirection_component>(entityHandle);
 }
 
-uint32 broadphase(scene& appScene, uint32 sortingAxis, bounding_box* worldSpaceAABBs, broadphase_collision* outCollisions)
+uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpaceAABBs, broadphase_collision* outCollisions)
 {
-	uint32 numColliders = appScene.numberOfComponentsOfType<collider_component>();
+	uint32 numColliders = scene.numberOfComponentsOfType<collider_component>();
 	if (numColliders == 0)
 	{
 		return 0;
@@ -77,7 +77,7 @@ uint32 broadphase(scene& appScene, uint32 sortingAxis, bounding_box* worldSpaceA
 	// TODO:
 	static uint16* activeList = new uint16[10000];
 
-	sap_context& context = appScene.getContextVariable<sap_context>();
+	sap_context& context = scene.getContextVariable<sap_context>();
 	auto& endpoints = context.endpoints;
 
 	uint32 numEndpoints = numColliders * 2;
@@ -90,10 +90,10 @@ uint32 broadphase(scene& appScene, uint32 sortingAxis, bounding_box* worldSpaceA
 	// Disable broadphase.
 
 	uint16 collider0Index = 0;
-	for (auto [entityHandle0, collider0] : appScene.view<collider_component>().each())
+	for (auto [entityHandle0, collider0] : scene.view<collider_component>().each())
 	{
 		uint16 collider1Index = 0;
-		for (auto [entityHandle1, collider1] : appScene.view<collider_component>().each())
+		for (auto [entityHandle1, collider1] : scene.view<collider_component>().each())
 		{
 			if (entityHandle0 == entityHandle1)
 			{
@@ -119,7 +119,7 @@ uint32 broadphase(scene& appScene, uint32 sortingAxis, bounding_box* worldSpaceA
 	uint16 index = 0;
 
 	// Update endpoint positions.
-	for (auto [entityHandle, indirection] : appScene.view<sap_endpoint_indirection_component>().each())
+	for (auto [entityHandle, indirection] : scene.view<sap_endpoint_indirection_component>().each())
 	{
 		bounding_box& aabb = worldSpaceAABBs[index];
 
@@ -201,7 +201,7 @@ uint32 broadphase(scene& appScene, uint32 sortingAxis, bounding_box* worldSpaceA
 	for (uint32 i = 0; i < numEndpoints; ++i)
 	{
 		sap_endpoint ep = endpoints[i];
-		scene_entity entity = { ep.entity, appScene };
+		scene_entity entity = { ep.entity, scene };
 		sap_endpoint_indirection_component& in = entity.getComponent<sap_endpoint_indirection_component>();
 
 		if (ep.start)

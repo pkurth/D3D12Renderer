@@ -3,10 +3,10 @@
 #include "render_resources.h"
 #include "shadow_map_cache.h"
 
-static void renderStaticGeometryToSunShadowMap(sun_shadow_render_pass* renderPass, scene& appScene)
+static void renderStaticGeometryToSunShadowMap(sun_shadow_render_pass* renderPass, game_scene& scene)
 {
 	for (auto [entityHandle, raster, transform] : 
-		appScene.group(entt::get<raster_component, transform_component>, entt::exclude<dynamic_transform_component>).each())
+		scene.group(entt::get<raster_component, transform_component>, entt::exclude<dynamic_transform_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -18,10 +18,10 @@ static void renderStaticGeometryToSunShadowMap(sun_shadow_render_pass* renderPas
 	}
 }
 
-static void renderDynamicGeometryToSunShadowMap(sun_shadow_render_pass* renderPass, scene& appScene)
+static void renderDynamicGeometryToSunShadowMap(sun_shadow_render_pass* renderPass, game_scene& scene)
 {
 	for (auto [entityHandle, raster, transform, dynamic] : 
-		appScene.group(entt::get<raster_component, transform_component, dynamic_transform_component>, entt::exclude<animation_component>).each())
+		scene.group(entt::get<raster_component, transform_component, dynamic_transform_component>, entt::exclude<animation_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -33,7 +33,7 @@ static void renderDynamicGeometryToSunShadowMap(sun_shadow_render_pass* renderPa
 	}
 
 	for (auto [entityHandle, raster, anim, transform, dynamic] :
-		appScene.group(entt::get<raster_component, animation_component, transform_component, dynamic_transform_component>).each())
+		scene.group(entt::get<raster_component, animation_component, transform_component, dynamic_transform_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -47,10 +47,10 @@ static void renderDynamicGeometryToSunShadowMap(sun_shadow_render_pass* renderPa
 	}
 }
 
-static void renderStaticGeometryToSpotShadowMap(spot_shadow_render_pass* renderPass, scene& appScene)
+static void renderStaticGeometryToSpotShadowMap(spot_shadow_render_pass* renderPass, game_scene& scene)
 {
 	for (auto [entityHandle, raster, transform] : 
-		appScene.group(entt::get<raster_component, transform_component>, entt::exclude<dynamic_transform_component>).each())
+		scene.group(entt::get<raster_component, transform_component>, entt::exclude<dynamic_transform_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -62,10 +62,10 @@ static void renderStaticGeometryToSpotShadowMap(spot_shadow_render_pass* renderP
 	}
 }
 
-static void renderDynamicGeometryToSpotShadowMap(spot_shadow_render_pass* renderPass, scene& appScene)
+static void renderDynamicGeometryToSpotShadowMap(spot_shadow_render_pass* renderPass, game_scene& scene)
 {
 	for (auto [entityHandle, raster, transform, dynamic] : 
-		appScene.group(entt::get<raster_component, transform_component, dynamic_transform_component>, entt::exclude<animation_component>).each())
+		scene.group(entt::get<raster_component, transform_component, dynamic_transform_component>, entt::exclude<animation_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -77,7 +77,7 @@ static void renderDynamicGeometryToSpotShadowMap(spot_shadow_render_pass* render
 	}
 
 	for (auto [entityHandle, raster, anim, transform, dynamic] : 
-		appScene.group(entt::get<raster_component, animation_component, transform_component, dynamic_transform_component>).each())
+		scene.group(entt::get<raster_component, animation_component, transform_component, dynamic_transform_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -91,10 +91,10 @@ static void renderDynamicGeometryToSpotShadowMap(spot_shadow_render_pass* render
 	}
 }
 
-static void renderStaticGeometryToPointShadowMap(point_shadow_render_pass* renderPass, scene& appScene)
+static void renderStaticGeometryToPointShadowMap(point_shadow_render_pass* renderPass, game_scene& scene)
 {
 	for (auto [entityHandle, raster, transform] : 
-		appScene.group(entt::get<raster_component, transform_component>, entt::exclude<dynamic_transform_component>).each())
+		scene.group(entt::get<raster_component, transform_component>, entt::exclude<dynamic_transform_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -106,10 +106,10 @@ static void renderStaticGeometryToPointShadowMap(point_shadow_render_pass* rende
 	}
 }
 
-static void renderDynamicGeometryToPointShadowMap(point_shadow_render_pass* renderPass, scene& appScene)
+static void renderDynamicGeometryToPointShadowMap(point_shadow_render_pass* renderPass, game_scene& scene)
 {
 	for (auto [entityHandle, raster, transform, dynamic] : 
-		appScene.group(entt::get<raster_component, transform_component, dynamic_transform_component>, entt::exclude<animation_component>).each())
+		scene.group(entt::get<raster_component, transform_component, dynamic_transform_component>, entt::exclude<animation_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -121,7 +121,7 @@ static void renderDynamicGeometryToPointShadowMap(point_shadow_render_pass* rend
 	}
 
 	for (auto [entityHandle, raster, anim, transform, dynamic] : 
-		appScene.group(entt::get<raster_component, animation_component, transform_component, dynamic_transform_component>).each())
+		scene.group(entt::get<raster_component, animation_component, transform_component, dynamic_transform_component>).each())
 	{
 		const dx_mesh& mesh = raster.mesh->mesh;
 		mat4 m = trsToMat4(transform);
@@ -139,7 +139,7 @@ static void renderDynamicGeometryToPointShadowMap(point_shadow_render_pass* rend
 
 
 
-void renderSunShadowMap(directional_light& sun, sun_shadow_render_pass* renderPass, scene& appScene, bool invalidateCache)
+void renderSunShadowMap(directional_light& sun, sun_shadow_render_pass* renderPass, game_scene& scene, bool invalidateCache)
 {
 	bool staticCacheAvailable = !invalidateCache;
 
@@ -166,13 +166,13 @@ void renderSunShadowMap(directional_light& sun, sun_shadow_render_pass* renderPa
 	}
 	else
 	{
-		renderStaticGeometryToSunShadowMap(renderPass, appScene);
+		renderStaticGeometryToSunShadowMap(renderPass, scene);
 	}
 
-	renderDynamicGeometryToSunShadowMap(renderPass, appScene);
+	renderDynamicGeometryToSunShadowMap(renderPass, scene);
 }
 
-spot_shadow_info renderSpotShadowMap(const spot_light_cb& spotLight, uint32 lightID, spot_shadow_render_pass* renderPass, scene& appScene, bool invalidateCache, uint32 resolution)
+spot_shadow_info renderSpotShadowMap(const spot_light_cb& spotLight, uint32 lightID, spot_shadow_render_pass* renderPass, game_scene& scene, bool invalidateCache, uint32 resolution)
 {
 	uint64 uniqueID = ((uint64)(lightID + 1) << 32);
 
@@ -189,10 +189,10 @@ spot_shadow_info renderSpotShadowMap(const spot_light_cb& spotLight, uint32 ligh
 	}
 	else
 	{
-		renderStaticGeometryToSpotShadowMap(renderPass, appScene);
+		renderStaticGeometryToSpotShadowMap(renderPass, scene);
 	}
 
-	renderDynamicGeometryToSpotShadowMap(renderPass, appScene);
+	renderDynamicGeometryToSpotShadowMap(renderPass, scene);
 
 	spot_shadow_info si;
 	si.viewport = vec4(vp.x, vp.y, vp.size, vp.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
@@ -201,7 +201,7 @@ spot_shadow_info renderSpotShadowMap(const spot_light_cb& spotLight, uint32 ligh
 	return si;
 }
 
-point_shadow_info renderPointShadowMap(const point_light_cb& pointLight, uint32 lightID, point_shadow_render_pass* renderPass, scene& appScene, bool invalidateCache, uint32 resolution)
+point_shadow_info renderPointShadowMap(const point_light_cb& pointLight, uint32 lightID, point_shadow_render_pass* renderPass, game_scene& scene, bool invalidateCache, uint32 resolution)
 {
 	uint64 uniqueID = ((uint64)(lightID + 1) << 32);
 
@@ -222,10 +222,10 @@ point_shadow_info renderPointShadowMap(const point_light_cb& pointLight, uint32 
 	}
 	else
 	{
-		renderStaticGeometryToPointShadowMap(renderPass, appScene);
+		renderStaticGeometryToPointShadowMap(renderPass, scene);
 	}
 
-	renderDynamicGeometryToPointShadowMap(renderPass, appScene);
+	renderDynamicGeometryToPointShadowMap(renderPass, scene);
 
 
 	point_shadow_info si;

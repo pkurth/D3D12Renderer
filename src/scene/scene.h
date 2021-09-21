@@ -4,13 +4,19 @@
 //#include <entt/entt.hpp>
 #include <entt/entity/registry.hpp>
 #include "components.h"
+#include "rendering/light_source.h"
+#include "rendering/pbr.h"
+#include "core/camera.h"
+
+struct game_scene;
 
 struct scene_entity
 {
 	scene_entity() = default;
-	inline scene_entity(entt::entity handle, struct scene& scene);
-	inline scene_entity(uint32 id, struct scene& scene);
+	inline scene_entity(entt::entity handle, game_scene& scene);
+	inline scene_entity(uint32 id, game_scene& scene);
 	scene_entity(entt::entity handle, entt::registry* registry) : handle(handle), registry(registry) {}
+	scene_entity(uint32 id, entt::registry* reg) : handle((entt::entity)id), registry(reg) {}
 	scene_entity(const scene_entity&) = default;
 
 	template <typename component_t, typename... args>
@@ -123,17 +129,11 @@ struct scene_entity
 
 	entt::entity handle = entt::null;
 	entt::registry* registry;
-
-
-	scene_entity(uint32 id, entt::registry* reg) : handle((entt::entity)id), registry(reg) {}
-
-	friend struct scene;
-	friend void onColliderAdded(entt::registry& registry, entt::entity entityHandle);
 };
 
-struct scene
+struct game_scene
 {
-	scene();
+	game_scene();
 
 	scene_entity createEntity(const char* name)
 	{
@@ -229,7 +229,12 @@ struct scene
 	}
 
 	entt::registry registry;
+
+
+	render_camera camera;
+	directional_light sun;
+	ref<pbr_environment> environment;
 };
 
-inline scene_entity::scene_entity(entt::entity handle, struct scene& scene) : handle(handle), registry(&scene.registry) {}
-inline scene_entity::scene_entity(uint32 id, struct scene& scene) : handle((entt::entity)id), registry(&scene.registry) {}
+inline scene_entity::scene_entity(entt::entity handle, game_scene& scene) : handle(handle), registry(&scene.registry) {}
+inline scene_entity::scene_entity(uint32 id, game_scene& scene) : handle((entt::entity)id), registry(&scene.registry) {}

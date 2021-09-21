@@ -123,6 +123,11 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 		objectIDsTexture = createTexture(0, renderWidth, renderHeight, objectIDsFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		SET_NAME(objectIDsTexture->resource, "Object IDs");
 	}
+
+	if (dxContext.featureSupport.raytracing())
+	{
+		pathTracer.initialize();
+	}
 }
 
 void main_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
@@ -635,8 +640,10 @@ void main_renderer::endFrame(const user_input& input)
 
 		dxContext.executeCommandLists(cls, arraysize(cls));
 	}
-	else if (dxContext.featureSupport.raytracing() && raytracer)
+	else if (dxContext.featureSupport.raytracing())
 	{
+		pathTracer.rebuildBindingTable();
+
 		dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
 
@@ -658,7 +665,7 @@ void main_renderer::endFrame(const user_input& input)
 
 			dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // Wait for AS-rebuilds. TODO: This is not the way to go here. We should wait for the specific value returned by executeCommandList.
 
-			raytracer->render(cl, *tlas, hdrColorTexture, materialInfo);
+			pathTracer.render(cl, *tlas, hdrColorTexture, materialInfo);
 		}
 
 		cl->resetToDynamicDescriptorHeap();

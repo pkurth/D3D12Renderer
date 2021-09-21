@@ -152,12 +152,18 @@ raytracing_object_type path_tracer::defineObjectType(const ref<raytracing_blas>&
 
     instanceContributionToHitGroupIndex += numGeometries * numRayTypes;
 
+    dirty = true;
+
     return result;
 }
 
-void path_tracer::finish()
+void path_tracer::rebuildBindingTable()
 {
-    bindingTable.build();
+    if (dirty)
+    {
+        bindingTable.build();
+        dirty = false;
+    }
 }
 
 void path_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
@@ -212,6 +218,11 @@ void path_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
     cl->raytrace(raytraceDesc);
 
     ++numAveragedFrames;
+}
+
+void path_tracer::resetRendering()
+{
+    numAveragedFrames = 0;
 }
 
 

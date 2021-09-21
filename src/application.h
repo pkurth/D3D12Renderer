@@ -5,17 +5,12 @@
 #include "core/camera_controller.h"
 #include "geometry/mesh.h"
 #include "core/math.h"
-#include "rendering/main_renderer.h"
-#include "rendering/light_source.h"
-#include "scene/particle_systems.h"
-#include "editor/transformation_gizmo.h"
-#include "rendering/raytracing.h"
-#include "physics/ragdoll.h"
-#include "editor/undo_stack.h"
-
-#include "rendering/path_tracing.h"
-
 #include "scene/scene.h"
+#include "rendering/main_renderer.h"
+#include "scene/particle_systems.h"
+#include "rendering/raytracing.h"
+#include "editor/editor.h"
+
 
 
 
@@ -25,32 +20,16 @@ struct application
 	void initialize(main_renderer* renderer);
 	void update(const user_input& input, float dt);
 
-	void setEnvironment(const fs::path& filename);
-
 	void handleFileDrop(const fs::path& filename);
-	void serializeToFile();
-	bool deserializeFromFile();
 
 private:
-	void updateSelectedEntityUIRotation();
-	void setSelectedEntity(scene_entity entity);
-	void setSelectedEntityNoUndo(scene_entity entity);
-	void drawMainMenuBar();
-	bool drawSceneHierarchy();
-	void drawSettings(float dt);
 
 	void resetRenderPasses();
 	void submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 numPointLightShadowPasses);
-	bool handleUserInput(const user_input& input, float dt);
 
-	undo_stack undoStack;
-
-	transformation_gizmo gizmo;
 
 	raytracing_tlas raytracingTLAS;
-	path_tracer pathTracer;
 
-	ref<pbr_environment> environment;
 
 
 	ref<dx_buffer> pointLightBuffer[NUM_BUFFERED_FRAMES];
@@ -68,25 +47,14 @@ private:
 	smoke_particle_system smokeParticleSystem;
 	boid_particle_system boidParticleSystem;
 
-	directional_light sun;
-
 	main_renderer* renderer;
 
-	render_camera camera;
-	camera_controller cameraController;
-
-	scene appScene;
-	scene_entity selectedEntity;
-	vec3 selectedEntityEulerRotation;
+	game_scene scene;
+	scene_editor editor;
 
 
 	uint32 numSpotShadowRenderPasses;
 	uint32 numPointShadowRenderPasses;
-
-	humanoid_ragdoll ragdoll;
-	float testPhysicsForce = 300.f;
-
-	physics_settings physicsSettings;
 
 	opaque_render_pass opaqueRenderPass;
 	transparent_render_pass transparentRenderPass;
@@ -96,5 +64,4 @@ private:
 	ldr_render_pass ldrRenderPass;
 
 
-	friend struct selection_undo;
 };
