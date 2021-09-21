@@ -13,3 +13,5 @@ learning/gym-loco/gym_loco/envs/__pycache__/
 trained_models/ppo/loco-v0.pt
 tmp/
 learning/__pycache__/
+*.user
+*.dll
