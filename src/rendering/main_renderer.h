@@ -17,6 +17,24 @@
 
 
 
+struct renderer_settings
+{
+	tonemap_settings tonemapSettings;
+	float environmentIntensity = 1.f;
+	float skyIntensity = 1.f;
+
+	bool enableSSR = true;
+	ssr_settings ssrSettings;
+
+	bool enableTAA = true;
+	taa_settings taaSettings;
+
+	bool enableBloom = true;
+	bloom_settings bloomSettings;
+
+	bool enableSharpen = true;
+	sharpen_settings sharpenSettings;
+};
 
 
 enum aspect_ratio_mode
@@ -87,23 +105,8 @@ struct main_renderer
 	renderer_mode mode = renderer_mode_rasterized;
 	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
 
-	tonemap_settings tonemapSettings;
-	float environmentIntensity = 1.f;
-	float skyIntensity = 1.f;
 
-	bool enableSSR = true;
-	ssr_settings ssrSettings;
-
-	bool enableTAA = true;
-	taa_settings taaSettings;
-
-	bool enableBloom = true;
-	bloom_settings bloomSettings;
-
-	bool enableSharpen = true;
-	sharpen_settings sharpenSettings;
-
-
+	renderer_settings settings;
 
 
 

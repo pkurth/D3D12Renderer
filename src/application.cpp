@@ -13,9 +13,8 @@
 #include "rendering/shadow_map.h"
 #include "rendering/shadow_map_renderer.h"
 #include "rendering/debug_visualization.h"
-#include "editor/file_dialog.h"
-#include "core/yaml.h"
 #include "learning/locomotion_learning.h"
+#include "scene/serialization.h"
 
 #include <fontawesome/list.h>
 
@@ -1381,15 +1380,15 @@ void application::drawSettings(float dt)
 
 		ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->aspectRatioMode);
 
-		plotAndEditTonemapping(renderer->tonemapSettings);
+		plotAndEditTonemapping(renderer->settings.tonemapSettings);
 		editSunShadowParameters(sun);
 
 		if (ImGui::BeginTree("Post processing"))
 		{
-			if (renderer->spec.allowSSR) { editSSR(renderer->enableSSR, renderer->ssrSettings); ImGui::Separator(); }
-			if (renderer->spec.allowTAA) { editTAA(renderer->enableTAA, renderer->taaSettings); ImGui::Separator(); }
-			if (renderer->spec.allowBloom) { editBloom(renderer->enableBloom, renderer->bloomSettings); ImGui::Separator(); }
-			editSharpen(renderer->enableSharpen, renderer->sharpenSettings);
+			if (renderer->spec.allowSSR) { editSSR(renderer->settings.enableSSR, renderer->settings.ssrSettings); ImGui::Separator(); }
+			if (renderer->spec.allowTAA) { editTAA(renderer->settings.enableTAA, renderer->settings.taaSettings); ImGui::Separator(); }
+			if (renderer->spec.allowBloom) { editBloom(renderer->settings.enableBloom, renderer->settings.bloomSettings); ImGui::Separator(); }
+			editSharpen(renderer->settings.enableSharpen, renderer->settings.sharpenSettings);
 
 			ImGui::EndTree();
 		}
@@ -1398,8 +1397,8 @@ void application::drawSettings(float dt)
 		{
 			if (ImGui::BeginProperties())
 			{
-				ImGui::PropertySlider("Environment intensity", renderer->environmentIntensity, 0.f, 2.f);
-				ImGui::PropertySlider("Sky intensity", renderer->skyIntensity, 0.f, 2.f);
+				ImGui::PropertySlider("Environment intensity", renderer->settings.environmentIntensity, 0.f, 2.f);
+				ImGui::PropertySlider("Sky intensity", renderer->settings.skyIntensity, 0.f, 2.f);
 				ImGui::EndProperties();
 			}
 
@@ -1979,231 +1978,20 @@ void application::handleFileDrop(const fs::path& filename)
 	}
 }
 
-
-
-
-// Serialization stuff.
-
 void application::serializeToFile()
 {
-	std::string filename = saveFileDialog("Scene files", "sc");
-	if (filename.empty())
-	{
-		return;
-	}
-
-	YAML::Emitter out;
-	out << YAML::BeginMap;
-	out << YAML::Key << "Scene" << YAML::Value << "My scene";
-
-	out << YAML::Key << "Camera"
-		<< YAML::Value
-		<< YAML::BeginMap
-		<< YAML::Key << "Position" << YAML::Value << camera.position
-		<< YAML::Key << "Rotation" << YAML::Value << camera.rotation
-		<< YAML::Key << "Near Plane" << YAML::Value << camera.nearPlane
-		<< YAML::Key << "Far Plane" << YAML::Value << camera.farPlane
-		<< YAML::Key << "Type" << YAML::Value << camera.type;
-	if (camera.type == camera_type_ingame)
-	{
-		out << YAML::Key << "FOV" << YAML::Value << camera.verticalFOV;
-	}
-	else
-	{
-		out << YAML::Key << "Fx" << YAML::Value << camera.fx
-			<< YAML::Key << "Fy" << YAML::Value << camera.fy
-			<< YAML::Key << "Cx" << YAML::Value << camera.cx
-			<< YAML::Key << "Cy" << YAML::Value << camera.cy;
-	}
-	out << YAML::EndMap;
-
-
-	out << YAML::Key << "Tone Map"
-		<< YAML::Value
-		<< YAML::BeginMap
-		<< YAML::Key << "A" << YAML::Value << renderer->tonemapSettings.A
-		<< YAML::Key << "B" << YAML::Value << renderer->tonemapSettings.B
-		<< YAML::Key << "C" << YAML::Value << renderer->tonemapSettings.C
-		<< YAML::Key << "D" << YAML::Value << renderer->tonemapSettings.D
-		<< YAML::Key << "E" << YAML::Value << renderer->tonemapSettings.E
-		<< YAML::Key << "F" << YAML::Value << renderer->tonemapSettings.F
-		<< YAML::Key << "Linear White" << YAML::Value << renderer->tonemapSettings.linearWhite
-		<< YAML::Key << "Exposure" << YAML::Value << renderer->tonemapSettings.exposure
-		<< YAML::EndMap;
-
-
-	out << YAML::Key << "Sun"
-		<< YAML::Value
-		<< YAML::BeginMap
-		<< YAML::Key << "Color" << YAML::Value << sun.color
-		<< YAML::Key << "Intensity" << YAML::Value << sun.intensity
-		<< YAML::Key << "Direction" << YAML::Value << sun.direction
-		<< YAML::Key << "Cascades" << YAML::Value << sun.numShadowCascades
-		<< YAML::Key << "Distances" << YAML::Value << sun.cascadeDistances
-		<< YAML::Key << "Bias" << YAML::Value << sun.bias
-		<< YAML::Key << "Blend Distances" << YAML::Value << sun.blendDistances
-		<< YAML::EndMap;
-
-
-	out << YAML::Key << "Environment"
-		<< YAML::Value
-		<< YAML::BeginMap
-		<< YAML::Key << "Name" << YAML::Value << environment->name
-		<< YAML::Key << "Intensity" << renderer->environmentIntensity
-		<< YAML::EndMap;
-
-	out << YAML::Key << "Entities"
-		<< YAML::Value
-		<< YAML::BeginSeq;
-
-	appScene.forEachEntity([this, &out](entt::entity entityID)
-	{
-		scene_entity entity = { entityID, appScene };
-
-		out << YAML::BeginMap;
-
-		tag_component& tag = entity.getComponent<tag_component>();
-		out << YAML::Key << "Tag" << YAML::Value << tag.name;
-
-		if (transform_component* transform = entity.getComponentIfExists<transform_component>())
-		{
-			out << YAML::Key << "Transform" << YAML::Value
-				<< YAML::BeginMap
-				<< YAML::Key << "Rotation" << YAML::Value << transform->rotation
-				<< YAML::Key << "Position" << YAML::Value << transform->position
-				<< YAML::Key << "Scale" << YAML::Value << transform->scale
-				<< YAML::EndMap;
-		}
-
-		if (raster_component* raster = entity.getComponentIfExists<raster_component>())
-		{
-			out << YAML::Key << "Raster" << YAML::Value
-				<< YAML::BeginMap
-				<< YAML::Key << "Mesh" << YAML::Value << raster->mesh->filepath
-				<< YAML::Key << "Flags" << YAML::Value << raster->mesh->flags
-				<< YAML::Key << "Animation files" << YAML::Value << YAML::BeginSeq;
-
-			for (const fs::path& s : raster->mesh->skeleton.files)
-			{
-				out << s;
-			}
-
-			out << YAML::EndSeq
-				<< YAML::EndMap;
-		}
-
-		if (animation_component* anim = entity.getComponentIfExists<animation_component>())
-		{
-
-		}
-
-		out << YAML::EndMap;
-	});
-
-	out << YAML::EndSeq;
-
-	out << YAML::EndMap;
-
-	fs::create_directories(fs::path(filename).parent_path());
-
-	std::ofstream fout(filename);
-	fout << out.c_str();
+	serializeSceneToDisk(appScene, camera, sun, renderer->settings, environment);
 }
 
 bool application::deserializeFromFile()
 {
-	std::string filename = openFileDialog("Scene files", "sc");
-	if (filename.empty())
+	std::string environmentName;
+	if (deserializeSceneFromDisk(appScene, camera, sun, renderer->settings, environmentName))
 	{
-		return false;
+		setSelectedEntityNoUndo({});
+		setEnvironment(environmentName);
+
+		return true;
 	}
-
-	std::ifstream stream(filename);
-	YAML::Node data = YAML::Load(stream);
-	if (!data["Scene"])
-	{
-		return false;
-	}
-
-	setSelectedEntityNoUndo({});
-
-	appScene = scene();
-
-	std::string sceneName = data["Scene"].as<std::string>();
-
-	auto cameraNode = data["Camera"];
-	camera.position = cameraNode["Position"].as<vec3>();
-	camera.rotation = cameraNode["Rotation"].as<quat>();
-	camera.nearPlane = cameraNode["Near Plane"].as<float>();
-	camera.farPlane = cameraNode["Far Plane"].as<float>();
-	camera.type = (camera_type)cameraNode["Type"].as<int>();
-	if (camera.type == camera_type_ingame)
-	{
-		camera.verticalFOV = cameraNode["FOV"].as<float>();
-	}
-	else
-	{
-		camera.fx = cameraNode["Fx"].as<float>();
-		camera.fy = cameraNode["Fy"].as<float>();
-		camera.cx = cameraNode["Cx"].as<float>();
-		camera.cy = cameraNode["Cy"].as<float>();
-	}
-
-	auto tonemapNode = data["Tone Map"];
-	renderer->tonemapSettings.A = tonemapNode["A"].as<float>();
-	renderer->tonemapSettings.B = tonemapNode["B"].as<float>();
-	renderer->tonemapSettings.C = tonemapNode["C"].as<float>();
-	renderer->tonemapSettings.D = tonemapNode["D"].as<float>();
-	renderer->tonemapSettings.E = tonemapNode["E"].as<float>();
-	renderer->tonemapSettings.F = tonemapNode["F"].as<float>();
-	renderer->tonemapSettings.linearWhite = tonemapNode["Linear White"].as<float>();
-	renderer->tonemapSettings.exposure = tonemapNode["Exposure"].as<float>();
-
-	auto sunNode = data["Sun"];
-	sun.color = sunNode["Color"].as<decltype(sun.color)>();
-	sun.intensity = sunNode["Intensity"].as<decltype(sun.intensity)>();
-	sun.direction = sunNode["Direction"].as<decltype(sun.direction)>();
-	sun.numShadowCascades = sunNode["Cascades"].as<decltype(sun.numShadowCascades)>();
-	sun.cascadeDistances = sunNode["Distances"].as<decltype(sun.cascadeDistances)>();
-	sun.bias = sunNode["Bias"].as<decltype(sun.bias)>();
-	sun.blendDistances = sunNode["Blend Distances"].as<decltype(sun.blendDistances)>();
-
-	auto environmentNode = data["Environment"];
-	setEnvironment(environmentNode["Name"].as<fs::path>());
-	renderer->environmentIntensity = environmentNode["Intensity"].as<float>();
-
-	auto entitiesNode = data["Entities"];
-	for (auto entityNode : entitiesNode)
-	{
-		std::string name = entityNode["Tag"].as<std::string>();
-		scene_entity entity = appScene.createEntity(name.c_str());
-
-		if (entityNode["Transform"])
-		{
-			auto transformNode = entityNode["Transform"];
-			entity.addComponent<transform_component>(transformNode["Position"].as<vec3>(), transformNode["Rotation"].as<quat>(), transformNode["Scale"].as<vec3>());
-		}
-
-		if (entityNode["Raster"])
-		{
-			auto rasterNode = entityNode["Raster"];
-			auto mesh = loadMeshFromFile(rasterNode["Mesh"].as<fs::path>(), rasterNode["Flags"].as<uint32>());
-
-			auto animationsNode = rasterNode["Animation files"];
-			for (auto file : animationsNode)
-			{
-				mesh->skeleton.pushAssimpAnimations(file.as<fs::path>());
-			}
-
-			entity.addComponent<raster_component>(mesh);
-		}
-
-		if (entityNode["Animation"])
-		{
-			auto animNode = entityNode["Animation"];
-			//entity.addComponent<animation_component>(createAnimationController((animation_controller_type)animNode["Type"].as<uint32>()));
-		}
-	}
-
-	return true;
+	return false;
 }
