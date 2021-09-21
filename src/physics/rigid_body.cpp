@@ -2,6 +2,7 @@
 #include "rigid_body.h"
 #include "physics.h"
 
+
 rigid_body_component::rigid_body_component(bool kinematic, float gravityFactor, float linearDamping, float angularDamping)
 {
 	if (kinematic)

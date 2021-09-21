@@ -40,6 +40,7 @@ struct point_light_component
 	point_light_component() {}
 	point_light_component(vec3 color, float intensity, float radius, bool castsShadow = false, uint32 shadowMapResolution = 512)
 		: color(color), intensity(intensity), radius(radius), castsShadow(castsShadow), shadowMapResolution(shadowMapResolution) {}
+	point_light_component(const point_light_component&) = default;
 };
 
 struct spot_light_component
@@ -55,6 +56,7 @@ struct spot_light_component
 	spot_light_component() {}
 	spot_light_component(vec3 color, float intensity, float distance, float innerAngle, float outerAngle, bool castsShadow = false, uint32 shadowMapResolution = 512)
 		: color(color), intensity(intensity), distance(distance), innerAngle(innerAngle), outerAngle(outerAngle), castsShadow(castsShadow), shadowMapResolution(shadowMapResolution) {}
+	spot_light_component(const spot_light_component&) = default;
 };
 
 mat4 getSpotLightViewProjectionMatrix(const spot_light_cb& sl);

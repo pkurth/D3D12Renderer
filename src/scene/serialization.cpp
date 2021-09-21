@@ -4,6 +4,8 @@
 #include "editor/file_dialog.h"
 #include "core/yaml.h"
 
+#include "physics/physics.h"
+
 
 static YAML::Emitter& operator<<(YAML::Emitter& out, const render_camera& camera)
 {
@@ -120,6 +122,107 @@ static YAML::Emitter& operator<<(YAML::Emitter& out, const transform_component& 
 		<< YAML::Key << "Rotation" << YAML::Value << c.rotation
 		<< YAML::Key << "Position" << YAML::Value << c.position
 		<< YAML::Key << "Scale" << YAML::Value << c.scale
+		<< YAML::EndMap;
+	return out;
+}
+
+static YAML::Emitter& operator<<(YAML::Emitter& out, const position_component& c)
+{
+	out << YAML::BeginMap
+		<< YAML::Key << "Position" << YAML::Value << c.position
+		<< YAML::EndMap;
+	return out;
+}
+
+static YAML::Emitter& operator<<(YAML::Emitter& out, const position_rotation_component& c)
+{
+	out << YAML::BeginMap
+		<< YAML::Key << "Rotation" << YAML::Value << c.rotation
+		<< YAML::Key << "Position" << YAML::Value << c.position
+		<< YAML::EndMap;
+	return out;
+}
+
+static YAML::Emitter& operator<<(YAML::Emitter& out, const point_light_component& c)
+{
+	out << YAML::BeginMap
+		<< YAML::Key << "Color" << YAML::Value << c.color
+		<< YAML::Key << "Intensity" << YAML::Value << c.intensity
+		<< YAML::Key << "Radius" << YAML::Value << c.radius
+		<< YAML::Key << "Casts shadow" << YAML::Value << c.castsShadow
+		<< YAML::Key << "Shadow resolution" << YAML::Value << c.shadowMapResolution
+		<< YAML::EndMap;
+	return out;
+}
+
+static YAML::Emitter& operator<<(YAML::Emitter& out, const spot_light_component& c)
+{
+	out << YAML::BeginMap
+		<< YAML::Key << "Color" << YAML::Value << c.color
+		<< YAML::Key << "Intensity" << YAML::Value << c.intensity
+		<< YAML::Key << "Distance" << YAML::Value << c.distance
+		<< YAML::Key << "Inner angle" << YAML::Value << c.innerAngle
+		<< YAML::Key << "Outer angle" << YAML::Value << c.outerAngle
+		<< YAML::Key << "Casts shadow" << YAML::Value << c.castsShadow
+		<< YAML::Key << "Shadow resolution" << YAML::Value << c.shadowMapResolution
+		<< YAML::EndMap;
+	return out;
+}
+
+static YAML::Emitter& operator<<(YAML::Emitter& out, const rigid_body_component& c)
+{
+	out << YAML::BeginMap
+		<< YAML::Key << "Local COG" << YAML::Value << c.localCOGPosition
+		<< YAML::Key << "Inv mass" << YAML::Value << c.invMass
+		<< YAML::Key << "Inv inertia" << YAML::Value << c.invInertia
+		<< YAML::Key << "Gravity factor" << YAML::Value << c.gravityFactor
+		<< YAML::Key << "Linear damping" << YAML::Value << c.linearDamping
+		<< YAML::Key << "Angular damping" << YAML::Value << c.angularDamping
+		<< YAML::EndMap;
+	return out;
+}
+
+static YAML::Emitter& operator<<(YAML::Emitter& out, const collider_component& c)
+{
+	out << YAML::BeginMap
+		<< YAML::Key << "Type" << YAML::Value << colliderTypeNames[c.type];
+
+	switch (c.type)
+	{
+		case collider_type_sphere:
+		{
+			out << YAML::Key << "Center" << YAML::Value << c.sphere.center
+				<< YAML::Key << "Radius" << YAML::Value << c.sphere.radius;
+		} break;
+
+		case collider_type_capsule:
+		{
+			out << YAML::Key << "Position A" << YAML::Value << c.capsule.positionA
+				<< YAML::Key << "Position B" << YAML::Value << c.capsule.positionB
+				<< YAML::Key << "Radius" << YAML::Value << c.capsule.radius;
+		} break;
+
+		case collider_type_aabb:
+		{
+			out << YAML::Key << "Min corner" << YAML::Value << c.aabb.minCorner
+				<< YAML::Key << "Max corner" << YAML::Value << c.aabb.maxCorner;
+		} break;
+
+		case collider_type_obb:
+		{
+			out << YAML::Key << "Center" << YAML::Value << c.obb.center
+				<< YAML::Key << "Radius" << YAML::Value << c.obb.radius
+				<< YAML::Key << "Rotation" << YAML::Value << c.obb.rotation;
+		} break;
+
+		case collider_type_hull:
+		{
+		} break;
+	}
+
+	out << YAML::Key << "Restitution" << YAML::Value << c.properties.restitution
+		<< YAML::Key << "Friction" << YAML::Value << c.properties.friction
+		<< YAML::Key << "Density" << YAML::Value << c.properties.density
 		<< YAML::EndMap;
 	return out;
 }
@@ -318,6 +421,179 @@ namespace YAML
 			return true;
 		}
 	};
+
+	template<>
+	struct convert<position_component>
+	{
+		static bool decode(const Node& n, position_component& c)
+		{
+			if (!n.IsMap())
+			{
+				return false;
+			}
+
+			LOAD(c.position, "Position");
+
+			return true;
+		}
+	};
+
+	template<>
+	struct convert<position_rotation_component>
+	{
+		static bool decode(const Node& n, position_rotation_component& c)
+		{
+			if (!n.IsMap())
+			{
+				return false;
+			}
+
+			LOAD(c.rotation, "Rotation");
+			LOAD(c.position, "Position");
+
+			return true;
+		}
+	};
+
+	template<>
+	struct convert<point_light_component>
+	{
+		static bool decode(const Node& n, point_light_component& c)
+		{
+			if (!n.IsMap())
+			{
+				return false;
+			}
+
+			LOAD(c.color, "Color");
+			LOAD(c.intensity, "Intensity");
+			LOAD(c.radius, "Radius");
+			LOAD(c.castsShadow, "Casts shadow");
+			LOAD(c.shadowMapResolution, "Shadow resolution");
+
+			return true;
+		}
+	};
+
+	template<>
+	struct convert<spot_light_component>
+	{
+		static bool decode(const Node& n, spot_light_component& c)
+		{
+			if (!n.IsMap())
+			{
+				return false;
+			}
+
+			LOAD(c.color, "Color");
+			LOAD(c.intensity, "Intensity");
+			LOAD(c.distance, "Distance");
+			LOAD(c.innerAngle, "Inner angle");
+			LOAD(c.outerAngle, "Outer angle");
+			LOAD(c.castsShadow, "Casts shadow");
+			LOAD(c.shadowMapResolution, "Shadow resolution");
+
+			return true;
+		}
+	};
+
+	template<>
+	struct convert<rigid_body_component>
+	{
+		static bool decode(const Node& n, rigid_body_component& c)
+		{
+			if (!n.IsMap())
+			{
+				return false;
+			}
+
+			LOAD(c.localCOGPosition, "Local COG");
+			LOAD(c.invMass, "Inv mass");
+			LOAD(c.invInertia, "Inv inertia");
+			LOAD(c.gravityFactor, "Gravity factor");
+			LOAD(c.linearDamping, "Linear damping");
+			LOAD(c.angularDamping, "Angular damping");
+
+			return true;
+		}
+	};
+
+	template<>
+	struct convert<collider_component>
+	{
+		static bool decode(const Node& n, collider_component& c)
+		{
+			if (!n.IsMap())
+			{
+				return false;
+			}
+
+			std::string typeString;
+			LOAD(typeString, "Type");
+			for (uint32 i = 0; i < collider_type_count; ++i)
+			{
+				if (typeString == colliderTypeNames[i])
+				{
+					c.type = (collider_type)i;
+					break;
+				}
+			}
+			float restitution, friction, density;
+			LOAD(restitution, "Restitution");
+			LOAD(friction, "Friction");
+			LOAD(density, "Density");
+
+			switch (c.type)
+			{
+				case collider_type_sphere:
+				{
+					vec3 center;
+					float radius;
+					LOAD(center, "Center");
+					LOAD(radius, "Radius");
+					c = collider_component::asSphere({ center, radius }, restitution, friction, density);
+				} break;
+
+				case collider_type_capsule:
+				{
+					vec3 positionA, positionB;
+					float radius;
+					LOAD(positionA, "Position A");
+					LOAD(positionB, "Position B");
+					LOAD(radius, "Radius");
+					c = collider_component::asCapsule({ positionA, positionB, radius }, restitution, friction, density);
+				} break;
+
+				case collider_type_aabb:
+				{
+					vec3 minCorner, maxCorner;
+					LOAD(minCorner, "Min corner");
+					LOAD(maxCorner, "Max corner");
+					c = collider_component::asAABB(bounding_box::fromMinMax(minCorner, maxCorner), restitution, friction, density);
+				} break;
+
+				case collider_type_obb:
+				{
+					vec3 center, radius;
+					quat rotation;
+					LOAD(center, "Center");
+					LOAD(radius, "Radius");
+					LOAD(rotation, "Rotatio");
+
+					c = collider_component::asOBB({ center, radius, rotation }, restitution, friction, density);
+				} break;
+
+				case collider_type_hull:
+				{
+					return false;
+				} break;
+
+				default: assert(false); break;
+			}
+
+			return true;
+		}
+	};
 }
 
 void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSettings)
@@ -353,9 +629,25 @@ void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSe
 
 			out << YAML::Key << "Tag" << YAML::Value << tag->name;
 
-			if (transform_component* transform = entity.getComponentIfExists<transform_component>())
-			{
-				out << YAML::Key << "Transform" << YAML::Value << *transform;
+			if (auto* c = entity.getComponentIfExists<transform_component>()) { out << YAML::Key << "Transform" << YAML::Value << *c; }
+			if (auto* c = entity.getComponentIfExists<position_component>()) { out << YAML::Key << "Position" << YAML::Value << *c; }
+			if (auto* c = entity.getComponentIfExists<position_rotation_component>()) { out << YAML::Key << "Position/Rotation" << YAML::Value << *c; }
+			if (entity.hasComponent<dynamic_transform_component>()) { out << YAML::Key << "Dynamic" << YAML::Value << true; }
+			if (auto* c = entity.getComponentIfExists<point_light_component>()) { out << YAML::Key << "Point light" << YAML::Value << *c; }
+			if (auto* c = entity.getComponentIfExists<spot_light_component>()) { out << YAML::Key << "Spot light" << YAML::Value << *c; }
+			if (auto* c = entity.getComponentIfExists<rigid_body_component>()) { out << YAML::Key << "Rigid body" << YAML::Value << *c; }
+			if (auto* c = entity.getComponentIfExists<physics_reference_component>()) 
+			{ 
+				if (c->numColliders)
+				{
+					out << YAML::Key << "Colliders" << YAML::Value;
+					out << YAML::BeginSeq;
+					for (scene_entity colliderEntity : collider_entity_iterator(entity))
+					{
+						out << colliderEntity.getComponent<collider_component>();
+					}
+					out << YAML::EndSeq;
+				}
 			}
 
 			out << YAML::EndMap;
@@ -403,12 +695,25 @@ bool deserializeSceneFromDisk(game_scene& scene, renderer_settings& rendererSett
 		std::string name = entityNode["Tag"].as<std::string>();
 		scene_entity entity = scene.createEntity(name.c_str());
 
-		if (entityNode["Transform"])
+#define LOAD_COMPONENT(type, name) if (auto node = entityNode[name]) { entity.addComponent<type>(node.as<type>()); }
+
+		LOAD_COMPONENT(transform_component, "Transform");
+		LOAD_COMPONENT(position_component, "Position");
+		LOAD_COMPONENT(position_rotation_component, "Position/Rotation");
+		if (entityNode["Dynamic"]) { entity.addComponent<dynamic_transform_component>(); }
+		LOAD_COMPONENT(point_light_component, "Point light");
+		LOAD_COMPONENT(spot_light_component, "Spot light");
+		LOAD_COMPONENT(rigid_body_component, "Rigid body");
+
+		if (auto collidersNode = entityNode["Colliders"])
 		{
-			auto transformNode = entityNode["Transform"];
-			entity.addComponent<transform_component>(transformNode.as<transform_component>());
+			for (uint32 i = 0; i < collidersNode.size(); ++i)
+			{
+				entity.addComponent<collider_component>(collidersNode[i].as<collider_component>());
+			}
 		}
 	}
 
 	return true;
 }
+
