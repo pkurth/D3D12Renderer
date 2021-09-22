@@ -273,7 +273,7 @@ union vec2
 
 	vec2() {}
 	vec2(float v) : vec2(v, v) {}
-	vec2(float x_, float y_) { x = x_; y = y_; }
+	vec2(float x, float y) : x(x), y(y) {}
 };
 
 union vec3
@@ -295,8 +295,8 @@ union vec3
 
 	vec3() {}
 	vec3(float v) : vec3(v, v, v) {}
-	vec3(float x_, float y_, float z_) { x = x_; y = y_; z = z_; }
-	vec3(vec2 v2, float z_) { x = v2.x; y = v2.y; z = z_; }
+	vec3(float x, float y, float z) : x(x), y(y), z(z) {}
+	vec3(vec2 xy, float z) : x(xy.x), y(xy.y), z(z) {}
 };
 
 union vec4
@@ -324,9 +324,9 @@ union vec4
 
 	vec4() {}
 	vec4(float v) : vec4(v, v, v, v) {}
-	vec4(float x_, float y_, float z_, float w_) { x = x_; y = y_; z = z_; w = w_; }
-	vec4(floatx4 f4_) { f4 = f4_; }
-	vec4(vec3 v3, float w_) { x = v3.x; y = v3.y; z = v3.z; w = w_; }
+	vec4(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
+	vec4(vec3 xyz, float w) : x(xyz.x), y(xyz.y), z(xyz.z), w(w) {}
+	vec4(floatx4 f4) : f4(f4) {}
 };
 
 union quat
@@ -344,9 +344,9 @@ union quat
 	floatx4 f4;
 
 	quat() {}
-	quat(float x_, float y_, float z_, float w_) { x = x_; y = y_; z = z_; w = w_; }
-	quat(floatx4 f4_) { f4 = f4_; }
+	quat(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
 	quat(vec3 axis, float angle);
+	quat(floatx4 f4) : f4(f4) {}
 
 	static const quat identity;
 };
@@ -369,8 +369,9 @@ union mat2
 	float m[4];
 
 	mat2() {}
-	mat2(float m00_, float m01_,
-		float m10_, float m11_);
+	mat2(
+		float m00, float m01,
+		float m10, float m11);
 
 	static const mat2 identity;
 	static const mat2 zero;
@@ -395,9 +396,10 @@ union mat3
 	float m[9];
 
 	mat3() {}
-	mat3(float m00_, float m01_, float m02_,
-		float m10_, float m11_, float m12_,
-		float m20_, float m21_, float m22_);
+	mat3(
+		float m00, float m01, float m02,
+		float m10, float m11, float m12,
+		float m20, float m21, float m22);
 
 	static const mat3 identity;
 	static const mat3 zero;
@@ -431,10 +433,11 @@ union mat4
 	float m[16];
 
 	mat4() {}
-	mat4(float m00_, float m01_, float m02_, float m03_,
-		float m10_, float m11_, float m12_, float m13_,
-		float m20_, float m21_, float m22_, float m23_,
-		float m30_, float m31_, float m32_, float m33_);
+	mat4(
+		float m00, float m01, float m02, float m03,
+		float m10, float m11, float m12, float m13,
+		float m20, float m21, float m22, float m23,
+		float m30, float m31, float m32, float m33);
 
 	static const mat4 identity;
 	static const mat4 zero;
@@ -467,8 +470,9 @@ union mat2
 	float m[4];
 
 	mat2() {}
-	mat2(float m00_, float m01_,
-		float m10_, float m11_);
+	mat2(
+		float m00, float m01,
+		float m10, float m11);
 
 	static const mat2 identity;
 	static const mat2 zero;
@@ -493,9 +497,10 @@ union mat3
 	float m[9];
 
 	mat3() {}
-	mat3(float m00_, float m01_, float m02_,
-		float m10_, float m11_, float m12_,
-		float m20_, float m21_, float m22_);
+	mat3(
+		float m00, float m01, float m02,
+		float m10, float m11, float m12,
+		float m20, float m21, float m22);
 
 	static const mat3 identity;
 	static const mat3 zero;
@@ -529,10 +534,11 @@ union mat4
 	float m[16];
 
 	mat4() {}
-	mat4(float m00_, float m01_, float m02_, float m_03,
-		float m10_, float m11_, float m12_, float m_13,
-		float m20_, float m21_, float m22_, float m_23,
-		float m30_, float m31_, float m32_, float m_33);
+	mat4(
+		float m00, float m01, float m02, float m03,
+		float m10, float m11, float m12, float m13,
+		float m20, float m21, float m22, float m23,
+		float m30, float m31, float m32, float m33);
 
 	static const mat4 identity;
 	static const mat4 zero;
@@ -543,7 +549,7 @@ static_assert(sizeof(mat4) == 16 * sizeof(float), "");
 static vec2 row(const mat2& a, uint32 r) { return { a.m[r], a.m[r + 2] }; }
 static vec3 row(const mat3& a, uint32 r) { return { a.m[r], a.m[r + 3], a.m[r + 6] }; }
 static vec4 row(const mat4& a, uint32 r) { return { a.m[r], a.m[r + 4], a.m[r + 8], a.m[r + 12] }; }
-
+	   
 static vec2 col(const mat2& a, uint32 c) { return a.cols[c]; }
 static vec3 col(const mat3& a, uint32 c) { return a.cols[c]; }
 static vec4 col(const mat4& a, uint32 c) { return a.cols[c]; }
@@ -557,7 +563,7 @@ struct trs
 	vec3 scale;
 
 	trs() {}
-	trs(vec3 position_, quat rotation_, vec3 scale_ = { 1.f, 1.f, 1.f }) { position = position_; rotation = rotation_; scale = scale_; }
+	trs(vec3 position, quat rotation, vec3 scale = { 1.f, 1.f, 1.f }) : position(position), rotation(rotation), scale(scale) {}
 	trs(const mat4& m);
 
 	static const trs identity;
@@ -634,7 +640,7 @@ static float dot(vec3 a, vec3 b) { float result = a.x * b.x + a.y * b.y + a.z * 
 static float dot(vec4 a, vec4 b) { floatx4 m = a.f4 * b.f4; return addElements(m); }
 
 
-static bool operator==(mat4 a, mat4 b) 
+static bool operator==(const mat4& a, const mat4& b)
 { 
 	for (uint32 i = 0; i < 16; ++i)
 	{
@@ -878,6 +884,39 @@ static bool isUniform(vec2 v) { return fuzzyEquals(v.x, v.y); }
 static bool isUniform(vec3 v) { return fuzzyEquals(v.x, v.y) && fuzzyEquals(v.x, v.z); }
 static bool isUniform(vec4 v) { return fuzzyEquals(v.x, v.y) && fuzzyEquals(v.x, v.z) && fuzzyEquals(v.x, v.w); }
 
+
+inline quat::quat(vec3 axis, float angle)
+{
+	w = cos(angle * 0.5f);
+	v = axis * sin(angle * 0.5f);
+}
+
+inline mat2::mat2(
+	float m00, float m01,
+	float m10, float m11)
+	:
+	m00(m00), m01(m01),
+	m10(m10), m11(m11) {}
+
+inline mat3::mat3(
+	float m00, float m01, float m02,
+	float m10, float m11, float m12,
+	float m20, float m21, float m22)
+	:
+	m00(m00), m01(m01), m02(m02),
+	m10(m10), m11(m11), m12(m12),
+	m20(m20), m21(m21), m22(m22) {}
+
+inline mat4::mat4(
+	float m00, float m01, float m02, float m03,
+	float m10, float m11, float m12, float m13,
+	float m20, float m21, float m22, float m23,
+	float m30, float m31, float m32, float m33)
+	:
+	m00(m00), m01(m01), m02(m02), m03(m03),
+	m10(m10), m11(m11), m12(m12), m13(m13),
+	m20(m20), m21(m21), m22(m22), m23(m23),
+	m30(m30), m31(m31), m32(m32), m33(m33) {}
 
 inline std::ostream& operator<<(std::ostream& s, vec2 v)
 {

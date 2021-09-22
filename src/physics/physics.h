@@ -61,6 +61,8 @@ struct collider_union
 	physics_properties calculatePhysicsProperties();
 
 	collider_type type;
+
+	// These two are only used internally and should not be read outside.
 	physics_object_type objectType;
 	uint16 objectIndex; // Depending on objectType: Rigid body index, force field index, ...
 
@@ -116,6 +118,7 @@ struct collider_component : collider_union
 
 	collider_component() = default;
 
+	// Set by scene on component creation.
 	entt::entity parentEntity;
 	entt::entity nextEntity;
 

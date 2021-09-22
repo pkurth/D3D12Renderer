@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dx/dx.h"
+#include <dx/d3dx12.h>
 #include <DirectXTex/DirectXTex.h>
 
 

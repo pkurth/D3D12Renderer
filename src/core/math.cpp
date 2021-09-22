@@ -1139,33 +1139,6 @@ mat4 invertAffine(const mat4& m)
 	return result;
 }
 
-mat2::mat2(float m00_, float m01_, float m10_, float m11_)
-{
-	m00 = m00_; m01 = m01_;
-	m10 = m10_; m11 = m11_;
-}
-
-mat3::mat3(float m00_, float m01_, float m02_, float m10_, float m11_, float m12_, float m20_, float m21_, float m22_)
-{
-	m00 = m00_; m01 = m01_; m02 = m02_;
-	m10 = m10_; m11 = m11_; m12 = m12_;
-	m20 = m20_; m21 = m21_; m22 = m22_;
-}
-
-mat4::mat4(float m00_, float m01_, float m02_, float m03_, float m10_, float m11_, float m12_, float m13_, float m20_, float m21_, float m22_, float m23_, float m30_, float m31_, float m32_, float m33_)
-{
-	m00 = m00_; m01 = m01_; m02 = m02_; m03 = m03_;
-	m10 = m10_; m11 = m11_; m12 = m12_; m13 = m13_;
-	m20 = m20_; m21 = m21_; m22 = m22_; m23 = m23_;
-	m30 = m30_; m31 = m31_; m32 = m32_; m33 = m33_;
-}
-
-quat::quat(vec3 axis, float angle)
-{
-	w = cos(angle * 0.5f);
-	v = axis * sin(angle * 0.5f);
-}
-
 bool pointInTriangle(vec3 point, vec3 triA, vec3 triB, vec3& triC)
 {
 	vec3 e10 = triB - triA;

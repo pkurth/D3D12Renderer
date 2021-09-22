@@ -85,7 +85,7 @@ struct dx_vertex_buffer_group_view
 	dx_vertex_buffer_view others;
 
 	dx_vertex_buffer_group_view() { positions.view.SizeInBytes = 0; others.view.SizeInBytes = 0; }
-	dx_vertex_buffer_group_view(const dx_vertex_buffer_view& positions, const dx_vertex_buffer_view& others) : positions(positions), others(others) {}
+	dx_vertex_buffer_group_view(const dx_vertex_buffer_view& positions, const dx_vertex_buffer_view& others = {}) : positions(positions), others(others) {}
 	dx_vertex_buffer_group_view(const vertex_buffer_group& vb) : positions(vb.positions), others(vb.others) {}
 
 	operator bool() const { return positions && others; }
