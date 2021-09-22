@@ -175,7 +175,7 @@ void application::initialize(main_renderer* renderer)
 				"assets/desert/textures/BlueContainer_Albedo.png",
 				"assets/desert/textures/Container_Normal.png",
 				{}, 
-				"assets/desert/textures/Container_Metallic.png", vec4(0.f), vec4(1.f), 1.f)
+				"assets/desert/textures/Container_Metallic.png", vec4(0.f), vec4(1.f), 0.2f, 1.f)
 			});
 
 		auto boxMesh = make_ref<composite_mesh>();
