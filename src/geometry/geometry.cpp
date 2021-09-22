@@ -405,6 +405,15 @@ submesh_info cpu_mesh::pushIcoSphere(float radius, uint32 refinement)
 #undef push_ico_vertex
 }
 
+submesh_info cpu_mesh::pushCapsule(uint16 slices, uint16 rows, vec3 positionA, vec3 positionB, float radius)
+{
+	vec3 axis = positionB - positionA;
+	float height = length(axis);
+	axis /= height;
+	vec3 center = (positionA + positionB) * 0.5f;
+	return pushCapsule(slices, rows, height, radius, center, axis);
+}
+
 submesh_info cpu_mesh::pushCapsule(uint16 slices, uint16 rows, float height, float radius, vec3 center, vec3 upAxis)
 {
 	alignNextTriangle();

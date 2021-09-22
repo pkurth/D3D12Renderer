@@ -167,7 +167,7 @@ void application::initialize(main_renderer* renderer)
 			{}, vec4(0.f), vec4(1.f), 1.f, 1.f);
 
 		auto testMesh = make_ref<composite_mesh>();
-		testMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 1.f, 0.1f), {}, trs::identity, lollipopMaterial });
+		testMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f), {}, trs::identity, lollipopMaterial });
 		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 0.4f, vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f)), {}, trs::identity, lollipopMaterial });
 
 		auto groundMesh = make_ref<composite_mesh>();
@@ -240,7 +240,7 @@ void application::initialize(main_renderer* renderer)
 
 #if 1
 		auto chainMesh = make_ref<composite_mesh>();
-		chainMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, 2.f, 0.18f, vec3(0.f)), {}, trs::identity, lollipopMaterial });
+		chainMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f), {}, trs::identity, lollipopMaterial });
 
 		auto fixed = scene.createEntity("Fixed")
 			.addComponent<transform_component>(vec3(37.f, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))

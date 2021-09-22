@@ -62,6 +62,7 @@ struct cpu_mesh
 	submesh_info pushCube(vec3 radius, bool flipWindingOrder = false, vec3 center = vec3(0.f, 0.f, 0.f));
 	submesh_info pushSphere(uint16 slices, uint16 rows, float radius, vec3 center = vec3(0.f, 0.f, 0.f));
 	submesh_info pushIcoSphere(float radius, uint32 refinement);
+	submesh_info pushCapsule(uint16 slices, uint16 rows, vec3 positionA, vec3 positionB, float radius);
 	submesh_info pushCapsule(uint16 slices, uint16 rows, float height, float radius, vec3 center = vec3(0.f, 0.f, 0.f), vec3 upAxis = vec3(0.f, 1.f, 0.f));
 	submesh_info pushCylinder(uint16 slices, float radius, float height);
 	submesh_info pushArrow(uint16 slices, float shaftRadius, float headRadius, float shaftLength, float headLength);
