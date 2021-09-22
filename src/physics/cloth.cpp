@@ -5,7 +5,7 @@
 #include "animation/skinning.h"
 #include "dx/dx_context.h"
 
-cloth_component::cloth_component(vec3 localPosition, quat localRotation, float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float stiffness, float damping, float gravityFactor)
+cloth_component::cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float stiffness, float damping, float gravityFactor)
 {
 	this->gravityFactor = gravityFactor;
 	this->damping = damping;
@@ -15,8 +15,6 @@ cloth_component::cloth_component(vec3 localPosition, quat localRotation, float w
 	this->gridSizeY = gridSizeY;
 	this->width = width;
 	this->height = height;
-	this->localPosition = localPosition;
-	this->localRotation = localRotation;
 
 	uint32 numParticles = gridSizeX * gridSizeY;
 
@@ -101,8 +99,38 @@ cloth_component::cloth_component(vec3 localPosition, quat localRotation, float w
 	indexBuffer = createIndexBuffer(sizeof(uint16), (uint32)triangles.size() * 3, triangles.data());
 }
 
-void cloth_component::setWorldPositionOfFixedVertices(const trs& transform)
+void cloth_component::setWorldPositionOfFixedVertices(const trs& transform, bool moveRigid)
 {
+	if (moveRigid)
+	{
+		vec3 pivot;
+		if (gridSizeX % 2 == 1)
+		{
+			pivot = positions[gridSizeX / 2];
+		}
+		else
+		{
+			pivot = (positions[gridSizeX / 2] + positions[gridSizeX / 2 - 1]) * 0.5f;
+		}
+
+		vec3 currentAxis = normalize(positions[gridSizeX - 1] - positions[0]);
+		vec3 newAxis = normalize(transformPosition(transform, getParticlePosition(1.f, 0.f)) - transformPosition(transform, getParticlePosition(0.f, 0.f)));
+
+		vec3 newPivot = transformPosition(transform, getParticlePosition(0.5f, 0.f));
+
+		quat deltaRotation = rotateFromTo(currentAxis, newAxis);
+		vec3 deltaTranslation = newPivot - pivot;
+
+		for (uint32 y = 1; y < gridSizeY; ++y)
+		{
+			for (uint32 x = 0; x < gridSizeX; ++x)
+			{
+				vec3& position = positions[y * gridSizeX + x];
+				position = deltaRotation * (position - pivot) + newPivot;
+			}
+		}
+	}
+
 	// Currently the top row is fixed, so transform this.
 	for (uint32 x = 0; x < gridSizeX; ++x)
 	{
@@ -118,7 +146,6 @@ vec3 cloth_component::getParticlePosition(float relX, float relY)
 	vec3 position = vec3(relX * width, -relY * height, 0.f);
 	position.x -= width * 0.5f;
 	std::swap(position.y, position.z);
-	position = localRotation * position + localPosition;
 	return position;
 }
 

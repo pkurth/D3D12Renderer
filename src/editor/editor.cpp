@@ -804,6 +804,14 @@ bool scene_editor::drawSceneHierarchy()
 							ImGui::EndProperties();
 						}
 					});
+
+					if (objectMovedByWidget)
+					{
+						if (cloth_component* cloth = selectedEntity.getComponentIfExists<cloth_component>())
+						{
+							cloth->setWorldPositionOfFixedVertices(selectedEntity.getComponent<transform_component>(), true);
+						}
+					}
 				}
 			}
 			ImGui::EndChild();
@@ -862,6 +870,11 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 					rb.linearVelocity = 0.f;
 
 					saved = true;
+				}
+
+				if (cloth_component* cloth = selectedEntity.getComponentIfExists<cloth_component>())
+				{
+					cloth->setWorldPositionOfFixedVertices(*transform, input.keyboard[key_shift].down);
 				}
 			}
 			else
@@ -1238,6 +1251,16 @@ void scene_editor::drawSettings(float dt)
 			{
 				if (ImGui::BeginProperties())
 				{
+					bool physicsPaused = physicsSettings.globalTimeScale < 0.f;
+					if (ImGui::PropertyCheckbox("Pause", physicsPaused))
+					{
+						physicsSettings.globalTimeScale *= -1.f;
+					}
+					if (physicsSettings.globalTimeScale >= 0.f)
+					{
+						ImGui::PropertySlider("Time scale", physicsSettings.globalTimeScale);
+					}
+
 					ImGui::PropertySlider("Rigid solver iterations", physicsSettings.numRigidSolverIterations, 1, 200);
 
 					ImGui::PropertySlider("Cloth velocity iterations", physicsSettings.numClothVelocityIterations, 0, 10);

@@ -68,9 +68,9 @@ void application::initialize(main_renderer* renderer)
 
 	editor.initialize(&scene, renderer);
 
-	//scene.createEntity("Cloth")
-	//	.addComponent<transform_component>(trs::identity)
-	//	.addComponent<cloth_component>(vec3(0.f, 0.f, 0.f), quat::identity, 10.f, 10.f, 20, 20, 8.f);
+	scene.createEntity("Cloth")
+		.addComponent<transform_component>(trs::identity)
+		.addComponent<cloth_component>(10.f, 10.f, 20u, 20u, 8.f);
 
 	//clothMaterial = createPBRMaterial(
 	//	"assets/sphere/Tiles074_2K_Color.jpg",
@@ -85,7 +85,7 @@ void application::initialize(main_renderer* renderer)
 		"assets/sponza/textures/Sponza_Curtain_metallic.tga",
 		vec4(0.f), vec4(1.f), 1.f, 1.f, true);
 
-#if 1
+#if 0
 	if (auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj"))
 	{
 		auto blas = defineBlasFromMesh(sponzaMesh, renderer->pathTracer);

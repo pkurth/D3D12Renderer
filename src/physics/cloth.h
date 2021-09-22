@@ -4,19 +4,12 @@
 #include "geometry/geometry.h"
 #include "dx/dx_buffer.h"
 
-struct cloth_constraint
-{
-	uint32 a, b;
-	float restDistance;
-	float inverseMassSum;
-};
-
 struct cloth_component
 {
-	cloth_component(vec3 localPosition, quat localRotation, float width, float height, uint32 gridSizeX, uint32 gridSizeY, 
+	cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, 
 		float totalMass, float stiffness = 0.5f, float damping = 0.3f, float gravityFactor = 1.f);
 
-	void setWorldPositionOfFixedVertices(const trs& transform);
+	void setWorldPositionOfFixedVertices(const trs& transform, bool moveRigid = false);
 	void applyWindForce(vec3 force);
 	void simulate(uint32 velocityIterations, uint32 positionIterations, uint32 driftIterations, float dt);
 
@@ -33,16 +26,19 @@ struct cloth_component
 	float stiffness;
 
 private:
+	struct cloth_constraint
+	{
+		uint32 a, b;
+		float restDistance;
+		float inverseMassSum;
+	};
+
 	std::vector<vec3> positions;
 	std::vector<vec3> prevPositions;
 	std::vector<vec3> velocities;
 	std::vector<vec3> forceAccumulators;
 	std::vector<float> invMasses;
 	std::vector<cloth_constraint> constraints;
-
-	// In entity's local space.
-	vec3 localPosition;
-	quat localRotation;
 
 	uint32 gridSizeX, gridSizeY;
 	float width, height;

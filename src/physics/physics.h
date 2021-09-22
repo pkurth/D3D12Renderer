@@ -257,6 +257,8 @@ struct physics_settings
 	uint32 numClothDriftIterations = 0;
 
 	float testForce = 1000.f;
+
+	float globalTimeScale = 1.f;
 };
 
 extern physics_settings physicsSettings;

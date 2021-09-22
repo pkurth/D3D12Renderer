@@ -570,7 +570,13 @@ static std::pair<vec3, uint32> getForceFieldStates(game_scene& scene, force_fiel
 
 void physicsStep(game_scene& scene, float dt)
 {
+	if (physicsSettings.globalTimeScale <= 0.f)
+	{
+		return;
+	}
+
 	dt = min(dt, 1.f / 30.f);
+	dt *= physicsSettings.globalTimeScale;
 
 	// TODO:
 	static broadphase_collision* possibleCollisions = new broadphase_collision[10000];
@@ -659,13 +665,6 @@ void physicsStep(game_scene& scene, float dt)
 
 	// Cloth. This needs to get integrated with the rest of the system.
 
-	// For all cloth strips, which have a transform, apply it.
-	for (auto [entityHandle, cloth, transform] : scene.group(entt::get<cloth_component, transform_component>).each())
-	{
-		cloth.setWorldPositionOfFixedVertices(transform);
-	}
-
-	// For all cloth strips (with and without transform), simulate.
 	for (auto [entityHandle, cloth] : scene.view<cloth_component>().each())
 	{
 		cloth.applyWindForce(globalForceField);
