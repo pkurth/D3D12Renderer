@@ -182,6 +182,14 @@ static YAML::Emitter& operator<<(YAML::Emitter& out, const rigid_body_component&
 	return out;
 }
 
+static YAML::Emitter& operator<<(YAML::Emitter& out, const force_field_component& c)
+{
+	out << YAML::BeginMap
+		<< YAML::Key << "Force" << YAML::Value << c.force
+		<< YAML::EndMap;
+	return out;
+}
+
 static YAML::Emitter& operator<<(YAML::Emitter& out, const collider_component& c)
 {
 	out << YAML::BeginMap
@@ -236,11 +244,8 @@ namespace YAML
 	struct convert<render_camera>
 	{
 		static bool decode(const Node& n, render_camera& camera) 
-		{ 
-			if (!n.IsMap())
-			{
-				return false;
-			}
+		{
+			if (!n.IsMap()) { return false; }
 
 			LOAD(camera.position, "Position");
 			LOAD(camera.rotation, "Rotation");
@@ -269,10 +274,7 @@ namespace YAML
 	{
 		static bool decode(const Node& n, tonemap_settings& s)
 		{
-			if (!n.IsMap())
-			{
-				return false;
-			}
+			if (!n.IsMap()) { return false; }
 
 			LOAD(s.A, "A");
 			LOAD(s.B, "B");
@@ -292,10 +294,7 @@ namespace YAML
 	{
 		static bool decode(const Node& n, ssr_settings& s)
 		{
-			if (!n.IsMap())
-			{
-				return false;
-			}
+			if (!n.IsMap()) { return false; }
 
 			LOAD(s.numSteps, "Num steps");
 			LOAD(s.maxDistance, "Max distance");
@@ -312,10 +311,7 @@ namespace YAML
 	{
 		static bool decode(const Node& n, taa_settings& s)
 		{
-			if (!n.IsMap())
-			{
-				return false;
-			}
+			if (!n.IsMap()) { return false; }
 
 			LOAD(s.cameraJitterStrength, "Camera jitter");
 
@@ -328,10 +324,7 @@ namespace YAML
 	{
 		static bool decode(const Node& n, bloom_settings& s)
 		{
-			if (!n.IsMap())
-			{
-				return false;
-			}
+			if (!n.IsMap()) { return false; }
 
 			LOAD(s.threshold, "Threshold");
 			LOAD(s.strength, "Strength");
@@ -345,10 +338,7 @@ namespace YAML
 	{
 		static bool decode(const Node& n, sharpen_settings& s)
 		{
-			if (!n.IsMap())
-			{
-				return false;
-			}
+			if (!n.IsMap()) { return false; }
 
 			LOAD(s.strength, "Strength");
 
@@ -361,10 +351,7 @@ namespace YAML
 	{
 		static bool decode(const Node& n, renderer_settings& settings)
 		{
-			if (!n.IsMap())
-			{
-				return false;
-			}
+			if (!n.IsMap()) { return false; }
 
 			LOAD(settings.tonemapSettings, "Tone map");
 			LOAD(settings.environmentIntensity, "Environment intensity");
@@ -387,10 +374,7 @@ namespace YAML
 	{
 		static bool decode(const Node& n, directional_light& sun)
 		{
-			if (!n.IsMap())
-			{
-				return false;
-			}
+			if (!n.IsMap()) { return false; }
 
 			LOAD(sun.color, "Color");
 			LOAD(sun.intensity, "Intensity");
@@ -409,10 +393,7 @@ namespace YAML
 	{
 		static bool decode(const Node& n, transform_component& c)
 		{
-			if (!n.IsMap())
-			{
-				return false;
-			}
+			if (!n.IsMap()) { return false; }
 
 			LOAD(c.rotation, "Rotation");
 			LOAD(c.position, "Position");
@@ -427,10 +408,7 @@ namespace YAML
 	{
 		static bool decode(const Node& n, position_component& c)
 		{
-			if (!n.IsMap())
-			{
-				return false;
-			}
+			if (!n.IsMap()) { return false; }
 
 			LOAD(c.position, "Position");
 
@@ -443,10 +421,7 @@ namespace YAML
 	{
 		static bool decode(const Node& n, position_rotation_component& c)
 		{
-			if (!n.IsMap())
-			{
-				return false;
-			}
+			if (!n.IsMap()) { return false; }
 
 			LOAD(c.rotation, "Rotation");
 			LOAD(c.position, "Position");
@@ -460,10 +435,7 @@ namespace YAML
 	{
 		static bool decode(const Node& n, point_light_component& c)
 		{
-			if (!n.IsMap())
-			{
-				return false;
-			}
+			if (!n.IsMap()) { return false; }
 
 			LOAD(c.color, "Color");
 			LOAD(c.intensity, "Intensity");
@@ -480,10 +452,7 @@ namespace YAML
 	{
 		static bool decode(const Node& n, spot_light_component& c)
 		{
-			if (!n.IsMap())
-			{
-				return false;
-			}
+			if (!n.IsMap()) { return false; }
 
 			LOAD(c.color, "Color");
 			LOAD(c.intensity, "Intensity");
@@ -502,10 +471,7 @@ namespace YAML
 	{
 		static bool decode(const Node& n, rigid_body_component& c)
 		{
-			if (!n.IsMap())
-			{
-				return false;
-			}
+			if (!n.IsMap()) { return false; }
 
 			LOAD(c.localCOGPosition, "Local COG");
 			LOAD(c.invMass, "Inv mass");
@@ -513,6 +479,19 @@ namespace YAML
 			LOAD(c.gravityFactor, "Gravity factor");
 			LOAD(c.linearDamping, "Linear damping");
 			LOAD(c.angularDamping, "Angular damping");
+
+			return true;
+		}
+	};
+
+	template<>
+	struct convert<force_field_component>
+	{
+		static bool decode(const Node& n, force_field_component& c)
+		{
+			if (!n.IsMap()) { return false; }
+
+			LOAD(c.force, "Force");
 
 			return true;
 		}
@@ -636,6 +615,7 @@ void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSe
 			if (auto* c = entity.getComponentIfExists<point_light_component>()) { out << YAML::Key << "Point light" << YAML::Value << *c; }
 			if (auto* c = entity.getComponentIfExists<spot_light_component>()) { out << YAML::Key << "Spot light" << YAML::Value << *c; }
 			if (auto* c = entity.getComponentIfExists<rigid_body_component>()) { out << YAML::Key << "Rigid body" << YAML::Value << *c; }
+			if (auto* c = entity.getComponentIfExists<force_field_component>()) { out << YAML::Key << "Force field" << YAML::Value << *c; }
 			if (auto* c = entity.getComponentIfExists<physics_reference_component>()) 
 			{ 
 				if (c->numColliders)
@@ -650,6 +630,15 @@ void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSe
 				}
 			}
 
+
+			/* 
+			TODO:
+				- Animation
+				- Raster
+				- Raytrace
+				- Cloth
+				- Constraints
+			*/
 			out << YAML::EndMap;
 		}
 	});
@@ -704,6 +693,7 @@ bool deserializeSceneFromDisk(game_scene& scene, renderer_settings& rendererSett
 		LOAD_COMPONENT(point_light_component, "Point light");
 		LOAD_COMPONENT(spot_light_component, "Spot light");
 		LOAD_COMPONENT(rigid_body_component, "Rigid body");
+		LOAD_COMPONENT(force_field_component, "Force field");
 
 		if (auto collidersNode = entityNode["Colliders"])
 		{
