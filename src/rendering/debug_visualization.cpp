@@ -86,20 +86,22 @@ void debug_unlit_line_pipeline::initialize()
 	unlitLinePipeline = createReloadablePipeline(desc, { "flat_unlit_vs", "flat_unlit_ps" });
 }
 
-void renderWireSphere(vec3 position, float radius, vec4 color, ldr_render_pass* renderPass)
+static std::tuple<dx_dynamic_vertex_buffer, dx_dynamic_index_buffer, submesh_info> getWireRing()
 {
-	uint32 numSegments = 16;
-	uint32 numVertices = numSegments + 1;
+	const uint32 numSegments = 32;
+
+	uint32 numLines = numSegments;
+	uint32 numVertices = numSegments;
 
 	auto [vb, vertexPtr] = dxContext.createDynamicVertexBuffer(sizeof(vec3), numVertices);
-	auto [ib, indexPtr] = dxContext.createDynamicIndexBuffer(sizeof(uint16), numSegments * 2);
+	auto [ib, indexPtr] = dxContext.createDynamicIndexBuffer(sizeof(uint16), numLines * 2);
 
 	vec3* vertices = (vec3*)vertexPtr;
 	indexed_line16* lines = (indexed_line16*)indexPtr;
 
-	float deltaRot = M_PI / numSegments;
-	float rot = -M_PI_OVER_2;
-	for (uint32 i = 0; i < numVertices; ++i)
+	float deltaRot = M_TAU / numSegments;
+	float rot = 0.f;
+	for (uint32 i = 0; i < numSegments; ++i)
 	{
 		*vertices++ = vec3(cos(rot), sin(rot), 0.f);
 		rot += deltaRot;
@@ -107,7 +109,12 @@ void renderWireSphere(vec3 position, float radius, vec4 color, ldr_render_pass* 
 
 	for (uint16 i = 0; i < numSegments; ++i)
 	{
-		*lines++ = { i, i + 1u };
+		uint16 next = i + 1;
+		if (i == numSegments - 1)
+		{
+			next = 0;
+		}
+		*lines++ = { i, next };
 	}
 
 	submesh_info sm;
@@ -116,12 +123,16 @@ void renderWireSphere(vec3 position, float radius, vec4 color, ldr_render_pass* 
 	sm.firstIndex = 0;
 	sm.numIndices = numSegments * 2;
 
-	renderPass->renderObject<debug_unlit_line_pipeline>(createModelMatrix(position, quat::identity, radius), dx_vertex_buffer_group_view(vb, {}), ib, sm, debug_line_material{ color });
-	renderPass->renderObject<debug_unlit_line_pipeline>(createModelMatrix(position, quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), radius), dx_vertex_buffer_group_view(vb, {}), ib, sm, debug_line_material{ color });
-	renderPass->renderObject<debug_unlit_line_pipeline>(createModelMatrix(position, quat(vec3(0.f, 1.f, 0.f), deg2rad(180.f)), radius), dx_vertex_buffer_group_view(vb, {}), ib, sm, debug_line_material{ color });
-	renderPass->renderObject<debug_unlit_line_pipeline>(createModelMatrix(position, quat(vec3(0.f, 1.f, 0.f), deg2rad(270.f)), radius), dx_vertex_buffer_group_view(vb, {}), ib, sm, debug_line_material{ color });
-	renderPass->renderObject<debug_unlit_line_pipeline>(createModelMatrix(position, quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), radius), dx_vertex_buffer_group_view(vb, {}), ib, sm, debug_line_material{ color });
-	renderPass->renderObject<debug_unlit_line_pipeline>(createModelMatrix(position, quat(vec3(0.f, 1.f, 0.f), deg2rad(180.f)) * quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), radius), dx_vertex_buffer_group_view(vb, {}), ib, sm, debug_line_material{ color });
+	return { vb, ib, sm };
+}
+
+void renderWireSphere(vec3 position, float radius, vec4 color, ldr_render_pass* renderPass)
+{
+	auto [vb, ib, sm] = getWireRing();
+
+	renderPass->renderObject<debug_unlit_line_pipeline>(createModelMatrix(position, quat::identity, radius), dx_vertex_buffer_group_view(vb), ib, sm, debug_line_material{ color });
+	renderPass->renderObject<debug_unlit_line_pipeline>(createModelMatrix(position, quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), radius), dx_vertex_buffer_group_view(vb), ib, sm, debug_line_material{ color });
+	renderPass->renderObject<debug_unlit_line_pipeline>(createModelMatrix(position, quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), radius), dx_vertex_buffer_group_view(vb), ib, sm, debug_line_material{ color });
 }
 
 void renderWireCone(vec3 position, vec3 direction, float distance, float angle, vec4 color, ldr_render_pass* renderPass)
@@ -162,17 +173,19 @@ void renderWireCone(vec3 position, vec3 direction, float distance, float angle, 
 
 	for (uint16 i = 0; i < numConeLines; ++i)
 	{
-		*lines++ = { 0, 1u + i * step };
+		uint16 next = 1u + i * step;
+		*lines++ = { 0, next };
 	}
 
 	for (uint16 i = 0; i < numSegments; ++i)
 	{
-		uint16 next = i + 1u;
+		uint16 cur = i + 1;
+		uint16 next = i + 2;
 		if (i == numSegments - 1)
 		{
-			next = 0;
+			next = 1;
 		}
-		*lines++ = { i + 1u, next + 1u };
+		*lines++ = { cur, next };
 	}
 
 	submesh_info sm;
@@ -181,7 +194,7 @@ void renderWireCone(vec3 position, vec3 direction, float distance, float angle, 
 	sm.firstIndex = 0;
 	sm.numIndices = numLines * 2;
 
-	renderPass->renderObject<debug_unlit_line_pipeline>(mat4::identity, dx_vertex_buffer_group_view(vb, {}), ib, sm, debug_line_material{ color });
+	renderPass->renderObject<debug_unlit_line_pipeline>(mat4::identity, dx_vertex_buffer_group_view(vb), ib, sm, debug_line_material{ color });
 }
 
 void renderWireBox(vec3 position, vec3 radius, quat rotation, vec4 color, ldr_render_pass* renderPass)
@@ -190,14 +203,14 @@ void renderWireBox(vec3 position, vec3 radius, quat rotation, vec4 color, ldr_re
 	auto [ib, indexPtr] = dxContext.createDynamicIndexBuffer(sizeof(uint16), 12 * 2);
 
 	vec3* vertices = (vec3*)vertexPtr;
-	*vertices++ = rotation * (radius * vec3(-1.f, 1.f, -1.f)) + position;
-	*vertices++ = rotation * (radius * vec3(1.f, 1.f, -1.f)) + position;
-	*vertices++ = rotation * (radius * vec3(-1.f, -1.f, -1.f)) + position;
-	*vertices++ = rotation * (radius * vec3(1.f, -1.f, -1.f)) + position;
-	*vertices++ = rotation * (radius * vec3(-1.f, 1.f, 1.f)) + position;
-	*vertices++ = rotation * (radius * vec3(1.f, 1.f, 1.f)) + position;
-	*vertices++ = rotation * (radius * vec3(-1.f, -1.f, 1.f)) + position;
-	*vertices++ = rotation * (radius * vec3(1.f, -1.f, 1.f)) + position;
+	*vertices++ = vec3(-1.f, 1.f, -1.f);
+	*vertices++ = vec3(1.f, 1.f, -1.f);
+	*vertices++ = vec3(-1.f, -1.f, -1.f);
+	*vertices++ = vec3(1.f, -1.f, -1.f);
+	*vertices++ = vec3(-1.f, 1.f, 1.f);
+	*vertices++ = vec3(1.f, 1.f, 1.f);
+	*vertices++ = vec3(-1.f, -1.f, 1.f);
+	*vertices++ = vec3(1.f, -1.f, 1.f);
 
 	indexed_line16* lines = (indexed_line16*)indexPtr;
 	*lines++ = { 0, 1 };
@@ -220,8 +233,8 @@ void renderWireBox(vec3 position, vec3 radius, quat rotation, vec4 color, ldr_re
 	sm.numVertices = 8;
 	sm.firstIndex = 0;
 	sm.numIndices = 12 * 2;
-
-	renderPass->renderObject<debug_unlit_line_pipeline>(mat4::identity, dx_vertex_buffer_group_view(vb, {}), ib, sm, debug_line_material{ color });
+	
+	renderPass->renderObject<debug_unlit_line_pipeline>(createModelMatrix(position, rotation, radius), dx_vertex_buffer_group_view(vb), ib, sm, debug_line_material{ color });
 }
 
 void renderCameraFrustum(const render_camera& frustum, vec4 color, ldr_render_pass* renderPass, float alternativeFarPlane)
@@ -254,7 +267,7 @@ void renderCameraFrustum(const render_camera& frustum, vec4 color, ldr_render_pa
 	sm.firstIndex = 0;
 	sm.numIndices = 12 * 2;
 
-	renderPass->renderObject<debug_unlit_line_pipeline>(mat4::identity, dx_vertex_buffer_group_view(vb, {}), ib, sm, debug_line_material{ color });
+	renderPass->renderObject<debug_unlit_line_pipeline>(mat4::identity, dx_vertex_buffer_group_view(vb), ib, sm, debug_line_material{ color });
 }
 
 PIPELINE_SETUP_IMPL(debug_unlit_line_pipeline)
