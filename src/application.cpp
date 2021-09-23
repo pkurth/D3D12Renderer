@@ -175,7 +175,7 @@ void application::initialize(main_renderer* renderer)
 				"assets/desert/textures/BlueContainer_Albedo.png",
 				"assets/desert/textures/Container_Normal.png",
 				{}, 
-				"assets/desert/textures/Container_Metallic.png", vec4(0.f), vec4(1.f), 0.2f, 1.f)
+				"assets/desert/textures/Container_Metallic.png", vec4(0.f), vec4(1.f), 0.1f, 1.f)
 			});
 
 		auto boxMesh = make_ref<composite_mesh>();
@@ -361,7 +361,7 @@ void application::initialize(main_renderer* renderer)
 	scene.sun.numShadowCascades = 3;
 	scene.sun.shadowDimensions = 2048;
 	scene.sun.cascadeDistances = vec4(9.f, 39.f, 74.f, 10000.f);
-	scene.sun.bias = vec4(0.000049f, 0.000114f, 0.000082f, 0.0035f);
+	scene.sun.bias = vec4(0.000147f, 0.000147f, 0.000221f, 0.0035f);
 	scene.sun.blendDistances = vec4(3.f, 3.f, 10.f, 10.f);
 	scene.sun.stabilize = true;
 

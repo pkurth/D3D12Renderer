@@ -61,6 +61,24 @@ struct scene_entity
 					addComponent<dynamic_transform_component>();
 				}
 			}
+
+
+			// If component is cloth, transform to correct position.
+			if constexpr (std::is_same_v<component_t, struct cloth_component>)
+			{
+				if (transform_component* transform = getComponentIfExists<transform_component>())
+				{
+					component.setWorldPositionOfFixedVertices(*transform, true);
+				}
+			}
+
+			if constexpr (std::is_same_v<component_t, struct transform_component>)
+			{
+				if (cloth_component* cloth = getComponentIfExists<cloth_component>())
+				{
+					cloth->setWorldPositionOfFixedVertices(component, true);
+				}
+			}
 		}
 
 		return *this;

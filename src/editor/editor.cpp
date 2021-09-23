@@ -6,6 +6,7 @@
 #include "animation/animation.h"
 #include "geometry/mesh.h"
 #include "physics/physics.h"
+#include "physics/ragdoll.h"
 #include "scene/serialization.h"
 
 #include <fontawesome/list.h>
@@ -929,6 +930,85 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 	{
 		gizmo.manipulateNothing(scene->camera, input, !inputCaptured, ldrRenderPass);
 	}
+
+
+	if (ImGui::BeginControlsWindow("##EntityControls"))
+	{
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+		
+		ImGui::Button(ICON_FA_PLUS);
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("Create entity");
+		}
+		if (ImGui::BeginPopupContextItem("Context", ImGuiPopupFlags_MouseButtonLeft))
+		{
+			if (ImGui::BeginMenu("Lights"))
+			{
+				if (ImGui::MenuItem("Point light"))
+				{
+					auto pl = scene->createEntity("Point light")
+						.addComponent<position_component>(scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f))
+						.addComponent<point_light_component>(
+							vec3(1.f, 1.f, 1.f),
+							1.f,
+							10.f,
+							false,
+							512u
+						);
+
+					setSelectedEntity(pl);
+				}
+
+				if (ImGui::MenuItem("Spot light"))
+				{
+					auto sl = scene->createEntity("Spot light")
+						.addComponent<position_rotation_component>(scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f), quat::identity)
+						.addComponent<spot_light_component>(
+							vec3(1.f, 1.f, 1.f),
+							1.f,
+							25.f,
+							deg2rad(20.f),
+							deg2rad(30.f),
+							false,
+							512u
+						);
+
+					setSelectedEntity(sl);
+				}
+
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("Physics"))
+			{
+				if (ImGui::MenuItem("Cloth"))
+				{
+					auto cloth = scene->createEntity("Cloth")
+						.addComponent<transform_component>(scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f), scene->camera.rotation)
+						.addComponent<cloth_component>(10.f, 10.f, 20u, 20u, 8.f);
+
+					setSelectedEntity(cloth);
+				}
+
+				if (ImGui::MenuItem("Humanoid ragdoll"))
+				{
+					auto ragdoll = humanoid_ragdoll::create(*scene, scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f));
+					setSelectedEntity(ragdoll.torso);
+				}
+
+				ImGui::EndMenu();
+			}
+
+			ImGui::EndPopup();
+		}
+
+		ImGui::PopStyleColor();
+	}
+
+	ImGui::End();
+
+
 
 	if (!inputCaptured)
 	{
