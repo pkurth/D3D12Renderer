@@ -21,6 +21,7 @@ private:
 	void drawMainMenuBar();
 	bool drawSceneHierarchy();
 	bool handleUserInput(const user_input& input, ldr_render_pass* ldrRenderPass, float dt);
+	void drawEntityCreationPopup();
 
 	void updateSelectedEntityUIRotation();
 

@@ -187,7 +187,8 @@ void scene_editor::drawMainMenuBar()
 		);
 		ImGui::BulletText(
 			"Orbit: While holding Alt, press and hold the left mouse button to\n"
-			"orbit around a point in front of the camera."
+			"orbit around a point in front of the camera. Hold the middle mouse button \n"
+			"to pan."
 		);
 		ImGui::Separator();
 		ImGui::Text(
@@ -199,7 +200,7 @@ void scene_editor::drawMainMenuBar()
 		ImGui::Separator();
 		ImGui::Text(
 			"Press F to focus the camera on the selected object. This automatically\n"
-			"sets the orbit distance such that you now orbit around this object."
+			"sets the orbit distance such that you now orbit around this object (with alt)."
 		);
 		ImGui::Separator();
 		ImGui::Text(
@@ -207,7 +208,7 @@ void scene_editor::drawMainMenuBar()
 		);
 		ImGui::Separator();
 		ImGui::Text(
-			"You can drag and drop meshes from the Windows explorer into the game\n"
+			"You can drag and drop meshes from the asset window at the bottom into the game\n"
 			"window to add it to the scene."
 		);
 		ImGui::Separator();
@@ -932,76 +933,24 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 	}
 
 
+	if (!inputCaptured)
+	{
+		if (input.keyboard[key_shift].down && input.keyboard['A'].pressEvent)
+		{
+			ImGui::OpenPopup("CreateEntityPopup");
+			inputCaptured = true;
+		}
+	}
+
+	drawEntityCreationPopup();
+
 	if (ImGui::BeginControlsWindow("##EntityControls"))
 	{
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-		
-		ImGui::Button(ICON_FA_PLUS);
-		if (ImGui::IsItemHovered())
-		{
-			ImGui::SetTooltip("Create entity");
-		}
-		if (ImGui::BeginPopupContextItem("Context", ImGuiPopupFlags_MouseButtonLeft))
-		{
-			if (ImGui::BeginMenu("Lights"))
-			{
-				if (ImGui::MenuItem("Point light"))
-				{
-					auto pl = scene->createEntity("Point light")
-						.addComponent<position_component>(scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f))
-						.addComponent<point_light_component>(
-							vec3(1.f, 1.f, 1.f),
-							1.f,
-							10.f,
-							false,
-							512u
-						);
 
-					setSelectedEntity(pl);
-				}
-
-				if (ImGui::MenuItem("Spot light"))
-				{
-					auto sl = scene->createEntity("Spot light")
-						.addComponent<position_rotation_component>(scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f), quat::identity)
-						.addComponent<spot_light_component>(
-							vec3(1.f, 1.f, 1.f),
-							1.f,
-							25.f,
-							deg2rad(20.f),
-							deg2rad(30.f),
-							false,
-							512u
-						);
-
-					setSelectedEntity(sl);
-				}
-
-				ImGui::EndMenu();
-			}
-
-			if (ImGui::BeginMenu("Physics"))
-			{
-				if (ImGui::MenuItem("Cloth"))
-				{
-					auto cloth = scene->createEntity("Cloth")
-						.addComponent<transform_component>(scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f), scene->camera.rotation)
-						.addComponent<cloth_component>(10.f, 10.f, 20u, 20u, 8.f);
-
-					setSelectedEntity(cloth);
-				}
-
-				if (ImGui::MenuItem("Humanoid ragdoll"))
-				{
-					auto ragdoll = humanoid_ragdoll::create(*scene, scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f));
-					setSelectedEntity(ragdoll.torso);
-				}
-
-				ImGui::EndMenu();
-			}
-
-			ImGui::EndPopup();
-		}
+		if (ImGui::Button(ICON_FA_PLUS)) { ImGui::OpenPopup("CreateEntityPopup"); }
+		if (ImGui::IsItemHovered()) { ImGui::SetTooltip("Create entity (Shift+A)"); }
+		drawEntityCreationPopup();
 
 		ImGui::PopStyleColor();
 	}
@@ -1067,6 +1016,74 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 	}
 
 	return objectMovedByGizmo;
+}
+
+void scene_editor::drawEntityCreationPopup()
+{
+	if (ImGui::BeginPopup("CreateEntityPopup"))
+	{
+		bool clicked = false;
+
+		if (ImGui::MenuItem("Point light", "P") || ImGui::IsKeyPressed('P'))
+		{
+			auto pl = scene->createEntity("Point light")
+				.addComponent<position_component>(scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f))
+				.addComponent<point_light_component>(
+					vec3(1.f, 1.f, 1.f),
+					1.f,
+					10.f,
+					false,
+					512u
+				);
+
+			setSelectedEntity(pl);
+			clicked = true;
+		}
+
+		if (ImGui::MenuItem("Spot light", "S") || ImGui::IsKeyPressed('S'))
+		{
+			auto sl = scene->createEntity("Spot light")
+				.addComponent<position_rotation_component>(scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f), quat::identity)
+				.addComponent<spot_light_component>(
+					vec3(1.f, 1.f, 1.f),
+					1.f,
+					25.f,
+					deg2rad(20.f),
+					deg2rad(30.f),
+					false,
+					512u
+				);
+
+			setSelectedEntity(sl);
+			clicked = true;
+		}
+
+		ImGui::Separator();
+
+		if (ImGui::MenuItem("Cloth", "C") || ImGui::IsKeyPressed('C'))
+		{
+			auto cloth = scene->createEntity("Cloth")
+				.addComponent<transform_component>(scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f), scene->camera.rotation)
+				.addComponent<cloth_component>(10.f, 10.f, 20u, 20u, 8.f);
+
+			setSelectedEntity(cloth);
+			clicked = true;
+		}
+
+		if (ImGui::MenuItem("Humanoid ragdoll", "R") || ImGui::IsKeyPressed('R'))
+		{
+			auto ragdoll = humanoid_ragdoll::create(*scene, scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f));
+			setSelectedEntity(ragdoll.torso);
+			clicked = true;
+		}
+
+		if (clicked)
+		{
+			ImGui::CloseCurrentPopup();
+		}
+
+		ImGui::EndPopup();
+	}
 }
 
 void scene_editor::setEnvironment(const fs::path& filename)
