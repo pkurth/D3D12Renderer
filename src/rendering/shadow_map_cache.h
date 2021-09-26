@@ -8,6 +8,8 @@ struct shadow_map_viewport
 	uint16 size;
 };
 
+extern bool enableStaticShadowMapCaching;
+
 // Call after light view-projection-matrices are computed.
 uint64 getLightMovementHash(const struct directional_light& dl); // Whole light.
 uint64 getLightMovementHash(const struct spot_light_cb& sl);

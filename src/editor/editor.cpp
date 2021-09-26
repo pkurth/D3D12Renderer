@@ -1266,16 +1266,23 @@ void scene_editor::drawSettings(float dt)
 
 		ImGui::Text("%.3f ms, %u FPS", dt * 1000.f, (uint32)(1.f / dt));
 
-		if (ImGui::Dropdown("Renderer mode", rendererModeNames, renderer_mode_count, (uint32&)renderer->mode))
+		if (ImGui::BeginProperties())
 		{
-			pathTracer.resetRendering();
+			if (ImGui::PropertyDropdown("Renderer mode", rendererModeNames, renderer_mode_count, (uint32&)renderer->mode))
+			{
+				pathTracer.resetRendering();
+			}
+
+			dx_memory_usage memoryUsage = dxContext.getMemoryUsage();
+
+			ImGui::PropertyValue("Video memory usage", "%u / %uMB", memoryUsage.currentlyUsed, memoryUsage.available);
+
+			ImGui::PropertyDropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->aspectRatioMode);
+
+			ImGui::PropertyCheckbox("Static shadow map caching", enableStaticShadowMapCaching);
+
+			ImGui::EndProperties();
 		}
-
-		dx_memory_usage memoryUsage = dxContext.getMemoryUsage();
-
-		ImGui::Text("Video memory usage: %u / %uMB", memoryUsage.currentlyUsed, memoryUsage.available);
-
-		ImGui::Dropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->aspectRatioMode);
 
 		plotAndEditTonemapping(renderer->settings.tonemapSettings);
 		editSunShadowParameters(scene->sun);

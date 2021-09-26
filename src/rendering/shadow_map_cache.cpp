@@ -14,6 +14,7 @@
 #define DEBUG_VISUALIZATION 0
 
 
+bool enableStaticShadowMapCaching = true;
 
 
 static constexpr uint16 maximumSize = 2048;
@@ -218,6 +219,8 @@ std::pair<shadow_map_viewport, bool> assignShadowMapViewport(uint64 uniqueLightI
 
 		it->second.lightMovementHash = lightMovementHash;
 	}
+
+	staticCacheAvailable &= enableStaticShadowMapCaching;
 
 	return { vp, staticCacheAvailable };
 }

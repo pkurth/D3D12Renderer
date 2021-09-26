@@ -664,6 +664,11 @@ void shadowPasses(dx_command_list* cl,
 			}
 		}
 
+		if (!enableStaticShadowMapCaching)
+		{
+			numCopiesToStaticCache = 0;
+		}
+
 		if (numCopiesFromStaticCache)
 		{
 			DX_PROFILE_BLOCK(cl, "Copy from static shadow map cache");

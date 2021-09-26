@@ -535,7 +535,7 @@ void stepLocomotionEval()
 	evaluationEnv->getLastActionReward();
 }
 #else
-void initializeLocomotionEval(scene& scene, humanoid_ragdoll& ragdoll) {}
+void initializeLocomotionEval(game_scene& scene, humanoid_ragdoll& ragdoll) {}
 void stepLocomotionEval() {}
 #endif
 
