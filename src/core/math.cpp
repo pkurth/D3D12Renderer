@@ -159,7 +159,6 @@ mat4 operator*(const mat4& a, const mat4& b)
 	return result;
 #else
 	floatx8 a0, a1, b0, b1;
-	floatx8 c0, c1, c2, c3, c4, c5, c6, c7;
 
 #if ROW_MAJOR
 	floatx8 u0 = b.m;
@@ -176,35 +175,30 @@ mat4 operator*(const mat4& a, const mat4& b)
 	a0 = _mm256_shuffle_ps(t0, t0, _MM_SHUFFLE(0, 0, 0, 0));
 	a1 = _mm256_shuffle_ps(t1, t1, _MM_SHUFFLE(0, 0, 0, 0));
 	b0 = _mm256_permute2f128_ps(u0, u0, 0x00);
-	c0 = a0 * b0;
-	c1 = a1 * b0;
+	floatx8 c0 = a0 * b0;
+	floatx8 c1 = a1 * b0;
 
 	a0 = _mm256_shuffle_ps(t0, t0, _MM_SHUFFLE(1, 1, 1, 1));
 	a1 = _mm256_shuffle_ps(t1, t1, _MM_SHUFFLE(1, 1, 1, 1));
 	b0 = _mm256_permute2f128_ps(u0, u0, 0x11);
-	c2 = a0 * b0;
-	c3 = a1 * b0;
+	c0 = fmadd(a0, b0, c0);
+	c1 = fmadd(a1, b0, c1);
 
 	a0 = _mm256_shuffle_ps(t0, t0, _MM_SHUFFLE(2, 2, 2, 2));
 	a1 = _mm256_shuffle_ps(t1, t1, _MM_SHUFFLE(2, 2, 2, 2));
 	b1 = _mm256_permute2f128_ps(u1, u1, 0x00);
-	c4 = a0 * b1;
-	c5 = a1 * b1;
+	c0 = fmadd(a0, b1, c0);
+	c1 = fmadd(a1, b1, c1);
 
 	a0 = _mm256_shuffle_ps(t0, t0, _MM_SHUFFLE(3, 3, 3, 3));
 	a1 = _mm256_shuffle_ps(t1, t1, _MM_SHUFFLE(3, 3, 3, 3));
 	b1 = _mm256_permute2f128_ps(u1, u1, 0x11);
-	c6 = a0 * b1;
-	c7 = a1 * b1;
-
-	c0 = c0 + c2;
-	c4 = c4 + c6;
-	c1 = c1 + c3;
-	c5 = c5 + c7;
+	c0 = fmadd(a0, b1, c0);
+	c1 = fmadd(a1, b1, c1);
 
 	mat4 result;
-	(c0 + c4).store(result.m);
-	(c1 + c5).store(result.m + 8);
+	c0.store(result.m);
+	c1.store(result.m + 8);
 	return result;
 #endif
 }
