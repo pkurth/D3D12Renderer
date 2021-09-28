@@ -130,7 +130,6 @@ int main(int argc, char** argv)
 	float dt;
 	while (newFrame(dt))
 	{
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 		ImGui::BeginWindowHiddenTabBar("Scene Viewport");
 		uint32 renderWidth = (uint32)ImGui::GetContentRegionAvail().x;
 		uint32 renderHeight = (uint32)ImGui::GetContentRegionAvail().y;
@@ -212,7 +211,6 @@ int main(int argc, char** argv)
 		}
 
 		ImGui::End();
-		ImGui::PopStyleVar();
 
 		appFocusedLastFrame = ImGui::IsMousePosValid();
 

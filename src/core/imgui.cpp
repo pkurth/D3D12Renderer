@@ -181,10 +181,13 @@ namespace ImGui
 {
 	bool BeginWindowHiddenTabBar(const char* name, bool* open, ImGuiWindowFlags flags)
 	{
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 		ImGuiWindowClass windowClass;
 		windowClass.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_AutoHideTabBar;
 		ImGui::SetNextWindowClass(&windowClass);
-		return ImGui::Begin(name, open, flags);
+		bool result = ImGui::Begin(name, open, flags);
+		ImGui::PopStyleVar();
+		return result;
 	}
 
 	bool BeginControlsWindow(const char* name)
