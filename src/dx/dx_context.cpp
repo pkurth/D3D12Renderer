@@ -430,6 +430,21 @@ dx_command_list* dx_context::getFreeRenderCommandList()
 	return cl;
 }
 
+static void enqueueRunningCommandList(dx_command_queue& queue, dx_command_list* commandList)
+{
+	commandList->next = 0;
+	if (queue.newestRunningCommandList)
+	{
+		assert(queue.newestRunningCommandList->next == 0);
+		queue.newestRunningCommandList->next = commandList;
+	}
+	queue.newestRunningCommandList = commandList;
+	if (!queue.runningCommandLists)
+	{
+		queue.runningCommandLists = commandList;
+	}
+}
+
 uint64 dx_context::executeCommandList(dx_command_list* commandList)
 {
 	dx_command_queue& queue = getQueue(commandList->type);
@@ -444,11 +459,8 @@ uint64 dx_context::executeCommandList(dx_command_list* commandList)
 	commandList->lastExecutionFenceValue = fenceValue;
 
 	queue.commandListMutex.lock();
-
-	commandList->next = queue.runningCommandLists;
-	queue.runningCommandLists = commandList;
+	enqueueRunningCommandList(queue, commandList);
 	atomicIncrement(queue.numRunningCommandLists);
-
 	queue.commandListMutex.unlock();
 
 	return fenceValue;
@@ -476,11 +488,9 @@ uint64 dx_context::executeCommandLists(dx_command_list** commandLists, uint32 co
 	}
 
 	queue.commandListMutex.lock();
-
 	for (uint32 i = 0; i < count; ++i)
 	{
-		commandLists[i]->next = queue.runningCommandLists;
-		queue.runningCommandLists = commandLists[i];
+		enqueueRunningCommandList(queue, commandLists[i]);
 	}
 	atomicAdd(queue.numRunningCommandLists, count);
 

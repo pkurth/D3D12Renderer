@@ -23,6 +23,7 @@ struct dx_command_queue
 	volatile uint64 fenceValue;
 
 	dx_command_list* runningCommandLists;
+	dx_command_list* newestRunningCommandList;
 	dx_command_list* freeCommandLists;
 
 	volatile uint32 numRunningCommandLists;

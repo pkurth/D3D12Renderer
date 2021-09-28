@@ -4,7 +4,7 @@
 #include "dx_context.h"
 #include "core/threading.h"
 
-static DWORD processRunningCommandAllocators(void* data);
+static DWORD processRunningCommandLists(void* data);
 
 void dx_command_queue::initialize(dx_device device, D3D12_COMMAND_LIST_TYPE type)
 {
@@ -26,7 +26,7 @@ void dx_command_queue::initialize(dx_device device, D3D12_COMMAND_LIST_TYPE type
 		// TODO: Calibrate command queue time line with CPU.
 	}
 
-	processThreadHandle = CreateThread(0, 0, processRunningCommandAllocators, this, 0, 0);
+	processThreadHandle = CreateThread(0, 0, processRunningCommandLists, this, 0, 0);
 
 	switch (type)
 	{
@@ -75,7 +75,7 @@ void dx_command_queue::flush()
 	waitForFence(signal());
 }
 
-static DWORD processRunningCommandAllocators(void* data)
+static DWORD processRunningCommandLists(void* data)
 {
 	dx_command_queue& queue = *(dx_command_queue*)data;
 
@@ -88,6 +88,11 @@ static DWORD processRunningCommandAllocators(void* data)
 			if (list)
 			{
 				queue.runningCommandLists = list->next;
+				if (list == queue.newestRunningCommandList)
+				{
+					assert(list->next == 0);
+					queue.newestRunningCommandList = 0;
+				}
 			}
 			queue.commandListMutex.unlock();
 
@@ -97,9 +102,12 @@ static DWORD processRunningCommandAllocators(void* data)
 				list->reset();
 
 				queue.commandListMutex.lock();
+
 				list->next = queue.freeCommandLists;
 				queue.freeCommandLists = list;
+
 				atomicDecrement(queue.numRunningCommandLists);
+
 				queue.commandListMutex.unlock();
 			}
 			else
