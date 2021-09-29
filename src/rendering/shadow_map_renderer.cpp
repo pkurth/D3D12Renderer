@@ -5,6 +5,7 @@
 #include "render_algorithms.h"
 #include "dx/dx_context.h"
 #include "dx/dx_command_list.h"
+#include "dx/dx_profiling.h"
 
 const sun_shadow_render_pass* shadow_map_renderer::sunShadowRenderPasses[MAX_NUM_SUN_LIGHT_SHADOW_PASSES];
 const spot_shadow_render_pass* shadow_map_renderer::spotLightShadowRenderPasses[MAX_NUM_SPOT_LIGHT_SHADOW_PASSES];
@@ -24,15 +25,19 @@ void shadow_map_renderer::endFrame()
 {
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
-	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	{
+		PROFILE_ALL(cl, "Shadow maps");
 
-	cl->transitionBarrier(render_resources::shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	shadowPasses(cl, sunShadowRenderPasses, numSunLightShadowRenderPasses,
-		spotLightShadowRenderPasses, numSpotLightShadowRenderPasses,
-		pointLightShadowRenderPasses, numPointLightShadowRenderPasses);
+		cl->transitionBarrier(render_resources::shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
-	cl->transitionBarrier(render_resources::shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		shadowPasses(cl, sunShadowRenderPasses, numSunLightShadowRenderPasses,
+			spotLightShadowRenderPasses, numSpotLightShadowRenderPasses,
+			pointLightShadowRenderPasses, numPointLightShadowRenderPasses);
+
+		cl->transitionBarrier(render_resources::shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	}
 
 	dxContext.executeCommandList(cl);
 }

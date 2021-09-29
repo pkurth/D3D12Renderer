@@ -2,6 +2,7 @@
 
 #include "dx_command_list.h"
 #include "core/profiling_internal.h"
+#include "core/cpu_profiling.h"
 
 extern bool dxProfilerWindowOpen;
 
@@ -10,6 +11,10 @@ extern bool dxProfilerWindowOpen;
 
 #define DX_PROFILE_BLOCK_(counter, cl, name) dx_profile_block_recorder COMPOSITE_VARNAME(__DX_PROFILE_BLOCK, counter)(cl, name)
 #define DX_PROFILE_BLOCK(cl, name) DX_PROFILE_BLOCK_(__COUNTER__, cl, name)
+
+
+#define PROFILE_ALL(cl, name) DX_PROFILE_BLOCK(cl, name); CPU_PROFILE_BLOCK(name)
+
 
 #define MAX_NUM_DX_PROFILE_BLOCKS 2048
 #define MAX_NUM_DX_PROFILE_EVENTS (MAX_NUM_DX_PROFILE_BLOCKS * 2) // One for start and end.

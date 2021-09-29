@@ -342,7 +342,7 @@ void main_renderer::endFrame(const user_input& input)
 		context.addWork([&]()
 		{
 			dx_command_list* cl = dxContext.getFreeRenderCommandList();
-
+			PROFILE_ALL(cl, "Render thread 1");
 
 			if (aspectRatioModeChanged)
 			{
@@ -396,6 +396,7 @@ void main_renderer::endFrame(const user_input& input)
 		context.addWork([&]()
 		{
 			dx_command_list* cl = dxContext.getFreeRenderCommandList();
+			PROFILE_ALL(cl, "Render thread 2");
 
 
 			// ----------------------------------------
@@ -426,7 +427,7 @@ void main_renderer::endFrame(const user_input& input)
 
 				if (windowHovered)
 				{
-					DX_PROFILE_BLOCK(cl, "Copy hovered object ID");
+					PROFILE_ALL(cl, "Copy hovered object ID");
 
 					cl->transitionBarrier(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 					cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer, dxContext.bufferedFrameID, input.mouse.x - windowXOffset, input.mouse.y - windowYOffset, 1, 1);
@@ -445,7 +446,7 @@ void main_renderer::endFrame(const user_input& input)
 
 
 			{
-				DX_PROFILE_BLOCK(cl, "Transition textures");
+				PROFILE_ALL(cl, "Transition textures");
 
 				barrier_batcher(cl)
 					.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
@@ -458,7 +459,7 @@ void main_renderer::endFrame(const user_input& input)
 			}
 
 			{
-				DX_PROFILE_BLOCK(cl, "Copy depth buffer");
+				PROFILE_ALL(cl, "Copy depth buffer");
 				cl->copyResource(depthStencilBuffer->resource, opaqueDepthBuffer->resource);
 			}
 
@@ -468,6 +469,7 @@ void main_renderer::endFrame(const user_input& input)
 		context.addWork([&]()
 		{
 			dx_command_list* cl = dxContext.getFreeRenderCommandList();
+			PROFILE_ALL(cl, "Render thread 3");
 
 			barrier_batcher(cl)
 				.transitionBegin(opaqueDepthBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -661,7 +663,7 @@ void main_renderer::endFrame(const user_input& input)
 			.transitionEnd(frameResult, frameResultState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		{
-			DX_PROFILE_BLOCK(cl, "Raytracing");
+			PROFILE_ALL(cl, "Raytracing");
 
 			dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // Wait for AS-rebuilds. TODO: This is not the way to go here. We should wait for the specific value returned by executeCommandList.
 

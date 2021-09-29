@@ -149,6 +149,8 @@ void profiler_timeline::begin(uint32 numFrames)
 	rightEdge = leftPadding + totalWidth;
 	horizontalBarStride = totalWidth / numFrames;
 	barWidth = horizontalBarStride/* * 0.9f*/;
+
+	callStackTop = highlightTop;
 }
 
 void profiler_timeline::drawHeader(bool& pauseRecording)
@@ -217,6 +219,7 @@ void profiler_timeline::drawHighlightFrameInfo(profile_frame& frame)
 
 void profiler_timeline::drawCallStack(profile_block* blocks, float frameWidthMultiplier, float callstackLeftPadding, uint16 startIndex)
 {
+#if 0
 	ImGui::SameLine();
 	if (ImGui::Button("Dump this frame to stdout"))
 	{
@@ -261,6 +264,7 @@ void profiler_timeline::drawCallStack(profile_block* blocks, float frameWidthMul
 			currentIndex = nextIndex;
 		}
 	}
+#endif
 
 
 	static const float barHeight = verticalBarStride * 0.8f;
@@ -277,7 +281,7 @@ void profiler_timeline::drawCallStack(profile_block* blocks, float frameWidthMul
 		profile_block* current = blocks + currentIndex;
 
 		// Draw.
-		float top = highlightTop + depth * verticalBarStride;
+		float top = callStackTop + depth * verticalBarStride;
 		float left = callstackLeftPadding + current->relStart / (1000.f / 60.f) * frameWidth16ms;
 		float width = current->duration / (1000.f / 60.f) * frameWidth16ms;
 		if (width > 0.f) // Important. ImGui renders zero-size elements with a default size (> 0).
@@ -336,6 +340,8 @@ void profiler_timeline::drawCallStack(profile_block* blocks, float frameWidthMul
 	}
 
 	assert(depth == 0);
+
+	callStackTop += (maxDepth + 1) * verticalBarStride + 10.f;
 }
 
 void profiler_timeline::drawMillisecondSpacings(profile_frame& frame, float frameWidthMultiplier, float callstackLeftPadding)

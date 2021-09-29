@@ -188,10 +188,30 @@ void cpuProfilingResolveTimeStamps()
 					static float horizontalScrollAnchor = 0;
 					static bool horizontalScrolling = false;
 
-					for (uint32 thread = 0; thread < numThreads; ++thread)
+					timeline.drawHighlightFrameInfo(frame);
+
+
+					uint32 threadIndices[MAX_NUM_CPU_PROFILE_THREADS];
+					char threadNamesBuffer[MAX_NUM_CPU_PROFILE_THREADS][32];
+					const char* threadNames[MAX_NUM_CPU_PROFILE_THREADS];
+					uint32 numActiveThreadsThisFrame = 0;
+
+					for (uint32 i = 0; i < numThreads; ++i)
 					{
-						timeline.drawCallStack(blocks, frameWidthMultiplier, callstackLeftPadding, frame.firstTopLevelBlockPerThread[thread]);
+						if (frame.firstTopLevelBlockPerThread[i] != INVALID_PROFILE_BLOCK)
+						{
+							threadIndices[numActiveThreadsThisFrame] = i;
+							snprintf(threadNamesBuffer[numActiveThreadsThisFrame], 32, "Thread %u", profileThreads[i].id);
+							threadNames[numActiveThreadsThisFrame] = threadNamesBuffer[numActiveThreadsThisFrame];
+							++numActiveThreadsThisFrame;
+						}
 					}
+
+					static uint32 threadIndex = 0;
+					ImGui::SameLine();
+					ImGui::Dropdown("Thread", threadNames, numActiveThreadsThisFrame, threadIndex);
+
+					timeline.drawCallStack(blocks, frameWidthMultiplier, callstackLeftPadding,  frame.firstTopLevelBlockPerThread[threadIndices[threadIndex]]);
 
 					timeline.drawMillisecondSpacings(frame, frameWidthMultiplier, callstackLeftPadding);
 					timeline.handleUserInteractions(frameWidthMultiplier, callstackLeftPadding,

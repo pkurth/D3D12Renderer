@@ -67,11 +67,11 @@ struct profiler_timeline
 	float rightEdge;
 	float horizontalBarStride;
 	float barWidth;
+	float callStackTop;
 
 
 	uint32 colorIndex = 0;
 	uint32 maxDepth = 0;
-
 
 
 	void begin(uint32 numFrames);
