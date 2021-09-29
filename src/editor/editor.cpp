@@ -925,6 +925,14 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 				inputCaptured = true;
 				objectMovedByGizmo = true;
 			}
+			else if (input.keyboard[key_ctrl].down && input.keyboard['D'].pressEvent)
+			{
+				// Duplicate entity.
+				scene_entity newEntity = scene->copyEntity(selectedEntity);
+				setSelectedEntity(newEntity);
+				inputCaptured = true;
+				objectMovedByGizmo = true;
+			}
 		}
 	}
 	else

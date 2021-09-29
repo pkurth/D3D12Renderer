@@ -214,9 +214,22 @@ struct collider_entity_iterator
 	};
 
 	iterator begin() { return iterator{ firstColliderEntity }; }
-	iterator end() { return iterator{ { entt::entity(entt::null), firstColliderEntity.registry } }; }
+	iterator end() { return iterator{ scene_entity{ entt::entity(entt::null), firstColliderEntity.registry } }; }
 
 	scene_entity firstColliderEntity = {};
+};
+
+struct collider_component_iterator : collider_entity_iterator
+{
+	collider_component_iterator(scene_entity entity) : collider_entity_iterator(entity) {}
+
+	struct iterator : collider_entity_iterator::iterator 
+	{
+		collider_component& operator*() { return entity.getComponent<collider_component>(); }
+	};
+
+	iterator begin() { return iterator{ firstColliderEntity }; }
+	iterator end() { return iterator{ scene_entity{ entt::entity(entt::null), firstColliderEntity.registry } }; }
 };
 
 struct constraint_entity_iterator

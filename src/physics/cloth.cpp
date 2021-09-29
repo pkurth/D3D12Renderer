@@ -6,15 +6,12 @@
 #include "dx/dx_context.h"
 
 cloth_component::cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float stiffness, float damping, float gravityFactor)
+	: gridSizeX(gridSizeX), gridSizeY(gridSizeY), width(width), height(height)
 {
 	this->gravityFactor = gravityFactor;
 	this->damping = damping;
 	this->totalMass = totalMass;
 	this->stiffness = stiffness;
-	this->gridSizeX = gridSizeX;
-	this->gridSizeY = gridSizeY;
-	this->width = width;
-	this->height = height;
 
 	uint32 numParticles = gridSizeX * gridSizeY;
 

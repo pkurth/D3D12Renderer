@@ -159,6 +159,8 @@ struct game_scene
 			.addComponent<tag_component>(name);
 	}
 
+	scene_entity copyEntity(scene_entity src); // Source can be either from the same scene or from another.
+
 	void deleteEntity(scene_entity e);
 	void clearAll();
 

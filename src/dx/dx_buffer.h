@@ -74,6 +74,11 @@ struct dx_vertex_buffer_view
 	dx_vertex_buffer_view() { view.SizeInBytes = 0; }
 	dx_vertex_buffer_view(const ref<dx_vertex_buffer>& vb) : view(vb ? vb->view : D3D12_VERTEX_BUFFER_VIEW{ 0 }) {}
 	dx_vertex_buffer_view(const dx_dynamic_vertex_buffer& vb) : view(vb.view) {}
+	dx_vertex_buffer_view(const dx_vertex_buffer_view&) = default;
+	dx_vertex_buffer_view(dx_vertex_buffer_view&&) = default;
+
+	dx_vertex_buffer_view& operator=(const dx_vertex_buffer_view&) = default;
+	dx_vertex_buffer_view& operator=(dx_vertex_buffer_view&&) = default;
 
 	operator bool() const { return view.SizeInBytes > 0; }
 	operator const D3D12_VERTEX_BUFFER_VIEW& () const { return view; }
@@ -87,6 +92,11 @@ struct dx_vertex_buffer_group_view
 	dx_vertex_buffer_group_view() { positions.view.SizeInBytes = 0; others.view.SizeInBytes = 0; }
 	dx_vertex_buffer_group_view(const dx_vertex_buffer_view& positions, const dx_vertex_buffer_view& others = {}) : positions(positions), others(others) {}
 	dx_vertex_buffer_group_view(const vertex_buffer_group& vb) : positions(vb.positions), others(vb.others) {}
+	dx_vertex_buffer_group_view(const dx_vertex_buffer_group_view&) = default;
+	dx_vertex_buffer_group_view(dx_vertex_buffer_group_view&&) = default;
+
+	dx_vertex_buffer_group_view& operator=(const dx_vertex_buffer_group_view&) = default;
+	dx_vertex_buffer_group_view& operator=(dx_vertex_buffer_group_view&&) = default;
 
 	operator bool() const { return positions && others; }
 };
@@ -98,6 +108,11 @@ struct dx_index_buffer_view
 	dx_index_buffer_view() { view.SizeInBytes = 0; }
 	dx_index_buffer_view(const ref<dx_index_buffer>& vb) : view(vb->view) {}
 	dx_index_buffer_view(const dx_dynamic_index_buffer& vb) : view(vb.view) {}
+	dx_index_buffer_view(const dx_index_buffer_view&) = default;
+	dx_index_buffer_view(dx_index_buffer_view&&) = default;
+
+	dx_index_buffer_view& operator=(const dx_index_buffer_view&) = default;
+	dx_index_buffer_view& operator=(dx_index_buffer_view&&) = default;
 
 	operator bool() const { return view.SizeInBytes > 0; }
 	operator const D3D12_INDEX_BUFFER_VIEW& () const { return view; }

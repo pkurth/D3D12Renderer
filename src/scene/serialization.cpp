@@ -235,6 +235,22 @@ static YAML::Emitter& operator<<(YAML::Emitter& out, const collider_component& c
 	return out;
 }
 
+static YAML::Emitter& operator<<(YAML::Emitter& out, const cloth_component& c)
+{
+	out << YAML::BeginMap
+		<< YAML::Key << "Width" << YAML::Value << c.width
+		<< YAML::Key << "Height" << YAML::Value << c.height
+		<< YAML::Key << "Grid size x" << YAML::Value << c.gridSizeX
+		<< YAML::Key << "Grid size y" << YAML::Value << c.gridSizeY
+		<< YAML::Key << "Total mass" << YAML::Value << c.totalMass
+		<< YAML::Key << "Stiffness" << YAML::Value << c.stiffness
+		<< YAML::Key << "Damping" << YAML::Value << c.damping
+		<< YAML::Key << "Gravity factor" << YAML::Value << c.gravityFactor
+		<< YAML::EndMap;
+
+	return out;
+}
+
 #define LOAD(var, name) var = n[name].as<std::remove_reference_t<decltype(var)>>()
 #define LOAD_ENUM(var, name) var = (decltype(var))(n[name].as<int>())
 
@@ -557,7 +573,7 @@ namespace YAML
 					quat rotation;
 					LOAD(center, "Center");
 					LOAD(radius, "Radius");
-					LOAD(rotation, "Rotatio");
+					LOAD(rotation, "Rotation");
 
 					c = collider_component::asOBB({ center, radius, rotation }, restitution, friction, density);
 				} break;
@@ -569,6 +585,31 @@ namespace YAML
 
 				default: assert(false); break;
 			}
+
+			return true;
+		}
+	};
+
+	template<>
+	struct convert<cloth_component>
+	{
+		static bool decode(const Node& n, cloth_component& c)
+		{
+			if (!n.IsMap()) { return false; }
+
+			uint32 gridSizeX, gridSizeY;
+			float width, height, totalMass, stiffness, damping, gravityFactor;
+
+			LOAD(width, "Width");
+			LOAD(height, "Height");
+			LOAD(gridSizeX, "Grid size x");
+			LOAD(gridSizeY, "Grid size y");
+			LOAD(totalMass, "Total mass");
+			LOAD(stiffness, "Stiffness");
+			LOAD(damping, "Damping");
+			LOAD(gravityFactor, "Gravity factor");
+
+			c = cloth_component(width, height, gridSizeX, gridSizeY, totalMass, stiffness, damping, gravityFactor);
 
 			return true;
 		}
@@ -616,15 +657,16 @@ void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSe
 			if (auto* c = entity.getComponentIfExists<spot_light_component>()) { out << YAML::Key << "Spot light" << YAML::Value << *c; }
 			if (auto* c = entity.getComponentIfExists<rigid_body_component>()) { out << YAML::Key << "Rigid body" << YAML::Value << *c; }
 			if (auto* c = entity.getComponentIfExists<force_field_component>()) { out << YAML::Key << "Force field" << YAML::Value << *c; }
+			if (auto* c = entity.getComponentIfExists<cloth_component>()) { out << YAML::Key << "Cloth" << YAML::Value << *c; }
 			if (auto* c = entity.getComponentIfExists<physics_reference_component>()) 
 			{ 
 				if (c->numColliders)
 				{
 					out << YAML::Key << "Colliders" << YAML::Value;
 					out << YAML::BeginSeq;
-					for (scene_entity colliderEntity : collider_entity_iterator(entity))
+					for (collider_component& collider : collider_component_iterator(entity))
 					{
-						out << colliderEntity.getComponent<collider_component>();
+						out << collider;
 					}
 					out << YAML::EndSeq;
 				}
@@ -636,7 +678,6 @@ void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSe
 				- Animation
 				- Raster
 				- Raytrace
-				- Cloth
 				- Constraints
 			*/
 			out << YAML::EndMap;
@@ -694,6 +735,7 @@ bool deserializeSceneFromDisk(game_scene& scene, renderer_settings& rendererSett
 		LOAD_COMPONENT(spot_light_component, "Spot light");
 		LOAD_COMPONENT(rigid_body_component, "Rigid body");
 		LOAD_COMPONENT(force_field_component, "Force field");
+		LOAD_COMPONENT(cloth_component, "Cloth");
 
 		if (auto collidersNode = entityNode["Colliders"])
 		{

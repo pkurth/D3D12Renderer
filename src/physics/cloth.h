@@ -6,8 +6,14 @@
 
 struct cloth_component
 {
+	cloth_component() {}
 	cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, 
 		float totalMass, float stiffness = 0.5f, float damping = 0.3f, float gravityFactor = 1.f);
+	cloth_component(const cloth_component&) = default;
+	cloth_component(cloth_component&&) = default;
+
+	cloth_component& operator=(const cloth_component&) = default;
+	cloth_component& operator=(cloth_component&&) = default;
 
 	void setWorldPositionOfFixedVertices(const trs& transform, bool moveRigid = false);
 	void applyWindForce(vec3 force);
@@ -17,13 +23,15 @@ struct cloth_component
 
 	uint32 getRenderableVertexCount() const;
 	uint32 getRenderableTriangleCount() const;
-	//submesh_info getRenderData(vec3* positions, vertex_uv_normal_tangent* others, indexed_triangle16* triangles) const;
 	std::tuple<dx_vertex_buffer_group_view, dx_vertex_buffer_group_view, dx_index_buffer_view, submesh_info> getRenderData();
 
 	float totalMass;
 	float gravityFactor;
 	float damping;
 	float stiffness;
+
+	uint32 gridSizeX, gridSizeY;
+	float width, height;
 
 private:
 	struct cloth_constraint
@@ -39,9 +47,6 @@ private:
 	std::vector<vec3> forceAccumulators;
 	std::vector<float> invMasses;
 	std::vector<cloth_constraint> constraints;
-
-	uint32 gridSizeX, gridSizeY;
-	float width, height;
 
 	void solveVelocities(const std::vector<struct cloth_constraint_temp>& constraintsTemp);
 	void solvePositions();
