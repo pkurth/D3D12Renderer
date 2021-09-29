@@ -20,7 +20,7 @@ extern bool cpuProfilerWindowOpen;
 	uint32 eventIndex = (arrayAndEventIndex & 0xFFFFFFFF); \
 	assert(eventIndex < MAX_NUM_CPU_PROFILE_EVENTS); \
 	profile_event* event = cpuProfileEvents[arrayAndEventIndex >> 32] + eventIndex; \
-	event->laneIndex = getThreadIDFast(); \
+	event->threadID = getThreadIDFast(); \
 	event->name = name_; \
 	event->type = type_; \
 	QueryPerformanceCounter((LARGE_INTEGER*)&event->timestamp);

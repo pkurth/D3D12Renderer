@@ -4,7 +4,7 @@
 #define COMPOSITE_VARNAME(a, b) COMPOSITE_VARNAME_(a, b)
 
 
-enum profile_event_type
+enum profile_event_type : uint16
 {
 	profile_event_frame_marker,
 	profile_event_begin_block,
@@ -16,7 +16,8 @@ enum profile_event_type
 struct profile_event
 {
 	profile_event_type type;
-	uint32 laneIndex;
+	uint16 clType; // For gpu profiler.
+	uint32 threadID;
 	const char* name;
 	uint64 timestamp;
 };
@@ -38,6 +39,8 @@ struct profile_block
 
 	float relStart;
 	float duration;
+
+	uint32 threadID;
 
 	const char* name;
 };

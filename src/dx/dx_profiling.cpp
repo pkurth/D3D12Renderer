@@ -36,7 +36,8 @@ void dxProfilingFrameEndMarker(dx_command_list* cl)
 	dxProfileEvents[dxContext.bufferedFrameID][queryIndex] = 
 	{ 
 		profile_event_frame_marker,
-		profile_cl_graphics, 
+		profile_cl_graphics,
+		getThreadIDFast(),
 		"Frame End" };
 }
 
@@ -65,16 +66,6 @@ void dxProfilingResolveTimeStamps(uint64* timestamps)
 		});
 
 
-#if 0
-		for (uint32 i = 0; i < numQueries; ++i)
-		{
-			profile_event* e = events + i;
-			std::cout << i << ") " << (e->type == profile_event_begin_block ? "BEGIN: " : "END  : ") << e->name << " (" << e->timestamp << ")\n";
-		}
-#endif
-
-
-
 		uint16 stack[profile_cl_count][1024];
 		uint32 depth[profile_cl_count] = {};
 		uint32 count[profile_cl_count] = {};
@@ -90,7 +81,7 @@ void dxProfilingResolveTimeStamps(uint64* timestamps)
 		for (uint32 i = 0; i < numQueries; ++i)
 		{
 			profile_event* e = events + i;
-			profile_cl_type clType = (profile_cl_type)e->laneIndex;
+			profile_cl_type clType = (profile_cl_type)e->clType;
 
 			uint64 frameEndTimestamp;
 			if (handleProfileEvent(events, i, numQueries, stack[clType], depth[clType], frame.blocks[clType], count[clType], frameEndTimestamp))
@@ -126,58 +117,6 @@ void dxProfilingResolveTimeStamps(uint64* timestamps)
 				}
 			}
 		}
-
-
-
-#if 0
-		{
-			uint16 currentIndex = 0;
-			uint32 depth = 0;
-
-			profile_block* blocks = frame.blocks[0];
-
-			while (currentIndex != INVALID_PROFILE_BLOCK)
-			{
-				profile_block* current = blocks + currentIndex;
-
-				for (uint32 i = 0; i < depth; ++i)
-				{
-					std::cout << " ";
-				}
-				std::cout << current->name << '\n';
-
-				// Advance.
-				uint16 nextIndex = current->firstChild;
-				if (nextIndex == INVALID_PROFILE_BLOCK)
-				{
-					nextIndex = current->nextSibling;
-
-					if (nextIndex == INVALID_PROFILE_BLOCK)
-					{
-						uint16 nextAncestor = current->parent;
-						while (nextAncestor != INVALID_PROFILE_BLOCK)
-						{
-							--depth;
-							if (blocks[nextAncestor].nextSibling != INVALID_PROFILE_BLOCK)
-							{
-								nextIndex = blocks[nextAncestor].nextSibling;
-								break;
-							}
-							nextAncestor = blocks[nextAncestor].parent;
-						}
-					}
-				}
-				else
-				{
-					++depth;
-				}
-				currentIndex = nextIndex;
-			}
-		}
-
-		exit(0);
-#endif
-
 	}
 
 

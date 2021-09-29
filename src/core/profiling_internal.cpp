@@ -19,21 +19,24 @@ bool handleProfileEvent(profile_event* events, uint32 eventIndex, uint32 numEven
 
 
 			// The end event of one block often has the exact same timestamp as the begin event of the next block(s).
-			// When rendering multithreaded, the order of these events in the CPU-side array may not be correct.
+			// When recording events multithreaded (e.g. when rendering on multiple cores), the order of these events 
+			// in the CPU-side array may not be correct.
 			// We thus search for possible end blocks with the same timestamp here and - if we already saw a matching 
 			// begin block earlier - process them first.
 
 			if (d > 0)
 			{
+				profile_block* currentStackTop = blocks + stack[d - 1];
+
 				for (uint32 j = eventIndex + 1; j < numEvents && events[j].timestamp == timestamp; ++j)
 				{
 					if (events[j].type == profile_event_end_block
-						&& events[j].laneIndex == e->laneIndex 
-						&& events[j].name == blocks[stack[d - 1]].name)
+						&& events[j].threadID != e->threadID				// Event is from another thread than current event. Events on the same thread are always in the correct order.
+						&& events[j].threadID == currentStackTop->threadID	// Event is from the same thread as current stack top.
+						&& events[j].name == currentStackTop->name)			// Event has the same name as current stack top.
 					{
 						--d;
-						profile_block* block = blocks + stack[d];
-						block->endClock = timestamp;
+						currentStackTop->endClock = timestamp;
 
 						events[j].type = profile_event_none; // Mark as handled.
 						goto rehandleEvent;
@@ -47,6 +50,7 @@ bool handleProfileEvent(profile_event* events, uint32 eventIndex, uint32 numEven
 			block.startClock = timestamp;
 			block.parent = (d == 0) ? INVALID_PROFILE_BLOCK : stack[d - 1];
 			block.name = e->name;
+			block.threadID = e->threadID;
 			block.firstChild = INVALID_PROFILE_BLOCK;
 			block.lastChild = INVALID_PROFILE_BLOCK;
 			block.nextSibling = INVALID_PROFILE_BLOCK;
@@ -102,24 +106,36 @@ static const ImColor highlightFrameColor = ImGui::green;
 static const float timelineBottom = 400.f;
 static const float rightPadding = 50.f;
 static const float highlightTop = timelineBottom + 150.f;
+static const float verticalBarStride = 40.f;
 
-static const ImVec4 colorTable[] =
+static const ImColor colorTable[] =
 {
-	ImVec4(1.f, 0, 0, 1.f),
-	ImVec4(0, 1.f, 0, 1.f),
-	ImVec4(0, 0, 1.f, 1.f),
-
-	ImVec4(1.f, 0, 1.f, 1.f),
-	ImVec4(1.f, 1.f, 0, 1.f),
-	ImVec4(0, 1.f, 1.f, 1.f),
-
-	ImVec4(1.f, 0.5f, 0, 1.f),
-	ImVec4(0, 1.f, 0.5f, 1.f),
-	ImVec4(0.5f, 0, 1.f, 1.f),
-
-	ImVec4(0.5f, 1.f, 0, 1.f),
-	ImVec4(1.f, 0, 0.5f, 1.f),
-	ImVec4(0, 0.5f, 1.f, 1.f),
+	ImColor(107, 142, 35), 
+	ImColor(220, 20, 60), 
+	ImColor(128, 0, 0), 
+	ImColor(124, 252, 0), 
+	ImColor(60, 179, 113), 
+	ImColor(250, 235, 215), 
+	ImColor(0, 100, 0), 
+	ImColor(0, 255, 255), 
+	ImColor(143, 188, 143), 
+	ImColor(233, 150, 122), 
+	ImColor(255, 255, 0), 
+	ImColor(147, 112, 219), 
+	ImColor(255, 69, 0), 
+	ImColor(255, 215, 0), 
+	ImColor(221, 160, 221), 
+	ImColor(25, 25, 112), 
+	ImColor(138, 43, 226), 
+	ImColor(0, 128, 128), 
+	ImColor(0, 191, 255), 
+	ImColor(189, 183, 107), 
+	ImColor(176, 224, 230), 
+	ImColor(65, 105, 225), 
+	ImColor(255, 250, 240), 
+	ImColor(139, 69, 19), 
+	ImColor(245, 255, 250), 
+	ImColor(188, 143, 143), 
 };
 
 void profiler_timeline::begin(uint32 numFrames)
@@ -151,27 +167,30 @@ void profiler_timeline::drawOverviewFrame(profile_frame& frame, uint32 frameInde
 	{
 		float left = leftPadding + frameIndex * horizontalBarStride;
 		float height = frame.duration / (1000.f / 60.f) * barHeight16ms;
-		float top = timelineBottom - height;
-
-		ImGui::PushID(frameIndex);
-
-		ImGui::SetCursorPos(ImVec2(left, top));
-
-		ImColor color = (frameIndex == highlightFrameIndex) ? highlightFrameColor : ImGui::red;
-		color = (frameIndex == currentFrame) ? ImGui::yellow : color;
-
-		bool result = ImGui::ColorButton("", color, ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(barWidth, height));
-		if (ImGui::IsItemHovered())
+		if (height > 0.f)
 		{
-			ImGui::SetTooltip("Frame %llu (%fms)", frame.globalFrameID, frame.duration);
-		}
+			float top = timelineBottom - height;
 
-		if (result)
-		{
-			highlightFrameIndex = frameIndex;
-		}
+			ImGui::PushID(frameIndex);
 
-		ImGui::PopID();
+			ImGui::SetCursorPos(ImVec2(left, top));
+
+			ImColor color = (frameIndex == highlightFrameIndex) ? highlightFrameColor : ImGui::red;
+			color = (frameIndex == currentFrame) ? ImGui::yellow : color;
+
+			bool result = ImGui::ColorButton("", color, ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(barWidth, height));
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("Frame %llu (%fms)", frame.globalFrameID, frame.duration);
+			}
+
+			if (result)
+			{
+				highlightFrameIndex = frameIndex;
+			}
+
+			ImGui::PopID();
+		}
 	}
 }
 
@@ -198,8 +217,53 @@ void profiler_timeline::drawHighlightFrameInfo(profile_frame& frame)
 
 void profiler_timeline::drawCallStack(profile_block* blocks, float frameWidthMultiplier, float callstackLeftPadding, uint16 startIndex)
 {
-	static const float barStride = 40.f;
-	static const float barHeight = barStride * 0.8f;
+	ImGui::SameLine();
+	if (ImGui::Button("Dump this frame to stdout"))
+	{
+		uint16 currentIndex = 0;
+		uint32 depth = 0;
+
+		while (currentIndex != INVALID_PROFILE_BLOCK)
+		{
+			profile_block* current = blocks + currentIndex;
+
+			for (uint32 i = 0; i < depth; ++i)
+			{
+				std::cout << " ";
+			}
+			std::cout << current->name << '\n';
+
+			// Advance.
+			uint16 nextIndex = current->firstChild;
+			if (nextIndex == INVALID_PROFILE_BLOCK)
+			{
+				nextIndex = current->nextSibling;
+
+				if (nextIndex == INVALID_PROFILE_BLOCK)
+				{
+					uint16 nextAncestor = current->parent;
+					while (nextAncestor != INVALID_PROFILE_BLOCK)
+					{
+						--depth;
+						if (blocks[nextAncestor].nextSibling != INVALID_PROFILE_BLOCK)
+						{
+							nextIndex = blocks[nextAncestor].nextSibling;
+							break;
+						}
+						nextAncestor = blocks[nextAncestor].parent;
+					}
+				}
+			}
+			else
+			{
+				++depth;
+			}
+			currentIndex = nextIndex;
+		}
+	}
+
+
+	static const float barHeight = verticalBarStride * 0.8f;
 
 	const float frameWidth16ms = totalWidth * frameWidthMultiplier;
 	const float frameWidth33ms = frameWidth16ms * 2.f;
@@ -213,31 +277,32 @@ void profiler_timeline::drawCallStack(profile_block* blocks, float frameWidthMul
 		profile_block* current = blocks + currentIndex;
 
 		// Draw.
-		float top = highlightTop + depth * barStride;
+		float top = highlightTop + depth * verticalBarStride;
 		float left = callstackLeftPadding + current->relStart / (1000.f / 60.f) * frameWidth16ms;
 		float width = current->duration / (1000.f / 60.f) * frameWidth16ms;
-
-		ImGui::SetCursorPos(ImVec2(left, top));
-		ImGui::ColorButton(current->name, colorTable[colorIndex++],
-			ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder | ImGuiColorEditFlags_NoDragDrop,
-			ImVec2(width, barHeight));
-
-		if (ImGui::IsItemHovered())
+		if (width > 0.f) // Important. ImGui renders zero-size elements with a default size (> 0).
 		{
-			ImGui::SetTooltip("%s: %.3fms", current->name, current->duration);
+			ImGui::SetCursorPos(ImVec2(left, top));
+			ImGui::ColorButton(current->name, colorTable[colorIndex++],
+				ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder | ImGuiColorEditFlags_NoDragDrop,
+				ImVec2(width, barHeight));
+
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("%s: %.3fms", current->name, current->duration);
+			}
+
+			ImGui::PushClipRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), true);
+			ImGui::SetCursorPos(ImVec2(left + ImGui::GetStyle().FramePadding.x, top + ImGui::GetStyle().FramePadding.y));
+			ImGui::Text("%s: %.3fms", current->name, current->duration);
+			ImGui::PopClipRect();
+
+
+			if (colorIndex >= arraysize(colorTable))
+			{
+				colorIndex = 0;
+			}
 		}
-
-		ImGui::PushClipRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), true);
-		ImGui::SetCursorPos(ImVec2(left + ImGui::GetStyle().FramePadding.x, top + ImGui::GetStyle().FramePadding.y));
-		ImGui::Text("%s: %.3fms", current->name, current->duration);
-		ImGui::PopClipRect();
-
-
-		if (colorIndex >= arraysize(colorTable))
-		{
-			colorIndex = 0;
-		}
-
 
 
 
@@ -277,10 +342,9 @@ void profiler_timeline::drawMillisecondSpacings(profile_frame& frame, float fram
 {
 	const float frameWidth16ms = totalWidth * frameWidthMultiplier;
 	const float frameWidth33ms = frameWidth16ms * 2.f;
-	const float barStride = 40.f;
 
 	const float textSpacing = 30.f;
-	const float lineHeight = (maxDepth + 1) * barStride + textSpacing;
+	const float lineHeight = (maxDepth + 1) * verticalBarStride + textSpacing;
 	const float lineTop = highlightTop - textSpacing;
 
 	// 0ms.
@@ -331,16 +395,15 @@ void profiler_timeline::handleUserInteractions(float& frameWidthMultiplier, floa
 	const float frameWidth16ms = totalWidth * frameWidthMultiplier;
 	const float frameWidth33ms = frameWidth16ms * 2.f;
 
-	const float barStride = 40.f;
 	const float textSpacing = 30.f;
-	const float lineHeight = (maxDepth + 1) * barStride + textSpacing;
+	const float lineHeight = (maxDepth + 1) * verticalBarStride + textSpacing;
 	const float lineTop = highlightTop - textSpacing;
 
 
 
 	// Invisible widget to block window dragging in this area.
 	ImGui::SetCursorPos(ImVec2(leftPadding, highlightTop));
-	ImGui::InvisibleButton("Blocker", ImVec2(totalWidth + rightPadding, (maxDepth + 1) * barStride));
+	ImGui::InvisibleButton("Blocker", ImVec2(totalWidth + rightPadding, (maxDepth + 1) * verticalBarStride));
 
 
 	ImVec2 mousePos = ImGui::GetMousePos();
@@ -349,7 +412,7 @@ void profiler_timeline::handleUserInteractions(float& frameWidthMultiplier, floa
 	float relMouseX = mousePos.x - windowPos.x;
 
 	bool overStack = false;
-	if (ImGui::IsMouseHoveringRect(ImVec2(leftPadding + windowPos.x, highlightTop + windowPos.y), ImVec2(leftPadding + totalWidth + rightPadding + windowPos.x, highlightTop + (maxDepth + 1) * barStride + windowPos.y), false))
+	if (ImGui::IsMouseHoveringRect(ImVec2(leftPadding + windowPos.x, highlightTop + windowPos.y), ImVec2(leftPadding + totalWidth + rightPadding + windowPos.x, highlightTop + (maxDepth + 1) * verticalBarStride + windowPos.y), false))
 	{
 		overStack = true;
 

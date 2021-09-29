@@ -39,7 +39,8 @@ struct dx_profile_block_recorder
 		dxProfileEvents[dxContext.bufferedFrameID][queryIndex] = 
 		{ 
 			profile_event_begin_block,
-			(uint32)((cl->type == D3D12_COMMAND_LIST_TYPE_DIRECT) ? profile_cl_graphics : profile_cl_compute), 
+			(uint16)((cl->type == D3D12_COMMAND_LIST_TYPE_DIRECT) ? profile_cl_graphics : profile_cl_compute),
+			getThreadIDFast(),
 			name 
 		};
 	}
@@ -52,7 +53,8 @@ struct dx_profile_block_recorder
 		dxProfileEvents[dxContext.bufferedFrameID][queryIndex] = 
 		{ 
 			profile_event_end_block,
-			(uint32)((cl->type == D3D12_COMMAND_LIST_TYPE_DIRECT) ? profile_cl_graphics : profile_cl_compute), 
+			(uint16)((cl->type == D3D12_COMMAND_LIST_TYPE_DIRECT) ? profile_cl_graphics : profile_cl_compute),
+			getThreadIDFast(),
 			name 
 		};
 	}

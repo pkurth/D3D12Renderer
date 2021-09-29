@@ -97,7 +97,7 @@ void cpuProfilingResolveTimeStamps()
 		for (uint32 i = 0; i < numEvents; ++i)
 		{
 			profile_event* e = events + i;
-			uint32 threadID = e->laneIndex;
+			uint32 threadID = e->threadID;
 			uint32 threadIndex = mapThreadIDToIndex(threadID);
 
 			uint32 blocksBefore = frame->totalNumProfileBlocks;
