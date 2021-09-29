@@ -18,13 +18,6 @@ extern "C"
 dx_context& dxContext = *new dx_context{};
 
 
-#if ENABLE_DX_PROFILING
-// Defined in dx_profiling.cpp.
-void profileFrameMarker(dx_command_list* cl);
-void resolveTimeStampQueries(uint64* timestamps);
-#endif
-
-
 LONG NTAPI handleVectoredException(PEXCEPTION_POINTERS exceptionInfo)
 {
 	PEXCEPTION_RECORD exceptionRecord = exceptionInfo->ExceptionRecord;
@@ -549,7 +542,7 @@ dx_memory_usage dx_context::getMemoryUsage()
 void dx_context::endFrame(dx_command_list* cl)
 {
 #if ENABLE_DX_PROFILING
-	profileFrameMarker(cl);
+	dxProfilingFrameEndMarker(cl);
 	cl->commandList->ResolveQueryData(timestampHeaps[bufferedFrameID].heap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 0, timestampQueryIndex[bufferedFrameID], resolvedTimestampBuffers[bufferedFrameID]->resource.Get(), 0);
 #endif
 }
@@ -563,7 +556,7 @@ void dx_context::newFrame(uint64 frameID)
 
 #if ENABLE_DX_PROFILING
 	uint64* timestamps = (uint64*)mapBuffer(resolvedTimestampBuffers[bufferedFrameID], true);
-	resolveTimeStampQueries(timestamps);
+	dxProfilingResolveTimeStamps(timestamps);
 	unmapBuffer(resolvedTimestampBuffers[bufferedFrameID], false);
 
 	timestampQueryIndex[bufferedFrameID] = 0;

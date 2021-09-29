@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "cloth.h"
 #include "physics.h"
-#include "core/random.h"
+#include "core/cpu_profiling.h"
 #include "animation/skinning.h"
 #include "dx/dx_context.h"
 
@@ -225,6 +225,8 @@ struct cloth_constraint_temp
 
 void cloth_component::simulate(uint32 velocityIterations, uint32 positionIterations, uint32 driftIterations, float dt)
 {
+	CPU_PROFILE_BLOCK("Simulate cloth");
+
 	float gravityVelocity = GRAVITY * dt * gravityFactor;
 	uint32 numParticles = gridSizeX * gridSizeY;
 

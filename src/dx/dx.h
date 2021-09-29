@@ -51,8 +51,6 @@ typedef com<ID3D12GraphicsCommandList4> dx_graphics_command_list;
 
 #define NUM_BUFFERED_FRAMES 2
 
-#define ENABLE_DX_PROFILING 1
-
 #define SET_NAME(obj, name) checkResult(obj->SetName(L##name));
 
 

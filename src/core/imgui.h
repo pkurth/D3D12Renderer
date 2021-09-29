@@ -115,4 +115,9 @@ namespace ImGui
 	}
 #endif
 
+	static const ImColor white(1.f, 1.f, 1.f, 1.f);
+	static const ImColor yellow(1.f, 1.f, 0.f, 1.f);
+	static const ImColor green(0.f, 1.f, 0.f, 1.f);
+	static const ImColor red(1.f, 0.f, 0.f, 1.f);
+	static const ImColor blue(0.f, 0.f, 1.f, 1.f);
 }

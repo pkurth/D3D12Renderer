@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "editor.h"
 #include "core/imgui.h"
+#include "core/cpu_profiling.h"
 #include "dx/dx_profiling.h"
 #include "scene/components.h"
 #include "animation/animation.h"
@@ -143,9 +144,16 @@ void scene_editor::drawMainMenuBar()
 				showDemoWindow = !showDemoWindow;
 			}
 
-			if (ImGui::MenuItem(profilerWindowOpen ? (ICON_FA_CHART_BAR "  Hide GPU profiler") : (ICON_FA_CHART_BAR "  Show GPU profiler"), nullptr, nullptr, ENABLE_DX_PROFILING))
+			ImGui::Separator();
+
+			if (ImGui::MenuItem(dxProfilerWindowOpen ? (ICON_FA_CHART_BAR "  Hide GPU profiler") : (ICON_FA_CHART_BAR "  Show GPU profiler"), nullptr, nullptr, ENABLE_DX_PROFILING))
 			{
-				profilerWindowOpen = !profilerWindowOpen;
+				dxProfilerWindowOpen = !dxProfilerWindowOpen;
+			}
+
+			if (ImGui::MenuItem(cpuProfilerWindowOpen ? (ICON_FA_CHART_LINE "  Hide CPU profiler") : (ICON_FA_CHART_LINE "  Show CPU profiler"), nullptr, nullptr, ENABLE_CPU_PROFILING))
+			{
+				cpuProfilerWindowOpen = !cpuProfilerWindowOpen;
 			}
 
 			ImGui::EndMenu();
@@ -1284,6 +1292,7 @@ void scene_editor::drawSettings(float dt)
 			dx_memory_usage memoryUsage = dxContext.getMemoryUsage();
 
 			ImGui::PropertyValue("Video memory usage", "%u / %uMB", memoryUsage.currentlyUsed, memoryUsage.available);
+			//ImGui::PropertyValue("Running command lists", "%u", dxContext.renderQueue.numRunningCommandLists);
 
 			ImGui::PropertyDropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->aspectRatioMode);
 

@@ -5,6 +5,7 @@
 #include "dx/dx_profiling.h"
 #include "core/input.h"
 #include "core/imgui.h"
+#include "core/cpu_profiling.h"
 #include "editor/file_browser.h"
 #include "application.h"
 #include "rendering/render_utils.h"
@@ -45,6 +46,8 @@ static bool newFrame(float& dt)
 
 	newImGuiFrame(dt);
 	ImGui::DockSpaceOverViewport();
+
+	cpuProfilingResolveTimeStamps();
 
 	return result;
 }
@@ -237,6 +240,7 @@ int main(int argc, char** argv)
 
 		fenceValues[window.currentBackbufferIndex] = renderToMainWindow(window);
 
+		cpuProfilingFrameEndMarker();
 
 		++frameID;
 	}

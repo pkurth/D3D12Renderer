@@ -39,6 +39,24 @@ static uint64 atomicCompareExchange(volatile uint64& destination, uint64 exchang
 	return InterlockedCompareExchange64((volatile LONG64*)&destination, exchange, compare);
 }
 
+static uint32 atomicExchange(volatile uint32& destination, uint32 exchange)
+{
+	return InterlockedExchange((volatile LONG*)&destination, exchange);
+}
+
+static uint64 atomicExchange(volatile uint64& destination, uint64 exchange)
+{
+	return InterlockedExchange64((volatile LONG64*)&destination, exchange);
+}
+
+static uint32 getThreadIDFast()
+{
+	// This is what standard library functions do internally, but this function can trivially be inlined.
+	uint8* threadLocalStorage = (uint8*)__readgsqword(0x30);
+	uint32 threadID = *(uint32*)(threadLocalStorage + 0x48);
+	return threadID;
+}
+
 
 struct thread_job_context
 {

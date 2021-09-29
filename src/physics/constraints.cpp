@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "constraints.h"
 #include "physics.h"
+#include "core/cpu_profiling.h"
 
 #define DISTANCE_CONSTRAINT_BETA 0.1f
 #define BALL_JOINT_CONSTRAINT_BETA 0.1f
@@ -12,6 +13,8 @@
 
 void initializeDistanceVelocityConstraints(game_scene& scene, rigid_body_global_state* rbs, const distance_constraint* input, distance_constraint_update* output, uint32 count, float dt)
 {
+	CPU_PROFILE_BLOCK("Initialize distance constraints");
+
 	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
@@ -73,6 +76,8 @@ void initializeDistanceVelocityConstraints(game_scene& scene, rigid_body_global_
 
 void solveDistanceVelocityConstraints(distance_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs)
 {
+	CPU_PROFILE_BLOCK("Solve distance constraints");
+
 	for (uint32 i = 0; i < count; ++i)
 	{
 		distance_constraint_update& con = constraints[i];
@@ -95,6 +100,8 @@ void solveDistanceVelocityConstraints(distance_constraint_update* constraints, u
 
 void initializeBallJointVelocityConstraints(game_scene& scene, rigid_body_global_state* rbs, const ball_joint_constraint* input, ball_joint_constraint_update* output, uint32 count, float dt)
 {
+	CPU_PROFILE_BLOCK("Initialize ball joint constraints");
+
 	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
@@ -145,6 +152,8 @@ void initializeBallJointVelocityConstraints(game_scene& scene, rigid_body_global
 
 void solveBallJointVelocityConstraints(ball_joint_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs)
 {
+	CPU_PROFILE_BLOCK("Solve ball joint constraints");
+
 	for (uint32 i = 0; i < count; ++i)
 	{
 		ball_joint_constraint_update& con = constraints[i];
@@ -166,6 +175,8 @@ void solveBallJointVelocityConstraints(ball_joint_constraint_update* constraints
 
 void initializeHingeJointVelocityConstraints(game_scene& scene, rigid_body_global_state* rbs, const hinge_joint_constraint* input, hinge_joint_constraint_update* output, uint32 count, float dt)
 {
+	CPU_PROFILE_BLOCK("Initialize hinge joint constraints");
+
 	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
@@ -302,6 +313,8 @@ void initializeHingeJointVelocityConstraints(game_scene& scene, rigid_body_globa
 
 void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs)
 {
+	CPU_PROFILE_BLOCK("Solve hinge joint constraints");
+
 	for (uint32 i = 0; i < count; ++i)
 	{
 		hinge_joint_constraint_update& con = constraints[i];
@@ -396,6 +409,8 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 
 void initializeConeTwistVelocityConstraints(game_scene& scene, rigid_body_global_state* rbs, const cone_twist_constraint* input, cone_twist_constraint_update* output, uint32 count, float dt)
 {
+	CPU_PROFILE_BLOCK("Initialize cone twist constraints");
+
 	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
@@ -563,6 +578,8 @@ void initializeConeTwistVelocityConstraints(game_scene& scene, rigid_body_global
 
 void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs)
 {
+	CPU_PROFILE_BLOCK("Solve cone twist constraints");
+
 	for (uint32 i = 0; i < count; ++i)
 	{
 		cone_twist_constraint_update& con = constraints[i];

@@ -3,6 +3,7 @@
 #include "collision_broad.h"
 #include "collision_narrow.h"
 #include "geometry/geometry.h"
+#include "core/cpu_profiling.h"
 
 
 extern physics_settings physicsSettings = {};
@@ -440,6 +441,8 @@ void testPhysicsInteraction(game_scene& scene, ray r)
 
 static void getWorldSpaceColliders(game_scene& scene, bounding_box* outWorldspaceAABBs, collider_union* outWorldSpaceColliders)
 {
+	CPU_PROFILE_BLOCK("Get world space colliders");
+
 	uint32 pushIndex = 0;
 
 	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
@@ -570,6 +573,8 @@ static std::pair<vec3, uint32> getForceFieldStates(game_scene& scene, force_fiel
 
 void physicsStep(game_scene& scene, float dt)
 {
+	CPU_PROFILE_BLOCK("Physics step");
+
 	if (physicsSettings.globalTimeScale <= 0.f)
 	{
 		return;
@@ -640,18 +645,25 @@ void physicsStep(game_scene& scene, float dt)
 	uint32 numHingeJointConstraints = scene.numberOfComponentsOfType<hinge_joint_constraint>();
 	uint32 numConeTwistConstraints = scene.numberOfComponentsOfType<cone_twist_constraint>();
 
-	initializeDistanceVelocityConstraints(scene, rbGlobal, scene.raw<distance_constraint>(), distanceConstraintUpdates, numDistanceConstraints, dt);
-	initializeBallJointVelocityConstraints(scene, rbGlobal, scene.raw<ball_joint_constraint>(), ballJointConstraintUpdates, numBallJointConstraints, dt);
-	initializeHingeJointVelocityConstraints(scene, rbGlobal, scene.raw<hinge_joint_constraint>(), hingeJointConstraintUpdates, numHingeJointConstraints, dt);
-	initializeConeTwistVelocityConstraints(scene, rbGlobal, scene.raw<cone_twist_constraint>(), coneTwistConstraintUpdates, numConeTwistConstraints, dt);
-
-	for (uint32 it = 0; it < physicsSettings.numRigidSolverIterations; ++it)
 	{
-		solveDistanceVelocityConstraints(distanceConstraintUpdates, numDistanceConstraints, rbGlobal);
-		solveBallJointVelocityConstraints(ballJointConstraintUpdates, numBallJointConstraints, rbGlobal);
-		solveHingeJointVelocityConstraints(hingeJointConstraintUpdates, numHingeJointConstraints, rbGlobal);
-		solveConeTwistVelocityConstraints(coneTwistConstraintUpdates, numConeTwistConstraints, rbGlobal);
-		solveCollisionVelocityConstraints(collisionConstraints, narrowPhaseResult.numCollisions, rbGlobal);
+		CPU_PROFILE_BLOCK("Initialize constraints");
+
+		initializeDistanceVelocityConstraints(scene, rbGlobal, scene.raw<distance_constraint>(), distanceConstraintUpdates, numDistanceConstraints, dt);
+		initializeBallJointVelocityConstraints(scene, rbGlobal, scene.raw<ball_joint_constraint>(), ballJointConstraintUpdates, numBallJointConstraints, dt);
+		initializeHingeJointVelocityConstraints(scene, rbGlobal, scene.raw<hinge_joint_constraint>(), hingeJointConstraintUpdates, numHingeJointConstraints, dt);
+		initializeConeTwistVelocityConstraints(scene, rbGlobal, scene.raw<cone_twist_constraint>(), coneTwistConstraintUpdates, numConeTwistConstraints, dt);
+	}
+	{
+		CPU_PROFILE_BLOCK("Solve constraints");
+
+		for (uint32 it = 0; it < physicsSettings.numRigidSolverIterations; ++it)
+		{
+			solveDistanceVelocityConstraints(distanceConstraintUpdates, numDistanceConstraints, rbGlobal);
+			solveBallJointVelocityConstraints(ballJointConstraintUpdates, numBallJointConstraints, rbGlobal);
+			solveHingeJointVelocityConstraints(hingeJointConstraintUpdates, numHingeJointConstraints, rbGlobal);
+			solveConeTwistVelocityConstraints(coneTwistConstraintUpdates, numConeTwistConstraints, rbGlobal);
+			solveCollisionVelocityConstraints(collisionConstraints, narrowPhaseResult.numCollisions, rbGlobal);
+		}
 	}
 
 

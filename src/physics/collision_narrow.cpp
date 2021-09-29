@@ -5,6 +5,7 @@
 #include "collision_gjk.h"
 #include "collision_epa.h"
 #include "collision_sat.h"
+#include "core/cpu_profiling.h"
 
 
 #ifndef PHYSICS_ONLY
@@ -1367,6 +1368,8 @@ static bool overlapCheck(collider_union* worldSpaceColliders, broadphase_collisi
 narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions,
 	collision_constraint* outCollisionConstraints, non_collision_interaction* outNonCollisionInteractions)
 {
+	CPU_PROFILE_BLOCK("Narrow phase");
+
 	uint32 numCollisions = 0;
 	uint32 numNonCollisionInteractions = 0;
 
@@ -1419,6 +1422,8 @@ static rigid_body_global_state dummyRigidBody =
 void finalizeCollisionVelocityConstraintInitialization(collider_union* worldSpaceColliders, rigid_body_global_state* rbs, 
 	collision_constraint* collisionConstraints, uint32 numCollisionConstraints, float dt)
 {
+	CPU_PROFILE_BLOCK("Finalize collision constraint initialization");
+
 	for (uint32 collisionID = 0; collisionID < numCollisionConstraints; ++collisionID)
 	{
 		collision_constraint& c = collisionConstraints[collisionID];

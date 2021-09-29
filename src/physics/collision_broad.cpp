@@ -2,6 +2,7 @@
 #include "collision_broad.h"
 #include "scene/scene.h"
 #include "physics.h"
+#include "core/cpu_profiling.h"
 
 
 struct sap_endpoint
@@ -68,6 +69,8 @@ void onColliderRemoved(entt::registry& registry, entt::entity entityHandle)
 
 uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpaceAABBs, broadphase_collision* outCollisions)
 {
+	CPU_PROFILE_BLOCK("Broad phase");
+
 	uint32 numColliders = scene.numberOfComponentsOfType<collider_component>();
 	if (numColliders == 0)
 	{
