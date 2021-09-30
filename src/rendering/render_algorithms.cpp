@@ -348,19 +348,22 @@ void depthPrePass(dx_command_list* cl,
 	const mat4& viewProj, const mat4& prevFrameViewProj,
 	vec2 jitter, vec2 prevFrameJitter)
 {
-	PROFILE_ALL(cl, "Depth pre-pass");
+	if (opaqueRenderPass)
+	{
+		PROFILE_ALL(cl, "Depth pre-pass");
 
-	cl->setRenderTarget(depthOnlyRenderTarget);
-	cl->setViewport(depthOnlyRenderTarget.viewport);
-	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		cl->setRenderTarget(depthOnlyRenderTarget);
+		cl->setViewport(depthOnlyRenderTarget.viewport);
+		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	depth_only_camera_jitter_cb jitterCB = { jitter, prevFrameJitter };
+		depth_only_camera_jitter_cb jitterCB = { jitter, prevFrameJitter };
 
-	depthPrePassInternal(cl, depthPrePassPipeline, opaqueRenderPass->staticDepthPrepass, opaqueRenderPass->dynamicDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
-	depthPrePassInternal(cl, doubleSidedDepthPrePassPipeline, opaqueRenderPass->staticDoublesidedDepthPrepass, opaqueRenderPass->dynamicDoublesidedDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
-	
-	depthPrePassInternal(cl, animatedDepthPrePassPipeline, opaqueRenderPass->animatedDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
-	depthPrePassInternal(cl, doubleSidedAnimatedDepthPrePassPipeline, opaqueRenderPass->animatedDoublesidedDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
+		depthPrePassInternal(cl, depthPrePassPipeline, opaqueRenderPass->staticDepthPrepass, opaqueRenderPass->dynamicDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
+		depthPrePassInternal(cl, doubleSidedDepthPrePassPipeline, opaqueRenderPass->staticDoublesidedDepthPrepass, opaqueRenderPass->dynamicDoublesidedDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
+
+		depthPrePassInternal(cl, animatedDepthPrePassPipeline, opaqueRenderPass->animatedDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
+		depthPrePassInternal(cl, doubleSidedAnimatedDepthPrePassPipeline, opaqueRenderPass->animatedDoublesidedDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
+	}
 }
 
 void texturedSky(dx_command_list* cl,
@@ -841,81 +844,84 @@ void ldrPass(dx_command_list* cl,
 	const common_material_info& materialInfo,
 	const mat4& viewProj)
 {
-	PROFILE_ALL(cl, "LDR pass");
-
-	cl->setRenderTarget(ldrRenderTarget);
-	cl->setViewport(ldrRenderTarget.viewport);
-
-
-	if (ldrRenderPass->ldrPass.size())
+	if (ldrRenderPass)
 	{
-		PROFILE_ALL(cl, "LDR Objects");
+		PROFILE_ALL(cl, "LDR pass");
 
-		pipeline_setup_func lastSetupFunc = 0;
+		cl->setRenderTarget(ldrRenderTarget);
+		cl->setViewport(ldrRenderTarget.viewport);
 
-		for (const auto& dc : ldrRenderPass->ldrPass)
+
+		if (ldrRenderPass->ldrPass.size())
 		{
-			if (dc.setup != lastSetupFunc)
+			PROFILE_ALL(cl, "LDR Objects");
+
+			pipeline_setup_func lastSetupFunc = 0;
+
+			for (const auto& dc : ldrRenderPass->ldrPass)
 			{
-				dc.setup(cl, materialInfo);
-				lastSetupFunc = dc.setup;
+				if (dc.setup != lastSetupFunc)
+				{
+					dc.setup(cl, materialInfo);
+					lastSetupFunc = dc.setup;
+				}
+				dc.render(cl, viewProj, dc.data);
 			}
-			dc.render(cl, viewProj, dc.data);
 		}
-	}
 
-	if (ldrRenderPass->overlays.size())
-	{
-		PROFILE_ALL(cl, "3D Overlays");
-
-		cl->clearDepth(ldrRenderTarget.dsv);
-
-		pipeline_setup_func lastSetupFunc = 0;
-
-		for (const auto& dc : ldrRenderPass->overlays)
+		if (ldrRenderPass->overlays.size())
 		{
-			if (dc.setup != lastSetupFunc)
+			PROFILE_ALL(cl, "3D Overlays");
+
+			cl->clearDepth(ldrRenderTarget.dsv);
+
+			pipeline_setup_func lastSetupFunc = 0;
+
+			for (const auto& dc : ldrRenderPass->overlays)
 			{
-				dc.setup(cl, materialInfo);
-				lastSetupFunc = dc.setup;
+				if (dc.setup != lastSetupFunc)
+				{
+					dc.setup(cl, materialInfo);
+					lastSetupFunc = dc.setup;
+				}
+				dc.render(cl, viewProj, dc.data);
 			}
-			dc.render(cl, viewProj, dc.data);
 		}
-	}
 
-	if (ldrRenderPass->outlines.size())
-	{
-		PROFILE_ALL(cl, "Outlines");
-
-		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		cl->setStencilReference(stencil_flag_selected_object);
-
-		cl->setPipelineState(*outlineMarkerPipeline.pipeline);
-		cl->setGraphicsRootSignature(*outlineMarkerPipeline.rootSignature);
-
-
-		// Mark objects in stencil.
-		for (const auto& dc : ldrRenderPass->outlines)
+		if (ldrRenderPass->outlines.size())
 		{
-			cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * dc.transform });
+			PROFILE_ALL(cl, "Outlines");
 
-			cl->setVertexBuffer(0, dc.vertexBuffer);
-			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(dc.submesh.numIndices, 1, dc.submesh.firstIndex, dc.submesh.baseVertex, 0);
+			cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			cl->setStencilReference(stencil_flag_selected_object);
+
+			cl->setPipelineState(*outlineMarkerPipeline.pipeline);
+			cl->setGraphicsRootSignature(*outlineMarkerPipeline.rootSignature);
+
+
+			// Mark objects in stencil.
+			for (const auto& dc : ldrRenderPass->outlines)
+			{
+				cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * dc.transform });
+
+				cl->setVertexBuffer(0, dc.vertexBuffer);
+				cl->setIndexBuffer(dc.indexBuffer);
+				cl->drawIndexed(dc.submesh.numIndices, 1, dc.submesh.firstIndex, dc.submesh.baseVertex, 0);
+			}
+
+			// Draw outline.
+			cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ);
+
+			cl->setPipelineState(*outlineDrawerPipeline.pipeline);
+			cl->setGraphicsRootSignature(*outlineDrawerPipeline.rootSignature);
+
+			cl->setGraphics32BitConstants(OUTLINE_RS_CB, outline_drawer_cb{ (int)depthStencilBuffer->width, (int)depthStencilBuffer->height });
+			cl->setDescriptorHeapResource(OUTLINE_RS_STENCIL, 0, 1, depthStencilBuffer->stencilSRV);
+
+			cl->drawFullscreenTriangle();
+
+			cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 		}
-
-		// Draw outline.
-		cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ);
-
-		cl->setPipelineState(*outlineDrawerPipeline.pipeline);
-		cl->setGraphicsRootSignature(*outlineDrawerPipeline.rootSignature);
-
-		cl->setGraphics32BitConstants(OUTLINE_RS_CB, outline_drawer_cb{ (int)depthStencilBuffer->width, (int)depthStencilBuffer->height });
-		cl->setDescriptorHeapResource(OUTLINE_RS_STENCIL, 0, 1, depthStencilBuffer->stencilSRV);
-
-		cl->drawFullscreenTriangle();
-
-		cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 	}
 }
 
