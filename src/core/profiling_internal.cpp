@@ -458,7 +458,8 @@ void profiler_timeline::handleUserInteractions()
 	float relMouseX = mousePos.x - windowPos.x;
 
 	bool overStack = false;
-	if (ImGui::IsMouseHoveringRect(ImVec2(leftPadding + windowPos.x, highlightTop + windowPos.y), ImVec2(leftPadding + totalWidth + rightPadding + windowPos.x, highlightTop + (maxDepth + 1) * verticalBarStride + windowPos.y), false))
+	if (!ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) && // If dropdown or smth is open, don't interact with call stack.
+		ImGui::IsMouseHoveringRect(ImVec2(leftPadding + windowPos.x, highlightTop + windowPos.y), ImVec2(leftPadding + totalWidth + rightPadding + windowPos.x, highlightTop + (maxDepth + 1) * verticalBarStride + windowPos.y), false))
 	{
 		overStack = true;
 
