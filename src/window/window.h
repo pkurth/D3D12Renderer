@@ -28,7 +28,7 @@ struct win32_window
 {
 	win32_window() = default;
 	win32_window(win32_window&) = delete;
-	win32_window(win32_window&& o);
+	win32_window(win32_window&& o) noexcept;
 
 	bool initialize(const TCHAR* name, uint32 clientWidth, uint32 clientHeight, bool visible = true);
 	virtual void shutdown();

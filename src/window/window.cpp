@@ -382,7 +382,7 @@ void win32_window::setFileDropCallback(std::function<void(const fs::path&)> cb)
 	fileDropCallback = cb;
 }
 
-win32_window::win32_window(win32_window&& o)
+win32_window::win32_window(win32_window&& o) noexcept
 {
 	open = o.open;
 	windowHandle = o.windowHandle;

@@ -2,7 +2,7 @@
 #include "software_window.h"
 
 
-software_window::software_window(software_window&& o)
+software_window::software_window(software_window&& o) noexcept
 	: win32_window(std::move(o))
 {
 	bitmapInfo = o.bitmapInfo;
@@ -25,6 +25,10 @@ bool software_window::initialize(const TCHAR* name, uint32 requestedClientWidth,
 	if (!bitmapInfo)
 	{
 		bitmapInfo = (BITMAPINFO*)malloc(sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 256);
+		if (!bitmapInfo)
+		{
+			return false;
+		}
 
 		bitmapInfo->bmiHeader.biSize = sizeof(bitmapInfo->bmiHeader);
 		bitmapInfo->bmiHeader.biCompression = BI_RGB;
