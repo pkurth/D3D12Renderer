@@ -13,9 +13,6 @@ extern bool dxProfilerWindowOpen;
 #define DX_PROFILE_BLOCK(cl, name) DX_PROFILE_BLOCK_(__COUNTER__, cl, name)
 
 
-#define PROFILE_ALL(cl, name) DX_PROFILE_BLOCK(cl, name); CPU_PROFILE_BLOCK(name)
-
-
 #define MAX_NUM_DX_PROFILE_BLOCKS 2048
 #define MAX_NUM_DX_PROFILE_EVENTS (MAX_NUM_DX_PROFILE_BLOCKS * 2) // One for start and end.
 
@@ -70,9 +67,13 @@ void dxProfilingResolveTimeStamps(uint64* timestamps);
 
 #else
 
-#define DX_PROFILE_BLOCK(cl, name)
+#define DX_PROFILE_BLOCK(...)
 
 #define dxProfilingFrameEndMarker(...)
 #define dxProfilingResolveTimeStamps(...)
 
 #endif
+
+
+#define PROFILE_ALL(cl, name) DX_PROFILE_BLOCK(cl, name); CPU_PROFILE_BLOCK(name)
+

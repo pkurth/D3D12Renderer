@@ -18,7 +18,7 @@ extern bool cpuProfilerWindowOpen;
 #define CPU_PROFILE_BLOCK_(counter, name) cpu_profile_block_recorder COMPOSITE_VARNAME(__PROFILE_BLOCK, counter)(name)
 #define CPU_PROFILE_BLOCK(name) CPU_PROFILE_BLOCK_(__COUNTER__, name)
 
-#define MAX_NUM_CPU_PROFILE_BLOCKS 2048
+#define MAX_NUM_CPU_PROFILE_BLOCKS 16384
 #define MAX_NUM_CPU_PROFILE_EVENTS (MAX_NUM_CPU_PROFILE_BLOCKS * 2) // One for start and end.
 
 
@@ -68,6 +68,8 @@ void cpuProfilingResolveTimeStamps();
 #undef recordProfileEvent
 
 #else
+
+#define CPU_PROFILE_BLOCK(...)
 
 #define cpuProfilingFrameEndMarker(...)
 #define cpuProfilingResolveTimeStamps(...)
