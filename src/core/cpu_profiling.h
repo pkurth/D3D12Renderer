@@ -22,11 +22,12 @@ extern bool cpuProfilerWindowOpen;
 
 #define recordProfileEvent(type_, name_) \
 	extern profile_event cpuProfileEvents[2][MAX_NUM_CPU_PROFILE_EVENTS]; \
-	extern volatile uint64 cpuProfileArrayAndEventIndex; \
-	uint64 arrayAndEventIndex = atomicIncrement(cpuProfileArrayAndEventIndex); \
-	uint32 eventIndex = (uint32)arrayAndEventIndex; \
+	extern volatile uint32 cpuProfileArrayAndEventIndex; \
+	uint32 arrayAndEventIndex = atomicIncrement(cpuProfileArrayAndEventIndex); \
+	uint32 eventIndex = arrayAndEventIndex & ((1u << 31) - 1); \
+	uint32 arrayIndex = arrayAndEventIndex >> 31; \
 	assert(eventIndex < MAX_NUM_CPU_PROFILE_EVENTS); \
-	profile_event* event = cpuProfileEvents[arrayAndEventIndex >> 32] + eventIndex; \
+	profile_event* event = cpuProfileEvents[arrayIndex] + eventIndex; \
 	event->threadID = getThreadIDFast(); \
 	event->name = name_; \
 	event->type = type_; \

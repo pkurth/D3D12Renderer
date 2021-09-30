@@ -9,7 +9,7 @@ bool cpuProfilerWindowOpen = false;
 
 #if ENABLE_CPU_PROFILING
 
-volatile uint64 cpuProfileArrayAndEventIndex = 0;
+volatile uint32 cpuProfileArrayAndEventIndex = 0;
 profile_event cpuProfileEvents[2][MAX_NUM_CPU_PROFILE_EVENTS];
 
 
@@ -59,15 +59,15 @@ void cpuProfilingResolveTimeStamps()
 {
 	uint32 currentFrame = profileFrameWriteIndex;
 
-	uint32 arrayIndex = (uint32)(cpuProfileArrayAndEventIndex >> 32); // We are only interested in upper 32 bits here, so don't worry about thread safety.
-	uint64 currentArrayAndEventIndex = atomicExchange(cpuProfileArrayAndEventIndex, (uint64)(1 - arrayIndex) << 32); // Swap array and get current event count.
+	uint32 arrayIndex = cpuProfileArrayAndEventIndex >> 31; // We are only interested in most significant bit here, so don't worry about thread safety.
+	uint32 currentArrayAndEventIndex = atomicExchange(cpuProfileArrayAndEventIndex, (1 - arrayIndex) << 31); // Swap array and get current event count.
 
 
 	
 	CPU_PROFILE_BLOCK("CPU Profiling"); // Important: Must be after array swap!
 	
 	profile_event* events = cpuProfileEvents[arrayIndex];
-	uint32 numEvents = (uint32)currentArrayAndEventIndex;
+	uint32 numEvents = currentArrayAndEventIndex & ((1u << 31) - 1);
 
 	if (!pauseRecording)
 	{
