@@ -7,7 +7,6 @@ extern bool cpuProfilerWindowOpen;
 
 
 // Things the CPU profiler currently doesn't support (but probably should):
-// - Blocks going over frame boundaries (for background tasks)
 // - Thread names
 // - Display of multiple threads
 // - Filtering?

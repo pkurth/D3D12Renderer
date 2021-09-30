@@ -100,6 +100,6 @@ struct profiler_timeline
 
 // Returns true if frame-end marker is found.
 bool handleProfileEvent(profile_event* events, uint32 eventIndex, uint32 numEvents, uint16* stack, uint32& d, profile_block* blocks, uint32& numBlocksUsed, uint64& frameEndTimestamp, bool lookahead);
-
+void copyProfileBlocks(profile_block* src, uint16* stack, uint32 depth, profile_block* dest, uint32& numDestBlocks);
 
 #endif

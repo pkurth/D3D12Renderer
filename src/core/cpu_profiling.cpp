@@ -79,24 +79,23 @@ void cpuProfilingResolveTimeStamps()
 		});
 
 
-		uint16 stack[MAX_NUM_CPU_PROFILE_THREADS][1024];
-		uint32 depth[MAX_NUM_CPU_PROFILE_THREADS] = {};
-
-		for (uint32 thread = 0; thread < MAX_NUM_CPU_PROFILE_THREADS; ++thread)
-		{
-			stack[thread][0] = INVALID_PROFILE_BLOCK;
-		}
+		static uint16 stack[MAX_NUM_CPU_PROFILE_THREADS][1024];
+		static uint32 depth[MAX_NUM_CPU_PROFILE_THREADS] = {};
+		static bool initializedStack = false;
 
 
 		cpu_profile_frame* frame = profileFrames + profileFrameWriteIndex;
 
-		// Only valid on the very first frame.
-		if (frame->endClock == 0)
+		// Initialize on the very first frame.
+		if (!initializedStack)
 		{
 			for (uint32 thread = 0; thread < MAX_NUM_CPU_PROFILE_THREADS; ++thread)
 			{
+				stack[thread][0] = INVALID_PROFILE_BLOCK;
 				frame->firstTopLevelBlockPerThread[thread] = INVALID_PROFILE_BLOCK;
 			}
+
+			initializedStack = true;
 		}
 
 
@@ -127,12 +126,26 @@ void cpuProfilingResolveTimeStamps()
 				{
 					profile_block* block = profileBlockPool[profileFrameWriteIndex] + i;
 
-					assert(block->endClock <= frame->endClock);
+					uint64 endClock = (block->endClock == 0) ? frame->endClock : block->endClock;
 
-					block->relStart = (float)(block->startClock - frame->startClock) / clockFrequency * 1000.f;
-					block->duration = (float)(block->endClock - block->startClock) / clockFrequency * 1000.f;
+					assert(endClock <= frame->endClock);
+
+					if (block->startClock >= frame->startClock)
+					{
+						block->relStart = (float)(block->startClock - frame->startClock) / clockFrequency * 1000.f;
+					}
+					else
+					{
+						// For blocks which started in a previous frame.
+						block->relStart = -(float)(frame->startClock - block->startClock) / clockFrequency * 1000.f;
+					}
+					block->duration = (float)(endClock - block->startClock) / clockFrequency * 1000.f;
 				}
 
+
+				cpu_profile_frame* oldFrame = frame;
+				uint32 oldFrameIndex = profileFrameWriteIndex;
+				profile_block* oldBlocks = profileBlockPool[profileFrameWriteIndex];
 
 
 				++profileFrameWriteIndex;
@@ -147,16 +160,30 @@ void cpuProfilingResolveTimeStamps()
 
 				for (uint32 thread = 0; thread < MAX_NUM_CPU_PROFILE_THREADS; ++thread)
 				{
-					frame->firstTopLevelBlockPerThread[thread] = INVALID_PROFILE_BLOCK;
+					if (depth[thread] > 0)
+					{
+						// Some blocks are still running on this thread.
+						copyProfileBlocks(oldBlocks, stack[thread], depth[thread], profileBlockPool[profileFrameWriteIndex], frame->totalNumProfileBlocks);
+						frame->firstTopLevelBlockPerThread[thread] = stack[thread][0];
+					}
+					else
+					{
+						frame->firstTopLevelBlockPerThread[thread] = INVALID_PROFILE_BLOCK;
+						stack[thread][0] = INVALID_PROFILE_BLOCK;
+					}
+				}
+			}
+			else
+			{
+				// Set first top-level block if another block was added and this thread has no first top-level block yet.
+				uint32 blocksAfter = frame->totalNumProfileBlocks;
+
+				if (blocksBefore != blocksAfter && frame->firstTopLevelBlockPerThread[threadIndex] == INVALID_PROFILE_BLOCK)
+				{
+					frame->firstTopLevelBlockPerThread[threadIndex] = frame->totalNumProfileBlocks - 1;
 				}
 			}
 
-			uint32 blocksAfter = frame->totalNumProfileBlocks;
-
-			if (blocksBefore != blocksAfter && frame->firstTopLevelBlockPerThread[threadIndex] == INVALID_PROFILE_BLOCK)
-			{
-				frame->firstTopLevelBlockPerThread[threadIndex] = frame->totalNumProfileBlocks - 1;
-			}
 		}
 	}
 
@@ -181,7 +208,7 @@ void cpuProfilingResolveTimeStamps()
 
 
 
-			if (persistent.highlightFrameIndex != -1)
+			if (persistent.highlightFrameIndex != -1 && persistent.highlightFrameIndex != profileFrameWriteIndex)
 			{
 				cpu_profile_frame& frame = profileFrames[persistent.highlightFrameIndex];
 				profile_block* blocks = profileBlockPool[persistent.highlightFrameIndex];

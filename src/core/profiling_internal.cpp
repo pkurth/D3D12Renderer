@@ -48,6 +48,7 @@ bool handleProfileEvent(profile_event* events, uint32 eventIndex, uint32 numEven
 			profile_block& block = blocks[index];
 
 			block.startClock = timestamp;
+			block.endClock = 0;
 			block.parent = (d == 0) ? INVALID_PROFILE_BLOCK : stack[d - 1];
 			block.name = e->name;
 			block.threadID = e->threadID;
@@ -99,6 +100,42 @@ bool handleProfileEvent(profile_event* events, uint32 eventIndex, uint32 numEven
 
 	return result;
 }
+
+void copyProfileBlocks(profile_block* src, uint16* stack, uint32 depth, profile_block* dest, uint32& numDestBlocks)
+{
+	for (uint32 d = 0; d < depth; ++d)
+	{
+		uint32 index = numDestBlocks++;
+		profile_block& old = src[stack[d]];
+		profile_block& block = dest[index];
+
+		block.startClock = old.startClock;
+		block.endClock = 0;
+		block.parent = (d == 0) ? INVALID_PROFILE_BLOCK : stack[d - 1];
+		block.name = old.name;
+		block.threadID = old.threadID;
+		block.firstChild = INVALID_PROFILE_BLOCK;
+		block.lastChild = INVALID_PROFILE_BLOCK;
+		block.nextSibling = INVALID_PROFILE_BLOCK;
+
+		if (block.parent != INVALID_PROFILE_BLOCK) // d > 0.
+		{
+			profile_block* parent = dest + block.parent;
+
+			if (parent->firstChild == INVALID_PROFILE_BLOCK)
+			{
+				parent->firstChild = index;
+			}
+			parent->lastChild = index;
+		}
+
+		stack[d] = index;
+	}
+}
+
+
+
+
 
 static const ImColor highlightFrameColor = ImGui::green;
 
@@ -298,7 +335,7 @@ void profiler_timeline::drawCallStack(profile_block* blocks, uint16 startIndex)
 
 			ImGui::PushClipRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), true);
 			ImGui::SetCursorPos(ImVec2(left + ImGui::GetStyle().FramePadding.x, top + ImGui::GetStyle().FramePadding.y));
-			ImGui::Text("%s: %.3fms", current->name, current->duration);
+			ImGui::Text("%s: %.3fms%s", current->name, current->duration, (current->endClock == 0) ? " (continues in next frame" : "");
 			ImGui::PopClipRect();
 
 
