@@ -21,6 +21,8 @@ profile_event cpuProfileEvents[2][MAX_NUM_CPU_PROFILE_EVENTS];
 struct cpu_profile_frame : profile_frame
 {
 	uint16 firstTopLevelBlockPerThread[MAX_NUM_CPU_PROFILE_THREADS];
+
+	profile_block profileBlockPool[MAX_NUM_CPU_PROFILE_BLOCKS];
 	uint32 totalNumProfileBlocks;
 };
 
@@ -40,9 +42,6 @@ static uint32 dummyFrameWriteIndex;
 
 
 static bool pauseRecording;
-
-static profile_block profileBlockPool[MAX_NUM_CPU_PROFILE_FRAMES][MAX_NUM_CPU_PROFILE_BLOCKS];
-static profile_block dummyProfileBlockPool[2][MAX_NUM_CPU_PROFILE_BLOCKS];
 
 
 static uint16 stack[MAX_NUM_CPU_PROFILE_THREADS][1024];
@@ -64,14 +63,14 @@ static uint32 mapThreadIDToIndex(uint32 threadID)
 	return index;
 }
 
-static void initializeNewFrame(profile_block* src, profile_block* dest, cpu_profile_frame& newFrame)
+static void initializeNewFrame(cpu_profile_frame& oldFrame, cpu_profile_frame& newFrame)
 {
 	for (uint32 thread = 0; thread < MAX_NUM_CPU_PROFILE_THREADS; ++thread)
 	{
 		if (depth[thread] > 0)
 		{
 			// Some blocks are still running on this thread.
-			copyProfileBlocks(src, stack[thread], depth[thread], dest, newFrame.totalNumProfileBlocks);
+			copyProfileBlocks(oldFrame.profileBlockPool, stack[thread], depth[thread], newFrame.profileBlockPool, newFrame.totalNumProfileBlocks);
 			newFrame.firstTopLevelBlockPerThread[thread] = stack[thread][0];
 		}
 		else
@@ -126,7 +125,6 @@ void cpuProfilingResolveTimeStamps()
 
 
 		cpu_profile_frame* frame = !pauseRecording ? (profileFrames + profileFrameWriteIndex) : (dummyFrames + dummyFrameWriteIndex);
-		profile_block* pool = !pauseRecording ? profileBlockPool[profileFrameWriteIndex] : dummyProfileBlockPool[dummyFrameWriteIndex];
 
 		for (uint32 i = 0; i < numEvents; ++i)
 		{
@@ -137,7 +135,7 @@ void cpuProfilingResolveTimeStamps()
 			uint32 blocksBefore = frame->totalNumProfileBlocks;
 
 			uint64 frameEndTimestamp;
-			if (handleProfileEvent(events, i, numEvents, stack[threadIndex], depth[threadIndex], pool, frame->totalNumProfileBlocks, frameEndTimestamp, false))
+			if (handleProfileEvent(events, i, numEvents, stack[threadIndex], depth[threadIndex], frame->profileBlockPool, frame->totalNumProfileBlocks, frameEndTimestamp, false))
 			{
 				static uint64 clockFrequency;
 				static bool performanceFrequencyQueried = QueryPerformanceFrequency((LARGE_INTEGER*)&clockFrequency);
@@ -163,7 +161,7 @@ void cpuProfilingResolveTimeStamps()
 
 				for (uint32 i = 0; i < frame->totalNumProfileBlocks; ++i)
 				{
-					profile_block* block = pool + i;
+					profile_block* block = frame->profileBlockPool + i;
 
 					uint64 endClock = (block->endClock == 0) ? frame->endClock : block->endClock;
 					assert(endClock <= frame->endClock);
@@ -180,24 +178,22 @@ void cpuProfilingResolveTimeStamps()
 					block->duration = (float)(endClock - block->startClock) / clockFrequency * 1000.f;
 				}
 
-				profile_block* oldPool = pool;
+				cpu_profile_frame* oldFrame = frame;
 
 				if (!pauseRecording)
 				{
 					profileFrameWriteIndex = (profileFrameWriteIndex + 1) % MAX_NUM_CPU_PROFILE_FRAMES;
 					frame = profileFrames + profileFrameWriteIndex;
-					pool = profileBlockPool[profileFrameWriteIndex];
 				}
 				else
 				{
 					dummyFrameWriteIndex = 1 - dummyFrameWriteIndex;
 					frame = dummyFrames + dummyFrameWriteIndex;
-					pool = dummyProfileBlockPool[dummyFrameWriteIndex];
 				}
 
 				frame->totalNumProfileBlocks = 0;
 
-				initializeNewFrame(oldPool, pool, *frame);
+				initializeNewFrame(*oldFrame, *frame);
 			}
 			else
 			{
@@ -228,17 +224,15 @@ void cpuProfilingResolveTimeStamps()
 				// Recording has been stopped/resumed. Swap array into which is recorded.
 				if (pauseRecording)
 				{
-					profile_block* src = profileBlockPool[profileFrameWriteIndex];
-					profile_block* dest = dummyProfileBlockPool[dummyFrameWriteIndex];
-					cpu_profile_frame& frame = dummyFrames[dummyFrameWriteIndex];
-					initializeNewFrame(src, dest, frame);
+					cpu_profile_frame& oldFrame = profileFrames[profileFrameWriteIndex];
+					cpu_profile_frame& newFrame = dummyFrames[dummyFrameWriteIndex];
+					initializeNewFrame(oldFrame, newFrame);
 				}
 				else
 				{
-					profile_block* src = dummyProfileBlockPool[dummyFrameWriteIndex];
-					profile_block* dest = profileBlockPool[profileFrameWriteIndex];
-					cpu_profile_frame& frame = profileFrames[profileFrameWriteIndex];
-					initializeNewFrame(src, dest, frame);
+					cpu_profile_frame& oldFrame = dummyFrames[dummyFrameWriteIndex];
+					cpu_profile_frame& newFrame = profileFrames[profileFrameWriteIndex];
+					initializeNewFrame(oldFrame, newFrame);
 				}
 			}
 
@@ -253,7 +247,7 @@ void cpuProfilingResolveTimeStamps()
 			if (persistent.highlightFrameIndex != -1 && persistent.highlightFrameIndex != profileFrameWriteIndex)
 			{
 				cpu_profile_frame& frame = profileFrames[persistent.highlightFrameIndex];
-				profile_block* blocks = profileBlockPool[persistent.highlightFrameIndex];
+				profile_block* blocks = profileFrames[persistent.highlightFrameIndex].profileBlockPool;
 
 				if (frame.totalNumProfileBlocks)
 				{
