@@ -88,7 +88,7 @@ struct profiler_timeline
 
 
 	profiler_timeline(profiler_persistent& persistent, uint32 numFrames);
-	void drawHeader(bool& pauseRecording);
+	bool drawHeader(bool& pauseRecording);
 	void drawOverviewFrame(profile_frame& frame, uint32 frameIndex, uint32 currentFrame);
 	void endOverview();
 

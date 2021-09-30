@@ -190,14 +190,17 @@ profiler_timeline::profiler_timeline(profiler_persistent& persistent, uint32 num
 	callStackTop = highlightTop;
 }
 
-void profiler_timeline::drawHeader(bool& pauseRecording)
+bool profiler_timeline::drawHeader(bool& pauseRecording)
 {
+	bool result = false;
 	if (ImGui::Button(pauseRecording ? (ICON_FA_PLAY "  Resume recording") : (ICON_FA_PAUSE "  Pause recording")))
 	{
 		pauseRecording = !pauseRecording;
+		result = true;
 	}
 	ImGui::SameLine();
 	ImGui::Text("The last %u frames are recorded. Click on one frame to get a detailed hierarchical view of all blocks. Zoom into detail view with mouse wheel and click and drag to shift the display.", numFrames);
+	return result;
 }
 
 void profiler_timeline::drawOverviewFrame(profile_frame& frame, uint32 frameIndex, uint32 currentFrame)
