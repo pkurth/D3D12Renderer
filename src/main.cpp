@@ -20,7 +20,11 @@
 
 bool handleWindowsMessages();
 
-static bool newFrame(float& dt)
+static uint64 fenceValues[NUM_BUFFERED_FRAMES];
+static uint64 frameID;
+
+
+static bool newFrame(float& dt, dx_window& window)
 {
 	static bool first = true;
 	static float perfFreq;
@@ -49,10 +53,17 @@ static bool newFrame(float& dt)
 
 	cpuProfilingResolveTimeStamps();
 
+	{
+		CPU_PROFILE_BLOCK("Wait for queued frame to finish rendering");
+		dxContext.renderQueue.waitForFence(fenceValues[window.currentBackbufferIndex]);
+	}
+
+	dxContext.newFrame(frameID);
+
 	return result;
 }
 
-static uint64 renderToMainWindow(dx_window& window)
+static void renderToMainWindow(dx_window& window)
 {
 	dx_resource backbuffer = window.backBuffers[window.currentBackbufferIndex];
 	dx_rtv_descriptor_handle rtv = window.backBufferRTVs[window.currentBackbufferIndex];
@@ -80,7 +91,7 @@ static uint64 renderToMainWindow(dx_window& window)
 
 	window.swapBuffers();
 
-	return result;
+	fenceValues[window.currentBackbufferIndex] = result;
 }
 
 int main(int argc, char** argv)
@@ -94,7 +105,6 @@ int main(int argc, char** argv)
 
 	dx_window window;
 	window.initialize(TEXT("D3D12 Renderer"), 1920, 1080);
-	setMainWindow(&window);
 	window.setIcon("assets/icons/project_icon.png");
 	window.setCustomWindowStyle();
 
@@ -120,10 +130,7 @@ int main(int argc, char** argv)
 
 	user_input input = {};
 
-	uint64 fenceValues[NUM_BUFFERED_FRAMES] = {};
 	fenceValues[NUM_BUFFERED_FRAMES - 1] = dxContext.renderQueue.signal();
-
-	uint64 frameID = 0;
 
 	bool appFocusedLastFrame = true;
 
@@ -131,24 +138,49 @@ int main(int argc, char** argv)
 
 
 	float dt;
-	while (newFrame(dt))
+	while (newFrame(dt, window))
 	{
 		ImGui::BeginWindowHiddenTabBar("Scene Viewport");
 		uint32 renderWidth = (uint32)ImGui::GetContentRegionAvail().x;
 		uint32 renderHeight = (uint32)ImGui::GetContentRegionAvail().y;
 		ImGui::Image(renderer.frameResult, renderWidth, renderHeight);
 
-		ImGuiIO& io = ImGui::GetIO();
-		if (ImGui::IsItemHovered())
 		{
-			ImVec2 relativeMouse = ImGui::GetMousePos() - ImGui::GetItemRectMin();
-			vec2 mousePos = { relativeMouse.x, relativeMouse.y };
-			if (appFocusedLastFrame)
+			CPU_PROFILE_BLOCK("Collect user input");
+
+			ImGuiIO& io = ImGui::GetIO();
+			if (ImGui::IsItemHovered())
 			{
-				input.mouse.dx = (int32)(mousePos.x - input.mouse.x);
-				input.mouse.dy = (int32)(mousePos.y - input.mouse.y);
-				input.mouse.reldx = (float)input.mouse.dx / (renderWidth - 1);
-				input.mouse.reldy = (float)input.mouse.dy / (renderHeight - 1);
+				ImVec2 relativeMouse = ImGui::GetMousePos() - ImGui::GetItemRectMin();
+				vec2 mousePos = { relativeMouse.x, relativeMouse.y };
+				if (appFocusedLastFrame)
+				{
+					input.mouse.dx = (int32)(mousePos.x - input.mouse.x);
+					input.mouse.dy = (int32)(mousePos.y - input.mouse.y);
+					input.mouse.reldx = (float)input.mouse.dx / (renderWidth - 1);
+					input.mouse.reldy = (float)input.mouse.dy / (renderHeight - 1);
+				}
+				else
+				{
+					input.mouse.dx = 0;
+					input.mouse.dy = 0;
+					input.mouse.reldx = 0.f;
+					input.mouse.reldy = 0.f;
+				}
+				input.mouse.x = (int32)mousePos.x;
+				input.mouse.y = (int32)mousePos.y;
+				input.mouse.relX = mousePos.x / (renderWidth - 1);
+				input.mouse.relY = mousePos.y / (renderHeight - 1);
+				input.mouse.left = { ImGui::IsMouseDown(ImGuiMouseButton_Left), ImGui::IsMouseClicked(ImGuiMouseButton_Left), ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) };
+				input.mouse.right = { ImGui::IsMouseDown(ImGuiMouseButton_Right), ImGui::IsMouseClicked(ImGuiMouseButton_Right), ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Right) };
+				input.mouse.middle = { ImGui::IsMouseDown(ImGuiMouseButton_Middle), ImGui::IsMouseClicked(ImGuiMouseButton_Middle), ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Middle) };
+
+				for (uint32 i = 0; i < arraysize(user_input::keyboard); ++i)
+				{
+					input.keyboard[i] = { ImGui::IsKeyDown(i), ImGui::IsKeyPressed(i, false) };
+				}
+
+				input.overWindow = true;
 			}
 			else
 			{
@@ -156,46 +188,24 @@ int main(int argc, char** argv)
 				input.mouse.dy = 0;
 				input.mouse.reldx = 0.f;
 				input.mouse.reldy = 0.f;
-			}
-			input.mouse.x = (int32)mousePos.x;
-			input.mouse.y = (int32)mousePos.y;
-			input.mouse.relX = mousePos.x / (renderWidth - 1);
-			input.mouse.relY = mousePos.y / (renderHeight - 1);
-			input.mouse.left = { ImGui::IsMouseDown(ImGuiMouseButton_Left), ImGui::IsMouseClicked(ImGuiMouseButton_Left), ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) };
-			input.mouse.right = { ImGui::IsMouseDown(ImGuiMouseButton_Right), ImGui::IsMouseClicked(ImGuiMouseButton_Right), ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Right) };
-			input.mouse.middle = { ImGui::IsMouseDown(ImGuiMouseButton_Middle), ImGui::IsMouseClicked(ImGuiMouseButton_Middle), ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Middle) };
 
-			for (uint32 i = 0; i < arraysize(user_input::keyboard); ++i)
-			{
-				input.keyboard[i] = { ImGui::IsKeyDown(i), ImGui::IsKeyPressed(i, false) };
-			}
+				if (input.mouse.left.down && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) { input.mouse.left.down = false; }
+				if (input.mouse.right.down && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) { input.mouse.right.down = false; }
+				if (input.mouse.middle.down && !ImGui::IsMouseDown(ImGuiMouseButton_Middle)) { input.mouse.middle.down = false; }
 
-			input.overWindow = true;
+				input.mouse.left.clickEvent = input.mouse.left.doubleClickEvent = false;
+				input.mouse.right.clickEvent = input.mouse.right.doubleClickEvent = false;
+				input.mouse.middle.clickEvent = input.mouse.middle.doubleClickEvent = false;
+
+				for (uint32 i = 0; i < arraysize(user_input::keyboard); ++i)
+				{
+					if (!ImGui::IsKeyDown(i)) { input.keyboard[i].down = false; }
+					input.keyboard[i].pressEvent = false;
+				}
+
+				input.overWindow = false;
+			}
 		}
-		else
-		{
-			input.mouse.dx = 0;
-			input.mouse.dy = 0;
-			input.mouse.reldx = 0.f;
-			input.mouse.reldy = 0.f;
-
-			if (input.mouse.left.down && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) { input.mouse.left.down = false; }
-			if (input.mouse.right.down && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) { input.mouse.right.down = false; }
-			if (input.mouse.middle.down && !ImGui::IsMouseDown(ImGuiMouseButton_Middle)) { input.mouse.middle.down = false; }
-
-			input.mouse.left.clickEvent = input.mouse.left.doubleClickEvent = false;
-			input.mouse.right.clickEvent = input.mouse.right.doubleClickEvent = false;
-			input.mouse.middle.clickEvent = input.mouse.middle.doubleClickEvent = false;
-
-			for (uint32 i = 0; i < arraysize(user_input::keyboard); ++i)
-			{
-				if (!ImGui::IsKeyDown(i)) { input.keyboard[i].down = false; }
-				input.keyboard[i].pressEvent = false;
-			}
-
-			input.overWindow = false;
-		}
-
 
 		// The drag&drop outline is rendered around the drop target. Since the image fills the frame, the outline is outside the window 
 		// and thus invisible. So instead this Dummy acts as the drop target.
@@ -222,10 +232,6 @@ int main(int argc, char** argv)
 		if (ImGui::IsKeyPressed(key_enter) && ImGui::IsKeyDown(key_alt)) { window.toggleFullscreen(); } // Also allowed if not focused on main window.
 
 
-
-		dxContext.renderQueue.waitForFence(fenceValues[window.currentBackbufferIndex]);
-		dxContext.newFrame(frameID);
-
 		shadow_map_renderer::beginFrame();
 		renderer.beginFrame(renderWidth, renderHeight);
 		
@@ -238,7 +244,7 @@ int main(int argc, char** argv)
 		fileBrowser.draw(meshEditor);
 		meshEditor.draw();
 
-		fenceValues[window.currentBackbufferIndex] = renderToMainWindow(window);
+		renderToMainWindow(window);
 
 		cpuProfilingFrameEndMarker();
 

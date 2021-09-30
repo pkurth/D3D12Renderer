@@ -61,12 +61,18 @@ void cpuProfilingResolveTimeStamps()
 
 	uint32 arrayIndex = (uint32)(cpuProfileArrayAndEventIndex >> 32); // We are only interested in upper 32 bits here, so don't worry about thread safety.
 	uint64 currentArrayAndEventIndex = atomicExchange(cpuProfileArrayAndEventIndex, (uint64)(1 - arrayIndex) << 32); // Swap array and get current event count.
+
+
+	
+	CPU_PROFILE_BLOCK("CPU Profiling"); // Important: Must be after array swap!
 	
 	profile_event* events = cpuProfileEvents[arrayIndex];
 	uint32 numEvents = (uint32)currentArrayAndEventIndex;
 
 	if (!pauseRecording)
 	{
+		CPU_PROFILE_BLOCK("Collate profile events from last frame");
+
 		std::stable_sort(events, events + numEvents, [](const profile_event& a, const profile_event& b)
 		{
 			return a.timestamp < b.timestamp;
@@ -103,7 +109,7 @@ void cpuProfilingResolveTimeStamps()
 			uint32 blocksBefore = frame->totalNumProfileBlocks;
 
 			uint64 frameEndTimestamp;
-			if (handleProfileEvent(events, i, numEvents, stack[threadIndex], depth[threadIndex], profileBlockPool[profileFrameWriteIndex], frame->totalNumProfileBlocks, frameEndTimestamp))
+			if (handleProfileEvent(events, i, numEvents, stack[threadIndex], depth[threadIndex], profileBlockPool[profileFrameWriteIndex], frame->totalNumProfileBlocks, frameEndTimestamp, false))
 			{
 				static uint64 clockFrequency;
 				static bool performanceFrequencyQueried = QueryPerformanceFrequency((LARGE_INTEGER*)&clockFrequency);
@@ -155,41 +161,34 @@ void cpuProfilingResolveTimeStamps()
 	}
 
 
-	static uint32 highlightFrameIndex = -1;
-
 
 	if (cpuProfilerWindowOpen)
 	{
+		CPU_PROFILE_BLOCK("Display profiling");
+
 		if (ImGui::Begin("CPU Profiling", &cpuProfilerWindowOpen))
 		{
-			profiler_timeline timeline;
-			timeline.begin(MAX_NUM_CPU_PROFILE_FRAMES);
+			static profiler_persistent persistent;
+			profiler_timeline timeline(persistent, MAX_NUM_CPU_PROFILE_FRAMES);
 
 			timeline.drawHeader(pauseRecording);
 
 			for (uint32 frameIndex = 0; frameIndex < MAX_NUM_CPU_PROFILE_FRAMES; ++frameIndex)
 			{
-				timeline.drawOverviewFrame(profileFrames[frameIndex], frameIndex, highlightFrameIndex, currentFrame);
+				timeline.drawOverviewFrame(profileFrames[frameIndex], frameIndex, currentFrame);
 			}
 			timeline.endOverview();
 
 
 
-			if (highlightFrameIndex != -1)
+			if (persistent.highlightFrameIndex != -1)
 			{
-				cpu_profile_frame& frame = profileFrames[highlightFrameIndex];
-				profile_block* blocks = profileBlockPool[highlightFrameIndex];
+				cpu_profile_frame& frame = profileFrames[persistent.highlightFrameIndex];
+				profile_block* blocks = profileBlockPool[persistent.highlightFrameIndex];
 
 				if (frame.totalNumProfileBlocks)
 				{
-					static float frameWidthMultiplier = 1.f;
-					static float callstackLeftPadding = leftPadding;
-
-					static float horizontalScrollAnchor = 0;
-					static bool horizontalScrolling = false;
-
 					timeline.drawHighlightFrameInfo(frame);
-
 
 					uint32 threadIndices[MAX_NUM_CPU_PROFILE_THREADS];
 					char threadNamesBuffer[MAX_NUM_CPU_PROFILE_THREADS][32];
@@ -211,11 +210,10 @@ void cpuProfilingResolveTimeStamps()
 					ImGui::SameLine();
 					ImGui::Dropdown("Thread", threadNames, numActiveThreadsThisFrame, threadIndex);
 
-					timeline.drawCallStack(blocks, frameWidthMultiplier, callstackLeftPadding,  frame.firstTopLevelBlockPerThread[threadIndices[threadIndex]]);
+					timeline.drawCallStack(blocks, frame.firstTopLevelBlockPerThread[threadIndices[threadIndex]]);
 
-					timeline.drawMillisecondSpacings(frame, frameWidthMultiplier, callstackLeftPadding);
-					timeline.handleUserInteractions(frameWidthMultiplier, callstackLeftPadding,
-						horizontalScrollAnchor, horizontalScrolling);
+					timeline.drawMillisecondSpacings(frame);
+					timeline.handleUserInteractions();
 
 				}
 			}

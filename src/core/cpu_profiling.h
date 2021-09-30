@@ -5,6 +5,14 @@
 
 extern bool cpuProfilerWindowOpen;
 
+
+// Things the CPU profiler currently doesn't support (but probably should):
+// - Blocks going over frame boundaries (for background tasks)
+// - Thread names
+// - Display of multiple threads
+// - Filtering?
+
+
 #if ENABLE_CPU_PROFILING
 
 #define CPU_PROFILE_BLOCK_(counter, name) cpu_profile_block_recorder COMPOSITE_VARNAME(__PROFILE_BLOCK, counter)(name)
@@ -17,7 +25,7 @@ extern bool cpuProfilerWindowOpen;
 	extern profile_event cpuProfileEvents[2][MAX_NUM_CPU_PROFILE_EVENTS]; \
 	extern volatile uint64 cpuProfileArrayAndEventIndex; \
 	uint64 arrayAndEventIndex = atomicIncrement(cpuProfileArrayAndEventIndex); \
-	uint32 eventIndex = (arrayAndEventIndex & 0xFFFFFFFF); \
+	uint32 eventIndex = (uint32)arrayAndEventIndex; \
 	assert(eventIndex < MAX_NUM_CPU_PROFILE_EVENTS); \
 	profile_event* event = cpuProfileEvents[arrayAndEventIndex >> 32] + eventIndex; \
 	event->threadID = getThreadIDFast(); \
@@ -45,6 +53,8 @@ inline void cpuProfilingFrameEndMarker()
 {
 	recordProfileEvent(profile_event_frame_marker, 0);
 }
+
+// Currently there must not be any profile events between calling cpuProfilingFrameEndMarker and cpuProfilingResolveTimeStamps.
 
 void cpuProfilingResolveTimeStamps();
 

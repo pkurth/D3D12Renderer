@@ -4,7 +4,7 @@
 #include "core/imgui.h"
 
 
-bool handleProfileEvent(profile_event* events, uint32 eventIndex, uint32 numEvents, uint16* stack, uint32& d, profile_block* blocks, uint32& numBlocksUsed, uint64& frameEndTimestamp)
+bool handleProfileEvent(profile_event* events, uint32 eventIndex, uint32 numEvents, uint16* stack, uint32& d, profile_block* blocks, uint32& numBlocksUsed, uint64& frameEndTimestamp, bool lookahead)
 {
 	profile_event* e = events + eventIndex;
 
@@ -24,7 +24,7 @@ bool handleProfileEvent(profile_event* events, uint32 eventIndex, uint32 numEven
 			// We thus search for possible end blocks with the same timestamp here and - if we already saw a matching 
 			// begin block earlier - process them first.
 
-			if (d > 0)
+			if (lookahead && d > 0)
 			{
 				profile_block* currentStackTop = blocks + stack[d - 1];
 
@@ -138,9 +138,9 @@ static const ImColor colorTable[] =
 	ImColor(188, 143, 143), 
 };
 
-void profiler_timeline::begin(uint32 numFrames)
+profiler_timeline::profiler_timeline(profiler_persistent& persistent, uint32 numFrames)
+	: persistent(persistent), numFrames(numFrames)
 {
-	this->numFrames = numFrames;
 	totalWidth = ImGui::GetContentRegionAvail().x - leftPadding - rightPadding;
 
 	barHeight16ms = 100.f;
@@ -163,7 +163,7 @@ void profiler_timeline::drawHeader(bool& pauseRecording)
 	ImGui::Text("The last %u frames are recorded. Click on one frame to get a detailed hierarchical view of all blocks. Zoom into detail view with mouse wheel and click and drag to shift the display.", numFrames);
 }
 
-void profiler_timeline::drawOverviewFrame(profile_frame& frame, uint32 frameIndex, uint32& highlightFrameIndex, uint32 currentFrame)
+void profiler_timeline::drawOverviewFrame(profile_frame& frame, uint32 frameIndex, uint32 currentFrame)
 {
 	if (frame.duration > 0.f)
 	{
@@ -177,7 +177,7 @@ void profiler_timeline::drawOverviewFrame(profile_frame& frame, uint32 frameInde
 
 			ImGui::SetCursorPos(ImVec2(left, top));
 
-			ImColor color = (frameIndex == highlightFrameIndex) ? highlightFrameColor : ImGui::red;
+			ImColor color = (frameIndex == persistent.highlightFrameIndex) ? highlightFrameColor : ImGui::red;
 			color = (frameIndex == currentFrame) ? ImGui::yellow : color;
 
 			bool result = ImGui::ColorButton("", color, ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(barWidth, height));
@@ -188,7 +188,7 @@ void profiler_timeline::drawOverviewFrame(profile_frame& frame, uint32 frameInde
 
 			if (result)
 			{
-				highlightFrameIndex = frameIndex;
+				persistent.highlightFrameIndex = frameIndex;
 			}
 
 			ImGui::PopID();
@@ -217,7 +217,7 @@ void profiler_timeline::drawHighlightFrameInfo(profile_frame& frame)
 	ImGui::Text("Frame %llu (%fms)", frame.globalFrameID, frame.duration);
 }
 
-void profiler_timeline::drawCallStack(profile_block* blocks, float frameWidthMultiplier, float callstackLeftPadding, uint16 startIndex)
+void profiler_timeline::drawCallStack(profile_block* blocks, uint16 startIndex)
 {
 #if 0
 	ImGui::SameLine();
@@ -269,7 +269,7 @@ void profiler_timeline::drawCallStack(profile_block* blocks, float frameWidthMul
 
 	static const float barHeight = verticalBarStride * 0.8f;
 
-	const float frameWidth16ms = totalWidth * frameWidthMultiplier;
+	const float frameWidth16ms = totalWidth * persistent.frameWidthMultiplier;
 	const float frameWidth33ms = frameWidth16ms * 2.f;
 
 	// Call stack.
@@ -282,7 +282,7 @@ void profiler_timeline::drawCallStack(profile_block* blocks, float frameWidthMul
 
 		// Draw.
 		float top = callStackTop + depth * verticalBarStride;
-		float left = callstackLeftPadding + current->relStart / (1000.f / 60.f) * frameWidth16ms;
+		float left = persistent.callstackLeftPadding + current->relStart / (1000.f / 60.f) * frameWidth16ms;
 		float width = current->duration / (1000.f / 60.f) * frameWidth16ms;
 		if (width > 0.f) // Important. ImGui renders zero-size elements with a default size (> 0).
 		{
@@ -344,9 +344,9 @@ void profiler_timeline::drawCallStack(profile_block* blocks, float frameWidthMul
 	callStackTop += (maxDepth + 1) * verticalBarStride + 10.f;
 }
 
-void profiler_timeline::drawMillisecondSpacings(profile_frame& frame, float frameWidthMultiplier, float callstackLeftPadding)
+void profiler_timeline::drawMillisecondSpacings(profile_frame& frame)
 {
-	const float frameWidth16ms = totalWidth * frameWidthMultiplier;
+	const float frameWidth16ms = totalWidth * persistent.frameWidthMultiplier;
 	const float frameWidth33ms = frameWidth16ms * 2.f;
 
 	const float textSpacing = 30.f;
@@ -354,24 +354,24 @@ void profiler_timeline::drawMillisecondSpacings(profile_frame& frame, float fram
 	const float lineTop = highlightTop - textSpacing;
 
 	// 0ms.
-	ImGui::SetCursorPos(ImVec2(callstackLeftPadding, lineTop));
+	ImGui::SetCursorPos(ImVec2(persistent.callstackLeftPadding, lineTop));
 	ImGui::ColorButton("##0ms", ImGui::white, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(1, lineHeight));
 
-	ImGui::SetCursorPos(ImVec2(callstackLeftPadding + 2, lineTop - 5));
+	ImGui::SetCursorPos(ImVec2(persistent.callstackLeftPadding + 2, lineTop - 5));
 	ImGui::Text("0ms");
 
 	// 16ms.
-	ImGui::SetCursorPos(ImVec2(callstackLeftPadding + frameWidth16ms, lineTop));
+	ImGui::SetCursorPos(ImVec2(persistent.callstackLeftPadding + frameWidth16ms, lineTop));
 	ImGui::ColorButton("##16ms", ImGui::white, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(1, lineHeight));
 
-	ImGui::SetCursorPos(ImVec2(callstackLeftPadding + frameWidth16ms + 2, lineTop - 5));
+	ImGui::SetCursorPos(ImVec2(persistent.callstackLeftPadding + frameWidth16ms + 2, lineTop - 5));
 	ImGui::Text("16.7ms");
 
 	// 33ms.
-	ImGui::SetCursorPos(ImVec2(callstackLeftPadding + frameWidth33ms, lineTop));
+	ImGui::SetCursorPos(ImVec2(persistent.callstackLeftPadding + frameWidth33ms, lineTop));
 	ImGui::ColorButton("##33ms", ImGui::white, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(1, lineHeight));
 
-	ImGui::SetCursorPos(ImVec2(callstackLeftPadding + frameWidth33ms + 2, lineTop - 5));
+	ImGui::SetCursorPos(ImVec2(persistent.callstackLeftPadding + frameWidth33ms + 2, lineTop - 5));
 	ImGui::Text("33.3ms");
 
 
@@ -384,21 +384,21 @@ void profiler_timeline::drawMillisecondSpacings(profile_frame& frame, float fram
 	{
 		ImVec4 color = (i % 5 == 0) ? specialColor : normalColor;
 
-		ImGui::SetCursorPos(ImVec2(callstackLeftPadding + i * millisecondSpacing, lineTop + 8));
+		ImGui::SetCursorPos(ImVec2(persistent.callstackLeftPadding + i * millisecondSpacing, lineTop + 8));
 		ImGui::ColorButton("", color, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(1, lineHeight));
 	}
 
 	// Frame end.
-	ImGui::SetCursorPos(ImVec2(callstackLeftPadding + frame.duration * millisecondSpacing, lineTop));
+	ImGui::SetCursorPos(ImVec2(persistent.callstackLeftPadding + frame.duration * millisecondSpacing, lineTop));
 	ImGui::ColorButton("##Frame end", ImGui::blue, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(1, lineHeight));
 
-	ImGui::SetCursorPos(ImVec2(callstackLeftPadding + frame.duration * millisecondSpacing + 2, lineTop - 5));
+	ImGui::SetCursorPos(ImVec2(persistent.callstackLeftPadding + frame.duration * millisecondSpacing + 2, lineTop - 5));
 	ImGui::Text("Frame end");
 }
 
-void profiler_timeline::handleUserInteractions(float& frameWidthMultiplier, float& callstackLeftPadding, float& horizontalScrollAnchor, bool& horizontalScrolling)
+void profiler_timeline::handleUserInteractions()
 {
-	const float frameWidth16ms = totalWidth * frameWidthMultiplier;
+	const float frameWidth16ms = totalWidth * persistent.frameWidthMultiplier;
 	const float frameWidth33ms = frameWidth16ms * 2.f;
 
 	const float textSpacing = 30.f;
@@ -424,7 +424,7 @@ void profiler_timeline::handleUserInteractions(float& frameWidthMultiplier, floa
 
 		// Hover time.
 		float hoveredX = ImGui::GetMousePos().x - ImGui::GetWindowPos().x;
-		float hoveredTime = (hoveredX - callstackLeftPadding) / frameWidth33ms * (1000.f / 30.f);
+		float hoveredTime = (hoveredX - persistent.callstackLeftPadding) / frameWidth33ms * (1000.f / 30.f);
 		ImGui::SetCursorPos(ImVec2(hoveredX, lineTop));
 		ImGui::ColorButton("", ImGui::yellow, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(1, lineHeight));
 
@@ -437,17 +437,17 @@ void profiler_timeline::handleUserInteractions(float& frameWidthMultiplier, floa
 
 	if (!ImGui::IsMouseDown(ImGuiPopupFlags_MouseButtonLeft))
 	{
-		horizontalScrolling = false;
+		persistent.horizontalScrolling = false;
 	}
 	if (overStack && ImGui::IsMouseClicked(ImGuiPopupFlags_MouseButtonLeft))
 	{
-		horizontalScrollAnchor = relMouseX;
-		horizontalScrolling = true;
+		persistent.horizontalScrollAnchor = relMouseX;
+		persistent.horizontalScrolling = true;
 	}
-	if (horizontalScrolling)
+	if (persistent.horizontalScrolling)
 	{
-		callstackLeftPadding += relMouseX - horizontalScrollAnchor;
-		horizontalScrollAnchor = relMouseX;
+		persistent.callstackLeftPadding += relMouseX - persistent.horizontalScrollAnchor;
+		persistent.horizontalScrollAnchor = relMouseX;
 	}
 
 
@@ -459,13 +459,13 @@ void profiler_timeline::handleUserInteractions(float& frameWidthMultiplier, floa
 
 		if (zoom != 0.f)
 		{
-			float t = inverseLerp(callstackLeftPadding, callstackLeftPadding + frameWidth16ms, relMouseX);
+			float t = inverseLerp(persistent.callstackLeftPadding, persistent.callstackLeftPadding + frameWidth16ms, relMouseX);
 
-			frameWidthMultiplier += zoom * 0.1f;
-			frameWidthMultiplier = max(frameWidthMultiplier, 0.2f);
+			persistent.frameWidthMultiplier += zoom * 0.1f;
+			persistent.frameWidthMultiplier = max(persistent.frameWidthMultiplier, 0.2f);
 
-			float newFrameWidth16ms = totalWidth * frameWidthMultiplier;
-			callstackLeftPadding = relMouseX - t * newFrameWidth16ms;
+			float newFrameWidth16ms = totalWidth * persistent.frameWidthMultiplier;
+			persistent.callstackLeftPadding = relMouseX - t * newFrameWidth16ms;
 		}
 	}
 }

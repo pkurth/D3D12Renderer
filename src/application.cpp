@@ -588,89 +588,92 @@ void application::update(const user_input& input, float dt)
 
 
 
-		// Submit render calls.
-		for (auto [entityHandle, raster, transform] : scene.group(entt::get<raster_component, transform_component>).each())
 		{
-			const dx_mesh& mesh = raster.mesh->mesh;
-			mat4 m = trsToMat4(transform);
+			CPU_PROFILE_BLOCK("Submit render commands");
 
-			scene_entity entity = { entityHandle, scene };
-			bool outline = selectedEntity == entity;
-
-			dynamic_transform_component* dynamic = entity.getComponentIfExists<dynamic_transform_component>();
-			mat4 lastM = dynamic ? trsToMat4(*dynamic) : m;
-
-			if (animation_component* anim = entity.getComponentIfExists<animation_component>())
+			for (auto [entityHandle, raster, transform] : scene.group(entt::get<raster_component, transform_component>).each())
 			{
-				uint32 numSubmeshes = (uint32)raster.mesh->submeshes.size();
+				const dx_mesh& mesh = raster.mesh->mesh;
+				mat4 m = trsToMat4(transform);
 
-				for (uint32 i = 0; i < numSubmeshes; ++i)
+				scene_entity entity = { entityHandle, scene };
+				bool outline = selectedEntity == entity;
+
+				dynamic_transform_component* dynamic = entity.getComponentIfExists<dynamic_transform_component>();
+				mat4 lastM = dynamic ? trsToMat4(*dynamic) : m;
+
+				if (animation_component* anim = entity.getComponentIfExists<animation_component>())
 				{
-					submesh_info submesh = raster.mesh->submeshes[i].info;
-					submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
+					uint32 numSubmeshes = (uint32)raster.mesh->submeshes.size();
 
-					const ref<pbr_material>& material = raster.mesh->submeshes[i].material;
+					for (uint32 i = 0; i < numSubmeshes; ++i)
+					{
+						submesh_info submesh = raster.mesh->submeshes[i].info;
+						submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
 
-					if (material->albedoTint.a < 1.f)
-					{
-						transparentRenderPass.renderObject(m, anim->currentVertexBuffer, mesh.indexBuffer, submesh, material);
-					}
-					else
-					{
-						opaqueRenderPass.renderAnimatedObject(m, lastM,
-							anim->currentVertexBuffer, anim->prevFrameVertexBuffer, mesh.indexBuffer,
-							submesh, material,
-							(uint32)entityHandle);
-					}
+						const ref<pbr_material>& material = raster.mesh->submeshes[i].material;
 
-					if (outline)
-					{
-						ldrRenderPass.renderOutline(m, anim->currentVertexBuffer, mesh.indexBuffer, submesh);
-					}
-				}
-			}
-			else
-			{
-				for (auto& sm : raster.mesh->submeshes)
-				{
-					submesh_info submesh = sm.info;
-					const ref<pbr_material>& material = sm.material;
-
-					if (material->albedoTint.a < 1.f)
-					{
-						transparentRenderPass.renderObject(m, mesh.vertexBuffer, mesh.indexBuffer, submesh, material);
-					}
-					else
-					{
-						if (dynamic)
+						if (material->albedoTint.a < 1.f)
 						{
-							opaqueRenderPass.renderDynamicObject(m, lastM, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
+							transparentRenderPass.renderObject(m, anim->currentVertexBuffer, mesh.indexBuffer, submesh, material);
 						}
 						else
 						{
-							opaqueRenderPass.renderStaticObject(m, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
+							opaqueRenderPass.renderAnimatedObject(m, lastM,
+								anim->currentVertexBuffer, anim->prevFrameVertexBuffer, mesh.indexBuffer,
+								submesh, material,
+								(uint32)entityHandle);
+						}
+
+						if (outline)
+						{
+							ldrRenderPass.renderOutline(m, anim->currentVertexBuffer, mesh.indexBuffer, submesh);
 						}
 					}
-
-					if (outline)
+				}
+				else
+				{
+					for (auto& sm : raster.mesh->submeshes)
 					{
-						ldrRenderPass.renderOutline(m, mesh.vertexBuffer, mesh.indexBuffer, submesh);
+						submesh_info submesh = sm.info;
+						const ref<pbr_material>& material = sm.material;
+
+						if (material->albedoTint.a < 1.f)
+						{
+							transparentRenderPass.renderObject(m, mesh.vertexBuffer, mesh.indexBuffer, submesh, material);
+						}
+						else
+						{
+							if (dynamic)
+							{
+								opaqueRenderPass.renderDynamicObject(m, lastM, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
+							}
+							else
+							{
+								opaqueRenderPass.renderStaticObject(m, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
+							}
+						}
+
+						if (outline)
+						{
+							ldrRenderPass.renderOutline(m, mesh.vertexBuffer, mesh.indexBuffer, submesh);
+						}
 					}
 				}
 			}
-		}
 
-		for (auto [entityHandle, cloth] : scene.view<cloth_component>().each())
-		{
-			auto [vb, prevFrameVB, ib, sm] = cloth.getRenderData();
-			opaqueRenderPass.renderAnimatedObject(mat4::identity, mat4::identity, vb, prevFrameVB, ib, sm, clothMaterial, (uint32)entityHandle);
-
-			scene_entity entity = { entityHandle, scene };
-			bool outline = selectedEntity == entity;
-
-			if (outline)
+			for (auto [entityHandle, cloth] : scene.view<cloth_component>().each())
 			{
-				ldrRenderPass.renderOutline(mat4::identity, vb, ib, sm);
+				auto [vb, prevFrameVB, ib, sm] = cloth.getRenderData();
+				opaqueRenderPass.renderAnimatedObject(mat4::identity, mat4::identity, vb, prevFrameVB, ib, sm, clothMaterial, (uint32)entityHandle);
+
+				scene_entity entity = { entityHandle, scene };
+				bool outline = selectedEntity == entity;
+
+				if (outline)
+				{
+					ldrRenderPass.renderOutline(mat4::identity, vb, ib, sm);
+				}
 			}
 		}
 

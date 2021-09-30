@@ -622,7 +622,7 @@ static vec4& operator-=(vec4& a, vec4 b) { a = a - b; return a; }
 static vec4 operator*(vec4 a, vec4 b) { vec4 result = { a.f4 * b.f4 }; return result; }
 static vec4& operator*=(vec4& a, vec4 b) { a = a * b; return a; }
 static vec4 operator/(vec4 a, vec4 b) { vec4 result = { a.f4 / b.f4 }; return result; }
-static vec4 operator/=(vec4& a, vec4 b) { a = a / b; return a; }
+static vec4& operator/=(vec4& a, vec4 b) { a = a / b; return a; }
 
 static vec4 operator*(vec4 a, float b) { vec4 result = { a.f4 * floatx4(b) }; return result; }
 static vec4 operator*(float a, vec4 b) { return b * a; }
@@ -638,19 +638,6 @@ static bool operator==(vec4 a, vec4 b) { return a.x == b.x && a.y == b.y && a.z 
 static float dot(vec2 a, vec2 b) { float result = a.x * b.x + a.y * b.y; return result; }
 static float dot(vec3 a, vec3 b) { float result = a.x * b.x + a.y * b.y + a.z * b.z; return result; }
 static float dot(vec4 a, vec4 b) { floatx4 m = a.f4 * b.f4; return addElements(m); }
-
-
-static bool operator==(const mat4& a, const mat4& b)
-{ 
-	for (uint32 i = 0; i < 16; ++i)
-	{
-		if (a.m[i] != b.m[i])
-		{
-			return false;
-		}
-	}
-	return true;
-}
 
 static float cross(vec2 a, vec2 b) { return a.x * b.y - a.y * b.x; }
 static vec3 cross(vec3 a, vec3 b) { vec3 result = { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; return result; }

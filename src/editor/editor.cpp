@@ -79,6 +79,8 @@ void scene_editor::initialize(game_scene* scene, main_renderer* renderer)
 
 bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPass, float dt)
 {
+	CPU_PROFILE_BLOCK("Update editor");
+
 	bool objectDragged = false;
 	objectDragged |= handleUserInput(input, ldrRenderPass, dt);
 	objectDragged |= drawSceneHierarchy();

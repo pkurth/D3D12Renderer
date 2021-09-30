@@ -338,6 +338,11 @@ bool win32_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clie
 		atLeastOneWindowWasOpened = true;
 	}
 
+	if (!mainWindow)
+	{
+		mainWindow = this;
+	}
+
 	open = true;
 	this->visible = visible;
 	if (visible)

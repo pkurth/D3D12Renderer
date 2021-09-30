@@ -84,7 +84,7 @@ void dxProfilingResolveTimeStamps(uint64* timestamps)
 			profile_cl_type clType = (profile_cl_type)e->clType;
 
 			uint64 frameEndTimestamp;
-			if (handleProfileEvent(events, i, numQueries, stack[clType], depth[clType], frame.blocks[clType], count[clType], frameEndTimestamp))
+			if (handleProfileEvent(events, i, numQueries, stack[clType], depth[clType], frame.blocks[clType], count[clType], frameEndTimestamp, true))
 			{
 				uint32 previousFrameIndex = (profileFrameWriteIndex == 0) ? (MAX_NUM_DX_PROFILE_FRAMES - 1) : (profileFrameWriteIndex - 1);
 				dx_profile_frame& previousFrame = profileFrames[previousFrameIndex];
@@ -120,36 +120,28 @@ void dxProfilingResolveTimeStamps(uint64* timestamps)
 	}
 
 
-	static uint32 highlightFrameIndex = -1;
-
 
 	if (dxProfilerWindowOpen)
 	{
 		if (ImGui::Begin("GPU Profiling", &dxProfilerWindowOpen))
 		{
-			profiler_timeline timeline;
-			timeline.begin(MAX_NUM_DX_PROFILE_FRAMES);
+			static profiler_persistent persistent;
+			profiler_timeline timeline(persistent, MAX_NUM_DX_PROFILE_FRAMES);
 
 			timeline.drawHeader(pauseRecording);
 
 			for (uint32 frameIndex = 0; frameIndex < MAX_NUM_DX_PROFILE_FRAMES; ++frameIndex)
 			{
-				timeline.drawOverviewFrame(profileFrames[frameIndex], frameIndex, highlightFrameIndex, currentFrame);
+				timeline.drawOverviewFrame(profileFrames[frameIndex], frameIndex, currentFrame);
 			}
 			timeline.endOverview();
 
 
-			if (highlightFrameIndex != -1)
+			if (persistent.highlightFrameIndex != -1)
 			{
-				static float frameWidthMultiplier = 1.f;
-				static float callstackLeftPadding = leftPadding;
-
-				static float horizontalScrollAnchor = 0;
-				static bool horizontalScrolling = false;
-
 				uint32 colorIndex = 0;
 
-				dx_profile_frame& frame = profileFrames[highlightFrameIndex];
+				dx_profile_frame& frame = profileFrames[persistent.highlightFrameIndex];
 
 				timeline.drawHighlightFrameInfo(frame);
 
@@ -159,10 +151,9 @@ void dxProfilingResolveTimeStamps(uint64* timestamps)
 
 				if (count > 0)
 				{
-					timeline.drawCallStack(blocks, frameWidthMultiplier, callstackLeftPadding, 0);
-					timeline.drawMillisecondSpacings(frame, frameWidthMultiplier, callstackLeftPadding);
-					timeline.handleUserInteractions(frameWidthMultiplier, callstackLeftPadding,
-						horizontalScrollAnchor, horizontalScrolling);
+					timeline.drawCallStack(blocks, 0);
+					timeline.drawMillisecondSpacings(frame);
+					timeline.handleUserInteractions();
 				}
 			}
 

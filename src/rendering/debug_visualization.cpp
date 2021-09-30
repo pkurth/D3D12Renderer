@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "debug_visualization.h"
+#include "core/cpu_profiling.h"
 #include "render_utils.h"
 #include "render_resources.h"
 #include "transform.hlsli"
@@ -128,6 +129,8 @@ static std::tuple<dx_dynamic_vertex_buffer, dx_dynamic_index_buffer, submesh_inf
 
 void renderWireSphere(vec3 position, float radius, vec4 color, ldr_render_pass* renderPass)
 {
+	CPU_PROFILE_BLOCK("Render wire sphere");
+
 	auto [vb, ib, sm] = getWireRing();
 
 	renderPass->renderObject<debug_unlit_line_pipeline>(createModelMatrix(position, quat::identity, radius), dx_vertex_buffer_group_view(vb), ib, sm, debug_line_material{ color });
@@ -137,6 +140,8 @@ void renderWireSphere(vec3 position, float radius, vec4 color, ldr_render_pass* 
 
 void renderWireCone(vec3 position, vec3 direction, float distance, float angle, vec4 color, ldr_render_pass* renderPass)
 {
+	CPU_PROFILE_BLOCK("Render wire cone");
+
 	const uint32 numSegments = 32;
 	const uint32 numConeLines = 8;
 	static_assert(numSegments % numConeLines == 0, "");
@@ -199,6 +204,8 @@ void renderWireCone(vec3 position, vec3 direction, float distance, float angle, 
 
 void renderWireBox(vec3 position, vec3 radius, quat rotation, vec4 color, ldr_render_pass* renderPass)
 {
+	CPU_PROFILE_BLOCK("Render wire box");
+
 	auto [vb, vertexPtr] = dxContext.createDynamicVertexBuffer(sizeof(vec3), 8);
 	auto [ib, indexPtr] = dxContext.createDynamicIndexBuffer(sizeof(uint16), 12 * 2);
 
@@ -239,6 +246,8 @@ void renderWireBox(vec3 position, vec3 radius, quat rotation, vec4 color, ldr_re
 
 void renderCameraFrustum(const render_camera& frustum, vec4 color, ldr_render_pass* renderPass, float alternativeFarPlane)
 {
+	CPU_PROFILE_BLOCK("Render camera frustum");
+
 	auto [vb, vertexPtr] = dxContext.createDynamicVertexBuffer(sizeof(vec3), 8);
 	auto [ib, indexPtr] = dxContext.createDynamicIndexBuffer(sizeof(uint16), 12 * 2);
 

@@ -200,6 +200,8 @@ uint32 cloth_component::getRenderableTriangleCount() const
 
 std::tuple<dx_vertex_buffer_group_view, dx_vertex_buffer_group_view, dx_index_buffer_view, submesh_info> cloth_component::getRenderData()
 {
+	CPU_PROFILE_BLOCK("Get cloth render data");
+
 	uint32 numVertices = getRenderableVertexCount();
 	auto [positionVertexBuffer, positionPtr] = dxContext.createDynamicVertexBuffer(sizeof(vec3), numVertices);
 	memcpy(positionPtr, positions.data(), numVertices * sizeof(vec3));

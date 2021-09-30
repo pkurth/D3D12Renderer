@@ -1502,6 +1502,8 @@ void finalizeCollisionVelocityConstraintInitialization(collider_union* worldSpac
 
 void solveCollisionVelocityConstraints(collision_constraint* constraints, uint32 count, rigid_body_global_state* rbs)
 {
+	CPU_PROFILE_BLOCK("Solve collision constraints");
+
 	for (uint32 i = 0; i < count; ++i)
 	{
 		collision_constraint& c = constraints[i];

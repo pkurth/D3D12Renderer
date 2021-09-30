@@ -56,6 +56,17 @@ struct profile_frame
 
 static const float leftPadding = 5.f;
 
+struct profiler_persistent
+{
+	uint32 highlightFrameIndex = -1;
+
+	float frameWidthMultiplier = 1.f;
+	float callstackLeftPadding = leftPadding;
+
+	float horizontalScrollAnchor = 0;
+	bool horizontalScrolling = false;
+};
+
 struct profiler_timeline
 {
 	uint32 numFrames;
@@ -73,20 +84,22 @@ struct profiler_timeline
 	uint32 colorIndex = 0;
 	uint32 maxDepth = 0;
 
+	profiler_persistent& persistent;
 
-	void begin(uint32 numFrames);
+
+	profiler_timeline(profiler_persistent& persistent, uint32 numFrames);
 	void drawHeader(bool& pauseRecording);
-	void drawOverviewFrame(profile_frame& frame, uint32 frameIndex, uint32& highlightFrameIndex, uint32 currentFrame);
+	void drawOverviewFrame(profile_frame& frame, uint32 frameIndex, uint32 currentFrame);
 	void endOverview();
 
 	void drawHighlightFrameInfo(profile_frame& frame);
-	void drawCallStack(profile_block* blocks, float frameWidthMultiplier, float callstackLeftPadding, uint16 startIndex);
-	void drawMillisecondSpacings(profile_frame& frame, float frameWidthMultiplier, float callstackLeftPadding);
-	void handleUserInteractions(float& frameWidthMultiplier, float& callstackLeftPadding, float& horizontalScrollAnchor, bool& horizontalScrolling);
+	void drawCallStack(profile_block* blocks, uint16 startIndex);
+	void drawMillisecondSpacings(profile_frame& frame);
+	void handleUserInteractions();
 };
 
 // Returns true if frame-end marker is found.
-bool handleProfileEvent(profile_event* events, uint32 eventIndex, uint32 numEvents, uint16* stack, uint32& d, profile_block* blocks, uint32& numBlocksUsed, uint64& frameEndTimestamp);
+bool handleProfileEvent(profile_event* events, uint32 eventIndex, uint32 numEvents, uint16* stack, uint32& d, profile_block* blocks, uint32& numBlocksUsed, uint64& frameEndTimestamp, bool lookahead);
 
 
 #endif
