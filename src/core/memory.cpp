@@ -17,18 +17,8 @@ void memory_arena::initialize(uint64 minimumBlockSize, uint64 reserveSize)
 	this->reserveSize = reserveSize;
 }
 
-void* memory_arena::allocate(uint64 size, uint64 alignment, bool clearToZero)
+void memory_arena::ensureFreeSize(uint64 size)
 {
-	uint64 mask = alignment - 1;
-	uint64 misalignment = current & mask;
-	uint64 adjustment = (misalignment == 0) ? 0 : (alignment - misalignment);
-	current += adjustment;
-
-	sizeLeftCurrent -= adjustment;
-	sizeLeftTotal -= adjustment;
-
-	assert(sizeLeftTotal >= size);
-
 	if (sizeLeftCurrent < size)
 	{
 		uint64 allocationSize = max(size, minimumBlockSize);
@@ -39,6 +29,26 @@ void* memory_arena::allocate(uint64 size, uint64 alignment, bool clearToZero)
 		sizeLeftCurrent += allocationSize;
 		committedMemory += allocationSize;
 	}
+}
+
+void* memory_arena::allocate(uint64 size, uint64 alignment, bool clearToZero)
+{
+	if (size == 0)
+	{
+		return 0;
+	}
+
+	uint64 mask = alignment - 1;
+	uint64 misalignment = current & mask;
+	uint64 adjustment = (misalignment == 0) ? 0 : (alignment - misalignment);
+	current += adjustment;
+
+	sizeLeftCurrent -= adjustment;
+	sizeLeftTotal -= adjustment;
+
+	assert(sizeLeftTotal >= size);
+
+	ensureFreeSize(size);
 
 	uint8* result = memory + current;
 	if (clearToZero)
@@ -52,6 +62,18 @@ void* memory_arena::allocate(uint64 size, uint64 alignment, bool clearToZero)
 	return result;
 }
 
+void* memory_arena::getCurrent(uint64 alignment)
+{
+	return memory + alignTo(current, alignment);
+}
+
+void memory_arena::setCurrentTo(void* ptr)
+{
+	current = (uint8*)ptr - memory;
+	sizeLeftCurrent = committedMemory - current;
+	sizeLeftTotal = reserveSize - current;
+}
+
 void memory_arena::reset(bool freeMemory)
 {
 	if (memory && freeMemory)
@@ -61,7 +83,17 @@ void memory_arena::reset(bool freeMemory)
 		committedMemory = 0;
 	}
 
-	current = 0;
-	sizeLeftCurrent = committedMemory;
-	sizeLeftTotal = reserveSize;
+	resetToMarker(memory_marker{ 0 });
+}
+
+memory_marker memory_arena::getMarker()
+{
+	return { current };
+}
+
+void memory_arena::resetToMarker(memory_marker marker)
+{
+	current = marker.before;
+	sizeLeftCurrent = committedMemory - current;
+	sizeLeftTotal = reserveSize - current;
 }

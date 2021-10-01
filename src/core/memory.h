@@ -44,6 +44,11 @@ static bool rangesOverlap(void* fromA, void* toA, void* fromB, void* toB)
 	return true;
 }
 
+struct memory_marker
+{
+	uint64 before;
+};
+
 struct memory_arena
 {
 	memory_arena() {}
@@ -53,19 +58,36 @@ struct memory_arena
 
 	void initialize(uint64 minimumBlockSize = 0, uint64 reserveSize = GB(8));
 
+
+	void ensureFreeSize(uint64 size);
+
 	void* allocate(uint64 size, uint64 alignment = 1, bool clearToZero = false);
 
 	template <typename T>
-	T* allocate(bool clearToZero = false)
+	T* allocate(uint32 count = 1, bool clearToZero = false)
 	{
-		return (T*)allocate(sizeof(T), alignof(T), clearToZero);
+		return (T*)allocate(sizeof(T) * count, alignof(T), clearToZero);
 	}
+
+	void* getCurrent(uint64 alignment = 1);
+
+	template <typename T>
+	T* getCurrent()
+	{
+		return (T*)getCurrent(alignof(T));
+	}
+
+	void setCurrentTo(void* ptr);
+
 
 	void reset(bool freeMemory = false);
 
+	memory_marker getMarker();
+	void resetToMarker(memory_marker marker);
+
 	uint8* base() { return memory; }
 
-private:
+protected:
 	uint8* memory;
 	uint64 committedMemory;
 
