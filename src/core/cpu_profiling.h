@@ -2,7 +2,6 @@
 
 #include "core/threading.h"
 #include "profiling_internal.h"
-#include <intrin.h>
 
 extern bool cpuProfilerWindowOpen;
 
