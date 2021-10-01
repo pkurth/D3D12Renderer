@@ -24,20 +24,18 @@ extern bool cpuProfilerWindowOpen;
 
 #define recordProfileEvent(type_, name_) \
 	extern profile_event cpuProfileEvents[2][MAX_NUM_CPU_PROFILE_EVENTS]; \
-	extern volatile uint32 cpuProfileArrayAndEventIndex; \
-	extern volatile uint32 cpuProfileEventsCompletelyWritten[2]; \
-	uint32 arrayAndEventIndex = atomicIncrement(cpuProfileArrayAndEventIndex); \
+	extern std::atomic<uint32> cpuProfileArrayAndEventIndex; \
+	extern std::atomic<uint32> cpuProfileEventsCompletelyWritten[2]; \
+	uint32 arrayAndEventIndex = cpuProfileArrayAndEventIndex++; \
 	uint32 eventIndex = arrayAndEventIndex & ((1u << 31) - 1); \
 	uint32 arrayIndex = arrayAndEventIndex >> 31; \
 	assert(eventIndex < MAX_NUM_CPU_PROFILE_EVENTS); \
-	profile_event* event = cpuProfileEvents[arrayIndex] + eventIndex; \
-	event->threadID = getThreadIDFast(); \
-	event->name = name_; \
-	event->type = type_; \
-	QueryPerformanceCounter((LARGE_INTEGER*)&event->timestamp); \
-	_WriteBarrier(); \
-	MemoryBarrier(); \
-	atomicIncrement(cpuProfileEventsCompletelyWritten[arrayIndex]);
+	profile_event* e = cpuProfileEvents[arrayIndex] + eventIndex; \
+	e->threadID = getThreadIDFast(); \
+	e->name = name_; \
+	e->type = type_; \
+	QueryPerformanceCounter((LARGE_INTEGER*)&e->timestamp); \
+	cpuProfileEventsCompletelyWritten[arrayIndex].fetch_add(1, std::memory_order_release); // Mark this event as written. Release means that the compiler may not reorder the previous writes after this.
 
 
 struct cpu_profile_block_recorder

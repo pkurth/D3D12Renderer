@@ -9,8 +9,8 @@ bool cpuProfilerWindowOpen = false;
 
 #if ENABLE_CPU_PROFILING
 
-volatile uint32 cpuProfileArrayAndEventIndex;
-volatile uint32 cpuProfileEventsCompletelyWritten[2];
+std::atomic<uint32> cpuProfileArrayAndEventIndex;
+std::atomic<uint32> cpuProfileEventsCompletelyWritten[2];
 profile_event cpuProfileEvents[2][MAX_NUM_CPU_PROFILE_EVENTS];
 
 
@@ -86,7 +86,7 @@ void cpuProfilingResolveTimeStamps()
 	uint32 currentFrame = profileFrameWriteIndex;
 
 	uint32 arrayIndex = cpuProfileArrayAndEventIndex >> 31; // We are only interested in the most significant bit here, so don't worry about thread safety.
-	uint32 currentArrayAndEventIndex = atomicExchange(cpuProfileArrayAndEventIndex, (1 - arrayIndex) << 31); // Swap array and get current event count.
+	uint32 currentArrayAndEventIndex = cpuProfileArrayAndEventIndex.exchange((1 - arrayIndex) << 31); // Swap array and get current event count.
 
 	profile_event* events = cpuProfileEvents[arrayIndex];
 	uint32 numEvents = currentArrayAndEventIndex & ((1u << 31) - 1);

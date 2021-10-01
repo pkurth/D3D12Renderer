@@ -143,6 +143,7 @@ uint64 performSkinning()
 {
 	bool result = 0;
 
+	// TODO: We currently make no attempt to ensure that all draw calls have actually been written completely, if executed on another thread. 
 	if (numCalls > 0 || numClothCalls > 0)
 	{
 		//dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
