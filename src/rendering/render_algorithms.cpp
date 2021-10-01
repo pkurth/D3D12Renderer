@@ -171,7 +171,7 @@ void loadCommonShaders()
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.renderTargets(0, 0, render_resources::shadowDepthFormat)
-			.depthSettings(false, true)
+			.depthSettings(true, true, D3D12_COMPARISON_FUNC_ALWAYS)
 			.cullingOff();
 
 		shadowMapCopyPipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "shadow_map_copy_ps" });
