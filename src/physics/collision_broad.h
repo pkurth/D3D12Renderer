@@ -2,6 +2,7 @@
 
 #include "bounding_volumes.h"
 #include "scene/scene.h"
+#include "core/memory.h"
 
 
 struct broadphase_collision
@@ -11,7 +12,7 @@ struct broadphase_collision
 	uint16 colliderB;
 };
 
-uint32 broadphase(struct game_scene& scene, uint32 sortingAxis, bounding_box* worldSpaceAABBs, broadphase_collision* outOverlaps);
+uint32 broadphase(struct game_scene& scene, uint32 sortingAxis, bounding_box* worldSpaceAABBs, memory_arena& arena, broadphase_collision* outOverlaps);
 
 
 

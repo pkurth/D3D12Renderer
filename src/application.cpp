@@ -387,6 +387,8 @@ void application::initialize(main_renderer* renderer)
 	smokeParticleSystem.initialize(10000, 500.f, "assets/particles/smoke1.tif", 5, 5);
 	boidParticleSystem.initialize(10000, 2000.f);
 #endif
+
+	stackArena.initialize();
 }
 
 #if 0
@@ -476,6 +478,8 @@ void application::submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 num
 
 void application::update(const user_input& input, float dt)
 {
+	stackArena.reset();
+
 	//stepLocomotionEval();
 
 	resetRenderPasses();
@@ -484,7 +488,7 @@ void application::update(const user_input& input, float dt)
 
 	scene_entity selectedEntity = editor.selectedEntity;
 
-	physicsStep(scene, dt);
+	physicsStep(scene, stackArena, dt);
 
 	// Particles.
 

@@ -6,7 +6,7 @@
 dx_page* dx_page_pool::allocateNewPage()
 {
 	mutex.lock();
-	dx_page* result = arena.allocate<dx_page>(true);
+	dx_page* result = arena.allocate<dx_page>(1, true);
 	mutex.unlock();
 
 	checkResult(dxContext.device->CreateCommittedResource(

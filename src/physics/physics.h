@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/math.h"
+#include "core/memory.h"
 #include "bounding_volumes.h"
 #include "scene/scene.h"
 #include "constraints.h"
@@ -277,4 +278,4 @@ struct physics_settings
 extern physics_settings physicsSettings;
 
 void testPhysicsInteraction(game_scene& scene, ray r);
-void physicsStep(game_scene& scene, float dt);
+void physicsStep(game_scene& scene, memory_arena& arena, float dt);

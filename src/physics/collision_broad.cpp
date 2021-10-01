@@ -67,7 +67,7 @@ void onColliderRemoved(entt::registry& registry, entt::entity entityHandle)
 	registry.remove_if_exists<sap_endpoint_indirection_component>(entityHandle);
 }
 
-uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpaceAABBs, broadphase_collision* outCollisions)
+uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpaceAABBs, memory_arena& arena, broadphase_collision* outCollisions)
 {
 	CPU_PROFILE_BLOCK("Broad phase");
 
@@ -76,9 +76,6 @@ uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpac
 	{
 		return 0;
 	}
-
-	// TODO:
-	static uint16* activeList = new uint16[10000];
 
 	sap_context& context = scene.getContextVariable<sap_context>();
 	auto& endpoints = context.endpoints;
@@ -163,8 +160,11 @@ uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpac
 #endif
 
 
+	memory_marker marker = arena.getMarker();
+
 	// Determine overlaps.
 	uint32 numActive = 0;
+	uint16* activeList = arena.allocate<uint16>(numColliders); // Conservative estimate.
 
 	for (uint32 i = 0; i < numEndpoints; ++i)
 	{
@@ -196,6 +196,8 @@ uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpac
 			}
 		}
 	}
+
+	arena.resetToMarker(marker);
 
 	assert(numActive == 0);
 

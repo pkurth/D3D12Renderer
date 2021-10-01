@@ -99,6 +99,8 @@ struct locomotion_environment
 	vec3 torsoVelocityTarget;
 
 	random_number_generator rng;
+
+	memory_arena stackArena;
 };
 
 static locomotion_environment* learningEnv = 0;
@@ -393,7 +395,7 @@ extern "C" __declspec(dllexport) int updatePhysics(float* action, float* outStat
 		testPhysicsInteraction(learningEnv->scene, ray{ origin, direction });
 	}
 
-	physicsStep(learningEnv->scene, 1.f / 60.f);
+	physicsStep(learningEnv->scene, learningEnv->stackArena, 1.f / 60.f);
 	
 	bool failure = learningEnv->getState(*(learning_state*)outState);
 	*outReward = 0.f;
@@ -454,6 +456,7 @@ extern "C" __declspec(dllexport) void resetPhysics(float* outState)
 	if (!learningEnv)
 	{
 		learningEnv = new locomotion_environment{ scene };
+		learningEnv->stackArena.initialize();
 	}
 
 	learningEnv->resetForLearning();
