@@ -26,12 +26,8 @@ struct cpu_profile_frame : profile_frame
 	uint32 totalNumProfileBlocks;
 };
 
-struct cpu_profile_thread
-{
-	uint32 id;
-};
-
-static cpu_profile_thread profileThreads[MAX_NUM_CPU_PROFILE_THREADS];
+static uint32 profileThreads[MAX_NUM_CPU_PROFILE_THREADS];
+static char profileThreadNames[MAX_NUM_CPU_PROFILE_THREADS][32];
 static uint32 numThreads;
 
 static cpu_profile_frame profileFrames[MAX_NUM_CPU_PROFILE_FRAMES];
@@ -51,15 +47,27 @@ static uint32 mapThreadIDToIndex(uint32 threadID)
 {
 	for (uint32 i = 0; i < numThreads; ++i)
 	{
-		if (profileThreads[i].id == threadID)
+		if (profileThreads[i] == threadID)
 		{
 			return i;
 		}
 	}
 
+	HANDLE handle = OpenThread(THREAD_ALL_ACCESS, false, threadID);
+	assert(handle);
+	WCHAR* description = nullptr;
+	checkResult(GetThreadDescription(handle, &description));
+	CloseHandle(handle);
+
+	if (!description || !description[0])
+	{
+		description = L"Main thread";
+	}
+
 	assert(numThreads < MAX_NUM_CPU_PROFILE_THREADS);
 	uint32 index = numThreads++;
-	profileThreads[index] = { threadID };
+	profileThreads[index] = threadID;
+	snprintf(profileThreadNames[index], sizeof(profileThreadNames[index]), "Thread %u (%ws)", threadID, description);
 	return index;
 }
 
@@ -244,17 +252,14 @@ void cpuProfilingResolveTimeStamps()
 
 
 
-			if (persistent.highlightFrameIndex != -1 && persistent.highlightFrameIndex != profileFrameWriteIndex)
+			if (persistent.highlightFrameIndex != -1)
 			{
 				cpu_profile_frame& frame = profileFrames[persistent.highlightFrameIndex];
 				profile_block* blocks = profileFrames[persistent.highlightFrameIndex].profileBlockPool;
 
 				if (frame.totalNumProfileBlocks)
 				{
-					timeline.drawHighlightFrameInfo(frame);
-
 					uint32 threadIndices[MAX_NUM_CPU_PROFILE_THREADS];
-					char threadNamesBuffer[MAX_NUM_CPU_PROFILE_THREADS][32];
 					const char* threadNames[MAX_NUM_CPU_PROFILE_THREADS];
 					uint32 numActiveThreadsThisFrame = 0;
 
@@ -263,17 +268,22 @@ void cpuProfilingResolveTimeStamps()
 						if (frame.firstTopLevelBlockPerThread[i] != INVALID_PROFILE_BLOCK)
 						{
 							threadIndices[numActiveThreadsThisFrame] = i;
-							snprintf(threadNamesBuffer[numActiveThreadsThisFrame], 32, "Thread %u", profileThreads[i].id);
-							threadNames[numActiveThreadsThisFrame] = threadNamesBuffer[numActiveThreadsThisFrame];
+							threadNames[numActiveThreadsThisFrame] = profileThreadNames[i];
 							++numActiveThreadsThisFrame;
 						}
 					}
+
+
+					timeline.drawHighlightFrameInfo(frame);
 
 					static uint32 threadIndex = 0;
 					ImGui::SameLine();
 					ImGui::Dropdown("Thread", threadNames, numActiveThreadsThisFrame, threadIndex);
 
-					timeline.drawCallStack(blocks, frame.firstTopLevelBlockPerThread[threadIndices[threadIndex]]);
+					if (persistent.highlightFrameIndex != profileFrameWriteIndex)
+					{
+						timeline.drawCallStack(blocks, frame.firstTopLevelBlockPerThread[threadIndices[threadIndex]]);
+					}
 
 					timeline.drawMillisecondSpacings(frame);
 					timeline.handleUserInteractions();
