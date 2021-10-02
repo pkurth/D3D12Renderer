@@ -39,9 +39,38 @@ struct floatx4
 	floatx4(float a, float b, float c, float d) { f = _mm_setr_ps(a, b, c, d); }
 	floatx4(const float* f_) { f = _mm_loadu_ps(f_); }
 
+#if defined(SIMD_AVX_2)
+	floatx4(const float* baseAddress, __m128i indices) { f = _mm_i32gather_ps(baseAddress, indices, 4); }
+	floatx4(const float* baseAddress, int a, int b, int c, int d) : floatx4(baseAddress, _mm_setr_epi32(a, b, c, d)) {}
+#else
+	floatx4(const float* baseAddress, int a, int b, int c, int d) { f = _mm_setr_ps(baseAddress[a], baseAddress[b], baseAddress[c], baseAddress[d]);  }
+	floatx4(const float* baseAddress, __m128i indices) : floatx4(baseAddress, indices.m128i_i32[0], indices.m128i_i32[1], indices.m128i_i32[2], indices.m128i_i32[3]) {}
+#endif
+
 	operator __m128() { return f; }
 
 	void store(float* f_) { _mm_storeu_ps(f_, f); }
+
+#if defined(SIMD_AVX_512)
+	void scatter(float* baseAddress, __m128i indices) { _mm_i32scatter_ps(baseAddress, indices, f, 4); }
+	void scatter(float* baseAddress, int a, int b, int c, int d) { scatter(baseAddress, _mm_setr_epi32(a, b, c, d)); }
+#else
+	void scatter(float* baseAddress, int a, int b, int c, int d)
+	{
+		baseAddress[a] = this->f.m128_f32[0];
+		baseAddress[b] = this->f.m128_f32[1];
+		baseAddress[c] = this->f.m128_f32[2];
+		baseAddress[d] = this->f.m128_f32[3];
+	}
+
+	void scatter(float* baseAddress, __m128i indices)
+	{
+		baseAddress[indices.m128i_i32[0]] = this->f.m128_f32[0];
+		baseAddress[indices.m128i_i32[1]] = this->f.m128_f32[1];
+		baseAddress[indices.m128i_i32[2]] = this->f.m128_f32[2];
+		baseAddress[indices.m128i_i32[3]] = this->f.m128_f32[3];
+	}
+#endif
 };
 
 struct intx4
@@ -54,9 +83,38 @@ struct intx4
 	intx4(int a, int b, int c, int d) { i = _mm_setr_epi32(a, b, c, d); }
 	intx4(int* i_) { i = _mm_loadu_si128((const __m128i*)i_); }
 
+#if defined(SIMD_AVX_2)
+	intx4(const int* baseAddress, __m128i indices) { i = _mm_i32gather_epi32(baseAddress, indices, 4); }
+	intx4(const int* baseAddress, int a, int b, int c, int d) : intx4(baseAddress, _mm_setr_epi32(a, b, c, d)) {}
+#else
+	intx4(const int* baseAddress, int a, int b, int c, int d) { i = _mm_setr_epi32(baseAddress[a], baseAddress[b], baseAddress[c], baseAddress[d]); }
+	intx4(const int* baseAddress, __m128i indices) : intx4(baseAddress, indices.m128i_i32[0], indices.m128i_i32[1], indices.m128i_i32[2], indices.m128i_i32[3]) {}
+#endif
+
 	operator __m128i() { return i; }
 
 	void store(int* i_) { _mm_storeu_si128((__m128i*)i_, i); }
+
+#if defined(SIMD_AVX_512)
+	void scatter(int* baseAddress, __m128i indices) { _mm_i32scatter_epi32(baseAddress, indices, i, 4); }
+	void scatter(int* baseAddress, int a, int b, int c, int d) { scatter(baseAddress, _mm_setr_epi32(a, b, c, d)); }
+#else
+	void scatter(int* baseAddress, int a, int b, int c, int d)
+	{
+		baseAddress[a] = this->i.m128i_i32[0];
+		baseAddress[b] = this->i.m128i_i32[1];
+		baseAddress[c] = this->i.m128i_i32[2];
+		baseAddress[d] = this->i.m128i_i32[3];
+	}
+
+	void scatter(int* baseAddress, __m128i indices)
+	{
+		baseAddress[indices.m128i_i32[0]] = this->i.m128i_i32[0];
+		baseAddress[indices.m128i_i32[1]] = this->i.m128i_i32[1];
+		baseAddress[indices.m128i_i32[2]] = this->i.m128i_i32[2];
+		baseAddress[indices.m128i_i32[3]] = this->i.m128i_i32[3];
+	}
+#endif
 };
 
 static floatx4 truex4() { const float nnan = (const float&)0xFFFFFFFF; return nnan; }
@@ -246,9 +304,41 @@ struct floatx8
 	floatx8(float a, float b, float c, float d, float e, float f, float g, float h) { this->f = _mm256_setr_ps(a, b, c, d, e, f, g, h); }
 	floatx8(const float* f_) { f = _mm256_loadu_ps(f_); }
 
+	floatx8(const float* baseAddress, __m256i indices) { f = _mm256_i32gather_ps(baseAddress, indices, 4); }
+	floatx8(const float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) : floatx8(baseAddress, _mm256_setr_epi32(a, b, c, d, e, f, g, h)) {}
+
 	operator __m256() { return f; }
 
 	void store(float* f_) { _mm256_storeu_ps(f_, f); }
+
+#if defined(SIMD_AVX_512)
+	void scatter(float* baseAddress, __m256i indices) { _mm256_i32scatter_ps(baseAddress, indices, f, 4); }
+	void scatter(float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) { scatter(baseAddress, _mm256_setr_epi32(a, b, c, d, e, f, g, h)); }
+#else
+	void scatter(float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h)
+	{
+		baseAddress[a] = this->f.m256_f32[0];
+		baseAddress[b] = this->f.m256_f32[1];
+		baseAddress[c] = this->f.m256_f32[2];
+		baseAddress[d] = this->f.m256_f32[3];
+		baseAddress[e] = this->f.m256_f32[4];
+		baseAddress[f] = this->f.m256_f32[5];
+		baseAddress[g] = this->f.m256_f32[6];
+		baseAddress[h] = this->f.m256_f32[7];
+	}
+
+	void scatter(float* baseAddress, __m256i indices)
+	{
+		baseAddress[indices.m256i_i32[0]] = this->f.m256_f32[0];
+		baseAddress[indices.m256i_i32[1]] = this->f.m256_f32[1];
+		baseAddress[indices.m256i_i32[2]] = this->f.m256_f32[2];
+		baseAddress[indices.m256i_i32[3]] = this->f.m256_f32[3];
+		baseAddress[indices.m256i_i32[4]] = this->f.m256_f32[4];
+		baseAddress[indices.m256i_i32[5]] = this->f.m256_f32[5];
+		baseAddress[indices.m256i_i32[6]] = this->f.m256_f32[6];
+		baseAddress[indices.m256i_i32[7]] = this->f.m256_f32[7];
+	}
+#endif
 };
 
 struct intx8
@@ -261,9 +351,41 @@ struct intx8
 	intx8(int a, int b, int c, int d, int e, int f, int g, int h) { this->i = _mm256_setr_epi32(a, b, c, d, e, f, g, h); }
 	intx8(const int* i_) { i = _mm256_loadu_epi32(i_); }
 
+	intx8(const int* baseAddress, __m256i indices) { i = _mm256_i32gather_epi32(baseAddress, indices, 4); }
+	intx8(const int* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) : intx8(baseAddress, _mm256_setr_epi32(a, b, c, d, e, f, g, h)) {}
+
 	operator __m256i() { return i; }
 
 	void store(int* i_) { _mm256_storeu_epi32(i_, i); }
+
+#if defined(SIMD_AVX_512)
+	void scatter(int* baseAddress, __m256i indices) { _mm256_i32scatter_epi32(baseAddress, indices, i, 4); }
+	void scatter(int* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) { scatter(baseAddress, _mm256_setr_epi32(a, b, c, d, e, f, g, h)); }
+#else
+	void scatter(int* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) 
+	{
+		baseAddress[a] = this->i.m256i_i32[0];
+		baseAddress[b] = this->i.m256i_i32[1];
+		baseAddress[c] = this->i.m256i_i32[2];
+		baseAddress[d] = this->i.m256i_i32[3];
+		baseAddress[e] = this->i.m256i_i32[4];
+		baseAddress[f] = this->i.m256i_i32[5];
+		baseAddress[g] = this->i.m256i_i32[6];
+		baseAddress[h] = this->i.m256i_i32[7];
+	}
+
+	void scatter(int* baseAddress, __m256i indices)
+	{
+		baseAddress[indices.m256i_i32[0]] = this->i.m256i_i32[0];
+		baseAddress[indices.m256i_i32[1]] = this->i.m256i_i32[1];
+		baseAddress[indices.m256i_i32[2]] = this->i.m256i_i32[2];
+		baseAddress[indices.m256i_i32[3]] = this->i.m256i_i32[3];
+		baseAddress[indices.m256i_i32[4]] = this->i.m256i_i32[4];
+		baseAddress[indices.m256i_i32[5]] = this->i.m256i_i32[5];
+		baseAddress[indices.m256i_i32[6]] = this->i.m256i_i32[6];
+		baseAddress[indices.m256i_i32[7]] = this->i.m256i_i32[7];
+	}
+#endif
 };
 
 static floatx8 truex8() { const float nnan = (const float&)0xFFFFFFFF; return nnan; }
@@ -471,9 +593,15 @@ struct floatx16
 	floatx16(float a, float b, float c, float d, float e, float f, float g, float h, float i, float j, float k, float l, float m, float n, float o, float p) { this->f = _mm512_setr_ps(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p); }
 	floatx16(const float* f_) { f = _mm512_loadu_ps(f_); }
 
+	floatx16(const float* baseAddress, __m512i indices) { f = _mm512_i32gather_ps(indices, baseAddress, 4); }
+	floatx16(const float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) : floatx16(baseAddress, _mm512_setr_epi32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)) {}
+
 	operator __m512() { return f; }
 
 	void store(float* f_) { _mm512_storeu_ps(f_, f); }
+
+	void scatter(float* baseAddress, __m512i indices) { _mm512_i32scatter_ps(baseAddress, indices, f, 4); }
+	void scatter(float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) { scatter(baseAddress, _mm512_setr_epi32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)); }
 };
 
 struct intx16
@@ -485,6 +613,9 @@ struct intx16
 	intx16(__m512i i_) { i = i_; }
 	intx16(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) { this->i = _mm512_setr_epi32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p); }
 	intx16(const int* i_) { i = _mm512_loadu_epi32(i_); }
+
+	intx16(const int* baseAddress, __m512i indices) { i = _mm512_i32gather_epi32(indices, baseAddress, 4); }
+	intx16(const int* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) : intx16(baseAddress, _mm512_setr_epi32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)) {}
 
 	operator __m512i() { return i; }
 
