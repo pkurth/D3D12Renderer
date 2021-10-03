@@ -39,14 +39,14 @@ struct vertex_penetration_pair
 	float penetrationDepth;
 };
 
-static void findStableContactManifold(vertex_penetration_pair* vertices, uint32 numVertices, vec3 normal, vec3 tangent, contact_manifold& outContact)
+static void findStableContactManifold(vertex_penetration_pair* vertices, uint32 numVertices, vec3 normal, contact_manifold& outContact)
 {
 	// http://media.steampowered.com/apps/valve/2015/DirkGregorius_Contacts.pdf slide 103ff.
 
 	if (numVertices > 4)
 	{
 		// Find first vertex along some fixed distance.
-		vec3 searchDir = tangent;
+		vec3 searchDir = getTangent(normal);
 		float bestDistance = dot(searchDir, vertices[0].vertex);
 		uint32 resultIndex = 0;
 		for (uint32 i = 1; i < numVertices; ++i)
@@ -346,7 +346,7 @@ static bool clipPointsAndBuildContact(clipping_polygon& polygon, const vec4* cli
 
 		if (clippedPolygon.numPoints > 0)
 		{
-			findStableContactManifold(clippedPolygon.points, clippedPolygon.numPoints, outContact.collisionNormal, outContact.collisionTangent, outContact);
+			findStableContactManifold(clippedPolygon.points, clippedPolygon.numPoints, outContact.collisionNormal, outContact);
 			return true;
 		}
 	}
@@ -374,7 +374,6 @@ static bool intersection(const bounding_sphere& s1, const bounding_sphere& s2, c
 			outContact.collisionNormal = n / distance;
 		}
 
-		getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
 		outContact.numContacts = 1;
 		outContact.contacts[0].penetrationDepth = radiusSum - distance; // Flipped to change sign.
 		assert(outContact.contacts[0].penetrationDepth >= 0.f);
@@ -413,7 +412,6 @@ static bool intersection(const bounding_sphere& s, const bounding_box& a, contac
 		outContact.collisionNormal = n;
 		outContact.contacts[0].penetrationDepth = s.radius - dist; // Flipped to change sign.
 		outContact.contacts[0].point = 0.5f * (p + s.center + n * s.radius);
-		getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
 
 		return true;
 	}
@@ -430,8 +428,6 @@ static bool intersection(const bounding_sphere& s, const bounding_oriented_box& 
 	if (intersection(s_, aabb, outContact))
 	{
 		outContact.collisionNormal = o.rotation * outContact.collisionNormal;
-		outContact.collisionTangent = o.rotation * outContact.collisionTangent;
-		outContact.collisionBitangent = o.rotation * outContact.collisionBitangent;
 		outContact.contacts[0].point = o.rotation * (outContact.contacts[0].point - o.center) + o.center;
 		return true;
 	}
@@ -457,7 +453,6 @@ static bool intersection(const bounding_sphere& s, const bounding_hull& h, conta
 	}
 
 	outContact.collisionNormal = epa.normal;
-	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
 	outContact.numContacts = 1;
 	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
 	outContact.contacts[0].point = epa.point;
@@ -541,7 +536,6 @@ static bool intersection(const bounding_capsule& a, const bounding_capsule& b, c
 		}
 
 		outContact.collisionNormal = normal;
-		getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
 		outContact.numContacts = 2;
 		outContact.contacts[0].penetrationDepth = penetration;
 		outContact.contacts[0].point = (contactA0 + contactB0) * 0.5f;
@@ -580,7 +574,6 @@ static bool intersection(const bounding_capsule& c, const bounding_box& a, conta
 	vec3 point = epa.point;
 
 	outContact.collisionNormal = normal;
-	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
 	outContact.numContacts = 1;
 	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
 	outContact.contacts[0].point = point;
@@ -636,8 +629,6 @@ static bool intersection(const bounding_capsule& c, const bounding_oriented_box&
 	if (intersection(c_, aabb, outContact))
 	{
 		outContact.collisionNormal = o.rotation * outContact.collisionNormal;
-		outContact.collisionTangent = o.rotation * outContact.collisionTangent;
-		outContact.collisionBitangent = o.rotation * outContact.collisionBitangent;
 
 		for (uint32 i = 0; i < outContact.numContacts; ++i)
 		{
@@ -669,7 +660,6 @@ static bool intersection(const bounding_capsule& c, const bounding_hull& h, cont
 	}
 
 	outContact.collisionNormal = epa.normal;
-	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
 	outContact.numContacts = 1;
 	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
 	outContact.contacts[0].point = epa.point;
@@ -702,7 +692,6 @@ static bool intersection(const bounding_box& a, const bounding_box& b, contact_m
 	normal.data[minElement] = s;
 
 	outContact.collisionNormal = normal;
-	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
 	outContact.numContacts = 4;
 
 	uint32 axis0 = (minElement + 1) % 3;
@@ -776,7 +765,6 @@ static bool intersection(const bounding_box& a, const bounding_hull& h, contact_
 	}
 
 	outContact.collisionNormal = epa.normal;
-	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
 	outContact.numContacts = 1;
 	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
 	outContact.contacts[0].point = epa.point;
@@ -1043,7 +1031,6 @@ static bool intersection(const bounding_oriented_box& a, const bounding_oriented
 	// Normal is now in world space and points from a to b.
 
 	outContact.collisionNormal = normal;
-	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
 
 	if (faceCollision)
 	{
@@ -1157,7 +1144,6 @@ static bool intersection(const bounding_oriented_box& o, const bounding_hull& h,
 	}
 
 	outContact.collisionNormal = epa.normal;
-	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
 	outContact.numContacts = 1;
 	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
 	outContact.contacts[0].point = epa.point;
@@ -1187,7 +1173,6 @@ static bool intersection(const bounding_hull& a, const bounding_hull& b, contact
 	}
 
 	outContact.collisionNormal = epa.normal;
-	getTangents(outContact.collisionNormal, outContact.collisionTangent, outContact.collisionBitangent);
 	outContact.numContacts = 1;
 	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
 	outContact.contacts[0].point = epa.point;

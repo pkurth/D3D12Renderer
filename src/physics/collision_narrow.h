@@ -18,8 +18,6 @@ struct contact_manifold
 	contact_info contacts[4];
 
 	vec3 collisionNormal; // From a to b.
-	vec3 collisionTangent;
-	vec3 collisionBitangent;
 	uint32 numContacts;
 
 	uint16 colliderA;
