@@ -607,12 +607,10 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	// Collision detection.
 	getWorldSpaceColliders(scene, worldSpaceAABBs, worldSpaceColliders);
 	uint32 numPossibleCollisions = broadphase(scene, 0, worldSpaceAABBs, arena, possibleCollisions);
-
-	collision_constraint* collisionConstraints = arena.allocate<collision_constraint>(numPossibleCollisions);
 	non_collision_interaction* nonCollisionInteractions = arena.allocate<non_collision_interaction>(numPossibleCollisions);
+	collision_contact* contacts = arena.allocate<collision_contact>(numPossibleCollisions * 4); // Each collision can have up to 4 contact points.
 
-	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, possibleCollisions, numPossibleCollisions, collisionConstraints, nonCollisionInteractions);
-
+	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, possibleCollisions, numPossibleCollisions, contacts, nonCollisionInteractions);
 
 	auto [globalForceField, numLocalForceFields] = getForceFieldStates(scene, ffGlobal);
 
@@ -635,6 +633,8 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	}
 
 
+
+
 	//  Apply global forces (including gravity) and air drag and integrate forces.
 	for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, transform_component>().each())
 	{
@@ -646,26 +646,37 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	}
 
 
-	// Solve constraints.
-	finalizeCollisionVelocityConstraintInitialization(worldSpaceColliders, rbGlobal, collisionConstraints, narrowPhaseResult.numCollisions, dt);
-	
+	// Collect constraints.
 	uint32 numDistanceConstraints = scene.numberOfComponentsOfType<distance_constraint>();
 	uint32 numBallJointConstraints = scene.numberOfComponentsOfType<ball_joint_constraint>();
 	uint32 numHingeJointConstraints = scene.numberOfComponentsOfType<hinge_joint_constraint>();
 	uint32 numConeTwistConstraints = scene.numberOfComponentsOfType<cone_twist_constraint>();
+
+	uint32 numCollisionConstraints = narrowPhaseResult.numContacts;
+
+	distance_constraint* distanceConstraints = scene.raw<distance_constraint>();
+	ball_joint_constraint* ballJointConstraints = scene.raw<ball_joint_constraint>();
+	hinge_joint_constraint* hingeJointConstraints = scene.raw<hinge_joint_constraint>();
+	cone_twist_constraint* coneTwistConstraints = scene.raw<cone_twist_constraint>();
 
 	distance_constraint_update* distanceConstraintUpdates = arena.allocate<distance_constraint_update>(numDistanceConstraints);
 	ball_joint_constraint_update* ballJointConstraintUpdates = arena.allocate<ball_joint_constraint_update>(numBallJointConstraints);
 	hinge_joint_constraint_update* hingeJointConstraintUpdates = arena.allocate<hinge_joint_constraint_update>(numHingeJointConstraints);
 	cone_twist_constraint_update* coneTwistConstraintUpdates = arena.allocate<cone_twist_constraint_update>(numConeTwistConstraints);
 
+	collision_constraint* collisionConstraints = arena.allocate<collision_constraint>(numCollisionConstraints);
+
+
+	// Solve constraints.
 	{
 		CPU_PROFILE_BLOCK("Initialize constraints");
 
-		initializeDistanceVelocityConstraints(scene, rbGlobal, scene.raw<distance_constraint>(), distanceConstraintUpdates, numDistanceConstraints, dt);
-		initializeBallJointVelocityConstraints(scene, rbGlobal, scene.raw<ball_joint_constraint>(), ballJointConstraintUpdates, numBallJointConstraints, dt);
-		initializeHingeJointVelocityConstraints(scene, rbGlobal, scene.raw<hinge_joint_constraint>(), hingeJointConstraintUpdates, numHingeJointConstraints, dt);
-		initializeConeTwistVelocityConstraints(scene, rbGlobal, scene.raw<cone_twist_constraint>(), coneTwistConstraintUpdates, numConeTwistConstraints, dt);
+		initializeCollisionVelocityConstraints(rbGlobal, contacts, collisionConstraints, numCollisionConstraints, dt);
+
+		initializeDistanceVelocityConstraints(scene, rbGlobal, distanceConstraints, distanceConstraintUpdates, numDistanceConstraints, dt);
+		initializeBallJointVelocityConstraints(scene, rbGlobal, ballJointConstraints, ballJointConstraintUpdates, numBallJointConstraints, dt);
+		initializeHingeJointVelocityConstraints(scene, rbGlobal, hingeJointConstraints, hingeJointConstraintUpdates, numHingeJointConstraints, dt);
+		initializeConeTwistVelocityConstraints(scene, rbGlobal, coneTwistConstraints, coneTwistConstraintUpdates, numConeTwistConstraints, dt);
 	}
 	{
 		CPU_PROFILE_BLOCK("Solve constraints");
@@ -676,7 +687,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 			solveBallJointVelocityConstraints(ballJointConstraintUpdates, numBallJointConstraints, rbGlobal);
 			solveHingeJointVelocityConstraints(hingeJointConstraintUpdates, numHingeJointConstraints, rbGlobal);
 			solveConeTwistVelocityConstraints(coneTwistConstraintUpdates, numConeTwistConstraints, rbGlobal);
-			solveCollisionVelocityConstraints(collisionConstraints, narrowPhaseResult.numCollisions, rbGlobal);
+			solveCollisionVelocityConstraints(contacts, collisionConstraints, numCollisionConstraints, rbGlobal);
 		}
 	}
 

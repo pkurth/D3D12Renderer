@@ -9,22 +9,22 @@ struct broadphase_collision;
 
 struct contact_info
 {
-	vec3 point; // In world space.
+	vec3 point;
 	float penetrationDepth;
 };
 
-struct contact_manifold
+struct collision_contact
 {
-	contact_info contacts[4];
-
-	vec3 collisionNormal; // From a to b.
-	uint32 numContacts;
-
-	uint16 colliderA;
-	uint16 colliderB;
+	vec3 point;
+	float penetrationDepth;
+	vec3 normal;
+	float friction;
+	float restitution;
+	uint16 rbA;
+	uint16 rbB;
 };
 
-struct collision_point
+struct collision_constraint
 {
 	vec3 relGlobalAnchorA;
 	vec3 relGlobalAnchorB;
@@ -37,18 +37,6 @@ struct collision_point
 	float bias;
 };
 
-struct collision_constraint
-{
-	contact_manifold contact;
-
-	collision_point points[4];
-
-	uint16 rbA;
-	uint16 rbB;
-
-	float friction;
-};
-
 struct non_collision_interaction
 {
 	uint16 rigidBodyIndex;
@@ -58,14 +46,13 @@ struct non_collision_interaction
 
 struct narrowphase_result
 {
-	uint32 numCollisions;
+	uint32 numContacts;
 	uint32 numNonCollisionInteractions;
 };
 
 narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions,
-	collision_constraint* outCollisionConstraints, non_collision_interaction* outNonCollisionInteractions);
+	collision_contact* outContacts, non_collision_interaction* outNonCollisionInteractions);
 
-void finalizeCollisionVelocityConstraintInitialization(collider_union* worldSpaceColliders, rigid_body_global_state* rbs,
-	collision_constraint* collisionConstraints, uint32 numCollisionConstraints, float dt);
+void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collision_contact* contacts, collision_constraint* collisionConstraints, uint32 numContacts, float dt);
 
-void solveCollisionVelocityConstraints(collision_constraint* constraints, uint32 count, rigid_body_global_state* rbs);
+void solveCollisionVelocityConstraints(collision_contact* contacts, collision_constraint* constraints, uint32 count, rigid_body_global_state* rbs);

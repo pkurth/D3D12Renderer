@@ -31,6 +31,17 @@ static void debugSphere(vec3 position, float radius, vec4 color)
 #endif
 
 
+struct contact_manifold
+{
+	contact_info contacts[4];
+
+	vec3 collisionNormal; // From a to b.
+	uint32 numContacts;
+
+	uint16 colliderA;
+	uint16 colliderB;
+};
+
 static bool intersection(const bounding_oriented_box& a, const bounding_oriented_box& b, contact_manifold& outContact);
 
 struct vertex_penetration_pair
@@ -1351,11 +1362,11 @@ static bool overlapCheck(collider_union* worldSpaceColliders, broadphase_collisi
 }
 
 narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions,
-	collision_constraint* outCollisionConstraints, non_collision_interaction* outNonCollisionInteractions)
+	collision_contact* outContacts, non_collision_interaction* outNonCollisionInteractions)
 {
 	CPU_PROFILE_BLOCK("Narrow phase");
 
-	uint32 numCollisions = 0;
+	uint32 numContacts = 0;
 	uint32 numNonCollisionInteractions = 0;
 
 	for (uint32 i = 0; i < numPossibleCollisions; ++i)
@@ -1386,12 +1397,38 @@ narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_c
 		}
 		else
 		{
-			contact_manifold& contact = outCollisionConstraints[numCollisions].contact;
-			numCollisions += collisionCheck(worldSpaceColliders, overlap, contact);
+			contact_manifold contact;
+			if (collisionCheck(worldSpaceColliders, overlap, contact))
+			{
+				collider_union* colliderA = worldSpaceColliders + contact.colliderA;
+				collider_union* colliderB = worldSpaceColliders + contact.colliderB;
+
+				uint16 rbA = (colliderA->objectType == physics_object_type_rigid_body) ? colliderA->objectIndex : UINT16_MAX;
+				uint16 rbB = (colliderB->objectType == physics_object_type_rigid_body) ? colliderB->objectIndex : UINT16_MAX;
+
+
+				collider_properties propsA = colliderA->properties;
+				collider_properties propsB = colliderB->properties;
+
+				float friction = sqrt(propsA.friction * propsB.friction);
+				float restitution = max(propsA.restitution, propsB.restitution);
+
+				for (uint32 contactIndex = 0; contactIndex < contact.numContacts; ++contactIndex)
+				{
+					collision_contact& out = outContacts[numContacts++];
+					out.normal = contact.collisionNormal;
+					out.penetrationDepth = contact.contacts[contactIndex].penetrationDepth;
+					out.point = contact.contacts[contactIndex].point;
+					out.rbA = rbA;
+					out.rbB = rbB;
+					out.friction = friction;
+					out.restitution = restitution;
+				}
+			}
 		}
 	}
 
-	return narrowphase_result{ numCollisions, numNonCollisionInteractions };
+	return narrowphase_result{ numContacts, numNonCollisionInteractions };
 }
 
 static rigid_body_global_state dummyRigidBody =
@@ -1404,97 +1441,80 @@ static rigid_body_global_state dummyRigidBody =
 	0.f,
 };
 
-void finalizeCollisionVelocityConstraintInitialization(collider_union* worldSpaceColliders, rigid_body_global_state* rbs, 
-	collision_constraint* collisionConstraints, uint32 numCollisionConstraints, float dt)
+void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collision_contact* contacts, collision_constraint* collisionConstraints, uint32 numContacts, float dt)
 {
-	CPU_PROFILE_BLOCK("Finalize collision constraint initialization");
+	CPU_PROFILE_BLOCK("Initialize collision constraints");
 
-	for (uint32 collisionID = 0; collisionID < numCollisionConstraints; ++collisionID)
+	for (uint32 contactID = 0; contactID < numContacts; ++contactID)
 	{
-		collision_constraint& c = collisionConstraints[collisionID];
-		contact_manifold& contact = c.contact;
+		collision_constraint& constraint = collisionConstraints[contactID];
+		collision_contact& contact = contacts[contactID];
 
-		collider_union* colliderA = worldSpaceColliders + contact.colliderA;
-		collider_union* colliderB = worldSpaceColliders + contact.colliderB;
+		auto& rbA = contact.rbA != UINT16_MAX ? rbs[contact.rbA] : dummyRigidBody;
+		auto& rbB = contact.rbB != UINT16_MAX ? rbs[contact.rbB] : dummyRigidBody;
 
-		collider_properties propsA = colliderA->properties;
-		collider_properties propsB = colliderB->properties;
 
-		c.friction = sqrt(propsA.friction * propsB.friction);
-		c.rbA = (colliderA->objectType == physics_object_type_rigid_body) ? colliderA->objectIndex : UINT16_MAX;
-		c.rbB = (colliderB->objectType == physics_object_type_rigid_body) ? colliderB->objectIndex : UINT16_MAX;
+		constraint.impulseInNormalDir = 0.f;
+		constraint.impulseInTangentDir = 0.f;
 
-		auto& rbA = c.rbA != UINT16_MAX ? rbs[c.rbA] : dummyRigidBody;
-		auto& rbB = c.rbB != UINT16_MAX ? rbs[c.rbB] : dummyRigidBody;
+		constraint.relGlobalAnchorA = contact.point - rbA.position;
+		constraint.relGlobalAnchorB = contact.point - rbB.position;
 
-		float restitution = max(propsA.restitution, propsB.restitution);
+		vec3 anchorVelocityA = rbA.linearVelocity + cross(rbA.angularVelocity, constraint.relGlobalAnchorA);
+		vec3 anchorVelocityB = rbB.linearVelocity + cross(rbB.angularVelocity, constraint.relGlobalAnchorB);
 
-		for (uint32 contactID = 0; contactID < contact.numContacts; ++contactID)
+		vec3 relVelocity = anchorVelocityB - anchorVelocityA;
+		constraint.tangent = relVelocity - dot(contact.normal, relVelocity) * contact.normal;
+		if (squaredLength(constraint.tangent) > 0.f)
 		{
-			collision_point& point = c.points[contactID];
-			contact_info& contact = c.contact.contacts[contactID];
+			constraint.tangent = normalize(constraint.tangent);
+		}
+		else
+		{
+			constraint.tangent = vec3(-1.f, 0.f, 0.f);
+		}
 
-			point.impulseInNormalDir = 0.f;
-			point.impulseInTangentDir = 0.f;
+		{ // Tangent direction.
+			vec3 crAt = cross(constraint.relGlobalAnchorA, constraint.tangent);
+			vec3 crBt = cross(constraint.relGlobalAnchorB, constraint.tangent);
+			float invMassInTangentDir = rbA.invMass + dot(crAt, rbA.invInertia * crAt)
+				+ rbB.invMass + dot(crBt, rbB.invInertia * crBt);
+			constraint.effectiveMassInTangentDir = (invMassInTangentDir != 0.f) ? (1.f / invMassInTangentDir) : 0.f;
+		}
 
-			point.relGlobalAnchorA = contact.point - rbA.position;
-			point.relGlobalAnchorB = contact.point - rbB.position;
+		{ // Normal direction.
+			vec3 crAn = cross(constraint.relGlobalAnchorA, contact.normal);
+			vec3 crBn = cross(constraint.relGlobalAnchorB, contact.normal);
+			float invMassInNormalDir = rbA.invMass + dot(crAn, rbA.invInertia * crAn)
+				+ rbB.invMass + dot(crBn, rbB.invInertia * crBn);
+			constraint.effectiveMassInNormalDir = (invMassInNormalDir != 0.f) ? (1.f / invMassInNormalDir) : 0.f;
 
-			vec3 anchorVelocityA = rbA.linearVelocity + cross(rbA.angularVelocity, point.relGlobalAnchorA);
-			vec3 anchorVelocityB = rbB.linearVelocity + cross(rbB.angularVelocity, point.relGlobalAnchorB);
+			constraint.bias = 0.f;
 
-			vec3 relVelocity = anchorVelocityB - anchorVelocityA;
-			point.tangent = relVelocity - dot(c.contact.collisionNormal, relVelocity) * c.contact.collisionNormal;
-			if (squaredLength(point.tangent) > 0.f)
+			if (dt > 1e-5f)
 			{
-				point.tangent = normalize(point.tangent);
-			}
-			else
-			{
-				point.tangent = vec3(-1.f, 0.f, 0.f);
-			}
-
-			{ // Tangent direction.
-				vec3 crAt = cross(point.relGlobalAnchorA, point.tangent);
-				vec3 crBt = cross(point.relGlobalAnchorB, point.tangent);
-				float invMassInTangentDir = rbA.invMass + dot(crAt, rbA.invInertia * crAt)
-					+ rbB.invMass + dot(crBt, rbB.invInertia * crBt);
-				point.effectiveMassInTangentDir = (invMassInTangentDir != 0.f) ? (1.f / invMassInTangentDir) : 0.f;
-			}
-
-			{ // Normal direction.
-				vec3 crAn = cross(point.relGlobalAnchorA, c.contact.collisionNormal);
-				vec3 crBn = cross(point.relGlobalAnchorB, c.contact.collisionNormal);
-				float invMassInNormalDir = rbA.invMass + dot(crAn, rbA.invInertia * crAn)
-					+ rbB.invMass + dot(crBn, rbB.invInertia * crBn);
-				point.effectiveMassInNormalDir = (invMassInNormalDir != 0.f) ? (1.f / invMassInNormalDir) : 0.f;
-
-				point.bias = 0.f;
-
-				if (dt > 1e-5f)
+				float vRel = dot(contact.normal, anchorVelocityB - anchorVelocityA);
+				const float slop = -0.001f;
+				if (-contact.penetrationDepth < slop && vRel < 0.f)
 				{
-					float vRel = dot(c.contact.collisionNormal, anchorVelocityB - anchorVelocityA);
-					const float slop = -0.001f;
-					if (-contact.penetrationDepth < slop && vRel < 0.f)
-					{
-						point.bias = -restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) / dt;
-					}
+					constraint.bias = -contact.restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) / dt;
 				}
 			}
 		}
 	}
 }
 
-void solveCollisionVelocityConstraints(collision_constraint* constraints, uint32 count, rigid_body_global_state* rbs)
+void solveCollisionVelocityConstraints(collision_contact* contacts, collision_constraint* constraints, uint32 count, rigid_body_global_state* rbs)
 {
 	CPU_PROFILE_BLOCK("Solve collision constraints");
 
 	for (uint32 i = 0; i < count; ++i)
 	{
-		collision_constraint& c = constraints[i];
+		collision_contact& contact = contacts[i];
+		collision_constraint& constraint = constraints[i];
 
-		auto& rbA = c.rbA != UINT16_MAX ? rbs[c.rbA] : dummyRigidBody;
-		auto& rbB = c.rbB != UINT16_MAX ? rbs[c.rbB] : dummyRigidBody;
+		auto& rbA = contact.rbA != UINT16_MAX ? rbs[contact.rbA] : dummyRigidBody;
+		auto& rbB = contact.rbB != UINT16_MAX ? rbs[contact.rbB] : dummyRigidBody;
 
 		if (rbA.invMass == 0.f && rbB.invMass == 0.f)
 		{
@@ -1506,49 +1526,43 @@ void solveCollisionVelocityConstraints(collision_constraint* constraints, uint32
 		vec3 vB = rbB.linearVelocity;
 		vec3 wB = rbB.angularVelocity;
 
-		for (uint32 contactID = 0; contactID < c.contact.numContacts; ++contactID)
-		{
-			collision_point& point = c.points[contactID];
-			contact_info& contact = c.contact.contacts[contactID];
+		{ // Tangent dir
+			vec3 anchorVelocityA = vA + cross(wA, constraint.relGlobalAnchorA);
+			vec3 anchorVelocityB = vB + cross(wB, constraint.relGlobalAnchorB);
 
-			{ // Tangent dir
-				vec3 anchorVelocityA = vA + cross(wA, point.relGlobalAnchorA);
-				vec3 anchorVelocityB = vB + cross(wB, point.relGlobalAnchorB);
+			vec3 relVelocity = anchorVelocityB - anchorVelocityA;
+			float vt = dot(relVelocity, constraint.tangent);
+			float lambda = -constraint.effectiveMassInTangentDir * vt;
 
-				vec3 relVelocity = anchorVelocityB - anchorVelocityA;
-				float vt = dot(relVelocity, point.tangent);
-				float lambda = -point.effectiveMassInTangentDir * vt;
+			float maxFriction = contact.friction * constraint.impulseInNormalDir;
+			assert(maxFriction >= 0.f);
+			float newImpulse = clamp(constraint.impulseInTangentDir + lambda, -maxFriction, maxFriction);
+			lambda = newImpulse - constraint.impulseInTangentDir;
+			constraint.impulseInTangentDir = newImpulse;
 
-				float maxFriction = c.friction * point.impulseInNormalDir;
-				assert(maxFriction >= 0.f);
-				float newImpulse = clamp(point.impulseInTangentDir + lambda, -maxFriction, maxFriction);
-				lambda = newImpulse - point.impulseInTangentDir;
-				point.impulseInTangentDir = newImpulse;
+			vec3 P = lambda * constraint.tangent;
+			vA -= rbA.invMass * P;
+			wA -= rbA.invInertia * cross(constraint.relGlobalAnchorA, P);
+			vB += rbB.invMass * P;
+			wB += rbB.invInertia * cross(constraint.relGlobalAnchorB, P);
+		}
 
-				vec3 P = lambda * point.tangent;
-				vA -= rbA.invMass * P;
-				wA -= rbA.invInertia * cross(point.relGlobalAnchorA, P);
-				vB += rbB.invMass * P;
-				wB += rbB.invInertia * cross(point.relGlobalAnchorB, P);
-			}
+		{ // Normal dir
+			vec3 anchorVelocityA = vA + cross(wA, constraint.relGlobalAnchorA);
+			vec3 anchorVelocityB = vB + cross(wB, constraint.relGlobalAnchorB);
 
-			{ // Normal dir
-				vec3 anchorVelocityA = vA + cross(wA, point.relGlobalAnchorA);
-				vec3 anchorVelocityB = vB + cross(wB, point.relGlobalAnchorB);
+			vec3 relVelocity = anchorVelocityB - anchorVelocityA;
+			float vn = dot(relVelocity, contact.normal);
+			float lambda = -constraint.effectiveMassInNormalDir * (vn - constraint.bias);
+			float impulse = max(constraint.impulseInNormalDir + lambda, 0.f);
+			lambda = impulse - constraint.impulseInNormalDir;
+			constraint.impulseInNormalDir = impulse;
 
-				vec3 relVelocity = anchorVelocityB - anchorVelocityA;
-				float vn = dot(relVelocity, c.contact.collisionNormal);
-				float lambda = -point.effectiveMassInNormalDir * (vn - point.bias);
-				float impulse = max(point.impulseInNormalDir + lambda, 0.f);
-				lambda = impulse - point.impulseInNormalDir;
-				point.impulseInNormalDir = impulse;
-
-				vec3 P = lambda * c.contact.collisionNormal;
-				vA -= rbA.invMass * P;
-				wA -= rbA.invInertia * cross(point.relGlobalAnchorA, P);
-				vB += rbB.invMass * P;
-				wB += rbB.invInertia * cross(point.relGlobalAnchorB, P);
-			}
+			vec3 P = lambda * contact.normal;
+			vA -= rbA.invMass * P;
+			wA -= rbA.invInertia * cross(constraint.relGlobalAnchorA, P);
+			vB += rbB.invMass * P;
+			wB += rbB.invInertia * cross(constraint.relGlobalAnchorB, P);
 		}
 
 		rbA.linearVelocity = vA;
