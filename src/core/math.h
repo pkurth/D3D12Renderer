@@ -818,6 +818,7 @@ vec3 getBarycentricCoordinates(vec3 a, vec3 b, vec3 c, vec3 p);
 bool insideTriangle(vec3 barycentrics);
 
 void getTangents(vec3 normal, vec3& outTangent, vec3& outBitangent);
+vec3 getTangent(vec3 normal);
 
 // W = PDF = 1 / 4pi
 vec4 uniformSampleSphere(vec2 E);

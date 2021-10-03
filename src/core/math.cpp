@@ -1275,17 +1275,14 @@ bool insideTriangle(vec3 barycentrics)
 
 void getTangents(vec3 normal, vec3& outTangent, vec3& outBitangent)
 {
-	if (abs(normal.x) >= 0.57735f)
-	{
-		outTangent = vec3(normal.y, -normal.x, 0.f);
-	}
-	else
-	{
-		outTangent = vec3(0.f, normal.z, -normal.y);
-	}
-
-	outTangent = normalize(outTangent);
+	outTangent = getTangent(normal);
 	outBitangent = cross(normal, outTangent);
+}
+
+vec3 getTangent(vec3 normal)
+{
+	vec3 tangent = (abs(normal.x) >= 0.57735f) ? vec3(normal.y, -normal.x, 0.f) : vec3(0.f, normal.z, -normal.y);
+	return normalize(tangent);
 }
 
 vec4 uniformSampleSphere(vec2 E)
