@@ -231,6 +231,24 @@ static floatx4 clamp01(floatx4 v) { return clamp(v, 0.f, 1.f); }
 static floatx4 signOf(floatx4 f) { return ifThen(f < 0.f, floatx4(-1), ifThen(f == 0.f, zerox4(), floatx4(1))); }
 static floatx4 signbit(floatx4 f) { return (f & -0.f) >> 31; }
 
+static floatx4 cos(floatx4 x) 
+{ 
+	static const floatx4 tp = 1.f / (2.f * 3.14159265359f);
+	static const floatx4 q = 0.25f;
+	static const floatx4 h = 0.5f;
+	static const floatx4 o = 1.f;
+	static const floatx4 s = 16.f;
+	static const floatx4 v = 0.225f;
+
+	x *= tp;
+	x -= q + floor(x + q);
+	x *= s * (abs(x) - h);
+	x += v * x * (abs(x) - o);
+	return x;
+}
+
+static floatx4 sin(floatx4 x) { return cos(x - (3.14159265359f * 0.5f)); }
+
 
 static floatx4 exp2(floatx4 x)
 {
@@ -529,6 +547,24 @@ static floatx8 clamp01(floatx8 v) { return clamp(v, 0.f, 1.f); }
 static floatx8 signOf(floatx8 f) { return ifThen(f < 0.f, floatx8(-1), ifThen(f == 0.f, zerox8(), floatx8(1))); }
 static floatx8 signbit(floatx8 f) { return (f & -0.f) >> 31; }
 
+static floatx8 cos(floatx8 x)
+{
+	static const floatx8 tp = 1.f / (2.f * 3.14159265359f);
+	static const floatx8 q = 0.25f;
+	static const floatx8 h = 0.5f;
+	static const floatx8 o = 1.f;
+	static const floatx8 s = 16.f;
+	static const floatx8 v = 0.225f;
+
+	x *= tp;
+	x -= q + floor(x + q);
+	x *= s * (abs(x) - h);
+	x += v * x * (abs(x) - o);
+	return x;
+}
+
+static floatx8 sin(floatx8 x) { return cos(x - (3.14159265359f * 0.5f)); }
+
 static floatx8 exp2(floatx8 x)
 {
 	x = minimum(x, 129.00000f);
@@ -735,6 +771,24 @@ static floatx16 clamp01(floatx16 v) { return clamp(v, 0.f, 1.f); }
 
 static floatx16 signOf(floatx16 f) { return ifThen(f < 0.f, floatx16(-1), ifThen(f == 0.f, zerox16(), floatx16(1))); }
 static floatx16 signbit(floatx16 f) { return (f & -0.f) >> 31; }
+
+static floatx16 cos(floatx16 x)
+{
+	static const floatx16 tp = 1.f / (2.f * 3.14159265359f);
+	static const floatx16 q = 0.25f;
+	static const floatx16 h = 0.5f;
+	static const floatx16 o = 1.f;
+	static const floatx16 s = 16.f;
+	static const floatx16 v = 0.225f;
+
+	x *= tp;
+	x -= q + floor(x + q);
+	x *= s * (abs(x) - h);
+	x += v * x * (abs(x) - o);
+	return x;
+}
+
+static floatx4 sin(floatx4 x) { return cos(x - (3.14159265359f * 0.5f)); }
 
 static floatx16 exp2(floatx16 x)
 {
