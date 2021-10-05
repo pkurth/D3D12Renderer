@@ -1,6 +1,7 @@
 #pragma once
 
 #include "simd.h"
+#include "soa.h"
 
 
 template <typename simd_t>
@@ -15,6 +16,7 @@ union vec2x
 	vec2x() {}
 	vec2x(simd_t v) : vec2x(v, v) {}
 	vec2x(simd_t x, simd_t y) : x(x), y(y) {}
+	vec2x(soa_vec2 v, uint32 offset) : x(v.x + offset), y(v.y + offset) {}
 
 	static vec2x zero() 
 	{
@@ -47,6 +49,7 @@ union vec3x
 	vec3x(simd_t v) : vec3x(v, v, v) {}
 	vec3x(simd_t x, simd_t y, simd_t z) : x(x), y(y), z(z) {}
 	vec3x(vec2x<simd_t> xy, simd_t z) : x(xy.x), y(xy.y), z(z) {}
+	vec3x(soa_vec3 v, uint32 offset) : x(v.x + offset), y(v.y + offset), z(v.z + offset) {}
 
 	static vec3x zero()
 	{
@@ -84,6 +87,7 @@ union vec4x
 	vec4x(simd_t v) : vec4x(v, v, v, v) {}
 	vec4x(simd_t x, simd_t y, simd_t z, simd_t w) : x(x), y(y), z(z), w(w) {}
 	vec4x(vec3x<simd_t> xyz, simd_t w) : x(xyz.x), y(xyz.y), z(xyz.z), w(w) {}
+	vec4x(soa_vec4 v, uint32 offset) : x(v.x + offset), y(v.y + offset), z(v.z + offset), w(v.w + offset) {}
 
 	static vec4x zero()
 	{
@@ -111,9 +115,71 @@ union quatx
 	quatx() {}
 	quatx(simd_t x, simd_t y, simd_t z, simd_t w) : x(x), y(y), z(z), w(w) {}
 	quatx(vec3x<simd_t> axis, simd_t angle);
+	quatx(soa_quat v, uint32 offset) : x(v.x + offset), y(v.y + offset), z(v.z + offset), w(v.w + offset) {}
 
 	static const quatx identity;
 };
+
+template <typename simd_t>
+union mat2x
+{
+	struct
+	{
+		simd_t
+			m00, m10,
+			m01, m11;
+	};
+	simd_t m[4];
+
+	mat2x() {}
+	mat2x(
+		simd_t m00, simd_t m01,
+		simd_t m10, simd_t m11);
+};
+
+template <typename simd_t>
+union mat3x
+{
+	struct
+	{
+		simd_t
+			m00, m10, m20,
+			m01, m11, m21,
+			m02, m12, m22;
+	};
+	simd_t m[9];
+
+	mat3x() {}
+	mat3x(
+		simd_t m00, simd_t m01, simd_t m02,
+		simd_t m10, simd_t m11, simd_t m12,
+		simd_t m20, simd_t m21, simd_t m22);
+};
+
+template <typename simd_t>
+union mat4x
+{
+	struct
+	{
+		simd_t
+			m00, m10, m20, m30,
+			m01, m11, m21, m31,
+			m02, m12, m22, m32,
+			m03, m13, m23, m33;
+	};
+	simd_t m[16];
+
+	mat4x() {}
+	mat4x(
+		simd_t m00, simd_t m01, simd_t m02, simd_t m03,
+		simd_t m10, simd_t m11, simd_t m12, simd_t m13,
+		simd_t m20, simd_t m21, simd_t m22, simd_t m23,
+		simd_t m30, simd_t m31, simd_t m32, simd_t m33);
+
+	static const mat4 identity;
+	static const mat4 zero;
+};
+
 
 
 // Vec2 operators.
@@ -264,6 +330,40 @@ template <typename simd_t> static vec2x<simd_t> pow(vec2x<simd_t> v, simd_t e) {
 template <typename simd_t> static vec3x<simd_t> pow(vec3x<simd_t> v, simd_t e) { return vec3x(pow(v.x, e), pow(v.y, e), pow(v.z, e)); }
 template <typename simd_t> static vec4x<simd_t> pow(vec4x<simd_t> v, simd_t e) { return vec4x(pow(v.x, e), pow(v.y, e), pow(v.z, e), pow(v.w, e)); }
 
+
+template <typename simd_t>
+static vec2x<simd_t> operator*(const mat2x<simd_t>& a, vec2x<simd_t> b) 
+{ 
+	vec2x<simd_t> result;
+	result.x = fmadd(a.m00, b.x, a.m01 * b.y);
+	result.y = fmadd(a.m10, b.x, a.m11 * b.y);
+	return result;
+}
+
+template <typename simd_t>
+static vec3x<simd_t> operator*(const mat3x<simd_t>& a, vec3x<simd_t> b)
+{
+	vec3x<simd_t> result;
+	result.x = fmadd(a.m00, b.x, fmadd(a.m01, b.y, a.m02 * b.z));
+	result.y = fmadd(a.m10, b.x, fmadd(a.m11, b.y, a.m12 * b.z));
+	result.z = fmadd(a.m20, b.x, fmadd(a.m21, b.y, a.m22 * b.z));
+	return result;
+}
+
+template <typename simd_t>
+static vec4x<simd_t> operator*(const mat4x<simd_t>& a, vec4x<simd_t> b)
+{
+	vec4x<simd_t> result;
+	result.x = fmadd(a.m00, b.x, fmadd(a.m01, b.y, fmadd(a.m02, b.z, a.m03 * b.w)));
+	result.y = fmadd(a.m10, b.x, fmadd(a.m11, b.y, fmadd(a.m12, b.z, a.m13 * b.w)));
+	result.z = fmadd(a.m20, b.x, fmadd(a.m21, b.y, fmadd(a.m22, b.z, a.m23 * b.w)));
+	result.w = fmadd(a.m30, b.x, fmadd(a.m31, b.y, fmadd(a.m32, b.z, a.m33 * b.w)));
+	return result;
+}
+
+
+
+
 template<typename simd_t>
 inline quatx<simd_t>::quatx(vec3x<simd_t> axis, simd_t angle)
 {
@@ -271,3 +371,33 @@ inline quatx<simd_t>::quatx(vec3x<simd_t> axis, simd_t angle)
 	w = cos(angle * h);
 	v = axis * sin(angle * h);
 }
+
+template<typename simd_t>
+inline mat2x<simd_t>::mat2x(
+	simd_t m00, simd_t m01, 
+	simd_t m10, simd_t m11)
+	:
+	m00(m00), m01(m01),
+	m10(m10), m11(m11) {}
+
+template<typename simd_t>
+inline mat3x<simd_t>::mat3x(
+	simd_t m00, simd_t m01, simd_t m02, 
+	simd_t m10, simd_t m11, simd_t m12, 
+	simd_t m20, simd_t m21, simd_t m22)
+	:
+	m00(m00), m01(m01), m02(m02),
+	m10(m10), m11(m11), m12(m12),
+	m20(m20), m21(m21), m22(m22) {}
+
+template<typename simd_t>
+inline mat4x<simd_t>::mat4x(
+	simd_t m00, simd_t m01, simd_t m02, simd_t m03, 
+	simd_t m10, simd_t m11, simd_t m12, simd_t m13, 
+	simd_t m20, simd_t m21, simd_t m22, simd_t m23, 
+	simd_t m30, simd_t m31, simd_t m32, simd_t m33)
+	:
+	m00(m00), m01(m01), m02(m02), m03(m03),
+	m10(m10), m11(m11), m12(m12), m13(m13),
+	m20(m20), m21(m21), m22(m22), m23(m23),
+	m30(m30), m31(m31), m32(m32), m33(m33) {}

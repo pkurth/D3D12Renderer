@@ -27,8 +27,6 @@
 
 #if defined(SIMD_SSE_2)
 
-typedef __m128 cmpx4;
-
 struct floatx4
 {
 	__m128 f;
@@ -49,13 +47,13 @@ struct floatx4
 
 	operator __m128() { return f; }
 
-	void store(float* f_) { _mm_storeu_ps(f_, f); }
+	void store(float* f_) const { _mm_storeu_ps(f_, f); }
 
 #if defined(SIMD_AVX_512)
 	void scatter(float* baseAddress, __m128i indices) { _mm_i32scatter_ps(baseAddress, indices, f, 4); }
 	void scatter(float* baseAddress, int a, int b, int c, int d) { scatter(baseAddress, _mm_setr_epi32(a, b, c, d)); }
 #else
-	void scatter(float* baseAddress, int a, int b, int c, int d)
+	void scatter(float* baseAddress, int a, int b, int c, int d) const
 	{
 		baseAddress[a] = this->f.m128_f32[0];
 		baseAddress[b] = this->f.m128_f32[1];
@@ -63,7 +61,7 @@ struct floatx4
 		baseAddress[d] = this->f.m128_f32[3];
 	}
 
-	void scatter(float* baseAddress, __m128i indices)
+	void scatter(float* baseAddress, __m128i indices) const
 	{
 		baseAddress[indices.m128i_i32[0]] = this->f.m128_f32[0];
 		baseAddress[indices.m128i_i32[1]] = this->f.m128_f32[1];
@@ -93,13 +91,13 @@ struct intx4
 
 	operator __m128i() { return i; }
 
-	void store(int* i_) { _mm_storeu_si128((__m128i*)i_, i); }
+	void store(int* i_) const { _mm_storeu_si128((__m128i*)i_, i); }
 
 #if defined(SIMD_AVX_512)
 	void scatter(int* baseAddress, __m128i indices) { _mm_i32scatter_epi32(baseAddress, indices, i, 4); }
 	void scatter(int* baseAddress, int a, int b, int c, int d) { scatter(baseAddress, _mm_setr_epi32(a, b, c, d)); }
 #else
-	void scatter(int* baseAddress, int a, int b, int c, int d)
+	void scatter(int* baseAddress, int a, int b, int c, int d) const
 	{
 		baseAddress[a] = this->i.m128i_i32[0];
 		baseAddress[b] = this->i.m128i_i32[1];
@@ -107,7 +105,7 @@ struct intx4
 		baseAddress[d] = this->i.m128i_i32[3];
 	}
 
-	void scatter(int* baseAddress, __m128i indices)
+	void scatter(int* baseAddress, __m128i indices) const
 	{
 		baseAddress[indices.m128i_i32[0]] = this->i.m128i_i32[0];
 		baseAddress[indices.m128i_i32[1]] = this->i.m128i_i32[1];
@@ -176,26 +174,26 @@ static floatx4& operator^=(floatx4& a, floatx4 b) { a = a ^ b; return a; }
 static floatx4 operator~(floatx4 a) { a = andNot(a, truex4()); return a; }
 
 
-static cmpx4 operator==(intx4 a, intx4 b) { return reinterpret(_mm_cmpeq_epi32(a, b)); }
-static cmpx4 operator!=(intx4 a, intx4 b) { return ~(a == b); }
-static cmpx4 operator>(intx4 a, intx4 b) { return reinterpret(_mm_cmpgt_epi32(a, b)); }
-static cmpx4 operator>=(intx4 a, intx4 b) { return (a > b) | (a == b); }
-static cmpx4 operator<(intx4 a, intx4 b) { return reinterpret(_mm_cmplt_epi32(a, b)); }
-static cmpx4 operator<=(intx4 a, intx4 b) { return (a < b) | (a == b); }
+static intx4 operator==(intx4 a, intx4 b) { return _mm_cmpeq_epi32(a, b); }
+static intx4 operator!=(intx4 a, intx4 b) { return ~(a == b); }
+static intx4 operator>(intx4 a, intx4 b) { return _mm_cmpgt_epi32(a, b); }
+static intx4 operator>=(intx4 a, intx4 b) { return (a > b) | (a == b); }
+static intx4 operator<(intx4 a, intx4 b) { return _mm_cmplt_epi32(a, b); }
+static intx4 operator<=(intx4 a, intx4 b) { return (a < b) | (a == b); }
 
-static cmpx4 operator==(floatx4 a, floatx4 b) { return _mm_cmpeq_ps(a, b); }
-static cmpx4 operator!=(floatx4 a, floatx4 b) { return _mm_cmpneq_ps(a, b); }
-static cmpx4 operator>(floatx4 a, floatx4 b) { return _mm_cmpgt_ps(a, b); }
-static cmpx4 operator>=(floatx4 a, floatx4 b) { return _mm_cmpge_ps(a, b); }
-static cmpx4 operator<(floatx4 a, floatx4 b) { return _mm_cmplt_ps(a, b); }
-static cmpx4 operator<=(floatx4 a, floatx4 b) { return _mm_cmple_ps(a, b); }
+static floatx4 operator==(floatx4 a, floatx4 b) { return _mm_cmpeq_ps(a, b); }
+static floatx4 operator!=(floatx4 a, floatx4 b) { return _mm_cmpneq_ps(a, b); }
+static floatx4 operator>(floatx4 a, floatx4 b) { return _mm_cmpgt_ps(a, b); }
+static floatx4 operator>=(floatx4 a, floatx4 b) { return _mm_cmpge_ps(a, b); }
+static floatx4 operator<(floatx4 a, floatx4 b) { return _mm_cmplt_ps(a, b); }
+static floatx4 operator<=(floatx4 a, floatx4 b) { return _mm_cmple_ps(a, b); }
 
 static floatx4 operator>>(floatx4 a, int b) { return reinterpret(reinterpret(a) >> b); }
 static floatx4& operator>>=(floatx4& a, int b) { a = a >> b; return a; }
 static floatx4 operator<<(floatx4 a, int b) { return reinterpret(reinterpret(a) << b); }
 static floatx4& operator<<=(floatx4& a, int b) { a = a << b; return a; }
 
-static floatx4 operator-(floatx4 a) { return _mm_xor_ps(a, _mm_set1_ps(-0)); }
+static floatx4 operator-(floatx4 a) { return _mm_xor_ps(a, reinterpret(intx4(1 << 31))); }
 
 
 
@@ -208,13 +206,21 @@ static floatx4 fmsub(floatx4 a, floatx4 b, floatx4 c) { return _mm_fmsub_ps(a, b
 static floatx4 sqrt(floatx4 a) { return _mm_sqrt_ps(a); }
 static floatx4 rsqrt(floatx4 a) { return _mm_rsqrt_ps(a); }
 
-static floatx4 ifThen(cmpx4 cond, floatx4 ifCase, floatx4 elseCase) { return _mm_blendv_ps(elseCase, ifCase, cond); }
+static floatx4 ifThen(floatx4 cond, floatx4 ifCase, floatx4 elseCase) { return _mm_blendv_ps(elseCase, ifCase, cond); }
+static intx4 ifThen(intx4 cond, intx4 ifCase, intx4 elseCase) { return reinterpret(ifThen(reinterpret(cond), reinterpret(ifCase), reinterpret(elseCase))); }
 
-static int toBitMask(floatx4 a) { int result = _mm_movemask_ps(a); return result; }
+static int toBitMask(floatx4 a) { return _mm_movemask_ps(a); }
+static int toBitMask(intx4 a) { return toBitMask(reinterpret(a)); }
+
 static bool allTrue(floatx4 a) { return toBitMask(a) == (1 << 4) - 1; }
 static bool allFalse(floatx4 a) { return toBitMask(a) == 0; }
 static bool anyTrue(floatx4 a) { return toBitMask(a) > 0; }
 static bool anyFalse(floatx4 a) { return !allTrue(a); }
+
+static bool allTrue(intx4 a) { return allTrue(reinterpret(a)); }
+static bool allFalse(intx4 a) { return allFalse(reinterpret(a)); }
+static bool anyTrue(intx4 a) { return anyTrue(reinterpret(a)); }
+static bool anyFalse(intx4 a) { return anyFalse(reinterpret(a)); }
 
 static floatx4 abs(floatx4 a) { floatx4 result = andNot(-0.f, a); return result; }
 static floatx4 floor(floatx4 a) { return _mm_floor_ps(a); }
@@ -302,15 +308,71 @@ static floatx4 tanh(floatx4 x)
 	return (a - b) / (a + b);
 }
 
+static void load4(float* baseAddress, uint16* indices, uint32 stride,
+	floatx4& out0, floatx4& out1, floatx4& out2, floatx4& out3)
+{
+	const uint32 strideInFloats = stride / sizeof(float);
+
+	out0 = floatx4(baseAddress + strideInFloats * indices[0]);
+	out1 = floatx4(baseAddress + strideInFloats * indices[1]);
+	out2 = floatx4(baseAddress + strideInFloats * indices[2]);
+	out3 = floatx4(baseAddress + strideInFloats * indices[3]);
+
+	_MM_TRANSPOSE4_PS(out0.f, out1.f, out2.f, out3.f);
+}
+
+static void store4(float* baseAddress, uint16* indices, uint32 stride,
+	floatx4 in0, floatx4 in1, floatx4 in2, floatx4 in3)
+{
+	const uint32 strideInFloats = stride / sizeof(float);
+
+	_MM_TRANSPOSE4_PS(in0.f, in1.f, in2.f, in3.f);
+
+	in0.store(baseAddress + strideInFloats * indices[0]);
+	in1.store(baseAddress + strideInFloats * indices[1]);
+	in2.store(baseAddress + strideInFloats * indices[2]);
+	in3.store(baseAddress + strideInFloats * indices[3]);
+}
+
+static void load8(float* baseAddress, uint16* indices, uint32 stride,
+	floatx4& out0, floatx4& out1, floatx4& out2, floatx4& out3, floatx4& out4, floatx4& out5, floatx4& out6, floatx4& out7)
+{
+	const uint32 strideInFloats = stride / sizeof(float);
+
+	out0 = floatx4(baseAddress + strideInFloats * indices[0]);
+	out1 = floatx4(baseAddress + strideInFloats * indices[1]);
+	out2 = floatx4(baseAddress + strideInFloats * indices[2]);
+	out3 = floatx4(baseAddress + strideInFloats * indices[3]);
+	out4 = floatx4(baseAddress + strideInFloats * indices[0] + 4);
+	out5 = floatx4(baseAddress + strideInFloats * indices[1] + 4);
+	out6 = floatx4(baseAddress + strideInFloats * indices[2] + 4);
+	out7 = floatx4(baseAddress + strideInFloats * indices[3] + 4);
+
+	_MM_TRANSPOSE4_PS(out0.f, out1.f, out2.f, out3.f);
+	_MM_TRANSPOSE4_PS(out4.f, out5.f, out6.f, out7.f);
+}
+
+static void store8(float* baseAddress, uint16* indices, uint32 stride,
+	floatx4 in0, floatx4 in1, floatx4 in2, floatx4 in3, floatx4 in4, floatx4 in5, floatx4 in6, floatx4 in7)
+{
+	const uint32 strideInFloats = stride / sizeof(float);
+
+	_MM_TRANSPOSE4_PS(in0.f, in1.f, in2.f, in3.f);
+	_MM_TRANSPOSE4_PS(in4.f, in5.f, in6.f, in7.f);
+
+	in0.store(baseAddress + strideInFloats * indices[0]);
+	in1.store(baseAddress + strideInFloats * indices[1]);
+	in2.store(baseAddress + strideInFloats * indices[2]);
+	in3.store(baseAddress + strideInFloats * indices[3]);
+	in4.store(baseAddress + strideInFloats * indices[0] + 4);
+	in5.store(baseAddress + strideInFloats * indices[1] + 4);
+	in6.store(baseAddress + strideInFloats * indices[2] + 4);
+	in7.store(baseAddress + strideInFloats * indices[3] + 4);
+}
+
 #endif
 
 #if defined(SIMD_AVX_2)
-
-#if defined(SIMD_AVX_512)
-typedef __mmask8 cmpx8;
-#else
-typedef __m256 cmpx8;
-#endif
 
 struct floatx8
 {
@@ -327,13 +389,13 @@ struct floatx8
 
 	operator __m256() { return f; }
 
-	void store(float* f_) { _mm256_storeu_ps(f_, f); }
+	void store(float* f_) const { _mm256_storeu_ps(f_, f); }
 
 #if defined(SIMD_AVX_512)
 	void scatter(float* baseAddress, __m256i indices) { _mm256_i32scatter_ps(baseAddress, indices, f, 4); }
 	void scatter(float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) { scatter(baseAddress, _mm256_setr_epi32(a, b, c, d, e, f, g, h)); }
 #else
-	void scatter(float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h)
+	void scatter(float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) const
 	{
 		baseAddress[a] = this->f.m256_f32[0];
 		baseAddress[b] = this->f.m256_f32[1];
@@ -345,7 +407,7 @@ struct floatx8
 		baseAddress[h] = this->f.m256_f32[7];
 	}
 
-	void scatter(float* baseAddress, __m256i indices)
+	void scatter(float* baseAddress, __m256i indices) const
 	{
 		baseAddress[indices.m256i_i32[0]] = this->f.m256_f32[0];
 		baseAddress[indices.m256i_i32[1]] = this->f.m256_f32[1];
@@ -374,13 +436,13 @@ struct intx8
 
 	operator __m256i() { return i; }
 
-	void store(int* i_) { _mm256_storeu_epi32(i_, i); }
+	void store(int* i_) const { _mm256_storeu_epi32(i_, i); }
 
 #if defined(SIMD_AVX_512)
 	void scatter(int* baseAddress, __m256i indices) { _mm256_i32scatter_epi32(baseAddress, indices, i, 4); }
 	void scatter(int* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) { scatter(baseAddress, _mm256_setr_epi32(a, b, c, d, e, f, g, h)); }
 #else
-	void scatter(int* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) 
+	void scatter(int* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) const
 	{
 		baseAddress[a] = this->i.m256i_i32[0];
 		baseAddress[b] = this->i.m256i_i32[1];
@@ -392,7 +454,7 @@ struct intx8
 		baseAddress[h] = this->i.m256i_i32[7];
 	}
 
-	void scatter(int* baseAddress, __m256i indices)
+	void scatter(int* baseAddress, __m256i indices) const
 	{
 		baseAddress[indices.m256i_i32[0]] = this->i.m256i_i32[0];
 		baseAddress[indices.m256i_i32[1]] = this->i.m256i_i32[1];
@@ -466,36 +528,36 @@ static floatx8 operator~(floatx8 a) { a = andNot(a, truex8()); return a; }
 
 
 #if defined(SIMD_AVX_512)
-static cmpx8 operator==(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_EQ); }
-static cmpx8 operator!=(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_NE); }
-static cmpx8 operator>(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(b, a, _MM_CMPINT_LT); }
-static cmpx8 operator>=(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(b, a, _MM_CMPINT_LE); }
-static cmpx8 operator<(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_LT); }
-static cmpx8 operator<=(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_LE); }
+static uint8 operator==(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_EQ); }
+static uint8 operator!=(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_NE); }
+static uint8 operator>(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(b, a, _MM_CMPINT_LT); }
+static uint8 operator>=(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(b, a, _MM_CMPINT_LE); }
+static uint8 operator<(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_LT); }
+static uint8 operator<=(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_LE); }
 #else
-static cmpx8 operator==(intx8 a, intx8 b) { return reinterpret(_mm256_cmpeq_epi32(a, b)); }
-static cmpx8 operator!=(intx8 a, intx8 b) { return ~(a == b); }
-static cmpx8 operator>(intx8 a, intx8 b) { return reinterpret(_mm256_cmpgt_epi32(a, b)); }
-static cmpx8 operator>=(intx8 a, intx8 b) { return (a > b) | (a == b); }
-static cmpx8 operator<(intx8 a, intx8 b) { return reinterpret(_mm256_cmpgt_epi32(b, a)); }
-static cmpx8 operator<=(intx8 a, intx8 b) { return (a < b) | (a == b); }
+static intx8 operator==(intx8 a, intx8 b) { return _mm256_cmpeq_epi32(a, b); }
+static intx8 operator!=(intx8 a, intx8 b) { return ~(a == b); }
+static intx8 operator>(intx8 a, intx8 b) { return _mm256_cmpgt_epi32(a, b); }
+static intx8 operator>=(intx8 a, intx8 b) { return (a > b) | (a == b); }
+static intx8 operator<(intx8 a, intx8 b) { return _mm256_cmpgt_epi32(b, a); }
+static intx8 operator<=(intx8 a, intx8 b) { return (a < b) | (a == b); }
 #endif
 
 
 #if defined(SIMD_AVX_512)
-static cmpx8 operator==(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_EQ_OQ); }
-static cmpx8 operator!=(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_NEQ_OQ); }
-static cmpx8 operator>(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_GT_OQ); }
-static cmpx8 operator>=(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_GE_OQ); }
-static cmpx8 operator<(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_LT_OQ); }
-static cmpx8 operator<=(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_LE_OQ); }
+static uint8 operator==(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_EQ_OQ); }
+static uint8 operator!=(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_NEQ_OQ); }
+static uint8 operator>(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_GT_OQ); }
+static uint8 operator>=(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_GE_OQ); }
+static uint8 operator<(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_LT_OQ); }
+static uint8 operator<=(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_LE_OQ); }
 #else
-static cmpx8 operator==(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_EQ_OQ); }
-static cmpx8 operator!=(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_NEQ_OQ); }
-static cmpx8 operator>(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_GT_OQ); }
-static cmpx8 operator>=(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_GE_OQ); }
-static cmpx8 operator<(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_LT_OQ); }
-static cmpx8 operator<=(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_LE_OQ); }
+static floatx8 operator==(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_EQ_OQ); }
+static floatx8 operator!=(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_NEQ_OQ); }
+static floatx8 operator>(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_GT_OQ); }
+static floatx8 operator>=(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_GE_OQ); }
+static floatx8 operator<(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_LT_OQ); }
+static floatx8 operator<=(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_LE_OQ); }
 #endif
 
 static floatx8 operator>>(floatx8 a, int b) { return reinterpret(reinterpret(a) >> b); }
@@ -503,7 +565,7 @@ static floatx8& operator>>=(floatx8& a, int b) { a = a >> b; return a; }
 static floatx8 operator<<(floatx8 a, int b) { return reinterpret(reinterpret(a) << b); }
 static floatx8& operator<<=(floatx8& a, int b) { a = a << b; return a; }
 
-static floatx8 operator-(floatx8 a) { return _mm256_xor_ps(a, _mm256_set1_ps(-0)); }
+static floatx8 operator-(floatx8 a) { return _mm256_xor_ps(a, reinterpret(intx8(1 << 31))); }
 
 
 
@@ -516,22 +578,34 @@ static floatx8 fmsub(floatx8 a, floatx8 b, floatx8 c) { return _mm256_fmsub_ps(a
 static floatx8 sqrt(floatx8 a) { return _mm256_sqrt_ps(a); }
 static floatx8 rsqrt(floatx8 a) { return _mm256_rsqrt_ps(a); }
 
+static int toBitMask(floatx8 a) { return _mm256_movemask_ps(a); }
+static int toBitMask(intx8 a) { return toBitMask(reinterpret(a)); }
+
 #if defined(SIMD_AVX_512)
-static floatx8 ifThen(cmpx8 cond, floatx8 ifCase, floatx8 elseCase) { return _mm256_mask_blend_ps(cond, elseCase, ifCase); }
+static floatx8 ifThen(uint8 cond, floatx8 ifCase, floatx8 elseCase) { return _mm256_mask_blend_ps(cond, elseCase, ifCase); }
+static intx8 ifThen(uint8 cond, intx8 ifCase, intx8 elseCase) { return reinterpret(ifThen(cond, reinterpret(ifCase), reinterpret(elseCase))); }
 
-static bool allTrue(cmpx8 a) { return a == (1 << 8) - 1; }
-static bool allFalse(cmpx8 a) { return a == 0; }
-static bool anyTrue(cmpx8 a) { return a > 0; }
-static bool anyFalse(cmpx8 a) { return !allTrue(a); }
+static int toBitMask(uint8 a) { return a; }
+
+static bool allTrue(uint8 a) { return a == (1 << 8) - 1; }
+static bool allFalse(uint8 a) { return a == 0; }
+static bool anyTrue(uint8 a) { return a > 0; }
+static bool anyFalse(uint8 a) { return !allTrue(a); }
 #else
-static floatx8 ifThen(cmpx8 cond, floatx8 ifCase, floatx8 elseCase) { return _mm256_blendv_ps(elseCase, ifCase, cond); }
+static floatx8 ifThen(floatx8 cond, floatx8 ifCase, floatx8 elseCase) { return _mm256_blendv_ps(elseCase, ifCase, cond); }
+static intx8 ifThen(intx8 cond, intx8 ifCase, intx8 elseCase) { return reinterpret(ifThen(reinterpret(cond), reinterpret(ifCase), reinterpret(elseCase))); }
 
-static int toBitMask(cmpx8 a) { return _mm256_movemask_ps(a); }
-static bool allTrue(cmpx8 a) { return toBitMask(a) == (1 << 8) - 1; }
-static bool allFalse(cmpx8 a) { return toBitMask(a) == 0; }
-static bool anyTrue(cmpx8 a) { return toBitMask(a) > 0; }
-static bool anyFalse(cmpx8 a) { return !allTrue(a); }
+static bool allTrue(floatx8 a) { return toBitMask(a) == (1 << 8) - 1; }
+static bool allFalse(floatx8 a) { return toBitMask(a) == 0; }
+static bool anyTrue(floatx8 a) { return toBitMask(a) > 0; }
+static bool anyFalse(floatx8 a) { return !allTrue(a); }
+
+static bool allTrue(intx8 a) { return allTrue(reinterpret(a)); }
+static bool allFalse(intx8 a) { return allFalse(reinterpret(a)); }
+static bool anyTrue(intx8 a) { return anyTrue(reinterpret(a)); }
+static bool anyFalse(intx8 a) { return anyFalse(reinterpret(a)); }
 #endif
+
 
 static floatx8 abs(floatx8 a) { floatx8 result = andNot(-0.f, a); return result; }
 static floatx8 floor(floatx8 a) { return _mm256_floor_ps(a); }
@@ -612,12 +686,78 @@ static floatx8 tanh(floatx8 x)
 	return (a - b) / (a + b);
 }
 
+static void load4(float* baseAddress, uint16* indices, uint32 stride,
+	floatx8& out0, floatx8& out1, floatx8& out2, floatx8& out3)
+{
+	const uint32 strideInFloats = stride / sizeof(float);
+
+	floatx4 tmp0(baseAddress + strideInFloats * indices[0]);
+	floatx4 tmp1(baseAddress + strideInFloats * indices[1]);
+	floatx4 tmp2(baseAddress + strideInFloats * indices[2]);
+	floatx4 tmp3(baseAddress + strideInFloats * indices[3]);
+	floatx4 tmp4(baseAddress + strideInFloats * indices[4]);
+	floatx4 tmp5(baseAddress + strideInFloats * indices[5]);
+	floatx4 tmp6(baseAddress + strideInFloats * indices[6]);
+	floatx4 tmp7(baseAddress + strideInFloats * indices[7]);
+
+	out0 = _mm256_insertf128_ps(_mm256_castps128_ps256(tmp0), tmp4, 1);
+	out1 = _mm256_insertf128_ps(_mm256_castps128_ps256(tmp1), tmp5, 1);
+	out2 = _mm256_insertf128_ps(_mm256_castps128_ps256(tmp2), tmp6, 1);
+	out3 = _mm256_insertf128_ps(_mm256_castps128_ps256(tmp3), tmp7, 1);
+}
+
+static void load8(float* baseAddress, uint16* indices, uint32 stride,
+	floatx8& out0, floatx8& out1, floatx8& out2, floatx8& out3, floatx8& out4, floatx8& out5, floatx8& out6, floatx8& out7)
+{
+	const uint32 strideInFloats = stride / sizeof(float);
+
+	floatx8 tmp0(baseAddress + strideInFloats * indices[0]);
+	floatx8 tmp1(baseAddress + strideInFloats * indices[1]);
+	floatx8 tmp2(baseAddress + strideInFloats * indices[2]);
+	floatx8 tmp3(baseAddress + strideInFloats * indices[3]);
+	floatx8 tmp4(baseAddress + strideInFloats * indices[4]);
+	floatx8 tmp5(baseAddress + strideInFloats * indices[5]);
+	floatx8 tmp6(baseAddress + strideInFloats * indices[6]);
+	floatx8 tmp7(baseAddress + strideInFloats * indices[7]);
+
+	out0 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp0), _mm256_castps_si256(tmp4), 0 | (2 << 4)));
+	out1 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp1), _mm256_castps_si256(tmp5), 0 | (2 << 4)));
+	out2 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp2), _mm256_castps_si256(tmp6), 0 | (2 << 4)));
+	out3 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp3), _mm256_castps_si256(tmp7), 0 | (2 << 4)));
+	out4 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp0), _mm256_castps_si256(tmp4), 1 | (3 << 4)));
+	out5 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp1), _mm256_castps_si256(tmp5), 1 | (3 << 4)));
+	out6 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp2), _mm256_castps_si256(tmp6), 1 | (3 << 4)));
+	out7 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp3), _mm256_castps_si256(tmp7), 1 | (3 << 4)));
+}
+
+static void store8(float* baseAddress, uint16* indices, uint32 stride,
+	floatx8 in0, floatx8 in1, floatx8 in2, floatx8 in3, floatx8 in4, floatx8 in5, floatx8 in6, floatx8 in7)
+{
+	const uint32 strideInFloats = stride / sizeof(float);
+
+	floatx8 tmp0 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in0), _mm256_castps_si256(in4), 0 | (2 << 4)));
+	floatx8 tmp1 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in1), _mm256_castps_si256(in5), 0 | (2 << 4)));
+	floatx8 tmp2 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in2), _mm256_castps_si256(in6), 0 | (2 << 4)));
+	floatx8 tmp3 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in3), _mm256_castps_si256(in7), 0 | (2 << 4)));
+	floatx8 tmp4 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in0), _mm256_castps_si256(in4), 1 | (3 << 4)));
+	floatx8 tmp5 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in1), _mm256_castps_si256(in5), 1 | (3 << 4)));
+	floatx8 tmp6 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in2), _mm256_castps_si256(in6), 1 | (3 << 4)));
+	floatx8 tmp7 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in3), _mm256_castps_si256(in7), 1 | (3 << 4)));
+
+	tmp0.store(baseAddress + strideInFloats * indices[0]);
+	tmp1.store(baseAddress + strideInFloats * indices[1]);
+	tmp2.store(baseAddress + strideInFloats * indices[2]);
+	tmp3.store(baseAddress + strideInFloats * indices[3]);
+	tmp4.store(baseAddress + strideInFloats * indices[4]);
+	tmp5.store(baseAddress + strideInFloats * indices[5]);
+	tmp6.store(baseAddress + strideInFloats * indices[6]);
+	tmp7.store(baseAddress + strideInFloats * indices[7]);
+}
+
 
 #endif
 
 #if defined(SIMD_AVX_512)
-
-typedef __mmask16 cmpx16;
 
 struct floatx16
 {
@@ -634,10 +774,10 @@ struct floatx16
 
 	operator __m512() { return f; }
 
-	void store(float* f_) { _mm512_storeu_ps(f_, f); }
+	void store(float* f_) const { _mm512_storeu_ps(f_, f); }
 
-	void scatter(float* baseAddress, __m512i indices) { _mm512_i32scatter_ps(baseAddress, indices, f, 4); }
-	void scatter(float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) { scatter(baseAddress, _mm512_setr_epi32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)); }
+	void scatter(float* baseAddress, __m512i indices) const { _mm512_i32scatter_ps(baseAddress, indices, f, 4); }
+	void scatter(float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) const { scatter(baseAddress, _mm512_setr_epi32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)); }
 };
 
 struct intx16
@@ -655,7 +795,7 @@ struct intx16
 
 	operator __m512i() { return i; }
 
-	void store(int* i_) { _mm512_storeu_epi32(i_, i); }
+	void store(int* i_) const { _mm512_storeu_epi32(i_, i); }
 };
 
 static floatx16 truex16() { const float nnan = (const float&)0xFFFFFFFF; return nnan; }
@@ -687,12 +827,12 @@ static intx16& operator^=(intx16& a, intx16 b) { a = a ^ b; return a; }
 
 static intx16 operator~(intx16 a) { a = andNot(a, reinterpret(truex16())); return a; }
 
-static cmpx16 operator==(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_EQ); }
-static cmpx16 operator!=(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_NE); }
-static cmpx16 operator>(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(b, a, _MM_CMPINT_LT); }
-static cmpx16 operator>=(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(b, a, _MM_CMPINT_LE); }
-static cmpx16 operator<(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_LT); }
-static cmpx16 operator<=(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_LE); }
+static uint16 operator==(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_EQ); }
+static uint16 operator!=(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_NE); }
+static uint16 operator>(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(b, a, _MM_CMPINT_LT); }
+static uint16 operator>=(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(b, a, _MM_CMPINT_LE); }
+static uint16 operator<(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_LT); }
+static uint16 operator<=(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_LE); }
 
 
 static intx16 operator>>(intx16 a, int b) { return _mm512_srli_epi32(a, b); }
@@ -724,12 +864,12 @@ static floatx16& operator^=(floatx16& a, floatx16 b) { a = a ^ b; return a; }
 
 static floatx16 operator~(floatx16 a) { a = andNot(a, truex16()); return a; }
 
-static cmpx16 operator==(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_EQ_OQ); }
-static cmpx16 operator!=(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_NEQ_OQ); }
-static cmpx16 operator>(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_GT_OQ); }
-static cmpx16 operator>=(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_GE_OQ); }
-static cmpx16 operator<(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_LT_OQ); }
-static cmpx16 operator<=(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_LE_OQ); }
+static uint16 operator==(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_EQ_OQ); }
+static uint16 operator!=(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_NEQ_OQ); }
+static uint16 operator>(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_GT_OQ); }
+static uint16 operator>=(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_GE_OQ); }
+static uint16 operator<(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_LT_OQ); }
+static uint16 operator<=(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_LE_OQ); }
 
 
 static floatx16 operator>>(floatx16 a, int b) { return reinterpret(reinterpret(a) >> b); }
@@ -737,7 +877,7 @@ static floatx16& operator>>=(floatx16& a, int b) { a = a >> b; return a; }
 static floatx16 operator<<(floatx16 a, int b) { return reinterpret(reinterpret(a) << b); }
 static floatx16& operator<<=(floatx16& a, int b) { a = a << b; return a; }
 
-static floatx16 operator-(floatx16 a) { return _mm512_xor_ps(a, _mm512_set1_ps(-0)); }
+static floatx16 operator-(floatx16 a) { return _mm512_xor_ps(a, reinterpret(intx16(1 << 31))); }
 
 
 
@@ -750,12 +890,13 @@ static floatx16 fmsub(floatx16 a, floatx16 b, floatx16 c) { return _mm512_fmsub_
 static floatx16 sqrt(floatx16 a) { return _mm512_sqrt_ps(a); }
 static floatx16 rsqrt(floatx16 a) { return 1.f / _mm512_sqrt_ps(a); }
 
-static floatx16 ifThen(cmpx16 cond, floatx16 ifCase, floatx16 elseCase) { return _mm512_mask_blend_ps(cond, elseCase, ifCase); }
+static floatx16 ifThen(uint16 cond, floatx16 ifCase, floatx16 elseCase) { return _mm512_mask_blend_ps(cond, elseCase, ifCase); }
+static intx16 ifThen(uint16 cond, intx16 ifCase, intx16 elseCase) { return reinterpret(ifThen(cond, reinterpret(ifCase), reinterpret(elseCase))); }
 
-static bool allTrue(cmpx16 a) { return a == (1 << 16) - 1; }
-static bool allFalse(cmpx16 a) { return a == 0; }
-static bool anyTrue(cmpx16 a) { return a > 0; }
-static bool anyFalse(cmpx16 a) { return !allTrue(a); }
+static bool allTrue(uint16 a) { return a == (1 << 16) - 1; }
+static bool allFalse(uint16 a) { return a == 0; }
+static bool anyTrue(uint16 a) { return a > 0; }
+static bool anyFalse(uint16 a) { return !allTrue(a); }
 
 
 static floatx16 abs(floatx16 a) { floatx16 result = andNot(-0.f, a); return result; }
@@ -788,7 +929,7 @@ static floatx16 cos(floatx16 x)
 	return x;
 }
 
-static floatx4 sin(floatx4 x) { return cos(x - (3.14159265359f * 0.5f)); }
+static floatx16 sin(floatx16 x) { return cos(x - (3.14159265359f * 0.5f)); }
 
 static floatx16 exp2(floatx16 x)
 {
@@ -844,12 +985,10 @@ static floatx16 tanh(floatx16 x)
 #if defined(SIMD_AVX_512)
 typedef floatx16 floatx;
 typedef intx16 intx;
-typedef cmpx16 cmpx;
 #define SIMD_LANES 16
 #elif defined(SIMD_AVX_2)
 typedef floatx8 floatx;
 typedef intx8 intx;
-typedef cmpx8 cmpx;
 #define SIMD_LANES 8
 #else
 typedef floatx4 floatx;
