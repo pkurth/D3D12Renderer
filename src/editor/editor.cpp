@@ -1392,6 +1392,8 @@ void scene_editor::drawSettings(float dt)
 
 					ImGui::PropertySlider("Test force", physicsSettings.testForce, 1.f, 10000.f);
 
+					ImGui::PropertyCheckbox("Use SIMD", physicsSettings.simd);
+
 					ImGui::EndProperties();
 				}
 				ImGui::EndTree();

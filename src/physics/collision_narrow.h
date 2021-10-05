@@ -18,8 +18,7 @@ struct collision_contact
 	vec3 point;
 	float penetrationDepth;
 	vec3 normal;
-	float friction;
-	float restitution;
+	uint32 friction_restitution; // Packed as 16 bit int each.
 	uint16 rbA;
 	uint16 rbB;
 };
@@ -54,5 +53,37 @@ narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_c
 	collision_contact* outContacts, non_collision_interaction* outNonCollisionInteractions);
 
 void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collision_contact* contacts, collision_constraint* collisionConstraints, uint32 numContacts, float dt);
-
 void solveCollisionVelocityConstraints(collision_contact* contacts, collision_constraint* constraints, uint32 count, rigid_body_global_state* rbs);
+
+
+
+
+
+#define COLLISION_SIMD_WIDTH 4
+
+struct simd_collision_batch
+{
+	float relGlobalAnchorA[3][COLLISION_SIMD_WIDTH];
+	float relGlobalAnchorB[3][COLLISION_SIMD_WIDTH];
+	float normal[3][COLLISION_SIMD_WIDTH];
+	float tangent[3][COLLISION_SIMD_WIDTH];
+	float effectiveMassInNormalDir[COLLISION_SIMD_WIDTH];
+	float effectiveMassInTangentDir[COLLISION_SIMD_WIDTH];
+	float friction[COLLISION_SIMD_WIDTH];
+	float impulseInNormalDir[COLLISION_SIMD_WIDTH];
+	float impulseInTangentDir[COLLISION_SIMD_WIDTH];
+	float bias[COLLISION_SIMD_WIDTH];
+
+	uint16 rbAIndices[COLLISION_SIMD_WIDTH];
+	uint16 rbBIndices[COLLISION_SIMD_WIDTH];
+};
+
+struct simd_collision_constraint
+{
+	simd_collision_batch* batches;
+	uint32 numBatches;
+};
+
+void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_global_state* rbs, collision_contact* contacts, uint32 numContacts, 
+	uint16 dummyRigidBodyIndex, simd_collision_constraint& outConstraints, float dt);
+void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint& constraints, rigid_body_global_state* rbs);

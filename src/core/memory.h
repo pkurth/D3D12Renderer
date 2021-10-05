@@ -102,3 +102,12 @@ protected:
 	uint64 reserveSize;
 };
 
+struct scope_temp_memory
+{
+	memory_arena& arena;
+	memory_marker marker;
+
+	scope_temp_memory(memory_arena& arena) : arena(arena), marker(arena.getMarker()) {}
+	~scope_temp_memory() { arena.resetToMarker(marker); }
+};
+

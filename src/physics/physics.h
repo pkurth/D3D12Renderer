@@ -273,6 +273,8 @@ struct physics_settings
 	float testForce = 1000.f;
 
 	float globalTimeScale = 1.f;
+
+	bool simd = true;
 };
 
 extern physics_settings physicsSettings;

@@ -1403,15 +1403,16 @@ narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_c
 				collider_union* colliderA = worldSpaceColliders + contact.colliderA;
 				collider_union* colliderB = worldSpaceColliders + contact.colliderB;
 
-				uint16 rbA = (colliderA->objectType == physics_object_type_rigid_body) ? colliderA->objectIndex : UINT16_MAX;
-				uint16 rbB = (colliderB->objectType == physics_object_type_rigid_body) ? colliderB->objectIndex : UINT16_MAX;
-
+				uint16 rbA = colliderA->objectIndex;
+				uint16 rbB = colliderB->objectIndex;
 
 				collider_properties propsA = colliderA->properties;
 				collider_properties propsB = colliderB->properties;
 
-				float friction = sqrt(propsA.friction * propsB.friction);
-				float restitution = max(propsA.restitution, propsB.restitution);
+				float friction = clamp01(sqrt(propsA.friction * propsB.friction));
+				float restitution = clamp01(max(propsA.restitution, propsB.restitution));
+
+				uint32 friction_restitution = ((uint32)(friction * 0xFFFF) << 16) | (uint32)(restitution * 0xFFFF);
 
 				for (uint32 contactIndex = 0; contactIndex < contact.numContacts; ++contactIndex)
 				{
@@ -1421,8 +1422,7 @@ narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_c
 					out.point = contact.contacts[contactIndex].point;
 					out.rbA = rbA;
 					out.rbB = rbB;
-					out.friction = friction;
-					out.restitution = restitution;
+					out.friction_restitution = friction_restitution;
 				}
 			}
 		}
@@ -1430,16 +1430,6 @@ narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_c
 
 	return narrowphase_result{ numContacts, numNonCollisionInteractions };
 }
-
-static rigid_body_global_state dummyRigidBody =
-{
-	quat::identity,
-	vec3(0.f),
-	vec3(0.f),
-	vec3(0.f),
-	mat3::zero,
-	0.f,
-};
 
 void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collision_contact* contacts, collision_constraint* collisionConstraints, uint32 numContacts, float dt)
 {
@@ -1450,9 +1440,8 @@ void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collis
 		collision_constraint& constraint = collisionConstraints[contactID];
 		collision_contact& contact = contacts[contactID];
 
-		auto& rbA = contact.rbA != UINT16_MAX ? rbs[contact.rbA] : dummyRigidBody;
-		auto& rbB = contact.rbB != UINT16_MAX ? rbs[contact.rbB] : dummyRigidBody;
-
+		auto& rbA = rbs[contact.rbA];
+		auto& rbB = rbs[contact.rbB];
 
 		constraint.impulseInNormalDir = 0.f;
 		constraint.impulseInTangentDir = 0.f;
@@ -1465,14 +1454,7 @@ void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collis
 
 		vec3 relVelocity = anchorVelocityB - anchorVelocityA;
 		constraint.tangent = relVelocity - dot(contact.normal, relVelocity) * contact.normal;
-		if (squaredLength(constraint.tangent) > 0.f)
-		{
-			constraint.tangent = normalize(constraint.tangent);
-		}
-		else
-		{
-			constraint.tangent = vec3(-1.f, 0.f, 0.f);
-		}
+		constraint.tangent = noz(constraint.tangent);
 
 		{ // Tangent direction.
 			vec3 crAt = cross(constraint.relGlobalAnchorA, constraint.tangent);
@@ -1497,7 +1479,8 @@ void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collis
 				const float slop = -0.001f;
 				if (-contact.penetrationDepth < slop && vRel < 0.f)
 				{
-					constraint.bias = -contact.restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) / dt;
+					float restitution = (float)(contact.friction_restitution & 0xFFFF) / (float)0xFFFF;
+					constraint.bias = -restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) / dt;
 				}
 			}
 		}
@@ -1513,8 +1496,8 @@ void solveCollisionVelocityConstraints(collision_contact* contacts, collision_co
 		collision_contact& contact = contacts[i];
 		collision_constraint& constraint = constraints[i];
 
-		auto& rbA = contact.rbA != UINT16_MAX ? rbs[contact.rbA] : dummyRigidBody;
-		auto& rbB = contact.rbB != UINT16_MAX ? rbs[contact.rbB] : dummyRigidBody;
+		auto& rbA = rbs[contact.rbA];
+		auto& rbB = rbs[contact.rbB];
 
 		if (rbA.invMass == 0.f && rbB.invMass == 0.f)
 		{
@@ -1526,7 +1509,7 @@ void solveCollisionVelocityConstraints(collision_contact* contacts, collision_co
 		vec3 vB = rbB.linearVelocity;
 		vec3 wB = rbB.angularVelocity;
 
-		{ // Tangent dir
+		{ // Tangent dir.
 			vec3 anchorVelocityA = vA + cross(wA, constraint.relGlobalAnchorA);
 			vec3 anchorVelocityB = vB + cross(wB, constraint.relGlobalAnchorB);
 
@@ -1534,7 +1517,8 @@ void solveCollisionVelocityConstraints(collision_contact* contacts, collision_co
 			float vt = dot(relVelocity, constraint.tangent);
 			float lambda = -constraint.effectiveMassInTangentDir * vt;
 
-			float maxFriction = contact.friction * constraint.impulseInNormalDir;
+			float friction = (float)(contact.friction_restitution >> 16) / (float)0xFFFF;
+			float maxFriction = friction * constraint.impulseInNormalDir;
 			assert(maxFriction >= 0.f);
 			float newImpulse = clamp(constraint.impulseInTangentDir + lambda, -maxFriction, maxFriction);
 			lambda = newImpulse - constraint.impulseInTangentDir;
@@ -1547,7 +1531,7 @@ void solveCollisionVelocityConstraints(collision_contact* contacts, collision_co
 			wB += rbB.invInertia * cross(constraint.relGlobalAnchorB, P);
 		}
 
-		{ // Normal dir
+		{ // Normal dir.
 			vec3 anchorVelocityA = vA + cross(wA, constraint.relGlobalAnchorA);
 			vec3 anchorVelocityB = vB + cross(wB, constraint.relGlobalAnchorB);
 
@@ -1569,6 +1553,410 @@ void solveCollisionVelocityConstraints(collision_contact* contacts, collision_co
 		rbA.angularVelocity = wA;
 		rbB.linearVelocity = vB;
 		rbB.angularVelocity = wB;
+	}
+}
+
+#include "core/math_simd.h"
+
+#if COLLISION_SIMD_WIDTH == 4
+typedef vec2x<floatx4> vec2w;
+typedef vec3x<floatx4> vec3w;
+typedef vec4x<floatx4> vec4w;
+typedef quatx<floatx4> quatw;
+typedef mat3x<floatx4> mat3w;
+typedef floatx4 floatw;
+typedef intx4 intw;
+#else
+typedef vec2x<floatx8> vec2w;
+typedef vec3x<floatx8> vec3w;
+typedef vec4x<floatx8> vec4w;
+typedef quatx<floatx8> quatw;
+typedef mat3x<floatx8> mat3w;
+typedef floatx8 floatw;
+typedef intx8 intw;
+#endif
+
+void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_global_state* rbs, collision_contact* contacts, uint32 numContacts,
+	uint16 dummyRigidBodyIndex, simd_collision_constraint& outConstraints, float dt)
+{
+	CPU_PROFILE_BLOCK("Initialize collision constraints SIMD");
+
+	struct alignas(32) simd_contact_pair
+	{
+		uint32 ab[COLLISION_SIMD_WIDTH];
+	};
+
+	struct alignas(32) simd_contact_slot
+	{
+		uint32 indices[COLLISION_SIMD_WIDTH];
+	};
+
+
+	simd_contact_slot* contactSlots = arena.allocate<simd_contact_slot>(numContacts);
+	uint32 numContactSlots = 0;
+
+
+	static const uint32 numBuckets = 16;
+	simd_contact_pair* pairBuckets[numBuckets];
+	simd_contact_slot* slotBuckets[numBuckets];
+	uint32 numEntriesPerBucket[numBuckets] = {};
+
+	intw invalid = ~0;
+
+	for (unsigned i = 0; i < numBuckets; ++i)
+	{
+		pairBuckets[i] = arena.allocate<simd_contact_pair>(numContacts + 1);
+		slotBuckets[i] = arena.allocate<simd_contact_slot>(numContacts);
+
+		// Add padding with invalid data so we don't have to range check.
+		invalid.store((int*)pairBuckets[i]->ab);
+	}
+
+	for (uint32 i = 0; i < numContacts; ++i) 
+	{
+		collision_contact& contact = contacts[i];
+
+		// If one of the bodies is the dummy, just set it to the other for the comparison below.
+		uint16 rbA = (contact.rbA == dummyRigidBodyIndex) ? contact.rbB : contact.rbA;
+		uint16 rbB = (contact.rbB == dummyRigidBodyIndex) ? contact.rbA : contact.rbB;
+
+		uint32 bucket = i % numBuckets;
+		simd_contact_pair* pairs = pairBuckets[bucket];
+		simd_contact_slot* slots = slotBuckets[bucket];
+
+
+#if COLLISION_SIMD_WIDTH == 4
+		intw a = _mm_set1_epi16(rbA);
+		intw b = _mm_set1_epi16(rbB);
+		intw scheduled;
+
+		uint32 j = 0;
+		for (;; ++j)
+		{
+			scheduled = _mm_load_si128((const __m128i*)pairs[j].ab);
+
+			__m128i conflictsWithThisSlot = _mm_packs_epi16(_mm_cmpeq_epi16(a, scheduled), _mm_cmpeq_epi16(b, scheduled));
+			if (!_mm_movemask_epi8(conflictsWithThisSlot))
+			{
+				break;
+			}
+		}
+#else
+		intw a = _mm256_set1_epi16(rbA);
+		intw b = _mm256_set1_epi16(rbB);
+		intw scheduled;
+
+		uint32 j = 0;
+		for (;; ++j)
+		{
+			scheduled = _mm256_load_si256((const __m256i*)pairs[j].ab);
+
+			__m256i conflictsWithThisSlot = _mm256_packs_epi16(_mm256_cmpeq_epi16(a, scheduled), _mm256_cmpeq_epi16(b, scheduled));
+			if (!_mm256_movemask_epi8(conflictsWithThisSlot))
+			{
+				break;
+			}
+		}
+
+#endif
+
+		// Hardcoded until here.
+
+
+		uint32 lane = indexOfLeastSignificantSetBit(toBitMask(reinterpret(scheduled == invalid)));
+
+		simd_contact_pair* pair = pairs + j;
+		simd_contact_slot* slot = slots + j;
+
+		slot->indices[lane] = i;
+		pair->ab[lane] = ((uint32)contact.rbA << 16) | contact.rbB; // Use the original indices here.
+
+		uint32& count = numEntriesPerBucket[bucket];
+		if (j == count)
+		{
+			// We used a new entry.
+			++count;
+
+			// Set entry at end to invalid.
+			invalid.store((int*)pairs[count].ab);
+		}
+		else if (lane == COLLISION_SIMD_WIDTH - 1)
+		{
+			// This entry is full -> commit it.
+			intw indices = (int32*)slot->indices;
+
+			// Swap and pop.
+			--count;
+			*pair = pairs[count];
+			*slot = slots[count];
+
+			indices.store((int32*)contactSlots[numContactSlots++].indices);
+
+			// Set entry at end to invalid.
+			invalid.store((int*)pairs[count].ab);
+		}
+	}
+
+	// There are still entries left, where not all lanes are filled. We replace these indices with the first in this entry.
+
+	for (uint32 bucket = 0; bucket < numBuckets; ++bucket)
+	{
+		simd_contact_pair* pairs = pairBuckets[bucket];
+		simd_contact_slot* slots = slotBuckets[bucket];
+		uint32 count = numEntriesPerBucket[bucket];
+
+		for (uint32 i = 0; i < count; ++i)
+		{
+			intw ab = (int32*)pairs[i].ab;
+			intw indices = (int32_t*)slots[i].indices;
+
+			// Hardcoded to 4-wide!
+#if COLLISION_SIMD_WIDTH == 4
+			intw firstIndex = _mm_shuffle_epi32(indices, _MM_SHUFFLE(0, 0, 0, 0));
+#else
+			intw firstIndex = _mm256_shuffle_epi32(indices, _MM_SHUFFLE(0, 0, 0, 0));
+			firstIndex = _mm256_permute2x128_si256(firstIndex, firstIndex, 0 | (0 << 4));
+#endif
+
+			auto mask = ab == invalid;
+			indices = ifThen(mask, firstIndex, indices);
+			indices.store((int32*)contactSlots[numContactSlots++].indices);
+		}
+	}
+
+
+
+	// Initialize constraints.
+
+	outConstraints.numBatches = numContactSlots;
+	outConstraints.batches = arena.allocate<simd_collision_batch>(outConstraints.numBatches);
+
+	const floatw zero(0.f);
+	const floatw slop = -0.001f;
+	const floatw scale = 0.1f;
+	const floatw invDt = 1.f / dt;
+
+	for (uint32 i = 0; i < numContactSlots; ++i)
+	{
+		simd_contact_slot& slot = contactSlots[i];
+		simd_collision_batch& batch = outConstraints.batches[i];
+
+		uint16 contactIndices[COLLISION_SIMD_WIDTH];
+		for (uint32 j = 0; j < COLLISION_SIMD_WIDTH; ++j)
+		{
+			contactIndices[j] = (uint16)slot.indices[j];
+			batch.rbAIndices[j] = contacts[slot.indices[j]].rbA;
+			batch.rbBIndices[j] = contacts[slot.indices[j]].rbB;
+		}
+
+		vec3w point, normal;
+		floatw penetrationDepth, friction_restitutionF;
+		load8((float*)contacts, contactIndices, (uint32)sizeof(collision_contact),
+			point.x, point.y, point.z, penetrationDepth, normal.x, normal.y, normal.z, friction_restitutionF);
+		intw friction_restitution = reinterpret(friction_restitutionF);
+
+		floatw friction = convert(friction_restitution >> 16) / floatw(0xFFFF);
+		floatw restitution = convert(friction_restitution & 0xFFFF) / floatw(0xFFFF);
+
+
+		// Load body A.
+		vec3w vA, wA;
+		mat3w invInertiaA;
+		floatw invMassA;
+		vec3w positionA;
+		floatw unused;
+
+		load8((float*)&rbs->linearVelocity, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			vA.x, vA.y, vA.z, wA.x, wA.y, wA.z, invInertiaA.m00, invInertiaA.m10);
+
+		load8((float*)&rbs->invInertia.m20, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m20, invInertiaA.m01, invInertiaA.m11, invInertiaA.m21,
+			invInertiaA.m02, invInertiaA.m12, invInertiaA.m22, invMassA);
+
+		load4((float*)&rbs->position, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			positionA.x, positionA.y, positionA.z, unused);
+
+
+		// Load body B.
+		vec3w vB, wB;
+		mat3w invInertiaB;
+		floatw invMassB;
+		vec3w positionB;
+
+		load8((float*)&rbs->linearVelocity, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			vB.x, vB.y, vB.z, wB.x, wB.y, wB.z, invInertiaB.m00, invInertiaB.m10);
+
+		load8((float*)&rbs->invInertia.m20, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m20, invInertiaB.m01, invInertiaB.m11, invInertiaB.m21,
+			invInertiaB.m02, invInertiaB.m12, invInertiaB.m22, invMassB);
+
+		load4((float*)&rbs->position, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			positionB.x, positionB.y, positionB.z, unused);
+
+
+
+
+
+		vec3w relGlobalAnchorA = point - positionA;
+		vec3w relGlobalAnchorB = point - positionB;
+
+		vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
+		vec3w anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
+
+		vec3w relVelocity = anchorVelocityB - anchorVelocityA;
+		vec3w tangent = relVelocity - dot(normal, relVelocity) * normal;
+		tangent = noz(tangent);
+
+
+		relGlobalAnchorA.x.store(batch.relGlobalAnchorA[0]);
+		relGlobalAnchorA.y.store(batch.relGlobalAnchorA[1]);
+		relGlobalAnchorA.z.store(batch.relGlobalAnchorA[2]);
+
+		relGlobalAnchorB.x.store(batch.relGlobalAnchorB[0]);
+		relGlobalAnchorB.y.store(batch.relGlobalAnchorB[1]);
+		relGlobalAnchorB.z.store(batch.relGlobalAnchorB[2]);
+
+		normal.x.store(batch.normal[0]);
+		normal.y.store(batch.normal[1]);
+		normal.z.store(batch.normal[2]);
+
+		tangent.x.store(batch.tangent[0]);
+		tangent.y.store(batch.tangent[1]);
+		tangent.z.store(batch.tangent[2]);
+
+		zero.store(batch.impulseInNormalDir);
+		zero.store(batch.impulseInTangentDir);
+		friction.store(batch.friction);
+
+
+
+		{ // Tangent direction.
+			vec3w crAt = cross(relGlobalAnchorA, tangent);
+			vec3w crBt = cross(relGlobalAnchorB, tangent);
+			floatw invMassInTangentDir = invMassA + dot(crAt, invInertiaA * crAt)
+									   + invMassB + dot(crBt, invInertiaB * crBt);
+			floatw effectiveMassInTangentDir = ifThen(invMassInTangentDir != zero, 1.f / invMassInTangentDir, zero);
+			effectiveMassInTangentDir.store(batch.effectiveMassInTangentDir);
+		}
+		
+
+		{ // Normal direction.
+			vec3w crAn = cross(relGlobalAnchorA, normal);
+			vec3w crBn = cross(relGlobalAnchorB, normal);
+			floatw invMassInNormalDir = invMassA + dot(crAn, invInertiaA * crAn)
+									  + invMassB + dot(crBn, invInertiaB * crBn);
+			floatw effectiveMassInNormalDir = ifThen(invMassInNormalDir != zero, 1.f / invMassInNormalDir, zero);
+
+			floatw bias = zero;
+
+			if (dt > 1e-5f)
+			{
+				floatw vRel = dot(normal, anchorVelocityB - anchorVelocityA);
+
+				floatw bounceBias = -restitution * vRel - scale * (-penetrationDepth - slop) * invDt;
+				bias = ifThen((-penetrationDepth < slop) & (vRel < zero), bounceBias, bias);
+			}
+
+			effectiveMassInNormalDir.store(batch.effectiveMassInNormalDir);
+			bias.store(batch.bias);
+		}
+	}
+
+}
+
+void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint& constraints, rigid_body_global_state* rbs)
+{
+	CPU_PROFILE_BLOCK("Solve collision constraints SIMD");
+
+	for (uint32 i = 0; i < constraints.numBatches; ++i)
+	{
+		simd_collision_batch& batch = constraints.batches[i];
+
+		// Load body A.
+		vec3w vA, wA;
+		mat3w invInertiaA;
+		floatw invMassA;
+
+		load8((float*)&rbs->linearVelocity, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			vA.x, vA.y, vA.z, wA.x, wA.y, wA.z, invInertiaA.m00, invInertiaA.m10);
+
+		load8((float*)&rbs->invInertia.m20, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m20, invInertiaA.m01, invInertiaA.m11, invInertiaA.m21,
+			invInertiaA.m02, invInertiaA.m12, invInertiaA.m22, invMassA);
+
+
+		// Load body B.
+		vec3w vB, wB;
+		mat3w invInertiaB;
+		floatw invMassB;
+
+		load8((float*)&rbs->linearVelocity, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			vB.x, vB.y, vB.z, wB.x, wB.y, wB.z, invInertiaB.m00, invInertiaB.m10);
+
+		load8((float*)&rbs->invInertia.m20, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m20, invInertiaB.m01, invInertiaB.m11, invInertiaB.m21,
+			invInertiaB.m02, invInertiaB.m12, invInertiaB.m22, invMassB);
+
+
+		// Load constraint.
+		vec3w relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
+		vec3w relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
+		vec3w normal(batch.normal[0], batch.normal[1], batch.normal[2]);
+		vec3w tangent(batch.tangent[0], batch.tangent[1], batch.tangent[2]);
+		floatw effectiveMassInNormalDir(batch.effectiveMassInNormalDir);
+		floatw effectiveMassInTangentDir(batch.effectiveMassInTangentDir);
+		floatw friction(batch.friction);
+		floatw impulseInNormalDir(batch.impulseInNormalDir);
+		floatw impulseInTangentDir(batch.impulseInTangentDir);
+		floatw bias(batch.bias);
+
+
+		{ // Tangent dir.
+			vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
+			vec3w anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
+
+			vec3w relVelocity = anchorVelocityB - anchorVelocityA;
+			floatw vt = dot(relVelocity, tangent);
+			floatw lambda = -effectiveMassInTangentDir * vt;
+
+			floatw maxFriction = friction * impulseInNormalDir;
+			floatw newImpulse = clamp(impulseInTangentDir + lambda, -maxFriction, maxFriction);
+			lambda = newImpulse - impulseInTangentDir;
+			impulseInTangentDir = newImpulse;
+
+			vec3w P = lambda * tangent;
+			vA -= invMassA * P;
+			wA -= invInertiaA * cross(relGlobalAnchorA, P);
+			vB += invMassB * P;
+			wB += invInertiaB * cross(relGlobalAnchorB, P);
+		}
+
+		{ // Normal dir.
+			vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
+			vec3w anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
+
+			vec3w relVelocity = anchorVelocityB - anchorVelocityA;
+			floatw vn = dot(relVelocity, normal);
+			floatw lambda = -effectiveMassInNormalDir * (vn - bias);
+			floatw impulse = maximum(impulseInNormalDir + lambda, 0.f);
+			lambda = impulse - impulseInNormalDir;
+			impulseInNormalDir = impulse;
+
+			vec3w P = lambda * normal;
+			vA -= invMassA * P;
+			wA -= invInertiaA * cross(relGlobalAnchorA, P);
+			vB += invMassB * P;
+			wB += invInertiaB * cross(relGlobalAnchorB, P);
+		}
+
+		impulseInNormalDir.store(batch.impulseInNormalDir);
+		impulseInTangentDir.store(batch.impulseInTangentDir);
+
+		store8((float*)&rbs->linearVelocity, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			vA.x, vA.y, vA.z, wA.x, wA.y, wA.z, invInertiaA.m00, invInertiaA.m10);
+
+		store8((float*)&rbs->linearVelocity, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			vB.x, vB.y, vB.z, wB.x, wB.y, wB.z, invInertiaB.m00, invInertiaB.m10);
 	}
 }
 
