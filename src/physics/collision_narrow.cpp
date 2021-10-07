@@ -1462,6 +1462,9 @@ void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collis
 			float invMassInTangentDir = rbA.invMass + dot(crAt, rbA.invInertia * crAt)
 				+ rbB.invMass + dot(crBt, rbB.invInertia * crBt);
 			constraint.effectiveMassInTangentDir = (invMassInTangentDir != 0.f) ? (1.f / invMassInTangentDir) : 0.f;
+
+			constraint.tangentImpulseToAngularVelocityA = rbA.invInertia * crAt;
+			constraint.tangentImpulseToAngularVelocityB = rbB.invInertia * crBt;
 		}
 
 		{ // Normal direction.
@@ -1483,6 +1486,9 @@ void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collis
 					constraint.bias = -restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) / dt;
 				}
 			}
+
+			constraint.normalImpulseToAngularVelocityA = rbA.invInertia * crAn;
+			constraint.normalImpulseToAngularVelocityB = rbB.invInertia * crBn;
 		}
 	}
 }
@@ -1526,9 +1532,9 @@ void solveCollisionVelocityConstraints(collision_contact* contacts, collision_co
 
 			vec3 P = lambda * constraint.tangent;
 			vA -= rbA.invMass * P;
-			wA -= rbA.invInertia * cross(constraint.relGlobalAnchorA, P);
+			wA -= constraint.tangentImpulseToAngularVelocityA * lambda;
 			vB += rbB.invMass * P;
-			wB += rbB.invInertia * cross(constraint.relGlobalAnchorB, P);
+			wB += constraint.tangentImpulseToAngularVelocityB * lambda;
 		}
 
 		{ // Normal dir.
@@ -1544,9 +1550,9 @@ void solveCollisionVelocityConstraints(collision_contact* contacts, collision_co
 
 			vec3 P = lambda * contact.normal;
 			vA -= rbA.invMass * P;
-			wA -= rbA.invInertia * cross(constraint.relGlobalAnchorA, P);
+			wA -= constraint.normalImpulseToAngularVelocityA * lambda;
 			vB += rbB.invMass * P;
-			wB += rbB.invInertia * cross(constraint.relGlobalAnchorB, P);
+			wB += constraint.normalImpulseToAngularVelocityB * lambda;
 		}
 
 		rbA.linearVelocity = vA;
@@ -1765,11 +1771,11 @@ void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_
 		floatw unused;
 
 		load8((float*)&rbs->linearVelocity, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
-			vA.x, vA.y, vA.z, wA.x, wA.y, wA.z, invInertiaA.m00, invInertiaA.m10);
+			vA.x, vA.y, vA.z, wA.x, wA.y, wA.z, invMassA, invInertiaA.m00);
 
-		load8((float*)&rbs->invInertia.m20, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
-			invInertiaA.m20, invInertiaA.m01, invInertiaA.m11, invInertiaA.m21,
-			invInertiaA.m02, invInertiaA.m12, invInertiaA.m22, invMassA);
+		load8((float*)&rbs->invInertia.m10, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m10, invInertiaA.m20, invInertiaA.m01, invInertiaA.m11, 
+			invInertiaA.m21, invInertiaA.m02, invInertiaA.m12, invInertiaA.m22);
 
 		load4((float*)&rbs->position, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			positionA.x, positionA.y, positionA.z, unused);
@@ -1782,11 +1788,11 @@ void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_
 		vec3w positionB;
 
 		load8((float*)&rbs->linearVelocity, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
-			vB.x, vB.y, vB.z, wB.x, wB.y, wB.z, invInertiaB.m00, invInertiaB.m10);
+			vB.x, vB.y, vB.z, wB.x, wB.y, wB.z, invMassB, invInertiaB.m00);
 
-		load8((float*)&rbs->invInertia.m20, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
-			invInertiaB.m20, invInertiaB.m01, invInertiaB.m11, invInertiaB.m21,
-			invInertiaB.m02, invInertiaB.m12, invInertiaB.m22, invMassB);
+		load8((float*)&rbs->invInertia.m10, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m10, invInertiaB.m20, invInertiaB.m01, invInertiaB.m11, 
+			invInertiaB.m21, invInertiaB.m02, invInertiaB.m12, invInertiaB.m22);
 
 		load4((float*)&rbs->position, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			positionB.x, positionB.y, positionB.z, unused);
@@ -1835,6 +1841,16 @@ void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_
 									   + invMassB + dot(crBt, invInertiaB * crBt);
 			floatw effectiveMassInTangentDir = ifThen(invMassInTangentDir != zero, 1.f / invMassInTangentDir, zero);
 			effectiveMassInTangentDir.store(batch.effectiveMassInTangentDir);
+
+			vec3w tangentImpulseToAngularVelocityA = invInertiaA * crAt;
+			tangentImpulseToAngularVelocityA.x.store(batch.tangentImpulseToAngularVelocityA[0]);
+			tangentImpulseToAngularVelocityA.y.store(batch.tangentImpulseToAngularVelocityA[1]);
+			tangentImpulseToAngularVelocityA.z.store(batch.tangentImpulseToAngularVelocityA[2]);
+
+			vec3w tangentImpulseToAngularVelocityB = invInertiaB * crBt;
+			tangentImpulseToAngularVelocityB.x.store(batch.tangentImpulseToAngularVelocityB[0]);
+			tangentImpulseToAngularVelocityB.y.store(batch.tangentImpulseToAngularVelocityB[1]);
+			tangentImpulseToAngularVelocityB.z.store(batch.tangentImpulseToAngularVelocityB[2]);
 		}
 		
 
@@ -1857,6 +1873,16 @@ void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_
 
 			effectiveMassInNormalDir.store(batch.effectiveMassInNormalDir);
 			bias.store(batch.bias);
+
+			vec3w normalImpulseToAngularVelocityA = invInertiaA * crAn;
+			normalImpulseToAngularVelocityA.x.store(batch.normalImpulseToAngularVelocityA[0]);
+			normalImpulseToAngularVelocityA.y.store(batch.normalImpulseToAngularVelocityA[1]);
+			normalImpulseToAngularVelocityA.z.store(batch.normalImpulseToAngularVelocityA[2]);
+
+			vec3w normalImpulseToAngularVelocityB = invInertiaB * crBn;
+			normalImpulseToAngularVelocityB.x.store(batch.normalImpulseToAngularVelocityB[0]);
+			normalImpulseToAngularVelocityB.y.store(batch.normalImpulseToAngularVelocityB[1]);
+			normalImpulseToAngularVelocityB.z.store(batch.normalImpulseToAngularVelocityB[2]);
 		}
 	}
 
@@ -1872,28 +1898,20 @@ void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint& constraint
 
 		// Load body A.
 		vec3w vA, wA;
-		mat3w invInertiaA;
 		floatw invMassA;
+		floatw dummyA;
 
 		load8((float*)&rbs->linearVelocity, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
-			vA.x, vA.y, vA.z, wA.x, wA.y, wA.z, invInertiaA.m00, invInertiaA.m10);
-
-		load8((float*)&rbs->invInertia.m20, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
-			invInertiaA.m20, invInertiaA.m01, invInertiaA.m11, invInertiaA.m21,
-			invInertiaA.m02, invInertiaA.m12, invInertiaA.m22, invMassA);
+			vA.x, vA.y, vA.z, wA.x, wA.y, wA.z, invMassA, dummyA);
 
 
 		// Load body B.
 		vec3w vB, wB;
-		mat3w invInertiaB;
 		floatw invMassB;
+		floatw dummyB;
 
 		load8((float*)&rbs->linearVelocity, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
-			vB.x, vB.y, vB.z, wB.x, wB.y, wB.z, invInertiaB.m00, invInertiaB.m10);
-
-		load8((float*)&rbs->invInertia.m20, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
-			invInertiaB.m20, invInertiaB.m01, invInertiaB.m11, invInertiaB.m21,
-			invInertiaB.m02, invInertiaB.m12, invInertiaB.m22, invMassB);
+			vB.x, vB.y, vB.z, wB.x, wB.y, wB.z, invMassB, dummyB);
 
 
 		// Load constraint.
@@ -1908,6 +1926,8 @@ void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint& constraint
 		floatw impulseInTangentDir(batch.impulseInTangentDir);
 		floatw bias(batch.bias);
 
+		vec3w tangentImpulseToAngularVelocityA(batch.tangentImpulseToAngularVelocityA[0], batch.tangentImpulseToAngularVelocityA[1], batch.tangentImpulseToAngularVelocityA[2]);
+		vec3w tangentImpulseToAngularVelocityB(batch.tangentImpulseToAngularVelocityB[0], batch.tangentImpulseToAngularVelocityB[1], batch.tangentImpulseToAngularVelocityB[2]);
 
 		{ // Tangent dir.
 			vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
@@ -1924,10 +1944,13 @@ void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint& constraint
 
 			vec3w P = lambda * tangent;
 			vA -= invMassA * P;
-			wA -= invInertiaA * cross(relGlobalAnchorA, P);
+			wA -= tangentImpulseToAngularVelocityA * lambda;
 			vB += invMassB * P;
-			wB += invInertiaB * cross(relGlobalAnchorB, P);
+			wB += tangentImpulseToAngularVelocityB * lambda;
 		}
+
+		vec3w normalImpulseToAngularVelocityA(batch.normalImpulseToAngularVelocityA[0], batch.normalImpulseToAngularVelocityA[1], batch.normalImpulseToAngularVelocityA[2]);
+		vec3w normalImpulseToAngularVelocityB(batch.normalImpulseToAngularVelocityB[0], batch.normalImpulseToAngularVelocityB[1], batch.normalImpulseToAngularVelocityB[2]);
 
 		{ // Normal dir.
 			vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
@@ -1942,19 +1965,19 @@ void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint& constraint
 
 			vec3w P = lambda * normal;
 			vA -= invMassA * P;
-			wA -= invInertiaA * cross(relGlobalAnchorA, P);
+			wA -= normalImpulseToAngularVelocityA * lambda;
 			vB += invMassB * P;
-			wB += invInertiaB * cross(relGlobalAnchorB, P);
+			wB += normalImpulseToAngularVelocityB * lambda;
 		}
 
 		impulseInNormalDir.store(batch.impulseInNormalDir);
 		impulseInTangentDir.store(batch.impulseInTangentDir);
 
 		store8((float*)&rbs->linearVelocity, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
-			vA.x, vA.y, vA.z, wA.x, wA.y, wA.z, invInertiaA.m00, invInertiaA.m10);
+			vA.x, vA.y, vA.z, wA.x, wA.y, wA.z, invMassA, dummyA);
 
 		store8((float*)&rbs->linearVelocity, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
-			vB.x, vB.y, vB.z, wB.x, wB.y, wB.z, invInertiaB.m00, invInertiaB.m10);
+			vB.x, vB.y, vB.z, wB.x, wB.y, wB.z, invMassB, dummyB);
 	}
 }
 

@@ -30,6 +30,11 @@ struct collision_constraint
 	vec3 relGlobalAnchorB;
 	vec3 tangent;
 
+	vec3 tangentImpulseToAngularVelocityA;
+	vec3 tangentImpulseToAngularVelocityB;
+	vec3 normalImpulseToAngularVelocityA;
+	vec3 normalImpulseToAngularVelocityB;
+
 	float impulseInNormalDir;
 	float impulseInTangentDir;
 	float effectiveMassInNormalDir;
@@ -68,6 +73,12 @@ struct simd_collision_batch
 	float relGlobalAnchorB[3][COLLISION_SIMD_WIDTH];
 	float normal[3][COLLISION_SIMD_WIDTH];
 	float tangent[3][COLLISION_SIMD_WIDTH];
+
+	float normalImpulseToAngularVelocityA[3][COLLISION_SIMD_WIDTH];
+	float tangentImpulseToAngularVelocityA[3][COLLISION_SIMD_WIDTH];
+	float normalImpulseToAngularVelocityB[3][COLLISION_SIMD_WIDTH];
+	float tangentImpulseToAngularVelocityB[3][COLLISION_SIMD_WIDTH];
+
 	float effectiveMassInNormalDir[COLLISION_SIMD_WIDTH];
 	float effectiveMassInTangentDir[COLLISION_SIMD_WIDTH];
 	float friction[COLLISION_SIMD_WIDTH];

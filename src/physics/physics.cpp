@@ -652,8 +652,8 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 		vec3(0.f),
 		vec3(0.f),
 		vec3(0.f),
-		mat3::zero,
 		0.f,
+		mat3::zero,
 	};
 
 
