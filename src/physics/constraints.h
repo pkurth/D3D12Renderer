@@ -1,7 +1,11 @@
 #pragma once
 
 #include "core/math.h"
+#include "core/memory.h"
 #include "scene/scene.h"
+
+
+#define CONSTRAINT_SIMD_WIDTH 8
 
 enum constraint_type
 {
@@ -232,7 +236,59 @@ struct cone_twist_constraint_update
 
 
 
+// Collision constraint.
+
+struct collision_constraint
+{
+	vec3 relGlobalAnchorA;
+	vec3 relGlobalAnchorB;
+	vec3 tangent;
+
+	vec3 tangentImpulseToAngularVelocityA;
+	vec3 tangentImpulseToAngularVelocityB;
+	vec3 normalImpulseToAngularVelocityA;
+	vec3 normalImpulseToAngularVelocityB;
+
+	float impulseInNormalDir;
+	float impulseInTangentDir;
+	float effectiveMassInNormalDir;
+	float effectiveMassInTangentDir;
+	float bias;
+};
+
+struct simd_collision_constraint_batch
+{
+	float relGlobalAnchorA[3][CONSTRAINT_SIMD_WIDTH];
+	float relGlobalAnchorB[3][CONSTRAINT_SIMD_WIDTH];
+	float normal[3][CONSTRAINT_SIMD_WIDTH];
+	float tangent[3][CONSTRAINT_SIMD_WIDTH];
+
+	float normalImpulseToAngularVelocityA[3][CONSTRAINT_SIMD_WIDTH];
+	float tangentImpulseToAngularVelocityA[3][CONSTRAINT_SIMD_WIDTH];
+	float normalImpulseToAngularVelocityB[3][CONSTRAINT_SIMD_WIDTH];
+	float tangentImpulseToAngularVelocityB[3][CONSTRAINT_SIMD_WIDTH];
+
+	float effectiveMassInNormalDir[CONSTRAINT_SIMD_WIDTH];
+	float effectiveMassInTangentDir[CONSTRAINT_SIMD_WIDTH];
+	float friction[CONSTRAINT_SIMD_WIDTH];
+	float impulseInNormalDir[CONSTRAINT_SIMD_WIDTH];
+	float impulseInTangentDir[CONSTRAINT_SIMD_WIDTH];
+	float bias[CONSTRAINT_SIMD_WIDTH];
+
+	uint16 rbAIndices[CONSTRAINT_SIMD_WIDTH];
+	uint16 rbBIndices[CONSTRAINT_SIMD_WIDTH];
+};
+
+struct simd_collision_constraint
+{
+	simd_collision_constraint_batch* batches;
+	uint32 numBatches;
+};
+
+
+
 struct rigid_body_global_state;
+struct collision_contact;
 
 void initializeDistanceVelocityConstraints(game_scene& scene, rigid_body_global_state* rbs, const distance_constraint* input, distance_constraint_update* output, uint32 count, float dt);
 void solveDistanceVelocityConstraints(distance_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);
@@ -245,3 +301,13 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 
 void initializeConeTwistVelocityConstraints(game_scene& scene, rigid_body_global_state* rbs, const cone_twist_constraint* input, cone_twist_constraint_update* output, uint32 count, float dt);
 void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);
+
+
+
+void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collision_contact* contacts, collision_constraint* collisionConstraints, uint32 numContacts, float dt);
+void solveCollisionVelocityConstraints(collision_contact* contacts, collision_constraint* constraints, uint32 count, rigid_body_global_state* rbs);
+
+void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_global_state* rbs, collision_contact* contacts, uint32 numContacts,
+	uint16 dummyRigidBodyIndex, simd_collision_constraint& outConstraints, float dt);
+void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint& constraints, rigid_body_global_state* rbs);
+
