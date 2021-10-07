@@ -94,6 +94,9 @@ void initializeDistanceVelocityConstraints(game_scene& scene, rigid_body_global_
 		{
 			out.bias = (l - in.globalLength) * DISTANCE_CONSTRAINT_BETA / dt;
 		}
+
+		out.impulseToAngularVelocityA = globalA.invInertia * cross(out.relGlobalAnchorA, crAu);
+		out.impulseToAngularVelocityB = globalB.invInertia * cross(out.relGlobalAnchorB, crBu);
 	}
 }
 
@@ -115,9 +118,9 @@ void solveDistanceVelocityConstraints(distance_constraint_update* constraints, u
 		float lambda = -con.effectiveMass * Cdot;
 		vec3 P = lambda * con.u;
 		rbA.linearVelocity -= rbA.invMass * P;
-		rbA.angularVelocity -= rbA.invInertia * cross(con.relGlobalAnchorA, P);
+		rbA.angularVelocity -= con.impulseToAngularVelocityA * lambda;
 		rbB.linearVelocity += rbB.invMass * P;
-		rbB.angularVelocity += rbB.invInertia * cross(con.relGlobalAnchorB, P);
+		rbB.angularVelocity += con.impulseToAngularVelocityB * lambda;
 	}
 }
 
@@ -312,6 +315,9 @@ void initializeHingeJointVelocityConstraints(game_scene& scene, rigid_body_globa
 				out.maxMotorImpulse = in.maxMotorTorque * dt;
 				out.motorImpulse = 0.f;
 
+				out.motorAndLimitImpulseToAngularVelocityA = globalA.invInertia * out.globalRotationAxis;
+				out.motorAndLimitImpulseToAngularVelocityB = globalB.invInertia * out.globalRotationAxis;
+
 				out.motorVelocity = in.motorVelocity;
 				if (in.motorType == constraint_position_motor)
 				{
@@ -368,9 +374,8 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 			con.motorImpulse = clamp(con.motorImpulse + motorLambda, -con.maxMotorImpulse, con.maxMotorImpulse);
 			motorLambda = con.motorImpulse - oldImpulse;
 
-			vec3 P = globalRotationAxis * motorLambda;
-			wA -= rbA.invInertia * P;
-			wB += rbB.invInertia * P;
+			wA -= con.motorAndLimitImpulseToAngularVelocityA * motorLambda;
+			wB += con.motorAndLimitImpulseToAngularVelocityB * motorLambda;
 		}
 
 		// Limits.
@@ -391,9 +396,8 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 
 			limitLambda *= limitSign;
 
-			vec3 P = globalRotationAxis * limitLambda;
-			wA -= rbA.invInertia * P;
-			wB += rbB.invInertia * P;
+			wA -= con.motorAndLimitImpulseToAngularVelocityA * limitLambda;
+			wB += con.motorAndLimitImpulseToAngularVelocityB * limitLambda;
 		}
 
 		// Rotation part.
@@ -520,6 +524,9 @@ void initializeConeTwistVelocityConstraints(game_scene& scene, rigid_body_global
 			{
 				out.swingLimitBias = (in.swingLimit - swingAngle) * HINGE_LIMIT_CONSTRAINT_BETA / dt;
 			}
+
+			out.swingLimitImpulseToAngularVelocityA = globalA.invInertia * out.globalSwingAxis;
+			out.swingLimitImpulseToAngularVelocityB = globalB.invInertia * out.globalSwingAxis;
 		}
 
 		// Swing motor.
@@ -554,6 +561,9 @@ void initializeConeTwistVelocityConstraints(game_scene& scene, rigid_body_global
 				out.swingMotorVelocity = (dt > DT_THRESHOLD) ? (deltaAngle / dt * 0.2f) : 0.f;
 			}
 
+			out.swingMotorImpulseToAngularVelocityA = globalA.invInertia * out.globalSwingMotorAxis;
+			out.swingMotorImpulseToAngularVelocityB = globalB.invInertia * out.globalSwingMotorAxis;
+
 			float invEffectiveMotorMass = dot(out.globalSwingMotorAxis, globalA.invInertia * out.globalSwingMotorAxis)
 										+ dot(out.globalSwingMotorAxis, globalB.invInertia * out.globalSwingMotorAxis);
 			out.effectiveSwingMotorMass = (invEffectiveMotorMass != 0.f) ? (1.f / invEffectiveMotorMass) : 0.f;
@@ -578,6 +588,9 @@ void initializeConeTwistVelocityConstraints(game_scene& scene, rigid_body_global
 
 			out.maxTwistMotorImpulse = in.maxTwistMotorTorque * dt;
 			out.twistMotorImpulse = 0.f;
+
+			out.twistMotorAndLimitImpulseToAngularVelocityA = globalA.invInertia * out.globalTwistAxis;
+			out.twistMotorAndLimitImpulseToAngularVelocityB = globalB.invInertia * out.globalTwistAxis;
 
 			out.twistMotorVelocity = in.twistMotorVelocity;
 			if (in.twistMotorType == constraint_position_motor)
@@ -633,9 +646,8 @@ void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints
 			con.twistMotorImpulse = clamp(con.twistMotorImpulse + motorLambda, -con.maxTwistMotorImpulse, con.maxTwistMotorImpulse);
 			motorLambda = con.twistMotorImpulse - oldImpulse;
 
-			vec3 P = globalTwistAxis * motorLambda;
-			wA -= rbA.invInertia * P;
-			wB += rbB.invInertia * P;
+			wA -= con.twistMotorAndLimitImpulseToAngularVelocityA * motorLambda;
+			wB += con.twistMotorAndLimitImpulseToAngularVelocityB * motorLambda;
 		}
 
 		if (con.solveSwingMotor)
@@ -653,9 +665,8 @@ void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints
 			con.swingMotorImpulse = clamp(con.swingMotorImpulse + motorLambda, -con.maxSwingMotorImpulse, con.maxSwingMotorImpulse);
 			motorLambda = con.swingMotorImpulse - oldImpulse;
 
-			vec3 P = globalSwingMotorAxis * motorLambda;
-			wA -= rbA.invInertia * P;
-			wB += rbB.invInertia * P;
+			wA -= con.swingMotorImpulseToAngularVelocityA * motorLambda;
+			wB += con.swingMotorImpulseToAngularVelocityB * motorLambda;
 		}
 
 		// Twist.
@@ -676,9 +687,8 @@ void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints
 
 			limitLambda *= limitSign;
 
-			vec3 P = globalTwistAxis * limitLambda;
-			wA -= rbA.invInertia * P;
-			wB += rbB.invInertia * P;
+			wA -= con.twistMotorAndLimitImpulseToAngularVelocityA * limitLambda;
+			wB += con.twistMotorAndLimitImpulseToAngularVelocityB * limitLambda;
 		}
 
 		// Cone.
@@ -687,15 +697,14 @@ void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints
 			float aDotWA = dot(con.globalSwingAxis, wA);
 			float aDotWB = dot(con.globalSwingAxis, wB);
 			float swingLimitCdot = aDotWA - aDotWB + con.swingLimitBias;
-			float swingLimitLambda = -con.effectiveSwingLimitMass * swingLimitCdot;
+			float limitLambda = -con.effectiveSwingLimitMass * swingLimitCdot;
 
-			float impulse = max(con.swingImpulse + swingLimitLambda, 0.f);
-			swingLimitLambda = impulse - con.swingImpulse;
+			float impulse = max(con.swingImpulse + limitLambda, 0.f);
+			limitLambda = impulse - con.swingImpulse;
 			con.swingImpulse = impulse;
 
-			vec3 P = con.globalSwingAxis * swingLimitLambda;
-			wA += rbA.invInertia * P;
-			wB -= rbB.invInertia * P;
+			wA += con.swingLimitImpulseToAngularVelocityA * limitLambda;
+			wB -= con.swingLimitImpulseToAngularVelocityB * limitLambda;
 		}
 
 

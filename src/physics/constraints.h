@@ -70,6 +70,9 @@ struct distance_constraint_update
 	vec3 relGlobalAnchorA;
 	vec3 relGlobalAnchorB;
 
+	vec3 impulseToAngularVelocityA;
+	vec3 impulseToAngularVelocityB;
+
 	vec3 u;
 	float bias;
 	float effectiveMass;
@@ -156,6 +159,9 @@ struct hinge_joint_constraint_update
 	float motorImpulse;
 	float maxMotorImpulse;
 	float motorVelocity;
+
+	vec3 motorAndLimitImpulseToAngularVelocityA;
+	vec3 motorAndLimitImpulseToAngularVelocityB;
 };
 
 
@@ -232,6 +238,14 @@ struct cone_twist_constraint_update
 	float twistMotorImpulse;
 	float maxTwistMotorImpulse;
 	float twistMotorVelocity;
+
+	vec3 twistMotorAndLimitImpulseToAngularVelocityA;
+	vec3 twistMotorAndLimitImpulseToAngularVelocityB;
+
+	vec3 swingMotorImpulseToAngularVelocityA;
+	vec3 swingMotorImpulseToAngularVelocityB;
+	vec3 swingLimitImpulseToAngularVelocityA;
+	vec3 swingLimitImpulseToAngularVelocityB;
 };
 
 
