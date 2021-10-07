@@ -689,7 +689,16 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 
 		if (physicsSettings.simd)
 		{
-			initializeCollisionVelocityConstraintsSIMD(arena, rbGlobal, contacts, numContacts, dummyRigidBodyIndex, collisionConstraintsSIMD, dt);
+			simd_collision_metrics metrics;
+			initializeCollisionVelocityConstraintsSIMD(arena, rbGlobal, contacts, numContacts, dummyRigidBodyIndex, collisionConstraintsSIMD, dt, metrics);
+
+#if 0
+			std::cout << "Num contacts    " << metrics.numContacts << '\n';
+			std::cout << "SIMD width      " << metrics.simdWidth << '\n';
+			std::cout << "Num batches     " << metrics.numBatches << '\n';
+			std::cout << "Avg. fill rate  " << metrics.averageFillRate << '\n';
+			std::cout << "-----\n";
+#endif
 		}
 		else
 		{

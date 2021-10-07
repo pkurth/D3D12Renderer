@@ -242,7 +242,7 @@ mat3 transpose(const mat3& a)
 mat4 transpose(const mat4& a)
 {
 	mat4 result = a;
-	_MM_TRANSPOSE4_PS(result.f40.f, result.f41.f, result.f42.f, result.f43.f);
+	transpose(result.f40, result.f41, result.f42, result.f43);
 	return result;
 }
 

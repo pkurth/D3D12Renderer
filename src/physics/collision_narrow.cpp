@@ -1577,7 +1577,7 @@ typedef intx8 intw;
 #endif
 
 void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_global_state* rbs, collision_contact* contacts, uint32 numContacts,
-	uint16 dummyRigidBodyIndex, simd_collision_constraint& outConstraints, float dt)
+	uint16 dummyRigidBodyIndex, simd_collision_constraint& outConstraints, float dt, simd_collision_metrics& metrics)
 {
 	CPU_PROFILE_BLOCK("Initialize collision constraints SIMD");
 
@@ -1596,12 +1596,13 @@ void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_
 	uint32 numContactSlots = 0;
 
 
-	static const uint32 numBuckets = 16;
+	static const uint32 numBuckets = 4;
 	simd_contact_pair* pairBuckets[numBuckets];
 	simd_contact_slot* slotBuckets[numBuckets];
 	uint32 numEntriesPerBucket[numBuckets] = {};
 
 	intw invalid = ~0;
+
 
 	for (unsigned i = 0; i < numBuckets; ++i)
 	{
@@ -1660,8 +1661,6 @@ void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_
 
 #endif
 
-		// Hardcoded until here.
-
 
 		uint32 lane = indexOfLeastSignificantSetBit(toBitMask(reinterpret(scheduled == invalid)));
 
@@ -1710,13 +1709,7 @@ void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_
 			intw ab = (int32*)pairs[i].ab;
 			intw indices = (int32_t*)slots[i].indices;
 
-			// Hardcoded to 4-wide!
-#if COLLISION_SIMD_WIDTH == 4
-			intw firstIndex = _mm_shuffle_epi32(indices, _MM_SHUFFLE(0, 0, 0, 0));
-#else
-			intw firstIndex = _mm256_shuffle_epi32(indices, _MM_SHUFFLE(0, 0, 0, 0));
-			firstIndex = _mm256_permute2x128_si256(firstIndex, firstIndex, 0 | (0 << 4));
-#endif
+			intw firstIndex = fillWithFirstLane(indices);
 
 			auto mask = ab == invalid;
 			indices = ifThen(mask, firstIndex, indices);
@@ -1725,13 +1718,18 @@ void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_
 	}
 
 
+	metrics.simdWidth = COLLISION_SIMD_WIDTH;
+	metrics.numBatches = numContactSlots;
+	metrics.numContacts = numContacts;
+	metrics.averageFillRate = (float)numContacts / (float)(numContactSlots * COLLISION_SIMD_WIDTH);
+
 
 	// Initialize constraints.
 
 	outConstraints.numBatches = numContactSlots;
 	outConstraints.batches = arena.allocate<simd_collision_batch>(outConstraints.numBatches);
 
-	const floatw zero(0.f);
+	const floatw zero = floatw::zero();
 	const floatw slop = -0.001f;
 	const floatw scale = 0.1f;
 	const floatw invDt = 1.f / dt;
@@ -1938,7 +1936,7 @@ void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint& constraint
 			vec3w relVelocity = anchorVelocityB - anchorVelocityA;
 			floatw vn = dot(relVelocity, normal);
 			floatw lambda = -effectiveMassInNormalDir * (vn - bias);
-			floatw impulse = maximum(impulseInNormalDir + lambda, 0.f);
+			floatw impulse = maximum(impulseInNormalDir + lambda, floatw::zero());
 			lambda = impulse - impulseInNormalDir;
 			impulseInNormalDir = impulse;
 

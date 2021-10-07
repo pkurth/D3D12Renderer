@@ -15,10 +15,11 @@ struct contact_info
 
 struct collision_contact
 {
+	// Don't change the order here.
 	vec3 point;
 	float penetrationDepth;
 	vec3 normal;
-	uint32 friction_restitution; // Packed as 16 bit int each.
+	uint32 friction_restitution; // Packed as 16 bit int each. The packing makes it more convenient for the SIMD code to load the contact data.
 	uint16 rbA;
 	uint16 rbB;
 };
@@ -59,7 +60,7 @@ void solveCollisionVelocityConstraints(collision_contact* contacts, collision_co
 
 
 
-#define COLLISION_SIMD_WIDTH 4
+#define COLLISION_SIMD_WIDTH 8
 
 struct simd_collision_batch
 {
@@ -84,6 +85,14 @@ struct simd_collision_constraint
 	uint32 numBatches;
 };
 
+struct simd_collision_metrics
+{
+	uint32 simdWidth;
+	uint32 numContacts;
+	uint32 numBatches;
+	float averageFillRate;
+};
+
 void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_global_state* rbs, collision_contact* contacts, uint32 numContacts, 
-	uint16 dummyRigidBodyIndex, simd_collision_constraint& outConstraints, float dt);
+	uint16 dummyRigidBodyIndex, simd_collision_constraint& outConstraints, float dt, simd_collision_metrics& metrics);
 void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint& constraints, rigid_body_global_state* rbs);

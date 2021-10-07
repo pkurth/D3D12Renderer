@@ -20,9 +20,9 @@ union vec2x
 
 	static vec2x zero() 
 	{
-		if constexpr (std::is_same_v<simd_t, floatx4>) { return vec2x(zerox4(), zerox4()); }
-		else if constexpr (std::is_same_v<simd_t, floatx8>) { return vec2x(zerox8(), zerox8()); }
-		else if constexpr (std::is_same_v<simd_t, floatx16>) { return vec2x(zerox16(), zerox16()); }
+		if constexpr (std::is_same_v<simd_t, floatx4>) { return vec2x(floatx4::zero(), floatx4::zero()); }
+		else if constexpr (std::is_same_v<simd_t, floatx8>) { return vec2x(floatx8::zero(), floatx8::zero()); }
+		else if constexpr (std::is_same_v<simd_t, floatx16>) { return vec2x(floatx16::zero(), floatx16::zero()); }
 		else { static_assert(false); }
 	}
 };
@@ -53,9 +53,9 @@ union vec3x
 
 	static vec3x zero()
 	{
-		if constexpr (std::is_same_v<simd_t, floatx4>) { return vec3x(zerox4(), zerox4(), zerox4()); }
-		else if constexpr (std::is_same_v<simd_t, floatx8>) { return vec3x(zerox8(), zerox8(), zerox8()); }
-		else if constexpr (std::is_same_v<simd_t, floatx16>) { return vec3x(zerox16(), zerox16(), zerox16()); }
+		if constexpr (std::is_same_v<simd_t, floatx4>) { return vec3x(floatx4::zero(), floatx4::zero(), floatx4::zero()); }
+		else if constexpr (std::is_same_v<simd_t, floatx8>) { return vec3x(floatx8::zero(), floatx8::zero(), floatx8::zero()); }
+		else if constexpr (std::is_same_v<simd_t, floatx16>) { return vec3x(floatx16::zero(), floatx16::zero(), floatx16::zero()); }
 		else { static_assert(false); }
 	}
 };
@@ -91,9 +91,9 @@ union vec4x
 
 	static vec4x zero()
 	{
-		if constexpr (std::is_same_v<simd_t, floatx4>) { return vec4x(zerox4(), zerox4(), zerox4(), zerox4()); }
-		else if constexpr (std::is_same_v<simd_t, floatx8>) { return vec4x(zerox8(), zerox8(), zerox8(), zerox8()); }
-		else if constexpr (std::is_same_v<simd_t, floatx16>) { return vec4x(zerox16(), zerox16(), zerox16(), zerox16()); }
+		if constexpr (std::is_same_v<simd_t, floatx4>) { return vec4x(floatx4::zero(), floatx4::zero(), floatx4::zero(), floatx4::zero()); }
+		else if constexpr (std::is_same_v<simd_t, floatx8>) { return vec4x(floatx8::zero(), floatx8::zero(), floatx8::zero(), floatx8::zero()); }
+		else if constexpr (std::is_same_v<simd_t, floatx16>) { return vec4x(floatx16::zero(), floatx16::zero(), floatx16::zero(), floatx16::zero()); }
 		else { static_assert(false); }
 	}
 };

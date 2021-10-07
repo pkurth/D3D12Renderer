@@ -69,6 +69,9 @@ struct floatx4
 		baseAddress[indices.m128i_i32[3]] = this->f.m128_f32[3];
 	}
 #endif
+
+	static floatx4 allOnes() { const float nnan = (const float&)0xFFFFFFFF; return nnan; }
+	static floatx4 zero() { return _mm_setzero_ps(); }
 };
 
 struct intx4
@@ -113,10 +116,10 @@ struct intx4
 		baseAddress[indices.m128i_i32[3]] = this->i.m128i_i32[3];
 	}
 #endif
-};
 
-static floatx4 truex4() { const float nnan = (const float&)0xFFFFFFFF; return nnan; }
-static floatx4 zerox4() { return _mm_setzero_ps(); }
+	static intx4 allOnes() { return UINT32_MAX; }
+	static intx4 zero() { return _mm_setzero_si128(); }
+};
 
 static floatx4 convert(intx4 i) { return _mm_cvtepi32_ps(i); }
 static intx4 convert(floatx4 f) { return _mm_cvtps_epi32(f); }
@@ -142,14 +145,14 @@ static intx4& operator|=(intx4& a, intx4 b) { a = a | b; return a; }
 static intx4 operator^(intx4 a, intx4 b) { return _mm_xor_si128(a, b); }
 static intx4& operator^=(intx4& a, intx4 b) { a = a ^ b; return a; }
 
-static intx4 operator~(intx4 a) { a = andNot(a, reinterpret(truex4())); return a; }
+static intx4 operator~(intx4 a) { a = andNot(a, intx4::allOnes()); return a; }
 
 static intx4 operator>>(intx4 a, int b) { return _mm_srli_epi32(a, b); }
 static intx4& operator>>=(intx4& a, int b) { a = a >> b; return a; }
 static intx4 operator<<(intx4 a, int b) { return _mm_slli_epi32(a, b); }
 static intx4& operator<<=(intx4& a, int b) { a = a << b; return a; }
 
-static intx4 operator-(intx4 a) { return _mm_sub_epi32(_mm_setzero_si128(), a); }
+static intx4 operator-(intx4 a) { return _mm_sub_epi32(intx4::zero(), a); }
 
 
 
@@ -171,7 +174,7 @@ static floatx4& operator|=(floatx4& a, floatx4 b) { a = a | b; return a; }
 static floatx4 operator^(floatx4 a, floatx4 b) { return _mm_xor_ps(a, b); }
 static floatx4& operator^=(floatx4& a, floatx4 b) { a = a ^ b; return a; }
 
-static floatx4 operator~(floatx4 a) { a = andNot(a, truex4()); return a; }
+static floatx4 operator~(floatx4 a) { a = andNot(a, floatx4::allOnes()); return a; }
 
 
 static intx4 operator==(intx4 a, intx4 b) { return _mm_cmpeq_epi32(a, b); }
@@ -234,7 +237,7 @@ static floatx4 remap(floatx4 v, floatx4 oldL, floatx4 oldU, floatx4 newL, floatx
 static floatx4 clamp(floatx4 v, floatx4 l, floatx4 u) { return minimum(u, maximum(l, v)); }
 static floatx4 clamp01(floatx4 v) { return clamp(v, 0.f, 1.f); }
 
-static floatx4 signOf(floatx4 f) { return ifThen(f < 0.f, floatx4(-1), ifThen(f == 0.f, zerox4(), floatx4(1))); }
+static floatx4 signOf(floatx4 f) { floatx4 z = floatx4::zero(); return ifThen(f < z, floatx4(-1), ifThen(f == z, z, floatx4(1))); }
 static floatx4 signbit(floatx4 f) { return (f & -0.f) >> 31; }
 
 static floatx4 cos(floatx4 x) 
@@ -308,6 +311,17 @@ static floatx4 tanh(floatx4 x)
 	return (a - b) / (a + b);
 }
 
+static intx4 fillWithFirstLane(intx4 a)
+{
+	intx4 first = _mm_shuffle_epi32(a, _MM_SHUFFLE(0, 0, 0, 0));
+	return first;
+}
+
+static void transpose(floatx4& out0, floatx4& out1, floatx4& out2, floatx4& out3)
+{
+	_MM_TRANSPOSE4_PS(out0.f, out1.f, out2.f, out3.f);
+}
+
 static void load4(float* baseAddress, uint16* indices, uint32 stride,
 	floatx4& out0, floatx4& out1, floatx4& out2, floatx4& out3)
 {
@@ -318,7 +332,7 @@ static void load4(float* baseAddress, uint16* indices, uint32 stride,
 	out2 = floatx4(baseAddress + strideInFloats * indices[2]);
 	out3 = floatx4(baseAddress + strideInFloats * indices[3]);
 
-	_MM_TRANSPOSE4_PS(out0.f, out1.f, out2.f, out3.f);
+	transpose(out0, out1, out2, out3);
 }
 
 static void store4(float* baseAddress, uint16* indices, uint32 stride,
@@ -326,7 +340,7 @@ static void store4(float* baseAddress, uint16* indices, uint32 stride,
 {
 	const uint32 strideInFloats = stride / sizeof(float);
 
-	_MM_TRANSPOSE4_PS(in0.f, in1.f, in2.f, in3.f);
+	transpose(in0, in1, in2, in3);
 
 	in0.store(baseAddress + strideInFloats * indices[0]);
 	in1.store(baseAddress + strideInFloats * indices[1]);
@@ -348,8 +362,8 @@ static void load8(float* baseAddress, uint16* indices, uint32 stride,
 	out6 = floatx4(baseAddress + strideInFloats * indices[2] + 4);
 	out7 = floatx4(baseAddress + strideInFloats * indices[3] + 4);
 
-	_MM_TRANSPOSE4_PS(out0.f, out1.f, out2.f, out3.f);
-	_MM_TRANSPOSE4_PS(out4.f, out5.f, out6.f, out7.f);
+	transpose(out0, out1, out2, out3);
+	transpose(out4, out5, out6, out7);
 }
 
 static void store8(float* baseAddress, uint16* indices, uint32 stride,
@@ -357,8 +371,8 @@ static void store8(float* baseAddress, uint16* indices, uint32 stride,
 {
 	const uint32 strideInFloats = stride / sizeof(float);
 
-	_MM_TRANSPOSE4_PS(in0.f, in1.f, in2.f, in3.f);
-	_MM_TRANSPOSE4_PS(in4.f, in5.f, in6.f, in7.f);
+	transpose(in0, in1, in2, in3);
+	transpose(in4, in5, in6, in7);
 
 	in0.store(baseAddress + strideInFloats * indices[0]);
 	in1.store(baseAddress + strideInFloats * indices[1]);
@@ -419,6 +433,9 @@ struct floatx8
 		baseAddress[indices.m256i_i32[7]] = this->f.m256_f32[7];
 	}
 #endif
+
+	static floatx8 allOnes() { const float nnan = (const float&)0xFFFFFFFF; return nnan; }
+	static floatx8 zero() { return _mm256_setzero_ps(); }
 };
 
 struct intx8
@@ -466,10 +483,10 @@ struct intx8
 		baseAddress[indices.m256i_i32[7]] = this->i.m256i_i32[7];
 	}
 #endif
-};
 
-static floatx8 truex8() { const float nnan = (const float&)0xFFFFFFFF; return nnan; }
-static floatx8 zerox8() { return _mm256_setzero_ps(); }
+	static intx8 allOnes() { return UINT32_MAX; }
+	static intx8 zero() { return _mm256_setzero_si256(); }
+};
 
 static floatx8 convert(intx8 i) { return _mm256_cvtepi32_ps(i); }
 static intx8 convert(floatx8 f) { return _mm256_cvtps_epi32(f); }
@@ -495,14 +512,14 @@ static intx8& operator|=(intx8& a, intx8 b) { a = a | b; return a; }
 static intx8 operator^(intx8 a, intx8 b) { return _mm256_xor_si256(a, b); }
 static intx8& operator^=(intx8& a, intx8 b) { a = a ^ b; return a; }
 
-static intx8 operator~(intx8 a) { a = andNot(a, reinterpret(truex8())); return a; }
+static intx8 operator~(intx8 a) { a = andNot(a, intx8::allOnes()); return a; }
 
 static intx8 operator>>(intx8 a, int b) { return _mm256_srli_epi32(a, b); }
 static intx8& operator>>=(intx8& a, int b) { a = a >> b; return a; }
 static intx8 operator<<(intx8 a, int b) { return _mm256_slli_epi32(a, b); }
 static intx8& operator<<=(intx8& a, int b) { a = a << b; return a; }
 
-static intx8 operator-(intx8 a) { return _mm256_sub_epi32(_mm256_setzero_si256(), a); }
+static intx8 operator-(intx8 a) { return _mm256_sub_epi32(intx8::zero(), a); }
 
 
 
@@ -524,7 +541,7 @@ static floatx8& operator|=(floatx8& a, floatx8 b) { a = a | b; return a; }
 static floatx8 operator^(floatx8 a, floatx8 b) { return _mm256_xor_ps(a, b); }
 static floatx8& operator^=(floatx8& a, floatx8 b) { a = a ^ b; return a; }
 
-static floatx8 operator~(floatx8 a) { a = andNot(a, truex8()); return a; }
+static floatx8 operator~(floatx8 a) { a = andNot(a, floatx8::allOnes()); return a; }
 
 
 #if defined(SIMD_AVX_512)
@@ -618,17 +635,17 @@ static floatx8 remap(floatx8 v, floatx8 oldL, floatx8 oldU, floatx8 newL, floatx
 static floatx8 clamp(floatx8 v, floatx8 l, floatx8 u) { return minimum(u, maximum(l, v)); }
 static floatx8 clamp01(floatx8 v) { return clamp(v, 0.f, 1.f); }
 
-static floatx8 signOf(floatx8 f) { return ifThen(f < 0.f, floatx8(-1), ifThen(f == 0.f, zerox8(), floatx8(1))); }
+static floatx8 signOf(floatx8 f) { floatx8 z = floatx8::zero(); return ifThen(f < z, floatx8(-1), ifThen(f == z, z, floatx8(1))); }
 static floatx8 signbit(floatx8 f) { return (f & -0.f) >> 31; }
 
 static floatx8 cos(floatx8 x)
 {
-	static const floatx8 tp = 1.f / (2.f * 3.14159265359f);
-	static const floatx8 q = 0.25f;
-	static const floatx8 h = 0.5f;
-	static const floatx8 o = 1.f;
-	static const floatx8 s = 16.f;
-	static const floatx8 v = 0.225f;
+	const floatx8 tp = 1.f / (2.f * 3.14159265359f);
+	const floatx8 q = 0.25f;
+	const floatx8 h = 0.5f;
+	const floatx8 o = 1.f;
+	const floatx8 s = 16.f;
+	const floatx8 v = 0.225f;
 
 	x *= tp;
 	x -= q + floor(x + q);
@@ -686,6 +703,69 @@ static floatx8 tanh(floatx8 x)
 	return (a - b) / (a + b);
 }
 
+static floatx8 concat(floatx4 a, floatx4 b)
+{
+	return _mm256_insertf128_ps(_mm256_castps128_ps256(a), b, 1);
+}
+
+static intx8 concat(intx4 a, intx4 b)
+{
+	return _mm256_inserti128_si256(_mm256_castsi128_si256(a), b, 1);
+}
+
+static floatx8 concatLow(floatx8 a, floatx8 b)
+{
+	return _mm256_permute2f128_ps(a, b, 0 | (0 << 4));
+}
+
+static intx8 concatLow(intx8 a, intx8 b)
+{
+	return _mm256_permute2x128_si256(a, b, 0 | (0 << 4));
+}
+
+static intx8 fillWithFirstLane(intx8 a)
+{
+	intx8 first = _mm256_shuffle_epi32(a, _MM_SHUFFLE(0, 0, 0, 0));
+	first = concatLow(first, first);
+	return first;
+}
+
+static void transpose32(floatx8& out0, floatx8& out1, floatx8& out2, floatx8& out3)
+{
+	floatx8 t0 = _mm256_unpacklo_ps(out0, out1);
+	floatx8 t1 = _mm256_unpacklo_ps(out2, out3);
+	floatx8 t2 = _mm256_unpackhi_ps(out0, out1);
+	floatx8 t3 = _mm256_unpackhi_ps(out2, out3);
+	out0 = _mm256_shuffle_ps(t0, t1, _MM_SHUFFLE(1, 0, 1, 0));
+	out1 = _mm256_shuffle_ps(t0, t1, _MM_SHUFFLE(3, 2, 3, 2));
+	out2 = _mm256_shuffle_ps(t2, t3, _MM_SHUFFLE(1, 0, 1, 0));
+	out3 = _mm256_shuffle_ps(t2, t3, _MM_SHUFFLE(3, 2, 3, 2));
+}
+
+static void transpose(floatx8& out0, floatx8& out1, floatx8& out2, floatx8& out3, floatx8& out4, floatx8& out5, floatx8& out6, floatx8& out7)
+{
+	floatx8 tmp0 = reinterpret(_mm256_permute2x128_si256(reinterpret(out0), reinterpret(out4), 0 | (2 << 4)));
+	floatx8 tmp1 = reinterpret(_mm256_permute2x128_si256(reinterpret(out1), reinterpret(out5), 0 | (2 << 4)));
+	floatx8 tmp2 = reinterpret(_mm256_permute2x128_si256(reinterpret(out2), reinterpret(out6), 0 | (2 << 4)));
+	floatx8 tmp3 = reinterpret(_mm256_permute2x128_si256(reinterpret(out3), reinterpret(out7), 0 | (2 << 4)));
+	floatx8 tmp4 = reinterpret(_mm256_permute2x128_si256(reinterpret(out0), reinterpret(out4), 1 | (3 << 4)));
+	floatx8 tmp5 = reinterpret(_mm256_permute2x128_si256(reinterpret(out1), reinterpret(out5), 1 | (3 << 4)));
+	floatx8 tmp6 = reinterpret(_mm256_permute2x128_si256(reinterpret(out2), reinterpret(out6), 1 | (3 << 4)));
+	floatx8 tmp7 = reinterpret(_mm256_permute2x128_si256(reinterpret(out3), reinterpret(out7), 1 | (3 << 4)));
+
+	out0 = tmp0;
+	out1 = tmp1;
+	out2 = tmp2;
+	out3 = tmp3;
+	out4 = tmp4;
+	out5 = tmp5;
+	out6 = tmp6;
+	out7 = tmp7;
+
+	transpose32(out0, out1, out2, out3);
+	transpose32(out4, out5, out6, out7);
+}
+
 static void load4(float* baseAddress, uint16* indices, uint32 stride,
 	floatx8& out0, floatx8& out1, floatx8& out2, floatx8& out3)
 {
@@ -700,10 +780,12 @@ static void load4(float* baseAddress, uint16* indices, uint32 stride,
 	floatx4 tmp6(baseAddress + strideInFloats * indices[6]);
 	floatx4 tmp7(baseAddress + strideInFloats * indices[7]);
 
-	out0 = _mm256_insertf128_ps(_mm256_castps128_ps256(tmp0), tmp4, 1);
-	out1 = _mm256_insertf128_ps(_mm256_castps128_ps256(tmp1), tmp5, 1);
-	out2 = _mm256_insertf128_ps(_mm256_castps128_ps256(tmp2), tmp6, 1);
-	out3 = _mm256_insertf128_ps(_mm256_castps128_ps256(tmp3), tmp7, 1);
+	out0 = concat(tmp0, tmp4);
+	out1 = concat(tmp1, tmp5);
+	out2 = concat(tmp2, tmp6);
+	out3 = concat(tmp3, tmp7);
+
+	transpose32(out0, out1, out2, out3);
 }
 
 static void load8(float* baseAddress, uint16* indices, uint32 stride,
@@ -711,23 +793,16 @@ static void load8(float* baseAddress, uint16* indices, uint32 stride,
 {
 	const uint32 strideInFloats = stride / sizeof(float);
 
-	floatx8 tmp0(baseAddress + strideInFloats * indices[0]);
-	floatx8 tmp1(baseAddress + strideInFloats * indices[1]);
-	floatx8 tmp2(baseAddress + strideInFloats * indices[2]);
-	floatx8 tmp3(baseAddress + strideInFloats * indices[3]);
-	floatx8 tmp4(baseAddress + strideInFloats * indices[4]);
-	floatx8 tmp5(baseAddress + strideInFloats * indices[5]);
-	floatx8 tmp6(baseAddress + strideInFloats * indices[6]);
-	floatx8 tmp7(baseAddress + strideInFloats * indices[7]);
+	out0 = floatx8(baseAddress + strideInFloats * indices[0]);
+	out1 = floatx8(baseAddress + strideInFloats * indices[1]);
+	out2 = floatx8(baseAddress + strideInFloats * indices[2]);
+	out3 = floatx8(baseAddress + strideInFloats * indices[3]);
+	out4 = floatx8(baseAddress + strideInFloats * indices[4]);
+	out5 = floatx8(baseAddress + strideInFloats * indices[5]);
+	out6 = floatx8(baseAddress + strideInFloats * indices[6]);
+	out7 = floatx8(baseAddress + strideInFloats * indices[7]);
 
-	out0 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp0), _mm256_castps_si256(tmp4), 0 | (2 << 4)));
-	out1 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp1), _mm256_castps_si256(tmp5), 0 | (2 << 4)));
-	out2 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp2), _mm256_castps_si256(tmp6), 0 | (2 << 4)));
-	out3 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp3), _mm256_castps_si256(tmp7), 0 | (2 << 4)));
-	out4 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp0), _mm256_castps_si256(tmp4), 1 | (3 << 4)));
-	out5 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp1), _mm256_castps_si256(tmp5), 1 | (3 << 4)));
-	out6 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp2), _mm256_castps_si256(tmp6), 1 | (3 << 4)));
-	out7 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(tmp3), _mm256_castps_si256(tmp7), 1 | (3 << 4)));
+	transpose(out0, out1, out2, out3, out4, out5, out6, out7);
 }
 
 static void store8(float* baseAddress, uint16* indices, uint32 stride,
@@ -735,23 +810,16 @@ static void store8(float* baseAddress, uint16* indices, uint32 stride,
 {
 	const uint32 strideInFloats = stride / sizeof(float);
 
-	floatx8 tmp0 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in0), _mm256_castps_si256(in4), 0 | (2 << 4)));
-	floatx8 tmp1 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in1), _mm256_castps_si256(in5), 0 | (2 << 4)));
-	floatx8 tmp2 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in2), _mm256_castps_si256(in6), 0 | (2 << 4)));
-	floatx8 tmp3 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in3), _mm256_castps_si256(in7), 0 | (2 << 4)));
-	floatx8 tmp4 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in0), _mm256_castps_si256(in4), 1 | (3 << 4)));
-	floatx8 tmp5 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in1), _mm256_castps_si256(in5), 1 | (3 << 4)));
-	floatx8 tmp6 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in2), _mm256_castps_si256(in6), 1 | (3 << 4)));
-	floatx8 tmp7 = _mm256_castsi256_ps(_mm256_permute2x128_si256(_mm256_castps_si256(in3), _mm256_castps_si256(in7), 1 | (3 << 4)));
+	transpose(in0, in1, in2, in3, in4, in5, in6, in7);
 
-	tmp0.store(baseAddress + strideInFloats * indices[0]);
-	tmp1.store(baseAddress + strideInFloats * indices[1]);
-	tmp2.store(baseAddress + strideInFloats * indices[2]);
-	tmp3.store(baseAddress + strideInFloats * indices[3]);
-	tmp4.store(baseAddress + strideInFloats * indices[4]);
-	tmp5.store(baseAddress + strideInFloats * indices[5]);
-	tmp6.store(baseAddress + strideInFloats * indices[6]);
-	tmp7.store(baseAddress + strideInFloats * indices[7]);
+	in0.store(baseAddress + strideInFloats * indices[0]);
+	in1.store(baseAddress + strideInFloats * indices[1]);
+	in2.store(baseAddress + strideInFloats * indices[2]);
+	in3.store(baseAddress + strideInFloats * indices[3]);
+	in4.store(baseAddress + strideInFloats * indices[4]);
+	in5.store(baseAddress + strideInFloats * indices[5]);
+	in6.store(baseAddress + strideInFloats * indices[6]);
+	in7.store(baseAddress + strideInFloats * indices[7]);
 }
 
 
@@ -915,12 +983,12 @@ static floatx16 signbit(floatx16 f) { return (f & -0.f) >> 31; }
 
 static floatx16 cos(floatx16 x)
 {
-	static const floatx16 tp = 1.f / (2.f * 3.14159265359f);
-	static const floatx16 q = 0.25f;
-	static const floatx16 h = 0.5f;
-	static const floatx16 o = 1.f;
-	static const floatx16 s = 16.f;
-	static const floatx16 v = 0.225f;
+	const floatx16 tp = 1.f / (2.f * 3.14159265359f);
+	const floatx16 q = 0.25f;
+	const floatx16 h = 0.5f;
+	const floatx16 o = 1.f;
+	const floatx16 s = 16.f;
+	const floatx16 v = 0.225f;
 
 	x *= tp;
 	x -= q + floor(x + q);
