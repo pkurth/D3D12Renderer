@@ -610,8 +610,9 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	uint32 numPossibleCollisions = broadphase(scene, 0, worldSpaceAABBs, arena, possibleCollisions);
 	non_collision_interaction* nonCollisionInteractions = arena.allocate<non_collision_interaction>(numPossibleCollisions);
 	collision_contact* contacts = arena.allocate<collision_contact>(numPossibleCollisions * 4); // Each collision can have up to 4 contact points.
+	constraint_body_pair* collisionBodyPairs = arena.allocate<constraint_body_pair>(numPossibleCollisions * 4);
 
-	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, possibleCollisions, numPossibleCollisions, contacts, nonCollisionInteractions);
+	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, possibleCollisions, numPossibleCollisions, contacts, collisionBodyPairs, nonCollisionInteractions);
 
 	auto [globalForceField, numLocalForceFields] = getForceFieldStates(scene, ffGlobal);
 
@@ -689,11 +690,11 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 
 		if (physicsSettings.simd)
 		{
-			initializeCollisionVelocityConstraintsSIMD(arena, rbGlobal, contacts, numContacts, dummyRigidBodyIndex, collisionConstraintsSIMD, dt);
+			initializeCollisionVelocityConstraintsSIMD(arena, rbGlobal, contacts, collisionBodyPairs, numContacts, dummyRigidBodyIndex, collisionConstraintsSIMD, dt);
 		}
 		else
 		{
-			initializeCollisionVelocityConstraints(rbGlobal, contacts, collisionConstraints, numContacts, dt);
+			initializeCollisionVelocityConstraints(rbGlobal, contacts, collisionBodyPairs, collisionConstraints, numContacts, dt);
 		}
 		
 
@@ -718,7 +719,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 			}
 			else
 			{
-				solveCollisionVelocityConstraints(contacts, collisionConstraints, numContacts, rbGlobal);
+				solveCollisionVelocityConstraints(contacts, collisionConstraints, collisionBodyPairs, numContacts, rbGlobal);
 			}
 		}
 	}

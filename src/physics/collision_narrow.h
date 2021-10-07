@@ -19,8 +19,6 @@ struct collision_contact
 	float penetrationDepth;
 	vec3 normal;
 	uint32 friction_restitution; // Packed as 16 bit int each. The packing makes it more convenient for the SIMD code to load the contact data.
-	uint16 rbA;
-	uint16 rbB;
 };
 
 struct non_collision_interaction
@@ -37,6 +35,6 @@ struct narrowphase_result
 };
 
 narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions,
-	collision_contact* outContacts, non_collision_interaction* outNonCollisionInteractions);
+	collision_contact* outContacts, constraint_body_pair* outBodyPairs, non_collision_interaction* outNonCollisionInteractions);
 
 

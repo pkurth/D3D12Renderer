@@ -42,6 +42,10 @@ static const char* constraintMotorTypeNames[] =
 	"Position",
 };
 
+struct constraint_body_pair
+{
+	uint16 rbA, rbB;
+};
 
 
 struct physics_constraint
@@ -318,10 +322,10 @@ void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints
 
 
 
-void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collision_contact* contacts, collision_constraint* collisionConstraints, uint32 numContacts, float dt);
-void solveCollisionVelocityConstraints(collision_contact* contacts, collision_constraint* constraints, uint32 count, rigid_body_global_state* rbs);
+void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collision_contact* contacts, constraint_body_pair* bodyPairs, collision_constraint* collisionConstraints, uint32 numContacts, float dt);
+void solveCollisionVelocityConstraints(collision_contact* contacts, collision_constraint* constraints, constraint_body_pair* bodyPairs, uint32 count, rigid_body_global_state* rbs);
 
-void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_global_state* rbs, collision_contact* contacts, uint32 numContacts,
+void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_global_state* rbs, collision_contact* contacts, constraint_body_pair* bodyPairs, uint32 numContacts,
 	uint16 dummyRigidBodyIndex, simd_collision_constraint& outConstraints, float dt);
 void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint& constraints, rigid_body_global_state* rbs);
 

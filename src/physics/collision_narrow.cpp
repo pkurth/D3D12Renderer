@@ -1362,7 +1362,7 @@ static bool overlapCheck(collider_union* worldSpaceColliders, broadphase_collisi
 }
 
 narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions,
-	collision_contact* outContacts, non_collision_interaction* outNonCollisionInteractions)
+	collision_contact* outContacts, constraint_body_pair* outBodyPairs, non_collision_interaction* outNonCollisionInteractions)
 {
 	CPU_PROFILE_BLOCK("Narrow phase");
 
@@ -1416,13 +1416,18 @@ narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_c
 
 				for (uint32 contactIndex = 0; contactIndex < contact.numContacts; ++contactIndex)
 				{
-					collision_contact& out = outContacts[numContacts++];
+					collision_contact& out = outContacts[numContacts];
+					constraint_body_pair& pair = outBodyPairs[numContacts];
+
 					out.normal = contact.collisionNormal;
 					out.penetrationDepth = contact.contacts[contactIndex].penetrationDepth;
 					out.point = contact.contacts[contactIndex].point;
-					out.rbA = rbA;
-					out.rbB = rbB;
 					out.friction_restitution = friction_restitution;
+
+					pair.rbA = rbA;
+					pair.rbB = rbB;
+
+					++numContacts;
 				}
 			}
 		}

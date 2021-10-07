@@ -734,7 +734,7 @@ void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints
 
 
 
-void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collision_contact* contacts, collision_constraint* collisionConstraints, uint32 numContacts, float dt)
+void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collision_contact* contacts, constraint_body_pair* bodyPairs, collision_constraint* collisionConstraints, uint32 numContacts, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize collision constraints");
 
@@ -742,9 +742,10 @@ void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collis
 	{
 		collision_constraint& constraint = collisionConstraints[contactID];
 		collision_contact& contact = contacts[contactID];
+		constraint_body_pair& pair = bodyPairs[contactID];
 
-		auto& rbA = rbs[contact.rbA];
-		auto& rbB = rbs[contact.rbB];
+		auto& rbA = rbs[pair.rbA];
+		auto& rbB = rbs[pair.rbB];
 
 		constraint.impulseInNormalDir = 0.f;
 		constraint.impulseInTangentDir = 0.f;
@@ -796,7 +797,7 @@ void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collis
 	}
 }
 
-void solveCollisionVelocityConstraints(collision_contact* contacts, collision_constraint* constraints, uint32 count, rigid_body_global_state* rbs)
+void solveCollisionVelocityConstraints(collision_contact* contacts, collision_constraint* constraints, constraint_body_pair* bodyPairs, uint32 count, rigid_body_global_state* rbs)
 {
 	CPU_PROFILE_BLOCK("Solve collision constraints");
 
@@ -804,9 +805,10 @@ void solveCollisionVelocityConstraints(collision_contact* contacts, collision_co
 	{
 		collision_contact& contact = contacts[i];
 		collision_constraint& constraint = constraints[i];
+		constraint_body_pair& pair = bodyPairs[i];
 
-		auto& rbA = rbs[contact.rbA];
-		auto& rbB = rbs[contact.rbB];
+		auto& rbA = rbs[pair.rbA];
+		auto& rbB = rbs[pair.rbB];
 
 		if (rbA.invMass == 0.f && rbB.invMass == 0.f)
 		{
@@ -875,7 +877,7 @@ struct alignas(32) simd_constraint_slot
 	uint32 indices[CONSTRAINT_SIMD_WIDTH];
 };
 
-static uint32 scheduleConstraintsSIMD(memory_arena& arena, collision_contact* contacts, uint32 numContacts, uint16 dummyRigidBodyIndex, simd_constraint_slot* outConstraintSlots)
+static uint32 scheduleConstraintsSIMD(memory_arena& arena, constraint_body_pair* bodyPairs, uint32 numBodyPairs, uint16 dummyRigidBodyIndex, simd_constraint_slot* outConstraintSlots)
 {
 	CPU_PROFILE_BLOCK("Schedule constraints SIMD");
 
@@ -888,7 +890,7 @@ static uint32 scheduleConstraintsSIMD(memory_arena& arena, collision_contact* co
 
 	intw invalid = ~0;
 
-	uint32 numAllocationsPerBucket = bucketize(numContacts, numBuckets);
+	uint32 numAllocationsPerBucket = bucketize(numBodyPairs, numBuckets);
 
 	memory_marker marker = arena.getMarker();
 
@@ -901,13 +903,13 @@ static uint32 scheduleConstraintsSIMD(memory_arena& arena, collision_contact* co
 		invalid.store((int*)pairBuckets[i]->ab);
 	}
 
-	for (uint32 i = 0; i < numContacts; ++i)
+	for (uint32 i = 0; i < numBodyPairs; ++i)
 	{
-		collision_contact& contact = contacts[i];
+		constraint_body_pair bodyPair = bodyPairs[i];
 
 		// If one of the bodies is the dummy, just set it to the other for the comparison below.
-		uint16 rbA = (contact.rbA == dummyRigidBodyIndex) ? contact.rbB : contact.rbA;
-		uint16 rbB = (contact.rbB == dummyRigidBodyIndex) ? contact.rbA : contact.rbB;
+		uint16 rbA = (bodyPair.rbA == dummyRigidBodyIndex) ? bodyPair.rbB : bodyPair.rbA;
+		uint16 rbB = (bodyPair.rbB == dummyRigidBodyIndex) ? bodyPair.rbA : bodyPair.rbB;
 
 		uint32 bucket = i % numBuckets;
 		simd_constraint_body_pair* pairs = pairBuckets[bucket];
@@ -956,7 +958,7 @@ static uint32 scheduleConstraintsSIMD(memory_arena& arena, collision_contact* co
 		simd_constraint_slot* slot = slots + j;
 
 		slot->indices[lane] = i;
-		pair->ab[lane] = ((uint32)contact.rbA << 16) | contact.rbB; // Use the original indices here.
+		pair->ab[lane] = ((uint32)bodyPair.rbA << 16) | bodyPair.rbB; // Use the original indices here.
 
 		uint32& count = numEntriesPerBucket[bucket];
 		if (j == count)
@@ -1010,13 +1012,13 @@ static uint32 scheduleConstraintsSIMD(memory_arena& arena, collision_contact* co
 	return numConstraintSlots;
 }
 
-void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_global_state* rbs, collision_contact* contacts, uint32 numContacts,
+void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_global_state* rbs, collision_contact* contacts, constraint_body_pair* bodyPairs, uint32 numContacts,
 	uint16 dummyRigidBodyIndex, simd_collision_constraint& outConstraints, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize collision constraints SIMD");
 
 	simd_constraint_slot* contactSlots = arena.allocate<simd_constraint_slot>(numContacts);
-	uint32 numContactSlots = scheduleConstraintsSIMD(arena, contacts, numContacts, dummyRigidBodyIndex, contactSlots);
+	uint32 numContactSlots = scheduleConstraintsSIMD(arena, bodyPairs, numContacts, dummyRigidBodyIndex, contactSlots);
 
 	outConstraints.numBatches = numContactSlots;
 	outConstraints.batches = arena.allocate<simd_collision_constraint_batch>(outConstraints.numBatches);
@@ -1035,8 +1037,8 @@ void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_
 		for (uint32 j = 0; j < CONSTRAINT_SIMD_WIDTH; ++j)
 		{
 			contactIndices[j] = (uint16)slot.indices[j];
-			batch.rbAIndices[j] = contacts[slot.indices[j]].rbA;
-			batch.rbBIndices[j] = contacts[slot.indices[j]].rbB;
+			batch.rbAIndices[j] = bodyPairs[slot.indices[j]].rbA;
+			batch.rbBIndices[j] = bodyPairs[slot.indices[j]].rbB;
 		}
 
 		vec3w point, normal;
