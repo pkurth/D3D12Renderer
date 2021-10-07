@@ -51,26 +51,19 @@ void initializeDistanceVelocityConstraints(game_scene& scene, rigid_body_global_
 		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
 		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
 
-		transform_component& transformA = entityA.getComponent<transform_component>();
-		transform_component& transformB = entityB.getComponent<transform_component>();
-
 		out.rigidBodyIndexA = (uint16)(&rbA - rbBase);
 		out.rigidBodyIndexB = (uint16)(&rbB - rbBase);
 
 		rigid_body_global_state& globalA = rbs[out.rigidBodyIndexA];
 		rigid_body_global_state& globalB = rbs[out.rigidBodyIndexB];
 
-		// Relative to entity's origin.
-		vec3 relGlobalAnchorA = transformA.rotation * in.localAnchorA;
-		vec3 relGlobalAnchorB = transformA.rotation * in.localAnchorB;
+		// Relative to COG.
+		out.relGlobalAnchorA = globalA.rotation * (in.localAnchorA - rbA.localCOGPosition);
+		out.relGlobalAnchorB = globalB.rotation * (in.localAnchorB - rbB.localCOGPosition);
 
 		// Global.
-		vec3 globalAnchorA = transformA.position + relGlobalAnchorA;
-		vec3 globalAnchorB = transformB.position + relGlobalAnchorB;
-
-		// Relative to COG.
-		out.relGlobalAnchorA = transformA.rotation * (in.localAnchorA - rbA.localCOGPosition);
-		out.relGlobalAnchorB = transformB.rotation * (in.localAnchorB - rbB.localCOGPosition);
+		vec3 globalAnchorA = globalA.position + out.relGlobalAnchorA;
+		vec3 globalAnchorB = globalB.position + out.relGlobalAnchorB;
 
 		out.u = globalAnchorB - globalAnchorA;
 		float l = length(out.u);
@@ -141,26 +134,19 @@ void initializeBallJointVelocityConstraints(game_scene& scene, rigid_body_global
 		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
 		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
 
-		transform_component& transformA = entityA.getComponent<transform_component>();
-		transform_component& transformB = entityB.getComponent<transform_component>();
-
 		out.rigidBodyIndexA = (uint16)(&rbA - rbBase);
 		out.rigidBodyIndexB = (uint16)(&rbB - rbBase);
 
 		rigid_body_global_state& globalA = rbs[out.rigidBodyIndexA];
 		rigid_body_global_state& globalB = rbs[out.rigidBodyIndexB];
 
-		// Relative to entity's origin.
-		vec3 relGlobalAnchorA = transformA.rotation * in.localAnchorA;
-		vec3 relGlobalAnchorB = transformB.rotation * in.localAnchorB;
+		// Relative to COG.
+		out.relGlobalAnchorA = globalA.rotation * (in.localAnchorA - rbA.localCOGPosition);
+		out.relGlobalAnchorB = globalB.rotation * (in.localAnchorB - rbB.localCOGPosition);
 
 		// Global.
-		vec3 globalAnchorA = transformA.position + relGlobalAnchorA;
-		vec3 globalAnchorB = transformB.position + relGlobalAnchorB;
-
-		// Relative to COG.
-		out.relGlobalAnchorA = transformA.rotation * (in.localAnchorA - rbA.localCOGPosition);
-		out.relGlobalAnchorB = transformB.rotation * (in.localAnchorB - rbB.localCOGPosition);
+		vec3 globalAnchorA = globalA.position + out.relGlobalAnchorA;
+		vec3 globalAnchorB = globalB.position + out.relGlobalAnchorB;
 
 		mat3 skewMatA = getSkewMatrix(out.relGlobalAnchorA);
 		mat3 skewMatB = getSkewMatrix(out.relGlobalAnchorB);
@@ -216,26 +202,19 @@ void initializeHingeJointVelocityConstraints(game_scene& scene, rigid_body_globa
 		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
 		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
 
-		transform_component& transformA = entityA.getComponent<transform_component>();
-		transform_component& transformB = entityB.getComponent<transform_component>();
-
 		out.rigidBodyIndexA = (uint16)(&rbA - rbBase);
 		out.rigidBodyIndexB = (uint16)(&rbB - rbBase);
 
 		rigid_body_global_state& globalA = rbs[out.rigidBodyIndexA];
 		rigid_body_global_state& globalB = rbs[out.rigidBodyIndexB];
 
-		// Relative to entity's origin.
-		vec3 relGlobalAnchorA = transformA.rotation * in.localAnchorA;
-		vec3 relGlobalAnchorB = transformB.rotation * in.localAnchorB;
+		// Relative to COG.
+		out.relGlobalAnchorA = globalA.rotation * (in.localAnchorA - rbA.localCOGPosition);
+		out.relGlobalAnchorB = globalB.rotation * (in.localAnchorB - rbB.localCOGPosition);
 
 		// Global.
-		vec3 globalAnchorA = transformA.position + relGlobalAnchorA;
-		vec3 globalAnchorB = transformB.position + relGlobalAnchorB;
-
-		// Relative to COG.
-		out.relGlobalAnchorA = transformA.rotation * (in.localAnchorA - rbA.localCOGPosition);
-		out.relGlobalAnchorB = transformB.rotation * (in.localAnchorB - rbB.localCOGPosition);
+		vec3 globalAnchorA = globalA.position + out.relGlobalAnchorA;
+		vec3 globalAnchorB = globalB.position + out.relGlobalAnchorB;
 
 
 
@@ -257,8 +236,8 @@ void initializeHingeJointVelocityConstraints(game_scene& scene, rigid_body_globa
 
 
 		// Rotation part.
-		vec3 globalHingeAxisA = transformA.rotation * in.localHingeAxisA;
-		vec3 globalHingeAxisB = transformB.rotation * in.localHingeAxisB;
+		vec3 globalHingeAxisA = globalA.rotation * in.localHingeAxisA;
+		vec3 globalHingeAxisB = globalB.rotation * in.localHingeAxisB;
 
 		vec3 globalTangentB, globalBitangentB;
 		getTangents(globalHingeAxisB, globalTangentB, globalBitangentB);
@@ -291,7 +270,7 @@ void initializeHingeJointVelocityConstraints(game_scene& scene, rigid_body_globa
 
 		if (in.minRotationLimit <= 0.f || in.maxRotationLimit >= 0.f || in.maxMotorTorque > 0.f)
 		{
-			vec3 localHingeCompareA = conjugate(transformA.rotation) * (transformB.rotation * in.localHingeTangentB);
+			vec3 localHingeCompareA = conjugate(globalA.rotation) * (globalB.rotation * in.localHingeTangentB);
 			float angle = atan2(dot(localHingeCompareA, in.localHingeBitangentA), dot(localHingeCompareA, in.localHingeTangentA));
 
 			bool minLimitViolated = in.minRotationLimit <= 0.f && angle <= in.minRotationLimit;
@@ -451,26 +430,19 @@ void initializeConeTwistVelocityConstraints(game_scene& scene, rigid_body_global
 		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
 		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
 
-		transform_component& transformA = entityA.getComponent<transform_component>();
-		transform_component& transformB = entityB.getComponent<transform_component>();
-
 		out.rigidBodyIndexA = (uint16)(&rbA - rbBase);
 		out.rigidBodyIndexB = (uint16)(&rbB - rbBase);
 
 		rigid_body_global_state& globalA = rbs[out.rigidBodyIndexA];
 		rigid_body_global_state& globalB = rbs[out.rigidBodyIndexB];
 
-		// Relative to entity's origin.
-		vec3 relGlobalAnchorA = transformA.rotation * in.localAnchorA;
-		vec3 relGlobalAnchorB = transformB.rotation * in.localAnchorB;
+		// Relative to COG.
+		out.relGlobalAnchorA = globalA.rotation * (in.localAnchorA - rbA.localCOGPosition);
+		out.relGlobalAnchorB = globalB.rotation * (in.localAnchorB - rbB.localCOGPosition);
 
 		// Global.
-		vec3 globalAnchorA = transformA.position + relGlobalAnchorA;
-		vec3 globalAnchorB = transformB.position + relGlobalAnchorB;
-
-		// Relative to COG.
-		out.relGlobalAnchorA = transformA.rotation * (in.localAnchorA - rbA.localCOGPosition);
-		out.relGlobalAnchorB = transformB.rotation * (in.localAnchorB - rbB.localCOGPosition);
+		vec3 globalAnchorA = globalA.position + out.relGlobalAnchorA;
+		vec3 globalAnchorB = globalB.position + out.relGlobalAnchorB;
 
 		mat3 skewMatA = getSkewMatrix(out.relGlobalAnchorA);
 		mat3 skewMatB = getSkewMatrix(out.relGlobalAnchorB);
@@ -487,7 +459,7 @@ void initializeConeTwistVelocityConstraints(game_scene& scene, rigid_body_global
 
 		// Limits and motors.
 
-		quat btoa = conjugate(transformA.rotation) * transformB.rotation;
+		quat btoa = conjugate(globalA.rotation) * globalB.rotation;
 
 		vec3 localLimitAxisA = in.localLimitAxisA;
 		vec3 localLimitAxisCompareA = btoa * in.localLimitAxisB;
@@ -514,7 +486,7 @@ void initializeConeTwistVelocityConstraints(game_scene& scene, rigid_body_global
 		if (out.solveSwingLimit)
 		{
 			out.swingImpulse = 0.f;
-			out.globalSwingAxis = transformA.rotation * swingAxis;
+			out.globalSwingAxis = globalA.rotation * swingAxis;
 			float invEffectiveLimitMass = dot(out.globalSwingAxis, globalA.invInertia * out.globalSwingAxis)
 										+ dot(out.globalSwingAxis, globalB.invInertia * out.globalSwingAxis);
 			out.effectiveSwingLimitMass = (invEffectiveLimitMass != 0.f) ? (1.f / invEffectiveLimitMass) : 0.f;
@@ -541,7 +513,7 @@ void initializeConeTwistVelocityConstraints(game_scene& scene, rigid_body_global
 
 			if (in.swingMotorType == constraint_velocity_motor)
 			{
-				out.globalSwingMotorAxis = transformA.rotation * localSwingMotorAxis;
+				out.globalSwingMotorAxis = globalA.rotation * localSwingMotorAxis;
 				out.swingMotorVelocity = in.swingMotorVelocity;
 			}
 			else
@@ -554,7 +526,7 @@ void initializeConeTwistVelocityConstraints(game_scene& scene, rigid_body_global
 
 				vec3 localTargetDirection = quat(localSwingMotorAxis, targetAngle) * localLimitAxisA;
 				vec3 localSwingMotorAxis = noz(cross(localLimitAxisCompareA, localTargetDirection));
-				out.globalSwingMotorAxis = transformA.rotation * localSwingMotorAxis;
+				out.globalSwingMotorAxis = globalA.rotation * localSwingMotorAxis;
 
 				float cosAngle = dot(localTargetDirection, localLimitAxisCompareA);
 				float deltaAngle = acos(clamp01(cosAngle));
@@ -579,7 +551,7 @@ void initializeConeTwistVelocityConstraints(game_scene& scene, rigid_body_global
 		if (out.solveTwistLimit || out.solveTwistMotor)
 		{
 			out.twistImpulse = 0.f;
-			out.globalTwistAxis = transformA.rotation * localLimitAxisA;
+			out.globalTwistAxis = globalA.rotation * localLimitAxisA;
 			float invEffectiveMass = dot(out.globalTwistAxis, globalA.invInertia * out.globalTwistAxis)
 								   + dot(out.globalTwistAxis, globalB.invInertia * out.globalTwistAxis);
 			out.effectiveTwistMass = (invEffectiveMass != 0.f) ? (1.f / invEffectiveMass) : 0.f;
