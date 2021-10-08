@@ -181,6 +181,9 @@ static uint32 scheduleConstraintsSIMD(memory_arena& arena, const constraint_body
 	return numConstraintSlots;
 }
 
+
+
+
 void initializeDistanceVelocityConstraints(const rigid_body_global_state* rbs, const distance_constraint* input, const constraint_body_pair* bodyPairs, distance_constraint_update* output, uint32 count, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize distance constraints");
@@ -261,13 +264,11 @@ void initializeDistanceVelocityConstraintsSIMD(memory_arena& arena, const rigid_
 	outConstraints.batches = arena.allocate<simd_distance_constraint_batch>(outConstraints.numBatches);
 
 	const floatw zero = floatw::zero();
-	const floatw slop = -0.001f;
-	const floatw scale = 0.1f;
 	const floatw invDt = 1.f / dt;
 
 	for (uint32 i = 0; i < numContactSlots; ++i)
 	{
-		simd_constraint_slot& slot = contactSlots[i];
+		const simd_constraint_slot& slot = contactSlots[i];
 		simd_distance_constraint_batch& batch = outConstraints.batches[i];
 
 		uint16 constraintIndices[CONSTRAINT_SIMD_WIDTH];
@@ -293,9 +294,9 @@ void initializeDistanceVelocityConstraintsSIMD(memory_arena& arena, const rigid_
 		mat3w invInertiaA;
 		floatw invMassA;
 
-		load8(&rbs->localCOGPosition.x, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
-			localCOGPositionA.x, localCOGPositionA.y, localCOGPositionA.z,
+		load8(&rbs->rotation.x, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			rotationA.x, rotationA.y, rotationA.z, rotationA.w,
+			localCOGPositionA.x, localCOGPositionA.y, localCOGPositionA.z,
 			positionA.x);
 
 		load8(&rbs->position.y, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
@@ -315,9 +316,9 @@ void initializeDistanceVelocityConstraintsSIMD(memory_arena& arena, const rigid_
 		mat3w invInertiaB;
 		floatw invMassB;
 
-		load8(&rbs->localCOGPosition.x, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
-			localCOGPositionB.x, localCOGPositionB.y, localCOGPositionB.z,
+		load8(&rbs->rotation.x, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			rotationB.x, rotationB.y, rotationB.z, rotationB.w,
+			localCOGPositionB.x, localCOGPositionB.y, localCOGPositionB.z,
 			positionB.x);
 
 		load8(&rbs->position.y, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
@@ -346,12 +347,12 @@ void initializeDistanceVelocityConstraintsSIMD(memory_arena& arena, const rigid_
 		vec3w crBu = cross(relGlobalAnchorB, u);
 		floatw invMass = invMassA + dot(crAu, invInertiaA * crAu)
 					   + invMassB + dot(crBu, invInertiaB * crBu);
-		floatw effectiveMass = ifThen(invMass != floatw::zero(), 1.f / invMass, floatw::zero());
+		floatw effectiveMass = ifThen(invMass != zero, 1.f / invMass, zero);
 
-		floatw bias = floatw::zero();
+		floatw bias = zero;
 		if (dt > DT_THRESHOLD)
 		{
-			bias = (l - globalLength) * DISTANCE_CONSTRAINT_BETA / dt;
+			bias = (l - globalLength) * DISTANCE_CONSTRAINT_BETA * invDt;
 		}
 
 		vec3w impulseToAngularVelocityA = invInertiaA * cross(relGlobalAnchorA, crAu);
@@ -501,6 +502,204 @@ void solveBallJointVelocityConstraints(ball_joint_constraint_update* constraints
 		rbB.angularVelocity += rbB.invInertia * cross(con.relGlobalAnchorB, P);
 	}
 }
+
+void initializeBallJointVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const ball_joint_constraint* input, const constraint_body_pair* bodyPairs, uint32 count,
+	simd_ball_joint_constraint& outConstraints, float dt)
+{
+	CPU_PROFILE_BLOCK("Initialize distance constraints SIMD");
+
+	simd_constraint_slot* contactSlots = arena.allocate<simd_constraint_slot>(count);
+	uint32 numContactSlots = scheduleConstraintsSIMD(arena, bodyPairs, count, UINT16_MAX, contactSlots);
+
+	outConstraints.numBatches = numContactSlots;
+	outConstraints.batches = arena.allocate<simd_ball_joint_constraint_batch>(outConstraints.numBatches);
+
+	const floatw zero = floatw::zero();
+	const floatw invDt = 1.f / dt;
+
+	for (uint32 i = 0; i < numContactSlots; ++i)
+	{
+		const simd_constraint_slot& slot = contactSlots[i];
+		simd_ball_joint_constraint_batch& batch = outConstraints.batches[i];
+
+		uint16 constraintIndices[CONSTRAINT_SIMD_WIDTH];
+		for (uint32 j = 0; j < CONSTRAINT_SIMD_WIDTH; ++j)
+		{
+			constraintIndices[j] = (uint16)slot.indices[j];
+			batch.rbAIndices[j] = bodyPairs[slot.indices[j]].rbA;
+			batch.rbBIndices[j] = bodyPairs[slot.indices[j]].rbB;
+		}
+
+
+		vec3w localAnchorA, localAnchorB;
+		floatw dummy0, dummy1;
+		load8((float*)input, constraintIndices, (uint32)sizeof(collision_contact),
+			localAnchorA.x, localAnchorA.y, localAnchorA.z, localAnchorB.x, localAnchorB.y, localAnchorB.z, dummy0, dummy1);
+
+
+		// Load body A.
+		vec3w localCOGPositionA;
+		quatw rotationA;
+		vec3w positionA;
+		mat3w invInertiaA;
+		floatw invMassA;
+
+		load8(&rbs->rotation.x, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			rotationA.x, rotationA.y, rotationA.z, rotationA.w,
+			localCOGPositionA.x, localCOGPositionA.y, localCOGPositionA.z,
+			positionA.x);
+
+		load8(&rbs->position.y, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			positionA.y, positionA.z,
+			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20,
+			invInertiaA.m01, invInertiaA.m11, invInertiaA.m21);
+
+		load4(&rbs->invInertia.m02, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m02, invInertiaA.m12, invInertiaA.m22,
+			invMassA);
+
+
+		// Load body B.
+		quatw rotationB;
+		vec3w positionB;
+		vec3w localCOGPositionB;
+		mat3w invInertiaB;
+		floatw invMassB;
+
+		load8(&rbs->rotation.x, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			rotationB.x, rotationB.y, rotationB.z, rotationB.w,
+			localCOGPositionB.x, localCOGPositionB.y, localCOGPositionB.z,
+			positionB.x);
+
+		load8(&rbs->position.y, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			positionB.y, positionB.z,
+			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
+			invInertiaB.m01, invInertiaB.m11, invInertiaB.m21);
+
+		load4(&rbs->invInertia.m02, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m02, invInertiaB.m12, invInertiaB.m22,
+			invMassB);
+
+
+		// Relative to COG.
+		vec3w relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
+		vec3w relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
+
+		// Global.
+		vec3w globalAnchorA = positionA + relGlobalAnchorA;
+		vec3w globalAnchorB = positionB + relGlobalAnchorB;
+
+		mat3w skewMatA = getSkewMatrix(relGlobalAnchorA);
+		mat3w skewMatB = getSkewMatrix(relGlobalAnchorB);
+
+		mat3w identity;
+		mat3w invEffectiveMass = identity * invMassA + skewMatA * invInertiaA * transpose(skewMatA)
+							   + identity * invMassB + skewMatB * invInertiaB * transpose(skewMatB);
+
+		vec3w bias = zero;
+		if (dt > DT_THRESHOLD)
+		{
+			bias = (globalAnchorB - globalAnchorA) * floatw(BALL_JOINT_CONSTRAINT_BETA) * invDt;
+		}
+
+		relGlobalAnchorA.x.store(batch.relGlobalAnchorA[0]);
+		relGlobalAnchorA.y.store(batch.relGlobalAnchorA[1]);
+		relGlobalAnchorA.z.store(batch.relGlobalAnchorA[2]);
+
+		relGlobalAnchorB.x.store(batch.relGlobalAnchorB[0]);
+		relGlobalAnchorB.y.store(batch.relGlobalAnchorB[1]);
+		relGlobalAnchorB.z.store(batch.relGlobalAnchorB[2]);
+
+		bias.x.store(batch.bias[0]);
+		bias.y.store(batch.bias[1]);
+		bias.z.store(batch.bias[2]);
+
+		invEffectiveMass.m[0].store(batch.invEffectiveMass[0]);
+		invEffectiveMass.m[1].store(batch.invEffectiveMass[1]);
+		invEffectiveMass.m[2].store(batch.invEffectiveMass[2]);
+		invEffectiveMass.m[3].store(batch.invEffectiveMass[3]);
+		invEffectiveMass.m[4].store(batch.invEffectiveMass[4]);
+		invEffectiveMass.m[5].store(batch.invEffectiveMass[5]);
+		invEffectiveMass.m[6].store(batch.invEffectiveMass[6]);
+		invEffectiveMass.m[7].store(batch.invEffectiveMass[7]);
+		invEffectiveMass.m[8].store(batch.invEffectiveMass[8]);
+	}
+}
+
+void solveBallJointVelocityConstraintsSIMD(simd_ball_joint_constraint& constraints, rigid_body_global_state* rbs)
+{
+	CPU_PROFILE_BLOCK("Solve ball joint constraints SIMD");
+
+	for (uint32 i = 0; i < constraints.numBatches; ++i)
+	{
+		simd_ball_joint_constraint_batch& batch = constraints.batches[i];
+
+
+		// Load body A.
+		vec3w vA, wA;
+		floatw invMassA;
+		mat3w invInertiaA;
+
+		load8(&rbs->invInertia.m00, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20,
+			invInertiaA.m01, invInertiaA.m11, invInertiaA.m21,
+			invInertiaA.m02, invInertiaA.m12);
+
+		load8(&rbs->invInertia.m22, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m22, invMassA, vA.x, vA.y, vA.z, wA.x, wA.y, wA.z);
+
+
+		// Load body B.
+		vec3w vB, wB;
+		floatw invMassB;
+		mat3w invInertiaB;
+
+		load8(&rbs->invInertia.m00, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
+			invInertiaB.m01, invInertiaB.m11, invInertiaB.m21,
+			invInertiaB.m02, invInertiaB.m12);
+
+		load8(&rbs->invInertia.m22, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m22, invMassB, vB.x, vB.y, vB.z, wB.x, wB.y, wB.z);
+
+
+		// Load constraint.
+		vec3w relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
+		vec3w relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
+		vec3w bias(batch.bias[0], batch.bias[1], batch.bias[2]);
+		mat3w invEffectiveMass;
+		invEffectiveMass.m[0] = floatw(batch.invEffectiveMass[0]);
+		invEffectiveMass.m[1] = floatw(batch.invEffectiveMass[1]);
+		invEffectiveMass.m[2] = floatw(batch.invEffectiveMass[2]);
+		invEffectiveMass.m[3] = floatw(batch.invEffectiveMass[3]);
+		invEffectiveMass.m[4] = floatw(batch.invEffectiveMass[4]);
+		invEffectiveMass.m[5] = floatw(batch.invEffectiveMass[5]);
+		invEffectiveMass.m[6] = floatw(batch.invEffectiveMass[6]);
+		invEffectiveMass.m[7] = floatw(batch.invEffectiveMass[7]);
+		invEffectiveMass.m[8] = floatw(batch.invEffectiveMass[8]);
+
+		vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
+		vec3w anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
+		vec3w Cdot = anchorVelocityB - anchorVelocityA + bias;
+
+		vec3w P = solveLinearSystem(invEffectiveMass, -Cdot);
+		vA -= invMassA * P;
+		wA -= invInertiaA * cross(relGlobalAnchorA, P);
+		vB += invMassB * P;
+		wB += invInertiaB * cross(relGlobalAnchorB, P);
+
+
+		store8(&rbs->invInertia.m22, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m22, invMassA, vA.x, vA.y, vA.z, wA.x, wA.y, wA.z);
+
+		store8(&rbs->invInertia.m22, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m22, invMassB, vB.x, vB.y, vB.z, wB.x, wB.y, wB.z);
+	}
+}
+
+
+
+
 
 void initializeHingeJointVelocityConstraints(const rigid_body_global_state* rbs, const hinge_joint_constraint* input, const constraint_body_pair* bodyPairs, hinge_joint_constraint_update* output, uint32 count, float dt)
 {
@@ -1158,7 +1357,7 @@ void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, const rigid
 
 	for (uint32 i = 0; i < numContactSlots; ++i)
 	{
-		simd_constraint_slot& slot = contactSlots[i];
+		const simd_constraint_slot& slot = contactSlots[i];
 		simd_collision_constraint_batch& batch = outConstraints.batches[i];
 
 		uint16 contactIndices[CONSTRAINT_SIMD_WIDTH];

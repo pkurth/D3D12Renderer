@@ -124,6 +124,24 @@ struct ball_joint_constraint_update
 	mat3 invEffectiveMass;
 };
 
+struct simd_ball_joint_constraint_batch
+{
+	float relGlobalAnchorA[3][CONSTRAINT_SIMD_WIDTH];
+	float relGlobalAnchorB[3][CONSTRAINT_SIMD_WIDTH];
+
+	float bias[3][CONSTRAINT_SIMD_WIDTH];
+	float invEffectiveMass[9][CONSTRAINT_SIMD_WIDTH];
+	
+	uint16 rbAIndices[CONSTRAINT_SIMD_WIDTH];
+	uint16 rbBIndices[CONSTRAINT_SIMD_WIDTH];
+};
+
+struct simd_ball_joint_constraint
+{
+	simd_ball_joint_constraint_batch* batches;
+	uint32 numBatches;
+};
+
 
 // Hinge-joint constraint.
 

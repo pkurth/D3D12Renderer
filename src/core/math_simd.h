@@ -361,7 +361,156 @@ static vec4x<simd_t> operator*(const mat4x<simd_t>& a, vec4x<simd_t> b)
 	return result;
 }
 
+template <typename simd_t>
+mat2x<simd_t> operator*(const mat2x<simd_t>& a, const mat2x<simd_t>& b)
+{
+	mat2x<simd_t> result;
 
+	result.m00 = fmadd(a.m00, b.m00, a.m01 * b.m10);
+	result.m01 = fmadd(a.m00, b.m01, a.m01 * b.m11);
+
+	result.m10 = fmadd(a.m10, b.m00, a.m11 * b.m10);
+	result.m11 = fmadd(a.m10, b.m01, a.m11 * b.m11);
+
+	return result;
+}
+
+template <typename simd_t>
+mat3x<simd_t> operator*(const mat3x<simd_t>& a, const mat3x<simd_t>& b)
+{
+	mat3x<simd_t> result;
+
+	result.m00 = fmadd(a.m00, b.m00, fmadd(a.m01, b.m10, a.m02 * b.m20));
+	result.m01 = fmadd(a.m00, b.m01, fmadd(a.m01, b.m11, a.m02 * b.m21));
+	result.m02 = fmadd(a.m00, b.m02, fmadd(a.m01, b.m12, a.m02 * b.m22));
+
+	result.m10 = fmadd(a.m10, b.m00, fmadd(a.m11, b.m10, a.m12 * b.m20));
+	result.m11 = fmadd(a.m10, b.m01, fmadd(a.m11, b.m11, a.m12 * b.m21));
+	result.m12 = fmadd(a.m10, b.m02, fmadd(a.m11, b.m12, a.m12 * b.m22));
+
+	result.m20 = fmadd(a.m20, b.m00, fmadd(a.m21, b.m10, a.m22 * b.m20));
+	result.m21 = fmadd(a.m20, b.m01, fmadd(a.m21, b.m11, a.m22 * b.m21));
+	result.m22 = fmadd(a.m20, b.m02, fmadd(a.m21, b.m12, a.m22 * b.m22));
+	
+	return result;
+}
+
+template <typename simd_t>
+mat4x<simd_t> operator*(const mat4x<simd_t>& a, const mat4x<simd_t>& b)
+{
+	mat4x<simd_t> result;
+
+	result.m00 = fmadd(a.m00, b.m00, fmadd(a.m01, b.m10, fmadd(a.m02, b.m20, a.m03 * b.m30)));
+	result.m01 = fmadd(a.m00, b.m01, fmadd(a.m01, b.m11, fmadd(a.m02, b.m21, a.m03 * b.m31)));
+	result.m02 = fmadd(a.m00, b.m02, fmadd(a.m01, b.m12, fmadd(a.m02, b.m22, a.m03 * b.m32)));
+	result.m03 = fmadd(a.m00, b.m03, fmadd(a.m01, b.m13, fmadd(a.m02, b.m23, a.m03 * b.m33)));
+
+	result.m10 = fmadd(a.m10, b.m00, fmadd(a.m11, b.m10, fmadd(a.m12, b.m20, a.m13 * b.m30)));
+	result.m11 = fmadd(a.m10, b.m01, fmadd(a.m11, b.m11, fmadd(a.m12, b.m21, a.m13 * b.m31)));
+	result.m12 = fmadd(a.m10, b.m02, fmadd(a.m11, b.m12, fmadd(a.m12, b.m22, a.m13 * b.m32)));
+	result.m13 = fmadd(a.m10, b.m03, fmadd(a.m11, b.m13, fmadd(a.m12, b.m23, a.m13 * b.m33)));
+
+	result.m20 = fmadd(a.m20, b.m00, fmadd(a.m21, b.m10, fmadd(a.m22, b.m20, a.m23 * b.m30)));
+	result.m21 = fmadd(a.m20, b.m01, fmadd(a.m21, b.m11, fmadd(a.m22, b.m21, a.m23 * b.m31)));
+	result.m22 = fmadd(a.m20, b.m02, fmadd(a.m21, b.m12, fmadd(a.m22, b.m22, a.m23 * b.m32)));
+	result.m23 = fmadd(a.m20, b.m03, fmadd(a.m21, b.m13, fmadd(a.m22, b.m23, a.m23 * b.m33)));
+
+	result.m30 = fmadd(a.m30, b.m00, fmadd(a.m31, b.m10, fmadd(a.m32, b.m20, a.m33 * b.m30)));
+	result.m31 = fmadd(a.m30, b.m01, fmadd(a.m31, b.m11, fmadd(a.m32, b.m21, a.m33 * b.m31)));
+	result.m32 = fmadd(a.m30, b.m02, fmadd(a.m31, b.m12, fmadd(a.m32, b.m22, a.m33 * b.m32)));
+	result.m33 = fmadd(a.m30, b.m03, fmadd(a.m31, b.m13, fmadd(a.m32, b.m23, a.m33 * b.m33)));
+
+	return result;
+}
+
+template <typename simd_t> mat2x<simd_t> operator*(const mat2x<simd_t>& a, simd_t b) { mat2x<simd_t> result; for (uint32 i = 0; i < 4; ++i) { result.m[i] = a.m[i] * b; } return result; }
+template <typename simd_t> mat3x<simd_t> operator*(const mat3x<simd_t>& a, simd_t b) { mat3x<simd_t> result; for (uint32 i = 0; i < 9; ++i) { result.m[i] = a.m[i] * b; } return result; }
+template <typename simd_t> mat4x<simd_t> operator*(const mat4x<simd_t>& a, simd_t b) { mat4x<simd_t> result; for (uint32 i = 0; i < 16; ++i) { result.m[i] = a.m[i] * b; } return result; }
+
+template <typename simd_t> mat2x<simd_t> operator*(simd_t b, const mat2x<simd_t>& a) { return a * b; }
+template <typename simd_t> mat3x<simd_t> operator*(simd_t b, const mat3x<simd_t>& a) { return a * b; }
+template <typename simd_t> mat4x<simd_t> operator*(simd_t b, const mat4x<simd_t>& a) { return a * b; }
+
+template <typename simd_t> mat2x<simd_t> operator+(const mat2x<simd_t>& a, const mat2x<simd_t>& b) { mat2x<simd_t> result; for (uint32 i = 0; i < 4; ++i) { result.m[i] = a.m[i] + b.m[i]; } return result; }
+template <typename simd_t> mat3x<simd_t> operator+(const mat3x<simd_t>& a, const mat3x<simd_t>& b) { mat3x<simd_t> result; for (uint32 i = 0; i < 9; ++i) { result.m[i] = a.m[i] + b.m[i]; } return result; }
+template <typename simd_t> mat4x<simd_t> operator+(const mat4x<simd_t>& a, const mat4x<simd_t>& b) { mat4x<simd_t> result; for (uint32 i = 0; i < 16; ++i) { result.m[i] = a.m[i] + b.m[i]; } return result; }
+
+template <typename simd_t>
+static mat2x<simd_t> transpose(const mat2x<simd_t>& a)
+{
+	mat2x<simd_t> result;
+	result.m00 = a.m00; result.m01 = a.m10;
+	result.m10 = a.m01; result.m11 = a.m11;
+	return result;
+}
+
+template <typename simd_t>
+static mat3x<simd_t> transpose(const mat3x<simd_t>& a)
+{
+	mat3x<simd_t> result;
+	result.m00 = a.m00; result.m01 = a.m10; result.m02 = a.m20;
+	result.m10 = a.m01; result.m11 = a.m11; result.m12 = a.m21;
+	result.m20 = a.m02; result.m21 = a.m12; result.m22 = a.m22;
+	return result;
+}
+
+template <typename simd_t>
+static mat4x<simd_t> transpose(const mat4x<simd_t>& a)
+{
+	mat4x<simd_t> result;
+	result.m00 = a.m00; result.m01 = a.m10; result.m02 = a.m20; result.m03 = a.m30;
+	result.m10 = a.m01; result.m11 = a.m11; result.m12 = a.m21; result.m13 = a.m31;
+	result.m20 = a.m02; result.m21 = a.m12; result.m22 = a.m22; result.m23 = a.m32;
+	result.m30 = a.m03; result.m31 = a.m13; result.m32 = a.m23; result.m33 = a.m32;
+	return result;
+}
+
+template <typename simd_t>
+mat3x<simd_t> getSkewMatrix(vec3x<simd_t> r)
+{
+	simd_t zero = simd_t::zero();
+	mat3x<simd_t> result;
+	result.m00 = zero;
+	result.m01 = -r.z;
+	result.m02 = r.y;
+	result.m10 = r.z;
+	result.m11 = zero;
+	result.m12 = -r.x;
+	result.m20 = -r.y;
+	result.m21 = r.x;
+	result.m22 = zero;
+	return result;
+}
+
+template <typename simd_t>
+vec2x<simd_t> solveLinearSystem(const mat2x<simd_t>& A, vec2x<simd_t> b)
+{
+	vec2x<simd_t> ex(A.m00, A.m10);
+	vec2x<simd_t> ey(A.m01, A.m11);
+	simd_t det = cross(ex, ey);
+	det = ifThen(det != simd_t::zero(), 1.f / det, det);
+
+	vec2x<simd_t> x;
+	x.x = det * cross(b, ey);
+	x.y = det * cross(ex, b);
+	return x;
+}
+
+template <typename simd_t>
+vec3x<simd_t> solveLinearSystem(const mat3x<simd_t>& A, vec3x<simd_t> b)
+{
+	vec3x<simd_t> ex(A.m00, A.m10, A.m20);
+	vec3x<simd_t> ey(A.m01, A.m11, A.m21);
+	vec3x<simd_t> ez(A.m02, A.m12, A.m22);
+	simd_t det = dot(ex, cross(ey, ez));
+	det = ifThen(det != simd_t::zero(), 1.f / det, det);
+
+	vec3x<simd_t> x;
+	x.x = det * dot(b, cross(ey, ez));
+	x.y = det * dot(ex, cross(b, ez));
+	x.z = det * dot(ex, cross(ey, b));
+	return x;
+}
 
 
 template<typename simd_t>
