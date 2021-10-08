@@ -681,15 +681,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	}
 
 	// Kinematic rigid body. This is used in collision constraint solving, when a collider has no rigid body.
-	rbGlobal[dummyRigidBodyIndex] = {
-		quat::identity,
-		vec3(0.f),
-		vec3(0.f),
-		vec3(0.f),
-		0.f,
-		mat3::zero,
-		vec3(0.f),
-	};
+	memset(&rbGlobal[dummyRigidBodyIndex], 0, sizeof(rigid_body_global_state));
 
 
 	// Collect constraints.

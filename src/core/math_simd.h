@@ -306,14 +306,14 @@ template <typename simd_t> static quatx<simd_t> operator+(quatx<simd_t> a, quatx
 template <typename simd_t>
 static quatx<simd_t> operator*(quatx<simd_t> a, quatx<simd_t> b)
 {
-	quatx result;
+	quatx<simd_t> result;
 	result.w = fmsub(a.w, b.w, dot(a.v, b.v));
 	result.v = a.v * b.w + b.v * a.w + cross(a.v, b.v);
 	return result;
 }
 
 template <typename simd_t> static quatx<simd_t> operator*(quatx<simd_t> q, simd_t s) { quatx result; result.v4 = q.v4 * s;	return result; }
-template <typename simd_t> static vec3x<simd_t> operator*(quatx<simd_t> q, vec3x<simd_t> v) { quatx p(v.x, v.y, v.z, 0.f); return (q * p * conjugate(q)).v; }
+template <typename simd_t> static vec3x<simd_t> operator*(quatx<simd_t> q, vec3x<simd_t> v) { quatx p(v.x, v.y, v.z, simd_t::zero()); return (q * p * conjugate(q)).v; }
 
 template <typename simd_t> static auto operator==(quatx<simd_t> a, quatx<simd_t> b) { return a.x == b.x & a.y == b.y & a.z == b.z & a.w == b.w; }
 

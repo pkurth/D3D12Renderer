@@ -82,6 +82,28 @@ struct distance_constraint_update
 	float effectiveMass;
 };
 
+struct simd_distance_constraint_batch
+{
+	float relGlobalAnchorA[3][CONSTRAINT_SIMD_WIDTH];
+	float relGlobalAnchorB[3][CONSTRAINT_SIMD_WIDTH];
+
+	float impulseToAngularVelocityA[3][CONSTRAINT_SIMD_WIDTH];
+	float impulseToAngularVelocityB[3][CONSTRAINT_SIMD_WIDTH];
+
+	float u[3][CONSTRAINT_SIMD_WIDTH];
+	float bias[CONSTRAINT_SIMD_WIDTH];
+	float effectiveMass[CONSTRAINT_SIMD_WIDTH];
+
+	uint16 rbAIndices[CONSTRAINT_SIMD_WIDTH];
+	uint16 rbBIndices[CONSTRAINT_SIMD_WIDTH];
+};
+
+struct simd_distance_constraint
+{
+	simd_distance_constraint_batch* batches;
+	uint32 numBatches;
+};
+
 
 // Ball-joint constraint.
 
@@ -320,12 +342,19 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 void initializeConeTwistVelocityConstraints(const rigid_body_global_state* rbs, const cone_twist_constraint* input, const constraint_body_pair* bodyPairs, cone_twist_constraint_update* output, uint32 count, float dt);
 void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);
 
-
-
-void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, collision_constraint* collisionConstraints, uint32 numContacts, float dt);
+void initializeCollisionVelocityConstraints(const rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, collision_constraint* outConstraints, uint32 numContacts, float dt);
 void solveCollisionVelocityConstraints(const collision_contact* contacts, collision_constraint* constraints, const constraint_body_pair* bodyPairs, uint32 count, rigid_body_global_state* rbs);
 
-void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, uint32 numContacts,
+
+
+
+// SIMD.
+
+void initializeDistanceVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const distance_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, simd_distance_constraint& outConstraints, float dt);
+void solveDistanceVelocityConstraintsSIMD(simd_distance_constraint& constraints, rigid_body_global_state* rbs);
+
+
+void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, uint32 numContacts,
 	uint16 dummyRigidBodyIndex, simd_collision_constraint& outConstraints, float dt);
 void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint& constraints, rigid_body_global_state* rbs);
 
