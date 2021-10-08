@@ -574,11 +574,11 @@ bool scene_editor::drawSceneHierarchy()
 							{
 								case constraint_type_distance:
 								{
-									drawComponent<distance_constraint>(constraintEntity, "Distance constraint", [this](distance_constraint& constraint)
+									drawComponent<distance_constraint>(constraintEntity, "Distance constraint", [this, constraintEntity = constraintEntity](distance_constraint& constraint)
 									{
 										if (ImGui::BeginProperties())
 										{
-											scene_entity otherEntity = getOtherEntity(constraint, selectedEntity);
+											scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
 											if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
 											{
 												setSelectedEntity(otherEntity);
@@ -592,11 +592,11 @@ bool scene_editor::drawSceneHierarchy()
 
 								case constraint_type_ball_joint:
 								{
-									drawComponent<ball_joint_constraint>(constraintEntity, "Ball joint constraint", [this](ball_joint_constraint& constraint)
+									drawComponent<ball_joint_constraint>(constraintEntity, "Ball joint constraint", [this, constraintEntity = constraintEntity](ball_joint_constraint& constraint)
 									{
 										if (ImGui::BeginProperties())
 										{
-											scene_entity otherEntity = getOtherEntity(constraint, selectedEntity);
+											scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
 											if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
 											{
 												setSelectedEntity(otherEntity);
@@ -609,11 +609,11 @@ bool scene_editor::drawSceneHierarchy()
 
 								case constraint_type_hinge_joint:
 								{
-									drawComponent<hinge_joint_constraint>(constraintEntity, "Hinge joint constraint", [this](hinge_joint_constraint& constraint)
+									drawComponent<hinge_joint_constraint>(constraintEntity, "Hinge joint constraint", [this, constraintEntity = constraintEntity](hinge_joint_constraint& constraint)
 									{
 										if (ImGui::BeginProperties())
 										{
-											scene_entity otherEntity = getOtherEntity(constraint, selectedEntity);
+											scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
 											if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
 											{
 												setSelectedEntity(otherEntity);
@@ -670,11 +670,11 @@ bool scene_editor::drawSceneHierarchy()
 
 								case constraint_type_cone_twist:
 								{
-									drawComponent<cone_twist_constraint>(constraintEntity, "Cone twist constraint", [this](cone_twist_constraint& constraint)
+									drawComponent<cone_twist_constraint>(constraintEntity, "Cone twist constraint", [this, constraintEntity = constraintEntity](cone_twist_constraint& constraint)
 									{
 										if (ImGui::BeginProperties())
 										{
-											scene_entity otherEntity = getOtherEntity(constraint, selectedEntity);
+											scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
 											if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
 											{
 												setSelectedEntity(otherEntity);

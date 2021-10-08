@@ -24,6 +24,8 @@ struct scene_entity
 	{
 		if constexpr (std::is_same_v<component_t, struct collider_component>)
 		{
+			void addColliderToBroadphase(scene_entity entity);
+
 			if (!hasComponent<physics_reference_component>())
 			{
 				addComponent<physics_reference_component>();
@@ -34,6 +36,7 @@ struct scene_entity
 
 			entt::entity child = registry->create();
 			collider_component& collider = registry->emplace<collider_component>(child, std::forward<args>(a)...);
+			addColliderToBroadphase(scene_entity(child, registry));
 
 			collider.parentEntity = handle;
 			collider.nextEntity = reference.firstColliderEntity;

@@ -188,7 +188,7 @@ void deleteConstraint(game_scene& scene, cone_twist_constraint_handle handle);
 
 void deleteAllConstraintsFromEntity(scene_entity& entity);
 
-static scene_entity getOtherEntity(physics_constraint& constraint, scene_entity first)
+static scene_entity getOtherEntity(const constraint_entity_reference_component& constraint, scene_entity first)
 {
 	entt::entity result = (first == constraint.entityA) ? constraint.entityB : constraint.entityA;
 	return { result, first.registry };

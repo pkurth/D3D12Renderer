@@ -12,6 +12,7 @@ struct rigid_body_global_state
 	vec3 angularVelocity;
 	float invMass;
 	mat3 invInertia;
+	vec3 localCOGPosition;
 };
 
 struct rigid_body_component

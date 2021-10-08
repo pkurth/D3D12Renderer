@@ -25,6 +25,3 @@ struct sap_endpoint_indirection_component
 	uint16 startEndpoint;
 	uint16 endEndpoint;
 };
-
-void onColliderAdded(entt::registry& registry, entt::entity entity);
-void onColliderRemoved(entt::registry& registry, entt::entity entity);

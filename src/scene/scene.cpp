@@ -11,9 +11,6 @@ game_scene::game_scene()
 	(void)registry.group<transform_component, rigid_body_component>();
 	(void)registry.group<position_component, point_light_component>();
 	(void)registry.group<position_rotation_component, spot_light_component>();
-
-	registry.on_construct<collider_component>().connect<&onColliderAdded>();
-	registry.on_destroy<collider_component>().connect<&onColliderRemoved>();
 }
 
 void game_scene::clearAll()
@@ -58,6 +55,8 @@ scene_entity game_scene::copyEntity(scene_entity src)
 
 void game_scene::deleteEntity(scene_entity e)
 {
+	void removeColliderFromBroadphase(scene_entity entity);
+
 	if (physics_reference_component* reference = e.getComponentIfExists<physics_reference_component>())
 	{
 		scene_entity colliderEntity = { reference->firstColliderEntity, &registry };
@@ -65,6 +64,8 @@ void game_scene::deleteEntity(scene_entity e)
 		{
 			collider_component& collider = colliderEntity.getComponent<collider_component>();
 			entt::entity next = collider.nextEntity;
+
+			removeColliderFromBroadphase(colliderEntity);
 		
 			registry.destroy(colliderEntity.handle);
 		

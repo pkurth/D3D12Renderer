@@ -120,6 +120,7 @@ void rigid_body_component::applyGravityAndIntegrateForces(rigid_body_global_stat
 
 	global.linearVelocity = linearVelocity;
 	global.angularVelocity = angularVelocity;
+	global.localCOGPosition = localCOGPosition;
 }
 
 void rigid_body_component::integrateVelocity(const rigid_body_global_state& global, trs& transform, float dt)

@@ -22,17 +22,19 @@ struct sap_context
 };
 
 
-void onColliderAdded(entt::registry& registry, entt::entity entityHandle)
+void addColliderToBroadphase(scene_entity entity)
 {
-	sap_context& context = registry.ctx_or_set<sap_context>();
+	sap_context& context = entity.registry->ctx_or_set<sap_context>();
 
-	sap_endpoint_indirection_component& endpointIndirection = registry.emplace<sap_endpoint_indirection_component>(entityHandle);
+	sap_endpoint_indirection_component endpointIndirection;
 
 	endpointIndirection.startEndpoint = (uint16)context.endpoints.size();
-	context.endpoints.emplace_back(entityHandle, true);
+	context.endpoints.emplace_back(entity.handle, true);
 
 	endpointIndirection.endEndpoint = (uint16)context.endpoints.size();
-	context.endpoints.emplace_back(entityHandle, false);
+	context.endpoints.emplace_back(entity.handle, false);
+
+	entity.addComponent<sap_endpoint_indirection_component>(endpointIndirection);
 }
 
 static void removeEndpoint(uint16 endpointIndex, entt::registry& registry, sap_context& context)
@@ -55,16 +57,14 @@ static void removeEndpoint(uint16 endpointIndex, entt::registry& registry, sap_c
 	context.endpoints.pop_back();
 }
 
-void onColliderRemoved(entt::registry& registry, entt::entity entityHandle)
+void removeColliderFromBroadphase(scene_entity entity)
 {
-	scene_entity entity = { entityHandle, &registry };
-
 	sap_endpoint_indirection_component& endpointIndirection = entity.getComponent<sap_endpoint_indirection_component>();
 
-	sap_context& context = registry.ctx<sap_context>();
+	sap_context& context = entity.registry->ctx<sap_context>();
 
-	removeEndpoint(endpointIndirection.startEndpoint, registry, context);
-	removeEndpoint(endpointIndirection.endEndpoint, registry, context);
+	removeEndpoint(endpointIndirection.startEndpoint, *entity.registry, context);
+	removeEndpoint(endpointIndirection.endEndpoint, *entity.registry, context);
 
 	if (entity.hasComponent<sap_endpoint_indirection_component>())
 	{

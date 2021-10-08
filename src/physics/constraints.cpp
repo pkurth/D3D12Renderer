@@ -34,32 +34,24 @@ typedef intx8 intw;
 #endif
 
 
-void initializeDistanceVelocityConstraints(game_scene& scene, rigid_body_global_state* rbs, const distance_constraint* input, distance_constraint_update* output, uint32 count, float dt)
+void initializeDistanceVelocityConstraints(const rigid_body_global_state* rbs, const distance_constraint* input, const constraint_body_pair* bodyPairs, distance_constraint_update* output, uint32 count, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize distance constraints");
-
-	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
 	{
 		const distance_constraint& in = input[i];
 		distance_constraint_update& out = output[i];
 
-		scene_entity entityA = { in.entityA, scene };
-		scene_entity entityB = { in.entityB, scene };
+		out.rigidBodyIndexA = bodyPairs[i].rbA;
+		out.rigidBodyIndexB = bodyPairs[i].rbB;
 
-		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
-		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
-
-		out.rigidBodyIndexA = (uint16)(&rbA - rbBase);
-		out.rigidBodyIndexB = (uint16)(&rbB - rbBase);
-
-		rigid_body_global_state& globalA = rbs[out.rigidBodyIndexA];
-		rigid_body_global_state& globalB = rbs[out.rigidBodyIndexB];
+		const rigid_body_global_state& globalA = rbs[out.rigidBodyIndexA];
+		const rigid_body_global_state& globalB = rbs[out.rigidBodyIndexB];
 
 		// Relative to COG.
-		out.relGlobalAnchorA = globalA.rotation * (in.localAnchorA - rbA.localCOGPosition);
-		out.relGlobalAnchorB = globalB.rotation * (in.localAnchorB - rbB.localCOGPosition);
+		out.relGlobalAnchorA = globalA.rotation * (in.localAnchorA - globalA.localCOGPosition);
+		out.relGlobalAnchorB = globalB.rotation * (in.localAnchorB - globalB.localCOGPosition);
 
 		// Global.
 		vec3 globalAnchorA = globalA.position + out.relGlobalAnchorA;
@@ -117,32 +109,24 @@ void solveDistanceVelocityConstraints(distance_constraint_update* constraints, u
 	}
 }
 
-void initializeBallJointVelocityConstraints(game_scene& scene, rigid_body_global_state* rbs, const ball_joint_constraint* input, ball_joint_constraint_update* output, uint32 count, float dt)
+void initializeBallJointVelocityConstraints(const rigid_body_global_state* rbs, const ball_joint_constraint* input, const constraint_body_pair* bodyPairs, ball_joint_constraint_update* output, uint32 count, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize ball joint constraints");
-
-	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
 	{
 		const ball_joint_constraint& in = input[i];
 		ball_joint_constraint_update& out = output[i];
 
-		scene_entity entityA = { in.entityA, scene };
-		scene_entity entityB = { in.entityB, scene };
+		out.rigidBodyIndexA = bodyPairs[i].rbA;
+		out.rigidBodyIndexB = bodyPairs[i].rbB;
 
-		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
-		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
-
-		out.rigidBodyIndexA = (uint16)(&rbA - rbBase);
-		out.rigidBodyIndexB = (uint16)(&rbB - rbBase);
-
-		rigid_body_global_state& globalA = rbs[out.rigidBodyIndexA];
-		rigid_body_global_state& globalB = rbs[out.rigidBodyIndexB];
+		const rigid_body_global_state& globalA = rbs[out.rigidBodyIndexA];
+		const rigid_body_global_state& globalB = rbs[out.rigidBodyIndexB];
 
 		// Relative to COG.
-		out.relGlobalAnchorA = globalA.rotation * (in.localAnchorA - rbA.localCOGPosition);
-		out.relGlobalAnchorB = globalB.rotation * (in.localAnchorB - rbB.localCOGPosition);
+		out.relGlobalAnchorA = globalA.rotation * (in.localAnchorA - globalA.localCOGPosition);
+		out.relGlobalAnchorB = globalB.rotation * (in.localAnchorB - globalB.localCOGPosition);
 
 		// Global.
 		vec3 globalAnchorA = globalA.position + out.relGlobalAnchorA;
@@ -185,32 +169,24 @@ void solveBallJointVelocityConstraints(ball_joint_constraint_update* constraints
 	}
 }
 
-void initializeHingeJointVelocityConstraints(game_scene& scene, rigid_body_global_state* rbs, const hinge_joint_constraint* input, hinge_joint_constraint_update* output, uint32 count, float dt)
+void initializeHingeJointVelocityConstraints(const rigid_body_global_state* rbs, const hinge_joint_constraint* input, const constraint_body_pair* bodyPairs, hinge_joint_constraint_update* output, uint32 count, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize hinge joint constraints");
-
-	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
 	{
 		const hinge_joint_constraint& in = input[i];
 		hinge_joint_constraint_update& out = output[i];
 
-		scene_entity entityA = { in.entityA, scene };
-		scene_entity entityB = { in.entityB, scene };
+		out.rigidBodyIndexA = bodyPairs[i].rbA;
+		out.rigidBodyIndexB = bodyPairs[i].rbB;
 
-		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
-		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
-
-		out.rigidBodyIndexA = (uint16)(&rbA - rbBase);
-		out.rigidBodyIndexB = (uint16)(&rbB - rbBase);
-
-		rigid_body_global_state& globalA = rbs[out.rigidBodyIndexA];
-		rigid_body_global_state& globalB = rbs[out.rigidBodyIndexB];
+		const rigid_body_global_state& globalA = rbs[out.rigidBodyIndexA];
+		const rigid_body_global_state& globalB = rbs[out.rigidBodyIndexB];
 
 		// Relative to COG.
-		out.relGlobalAnchorA = globalA.rotation * (in.localAnchorA - rbA.localCOGPosition);
-		out.relGlobalAnchorB = globalB.rotation * (in.localAnchorB - rbB.localCOGPosition);
+		out.relGlobalAnchorA = globalA.rotation * (in.localAnchorA - globalA.localCOGPosition);
+		out.relGlobalAnchorB = globalB.rotation * (in.localAnchorB - globalB.localCOGPosition);
 
 		// Global.
 		vec3 globalAnchorA = globalA.position + out.relGlobalAnchorA;
@@ -413,32 +389,24 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 	}
 }
 
-void initializeConeTwistVelocityConstraints(game_scene& scene, rigid_body_global_state* rbs, const cone_twist_constraint* input, cone_twist_constraint_update* output, uint32 count, float dt)
+void initializeConeTwistVelocityConstraints(const rigid_body_global_state* rbs, const cone_twist_constraint* input, const constraint_body_pair* bodyPairs, cone_twist_constraint_update* output, uint32 count, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize cone twist constraints");
-
-	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
 
 	for (uint32 i = 0; i < count; ++i)
 	{
 		const cone_twist_constraint& in = input[i];
 		cone_twist_constraint_update& out = output[i];
 
-		scene_entity entityA = { in.entityA, scene };
-		scene_entity entityB = { in.entityB, scene };
+		out.rigidBodyIndexA = bodyPairs[i].rbA;
+		out.rigidBodyIndexB = bodyPairs[i].rbB;
 
-		rigid_body_component& rbA = entityA.getComponent<rigid_body_component>();
-		rigid_body_component& rbB = entityB.getComponent<rigid_body_component>();
-
-		out.rigidBodyIndexA = (uint16)(&rbA - rbBase);
-		out.rigidBodyIndexB = (uint16)(&rbB - rbBase);
-
-		rigid_body_global_state& globalA = rbs[out.rigidBodyIndexA];
-		rigid_body_global_state& globalB = rbs[out.rigidBodyIndexB];
+		const rigid_body_global_state& globalA = rbs[out.rigidBodyIndexA];
+		const rigid_body_global_state& globalB = rbs[out.rigidBodyIndexB];
 
 		// Relative to COG.
-		out.relGlobalAnchorA = globalA.rotation * (in.localAnchorA - rbA.localCOGPosition);
-		out.relGlobalAnchorB = globalB.rotation * (in.localAnchorB - rbB.localCOGPosition);
+		out.relGlobalAnchorA = globalA.rotation * (in.localAnchorA - globalA.localCOGPosition);
+		out.relGlobalAnchorB = globalB.rotation * (in.localAnchorB - globalB.localCOGPosition);
 
 		// Global.
 		vec3 globalAnchorA = globalA.position + out.relGlobalAnchorA;
