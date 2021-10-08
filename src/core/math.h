@@ -728,7 +728,7 @@ static vec4 exp(vec4 v) { return vec4(exp(v.f4)); }
 
 static vec2 pow(vec2 v, float e) { return vec2(pow(v.x, e), pow(v.y, e)); }
 static vec3 pow(vec3 v, float e) { return vec3(pow(v.x, e), pow(v.y, e), pow(v.z, e)); }
-static vec4 pow(vec4 v, float e) { return vec4(pow(v.f4, e)); }
+static vec4 pow(vec4 v, float e) { return vec4(pow(v.f4, floatx4(e))); }
 
 mat2 operator*(const mat2& a, const mat2& b);
 mat3 operator*(const mat3& a, const mat3& b);
