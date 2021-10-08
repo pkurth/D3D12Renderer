@@ -706,15 +706,15 @@ void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints
 
 
 
-void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collision_contact* contacts, constraint_body_pair* bodyPairs, collision_constraint* collisionConstraints, uint32 numContacts, float dt)
+void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, collision_constraint* collisionConstraints, uint32 numContacts, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize collision constraints");
 
 	for (uint32 contactID = 0; contactID < numContacts; ++contactID)
 	{
 		collision_constraint& constraint = collisionConstraints[contactID];
-		collision_contact& contact = contacts[contactID];
-		constraint_body_pair& pair = bodyPairs[contactID];
+		const collision_contact& contact = contacts[contactID];
+		constraint_body_pair pair = bodyPairs[contactID];
 
 		auto& rbA = rbs[pair.rbA];
 		auto& rbB = rbs[pair.rbB];
@@ -769,15 +769,15 @@ void initializeCollisionVelocityConstraints(rigid_body_global_state* rbs, collis
 	}
 }
 
-void solveCollisionVelocityConstraints(collision_contact* contacts, collision_constraint* constraints, constraint_body_pair* bodyPairs, uint32 count, rigid_body_global_state* rbs)
+void solveCollisionVelocityConstraints(const collision_contact* contacts, collision_constraint* constraints, const constraint_body_pair* bodyPairs, uint32 count, rigid_body_global_state* rbs)
 {
 	CPU_PROFILE_BLOCK("Solve collision constraints");
 
 	for (uint32 i = 0; i < count; ++i)
 	{
-		collision_contact& contact = contacts[i];
+		const collision_contact& contact = contacts[i];
 		collision_constraint& constraint = constraints[i];
-		constraint_body_pair& pair = bodyPairs[i];
+		constraint_body_pair pair = bodyPairs[i];
 
 		auto& rbA = rbs[pair.rbA];
 		auto& rbB = rbs[pair.rbB];
@@ -849,7 +849,7 @@ struct alignas(32) simd_constraint_slot
 	uint32 indices[CONSTRAINT_SIMD_WIDTH];
 };
 
-static uint32 scheduleConstraintsSIMD(memory_arena& arena, constraint_body_pair* bodyPairs, uint32 numBodyPairs, uint16 dummyRigidBodyIndex, simd_constraint_slot* outConstraintSlots)
+static uint32 scheduleConstraintsSIMD(memory_arena& arena, const constraint_body_pair* bodyPairs, uint32 numBodyPairs, uint16 dummyRigidBodyIndex, simd_constraint_slot* outConstraintSlots)
 {
 	CPU_PROFILE_BLOCK("Schedule constraints SIMD");
 
@@ -984,7 +984,7 @@ static uint32 scheduleConstraintsSIMD(memory_arena& arena, constraint_body_pair*
 	return numConstraintSlots;
 }
 
-void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_global_state* rbs, collision_contact* contacts, constraint_body_pair* bodyPairs, uint32 numContacts,
+void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, uint32 numContacts,
 	uint16 dummyRigidBodyIndex, simd_collision_constraint& outConstraints, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize collision constraints SIMD");

@@ -322,7 +322,7 @@ static void transpose(floatx4& out0, floatx4& out1, floatx4& out2, floatx4& out3
 	_MM_TRANSPOSE4_PS(out0.f, out1.f, out2.f, out3.f);
 }
 
-static void load4(float* baseAddress, uint16* indices, uint32 stride,
+static void load4(const float* baseAddress, const uint16* indices, uint32 stride,
 	floatx4& out0, floatx4& out1, floatx4& out2, floatx4& out3)
 {
 	const uint32 strideInFloats = stride / sizeof(float);
@@ -335,7 +335,7 @@ static void load4(float* baseAddress, uint16* indices, uint32 stride,
 	transpose(out0, out1, out2, out3);
 }
 
-static void store4(float* baseAddress, uint16* indices, uint32 stride,
+static void store4(float* baseAddress, const uint16* indices, uint32 stride,
 	floatx4 in0, floatx4 in1, floatx4 in2, floatx4 in3)
 {
 	const uint32 strideInFloats = stride / sizeof(float);
@@ -348,7 +348,7 @@ static void store4(float* baseAddress, uint16* indices, uint32 stride,
 	in3.store(baseAddress + strideInFloats * indices[3]);
 }
 
-static void load8(float* baseAddress, uint16* indices, uint32 stride,
+static void load8(const float* baseAddress, const uint16* indices, uint32 stride,
 	floatx4& out0, floatx4& out1, floatx4& out2, floatx4& out3, floatx4& out4, floatx4& out5, floatx4& out6, floatx4& out7)
 {
 	const uint32 strideInFloats = stride / sizeof(float);
@@ -366,7 +366,7 @@ static void load8(float* baseAddress, uint16* indices, uint32 stride,
 	transpose(out4, out5, out6, out7);
 }
 
-static void store8(float* baseAddress, uint16* indices, uint32 stride,
+static void store8(float* baseAddress, const uint16* indices, uint32 stride,
 	floatx4 in0, floatx4 in1, floatx4 in2, floatx4 in3, floatx4 in4, floatx4 in5, floatx4 in6, floatx4 in7)
 {
 	const uint32 strideInFloats = stride / sizeof(float);
@@ -766,7 +766,7 @@ static void transpose(floatx8& out0, floatx8& out1, floatx8& out2, floatx8& out3
 	transpose32(out4, out5, out6, out7);
 }
 
-static void load4(float* baseAddress, uint16* indices, uint32 stride,
+static void load4(const float* baseAddress, const uint16* indices, uint32 stride,
 	floatx8& out0, floatx8& out1, floatx8& out2, floatx8& out3)
 {
 	const uint32 strideInFloats = stride / sizeof(float);
@@ -788,7 +788,7 @@ static void load4(float* baseAddress, uint16* indices, uint32 stride,
 	transpose32(out0, out1, out2, out3);
 }
 
-static void load8(float* baseAddress, uint16* indices, uint32 stride,
+static void load8(const float* baseAddress, const uint16* indices, uint32 stride,
 	floatx8& out0, floatx8& out1, floatx8& out2, floatx8& out3, floatx8& out4, floatx8& out5, floatx8& out6, floatx8& out7)
 {
 	const uint32 strideInFloats = stride / sizeof(float);
@@ -805,7 +805,7 @@ static void load8(float* baseAddress, uint16* indices, uint32 stride,
 	transpose(out0, out1, out2, out3, out4, out5, out6, out7);
 }
 
-static void store8(float* baseAddress, uint16* indices, uint32 stride,
+static void store8(float* baseAddress, const uint16* indices, uint32 stride,
 	floatx8 in0, floatx8 in1, floatx8 in2, floatx8 in3, floatx8 in4, floatx8 in5, floatx8 in6, floatx8 in7)
 {
 	const uint32 strideInFloats = stride / sizeof(float);
