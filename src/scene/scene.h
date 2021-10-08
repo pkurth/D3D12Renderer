@@ -209,7 +209,8 @@ struct game_scene
 	template <typename component_t>
 	auto raw()
 	{
-		return registry.view<component_t>().raw();
+		component_t** r = registry.view<component_t>().raw();
+		return r ? *r : 0;
 	}
 
 	template <typename func_t>

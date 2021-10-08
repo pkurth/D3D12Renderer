@@ -4,10 +4,10 @@
 #include <emmintrin.h>
 #include <immintrin.h>
 
-#define SIMD_SSE_2 // Not quite correct but I think it is safe to assume that every processor has SSE2.
+#define SIMD_SSE_2 // All x64 processors support SSE2.
 
 #if defined(__AVX__)
-#if defined(__AVX512BW__)
+#if defined(__AVX512F__)
 #define SIMD_AVX_512
 #define SIMD_AVX_2
 #elif defined(__AVX2__)

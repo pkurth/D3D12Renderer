@@ -42,6 +42,4 @@ struct rigid_body_component
 
 	vec3 forceAccumulator;
 	vec3 torqueAccumulator;
-
-	uint16 globalStateIndex;
 };

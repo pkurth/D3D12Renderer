@@ -57,14 +57,19 @@ static void removeEndpoint(uint16 endpointIndex, entt::registry& registry, sap_c
 
 void onColliderRemoved(entt::registry& registry, entt::entity entityHandle)
 {
-	sap_endpoint_indirection_component& endpointIndirection = registry.get<sap_endpoint_indirection_component>(entityHandle);
+	scene_entity entity = { entityHandle, &registry };
+
+	sap_endpoint_indirection_component& endpointIndirection = entity.getComponent<sap_endpoint_indirection_component>();
 
 	sap_context& context = registry.ctx<sap_context>();
 
 	removeEndpoint(endpointIndirection.startEndpoint, registry, context);
 	removeEndpoint(endpointIndirection.endEndpoint, registry, context);
 
-	registry.remove_if_exists<sap_endpoint_indirection_component>(entityHandle);
+	if (entity.hasComponent<sap_endpoint_indirection_component>())
+	{
+		entity.removeComponent<sap_endpoint_indirection_component>();
+	}
 }
 
 uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpaceAABBs, memory_arena& arena, broadphase_collision* outCollisions)

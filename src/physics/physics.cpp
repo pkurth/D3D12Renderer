@@ -540,11 +540,11 @@ static void getWorldSpaceColliders(game_scene& scene, bounding_box* outWorldspac
 }
 
 // Returns the accumulated force from all global force fields and writes localized forces (from force fields with colliders) in outLocalizedForceFields.
-// The second return value is the number of these localized force fields.
-static std::pair<vec3, uint32> getForceFieldStates(game_scene& scene, force_field_global_state* outLocalForceFields)
+static vec3 getForceFieldStates(game_scene& scene, force_field_global_state* outLocalForceFields)
 {
 	vec3 globalForceField(0.f);
-	uint32 numLocalForceFields = 0;
+
+	force_field_component* ffBase = scene.raw<force_field_component>();
 
 	for (auto [entityHandle, forceField] : scene.view<force_field_component>().each())
 	{
@@ -559,7 +559,8 @@ static std::pair<vec3, uint32> getForceFieldStates(game_scene& scene, force_fiel
 		if (entity.hasComponent<collider_component>())
 		{
 			// Localized force field.
-			outLocalForceFields[numLocalForceFields++].force = force;
+			uint16 index = (uint16)(&forceField - ffBase);
+			outLocalForceFields[index].force = force;
 		}
 		else
 		{
@@ -568,7 +569,7 @@ static std::pair<vec3, uint32> getForceFieldStates(game_scene& scene, force_fiel
 		}
 	}
 
-	return { globalForceField, numLocalForceFields };
+	return globalForceField;
 }
 
 void physicsStep(game_scene& scene, memory_arena& arena, float dt)
@@ -608,13 +609,14 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	// Collision detection.
 	getWorldSpaceColliders(scene, worldSpaceAABBs, worldSpaceColliders, dummyRigidBodyIndex);
 	uint32 numPossibleCollisions = broadphase(scene, 0, worldSpaceAABBs, arena, possibleCollisions);
+
 	non_collision_interaction* nonCollisionInteractions = arena.allocate<non_collision_interaction>(numPossibleCollisions);
 	collision_contact* contacts = arena.allocate<collision_contact>(numPossibleCollisions * 4); // Each collision can have up to 4 contact points.
 	constraint_body_pair* collisionBodyPairs = arena.allocate<constraint_body_pair>(numPossibleCollisions * 4);
 
 	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, possibleCollisions, numPossibleCollisions, contacts, collisionBodyPairs, nonCollisionInteractions);
 
-	auto [globalForceField, numLocalForceFields] = getForceFieldStates(scene, ffGlobal);
+	vec3 globalForceField = getForceFieldStates(scene, ffGlobal);
 
 
 	// Handle non-collision interactions (triggers, force fields etc).
@@ -638,13 +640,16 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 
 
 	//  Apply global forces (including gravity) and air drag and integrate forces.
-	for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, transform_component>().each())
 	{
-		uint16 globalStateIndex = (uint16)(&rb - rbBase);
-		rigid_body_global_state& global = rbGlobal[globalStateIndex];
-		rb.forceAccumulator += globalForceField;
-		rb.applyGravityAndIntegrateForces(global, transform, dt);
-		rb.globalStateIndex = globalStateIndex;
+		CPU_PROFILE_BLOCK("Integrate rigid body forces");
+
+		uint32 rbIndex = numRigidBodies - 1; // ENTT iterates back to front.
+		for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, transform_component>().each())
+		{
+			rigid_body_global_state& global = rbGlobal[rbIndex--];
+			rb.forceAccumulator += globalForceField;
+			rb.applyGravityAndIntegrateForces(global, transform, dt);
+		}
 	}
 
 	// Kinematic rigid body. This is used in collision constraint solving, when a collider has no rigid body.
@@ -726,10 +731,15 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 
 
 	// Integrate velocities.
-	for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, transform_component>().each())
 	{
-		rigid_body_global_state& global = rbGlobal[rb.globalStateIndex];
-		rb.integrateVelocity(global, transform, dt);
+		CPU_PROFILE_BLOCK("Integrate rigid body velocities");
+
+		uint32 rbIndex = numRigidBodies - 1; // ENTT iterates back to front.
+		for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, transform_component>().each())
+		{
+			rigid_body_global_state& global = rbGlobal[rbIndex--];
+			rb.integrateVelocity(global, transform, dt);
+		}
 	}
 
 
