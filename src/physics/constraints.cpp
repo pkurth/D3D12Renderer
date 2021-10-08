@@ -188,6 +188,8 @@ void initializeDistanceVelocityConstraints(const rigid_body_global_state* rbs, c
 {
 	CPU_PROFILE_BLOCK("Initialize distance constraints");
 
+	float invDt = 1.f / dt;
+
 	for (uint32 i = 0; i < count; ++i)
 	{
 		const distance_constraint& in = input[i];
@@ -220,7 +222,7 @@ void initializeDistanceVelocityConstraints(const rigid_body_global_state* rbs, c
 		out.bias = 0.f;
 		if (dt > DT_THRESHOLD)
 		{
-			out.bias = (l - in.globalLength) * DISTANCE_CONSTRAINT_BETA / dt;
+			out.bias = (l - in.globalLength) * (DISTANCE_CONSTRAINT_BETA * invDt);
 		}
 
 		out.impulseToAngularVelocityA = globalA.invInertia * cross(out.relGlobalAnchorA, crAu);
@@ -352,7 +354,7 @@ void initializeDistanceVelocityConstraintsSIMD(memory_arena& arena, const rigid_
 		floatw bias = zero;
 		if (dt > DT_THRESHOLD)
 		{
-			bias = (l - globalLength) * DISTANCE_CONSTRAINT_BETA * invDt;
+			bias = (l - globalLength) * (DISTANCE_CONSTRAINT_BETA * invDt);
 		}
 
 		vec3w impulseToAngularVelocityA = invInertiaA * cross(relGlobalAnchorA, crAu);
@@ -447,6 +449,8 @@ void initializeBallJointVelocityConstraints(const rigid_body_global_state* rbs, 
 {
 	CPU_PROFILE_BLOCK("Initialize ball joint constraints");
 
+	float invDt = 1.f / dt;
+
 	for (uint32 i = 0; i < count; ++i)
 	{
 		const ball_joint_constraint& in = input[i];
@@ -475,7 +479,7 @@ void initializeBallJointVelocityConstraints(const rigid_body_global_state* rbs, 
 		out.bias = 0.f;
 		if (dt > DT_THRESHOLD)
 		{
-			out.bias = (globalAnchorB - globalAnchorA) * BALL_JOINT_CONSTRAINT_BETA / dt;
+			out.bias = (globalAnchorB - globalAnchorA) * (BALL_JOINT_CONSTRAINT_BETA * invDt);
 		}
 	}
 }
@@ -599,7 +603,7 @@ void initializeBallJointVelocityConstraintsSIMD(memory_arena& arena, const rigid
 		vec3w bias = zero;
 		if (dt > DT_THRESHOLD)
 		{
-			bias = (globalAnchorB - globalAnchorA) * floatw(BALL_JOINT_CONSTRAINT_BETA) * invDt;
+			bias = (globalAnchorB - globalAnchorA) * (BALL_JOINT_CONSTRAINT_BETA * invDt);
 		}
 
 		relGlobalAnchorA.x.store(batch.relGlobalAnchorA[0]);
@@ -705,6 +709,8 @@ void initializeHingeJointVelocityConstraints(const rigid_body_global_state* rbs,
 {
 	CPU_PROFILE_BLOCK("Initialize hinge joint constraints");
 
+	float invDt = 1.f / dt;
+
 	for (uint32 i = 0; i < count; ++i)
 	{
 		const hinge_joint_constraint& in = input[i];
@@ -738,7 +744,7 @@ void initializeHingeJointVelocityConstraints(const rigid_body_global_state* rbs,
 		out.translationBias = 0.f;
 		if (dt > DT_THRESHOLD)
 		{
-			out.translationBias = (globalAnchorB - globalAnchorA) * BALL_JOINT_CONSTRAINT_BETA / dt;
+			out.translationBias = (globalAnchorB - globalAnchorA) * (BALL_JOINT_CONSTRAINT_BETA * invDt);
 		}
 
 
@@ -768,7 +774,7 @@ void initializeHingeJointVelocityConstraints(const rigid_body_global_state* rbs,
 		out.rotationBias = vec2(0.f, 0.f);
 		if (dt > DT_THRESHOLD)
 		{
-			out.rotationBias = vec2(dot(globalHingeAxisA, globalTangentB), dot(globalHingeAxisA, globalBitangentB)) * HINGE_ROTATION_CONSTRAINT_BETA / dt;
+			out.rotationBias = vec2(dot(globalHingeAxisA, globalTangentB), dot(globalHingeAxisA, globalBitangentB)) * (HINGE_ROTATION_CONSTRAINT_BETA * invDt);
 		}
 
 
@@ -813,14 +819,14 @@ void initializeHingeJointVelocityConstraints(const rigid_body_global_state* rbs,
 					float minLimit = (in.minRotationLimit <= 0.f) ? in.minRotationLimit : -M_PI;
 					float maxLimit = (in.maxRotationLimit >= 0.f) ? in.maxRotationLimit : M_PI;
 					float targetAngle = clamp(in.motorTargetAngle, minLimit, maxLimit);
-					out.motorVelocity = (dt > DT_THRESHOLD) ? ((targetAngle - angle) / dt) : 0.f;
+					out.motorVelocity = (dt > DT_THRESHOLD) ? ((targetAngle - angle) * invDt) : 0.f;
 				}
 
 				out.limitBias = 0.f;
 				if (dt > DT_THRESHOLD)
 				{
 					float d = minLimitViolated ? (angle - in.minRotationLimit) : (in.maxRotationLimit - angle);
-					out.limitBias = d * HINGE_LIMIT_CONSTRAINT_BETA / dt;
+					out.limitBias = d * HINGE_LIMIT_CONSTRAINT_BETA * invDt;
 				}
 			}
 		}
@@ -921,9 +927,15 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 	}
 }
 
+
+
+
+
 void initializeConeTwistVelocityConstraints(const rigid_body_global_state* rbs, const cone_twist_constraint* input, const constraint_body_pair* bodyPairs, cone_twist_constraint_update* output, uint32 count, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize cone twist constraints");
+
+	float invDt = 1.f / dt;
 
 	for (uint32 i = 0; i < count; ++i)
 	{
@@ -953,7 +965,7 @@ void initializeConeTwistVelocityConstraints(const rigid_body_global_state* rbs, 
 		out.bias = 0.f;
 		if (dt > DT_THRESHOLD)
 		{
-			out.bias = (globalAnchorB - globalAnchorA) * BALL_JOINT_CONSTRAINT_BETA / dt;
+			out.bias = (globalAnchorB - globalAnchorA) * (BALL_JOINT_CONSTRAINT_BETA * invDt);
 		}
 
 
@@ -994,7 +1006,7 @@ void initializeConeTwistVelocityConstraints(const rigid_body_global_state* rbs, 
 			out.swingLimitBias = 0.f;
 			if (dt > DT_THRESHOLD)
 			{
-				out.swingLimitBias = (in.swingLimit - swingAngle) * HINGE_LIMIT_CONSTRAINT_BETA / dt;
+				out.swingLimitBias = (in.swingLimit - swingAngle) * (HINGE_LIMIT_CONSTRAINT_BETA * invDt);
 			}
 
 			out.swingLimitImpulseToAngularVelocityA = globalA.invInertia * out.globalSwingAxis;
@@ -1030,7 +1042,7 @@ void initializeConeTwistVelocityConstraints(const rigid_body_global_state* rbs, 
 
 				float cosAngle = dot(localTargetDirection, localLimitAxisCompareA);
 				float deltaAngle = acos(clamp01(cosAngle));
-				out.swingMotorVelocity = (dt > DT_THRESHOLD) ? (deltaAngle / dt * 0.2f) : 0.f;
+				out.swingMotorVelocity = (dt > DT_THRESHOLD) ? (deltaAngle * invDt * 0.2f) : 0.f;
 			}
 
 			out.swingMotorImpulseToAngularVelocityA = globalA.invInertia * out.globalSwingMotorAxis;
@@ -1071,14 +1083,14 @@ void initializeConeTwistVelocityConstraints(const rigid_body_global_state* rbs, 
 				// This will later get clamped to the maximum motor impulse.
 				float limit = (in.twistLimit >= 0.f) ? in.twistLimit : M_PI;
 				float targetAngle = clamp(in.twistMotorTargetAngle, -limit, limit);
-				out.twistMotorVelocity = (dt > DT_THRESHOLD) ? ((targetAngle - twistAngle) / dt) : 0.f;
+				out.twistMotorVelocity = (dt > DT_THRESHOLD) ? ((targetAngle - twistAngle) * invDt) : 0.f;
 			}
 
 			out.twistLimitBias = 0.f;
 			if (dt > DT_THRESHOLD)
 			{
 				float d = minTwistLimitViolated ? (in.twistLimit + twistAngle) : (in.twistLimit - twistAngle);
-				out.twistLimitBias = d * TWIST_LIMIT_CONSTRAINT_BETA / dt;
+				out.twistLimitBias = d * TWIST_LIMIT_CONSTRAINT_BETA * invDt;
 			}
 		}
 	}
@@ -1210,6 +1222,8 @@ void initializeCollisionVelocityConstraints(const rigid_body_global_state* rbs, 
 {
 	CPU_PROFILE_BLOCK("Initialize collision constraints");
 
+	float invDt = 1.f / dt;
+
 	for (uint32 contactID = 0; contactID < numContacts; ++contactID)
 	{
 		collision_constraint& constraint = outConstraints[contactID];
@@ -1259,7 +1273,7 @@ void initializeCollisionVelocityConstraints(const rigid_body_global_state* rbs, 
 				if (-contact.penetrationDepth < slop && vRel < 0.f)
 				{
 					float restitution = (float)(contact.friction_restitution & 0xFFFF) / (float)0xFFFF;
-					constraint.bias = -restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) / dt;
+					constraint.bias = -restitution * vRel - 0.1f * (-contact.penetrationDepth - slop) * invDt;
 				}
 			}
 

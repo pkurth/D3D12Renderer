@@ -371,6 +371,9 @@ void solveCollisionVelocityConstraints(const collision_contact* contacts, collis
 void initializeDistanceVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const distance_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, simd_distance_constraint& outConstraints, float dt);
 void solveDistanceVelocityConstraintsSIMD(simd_distance_constraint& constraints, rigid_body_global_state* rbs);
 
+void initializeBallJointVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const ball_joint_constraint* input, const constraint_body_pair* bodyPairs, uint32 count,
+	simd_ball_joint_constraint& outConstraints, float dt);
+void solveBallJointVelocityConstraintsSIMD(simd_ball_joint_constraint& constraints, rigid_body_global_state* rbs);
 
 void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, uint32 numContacts,
 	uint16 dummyRigidBodyIndex, simd_collision_constraint& outConstraints, float dt);
