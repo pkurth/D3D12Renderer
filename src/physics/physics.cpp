@@ -692,10 +692,6 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	hinge_joint_constraint* hingeJointConstraints = scene.raw<hinge_joint_constraint>();
 	cone_twist_constraint* coneTwistConstraints = scene.raw<cone_twist_constraint>();
 
-	distance_constraint_update* distanceConstraintUpdates = arena.allocate<distance_constraint_update>(numDistanceConstraints);
-	ball_joint_constraint_update* ballJointConstraintUpdates = arena.allocate<ball_joint_constraint_update>(numBallJointConstraints);
-	hinge_joint_constraint_update* hingeJointConstraintUpdates = arena.allocate<hinge_joint_constraint_update>(numHingeJointConstraints);
-
 	constraint_body_pair* distanceConstraintBodyPairs = allConstraintBodyPairs + 0;
 	constraint_body_pair* ballJointConstraintBodyPairs = distanceConstraintBodyPairs + numDistanceConstraints;
 	constraint_body_pair* hingeJointConstraintBodyPairs = ballJointConstraintBodyPairs + numBallJointConstraints;
@@ -706,19 +702,20 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	getConstraintBodyPairs<hinge_joint_constraint>(scene, hingeJointConstraintBodyPairs);
 	getConstraintBodyPairs<cone_twist_constraint>(scene, coneTwistConstraintBodyPairs);
 
+	distance_constraint_solver distanceConstraintSolver;
+	simd_distance_constraint_solver distanceConstraintSolverSIMD;
 
+	ball_joint_constraint_solver ballJointConstraintSolver;
+	simd_ball_joint_constraint_solver ballJointConstraintSolverSIMD;
 
-	cone_twist_constraint_update* coneTwistConstraintUpdates;
-	simd_cone_twist_constraint coneTwistConstraintsSIMD;
+	hinge_joint_constraint_solver hingeJointConstraintSolver;
+	simd_hinge_joint_constraint_solver hingeJointConstraintSolverSIMD;
 
-	collision_constraint* collisionConstraints;
-	simd_collision_constraint collisionConstraintsSIMD;
+	cone_twist_constraint_solver coneTwistConstraintSolver;
+	simd_cone_twist_constraint_solver coneTwistConstraintSolverSIMD;
 
-	if (!physicsSettings.simd)
-	{
-		coneTwistConstraintUpdates = arena.allocate<cone_twist_constraint_update>(numConeTwistConstraints);
-		collisionConstraints = arena.allocate<collision_constraint>(numContacts);
-	}
+	collision_constraint_solver collisionConstraintSolver;
+	simd_collision_constraint_solver collisionConstraintSolverSIMD;
 
 
 	// Solve constraints.
@@ -727,38 +724,41 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 
 		if (physicsSettings.simd)
 		{
-			initializeConeTwistVelocityConstraintsSIMD(arena, rbGlobal, coneTwistConstraints, coneTwistConstraintBodyPairs, numConeTwistConstraints, coneTwistConstraintsSIMD, dt);
-			initializeCollisionVelocityConstraintsSIMD(arena, rbGlobal, contacts, collisionBodyPairs, numContacts, dummyRigidBodyIndex, collisionConstraintsSIMD, dt);
+			distanceConstraintSolverSIMD = initializeDistanceVelocityConstraintsSIMD(arena, rbGlobal, distanceConstraints, distanceConstraintBodyPairs, numDistanceConstraints, dt);
+			ballJointConstraintSolverSIMD = initializeBallJointVelocityConstraintsSIMD(arena, rbGlobal, ballJointConstraints, ballJointConstraintBodyPairs, numBallJointConstraints, dt);
+			hingeJointConstraintSolverSIMD = initializeHingeJointVelocityConstraintsSIMD(arena, rbGlobal, hingeJointConstraints, hingeJointConstraintBodyPairs, numHingeJointConstraints, dt);
+			coneTwistConstraintSolverSIMD = initializeConeTwistVelocityConstraintsSIMD(arena, rbGlobal, coneTwistConstraints, coneTwistConstraintBodyPairs, numConeTwistConstraints, dt);
+			collisionConstraintSolverSIMD = initializeCollisionVelocityConstraintsSIMD(arena, rbGlobal, contacts, collisionBodyPairs, numContacts, dummyRigidBodyIndex, dt);
 		}
 		else
 		{
-			initializeConeTwistVelocityConstraints(rbGlobal, coneTwistConstraints, coneTwistConstraintBodyPairs, coneTwistConstraintUpdates, numConeTwistConstraints, dt);
-			initializeCollisionVelocityConstraints(rbGlobal, contacts, collisionBodyPairs, collisionConstraints, numContacts, dt);
+			distanceConstraintSolver = initializeDistanceVelocityConstraints(arena, rbGlobal, distanceConstraints, distanceConstraintBodyPairs, numDistanceConstraints, dt);
+			ballJointConstraintSolver = initializeBallJointVelocityConstraints(arena, rbGlobal, ballJointConstraints, ballJointConstraintBodyPairs, numBallJointConstraints, dt);
+			hingeJointConstraintSolver = initializeHingeJointVelocityConstraints(arena, rbGlobal, hingeJointConstraints, hingeJointConstraintBodyPairs, numHingeJointConstraints, dt);
+			coneTwistConstraintSolver = initializeConeTwistVelocityConstraints(arena, rbGlobal, coneTwistConstraints, coneTwistConstraintBodyPairs, numConeTwistConstraints, dt);
+			collisionConstraintSolver = initializeCollisionVelocityConstraints(arena, rbGlobal, contacts, collisionBodyPairs, numContacts, dt);
 		}
-		
-
-		initializeDistanceVelocityConstraints(rbGlobal, distanceConstraints, distanceConstraintBodyPairs, distanceConstraintUpdates, numDistanceConstraints, dt);
-		initializeBallJointVelocityConstraints(rbGlobal, ballJointConstraints, ballJointConstraintBodyPairs, ballJointConstraintUpdates, numBallJointConstraints, dt);
-		initializeHingeJointVelocityConstraints(rbGlobal, hingeJointConstraints, hingeJointConstraintBodyPairs, hingeJointConstraintUpdates, numHingeJointConstraints, dt);
 	}
 	{
 		CPU_PROFILE_BLOCK("Solve constraints");
 
 		for (uint32 it = 0; it < physicsSettings.numRigidSolverIterations; ++it)
 		{
-			solveDistanceVelocityConstraints(distanceConstraintUpdates, numDistanceConstraints, rbGlobal);
-			solveBallJointVelocityConstraints(ballJointConstraintUpdates, numBallJointConstraints, rbGlobal);
-			solveHingeJointVelocityConstraints(hingeJointConstraintUpdates, numHingeJointConstraints, rbGlobal);
-
 			if (physicsSettings.simd)
 			{
-				solveConeTwistVelocityConstraintsSIMD(coneTwistConstraintsSIMD, rbGlobal);
-				solveCollisionVelocityConstraintsSIMD(collisionConstraintsSIMD, rbGlobal);
+				solveDistanceVelocityConstraintsSIMD(distanceConstraintSolverSIMD, rbGlobal);
+				solveBallJointVelocityConstraintsSIMD(ballJointConstraintSolverSIMD, rbGlobal);
+				solveHingeJointVelocityConstraintsSIMD(hingeJointConstraintSolverSIMD, rbGlobal);
+				solveConeTwistVelocityConstraintsSIMD(coneTwistConstraintSolverSIMD, rbGlobal);
+				solveCollisionVelocityConstraintsSIMD(collisionConstraintSolverSIMD, rbGlobal);
 			}
 			else
 			{
-				solveConeTwistVelocityConstraints(coneTwistConstraintUpdates, numConeTwistConstraints, rbGlobal);
-				solveCollisionVelocityConstraints(contacts, collisionConstraints, collisionBodyPairs, numContacts, rbGlobal);
+				solveDistanceVelocityConstraints(distanceConstraintSolver, rbGlobal);
+				solveBallJointVelocityConstraints(ballJointConstraintSolver, rbGlobal);
+				solveHingeJointVelocityConstraints(hingeJointConstraintSolver, rbGlobal);
+				solveConeTwistVelocityConstraints(coneTwistConstraintSolver, rbGlobal);
+				solveCollisionVelocityConstraints(collisionConstraintSolver, rbGlobal);
 			}
 		}
 	}

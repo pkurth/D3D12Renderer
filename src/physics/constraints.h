@@ -5,6 +5,10 @@
 #include "scene/scene.h"
 
 
+
+struct rigid_body_global_state;
+struct collision_contact;
+
 #define CONSTRAINT_SIMD_WIDTH 8
 
 enum constraint_type
@@ -82,6 +86,12 @@ struct distance_constraint_update
 	float effectiveMass;
 };
 
+struct distance_constraint_solver
+{
+	distance_constraint_update* constraints;
+	uint32 count;
+};
+
 struct simd_distance_constraint_batch
 {
 	float relGlobalAnchorA[3][CONSTRAINT_SIMD_WIDTH];
@@ -98,7 +108,7 @@ struct simd_distance_constraint_batch
 	uint16 rbBIndices[CONSTRAINT_SIMD_WIDTH];
 };
 
-struct simd_distance_constraint
+struct simd_distance_constraint_solver
 {
 	simd_distance_constraint_batch* batches;
 	uint32 numBatches;
@@ -124,6 +134,12 @@ struct ball_joint_constraint_update
 	mat3 invEffectiveMass;
 };
 
+struct ball_joint_constraint_solver
+{
+	ball_joint_constraint_update* constraints;
+	uint32 count;
+};
+
 struct simd_ball_joint_constraint_batch
 {
 	float relGlobalAnchorA[3][CONSTRAINT_SIMD_WIDTH];
@@ -136,7 +152,7 @@ struct simd_ball_joint_constraint_batch
 	uint16 rbBIndices[CONSTRAINT_SIMD_WIDTH];
 };
 
-struct simd_ball_joint_constraint
+struct simd_ball_joint_constraint_solver
 {
 	simd_ball_joint_constraint_batch* batches;
 	uint32 numBatches;
@@ -152,24 +168,25 @@ struct hinge_joint_constraint
 	vec3 localHingeAxisA;
 	vec3 localHingeAxisB;
 
-	// Used for limits and motor.
-	vec3 localHingeTangentA;
-	vec3 localHingeBitangentA;
-	vec3 localHingeTangentB;
-
 	// Limits. The rotation limits are the allowed deviations in radians from the initial relative rotation.
 	// If the limits are not in the specified range, they are disabled.
 	float minRotationLimit; // [-pi, 0]
 	float maxRotationLimit; // [0, pi]
 
 	// Motor.
+	float maxMotorTorque;
 	constraint_motor_type motorType;
 	union
 	{
 		float motorVelocity;
 		float motorTargetAngle;
 	};
-	float maxMotorTorque;
+
+
+	// Used for limits and motor.
+	vec3 localHingeTangentA;
+	vec3 localHingeBitangentA;
+	vec3 localHingeTangentB;
 };
 
 struct hinge_joint_constraint_update
@@ -206,6 +223,54 @@ struct hinge_joint_constraint_update
 
 	vec3 motorAndLimitImpulseToAngularVelocityA;
 	vec3 motorAndLimitImpulseToAngularVelocityB;
+};
+
+struct hinge_joint_constraint_solver
+{
+	hinge_joint_constraint_update* constraints;
+	uint32 count;
+};
+
+struct simd_hinge_joint_constraint_batch
+{
+	uint16 rbAIndices[CONSTRAINT_SIMD_WIDTH];
+	uint16 rbBIndices[CONSTRAINT_SIMD_WIDTH];
+
+	float relGlobalAnchorA[3][CONSTRAINT_SIMD_WIDTH];
+	float relGlobalAnchorB[3][CONSTRAINT_SIMD_WIDTH];
+
+	float translationBias[3][CONSTRAINT_SIMD_WIDTH];
+	float invEffectiveTranslationMass[9][CONSTRAINT_SIMD_WIDTH];
+
+
+	float rotationBias[2][CONSTRAINT_SIMD_WIDTH];
+	float invEffectiveRotationMass[4][CONSTRAINT_SIMD_WIDTH];
+	float bxa[3][CONSTRAINT_SIMD_WIDTH];
+	float cxa[3][CONSTRAINT_SIMD_WIDTH];
+
+	bool solveLimit;
+	bool solveMotor;
+
+	float globalRotationAxis[3][CONSTRAINT_SIMD_WIDTH];
+	float effectiveLimitAxialMass[CONSTRAINT_SIMD_WIDTH];
+	float effectiveMotorAxialMass[CONSTRAINT_SIMD_WIDTH];
+
+	float limitImpulse[CONSTRAINT_SIMD_WIDTH];
+	float limitBias[CONSTRAINT_SIMD_WIDTH];
+	float limitSign[CONSTRAINT_SIMD_WIDTH];
+
+	float motorImpulse[CONSTRAINT_SIMD_WIDTH];
+	float maxMotorImpulse[CONSTRAINT_SIMD_WIDTH];
+	float motorVelocity[CONSTRAINT_SIMD_WIDTH];
+
+	float motorAndLimitImpulseToAngularVelocityA[3][CONSTRAINT_SIMD_WIDTH];
+	float motorAndLimitImpulseToAngularVelocityB[3][CONSTRAINT_SIMD_WIDTH];
+};
+
+struct simd_hinge_joint_constraint_solver
+{
+	simd_hinge_joint_constraint_batch* batches;
+	uint32 numBatches;
 };
 
 
@@ -292,6 +357,12 @@ struct cone_twist_constraint_update
 	vec3 swingLimitImpulseToAngularVelocityB;
 };
 
+struct cone_twist_constraint_solver
+{
+	cone_twist_constraint_update* constraints;
+	uint32 count;
+};
+
 struct simd_cone_twist_constraint_batch
 {
 	uint16 rbAIndices[CONSTRAINT_SIMD_WIDTH];
@@ -345,7 +416,7 @@ struct simd_cone_twist_constraint_batch
 	float twistMotorAndLimitImpulseToAngularVelocityB[3][CONSTRAINT_SIMD_WIDTH];
 };
 
-struct simd_cone_twist_constraint
+struct simd_cone_twist_constraint_solver
 {
 	simd_cone_twist_constraint_batch* batches;
 	uint32 numBatches;
@@ -373,6 +444,14 @@ struct collision_constraint
 	float bias;
 };
 
+struct collision_constraint_solver
+{
+	collision_constraint* constraints;
+	const collision_contact* contacts;
+	const constraint_body_pair* bodyPairs;
+	uint32 count;
+};
+
 struct simd_collision_constraint_batch
 {
 	float relGlobalAnchorA[3][CONSTRAINT_SIMD_WIDTH];
@@ -396,7 +475,7 @@ struct simd_collision_constraint_batch
 	uint16 rbBIndices[CONSTRAINT_SIMD_WIDTH];
 };
 
-struct simd_collision_constraint
+struct simd_collision_constraint_solver
 {
 	simd_collision_constraint_batch* batches;
 	uint32 numBatches;
@@ -404,41 +483,39 @@ struct simd_collision_constraint
 
 
 
-struct rigid_body_global_state;
-struct collision_contact;
 
-void initializeDistanceVelocityConstraints(const rigid_body_global_state* rbs, const distance_constraint* input, const constraint_body_pair* bodyPairs, distance_constraint_update* output, uint32 count, float dt);
-void solveDistanceVelocityConstraints(distance_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);
+distance_constraint_solver initializeDistanceVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const distance_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
+void solveDistanceVelocityConstraints(distance_constraint_solver constraints, rigid_body_global_state* rbs);
 
-void initializeBallJointVelocityConstraints(const rigid_body_global_state* rbs, const ball_joint_constraint* input, const constraint_body_pair* bodyPairs, ball_joint_constraint_update* output, uint32 count, float dt);
-void solveBallJointVelocityConstraints(ball_joint_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);
+ball_joint_constraint_solver initializeBallJointVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const ball_joint_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
+void solveBallJointVelocityConstraints(ball_joint_constraint_solver constraints, rigid_body_global_state* rbs);
 
-void initializeHingeJointVelocityConstraints(const rigid_body_global_state* rbs, const hinge_joint_constraint* input, const constraint_body_pair* bodyPairs, hinge_joint_constraint_update* output, uint32 count, float dt);
-void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);
+hinge_joint_constraint_solver initializeHingeJointVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const hinge_joint_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
+void solveHingeJointVelocityConstraints(hinge_joint_constraint_solver constraints, rigid_body_global_state* rbs);
 
-void initializeConeTwistVelocityConstraints(const rigid_body_global_state* rbs, const cone_twist_constraint* input, const constraint_body_pair* bodyPairs, cone_twist_constraint_update* output, uint32 count, float dt);
-void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs);
+cone_twist_constraint_solver initializeConeTwistVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const cone_twist_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
+void solveConeTwistVelocityConstraints(cone_twist_constraint_solver constraints, rigid_body_global_state* rbs);
 
-void initializeCollisionVelocityConstraints(const rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, collision_constraint* outConstraints, uint32 numContacts, float dt);
-void solveCollisionVelocityConstraints(const collision_contact* contacts, collision_constraint* constraints, const constraint_body_pair* bodyPairs, uint32 count, rigid_body_global_state* rbs);
+collision_constraint_solver initializeCollisionVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, uint32 numContacts, float dt);
+void solveCollisionVelocityConstraints(collision_constraint_solver constraints, rigid_body_global_state* rbs);
 
 
 
 
 // SIMD.
 
-void initializeDistanceVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const distance_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, simd_distance_constraint& outConstraints, float dt);
-void solveDistanceVelocityConstraintsSIMD(simd_distance_constraint& constraints, rigid_body_global_state* rbs);
+simd_distance_constraint_solver initializeDistanceVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const distance_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
+void solveDistanceVelocityConstraintsSIMD(simd_distance_constraint_solver constraints, rigid_body_global_state* rbs);
 
-void initializeBallJointVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const ball_joint_constraint* input, const constraint_body_pair* bodyPairs, uint32 count,
-	simd_ball_joint_constraint& outConstraints, float dt);
-void solveBallJointVelocityConstraintsSIMD(simd_ball_joint_constraint& constraints, rigid_body_global_state* rbs);
+simd_ball_joint_constraint_solver initializeBallJointVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const ball_joint_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
+void solveBallJointVelocityConstraintsSIMD(simd_ball_joint_constraint_solver constraints, rigid_body_global_state* rbs);
 
-void initializeConeTwistVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const cone_twist_constraint* input, const constraint_body_pair* bodyPairs, uint32 count,
-	simd_cone_twist_constraint& outConstraints, float dt);
-void solveConeTwistVelocityConstraintsSIMD(simd_cone_twist_constraint& constraints, rigid_body_global_state* rbs);
+simd_hinge_joint_constraint_solver initializeHingeJointVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const hinge_joint_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
+void solveHingeJointVelocityConstraintsSIMD(simd_hinge_joint_constraint_solver constraints, rigid_body_global_state* rbs);
 
-void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, uint32 numContacts,
-	uint16 dummyRigidBodyIndex, simd_collision_constraint& outConstraints, float dt);
-void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint& constraints, rigid_body_global_state* rbs);
+simd_cone_twist_constraint_solver initializeConeTwistVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const cone_twist_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
+void solveConeTwistVelocityConstraintsSIMD(simd_cone_twist_constraint_solver constraints, rigid_body_global_state* rbs);
+
+simd_collision_constraint_solver initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, uint32 numContacts, uint16 dummyRigidBodyIndex, float dt);
+void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint_solver constraints, rigid_body_global_state* rbs);
 

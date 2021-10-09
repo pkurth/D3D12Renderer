@@ -20,6 +20,7 @@ typedef vec2x<floatx4> vec2w;
 typedef vec3x<floatx4> vec3w;
 typedef vec4x<floatx4> vec4w;
 typedef quatx<floatx4> quatw;
+typedef mat2x<floatx4> mat2w;
 typedef mat3x<floatx4> mat3w;
 typedef floatx4 floatw;
 typedef intx4 intw;
@@ -28,6 +29,7 @@ typedef vec2x<floatx8> vec2w;
 typedef vec3x<floatx8> vec3w;
 typedef vec4x<floatx8> vec4w;
 typedef quatx<floatx8> quatw;
+typedef mat2x<floatx8> mat2w;
 typedef mat3x<floatx8> mat3w;
 typedef floatx8 floatw;
 typedef intx8 intw;
@@ -184,16 +186,18 @@ static uint32 scheduleConstraintsSIMD(memory_arena& arena, const constraint_body
 
 
 
-void initializeDistanceVelocityConstraints(const rigid_body_global_state* rbs, const distance_constraint* input, const constraint_body_pair* bodyPairs, distance_constraint_update* output, uint32 count, float dt)
+distance_constraint_solver initializeDistanceVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const distance_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize distance constraints");
 
 	float invDt = 1.f / dt;
 
+	distance_constraint_update* constraints = arena.allocate<distance_constraint_update>(count);
+
 	for (uint32 i = 0; i < count; ++i)
 	{
 		const distance_constraint& in = input[i];
-		distance_constraint_update& out = output[i];
+		distance_constraint_update& out = constraints[i];
 
 		out.rigidBodyIndexA = bodyPairs[i].rbA;
 		out.rigidBodyIndexB = bodyPairs[i].rbB;
@@ -228,15 +232,20 @@ void initializeDistanceVelocityConstraints(const rigid_body_global_state* rbs, c
 		out.impulseToAngularVelocityA = globalA.invInertia * cross(out.relGlobalAnchorA, crAu);
 		out.impulseToAngularVelocityB = globalB.invInertia * cross(out.relGlobalAnchorB, crBu);
 	}
+
+	distance_constraint_solver result;
+	result.constraints = constraints;
+	result.count = count;
+	return result;
 }
 
-void solveDistanceVelocityConstraints(distance_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs)
+void solveDistanceVelocityConstraints(distance_constraint_solver constraints, rigid_body_global_state* rbs)
 {
 	CPU_PROFILE_BLOCK("Solve distance constraints");
 
-	for (uint32 i = 0; i < count; ++i)
+	for (uint32 i = 0; i < constraints.count; ++i)
 	{
-		distance_constraint_update& con = constraints[i];
+		distance_constraint_update& con = constraints.constraints[i];
 
 		rigid_body_global_state& rbA = rbs[con.rigidBodyIndexA];
 		rigid_body_global_state& rbB = rbs[con.rigidBodyIndexB];
@@ -254,24 +263,22 @@ void solveDistanceVelocityConstraints(distance_constraint_update* constraints, u
 	}
 }
 
-void initializeDistanceVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const distance_constraint* input, const constraint_body_pair* bodyPairs, uint32 count,
-	simd_distance_constraint& outConstraints, float dt)
+simd_distance_constraint_solver initializeDistanceVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const distance_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize distance constraints SIMD");
 
 	simd_constraint_slot* contactSlots = arena.allocate<simd_constraint_slot>(count);
-	uint32 numContactSlots = scheduleConstraintsSIMD(arena, bodyPairs, count, UINT16_MAX, contactSlots);
+	uint32 numBatches = scheduleConstraintsSIMD(arena, bodyPairs, count, UINT16_MAX, contactSlots);
 
-	outConstraints.numBatches = numContactSlots;
-	outConstraints.batches = arena.allocate<simd_distance_constraint_batch>(outConstraints.numBatches);
+	simd_distance_constraint_batch* batches = arena.allocate<simd_distance_constraint_batch>(numBatches);
 
 	const floatw zero = floatw::zero();
 	const floatw invDt = 1.f / dt;
 
-	for (uint32 i = 0; i < numContactSlots; ++i)
+	for (uint32 i = 0; i < numBatches; ++i)
 	{
 		const simd_constraint_slot& slot = contactSlots[i];
-		simd_distance_constraint_batch& batch = outConstraints.batches[i];
+		simd_distance_constraint_batch& batch = batches[i];
 
 		uint16 constraintIndices[CONSTRAINT_SIMD_WIDTH];
 		for (uint32 j = 0; j < CONSTRAINT_SIMD_WIDTH; ++j)
@@ -384,9 +391,14 @@ void initializeDistanceVelocityConstraintsSIMD(memory_arena& arena, const rigid_
 		bias.store(batch.bias);
 		effectiveMass.store(batch.effectiveMass);
 	}
+
+	simd_distance_constraint_solver result;
+	result.batches = batches;
+	result.numBatches = numBatches;
+	return result;
 }
 
-void solveDistanceVelocityConstraintsSIMD(simd_distance_constraint& constraints, rigid_body_global_state* rbs)
+void solveDistanceVelocityConstraintsSIMD(simd_distance_constraint_solver constraints, rigid_body_global_state* rbs)
 {
 	CPU_PROFILE_BLOCK("Solve distance constraints SIMD");
 
@@ -445,16 +457,18 @@ void solveDistanceVelocityConstraintsSIMD(simd_distance_constraint& constraints,
 
 
 
-void initializeBallJointVelocityConstraints(const rigid_body_global_state* rbs, const ball_joint_constraint* input, const constraint_body_pair* bodyPairs, ball_joint_constraint_update* output, uint32 count, float dt)
+ball_joint_constraint_solver initializeBallJointVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const ball_joint_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize ball joint constraints");
 
 	float invDt = 1.f / dt;
 
+	ball_joint_constraint_update* constraints = arena.allocate<ball_joint_constraint_update>(count);
+
 	for (uint32 i = 0; i < count; ++i)
 	{
 		const ball_joint_constraint& in = input[i];
-		ball_joint_constraint_update& out = output[i];
+		ball_joint_constraint_update& out = constraints[i];
 
 		out.rigidBodyIndexA = bodyPairs[i].rbA;
 		out.rigidBodyIndexB = bodyPairs[i].rbB;
@@ -482,15 +496,20 @@ void initializeBallJointVelocityConstraints(const rigid_body_global_state* rbs, 
 			out.bias = (globalAnchorB - globalAnchorA) * (BALL_JOINT_CONSTRAINT_BETA * invDt);
 		}
 	}
+
+	ball_joint_constraint_solver result;
+	result.constraints = constraints;
+	result.count = count;
+	return result;
 }
 
-void solveBallJointVelocityConstraints(ball_joint_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs)
+void solveBallJointVelocityConstraints(ball_joint_constraint_solver constraints, rigid_body_global_state* rbs)
 {
 	CPU_PROFILE_BLOCK("Solve ball joint constraints");
 
-	for (uint32 i = 0; i < count; ++i)
+	for (uint32 i = 0; i < constraints.count; ++i)
 	{
-		ball_joint_constraint_update& con = constraints[i];
+		ball_joint_constraint_update& con = constraints.constraints[i];
 
 		rigid_body_global_state& rbA = rbs[con.rigidBodyIndexA];
 		rigid_body_global_state& rbB = rbs[con.rigidBodyIndexB];
@@ -507,16 +526,14 @@ void solveBallJointVelocityConstraints(ball_joint_constraint_update* constraints
 	}
 }
 
-void initializeBallJointVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const ball_joint_constraint* input, const constraint_body_pair* bodyPairs, uint32 count,
-	simd_ball_joint_constraint& outConstraints, float dt)
+simd_ball_joint_constraint_solver initializeBallJointVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const ball_joint_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize distance constraints SIMD");
 
 	simd_constraint_slot* contactSlots = arena.allocate<simd_constraint_slot>(count);
-	uint32 numContactSlots = scheduleConstraintsSIMD(arena, bodyPairs, count, UINT16_MAX, contactSlots);
+	uint32 numBatches = scheduleConstraintsSIMD(arena, bodyPairs, count, UINT16_MAX, contactSlots);
 
-	outConstraints.numBatches = numContactSlots;
-	outConstraints.batches = arena.allocate<simd_ball_joint_constraint_batch>(outConstraints.numBatches);
+	simd_ball_joint_constraint_batch* batches = arena.allocate<simd_ball_joint_constraint_batch>(numBatches);
 
 	const floatw zero = floatw::zero();
 	const floatw invDt = 1.f / dt;
@@ -526,10 +543,10 @@ void initializeBallJointVelocityConstraintsSIMD(memory_arena& arena, const rigid
 		zero, one, zero,
 		zero, zero, one);
 
-	for (uint32 i = 0; i < numContactSlots; ++i)
+	for (uint32 i = 0; i < numBatches; ++i)
 	{
 		const simd_constraint_slot& slot = contactSlots[i];
-		simd_ball_joint_constraint_batch& batch = outConstraints.batches[i];
+		simd_ball_joint_constraint_batch& batch = batches[i];
 
 		uint16 constraintIndices[CONSTRAINT_SIMD_WIDTH];
 		for (uint32 j = 0; j < CONSTRAINT_SIMD_WIDTH; ++j)
@@ -632,9 +649,14 @@ void initializeBallJointVelocityConstraintsSIMD(memory_arena& arena, const rigid
 		invEffectiveMass.m[7].store(batch.invEffectiveMass[7]);
 		invEffectiveMass.m[8].store(batch.invEffectiveMass[8]);
 	}
+
+	simd_ball_joint_constraint_solver result;
+	result.batches = batches;
+	result.numBatches = numBatches;
+	return result;
 }
 
-void solveBallJointVelocityConstraintsSIMD(simd_ball_joint_constraint& constraints, rigid_body_global_state* rbs)
+void solveBallJointVelocityConstraintsSIMD(simd_ball_joint_constraint_solver constraints, rigid_body_global_state* rbs)
 {
 	CPU_PROFILE_BLOCK("Solve ball joint constraints SIMD");
 
@@ -709,16 +731,18 @@ void solveBallJointVelocityConstraintsSIMD(simd_ball_joint_constraint& constrain
 
 
 
-void initializeHingeJointVelocityConstraints(const rigid_body_global_state* rbs, const hinge_joint_constraint* input, const constraint_body_pair* bodyPairs, hinge_joint_constraint_update* output, uint32 count, float dt)
+hinge_joint_constraint_solver initializeHingeJointVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const hinge_joint_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize hinge joint constraints");
 
 	float invDt = 1.f / dt;
 
+	hinge_joint_constraint_update* constraints = arena.allocate<hinge_joint_constraint_update>(count);
+
 	for (uint32 i = 0; i < count; ++i)
 	{
 		const hinge_joint_constraint& in = input[i];
-		hinge_joint_constraint_update& out = output[i];
+		hinge_joint_constraint_update& out = constraints[i];
 
 		out.rigidBodyIndexA = bodyPairs[i].rbA;
 		out.rigidBodyIndexB = bodyPairs[i].rbB;
@@ -835,15 +859,20 @@ void initializeHingeJointVelocityConstraints(const rigid_body_global_state* rbs,
 			}
 		}
 	}
+
+	hinge_joint_constraint_solver result;
+	result.constraints = constraints;
+	result.count = count;
+	return result;
 }
 
-void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs)
+void solveHingeJointVelocityConstraints(hinge_joint_constraint_solver constraints, rigid_body_global_state* rbs)
 {
 	CPU_PROFILE_BLOCK("Solve hinge joint constraints");
 
-	for (uint32 i = 0; i < count; ++i)
+	for (uint32 i = 0; i < constraints.count; ++i)
 	{
-		hinge_joint_constraint_update& con = constraints[i];
+		hinge_joint_constraint_update& con = constraints.constraints[i];
 
 		rigid_body_global_state& rbA = rbs[con.rigidBodyIndexA];
 		rigid_body_global_state& rbB = rbs[con.rigidBodyIndexB];
@@ -931,20 +960,490 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_update* constrain
 	}
 }
 
+simd_hinge_joint_constraint_solver initializeHingeJointVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const hinge_joint_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt)
+{
+	CPU_PROFILE_BLOCK("Initialize hinge joint constraints SIMD");
+
+	simd_constraint_slot* contactSlots = arena.allocate<simd_constraint_slot>(count);
+	uint32 numBatches = scheduleConstraintsSIMD(arena, bodyPairs, count, UINT16_MAX, contactSlots);
+
+	simd_hinge_joint_constraint_batch* batches = arena.allocate<simd_hinge_joint_constraint_batch>(numBatches);
+
+	const floatw zero = floatw::zero();
+	const floatw invDt = 1.f / dt;
+	const floatw one = 1.f;
+
+	for (uint32 i = 0; i < numBatches; ++i)
+	{
+		const simd_constraint_slot& slot = contactSlots[i];
+		simd_hinge_joint_constraint_batch& batch = batches[i];
+
+		uint16 constraintIndices[CONSTRAINT_SIMD_WIDTH];
+		for (uint32 j = 0; j < CONSTRAINT_SIMD_WIDTH; ++j)
+		{
+			constraintIndices[j] = (uint16)slot.indices[j];
+			batch.rbAIndices[j] = bodyPairs[slot.indices[j]].rbA;
+			batch.rbBIndices[j] = bodyPairs[slot.indices[j]].rbB;
+		}
+
+
+		// Load body A.
+		vec3w localCOGPositionA;
+		quatw rotationA;
+		vec3w positionA;
+		mat3w invInertiaA;
+		floatw invMassA;
+
+		load8(&rbs->rotation.x, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			rotationA.x, rotationA.y, rotationA.z, rotationA.w,
+			localCOGPositionA.x, localCOGPositionA.y, localCOGPositionA.z,
+			positionA.x);
+
+		load8(&rbs->position.y, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			positionA.y, positionA.z,
+			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20,
+			invInertiaA.m01, invInertiaA.m11, invInertiaA.m21);
+
+		load4(&rbs->invInertia.m02, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m02, invInertiaA.m12, invInertiaA.m22,
+			invMassA);
+
+
+		// Load body B.
+		quatw rotationB;
+		vec3w positionB;
+		vec3w localCOGPositionB;
+		mat3w invInertiaB;
+		floatw invMassB;
+
+		load8(&rbs->rotation.x, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			rotationB.x, rotationB.y, rotationB.z, rotationB.w,
+			localCOGPositionB.x, localCOGPositionB.y, localCOGPositionB.z,
+			positionB.x);
+
+		load8(&rbs->position.y, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			positionB.y, positionB.z,
+			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
+			invInertiaB.m01, invInertiaB.m11, invInertiaB.m21);
+
+		load4(&rbs->invInertia.m02, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m02, invInertiaB.m12, invInertiaB.m22,
+			invMassB);
+
+
+
+		vec3w localAnchorA;
+		vec3w localAnchorB;
+		vec3w localHingeAxisA;
+		vec3w localHingeAxisB;
+
+		floatw minRotationLimit;
+		floatw maxRotationLimit;
+
+		floatw maxMotorTorque;
+		floatw motorTypeF;
+
+
+
+		load8((float*)input, constraintIndices, (uint32)sizeof(*input),
+			localAnchorA.x, localAnchorA.y, localAnchorA.z,
+			localAnchorB.x, localAnchorB.y, localAnchorB.z,
+			localHingeAxisA.x, localHingeAxisA.y);
+
+		load8(&input->localHingeAxisA.z, constraintIndices, (uint32)sizeof(*input),
+			localHingeAxisA.z, 
+			localHingeAxisB.x, localHingeAxisB.y, localHingeAxisB.z,
+			minRotationLimit, maxRotationLimit,
+			maxMotorTorque, motorTypeF);
+
+		intw motorType = reinterpret(motorTypeF);
+
+
+		// Relative to COG.
+		vec3w relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
+		vec3w relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
+
+		// Global.
+		vec3w globalAnchorA = positionA + relGlobalAnchorA;
+		vec3w globalAnchorB = positionB + relGlobalAnchorB;
 
 
 
 
-void initializeConeTwistVelocityConstraints(const rigid_body_global_state* rbs, const cone_twist_constraint* input, const constraint_body_pair* bodyPairs, cone_twist_constraint_update* output, uint32 count, float dt)
+		// Position part. Identical to ball joint.
+
+		mat3w skewMatA = getSkewMatrix(relGlobalAnchorA);
+		mat3w skewMatB = getSkewMatrix(relGlobalAnchorB);
+
+		mat3w invEffectiveTranslationMass = skewMatA * invInertiaA * transpose(skewMatA)
+										  + skewMatB * invInertiaB * transpose(skewMatB);
+		floatw invMassSum = invMassA + invMassB;
+		invEffectiveTranslationMass.m00 += invMassSum;
+		invEffectiveTranslationMass.m11 += invMassSum;
+		invEffectiveTranslationMass.m22 += invMassSum;
+
+		vec3w translationBias = zero;
+		if (dt > DT_THRESHOLD)
+		{
+			translationBias = (globalAnchorB - globalAnchorA) * (floatw(BALL_JOINT_CONSTRAINT_BETA) * invDt);
+		}
+
+		relGlobalAnchorA.x.store(batch.relGlobalAnchorA[0]);
+		relGlobalAnchorA.y.store(batch.relGlobalAnchorA[1]);
+		relGlobalAnchorA.z.store(batch.relGlobalAnchorA[2]);
+
+		relGlobalAnchorB.x.store(batch.relGlobalAnchorB[0]);
+		relGlobalAnchorB.y.store(batch.relGlobalAnchorB[1]);
+		relGlobalAnchorB.z.store(batch.relGlobalAnchorB[2]);
+
+		translationBias.x.store(batch.translationBias[0]);
+		translationBias.y.store(batch.translationBias[1]);
+		translationBias.z.store(batch.translationBias[2]);
+
+		invEffectiveTranslationMass.m[0].store(batch.invEffectiveTranslationMass[0]);
+		invEffectiveTranslationMass.m[1].store(batch.invEffectiveTranslationMass[1]);
+		invEffectiveTranslationMass.m[2].store(batch.invEffectiveTranslationMass[2]);
+		invEffectiveTranslationMass.m[3].store(batch.invEffectiveTranslationMass[3]);
+		invEffectiveTranslationMass.m[4].store(batch.invEffectiveTranslationMass[4]);
+		invEffectiveTranslationMass.m[5].store(batch.invEffectiveTranslationMass[5]);
+		invEffectiveTranslationMass.m[6].store(batch.invEffectiveTranslationMass[6]);
+		invEffectiveTranslationMass.m[7].store(batch.invEffectiveTranslationMass[7]);
+		invEffectiveTranslationMass.m[8].store(batch.invEffectiveTranslationMass[8]);
+
+
+
+		// Rotation part.
+		vec3w globalHingeAxisA = rotationA * localHingeAxisA;
+		vec3w globalHingeAxisB = rotationB * localHingeAxisB;
+
+		vec3w globalTangentB, globalBitangentB;
+		getTangents(globalHingeAxisB, globalTangentB, globalBitangentB);
+
+		vec3w bxa = cross(globalTangentB, globalHingeAxisA);
+		vec3w cxa = cross(globalBitangentB, globalHingeAxisA);
+		vec3w iAbxa = invInertiaA * bxa;
+		vec3w iBbxa = invInertiaB * bxa;
+		vec3w iAcxa = invInertiaA * cxa;
+		vec3w iBcxa = invInertiaB * cxa;
+
+		mat2w invEffectiveRotationMass;
+		invEffectiveRotationMass.m00 = dot(bxa, iAbxa) + dot(bxa, iBbxa);
+		invEffectiveRotationMass.m01 = dot(bxa, iAcxa) + dot(bxa, iBcxa);
+		invEffectiveRotationMass.m10 = dot(cxa, iAbxa) + dot(cxa, iBbxa);
+		invEffectiveRotationMass.m11 = dot(cxa, iAcxa) + dot(cxa, iBcxa);
+
+		vec2w rotationBias = zero;
+		if (dt > DT_THRESHOLD)
+		{
+			rotationBias = vec2w(dot(globalHingeAxisA, globalTangentB), dot(globalHingeAxisA, globalBitangentB)) * (floatw(HINGE_ROTATION_CONSTRAINT_BETA) * invDt);
+		}
+
+		rotationBias.x.store(batch.rotationBias[0]);
+		rotationBias.y.store(batch.rotationBias[1]);
+
+		invEffectiveRotationMass.m[0].store(batch.invEffectiveRotationMass[0]);
+		invEffectiveRotationMass.m[1].store(batch.invEffectiveRotationMass[1]);
+		invEffectiveRotationMass.m[2].store(batch.invEffectiveRotationMass[2]);
+		invEffectiveRotationMass.m[3].store(batch.invEffectiveRotationMass[3]);
+
+		bxa.x.store(batch.bxa[0]);
+		bxa.y.store(batch.bxa[1]);
+		bxa.z.store(batch.bxa[2]);
+
+		cxa.x.store(batch.cxa[0]);
+		cxa.y.store(batch.cxa[1]);
+		cxa.z.store(batch.cxa[2]);
+
+
+		// Limits and motor.
+		batch.solveLimit = false;
+		batch.solveMotor = false;
+
+		auto minLimitActive = minRotationLimit <= zero;
+		auto maxLimitActive = maxRotationLimit >= zero;
+		auto motorActive = maxMotorTorque > zero;
+		auto cond = minLimitActive | maxLimitActive | motorActive;
+
+		if (anyTrue(cond))
+		{
+			floatw motorVelocity;
+
+			vec3w localHingeTangentA;
+			vec3w localHingeBitangentA;
+			vec3w localHingeTangentB;
+
+			floatw dummy0, dummy1;
+
+			load8(&input->motorVelocity, constraintIndices, (uint32)sizeof(*input),
+				motorVelocity,
+				localHingeTangentA.x, localHingeTangentA.y, localHingeTangentA.z,
+				localHingeBitangentA.x, localHingeBitangentA.y, localHingeBitangentA.z,
+				localHingeTangentB.x);
+
+			load4(&input->localHingeTangentB.y, constraintIndices, (uint32)sizeof(*input),
+				localHingeTangentB.y, localHingeTangentB.z,
+				dummy0, dummy1);
+
+
+
+			vec3w localHingeCompareA = conjugate(rotationA) * (rotationB * localHingeTangentB);
+			floatw angle = atan2(dot(localHingeCompareA, localHingeBitangentA), dot(localHingeCompareA, localHingeTangentA));
+
+			auto minLimitViolated = minLimitActive & (angle <= minRotationLimit);
+			auto maxLimitViolated = maxLimitActive & (angle >= maxRotationLimit);
+
+			auto limitViolated = minLimitViolated | maxLimitViolated;
+
+			batch.solveLimit = anyTrue(limitViolated);
+			batch.solveMotor = anyTrue(motorActive);
+			if (batch.solveLimit || batch.solveMotor)
+			{
+				vec3w globalRotationAxis = globalHingeAxisA;
+
+				floatw invEffectiveAxialMass = dot(globalRotationAxis, invInertiaA * globalRotationAxis)
+											 + dot(globalRotationAxis, invInertiaB * globalRotationAxis);
+
+				floatw effectiveAxialMass = ifThen(invEffectiveAxialMass != zero, 1.f / invEffectiveAxialMass, zero);
+				floatw effectiveLimitAxialMass = ifThen(limitViolated, effectiveAxialMass, zero);
+				floatw effectiveMotorAxialMass = ifThen(motorActive, effectiveAxialMass, zero);
+
+				floatw limitSign = ifThen(minLimitViolated, 1.f, -1.f);
+
+				floatw maxMotorImpulse = maxMotorTorque * floatw(dt);
+
+				vec3w motorAndLimitImpulseToAngularVelocityA = invInertiaA * globalRotationAxis;
+				vec3w motorAndLimitImpulseToAngularVelocityB = invInertiaB * globalRotationAxis;
+
+				if (batch.solveMotor)
+				{
+					auto isVelocityMotor = motorType == constraint_velocity_motor;
+
+					if (anyFalse(isVelocityMotor))
+					{
+						// Inspired by Bullet Engine. We set the velocity such that the target angle is reached within one frame.
+						// This will later get clamped to the maximum motor impulse.
+
+						floatw motorTargetAngle = motorVelocity; // This is a union.
+
+						floatw minLimit = ifThen(minLimitActive, minRotationLimit, -M_PI);
+						floatw maxLimit = ifThen(maxLimitActive, maxRotationLimit, M_PI);
+						floatw targetAngle = clamp(motorTargetAngle, minLimit, maxLimit);
+
+						floatw motorVelocityOverride = (dt > DT_THRESHOLD) ? ((targetAngle - angle) * invDt) : zero;
+						motorVelocity = ifThen(reinterpret(isVelocityMotor), motorVelocity, motorVelocityOverride);
+					}
+				}
+
+				floatw limitBias = zero;
+				if (batch.solveLimit && dt > DT_THRESHOLD)
+				{
+					floatw d = ifThen(minLimitViolated, angle - minRotationLimit, maxRotationLimit - angle);
+					limitBias = d * floatw(HINGE_LIMIT_CONSTRAINT_BETA) * invDt;
+				}
+				
+				globalRotationAxis.x.store(batch.globalRotationAxis[0]);
+				globalRotationAxis.y.store(batch.globalRotationAxis[1]);
+				globalRotationAxis.z.store(batch.globalRotationAxis[2]);
+
+				effectiveLimitAxialMass.store(batch.effectiveLimitAxialMass);
+				effectiveMotorAxialMass.store(batch.effectiveMotorAxialMass);
+
+				zero.store(batch.limitImpulse);
+				limitBias.store(batch.limitBias);
+				limitSign.store(batch.limitSign);
+
+				zero.store(batch.motorImpulse);
+				maxMotorImpulse.store(batch.maxMotorImpulse);
+				motorVelocity.store(batch.motorVelocity);
+
+				motorAndLimitImpulseToAngularVelocityA.x.store(batch.motorAndLimitImpulseToAngularVelocityA[0]);
+				motorAndLimitImpulseToAngularVelocityA.y.store(batch.motorAndLimitImpulseToAngularVelocityA[1]);
+				motorAndLimitImpulseToAngularVelocityA.z.store(batch.motorAndLimitImpulseToAngularVelocityA[2]);
+
+				motorAndLimitImpulseToAngularVelocityB.x.store(batch.motorAndLimitImpulseToAngularVelocityB[0]);
+				motorAndLimitImpulseToAngularVelocityB.y.store(batch.motorAndLimitImpulseToAngularVelocityB[1]);
+				motorAndLimitImpulseToAngularVelocityB.z.store(batch.motorAndLimitImpulseToAngularVelocityB[2]);
+			}
+		}
+
+	}
+
+	simd_hinge_joint_constraint_solver result;
+	result.batches = batches;
+	result.numBatches = numBatches;
+	return result;
+}
+
+void solveHingeJointVelocityConstraintsSIMD(simd_hinge_joint_constraint_solver constraints, rigid_body_global_state* rbs)
+{
+	CPU_PROFILE_BLOCK("Solve hinge twist constraints SIMD");
+
+	for (uint32 i = 0; i < constraints.numBatches; ++i)
+	{
+		simd_hinge_joint_constraint_batch& batch = constraints.batches[i];
+
+
+		// Load body A.
+		vec3w vA, wA;
+		floatw invMassA;
+		mat3w invInertiaA;
+
+		load8(&rbs->invInertia.m00, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20,
+			invInertiaA.m01, invInertiaA.m11, invInertiaA.m21,
+			invInertiaA.m02, invInertiaA.m12);
+
+		load8(&rbs->invInertia.m22, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m22, invMassA, vA.x, vA.y, vA.z, wA.x, wA.y, wA.z);
+
+
+		// Load body B.
+		vec3w vB, wB;
+		floatw invMassB;
+		mat3w invInertiaB;
+
+		load8(&rbs->invInertia.m00, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
+			invInertiaB.m01, invInertiaB.m11, invInertiaB.m21,
+			invInertiaB.m02, invInertiaB.m12);
+
+		load8(&rbs->invInertia.m22, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m22, invMassB, vB.x, vB.y, vB.z, wB.x, wB.y, wB.z);
+
+
+		// Solve in order of importance (most important last): Motor -> Limits -> Rotation -> Position.
+
+		vec3w globalRotationAxis(batch.globalRotationAxis[0], batch.globalRotationAxis[1], batch.globalRotationAxis[2]);
+		vec3w motorAndLimitImpulseToAngularVelocityA(batch.motorAndLimitImpulseToAngularVelocityA[0], batch.motorAndLimitImpulseToAngularVelocityA[1], batch.motorAndLimitImpulseToAngularVelocityA[2]);
+		vec3w motorAndLimitImpulseToAngularVelocityB(batch.motorAndLimitImpulseToAngularVelocityB[0], batch.motorAndLimitImpulseToAngularVelocityB[1], batch.motorAndLimitImpulseToAngularVelocityB[2]);
+
+		// Motor.
+		if (batch.solveMotor)
+		{
+			floatw motorVelocity(batch.motorVelocity);
+			floatw effectiveMotorAxialMass(batch.effectiveMotorAxialMass);
+			floatw motorImpulse(batch.motorImpulse);
+			floatw maxMotorImpulse(batch.maxMotorImpulse);
+
+			floatw aDotWA = dot(globalRotationAxis, wA); // How fast are we turning about the axis.
+			floatw aDotWB = dot(globalRotationAxis, wB);
+
+			floatw relAngularVelocity = (aDotWB - aDotWA);
+			floatw motorCdot = relAngularVelocity - motorVelocity;
+
+			floatw motorLambda = -effectiveMotorAxialMass * motorCdot;
+			floatw oldImpulse = motorImpulse;
+			motorImpulse = clamp(motorImpulse + motorLambda, -maxMotorImpulse, maxMotorImpulse);
+			motorLambda = motorImpulse - oldImpulse;
+
+			wA -= motorAndLimitImpulseToAngularVelocityA * motorLambda;
+			wB += motorAndLimitImpulseToAngularVelocityB * motorLambda;
+
+			motorImpulse.store(batch.motorImpulse);
+		}
+
+		// Limits.
+		if (batch.solveLimit)
+		{
+			floatw limitSign(batch.limitSign);
+			floatw limitBias(batch.limitBias);
+			floatw limitImpulse(batch.limitImpulse);
+			floatw effectiveLimitAxialMass(batch.effectiveLimitAxialMass);
+
+			floatw aDotWA = dot(globalRotationAxis, wA); // How fast are we turning about the axis.
+			floatw aDotWB = dot(globalRotationAxis, wB);
+			floatw relAngularVelocity = limitSign * (aDotWB - aDotWA);
+
+			floatw limitCdot = relAngularVelocity + limitBias;
+			floatw limitLambda = -effectiveLimitAxialMass * limitCdot;
+
+			floatw impulse = maximum(limitImpulse + limitLambda, 0.f);
+			limitLambda = impulse - limitImpulse;
+			limitImpulse = impulse;
+
+			limitLambda *= limitSign;
+
+			wA -= motorAndLimitImpulseToAngularVelocityA * limitLambda;
+			wB += motorAndLimitImpulseToAngularVelocityB * limitLambda;
+
+			limitImpulse.store(batch.limitImpulse);
+		}
+
+		// Rotation part.
+		{
+			vec3w bxa(batch.bxa[0], batch.bxa[1], batch.bxa[2]);
+			vec3w cxa(batch.cxa[0], batch.cxa[1], batch.cxa[2]);
+			vec2w rotationBias(batch.rotationBias[0], batch.rotationBias[1]);
+			mat2w invEffectiveRotationMass;
+			invEffectiveRotationMass.m[0] = floatw(batch.invEffectiveRotationMass[0]);
+			invEffectiveRotationMass.m[1] = floatw(batch.invEffectiveRotationMass[1]);
+			invEffectiveRotationMass.m[2] = floatw(batch.invEffectiveRotationMass[2]);
+			invEffectiveRotationMass.m[3] = floatw(batch.invEffectiveRotationMass[3]);
+
+			vec3w deltaAngularVelocity = wB - wA;
+
+			vec2w rotationCdot(dot(bxa, deltaAngularVelocity), dot(cxa, deltaAngularVelocity));
+			vec2w rotLambda = solveLinearSystem(invEffectiveRotationMass, -(rotationCdot + rotationBias));
+
+			vec3w rotationP = bxa * rotLambda.x + cxa * rotLambda.y;
+
+			wA -= invInertiaA * rotationP;
+			wB += invInertiaB * rotationP;
+		}
+
+		// Position part.
+		{
+			vec3w relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
+			vec3w relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
+			vec3w translationBias(batch.translationBias[0], batch.translationBias[1], batch.translationBias[2]);
+
+			mat3w invEffectiveTranslationMass;
+			invEffectiveTranslationMass.m[0] = floatw(batch.invEffectiveTranslationMass[0]);
+			invEffectiveTranslationMass.m[1] = floatw(batch.invEffectiveTranslationMass[1]);
+			invEffectiveTranslationMass.m[2] = floatw(batch.invEffectiveTranslationMass[2]);
+			invEffectiveTranslationMass.m[3] = floatw(batch.invEffectiveTranslationMass[3]);
+			invEffectiveTranslationMass.m[4] = floatw(batch.invEffectiveTranslationMass[4]);
+			invEffectiveTranslationMass.m[5] = floatw(batch.invEffectiveTranslationMass[5]);
+			invEffectiveTranslationMass.m[6] = floatw(batch.invEffectiveTranslationMass[6]);
+			invEffectiveTranslationMass.m[7] = floatw(batch.invEffectiveTranslationMass[7]);
+			invEffectiveTranslationMass.m[8] = floatw(batch.invEffectiveTranslationMass[8]);
+
+			vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
+			vec3w anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
+			vec3w translationCdot = anchorVelocityB - anchorVelocityA + translationBias;
+
+			vec3w translationP = solveLinearSystem(invEffectiveTranslationMass, -translationCdot);
+
+			vA -= invMassA * translationP;
+			wA -= invInertiaA * cross(relGlobalAnchorA, translationP);
+			vB += invMassB * translationP;
+			wB += invInertiaB * cross(relGlobalAnchorB, translationP);
+		}
+
+
+		store8(&rbs->invInertia.m22, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m22, invMassA, vA.x, vA.y, vA.z, wA.x, wA.y, wA.z);
+
+		store8(&rbs->invInertia.m22, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m22, invMassB, vB.x, vB.y, vB.z, wB.x, wB.y, wB.z);
+	}
+}
+
+
+
+
+cone_twist_constraint_solver initializeConeTwistVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const cone_twist_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize cone twist constraints");
 
 	float invDt = 1.f / dt;
 
+	cone_twist_constraint_update* constraints = arena.allocate<cone_twist_constraint_update>(count);
+
 	for (uint32 i = 0; i < count; ++i)
 	{
 		const cone_twist_constraint& in = input[i];
-		cone_twist_constraint_update& out = output[i];
+		cone_twist_constraint_update& out = constraints[i];
 
 		out.rigidBodyIndexA = bodyPairs[i].rbA;
 		out.rigidBodyIndexB = bodyPairs[i].rbB;
@@ -1098,15 +1597,20 @@ void initializeConeTwistVelocityConstraints(const rigid_body_global_state* rbs, 
 			}
 		}
 	}
+
+	cone_twist_constraint_solver result;
+	result.constraints = constraints;
+	result.count = count;
+	return result;
 }
 
-void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints, uint32 count, rigid_body_global_state* rbs)
+void solveConeTwistVelocityConstraints(cone_twist_constraint_solver constraints, rigid_body_global_state* rbs)
 {
 	CPU_PROFILE_BLOCK("Solve cone twist constraints");
 
-	for (uint32 i = 0; i < count; ++i)
+	for (uint32 i = 0; i < constraints.count; ++i)
 	{
-		cone_twist_constraint_update& con = constraints[i];
+		cone_twist_constraint_update& con = constraints.constraints[i];
 
 		rigid_body_global_state& rbA = rbs[con.rigidBodyIndexA];
 		rigid_body_global_state& rbB = rbs[con.rigidBodyIndexB];
@@ -1217,25 +1721,23 @@ void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints
 	}
 }
 
-void initializeConeTwistVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const cone_twist_constraint* input, const constraint_body_pair* bodyPairs, uint32 count,
-	simd_cone_twist_constraint& outConstraints, float dt)
+simd_cone_twist_constraint_solver initializeConeTwistVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const cone_twist_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize cone twist constraints SIMD");
 
 	simd_constraint_slot* contactSlots = arena.allocate<simd_constraint_slot>(count);
-	uint32 numContactSlots = scheduleConstraintsSIMD(arena, bodyPairs, count, UINT16_MAX, contactSlots);
+	uint32 numBatches = scheduleConstraintsSIMD(arena, bodyPairs, count, UINT16_MAX, contactSlots);
 
-	outConstraints.numBatches = numContactSlots;
-	outConstraints.batches = arena.allocate<simd_cone_twist_constraint_batch>(outConstraints.numBatches);
+	simd_cone_twist_constraint_batch* batches = arena.allocate<simd_cone_twist_constraint_batch>(numBatches);
 
 	const floatw zero = floatw::zero();
 	const floatw invDt = 1.f / dt;
 	const floatw one = 1.f;
 
-	for (uint32 i = 0; i < numContactSlots; ++i)
+	for (uint32 i = 0; i < numBatches; ++i)
 	{
 		const simd_constraint_slot& slot = contactSlots[i];
-		simd_cone_twist_constraint_batch& batch = outConstraints.batches[i];
+		simd_cone_twist_constraint_batch& batch = batches[i];
 
 		uint16 constraintIndices[CONSTRAINT_SIMD_WIDTH];
 		for (uint32 j = 0; j < CONSTRAINT_SIMD_WIDTH; ++j)
@@ -1537,22 +2039,25 @@ void initializeConeTwistVelocityConstraintsSIMD(memory_arena& arena, const rigid
 			vec3w twistMotorAndLimitImpulseToAngularVelocityA = invInertiaA * globalTwistAxis;
 			vec3w twistMotorAndLimitImpulseToAngularVelocityB = invInertiaB * globalTwistAxis;
 
-			auto isVelocityMotor = twistMotorType == constraint_velocity_motor;
-
-			if (anyFalse(isVelocityMotor)) // At least one position motor.
+			if (batch.solveTwistMotor)
 			{
-				// Inspired by Bullet Engine. We set the velocity such that the target angle is reached within one frame.
-				// This will later get clamped to the maximum motor impulse.
-				floatw limit = ifThen(twistLimit >= zero, twistLimit, M_PI);
-				floatw twistMotorTargetAngle = twistMotorVelocity; // This is a union.
-				floatw targetAngle = clamp(twistMotorTargetAngle, -limit, limit);
+				auto isVelocityMotor = twistMotorType == constraint_velocity_motor;
 
-				floatw twistMotorVelocityOverride = (dt > DT_THRESHOLD) ? ((targetAngle - twistAngle) * invDt) : zero;
-				twistMotorVelocity = ifThen(reinterpret(isVelocityMotor), twistMotorVelocity, twistMotorVelocityOverride);
+				if (anyFalse(isVelocityMotor)) // At least one position motor.
+				{
+					// Inspired by Bullet Engine. We set the velocity such that the target angle is reached within one frame.
+					// This will later get clamped to the maximum motor impulse.
+					floatw limit = ifThen(twistLimit >= zero, twistLimit, M_PI);
+					floatw twistMotorTargetAngle = twistMotorVelocity; // This is a union.
+					floatw targetAngle = clamp(twistMotorTargetAngle, -limit, limit);
+
+					floatw twistMotorVelocityOverride = (dt > DT_THRESHOLD) ? ((targetAngle - twistAngle) * invDt) : zero;
+					twistMotorVelocity = ifThen(reinterpret(isVelocityMotor), twistMotorVelocity, twistMotorVelocityOverride);
+				}
 			}
 
 			floatw twistLimitBias = zero;
-			if (dt > DT_THRESHOLD)
+			if (batch.solveTwistLimit && dt > DT_THRESHOLD)
 			{
 				floatw d = ifThen(minTwistLimitViolated, twistLimit + twistAngle, twistLimit - twistAngle);
 				twistLimitBias = d * (floatw(TWIST_LIMIT_CONSTRAINT_BETA) * invDt);
@@ -1582,9 +2087,14 @@ void initializeConeTwistVelocityConstraintsSIMD(memory_arena& arena, const rigid
 		}
 
 	}
+
+	simd_cone_twist_constraint_solver result;
+	result.batches = batches;
+	result.numBatches = numBatches;
+	return result;
 }
 
-void solveConeTwistVelocityConstraintsSIMD(simd_cone_twist_constraint& constraints, rigid_body_global_state* rbs)
+void solveConeTwistVelocityConstraintsSIMD(simd_cone_twist_constraint_solver constraints, rigid_body_global_state* rbs)
 {
 	CPU_PROFILE_BLOCK("Solve cone twist constraints SIMD");
 
@@ -1775,15 +2285,17 @@ void solveConeTwistVelocityConstraintsSIMD(simd_cone_twist_constraint& constrain
 
 
 
-void initializeCollisionVelocityConstraints(const rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, collision_constraint* outConstraints, uint32 numContacts, float dt)
+collision_constraint_solver initializeCollisionVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, uint32 numContacts, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize collision constraints");
 
 	float invDt = 1.f / dt;
 
+	collision_constraint* constraints = arena.allocate<collision_constraint>(numContacts);
+
 	for (uint32 contactID = 0; contactID < numContacts; ++contactID)
 	{
-		collision_constraint& constraint = outConstraints[contactID];
+		collision_constraint& constraint = constraints[contactID];
 		const collision_contact& contact = contacts[contactID];
 		constraint_body_pair pair = bodyPairs[contactID];
 
@@ -1838,17 +2350,24 @@ void initializeCollisionVelocityConstraints(const rigid_body_global_state* rbs, 
 			constraint.normalImpulseToAngularVelocityB = rbB.invInertia * crBn;
 		}
 	}
+
+	collision_constraint_solver result;
+	result.constraints = constraints;
+	result.bodyPairs = bodyPairs;
+	result.contacts = contacts;
+	result.count = numContacts;
+	return result;
 }
 
-void solveCollisionVelocityConstraints(const collision_contact* contacts, collision_constraint* constraints, const constraint_body_pair* bodyPairs, uint32 count, rigid_body_global_state* rbs)
+void solveCollisionVelocityConstraints(collision_constraint_solver constraints, rigid_body_global_state* rbs)
 {
 	CPU_PROFILE_BLOCK("Solve collision constraints");
 
-	for (uint32 i = 0; i < count; ++i)
+	for (uint32 i = 0; i < constraints.count; ++i)
 	{
-		const collision_contact& contact = contacts[i];
-		collision_constraint& constraint = constraints[i];
-		constraint_body_pair pair = bodyPairs[i];
+		const collision_contact& contact = constraints.contacts[i];
+		collision_constraint& constraint = constraints.constraints[i];
+		constraint_body_pair pair = constraints.bodyPairs[i];
 
 		auto& rbA = rbs[pair.rbA];
 		auto& rbB = rbs[pair.rbB];
@@ -1910,26 +2429,24 @@ void solveCollisionVelocityConstraints(const collision_contact* contacts, collis
 	}
 }
 
-void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, uint32 numContacts,
-	uint16 dummyRigidBodyIndex, simd_collision_constraint& outConstraints, float dt)
+simd_collision_constraint_solver initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, uint32 numContacts, uint16 dummyRigidBodyIndex, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize collision constraints SIMD");
 
 	simd_constraint_slot* contactSlots = arena.allocate<simd_constraint_slot>(numContacts);
-	uint32 numContactSlots = scheduleConstraintsSIMD(arena, bodyPairs, numContacts, dummyRigidBodyIndex, contactSlots);
+	uint32 numBatches = scheduleConstraintsSIMD(arena, bodyPairs, numContacts, dummyRigidBodyIndex, contactSlots);
 
-	outConstraints.numBatches = numContactSlots;
-	outConstraints.batches = arena.allocate<simd_collision_constraint_batch>(outConstraints.numBatches);
+	simd_collision_constraint_batch* batches = arena.allocate<simd_collision_constraint_batch>(numBatches);
 
 	const floatw zero = floatw::zero();
 	const floatw slop = -0.001f;
 	const floatw scale = 0.1f;
 	const floatw invDt = 1.f / dt;
 
-	for (uint32 i = 0; i < numContactSlots; ++i)
+	for (uint32 i = 0; i < numBatches; ++i)
 	{
 		const simd_constraint_slot& slot = contactSlots[i];
-		simd_collision_constraint_batch& batch = outConstraints.batches[i];
+		simd_collision_constraint_batch& batch = batches[i];
 
 		uint16 contactIndices[CONSTRAINT_SIMD_WIDTH];
 		for (uint32 j = 0; j < CONSTRAINT_SIMD_WIDTH; ++j)
@@ -2073,9 +2590,14 @@ void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, const rigid
 			normalImpulseToAngularVelocityB.z.store(batch.normalImpulseToAngularVelocityB[2]);
 		}
 	}
+
+	simd_collision_constraint_solver result;
+	result.batches = batches;
+	result.numBatches = numBatches;
+	return result;
 }
 
-void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint& constraints, rigid_body_global_state* rbs)
+void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint_solver constraints, rigid_body_global_state* rbs)
 {
 	CPU_PROFILE_BLOCK("Solve collision constraints SIMD");
 

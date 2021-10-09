@@ -589,6 +589,21 @@ void getAxisRotation(quatx<simd_t> q, vec3x<simd_t>& axis, simd_t& angle)
 	}
 }
 
+template <typename simd_t>
+vec3x<simd_t> getTangent(vec3x<simd_t> normal)
+{
+	auto mask = abs(normal.x) > simd_t(0.57735f);
+	vec3x<simd_t> tangent = ifThen(mask, vec3x<simd_t>(normal.y, -normal.x, simd_t::zero()), vec3x<simd_t>(simd_t::zero(), normal.z, -normal.y));
+	return normalize(tangent);
+}
+
+template <typename simd_t>
+void getTangents(vec3x<simd_t> normal, vec3x<simd_t>& outTangent, vec3x<simd_t>& outBitangent)
+{
+	outTangent = getTangent(normal);
+	outBitangent = cross(normal, outTangent);
+}
+
 
 template<typename simd_t>
 inline quatx<simd_t>::quatx(vec3x<simd_t> axis, simd_t angle)
