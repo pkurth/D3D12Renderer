@@ -147,6 +147,22 @@ static float_t atan2Internal(float_t y, float_t x)
 	return result * float_t(3.14159265359f * 0.5f);
 }
 
+template <typename float_t>
+static float_t acosInternal(float_t x)
+{
+	// https://developer.download.nvidia.com/cg/acos.html
+
+	float_t negate = ifThen(x < 0.f, 1.f, 0.f);
+	x = abs(x);
+	float_t ret = -0.0187293f;
+	ret = fmadd(ret, x, 0.0742610f);
+	ret = fmadd(ret, x, -0.2121144f);
+	ret = fmadd(ret, x, 1.5707288f);
+	ret = ret * sqrt(1.f - x);
+	ret = ret - negate * ret * float_t(2.f);
+	return fmadd(negate, 3.14159265359f, ret);
+}
+
 
 #if defined(SIMD_SSE_2)
 
@@ -372,6 +388,7 @@ static floatx4 exp(floatx4 x) { return expInternal<floatx4, intx4>(x); }
 static floatx4 tanh(floatx4 x) { return tanhInternal(x); }
 static floatx4 atan(floatx4 x) { return atanInternal<floatx4, intx4>(x); }
 static floatx4 atan2(floatx4 y, floatx4 x) { return atan2Internal<floatx4, intx4>(y, x); }
+static floatx4 acos(floatx4 x) { return acosInternal(x); }
 
 static intx4 fillWithFirstLane(intx4 a)
 {
@@ -709,6 +726,7 @@ static floatx8 exp(floatx8 x) { return expInternal<floatx8, intx8>(x); }
 static floatx8 tanh(floatx8 x) { return tanhInternal(x); }
 static floatx8 atan(floatx8 x) { return atanInternal<floatx8, intx8>(x); }
 static floatx8 atan2(floatx8 y, floatx8 x) { return atan2Internal<floatx8, intx8>(y, x); }
+static floatx8 acos(floatx8 x) { return acosInternal(x); }
 
 static floatx8 concat(floatx4 a, floatx4 b)
 {
@@ -997,6 +1015,7 @@ static floatx16 exp(floatx16 x) { return expInternal<floatx16, intx16>(x); }
 static floatx16 tanh(floatx16 x) { return tanhInternal(x); }
 static floatx16 atan(floatx16 x) { return atanInternal<floatx16, intx16>(x); }
 static floatx16 atan2(floatx16 y, floatx16 x) { return atan2Internal<floatx16, intx16>(y, x); }
+static floatx16 acos(floatx16 x) { return acosInternal(x); }
 
 
 #endif

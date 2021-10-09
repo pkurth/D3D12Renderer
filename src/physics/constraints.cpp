@@ -285,7 +285,7 @@ void initializeDistanceVelocityConstraintsSIMD(memory_arena& arena, const rigid_
 		vec3w localAnchorA, localAnchorB;
 		floatw globalLength;
 		floatw dummy;
-		load8((float*)input, constraintIndices, (uint32)sizeof(collision_contact),
+		load8((float*)input, constraintIndices, (uint32)sizeof(*input),
 			localAnchorA.x, localAnchorA.y, localAnchorA.z, localAnchorB.x, localAnchorB.y, localAnchorB.z, globalLength, dummy);
 
 
@@ -354,7 +354,7 @@ void initializeDistanceVelocityConstraintsSIMD(memory_arena& arena, const rigid_
 		floatw bias = zero;
 		if (dt > DT_THRESHOLD)
 		{
-			bias = (l - globalLength) * (DISTANCE_CONSTRAINT_BETA * invDt);
+			bias = (l - globalLength) * (floatw(DISTANCE_CONSTRAINT_BETA) * invDt);
 		}
 
 		vec3w impulseToAngularVelocityA = invInertiaA * cross(relGlobalAnchorA, crAu);
@@ -542,7 +542,7 @@ void initializeBallJointVelocityConstraintsSIMD(memory_arena& arena, const rigid
 
 		vec3w localAnchorA, localAnchorB;
 		floatw dummy0, dummy1;
-		load8((float*)input, constraintIndices, (uint32)sizeof(collision_contact),
+		load8((float*)input, constraintIndices, (uint32)sizeof(*input),
 			localAnchorA.x, localAnchorA.y, localAnchorA.z, localAnchorB.x, localAnchorB.y, localAnchorB.z, dummy0, dummy1);
 
 
@@ -607,7 +607,7 @@ void initializeBallJointVelocityConstraintsSIMD(memory_arena& arena, const rigid
 		vec3w bias = zero;
 		if (dt > DT_THRESHOLD)
 		{
-			bias = (globalAnchorB - globalAnchorA) * (BALL_JOINT_CONSTRAINT_BETA * invDt);
+			bias = (globalAnchorB - globalAnchorA) * (floatw(BALL_JOINT_CONSTRAINT_BETA) * invDt);
 		}
 
 		relGlobalAnchorA.x.store(batch.relGlobalAnchorA[0]);
@@ -1217,8 +1217,560 @@ void solveConeTwistVelocityConstraints(cone_twist_constraint_update* constraints
 	}
 }
 
+void initializeConeTwistVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const cone_twist_constraint* input, const constraint_body_pair* bodyPairs, uint32 count,
+	simd_cone_twist_constraint& outConstraints, float dt)
+{
+	CPU_PROFILE_BLOCK("Initialize cone twist constraints SIMD");
+
+	simd_constraint_slot* contactSlots = arena.allocate<simd_constraint_slot>(count);
+	uint32 numContactSlots = scheduleConstraintsSIMD(arena, bodyPairs, count, UINT16_MAX, contactSlots);
+
+	outConstraints.numBatches = numContactSlots;
+	outConstraints.batches = arena.allocate<simd_cone_twist_constraint_batch>(outConstraints.numBatches);
+
+	const floatw zero = floatw::zero();
+	const floatw invDt = 1.f / dt;
+	const floatw one = 1.f;
+
+	const mat3w identity(
+		one, zero, zero,
+		zero, one, zero,
+		zero, zero, one);
+
+	for (uint32 i = 0; i < numContactSlots; ++i)
+	{
+		const simd_constraint_slot& slot = contactSlots[i];
+		simd_cone_twist_constraint_batch& batch = outConstraints.batches[i];
+
+		uint16 constraintIndices[CONSTRAINT_SIMD_WIDTH];
+		for (uint32 j = 0; j < CONSTRAINT_SIMD_WIDTH; ++j)
+		{
+			constraintIndices[j] = (uint16)slot.indices[j];
+			batch.rbAIndices[j] = bodyPairs[slot.indices[j]].rbA;
+			batch.rbBIndices[j] = bodyPairs[slot.indices[j]].rbB;
+		}
 
 
+		// Load body A.
+		vec3w localCOGPositionA;
+		quatw rotationA;
+		vec3w positionA;
+		mat3w invInertiaA;
+		floatw invMassA;
+
+		load8(&rbs->rotation.x, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			rotationA.x, rotationA.y, rotationA.z, rotationA.w,
+			localCOGPositionA.x, localCOGPositionA.y, localCOGPositionA.z,
+			positionA.x);
+
+		load8(&rbs->position.y, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			positionA.y, positionA.z,
+			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20,
+			invInertiaA.m01, invInertiaA.m11, invInertiaA.m21);
+
+		load4(&rbs->invInertia.m02, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m02, invInertiaA.m12, invInertiaA.m22,
+			invMassA);
+
+
+		// Load body B.
+		quatw rotationB;
+		vec3w positionB;
+		vec3w localCOGPositionB;
+		mat3w invInertiaB;
+		floatw invMassB;
+
+		load8(&rbs->rotation.x, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			rotationB.x, rotationB.y, rotationB.z, rotationB.w,
+			localCOGPositionB.x, localCOGPositionB.y, localCOGPositionB.z,
+			positionB.x);
+
+		load8(&rbs->position.y, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			positionB.y, positionB.z,
+			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
+			invInertiaB.m01, invInertiaB.m11, invInertiaB.m21);
+
+		load4(&rbs->invInertia.m02, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m02, invInertiaB.m12, invInertiaB.m22,
+			invMassB);
+
+
+
+
+
+
+		vec3w localAnchorA;
+		vec3w localAnchorB;
+
+		vec3w localLimitAxisA;
+		vec3w localLimitAxisB;
+
+		vec3w localLimitTangentA;
+		vec3w localLimitBitangentA;
+		vec3w localLimitTangentB;
+
+		floatw swingLimit;
+		floatw twistLimit;
+
+		floatw swingMotorTypeF;
+		floatw swingMotorVelocity;
+		floatw maxSwingMotorTorque;
+		floatw swingMotorAxis;
+
+		floatw twistMotorTypeF;
+		floatw twistMotorVelocity;
+		floatw maxTwistMotorTorque;
+
+		floatw dummy0, dummy1;
+
+
+		load8((float*)input, constraintIndices, (uint32)sizeof(*input),
+			localAnchorA.x, localAnchorA.y, localAnchorA.z, 
+			localAnchorB.x, localAnchorB.y, localAnchorB.z, 
+			localLimitAxisA.x, localLimitAxisA.y);
+
+		load8(&input->localLimitAxisA.z, constraintIndices, (uint32)sizeof(*input),
+			localLimitAxisA.z,
+			localLimitAxisB.x, localLimitAxisB.y, localLimitAxisB.z,
+			localLimitTangentA.x, localLimitTangentA.y, localLimitTangentA.z, 
+			localLimitBitangentA.x);
+
+		load8(&input->localLimitBitangentA.y, constraintIndices, (uint32)sizeof(*input),
+			localLimitBitangentA.y, localLimitBitangentA.z,
+			localLimitTangentB.x, localLimitTangentB.y, localLimitTangentB.z,
+			swingLimit, twistLimit, swingMotorTypeF);
+
+		load8(&input->swingMotorVelocity, constraintIndices, (uint32)sizeof(*input),
+			swingMotorVelocity, maxSwingMotorTorque, swingMotorAxis,
+			twistMotorTypeF, twistMotorVelocity, maxTwistMotorTorque,
+			dummy0, dummy1);
+
+
+		intw swingMotorType = reinterpret(swingMotorTypeF);
+		intw twistMotorType = reinterpret(twistMotorTypeF);
+
+
+
+
+
+
+		// Relative to COG.
+		vec3w relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
+		vec3w relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
+
+		// Global.
+		vec3w globalAnchorA = positionA + relGlobalAnchorA;
+		vec3w globalAnchorB = positionB + relGlobalAnchorB;
+
+		mat3w skewMatA = getSkewMatrix(relGlobalAnchorA);
+		mat3w skewMatB = getSkewMatrix(relGlobalAnchorB);
+
+		mat3w invEffectiveMass = identity * invMassA + skewMatA * invInertiaA * transpose(skewMatA)
+							   + identity * invMassB + skewMatB * invInertiaB * transpose(skewMatB);
+
+		vec3w bias = vec3w::zero();
+		if (dt > DT_THRESHOLD)
+		{
+			bias = (globalAnchorB - globalAnchorA) * (floatw(BALL_JOINT_CONSTRAINT_BETA) * invDt);
+		}
+
+		relGlobalAnchorA.x.store(batch.relGlobalAnchorA[0]);
+		relGlobalAnchorA.y.store(batch.relGlobalAnchorA[1]);
+		relGlobalAnchorA.z.store(batch.relGlobalAnchorA[2]);
+
+		relGlobalAnchorB.x.store(batch.relGlobalAnchorB[0]);
+		relGlobalAnchorB.y.store(batch.relGlobalAnchorB[1]);
+		relGlobalAnchorB.z.store(batch.relGlobalAnchorB[2]);
+
+		bias.x.store(batch.bias[0]);
+		bias.y.store(batch.bias[1]);
+		bias.z.store(batch.bias[2]);
+
+		invEffectiveMass.m[0].store(batch.invEffectiveMass[0]);
+		invEffectiveMass.m[1].store(batch.invEffectiveMass[1]);
+		invEffectiveMass.m[2].store(batch.invEffectiveMass[2]);
+		invEffectiveMass.m[3].store(batch.invEffectiveMass[3]);
+		invEffectiveMass.m[4].store(batch.invEffectiveMass[4]);
+		invEffectiveMass.m[5].store(batch.invEffectiveMass[5]);
+		invEffectiveMass.m[6].store(batch.invEffectiveMass[6]);
+		invEffectiveMass.m[7].store(batch.invEffectiveMass[7]);
+		invEffectiveMass.m[8].store(batch.invEffectiveMass[8]);
+
+
+		// Limits and motors.
+
+		quatw btoa = conjugate(rotationA) * rotationB;
+
+		vec3w localLimitAxisCompareA = btoa * localLimitAxisB;
+
+		quatw swingRotation = rotateFromTo(localLimitAxisA, localLimitAxisCompareA);
+
+		vec3w twistTangentA = swingRotation * localLimitTangentA;
+		vec3w twistBitangentA = swingRotation * localLimitBitangentA;
+		vec3w localLimitTangentCompareA = btoa * localLimitTangentB;
+		floatw twistAngle = atan2(dot(localLimitTangentCompareA, twistBitangentA), dot(localLimitTangentCompareA, twistTangentA));
+
+
+
+		// Swing limit.
+		vec3w swingAxis; floatw swingAngle;
+		getAxisRotation(swingRotation, swingAxis, swingAngle);
+		auto swingAngleNegative = swingAngle < zero;
+		swingAngle = ifThen(swingAngleNegative, -swingAngle, swingAngle);
+		swingAxis = ifThen(swingAngleNegative, -swingAxis, swingAxis);
+
+		auto solveSwingLimit = (swingLimit >= zero) & (swingAngle >= swingLimit);
+		batch.solveSwingLimit = anyTrue(solveSwingLimit);
+		if (batch.solveSwingLimit)
+		{
+			vec3w globalSwingAxis = rotationA * swingAxis;
+			floatw invEffectiveLimitMass = dot(globalSwingAxis, invInertiaA * globalSwingAxis)
+										 + dot(globalSwingAxis, invInertiaB * globalSwingAxis);
+			floatw effectiveSwingLimitMass = ifThen(invEffectiveLimitMass != zero, 1.f / invEffectiveLimitMass, zero);
+			effectiveSwingLimitMass = ifThen(solveSwingLimit, effectiveSwingLimitMass, zero); // Set to zero for constraints, which aren't at the limit.
+
+			floatw swingLimitBias = zero;
+			if (dt > DT_THRESHOLD)
+			{
+				swingLimitBias = (swingLimit - swingAngle) * (floatw(HINGE_LIMIT_CONSTRAINT_BETA) * invDt);
+			}
+
+			vec3w swingLimitImpulseToAngularVelocityA = invInertiaA * globalSwingAxis;
+			vec3w swingLimitImpulseToAngularVelocityB = invInertiaB * globalSwingAxis;
+
+			globalSwingAxis.x.store(batch.globalSwingAxis[0]);
+			globalSwingAxis.y.store(batch.globalSwingAxis[1]);
+			globalSwingAxis.z.store(batch.globalSwingAxis[2]);
+
+			zero.store(batch.swingImpulse);
+			effectiveSwingLimitMass.store(batch.effectiveSwingLimitMass);
+			swingLimitBias.store(batch.swingLimitBias);
+
+			swingLimitImpulseToAngularVelocityA.x.store(batch.swingLimitImpulseToAngularVelocityA[0]);
+			swingLimitImpulseToAngularVelocityA.y.store(batch.swingLimitImpulseToAngularVelocityA[1]);
+			swingLimitImpulseToAngularVelocityA.z.store(batch.swingLimitImpulseToAngularVelocityA[2]);
+
+			swingLimitImpulseToAngularVelocityB.x.store(batch.swingLimitImpulseToAngularVelocityB[0]);
+			swingLimitImpulseToAngularVelocityB.y.store(batch.swingLimitImpulseToAngularVelocityB[1]);
+			swingLimitImpulseToAngularVelocityB.z.store(batch.swingLimitImpulseToAngularVelocityB[2]);
+		}
+
+		// Swing motor.
+		auto solveSwingMotor = maxSwingMotorTorque > zero;
+		batch.solveSwingMotor = anyTrue(solveSwingMotor);
+		if (batch.solveSwingMotor)
+		{
+			floatw maxSwingMotorImpulse = maxSwingMotorTorque * floatw(dt);
+
+			floatw axisX = cos(swingMotorAxis), axisY = sin(swingMotorAxis);
+			vec3w localSwingMotorAxis = axisX * localLimitTangentA + axisY * localLimitBitangentA;
+
+			auto isVelocityMotor = swingMotorType == constraint_velocity_motor;
+			vec3w globalSwingMotorAxis = rotationA * localSwingMotorAxis;
+
+			if (anyFalse(isVelocityMotor)) // At least one position motor.
+			{
+				floatw targetAngle = swingMotorVelocity; // This is a union.
+				targetAngle = ifThen(swingLimit >= zero, clamp(targetAngle, -swingLimit, swingLimit), targetAngle);
+
+				vec3w localTargetDirection = quatw(localSwingMotorAxis, targetAngle) * localLimitAxisA;
+				vec3w localSwingMotorAxis = noz(cross(localLimitAxisCompareA, localTargetDirection));
+
+				floatw cosAngle = dot(localTargetDirection, localLimitAxisCompareA);
+				floatw deltaAngle = acos(clamp01(cosAngle));
+				floatw swingMotorVelocityOverride = (dt > DT_THRESHOLD) ? (deltaAngle * invDt * floatw(0.2f)) : zero;
+
+				swingMotorVelocity = ifThen(reinterpret(isVelocityMotor), swingMotorVelocity, swingMotorVelocityOverride);
+			}
+
+			vec3w swingMotorImpulseToAngularVelocityA = invInertiaA * globalSwingMotorAxis;
+			vec3w swingMotorImpulseToAngularVelocityB = invInertiaB * globalSwingMotorAxis;
+
+			floatw invEffectiveMotorMass = dot(globalSwingMotorAxis, invInertiaA * globalSwingMotorAxis)
+										 + dot(globalSwingMotorAxis, invInertiaB * globalSwingMotorAxis);
+			floatw effectiveSwingMotorMass = ifThen(invEffectiveMotorMass != zero, 1.f / invEffectiveMotorMass, zero);
+			effectiveSwingMotorMass = ifThen(solveSwingMotor, effectiveSwingMotorMass, zero); // Set to zero for constraints, which have no motor.
+
+			
+			zero.store(batch.swingMotorImpulse);
+			maxSwingMotorImpulse.store(batch.maxSwingMotorImpulse);
+			swingMotorVelocity.store(batch.swingMotorVelocity);
+
+			globalSwingMotorAxis.x.store(batch.globalSwingMotorAxis[0]);
+			globalSwingMotorAxis.y.store(batch.globalSwingMotorAxis[1]);
+			globalSwingMotorAxis.z.store(batch.globalSwingMotorAxis[2]);
+
+			swingMotorImpulseToAngularVelocityA.x.store(batch.swingMotorImpulseToAngularVelocityA[0]);
+			swingMotorImpulseToAngularVelocityA.y.store(batch.swingMotorImpulseToAngularVelocityA[1]);
+			swingMotorImpulseToAngularVelocityA.z.store(batch.swingMotorImpulseToAngularVelocityA[2]);
+
+			swingMotorImpulseToAngularVelocityB.x.store(batch.swingMotorImpulseToAngularVelocityB[0]);
+			swingMotorImpulseToAngularVelocityB.y.store(batch.swingMotorImpulseToAngularVelocityB[1]);
+			swingMotorImpulseToAngularVelocityB.z.store(batch.swingMotorImpulseToAngularVelocityB[2]);
+
+			effectiveSwingMotorMass.store(batch.effectiveSwingMotorMass);
+		}
+
+		// Twist limit and motor.
+		auto minTwistLimitViolated = (twistLimit >= zero) & (twistAngle <= -twistLimit);
+		auto maxTwistLimitViolated = (twistLimit >= zero) & (twistAngle >= twistLimit);
+
+		auto solveTwistLimit = minTwistLimitViolated | maxTwistLimitViolated;
+		auto solveTwistMotor = maxTwistMotorTorque > zero;
+		batch.solveTwistLimit = anyTrue(solveTwistLimit);
+		batch.solveTwistMotor = anyTrue(solveTwistMotor);
+		if (batch.solveTwistLimit || batch.solveTwistMotor)
+		{
+			vec3w globalTwistAxis = rotationA * localLimitAxisA;
+			floatw invEffectiveMass = dot(globalTwistAxis, invInertiaA * globalTwistAxis)
+									+ dot(globalTwistAxis, invInertiaB * globalTwistAxis);
+			floatw effectiveTwistMass = ifThen(invEffectiveMass != zero, 1.f / invEffectiveMass, zero);
+
+			floatw effectiveTwistLimitMass = ifThen(solveTwistLimit, effectiveTwistMass, zero); // Set to zero for constraints, which aren't at the limit.
+			floatw effectiveTwistMotorMass = ifThen(solveTwistMotor, effectiveTwistMass, zero); // Set to zero for constraints, which have no motor.
+
+			floatw twistLimitSign = ifThen(minTwistLimitViolated, 1.f, -1.f);
+
+			floatw maxTwistMotorImpulse = maxTwistMotorTorque * floatw(dt);
+
+			vec3w twistMotorAndLimitImpulseToAngularVelocityA = invInertiaA * globalTwistAxis;
+			vec3w twistMotorAndLimitImpulseToAngularVelocityB = invInertiaB * globalTwistAxis;
+
+			auto isVelocityMotor = twistMotorType == constraint_velocity_motor;
+
+			if (anyFalse(isVelocityMotor)) // At least one position motor.
+			{
+				// Inspired by Bullet Engine. We set the velocity such that the target angle is reached within one frame.
+				// This will later get clamped to the maximum motor impulse.
+				floatw limit = ifThen(twistLimit >= zero, twistLimit, M_PI);
+				floatw twistMotorTargetAngle = twistMotorVelocity; // This is a union.
+				floatw targetAngle = clamp(twistMotorTargetAngle, -limit, limit);
+
+				floatw twistMotorVelocityOverride = (dt > DT_THRESHOLD) ? ((targetAngle - twistAngle) * invDt) : zero;
+				twistMotorVelocity = ifThen(reinterpret(isVelocityMotor), twistMotorVelocity, twistMotorVelocityOverride);
+			}
+
+			floatw twistLimitBias = zero;
+			if (dt > DT_THRESHOLD)
+			{
+				floatw d = ifThen(minTwistLimitViolated, twistLimit + twistAngle, twistLimit - twistAngle);
+				twistLimitBias = d * (floatw(TWIST_LIMIT_CONSTRAINT_BETA) * invDt);
+			}
+
+			globalTwistAxis.x.store(batch.globalTwistAxis[0]);
+			globalTwistAxis.y.store(batch.globalTwistAxis[1]);
+			globalTwistAxis.z.store(batch.globalTwistAxis[2]);
+
+			zero.store(batch.twistImpulse);
+			twistLimitSign.store(batch.twistLimitSign);
+			effectiveTwistLimitMass.store(batch.effectiveTwistLimitMass);
+			effectiveTwistMotorMass.store(batch.effectiveTwistMotorMass);
+			twistLimitBias.store(batch.twistLimitBias);
+
+			maxTwistMotorImpulse.store(batch.maxTwistMotorImpulse);
+			zero.store(batch.twistMotorImpulse);
+			twistMotorVelocity.store(batch.twistMotorVelocity);
+
+			twistMotorAndLimitImpulseToAngularVelocityA.x.store(batch.twistMotorAndLimitImpulseToAngularVelocityA[0]);
+			twistMotorAndLimitImpulseToAngularVelocityA.y.store(batch.twistMotorAndLimitImpulseToAngularVelocityA[1]);
+			twistMotorAndLimitImpulseToAngularVelocityA.z.store(batch.twistMotorAndLimitImpulseToAngularVelocityA[2]);
+
+			twistMotorAndLimitImpulseToAngularVelocityB.x.store(batch.twistMotorAndLimitImpulseToAngularVelocityB[0]);
+			twistMotorAndLimitImpulseToAngularVelocityB.y.store(batch.twistMotorAndLimitImpulseToAngularVelocityB[1]);
+			twistMotorAndLimitImpulseToAngularVelocityB.z.store(batch.twistMotorAndLimitImpulseToAngularVelocityB[2]);
+		}
+
+	}
+}
+
+void solveConeTwistVelocityConstraintsSIMD(simd_cone_twist_constraint& constraints, rigid_body_global_state* rbs)
+{
+	CPU_PROFILE_BLOCK("Solve cone twist constraints SIMD");
+
+	for (uint32 i = 0; i < constraints.numBatches; ++i)
+	{
+		simd_cone_twist_constraint_batch& batch = constraints.batches[i];
+
+
+		// Load body A.
+		vec3w vA, wA;
+		floatw invMassA;
+		mat3w invInertiaA;
+
+		load8(&rbs->invInertia.m00, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20,
+			invInertiaA.m01, invInertiaA.m11, invInertiaA.m21,
+			invInertiaA.m02, invInertiaA.m12);
+
+		load8(&rbs->invInertia.m22, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m22, invMassA, vA.x, vA.y, vA.z, wA.x, wA.y, wA.z);
+
+
+		// Load body B.
+		vec3w vB, wB;
+		floatw invMassB;
+		mat3w invInertiaB;
+
+		load8(&rbs->invInertia.m00, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
+			invInertiaB.m01, invInertiaB.m11, invInertiaB.m21,
+			invInertiaB.m02, invInertiaB.m12);
+
+		load8(&rbs->invInertia.m22, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m22, invMassB, vB.x, vB.y, vB.z, wB.x, wB.y, wB.z);
+
+
+		// Solve in order of importance (most important last): Motors -> Limits -> Position.
+
+		vec3w globalTwistAxis(batch.globalTwistAxis[0], batch.globalTwistAxis[1], batch.globalTwistAxis[2]);
+		vec3w twistMotorAndLimitImpulseToAngularVelocityA(batch.twistMotorAndLimitImpulseToAngularVelocityA[0], batch.twistMotorAndLimitImpulseToAngularVelocityA[1], batch.twistMotorAndLimitImpulseToAngularVelocityA[2]);
+		vec3w twistMotorAndLimitImpulseToAngularVelocityB(batch.twistMotorAndLimitImpulseToAngularVelocityB[0], batch.twistMotorAndLimitImpulseToAngularVelocityB[1], batch.twistMotorAndLimitImpulseToAngularVelocityB[2]);
+
+		// Motor.
+		if (batch.solveTwistMotor)
+		{
+			floatw twistMotorVelocity(batch.twistMotorVelocity);
+			floatw effectiveTwistMotorMass(batch.effectiveTwistMotorMass);
+			floatw twistMotorImpulse(batch.twistMotorImpulse);
+			floatw maxTwistMotorImpulse(batch.maxTwistMotorImpulse);
+
+			floatw aDotWA = dot(globalTwistAxis, wA);
+			floatw aDotWB = dot(globalTwistAxis, wB);
+			floatw relAngularVelocity = (aDotWB - aDotWA);
+
+			floatw motorCdot = relAngularVelocity - twistMotorVelocity;
+
+			floatw motorLambda = -effectiveTwistMotorMass * motorCdot;
+			floatw oldImpulse = twistMotorImpulse;
+			twistMotorImpulse = clamp(twistMotorImpulse + motorLambda, -maxTwistMotorImpulse, maxTwistMotorImpulse);
+			motorLambda = twistMotorImpulse - oldImpulse;
+
+			wA -= twistMotorAndLimitImpulseToAngularVelocityA * motorLambda;
+			wB += twistMotorAndLimitImpulseToAngularVelocityB * motorLambda;
+
+			twistMotorImpulse.store(batch.twistMotorImpulse);
+		}
+
+		if (batch.solveSwingMotor)
+		{
+			floatw swingMotorVelocity(batch.swingMotorVelocity);
+			floatw effectiveSwingMotorMass(batch.effectiveSwingMotorMass);
+			vec3w globalSwingMotorAxis(batch.globalSwingMotorAxis[0], batch.globalSwingMotorAxis[1], batch.globalSwingMotorAxis[2]);
+			floatw swingMotorImpulse(batch.swingMotorImpulse);
+			floatw maxSwingMotorImpulse(batch.maxSwingMotorImpulse);
+
+			vec3w swingMotorImpulseToAngularVelocityA(batch.swingMotorImpulseToAngularVelocityA[0], batch.swingMotorImpulseToAngularVelocityA[1], batch.swingMotorImpulseToAngularVelocityA[2]);
+			vec3w swingMotorImpulseToAngularVelocityB(batch.swingMotorImpulseToAngularVelocityB[0], batch.swingMotorImpulseToAngularVelocityB[1], batch.swingMotorImpulseToAngularVelocityB[2]);
+
+			floatw aDotWA = dot(globalSwingMotorAxis, wA);
+			floatw aDotWB = dot(globalSwingMotorAxis, wB);
+			floatw relAngularVelocity = (aDotWB - aDotWA);
+
+			floatw motorCdot = relAngularVelocity - swingMotorVelocity;
+
+			floatw motorLambda = -effectiveSwingMotorMass * motorCdot;
+			floatw oldImpulse = swingMotorImpulse;
+			swingMotorImpulse = clamp(swingMotorImpulse + motorLambda, -maxSwingMotorImpulse, maxSwingMotorImpulse);
+			motorLambda = swingMotorImpulse - oldImpulse;
+
+			wA -= swingMotorImpulseToAngularVelocityA * motorLambda;
+			wB += swingMotorImpulseToAngularVelocityB * motorLambda;
+
+			swingMotorImpulse.store(batch.swingMotorImpulse);
+		}
+
+		// Twist.
+		if (batch.solveTwistLimit)
+		{
+			floatw limitSign(batch.twistLimitSign);
+			floatw twistLimitBias(batch.twistLimitBias);
+			floatw effectiveTwistLimitMass(batch.effectiveTwistLimitMass);
+			floatw twistImpulse(batch.twistImpulse);
+
+			floatw aDotWA = dot(globalTwistAxis, wA);
+			floatw aDotWB = dot(globalTwistAxis, wB);
+			floatw relAngularVelocity = limitSign * (aDotWB - aDotWA);
+
+			floatw limitCdot = relAngularVelocity + twistLimitBias;
+			floatw limitLambda = -effectiveTwistLimitMass * limitCdot;
+
+			floatw impulse = maximum(twistImpulse + limitLambda, floatw::zero());
+			limitLambda = impulse - twistImpulse;
+			twistImpulse = impulse;
+
+			limitLambda *= limitSign;
+
+			wA -= twistMotorAndLimitImpulseToAngularVelocityA * limitLambda;
+			wB += twistMotorAndLimitImpulseToAngularVelocityB * limitLambda;
+
+			twistImpulse.store(batch.twistImpulse);
+		}
+
+		// Cone.
+		if (batch.solveSwingLimit)
+		{
+			vec3w globalSwingAxis(batch.globalSwingAxis[0], batch.globalSwingAxis[1], batch.globalSwingAxis[2]);
+			floatw swingLimitBias(batch.swingLimitBias);
+			floatw effectiveSwingLimitMass(batch.effectiveSwingLimitMass);
+			floatw swingImpulse(batch.swingImpulse);
+
+			vec3w swingLimitImpulseToAngularVelocityA(batch.swingLimitImpulseToAngularVelocityA[0], batch.swingLimitImpulseToAngularVelocityA[1], batch.swingLimitImpulseToAngularVelocityA[2]);
+			vec3w swingLimitImpulseToAngularVelocityB(batch.swingLimitImpulseToAngularVelocityB[0], batch.swingLimitImpulseToAngularVelocityB[1], batch.swingLimitImpulseToAngularVelocityB[2]);
+
+			floatw aDotWA = dot(globalSwingAxis, wA);
+			floatw aDotWB = dot(globalSwingAxis, wB);
+			floatw swingLimitCdot = aDotWA - aDotWB + swingLimitBias;
+			floatw limitLambda = -effectiveSwingLimitMass * swingLimitCdot;
+
+			floatw impulse = maximum(swingImpulse + limitLambda, floatw::zero());
+			limitLambda = impulse - swingImpulse;
+			swingImpulse = impulse;
+
+			wA += swingLimitImpulseToAngularVelocityA * limitLambda;
+			wB -= swingLimitImpulseToAngularVelocityB * limitLambda;
+
+			swingImpulse.store(batch.swingImpulse);
+		}
+
+
+		// Position part.
+		{
+			vec3w relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
+			vec3w relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
+			vec3w bias(batch.bias[0], batch.bias[1], batch.bias[2]);
+
+			mat3w invEffectiveMass;
+			invEffectiveMass.m[0] = floatw(batch.invEffectiveMass[0]);
+			invEffectiveMass.m[1] = floatw(batch.invEffectiveMass[1]);
+			invEffectiveMass.m[2] = floatw(batch.invEffectiveMass[2]);
+			invEffectiveMass.m[3] = floatw(batch.invEffectiveMass[3]);
+			invEffectiveMass.m[4] = floatw(batch.invEffectiveMass[4]);
+			invEffectiveMass.m[5] = floatw(batch.invEffectiveMass[5]);
+			invEffectiveMass.m[6] = floatw(batch.invEffectiveMass[6]);
+			invEffectiveMass.m[7] = floatw(batch.invEffectiveMass[7]);
+			invEffectiveMass.m[8] = floatw(batch.invEffectiveMass[8]);
+
+			vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
+			vec3w anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
+			vec3w translationCdot = anchorVelocityB - anchorVelocityA + bias;
+
+			vec3w translationP = solveLinearSystem(invEffectiveMass, -translationCdot);
+
+			vA -= invMassA * translationP;
+			wA -= invInertiaA * cross(relGlobalAnchorA, translationP);
+			vB += invMassB * translationP;
+			wB += invInertiaB * cross(relGlobalAnchorB, translationP);
+		}
+
+
+
+		store8(&rbs->invInertia.m22, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m22, invMassA, vA.x, vA.y, vA.z, wA.x, wA.y, wA.z);
+
+		store8(&rbs->invInertia.m22, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m22, invMassB, vB.x, vB.y, vB.z, wB.x, wB.y, wB.z);
+	}
+}
 
 
 

@@ -5,7 +5,7 @@
 #include "scene/scene.h"
 
 
-#define CONSTRAINT_SIMD_WIDTH 8
+#define CONSTRAINT_SIMD_WIDTH 4
 
 enum constraint_type
 {
@@ -216,15 +216,15 @@ struct cone_twist_constraint
 	vec3 localAnchorA;
 	vec3 localAnchorB;
 
-	float swingLimit;
-	float twistLimit;
-
 	vec3 localLimitAxisA;
 	vec3 localLimitAxisB;
 
 	vec3 localLimitTangentA;
 	vec3 localLimitBitangentA;
 	vec3 localLimitTangentB;
+
+	float swingLimit;
+	float twistLimit;
 
 	// Motor.
 	constraint_motor_type swingMotorType;
@@ -290,6 +290,65 @@ struct cone_twist_constraint_update
 	vec3 swingMotorImpulseToAngularVelocityB;
 	vec3 swingLimitImpulseToAngularVelocityA;
 	vec3 swingLimitImpulseToAngularVelocityB;
+};
+
+struct simd_cone_twist_constraint_batch
+{
+	uint16 rbAIndices[CONSTRAINT_SIMD_WIDTH];
+	uint16 rbBIndices[CONSTRAINT_SIMD_WIDTH];
+
+	float relGlobalAnchorA[3][CONSTRAINT_SIMD_WIDTH];
+	float relGlobalAnchorB[3][CONSTRAINT_SIMD_WIDTH];
+
+	float bias[3][CONSTRAINT_SIMD_WIDTH];
+	float invEffectiveMass[9][CONSTRAINT_SIMD_WIDTH];
+
+	bool solveSwingLimit;
+	bool solveTwistLimit;
+	bool solveSwingMotor;
+	bool solveTwistMotor;
+
+	// Limits.
+	float globalSwingAxis[3][CONSTRAINT_SIMD_WIDTH];
+	float swingImpulse[CONSTRAINT_SIMD_WIDTH];
+	float effectiveSwingLimitMass[CONSTRAINT_SIMD_WIDTH];
+	float swingLimitBias[CONSTRAINT_SIMD_WIDTH];
+
+	float swingLimitImpulseToAngularVelocityA[3][CONSTRAINT_SIMD_WIDTH];
+	float swingLimitImpulseToAngularVelocityB[3][CONSTRAINT_SIMD_WIDTH];
+
+
+	float globalTwistAxis[3][CONSTRAINT_SIMD_WIDTH];
+	float twistImpulse[CONSTRAINT_SIMD_WIDTH];
+	float twistLimitSign[CONSTRAINT_SIMD_WIDTH];
+	float effectiveTwistLimitMass[CONSTRAINT_SIMD_WIDTH];
+	float twistLimitBias[CONSTRAINT_SIMD_WIDTH];
+
+
+
+	// Motors.
+	float swingMotorImpulse[CONSTRAINT_SIMD_WIDTH];
+	float maxSwingMotorImpulse[CONSTRAINT_SIMD_WIDTH];
+	float swingMotorVelocity[CONSTRAINT_SIMD_WIDTH];
+	float globalSwingMotorAxis[3][CONSTRAINT_SIMD_WIDTH];
+	float effectiveSwingMotorMass[CONSTRAINT_SIMD_WIDTH];
+
+	float swingMotorImpulseToAngularVelocityA[3][CONSTRAINT_SIMD_WIDTH];
+	float swingMotorImpulseToAngularVelocityB[3][CONSTRAINT_SIMD_WIDTH];
+
+	float twistMotorImpulse[CONSTRAINT_SIMD_WIDTH];
+	float maxTwistMotorImpulse[CONSTRAINT_SIMD_WIDTH];
+	float twistMotorVelocity[CONSTRAINT_SIMD_WIDTH];
+	float effectiveTwistMotorMass[CONSTRAINT_SIMD_WIDTH];
+
+	float twistMotorAndLimitImpulseToAngularVelocityA[3][CONSTRAINT_SIMD_WIDTH];
+	float twistMotorAndLimitImpulseToAngularVelocityB[3][CONSTRAINT_SIMD_WIDTH];
+};
+
+struct simd_cone_twist_constraint
+{
+	simd_cone_twist_constraint_batch* batches;
+	uint32 numBatches;
 };
 
 
@@ -374,6 +433,10 @@ void solveDistanceVelocityConstraintsSIMD(simd_distance_constraint& constraints,
 void initializeBallJointVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const ball_joint_constraint* input, const constraint_body_pair* bodyPairs, uint32 count,
 	simd_ball_joint_constraint& outConstraints, float dt);
 void solveBallJointVelocityConstraintsSIMD(simd_ball_joint_constraint& constraints, rigid_body_global_state* rbs);
+
+void initializeConeTwistVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const cone_twist_constraint* input, const constraint_body_pair* bodyPairs, uint32 count,
+	simd_cone_twist_constraint& outConstraints, float dt);
+void solveConeTwistVelocityConstraintsSIMD(simd_cone_twist_constraint& constraints, rigid_body_global_state* rbs);
 
 void initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, uint32 numContacts,
 	uint16 dummyRigidBodyIndex, simd_collision_constraint& outConstraints, float dt);
