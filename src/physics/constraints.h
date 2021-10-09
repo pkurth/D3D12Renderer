@@ -5,7 +5,7 @@
 #include "scene/scene.h"
 
 
-#define CONSTRAINT_SIMD_WIDTH 4
+#define CONSTRAINT_SIMD_WIDTH 8
 
 enum constraint_type
 {

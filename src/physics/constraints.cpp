@@ -1232,11 +1232,6 @@ void initializeConeTwistVelocityConstraintsSIMD(memory_arena& arena, const rigid
 	const floatw invDt = 1.f / dt;
 	const floatw one = 1.f;
 
-	const mat3w identity(
-		one, zero, zero,
-		zero, one, zero,
-		zero, zero, one);
-
 	for (uint32 i = 0; i < numContactSlots; ++i)
 	{
 		const simd_constraint_slot& slot = contactSlots[i];
@@ -1365,10 +1360,14 @@ void initializeConeTwistVelocityConstraintsSIMD(memory_arena& arena, const rigid
 		mat3w skewMatA = getSkewMatrix(relGlobalAnchorA);
 		mat3w skewMatB = getSkewMatrix(relGlobalAnchorB);
 
-		mat3w invEffectiveMass = identity * invMassA + skewMatA * invInertiaA * transpose(skewMatA)
-							   + identity * invMassB + skewMatB * invInertiaB * transpose(skewMatB);
+		mat3w invEffectiveMass = skewMatA * invInertiaA * transpose(skewMatA)
+							   + skewMatB * invInertiaB * transpose(skewMatB);
+		floatw invMassSum = invMassA + invMassB;
+		invEffectiveMass.m00 += invMassSum;
+		invEffectiveMass.m11 += invMassSum;
+		invEffectiveMass.m22 += invMassSum;
 
-		vec3w bias = vec3w::zero();
+		vec3w bias = zero;
 		if (dt > DT_THRESHOLD)
 		{
 			bias = (globalAnchorB - globalAnchorA) * (floatw(BALL_JOINT_CONSTRAINT_BETA) * invDt);
