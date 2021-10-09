@@ -1474,12 +1474,14 @@ void initializeConeTwistVelocityConstraintsSIMD(memory_arena& arena, const rigid
 
 				vec3w localTargetDirection = quatw(localSwingMotorAxis, targetAngle) * localLimitAxisA;
 				vec3w localSwingMotorAxis = noz(cross(localLimitAxisCompareA, localTargetDirection));
+				vec3w globalSwingMotorAxisOverride = rotationA * localSwingMotorAxis;
 
 				floatw cosAngle = dot(localTargetDirection, localLimitAxisCompareA);
 				floatw deltaAngle = acos(clamp01(cosAngle));
 				floatw swingMotorVelocityOverride = (dt > DT_THRESHOLD) ? (deltaAngle * invDt * floatw(0.2f)) : zero;
 
 				swingMotorVelocity = ifThen(reinterpret(isVelocityMotor), swingMotorVelocity, swingMotorVelocityOverride);
+				globalSwingMotorAxis = ifThen(reinterpret(isVelocityMotor), globalSwingMotorAxis, globalSwingMotorAxisOverride);
 			}
 
 			vec3w swingMotorImpulseToAngularVelocityA = invInertiaA * globalSwingMotorAxis;
