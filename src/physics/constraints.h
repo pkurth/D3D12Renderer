@@ -20,6 +20,8 @@ enum constraint_type
 	constraint_type_hinge_joint,
 	constraint_type_cone_twist,
 
+	constraint_type_collision, // This is a bit of a special case, because it is generated in each frame.
+
 	constraint_type_count,
 };
 
