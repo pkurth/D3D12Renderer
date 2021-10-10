@@ -6,7 +6,7 @@
 	url = ../assimp.git
 [submodule "ext/entt"]
 	path = ext/entt
-	url = ../../skypjack/entt.git
+	url = ../entt.git
 [submodule "ext/directxtex"]
 	path = ext/directxtex
 	url = ../../microsoft/DirectXTex.git
