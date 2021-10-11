@@ -171,7 +171,7 @@ void application::initialize(main_renderer* renderer)
 		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 0.4f, vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f)), {}, trs::identity, lollipopMaterial });
 
 		auto groundMesh = make_ref<composite_mesh>();
-		groundMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(20.f, 4.f, 20.f)), {}, trs::identity, createPBRMaterial(
+		groundMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(100.f, 4.f, 100.f)), {}, trs::identity, createPBRMaterial(
 				"assets/desert/textures/BlueContainer_Albedo.png",
 				"assets/desert/textures/Container_Normal.png",
 				{}, 
@@ -186,22 +186,27 @@ void application::initialize(main_renderer* renderer)
 				{}, {})
 			});
 
-		auto test1 = scene.createEntity("Lollipop 1")
-			.addComponent<transform_component>(vec3(20.f, 5.f, 0.f), quat::identity)
-			.addComponent<raster_component>(testMesh)
-			.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f))
-			.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f))
-			.addComponent<rigid_body_component>(true, 1.f);
+		//auto test1 = scene.createEntity("Lollipop 1")
+		//	.addComponent<transform_component>(vec3(20.f, 5.f, 0.f), quat::identity)
+		//	.addComponent<raster_component>(testMesh)
+		//	.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f))
+		//	.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f))
+		//	.addComponent<rigid_body_component>(true, 1.f);
+		//
+		//auto test2 = scene.createEntity("Lollipop 2")
+		//	.addComponent<transform_component>(vec3(20.f, 5.f, -2.f), quat::identity)
+		//	.addComponent<raster_component>(testMesh)
+		//	.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f))
+		//	.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f))
+		//	.addComponent<rigid_body_component>(true, 1.f);
 
-		auto test2 = scene.createEntity("Lollipop 2")
-			.addComponent<transform_component>(vec3(20.f, 5.f, -2.f), quat::identity)
-			.addComponent<raster_component>(testMesh)
-			.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f))
-			.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f))
-			.addComponent<rigid_body_component>(true, 1.f);
-
-		for (uint32 i = 0; i < 10; ++i)
+		random_number_generator rng = { 15681923 };
+		for (uint32 i = 0; i < 1000; ++i)
 		{
+			float x = rng.randomFloatBetween(-90.f, 90.f);
+			float z = rng.randomFloatBetween(-90.f, 90.f);
+			float y = rng.randomFloatBetween(20.f, 60.f);
+
 			scene.createEntity("Cube")
 				.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
 				.addComponent<raster_component>(boxMesh)
@@ -209,26 +214,26 @@ void application::initialize(main_renderer* renderer)
 				.addComponent<rigid_body_component>(false, 1.f);
 		}
 
-		bounding_hull hull =
-		{
-			quat::identity,
-			vec3(0.f),
-			allocateBoundingHullGeometry("assets/colliders/hull.fbx")
-		};
-
-		if (hull.geometryIndex != INVALID_BOUNDING_HULL_INDEX)
-		{
-			scene.createEntity("Hull")
-				.addComponent<transform_component>(vec3(20.f, 15.f, 0.f), quat::identity)
-				.addComponent<raster_component>(loadMeshFromFile("assets/colliders/hull.fbx"))
-				.addComponent<collider_component>(collider_component::asHull(hull, 0.1f, 0.5f, 0.1f))
-				.addComponent<rigid_body_component>(false, 0.f);
-		}
+		//bounding_hull hull =
+		//{
+		//	quat::identity,
+		//	vec3(0.f),
+		//	allocateBoundingHullGeometry("assets/colliders/hull.fbx")
+		//};
+		//
+		//if (hull.geometryIndex != INVALID_BOUNDING_HULL_INDEX)
+		//{
+		//	scene.createEntity("Hull")
+		//		.addComponent<transform_component>(vec3(20.f, 15.f, 0.f), quat::identity)
+		//		.addComponent<raster_component>(loadMeshFromFile("assets/colliders/hull.fbx"))
+		//		.addComponent<collider_component>(collider_component::asHull(hull, 0.1f, 0.5f, 0.1f))
+		//		.addComponent<rigid_body_component>(false, 0.f);
+		//}
 
 		scene.createEntity("Test ground")
-			.addComponent<transform_component>(vec3(30.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
+			.addComponent<transform_component>(vec3(0.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
-			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f));
+			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(100.f, 4.f, 100.f)), 0.1f, 1.f, 4.f));
 
 		/*scene.createEntity("Test ground")
 			.addComponent<transform_component>(vec3(20.f, -5.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
@@ -236,8 +241,8 @@ void application::initialize(main_renderer* renderer)
 			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f));*/
 
 
-#if 1
 		auto chainMesh = make_ref<composite_mesh>();
+#if 0
 		chainMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f), {}, trs::identity, lollipopMaterial });
 
 		auto fixed = scene.createEntity("Fixed")
@@ -279,7 +284,7 @@ void application::initialize(main_renderer* renderer)
 #endif
 
 	//humanoid_ragdoll::create(scene, vec3(60.f, 1.25f, -2.f));
-	humanoid_ragdoll ragdoll = humanoid_ragdoll::create(scene, vec3(20.f, 1.25f, 0.f));
+	//humanoid_ragdoll ragdoll = humanoid_ragdoll::create(scene, vec3(20.f, 1.25f, 0.f));
 
 	//initializeLocomotionEval(scene, ragdoll);
 

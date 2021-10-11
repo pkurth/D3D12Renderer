@@ -118,6 +118,21 @@ struct scene_entity
 	}
 
 	template <typename component_t>
+	uint32 getComponentIndex() const
+	{
+		auto pool = registry->pool_if_exists<component_t>();
+		assert(pool);
+		return (uint32)pool->index(handle);
+	}
+
+	template <typename component_t>
+	uint32 getComponentIndexIfExists() const
+	{
+		auto pool = registry->pool_if_exists<component_t>();
+		return (pool && pool->contains(handle)) ? (uint32)pool->index(handle) : (uint32)-1;
+	}
+
+	template <typename component_t>
 	void removeComponent()
 	{
 		registry->remove<component_t>(handle);
@@ -226,6 +241,14 @@ struct game_scene
 	uint32 numberOfComponentsOfType()
 	{
 		return (uint32)registry.size<component_t>();
+	}
+
+	template <typename component_t>
+	component_t& getComponentAtIndex(uint32 index)
+	{
+		auto pool = registry.pool_if_exists<component_t>();
+		assert(pool);
+		return pool->element_at(index);
 	}
 
 	template <typename context_t, typename... args>

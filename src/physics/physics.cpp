@@ -441,9 +441,6 @@ static void getWorldSpaceColliders(game_scene& scene, bounding_box* outWorldspac
 
 	uint32 pushIndex = 0;
 
-	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
-	force_field_component* ffBase = scene.raw<force_field_component>();
-
 	for (auto [entityHandle, collider] : scene.view<collider_component>().each())
 	{
 		bounding_box& bb = outWorldspaceAABBs[pushIndex];
@@ -457,14 +454,14 @@ static void getWorldSpaceColliders(game_scene& scene, bounding_box* outWorldspac
 		col.type = collider.type;
 		col.properties = collider.properties;
 
-		if (rigid_body_component* rb = entity.getComponentIfExists<rigid_body_component>())
+		if (entity.hasComponent<rigid_body_component>())
 		{
-			col.objectIndex = (uint16)(rb - rbBase);
+			col.objectIndex = (uint16)entity.getComponentIndex<rigid_body_component>();
 			col.objectType = physics_object_type_rigid_body;
 		}
-		else if (force_field_component* ff = entity.getComponentIfExists<force_field_component>())
+		else if (entity.hasComponent<force_field_component>())
 		{
-			col.objectIndex = (uint16)(ff - ffBase);
+			col.objectIndex = (uint16)entity.getComponentIndex<force_field_component>();
 			col.objectType = physics_object_type_force_field;
 		}
 		else
@@ -540,8 +537,6 @@ static vec3 getForceFieldStates(game_scene& scene, force_field_global_state* out
 {
 	vec3 globalForceField(0.f);
 
-	force_field_component* ffBase = scene.raw<force_field_component>();
-
 	for (auto [entityHandle, forceField] : scene.view<force_field_component>().each())
 	{
 		scene_entity entity = { entityHandle, scene };
@@ -555,7 +550,7 @@ static vec3 getForceFieldStates(game_scene& scene, force_field_global_state* out
 		if (entity.hasComponent<collider_component>())
 		{
 			// Localized force field.
-			uint16 index = (uint16)(&forceField - ffBase);
+			uint16 index = (uint16)entity.getComponentIndex<force_field_component>();
 			outLocalForceFields[index].force = force;
 		}
 		else
@@ -571,8 +566,6 @@ static vec3 getForceFieldStates(game_scene& scene, force_field_global_state* out
 template <typename constraint_t>
 static void getConstraintBodyPairs(game_scene& scene, constraint_body_pair* bodyPairs)
 {
-	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
-
 	uint32 i = scene.numberOfComponentsOfType<constraint_t>() - 1;
 	for (auto [entityHandle, _] : scene.view<constraint_t>().each())
 	{
@@ -583,8 +576,8 @@ static void getConstraintBodyPairs(game_scene& scene, constraint_body_pair* body
 
 		scene_entity rbAEntity = { reference.entityA, scene };
 		scene_entity rbBEntity = { reference.entityB, scene };
-		pair.rbA = (uint16)(&rbAEntity.getComponent<rigid_body_component>() - rbBase);
-		pair.rbB = (uint16)(&rbBEntity.getComponent<rigid_body_component>() - rbBase);
+		pair.rbA = (uint16)rbAEntity.getComponentIndex<rigid_body_component>();
+		pair.rbB = (uint16)rbBEntity.getComponentIndex<rigid_body_component>();
 	}
 }
 
@@ -620,8 +613,6 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 
 	memory_marker marker = arena.getMarker();
 
-	rigid_body_component* rbBase = scene.raw<rigid_body_component>();
-
 	rigid_body_global_state* rbGlobal = arena.allocate<rigid_body_global_state>(numRigidBodies + 1); // Reserve one slot for dummy.
 	force_field_global_state* ffGlobal = arena.allocate<force_field_global_state>(numForceFields);
 	bounding_box* worldSpaceAABBs = arena.allocate<bounding_box>(numColliders);
@@ -648,11 +639,10 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 
 
 	// Handle non-collision interactions (triggers, force fields etc).
-
 	for (uint32 i = 0; i < narrowPhaseResult.numNonCollisionInteractions; ++i)
 	{
 		non_collision_interaction interaction = nonCollisionInteractions[i];
-		rigid_body_component& rb = rbBase[interaction.rigidBodyIndex];
+		rigid_body_component& rb = scene.getComponentAtIndex<rigid_body_component>(interaction.rigidBodyIndex);
 
 		switch (interaction.otherType)
 		{
