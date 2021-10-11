@@ -25,9 +25,9 @@
 static constexpr float lerp(float l, float u, float t) { return l + t * (u - l); }
 static constexpr float inverseLerp(float l, float u, float v) { return (v - l) / (u - l); }
 static constexpr float remap(float v, float oldL, float oldU, float newL, float newU) { return lerp(newL, newU, inverseLerp(oldL, oldU, v)); }
-static constexpr float clamp(float v, float l, float u) { return min(u, max(l, v)); }
-static constexpr uint32 clamp(uint32 v, uint32 l, uint32 u) { return min(u, max(l, v)); }
-static constexpr int32 clamp(int32 v, int32 l, int32 u) { return min(u, max(l, v)); }
+static constexpr float clamp(float v, float l, float u) { float r = max(l, v); r = min(u, r); return r; }
+static constexpr uint32 clamp(uint32 v, uint32 l, uint32 u) { uint32 r = max(l, v); r = min(u, r); return r; }
+static constexpr int32 clamp(int32 v, int32 l, int32 u) { int32 r = max(l, v); r = min(u, r); return r; }
 static constexpr float clamp01(float v) { return clamp(v, 0.f, 1.f); }
 static constexpr float saturate(float v) { return clamp01(v); }
 static constexpr uint32 bucketize(uint32 problemSize, uint32 bucketSize) { return (problemSize + bucketSize - 1) / bucketSize; }

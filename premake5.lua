@@ -232,6 +232,7 @@ project "D3D12Renderer"
 	}
 
 	vectorextensions "AVX2"
+	floatingpoint "Fast"
 
 	filter "configurations:Debug"
         runtime "Debug"
@@ -363,6 +364,9 @@ project "Physics-Lib"
 		"ext/entt/src",
 		"ext",
 	}
+
+	vectorextensions "AVX2"
+	floatingpoint "Fast"
 
 	files {
 		"src/bounding_volumes.*",
