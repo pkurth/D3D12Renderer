@@ -123,104 +123,118 @@ uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpac
 	// We iterate over the endpoint indirections, which are sorted the exact same way as the colliders.
 	uint16 index = 0;
 
-	// Update endpoint positions.
-	for (auto [entityHandle, indirection] : scene.view<sap_endpoint_indirection_component>().each())
 	{
-		bounding_box& aabb = worldSpaceAABBs[index];
+		CPU_PROFILE_BLOCK("Update endpoints");
 
-		uint16 start = indirection.startEndpoint;
-		uint16 end = indirection.endEndpoint;
-
-		float lo = aabb.minCorner.data[sortingAxis];
-		float hi = aabb.maxCorner.data[sortingAxis];
-		endpoints[start].value = lo;
-		endpoints[end].value = hi;
-
-		endpoints[start].colliderIndex = index;
-		endpoints[end].colliderIndex = index;
-
-		assert(endpoints[start].entity == entityHandle);
-		assert(endpoints[end].entity == entityHandle);
-
-		++index;
-	}
-
-	// Sort endpoints.
-#if 1
-	// Insertion sort.
-	for (uint32 i = 1; i < numEndpoints; ++i)
-	{
-		sap_endpoint key = endpoints[i];
-		uint32 j = i - 1;
-
-		while (j != UINT32_MAX && endpoints[j].value > key.value)
+		for (auto [entityHandle, indirection] : scene.view<sap_endpoint_indirection_component>().each())
 		{
-			endpoints[j + 1] = endpoints[j];
-			j = j - 1;
+			bounding_box& aabb = worldSpaceAABBs[index];
+
+			uint16 start = indirection.startEndpoint;
+			uint16 end = indirection.endEndpoint;
+
+			float lo = aabb.minCorner.data[sortingAxis];
+			float hi = aabb.maxCorner.data[sortingAxis];
+			endpoints[start].value = lo;
+			endpoints[end].value = hi;
+
+			endpoints[start].colliderIndex = index;
+			endpoints[end].colliderIndex = index;
+
+			assert(endpoints[start].entity == entityHandle);
+			assert(endpoints[end].entity == entityHandle);
+
+			++index;
 		}
-		endpoints[j + 1] = key;
 	}
+
+	{
+		CPU_PROFILE_BLOCK("Sort endpoints");
+
+#if 1
+		// Insertion sort.
+		for (uint32 i = 1; i < numEndpoints; ++i)
+		{
+			sap_endpoint key = endpoints[i];
+			uint32 j = i - 1;
+
+			while (j != UINT32_MAX && endpoints[j].value > key.value)
+			{
+				endpoints[j + 1] = endpoints[j];
+				j = j - 1;
+			}
+			endpoints[j + 1] = key;
+		}
 #else
-	std::sort(endpoints, endpoints + numEndpoints, [](sap_endpoint a, sap_endpoint b) { return a.value < b.value; });
+		std::sort(endpoints, endpoints + numEndpoints, [](sap_endpoint a, sap_endpoint b) { return a.value < b.value; });
 #endif
+	}
 
 
 	memory_marker marker = arena.getMarker();
 
-	// Determine overlaps.
-	uint32 numActive = 0;
-	uint16* activeList = arena.allocate<uint16>(numColliders); // Conservative estimate.
-
-	for (uint32 i = 0; i < numEndpoints; ++i)
 	{
-		sap_endpoint ep = endpoints[i];
-		if (ep.start)
-		{
-			for (uint32 active = 0; active < numActive; ++active)
-			{
-				bounding_box& a = worldSpaceAABBs[ep.colliderIndex];
-				bounding_box& b = worldSpaceAABBs[activeList[active]];
+		CPU_PROFILE_BLOCK("Determine overlaps");
 
-				if (aabbVsAABB(a, b))
-				{
-					outCollisions[numCollisions++] = { ep.colliderIndex, activeList[active] };
-				}
-			}
-			activeList[numActive++] = ep.colliderIndex;
-		}
-		else
+		uint32 numActive = 0;
+		uint16* activeList = arena.allocate<uint16>(numColliders); // Conservative estimate.
+
+		for (uint32 i = 0; i < numEndpoints; ++i)
 		{
-			for (uint32 a = 0; a < numActive; ++a)
+			sap_endpoint ep = endpoints[i];
+			if (ep.start)
 			{
-				if (ep.colliderIndex == activeList[a])
+				for (uint32 active = 0; active < numActive; ++active)
 				{
-					activeList[a] = activeList[numActive - 1];
-					--numActive;
-					break;
+					bounding_box& a = worldSpaceAABBs[ep.colliderIndex];
+					bounding_box& b = worldSpaceAABBs[activeList[active]];
+
+					if (aabbVsAABB(a, b))
+					{
+						outCollisions[numCollisions++] = { ep.colliderIndex, activeList[active] };
+					}
+				}
+				activeList[numActive++] = ep.colliderIndex;
+			}
+			else
+			{
+				for (uint32 a = 0; a < numActive; ++a)
+				{
+					if (ep.colliderIndex == activeList[a])
+					{
+						activeList[a] = activeList[numActive - 1];
+						--numActive;
+						break;
+					}
 				}
 			}
 		}
+
+		assert(numActive == 0);
 	}
 
 	arena.resetToMarker(marker);
 
-	assert(numActive == 0);
 
 
 	// Fix up indirections.
-	for (uint32 i = 0; i < numEndpoints; ++i)
 	{
-		sap_endpoint ep = endpoints[i];
-		scene_entity entity = { ep.entity, scene };
-		sap_endpoint_indirection_component& in = entity.getComponent<sap_endpoint_indirection_component>();
+		CPU_PROFILE_BLOCK("Fix up indirections");
 
-		if (ep.start)
+		for (uint32 i = 0; i < numEndpoints; ++i)
 		{
-			in.startEndpoint = i;
-		}
-		else
-		{
-			in.endEndpoint = i;
+			sap_endpoint ep = endpoints[i];
+			scene_entity entity = { ep.entity, scene };
+			sap_endpoint_indirection_component& in = entity.getComponent<sap_endpoint_indirection_component>();
+
+			if (ep.start)
+			{
+				in.startEndpoint = i;
+			}
+			else
+			{
+				in.endEndpoint = i;
+			}
 		}
 	}
 
