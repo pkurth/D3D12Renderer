@@ -509,4 +509,6 @@ void profiler_timeline::handleUserInteractions()
 			persistent.callstackLeftPadding = relMouseX - t * newFrameWidth16ms;
 		}
 	}
+
+	ImGui::SetCursorPos(ImVec2(leftPadding, highlightTop + (maxDepth + 1) * verticalBarStride));
 }

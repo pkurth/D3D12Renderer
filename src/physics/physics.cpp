@@ -654,14 +654,17 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 		}
 	}
 
-
+	CPU_PROFILE_STAT("Num rigid bodies: %u", numRigidBodies);
+	CPU_PROFILE_STAT("Num colliders: %u", numColliders);
+	CPU_PROFILE_STAT("Num broadphase overlaps: %u", numPossibleCollisions);
+	CPU_PROFILE_STAT("Num narrowphase contacts: %u", narrowPhaseResult.numContacts);
 
 
 	//  Apply global forces (including gravity) and air drag and integrate forces.
 	{
 		CPU_PROFILE_BLOCK("Integrate rigid body forces");
 
-		uint32 rbIndex = numRigidBodies - 1; // ENTT iterates back to front.
+		uint32 rbIndex = numRigidBodies - 1; // EnTT iterates back to front.
 		for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, transform_component>().each())
 		{
 			rigid_body_global_state& global = rbGlobal[rbIndex--];
@@ -758,7 +761,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	{
 		CPU_PROFILE_BLOCK("Integrate rigid body velocities");
 
-		uint32 rbIndex = numRigidBodies - 1; // ENTT iterates back to front.
+		uint32 rbIndex = numRigidBodies - 1; // EnTT iterates back to front.
 		for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, transform_component>().each())
 		{
 			rigid_body_global_state& global = rbGlobal[rbIndex--];

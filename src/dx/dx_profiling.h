@@ -9,8 +9,8 @@ extern bool dxProfilerWindowOpen;
 
 #if ENABLE_DX_PROFILING
 
-#define DX_PROFILE_BLOCK_(counter, cl, name) dx_profile_block_recorder COMPOSITE_VARNAME(__DX_PROFILE_BLOCK, counter)(cl, name)
-#define DX_PROFILE_BLOCK(cl, name) DX_PROFILE_BLOCK_(__COUNTER__, cl, name)
+#define _DX_PROFILE_BLOCK_(counter, cl, name) dx_profile_block_recorder COMPOSITE_VARNAME(__DX_PROFILE_BLOCK, counter)(cl, name)
+#define DX_PROFILE_BLOCK(cl, name) _DX_PROFILE_BLOCK_(__COUNTER__, cl, name)
 
 
 #define MAX_NUM_DX_PROFILE_BLOCKS 2048
