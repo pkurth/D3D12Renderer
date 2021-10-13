@@ -244,6 +244,11 @@ static dx_feature_support checkFeatureSupport(dx_device device)
 
 bool dx_context::initialize()
 {
+	HANDLE handle = GetCurrentThread();
+	SetThreadAffinityMask(handle, 1);
+	SetThreadPriority(handle, THREAD_PRIORITY_HIGHEST);
+	CloseHandle(handle);
+
 	SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 	AddVectoredExceptionHandler(TRUE, handleVectoredException);
 

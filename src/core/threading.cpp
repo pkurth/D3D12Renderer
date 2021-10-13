@@ -90,7 +90,7 @@ void initializeJobSystem()
 
 		HANDLE handle = (HANDLE)thread.native_handle();
 
-		uint64 affinityMask = 1ull << i;
+		uint64 affinityMask = 1ull << (i + 1); // 1 is the main thread.
 		SetThreadAffinityMask(handle, affinityMask);
 
 		//SetThreadPriority(handle, THREAD_PRIORITY_HIGHEST);
