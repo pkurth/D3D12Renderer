@@ -80,6 +80,12 @@ static void workerThreadProc()
 
 void initializeJobSystem()
 {
+	HANDLE handle = GetCurrentThread();
+	SetThreadAffinityMask(handle, 1);
+	SetThreadPriority(handle, THREAD_PRIORITY_HIGHEST);
+	CloseHandle(handle);
+
+
 	uint32 numThreads = std::thread::hardware_concurrency();
 	numThreads = clamp(numThreads, 1u, 8u);
 	semaphoreHandle = CreateSemaphoreEx(0, 0, numThreads, 0, 0, SEMAPHORE_ALL_ACCESS);
