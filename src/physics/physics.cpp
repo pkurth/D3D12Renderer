@@ -654,10 +654,10 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 		}
 	}
 
-	CPU_PROFILE_STAT("Num rigid bodies: %u", numRigidBodies);
-	CPU_PROFILE_STAT("Num colliders: %u", numColliders);
-	CPU_PROFILE_STAT("Num broadphase overlaps: %u", numPossibleCollisions);
-	CPU_PROFILE_STAT("Num narrowphase contacts: %u", narrowPhaseResult.numContacts);
+	CPU_PROFILE_STAT("Num rigid bodies", numRigidBodies);
+	CPU_PROFILE_STAT("Num colliders", numColliders);
+	CPU_PROFILE_STAT("Num broadphase overlaps", numPossibleCollisions);
+	CPU_PROFILE_STAT("Num narrowphase contacts", narrowPhaseResult.numContacts);
 
 
 	//  Apply global forces (including gravity) and air drag and integrate forces.

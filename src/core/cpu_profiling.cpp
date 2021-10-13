@@ -12,7 +12,7 @@ bool cpuProfilerWindowOpen = false;
 std::atomic<uint32> cpuProfileIndex;
 std::atomic<uint32> cpuProfileCompletelyWritten[2];
 profile_event cpuProfileEvents[2][MAX_NUM_CPU_PROFILE_EVENTS];
-char cpuProfileStats[2][MAX_NUM_CPU_PROFILE_STATS][MAX_CPU_PROFILE_STAT_LENGTH];
+profile_stat cpuProfileStats[2][MAX_NUM_CPU_PROFILE_STATS];
 
 
 #define MAX_NUM_CPU_PROFILE_THREADS 128
@@ -26,7 +26,7 @@ struct cpu_profile_frame : profile_frame
 	profile_block profileBlockPool[MAX_NUM_CPU_PROFILE_BLOCKS];
 	uint32 totalNumProfileBlocks;
 
-	char stats[MAX_NUM_CPU_PROFILE_STATS][MAX_CPU_PROFILE_STAT_LENGTH];
+	profile_stat stats[MAX_NUM_CPU_PROFILE_STATS];
 	uint32 numStats;
 };
 
@@ -194,7 +194,7 @@ void cpuProfilingResolveTimeStamps()
 				}
 
 				frame->numStats = numStats;
-				memcpy(frame->stats, stats, numStats * MAX_CPU_PROFILE_STAT_LENGTH);
+				memcpy(frame->stats, stats, numStats * sizeof(profile_stat));
 
 
 				cpu_profile_frame* oldFrame = frame;
@@ -308,7 +308,17 @@ void cpuProfilingResolveTimeStamps()
 							ImGui::Separator();
 							for (uint32 i = 0; i < frame.numStats; ++i)
 							{
-								ImGui::Text(frame.stats[i]);
+								const profile_stat& stat = frame.stats[i];
+								switch (stat.type)
+								{
+									case profile_stat_type_bool: ImGui::Value(stat.label, stat.boolValue); break;
+									case profile_stat_type_int32: ImGui::Value(stat.label, stat.int32Value); break;
+									case profile_stat_type_uint32: ImGui::Value(stat.label, stat.uint32Value); break;
+									case profile_stat_type_int64: ImGui::Value(stat.label, stat.int64Value); break;
+									case profile_stat_type_uint64: ImGui::Value(stat.label, stat.uint64Value); break;
+									case profile_stat_type_float: ImGui::Value(stat.label, stat.floatValue); break;
+									case profile_stat_type_string: ImGui::Value(stat.label, stat.stringValue); break;
+								}
 							}
 						}
 						ImGui::EndChild();

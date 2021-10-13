@@ -15,14 +15,10 @@ extern bool cpuProfilerWindowOpen;
 #define _CPU_PROFILE_BLOCK_(counter, name) cpu_profile_block_recorder COMPOSITE_VARNAME(__PROFILE_BLOCK, counter)(name)
 #define CPU_PROFILE_BLOCK(name) _CPU_PROFILE_BLOCK_(__COUNTER__, name)
 
-#define CPU_PROFILE_STAT(format, ...) cpuProfilingStat(format, __VA_ARGS__)
-
-
 
 #define MAX_NUM_CPU_PROFILE_BLOCKS 16384
 #define MAX_NUM_CPU_PROFILE_EVENTS (MAX_NUM_CPU_PROFILE_BLOCKS * 2) // One for start and end.
-#define MAX_NUM_CPU_PROFILE_STATS 128
-#define MAX_CPU_PROFILE_STAT_LENGTH 64
+#define MAX_NUM_CPU_PROFILE_STATS 512
 
 
 // 1 bit for array index, 1 free bit, 20 bits for events, 10 bits for stats.
@@ -67,25 +63,54 @@ inline void cpuProfilingFrameEndMarker()
 	recordProfileEvent(profile_event_frame_marker, 0);
 }
 
-inline void cpuProfilingStat(const char* format, ...)
+enum profile_stat_type
 {
-	extern std::atomic<uint32> cpuProfileIndex;
-	extern std::atomic<uint32> cpuProfileCompletelyWritten[2];
-	extern char cpuProfileStats[2][MAX_NUM_CPU_PROFILE_STATS][MAX_CPU_PROFILE_STAT_LENGTH];
+	profile_stat_type_bool,
+	profile_stat_type_int32,
+	profile_stat_type_uint32,
+	profile_stat_type_int64,
+	profile_stat_type_uint64,
+	profile_stat_type_float,
+	profile_stat_type_string,
+};
 
-	uint32 arrayAndStatIndex = cpuProfileIndex.fetch_add(1 << 20);
-	uint32 statIndex = _CPU_PROFILE_GET_STAT_INDEX(arrayAndStatIndex);
-	uint32 arrayIndex = _CPU_PROFILE_GET_ARRAY_INDEX(arrayAndStatIndex);
-	assert(statIndex < MAX_NUM_CPU_PROFILE_STATS);
+struct profile_stat
+{
+	const char* label;
+	union
+	{
+		bool boolValue;
+		int32 int32Value;
+		uint32 uint32Value;
+		int64 int64Value;
+		uint64 uint64Value;
+		float floatValue;
+		const char* stringValue;
+	};
+	profile_stat_type type;
+};
 
-	char* statBuffer = cpuProfileStats[arrayIndex][statIndex];
-	va_list arg;
-	va_start(arg, format);
-	vsnprintf(statBuffer, MAX_CPU_PROFILE_STAT_LENGTH, format, arg);
-	va_end(arg);
-
+#define _CPU_PROFILE_STAT(labelValue, value, member, valueType) \
+	extern std::atomic<uint32> cpuProfileIndex; \
+	extern std::atomic<uint32> cpuProfileCompletelyWritten[2]; \
+	extern profile_stat cpuProfileStats[2][MAX_NUM_CPU_PROFILE_STATS]; \
+	uint32 arrayAndStatIndex = cpuProfileIndex.fetch_add(1 << 20); \
+	uint32 statIndex = _CPU_PROFILE_GET_STAT_INDEX(arrayAndStatIndex); \
+	uint32 arrayIndex = _CPU_PROFILE_GET_ARRAY_INDEX(arrayAndStatIndex); \
+	assert(statIndex < MAX_NUM_CPU_PROFILE_STATS); \
+	profile_stat* stat = cpuProfileStats[arrayIndex] + statIndex; \
+	stat->label = labelValue; \
+	stat->member = value; \
+	stat->type = valueType; \
 	cpuProfileCompletelyWritten[arrayIndex].fetch_add(1, std::memory_order_release); // Mark this stat as written. Release means that the compiler may not reorder the previous writes after this.
-}
+
+inline void CPU_PROFILE_STAT(const char* label, bool value) { _CPU_PROFILE_STAT(label, value, boolValue, profile_stat_type_bool); }
+inline void CPU_PROFILE_STAT(const char* label, int32 value) { _CPU_PROFILE_STAT(label, value, int32Value, profile_stat_type_int32); }
+inline void CPU_PROFILE_STAT(const char* label, uint32 value) { _CPU_PROFILE_STAT(label, value, uint32Value, profile_stat_type_uint32); }
+inline void CPU_PROFILE_STAT(const char* label, int64 value) { _CPU_PROFILE_STAT(label, value, int64Value, profile_stat_type_int64); }
+inline void CPU_PROFILE_STAT(const char* label, uint64 value) { _CPU_PROFILE_STAT(label, value, uint64Value, profile_stat_type_uint64); }
+inline void CPU_PROFILE_STAT(const char* label, float value) { _CPU_PROFILE_STAT(label, value, floatValue, profile_stat_type_float); }
+inline void CPU_PROFILE_STAT(const char* label, const char* value) { _CPU_PROFILE_STAT(label, value, stringValue, profile_stat_type_string); }
 
 // Currently there must not be any profile events between calling cpuProfilingFrameEndMarker and cpuProfilingResolveTimeStamps.
 

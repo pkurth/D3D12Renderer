@@ -67,6 +67,9 @@ namespace ImGui
 	bool BeginTree(const char* label, bool defaultOpen = false);
 	void EndTree();
 
+	inline void Value(const char* prefix, int64 v) { ImGui::Text("%s: %lld", prefix, v); }
+	inline void Value(const char* prefix, uint64 v) { ImGui::Text("%s: %llu", prefix, v); }
+	inline void Value(const char* prefix, const char* v) { ImGui::Text("%s: %s", prefix, v); }
 
 
 
