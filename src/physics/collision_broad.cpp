@@ -118,13 +118,12 @@ uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpac
 #endif
 
 
-
-	// Index of each collider in the scene. 
-	// We iterate over the endpoint indirections, which are sorted the exact same way as the colliders.
-	uint16 index = 0;
-
 	{
 		CPU_PROFILE_BLOCK("Update endpoints");
+
+		// Index of each collider in the scene. 
+		// We iterate over the endpoint indirections, which are sorted the exact same way as the colliders.
+		uint16 index = 0;
 
 		for (auto [entityHandle, indirection] : scene.view<sap_endpoint_indirection_component>().each())
 		{
@@ -178,6 +177,7 @@ uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpac
 
 		uint32 numActive = 0;
 		uint16* activeList = arena.allocate<uint16>(numColliders); // Conservative estimate.
+		uint16* positionInActiveList = arena.allocate<uint16>(numColliders);
 
 		for (uint32 i = 0; i < numEndpoints; ++i)
 		{
@@ -194,10 +194,14 @@ uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpac
 						outCollisions[numCollisions++] = { ep.colliderIndex, activeList[active] };
 					}
 				}
+
+				assert(ep.colliderIndex < numColliders);
+				positionInActiveList[ep.colliderIndex] = numActive;
 				activeList[numActive++] = ep.colliderIndex;
 			}
 			else
 			{
+#if 0
 				for (uint32 a = 0; a < numActive; ++a)
 				{
 					if (ep.colliderIndex == activeList[a])
@@ -207,6 +211,15 @@ uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpac
 						break;
 					}
 				}
+#else
+				uint16 pos = positionInActiveList[ep.colliderIndex];
+
+				uint16 lastColliderInActiveList = activeList[numActive - 1];
+				positionInActiveList[lastColliderInActiveList] = pos;
+
+				activeList[pos] = activeList[numActive - 1];
+				--numActive;
+#endif
 			}
 		}
 
