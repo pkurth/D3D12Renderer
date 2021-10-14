@@ -581,6 +581,126 @@ static void getConstraintBodyPairs(game_scene& scene, constraint_body_pair* body
 	}
 }
 
+#if 0
+#define VALIDATE1(line, prefix, value) if (!isfinite(value)) { bool nan = isnan(value); std::cout << prefix << "(" << line << "): " << #value << " is " << (nan ? "NaN" : "Inf") << '\n'; }
+#define VALIDATE3(line, prefix, value) VALIDATE1(line, prefix, value.x); VALIDATE1(line, prefix, value.y); VALIDATE1(line, prefix, value.z);
+#define VALIDATE4(line, prefix, value) VALIDATE1(line, prefix, value.x); VALIDATE1(line, prefix, value.y); VALIDATE1(line, prefix, value.z); VALIDATE1(line, prefix, value.w);
+
+void validate(uint32 line, collider_union* colliders, uint32 count)
+{
+	for (uint32 i = 0; i < count; ++i)
+	{
+		collider_union& c = colliders[i];
+		switch (c.type)
+		{
+			case collider_type_sphere: VALIDATE3(line, "Collider", c.sphere.center); VALIDATE1(line, "Collider", c.sphere.radius); break;
+			case collider_type_capsule: VALIDATE3(line, "Collider", c.capsule.positionA); VALIDATE3(line, "Collider", c.capsule.positionB); VALIDATE1(line, "Collider", c.capsule.radius); break;
+			case collider_type_aabb: VALIDATE3(line, "Collider", c.aabb.minCorner); VALIDATE3(line, "Collider", c.aabb.maxCorner); break;
+			case collider_type_obb: VALIDATE3(line, "Collider", c.obb.center); VALIDATE3(line, "Collider", c.obb.radius); VALIDATE4(line, "Collider", c.obb.rotation); break;
+			case collider_type_hull: break;
+		}
+	}
+}
+void validate(uint32 line, bounding_box* colliders, uint32 count)
+{
+	for (uint32 i = 0; i < count; ++i)
+	{
+		bounding_box& c = colliders[i];
+		VALIDATE3(line, "World space BB", c.minCorner);
+		VALIDATE3(line, "World space BB", c.maxCorner);
+	}
+}
+void validate(uint32 line, rigid_body_global_state* rbs, uint32 count)
+{
+	for (uint32 i = 0; i < count; ++i)
+	{
+		rigid_body_global_state& r = rbs[i];
+		VALIDATE4(line, "RB update", r.rotation);
+		VALIDATE3(line, "RB update", r.localCOGPosition);
+		VALIDATE3(line, "RB update", r.position);
+		VALIDATE3(line, "RB update", r.invInertia.col0);
+		VALIDATE3(line, "RB update", r.invInertia.col1);
+		VALIDATE3(line, "RB update", r.invInertia.col2);
+		VALIDATE1(line, "RB update", r.invMass);
+		VALIDATE3(line, "RB update", r.linearVelocity);
+		VALIDATE3(line, "RB update", r.angularVelocity);
+	}
+}
+void validate(uint32 line, collision_contact* contacts, uint32 count)
+{
+	for (uint32 i = 0; i < count; ++i)
+	{
+		collision_contact& c = contacts[i];
+		VALIDATE3(line, "Contact", c.point);
+		VALIDATE1(line, "Contact", c.penetrationDepth);
+		VALIDATE3(line, "Contact", c.normal);
+	}
+}
+void validate(uint32 line, collision_constraint* constraints, uint32 count)
+{
+	for (uint32 i = 0; i < count; ++i)
+	{
+		collision_constraint& c = constraints[i];
+		VALIDATE3(line, "Collision", c.relGlobalAnchorA);
+		VALIDATE3(line, "Collision", c.relGlobalAnchorB);
+		VALIDATE3(line, "Collision", c.tangent);
+		VALIDATE3(line, "Collision", c.tangentImpulseToAngularVelocityA);
+		VALIDATE3(line, "Collision", c.tangentImpulseToAngularVelocityB);
+		VALIDATE3(line, "Collision", c.normalImpulseToAngularVelocityA);
+		VALIDATE3(line, "Collision", c.normalImpulseToAngularVelocityB);
+		VALIDATE1(line, "Collision", c.impulseInNormalDir);
+		VALIDATE1(line, "Collision", c.impulseInTangentDir);
+		VALIDATE1(line, "Collision", c.effectiveMassInNormalDir);
+		VALIDATE1(line, "Collision", c.effectiveMassInTangentDir);
+		VALIDATE1(line, "Collision", c.bias);
+	}
+}
+void validate(uint32 line, simd_collision_constraint_batch* constraints, uint32 count)
+{
+	for (uint32 i = 0; i < count; ++i)
+	{
+		simd_collision_constraint_batch& c = constraints[i];
+		for (uint32 j = 0; j < CONSTRAINT_SIMD_WIDTH; ++j)
+		{
+			VALIDATE1(line, "Collision", c.relGlobalAnchorA[0][j]);
+			VALIDATE1(line, "Collision", c.relGlobalAnchorA[1][j]);
+			VALIDATE1(line, "Collision", c.relGlobalAnchorA[2][j]);
+			VALIDATE1(line, "Collision", c.relGlobalAnchorB[0][j]);
+			VALIDATE1(line, "Collision", c.relGlobalAnchorB[1][j]);
+			VALIDATE1(line, "Collision", c.relGlobalAnchorB[2][j]);
+			VALIDATE1(line, "Collision", c.normal[0][j]);
+			VALIDATE1(line, "Collision", c.normal[1][j]);
+			VALIDATE1(line, "Collision", c.normal[2][j]);
+			VALIDATE1(line, "Collision", c.tangent[0][j]);
+			VALIDATE1(line, "Collision", c.tangent[1][j]);
+			VALIDATE1(line, "Collision", c.tangent[2][j]);
+			VALIDATE1(line, "Collision", c.normalImpulseToAngularVelocityA[0][j]);
+			VALIDATE1(line, "Collision", c.normalImpulseToAngularVelocityA[1][j]);
+			VALIDATE1(line, "Collision", c.normalImpulseToAngularVelocityA[2][j]);
+			VALIDATE1(line, "Collision", c.tangentImpulseToAngularVelocityA[0][j]);
+			VALIDATE1(line, "Collision", c.tangentImpulseToAngularVelocityA[1][j]);
+			VALIDATE1(line, "Collision", c.tangentImpulseToAngularVelocityA[2][j]);
+			VALIDATE1(line, "Collision", c.normalImpulseToAngularVelocityB[0][j]);
+			VALIDATE1(line, "Collision", c.normalImpulseToAngularVelocityB[1][j]);
+			VALIDATE1(line, "Collision", c.normalImpulseToAngularVelocityB[2][j]);
+			VALIDATE1(line, "Collision", c.tangentImpulseToAngularVelocityB[0][j]);
+			VALIDATE1(line, "Collision", c.tangentImpulseToAngularVelocityB[1][j]);
+			VALIDATE1(line, "Collision", c.tangentImpulseToAngularVelocityB[2][j]);
+			VALIDATE1(line, "Collision", c.effectiveMassInNormalDir[j]);
+			VALIDATE1(line, "Collision", c.effectiveMassInTangentDir[j]);
+			VALIDATE1(line, "Collision", c.friction[j]);
+			VALIDATE1(line, "Collision", c.impulseInNormalDir[j]);
+			VALIDATE1(line, "Collision", c.impulseInTangentDir[j]);
+			VALIDATE1(line, "Collision", c.bias[j]);
+		}
+	}
+}
+
+#define VALIDATE(arr, count) validate(__LINE__, arr, count)
+
+#else
+#define VALIDATE(...)
+#endif
 
 void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 {
@@ -624,6 +744,9 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 
 	// Collision detection.
 	getWorldSpaceColliders(scene, worldSpaceAABBs, worldSpaceColliders, dummyRigidBodyIndex);
+	VALIDATE(worldSpaceColliders, numColliders);
+	VALIDATE(worldSpaceAABBs, numColliders);
+
 	uint32 numPossibleCollisions = broadphase(scene, 0, worldSpaceAABBs, arena, possibleCollisions);
 
 	non_collision_interaction* nonCollisionInteractions = arena.allocate<non_collision_interaction>(numPossibleCollisions);
@@ -634,6 +757,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	constraint_body_pair* collisionBodyPairs = allConstraintBodyPairs + numConstraints;
 
 	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, possibleCollisions, numPossibleCollisions, contacts, collisionBodyPairs, nonCollisionInteractions);
+	VALIDATE(contacts, narrowPhaseResult.numContacts);
 
 	vec3 globalForceField = getForceFieldStates(scene, ffGlobal);
 
@@ -676,6 +800,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	// Kinematic rigid body. This is used in collision constraint solving, when a collider has no rigid body.
 	memset(&rbGlobal[dummyRigidBodyIndex], 0, sizeof(rigid_body_global_state));
 
+	VALIDATE(rbGlobal, numRigidBodies);
 
 	// Collect constraints.
 	uint32 numContacts = narrowPhaseResult.numContacts;
@@ -722,6 +847,8 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 			hingeJointConstraintSolverSIMD = initializeHingeJointVelocityConstraintsSIMD(arena, rbGlobal, hingeJointConstraints, hingeJointConstraintBodyPairs, numHingeJointConstraints, dt);
 			coneTwistConstraintSolverSIMD = initializeConeTwistVelocityConstraintsSIMD(arena, rbGlobal, coneTwistConstraints, coneTwistConstraintBodyPairs, numConeTwistConstraints, dt);
 			collisionConstraintSolverSIMD = initializeCollisionVelocityConstraintsSIMD(arena, rbGlobal, contacts, collisionBodyPairs, numContacts, dummyRigidBodyIndex, dt);
+
+			VALIDATE(collisionConstraintSolverSIMD.batches, collisionConstraintSolverSIMD.numBatches);
 		}
 		else
 		{
@@ -730,6 +857,8 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 			hingeJointConstraintSolver = initializeHingeJointVelocityConstraints(arena, rbGlobal, hingeJointConstraints, hingeJointConstraintBodyPairs, numHingeJointConstraints, dt);
 			coneTwistConstraintSolver = initializeConeTwistVelocityConstraints(arena, rbGlobal, coneTwistConstraints, coneTwistConstraintBodyPairs, numConeTwistConstraints, dt);
 			collisionConstraintSolver = initializeCollisionVelocityConstraints(arena, rbGlobal, contacts, collisionBodyPairs, numContacts, dt);
+
+			VALIDATE(collisionConstraintSolver.constraints, collisionConstraintSolver.count);
 		}
 	}
 	{
@@ -744,6 +873,8 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 				solveHingeJointVelocityConstraintsSIMD(hingeJointConstraintSolverSIMD, rbGlobal);
 				solveConeTwistVelocityConstraintsSIMD(coneTwistConstraintSolverSIMD, rbGlobal);
 				solveCollisionVelocityConstraintsSIMD(collisionConstraintSolverSIMD, rbGlobal);
+
+				VALIDATE(collisionConstraintSolverSIMD.batches, collisionConstraintSolverSIMD.numBatches);
 			}
 			else
 			{
@@ -752,7 +883,11 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 				solveHingeJointVelocityConstraints(hingeJointConstraintSolver, rbGlobal);
 				solveConeTwistVelocityConstraints(coneTwistConstraintSolver, rbGlobal);
 				solveCollisionVelocityConstraints(collisionConstraintSolver, rbGlobal);
+
+				VALIDATE(collisionConstraintSolver.constraints, collisionConstraintSolver.count);
 			}
+
+			VALIDATE(rbGlobal, numRigidBodies);
 		}
 	}
 
@@ -769,6 +904,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 		}
 	}
 
+	VALIDATE(rbGlobal, numRigidBodies);
 
 	// Cloth. This needs to get integrated with the rest of the system.
 
