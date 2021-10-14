@@ -294,9 +294,9 @@ static quatx<simd_t> ifThen(cmp_t cond, quatx<simd_t> ifCase, quatx<simd_t> then
 	return { ifThen(cond, ifCase.x, thenCase.x), ifThen(cond, ifCase.y, thenCase.y), ifThen(cond, ifCase.z, thenCase.z), ifThen(cond, ifCase.w, thenCase.w) };
 }
 
-template <typename simd_t> static vec2x<simd_t> noz(vec2x<simd_t> a) { simd_t sl = squaredLength(a); return ifThen(sl == 0.f, vec2x<simd_t>::zero(), a * rsqrt(sl)); }
-template <typename simd_t> static vec3x<simd_t> noz(vec3x<simd_t> a) { simd_t sl = squaredLength(a); return ifThen(sl == 0.f, vec3x<simd_t>::zero(), a * rsqrt(sl)); }
-template <typename simd_t> static vec4x<simd_t> noz(vec4x<simd_t> a) { simd_t sl = squaredLength(a); return ifThen(sl == 0.f, vec4x<simd_t>::zero(), a * rsqrt(sl)); }
+template <typename simd_t> static vec2x<simd_t> noz(vec2x<simd_t> a) { simd_t sl = squaredLength(a); return ifThen(sl < 1e-8f, vec2x<simd_t>::zero(), a * rsqrt(sl)); }
+template <typename simd_t> static vec3x<simd_t> noz(vec3x<simd_t> a) { simd_t sl = squaredLength(a); return ifThen(sl < 1e-8f, vec3x<simd_t>::zero(), a * rsqrt(sl)); }
+template <typename simd_t> static vec4x<simd_t> noz(vec4x<simd_t> a) { simd_t sl = squaredLength(a); return ifThen(sl < 1e-8f, vec4x<simd_t>::zero(), a * rsqrt(sl)); }
 
 template <typename simd_t> static vec2x<simd_t> normalize(vec2x<simd_t> a) { simd_t l2 = squaredLength(a); return a * rsqrt(l2); }
 template <typename simd_t> static vec3x<simd_t> normalize(vec3x<simd_t> a) { simd_t l2 = squaredLength(a); return a * rsqrt(l2); }

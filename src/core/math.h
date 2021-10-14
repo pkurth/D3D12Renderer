@@ -650,9 +650,9 @@ static float length(vec2 a) { return sqrt(squaredLength(a)); }
 static float length(vec3 a) { return sqrt(squaredLength(a)); }
 static float length(vec4 a) { return sqrt(squaredLength(a)); }
 
-static vec2 noz(vec2 a) { float sl = squaredLength(a); return (sl == 0.f) ? vec2(0.f, 0.f) : (a * (1.f / sqrt(sl))); }
-static vec3 noz(vec3 a) { float sl = squaredLength(a); return (sl == 0.f) ? vec3(0.f, 0.f, 0.f) : (a * (1.f / sqrt(sl))); }
-static vec4 noz(vec4 a) { float sl = squaredLength(a); return (sl == 0.f) ? vec4(0.f, 0.f, 0.f, 0.f) : (a * (1.f / sqrt(sl))); }
+static vec2 noz(vec2 a) { float sl = squaredLength(a); return (sl < 1e-8f) ? vec2(0.f, 0.f) : (a * (1.f / sqrt(sl))); }
+static vec3 noz(vec3 a) { float sl = squaredLength(a); return (sl < 1e-8f) ? vec3(0.f, 0.f, 0.f) : (a * (1.f / sqrt(sl))); }
+static vec4 noz(vec4 a) { float sl = squaredLength(a); return (sl < 1e-8f) ? vec4(0.f, 0.f, 0.f, 0.f) : (a * (1.f / sqrt(sl))); }
 
 static vec2 normalize(vec2 a) { float l = length(a); return a * (1.f / l); }
 static vec3 normalize(vec3 a) { float l = length(a); return a * (1.f / l); }
