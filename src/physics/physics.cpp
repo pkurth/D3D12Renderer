@@ -747,7 +747,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	VALIDATE(worldSpaceColliders, numColliders);
 	VALIDATE(worldSpaceAABBs, numColliders);
 
-	uint32 numPossibleCollisions = broadphase(scene, 0, worldSpaceAABBs, arena, possibleCollisions);
+	uint32 numPossibleCollisions = broadphase(scene, worldSpaceAABBs, arena, possibleCollisions);
 
 	non_collision_interaction* nonCollisionInteractions = arena.allocate<non_collision_interaction>(numPossibleCollisions);
 	collision_contact* contacts = arena.allocate<collision_contact>(numPossibleCollisions * 4); // Each collision can have up to 4 contact points.

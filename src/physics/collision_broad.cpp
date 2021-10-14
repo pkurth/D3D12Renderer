@@ -19,6 +19,7 @@ struct sap_endpoint
 struct sap_context
 {
 	std::vector<sap_endpoint> endpoints;
+	uint32 sortingAxis = 0;
 };
 
 
@@ -72,7 +73,7 @@ void removeColliderFromBroadphase(scene_entity entity)
 	}
 }
 
-uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpaceAABBs, memory_arena& arena, broadphase_collision* outCollisions)
+uint32 broadphase(game_scene& scene, bounding_box* worldSpaceAABBs, memory_arena& arena, broadphase_collision* outCollisions)
 {
 	CPU_PROFILE_BLOCK("Broad phase");
 
@@ -117,6 +118,12 @@ uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpac
 
 #endif
 
+	vec3 s(0.f, 0.f, 0.f);
+	vec3 s2(0.f, 0.f, 0.f);
+
+	uint32 sortingAxis = context.sortingAxis;
+
+	CPU_PROFILE_STAT("Broadphase sorting axis", sortingAxis);
 
 	{
 		CPU_PROFILE_BLOCK("Update endpoints");
@@ -127,7 +134,7 @@ uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpac
 
 		for (auto [entityHandle, indirection] : scene.view<sap_endpoint_indirection_component>().each())
 		{
-			bounding_box& aabb = worldSpaceAABBs[index];
+			const bounding_box& aabb = worldSpaceAABBs[index];
 
 			uint16 start = indirection.startEndpoint;
 			uint16 end = indirection.endEndpoint;
@@ -142,6 +149,10 @@ uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpac
 
 			assert(endpoints[start].entity == entityHandle);
 			assert(endpoints[end].entity == entityHandle);
+
+			vec3 center = aabb.getCenter();
+			s += center;
+			s2 += center * center;
 
 			++index;
 		}
@@ -251,6 +262,9 @@ uint32 broadphase(game_scene& scene, uint32 sortingAxis, bounding_box* worldSpac
 		}
 	}
 
+
+	vec3 variance = s2 - s * s / (float)numColliders;
+	context.sortingAxis = (variance.x > variance.y) ? ((variance.x > variance.z) ? 0 : 2) : ((variance.y > variance.z) ? 1 : 2);
 
 	return numCollisions;
 }

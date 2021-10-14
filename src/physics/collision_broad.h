@@ -12,7 +12,7 @@ struct broadphase_collision
 	uint16 colliderB;
 };
 
-uint32 broadphase(struct game_scene& scene, uint32 sortingAxis, bounding_box* worldSpaceAABBs, memory_arena& arena, broadphase_collision* outOverlaps);
+uint32 broadphase(struct game_scene& scene, bounding_box* worldSpaceAABBs, memory_arena& arena, broadphase_collision* outOverlaps);
 
 
 
