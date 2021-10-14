@@ -154,9 +154,9 @@ void application::initialize(main_renderer* renderer)
 
 #if 1
 	{
-		scene.createEntity("Force field")
-			.addComponent<transform_component>(vec3(0.f), quat::identity)
-			.addComponent<force_field_component>(vec3(0.f, 0.f, -1.f));
+		//scene.createEntity("Force field")
+		//	.addComponent<transform_component>(vec3(0.f), quat::identity)
+		//	.addComponent<force_field_component>(vec3(0.f, 0.f, -1.f));
 
 		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 
@@ -178,13 +178,16 @@ void application::initialize(main_renderer* renderer)
 				"assets/desert/textures/Container_Metallic.png", vec4(0.f), vec4(1.f), 0.1f, 1.f)
 			});
 
+		auto woodMaterial = createPBRMaterial(
+			"assets/desert/textures/WoodenCrate2_Albedo.png",
+			"assets/desert/textures/WoodenCrate2_Normal.png",
+			{}, {});
+
 		auto boxMesh = make_ref<composite_mesh>();
-		boxMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(1.f, 1.f, 2.f)), {}, trs::identity, 
-			createPBRMaterial(
-				"assets/desert/textures/WoodenCrate2_Albedo.png", 
-				"assets/desert/textures/WoodenCrate2_Normal.png", 
-				{}, {})
-			});
+		boxMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(1.f, 1.f, 2.f)), {}, trs::identity, woodMaterial });
+
+		auto sphereMesh = make_ref<composite_mesh>();
+		sphereMesh->submeshes.push_back({ primitiveMesh.pushSphere(16, 16, 1.f), {}, trs::identity, woodMaterial });
 
 		//auto test1 = scene.createEntity("Lollipop 1")
 		//	.addComponent<transform_component>(vec3(20.f, 5.f, 0.f), quat::identity)
@@ -200,18 +203,29 @@ void application::initialize(main_renderer* renderer)
 		//	.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f))
 		//	.addComponent<rigid_body_component>(true, 1.f);
 
-		random_number_generator rng = { 15681923 };
+		//random_number_generator rng = { 15681923 };
 		for (uint32 i = 0; i < 1000; ++i)
 		{
-			float x = rng.randomFloatBetween(-90.f, 90.f);
-			float z = rng.randomFloatBetween(-90.f, 90.f);
-			float y = rng.randomFloatBetween(20.f, 60.f);
+			//float x = rng.randomFloatBetween(-90.f, 90.f);
+			//float z = rng.randomFloatBetween(-90.f, 90.f);
+			//float y = rng.randomFloatBetween(20.f, 60.f);
 
-			scene.createEntity("Cube")
-				.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
-				.addComponent<raster_component>(boxMesh)
-				.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 1.f))
-				.addComponent<rigid_body_component>(false, 1.f);
+			if (i % 2 == 0)
+			{
+				scene.createEntity("Cube")
+					.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+					.addComponent<raster_component>(boxMesh)
+					.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 1.f))
+					.addComponent<rigid_body_component>(false, 1.f);
+			}
+			else
+			{
+				scene.createEntity("Sphere")
+					.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+					.addComponent<raster_component>(sphereMesh)
+					.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.f, 0.f), 1.f }, 0.1f, 0.5f, 1.f))
+					.addComponent<rigid_body_component>(false, 1.f);
+			}
 		}
 
 		//bounding_hull hull =
@@ -278,6 +292,7 @@ void application::initialize(main_renderer* renderer)
 		testMesh->mesh = 
 		groundMesh->mesh = 
 		boxMesh->mesh = 
+		sphereMesh->mesh =
 		chainMesh->mesh =
 			primitiveMesh.createDXMesh();
 	}
