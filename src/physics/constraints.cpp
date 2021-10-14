@@ -2319,7 +2319,7 @@ collision_constraint_solver initializeCollisionVelocityConstraints(memory_arena&
 			vec3 crAt = cross(constraint.relGlobalAnchorA, constraint.tangent);
 			vec3 crBt = cross(constraint.relGlobalAnchorB, constraint.tangent);
 			float invMassInTangentDir = rbA.invMass + dot(crAt, rbA.invInertia * crAt)
-				+ rbB.invMass + dot(crBt, rbB.invInertia * crBt);
+									  + rbB.invMass + dot(crBt, rbB.invInertia * crBt);
 			constraint.effectiveMassInTangentDir = (invMassInTangentDir != 0.f) ? (1.f / invMassInTangentDir) : 0.f;
 
 			constraint.tangentImpulseToAngularVelocityA = rbA.invInertia * crAt;
@@ -2330,14 +2330,14 @@ collision_constraint_solver initializeCollisionVelocityConstraints(memory_arena&
 			vec3 crAn = cross(constraint.relGlobalAnchorA, contact.normal);
 			vec3 crBn = cross(constraint.relGlobalAnchorB, contact.normal);
 			float invMassInNormalDir = rbA.invMass + dot(crAn, rbA.invInertia * crAn)
-				+ rbB.invMass + dot(crBn, rbB.invInertia * crBn);
+									 + rbB.invMass + dot(crBn, rbB.invInertia * crBn);
 			constraint.effectiveMassInNormalDir = (invMassInNormalDir != 0.f) ? (1.f / invMassInNormalDir) : 0.f;
 
 			constraint.bias = 0.f;
 
 			if (dt > DT_THRESHOLD)
 			{
-				float vRel = dot(contact.normal, anchorVelocityB - anchorVelocityA);
+				float vRel = dot(contact.normal, relVelocity);
 				const float slop = -0.001f;
 				if (-contact.penetrationDepth < slop && vRel < 0.f)
 				{
@@ -2516,7 +2516,6 @@ simd_collision_constraint_solver initializeCollisionVelocityConstraintsSIMD(memo
 		vec3w tangent = relVelocity - dot(normal, relVelocity) * normal;
 		tangent = noz(tangent);
 
-
 		relGlobalAnchorA.x.store(batch.relGlobalAnchorA[0]);
 		relGlobalAnchorA.y.store(batch.relGlobalAnchorA[1]);
 		relGlobalAnchorA.z.store(batch.relGlobalAnchorA[2]);
@@ -2570,7 +2569,7 @@ simd_collision_constraint_solver initializeCollisionVelocityConstraintsSIMD(memo
 
 			if (dt > DT_THRESHOLD)
 			{
-				floatw vRel = dot(normal, anchorVelocityB - anchorVelocityA);
+				floatw vRel = dot(normal, relVelocity);
 
 				floatw bounceBias = -restitution * vRel - scale * (-penetrationDepth - slop) * invDt;
 				bias = ifThen((-penetrationDepth < slop) & (vRel < zero), bounceBias, bias);
