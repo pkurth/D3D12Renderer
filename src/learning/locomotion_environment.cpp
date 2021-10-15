@@ -6,8 +6,11 @@
 
 static void readBodyPartState(const trs& transform, scene_entity entity, vec3& position, vec3& velocity)
 {
-	position = inverseTransformPosition(transform, entity.getComponent<transform_component>().position);
-	velocity = inverseTransformDirection(transform, entity.getComponent<rigid_body_component>().linearVelocity);
+	transform_component& bodyPartTransform = entity.getComponent<transform_component>();
+	rigid_body_component& rb = entity.getComponent<rigid_body_component>();
+
+	position = inverseTransformPosition(transform, rb.getGlobalCOGPosition(bodyPartTransform));
+	velocity = inverseTransformDirection(transform, rb.linearVelocity);
 }
 
 static void updateConstraint(game_scene& scene, hinge_joint_constraint_handle handle, hinge_action action = {})
@@ -47,17 +50,7 @@ void locomotion_environment::reset(game_scene& scene)
 
 bool locomotion_environment::getState(learning_state& outState)
 {
-	// Create coordinate system centered at the torso's location (projected onto the ground), with axes constructed from the horizontal heading and global up vector.
-	//quat rotation = ragdoll.torso.getComponent<transform_component>().rotation;
-	//vec3 forward = rotation * vec3(0.f, 0.f, -1.f);
-	//forward.y = 0.f;
-	//forward = normalize(forward);
-	//
-	vec3 cog = ragdoll.torso.getComponent<rigid_body_component>().getGlobalCOGPosition(ragdoll.torso.getComponent<transform_component>());
-	cog.y = 0;
-	//
-	//trs transform(cog, rotateFromTo(vec3(0.f, 0.f, -1.f), forward));
-	trs transform(cog, quat::identity);
+	trs transform = getCoordinateSystem();
 
 
 	readBodyPartState(transform, ragdoll.head, outState.headPosition, outState.headVelocity);
@@ -82,7 +75,7 @@ bool locomotion_environment::getState(learning_state& outState)
 
 void locomotion_environment::applyAction(game_scene& scene, const learning_action& action)
 {
-	const float beta = 0.2f;
+	const float beta = 0.1f;
 
 	const float* in = (float*)&action;
 	float* out = (float*)&lastSmoothedAction;
@@ -99,4 +92,24 @@ void locomotion_environment::applyAction(game_scene& scene, const learning_actio
 	{
 		updateConstraint(scene, ragdoll.hingeJointConstraints[i], lastSmoothedAction.hingeJointActions[i]);
 	}
+}
+
+trs locomotion_environment::getCoordinateSystem()
+{
+	// Create coordinate system centered at the torso's location (projected onto the ground), with axes constructed from the horizontal heading and global up vector.
+
+	transform_component& torsoTransform = ragdoll.torso.getComponent<transform_component>();
+
+	vec3 forward = torsoTransform.rotation * vec3(0.f, 0.f, -1.f);
+	forward.y = 0.f;
+	forward = normalize(forward);
+
+	vec3 cog = ragdoll.torso.getComponent<rigid_body_component>().getGlobalCOGPosition(torsoTransform);
+	cog.y = 0;
+
+	trs transform(cog, rotateFromTo(vec3(0.f, 0.f, -1.f), forward));
+	//trs transform(cog, quat::identity);
+	transform.scale = vec3(1.f);
+
+	return transform;
 }

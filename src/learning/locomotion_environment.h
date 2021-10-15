@@ -69,6 +69,7 @@ struct locomotion_environment
 	bool getState(learning_state& outState);
 	void applyAction(game_scene& scene, const learning_action& action);
 
+	trs getCoordinateSystem();
 
 	humanoid_ragdoll ragdoll;
 

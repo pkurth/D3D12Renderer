@@ -113,7 +113,7 @@ static void getLimits(game_scene& scene, cone_twist_constraint_handle handle, fl
 	maxPtr[maxPushIndex++] = M_PI;
 }
 
-static void getBodyPartTarget(scene_entity entity, scene_entity parent, learning_target& outTarget, const learning_positions& localPositions)
+static void getBodyPartTarget(scene_entity entity, scene_entity parent, learning_target& outTarget, const learning_positions& localPositions, const transform_component& torsoTransform)
 {
 	transform_component& transform = entity.getComponent<transform_component>();
 	rigid_body_component& rb = entity.getComponent<rigid_body_component>();
@@ -121,10 +121,12 @@ static void getBodyPartTarget(scene_entity entity, scene_entity parent, learning
 	for (uint32 i = 0; i < 6; ++i)
 	{
 		vec3 globalPosition = transformPosition(transform, localPositions.p[i]);
-		outTarget.targetPositions[i] = globalPosition;
+		vec3 pos = inverseTransformPosition(torsoTransform, globalPosition);
+		outTarget.targetPositions[i] = pos;
 
 		vec3 globalVelocity = rb.getGlobalPointVelocity(transform, localPositions.p[i]);
-		outTarget.targetVelocities[i] = globalVelocity;
+		vec3 vel = inverseTransformDirection(torsoTransform, globalVelocity);
+		outTarget.targetVelocities[i] = vel;
 	}
 
 	quat parentRotation = parent ? parent.getComponent<transform_component>().rotation : quat::identity;
@@ -132,7 +134,7 @@ static void getBodyPartTarget(scene_entity entity, scene_entity parent, learning
 	outTarget.localTargetRotation = localRotation;
 }
 
-static body_part_error readPartDifference(scene_entity entity, scene_entity parent, const learning_target& target, const learning_positions& localPositions)
+static body_part_error readPartDifference(scene_entity entity, scene_entity parent, const learning_target& target, const learning_positions& localPositions, const transform_component& torsoTransform)
 {
 	transform_component& transform = entity.getComponent<transform_component>();
 	rigid_body_component& rb = entity.getComponent<rigid_body_component>();
@@ -144,10 +146,12 @@ static body_part_error readPartDifference(scene_entity entity, scene_entity pare
 	for (uint32 i = 0; i < 6; ++i)
 	{
 		vec3 globalPosition = transformPosition(transform, localPositions.p[i]);
-		positionError += length(globalPosition - target.targetPositions[i]);
+		vec3 pos = inverseTransformPosition(torsoTransform, globalPosition);
+		positionError += length(pos - target.targetPositions[i]);
 
 		vec3 globalVelocity = rb.getGlobalPointVelocity(transform, localPositions.p[i]);
-		velocityError += length(globalVelocity - target.targetVelocities[i]);
+		vec3 vel = inverseTransformDirection(torsoTransform, globalVelocity);
+		velocityError += length(vel - target.targetVelocities[i]);
 	}
 
 	quat parentRotation = parent ? parent.getComponent<transform_component>().rotation : quat::identity;
@@ -174,11 +178,12 @@ void locomotion_learning_environment::reset()
 	ragdoll.initialize(scene, vec3(0.f, 1.25f, 0.f));
 
 
+	transform_component torsoTransform = getCoordinateSystem();
 
 	for (uint32 i = 0; i < NUM_BODY_PARTS; ++i)
 	{
 		getLocalPositions(ragdoll.bodyParts[i], localPositions[i]);
-		getBodyPartTarget(ragdoll.bodyParts[i], ragdoll.bodyPartParents[i], targets[i], localPositions[i]);
+		getBodyPartTarget(ragdoll.bodyParts[i], ragdoll.bodyPartParents[i], targets[i], localPositions[i], torsoTransform);
 	}
 
 	locomotion_environment::reset(scene);
@@ -192,9 +197,11 @@ float locomotion_learning_environment::getLastActionReward()
 	float velocityError = 0.f;
 	float rotationError = 0.f;
 
+	transform_component torsoTransform = getCoordinateSystem();
+
 	for (uint32 i = 0; i < NUM_BODY_PARTS; ++i)
 	{
-		body_part_error err = readPartDifference(ragdoll.bodyParts[i], ragdoll.bodyPartParents[i], targets[i], localPositions[i]);
+		body_part_error err = readPartDifference(ragdoll.bodyParts[i], ragdoll.bodyPartParents[i], targets[i], localPositions[i], torsoTransform);
 		positionError += err.positionError;
 		velocityError += err.velocityError;
 		rotationError += err.rotationError;
@@ -212,11 +219,6 @@ float locomotion_learning_environment::getLastActionReward()
 
 	float result = fall * (rp + rv + rlocal + rvcm);
 	totalReward += result;
-
-	if (!isfinite(result))
-	{
-		std::cout << "Reward is inf or nan\n";
-	}
 	return result;
 }
 
@@ -287,16 +289,16 @@ extern "C" __declspec(dllexport) int updatePhysics(float* action, float* outStat
 
 	learningEnv->applyAction(learningEnv->scene, *(learning_action*)action);
 
-	//if (learningEnv->rng.randomFloat01() < 0.02f)
-	//{
-	//	uint32 bodyPartIndex = learningEnv->rng.randomUintBetween(0, NUM_BODY_PARTS - 1);
-	//
-	//	vec3 part = learningEnv->ragdoll.bodyParts[bodyPartIndex].getComponent<transform_component>().position + vec3(0.f, 0.2f, 0.f);
-	//	vec3 direction = normalize(vec3(learningEnv->rng.randomFloatBetween(-1.f, 1.f), 0.f, learningEnv->rng.randomFloatBetween(-1.f, 1.f)));
-	//	vec3 origin = part - direction * 5.f;
-	//
-	//	testPhysicsInteraction(learningEnv->scene, ray{ origin, direction });
-	//}
+	if (learningEnv->rng.randomFloat01() < 0.02f)
+	{
+		uint32 bodyPartIndex = learningEnv->rng.randomUintBetween(0, NUM_BODY_PARTS - 1);
+	
+		vec3 part = learningEnv->ragdoll.bodyParts[bodyPartIndex].getComponent<transform_component>().position + vec3(0.f, 0.2f, 0.f);
+		vec3 direction = normalize(vec3(learningEnv->rng.randomFloatBetween(-1.f, 1.f), 0.f, learningEnv->rng.randomFloatBetween(-1.f, 1.f)));
+		vec3 origin = part - direction * 5.f;
+	
+		testPhysicsInteraction(learningEnv->scene, ray{ origin, direction });
+	}
 
 	physicsStep(learningEnv->scene, stackArena, 1.f / 60.f);
 	
