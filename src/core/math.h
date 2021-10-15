@@ -15,7 +15,9 @@
 #define M_PI_OVER_180 (M_PI / 180.f)
 #define M_180_OVER_PI (180.f / M_PI)
 #define SQRT_PI	1.77245385090f
+#define INV_PI 0.31830988618379f
 #define M_TAU 6.28318530718f
+#define INV_TAU 0.159154943091895335f
 
 #define EPSILON 1e-6f
 

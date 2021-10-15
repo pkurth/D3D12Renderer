@@ -28,12 +28,12 @@
 template <typename float_t>
 static float_t cosInternal(float_t x)
 {
-	static const float_t tp = 1.f / (2.f * 3.14159265359f);
-	static const float_t q = 0.25f;
-	static const float_t h = 0.5f;
-	static const float_t o = 1.f;
-	static const float_t s = 16.f;
-	static const float_t v = 0.225f;
+	const float_t tp = 1.f / (2.f * 3.14159265359f);
+	const float_t q = 0.25f;
+	const float_t h = 0.5f;
+	const float_t o = 1.f;
+	const float_t s = 16.f;
+	const float_t v = 0.225f;
 
 	x *= tp;
 	x -= q + floor(x + q);
@@ -1024,16 +1024,16 @@ static floatx16 acos(floatx16 x) { return acosInternal(x); }
 #if defined(SIMD_AVX_512)
 typedef floatx16 floatx;
 typedef intx16 intx;
-#define SIMD_LANES 16
+#define SIMD_WIDTH 16
 #elif defined(SIMD_AVX_2)
 typedef floatx8 floatx;
 typedef intx8 intx;
-#define SIMD_LANES 8
+#define SIMD_WIDTH 8
 #else
 typedef floatx4 floatx;
 typedef intx4 intx;
 typedef floatx4 cmpx;
-#define SIMD_LANES 4
+#define SIMD_WIDTH 4
 #endif
 
 
