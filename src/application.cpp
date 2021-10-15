@@ -14,7 +14,6 @@
 #include "rendering/shadow_map.h"
 #include "rendering/shadow_map_renderer.h"
 #include "rendering/debug_visualization.h"
-#include "learning/locomotion_learning.h"
 
 
 struct raytrace_component
@@ -70,7 +69,8 @@ void application::initialize(main_renderer* renderer)
 
 	scene.createEntity("Cloth")
 		.addComponent<transform_component>(trs::identity)
-		.addComponent<cloth_component>(10.f, 10.f, 20u, 20u, 8.f);
+		.addComponent<cloth_component>(10.f, 10.f, 20u, 20u, 8.f)
+		.addComponent<cloth_render_component>();
 
 	//clothMaterial = createPBRMaterial(
 	//	"assets/sphere/Tiles074_2K_Color.jpg",
@@ -204,29 +204,29 @@ void application::initialize(main_renderer* renderer)
 		//	.addComponent<rigid_body_component>(true, 1.f);
 
 		//random_number_generator rng = { 15681923 };
-		for (uint32 i = 0; i < 1000; ++i)
-		{
-			//float x = rng.randomFloatBetween(-90.f, 90.f);
-			//float z = rng.randomFloatBetween(-90.f, 90.f);
-			//float y = rng.randomFloatBetween(20.f, 60.f);
-
-			if (i % 2 == 0)
-			{
-				scene.createEntity("Cube")
-					.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
-					.addComponent<raster_component>(boxMesh)
-					.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 1.f))
-					.addComponent<rigid_body_component>(false, 1.f);
-			}
-			else
-			{
-				scene.createEntity("Sphere")
-					.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
-					.addComponent<raster_component>(sphereMesh)
-					.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.f, 0.f), 1.f }, 0.1f, 0.5f, 1.f))
-					.addComponent<rigid_body_component>(false, 1.f);
-			}
-		}
+		//for (uint32 i = 0; i < 1000; ++i)
+		//{
+		//	//float x = rng.randomFloatBetween(-90.f, 90.f);
+		//	//float z = rng.randomFloatBetween(-90.f, 90.f);
+		//	//float y = rng.randomFloatBetween(20.f, 60.f);
+		//
+		//	if (i % 2 == 0)
+		//	{
+		//		scene.createEntity("Cube")
+		//			.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+		//			.addComponent<raster_component>(boxMesh)
+		//			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 1.f))
+		//			.addComponent<rigid_body_component>(false, 1.f);
+		//	}
+		//	else
+		//	{
+		//		scene.createEntity("Sphere")
+		//			.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+		//			.addComponent<raster_component>(sphereMesh)
+		//			.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.f, 0.f), 1.f }, 0.1f, 0.5f, 1.f))
+		//			.addComponent<rigid_body_component>(false, 1.f);
+		//	}
+		//}
 
 		//bounding_hull hull =
 		//{
@@ -299,9 +299,9 @@ void application::initialize(main_renderer* renderer)
 #endif
 
 	//humanoid_ragdoll::create(scene, vec3(60.f, 1.25f, -2.f));
-	//humanoid_ragdoll ragdoll = humanoid_ragdoll::create(scene, vec3(20.f, 1.25f, 0.f));
+	humanoid_ragdoll ragdoll = humanoid_ragdoll::create(scene, vec3(20.f, 1.25f, 0.f));
 
-	//initializeLocomotionEval(scene, ragdoll);
+	locomotionInference.initialize(scene, ragdoll);
 
 
 	editor.setEnvironment("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
@@ -498,7 +498,7 @@ void application::update(const user_input& input, float dt)
 {
 	stackArena.reset();
 
-	//stepLocomotionEval();
+	locomotionInference.update(scene);
 
 	resetRenderPasses();
 
@@ -684,9 +684,9 @@ void application::update(const user_input& input, float dt)
 				}
 			}
 
-			for (auto [entityHandle, cloth] : scene.view<cloth_component>().each())
+			for (auto [entityHandle, cloth, render] : scene.group<cloth_component, cloth_render_component>().each())
 			{
-				auto [vb, prevFrameVB, ib, sm] = cloth.getRenderData();
+				auto [vb, prevFrameVB, ib, sm] = render.getRenderData(cloth);
 				opaqueRenderPass.renderAnimatedObject(mat4::identity, mat4::identity, vb, prevFrameVB, ib, sm, clothMaterial, (uint32)entityHandle);
 
 				scene_entity entity = { entityHandle, scene };

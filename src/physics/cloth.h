@@ -21,10 +21,6 @@ struct cloth_component
 
 	void recalculateProperties(); // Call if stiffness or total mass changed. No need for changes in damping or gravity factor.
 
-	uint32 getRenderableVertexCount() const;
-	uint32 getRenderableTriangleCount() const;
-	std::tuple<dx_vertex_buffer_group_view, dx_vertex_buffer_group_view, dx_index_buffer_view, submesh_info> getRenderData();
-
 	float totalMass;
 	float gravityFactor;
 	float damping;
@@ -55,6 +51,16 @@ private:
 
 	void addConstraint(uint32 a, uint32 b);
 
+	friend struct cloth_render_component;
+};
+
+
+#ifndef PHYSICS_ONLY
+struct cloth_render_component
+{
+	std::tuple<dx_vertex_buffer_group_view, dx_vertex_buffer_group_view, dx_index_buffer_view, submesh_info> getRenderData(const cloth_component& cloth);
+
 	ref<dx_index_buffer> indexBuffer;
 	dx_vertex_buffer_group_view prevFrameVB;
 };
+#endif

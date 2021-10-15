@@ -248,7 +248,9 @@ project "D3D12Renderer"
 		defines {
 			"_UNICODE",
 			"UNICODE",
-			"_CRT_SECURE_NO_WARNINGS"
+			"_CRT_SECURE_NO_WARNINGS",
+			"ENABLE_CPU_PROFILING=1",
+			"ENABLE_DX_PROFILING=1",
 		}
 		
 		if turing_or_higher then
@@ -360,6 +362,10 @@ project "Physics-Lib"
 	pchheader "pch.h"
 	pchsource "src/pch.cpp"
 
+	includedirs {
+		"src",
+	}
+
 	sysincludedirs {
 		"ext/entt/src",
 		"ext",
@@ -369,24 +375,29 @@ project "Physics-Lib"
 	floatingpoint "Fast"
 
 	files {
-		"src/bounding_volumes.*",
-		"src/collision_broad.*",
-		"src/collision_epa.*",
-		"src/collision_gjk.*",
-		"src/collision_narrow.*",
-		"src/collision_sat.*",
-		"src/constraints.*",
-		"src/locomotion_learning.*",
-		"src/math.*",
+		"src/physics/bounding_volumes.*",
+		"src/physics/collision_broad.*",
+		"src/physics/collision_epa.*",
+		"src/physics/collision_gjk.*",
+		"src/physics/collision_narrow.*",
+		"src/physics/collision_sat.*",
+		"src/physics/constraints.*",
+		"src/physics/physics.*",
+		"src/physics/cloth.*",
+		"src/physics/rigid_body.*",
+		"src/physics/ragdoll.*",
+		"src/learning/locomotion_learning.*",
+		"src/learning/locomotion_environment.*",
+		"src/core/math.*",
+		"src/core/memory.*",
+		"src/core/threading.*",
+		"src/scene/scene.*",
 		"src/pch.*",
-		"src/physics.*",
-		"src/ragdoll.*",
-		"src/scene.*",
 	}
 
 	vpaths {
-		["Headers"] = { "src/*.h" },
-		["Sources"] = { "src/*.cpp" },
+		["Headers/*"] = { "src/**.h" },
+		["Sources/*"] = { "src/**.cpp" },
 	}
 
 	filter "system:windows"
@@ -396,7 +407,9 @@ project "Physics-Lib"
 			"PHYSICS_ONLY",
 			"_UNICODE",
 			"UNICODE",
-			"_CRT_SECURE_NO_WARNINGS"
+			"_CRT_SECURE_NO_WARNINGS",
+			"ENABLE_CPU_PROFILING=0",
+			"ENABLE_DX_PROFILING=0",
 		}
 
 	filter "configurations:Debug"

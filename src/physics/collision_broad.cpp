@@ -73,6 +73,15 @@ void removeColliderFromBroadphase(scene_entity entity)
 	}
 }
 
+void clearBroadphase(game_scene& scene)
+{
+	if (sap_context* context = scene.registry.try_ctx<sap_context>())
+	{
+		context->endpoints.clear();
+		context->sortingAxis = 0;
+	}
+}
+
 uint32 broadphase(game_scene& scene, bounding_box* worldSpaceAABBs, memory_arena& arena, broadphase_collision* outCollisions)
 {
 	CPU_PROFILE_BLOCK("Broad phase");

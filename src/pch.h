@@ -56,8 +56,5 @@ static void checkResult(HRESULT hr)
 	assert(SUCCEEDED(hr));
 }
 
-#define ENABLE_CPU_PROFILING 1
-#define ENABLE_DX_PROFILING 1
-
 
 

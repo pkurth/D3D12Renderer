@@ -2,7 +2,6 @@
 #include "cloth.h"
 #include "physics.h"
 #include "core/cpu_profiling.h"
-#include "animation/skinning.h"
 #include "dx/dx_context.h"
 
 cloth_component::cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float stiffness, float damping, float gravityFactor)
@@ -76,24 +75,6 @@ cloth_component::cloth_component(float width, float height, uint32 gridSizeX, ui
 		}
 	}
 
-
-	std::vector<indexed_triangle16> triangles;
-	triangles.reserve(getRenderableTriangleCount());
-	for (uint32 y = 0; y < gridSizeY - 1; ++y)
-	{
-		for (uint32 x = 0; x < gridSizeX - 1; ++x)
-		{
-			uint16 tlIndex = y * gridSizeX + x;
-			uint16 trIndex = tlIndex + 1;
-			uint16 blIndex = tlIndex + gridSizeX;
-			uint16 brIndex = blIndex + 1;
-
-			triangles.push_back({ tlIndex, blIndex, brIndex });
-			triangles.push_back({ tlIndex, brIndex, trIndex });
-		}
-	}
-
-	indexBuffer = createIndexBuffer(sizeof(uint16), (uint32)triangles.size() * 3, triangles.data());
 }
 
 void cloth_component::setWorldPositionOfFixedVertices(const trs& transform, bool moveRigid)
@@ -186,37 +167,6 @@ void cloth_component::applyWindForce(vec3 force)
 			}
 		}
 	}
-}
-
-uint32 cloth_component::getRenderableVertexCount() const
-{
-	return gridSizeX * gridSizeY;
-}
-
-uint32 cloth_component::getRenderableTriangleCount() const
-{
-	return (gridSizeX - 1) * (gridSizeY - 1) * 2;
-}
-
-std::tuple<dx_vertex_buffer_group_view, dx_vertex_buffer_group_view, dx_index_buffer_view, submesh_info> cloth_component::getRenderData()
-{
-	CPU_PROFILE_BLOCK("Get cloth render data");
-
-	uint32 numVertices = getRenderableVertexCount();
-	auto [positionVertexBuffer, positionPtr] = dxContext.createDynamicVertexBuffer(sizeof(vec3), numVertices);
-	memcpy(positionPtr, positions.data(), numVertices * sizeof(vec3));
-
-	dx_vertex_buffer_group_view vb = skinCloth(positionVertexBuffer, gridSizeX, gridSizeY);
-	submesh_info sm;
-	sm.baseVertex = 0;
-	sm.firstIndex = 0;
-	sm.numIndices = getRenderableTriangleCount() * 3;
-	sm.numVertices = numVertices;
-
-	dx_vertex_buffer_group_view prev = prevFrameVB;
-	prevFrameVB = vb;
-
-	return { vb, prev, indexBuffer, sm };
 }
 
 struct cloth_constraint_temp
@@ -383,4 +333,60 @@ void cloth_component::recalculateProperties()
 		c.inverseMassSum = (invMasses[c.a] + invMasses[c.b]) * invStiffness;
 	}
 }
+
+
+
+
+
+#ifndef PHYSICS_ONLY
+#include "animation/skinning.h"
+
+std::tuple<dx_vertex_buffer_group_view, dx_vertex_buffer_group_view, dx_index_buffer_view, submesh_info> cloth_render_component::getRenderData(const cloth_component& cloth)
+{
+	CPU_PROFILE_BLOCK("Get cloth render data");
+
+	uint32 numVertices = cloth.gridSizeX * cloth.gridSizeY;
+	uint32 numTriangles = (cloth.gridSizeX - 1) * (cloth.gridSizeY - 1) * 2;
+
+	auto [positionVertexBuffer, positionPtr] = dxContext.createDynamicVertexBuffer(sizeof(vec3), numVertices);
+	memcpy(positionPtr, cloth.positions.data(), numVertices * sizeof(vec3));
+
+	dx_vertex_buffer_group_view vb = skinCloth(positionVertexBuffer, cloth.gridSizeX, cloth.gridSizeY);
+	submesh_info sm;
+	sm.baseVertex = 0;
+	sm.firstIndex = 0;
+	sm.numIndices = numTriangles * 3;
+	sm.numVertices = numVertices;
+
+	dx_vertex_buffer_group_view prev = prevFrameVB;
+	prevFrameVB = vb;
+
+
+
+	if (!indexBuffer)
+	{
+		std::vector<indexed_triangle16> triangles;
+		triangles.reserve(numTriangles);
+		for (uint32 y = 0; y < cloth.gridSizeY - 1; ++y)
+		{
+			for (uint32 x = 0; x < cloth.gridSizeX - 1; ++x)
+			{
+				uint16 tlIndex = y * cloth.gridSizeX + x;
+				uint16 trIndex = tlIndex + 1;
+				uint16 blIndex = tlIndex + cloth.gridSizeX;
+				uint16 brIndex = blIndex + 1;
+
+				triangles.push_back({ tlIndex, blIndex, brIndex });
+				triangles.push_back({ tlIndex, brIndex, trIndex });
+			}
+		}
+
+		indexBuffer = createIndexBuffer(sizeof(uint16), (uint32)triangles.size() * 3, triangles.data());
+	}
+
+
+	return { vb, prev, indexBuffer, sm };
+}
+
+#endif
 

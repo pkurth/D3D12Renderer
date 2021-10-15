@@ -2,7 +2,7 @@
 
 #include "core/math.h"
 #include "core/random.h"
-#include "rendering/material.h"
+#include "dx/dx_buffer.h"
 #include <unordered_map>
 
 #define NO_PARENT 0xFFFFFFFF

@@ -9,12 +9,18 @@ game_scene::game_scene()
 	(void)registry.group<collider_component, sap_endpoint_indirection_component>(); // Colliders and SAP endpoints are always sorted in the same order.
 	(void)registry.group<transform_component, dynamic_transform_component, rigid_body_component>();
 	(void)registry.group<transform_component, rigid_body_component>();
+
+#ifndef PHYSICS_ONLY
 	(void)registry.group<position_component, point_light_component>();
 	(void)registry.group<position_rotation_component, spot_light_component>();
+#endif
 }
 
 void game_scene::clearAll()
 {
+	void clearBroadphase(game_scene & scene);
+	clearBroadphase(*this);
+
 	deleteAllConstraints(*this);
 	registry.clear();
 }
@@ -30,8 +36,11 @@ scene_entity game_scene::copyEntity(scene_entity src)
 	if (auto* c = src.getComponentIfExists<position_component>()) { dest.addComponent<position_component>(*c); }
 	if (auto* c = src.getComponentIfExists<position_rotation_component>()) { dest.addComponent<position_rotation_component>(*c); }
 	if (auto* c = src.getComponentIfExists<dynamic_transform_component>()) { dest.addComponent<dynamic_transform_component>(*c); }
+
+#ifndef PHYSICS_ONLY
 	if (auto* c = src.getComponentIfExists<point_light_component>()) { dest.addComponent<point_light_component>(*c); }
 	if (auto* c = src.getComponentIfExists<spot_light_component>()) { dest.addComponent<spot_light_component>(*c); }
+#endif
 
 	for (collider_component& collider : collider_component_iterator(src))
 	{

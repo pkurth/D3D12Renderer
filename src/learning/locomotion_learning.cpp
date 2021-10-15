@@ -1,36 +1,14 @@
 #include "pch.h"
-#include "locomotion_learning.h"
 #include "scene/scene.h"
-#include "physics/ragdoll.h"
 #include "physics/physics.h"
 #include "core/random.h"
 
-#define NUM_CONE_TWIST_CONSTRAINTS arraysize(humanoid_ragdoll::coneTwistConstraints)
-#define NUM_HINGE_JOINT_CONSTRAINTS arraysize(humanoid_ragdoll::hingeJointConstraints)
-#define NUM_BODY_PARTS arraysize(humanoid_ragdoll::bodyParts)
+#include "locomotion_environment.h"
 
-struct hinge_action
-{
-	float targetAngle;
-};
-
-struct cone_twist_action
-{
-	float twistTargetAngle;
-	float swingTargetAngle;
-	float swingAxisAngle;
-};
 
 struct learning_positions
 {
 	vec3 p[6];
-};
-
-struct learning_target
-{
-	vec3 targetPositions[6];
-	vec3 targetVelocities[6];
-	quat localTargetRotation;
 };
 
 struct body_part_error
@@ -40,151 +18,20 @@ struct body_part_error
 	float rotationError;
 };
 
-struct learning_action
+struct locomotion_learning_environment : locomotion_environment
 {
-	cone_twist_action coneTwistActions[NUM_CONE_TWIST_CONSTRAINTS];
-	hinge_action hingeJointActions[NUM_HINGE_JOINT_CONSTRAINTS];
-};
+	void reset();
 
-struct learning_state
-{
-	vec3 cogVelocity;
-
-	vec3 leftToesPosition;
-	vec3 leftToesVelocity;
-
-	vec3 rightToesPosition;
-	vec3 rightToesVelocity;
-
-	vec3 torsoPosition;
-	vec3 torsoVelocity;
-
-	vec3 headPosition;
-	vec3 headVelocity;
-
-	vec3 leftLowerArmPosition;
-	vec3 leftLowerArmVelocity;
-
-	vec3 rightLowerArmPosition;
-	vec3 rightLowerArmVelocity;
-
-	learning_action lastSmoothedAction;
-};
-
-struct locomotion_environment
-{
-	void resetForLearning();
-	void resetForEvaluation();
-
-	void resetCommon();
-
-	// Returns true, if simulation has ended.
-	bool getState(learning_state& outState);
-	void applyAction(const learning_action& action);
 	float getLastActionReward();
 
-
-
-	game_scene& scene;
-	humanoid_ragdoll ragdoll;
-
-	uint32 episodeLength;
+	game_scene scene;
+	random_number_generator rng;
 	float totalReward;
 
-	learning_action lastSmoothedAction;
-
 	learning_target targets[NUM_BODY_PARTS];
+
 	learning_positions localPositions[NUM_BODY_PARTS];
-	float headTargetHeight;
-	vec3 torsoVelocityTarget;
-
-	random_number_generator rng;
-
-	memory_arena stackArena;
 };
-
-static locomotion_environment* learningEnv = 0;
-
-static void readBodyPartState(const trs& transform, scene_entity entity, vec3& position, vec3& velocity)
-{
-	position = inverseTransformPosition(transform, entity.getComponent<transform_component>().position);
-	velocity = inverseTransformDirection(transform, entity.getComponent<rigid_body_component>().linearVelocity);
-}
-
-static void updateConstraint(game_scene& scene, hinge_joint_constraint_handle handle, hinge_action action = {})
-{
-	hinge_joint_constraint& c = getConstraint(scene, handle);
-	c.maxMotorTorque = 200.f;
-	c.motorType = constraint_position_motor;
-	c.motorTargetAngle = action.targetAngle;
-}
-
-static void updateConstraint(game_scene& scene, cone_twist_constraint_handle handle, cone_twist_action action = {})
-{
-	cone_twist_constraint& c = getConstraint(scene, handle);
-	c.maxSwingMotorTorque = 200.f;
-	c.maxTwistMotorTorque = 200.f;
-	c.swingMotorType = constraint_position_motor;
-	c.twistMotorType = constraint_position_motor;
-	c.swingMotorTargetAngle = action.swingTargetAngle;
-	c.twistMotorTargetAngle = action.twistTargetAngle;
-	c.swingMotorAxis = action.swingAxisAngle;
-}
-
-static void getLimits(game_scene& scene, hinge_joint_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
-{
-	hinge_joint_constraint& c = getConstraint(scene, handle);
-	minPtr[minPushIndex++] = c.minRotationLimit <= 0.f ? c.minRotationLimit : -M_PI;
-	maxPtr[maxPushIndex++] = c.maxRotationLimit >= 0.f ? c.maxRotationLimit : M_PI;
-}
-
-static void getLimits(game_scene& scene, cone_twist_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
-{
-	cone_twist_constraint& c = getConstraint(scene, handle);
-
-	minPtr[minPushIndex++] = c.twistLimit >= 0.f ? -c.twistLimit : -M_PI;
-	minPtr[minPushIndex++] = c.swingLimit >= 0.f ? -c.swingLimit : -M_PI;
-	minPtr[minPushIndex++] = -M_PI;
-
-	maxPtr[maxPushIndex++] = c.twistLimit >= 0.f ? c.twistLimit : M_PI;
-	maxPtr[maxPushIndex++] = c.swingLimit >= 0.f ? c.swingLimit : M_PI;
-	maxPtr[maxPushIndex++] = M_PI;
-}
-
-bool locomotion_environment::getState(learning_state& outState)
-{
-	// Create coordinate system centered at the torso's location (projected onto the ground), with axes constructed from the horizontal heading and global up vector.
-	//quat rotation = ragdoll.torso.getComponent<transform_component>().rotation;
-	//vec3 forward = rotation * vec3(0.f, 0.f, -1.f);
-	//forward.y = 0.f;
-	//forward = normalize(forward);
-	//
-	vec3 cog = ragdoll.torso.getComponent<rigid_body_component>().getGlobalCOGPosition(ragdoll.torso.getComponent<transform_component>());
-	cog.y = 0;
-	//
-	//trs transform(cog, rotateFromTo(vec3(0.f, 0.f, -1.f), forward));
-	trs transform(cog, quat::identity);
-
-
-	readBodyPartState(transform, ragdoll.head, outState.headPosition, outState.headVelocity);
-	bool fallen = false;
-	if (outState.headPosition.y < 1.f)
-	{
-		fallen = true;
-	}
-
-	outState.cogVelocity = inverseTransformDirection(transform, ragdoll.torso.getComponent<rigid_body_component>().linearVelocity);
-	
-	readBodyPartState(transform, ragdoll.leftToes, outState.leftToesPosition, outState.leftToesVelocity);
-	readBodyPartState(transform, ragdoll.rightToes, outState.rightToesPosition, outState.rightToesVelocity);
-	readBodyPartState(transform, ragdoll.torso, outState.torsoPosition, outState.torsoVelocity);
-	readBodyPartState(transform, ragdoll.leftLowerArm, outState.leftLowerArmPosition, outState.leftLowerArmVelocity);
-	readBodyPartState(transform, ragdoll.rightLowerArm, outState.rightLowerArmPosition, outState.rightLowerArmVelocity);
-
-	outState.lastSmoothedAction = lastSmoothedAction;
-
-	return fallen;
-}
 
 static void getLocalPositions(scene_entity entity, learning_positions& outPositions)
 {
@@ -197,7 +44,7 @@ static void getLocalPositions(scene_entity entity, learning_positions& outPositi
 	while (colliderEntity)
 	{
 		collider_component& collider = colliderEntity.getComponent<collider_component>();
-		
+
 		bounding_box bb;
 		switch (collider.type)
 		{
@@ -232,7 +79,7 @@ static void getLocalPositions(scene_entity entity, learning_positions& outPositi
 		}
 		aabb.grow(bb.minCorner);
 		aabb.grow(bb.maxCorner);
-		
+
 		colliderEntity = { collider.nextEntity, entity.registry };
 	}
 
@@ -244,6 +91,26 @@ static void getLocalPositions(scene_entity entity, learning_positions& outPositi
 	outPositions.p[3] = c + vec3(r.x, 0.f, 0.f);
 	outPositions.p[4] = c + vec3(0.f, r.y, 0.f);
 	outPositions.p[5] = c + vec3(0.f, 0.f, r.z);
+}
+
+static void getLimits(game_scene& scene, hinge_joint_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
+{
+	hinge_joint_constraint& c = getConstraint(scene, handle);
+	minPtr[minPushIndex++] = c.minRotationLimit <= 0.f ? c.minRotationLimit : -M_PI;
+	maxPtr[maxPushIndex++] = c.maxRotationLimit >= 0.f ? c.maxRotationLimit : M_PI;
+}
+
+static void getLimits(game_scene& scene, cone_twist_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
+{
+	cone_twist_constraint& c = getConstraint(scene, handle);
+
+	minPtr[minPushIndex++] = c.twistLimit >= 0.f ? -c.twistLimit : -M_PI;
+	minPtr[minPushIndex++] = c.swingLimit >= 0.f ? -c.swingLimit : -M_PI;
+	minPtr[minPushIndex++] = -M_PI;
+
+	maxPtr[maxPushIndex++] = c.twistLimit >= 0.f ? c.twistLimit : M_PI;
+	maxPtr[maxPushIndex++] = c.swingLimit >= 0.f ? c.swingLimit : M_PI;
+	maxPtr[maxPushIndex++] = M_PI;
 }
 
 static void getBodyPartTarget(scene_entity entity, scene_entity parent, learning_target& outTarget, const learning_positions& localPositions)
@@ -292,7 +159,32 @@ static body_part_error readPartDifference(scene_entity entity, scene_entity pare
 	return { positionError, velocityError, rotationError };
 }
 
-float locomotion_environment::getLastActionReward()
+void locomotion_learning_environment::reset()
+{
+	totalReward = 0.f;
+
+	scene.clearAll();
+
+	rng = { (uint32)time(0) };
+
+	scene.createEntity("Test ground")
+		.addComponent<transform_component>(vec3(0.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
+		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f));
+
+	ragdoll.initialize(scene, vec3(0.f, 1.25f, 0.f));
+
+
+
+	for (uint32 i = 0; i < NUM_BODY_PARTS; ++i)
+	{
+		getLocalPositions(ragdoll.bodyParts[i], localPositions[i]);
+		getBodyPartTarget(ragdoll.bodyParts[i], ragdoll.bodyPartParents[i], targets[i], localPositions[i]);
+	}
+
+	locomotion_environment::reset(scene);
+}
+
+float locomotion_learning_environment::getLastActionReward()
 {
 	//return env->ragdoll.head.getComponent<transform_component>().position.y;
 
@@ -320,8 +212,26 @@ float locomotion_environment::getLastActionReward()
 
 	float result = fall * (rp + rv + rlocal + rvcm);
 	totalReward += result;
+
+	if (!isfinite(result))
+	{
+		std::cout << "Reward is inf or nan\n";
+	}
 	return result;
 }
+
+
+
+
+
+
+
+
+
+
+static locomotion_learning_environment* learningEnv = 0;
+static memory_arena stackArena;
+
 
 extern "C" __declspec(dllexport) int getPhysicsStateSize() { return sizeof(learning_state) / 4; }
 extern "C" __declspec(dllexport) int getPhysicsActionSize() { return sizeof(learning_action) / 4; }
@@ -357,45 +267,38 @@ extern "C" __declspec(dllexport) void getPhysicsRanges(float* stateMin, float* s
 	tmpScene.clearAll();
 }
 
-void locomotion_environment::applyAction(const learning_action& action)
+extern "C" __declspec(dllexport) void resetPhysics(float* outState)
 {
-	const float beta = 0.2f;
-
-	const float* in = (float*)&action;
-	float* out = (float*)&lastSmoothedAction;
-	for (uint32 i = 0; i < (uint32)getPhysicsActionSize(); ++i)
+	if (!learningEnv)
 	{
-		out[i] = lerp(out[i], in[i], beta);
+		learningEnv = new locomotion_learning_environment;
+		stackArena.initialize();
 	}
 
-	for (uint32 i = 0; i < NUM_CONE_TWIST_CONSTRAINTS; ++i)
-	{
-		updateConstraint(scene, ragdoll.coneTwistConstraints[i], lastSmoothedAction.coneTwistActions[i]);
-	}
-	for (uint32 i = 0; i < NUM_HINGE_JOINT_CONSTRAINTS; ++i)
-	{
-		updateConstraint(scene, ragdoll.hingeJointConstraints[i], lastSmoothedAction.hingeJointActions[i]);
-	}
+	learningEnv->reset();
 
-	++episodeLength;
+	bool failure = learningEnv->getState(*(learning_state*)outState);
+	assert(!failure);
 }
 
 extern "C" __declspec(dllexport) int updatePhysics(float* action, float* outState, float* outReward)
 {
-	learningEnv->applyAction(*(learning_action*)action);
+	stackArena.reset();
 
-	if (learningEnv->rng.randomFloat01() < 0.02f)
-	{
-		uint32 bodyPartIndex = learningEnv->rng.randomUintBetween(0, NUM_BODY_PARTS - 1);
+	learningEnv->applyAction(learningEnv->scene, *(learning_action*)action);
 
-		vec3 part = learningEnv->ragdoll.bodyParts[bodyPartIndex].getComponent<transform_component>().position + vec3(0.f, 0.2f, 0.f);
-		vec3 direction = normalize(vec3(learningEnv->rng.randomFloatBetween(-1.f, 1.f), 0.f, learningEnv->rng.randomFloatBetween(-1.f, 1.f)));
-		vec3 origin = part - direction * 5.f;
-	
-		testPhysicsInteraction(learningEnv->scene, ray{ origin, direction });
-	}
+	//if (learningEnv->rng.randomFloat01() < 0.02f)
+	//{
+	//	uint32 bodyPartIndex = learningEnv->rng.randomUintBetween(0, NUM_BODY_PARTS - 1);
+	//
+	//	vec3 part = learningEnv->ragdoll.bodyParts[bodyPartIndex].getComponent<transform_component>().position + vec3(0.f, 0.2f, 0.f);
+	//	vec3 direction = normalize(vec3(learningEnv->rng.randomFloatBetween(-1.f, 1.f), 0.f, learningEnv->rng.randomFloatBetween(-1.f, 1.f)));
+	//	vec3 origin = part - direction * 5.f;
+	//
+	//	testPhysicsInteraction(learningEnv->scene, ray{ origin, direction });
+	//}
 
-	physicsStep(learningEnv->scene, learningEnv->stackArena, 1.f / 60.f);
+	physicsStep(learningEnv->scene, stackArena, 1.f / 60.f);
 	
 	bool failure = learningEnv->getState(*(learning_state*)outState);
 	*outReward = 0.f;
@@ -411,135 +314,24 @@ extern "C" __declspec(dllexport) int updatePhysics(float* action, float* outStat
 	return failure;
 }
 
-void locomotion_environment::resetForLearning()
+
+
+
+void testLocomotionLearning()
 {
-	scene.clearAll();
+	float* state = new float[getPhysicsStateSize()];
+	float* action = new float[getPhysicsActionSize()];
+	float reward;
 
-	uint32 seed = (uint32)time(0);
-	rng = { seed };
-
-	scene.createEntity("Test ground")
-		.addComponent<transform_component>(vec3(0.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
-		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f))
-		.addComponent<rigid_body_component>(true);
-
-	ragdoll.initialize(scene, vec3(0.f, 1.25f, 0.f));
-
-	resetCommon();
-}
-
-void locomotion_environment::resetForEvaluation()
-{
-	resetCommon();
-}
-
-void locomotion_environment::resetCommon()
-{
-	episodeLength = 0;
-	totalReward = 0.f;
-	lastSmoothedAction = {};
-	applyAction({});
-
-	headTargetHeight = ragdoll.head.getComponent<transform_component>().position.y;
-	torsoVelocityTarget = vec3(0.f);
-
-	for (uint32 i = 0; i < NUM_BODY_PARTS; ++i)
+	resetPhysics(state);
+	while (true)
 	{
-		getLocalPositions(ragdoll.bodyParts[i], localPositions[i]);
-		getBodyPartTarget(ragdoll.bodyParts[i], ragdoll.bodyPartParents[i], targets[i], localPositions[i]);
-	}
-}
+		memset(action, 0, getPhysicsActionSize() * sizeof(float));
 
-extern "C" __declspec(dllexport) void resetPhysics(float* outState)
-{
-	static game_scene scene;
-	if (!learningEnv)
-	{
-		learningEnv = new locomotion_environment{ scene };
-		learningEnv->stackArena.initialize();
-	}
-
-	learningEnv->resetForLearning();
-
-	bool failure = learningEnv->getState(*(learning_state*)outState);
-	assert(!failure);
-}
-
-
-
-
-
-
-
-template <uint32 inputSize, uint32 outputSize>
-static void applyLayer(const float(&weights)[outputSize][inputSize], const float(&bias)[outputSize], const float* from, float* to, bool activation)
-{
-	for (uint32 y = 0; y < outputSize; ++y)
-	{
-		const float* row = weights[y];
-
-		float sum = 0.f;
-		for (uint32 x = 0; x < inputSize; ++x)
+		int failure = updatePhysics(action, state, &reward);
+		if (failure)
 		{
-			sum += row[x] * from[x];
+			break;
 		}
-		sum += bias[y];
-		to[y] = activation ? tanh(sum) : sum;
 	}
 }
-
-#if __has_include("../tmp/network.h")
-#include "../tmp/network.h"
-
-static locomotion_environment* evaluationEnv;
-
-void initializeLocomotionEval(game_scene& scene, humanoid_ragdoll& ragdoll)
-{
-	evaluationEnv = new locomotion_environment{ scene, ragdoll };
-	evaluationEnv->resetForEvaluation();
-}
-
-void stepLocomotionEval()
-{
-	if (!evaluationEnv)
-	{
-		return;
-	}
-
-	learning_state state;
-	if (evaluationEnv->getState(state))
-	{
-		std::string out = "Rew: " + std::to_string(evaluationEnv->totalReward) + ",  EpLen: " + std::to_string(evaluationEnv->episodeLength) + '\n';
-		std::cout << out;
-		evaluationEnv->episodeLength = 0;
-		evaluationEnv->totalReward = 0.f;
-		evaluationEnv->lastSmoothedAction = {};
-		evaluationEnv->applyAction({});
-	}
-
-	learning_action action;
-
-	float* buffers = (float*)alloca(sizeof(float) * HIDDEN_LAYER_SIZE * 2);
-
-	float* a = buffers;
-	float* b = buffers + HIDDEN_LAYER_SIZE;
-
-	// State to a.
-	applyLayer(policyWeights1, policyBias1, (const float*)&state, a, true);
-
-	// a to b.
-	applyLayer(policyWeights2, policyBias2, a, b, true);
-
-	// b to action.
-	applyLayer(actionWeights, actionBias, b, (float*)&action, false);
-
-
-	evaluationEnv->applyAction(action);
-	evaluationEnv->getLastActionReward();
-}
-#else
-void initializeLocomotionEval(game_scene& scene, humanoid_ragdoll& ragdoll) {}
-void stepLocomotionEval() {}
-#endif
-
-

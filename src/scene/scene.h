@@ -4,9 +4,11 @@
 //#include <entt/entt.hpp>
 #include <entt/entity/registry.hpp>
 #include "components.h"
+#ifndef PHYSICS_ONLY
 #include "rendering/light_source.h"
 #include "rendering/pbr.h"
 #include "core/camera.h"
+#endif
 
 struct game_scene;
 
@@ -278,9 +280,11 @@ struct game_scene
 	entt::registry registry;
 
 
+#ifndef PHYSICS_ONLY
 	render_camera camera;
 	directional_light sun;
 	ref<pbr_environment> environment;
+#endif
 };
 
 inline scene_entity::scene_entity(entt::entity handle, game_scene& scene) : handle(handle), registry(&scene.registry) {}

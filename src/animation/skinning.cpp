@@ -3,6 +3,8 @@
 #include "dx/dx_command_list.h"
 #include "dx/dx_barrier_batcher.h"
 #include "dx/dx_profiling.h"
+#include "rendering/material.h"
+#include "dx/dx_buffer.h"
 
 #include "skinning_rs.hlsli"
 

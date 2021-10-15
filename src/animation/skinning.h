@@ -1,15 +1,16 @@
 #pragma once
 
-#include "dx/dx_buffer.h"
-#include "geometry/geometry.h"
 #include "core/math.h"
-#include "rendering/material.h"
+#include "geometry/geometry.h"
 
 struct vertex_range
 {
 	uint32 firstVertex;
 	uint32 numVertices;
 };
+
+struct dx_vertex_buffer_group_view;
+struct dx_vertex_buffer_view;
 
 void initializeSkinning();
 std::tuple<dx_vertex_buffer_group_view, mat4*> skinObject(const dx_vertex_buffer_group_view& vertexBuffer, vertex_range range, uint32 numJoints);
