@@ -715,7 +715,8 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	dt *= physicsSettings.globalTimeScale;
 
 	uint32 numRigidBodies = scene.numberOfComponentsOfType<rigid_body_component>();
-	if (numRigidBodies == 0)
+	uint32 numCloths = scene.numberOfComponentsOfType<cloth_component>();
+	if (numRigidBodies == 0 && numCloths == 0)
 	{
 		return;
 	}
