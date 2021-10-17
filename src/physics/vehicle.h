@@ -13,9 +13,9 @@ struct vehicle
 	{
 		struct
 		{
-			scene_entity chassis;
-			scene_entity gears[16];
+			scene_entity motor;
+			scene_entity gears[2];
 		};
-		scene_entity parts[17];
+		scene_entity parts[3];
 	};
 };
