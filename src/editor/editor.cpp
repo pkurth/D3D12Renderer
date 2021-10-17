@@ -748,6 +748,33 @@ bool scene_editor::drawSceneHierarchy()
 										}
 									});
 								} break;
+
+								case constraint_type_wheel:
+								{
+									drawComponent<wheel_constraint>(constraintEntity, "Wheel constraint", [this, constraintEntity = constraintEntity](wheel_constraint& constraint)
+									{
+										if (ImGui::BeginProperties())
+										{
+											scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
+											if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
+											{
+												setSelectedEntity(otherEntity);
+											}
+
+											bool motorActive = constraint.maxMotorTorque > 0.f;
+											if (ImGui::PropertyCheckbox("Motor active", motorActive))
+											{
+												constraint.maxMotorTorque = -constraint.maxMotorTorque;
+											}
+											if (motorActive)
+											{
+												ImGui::PropertySliderAngle("Motor velocity", constraint.motorVelocity, -360.f, 360.f);
+												ImGui::PropertySlider("Max motor torque", constraint.maxMotorTorque, 0.001f, 1000.f);
+											}
+											ImGui::EndProperties();
+										}
+									});
+								} break;
 							}
 
 							ImGui::PopID();

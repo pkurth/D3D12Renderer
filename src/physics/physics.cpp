@@ -248,6 +248,34 @@ cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity
 	return { constraintEntity };
 }
 
+wheel_constraint_handle addWheelConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis)
+{
+	assert(a.registry == b.registry);
+
+	entt::registry& registry = *a.registry;
+	entt::entity constraintEntity = registry.create();
+	wheel_constraint& constraint = registry.emplace<wheel_constraint>(constraintEntity);
+	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
+
+	const transform_component& transformA = a.getComponent<transform_component>();
+	const transform_component& transformB = b.getComponent<transform_component>();
+
+	constraint.localAnchorA = inverseTransformPosition(transformA, globalAnchor);
+	constraint.localAnchorB = inverseTransformPosition(transformB, globalAnchor);
+
+	constraint.localAxisA = inverseTransformDirection(transformA, globalAxis);
+	constraint.localAxisB = inverseTransformDirection(transformB, globalAxis);
+
+	// Motor.
+	constraint.motorVelocity = 0.f;
+	constraint.maxMotorTorque = -1.f; // Disabled by default.
+
+	addConstraintEdge(a, ref, constraintEntity, constraint_type_wheel);
+	addConstraintEdge(b, ref, constraintEntity, constraint_type_wheel);
+
+	return { constraintEntity };
+}
+
 distance_constraint& getConstraint(game_scene& scene, distance_constraint_handle handle)
 {
 	return scene_entity{ handle.entity, scene }.getComponent<distance_constraint>();
@@ -266,6 +294,11 @@ hinge_joint_constraint& getConstraint(game_scene& scene, hinge_joint_constraint_
 cone_twist_constraint& getConstraint(game_scene& scene, cone_twist_constraint_handle handle)
 {
 	return scene_entity{ handle.entity, scene }.getComponent<cone_twist_constraint>();
+}
+
+wheel_constraint& getConstraint(game_scene& scene, wheel_constraint_handle handle)
+{
+	return scene_entity{ handle.entity, scene }.getComponent<wheel_constraint>();
 }
 
 void deleteAllConstraints(game_scene& scene)
@@ -331,6 +364,11 @@ void deleteConstraint(game_scene& scene, hinge_joint_constraint_handle handle)
 }
 
 void deleteConstraint(game_scene& scene, cone_twist_constraint_handle handle)
+{
+	deleteConstraint(&scene.registry, handle.entity);
+}
+
+void deleteConstraint(game_scene& scene, wheel_constraint_handle handle)
 {
 	deleteConstraint(&scene.registry, handle.entity);
 }
@@ -728,7 +766,8 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	uint32 numBallJointConstraints = scene.numberOfComponentsOfType<ball_joint_constraint>();
 	uint32 numHingeJointConstraints = scene.numberOfComponentsOfType<hinge_joint_constraint>();
 	uint32 numConeTwistConstraints = scene.numberOfComponentsOfType<cone_twist_constraint>();
-	uint32 numConstraints = numDistanceConstraints + numBallJointConstraints + numHingeJointConstraints + numConeTwistConstraints;
+	uint32 numWheelConstraints = scene.numberOfComponentsOfType<wheel_constraint>();
+	uint32 numConstraints = numDistanceConstraints + numBallJointConstraints + numHingeJointConstraints + numConeTwistConstraints + numWheelConstraints;
 
 
 
@@ -810,16 +849,19 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	ball_joint_constraint* ballJointConstraints = scene.raw<ball_joint_constraint>();
 	hinge_joint_constraint* hingeJointConstraints = scene.raw<hinge_joint_constraint>();
 	cone_twist_constraint* coneTwistConstraints = scene.raw<cone_twist_constraint>();
+	wheel_constraint* wheelConstraints = scene.raw<wheel_constraint>();
 
 	constraint_body_pair* distanceConstraintBodyPairs = allConstraintBodyPairs + 0;
 	constraint_body_pair* ballJointConstraintBodyPairs = distanceConstraintBodyPairs + numDistanceConstraints;
 	constraint_body_pair* hingeJointConstraintBodyPairs = ballJointConstraintBodyPairs + numBallJointConstraints;
 	constraint_body_pair* coneTwistConstraintBodyPairs = hingeJointConstraintBodyPairs + numHingeJointConstraints;
+	constraint_body_pair* wheelConstraintBodyPairs = coneTwistConstraintBodyPairs + numConeTwistConstraints;
 
 	getConstraintBodyPairs<distance_constraint>(scene, distanceConstraintBodyPairs);
 	getConstraintBodyPairs<ball_joint_constraint>(scene, ballJointConstraintBodyPairs);
 	getConstraintBodyPairs<hinge_joint_constraint>(scene, hingeJointConstraintBodyPairs);
 	getConstraintBodyPairs<cone_twist_constraint>(scene, coneTwistConstraintBodyPairs);
+	getConstraintBodyPairs<wheel_constraint>(scene, wheelConstraintBodyPairs);
 
 	distance_constraint_solver distanceConstraintSolver;
 	simd_distance_constraint_solver distanceConstraintSolverSIMD;
@@ -832,6 +874,8 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 
 	cone_twist_constraint_solver coneTwistConstraintSolver;
 	simd_cone_twist_constraint_solver coneTwistConstraintSolverSIMD;
+
+	wheel_constraint_solver wheelConstraintSolver;
 
 	collision_constraint_solver collisionConstraintSolver;
 	simd_collision_constraint_solver collisionConstraintSolverSIMD;
@@ -857,6 +901,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 			ballJointConstraintSolver = initializeBallJointVelocityConstraints(arena, rbGlobal, ballJointConstraints, ballJointConstraintBodyPairs, numBallJointConstraints, dt);
 			hingeJointConstraintSolver = initializeHingeJointVelocityConstraints(arena, rbGlobal, hingeJointConstraints, hingeJointConstraintBodyPairs, numHingeJointConstraints, dt);
 			coneTwistConstraintSolver = initializeConeTwistVelocityConstraints(arena, rbGlobal, coneTwistConstraints, coneTwistConstraintBodyPairs, numConeTwistConstraints, dt);
+			wheelConstraintSolver = initializeWheelVelocityConstraints(arena, rbGlobal, wheelConstraints, wheelConstraintBodyPairs, numWheelConstraints, dt);
 			collisionConstraintSolver = initializeCollisionVelocityConstraints(arena, rbGlobal, contacts, collisionBodyPairs, numContacts, dt);
 
 			VALIDATE(collisionConstraintSolver.constraints, collisionConstraintSolver.count);
@@ -883,6 +928,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 				solveBallJointVelocityConstraints(ballJointConstraintSolver, rbGlobal);
 				solveHingeJointVelocityConstraints(hingeJointConstraintSolver, rbGlobal);
 				solveConeTwistVelocityConstraints(coneTwistConstraintSolver, rbGlobal);
+				solveWheelVelocityConstraints(wheelConstraintSolver, rbGlobal);
 				solveCollisionVelocityConstraints(collisionConstraintSolver, rbGlobal);
 
 				VALIDATE(collisionConstraintSolver.constraints, collisionConstraintSolver.count);

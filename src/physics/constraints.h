@@ -19,6 +19,7 @@ enum constraint_type
 	constraint_type_ball_joint,
 	constraint_type_hinge_joint,
 	constraint_type_cone_twist,
+	constraint_type_wheel,
 
 	constraint_type_collision, // This is a bit of a special case, because it is generated in each frame.
 
@@ -425,6 +426,56 @@ struct simd_cone_twist_constraint_solver
 };
 
 
+// Wheel constraint.
+
+struct wheel_constraint
+{
+	vec3 localAnchorA;
+	vec3 localAnchorB;
+
+	vec3 localAxisA;
+	vec3 localAxisB;
+
+	float maxMotorTorque = -1.f;
+	float motorVelocity;
+};
+
+struct wheel_constraint_update
+{
+	uint16 rigidBodyIndexA;
+	uint16 rigidBodyIndexB;
+	vec3 relGlobalAnchorA;
+	vec3 relGlobalAnchorB;
+
+	vec3 translationBias;
+	mat3 invEffectiveTranslationMass;
+
+
+	vec2 rotationBias;
+	mat2 invEffectiveRotationMass;
+	vec3 bxa;
+	vec3 cxa;
+
+	// Motor.
+	vec3 globalRotationAxis;
+	float effectiveAxialMass;
+
+	bool solveMotor;
+
+	float motorImpulse;
+	float maxMotorImpulse;
+	float motorVelocity;
+
+	vec3 motorImpulseToAngularVelocityA;
+	vec3 motorImpulseToAngularVelocityB;
+};
+
+struct wheel_constraint_solver
+{
+	wheel_constraint_update* constraints;
+	uint32 count;
+};
+
 
 // Collision constraint.
 
@@ -497,6 +548,9 @@ void solveHingeJointVelocityConstraints(hinge_joint_constraint_solver constraint
 
 cone_twist_constraint_solver initializeConeTwistVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const cone_twist_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
 void solveConeTwistVelocityConstraints(cone_twist_constraint_solver constraints, rigid_body_global_state* rbs);
+
+wheel_constraint_solver initializeWheelVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const wheel_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
+void solveWheelVelocityConstraints(wheel_constraint_solver constraints, rigid_body_global_state* rbs);
 
 collision_constraint_solver initializeCollisionVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, uint32 numContacts, float dt);
 void solveCollisionVelocityConstraints(collision_constraint_solver constraints, rigid_body_global_state* rbs);

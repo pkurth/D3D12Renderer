@@ -2296,6 +2296,179 @@ void solveConeTwistVelocityConstraintsSIMD(simd_cone_twist_constraint_solver con
 
 
 
+wheel_constraint_solver initializeWheelVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const wheel_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt)
+{
+	CPU_PROFILE_BLOCK("Initialize wheel constraints");
+
+	float invDt = 1.f / dt;
+
+	wheel_constraint_update* constraints = arena.allocate<wheel_constraint_update>(count);
+
+	for (uint32 i = 0; i < count; ++i)
+	{
+		const wheel_constraint& in = input[i];
+		wheel_constraint_update& out = constraints[i];
+
+		out.rigidBodyIndexA = bodyPairs[i].rbA;
+		out.rigidBodyIndexB = bodyPairs[i].rbB;
+
+		const rigid_body_global_state& globalA = rbs[out.rigidBodyIndexA];
+		const rigid_body_global_state& globalB = rbs[out.rigidBodyIndexB];
+
+		// Relative to COG.
+		out.relGlobalAnchorA = globalA.rotation * (in.localAnchorA - globalA.localCOGPosition);
+		out.relGlobalAnchorB = globalB.rotation * (in.localAnchorB - globalB.localCOGPosition);
+
+		// Global.
+		vec3 globalAnchorA = globalA.position + out.relGlobalAnchorA;
+		vec3 globalAnchorB = globalB.position + out.relGlobalAnchorB;
+
+		mat3 skewMatA = getSkewMatrix(out.relGlobalAnchorA);
+		mat3 skewMatB = getSkewMatrix(out.relGlobalAnchorB);
+
+		out.invEffectiveTranslationMass = mat3::identity * globalA.invMass + skewMatA * globalA.invInertia * transpose(skewMatA)
+										+ mat3::identity * globalB.invMass + skewMatB * globalB.invInertia * transpose(skewMatB);
+
+		out.translationBias = 0.f;
+		if (dt > DT_THRESHOLD)
+		{
+			out.translationBias = (globalAnchorB - globalAnchorA) * (BALL_JOINT_CONSTRAINT_BETA * invDt);
+		}
+
+
+
+
+		// Rotation part.
+		vec3 globalAxisA = globalA.rotation * in.localAxisA;
+		vec3 globalAxisB = globalB.rotation * in.localAxisB;
+
+		vec3 globalTangentB, globalBitangentB;
+		getTangents(globalAxisB, globalTangentB, globalBitangentB);
+
+		vec3 bxa = cross(globalTangentB, globalAxisA);
+		vec3 cxa = cross(globalBitangentB, globalAxisA);
+		vec3 iAbxa = globalA.invInertia * bxa;
+		vec3 iBbxa = globalB.invInertia * bxa;
+		vec3 iAcxa = globalA.invInertia * cxa;
+		vec3 iBcxa = globalB.invInertia * cxa;
+
+		out.invEffectiveRotationMass.m00 = dot(bxa, iAbxa) + dot(bxa, iBbxa);
+		out.invEffectiveRotationMass.m01 = dot(bxa, iAcxa) + dot(bxa, iBcxa);
+		out.invEffectiveRotationMass.m10 = dot(cxa, iAbxa) + dot(cxa, iBbxa);
+		out.invEffectiveRotationMass.m11 = dot(cxa, iAcxa) + dot(cxa, iBcxa);
+
+		out.bxa = bxa;
+		out.cxa = cxa;
+
+		out.rotationBias = vec2(0.f, 0.f);
+		if (dt > DT_THRESHOLD)
+		{
+			out.rotationBias = vec2(dot(globalAxisA, globalTangentB), dot(globalAxisA, globalBitangentB)) * (HINGE_ROTATION_CONSTRAINT_BETA * invDt);
+		}
+
+
+		out.solveMotor = in.maxMotorTorque > 0.f;
+		if (out.solveMotor)
+		{
+			out.globalRotationAxis = globalAxisA;
+
+			float invEffectiveAxialMass = dot(globalAxisA, globalA.invInertia * globalAxisA)
+										+ dot(globalAxisA, globalB.invInertia * globalAxisA);
+
+			out.effectiveAxialMass = (invEffectiveAxialMass != 0.f) ? (1.f / invEffectiveAxialMass) : 0.f;
+
+			out.maxMotorImpulse = in.maxMotorTorque * dt;
+			out.motorImpulse = 0.f;
+
+			out.motorImpulseToAngularVelocityA = globalA.invInertia * out.globalRotationAxis;
+			out.motorImpulseToAngularVelocityB = globalB.invInertia * out.globalRotationAxis;
+
+			out.motorVelocity = in.motorVelocity;
+		}
+	}
+
+	wheel_constraint_solver result;
+	result.constraints = constraints;
+	result.count = count;
+	return result;
+}
+
+void solveWheelVelocityConstraints(wheel_constraint_solver constraints, rigid_body_global_state* rbs)
+{
+	CPU_PROFILE_BLOCK("Solve wheel constraints");
+
+	for (uint32 i = 0; i < constraints.count; ++i)
+	{
+		wheel_constraint_update& con = constraints.constraints[i];
+
+		rigid_body_global_state& rbA = rbs[con.rigidBodyIndexA];
+		rigid_body_global_state& rbB = rbs[con.rigidBodyIndexB];
+
+		vec3 vA = rbA.linearVelocity;
+		vec3 wA = rbA.angularVelocity;
+		vec3 vB = rbB.linearVelocity;
+		vec3 wB = rbB.angularVelocity;
+
+
+		// Solve in order of importance (most important last): Motor -> Rotation -> Position.
+
+		vec3 globalRotationAxis = con.globalRotationAxis;
+
+		// Motor.
+		if (con.solveMotor)
+		{
+			float aDotWA = dot(globalRotationAxis, wA); // How fast are we turning about the axis.
+			float aDotWB = dot(globalRotationAxis, wB);
+
+			float relAngularVelocity = (aDotWB - aDotWA);
+			float motorCdot = relAngularVelocity - con.motorVelocity;
+
+			float motorLambda = -con.effectiveAxialMass * motorCdot;
+			float oldImpulse = con.motorImpulse;
+			con.motorImpulse = clamp(con.motorImpulse + motorLambda, -con.maxMotorImpulse, con.maxMotorImpulse);
+			motorLambda = con.motorImpulse - oldImpulse;
+
+			wA -= con.motorImpulseToAngularVelocityA * motorLambda;
+			wB += con.motorImpulseToAngularVelocityB * motorLambda;
+		}
+
+		// Rotation part.
+		{
+			vec3 deltaAngularVelocity = wB - wA;
+
+			vec2 rotationCdot(dot(con.bxa, deltaAngularVelocity), dot(con.cxa, deltaAngularVelocity));
+			vec2 rotLambda = solveLinearSystem(con.invEffectiveRotationMass, -(rotationCdot + con.rotationBias));
+
+			vec3 rotationP = con.bxa * rotLambda.x + con.cxa * rotLambda.y;
+
+			wA -= rbA.invInertia * rotationP;
+			wB += rbB.invInertia * rotationP;
+		}
+
+		// Position part.
+		{
+			vec3 anchorVelocityA = vA + cross(wA, con.relGlobalAnchorA);
+			vec3 anchorVelocityB = vB + cross(wB, con.relGlobalAnchorB);
+			vec3 translationCdot = anchorVelocityB - anchorVelocityA + con.translationBias;
+
+			vec3 translationP = solveLinearSystem(con.invEffectiveTranslationMass, -translationCdot);
+
+			vA -= rbA.invMass * translationP;
+			wA -= rbA.invInertia * cross(con.relGlobalAnchorA, translationP);
+			vB += rbB.invMass * translationP;
+			wB += rbB.invInertia * cross(con.relGlobalAnchorB, translationP);
+		}
+
+
+		rbA.linearVelocity = vA;
+		rbA.angularVelocity = wA;
+		rbB.linearVelocity = vB;
+		rbB.angularVelocity = wB;
+	}
+}
+
+
+
 collision_constraint_solver initializeCollisionVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, uint32 numContacts, float dt)
 {
 	CPU_PROFILE_BLOCK("Initialize collision constraints");
