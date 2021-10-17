@@ -99,7 +99,7 @@ submesh_info cpu_mesh::pushQuad(vec2 radius)
 	return result;
 }
 
-submesh_info cpu_mesh::pushCube(vec3 radius, bool flipWindingOrder, vec3 center)
+submesh_info cpu_mesh::pushCube(vec3 radius, bool flipWindingOrder, vec3 center, quat rotation)
 {
 	alignNextTriangle();
 
@@ -116,14 +116,14 @@ submesh_info cpu_mesh::pushCube(vec3 radius, bool flipWindingOrder, vec3 center)
 		vec3* vertexPositionPtr = vertexPositions + numVertices;
 		uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
-		pushVertex(center + vec3(-radius.x, -radius.y, radius.z), {}, {}, {}, {});  // 0
-		pushVertex(center + vec3(radius.x, -radius.y, radius.z), {}, {}, {}, {});   // x
-		pushVertex(center + vec3(-radius.x, radius.y, radius.z), {}, {}, {}, {});   // y
-		pushVertex(center + vec3(radius.x, radius.y, radius.z), {}, {}, {}, {});	// xy
-		pushVertex(center + vec3(-radius.x, -radius.y, -radius.z), {}, {}, {}, {}); // z
-		pushVertex(center + vec3(radius.x, -radius.y, -radius.z), {}, {}, {}, {});  // xz
-		pushVertex(center + vec3(-radius.x, radius.y, -radius.z), {}, {}, {}, {});  // yz
-		pushVertex(center + vec3(radius.x, radius.y, -radius.z), {}, {}, {}, {});   // xyz
+		pushVertex(center + rotation * vec3(-radius.x, -radius.y, radius.z), {}, {}, {}, {});  // 0
+		pushVertex(center + rotation * vec3(radius.x, -radius.y, radius.z), {}, {}, {}, {});   // x
+		pushVertex(center + rotation * vec3(-radius.x, radius.y, radius.z), {}, {}, {}, {});   // y
+		pushVertex(center + rotation * vec3(radius.x, radius.y, radius.z), {}, {}, {}, {});	// xy
+		pushVertex(center + rotation * vec3(-radius.x, -radius.y, -radius.z), {}, {}, {}, {}); // z
+		pushVertex(center + rotation * vec3(radius.x, -radius.y, -radius.z), {}, {}, {}, {});  // xz
+		pushVertex(center + rotation * vec3(-radius.x, radius.y, -radius.z), {}, {}, {}, {});  // yz
+		pushVertex(center + rotation * vec3(radius.x, radius.y, -radius.z), {}, {}, {}, {});   // xyz
 
 		pushTriangle(0, 1, 2);
 		pushTriangle(1, 3, 2);
@@ -145,30 +145,30 @@ submesh_info cpu_mesh::pushCube(vec3 radius, bool flipWindingOrder, vec3 center)
 		vec3* vertexPositionPtr = vertexPositions + numVertices;
 		uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
-		pushVertex(center + vec3(-radius.x, -radius.y, radius.z), vec2(0.f, 0.f), vec3(0.f, 0.f, 1.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(radius.x, -radius.y, radius.z), vec2(1.f, 0.f), vec3(0.f, 0.f, 1.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(-radius.x, radius.y, radius.z), vec2(0.f, 1.f), vec3(0.f, 0.f, 1.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(radius.x, radius.y, radius.z), vec2(1.f, 1.f), vec3(0.f, 0.f, 1.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(radius.x, -radius.y, radius.z), vec2(0.f, 0.f), vec3(1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(radius.x, -radius.y, -radius.z), vec2(1.f, 0.f), vec3(1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(radius.x, radius.y, radius.z), vec2(0.f, 1.f), vec3(1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(radius.x, radius.y, -radius.z), vec2(1.f, 1.f), vec3(1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(radius.x, -radius.y, -radius.z), vec2(0.f, 0.f), vec3(0.f, 0.f, -1.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(-radius.x, -radius.y, -radius.z), vec2(1.f, 0.f), vec3(0.f, 0.f, -1.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(radius.x, radius.y, -radius.z), vec2(0.f, 1.f), vec3(0.f, 0.f, -1.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(-radius.x, radius.y, -radius.z), vec2(1.f, 1.f), vec3(0.f, 0.f, -1.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(-radius.x, -radius.y, -radius.z), vec2(0.f, 0.f), vec3(-1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(-radius.x, -radius.y, radius.z), vec2(1.f, 0.f), vec3(-1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(-radius.x, radius.y, -radius.z), vec2(0.f, 1.f), vec3(-1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(-radius.x, radius.y, radius.z), vec2(1.f, 1.f), vec3(-1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
-		pushVertex(center + vec3(-radius.x, radius.y, radius.z), vec2(0.f, 0.f), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
-		pushVertex(center + vec3(radius.x, radius.y, radius.z), vec2(1.f, 0.f), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
-		pushVertex(center + vec3(-radius.x, radius.y, -radius.z), vec2(0.f, 1.f), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
-		pushVertex(center + vec3(radius.x, radius.y, -radius.z), vec2(1.f, 1.f), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
-		pushVertex(center + vec3(-radius.x, -radius.y, -radius.z), vec2(0.f, 0.f), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
-		pushVertex(center + vec3(radius.x, -radius.y, -radius.z), vec2(1.f, 0.f), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
-		pushVertex(center + vec3(-radius.x, -radius.y, radius.z), vec2(0.f, 1.f), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
-		pushVertex(center + vec3(radius.x, -radius.y, radius.z), vec2(1.f, 1.f), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * vec3(-radius.x, -radius.y, radius.z), vec2(0.f, 0.f), vec3(0.f, 0.f, 1.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(radius.x, -radius.y, radius.z), vec2(1.f, 0.f), vec3(0.f, 0.f, 1.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(-radius.x, radius.y, radius.z), vec2(0.f, 1.f), vec3(0.f, 0.f, 1.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(radius.x, radius.y, radius.z), vec2(1.f, 1.f), vec3(0.f, 0.f, 1.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(radius.x, -radius.y, radius.z), vec2(0.f, 0.f), vec3(1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(radius.x, -radius.y, -radius.z), vec2(1.f, 0.f), vec3(1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(radius.x, radius.y, radius.z), vec2(0.f, 1.f), vec3(1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(radius.x, radius.y, -radius.z), vec2(1.f, 1.f), vec3(1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(radius.x, -radius.y, -radius.z), vec2(0.f, 0.f), vec3(0.f, 0.f, -1.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(-radius.x, -radius.y, -radius.z), vec2(1.f, 0.f), vec3(0.f, 0.f, -1.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(radius.x, radius.y, -radius.z), vec2(0.f, 1.f), vec3(0.f, 0.f, -1.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(-radius.x, radius.y, -radius.z), vec2(1.f, 1.f), vec3(0.f, 0.f, -1.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(-radius.x, -radius.y, -radius.z), vec2(0.f, 0.f), vec3(-1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(-radius.x, -radius.y, radius.z), vec2(1.f, 0.f), vec3(-1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(-radius.x, radius.y, -radius.z), vec2(0.f, 1.f), vec3(-1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(-radius.x, radius.y, radius.z), vec2(1.f, 1.f), vec3(-1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f), {});
+		pushVertex(center + rotation * vec3(-radius.x, radius.y, radius.z), vec2(0.f, 0.f), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * vec3(radius.x, radius.y, radius.z), vec2(1.f, 0.f), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * vec3(-radius.x, radius.y, -radius.z), vec2(0.f, 1.f), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * vec3(radius.x, radius.y, -radius.z), vec2(1.f, 1.f), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * vec3(-radius.x, -radius.y, -radius.z), vec2(0.f, 0.f), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * vec3(radius.x, -radius.y, -radius.z), vec2(1.f, 0.f), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * vec3(-radius.x, -radius.y, radius.z), vec2(0.f, 1.f), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * vec3(radius.x, -radius.y, radius.z), vec2(1.f, 1.f), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
 		pushTriangle(0, 1, 2);
 		pushTriangle(1, 3, 2);

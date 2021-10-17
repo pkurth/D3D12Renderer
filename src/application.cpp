@@ -9,6 +9,7 @@
 #include "dx/dx_profiling.h"
 #include "physics/physics.h"
 #include "physics/ragdoll.h"
+#include "physics/vehicle.h"
 #include "core/threading.h"
 #include "rendering/mesh_shader.h"
 #include "rendering/shadow_map.h"
@@ -299,9 +300,11 @@ void application::initialize(main_renderer* renderer)
 #endif
 
 	//humanoid_ragdoll::create(scene, vec3(60.f, 1.25f, -2.f));
-	humanoid_ragdoll ragdoll = humanoid_ragdoll::create(scene, vec3(20.f, 1.25f, 0.f));
+	//humanoid_ragdoll ragdoll = humanoid_ragdoll::create(scene, vec3(20.f, 1.25f, 0.f));
 
-	locomotionInference.initialize(scene, ragdoll);
+	vehicle::create(scene);
+
+	//locomotionInference.initialize(scene, ragdoll);
 
 
 	editor.setEnvironment("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
@@ -498,7 +501,7 @@ void application::update(const user_input& input, float dt)
 {
 	stackArena.reset();
 
-	locomotionInference.update(scene);
+	//locomotionInference.update(scene);
 
 	resetRenderPasses();
 
