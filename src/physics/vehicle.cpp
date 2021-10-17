@@ -9,8 +9,9 @@
 #endif
 
 static scene_entity createGear(game_scene& scene, cpu_mesh& primitiveMesh, ref<pbr_material> material,
-	vec3 position, quat rotation, float height, float innerRadius, uint32 numTeeth, float toothLength, float toothWidth, float rodLength,
-	float friction, float density)
+	vec3 position, quat rotation, float height, float innerRadius, uint32 numTeeth, float toothLength, float toothWidth, 
+	float firstRodLength, float secondRodLength,
+	float friction, float density, bool placeAnotherAtFirstEnd = false, bool placeAnotherAtSecondEnd = false)
 {
 	scene_entity gear = scene.createEntity("Gear")
 		.addComponent<transform_component>(position, rotation);
@@ -18,6 +19,16 @@ static scene_entity createGear(game_scene& scene, cpu_mesh& primitiveMesh, ref<p
 
 	auto gearMesh = make_ref<composite_mesh>();
 	gearMesh->submeshes.push_back({ primitiveMesh.pushCylinder(21, innerRadius, height), {}, trs::identity, material });
+
+	if (placeAnotherAtFirstEnd)
+	{
+		gearMesh->submeshes.push_back({ primitiveMesh.pushCylinder(21, innerRadius, height, vec3(0.f, firstRodLength, 0.f)), {}, trs::identity, material });
+	}
+	if (placeAnotherAtSecondEnd)
+	{
+		gearMesh->submeshes.push_back({ primitiveMesh.pushCylinder(21, innerRadius, height, vec3(0.f, -secondRodLength, 0.f)), {}, trs::identity, material });
+	}
+
 	for (uint32 i = 0; i < numTeeth; ++i)
 	{
 		float angle = i * M_TAU / numTeeth;
@@ -33,9 +44,31 @@ static scene_entity createGear(game_scene& scene, cpu_mesh& primitiveMesh, ref<p
 		capsule.radius = toothWidth * 0.5f;
 
 		gear.addComponent<collider_component>(collider_component::asCapsule(capsule, 0.2f, friction, density));
+
+		if (placeAnotherAtFirstEnd)
+		{
+			gearMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, toothLength, toothWidth * 0.5f, center + vec3(0.f, firstRodLength, 0.f), localRotation * vec3(1.f, 0.f, 0.f)), {}, trs::identity, material });
+
+			bounding_capsule c = capsule;
+			c.positionA += vec3(0.f, firstRodLength, 0.f);
+			c.positionB += vec3(0.f, firstRodLength, 0.f);
+
+			gear.addComponent<collider_component>(collider_component::asCapsule(c, 0.2f, friction, density));
+		}
+		if (placeAnotherAtSecondEnd)
+		{
+			gearMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, toothLength, toothWidth * 0.5f, center + vec3(0.f, -secondRodLength, 0.f), localRotation * vec3(1.f, 0.f, 0.f)), {}, trs::identity, material });
+
+			bounding_capsule c = capsule;
+			c.positionA += vec3(0.f, -secondRodLength, 0.f);
+			c.positionB += vec3(0.f, -secondRodLength, 0.f);
+
+			gear.addComponent<collider_component>(collider_component::asCapsule(c, 0.2f, friction, density));
+		}
 	}
 
-	gearMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(innerRadius * 0.1f, rodLength * 0.5f, innerRadius * 0.1f)), {}, trs::identity, material });
+	gearMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(innerRadius * 0.1f, firstRodLength * 0.5f, innerRadius * 0.1f), false, vec3(0.f, firstRodLength * 0.5f, 0.f)), {}, trs::identity, material });
+	gearMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(innerRadius * 0.1f, secondRodLength * 0.5f, innerRadius * 0.1f), false, vec3(0.f, -secondRodLength * 0.5f, 0.f)), {}, trs::identity, material });
 
 	gear.addComponent<raster_component>(gearMesh);
 	gear.addComponent<rigid_body_component>(false);
@@ -64,18 +97,39 @@ void vehicle::initialize(game_scene& scene)
 
 	motor.addComponent<raster_component>(motorMesh);
 
+	// Motor gear.
 	gears[0] = createGear(scene, primitiveMesh, material, vec3(0.f, 1.35f, 0.f), quat::identity, 
-		0.1f, 0.2f, 8, 0.05f, 0.1f, 0.25f, friction, density);
+		0.1f, 0.2f, 8, 0.05f, 0.1f, 0.25f, 0.25f, friction, density);
 	auto handle = addWheelConstraintFromGlobalPoints(motor, gears[0], vec3(0.f, 1.35f, 0.f), vec3(0.f, 1.f, 0.f));
 
 	wheel_constraint& wheelCon = getConstraint(scene, handle);
 	wheelCon.maxMotorTorque = 200.f;
 	wheelCon.motorVelocity = 1.f;
 
-	float offset = 0.26f;
-	gears[1] = createGear(scene, primitiveMesh, material, vec3(offset, 1.35f + offset, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)),
-		0.1f, 0.2f, 8, 0.05f, 0.1f, 4.5f, friction, density);
-	addWheelConstraintFromGlobalPoints(motor, gears[1], vec3(offset, 1.35f + offset, 0.f), vec3(1.f, 0.f, 0.f));
+	// Drive axis.
+	float driveAxisLength = 4.5f;
+	float driveAxisOffset = 0.26f;
+	gears[1] = createGear(scene, primitiveMesh, material, vec3(driveAxisOffset, 1.35f + driveAxisOffset, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)),
+		0.1f, 0.2f, 8, 0.05f, 0.1f, driveAxisLength * 0.5f, driveAxisLength * 0.5f, friction, density, true, true);
+	addWheelConstraintFromGlobalPoints(motor, gears[1], vec3(driveAxisOffset, 1.35f + driveAxisOffset, 0.f), vec3(1.f, 0.f, 0.f));
+	// Stabilization. Not really necessary.
+	addWheelConstraintFromGlobalPoints(motor, gears[1], vec3(driveAxisOffset + driveAxisLength * 0.5f, 1.35f + driveAxisOffset, 0.f), vec3(1.f, 0.f, 0.f));
+	addWheelConstraintFromGlobalPoints(motor, gears[1], vec3(driveAxisOffset - driveAxisLength * 0.5f, 1.35f + driveAxisOffset, 0.f), vec3(1.f, 0.f, 0.f));
+
+	// Front axis.
+	float frontAxisOffsetX = -driveAxisLength * 0.5f + driveAxisOffset * 2.f;
+	float frontAxisOffsetZ = driveAxisOffset;
+	float axisLength = 1.5f;
+	gears[2] = createGear(scene, primitiveMesh, material, vec3(frontAxisOffsetX, 1.35f + driveAxisOffset, frontAxisOffsetZ), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)),
+		0.1f, 0.2f, 8, 0.05f, 0.1f, axisLength - frontAxisOffsetZ, axisLength + frontAxisOffsetZ, friction, density, true, true);
+	addWheelConstraintFromGlobalPoints(motor, gears[2], vec3(frontAxisOffsetX, 1.35f + driveAxisOffset, frontAxisOffsetZ), vec3(0.f, 0.f, 1.f));
+
+	// Rear axis.
+	float rearAxisOffsetX = driveAxisLength * 0.5f;
+	float rearAxisOffsetZ = -driveAxisOffset;
+	gears[3] = createGear(scene, primitiveMesh, material, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)),
+		0.1f, 0.2f, 8, 0.05f, 0.1f, axisLength - rearAxisOffsetZ, axisLength + rearAxisOffsetZ, friction, density, true, true);
+	addWheelConstraintFromGlobalPoints(motor, gears[3], vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), vec3(0.f, 0.f, 1.f));
 
 
 	auto mesh = primitiveMesh.createDXMesh();
