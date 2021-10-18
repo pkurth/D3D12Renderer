@@ -434,6 +434,8 @@ struct slider_constraint
 	vec3 localAnchorB;
 
 	vec3 localAxisA;
+
+	quat initialInvRotationDifference;
 };
 
 struct slider_constraint_update
@@ -441,7 +443,6 @@ struct slider_constraint_update
 	uint16 rigidBodyIndexA;
 	uint16 rigidBodyIndexB;
 
-	vec3 rAu;
 	vec3 rBxt;
 	vec3 rBxb;
 	vec3 rAuxt;

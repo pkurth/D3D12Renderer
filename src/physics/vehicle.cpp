@@ -204,8 +204,8 @@ void vehicle::initialize(game_scene& scene)
 	addHingeConstraintFromGlobalPoints(motor, rearAxis, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), vec3(0.f, 0.f, 1.f));
 
 	// Steering axis.
-	steeringAxis = createAxis(scene, primitiveMesh, material, vec3(frontAxisOffsetX, 1.35f + driveAxisOffset + 4.f, frontAxisOffsetZ), quat::identity, gearDesc, &firstFrontAxisAttachment, &secondFrontAxisAttachment);
-	addSliderConstraintFromGlobalPoints(motor, steeringAxis, vec3(frontAxisOffsetX, 1.35f + driveAxisOffset + 4.f, frontAxisOffsetZ), vec3(0.f, 0.f, 1.f));
+	steeringAxis = createAxis(scene, primitiveMesh, material, vec3(frontAxisOffsetX, 1.35f + driveAxisOffset + 2.f, frontAxisOffsetZ), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), gearDesc, &firstFrontAxisAttachment, &secondFrontAxisAttachment);
+	addSliderConstraintFromGlobalPoints(motor, steeringAxis, vec3(frontAxisOffsetX, 1.35f + driveAxisOffset + 2.f, frontAxisOffsetZ), vec3(0.f, 0.f, 1.f));
 
 	auto mesh = primitiveMesh.createDXMesh();
 	for (uint32 i = 0; i < arraysize(parts); ++i)

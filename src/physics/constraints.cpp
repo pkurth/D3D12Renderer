@@ -2329,21 +2329,16 @@ slider_constraint_solver initializeSliderVelocityConstraints(memory_arena& arena
 		getTangents(globalSliderAxis, out.tangent, out.bitangent);
 		vec3 u = globalAnchorB - globalAnchorA;
 
-		out.rAu = relGlobalAnchorA + u;
+		vec3 rAu = relGlobalAnchorA + u;
 		out.rBxt = cross(relGlobalAnchorB, out.tangent);
 		out.rBxb = cross(relGlobalAnchorB, out.bitangent);
-		out.rAuxt = cross(out.rAu, out.tangent);
-		out.rAuxb = cross(out.rAu, out.bitangent);
+		out.rAuxt = cross(rAu, out.tangent);
+		out.rAuxb = cross(rAu, out.bitangent);
 
-		float x = dot(out.rAuxt, globalA.invInertia * out.rAuxt);
-		float y = dot(out.rBxt, globalB.invInertia * out.rBxt);
-		float z = dot(out.rAuxb, globalA.invInertia * out.rAuxb);
-		float w = dot(out.rBxb, globalB.invInertia * out.rBxb);
-
-		out.invEffectiveTranslationMass.m00 = (globalA.invMass + globalB.invMass) + x + y;
-		out.invEffectiveTranslationMass.m01 = x + y;
-		out.invEffectiveTranslationMass.m10 = z + w;
-		out.invEffectiveTranslationMass.m11 = (globalA.invMass + globalB.invMass) + z + w;
+		out.invEffectiveTranslationMass.m00 = (globalA.invMass + globalB.invMass) + dot(out.rAuxt, globalA.invInertia * out.rAuxt) + dot(out.rBxt, globalB.invInertia * out.rBxt);
+		out.invEffectiveTranslationMass.m01 =										dot(out.rAuxt, globalA.invInertia * out.rAuxb) + dot(out.rBxt, globalB.invInertia * out.rBxb);
+		out.invEffectiveTranslationMass.m10 =										dot(out.rAuxb, globalA.invInertia * out.rAuxt) + dot(out.rBxb, globalB.invInertia * out.rBxt);
+		out.invEffectiveTranslationMass.m11 = (globalA.invMass + globalB.invMass) + dot(out.rAuxb, globalA.invInertia * out.rAuxb) + dot(out.rBxb, globalB.invInertia * out.rBxb);
 
 		out.translationBias = vec2(0.f, 0.f);
 		if (dt > DT_THRESHOLD)
@@ -2353,13 +2348,13 @@ slider_constraint_solver initializeSliderVelocityConstraints(memory_arena& arena
 			out.translationBias = vec2(a, b) * (SLIDER_CONSTRAINT_BETA * invDt);
 		}
 
-
 		out.invEffectiveRotationMass = globalA.invInertia + globalB.invInertia;
 		out.rotationBias = vec3(0.f, 0.f, 0.f);
 		if (dt > DT_THRESHOLD)
 		{
 			// TODO.
-			out.rotationBias = vec3(0.f) * (SLIDER_CONSTRAINT_BETA * invDt);
+			quat error = globalB.rotation * in.initialInvRotationDifference * conjugate(globalA.rotation);
+			out.rotationBias = error.v * (SLIDER_CONSTRAINT_BETA * invDt * 2.f);
 		}
 
 	}

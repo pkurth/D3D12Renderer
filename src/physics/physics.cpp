@@ -264,6 +264,7 @@ slider_constraint_handle addSliderConstraintFromGlobalPoints(scene_entity& a, sc
 	constraint.localAnchorB = inverseTransformPosition(transformB, globalAnchor);
 
 	constraint.localAxisA = inverseTransformDirection(transformA, globalAxis);
+	constraint.initialInvRotationDifference = conjugate(transformB.rotation) * transformA.rotation;
 
 	addConstraintEdge(a, ref, constraintEntity, constraint_type_cone_twist);
 	addConstraintEdge(b, ref, constraintEntity, constraint_type_cone_twist);
