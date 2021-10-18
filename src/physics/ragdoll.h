@@ -66,17 +66,17 @@ struct humanoid_ragdoll
 			cone_twist_constraint_handle rightHipConstraint;
 			cone_twist_constraint_handle rightAnkleConstraint;
 
-			hinge_joint_constraint_handle leftElbowConstraint;
-			hinge_joint_constraint_handle rightElbowConstraint;
-			hinge_joint_constraint_handle leftKneeConstraint;
-			hinge_joint_constraint_handle leftToesConstraint;
-			hinge_joint_constraint_handle rightKneeConstraint;
-			hinge_joint_constraint_handle rightToesConstraint;
+			hinge_constraint_handle leftElbowConstraint;
+			hinge_constraint_handle rightElbowConstraint;
+			hinge_constraint_handle leftKneeConstraint;
+			hinge_constraint_handle leftToesConstraint;
+			hinge_constraint_handle rightKneeConstraint;
+			hinge_constraint_handle rightToesConstraint;
 		};
 		struct
 		{
 			cone_twist_constraint_handle coneTwistConstraints[7];
-			hinge_joint_constraint_handle hingeJointConstraints[6];
+			hinge_constraint_handle hingeConstraints[6];
 		};
 	};
 };

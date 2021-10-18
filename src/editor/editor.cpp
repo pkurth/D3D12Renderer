@@ -590,9 +590,9 @@ bool scene_editor::drawSceneHierarchy()
 									});
 								} break;
 
-								case constraint_type_ball_joint:
+								case constraint_type_ball:
 								{
-									drawComponent<ball_joint_constraint>(constraintEntity, "Ball joint constraint", [this, constraintEntity = constraintEntity](ball_joint_constraint& constraint)
+									drawComponent<ball_constraint>(constraintEntity, "Ball constraint", [this, constraintEntity = constraintEntity](ball_constraint& constraint)
 									{
 										if (ImGui::BeginProperties())
 										{
@@ -607,9 +607,9 @@ bool scene_editor::drawSceneHierarchy()
 									});
 								} break;
 
-								case constraint_type_hinge_joint:
+								case constraint_type_hinge:
 								{
-									drawComponent<hinge_joint_constraint>(constraintEntity, "Hinge joint constraint", [this, constraintEntity = constraintEntity](hinge_joint_constraint& constraint)
+									drawComponent<hinge_constraint>(constraintEntity, "Hinge constraint", [this, constraintEntity = constraintEntity](hinge_constraint& constraint)
 									{
 										if (ImGui::BeginProperties())
 										{
@@ -743,33 +743,6 @@ bool scene_editor::drawSceneHierarchy()
 
 												ImGui::PropertySliderAngle("Swing motor axis angle", constraint.swingMotorAxis, -180.f, 180.f);
 												ImGui::PropertySlider("Max swing motor torque", constraint.maxSwingMotorTorque, 0.001f, 1000.f);
-											}
-											ImGui::EndProperties();
-										}
-									});
-								} break;
-
-								case constraint_type_wheel:
-								{
-									drawComponent<wheel_constraint>(constraintEntity, "Wheel constraint", [this, constraintEntity = constraintEntity](wheel_constraint& constraint)
-									{
-										if (ImGui::BeginProperties())
-										{
-											scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
-											if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
-											{
-												setSelectedEntity(otherEntity);
-											}
-
-											bool motorActive = constraint.maxMotorTorque > 0.f;
-											if (ImGui::PropertyCheckbox("Motor active", motorActive))
-											{
-												constraint.maxMotorTorque = -constraint.maxMotorTorque;
-											}
-											if (motorActive)
-											{
-												ImGui::PropertySliderAngle("Motor velocity", constraint.motorVelocity, -360.f, 360.f);
-												ImGui::PropertySlider("Max motor torque", constraint.maxMotorTorque, 0.001f, 1000.f);
 											}
 											ImGui::EndProperties();
 										}

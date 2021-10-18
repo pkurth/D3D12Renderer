@@ -151,45 +151,44 @@ struct force_field_component
 uint32 allocateBoundingHullGeometry(const std::string& meshFilepath);
 
 struct distance_constraint_handle { entt::entity entity; };
-struct ball_joint_constraint_handle { entt::entity entity; };
-struct hinge_joint_constraint_handle { entt::entity entity; };
+struct ball_constraint_handle { entt::entity entity; };
+struct hinge_constraint_handle { entt::entity entity; };
 struct cone_twist_constraint_handle { entt::entity entity; };
-struct wheel_constraint_handle { entt::entity entity; };
+struct slider_constraint_handle { entt::entity entity; };
 
 // Local anchors are always in the space of the entities.
 distance_constraint_handle addDistanceConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB, float distance);
 distance_constraint_handle addDistanceConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchorA, vec3 globalAnchorB); // Calculates distance from current configuration.
 
-ball_joint_constraint_handle addBallJointConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB);
-ball_joint_constraint_handle addBallJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor); // Calculates local anchors from current configuration.
+ball_constraint_handle addBallConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB);
+ball_constraint_handle addBallConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor); // Calculates local anchors from current configuration.
 
 // The min limit is in the range [-pi, 0], the max limit in the range [0, pi]. 
 // If the specified values are not in this range, the limits are disabled.
 // Limits are specified as allowed deviations from the initial relative rotation.
 // Usually the absolute of each limit should be a lot smaller than pi.
-hinge_joint_constraint_handle addHingeJointConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalHingeAxis,
+hinge_constraint_handle addHingeConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalHingeAxis,
 	float minLimit = 1.f, float maxLimit = -1.f);
 
 cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis, 
 	float swingLimit, float twistLimit);
 
-wheel_constraint_handle addWheelConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis);
+slider_constraint_handle addSliderConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis);
 
 
 distance_constraint& getConstraint(game_scene& scene, distance_constraint_handle handle);
-ball_joint_constraint& getConstraint(game_scene& scene, ball_joint_constraint_handle handle);
-hinge_joint_constraint& getConstraint(game_scene& scene, hinge_joint_constraint_handle handle);
+ball_constraint& getConstraint(game_scene& scene, ball_constraint_handle handle);
+hinge_constraint& getConstraint(game_scene& scene, hinge_constraint_handle handle);
 cone_twist_constraint& getConstraint(game_scene& scene, cone_twist_constraint_handle handle);
-wheel_constraint& getConstraint(game_scene& scene, wheel_constraint_handle handle);
-
+slider_constraint& getConstraint(game_scene& scene, slider_constraint_handle handle);
 
 void deleteAllConstraints(game_scene& scene);
 
 void deleteConstraint(game_scene& scene, distance_constraint_handle handle);
-void deleteConstraint(game_scene& scene, ball_joint_constraint_handle handle);
-void deleteConstraint(game_scene& scene, hinge_joint_constraint_handle handle);
+void deleteConstraint(game_scene& scene, ball_constraint_handle handle);
+void deleteConstraint(game_scene& scene, hinge_constraint_handle handle);
 void deleteConstraint(game_scene& scene, cone_twist_constraint_handle handle);
-void deleteConstraint(game_scene& scene, wheel_constraint_handle handle);
+void deleteConstraint(game_scene& scene, slider_constraint_handle handle);
 
 void deleteAllConstraintsFromEntity(scene_entity& entity);
 

@@ -13,9 +13,9 @@ static void readBodyPartState(const trs& transform, scene_entity entity, vec3& p
 	velocity = inverseTransformDirection(transform, rb.linearVelocity);
 }
 
-static void updateConstraint(game_scene& scene, hinge_joint_constraint_handle handle, hinge_action action = {})
+static void updateConstraint(game_scene& scene, hinge_constraint_handle handle, hinge_action action = {})
 {
-	hinge_joint_constraint& c = getConstraint(scene, handle);
+	hinge_constraint& c = getConstraint(scene, handle);
 	c.maxMotorTorque = 200.f;
 	c.motorType = constraint_position_motor;
 	c.motorTargetAngle = action.targetAngle;
@@ -88,9 +88,9 @@ void locomotion_environment::applyAction(game_scene& scene, const learning_actio
 	{
 		updateConstraint(scene, ragdoll.coneTwistConstraints[i], lastSmoothedAction.coneTwistActions[i]);
 	}
-	for (uint32 i = 0; i < NUM_HINGE_JOINT_CONSTRAINTS; ++i)
+	for (uint32 i = 0; i < NUM_HINGE_CONSTRAINTS; ++i)
 	{
-		updateConstraint(scene, ragdoll.hingeJointConstraints[i], lastSmoothedAction.hingeJointActions[i]);
+		updateConstraint(scene, ragdoll.hingeConstraints[i], lastSmoothedAction.hingeActions[i]);
 	}
 }
 

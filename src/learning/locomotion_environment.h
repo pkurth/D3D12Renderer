@@ -6,7 +6,7 @@
 
 
 #define NUM_CONE_TWIST_CONSTRAINTS arraysize(humanoid_ragdoll::coneTwistConstraints)
-#define NUM_HINGE_JOINT_CONSTRAINTS arraysize(humanoid_ragdoll::hingeJointConstraints)
+#define NUM_HINGE_CONSTRAINTS arraysize(humanoid_ragdoll::hingeConstraints)
 #define NUM_BODY_PARTS arraysize(humanoid_ragdoll::bodyParts)
 
 struct hinge_action
@@ -24,7 +24,7 @@ struct cone_twist_action
 struct learning_action
 {
 	cone_twist_action coneTwistActions[NUM_CONE_TWIST_CONSTRAINTS];
-	hinge_action hingeJointActions[NUM_HINGE_JOINT_CONSTRAINTS];
+	hinge_action hingeActions[NUM_HINGE_CONSTRAINTS];
 };
 
 struct learning_target

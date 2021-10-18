@@ -18,7 +18,8 @@ struct vehicle
 			scene_entity driveAxis;
 			scene_entity frontAxis;
 			scene_entity rearAxis;
+			scene_entity steeringAxis;
 		};
-		scene_entity parts[5];
+		scene_entity parts[6];
 	};
 };

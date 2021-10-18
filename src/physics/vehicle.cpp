@@ -169,11 +169,11 @@ void vehicle::initialize(game_scene& scene)
 
 	// Motor gear.
 	motorGear = createAxis(scene, primitiveMesh, material, vec3(0.f, 1.35f, 0.f), quat::identity, gearDesc);
-	auto handle = addWheelConstraintFromGlobalPoints(motor, motorGear, vec3(0.f, 1.35f, 0.f), vec3(0.f, 1.f, 0.f));
+	auto handle = addHingeConstraintFromGlobalPoints(motor, motorGear, vec3(0.f, 1.35f, 0.f), vec3(0.f, 1.f, 0.f));
 
-	wheel_constraint& wheelCon = getConstraint(scene, handle);
-	wheelCon.maxMotorTorque = 200.f;
-	wheelCon.motorVelocity = 1.f;
+	auto& constraint = getConstraint(scene, handle);
+	//constraint.maxMotorTorque = 200.f;
+	constraint.motorVelocity = 1.f;
 
 	// Drive axis.
 	float driveAxisLength = 4.5f;
@@ -181,10 +181,10 @@ void vehicle::initialize(game_scene& scene)
 	axis_attachment driveAxisAttachment(driveAxisLength * 0.5f, gearDesc);
 	driveAxis = createAxis(scene, primitiveMesh, material, vec3(driveAxisOffset, 1.35f + driveAxisOffset, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)),
 		gearDesc, &driveAxisAttachment, &driveAxisAttachment);
-	addWheelConstraintFromGlobalPoints(motor, driveAxis, vec3(driveAxisOffset, 1.35f + driveAxisOffset, 0.f), vec3(1.f, 0.f, 0.f));
+	addHingeConstraintFromGlobalPoints(motor, driveAxis, vec3(driveAxisOffset, 1.35f + driveAxisOffset, 0.f), vec3(1.f, 0.f, 0.f));
 	// Stabilization. Not really necessary.
-	addWheelConstraintFromGlobalPoints(motor, driveAxis, vec3(driveAxisOffset + driveAxisLength * 0.5f, 1.35f + driveAxisOffset, 0.f), vec3(1.f, 0.f, 0.f));
-	addWheelConstraintFromGlobalPoints(motor, driveAxis, vec3(driveAxisOffset - driveAxisLength * 0.5f, 1.35f + driveAxisOffset, 0.f), vec3(1.f, 0.f, 0.f));
+	addHingeConstraintFromGlobalPoints(motor, driveAxis, vec3(driveAxisOffset + driveAxisLength * 0.5f, 1.35f + driveAxisOffset, 0.f), vec3(1.f, 0.f, 0.f));
+	addHingeConstraintFromGlobalPoints(motor, driveAxis, vec3(driveAxisOffset - driveAxisLength * 0.5f, 1.35f + driveAxisOffset, 0.f), vec3(1.f, 0.f, 0.f));
 
 	// Front axis.
 	float frontAxisOffsetX = -driveAxisLength * 0.5f + driveAxisOffset * 2.f;
@@ -193,7 +193,7 @@ void vehicle::initialize(game_scene& scene)
 	axis_attachment firstFrontAxisAttachment(axisLength - frontAxisOffsetZ, wheelDesc);
 	axis_attachment secondFrontAxisAttachment(axisLength + frontAxisOffsetZ, wheelDesc);
 	frontAxis = createAxis(scene, primitiveMesh, material, vec3(frontAxisOffsetX, 1.35f + driveAxisOffset, frontAxisOffsetZ), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), gearDesc, &firstFrontAxisAttachment, &secondFrontAxisAttachment);
-	addWheelConstraintFromGlobalPoints(motor, frontAxis, vec3(frontAxisOffsetX, 1.35f + driveAxisOffset, frontAxisOffsetZ), vec3(0.f, 0.f, 1.f));
+	addHingeConstraintFromGlobalPoints(motor, frontAxis, vec3(frontAxisOffsetX, 1.35f + driveAxisOffset, frontAxisOffsetZ), vec3(0.f, 0.f, 1.f));
 
 	// Rear axis.
 	float rearAxisOffsetX = driveAxisLength * 0.5f;
@@ -201,8 +201,11 @@ void vehicle::initialize(game_scene& scene)
 	axis_attachment firstRearAxisAttachment(axisLength - rearAxisOffsetZ, wheelDesc);
 	axis_attachment secondRearAxisAttachment(axisLength + rearAxisOffsetZ, wheelDesc);
 	rearAxis = createAxis(scene, primitiveMesh, material, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), gearDesc, &firstRearAxisAttachment, &secondRearAxisAttachment);
-	addWheelConstraintFromGlobalPoints(motor, rearAxis, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), vec3(0.f, 0.f, 1.f));
+	addHingeConstraintFromGlobalPoints(motor, rearAxis, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), vec3(0.f, 0.f, 1.f));
 
+	// Steering axis.
+	steeringAxis = createAxis(scene, primitiveMesh, material, vec3(frontAxisOffsetX, 1.35f + driveAxisOffset + 4.f, frontAxisOffsetZ), quat::identity, gearDesc, &firstFrontAxisAttachment, &secondFrontAxisAttachment);
+	addSliderConstraintFromGlobalPoints(motor, steeringAxis, vec3(frontAxisOffsetX, 1.35f + driveAxisOffset + 4.f, frontAxisOffsetZ), vec3(0.f, 0.f, 1.f));
 
 	auto mesh = primitiveMesh.createDXMesh();
 	for (uint32 i = 0; i < arraysize(parts); ++i)

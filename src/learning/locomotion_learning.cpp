@@ -93,9 +93,9 @@ static void getLocalPositions(scene_entity entity, learning_positions& outPositi
 	outPositions.p[5] = c + vec3(0.f, 0.f, r.z);
 }
 
-static void getLimits(game_scene& scene, hinge_joint_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
+static void getLimits(game_scene& scene, hinge_constraint_handle handle, float* minPtr, uint32& minPushIndex, float* maxPtr, uint32& maxPushIndex)
 {
-	hinge_joint_constraint& c = getConstraint(scene, handle);
+	hinge_constraint& c = getConstraint(scene, handle);
 	minPtr[minPushIndex++] = c.minRotationLimit <= 0.f ? c.minRotationLimit : -M_PI;
 	maxPtr[maxPushIndex++] = c.maxRotationLimit >= 0.f ? c.maxRotationLimit : M_PI;
 }
@@ -258,9 +258,9 @@ extern "C" __declspec(dllexport) void getPhysicsRanges(float* stateMin, float* s
 	{
 		getLimits(tmpScene, tmpRagdoll.coneTwistConstraints[i], actionMin, minPushIndex, actionMax, maxPushIndex);
 	}
-	for (uint32 i = 0; i < NUM_HINGE_JOINT_CONSTRAINTS; ++i)
+	for (uint32 i = 0; i < NUM_HINGE_CONSTRAINTS; ++i)
 	{
-		getLimits(tmpScene, tmpRagdoll.hingeJointConstraints[i], actionMin, minPushIndex, actionMax, maxPushIndex);
+		getLimits(tmpScene, tmpRagdoll.hingeConstraints[i], actionMin, minPushIndex, actionMax, maxPushIndex);
 	}
 
 	assert(minPushIndex == getPhysicsActionSize());

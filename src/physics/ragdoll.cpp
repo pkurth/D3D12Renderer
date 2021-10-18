@@ -107,19 +107,19 @@ void humanoid_ragdoll::initialize(game_scene& scene, vec3 initialHipPosition, fl
 
 	neckConstraint = addConeTwistConstraintFromGlobalPoints(torso, head, transformPosition(torsoTransform, scale * vec3(0.f, 1.2f, 0.f)), vec3(0.f, 1.f, 0.f), deg2rad(50.f), deg2rad(90.f));
 	leftShoulderConstraint = addConeTwistConstraintFromGlobalPoints(torso, leftUpperArm, transformPosition(torsoTransform, scale * vec3(-0.4f, 1.f, 0.f)), vec3(-1.f, 0.f, 0.f), deg2rad(130.f), deg2rad(90.f));
-	leftElbowConstraint = addHingeJointConstraintFromGlobalPoints(leftUpperArm, leftLowerArm, transformPosition(leftUpperArmTransform, scale * vec3(0.f, -0.42f, 0.f)), normalize(vec3(1.f, 0.f, 1.f)), deg2rad(-5.f), deg2rad(85.f));
+	leftElbowConstraint = addHingeConstraintFromGlobalPoints(leftUpperArm, leftLowerArm, transformPosition(leftUpperArmTransform, scale * vec3(0.f, -0.42f, 0.f)), normalize(vec3(1.f, 0.f, 1.f)), deg2rad(-5.f), deg2rad(85.f));
 	rightShoulderConstraint = addConeTwistConstraintFromGlobalPoints(torso, rightUpperArm, transformPosition(torsoTransform, scale * vec3(0.4f, 1.f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(130.f), deg2rad(90.f));
-	rightElbowConstraint = addHingeJointConstraintFromGlobalPoints(rightUpperArm, rightLowerArm, transformPosition(rightUpperArmTransform, scale * vec3(0.f, -0.42f, 0.f)), normalize(vec3(1.f, 0.f, -1.f)), deg2rad(-5.f), deg2rad(85.f));
+	rightElbowConstraint = addHingeConstraintFromGlobalPoints(rightUpperArm, rightLowerArm, transformPosition(rightUpperArmTransform, scale * vec3(0.f, -0.42f, 0.f)), normalize(vec3(1.f, 0.f, -1.f)), deg2rad(-5.f), deg2rad(85.f));
 	
 	leftHipConstraint = addConeTwistConstraintFromGlobalPoints(torso, leftUpperLeg, transformPosition(torsoTransform, scale * vec3(-0.3f, -0.25f, 0.f)), transformDirection(leftUpperLegTransform, vec3(0.f, -1.f, 0.f)), -1.f, deg2rad(30.f));
-	leftKneeConstraint = addHingeJointConstraintFromGlobalPoints(leftUpperLeg, leftLowerLeg, transformPosition(leftUpperLegTransform, scale * vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(-90.f), deg2rad(5.f));
+	leftKneeConstraint = addHingeConstraintFromGlobalPoints(leftUpperLeg, leftLowerLeg, transformPosition(leftUpperLegTransform, scale * vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(-90.f), deg2rad(5.f));
 	leftAnkleConstraint = addConeTwistConstraintFromGlobalPoints(leftLowerLeg, leftFoot, transformPosition(leftLowerLegTransform, scale * vec3(0.f, -0.52f, 0.f)), transformDirection(leftLowerLegTransform, vec3(0.f, -1.f, 0.f)), deg2rad(75.f), deg2rad(20.f));
-	leftToesConstraint = addHingeJointConstraintFromGlobalPoints(leftFoot, leftToes, transformPosition(leftFootTransform, scale * vec3(0.f, 0.f, -0.36f)), vec3(1.f, 0.f, 0.f), deg2rad(-45.f), deg2rad(45.f));
+	leftToesConstraint = addHingeConstraintFromGlobalPoints(leftFoot, leftToes, transformPosition(leftFootTransform, scale * vec3(0.f, 0.f, -0.36f)), vec3(1.f, 0.f, 0.f), deg2rad(-45.f), deg2rad(45.f));
 
 	rightHipConstraint = addConeTwistConstraintFromGlobalPoints(torso, rightUpperLeg, transformPosition(torsoTransform, scale * vec3(0.3f, -0.25f, 0.f)), transformDirection(rightUpperLegTransform, vec3(0.f, -1.f, 0.f)), -1.f, deg2rad(30.f));
-	rightKneeConstraint = addHingeJointConstraintFromGlobalPoints(rightUpperLeg, rightLowerLeg, transformPosition(rightUpperLegTransform, scale * vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(-90.f), deg2rad(5.f));
+	rightKneeConstraint = addHingeConstraintFromGlobalPoints(rightUpperLeg, rightLowerLeg, transformPosition(rightUpperLegTransform, scale * vec3(0.f, -0.6f, 0.f)), vec3(1.f, 0.f, 0.f), deg2rad(-90.f), deg2rad(5.f));
 	rightAnkleConstraint = addConeTwistConstraintFromGlobalPoints(rightLowerLeg, rightFoot, transformPosition(rightLowerLegTransform, scale * vec3(0.f, -0.52f, 0.f)), transformDirection(rightLowerLegTransform, vec3(0.f, -1.f, 0.f)), deg2rad(75.f), deg2rad(20.f));
-	rightToesConstraint = addHingeJointConstraintFromGlobalPoints(rightFoot, rightToes, transformPosition(rightFootTransform, scale * vec3(0.f, 0.f, -0.36f)), vec3(1.f, 0.f, 0.f), deg2rad(-45.f), deg2rad(45.f));
+	rightToesConstraint = addHingeConstraintFromGlobalPoints(rightFoot, rightToes, transformPosition(rightFootTransform, scale * vec3(0.f, 0.f, -0.36f)), vec3(1.f, 0.f, 0.f), deg2rad(-45.f), deg2rad(45.f));
 
 
 	quat rotation(vec3(0.f, 1.f, 0.f), initialRotation);
