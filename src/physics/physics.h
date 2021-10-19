@@ -278,7 +278,7 @@ struct physics_settings
 
 	float globalTimeScale = 1.f;
 
-	bool simd = false;
+	bool simd = true;
 };
 
 extern physics_settings physicsSettings;

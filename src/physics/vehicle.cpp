@@ -31,6 +31,7 @@ struct wheel_description
 
 enum attachment_type
 {
+	attachment_type_none,
 	attachment_type_gear,
 	attachment_type_wheel,
 };
@@ -46,6 +47,8 @@ struct axis_attachment
 		wheel_description wheel;
 	};
 
+	axis_attachment(float rodLength)
+		: type(attachment_type_none), rodLength(rodLength) {}
 	axis_attachment(float rodLength, gear_description gear)
 		: type(attachment_type_gear), rodLength(rodLength), gear(gear) {}
 	axis_attachment(float rodLength, wheel_description wheel)
@@ -129,6 +132,45 @@ static scene_entity createAxis(game_scene& scene, cpu_mesh& primitiveMesh, ref<p
 	return axis;
 }
 
+static scene_entity createGearAxis(game_scene& scene, cpu_mesh& primitiveMesh, ref<pbr_material> material,
+	vec3 position, quat rotation, float length, uint32 numTeeth, float toothLength, float toothWidth, 
+	float friction, float density)
+{
+	scene_entity axis = scene.createEntity("Axis")
+		.addComponent<transform_component>(position, rotation);
+
+	auto mesh = make_ref<composite_mesh>();
+
+	mesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(length * 0.5f, toothWidth * 0.5f, toothWidth * 0.5f)), {}, trs::identity, material });
+
+
+	float distance = length - toothWidth;
+	float stride = distance / (numTeeth - 1);
+
+	float leftOffset = -0.5f * length + 0.5f * toothWidth;
+
+	for (uint32 i = 0; i < numTeeth; ++i)
+	{
+		float x = leftOffset + i * stride;
+
+		vec3 center(x, toothWidth * 0.5f, 0.f);
+
+		bounding_capsule capsule;
+		capsule.positionA = center + vec3(0.f, toothLength * 0.5f, 0.f);
+		capsule.positionB = center - vec3(0.f, toothLength * 0.5f, 0.f);
+		capsule.radius = toothWidth * 0.5f;
+
+		axis.addComponent<collider_component>(collider_component::asCapsule(capsule, 0.2f, friction, density));
+
+		mesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, toothLength, toothWidth * 0.5f, center), {}, trs::identity, material });
+	}
+
+	axis.addComponent<raster_component>(mesh);
+	axis.addComponent<rigid_body_component>(false);
+
+	return axis;
+}
+
 void vehicle::initialize(game_scene& scene)
 {
 	float density = 2000.f;
@@ -160,6 +202,15 @@ void vehicle::initialize(game_scene& scene)
 	gearDesc.friction = 0.f;
 	gearDesc.density = density;
 
+	gear_description steeringWheelDesc;
+	steeringWheelDesc.height = 0.1f;
+	steeringWheelDesc.innerRadius = 0.4f;
+	steeringWheelDesc.numTeeth = 0;
+	steeringWheelDesc.toothLength = 0.07f;
+	steeringWheelDesc.toothWidth = 0.1f;
+	steeringWheelDesc.friction = 0.f;
+	steeringWheelDesc.density = density;
+
 	wheel_description wheelDesc;
 	wheelDesc.height = 0.3f;
 	wheelDesc.radius = 0.7f;
@@ -169,11 +220,11 @@ void vehicle::initialize(game_scene& scene)
 
 	// Motor gear.
 	motorGear = createAxis(scene, primitiveMesh, material, vec3(0.f, 1.35f, 0.f), quat::identity, gearDesc);
-	auto handle = addHingeConstraintFromGlobalPoints(motor, motorGear, vec3(0.f, 1.35f, 0.f), vec3(0.f, 1.f, 0.f));
+	auto motorConstraintHandle = addHingeConstraintFromGlobalPoints(motor, motorGear, vec3(0.f, 1.35f, 0.f), vec3(0.f, 1.f, 0.f));
 
-	auto& constraint = getConstraint(scene, handle);
-	//constraint.maxMotorTorque = 200.f;
-	constraint.motorVelocity = 1.f;
+	auto& motorConstraint = getConstraint(scene, motorConstraintHandle);
+	motorConstraint.maxMotorTorque = 500.f;
+	motorConstraint.motorVelocity = 0.f;
 
 	// Drive axis.
 	float driveAxisLength = 4.5f;
@@ -203,9 +254,25 @@ void vehicle::initialize(game_scene& scene)
 	rearAxis = createAxis(scene, primitiveMesh, material, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), gearDesc, &firstRearAxisAttachment, &secondRearAxisAttachment);
 	addHingeConstraintFromGlobalPoints(motor, rearAxis, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), vec3(0.f, 0.f, 1.f));
 
+	// Steering wheel.
+	axis_attachment steeringWheelAttachment(2.f, gearDesc);
+	quat steeringWheelRot(vec3(0.f, 0.f, 1.f), deg2rad(-80.f));
+	steeringWheel = createAxis(scene, primitiveMesh, material, vec3(0.8f, 2.3f, 0.f), 
+		steeringWheelRot, steeringWheelDesc, 0, &steeringWheelAttachment);
+	auto steeringWheelConstraintHandle = addHingeConstraintFromGlobalPoints(motor, steeringWheel, vec3(0.8f, 2.3f, 0.f), steeringWheelRot * vec3(0.f, -1.f, 0.f));
+
+	auto& steeringWheelConstraint = getConstraint(scene, steeringWheelConstraintHandle);
+	steeringWheelConstraint.motorType = constraint_position_motor;
+	steeringWheelConstraint.maxMotorTorque = 300.f;
+	steeringWheelConstraint.motorTargetAngle = 0.f;
+
 	// Steering axis.
-	steeringAxis = createAxis(scene, primitiveMesh, material, vec3(frontAxisOffsetX, 1.35f + driveAxisOffset + 2.f, frontAxisOffsetZ), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), gearDesc, &firstFrontAxisAttachment, &secondFrontAxisAttachment);
-	addSliderConstraintFromGlobalPoints(motor, steeringAxis, vec3(frontAxisOffsetX, 1.35f + driveAxisOffset + 2.f, frontAxisOffsetZ), vec3(0.f, 0.f, 1.f), -2.f, 3.f);
+	vec3 steeringAxisPos(frontAxisOffsetX + 0.49f, 1.35f + driveAxisOffset + 0.06f, 0.f);
+	steeringAxis = createGearAxis(scene, primitiveMesh, material, steeringAxisPos, steeringWheelRot * quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), axisLength * 1.05f, 8, gearDesc.toothLength, gearDesc.toothWidth, gearDesc.friction, gearDesc.density);
+	addSliderConstraintFromGlobalPoints(motor, steeringAxis, steeringAxisPos, vec3(0.f, 0.f, 1.f), -2.f, 3.f);
+
+
+
 
 	auto mesh = primitiveMesh.createDXMesh();
 	for (uint32 i = 0; i < arraysize(parts); ++i)
