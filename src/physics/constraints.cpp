@@ -12,6 +12,7 @@
 #define HINGE_ROTATION_CONSTRAINT_BETA 0.3f
 #define HINGE_LIMIT_CONSTRAINT_BETA 0.1f
 #define TWIST_LIMIT_CONSTRAINT_BETA 0.1f
+#define SLIDER_LIMIT_CONSTRAINT_BETA 0.1f
 
 #define DT_THRESHOLD 1e-5f
 
@@ -2335,28 +2336,83 @@ slider_constraint_solver initializeSliderVelocityConstraints(memory_arena& arena
 		out.rAuxt = cross(rAu, out.tangent);
 		out.rAuxb = cross(rAu, out.bitangent);
 
-		out.invEffectiveTranslationMass.m00 = (globalA.invMass + globalB.invMass) + dot(out.rAuxt, globalA.invInertia * out.rAuxt) + dot(out.rBxt, globalB.invInertia * out.rBxt);
-		out.invEffectiveTranslationMass.m01 =										dot(out.rAuxt, globalA.invInertia * out.rAuxb) + dot(out.rBxt, globalB.invInertia * out.rBxb);
-		out.invEffectiveTranslationMass.m10 =										dot(out.rAuxb, globalA.invInertia * out.rAuxt) + dot(out.rBxb, globalB.invInertia * out.rBxt);
-		out.invEffectiveTranslationMass.m11 = (globalA.invMass + globalB.invMass) + dot(out.rAuxb, globalA.invInertia * out.rAuxb) + dot(out.rBxb, globalB.invInertia * out.rBxb);
+		vec3 iArAuxt = globalA.invInertia * out.rAuxt;
+		vec3 iArAuxb = globalA.invInertia * out.rAuxb;
+		vec3 iBrBxt = globalB.invInertia * out.rBxt;
+		vec3 iBrBxb = globalB.invInertia * out.rBxb;
+		float invMassSum = globalA.invMass + globalB.invMass;
 
+		out.invEffectiveTranslationMass.m00 = dot(out.rAuxt, iArAuxt) + dot(out.rBxt, iBrBxt) + invMassSum;
+		out.invEffectiveTranslationMass.m01 = dot(out.rAuxt, iArAuxb) + dot(out.rBxt, iBrBxb);
+		out.invEffectiveTranslationMass.m10 = dot(out.rAuxb, iArAuxt) + dot(out.rBxb, iBrBxt);
+		out.invEffectiveTranslationMass.m11 = dot(out.rAuxb, iArAuxb) + dot(out.rBxb, iBrBxb) + invMassSum;
+
+		out.invEffectiveRotationMass = globalA.invInertia + globalB.invInertia;
 		out.translationBias = vec2(0.f, 0.f);
+		out.rotationBias = vec3(0.f, 0.f, 0.f);
+
 		if (dt > DT_THRESHOLD)
 		{
 			float a = dot(u, out.tangent);
 			float b = dot(u, out.bitangent);
 			out.translationBias = vec2(a, b) * (SLIDER_CONSTRAINT_BETA * invDt);
+
+			quat rotationError = globalB.rotation * in.initialInvRotationDifference * conjugate(globalA.rotation);
+			out.rotationBias = rotationError.v * (SLIDER_CONSTRAINT_BETA * invDt * 2.f);
 		}
 
-		out.invEffectiveRotationMass = globalA.invInertia + globalB.invInertia;
-		out.rotationBias = vec3(0.f, 0.f, 0.f);
-		if (dt > DT_THRESHOLD)
+		out.globalSliderAxis = globalSliderAxis;
+		float distanceAlongSlider = dot(u, globalSliderAxis);
+
+		out.solveLimit = false;
+		if (in.negDistanceLimit <= 0.f || in.posDistanceLimit >= 0.f)
 		{
-			// TODO.
-			quat error = globalB.rotation * in.initialInvRotationDifference * conjugate(globalA.rotation);
-			out.rotationBias = error.v * (SLIDER_CONSTRAINT_BETA * invDt * 2.f);
+			bool minLimitViolated = (in.negDistanceLimit <= 0.f) && (distanceAlongSlider < in.negDistanceLimit);
+			bool maxLimitViolated = (in.posDistanceLimit >= 0.f) && (distanceAlongSlider > in.posDistanceLimit);
+
+			assert(!(minLimitViolated && maxLimitViolated));
+
+			if (minLimitViolated || maxLimitViolated)
+			{
+				out.solveLimit = true;
+				out.limitImpulse = 0.f;
+
+				out.rAuxs = cross(rAu, globalSliderAxis);
+				out.rBxs = cross(relGlobalAnchorB, globalSliderAxis);
+				float invEffectiveAxialMass = invMassSum + dot(out.rAuxs, globalA.invInertia * out.rAuxs) + dot(out.rBxs, globalB.invInertia * out.rBxs);
+				out.effectiveAxialMass = (invEffectiveAxialMass != 0.f) ? (1.f / invEffectiveAxialMass) : 0.f;
+				out.limitSign = minLimitViolated ? 1.f : -1.f;
+
+				out.limitBias = 0.f;
+				if (dt > DT_THRESHOLD)
+				{
+					float error = minLimitViolated ? (distanceAlongSlider - in.negDistanceLimit) : (in.posDistanceLimit - distanceAlongSlider);
+					out.limitBias = error * (SLIDER_LIMIT_CONSTRAINT_BETA * invDt);
+				}
+
+				out.limitImpulseToAngularVelocityA = globalA.invInertia * out.rAuxs;
+				out.limitImpulseToAngularVelocityB = globalB.invInertia * out.rBxs;
+			}
 		}
 
+		out.solveMotor = false;
+		if (in.maxMotorForce > 0.f)
+		{
+			out.solveMotor = true;
+			out.maxMotorImpulse = in.maxMotorForce * dt;
+			out.motorImpulse = 0.f;
+
+			out.motorVelocity = in.motorVelocity;
+			if (in.motorType == constraint_position_motor)
+			{
+				// Inspired by Bullet Engine. We set the velocity such that the target angle is reached within one frame.
+				// This will later get clamped to the maximum motor impulse.
+				float minLimit = (in.negDistanceLimit <= 0.f) ? in.negDistanceLimit : -INFINITY;
+				float maxLimit = (in.posDistanceLimit >= 0.f) ? in.posDistanceLimit : INFINITY;
+				float targetDistance = clamp(in.motorTargetDistance, minLimit, maxLimit);
+				out.motorVelocity = (dt > DT_THRESHOLD) ? ((targetDistance - distanceAlongSlider) * invDt) : 0.f;
+			}
+		}
 	}
 
 	slider_constraint_solver result;
@@ -2381,6 +2437,43 @@ void solveSliderVelocityConstraints(slider_constraint_solver constraints, rigid_
 		vec3 vB = rbB.linearVelocity;
 		vec3 wB = rbB.angularVelocity;
 
+
+		// Motor.
+		if (con.solveMotor)
+		{
+			float Cdot = dot(vB, con.globalSliderAxis) - dot(vA, con.globalSliderAxis) - con.motorVelocity;
+			float mass = 1.f / (rbA.invMass + rbB.invMass);
+
+			float motorLambda = -mass * Cdot;
+			float oldImpulse = con.motorImpulse;
+			con.motorImpulse = clamp(con.motorImpulse + motorLambda, -con.maxMotorImpulse, con.maxMotorImpulse);
+			motorLambda = con.motorImpulse - oldImpulse;
+
+			vec3 P = motorLambda * con.globalSliderAxis;
+
+			vA -= rbA.invMass * motorLambda;
+			vB += rbB.invMass * motorLambda;
+		}
+
+		// Limit.
+		if (con.solveLimit)
+		{
+			float Cdot = dot(vB, con.globalSliderAxis) + dot(wB, con.rBxs) - dot(vA, con.globalSliderAxis) - dot(wA, con.rAuxs);
+			float limitLambda = -con.effectiveAxialMass * (con.limitSign * Cdot + con.limitBias);
+
+			float impulse = max(con.limitImpulse + limitLambda, 0.f);
+			limitLambda = impulse - con.limitImpulse;
+			con.limitImpulse = impulse;
+
+			limitLambda *= con.limitSign;
+
+			vec3 P = limitLambda * con.globalSliderAxis;
+
+			vA -= rbA.invMass * P;
+			wA -= con.limitImpulseToAngularVelocityA * limitLambda;
+			vB += rbB.invMass * P;
+			wB += con.limitImpulseToAngularVelocityB * limitLambda;
+		}
 		
 		// Rotation part.
 		{

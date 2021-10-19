@@ -248,7 +248,7 @@ cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity
 	return { constraintEntity };
 }
 
-slider_constraint_handle addSliderConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis)
+slider_constraint_handle addSliderConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis, float minLimit, float maxLimit)
 {
 	assert(a.registry == b.registry);
 
@@ -266,8 +266,15 @@ slider_constraint_handle addSliderConstraintFromGlobalPoints(scene_entity& a, sc
 	constraint.localAxisA = inverseTransformDirection(transformA, globalAxis);
 	constraint.initialInvRotationDifference = conjugate(transformB.rotation) * transformA.rotation;
 
-	addConstraintEdge(a, ref, constraintEntity, constraint_type_cone_twist);
-	addConstraintEdge(b, ref, constraintEntity, constraint_type_cone_twist);
+	constraint.negDistanceLimit = minLimit;
+	constraint.posDistanceLimit = maxLimit;
+
+	constraint.motorType = constraint_velocity_motor;
+	constraint.motorVelocity = 0.f;
+	constraint.maxMotorForce = -1.f; // Disabled by default.
+
+	addConstraintEdge(a, ref, constraintEntity, constraint_type_slider);
+	addConstraintEdge(b, ref, constraintEntity, constraint_type_slider);
 
 	return { constraintEntity };
 }

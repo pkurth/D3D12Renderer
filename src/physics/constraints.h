@@ -434,8 +434,21 @@ struct slider_constraint
 	vec3 localAnchorB;
 
 	vec3 localAxisA;
-
 	quat initialInvRotationDifference;
+
+
+	// Limit.
+	float negDistanceLimit; // Body b cannot go farther to the "left" (negative slider axis) than this value. [-inf, 0] if active, positive if no limit.
+	float posDistanceLimit; // Body b cannot go farther to the "right" (positive slider axis) than this value. [0, inf] if active, negative if no limit.
+
+	// Motor.
+	float maxMotorForce;
+	constraint_motor_type motorType;
+	union
+	{
+		float motorVelocity;
+		float motorTargetDistance;
+	};
 };
 
 struct slider_constraint_update
@@ -443,10 +456,10 @@ struct slider_constraint_update
 	uint16 rigidBodyIndexA;
 	uint16 rigidBodyIndexB;
 
-	vec3 rBxt;
-	vec3 rBxb;
 	vec3 rAuxt;
 	vec3 rAuxb;
+	vec3 rBxt;
+	vec3 rBxb;
 
 	vec3 tangent;
 	vec3 bitangent;
@@ -456,6 +469,24 @@ struct slider_constraint_update
 
 	mat3 invEffectiveRotationMass;
 	vec3 rotationBias;
+
+	bool solveLimit;
+	bool solveMotor;
+
+	vec3 globalSliderAxis;
+	float effectiveAxialMass;
+	float limitBias;
+	float limitImpulse;
+	float limitSign;
+	vec3 rAuxs;
+	vec3 rBxs;
+
+	vec3 limitImpulseToAngularVelocityA;
+	vec3 limitImpulseToAngularVelocityB;
+
+	float motorVelocity;
+	float motorImpulse;
+	float maxMotorImpulse;
 };
 
 struct slider_constraint_solver

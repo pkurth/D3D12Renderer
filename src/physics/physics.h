@@ -173,7 +173,7 @@ hinge_constraint_handle addHingeConstraintFromGlobalPoints(scene_entity& a, scen
 cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis, 
 	float swingLimit, float twistLimit);
 
-slider_constraint_handle addSliderConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis);
+slider_constraint_handle addSliderConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis, float minLimit = 1.f, float maxLimit = -1.f);
 
 
 distance_constraint& getConstraint(game_scene& scene, distance_constraint_handle handle);

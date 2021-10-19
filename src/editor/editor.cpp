@@ -748,6 +748,67 @@ bool scene_editor::drawSceneHierarchy()
 										}
 									});
 								} break;
+
+								case constraint_type_slider:
+								{
+									drawComponent<slider_constraint>(constraintEntity, "Slider constraint", [this, constraintEntity = constraintEntity](slider_constraint& constraint)
+									{
+										if (ImGui::BeginProperties())
+										{
+											scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
+											if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
+											{
+												setSelectedEntity(otherEntity);
+											}
+
+											bool minLimitActive = constraint.negDistanceLimit <= 0.f;
+											if (ImGui::PropertyCheckbox("Lower limit active", minLimitActive))
+											{
+												constraint.negDistanceLimit = -constraint.negDistanceLimit;
+											}
+											if (minLimitActive)
+											{
+												float minLimit = -constraint.negDistanceLimit;
+												ImGui::PropertySlider("Lower limit", minLimit, 0.f, 1000.f, "-%.3f");
+												constraint.negDistanceLimit = -minLimit;
+											}
+
+											bool maxLimitActive = constraint.posDistanceLimit >= 0.f;
+											if (ImGui::PropertyCheckbox("Upper limit active", maxLimitActive))
+											{
+												constraint.posDistanceLimit = -constraint.posDistanceLimit;
+											}
+											if (maxLimitActive)
+											{
+												ImGui::PropertySlider("Upper limit", constraint.posDistanceLimit, 0.f, 1000.f);
+											}
+
+											bool motorActive = constraint.maxMotorForce > 0.f;
+											if (ImGui::PropertyCheckbox("Motor active", motorActive))
+											{
+												constraint.maxMotorForce = -constraint.maxMotorForce;
+											}
+											if (motorActive)
+											{
+												ImGui::PropertyDropdown("Motor type", constraintMotorTypeNames, arraysize(constraintMotorTypeNames), (uint32&)constraint.motorType);
+
+												if (constraint.motorType == constraint_velocity_motor)
+												{
+													ImGui::PropertySlider("Motor velocity", constraint.motorVelocity, -10.f, 10.f);
+												}
+												else
+												{
+													float lo = minLimitActive ? constraint.negDistanceLimit : -100.f;
+													float hi = maxLimitActive ? constraint.posDistanceLimit : 100.f;
+													ImGui::PropertySlider("Motor target distance", constraint.motorTargetDistance, lo, hi);
+												}
+
+												ImGui::PropertySlider("Max motor force", constraint.maxMotorForce, 0.001f, 1000.f);
+											}
+											ImGui::EndProperties();
+										}
+									});
+								} break;
 							}
 
 							ImGui::PopID();
