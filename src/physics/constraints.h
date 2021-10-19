@@ -430,11 +430,11 @@ struct simd_cone_twist_constraint_solver
 
 struct slider_constraint
 {
+	quat initialInvRotationDifference;
 	vec3 localAnchorA;
 	vec3 localAnchorB;
 
 	vec3 localAxisA;
-	quat initialInvRotationDifference;
 
 
 	// Limit.
@@ -500,8 +500,39 @@ struct simd_slider_constraint_batch
 	uint16 rbAIndices[CONSTRAINT_SIMD_WIDTH];
 	uint16 rbBIndices[CONSTRAINT_SIMD_WIDTH];
 
-	float relGlobalAnchorA[3][CONSTRAINT_SIMD_WIDTH];
-	float relGlobalAnchorB[3][CONSTRAINT_SIMD_WIDTH];
+	float rAuxt[3][CONSTRAINT_SIMD_WIDTH];
+	float rAuxb[3][CONSTRAINT_SIMD_WIDTH];
+	float rBxt[3][CONSTRAINT_SIMD_WIDTH];
+	float rBxb[3][CONSTRAINT_SIMD_WIDTH];
+
+	float tangent[3][CONSTRAINT_SIMD_WIDTH];
+	float bitangent[3][CONSTRAINT_SIMD_WIDTH];
+
+	float invEffectiveTranslationMass[4][CONSTRAINT_SIMD_WIDTH];
+	float translationBias[2][CONSTRAINT_SIMD_WIDTH];
+
+	float invEffectiveRotationMass[9][CONSTRAINT_SIMD_WIDTH];
+	float rotationBias[3][CONSTRAINT_SIMD_WIDTH];
+
+	float globalSliderAxis[3][CONSTRAINT_SIMD_WIDTH];
+
+	bool solveLimit;
+	bool solveMotor;
+
+	float effectiveAxialMass[CONSTRAINT_SIMD_WIDTH];
+	float limitBias[CONSTRAINT_SIMD_WIDTH];
+	float limitImpulse[CONSTRAINT_SIMD_WIDTH];
+	float limitSign[CONSTRAINT_SIMD_WIDTH];
+	float rAuxs[3][CONSTRAINT_SIMD_WIDTH];
+	float rBxs[3][CONSTRAINT_SIMD_WIDTH];
+
+	float limitImpulseToAngularVelocityA[3][CONSTRAINT_SIMD_WIDTH];
+	float limitImpulseToAngularVelocityB[3][CONSTRAINT_SIMD_WIDTH];
+
+	float motorVelocity[CONSTRAINT_SIMD_WIDTH];
+	float motorImpulse[CONSTRAINT_SIMD_WIDTH];
+	float maxMotorImpulse[CONSTRAINT_SIMD_WIDTH];
+	float effectiveMotorMass[CONSTRAINT_SIMD_WIDTH];
 };
 
 struct simd_slider_constraint_solver

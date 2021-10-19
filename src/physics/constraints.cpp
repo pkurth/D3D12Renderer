@@ -1289,7 +1289,7 @@ simd_hinge_constraint_solver initializeHingeVelocityConstraintsSIMD(memory_arena
 
 void solveHingeVelocityConstraintsSIMD(simd_hinge_constraint_solver constraints, rigid_body_global_state* rbs)
 {
-	CPU_PROFILE_BLOCK("Solve hinge twist constraints SIMD");
+	CPU_PROFILE_BLOCK("Solve hinge constraints SIMD");
 
 	for (uint32 i = 0; i < constraints.numBatches; ++i)
 	{
@@ -2451,8 +2451,8 @@ void solveSliderVelocityConstraints(slider_constraint_solver constraints, rigid_
 
 			vec3 P = motorLambda * con.globalSliderAxis;
 
-			vA -= rbA.invMass * motorLambda;
-			vB += rbB.invMass * motorLambda;
+			vA -= rbA.invMass * P;
+			vB += rbB.invMass * P;
 		}
 
 		// Limit.
@@ -2510,11 +2510,459 @@ void solveSliderVelocityConstraints(slider_constraint_solver constraints, rigid_
 
 simd_slider_constraint_solver initializeSliderVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const slider_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt)
 {
-	return simd_slider_constraint_solver();
+	CPU_PROFILE_BLOCK("Initialize slider constraints SIMD");
+
+	simd_constraint_slot* contactSlots = arena.allocate<simd_constraint_slot>(count);
+	uint32 numBatches = scheduleConstraintsSIMD(arena, bodyPairs, count, UINT16_MAX, contactSlots);
+
+	simd_slider_constraint_batch* batches = arena.allocate<simd_slider_constraint_batch>(numBatches);
+
+	const floatw zero = floatw::zero();
+	const floatw invDt = 1.f / dt;
+	const floatw one = 1.f;
+
+	for (uint32 i = 0; i < numBatches; ++i)
+	{
+		const simd_constraint_slot& slot = contactSlots[i];
+		simd_slider_constraint_batch& batch = batches[i];
+
+		uint16 constraintIndices[CONSTRAINT_SIMD_WIDTH];
+		for (uint32 j = 0; j < CONSTRAINT_SIMD_WIDTH; ++j)
+		{
+			constraintIndices[j] = (uint16)slot.indices[j];
+			batch.rbAIndices[j] = bodyPairs[slot.indices[j]].rbA;
+			batch.rbBIndices[j] = bodyPairs[slot.indices[j]].rbB;
+		}
+
+
+		// Load body A.
+		vec3w localCOGPositionA;
+		quatw rotationA;
+		vec3w positionA;
+		mat3w invInertiaA;
+		floatw invMassA;
+
+		load8(&rbs->rotation.x, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			rotationA.x, rotationA.y, rotationA.z, rotationA.w,
+			localCOGPositionA.x, localCOGPositionA.y, localCOGPositionA.z,
+			positionA.x);
+
+		load8(&rbs->position.y, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			positionA.y, positionA.z,
+			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20,
+			invInertiaA.m01, invInertiaA.m11, invInertiaA.m21);
+
+		load4(&rbs->invInertia.m02, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m02, invInertiaA.m12, invInertiaA.m22,
+			invMassA);
+
+
+		// Load body B.
+		quatw rotationB;
+		vec3w positionB;
+		vec3w localCOGPositionB;
+		mat3w invInertiaB;
+		floatw invMassB;
+
+		load8(&rbs->rotation.x, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			rotationB.x, rotationB.y, rotationB.z, rotationB.w,
+			localCOGPositionB.x, localCOGPositionB.y, localCOGPositionB.z,
+			positionB.x);
+
+		load8(&rbs->position.y, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			positionB.y, positionB.z,
+			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
+			invInertiaB.m01, invInertiaB.m11, invInertiaB.m21);
+
+		load4(&rbs->invInertia.m02, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m02, invInertiaB.m12, invInertiaB.m22,
+			invMassB);
+
+
+		quatw initialInvRotationDifference;
+		vec3w localAnchorA;
+		vec3w localAnchorB;
+		vec3w localAxisA;
+
+		floatw negDistanceLimit;
+		floatw posDistanceLimit;
+		floatw maxMotorForce;
+
+		load8((float*)input, constraintIndices, (uint32)sizeof(*input),
+			initialInvRotationDifference.x, initialInvRotationDifference.y, initialInvRotationDifference.z, initialInvRotationDifference.w,
+			localAnchorA.x, localAnchorA.y, localAnchorA.z,
+			localAnchorB.x);
+
+		load8(&input->localAnchorB.y, constraintIndices, (uint32)sizeof(*input),
+			localAnchorB.y, localAnchorB.z,
+			localAxisA.x, localAxisA.y, localAxisA.z,
+			negDistanceLimit, posDistanceLimit, 
+			maxMotorForce);
+
+
+
+		// Relative to COG.
+		vec3w relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
+		vec3w relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
+
+		// Global.
+		vec3w globalAnchorA = positionA + relGlobalAnchorA;
+		vec3w globalAnchorB = positionB + relGlobalAnchorB;
+
+		vec3w globalSliderAxis = rotationA * localAxisA;
+
+		vec3w tangent, bitangent;
+		getTangents(globalSliderAxis, tangent, bitangent);
+		vec3w u = globalAnchorB - globalAnchorA;
+
+		vec3w rAu = relGlobalAnchorA + u;
+		vec3w rBxt = cross(relGlobalAnchorB, tangent);
+		vec3w rBxb = cross(relGlobalAnchorB, bitangent);
+		vec3w rAuxt = cross(rAu, tangent);
+		vec3w rAuxb = cross(rAu, bitangent);
+
+		vec3w iArAuxt = invInertiaA * rAuxt;
+		vec3w iArAuxb = invInertiaA * rAuxb;
+		vec3w iBrBxt = invInertiaB * rBxt;
+		vec3w iBrBxb = invInertiaB * rBxb;
+		floatw invMassSum = invMassA + invMassB;
+
+		mat2w invEffectiveTranslationMass;
+		invEffectiveTranslationMass.m00 = dot(rAuxt, iArAuxt) + dot(rBxt, iBrBxt) + invMassSum;
+		invEffectiveTranslationMass.m01 = dot(rAuxt, iArAuxb) + dot(rBxt, iBrBxb);
+		invEffectiveTranslationMass.m10 = dot(rAuxb, iArAuxt) + dot(rBxb, iBrBxt);
+		invEffectiveTranslationMass.m11 = dot(rAuxb, iArAuxb) + dot(rBxb, iBrBxb) + invMassSum;
+
+		mat3w invEffectiveRotationMass = invInertiaA + invInertiaB;
+		vec2w translationBias = zero;
+		vec3w rotationBias = zero;
+
+		if (dt > DT_THRESHOLD)
+		{
+			floatw a = dot(u, tangent);
+			floatw b = dot(u, bitangent);
+			translationBias = vec2w(a, b) * (SLIDER_CONSTRAINT_BETA * invDt);
+
+			quatw rotationError = rotationB * initialInvRotationDifference * conjugate(rotationA);
+			rotationBias = rotationError.v * (SLIDER_CONSTRAINT_BETA * 2.f * invDt);
+		}
+
+		rAuxt.x.store(batch.rAuxt[0]);
+		rAuxt.y.store(batch.rAuxt[1]);
+		rAuxt.z.store(batch.rAuxt[2]);
+
+		rAuxb.x.store(batch.rAuxb[0]);
+		rAuxb.y.store(batch.rAuxb[1]);
+		rAuxb.z.store(batch.rAuxb[2]);
+
+		rBxt.x.store(batch.rBxt[0]);
+		rBxt.y.store(batch.rBxt[1]);
+		rBxt.z.store(batch.rBxt[2]);
+
+		rBxb.x.store(batch.rBxb[0]);
+		rBxb.y.store(batch.rBxb[1]);
+		rBxb.z.store(batch.rBxb[2]);
+
+		tangent.x.store(batch.tangent[0]);
+		tangent.y.store(batch.tangent[1]);
+		tangent.z.store(batch.tangent[2]);
+
+		bitangent.x.store(batch.bitangent[0]);
+		bitangent.y.store(batch.bitangent[1]);
+		bitangent.z.store(batch.bitangent[2]);
+
+		invEffectiveTranslationMass.m[0].store(batch.invEffectiveTranslationMass[0]);
+		invEffectiveTranslationMass.m[1].store(batch.invEffectiveTranslationMass[1]);
+		invEffectiveTranslationMass.m[2].store(batch.invEffectiveTranslationMass[2]);
+		invEffectiveTranslationMass.m[3].store(batch.invEffectiveTranslationMass[3]);
+
+		translationBias.x.store(batch.translationBias[0]);
+		translationBias.y.store(batch.translationBias[1]);
+
+		invEffectiveRotationMass.m[0].store(batch.invEffectiveRotationMass[0]);
+		invEffectiveRotationMass.m[1].store(batch.invEffectiveRotationMass[1]);
+		invEffectiveRotationMass.m[2].store(batch.invEffectiveRotationMass[2]);
+		invEffectiveRotationMass.m[3].store(batch.invEffectiveRotationMass[3]);
+		invEffectiveRotationMass.m[4].store(batch.invEffectiveRotationMass[4]);
+		invEffectiveRotationMass.m[5].store(batch.invEffectiveRotationMass[5]);
+		invEffectiveRotationMass.m[6].store(batch.invEffectiveRotationMass[6]);
+		invEffectiveRotationMass.m[7].store(batch.invEffectiveRotationMass[7]);
+		invEffectiveRotationMass.m[8].store(batch.invEffectiveRotationMass[8]);
+
+		rotationBias.x.store(batch.rotationBias[0]);
+		rotationBias.y.store(batch.rotationBias[1]);
+		rotationBias.z.store(batch.rotationBias[2]);
+
+		globalSliderAxis.x.store(batch.globalSliderAxis[0]);
+		globalSliderAxis.y.store(batch.globalSliderAxis[1]);
+		globalSliderAxis.z.store(batch.globalSliderAxis[2]);
+
+
+		floatw distanceAlongSlider = dot(u, globalSliderAxis);
+
+
+		auto minLimitActive = negDistanceLimit <= zero;
+		auto maxLimitActive = posDistanceLimit >= zero;
+
+		if (anyTrue(minLimitActive | maxLimitActive))
+		{
+			auto minLimitViolated = minLimitActive & (distanceAlongSlider < negDistanceLimit);
+			auto maxLimitViolated = maxLimitActive & (distanceAlongSlider > posDistanceLimit);
+
+			auto limitViolated = minLimitViolated | maxLimitViolated;
+			batch.solveLimit = anyTrue(limitViolated);
+
+			if (batch.solveLimit)
+			{
+				vec3w rAuxs = cross(rAu, globalSliderAxis);
+				vec3w rBxs = cross(relGlobalAnchorB, globalSliderAxis);
+				floatw invEffectiveAxialMass = invMassSum + dot(rAuxs, invInertiaA * rAuxs) + dot(rBxs, invInertiaB * rBxs);
+				floatw effectiveAxialMass = ifThen(invEffectiveAxialMass != zero, one / invEffectiveAxialMass, zero);
+				effectiveAxialMass = ifThen(limitViolated, effectiveAxialMass, zero);
+				floatw limitSign = ifThen(minLimitViolated, one, -one);
+
+				floatw limitBias = zero;
+				if (dt > DT_THRESHOLD)
+				{
+					floatw error = ifThen(minLimitViolated, distanceAlongSlider - negDistanceLimit, posDistanceLimit - distanceAlongSlider);
+					limitBias = error * (SLIDER_LIMIT_CONSTRAINT_BETA * invDt);
+				}
+
+				vec3w limitImpulseToAngularVelocityA = invInertiaA * rAuxs;
+				vec3w limitImpulseToAngularVelocityB = invInertiaB * rBxs;
+
+				rAuxs.x.store(batch.rAuxs[0]);
+				rAuxs.y.store(batch.rAuxs[1]);
+				rAuxs.z.store(batch.rAuxs[2]);
+
+				rBxs.x.store(batch.rBxs[0]);
+				rBxs.y.store(batch.rBxs[1]);
+				rBxs.z.store(batch.rBxs[2]);
+
+				zero.store(batch.limitImpulse);
+				effectiveAxialMass.store(batch.effectiveAxialMass);
+				limitSign.store(batch.limitSign);
+				limitBias.store(batch.limitBias);
+
+				limitImpulseToAngularVelocityA.x.store(batch.limitImpulseToAngularVelocityA[0]);
+				limitImpulseToAngularVelocityA.y.store(batch.limitImpulseToAngularVelocityA[1]);
+				limitImpulseToAngularVelocityA.z.store(batch.limitImpulseToAngularVelocityA[2]);
+
+				limitImpulseToAngularVelocityB.x.store(batch.limitImpulseToAngularVelocityB[0]);
+				limitImpulseToAngularVelocityB.y.store(batch.limitImpulseToAngularVelocityB[1]);
+				limitImpulseToAngularVelocityB.z.store(batch.limitImpulseToAngularVelocityB[2]);
+			}
+
+		}
+
+
+
+
+		auto motorActive = maxMotorForce > zero;
+		batch.solveMotor = anyTrue(motorActive);
+		if (batch.solveMotor)
+		{
+			floatw motorTypeF;
+			floatw motorVelocity;
+			floatw dummy0, dummy1;
+
+			load4((float*)&input->motorType, constraintIndices, (uint32)sizeof(*input),
+				motorTypeF, motorVelocity,
+				dummy0, dummy1);
+
+			intw motorType = reinterpret(motorTypeF);
+
+			floatw maxMotorImpulse = maxMotorForce * dt;
+
+			auto isVelocityMotor = motorType == constraint_velocity_motor;
+
+			if (anyFalse(isVelocityMotor))
+			{
+				// Inspired by Bullet Engine. We set the velocity such that the target angle is reached within one frame.
+				// This will later get clamped to the maximum motor impulse.
+
+				floatw motorTargetDistance = motorVelocity; // This is a union.
+
+				floatw minLimit = ifThen(negDistanceLimit <= zero, negDistanceLimit, -INFINITY);
+				floatw maxLimit = ifThen(posDistanceLimit >= zero, posDistanceLimit, INFINITY);
+				floatw targetDistance = clamp(motorTargetDistance, minLimit, maxLimit);
+				floatw motorVelocityOverride = (dt > DT_THRESHOLD) ? ((targetDistance - distanceAlongSlider) * invDt) : 0.f;
+				motorVelocity = ifThen(reinterpret(isVelocityMotor), motorVelocity, motorVelocityOverride);
+			}
+
+			floatw effectiveMotorMass = one / invMassSum;
+			effectiveMotorMass = ifThen(motorActive, effectiveMotorMass, zero);
+
+			zero.store(batch.motorImpulse);
+			maxMotorImpulse.store(batch.maxMotorImpulse);
+			motorVelocity.store(batch.motorVelocity);
+			effectiveMotorMass.store(batch.effectiveMotorMass);
+		}
+
+	}
+
+	simd_slider_constraint_solver result;
+	result.batches = batches;
+	result.numBatches = numBatches;
+	return result;
 }
 
 void solveSliderVelocityConstraintsSIMD(simd_slider_constraint_solver constraints, rigid_body_global_state* rbs)
 {
+	CPU_PROFILE_BLOCK("Solve slider constraints SIMD");
+
+	for (uint32 i = 0; i < constraints.numBatches; ++i)
+	{
+		simd_slider_constraint_batch& batch = constraints.batches[i];
+
+
+		// Load body A.
+		vec3w vA, wA;
+		floatw invMassA;
+		mat3w invInertiaA;
+
+		load8(&rbs->invInertia.m00, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20,
+			invInertiaA.m01, invInertiaA.m11, invInertiaA.m21,
+			invInertiaA.m02, invInertiaA.m12);
+
+		load8(&rbs->invInertia.m22, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m22, invMassA, vA.x, vA.y, vA.z, wA.x, wA.y, wA.z);
+
+
+		// Load body B.
+		vec3w vB, wB;
+		floatw invMassB;
+		mat3w invInertiaB;
+
+		load8(&rbs->invInertia.m00, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
+			invInertiaB.m01, invInertiaB.m11, invInertiaB.m21,
+			invInertiaB.m02, invInertiaB.m12);
+
+		load8(&rbs->invInertia.m22, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m22, invMassB, vB.x, vB.y, vB.z, wB.x, wB.y, wB.z);
+
+
+		vec3w globalSliderAxis(batch.globalSliderAxis[0], batch.globalSliderAxis[1], batch.globalSliderAxis[2]);
+
+		// Motor.
+		if (batch.solveMotor)
+		{
+			floatw motorVelocity(batch.motorVelocity);
+			floatw motorImpulse(batch.motorImpulse);
+			floatw maxMotorImpulse(batch.maxMotorImpulse);
+			floatw effectiveMotorMass(batch.effectiveMotorMass);
+
+			floatw Cdot = dot(vB, globalSliderAxis) - dot(vA, globalSliderAxis) - motorVelocity;
+
+			floatw motorLambda = -effectiveMotorMass * Cdot;
+			floatw oldImpulse = motorImpulse;
+			motorImpulse = clamp(motorImpulse + motorLambda, -maxMotorImpulse, maxMotorImpulse);
+			motorLambda = motorImpulse - oldImpulse;
+
+			vec3w P = motorLambda * globalSliderAxis;
+
+			vA -= invMassA * P;
+			vB += invMassB * P;
+
+			motorImpulse.store(batch.motorImpulse);
+		}
+
+		// Limit.
+		if (batch.solveLimit)
+		{
+			floatw limitSign(batch.limitSign);
+			floatw limitBias(batch.limitBias);
+			floatw effectiveAxialMass(batch.effectiveAxialMass);
+			floatw limitImpulse(batch.limitImpulse);
+
+			vec3w rAuxs(batch.rAuxs[0], batch.rAuxs[1], batch.rAuxs[2]);
+			vec3w rBxs(batch.rBxs[0], batch.rBxs[1], batch.rBxs[2]);
+
+			vec3w limitImpulseToAngularVelocityA(batch.limitImpulseToAngularVelocityA[0], batch.limitImpulseToAngularVelocityA[1], batch.limitImpulseToAngularVelocityA[2]);
+			vec3w limitImpulseToAngularVelocityB(batch.limitImpulseToAngularVelocityB[0], batch.limitImpulseToAngularVelocityB[1], batch.limitImpulseToAngularVelocityB[2]);
+
+			floatw Cdot = dot(vB, globalSliderAxis) + dot(wB, rBxs) - dot(vA, globalSliderAxis) - dot(wA, rAuxs);
+			floatw limitLambda = -effectiveAxialMass * (limitSign * Cdot + limitBias);
+
+			floatw impulse = maximum(limitImpulse + limitLambda, 0.f);
+			limitLambda = impulse - limitImpulse;
+			limitImpulse = impulse;
+
+			limitLambda *= limitSign;
+
+			vec3w P = limitLambda * globalSliderAxis;
+
+			vA -= invMassA * P;
+			wA -= limitImpulseToAngularVelocityA * limitLambda;
+			vB += invMassB * P;
+			wB += limitImpulseToAngularVelocityB * limitLambda;
+
+			limitImpulse.store(batch.limitImpulse);
+		}
+
+
+		// Rotation part.
+		{
+			mat3w invEffectiveRotationMass;
+			invEffectiveRotationMass.m[0] = floatw(batch.invEffectiveRotationMass[0]);
+			invEffectiveRotationMass.m[1] = floatw(batch.invEffectiveRotationMass[1]);
+			invEffectiveRotationMass.m[2] = floatw(batch.invEffectiveRotationMass[2]);
+			invEffectiveRotationMass.m[3] = floatw(batch.invEffectiveRotationMass[3]);
+			invEffectiveRotationMass.m[4] = floatw(batch.invEffectiveRotationMass[4]);
+			invEffectiveRotationMass.m[5] = floatw(batch.invEffectiveRotationMass[5]);
+			invEffectiveRotationMass.m[6] = floatw(batch.invEffectiveRotationMass[6]);
+			invEffectiveRotationMass.m[7] = floatw(batch.invEffectiveRotationMass[7]);
+			invEffectiveRotationMass.m[8] = floatw(batch.invEffectiveRotationMass[8]);
+
+			vec3w rotationBias(batch.rotationBias[0], batch.rotationBias[1], batch.rotationBias[2]);
+
+			vec3w Cdot = wB - wA;
+
+			vec3w rotationLambda = solveLinearSystem(invEffectiveRotationMass, -(Cdot + rotationBias));
+			wA -= invInertiaA * rotationLambda;
+			wB += invInertiaB * rotationLambda;
+		}
+
+		// Position part.
+		{
+			vec3w tangent(batch.tangent[0], batch.tangent[1], batch.tangent[2]);
+			vec3w bitangent(batch.bitangent[0], batch.bitangent[1], batch.bitangent[2]);
+			vec3w rAuxt(batch.rAuxt[0], batch.rAuxt[1], batch.rAuxt[2]);
+			vec3w rAuxb(batch.rAuxb[0], batch.rAuxb[1], batch.rAuxb[2]);
+			vec3w rBxt(batch.rBxt[0], batch.rBxt[1], batch.rBxt[2]);
+			vec3w rBxb(batch.rBxb[0], batch.rBxb[1], batch.rBxb[2]);
+
+			mat2w invEffectiveTranslationMass;
+			invEffectiveTranslationMass.m[0] = floatw(batch.invEffectiveTranslationMass[0]);
+			invEffectiveTranslationMass.m[1] = floatw(batch.invEffectiveTranslationMass[1]);
+			invEffectiveTranslationMass.m[2] = floatw(batch.invEffectiveTranslationMass[2]);
+			invEffectiveTranslationMass.m[3] = floatw(batch.invEffectiveTranslationMass[3]);
+
+			vec2w translationBias(batch.translationBias[0], batch.translationBias[1]);
+
+			vec2w Cdot;
+			Cdot.x = dot(tangent, vB) + dot(rBxt, wB) - dot(tangent, vA) - dot(rAuxt, wA);
+			Cdot.y = dot(bitangent, vB) + dot(rBxb, wB) - dot(bitangent, vA) - dot(rAuxb, wA);
+
+			vec2w translationLambda = solveLinearSystem(invEffectiveTranslationMass, -(Cdot + translationBias));
+
+			vec3w tb = tangent * translationLambda.x + bitangent * translationLambda.y;
+
+			vA -= invMassA * tb;
+			wA -= invInertiaA * (rAuxt * translationLambda.x + rAuxb * translationLambda.y);
+			vB += invMassB * tb;
+			wB += invInertiaB * (rBxt * translationLambda.x + rBxb * translationLambda.y);
+		}
+
+
+		store8(&rbs->invInertia.m22, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m22, invMassA, vA.x, vA.y, vA.z, wA.x, wA.y, wA.z);
+
+		store8(&rbs->invInertia.m22, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m22, invMassB, vB.x, vB.y, vB.z, wB.x, wB.y, wB.z);
+	}
 }
 
 
