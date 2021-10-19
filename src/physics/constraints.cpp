@@ -499,9 +499,10 @@ ball_constraint_solver initializeBallVelocityConstraints(memory_arena& arena, co
 
 		mat3 skewMatA = getSkewMatrix(out.relGlobalAnchorA);
 		mat3 skewMatB = getSkewMatrix(out.relGlobalAnchorB);
-
-		out.invEffectiveMass = mat3::identity * globalA.invMass + skewMatA * globalA.invInertia * transpose(skewMatA)
-							 + mat3::identity * globalB.invMass + skewMatB * globalB.invInertia * transpose(skewMatB);
+		
+		out.invEffectiveMass = skewMatA * globalA.invInertia * transpose(skewMatA)
+							 + skewMatB * globalB.invInertia * transpose(skewMatB)
+							 + mat3::identity * (globalA.invMass + globalB.invMass);
 
 		out.bias = 0.f;
 		if (dt > DT_THRESHOLD)
@@ -630,9 +631,13 @@ simd_ball_constraint_solver initializeBallVelocityConstraintsSIMD(memory_arena& 
 
 		mat3w skewMatA = getSkewMatrix(relGlobalAnchorA);
 		mat3w skewMatB = getSkewMatrix(relGlobalAnchorB);
-
-		mat3w invEffectiveMass = identity * invMassA + skewMatA * invInertiaA * transpose(skewMatA)
-							   + identity * invMassB + skewMatB * invInertiaB * transpose(skewMatB);
+		
+		mat3w invEffectiveMass = skewMatA * invInertiaA * transpose(skewMatA)
+							   + skewMatB * invInertiaB * transpose(skewMatB);
+		floatw invMassSum = invMassA + invMassB;
+		invEffectiveMass.m00 += invMassSum;
+		invEffectiveMass.m11 += invMassSum;
+		invEffectiveMass.m22 += invMassSum;
 
 		vec3w bias = zero;
 		if (dt > DT_THRESHOLD)
@@ -779,8 +784,9 @@ hinge_constraint_solver initializeHingeVelocityConstraints(memory_arena& arena, 
 		mat3 skewMatA = getSkewMatrix(out.relGlobalAnchorA);
 		mat3 skewMatB = getSkewMatrix(out.relGlobalAnchorB);
 
-		out.invEffectiveTranslationMass = mat3::identity * globalA.invMass + skewMatA * globalA.invInertia * transpose(skewMatA)
-										+ mat3::identity * globalB.invMass + skewMatB * globalB.invInertia * transpose(skewMatB);
+		out.invEffectiveTranslationMass = skewMatA * globalA.invInertia * transpose(skewMatA)
+										+ skewMatB * globalB.invInertia * transpose(skewMatB)
+										+ mat3::identity * (globalA.invMass + globalB.invMass);
 
 		out.translationBias = 0.f;
 		if (dt > DT_THRESHOLD)
@@ -1475,8 +1481,9 @@ cone_twist_constraint_solver initializeConeTwistVelocityConstraints(memory_arena
 		mat3 skewMatA = getSkewMatrix(out.relGlobalAnchorA);
 		mat3 skewMatB = getSkewMatrix(out.relGlobalAnchorB);
 
-		out.invEffectiveMass = mat3::identity * globalA.invMass + skewMatA * globalA.invInertia * transpose(skewMatA)
-							 + mat3::identity * globalB.invMass + skewMatB * globalB.invInertia * transpose(skewMatB);
+		out.invEffectiveMass = skewMatA * globalA.invInertia * transpose(skewMatA)
+							 + skewMatB * globalB.invInertia * transpose(skewMatB)
+							 + mat3::identity * (globalA.invMass + globalB.invMass);
 
 		out.bias = 0.f;
 		if (dt > DT_THRESHOLD)
