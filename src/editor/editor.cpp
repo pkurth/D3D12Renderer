@@ -607,6 +607,23 @@ bool scene_editor::drawSceneHierarchy()
 									});
 								} break;
 
+								case constraint_type_fixed:
+								{
+									drawComponent<fixed_constraint>(constraintEntity, "Fixed constraint", [this, constraintEntity = constraintEntity](fixed_constraint& constraint)
+									{
+										if (ImGui::BeginProperties())
+										{
+											scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
+											if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
+											{
+												setSelectedEntity(otherEntity);
+											}
+
+											ImGui::EndProperties();
+										}
+									});
+								} break;
+
 								case constraint_type_hinge:
 								{
 									drawComponent<hinge_constraint>(constraintEntity, "Hinge constraint", [this, constraintEntity = constraintEntity](hinge_constraint& constraint)

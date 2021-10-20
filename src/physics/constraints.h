@@ -17,6 +17,7 @@ enum constraint_type
 
 	constraint_type_distance,
 	constraint_type_ball,
+	constraint_type_fixed,
 	constraint_type_hinge,
 	constraint_type_cone_twist,
 	constraint_type_slider,
@@ -97,6 +98,9 @@ struct distance_constraint_solver
 
 struct simd_distance_constraint_batch
 {
+	uint16 rbAIndices[CONSTRAINT_SIMD_WIDTH];
+	uint16 rbBIndices[CONSTRAINT_SIMD_WIDTH];
+
 	float relGlobalAnchorA[3][CONSTRAINT_SIMD_WIDTH];
 	float relGlobalAnchorB[3][CONSTRAINT_SIMD_WIDTH];
 
@@ -106,9 +110,6 @@ struct simd_distance_constraint_batch
 	float u[3][CONSTRAINT_SIMD_WIDTH];
 	float bias[CONSTRAINT_SIMD_WIDTH];
 	float effectiveMass[CONSTRAINT_SIMD_WIDTH];
-
-	uint16 rbAIndices[CONSTRAINT_SIMD_WIDTH];
-	uint16 rbBIndices[CONSTRAINT_SIMD_WIDTH];
 };
 
 struct simd_distance_constraint_solver
@@ -145,19 +146,71 @@ struct ball_constraint_solver
 
 struct simd_ball_constraint_batch
 {
+	uint16 rbAIndices[CONSTRAINT_SIMD_WIDTH];
+	uint16 rbBIndices[CONSTRAINT_SIMD_WIDTH];
+
 	float relGlobalAnchorA[3][CONSTRAINT_SIMD_WIDTH];
 	float relGlobalAnchorB[3][CONSTRAINT_SIMD_WIDTH];
 
 	float bias[3][CONSTRAINT_SIMD_WIDTH];
 	float invEffectiveMass[9][CONSTRAINT_SIMD_WIDTH];
-	
-	uint16 rbAIndices[CONSTRAINT_SIMD_WIDTH];
-	uint16 rbBIndices[CONSTRAINT_SIMD_WIDTH];
 };
 
 struct simd_ball_constraint_solver
 {
 	simd_ball_constraint_batch* batches;
+	uint32 numBatches;
+};
+
+
+// Fixed constraint.
+
+struct fixed_constraint
+{
+	quat initialInvRotationDifference;
+
+	vec3 localAnchorA;
+	vec3 localAnchorB;
+};
+
+struct fixed_constraint_update
+{
+	uint16 rigidBodyIndexA;
+	uint16 rigidBodyIndexB;
+	vec3 relGlobalAnchorA;
+	vec3 relGlobalAnchorB;
+
+	vec3 translationBias;
+	mat3 invEffectiveTranslationMass;
+
+	vec3 rotationBias;
+	mat3 invEffectiveRotationMass;
+};
+
+struct fixed_constraint_solver
+{
+	fixed_constraint_update* constraints;
+	uint32 count;
+};
+
+struct simd_fixed_constraint_batch
+{
+	uint16 rbAIndices[CONSTRAINT_SIMD_WIDTH];
+	uint16 rbBIndices[CONSTRAINT_SIMD_WIDTH];
+
+	float relGlobalAnchorA[3][CONSTRAINT_SIMD_WIDTH];
+	float relGlobalAnchorB[3][CONSTRAINT_SIMD_WIDTH];
+
+	float translationBias[3][CONSTRAINT_SIMD_WIDTH];
+	float invEffectiveTranslationMass[9][CONSTRAINT_SIMD_WIDTH];
+
+	float rotationBias[3][CONSTRAINT_SIMD_WIDTH];
+	float invEffectiveRotationMass[9][CONSTRAINT_SIMD_WIDTH];
+};
+
+struct simd_fixed_constraint_solver
+{
+	simd_fixed_constraint_batch* batches;
 	uint32 numBatches;
 };
 
@@ -608,6 +661,9 @@ void solveDistanceVelocityConstraints(distance_constraint_solver constraints, ri
 ball_constraint_solver initializeBallVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const ball_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
 void solveBallVelocityConstraints(ball_constraint_solver constraints, rigid_body_global_state* rbs);
 
+fixed_constraint_solver initializeFixedVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const fixed_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
+void solveFixedVelocityConstraints(fixed_constraint_solver constraints, rigid_body_global_state* rbs);
+
 hinge_constraint_solver initializeHingeVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const hinge_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
 void solveHingeVelocityConstraints(hinge_constraint_solver constraints, rigid_body_global_state* rbs);
 
@@ -630,6 +686,9 @@ void solveDistanceVelocityConstraintsSIMD(simd_distance_constraint_solver constr
 
 simd_ball_constraint_solver initializeBallVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const ball_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
 void solveBallVelocityConstraintsSIMD(simd_ball_constraint_solver constraints, rigid_body_global_state* rbs);
+
+simd_fixed_constraint_solver initializeFixedVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const fixed_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
+void solveFixedVelocityConstraintsSIMD(simd_fixed_constraint_solver constraints, rigid_body_global_state* rbs);
 
 simd_hinge_constraint_solver initializeHingeVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const hinge_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt);
 void solveHingeVelocityConstraintsSIMD(simd_hinge_constraint_solver constraints, rigid_body_global_state* rbs);

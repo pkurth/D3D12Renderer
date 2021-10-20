@@ -570,13 +570,6 @@ simd_ball_constraint_solver initializeBallVelocityConstraintsSIMD(memory_arena& 
 			batch.rbBIndices[j] = bodyPairs[slot.indices[j]].rbB;
 		}
 
-
-		vec3w localAnchorA, localAnchorB;
-		floatw dummy0, dummy1;
-		load8((float*)input, constraintIndices, (uint32)sizeof(*input),
-			localAnchorA.x, localAnchorA.y, localAnchorA.z, localAnchorB.x, localAnchorB.y, localAnchorB.z, dummy0, dummy1);
-
-
 		// Load body A.
 		vec3w localCOGPositionA;
 		quatw rotationA;
@@ -619,6 +612,13 @@ simd_ball_constraint_solver initializeBallVelocityConstraintsSIMD(memory_arena& 
 		load4(&rbs->invInertia.m02, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			invInertiaB.m02, invInertiaB.m12, invInertiaB.m22,
 			invMassB);
+
+
+
+		vec3w localAnchorA, localAnchorB;
+		floatw dummy0, dummy1;
+		load8((float*)input, constraintIndices, (uint32)sizeof(*input),
+			localAnchorA.x, localAnchorA.y, localAnchorA.z, localAnchorB.x, localAnchorB.y, localAnchorB.z, dummy0, dummy1);
 
 
 		// Relative to COG.
@@ -746,6 +746,346 @@ void solveBallVelocityConstraintsSIMD(simd_ball_constraint_solver constraints, r
 }
 
 
+fixed_constraint_solver initializeFixedVelocityConstraints(memory_arena& arena, const rigid_body_global_state* rbs, const fixed_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt)
+{
+	CPU_PROFILE_BLOCK("Initialize fixed constraints");
+
+	float invDt = 1.f / dt;
+
+	fixed_constraint_update* constraints = arena.allocate<fixed_constraint_update>(count);
+
+	for (uint32 i = 0; i < count; ++i)
+	{
+		const fixed_constraint& in = input[i];
+		fixed_constraint_update& out = constraints[i];
+
+		out.rigidBodyIndexA = bodyPairs[i].rbA;
+		out.rigidBodyIndexB = bodyPairs[i].rbB;
+
+		const rigid_body_global_state& globalA = rbs[out.rigidBodyIndexA];
+		const rigid_body_global_state& globalB = rbs[out.rigidBodyIndexB];
+
+		// Relative to COG.
+		out.relGlobalAnchorA = globalA.rotation * (in.localAnchorA - globalA.localCOGPosition);
+		out.relGlobalAnchorB = globalB.rotation * (in.localAnchorB - globalB.localCOGPosition);
+
+		// Global.
+		vec3 globalAnchorA = globalA.position + out.relGlobalAnchorA;
+		vec3 globalAnchorB = globalB.position + out.relGlobalAnchorB;
+
+		mat3 skewMatA = getSkewMatrix(out.relGlobalAnchorA);
+		mat3 skewMatB = getSkewMatrix(out.relGlobalAnchorB);
+
+		out.invEffectiveTranslationMass = skewMatA * globalA.invInertia * transpose(skewMatA)
+			+ skewMatB * globalB.invInertia * transpose(skewMatB)
+			+ mat3::identity * (globalA.invMass + globalB.invMass);
+
+		out.invEffectiveRotationMass = globalA.invInertia + globalB.invInertia;
+
+		out.translationBias = vec3(0.f, 0.f, 0.f);
+		out.rotationBias = vec3(0.f, 0.f, 0.f);
+
+		if (dt > DT_THRESHOLD)
+		{
+			out.translationBias = (globalAnchorB - globalAnchorA) * (BALL_CONSTRAINT_BETA * invDt);
+
+			quat rotationError = globalB.rotation * in.initialInvRotationDifference * conjugate(globalA.rotation);
+			out.rotationBias = rotationError.v * (SLIDER_CONSTRAINT_BETA * invDt * 2.f);
+		}
+	}
+
+	fixed_constraint_solver result;
+	result.constraints = constraints;
+	result.count = count;
+	return result;
+}
+
+void solveFixedVelocityConstraints(fixed_constraint_solver constraints, rigid_body_global_state* rbs)
+{
+	CPU_PROFILE_BLOCK("Solve fixed constraints");
+
+	for (uint32 i = 0; i < constraints.count; ++i)
+	{
+		fixed_constraint_update& con = constraints.constraints[i];
+
+		rigid_body_global_state& rbA = rbs[con.rigidBodyIndexA];
+		rigid_body_global_state& rbB = rbs[con.rigidBodyIndexB];
+
+		// Rotation part.
+		{
+			vec3 Cdot = rbB.angularVelocity - rbA.angularVelocity;
+
+			vec3 rotationLambda = solveLinearSystem(con.invEffectiveRotationMass, -(Cdot + con.rotationBias));
+			rbA.angularVelocity -= rbA.invInertia * rotationLambda;
+			rbB.angularVelocity += rbB.invInertia * rotationLambda;
+		}
+
+		// Position part.
+		{
+			vec3 anchorVelocityA = rbA.linearVelocity + cross(rbA.angularVelocity, con.relGlobalAnchorA);
+			vec3 anchorVelocityB = rbB.linearVelocity + cross(rbB.angularVelocity, con.relGlobalAnchorB);
+			vec3 Cdot = anchorVelocityB - anchorVelocityA + con.translationBias;
+
+			vec3 P = solveLinearSystem(con.invEffectiveTranslationMass, -Cdot);
+			rbA.linearVelocity -= rbA.invMass * P;
+			rbA.angularVelocity -= rbA.invInertia * cross(con.relGlobalAnchorA, P);
+			rbB.linearVelocity += rbB.invMass * P;
+			rbB.angularVelocity += rbB.invInertia * cross(con.relGlobalAnchorB, P);
+		}
+	}
+}
+
+simd_fixed_constraint_solver initializeFixedVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const fixed_constraint* input, const constraint_body_pair* bodyPairs, uint32 count, float dt)
+{
+	CPU_PROFILE_BLOCK("Initialize fixed constraints SIMD");
+
+	simd_constraint_slot* contactSlots = arena.allocate<simd_constraint_slot>(count);
+	uint32 numBatches = scheduleConstraintsSIMD(arena, bodyPairs, count, UINT16_MAX, contactSlots);
+
+	simd_fixed_constraint_batch* batches = arena.allocate<simd_fixed_constraint_batch>(numBatches);
+
+	const floatw zero = floatw::zero();
+	const floatw invDt = 1.f / dt;
+	const floatw one = 1.f;
+
+	for (uint32 i = 0; i < numBatches; ++i)
+	{
+		const simd_constraint_slot& slot = contactSlots[i];
+		simd_fixed_constraint_batch& batch = batches[i];
+
+		uint16 constraintIndices[CONSTRAINT_SIMD_WIDTH];
+		for (uint32 j = 0; j < CONSTRAINT_SIMD_WIDTH; ++j)
+		{
+			constraintIndices[j] = (uint16)slot.indices[j];
+			batch.rbAIndices[j] = bodyPairs[slot.indices[j]].rbA;
+			batch.rbBIndices[j] = bodyPairs[slot.indices[j]].rbB;
+		}
+
+
+		// Load body A.
+		vec3w localCOGPositionA;
+		quatw rotationA;
+		vec3w positionA;
+		mat3w invInertiaA;
+		floatw invMassA;
+
+		load8(&rbs->rotation.x, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			rotationA.x, rotationA.y, rotationA.z, rotationA.w,
+			localCOGPositionA.x, localCOGPositionA.y, localCOGPositionA.z,
+			positionA.x);
+
+		load8(&rbs->position.y, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			positionA.y, positionA.z,
+			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20,
+			invInertiaA.m01, invInertiaA.m11, invInertiaA.m21);
+
+		load4(&rbs->invInertia.m02, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m02, invInertiaA.m12, invInertiaA.m22,
+			invMassA);
+
+
+		// Load body B.
+		quatw rotationB;
+		vec3w positionB;
+		vec3w localCOGPositionB;
+		mat3w invInertiaB;
+		floatw invMassB;
+
+		load8(&rbs->rotation.x, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			rotationB.x, rotationB.y, rotationB.z, rotationB.w,
+			localCOGPositionB.x, localCOGPositionB.y, localCOGPositionB.z,
+			positionB.x);
+
+		load8(&rbs->position.y, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			positionB.y, positionB.z,
+			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
+			invInertiaB.m01, invInertiaB.m11, invInertiaB.m21);
+
+		load4(&rbs->invInertia.m02, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m02, invInertiaB.m12, invInertiaB.m22,
+			invMassB);
+
+
+		quatw initialInvRotationDifference;
+		vec3w localAnchorA, localAnchorB;
+		floatw dummy0, dummy1;
+		load8((float*)input, constraintIndices, (uint32)sizeof(*input),
+			initialInvRotationDifference.x, initialInvRotationDifference.y, initialInvRotationDifference.z, initialInvRotationDifference.w,
+			localAnchorA.x, localAnchorA.y, localAnchorA.z, localAnchorB.x);
+
+		load4(&input->localAnchorB.y, constraintIndices, (uint32)sizeof(*input),
+			localAnchorB.y, localAnchorB.z, dummy0, dummy1);
+
+
+		// Relative to COG.
+		vec3w relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
+		vec3w relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
+
+		// Global.
+		vec3w globalAnchorA = positionA + relGlobalAnchorA;
+		vec3w globalAnchorB = positionB + relGlobalAnchorB;
+
+		mat3w skewMatA = getSkewMatrix(relGlobalAnchorA);
+		mat3w skewMatB = getSkewMatrix(relGlobalAnchorB);
+
+		mat3w invEffectiveTranslationMass = skewMatA * invInertiaA * transpose(skewMatA)
+										  + skewMatB * invInertiaB * transpose(skewMatB);
+		floatw invMassSum = invMassA + invMassB;
+		invEffectiveTranslationMass.m00 += invMassSum;
+		invEffectiveTranslationMass.m11 += invMassSum;
+		invEffectiveTranslationMass.m22 += invMassSum;
+
+		mat3w invEffectiveRotationMass = invInertiaA + invInertiaB;
+
+		vec3w translationBias = zero;
+		vec3w rotationBias = zero;
+
+		if (dt > DT_THRESHOLD)
+		{
+			translationBias = (globalAnchorB - globalAnchorA) * (floatw(BALL_CONSTRAINT_BETA) * invDt);
+
+			quatw rotationError = rotationB * initialInvRotationDifference * conjugate(rotationA);
+			rotationBias = rotationError.v * (SLIDER_CONSTRAINT_BETA * 2.f * invDt);
+		}
+
+		relGlobalAnchorA.x.store(batch.relGlobalAnchorA[0]);
+		relGlobalAnchorA.y.store(batch.relGlobalAnchorA[1]);
+		relGlobalAnchorA.z.store(batch.relGlobalAnchorA[2]);
+
+		relGlobalAnchorB.x.store(batch.relGlobalAnchorB[0]);
+		relGlobalAnchorB.y.store(batch.relGlobalAnchorB[1]);
+		relGlobalAnchorB.z.store(batch.relGlobalAnchorB[2]);
+
+		invEffectiveTranslationMass.m[0].store(batch.invEffectiveTranslationMass[0]);
+		invEffectiveTranslationMass.m[1].store(batch.invEffectiveTranslationMass[1]);
+		invEffectiveTranslationMass.m[2].store(batch.invEffectiveTranslationMass[2]);
+		invEffectiveTranslationMass.m[3].store(batch.invEffectiveTranslationMass[3]);
+		invEffectiveTranslationMass.m[4].store(batch.invEffectiveTranslationMass[4]);
+		invEffectiveTranslationMass.m[5].store(batch.invEffectiveTranslationMass[5]);
+		invEffectiveTranslationMass.m[6].store(batch.invEffectiveTranslationMass[6]);
+		invEffectiveTranslationMass.m[7].store(batch.invEffectiveTranslationMass[7]);
+		invEffectiveTranslationMass.m[8].store(batch.invEffectiveTranslationMass[8]);
+
+		translationBias.x.store(batch.translationBias[0]);
+		translationBias.y.store(batch.translationBias[1]);
+		translationBias.z.store(batch.translationBias[2]);
+
+		invEffectiveRotationMass.m[0].store(batch.invEffectiveRotationMass[0]);
+		invEffectiveRotationMass.m[1].store(batch.invEffectiveRotationMass[1]);
+		invEffectiveRotationMass.m[2].store(batch.invEffectiveRotationMass[2]);
+		invEffectiveRotationMass.m[3].store(batch.invEffectiveRotationMass[3]);
+		invEffectiveRotationMass.m[4].store(batch.invEffectiveRotationMass[4]);
+		invEffectiveRotationMass.m[5].store(batch.invEffectiveRotationMass[5]);
+		invEffectiveRotationMass.m[6].store(batch.invEffectiveRotationMass[6]);
+		invEffectiveRotationMass.m[7].store(batch.invEffectiveRotationMass[7]);
+		invEffectiveRotationMass.m[8].store(batch.invEffectiveRotationMass[8]);
+
+		rotationBias.x.store(batch.rotationBias[0]);
+		rotationBias.y.store(batch.rotationBias[1]);
+		rotationBias.z.store(batch.rotationBias[2]);
+	}
+
+	simd_fixed_constraint_solver result;
+	result.batches = batches;
+	result.numBatches = numBatches;
+	return result;
+}
+
+void solveFixedVelocityConstraintsSIMD(simd_fixed_constraint_solver constraints, rigid_body_global_state* rbs)
+{
+	CPU_PROFILE_BLOCK("Solve fixed constraints SIMD");
+
+	for (uint32 i = 0; i < constraints.numBatches; ++i)
+	{
+		simd_fixed_constraint_batch& batch = constraints.batches[i];
+
+
+		// Load body A.
+		vec3w vA, wA;
+		floatw invMassA;
+		mat3w invInertiaA;
+
+		load8(&rbs->invInertia.m00, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20,
+			invInertiaA.m01, invInertiaA.m11, invInertiaA.m21,
+			invInertiaA.m02, invInertiaA.m12);
+
+		load8(&rbs->invInertia.m22, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m22, invMassA, vA.x, vA.y, vA.z, wA.x, wA.y, wA.z);
+
+
+		// Load body B.
+		vec3w vB, wB;
+		floatw invMassB;
+		mat3w invInertiaB;
+
+		load8(&rbs->invInertia.m00, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
+			invInertiaB.m01, invInertiaB.m11, invInertiaB.m21,
+			invInertiaB.m02, invInertiaB.m12);
+
+		load8(&rbs->invInertia.m22, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m22, invMassB, vB.x, vB.y, vB.z, wB.x, wB.y, wB.z);
+
+
+		// Rotation part.
+		{
+			vec3w rotationBias(batch.rotationBias[0], batch.rotationBias[1], batch.rotationBias[2]);
+			mat3w invEffectiveRotationMass;
+			invEffectiveRotationMass.m[0] = floatw(batch.invEffectiveRotationMass[0]);
+			invEffectiveRotationMass.m[1] = floatw(batch.invEffectiveRotationMass[1]);
+			invEffectiveRotationMass.m[2] = floatw(batch.invEffectiveRotationMass[2]);
+			invEffectiveRotationMass.m[3] = floatw(batch.invEffectiveRotationMass[3]);
+			invEffectiveRotationMass.m[4] = floatw(batch.invEffectiveRotationMass[4]);
+			invEffectiveRotationMass.m[5] = floatw(batch.invEffectiveRotationMass[5]);
+			invEffectiveRotationMass.m[6] = floatw(batch.invEffectiveRotationMass[6]);
+			invEffectiveRotationMass.m[7] = floatw(batch.invEffectiveRotationMass[7]);
+			invEffectiveRotationMass.m[8] = floatw(batch.invEffectiveRotationMass[8]);
+
+			vec3w Cdot = wB - wA;
+
+			vec3w rotationLambda = solveLinearSystem(invEffectiveRotationMass, -(Cdot + rotationBias));
+			wA -= invInertiaA * rotationLambda;
+			wB += invInertiaB * rotationLambda;
+		}
+
+
+		// Position part.
+		{
+			vec3w relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
+			vec3w relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
+			vec3w translationBias(batch.translationBias[0], batch.translationBias[1], batch.translationBias[2]);
+			mat3w invEffectiveTranslationMass;
+			invEffectiveTranslationMass.m[0] = floatw(batch.invEffectiveTranslationMass[0]);
+			invEffectiveTranslationMass.m[1] = floatw(batch.invEffectiveTranslationMass[1]);
+			invEffectiveTranslationMass.m[2] = floatw(batch.invEffectiveTranslationMass[2]);
+			invEffectiveTranslationMass.m[3] = floatw(batch.invEffectiveTranslationMass[3]);
+			invEffectiveTranslationMass.m[4] = floatw(batch.invEffectiveTranslationMass[4]);
+			invEffectiveTranslationMass.m[5] = floatw(batch.invEffectiveTranslationMass[5]);
+			invEffectiveTranslationMass.m[6] = floatw(batch.invEffectiveTranslationMass[6]);
+			invEffectiveTranslationMass.m[7] = floatw(batch.invEffectiveTranslationMass[7]);
+			invEffectiveTranslationMass.m[8] = floatw(batch.invEffectiveTranslationMass[8]);
+
+
+			vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
+			vec3w anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
+			vec3w Cdot = anchorVelocityB - anchorVelocityA + translationBias;
+
+			vec3w P = solveLinearSystem(invEffectiveTranslationMass, -Cdot);
+			vA -= invMassA * P;
+			wA -= invInertiaA * cross(relGlobalAnchorA, P);
+			vB += invMassB * P;
+			wB += invInertiaB * cross(relGlobalAnchorB, P);
+		}
+
+
+		store8(&rbs->invInertia.m22, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaA.m22, invMassA, vA.x, vA.y, vA.z, wA.x, wA.y, wA.z);
+
+		store8(&rbs->invInertia.m22, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
+			invInertiaB.m22, invMassB, vB.x, vB.y, vB.z, wB.x, wB.y, wB.z);
+	}
+}
 
 
 

@@ -171,6 +171,47 @@ ball_constraint_handle addBallConstraintFromGlobalPoints(scene_entity& a, scene_
 	return addBallConstraintFromLocalPoints(a, b, localAnchorA, localAnchorB);
 }
 
+fixed_constraint_handle addFixedConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB)
+{
+	assert(a.registry == b.registry);
+
+	entt::registry& registry = *a.registry;
+	entt::entity constraintEntity = registry.create();
+	fixed_constraint& constraint = registry.emplace<fixed_constraint>(constraintEntity);
+	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
+
+	constraint.localAnchorA = localAnchorA;
+	constraint.localAnchorB = localAnchorB;
+
+	addConstraintEdge(a, ref, constraintEntity, constraint_type_fixed);
+	addConstraintEdge(b, ref, constraintEntity, constraint_type_fixed);
+
+	return { constraintEntity };
+}
+
+fixed_constraint_handle addFixedConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor)
+{
+	assert(a.registry == b.registry);
+
+	entt::registry& registry = *a.registry;
+	entt::entity constraintEntity = registry.create();
+	fixed_constraint& constraint = registry.emplace<fixed_constraint>(constraintEntity);
+	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
+
+	const transform_component& transformA = a.getComponent<transform_component>();
+	const transform_component& transformB = b.getComponent<transform_component>();
+
+	constraint.localAnchorA = inverseTransformPosition(transformA, globalAnchor);
+	constraint.localAnchorB = inverseTransformPosition(transformB, globalAnchor);
+
+	constraint.initialInvRotationDifference = conjugate(transformB.rotation) * transformA.rotation;
+
+	addConstraintEdge(a, ref, constraintEntity, constraint_type_fixed);
+	addConstraintEdge(b, ref, constraintEntity, constraint_type_fixed);
+
+	return { constraintEntity };
+}
+
 hinge_constraint_handle addHingeConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalHingeAxis,
 	float minLimit, float maxLimit)
 {
@@ -289,6 +330,11 @@ ball_constraint& getConstraint(game_scene& scene, ball_constraint_handle handle)
 	return scene_entity{ handle.entity, scene }.getComponent<ball_constraint>();
 }
 
+fixed_constraint& getConstraint(game_scene& scene, fixed_constraint_handle handle)
+{
+	return scene_entity{ handle.entity, scene }.getComponent<fixed_constraint>();
+}
+
 hinge_constraint& getConstraint(game_scene& scene, hinge_constraint_handle handle)
 {
 	return scene_entity{ handle.entity, scene }.getComponent<hinge_constraint>();
@@ -308,6 +354,7 @@ void deleteAllConstraints(game_scene& scene)
 {
 	scene.deleteAllComponents<distance_constraint>();
 	scene.deleteAllComponents<ball_constraint>();
+	scene.deleteAllComponents<fixed_constraint>();
 	scene.deleteAllComponents<hinge_constraint>();
 	scene.deleteAllComponents<cone_twist_constraint>();
 	scene.deleteAllComponents<slider_constraint>();
@@ -358,6 +405,11 @@ void deleteConstraint(game_scene& scene, distance_constraint_handle handle)
 }
 
 void deleteConstraint(game_scene& scene, ball_constraint_handle handle)
+{
+	deleteConstraint(&scene.registry, handle.entity);
+}
+
+void deleteConstraint(game_scene& scene, fixed_constraint_handle handle)
 {
 	deleteConstraint(&scene.registry, handle.entity);
 }
@@ -768,10 +820,11 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 
 	uint32 numDistanceConstraints = scene.numberOfComponentsOfType<distance_constraint>();
 	uint32 numBallConstraints = scene.numberOfComponentsOfType<ball_constraint>();
+	uint32 numFixedConstraints = scene.numberOfComponentsOfType<fixed_constraint>();
 	uint32 numHingeConstraints = scene.numberOfComponentsOfType<hinge_constraint>();
 	uint32 numConeTwistConstraints = scene.numberOfComponentsOfType<cone_twist_constraint>();
 	uint32 numSliderConstraints = scene.numberOfComponentsOfType<slider_constraint>();
-	uint32 numConstraints = numDistanceConstraints + numBallConstraints + numHingeConstraints + numConeTwistConstraints + numSliderConstraints;
+	uint32 numConstraints = numDistanceConstraints + numBallConstraints + numFixedConstraints + numHingeConstraints + numConeTwistConstraints + numSliderConstraints;
 
 
 
@@ -851,18 +904,21 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 
 	distance_constraint* distanceConstraints = scene.raw<distance_constraint>();
 	ball_constraint* ballConstraints = scene.raw<ball_constraint>();
+	fixed_constraint* fixedConstraints = scene.raw<fixed_constraint>();
 	hinge_constraint* hingeConstraints = scene.raw<hinge_constraint>();
 	cone_twist_constraint* coneTwistConstraints = scene.raw<cone_twist_constraint>();
 	slider_constraint* sliderConstraints = scene.raw<slider_constraint>();
 
 	constraint_body_pair* distanceConstraintBodyPairs = allConstraintBodyPairs + 0;
 	constraint_body_pair* ballConstraintBodyPairs = distanceConstraintBodyPairs + numDistanceConstraints;
-	constraint_body_pair* hingeConstraintBodyPairs = ballConstraintBodyPairs + numBallConstraints;
+	constraint_body_pair* fixedConstraintBodyPairs = ballConstraintBodyPairs + numBallConstraints;
+	constraint_body_pair* hingeConstraintBodyPairs = fixedConstraintBodyPairs + numFixedConstraints;
 	constraint_body_pair* coneTwistConstraintBodyPairs = hingeConstraintBodyPairs + numHingeConstraints;
 	constraint_body_pair* sliderConstraintBodyPairs = coneTwistConstraintBodyPairs + numConeTwistConstraints;
 
 	getConstraintBodyPairs<distance_constraint>(scene, distanceConstraintBodyPairs);
 	getConstraintBodyPairs<ball_constraint>(scene, ballConstraintBodyPairs);
+	getConstraintBodyPairs<fixed_constraint>(scene, fixedConstraintBodyPairs);
 	getConstraintBodyPairs<hinge_constraint>(scene, hingeConstraintBodyPairs);
 	getConstraintBodyPairs<cone_twist_constraint>(scene, coneTwistConstraintBodyPairs);
 	getConstraintBodyPairs<slider_constraint>(scene, sliderConstraintBodyPairs);
@@ -872,6 +928,9 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 
 	ball_constraint_solver ballConstraintSolver;
 	simd_ball_constraint_solver ballConstraintSolverSIMD;
+
+	fixed_constraint_solver fixedConstraintSolver;
+	simd_fixed_constraint_solver fixedConstraintSolverSIMD;
 
 	hinge_constraint_solver hingeConstraintSolver;
 	simd_hinge_constraint_solver hingeConstraintSolverSIMD;
@@ -894,6 +953,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 		{
 			distanceConstraintSolverSIMD = initializeDistanceVelocityConstraintsSIMD(arena, rbGlobal, distanceConstraints, distanceConstraintBodyPairs, numDistanceConstraints, dt);
 			ballConstraintSolverSIMD = initializeBallVelocityConstraintsSIMD(arena, rbGlobal, ballConstraints, ballConstraintBodyPairs, numBallConstraints, dt);
+			fixedConstraintSolverSIMD = initializeFixedVelocityConstraintsSIMD(arena, rbGlobal, fixedConstraints, fixedConstraintBodyPairs, numFixedConstraints, dt);
 			hingeConstraintSolverSIMD = initializeHingeVelocityConstraintsSIMD(arena, rbGlobal, hingeConstraints, hingeConstraintBodyPairs, numHingeConstraints, dt);
 			coneTwistConstraintSolverSIMD = initializeConeTwistVelocityConstraintsSIMD(arena, rbGlobal, coneTwistConstraints, coneTwistConstraintBodyPairs, numConeTwistConstraints, dt);
 			sliderConstraintSolverSIMD = initializeSliderVelocityConstraintsSIMD(arena, rbGlobal, sliderConstraints, sliderConstraintBodyPairs, numSliderConstraints, dt);
@@ -905,6 +965,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 		{
 			distanceConstraintSolver = initializeDistanceVelocityConstraints(arena, rbGlobal, distanceConstraints, distanceConstraintBodyPairs, numDistanceConstraints, dt);
 			ballConstraintSolver = initializeBallVelocityConstraints(arena, rbGlobal, ballConstraints, ballConstraintBodyPairs, numBallConstraints, dt);
+			fixedConstraintSolver = initializeFixedVelocityConstraints(arena, rbGlobal, fixedConstraints, fixedConstraintBodyPairs, numFixedConstraints, dt);
 			hingeConstraintSolver = initializeHingeVelocityConstraints(arena, rbGlobal, hingeConstraints, hingeConstraintBodyPairs, numHingeConstraints, dt);
 			coneTwistConstraintSolver = initializeConeTwistVelocityConstraints(arena, rbGlobal, coneTwistConstraints, coneTwistConstraintBodyPairs, numConeTwistConstraints, dt);
 			sliderConstraintSolver = initializeSliderVelocityConstraints(arena, rbGlobal, sliderConstraints, sliderConstraintBodyPairs, numSliderConstraints, dt);
@@ -922,6 +983,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 			{
 				solveDistanceVelocityConstraintsSIMD(distanceConstraintSolverSIMD, rbGlobal);
 				solveBallVelocityConstraintsSIMD(ballConstraintSolverSIMD, rbGlobal);
+				solveFixedVelocityConstraintsSIMD(fixedConstraintSolverSIMD, rbGlobal);
 				solveHingeVelocityConstraintsSIMD(hingeConstraintSolverSIMD, rbGlobal);
 				solveConeTwistVelocityConstraintsSIMD(coneTwistConstraintSolverSIMD, rbGlobal);
 				solveSliderVelocityConstraintsSIMD(sliderConstraintSolverSIMD, rbGlobal);
@@ -933,6 +995,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 			{
 				solveDistanceVelocityConstraints(distanceConstraintSolver, rbGlobal);
 				solveBallVelocityConstraints(ballConstraintSolver, rbGlobal);
+				solveFixedVelocityConstraints(fixedConstraintSolver, rbGlobal);
 				solveHingeVelocityConstraints(hingeConstraintSolver, rbGlobal);
 				solveConeTwistVelocityConstraints(coneTwistConstraintSolver, rbGlobal);
 				solveSliderVelocityConstraints(sliderConstraintSolver, rbGlobal);
