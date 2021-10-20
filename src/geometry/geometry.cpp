@@ -515,7 +515,7 @@ submesh_info cpu_mesh::pushCapsule(uint16 slices, uint16 rows, float height, flo
 	return result;
 }
 
-submesh_info cpu_mesh::pushCylinder(uint16 slices, float radius, float height, vec3 center)
+submesh_info cpu_mesh::pushCylinder(uint16 slices, float radius, float height, vec3 center, vec3 upAxis)
 {
 	alignNextTriangle();
 
@@ -529,10 +529,12 @@ submesh_info cpu_mesh::pushCylinder(uint16 slices, float radius, float height, v
 
 	reserve(4 * slices + 2, 4 * slices);
 
+	quat rotation = rotateFromTo(vec3(0.f, 1.f, 0.f), upAxis);
+
 	vec3* vertexPositionPtr = vertexPositions + numVertices;
 	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 	vec2 uv(0.f, 0.f);
-	pushVertex(center + vec3(0.f, -halfHeight, 0.f), uv, vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+	pushVertex(center + rotation * vec3(0.f, -halfHeight, 0.f), uv, vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
 	// Bottom row, normal down.
 	for (uint32 x = 0; x < slices; ++x)
@@ -543,7 +545,7 @@ submesh_info cpu_mesh::pushCylinder(uint16 slices, float radius, float height, v
 		vec3 pos(vertexX * radius, -halfHeight, vertexZ * radius);
 		vec3 nor(0.f, -1.f, 0.f);
 
-		pushVertex(center + pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
 	}
 
 	// Bottom row, normal around.
@@ -555,7 +557,7 @@ submesh_info cpu_mesh::pushCylinder(uint16 slices, float radius, float height, v
 		vec3 pos(vertexX * radius, -halfHeight, vertexZ * radius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(center + pos, uv, nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(center + rotation * pos, uv, nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
 	}
 
 	// Top row, normal around.
@@ -567,7 +569,7 @@ submesh_info cpu_mesh::pushCylinder(uint16 slices, float radius, float height, v
 		vec3 pos(vertexX * radius, halfHeight, vertexZ * radius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(center + pos, uv, nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(center + rotation * pos, uv, nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
 	}
 
 	// Top row, normal up.
@@ -579,10 +581,10 @@ submesh_info cpu_mesh::pushCylinder(uint16 slices, float radius, float height, v
 		vec3 pos(vertexX * radius, halfHeight, vertexZ * radius);
 		vec3 nor(0.f, 1.f, 0.f);
 
-		pushVertex(center + pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
 	}
 
-	pushVertex(center + vec3(0.f, halfHeight, 0.f), uv, vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+	pushVertex(center + rotation * vec3(0.f, halfHeight, 0.f), uv, vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
 	index_t lastVertex = 4 * slices + 2;
 
