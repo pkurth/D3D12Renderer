@@ -78,6 +78,13 @@ namespace ImGui
 
 	void PropertyValue(const char* label, const char* format, ...);
 
+	inline void PropertyValue(const char* label, bool v) { ImGui::PropertyValue(label, v ? "True" : "False"); }
+	inline void PropertyValue(const char* label, float v) { ImGui::PropertyValue(label, "%.3f", v); }
+	inline void PropertyValue(const char* label, int32 v) { ImGui::PropertyValue(label, "%d", v); }
+	inline void PropertyValue(const char* label, uint32 v) { ImGui::PropertyValue(label, "%u", v); }
+	inline void PropertyValue(const char* label, int64 v) { ImGui::PropertyValue(label, "%lld", v); }
+	inline void PropertyValue(const char* label, uint64 v) { ImGui::PropertyValue(label, "%llu", v); }
+
 	bool PropertyCheckbox(const char* label, bool& v);
 
 	bool PropertySlider(const char* label, float& f, float minValue = 0.f, float maxValue = 1.f, const char* format = "%.3f");
