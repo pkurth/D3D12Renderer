@@ -40,6 +40,7 @@ struct axis_attachment
 {
 	attachment_type type;
 	float rodLength;
+	float rodThickness;
 
 	union
 	{
@@ -47,17 +48,17 @@ struct axis_attachment
 		wheel_description wheel;
 	};
 
-	axis_attachment(float rodLength)
-		: type(attachment_type_none), rodLength(rodLength) {}
-	axis_attachment(float rodLength, gear_description gear)
-		: type(attachment_type_gear), rodLength(rodLength), gear(gear) {}
-	axis_attachment(float rodLength, wheel_description wheel)
-		: type(attachment_type_wheel), rodLength(rodLength), wheel(wheel) {}
+	axis_attachment(float rodLength, float rodThickness)
+		: type(attachment_type_none), rodLength(rodLength), rodThickness(rodThickness) {}
+	axis_attachment(float rodLength, float rodThickness, gear_description gear)
+		: type(attachment_type_gear), rodLength(rodLength), rodThickness(rodThickness), gear(gear) {}
+	axis_attachment(float rodLength, float rodThickness, wheel_description wheel)
+		: type(attachment_type_wheel), rodLength(rodLength), rodThickness(rodThickness), wheel(wheel) {}
 };
 
 static void attach(ref<composite_mesh> mesh, cpu_mesh& primitiveMesh, ref<pbr_material> material, scene_entity axis, axis_attachment& attachment, float sign)
 {
-	float rodLength = attachment.rodLength * sign;
+	float rodOffset = attachment.rodLength * sign;
 
 	switch (attachment.type)
 	{
@@ -65,7 +66,7 @@ static void attach(ref<composite_mesh> mesh, cpu_mesh& primitiveMesh, ref<pbr_ma
 		{
 			gear_description desc = attachment.gear;
 
-			mesh->submeshes.push_back({ primitiveMesh.pushCylinder(21, desc.innerRadius, desc.height, vec3(0.f, rodLength, 0.f)), {}, trs::identity, material });
+			mesh->submeshes.push_back({ primitiveMesh.pushCylinder(21, desc.innerRadius, desc.height, vec3(0.f, rodOffset, 0.f)), {}, trs::identity, material });
 
 			for (uint32 i = 0; i < desc.numTeeth; ++i)
 			{
@@ -74,11 +75,11 @@ static void attach(ref<composite_mesh> mesh, cpu_mesh& primitiveMesh, ref<pbr_ma
 				vec3 center = localRotation * vec3(desc.innerRadius + desc.toothLength * 0.5f, 0.f, 0.f);
 				vec3 radius(desc.toothLength * 0.5f, desc.height * 0.5f, desc.toothWidth * 0.5f);
 
-				mesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, desc.toothLength, desc.toothWidth * 0.5f, center + vec3(0.f, rodLength, 0.f), localRotation * vec3(1.f, 0.f, 0.f)), {}, trs::identity, material });
+				mesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, desc.toothLength, desc.toothWidth * 0.5f, center + vec3(0.f, rodOffset, 0.f), localRotation * vec3(1.f, 0.f, 0.f)), {}, trs::identity, material });
 
 				bounding_capsule capsule;
-				capsule.positionA = center + vec3(0.f, rodLength, 0.f) - localRotation * vec3(desc.toothLength * 0.5f, 0.f, 0.f);
-				capsule.positionB = center + vec3(0.f, rodLength, 0.f) + localRotation * vec3(desc.toothLength * 0.5f, 0.f, 0.f);
+				capsule.positionA = center + vec3(0.f, rodOffset, 0.f) - localRotation * vec3(desc.toothLength * 0.5f, 0.f, 0.f);
+				capsule.positionB = center + vec3(0.f, rodOffset, 0.f) + localRotation * vec3(desc.toothLength * 0.5f, 0.f, 0.f);
 
 				capsule.radius = desc.toothWidth * 0.5f;
 
@@ -90,15 +91,20 @@ static void attach(ref<composite_mesh> mesh, cpu_mesh& primitiveMesh, ref<pbr_ma
 		{
 			wheel_description desc = attachment.wheel;
 
-			//mesh->submeshes.push_back({ primitiveMesh.pushCylinder(21, desc.radius, desc.height, vec3(0.f, rodLength, 0.f)), {}, trs::identity, material });
-			mesh->submeshes.push_back({ primitiveMesh.pushSphere(21, 21, desc.radius, vec3(0.f, rodLength, 0.f)), {}, trs::identity, material });
+			//mesh->submeshes.push_back({ primitiveMesh.pushCylinder(21, desc.radius, desc.height, vec3(0.f, rodOffset, 0.f)), {}, trs::identity, material });
+			mesh->submeshes.push_back({ primitiveMesh.pushSphere(21, 21, desc.radius, vec3(0.f, rodOffset, 0.f)), {}, trs::identity, material });
 
 			bounding_sphere sphere;
-			sphere.center = vec3(0.f, rodLength, 0.f);
+			sphere.center = vec3(0.f, rodOffset, 0.f);
 			sphere.radius = desc.radius;
 
 			axis.addComponent<collider_component>(collider_component::asSphere(sphere, 0.2f, desc.friction, desc.density));
 		} break;
+	}
+
+	if (attachment.rodLength > 0.f)
+	{
+		mesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(attachment.rodThickness * 0.5f, attachment.rodLength * 0.5f, attachment.rodThickness * 0.5f), false, vec3(0.f, rodOffset * 0.5f, 0.f)), {}, trs::identity, material });
 	}
 }
 
@@ -108,21 +114,19 @@ static scene_entity createAxis(game_scene& scene, cpu_mesh& primitiveMesh, ref<p
 	scene_entity axis = scene.createEntity("Axis")
 		.addComponent<transform_component>(position, rotation);
 
-
 	auto mesh = make_ref<composite_mesh>();
 
-	axis_attachment centerGearAttachment(0.f, desc);
+	axis_attachment centerGearAttachment(0.f, 0.f, desc);
 	attach(mesh, primitiveMesh, material, axis, centerGearAttachment, 1.f);
 
 	if (firstAttachment)
 	{
 		attach(mesh, primitiveMesh, material, axis, *firstAttachment, 1.f);
-		mesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(desc.innerRadius * 0.1f, firstAttachment->rodLength * 0.5f, desc.innerRadius * 0.1f), false, vec3(0.f, firstAttachment->rodLength * 0.5f, 0.f)), {}, trs::identity, material });
+
 	}
 	if (secondAttachment)
 	{
 		attach(mesh, primitiveMesh, material, axis, *secondAttachment, -1.f);
-		mesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(desc.innerRadius * 0.1f, secondAttachment->rodLength * 0.5f, desc.innerRadius * 0.1f), false, vec3(0.f, -secondAttachment->rodLength * 0.5f, 0.f)), {}, trs::identity, material });
 	}
 
 
@@ -136,7 +140,7 @@ static scene_entity createGearAxis(game_scene& scene, cpu_mesh& primitiveMesh, r
 	vec3 position, quat rotation, float length, uint32 numTeeth, float toothLength, float toothWidth, 
 	float friction, float density)
 {
-	scene_entity axis = scene.createEntity("Axis")
+	scene_entity axis = scene.createEntity("Gear Axis")
 		.addComponent<transform_component>(position, rotation);
 
 	auto mesh = make_ref<composite_mesh>();
@@ -169,6 +173,57 @@ static scene_entity createGearAxis(game_scene& scene, cpu_mesh& primitiveMesh, r
 	axis.addComponent<rigid_body_component>(false);
 
 	return axis;
+}
+
+static scene_entity createSphere(game_scene& scene, cpu_mesh& primitiveMesh, ref<pbr_material> material,
+	vec3 position, float radius, float friction, float density)
+{
+	scene_entity result = scene.createEntity("Sphere")
+		.addComponent<transform_component>(position, quat::identity);
+
+	auto mesh = make_ref<composite_mesh>();
+
+	mesh->submeshes.push_back({ primitiveMesh.pushSphere(21, 21, radius), {}, trs::identity, material });
+
+	bounding_sphere sphere;
+	sphere.center = vec3(0.f, 0.f, 0.f);
+	sphere.radius = radius;
+
+	result.addComponent<collider_component>(collider_component::asSphere(sphere, 0.2f, friction, density));
+
+	result.addComponent<raster_component>(mesh);
+	result.addComponent<rigid_body_component>(false);
+
+	return result;
+}
+
+static scene_entity createWheelSuspension(game_scene& scene, cpu_mesh& primitiveMesh, ref<pbr_material> material,
+	vec3 position, quat rotation, float axisLength, float thickness, bool right)
+{
+	scene_entity result = scene.createEntity("Wheel suspension")
+		.addComponent<transform_component>(position, rotation);
+
+	auto mesh = make_ref<composite_mesh>();
+
+	float xSign = right ? 1.f : -1.f;
+	//mesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(axisLength * 0.5f, thickness * 0.5f, thickness * 0.5f), false, vec3(axisLength * 0.5f * xSign, 0.f, 0.f)), {}, trs::identity, material });
+	//mesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(thickness * 0.5f, thickness * 0.5f, axisLength * 0.5f), false, vec3(0.f, 0.f, axisLength * 0.5f)), {}, trs::identity, material });
+	mesh->submeshes.push_back({ primitiveMesh.pushCylinder(15, thickness * 0.5f, axisLength, vec3(axisLength * 0.5f * xSign, 0.f, 0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, material });
+	mesh->submeshes.push_back({ primitiveMesh.pushCylinder(15, thickness * 0.5f, axisLength, vec3(0.f, 0.f, axisLength * 0.5f), vec3(0.f, 0.f, 1.f)), {}, trs::identity, material });
+
+	bounding_capsule capsule;
+	capsule.positionA = vec3(0.f);
+	capsule.positionB = vec3(axisLength * xSign, 0.f, 0.f);
+	capsule.radius = thickness * 0.5f;
+	result.addComponent<collider_component>(collider_component::asCapsule(capsule, 0.2f, 0.f, 4000.f));
+
+	capsule.positionB = vec3(0.f, 0.f, axisLength);
+	result.addComponent<collider_component>(collider_component::asCapsule(capsule, 0.2f, 0.f, 4000.f));
+
+	result.addComponent<raster_component>(mesh);
+	result.addComponent<rigid_body_component>(false);
+
+	return result;
 }
 
 void vehicle::initialize(game_scene& scene)
@@ -215,7 +270,7 @@ void vehicle::initialize(game_scene& scene)
 	wheelDesc.height = 0.3f;
 	wheelDesc.radius = 0.7f;
 	wheelDesc.friction = 1.f;
-	wheelDesc.density = 100.f;
+	wheelDesc.density = 50.f;
 
 
 	// Motor gear.
@@ -229,33 +284,32 @@ void vehicle::initialize(game_scene& scene)
 	// Drive axis.
 	float driveAxisLength = 4.5f;
 	float driveAxisOffset = 0.26f;
-	axis_attachment driveAxisAttachment(driveAxisLength * 0.5f, gearDesc);
+	axis_attachment driveAxisAttachment(driveAxisLength * 0.5f, gearDesc.innerRadius * 0.2f, gearDesc);
 	driveAxis = createAxis(scene, primitiveMesh, material, vec3(driveAxisOffset, 1.35f + driveAxisOffset, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)),
-		gearDesc, &driveAxisAttachment, &driveAxisAttachment);
+		gearDesc, 0, &driveAxisAttachment);
 	addHingeConstraintFromGlobalPoints(motor, driveAxis, vec3(driveAxisOffset, 1.35f + driveAxisOffset, 0.f), vec3(1.f, 0.f, 0.f));
-	// Stabilization. Not really necessary.
-	addHingeConstraintFromGlobalPoints(motor, driveAxis, vec3(driveAxisOffset + driveAxisLength * 0.5f, 1.35f + driveAxisOffset, 0.f), vec3(1.f, 0.f, 0.f));
-	addHingeConstraintFromGlobalPoints(motor, driveAxis, vec3(driveAxisOffset - driveAxisLength * 0.5f, 1.35f + driveAxisOffset, 0.f), vec3(1.f, 0.f, 0.f));
 
 	// Front axis.
 	float frontAxisOffsetX = -driveAxisLength * 0.5f + driveAxisOffset * 2.f;
 	float frontAxisOffsetZ = driveAxisOffset;
 	float axisLength = 1.5f;
-	axis_attachment firstFrontAxisAttachment(axisLength - frontAxisOffsetZ, wheelDesc);
-	axis_attachment secondFrontAxisAttachment(axisLength + frontAxisOffsetZ, wheelDesc);
-	frontAxis = createAxis(scene, primitiveMesh, material, vec3(frontAxisOffsetX, 1.35f + driveAxisOffset, frontAxisOffsetZ), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), gearDesc, &firstFrontAxisAttachment, &secondFrontAxisAttachment);
-	addHingeConstraintFromGlobalPoints(motor, frontAxis, vec3(frontAxisOffsetX, 1.35f + driveAxisOffset, frontAxisOffsetZ), vec3(0.f, 0.f, 1.f));
+	axis_attachment firstFrontAxisAttachment(axisLength - frontAxisOffsetZ, gearDesc.innerRadius * 0.2f);
+	axis_attachment secondFrontAxisAttachment(axisLength + frontAxisOffsetZ, gearDesc.innerRadius * 0.2f);
+	vec3 frontAxisPos(frontAxisOffsetX, 1.35f + driveAxisOffset, frontAxisOffsetZ);
+	frontAxis = createAxis(scene, primitiveMesh, material, frontAxisPos, quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), gearDesc, &firstFrontAxisAttachment, &secondFrontAxisAttachment);
+	addFixedConstraintFromGlobalPoints(motor, frontAxis, frontAxisPos);
 
 	// Rear axis.
 	float rearAxisOffsetX = driveAxisLength * 0.5f;
 	float rearAxisOffsetZ = -driveAxisOffset;
-	axis_attachment firstRearAxisAttachment(axisLength - rearAxisOffsetZ, wheelDesc);
-	axis_attachment secondRearAxisAttachment(axisLength + rearAxisOffsetZ, wheelDesc);
-	rearAxis = createAxis(scene, primitiveMesh, material, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), gearDesc, &firstRearAxisAttachment, &secondRearAxisAttachment);
+	axis_attachment firstRearAxisAttachment(axisLength - rearAxisOffsetZ, gearDesc.innerRadius * 0.2f, wheelDesc);
+	axis_attachment secondRearAxisAttachment(axisLength + rearAxisOffsetZ, gearDesc.innerRadius * 0.2f, wheelDesc);
+	rearAxis = createAxis(scene, primitiveMesh, material, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), gearDesc, 
+		&firstRearAxisAttachment, &secondRearAxisAttachment);
 	addHingeConstraintFromGlobalPoints(motor, rearAxis, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), vec3(0.f, 0.f, 1.f));
 
 	// Steering wheel.
-	axis_attachment steeringWheelAttachment(2.f, gearDesc);
+	axis_attachment steeringWheelAttachment(2.f, steeringWheelDesc.innerRadius * 0.2f, gearDesc);
 	quat steeringWheelRot(vec3(0.f, 0.f, 1.f), deg2rad(-80.f));
 	steeringWheel = createAxis(scene, primitiveMesh, material, vec3(0.8f, 2.3f, 0.f), 
 		steeringWheelRot, steeringWheelDesc, 0, &steeringWheelAttachment);
@@ -268,10 +322,34 @@ void vehicle::initialize(game_scene& scene)
 
 	// Steering axis.
 	vec3 steeringAxisPos(frontAxisOffsetX + 0.49f, 1.35f + driveAxisOffset + 0.06f, 0.f);
-	steeringAxis = createGearAxis(scene, primitiveMesh, material, steeringAxisPos, steeringWheelRot * quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), axisLength * 1.05f, 8, gearDesc.toothLength, gearDesc.toothWidth, gearDesc.friction, gearDesc.density);
+	float steeringAxisLength = axisLength * 1.05f;
+	steeringAxis = createGearAxis(scene, primitiveMesh, material, steeringAxisPos, steeringWheelRot * quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), steeringAxisLength, 8, 
+		gearDesc.toothLength, gearDesc.toothWidth, gearDesc.friction, gearDesc.density);
 	addSliderConstraintFromGlobalPoints(motor, steeringAxis, steeringAxisPos, vec3(0.f, 0.f, 1.f), -2.f, 3.f);
 
+	float suspensionLength = 0.4f;
 
+	// Left wheel suspension.
+	vec3 leftWheelSuspensionPos = frontAxisPos + vec3(0.f, 0.f, axisLength - frontAxisOffsetZ);
+	leftWheelSuspension = createWheelSuspension(scene, primitiveMesh, material, leftWheelSuspensionPos, quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), suspensionLength, 0.1f, false);
+	addHingeConstraintFromGlobalPoints(frontAxis, leftWheelSuspension, leftWheelSuspensionPos, vec3(0.f, 1.f, 0.f), deg2rad(-45.f), deg2rad(45.f));
+	addDistanceConstraintFromGlobalPoints(steeringAxis, leftWheelSuspension, steeringAxisPos + vec3(0.f, 0.f, steeringAxisLength * 0.5f), leftWheelSuspensionPos + vec3(suspensionLength, 0.f, 0.f));
+	
+	// Right wheel suspension.
+	vec3 rightWheelSuspensionPos = frontAxisPos + vec3(0.f, 0.f, -axisLength - frontAxisOffsetZ);
+	rightWheelSuspension = createWheelSuspension(scene, primitiveMesh, material, rightWheelSuspensionPos, quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), suspensionLength, 0.1f, true);
+	addHingeConstraintFromGlobalPoints(frontAxis, rightWheelSuspension, rightWheelSuspensionPos, vec3(0.f, 1.f, 0.f), deg2rad(-45.f), deg2rad(45.f));
+	addDistanceConstraintFromGlobalPoints(steeringAxis, rightWheelSuspension, steeringAxisPos + vec3(0.f, 0.f, -steeringAxisLength * 0.5f), rightWheelSuspensionPos + vec3(suspensionLength, 0.f, 0.f));
+
+	//// Left front wheel.
+	//vec3 leftFrontWheelPos = leftWheelSuspensionPos + vec3(0.f, 0.f, suspensionLength + wheelDesc.radius + 0.01f);
+	//leftFrontWheel = createSphere(scene, primitiveMesh, material, leftFrontWheelPos, wheelDesc.radius, wheelDesc.friction, wheelDesc.density);
+	//addHingeConstraintFromGlobalPoints(leftWheelSuspension, leftFrontWheel, leftFrontWheelPos, vec3(0.f, 0.f, 1.f));
+	//
+	//// Right front wheel.
+	//vec3 rightFrontWheelPos = rightWheelSuspensionPos - vec3(0.f, 0.f, suspensionLength + wheelDesc.radius + 0.01f);
+	//rightFrontWheel = createSphere(scene, primitiveMesh, material, rightFrontWheelPos, wheelDesc.radius, wheelDesc.friction, wheelDesc.density);
+	//addHingeConstraintFromGlobalPoints(rightWheelSuspension, rightFrontWheel, rightFrontWheelPos, vec3(0.f, 0.f, 1.f));
 
 
 	auto mesh = primitiveMesh.createDXMesh();

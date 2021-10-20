@@ -20,7 +20,13 @@ struct vehicle
 			scene_entity rearAxis;
 			scene_entity steeringWheel;
 			scene_entity steeringAxis;
+
+			scene_entity leftWheelSuspension;
+			scene_entity rightWheelSuspension;
+
+			//scene_entity leftFrontWheel;
+			//scene_entity rightFrontWheel;
 		};
-		scene_entity parts[7];
+		scene_entity parts[9];
 	};
 };
