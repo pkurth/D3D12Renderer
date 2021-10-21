@@ -297,53 +297,60 @@ bool ray::intersectCylinder(const bounding_cylinder& cylinder, float& outT) cons
 
 	quat q = rotateFromTo(axis, vec3(0.f, 1.f, 0.f));
 
-	vec3 posA = cylinder.positionA;
-	vec3 posB = posA + vec3(0.f, height, 0.f);
-
-	o = q * (o - posA);
+	// Cylinder base is at 0,0,0. Second point is above it.
+	o = q * (o - cylinder.positionA);
 	d = q * d;
 
-	float a = d.x * d.x + d.z * d.z;
-	float b = d.x * o.x + d.z * o.z;
-	float c = o.x * o.x + o.z * o.z - cylinder.radius * cylinder.radius;
-
-	float delta = b * b - a * c;
 
 	float epsilon = 1e-6f;
 
-	if (delta < epsilon)
+	float y = -1.f;
+	if (squaredLength(vec2(o.x, o.z)) > cylinder.radius * cylinder.radius)
 	{
-		return false;
+		// We are outside the infinite cylinder. Only in this case it is possible to hit the sides.
+
+		float a = d.x * d.x + d.z * d.z;
+		float b = d.x * o.x + d.z * o.z;
+		float c = o.x * o.x + o.z * o.z - cylinder.radius * cylinder.radius;
+
+		float delta = b * b - a * c;
+
+		if (delta < epsilon)
+		{
+			return false;
+		}
+
+		outT = (-b - sqrt(delta)) / a;
+		if (outT <= epsilon)
+		{
+			return false; // Behind ray.
+		}
+
+		y = o.y + outT * d.y;
 	}
 
-	outT = (-b - sqrt(delta)) / a;
-	if (outT <= epsilon)
-	{
-		return false; // Behind ray.
-	}
-
-
-	float y = o.y + outT * d.y;
-
-	// Check bases.
+	// Check bases. Always true if the above if is not taken.
 	if (y > height + epsilon || y < -epsilon) 
 	{
+		vec3 posA = vec3(0.f, 0.f, 0.f);
+		vec3 posB = vec3(0.f, height, 0.f);
+
 		ray localRay = { o, d };
 
 		float dist;
-		bool b1 = localRay.intersectDisk(posB, vec3(0.f, 1.f, 0.f), cylinder.radius, dist);
+		bool b1 = d.y < 0.f && localRay.intersectDisk(posB, vec3(0.f, 1.f, 0.f), cylinder.radius, dist);
 		if (b1)
 		{
 			outT = dist;
 		}
-		bool b2 = localRay.intersectDisk(posA, vec3(0.f, -1.f, 0.f), cylinder.radius, dist);
-		if (b2 && dist > epsilon && outT >= dist)
+		bool b2 = d.y > 0.f && localRay.intersectDisk(posA, vec3(0.f, -1.f, 0.f), cylinder.radius, dist);
+		if (b2)
 		{
 			outT = dist;
 		}
-	}
 
-	y = o.y + outT * d.y;
+		y = o.y + outT * d.y;
+	}
 
 	return y > -epsilon && y < height + epsilon;
 }
