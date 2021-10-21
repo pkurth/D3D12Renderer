@@ -38,6 +38,7 @@ enum collider_type : uint8
 	// The order here is important. See collision_narrow.cpp.
 	collider_type_sphere,
 	collider_type_capsule,
+	collider_type_cylinder,
 	collider_type_aabb,
 	collider_type_obb,
 	collider_type_hull,
@@ -49,6 +50,7 @@ static const char* colliderTypeNames[] =
 {
 	"Sphere",
 	"Capsule",
+	"Cylinder",
 	"AABB",
 	"OBB",
 	"Hull",
@@ -71,6 +73,7 @@ struct collider_union
 	{
 		bounding_sphere sphere;
 		bounding_capsule capsule;
+		bounding_cylinder cylinder;
 		bounding_box aabb;
 		bounding_oriented_box obb;
 		bounding_hull hull;
@@ -93,6 +96,13 @@ struct collider_component : collider_union
 		collider_component result;
 		result.capsule = c;
 		result.initialize(collider_type_capsule, restitution, friction, density);
+		return result;
+	}
+	static collider_component asCylinder(bounding_cylinder c, float restitution, float friction, float density)
+	{
+		collider_component result;
+		result.cylinder = c;
+		result.initialize(collider_type_cylinder, restitution, friction, density);
 		return result;
 	}
 	static collider_component asAABB(bounding_box b, float restitution, float friction, float density)

@@ -26,6 +26,23 @@ struct capsule_support_fn
 	}
 };
 
+struct cylinder_support_fn
+{
+	const bounding_cylinder& c;
+
+	vec3 operator()(const vec3& dir) const
+	{
+		float distA = dot(dir, c.positionA);
+		float distB = dot(dir, c.positionB);
+		vec3 fartherPoint = distA > distB ? c.positionA : c.positionB;
+
+		vec3 n = c.positionA - c.positionB;
+
+		vec3 projectedDir = noz(cross(cross(n, dir), n));
+		return fartherPoint + projectedDir * c.radius;
+	}
+};
+
 struct aabb_support_fn
 {
 	const bounding_box& b;

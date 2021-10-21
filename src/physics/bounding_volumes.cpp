@@ -720,6 +720,28 @@ bool sphereVsCapsule(const bounding_sphere& s, const bounding_capsule& c)
 	return sphereVsSphere(s, bounding_sphere{ closestPoint, c.radius });
 }
 
+bool sphereVsCylinder(const bounding_sphere& s, const bounding_cylinder& c)
+{
+	vec3 ab = c.positionB - c.positionA;
+	float t = dot(s.center - c.positionA, ab) / squaredLength(ab);
+	if (t >= 0.f && t <= 1.f)
+	{
+		return sphereVsSphere(s, bounding_sphere{ lerp(c.positionA, c.positionB, t), c.radius });
+	}
+
+	vec3 p = (t <= 0.f) ? c.positionA : c.positionB;
+	vec3 up = (t <= 0.f) ? -ab : ab;
+
+	vec3 projectedDirToCenter = normalize(cross(cross(up, s.center - p), up));
+	vec3 endA = p + projectedDirToCenter * c.radius;
+	vec3 endB = p - projectedDirToCenter * c.radius;
+
+	vec3 closestToSphere = closestPoint_PointSegment(s.center, line_segment{ endA, endB });
+	float sqDistance = squaredLength(closestToSphere - s.center);
+
+	return sqDistance <= s.radius;
+}
+
 bool sphereVsAABB(const bounding_sphere& s, const bounding_box& a)
 {
 	vec3 p = closestPoint_PointAABB(s.center, a);
@@ -754,6 +776,13 @@ bool capsuleVsCapsule(const bounding_capsule& a, const bounding_capsule& b)
 	return sphereVsSphere(bounding_sphere{ closestPoint1, a.radius }, bounding_sphere{ closestPoint2, b.radius });
 }
 
+bool capsuleVsCylinder(const bounding_capsule& a, const bounding_cylinder& b)
+{
+	vec3 closestPoint1, closestPoint2;
+	closestPoint_SegmentSegment(line_segment{ a.positionA, a.positionB }, line_segment{ b.positionA, b.positionB }, closestPoint1, closestPoint2);
+	return sphereVsCylinder(bounding_sphere{ closestPoint1, a.radius }, b);
+}
+
 bool capsuleVsAABB(const bounding_capsule& c, const bounding_box& b)
 {
 	capsule_support_fn capsuleSupport{ c };
@@ -781,6 +810,15 @@ bool capsuleVsHull(const bounding_capsule& c, const bounding_hull& h)
 
 	gjk_simplex gjkSimplex;
 	return gjkIntersectionTest(capsuleSupport, hullSupport, gjkSimplex);
+}
+
+bool cylinderVsCylinder(const bounding_cylinder& a, const bounding_cylinder& b)
+{
+	cylinder_support_fn cylinderSupportA{ a };
+	cylinder_support_fn cylinderSupportB{ b };
+
+	gjk_simplex gjkSimplex;
+	return gjkIntersectionTest(cylinderSupportA, cylinderSupportB, gjkSimplex);
 }
 
 bool aabbVsAABB(const bounding_box& a, const bounding_box& b)

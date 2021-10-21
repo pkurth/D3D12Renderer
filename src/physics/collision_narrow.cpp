@@ -400,6 +400,49 @@ static bool intersection(const bounding_sphere& s, const bounding_capsule& c, co
 	return intersection(s, bounding_sphere{ closestPoint, c.radius }, outContact);
 }
 
+static bool intersection(const bounding_sphere& s, const bounding_cylinder& c, contact_manifold& outContact)
+{
+	vec3 ab = c.positionB - c.positionA;
+	float t = dot(s.center - c.positionA, ab) / squaredLength(ab);
+	if (t >= 0.f && t <= 1.f)
+	{
+		return intersection(s, bounding_sphere{ lerp(c.positionA, c.positionB, t), c.radius }, outContact);
+	}
+
+	vec3 p = (t <= 0.f) ? c.positionA : c.positionB;
+	vec3 up = (t <= 0.f) ? -ab : ab;
+
+	vec3 projectedDirToCenter = normalize(cross(cross(up, s.center - p), up));
+	vec3 endA = p + projectedDirToCenter * c.radius;
+	vec3 endB = p - projectedDirToCenter * c.radius;
+
+	vec3 closestToSphere = closestPoint_PointSegment(s.center, line_segment{ endA, endB });
+	vec3 normal = closestToSphere - s.center; // From sphere to cylinder.
+	float sqDistance = squaredLength(normal);
+
+	if (sqDistance <= s.radius * s.radius)
+	{
+		float distance;
+		if (sqDistance == 0.f) // Degenerate case.
+		{
+			distance = 0.f;
+			outContact.collisionNormal = -normalize(up); // Flipped, so that from sphere to cylinder.
+		}
+		else
+		{
+			distance = sqrt(sqDistance);
+			outContact.collisionNormal = normal / distance;
+		}
+
+		outContact.numContacts = 1;
+		outContact.contacts[0].penetrationDepth = s.radius - distance;
+		assert(outContact.contacts[0].penetrationDepth >= 0.f);
+		outContact.contacts[0].point = closestToSphere + 0.5f * outContact.contacts[0].penetrationDepth * normal;
+		return true;
+	}
+	return false;
+}
+
 static bool intersection(const bounding_sphere& s, const bounding_box& a, contact_manifold& outContact)
 {
 	vec3 p = closestPoint_PointAABB(s.center, a);
@@ -563,6 +606,97 @@ static bool intersection(const bounding_capsule& a, const bounding_capsule& b, c
 	}
 }
 
+static bool intersection(const bounding_capsule& a, const bounding_cylinder& b, contact_manifold& outContact)
+{
+	vec3 aDir = a.positionB - a.positionA;
+	vec3 bDir = normalize(b.positionB - b.positionA);
+
+	float aDirLength = length(aDir);
+	aDir *= 1.f / aDirLength;
+
+	float parallel = dot(aDir, bDir);
+	if (abs(parallel) > 0.99f)
+	{
+		// Parallel case.
+
+		vec3 pAa = a.positionA;
+		vec3 pAb = a.positionB;
+		vec3 pBa = b.positionA;
+		vec3 pBb = b.positionB;
+
+		if (parallel < 0.f)
+		{
+			std::swap(pBa, pBb);
+		}
+
+		vec3 referencePoint = a.positionA;
+
+		float a0 = 0.f;
+		float a1 = aDirLength;
+
+		float b0 = dot(aDir, pBa - referencePoint);
+		float b1 = dot(aDir, pBb - referencePoint);
+		assert(b1 > b0);
+
+		float left = max(a0, b0);
+		float right = min(a1, b1);
+
+		if (right < left)
+		{
+			if (a0 > b1)
+			{
+				return intersection(bounding_sphere{ pAa, a.radius }, b, outContact);
+			}
+			else
+			{
+				return intersection(bounding_sphere{ pAb, a.radius }, b, outContact);
+			}
+		}
+
+		vec3 contactA0 = referencePoint + left * aDir;
+		vec3 contactA1 = referencePoint + right * aDir;
+
+		vec3 contactB0 = closestPoint_PointSegment(contactA0, line_segment{ pBa, pBb });
+		vec3 contactB1 = contactB0 + (right - left) * aDir;
+
+		vec3 normal = contactB0 - contactA0;
+		float d = length(normal);
+
+		if (d < EPSILON)
+		{
+			d = 0.f;
+			normal = vec3(0.f, 1.f, 0.f);
+		}
+		else
+		{
+			normal /= d;
+		}
+
+		float radiusSum = a.radius + b.radius;
+
+		float penetration = radiusSum - d;
+		if (penetration < 0.f)
+		{
+			return false;
+		}
+
+		outContact.collisionNormal = normal;
+		outContact.numContacts = 2;
+		outContact.contacts[0].penetrationDepth = penetration;
+		outContact.contacts[0].point = (contactA0 + contactB0) * 0.5f;
+		outContact.contacts[1].penetrationDepth = penetration;
+		outContact.contacts[1].point = (contactA1 + contactB1) * 0.5f;
+
+		return true;
+	}
+	else
+	{
+		vec3 closestPoint1, closestPoint2;
+		closestPoint_SegmentSegment(line_segment{ a.positionA, a.positionB }, line_segment{ b.positionA, b.positionB }, closestPoint1, closestPoint2);
+		return intersection(bounding_sphere{ closestPoint1, a.radius }, b, outContact);
+	}
+}
+
 static bool intersection(const bounding_capsule& c, const bounding_box& a, contact_manifold& outContact)
 {
 	capsule_support_fn capsuleSupport{ c };
@@ -676,6 +810,139 @@ static bool intersection(const bounding_capsule& c, const bounding_hull& h, cont
 	outContact.contacts[0].point = epa.point;
 
 	return true;
+}
+
+// Cylinder tests.
+static bool intersection(const bounding_cylinder& a, const bounding_cylinder& b, contact_manifold& outContact)
+{
+	vec3 aDir = a.positionB - a.positionA;
+	vec3 bDir = normalize(b.positionB - b.positionA);
+
+	float aDirLength = length(aDir);
+	aDir *= 1.f / aDirLength;
+
+	float parallel = dot(aDir, bDir);
+	if (abs(parallel) > 0.99f)
+	{
+		// Parallel case.
+
+		vec3 pAa = a.positionA;
+		vec3 pAb = a.positionB;
+		vec3 pBa = b.positionA;
+		vec3 pBb = b.positionB;
+
+		if (parallel < 0.f)
+		{
+			std::swap(pBa, pBb);
+		}
+
+		vec3 referencePoint = a.positionA;
+
+		float a0 = 0.f;
+		float a1 = aDirLength;
+
+		float b0 = dot(aDir, pBa - referencePoint);
+		float b1 = dot(aDir, pBb - referencePoint);
+		assert(b1 > b0);
+
+		float left = max(a0, b0);
+		float right = min(a1, b1);
+
+		if (right < left)
+		{
+			return false;
+		}
+
+		vec3 contactA0 = referencePoint + left * aDir;
+		vec3 contactA1 = referencePoint + right * aDir;
+
+		vec3 contactB0 = closestPoint_PointSegment(contactA0, line_segment{ pBa, pBb });
+		vec3 contactB1 = contactB0 + (right - left) * aDir;
+
+		vec3 normal = contactB0 - contactA0;
+		float d = length(normal);
+
+		float radiusSum = a.radius + b.radius;
+		float penetration = radiusSum - d;
+		if (penetration < 0.f)
+		{
+			return false;
+		}
+
+
+		float capPenetration = right - left;
+		assert(capPenetration > 0.f);
+
+		if (capPenetration < penetration)
+		{
+			// Cylinders touch cap to cap. TODO: Find stable contact manifold.
+			outContact.numContacts = 1;
+			outContact.contacts[0].penetrationDepth = capPenetration;
+
+			if (b0 > a0)
+			{ 
+				// B is "right" of A.
+				outContact.collisionNormal = aDir;
+				outContact.contacts[0].point = a.positionB - capPenetration * 0.5f;
+			}
+			else
+			{
+				// B is "left" of A.
+				outContact.collisionNormal = -aDir;
+				outContact.contacts[0].point = a.positionA + capPenetration * 0.5f;
+			}
+		}
+		else
+		{
+			// Cylinders touch tube to tube.
+
+			if (d < EPSILON)
+			{
+				d = 0.f;
+				normal = vec3(0.f, 1.f, 0.f);
+			}
+			else
+			{
+				normal /= d;
+			}
+
+			outContact.collisionNormal = normal;
+			outContact.numContacts = 2;
+			outContact.contacts[0].penetrationDepth = penetration;
+			outContact.contacts[0].point = (contactA0 + contactB0) * 0.5f;
+			outContact.contacts[1].penetrationDepth = penetration;
+			outContact.contacts[1].point = (contactA1 + contactB1) * 0.5f;
+		}
+
+		return true;
+	}
+	else
+	{
+		// TODO: Implement a less generic collision test.
+
+		cylinder_support_fn cylinderSupportA{ a };
+		cylinder_support_fn cylinderSupportB{ b };
+
+		gjk_simplex gjkSimplex;
+		if (!gjkIntersectionTest(cylinderSupportA, cylinderSupportB, gjkSimplex))
+		{
+			return false;
+		}
+
+		epa_result epa;
+		auto epaSuccess = epaCollisionInfo(gjkSimplex, cylinderSupportA, cylinderSupportB, epa);
+		if (epaSuccess != epa_success)
+		{
+			//return false;
+		}
+
+		outContact.collisionNormal = epa.normal;
+		outContact.numContacts = 1;
+		outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
+		outContact.contacts[0].point = epa.point;
+
+		return true;
+	}
 }
 
 // AABB tests.
@@ -1212,6 +1479,7 @@ static bool collisionCheck(collider_union* worldSpaceColliders, broadphase_colli
 				case collider_type_sphere: collides = intersection(colliderA->sphere, colliderB->sphere, contact); break;
 				case collider_type_capsule: collides = intersection(colliderA->sphere, colliderB->capsule, contact); break;
 				case collider_type_aabb: collides = intersection(colliderA->sphere, colliderB->aabb, contact); break;
+				case collider_type_cylinder: collides = intersection(colliderA->sphere, colliderB->cylinder, contact); break;
 				case collider_type_obb: collides = intersection(colliderA->sphere, colliderB->obb, contact); break;
 				case collider_type_hull: collides = intersection(colliderA->sphere, colliderB->hull, contact); break;
 			}
@@ -1223,9 +1491,22 @@ static bool collisionCheck(collider_union* worldSpaceColliders, broadphase_colli
 			switch (colliderB->type)
 			{
 				case collider_type_capsule: collides = intersection(colliderA->capsule, colliderB->capsule, contact); break;
+				case collider_type_cylinder: collides = intersection(colliderA->capsule, colliderB->cylinder, contact); break;
 				case collider_type_aabb: collides = intersection(colliderA->capsule, colliderB->aabb, contact); break;
 				case collider_type_obb: collides = intersection(colliderA->capsule, colliderB->obb, contact); break;
 				case collider_type_hull: collides = intersection(colliderA->capsule, colliderB->hull, contact); break;
+			}
+		} break;
+
+		// Cylinder tests.
+		case collider_type_cylinder:
+		{
+			switch (colliderB->type)
+			{
+				case collider_type_cylinder: collides = intersection(colliderA->cylinder, colliderB->cylinder, contact); break;
+				//case collider_type_aabb: collides = intersection(colliderA->cylinder, colliderB->aabb, contact); break;
+				//case collider_type_obb: collides = intersection(colliderA->cylinder, colliderB->obb, contact); break;
+				//case collider_type_hull: collides = intersection(colliderA->cylinder, colliderB->hull, contact); break;
 			}
 		} break;
 
@@ -1292,6 +1573,7 @@ static bool overlapCheck(collider_union* worldSpaceColliders, broadphase_collisi
 			{
 				case collider_type_sphere: overlaps = sphereVsSphere(colliderA->sphere, colliderB->sphere); break;
 				case collider_type_capsule: overlaps = sphereVsCapsule(colliderA->sphere, colliderB->capsule); break;
+				case collider_type_cylinder: overlaps = sphereVsCylinder(colliderA->sphere, colliderB->cylinder); break;
 				case collider_type_aabb: overlaps = sphereVsAABB(colliderA->sphere, colliderB->aabb); break;
 				case collider_type_obb: overlaps = sphereVsOBB(colliderA->sphere, colliderB->obb); break;
 				case collider_type_hull: overlaps = sphereVsHull(colliderA->sphere, colliderB->hull); break;
@@ -1304,9 +1586,22 @@ static bool overlapCheck(collider_union* worldSpaceColliders, broadphase_collisi
 			switch (colliderB->type)
 			{
 				case collider_type_capsule: overlaps = capsuleVsCapsule(colliderA->capsule, colliderB->capsule); break;
+				case collider_type_cylinder: overlaps = capsuleVsCylinder(colliderA->capsule, colliderB->cylinder); break;
 				case collider_type_aabb: overlaps = capsuleVsAABB(colliderA->capsule, colliderB->aabb); break;
 				case collider_type_obb: overlaps = capsuleVsOBB(colliderA->capsule, colliderB->obb); break;
 				case collider_type_hull: overlaps = capsuleVsHull(colliderA->capsule, colliderB->hull); break;
+			}
+		} break;
+
+		// Cylinder tests.
+		case collider_type_cylinder:
+		{
+			switch (colliderB->type)
+			{
+				case collider_type_cylinder: overlaps = cylinderVsCylinder(colliderA->cylinder, colliderB->cylinder); break;
+				//case collider_type_aabb: overlaps = cylinderVsAABB(colliderA->cylinder, colliderB->aabb); break;
+				//case collider_type_obb: overlaps = cylinderVsOBB(colliderA->cylinder, colliderB->obb); break;
+				//case collider_type_hull: overlaps = cylinderVsHull(colliderA->cylinder, colliderB->hull); break;
 			}
 		} break;
 

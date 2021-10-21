@@ -63,6 +63,14 @@ struct bounding_cylinder
 	vec3 positionA;
 	vec3 positionB;
 	float radius;
+
+	float volume()
+	{
+		float sqRadiusPI = M_PI * radius * radius;
+		float height = length(positionA - positionB);
+		float cylinderVolume = sqRadiusPI * height;
+		return cylinderVolume;
+	}
 };
 
 struct bounding_torus
@@ -244,14 +252,18 @@ struct ray
 bool sphereVsSphere(const bounding_sphere& a, const bounding_sphere& b);
 bool sphereVsPlane(const bounding_sphere& s, const vec4& p);
 bool sphereVsCapsule(const bounding_sphere& s, const bounding_capsule& c);
+bool sphereVsCylinder(const bounding_sphere& s, const bounding_cylinder& c);
 bool sphereVsAABB(const bounding_sphere& s, const bounding_box& a);
 bool sphereVsOBB(const bounding_sphere& s, const bounding_oriented_box& o);
 bool sphereVsHull(const bounding_sphere& s, const bounding_hull& h);
 
 bool capsuleVsCapsule(const bounding_capsule& a, const bounding_capsule& b);
+bool capsuleVsCylinder(const bounding_capsule& a, const bounding_cylinder& b);
 bool capsuleVsAABB(const bounding_capsule& c, const bounding_box& b);
 bool capsuleVsOBB(const bounding_capsule& c, const bounding_oriented_box& o);
 bool capsuleVsHull(const bounding_capsule& c, const bounding_hull& h);
+
+bool cylinderVsCylinder(const bounding_cylinder& a, const bounding_cylinder& b);
 
 bool aabbVsAABB(const bounding_box& a, const bounding_box& b);
 bool aabbVsOBB(const bounding_box& a, const bounding_oriented_box& o);

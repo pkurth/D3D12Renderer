@@ -9,7 +9,7 @@ struct broadphase_collision;
 struct contact_info
 {
 	vec3 point;
-	float penetrationDepth;
+	float penetrationDepth; // Positive.
 };
 
 struct collision_contact

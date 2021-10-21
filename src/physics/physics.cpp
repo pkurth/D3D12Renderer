@@ -490,6 +490,11 @@ void testPhysicsInteraction(game_scene& scene, ray r)
 					hit = localR.intersectCapsule(collider.capsule, t);
 				} break;
 
+				case collider_type_cylinder:
+				{
+					hit = localR.intersectCylinder(collider.cylinder, t);
+				} break;
+
 				case collider_type_aabb:
 				{
 					hit = localR.intersectAABB(collider.aabb, t);
@@ -588,6 +593,24 @@ static void getWorldSpaceColliders(game_scene& scene, bounding_box* outWorldspac
 				bb.grow(posB - radius3);
 
 				col.capsule = { posA, posB, radius };
+			} break;
+
+			case collider_type_cylinder:
+			{
+				vec3 posA = transform.rotation * collider.cylinder.positionA + transform.position;
+				vec3 posB = transform.rotation * collider.cylinder.positionB + transform.position;
+				float radius = collider.cylinder.radius;
+
+				vec3 a = posB - posA;
+				float aa = dot(a, a);
+				float x = sqrt(1.f - a.x * a.x / aa);
+				float y = sqrt(1.f - a.y * a.y / aa);
+				float z = sqrt(1.f - a.z * a.z / aa);
+				vec3 e = radius * vec3(x, y, z);
+
+				bb = bounding_box::fromMinMax(minimum(posA - e, posB - e), maximum(posA + e, posB + e));
+
+				col.cylinder = { posA, posB, radius };
 			} break;
 
 			case collider_type_aabb:
@@ -1080,6 +1103,33 @@ physics_properties collider_union::calculatePhysicsProperties()
 			float temp2 = temp0 + hemiSphereMass * (temp1 * temp1 + 3.f / 8.f * sqCapsuleHeight);
 			result.inertia.m00 += temp2 * 2.f;
 			result.inertia.m22 += temp2 * 2.f;
+			result.inertia.m01 = result.inertia.m02 = result.inertia.m10 = result.inertia.m12 = result.inertia.m20 = result.inertia.m21 = 0.f;
+
+			result.inertia = transpose(rot) * result.inertia * rot;
+		} break;
+
+		case collider_type_cylinder:
+		{
+			vec3 axis = cylinder.positionA - cylinder.positionB;
+			if (axis.y < 0.f)
+			{
+				axis *= -1.f;
+			}
+			float height = length(axis);
+			axis *= (1.f / height);
+
+			quat rotation = rotateFromTo(vec3(0.f, 1.f, 0.f), axis);
+			mat3 rot = quaternionToMat3(rotation);
+
+			result.mass = cylinder.volume() * properties.density;
+			result.cog = (cylinder.positionA + cylinder.positionB) * 0.5f;
+
+			// Inertia.
+			float sqRadius = cylinder.radius * cylinder.radius;
+			float sqHeight = height * height;
+
+			result.inertia.m11 = sqRadius * result.mass * 0.5f;
+			result.inertia.m00 = result.inertia.m22 = 1.f / 12.f * result.mass * (3.f * sqRadius + sqHeight);
 			result.inertia.m01 = result.inertia.m02 = result.inertia.m10 = result.inertia.m12 = result.inertia.m20 = result.inertia.m21 = 0.f;
 
 			result.inertia = transpose(rot) * result.inertia * rot;
