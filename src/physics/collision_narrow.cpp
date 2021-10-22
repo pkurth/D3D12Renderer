@@ -945,6 +945,126 @@ static bool intersection(const bounding_cylinder& a, const bounding_cylinder& b,
 	}
 }
 
+static bool intersection(const bounding_cylinder& c, const bounding_box& a, contact_manifold& outContact)
+{
+	cylinder_support_fn cylinderSupport{ c };
+	aabb_support_fn boxSupport{ a };
+
+	gjk_simplex gjkSimplex;
+	if (!gjkIntersectionTest(cylinderSupport, boxSupport, gjkSimplex))
+	{
+		return false;
+	}
+
+	epa_result epa;
+	auto epaSuccess = epaCollisionInfo(gjkSimplex, cylinderSupport, boxSupport, epa);
+	if (epaSuccess != epa_success)
+	{
+		//return false;
+	}
+
+	vec3 normal = epa.normal;
+	vec3 point = epa.point;
+
+	outContact.collisionNormal = normal;
+	outContact.numContacts = 1;
+	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
+	outContact.contacts[0].point = point;
+
+	if (abs(normal.x) > 0.99f || abs(normal.y) > 0.99f || abs(normal.z) > 0.99f)
+	{
+		// Probably AABB face.
+
+		vec3 axis = normalize(c.positionB - c.positionA);
+		float cosAngle = abs(dot(normal, axis));
+		if (cosAngle < 0.01f)
+		{
+			// Cylinder is parallel to AABB face (perpendicular to normal).
+
+			vec3 clipPlanePoints[4];
+			vec3 clipPlaneNormals[4];
+			vec4 clipPlanes[4];
+
+			vec3 aabbNormal = -normal;
+
+			vec4 referencePlane = getAABBReferencePlane(a, aabbNormal);
+
+			clipping_polygon polygon;
+			polygon.numPoints = 2;
+			vec3 pa = c.positionA + normal * c.radius;
+			vec3 pb = c.positionB + normal * c.radius;
+			polygon.points[0] = { pa, -signedDistanceToPlane(pa, referencePlane) };
+			polygon.points[1] = { pb, -signedDistanceToPlane(pb, referencePlane) };
+
+			vec3 aCenter = a.getCenter();
+			getAABBClippingPlanes(a.getRadius(), aabbNormal, clipPlanePoints, clipPlaneNormals);
+			for (uint32 i = 0; i < 4; ++i)
+			{
+				clipPlanePoints[i] = clipPlanePoints[i] + aCenter;
+				clipPlaneNormals[i] = clipPlaneNormals[i];
+				clipPlanes[i] = createPlane(clipPlanePoints[i], clipPlaneNormals[i]);
+			}
+
+			clipPointsAndBuildContact(polygon, clipPlanes, 4, referencePlane, outContact);
+		}
+		else if (cosAngle > 0.99f)
+		{
+			// Cylinder touches AABB with cap. TODO: Find stable contact manifold.
+		}
+	}
+
+	return true;
+}
+
+static bool intersection(const bounding_cylinder& c, const bounding_oriented_box& o, contact_manifold& outContact)
+{
+	bounding_box aabb = bounding_box::fromCenterRadius(o.center, o.radius);
+	bounding_cylinder c_ = {
+		conjugate(o.rotation) * (c.positionA - o.center) + o.center,
+		conjugate(o.rotation) * (c.positionB - o.center) + o.center,
+		c.radius };
+
+	if (intersection(c_, aabb, outContact))
+	{
+		outContact.collisionNormal = o.rotation * outContact.collisionNormal;
+
+		for (uint32 i = 0; i < outContact.numContacts; ++i)
+		{
+			outContact.contacts[i].point = o.rotation * (outContact.contacts[i].point - o.center) + o.center;
+		}
+		return true;
+	}
+	return false;
+}
+
+static bool intersection(const bounding_cylinder& c, const bounding_hull& h, contact_manifold& outContact)
+{
+	// TODO: Handle multiple-contact-points case.
+
+	cylinder_support_fn cylinderSupport{ c };
+	hull_support_fn hullSupport{ h };
+
+	gjk_simplex gjkSimplex;
+	if (!gjkIntersectionTest(cylinderSupport, hullSupport, gjkSimplex))
+	{
+		return false;
+	}
+
+	epa_result epa;
+	auto epaSuccess = epaCollisionInfo(gjkSimplex, cylinderSupport, hullSupport, epa);
+	if (epaSuccess != epa_success)
+	{
+		//return false;
+	}
+
+	outContact.collisionNormal = epa.normal;
+	outContact.numContacts = 1;
+	outContact.contacts[0].penetrationDepth = epa.penetrationDepth;
+	outContact.contacts[0].point = epa.point;
+
+	return true;
+}
+
 // AABB tests.
 static bool intersection(const bounding_box& a, const bounding_box& b, contact_manifold& outContact)
 {
@@ -1467,6 +1587,9 @@ static bool collisionCheck(collider_union* worldSpaceColliders, broadphase_colli
 	collider_union* colliderA = keepOrder ? colliderAInitial : colliderBInitial;
 	collider_union* colliderB = keepOrder ? colliderBInitial : colliderAInitial;
 
+	contact.colliderA = keepOrder ? overlap.colliderA : overlap.colliderB;
+	contact.colliderB = keepOrder ? overlap.colliderB : overlap.colliderA;
+
 	bool collides = false;
 
 	switch (colliderA->type)
@@ -1478,8 +1601,8 @@ static bool collisionCheck(collider_union* worldSpaceColliders, broadphase_colli
 			{
 				case collider_type_sphere: collides = intersection(colliderA->sphere, colliderB->sphere, contact); break;
 				case collider_type_capsule: collides = intersection(colliderA->sphere, colliderB->capsule, contact); break;
-				case collider_type_aabb: collides = intersection(colliderA->sphere, colliderB->aabb, contact); break;
 				case collider_type_cylinder: collides = intersection(colliderA->sphere, colliderB->cylinder, contact); break;
+				case collider_type_aabb: collides = intersection(colliderA->sphere, colliderB->aabb, contact); break;
 				case collider_type_obb: collides = intersection(colliderA->sphere, colliderB->obb, contact); break;
 				case collider_type_hull: collides = intersection(colliderA->sphere, colliderB->hull, contact); break;
 			}
@@ -1504,9 +1627,9 @@ static bool collisionCheck(collider_union* worldSpaceColliders, broadphase_colli
 			switch (colliderB->type)
 			{
 				case collider_type_cylinder: collides = intersection(colliderA->cylinder, colliderB->cylinder, contact); break;
-				//case collider_type_aabb: collides = intersection(colliderA->cylinder, colliderB->aabb, contact); break;
-				//case collider_type_obb: collides = intersection(colliderA->cylinder, colliderB->obb, contact); break;
-				//case collider_type_hull: collides = intersection(colliderA->cylinder, colliderB->hull, contact); break;
+				case collider_type_aabb: collides = intersection(colliderA->cylinder, colliderB->aabb, contact); break;
+				case collider_type_obb: collides = intersection(colliderA->cylinder, colliderB->obb, contact); break;
+				case collider_type_hull: collides = intersection(colliderA->cylinder, colliderB->hull, contact); break;
 			}
 		} break;
 
@@ -1541,13 +1664,7 @@ static bool collisionCheck(collider_union* worldSpaceColliders, broadphase_colli
 		} break;
 	}
 
-	if (collides)
-	{
-		contact.colliderA = keepOrder ? overlap.colliderA : overlap.colliderB;
-		contact.colliderB = keepOrder ? overlap.colliderB : overlap.colliderA;
-		return true;
-	}
-	return false;
+	return collides;
 }
 
 static bool overlapCheck(collider_union* worldSpaceColliders, broadphase_collision overlap, non_collision_interaction& interaction)
@@ -1561,6 +1678,19 @@ static bool overlapCheck(collider_union* worldSpaceColliders, broadphase_collisi
 
 	assert(colliderA->type == physics_object_type_rigid_body || colliderB->type == physics_object_type_rigid_body);
 	assert(colliderA->type != physics_object_type_rigid_body || colliderB->type != physics_object_type_rigid_body);
+
+	if (colliderA->type == physics_object_type_rigid_body)
+	{
+		interaction.rigidBodyIndex = colliderA->objectIndex;
+		interaction.otherIndex = colliderB->objectIndex;
+		interaction.otherType = colliderB->objectType;
+	}
+	else
+	{
+		interaction.rigidBodyIndex = colliderB->objectIndex;
+		interaction.otherIndex = colliderA->objectIndex;
+		interaction.otherType = colliderA->objectType;
+	}
 
 	bool overlaps = false;
 
@@ -1599,9 +1729,9 @@ static bool overlapCheck(collider_union* worldSpaceColliders, broadphase_collisi
 			switch (colliderB->type)
 			{
 				case collider_type_cylinder: overlaps = cylinderVsCylinder(colliderA->cylinder, colliderB->cylinder); break;
-				//case collider_type_aabb: overlaps = cylinderVsAABB(colliderA->cylinder, colliderB->aabb); break;
-				//case collider_type_obb: overlaps = cylinderVsOBB(colliderA->cylinder, colliderB->obb); break;
-				//case collider_type_hull: overlaps = cylinderVsHull(colliderA->cylinder, colliderB->hull); break;
+				case collider_type_aabb: overlaps = cylinderVsAABB(colliderA->cylinder, colliderB->aabb); break;
+				case collider_type_obb: overlaps = cylinderVsOBB(colliderA->cylinder, colliderB->obb); break;
+				case collider_type_hull: overlaps = cylinderVsHull(colliderA->cylinder, colliderB->hull); break;
 			}
 		} break;
 
@@ -1636,24 +1766,7 @@ static bool overlapCheck(collider_union* worldSpaceColliders, broadphase_collisi
 		} break;
 	}
 
-	if (overlaps)
-	{
-		if (colliderA->type == physics_object_type_rigid_body)
-		{
-			interaction.rigidBodyIndex = colliderA->objectIndex;
-			interaction.otherIndex = colliderB->objectIndex;
-			interaction.otherType = colliderB->objectType;
-		}
-		else
-		{
-			interaction.rigidBodyIndex = colliderB->objectIndex;
-			interaction.otherIndex = colliderA->objectIndex;
-			interaction.otherType = colliderA->objectType;
-		}
-
-		return true;
-	}
-	return false;
+	return overlaps;
 }
 
 narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions,

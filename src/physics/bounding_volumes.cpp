@@ -821,6 +821,35 @@ bool cylinderVsCylinder(const bounding_cylinder& a, const bounding_cylinder& b)
 	return gjkIntersectionTest(cylinderSupportA, cylinderSupportB, gjkSimplex);
 }
 
+bool cylinderVsAABB(const bounding_cylinder& c, const bounding_box& b)
+{
+	cylinder_support_fn cylinderSupport{ c };
+	aabb_support_fn boxSupport{ b };
+
+	gjk_simplex gjkSimplex;
+	return gjkIntersectionTest(cylinderSupport, boxSupport, gjkSimplex);
+}
+
+bool cylinderVsOBB(const bounding_cylinder& c, const bounding_oriented_box& o)
+{
+	bounding_box aabb = bounding_box::fromCenterRadius(o.center, o.radius);
+	bounding_cylinder c_ = {
+		conjugate(o.rotation) * (c.positionA - o.center) + o.center,
+		conjugate(o.rotation) * (c.positionB - o.center) + o.center,
+		c.radius };
+
+	return cylinderVsAABB(c_, aabb);
+}
+
+bool cylinderVsHull(const bounding_cylinder& c, const bounding_hull& h)
+{
+	cylinder_support_fn cylinderSupport{ c };
+	hull_support_fn hullSupport{ h };
+
+	gjk_simplex gjkSimplex;
+	return gjkIntersectionTest(cylinderSupport, hullSupport, gjkSimplex);
+}
+
 bool aabbVsAABB(const bounding_box& a, const bounding_box& b)
 {
 	if (a.maxCorner.x < b.minCorner.x || a.minCorner.x > b.maxCorner.x) return false;

@@ -264,6 +264,9 @@ bool capsuleVsOBB(const bounding_capsule& c, const bounding_oriented_box& o);
 bool capsuleVsHull(const bounding_capsule& c, const bounding_hull& h);
 
 bool cylinderVsCylinder(const bounding_cylinder& a, const bounding_cylinder& b);
+bool cylinderVsAABB(const bounding_cylinder& c, const bounding_box& b);
+bool cylinderVsOBB(const bounding_cylinder& c, const bounding_oriented_box& o);
+bool cylinderVsHull(const bounding_cylinder& c, const bounding_hull& h);
 
 bool aabbVsAABB(const bounding_box& a, const bounding_box& b);
 bool aabbVsOBB(const bounding_box& a, const bounding_oriented_box& o);
