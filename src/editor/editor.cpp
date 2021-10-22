@@ -486,6 +486,9 @@ bool scene_editor::drawSceneHierarchy()
 							ImGui::PropertySlider("Angular velocity damping", rb.angularDamping);
 							ImGui::PropertySlider("Gravity factor", rb.gravityFactor);
 
+							ImGui::PropertyValue("Linear velocity", rb.linearVelocity);
+							ImGui::PropertyValue("Angular velocity", rb.angularVelocity);
+
 							ImGui::EndProperties();
 						}
 					});

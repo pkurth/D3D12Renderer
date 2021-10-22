@@ -1569,6 +1569,7 @@ simd_hinge_constraint_solver initializeHingeVelocityConstraintsSIMD(memory_arena
 				floatw limitSign = ifThen(minLimitViolated, 1.f, -1.f);
 
 				floatw maxMotorImpulse = maxMotorTorque * floatw(dt);
+				maxMotorImpulse = ifThen(motorActive, maxMotorImpulse, zero);
 
 				vec3w motorAndLimitImpulseToAngularVelocityA = invInertiaA * globalRotationAxis;
 				vec3w motorAndLimitImpulseToAngularVelocityB = invInertiaB * globalRotationAxis;
@@ -2322,6 +2323,7 @@ simd_cone_twist_constraint_solver initializeConeTwistVelocityConstraintsSIMD(mem
 		if (batch.solveSwingMotor)
 		{
 			floatw maxSwingMotorImpulse = maxSwingMotorTorque * floatw(dt);
+			maxSwingMotorTorque = ifThen(solveSwingMotor, maxSwingMotorTorque, zero);
 
 			floatw axisX = cos(swingMotorAxis), axisY = sin(swingMotorAxis);
 			vec3w localSwingMotorAxis = axisX * localLimitTangentA + axisY * localLimitBitangentA;
@@ -2395,6 +2397,7 @@ simd_cone_twist_constraint_solver initializeConeTwistVelocityConstraintsSIMD(mem
 			floatw twistLimitSign = ifThen(minTwistLimitViolated, 1.f, -1.f);
 
 			floatw maxTwistMotorImpulse = maxTwistMotorTorque * floatw(dt);
+			maxTwistMotorImpulse = ifThen(solveTwistMotor, maxTwistMotorImpulse, zero);
 
 			vec3w twistMotorAndLimitImpulseToAngularVelocityA = invInertiaA * globalTwistAxis;
 			vec3w twistMotorAndLimitImpulseToAngularVelocityB = invInertiaB * globalTwistAxis;
@@ -3120,6 +3123,7 @@ simd_slider_constraint_solver initializeSliderVelocityConstraintsSIMD(memory_are
 			intw motorType = reinterpret(motorTypeF);
 
 			floatw maxMotorImpulse = maxMotorForce * dt;
+			maxMotorImpulse = ifThen(motorActive, maxMotorImpulse, zero);
 
 			auto isVelocityMotor = motorType == constraint_velocity_motor;
 

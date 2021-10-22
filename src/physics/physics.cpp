@@ -604,9 +604,14 @@ static void getWorldSpaceColliders(game_scene& scene, bounding_box* outWorldspac
 
 				vec3 a = posB - posA;
 				float aa = dot(a, a);
-				float x = sqrt(1.f - a.x * a.x / aa);
-				float y = sqrt(1.f - a.y * a.y / aa);
-				float z = sqrt(1.f - a.z * a.z / aa);
+
+				float x = 1.f - a.x * a.x / aa;
+				float y = 1.f - a.y * a.y / aa;
+				float z = 1.f - a.z * a.z / aa;
+				x = sqrt(max(0.f, x));
+				y = sqrt(max(0.f, y));
+				z = sqrt(max(0.f, z));
+
 				vec3 e = radius * vec3(x, y, z);
 
 				bb = bounding_box::fromMinMax(minimum(posA - e, posB - e), maximum(posA + e, posB + e));

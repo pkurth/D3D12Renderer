@@ -84,6 +84,9 @@ namespace ImGui
 	inline void PropertyValue(const char* label, uint32 v, const char* format = "%u") { ImGui::PropertyValue(label, format, v); }
 	inline void PropertyValue(const char* label, int64 v, const char* format = "%lld") { ImGui::PropertyValue(label, format, v); }
 	inline void PropertyValue(const char* label, uint64 v, const char* format = "%llu") { ImGui::PropertyValue(label, format, v); }
+	inline void PropertyValue(const char* label, vec2 v, const char* format = "%.3f, %.3f") { ImGui::PropertyValue(label, format, v.x, v.y); }
+	inline void PropertyValue(const char* label, vec3 v, const char* format = "%.3f, %.3f, %.3f") { ImGui::PropertyValue(label, format, v.x, v.y, v.z); }
+	inline void PropertyValue(const char* label, vec4 v, const char* format = "%.3f, %.3f, %.3f, %.3f") { ImGui::PropertyValue(label, format, v.x, v.y, v.z, v.w); }
 
 	bool PropertyCheckbox(const char* label, bool& v);
 
