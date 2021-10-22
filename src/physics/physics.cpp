@@ -431,17 +431,18 @@ void deleteConstraint(game_scene& scene, slider_constraint_handle handle)
 
 void deleteAllConstraintsFromEntity(scene_entity& entity)
 {
-	if (physics_reference_component* ref = entity.getComponentIfExists<physics_reference_component>())
+	entt::registry* registry = entity.registry;
+	if (constraint_context* context = registry->try_ctx<constraint_context>())
 	{
-		entt::registry* registry = entity.registry;
-		constraint_context& context = registry->ctx<constraint_context>();
-
-		for (auto edgeIndex = ref->firstConstraintEdge; edgeIndex != INVALID_CONSTRAINT_EDGE; )
+		if (physics_reference_component* ref = entity.getComponentIfExists<physics_reference_component>())
 		{
-			constraint_edge& edge = context.constraintEdges[edgeIndex];
-			edgeIndex = edge.nextConstraintEdge;
+			for (auto edgeIndex = ref->firstConstraintEdge; edgeIndex != INVALID_CONSTRAINT_EDGE; )
+			{
+				constraint_edge& edge = context->constraintEdges[edgeIndex];
+				edgeIndex = edge.nextConstraintEdge;
 
-			deleteConstraint(registry, edge.constraintEntity);
+				deleteConstraint(registry, edge.constraintEntity);
+			}
 		}
 	}
 }
