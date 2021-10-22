@@ -685,7 +685,7 @@ bool scene_editor::drawSceneHierarchy()
 													ImGui::PropertySliderAngle("Motor target angle", constraint.motorTargetAngle, rad2deg(lo), rad2deg(hi));
 												}
 
-												ImGui::PropertySlider("Max motor torque", constraint.maxMotorTorque, 0.001f, 1000.f);
+												ImGui::PropertySlider("Max motor torque", constraint.maxMotorTorque, 0.001f, 10000.f);
 											}
 											ImGui::EndProperties();
 										}

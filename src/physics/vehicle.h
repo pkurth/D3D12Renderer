@@ -24,9 +24,12 @@ struct vehicle
 			scene_entity leftWheelSuspension;
 			scene_entity rightWheelSuspension;
 
-			//scene_entity leftFrontWheel;
-			//scene_entity rightFrontWheel;
+			scene_entity leftFrontWheel;
+			scene_entity rightFrontWheel;
+
+			scene_entity leftWheelArm;
+			scene_entity rightWheelArm;
 		};
-		scene_entity parts[9];
+		scene_entity parts[11];
 	};
 };
