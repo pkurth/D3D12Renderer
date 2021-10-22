@@ -79,11 +79,11 @@ namespace ImGui
 	void PropertyValue(const char* label, const char* format, ...);
 
 	inline void PropertyValue(const char* label, bool v) { ImGui::PropertyValue(label, v ? "True" : "False"); }
-	inline void PropertyValue(const char* label, float v) { ImGui::PropertyValue(label, "%.3f", v); }
-	inline void PropertyValue(const char* label, int32 v) { ImGui::PropertyValue(label, "%d", v); }
-	inline void PropertyValue(const char* label, uint32 v) { ImGui::PropertyValue(label, "%u", v); }
-	inline void PropertyValue(const char* label, int64 v) { ImGui::PropertyValue(label, "%lld", v); }
-	inline void PropertyValue(const char* label, uint64 v) { ImGui::PropertyValue(label, "%llu", v); }
+	inline void PropertyValue(const char* label, float v, const char* format = "%.3f") { ImGui::PropertyValue(label, format, v); }
+	inline void PropertyValue(const char* label, int32 v, const char* format = "%d") { ImGui::PropertyValue(label, format, v); }
+	inline void PropertyValue(const char* label, uint32 v, const char* format = "%u") { ImGui::PropertyValue(label, format, v); }
+	inline void PropertyValue(const char* label, int64 v, const char* format = "%lld") { ImGui::PropertyValue(label, format, v); }
+	inline void PropertyValue(const char* label, uint64 v, const char* format = "%llu") { ImGui::PropertyValue(label, format, v); }
 
 	bool PropertyCheckbox(const char* label, bool& v);
 

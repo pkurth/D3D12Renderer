@@ -777,8 +777,8 @@ fixed_constraint_solver initializeFixedVelocityConstraints(memory_arena& arena, 
 		mat3 skewMatB = getSkewMatrix(out.relGlobalAnchorB);
 
 		out.invEffectiveTranslationMass = skewMatA * globalA.invInertia * transpose(skewMatA)
-			+ skewMatB * globalB.invInertia * transpose(skewMatB)
-			+ mat3::identity * (globalA.invMass + globalB.invMass);
+										+ skewMatB * globalB.invInertia * transpose(skewMatB)
+										+ mat3::identity * (globalA.invMass + globalB.invMass);
 
 		out.invEffectiveRotationMass = globalA.invInertia + globalB.invInertia;
 

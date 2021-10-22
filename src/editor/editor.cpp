@@ -480,7 +480,7 @@ bool scene_editor::drawSceneHierarchy()
 
 							if (!kinematic)
 							{
-								ImGui::PropertyValue("Mass", 1.f / rb.invMass);
+								ImGui::PropertyValue("Mass", 1.f / rb.invMass, "%.3fkg");
 							}
 							ImGui::PropertySlider("Linear velocity damping", rb.linearDamping);
 							ImGui::PropertySlider("Angular velocity damping", rb.angularDamping);

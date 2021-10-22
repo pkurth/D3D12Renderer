@@ -37,6 +37,7 @@ static constexpr uint64 bucketize(uint64 problemSize, uint64 bucketSize) { retur
 
 static void copySign(float from, float& to) { to = copysign(to, from); }
 
+static void flushDenormalsToZero() { _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON); }
 
 // Constexpr-version of _BitScanForward. Returns -1 if mask is zero.
 static constexpr uint32 indexOfLeastSignificantSetBit(uint32 i)
@@ -731,6 +732,14 @@ static vec4 exp(vec4 v) { return vec4(exp(v.f4)); }
 static vec2 pow(vec2 v, float e) { return vec2(pow(v.x, e), pow(v.y, e)); }
 static vec3 pow(vec3 v, float e) { return vec3(pow(v.x, e), pow(v.y, e), pow(v.z, e)); }
 static vec4 pow(vec4 v, float e) { return vec4(pow(v.f4, floatx4(e))); }
+
+static vec2 minimum(vec2 a, vec2 b) { return vec2(min(a.x, b.x), min(a.y, b.y)); }
+static vec3 minimum(vec3 a, vec3 b) { return vec3(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }
+static vec4 minimum(vec4 a, vec4 b) { return vec4(minimum(a.f4, b.f4)); }
+
+static vec2 maximum(vec2 a, vec2 b) { return vec2(max(a.x, b.x), max(a.y, b.y)); }
+static vec3 maximum(vec3 a, vec3 b) { return vec3(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }
+static vec4 maximum(vec4 a, vec4 b) { return vec4(maximum(a.f4, b.f4)); }
 
 mat2 operator*(const mat2& a, const mat2& b);
 mat3 operator*(const mat3& a, const mat3& b);

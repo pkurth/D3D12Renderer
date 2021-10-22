@@ -464,12 +464,19 @@ namespace ImGui
 		ImGui::EndTable();
 	}
 
+	static void paddedTextV(const char* format, va_list args)
+	{
+		ImVec2 padding = ImGui::GetStyle().FramePadding;
+		ImGui::SetCursorPos(ImGui::GetCursorPos() + padding);
+		ImGui::TextV(format, args);
+	}
+
 	void PropertyValue(const char* label, const char* format, ...)
 	{
 		pre(label);
 		va_list args;
 		va_start(args, format);
-		ImGui::TextV(format, args);
+		paddedTextV(format, args);
 		va_end(args);
 		post();
 	}
