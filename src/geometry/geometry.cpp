@@ -617,6 +617,181 @@ submesh_info cpu_mesh::pushCylinder(uint16 slices, float radius, float height, v
 	return result;
 }
 
+submesh_info cpu_mesh::pushHollowCylinder(uint16 slices, float radius, float innerRadius, float height, vec3 center, vec3 upAxis)
+{
+	alignNextTriangle();
+
+	uint32 baseVertex = numVertices;
+	uint32 firstTriangle = numTriangles;
+
+	assert(slices > 2);
+
+	float horzDeltaAngle = 2.f * M_PI / slices;
+	float halfHeight = height * 0.5f;
+
+	reserve(8 * slices, 8 * slices);
+
+	quat rotation = rotateFromTo(vec3(0.f, 1.f, 0.f), upAxis);
+
+	vec3* vertexPositionPtr = vertexPositions + numVertices;
+	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
+
+	vec2 uv(0.f, 0.f);
+
+	struct sincos
+	{
+		float sin, cos;
+	};
+
+	sincos* angles = (sincos*)alloca(sizeof(sincos) * slices);
+	for (uint32 x = 0; x < slices; ++x)
+	{
+		float horzAngle = x * horzDeltaAngle;
+		angles[x] = { sinf(horzAngle), cosf(horzAngle) };
+	}
+
+
+	// Bottom outer row, normal down.
+	for (uint32 x = 0; x < slices; ++x)
+	{
+		float vertexX = angles[x].cos;
+		float vertexZ = angles[x].sin;
+		vec3 pos(vertexX * radius, -halfHeight, vertexZ * radius);
+		vec3 nor(0.f, -1.f, 0.f);
+
+		pushVertex(center + rotation * pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
+	}
+
+	// Bottom row, normal around.
+	for (uint32 x = 0; x < slices; ++x)
+	{
+		float vertexX = angles[x].cos;
+		float vertexZ = angles[x].sin;
+		vec3 pos(vertexX * radius, -halfHeight, vertexZ * radius);
+		vec3 nor(vertexX, 0.f, vertexZ);
+
+		pushVertex(center + rotation * pos, uv, nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+	}
+
+	// Top row, normal around.
+	for (uint32 x = 0; x < slices; ++x)
+	{
+		float vertexX = angles[x].cos;
+		float vertexZ = angles[x].sin;
+		vec3 pos(vertexX * radius, halfHeight, vertexZ * radius);
+		vec3 nor(vertexX, 0.f, vertexZ);
+
+		pushVertex(center + rotation * pos, uv, nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+	}
+
+	// Top row, normal up.
+	for (uint32 x = 0; x < slices; ++x)
+	{
+		float horzAngle = x * horzDeltaAngle;
+		float vertexX = cosf(horzAngle);
+		float vertexZ = sinf(horzAngle);
+		vec3 pos(vertexX * radius, halfHeight, vertexZ * radius);
+		vec3 nor(0.f, 1.f, 0.f);
+
+		pushVertex(center + rotation * pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
+	}
+
+	// Bottom inner row, normal down.
+	for (uint32 x = 0; x < slices; ++x)
+	{
+		float vertexX = angles[x].cos;
+		float vertexZ = angles[x].sin;
+		vec3 pos(vertexX * innerRadius, -halfHeight, vertexZ * innerRadius);
+		vec3 nor(0.f, -1.f, 0.f);
+
+		pushVertex(center + rotation * pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
+	}
+
+	// Bottom inner row, normal inside.
+	for (uint32 x = 0; x < slices; ++x)
+	{
+		float vertexX = angles[x].cos;
+		float vertexZ = angles[x].sin;
+		vec3 pos(vertexX * innerRadius, -halfHeight, vertexZ * innerRadius);
+		vec3 nor(-vertexX, 0.f, -vertexZ);
+
+		pushVertex(center + rotation * pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
+	}
+
+	// Top inner row, normal inside.
+	for (uint32 x = 0; x < slices; ++x)
+	{
+		float vertexX = angles[x].cos;
+		float vertexZ = angles[x].sin;
+		vec3 pos(vertexX * innerRadius, halfHeight, vertexZ * innerRadius);
+		vec3 nor(-vertexX, 0.f, -vertexZ);
+
+		pushVertex(center + rotation * pos, uv, nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+	}
+
+	// Top inner row, normal up.
+	for (uint32 x = 0; x < slices; ++x)
+	{
+		float vertexX = angles[x].cos;
+		float vertexZ = angles[x].sin;
+		vec3 pos(vertexX * innerRadius, halfHeight, vertexZ * innerRadius);
+		vec3 nor(0.f, 1.f, 0.f);
+
+		pushVertex(center + rotation * pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
+	}
+
+
+	// Indices.
+
+	index_t firstInnerBottomVertex = 4 * slices;
+
+	for (uint32 x = 0; x < slices - 1u; ++x)
+	{
+		pushTriangle(firstInnerBottomVertex + x, x, x + 1);
+		pushTriangle(firstInnerBottomVertex + x, x + 1, firstInnerBottomVertex + x + 1);
+	}
+	pushTriangle(firstInnerBottomVertex + slices - 1u, slices - 1u, 0);
+	pushTriangle(firstInnerBottomVertex + slices - 1u, 0, firstInnerBottomVertex);
+
+	for (uint32 x = 0; x < slices - 1u; ++x)
+	{
+		pushTriangle(slices + x, 2 * slices + 1 + x, slices + 1 + x);
+		pushTriangle(slices + x, 2 * slices + x, 2 * slices + 1 + x);
+	}
+	pushTriangle(slices + slices - 1, 2 * slices, slices);
+	pushTriangle(slices + slices - 1, 2 * slices + slices - 1, 2 * slices);
+
+	index_t firstInnerTopVertex = 7 * slices;
+	index_t firstOuterTopVertex = 3 * slices;
+
+	for (uint32 x = 0; x < slices - 1u; ++x)
+	{
+		pushTriangle(firstInnerTopVertex + x, firstOuterTopVertex + x + 1, firstOuterTopVertex + x);
+		pushTriangle(firstInnerTopVertex + x, firstInnerTopVertex + x + 1, firstOuterTopVertex + x + 1);
+	}
+	pushTriangle(firstInnerTopVertex + slices - 1u, firstOuterTopVertex + 0, firstOuterTopVertex + slices - 1u);
+	pushTriangle(firstInnerTopVertex + slices - 1u, firstInnerTopVertex, firstOuterTopVertex + 0);
+
+	firstInnerBottomVertex = 5 * slices;
+	firstInnerTopVertex = 6 * slices;
+
+	for (uint32 x = 0; x < slices - 1u; ++x)
+	{
+		pushTriangle(firstInnerBottomVertex + x, firstInnerBottomVertex + 1 + x, firstInnerTopVertex + 1 + x);
+		pushTriangle(firstInnerBottomVertex + x, firstInnerTopVertex + 1 + x, firstInnerTopVertex + x);
+	}
+	pushTriangle(firstInnerBottomVertex + slices - 1, firstInnerBottomVertex, firstInnerTopVertex);
+	pushTriangle(firstInnerBottomVertex + slices - 1, firstInnerTopVertex, firstInnerTopVertex + slices - 1);
+
+
+	submesh_info result;
+	result.firstIndex = firstTriangle * 3;
+	result.numIndices = 8 * slices * 3;
+	result.baseVertex = baseVertex;
+	result.numVertices = numVertices - baseVertex;
+	return result;
+}
+
 submesh_info cpu_mesh::pushArrow(uint16 slices, float shaftRadius, float headRadius, float shaftLength, float headLength)
 {
 	alignNextTriangle();

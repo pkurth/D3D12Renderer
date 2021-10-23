@@ -24,6 +24,7 @@ struct wheel_description
 {
 	float height;
 	float radius;
+	float innerRadius;
 
 	float friction;
 	float density;
@@ -91,8 +92,8 @@ static void attach(ref<composite_mesh> mesh, cpu_mesh& primitiveMesh, ref<pbr_ma
 		{
 			wheel_description desc = attachment.wheel;
 
-			mesh->submeshes.push_back({ primitiveMesh.pushCylinder(21, desc.radius, desc.height, vec3(0.f, rodOffset, 0.f)), {}, trs::identity, material });
-			//mesh->submeshes.push_back({ primitiveMesh.pushSphere(21, 21, desc.radius, vec3(0.f, rodOffset, 0.f)), {}, trs::identity, material });
+			//mesh->submeshes.push_back({ primitiveMesh.pushCylinder(21, desc.radius, desc.height, vec3(0.f, rodOffset, 0.f)), {}, trs::identity, material });
+			mesh->submeshes.push_back({ primitiveMesh.pushHollowCylinder(21, desc.radius, desc.innerRadius, desc.height, vec3(0.f, rodOffset, 0.f)), {}, trs::identity, material });
 
 			bounding_cylinder cylinder;
 			cylinder.positionA = vec3(0.f, rodOffset - desc.height * 0.5f, 0.f);
@@ -184,7 +185,8 @@ static scene_entity createWheel(game_scene& scene, cpu_mesh& primitiveMesh, ref<
 
 	auto mesh = make_ref<composite_mesh>();
 
-	mesh->submeshes.push_back({ primitiveMesh.pushCylinder(21, desc.radius, desc.height), {}, trs::identity, material });
+	//mesh->submeshes.push_back({ primitiveMesh.pushCylinder(21, desc.radius, desc.height), {}, trs::identity, material });
+	mesh->submeshes.push_back({ primitiveMesh.pushHollowCylinder(21, desc.radius, desc.innerRadius, desc.height), {}, trs::identity, material });
 
 	bounding_cylinder cylinder;
 	cylinder.positionA = vec3(0.f, -desc.height * 0.5f, 0.f);
@@ -287,6 +289,7 @@ void vehicle::initialize(game_scene& scene)
 	wheel_description wheelDesc;
 	wheelDesc.height = 0.3f;
 	wheelDesc.radius = 0.7f;
+	wheelDesc.innerRadius = wheelDesc.radius * 0.4f;
 	wheelDesc.friction = 1.f;
 	wheelDesc.density = 50.f;
 
