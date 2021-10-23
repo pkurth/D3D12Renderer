@@ -11,6 +11,11 @@ struct vertex_info
 	uint32 skinOffset;
 };
 
+struct sincos
+{
+	float sin, cos;
+};
+
 static vertex_info getVertexInfo(uint32 flags)
 {
 	vertex_info result = {};
@@ -531,60 +536,66 @@ submesh_info cpu_mesh::pushCylinder(uint16 slices, float radius, float height, v
 
 	quat rotation = rotateFromTo(vec3(0.f, 1.f, 0.f), upAxis);
 
+	sincos* angles = (sincos*)alloca(sizeof(sincos) * slices);
+	for (uint32 x = 0; x < slices; ++x)
+	{
+		float horzAngle = x * horzDeltaAngle;
+		angles[x] = { sinf(horzAngle), cosf(horzAngle) };
+	}
+
 	vec3* vertexPositionPtr = vertexPositions + numVertices;
 	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
-	vec2 uv(0.f, 0.f);
-	pushVertex(center + rotation * vec3(0.f, -halfHeight, 0.f), uv, vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+	pushVertex(center + rotation * vec3(0.f, -halfHeight, 0.f), vec2(0.25f, 0.75f), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
 	// Bottom row, normal down.
 	for (uint32 x = 0; x < slices; ++x)
 	{
 		float horzAngle = x * horzDeltaAngle;
-		float vertexX = cosf(horzAngle);
-		float vertexZ = sinf(horzAngle);
+		float vertexX = angles[x].cos;
+		float vertexZ = angles[x].sin;
 		vec3 pos(vertexX * radius, -halfHeight, vertexZ * radius);
 		vec3 nor(0.f, -1.f, 0.f);
 
-		pushVertex(center + rotation * pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, vec2(0.f, 0.5f), vec2(0.5f, 1.f)), nor, vec3(1.f, 0.f, 0.f), {});
 	}
 
 	// Bottom row, normal around.
 	for (uint32 x = 0; x < slices; ++x)
 	{
 		float horzAngle = x * horzDeltaAngle;
-		float vertexX = cosf(horzAngle);
-		float vertexZ = sinf(horzAngle);
+		float vertexX = angles[x].cos;
+		float vertexZ = angles[x].sin;
 		vec3 pos(vertexX * radius, -halfHeight, vertexZ * radius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(center + rotation * pos, uv, nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.5f), nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
 	}
 
 	// Top row, normal around.
 	for (uint32 x = 0; x < slices; ++x)
 	{
 		float horzAngle = x * horzDeltaAngle;
-		float vertexX = cosf(horzAngle);
-		float vertexZ = sinf(horzAngle);
+		float vertexX = angles[x].cos;
+		float vertexZ = angles[x].sin;
 		vec3 pos(vertexX * radius, halfHeight, vertexZ * radius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(center + rotation * pos, uv, nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.f), nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
 	}
 
 	// Top row, normal up.
 	for (uint32 x = 0; x < slices; ++x)
 	{
 		float horzAngle = x * horzDeltaAngle;
-		float vertexX = cosf(horzAngle);
-		float vertexZ = sinf(horzAngle);
+		float vertexX = angles[x].cos;
+		float vertexZ = angles[x].sin;
 		vec3 pos(vertexX * radius, halfHeight, vertexZ * radius);
 		vec3 nor(0.f, 1.f, 0.f);
 
-		pushVertex(center + rotation * pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, vec2(0.5f, 0.5f), vec2(1.f, 1.f)), nor, vec3(1.f, 0.f, 0.f), {});
 	}
 
-	pushVertex(center + rotation * vec3(0.f, halfHeight, 0.f), uv, vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+	pushVertex(center + rotation * vec3(0.f, halfHeight, 0.f), vec2(0.75f, 0.75f), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
 
 	index_t lastVertex = 4 * slices + 2;
 
@@ -636,13 +647,6 @@ submesh_info cpu_mesh::pushHollowCylinder(uint16 slices, float radius, float inn
 	vec3* vertexPositionPtr = vertexPositions + numVertices;
 	uint8* vertexOthersPtr = vertexOthers + othersSize * numVertices;
 
-	vec2 uv(0.f, 0.f);
-
-	struct sincos
-	{
-		float sin, cos;
-	};
-
 	sincos* angles = (sincos*)alloca(sizeof(sincos) * slices);
 	for (uint32 x = 0; x < slices; ++x)
 	{
@@ -650,6 +654,7 @@ submesh_info cpu_mesh::pushHollowCylinder(uint16 slices, float radius, float inn
 		angles[x] = { sinf(horzAngle), cosf(horzAngle) };
 	}
 
+	float radiusRelation = innerRadius / radius;
 
 	// Bottom outer row, normal down.
 	for (uint32 x = 0; x < slices; ++x)
@@ -659,7 +664,7 @@ submesh_info cpu_mesh::pushHollowCylinder(uint16 slices, float radius, float inn
 		vec3 pos(vertexX * radius, -halfHeight, vertexZ * radius);
 		vec3 nor(0.f, -1.f, 0.f);
 
-		pushVertex(center + rotation * pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, vec2(0.f, 0.5f), vec2(0.5f, 1.f)), nor, vec3(1.f, 0.f, 0.f), {});
 	}
 
 	// Bottom row, normal around.
@@ -670,7 +675,7 @@ submesh_info cpu_mesh::pushHollowCylinder(uint16 slices, float radius, float inn
 		vec3 pos(vertexX * radius, -halfHeight, vertexZ * radius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(center + rotation * pos, uv, nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.5f), nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
 	}
 
 	// Top row, normal around.
@@ -681,7 +686,7 @@ submesh_info cpu_mesh::pushHollowCylinder(uint16 slices, float radius, float inn
 		vec3 pos(vertexX * radius, halfHeight, vertexZ * radius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(center + rotation * pos, uv, nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.f), nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
 	}
 
 	// Top row, normal up.
@@ -693,8 +698,11 @@ submesh_info cpu_mesh::pushHollowCylinder(uint16 slices, float radius, float inn
 		vec3 pos(vertexX * radius, halfHeight, vertexZ * radius);
 		vec3 nor(0.f, 1.f, 0.f);
 
-		pushVertex(center + rotation * pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, vec2(0.5f, 0.5f), vec2(1.f, 1.f)), nor, vec3(1.f, 0.f, 0.f), {});
 	}
+
+	vec2 innerUVMin = vec2(0.25f, 0.75f) - 0.25f * radiusRelation;
+	vec2 innerUVMax = vec2(0.25f, 0.75f) + 0.25f * radiusRelation;
 
 	// Bottom inner row, normal down.
 	for (uint32 x = 0; x < slices; ++x)
@@ -704,7 +712,7 @@ submesh_info cpu_mesh::pushHollowCylinder(uint16 slices, float radius, float inn
 		vec3 pos(vertexX * innerRadius, -halfHeight, vertexZ * innerRadius);
 		vec3 nor(0.f, -1.f, 0.f);
 
-		pushVertex(center + rotation * pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, innerUVMin, innerUVMax), nor, vec3(1.f, 0.f, 0.f), {});
 	}
 
 	// Bottom inner row, normal inside.
@@ -715,7 +723,7 @@ submesh_info cpu_mesh::pushHollowCylinder(uint16 slices, float radius, float inn
 		vec3 pos(vertexX * innerRadius, -halfHeight, vertexZ * innerRadius);
 		vec3 nor(-vertexX, 0.f, -vertexZ);
 
-		pushVertex(center + rotation * pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.5f), nor, vec3(1.f, 0.f, 0.f), {});
 	}
 
 	// Top inner row, normal inside.
@@ -726,7 +734,7 @@ submesh_info cpu_mesh::pushHollowCylinder(uint16 slices, float radius, float inn
 		vec3 pos(vertexX * innerRadius, halfHeight, vertexZ * innerRadius);
 		vec3 nor(-vertexX, 0.f, -vertexZ);
 
-		pushVertex(center + rotation * pos, uv, nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.f), nor, normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
 	}
 
 	// Top inner row, normal up.
@@ -737,7 +745,7 @@ submesh_info cpu_mesh::pushHollowCylinder(uint16 slices, float radius, float inn
 		vec3 pos(vertexX * innerRadius, halfHeight, vertexZ * innerRadius);
 		vec3 nor(0.f, 1.f, 0.f);
 
-		pushVertex(center + rotation * pos, uv, nor, vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, innerUVMin + vec2(0.5f, 0.f), innerUVMax + vec2(0.5f, 0.f)), nor, vec3(1.f, 0.f, 0.f), {});
 	}
 
 

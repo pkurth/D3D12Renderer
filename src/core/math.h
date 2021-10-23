@@ -741,6 +741,34 @@ static vec2 maximum(vec2 a, vec2 b) { return vec2(max(a.x, b.x), max(a.y, b.y));
 static vec3 maximum(vec3 a, vec3 b) { return vec3(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }
 static vec4 maximum(vec4 a, vec4 b) { return vec4(maximum(a.f4, b.f4)); }
 
+static vec2 remap(vec2 v, vec2 oldL, vec2 oldU, vec2 newL, vec2 newU)
+{
+	return
+	{
+		remap(v.x, oldL.x, oldU.x, newL.x, newU.x),
+		remap(v.y, oldL.y, oldU.y, newL.y, newU.y),
+	};
+}
+static vec3 remap(vec3 v, vec3 oldL, vec3 oldU, vec3 newL, vec3 newU)
+{
+	return
+	{
+		remap(v.x, oldL.x, oldU.x, newL.x, newU.x),
+		remap(v.y, oldL.y, oldU.y, newL.y, newU.y),
+		remap(v.z, oldL.z, oldU.z, newL.z, newU.z),
+	};
+}
+static vec4 remap(vec4 v, vec4 oldL, vec4 oldU, vec4 newL, vec4 newU)
+{
+	return
+	{
+		remap(v.x, oldL.x, oldU.x, newL.x, newU.x),
+		remap(v.y, oldL.y, oldU.y, newL.y, newU.y),
+		remap(v.z, oldL.z, oldU.z, newL.z, newU.z),
+		remap(v.w, oldL.w, oldU.w, newL.w, newU.w),
+	};
+}
+
 mat2 operator*(const mat2& a, const mat2& b);
 mat3 operator*(const mat3& a, const mat3& b);
 mat3 operator+(const mat3& a, const mat3& b);
