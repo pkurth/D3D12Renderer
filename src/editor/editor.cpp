@@ -8,6 +8,7 @@
 #include "geometry/mesh.h"
 #include "physics/physics.h"
 #include "physics/ragdoll.h"
+#include "physics/vehicle.h"
 #include "scene/serialization.h"
 
 #include <fontawesome/list.h>
@@ -1177,6 +1178,13 @@ void scene_editor::drawEntityCreationPopup()
 		{
 			auto ragdoll = humanoid_ragdoll::create(*scene, scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f));
 			setSelectedEntity(ragdoll.torso);
+			clicked = true;
+		}
+
+		if (ImGui::MenuItem("Vehicle", "V") || ImGui::IsKeyPressed('V'))
+		{
+			auto vehicle = vehicle::create(*scene);
+			setSelectedEntity(vehicle.motor);
 			clicked = true;
 		}
 
