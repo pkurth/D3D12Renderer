@@ -266,11 +266,11 @@ void vehicle::initialize(game_scene& scene)
 
 	motor = scene.createEntity("Motor")
 		.addComponent<transform_component>(vec3(0.f, 1.1f, 0.f), quat::identity)
-		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f), vec3(1.f, 0.1f, 0.6f)), 0.2f, 0.f, density))
+		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f), vec3(0.6f, 0.1f, 1.f)), 0.2f, 0.f, density))
 		.addComponent<rigid_body_component>(true);
 
 	auto motorMesh = make_ref<composite_mesh>();
-	motorMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(1.f, 0.1f, 0.6f)), {}, trs::identity, material });
+	motorMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(0.6f, 0.1f, 1.f)), {}, trs::identity, material });
 
 	motor.addComponent<raster_component>(motorMesh);
 
@@ -305,9 +305,12 @@ void vehicle::initialize(game_scene& scene)
 	wheelDesc.density = 50.f;
 
 
+	float motorGearY = 1.35f;
+	float gearOffset = 0.26f;
+
 	// Motor gear.
-	motorGear = createAxis(scene, primitiveMesh, material, vec3(0.f, 1.35f, 0.f), quat::identity, motorGearDesc);
-	auto motorConstraintHandle = addHingeConstraintFromGlobalPoints(motor, motorGear, vec3(0.f, 1.35f, 0.f), vec3(0.f, 1.f, 0.f));
+	motorGear = createAxis(scene, primitiveMesh, material, vec3(0.f, motorGearY, 0.f), quat::identity, motorGearDesc);
+	auto motorConstraintHandle = addHingeConstraintFromGlobalPoints(motor, motorGear, vec3(0.f, motorGearY, 0.f), vec3(0.f, 1.f, 0.f));
 
 	auto& motorConstraint = getConstraint(scene, motorConstraintHandle);
 	motorConstraint.maxMotorTorque = 500.f;
@@ -315,27 +318,26 @@ void vehicle::initialize(game_scene& scene)
 
 	// Drive axis.
 	float driveAxisLength = 4.5f;
-	float driveAxisOffset = 0.26f;
 	axis_attachment driveAxisAttachment(driveAxisLength * 0.57f, rodThickness, motorGearDesc);
-	driveAxis = createAxis(scene, primitiveMesh, material, vec3(driveAxisOffset, 1.35f + driveAxisOffset, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)),
+	driveAxis = createAxis(scene, primitiveMesh, material, vec3(0.f, motorGearY + gearOffset, gearOffset), quat(vec3(-1.f, 0.f, 0.f), deg2rad(90.f)),
 		motorGearDesc, 0, &driveAxisAttachment);
-	addHingeConstraintFromGlobalPoints(motor, driveAxis, vec3(driveAxisOffset, 1.35f + driveAxisOffset, 0.f), vec3(1.f, 0.f, 0.f));
+	addHingeConstraintFromGlobalPoints(motor, driveAxis, vec3(0.f, motorGearY + gearOffset, gearOffset), vec3(0.f, 0.f, 1.f));
 
 	// Front axis.
 	float axisLength = 1.5f;
 	float suspensionLength = 0.4f;
 
-	float frontAxisOffsetX = -driveAxisLength * 0.5f + driveAxisOffset * 2.f;
-	vec3 frontAxisPos(frontAxisOffsetX, 1.35f + driveAxisOffset, 0.f);
-	frontAxis = createRod(scene, primitiveMesh, material, frontAxisPos + vec3(0.f, 0.f, axisLength), frontAxisPos - vec3(0.f, 0.f, axisLength), 0.05f);
+	float frontAxisOffsetZ = -driveAxisLength * 0.5f + gearOffset * 2.f;
+	vec3 frontAxisPos(0.f, motorGearY + gearOffset, frontAxisOffsetZ);
+	frontAxis = createRod(scene, primitiveMesh, material, frontAxisPos + vec3(axisLength, 0.f, 0.f), frontAxisPos - vec3(axisLength, 0.f, 0.f), 0.05f);
 	addFixedConstraintFromGlobalPoints(motor, frontAxis, frontAxisPos);
 
 	// Steering wheel.
 	axis_attachment steeringWheelAttachment(2.f, rodThickness, motorGearDesc);
-	quat steeringWheelRot(vec3(0.f, 0.f, 1.f), deg2rad(-80.f));
-	steeringWheel = createAxis(scene, primitiveMesh, material, vec3(0.8f, 2.3f, 0.f),
+	quat steeringWheelRot(vec3(-1.f, 0.f, 0.f), deg2rad(-80.f));
+	steeringWheel = createAxis(scene, primitiveMesh, material, vec3(0.f, 2.3f, 0.8f),
 		steeringWheelRot, steeringWheelDesc, 0, &steeringWheelAttachment);
-	auto steeringWheelConstraintHandle = addHingeConstraintFromGlobalPoints(motor, steeringWheel, vec3(0.8f, 2.3f, 0.f), steeringWheelRot * vec3(0.f, -1.f, 0.f));
+	auto steeringWheelConstraintHandle = addHingeConstraintFromGlobalPoints(motor, steeringWheel, vec3(0.f, 2.3f, 0.8f), steeringWheelRot * vec3(0.f, -1.f, 0.f));
 
 	auto& steeringWheelConstraint = getConstraint(scene, steeringWheelConstraintHandle);
 	steeringWheelConstraint.motorType = constraint_position_motor;
@@ -343,38 +345,38 @@ void vehicle::initialize(game_scene& scene)
 	steeringWheelConstraint.motorTargetAngle = 0.f;
 
 	// Steering axis.
-	vec3 steeringAxisPos(frontAxisOffsetX + 0.49f, 1.35f + driveAxisOffset + 0.06f, 0.f);
+	vec3 steeringAxisPos(0.f, motorGearY + gearOffset + 0.06f, frontAxisOffsetZ + 0.49f);
 	float steeringAxisLength = axisLength * 1.05f;
-	steeringAxis = createGearAxis(scene, primitiveMesh, material, steeringAxisPos, steeringWheelRot * quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), steeringAxisLength, 8,
+	steeringAxis = createGearAxis(scene, primitiveMesh, material, steeringAxisPos, steeringWheelRot, steeringAxisLength, 8,
 		motorGearDesc.toothLength, motorGearDesc.toothWidth, motorGearDesc.friction, motorGearDesc.density);
-	addSliderConstraintFromGlobalPoints(motor, steeringAxis, steeringAxisPos, vec3(0.f, 0.f, 1.f), -4.f, 4.f);
+	addSliderConstraintFromGlobalPoints(motor, steeringAxis, steeringAxisPos, vec3(1.f, 0.f, 0.f), -4.f, 4.f);
 
-	vec3 leftSteeringAxisAttachmentPos = steeringAxisPos + vec3(0.f, 0.f, steeringAxisLength * 0.5f);
-	vec3 rightSteeringAxisAttachmentPos = steeringAxisPos - vec3(0.f, 0.f, steeringAxisLength * 0.5f);
+	vec3 leftSteeringAxisAttachmentPos = steeringAxisPos - vec3(steeringAxisLength * 0.5f, 0.f, 0.f);
+	vec3 rightSteeringAxisAttachmentPos = steeringAxisPos + vec3(steeringAxisLength * 0.5f, 0.f, 0.f);
 
 	// Left wheel suspension.
-	vec3 leftWheelSuspensionPos = frontAxisPos + vec3(0.f, 0.f, axisLength);
-	vec3 leftWheelSuspensionAttachmentPos = leftWheelSuspensionPos + vec3(suspensionLength, 0.f, 0.f);
-	leftWheelSuspension = createWheelSuspension(scene, primitiveMesh, material, leftWheelSuspensionPos, quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), suspensionLength, 0.1f, false);
+	vec3 leftWheelSuspensionPos = frontAxisPos - vec3(axisLength, 0.f, 0.f);
+	vec3 leftWheelSuspensionAttachmentPos = leftWheelSuspensionPos + vec3(0.f, 0.f, suspensionLength);
+	leftWheelSuspension = createWheelSuspension(scene, primitiveMesh, material, leftWheelSuspensionPos, quat::identity, suspensionLength, 0.1f, false);
 	addHingeConstraintFromGlobalPoints(motor, leftWheelSuspension, leftWheelSuspensionPos, vec3(0.f, 1.f, 0.f), deg2rad(-45.f), deg2rad(45.f));
 
 	// Right wheel suspension.
-	vec3 rightWheelSuspensionPos = frontAxisPos - vec3(0.f, 0.f, axisLength);
-	vec3 rightWheelSuspensionAttachmentPos = rightWheelSuspensionPos + vec3(suspensionLength, 0.f, 0.f);
-	rightWheelSuspension = createWheelSuspension(scene, primitiveMesh, material, rightWheelSuspensionPos, quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), suspensionLength, 0.1f, true);
+	vec3 rightWheelSuspensionPos = frontAxisPos + vec3(axisLength, 0.f, 0.f);
+	vec3 rightWheelSuspensionAttachmentPos = rightWheelSuspensionPos + vec3(0.f, 0.f, suspensionLength);
+	rightWheelSuspension = createWheelSuspension(scene, primitiveMesh, material, rightWheelSuspensionPos, quat::identity, suspensionLength, 0.1f, true);
 	addHingeConstraintFromGlobalPoints(motor, rightWheelSuspension, rightWheelSuspensionPos, vec3(0.f, 1.f, 0.f), deg2rad(-45.f), deg2rad(45.f));
 
 
 	// Left front wheel.
-	vec3 leftFrontWheelPos = leftWheelSuspensionPos + vec3(0.f, 0.f, suspensionLength * 0.5f);
-	leftFrontWheel = createWheel(scene, primitiveMesh, material, leftFrontWheelPos, quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), wheelDesc);
+	vec3 leftFrontWheelPos = leftWheelSuspensionPos - vec3(suspensionLength * 0.5f, 0.f, 0.f);
+	leftFrontWheel = createWheel(scene, primitiveMesh, material, leftFrontWheelPos, quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)), wheelDesc);
 
 	// Right front wheel.
-	vec3 rightFrontWheelPos = rightWheelSuspensionPos - vec3(0.f, 0.f, suspensionLength * 0.5f);
-	rightFrontWheel = createWheel(scene, primitiveMesh, material, rightFrontWheelPos, quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), wheelDesc);
+	vec3 rightFrontWheelPos = rightWheelSuspensionPos + vec3(suspensionLength * 0.5f, 0.f, 0.f);
+	rightFrontWheel = createWheel(scene, primitiveMesh, material, rightFrontWheelPos, quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)), wheelDesc);
 
-	addHingeConstraintFromGlobalPoints(leftFrontWheel, leftWheelSuspension, leftFrontWheelPos, vec3(0.f, 0.f, 1.f));
-	addHingeConstraintFromGlobalPoints(rightFrontWheel, rightWheelSuspension, rightFrontWheelPos, vec3(0.f, 0.f, 1.f));
+	addHingeConstraintFromGlobalPoints(leftFrontWheel, leftWheelSuspension, leftFrontWheelPos, vec3(1.f, 0.f, 0.f));
+	addHingeConstraintFromGlobalPoints(rightFrontWheel, rightWheelSuspension, rightFrontWheelPos, vec3(1.f, 0.f, 0.f));
 
 
 	leftWheelArm = createRod(scene, primitiveMesh, material, leftSteeringAxisAttachmentPos, leftWheelSuspensionAttachmentPos, 0.05f);
@@ -397,27 +399,27 @@ void vehicle::initialize(game_scene& scene)
 
 
 	// Rear axis.
-	float rearAxisOffsetX = driveAxisLength * 0.5f;
-	float rearAxisOffsetZ = -driveAxisOffset;
-	differentialSunGear = createAxis(scene, primitiveMesh, material, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), rearAxisGearDesc);
-	addHingeConstraintFromGlobalPoints(motor, differentialSunGear, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), vec3(0.f, 0.f, 1.f));
+	float rearAxisOffsetZ = driveAxisLength * 0.5f;
+	float rearAxisOffsetX = gearOffset;
+	differentialSunGear = createAxis(scene, primitiveMesh, material, vec3(rearAxisOffsetX, motorGearY + gearOffset, rearAxisOffsetZ), quat(vec3(0.f, 0.f, -1.f), deg2rad(90.f)), rearAxisGearDesc);
+	addHingeConstraintFromGlobalPoints(motor, differentialSunGear, vec3(rearAxisOffsetX, motorGearY + gearOffset, rearAxisOffsetZ), vec3(1.f, 0.f, 0.f));
 
 	// Differential.
-	vec3 differentialSpiderGearPos(rearAxisOffsetX, 1.35f + driveAxisOffset * 2.f, 0.11f);
+	vec3 differentialSpiderGearPos(-0.11f, motorGearY + gearOffset * 2.f, rearAxisOffsetZ);
 	differentialSpiderGear = createAxis(scene, primitiveMesh, material, differentialSpiderGearPos, quat::identity, motorGearDesc);
 	addHingeConstraintFromGlobalPoints(differentialSunGear, differentialSpiderGear, differentialSpiderGearPos, vec3(0.f, 1.f, 0.f));
 
-	vec3 leftRearWheelPos = differentialSpiderGearPos + vec3(0.f, -driveAxisOffset, driveAxisOffset);
-	vec3 rightRearWheelPos = differentialSpiderGearPos + vec3(0.f, -driveAxisOffset, -driveAxisOffset);
+	vec3 leftRearWheelPos = differentialSpiderGearPos + vec3(-gearOffset, -gearOffset, 0.f);
+	vec3 rightRearWheelPos = differentialSpiderGearPos + vec3(gearOffset, -gearOffset, 0.f);
 
-	axis_attachment leftWheelAttachment(axisLength - differentialSpiderGearPos.z, rodThickness, wheelDesc);
-	axis_attachment rightWheelAttachment(axisLength + differentialSpiderGearPos.z, rodThickness, wheelDesc);
+	axis_attachment leftWheelAttachment(axisLength - differentialSpiderGearPos.x + suspensionLength, rodThickness, wheelDesc);
+	axis_attachment rightWheelAttachment(axisLength + differentialSpiderGearPos.x + suspensionLength, rodThickness, wheelDesc);
 
-	leftRearWheel = createAxis(scene, primitiveMesh, material, leftRearWheelPos, quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), motorGearDesc, &leftWheelAttachment, 0);
-	rightRearWheel = createAxis(scene, primitiveMesh, material, rightRearWheelPos, quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), motorGearDesc, 0, &rightWheelAttachment);
+	leftRearWheel = createAxis(scene, primitiveMesh, material, leftRearWheelPos, quat(vec3(0.f, 0.f, -1.f), deg2rad(90.f)), motorGearDesc, &leftWheelAttachment, 0);
+	rightRearWheel = createAxis(scene, primitiveMesh, material, rightRearWheelPos, quat(vec3(0.f, 0.f, -1.f), deg2rad(90.f)), motorGearDesc, 0, &rightWheelAttachment);
 
-	addHingeConstraintFromGlobalPoints(motor, leftRearWheel, leftRearWheelPos, vec3(0.f, 0.f, 1.f));
-	addHingeConstraintFromGlobalPoints(motor, rightRearWheel, rightRearWheelPos, vec3(0.f, 0.f, 1.f));
+	addHingeConstraintFromGlobalPoints(motor, leftRearWheel, leftRearWheelPos, vec3(1.f, 0.f, 0.f));
+	addHingeConstraintFromGlobalPoints(motor, rightRearWheel, rightRearWheelPos, vec3(1.f, 0.f, 0.f));
 
 
 
