@@ -677,7 +677,7 @@ bool scene_editor::drawSceneHierarchy()
 
 												if (constraint.motorType == constraint_velocity_motor)
 												{
-													ImGui::PropertySliderAngle("Motor velocity", constraint.motorVelocity, -360.f, 360.f);
+													ImGui::PropertySliderAngle("Motor velocity", constraint.motorVelocity, -1000.f, 1000.f);
 												}
 												else
 												{

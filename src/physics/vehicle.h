@@ -17,7 +17,6 @@ struct vehicle
 			scene_entity motorGear;
 			scene_entity driveAxis;
 			scene_entity frontAxis;
-			scene_entity rearAxis;
 			scene_entity steeringWheel;
 			scene_entity steeringAxis;
 
@@ -29,7 +28,13 @@ struct vehicle
 
 			scene_entity leftWheelArm;
 			scene_entity rightWheelArm;
+
+			scene_entity differentialSunGear;
+			scene_entity differentialSpiderGear;
+
+			scene_entity leftRearWheel;
+			scene_entity rightRearWheel;
 		};
-		scene_entity parts[13];
+		scene_entity parts[16];
 	};
 };

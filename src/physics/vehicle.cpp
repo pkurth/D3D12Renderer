@@ -11,7 +11,8 @@
 struct gear_description
 {
 	float height; 
-	float innerRadius; 
+	float cylinderRadius;
+	float cylinderInnerRadius;
 	uint32 numTeeth; 
 	float toothLength; 
 	float toothWidth;
@@ -67,13 +68,20 @@ static void attach(ref<composite_mesh> mesh, cpu_mesh& primitiveMesh, ref<pbr_ma
 		{
 			gear_description desc = attachment.gear;
 
-			mesh->submeshes.push_back({ primitiveMesh.pushCylinder(21, desc.innerRadius, desc.height, vec3(0.f, rodOffset, 0.f)), {}, trs::identity, material });
+			if (desc.cylinderInnerRadius > 0.f)
+			{
+				mesh->submeshes.push_back({ primitiveMesh.pushHollowCylinder(21, desc.cylinderRadius, desc.cylinderInnerRadius, desc.height, vec3(0.f, rodOffset, 0.f)), {}, trs::identity, material });
+			}
+			else
+			{
+				mesh->submeshes.push_back({ primitiveMesh.pushCylinder(21, desc.cylinderRadius, desc.height, vec3(0.f, rodOffset, 0.f)), {}, trs::identity, material });
+			}
 
 			for (uint32 i = 0; i < desc.numTeeth; ++i)
 			{
 				float angle = i * M_TAU / desc.numTeeth;
 				quat localRotation(vec3(0.f, 1.f, 0.f), angle);
-				vec3 center = localRotation * vec3(desc.innerRadius + desc.toothLength * 0.5f, 0.f, 0.f);
+				vec3 center = localRotation * vec3(desc.cylinderRadius + desc.toothLength * 0.5f, 0.f, 0.f);
 				vec3 radius(desc.toothLength * 0.5f, desc.height * 0.5f, desc.toothWidth * 0.5f);
 
 				mesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, desc.toothLength, desc.toothWidth * 0.5f, center + vec3(0.f, rodOffset, 0.f), localRotation * vec3(1.f, 0.f, 0.f)), {}, trs::identity, material });
@@ -267,18 +275,22 @@ void vehicle::initialize(game_scene& scene)
 	motor.addComponent<raster_component>(motorMesh);
 
 
-	gear_description gearDesc;
-	gearDesc.height = 0.1f;
-	gearDesc.innerRadius = 0.2f;
-	gearDesc.numTeeth = 8;
-	gearDesc.toothLength = 0.07f;
-	gearDesc.toothWidth = 0.1f;
-	gearDesc.friction = 0.f;
-	gearDesc.density = density;
+	gear_description motorGearDesc;
+	motorGearDesc.height = 0.1f;
+	motorGearDesc.cylinderRadius = 0.2f;
+	motorGearDesc.cylinderInnerRadius = 0.f;
+	motorGearDesc.numTeeth = 8;
+	motorGearDesc.toothLength = 0.07f;
+	motorGearDesc.toothWidth = 0.1f;
+	motorGearDesc.friction = 0.f;
+	motorGearDesc.density = density;
+
+	float rodThickness = 0.05f;
 
 	gear_description steeringWheelDesc;
 	steeringWheelDesc.height = 0.1f;
-	steeringWheelDesc.innerRadius = 0.4f;
+	steeringWheelDesc.cylinderRadius = 0.4f;
+	steeringWheelDesc.cylinderInnerRadius = 0.2f;
 	steeringWheelDesc.numTeeth = 0;
 	steeringWheelDesc.toothLength = 0.07f;
 	steeringWheelDesc.toothWidth = 0.1f;
@@ -294,7 +306,7 @@ void vehicle::initialize(game_scene& scene)
 
 
 	// Motor gear.
-	motorGear = createAxis(scene, primitiveMesh, material, vec3(0.f, 1.35f, 0.f), quat::identity, gearDesc);
+	motorGear = createAxis(scene, primitiveMesh, material, vec3(0.f, 1.35f, 0.f), quat::identity, motorGearDesc);
 	auto motorConstraintHandle = addHingeConstraintFromGlobalPoints(motor, motorGear, vec3(0.f, 1.35f, 0.f), vec3(0.f, 1.f, 0.f));
 
 	auto& motorConstraint = getConstraint(scene, motorConstraintHandle);
@@ -304,9 +316,9 @@ void vehicle::initialize(game_scene& scene)
 	// Drive axis.
 	float driveAxisLength = 4.5f;
 	float driveAxisOffset = 0.26f;
-	axis_attachment driveAxisAttachment(driveAxisLength * 0.5f, gearDesc.innerRadius * 0.2f, gearDesc);
+	axis_attachment driveAxisAttachment(driveAxisLength * 0.57f, rodThickness, motorGearDesc);
 	driveAxis = createAxis(scene, primitiveMesh, material, vec3(driveAxisOffset, 1.35f + driveAxisOffset, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)),
-		gearDesc, 0, &driveAxisAttachment);
+		motorGearDesc, 0, &driveAxisAttachment);
 	addHingeConstraintFromGlobalPoints(motor, driveAxis, vec3(driveAxisOffset, 1.35f + driveAxisOffset, 0.f), vec3(1.f, 0.f, 0.f));
 
 	// Front axis.
@@ -318,17 +330,8 @@ void vehicle::initialize(game_scene& scene)
 	frontAxis = createRod(scene, primitiveMesh, material, frontAxisPos + vec3(0.f, 0.f, axisLength), frontAxisPos - vec3(0.f, 0.f, axisLength), 0.05f);
 	addFixedConstraintFromGlobalPoints(motor, frontAxis, frontAxisPos);
 
-	// Rear axis.
-	float rearAxisOffsetX = driveAxisLength * 0.5f;
-	float rearAxisOffsetZ = -driveAxisOffset;
-	axis_attachment firstRearAxisAttachment(axisLength - rearAxisOffsetZ, gearDesc.innerRadius * 0.2f, wheelDesc);
-	axis_attachment secondRearAxisAttachment(axisLength + rearAxisOffsetZ, gearDesc.innerRadius * 0.2f, wheelDesc);
-	rearAxis = createAxis(scene, primitiveMesh, material, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), gearDesc,
-		&firstRearAxisAttachment, &secondRearAxisAttachment);
-	addHingeConstraintFromGlobalPoints(motor, rearAxis, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), vec3(0.f, 0.f, 1.f));
-
 	// Steering wheel.
-	axis_attachment steeringWheelAttachment(2.f, steeringWheelDesc.innerRadius * 0.2f, gearDesc);
+	axis_attachment steeringWheelAttachment(2.f, rodThickness, motorGearDesc);
 	quat steeringWheelRot(vec3(0.f, 0.f, 1.f), deg2rad(-80.f));
 	steeringWheel = createAxis(scene, primitiveMesh, material, vec3(0.8f, 2.3f, 0.f),
 		steeringWheelRot, steeringWheelDesc, 0, &steeringWheelAttachment);
@@ -343,7 +346,7 @@ void vehicle::initialize(game_scene& scene)
 	vec3 steeringAxisPos(frontAxisOffsetX + 0.49f, 1.35f + driveAxisOffset + 0.06f, 0.f);
 	float steeringAxisLength = axisLength * 1.05f;
 	steeringAxis = createGearAxis(scene, primitiveMesh, material, steeringAxisPos, steeringWheelRot * quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), steeringAxisLength, 8,
-		gearDesc.toothLength, gearDesc.toothWidth, gearDesc.friction, gearDesc.density);
+		motorGearDesc.toothLength, motorGearDesc.toothWidth, motorGearDesc.friction, motorGearDesc.density);
 	addSliderConstraintFromGlobalPoints(motor, steeringAxis, steeringAxisPos, vec3(0.f, 0.f, 1.f), -4.f, 4.f);
 
 	vec3 leftSteeringAxisAttachmentPos = steeringAxisPos + vec3(0.f, 0.f, steeringAxisLength * 0.5f);
@@ -382,6 +385,39 @@ void vehicle::initialize(game_scene& scene)
 
 	addBallConstraintFromGlobalPoints(rightWheelSuspension, rightWheelArm, rightWheelSuspensionAttachmentPos);
 	addBallConstraintFromGlobalPoints(steeringAxis, rightWheelArm, rightSteeringAxisAttachmentPos);
+
+
+
+
+
+	gear_description rearAxisGearDesc = motorGearDesc;
+	rearAxisGearDesc.cylinderRadius = 0.5f;
+	rearAxisGearDesc.cylinderInnerRadius = 0.4f;
+	rearAxisGearDesc.numTeeth = 17;
+
+
+	// Rear axis.
+	float rearAxisOffsetX = driveAxisLength * 0.5f;
+	float rearAxisOffsetZ = -driveAxisOffset;
+	differentialSunGear = createAxis(scene, primitiveMesh, material, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), rearAxisGearDesc);
+	addHingeConstraintFromGlobalPoints(motor, differentialSunGear, vec3(rearAxisOffsetX, 1.35f + driveAxisOffset, rearAxisOffsetZ), vec3(0.f, 0.f, 1.f));
+
+	// Differential.
+	vec3 differentialSpiderGearPos(rearAxisOffsetX, 1.35f + driveAxisOffset * 2.f, 0.11f);
+	differentialSpiderGear = createAxis(scene, primitiveMesh, material, differentialSpiderGearPos, quat::identity, motorGearDesc);
+	addHingeConstraintFromGlobalPoints(differentialSunGear, differentialSpiderGear, differentialSpiderGearPos, vec3(0.f, 1.f, 0.f));
+
+	vec3 leftRearWheelPos = differentialSpiderGearPos + vec3(0.f, -driveAxisOffset, driveAxisOffset);
+	vec3 rightRearWheelPos = differentialSpiderGearPos + vec3(0.f, -driveAxisOffset, -driveAxisOffset);
+
+	axis_attachment leftWheelAttachment(axisLength - differentialSpiderGearPos.z, rodThickness, wheelDesc);
+	axis_attachment rightWheelAttachment(axisLength + differentialSpiderGearPos.z, rodThickness, wheelDesc);
+
+	leftRearWheel = createAxis(scene, primitiveMesh, material, leftRearWheelPos, quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), motorGearDesc, &leftWheelAttachment, 0);
+	rightRearWheel = createAxis(scene, primitiveMesh, material, rightRearWheelPos, quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), motorGearDesc, 0, &rightWheelAttachment);
+
+	addHingeConstraintFromGlobalPoints(motor, leftRearWheel, leftRearWheelPos, vec3(0.f, 0.f, 1.f));
+	addHingeConstraintFromGlobalPoints(motor, rightRearWheel, rightRearWheelPos, vec3(0.f, 0.f, 1.f));
 
 
 
