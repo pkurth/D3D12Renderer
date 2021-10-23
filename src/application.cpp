@@ -302,7 +302,7 @@ void application::initialize(main_renderer* renderer)
 	//humanoid_ragdoll::create(scene, vec3(60.f, 1.25f, -2.f));
 	//humanoid_ragdoll ragdoll = humanoid_ragdoll::create(scene, vec3(20.f, 1.25f, 0.f));
 
-	vehicle::create(scene);
+	vehicle::create(scene, vec3(0.f, 1.f, 0.f));
 
 	//locomotionInference.initialize(scene, ragdoll);
 

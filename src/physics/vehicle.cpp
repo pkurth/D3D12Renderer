@@ -250,7 +250,7 @@ static scene_entity createRod(game_scene& scene, cpu_mesh& primitiveMesh, ref<pb
 	return result;
 }
 
-void vehicle::initialize(game_scene& scene)
+void vehicle::initialize(game_scene& scene, vec3 initialMotorPosition, float initialRotation)
 {
 	float density = 2000.f;
 
@@ -265,9 +265,9 @@ void vehicle::initialize(game_scene& scene)
 
 
 	motor = scene.createEntity("Motor")
-		.addComponent<transform_component>(vec3(0.f, 1.1f, 0.f), quat::identity)
+		.addComponent<transform_component>(vec3(0.f, 0.f, 0.f), quat::identity)
 		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f), vec3(0.6f, 0.1f, 1.f)), 0.2f, 0.f, density))
-		.addComponent<rigid_body_component>(true);
+		.addComponent<rigid_body_component>(false);
 
 	auto motorMesh = make_ref<composite_mesh>();
 	motorMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(0.6f, 0.1f, 1.f)), {}, trs::identity, material });
@@ -305,7 +305,7 @@ void vehicle::initialize(game_scene& scene)
 	wheelDesc.density = 50.f;
 
 
-	float motorGearY = 1.35f;
+	float motorGearY = 0.25f;
 	float gearOffset = 0.26f;
 
 	// Motor gear.
@@ -335,9 +335,10 @@ void vehicle::initialize(game_scene& scene)
 	// Steering wheel.
 	axis_attachment steeringWheelAttachment(2.f, rodThickness, motorGearDesc);
 	quat steeringWheelRot(vec3(-1.f, 0.f, 0.f), deg2rad(-80.f));
-	steeringWheel = createAxis(scene, primitiveMesh, material, vec3(0.f, 2.3f, 0.8f),
+	vec3 steeringWheelPos(0.f, 1.12f, 0.81f);
+	steeringWheel = createAxis(scene, primitiveMesh, material, steeringWheelPos,
 		steeringWheelRot, steeringWheelDesc, 0, &steeringWheelAttachment);
-	auto steeringWheelConstraintHandle = addHingeConstraintFromGlobalPoints(motor, steeringWheel, vec3(0.f, 2.3f, 0.8f), steeringWheelRot * vec3(0.f, -1.f, 0.f));
+	auto steeringWheelConstraintHandle = addHingeConstraintFromGlobalPoints(motor, steeringWheel, steeringWheelPos, steeringWheelRot * vec3(0.f, -1.f, 0.f));
 
 	auto& steeringWheelConstraint = getConstraint(scene, steeringWheelConstraintHandle);
 	steeringWheelConstraint.motorType = constraint_position_motor;
@@ -399,14 +400,19 @@ void vehicle::initialize(game_scene& scene)
 
 
 	// Rear axis.
-	float rearAxisOffsetZ = driveAxisLength * 0.5f;
+	float rearAxisOffsetZ = driveAxisLength * 0.505f;
 	float rearAxisOffsetX = gearOffset;
 	differentialSunGear = createAxis(scene, primitiveMesh, material, vec3(rearAxisOffsetX, motorGearY + gearOffset, rearAxisOffsetZ), quat(vec3(0.f, 0.f, -1.f), deg2rad(90.f)), rearAxisGearDesc);
 	addHingeConstraintFromGlobalPoints(motor, differentialSunGear, vec3(rearAxisOffsetX, motorGearY + gearOffset, rearAxisOffsetZ), vec3(1.f, 0.f, 0.f));
 
+	differentialSunGear.getComponent<raster_component>().mesh->submeshes.push_back(
+		{ primitiveMesh.pushCube(vec3(0.02f, 0.3f, 0.05f), false, vec3(-rearAxisGearDesc.cylinderRadius * 0.9f, -0.15f - rearAxisGearDesc.height, 0.f)), {}, trs::identity, material });
+
+
 	// Differential.
 	vec3 differentialSpiderGearPos(-0.11f, motorGearY + gearOffset * 2.f, rearAxisOffsetZ);
-	differentialSpiderGear = createAxis(scene, primitiveMesh, material, differentialSpiderGearPos, quat::identity, motorGearDesc);
+	axis_attachment spiderGearAttachment(0.2f, 0.02f);
+	differentialSpiderGear = createAxis(scene, primitiveMesh, material, differentialSpiderGearPos, quat::identity, motorGearDesc, &spiderGearAttachment);
 	addHingeConstraintFromGlobalPoints(differentialSunGear, differentialSpiderGear, differentialSpiderGearPos, vec3(0.f, 1.f, 0.f));
 
 	vec3 leftRearWheelPos = differentialSpiderGearPos + vec3(-gearOffset, -gearOffset, 0.f);
@@ -422,17 +428,22 @@ void vehicle::initialize(game_scene& scene)
 	addHingeConstraintFromGlobalPoints(motor, rightRearWheel, rightRearWheelPos, vec3(1.f, 0.f, 0.f));
 
 
+	quat rotation(vec3(0.f, 1.f, 0.f), initialRotation);
 
 	auto mesh = primitiveMesh.createDXMesh();
 	for (uint32 i = 0; i < arraysize(parts); ++i)
 	{
 		parts[i].getComponent<raster_component>().mesh->mesh = mesh;
+
+		auto& transform = parts[i].getComponent<transform_component>();
+		transform.position = rotation * transform.position + initialMotorPosition;
+		transform.rotation = rotation * transform.rotation;
 	}
 }
 
-vehicle vehicle::create(game_scene& scene)
+vehicle vehicle::create(game_scene& scene, vec3 initialMotorPosition, float initialRotation)
 {
 	vehicle v;
-	v.initialize(scene);
+	v.initialize(scene, initialMotorPosition, initialRotation);
 	return v;
 }

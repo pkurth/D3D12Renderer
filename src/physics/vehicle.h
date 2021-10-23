@@ -6,8 +6,8 @@ struct vehicle
 {
 	vehicle() {}
 
-	void initialize(game_scene& scene);
-	static vehicle create(game_scene& scene);
+	void initialize(game_scene& scene, vec3 initialMotorPosition, float initialRotation = 0.f);
+	static vehicle create(game_scene& scene, vec3 initialMotorPosition, float initialRotation = 0.f);
 
 	union
 	{

@@ -1183,7 +1183,7 @@ void scene_editor::drawEntityCreationPopup()
 
 		if (ImGui::MenuItem("Vehicle", "V") || ImGui::IsKeyPressed('V'))
 		{
-			auto vehicle = vehicle::create(*scene);
+			auto vehicle = vehicle::create(*scene, scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -4.f));
 			setSelectedEntity(vehicle.motor);
 			clicked = true;
 		}
