@@ -30,6 +30,6 @@ struct vehicle
 			scene_entity leftWheelArm;
 			scene_entity rightWheelArm;
 		};
-		scene_entity parts[11];
+		scene_entity parts[13];
 	};
 };

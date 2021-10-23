@@ -210,35 +210,34 @@ static scene_entity createWheelSuspension(game_scene& scene, cpu_mesh& primitive
 	auto mesh = make_ref<composite_mesh>();
 
 	float xSign = right ? 1.f : -1.f;
-	//mesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(axisLength * 0.5f, thickness * 0.5f, thickness * 0.5f), false, vec3(axisLength * 0.5f * xSign, 0.f, 0.f)), {}, trs::identity, material });
-	//mesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(thickness * 0.5f, thickness * 0.5f, axisLength * 0.5f), false, vec3(0.f, 0.f, axisLength * 0.5f)), {}, trs::identity, material });
 	mesh->submeshes.push_back({ primitiveMesh.pushCylinder(15, thickness * 0.5f, axisLength, vec3(axisLength * 0.5f * xSign, 0.f, 0.f), vec3(1.f, 0.f, 0.f)), {}, trs::identity, material });
 	mesh->submeshes.push_back({ primitiveMesh.pushCylinder(15, thickness * 0.5f, axisLength, vec3(0.f, 0.f, axisLength * 0.5f), vec3(0.f, 0.f, 1.f)), {}, trs::identity, material });
 
-	//bounding_capsule capsule;
-	//capsule.positionA = vec3(0.f);
-	//capsule.positionB = vec3(axisLength * xSign, 0.f, 0.f);
-	//capsule.radius = thickness * 0.5f;
-	//result.addComponent<collider_component>(collider_component::asCapsule(capsule, 0.2f, 0.f, 4000.f));
-	//
-	//capsule.positionB = vec3(0.f, 0.f, axisLength);
-	//result.addComponent<collider_component>(collider_component::asCapsule(capsule, 0.2f, 0.f, 4000.f));
-
-#if 0
-	// This last collider is a hack. This just balances the COG out, because the solver currently seems to have problems, if this is not the case.
-	capsule.positionB = vec3(0.f, 0.f, -axisLength);
-	result.addComponent<collider_component>(collider_component::asCapsule(capsule, 0.2f, 0.f, 500.f));
-#endif
+	// These rigid bodies don't have colliders, since they penetrate the wheels.
 
 	result.addComponent<raster_component>(mesh);
 	result.addComponent<rigid_body_component>(false);
 
-	//float mass = 30.f;
-	//mat3 inertia = mat3::identity * (2.f / 5.f * mass * axisLength * axisLength);
-	//
-	//auto& rb = result.getComponent<rigid_body_component>();
-	//rb.invMass = 1.f / mass;
-	//rb.invInertia = invert(inertia);
+	return result;
+}
+
+static scene_entity createRod(game_scene& scene, cpu_mesh& primitiveMesh, ref<pbr_material> material, 
+	vec3 from, vec3 to, float thickness)
+{
+	vec3 position = (from + to) * 0.5f;
+	vec3 axis = normalize(to - from);
+	float len = length(to - from);
+	quat rotation = rotateFromTo(vec3(0.f, 1.f, 0.f), axis);
+
+	scene_entity result = scene.createEntity("Rod")
+		.addComponent<transform_component>(position, rotation);
+
+	auto mesh = make_ref<composite_mesh>();
+
+	mesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(thickness * 0.5f, len * 0.5f, thickness * 0.5f)), {}, trs::identity, material });
+
+	result.addComponent<raster_component>(mesh);
+	result.addComponent<rigid_body_component>(false);
 
 	return result;
 }
@@ -311,19 +310,13 @@ void vehicle::initialize(game_scene& scene)
 	addHingeConstraintFromGlobalPoints(motor, driveAxis, vec3(driveAxisOffset, 1.35f + driveAxisOffset, 0.f), vec3(1.f, 0.f, 0.f));
 
 	// Front axis.
-	float frontAxisOffsetX = -driveAxisLength * 0.5f + driveAxisOffset * 2.f;
-	float frontAxisOffsetZ = driveAxisOffset;
 	float axisLength = 1.5f;
 	float suspensionLength = 0.4f;
 
-	float frontAxisLength = axisLength/* - suspensionLength * 2.f*/;
-	axis_attachment firstFrontAxisAttachment(axisLength - frontAxisOffsetZ, gearDesc.innerRadius * 0.2f);
-	axis_attachment secondFrontAxisAttachment(axisLength + frontAxisOffsetZ, gearDesc.innerRadius * 0.2f);
-	vec3 frontAxisPos(frontAxisOffsetX, 1.35f + driveAxisOffset, frontAxisOffsetZ);
-	frontAxis = createAxis(scene, primitiveMesh, material, frontAxisPos, quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), gearDesc, &firstFrontAxisAttachment, &secondFrontAxisAttachment);
+	float frontAxisOffsetX = -driveAxisLength * 0.5f + driveAxisOffset * 2.f;
+	vec3 frontAxisPos(frontAxisOffsetX, 1.35f + driveAxisOffset, 0.f);
+	frontAxis = createRod(scene, primitiveMesh, material, frontAxisPos + vec3(0.f, 0.f, axisLength), frontAxisPos - vec3(0.f, 0.f, axisLength), 0.05f);
 	addFixedConstraintFromGlobalPoints(motor, frontAxis, frontAxisPos);
-	addFixedConstraintFromGlobalPoints(motor, frontAxis, frontAxisPos + vec3(0.f, 0.f, axisLength));
-	addFixedConstraintFromGlobalPoints(motor, frontAxis, frontAxisPos + vec3(0.f, 0.f, -axisLength));
 
 	// Rear axis.
 	float rearAxisOffsetX = driveAxisLength * 0.5f;
@@ -357,18 +350,16 @@ void vehicle::initialize(game_scene& scene)
 	vec3 rightSteeringAxisAttachmentPos = steeringAxisPos - vec3(0.f, 0.f, steeringAxisLength * 0.5f);
 
 	// Left wheel suspension.
-	vec3 leftWheelSuspensionPos = frontAxisPos + vec3(0.f, 0.f, axisLength - frontAxisOffsetZ);
+	vec3 leftWheelSuspensionPos = frontAxisPos + vec3(0.f, 0.f, axisLength);
 	vec3 leftWheelSuspensionAttachmentPos = leftWheelSuspensionPos + vec3(suspensionLength, 0.f, 0.f);
 	leftWheelSuspension = createWheelSuspension(scene, primitiveMesh, material, leftWheelSuspensionPos, quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), suspensionLength, 0.1f, false);
 	addHingeConstraintFromGlobalPoints(motor, leftWheelSuspension, leftWheelSuspensionPos, vec3(0.f, 1.f, 0.f), deg2rad(-45.f), deg2rad(45.f));
-	//addDistanceConstraintFromGlobalPoints(steeringAxis, leftWheelSuspension, leftSteeringAxisAttachmentPos, leftWheelSuspensionAttachmentPos);
 
 	// Right wheel suspension.
-	vec3 rightWheelSuspensionPos = frontAxisPos + vec3(0.f, 0.f, -axisLength - frontAxisOffsetZ);
+	vec3 rightWheelSuspensionPos = frontAxisPos - vec3(0.f, 0.f, axisLength);
 	vec3 rightWheelSuspensionAttachmentPos = rightWheelSuspensionPos + vec3(suspensionLength, 0.f, 0.f);
 	rightWheelSuspension = createWheelSuspension(scene, primitiveMesh, material, rightWheelSuspensionPos, quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), suspensionLength, 0.1f, true);
 	addHingeConstraintFromGlobalPoints(motor, rightWheelSuspension, rightWheelSuspensionPos, vec3(0.f, 1.f, 0.f), deg2rad(-45.f), deg2rad(45.f));
-	//addDistanceConstraintFromGlobalPoints(steeringAxis, rightWheelSuspension, rightSteeringAxisAttachmentPos, rightWheelSuspensionAttachmentPos);
 
 
 	// Left front wheel.
@@ -383,12 +374,8 @@ void vehicle::initialize(game_scene& scene)
 	addHingeConstraintFromGlobalPoints(rightFrontWheel, rightWheelSuspension, rightFrontWheelPos, vec3(0.f, 0.f, 1.f));
 
 
-	leftWheelArm = scene.createEntity("Left wheel arm")
-		.addComponent<transform_component>((leftSteeringAxisAttachmentPos + leftWheelSuspensionAttachmentPos) * 0.5f, quat::identity)
-		.addComponent<rigid_body_component>(false);
-	rightWheelArm = scene.createEntity("Right wheel arm")
-		.addComponent<transform_component>((rightSteeringAxisAttachmentPos + rightWheelSuspensionAttachmentPos) * 0.5f, quat::identity)
-		.addComponent<rigid_body_component>(false);
+	leftWheelArm = createRod(scene, primitiveMesh, material, leftSteeringAxisAttachmentPos, leftWheelSuspensionAttachmentPos, 0.05f);
+	rightWheelArm = createRod(scene, primitiveMesh, material, rightSteeringAxisAttachmentPos, rightWheelSuspensionAttachmentPos, 0.05f);
 
 	addBallConstraintFromGlobalPoints(leftWheelSuspension, leftWheelArm, leftWheelSuspensionAttachmentPos);
 	addBallConstraintFromGlobalPoints(steeringAxis, leftWheelArm, leftSteeringAxisAttachmentPos);
