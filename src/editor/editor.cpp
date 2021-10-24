@@ -487,8 +487,8 @@ bool scene_editor::drawSceneHierarchy()
 							ImGui::PropertySlider("Angular velocity damping", rb.angularDamping);
 							ImGui::PropertySlider("Gravity factor", rb.gravityFactor);
 
-							ImGui::PropertyValue("Linear velocity", rb.linearVelocity);
-							ImGui::PropertyValue("Angular velocity", rb.angularVelocity);
+							//ImGui::PropertyValue("Linear velocity", rb.linearVelocity);
+							//ImGui::PropertyValue("Angular velocity", rb.angularVelocity);
 
 							ImGui::EndProperties();
 						}
@@ -1168,7 +1168,8 @@ void scene_editor::drawEntityCreationPopup()
 		{
 			auto cloth = scene->createEntity("Cloth")
 				.addComponent<transform_component>(scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f), scene->camera.rotation)
-				.addComponent<cloth_component>(10.f, 10.f, 20u, 20u, 8.f);
+				.addComponent<cloth_component>(10.f, 10.f, 20u, 20u, 8.f)
+				.addComponent<cloth_render_component>();
 
 			setSelectedEntity(cloth);
 			clicked = true;
