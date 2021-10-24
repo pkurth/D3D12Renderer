@@ -6,23 +6,23 @@ It supports some "new" features like raytracing, mesh shaders etc.
 It also features a custom written physics engine written completely from scratch.
 
 ## Table of Contents
-- [Graphics features](#graphics-features)
-- [Physics](#physics)
-- [Others](#others)
+- [Graphics](#graphics-features)
+- [Physics](#physics-features)
+- [Other](#other-features)
 - [System Requirements](#system-requirements)
 - [Build Instructions](#build-instructions)
 
 ## Graphics features
 
-<img style="float:right" src="assets/samples/raster.png" width="300"/>
-<img style="float:right" width="100%" />
+<img align="right" src="assets/samples/raster.png" width="300"/>
+<img align="right" width="100%" />
 
-<img style="float:right" src="assets/samples/raster2.png" width="300"/>
-<img style="float:right" width="100%" />
+<img align="right" src="assets/samples/raster2.png" width="300"/>
+<img align="right" width="100%" />
 
-<img style="float:right" src="assets/samples/raster3.png" width="300"/>
+<img align="right" src="assets/samples/raster3.png" width="300"/>
 
-<p style="float:left">
+<p align="left">
 
 - Forward+ rendering
 - Physically based rendering
@@ -53,14 +53,18 @@ It has an integrated (albeit pretty simple) path tracer (using hardware-accelera
 <img src="assets/samples/path_trace.png" width="512"/><br>
 
 
-## Physics
+## Physics features
 
+<a href="https://youtu.be/FqwCIoI-c_A"><img align="right" src="https://img.youtube.com/vi/FqwCIoI-c_A/mqdefault.jpg" width="300" /></a>
+<img align="right" width="100%" />
+<a href="https://youtu.be/YLASi_r13cc"><img align="right" src="https://img.youtube.com/vi/YLASi_r13cc/mqdefault.jpg" width="300" /></a>
+<img align="right" width="100%" />
+<a href="https://youtu.be/3I1dQZXHvrQ"><img align="right" src="https://img.youtube.com/vi/3I1dQZXHvrQ/mqdefault.jpg" width="300" /></a>
+<img align="right" width="100%" />
+<a href="https://youtu.be/j3n3yseyKFU"><img align="right" src="https://img.youtube.com/vi/j3n3yseyKFU/mqdefault.jpg" width="300" /></a>
 
-<a style="float:right; text-align:right; position: relative; z-index: 10;" href="https://www.youtube.com/watch?v=FqwCIoI-c_A">
-	<img src="https://img.youtube.com/vi/FqwCIoI-c_A/mqdefault.jpg" style="width:400px" />
-</a>
-
-<p style="float:left">
+<p align="left">
+Images to the right are links to YouTube videos showcasing the various physics features.
 
 - Rigid body dynamics
 - Cloth simulation
@@ -75,21 +79,22 @@ It has an integrated (albeit pretty simple) path tracer (using hardware-accelera
   - Capsules
   - Cylinders
   - AABBs and OBBs
-  - Convex hulls
-- SIMD support for constraint resolution
+  - Arbitrary convex hulls
+- SIMD support for constraint resolution (SSE4 and AVX2)
 - Ragdolls
 - Vehicle physics
 - Machine learning for ragdoll locomotion. Based on [Machine Learning Summit: Ragdoll Motion Matching](https://www.youtube.com/watch?v=JZKaqQKcAnw) and [DReCon: Data-Driven Responsive Control of Physics-Based Characters](https://static-wordpress.akamaized.net/montreal.ubisoft.com/wp-content/uploads/2019/11/13214229/DReCon.pdf) by Ubisoft
 
 </p>
 
-## Others
+## Other features
+
 - Editor tools
 - Integrated CPU and GPU profiler (with multi-threading support)
 
 ## System Requirements
 
-Since this project uses Direct3D 12 as the only rendering backend, the only supported platform is Windows 10. 
+Since this project uses Direct3D 12 as the only rendering backend, the only supported platforms are Windows 10 or higher. 
 The project is only tested with Visual Studio 2019, and only on NVIDIA GPUs.
 
 For mesh shaders you will need the Windows 10 SDK version 10.0.19041.0 or higher.
@@ -101,6 +106,9 @@ If these requirements are not met, you should still be able to build and run the
 If you want to use raytracing or mesh shaders, you need a compatible NVIDIA GPU. 
 For raytracing these are the GPUs with the Pascal architecture or newer.
 For mesh shaders you will need a Turing GPU or newer.
+
+The project files are currently generated with the AVX2 instruction set. 
+If your processor does not support this, set another instruction set (either in Visual Studio or in premake5.lua).
 
 All other dependencies (external libraries) either come directly with the source code or in the form of submodules.
 
@@ -116,7 +124,7 @@ The project uses Premake, but all you need comes with the source.
 The build process will automatically enable and disable certain features based on your installed GPU and the available Windows 10 SDK.
 - Open the solution and build. 
 This _should_ work directly. 
-In a release build Visual Studio sometimes reports an "Unknown error" when building. 
+Visual Studio sometimes reports an "Unspecified error" when building. 
 In that case simply restart Visual Studio and you are good to go.
 - If you add new source files (or shaders), re-run the _generate.bat_ file.
 
