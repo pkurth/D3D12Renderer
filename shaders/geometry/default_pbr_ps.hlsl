@@ -65,17 +65,18 @@ struct ps_output
 ps_output main(ps_input IN)
 {
 	uint flags = material.getFlags();
+	float2 materialUV = IN.uv * material.uvScale();
 
 	surface_info surface;
 
 	surface.albedo = ((flags & USE_ALBEDO_TEXTURE)
-		? albedoTex.Sample(wrapSampler, IN.uv)
+		? albedoTex.Sample(wrapSampler, materialUV)
 		: float4(1.f, 1.f, 1.f, 1.f))
 		* material.getAlbedo();
 
 	const float normalMapStrength = material.getNormalMapStrength() * 0.2f;
 	surface.N = (flags & USE_NORMAL_TEXTURE)
-		? mul(float3(normalMapStrength, normalMapStrength, 1.f) * (normalTex.Sample(wrapSampler, IN.uv).xyz * 2.f - 1.f), IN.tbn)
+		? mul(float3(normalMapStrength, normalMapStrength, 1.f) * (normalTex.Sample(wrapSampler, materialUV).xyz * 2.f - 1.f), IN.tbn)
 		: IN.tbn[2];
 	surface.N = normalize(surface.N);
 	if (material.doubleSided() && !IN.isFrontFace)
@@ -84,12 +85,12 @@ ps_output main(ps_input IN)
 	}
 
 	surface.roughness = (flags & USE_ROUGHNESS_TEXTURE)
-		? roughTex.Sample(wrapSampler, IN.uv)
+		? roughTex.Sample(wrapSampler, materialUV)
 		: material.getRoughnessOverride();
 	surface.roughness = clamp(surface.roughness, 0.01f, 0.99f);
 
 	surface.metallic = (flags & USE_METALLIC_TEXTURE)
-		? metalTex.Sample(wrapSampler, IN.uv)
+		? metalTex.Sample(wrapSampler, materialUV)
 		: material.getMetallicOverride();
 
 	surface.emission = material.emission;

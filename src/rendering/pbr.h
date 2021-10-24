@@ -17,7 +17,8 @@ struct pbr_material
 		const vec4& albedoTint, 
 		float roughnessOverride, 
 		float metallicOverride,
-		bool doubleSided)
+		bool doubleSided,
+		float uvScale)
 		: albedo(albedo), 
 		normal(normal), 
 		roughness(roughness), 
@@ -26,7 +27,8 @@ struct pbr_material
 		albedoTint(albedoTint), 
 		roughnessOverride(roughnessOverride), 
 		metallicOverride(metallicOverride),
-		doubleSided(doubleSided) {}
+		doubleSided(doubleSided),
+		uvScale(uvScale) {}
 
 	ref<dx_texture> albedo;
 	ref<dx_texture> normal;
@@ -38,6 +40,7 @@ struct pbr_material
 	float roughnessOverride;
 	float metallicOverride;
 	bool doubleSided;
+	float uvScale;
 };
 
 struct opaque_pbr_pipeline
@@ -86,7 +89,7 @@ struct pbr_environment
 };
 
 ref<pbr_material> createPBRMaterial(const fs::path& albedoTex, const fs::path& normalTex, const fs::path& roughTex, const fs::path& metallicTex,
-	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f, bool doubleSided = false);
+	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f, bool doubleSided = false, float uvScale = 1.f);
 ref<pbr_material> getDefaultPBRMaterial();
 
 ref<pbr_environment> createEnvironment(const fs::path& filename, uint32 skyResolution = 2048, uint32 environmentResolution = 128, uint32 irradianceResolution = 32, bool asyncCompute = false);

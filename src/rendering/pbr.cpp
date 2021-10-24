@@ -27,6 +27,7 @@ struct material_key
 	vec4 albedoTint;
 	float roughnessOverride, metallicOverride;
 	bool doubleSided;
+	float uvScale;
 };
 
 namespace std
@@ -47,6 +48,7 @@ namespace std
 			hash_combine(seed, x.roughnessOverride);
 			hash_combine(seed, x.metallicOverride);
 			hash_combine(seed, x.doubleSided);
+			hash_combine(seed, x.uvScale);
 
 			return seed;
 		}
@@ -63,7 +65,8 @@ static bool operator==(const material_key& a, const material_key& b)
 		&& a.albedoTint == b.albedoTint
 		&& a.roughnessOverride == b.roughnessOverride
 		&& a.metallicOverride == b.metallicOverride
-		&& a.doubleSided == b.doubleSided;
+		&& a.doubleSided == b.doubleSided
+		&& a.uvScale == b.uvScale;
 }
 
 ref<pbr_material> createPBRMaterial(
@@ -75,7 +78,8 @@ ref<pbr_material> createPBRMaterial(
 	const vec4& albedoTint, 
 	float roughOverride, 
 	float metallicOverride, 
-	bool doubleSided)
+	bool doubleSided,
+	float uvScale)
 {
 	material_key s =
 	{
@@ -88,6 +92,7 @@ ref<pbr_material> createPBRMaterial(
 		!roughTex.empty() ? 1.f : roughOverride,			// If texture is set, override does not matter, so set it to consistent value.
 		!metallicTex.empty() ? 0.f : metallicOverride,		// If texture is set, override does not matter, so set it to consistent value.
 		doubleSided,
+		uvScale,
 	};
 
 
@@ -110,6 +115,7 @@ ref<pbr_material> createPBRMaterial(
 		material->roughnessOverride = roughOverride;
 		material->metallicOverride = metallicOverride;
 		material->doubleSided = doubleSided;
+		material->uvScale = uvScale;
 
 		cache[s] = sp = material;
 	}
@@ -120,7 +126,7 @@ ref<pbr_material> createPBRMaterial(
 
 ref<pbr_material> getDefaultPBRMaterial()
 {
-	static ref<pbr_material> material = make_ref<pbr_material>(nullptr, nullptr, nullptr, nullptr, vec4(0.f), vec4(1.f, 0.f, 1.f, 1.f), 1.f, 0.f, false);
+	static ref<pbr_material> material = make_ref<pbr_material>(nullptr, nullptr, nullptr, nullptr, vec4(0.f), vec4(1.f, 0.f, 1.f, 1.f), 1.f, 0.f, false, 1.f);
 	return material;
 }
 
@@ -240,7 +246,7 @@ static void renderPBRCommon(dx_command_list* cl, const mat4& viewProj, const def
 	}
 
 	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_MATERIAL,
-		pbr_material_cb(mat->albedoTint, mat->emission.xyz, mat->roughnessOverride, mat->metallicOverride, flags, 1.f, 0.f, mat->doubleSided)
+		pbr_material_cb(mat->albedoTint, mat->emission.xyz, mat->roughnessOverride, mat->metallicOverride, flags, 1.f, 0.f, mat->doubleSided, mat->uvScale)
 	);
 
 
