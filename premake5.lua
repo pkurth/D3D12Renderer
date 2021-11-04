@@ -195,7 +195,7 @@ project "D3D12Renderer"
 	vpaths {
 		["Headers/*"] = { "src/**.h" },
 		["Sources/*"] = { "src/**.cpp" },
-		["Shaders"] = { "shaders/*.hlsl" },
+		["Shaders/*"] = { "shaders/**.hlsl" },
 	}
 
 	links {
@@ -229,6 +229,10 @@ project "D3D12Renderer"
 		"ext/entt/src",
 		"ext/directxtex",
 		"ext",
+	}
+
+	prebuildcommands {
+		"ECHO Compiling shaders..."
 	}
 
 	vectorextensions "AVX2"
@@ -296,33 +300,40 @@ project "D3D12Renderer"
 			"vec4=float4",
 			"uint32=uint"
 		}
-
+	
 		shaderoptions {
 			"/WX",
 			"/all_resources_bound",
-			--"/Qembed_debug",
+			"/denorm ftz",
 		}
- 
+		
+	
+	filter { "configurations:Debug", "files:**.hlsl" }
+		shaderoptions {
+			"/Qembed_debug",
+		}
+		
+ 	
 	filter("files:**_vs.hlsl")
 		removeflags("ExcludeFromBuild")
 		shadertype("Vertex")
- 
+ 	
 	filter("files:**_gs.hlsl")
 		removeflags("ExcludeFromBuild")
 		shadertype("Geometry")
- 
+ 	
 	filter("files:**_hs.hlsl")
 		removeflags("ExcludeFromBuild")
 		shadertype("Hull")
- 
+ 	
 	filter("files:**_ds.hlsl")
 		removeflags("ExcludeFromBuild")
 		shadertype("Domain")
-
+	
 	filter("files:**_ps.hlsl")
 		removeflags("ExcludeFromBuild")
 		shadertype("Pixel")
- 
+ 	
 	filter("files:**_cs.hlsl")
 		removeflags("ExcludeFromBuild")
 		shadertype("Compute")
@@ -332,7 +343,7 @@ project "D3D12Renderer"
 			removeflags("ExcludeFromBuild")
 			shadertype("Mesh")
 			shadermodel "6.5" -- Required for mesh shaders.
-
+	
 		filter("files:**_as.hlsl")
 			removeflags("ExcludeFromBuild")
 			shadertype("Amplification")
