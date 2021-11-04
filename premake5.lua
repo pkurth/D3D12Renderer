@@ -304,9 +304,13 @@ project "D3D12Renderer"
 		shaderoptions {
 			"/WX",
 			"/all_resources_bound",
-			"/denorm ftz",
 		}
-		
+
+		if turing_or_higher then
+			shaderoptions {
+				"/denorm ftz",
+			}
+		end
 	
 	filter { "configurations:Debug", "files:**.hlsl" }
 		shaderoptions {
