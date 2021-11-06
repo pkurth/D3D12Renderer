@@ -404,7 +404,7 @@ void animation_skeleton::getSkinningMatricesFromLocalTransforms(const trs* local
 			globalTransforms[i] = worldTransform * localTransforms[i];
 		}
 
-		outSkinningMatrices[i] = trsToMat4(globalTransforms[i] * joints[i].invBindTransform);
+		outSkinningMatrices[i] = trsToMat4(globalTransforms[i]) * joints[i].invBindTransform;
 	}
 }
 
@@ -414,7 +414,7 @@ void animation_skeleton::getSkinningMatricesFromGlobalTransforms(const trs* glob
 
 	for (uint32 i = 0; i < numJoints; ++i)
 	{
-		outSkinningMatrices[i] = trsToMat4(globalTransforms[i] * joints[i].invBindTransform);
+		outSkinningMatrices[i] = trsToMat4(globalTransforms[i]) * joints[i].invBindTransform;
 	}
 }
 

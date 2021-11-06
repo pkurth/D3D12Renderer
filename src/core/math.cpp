@@ -449,10 +449,10 @@ float trace(const mat4& m)
 
 trs operator*(const trs& a, const trs& b)
 {
-	if (!isUniform(a.scale) || !isUniform(b.scale))
-	{
-		return trsToMat4(a) * trsToMat4(b);
-	}
+	//if (!isUniform(a.scale) || !isUniform(b.scale))
+	//{
+	//	return trsToMat4(a) * trsToMat4(b);
+	//}
 
 	trs result;
 	result.rotation = a.rotation * b.rotation;
@@ -463,13 +463,13 @@ trs operator*(const trs& a, const trs& b)
 
 trs invert(const trs& t)
 {
-	if (!isUniform(t.scale))
-	{
-		mat4 m = trsToMat4(t);
-		mat4 invM = invert(m);
-		trs result = invM;
-		return result;
-	}
+	//if (!isUniform(t.scale))
+	//{
+	//	mat4 m = trsToMat4(t);
+	//	mat4 invM = invert(m);
+	//	trs result = invM;
+	//	return result;
+	//}
 
 	quat invRotation = conjugate(t.rotation);
 	vec3 invScale = 1.f / t.scale;
@@ -1050,6 +1050,43 @@ mat4 trsToMat4(const trs& transform)
 	return createModelMatrix(transform.position, transform.rotation, transform.scale);
 }
 
+trs mat4ToTRS(const mat4& m)
+{
+	trs result;
+
+	vec3 c0(m.m00, m.m10, m.m20);
+	vec3 c1(m.m01, m.m11, m.m21);
+	vec3 c2(m.m02, m.m12, m.m22);
+	result.scale.x = sqrt(dot(c0, c0));
+	result.scale.y = sqrt(dot(c1, c1));
+	result.scale.z = sqrt(dot(c2, c2));
+
+
+	vec3 invScale = 1.f / result.scale;
+
+	result.position.x = m.m03;
+	result.position.y = m.m13;
+	result.position.z = m.m23;
+
+	mat3 R;
+
+	R.m00 = m.m00 * invScale.x;
+	R.m10 = m.m10 * invScale.x;
+	R.m20 = m.m20 * invScale.x;
+
+	R.m01 = m.m01 * invScale.y;
+	R.m11 = m.m11 * invScale.y;
+	R.m21 = m.m21 * invScale.y;
+
+	R.m02 = m.m02 * invScale.z;
+	R.m12 = m.m12 * invScale.z;
+	R.m22 = m.m22 * invScale.z;
+
+	result.rotation = mat3ToQuaternion(R);
+
+	return result;
+}
+
 mat4 createViewMatrix(vec3 eye, float pitch, float yaw)
 {
 	float cosPitch = cosf(pitch);
@@ -1297,37 +1334,4 @@ vec4 uniformSampleSphere(vec2 E)
 	float PDF = 1.f / (4.f * M_PI);
 
 	return vec4(H, PDF);
-}
-
-trs::trs(const mat4& in)
-{
-	vec3 c0(in.m00, in.m10, in.m20);
-	vec3 c1(in.m01, in.m11, in.m21);
-	vec3 c2(in.m02, in.m12, in.m22);
-	scale.x = sqrt(dot(c0, c0));
-	scale.y = sqrt(dot(c1, c1));
-	scale.z = sqrt(dot(c2, c2));
-
-
-	vec3 invScale = 1.f / scale;
-
-	position.x = in.m03;
-	position.y = in.m13;
-	position.z = in.m23;
-
-	mat3 R;
-
-	R.m00 = in.m00 * invScale.x;
-	R.m10 = in.m10 * invScale.x;
-	R.m20 = in.m20 * invScale.x;
-			
-	R.m01 = in.m01 * invScale.y;
-	R.m11 = in.m11 * invScale.y;
-	R.m21 = in.m21 * invScale.y;
-			
-	R.m02 = in.m02 * invScale.z;
-	R.m12 = in.m12 * invScale.z;
-	R.m22 = in.m22 * invScale.z;
-
-	rotation = mat3ToQuaternion(R);
 }

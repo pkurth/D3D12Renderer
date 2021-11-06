@@ -499,13 +499,13 @@ union mat4
 static_assert(sizeof(mat4) == 16 * sizeof(float), "");
 
 #if ROW_MAJOR
-static vec2 row(mat2 a, uint32 r) { return a.rows[r]; }
-static vec3 row(mat3 a, uint32 r) { return a.rows[r]; }
-static vec4 row(mat4 a, uint32 r) { return a.rows[r]; }
+static vec2 row(const mat2& a, uint32 r) { return a.rows[r]; }
+static vec3 row(const mat3& a, uint32 r) { return a.rows[r]; }
+static vec4 row(const mat4& a, uint32 r) { return a.rows[r]; }
 
-static vec2 col(mat2 a, uint32 c) { return { a.m[c], a.m[c + 2] }; }
-static vec3 col(mat3 a, uint32 c) { return { a.m[c], a.m[c + 3], a.m[c + 6] }; }
-static vec4 col(mat4 a, uint32 c) { return { a.m[c], a.m[c + 4], a.m[c + 8], a.m[c + 12] }; }
+static vec2 col(const mat2& a, uint32 c) { return { a.m[c], a.m[c + 2] }; }
+static vec3 col(const mat3& a, uint32 c) { return { a.m[c], a.m[c + 3], a.m[c + 6] }; }
+static vec4 col(const mat4& a, uint32 c) { return { a.m[c], a.m[c + 4], a.m[c + 8], a.m[c + 12] }; }
 #else
 static vec2 row(const mat2& a, uint32 r) { return { a.m[r], a.m[r + 2] }; }
 static vec3 row(const mat3& a, uint32 r) { return { a.m[r], a.m[r + 3], a.m[r + 6] }; }
@@ -524,7 +524,6 @@ struct trs
 
 	trs() {}
 	trs(vec3 position, quat rotation = quat::identity, vec3 scale = { 1.f, 1.f, 1.f }) : position(position), rotation(rotation), scale(scale) {}
-	trs(const mat4& m);
 
 	static const trs identity;
 };
@@ -783,6 +782,7 @@ mat3 outerProduct(vec3 a, vec3 b);
 mat3 getSkewMatrix(vec3 r);
 
 mat4 trsToMat4(const trs& transform);
+trs mat4ToTRS(const mat4& m);
 
 mat4 createPerspectiveProjectionMatrix(float fov, float aspect, float nearPlane, float farPlane);
 mat4 createPerspectiveProjectionMatrix(float width, float height, float fx, float fy, float cx, float cy, float nearPlane, float farPlane);

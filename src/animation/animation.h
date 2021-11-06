@@ -16,8 +16,8 @@ struct skinning_weights
 struct skeleton_joint
 {
 	std::string name;
-	trs invBindTransform; // Transforms from model space to joint space.
-	trs bindTransform;	  // Position of joint relative to model space.
+	mat4 invBindTransform; // Transforms from model space to joint space.
+	mat4 bindTransform;	  // Position of joint relative to model space.
 	uint32 parentID;
 };
 

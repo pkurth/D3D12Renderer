@@ -15,7 +15,7 @@ static void getMeshNamesAndTransforms(const aiNode* node, ref<composite_mesh>& m
 		uint32 meshIndex = node->mMeshes[i];
 		auto& submesh = mesh->submeshes[meshIndex];
 		submesh.name = node->mName.C_Str();
-		submesh.transform = transform;
+		submesh.transform = mat4ToTRS(transform);
 	}
 
 	for (uint32 i = 0; i < node->mNumChildren; ++i)
