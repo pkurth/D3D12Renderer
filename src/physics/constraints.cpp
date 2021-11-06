@@ -18,32 +18,32 @@
 
 
 #if CONSTRAINT_SIMD_WIDTH == 4
-typedef vec2x<floatx4> vec2w;
-typedef vec3x<floatx4> vec3w;
-typedef vec4x<floatx4> vec4w;
-typedef quatx<floatx4> quatw;
-typedef mat2x<floatx4> mat2w;
-typedef mat3x<floatx4> mat3w;
-typedef floatx4 floatw;
-typedef intx4 intw;
+typedef vec2w4 vec2w;
+typedef vec3w4 vec3w;
+typedef vec4w4 vec4w;
+typedef quatw4 quatw;
+typedef mat2w4 mat2w;
+typedef mat3w4 mat3w;
+typedef floatw4 floatw;
+typedef intw4 intw;
 #elif CONSTRAINT_SIMD_WIDTH == 8 && defined(SIMD_AVX_2)
-typedef vec2x<floatx8> vec2w;
-typedef vec3x<floatx8> vec3w;
-typedef vec4x<floatx8> vec4w;
-typedef quatx<floatx8> quatw;
-typedef mat2x<floatx8> mat2w;
-typedef mat3x<floatx8> mat3w;
-typedef floatx8 floatw;
-typedef intx8 intw;
+typedef vec2w8 vec2w;
+typedef vec3w8 vec3w;
+typedef vec4w8 vec4w;
+typedef quatw8 quatw;
+typedef mat2w8 mat2w;
+typedef mat3w8 mat3w;
+typedef floatw8 floatw;
+typedef intw8 intw;
 #elif CONSTRAINT_SIMD_WIDTH == 16 && defined(SIMD_AVX_512)
-typedef vec2x<floatx16> vec2w;
-typedef vec3x<floatx16> vec3w;
-typedef vec4x<floatx16> vec4w;
-typedef quatx<floatx16> quatw;
-typedef mat2x<floatx16> mat2w;
-typedef mat3x<floatx16> mat3w;
-typedef floatx16 floatw;
-typedef intx16 intw;
+typedef vec2w16 vec2w;
+typedef vec3w16 vec3w;
+typedef vec4w16 vec4w;
+typedef quatw16 quatw;
+typedef mat2w16 mat2w;
+typedef mat3w16 mat3w;
+typedef floatw16 floatw;
+typedef intw16 intw;
 #else
 #error Invalid SIMD width.
 #endif

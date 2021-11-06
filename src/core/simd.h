@@ -166,22 +166,22 @@ static float_t acosInternal(float_t x)
 
 #if defined(SIMD_SSE_2)
 
-struct floatx4
+struct floatw4
 {
 	__m128 f;
 
-	floatx4() {}
-	floatx4(float f_) { f = _mm_set1_ps(f_); }
-	floatx4(__m128 f_) { f = f_; }
-	floatx4(float a, float b, float c, float d) { f = _mm_setr_ps(a, b, c, d); }
-	floatx4(const float* f_) { f = _mm_loadu_ps(f_); }
+	floatw4() {}
+	floatw4(float f_) { f = _mm_set1_ps(f_); }
+	floatw4(__m128 f_) { f = f_; }
+	floatw4(float a, float b, float c, float d) { f = _mm_setr_ps(a, b, c, d); }
+	floatw4(const float* f_) { f = _mm_loadu_ps(f_); }
 
 #if defined(SIMD_AVX_2)
-	floatx4(const float* baseAddress, __m128i indices) { f = _mm_i32gather_ps(baseAddress, indices, 4); }
-	floatx4(const float* baseAddress, int a, int b, int c, int d) : floatx4(baseAddress, _mm_setr_epi32(a, b, c, d)) {}
+	floatw4(const float* baseAddress, __m128i indices) { f = _mm_i32gather_ps(baseAddress, indices, 4); }
+	floatw4(const float* baseAddress, int a, int b, int c, int d) : floatw4(baseAddress, _mm_setr_epi32(a, b, c, d)) {}
 #else
-	floatx4(const float* baseAddress, int a, int b, int c, int d) { f = _mm_setr_ps(baseAddress[a], baseAddress[b], baseAddress[c], baseAddress[d]);  }
-	floatx4(const float* baseAddress, __m128i indices) : floatx4(baseAddress, indices.m128i_i32[0], indices.m128i_i32[1], indices.m128i_i32[2], indices.m128i_i32[3]) {}
+	floatw4(const float* baseAddress, int a, int b, int c, int d) { f = _mm_setr_ps(baseAddress[a], baseAddress[b], baseAddress[c], baseAddress[d]);  }
+	floatw4(const float* baseAddress, __m128i indices) : floatw4(baseAddress, indices.m128i_i32[0], indices.m128i_i32[1], indices.m128i_i32[2], indices.m128i_i32[3]) {}
 #endif
 
 	operator __m128() { return f; }
@@ -209,26 +209,26 @@ struct floatx4
 	}
 #endif
 
-	static floatx4 allOnes() { const float nnan = (const float&)0xFFFFFFFF; return nnan; }
-	static floatx4 zero() { return _mm_setzero_ps(); }
+	static floatw4 allOnes() { const float nnan = (const float&)0xFFFFFFFF; return nnan; }
+	static floatw4 zero() { return _mm_setzero_ps(); }
 };
 
-struct intx4
+struct intw4
 {
 	__m128i i;
 
-	intx4() {}
-	intx4(int i_) { i = _mm_set1_epi32(i_); }
-	intx4(__m128i i_) { i = i_; }
-	intx4(int a, int b, int c, int d) { i = _mm_setr_epi32(a, b, c, d); }
-	intx4(int* i_) { i = _mm_loadu_si128((const __m128i*)i_); }
+	intw4() {}
+	intw4(int i_) { i = _mm_set1_epi32(i_); }
+	intw4(__m128i i_) { i = i_; }
+	intw4(int a, int b, int c, int d) { i = _mm_setr_epi32(a, b, c, d); }
+	intw4(int* i_) { i = _mm_loadu_si128((const __m128i*)i_); }
 
 #if defined(SIMD_AVX_2)
-	intx4(const int* baseAddress, __m128i indices) { i = _mm_i32gather_epi32(baseAddress, indices, 4); }
-	intx4(const int* baseAddress, int a, int b, int c, int d) : intx4(baseAddress, _mm_setr_epi32(a, b, c, d)) {}
+	intw4(const int* baseAddress, __m128i indices) { i = _mm_i32gather_epi32(baseAddress, indices, 4); }
+	intw4(const int* baseAddress, int a, int b, int c, int d) : intw4(baseAddress, _mm_setr_epi32(a, b, c, d)) {}
 #else
-	intx4(const int* baseAddress, int a, int b, int c, int d) { i = _mm_setr_epi32(baseAddress[a], baseAddress[b], baseAddress[c], baseAddress[d]); }
-	intx4(const int* baseAddress, __m128i indices) : intx4(baseAddress, indices.m128i_i32[0], indices.m128i_i32[1], indices.m128i_i32[2], indices.m128i_i32[3]) {}
+	intw4(const int* baseAddress, int a, int b, int c, int d) { i = _mm_setr_epi32(baseAddress[a], baseAddress[b], baseAddress[c], baseAddress[d]); }
+	intw4(const int* baseAddress, __m128i indices) : intw4(baseAddress, indices.m128i_i32[0], indices.m128i_i32[1], indices.m128i_i32[2], indices.m128i_i32[3]) {}
 #endif
 
 	operator __m128i() { return i; }
@@ -256,166 +256,166 @@ struct intx4
 	}
 #endif
 
-	static intx4 allOnes() { return UINT32_MAX; }
-	static intx4 zero() { return _mm_setzero_si128(); }
+	static intw4 allOnes() { return UINT32_MAX; }
+	static intw4 zero() { return _mm_setzero_si128(); }
 };
 
-static floatx4 convert(intx4 i) { return _mm_cvtepi32_ps(i); }
-static intx4 convert(floatx4 f) { return _mm_cvtps_epi32(f); }
-static floatx4 reinterpret(intx4 i) { return _mm_castsi128_ps(i); }
-static intx4 reinterpret(floatx4 f) { return _mm_castps_si128(f); }
+static floatw4 convert(intw4 i) { return _mm_cvtepi32_ps(i); }
+static intw4 convert(floatw4 f) { return _mm_cvtps_epi32(f); }
+static floatw4 reinterpret(intw4 i) { return _mm_castsi128_ps(i); }
+static intw4 reinterpret(floatw4 f) { return _mm_castps_si128(f); }
 
 
 // Int operators.
-static intx4 andNot(intx4 a, intx4 b) { return _mm_andnot_si128(a, b); }
+static intw4 andNot(intw4 a, intw4 b) { return _mm_andnot_si128(a, b); }
 
-static intx4 operator+(intx4 a, intx4 b) { return _mm_add_epi32(a, b); }
-static intx4& operator+=(intx4& a, intx4 b) { a = a + b; return a; }
-static intx4 operator-(intx4 a, intx4 b) { return _mm_sub_epi32(a, b); }
-static intx4& operator-=(intx4& a, intx4 b) { a = a - b; return a; }
-static intx4 operator*(intx4 a, intx4 b) { return _mm_mul_epi32(a, b); }
-static intx4& operator*=(intx4& a, intx4 b) { a = a * b; return a; }
-static intx4 operator/(intx4 a, intx4 b) { return _mm_div_epi32(a, b); }
-static intx4& operator/=(intx4& a, intx4 b) { a = a / b; return a; }
-static intx4 operator&(intx4 a, intx4 b) { return _mm_and_si128(a, b); }
-static intx4& operator&=(intx4& a, intx4 b) { a = a & b; return a; }
-static intx4 operator|(intx4 a, intx4 b) { return _mm_or_si128(a, b); }
-static intx4& operator|=(intx4& a, intx4 b) { a = a | b; return a; }
-static intx4 operator^(intx4 a, intx4 b) { return _mm_xor_si128(a, b); }
-static intx4& operator^=(intx4& a, intx4 b) { a = a ^ b; return a; }
+static intw4 operator+(intw4 a, intw4 b) { return _mm_add_epi32(a, b); }
+static intw4& operator+=(intw4& a, intw4 b) { a = a + b; return a; }
+static intw4 operator-(intw4 a, intw4 b) { return _mm_sub_epi32(a, b); }
+static intw4& operator-=(intw4& a, intw4 b) { a = a - b; return a; }
+static intw4 operator*(intw4 a, intw4 b) { return _mm_mul_epi32(a, b); }
+static intw4& operator*=(intw4& a, intw4 b) { a = a * b; return a; }
+static intw4 operator/(intw4 a, intw4 b) { return _mm_div_epi32(a, b); }
+static intw4& operator/=(intw4& a, intw4 b) { a = a / b; return a; }
+static intw4 operator&(intw4 a, intw4 b) { return _mm_and_si128(a, b); }
+static intw4& operator&=(intw4& a, intw4 b) { a = a & b; return a; }
+static intw4 operator|(intw4 a, intw4 b) { return _mm_or_si128(a, b); }
+static intw4& operator|=(intw4& a, intw4 b) { a = a | b; return a; }
+static intw4 operator^(intw4 a, intw4 b) { return _mm_xor_si128(a, b); }
+static intw4& operator^=(intw4& a, intw4 b) { a = a ^ b; return a; }
 
-static intx4 operator~(intx4 a) { a = andNot(a, intx4::allOnes()); return a; }
+static intw4 operator~(intw4 a) { a = andNot(a, intw4::allOnes()); return a; }
 
-static intx4 operator>>(intx4 a, int b) { return _mm_srli_epi32(a, b); }
-static intx4& operator>>=(intx4& a, int b) { a = a >> b; return a; }
-static intx4 operator<<(intx4 a, int b) { return _mm_slli_epi32(a, b); }
-static intx4& operator<<=(intx4& a, int b) { a = a << b; return a; }
+static intw4 operator>>(intw4 a, int b) { return _mm_srli_epi32(a, b); }
+static intw4& operator>>=(intw4& a, int b) { a = a >> b; return a; }
+static intw4 operator<<(intw4 a, int b) { return _mm_slli_epi32(a, b); }
+static intw4& operator<<=(intw4& a, int b) { a = a << b; return a; }
 
-static intx4 operator-(intx4 a) { return _mm_sub_epi32(intx4::zero(), a); }
+static intw4 operator-(intw4 a) { return _mm_sub_epi32(intw4::zero(), a); }
 
 
 
 // Float operators.
-static floatx4 andNot(floatx4 a, floatx4 b) { return _mm_andnot_ps(a, b); }
+static floatw4 andNot(floatw4 a, floatw4 b) { return _mm_andnot_ps(a, b); }
 
-static floatx4 operator+(floatx4 a, floatx4 b) { return _mm_add_ps(a, b); }
-static floatx4& operator+=(floatx4& a, floatx4 b) { a = a + b; return a; }
-static floatx4 operator-(floatx4 a, floatx4 b) { return _mm_sub_ps(a, b); }
-static floatx4& operator-=(floatx4& a, floatx4 b) { a = a - b; return a; }
-static floatx4 operator*(floatx4 a, floatx4 b) { return _mm_mul_ps(a, b); }
-static floatx4& operator*=(floatx4& a, floatx4 b) { a = a * b; return a; }
-static floatx4 operator/(floatx4 a, floatx4 b) { return _mm_div_ps(a, b); }
-static floatx4& operator/=(floatx4& a, floatx4 b) { a = a / b; return a; }
-static floatx4 operator&(floatx4 a, floatx4 b) { return _mm_and_ps(a, b); }
-static floatx4& operator&=(floatx4& a, floatx4 b) { a = a & b; return a; }
-static floatx4 operator|(floatx4 a, floatx4 b) { return _mm_or_ps(a, b); }
-static floatx4& operator|=(floatx4& a, floatx4 b) { a = a | b; return a; }
-static floatx4 operator^(floatx4 a, floatx4 b) { return _mm_xor_ps(a, b); }
-static floatx4& operator^=(floatx4& a, floatx4 b) { a = a ^ b; return a; }
+static floatw4 operator+(floatw4 a, floatw4 b) { return _mm_add_ps(a, b); }
+static floatw4& operator+=(floatw4& a, floatw4 b) { a = a + b; return a; }
+static floatw4 operator-(floatw4 a, floatw4 b) { return _mm_sub_ps(a, b); }
+static floatw4& operator-=(floatw4& a, floatw4 b) { a = a - b; return a; }
+static floatw4 operator*(floatw4 a, floatw4 b) { return _mm_mul_ps(a, b); }
+static floatw4& operator*=(floatw4& a, floatw4 b) { a = a * b; return a; }
+static floatw4 operator/(floatw4 a, floatw4 b) { return _mm_div_ps(a, b); }
+static floatw4& operator/=(floatw4& a, floatw4 b) { a = a / b; return a; }
+static floatw4 operator&(floatw4 a, floatw4 b) { return _mm_and_ps(a, b); }
+static floatw4& operator&=(floatw4& a, floatw4 b) { a = a & b; return a; }
+static floatw4 operator|(floatw4 a, floatw4 b) { return _mm_or_ps(a, b); }
+static floatw4& operator|=(floatw4& a, floatw4 b) { a = a | b; return a; }
+static floatw4 operator^(floatw4 a, floatw4 b) { return _mm_xor_ps(a, b); }
+static floatw4& operator^=(floatw4& a, floatw4 b) { a = a ^ b; return a; }
 
-static floatx4 operator~(floatx4 a) { a = andNot(a, floatx4::allOnes()); return a; }
-
-
-static intx4 operator==(intx4 a, intx4 b) { return _mm_cmpeq_epi32(a, b); }
-static intx4 operator!=(intx4 a, intx4 b) { return ~(a == b); }
-static intx4 operator>(intx4 a, intx4 b) { return _mm_cmpgt_epi32(a, b); }
-static intx4 operator>=(intx4 a, intx4 b) { return (a > b) | (a == b); }
-static intx4 operator<(intx4 a, intx4 b) { return _mm_cmplt_epi32(a, b); }
-static intx4 operator<=(intx4 a, intx4 b) { return (a < b) | (a == b); }
-
-static floatx4 operator==(floatx4 a, floatx4 b) { return _mm_cmpeq_ps(a, b); }
-static floatx4 operator!=(floatx4 a, floatx4 b) { return _mm_cmpneq_ps(a, b); }
-static floatx4 operator>(floatx4 a, floatx4 b) { return _mm_cmpgt_ps(a, b); }
-static floatx4 operator>=(floatx4 a, floatx4 b) { return _mm_cmpge_ps(a, b); }
-static floatx4 operator<(floatx4 a, floatx4 b) { return _mm_cmplt_ps(a, b); }
-static floatx4 operator<=(floatx4 a, floatx4 b) { return _mm_cmple_ps(a, b); }
-
-static floatx4 operator>>(floatx4 a, int b) { return reinterpret(reinterpret(a) >> b); }
-static floatx4& operator>>=(floatx4& a, int b) { a = a >> b; return a; }
-static floatx4 operator<<(floatx4 a, int b) { return reinterpret(reinterpret(a) << b); }
-static floatx4& operator<<=(floatx4& a, int b) { a = a << b; return a; }
-
-static floatx4 operator-(floatx4 a) { return _mm_xor_ps(a, reinterpret(intx4(1 << 31))); }
+static floatw4 operator~(floatw4 a) { a = andNot(a, floatw4::allOnes()); return a; }
 
 
+static intw4 operator==(intw4 a, intw4 b) { return _mm_cmpeq_epi32(a, b); }
+static intw4 operator!=(intw4 a, intw4 b) { return ~(a == b); }
+static intw4 operator>(intw4 a, intw4 b) { return _mm_cmpgt_epi32(a, b); }
+static intw4 operator>=(intw4 a, intw4 b) { return (a > b) | (a == b); }
+static intw4 operator<(intw4 a, intw4 b) { return _mm_cmplt_epi32(a, b); }
+static intw4 operator<=(intw4 a, intw4 b) { return (a < b) | (a == b); }
+
+static floatw4 operator==(floatw4 a, floatw4 b) { return _mm_cmpeq_ps(a, b); }
+static floatw4 operator!=(floatw4 a, floatw4 b) { return _mm_cmpneq_ps(a, b); }
+static floatw4 operator>(floatw4 a, floatw4 b) { return _mm_cmpgt_ps(a, b); }
+static floatw4 operator>=(floatw4 a, floatw4 b) { return _mm_cmpge_ps(a, b); }
+static floatw4 operator<(floatw4 a, floatw4 b) { return _mm_cmplt_ps(a, b); }
+static floatw4 operator<=(floatw4 a, floatw4 b) { return _mm_cmple_ps(a, b); }
+
+static floatw4 operator>>(floatw4 a, int b) { return reinterpret(reinterpret(a) >> b); }
+static floatw4& operator>>=(floatw4& a, int b) { a = a >> b; return a; }
+static floatw4 operator<<(floatw4 a, int b) { return reinterpret(reinterpret(a) << b); }
+static floatw4& operator<<=(floatw4& a, int b) { a = a << b; return a; }
+
+static floatw4 operator-(floatw4 a) { return _mm_xor_ps(a, reinterpret(intw4(1 << 31))); }
 
 
-static float addElements(floatx4 a) { __m128 aa = _mm_hadd_ps(a, a); aa = _mm_hadd_ps(aa, aa); return aa.m128_f32[0]; }
 
-static floatx4 fmadd(floatx4 a, floatx4 b, floatx4 c) { return _mm_fmadd_ps(a, b, c); }
-static floatx4 fmsub(floatx4 a, floatx4 b, floatx4 c) { return _mm_fmsub_ps(a, b, c); }
 
-static floatx4 sqrt(floatx4 a) { return _mm_sqrt_ps(a); }
-static floatx4 rsqrt(floatx4 a) { return _mm_rsqrt_ps(a); }
+static float addElements(floatw4 a) { __m128 aa = _mm_hadd_ps(a, a); aa = _mm_hadd_ps(aa, aa); return aa.m128_f32[0]; }
 
-static floatx4 ifThen(floatx4 cond, floatx4 ifCase, floatx4 elseCase) { return _mm_blendv_ps(elseCase, ifCase, cond); }
-static intx4 ifThen(intx4 cond, intx4 ifCase, intx4 elseCase) { return reinterpret(ifThen(reinterpret(cond), reinterpret(ifCase), reinterpret(elseCase))); }
+static floatw4 fmadd(floatw4 a, floatw4 b, floatw4 c) { return _mm_fmadd_ps(a, b, c); }
+static floatw4 fmsub(floatw4 a, floatw4 b, floatw4 c) { return _mm_fmsub_ps(a, b, c); }
 
-static int toBitMask(floatx4 a) { return _mm_movemask_ps(a); }
-static int toBitMask(intx4 a) { return toBitMask(reinterpret(a)); }
+static floatw4 sqrt(floatw4 a) { return _mm_sqrt_ps(a); }
+static floatw4 rsqrt(floatw4 a) { return _mm_rsqrt_ps(a); }
 
-static bool allTrue(floatx4 a) { return toBitMask(a) == (1 << 4) - 1; }
-static bool allFalse(floatx4 a) { return toBitMask(a) == 0; }
-static bool anyTrue(floatx4 a) { return toBitMask(a) > 0; }
-static bool anyFalse(floatx4 a) { return !allTrue(a); }
+static floatw4 ifThen(floatw4 cond, floatw4 ifCase, floatw4 elseCase) { return _mm_blendv_ps(elseCase, ifCase, cond); }
+static intw4 ifThen(intw4 cond, intw4 ifCase, intw4 elseCase) { return reinterpret(ifThen(reinterpret(cond), reinterpret(ifCase), reinterpret(elseCase))); }
 
-static bool allTrue(intx4 a) { return allTrue(reinterpret(a)); }
-static bool allFalse(intx4 a) { return allFalse(reinterpret(a)); }
-static bool anyTrue(intx4 a) { return anyTrue(reinterpret(a)); }
-static bool anyFalse(intx4 a) { return anyFalse(reinterpret(a)); }
+static int toBitMask(floatw4 a) { return _mm_movemask_ps(a); }
+static int toBitMask(intw4 a) { return toBitMask(reinterpret(a)); }
 
-static floatx4 abs(floatx4 a) { floatx4 result = andNot(-0.f, a); return result; }
-static floatx4 floor(floatx4 a) { return _mm_floor_ps(a); }
-static floatx4 round(floatx4 a) { return _mm_round_ps(a, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC); }
-static floatx4 minimum(floatx4 a, floatx4 b) { return _mm_min_ps(a, b); }
-static floatx4 maximum(floatx4 a, floatx4 b) { return _mm_max_ps(a, b); }
+static bool allTrue(floatw4 a) { return toBitMask(a) == (1 << 4) - 1; }
+static bool allFalse(floatw4 a) { return toBitMask(a) == 0; }
+static bool anyTrue(floatw4 a) { return toBitMask(a) > 0; }
+static bool anyFalse(floatw4 a) { return !allTrue(a); }
 
-static floatx4 lerp(floatx4 l, floatx4 u, floatx4 t) { return fmadd(t, u - l, l); }
-static floatx4 inverseLerp(floatx4 l, floatx4 u, floatx4 v) { return (v - l) / (u - l); }
-static floatx4 remap(floatx4 v, floatx4 oldL, floatx4 oldU, floatx4 newL, floatx4 newU) { return lerp(newL, newU, inverseLerp(oldL, oldU, v)); }
-static floatx4 clamp(floatx4 v, floatx4 l, floatx4 u) { return minimum(u, maximum(l, v)); }
-static floatx4 clamp01(floatx4 v) { return clamp(v, 0.f, 1.f); }
+static bool allTrue(intw4 a) { return allTrue(reinterpret(a)); }
+static bool allFalse(intw4 a) { return allFalse(reinterpret(a)); }
+static bool anyTrue(intw4 a) { return anyTrue(reinterpret(a)); }
+static bool anyFalse(intw4 a) { return anyFalse(reinterpret(a)); }
 
-static floatx4 signOf(floatx4 f) { floatx4 z = floatx4::zero(); return ifThen(f < z, floatx4(-1), ifThen(f == z, z, floatx4(1))); }
-static floatx4 signbit(floatx4 f) { return (f & -0.f) >> 31; }
+static floatw4 abs(floatw4 a) { floatw4 result = andNot(-0.f, a); return result; }
+static floatw4 floor(floatw4 a) { return _mm_floor_ps(a); }
+static floatw4 round(floatw4 a) { return _mm_round_ps(a, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC); }
+static floatw4 minimum(floatw4 a, floatw4 b) { return _mm_min_ps(a, b); }
+static floatw4 maximum(floatw4 a, floatw4 b) { return _mm_max_ps(a, b); }
 
-static floatx4 cos(floatx4 x) { return cosInternal(x); }
-static floatx4 sin(floatx4 x) { return sinInternal(x); }
-static floatx4 exp2(floatx4 x) { return exp2Internal<floatx4, intx4>(x); }
-static floatx4 log2(floatx4 x) { return log2Internal<floatx4, intx4>(x); }
-static floatx4 pow(floatx4 x, floatx4 y) { return powInternal<floatx4, intx4>(x, y); }
-static floatx4 exp(floatx4 x) { return expInternal<floatx4, intx4>(x); }
-static floatx4 tanh(floatx4 x) { return tanhInternal(x); }
-static floatx4 atan(floatx4 x) { return atanInternal<floatx4, intx4>(x); }
-static floatx4 atan2(floatx4 y, floatx4 x) { return atan2Internal<floatx4, intx4>(y, x); }
-static floatx4 acos(floatx4 x) { return acosInternal(x); }
+static floatw4 lerp(floatw4 l, floatw4 u, floatw4 t) { return fmadd(t, u - l, l); }
+static floatw4 inverseLerp(floatw4 l, floatw4 u, floatw4 v) { return (v - l) / (u - l); }
+static floatw4 remap(floatw4 v, floatw4 oldL, floatw4 oldU, floatw4 newL, floatw4 newU) { return lerp(newL, newU, inverseLerp(oldL, oldU, v)); }
+static floatw4 clamp(floatw4 v, floatw4 l, floatw4 u) { return minimum(u, maximum(l, v)); }
+static floatw4 clamp01(floatw4 v) { return clamp(v, 0.f, 1.f); }
 
-static intx4 fillWithFirstLane(intx4 a)
+static floatw4 signOf(floatw4 f) { floatw4 z = floatw4::zero(); return ifThen(f < z, floatw4(-1), ifThen(f == z, z, floatw4(1))); }
+static floatw4 signbit(floatw4 f) { return (f & -0.f) >> 31; }
+
+static floatw4 cos(floatw4 x) { return cosInternal(x); }
+static floatw4 sin(floatw4 x) { return sinInternal(x); }
+static floatw4 exp2(floatw4 x) { return exp2Internal<floatw4, intw4>(x); }
+static floatw4 log2(floatw4 x) { return log2Internal<floatw4, intw4>(x); }
+static floatw4 pow(floatw4 x, floatw4 y) { return powInternal<floatw4, intw4>(x, y); }
+static floatw4 exp(floatw4 x) { return expInternal<floatw4, intw4>(x); }
+static floatw4 tanh(floatw4 x) { return tanhInternal(x); }
+static floatw4 atan(floatw4 x) { return atanInternal<floatw4, intw4>(x); }
+static floatw4 atan2(floatw4 y, floatw4 x) { return atan2Internal<floatw4, intw4>(y, x); }
+static floatw4 acos(floatw4 x) { return acosInternal(x); }
+
+static intw4 fillWithFirstLane(intw4 a)
 {
-	intx4 first = _mm_shuffle_epi32(a, _MM_SHUFFLE(0, 0, 0, 0));
+	intw4 first = _mm_shuffle_epi32(a, _MM_SHUFFLE(0, 0, 0, 0));
 	return first;
 }
 
-static void transpose(floatx4& out0, floatx4& out1, floatx4& out2, floatx4& out3)
+static void transpose(floatw4& out0, floatw4& out1, floatw4& out2, floatw4& out3)
 {
 	_MM_TRANSPOSE4_PS(out0.f, out1.f, out2.f, out3.f);
 }
 
 static void load4(const float* baseAddress, const uint16* indices, uint32 stride,
-	floatx4& out0, floatx4& out1, floatx4& out2, floatx4& out3)
+	floatw4& out0, floatw4& out1, floatw4& out2, floatw4& out3)
 {
 	const uint32 strideInFloats = stride / sizeof(float);
 
-	out0 = floatx4(baseAddress + strideInFloats * indices[0]);
-	out1 = floatx4(baseAddress + strideInFloats * indices[1]);
-	out2 = floatx4(baseAddress + strideInFloats * indices[2]);
-	out3 = floatx4(baseAddress + strideInFloats * indices[3]);
+	out0 = floatw4(baseAddress + strideInFloats * indices[0]);
+	out1 = floatw4(baseAddress + strideInFloats * indices[1]);
+	out2 = floatw4(baseAddress + strideInFloats * indices[2]);
+	out3 = floatw4(baseAddress + strideInFloats * indices[3]);
 
 	transpose(out0, out1, out2, out3);
 }
 
 static void store4(float* baseAddress, const uint16* indices, uint32 stride,
-	floatx4 in0, floatx4 in1, floatx4 in2, floatx4 in3)
+	floatw4 in0, floatw4 in1, floatw4 in2, floatw4 in3)
 {
 	const uint32 strideInFloats = stride / sizeof(float);
 
@@ -428,25 +428,25 @@ static void store4(float* baseAddress, const uint16* indices, uint32 stride,
 }
 
 static void load8(const float* baseAddress, const uint16* indices, uint32 stride,
-	floatx4& out0, floatx4& out1, floatx4& out2, floatx4& out3, floatx4& out4, floatx4& out5, floatx4& out6, floatx4& out7)
+	floatw4& out0, floatw4& out1, floatw4& out2, floatw4& out3, floatw4& out4, floatw4& out5, floatw4& out6, floatw4& out7)
 {
 	const uint32 strideInFloats = stride / sizeof(float);
 
-	out0 = floatx4(baseAddress + strideInFloats * indices[0]);
-	out1 = floatx4(baseAddress + strideInFloats * indices[1]);
-	out2 = floatx4(baseAddress + strideInFloats * indices[2]);
-	out3 = floatx4(baseAddress + strideInFloats * indices[3]);
-	out4 = floatx4(baseAddress + strideInFloats * indices[0] + 4);
-	out5 = floatx4(baseAddress + strideInFloats * indices[1] + 4);
-	out6 = floatx4(baseAddress + strideInFloats * indices[2] + 4);
-	out7 = floatx4(baseAddress + strideInFloats * indices[3] + 4);
+	out0 = floatw4(baseAddress + strideInFloats * indices[0]);
+	out1 = floatw4(baseAddress + strideInFloats * indices[1]);
+	out2 = floatw4(baseAddress + strideInFloats * indices[2]);
+	out3 = floatw4(baseAddress + strideInFloats * indices[3]);
+	out4 = floatw4(baseAddress + strideInFloats * indices[0] + 4);
+	out5 = floatw4(baseAddress + strideInFloats * indices[1] + 4);
+	out6 = floatw4(baseAddress + strideInFloats * indices[2] + 4);
+	out7 = floatw4(baseAddress + strideInFloats * indices[3] + 4);
 
 	transpose(out0, out1, out2, out3);
 	transpose(out4, out5, out6, out7);
 }
 
 static void store8(float* baseAddress, const uint16* indices, uint32 stride,
-	floatx4 in0, floatx4 in1, floatx4 in2, floatx4 in3, floatx4 in4, floatx4 in5, floatx4 in6, floatx4 in7)
+	floatw4 in0, floatw4 in1, floatw4 in2, floatw4 in3, floatw4 in4, floatw4 in5, floatw4 in6, floatw4 in7)
 {
 	const uint32 strideInFloats = stride / sizeof(float);
 
@@ -467,18 +467,18 @@ static void store8(float* baseAddress, const uint16* indices, uint32 stride,
 
 #if defined(SIMD_AVX_2)
 
-struct floatx8
+struct floatw8
 {
 	__m256 f;
 
-	floatx8() {}
-	floatx8(float f_) { f = _mm256_set1_ps(f_); }
-	floatx8(__m256 f_) { f = f_; }
-	floatx8(float a, float b, float c, float d, float e, float f, float g, float h) { this->f = _mm256_setr_ps(a, b, c, d, e, f, g, h); }
-	floatx8(const float* f_) { f = _mm256_loadu_ps(f_); }
+	floatw8() {}
+	floatw8(float f_) { f = _mm256_set1_ps(f_); }
+	floatw8(__m256 f_) { f = f_; }
+	floatw8(float a, float b, float c, float d, float e, float f, float g, float h) { this->f = _mm256_setr_ps(a, b, c, d, e, f, g, h); }
+	floatw8(const float* f_) { f = _mm256_loadu_ps(f_); }
 
-	floatx8(const float* baseAddress, __m256i indices) { f = _mm256_i32gather_ps(baseAddress, indices, 4); }
-	floatx8(const float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) : floatx8(baseAddress, _mm256_setr_epi32(a, b, c, d, e, f, g, h)) {}
+	floatw8(const float* baseAddress, __m256i indices) { f = _mm256_i32gather_ps(baseAddress, indices, 4); }
+	floatw8(const float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) : floatw8(baseAddress, _mm256_setr_epi32(a, b, c, d, e, f, g, h)) {}
 
 	operator __m256() { return f; }
 
@@ -513,22 +513,22 @@ struct floatx8
 	}
 #endif
 
-	static floatx8 allOnes() { const float nnan = (const float&)0xFFFFFFFF; return nnan; }
-	static floatx8 zero() { return _mm256_setzero_ps(); }
+	static floatw8 allOnes() { const float nnan = (const float&)0xFFFFFFFF; return nnan; }
+	static floatw8 zero() { return _mm256_setzero_ps(); }
 };
 
-struct intx8
+struct intw8
 {
 	__m256i i;
 
-	intx8() {}
-	intx8(int i_) { i = _mm256_set1_epi32(i_); }
-	intx8(__m256i i_) { i = i_; }
-	intx8(int a, int b, int c, int d, int e, int f, int g, int h) { this->i = _mm256_setr_epi32(a, b, c, d, e, f, g, h); }
-	intx8(const int* i_) { i = _mm256_loadu_epi32(i_); }
+	intw8() {}
+	intw8(int i_) { i = _mm256_set1_epi32(i_); }
+	intw8(__m256i i_) { i = i_; }
+	intw8(int a, int b, int c, int d, int e, int f, int g, int h) { this->i = _mm256_setr_epi32(a, b, c, d, e, f, g, h); }
+	intw8(const int* i_) { i = _mm256_loadu_epi32(i_); }
 
-	intx8(const int* baseAddress, __m256i indices) { i = _mm256_i32gather_epi32(baseAddress, indices, 4); }
-	intx8(const int* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) : intx8(baseAddress, _mm256_setr_epi32(a, b, c, d, e, f, g, h)) {}
+	intw8(const int* baseAddress, __m256i indices) { i = _mm256_i32gather_epi32(baseAddress, indices, 4); }
+	intw8(const int* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) : intw8(baseAddress, _mm256_setr_epi32(a, b, c, d, e, f, g, h)) {}
 
 	operator __m256i() { return i; }
 
@@ -563,123 +563,123 @@ struct intx8
 	}
 #endif
 
-	static intx8 allOnes() { return UINT32_MAX; }
-	static intx8 zero() { return _mm256_setzero_si256(); }
+	static intw8 allOnes() { return UINT32_MAX; }
+	static intw8 zero() { return _mm256_setzero_si256(); }
 };
 
-static floatx8 convert(intx8 i) { return _mm256_cvtepi32_ps(i); }
-static intx8 convert(floatx8 f) { return _mm256_cvtps_epi32(f); }
-static floatx8 reinterpret(intx8 i) { return _mm256_castsi256_ps(i); }
-static intx8 reinterpret(floatx8 f) { return _mm256_castps_si256(f); }
+static floatw8 convert(intw8 i) { return _mm256_cvtepi32_ps(i); }
+static intw8 convert(floatw8 f) { return _mm256_cvtps_epi32(f); }
+static floatw8 reinterpret(intw8 i) { return _mm256_castsi256_ps(i); }
+static intw8 reinterpret(floatw8 f) { return _mm256_castps_si256(f); }
 
 
 // Int operators.
-static intx8 andNot(intx8 a, intx8 b) { return _mm256_andnot_si256(a, b); }
+static intw8 andNot(intw8 a, intw8 b) { return _mm256_andnot_si256(a, b); }
 
-static intx8 operator+(intx8 a, intx8 b) { return _mm256_add_epi32(a, b); }
-static intx8& operator+=(intx8& a, intx8 b) { a = a + b; return a; }
-static intx8 operator-(intx8 a, intx8 b) { return _mm256_sub_epi32(a, b); }
-static intx8& operator-=(intx8& a, intx8 b) { a = a - b; return a; }
-static intx8 operator*(intx8 a, intx8 b) { return _mm256_mul_epi32(a, b); }
-static intx8& operator*=(intx8& a, intx8 b) { a = a * b; return a; }
-static intx8 operator/(intx8 a, intx8 b) { return _mm256_div_epi32(a, b); }
-static intx8& operator/=(intx8& a, intx8 b) { a = a / b; return a; }
-static intx8 operator&(intx8 a, intx8 b) { return _mm256_and_si256(a, b); }
-static intx8& operator&=(intx8& a, intx8 b) { a = a & b; return a; }
-static intx8 operator|(intx8 a, intx8 b) { return _mm256_or_si256(a, b); }
-static intx8& operator|=(intx8& a, intx8 b) { a = a | b; return a; }
-static intx8 operator^(intx8 a, intx8 b) { return _mm256_xor_si256(a, b); }
-static intx8& operator^=(intx8& a, intx8 b) { a = a ^ b; return a; }
+static intw8 operator+(intw8 a, intw8 b) { return _mm256_add_epi32(a, b); }
+static intw8& operator+=(intw8& a, intw8 b) { a = a + b; return a; }
+static intw8 operator-(intw8 a, intw8 b) { return _mm256_sub_epi32(a, b); }
+static intw8& operator-=(intw8& a, intw8 b) { a = a - b; return a; }
+static intw8 operator*(intw8 a, intw8 b) { return _mm256_mul_epi32(a, b); }
+static intw8& operator*=(intw8& a, intw8 b) { a = a * b; return a; }
+static intw8 operator/(intw8 a, intw8 b) { return _mm256_div_epi32(a, b); }
+static intw8& operator/=(intw8& a, intw8 b) { a = a / b; return a; }
+static intw8 operator&(intw8 a, intw8 b) { return _mm256_and_si256(a, b); }
+static intw8& operator&=(intw8& a, intw8 b) { a = a & b; return a; }
+static intw8 operator|(intw8 a, intw8 b) { return _mm256_or_si256(a, b); }
+static intw8& operator|=(intw8& a, intw8 b) { a = a | b; return a; }
+static intw8 operator^(intw8 a, intw8 b) { return _mm256_xor_si256(a, b); }
+static intw8& operator^=(intw8& a, intw8 b) { a = a ^ b; return a; }
 
-static intx8 operator~(intx8 a) { a = andNot(a, intx8::allOnes()); return a; }
+static intw8 operator~(intw8 a) { a = andNot(a, intw8::allOnes()); return a; }
 
-static intx8 operator>>(intx8 a, int b) { return _mm256_srli_epi32(a, b); }
-static intx8& operator>>=(intx8& a, int b) { a = a >> b; return a; }
-static intx8 operator<<(intx8 a, int b) { return _mm256_slli_epi32(a, b); }
-static intx8& operator<<=(intx8& a, int b) { a = a << b; return a; }
+static intw8 operator>>(intw8 a, int b) { return _mm256_srli_epi32(a, b); }
+static intw8& operator>>=(intw8& a, int b) { a = a >> b; return a; }
+static intw8 operator<<(intw8 a, int b) { return _mm256_slli_epi32(a, b); }
+static intw8& operator<<=(intw8& a, int b) { a = a << b; return a; }
 
-static intx8 operator-(intx8 a) { return _mm256_sub_epi32(intx8::zero(), a); }
+static intw8 operator-(intw8 a) { return _mm256_sub_epi32(intw8::zero(), a); }
 
 
 
 // Float operators.
-static floatx8 andNot(floatx8 a, floatx8 b) { return _mm256_andnot_ps(a, b); }
+static floatw8 andNot(floatw8 a, floatw8 b) { return _mm256_andnot_ps(a, b); }
 
-static floatx8 operator+(floatx8 a, floatx8 b) { return _mm256_add_ps(a, b); }
-static floatx8& operator+=(floatx8& a, floatx8 b) { a = a + b; return a; }
-static floatx8 operator-(floatx8 a, floatx8 b) { return _mm256_sub_ps(a, b); }
-static floatx8& operator-=(floatx8& a, floatx8 b) { a = a - b; return a; }
-static floatx8 operator*(floatx8 a, floatx8 b) { return _mm256_mul_ps(a, b); }
-static floatx8& operator*=(floatx8& a, floatx8 b) { a = a * b; return a; }
-static floatx8 operator/(floatx8 a, floatx8 b) { return _mm256_div_ps(a, b); }
-static floatx8& operator/=(floatx8& a, floatx8 b) { a = a / b; return a; }
-static floatx8 operator&(floatx8 a, floatx8 b) { return _mm256_and_ps(a, b); }
-static floatx8& operator&=(floatx8& a, floatx8 b) { a = a & b; return a; }
-static floatx8 operator|(floatx8 a, floatx8 b) { return _mm256_or_ps(a, b); }
-static floatx8& operator|=(floatx8& a, floatx8 b) { a = a | b; return a; }
-static floatx8 operator^(floatx8 a, floatx8 b) { return _mm256_xor_ps(a, b); }
-static floatx8& operator^=(floatx8& a, floatx8 b) { a = a ^ b; return a; }
+static floatw8 operator+(floatw8 a, floatw8 b) { return _mm256_add_ps(a, b); }
+static floatw8& operator+=(floatw8& a, floatw8 b) { a = a + b; return a; }
+static floatw8 operator-(floatw8 a, floatw8 b) { return _mm256_sub_ps(a, b); }
+static floatw8& operator-=(floatw8& a, floatw8 b) { a = a - b; return a; }
+static floatw8 operator*(floatw8 a, floatw8 b) { return _mm256_mul_ps(a, b); }
+static floatw8& operator*=(floatw8& a, floatw8 b) { a = a * b; return a; }
+static floatw8 operator/(floatw8 a, floatw8 b) { return _mm256_div_ps(a, b); }
+static floatw8& operator/=(floatw8& a, floatw8 b) { a = a / b; return a; }
+static floatw8 operator&(floatw8 a, floatw8 b) { return _mm256_and_ps(a, b); }
+static floatw8& operator&=(floatw8& a, floatw8 b) { a = a & b; return a; }
+static floatw8 operator|(floatw8 a, floatw8 b) { return _mm256_or_ps(a, b); }
+static floatw8& operator|=(floatw8& a, floatw8 b) { a = a | b; return a; }
+static floatw8 operator^(floatw8 a, floatw8 b) { return _mm256_xor_ps(a, b); }
+static floatw8& operator^=(floatw8& a, floatw8 b) { a = a ^ b; return a; }
 
-static floatx8 operator~(floatx8 a) { a = andNot(a, floatx8::allOnes()); return a; }
+static floatw8 operator~(floatw8 a) { a = andNot(a, floatw8::allOnes()); return a; }
 
 
 #if defined(SIMD_AVX_512)
-static uint8 operator==(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_EQ); }
-static uint8 operator!=(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_NE); }
-static uint8 operator>(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(b, a, _MM_CMPINT_LT); }
-static uint8 operator>=(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(b, a, _MM_CMPINT_LE); }
-static uint8 operator<(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_LT); }
-static uint8 operator<=(intx8 a, intx8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_LE); }
+static uint8 operator==(intw8 a, intw8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_EQ); }
+static uint8 operator!=(intw8 a, intw8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_NE); }
+static uint8 operator>(intw8 a, intw8 b) { return _mm256_cmp_epi32_mask(b, a, _MM_CMPINT_LT); }
+static uint8 operator>=(intw8 a, intw8 b) { return _mm256_cmp_epi32_mask(b, a, _MM_CMPINT_LE); }
+static uint8 operator<(intw8 a, intw8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_LT); }
+static uint8 operator<=(intw8 a, intw8 b) { return _mm256_cmp_epi32_mask(a, b, _MM_CMPINT_LE); }
 #else
-static intx8 operator==(intx8 a, intx8 b) { return _mm256_cmpeq_epi32(a, b); }
-static intx8 operator!=(intx8 a, intx8 b) { return ~(a == b); }
-static intx8 operator>(intx8 a, intx8 b) { return _mm256_cmpgt_epi32(a, b); }
-static intx8 operator>=(intx8 a, intx8 b) { return (a > b) | (a == b); }
-static intx8 operator<(intx8 a, intx8 b) { return _mm256_cmpgt_epi32(b, a); }
-static intx8 operator<=(intx8 a, intx8 b) { return (a < b) | (a == b); }
+static intw8 operator==(intw8 a, intw8 b) { return _mm256_cmpeq_epi32(a, b); }
+static intw8 operator!=(intw8 a, intw8 b) { return ~(a == b); }
+static intw8 operator>(intw8 a, intw8 b) { return _mm256_cmpgt_epi32(a, b); }
+static intw8 operator>=(intw8 a, intw8 b) { return (a > b) | (a == b); }
+static intw8 operator<(intw8 a, intw8 b) { return _mm256_cmpgt_epi32(b, a); }
+static intw8 operator<=(intw8 a, intw8 b) { return (a < b) | (a == b); }
 #endif
 
 
 #if defined(SIMD_AVX_512)
-static uint8 operator==(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_EQ_OQ); }
-static uint8 operator!=(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_NEQ_OQ); }
-static uint8 operator>(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_GT_OQ); }
-static uint8 operator>=(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_GE_OQ); }
-static uint8 operator<(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_LT_OQ); }
-static uint8 operator<=(floatx8 a, floatx8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_LE_OQ); }
+static uint8 operator==(floatw8 a, floatw8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_EQ_OQ); }
+static uint8 operator!=(floatw8 a, floatw8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_NEQ_OQ); }
+static uint8 operator>(floatw8 a, floatw8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_GT_OQ); }
+static uint8 operator>=(floatw8 a, floatw8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_GE_OQ); }
+static uint8 operator<(floatw8 a, floatw8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_LT_OQ); }
+static uint8 operator<=(floatw8 a, floatw8 b) { return _mm256_cmp_ps_mask(a, b, _CMP_LE_OQ); }
 #else
-static floatx8 operator==(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_EQ_OQ); }
-static floatx8 operator!=(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_NEQ_OQ); }
-static floatx8 operator>(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_GT_OQ); }
-static floatx8 operator>=(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_GE_OQ); }
-static floatx8 operator<(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_LT_OQ); }
-static floatx8 operator<=(floatx8 a, floatx8 b) { return _mm256_cmp_ps(a, b, _CMP_LE_OQ); }
+static floatw8 operator==(floatw8 a, floatw8 b) { return _mm256_cmp_ps(a, b, _CMP_EQ_OQ); }
+static floatw8 operator!=(floatw8 a, floatw8 b) { return _mm256_cmp_ps(a, b, _CMP_NEQ_OQ); }
+static floatw8 operator>(floatw8 a, floatw8 b) { return _mm256_cmp_ps(a, b, _CMP_GT_OQ); }
+static floatw8 operator>=(floatw8 a, floatw8 b) { return _mm256_cmp_ps(a, b, _CMP_GE_OQ); }
+static floatw8 operator<(floatw8 a, floatw8 b) { return _mm256_cmp_ps(a, b, _CMP_LT_OQ); }
+static floatw8 operator<=(floatw8 a, floatw8 b) { return _mm256_cmp_ps(a, b, _CMP_LE_OQ); }
 #endif
 
-static floatx8 operator>>(floatx8 a, int b) { return reinterpret(reinterpret(a) >> b); }
-static floatx8& operator>>=(floatx8& a, int b) { a = a >> b; return a; }
-static floatx8 operator<<(floatx8 a, int b) { return reinterpret(reinterpret(a) << b); }
-static floatx8& operator<<=(floatx8& a, int b) { a = a << b; return a; }
+static floatw8 operator>>(floatw8 a, int b) { return reinterpret(reinterpret(a) >> b); }
+static floatw8& operator>>=(floatw8& a, int b) { a = a >> b; return a; }
+static floatw8 operator<<(floatw8 a, int b) { return reinterpret(reinterpret(a) << b); }
+static floatw8& operator<<=(floatw8& a, int b) { a = a << b; return a; }
 
-static floatx8 operator-(floatx8 a) { return _mm256_xor_ps(a, reinterpret(intx8(1 << 31))); }
-
-
+static floatw8 operator-(floatw8 a) { return _mm256_xor_ps(a, reinterpret(intw8(1 << 31))); }
 
 
-static float addElements(floatx8 a) { __m256 aa = _mm256_hadd_ps(a, a); aa = _mm256_hadd_ps(aa, aa); return aa.m256_f32[0] + aa.m256_f32[4]; }
 
-static floatx8 fmadd(floatx8 a, floatx8 b, floatx8 c) { return _mm256_fmadd_ps(a, b, c); }
-static floatx8 fmsub(floatx8 a, floatx8 b, floatx8 c) { return _mm256_fmsub_ps(a, b, c); }
 
-static floatx8 sqrt(floatx8 a) { return _mm256_sqrt_ps(a); }
-static floatx8 rsqrt(floatx8 a) { return _mm256_rsqrt_ps(a); }
+static float addElements(floatw8 a) { __m256 aa = _mm256_hadd_ps(a, a); aa = _mm256_hadd_ps(aa, aa); return aa.m256_f32[0] + aa.m256_f32[4]; }
 
-static int toBitMask(floatx8 a) { return _mm256_movemask_ps(a); }
-static int toBitMask(intx8 a) { return toBitMask(reinterpret(a)); }
+static floatw8 fmadd(floatw8 a, floatw8 b, floatw8 c) { return _mm256_fmadd_ps(a, b, c); }
+static floatw8 fmsub(floatw8 a, floatw8 b, floatw8 c) { return _mm256_fmsub_ps(a, b, c); }
+
+static floatw8 sqrt(floatw8 a) { return _mm256_sqrt_ps(a); }
+static floatw8 rsqrt(floatw8 a) { return _mm256_rsqrt_ps(a); }
+
+static int toBitMask(floatw8 a) { return _mm256_movemask_ps(a); }
+static int toBitMask(intw8 a) { return toBitMask(reinterpret(a)); }
 
 #if defined(SIMD_AVX_512)
-static floatx8 ifThen(uint8 cond, floatx8 ifCase, floatx8 elseCase) { return _mm256_mask_blend_ps(cond, elseCase, ifCase); }
-static intx8 ifThen(uint8 cond, intx8 ifCase, intx8 elseCase) { return reinterpret(ifThen(cond, reinterpret(ifCase), reinterpret(elseCase))); }
+static floatw8 ifThen(uint8 cond, floatw8 ifCase, floatw8 elseCase) { return _mm256_mask_blend_ps(cond, elseCase, ifCase); }
+static intw8 ifThen(uint8 cond, intw8 ifCase, intw8 elseCase) { return reinterpret(ifThen(cond, reinterpret(ifCase), reinterpret(elseCase))); }
 
 static int toBitMask(uint8 a) { return a; }
 
@@ -688,95 +688,95 @@ static bool allFalse(uint8 a) { return a == 0; }
 static bool anyTrue(uint8 a) { return a > 0; }
 static bool anyFalse(uint8 a) { return !allTrue(a); }
 #else
-static floatx8 ifThen(floatx8 cond, floatx8 ifCase, floatx8 elseCase) { return _mm256_blendv_ps(elseCase, ifCase, cond); }
-static intx8 ifThen(intx8 cond, intx8 ifCase, intx8 elseCase) { return reinterpret(ifThen(reinterpret(cond), reinterpret(ifCase), reinterpret(elseCase))); }
+static floatw8 ifThen(floatw8 cond, floatw8 ifCase, floatw8 elseCase) { return _mm256_blendv_ps(elseCase, ifCase, cond); }
+static intw8 ifThen(intw8 cond, intw8 ifCase, intw8 elseCase) { return reinterpret(ifThen(reinterpret(cond), reinterpret(ifCase), reinterpret(elseCase))); }
 
-static bool allTrue(floatx8 a) { return toBitMask(a) == (1 << 8) - 1; }
-static bool allFalse(floatx8 a) { return toBitMask(a) == 0; }
-static bool anyTrue(floatx8 a) { return toBitMask(a) > 0; }
-static bool anyFalse(floatx8 a) { return !allTrue(a); }
+static bool allTrue(floatw8 a) { return toBitMask(a) == (1 << 8) - 1; }
+static bool allFalse(floatw8 a) { return toBitMask(a) == 0; }
+static bool anyTrue(floatw8 a) { return toBitMask(a) > 0; }
+static bool anyFalse(floatw8 a) { return !allTrue(a); }
 
-static bool allTrue(intx8 a) { return allTrue(reinterpret(a)); }
-static bool allFalse(intx8 a) { return allFalse(reinterpret(a)); }
-static bool anyTrue(intx8 a) { return anyTrue(reinterpret(a)); }
-static bool anyFalse(intx8 a) { return anyFalse(reinterpret(a)); }
+static bool allTrue(intw8 a) { return allTrue(reinterpret(a)); }
+static bool allFalse(intw8 a) { return allFalse(reinterpret(a)); }
+static bool anyTrue(intw8 a) { return anyTrue(reinterpret(a)); }
+static bool anyFalse(intw8 a) { return anyFalse(reinterpret(a)); }
 #endif
 
 
-static floatx8 abs(floatx8 a) { floatx8 result = andNot(-0.f, a); return result; }
-static floatx8 floor(floatx8 a) { return _mm256_floor_ps(a); }
-static floatx8 minimum(floatx8 a, floatx8 b) { return _mm256_min_ps(a, b); }
-static floatx8 maximum(floatx8 a, floatx8 b) { return _mm256_max_ps(a, b); }
+static floatw8 abs(floatw8 a) { floatw8 result = andNot(-0.f, a); return result; }
+static floatw8 floor(floatw8 a) { return _mm256_floor_ps(a); }
+static floatw8 minimum(floatw8 a, floatw8 b) { return _mm256_min_ps(a, b); }
+static floatw8 maximum(floatw8 a, floatw8 b) { return _mm256_max_ps(a, b); }
 
-static floatx8 lerp(floatx8 l, floatx8 u, floatx8 t) { return fmadd(t, u - l, l); }
-static floatx8 inverseLerp(floatx8 l, floatx8 u, floatx8 v) { return (v - l) / (u - l); }
-static floatx8 remap(floatx8 v, floatx8 oldL, floatx8 oldU, floatx8 newL, floatx8 newU) { return lerp(newL, newU, inverseLerp(oldL, oldU, v)); }
-static floatx8 clamp(floatx8 v, floatx8 l, floatx8 u) { return minimum(u, maximum(l, v)); }
-static floatx8 clamp01(floatx8 v) { return clamp(v, 0.f, 1.f); }
+static floatw8 lerp(floatw8 l, floatw8 u, floatw8 t) { return fmadd(t, u - l, l); }
+static floatw8 inverseLerp(floatw8 l, floatw8 u, floatw8 v) { return (v - l) / (u - l); }
+static floatw8 remap(floatw8 v, floatw8 oldL, floatw8 oldU, floatw8 newL, floatw8 newU) { return lerp(newL, newU, inverseLerp(oldL, oldU, v)); }
+static floatw8 clamp(floatw8 v, floatw8 l, floatw8 u) { return minimum(u, maximum(l, v)); }
+static floatw8 clamp01(floatw8 v) { return clamp(v, 0.f, 1.f); }
 
-static floatx8 signOf(floatx8 f) { floatx8 z = floatx8::zero(); return ifThen(f < z, floatx8(-1), ifThen(f == z, z, floatx8(1))); }
-static floatx8 signbit(floatx8 f) { return (f & -0.f) >> 31; }
+static floatw8 signOf(floatw8 f) { floatw8 z = floatw8::zero(); return ifThen(f < z, floatw8(-1), ifThen(f == z, z, floatw8(1))); }
+static floatw8 signbit(floatw8 f) { return (f & -0.f) >> 31; }
 
-static floatx8 cos(floatx8 x) { return cosInternal(x); }
-static floatx8 sin(floatx8 x) { return sinInternal(x); }
-static floatx8 exp2(floatx8 x) { return exp2Internal<floatx8, intx8>(x); }
-static floatx8 log2(floatx8 x) { return log2Internal<floatx8, intx8>(x); }
-static floatx8 pow(floatx8 x, floatx8 y) { return powInternal<floatx8, intx8>(x, y); }
-static floatx8 exp(floatx8 x) { return expInternal<floatx8, intx8>(x); }
-static floatx8 tanh(floatx8 x) { return tanhInternal(x); }
-static floatx8 atan(floatx8 x) { return atanInternal<floatx8, intx8>(x); }
-static floatx8 atan2(floatx8 y, floatx8 x) { return atan2Internal<floatx8, intx8>(y, x); }
-static floatx8 acos(floatx8 x) { return acosInternal(x); }
+static floatw8 cos(floatw8 x) { return cosInternal(x); }
+static floatw8 sin(floatw8 x) { return sinInternal(x); }
+static floatw8 exp2(floatw8 x) { return exp2Internal<floatw8, intw8>(x); }
+static floatw8 log2(floatw8 x) { return log2Internal<floatw8, intw8>(x); }
+static floatw8 pow(floatw8 x, floatw8 y) { return powInternal<floatw8, intw8>(x, y); }
+static floatw8 exp(floatw8 x) { return expInternal<floatw8, intw8>(x); }
+static floatw8 tanh(floatw8 x) { return tanhInternal(x); }
+static floatw8 atan(floatw8 x) { return atanInternal<floatw8, intw8>(x); }
+static floatw8 atan2(floatw8 y, floatw8 x) { return atan2Internal<floatw8, intw8>(y, x); }
+static floatw8 acos(floatw8 x) { return acosInternal(x); }
 
-static floatx8 concat(floatx4 a, floatx4 b)
+static floatw8 concat(floatw4 a, floatw4 b)
 {
 	return _mm256_insertf128_ps(_mm256_castps128_ps256(a), b, 1);
 }
 
-static intx8 concat(intx4 a, intx4 b)
+static intw8 concat(intw4 a, intw4 b)
 {
 	return _mm256_inserti128_si256(_mm256_castsi128_si256(a), b, 1);
 }
 
-static floatx8 concatLow(floatx8 a, floatx8 b)
+static floatw8 concatLow(floatw8 a, floatw8 b)
 {
 	return _mm256_permute2f128_ps(a, b, 0 | (0 << 4));
 }
 
-static intx8 concatLow(intx8 a, intx8 b)
+static intw8 concatLow(intw8 a, intw8 b)
 {
 	return _mm256_permute2x128_si256(a, b, 0 | (0 << 4));
 }
 
-static intx8 fillWithFirstLane(intx8 a)
+static intw8 fillWithFirstLane(intw8 a)
 {
-	intx8 first = _mm256_shuffle_epi32(a, _MM_SHUFFLE(0, 0, 0, 0));
+	intw8 first = _mm256_shuffle_epi32(a, _MM_SHUFFLE(0, 0, 0, 0));
 	first = concatLow(first, first);
 	return first;
 }
 
-static void transpose32(floatx8& out0, floatx8& out1, floatx8& out2, floatx8& out3)
+static void transpose32(floatw8& out0, floatw8& out1, floatw8& out2, floatw8& out3)
 {
-	floatx8 t0 = _mm256_unpacklo_ps(out0, out1);
-	floatx8 t1 = _mm256_unpacklo_ps(out2, out3);
-	floatx8 t2 = _mm256_unpackhi_ps(out0, out1);
-	floatx8 t3 = _mm256_unpackhi_ps(out2, out3);
+	floatw8 t0 = _mm256_unpacklo_ps(out0, out1);
+	floatw8 t1 = _mm256_unpacklo_ps(out2, out3);
+	floatw8 t2 = _mm256_unpackhi_ps(out0, out1);
+	floatw8 t3 = _mm256_unpackhi_ps(out2, out3);
 	out0 = _mm256_shuffle_ps(t0, t1, _MM_SHUFFLE(1, 0, 1, 0));
 	out1 = _mm256_shuffle_ps(t0, t1, _MM_SHUFFLE(3, 2, 3, 2));
 	out2 = _mm256_shuffle_ps(t2, t3, _MM_SHUFFLE(1, 0, 1, 0));
 	out3 = _mm256_shuffle_ps(t2, t3, _MM_SHUFFLE(3, 2, 3, 2));
 }
 
-static void transpose(floatx8& out0, floatx8& out1, floatx8& out2, floatx8& out3, floatx8& out4, floatx8& out5, floatx8& out6, floatx8& out7)
+static void transpose(floatw8& out0, floatw8& out1, floatw8& out2, floatw8& out3, floatw8& out4, floatw8& out5, floatw8& out6, floatw8& out7)
 {
-	floatx8 tmp0 = reinterpret(_mm256_permute2x128_si256(reinterpret(out0), reinterpret(out4), 0 | (2 << 4)));
-	floatx8 tmp1 = reinterpret(_mm256_permute2x128_si256(reinterpret(out1), reinterpret(out5), 0 | (2 << 4)));
-	floatx8 tmp2 = reinterpret(_mm256_permute2x128_si256(reinterpret(out2), reinterpret(out6), 0 | (2 << 4)));
-	floatx8 tmp3 = reinterpret(_mm256_permute2x128_si256(reinterpret(out3), reinterpret(out7), 0 | (2 << 4)));
-	floatx8 tmp4 = reinterpret(_mm256_permute2x128_si256(reinterpret(out0), reinterpret(out4), 1 | (3 << 4)));
-	floatx8 tmp5 = reinterpret(_mm256_permute2x128_si256(reinterpret(out1), reinterpret(out5), 1 | (3 << 4)));
-	floatx8 tmp6 = reinterpret(_mm256_permute2x128_si256(reinterpret(out2), reinterpret(out6), 1 | (3 << 4)));
-	floatx8 tmp7 = reinterpret(_mm256_permute2x128_si256(reinterpret(out3), reinterpret(out7), 1 | (3 << 4)));
+	floatw8 tmp0 = reinterpret(_mm256_permute2x128_si256(reinterpret(out0), reinterpret(out4), 0 | (2 << 4)));
+	floatw8 tmp1 = reinterpret(_mm256_permute2x128_si256(reinterpret(out1), reinterpret(out5), 0 | (2 << 4)));
+	floatw8 tmp2 = reinterpret(_mm256_permute2x128_si256(reinterpret(out2), reinterpret(out6), 0 | (2 << 4)));
+	floatw8 tmp3 = reinterpret(_mm256_permute2x128_si256(reinterpret(out3), reinterpret(out7), 0 | (2 << 4)));
+	floatw8 tmp4 = reinterpret(_mm256_permute2x128_si256(reinterpret(out0), reinterpret(out4), 1 | (3 << 4)));
+	floatw8 tmp5 = reinterpret(_mm256_permute2x128_si256(reinterpret(out1), reinterpret(out5), 1 | (3 << 4)));
+	floatw8 tmp6 = reinterpret(_mm256_permute2x128_si256(reinterpret(out2), reinterpret(out6), 1 | (3 << 4)));
+	floatw8 tmp7 = reinterpret(_mm256_permute2x128_si256(reinterpret(out3), reinterpret(out7), 1 | (3 << 4)));
 
 	out0 = tmp0;
 	out1 = tmp1;
@@ -792,18 +792,18 @@ static void transpose(floatx8& out0, floatx8& out1, floatx8& out2, floatx8& out3
 }
 
 static void load4(const float* baseAddress, const uint16* indices, uint32 stride,
-	floatx8& out0, floatx8& out1, floatx8& out2, floatx8& out3)
+	floatw8& out0, floatw8& out1, floatw8& out2, floatw8& out3)
 {
 	const uint32 strideInFloats = stride / sizeof(float);
 
-	floatx4 tmp0(baseAddress + strideInFloats * indices[0]);
-	floatx4 tmp1(baseAddress + strideInFloats * indices[1]);
-	floatx4 tmp2(baseAddress + strideInFloats * indices[2]);
-	floatx4 tmp3(baseAddress + strideInFloats * indices[3]);
-	floatx4 tmp4(baseAddress + strideInFloats * indices[4]);
-	floatx4 tmp5(baseAddress + strideInFloats * indices[5]);
-	floatx4 tmp6(baseAddress + strideInFloats * indices[6]);
-	floatx4 tmp7(baseAddress + strideInFloats * indices[7]);
+	floatw4 tmp0(baseAddress + strideInFloats * indices[0]);
+	floatw4 tmp1(baseAddress + strideInFloats * indices[1]);
+	floatw4 tmp2(baseAddress + strideInFloats * indices[2]);
+	floatw4 tmp3(baseAddress + strideInFloats * indices[3]);
+	floatw4 tmp4(baseAddress + strideInFloats * indices[4]);
+	floatw4 tmp5(baseAddress + strideInFloats * indices[5]);
+	floatw4 tmp6(baseAddress + strideInFloats * indices[6]);
+	floatw4 tmp7(baseAddress + strideInFloats * indices[7]);
 
 	out0 = concat(tmp0, tmp4);
 	out1 = concat(tmp1, tmp5);
@@ -814,24 +814,24 @@ static void load4(const float* baseAddress, const uint16* indices, uint32 stride
 }
 
 static void load8(const float* baseAddress, const uint16* indices, uint32 stride,
-	floatx8& out0, floatx8& out1, floatx8& out2, floatx8& out3, floatx8& out4, floatx8& out5, floatx8& out6, floatx8& out7)
+	floatw8& out0, floatw8& out1, floatw8& out2, floatw8& out3, floatw8& out4, floatw8& out5, floatw8& out6, floatw8& out7)
 {
 	const uint32 strideInFloats = stride / sizeof(float);
 
-	out0 = floatx8(baseAddress + strideInFloats * indices[0]);
-	out1 = floatx8(baseAddress + strideInFloats * indices[1]);
-	out2 = floatx8(baseAddress + strideInFloats * indices[2]);
-	out3 = floatx8(baseAddress + strideInFloats * indices[3]);
-	out4 = floatx8(baseAddress + strideInFloats * indices[4]);
-	out5 = floatx8(baseAddress + strideInFloats * indices[5]);
-	out6 = floatx8(baseAddress + strideInFloats * indices[6]);
-	out7 = floatx8(baseAddress + strideInFloats * indices[7]);
+	out0 = floatw8(baseAddress + strideInFloats * indices[0]);
+	out1 = floatw8(baseAddress + strideInFloats * indices[1]);
+	out2 = floatw8(baseAddress + strideInFloats * indices[2]);
+	out3 = floatw8(baseAddress + strideInFloats * indices[3]);
+	out4 = floatw8(baseAddress + strideInFloats * indices[4]);
+	out5 = floatw8(baseAddress + strideInFloats * indices[5]);
+	out6 = floatw8(baseAddress + strideInFloats * indices[6]);
+	out7 = floatw8(baseAddress + strideInFloats * indices[7]);
 
 	transpose(out0, out1, out2, out3, out4, out5, out6, out7);
 }
 
 static void store8(float* baseAddress, const uint16* indices, uint32 stride,
-	floatx8 in0, floatx8 in1, floatx8 in2, floatx8 in3, floatx8 in4, floatx8 in5, floatx8 in6, floatx8 in7)
+	floatw8 in0, floatw8 in1, floatw8 in2, floatw8 in3, floatw8 in4, floatw8 in5, floatw8 in6, floatw8 in7)
 {
 	const uint32 strideInFloats = stride / sizeof(float);
 
@@ -852,18 +852,18 @@ static void store8(float* baseAddress, const uint16* indices, uint32 stride,
 
 #if defined(SIMD_AVX_512)
 
-struct floatx16
+struct floatw16
 {
 	__m512 f;
 
-	floatx16() {}
-	floatx16(float f_) { f = _mm512_set1_ps(f_); }
-	floatx16(__m512 f_) { f = f_; }
-	floatx16(float a, float b, float c, float d, float e, float f, float g, float h, float i, float j, float k, float l, float m, float n, float o, float p) { this->f = _mm512_setr_ps(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p); }
-	floatx16(const float* f_) { f = _mm512_loadu_ps(f_); }
+	floatw16() {}
+	floatw16(float f_) { f = _mm512_set1_ps(f_); }
+	floatw16(__m512 f_) { f = f_; }
+	floatw16(float a, float b, float c, float d, float e, float f, float g, float h, float i, float j, float k, float l, float m, float n, float o, float p) { this->f = _mm512_setr_ps(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p); }
+	floatw16(const float* f_) { f = _mm512_loadu_ps(f_); }
 
-	floatx16(const float* baseAddress, __m512i indices) { f = _mm512_i32gather_ps(indices, baseAddress, 4); }
-	floatx16(const float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) : floatx16(baseAddress, _mm512_setr_epi32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)) {}
+	floatw16(const float* baseAddress, __m512i indices) { f = _mm512_i32gather_ps(indices, baseAddress, 4); }
+	floatw16(const float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) : floatw16(baseAddress, _mm512_setr_epi32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)) {}
 
 	operator __m512() { return f; }
 
@@ -873,118 +873,118 @@ struct floatx16
 	void scatter(float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) const { scatter(baseAddress, _mm512_setr_epi32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)); }
 };
 
-struct intx16
+struct intw16
 {
 	__m512i i;
 
-	intx16() {}
-	intx16(int i_) { i = _mm512_set1_epi32(i_); }
-	intx16(__m512i i_) { i = i_; }
-	intx16(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) { this->i = _mm512_setr_epi32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p); }
-	intx16(const int* i_) { i = _mm512_loadu_epi32(i_); }
+	intw16() {}
+	intw16(int i_) { i = _mm512_set1_epi32(i_); }
+	intw16(__m512i i_) { i = i_; }
+	intw16(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) { this->i = _mm512_setr_epi32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p); }
+	intw16(const int* i_) { i = _mm512_loadu_epi32(i_); }
 
-	intx16(const int* baseAddress, __m512i indices) { i = _mm512_i32gather_epi32(indices, baseAddress, 4); }
-	intx16(const int* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) : intx16(baseAddress, _mm512_setr_epi32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)) {}
+	intw16(const int* baseAddress, __m512i indices) { i = _mm512_i32gather_epi32(indices, baseAddress, 4); }
+	intw16(const int* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) : intw16(baseAddress, _mm512_setr_epi32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)) {}
 
 	operator __m512i() { return i; }
 
 	void store(int* i_) const { _mm512_storeu_epi32(i_, i); }
 };
 
-static floatx16 truex16() { const float nnan = (const float&)0xFFFFFFFF; return nnan; }
-static floatx16 zerox16() { return _mm512_setzero_ps(); }
+static floatw16 truex16() { const float nnan = (const float&)0xFFFFFFFF; return nnan; }
+static floatw16 zerox16() { return _mm512_setzero_ps(); }
 
-static floatx16 convert(intx16 i) { return _mm512_cvtepi32_ps(i); }
-static intx16 convert(floatx16 f) { return _mm512_cvtps_epi32(f); }
-static floatx16 reinterpret(intx16 i) { return _mm512_castsi512_ps(i); }
-static intx16 reinterpret(floatx16 f) { return _mm512_castps_si512(f); }
+static floatw16 convert(intw16 i) { return _mm512_cvtepi32_ps(i); }
+static intw16 convert(floatw16 f) { return _mm512_cvtps_epi32(f); }
+static floatw16 reinterpret(intw16 i) { return _mm512_castsi512_ps(i); }
+static intw16 reinterpret(floatw16 f) { return _mm512_castps_si512(f); }
 
 
 // Int operators.
-static intx16 andNot(intx16 a, intx16 b) { return _mm512_andnot_si512(a, b); }
+static intw16 andNot(intw16 a, intw16 b) { return _mm512_andnot_si512(a, b); }
 
-static intx16 operator+(intx16 a, intx16 b) { return _mm512_add_epi32(a, b); }
-static intx16& operator+=(intx16& a, intx16 b) { a = a + b; return a; }
-static intx16 operator-(intx16 a, intx16 b) { return _mm512_sub_epi32(a, b); }
-static intx16& operator-=(intx16& a, intx16 b) { a = a - b; return a; }
-static intx16 operator*(intx16 a, intx16 b) { return _mm512_mul_epi32(a, b); }
-static intx16& operator*=(intx16& a, intx16 b) { a = a * b; return a; }
-static intx16 operator/(intx16 a, intx16 b) { return _mm512_div_epi32(a, b); }
-static intx16& operator/=(intx16& a, intx16 b) { a = a / b; return a; }
-static intx16 operator&(intx16 a, intx16 b) { return _mm512_and_epi32(a, b); }
-static intx16& operator&=(intx16& a, intx16 b) { a = a & b; return a; }
-static intx16 operator|(intx16 a, intx16 b) { return _mm512_or_epi32(a, b); }
-static intx16& operator|=(intx16& a, intx16 b) { a = a | b; return a; }
-static intx16 operator^(intx16 a, intx16 b) { return _mm512_xor_epi32(a, b); }
-static intx16& operator^=(intx16& a, intx16 b) { a = a ^ b; return a; }
+static intw16 operator+(intw16 a, intw16 b) { return _mm512_add_epi32(a, b); }
+static intw16& operator+=(intw16& a, intw16 b) { a = a + b; return a; }
+static intw16 operator-(intw16 a, intw16 b) { return _mm512_sub_epi32(a, b); }
+static intw16& operator-=(intw16& a, intw16 b) { a = a - b; return a; }
+static intw16 operator*(intw16 a, intw16 b) { return _mm512_mul_epi32(a, b); }
+static intw16& operator*=(intw16& a, intw16 b) { a = a * b; return a; }
+static intw16 operator/(intw16 a, intw16 b) { return _mm512_div_epi32(a, b); }
+static intw16& operator/=(intw16& a, intw16 b) { a = a / b; return a; }
+static intw16 operator&(intw16 a, intw16 b) { return _mm512_and_epi32(a, b); }
+static intw16& operator&=(intw16& a, intw16 b) { a = a & b; return a; }
+static intw16 operator|(intw16 a, intw16 b) { return _mm512_or_epi32(a, b); }
+static intw16& operator|=(intw16& a, intw16 b) { a = a | b; return a; }
+static intw16 operator^(intw16 a, intw16 b) { return _mm512_xor_epi32(a, b); }
+static intw16& operator^=(intw16& a, intw16 b) { a = a ^ b; return a; }
 
-static intx16 operator~(intx16 a) { a = andNot(a, reinterpret(truex16())); return a; }
+static intw16 operator~(intw16 a) { a = andNot(a, reinterpret(truex16())); return a; }
 
-static uint16 operator==(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_EQ); }
-static uint16 operator!=(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_NE); }
-static uint16 operator>(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(b, a, _MM_CMPINT_LT); }
-static uint16 operator>=(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(b, a, _MM_CMPINT_LE); }
-static uint16 operator<(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_LT); }
-static uint16 operator<=(intx16 a, intx16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_LE); }
+static uint16 operator==(intw16 a, intw16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_EQ); }
+static uint16 operator!=(intw16 a, intw16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_NE); }
+static uint16 operator>(intw16 a, intw16 b) { return _mm512_cmp_epi32_mask(b, a, _MM_CMPINT_LT); }
+static uint16 operator>=(intw16 a, intw16 b) { return _mm512_cmp_epi32_mask(b, a, _MM_CMPINT_LE); }
+static uint16 operator<(intw16 a, intw16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_LT); }
+static uint16 operator<=(intw16 a, intw16 b) { return _mm512_cmp_epi32_mask(a, b, _MM_CMPINT_LE); }
 
 
-static intx16 operator>>(intx16 a, int b) { return _mm512_srli_epi32(a, b); }
-static intx16& operator>>=(intx16& a, int b) { a = a >> b; return a; }
-static intx16 operator<<(intx16 a, int b) { return _mm512_slli_epi32(a, b); }
-static intx16& operator<<=(intx16& a, int b) { a = a << b; return a; }
+static intw16 operator>>(intw16 a, int b) { return _mm512_srli_epi32(a, b); }
+static intw16& operator>>=(intw16& a, int b) { a = a >> b; return a; }
+static intw16 operator<<(intw16 a, int b) { return _mm512_slli_epi32(a, b); }
+static intw16& operator<<=(intw16& a, int b) { a = a << b; return a; }
 
-static intx16 operator-(intx16 a) { return _mm512_sub_epi32(_mm512_setzero_si512(), a); }
+static intw16 operator-(intw16 a) { return _mm512_sub_epi32(_mm512_setzero_si512(), a); }
 
 
 
 // Float operators.
-static floatx16 andNot(floatx16 a, floatx16 b) { return _mm512_andnot_ps(a, b); }
+static floatw16 andNot(floatw16 a, floatw16 b) { return _mm512_andnot_ps(a, b); }
 
-static floatx16 operator+(floatx16 a, floatx16 b) { return _mm512_add_ps(a, b); }
-static floatx16& operator+=(floatx16& a, floatx16 b) { a = a + b; return a; }
-static floatx16 operator-(floatx16 a, floatx16 b) { return _mm512_sub_ps(a, b); }
-static floatx16& operator-=(floatx16& a, floatx16 b) { a = a - b; return a; }
-static floatx16 operator*(floatx16 a, floatx16 b) { return _mm512_mul_ps(a, b); }
-static floatx16& operator*=(floatx16& a, floatx16 b) { a = a * b; return a; }
-static floatx16 operator/(floatx16 a, floatx16 b) { return _mm512_div_ps(a, b); }
-static floatx16& operator/=(floatx16& a, floatx16 b) { a = a / b; return a; }
-static floatx16 operator&(floatx16 a, floatx16 b) { return _mm512_and_ps(a, b); }
-static floatx16& operator&=(floatx16& a, floatx16 b) { a = a & b; return a; }
-static floatx16 operator|(floatx16 a, floatx16 b) { return _mm512_or_ps(a, b); }
-static floatx16& operator|=(floatx16& a, floatx16 b) { a = a | b; return a; }
-static floatx16 operator^(floatx16 a, floatx16 b) { return _mm512_xor_ps(a, b); }
-static floatx16& operator^=(floatx16& a, floatx16 b) { a = a ^ b; return a; }
+static floatw16 operator+(floatw16 a, floatw16 b) { return _mm512_add_ps(a, b); }
+static floatw16& operator+=(floatw16& a, floatw16 b) { a = a + b; return a; }
+static floatw16 operator-(floatw16 a, floatw16 b) { return _mm512_sub_ps(a, b); }
+static floatw16& operator-=(floatw16& a, floatw16 b) { a = a - b; return a; }
+static floatw16 operator*(floatw16 a, floatw16 b) { return _mm512_mul_ps(a, b); }
+static floatw16& operator*=(floatw16& a, floatw16 b) { a = a * b; return a; }
+static floatw16 operator/(floatw16 a, floatw16 b) { return _mm512_div_ps(a, b); }
+static floatw16& operator/=(floatw16& a, floatw16 b) { a = a / b; return a; }
+static floatw16 operator&(floatw16 a, floatw16 b) { return _mm512_and_ps(a, b); }
+static floatw16& operator&=(floatw16& a, floatw16 b) { a = a & b; return a; }
+static floatw16 operator|(floatw16 a, floatw16 b) { return _mm512_or_ps(a, b); }
+static floatw16& operator|=(floatw16& a, floatw16 b) { a = a | b; return a; }
+static floatw16 operator^(floatw16 a, floatw16 b) { return _mm512_xor_ps(a, b); }
+static floatw16& operator^=(floatw16& a, floatw16 b) { a = a ^ b; return a; }
 
-static floatx16 operator~(floatx16 a) { a = andNot(a, truex16()); return a; }
+static floatw16 operator~(floatw16 a) { a = andNot(a, truex16()); return a; }
 
-static uint16 operator==(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_EQ_OQ); }
-static uint16 operator!=(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_NEQ_OQ); }
-static uint16 operator>(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_GT_OQ); }
-static uint16 operator>=(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_GE_OQ); }
-static uint16 operator<(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_LT_OQ); }
-static uint16 operator<=(floatx16 a, floatx16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_LE_OQ); }
-
-
-static floatx16 operator>>(floatx16 a, int b) { return reinterpret(reinterpret(a) >> b); }
-static floatx16& operator>>=(floatx16& a, int b) { a = a >> b; return a; }
-static floatx16 operator<<(floatx16 a, int b) { return reinterpret(reinterpret(a) << b); }
-static floatx16& operator<<=(floatx16& a, int b) { a = a << b; return a; }
-
-static floatx16 operator-(floatx16 a) { return _mm512_xor_ps(a, reinterpret(intx16(1 << 31))); }
+static uint16 operator==(floatw16 a, floatw16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_EQ_OQ); }
+static uint16 operator!=(floatw16 a, floatw16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_NEQ_OQ); }
+static uint16 operator>(floatw16 a, floatw16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_GT_OQ); }
+static uint16 operator>=(floatw16 a, floatw16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_GE_OQ); }
+static uint16 operator<(floatw16 a, floatw16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_LT_OQ); }
+static uint16 operator<=(floatw16 a, floatw16 b) { return _mm512_cmp_ps_mask(a, b, _CMP_LE_OQ); }
 
 
+static floatw16 operator>>(floatw16 a, int b) { return reinterpret(reinterpret(a) >> b); }
+static floatw16& operator>>=(floatw16& a, int b) { a = a >> b; return a; }
+static floatw16 operator<<(floatw16 a, int b) { return reinterpret(reinterpret(a) << b); }
+static floatw16& operator<<=(floatw16& a, int b) { a = a << b; return a; }
+
+static floatw16 operator-(floatw16 a) { return _mm512_xor_ps(a, reinterpret(intw16(1 << 31))); }
 
 
-static float addElements(floatx16 a) { return _mm512_reduce_add_ps(a); }
 
-static floatx16 fmadd(floatx16 a, floatx16 b, floatx16 c) { return _mm512_fmadd_ps(a, b, c); }
-static floatx16 fmsub(floatx16 a, floatx16 b, floatx16 c) { return _mm512_fmsub_ps(a, b, c); }
 
-static floatx16 sqrt(floatx16 a) { return _mm512_sqrt_ps(a); }
-static floatx16 rsqrt(floatx16 a) { return 1.f / _mm512_sqrt_ps(a); }
+static float addElements(floatw16 a) { return _mm512_reduce_add_ps(a); }
 
-static floatx16 ifThen(uint16 cond, floatx16 ifCase, floatx16 elseCase) { return _mm512_mask_blend_ps(cond, elseCase, ifCase); }
-static intx16 ifThen(uint16 cond, intx16 ifCase, intx16 elseCase) { return reinterpret(ifThen(cond, reinterpret(ifCase), reinterpret(elseCase))); }
+static floatw16 fmadd(floatw16 a, floatw16 b, floatw16 c) { return _mm512_fmadd_ps(a, b, c); }
+static floatw16 fmsub(floatw16 a, floatw16 b, floatw16 c) { return _mm512_fmsub_ps(a, b, c); }
+
+static floatw16 sqrt(floatw16 a) { return _mm512_sqrt_ps(a); }
+static floatw16 rsqrt(floatw16 a) { return 1.f / _mm512_sqrt_ps(a); }
+
+static floatw16 ifThen(uint16 cond, floatw16 ifCase, floatw16 elseCase) { return _mm512_mask_blend_ps(cond, elseCase, ifCase); }
+static intw16 ifThen(uint16 cond, intw16 ifCase, intw16 elseCase) { return reinterpret(ifThen(cond, reinterpret(ifCase), reinterpret(elseCase))); }
 
 static bool allTrue(uint16 a) { return a == (1 << 16) - 1; }
 static bool allFalse(uint16 a) { return a == 0; }
@@ -992,48 +992,32 @@ static bool anyTrue(uint16 a) { return a > 0; }
 static bool anyFalse(uint16 a) { return !allTrue(a); }
 
 
-static floatx16 abs(floatx16 a) { floatx16 result = andNot(-0.f, a); return result; }
-static floatx16 floor(floatx16 a) { return _mm512_floor_ps(a); }
-static floatx16 minimum(floatx16 a, floatx16 b) { return _mm512_min_ps(a, b); }
-static floatx16 maximum(floatx16 a, floatx16 b) { return _mm512_max_ps(a, b); }
+static floatw16 abs(floatw16 a) { floatw16 result = andNot(-0.f, a); return result; }
+static floatw16 floor(floatw16 a) { return _mm512_floor_ps(a); }
+static floatw16 minimum(floatw16 a, floatw16 b) { return _mm512_min_ps(a, b); }
+static floatw16 maximum(floatw16 a, floatw16 b) { return _mm512_max_ps(a, b); }
 
-static floatx16 lerp(floatx16 l, floatx16 u, floatx16 t) { return fmadd(t, u - l, l); }
-static floatx16 inverseLerp(floatx16 l, floatx16 u, floatx16 v) { return (v - l) / (u - l); }
-static floatx16 remap(floatx16 v, floatx16 oldL, floatx16 oldU, floatx16 newL, floatx16 newU) { return lerp(newL, newU, inverseLerp(oldL, oldU, v)); }
-static floatx16 clamp(floatx16 v, floatx16 l, floatx16 u) { return minimum(u, maximum(l, v)); }
-static floatx16 clamp01(floatx16 v) { return clamp(v, 0.f, 1.f); }
+static floatw16 lerp(floatw16 l, floatw16 u, floatw16 t) { return fmadd(t, u - l, l); }
+static floatw16 inverseLerp(floatw16 l, floatw16 u, floatw16 v) { return (v - l) / (u - l); }
+static floatw16 remap(floatw16 v, floatw16 oldL, floatw16 oldU, floatw16 newL, floatw16 newU) { return lerp(newL, newU, inverseLerp(oldL, oldU, v)); }
+static floatw16 clamp(floatw16 v, floatw16 l, floatw16 u) { return minimum(u, maximum(l, v)); }
+static floatw16 clamp01(floatw16 v) { return clamp(v, 0.f, 1.f); }
 
-static floatx16 signOf(floatx16 f) { return ifThen(f < 0.f, floatx16(-1), ifThen(f == 0.f, zerox16(), floatx16(1))); }
-static floatx16 signbit(floatx16 f) { return (f & -0.f) >> 31; }
+static floatw16 signOf(floatw16 f) { return ifThen(f < 0.f, floatw16(-1), ifThen(f == 0.f, zerox16(), floatw16(1))); }
+static floatw16 signbit(floatw16 f) { return (f & -0.f) >> 31; }
 
-static floatx16 cos(floatx16 x) { return cosInternal(x); }
-static floatx16 sin(floatx16 x) { return sinInternal(x); }
-static floatx16 exp2(floatx16 x) { return exp2Internal<floatx16, intx16>(x); }
-static floatx16 log2(floatx16 x) { return log2Internal<floatx16, intx16>(x); }
-static floatx16 pow(floatx16 x, floatx16 y) { return powInternal<floatx16, intx16>(x, y); }
-static floatx16 exp(floatx16 x) { return expInternal<floatx16, intx16>(x); }
-static floatx16 tanh(floatx16 x) { return tanhInternal(x); }
-static floatx16 atan(floatx16 x) { return atanInternal<floatx16, intx16>(x); }
-static floatx16 atan2(floatx16 y, floatx16 x) { return atan2Internal<floatx16, intx16>(y, x); }
-static floatx16 acos(floatx16 x) { return acosInternal(x); }
-
-
-#endif
+static floatw16 cos(floatw16 x) { return cosInternal(x); }
+static floatw16 sin(floatw16 x) { return sinInternal(x); }
+static floatw16 exp2(floatw16 x) { return exp2Internal<floatw16, intw16>(x); }
+static floatw16 log2(floatw16 x) { return log2Internal<floatw16, intw16>(x); }
+static floatw16 pow(floatw16 x, floatw16 y) { return powInternal<floatw16, intw16>(x, y); }
+static floatw16 exp(floatw16 x) { return expInternal<floatw16, intw16>(x); }
+static floatw16 tanh(floatw16 x) { return tanhInternal(x); }
+static floatw16 atan(floatw16 x) { return atanInternal<floatw16, intw16>(x); }
+static floatw16 atan2(floatw16 y, floatw16 x) { return atan2Internal<floatw16, intw16>(y, x); }
+static floatw16 acos(floatw16 x) { return acosInternal(x); }
 
 
-#if defined(SIMD_AVX_512)
-typedef floatx16 floatx;
-typedef intx16 intx;
-#define SIMD_WIDTH 16
-#elif defined(SIMD_AVX_2)
-typedef floatx8 floatx;
-typedef intx8 intx;
-#define SIMD_WIDTH 8
-#else
-typedef floatx4 floatx;
-typedef intx4 intx;
-typedef floatx4 cmpx;
-#define SIMD_WIDTH 4
 #endif
 
 

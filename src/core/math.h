@@ -322,14 +322,14 @@ union vec4
 		vec2 xy;
 		vec2 zw;
 	};
-	floatx4 f4;
+	floatw4 f4;
 	float data[4];
 
 	vec4() {}
 	vec4(float v) : vec4(v, v, v, v) {}
 	vec4(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
 	vec4(vec3 xyz, float w) : x(xyz.x), y(xyz.y), z(xyz.z), w(w) {}
-	vec4(floatx4 f4) : f4(f4) {}
+	vec4(floatw4 f4) : f4(f4) {}
 };
 
 union quat
@@ -344,19 +344,19 @@ union quat
 		float cosHalfAngle;
 	};
 	vec4 v4;
-	floatx4 f4;
+	floatw4 f4;
 
 	quat() {}
 	quat(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
 	quat(vec3 axis, float angle);
-	quat(floatx4 f4) : f4(f4) {}
+	quat(floatw4 f4) : f4(f4) {}
 
 	static const quat identity;
 };
 
-#if ROW_MAJOR
 union mat2
 {
+#if ROW_MAJOR
 	struct
 	{
 		float
@@ -369,6 +369,20 @@ union mat2
 		vec2 row1;
 	};
 	vec2 rows[2];
+#else
+	struct
+	{
+		float
+			m00, m10,
+			m01, m11;
+	};
+	struct
+	{
+		vec2 col0;
+		vec2 col1;
+	};
+	vec2 cols[2];
+#endif
 	float m[4];
 
 	mat2() {}
@@ -382,6 +396,7 @@ union mat2
 
 union mat3
 {
+#if ROW_MAJOR
 	struct
 	{
 		float
@@ -396,6 +411,22 @@ union mat3
 		vec3 row2;
 	};
 	vec3 rows[3];
+#else
+	struct
+	{
+		float
+			m00, m10, m20,
+			m01, m11, m21,
+			m02, m12, m22;
+	};
+	struct
+	{
+		vec3 col0;
+		vec3 col1;
+		vec3 col2;
+	};
+	vec3 cols[3];
+#endif
 	float m[9];
 
 	mat3() {}
@@ -410,6 +441,7 @@ union mat3
 
 union mat4
 {
+#if ROW_MAJOR
 	struct
 	{
 		float
@@ -425,92 +457,8 @@ union mat4
 		vec4 row2;
 		vec4 row3;
 	};
-	struct
-	{
-		floatx4 f40;
-		floatx4 f41;
-		floatx4 f42;
-		floatx4 f43;
-	};
 	vec4 rows[4];
-	float m[16];
-
-	mat4() {}
-	mat4(
-		float m00, float m01, float m02, float m03,
-		float m10, float m11, float m12, float m13,
-		float m20, float m21, float m22, float m23,
-		float m30, float m31, float m32, float m33);
-
-	static const mat4 identity;
-	static const mat4 zero;
-};
-
-static vec2 row(mat2 a, uint32 r) { return a.rows[r]; }
-static vec3 row(mat3 a, uint32 r) { return a.rows[r]; }
-static vec4 row(mat4 a, uint32 r) { return a.rows[r]; }
-
-static vec2 col(mat2 a, uint32 c) { return { a.m[c], a.m[c + 2] }; }
-static vec3 col(mat3 a, uint32 c) { return { a.m[c], a.m[c + 3], a.m[c + 6] }; }
-static vec4 col(mat4 a, uint32 c) { return { a.m[c], a.m[c + 4], a.m[c + 8], a.m[c + 12] }; }
-
 #else
-
-union mat2
-{
-	struct
-	{
-		float
-			m00, m10,
-			m01, m11;
-	};
-	struct
-	{
-		vec2 col0;
-		vec2 col1;
-	};
-	vec2 cols[2];
-	float m[4];
-
-	mat2() {}
-	mat2(
-		float m00, float m01,
-		float m10, float m11);
-
-	static const mat2 identity;
-	static const mat2 zero;
-};
-
-union mat3
-{
-	struct
-	{
-		float
-			m00, m10, m20,
-			m01, m11, m21,
-			m02, m12, m22;
-	};
-	struct
-	{
-		vec3 col0;
-		vec3 col1;
-		vec3 col2;
-	};
-	vec3 cols[3];
-	float m[9];
-
-	mat3() {}
-	mat3(
-		float m00, float m01, float m02,
-		float m10, float m11, float m12,
-		float m20, float m21, float m22);
-
-	static const mat3 identity;
-	static const mat3 zero;
-};
-
-union mat4
-{
 	struct
 	{
 		float
@@ -526,14 +474,15 @@ union mat4
 		vec4 col2;
 		vec4 col3;
 	};
+	vec4 cols[4];
+#endif
 	struct
 	{
-		floatx4 f40;
-		floatx4 f41;
-		floatx4 f42;
-		floatx4 f43;
+		floatw4 f40;
+		floatw4 f41;
+		floatw4 f42;
+		floatw4 f43;
 	};
-	vec4 cols[4];
 	float m[16];
 
 	mat4() {}
@@ -549,6 +498,15 @@ union mat4
 
 static_assert(sizeof(mat4) == 16 * sizeof(float), "");
 
+#if ROW_MAJOR
+static vec2 row(mat2 a, uint32 r) { return a.rows[r]; }
+static vec3 row(mat3 a, uint32 r) { return a.rows[r]; }
+static vec4 row(mat4 a, uint32 r) { return a.rows[r]; }
+
+static vec2 col(mat2 a, uint32 c) { return { a.m[c], a.m[c + 2] }; }
+static vec3 col(mat3 a, uint32 c) { return { a.m[c], a.m[c + 3], a.m[c + 6] }; }
+static vec4 col(mat4 a, uint32 c) { return { a.m[c], a.m[c + 4], a.m[c + 8], a.m[c + 12] }; }
+#else
 static vec2 row(const mat2& a, uint32 r) { return { a.m[r], a.m[r + 2] }; }
 static vec3 row(const mat3& a, uint32 r) { return { a.m[r], a.m[r + 3], a.m[r + 6] }; }
 static vec4 row(const mat4& a, uint32 r) { return { a.m[r], a.m[r + 4], a.m[r + 8], a.m[r + 12] }; }
@@ -556,7 +514,6 @@ static vec4 row(const mat4& a, uint32 r) { return { a.m[r], a.m[r + 4], a.m[r + 
 static vec2 col(const mat2& a, uint32 c) { return a.cols[c]; }
 static vec3 col(const mat3& a, uint32 c) { return a.cols[c]; }
 static vec4 col(const mat4& a, uint32 c) { return a.cols[c]; }
-
 #endif
 
 struct trs
@@ -566,7 +523,7 @@ struct trs
 	vec3 scale;
 
 	trs() {}
-	trs(vec3 position, quat rotation, vec3 scale = { 1.f, 1.f, 1.f }) : position(position), rotation(rotation), scale(scale) {}
+	trs(vec3 position, quat rotation = quat::identity, vec3 scale = { 1.f, 1.f, 1.f }) : position(position), rotation(rotation), scale(scale) {}
 	trs(const mat4& m);
 
 	static const trs identity;
@@ -627,10 +584,10 @@ static vec4& operator*=(vec4& a, vec4 b) { a = a * b; return a; }
 static vec4 operator/(vec4 a, vec4 b) { vec4 result = { a.f4 / b.f4 }; return result; }
 static vec4& operator/=(vec4& a, vec4 b) { a = a / b; return a; }
 
-static vec4 operator*(vec4 a, float b) { vec4 result = { a.f4 * floatx4(b) }; return result; }
+static vec4 operator*(vec4 a, float b) { vec4 result = { a.f4 * floatw4(b) }; return result; }
 static vec4 operator*(float a, vec4 b) { return b * a; }
 static vec4& operator*=(vec4& a, float b) { a = a * b; return a; }
-static vec4 operator/(vec4 a, float b) { vec4 result = { a.f4 / floatx4(b) }; return result; }
+static vec4 operator/(vec4 a, float b) { vec4 result = { a.f4 / floatw4(b) }; return result; }
 static vec4& operator/=(vec4& a, float b) { a = a / b; return a; }
 
 static vec4 operator-(vec4 a) { return vec4(-a.f4); }
@@ -640,7 +597,7 @@ static bool operator==(vec4 a, vec4 b) { return a.x == b.x && a.y == b.y && a.z 
 
 static float dot(vec2 a, vec2 b) { float result = a.x * b.x + a.y * b.y; return result; }
 static float dot(vec3 a, vec3 b) { float result = a.x * b.x + a.y * b.y + a.z * b.z; return result; }
-static float dot(vec4 a, vec4 b) { floatx4 m = a.f4 * b.f4; return addElements(m); }
+static float dot(vec4 a, vec4 b) { floatw4 m = a.f4 * b.f4; return addElements(m); }
 
 static float cross(vec2 a, vec2 b) { return a.x * b.y - a.y * b.x; }
 static vec3 cross(vec3 a, vec3 b) { vec3 result = { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; return result; }
@@ -731,7 +688,7 @@ static vec4 exp(vec4 v) { return vec4(exp(v.f4)); }
 
 static vec2 pow(vec2 v, float e) { return vec2(pow(v.x, e), pow(v.y, e)); }
 static vec3 pow(vec3 v, float e) { return vec3(pow(v.x, e), pow(v.y, e), pow(v.z, e)); }
-static vec4 pow(vec4 v, float e) { return vec4(pow(v.f4, floatx4(e))); }
+static vec4 pow(vec4 v, float e) { return vec4(pow(v.f4, floatw4(e))); }
 
 static vec2 minimum(vec2 a, vec2 b) { return vec2(min(a.x, b.x), min(a.y, b.y)); }
 static vec3 minimum(vec3 a, vec3 b) { return vec3(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }
