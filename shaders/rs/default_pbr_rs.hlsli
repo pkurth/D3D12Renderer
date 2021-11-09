@@ -25,13 +25,13 @@ struct lighting_cb
         "addressU = TEXTURE_ADDRESS_WRAP," \
         "addressV = TEXTURE_ADDRESS_WRAP," \
         "addressW = TEXTURE_ADDRESS_WRAP," \
-        "filter = FILTER_MIN_MAG_MIP_LINEAR," \
+        "filter = FILTER_ANISOTROPIC," \
         "visibility=SHADER_VISIBILITY_PIXEL)," \
     "StaticSampler(s1," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \
         "addressV = TEXTURE_ADDRESS_CLAMP," \
         "addressW = TEXTURE_ADDRESS_CLAMP," \
-        "filter = FILTER_MIN_MAG_MIP_LINEAR," \
+        "filter = FILTER_ANISOTROPIC," \
         "visibility=SHADER_VISIBILITY_PIXEL)," \
     "StaticSampler(s2," \
         "addressU = TEXTURE_ADDRESS_BORDER," \
