@@ -295,6 +295,8 @@ project "D3D12Renderer"
 		shaderdefines {
 			"HLSL",
 			"mat4=float4x4",
+			"mat4x3=float4x3",
+			"mat3x4=float3x4",
 			"vec2=float2",
 			"vec3=float3",
 			"vec4=float4",

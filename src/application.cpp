@@ -68,10 +68,10 @@ void application::initialize(main_renderer* renderer)
 
 	editor.initialize(&scene, renderer);
 
-	scene.createEntity("Cloth")
-		.addComponent<transform_component>(trs::identity)
-		.addComponent<cloth_component>(10.f, 10.f, 20u, 20u, 8.f)
-		.addComponent<cloth_render_component>();
+	//scene.createEntity("Cloth")
+	//	.addComponent<transform_component>(vec3(0.f, 10.f, 0.f), quat::identity)
+	//	.addComponent<cloth_component>(10.f, 10.f, 20u, 20u, 8.f)
+	//	.addComponent<cloth_render_component>();
 
 	//clothMaterial = createPBRMaterial(
 	//	"assets/sphere/Tiles074_2K_Color.jpg",
@@ -162,22 +162,17 @@ void application::initialize(main_renderer* renderer)
 		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 
 		auto lollipopMaterial = createPBRMaterial(
-			"assets/sphere/Tiles074_2K_Color.jpg",
-			"assets/sphere/Tiles074_2K_Normal.jpg",
-			"assets/sphere/Tiles074_2K_Roughness.jpg",
-			{}, vec4(0.f), vec4(1.f), 1.f, 1.f);
+			"assets/cc0/sphere/Tiles074_2K_Color.jpg",
+			"assets/cc0/sphere/Tiles074_2K_Normal.jpg",
+			"assets/cc0/sphere/Tiles074_2K_Roughness.jpg",
+			{}, vec4(0.f), vec4(1.f), 1.f, 0.5f, false, 3.f);
 
 		auto testMesh = make_ref<composite_mesh>();
 		testMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f), {}, trs::identity, lollipopMaterial });
 		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 0.4f, vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f)), {}, trs::identity, lollipopMaterial });
 
 		auto groundMesh = make_ref<composite_mesh>();
-		groundMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(100.f, 4.f, 100.f)), {}, trs::identity, createPBRMaterial(
-				"assets/desert/textures/BlueContainer_Albedo.png",
-				"assets/desert/textures/Container_Normal.png",
-				{}, 
-				"assets/desert/textures/Container_Metallic.png", vec4(0.f), vec4(1.f), 0.1f, 1.f)
-			});
+		groundMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(100.f, 4.f, 100.f)), {}, trs::identity, lollipopMaterial });
 
 		auto woodMaterial = createPBRMaterial(
 			"assets/desert/textures/WoodenCrate2_Albedo.png",
@@ -302,7 +297,7 @@ void application::initialize(main_renderer* renderer)
 	//humanoid_ragdoll::create(scene, vec3(60.f, 1.25f, -2.f));
 	//humanoid_ragdoll ragdoll = humanoid_ragdoll::create(scene, vec3(20.f, 1.25f, 0.f));
 
-	vehicle::create(scene, vec3(0.f, 1.f, 0.f));
+	//vehicle::create(scene, vec3(0.f, 1.f, 0.f));
 
 	//locomotionInference.initialize(scene, ragdoll);
 
@@ -313,7 +308,7 @@ void application::initialize(main_renderer* renderer)
 
 	random_number_generator rng = { 14878213 };
 
-#if 1
+#if 0
 	scene.createEntity("Spot light 0")
 		.addComponent<position_rotation_component>(vec3(2.f, 3.f, 0.f), lookAtQuaternion(vec3(1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f)))
 		.addComponent<spot_light_component>(
