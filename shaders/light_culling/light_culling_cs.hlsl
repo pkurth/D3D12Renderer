@@ -273,9 +273,9 @@ void main(cs_input IN)
     const float3 forward = camera.forward.xyz;
     const float3 cameraPos = camera.position.xyz;
 
-    const float nearZ = depthBufferDepthToEyeDepth(minDepth, camera.projectionParams); // Positive.
-    const float farZ  = depthBufferDepthToEyeDepth(maxDepth, camera.projectionParams); // Positive.
-    const float myZ   = depthBufferDepthToEyeDepth(fDepth, camera.projectionParams);   // Positive.
+    const float nearZ = camera.depthBufferDepthToEyeDepth(minDepth); // Positive.
+    const float farZ  = camera.depthBufferDepthToEyeDepth(maxDepth); // Positive.
+    const float myZ   = camera.depthBufferDepthToEyeDepth(fDepth);   // Positive.
 
     const float depthRangeRecip = 31.f / (farZ - nearZ);
     const uint depthMaskIndex = max(0, min(31, floor((myZ - nearZ) * depthRangeRecip)));
@@ -296,7 +296,7 @@ void main(cs_input IN)
         const uint2 coord = (IN.groupID.xy + uint2(x, y)) * LIGHT_CULLING_TILE_SIZE;
         const float2 uv = (float2(coord) + 0.5f) / screenSize;
 
-        groupViewSpaceAABBCorners[IN.groupIndex] = restoreViewSpacePosition(camera.invProj, uv, lerp(minDepth, maxDepth, z));
+        groupViewSpaceAABBCorners[IN.groupIndex] = camera.restoreViewSpacePosition(uv, lerp(minDepth, maxDepth, z));
     }
 
     GroupMemoryBarrierWithGroupSync();

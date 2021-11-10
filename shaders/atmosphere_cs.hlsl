@@ -123,7 +123,7 @@ void main(cs_input IN)
 
 	float2 screenUV = texCoord * camera.invScreenDims;
 
-	float3 P = restoreWorldSpacePosition(camera.invViewProj, screenUV, depth);
+	float3 P = camera.restoreWorldSpacePosition(screenUV, depth);
 	float3 O = camera.position.xyz;
 	float3 V = P - O;
 	float distanceToGeometry = length(V);

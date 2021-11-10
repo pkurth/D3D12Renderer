@@ -80,6 +80,8 @@ void buildCameraConstantBuffer(const render_camera& camera, vec2 jitter, camera_
 	outCB.right = vec4(camera.rotation * vec3(1.f, 0.f, 0.f), 0.f);
 	outCB.up = vec4(camera.rotation * vec3(0.f, 1.f, 0.f), 0.f);
 	outCB.projectionParams = vec4(camera.nearPlane, camera.farPlane, camera.farPlane / camera.nearPlane, 1.f - camera.farPlane / camera.nearPlane);
+	outCB.viewSpaceTopLeftFrustumVector = vec4(camera.restoreViewSpacePosition(vec2(0.f, 0.f), 0.f) / camera.nearPlane, 0.f);
+	outCB.extentAtDistanceOne = abs(camera.restoreViewSpacePosition(vec2(1.f, 1.f), 0.f).xy / camera.nearPlane - outCB.viewSpaceTopLeftFrustumVector.xy);
 	outCB.screenDims = vec2((float)camera.width, (float)camera.height);
 	outCB.invScreenDims = vec2(1.f / camera.width, 1.f / camera.height);
 	outCB.prevFrameJitter = outCB.jitter;

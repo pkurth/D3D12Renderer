@@ -151,7 +151,7 @@ void main(cs_input IN)
 
         float neighborHit = neighborSceneColor.a;
 
-        const float3 neighborViewPos = restoreViewSpacePosition(camera.invProj, neighborUV, neighborDepth);
+        const float3 neighborViewPos = camera.restoreViewSpacePosition(neighborUV, neighborDepth);
 
 
         // BRDF weight.
