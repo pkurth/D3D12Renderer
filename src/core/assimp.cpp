@@ -36,7 +36,7 @@ const aiScene* loadAssimpSceneFile(const fs::path& filepath, Assimp::Importer& i
 	fs::path extension = filepath.extension();
 
 	fs::path cachedFilename = filepath;
-	cachedFilename.replace_extension(".cache." + std::to_string(removeFlags) + CACHE_FORMAT);
+	cachedFilename.replace_extension("." + std::to_string(removeFlags) + ".cache." + CACHE_FORMAT);
 
 	fs::path cacheFilepath = L"asset_cache" / cachedFilename;
 

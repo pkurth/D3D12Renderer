@@ -670,7 +670,8 @@ static LRESULT CALLBACK windowCallBack(
 		if (window->hoveredButton != titlebar_button_none)
 		{
 			window->hoveredButton = titlebar_button_none;
-			InvalidateRect(0, 0, FALSE);
+			//InvalidateRect(0, 0, FALSE);
+			RedrawWindow(hwnd, 0, 0, RDW_INVALIDATE | RDW_FRAME);
 		}
 
 		window->trackingMouse = false;
@@ -740,7 +741,8 @@ static LRESULT CALLBACK windowCallBack(
 			}
 			if (window && window->customWindowStyle)
 			{
-				InvalidateRect(0, 0, FALSE);
+				//InvalidateRect(0, 0, FALSE);
+				RedrawWindow(hwnd, 0, 0, RDW_INVALIDATE | RDW_FRAME);
 			}
 		} break;
 
@@ -1045,7 +1047,8 @@ static LRESULT CALLBACK windowCallBack(
 				if (hoveredButton != window->hoveredButton)
 				{
 					window->hoveredButton = hoveredButton;
-					InvalidateRect(0, 0, FALSE);
+					//InvalidateRect(0, 0, FALSE);
+					RedrawWindow(hwnd, 0, 0, RDW_INVALIDATE | RDW_FRAME);
 				}
 
 				if (!window->trackingMouse)
