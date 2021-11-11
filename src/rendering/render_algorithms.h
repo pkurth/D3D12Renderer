@@ -15,6 +15,8 @@ enum gaussian_blur_kernel_size
 	gaussian_blur_5x5,
 	gaussian_blur_9x9,
 	gaussian_blur_13x13,
+
+	gaussian_blur_kernel_size_count,
 };
 
 struct ssr_settings
@@ -177,6 +179,21 @@ void gaussianBlur(dx_command_list* cl,
 	ref<dx_texture> temp,						// UNORDERED_ACCESS
 	uint32 inputMip, uint32 outputMip, gaussian_blur_kernel_size kernel, uint32 numIterations = 1);
 
+void dilate(dx_command_list* cl,
+	ref<dx_texture> inputOutput,				// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> temp,						// UNORDERED_ACCESS
+	uint32 radius, uint32 numIterations = 1);
+
+void erode(dx_command_list* cl,
+	ref<dx_texture> inputOutput,				// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> temp,						// UNORDERED_ACCESS
+	uint32 radius, uint32 numIterations = 1);
+
+void depthSobel(dx_command_list* cl,
+	ref<dx_texture> input,						// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> output,						// UNORDERED_ACCESS
+	vec4 projectionParams, float threshold);
+
 void screenSpaceReflections(dx_command_list* cl,
 	ref<dx_texture> hdrInput,					// NON_PIXEL_SHADER_RESOURCE
 	ref<dx_texture> prevFrameHDR,				// NON_PIXEL_SHADER_RESOURCE
@@ -225,6 +242,10 @@ void tonemap(dx_command_list* cl,
 	ref<dx_texture> hdrInput,					// NON_PIXEL_SHADER_RESOURCE
 	ref<dx_texture> ldrOutput,					// UNORDERED_ACCESS
 	const tonemap_settings& settings);
+
+void blit(dx_command_list* cl,
+	ref<dx_texture> input,						// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> output);					// UNORDERED_ACCESS
 
 void present(dx_command_list* cl,
 	ref<dx_texture> ldrInput,					// NON_PIXEL_SHADER_RESOURCE

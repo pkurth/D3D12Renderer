@@ -106,6 +106,31 @@ struct gaussian_blur_cb
 
 
 // ----------------------------------------
+// MORPHOLOGY
+// ----------------------------------------
+
+struct morphology_cb
+{
+    uint32 radius;
+    uint32 direction; // 0 = x, 1 = y.
+    uint32 dimInDirection;
+};
+
+#define MORPHOLOGY_MAX_RADIUS 16
+#define MORPHOLOGY_BLOCK_SIZE 128
+
+#define MORPHOLOGY_RS \
+    "RootFlags(0), " \
+    "RootConstants(b0, num32BitConstants = 3), " \
+    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 1) )"
+
+
+#define MORPHOLOGY_RS_CB              0
+#define MORPHOLOGY_RS_TEXTURES        1
+
+
+
+// ----------------------------------------
 // HIERARCHICAL LINEAR DEPTH
 // ----------------------------------------
 
@@ -246,5 +271,26 @@ struct present_cb
 
 #define PRESENT_RS_CB               0
 #define PRESENT_RS_TEXTURES         1
+
+
+
+
+// ----------------------------------------
+// DEPTH SOBEL
+// ----------------------------------------
+
+struct depth_sobel_cb
+{
+    vec4 projectionParams;
+    float threshold;
+};
+
+#define DEPTH_SOBEL_RS \
+    "RootFlags(0), " \
+    "RootConstants(num32BitConstants=8, b0),"  \
+    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 1) )"
+
+#define DEPTH_SOBEL_RS_CB           0
+#define DEPTH_SOBEL_RS_TEXTURES     1
 
 #endif

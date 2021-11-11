@@ -1,11 +1,10 @@
 #include "cs.hlsli"
 #include "post_processing_rs.hlsli"
 
-
 ConstantBuffer<gaussian_blur_cb> cb	    : register(b0);
 
-Texture2D<float4> input		            : register(t0);
-RWTexture2D<float4> output		        : register(u0);
+Texture2D<DATA_T> input		            : register(t0);
+RWTexture2D<DATA_T> output		        : register(u0);
 SamplerState linearClampSampler         : register(s0);
 
 
@@ -21,7 +20,7 @@ void main(cs_input IN)
     direction *= cb.stepScale;
 
     uint sourceMipLevel = cb.directionAndSourceMipLevel & 0xFFFF;
-    float4 color = input.SampleLevel(linearClampSampler, uv, sourceMipLevel) * blurWeights[0];
+    DATA_T color = input.SampleLevel(linearClampSampler, uv, sourceMipLevel) * blurWeights[0];
 
     [unroll]
     for (int i = 1; i < NUM_WEIGHTS; ++i)

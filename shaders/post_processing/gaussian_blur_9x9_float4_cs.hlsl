@@ -1,4 +1,8 @@
 
+#ifndef DATA_T
+#define DATA_T float4
+#endif
+
 #define NUM_WEIGHTS 3
 
 static const float kernelOffsets[3] = { 0.f, 1.3846153846f, 3.2307692308f };

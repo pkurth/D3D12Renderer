@@ -49,9 +49,11 @@ static dx_pipeline specularAmbientPipeline;
 
 static dx_pipeline hierarchicalLinearDepthPipeline;
 
-static dx_pipeline gaussianBlur5x5Pipeline;
-static dx_pipeline gaussianBlur9x9Pipeline;
-static dx_pipeline gaussianBlur13x13Pipeline;
+static dx_pipeline gaussianBlurFloatPipelines[gaussian_blur_kernel_size_count];
+static dx_pipeline gaussianBlurFloat4Pipelines[gaussian_blur_kernel_size_count];
+
+static dx_pipeline dilationPipeline;
+static dx_pipeline erosionPipeline;
 
 static dx_pipeline taaPipeline;
 
@@ -62,6 +64,8 @@ static dx_pipeline bloomCombinePipeline;
 
 static dx_pipeline tonemapPipeline;
 static dx_pipeline presentPipeline;
+
+static dx_pipeline depthSobelPipeline;
 
 static dx_command_signature rigidDepthPrePassCommandSignature;
 static dx_command_signature animatedDepthPrePassCommandSignature;
@@ -189,9 +193,16 @@ void loadCommonShaders()
 
 	hierarchicalLinearDepthPipeline = createReloadablePipeline("hierarchical_linear_depth_cs");
 
-	gaussianBlur5x5Pipeline = createReloadablePipeline("gaussian_blur_5x5_cs");
-	gaussianBlur9x9Pipeline = createReloadablePipeline("gaussian_blur_9x9_cs");
-	gaussianBlur13x13Pipeline = createReloadablePipeline("gaussian_blur_13x13_cs");
+	gaussianBlurFloatPipelines[gaussian_blur_5x5] = createReloadablePipeline("gaussian_blur_5x5_float_cs");
+	gaussianBlurFloatPipelines[gaussian_blur_9x9] = createReloadablePipeline("gaussian_blur_9x9_float_cs");
+	gaussianBlurFloatPipelines[gaussian_blur_13x13] = createReloadablePipeline("gaussian_blur_13x13_float_cs");
+
+	gaussianBlurFloat4Pipelines[gaussian_blur_5x5] = createReloadablePipeline("gaussian_blur_5x5_float4_cs");
+	gaussianBlurFloat4Pipelines[gaussian_blur_9x9] = createReloadablePipeline("gaussian_blur_9x9_float4_cs");
+	gaussianBlurFloat4Pipelines[gaussian_blur_13x13] = createReloadablePipeline("gaussian_blur_13x13_float4_cs");
+
+	dilationPipeline = createReloadablePipeline("dilation_cs");
+	erosionPipeline = createReloadablePipeline("erosion_cs");
 
 	taaPipeline = createReloadablePipeline("taa_cs");
 
@@ -202,6 +213,8 @@ void loadCommonShaders()
 
 	tonemapPipeline = createReloadablePipeline("tonemap_cs");
 	presentPipeline = createReloadablePipeline("present_cs");
+
+	depthSobelPipeline = createReloadablePipeline("depth_sobel_cs");
 }
 
 void loadRemainingRenderResources()
@@ -260,15 +273,15 @@ static void batchRenderRigidDepthPrepass(dx_command_list* cl,
 		++ptr;
 	}
 
-	cl->drawIndirect(rigidDepthPrePassCommandSignature, (uint32)commands.size(), 
+	cl->drawIndirect(rigidDepthPrePassCommandSignature, (uint32)commands.size(),
 		allocation.resource,
 		allocation.offsetInResource);
 }
 #endif
 
-static void depthPrePassInternal(dx_command_list* cl, 
+static void depthPrePassInternal(dx_command_list* cl,
 	dx_pipeline& pipeline,
-	const sort_key_vector<float, static_depth_only_render_command>& staticCommands, 
+	const sort_key_vector<float, static_depth_only_render_command>& staticCommands,
 	const sort_key_vector<float, dynamic_depth_only_render_command>& dynamicCommands,
 	const mat4& viewProj, const mat4& prevFrameViewProj,
 	depth_only_camera_jitter_cb jitterCB)
@@ -406,10 +419,10 @@ void proceduralSky(dx_command_list* cl,
 	cl->drawCubeTriangleStrip();
 }
 
-void sphericalHarmonicsSky(dx_command_list* cl, 
-	const dx_render_target& skyRenderTarget, 
-	const mat4& proj, const mat4& view, 
-	const ref<dx_buffer>& sh, uint32 shIndex, 
+void sphericalHarmonicsSky(dx_command_list* cl,
+	const dx_render_target& skyRenderTarget,
+	const mat4& proj, const mat4& view,
+	const ref<dx_buffer>& sh, uint32 shIndex,
 	float skyIntensity)
 {
 	PROFILE_ALL(cl, "Sky");
@@ -427,9 +440,9 @@ void sphericalHarmonicsSky(dx_command_list* cl,
 	cl->drawCubeTriangleStrip();
 }
 
-void preethamSky(dx_command_list* cl, 
-	const dx_render_target& skyRenderTarget, 
-	const mat4& proj, const mat4& view, 
+void preethamSky(dx_command_list* cl,
+	const dx_render_target& skyRenderTarget,
+	const mat4& proj, const mat4& view,
 	vec3 sunDirection, float skyIntensity)
 {
 	PROFILE_ALL(cl, "Sky");
@@ -524,10 +537,10 @@ static void sunShadowPassInternal(dx_command_list* cl,
 
 			for (uint32 i = 0; i <= renderCascadeIndex; ++i)
 			{
-				auto& dcs = 
-					staticGeom 
-						? (doubleSided ? pass->cascades[i].doubleSidedStaticDrawCalls : pass->cascades[i].staticDrawCalls)
-						: (doubleSided ? pass->cascades[i].doubleSidedDynamicDrawCalls : pass->cascades[i].dynamicDrawCalls);
+				auto& dcs =
+					staticGeom
+					? (doubleSided ? pass->cascades[i].doubleSidedStaticDrawCalls : pass->cascades[i].staticDrawCalls)
+					: (doubleSided ? pass->cascades[i].doubleSidedDynamicDrawCalls : pass->cascades[i].dynamicDrawCalls);
 
 				renderSunCascadeShadow(cl, dcs, cascade.viewProj);
 			}
@@ -535,7 +548,7 @@ static void sunShadowPassInternal(dx_command_list* cl,
 	}
 }
 
-static void spotShadowPassInternal(dx_command_list* cl, 
+static void spotShadowPassInternal(dx_command_list* cl,
 	const spot_shadow_render_pass** spotLightShadowRenderPasses, uint32 numSpotLightShadowRenderPasses,
 	bool staticGeom, bool doubleSided)
 {
@@ -553,16 +566,16 @@ static void spotShadowPassInternal(dx_command_list* cl,
 		shadow_map_viewport vp = spotLightShadowRenderPasses[i]->viewport;
 		cl->setViewport(vp.x, vp.y, vp.size, vp.size);
 
-		auto& dcs = 
-			staticGeom 
-				? (doubleSided ? spotLightShadowRenderPasses[i]->doubleSidedStaticDrawCalls : spotLightShadowRenderPasses[i]->staticDrawCalls)
-				: (doubleSided ? spotLightShadowRenderPasses[i]->doubleSidedDynamicDrawCalls : spotLightShadowRenderPasses[i]->dynamicDrawCalls);
+		auto& dcs =
+			staticGeom
+			? (doubleSided ? spotLightShadowRenderPasses[i]->doubleSidedStaticDrawCalls : spotLightShadowRenderPasses[i]->staticDrawCalls)
+			: (doubleSided ? spotLightShadowRenderPasses[i]->doubleSidedDynamicDrawCalls : spotLightShadowRenderPasses[i]->dynamicDrawCalls);
 
 		renderSpotShadow(cl, dcs, spotLightShadowRenderPasses[i]->viewProjMatrix);
 	}
 }
 
-static void pointShadowPassInternal(dx_command_list* cl, 
+static void pointShadowPassInternal(dx_command_list* cl,
 	const point_shadow_render_pass** pointLightShadowRenderPasses, uint32 numPointLightShadowRenderPasses,
 	bool staticGeom, bool doubleSided)
 {
@@ -586,8 +599,8 @@ static void pointShadowPassInternal(dx_command_list* cl,
 
 			auto& dcs =
 				staticGeom
-					? (doubleSided ? pointLightShadowRenderPasses[i]->doubleSidedStaticDrawCalls : pointLightShadowRenderPasses[i]->staticDrawCalls)
-					: (doubleSided ? pointLightShadowRenderPasses[i]->doubleSidedDynamicDrawCalls : pointLightShadowRenderPasses[i]->dynamicDrawCalls);
+				? (doubleSided ? pointLightShadowRenderPasses[i]->doubleSidedStaticDrawCalls : pointLightShadowRenderPasses[i]->staticDrawCalls)
+				: (doubleSided ? pointLightShadowRenderPasses[i]->doubleSidedDynamicDrawCalls : pointLightShadowRenderPasses[i]->dynamicDrawCalls);
 
 			renderPointShadow(cl, dcs, pointLightShadowRenderPasses[i]->lightPosition, pointLightShadowRenderPasses[i]->maxDistance, (v == 0) ? 1.f : -1.f);
 		}
@@ -786,7 +799,7 @@ void shadowPasses(dx_command_list* cl,
 void opaqueLightPass(dx_command_list* cl,
 	const dx_render_target& renderTarget,
 	const opaque_render_pass* opaqueRenderPass,
-	const common_material_info& materialInfo, 
+	const common_material_info& materialInfo,
 	const mat4& viewProj)
 {
 	if (opaqueRenderPass && opaqueRenderPass->pass.size() > 0)
@@ -811,9 +824,9 @@ void opaqueLightPass(dx_command_list* cl,
 }
 
 void transparentLightPass(dx_command_list* cl,
-	const dx_render_target& renderTarget, 
+	const dx_render_target& renderTarget,
 	const transparent_render_pass* transparentRenderPass,
-	const common_material_info& materialInfo, 
+	const common_material_info& materialInfo,
 	const mat4& viewProj)
 {
 	if (transparentRenderPass && transparentRenderPass->pass.size() > 0)
@@ -925,7 +938,7 @@ void ldrPass(dx_command_list* cl,
 	}
 }
 
-void copyShadowMapParts(dx_command_list* cl, 
+void copyShadowMapParts(dx_command_list* cl,
 	ref<dx_texture> from,
 	ref<dx_texture> to,
 	shadow_map_viewport* copies, uint32 numCopies)
@@ -951,7 +964,7 @@ void copyShadowMapParts(dx_command_list* cl,
 }
 
 
-void lightAndDecalCulling(dx_command_list* cl, 
+void lightAndDecalCulling(dx_command_list* cl,
 	ref<dx_texture> depthStencilBuffer,
 	ref<dx_buffer> pointLights,
 	ref<dx_buffer> spotLights,
@@ -1038,11 +1051,12 @@ void gaussianBlur(dx_command_list* cl,
 {
 	PROFILE_ALL(cl, "Gaussian Blur");
 
-	auto& pipeline =
-		(kernel == gaussian_blur_5x5) ? gaussianBlur5x5Pipeline :
-		(kernel == gaussian_blur_9x9) ? gaussianBlur9x9Pipeline :
-		(kernel == gaussian_blur_13x13) ? gaussianBlur13x13Pipeline :
-		gaussianBlur5x5Pipeline; // TODO: Emit error!
+	assert(inputOutput->format == temp->format);
+
+	uint32 numChannels = getNumberOfChannels(inputOutput->format);
+
+	// Maybe we could add more specializations for 2 and 3 channels.
+	dx_pipeline& pipeline = ((numChannels == 1) ? gaussianBlurFloatPipelines : gaussianBlurFloat4Pipelines)[kernel];
 
 	cl->setPipelineState(*pipeline.pipeline);
 	cl->setComputeRootSignature(*pipeline.rootSignature);
@@ -1105,6 +1119,83 @@ void gaussianBlur(dx_command_list* cl,
 				.transition(inputOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		}
 	}
+}
+
+static void morphologyCommon(dx_command_list* cl, dx_pipeline& pipeline, ref<dx_texture> inputOutput, ref<dx_texture> temp, uint32 radius, uint32 numIterations)
+{
+	if (radius == 0 || numIterations == 0)
+	{
+		return;
+	}
+
+	assert(inputOutput->width == temp->width);
+	assert(inputOutput->height == temp->height);
+
+	radius = min(radius, MORPHOLOGY_MAX_RADIUS);
+
+	cl->setPipelineState(*pipeline.pipeline);
+	cl->setComputeRootSignature(*pipeline.rootSignature);
+
+	for (uint32 i = 0; i < numIterations; ++i)
+	{
+		DX_PROFILE_BLOCK(cl, "Iteration");
+
+		{
+			DX_PROFILE_BLOCK(cl, "Vertical");
+
+			cl->setCompute32BitConstants(MORPHOLOGY_RS_CB, morphology_cb{ radius, 1, inputOutput->height });
+			cl->setDescriptorHeapUAV(MORPHOLOGY_RS_TEXTURES, 0, temp);
+			cl->setDescriptorHeapSRV(MORPHOLOGY_RS_TEXTURES, 1, inputOutput);
+
+			cl->dispatch(bucketize(inputOutput->height, MORPHOLOGY_BLOCK_SIZE), inputOutput->width);
+
+			barrier_batcher(cl)
+				//.uav(temp)
+				.transition(temp, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+				.transition(inputOutput, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		}
+
+		{
+			DX_PROFILE_BLOCK(cl, "Horizontal");
+
+			cl->setCompute32BitConstants(MORPHOLOGY_RS_CB, morphology_cb{ radius, 0, inputOutput->width });
+			cl->setDescriptorHeapUAV(MORPHOLOGY_RS_TEXTURES, 0, inputOutput);
+			cl->setDescriptorHeapSRV(MORPHOLOGY_RS_TEXTURES, 1, temp);
+
+			cl->dispatch(bucketize(inputOutput->width, MORPHOLOGY_BLOCK_SIZE), inputOutput->height);
+
+			barrier_batcher(cl)
+				//.uav(inputOutput)
+				.transition(temp, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+				.transition(inputOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		}
+	}
+}
+
+void dilate(dx_command_list* cl, ref<dx_texture> inputOutput, ref<dx_texture> temp, uint32 radius, uint32 numIterations)
+{
+	DX_PROFILE_BLOCK(cl, "Dilate");
+	morphologyCommon(cl, dilationPipeline, inputOutput, temp, radius, numIterations);
+}
+
+void erode(dx_command_list* cl, ref<dx_texture> inputOutput, ref<dx_texture> temp, uint32 radius, uint32 numIterations)
+{
+	DX_PROFILE_BLOCK(cl, "Erode");
+	morphologyCommon(cl, erosionPipeline, inputOutput, temp, radius, numIterations);
+}
+
+void depthSobel(dx_command_list* cl, ref<dx_texture> input, ref<dx_texture> output, vec4 projectionParams, float threshold)
+{
+	DX_PROFILE_BLOCK(cl, "Depth sobel");
+
+	cl->setPipelineState(*depthSobelPipeline.pipeline);
+	cl->setComputeRootSignature(*depthSobelPipeline.rootSignature);
+
+	cl->setCompute32BitConstants(DEPTH_SOBEL_RS_CB, depth_sobel_cb{ projectionParams, threshold });
+	cl->setDescriptorHeapUAV(DEPTH_SOBEL_RS_TEXTURES, 0, output);
+	cl->setDescriptorHeapSRV(DEPTH_SOBEL_RS_TEXTURES, 1, input);
+
+	cl->dispatch(bucketize(input->width, POST_PROCESSING_BLOCK_SIZE), bucketize(input->height, POST_PROCESSING_BLOCK_SIZE));
 }
 
 void screenSpaceReflections(dx_command_list* cl,
@@ -1230,7 +1321,7 @@ void screenSpaceReflections(dx_command_list* cl,
 }
 
 void specularAmbient(dx_command_list* cl,
-	ref<dx_texture> hdrInput, 
+	ref<dx_texture> hdrInput,
 	ref<dx_texture> ssr,
 	ref<dx_texture> worldNormalsTexture,
 	ref<dx_texture> reflectanceTexture,
@@ -1291,7 +1382,7 @@ void temporalAntiAliasing(dx_command_list* cl,
 
 void downsample(dx_command_list* cl,
 	ref<dx_texture> input,
-	ref<dx_texture> output, 
+	ref<dx_texture> output,
 	ref<dx_texture> temp)
 {
 	PROFILE_ALL(cl, "Downsample");
@@ -1299,14 +1390,7 @@ void downsample(dx_command_list* cl,
 	barrier_batcher(cl)
 		.transition(output, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-	cl->setPipelineState(*blitPipeline.pipeline);
-	cl->setComputeRootSignature(*blitPipeline.rootSignature);
-
-	cl->setCompute32BitConstants(BLIT_RS_CB, blit_cb{ vec2(1.f / output->width, 1.f / output->height) });
-	cl->setDescriptorHeapUAV(BLIT_RS_TEXTURES, 0, output);
-	cl->setDescriptorHeapSRV(BLIT_RS_TEXTURES, 1, input);
-
-	cl->dispatch(bucketize(output->width, POST_PROCESSING_BLOCK_SIZE), bucketize(output->height, POST_PROCESSING_BLOCK_SIZE));
+	blit(cl, input, output);
 
 	barrier_batcher(cl)
 		//.uav(prevFrameHDRColorTexture)
@@ -1395,6 +1479,20 @@ void tonemap(dx_command_list* cl,
 	cl->setCompute32BitConstants(TONEMAP_RS_CB, cb);
 
 	cl->dispatch(bucketize(ldrOutput->width, POST_PROCESSING_BLOCK_SIZE), bucketize(ldrOutput->height, POST_PROCESSING_BLOCK_SIZE));
+}
+
+void blit(dx_command_list* cl, ref<dx_texture> input, ref<dx_texture> output)
+{
+	DX_PROFILE_BLOCK(cl, "Blit");
+
+	cl->setPipelineState(*blitPipeline.pipeline);
+	cl->setComputeRootSignature(*blitPipeline.rootSignature);
+
+	cl->setCompute32BitConstants(BLIT_RS_CB, blit_cb{ vec2(1.f / output->width, 1.f / output->height) });
+	cl->setDescriptorHeapUAV(BLIT_RS_TEXTURES, 0, output);
+	cl->setDescriptorHeapSRV(BLIT_RS_TEXTURES, 1, input);
+
+	cl->dispatch(bucketize(output->width, POST_PROCESSING_BLOCK_SIZE), bucketize(output->height, POST_PROCESSING_BLOCK_SIZE));
 }
 
 void present(dx_command_list* cl,
