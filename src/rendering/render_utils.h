@@ -29,6 +29,8 @@ static constexpr DXGI_FORMAT linearDepthFormat = DXGI_FORMAT_R32_FLOAT;
 static constexpr DXGI_FORMAT objectIDsFormat = DXGI_FORMAT_R32_UINT;
 static constexpr DXGI_FORMAT reflectanceFormat = DXGI_FORMAT_R8G8B8A8_UNORM; // Fresnel (xyz), roughness (w).
 
+static constexpr DXGI_FORMAT aoFormat = DXGI_FORMAT_R8_UNORM;
+
 
 static constexpr DXGI_FORMAT opaqueLightPassFormats[] = { hdrFormat, worldNormalsFormat, reflectanceFormat };
 static constexpr DXGI_FORMAT transparentLightPassFormats[] = { hdrFormat };

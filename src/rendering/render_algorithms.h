@@ -39,6 +39,15 @@ struct bloom_settings
 	float strength = 0.1f;
 };
 
+struct hbao_settings
+{
+	float radius = 3.f;
+	uint32 maxNumSteps = 5;
+	uint32 numSampleDirections = 4;
+	float bias = 0.01f;
+	float strength = 1.f;
+};
+
 struct sharpen_settings
 {
 	float strength = 0.5f;
@@ -237,6 +246,13 @@ void bloom(dx_command_list* cl,
 	ref<dx_texture> bloomTexture,				// UNORDERED_ACCESS
 	ref<dx_texture> bloomTempTexture,			// UNORDERED_ACCESS
 	bloom_settings settings);
+
+void hbao(dx_command_list* cl,
+	ref<dx_texture> linearDepth,				// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> worldNormals,				// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> output,						// UNORDERED_ACCESS
+	hbao_settings settings,
+	dx_dynamic_constant_buffer cameraCBV);
 
 void tonemap(dx_command_list* cl,
 	ref<dx_texture> hdrInput,					// NON_PIXEL_SHADER_RESOURCE

@@ -25,6 +25,9 @@ struct renderer_settings
 	float environmentIntensity = 1.f;
 	float skyIntensity = 1.f;
 
+	bool enableAO = true;
+	hbao_settings aoSettings;
+
 	bool enableSSR = true;
 	ssr_settings ssrSettings;
 
@@ -73,6 +76,7 @@ static const char* rendererModeNames[] =
 struct renderer_spec
 {
 	bool allowObjectPicking = true; // This currently can only be true, if ALL other flags are also set to true.
+	bool allowAO = true;
 	bool allowSSR = true;
 	bool allowTAA = true;
 	bool allowBloom = true;
@@ -147,6 +151,7 @@ private:
 	ref<dx_texture> depthStencilBuffer;
 	ref<dx_texture> linearDepthBuffer;
 	ref<dx_texture> opaqueDepthBuffer; // The depth-stencil buffer gets copied to this texture after the opaque pass.
+	ref<dx_texture> aoTexture;
 
 	ref<dx_texture> ssrRaycastTexture;
 	ref<dx_texture> ssrResolveTexture;

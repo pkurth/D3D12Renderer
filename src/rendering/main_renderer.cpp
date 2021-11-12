@@ -68,6 +68,13 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 	SET_NAME(linearDepthBuffer->resource, "Linear depth buffer");
 
 
+	if (spec.allowAO)
+	{
+		aoTexture = createTexture(0, renderWidth / 2, renderHeight / 2, aoFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		SET_NAME(aoTexture->resource, "AO");
+	}
+
+
 	if (spec.allowSSR)
 	{
 		ssrRaycastTexture = createTexture(0, SSR_RAYCAST_WIDTH, SSR_RAYCAST_HEIGHT, hdrFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -215,6 +222,8 @@ void main_renderer::recalculateViewport(bool resizeTextures)
 		resizeTexture(opaqueDepthBuffer, renderWidth, renderHeight);
 		resizeTexture(linearDepthBuffer, renderWidth, renderHeight);
 
+		resizeTexture(aoTexture, renderWidth / 2, renderHeight / 2);
+
 		resizeTexture(objectIDsTexture, renderWidth, renderHeight);
 
 		resizeTexture(ssrRaycastTexture, SSR_RAYCAST_WIDTH, SSR_RAYCAST_HEIGHT);
@@ -326,7 +335,7 @@ void main_renderer::endFrame(const user_input& input)
 	materialInfo.sunCBV = sunCBV;
 
 
-
+	settings.enableAO &= spec.allowAO;
 	settings.enableSSR &= spec.allowSSR;
 	settings.enableBloom &= spec.allowBloom;
 	settings.enableTAA &= spec.allowTAA;
@@ -383,6 +392,20 @@ void main_renderer::endFrame(const user_input& input)
 			// ----------------------------------------
 
 			linearDepthPyramid(cl, depthStencilBuffer, linearDepthBuffer, jitteredCamera.projectionParams);
+
+			barrier_batcher(cl)
+				//.uav(linearDepthBuffer)
+				.transitionBegin(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+
+			// ----------------------------------------
+			// AMBIENT OCCLUSION
+			// ----------------------------------------
+
+			//if (settings.enableAO)
+			//{
+			//	hbao(cl, linearDepthBuffer, )
+			//}
 
 			barrier_batcher(cl)
 				//.uav(linearDepthBuffer)

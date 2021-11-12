@@ -260,7 +260,7 @@ static float4 uniformSampleSphere(float2 E)
 
 // ----------------------------------------
 // LIGHTING COMPUTATION.
-// 
+// ----------------------------------------
 
 static float3 diffuseIBL(float3 kd, surface_info surface, TextureCube<float4> irradianceTexture, SamplerState clampSampler)
 {

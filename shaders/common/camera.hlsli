@@ -39,15 +39,6 @@ struct camera_cb
 		}
 	}
 
-	float3 restoreViewSpacePosition(float4x4 invProj, float2 uv, float depth)
-	{
-		uv.y = 1.f - uv.y; // Screen uvs start at the top left, so flip y.
-		float3 ndc = float3(uv * 2.f - float2(1.f, 1.f), depth);
-		float4 homPosition = mul(invProj, float4(ndc, 1.f));
-		float3 position = homPosition.xyz / homPosition.w;
-		return position;
-	}
-
 	// NOT normalized. Z-coordinate is 1 unit long.
 	float3 restoreViewDirection(float2 uv)
 	{
@@ -59,6 +50,11 @@ struct camera_cb
 	{
 		float viewDepth = depthBufferDepthToEyeDepth(depth);
 		return restoreViewDirection(uv) * viewDepth;
+	}
+
+	float3 restoreViewSpacePositionEyeDepth(float2 uv, float eyeDepth)
+	{
+		return restoreViewDirection(uv) * eyeDepth;
 	}
 
 	float3 restoreWorldSpacePosition(float2 uv, float depth)

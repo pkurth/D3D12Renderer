@@ -62,6 +62,8 @@ static dx_pipeline blitPipeline;
 static dx_pipeline bloomThresholdPipeline;
 static dx_pipeline bloomCombinePipeline;
 
+static dx_pipeline hbaoPipeline;
+
 static dx_pipeline tonemapPipeline;
 static dx_pipeline presentPipeline;
 
@@ -210,6 +212,8 @@ void loadCommonShaders()
 
 	bloomThresholdPipeline = createReloadablePipeline("bloom_threshold_cs");
 	bloomCombinePipeline = createReloadablePipeline("bloom_combine_cs");
+
+	hbaoPipeline = createReloadablePipeline("hbao_cs");
 
 	tonemapPipeline = createReloadablePipeline("tonemap_cs");
 	presentPipeline = createReloadablePipeline("present_cs");
@@ -1452,6 +1456,39 @@ void bloom(dx_command_list* cl,
 		//.uav(bloomResult)
 		.transition(output, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) // Will be read by rest of post processing stack. 
 		.transition(bloomTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.
+}
+
+void hbao(dx_command_list* cl, 
+	ref<dx_texture> linearDepth, 
+	ref<dx_texture> worldNormals, 
+	ref<dx_texture> output, 
+	hbao_settings settings,
+	dx_dynamic_constant_buffer cameraCBV)
+{
+	PROFILE_ALL(cl, "HBAO");
+
+	hbao_cb cb;
+	cb.screenWidth = output->width;
+	cb.screenHeight = output->height;
+	cb.depthBufferMipLevel = log2((float)linearDepth->width / output->width);
+	cb.halfRadius = settings.radius * 0.5f;
+	cb.maxNumSteps = settings.maxNumSteps;
+	cb.numSampleDirections = settings.numSampleDirections;
+	cb.bias = settings.bias;
+	cb.strength = settings.strength;
+
+	cl->setPipelineState(*hbaoPipeline.pipeline);
+	cl->setComputeRootSignature(*hbaoPipeline.rootSignature);
+
+	cl->setDescriptorHeapUAV(HBAO_RS_TEXTURES, 0, output);
+	cl->setDescriptorHeapUAV(HBAO_RS_TEXTURES, 1, linearDepth);
+	cl->setDescriptorHeapUAV(HBAO_RS_TEXTURES, 2, worldNormals);
+
+	cl->setCompute32BitConstants(HBAO_RS_CB, cb);
+	cl->setCompute32BitConstants(HBAO_RS_CAMERA, cameraCBV);
+
+	cl->dispatch(bucketize(output->width, POST_PROCESSING_BLOCK_SIZE), bucketize(output->height, POST_PROCESSING_BLOCK_SIZE));
+	cl->uavBarrier(output);
 }
 
 void tonemap(dx_command_list* cl,

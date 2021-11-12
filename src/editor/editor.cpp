@@ -1306,6 +1306,20 @@ static bool editSunShadowParameters(directional_light& sun)
 	return result;
 }
 
+static bool editAO(bool& enable, hbao_settings& settings)
+{
+	bool result = false;
+	if (ImGui::BeginProperties())
+	{
+		result |= ImGui::PropertyCheckbox("Enable HBAO", enable);
+		if (enable)
+		{
+		}
+		ImGui::EndProperties();
+	}
+	return result;
+}
+
 static bool editSSR(bool& enable, ssr_settings& settings)
 {
 	bool result = false;
@@ -1402,6 +1416,7 @@ void scene_editor::drawSettings(float dt)
 
 		if (ImGui::BeginTree("Post processing"))
 		{
+			if (renderer->spec.allowAO) { editAO(renderer->settings.enableAO, renderer->settings.aoSettings); ImGui::Separator(); }
 			if (renderer->spec.allowSSR) { editSSR(renderer->settings.enableSSR, renderer->settings.ssrSettings); ImGui::Separator(); }
 			if (renderer->spec.allowTAA) { editTAA(renderer->settings.enableTAA, renderer->settings.taaSettings); ImGui::Separator(); }
 			if (renderer->spec.allowBloom) { editBloom(renderer->settings.enableBloom, renderer->settings.bloomSettings); ImGui::Separator(); }
