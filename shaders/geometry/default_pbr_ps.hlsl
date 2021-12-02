@@ -61,6 +61,7 @@ struct ps_output
 #endif
 };
 
+[earlydepthstencil]
 [RootSignature(DEFAULT_PBR_RS)]
 ps_output main(ps_input IN)
 {
