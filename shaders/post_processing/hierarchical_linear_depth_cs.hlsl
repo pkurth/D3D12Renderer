@@ -29,15 +29,19 @@ void main(cs_input IN)
 	const uint2 groupThreadID = IN.groupThreadID.xy;
 	const uint2 dispatchThreadID = IN.dispatchThreadID.xy;
 
-	float2 uv = (dispatchThreadID + float2(0.5f, 0.5f)) * cb.invDimensions;
 
+#if 0
+	float2 uv = (dispatchThreadID + float2(0.7f, 0.7f)) * cb.invDimensions;
 	float4 depths = input.Gather(linearClampSampler, uv);
-	//float4 depths = float4(
-	//	input[dispatchThreadID * 2 + uint2(0, 0)],
-	//	input[dispatchThreadID * 2 + uint2(1, 0)],
-	//	input[dispatchThreadID * 2 + uint2(0, 1)],
-	//	input[dispatchThreadID * 2 + uint2(1, 1)]
-	//);
+	depths = depths.wzxy; // This brings it into the same order as the variant below. See https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/gather4--sm5---asm-
+#else
+	float4 depths = float4(
+		input[dispatchThreadID * 2 + uint2(0, 0)],
+		input[dispatchThreadID * 2 + uint2(1, 0)],
+		input[dispatchThreadID * 2 + uint2(0, 1)],
+		input[dispatchThreadID * 2 + uint2(1, 1)]
+	);
+#endif
 	float maxdepth = max(depths.x, max(depths.y, max(depths.z, depths.w)));
 	tile[groupThreadID.x][groupThreadID.y] = maxdepth;
 
