@@ -219,6 +219,16 @@ namespace ImGui
 
 	void Image(const ref<dx_texture>& texture, uint32 width, uint32 height)
 	{
+		if (width == 0)
+		{
+			width = min((uint32)ImGui::GetContentRegionAvail().x, texture->width);
+		}
+
+		if (height == 0)
+		{
+			height = texture->height * width / texture->width;
+		}
+
 		ImGui::Image(texture->defaultSRV, width, height);
 	}
 

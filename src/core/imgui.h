@@ -45,7 +45,7 @@ namespace ImGui
 	void Image(struct dx_cpu_descriptor_handle& handle, ImVec2 size);
 	void Image(struct dx_cpu_descriptor_handle& handle, uint32 width, uint32 height);
 	void Image(const ref<dx_texture>& texture, ImVec2 size);
-	void Image(const ref<dx_texture>& texture, uint32 width, uint32 height);
+	void Image(const ref<dx_texture>& texture, uint32 width = 0, uint32 height = 0);
 
 	bool ImageButton(struct dx_cpu_descriptor_handle& handle, ImVec2 size, ImVec2 uvTopLeft = ImVec2(0, 0), ImVec2 uvBottomRight = ImVec2(1, 1));
 	bool ImageButton(struct dx_cpu_descriptor_handle& handle, uint32 width, uint32 height, ImVec2 uvTopLeft = ImVec2(0, 0), ImVec2 uvBottomRight = ImVec2(1, 1));

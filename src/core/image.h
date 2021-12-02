@@ -487,7 +487,7 @@ static uint32 getNumberOfChannels(DXGI_FORMAT format)
 		case DXGI_FORMAT_R8G8B8A8_SINT:
 			return 4;
 		default:
-			assert(false);
+			//assert(false);
 			return 0;
 	}
 }
