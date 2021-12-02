@@ -246,6 +246,25 @@ mat4 transpose(const mat4& a)
 	return result;
 }
 
+mat2 invert(const mat2& m)
+{
+	float det = determinant(m);
+	if (det == 0.f)
+	{
+		return mat2();
+	}
+
+	mat2 inv;
+	inv.m00 = m.m11;
+	inv.m01 = -m.m01;
+	inv.m10 = -m.m10;
+	inv.m11 = m.m00;
+
+	inv *= 1.f / det;
+
+	return inv;
+}
+
 mat3 invert(const mat3& m)
 {
 	mat3 inv;
@@ -784,9 +803,23 @@ mat3 getSkewMatrix(vec3 r)
 
 mat4 createPerspectiveProjectionMatrix(float fov, float aspect, float nearPlane, float farPlane)
 {
-	mat4 result = mat4::identity;
-	result.m11 = 1.f / tan(0.5f * fov);
-	result.m00 = result.m11 / aspect;
+	mat4 result;
+
+	float a = 1.f / tan(0.5f * fov);
+
+	result.m00 = a / aspect;
+	result.m01 = 0.f;
+	result.m02 = 0.f;
+	result.m03 = 0.f;
+
+	result.m10 = 0.f;
+	result.m11 = a;
+	result.m12 = 0.f;
+	result.m13 = 0.f;
+
+	result.m20 = 0.f;
+	result.m21 = 0.f;
+
 	if (farPlane > 0.f)
 	{
 #if DIRECTX_COORDINATE_SYSTEM
@@ -806,6 +839,9 @@ mat4 createPerspectiveProjectionMatrix(float fov, float aspect, float nearPlane,
 		result.m23 = -2.f * nearPlane;
 #endif
 	}
+
+	result.m30 = 0.f;
+	result.m31 = 0.f;
 	result.m32 = -1.f;
 	result.m33 = 0.f;
 
@@ -817,22 +853,17 @@ mat4 createPerspectiveProjectionMatrix(float width, float height, float fx, floa
 	mat4 result;
 
 	result.m00 = 2.f * fx / width;
-	result.m10 = 0.f;
-	result.m20 = 0.f;
-	result.m30 = 0.f;
-	
 	result.m01 = 0.f;
-	result.m11 = 2.f * fy / height;
-	result.m21 = 0.f;
-	result.m31 = 0.f;
-	
 	result.m02 = 1.f - 2.f * cx / width;
-	result.m12 = 2.f * cy / height - 1.f;
-	result.m32 = -1.f;
-	
 	result.m03 = 0.f;
+
+	result.m10 = 0.f;
+	result.m11 = 2.f * fy / height;
+	result.m12 = 2.f * cy / height - 1.f;
 	result.m13 = 0.f;
-	result.m33 = 0.f;
+
+	result.m20 = 0.f;
+	result.m21 = 0.f;
 
 	if (farPlane > 0.f)
 	{
@@ -854,12 +885,18 @@ mat4 createPerspectiveProjectionMatrix(float width, float height, float fx, floa
 #endif
 	}
 
+	result.m30 = 0.f;
+	result.m31 = 0.f;
+	result.m32 = -1.f;
+	result.m33 = 0.f;
+
 	return result;
 }
 
 mat4 createPerspectiveProjectionMatrix(float r, float l, float t, float b, float nearPlane, float farPlane)
 {
 	mat4 result;
+
 	result.m00 = (2.f * nearPlane) / (r - l);
 	result.m01 = 0.f; 
 	result.m02 = (r + l) / (r - l);
@@ -870,7 +907,9 @@ mat4 createPerspectiveProjectionMatrix(float r, float l, float t, float b, float
 	result.m12 = (t + b) / (t - b);
 	result.m13 = 0.f;
 
-	result.m20 = 0; result.m21 = 0;
+	result.m20 = 0; 
+	result.m21 = 0;
+
 	if (farPlane > 0.f)
 	{
 #if DIRECTX_COORDINATE_SYSTEM
@@ -901,11 +940,20 @@ mat4 createPerspectiveProjectionMatrix(float r, float l, float t, float b, float
 
 mat4 createOrthographicProjectionMatrix(float r, float l, float t, float b, float nearPlane, float farPlane)
 {
-	mat4 result = mat4::identity;
+	mat4 result;
+
 	result.m00 = 2.f / (r - l);
+	result.m01 = 0.f;
+	result.m02 = 0.f;
 	result.m03 = -(r + l) / (r - l);
+
+	result.m10 = 0.f;
 	result.m11 = 2.f / (t - b);
+	result.m12 = 0.f;
 	result.m13 = -(t + b) / (t - b);
+
+	result.m20 = 0.f;
+	result.m21 = 0.f;
 
 #if DIRECTX_COORDINATE_SYSTEM
 	result.m22 = -1.f / (farPlane - nearPlane);
@@ -915,30 +963,65 @@ mat4 createOrthographicProjectionMatrix(float r, float l, float t, float b, floa
 	result.m23 = -(farPlane + nearPlane) / (farPlane - nearPlane);
 #endif
 
+	result.m30 = 0.f;
+	result.m31 = 0.f;
+	result.m32 = 0.f;
+	result.m33 = 1.f;
+
 	return result;
 }
 
 mat4 invertPerspectiveProjectionMatrix(const mat4& m)
 {
-	mat4 inv = mat4::identity;
+	mat4 inv;
+	
 	inv.m00 = 1.f / m.m00;
+	inv.m01 = 0.f;
+	inv.m02 = 0.f;
+	inv.m03 = m.m02 / m.m00;
+
+	inv.m10 = 0.f;
 	inv.m11 = 1.f / m.m11;
+	inv.m12 = 0.f;
+	inv.m13 = m.m12 / m.m11;
+
+	inv.m20 = 0.f;
+	inv.m21 = 0.f;
 	inv.m22 = 0.f;
 	inv.m23 = -1.f;
+
+	inv.m30 = 0.f;
+	inv.m31 = 0.f;
 	inv.m32 = 1.f / m.m23;
 	inv.m33 = m.m22 / m.m23;
+
 	return inv;
 }
 
 mat4 invertOrthographicProjectionMatrix(const mat4& m)
 {
 	mat4 inv;
+
 	inv.m00 = 1.f / m.m00;
+	inv.m01 = 0.f;
+	inv.m02 = 0.f;
 	inv.m03 = -m.m03 / m.m00;
+
+	inv.m10 = 0.f;
 	inv.m11 = 1.f / m.m11;
+	inv.m12 = 0.f;
 	inv.m13 = -m.m13 / m.m11;
+
+	inv.m20 = 0.f;
+	inv.m21 = 0.f;
 	inv.m22 = 1.f / m.m22;
 	inv.m23 = -m.m23 / m.m22;
+
+	inv.m30 = 0.f;
+	inv.m31 = 0.f;
+	inv.m32 = 0.f;
+	inv.m33 = 1.f;
+
 	return inv;
 }
 
