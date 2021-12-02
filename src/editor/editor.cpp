@@ -1435,7 +1435,7 @@ void scene_editor::drawSettings(float dt)
 
 		if (ImGui::BeginTree("Post processing"))
 		{
-			if (renderer->spec.allowAO) { editAO(renderer->settings.enableAO, renderer->settings.aoSettings, renderer->aoTexture); ImGui::Separator(); }
+			if (renderer->spec.allowAO) { editAO(renderer->settings.enableAO, renderer->settings.aoSettings, renderer->aoTextures[renderer->aoHistoryIndex]); ImGui::Separator(); }
 			if (renderer->spec.allowSSR) { editSSR(renderer->settings.enableSSR, renderer->settings.ssrSettings, renderer->ssrResolveTexture); ImGui::Separator(); }
 			if (renderer->spec.allowTAA) { editTAA(renderer->settings.enableTAA, renderer->settings.taaSettings); ImGui::Separator(); }
 			if (renderer->spec.allowBloom) { editBloom(renderer->settings.enableBloom, renderer->settings.bloomSettings, renderer->bloomTexture); ImGui::Separator(); }

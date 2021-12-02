@@ -18,6 +18,7 @@ Texture2D<float4> reflection				: register(t3);
 
 TextureCube<float4> environmentTexture		: register(t4);
 Texture2D<float2> brdf						: register(t5);
+Texture2D<float> aoTexture					: register(t6);
 
 SamplerState clampSampler					: register(s0);
 
@@ -47,7 +48,9 @@ void main(cs_input IN)
 		float3 specular = specularIBL(refl.rgb, surface, environmentTexture, brdf, clampSampler);
 		specular = lerp(specular, ssr.rgb, ssr.a);
 
-		color.rgb += specular;
+		float ao = aoTexture.SampleLevel(clampSampler, uv, 0);
+
+		color.rgb += specular * ao;
 	}
 	output[IN.dispatchThreadID.xy] = color;
 }

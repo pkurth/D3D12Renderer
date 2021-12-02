@@ -11,7 +11,8 @@ struct common_material_info
 	ref<dx_texture> sky;
 	ref<dx_texture> irradiance;
 	ref<dx_texture> environment;
-	ref<dx_texture> brdf;
+
+	ref<dx_texture> aoTexture;
 
 	ref<dx_texture> tiledCullingGrid;
 	ref<dx_buffer> tiledObjectsIndexList;

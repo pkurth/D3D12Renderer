@@ -154,7 +154,9 @@ struct main_renderer
 
 	ref<dx_texture> aoCalculationTexture;
 	ref<dx_texture> aoBlurTempTexture;
-	ref<dx_texture> aoTexture;
+	ref<dx_texture> aoTextures[2];
+	uint32 aoHistoryIndex = 0;
+	bool aoWasOnLastFrame = false;
 
 	ref<dx_texture> ssrRaycastTexture;
 	ref<dx_texture> ssrResolveTexture;

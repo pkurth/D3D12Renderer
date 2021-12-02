@@ -72,11 +72,13 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 	{
 		aoCalculationTexture = createTexture(0, renderWidth / 2, renderHeight / 2, aoFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		aoBlurTempTexture = createTexture(0, renderWidth, renderHeight, aoFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		aoTexture = createTexture(0, renderWidth, renderHeight, aoFormat, false, false, true, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		aoTextures[aoHistoryIndex] = createTexture(0, renderWidth, renderHeight, aoFormat, false, false, true, D3D12_RESOURCE_STATE_GENERIC_READ);
+		aoTextures[1 - aoHistoryIndex] = createTexture(0, renderWidth, renderHeight, aoFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		SET_NAME(aoCalculationTexture->resource, "AO Calculation");
 		SET_NAME(aoBlurTempTexture->resource, "AO Temp");
-		SET_NAME(aoTexture->resource, "AO");
+		SET_NAME(aoTextures[0]->resource, "AO 0");
+		SET_NAME(aoTextures[1]->resource, "AO 1");
 	}
 
 
@@ -229,7 +231,8 @@ void main_renderer::recalculateViewport(bool resizeTextures)
 
 		resizeTexture(aoCalculationTexture, renderWidth / 2, renderHeight / 2);
 		resizeTexture(aoBlurTempTexture, renderWidth, renderHeight);
-		resizeTexture(aoTexture, renderWidth, renderHeight);
+		resizeTexture(aoTextures[aoHistoryIndex], renderWidth, renderHeight, D3D12_RESOURCE_STATE_GENERIC_READ);
+		resizeTexture(aoTextures[1 - aoHistoryIndex], renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		resizeTexture(objectIDsTexture, renderWidth, renderHeight);
 
@@ -312,6 +315,12 @@ void main_renderer::endFrame(const user_input& input)
 	auto unjitteredCameraCBV = dxContext.uploadDynamicConstantBuffer(unjitteredCamera);
 	auto sunCBV = dxContext.uploadDynamicConstantBuffer(sun);
 
+
+	settings.enableAO &= spec.allowAO;
+	settings.enableSSR &= spec.allowSSR;
+	settings.enableBloom &= spec.allowBloom;
+	settings.enableTAA &= spec.allowTAA;
+
 	common_material_info materialInfo;
 	if (environment)
 	{
@@ -327,7 +336,7 @@ void main_renderer::endFrame(const user_input& input)
 	}
 	materialInfo.environmentIntensity = settings.environmentIntensity;
 	materialInfo.skyIntensity = settings.skyIntensity;
-	materialInfo.brdf = render_resources::brdfTex;
+	materialInfo.aoTexture = settings.enableAO ? aoTextures[1 - aoHistoryIndex] : render_resources::whiteTexture;
 	materialInfo.tiledCullingGrid = culling.tiledCullingGrid;
 	materialInfo.tiledObjectsIndexList = culling.tiledObjectsIndexList;
 	materialInfo.pointLightBuffer = pointLights;
@@ -341,11 +350,6 @@ void main_renderer::endFrame(const user_input& input)
 	materialInfo.cameraCBV = jitteredCameraCBV;
 	materialInfo.sunCBV = sunCBV;
 
-
-	settings.enableAO &= spec.allowAO;
-	settings.enableSSR &= spec.allowSSR;
-	settings.enableBloom &= spec.allowBloom;
-	settings.enableTAA &= spec.allowTAA;
 
 
 	if (mode == renderer_mode_rasterized)
@@ -406,17 +410,6 @@ void main_renderer::endFrame(const user_input& input)
 				.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
-
-			// ----------------------------------------
-			// AMBIENT OCCLUSION
-			// ----------------------------------------
-
-			if (settings.enableAO)
-			{
-				cl->transitionBarrier(aoTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-				hbao(cl, linearDepthBuffer, aoCalculationTexture, aoBlurTempTexture, aoTexture, settings.aoSettings, materialInfo.cameraCBV);
-			}
-
 			cls[0] = cl;
 		});
 
@@ -463,6 +456,30 @@ void main_renderer::endFrame(const user_input& input)
 			}
 
 
+			barrier_batcher(cl)
+				.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+
+			// ----------------------------------------
+			// AMBIENT OCCLUSION
+			// ----------------------------------------
+
+			if (settings.enableAO)
+			{
+				uint32 aoResultIndex = 1 - aoHistoryIndex;
+				ref<dx_texture> aoHistory = aoWasOnLastFrame ? aoTextures[aoHistoryIndex] : render_resources::whiteTexture;
+				ref<dx_texture> aoResult = aoTextures[aoResultIndex];
+				hbao(cl, linearDepthBuffer, screenVelocitiesTexture, aoCalculationTexture, aoBlurTempTexture, aoHistory, aoResult, settings.aoSettings, materialInfo.cameraCBV);
+
+				barrier_batcher(cl)
+					// UAV barrier is done by hbao-function.
+					.transition(aoTextures[aoResultIndex], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ) // Read by opaque pass and next frame as history.
+					.transition(aoTextures[aoHistoryIndex], D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.
+
+				aoHistoryIndex = aoResultIndex;
+			}
+
+
 
 			// ----------------------------------------
 			// OPAQUE LIGHT PASS
@@ -472,17 +489,12 @@ void main_renderer::endFrame(const user_input& input)
 			opaqueLightPass(cl, hdrOpaqueRenderTarget, opaqueRenderPass, materialInfo, jitteredCamera.viewProj);
 
 
-			{
-				PROFILE_ALL(cl, "Transition textures");
-
-				barrier_batcher(cl)
-					.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ)
-					.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-					.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-					.transition(reflectanceTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-					.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			}
+			barrier_batcher(cl)
+				.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ)
+				.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+				.transition(reflectanceTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+				.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 			{
 				PROFILE_ALL(cl, "Copy depth buffer");
@@ -521,7 +533,7 @@ void main_renderer::endFrame(const user_input& input)
 			// ----------------------------------------
 
 			specularAmbient(cl, hdrColorTexture, settings.enableSSR ? ssrResolveTexture : 0, worldNormalsTexture, reflectanceTexture,
-				environment ? environment->environment : 0, hdrPostProcessingTexture, materialInfo.cameraCBV);
+				environment ? environment->environment : 0, materialInfo.aoTexture, hdrPostProcessingTexture, materialInfo.cameraCBV);
 
 			barrier_batcher(cl)
 				//.uav(hdrPostProcessingTexture)
@@ -717,4 +729,6 @@ void main_renderer::endFrame(const user_input& input)
 
 		dxContext.executeCommandList(cl);
 	}
+
+	aoWasOnLastFrame = settings.enableAO;
 }

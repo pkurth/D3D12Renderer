@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "raytracing_specular.h"
 #include "core/color.h"
+#include "render_resources.h"
 
 #include "raytracing.hlsli"
 
@@ -177,7 +178,7 @@ void specular_reflections_raytracer::render(dx_command_list* cl, const raytracin
     in.irradiance = materialInfo.irradiance->defaultSRV;
     in.environment = materialInfo.environment->defaultSRV;
     in.sky = materialInfo.sky->defaultSRV;
-    in.brdf = materialInfo.brdf->defaultSRV;
+    in.brdf = render_resources::brdfTex->defaultSRV;
 
     output_resources out;
     out.output = output->defaultUAV;

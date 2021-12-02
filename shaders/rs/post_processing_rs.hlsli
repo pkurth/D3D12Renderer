@@ -217,12 +217,13 @@ struct hbao_cb
 
 struct hbao_blur_cb
 {
+    vec2 dimensions;
     vec2 invDimensions;
 };
 
 #define HBAO_BLUR_X_RS \
     "RootFlags(0), " \
-    "RootConstants(num32BitConstants=2, b0),"  \
+    "RootConstants(num32BitConstants=4, b0),"  \
     "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 2) ), " \
     "StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \
@@ -237,8 +238,8 @@ struct hbao_blur_cb
 
 #define HBAO_BLUR_Y_RS \
     "RootFlags(0), " \
-    "RootConstants(num32BitConstants=2, b0),"  \
-    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 2) ), " \
+    "RootConstants(num32BitConstants=4, b0),"  \
+    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 4) ), " \
     "StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \
         "addressV = TEXTURE_ADDRESS_CLAMP," \
@@ -268,7 +269,7 @@ struct specular_ambient_cb
     "RootFlags(0), " \
     "RootConstants(b0, num32BitConstants = 2), " \
     "CBV(b1), " \
-    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 6) )," \
+    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 7) )," \
     "StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \
         "addressV = TEXTURE_ADDRESS_CLAMP," \

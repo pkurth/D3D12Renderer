@@ -301,7 +301,7 @@ PIPELINE_SETUP_IMPL(boid_particle_system::boid_pipeline)
 
 	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 0, materialInfo.irradiance);
 	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 1, materialInfo.environment);
-	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 2, materialInfo.brdf);
+	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 2, render_resources::brdfTex);
 }
 
 PARTICLE_PIPELINE_RENDER_IMPL(boid_particle_system::boid_pipeline)

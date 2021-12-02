@@ -1334,6 +1334,7 @@ void specularAmbient(dx_command_list* cl,
 	ref<dx_texture> worldNormalsTexture,
 	ref<dx_texture> reflectanceTexture,
 	ref<dx_texture> environment,
+	ref<dx_texture> ao,
 	ref<dx_texture> output,
 	dx_dynamic_constant_buffer cameraCBV)
 {
@@ -1352,6 +1353,7 @@ void specularAmbient(dx_command_list* cl,
 	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 4, ssr ? ssr->defaultSRV : render_resources::nullTextureSRV);
 	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 5, environment ? environment : render_resources::blackCubeTexture);
 	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 6, render_resources::brdfTex);
+	cl->setDescriptorHeapSRV(SPECULAR_AMBIENT_RS_TEXTURES, 7, ao ? ao : render_resources::whiteTexture);
 
 	cl->dispatch(bucketize(output->width, POST_PROCESSING_BLOCK_SIZE), bucketize(output->height, POST_PROCESSING_BLOCK_SIZE));
 }
@@ -1464,8 +1466,10 @@ void bloom(dx_command_list* cl,
 
 void hbao(dx_command_list* cl,
 	ref<dx_texture> linearDepth,
-	ref<dx_texture> aoTexture,
+	ref<dx_texture> screenVelocitiesTexture,
+	ref<dx_texture> aoCalculationTexture,
 	ref<dx_texture> aoBlurTempTexture,
+	ref<dx_texture> history,
 	ref<dx_texture> output,
 	hbao_settings settings,
 	dx_dynamic_constant_buffer cameraCBV)
@@ -1476,9 +1480,9 @@ void hbao(dx_command_list* cl,
 		PROFILE_ALL(cl, "Calculate AO");
 
 		hbao_cb cb;
-		cb.screenWidth = aoTexture->width;
-		cb.screenHeight = aoTexture->height;
-		cb.depthBufferMipLevel = log2((float)linearDepth->width / aoTexture->width);
+		cb.screenWidth = aoCalculationTexture->width;
+		cb.screenHeight = aoCalculationTexture->height;
+		cb.depthBufferMipLevel = log2((float)linearDepth->width / aoCalculationTexture->width);
 		cb.numRays = settings.numRays;
 		cb.maxNumStepsPerRay = settings.maxNumStepsPerRay;
 		cb.strength = settings.strength;
@@ -1491,31 +1495,33 @@ void hbao(dx_command_list* cl,
 		cl->setPipelineState(*hbaoPipeline.pipeline);
 		cl->setComputeRootSignature(*hbaoPipeline.rootSignature);
 
-		cl->setDescriptorHeapUAV(HBAO_RS_TEXTURES, 0, aoTexture);
+		cl->setDescriptorHeapUAV(HBAO_RS_TEXTURES, 0, aoCalculationTexture);
 		cl->setDescriptorHeapSRV(HBAO_RS_TEXTURES, 1, linearDepth);
 
 		cl->setCompute32BitConstants(HBAO_RS_CB, cb);
 		cl->setComputeDynamicConstantBuffer(HBAO_RS_CAMERA, cameraCBV);
 
-		cl->dispatch(bucketize(aoTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(aoTexture->height, POST_PROCESSING_BLOCK_SIZE));
+		cl->dispatch(bucketize(aoCalculationTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(aoCalculationTexture->height, POST_PROCESSING_BLOCK_SIZE));
 
 		barrier_batcher(cl)
 			//.uav(aoTexture)
-			.transition(aoTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			.transition(aoCalculationTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	}
 
 	{
 		PROFILE_ALL(cl, "Horizontal blur");
 
 		hbao_blur_cb cb;
-		cb.invDimensions.x = 1.f / aoBlurTempTexture->width;
-		cb.invDimensions.y = 1.f / aoBlurTempTexture->height;
+		cb.dimensions.x = (float)aoBlurTempTexture->width;
+		cb.dimensions.y = (float)aoBlurTempTexture->height;
+		cb.invDimensions.x = 1.f / cb.dimensions.x;
+		cb.invDimensions.y = 1.f / cb.dimensions.y;
 
 		cl->setPipelineState(*hbaoBlurXPipeline.pipeline);
 		cl->setComputeRootSignature(*hbaoBlurXPipeline.rootSignature);
 
 		cl->setDescriptorHeapUAV(HBAO_BLUR_RS_TEXTURES, 0, aoBlurTempTexture);
-		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 1, aoTexture);
+		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 1, aoCalculationTexture);
 		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 2, linearDepth);
 
 		cl->setCompute32BitConstants(HBAO_BLUR_RS_CB, cb);
@@ -1525,15 +1531,17 @@ void hbao(dx_command_list* cl,
 		barrier_batcher(cl)
 			//.uav(blurXTexture)
 			.transition(aoBlurTempTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-			.transitionBegin(aoTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			.transitionBegin(aoCalculationTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	}
 
 	{
 		PROFILE_ALL(cl, "Vertical blur");
 
 		hbao_blur_cb cb;
-		cb.invDimensions.x = 1.f / output->width;
-		cb.invDimensions.y = 1.f / output->height;
+		cb.dimensions.x = (float)output->width;
+		cb.dimensions.y = (float)output->height;
+		cb.invDimensions.x = 1.f / cb.dimensions.x;
+		cb.invDimensions.y = 1.f / cb.dimensions.y;
 
 		cl->setPipelineState(*hbaoBlurYPipeline.pipeline);
 		cl->setComputeRootSignature(*hbaoBlurYPipeline.rootSignature);
@@ -1541,16 +1549,17 @@ void hbao(dx_command_list* cl,
 		cl->setDescriptorHeapUAV(HBAO_BLUR_RS_TEXTURES, 0, output);
 		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 1, aoBlurTempTexture);
 		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 2, linearDepth);
+		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 3, screenVelocitiesTexture);
+		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 4, history);
 
 		cl->setCompute32BitConstants(HBAO_BLUR_RS_CB, cb);
 
 		cl->dispatch(bucketize(output->width, POST_PROCESSING_BLOCK_SIZE), bucketize(output->height, POST_PROCESSING_BLOCK_SIZE));
 
 		barrier_batcher(cl)
-			//.uav(output)
-			.transition(output, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+			.uav(output)
 			.transition(aoBlurTempTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-			.transitionEnd(aoTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			.transitionEnd(aoCalculationTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	}
 }
 

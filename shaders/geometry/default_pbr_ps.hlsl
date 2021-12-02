@@ -50,6 +50,8 @@ StructuredBuffer<spot_shadow_info> spotShadowInfos		: register(t10, space2);
 
 Texture2D<float4> decalTextureAtlas                     : register(t11, space2);
 
+Texture2D<float> aoTexture								: register(t12, space2);
+
 
 struct ps_output
 {
@@ -273,12 +275,14 @@ ps_output main(ps_input IN)
 
 
 	// Ambient light.
+	float ao = aoTexture.SampleLevel(clampSampler, IN.screenPosition.xy * camera.invScreenDims, 0);
+
 	ambient_factors factors = getAmbientFactors(surface);
-	totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity;
+	totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity * ao;
 
 #ifdef TRANSPARENT
 	// Only add ambient specular for transparent objects. Opaque objects get their ambient specular in a later render pass.
-	totalLighting.specular += specularIBL(factors.ks, surface, environmentTexture, brdf, clampSampler) * lighting.environmentIntensity;
+	totalLighting.specular += specularIBL(factors.ks, surface, environmentTexture, brdf, clampSampler) * lighting.environmentIntensity * ao;
 #endif
 
 

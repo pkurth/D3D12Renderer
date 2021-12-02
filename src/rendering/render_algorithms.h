@@ -223,6 +223,7 @@ void specularAmbient(dx_command_list* cl,
 	ref<dx_texture> worldNormalsTexture,		// NON_PIXEL_SHADER_RESOURCE
 	ref<dx_texture> reflectanceTexture,			// NON_PIXEL_SHADER_RESOURCE
 	ref<dx_texture> environment,				// NON_PIXEL_SHADER_RESOURCE. Can be null.
+	ref<dx_texture> ao,							// NON_PIXEL_SHADER_RESOURCE. Can be null.
 	ref<dx_texture> output,						// UNORDERED_ACCESS
 	dx_dynamic_constant_buffer cameraCBV);
 
@@ -248,9 +249,11 @@ void bloom(dx_command_list* cl,
 
 void hbao(dx_command_list* cl,
 	ref<dx_texture> linearDepth,				// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> screenVelocitiesTexture,	// NON_PIXEL_SHADER_RESOURCE
 	ref<dx_texture> aoCalculationTexture,		// UNORDERED_ACCESS
 	ref<dx_texture> aoBlurTempTexture,			// UNORDERED_ACCESS
-	ref<dx_texture> output,						// Input as UNORDERED_ACCESS. After call NON_PIXEL_SHADER_RESOURCE.
+	ref<dx_texture> history,					// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> output,						// UNORDERED_ACCESS
 	hbao_settings settings,
 	dx_dynamic_constant_buffer cameraCBV);
 
