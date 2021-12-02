@@ -1,15 +1,19 @@
 #include "pch.h"
 #include "dx_descriptor.h"
-
 #include "dx_context.h"
 #include "dx_texture.h"
 #include "dx_buffer.h"
+
+static uint32 getShader4ComponentMapping(DXGI_FORMAT format)
+{
+	return (getNumberOfChannels(format) == 1) ? D3D12_ENCODE_SHADER_4_COMPONENT_MAPPING(0, 0, 0, 0) : D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+}
 
 dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::create2DTextureSRV(const ref<dx_texture>& texture, texture_mip_range mipRange, DXGI_FORMAT overrideFormat)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Format = (overrideFormat == DXGI_FORMAT_UNKNOWN) ? texture->resource->GetDesc().Format : overrideFormat;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Shader4ComponentMapping = getShader4ComponentMapping(srvDesc.Format);
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MostDetailedMip = mipRange.first;
 	srvDesc.Texture2D.MipLevels = mipRange.count;
@@ -23,7 +27,7 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createCubemapSRV(const ref<d
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Format = (overrideFormat == DXGI_FORMAT_UNKNOWN) ? texture->resource->GetDesc().Format : overrideFormat;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Shader4ComponentMapping = getShader4ComponentMapping(srvDesc.Format);
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 	srvDesc.TextureCube.MostDetailedMip = mipRange.first;
 	srvDesc.TextureCube.MipLevels = mipRange.count;
@@ -37,7 +41,7 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createCubemapArraySRV(const 
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Format = (overrideFormat == DXGI_FORMAT_UNKNOWN) ? texture->resource->GetDesc().Format : overrideFormat;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Shader4ComponentMapping = getShader4ComponentMapping(srvDesc.Format);
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
 	srvDesc.TextureCubeArray.MostDetailedMip = mipRange.first;
 	srvDesc.TextureCubeArray.MipLevels = mipRange.count;
@@ -53,7 +57,7 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createVolumeTextureSRV(const
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Format = (overrideFormat == DXGI_FORMAT_UNKNOWN) ? texture->resource->GetDesc().Format : overrideFormat;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Shader4ComponentMapping = getShader4ComponentMapping(srvDesc.Format);
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
 	srvDesc.Texture3D.MostDetailedMip = mipRange.first;
 	srvDesc.Texture3D.MipLevels = mipRange.count;
@@ -68,7 +72,7 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createDepthTextureSRV(const 
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Format = getDepthReadFormat(texture->format);
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Shader4ComponentMapping = D3D12_ENCODE_SHADER_4_COMPONENT_MAPPING(0, 0, 0, 0);
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MipLevels = 1;
 
@@ -81,7 +85,7 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createDepthTextureArraySRV(c
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Format = getDepthReadFormat(texture->format);
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Shader4ComponentMapping = D3D12_ENCODE_SHADER_4_COMPONENT_MAPPING(0, 0, 0, 0);
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
 	srvDesc.Texture2DArray.MipLevels = 1;
 	srvDesc.Texture2DArray.FirstArraySlice = 0;
