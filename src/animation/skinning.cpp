@@ -143,7 +143,7 @@ dx_vertex_buffer_group_view skinCloth(const dx_vertex_buffer_view& inpositions, 
 
 uint64 performSkinning()
 {
-	bool result = 0;
+	uint64 result = 0;
 
 	// TODO: We currently make no attempt to ensure that all draw calls have actually been written completely, if executed on another thread. 
 	if (numCalls > 0 || numClothCalls > 0)

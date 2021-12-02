@@ -63,6 +63,8 @@ static dx_pipeline bloomThresholdPipeline;
 static dx_pipeline bloomCombinePipeline;
 
 static dx_pipeline hbaoPipeline;
+static dx_pipeline hbaoBlurXPipeline;
+static dx_pipeline hbaoBlurYPipeline;
 
 static dx_pipeline tonemapPipeline;
 static dx_pipeline presentPipeline;
@@ -214,6 +216,8 @@ void loadCommonShaders()
 	bloomCombinePipeline = createReloadablePipeline("bloom_combine_cs");
 
 	hbaoPipeline = createReloadablePipeline("hbao_cs");
+	hbaoBlurXPipeline = createReloadablePipeline("hbao_blur_x_cs");
+	hbaoBlurYPipeline = createReloadablePipeline("hbao_blur_y_cs");
 
 	tonemapPipeline = createReloadablePipeline("tonemap_cs");
 	presentPipeline = createReloadablePipeline("present_cs");
@@ -1458,37 +1462,96 @@ void bloom(dx_command_list* cl,
 		.transition(bloomTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.
 }
 
-void hbao(dx_command_list* cl, 
-	ref<dx_texture> linearDepth, 
-	ref<dx_texture> worldNormals, 
-	ref<dx_texture> output, 
+void hbao(dx_command_list* cl,
+	ref<dx_texture> linearDepth,
+	ref<dx_texture> aoTexture,
+	ref<dx_texture> aoBlurTempTexture,
+	ref<dx_texture> output,
 	hbao_settings settings,
 	dx_dynamic_constant_buffer cameraCBV)
 {
 	PROFILE_ALL(cl, "HBAO");
 
-	hbao_cb cb;
-	cb.screenWidth = output->width;
-	cb.screenHeight = output->height;
-	cb.depthBufferMipLevel = log2((float)linearDepth->width / output->width);
-	cb.halfRadius = settings.radius * 0.5f;
-	cb.maxNumSteps = settings.maxNumSteps;
-	cb.numSampleDirections = settings.numSampleDirections;
-	cb.bias = settings.bias;
-	cb.strength = settings.strength;
+	{
+		PROFILE_ALL(cl, "Calculate AO");
 
-	cl->setPipelineState(*hbaoPipeline.pipeline);
-	cl->setComputeRootSignature(*hbaoPipeline.rootSignature);
+		hbao_cb cb;
+		cb.screenWidth = aoTexture->width;
+		cb.screenHeight = aoTexture->height;
+		cb.depthBufferMipLevel = log2((float)linearDepth->width / aoTexture->width);
+		cb.numRays = settings.numRays;
+		cb.maxNumStepsPerRay = settings.maxNumStepsPerRay;
+		cb.strength = settings.strength;
+		cb.radius = settings.radius;
+		cb.seed = (float)(dxContext.frameID & 0xFFFFFFFF);
 
-	cl->setDescriptorHeapUAV(HBAO_RS_TEXTURES, 0, output);
-	cl->setDescriptorHeapUAV(HBAO_RS_TEXTURES, 1, linearDepth);
-	cl->setDescriptorHeapUAV(HBAO_RS_TEXTURES, 2, worldNormals);
+		float alpha = M_TAU / settings.numRays;
+		cb.rayDeltaRotation = vec2(cos(alpha), sin(alpha));
 
-	cl->setCompute32BitConstants(HBAO_RS_CB, cb);
-	cl->setCompute32BitConstants(HBAO_RS_CAMERA, cameraCBV);
+		cl->setPipelineState(*hbaoPipeline.pipeline);
+		cl->setComputeRootSignature(*hbaoPipeline.rootSignature);
 
-	cl->dispatch(bucketize(output->width, POST_PROCESSING_BLOCK_SIZE), bucketize(output->height, POST_PROCESSING_BLOCK_SIZE));
-	cl->uavBarrier(output);
+		cl->setDescriptorHeapUAV(HBAO_RS_TEXTURES, 0, aoTexture);
+		cl->setDescriptorHeapSRV(HBAO_RS_TEXTURES, 1, linearDepth);
+
+		cl->setCompute32BitConstants(HBAO_RS_CB, cb);
+		cl->setComputeDynamicConstantBuffer(HBAO_RS_CAMERA, cameraCBV);
+
+		cl->dispatch(bucketize(aoTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(aoTexture->height, POST_PROCESSING_BLOCK_SIZE));
+
+		barrier_batcher(cl)
+			//.uav(aoTexture)
+			.transition(aoTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	}
+
+	{
+		PROFILE_ALL(cl, "Horizontal blur");
+
+		hbao_blur_cb cb;
+		cb.invDimensions.x = 1.f / aoBlurTempTexture->width;
+		cb.invDimensions.y = 1.f / aoBlurTempTexture->height;
+
+		cl->setPipelineState(*hbaoBlurXPipeline.pipeline);
+		cl->setComputeRootSignature(*hbaoBlurXPipeline.rootSignature);
+
+		cl->setDescriptorHeapUAV(HBAO_BLUR_RS_TEXTURES, 0, aoBlurTempTexture);
+		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 1, aoTexture);
+		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 2, linearDepth);
+
+		cl->setCompute32BitConstants(HBAO_BLUR_RS_CB, cb);
+
+		cl->dispatch(bucketize(aoBlurTempTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(aoBlurTempTexture->height, POST_PROCESSING_BLOCK_SIZE));
+
+		barrier_batcher(cl)
+			//.uav(blurXTexture)
+			.transition(aoBlurTempTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+			.transitionBegin(aoTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	}
+
+	{
+		PROFILE_ALL(cl, "Vertical blur");
+
+		hbao_blur_cb cb;
+		cb.invDimensions.x = 1.f / output->width;
+		cb.invDimensions.y = 1.f / output->height;
+
+		cl->setPipelineState(*hbaoBlurYPipeline.pipeline);
+		cl->setComputeRootSignature(*hbaoBlurYPipeline.rootSignature);
+
+		cl->setDescriptorHeapUAV(HBAO_BLUR_RS_TEXTURES, 0, output);
+		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 1, aoBlurTempTexture);
+		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 2, linearDepth);
+
+		cl->setCompute32BitConstants(HBAO_BLUR_RS_CB, cb);
+
+		cl->dispatch(bucketize(output->width, POST_PROCESSING_BLOCK_SIZE), bucketize(output->height, POST_PROCESSING_BLOCK_SIZE));
+
+		barrier_batcher(cl)
+			//.uav(output)
+			.transition(output, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+			.transition(aoBlurTempTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+			.transitionEnd(aoTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	}
 }
 
 void tonemap(dx_command_list* cl,

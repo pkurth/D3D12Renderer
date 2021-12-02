@@ -41,10 +41,9 @@ struct bloom_settings
 
 struct hbao_settings
 {
-	float radius = 3.f;
-	uint32 maxNumSteps = 5;
-	uint32 numSampleDirections = 4;
-	float bias = 0.01f;
+	float radius = 0.5f; // In meters.
+	uint32 numRays = 4;
+	uint32 maxNumStepsPerRay = 10;
 	float strength = 1.f;
 };
 
@@ -249,8 +248,9 @@ void bloom(dx_command_list* cl,
 
 void hbao(dx_command_list* cl,
 	ref<dx_texture> linearDepth,				// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> worldNormals,				// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> output,						// UNORDERED_ACCESS
+	ref<dx_texture> aoCalculationTexture,		// UNORDERED_ACCESS
+	ref<dx_texture> aoBlurTempTexture,			// UNORDERED_ACCESS
+	ref<dx_texture> output,						// Input as UNORDERED_ACCESS. After call NON_PIXEL_SHADER_RESOURCE.
 	hbao_settings settings,
 	dx_dynamic_constant_buffer cameraCBV);
 

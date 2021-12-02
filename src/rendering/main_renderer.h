@@ -127,7 +127,7 @@ struct main_renderer
 
 	path_tracer pathTracer;
 
-private:
+//private:
 
 	raytracing_tlas* tlas;
 
@@ -151,6 +151,9 @@ private:
 	ref<dx_texture> depthStencilBuffer;
 	ref<dx_texture> linearDepthBuffer;
 	ref<dx_texture> opaqueDepthBuffer; // The depth-stencil buffer gets copied to this texture after the opaque pass.
+
+	ref<dx_texture> aoCalculationTexture;
+	ref<dx_texture> aoBlurTempTexture;
 	ref<dx_texture> aoTexture;
 
 	ref<dx_texture> ssrRaycastTexture;

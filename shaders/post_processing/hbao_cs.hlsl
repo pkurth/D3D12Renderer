@@ -1,59 +1,126 @@
 #include "cs.hlsli"
 #include "post_processing_rs.hlsli"
 #include "camera.hlsli"
-#include "normal.hlsli"
+#include "random.hlsli"
 
 ConstantBuffer<hbao_cb> cb				: register(b0);
 ConstantBuffer<camera_cb> camera		: register(b1);
 
 Texture2D<float> depthBuffer			: register(t0);
-Texture2D<float2> normalTexture			: register(t1);
 
-RWTexture2D<float> resultTexture		: register(u0);
+RWTexture2D<float4> resultTexture		: register(u0);
 
 SamplerState linearSampler				: register(s0);
 
-static const float2 sampleDirections[32] =
+static float3 positionAt(float2 uv)
 {
-	float2(0.3659715790983448f, -0.9306260276245577f),
-	float2(-0.9999833371934095f, -0.005772810020429772f),
-	float2(-0.2614489710714677f, -0.9652172996406928f),
-	float2(-0.6421558525368186f, -0.7665741066933527f),
-	float2(-0.655479940981266f, 0.7552125839597722f),
-	float2(-0.07920499519917198f, -0.9968583493834513f),
-	float2(-0.7238770228419326f, 0.6899290222925111f),
-	float2(-0.9935787234255465f, 0.11314292004390468f),
-	float2(0.904167511638826f, 0.4271780786707733f),
-	float2(-0.09542247728397345f, 0.9954368643108359f),
-	float2(0.9921624951558193f, 0.12495432447970235f),
-	float2(-0.970041527120819f, 0.2429391604108099f),
-	float2(-0.5893412584414545f, -0.8078842003026442f),
-	float2(-0.6293914687063439f, 0.7770883985234056f),
-	float2(-0.9595660401111906f, -0.28148359573042425f),
-	float2(-0.9610157207306117f, 0.2764937332176319f),
-	float2(0.4944610411693459f, -0.869199792202993f),
-	float2(0.10014828130541988f, 0.994972523113865f),
-	float2(-0.29715312460309856f, 0.9548298385254911f),
-	float2(0.9538395321602133f, 0.30031674426908894f),
-	float2(-0.9977463494755803f, -0.06709859989711618f),
-	float2(-0.8778395421253317f, 0.4789548395007488f),
-	float2(0.557554723126058f, 0.8301401873899521f),
-	float2(-0.989295975868064f, 0.14592282936968815f),
-	float2(0.9878087082656999f, 0.1556725919179397f),
-	float2(0.23683594573354044f, -0.971549656378149f),
-	float2(-0.8055372148585417f, 0.5925451843344469f),
-	float2(0.2991435323607186f, 0.9542081256448992f),
-	float2(0.4869690691924386f, 0.8734192152968985f),
-	float2(-0.1937220499646552f, 0.981056454724952f),
-	float2(-0.599313287615268f, -0.8005145740633202f),
-	float2(-0.35297338935059924f, 0.9356333611037767f),
-};
+	float depth = depthBuffer.SampleLevel(linearSampler, uv, cb.depthBufferMipLevel);
+	float3 pos = camera.restoreViewSpacePositionEyeDepth(uv, depth);
+	return pos;
+}
 
-// https://www.derschmale.com/source/hbao/HBAOFragmentShader.hlsl
-
-static float2 snapToTexel(float2 uv, float2 screenDims, float2 invScreenDims)
+static float3 calculateNormal(float3 center, float3 right, float3 left, float3 top, float3 bottom)
 {
-	return round(uv * screenDims) * invScreenDims;
+	float3 R = right - center;
+	float3 L = center - left;
+	float3 B = bottom - center;
+	float3 T = center - top;
+
+	float3 hor = (abs(L.z) < abs(R.z)) ? L : R;
+	float3 ver = (abs(B.z) < abs(T.z)) ? B : T;
+
+	float3 normal = cross(ver, hor);
+	return normalize(normal);
+}
+
+static float length2(float3 v)
+{
+	return dot(v, v);
+}
+
+static float3 minDiff(float3 P, float3 right, float3 left)
+{
+	float3 V1 = right - P;
+	float3 V2 = P - left;
+	return (length2(V1) < length2(V2)) ? V1 : V2;
+}
+
+static float2 rotateDirections(float2 dir, float2 cosSin)
+{
+	return float2(dir.x * cosSin.x - dir.y * cosSin.y,
+		dir.x * cosSin.y + dir.y * cosSin.x);
+}
+
+static float2 snapUVOffset(float2 uv, float2 dims, float2 invDims)
+{
+	return round(uv * dims) * invDims;
+}
+
+static float tanToSin(float x)
+{
+	return x * rsqrt(x * x + 1.f);
+}
+
+static float invLength(float2 v)
+{
+	return rsqrt(dot(v, v));
+}
+
+static const float tanBias = tan(30.f * M_PI / 180.f);
+static float biasedTangent(float3 v)
+{
+	return v.z * invLength(v.xy) + tanBias;
+}
+
+static float tangent(float3 P, float3 S)
+{
+	return -(P.z - S.z) * invLength(S.xy - P.xy);
+}
+
+static float falloff(float d2, float negInvRadius2)
+{
+	return d2 * negInvRadius2 + 1.f;
+}
+
+static float horizonOcclusion(float2 centerUV, float2 deltaUV, float3 P, 
+	float3 dPdu, float3 dPdv, float jitter, float numSamples,
+	float radius2, float negInvRadius2,
+	float2 dims, float2 invDims)
+{
+	// Offset the first coord with some noise.
+	float2 uv = centerUV + snapUVOffset(jitter * deltaUV, dims, invDims);
+	deltaUV = snapUVOffset(deltaUV, dims, invDims);
+
+	// Calculate the tangent vector.
+	float3 T = deltaUV.x * dPdu + deltaUV.y * dPdv;
+
+	// Get the angle of the tangent vector from the viewspace axis.
+	float tanH = biasedTangent(T);
+	float sinH = tanToSin(tanH);
+
+	float ao = 0.f;
+
+	// Sample to find the maximum angle
+	for (float s = 0; s < numSamples; ++s)
+	{
+		uv += deltaUV;
+		float3 S = positionAt(uv);
+		float tanS = tangent(P, S);
+		float d2 = length2(S - P);
+
+		// Is the sample within the radius and the angle greater?
+		if (d2 < radius2 && tanS > tanH)
+		{
+			float sinS = tanToSin(tanS);
+			// Apply falloff based on the distance.
+			ao += falloff(d2, negInvRadius2) * (sinS - sinH);
+
+			tanH = tanS;
+			sinH = sinS;
+		}
+	}
+
+	return ao;
 }
 
 [RootSignature(HBAO_RS)]
@@ -66,88 +133,87 @@ void main(cs_input IN)
 	}
 
 	float2 screenDims = float2(cb.screenWidth, cb.screenHeight);
-	float2 invScreenDims = rcp(screenDims);;
+	float2 invScreenDims = rcp(screenDims);
 
 	float2 centerUV = (IN.dispatchThreadID.xy + float2(0.5f, 0.5f)) * invScreenDims;
-	float centerDepth = depthBuffer.SampleLevel(linearSampler, centerUV, cb.depthBufferMipLevel);
+	float3 centerPos = positionAt(centerUV);
 
-	float3 centerPos = camera.restoreViewSpacePositionEyeDepth(centerUV, centerDepth);
-	float3 centerNormal = mul(camera.view, float4(unpackNormal(normalTexture.SampleLevel(linearSampler, centerUV, 0)), 0.f)).xyz;
-
-	float3 random = float3(1.f, 0.f, 0.f); // TODO: cos(angle), sin(angle), jitter.
-	float2 rotationX = normalize(random.xy - 0.5f);
-	float jitter = random.z;
-
-	float2x2 rotation = float2x2(
-		rotationX,
-		rotationX.yx * float2(-1.f, 1.f)
-	);
-
-	float2 projectedRadii = (cb.halfRadius * camera.proj._m00_m11) / -centerPos.z; // With half radius we scale the [-1, 1] by half.
-
-	float screenRadius = projectedRadii.x * screenDims.x;
-
-	float result = 1.f;
-	if (screenRadius >= 1.f)
+	if (centerPos.z < -1000.f)
 	{
-		uint numStepsPerRay = min(cb.maxNumSteps, screenRadius);
-		float totalOcclusion = 0.f;
-
-		for (uint rayIndex = 0; rayIndex < cb.numSampleDirections; ++rayIndex)
-		{
-			float2 direction = mul(rotation, sampleDirections[rayIndex]);
-			float2 uvStep = direction * invScreenDims;
-
-			direction *= projectedRadii;
-
-			float2 uv = centerUV + uvStep;
-			float depth = depthBuffer.SampleLevel(linearSampler, uv, cb.depthBufferMipLevel);
-			float3 tangent = camera.restoreViewSpacePositionEyeDepth(uv, depth) - centerPos;
-			tangent -= dot(centerNormal, tangent) * centerNormal;
-
-			float2 snappedUVStep = snapToTexel(direction.xy / (numStepsPerRay - 1), screenDims, invScreenDims);
-
-			// Jitter the starting position for ray marching between the nearest neighbour and the sample step size.
-			float2 jitteredOffset = lerp(uvStep, snappedUVStep, jitter);
-			uv = snapToTexel(centerUV + jitteredOffset, screenDims, invScreenDims);
-
-			float topOcclusion = cb.bias;
-			float occlusion = 0.f;
-
-			for (uint stepIndex = 0; stepIndex < numStepsPerRay; ++stepIndex)
-			{
-				float depth = depthBuffer.SampleLevel(linearSampler, uv, cb.depthBufferMipLevel);
-				float3 samplePos = camera.restoreViewSpacePositionEyeDepth(uv, depth);
-
-				float3 horizonVector = samplePos - centerPos;
-				float horizonVectorLength = length(horizonVector);
-
-				float sampleOcclusion = 0.5f;
-
-				if (dot(tangent, horizonVector) >= 0.f)
-				{
-					sampleOcclusion = dot(centerNormal, horizonVector) / horizonVectorLength;
-
-					// This adds occlusion only if angle of the horizon vector is higher than the previous highest one without branching.
-					float diff = max(sampleOcclusion - topOcclusion, 0.f);
-					topOcclusion = max(sampleOcclusion, topOcclusion);
-
-					// Attenuate occlusion contribution using distance function 1 - (d/f)^2.
-					float distanceFactor = saturate(horizonVectorLength / cb.falloff);
-					distanceFactor = 1.f - distanceFactor * distanceFactor;
-					sampleOcclusion = diff * distanceFactor;
-				}
-
-				occlusion += sampleOcclusion;
-
-				uv += snappedUVStep;
-			}
-
-			totalOcclusion += occlusion;
-		}
-
-		result = 1.f - saturate(totalOcclusion * cb.strength / cb.numSampleDirections);
+		resultTexture[IN.dispatchThreadID.xy] = 0.f;
+		return;
 	}
 
-	resultTexture[IN.dispatchThreadID.xy] = result;
+	float3 rightPos = positionAt(centerUV + float2(invScreenDims.x, 0.f));
+	float3 leftPos = positionAt(centerUV - float2(invScreenDims.x, 0.f));
+	float3 topPos = positionAt(centerUV - float2(0.f, invScreenDims.y));
+	float3 bottomPos = positionAt(centerUV + float2(0.f, invScreenDims.y));
+
+	float3 dPdu = minDiff(centerPos, rightPos, leftPos);
+	float3 dPdv = minDiff(centerPos, bottomPos, topPos) * (screenDims.y * invScreenDims.x);
+
+	float2 rayRadiusUV = 0.5f * cb.radius * camera.proj._m00_m11 / -centerPos.z;
+
+	float rayRadiusPix = rayRadiusUV.x * screenDims.x;
+
+
+	float ao = 1.f;
+
+	if (rayRadiusPix > 1.f)
+	{
+		ao = 0.f;
+
+		float jitter = random(centerUV * 9523.f + cb.seed) * 0.4f;
+
+		// Compute steps.
+		float numSteps = min((float)cb.maxNumStepsPerRay, rayRadiusPix);
+
+		// Divide by Ns+1 so that the farthest samples are not fully attenuated.
+		float stepSizePix = rayRadiusPix / (numSteps + 1);
+
+		// Clamp numSteps if it is greater than the max kernel footprint.
+		float maxNumSteps = cb.maxNumStepsPerRay / stepSizePix;
+		if (maxNumSteps < numSteps)
+		{
+			// Use dithering to avoid AO discontinuities.
+			numSteps = floor(maxNumSteps + jitter);
+			numSteps = max(numSteps, 1);
+			stepSizePix = cb.maxNumStepsPerRay / numSteps;
+		}
+
+		float2 stepSizeUV = stepSizePix * invScreenDims;
+
+
+		float angle = random(centerUV * 5416.f + cb.seed) * M_PI * 2.f;
+		float2 randomRotation = float2(cos(angle), sin(angle)); // TODO: Maybe get this from texture.
+
+		// Apply noise to initial rotation.
+		float2 dir = rotateDirections(float2(1.f, 0.f), randomRotation);
+
+		float2 rayDeltaRotation = cb.rayDeltaRotation;
+
+		float radius2 = cb.radius * cb.radius;
+		float negInvRadius2 = rcp(radius2);
+
+		for (float d = 0; d < cb.numRays; ++d)
+		{
+			float2 deltaUV = dir * stepSizeUV;
+
+			// Sample the pixels along the direction.
+			ao += horizonOcclusion(
+				centerUV, deltaUV,
+				centerPos,
+				dPdu, dPdv,
+				jitter, numSteps,
+				radius2, negInvRadius2,
+				screenDims, invScreenDims);
+
+			dir = rotateDirections(dir, rayDeltaRotation);
+		}
+
+		// Average the results and produce the final AO.
+		ao = saturate(1.f - ao / cb.numRays * cb.strength);
+	}
+
+	resultTexture[IN.dispatchThreadID.xy] = ao;
 }

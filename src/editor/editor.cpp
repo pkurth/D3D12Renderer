@@ -1306,7 +1306,7 @@ static bool editSunShadowParameters(directional_light& sun)
 	return result;
 }
 
-static bool editAO(bool& enable, hbao_settings& settings)
+static bool editAO(bool& enable, hbao_settings& settings, const ref<dx_texture>& aoTexture)
 {
 	bool result = false;
 	if (ImGui::BeginProperties())
@@ -1314,13 +1314,22 @@ static bool editAO(bool& enable, hbao_settings& settings)
 		result |= ImGui::PropertyCheckbox("Enable HBAO", enable);
 		if (enable)
 		{
+			result |= ImGui::PropertySlider("Num rays", settings.numRays, 1, 16);
+			result |= ImGui::PropertySlider("Max num steps per ray", settings.maxNumStepsPerRay, 1, 16);
+			result |= ImGui::PropertySlider("Radius", settings.radius, 0.f, 1.f, "%.3fm");
+			result |= ImGui::PropertySlider("Strength", settings.strength, 0.f, 2.f);
 		}
 		ImGui::EndProperties();
+	}
+	if (enable && aoTexture && ImGui::BeginTree("Show##ShowAO"))
+	{
+		ImGui::Image(aoTexture);
+		ImGui::EndTree();
 	}
 	return result;
 }
 
-static bool editSSR(bool& enable, ssr_settings& settings)
+static bool editSSR(bool& enable, ssr_settings& settings, const ref<dx_texture>& ssrTexture)
 {
 	bool result = false;
 	if (ImGui::BeginProperties())
@@ -1334,6 +1343,11 @@ static bool editSSR(bool& enable, ssr_settings& settings)
 			result |= ImGui::PropertySlider("Max. stride", settings.maxStride, settings.minStride, 50.f);
 		}
 		ImGui::EndProperties();
+	}
+	if (enable && ssrTexture && ImGui::BeginTree("Show##ShowSSR"))
+	{
+		ImGui::Image(ssrTexture);
+		ImGui::EndTree();
 	}
 	return result;
 }
@@ -1353,7 +1367,7 @@ static bool editTAA(bool& enable, taa_settings& settings)
 	return result;
 }
 
-static bool editBloom(bool& enable, bloom_settings& settings)
+static bool editBloom(bool& enable, bloom_settings& settings, const ref<dx_texture>& bloomTexture)
 {
 	bool result = false;
 	if (ImGui::BeginProperties())
@@ -1365,6 +1379,11 @@ static bool editBloom(bool& enable, bloom_settings& settings)
 			result |= ImGui::PropertySlider("Bloom strength", settings.strength);
 		}
 		ImGui::EndProperties();
+	}
+	if (enable && bloomTexture && ImGui::BeginTree("Show##ShowBloom"))
+	{
+		ImGui::Image(bloomTexture);
+		ImGui::EndTree();
 	}
 	return result;
 }
@@ -1416,10 +1435,10 @@ void scene_editor::drawSettings(float dt)
 
 		if (ImGui::BeginTree("Post processing"))
 		{
-			if (renderer->spec.allowAO) { editAO(renderer->settings.enableAO, renderer->settings.aoSettings); ImGui::Separator(); }
-			if (renderer->spec.allowSSR) { editSSR(renderer->settings.enableSSR, renderer->settings.ssrSettings); ImGui::Separator(); }
+			if (renderer->spec.allowAO) { editAO(renderer->settings.enableAO, renderer->settings.aoSettings, renderer->aoTexture); ImGui::Separator(); }
+			if (renderer->spec.allowSSR) { editSSR(renderer->settings.enableSSR, renderer->settings.ssrSettings, renderer->ssrResolveTexture); ImGui::Separator(); }
 			if (renderer->spec.allowTAA) { editTAA(renderer->settings.enableTAA, renderer->settings.taaSettings); ImGui::Separator(); }
-			if (renderer->spec.allowBloom) { editBloom(renderer->settings.enableBloom, renderer->settings.bloomSettings); ImGui::Separator(); }
+			if (renderer->spec.allowBloom) { editBloom(renderer->settings.enableBloom, renderer->settings.bloomSettings, renderer->bloomTexture); ImGui::Separator(); }
 			editSharpen(renderer->settings.enableSharpen, renderer->settings.sharpenSettings);
 
 			ImGui::EndTree();

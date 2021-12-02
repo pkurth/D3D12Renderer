@@ -70,7 +70,12 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 
 	if (spec.allowAO)
 	{
-		aoTexture = createTexture(0, renderWidth / 2, renderHeight / 2, aoFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		aoCalculationTexture = createTexture(0, renderWidth / 2, renderHeight / 2, aoFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		aoBlurTempTexture = createTexture(0, renderWidth, renderHeight, aoFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		aoTexture = createTexture(0, renderWidth, renderHeight, aoFormat, false, false, true, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+		SET_NAME(aoCalculationTexture->resource, "AO Calculation");
+		SET_NAME(aoBlurTempTexture->resource, "AO Temp");
 		SET_NAME(aoTexture->resource, "AO");
 	}
 
@@ -222,7 +227,9 @@ void main_renderer::recalculateViewport(bool resizeTextures)
 		resizeTexture(opaqueDepthBuffer, renderWidth, renderHeight);
 		resizeTexture(linearDepthBuffer, renderWidth, renderHeight);
 
-		resizeTexture(aoTexture, renderWidth / 2, renderHeight / 2);
+		resizeTexture(aoCalculationTexture, renderWidth / 2, renderHeight / 2);
+		resizeTexture(aoBlurTempTexture, renderWidth, renderHeight);
+		resizeTexture(aoTexture, renderWidth, renderHeight);
 
 		resizeTexture(objectIDsTexture, renderWidth, renderHeight);
 
@@ -393,25 +400,22 @@ void main_renderer::endFrame(const user_input& input)
 
 			linearDepthPyramid(cl, depthStencilBuffer, linearDepthBuffer, jitteredCamera.projectionParams);
 
+
 			barrier_batcher(cl)
 				//.uav(linearDepthBuffer)
-				.transitionBegin(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+				.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 
 			// ----------------------------------------
 			// AMBIENT OCCLUSION
 			// ----------------------------------------
 
-			//if (settings.enableAO)
-			//{
-			//	hbao(cl, linearDepthBuffer, )
-			//}
-
-			barrier_batcher(cl)
-				//.uav(linearDepthBuffer)
-				.transitionBegin(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-
+			if (settings.enableAO)
+			{
+				cl->transitionBarrier(aoTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				hbao(cl, linearDepthBuffer, aoCalculationTexture, aoBlurTempTexture, aoTexture, settings.aoSettings, materialInfo.cameraCBV);
+			}
 
 			cls[0] = cl;
 		});
@@ -477,8 +481,7 @@ void main_renderer::endFrame(const user_input& input)
 					.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 					.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 					.transition(reflectanceTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-					.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-					.transitionEnd(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+					.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 			}
 
 			{
