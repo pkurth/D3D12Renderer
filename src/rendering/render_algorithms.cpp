@@ -132,7 +132,7 @@ void loadCommonShaders()
 	// Shadow.
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(0, 0, render_resources::shadowDepthFormat)
+			.renderTargets(0, 0, shadowDepthFormat)
 			.inputLayout(inputLayout_position)
 			//.cullFrontFaces()
 			;
@@ -178,7 +178,7 @@ void loadCommonShaders()
 	// Shadow map copy.
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(0, 0, render_resources::shadowDepthFormat)
+			.renderTargets(0, 0, shadowDepthFormat)
 			.depthSettings(true, true, D3D12_COMPARISON_FUNC_ALWAYS)
 			.cullingOff();
 
@@ -713,7 +713,9 @@ void shadowPasses(dx_command_list* cl,
 
 
 
-		dx_render_target shadowRenderTarget({}, render_resources::shadowMap);
+		auto shadowRenderTarget = dx_render_target(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT)
+			.depthAttachment(render_resources::shadowMap);
+
 		cl->setRenderTarget(shadowRenderTarget);
 
 		{
@@ -954,7 +956,9 @@ void copyShadowMapParts(dx_command_list* cl,
 	// Since copies from or to parts of a depth-stencil texture are not allowed (even though they work on at least some hardware),
 	// we copy to and from the static shadow map cache via a shader, and not via CopyTextureRegion.
 
-	dx_render_target shadowRenderTarget({}, to);
+	auto shadowRenderTarget = dx_render_target(to->width, to->height)
+		.depthAttachment(to);
+
 	cl->setRenderTarget(shadowRenderTarget);
 
 	cl->setPipelineState(*shadowMapCopyPipeline.pipeline);

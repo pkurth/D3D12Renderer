@@ -3,6 +3,8 @@
 #include "camera.hlsli"
 #include "random.hlsli"
 
+// This file is based on https://github.com/scanberg/hbao
+
 ConstantBuffer<hbao_cb> cb				: register(b0);
 ConstantBuffer<camera_cb> camera		: register(b1);
 

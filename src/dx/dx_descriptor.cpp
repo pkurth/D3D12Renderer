@@ -395,6 +395,17 @@ dx_rtv_descriptor_handle& dx_rtv_descriptor_handle::create2DTextureRTV(const ref
 	return *this;
 }
 
+dx_rtv_descriptor_handle& dx_rtv_descriptor_handle::createNullTextureRTV(DXGI_FORMAT format)
+{
+	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+	rtvDesc.Format = format;
+	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
+	dxContext.device->CreateRenderTargetView(0, &rtvDesc, cpuHandle);
+
+	return *this;
+}
+
 dx_dsv_descriptor_handle& dx_dsv_descriptor_handle::create2DTextureDSV(const ref<dx_texture>& texture, uint32 arraySlice, uint32 mipSlice)
 {
 	assert(texture->supportsDSV);

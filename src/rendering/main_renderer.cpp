@@ -43,7 +43,8 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 		SET_NAME(prevFrameHDRColorTempTexture->resource, "Prev frame HDR Color Temp");
 	}
 
-	if (spec.allowSSR || spec.allowTAA)
+	// If object picking is allowed, but none of the others, we still have to allocate screen velocities due to dumb internal reasons with our render targets.
+	if (spec.allowSSR || spec.allowTAA || spec.allowAO || spec.allowObjectPicking)
 	{
 		screenVelocitiesTexture = createTexture(0, renderWidth, renderHeight, screenVelocitiesFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		SET_NAME(screenVelocitiesTexture->resource, "Screen velocities");
@@ -382,7 +383,11 @@ void main_renderer::endFrame(const user_input& input)
 			// DEPTH-ONLY PASS
 			// ----------------------------------------
 
-			dx_render_target depthOnlyRenderTarget({ screenVelocitiesTexture, objectIDsTexture }, depthStencilBuffer);
+			auto depthOnlyRenderTarget = dx_render_target(renderWidth, renderHeight)
+				.colorAttachment(screenVelocitiesTexture, render_resources::nullScreenVelocitiesRTV)
+				.colorAttachment(objectIDsTexture, render_resources::nullObjectIDsRTV)
+				.depthAttachment(depthStencilBuffer);
+
 			depthPrePass(cl, depthOnlyRenderTarget, opaqueRenderPass,
 				jitteredCamera.viewProj, jitteredCamera.prevFrameViewProj, jitteredCamera.jitter, jitteredCamera.prevFrameJitter);
 
@@ -423,7 +428,12 @@ void main_renderer::endFrame(const user_input& input)
 			// SKY PASS
 			// ----------------------------------------
 
-			dx_render_target skyRenderTarget({ hdrColorTexture, screenVelocitiesTexture, objectIDsTexture }, depthStencilBuffer);
+			auto skyRenderTarget = dx_render_target(renderWidth, renderHeight)
+				.colorAttachment(hdrColorTexture)
+				.colorAttachment(screenVelocitiesTexture, render_resources::nullScreenVelocitiesRTV)
+				.colorAttachment(objectIDsTexture, render_resources::nullObjectIDsRTV)
+				.depthAttachment(depthStencilBuffer);
+
 			if (environment)
 			{
 				texturedSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, environment->sky, settings.skyIntensity);
@@ -485,7 +495,12 @@ void main_renderer::endFrame(const user_input& input)
 			// OPAQUE LIGHT PASS
 			// ----------------------------------------
 
-			dx_render_target hdrOpaqueRenderTarget({ hdrColorTexture, worldNormalsTexture, reflectanceTexture }, depthStencilBuffer);
+			auto hdrOpaqueRenderTarget = dx_render_target(renderWidth, renderHeight)
+				.colorAttachment(hdrColorTexture)
+				.colorAttachment(worldNormalsTexture)
+				.colorAttachment(reflectanceTexture)
+				.depthAttachment(depthStencilBuffer);
+
 			opaqueLightPass(cl, hdrOpaqueRenderTarget, opaqueRenderPass, materialInfo, jitteredCamera.viewProj);
 
 
@@ -572,7 +587,9 @@ void main_renderer::endFrame(const user_input& input)
 					.transition(hdrResult, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
 					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
-				dx_render_target hdrTransparentRenderTarget({ hdrResult }, depthStencilBuffer);
+				auto hdrTransparentRenderTarget = dx_render_target(renderWidth, renderHeight)
+					.colorAttachment(hdrResult)
+					.depthAttachment(depthStencilBuffer);
 
 				transparentLightPass(cl, hdrTransparentRenderTarget, transparentRenderPass, materialInfo, unjitteredCamera.viewProj);
 
@@ -641,7 +658,10 @@ void main_renderer::endFrame(const user_input& input)
 					.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RENDER_TARGET)
 					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
-				dx_render_target ldrRenderTarget({ ldrPostProcessingTexture }, depthStencilBuffer);
+				auto ldrRenderTarget = dx_render_target(renderWidth, renderHeight)
+					.colorAttachment(ldrPostProcessingTexture)
+					.depthAttachment(depthStencilBuffer);
+
 				ldrPass(cl, ldrRenderTarget, depthStencilBuffer, ldrRenderPass, materialInfo, unjitteredCamera.viewProj);
 
 				barrier_batcher(cl)

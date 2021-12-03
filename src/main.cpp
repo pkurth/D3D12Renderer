@@ -118,7 +118,12 @@ int main(int argc, char** argv)
 
 	initializeImGui(window);
 
-	renderer_spec spec = { true, true, true, true };
+	renderer_spec spec;
+	spec.allowObjectPicking = true;
+	spec.allowAO = true;
+	spec.allowSSR = true;
+	spec.allowTAA = true;
+	spec.allowBloom = true;
 
 	main_renderer renderer;
 	renderer.initialize(window.colorDepth, window.clientWidth, window.clientHeight, spec);
@@ -128,14 +133,14 @@ int main(int argc, char** argv)
 	file_browser fileBrowser;
 	mesh_editor_panel meshEditor;
 
-	user_input input = {};
 
+	// Wait for initialization to finish.
 	fenceValues[NUM_BUFFERED_FRAMES - 1] = dxContext.renderQueue.signal();
-
-	bool appFocusedLastFrame = true;
-
 	dxContext.flushApplication();
 
+
+	user_input input = {};
+	bool appFocusedLastFrame = true;
 
 	float dt;
 	while (newFrame(dt, window))
@@ -208,18 +213,14 @@ int main(int argc, char** argv)
 		}
 
 		// The drag&drop outline is rendered around the drop target. Since the image fills the frame, the outline is outside the window 
-		// and thus invisible. So instead this Dummy acts as the drop target.
-		// Important: This is under the input processing, so that we don't override the current element id.
+		// and thus invisible. So instead this (slightly smaller) Dummy acts as the drop target.
+		// Important: This is below the input processing, so that we don't override the current element id.
 		ImGui::SetCursorPos(ImVec2(4.5f, 4.5f));
 		ImGui::Dummy(ImVec2(renderWidth - 9.f, renderHeight - 9.f));
 
 		if (ImGui::BeginDragDropTarget())
 		{
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("content_browser_file"))
-			{
-				std::string str = (const char*)payload->Data;
-				app.handleFileDrop(str);
-			}
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("content_browser_file")) { app.handleFileDrop((const char*)payload->Data); }
 			ImGui::EndDragDropTarget();
 		}
 
@@ -231,6 +232,9 @@ int main(int argc, char** argv)
 		if (ImGui::IsKeyPressed(key_esc)) { break; } // Also allowed if not focused on main window.
 		if (ImGui::IsKeyPressed(key_enter) && ImGui::IsKeyDown(key_alt)) { window.toggleFullscreen(); } // Also allowed if not focused on main window.
 
+
+
+		// Update and render.
 
 		shadow_map_renderer::beginFrame();
 		renderer.beginFrame(renderWidth, renderHeight);

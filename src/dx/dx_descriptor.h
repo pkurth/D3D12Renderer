@@ -96,6 +96,7 @@ struct dx_rtv_descriptor_handle
 
 
 	dx_rtv_descriptor_handle& create2DTextureRTV(const ref<dx_texture>& texture, uint32 arraySlice = 0, uint32 mipSlice = 0);
+	dx_rtv_descriptor_handle& createNullTextureRTV(DXGI_FORMAT format);
 };
 
 struct dx_dsv_descriptor_handle

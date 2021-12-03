@@ -75,7 +75,7 @@ static const char* rendererModeNames[] =
 
 struct renderer_spec
 {
-	bool allowObjectPicking = true; // This currently can only be true, if ALL other flags are also set to true.
+	bool allowObjectPicking = true;
 	bool allowAO = true;
 	bool allowSSR = true;
 	bool allowTAA = true;
@@ -127,7 +127,12 @@ struct main_renderer
 
 	path_tracer pathTracer;
 
-//private:
+
+	const ref<dx_texture>& getAOResult() const { return aoTextures[aoHistoryIndex]; }
+	const ref<dx_texture>& getSSRResult() const { return ssrResolveTexture; }
+	const ref<dx_texture>& getBloomResult() const { return bloomTexture; }
+
+private:
 
 	raytracing_tlas* tlas;
 
@@ -154,7 +159,7 @@ struct main_renderer
 
 	ref<dx_texture> aoCalculationTexture;
 	ref<dx_texture> aoBlurTempTexture;
-	ref<dx_texture> aoTextures[2];
+	ref<dx_texture> aoTextures[2]; // These get flip-flopped from frame to frame.
 	uint32 aoHistoryIndex = 0;
 	bool aoWasOnLastFrame = false;
 
