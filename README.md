@@ -33,6 +33,7 @@ It also features a custom written physics engine written completely from scratch
 - Decals
 - Post processing stack
 	- Temporal anti-aliasing
+	- Horizon-based ambient occlusion
 	- Bloom
 	- Filmic tone-mapping
 	- Sharpening
@@ -125,7 +126,7 @@ The build process will automatically enable and disable certain features based o
 - Open the solution and build. 
 This _should_ work directly. 
 Visual Studio sometimes reports an "Unspecified error" when building. 
-In that case simply restart Visual Studio and you are good to go.
+In that case either restart Visual Studio or re-generate the project (_generate.bat_) and you are good to go.
 - If you add new source files (or shaders), re-run the _generate.bat_ file.
 
 The assets seen in the screenshots above are not included with the source code. 
