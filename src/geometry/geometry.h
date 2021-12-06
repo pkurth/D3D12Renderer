@@ -24,6 +24,9 @@ enum mesh_creation_flags
 	mesh_creation_flags_with_normals	= (1 << 2),
 	mesh_creation_flags_with_tangents	= (1 << 3),
 	mesh_creation_flags_with_skin		= (1 << 4),
+
+	mesh_creation_flags_default = mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents,
+	mesh_creation_flags_animated = mesh_creation_flags_default | mesh_creation_flags_with_skin,
 };
 
 static uint32 getVertexSize(uint32 meshFlags)

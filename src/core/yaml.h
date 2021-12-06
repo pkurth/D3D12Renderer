@@ -147,3 +147,7 @@ namespace YAML
 }
 
 
+#define YAML_LOAD(var, name) var = n[name].as<std::remove_reference_t<decltype(var)>>()
+#define YAML_LOAD_ENUM(var, name) var = (decltype(var))(n[name].as<int>())
+
+
