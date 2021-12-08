@@ -270,3 +270,9 @@ void present(dx_command_list* cl,
 	ref<dx_texture> ldrInput,					// NON_PIXEL_SHADER_RESOURCE
 	ref<dx_texture> output,						// UNORDERED_ACCESS
 	sharpen_settings sharpenSettings);
+
+void visualizeSunShadowCascades(dx_command_list* cl,
+	ref<dx_texture> depthBuffer,				// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> output,						// UNORDERED_ACCESS
+	dx_dynamic_constant_buffer sunCBV,
+	const mat4& invViewProj, vec3 cameraPosition, vec3 cameraForward);

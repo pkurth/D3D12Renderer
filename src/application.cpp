@@ -530,7 +530,7 @@ void application::update(const user_input& input, float dt)
 	renderer->setEnvironment(scene.environment);
 
 #if 1
-	if (renderer->mode == renderer_mode_rasterized)
+	if (renderer->mode != renderer_mode_pathtraced)
 	{
 		if (dxContext.featureSupport.meshShaders())
 		{

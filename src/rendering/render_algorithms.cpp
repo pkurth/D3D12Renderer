@@ -14,6 +14,7 @@
 #include "sky_rs.hlsli"
 #include "outline_rs.hlsli"
 #include "transform.hlsli"
+#include "visualization_rs.hlsli"
 
 static dx_pipeline depthPrePassPipeline;
 static dx_pipeline animatedDepthPrePassPipeline;
@@ -70,6 +71,8 @@ static dx_pipeline tonemapPipeline;
 static dx_pipeline presentPipeline;
 
 static dx_pipeline depthSobelPipeline;
+
+static dx_pipeline visualizeSunShadowCascadesPipeline;
 
 static dx_command_signature rigidDepthPrePassCommandSignature;
 static dx_command_signature animatedDepthPrePassCommandSignature;
@@ -223,6 +226,8 @@ void loadCommonShaders()
 	presentPipeline = createReloadablePipeline("present_cs");
 
 	depthSobelPipeline = createReloadablePipeline("depth_sobel_cs");
+
+	visualizeSunShadowCascadesPipeline = createReloadablePipeline("sun_shadow_cascades_cs");
 }
 
 void loadRemainingRenderResources()
@@ -1626,6 +1631,26 @@ void present(dx_command_list* cl,
 	cl->setCompute32BitConstants(PRESENT_RS_CB, present_cb{ present_sdr, 0.f, sharpenSettings.strength, (xOffset << 16) | yOffset });
 
 	cl->dispatch(bucketize(output->width, POST_PROCESSING_BLOCK_SIZE), bucketize(output->height, POST_PROCESSING_BLOCK_SIZE));
+}
+
+void visualizeSunShadowCascades(dx_command_list* cl, ref<dx_texture> depthBuffer, ref<dx_texture> output, dx_dynamic_constant_buffer sunCBV, const mat4& invViewProj, vec3 cameraPosition, vec3 cameraForward)
+{
+	PROFILE_ALL(cl, "Visualize sun shadow cascades");
+
+	cl->setPipelineState(*visualizeSunShadowCascadesPipeline.pipeline);
+	cl->setComputeRootSignature(*visualizeSunShadowCascadesPipeline.rootSignature);
+
+	visualize_sun_shadow_cascades_cb cb;
+	cb.invViewProj = invViewProj;
+	cb.cameraPosition = vec4(cameraPosition, 1.f);
+	cb.cameraForward = vec4(cameraForward, 0.f);
+
+	cl->setDescriptorHeapUAV(VISUALIZE_SUN_SHADOW_CASCADES_RS_TEXTURES, 0, output);
+	cl->setDescriptorHeapSRV(VISUALIZE_SUN_SHADOW_CASCADES_RS_TEXTURES, 1, depthBuffer);
+	cl->setComputeDynamicConstantBuffer(VISUALIZE_SUN_SHADOW_CASCADES_RS_SUN, sunCBV);
+	cl->setCompute32BitConstants(VISUALIZE_SUN_SHADOW_CASCADES_RS_CB, cb);
+
+	cl->dispatch(bucketize(output->width, 16), bucketize(output->height, 16));
 }
 
 void light_culling::allocateIfNecessary(uint32 renderWidth, uint32 renderHeight)

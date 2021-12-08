@@ -700,7 +700,43 @@ void main_renderer::endFrame(const user_input& input)
 
 		dxContext.executeCommandLists(cls, arraysize(cls));
 	}
-	else if (dxContext.featureSupport.raytracing())
+	else if (mode == renderer_mode_visualize_sun_shadow_cascades)
+	{
+		dx_command_list* cl = dxContext.getFreeRenderCommandList();
+
+		if (aspectRatioModeChanged)
+		{
+			cl->transitionBarrier(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			cl->clearRTV(frameResult, 0.f, 0.f, 0.f);
+			cl->transitionBarrier(frameResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON);
+		}
+
+		cl->clearDepthAndStencil(depthStencilBuffer);
+
+		waitForSkinningToFinish();
+
+		auto depthOnlyRenderTarget = dx_render_target(renderWidth, renderHeight)
+			// No screen space velocities or object IDs needed.
+			.depthAttachment(depthStencilBuffer);
+
+		depthPrePass(cl, depthOnlyRenderTarget, opaqueRenderPass,
+			unjitteredCamera.viewProj, unjitteredCamera.prevFrameViewProj, unjitteredCamera.jitter, unjitteredCamera.prevFrameJitter);
+
+
+		barrier_batcher(cl)
+			.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+			.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+		visualizeSunShadowCascades(cl, depthStencilBuffer, frameResult, sunCBV, unjitteredCamera.invViewProj, unjitteredCamera.position.xyz, unjitteredCamera.forward.xyz);
+
+		barrier_batcher(cl)
+			//.uav(frameResult)
+			.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE)
+			.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
+
+		dxContext.executeCommandList(cl);
+	}
+	else if (mode == renderer_mode_pathtraced && dxContext.featureSupport.raytracing())
 	{
 		pathTracer.rebuildBindingTable();
 

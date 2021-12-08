@@ -61,6 +61,7 @@ static const char* aspectRatioNames[] =
 enum renderer_mode
 {
 	renderer_mode_rasterized,
+	renderer_mode_visualize_sun_shadow_cascades,
 	renderer_mode_pathtraced,
 
 	renderer_mode_count,
@@ -69,6 +70,7 @@ enum renderer_mode
 static const char* rendererModeNames[] =
 {
 	"Rasterized",
+	"Visualize sun shadow cascades",
 	"Path-traced",
 };
 

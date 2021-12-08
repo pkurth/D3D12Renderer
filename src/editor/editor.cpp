@@ -1227,6 +1227,18 @@ bool scene_editor::deserializeFromFile()
 	return false;
 }
 
+static bool editCamera(render_camera& camera)
+{
+	bool result = false;
+	if (ImGui::BeginTree("Camera"))
+	{
+		result |= ImGui::PropertySliderAngle("Field of view", camera.verticalFOV, 1.f, 150.f);
+		
+		ImGui::EndTree();
+	}
+	return result;
+}
+
 static bool plotAndEditTonemapping(tonemap_settings& tonemap)
 {
 	bool result = false;
@@ -1268,10 +1280,14 @@ static bool editSunShadowParameters(directional_light& sun)
 		{
 			result |= ImGui::PropertySlider("Intensity", sun.intensity, 0.f, 1000.f);
 			result |= ImGui::PropertyColor("Color", sun.color);
+
+			result |= ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, sun.shadowDimensions);
+			result |= ImGui::PropertyCheckbox("Stabilize", sun.stabilize);
+
 			result |= ImGui::PropertySlider("# Cascades", sun.numShadowCascades, 1, 4);
 
 			const float minCascadeDistance = 0.f, maxCascadeDistance = 300.f;
-			const float minBias = 0.f, maxBias = 0.005f;
+			const float minBias = 0.f, maxBias = 0.0015f;
 			const float minBlend = 0.f, maxBlend = 10.f;
 			if (sun.numShadowCascades == 1)
 			{
@@ -1430,6 +1446,7 @@ void scene_editor::drawSettings(float dt)
 			ImGui::EndProperties();
 		}
 
+		editCamera(scene->camera);
 		plotAndEditTonemapping(renderer->settings.tonemapSettings);
 		editSunShadowParameters(scene->sun);
 

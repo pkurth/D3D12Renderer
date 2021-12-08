@@ -80,4 +80,23 @@ struct visualization_textured_cb
 #define PROBE_SH_VIS_RS_SH				1
 
 
+
+struct visualize_sun_shadow_cascades_cb
+{
+	mat4 invViewProj;
+	vec4 cameraPosition;
+	vec4 cameraForward;
+};
+
+#define VISUALIZE_SUN_SHADOW_CASCADES_RS \
+	"RootFlags(0), " \
+	"RootConstants(num32BitConstants=24, b0)," \
+	"CBV(b1), " \
+	"DescriptorTable(UAV(u0, numDescriptors=1), SRV(t0, numDescriptors=1))"
+
+#define VISUALIZE_SUN_SHADOW_CASCADES_RS_CB			0
+#define VISUALIZE_SUN_SHADOW_CASCADES_RS_SUN		1
+#define VISUALIZE_SUN_SHADOW_CASCADES_RS_TEXTURES	2
+
+
 #endif
