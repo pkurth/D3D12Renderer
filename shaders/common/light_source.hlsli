@@ -244,69 +244,60 @@ static float sampleShadowMapSimple(float4x4 vp, float3 worldPosition,
 	float4 lightProjected = mul(vp, float4(worldPosition, 1.f));
 	lightProjected.xyz /= lightProjected.w;
 
-	float visibility = 1.f;
+	float2 lightUV = lightProjected.xy * 0.5f + float2(0.5f, 0.5f);
+	lightUV.y = 1.f - lightUV.y;
 
-	if (lightProjected.z < 1.f)
-	{
-		float2 lightUV = lightProjected.xy * 0.5f + float2(0.5f, 0.5f);
-		lightUV.y = 1.f - lightUV.y;
+	lightUV = lightUV * viewport.zw + viewport.xy;
 
-		lightUV = lightUV * viewport.zw + viewport.xy;
+	float visibility = shadowMap.SampleCmpLevelZero(
+		shadowMapSampler,
+		lightUV,
+		lightProjected.z - bias);
 
-		visibility = shadowMap.SampleCmpLevelZero(
-			shadowMapSampler,
-			lightUV,
-			lightProjected.z - bias);
-	}
 	return visibility;
 }
 
 static float sampleShadowMapPCF(float4x4 vp, float3 worldPosition, 
 	Texture2D<float> shadowMap, float4 viewport,
 	SamplerComparisonState shadowMapSampler, 
-	float2 texelSize, float bias)
+	float2 texelSize, float bias, float pcfRadius = 1.5f, float numPCFSamples = 16.f)
 {
 	float4 lightProjected = mul(vp, float4(worldPosition, 1.f));
 	lightProjected.xyz /= lightProjected.w;
 
-	float visibility = 1.f;
+	float2 lightUV = lightProjected.xy * 0.5f + float2(0.5f, 0.5f);
+	lightUV.y = 1.f - lightUV.y;
 
-	if (lightProjected.z < 1.f)
+	lightUV = lightUV * viewport.zw + viewport.xy;
+
+	float visibility = 0.f;
+	for (float y = -pcfRadius; y <= pcfRadius + 0.01f; y += 1.f)
 	{
-		visibility = 0.f;
-
-		float2 lightUV = lightProjected.xy * 0.5f + float2(0.5f, 0.5f);
-		lightUV.y = 1.f - lightUV.y;
-
-		lightUV = lightUV * viewport.zw + viewport.xy;
-
-		for (float y = -1.5f; y <= 1.6f; y += 1.f)
+		for (float x = -pcfRadius; x <= pcfRadius + 0.01f; x += 1.f)
 		{
-			for (float x = -1.5f; x <= 1.6f; x += 1.f)
-			{
-				visibility += shadowMap.SampleCmpLevelZero(
-					shadowMapSampler,
-					lightUV + float2(x, y) * texelSize,
-					lightProjected.z - bias);
-			}
+			visibility += shadowMap.SampleCmpLevelZero(
+				shadowMapSampler,
+				lightUV + float2(x, y) * texelSize,
+				lightProjected.z - bias);
 		}
-		visibility /= 16.f;
 	}
+	visibility /= numPCFSamples;
+
 	return visibility;
 }
 
 static float samplePointLightShadowMapPCF(float3 worldPosition, float3 lightPosition,
 	Texture2D<float> shadowMap, 
-	vec4 viewport, vec4 viewport2, 
+	float4 viewport, float4 viewport2,
 	SamplerComparisonState shadowMapSampler, 
-	float2 texelSize, float maxDistance)
+	float2 texelSize, float maxDistance, float pcfRadius = 1.5f, float numPCFSamples = 16.f)
 {
 	float3 L = worldPosition - lightPosition;
 	float l = length(L);
 	L /= l;
 
 	float flip = L.z > 0.f ? 1.f : -1.f;
-	vec4 vp = L.z > 0.f ? viewport : viewport2;
+	float4 vp = L.z > 0.f ? viewport : viewport2;
 
 	L.z *= flip;
 	L.xy /= L.z + 1.f;
@@ -320,16 +311,10 @@ static float samplePointLightShadowMapPCF(float3 worldPosition, float3 lightPosi
 
 	float bias = -0.001f * flip;
 
-#if 0
-	float visibility = shadowMap.SampleCmpLevelZero(
-		shadowMapSampler,
-		lightUV,
-		compareDistance - bias);
-#else
 	float visibility = 0.f;
-	for (float y = -1.5f; y <= 1.6f; y += 1.f)
+	for (float y = -pcfRadius; y <= pcfRadius + 0.01f; y += 1.f)
 	{
-		for (float x = -1.5f; x <= 1.6f; x += 1.f)
+		for (float x = -pcfRadius; x <= pcfRadius + 0.01f; x += 1.f)
 		{
 			visibility += shadowMap.SampleCmpLevelZero(
 				shadowMapSampler,
@@ -337,8 +322,7 @@ static float samplePointLightShadowMapPCF(float3 worldPosition, float3 lightPosi
 				compareDistance - bias);
 		}
 	}
-	visibility /= 16.f;
-#endif
+	visibility /= numPCFSamples;
 
 	return visibility;
 }
@@ -365,11 +349,15 @@ static float sampleCascadedShadowMapSimple(float4x4 vp[4], float3 worldPosition,
 	float blendStart = blendEnd - blendDistances[currentCascadeIndex];
 	float alpha = smoothstep(blendStart, blendEnd, pixelDepth);
 
-	float nextCascadeVisibility = (currentCascadeIndex == nextCascadeIndex || alpha == 0.f)
-		? 1.f // No need to sample next cascade, if we are the last cascade or if we are not in the blend area.
-		: sampleShadowMapSimple(vp[nextCascadeIndex], worldPosition, 
-			shadowMap, viewports[nextCascadeIndex], 
+	float nextCascadeVisibility = visibility;
+	
+	[branch]
+	if (currentCascadeIndex != nextCascadeIndex && alpha != 0.f)
+	{
+		nextCascadeVisibility = sampleShadowMapSimple(vp[nextCascadeIndex], worldPosition,
+			shadowMap, viewports[nextCascadeIndex],
 			shadowMapSampler, bias[nextCascadeIndex]);
+	}
 
 	visibility = lerp(visibility, nextCascadeVisibility, alpha);
 	return visibility;
@@ -387,19 +375,31 @@ static float sampleCascadedShadowMapPCF(float4x4 vp[4], float3 worldPosition,
 
 	int nextCascadeIndex = min(numCascades - 1, currentCascadeIndex + 1);
 
+	static const float pcfRadius[4] = {
+		1.5f, 1.f, 0.5f, 0.f,
+	};
+
+	static const float numPCFSamples[4] = {
+		16.f, 9.f, 4.f, 1.f,
+	};
+
 	float visibility = sampleShadowMapPCF(vp[currentCascadeIndex], worldPosition, 
 		shadowMap, viewports[currentCascadeIndex],
-		shadowMapSampler, texelSize, bias[currentCascadeIndex]);
+		shadowMapSampler, texelSize, bias[currentCascadeIndex], pcfRadius[currentCascadeIndex], numPCFSamples[currentCascadeIndex]);
 
 	float blendEnd = cascadeDistances[currentCascadeIndex];
 	float blendStart = blendEnd - blendDistances[currentCascadeIndex];
 	float alpha = smoothstep(blendStart, blendEnd, pixelDepth);
 
-	float nextCascadeVisibility = (currentCascadeIndex == nextCascadeIndex || alpha == 0.f) 
-		? 1.f // No need to sample next cascade, if we are the last cascade or if we are not in the blend area.
-		: sampleShadowMapPCF(vp[nextCascadeIndex], worldPosition, 
-			shadowMap, viewports[nextCascadeIndex], 
-			shadowMapSampler, texelSize, bias[nextCascadeIndex]);
+	float nextCascadeVisibility = visibility;
+
+	[branch]
+	if (currentCascadeIndex != nextCascadeIndex && alpha != 0.f)
+	{
+		nextCascadeVisibility = sampleShadowMapPCF(vp[nextCascadeIndex], worldPosition,
+			shadowMap, viewports[nextCascadeIndex],
+			shadowMapSampler, texelSize, bias[nextCascadeIndex], pcfRadius[nextCascadeIndex], numPCFSamples[nextCascadeIndex]);
+	}
 
 	visibility = lerp(visibility, nextCascadeVisibility, alpha);
 	return visibility;

@@ -376,9 +376,9 @@ void application::initialize(main_renderer* renderer)
 
 	scene.sun.numShadowCascades = 3;
 	scene.sun.shadowDimensions = 2048;
-	scene.sun.cascadeDistances = vec4(9.f, 39.f, 74.f, 10000.f);
-	scene.sun.bias = vec4(0.000147f, 0.000147f, 0.000221f, 0.0035f);
-	scene.sun.blendDistances = vec4(3.f, 3.f, 10.f, 10.f);
+	scene.sun.cascadeDistances = vec4(9.f, 25.f, 50.f, 10000.f);
+	scene.sun.bias = vec4(0.000588f, 0.000784f, 0.000824f, 0.0035f);
+	scene.sun.blendDistances = vec4(5.f, 10.f, 10.f, 10.f);
 	scene.sun.stabilize = true;
 
 	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)

@@ -18,10 +18,11 @@ void directional_light::updateMatrices(const render_camera& camera)
 	topLeftRay /= dot(topLeftRay, cameraForward);
 	topRightRay /= dot(topRightRay, cameraForward);
 
+
 	for (uint32 cascade = 0; cascade < numShadowCascades; ++cascade)
 	{
+		float prevDistance = (cascade == 0) ? camera.nearPlane : (cascadeDistances.data[cascade - 1] - blendDistances.data[cascade - 1]);
 		float distance = cascadeDistances.data[cascade];
-		float prevDistance = (cascade == 0) ? camera.nearPlane : cascadeDistances.data[cascade - 1];
 
 		vec3 corners[8];
 		corners[0] = camera.position + bottomLeftRay * prevDistance;
@@ -40,17 +41,23 @@ void directional_light::updateMatrices(const render_camera& camera)
 		}
 		center /= 8.f;
 
-		vec3 upDir = stabilize ? vec3(0.f, 1.f, 0.f) : (camera.rotation * vec3(1.f, 0.f, 1.f));
+		vec3 upDir = vec3(0.f, 1.f, 0.f);
+		if (abs(dot(upDir, direction)) > 1.f - EPSILON)
+		{
+			upDir = vec3(0.f, 0.f, 1.f);
+		}
 
 		mat4 viewMatrix = lookAt(center, center + direction, upDir);
 
 		vec3 minExtents, maxExtents;
 		if (stabilize)
 		{
+			vec3 viewCenter = transformPosition(viewMatrix, center);
+
 			float sphereRadius = 0.f;
 			for (uint32 i = 0; i < 8; ++i)
 			{
-				float d = length(corners[i] - center);
+				float d = length(transformPosition(viewMatrix, corners[i]) - viewCenter);
 				sphereRadius = max(sphereRadius, d);
 			}
 
@@ -70,19 +77,19 @@ void directional_light::updateMatrices(const render_camera& camera)
 			minExtents = extents.minCorner;
 			maxExtents = extents.maxCorner;
 
-			float scale = (shadowDimensions + 9.f) / shadowDimensions;
-			minExtents.xy *= scale;
-			maxExtents.xy *= scale;
+			//float scale = (shadowDimensions + 9.f) / shadowDimensions;
+			//minExtents.xy *= scale;
+			//maxExtents.xy *= scale;
 		}
 
 		vec3 cascadeExtents = maxExtents - minExtents;
 		vec3 shadowCamPos = center + direction * minExtents.z;
 
-		viewMatrix = lookAt(shadowCamPos, shadowCamPos + direction, upDir);
+		//viewMatrix = lookAt(shadowCamPos, shadowCamPos + direction, upDir);
 
 		mat4 projMatrix = createOrthographicProjectionMatrix(maxExtents.x, minExtents.x, maxExtents.y, minExtents.y, -SHADOW_MAP_NEGATIVE_Z_OFFSET, cascadeExtents.z);
 
-		if (stabilize)
+		//if (stabilize)
 		{
 			mat4 matrix = projMatrix * viewMatrix;
 			vec3 shadowOrigin(0.f);
