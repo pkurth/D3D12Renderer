@@ -197,7 +197,7 @@ void main(cs_input IN)
 		float radius2 = cb.radius * cb.radius;
 		float negInvRadius2 = rcp(radius2);
 
-		for (float d = 0; d < cb.numRays; ++d)
+		for (float d = 0; d < (float)cb.numRays; d += 1.f)
 		{
 			float2 deltaUV = dir * stepSizeUV;
 

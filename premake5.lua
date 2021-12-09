@@ -345,10 +345,12 @@ project "D3D12Renderer"
 			}
 		end
 	
-	filter { "configurations:Debug", "files:**.hlsl" }
-		shaderoptions {
-			"/Qembed_debug",
-		}
+	if turing_or_higher then
+		filter { "configurations:Debug", "files:**.hlsl" }
+			shaderoptions {
+				"/Qembed_debug",
+			}
+	end
 		
  	
 	filter("files:**_vs.hlsl")
