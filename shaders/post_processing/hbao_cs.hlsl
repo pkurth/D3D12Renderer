@@ -10,7 +10,7 @@ ConstantBuffer<camera_cb> camera		: register(b1);
 
 Texture2D<float> depthBuffer			: register(t0);
 
-RWTexture2D<float4> resultTexture		: register(u0);
+RWTexture2D<float> resultTexture		: register(u0);
 
 SamplerState linearSampler				: register(s0);
 
