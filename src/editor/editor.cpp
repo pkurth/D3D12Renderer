@@ -1345,6 +1345,31 @@ static bool editAO(bool& enable, hbao_settings& settings, const ref<dx_texture>&
 	return result;
 }
 
+static bool editSSS(bool& enable, sss_settings& settings, const ref<dx_texture>& sssTexture)
+{
+	bool result = false;
+	if (ImGui::BeginProperties())
+	{
+		result |= ImGui::PropertyCheckbox("Enable SSS", enable);
+		if (enable)
+		{
+			result |= ImGui::PropertySlider("Num iterations", settings.numSteps, 1, 64);
+			result |= ImGui::PropertySlider("Ray distance", settings.rayDistance, 0.05f, 3.f, "%.3fm");
+			result |= ImGui::PropertySlider("Thickness", settings.thickness, 0.05f, 1.f, "%.3fm");
+			result |= ImGui::PropertySlider("Max distance from camera", settings.maxDistanceFromCamera, 5.f, 1000.f, "%.3fm");
+			result |= ImGui::PropertySlider("Distance fadeout range", settings.distanceFadeoutRange, 1.f, 5.f, "%.3fm");
+			result |= ImGui::PropertySlider("Border fadeout", settings.borderFadeout, 0.f, 0.5f);
+		}
+		ImGui::EndProperties();
+	}
+	if (enable && sssTexture && ImGui::BeginTree("Show##ShowSSS"))
+	{
+		ImGui::Image(sssTexture);
+		ImGui::EndTree();
+	}
+	return result;
+}
+
 static bool editSSR(bool& enable, ssr_settings& settings, const ref<dx_texture>& ssrTexture)
 {
 	bool result = false;
@@ -1453,6 +1478,7 @@ void scene_editor::drawSettings(float dt)
 		if (ImGui::BeginTree("Post processing"))
 		{
 			if (renderer->spec.allowAO) { editAO(renderer->settings.enableAO, renderer->settings.aoSettings, renderer->getAOResult()); ImGui::Separator(); }
+			if (renderer->spec.allowSSS) { editSSS(renderer->settings.enableSSS, renderer->settings.sssSettings, renderer->getSSSResult()); ImGui::Separator(); }
 			if (renderer->spec.allowSSR) { editSSR(renderer->settings.enableSSR, renderer->settings.ssrSettings, renderer->getSSRResult()); ImGui::Separator(); }
 			if (renderer->spec.allowTAA) { editTAA(renderer->settings.enableTAA, renderer->settings.taaSettings); ImGui::Separator(); }
 			if (renderer->spec.allowBloom) { editBloom(renderer->settings.enableBloom, renderer->settings.bloomSettings, renderer->getBloomResult()); ImGui::Separator(); }

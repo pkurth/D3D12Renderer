@@ -28,6 +28,9 @@ struct renderer_settings
 	bool enableAO = true;
 	hbao_settings aoSettings;
 
+	bool enableSSS = true;
+	sss_settings sssSettings;
+
 	bool enableSSR = true;
 	ssr_settings ssrSettings;
 
@@ -79,6 +82,7 @@ struct renderer_spec
 {
 	bool allowObjectPicking = true;
 	bool allowAO = true;
+	bool allowSSS = true;
 	bool allowSSR = true;
 	bool allowTAA = true;
 	bool allowBloom = true;
@@ -131,6 +135,7 @@ struct main_renderer
 
 
 	const ref<dx_texture>& getAOResult() const { return aoTextures[aoHistoryIndex]; }
+	const ref<dx_texture>& getSSSResult() const { return sssTextures[sssHistoryIndex]; }
 	const ref<dx_texture>& getSSRResult() const { return ssrResolveTexture; }
 	const ref<dx_texture>& getBloomResult() const { return bloomTexture; }
 
@@ -164,6 +169,12 @@ private:
 	ref<dx_texture> aoTextures[2]; // These get flip-flopped from frame to frame.
 	uint32 aoHistoryIndex = 0;
 	bool aoWasOnLastFrame = false;
+
+	ref<dx_texture> sssCalculationTexture;
+	ref<dx_texture> sssBlurTempTexture;
+	ref<dx_texture> sssTextures[2]; // These get flip-flopped from frame to frame.
+	uint32 sssHistoryIndex = 0;
+	bool sssWasOnLastFrame = false;
 
 	ref<dx_texture> ssrRaycastTexture;
 	ref<dx_texture> ssrResolveTexture;

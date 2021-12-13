@@ -367,4 +367,40 @@ struct depth_sobel_cb
 #define DEPTH_SOBEL_RS_CB           0
 #define DEPTH_SOBEL_RS_TEXTURES     1
 
+
+
+
+// ----------------------------------------
+// SCREEN-SPACE SHADOWS
+// ----------------------------------------
+
+struct sss_cb
+{
+    vec2 invDimensions;
+    uint32 numSteps;
+    float rayDistance;
+    vec3 lightDirection;
+    float thickness;
+    float maxDistanceFromCamera;
+    float distanceFadeoutRange;
+    float invBorderFadeout;
+    float seed;
+};
+
+#define SSS_RS \
+    "RootFlags(0), " \
+    "RootConstants(num32BitConstants=12, b0),"  \
+    "CBV(b1), " \
+    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 1) )," \
+    "StaticSampler(s0," \
+        "addressU = TEXTURE_ADDRESS_CLAMP," \
+        "addressV = TEXTURE_ADDRESS_CLAMP," \
+        "addressW = TEXTURE_ADDRESS_CLAMP," \
+        "filter = FILTER_MIN_MAG_MIP_POINT)"
+
+#define SSS_RS_CB                   0
+#define SSS_RS_CAMERA               1
+#define SSS_RS_TEXTURES             2
+
+
 #endif

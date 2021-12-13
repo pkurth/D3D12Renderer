@@ -13,6 +13,7 @@ struct common_material_info
 	ref<dx_texture> environment;
 
 	ref<dx_texture> aoTexture;
+	ref<dx_texture> sssTexture;
 
 	ref<dx_texture> tiledCullingGrid;
 	ref<dx_buffer> tiledObjectsIndexList;

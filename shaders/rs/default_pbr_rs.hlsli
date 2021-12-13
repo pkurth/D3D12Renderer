@@ -20,7 +20,7 @@ struct lighting_cb
     "CBV(b1, space=1, visibility=SHADER_VISIBILITY_PIXEL), " \
     "DescriptorTable(SRV(t0, numDescriptors=4, space=1), visibility=SHADER_VISIBILITY_PIXEL), " \
     "CBV(b0, space=2, visibility=SHADER_VISIBILITY_PIXEL), " \
-    "DescriptorTable(SRV(t0, space=2, numDescriptors=13), visibility=SHADER_VISIBILITY_PIXEL), " \
+    "DescriptorTable(SRV(t0, space=2, numDescriptors=14), visibility=SHADER_VISIBILITY_PIXEL), " \
     "StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_WRAP," \
         "addressV = TEXTURE_ADDRESS_WRAP," \

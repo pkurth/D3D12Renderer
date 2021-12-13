@@ -51,6 +51,7 @@ StructuredBuffer<spot_shadow_info> spotShadowInfos		: register(t10, space2);
 Texture2D<float4> decalTextureAtlas                     : register(t11, space2);
 
 Texture2D<float> aoTexture								: register(t12, space2);
+Texture2D<float> sssTexture								: register(t13, space2);
 
 
 struct ps_output
@@ -265,6 +266,9 @@ ps_output main(ps_input IN)
 			shadowMap, sun.viewports,
 			shadowSampler, lighting.shadowMapTexelSize, pixelDepth, sun.numShadowCascades,
 			sun.cascadeDistances, sun.bias, sun.blendDistances);
+
+		float sss = sssTexture.SampleLevel(clampSampler, IN.screenPosition.xy * camera.invScreenDims, 0);
+		visibility *= sss;
 
 		[branch]
 		if (visibility > 0.f)

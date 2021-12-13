@@ -121,6 +121,7 @@ int main(int argc, char** argv)
 	renderer_spec spec;
 	spec.allowObjectPicking = true;
 	spec.allowAO = true;
+	spec.allowSSS = true;
 	spec.allowSSR = true;
 	spec.allowTAA = true;
 	spec.allowBloom = true;

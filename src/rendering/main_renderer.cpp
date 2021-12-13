@@ -82,6 +82,18 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 		SET_NAME(aoTextures[1]->resource, "AO 1");
 	}
 
+	if (spec.allowSSS)
+	{
+		sssCalculationTexture = createTexture(0, renderWidth / 2, renderHeight / 2, sssFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		sssBlurTempTexture = createTexture(0, renderWidth, renderHeight, sssFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		sssTextures[sssHistoryIndex] = createTexture(0, renderWidth, renderHeight, sssFormat, false, false, true, D3D12_RESOURCE_STATE_GENERIC_READ);
+		sssTextures[1 - sssHistoryIndex] = createTexture(0, renderWidth, renderHeight, sssFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+		SET_NAME(sssCalculationTexture->resource, "SSS Calculation");
+		SET_NAME(sssBlurTempTexture->resource, "SSS Temp");
+		SET_NAME(sssTextures[0]->resource, "SSS 0");
+		SET_NAME(sssTextures[1]->resource, "SSS 1");
+	}
 
 	if (spec.allowSSR)
 	{
@@ -235,6 +247,11 @@ void main_renderer::recalculateViewport(bool resizeTextures)
 		resizeTexture(aoTextures[aoHistoryIndex], renderWidth, renderHeight, D3D12_RESOURCE_STATE_GENERIC_READ);
 		resizeTexture(aoTextures[1 - aoHistoryIndex], renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
+		resizeTexture(sssCalculationTexture, renderWidth / 2, renderHeight / 2);
+		resizeTexture(sssBlurTempTexture, renderWidth, renderHeight);
+		resizeTexture(sssTextures[sssHistoryIndex], renderWidth, renderHeight, D3D12_RESOURCE_STATE_GENERIC_READ);
+		resizeTexture(sssTextures[1 - sssHistoryIndex], renderWidth, renderHeight, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
 		resizeTexture(objectIDsTexture, renderWidth, renderHeight);
 
 		resizeTexture(ssrRaycastTexture, SSR_RAYCAST_WIDTH, SSR_RAYCAST_HEIGHT);
@@ -318,6 +335,7 @@ void main_renderer::endFrame(const user_input& input)
 
 
 	settings.enableAO &= spec.allowAO;
+	settings.enableSSS &= spec.allowSSS;
 	settings.enableSSR &= spec.allowSSR;
 	settings.enableBloom &= spec.allowBloom;
 	settings.enableTAA &= spec.allowTAA;
@@ -338,6 +356,7 @@ void main_renderer::endFrame(const user_input& input)
 	materialInfo.environmentIntensity = settings.environmentIntensity;
 	materialInfo.skyIntensity = settings.skyIntensity;
 	materialInfo.aoTexture = settings.enableAO ? aoTextures[1 - aoHistoryIndex] : render_resources::whiteTexture;
+	materialInfo.sssTexture = settings.enableSSS ? sssTextures[1 - sssHistoryIndex] : render_resources::whiteTexture;
 	materialInfo.tiledCullingGrid = culling.tiledCullingGrid;
 	materialInfo.tiledObjectsIndexList = culling.tiledObjectsIndexList;
 	materialInfo.pointLightBuffer = pointLights;
@@ -489,6 +508,25 @@ void main_renderer::endFrame(const user_input& input)
 				aoHistoryIndex = aoResultIndex;
 			}
 
+
+			// ----------------------------------------
+			// SCREEN SPACE SHADOWS
+			// ----------------------------------------
+
+			if (settings.enableSSS)
+			{
+				uint32 sssResultIndex = 1 - sssHistoryIndex;
+				ref<dx_texture> sssHistory = sssWasOnLastFrame ? sssTextures[sssHistoryIndex] : render_resources::whiteTexture;
+				ref<dx_texture> sssResult = sssTextures[sssResultIndex];
+				screenSpaceShadows(cl, linearDepthBuffer, screenVelocitiesTexture, sssCalculationTexture, sssBlurTempTexture, sssHistory, sssResult, sun.direction, settings.sssSettings, jitteredCamera.view, materialInfo.cameraCBV);
+
+				barrier_batcher(cl)
+					// UAV barrier is done by sss-function.
+					.transition(sssTextures[sssResultIndex], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ) // Read by opaque pass and next frame as history.
+					.transition(sssTextures[sssHistoryIndex], D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.
+
+				sssHistoryIndex = sssResultIndex;
+			}
 
 
 			// ----------------------------------------
@@ -787,4 +825,5 @@ void main_renderer::endFrame(const user_input& input)
 	}
 
 	aoWasOnLastFrame = settings.enableAO;
+	sssWasOnLastFrame = settings.enableSSS;
 }
