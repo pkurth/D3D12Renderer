@@ -244,8 +244,7 @@ static float sampleShadowMapSimple(float4x4 vp, float3 worldPosition,
 	float4 lightProjected = mul(vp, float4(worldPosition, 1.f));
 	lightProjected.xyz /= lightProjected.w;
 
-	float2 lightUV = lightProjected.xy * 0.5f + float2(0.5f, 0.5f);
-	lightUV.y = 1.f - lightUV.y;
+	float2 lightUV = lightProjected.xy * float2(0.5f, -0.5f) + float2(0.5f, 0.5f);
 
 	lightUV = lightUV * viewport.zw + viewport.xy;
 
@@ -265,8 +264,7 @@ static float sampleShadowMapPCF(float4x4 vp, float3 worldPosition,
 	float4 lightProjected = mul(vp, float4(worldPosition, 1.f));
 	lightProjected.xyz /= lightProjected.w;
 
-	float2 lightUV = lightProjected.xy * 0.5f + float2(0.5f, 0.5f);
-	lightUV.y = 1.f - lightUV.y;
+	float2 lightUV = lightProjected.xy * float2(0.5f, -0.5f) + float2(0.5f, 0.5f);
 
 	lightUV = lightUV * viewport.zw + viewport.xy;
 
@@ -302,8 +300,7 @@ static float samplePointLightShadowMapPCF(float3 worldPosition, float3 lightPosi
 	L.z *= flip;
 	L.xy /= L.z + 1.f;
 
-	float2 lightUV = L.xy * 0.5f + float2(0.5f, 0.5f);
-	lightUV.y = 1.f - lightUV.y;
+	float2 lightUV = L.xy * float2(0.5f, -0.5f) + float2(0.5f, 0.5f);
 
 	lightUV = lightUV * vp.zw + vp.xy;
 
