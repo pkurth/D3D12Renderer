@@ -21,20 +21,6 @@ static float3 positionAt(float2 uv)
 	return pos;
 }
 
-static float3 calculateNormal(float3 center, float3 right, float3 left, float3 top, float3 bottom)
-{
-	float3 R = right - center;
-	float3 L = center - left;
-	float3 B = bottom - center;
-	float3 T = center - top;
-
-	float3 hor = (abs(L.z) < abs(R.z)) ? L : R;
-	float3 ver = (abs(B.z) < abs(T.z)) ? B : T;
-
-	float3 normal = cross(ver, hor);
-	return normalize(normal);
-}
-
 static float length2(float3 v)
 {
 	return dot(v, v);
@@ -197,7 +183,7 @@ void main(cs_input IN)
 		float radius2 = cb.radius * cb.radius;
 		float negInvRadius2 = rcp(radius2);
 
-		for (float d = 0; d < cb.numRays; ++d)
+		for (float d = 0; d < (float)cb.numRays; d += 1.f)
 		{
 			float2 deltaUV = dir * stepSizeUV;
 

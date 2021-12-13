@@ -479,7 +479,7 @@ void main_renderer::endFrame(const user_input& input)
 				uint32 aoResultIndex = 1 - aoHistoryIndex;
 				ref<dx_texture> aoHistory = aoWasOnLastFrame ? aoTextures[aoHistoryIndex] : render_resources::whiteTexture;
 				ref<dx_texture> aoResult = aoTextures[aoResultIndex];
-				hbao(cl, linearDepthBuffer, screenVelocitiesTexture, aoCalculationTexture, aoBlurTempTexture, aoHistory, aoResult, settings.aoSettings, materialInfo.cameraCBV);
+				ambientOcclusion(cl, linearDepthBuffer, screenVelocitiesTexture, aoCalculationTexture, aoBlurTempTexture, aoHistory, aoResult, settings.aoSettings, materialInfo.cameraCBV);
 
 				barrier_batcher(cl)
 					// UAV barrier is done by hbao-function.

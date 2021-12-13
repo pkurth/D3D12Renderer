@@ -1473,7 +1473,70 @@ void bloom(dx_command_list* cl,
 		.transition(bloomTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.
 }
 
-void hbao(dx_command_list* cl,
+static void bilateralBlurShadows(dx_command_list* cl,
+	ref<dx_texture> input,
+	ref<dx_texture> tempTexture,
+	ref<dx_texture> linearDepth,
+	ref<dx_texture> screenVelocitiesTexture,
+	ref<dx_texture> history,
+	ref<dx_texture> output)
+{
+	{
+		PROFILE_ALL(cl, "Horizontal blur");
+
+		hbao_blur_cb cb;
+		cb.dimensions.x = (float)tempTexture->width;
+		cb.dimensions.y = (float)tempTexture->height;
+		cb.invDimensions.x = 1.f / cb.dimensions.x;
+		cb.invDimensions.y = 1.f / cb.dimensions.y;
+
+		cl->setPipelineState(*hbaoBlurXPipeline.pipeline);
+		cl->setComputeRootSignature(*hbaoBlurXPipeline.rootSignature);
+
+		cl->setDescriptorHeapUAV(HBAO_BLUR_RS_TEXTURES, 0, tempTexture);
+		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 1, input);
+		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 2, linearDepth);
+
+		cl->setCompute32BitConstants(HBAO_BLUR_RS_CB, cb);
+
+		cl->dispatch(bucketize(tempTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(tempTexture->height, POST_PROCESSING_BLOCK_SIZE));
+
+		barrier_batcher(cl)
+			//.uav(tempTexture)
+			.transition(tempTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+			.transitionBegin(input, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	}
+
+	{
+		PROFILE_ALL(cl, "Vertical blur");
+
+		hbao_blur_cb cb;
+		cb.dimensions.x = (float)output->width;
+		cb.dimensions.y = (float)output->height;
+		cb.invDimensions.x = 1.f / cb.dimensions.x;
+		cb.invDimensions.y = 1.f / cb.dimensions.y;
+
+		cl->setPipelineState(*hbaoBlurYPipeline.pipeline);
+		cl->setComputeRootSignature(*hbaoBlurYPipeline.rootSignature);
+
+		cl->setDescriptorHeapUAV(HBAO_BLUR_RS_TEXTURES, 0, output);
+		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 1, tempTexture);
+		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 2, linearDepth);
+		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 3, screenVelocitiesTexture);
+		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 4, history);
+
+		cl->setCompute32BitConstants(HBAO_BLUR_RS_CB, cb);
+
+		cl->dispatch(bucketize(output->width, POST_PROCESSING_BLOCK_SIZE), bucketize(output->height, POST_PROCESSING_BLOCK_SIZE));
+
+		barrier_batcher(cl)
+			.uav(output)
+			.transition(tempTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+			.transitionEnd(input, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	}
+}
+
+void ambientOcclusion(dx_command_list* cl,
 	ref<dx_texture> linearDepth,
 	ref<dx_texture> screenVelocitiesTexture,
 	ref<dx_texture> aoCalculationTexture,
@@ -1517,59 +1580,7 @@ void hbao(dx_command_list* cl,
 			.transition(aoCalculationTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	}
 
-	{
-		PROFILE_ALL(cl, "Horizontal blur");
-
-		hbao_blur_cb cb;
-		cb.dimensions.x = (float)aoBlurTempTexture->width;
-		cb.dimensions.y = (float)aoBlurTempTexture->height;
-		cb.invDimensions.x = 1.f / cb.dimensions.x;
-		cb.invDimensions.y = 1.f / cb.dimensions.y;
-
-		cl->setPipelineState(*hbaoBlurXPipeline.pipeline);
-		cl->setComputeRootSignature(*hbaoBlurXPipeline.rootSignature);
-
-		cl->setDescriptorHeapUAV(HBAO_BLUR_RS_TEXTURES, 0, aoBlurTempTexture);
-		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 1, aoCalculationTexture);
-		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 2, linearDepth);
-
-		cl->setCompute32BitConstants(HBAO_BLUR_RS_CB, cb);
-
-		cl->dispatch(bucketize(aoBlurTempTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(aoBlurTempTexture->height, POST_PROCESSING_BLOCK_SIZE));
-
-		barrier_batcher(cl)
-			//.uav(blurXTexture)
-			.transition(aoBlurTempTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-			.transitionBegin(aoCalculationTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	}
-
-	{
-		PROFILE_ALL(cl, "Vertical blur");
-
-		hbao_blur_cb cb;
-		cb.dimensions.x = (float)output->width;
-		cb.dimensions.y = (float)output->height;
-		cb.invDimensions.x = 1.f / cb.dimensions.x;
-		cb.invDimensions.y = 1.f / cb.dimensions.y;
-
-		cl->setPipelineState(*hbaoBlurYPipeline.pipeline);
-		cl->setComputeRootSignature(*hbaoBlurYPipeline.rootSignature);
-
-		cl->setDescriptorHeapUAV(HBAO_BLUR_RS_TEXTURES, 0, output);
-		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 1, aoBlurTempTexture);
-		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 2, linearDepth);
-		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 3, screenVelocitiesTexture);
-		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 4, history);
-
-		cl->setCompute32BitConstants(HBAO_BLUR_RS_CB, cb);
-
-		cl->dispatch(bucketize(output->width, POST_PROCESSING_BLOCK_SIZE), bucketize(output->height, POST_PROCESSING_BLOCK_SIZE));
-
-		barrier_batcher(cl)
-			.uav(output)
-			.transition(aoBlurTempTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-			.transitionEnd(aoCalculationTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	}
+	bilateralBlurShadows(cl, aoCalculationTexture, aoBlurTempTexture, linearDepth, screenVelocitiesTexture, history, output);
 }
 
 void tonemap(dx_command_list* cl,
@@ -1633,7 +1644,13 @@ void present(dx_command_list* cl,
 	cl->dispatch(bucketize(output->width, POST_PROCESSING_BLOCK_SIZE), bucketize(output->height, POST_PROCESSING_BLOCK_SIZE));
 }
 
-void visualizeSunShadowCascades(dx_command_list* cl, ref<dx_texture> depthBuffer, ref<dx_texture> output, dx_dynamic_constant_buffer sunCBV, const mat4& invViewProj, vec3 cameraPosition, vec3 cameraForward)
+void visualizeSunShadowCascades(dx_command_list* cl, 
+	ref<dx_texture> depthBuffer, 
+	ref<dx_texture> output, 
+	dx_dynamic_constant_buffer sunCBV, 
+	const mat4& invViewProj, 
+	vec3 cameraPosition, 
+	vec3 cameraForward)
 {
 	PROFILE_ALL(cl, "Visualize sun shadow cascades");
 

@@ -161,7 +161,7 @@ static bool traceScreenSpaceRay(float3 rayOrigin, float3 rayDirection, float jit
         hitPixel = permute ? PQk.yx : PQk.xy;
         hitPixel *= cb.invDimensions;
 
-        sceneZMax = linearDepthBuffer.SampleLevel(linearSampler, hitPixel, level); // Already in world units.
+        sceneZMax = linearDepthBuffer.SampleLevel(pointSampler, hitPixel, level); // Already in world units.
 
 
         PQk += dPQk;

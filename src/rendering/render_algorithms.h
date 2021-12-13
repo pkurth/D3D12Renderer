@@ -247,7 +247,7 @@ void bloom(dx_command_list* cl,
 	ref<dx_texture> bloomTempTexture,			// UNORDERED_ACCESS
 	bloom_settings settings);
 
-void hbao(dx_command_list* cl,
+void ambientOcclusion(dx_command_list* cl,
 	ref<dx_texture> linearDepth,				// NON_PIXEL_SHADER_RESOURCE
 	ref<dx_texture> screenVelocitiesTexture,	// NON_PIXEL_SHADER_RESOURCE
 	ref<dx_texture> aoCalculationTexture,		// UNORDERED_ACCESS

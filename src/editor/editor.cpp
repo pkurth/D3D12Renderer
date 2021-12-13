@@ -1354,9 +1354,9 @@ static bool editSSR(bool& enable, ssr_settings& settings, const ref<dx_texture>&
 		if (enable)
 		{
 			result |= ImGui::PropertySlider("Num iterations", settings.numSteps, 1, 1024);
-			result |= ImGui::PropertySlider("Max distance", settings.maxDistance, 5.f, 1000.f);
-			result |= ImGui::PropertySlider("Min. stride", settings.minStride, 1.f, 50.f);
-			result |= ImGui::PropertySlider("Max. stride", settings.maxStride, settings.minStride, 50.f);
+			result |= ImGui::PropertySlider("Max distance", settings.maxDistance, 5.f, 1000.f, "%.3fm");
+			result |= ImGui::PropertySlider("Min stride", settings.minStride, 1.f, 50.f, "%.3fm");
+			result |= ImGui::PropertySlider("Max stride", settings.maxStride, settings.minStride, 50.f, "%.3fm");
 		}
 		ImGui::EndProperties();
 	}
