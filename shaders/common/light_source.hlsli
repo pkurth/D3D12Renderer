@@ -246,6 +246,12 @@ static float sampleShadowMapSimple(float4x4 vp, float3 worldPosition,
 
 	float2 lightUV = lightProjected.xy * float2(0.5f, -0.5f) + float2(0.5f, 0.5f);
 
+	// This case is not handled by a border sampler because we are using a shadow map atlas.
+	if (any(lightUV < 0.f || lightUV > 1.f))
+	{
+		return 1.f;
+	}
+
 	lightUV = lightUV * viewport.zw + viewport.xy;
 
 	float visibility = shadowMap.SampleCmpLevelZero(
@@ -265,6 +271,12 @@ static float sampleShadowMapPCF(float4x4 vp, float3 worldPosition,
 	lightProjected.xyz /= lightProjected.w;
 
 	float2 lightUV = lightProjected.xy * float2(0.5f, -0.5f) + float2(0.5f, 0.5f);
+
+	// This case is not handled by a border sampler because we are using a shadow map atlas.
+	if (any(lightUV < 0.f || lightUV > 1.f))
+	{
+		return 1.f;
+	}
 
 	lightUV = lightUV * viewport.zw + viewport.xy;
 
