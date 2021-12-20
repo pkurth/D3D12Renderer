@@ -64,15 +64,15 @@ static dx_pipeline bloomThresholdPipeline;
 static dx_pipeline bloomCombinePipeline;
 
 static dx_pipeline hbaoPipeline;
-static dx_pipeline hbaoBlurXPipeline;
-static dx_pipeline hbaoBlurYPipeline;
+static dx_pipeline sssPipeline;
+
+static dx_pipeline shadowBlurXPipeline;
+static dx_pipeline shadowBlurYPipeline;
 
 static dx_pipeline tonemapPipeline;
 static dx_pipeline presentPipeline;
 
 static dx_pipeline depthSobelPipeline;
-
-static dx_pipeline sssPipeline;
 
 static dx_pipeline visualizeSunShadowCascadesPipeline;
 
@@ -221,15 +221,16 @@ void loadCommonShaders()
 	bloomCombinePipeline = createReloadablePipeline("bloom_combine_cs");
 
 	hbaoPipeline = createReloadablePipeline("hbao_cs");
-	hbaoBlurXPipeline = createReloadablePipeline("hbao_blur_x_cs");
-	hbaoBlurYPipeline = createReloadablePipeline("hbao_blur_y_cs");
+	sssPipeline = createReloadablePipeline("sss_cs");
+
+	shadowBlurXPipeline = createReloadablePipeline("shadow_blur_x_cs");
+	shadowBlurYPipeline = createReloadablePipeline("shadow_blur_y_cs");
 
 	tonemapPipeline = createReloadablePipeline("tonemap_cs");
 	presentPipeline = createReloadablePipeline("present_cs");
 
 	depthSobelPipeline = createReloadablePipeline("depth_sobel_cs");
 
-	sssPipeline = createReloadablePipeline("sss_cs");
 
 	visualizeSunShadowCascadesPipeline = createReloadablePipeline("sun_shadow_cascades_cs");
 }
@@ -1485,23 +1486,25 @@ static void bilateralBlurShadows(dx_command_list* cl,
 	ref<dx_texture> history,
 	ref<dx_texture> output)
 {
-	{
-		PROFILE_ALL(cl, "Horizontal blur");
+	PROFILE_ALL(cl, "Bilateral blur");
 
-		hbao_blur_cb cb;
+	{
+		PROFILE_ALL(cl, "Horizontal");
+
+		shadow_blur_cb cb;
 		cb.dimensions.x = (float)tempTexture->width;
 		cb.dimensions.y = (float)tempTexture->height;
 		cb.invDimensions.x = 1.f / cb.dimensions.x;
 		cb.invDimensions.y = 1.f / cb.dimensions.y;
 
-		cl->setPipelineState(*hbaoBlurXPipeline.pipeline);
-		cl->setComputeRootSignature(*hbaoBlurXPipeline.rootSignature);
+		cl->setPipelineState(*shadowBlurXPipeline.pipeline);
+		cl->setComputeRootSignature(*shadowBlurXPipeline.rootSignature);
 
-		cl->setDescriptorHeapUAV(HBAO_BLUR_RS_TEXTURES, 0, tempTexture);
-		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 1, input);
-		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 2, linearDepth);
+		cl->setDescriptorHeapUAV(SHADOW_BLUR_RS_TEXTURES, 0, tempTexture);
+		cl->setDescriptorHeapSRV(SHADOW_BLUR_RS_TEXTURES, 1, input);
+		cl->setDescriptorHeapSRV(SHADOW_BLUR_RS_TEXTURES, 2, linearDepth);
 
-		cl->setCompute32BitConstants(HBAO_BLUR_RS_CB, cb);
+		cl->setCompute32BitConstants(SHADOW_BLUR_RS_CB, cb);
 
 		cl->dispatch(bucketize(tempTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(tempTexture->height, POST_PROCESSING_BLOCK_SIZE));
 
@@ -1512,24 +1515,24 @@ static void bilateralBlurShadows(dx_command_list* cl,
 	}
 
 	{
-		PROFILE_ALL(cl, "Vertical blur");
+		PROFILE_ALL(cl, "Vertical");
 
-		hbao_blur_cb cb;
+		shadow_blur_cb cb;
 		cb.dimensions.x = (float)output->width;
 		cb.dimensions.y = (float)output->height;
 		cb.invDimensions.x = 1.f / cb.dimensions.x;
 		cb.invDimensions.y = 1.f / cb.dimensions.y;
 
-		cl->setPipelineState(*hbaoBlurYPipeline.pipeline);
-		cl->setComputeRootSignature(*hbaoBlurYPipeline.rootSignature);
+		cl->setPipelineState(*shadowBlurYPipeline.pipeline);
+		cl->setComputeRootSignature(*shadowBlurYPipeline.rootSignature);
 
-		cl->setDescriptorHeapUAV(HBAO_BLUR_RS_TEXTURES, 0, output);
-		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 1, tempTexture);
-		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 2, linearDepth);
-		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 3, screenVelocitiesTexture);
-		cl->setDescriptorHeapSRV(HBAO_BLUR_RS_TEXTURES, 4, history);
+		cl->setDescriptorHeapUAV(SHADOW_BLUR_RS_TEXTURES, 0, output);
+		cl->setDescriptorHeapSRV(SHADOW_BLUR_RS_TEXTURES, 1, tempTexture);
+		cl->setDescriptorHeapSRV(SHADOW_BLUR_RS_TEXTURES, 2, linearDepth);
+		cl->setDescriptorHeapSRV(SHADOW_BLUR_RS_TEXTURES, 3, screenVelocitiesTexture);
+		cl->setDescriptorHeapSRV(SHADOW_BLUR_RS_TEXTURES, 4, history);
 
-		cl->setCompute32BitConstants(HBAO_BLUR_RS_CB, cb);
+		cl->setCompute32BitConstants(SHADOW_BLUR_RS_CB, cb);
 
 		cl->dispatch(bucketize(output->width, POST_PROCESSING_BLOCK_SIZE), bucketize(output->height, POST_PROCESSING_BLOCK_SIZE));
 
