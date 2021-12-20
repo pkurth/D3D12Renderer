@@ -18,32 +18,32 @@
 
 
 #if CONSTRAINT_SIMD_WIDTH == 4
-typedef vec2w4 vec2w;
-typedef vec3w4 vec3w;
-typedef vec4w4 vec4w;
-typedef quatw4 quatw;
-typedef mat2w4 mat2w;
-typedef mat3w4 mat3w;
-typedef floatw4 floatw;
-typedef intw4 intw;
+typedef w4_vec2 w_vec2;
+typedef w4_vec3 w_vec3;
+typedef w4_vec4 w_vec4;
+typedef w4_quat w_quat;
+typedef w4_mat2 w_mat2;
+typedef w4_mat3 w_mat3;
+typedef w4_float w_float;
+typedef w4_int w_int;
 #elif CONSTRAINT_SIMD_WIDTH == 8 && defined(SIMD_AVX_2)
-typedef vec2w8 vec2w;
-typedef vec3w8 vec3w;
-typedef vec4w8 vec4w;
-typedef quatw8 quatw;
-typedef mat2w8 mat2w;
-typedef mat3w8 mat3w;
-typedef floatw8 floatw;
-typedef intw8 intw;
+typedef w8_vec2 w_vec2;
+typedef w8_vec3 w_vec3;
+typedef w8_vec4 w_vec4;
+typedef w8_quat w_quat;
+typedef w8_mat2 w_mat2;
+typedef w8_mat3 w_mat3;
+typedef w8_float w_float;
+typedef w8_int w_int;
 #elif CONSTRAINT_SIMD_WIDTH == 16 && defined(SIMD_AVX_512)
-typedef vec2w16 vec2w;
-typedef vec3w16 vec3w;
-typedef vec4w16 vec4w;
-typedef quatw16 quatw;
-typedef mat2w16 mat2w;
-typedef mat3w16 mat3w;
-typedef floatw16 floatw;
-typedef intw16 intw;
+typedef w16_vec2 w_vec2;
+typedef w16_vec3 w_vec3;
+typedef w16_vec4 w_vec4;
+typedef w16_quat w_quat;
+typedef w16_mat2 w_mat2;
+typedef w16_mat3 w_mat3;
+typedef w16_float w_float;
+typedef w16_int w_int;
 #else
 #error Invalid SIMD width.
 #endif
@@ -72,7 +72,7 @@ static uint32 scheduleConstraintsSIMD(memory_arena& arena, const constraint_body
 	simd_constraint_slot* slotBuckets[numBuckets];
 	uint32 numEntriesPerBucket[numBuckets] = {};
 
-	intw invalid = ~0;
+	w_int invalid = ~0;
 
 	uint32 numAllocationsPerBucket = bucketize(numBodyPairs, numBuckets);
 
@@ -101,9 +101,9 @@ static uint32 scheduleConstraintsSIMD(memory_arena& arena, const constraint_body
 
 
 #if CONSTRAINT_SIMD_WIDTH == 4
-		intw a = _mm_set1_epi16(rbA);
-		intw b = _mm_set1_epi16(rbB);
-		intw scheduled;
+		w_int a = _mm_set1_epi16(rbA);
+		w_int b = _mm_set1_epi16(rbB);
+		w_int scheduled;
 
 		uint32 j = 0;
 		for (;; ++j)
@@ -117,9 +117,9 @@ static uint32 scheduleConstraintsSIMD(memory_arena& arena, const constraint_body
 			}
 		}
 #else
-		intw a = _mm256_set1_epi16(rbA);
-		intw b = _mm256_set1_epi16(rbB);
-		intw scheduled;
+		w_int a = _mm256_set1_epi16(rbA);
+		w_int b = _mm256_set1_epi16(rbB);
+		w_int scheduled;
 
 		uint32 j = 0;
 		for (;; ++j)
@@ -156,7 +156,7 @@ static uint32 scheduleConstraintsSIMD(memory_arena& arena, const constraint_body
 		else if (lane == CONSTRAINT_SIMD_WIDTH - 1)
 		{
 			// This entry is full -> commit it.
-			intw indices = (int32*)slot->indices;
+			w_int indices = (int32*)slot->indices;
 
 			// Swap and pop.
 			--count;
@@ -180,10 +180,10 @@ static uint32 scheduleConstraintsSIMD(memory_arena& arena, const constraint_body
 
 		for (uint32 i = 0; i < count; ++i)
 		{
-			intw ab = (int32*)pairs[i].ab;
-			intw indices = (int32_t*)slots[i].indices;
+			w_int ab = (int32*)pairs[i].ab;
+			w_int indices = (int32_t*)slots[i].indices;
 
-			intw firstIndex = fillWithFirstLane(indices);
+			w_int firstIndex = fillWithFirstLane(indices);
 
 			auto mask = ab == invalid;
 			indices = ifThen(mask, firstIndex, indices);
@@ -285,8 +285,8 @@ simd_distance_constraint_solver initializeDistanceVelocityConstraintsSIMD(memory
 
 	simd_distance_constraint_batch* batches = arena.allocate<simd_distance_constraint_batch>(numBatches);
 
-	const floatw zero = floatw::zero();
-	const floatw invDt = 1.f / dt;
+	const w_float zero = w_float::zero();
+	const w_float invDt = 1.f / dt;
 
 	for (uint32 i = 0; i < numBatches; ++i)
 	{
@@ -302,19 +302,19 @@ simd_distance_constraint_solver initializeDistanceVelocityConstraintsSIMD(memory
 		}
 
 
-		vec3w localAnchorA, localAnchorB;
-		floatw globalLength;
-		floatw dummy;
+		w_vec3 localAnchorA, localAnchorB;
+		w_float globalLength;
+		w_float dummy;
 		load8((float*)input, constraintIndices, (uint32)sizeof(*input),
 			localAnchorA.x, localAnchorA.y, localAnchorA.z, localAnchorB.x, localAnchorB.y, localAnchorB.z, globalLength, dummy);
 
 
 		// Load body A.
-		vec3w localCOGPositionA;
-		quatw rotationA;
-		vec3w positionA;
-		mat3w invInertiaA;
-		floatw invMassA;
+		w_vec3 localCOGPositionA;
+		w_quat rotationA;
+		w_vec3 positionA;
+		w_mat3 invInertiaA;
+		w_float invMassA;
 
 		load8(&rbs->rotation.x, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			rotationA.x, rotationA.y, rotationA.z, rotationA.w,
@@ -332,11 +332,11 @@ simd_distance_constraint_solver initializeDistanceVelocityConstraintsSIMD(memory
 
 
 		// Load body B.
-		quatw rotationB;
-		vec3w positionB;
-		vec3w localCOGPositionB;
-		mat3w invInertiaB;
-		floatw invMassB;
+		w_quat rotationB;
+		w_vec3 positionB;
+		w_vec3 localCOGPositionB;
+		w_mat3 invInertiaB;
+		w_float invMassB;
 
 		load8(&rbs->rotation.x, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			rotationB.x, rotationB.y, rotationB.z, rotationB.w,
@@ -354,31 +354,31 @@ simd_distance_constraint_solver initializeDistanceVelocityConstraintsSIMD(memory
 
 
 		// Relative to COG.
-		vec3w relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
-		vec3w relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
+		w_vec3 relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
+		w_vec3 relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
 
 		// Global.
-		vec3w globalAnchorA = positionA + relGlobalAnchorA;
-		vec3w globalAnchorB = positionB + relGlobalAnchorB;
+		w_vec3 globalAnchorA = positionA + relGlobalAnchorA;
+		w_vec3 globalAnchorB = positionB + relGlobalAnchorB;
 
-		vec3w u = globalAnchorB - globalAnchorA;
-		floatw l = length(u);
-		u = ifThen(l > 0.001f, u * (1.f / l), vec3w::zero());
+		w_vec3 u = globalAnchorB - globalAnchorA;
+		w_float l = length(u);
+		u = ifThen(l > 0.001f, u * (1.f / l), w_vec3::zero());
 
-		vec3w crAu = cross(relGlobalAnchorA, u);
-		vec3w crBu = cross(relGlobalAnchorB, u);
-		floatw invMass = invMassA + dot(crAu, invInertiaA * crAu)
+		w_vec3 crAu = cross(relGlobalAnchorA, u);
+		w_vec3 crBu = cross(relGlobalAnchorB, u);
+		w_float invMass = invMassA + dot(crAu, invInertiaA * crAu)
 					   + invMassB + dot(crBu, invInertiaB * crBu);
-		floatw effectiveMass = ifThen(invMass != zero, 1.f / invMass, zero);
+		w_float effectiveMass = ifThen(invMass != zero, 1.f / invMass, zero);
 
-		floatw bias = zero;
+		w_float bias = zero;
 		if (dt > DT_THRESHOLD)
 		{
-			bias = (l - globalLength) * (floatw(DISTANCE_CONSTRAINT_BETA) * invDt);
+			bias = (l - globalLength) * (w_float(DISTANCE_CONSTRAINT_BETA) * invDt);
 		}
 
-		vec3w impulseToAngularVelocityA = invInertiaA * cross(relGlobalAnchorA, crAu);
-		vec3w impulseToAngularVelocityB = invInertiaB * cross(relGlobalAnchorB, crBu);
+		w_vec3 impulseToAngularVelocityA = invInertiaA * cross(relGlobalAnchorA, crAu);
+		w_vec3 impulseToAngularVelocityB = invInertiaB * cross(relGlobalAnchorB, crBu);
 
 
 		relGlobalAnchorA.x.store(batch.relGlobalAnchorA[0]);
@@ -421,38 +421,38 @@ void solveDistanceVelocityConstraintsSIMD(simd_distance_constraint_solver constr
 
 
 		// Load body A.
-		vec3w vA, wA;
-		floatw invMassA;
-		floatw dummyA;
+		w_vec3 vA, wA;
+		w_float invMassA;
+		w_float dummyA;
 
 		load8(&rbs->invInertia.m22, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			dummyA, invMassA, vA.x, vA.y, vA.z, wA.x, wA.y, wA.z);
 
 
 		// Load body B.
-		vec3w vB, wB;
-		floatw invMassB;
-		floatw dummyB;
+		w_vec3 vB, wB;
+		w_float invMassB;
+		w_float dummyB;
 
 		load8(&rbs->invInertia.m22, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			dummyB, invMassB, vB.x, vB.y, vB.z, wB.x, wB.y, wB.z);
 
 
 		// Load constraint.
-		vec3w relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
-		vec3w relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
-		vec3w impulseToAngularVelocityA(batch.impulseToAngularVelocityA[0], batch.impulseToAngularVelocityA[1], batch.impulseToAngularVelocityA[2]);
-		vec3w impulseToAngularVelocityB(batch.impulseToAngularVelocityB[0], batch.impulseToAngularVelocityB[1], batch.impulseToAngularVelocityB[2]);
-		vec3w u(batch.u[0], batch.u[1], batch.u[2]);
-		floatw bias(batch.bias);
-		floatw effectiveMass(batch.effectiveMass);
+		w_vec3 relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
+		w_vec3 relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
+		w_vec3 impulseToAngularVelocityA(batch.impulseToAngularVelocityA[0], batch.impulseToAngularVelocityA[1], batch.impulseToAngularVelocityA[2]);
+		w_vec3 impulseToAngularVelocityB(batch.impulseToAngularVelocityB[0], batch.impulseToAngularVelocityB[1], batch.impulseToAngularVelocityB[2]);
+		w_vec3 u(batch.u[0], batch.u[1], batch.u[2]);
+		w_float bias(batch.bias);
+		w_float effectiveMass(batch.effectiveMass);
 
-		vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
-		vec3w anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
-		floatw Cdot = dot(u, anchorVelocityB - anchorVelocityA) + bias;
+		w_vec3 anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
+		w_vec3 anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
+		w_float Cdot = dot(u, anchorVelocityB - anchorVelocityA) + bias;
 
-		floatw lambda = -effectiveMass * Cdot;
-		vec3w P = lambda * u;
+		w_float lambda = -effectiveMass * Cdot;
+		w_vec3 P = lambda * u;
 		vA -= invMassA * P;
 		wA -= impulseToAngularVelocityA * lambda;
 		vB += invMassB * P;
@@ -549,11 +549,11 @@ simd_ball_constraint_solver initializeBallVelocityConstraintsSIMD(memory_arena& 
 
 	simd_ball_constraint_batch* batches = arena.allocate<simd_ball_constraint_batch>(numBatches);
 
-	const floatw zero = floatw::zero();
-	const floatw invDt = 1.f / dt;
-	const floatw one = 1.f;
+	const w_float zero = w_float::zero();
+	const w_float invDt = 1.f / dt;
+	const w_float one = 1.f;
 
-	const mat3w identity(one, zero, zero,
+	const w_mat3 identity(one, zero, zero,
 		zero, one, zero,
 		zero, zero, one);
 
@@ -571,11 +571,11 @@ simd_ball_constraint_solver initializeBallVelocityConstraintsSIMD(memory_arena& 
 		}
 
 		// Load body A.
-		vec3w localCOGPositionA;
-		quatw rotationA;
-		vec3w positionA;
-		mat3w invInertiaA;
-		floatw invMassA;
+		w_vec3 localCOGPositionA;
+		w_quat rotationA;
+		w_vec3 positionA;
+		w_mat3 invInertiaA;
+		w_float invMassA;
 
 		load8(&rbs->rotation.x, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			rotationA.x, rotationA.y, rotationA.z, rotationA.w,
@@ -593,11 +593,11 @@ simd_ball_constraint_solver initializeBallVelocityConstraintsSIMD(memory_arena& 
 
 
 		// Load body B.
-		quatw rotationB;
-		vec3w positionB;
-		vec3w localCOGPositionB;
-		mat3w invInertiaB;
-		floatw invMassB;
+		w_quat rotationB;
+		w_vec3 positionB;
+		w_vec3 localCOGPositionB;
+		w_mat3 invInertiaB;
+		w_float invMassB;
 
 		load8(&rbs->rotation.x, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			rotationB.x, rotationB.y, rotationB.z, rotationB.w,
@@ -615,34 +615,34 @@ simd_ball_constraint_solver initializeBallVelocityConstraintsSIMD(memory_arena& 
 
 
 
-		vec3w localAnchorA, localAnchorB;
-		floatw dummy0, dummy1;
+		w_vec3 localAnchorA, localAnchorB;
+		w_float dummy0, dummy1;
 		load8((float*)input, constraintIndices, (uint32)sizeof(*input),
 			localAnchorA.x, localAnchorA.y, localAnchorA.z, localAnchorB.x, localAnchorB.y, localAnchorB.z, dummy0, dummy1);
 
 
 		// Relative to COG.
-		vec3w relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
-		vec3w relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
+		w_vec3 relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
+		w_vec3 relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
 
 		// Global.
-		vec3w globalAnchorA = positionA + relGlobalAnchorA;
-		vec3w globalAnchorB = positionB + relGlobalAnchorB;
+		w_vec3 globalAnchorA = positionA + relGlobalAnchorA;
+		w_vec3 globalAnchorB = positionB + relGlobalAnchorB;
 
-		mat3w skewMatA = getSkewMatrix(relGlobalAnchorA);
-		mat3w skewMatB = getSkewMatrix(relGlobalAnchorB);
+		w_mat3 skewMatA = getSkewMatrix(relGlobalAnchorA);
+		w_mat3 skewMatB = getSkewMatrix(relGlobalAnchorB);
 		
-		mat3w invEffectiveMass = skewMatA * invInertiaA * transpose(skewMatA)
+		w_mat3 invEffectiveMass = skewMatA * invInertiaA * transpose(skewMatA)
 							   + skewMatB * invInertiaB * transpose(skewMatB);
-		floatw invMassSum = invMassA + invMassB;
+		w_float invMassSum = invMassA + invMassB;
 		invEffectiveMass.m00 += invMassSum;
 		invEffectiveMass.m11 += invMassSum;
 		invEffectiveMass.m22 += invMassSum;
 
-		vec3w bias = zero;
+		w_vec3 bias = zero;
 		if (dt > DT_THRESHOLD)
 		{
-			bias = (globalAnchorB - globalAnchorA) * (floatw(BALL_CONSTRAINT_BETA) * invDt);
+			bias = (globalAnchorB - globalAnchorA) * (w_float(BALL_CONSTRAINT_BETA) * invDt);
 		}
 
 		relGlobalAnchorA.x.store(batch.relGlobalAnchorA[0]);
@@ -684,9 +684,9 @@ void solveBallVelocityConstraintsSIMD(simd_ball_constraint_solver constraints, r
 
 
 		// Load body A.
-		vec3w vA, wA;
-		floatw invMassA;
-		mat3w invInertiaA;
+		w_vec3 vA, wA;
+		w_float invMassA;
+		w_mat3 invInertiaA;
 
 		load8(&rbs->invInertia.m00, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20,
@@ -698,9 +698,9 @@ void solveBallVelocityConstraintsSIMD(simd_ball_constraint_solver constraints, r
 
 
 		// Load body B.
-		vec3w vB, wB;
-		floatw invMassB;
-		mat3w invInertiaB;
+		w_vec3 vB, wB;
+		w_float invMassB;
+		w_mat3 invInertiaB;
 
 		load8(&rbs->invInertia.m00, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
@@ -712,25 +712,25 @@ void solveBallVelocityConstraintsSIMD(simd_ball_constraint_solver constraints, r
 
 
 		// Load constraint.
-		vec3w relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
-		vec3w relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
-		vec3w bias(batch.bias[0], batch.bias[1], batch.bias[2]);
-		mat3w invEffectiveMass;
-		invEffectiveMass.m[0] = floatw(batch.invEffectiveMass[0]);
-		invEffectiveMass.m[1] = floatw(batch.invEffectiveMass[1]);
-		invEffectiveMass.m[2] = floatw(batch.invEffectiveMass[2]);
-		invEffectiveMass.m[3] = floatw(batch.invEffectiveMass[3]);
-		invEffectiveMass.m[4] = floatw(batch.invEffectiveMass[4]);
-		invEffectiveMass.m[5] = floatw(batch.invEffectiveMass[5]);
-		invEffectiveMass.m[6] = floatw(batch.invEffectiveMass[6]);
-		invEffectiveMass.m[7] = floatw(batch.invEffectiveMass[7]);
-		invEffectiveMass.m[8] = floatw(batch.invEffectiveMass[8]);
+		w_vec3 relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
+		w_vec3 relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
+		w_vec3 bias(batch.bias[0], batch.bias[1], batch.bias[2]);
+		w_mat3 invEffectiveMass;
+		invEffectiveMass.m[0] = w_float(batch.invEffectiveMass[0]);
+		invEffectiveMass.m[1] = w_float(batch.invEffectiveMass[1]);
+		invEffectiveMass.m[2] = w_float(batch.invEffectiveMass[2]);
+		invEffectiveMass.m[3] = w_float(batch.invEffectiveMass[3]);
+		invEffectiveMass.m[4] = w_float(batch.invEffectiveMass[4]);
+		invEffectiveMass.m[5] = w_float(batch.invEffectiveMass[5]);
+		invEffectiveMass.m[6] = w_float(batch.invEffectiveMass[6]);
+		invEffectiveMass.m[7] = w_float(batch.invEffectiveMass[7]);
+		invEffectiveMass.m[8] = w_float(batch.invEffectiveMass[8]);
 
-		vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
-		vec3w anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
-		vec3w Cdot = anchorVelocityB - anchorVelocityA + bias;
+		w_vec3 anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
+		w_vec3 anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
+		w_vec3 Cdot = anchorVelocityB - anchorVelocityA + bias;
 
-		vec3w P = solveLinearSystem(invEffectiveMass, -Cdot);
+		w_vec3 P = solveLinearSystem(invEffectiveMass, -Cdot);
 		vA -= invMassA * P;
 		wA -= invInertiaA * cross(relGlobalAnchorA, P);
 		vB += invMassB * P;
@@ -844,9 +844,9 @@ simd_fixed_constraint_solver initializeFixedVelocityConstraintsSIMD(memory_arena
 
 	simd_fixed_constraint_batch* batches = arena.allocate<simd_fixed_constraint_batch>(numBatches);
 
-	const floatw zero = floatw::zero();
-	const floatw invDt = 1.f / dt;
-	const floatw one = 1.f;
+	const w_float zero = w_float::zero();
+	const w_float invDt = 1.f / dt;
+	const w_float one = 1.f;
 
 	for (uint32 i = 0; i < numBatches; ++i)
 	{
@@ -863,11 +863,11 @@ simd_fixed_constraint_solver initializeFixedVelocityConstraintsSIMD(memory_arena
 
 
 		// Load body A.
-		vec3w localCOGPositionA;
-		quatw rotationA;
-		vec3w positionA;
-		mat3w invInertiaA;
-		floatw invMassA;
+		w_vec3 localCOGPositionA;
+		w_quat rotationA;
+		w_vec3 positionA;
+		w_mat3 invInertiaA;
+		w_float invMassA;
 
 		load8(&rbs->rotation.x, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			rotationA.x, rotationA.y, rotationA.z, rotationA.w,
@@ -885,11 +885,11 @@ simd_fixed_constraint_solver initializeFixedVelocityConstraintsSIMD(memory_arena
 
 
 		// Load body B.
-		quatw rotationB;
-		vec3w positionB;
-		vec3w localCOGPositionB;
-		mat3w invInertiaB;
-		floatw invMassB;
+		w_quat rotationB;
+		w_vec3 positionB;
+		w_vec3 localCOGPositionB;
+		w_mat3 invInertiaB;
+		w_float invMassB;
 
 		load8(&rbs->rotation.x, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			rotationB.x, rotationB.y, rotationB.z, rotationB.w,
@@ -906,9 +906,9 @@ simd_fixed_constraint_solver initializeFixedVelocityConstraintsSIMD(memory_arena
 			invMassB);
 
 
-		quatw initialInvRotationDifference;
-		vec3w localAnchorA, localAnchorB;
-		floatw dummy0, dummy1;
+		w_quat initialInvRotationDifference;
+		w_vec3 localAnchorA, localAnchorB;
+		w_float dummy0, dummy1;
 		load8((float*)input, constraintIndices, (uint32)sizeof(*input),
 			initialInvRotationDifference.x, initialInvRotationDifference.y, initialInvRotationDifference.z, initialInvRotationDifference.w,
 			localAnchorA.x, localAnchorA.y, localAnchorA.z, localAnchorB.x);
@@ -918,33 +918,33 @@ simd_fixed_constraint_solver initializeFixedVelocityConstraintsSIMD(memory_arena
 
 
 		// Relative to COG.
-		vec3w relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
-		vec3w relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
+		w_vec3 relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
+		w_vec3 relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
 
 		// Global.
-		vec3w globalAnchorA = positionA + relGlobalAnchorA;
-		vec3w globalAnchorB = positionB + relGlobalAnchorB;
+		w_vec3 globalAnchorA = positionA + relGlobalAnchorA;
+		w_vec3 globalAnchorB = positionB + relGlobalAnchorB;
 
-		mat3w skewMatA = getSkewMatrix(relGlobalAnchorA);
-		mat3w skewMatB = getSkewMatrix(relGlobalAnchorB);
+		w_mat3 skewMatA = getSkewMatrix(relGlobalAnchorA);
+		w_mat3 skewMatB = getSkewMatrix(relGlobalAnchorB);
 
-		mat3w invEffectiveTranslationMass = skewMatA * invInertiaA * transpose(skewMatA)
+		w_mat3 invEffectiveTranslationMass = skewMatA * invInertiaA * transpose(skewMatA)
 										  + skewMatB * invInertiaB * transpose(skewMatB);
-		floatw invMassSum = invMassA + invMassB;
+		w_float invMassSum = invMassA + invMassB;
 		invEffectiveTranslationMass.m00 += invMassSum;
 		invEffectiveTranslationMass.m11 += invMassSum;
 		invEffectiveTranslationMass.m22 += invMassSum;
 
-		mat3w invEffectiveRotationMass = invInertiaA + invInertiaB;
+		w_mat3 invEffectiveRotationMass = invInertiaA + invInertiaB;
 
-		vec3w translationBias = zero;
-		vec3w rotationBias = zero;
+		w_vec3 translationBias = zero;
+		w_vec3 rotationBias = zero;
 
 		if (dt > DT_THRESHOLD)
 		{
-			translationBias = (globalAnchorB - globalAnchorA) * (floatw(BALL_CONSTRAINT_BETA) * invDt);
+			translationBias = (globalAnchorB - globalAnchorA) * (w_float(BALL_CONSTRAINT_BETA) * invDt);
 
-			quatw rotationError = rotationB * initialInvRotationDifference * conjugate(rotationA);
+			w_quat rotationError = rotationB * initialInvRotationDifference * conjugate(rotationA);
 			rotationBias = rotationError.v * (SLIDER_CONSTRAINT_BETA * 2.f * invDt);
 		}
 
@@ -1001,9 +1001,9 @@ void solveFixedVelocityConstraintsSIMD(simd_fixed_constraint_solver constraints,
 
 
 		// Load body A.
-		vec3w vA, wA;
-		floatw invMassA;
-		mat3w invInertiaA;
+		w_vec3 vA, wA;
+		w_float invMassA;
+		w_mat3 invInertiaA;
 
 		load8(&rbs->invInertia.m00, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20,
@@ -1015,9 +1015,9 @@ void solveFixedVelocityConstraintsSIMD(simd_fixed_constraint_solver constraints,
 
 
 		// Load body B.
-		vec3w vB, wB;
-		floatw invMassB;
-		mat3w invInertiaB;
+		w_vec3 vB, wB;
+		w_float invMassB;
+		w_mat3 invInertiaB;
 
 		load8(&rbs->invInertia.m00, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
@@ -1030,21 +1030,21 @@ void solveFixedVelocityConstraintsSIMD(simd_fixed_constraint_solver constraints,
 
 		// Rotation part.
 		{
-			vec3w rotationBias(batch.rotationBias[0], batch.rotationBias[1], batch.rotationBias[2]);
-			mat3w invEffectiveRotationMass;
-			invEffectiveRotationMass.m[0] = floatw(batch.invEffectiveRotationMass[0]);
-			invEffectiveRotationMass.m[1] = floatw(batch.invEffectiveRotationMass[1]);
-			invEffectiveRotationMass.m[2] = floatw(batch.invEffectiveRotationMass[2]);
-			invEffectiveRotationMass.m[3] = floatw(batch.invEffectiveRotationMass[3]);
-			invEffectiveRotationMass.m[4] = floatw(batch.invEffectiveRotationMass[4]);
-			invEffectiveRotationMass.m[5] = floatw(batch.invEffectiveRotationMass[5]);
-			invEffectiveRotationMass.m[6] = floatw(batch.invEffectiveRotationMass[6]);
-			invEffectiveRotationMass.m[7] = floatw(batch.invEffectiveRotationMass[7]);
-			invEffectiveRotationMass.m[8] = floatw(batch.invEffectiveRotationMass[8]);
+			w_vec3 rotationBias(batch.rotationBias[0], batch.rotationBias[1], batch.rotationBias[2]);
+			w_mat3 invEffectiveRotationMass;
+			invEffectiveRotationMass.m[0] = w_float(batch.invEffectiveRotationMass[0]);
+			invEffectiveRotationMass.m[1] = w_float(batch.invEffectiveRotationMass[1]);
+			invEffectiveRotationMass.m[2] = w_float(batch.invEffectiveRotationMass[2]);
+			invEffectiveRotationMass.m[3] = w_float(batch.invEffectiveRotationMass[3]);
+			invEffectiveRotationMass.m[4] = w_float(batch.invEffectiveRotationMass[4]);
+			invEffectiveRotationMass.m[5] = w_float(batch.invEffectiveRotationMass[5]);
+			invEffectiveRotationMass.m[6] = w_float(batch.invEffectiveRotationMass[6]);
+			invEffectiveRotationMass.m[7] = w_float(batch.invEffectiveRotationMass[7]);
+			invEffectiveRotationMass.m[8] = w_float(batch.invEffectiveRotationMass[8]);
 
-			vec3w Cdot = wB - wA;
+			w_vec3 Cdot = wB - wA;
 
-			vec3w rotationLambda = solveLinearSystem(invEffectiveRotationMass, -(Cdot + rotationBias));
+			w_vec3 rotationLambda = solveLinearSystem(invEffectiveRotationMass, -(Cdot + rotationBias));
 			wA -= invInertiaA * rotationLambda;
 			wB += invInertiaB * rotationLambda;
 		}
@@ -1052,26 +1052,26 @@ void solveFixedVelocityConstraintsSIMD(simd_fixed_constraint_solver constraints,
 
 		// Position part.
 		{
-			vec3w relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
-			vec3w relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
-			vec3w translationBias(batch.translationBias[0], batch.translationBias[1], batch.translationBias[2]);
-			mat3w invEffectiveTranslationMass;
-			invEffectiveTranslationMass.m[0] = floatw(batch.invEffectiveTranslationMass[0]);
-			invEffectiveTranslationMass.m[1] = floatw(batch.invEffectiveTranslationMass[1]);
-			invEffectiveTranslationMass.m[2] = floatw(batch.invEffectiveTranslationMass[2]);
-			invEffectiveTranslationMass.m[3] = floatw(batch.invEffectiveTranslationMass[3]);
-			invEffectiveTranslationMass.m[4] = floatw(batch.invEffectiveTranslationMass[4]);
-			invEffectiveTranslationMass.m[5] = floatw(batch.invEffectiveTranslationMass[5]);
-			invEffectiveTranslationMass.m[6] = floatw(batch.invEffectiveTranslationMass[6]);
-			invEffectiveTranslationMass.m[7] = floatw(batch.invEffectiveTranslationMass[7]);
-			invEffectiveTranslationMass.m[8] = floatw(batch.invEffectiveTranslationMass[8]);
+			w_vec3 relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
+			w_vec3 relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
+			w_vec3 translationBias(batch.translationBias[0], batch.translationBias[1], batch.translationBias[2]);
+			w_mat3 invEffectiveTranslationMass;
+			invEffectiveTranslationMass.m[0] = w_float(batch.invEffectiveTranslationMass[0]);
+			invEffectiveTranslationMass.m[1] = w_float(batch.invEffectiveTranslationMass[1]);
+			invEffectiveTranslationMass.m[2] = w_float(batch.invEffectiveTranslationMass[2]);
+			invEffectiveTranslationMass.m[3] = w_float(batch.invEffectiveTranslationMass[3]);
+			invEffectiveTranslationMass.m[4] = w_float(batch.invEffectiveTranslationMass[4]);
+			invEffectiveTranslationMass.m[5] = w_float(batch.invEffectiveTranslationMass[5]);
+			invEffectiveTranslationMass.m[6] = w_float(batch.invEffectiveTranslationMass[6]);
+			invEffectiveTranslationMass.m[7] = w_float(batch.invEffectiveTranslationMass[7]);
+			invEffectiveTranslationMass.m[8] = w_float(batch.invEffectiveTranslationMass[8]);
 
 
-			vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
-			vec3w anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
-			vec3w Cdot = anchorVelocityB - anchorVelocityA + translationBias;
+			w_vec3 anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
+			w_vec3 anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
+			w_vec3 Cdot = anchorVelocityB - anchorVelocityA + translationBias;
 
-			vec3w P = solveLinearSystem(invEffectiveTranslationMass, -Cdot);
+			w_vec3 P = solveLinearSystem(invEffectiveTranslationMass, -Cdot);
 			vA -= invMassA * P;
 			wA -= invInertiaA * cross(relGlobalAnchorA, P);
 			vB += invMassB * P;
@@ -1328,9 +1328,9 @@ simd_hinge_constraint_solver initializeHingeVelocityConstraintsSIMD(memory_arena
 
 	simd_hinge_constraint_batch* batches = arena.allocate<simd_hinge_constraint_batch>(numBatches);
 
-	const floatw zero = floatw::zero();
-	const floatw invDt = 1.f / dt;
-	const floatw one = 1.f;
+	const w_float zero = w_float::zero();
+	const w_float invDt = 1.f / dt;
+	const w_float one = 1.f;
 
 	for (uint32 i = 0; i < numBatches; ++i)
 	{
@@ -1347,11 +1347,11 @@ simd_hinge_constraint_solver initializeHingeVelocityConstraintsSIMD(memory_arena
 
 
 		// Load body A.
-		vec3w localCOGPositionA;
-		quatw rotationA;
-		vec3w positionA;
-		mat3w invInertiaA;
-		floatw invMassA;
+		w_vec3 localCOGPositionA;
+		w_quat rotationA;
+		w_vec3 positionA;
+		w_mat3 invInertiaA;
+		w_float invMassA;
 
 		load8(&rbs->rotation.x, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			rotationA.x, rotationA.y, rotationA.z, rotationA.w,
@@ -1369,11 +1369,11 @@ simd_hinge_constraint_solver initializeHingeVelocityConstraintsSIMD(memory_arena
 
 
 		// Load body B.
-		quatw rotationB;
-		vec3w positionB;
-		vec3w localCOGPositionB;
-		mat3w invInertiaB;
-		floatw invMassB;
+		w_quat rotationB;
+		w_vec3 positionB;
+		w_vec3 localCOGPositionB;
+		w_mat3 invInertiaB;
+		w_float invMassB;
 
 		load8(&rbs->rotation.x, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			rotationB.x, rotationB.y, rotationB.z, rotationB.w,
@@ -1391,16 +1391,16 @@ simd_hinge_constraint_solver initializeHingeVelocityConstraintsSIMD(memory_arena
 
 
 
-		vec3w localAnchorA;
-		vec3w localAnchorB;
-		vec3w localHingeAxisA;
-		vec3w localHingeAxisB;
+		w_vec3 localAnchorA;
+		w_vec3 localAnchorB;
+		w_vec3 localHingeAxisA;
+		w_vec3 localHingeAxisB;
 
-		floatw minRotationLimit;
-		floatw maxRotationLimit;
+		w_float minRotationLimit;
+		w_float maxRotationLimit;
 
-		floatw maxMotorTorque;
-		floatw motorTypeF;
+		w_float maxMotorTorque;
+		w_float motorTypeF;
 
 
 
@@ -1415,36 +1415,36 @@ simd_hinge_constraint_solver initializeHingeVelocityConstraintsSIMD(memory_arena
 			minRotationLimit, maxRotationLimit,
 			maxMotorTorque, motorTypeF);
 
-		intw motorType = reinterpret(motorTypeF);
+		w_int motorType = reinterpret(motorTypeF);
 
 
 		// Relative to COG.
-		vec3w relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
-		vec3w relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
+		w_vec3 relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
+		w_vec3 relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
 
 		// Global.
-		vec3w globalAnchorA = positionA + relGlobalAnchorA;
-		vec3w globalAnchorB = positionB + relGlobalAnchorB;
+		w_vec3 globalAnchorA = positionA + relGlobalAnchorA;
+		w_vec3 globalAnchorB = positionB + relGlobalAnchorB;
 
 
 
 
 		// Position part. Identical to ball.
 
-		mat3w skewMatA = getSkewMatrix(relGlobalAnchorA);
-		mat3w skewMatB = getSkewMatrix(relGlobalAnchorB);
+		w_mat3 skewMatA = getSkewMatrix(relGlobalAnchorA);
+		w_mat3 skewMatB = getSkewMatrix(relGlobalAnchorB);
 
-		mat3w invEffectiveTranslationMass = skewMatA * invInertiaA * transpose(skewMatA)
+		w_mat3 invEffectiveTranslationMass = skewMatA * invInertiaA * transpose(skewMatA)
 										  + skewMatB * invInertiaB * transpose(skewMatB);
-		floatw invMassSum = invMassA + invMassB;
+		w_float invMassSum = invMassA + invMassB;
 		invEffectiveTranslationMass.m00 += invMassSum;
 		invEffectiveTranslationMass.m11 += invMassSum;
 		invEffectiveTranslationMass.m22 += invMassSum;
 
-		vec3w translationBias = zero;
+		w_vec3 translationBias = zero;
 		if (dt > DT_THRESHOLD)
 		{
-			translationBias = (globalAnchorB - globalAnchorA) * (floatw(BALL_CONSTRAINT_BETA) * invDt);
+			translationBias = (globalAnchorB - globalAnchorA) * (w_float(BALL_CONSTRAINT_BETA) * invDt);
 		}
 
 		relGlobalAnchorA.x.store(batch.relGlobalAnchorA[0]);
@@ -1472,29 +1472,29 @@ simd_hinge_constraint_solver initializeHingeVelocityConstraintsSIMD(memory_arena
 
 
 		// Rotation part.
-		vec3w globalHingeAxisA = rotationA * localHingeAxisA;
-		vec3w globalHingeAxisB = rotationB * localHingeAxisB;
+		w_vec3 globalHingeAxisA = rotationA * localHingeAxisA;
+		w_vec3 globalHingeAxisB = rotationB * localHingeAxisB;
 
-		vec3w globalTangentB, globalBitangentB;
+		w_vec3 globalTangentB, globalBitangentB;
 		getTangents(globalHingeAxisB, globalTangentB, globalBitangentB);
 
-		vec3w bxa = cross(globalTangentB, globalHingeAxisA);
-		vec3w cxa = cross(globalBitangentB, globalHingeAxisA);
-		vec3w iAbxa = invInertiaA * bxa;
-		vec3w iBbxa = invInertiaB * bxa;
-		vec3w iAcxa = invInertiaA * cxa;
-		vec3w iBcxa = invInertiaB * cxa;
+		w_vec3 bxa = cross(globalTangentB, globalHingeAxisA);
+		w_vec3 cxa = cross(globalBitangentB, globalHingeAxisA);
+		w_vec3 iAbxa = invInertiaA * bxa;
+		w_vec3 iBbxa = invInertiaB * bxa;
+		w_vec3 iAcxa = invInertiaA * cxa;
+		w_vec3 iBcxa = invInertiaB * cxa;
 
-		mat2w invEffectiveRotationMass;
+		w_mat2 invEffectiveRotationMass;
 		invEffectiveRotationMass.m00 = dot(bxa, iAbxa) + dot(bxa, iBbxa);
 		invEffectiveRotationMass.m01 = dot(bxa, iAcxa) + dot(bxa, iBcxa);
 		invEffectiveRotationMass.m10 = dot(cxa, iAbxa) + dot(cxa, iBbxa);
 		invEffectiveRotationMass.m11 = dot(cxa, iAcxa) + dot(cxa, iBcxa);
 
-		vec2w rotationBias = zero;
+		w_vec2 rotationBias = zero;
 		if (dt > DT_THRESHOLD)
 		{
-			rotationBias = vec2w(dot(globalHingeAxisA, globalTangentB), dot(globalHingeAxisA, globalBitangentB)) * (floatw(HINGE_ROTATION_CONSTRAINT_BETA) * invDt);
+			rotationBias = w_vec2(dot(globalHingeAxisA, globalTangentB), dot(globalHingeAxisA, globalBitangentB)) * (w_float(HINGE_ROTATION_CONSTRAINT_BETA) * invDt);
 		}
 
 		rotationBias.x.store(batch.rotationBias[0]);
@@ -1525,13 +1525,13 @@ simd_hinge_constraint_solver initializeHingeVelocityConstraintsSIMD(memory_arena
 
 		if (anyTrue(cond))
 		{
-			floatw motorVelocity;
+			w_float motorVelocity;
 
-			vec3w localHingeTangentA;
-			vec3w localHingeBitangentA;
-			vec3w localHingeTangentB;
+			w_vec3 localHingeTangentA;
+			w_vec3 localHingeBitangentA;
+			w_vec3 localHingeTangentB;
 
-			floatw dummy0, dummy1;
+			w_float dummy0, dummy1;
 
 			load8(&input->motorVelocity, constraintIndices, (uint32)sizeof(*input),
 				motorVelocity,
@@ -1545,8 +1545,8 @@ simd_hinge_constraint_solver initializeHingeVelocityConstraintsSIMD(memory_arena
 
 
 
-			vec3w localHingeCompareA = conjugate(rotationA) * (rotationB * localHingeTangentB);
-			floatw angle = atan2(dot(localHingeCompareA, localHingeBitangentA), dot(localHingeCompareA, localHingeTangentA));
+			w_vec3 localHingeCompareA = conjugate(rotationA) * (rotationB * localHingeTangentB);
+			w_float angle = atan2(dot(localHingeCompareA, localHingeBitangentA), dot(localHingeCompareA, localHingeTangentA));
 
 			auto minLimitViolated = minLimitActive & (angle <= minRotationLimit);
 			auto maxLimitViolated = maxLimitActive & (angle >= maxRotationLimit);
@@ -1557,22 +1557,22 @@ simd_hinge_constraint_solver initializeHingeVelocityConstraintsSIMD(memory_arena
 			batch.solveMotor = anyTrue(motorActive);
 			if (batch.solveLimit || batch.solveMotor)
 			{
-				vec3w globalRotationAxis = globalHingeAxisA;
+				w_vec3 globalRotationAxis = globalHingeAxisA;
 
-				floatw invEffectiveAxialMass = dot(globalRotationAxis, invInertiaA * globalRotationAxis)
+				w_float invEffectiveAxialMass = dot(globalRotationAxis, invInertiaA * globalRotationAxis)
 											 + dot(globalRotationAxis, invInertiaB * globalRotationAxis);
 
-				floatw effectiveAxialMass = ifThen(invEffectiveAxialMass != zero, 1.f / invEffectiveAxialMass, zero);
-				floatw effectiveLimitAxialMass = ifThen(limitViolated, effectiveAxialMass, zero);
-				floatw effectiveMotorAxialMass = ifThen(motorActive, effectiveAxialMass, zero);
+				w_float effectiveAxialMass = ifThen(invEffectiveAxialMass != zero, 1.f / invEffectiveAxialMass, zero);
+				w_float effectiveLimitAxialMass = ifThen(limitViolated, effectiveAxialMass, zero);
+				w_float effectiveMotorAxialMass = ifThen(motorActive, effectiveAxialMass, zero);
 
-				floatw limitSign = ifThen(minLimitViolated, 1.f, -1.f);
+				w_float limitSign = ifThen(minLimitViolated, 1.f, -1.f);
 
-				floatw maxMotorImpulse = maxMotorTorque * floatw(dt);
+				w_float maxMotorImpulse = maxMotorTorque * w_float(dt);
 				maxMotorImpulse = ifThen(motorActive, maxMotorImpulse, zero);
 
-				vec3w motorAndLimitImpulseToAngularVelocityA = invInertiaA * globalRotationAxis;
-				vec3w motorAndLimitImpulseToAngularVelocityB = invInertiaB * globalRotationAxis;
+				w_vec3 motorAndLimitImpulseToAngularVelocityA = invInertiaA * globalRotationAxis;
+				w_vec3 motorAndLimitImpulseToAngularVelocityB = invInertiaB * globalRotationAxis;
 
 				if (batch.solveMotor)
 				{
@@ -1583,22 +1583,22 @@ simd_hinge_constraint_solver initializeHingeVelocityConstraintsSIMD(memory_arena
 						// Inspired by Bullet Engine. We set the velocity such that the target angle is reached within one frame.
 						// This will later get clamped to the maximum motor impulse.
 
-						floatw motorTargetAngle = motorVelocity; // This is a union.
+						w_float motorTargetAngle = motorVelocity; // This is a union.
 
-						floatw minLimit = ifThen(minLimitActive, minRotationLimit, -M_PI);
-						floatw maxLimit = ifThen(maxLimitActive, maxRotationLimit, M_PI);
-						floatw targetAngle = clamp(motorTargetAngle, minLimit, maxLimit);
+						w_float minLimit = ifThen(minLimitActive, minRotationLimit, -M_PI);
+						w_float maxLimit = ifThen(maxLimitActive, maxRotationLimit, M_PI);
+						w_float targetAngle = clamp(motorTargetAngle, minLimit, maxLimit);
 
-						floatw motorVelocityOverride = (dt > DT_THRESHOLD) ? ((targetAngle - angle) * invDt) : zero;
+						w_float motorVelocityOverride = (dt > DT_THRESHOLD) ? ((targetAngle - angle) * invDt) : zero;
 						motorVelocity = ifThen(reinterpret(isVelocityMotor), motorVelocity, motorVelocityOverride);
 					}
 				}
 
-				floatw limitBias = zero;
+				w_float limitBias = zero;
 				if (batch.solveLimit && dt > DT_THRESHOLD)
 				{
-					floatw d = ifThen(minLimitViolated, angle - minRotationLimit, maxRotationLimit - angle);
-					limitBias = d * floatw(HINGE_LIMIT_CONSTRAINT_BETA) * invDt;
+					w_float d = ifThen(minLimitViolated, angle - minRotationLimit, maxRotationLimit - angle);
+					limitBias = d * w_float(HINGE_LIMIT_CONSTRAINT_BETA) * invDt;
 				}
 				
 				globalRotationAxis.x.store(batch.globalRotationAxis[0]);
@@ -1644,9 +1644,9 @@ void solveHingeVelocityConstraintsSIMD(simd_hinge_constraint_solver constraints,
 
 
 		// Load body A.
-		vec3w vA, wA;
-		floatw invMassA;
-		mat3w invInertiaA;
+		w_vec3 vA, wA;
+		w_float invMassA;
+		w_mat3 invInertiaA;
 
 		load8(&rbs->invInertia.m00, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20,
@@ -1658,9 +1658,9 @@ void solveHingeVelocityConstraintsSIMD(simd_hinge_constraint_solver constraints,
 
 
 		// Load body B.
-		vec3w vB, wB;
-		floatw invMassB;
-		mat3w invInertiaB;
+		w_vec3 vB, wB;
+		w_float invMassB;
+		w_mat3 invInertiaB;
 
 		load8(&rbs->invInertia.m00, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
@@ -1673,26 +1673,26 @@ void solveHingeVelocityConstraintsSIMD(simd_hinge_constraint_solver constraints,
 
 		// Solve in order of importance (most important last): Motor -> Limits -> Rotation -> Position.
 
-		vec3w globalRotationAxis(batch.globalRotationAxis[0], batch.globalRotationAxis[1], batch.globalRotationAxis[2]);
-		vec3w motorAndLimitImpulseToAngularVelocityA(batch.motorAndLimitImpulseToAngularVelocityA[0], batch.motorAndLimitImpulseToAngularVelocityA[1], batch.motorAndLimitImpulseToAngularVelocityA[2]);
-		vec3w motorAndLimitImpulseToAngularVelocityB(batch.motorAndLimitImpulseToAngularVelocityB[0], batch.motorAndLimitImpulseToAngularVelocityB[1], batch.motorAndLimitImpulseToAngularVelocityB[2]);
+		w_vec3 globalRotationAxis(batch.globalRotationAxis[0], batch.globalRotationAxis[1], batch.globalRotationAxis[2]);
+		w_vec3 motorAndLimitImpulseToAngularVelocityA(batch.motorAndLimitImpulseToAngularVelocityA[0], batch.motorAndLimitImpulseToAngularVelocityA[1], batch.motorAndLimitImpulseToAngularVelocityA[2]);
+		w_vec3 motorAndLimitImpulseToAngularVelocityB(batch.motorAndLimitImpulseToAngularVelocityB[0], batch.motorAndLimitImpulseToAngularVelocityB[1], batch.motorAndLimitImpulseToAngularVelocityB[2]);
 
 		// Motor.
 		if (batch.solveMotor)
 		{
-			floatw motorVelocity(batch.motorVelocity);
-			floatw effectiveMotorAxialMass(batch.effectiveMotorAxialMass);
-			floatw motorImpulse(batch.motorImpulse);
-			floatw maxMotorImpulse(batch.maxMotorImpulse);
+			w_float motorVelocity(batch.motorVelocity);
+			w_float effectiveMotorAxialMass(batch.effectiveMotorAxialMass);
+			w_float motorImpulse(batch.motorImpulse);
+			w_float maxMotorImpulse(batch.maxMotorImpulse);
 
-			floatw aDotWA = dot(globalRotationAxis, wA); // How fast are we turning about the axis.
-			floatw aDotWB = dot(globalRotationAxis, wB);
+			w_float aDotWA = dot(globalRotationAxis, wA); // How fast are we turning about the axis.
+			w_float aDotWB = dot(globalRotationAxis, wB);
 
-			floatw relAngularVelocity = (aDotWB - aDotWA);
-			floatw motorCdot = relAngularVelocity - motorVelocity;
+			w_float relAngularVelocity = (aDotWB - aDotWA);
+			w_float motorCdot = relAngularVelocity - motorVelocity;
 
-			floatw motorLambda = -effectiveMotorAxialMass * motorCdot;
-			floatw oldImpulse = motorImpulse;
+			w_float motorLambda = -effectiveMotorAxialMass * motorCdot;
+			w_float oldImpulse = motorImpulse;
 			motorImpulse = clamp(motorImpulse + motorLambda, -maxMotorImpulse, maxMotorImpulse);
 			motorLambda = motorImpulse - oldImpulse;
 
@@ -1705,19 +1705,19 @@ void solveHingeVelocityConstraintsSIMD(simd_hinge_constraint_solver constraints,
 		// Limits.
 		if (batch.solveLimit)
 		{
-			floatw limitSign(batch.limitSign);
-			floatw limitBias(batch.limitBias);
-			floatw limitImpulse(batch.limitImpulse);
-			floatw effectiveLimitAxialMass(batch.effectiveLimitAxialMass);
+			w_float limitSign(batch.limitSign);
+			w_float limitBias(batch.limitBias);
+			w_float limitImpulse(batch.limitImpulse);
+			w_float effectiveLimitAxialMass(batch.effectiveLimitAxialMass);
 
-			floatw aDotWA = dot(globalRotationAxis, wA); // How fast are we turning about the axis.
-			floatw aDotWB = dot(globalRotationAxis, wB);
-			floatw relAngularVelocity = limitSign * (aDotWB - aDotWA);
+			w_float aDotWA = dot(globalRotationAxis, wA); // How fast are we turning about the axis.
+			w_float aDotWB = dot(globalRotationAxis, wB);
+			w_float relAngularVelocity = limitSign * (aDotWB - aDotWA);
 
-			floatw limitCdot = relAngularVelocity + limitBias;
-			floatw limitLambda = -effectiveLimitAxialMass * limitCdot;
+			w_float limitCdot = relAngularVelocity + limitBias;
+			w_float limitLambda = -effectiveLimitAxialMass * limitCdot;
 
-			floatw impulse = maximum(limitImpulse + limitLambda, 0.f);
+			w_float impulse = maximum(limitImpulse + limitLambda, 0.f);
 			limitLambda = impulse - limitImpulse;
 			limitImpulse = impulse;
 
@@ -1731,21 +1731,21 @@ void solveHingeVelocityConstraintsSIMD(simd_hinge_constraint_solver constraints,
 
 		// Rotation part.
 		{
-			vec3w bxa(batch.bxa[0], batch.bxa[1], batch.bxa[2]);
-			vec3w cxa(batch.cxa[0], batch.cxa[1], batch.cxa[2]);
-			vec2w rotationBias(batch.rotationBias[0], batch.rotationBias[1]);
-			mat2w invEffectiveRotationMass;
-			invEffectiveRotationMass.m[0] = floatw(batch.invEffectiveRotationMass[0]);
-			invEffectiveRotationMass.m[1] = floatw(batch.invEffectiveRotationMass[1]);
-			invEffectiveRotationMass.m[2] = floatw(batch.invEffectiveRotationMass[2]);
-			invEffectiveRotationMass.m[3] = floatw(batch.invEffectiveRotationMass[3]);
+			w_vec3 bxa(batch.bxa[0], batch.bxa[1], batch.bxa[2]);
+			w_vec3 cxa(batch.cxa[0], batch.cxa[1], batch.cxa[2]);
+			w_vec2 rotationBias(batch.rotationBias[0], batch.rotationBias[1]);
+			w_mat2 invEffectiveRotationMass;
+			invEffectiveRotationMass.m[0] = w_float(batch.invEffectiveRotationMass[0]);
+			invEffectiveRotationMass.m[1] = w_float(batch.invEffectiveRotationMass[1]);
+			invEffectiveRotationMass.m[2] = w_float(batch.invEffectiveRotationMass[2]);
+			invEffectiveRotationMass.m[3] = w_float(batch.invEffectiveRotationMass[3]);
 
-			vec3w deltaAngularVelocity = wB - wA;
+			w_vec3 deltaAngularVelocity = wB - wA;
 
-			vec2w rotationCdot(dot(bxa, deltaAngularVelocity), dot(cxa, deltaAngularVelocity));
-			vec2w rotLambda = solveLinearSystem(invEffectiveRotationMass, -(rotationCdot + rotationBias));
+			w_vec2 rotationCdot(dot(bxa, deltaAngularVelocity), dot(cxa, deltaAngularVelocity));
+			w_vec2 rotLambda = solveLinearSystem(invEffectiveRotationMass, -(rotationCdot + rotationBias));
 
-			vec3w rotationP = bxa * rotLambda.x + cxa * rotLambda.y;
+			w_vec3 rotationP = bxa * rotLambda.x + cxa * rotLambda.y;
 
 			wA -= invInertiaA * rotationP;
 			wB += invInertiaB * rotationP;
@@ -1753,26 +1753,26 @@ void solveHingeVelocityConstraintsSIMD(simd_hinge_constraint_solver constraints,
 
 		// Position part.
 		{
-			vec3w relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
-			vec3w relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
-			vec3w translationBias(batch.translationBias[0], batch.translationBias[1], batch.translationBias[2]);
+			w_vec3 relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
+			w_vec3 relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
+			w_vec3 translationBias(batch.translationBias[0], batch.translationBias[1], batch.translationBias[2]);
 
-			mat3w invEffectiveTranslationMass;
-			invEffectiveTranslationMass.m[0] = floatw(batch.invEffectiveTranslationMass[0]);
-			invEffectiveTranslationMass.m[1] = floatw(batch.invEffectiveTranslationMass[1]);
-			invEffectiveTranslationMass.m[2] = floatw(batch.invEffectiveTranslationMass[2]);
-			invEffectiveTranslationMass.m[3] = floatw(batch.invEffectiveTranslationMass[3]);
-			invEffectiveTranslationMass.m[4] = floatw(batch.invEffectiveTranslationMass[4]);
-			invEffectiveTranslationMass.m[5] = floatw(batch.invEffectiveTranslationMass[5]);
-			invEffectiveTranslationMass.m[6] = floatw(batch.invEffectiveTranslationMass[6]);
-			invEffectiveTranslationMass.m[7] = floatw(batch.invEffectiveTranslationMass[7]);
-			invEffectiveTranslationMass.m[8] = floatw(batch.invEffectiveTranslationMass[8]);
+			w_mat3 invEffectiveTranslationMass;
+			invEffectiveTranslationMass.m[0] = w_float(batch.invEffectiveTranslationMass[0]);
+			invEffectiveTranslationMass.m[1] = w_float(batch.invEffectiveTranslationMass[1]);
+			invEffectiveTranslationMass.m[2] = w_float(batch.invEffectiveTranslationMass[2]);
+			invEffectiveTranslationMass.m[3] = w_float(batch.invEffectiveTranslationMass[3]);
+			invEffectiveTranslationMass.m[4] = w_float(batch.invEffectiveTranslationMass[4]);
+			invEffectiveTranslationMass.m[5] = w_float(batch.invEffectiveTranslationMass[5]);
+			invEffectiveTranslationMass.m[6] = w_float(batch.invEffectiveTranslationMass[6]);
+			invEffectiveTranslationMass.m[7] = w_float(batch.invEffectiveTranslationMass[7]);
+			invEffectiveTranslationMass.m[8] = w_float(batch.invEffectiveTranslationMass[8]);
 
-			vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
-			vec3w anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
-			vec3w translationCdot = anchorVelocityB - anchorVelocityA + translationBias;
+			w_vec3 anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
+			w_vec3 anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
+			w_vec3 translationCdot = anchorVelocityB - anchorVelocityA + translationBias;
 
-			vec3w translationP = solveLinearSystem(invEffectiveTranslationMass, -translationCdot);
+			w_vec3 translationP = solveLinearSystem(invEffectiveTranslationMass, -translationCdot);
 
 			vA -= invMassA * translationP;
 			wA -= invInertiaA * cross(relGlobalAnchorA, translationP);
@@ -1918,11 +1918,11 @@ cone_twist_constraint_solver initializeConeTwistVelocityConstraints(memory_arena
 		}
 
 		// Twist limit and motor.
-		bool minTwistLimitViolated = in.twistLimit >= 0.f && twistAngle <= -in.twistLimit;
+		bool mw_intistLimitViolated = in.twistLimit >= 0.f && twistAngle <= -in.twistLimit;
 		bool maxTwistLimitViolated = in.twistLimit >= 0.f && twistAngle >= in.twistLimit; 
-		assert(!(minTwistLimitViolated && maxTwistLimitViolated));
+		assert(!(mw_intistLimitViolated && maxTwistLimitViolated));
 
-		out.solveTwistLimit = minTwistLimitViolated || maxTwistLimitViolated;
+		out.solveTwistLimit = mw_intistLimitViolated || maxTwistLimitViolated;
 		out.solveTwistMotor = in.maxTwistMotorTorque > 0.f;
 		if (out.solveTwistLimit || out.solveTwistMotor)
 		{
@@ -1932,7 +1932,7 @@ cone_twist_constraint_solver initializeConeTwistVelocityConstraints(memory_arena
 								   + dot(out.globalTwistAxis, globalB.invInertia * out.globalTwistAxis);
 			out.effectiveTwistMass = (invEffectiveMass != 0.f) ? (1.f / invEffectiveMass) : 0.f;
 
-			out.twistLimitSign = minTwistLimitViolated ? 1.f : -1.f;
+			out.twistLimitSign = mw_intistLimitViolated ? 1.f : -1.f;
 
 			out.maxTwistMotorImpulse = in.maxTwistMotorTorque * dt;
 			out.twistMotorImpulse = 0.f;
@@ -1953,7 +1953,7 @@ cone_twist_constraint_solver initializeConeTwistVelocityConstraints(memory_arena
 			out.twistLimitBias = 0.f;
 			if (dt > DT_THRESHOLD)
 			{
-				float d = minTwistLimitViolated ? (in.twistLimit + twistAngle) : (in.twistLimit - twistAngle);
+				float d = mw_intistLimitViolated ? (in.twistLimit + twistAngle) : (in.twistLimit - twistAngle);
 				out.twistLimitBias = d * TWIST_LIMIT_CONSTRAINT_BETA * invDt;
 			}
 		}
@@ -2091,9 +2091,9 @@ simd_cone_twist_constraint_solver initializeConeTwistVelocityConstraintsSIMD(mem
 
 	simd_cone_twist_constraint_batch* batches = arena.allocate<simd_cone_twist_constraint_batch>(numBatches);
 
-	const floatw zero = floatw::zero();
-	const floatw invDt = 1.f / dt;
-	const floatw one = 1.f;
+	const w_float zero = w_float::zero();
+	const w_float invDt = 1.f / dt;
+	const w_float one = 1.f;
 
 	for (uint32 i = 0; i < numBatches; ++i)
 	{
@@ -2110,11 +2110,11 @@ simd_cone_twist_constraint_solver initializeConeTwistVelocityConstraintsSIMD(mem
 
 
 		// Load body A.
-		vec3w localCOGPositionA;
-		quatw rotationA;
-		vec3w positionA;
-		mat3w invInertiaA;
-		floatw invMassA;
+		w_vec3 localCOGPositionA;
+		w_quat rotationA;
+		w_vec3 positionA;
+		w_mat3 invInertiaA;
+		w_float invMassA;
 
 		load8(&rbs->rotation.x, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			rotationA.x, rotationA.y, rotationA.z, rotationA.w,
@@ -2132,11 +2132,11 @@ simd_cone_twist_constraint_solver initializeConeTwistVelocityConstraintsSIMD(mem
 
 
 		// Load body B.
-		quatw rotationB;
-		vec3w positionB;
-		vec3w localCOGPositionB;
-		mat3w invInertiaB;
-		floatw invMassB;
+		w_quat rotationB;
+		w_vec3 positionB;
+		w_vec3 localCOGPositionB;
+		w_mat3 invInertiaB;
+		w_float invMassB;
 
 		load8(&rbs->rotation.x, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			rotationB.x, rotationB.y, rotationB.z, rotationB.w,
@@ -2157,29 +2157,29 @@ simd_cone_twist_constraint_solver initializeConeTwistVelocityConstraintsSIMD(mem
 
 
 
-		vec3w localAnchorA;
-		vec3w localAnchorB;
+		w_vec3 localAnchorA;
+		w_vec3 localAnchorB;
 
-		vec3w localLimitAxisA;
-		vec3w localLimitAxisB;
+		w_vec3 localLimitAxisA;
+		w_vec3 localLimitAxisB;
 
-		vec3w localLimitTangentA;
-		vec3w localLimitBitangentA;
-		vec3w localLimitTangentB;
+		w_vec3 localLimitTangentA;
+		w_vec3 localLimitBitangentA;
+		w_vec3 localLimitTangentB;
 
-		floatw swingLimit;
-		floatw twistLimit;
+		w_float swingLimit;
+		w_float twistLimit;
 
-		floatw swingMotorTypeF;
-		floatw swingMotorVelocity;
-		floatw maxSwingMotorTorque;
-		floatw swingMotorAxis;
+		w_float swingMotorTypeF;
+		w_float swingMotorVelocity;
+		w_float maxSwingMotorTorque;
+		w_float swingMotorAxis;
 
-		floatw twistMotorTypeF;
-		floatw twistMotorVelocity;
-		floatw maxTwistMotorTorque;
+		w_float twistMotorTypeF;
+		w_float twistMotorVelocity;
+		w_float maxTwistMotorTorque;
 
-		floatw dummy0, dummy1;
+		w_float dummy0, dummy1;
 
 
 		load8((float*)input, constraintIndices, (uint32)sizeof(*input),
@@ -2204,8 +2204,8 @@ simd_cone_twist_constraint_solver initializeConeTwistVelocityConstraintsSIMD(mem
 			dummy0, dummy1);
 
 
-		intw swingMotorType = reinterpret(swingMotorTypeF);
-		intw twistMotorType = reinterpret(twistMotorTypeF);
+		w_int swingMotorType = reinterpret(swingMotorTypeF);
+		w_int twistMotorType = reinterpret(twistMotorTypeF);
 
 
 
@@ -2213,27 +2213,27 @@ simd_cone_twist_constraint_solver initializeConeTwistVelocityConstraintsSIMD(mem
 
 
 		// Relative to COG.
-		vec3w relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
-		vec3w relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
+		w_vec3 relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
+		w_vec3 relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
 
 		// Global.
-		vec3w globalAnchorA = positionA + relGlobalAnchorA;
-		vec3w globalAnchorB = positionB + relGlobalAnchorB;
+		w_vec3 globalAnchorA = positionA + relGlobalAnchorA;
+		w_vec3 globalAnchorB = positionB + relGlobalAnchorB;
 
-		mat3w skewMatA = getSkewMatrix(relGlobalAnchorA);
-		mat3w skewMatB = getSkewMatrix(relGlobalAnchorB);
+		w_mat3 skewMatA = getSkewMatrix(relGlobalAnchorA);
+		w_mat3 skewMatB = getSkewMatrix(relGlobalAnchorB);
 
-		mat3w invEffectiveMass = skewMatA * invInertiaA * transpose(skewMatA)
+		w_mat3 invEffectiveMass = skewMatA * invInertiaA * transpose(skewMatA)
 							   + skewMatB * invInertiaB * transpose(skewMatB);
-		floatw invMassSum = invMassA + invMassB;
+		w_float invMassSum = invMassA + invMassB;
 		invEffectiveMass.m00 += invMassSum;
 		invEffectiveMass.m11 += invMassSum;
 		invEffectiveMass.m22 += invMassSum;
 
-		vec3w bias = zero;
+		w_vec3 bias = zero;
 		if (dt > DT_THRESHOLD)
 		{
-			bias = (globalAnchorB - globalAnchorA) * (floatw(BALL_CONSTRAINT_BETA) * invDt);
+			bias = (globalAnchorB - globalAnchorA) * (w_float(BALL_CONSTRAINT_BETA) * invDt);
 		}
 
 		relGlobalAnchorA.x.store(batch.relGlobalAnchorA[0]);
@@ -2261,21 +2261,21 @@ simd_cone_twist_constraint_solver initializeConeTwistVelocityConstraintsSIMD(mem
 
 		// Limits and motors.
 
-		quatw btoa = conjugate(rotationA) * rotationB;
+		w_quat btoa = conjugate(rotationA) * rotationB;
 
-		vec3w localLimitAxisCompareA = btoa * localLimitAxisB;
+		w_vec3 localLimitAxisCompareA = btoa * localLimitAxisB;
 
-		quatw swingRotation = rotateFromTo(localLimitAxisA, localLimitAxisCompareA);
+		w_quat swingRotation = rotateFromTo(localLimitAxisA, localLimitAxisCompareA);
 
-		vec3w twistTangentA = swingRotation * localLimitTangentA;
-		vec3w twistBitangentA = swingRotation * localLimitBitangentA;
-		vec3w localLimitTangentCompareA = btoa * localLimitTangentB;
-		floatw twistAngle = atan2(dot(localLimitTangentCompareA, twistBitangentA), dot(localLimitTangentCompareA, twistTangentA));
+		w_vec3 twistTangentA = swingRotation * localLimitTangentA;
+		w_vec3 twistBitangentA = swingRotation * localLimitBitangentA;
+		w_vec3 localLimitTangentCompareA = btoa * localLimitTangentB;
+		w_float twistAngle = atan2(dot(localLimitTangentCompareA, twistBitangentA), dot(localLimitTangentCompareA, twistTangentA));
 
 
 
 		// Swing limit.
-		vec3w swingAxis; floatw swingAngle;
+		w_vec3 swingAxis; w_float swingAngle;
 		getAxisRotation(swingRotation, swingAxis, swingAngle);
 		auto swingAngleNegative = swingAngle < zero;
 		swingAngle = ifThen(swingAngleNegative, -swingAngle, swingAngle);
@@ -2285,20 +2285,20 @@ simd_cone_twist_constraint_solver initializeConeTwistVelocityConstraintsSIMD(mem
 		batch.solveSwingLimit = anyTrue(solveSwingLimit);
 		if (batch.solveSwingLimit)
 		{
-			vec3w globalSwingAxis = rotationA * swingAxis;
-			floatw invEffectiveLimitMass = dot(globalSwingAxis, invInertiaA * globalSwingAxis)
+			w_vec3 globalSwingAxis = rotationA * swingAxis;
+			w_float invEffectiveLimitMass = dot(globalSwingAxis, invInertiaA * globalSwingAxis)
 										 + dot(globalSwingAxis, invInertiaB * globalSwingAxis);
-			floatw effectiveSwingLimitMass = ifThen(invEffectiveLimitMass != zero, 1.f / invEffectiveLimitMass, zero);
+			w_float effectiveSwingLimitMass = ifThen(invEffectiveLimitMass != zero, 1.f / invEffectiveLimitMass, zero);
 			effectiveSwingLimitMass = ifThen(solveSwingLimit, effectiveSwingLimitMass, zero); // Set to zero for constraints, which aren't at the limit.
 
-			floatw swingLimitBias = zero;
+			w_float swingLimitBias = zero;
 			if (dt > DT_THRESHOLD)
 			{
-				swingLimitBias = (swingLimit - swingAngle) * (floatw(HINGE_LIMIT_CONSTRAINT_BETA) * invDt);
+				swingLimitBias = (swingLimit - swingAngle) * (w_float(HINGE_LIMIT_CONSTRAINT_BETA) * invDt);
 			}
 
-			vec3w swingLimitImpulseToAngularVelocityA = invInertiaA * globalSwingAxis;
-			vec3w swingLimitImpulseToAngularVelocityB = invInertiaB * globalSwingAxis;
+			w_vec3 swingLimitImpulseToAngularVelocityA = invInertiaA * globalSwingAxis;
+			w_vec3 swingLimitImpulseToAngularVelocityB = invInertiaB * globalSwingAxis;
 
 			globalSwingAxis.x.store(batch.globalSwingAxis[0]);
 			globalSwingAxis.y.store(batch.globalSwingAxis[1]);
@@ -2322,38 +2322,38 @@ simd_cone_twist_constraint_solver initializeConeTwistVelocityConstraintsSIMD(mem
 		batch.solveSwingMotor = anyTrue(solveSwingMotor);
 		if (batch.solveSwingMotor)
 		{
-			floatw maxSwingMotorImpulse = maxSwingMotorTorque * floatw(dt);
+			w_float maxSwingMotorImpulse = maxSwingMotorTorque * w_float(dt);
 			maxSwingMotorTorque = ifThen(solveSwingMotor, maxSwingMotorTorque, zero);
 
-			floatw axisX = cos(swingMotorAxis), axisY = sin(swingMotorAxis);
-			vec3w localSwingMotorAxis = axisX * localLimitTangentA + axisY * localLimitBitangentA;
+			w_float axisX = cos(swingMotorAxis), axisY = sin(swingMotorAxis);
+			w_vec3 localSwingMotorAxis = axisX * localLimitTangentA + axisY * localLimitBitangentA;
 
 			auto isVelocityMotor = swingMotorType == constraint_velocity_motor;
-			vec3w globalSwingMotorAxis = rotationA * localSwingMotorAxis;
+			w_vec3 globalSwingMotorAxis = rotationA * localSwingMotorAxis;
 
 			if (anyFalse(isVelocityMotor)) // At least one position motor.
 			{
-				floatw targetAngle = swingMotorVelocity; // This is a union.
+				w_float targetAngle = swingMotorVelocity; // This is a union.
 				targetAngle = ifThen(swingLimit >= zero, clamp(targetAngle, -swingLimit, swingLimit), targetAngle);
 
-				vec3w localTargetDirection = quatw(localSwingMotorAxis, targetAngle) * localLimitAxisA;
-				vec3w localSwingMotorAxis = noz(cross(localLimitAxisCompareA, localTargetDirection));
-				vec3w globalSwingMotorAxisOverride = rotationA * localSwingMotorAxis;
+				w_vec3 localTargetDirection = w_quat(localSwingMotorAxis, targetAngle) * localLimitAxisA;
+				w_vec3 localSwingMotorAxis = noz(cross(localLimitAxisCompareA, localTargetDirection));
+				w_vec3 globalSwingMotorAxisOverride = rotationA * localSwingMotorAxis;
 
-				floatw cosAngle = dot(localTargetDirection, localLimitAxisCompareA);
-				floatw deltaAngle = acos(clamp01(cosAngle));
-				floatw swingMotorVelocityOverride = (dt > DT_THRESHOLD) ? (deltaAngle * invDt * floatw(0.2f)) : zero;
+				w_float cosAngle = dot(localTargetDirection, localLimitAxisCompareA);
+				w_float deltaAngle = acos(clamp01(cosAngle));
+				w_float swingMotorVelocityOverride = (dt > DT_THRESHOLD) ? (deltaAngle * invDt * w_float(0.2f)) : zero;
 
 				swingMotorVelocity = ifThen(reinterpret(isVelocityMotor), swingMotorVelocity, swingMotorVelocityOverride);
 				globalSwingMotorAxis = ifThen(reinterpret(isVelocityMotor), globalSwingMotorAxis, globalSwingMotorAxisOverride);
 			}
 
-			vec3w swingMotorImpulseToAngularVelocityA = invInertiaA * globalSwingMotorAxis;
-			vec3w swingMotorImpulseToAngularVelocityB = invInertiaB * globalSwingMotorAxis;
+			w_vec3 swingMotorImpulseToAngularVelocityA = invInertiaA * globalSwingMotorAxis;
+			w_vec3 swingMotorImpulseToAngularVelocityB = invInertiaB * globalSwingMotorAxis;
 
-			floatw invEffectiveMotorMass = dot(globalSwingMotorAxis, invInertiaA * globalSwingMotorAxis)
+			w_float invEffectiveMotorMass = dot(globalSwingMotorAxis, invInertiaA * globalSwingMotorAxis)
 										 + dot(globalSwingMotorAxis, invInertiaB * globalSwingMotorAxis);
-			floatw effectiveSwingMotorMass = ifThen(invEffectiveMotorMass != zero, 1.f / invEffectiveMotorMass, zero);
+			w_float effectiveSwingMotorMass = ifThen(invEffectiveMotorMass != zero, 1.f / invEffectiveMotorMass, zero);
 			effectiveSwingMotorMass = ifThen(solveSwingMotor, effectiveSwingMotorMass, zero); // Set to zero for constraints, which have no motor.
 
 			
@@ -2377,30 +2377,30 @@ simd_cone_twist_constraint_solver initializeConeTwistVelocityConstraintsSIMD(mem
 		}
 
 		// Twist limit and motor.
-		auto minTwistLimitViolated = (twistLimit >= zero) & (twistAngle <= -twistLimit);
+		auto mw_intistLimitViolated = (twistLimit >= zero) & (twistAngle <= -twistLimit);
 		auto maxTwistLimitViolated = (twistLimit >= zero) & (twistAngle >= twistLimit);
 
-		auto solveTwistLimit = minTwistLimitViolated | maxTwistLimitViolated;
+		auto solveTwistLimit = mw_intistLimitViolated | maxTwistLimitViolated;
 		auto solveTwistMotor = maxTwistMotorTorque > zero;
 		batch.solveTwistLimit = anyTrue(solveTwistLimit);
 		batch.solveTwistMotor = anyTrue(solveTwistMotor);
 		if (batch.solveTwistLimit || batch.solveTwistMotor)
 		{
-			vec3w globalTwistAxis = rotationA * localLimitAxisA;
-			floatw invEffectiveMass = dot(globalTwistAxis, invInertiaA * globalTwistAxis)
+			w_vec3 globalTwistAxis = rotationA * localLimitAxisA;
+			w_float invEffectiveMass = dot(globalTwistAxis, invInertiaA * globalTwistAxis)
 									+ dot(globalTwistAxis, invInertiaB * globalTwistAxis);
-			floatw effectiveTwistMass = ifThen(invEffectiveMass != zero, 1.f / invEffectiveMass, zero);
+			w_float effectiveTwistMass = ifThen(invEffectiveMass != zero, 1.f / invEffectiveMass, zero);
 
-			floatw effectiveTwistLimitMass = ifThen(solveTwistLimit, effectiveTwistMass, zero); // Set to zero for constraints, which aren't at the limit.
-			floatw effectiveTwistMotorMass = ifThen(solveTwistMotor, effectiveTwistMass, zero); // Set to zero for constraints, which have no motor.
+			w_float effectiveTwistLimitMass = ifThen(solveTwistLimit, effectiveTwistMass, zero); // Set to zero for constraints, which aren't at the limit.
+			w_float effectiveTwistMotorMass = ifThen(solveTwistMotor, effectiveTwistMass, zero); // Set to zero for constraints, which have no motor.
 
-			floatw twistLimitSign = ifThen(minTwistLimitViolated, 1.f, -1.f);
+			w_float twistLimitSign = ifThen(mw_intistLimitViolated, 1.f, -1.f);
 
-			floatw maxTwistMotorImpulse = maxTwistMotorTorque * floatw(dt);
+			w_float maxTwistMotorImpulse = maxTwistMotorTorque * w_float(dt);
 			maxTwistMotorImpulse = ifThen(solveTwistMotor, maxTwistMotorImpulse, zero);
 
-			vec3w twistMotorAndLimitImpulseToAngularVelocityA = invInertiaA * globalTwistAxis;
-			vec3w twistMotorAndLimitImpulseToAngularVelocityB = invInertiaB * globalTwistAxis;
+			w_vec3 twistMotorAndLimitImpulseToAngularVelocityA = invInertiaA * globalTwistAxis;
+			w_vec3 twistMotorAndLimitImpulseToAngularVelocityB = invInertiaB * globalTwistAxis;
 
 			if (batch.solveTwistMotor)
 			{
@@ -2410,20 +2410,20 @@ simd_cone_twist_constraint_solver initializeConeTwistVelocityConstraintsSIMD(mem
 				{
 					// Inspired by Bullet Engine. We set the velocity such that the target angle is reached within one frame.
 					// This will later get clamped to the maximum motor impulse.
-					floatw limit = ifThen(twistLimit >= zero, twistLimit, M_PI);
-					floatw twistMotorTargetAngle = twistMotorVelocity; // This is a union.
-					floatw targetAngle = clamp(twistMotorTargetAngle, -limit, limit);
+					w_float limit = ifThen(twistLimit >= zero, twistLimit, M_PI);
+					w_float twistMotorTargetAngle = twistMotorVelocity; // This is a union.
+					w_float targetAngle = clamp(twistMotorTargetAngle, -limit, limit);
 
-					floatw twistMotorVelocityOverride = (dt > DT_THRESHOLD) ? ((targetAngle - twistAngle) * invDt) : zero;
+					w_float twistMotorVelocityOverride = (dt > DT_THRESHOLD) ? ((targetAngle - twistAngle) * invDt) : zero;
 					twistMotorVelocity = ifThen(reinterpret(isVelocityMotor), twistMotorVelocity, twistMotorVelocityOverride);
 				}
 			}
 
-			floatw twistLimitBias = zero;
+			w_float twistLimitBias = zero;
 			if (batch.solveTwistLimit && dt > DT_THRESHOLD)
 			{
-				floatw d = ifThen(minTwistLimitViolated, twistLimit + twistAngle, twistLimit - twistAngle);
-				twistLimitBias = d * (floatw(TWIST_LIMIT_CONSTRAINT_BETA) * invDt);
+				w_float d = ifThen(mw_intistLimitViolated, twistLimit + twistAngle, twistLimit - twistAngle);
+				twistLimitBias = d * (w_float(TWIST_LIMIT_CONSTRAINT_BETA) * invDt);
 			}
 
 			globalTwistAxis.x.store(batch.globalTwistAxis[0]);
@@ -2467,9 +2467,9 @@ void solveConeTwistVelocityConstraintsSIMD(simd_cone_twist_constraint_solver con
 
 
 		// Load body A.
-		vec3w vA, wA;
-		floatw invMassA;
-		mat3w invInertiaA;
+		w_vec3 vA, wA;
+		w_float invMassA;
+		w_mat3 invInertiaA;
 
 		load8(&rbs->invInertia.m00, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20,
@@ -2481,9 +2481,9 @@ void solveConeTwistVelocityConstraintsSIMD(simd_cone_twist_constraint_solver con
 
 
 		// Load body B.
-		vec3w vB, wB;
-		floatw invMassB;
-		mat3w invInertiaB;
+		w_vec3 vB, wB;
+		w_float invMassB;
+		w_mat3 invInertiaB;
 
 		load8(&rbs->invInertia.m00, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
@@ -2496,26 +2496,26 @@ void solveConeTwistVelocityConstraintsSIMD(simd_cone_twist_constraint_solver con
 
 		// Solve in order of importance (most important last): Motors -> Limits -> Position.
 
-		vec3w globalTwistAxis(batch.globalTwistAxis[0], batch.globalTwistAxis[1], batch.globalTwistAxis[2]);
-		vec3w twistMotorAndLimitImpulseToAngularVelocityA(batch.twistMotorAndLimitImpulseToAngularVelocityA[0], batch.twistMotorAndLimitImpulseToAngularVelocityA[1], batch.twistMotorAndLimitImpulseToAngularVelocityA[2]);
-		vec3w twistMotorAndLimitImpulseToAngularVelocityB(batch.twistMotorAndLimitImpulseToAngularVelocityB[0], batch.twistMotorAndLimitImpulseToAngularVelocityB[1], batch.twistMotorAndLimitImpulseToAngularVelocityB[2]);
+		w_vec3 globalTwistAxis(batch.globalTwistAxis[0], batch.globalTwistAxis[1], batch.globalTwistAxis[2]);
+		w_vec3 twistMotorAndLimitImpulseToAngularVelocityA(batch.twistMotorAndLimitImpulseToAngularVelocityA[0], batch.twistMotorAndLimitImpulseToAngularVelocityA[1], batch.twistMotorAndLimitImpulseToAngularVelocityA[2]);
+		w_vec3 twistMotorAndLimitImpulseToAngularVelocityB(batch.twistMotorAndLimitImpulseToAngularVelocityB[0], batch.twistMotorAndLimitImpulseToAngularVelocityB[1], batch.twistMotorAndLimitImpulseToAngularVelocityB[2]);
 
 		// Motor.
 		if (batch.solveTwistMotor)
 		{
-			floatw twistMotorVelocity(batch.twistMotorVelocity);
-			floatw effectiveTwistMotorMass(batch.effectiveTwistMotorMass);
-			floatw twistMotorImpulse(batch.twistMotorImpulse);
-			floatw maxTwistMotorImpulse(batch.maxTwistMotorImpulse);
+			w_float twistMotorVelocity(batch.twistMotorVelocity);
+			w_float effectiveTwistMotorMass(batch.effectiveTwistMotorMass);
+			w_float twistMotorImpulse(batch.twistMotorImpulse);
+			w_float maxTwistMotorImpulse(batch.maxTwistMotorImpulse);
 
-			floatw aDotWA = dot(globalTwistAxis, wA);
-			floatw aDotWB = dot(globalTwistAxis, wB);
-			floatw relAngularVelocity = (aDotWB - aDotWA);
+			w_float aDotWA = dot(globalTwistAxis, wA);
+			w_float aDotWB = dot(globalTwistAxis, wB);
+			w_float relAngularVelocity = (aDotWB - aDotWA);
 
-			floatw motorCdot = relAngularVelocity - twistMotorVelocity;
+			w_float motorCdot = relAngularVelocity - twistMotorVelocity;
 
-			floatw motorLambda = -effectiveTwistMotorMass * motorCdot;
-			floatw oldImpulse = twistMotorImpulse;
+			w_float motorLambda = -effectiveTwistMotorMass * motorCdot;
+			w_float oldImpulse = twistMotorImpulse;
 			twistMotorImpulse = clamp(twistMotorImpulse + motorLambda, -maxTwistMotorImpulse, maxTwistMotorImpulse);
 			motorLambda = twistMotorImpulse - oldImpulse;
 
@@ -2527,23 +2527,23 @@ void solveConeTwistVelocityConstraintsSIMD(simd_cone_twist_constraint_solver con
 
 		if (batch.solveSwingMotor)
 		{
-			floatw swingMotorVelocity(batch.swingMotorVelocity);
-			floatw effectiveSwingMotorMass(batch.effectiveSwingMotorMass);
-			vec3w globalSwingMotorAxis(batch.globalSwingMotorAxis[0], batch.globalSwingMotorAxis[1], batch.globalSwingMotorAxis[2]);
-			floatw swingMotorImpulse(batch.swingMotorImpulse);
-			floatw maxSwingMotorImpulse(batch.maxSwingMotorImpulse);
+			w_float swingMotorVelocity(batch.swingMotorVelocity);
+			w_float effectiveSwingMotorMass(batch.effectiveSwingMotorMass);
+			w_vec3 globalSwingMotorAxis(batch.globalSwingMotorAxis[0], batch.globalSwingMotorAxis[1], batch.globalSwingMotorAxis[2]);
+			w_float swingMotorImpulse(batch.swingMotorImpulse);
+			w_float maxSwingMotorImpulse(batch.maxSwingMotorImpulse);
 
-			vec3w swingMotorImpulseToAngularVelocityA(batch.swingMotorImpulseToAngularVelocityA[0], batch.swingMotorImpulseToAngularVelocityA[1], batch.swingMotorImpulseToAngularVelocityA[2]);
-			vec3w swingMotorImpulseToAngularVelocityB(batch.swingMotorImpulseToAngularVelocityB[0], batch.swingMotorImpulseToAngularVelocityB[1], batch.swingMotorImpulseToAngularVelocityB[2]);
+			w_vec3 swingMotorImpulseToAngularVelocityA(batch.swingMotorImpulseToAngularVelocityA[0], batch.swingMotorImpulseToAngularVelocityA[1], batch.swingMotorImpulseToAngularVelocityA[2]);
+			w_vec3 swingMotorImpulseToAngularVelocityB(batch.swingMotorImpulseToAngularVelocityB[0], batch.swingMotorImpulseToAngularVelocityB[1], batch.swingMotorImpulseToAngularVelocityB[2]);
 
-			floatw aDotWA = dot(globalSwingMotorAxis, wA);
-			floatw aDotWB = dot(globalSwingMotorAxis, wB);
-			floatw relAngularVelocity = (aDotWB - aDotWA);
+			w_float aDotWA = dot(globalSwingMotorAxis, wA);
+			w_float aDotWB = dot(globalSwingMotorAxis, wB);
+			w_float relAngularVelocity = (aDotWB - aDotWA);
 
-			floatw motorCdot = relAngularVelocity - swingMotorVelocity;
+			w_float motorCdot = relAngularVelocity - swingMotorVelocity;
 
-			floatw motorLambda = -effectiveSwingMotorMass * motorCdot;
-			floatw oldImpulse = swingMotorImpulse;
+			w_float motorLambda = -effectiveSwingMotorMass * motorCdot;
+			w_float oldImpulse = swingMotorImpulse;
 			swingMotorImpulse = clamp(swingMotorImpulse + motorLambda, -maxSwingMotorImpulse, maxSwingMotorImpulse);
 			motorLambda = swingMotorImpulse - oldImpulse;
 
@@ -2556,19 +2556,19 @@ void solveConeTwistVelocityConstraintsSIMD(simd_cone_twist_constraint_solver con
 		// Twist.
 		if (batch.solveTwistLimit)
 		{
-			floatw limitSign(batch.twistLimitSign);
-			floatw twistLimitBias(batch.twistLimitBias);
-			floatw effectiveTwistLimitMass(batch.effectiveTwistLimitMass);
-			floatw twistImpulse(batch.twistImpulse);
+			w_float limitSign(batch.twistLimitSign);
+			w_float twistLimitBias(batch.twistLimitBias);
+			w_float effectiveTwistLimitMass(batch.effectiveTwistLimitMass);
+			w_float twistImpulse(batch.twistImpulse);
 
-			floatw aDotWA = dot(globalTwistAxis, wA);
-			floatw aDotWB = dot(globalTwistAxis, wB);
-			floatw relAngularVelocity = limitSign * (aDotWB - aDotWA);
+			w_float aDotWA = dot(globalTwistAxis, wA);
+			w_float aDotWB = dot(globalTwistAxis, wB);
+			w_float relAngularVelocity = limitSign * (aDotWB - aDotWA);
 
-			floatw limitCdot = relAngularVelocity + twistLimitBias;
-			floatw limitLambda = -effectiveTwistLimitMass * limitCdot;
+			w_float limitCdot = relAngularVelocity + twistLimitBias;
+			w_float limitLambda = -effectiveTwistLimitMass * limitCdot;
 
-			floatw impulse = maximum(twistImpulse + limitLambda, floatw::zero());
+			w_float impulse = maximum(twistImpulse + limitLambda, w_float::zero());
 			limitLambda = impulse - twistImpulse;
 			twistImpulse = impulse;
 
@@ -2583,20 +2583,20 @@ void solveConeTwistVelocityConstraintsSIMD(simd_cone_twist_constraint_solver con
 		// Cone.
 		if (batch.solveSwingLimit)
 		{
-			vec3w globalSwingAxis(batch.globalSwingAxis[0], batch.globalSwingAxis[1], batch.globalSwingAxis[2]);
-			floatw swingLimitBias(batch.swingLimitBias);
-			floatw effectiveSwingLimitMass(batch.effectiveSwingLimitMass);
-			floatw swingImpulse(batch.swingImpulse);
+			w_vec3 globalSwingAxis(batch.globalSwingAxis[0], batch.globalSwingAxis[1], batch.globalSwingAxis[2]);
+			w_float swingLimitBias(batch.swingLimitBias);
+			w_float effectiveSwingLimitMass(batch.effectiveSwingLimitMass);
+			w_float swingImpulse(batch.swingImpulse);
 
-			vec3w swingLimitImpulseToAngularVelocityA(batch.swingLimitImpulseToAngularVelocityA[0], batch.swingLimitImpulseToAngularVelocityA[1], batch.swingLimitImpulseToAngularVelocityA[2]);
-			vec3w swingLimitImpulseToAngularVelocityB(batch.swingLimitImpulseToAngularVelocityB[0], batch.swingLimitImpulseToAngularVelocityB[1], batch.swingLimitImpulseToAngularVelocityB[2]);
+			w_vec3 swingLimitImpulseToAngularVelocityA(batch.swingLimitImpulseToAngularVelocityA[0], batch.swingLimitImpulseToAngularVelocityA[1], batch.swingLimitImpulseToAngularVelocityA[2]);
+			w_vec3 swingLimitImpulseToAngularVelocityB(batch.swingLimitImpulseToAngularVelocityB[0], batch.swingLimitImpulseToAngularVelocityB[1], batch.swingLimitImpulseToAngularVelocityB[2]);
 
-			floatw aDotWA = dot(globalSwingAxis, wA);
-			floatw aDotWB = dot(globalSwingAxis, wB);
-			floatw swingLimitCdot = aDotWA - aDotWB + swingLimitBias;
-			floatw limitLambda = -effectiveSwingLimitMass * swingLimitCdot;
+			w_float aDotWA = dot(globalSwingAxis, wA);
+			w_float aDotWB = dot(globalSwingAxis, wB);
+			w_float swingLimitCdot = aDotWA - aDotWB + swingLimitBias;
+			w_float limitLambda = -effectiveSwingLimitMass * swingLimitCdot;
 
-			floatw impulse = maximum(swingImpulse + limitLambda, floatw::zero());
+			w_float impulse = maximum(swingImpulse + limitLambda, w_float::zero());
 			limitLambda = impulse - swingImpulse;
 			swingImpulse = impulse;
 
@@ -2609,26 +2609,26 @@ void solveConeTwistVelocityConstraintsSIMD(simd_cone_twist_constraint_solver con
 
 		// Position part.
 		{
-			vec3w relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
-			vec3w relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
-			vec3w bias(batch.bias[0], batch.bias[1], batch.bias[2]);
+			w_vec3 relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
+			w_vec3 relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
+			w_vec3 bias(batch.bias[0], batch.bias[1], batch.bias[2]);
 
-			mat3w invEffectiveMass;
-			invEffectiveMass.m[0] = floatw(batch.invEffectiveMass[0]);
-			invEffectiveMass.m[1] = floatw(batch.invEffectiveMass[1]);
-			invEffectiveMass.m[2] = floatw(batch.invEffectiveMass[2]);
-			invEffectiveMass.m[3] = floatw(batch.invEffectiveMass[3]);
-			invEffectiveMass.m[4] = floatw(batch.invEffectiveMass[4]);
-			invEffectiveMass.m[5] = floatw(batch.invEffectiveMass[5]);
-			invEffectiveMass.m[6] = floatw(batch.invEffectiveMass[6]);
-			invEffectiveMass.m[7] = floatw(batch.invEffectiveMass[7]);
-			invEffectiveMass.m[8] = floatw(batch.invEffectiveMass[8]);
+			w_mat3 invEffectiveMass;
+			invEffectiveMass.m[0] = w_float(batch.invEffectiveMass[0]);
+			invEffectiveMass.m[1] = w_float(batch.invEffectiveMass[1]);
+			invEffectiveMass.m[2] = w_float(batch.invEffectiveMass[2]);
+			invEffectiveMass.m[3] = w_float(batch.invEffectiveMass[3]);
+			invEffectiveMass.m[4] = w_float(batch.invEffectiveMass[4]);
+			invEffectiveMass.m[5] = w_float(batch.invEffectiveMass[5]);
+			invEffectiveMass.m[6] = w_float(batch.invEffectiveMass[6]);
+			invEffectiveMass.m[7] = w_float(batch.invEffectiveMass[7]);
+			invEffectiveMass.m[8] = w_float(batch.invEffectiveMass[8]);
 
-			vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
-			vec3w anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
-			vec3w translationCdot = anchorVelocityB - anchorVelocityA + bias;
+			w_vec3 anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
+			w_vec3 anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
+			w_vec3 translationCdot = anchorVelocityB - anchorVelocityA + bias;
 
-			vec3w translationP = solveLinearSystem(invEffectiveMass, -translationCdot);
+			w_vec3 translationP = solveLinearSystem(invEffectiveMass, -translationCdot);
 
 			vA -= invMassA * translationP;
 			wA -= invInertiaA * cross(relGlobalAnchorA, translationP);
@@ -2867,9 +2867,9 @@ simd_slider_constraint_solver initializeSliderVelocityConstraintsSIMD(memory_are
 
 	simd_slider_constraint_batch* batches = arena.allocate<simd_slider_constraint_batch>(numBatches);
 
-	const floatw zero = floatw::zero();
-	const floatw invDt = 1.f / dt;
-	const floatw one = 1.f;
+	const w_float zero = w_float::zero();
+	const w_float invDt = 1.f / dt;
+	const w_float one = 1.f;
 
 	for (uint32 i = 0; i < numBatches; ++i)
 	{
@@ -2886,11 +2886,11 @@ simd_slider_constraint_solver initializeSliderVelocityConstraintsSIMD(memory_are
 
 
 		// Load body A.
-		vec3w localCOGPositionA;
-		quatw rotationA;
-		vec3w positionA;
-		mat3w invInertiaA;
-		floatw invMassA;
+		w_vec3 localCOGPositionA;
+		w_quat rotationA;
+		w_vec3 positionA;
+		w_mat3 invInertiaA;
+		w_float invMassA;
 
 		load8(&rbs->rotation.x, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			rotationA.x, rotationA.y, rotationA.z, rotationA.w,
@@ -2908,11 +2908,11 @@ simd_slider_constraint_solver initializeSliderVelocityConstraintsSIMD(memory_are
 
 
 		// Load body B.
-		quatw rotationB;
-		vec3w positionB;
-		vec3w localCOGPositionB;
-		mat3w invInertiaB;
-		floatw invMassB;
+		w_quat rotationB;
+		w_vec3 positionB;
+		w_vec3 localCOGPositionB;
+		w_mat3 invInertiaB;
+		w_float invMassB;
 
 		load8(&rbs->rotation.x, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			rotationB.x, rotationB.y, rotationB.z, rotationB.w,
@@ -2929,14 +2929,14 @@ simd_slider_constraint_solver initializeSliderVelocityConstraintsSIMD(memory_are
 			invMassB);
 
 
-		quatw initialInvRotationDifference;
-		vec3w localAnchorA;
-		vec3w localAnchorB;
-		vec3w localAxisA;
+		w_quat initialInvRotationDifference;
+		w_vec3 localAnchorA;
+		w_vec3 localAnchorB;
+		w_vec3 localAxisA;
 
-		floatw negDistanceLimit;
-		floatw posDistanceLimit;
-		floatw maxMotorForce;
+		w_float negDistanceLimit;
+		w_float posDistanceLimit;
+		w_float maxMotorForce;
 
 		load8((float*)input, constraintIndices, (uint32)sizeof(*input),
 			initialInvRotationDifference.x, initialInvRotationDifference.y, initialInvRotationDifference.z, initialInvRotationDifference.w,
@@ -2952,48 +2952,48 @@ simd_slider_constraint_solver initializeSliderVelocityConstraintsSIMD(memory_are
 
 
 		// Relative to COG.
-		vec3w relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
-		vec3w relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
+		w_vec3 relGlobalAnchorA = rotationA * (localAnchorA - localCOGPositionA);
+		w_vec3 relGlobalAnchorB = rotationB * (localAnchorB - localCOGPositionB);
 
 		// Global.
-		vec3w globalAnchorA = positionA + relGlobalAnchorA;
-		vec3w globalAnchorB = positionB + relGlobalAnchorB;
+		w_vec3 globalAnchorA = positionA + relGlobalAnchorA;
+		w_vec3 globalAnchorB = positionB + relGlobalAnchorB;
 
-		vec3w globalSliderAxis = rotationA * localAxisA;
+		w_vec3 globalSliderAxis = rotationA * localAxisA;
 
-		vec3w tangent, bitangent;
+		w_vec3 tangent, bitangent;
 		getTangents(globalSliderAxis, tangent, bitangent);
-		vec3w u = globalAnchorB - globalAnchorA;
+		w_vec3 u = globalAnchorB - globalAnchorA;
 
-		vec3w rAu = relGlobalAnchorA + u;
-		vec3w rBxt = cross(relGlobalAnchorB, tangent);
-		vec3w rBxb = cross(relGlobalAnchorB, bitangent);
-		vec3w rAuxt = cross(rAu, tangent);
-		vec3w rAuxb = cross(rAu, bitangent);
+		w_vec3 rAu = relGlobalAnchorA + u;
+		w_vec3 rBxt = cross(relGlobalAnchorB, tangent);
+		w_vec3 rBxb = cross(relGlobalAnchorB, bitangent);
+		w_vec3 rAuxt = cross(rAu, tangent);
+		w_vec3 rAuxb = cross(rAu, bitangent);
 
-		vec3w iArAuxt = invInertiaA * rAuxt;
-		vec3w iArAuxb = invInertiaA * rAuxb;
-		vec3w iBrBxt = invInertiaB * rBxt;
-		vec3w iBrBxb = invInertiaB * rBxb;
-		floatw invMassSum = invMassA + invMassB;
+		w_vec3 iArAuxt = invInertiaA * rAuxt;
+		w_vec3 iArAuxb = invInertiaA * rAuxb;
+		w_vec3 iBrBxt = invInertiaB * rBxt;
+		w_vec3 iBrBxb = invInertiaB * rBxb;
+		w_float invMassSum = invMassA + invMassB;
 
-		mat2w invEffectiveTranslationMass;
+		w_mat2 invEffectiveTranslationMass;
 		invEffectiveTranslationMass.m00 = dot(rAuxt, iArAuxt) + dot(rBxt, iBrBxt) + invMassSum;
 		invEffectiveTranslationMass.m01 = dot(rAuxt, iArAuxb) + dot(rBxt, iBrBxb);
 		invEffectiveTranslationMass.m10 = dot(rAuxb, iArAuxt) + dot(rBxb, iBrBxt);
 		invEffectiveTranslationMass.m11 = dot(rAuxb, iArAuxb) + dot(rBxb, iBrBxb) + invMassSum;
 
-		mat3w invEffectiveRotationMass = invInertiaA + invInertiaB;
-		vec2w translationBias = zero;
-		vec3w rotationBias = zero;
+		w_mat3 invEffectiveRotationMass = invInertiaA + invInertiaB;
+		w_vec2 translationBias = zero;
+		w_vec3 rotationBias = zero;
 
 		if (dt > DT_THRESHOLD)
 		{
-			floatw a = dot(u, tangent);
-			floatw b = dot(u, bitangent);
-			translationBias = vec2w(a, b) * (SLIDER_CONSTRAINT_BETA * invDt);
+			w_float a = dot(u, tangent);
+			w_float b = dot(u, bitangent);
+			translationBias = w_vec2(a, b) * (SLIDER_CONSTRAINT_BETA * invDt);
 
-			quatw rotationError = rotationB * initialInvRotationDifference * conjugate(rotationA);
+			w_quat rotationError = rotationB * initialInvRotationDifference * conjugate(rotationA);
 			rotationBias = rotationError.v * (SLIDER_CONSTRAINT_BETA * 2.f * invDt);
 		}
 
@@ -3048,7 +3048,7 @@ simd_slider_constraint_solver initializeSliderVelocityConstraintsSIMD(memory_are
 		globalSliderAxis.z.store(batch.globalSliderAxis[2]);
 
 
-		floatw distanceAlongSlider = dot(u, globalSliderAxis);
+		w_float distanceAlongSlider = dot(u, globalSliderAxis);
 
 
 		auto minLimitActive = negDistanceLimit <= zero;
@@ -3064,22 +3064,22 @@ simd_slider_constraint_solver initializeSliderVelocityConstraintsSIMD(memory_are
 
 			if (batch.solveLimit)
 			{
-				vec3w rAuxs = cross(rAu, globalSliderAxis);
-				vec3w rBxs = cross(relGlobalAnchorB, globalSliderAxis);
-				floatw invEffectiveAxialMass = invMassSum + dot(rAuxs, invInertiaA * rAuxs) + dot(rBxs, invInertiaB * rBxs);
-				floatw effectiveAxialMass = ifThen(invEffectiveAxialMass != zero, one / invEffectiveAxialMass, zero);
+				w_vec3 rAuxs = cross(rAu, globalSliderAxis);
+				w_vec3 rBxs = cross(relGlobalAnchorB, globalSliderAxis);
+				w_float invEffectiveAxialMass = invMassSum + dot(rAuxs, invInertiaA * rAuxs) + dot(rBxs, invInertiaB * rBxs);
+				w_float effectiveAxialMass = ifThen(invEffectiveAxialMass != zero, one / invEffectiveAxialMass, zero);
 				effectiveAxialMass = ifThen(limitViolated, effectiveAxialMass, zero);
-				floatw limitSign = ifThen(minLimitViolated, one, -one);
+				w_float limitSign = ifThen(minLimitViolated, one, -one);
 
-				floatw limitBias = zero;
+				w_float limitBias = zero;
 				if (dt > DT_THRESHOLD)
 				{
-					floatw error = ifThen(minLimitViolated, distanceAlongSlider - negDistanceLimit, posDistanceLimit - distanceAlongSlider);
+					w_float error = ifThen(minLimitViolated, distanceAlongSlider - negDistanceLimit, posDistanceLimit - distanceAlongSlider);
 					limitBias = error * (SLIDER_LIMIT_CONSTRAINT_BETA * invDt);
 				}
 
-				vec3w limitImpulseToAngularVelocityA = invInertiaA * rAuxs;
-				vec3w limitImpulseToAngularVelocityB = invInertiaB * rBxs;
+				w_vec3 limitImpulseToAngularVelocityA = invInertiaA * rAuxs;
+				w_vec3 limitImpulseToAngularVelocityB = invInertiaB * rBxs;
 
 				rAuxs.x.store(batch.rAuxs[0]);
 				rAuxs.y.store(batch.rAuxs[1]);
@@ -3112,17 +3112,17 @@ simd_slider_constraint_solver initializeSliderVelocityConstraintsSIMD(memory_are
 		batch.solveMotor = anyTrue(motorActive);
 		if (batch.solveMotor)
 		{
-			floatw motorTypeF;
-			floatw motorVelocity;
-			floatw dummy0, dummy1;
+			w_float motorTypeF;
+			w_float motorVelocity;
+			w_float dummy0, dummy1;
 
 			load4((float*)&input->motorType, constraintIndices, (uint32)sizeof(*input),
 				motorTypeF, motorVelocity,
 				dummy0, dummy1);
 
-			intw motorType = reinterpret(motorTypeF);
+			w_int motorType = reinterpret(motorTypeF);
 
-			floatw maxMotorImpulse = maxMotorForce * dt;
+			w_float maxMotorImpulse = maxMotorForce * dt;
 			maxMotorImpulse = ifThen(motorActive, maxMotorImpulse, zero);
 
 			auto isVelocityMotor = motorType == constraint_velocity_motor;
@@ -3132,16 +3132,16 @@ simd_slider_constraint_solver initializeSliderVelocityConstraintsSIMD(memory_are
 				// Inspired by Bullet Engine. We set the velocity such that the target angle is reached within one frame.
 				// This will later get clamped to the maximum motor impulse.
 
-				floatw motorTargetDistance = motorVelocity; // This is a union.
+				w_float motorTargetDistance = motorVelocity; // This is a union.
 
-				floatw minLimit = ifThen(negDistanceLimit <= zero, negDistanceLimit, -INFINITY);
-				floatw maxLimit = ifThen(posDistanceLimit >= zero, posDistanceLimit, INFINITY);
-				floatw targetDistance = clamp(motorTargetDistance, minLimit, maxLimit);
-				floatw motorVelocityOverride = (dt > DT_THRESHOLD) ? ((targetDistance - distanceAlongSlider) * invDt) : 0.f;
+				w_float minLimit = ifThen(negDistanceLimit <= zero, negDistanceLimit, -INFINITY);
+				w_float maxLimit = ifThen(posDistanceLimit >= zero, posDistanceLimit, INFINITY);
+				w_float targetDistance = clamp(motorTargetDistance, minLimit, maxLimit);
+				w_float motorVelocityOverride = (dt > DT_THRESHOLD) ? ((targetDistance - distanceAlongSlider) * invDt) : 0.f;
 				motorVelocity = ifThen(reinterpret(isVelocityMotor), motorVelocity, motorVelocityOverride);
 			}
 
-			floatw effectiveMotorMass = one / invMassSum;
+			w_float effectiveMotorMass = one / invMassSum;
 			effectiveMotorMass = ifThen(motorActive, effectiveMotorMass, zero);
 
 			zero.store(batch.motorImpulse);
@@ -3168,9 +3168,9 @@ void solveSliderVelocityConstraintsSIMD(simd_slider_constraint_solver constraint
 
 
 		// Load body A.
-		vec3w vA, wA;
-		floatw invMassA;
-		mat3w invInertiaA;
+		w_vec3 vA, wA;
+		w_float invMassA;
+		w_mat3 invInertiaA;
 
 		load8(&rbs->invInertia.m00, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20,
@@ -3182,9 +3182,9 @@ void solveSliderVelocityConstraintsSIMD(simd_slider_constraint_solver constraint
 
 
 		// Load body B.
-		vec3w vB, wB;
-		floatw invMassB;
-		mat3w invInertiaB;
+		w_vec3 vB, wB;
+		w_float invMassB;
+		w_mat3 invInertiaB;
 
 		load8(&rbs->invInertia.m00, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
@@ -3195,24 +3195,24 @@ void solveSliderVelocityConstraintsSIMD(simd_slider_constraint_solver constraint
 			invInertiaB.m22, invMassB, vB.x, vB.y, vB.z, wB.x, wB.y, wB.z);
 
 
-		vec3w globalSliderAxis(batch.globalSliderAxis[0], batch.globalSliderAxis[1], batch.globalSliderAxis[2]);
+		w_vec3 globalSliderAxis(batch.globalSliderAxis[0], batch.globalSliderAxis[1], batch.globalSliderAxis[2]);
 
 		// Motor.
 		if (batch.solveMotor)
 		{
-			floatw motorVelocity(batch.motorVelocity);
-			floatw motorImpulse(batch.motorImpulse);
-			floatw maxMotorImpulse(batch.maxMotorImpulse);
-			floatw effectiveMotorMass(batch.effectiveMotorMass);
+			w_float motorVelocity(batch.motorVelocity);
+			w_float motorImpulse(batch.motorImpulse);
+			w_float maxMotorImpulse(batch.maxMotorImpulse);
+			w_float effectiveMotorMass(batch.effectiveMotorMass);
 
-			floatw Cdot = dot(vB, globalSliderAxis) - dot(vA, globalSliderAxis) - motorVelocity;
+			w_float Cdot = dot(vB, globalSliderAxis) - dot(vA, globalSliderAxis) - motorVelocity;
 
-			floatw motorLambda = -effectiveMotorMass * Cdot;
-			floatw oldImpulse = motorImpulse;
+			w_float motorLambda = -effectiveMotorMass * Cdot;
+			w_float oldImpulse = motorImpulse;
 			motorImpulse = clamp(motorImpulse + motorLambda, -maxMotorImpulse, maxMotorImpulse);
 			motorLambda = motorImpulse - oldImpulse;
 
-			vec3w P = motorLambda * globalSliderAxis;
+			w_vec3 P = motorLambda * globalSliderAxis;
 
 			vA -= invMassA * P;
 			vB += invMassB * P;
@@ -3223,27 +3223,27 @@ void solveSliderVelocityConstraintsSIMD(simd_slider_constraint_solver constraint
 		// Limit.
 		if (batch.solveLimit)
 		{
-			floatw limitSign(batch.limitSign);
-			floatw limitBias(batch.limitBias);
-			floatw effectiveAxialMass(batch.effectiveAxialMass);
-			floatw limitImpulse(batch.limitImpulse);
+			w_float limitSign(batch.limitSign);
+			w_float limitBias(batch.limitBias);
+			w_float effectiveAxialMass(batch.effectiveAxialMass);
+			w_float limitImpulse(batch.limitImpulse);
 
-			vec3w rAuxs(batch.rAuxs[0], batch.rAuxs[1], batch.rAuxs[2]);
-			vec3w rBxs(batch.rBxs[0], batch.rBxs[1], batch.rBxs[2]);
+			w_vec3 rAuxs(batch.rAuxs[0], batch.rAuxs[1], batch.rAuxs[2]);
+			w_vec3 rBxs(batch.rBxs[0], batch.rBxs[1], batch.rBxs[2]);
 
-			vec3w limitImpulseToAngularVelocityA(batch.limitImpulseToAngularVelocityA[0], batch.limitImpulseToAngularVelocityA[1], batch.limitImpulseToAngularVelocityA[2]);
-			vec3w limitImpulseToAngularVelocityB(batch.limitImpulseToAngularVelocityB[0], batch.limitImpulseToAngularVelocityB[1], batch.limitImpulseToAngularVelocityB[2]);
+			w_vec3 limitImpulseToAngularVelocityA(batch.limitImpulseToAngularVelocityA[0], batch.limitImpulseToAngularVelocityA[1], batch.limitImpulseToAngularVelocityA[2]);
+			w_vec3 limitImpulseToAngularVelocityB(batch.limitImpulseToAngularVelocityB[0], batch.limitImpulseToAngularVelocityB[1], batch.limitImpulseToAngularVelocityB[2]);
 
-			floatw Cdot = dot(vB, globalSliderAxis) + dot(wB, rBxs) - dot(vA, globalSliderAxis) - dot(wA, rAuxs);
-			floatw limitLambda = -effectiveAxialMass * (limitSign * Cdot + limitBias);
+			w_float Cdot = dot(vB, globalSliderAxis) + dot(wB, rBxs) - dot(vA, globalSliderAxis) - dot(wA, rAuxs);
+			w_float limitLambda = -effectiveAxialMass * (limitSign * Cdot + limitBias);
 
-			floatw impulse = maximum(limitImpulse + limitLambda, 0.f);
+			w_float impulse = maximum(limitImpulse + limitLambda, 0.f);
 			limitLambda = impulse - limitImpulse;
 			limitImpulse = impulse;
 
 			limitLambda *= limitSign;
 
-			vec3w P = limitLambda * globalSliderAxis;
+			w_vec3 P = limitLambda * globalSliderAxis;
 
 			vA -= invMassA * P;
 			wA -= limitImpulseToAngularVelocityA * limitLambda;
@@ -3256,50 +3256,50 @@ void solveSliderVelocityConstraintsSIMD(simd_slider_constraint_solver constraint
 
 		// Rotation part.
 		{
-			mat3w invEffectiveRotationMass;
-			invEffectiveRotationMass.m[0] = floatw(batch.invEffectiveRotationMass[0]);
-			invEffectiveRotationMass.m[1] = floatw(batch.invEffectiveRotationMass[1]);
-			invEffectiveRotationMass.m[2] = floatw(batch.invEffectiveRotationMass[2]);
-			invEffectiveRotationMass.m[3] = floatw(batch.invEffectiveRotationMass[3]);
-			invEffectiveRotationMass.m[4] = floatw(batch.invEffectiveRotationMass[4]);
-			invEffectiveRotationMass.m[5] = floatw(batch.invEffectiveRotationMass[5]);
-			invEffectiveRotationMass.m[6] = floatw(batch.invEffectiveRotationMass[6]);
-			invEffectiveRotationMass.m[7] = floatw(batch.invEffectiveRotationMass[7]);
-			invEffectiveRotationMass.m[8] = floatw(batch.invEffectiveRotationMass[8]);
+			w_mat3 invEffectiveRotationMass;
+			invEffectiveRotationMass.m[0] = w_float(batch.invEffectiveRotationMass[0]);
+			invEffectiveRotationMass.m[1] = w_float(batch.invEffectiveRotationMass[1]);
+			invEffectiveRotationMass.m[2] = w_float(batch.invEffectiveRotationMass[2]);
+			invEffectiveRotationMass.m[3] = w_float(batch.invEffectiveRotationMass[3]);
+			invEffectiveRotationMass.m[4] = w_float(batch.invEffectiveRotationMass[4]);
+			invEffectiveRotationMass.m[5] = w_float(batch.invEffectiveRotationMass[5]);
+			invEffectiveRotationMass.m[6] = w_float(batch.invEffectiveRotationMass[6]);
+			invEffectiveRotationMass.m[7] = w_float(batch.invEffectiveRotationMass[7]);
+			invEffectiveRotationMass.m[8] = w_float(batch.invEffectiveRotationMass[8]);
 
-			vec3w rotationBias(batch.rotationBias[0], batch.rotationBias[1], batch.rotationBias[2]);
+			w_vec3 rotationBias(batch.rotationBias[0], batch.rotationBias[1], batch.rotationBias[2]);
 
-			vec3w Cdot = wB - wA;
+			w_vec3 Cdot = wB - wA;
 
-			vec3w rotationLambda = solveLinearSystem(invEffectiveRotationMass, -(Cdot + rotationBias));
+			w_vec3 rotationLambda = solveLinearSystem(invEffectiveRotationMass, -(Cdot + rotationBias));
 			wA -= invInertiaA * rotationLambda;
 			wB += invInertiaB * rotationLambda;
 		}
 
 		// Position part.
 		{
-			vec3w tangent(batch.tangent[0], batch.tangent[1], batch.tangent[2]);
-			vec3w bitangent(batch.bitangent[0], batch.bitangent[1], batch.bitangent[2]);
-			vec3w rAuxt(batch.rAuxt[0], batch.rAuxt[1], batch.rAuxt[2]);
-			vec3w rAuxb(batch.rAuxb[0], batch.rAuxb[1], batch.rAuxb[2]);
-			vec3w rBxt(batch.rBxt[0], batch.rBxt[1], batch.rBxt[2]);
-			vec3w rBxb(batch.rBxb[0], batch.rBxb[1], batch.rBxb[2]);
+			w_vec3 tangent(batch.tangent[0], batch.tangent[1], batch.tangent[2]);
+			w_vec3 bitangent(batch.bitangent[0], batch.bitangent[1], batch.bitangent[2]);
+			w_vec3 rAuxt(batch.rAuxt[0], batch.rAuxt[1], batch.rAuxt[2]);
+			w_vec3 rAuxb(batch.rAuxb[0], batch.rAuxb[1], batch.rAuxb[2]);
+			w_vec3 rBxt(batch.rBxt[0], batch.rBxt[1], batch.rBxt[2]);
+			w_vec3 rBxb(batch.rBxb[0], batch.rBxb[1], batch.rBxb[2]);
 
-			mat2w invEffectiveTranslationMass;
-			invEffectiveTranslationMass.m[0] = floatw(batch.invEffectiveTranslationMass[0]);
-			invEffectiveTranslationMass.m[1] = floatw(batch.invEffectiveTranslationMass[1]);
-			invEffectiveTranslationMass.m[2] = floatw(batch.invEffectiveTranslationMass[2]);
-			invEffectiveTranslationMass.m[3] = floatw(batch.invEffectiveTranslationMass[3]);
+			w_mat2 invEffectiveTranslationMass;
+			invEffectiveTranslationMass.m[0] = w_float(batch.invEffectiveTranslationMass[0]);
+			invEffectiveTranslationMass.m[1] = w_float(batch.invEffectiveTranslationMass[1]);
+			invEffectiveTranslationMass.m[2] = w_float(batch.invEffectiveTranslationMass[2]);
+			invEffectiveTranslationMass.m[3] = w_float(batch.invEffectiveTranslationMass[3]);
 
-			vec2w translationBias(batch.translationBias[0], batch.translationBias[1]);
+			w_vec2 translationBias(batch.translationBias[0], batch.translationBias[1]);
 
-			vec2w Cdot;
+			w_vec2 Cdot;
 			Cdot.x = dot(tangent, vB) + dot(rBxt, wB) - dot(tangent, vA) - dot(rAuxt, wA);
 			Cdot.y = dot(bitangent, vB) + dot(rBxb, wB) - dot(bitangent, vA) - dot(rAuxb, wA);
 
-			vec2w translationLambda = solveLinearSystem(invEffectiveTranslationMass, -(Cdot + translationBias));
+			w_vec2 translationLambda = solveLinearSystem(invEffectiveTranslationMass, -(Cdot + translationBias));
 
-			vec3w tb = tangent * translationLambda.x + bitangent * translationLambda.y;
+			w_vec3 tb = tangent * translationLambda.x + bitangent * translationLambda.y;
 
 			vA -= invMassA * tb;
 			wA -= invInertiaA * (rAuxt * translationLambda.x + rAuxb * translationLambda.y);
@@ -3470,10 +3470,10 @@ simd_collision_constraint_solver initializeCollisionVelocityConstraintsSIMD(memo
 
 	simd_collision_constraint_batch* batches = arena.allocate<simd_collision_constraint_batch>(numBatches);
 
-	const floatw zero = floatw::zero();
-	const floatw slop = -0.001f;
-	const floatw scale = 0.1f;
-	const floatw invDt = 1.f / dt;
+	const w_float zero = w_float::zero();
+	const w_float slop = -0.001f;
+	const w_float scale = 0.1f;
+	const w_float invDt = 1.f / dt;
 
 	for (uint32 i = 0; i < numBatches; ++i)
 	{
@@ -3488,22 +3488,22 @@ simd_collision_constraint_solver initializeCollisionVelocityConstraintsSIMD(memo
 			batch.rbBIndices[j] = bodyPairs[slot.indices[j]].rbB;
 		}
 
-		vec3w point, normal;
-		floatw penetrationDepth, friction_restitutionF;
+		w_vec3 point, normal;
+		w_float penetrationDepth, friction_restitutionF;
 		load8((float*)contacts, contactIndices, (uint32)sizeof(collision_contact),
 			point.x, point.y, point.z, penetrationDepth, normal.x, normal.y, normal.z, friction_restitutionF);
-		intw friction_restitution = reinterpret(friction_restitutionF);
+		w_int friction_restitution = reinterpret(friction_restitutionF);
 
-		floatw friction = convert(friction_restitution >> 16) / floatw(0xFFFF);
-		floatw restitution = convert(friction_restitution & 0xFFFF) / floatw(0xFFFF);
+		w_float friction = convert(friction_restitution >> 16) / w_float(0xFFFF);
+		w_float restitution = convert(friction_restitution & 0xFFFF) / w_float(0xFFFF);
 
 
 		// Load body A.
-		vec3w vA, wA;
-		mat3w invInertiaA;
-		floatw invMassA;
-		vec3w positionA;
-		floatw unused;
+		w_vec3 vA, wA;
+		w_mat3 invInertiaA;
+		w_float invMassA;
+		w_vec3 positionA;
+		w_float unused;
 
 		load8(&rbs->invInertia.m00, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			invInertiaA.m00, invInertiaA.m10, invInertiaA.m20, 
@@ -3518,10 +3518,10 @@ simd_collision_constraint_solver initializeCollisionVelocityConstraintsSIMD(memo
 
 
 		// Load body B.
-		vec3w vB, wB;
-		mat3w invInertiaB;
-		floatw invMassB;
-		vec3w positionB;
+		w_vec3 vB, wB;
+		w_mat3 invInertiaB;
+		w_float invMassB;
+		w_vec3 positionB;
 
 		load8(&rbs->invInertia.m00, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			invInertiaB.m00, invInertiaB.m10, invInertiaB.m20,
@@ -3538,14 +3538,14 @@ simd_collision_constraint_solver initializeCollisionVelocityConstraintsSIMD(memo
 
 
 
-		vec3w relGlobalAnchorA = point - positionA;
-		vec3w relGlobalAnchorB = point - positionB;
+		w_vec3 relGlobalAnchorA = point - positionA;
+		w_vec3 relGlobalAnchorB = point - positionB;
 
-		vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
-		vec3w anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
+		w_vec3 anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
+		w_vec3 anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
 
-		vec3w relVelocity = anchorVelocityB - anchorVelocityA;
-		vec3w tangent = relVelocity - dot(normal, relVelocity) * normal;
+		w_vec3 relVelocity = anchorVelocityB - anchorVelocityA;
+		w_vec3 tangent = relVelocity - dot(normal, relVelocity) * normal;
 		tangent = noz(tangent);
 
 		relGlobalAnchorA.x.store(batch.relGlobalAnchorA[0]);
@@ -3571,19 +3571,19 @@ simd_collision_constraint_solver initializeCollisionVelocityConstraintsSIMD(memo
 
 
 		{ // Tangent direction.
-			vec3w crAt = cross(relGlobalAnchorA, tangent);
-			vec3w crBt = cross(relGlobalAnchorB, tangent);
-			floatw invMassInTangentDir = invMassA + dot(crAt, invInertiaA * crAt)
+			w_vec3 crAt = cross(relGlobalAnchorA, tangent);
+			w_vec3 crBt = cross(relGlobalAnchorB, tangent);
+			w_float invMassInTangentDir = invMassA + dot(crAt, invInertiaA * crAt)
 				+ invMassB + dot(crBt, invInertiaB * crBt);
-			floatw effectiveMassInTangentDir = ifThen(invMassInTangentDir != zero, 1.f / invMassInTangentDir, zero);
+			w_float effectiveMassInTangentDir = ifThen(invMassInTangentDir != zero, 1.f / invMassInTangentDir, zero);
 			effectiveMassInTangentDir.store(batch.effectiveMassInTangentDir);
 
-			vec3w tangentImpulseToAngularVelocityA = invInertiaA * crAt;
+			w_vec3 tangentImpulseToAngularVelocityA = invInertiaA * crAt;
 			tangentImpulseToAngularVelocityA.x.store(batch.tangentImpulseToAngularVelocityA[0]);
 			tangentImpulseToAngularVelocityA.y.store(batch.tangentImpulseToAngularVelocityA[1]);
 			tangentImpulseToAngularVelocityA.z.store(batch.tangentImpulseToAngularVelocityA[2]);
 
-			vec3w tangentImpulseToAngularVelocityB = invInertiaB * crBt;
+			w_vec3 tangentImpulseToAngularVelocityB = invInertiaB * crBt;
 			tangentImpulseToAngularVelocityB.x.store(batch.tangentImpulseToAngularVelocityB[0]);
 			tangentImpulseToAngularVelocityB.y.store(batch.tangentImpulseToAngularVelocityB[1]);
 			tangentImpulseToAngularVelocityB.z.store(batch.tangentImpulseToAngularVelocityB[2]);
@@ -3591,31 +3591,31 @@ simd_collision_constraint_solver initializeCollisionVelocityConstraintsSIMD(memo
 
 
 		{ // Normal direction.
-			vec3w crAn = cross(relGlobalAnchorA, normal);
-			vec3w crBn = cross(relGlobalAnchorB, normal);
-			floatw invMassInNormalDir = invMassA + dot(crAn, invInertiaA * crAn)
+			w_vec3 crAn = cross(relGlobalAnchorA, normal);
+			w_vec3 crBn = cross(relGlobalAnchorB, normal);
+			w_float invMassInNormalDir = invMassA + dot(crAn, invInertiaA * crAn)
 				+ invMassB + dot(crBn, invInertiaB * crBn);
-			floatw effectiveMassInNormalDir = ifThen(invMassInNormalDir != zero, 1.f / invMassInNormalDir, zero);
+			w_float effectiveMassInNormalDir = ifThen(invMassInNormalDir != zero, 1.f / invMassInNormalDir, zero);
 
-			floatw bias = zero;
+			w_float bias = zero;
 
 			if (dt > DT_THRESHOLD)
 			{
-				floatw vRel = dot(normal, relVelocity);
+				w_float vRel = dot(normal, relVelocity);
 
-				floatw bounceBias = -restitution * vRel - scale * (-penetrationDepth - slop) * invDt;
+				w_float bounceBias = -restitution * vRel - scale * (-penetrationDepth - slop) * invDt;
 				bias = ifThen((-penetrationDepth < slop) & (vRel < zero), bounceBias, bias);
 			}
 
 			effectiveMassInNormalDir.store(batch.effectiveMassInNormalDir);
 			bias.store(batch.bias);
 
-			vec3w normalImpulseToAngularVelocityA = invInertiaA * crAn;
+			w_vec3 normalImpulseToAngularVelocityA = invInertiaA * crAn;
 			normalImpulseToAngularVelocityA.x.store(batch.normalImpulseToAngularVelocityA[0]);
 			normalImpulseToAngularVelocityA.y.store(batch.normalImpulseToAngularVelocityA[1]);
 			normalImpulseToAngularVelocityA.z.store(batch.normalImpulseToAngularVelocityA[2]);
 
-			vec3w normalImpulseToAngularVelocityB = invInertiaB * crBn;
+			w_vec3 normalImpulseToAngularVelocityB = invInertiaB * crBn;
 			normalImpulseToAngularVelocityB.x.store(batch.normalImpulseToAngularVelocityB[0]);
 			normalImpulseToAngularVelocityB.y.store(batch.normalImpulseToAngularVelocityB[1]);
 			normalImpulseToAngularVelocityB.z.store(batch.normalImpulseToAngularVelocityB[2]);
@@ -3637,73 +3637,73 @@ void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint_solver cons
 		simd_collision_constraint_batch& batch = constraints.batches[i];
 
 		// Load body A.
-		vec3w vA, wA;
-		floatw invMassA;
-		floatw dummyA;
+		w_vec3 vA, wA;
+		w_float invMassA;
+		w_float dummyA;
 
 		load8(&rbs->invInertia.m22, batch.rbAIndices, (uint32)sizeof(rigid_body_global_state),
 			dummyA, invMassA, vA.x, vA.y, vA.z, wA.x, wA.y, wA.z);
 
 
 		// Load body B.
-		vec3w vB, wB;
-		floatw invMassB;
-		floatw dummyB;
+		w_vec3 vB, wB;
+		w_float invMassB;
+		w_float dummyB;
 
 		load8(&rbs->invInertia.m22, batch.rbBIndices, (uint32)sizeof(rigid_body_global_state),
 			dummyB, invMassB, vB.x, vB.y, vB.z, wB.x, wB.y, wB.z);
 
 
 		// Load constraint.
-		vec3w relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
-		vec3w relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
-		vec3w normal(batch.normal[0], batch.normal[1], batch.normal[2]);
-		vec3w tangent(batch.tangent[0], batch.tangent[1], batch.tangent[2]);
-		floatw effectiveMassInNormalDir(batch.effectiveMassInNormalDir);
-		floatw effectiveMassInTangentDir(batch.effectiveMassInTangentDir);
-		floatw friction(batch.friction);
-		floatw impulseInNormalDir(batch.impulseInNormalDir);
-		floatw impulseInTangentDir(batch.impulseInTangentDir);
-		floatw bias(batch.bias);
+		w_vec3 relGlobalAnchorA(batch.relGlobalAnchorA[0], batch.relGlobalAnchorA[1], batch.relGlobalAnchorA[2]);
+		w_vec3 relGlobalAnchorB(batch.relGlobalAnchorB[0], batch.relGlobalAnchorB[1], batch.relGlobalAnchorB[2]);
+		w_vec3 normal(batch.normal[0], batch.normal[1], batch.normal[2]);
+		w_vec3 tangent(batch.tangent[0], batch.tangent[1], batch.tangent[2]);
+		w_float effectiveMassInNormalDir(batch.effectiveMassInNormalDir);
+		w_float effectiveMassInTangentDir(batch.effectiveMassInTangentDir);
+		w_float friction(batch.friction);
+		w_float impulseInNormalDir(batch.impulseInNormalDir);
+		w_float impulseInTangentDir(batch.impulseInTangentDir);
+		w_float bias(batch.bias);
 
-		vec3w tangentImpulseToAngularVelocityA(batch.tangentImpulseToAngularVelocityA[0], batch.tangentImpulseToAngularVelocityA[1], batch.tangentImpulseToAngularVelocityA[2]);
-		vec3w tangentImpulseToAngularVelocityB(batch.tangentImpulseToAngularVelocityB[0], batch.tangentImpulseToAngularVelocityB[1], batch.tangentImpulseToAngularVelocityB[2]);
+		w_vec3 tangentImpulseToAngularVelocityA(batch.tangentImpulseToAngularVelocityA[0], batch.tangentImpulseToAngularVelocityA[1], batch.tangentImpulseToAngularVelocityA[2]);
+		w_vec3 tangentImpulseToAngularVelocityB(batch.tangentImpulseToAngularVelocityB[0], batch.tangentImpulseToAngularVelocityB[1], batch.tangentImpulseToAngularVelocityB[2]);
 
 		{ // Tangent dir.
-			vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
-			vec3w anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
+			w_vec3 anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
+			w_vec3 anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
 
-			vec3w relVelocity = anchorVelocityB - anchorVelocityA;
-			floatw vt = dot(relVelocity, tangent);
-			floatw lambda = -effectiveMassInTangentDir * vt;
+			w_vec3 relVelocity = anchorVelocityB - anchorVelocityA;
+			w_float vt = dot(relVelocity, tangent);
+			w_float lambda = -effectiveMassInTangentDir * vt;
 
-			floatw maxFriction = friction * impulseInNormalDir;
-			floatw newImpulse = clamp(impulseInTangentDir + lambda, -maxFriction, maxFriction);
+			w_float maxFriction = friction * impulseInNormalDir;
+			w_float newImpulse = clamp(impulseInTangentDir + lambda, -maxFriction, maxFriction);
 			lambda = newImpulse - impulseInTangentDir;
 			impulseInTangentDir = newImpulse;
 
-			vec3w P = lambda * tangent;
+			w_vec3 P = lambda * tangent;
 			vA -= invMassA * P;
 			wA -= tangentImpulseToAngularVelocityA * lambda;
 			vB += invMassB * P;
 			wB += tangentImpulseToAngularVelocityB * lambda;
 		}
 
-		vec3w normalImpulseToAngularVelocityA(batch.normalImpulseToAngularVelocityA[0], batch.normalImpulseToAngularVelocityA[1], batch.normalImpulseToAngularVelocityA[2]);
-		vec3w normalImpulseToAngularVelocityB(batch.normalImpulseToAngularVelocityB[0], batch.normalImpulseToAngularVelocityB[1], batch.normalImpulseToAngularVelocityB[2]);
+		w_vec3 normalImpulseToAngularVelocityA(batch.normalImpulseToAngularVelocityA[0], batch.normalImpulseToAngularVelocityA[1], batch.normalImpulseToAngularVelocityA[2]);
+		w_vec3 normalImpulseToAngularVelocityB(batch.normalImpulseToAngularVelocityB[0], batch.normalImpulseToAngularVelocityB[1], batch.normalImpulseToAngularVelocityB[2]);
 
 		{ // Normal dir.
-			vec3w anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
-			vec3w anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
+			w_vec3 anchorVelocityA = vA + cross(wA, relGlobalAnchorA);
+			w_vec3 anchorVelocityB = vB + cross(wB, relGlobalAnchorB);
 
-			vec3w relVelocity = anchorVelocityB - anchorVelocityA;
-			floatw vn = dot(relVelocity, normal);
-			floatw lambda = -effectiveMassInNormalDir * (vn - bias);
-			floatw impulse = maximum(impulseInNormalDir + lambda, floatw::zero());
+			w_vec3 relVelocity = anchorVelocityB - anchorVelocityA;
+			w_float vn = dot(relVelocity, normal);
+			w_float lambda = -effectiveMassInNormalDir * (vn - bias);
+			w_float impulse = maximum(impulseInNormalDir + lambda, w_float::zero());
 			lambda = impulse - impulseInNormalDir;
 			impulseInNormalDir = impulse;
 
-			vec3w P = lambda * normal;
+			w_vec3 P = lambda * normal;
 			vA -= invMassA * P;
 			wA -= normalImpulseToAngularVelocityA * lambda;
 			vB += invMassB * P;

@@ -322,14 +322,14 @@ union vec4
 		vec2 xy;
 		vec2 zw;
 	};
-	floatw4 f4;
+	w4_float f4;
 	float data[4];
 
 	vec4() {}
 	vec4(float v) : vec4(v, v, v, v) {}
 	vec4(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
 	vec4(vec3 xyz, float w) : x(xyz.x), y(xyz.y), z(xyz.z), w(w) {}
-	vec4(floatw4 f4) : f4(f4) {}
+	vec4(w4_float f4) : f4(f4) {}
 };
 
 union quat
@@ -344,12 +344,12 @@ union quat
 		float cosHalfAngle;
 	};
 	vec4 v4;
-	floatw4 f4;
+	w4_float f4;
 
 	quat() {}
 	quat(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
 	quat(vec3 axis, float angle);
-	quat(floatw4 f4) : f4(f4) {}
+	quat(w4_float f4) : f4(f4) {}
 
 	static const quat identity;
 };
@@ -478,10 +478,10 @@ union mat4
 #endif
 	struct
 	{
-		floatw4 f40;
-		floatw4 f41;
-		floatw4 f42;
-		floatw4 f43;
+		w4_float f40;
+		w4_float f41;
+		w4_float f42;
+		w4_float f43;
 	};
 	float m[16];
 
@@ -583,10 +583,10 @@ static vec4& operator*=(vec4& a, vec4 b) { a = a * b; return a; }
 static vec4 operator/(vec4 a, vec4 b) { vec4 result = { a.f4 / b.f4 }; return result; }
 static vec4& operator/=(vec4& a, vec4 b) { a = a / b; return a; }
 
-static vec4 operator*(vec4 a, float b) { vec4 result = { a.f4 * floatw4(b) }; return result; }
+static vec4 operator*(vec4 a, float b) { vec4 result = { a.f4 * w4_float(b) }; return result; }
 static vec4 operator*(float a, vec4 b) { return b * a; }
 static vec4& operator*=(vec4& a, float b) { a = a * b; return a; }
-static vec4 operator/(vec4 a, float b) { vec4 result = { a.f4 / floatw4(b) }; return result; }
+static vec4 operator/(vec4 a, float b) { vec4 result = { a.f4 / w4_float(b) }; return result; }
 static vec4& operator/=(vec4& a, float b) { a = a / b; return a; }
 
 static vec4 operator-(vec4 a) { return vec4(-a.f4); }
@@ -596,7 +596,7 @@ static bool operator==(vec4 a, vec4 b) { return a.x == b.x && a.y == b.y && a.z 
 
 static float dot(vec2 a, vec2 b) { float result = a.x * b.x + a.y * b.y; return result; }
 static float dot(vec3 a, vec3 b) { float result = a.x * b.x + a.y * b.y + a.z * b.z; return result; }
-static float dot(vec4 a, vec4 b) { floatw4 m = a.f4 * b.f4; return addElements(m); }
+static float dot(vec4 a, vec4 b) { w4_float m = a.f4 * b.f4; return addElements(m); }
 
 static float cross(vec2 a, vec2 b) { return a.x * b.y - a.y * b.x; }
 static vec3 cross(vec3 a, vec3 b) { vec3 result = { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; return result; }
@@ -687,7 +687,7 @@ static vec4 exp(vec4 v) { return vec4(exp(v.f4)); }
 
 static vec2 pow(vec2 v, float e) { return vec2(pow(v.x, e), pow(v.y, e)); }
 static vec3 pow(vec3 v, float e) { return vec3(pow(v.x, e), pow(v.y, e), pow(v.z, e)); }
-static vec4 pow(vec4 v, float e) { return vec4(pow(v.f4, floatw4(e))); }
+static vec4 pow(vec4 v, float e) { return vec4(pow(v.f4, w4_float(e))); }
 
 static vec2 minimum(vec2 a, vec2 b) { return vec2(min(a.x, b.x), min(a.y, b.y)); }
 static vec3 minimum(vec3 a, vec3 b) { return vec3(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }

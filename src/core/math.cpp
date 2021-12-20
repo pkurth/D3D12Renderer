@@ -158,25 +158,25 @@ mat4 operator*(const mat4& a, const mat4& b)
 	result.m30 = dot(r3, c0); result.m31 = dot(r3, c1); result.m32 = dot(r3, c2); result.m33 = dot(r3, c3);
 	return result;
 #else
-	floatw8 a0, a1, b0, b1;
+	w8_float a0, a1, b0, b1;
 
 #if ROW_MAJOR
-	floatw8 u0 = b.m;
-	floatw8 u1 = b.m + 8;
-	floatw8 t0 = a.m;
-	floatw8 t1 = a.m + 8;
+	w8_float u0 = b.m;
+	w8_float u1 = b.m + 8;
+	w8_float t0 = a.m;
+	w8_float t1 = a.m + 8;
 #else
-	floatw8 t0 = b.m;
-	floatw8 t1 = b.m + 8;
-	floatw8 u0 = a.m;
-	floatw8 u1 = a.m + 8;
+	w8_float t0 = b.m;
+	w8_float t1 = b.m + 8;
+	w8_float u0 = a.m;
+	w8_float u1 = a.m + 8;
 #endif
 
 	a0 = _mm256_shuffle_ps(t0, t0, _MM_SHUFFLE(0, 0, 0, 0));
 	a1 = _mm256_shuffle_ps(t1, t1, _MM_SHUFFLE(0, 0, 0, 0));
 	b0 = _mm256_permute2f128_ps(u0, u0, 0x00);
-	floatw8 c0 = a0 * b0;
-	floatw8 c1 = a1 * b0;
+	w8_float c0 = a0 * b0;
+	w8_float c1 = a1 * b0;
 
 	a0 = _mm256_shuffle_ps(t0, t0, _MM_SHUFFLE(1, 1, 1, 1));
 	a1 = _mm256_shuffle_ps(t1, t1, _MM_SHUFFLE(1, 1, 1, 1));
