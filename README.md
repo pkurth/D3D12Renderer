@@ -34,6 +34,7 @@ It also features a custom written physics engine written completely from scratch
 - Post processing stack
 	- Temporal anti-aliasing
 	- Horizon-based ambient occlusion
+	- Screen space shadows
 	- Bloom
 	- Filmic tone-mapping
 	- Sharpening
