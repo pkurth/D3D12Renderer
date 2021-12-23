@@ -2,12 +2,14 @@
 #include "dx_pipeline.h"
 #include "core/threading.h"
 #include "core/string.h"
+#include "core/file_system.h"
+#include "core/log.h"
 
 #include <unordered_map>
 #include <set>
 #include <deque>
 
-static DWORD checkForFileChanges(void*);
+void handlePipelineChanges(file_system_change change, const fs::path&);
 
 struct shader_file
 {
@@ -389,7 +391,60 @@ void createAllPendingReloadablePipelines()
 	rsOffset = (int)rootSignaturesFromFiles.size();
 	pipelineOffset = (int)pipelines.size();
 
-	static HANDLE thread = CreateThread(0, 0, checkForFileChanges, 0, 0, 0); // Static, so that we only do this once.
+	//static HANDLE thread = CreateThread(0, 0, checkForFileChanges, 0, 0, 0); // Static, so that we only do this once.
+	static bool observing = observeDirectory(SHADER_BIN_DIR, handlePipelineChanges); // Static, so that we only do this once.
+}
+
+static bool fileIsLocked(const wchar* filename)
+{
+	HANDLE fileHandle = CreateFileW(filename, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (fileHandle == INVALID_HANDLE_VALUE)
+	{
+		return true;
+	}
+	CloseHandle(fileHandle);
+	return false;
+}
+
+void handlePipelineChanges(file_system_change change, const fs::path& path)
+{
+	if (change == file_system_change_modify)
+	{
+		bool isFile = !fs::is_directory(path);
+
+		if (isFile)
+		{
+			mutex.lock();
+			auto it = shaderBlobs.find(path.stem().string());
+			if (it != shaderBlobs.end())
+			{
+				mutex.unlock();
+				auto wPath = path.wstring();
+				while (fileIsLocked(wPath.c_str()))
+				{
+					// Wait.
+				}
+
+				LOG_MESSAGE("Reloading shader blob %ws", path.c_str());
+
+				dx_blob blob;
+				checkResult(D3DReadFileToBlob(path.c_str(), &blob));
+
+				mutex.lock();
+				it->second.blob = blob;
+				dirtyPipelines.insert(dirtyPipelines.end(), it->second.usedByPipelines.begin(), it->second.usedByPipelines.end());
+				if (it->second.rootSignature)
+				{
+					dirtyRootSignatures.push_back(it->second.rootSignature);
+				}
+				mutex.unlock();
+			}
+			else
+			{
+				mutex.unlock();
+			}
+		}
+	}
 }
 
 void checkForChangedPipelines()
@@ -426,158 +481,6 @@ void checkForChangedPipelines()
 	dirtyRootSignatures.clear();
 	dirtyPipelines.clear();
 	mutex.unlock();
-}
-
-static bool fileIsLocked(const wchar* filename)
-{
-	HANDLE fileHandle = CreateFileW(filename, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (fileHandle == INVALID_HANDLE_VALUE)
-	{
-		return true;
-	}
-	CloseHandle(fileHandle);
-	return false;
-}
-
-static DWORD checkForFileChanges(void*)
-{
-	HANDLE directoryHandle;
-	OVERLAPPED overlapped;
-
-	uint8 buffer[1024] = {};
-
-	directoryHandle = CreateFileW(
-		SHADER_BIN_DIR,
-		FILE_LIST_DIRECTORY,
-		FILE_SHARE_READ,
-		NULL,
-		OPEN_EXISTING,
-		FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
-		NULL);
-
-	if (directoryHandle == INVALID_HANDLE_VALUE)
-	{
-		std::cerr << "Monitor directory failed.\n";
-		return 1;
-	}
-
-	overlapped.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	ResetEvent(overlapped.hEvent);
-
-	DWORD eventName = FILE_NOTIFY_CHANGE_LAST_WRITE;
-
-	DWORD error = ReadDirectoryChangesW(directoryHandle,
-		buffer, sizeof(buffer), TRUE,
-		eventName,
-		NULL, &overlapped, NULL);
-
-	fs::path lastChangedPath = "";
-	fs::file_time_type lastChangedPathTimeStamp;
-
-	while (true)
-	{
-		DWORD result = WaitForSingleObject(overlapped.hEvent, INFINITE);
-
-		DWORD dw;
-		if (!GetOverlappedResult(directoryHandle, &overlapped, &dw, FALSE) || dw == 0)
-		{
-			std::cerr << "Get overlapped result failed.\n";
-			return 1;
-		}
-
-		FILE_NOTIFY_INFORMATION* filenotify;
-
-		DWORD offset = 0;
-
-		do
-		{
-			filenotify = (FILE_NOTIFY_INFORMATION*)(&buffer[offset]);
-
-			if (filenotify->Action == FILE_ACTION_MODIFIED)
-			{
-				char filename[MAX_PATH];
-				int ret = WideCharToMultiByte(CP_ACP, 0, filenotify->FileName,
-					filenotify->FileNameLength / sizeof(WCHAR),
-					filename, MAX_PATH, NULL, NULL);
-
-				filename[filenotify->FileNameLength / sizeof(WCHAR)] = 0;
-
-				fs::path changedPath = (SHADER_BIN_DIR / fs::path(filename)).lexically_normal();
-				auto changedPathWriteTime = fs::last_write_time(changedPath);
-
-				// The filesystem usually sends multiple notifications for changed files, since the file is first written, then metadata is changed etc.
-				// This check prevents these notifications if they are too close together in time.
-				// This is a pretty crude fix. In this setup files should not change at the same time, since we only ever track one file.
-				if (changedPath == lastChangedPath
-					&& std::chrono::duration_cast<std::chrono::milliseconds>(changedPathWriteTime - lastChangedPathTimeStamp).count() < 200)
-				{
-					lastChangedPath = changedPath;
-					lastChangedPathTimeStamp = changedPathWriteTime;
-					break;
-				}
-
-				bool isFile = !fs::is_directory(changedPath);
-
-				if (isFile)
-				{
-					mutex.lock();
-					auto it = shaderBlobs.find(changedPath.stem().string());
-					if (it != shaderBlobs.end())
-					{
-						mutex.unlock();
-						auto wPath = changedPath.wstring();
-						while (fileIsLocked(wPath.c_str()))
-						{
-							// Wait.
-						}
-
-						std::cout << "Reloading shader blob " << changedPath << '\n';
-						dx_blob blob;
-						checkResult(D3DReadFileToBlob(changedPath.wstring().c_str(), &blob));
-
-						mutex.lock();
-						it->second.blob = blob;
-						dirtyPipelines.insert(dirtyPipelines.end(), it->second.usedByPipelines.begin(), it->second.usedByPipelines.end());
-						if (it->second.rootSignature)
-						{
-							dirtyRootSignatures.push_back(it->second.rootSignature);
-						}
-						mutex.unlock();
-					}
-					else
-					{
-						mutex.unlock();
-					}
-
-					lastChangedPath = changedPath;
-					lastChangedPathTimeStamp = changedPathWriteTime;
-				}
-
-			}
-
-			offset += filenotify->NextEntryOffset;
-
-		} while (filenotify->NextEntryOffset != 0);
-
-
-		if (!ResetEvent(overlapped.hEvent))
-		{
-			std::cerr << "Reset event failed.\n";
-		}
-
-		DWORD error = ReadDirectoryChangesW(directoryHandle,
-			buffer, sizeof(buffer), TRUE,
-			eventName,
-			NULL, &overlapped, NULL);
-
-		if (error == 0)
-		{
-			std::cerr << "Read directory failed.\n";
-		}
-
-	}
-
-	return 0;
 }
 
 static void copyRootSignatureDesc(const D3D12_ROOT_SIGNATURE_DESC* desc, dx_root_signature& result)
