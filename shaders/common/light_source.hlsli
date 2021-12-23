@@ -246,18 +246,18 @@ static float sampleShadowMapSimple(float4x4 vp, float3 worldPosition,
 
 	float2 lightUV = lightProjected.xy * float2(0.5f, -0.5f) + float2(0.5f, 0.5f);
 
+	float visibility = 1.f;
+
 	// This case is not handled by a border sampler because we are using a shadow map atlas.
-	if (any(lightUV < 0.f || lightUV > 1.f))
+	if (all(lightUV >= 0.f && lightUV <= 1.f))
 	{
-		return 1.f;
+		lightUV = lightUV * viewport.zw + viewport.xy;
+
+		visibility = shadowMap.SampleCmpLevelZero(
+			shadowMapSampler,
+			lightUV,
+			lightProjected.z - bias);
 	}
-
-	lightUV = lightUV * viewport.zw + viewport.xy;
-
-	float visibility = shadowMap.SampleCmpLevelZero(
-		shadowMapSampler,
-		lightUV,
-		lightProjected.z - bias);
 
 	return visibility;
 }
@@ -272,26 +272,26 @@ static float sampleShadowMapPCF(float4x4 vp, float3 worldPosition,
 
 	float2 lightUV = lightProjected.xy * float2(0.5f, -0.5f) + float2(0.5f, 0.5f);
 
+	float visibility = 1.f;
+
 	// This case is not handled by a border sampler because we are using a shadow map atlas.
-	if (any(lightUV < 0.f || lightUV > 1.f))
+	if (all(lightUV >= 0.f && lightUV <= 1.f))
 	{
-		return 1.f;
-	}
+		lightUV = lightUV * viewport.zw + viewport.xy;
 
-	lightUV = lightUV * viewport.zw + viewport.xy;
-
-	float visibility = 0.f;
-	for (float y = -pcfRadius; y <= pcfRadius + 0.01f; y += 1.f)
-	{
-		for (float x = -pcfRadius; x <= pcfRadius + 0.01f; x += 1.f)
+		visibility = 0.f;
+		for (float y = -pcfRadius; y <= pcfRadius + 0.01f; y += 1.f)
 		{
-			visibility += shadowMap.SampleCmpLevelZero(
-				shadowMapSampler,
-				lightUV + float2(x, y) * texelSize,
-				lightProjected.z - bias);
+			for (float x = -pcfRadius; x <= pcfRadius + 0.01f; x += 1.f)
+			{
+				visibility += shadowMap.SampleCmpLevelZero(
+					shadowMapSampler,
+					lightUV + float2(x, y) * texelSize,
+					lightProjected.z - bias);
+			}
 		}
+		visibility /= numPCFSamples;
 	}
-	visibility /= numPCFSamples;
 
 	return visibility;
 }
