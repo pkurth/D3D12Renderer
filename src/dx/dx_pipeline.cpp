@@ -9,7 +9,7 @@
 #include <set>
 #include <deque>
 
-void handlePipelineChanges(file_system_change change, const fs::path&);
+static void handlePipelineChanges(const file_system_event& e);
 
 struct shader_file
 {
@@ -406,29 +406,29 @@ static bool fileIsLocked(const wchar* filename)
 	return false;
 }
 
-void handlePipelineChanges(file_system_change change, const fs::path& path)
+static void handlePipelineChanges(const file_system_event& e)
 {
-	if (change == file_system_change_modify)
+	if (e.change == file_system_change_modify)
 	{
-		bool isFile = !fs::is_directory(path);
+		bool isFile = !fs::is_directory(e.path);
 
 		if (isFile)
 		{
 			mutex.lock();
-			auto it = shaderBlobs.find(path.stem().string());
+			auto it = shaderBlobs.find(e.path.stem().string());
 			if (it != shaderBlobs.end())
 			{
 				mutex.unlock();
-				auto wPath = path.wstring();
+				auto wPath = e.path.wstring();
 				while (fileIsLocked(wPath.c_str()))
 				{
 					// Wait.
 				}
 
-				LOG_MESSAGE("Reloading shader blob %ws", path.c_str());
+				LOG_MESSAGE("Reloading shader blob %ws", e.path.c_str());
 
 				dx_blob blob;
-				checkResult(D3DReadFileToBlob(path.c_str(), &blob));
+				checkResult(D3DReadFileToBlob(e.path.c_str(), &blob));
 
 				mutex.lock();
 				it->second.blob = blob;
