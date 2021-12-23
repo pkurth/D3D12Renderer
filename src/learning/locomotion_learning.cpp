@@ -291,7 +291,7 @@ extern "C" __declspec(dllexport) int updatePhysics(float* action, float* outStat
 
 	if (learningEnv->rng.randomFloat01() < 0.02f)
 	{
-		uint32 bodyPartIndex = learningEnv->rng.randomUintBetween(0, NUM_BODY_PARTS - 1);
+		uint32 bodyPartIndex = learningEnv->rng.randomUint32Between(0, NUM_BODY_PARTS - 1);
 	
 		vec3 part = learningEnv->ragdoll.bodyParts[bodyPartIndex].getComponent<transform_component>().position + vec3(0.f, 0.2f, 0.f);
 		vec3 direction = normalize(vec3(learningEnv->rng.randomFloatBetween(-1.f, 1.f), 0.f, learningEnv->rng.randomFloatBetween(-1.f, 1.f)));

@@ -6,26 +6,41 @@ struct random_number_generator
 {
 	// XOR shift generator.
 
-	uint32 state;
+	uint64 state;
 
-	inline uint32 randomUint()
+	random_number_generator() {}
+	random_number_generator(uint64 seed) { state = seed; }
+
+	inline uint64 randomUint64()
 	{
-		uint32 x = state;
+		// https://en.wikipedia.org/wiki/Xorshift
+
+		uint64 x = state;
 		x ^= x << 13;
-		x ^= x >> 17;
-		x ^= x << 5;
+		x ^= x >> 7;
+		x ^= x << 17;
 		state = x;
 		return x;
 	}
 
-	inline uint32 randomUintBetween(uint32 lo, uint32 hi)
+	inline uint32 randomUint32()
 	{
-		return randomUint() % (hi - lo) + lo;
+		return (uint32)randomUint64();
+	}
+
+	inline uint64 randomUint64Between(uint64 lo, uint64 hi)
+	{
+		return randomUint64() % (hi - lo) + lo;
+	}
+
+	inline uint32 randomUint32Between(uint32 lo, uint32 hi)
+	{
+		return randomUint32() % (hi - lo) + lo;
 	}
 
 	inline float randomFloat01()
 	{
-		return randomUint() / (float)UINT_MAX;
+		return randomUint32() / (float)UINT_MAX;
 	}
 
 	inline float randomFloatBetween(float lo, float hi)

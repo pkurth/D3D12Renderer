@@ -221,7 +221,7 @@ void testBitonicSortUint(uint32 numElements, bool ascending)
 	uint32* values = new uint32[numElements];
 	for (uint32 i = 0; i < numElements; ++i)
 	{
-		values[i] = (rng.randomUint() & ~mask) | i;
+		values[i] = (rng.randomUint32() & ~mask) | i;
 	}
 
 	ref<dx_buffer> list = createBuffer(sizeof(uint32), numElements, values, true);
