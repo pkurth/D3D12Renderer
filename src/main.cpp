@@ -5,6 +5,7 @@
 #include "dx/dx_profiling.h"
 #include "core/input.h"
 #include "core/imgui.h"
+#include "core/log.h"
 #include "core/cpu_profiling.h"
 #include "editor/file_browser.h"
 #include "application.h"
@@ -102,6 +103,7 @@ int main(int argc, char** argv)
 	}
 
 	initializeJobSystem();
+	initializeMessageLog();
 
 	dx_window window;
 	window.initialize(TEXT("D3D12 Renderer"), 1920, 1080);
@@ -248,6 +250,8 @@ int main(int argc, char** argv)
 
 		fileBrowser.draw(meshEditor);
 		meshEditor.draw();
+
+		updateMessageLog(dt);
 
 		renderToMainWindow(window);
 

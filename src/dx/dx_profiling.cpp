@@ -123,7 +123,7 @@ void dxProfilingResolveTimeStamps(uint64* timestamps)
 
 	if (dxProfilerWindowOpen)
 	{
-		if (ImGui::Begin("GPU Profiling", &dxProfilerWindowOpen))
+		if (ImGui::Begin(ICON_FA_CHART_BAR "  GPU Profiling", &dxProfilerWindowOpen))
 		{
 			static profiler_persistent persistent;
 			profiler_timeline timeline(persistent, MAX_NUM_DX_PROFILE_FRAMES);

@@ -2,6 +2,7 @@
 #include "editor.h"
 #include "core/imgui.h"
 #include "core/cpu_profiling.h"
+#include "core/log.h"
 #include "dx/dx_profiling.h"
 #include "scene/components.h"
 #include "animation/animation.h"
@@ -159,6 +160,13 @@ void scene_editor::drawMainMenuBar()
 				cpuProfilerWindowOpen = !cpuProfilerWindowOpen;
 			}
 
+			ImGui::Separator();
+
+			if (ImGui::MenuItem(logWindowOpen ? (ICON_FA_CLIPBOARD_LIST "  Hide message log") : (ICON_FA_CLIPBOARD_LIST "  Show message log"), nullptr, nullptr, ENABLE_MESSAGE_LOG))
+			{
+				logWindowOpen = !logWindowOpen;
+			}
+
 			ImGui::EndMenu();
 		}
 
@@ -182,13 +190,13 @@ void scene_editor::drawMainMenuBar()
 
 	if (controlsClicked)
 	{
-		ImGui::OpenPopup("Controls");
+		ImGui::OpenPopup(ICON_FA_COMPASS "  Controls");
 	}
 
 	ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 	ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
-	if (ImGui::BeginPopupModal("Controls", 0, ImGuiWindowFlags_AlwaysAutoResize))
+	if (ImGui::BeginPopupModal(ICON_FA_COMPASS "  Controls", 0, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		ImGui::Text("The camera can be controlled in two modes:");
 		ImGui::BulletText(
@@ -206,12 +214,12 @@ void scene_editor::drawMainMenuBar()
 			"Left-click on objects to select them. Toggle through gizmos using\n"
 			"Q (no gizmo), W (translate), E (rotate), R (scale).\n"
 			"Press G to toggle between global and local coordinate system.\n"
-			"You can also change the object's properties in the Scene Hierarchy window."
+			"You can also change the object's transform in the Scene Hierarchy window."
 		);
 		ImGui::Separator();
 		ImGui::Text(
 			"Press F to focus the camera on the selected object. This automatically\n"
-			"sets the orbit distance such that you now orbit around this object (with alt)."
+			"sets the orbit distance such that you now orbit around this object (with alt, see above)."
 		);
 		ImGui::Separator();
 		ImGui::Text(
@@ -233,12 +241,12 @@ void scene_editor::drawMainMenuBar()
 
 	if (aboutClicked)
 	{
-		ImGui::OpenPopup("About");
+		ImGui::OpenPopup(ICON_FA_QUESTION "  About");
 	}
 
 	ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
-	if (ImGui::BeginPopupModal("About", 0, ImGuiWindowFlags_AlwaysAutoResize))
+	if (ImGui::BeginPopupModal(ICON_FA_QUESTION "  About", 0, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		ImGui::Text("Direct3D renderer");
 		ImGui::Separator();
@@ -253,10 +261,12 @@ void scene_editor::drawMainMenuBar()
 
 	if (showIconsWindow)
 	{
-		ImGui::Begin("Icons", &showIconsWindow);
+		ImGui::Begin(ICON_FA_ICONS "  Icons", &showIconsWindow);
 
 		static ImGuiTextFilter filter;
 		filter.Draw();
+
+		ImGui::BeginChild("Icons List");
 		for (uint32 i = 0; i < arraysize(awesomeIcons); ++i)
 		{
 			ImGui::PushID(i);
@@ -271,6 +281,7 @@ void scene_editor::drawMainMenuBar()
 			}
 			ImGui::PopID();
 		}
+		ImGui::EndChild();
 		ImGui::End();
 	}
 

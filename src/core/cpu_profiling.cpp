@@ -233,7 +233,7 @@ void cpuProfilingResolveTimeStamps()
 	{
 		CPU_PROFILE_BLOCK("Display profiling");
 
-		if (ImGui::Begin("CPU Profiling", &cpuProfilerWindowOpen))
+		if (ImGui::Begin(ICON_FA_CHART_LINE "  CPU Profiling", &cpuProfilerWindowOpen))
 		{
 			static profiler_persistent persistent;
 			profiler_timeline timeline(persistent, MAX_NUM_CPU_PROFILE_FRAMES);
