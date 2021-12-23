@@ -2,6 +2,7 @@
 
 #include "dx_descriptor.h"
 #include "dx_descriptor_allocation.h"
+#include "core/asset.h"
 #include "core/math.h"
 #include "core/image.h"
 
@@ -47,6 +48,8 @@ struct dx_texture
 
 	uint32 requestedNumMipLevels;
 	uint32 numMipLevels;
+
+	asset_handle handle;
 
 	void setName(const wchar* name);
 	std::wstring getName() const;

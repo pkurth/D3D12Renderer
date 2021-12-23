@@ -4,6 +4,7 @@
 #include <fstream>
 
 #include "math.h"
+#include "asset.h"
 
 
 
@@ -52,6 +53,12 @@ static YAML::Emitter& operator<<(YAML::Emitter& out, const mat4& m)
 static YAML::Emitter& operator<<(YAML::Emitter& out, const fs::path& p)
 {
 	out << p.string(); // TODO: This should really output wstrings.
+	return out;
+}
+
+static YAML::Emitter& operator<<(YAML::Emitter& out, asset_handle a)
+{
+	out << a.value;
 	return out;
 }
 
@@ -144,10 +151,16 @@ namespace YAML
 	{
 		static bool decode(const Node& n, fs::path& v) { v = n.as<std::string>(); return true; }
 	};
+
+	template<>
+	struct convert<asset_handle>
+	{
+		static bool decode(const Node& n, asset_handle& h) { h.value = n.as<uint64>(); return true; }
+	};
 }
 
 
-#define YAML_LOAD(var, name) var = n[name].as<std::remove_reference_t<decltype(var)>>()
-#define YAML_LOAD_ENUM(var, name) var = (decltype(var))(n[name].as<int>())
+#define YAML_LOAD(var, name) { auto nc = n[name]; if (nc) { var = nc.as<std::remove_reference_t<decltype(var)>>(); } }
+#define YAML_LOAD_ENUM(var, name) { auto nc = n[name]; if (nc) { var = (decltype(var))(nc.as<int>()); } }
 
 

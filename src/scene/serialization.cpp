@@ -38,10 +38,12 @@ static YAML::Emitter& operator<<(YAML::Emitter& out, const directional_light& su
 		<< YAML::Key << "Color" << YAML::Value << sun.color
 		<< YAML::Key << "Intensity" << YAML::Value << sun.intensity
 		<< YAML::Key << "Direction" << YAML::Value << sun.direction
+		<< YAML::Key << "Shadow dimensions" << YAML::Value << sun.shadowDimensions
 		<< YAML::Key << "Cascades" << YAML::Value << sun.numShadowCascades
 		<< YAML::Key << "Distances" << YAML::Value << sun.cascadeDistances
 		<< YAML::Key << "Bias" << YAML::Value << sun.bias
 		<< YAML::Key << "Blend distances" << YAML::Value << sun.blendDistances
+		<< YAML::Key << "Stabilize" << YAML::Value << sun.stabilize
 		<< YAML::EndMap;
 	return out;
 }
@@ -57,6 +59,30 @@ static YAML::Emitter& operator<<(YAML::Emitter& out, const tonemap_settings& s)
 		<< YAML::Key << "F" << YAML::Value << s.F
 		<< YAML::Key << "Linear white" << YAML::Value << s.linearWhite
 		<< YAML::Key << "Exposure" << YAML::Value << s.exposure
+		<< YAML::EndMap;
+	return out;
+}
+
+static YAML::Emitter& operator<<(YAML::Emitter& out, const hbao_settings& s)
+{
+	out << YAML::BeginMap
+		<< YAML::Key << "Radius" << YAML::Value << s.radius
+		<< YAML::Key << "Num rays" << YAML::Value << s.numRays
+		<< YAML::Key << "Max num steps per ray" << YAML::Value << s.maxNumStepsPerRay
+		<< YAML::Key << "Strength" << YAML::Value << s.strength
+		<< YAML::EndMap;
+	return out;
+}
+
+static YAML::Emitter& operator<<(YAML::Emitter& out, const sss_settings& s)
+{
+	out << YAML::BeginMap
+		<< YAML::Key << "Num steps" << YAML::Value << s.numSteps
+		<< YAML::Key << "Ray distance" << YAML::Value << s.rayDistance
+		<< YAML::Key << "Thickness" << YAML::Value << s.thickness
+		<< YAML::Key << "Max distance" << YAML::Value << s.maxDistanceFromCamera
+		<< YAML::Key << "Distance fadeout" << YAML::Value << s.distanceFadeoutRange
+		<< YAML::Key << "Border fadeout" << YAML::Value << s.borderFadeout
 		<< YAML::EndMap;
 	return out;
 }
@@ -108,6 +134,10 @@ static YAML::Emitter& operator<<(YAML::Emitter& out, const renderer_settings& s)
 		<< YAML::Key << "SSR" << YAML::Value << s.ssrSettings
 		<< YAML::Key << "Enable TAA" << YAML::Value << s.enableTAA
 		<< YAML::Key << "TAA" << YAML::Value << s.taaSettings
+		<< YAML::Key << "Enable AO" << YAML::Value << s.enableAO
+		<< YAML::Key << "AO" << YAML::Value << s.aoSettings
+		<< YAML::Key << "Enable SSS" << YAML::Value << s.enableSSS
+		<< YAML::Key << "SSS" << YAML::Value << s.sssSettings
 		<< YAML::Key << "Enable Bloom" << YAML::Value << s.enableBloom
 		<< YAML::Key << "Bloom" << YAML::Value << s.bloomSettings
 		<< YAML::Key << "Enable Sharpen" << YAML::Value << s.enableSharpen
@@ -251,6 +281,18 @@ static YAML::Emitter& operator<<(YAML::Emitter& out, const cloth_component& c)
 	return out;
 }
 
+static YAML::Emitter& operator<<(YAML::Emitter& out, const raster_component& c)
+{
+	auto mesh = c.mesh;
+
+	out << YAML::BeginMap
+		<< YAML::Key << "Handle" << YAML::Value << mesh->handle
+		<< YAML::Key << "Flags" << YAML::Value << mesh->flags
+		<< YAML::EndMap;
+
+	return out;
+}
+
 namespace YAML
 {
 	template<>
@@ -297,6 +339,40 @@ namespace YAML
 			YAML_LOAD(s.F, "F");
 			YAML_LOAD(s.linearWhite, "Linear white");
 			YAML_LOAD(s.exposure, "Exposure");
+
+			return true;
+		}
+	};
+
+	template<>
+	struct convert<hbao_settings>
+	{
+		static bool decode(const Node& n, hbao_settings& s)
+		{
+			if (!n.IsMap()) { return false; }
+
+			YAML_LOAD(s.radius, "Radius");
+			YAML_LOAD(s.numRays, "Num rays");
+			YAML_LOAD(s.maxNumStepsPerRay, "Max num steps per ray");
+			YAML_LOAD(s.strength, "Strength");
+
+			return true;
+		}
+	};
+
+	template<>
+	struct convert<sss_settings>
+	{
+		static bool decode(const Node& n, sss_settings& s)
+		{
+			if (!n.IsMap()) { return false; }
+
+			YAML_LOAD(s.numSteps, "Num steps");
+			YAML_LOAD(s.rayDistance, "Ray distance");
+			YAML_LOAD(s.thickness, "Thickness");
+			YAML_LOAD(s.maxDistanceFromCamera, "Max distance");
+			YAML_LOAD(s.distanceFadeoutRange, "Distance fadeout");
+			YAML_LOAD(s.borderFadeout, "Border fadeout");
 
 			return true;
 		}
@@ -373,6 +449,10 @@ namespace YAML
 			YAML_LOAD(settings.ssrSettings, "SSR");
 			YAML_LOAD(settings.enableTAA, "Enable TAA");
 			YAML_LOAD(settings.taaSettings, "TAA");
+			YAML_LOAD(settings.enableAO, "Enable AO");
+			YAML_LOAD(settings.aoSettings, "AO");
+			YAML_LOAD(settings.enableSSS, "Enable SSS");
+			YAML_LOAD(settings.sssSettings, "SSS");
 			YAML_LOAD(settings.enableBloom, "Enable Bloom");
 			YAML_LOAD(settings.bloomSettings, "Bloom");
 			YAML_LOAD(settings.enableSharpen, "Enable Sharpen");
@@ -392,10 +472,12 @@ namespace YAML
 			YAML_LOAD(sun.color, "Color");
 			YAML_LOAD(sun.intensity, "Intensity");
 			YAML_LOAD(sun.direction, "Direction");
+			YAML_LOAD(sun.shadowDimensions, "Shadow dimensions");
 			YAML_LOAD(sun.numShadowCascades, "Cascades");
 			YAML_LOAD(sun.cascadeDistances, "Distances");
 			YAML_LOAD(sun.bias, "Bias");
 			YAML_LOAD(sun.blendDistances, "Blend distances");
+			YAML_LOAD(sun.stabilize, "Stabilize");
 
 			return true;
 		}
@@ -611,14 +693,38 @@ namespace YAML
 			return true;
 		}
 	};
+
+	template<>
+	struct convert<raster_component>
+	{
+		static bool decode(const Node& n, raster_component& c)
+		{
+			if (!n.IsMap()) { return false; }
+
+			asset_handle handle;
+			uint32 flags;
+
+			YAML_LOAD(handle, "Handle");
+			YAML_LOAD(flags, "Flags");
+
+			c.mesh = loadMeshFromHandle(handle, flags);
+
+			return true;
+		}
+	};
 }
 
 void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSettings)
 {
-	std::string filename = saveFileDialog("Scene files", "sc");
-	if (filename.empty())
+	if (scene.savePath.empty())
 	{
-		return;
+		fs::path filename = saveFileDialog("Scene files", "sc");
+		if (filename.empty())
+		{
+			return;
+		}
+
+		scene.savePath = filename;
 	}
 
 	YAML::Emitter out;
@@ -655,6 +761,7 @@ void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSe
 			if (auto* c = entity.getComponentIfExists<rigid_body_component>()) { out << YAML::Key << "Rigid body" << YAML::Value << *c; }
 			if (auto* c = entity.getComponentIfExists<force_field_component>()) { out << YAML::Key << "Force field" << YAML::Value << *c; }
 			if (auto* c = entity.getComponentIfExists<cloth_component>()) { out << YAML::Key << "Cloth" << YAML::Value << *c; }
+			if (auto* c = entity.getComponentIfExists<raster_component>()) { out << YAML::Key << "Raster" << YAML::Value << *c; }
 			if (auto* c = entity.getComponentIfExists<physics_reference_component>()) 
 			{ 
 				if (c->numColliders)
@@ -673,7 +780,6 @@ void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSe
 			/* 
 			TODO:
 				- Animation
-				- Raster
 				- Raytrace
 				- Constraints
 			*/
@@ -685,15 +791,15 @@ void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSe
 
 	out << YAML::EndMap;
 
-	fs::create_directories(fs::path(filename).parent_path());
+	fs::create_directories(scene.savePath.parent_path());
 
-	std::ofstream fout(filename);
+	std::ofstream fout(scene.savePath);
 	fout << out.c_str();
 }
 
 bool deserializeSceneFromDisk(game_scene& scene, renderer_settings& rendererSettings, std::string& environmentName)
 {
-	std::string filename = openFileDialog("Scene files", "sc");
+	fs::path filename = openFileDialog("Scene files", "sc");
 	if (filename.empty())
 	{
 		return false;
@@ -707,6 +813,7 @@ bool deserializeSceneFromDisk(game_scene& scene, renderer_settings& rendererSett
 	}
 
 	scene = game_scene();
+	scene.savePath = filename;
 
 	std::string sceneName = n["Scene"].as<std::string>();
 
@@ -733,6 +840,7 @@ bool deserializeSceneFromDisk(game_scene& scene, renderer_settings& rendererSett
 		LOAD_COMPONENT(rigid_body_component, "Rigid body");
 		LOAD_COMPONENT(force_field_component, "Force field");
 		LOAD_COMPONENT(cloth_component, "Cloth");
+		LOAD_COMPONENT(raster_component, "Raster");
 
 		if (auto collidersNode = entityNode["Colliders"])
 		{

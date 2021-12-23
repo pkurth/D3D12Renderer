@@ -3,6 +3,7 @@
 #include "geometry.h"
 #include "rendering/pbr.h"
 #include "core/hash.h"
+#include "core/file_registry.h"
 
 #include "core/assimp.h"
 
@@ -24,10 +25,10 @@ static void getMeshNamesAndTransforms(const aiNode* node, ref<composite_mesh>& m
 	}
 }
 
-static std::unordered_map<fs::path, weakref<composite_mesh>> meshCache; // TODO: Pack flags into key.
+static std::unordered_map<asset_handle, weakref<composite_mesh>> meshCache; // TODO: Pack flags into key.
 static std::mutex mutex;
 
-static ref<composite_mesh> loadMeshFromFileInternal(const fs::path& sceneFilename, bool loadSkeleton, bool loadAnimations, uint32 flags)
+static ref<composite_mesh> loadMeshFromFileInternal(asset_handle handle, const fs::path& sceneFilename, uint32 flags)
 {
 	Assimp::Importer importer;
 
@@ -42,7 +43,7 @@ static ref<composite_mesh> loadMeshFromFileInternal(const fs::path& sceneFilenam
 
 	ref<composite_mesh> result = make_ref<composite_mesh>();
 
-	if (loadSkeleton && (flags & mesh_creation_flags_with_skin))
+	if (flags & mesh_creation_flags_with_skin)
 	{
 		result->skeleton.loadFromAssimp(scene, 1.f);
 
@@ -59,12 +60,10 @@ static ref<composite_mesh> loadMeshFromFileInternal(const fs::path& sceneFilenam
 		}
 #endif
 
-		if (loadAnimations)
+		// Load animations.
+		for (uint32 i = 0; i < scene->mNumAnimations; ++i)
 		{
-			for (uint32 i = 0; i < scene->mNumAnimations; ++i)
-			{
-				result->skeleton.pushAssimpAnimation(sceneFilename, scene->mAnimations[i], 1.f);
-			}
+			result->skeleton.pushAssimpAnimation(sceneFilename, scene->mAnimations[i], 1.f);
 		}
 	}
 
@@ -87,19 +86,37 @@ static ref<composite_mesh> loadMeshFromFileInternal(const fs::path& sceneFilenam
 
 	result->mesh = cpuMesh.createDXMesh();
 
-	result->filepath = sceneFilename;
+	result->handle = handle;
 	result->flags = flags;
 	return result;
 }
 
-ref<composite_mesh> loadMeshFromFile(const fs::path& sceneFilename, bool loadSkeleton, bool loadAnimations, uint32 flags)
+ref<composite_mesh> loadMeshFromFile(const fs::path& sceneFilename, uint32 flags)
 {
+	asset_handle handle = getAssetHandleFromPath(sceneFilename.lexically_normal());
+
 	mutex.lock();
 
-	auto sp = meshCache[sceneFilename].lock();
+	auto sp = meshCache[handle].lock();
 	if (!sp)
 	{
-		meshCache[sceneFilename] = sp = loadMeshFromFileInternal(sceneFilename, loadSkeleton, loadAnimations, flags);
+		meshCache[handle] = sp = loadMeshFromFileInternal(handle, sceneFilename, flags);
+	}
+
+	mutex.unlock();
+	return sp;
+}
+
+ref<composite_mesh> loadMeshFromHandle(asset_handle handle, uint32 flags)
+{
+	fs::path sceneFilename = getPathFromAssetHandle(handle);
+
+	mutex.lock();
+
+	auto sp = meshCache[handle].lock();
+	if (!sp)
+	{
+		meshCache[handle] = sp = loadMeshFromFileInternal(handle, sceneFilename, flags);
 	}
 
 	mutex.unlock();

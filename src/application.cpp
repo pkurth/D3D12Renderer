@@ -140,7 +140,7 @@ void application::initialize(main_renderer* renderer)
 #endif
 
 #if 0
-	if (auto ragdollMesh = loadAnimatedMeshFromFile("assets/ragdoll/locomotion_pack/xbot.fbx", true, false))
+	if (auto ragdollMesh = loadAnimatedMeshFromFile("assets/ragdoll/locomotion_pack/xbot.fbx"))
 	{
 		//ragdollMesh->skeleton.prettyPrintHierarchy();
 		ragdollMesh->skeleton.pushAssimpAnimationsInDirectory("assets/ragdoll/locomotion_pack/animations");

@@ -62,7 +62,7 @@ void mesh_editor_panel::setAsset(const fs::path& path)
 {
 #if 0
 	open = true;
-	asset = loadMeshFromFile(path.u8string(), false, false);
+	asset = loadMeshFromFile(path.u8string());
 #endif
 }
 

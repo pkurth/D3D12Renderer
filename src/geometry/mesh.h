@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/asset.h"
 #include "physics/bounding_volumes.h"
 #include "dx/dx_buffer.h"
 #include "animation/animation.h"
@@ -25,17 +26,18 @@ struct composite_mesh
 	dx_mesh mesh;
 	bounding_box aabb;
 
-	fs::path filepath;
+	asset_handle handle;
 	uint32 flags;
 };
 
 
-ref<composite_mesh> loadMeshFromFile(const fs::path& sceneFilename, bool loadSkeleton = true, bool loadAnimations = true, uint32 flags = mesh_creation_flags_default);
+ref<composite_mesh> loadMeshFromFile(const fs::path& sceneFilename, uint32 flags = mesh_creation_flags_default);
+ref<composite_mesh> loadMeshFromHandle(asset_handle handle, uint32 flags = mesh_creation_flags_default);
 
 // Same function but with different default flags (includes skin).
-inline ref<composite_mesh> loadAnimatedMeshFromFile(const fs::path& sceneFilename, bool loadSkeleton = true, bool loadAnimations = true, uint32 flags = mesh_creation_flags_animated)
+inline ref<composite_mesh> loadAnimatedMeshFromFile(const fs::path& sceneFilename, uint32 flags = mesh_creation_flags_animated)
 {
-	return loadMeshFromFile(sceneFilename, loadSkeleton, loadAnimations, flags);
+	return loadMeshFromFile(sceneFilename, flags);
 }
 
 struct raster_component

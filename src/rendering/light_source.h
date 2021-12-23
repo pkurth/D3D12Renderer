@@ -22,7 +22,7 @@ struct directional_light
 	mat4 viewProjs[MAX_NUM_SUN_SHADOW_CASCADES];
 
 	vec4 blendDistances;
-	uint32 shadowDimensions;
+	uint32 shadowDimensions = 2048;
 
 	bool stabilize;
 

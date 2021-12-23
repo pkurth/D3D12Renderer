@@ -280,6 +280,8 @@ struct game_scene
 	entt::registry registry;
 
 
+	fs::path savePath;
+
 #ifndef PHYSICS_ONLY
 	render_camera camera;
 	directional_light sun;
