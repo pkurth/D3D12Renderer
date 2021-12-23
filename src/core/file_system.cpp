@@ -46,12 +46,18 @@ static DWORD observeDirectoryThread(void* inParams)
 
 	while (true)
 	{
-		DWORD error = ReadDirectoryChangesW(directoryHandle,
+		DWORD result = ReadDirectoryChangesW(directoryHandle,
 			buffer, sizeof(buffer), params->watchSubDirectories,
 			eventName,
 			&bytesReturned, &overlapped, NULL);
 
-		DWORD result = WaitForSingleObject(overlapped.hEvent, INFINITE);
+		if (!result)
+		{
+			std::cerr << "Read directory changes failed\n";
+			break;
+		}
+
+		WaitForSingleObject(overlapped.hEvent, INFINITE);
 
 
 
@@ -59,11 +65,13 @@ static DWORD observeDirectoryThread(void* inParams)
 		if (!GetOverlappedResult(directoryHandle, &overlapped, &dw, FALSE) || dw == 0)
 		{
 			std::cerr << "Get overlapped result failed.\n";
-			return 1;
+			break;
 		}
 
 		FILE_NOTIFY_INFORMATION* filenotify;
 		DWORD offset = 0;
+
+		fs::path oldPath;
 
 		do
 		{
@@ -76,6 +84,12 @@ static DWORD observeDirectoryThread(void* inParams)
 				case FILE_ACTION_ADDED: { change = file_system_change_add; } break;
 				case FILE_ACTION_REMOVED: { change = file_system_change_delete; } break;
 				case FILE_ACTION_MODIFIED: { change = file_system_change_modify; } break;
+				case FILE_ACTION_RENAMED_OLD_NAME: 
+				{
+					uint32 filenameLength = filenotify->FileNameLength / sizeof(WCHAR);
+					oldPath = (params->directory / std::wstring(filenotify->FileName, filenameLength)).lexically_normal();
+				} break;
+				case FILE_ACTION_RENAMED_NEW_NAME: { change = file_system_change_rename; } break;
 			}
 
 			if (change != file_system_change_none)
@@ -83,23 +97,34 @@ static DWORD observeDirectoryThread(void* inParams)
 				uint32 filenameLength = filenotify->FileNameLength / sizeof(WCHAR);
 				fs::path path = (params->directory / std::wstring(filenotify->FileName, filenameLength)).lexically_normal();
 
-				auto changedPathWriteTime = fs::last_write_time(path);
-
-				// The filesystem usually sends multiple notifications for changed files, since the file is first written, then metadata is changed etc.
-				// This check prevents these notifications if they are too close together in time.
-				// This is a pretty crude fix. In this setup files should not change at the same time, since we only ever track one file.
-				if (path == lastChangedPath
-					&& std::chrono::duration_cast<std::chrono::milliseconds>(changedPathWriteTime - lastChangedPathTimeStamp).count() < 200)
+				if (change == file_system_change_modify)
 				{
+					auto writeTime = fs::last_write_time(path);
+
+					// The filesystem usually sends multiple notifications for changed files, since the file is first written, then metadata is changed etc.
+					// This check prevents these notifications if they are too close together in time.
+					// This is a pretty crude fix. In this setup files should not change at the same time, since we only ever track one file.
+					if (path == lastChangedPath
+						&& std::chrono::duration_cast<std::chrono::milliseconds>(writeTime - lastChangedPathTimeStamp).count() < 200)
+					{
+						lastChangedPath = path;
+						lastChangedPathTimeStamp = writeTime;
+						break;
+					}
+
 					lastChangedPath = path;
-					lastChangedPathTimeStamp = changedPathWriteTime;
-					break;
+					lastChangedPathTimeStamp = writeTime;
 				}
 
-				lastChangedPath = path;
-				lastChangedPathTimeStamp = changedPathWriteTime;
+				file_system_event e;
+				e.change = change;
+				e.path = std::move(path);
+				if (change == file_system_change_rename)
+				{
+					e.oldPath = std::move(oldPath);
+				}
 
-				params->callback(change, path);
+				params->callback(e);
 			}
 
 			offset += filenotify->NextEntryOffset;
