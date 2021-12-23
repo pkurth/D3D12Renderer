@@ -1583,7 +1583,7 @@ void ambientOcclusion(dx_command_list* cl,
 		cl->dispatch(bucketize(aoCalculationTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(aoCalculationTexture->height, POST_PROCESSING_BLOCK_SIZE));
 
 		barrier_batcher(cl)
-			//.uav(aoTexture)
+			//.uav(aoCalculationTexture)
 			.transition(aoCalculationTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	}
 
@@ -1629,7 +1629,7 @@ void screenSpaceShadows(dx_command_list* cl,
 		cl->dispatch(bucketize(sssCalculationTexture->width, POST_PROCESSING_BLOCK_SIZE), bucketize(sssCalculationTexture->height, POST_PROCESSING_BLOCK_SIZE));
 
 		barrier_batcher(cl)
-			//.uav(aoTexture)
+			//.uav(sssCalculationTexture)
 			.transition(sssCalculationTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	}
 
