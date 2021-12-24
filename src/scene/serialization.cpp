@@ -3,6 +3,7 @@
 
 #include "editor/file_dialog.h"
 #include "core/yaml.h"
+#include "core/log.h"
 
 #include "physics/physics.h"
 
@@ -302,22 +303,22 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(camera.position, "Position");
-			YAML_LOAD(camera.rotation, "Rotation");
-			YAML_LOAD(camera.nearPlane, "Near plane");
-			YAML_LOAD(camera.farPlane, "Far plane");
-			YAML_LOAD_ENUM(camera.type, "Type");
+			YAML_LOAD(n, camera.position, "Position");
+			YAML_LOAD(n, camera.rotation, "Rotation");
+			YAML_LOAD(n, camera.nearPlane, "Near plane");
+			YAML_LOAD(n, camera.farPlane, "Far plane");
+			YAML_LOAD_ENUM(n, camera.type, "Type");
 
 			if (camera.type == camera_type_ingame)
 			{
-				YAML_LOAD(camera.verticalFOV, "FOV");
+				YAML_LOAD(n, camera.verticalFOV, "FOV");
 			}
 			else
 			{
-				YAML_LOAD(camera.fx, "Fx");
-				YAML_LOAD(camera.fy, "Fy");
-				YAML_LOAD(camera.cx, "Cx");
-				YAML_LOAD(camera.cy, "Cy");
+				YAML_LOAD(n, camera.fx, "Fx");
+				YAML_LOAD(n, camera.fy, "Fy");
+				YAML_LOAD(n, camera.cx, "Cx");
+				YAML_LOAD(n, camera.cy, "Cy");
 			}
 
 			return true; 
@@ -331,14 +332,14 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(s.A, "A");
-			YAML_LOAD(s.B, "B");
-			YAML_LOAD(s.C, "C");
-			YAML_LOAD(s.D, "D");
-			YAML_LOAD(s.E, "E");
-			YAML_LOAD(s.F, "F");
-			YAML_LOAD(s.linearWhite, "Linear white");
-			YAML_LOAD(s.exposure, "Exposure");
+			YAML_LOAD(n, s.A, "A");
+			YAML_LOAD(n, s.B, "B");
+			YAML_LOAD(n, s.C, "C");
+			YAML_LOAD(n, s.D, "D");
+			YAML_LOAD(n, s.E, "E");
+			YAML_LOAD(n, s.F, "F");
+			YAML_LOAD(n, s.linearWhite, "Linear white");
+			YAML_LOAD(n, s.exposure, "Exposure");
 
 			return true;
 		}
@@ -351,10 +352,10 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(s.radius, "Radius");
-			YAML_LOAD(s.numRays, "Num rays");
-			YAML_LOAD(s.maxNumStepsPerRay, "Max num steps per ray");
-			YAML_LOAD(s.strength, "Strength");
+			YAML_LOAD(n, s.radius, "Radius");
+			YAML_LOAD(n, s.numRays, "Num rays");
+			YAML_LOAD(n, s.maxNumStepsPerRay, "Max num steps per ray");
+			YAML_LOAD(n, s.strength, "Strength");
 
 			return true;
 		}
@@ -367,12 +368,12 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(s.numSteps, "Num steps");
-			YAML_LOAD(s.rayDistance, "Ray distance");
-			YAML_LOAD(s.thickness, "Thickness");
-			YAML_LOAD(s.maxDistanceFromCamera, "Max distance");
-			YAML_LOAD(s.distanceFadeoutRange, "Distance fadeout");
-			YAML_LOAD(s.borderFadeout, "Border fadeout");
+			YAML_LOAD(n, s.numSteps, "Num steps");
+			YAML_LOAD(n, s.rayDistance, "Ray distance");
+			YAML_LOAD(n, s.thickness, "Thickness");
+			YAML_LOAD(n, s.maxDistanceFromCamera, "Max distance");
+			YAML_LOAD(n, s.distanceFadeoutRange, "Distance fadeout");
+			YAML_LOAD(n, s.borderFadeout, "Border fadeout");
 
 			return true;
 		}
@@ -385,11 +386,11 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(s.numSteps, "Num steps");
-			YAML_LOAD(s.maxDistance, "Max distance");
-			YAML_LOAD(s.strideCutoff, "Stride cutoff");
-			YAML_LOAD(s.minStride, "Min stride");
-			YAML_LOAD(s.maxStride, "Max stride");
+			YAML_LOAD(n, s.numSteps, "Num steps");
+			YAML_LOAD(n, s.maxDistance, "Max distance");
+			YAML_LOAD(n, s.strideCutoff, "Stride cutoff");
+			YAML_LOAD(n, s.minStride, "Min stride");
+			YAML_LOAD(n, s.maxStride, "Max stride");
 
 			return true;
 		}
@@ -402,7 +403,7 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(s.cameraJitterStrength, "Camera jitter");
+			YAML_LOAD(n, s.cameraJitterStrength, "Camera jitter");
 
 			return true;
 		}
@@ -415,8 +416,8 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(s.threshold, "Threshold");
-			YAML_LOAD(s.strength, "Strength");
+			YAML_LOAD(n, s.threshold, "Threshold");
+			YAML_LOAD(n, s.strength, "Strength");
 
 			return true;
 		}
@@ -429,7 +430,7 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(s.strength, "Strength");
+			YAML_LOAD(n, s.strength, "Strength");
 
 			return true;
 		}
@@ -442,21 +443,21 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(settings.tonemapSettings, "Tone map");
-			YAML_LOAD(settings.environmentIntensity, "Environment intensity");
-			YAML_LOAD(settings.skyIntensity, "Sky intensity");
-			YAML_LOAD(settings.enableSSR, "Enable SSR");
-			YAML_LOAD(settings.ssrSettings, "SSR");
-			YAML_LOAD(settings.enableTAA, "Enable TAA");
-			YAML_LOAD(settings.taaSettings, "TAA");
-			YAML_LOAD(settings.enableAO, "Enable AO");
-			YAML_LOAD(settings.aoSettings, "AO");
-			YAML_LOAD(settings.enableSSS, "Enable SSS");
-			YAML_LOAD(settings.sssSettings, "SSS");
-			YAML_LOAD(settings.enableBloom, "Enable Bloom");
-			YAML_LOAD(settings.bloomSettings, "Bloom");
-			YAML_LOAD(settings.enableSharpen, "Enable Sharpen");
-			YAML_LOAD(settings.sharpenSettings, "Sharpen");
+			YAML_LOAD(n, settings.tonemapSettings, "Tone map");
+			YAML_LOAD(n, settings.environmentIntensity, "Environment intensity");
+			YAML_LOAD(n, settings.skyIntensity, "Sky intensity");
+			YAML_LOAD(n, settings.enableSSR, "Enable SSR");
+			YAML_LOAD(n, settings.ssrSettings, "SSR");
+			YAML_LOAD(n, settings.enableTAA, "Enable TAA");
+			YAML_LOAD(n, settings.taaSettings, "TAA");
+			YAML_LOAD(n, settings.enableAO, "Enable AO");
+			YAML_LOAD(n, settings.aoSettings, "AO");
+			YAML_LOAD(n, settings.enableSSS, "Enable SSS");
+			YAML_LOAD(n, settings.sssSettings, "SSS");
+			YAML_LOAD(n, settings.enableBloom, "Enable Bloom");
+			YAML_LOAD(n, settings.bloomSettings, "Bloom");
+			YAML_LOAD(n, settings.enableSharpen, "Enable Sharpen");
+			YAML_LOAD(n, settings.sharpenSettings, "Sharpen");
 
 			return true;
 		}
@@ -469,15 +470,15 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(sun.color, "Color");
-			YAML_LOAD(sun.intensity, "Intensity");
-			YAML_LOAD(sun.direction, "Direction");
-			YAML_LOAD(sun.shadowDimensions, "Shadow dimensions");
-			YAML_LOAD(sun.numShadowCascades, "Cascades");
-			YAML_LOAD(sun.cascadeDistances, "Distances");
-			YAML_LOAD(sun.bias, "Bias");
-			YAML_LOAD(sun.blendDistances, "Blend distances");
-			YAML_LOAD(sun.stabilize, "Stabilize");
+			YAML_LOAD(n, sun.color, "Color");
+			YAML_LOAD(n, sun.intensity, "Intensity");
+			YAML_LOAD(n, sun.direction, "Direction");
+			YAML_LOAD(n, sun.shadowDimensions, "Shadow dimensions");
+			YAML_LOAD(n, sun.numShadowCascades, "Cascades");
+			YAML_LOAD(n, sun.cascadeDistances, "Distances");
+			YAML_LOAD(n, sun.bias, "Bias");
+			YAML_LOAD(n, sun.blendDistances, "Blend distances");
+			YAML_LOAD(n, sun.stabilize, "Stabilize");
 
 			return true;
 		}
@@ -490,9 +491,9 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(c.rotation, "Rotation");
-			YAML_LOAD(c.position, "Position");
-			YAML_LOAD(c.scale, "Scale");
+			YAML_LOAD(n, c.rotation, "Rotation");
+			YAML_LOAD(n, c.position, "Position");
+			YAML_LOAD(n, c.scale, "Scale");
 
 			return true;
 		}
@@ -505,7 +506,7 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(c.position, "Position");
+			YAML_LOAD(n, c.position, "Position");
 
 			return true;
 		}
@@ -518,8 +519,8 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(c.rotation, "Rotation");
-			YAML_LOAD(c.position, "Position");
+			YAML_LOAD(n, c.rotation, "Rotation");
+			YAML_LOAD(n, c.position, "Position");
 
 			return true;
 		}
@@ -532,11 +533,11 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(c.color, "Color");
-			YAML_LOAD(c.intensity, "Intensity");
-			YAML_LOAD(c.radius, "Radius");
-			YAML_LOAD(c.castsShadow, "Casts shadow");
-			YAML_LOAD(c.shadowMapResolution, "Shadow resolution");
+			YAML_LOAD(n, c.color, "Color");
+			YAML_LOAD(n, c.intensity, "Intensity");
+			YAML_LOAD(n, c.radius, "Radius");
+			YAML_LOAD(n, c.castsShadow, "Casts shadow");
+			YAML_LOAD(n, c.shadowMapResolution, "Shadow resolution");
 
 			return true;
 		}
@@ -549,13 +550,13 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(c.color, "Color");
-			YAML_LOAD(c.intensity, "Intensity");
-			YAML_LOAD(c.distance, "Distance");
-			YAML_LOAD(c.innerAngle, "Inner angle");
-			YAML_LOAD(c.outerAngle, "Outer angle");
-			YAML_LOAD(c.castsShadow, "Casts shadow");
-			YAML_LOAD(c.shadowMapResolution, "Shadow resolution");
+			YAML_LOAD(n, c.color, "Color");
+			YAML_LOAD(n, c.intensity, "Intensity");
+			YAML_LOAD(n, c.distance, "Distance");
+			YAML_LOAD(n, c.innerAngle, "Inner angle");
+			YAML_LOAD(n, c.outerAngle, "Outer angle");
+			YAML_LOAD(n, c.castsShadow, "Casts shadow");
+			YAML_LOAD(n, c.shadowMapResolution, "Shadow resolution");
 
 			return true;
 		}
@@ -568,12 +569,12 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(c.localCOGPosition, "Local COG");
-			YAML_LOAD(c.invMass, "Inv mass");
-			YAML_LOAD(c.invInertia, "Inv inertia");
-			YAML_LOAD(c.gravityFactor, "Gravity factor");
-			YAML_LOAD(c.linearDamping, "Linear damping");
-			YAML_LOAD(c.angularDamping, "Angular damping");
+			YAML_LOAD(n, c.localCOGPosition, "Local COG");
+			YAML_LOAD(n, c.invMass, "Inv mass");
+			YAML_LOAD(n, c.invInertia, "Inv inertia");
+			YAML_LOAD(n, c.gravityFactor, "Gravity factor");
+			YAML_LOAD(n, c.linearDamping, "Linear damping");
+			YAML_LOAD(n, c.angularDamping, "Angular damping");
 
 			return true;
 		}
@@ -586,7 +587,7 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			YAML_LOAD(c.force, "Force");
+			YAML_LOAD(n, c.force, "Force");
 
 			return true;
 		}
@@ -603,7 +604,7 @@ namespace YAML
 			}
 
 			std::string typeString;
-			YAML_LOAD(typeString, "Type");
+			YAML_LOAD(n, typeString, "Type");
 			for (uint32 i = 0; i < collider_type_count; ++i)
 			{
 				if (typeString == colliderTypeNames[i])
@@ -613,9 +614,9 @@ namespace YAML
 				}
 			}
 			float restitution, friction, density;
-			YAML_LOAD(restitution, "Restitution");
-			YAML_LOAD(friction, "Friction");
-			YAML_LOAD(density, "Density");
+			YAML_LOAD(n, restitution, "Restitution");
+			YAML_LOAD(n, friction, "Friction");
+			YAML_LOAD(n, density, "Density");
 
 			switch (c.type)
 			{
@@ -623,8 +624,8 @@ namespace YAML
 				{
 					vec3 center;
 					float radius;
-					YAML_LOAD(center, "Center");
-					YAML_LOAD(radius, "Radius");
+					YAML_LOAD(n, center, "Center");
+					YAML_LOAD(n, radius, "Radius");
 					c = collider_component::asSphere({ center, radius }, restitution, friction, density);
 				} break;
 
@@ -632,17 +633,17 @@ namespace YAML
 				{
 					vec3 positionA, positionB;
 					float radius;
-					YAML_LOAD(positionA, "Position A");
-					YAML_LOAD(positionB, "Position B");
-					YAML_LOAD(radius, "Radius");
+					YAML_LOAD(n, positionA, "Position A");
+					YAML_LOAD(n, positionB, "Position B");
+					YAML_LOAD(n, radius, "Radius");
 					c = collider_component::asCapsule({ positionA, positionB, radius }, restitution, friction, density);
 				} break;
 
 				case collider_type_aabb:
 				{
 					vec3 minCorner, maxCorner;
-					YAML_LOAD(minCorner, "Min corner");
-					YAML_LOAD(maxCorner, "Max corner");
+					YAML_LOAD(n, minCorner, "Min corner");
+					YAML_LOAD(n, maxCorner, "Max corner");
 					c = collider_component::asAABB(bounding_box::fromMinMax(minCorner, maxCorner), restitution, friction, density);
 				} break;
 
@@ -650,9 +651,9 @@ namespace YAML
 				{
 					vec3 center, radius;
 					quat rotation;
-					YAML_LOAD(center, "Center");
-					YAML_LOAD(radius, "Radius");
-					YAML_LOAD(rotation, "Rotation");
+					YAML_LOAD(n, center, "Center");
+					YAML_LOAD(n, radius, "Radius");
+					YAML_LOAD(n, rotation, "Rotation");
 
 					c = collider_component::asOBB({ center, radius, rotation }, restitution, friction, density);
 				} break;
@@ -679,14 +680,14 @@ namespace YAML
 			uint32 gridSizeX, gridSizeY;
 			float width, height, totalMass, stiffness, damping, gravityFactor;
 
-			YAML_LOAD(width, "Width");
-			YAML_LOAD(height, "Height");
-			YAML_LOAD(gridSizeX, "Grid size x");
-			YAML_LOAD(gridSizeY, "Grid size y");
-			YAML_LOAD(totalMass, "Total mass");
-			YAML_LOAD(stiffness, "Stiffness");
-			YAML_LOAD(damping, "Damping");
-			YAML_LOAD(gravityFactor, "Gravity factor");
+			YAML_LOAD(n, width, "Width");
+			YAML_LOAD(n, height, "Height");
+			YAML_LOAD(n, gridSizeX, "Grid size x");
+			YAML_LOAD(n, gridSizeY, "Grid size y");
+			YAML_LOAD(n, totalMass, "Total mass");
+			YAML_LOAD(n, stiffness, "Stiffness");
+			YAML_LOAD(n, damping, "Damping");
+			YAML_LOAD(n, gravityFactor, "Gravity factor");
 
 			c = cloth_component(width, height, gridSizeX, gridSizeY, totalMass, stiffness, damping, gravityFactor);
 
@@ -704,8 +705,8 @@ namespace YAML
 			asset_handle handle;
 			uint32 flags;
 
-			YAML_LOAD(handle, "Handle");
-			YAML_LOAD(flags, "Flags");
+			YAML_LOAD(n, handle, "Handle");
+			YAML_LOAD(n, flags, "Flags");
 
 			c.mesh = loadMeshFromHandle(handle, flags);
 
@@ -795,6 +796,8 @@ void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSe
 
 	std::ofstream fout(scene.savePath);
 	fout << out.c_str();
+
+	LOG_MESSAGE("Scene saved to '%ws'", scene.savePath.c_str());
 }
 
 bool deserializeSceneFromDisk(game_scene& scene, renderer_settings& rendererSettings, std::string& environmentName)
@@ -813,15 +816,15 @@ bool deserializeSceneFromDisk(game_scene& scene, renderer_settings& rendererSett
 	}
 
 	scene = game_scene();
-	scene.savePath = filename;
+	scene.savePath = std::move(filename);
 
 	std::string sceneName = n["Scene"].as<std::string>();
 
-	YAML_LOAD(scene.camera, "Camera");
-	YAML_LOAD(rendererSettings, "Rendering");
-	YAML_LOAD(scene.sun, "Sun");
+	YAML_LOAD(n, scene.camera, "Camera");
+	YAML_LOAD(n, rendererSettings, "Rendering");
+	YAML_LOAD(n, scene.sun, "Sun");
 
-	YAML_LOAD(environmentName, "Environment");
+	YAML_LOAD(n, environmentName, "Environment");
 
 	auto entitiesNode = n["Entities"];
 	for (auto entityNode : entitiesNode)
@@ -850,6 +853,8 @@ bool deserializeSceneFromDisk(game_scene& scene, renderer_settings& rendererSett
 			}
 		}
 	}
+
+	LOG_MESSAGE("Scene loaded from '%ws'", scene.savePath.c_str());
 
 	return true;
 }

@@ -25,10 +25,16 @@ static path_to_handle loadRegistryFromDisk()
 
 	for (auto entryNode : n)
 	{
-		fs::path path = entryNode["Path"].as<fs::path>();
-		asset_handle handle = entryNode["Handle"].as<asset_handle>();
+		asset_handle handle = 0;
+		fs::path path;
 
-		loadedRegistry[path] = handle;
+		YAML_LOAD(entryNode, handle, "Handle");
+		YAML_LOAD(entryNode, path, "Path");
+
+		if (handle)
+		{
+			loadedRegistry[path] = handle;
+		}
 	}
 
 	return loadedRegistry;
@@ -42,8 +48,8 @@ static void writeRegistryToDisk()
 	for (const auto& [path, handle] : pathToHandle)
 	{
 		out << YAML::BeginMap;
-		out << YAML::Key << "Path" << YAML::Value << path;
 		out << YAML::Key << "Handle" << YAML::Value << handle;
+		out << YAML::Key << "Path" << YAML::Value << path;
 		out << YAML::EndMap;
 	}
 
@@ -67,16 +73,8 @@ static void readDirectory(const fs::path& path, const path_to_handle& loadedRegi
 		{
 			auto it = loadedRegistry.find(path);
 
-			asset_handle handle;
-
-			if (it != loadedRegistry.end())
-			{
-				handle = it->second;
-			}
-			else
-			{
-				handle = asset_handle::generate();
-			}
+			// If already known, use the handle, otherwise generate one.
+			asset_handle handle = (it != loadedRegistry.end()) ? it->second : asset_handle::generate();
 
 			pathToHandle.insert({ path, handle });
 			handleToPath.insert({ handle, path });

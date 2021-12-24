@@ -9,7 +9,7 @@ struct asset_handle
 
 	static asset_handle generate();
 
-	bool valid() { return value != 0; }
+	operator bool() { return value != 0; }
 
 	uint64 value;
 };

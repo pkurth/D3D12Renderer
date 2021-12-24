@@ -160,7 +160,7 @@ namespace YAML
 }
 
 
-#define YAML_LOAD(var, name) { auto nc = n[name]; if (nc) { var = nc.as<std::remove_reference_t<decltype(var)>>(); } }
-#define YAML_LOAD_ENUM(var, name) { auto nc = n[name]; if (nc) { var = (decltype(var))(nc.as<int>()); } }
+#define YAML_LOAD(node, var, name) { auto nc = node[name]; if (nc) { var = nc.as<std::remove_reference_t<decltype(var)>>(); } }
+#define YAML_LOAD_ENUM(node, var, name) { auto nc = node[name]; if (nc) { var = (decltype(var))(nc.as<int>()); } }
 
 
