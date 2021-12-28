@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "application.h"
-#include "geometry/geometry.h"
+#include "geometry/mesh_builder.h"
 #include "dx/dx_texture.h"
 #include "core/random.h"
 #include "core/color.h"
@@ -159,7 +159,7 @@ void application::initialize(main_renderer* renderer)
 		//	.addComponent<transform_component>(vec3(0.f), quat::identity)
 		//	.addComponent<force_field_component>(vec3(0.f, 0.f, -1.f));
 
-		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
+		mesh_builder builder;
 
 		auto lollipopMaterial = createPBRMaterial(
 			"assets/cc0/sphere/Tiles074_2K_Color.jpg",
@@ -167,12 +167,9 @@ void application::initialize(main_renderer* renderer)
 			"assets/cc0/sphere/Tiles074_2K_Roughness.jpg",
 			{}, vec4(0.f), vec4(1.f), 1.f, 0.5f, false, 3.f);
 
-		auto testMesh = make_ref<composite_mesh>();
-		testMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f), {}, trs::identity, lollipopMaterial });
-		testMesh->submeshes.push_back({ primitiveMesh.pushSphere(15, 15, 0.4f, vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f)), {}, trs::identity, lollipopMaterial });
-
 		auto groundMesh = make_ref<composite_mesh>();
-		groundMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(100.f, 4.f, 100.f)), {}, trs::identity, lollipopMaterial });
+		builder.pushBox({ vec3(0.f), vec3(100.f, 4.f, 100.f) });
+		groundMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, lollipopMaterial });
 
 		auto woodMaterial = createPBRMaterial(
 			"assets/desert/textures/WoodenCrate2_Albedo.png",
@@ -180,10 +177,12 @@ void application::initialize(main_renderer* renderer)
 			{}, {});
 
 		auto boxMesh = make_ref<composite_mesh>();
-		boxMesh->submeshes.push_back({ primitiveMesh.pushCube(vec3(1.f, 1.f, 2.f)), {}, trs::identity, woodMaterial });
+		builder.pushBox({ vec3(0.f), vec3(1.f, 1.f, 2.f) });
+		boxMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, woodMaterial });
 
 		auto sphereMesh = make_ref<composite_mesh>();
-		sphereMesh->submeshes.push_back({ primitiveMesh.pushSphere(16, 16, 1.f), {}, trs::identity, woodMaterial });
+		builder.pushSphere({ });
+		sphereMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, woodMaterial });
 
 		//auto test1 = scene.createEntity("Lollipop 1")
 		//	.addComponent<transform_component>(vec3(20.f, 5.f, 0.f), quat::identity)
@@ -253,7 +252,8 @@ void application::initialize(main_renderer* renderer)
 
 		auto chainMesh = make_ref<composite_mesh>();
 #if 0
-		chainMesh->submeshes.push_back({ primitiveMesh.pushCapsule(15, 15, vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f), {}, trs::identity, lollipopMaterial });
+		builder.pushCapsule(capsule_mesh_desc(vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f));
+		chainMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, lollipopMaterial });
 
 		auto fixed = scene.createEntity("Fixed")
 			.addComponent<transform_component>(vec3(37.f, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))
@@ -285,12 +285,11 @@ void application::initialize(main_renderer* renderer)
 #endif
 
 
-		testMesh->mesh = 
 		groundMesh->mesh = 
 		boxMesh->mesh = 
 		sphereMesh->mesh =
 		chainMesh->mesh =
-			primitiveMesh.createDXMesh();
+			builder.createDXMesh();
 	}
 #endif
 
@@ -696,9 +695,6 @@ void application::update(const user_input& input, float dt)
 				}
 			}
 		}
-
-		void collisionDebugDraw(ldr_render_pass * renderPass);
-		collisionDebugDraw(&ldrRenderPass);
 
 
 		if (decals.size())

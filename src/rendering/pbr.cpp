@@ -4,7 +4,7 @@
 #include "texture_preprocessing.h"
 #include "dx/dx_context.h"
 #include "dx/dx_command_list.h"
-#include "geometry/geometry.h"
+#include "geometry/mesh_builder.h"
 #include "core/color.h"
 #include "core/hash.h"
 #include "render_resources.h"

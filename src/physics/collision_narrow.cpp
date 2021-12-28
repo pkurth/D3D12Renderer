@@ -8,29 +8,6 @@
 #include "core/cpu_profiling.h"
 
 
-#ifndef PHYSICS_ONLY
-#include "rendering/render_pass.h"
-#include "rendering/debug_visualization.h"
-#include "rendering/pbr.h"
-
-struct debug_draw_call
-{
-	mat4 transform;
-	vec4 color;
-};
-
-static std::vector<debug_draw_call> debugDrawCalls;
-
-static void debugSphere(vec3 position, float radius, vec4 color)
-{
-	debugDrawCalls.push_back({
-		createModelMatrix(position, quat::identity, radius),
-		color,
-	});
-}
-#endif
-
-
 struct contact_manifold
 {
 	contact_info contacts[4];
@@ -1844,24 +1821,3 @@ narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_c
 	return narrowphase_result{ numContacts, numNonCollisionInteractions };
 }
 
-#ifndef PHYSICS_ONLY
-void collisionDebugDraw(ldr_render_pass* renderPass)
-{
-	static dx_mesh debugMesh;
-	static submesh_info sphereMesh;
-
-	if (!debugMesh.vertexBuffer.positions)
-	{
-		cpu_mesh primitiveMesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals);
-		sphereMesh = primitiveMesh.pushSphere(15, 15, 1.f);
-		debugMesh = primitiveMesh.createDXMesh();		
-	}
-
-	for (auto& dc : debugDrawCalls)
-	{
-		renderPass->renderObject<debug_unlit_pipeline>(dc.transform, debugMesh.vertexBuffer, debugMesh.indexBuffer, sphereMesh, { dc.color });
-	}
-	
-	debugDrawCalls.clear();
-}
-#endif

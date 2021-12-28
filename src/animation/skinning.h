@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/math.h"
-#include "geometry/geometry.h"
+#include "geometry/mesh_builder.h"
 
 struct vertex_range
 {

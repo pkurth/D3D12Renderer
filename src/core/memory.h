@@ -87,19 +87,20 @@ struct memory_arena
 
 	uint8* base() { return memory; }
 
+
 protected:
-	uint8* memory;
-	uint64 committedMemory;
+	uint8* memory = 0;
+	uint64 committedMemory = 0;
 
-	uint64 current;
-	uint64 sizeLeftCurrent;
+	uint64 current = 0;
+	uint64 sizeLeftCurrent = 0;
 
-	uint64 sizeLeftTotal;
+	uint64 sizeLeftTotal = 0;
 
-	uint64 pageSize;
-	uint64 minimumBlockSize;
+	uint64 pageSize = 0;
+	uint64 minimumBlockSize = 0;
 
-	uint64 reserveSize;
+	uint64 reserveSize = 0;
 };
 
 struct scope_temp_memory

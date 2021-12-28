@@ -2,7 +2,7 @@
 #include "physics.h"
 #include "collision_broad.h"
 #include "collision_narrow.h"
-#include "geometry/geometry.h"
+#include "geometry/mesh_builder.h"
 #include "core/cpu_profiling.h"
 
 
@@ -62,14 +62,18 @@ uint32 allocateBoundingHullGeometry(const std::string& meshFilepath)
 		return INVALID_BOUNDING_HULL_INDEX;
 	}
 
-	cpu_mesh cpuMesh(mesh_creation_flags_with_positions);
+	mesh_builder builder(mesh_creation_flags_with_positions);
 
 	assert(scene->mNumMeshes == 1);
-	cpuMesh.pushAssimpMesh(scene->mMeshes[0], 1.f);
+	builder.pushAssimpMesh(scene->mMeshes[0], 1.f);
 
 
 	uint32 index = (uint32)boundingHullGeometries.size();
-	boundingHullGeometries.push_back(bounding_hull_geometry::fromMesh(cpuMesh.vertexPositions, cpuMesh.numVertices, cpuMesh.triangles, cpuMesh.numTriangles));
+	boundingHullGeometries.push_back(bounding_hull_geometry::fromMesh(
+		builder.getPositions(),
+		builder.getNumVertices(),
+		(indexed_triangle16*)builder.getTriangles(),
+		builder.getNumTriangles()));
 	return index;
 }
 #endif

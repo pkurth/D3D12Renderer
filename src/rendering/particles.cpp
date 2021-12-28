@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "particles.h"
 #include "core/camera.h"
-#include "geometry/geometry.h"
+#include "geometry/mesh_builder.h"
 #include "dx/dx_context.h"
 #include "dx/dx_command_list.h"
 #include "dx/dx_barrier_batcher.h"
@@ -28,9 +28,9 @@ void particle_system::initializePipeline()
 	argumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
 	particleCommandSignature = createCommandSignature({}, &argumentDesc, 1, sizeof(particle_draw));
 
-	cpu_mesh cpuMesh(mesh_creation_flags_with_positions);
-	submesh_info submesh = cpuMesh.pushQuad(1.f);
-	billboardMesh = cpuMesh.createDXMesh();
+	mesh_builder builder(mesh_creation_flags_with_positions);
+	builder.pushQuad({ });
+	billboardMesh = builder.createDXMesh();
 }
 
 void particle_system::initializeInternal(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, submesh_info submesh, sort_mode sortMode)

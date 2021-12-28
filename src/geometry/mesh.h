@@ -4,7 +4,7 @@
 #include "physics/bounding_volumes.h"
 #include "dx/dx_buffer.h"
 #include "animation/animation.h"
-#include "geometry.h"
+#include "mesh_builder.h"
 
 struct pbr_material;
 

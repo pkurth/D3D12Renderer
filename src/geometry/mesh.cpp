@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "mesh.h"
-#include "geometry.h"
+#include "mesh_builder.h"
 #include "rendering/pbr.h"
 #include "core/hash.h"
 #include "core/file_registry.h"
@@ -39,7 +39,7 @@ static ref<composite_mesh> loadMeshFromFileInternal(asset_handle handle, const f
 		return 0;
 	}
 
-	cpu_mesh cpuMesh(flags);
+	mesh_builder builder(flags);
 
 	ref<composite_mesh> result = make_ref<composite_mesh>();
 
@@ -77,14 +77,15 @@ static ref<composite_mesh> loadMeshFromFileInternal(asset_handle handle, const f
 		submesh& sub = result->submeshes[m];
 
 		aiMesh* mesh = scene->mMeshes[m];
-		sub.info = cpuMesh.pushAssimpMesh(mesh, 1.f, &sub.aabb, (flags & mesh_creation_flags_with_skin) ? &result->skeleton : 0);
+		builder.pushAssimpMesh(mesh, 1.f, &sub.aabb, (flags & mesh_creation_flags_with_skin) ? &result->skeleton : 0);
+		sub.info = builder.endSubmesh();
 		sub.material = scene->HasMaterials() ? loadAssimpMaterial(scene, sceneFilename, scene->mMaterials[mesh->mMaterialIndex]) : getDefaultPBRMaterial();
 
 		result->aabb.grow(sub.aabb.minCorner);
 		result->aabb.grow(sub.aabb.maxCorner);
 	}
 
-	result->mesh = cpuMesh.createDXMesh();
+	result->mesh = builder.createDXMesh();
 
 	result->handle = handle;
 	result->flags = flags;

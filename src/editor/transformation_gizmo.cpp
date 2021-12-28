@@ -2,7 +2,7 @@
 #include "transformation_gizmo.h"
 #include "dx/dx_command_list.h"
 #include "dx/dx_pipeline.h"
-#include "geometry/geometry.h"
+#include "geometry/mesh_builder.h"
 #include "physics/bounding_volumes.h"
 #include "rendering/render_utils.h"
 #include "rendering/debug_visualization.h"
@@ -64,16 +64,49 @@ static dx_mesh mesh;
 
 void initializeTransformationGizmos()
 {
-	cpu_mesh mesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals);
+	mesh_builder mesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals);
 	float shaftLength = 1.f;
 	float headLength = 0.2f;
 	float radius = 0.03f;
 	float headRadius = 0.065f;
-	translationSubmesh = mesh.pushArrow(6, radius, headRadius, shaftLength, headLength);
-	rotationSubmesh = mesh.pushTorus(6, 64, shaftLength, radius);
-	scaleSubmesh = mesh.pushMace(6, radius, headRadius, shaftLength, headLength);
-	planeSubmesh = mesh.pushCube(vec3(shaftLength, 0.01f, shaftLength) * 0.2f, false, vec3(shaftLength, 0.f, shaftLength) * 0.35f);
-	boxSubmesh = mesh.pushCube((shaftLength + headLength) * 0.3f);
+
+	arrow_mesh_desc arrowMesh;
+	arrowMesh.slices = 6;
+	arrowMesh.shaftRadius = radius;
+	arrowMesh.headRadius = headRadius;
+	arrowMesh.shaftLength = shaftLength;
+	arrowMesh.headLength = headLength;
+	mesh.pushArrow(arrowMesh);
+	translationSubmesh = mesh.endSubmesh();
+
+	torus_mesh_desc torusMesh;
+	torusMesh.slices = 6;
+	torusMesh.segments = 64;
+	torusMesh.torusRadius = shaftLength;
+	torusMesh.tubeRadius = radius;
+	mesh.pushTorus(torusMesh);
+	rotationSubmesh = mesh.endSubmesh();
+
+	mace_mesh_desc maceMesh;
+	maceMesh.slices = 6;
+	maceMesh.shaftRadius = radius;
+	maceMesh.headRadius = headRadius;
+	maceMesh.shaftLength = shaftLength;
+	maceMesh.headLength = headLength;
+	mesh.pushMace(maceMesh);
+	scaleSubmesh = mesh.endSubmesh();
+
+	box_mesh_desc planeMesh;
+	planeMesh.radius = vec3(shaftLength, 0.01f, shaftLength) * 0.2f;
+	planeMesh.center = vec3(shaftLength, 0.f, shaftLength) * 0.35f;
+	mesh.pushBox(planeMesh);
+	planeSubmesh = mesh.endSubmesh();
+
+	box_mesh_desc boxMesh;
+	boxMesh.radius = (shaftLength + headLength) * 0.3f;
+	mesh.pushBox(boxMesh);
+	boxSubmesh = mesh.endSubmesh();
+
 	::mesh = mesh.createDXMesh();
 
 	for (uint32 i = 0; i < 3; ++i)

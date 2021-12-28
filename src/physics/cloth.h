@@ -1,7 +1,7 @@
 #pragma once
 
 #include "bounding_volumes.h"
-#include "geometry/geometry.h"
+#include "geometry/mesh_builder.h"
 #include "dx/dx_buffer.h"
 
 struct cloth_component
