@@ -11,6 +11,7 @@
 #include <imgui/backends/imgui_impl_win32.cpp>
 #include <imgui/backends/imgui_impl_dx12.cpp>
 
+#include "input.h"
 #include "imgui.h"
 #include "dx/dx_context.h"
 #include "dx/dx_command_list.h"
@@ -184,6 +185,11 @@ static ImTextureID pushTexture(dx_cpu_descriptor_handle handle)
 
 namespace ImGui
 {
+	bool AnyModifiersDown()
+	{
+		return ImGui::IsKeyDown(key_ctrl) || ImGui::IsKeyDown(key_shift) || ImGui::IsKeyDown(key_alt);
+	}
+
 	bool BeginWindowHiddenTabBar(const char* name, bool* open, ImGuiWindowFlags flags)
 	{
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));

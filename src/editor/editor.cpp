@@ -162,7 +162,7 @@ void scene_editor::drawMainMenuBar()
 
 			ImGui::Separator();
 
-			if (ImGui::MenuItem(logWindowOpen ? (ICON_FA_CLIPBOARD_LIST "  Hide message log") : (ICON_FA_CLIPBOARD_LIST "  Show message log"), nullptr, nullptr, ENABLE_MESSAGE_LOG))
+			if (ImGui::MenuItem(logWindowOpen ? (ICON_FA_CLIPBOARD_LIST "  Hide message log") : (ICON_FA_CLIPBOARD_LIST "  Show message log"), "Ctrl+L", nullptr, ENABLE_MESSAGE_LOG))
 			{
 				logWindowOpen = !logWindowOpen;
 			}
@@ -1022,9 +1022,9 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 			gizmo.manipulateNothing(scene->camera, input, !inputCaptured, ldrRenderPass);
 		}
 
-		if (!inputCaptured)
+		if (!inputCaptured && !ImGui::IsAnyItemActive())
 		{
-			if (input.keyboard[key_backspace].pressEvent || input.keyboard[key_delete].pressEvent)
+			if (ImGui::IsKeyPressed(key_backspace) || ImGui::IsKeyPressed(key_delete))
 			{
 				// Delete entity.
 				scene->deleteEntity(selectedEntity);
@@ -1032,7 +1032,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 				inputCaptured = true;
 				objectMovedByGizmo = true;
 			}
-			else if (input.keyboard[key_ctrl].down && input.keyboard['D'].pressEvent)
+			else if (ImGui::IsKeyDown(key_ctrl) && ImGui::IsKeyPressed('D'))
 			{
 				// Duplicate entity.
 				scene_entity newEntity = scene->copyEntity(selectedEntity);
@@ -1048,13 +1048,10 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 	}
 
 
-	if (!inputCaptured)
+	if (!inputCaptured && !ImGui::IsAnyItemActive() && ImGui::IsKeyDown(key_shift) && ImGui::IsKeyPressed('A'))
 	{
-		if (input.keyboard[key_shift].down && input.keyboard['A'].pressEvent)
-		{
-			ImGui::OpenPopup("CreateEntityPopup");
-			inputCaptured = true;
-		}
+		ImGui::OpenPopup("CreateEntityPopup");
+		inputCaptured = true;
 	}
 
 	drawEntityCreationPopup();
@@ -1073,32 +1070,36 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 	ImGui::End();
 
 
-
-	if (!inputCaptured)
+	if (!ImGui::IsAnyItemActive())
 	{
-		if (input.keyboard[key_ctrl].down && input.keyboard['Z'].pressEvent)
+		if (!inputCaptured && ImGui::IsKeyDown(key_ctrl) && ImGui::IsKeyPressed('Z'))
 		{
 			undoStack.undo();
 			inputCaptured = true;
 			objectMovedByGizmo = true;
 		}
-		if (input.keyboard[key_ctrl].down && input.keyboard['Y'].pressEvent)
+		if (!inputCaptured && ImGui::IsKeyDown(key_ctrl) && ImGui::IsKeyPressed('Y'))
 		{
 			undoStack.redo();
 			inputCaptured = true;
 			objectMovedByGizmo = true;
 		}
-		if (input.keyboard[key_ctrl].down && input.keyboard['S'].pressEvent)
+		if (!inputCaptured && ImGui::IsKeyDown(key_ctrl) && ImGui::IsKeyPressed('S'))
 		{
 			serializeSceneToDisk(*scene, renderer->settings);
 			inputCaptured = true;
 			ImGui::GetIO().KeysDown['S'] = false; // Hack: Window does not get notified of inputs due to the file dialog.
 		}
-		if (input.keyboard[key_ctrl].down && input.keyboard['O'].pressEvent)
+		if (!inputCaptured && ImGui::IsKeyDown(key_ctrl) && ImGui::IsKeyPressed('O'))
 		{
 			deserializeFromFile();
 			inputCaptured = true;
 			ImGui::GetIO().KeysDown['O'] = false; // Hack: Window does not get notified of inputs due to the file dialog.
+		}
+		if (!inputCaptured && ImGui::IsKeyDown(key_ctrl) && ImGui::IsKeyPressed('L'))
+		{
+			logWindowOpen = !logWindowOpen;
+			inputCaptured = true;
 		}
 	}
 

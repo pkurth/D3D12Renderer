@@ -412,42 +412,42 @@ uint32 transformation_gizmo::handleScaling(trs& transform, ray r, const user_inp
 	return dragging ? axisIndex : hoverAxisIndex;
 }
 
-bool transformation_gizmo::handleUserInput(const user_input& input, bool allowKeyboardInput, 
+bool transformation_gizmo::handleUserInput(bool allowKeyboardInput, 
 	bool allowTranslation, bool allowRotation, bool allowScaling, bool allowSpaceChange)
 {
 	bool keyboardInteraction = false;
 	bool uiInteraction = false;
 
-	if (allowKeyboardInput)
+	if (allowKeyboardInput && !ImGui::IsAnyItemActive() && !ImGui::AnyModifiersDown())
 	{
 		if (type != transformation_type_scale)
 		{
-			if (input.keyboard['G'].pressEvent && allowSpaceChange)
+			if (ImGui::IsKeyPressed('G') && allowSpaceChange)
 			{
 				space = (transformation_space)(1 - space);
 				dragging = false;
 				keyboardInteraction = true;
 			}
 		}
-		if (input.keyboard['Q'].pressEvent)
+		if (ImGui::IsKeyPressed('Q'))
 		{
 			type = transformation_type_none;
 			dragging = false;
 			keyboardInteraction = true;
 		}
-		if (input.keyboard['W'].pressEvent && allowTranslation)
+		if (ImGui::IsKeyPressed('W') && allowTranslation)
 		{
 			type = transformation_type_translation;
 			dragging = false;
 			keyboardInteraction = true;
 		}
-		if (input.keyboard['E'].pressEvent && allowRotation)
+		if (ImGui::IsKeyPressed('E') && allowRotation)
 		{
 			type = transformation_type_rotation;
 			dragging = false;
 			keyboardInteraction = true;
 		}
-		if (input.keyboard['R'].pressEvent && allowScaling)
+		if (ImGui::IsKeyPressed('R') && allowScaling)
 		{
 			type = transformation_type_scale;
 			dragging = false;
@@ -601,7 +601,7 @@ void transformation_gizmo::manipulateInternal(trs& transform, const render_camer
 
 bool transformation_gizmo::manipulateTransformation(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
 {
-	bool inputCaptured = handleUserInput(input, allowInput, true, true, true, true);
+	bool inputCaptured = handleUserInput(allowInput, true, true, true, true);
 	manipulateInternal(transform, camera, input, allowInput, ldrRenderPass);
 	return dragging;
 }
@@ -614,7 +614,7 @@ bool transformation_gizmo::manipulatePosition(vec3& position, const render_camer
 	}
 	space = transformation_global;
 
-	bool inputCaptured = handleUserInput(input, allowInput, true, false, false, false);
+	bool inputCaptured = handleUserInput(allowInput, true, false, false, false);
 	trs transform = { position, quat::identity, vec3(1.f, 1.f, 1.f) };
 	manipulateInternal(transform, camera, input, allowInput, ldrRenderPass);
 	position = transform.position;
@@ -628,7 +628,7 @@ bool transformation_gizmo::manipulatePositionRotation(vec3& position, quat& rota
 		type = transformation_type_translation;
 	}
 
-	bool inputCaptured = handleUserInput(input, allowInput, true, true, false, true);
+	bool inputCaptured = handleUserInput(allowInput, true, true, false, true);
 	trs transform = { position, rotation, vec3(1.f, 1.f, 1.f) };
 	manipulateInternal(transform, camera, input, allowInput, ldrRenderPass);
 	position = transform.position;
@@ -639,7 +639,7 @@ bool transformation_gizmo::manipulatePositionRotation(vec3& position, quat& rota
 bool transformation_gizmo::manipulateNothing(const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
 {
 	dragging = false;
-	bool inputCaptured = handleUserInput(input, allowInput, true, true, true, true);
+	bool inputCaptured = handleUserInput(allowInput, true, true, true, true);
 	return false;
 }
 

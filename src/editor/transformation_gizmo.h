@@ -19,7 +19,7 @@ struct transformation_gizmo
 	bool dragging = false;
 
 private:
-	bool handleUserInput(const user_input& input, bool allowKeyboardInput, bool allowTranslation, bool allowRotation, bool allowScaling, bool allowSpaceChange);
+	bool handleUserInput(bool allowKeyboardInput, bool allowTranslation, bool allowRotation, bool allowScaling, bool allowSpaceChange);
 	void manipulateInternal(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
 
 	enum transformation_type

@@ -39,6 +39,8 @@ static const char* imguiIconNames[] =
 
 namespace ImGui
 {
+	bool AnyModifiersDown();
+
 	bool BeginWindowHiddenTabBar(const char* name, bool* open = 0, ImGuiWindowFlags flags = 0);
 	bool BeginControlsWindow(const char* name);
 
