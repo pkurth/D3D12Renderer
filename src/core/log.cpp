@@ -50,6 +50,8 @@ void initializeMessageLog()
 
 void updateMessageLog(float dt)
 {
+	dt = min(dt, 1.f); // If the app hangs, we don't want all the messages to go missing.
+
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.f);
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 0.1f));
 	ImGui::SetNextWindowSize(ImVec2(0.f, 0.f)); // Auto-resize to content.

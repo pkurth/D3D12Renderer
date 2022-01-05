@@ -4,6 +4,7 @@
 #include "rendering/render_resources.h"
 #include "rendering/render_utils.h"
 #include "animation/skinning.h"
+#include "core/log.h"
 
 
 #define BUILD_PARTICLE_SHADER_NAME(name, suffix) name##suffix
@@ -246,6 +247,7 @@ void boid_particle_system::initialize(uint32 maxNumParticles, float emitRate)
 	}
 	else
 	{
+		LOG_ERROR("Cannot create particle system, since mesh was not found");
 		std::cerr << "Cannot create particle system, since mesh was not found\n";
 	}
 }

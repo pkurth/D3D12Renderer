@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "assimp.h"
+#include "log.h"
 
 #ifndef PHYSICS_ONLY
 #include "rendering/pbr.h"
@@ -66,10 +67,12 @@ const aiScene* loadAssimpSceneFile(const fs::path& filepath, Assimp::Importer& i
 	{
 		if (!fs::exists(filepath))
 		{
+			LOG_WARNING("Could not find file '%ws'", filepath.c_str());
 			std::cerr << "Could not find file '" << filepath << "'.\n";
 			return 0;
 		}
 
+		LOG_MESSAGE("Preprocessing asset '%ws' for faster loading next time", filepath.c_str());
 		std::cout << "Preprocessing asset '" << filepath << "' for faster loading next time.";
 #ifdef _DEBUG
 		std::cout << " Consider running in a release build the first time.";
@@ -171,6 +174,7 @@ static ref<dx_texture> loadAssimpTexture(const aiScene* scene, const fs::path& s
 				}
 				else
 				{
+					LOG_ERROR("Unknown format hint '%s' in Assimp texture (processing file '%ws')", assimpTexture->achFormatHint, sceneFilepath.c_str());
 					std::cerr << "Unknown format hint '" << assimpTexture->achFormatHint << "' in Assimp texture.\n";
 					return 0;
 				}
@@ -181,7 +185,8 @@ static ref<dx_texture> loadAssimpTexture(const aiScene* scene, const fs::path& s
 			}
 			else
 			{
-				std::cerr << "Cannot load texture " << index << " from Assimp scene.\n";
+				LOG_ERROR("Cannot load texture with index %u from Assimp scene (processing file '%ws')", index, sceneFilepath.c_str());
+				std::cerr << "Cannot load texture with index " << index << " from Assimp scene.\n";
 			}
 		}
 		else

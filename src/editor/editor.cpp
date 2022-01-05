@@ -1216,7 +1216,8 @@ void scene_editor::setEnvironment(const fs::path& filename)
 
 	if (!scene->environment)
 	{
-		std::cout << "Could not load environment '" << filename << "'. Renderer will use procedural sky box. Procedural sky boxes currently cannot contribute to global illumnation, so expect very dark lighting.\n";
+		LOG_WARNING("Could not load environment '%ws'. Renderer will use procedural sky box. Procedural sky boxes currently cannot contribute to global illumination, so expect very dark lighting", filename.c_str());
+		std::cout << "Could not load environment '" << filename << "'. Renderer will use procedural sky box. Procedural sky boxes currently cannot contribute to global illumination, so expect very dark lighting.\n";
 	}
 }
 

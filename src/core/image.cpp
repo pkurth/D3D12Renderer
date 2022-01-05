@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "image.h"
+#include "log.h"
 
 #define NANOSVG_IMPLEMENTATION
 #include <nanosvg/nanosvg.h>
@@ -198,6 +199,7 @@ static void postProcessImage(DirectX::ScratchImage& scratchImage, DirectX::TexMe
 		}
 		else
 		{
+			LOG_ERROR("Cannot compress texture '%ws', since its dimensions are not a multiple of 4", filepath.c_str());
 			std::cerr << "Cannot compress texture '" << filepath << "', since its dimensions are not a multiple of 4.\n";
 		}
 	}
@@ -239,7 +241,8 @@ bool loadImageFromMemory(const void* data, uint32 size, image_format imageFormat
 	{
 		if (flags & image_load_flags_cache_to_dds)
 		{
-			std::cout << "Preprocessing in-memory texture'" << cachingFilepath.string() << "' for faster loading next time.";
+			LOG_MESSAGE("Preprocessing in-memory texture '%ws' for faster loading next time", cachingFilepath.c_str());
+			std::cout << "Preprocessing in-memory texture '" << cachingFilepath.string() << "' for faster loading next time.";
 #ifdef _DEBUG
 			std::cout << " Consider running in a release build the first time.";
 #endif
@@ -296,12 +299,14 @@ bool loadSVGFromFile(const fs::path& filepath, uint32 flags, DirectX::ScratchIma
 	{
 		if (!fs::exists(filepath))
 		{
+			LOG_WARNING("Could not find file '%ws'", filepath.c_str());
 			std::cerr << "Could not find file '" << filepath.string() << "'.\n";
 			return false;
 		}
 
 		if (flags & image_load_flags_cache_to_dds)
 		{
+			LOG_MESSAGE("Preprocessing asset '%ws' for faster loading next time", filepath.c_str());
 			std::cout << "Preprocessing asset '" << filepath.string() << "' for faster loading next time.";
 #ifdef _DEBUG
 			std::cout << " Consider running in a release build the first time.";
@@ -346,12 +351,14 @@ bool loadImageFromFile(const fs::path& filepath, uint32 flags, DirectX::ScratchI
 	{
 		if (!fs::exists(filepath))
 		{
+			LOG_WARNING("Could not find file '%ws'", filepath.c_str());
 			std::cerr << "Could not find file '" << filepath.string() << "'.\n";
 			return false;
 		}
 
 		if (flags & image_load_flags_cache_to_dds)
 		{
+			LOG_MESSAGE("Preprocessing asset '%ws' for faster loading next time", filepath.c_str());
 			std::cout << "Preprocessing asset '" << filepath.string() << "' for faster loading next time.";
 #ifdef _DEBUG
 			std::cout << " Consider running in a release build the first time.";
