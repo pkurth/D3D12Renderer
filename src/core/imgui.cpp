@@ -225,22 +225,22 @@ namespace ImGui
 
 	void Image(const ref<dx_texture>& texture, ImVec2 size)
 	{
+		if (size.x == 0)
+		{
+			size.x = min(ImGui::GetContentRegionAvail().x, (float)texture->width);
+		}
+
+		if (size.y == 0)
+		{
+			size.y = texture->height * size.x / (float)texture->width;
+		}
+
 		ImGui::Image(texture->defaultSRV, size);
 	}
 
 	void Image(const ref<dx_texture>& texture, uint32 width, uint32 height)
 	{
-		if (width == 0)
-		{
-			width = min((uint32)ImGui::GetContentRegionAvail().x, texture->width);
-		}
-
-		if (height == 0)
-		{
-			height = texture->height * width / texture->width;
-		}
-
-		ImGui::Image(texture->defaultSRV, width, height);
+		ImGui::Image(texture, ImVec2((float)width, (float)height));
 	}
 
 	bool ImageButton(::dx_cpu_descriptor_handle& handle, ImVec2 size, ImVec2 uvTopLeft, ImVec2 uvBottomRight)

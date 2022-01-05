@@ -31,7 +31,7 @@ static const char* imguiIconNames[] =
 	"Translate (W)",
 	"Rotate (E)",
 	"Scale (R)",
-	"No widget (Q)",
+	"No gizmo (Q)",
 };
 
 #define IMGUI_ICON_COLS 4

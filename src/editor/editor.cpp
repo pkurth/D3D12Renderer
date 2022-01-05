@@ -237,7 +237,7 @@ void scene_editor::drawMainMenuBar()
 		);
 		ImGui::Separator();
 		ImGui::Text(
-			"You can drag and drop meshes from the asset window at the bottom into the game\n"
+			"You can drag and drop meshes from the asset window at the bottom into the scene\n"
 			"window to add it to the scene."
 		);
 		ImGui::Separator();
