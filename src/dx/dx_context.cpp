@@ -98,7 +98,6 @@ struct adapter_desc
 {
 	dx_adapter adapter;
 	D3D_FEATURE_LEVEL featureLevel;
-	std::string name;
 };
 
 static adapter_desc getAdapter(dx_factory factory, D3D_FEATURE_LEVEL minimumFeatureLevel = D3D_FEATURE_LEVEL_11_0)
@@ -166,10 +165,7 @@ static adapter_desc getAdapter(dx_factory factory, D3D_FEATURE_LEVEL minimumFeat
 		}
 	}
 
-	std::string gpuName = wstringToString(desc.Description);
-	std::cout << "Using GPU: " << gpuName << '\n';
-
-	return { dxgiAdapter, featureLevel, gpuName };
+	return { dxgiAdapter, featureLevel };
 }
 
 static dx_device createDevice(dx_adapter adapter, D3D_FEATURE_LEVEL featureLevel)
@@ -534,7 +530,7 @@ std::pair<dx_dynamic_index_buffer, void*> dx_context::createDynamicIndexBuffer(u
 dx_memory_usage dx_context::getMemoryUsage()
 {
 	DXGI_QUERY_VIDEO_MEMORY_INFO memoryInfo;
-	checkResult(dxContext.adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memoryInfo));
+	checkResult(adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memoryInfo));
 	
 	return { (uint32)BYTE_TO_MB(memoryInfo.CurrentUsage), (uint32)BYTE_TO_MB(memoryInfo.Budget) };
 }
