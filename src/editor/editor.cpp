@@ -34,6 +34,16 @@ struct selection_undo
 	void redo() { editor->setSelectedEntityNoUndo(after); }
 };
 
+struct sun_direction_undo
+{
+	directional_light* sun;
+	vec3 before;
+	vec3 after;
+
+	void undo() { sun->direction = before; }
+	void redo() { sun->direction = after; }
+};
+
 void scene_editor::updateSelectedEntityUIRotation()
 {
 	if (selectedEntity)
@@ -1110,6 +1120,13 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		{
 			testPhysicsInteraction(*scene, scene->camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY));
 		}
+		else if (input.keyboard[key_ctrl].down)
+		{
+			vec3 dir = -scene->camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY).direction;
+			undoStack.pushAction("sun direction", sun_direction_undo{ &scene->sun, scene->sun.direction, dir });
+			scene->sun.direction = dir;
+			inputCaptured = true;
+		}
 		else
 		{
 			if (renderer->hoveredObjectID != -1)
@@ -1121,13 +1138,6 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 				setSelectedEntity({});
 			}
 		}
-		inputCaptured = true;
-	}
-
-	if (!inputCaptured && input.mouse.left.down && input.keyboard[key_ctrl].down)
-	{
-		vec3 dir = scene->camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY).direction;
-		scene->sun.direction = -dir;
 		inputCaptured = true;
 	}
 
