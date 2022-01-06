@@ -74,6 +74,8 @@ namespace ImGui
 	inline void Value(const char* prefix, const char* v) { ImGui::Text("%s: %s", prefix, v); }
 
 
+	void PopupOkButton(uint32 width = 120);
+
 
 	bool BeginProperties();
 	void EndProperties();

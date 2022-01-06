@@ -2,6 +2,7 @@
 
 #include "scene/scene.h"
 #include "core/camera_controller.h"
+#include "core/system.h"
 #include "undo_stack.h"
 #include "transformation_gizmo.h"
 #include "rendering/main_renderer.h"
@@ -40,6 +41,8 @@ private:
 	camera_controller cameraController;
 
 	vec3 selectedEntityEulerRotation;
+
+	system_info systemInfo;
 
 	friend struct selection_undo;
 };

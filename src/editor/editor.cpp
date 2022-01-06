@@ -87,6 +87,8 @@ void scene_editor::initialize(game_scene* scene, main_renderer* renderer)
 	this->scene = scene;
 	this->renderer = renderer;
 	cameraController.initialize(&scene->camera);
+
+	systemInfo = getSystemInfo();
 }
 
 bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPass, float dt)
@@ -106,9 +108,11 @@ void scene_editor::drawMainMenuBar()
 {
 	static bool showIconsWindow = false;
 	static bool showDemoWindow = false;
+	static bool showSystemWindow = false;
 
 	bool controlsClicked = false;
 	bool aboutClicked = false;
+	bool systemClicked = false;
 
 	if (ImGui::BeginMainMenuBar())
 	{
@@ -177,6 +181,13 @@ void scene_editor::drawMainMenuBar()
 				logWindowOpen = !logWindowOpen;
 			}
 
+			ImGui::Separator();
+
+			if (ImGui::MenuItem(ICON_FA_DESKTOP "  System"))
+			{
+				systemClicked = true;
+			}
+
 			ImGui::EndMenu();
 		}
 
@@ -198,14 +209,31 @@ void scene_editor::drawMainMenuBar()
 		ImGui::EndMainMenuBar();
 	}
 
+	ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+
+	if (systemClicked)
+	{
+		ImGui::OpenPopup(ICON_FA_DESKTOP "  System");
+	}
+
+	ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+	if (ImGui::BeginPopupModal(ICON_FA_DESKTOP "  System", 0, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::Value("CPU", systemInfo.cpuName.c_str());
+		ImGui::Value("GPU", systemInfo.gpuName.c_str());
+
+		ImGui::Separator();
+
+		ImGui::PopupOkButton();
+		ImGui::EndPopup();
+	}
+
 	if (controlsClicked)
 	{
 		ImGui::OpenPopup(ICON_FA_COMPASS "  Controls");
 	}
 
-	ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 	ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-
 	if (ImGui::BeginPopupModal(ICON_FA_COMPASS "  Controls", 0, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		ImGui::Text("The camera can be controlled in two modes:");
@@ -242,10 +270,7 @@ void scene_editor::drawMainMenuBar()
 		);
 		ImGui::Separator();
 
-		ImGui::SetCursorPosX((ImGui::GetWindowSize().x - 120) * 0.5f);
-
-		if (ImGui::Button("OK", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
-		ImGui::SetItemDefaultFocus();
+		ImGui::PopupOkButton();
 		ImGui::EndPopup();
 	}
 
@@ -255,16 +280,12 @@ void scene_editor::drawMainMenuBar()
 	}
 
 	ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-
 	if (ImGui::BeginPopupModal(ICON_FA_QUESTION "  About", 0, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		ImGui::Text("Direct3D renderer");
 		ImGui::Separator();
 
-		ImGui::SetCursorPosX((ImGui::GetWindowSize().x - 120) * 0.5f);
-
-		if (ImGui::Button("OK", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
-		ImGui::SetItemDefaultFocus();
+		ImGui::PopupOkButton();
 		ImGui::EndPopup();
 	}
 

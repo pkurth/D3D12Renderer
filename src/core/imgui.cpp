@@ -454,6 +454,13 @@ namespace ImGui
 		ImGui::TreePop();
 	}
 
+	void PopupOkButton(uint32 width)
+	{
+		float w = (float)width;
+		ImGui::SetCursorPosX((ImGui::GetWindowSize().x - w) * 0.5f);
+		if (ImGui::Button("OK", ImVec2(w, 0))) { ImGui::CloseCurrentPopup(); }
+		ImGui::SetItemDefaultFocus();
+	}
 
 
 
@@ -473,7 +480,6 @@ namespace ImGui
 		ImGui::PopID();
 		ImGui::PopItemWidth();
 	}
-
 
 	bool BeginProperties()
 	{
