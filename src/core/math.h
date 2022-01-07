@@ -277,6 +277,8 @@ union vec2
 	vec2() {}
 	vec2(float v) : vec2(v, v) {}
 	vec2(float x, float y) : x(x), y(y) {}
+
+	static const vec2 zero;
 };
 
 union vec3
@@ -300,6 +302,8 @@ union vec3
 	vec3(float v) : vec3(v, v, v) {}
 	vec3(float x, float y, float z) : x(x), y(y), z(z) {}
 	vec3(vec2 xy, float z) : x(xy.x), y(xy.y), z(z) {}
+
+	static const vec3 zero;
 };
 
 union vec4
@@ -330,6 +334,8 @@ union vec4
 	vec4(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
 	vec4(vec3 xyz, float w) : x(xyz.x), y(xyz.y), z(xyz.z), w(w) {}
 	vec4(w4_float f4) : f4(f4) {}
+
+	static const vec4 zero;
 };
 
 union quat
@@ -349,9 +355,27 @@ union quat
 	quat() {}
 	quat(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
 	quat(vec3 axis, float angle);
+	quat(vec4 v4) : v4(v4) {}
 	quat(w4_float f4) : f4(f4) {}
 
 	static const quat identity;
+	static const quat zero;
+};
+
+struct dual_quat
+{
+	quat real;
+	quat dual;
+
+	dual_quat() {}
+	dual_quat(quat real, quat dual) : real(real), dual(dual) {}
+	dual_quat(quat rotation, vec3 translation);
+
+	vec3 getTranslation();
+	quat getRotation();
+
+	static const dual_quat identity;
+	static const dual_quat zero;
 };
 
 union mat2
@@ -655,6 +679,14 @@ static vec3 operator*(quat q, vec3 v)
 	return (q * p * conjugate(q)).v;
 }
 
+static dual_quat operator+(const dual_quat& a, const dual_quat& b) { return { a.real + b.real, a.dual + b.dual }; }
+static dual_quat& operator+=(dual_quat& a, const dual_quat& b) { a = a + b; return a; }
+static dual_quat operator*(const dual_quat& a, const dual_quat& b) { return { a.real * b.real, a.dual * b.real + b.dual * a.real }; }
+static dual_quat operator*(const dual_quat& a, float b) { return { a.real * b, a.dual * b }; }
+static dual_quat operator*(float b, const dual_quat& a) { return a * b; }
+static dual_quat& operator*=(dual_quat& q, float v) { q = q * v; return q; }
+static dual_quat normalize(const dual_quat& q) { float n = 1.f / length(q.real.v4); return q * n; }
+
 static bool operator==(quat a, quat b) { return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w; }
 
 static vec2 operator*(mat2 a, vec2 b) { vec2 result = { dot(row(a, 0), b), dot(row(a, 1), b) }; return result; }
@@ -672,6 +704,7 @@ static vec2 lerp(vec2 l, vec2 u, float t) { return l + t * (u - l); }
 static vec3 lerp(vec3 l, vec3 u, float t) { return l + t * (u - l); }
 static vec4 lerp(vec4 l, vec4 u, float t) { return l + t * (u - l); }
 static quat lerp(quat l, quat u, float t) { quat result; result.v4 = lerp(l.v4, u.v4, t); return normalize(result); }
+static dual_quat lerp(const dual_quat& l, const dual_quat& u, float t) { return { quat(lerp(l.real.v4, u.real.v4, t)), quat(lerp(l.dual.v4, u.dual.v4, t)) }; }
 static trs lerp(const trs& l, const trs& u, float t)
 {
 	trs result;
@@ -873,6 +906,28 @@ inline quat::quat(vec3 axis, float angle)
 {
 	w = cos(angle * 0.5f);
 	v = axis * sin(angle * 0.5f);
+}
+
+inline dual_quat::dual_quat(quat rotation, vec3 translation)
+{
+	float w = -0.5f * (translation.x * rotation.x + translation.y * rotation.y + translation.z * rotation.z);
+	float x = 0.5f * (translation.x * rotation.w + translation.y * rotation.z - translation.z * rotation.y);
+	float y = 0.5f * (-translation.x * rotation.z + translation.y * rotation.w + translation.z * rotation.x);
+	float z = 0.5f * (translation.x * rotation.y - translation.y * rotation.x + translation.z * rotation.w);
+
+	real = rotation;
+	dual = quat(x, y, z, w);
+}
+
+inline vec3 dual_quat::getTranslation()
+{
+	quat tq = dual * conjugate(real);
+	return 2.f * tq.v4.xyz;
+}
+
+inline quat dual_quat::getRotation()
+{
+	return real;
 }
 
 inline mat2::mat2(

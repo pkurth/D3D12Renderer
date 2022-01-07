@@ -47,7 +47,15 @@ const mat4 mat4::zero =
 	0.f, 0.f, 0.f, 0.f,
 };
 
+const vec2 vec2::zero = { 0.f, 0.f };
+const vec3 vec3::zero = { 0.f, 0.f, 0.f };
+const vec4 vec4::zero = { 0.f, 0.f, 0.f, 0.f };
+
 const quat quat::identity = { 0.f, 0.f, 0.f, 1.f };
+const quat quat::zero = { 0.f, 0.f, 0.f, 0.f };
+
+const dual_quat dual_quat::identity = { { 0.f, 0.f, 0.f, 1.f }, { 0.f, 0.f, 0.f, 0.f } };
+const dual_quat dual_quat::zero = { { 0.f, 0.f, 0.f, 0.f }, { 0.f, 0.f, 0.f, 0.f } };
 
 const trs trs::identity = { vec3(0.f, 0.f, 0.f), quat(0.f, 0.f, 0.f, 1.f), vec3(1.f, 1.f, 1.f) };
 
