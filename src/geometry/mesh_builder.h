@@ -105,7 +105,6 @@ struct cylinder_mesh_desc
 	float radius = 0.4f;
 	quat rotation = quat::identity;
 	uint32 slices = 15;
-	uint32 rows = 15;
 };
 
 struct hollow_cylinder_mesh_desc
@@ -116,7 +115,6 @@ struct hollow_cylinder_mesh_desc
 	float innerRadius = 0.3f;
 	quat rotation = quat::identity;
 	uint32 slices = 15;
-	uint32 rows = 15;
 };
 
 struct arrow_mesh_desc

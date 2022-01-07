@@ -444,7 +444,6 @@ struct sincos
 void mesh_builder::pushCylinder(const cylinder_mesh_desc& desc, bool flipWindingOrder)
 {
 	uint32 slices = desc.slices;
-	uint32 rows = desc.rows;
 	float height = desc.height;
 	float radius = desc.radius;
 	quat rotation = desc.rotation;
@@ -543,7 +542,6 @@ void mesh_builder::pushCylinder(const cylinder_mesh_desc& desc, bool flipWinding
 void mesh_builder::pushHollowCylinder(const hollow_cylinder_mesh_desc& desc, bool flipWindingOrder)
 {
 	uint32 slices = desc.slices;
-	uint32 rows = desc.rows;
 	float height = desc.height;
 	float radius = desc.radius;
 	float innerRadius = desc.innerRadius;

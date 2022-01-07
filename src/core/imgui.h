@@ -108,6 +108,15 @@ namespace ImGui
 	bool PropertyInput(const char* label, vec2& f, const char* format = "%.3f");
 	bool PropertyInput(const char* label, vec3& f, const char* format = "%.3f");
 	bool PropertyInput(const char* label, vec4& f, const char* format = "%.3f");
+	bool PropertyInput(const char* label, int32& f, const char* format = "%d");
+	bool PropertyInput(const char* label, uint32& f, const char* format = "%u");
+
+	bool PropertyDrag(const char* label, float& f, float speed = 1.f, const char* format = "%.3f");
+	bool PropertyDrag(const char* label, vec2& f, float speed = 1.f, const char* format = "%.3f");
+	bool PropertyDrag(const char* label, vec3& f, float speed = 1.f, const char* format = "%.3f");
+	bool PropertyDrag(const char* label, vec4& f, float speed = 1.f, const char* format = "%.3f");
+	bool PropertyDrag(const char* label, int32& f, float speed = 1.f, const char* format = "%d");
+	bool PropertyDrag(const char* label, uint32& f, float speed = 1.f, const char* format = "%u");
 
 	bool PropertyDropdown(const char* label, const char** names, uint32 count, uint32& current);
 	bool PropertyDropdown(const char* label, const char* (*name_func)(uint32, void*), uint32& current, void* data = 0);
@@ -123,10 +132,10 @@ namespace ImGui
 
 
 	float SplineValue(float p, const float* x, const float* y, uint32 numPoints);
-	bool Spline(const char* label, const ImVec2& size, uint32 maxNumPoints, float* x, float* y, uint32 drawResolution = 256);
+	bool Spline(const char* label, ImVec2 size, uint32 maxNumPoints, float* x, float* y, uint32 drawResolution = 256);
 
 #ifdef spline
-	template <uint32 maxNumPoints> bool Spline(const char* label, const ImVec2& size, struct spline(float, maxNumPoints)& s, uint32 drawResolution = 256)
+	template <uint32 maxNumPoints> bool Spline(const char* label, ImVec2 size, struct spline(float, maxNumPoints)& s, uint32 drawResolution = 256)
 	{
 		return Spline(label, size, maxNumPoints, s.ts, s.values, drawResolution);
 	}
