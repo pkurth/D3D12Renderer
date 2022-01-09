@@ -3721,4 +3721,65 @@ void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint_solver cons
 	}
 }
 
+void constraint_solver::initialize(memory_arena& arena, rigid_body_global_state* rbs,
+	distance_constraint* distanceConstraints, constraint_body_pair* distanceConstraintBodyPairs, uint32 numDistanceConstraints,
+	ball_constraint* ballConstraints, constraint_body_pair* ballConstraintBodyPairs, uint32 numBallConstraints,
+	fixed_constraint* fixedConstraints, constraint_body_pair* fixedConstraintBodyPairs, uint32 numFixedConstraints,
+	hinge_constraint* hingeConstraints, constraint_body_pair* hingeConstraintBodyPairs, uint32 numHingeConstraints,
+	cone_twist_constraint* coneTwistConstraints, constraint_body_pair* coneTwistConstraintBodyPairs, uint32 numConeTwistConstraints,
+	slider_constraint* sliderConstraints, constraint_body_pair* sliderConstraintBodyPairs, uint32 numSliderConstraints,
+	collision_contact* contacts, constraint_body_pair* collisionBodyPairs, uint32 numContacts, 
+	uint32 dummyRigidBodyIndex, bool simd, float dt)
+{
+	CPU_PROFILE_BLOCK("Initialize constraints");
 
+	if (simd)
+	{
+		distanceConstraintSolverSIMD = initializeDistanceVelocityConstraintsSIMD(arena, rbs, distanceConstraints, distanceConstraintBodyPairs, numDistanceConstraints, dt);
+		ballConstraintSolverSIMD = initializeBallVelocityConstraintsSIMD(arena, rbs, ballConstraints, ballConstraintBodyPairs, numBallConstraints, dt);
+		fixedConstraintSolverSIMD = initializeFixedVelocityConstraintsSIMD(arena, rbs, fixedConstraints, fixedConstraintBodyPairs, numFixedConstraints, dt);
+		hingeConstraintSolverSIMD = initializeHingeVelocityConstraintsSIMD(arena, rbs, hingeConstraints, hingeConstraintBodyPairs, numHingeConstraints, dt);
+		coneTwistConstraintSolverSIMD = initializeConeTwistVelocityConstraintsSIMD(arena, rbs, coneTwistConstraints, coneTwistConstraintBodyPairs, numConeTwistConstraints, dt);
+		sliderConstraintSolverSIMD = initializeSliderVelocityConstraintsSIMD(arena, rbs, sliderConstraints, sliderConstraintBodyPairs, numSliderConstraints, dt);
+		collisionConstraintSolverSIMD = initializeCollisionVelocityConstraintsSIMD(arena, rbs, contacts, collisionBodyPairs, numContacts, dummyRigidBodyIndex, dt);
+	}
+	else
+	{
+		distanceConstraintSolver = initializeDistanceVelocityConstraints(arena, rbs, distanceConstraints, distanceConstraintBodyPairs, numDistanceConstraints, dt);
+		ballConstraintSolver = initializeBallVelocityConstraints(arena, rbs, ballConstraints, ballConstraintBodyPairs, numBallConstraints, dt);
+		fixedConstraintSolver = initializeFixedVelocityConstraints(arena, rbs, fixedConstraints, fixedConstraintBodyPairs, numFixedConstraints, dt);
+		hingeConstraintSolver = initializeHingeVelocityConstraints(arena, rbs, hingeConstraints, hingeConstraintBodyPairs, numHingeConstraints, dt);
+		coneTwistConstraintSolver = initializeConeTwistVelocityConstraints(arena, rbs, coneTwistConstraints, coneTwistConstraintBodyPairs, numConeTwistConstraints, dt);
+		sliderConstraintSolver = initializeSliderVelocityConstraints(arena, rbs, sliderConstraints, sliderConstraintBodyPairs, numSliderConstraints, dt);
+		collisionConstraintSolver = initializeCollisionVelocityConstraints(arena, rbs, contacts, collisionBodyPairs, numContacts, dt);
+	}
+
+	this->rbs = rbs;
+	this->simd = simd;
+}
+
+void constraint_solver::solveOneIteration()
+{
+	CPU_PROFILE_BLOCK("Solve constraints one iteration");
+
+	if (simd)
+	{
+		solveDistanceVelocityConstraintsSIMD(distanceConstraintSolverSIMD, rbs);
+		solveBallVelocityConstraintsSIMD(ballConstraintSolverSIMD, rbs);
+		solveFixedVelocityConstraintsSIMD(fixedConstraintSolverSIMD, rbs);
+		solveHingeVelocityConstraintsSIMD(hingeConstraintSolverSIMD, rbs);
+		solveConeTwistVelocityConstraintsSIMD(coneTwistConstraintSolverSIMD, rbs);
+		solveSliderVelocityConstraintsSIMD(sliderConstraintSolverSIMD, rbs);
+		solveCollisionVelocityConstraintsSIMD(collisionConstraintSolverSIMD, rbs);
+	}
+	else
+	{
+		solveDistanceVelocityConstraints(distanceConstraintSolver, rbs);
+		solveBallVelocityConstraints(ballConstraintSolver, rbs);
+		solveFixedVelocityConstraints(fixedConstraintSolver, rbs);
+		solveHingeVelocityConstraints(hingeConstraintSolver, rbs);
+		solveConeTwistVelocityConstraints(coneTwistConstraintSolver, rbs);
+		solveSliderVelocityConstraints(sliderConstraintSolver, rbs);
+		solveCollisionVelocityConstraints(collisionConstraintSolver, rbs);
+	}
+}

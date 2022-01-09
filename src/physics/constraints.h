@@ -702,3 +702,46 @@ void solveSliderVelocityConstraintsSIMD(simd_slider_constraint_solver constraint
 simd_collision_constraint_solver initializeCollisionVelocityConstraintsSIMD(memory_arena& arena, const rigid_body_global_state* rbs, const collision_contact* contacts, const constraint_body_pair* bodyPairs, uint32 numContacts, uint16 dummyRigidBodyIndex, float dt);
 void solveCollisionVelocityConstraintsSIMD(simd_collision_constraint_solver constraints, rigid_body_global_state* rbs);
 
+
+
+struct constraint_solver
+{
+	void initialize(memory_arena& arena, rigid_body_global_state* rbs,
+		distance_constraint* distanceConstraints, constraint_body_pair* distanceConstraintBodyPairs, uint32 numDistanceConstraints,
+		ball_constraint* ballConstraints, constraint_body_pair* ballConstraintBodyPairs, uint32 numBallConstraints,
+		fixed_constraint* fixedConstraints, constraint_body_pair* fixedConstraintBodyPairs, uint32 numFixedConstraints,
+		hinge_constraint* hingeConstraints, constraint_body_pair* hingeConstraintBodyPairs, uint32 numHingeConstraints,
+		cone_twist_constraint* coneTwistConstraints, constraint_body_pair* coneTwistConstraintBodyPairs, uint32 numConeTwistConstraints,
+		slider_constraint* sliderConstraints, constraint_body_pair* sliderConstraintBodyPairs, uint32 numSliderConstraints,
+		collision_contact* contacts, constraint_body_pair* collisionBodyPairs, uint32 numContacts, 
+		uint32 dummyRigidBodyIndex,	bool simd, float dt);
+
+	void solveOneIteration();
+
+private:
+
+	rigid_body_global_state* rbs;
+	bool simd;
+
+	distance_constraint_solver distanceConstraintSolver;
+	simd_distance_constraint_solver distanceConstraintSolverSIMD;
+
+	ball_constraint_solver ballConstraintSolver;
+	simd_ball_constraint_solver ballConstraintSolverSIMD;
+
+	fixed_constraint_solver fixedConstraintSolver;
+	simd_fixed_constraint_solver fixedConstraintSolverSIMD;
+
+	hinge_constraint_solver hingeConstraintSolver;
+	simd_hinge_constraint_solver hingeConstraintSolverSIMD;
+
+	cone_twist_constraint_solver coneTwistConstraintSolver;
+	simd_cone_twist_constraint_solver coneTwistConstraintSolverSIMD;
+
+	slider_constraint_solver sliderConstraintSolver;
+	simd_slider_constraint_solver sliderConstraintSolverSIMD;
+
+	collision_constraint_solver collisionConstraintSolver;
+	simd_collision_constraint_solver collisionConstraintSolverSIMD;
+};
+
