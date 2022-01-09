@@ -922,9 +922,13 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	vec3 globalForceField = getForceFieldStates(scene, ffGlobal);
 
 	
-	static std::unordered_set<trigger_overlap> prevFrameTriggerOverlaps;
-	std::unordered_set<trigger_overlap> thisFrameTriggerOverlaps;
+	static std::unordered_set<trigger_overlap> triggerOverlaps[2];
+	static uint32 triggerHistoryIndex = 0;
 
+	auto& prevFrameTriggerOverlaps = triggerOverlaps[triggerHistoryIndex];
+	auto& thisFrameTriggerOverlaps = triggerOverlaps[1 - triggerHistoryIndex];
+	triggerHistoryIndex = 1 - triggerHistoryIndex;
+	thisFrameTriggerOverlaps.clear();
 	
 	// Handle non-collision interactions (triggers, force fields etc).
 	for (uint32 i = 0; i < narrowPhaseResult.numNonCollisionInteractions; ++i)
@@ -1072,8 +1076,6 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 			}
 		}
 	}
-
-	prevFrameTriggerOverlaps = std::move(thisFrameTriggerOverlaps);
 }
 
 // This function returns the inertia tensors with respect to the center of gravity, so with a coordinate system centered at the COG.
