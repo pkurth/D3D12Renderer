@@ -5,6 +5,7 @@
 #include "geometry/mesh_builder.h"
 #include "core/cpu_profiling.h"
 
+#include <unordered_set>
 
 extern physics_settings physicsSettings = {};
 static std::vector<bounding_hull_geometry> boundingHullGeometries;
@@ -568,10 +569,15 @@ static void getWorldSpaceColliders(game_scene& scene, bounding_box* outWorldspac
 			col.objectIndex = (uint16)entity.getComponentIndex<force_field_component>();
 			col.objectType = physics_object_type_force_field;
 		}
+		else if (entity.hasComponent<trigger_component>())
+		{
+			col.objectIndex = (uint16)entity.getComponentIndex<trigger_component>();
+			col.objectType = physics_object_type_trigger;
+		}
 		else
 		{
 			col.objectIndex = dummyRigidBodyIndex;
-			col.objectType = physics_object_type_none;
+			col.objectType = physics_object_type_static_collider;
 		}
 
 		switch (collider.type)
@@ -829,6 +835,30 @@ void validate(uint32 line, simd_collision_constraint_batch* constraints, uint32 
 #define VALIDATE(...)
 #endif
 
+struct trigger_overlap
+{
+	entt::entity trigger;
+	entt::entity other;
+};
+
+namespace std
+{
+	template<>
+	struct hash<trigger_overlap>
+	{
+		size_t operator()(trigger_overlap x) const
+		{
+			uint64 combined = ((uint64)x.trigger << 32) | ((uint64)x.other);
+			return std::hash<uint64>()(combined);
+		}
+	};
+}
+
+static bool operator==(trigger_overlap a, trigger_overlap b)
+{
+	return a.trigger == b.trigger && a.other == b.other;
+}
+
 void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 {
 	CPU_PROFILE_BLOCK("Physics step");
@@ -849,6 +879,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	}
 
 	uint32 numForceFields = scene.numberOfComponentsOfType<force_field_component>();
+	uint32 numTriggers = scene.numberOfComponentsOfType<trigger_component>();
 	uint32 numColliders = scene.numberOfComponentsOfType<collider_component>();
 
 	uint32 numDistanceConstraints = scene.numberOfComponentsOfType<distance_constraint>();
@@ -868,7 +899,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	bounding_box* worldSpaceAABBs = arena.allocate<bounding_box>(numColliders);
 	collider_union* worldSpaceColliders = arena.allocate<collider_union>(numColliders);
 
-	broadphase_collision* possibleCollisions = arena.allocate<broadphase_collision>(numColliders * numColliders); // Conservative estimate.
+	collider_pair* possibleCollisions = arena.allocate<collider_pair>(numColliders * numColliders); // Conservative estimate.
 
 	uint32 dummyRigidBodyIndex = numRigidBodies;
 
@@ -891,20 +922,29 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 
 	vec3 globalForceField = getForceFieldStates(scene, ffGlobal);
 
+	
+	static std::unordered_set<trigger_overlap> prevFrameTriggerOverlaps;
+	std::unordered_set<trigger_overlap> thisFrameTriggerOverlaps;
 
+	
 	// Handle non-collision interactions (triggers, force fields etc).
 	for (uint32 i = 0; i < narrowPhaseResult.numNonCollisionInteractions; ++i)
 	{
 		non_collision_interaction interaction = nonCollisionInteractions[i];
 		rigid_body_component& rb = scene.getComponentAtIndex<rigid_body_component>(interaction.rigidBodyIndex);
 
-		switch (interaction.otherType)
+		if (interaction.otherType == physics_object_type_force_field)
 		{
-			case physics_object_type_force_field:
-			{
-				const force_field_global_state& ff = ffGlobal[interaction.otherIndex];
-				rb.forceAccumulator += ff.force;
-			} break;
+			const force_field_global_state& ff = ffGlobal[interaction.otherIndex];
+			rb.forceAccumulator += ff.force;
+		}
+		else if (interaction.otherType == physics_object_type_trigger)
+		{
+			scene_entity triggerEntity = scene.getEntityFromComponentAtIndex<trigger_component>(interaction.otherIndex);
+			scene_entity rbEntity = scene.getEntityFromComponent(rb);
+
+			trigger_overlap overlap = { triggerEntity.handle, rbEntity.handle };
+			thisFrameTriggerOverlaps.insert(overlap);
 		}
 	}
 
@@ -1002,6 +1042,39 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	}
 
 	arena.resetToMarker(marker);
+
+
+
+	// Handle triggers.
+
+	for (trigger_overlap o : thisFrameTriggerOverlaps)
+	{
+		// Didn't overlap last frame -> fire enter event.
+		if (prevFrameTriggerOverlaps.find(o) == prevFrameTriggerOverlaps.end())
+		{
+			scene_entity triggerEntity = { o.trigger, scene };
+			scene_entity otherEntity = { o.other, scene };
+			const trigger_component& triggerComp = triggerEntity.getComponent<trigger_component>();
+			triggerComp.callback(trigger_event{ triggerEntity, otherEntity, trigger_event_enter });
+		}
+	}
+
+	for (trigger_overlap o : prevFrameTriggerOverlaps)
+	{
+		// Did overlap last frame and don't this frame -> fire leave event.
+		if (thisFrameTriggerOverlaps.find(o) == thisFrameTriggerOverlaps.end())
+		{
+			scene_entity triggerEntity = { o.trigger, scene };
+			scene_entity otherEntity = { o.other, scene };
+			if (scene.isEntityValid(triggerEntity) && scene.isEntityValid(otherEntity))
+			{
+				const trigger_component& triggerComp = triggerEntity.getComponent<trigger_component>();
+				triggerComp.callback(trigger_event{ triggerEntity, otherEntity, trigger_event_leave });
+			}
+		}
+	}
+
+	prevFrameTriggerOverlaps = std::move(thisFrameTriggerOverlaps);
 }
 
 // This function returns the inertia tensors with respect to the center of gravity, so with a coordinate system centered at the COG.

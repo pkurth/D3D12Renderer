@@ -198,30 +198,41 @@ void application::initialize(main_renderer* renderer)
 		//	.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f))
 		//	.addComponent<rigid_body_component>(true, 1.f);
 
-		//random_number_generator rng = { 15681923 };
-		//for (uint32 i = 0; i < 1000; ++i)
-		//{
-		//	//float x = rng.randomFloatBetween(-90.f, 90.f);
-		//	//float z = rng.randomFloatBetween(-90.f, 90.f);
-		//	//float y = rng.randomFloatBetween(20.f, 60.f);
-		//
-		//	if (i % 2 == 0)
-		//	{
-		//		scene.createEntity("Cube")
-		//			.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
-		//			.addComponent<raster_component>(boxMesh)
-		//			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 1.f))
-		//			.addComponent<rigid_body_component>(false, 1.f);
-		//	}
-		//	else
-		//	{
-		//		scene.createEntity("Sphere")
-		//			.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
-		//			.addComponent<raster_component>(sphereMesh)
-		//			.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.f, 0.f), 1.f }, 0.1f, 0.5f, 1.f))
-		//			.addComponent<rigid_body_component>(false, 1.f);
-		//	}
-		//}
+		random_number_generator rng = { 15681923 };
+		for (uint32 i = 0; i < 1000; ++i)
+		{
+			//float x = rng.randomFloatBetween(-90.f, 90.f);
+			//float z = rng.randomFloatBetween(-90.f, 90.f);
+			//float y = rng.randomFloatBetween(20.f, 60.f);
+		
+			if (i % 2 == 0)
+			{
+				scene.createEntity("Cube")
+					.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+					.addComponent<raster_component>(boxMesh)
+					.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 1.f))
+					.addComponent<rigid_body_component>(false, 1.f);
+			}
+			else
+			{
+				scene.createEntity("Sphere")
+					.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+					.addComponent<raster_component>(sphereMesh)
+					.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.f, 0.f), 1.f }, 0.1f, 0.5f, 1.f))
+					.addComponent<rigid_body_component>(false, 1.f);
+			}
+		}
+
+		auto triggerCallback = [scene=&scene](trigger_event e)
+		{
+			//scene->deleteEntity(e.other);
+			std::cout << ((e.type == trigger_event_enter) ? "Enter" : "Leave") << '\n';
+		};
+
+		scene.createEntity("Trigger")
+			.addComponent<transform_component>(vec3(25.f, 1.f, -5.f), quat::identity)
+			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(5.f, 1.f, 5.f)), 0, 0, 0))
+			.addComponent<trigger_component>(triggerCallback);
 
 		//bounding_hull hull =
 		//{
@@ -499,11 +510,11 @@ void application::update(const user_input& input, float dt)
 
 	resetRenderPasses();
 
+	physicsStep(scene, stackArena, dt);
 	bool objectDragged = editor.update(input, &ldrRenderPass, dt);
 
 	scene_entity selectedEntity = editor.selectedEntity;
 
-	physicsStep(scene, stackArena, dt);
 
 	// Particles.
 

@@ -3,6 +3,7 @@
 //#define ENTT_ID_TYPE uint64
 //#include <entt/entt.hpp>
 #include <entt/entity/registry.hpp>
+#include <entt/entity/helper.hpp>
 #include "components.h"
 #ifndef PHYSICS_ONLY
 #include "rendering/light_source.h"
@@ -196,6 +197,13 @@ struct game_scene
 	}
 
 	template <typename component_t>
+	scene_entity getEntityFromComponent(const component_t& c)
+	{
+		entt::entity e = entt::to_entity(registry, c);
+		return { e, &registry };
+	}
+
+	template <typename component_t>
 	void copyComponentIfExists(scene_entity src, scene_entity dst)
 	{
 		if (component_t* comp = src.getComponentIfExists<component_t>())
@@ -251,6 +259,12 @@ struct game_scene
 		auto pool = registry.pool_if_exists<component_t>();
 		assert(pool);
 		return pool->element_at(index);
+	}
+
+	template <typename component_t>
+	scene_entity getEntityFromComponentAtIndex(uint32 index)
+	{
+		return getEntityFromComponent(getComponentAtIndex<component_t>(index));
 	}
 
 	template <typename context_t, typename... args>

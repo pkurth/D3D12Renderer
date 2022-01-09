@@ -82,7 +82,7 @@ void clearBroadphase(game_scene& scene)
 	}
 }
 
-uint32 broadphase(game_scene& scene, bounding_box* worldSpaceAABBs, memory_arena& arena, broadphase_collision* outCollisions)
+uint32 broadphase(game_scene& scene, bounding_box* worldSpaceAABBs, memory_arena& arena, collider_pair* outCollisions)
 {
 	CPU_PROFILE_BLOCK("Broad phase");
 

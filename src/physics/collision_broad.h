@@ -5,14 +5,14 @@
 #include "core/memory.h"
 
 
-struct broadphase_collision
+struct collider_pair
 {
 	// Indices of the colliders in the scene.
 	uint16 colliderA;
 	uint16 colliderB;
 };
 
-uint32 broadphase(struct game_scene& scene, bounding_box* worldSpaceAABBs, memory_arena& arena, broadphase_collision* outOverlaps);
+uint32 broadphase(struct game_scene& scene, bounding_box* worldSpaceAABBs, memory_arena& arena, collider_pair* outOverlaps);
 
 
 

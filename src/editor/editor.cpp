@@ -101,6 +101,11 @@ bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPas
 {
 	CPU_PROFILE_BLOCK("Update editor");
 
+	if (selectedEntity && !scene->isEntityValid(selectedEntity))
+	{
+		setSelectedEntityNoUndo({});
+	}
+
 	bool objectDragged = false;
 	objectDragged |= handleUserInput(input, ldrRenderPass, dt);
 	objectDragged |= drawSceneHierarchy();

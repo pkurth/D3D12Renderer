@@ -4,7 +4,7 @@
 #include "physics.h"
 
 struct collider_union;
-struct broadphase_collision;
+struct collider_pair;
 
 struct contact_info
 {
@@ -34,7 +34,8 @@ struct narrowphase_result
 	uint32 numNonCollisionInteractions;
 };
 
-narrowphase_result narrowphase(collider_union* worldSpaceColliders, broadphase_collision* possibleCollisions, uint32 numPossibleCollisions,
-	collision_contact* outContacts, constraint_body_pair* outBodyPairs, non_collision_interaction* outNonCollisionInteractions);
+narrowphase_result narrowphase(const collider_union* worldSpaceColliders, const collider_pair* possibleCollisions, uint32 numPossibleCollisions,
+	collision_contact* outContacts, constraint_body_pair* outBodyPairs, // result.numContacts many.
+	non_collision_interaction* outNonCollisionInteractions);			// result.numNonCollisionInteractions many.
 
 

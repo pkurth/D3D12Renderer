@@ -26,9 +26,10 @@ struct collider_properties
 
 enum physics_object_type : uint8
 {
-	physics_object_type_none,
 	physics_object_type_rigid_body,
+	physics_object_type_static_collider,
 	physics_object_type_force_field,
+	physics_object_type_trigger,
 
 	physics_object_type_count,
 };
@@ -154,6 +155,24 @@ struct physics_reference_component
 struct force_field_component
 {
 	vec3 force;
+};
+
+enum trigger_event_type
+{
+	trigger_event_enter,
+	trigger_event_leave,
+};
+
+struct trigger_event
+{
+	scene_entity trigger;
+	scene_entity other;
+	trigger_event_type type;
+};
+
+struct trigger_component
+{
+	std::function<void(trigger_event)> callback;
 };
 
 #define INVALID_BOUNDING_HULL_INDEX -1
