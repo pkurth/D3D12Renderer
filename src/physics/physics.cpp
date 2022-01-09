@@ -553,8 +553,7 @@ static void getWorldSpaceColliders(game_scene& scene, bounding_box* outWorldspac
 		++pushIndex;
 
 		scene_entity entity = { collider.parentEntity, scene };
-		assert(entity.hasComponent<transform_component>());
-		transform_component& transform = entity.getComponent<transform_component>();
+		const transform_component& transform = entity.hasComponent<transform_component>() ? entity.getComponent<transform_component>() : trs::identity;
 
 		col.type = collider.type;
 		col.properties = collider.properties;

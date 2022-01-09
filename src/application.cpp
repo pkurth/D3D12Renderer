@@ -230,8 +230,7 @@ void application::initialize(main_renderer* renderer)
 		};
 
 		scene.createEntity("Trigger")
-			.addComponent<transform_component>(vec3(25.f, 1.f, -5.f), quat::identity)
-			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(5.f, 1.f, 5.f)), 0, 0, 0))
+			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(25.f, 1.f, -5.f), vec3(5.f, 1.f, 5.f)), 0, 0, 0))
 			.addComponent<trigger_component>(triggerCallback);
 
 		//bounding_hull hull =
