@@ -1746,17 +1746,18 @@ static bool overlapCheck(const collider_union* worldSpaceColliders, collider_pai
 	return overlaps;
 }
 
-narrowphase_result narrowphase(const collider_union* worldSpaceColliders, const collider_pair* possibleCollisions, uint32 numPossibleCollisions,
+narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collider_pair* collisionPairs, uint32 numCollisionPairs,
 	collision_contact* outContacts, constraint_body_pair* outBodyPairs, non_collision_interaction* outNonCollisionInteractions)
 {
 	CPU_PROFILE_BLOCK("Narrow phase");
 
+	uint32 numCollisions = 0;
 	uint32 numContacts = 0;
 	uint32 numNonCollisionInteractions = 0;
 
-	for (uint32 i = 0; i < numPossibleCollisions; ++i)
+	for (uint32 i = 0; i < numCollisionPairs; ++i)
 	{
-		collider_pair overlap = possibleCollisions[i];
+		collider_pair overlap = collisionPairs[i];
 		const collider_union* colliderA = worldSpaceColliders + overlap.colliderA;
 		const collider_union* colliderB = worldSpaceColliders + overlap.colliderB;
 
@@ -1774,6 +1775,8 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, const 
 		}
 
 		// At this point, either one or both colliders belong to a rigid body. One of them could be a force field, trigger or a solo collider still.
+
+		bool swapBack = true;
 
 		if (colliderA->objectType == physics_object_type_rigid_body && colliderB->objectType == physics_object_type_rigid_body // Both rigid bodies.
 			|| colliderA->objectType == physics_object_type_static_collider || colliderB->objectType == physics_object_type_static_collider) // One is a static collider.
@@ -1810,6 +1813,9 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, const 
 
 					++numContacts;
 				}
+
+				swapBack = false;
+				++numCollisions;
 			}
 		}
 		else
@@ -1817,8 +1823,16 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, const 
 			non_collision_interaction& interaction = outNonCollisionInteractions[numNonCollisionInteractions];
 			numNonCollisionInteractions += overlapCheck(worldSpaceColliders, overlap, interaction);
 		}
+
+		if (swapBack)
+		{
+			// A copy may be enough, but this preserves all the pairs.
+			std::swap(collisionPairs[i], collisionPairs[numCollisionPairs - 1]);
+			--numCollisionPairs;
+			--i;
+		}
 	}
 
-	return narrowphase_result{ numContacts, numNonCollisionInteractions };
+	return narrowphase_result{ numCollisions, numContacts, numNonCollisionInteractions };
 }
 

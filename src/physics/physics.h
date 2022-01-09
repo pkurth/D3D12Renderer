@@ -315,7 +315,28 @@ struct physics_settings
 	bool simd = true;
 };
 
+
+enum collision_event_type
+{
+	collision_event_start,
+	collision_event_end,
+};
+
+struct collision_event
+{
+	scene_entity entityA;
+	scene_entity colliderEntityA;
+	const collider_component& colliderA;
+
+	scene_entity entityB;
+	scene_entity colliderEntityB;
+	const collider_component& colliderB;
+
+	collision_event_type type;
+};
+
 extern physics_settings physicsSettings;
+extern std::function<void(const collision_event&)> collisionCallback;
 
 void testPhysicsInteraction(game_scene& scene, ray r);
 void physicsStep(game_scene& scene, memory_arena& arena, float dt);

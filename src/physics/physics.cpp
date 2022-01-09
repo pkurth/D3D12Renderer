@@ -7,7 +7,8 @@
 
 #include <unordered_set>
 
-extern physics_settings physicsSettings = {};
+physics_settings physicsSettings = {};
+std::function<void(const collision_event&)> collisionCallback;
 static std::vector<bounding_hull_geometry> boundingHullGeometries;
 
 struct constraint_context
@@ -834,29 +835,24 @@ void validate(uint32 line, simd_collision_constraint_batch* constraints, uint32 
 #define VALIDATE(...)
 #endif
 
-struct trigger_overlap
+
+struct entity_pair
 {
-	entt::entity trigger;
-	entt::entity other;
+	entt::entity a;
+	entt::entity b;
 };
 
 namespace std
 {
-	template<>
-	struct hash<trigger_overlap>
-	{
-		size_t operator()(trigger_overlap x) const
-		{
-			uint64 combined = ((uint64)x.trigger << 32) | ((uint64)x.other);
-			return std::hash<uint64>()(combined);
-		}
-	};
+	template<> struct hash<entity_pair> { size_t operator()(entity_pair x) const { return std::hash<uint64>()(((uint64)x.a << 32) | ((uint64)x.b)); } };
 }
 
-static bool operator==(trigger_overlap a, trigger_overlap b)
-{
-	return a.trigger == b.trigger && a.other == b.other;
-}
+static bool operator==(entity_pair a, entity_pair b) { return a.a == b.a && a.b == b.b; }
+
+static std::unordered_set<entity_pair> triggerOverlaps[2];
+static std::unordered_set<entity_pair> objectContacts[2];
+static uint32 historyIndex = 0;
+
 
 void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 {
@@ -898,7 +894,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	bounding_box* worldSpaceAABBs = arena.allocate<bounding_box>(numColliders);
 	collider_union* worldSpaceColliders = arena.allocate<collider_union>(numColliders);
 
-	collider_pair* possibleCollisions = arena.allocate<collider_pair>(numColliders * numColliders); // Conservative estimate.
+	collider_pair* collisionPairs = arena.allocate<collider_pair>(numColliders * numColliders); // Conservative estimate.
 
 	uint32 dummyRigidBodyIndex = numRigidBodies;
 
@@ -907,27 +903,39 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 	VALIDATE(worldSpaceColliders, numColliders);
 	VALIDATE(worldSpaceAABBs, numColliders);
 
-	uint32 numPossibleCollisions = broadphase(scene, worldSpaceAABBs, arena, possibleCollisions);
+	uint32 numBroadphaseOverlaps = broadphase(scene, worldSpaceAABBs, arena, collisionPairs);
 
-	non_collision_interaction* nonCollisionInteractions = arena.allocate<non_collision_interaction>(numPossibleCollisions);
-	collision_contact* contacts = arena.allocate<collision_contact>(numPossibleCollisions * 4); // Each collision can have up to 4 contact points.
+	non_collision_interaction* nonCollisionInteractions = arena.allocate<non_collision_interaction>(numBroadphaseOverlaps);
+	collision_contact* contacts = arena.allocate<collision_contact>(numBroadphaseOverlaps * 4); // Each collision can have up to 4 contact points.
 	constraint_body_pair* allConstraintBodyPairs = arena.allocate<constraint_body_pair>(
-		numConstraints + numPossibleCollisions * 4);
+		numConstraints + numBroadphaseOverlaps * 4);
 
 	constraint_body_pair* collisionBodyPairs = allConstraintBodyPairs + numConstraints;
 
-	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, possibleCollisions, numPossibleCollisions, contacts, collisionBodyPairs, nonCollisionInteractions);
+	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, collisionPairs, numBroadphaseOverlaps, contacts, collisionBodyPairs, nonCollisionInteractions);
 	VALIDATE(contacts, narrowPhaseResult.numContacts);
+
+
+	auto& prevFrameObjectContacts = objectContacts[historyIndex];
+	auto& thisFrameObjectContacts = objectContacts[1 - historyIndex];
+	thisFrameObjectContacts.clear();
+
+	for (uint32 i = 0; i < narrowPhaseResult.numCollisions; ++i)
+	{
+		collider_pair pair = collisionPairs[i];
+
+		scene_entity colliderAEntity = scene.getEntityFromComponentAtIndex<collider_component>(pair.colliderA);
+		scene_entity colliderBEntity = scene.getEntityFromComponentAtIndex<collider_component>(pair.colliderB);
+
+		entity_pair contact = { colliderAEntity.handle, colliderBEntity.handle };
+		thisFrameObjectContacts.insert(contact);
+	}
+
 
 	vec3 globalForceField = getForceFieldStates(scene, ffGlobal);
 
-	
-	static std::unordered_set<trigger_overlap> triggerOverlaps[2];
-	static uint32 triggerHistoryIndex = 0;
-
-	auto& prevFrameTriggerOverlaps = triggerOverlaps[triggerHistoryIndex];
-	auto& thisFrameTriggerOverlaps = triggerOverlaps[1 - triggerHistoryIndex];
-	triggerHistoryIndex = 1 - triggerHistoryIndex;
+	auto& prevFrameTriggerOverlaps = triggerOverlaps[historyIndex];
+	auto& thisFrameTriggerOverlaps = triggerOverlaps[1 - historyIndex];
 	thisFrameTriggerOverlaps.clear();
 	
 	// Handle non-collision interactions (triggers, force fields etc).
@@ -946,14 +954,15 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 			scene_entity triggerEntity = scene.getEntityFromComponentAtIndex<trigger_component>(interaction.otherIndex);
 			scene_entity rbEntity = scene.getEntityFromComponent(rb);
 
-			trigger_overlap overlap = { triggerEntity.handle, rbEntity.handle };
+			entity_pair overlap = { triggerEntity.handle, rbEntity.handle };
 			thisFrameTriggerOverlaps.insert(overlap);
 		}
 	}
 
 	CPU_PROFILE_STAT("Num rigid bodies", numRigidBodies);
 	CPU_PROFILE_STAT("Num colliders", numColliders);
-	CPU_PROFILE_STAT("Num broadphase overlaps", numPossibleCollisions);
+	CPU_PROFILE_STAT("Num broadphase overlaps", numBroadphaseOverlaps);
+	CPU_PROFILE_STAT("Num narrowphase overlaps", narrowPhaseResult.numCollisions);
 	CPU_PROFILE_STAT("Num narrowphase contacts", narrowPhaseResult.numContacts);
 
 
@@ -1048,27 +1057,68 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 
 
 
-	// Handle triggers.
+	// Collision callbacks.
+	if (collisionCallback)
+	{
+		for (entity_pair o : thisFrameObjectContacts)
+		{
+			// Didn't touch last frame -> fire collision start event.
+			if (prevFrameObjectContacts.find(o) == prevFrameObjectContacts.end())
+			{
+				scene_entity colliderAEntity = { o.a, scene };
+				scene_entity colliderBEntity = { o.b, scene };
+				const collider_component& colliderA = colliderAEntity.getComponent<collider_component>();
+				const collider_component& colliderB = colliderBEntity.getComponent<collider_component>();
 
-	for (trigger_overlap o : thisFrameTriggerOverlaps)
+				scene_entity entityA = { colliderA.parentEntity, scene };
+				scene_entity entityB = { colliderB.parentEntity, scene };
+
+				collisionCallback(collision_event{ entityA, colliderAEntity, colliderA, entityB, colliderBEntity, colliderB, collision_event_start });
+			}
+		}
+
+		for (entity_pair o : prevFrameObjectContacts)
+		{
+			// Did touch last frame and don't this frame -> fire collision end event.
+			if (thisFrameObjectContacts.find(o) == thisFrameObjectContacts.end())
+			{
+				scene_entity colliderAEntity = { o.a, scene };
+				scene_entity colliderBEntity = { o.b, scene };
+				if (scene.isEntityValid(colliderAEntity) && scene.isEntityValid(colliderBEntity))
+				{
+					const collider_component& colliderA = colliderAEntity.getComponent<collider_component>();
+					const collider_component& colliderB = colliderBEntity.getComponent<collider_component>();
+
+					scene_entity entityA = { colliderA.parentEntity, scene };
+					scene_entity entityB = { colliderB.parentEntity, scene };
+
+					collisionCallback(collision_event{ entityA, colliderAEntity, colliderA, entityB, colliderBEntity, colliderB, collision_event_end });
+				}
+			}
+		}
+	}
+
+
+	// Trigger callbacks.
+	for (entity_pair o : thisFrameTriggerOverlaps)
 	{
 		// Didn't overlap last frame -> fire enter event.
 		if (prevFrameTriggerOverlaps.find(o) == prevFrameTriggerOverlaps.end())
 		{
-			scene_entity triggerEntity = { o.trigger, scene };
-			scene_entity otherEntity = { o.other, scene };
+			scene_entity triggerEntity = { o.a, scene };
+			scene_entity otherEntity = { o.b, scene };
 			const trigger_component& triggerComp = triggerEntity.getComponent<trigger_component>();
 			triggerComp.callback(trigger_event{ triggerEntity, otherEntity, trigger_event_enter });
 		}
 	}
 
-	for (trigger_overlap o : prevFrameTriggerOverlaps)
+	for (entity_pair o : prevFrameTriggerOverlaps)
 	{
 		// Did overlap last frame and don't this frame -> fire leave event.
 		if (thisFrameTriggerOverlaps.find(o) == thisFrameTriggerOverlaps.end())
 		{
-			scene_entity triggerEntity = { o.trigger, scene };
-			scene_entity otherEntity = { o.other, scene };
+			scene_entity triggerEntity = { o.a, scene };
+			scene_entity otherEntity = { o.b, scene };
 			if (scene.isEntityValid(triggerEntity) && scene.isEntityValid(otherEntity))
 			{
 				const trigger_component& triggerComp = triggerEntity.getComponent<trigger_component>();
@@ -1076,6 +1126,8 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 			}
 		}
 	}
+
+	historyIndex = 1 - historyIndex;
 }
 
 // This function returns the inertia tensors with respect to the center of gravity, so with a coordinate system centered at the COG.
