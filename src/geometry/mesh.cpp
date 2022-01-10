@@ -39,7 +39,18 @@ static ref<composite_mesh> loadMeshFromFileInternal(asset_handle handle, const f
 		return 0;
 	}
 
-	mesh_builder builder(flags);
+	mesh_index_type indexType = mesh_index_uint16;
+	for (uint32 m = 0; m < scene->mNumMeshes; ++m)
+	{
+		aiMesh* mesh = scene->mMeshes[m];
+		if (mesh->mNumVertices >= UINT16_MAX)
+		{
+			indexType = mesh_index_uint32;
+			break;
+		}
+	}
+
+	mesh_builder builder(flags, indexType);
 
 	ref<composite_mesh> result = make_ref<composite_mesh>();
 
