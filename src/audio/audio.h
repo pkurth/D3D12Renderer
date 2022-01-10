@@ -15,42 +15,59 @@
 #define B_HZ		493.88f
 
 
+#define AUDIO_DURATION_INFINITE -1.f
+
 struct audio_source
 {
+	uint32 numChannels;
+	uint32 sampleHz;
+	uint32 bufferedMilliseconds;
+	static const uint32 bytesPerChannel = sizeof(float);
+
+	audio_source(uint32 numChannels = 1, uint32 sampleHz = 44100, uint32 bufferedMilliseconds = 20)
+		: numChannels(numChannels), sampleHz(sampleHz), bufferedMilliseconds(bufferedMilliseconds) {}
+
 	virtual uint32 createSamples(float* buffer, uint32 numSamples) = 0;
 };
 
 struct sine_wave_audio_source : audio_source
 {
-	sine_wave_audio_source(float hz = C_HZ) : hz(hz) {}
+	sine_wave_audio_source(float hz = C_HZ, float duration = AUDIO_DURATION_INFINITE)
+		: hz(hz), duration(duration) {}
 
 	virtual uint32 createSamples(float* buffer, uint32 numSamples) override;
 
 private:
 	float hz;
+	float duration;
 	uint32 offset = 0;
 };
 
 struct audio_voice
 {
-	static const uint32 sampleHz = 44100;
-	static const uint32 numChannels = 1;
-	static const uint32 bytesPerChannel = sizeof(float);
-	static const uint32 bufferedMilliseconds = 20;
+	uint32 numSamplesPerBuffer;
+	uint32 numBytesPerBuffer;
 
-	static_assert(sampleHz * numChannels * bufferedMilliseconds % 1000 == 0, "");
-
-	static const uint32 numSamplesPerBuffer = sampleHz * numChannels * bufferedMilliseconds / 1000;
-	static const uint32 numBytesPerBuffer = numSamplesPerBuffer * bytesPerChannel;
-
-	float memory[2][numSamplesPerBuffer];
+	float* allMemory;
+	float* buffers[2];
 
 	audio_source* source;
 	struct IXAudio2SourceVoice* voice;
-	uint32 nextToWrite = 0;
+	uint32 nextToWrite;
+	uint32 stopOn;
 
-	float volume = 1.f;
-	float pitch = 1.f;
+	float volume;
+	float pitch;
+
+	bool paused;
+
+	uint32 generation = 0;
+};
+
+struct audio_handle
+{
+	uint32 generation;
+	uint32 index;
 };
 
 struct audio
@@ -60,16 +77,26 @@ struct audio
 
 	static void notifyOnSettingsChange();
 
-	static bool playSound(audio_source* source, float volume = 1.f, float pitch = 1.f);
+	static audio_handle playSound(audio_source* source, float volume = 1.f, float pitch = 1.f);
 
+	static void pause(audio_handle handle);
+	static void resume(audio_handle handle);
+	static void stop(audio_handle handle);
 
 	static inline float masterVolume = 0.1f;
 
 private:
+
+	static void retireVoice(audio_voice& voice);
 	
 	static com<struct IXAudio2> xaudio;
 	static inline struct IXAudio2MasteringVoice* masterVoice;
-	static inline std::vector<audio_voice*> sourceVoices;
+	
+	static inline audio_voice sourceVoices[64];
+	static inline uint32 freeVoices[64];
+	static inline uint32 numFreeVoices = 64;
 
 	static inline uint32 numOutputChannels;
+
+	friend struct voice_callback;
 };

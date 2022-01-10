@@ -108,6 +108,9 @@ int main(int argc, char** argv)
 	initializeMessageLog();
 	initializeFileRegistry();
 
+	sine_wave_audio_source sineC(C_HZ);
+	sine_wave_audio_source sineE(E_HZ);
+	sine_wave_audio_source sineG(G_HZ);
 
 	audio::initialize();
 
@@ -242,6 +245,17 @@ int main(int argc, char** argv)
 		if (ImGui::IsKeyPressed(key_enter) && ImGui::IsKeyDown(key_alt)) { window.toggleFullscreen(); } // Also allowed if not focused on main window.
 
 
+		if (input.keyboard[key_space].pressEvent)
+		{
+			static uint32 index = 0;
+			switch (index)
+			{
+				case 0: audio::playSound(&sineC, 0.1f); break;
+				case 1: audio::playSound(&sineE, 0.1f); break;
+				case 2: audio::playSound(&sineG, 0.1f); break;
+			}
+			++index;
+		}
 
 		// Update and render.
 
