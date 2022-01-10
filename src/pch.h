@@ -19,6 +19,8 @@ namespace fs = std::filesystem;
 
 #include <mutex>
 
+#include <wrl.h> 
+
 typedef char int8;
 typedef unsigned char uint8;
 typedef short int16;
@@ -37,6 +39,9 @@ inline ref<T> make_ref(Args&&... args)
 { 
 	return std::make_shared<T>(std::forward<Args>(args)...); 
 }
+
+template <typename T>
+using com = Microsoft::WRL::ComPtr<T>;
 
 #define arraysize(arr) (sizeof(arr) / sizeof((arr)[0]))
 

@@ -11,6 +11,7 @@
 #include "physics/ragdoll.h"
 #include "physics/vehicle.h"
 #include "scene/serialization.h"
+#include "audio/audio.h"
 
 #include <fontawesome/list.h>
 
@@ -1572,6 +1573,50 @@ void scene_editor::drawSettings(float dt)
 			ImGui::EndTree();
 		}
 
+		if (ImGui::BeginTree("Physics"))
+		{
+			if (ImGui::BeginProperties())
+			{
+				bool physicsPaused = physicsSettings.globalTimeScale < 0.f;
+				if (ImGui::PropertyCheckbox("Pause", physicsPaused))
+				{
+					physicsSettings.globalTimeScale *= -1.f;
+				}
+				if (physicsSettings.globalTimeScale >= 0.f)
+				{
+					ImGui::PropertySlider("Time scale", physicsSettings.globalTimeScale);
+				}
+
+				ImGui::PropertySlider("Rigid solver iterations", physicsSettings.numRigidSolverIterations, 1, 200);
+
+				ImGui::PropertySlider("Cloth velocity iterations", physicsSettings.numClothVelocityIterations, 0, 10);
+				ImGui::PropertySlider("Cloth position iterations", physicsSettings.numClothPositionIterations, 0, 10);
+				ImGui::PropertySlider("Cloth drift iterations", physicsSettings.numClothDriftIterations, 0, 10);
+
+				ImGui::PropertySlider("Test force", physicsSettings.testForce, 1.f, 10000.f);
+
+				ImGui::PropertyCheckbox("Use SIMD", physicsSettings.simd);
+
+				ImGui::EndProperties();
+			}
+			ImGui::EndTree();
+		}
+
+		if (ImGui::BeginTree("Audio"))
+		{
+			bool change = false;
+			if (ImGui::BeginProperties())
+			{
+				change |= ImGui::PropertyDrag("Master volume", audio::masterVolume, 0.05f);
+				ImGui::EndProperties();
+			}
+			if (change)
+			{
+				audio::notifyOnSettingsChange();
+			}
+			ImGui::EndTree();
+		}
+
 		if (renderer->mode == renderer_mode_pathtraced)
 		{
 			bool pathTracerDirty = false;
@@ -1613,35 +1658,6 @@ void scene_editor::drawSettings(float dt)
 			//
 			//	ImGui::EndTree();
 			//}
-
-			if (ImGui::BeginTree("Physics"))
-			{
-				if (ImGui::BeginProperties())
-				{
-					bool physicsPaused = physicsSettings.globalTimeScale < 0.f;
-					if (ImGui::PropertyCheckbox("Pause", physicsPaused))
-					{
-						physicsSettings.globalTimeScale *= -1.f;
-					}
-					if (physicsSettings.globalTimeScale >= 0.f)
-					{
-						ImGui::PropertySlider("Time scale", physicsSettings.globalTimeScale);
-					}
-
-					ImGui::PropertySlider("Rigid solver iterations", physicsSettings.numRigidSolverIterations, 1, 200);
-
-					ImGui::PropertySlider("Cloth velocity iterations", physicsSettings.numClothVelocityIterations, 0, 10);
-					ImGui::PropertySlider("Cloth position iterations", physicsSettings.numClothPositionIterations, 0, 10);
-					ImGui::PropertySlider("Cloth drift iterations", physicsSettings.numClothDriftIterations, 0, 10);
-
-					ImGui::PropertySlider("Test force", physicsSettings.testForce, 1.f, 10000.f);
-
-					ImGui::PropertyCheckbox("Use SIMD", physicsSettings.simd);
-
-					ImGui::EndProperties();
-				}
-				ImGui::EndTree();
-			}
 		}
 	}
 

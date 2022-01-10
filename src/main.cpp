@@ -14,6 +14,7 @@
 #include "rendering/main_renderer.h"
 #include "rendering/shadow_map_renderer.h"
 #include "editor/asset_editor_panel.h"
+#include "audio/audio.h"
 
 
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -106,6 +107,9 @@ int main(int argc, char** argv)
 	initializeJobSystem();
 	initializeMessageLog();
 	initializeFileRegistry();
+
+
+	audio::initialize();
 
 	dx_window window;
 	window.initialize(TEXT("D3D12 Renderer"), 1920, 1080);
@@ -262,6 +266,7 @@ int main(int argc, char** argv)
 		++frameID;
 	}
 
+	audio::shutdown();
 	dxContext.flushApplication();
 
 	dxContext.quit();

@@ -3,7 +3,6 @@
 #include <dx/d3dx12.h>
 #include <dxgi1_6.h>
 #include <d3dcompiler.h>
-#include <wrl.h> 
 #include <sdkddkver.h>
 
 // The newer SDK brings new APIs (e.g. mesh shaders), which can be enabled with this switch.
@@ -23,9 +22,6 @@
 
 #define USE_D3D12_BLOCK_ALLOCATOR 0
 namespace D3D12MA { class Allocator; class Allocation; };
-
-template <typename T>
-using com = Microsoft::WRL::ComPtr<T>;
 
 
 typedef com<ID3D12Object> dx_object;
