@@ -124,18 +124,24 @@ audio_handle audio::playSound(audio_source* source, float volume, float pitch)
     voice.stopOn = -1;
     voice.paused = false;
 
+    if (!source->streaming)
+    {
+        // This causes the sound to end as soon as the first buffer stops playing.
+        voice.nextToWrite = 1;
+        voice.stopOn = 1;
+    }
+
     assert(source->sampleHz * source->numChannels * source->bufferedMilliseconds % 1000 == 0);
 
     voice.numSamplesPerBuffer = source->sampleHz * source->numChannels * source->bufferedMilliseconds / 1000;
     voice.numBytesPerBuffer = voice.numSamplesPerBuffer * audio_source::bytesPerChannel;
 
-    voice.allMemory = new float[voice.numSamplesPerBuffer * 2];
+    uint32 numBuffers = source->streaming ? 2 : 1;
+    voice.allMemory = new float[voice.numSamplesPerBuffer * numBuffers];
     voice.buffers[0] = voice.allMemory;
     voice.buffers[1] = voice.allMemory + voice.numSamplesPerBuffer;
 
     uint32 numSamplesWritten0 = source->createSamples(voice.buffers[0], voice.numSamplesPerBuffer);
-    uint32 numSamplesWritten1 = source->createSamples(voice.buffers[1], voice.numSamplesPerBuffer);
-
     if (numSamplesWritten0)
     {
         WAVEFORMATEX waveFormat = {};
@@ -155,10 +161,14 @@ audio_handle audio::playSound(audio_source* source, float volume, float pitch)
         checkResult(voice.voice->SubmitSourceBuffer(&buffer0));
     }
 
-    if (numSamplesWritten1 > 0)
+    if (numBuffers == 2)
     {
-        XAUDIO2_BUFFER buffer1 = createBuffer(voice, 1, numSamplesWritten1);
-        checkResult(voice.voice->SubmitSourceBuffer(&buffer1));
+        uint32 numSamplesWritten1 = source->createSamples(voice.buffers[1], voice.numSamplesPerBuffer);
+        if (numSamplesWritten1 > 0)
+        {
+            XAUDIO2_BUFFER buffer1 = createBuffer(voice, 1, numSamplesWritten1);
+            checkResult(voice.voice->SubmitSourceBuffer(&buffer1));
+        }
     }
 
     if (volume != 1.f)

@@ -22,10 +22,12 @@ struct audio_source
 	uint32 numChannels;
 	uint32 sampleHz;
 	uint32 bufferedMilliseconds;
+	bool streaming;
+
 	static const uint32 bytesPerChannel = sizeof(float);
 
-	audio_source(uint32 numChannels = 1, uint32 sampleHz = 44100, uint32 bufferedMilliseconds = 20)
-		: numChannels(numChannels), sampleHz(sampleHz), bufferedMilliseconds(bufferedMilliseconds) {}
+	audio_source(uint32 numChannels = 1, uint32 sampleHz = 44100, uint32 bufferedMilliseconds = 20, bool streaming = false)
+		: numChannels(numChannels), sampleHz(sampleHz), bufferedMilliseconds(bufferedMilliseconds), streaming(streaming) {}
 
 	virtual uint32 createSamples(float* buffer, uint32 numSamples) = 0;
 };
@@ -33,7 +35,7 @@ struct audio_source
 struct sine_wave_audio_source : audio_source
 {
 	sine_wave_audio_source(float hz = C_HZ, float duration = AUDIO_DURATION_INFINITE)
-		: hz(hz), duration(duration) {}
+		: audio_source(1, 44100, 20, true), hz(hz), duration(duration) {}
 
 	virtual uint32 createSamples(float* buffer, uint32 numSamples) override;
 
