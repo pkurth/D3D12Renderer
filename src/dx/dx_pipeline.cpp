@@ -425,7 +425,8 @@ static void handlePipelineChanges(const file_system_event& e)
 					// Wait.
 				}
 
-				LOG_MESSAGE("Reloading shader blob %ws", e.path.c_str());
+				uint32 numDirtyPipelines = (uint32)it->second.usedByPipelines.size();
+				LOG_MESSAGE("Reloading shader blob '%ws'. Updating %u pipeline%s.", e.path.stem().c_str(), numDirtyPipelines, (numDirtyPipelines > 1 ? "s" : ""));
 
 				dx_blob blob;
 				checkResult(D3DReadFileToBlob(e.path.c_str(), &blob));
