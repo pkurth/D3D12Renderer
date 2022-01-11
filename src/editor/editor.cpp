@@ -1288,7 +1288,30 @@ static bool editCamera(render_camera& camera)
 	bool result = false;
 	if (ImGui::BeginTree("Camera"))
 	{
-		result |= ImGui::PropertySliderAngle("Field of view", camera.verticalFOV, 1.f, 150.f);
+		if (ImGui::BeginProperties())
+		{
+			result |= ImGui::PropertySliderAngle("Field of view", camera.verticalFOV, 1.f, 150.f);
+			result |= ImGui::PropertyInput("Near plane", camera.nearPlane);
+			bool infiniteFarplane = camera.farPlane < 0.f;
+			if (ImGui::PropertyCheckbox("Infinite far plane", infiniteFarplane))
+			{
+				if (!infiniteFarplane)
+				{
+					camera.farPlane = (camera.farPlane == -1.f) ? 500.f : -camera.farPlane;
+				}
+				else
+				{
+					camera.farPlane = -camera.farPlane;
+				}
+				result = true;
+			}
+			if (!infiniteFarplane)
+			{
+				result |= ImGui::PropertyInput("Far plane", camera.farPlane);
+			}
+
+			ImGui::EndProperties();
+		}
 		
 		ImGui::EndTree();
 	}
