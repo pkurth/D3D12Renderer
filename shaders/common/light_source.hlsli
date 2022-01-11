@@ -13,8 +13,8 @@ static float getAttenuation(float distance, float maxDistance)
 	// https://imdoingitwrong.wordpress.com/2011/02/10/improved-light-attenuation/
 	float relDist = min(distance / maxDistance, 1.f);
 	float d = distance / (1.f - relDist * relDist);
-	
-	float att =  1.f / (d * d + 1.f);
+
+	float att = 1.f / (d * d + 1.f);
 	return att;
 }
 
@@ -341,6 +341,11 @@ static float sampleCascadedShadowMapSimple(float4x4 vp[4], float3 worldPosition,
 	SamplerComparisonState shadowMapSampler,
 	float pixelDepth, uint numCascades, float4 cascadeDistances, float4 bias, float4 blendDistances)
 {
+	if (numCascades == 0)
+	{
+		return 1.f;
+	}
+
 	float blendArea = blendDistances.x;
 
 	float4 comparison = pixelDepth.xxxx > cascadeDistances;
@@ -377,6 +382,11 @@ static float sampleCascadedShadowMapPCF(float4x4 vp[4], float3 worldPosition,
 	SamplerComparisonState shadowMapSampler, 
 	float2 texelSize, float pixelDepth, uint numCascades, float4 cascadeDistances, float4 bias, float4 blendDistances)
 {
+	if (numCascades == 0)
+	{
+		return 1.f;
+	}
+
 	float4 comparison = pixelDepth.xxxx > cascadeDistances;
 
 	int currentCascadeIndex = dot(float4(numCascades > 0, numCascades > 1, numCascades > 2, numCascades > 3), comparison);

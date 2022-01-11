@@ -257,7 +257,7 @@ ps_output main(ps_input IN)
 
 	// Sun.
 	{
-		float3 L = -normalize(sun.direction);
+		float3 L = -sun.direction;
 
 		light_info light;
 		light.initialize(surface, L, sun.radiance);
