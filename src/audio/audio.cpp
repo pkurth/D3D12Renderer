@@ -178,7 +178,7 @@ static voice_callback voiceCallback;
 
 
 
-
+static IXAudio2MasteringVoice* masterVoice;
 static com<IXAudio2> xaudio;
 static std::mutex mutex;
 
@@ -608,7 +608,7 @@ static DWORD WINAPI retireStoppedVoices(void* parameter)
     return 0;
 }
 
-bool audio::initialize()
+bool initializeAudio()
 {
     uint32 flags = 0;
 #ifdef _DEBUG
@@ -630,12 +630,12 @@ bool audio::initialize()
     return true;
 }
 
-void audio::shutdown()
+void shutdownAudio()
 {
     xaudio->StopEngine();
 }
 
-bool audio::playFromFile(const fs::path& path, float volume, float pitch, bool stream, bool loop)
+bool playAudioFromFile(const fs::path& path, float volume, float pitch, bool stream, bool loop)
 {
     if (!stream)
     {
@@ -690,7 +690,7 @@ bool audio::playFromFile(const fs::path& path, float volume, float pitch, bool s
     return true;
 }
 
-bool audio::play(float* data, uint32 totalNumSamples, uint32 numChannels, uint32 sampleHz, float volume, float pitch, bool loop, bool deleteBufferAfterPlayback)
+bool playAudioFromData(float* data, uint32 totalNumSamples, uint32 numChannels, uint32 sampleHz, float volume, float pitch, bool loop, bool deleteBufferAfterPlayback)
 {
     WAVEFORMATEX wfx = {};
     wfx.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
@@ -723,7 +723,7 @@ bool audio::play(float* data, uint32 totalNumSamples, uint32 numChannels, uint32
     return true;
 }
 
-bool audio::play(audio_generator* generator, float volume, float pitch, bool stream, bool loop)
+bool playAudioFromGenerator(audio_generator* generator, float volume, float pitch, bool stream, bool loop)
 {
     WAVEFORMATEX wfx = {};
     wfx.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;

@@ -107,12 +107,12 @@ int main(int argc, char** argv)
 	initializeJobSystem();
 	initializeMessageLog();
 	initializeFileRegistry();
+	initializeAudio();
 
 	sine_wave_audio_generator sineC(5.f, C_HZ);
 	sine_wave_audio_generator sineE(5.f, E_HZ);
 	sine_wave_audio_generator sineG(5.f, G_HZ);
 
-	audio::initialize();
 
 	dx_window window;
 	window.initialize(TEXT("D3D12 Renderer"), 1920, 1080);
@@ -250,16 +250,16 @@ int main(int argc, char** argv)
 			static uint32 index = 0;
 			switch (index)
 			{
-				case 0: audio::play(&sineC, 0.1f, 1.f, false); break;
-				case 1: audio::play(&sineE, 0.1f, 1.f, false); break;
-				case 2: audio::play(&sineG, 0.1f, 1.f, false); break;
+				case 0: playAudioFromGenerator(&sineC, 0.1f, 1.f, false); break;
+				case 1: playAudioFromGenerator(&sineE, 0.1f, 1.f, false); break;
+				case 2: playAudioFromGenerator(&sineG, 0.1f, 1.f, false); break;
 			}
 			++index;
 		}
 
 		if (input.keyboard[key_enter].pressEvent)
 		{
-			audio::playFromFile("assets/audio/drums.wav", 0.5f, 1.f, true, false);
+			playAudioFromFile("assets/audio/drums.wav", 0.5f, 1.f, true, false);
 		}
 
 		// Update and render.
@@ -285,10 +285,11 @@ int main(int argc, char** argv)
 		++frameID;
 	}
 
-	audio::shutdown();
 	dxContext.flushApplication();
 
 	dxContext.quit();
+
+	shutdownAudio();
 
 	return EXIT_SUCCESS;
 }
