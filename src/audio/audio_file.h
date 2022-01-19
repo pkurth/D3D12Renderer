@@ -18,6 +18,8 @@ struct audio_file
 
     DWORD dataChunkSize;
     DWORD dataChunkPosition;
+
+    bool valid() { return fileHandle != INVALID_HANDLE_VALUE; }
 };
 
 audio_file openAudioFile(const fs::path& path);

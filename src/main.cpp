@@ -277,6 +277,7 @@ int main(int argc, char** argv)
 		meshEditor.draw();
 
 		updateMessageLog(dt);
+		updateAudio();
 
 		renderToMainWindow(window);
 

@@ -12,50 +12,69 @@
 
 static IXAudio2MasteringVoice* masterVoice;
 static com<IXAudio2> xaudio;
-static std::mutex mutex;
+
+float masterAudioVolume = 0.1f;
+static float oldMasterAudioVolume;
+
+struct voice_slot
+{
+	IXAudio2SourceVoice* voice;
+	void* deleteOnPlaybackEnd;
+	uint32 voiceKey;
+
+	uint32 prev;
+	uint32 next;
+
+	uint32 generation;
+};
+
+#define NUM_VOICE_SLOTS 128
+static voice_slot voiceSlots[NUM_VOICE_SLOTS];
+static uint32 firstFreeVoiceSlot = 0;
+static uint32 firstRunningVoiceSlot = -1;
 
 
 static uint32 getFormatTag(const WAVEFORMATEX& wfx) noexcept
 {
-    if (wfx.wFormatTag == WAVE_FORMAT_EXTENSIBLE)
-    {
-        if (wfx.cbSize < (sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX)))
-        {
-            return 0;
-        }
+	if (wfx.wFormatTag == WAVE_FORMAT_EXTENSIBLE)
+	{
+		if (wfx.cbSize < (sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX)))
+		{
+			return 0;
+		}
 
-        static const GUID s_wfexBase = { 0x00000000, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 } };
+		static const GUID s_wfexBase = { 0x00000000, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 } };
 
-        const WAVEFORMATEXTENSIBLE& wfex = (const WAVEFORMATEXTENSIBLE&)wfx;
+		const WAVEFORMATEXTENSIBLE& wfex = (const WAVEFORMATEXTENSIBLE&)wfx;
 
-        if (memcmp(reinterpret_cast<const BYTE*>(&wfex.SubFormat) + sizeof(DWORD),
-            reinterpret_cast<const BYTE*>(&s_wfexBase) + sizeof(DWORD), sizeof(GUID) - sizeof(DWORD)) != 0)
-        {
-            return 0;
-        }
+		if (memcmp(reinterpret_cast<const BYTE*>(&wfex.SubFormat) + sizeof(DWORD),
+			reinterpret_cast<const BYTE*>(&s_wfexBase) + sizeof(DWORD), sizeof(GUID) - sizeof(DWORD)) != 0)
+		{
+			return 0;
+		}
 
-        return wfex.SubFormat.Data1;
-    }
-    else
-    {
-        return wfx.wFormatTag;
-    }
+		return wfex.SubFormat.Data1;
+	}
+	else
+	{
+		return wfx.wFormatTag;
+	}
 }
 
 static uint32 getDefaultChannelMask(int channels)
 {
-    switch (channels)
-    {
-        case 1: return SPEAKER_MONO;
-        case 2: return SPEAKER_STEREO;
-        case 3: return SPEAKER_2POINT1;
-        case 4: return SPEAKER_QUAD;
-        case 5: return SPEAKER_4POINT1;
-        case 6: return SPEAKER_5POINT1;
-        case 7: return SPEAKER_5POINT1 | SPEAKER_BACK_CENTER;
-        case 8: return SPEAKER_7POINT1;
-        default: return 0;
-    }
+	switch (channels)
+	{
+		case 1: return SPEAKER_MONO;
+		case 2: return SPEAKER_STEREO;
+		case 3: return SPEAKER_2POINT1;
+		case 4: return SPEAKER_QUAD;
+		case 5: return SPEAKER_4POINT1;
+		case 6: return SPEAKER_5POINT1;
+		case 7: return SPEAKER_5POINT1 | SPEAKER_BACK_CENTER;
+		case 8: return SPEAKER_7POINT1;
+		default: return 0;
+	}
 }
 
 static uint32 getFormatKey(const WAVEFORMATEX& x)
@@ -139,465 +158,602 @@ static uint32 getFormatKey(const WAVEFORMATEX& x)
 
 static void setVolume(IXAudio2SourceVoice* voice, float volume)
 {
-    checkResult(voice->SetVolume(volume));
+	checkResult(voice->SetVolume(volume));
 }
 
 static void setPitch(IXAudio2SourceVoice* voice, float pitch)
 {
-    checkResult(voice->SetFrequencyRatio(pitch));
+	checkResult(voice->SetFrequencyRatio(pitch));
 }
 
 struct voice_callback : IXAudio2VoiceCallback
 {
-    HANDLE playEndEvent;
+	HANDLE playEndEvent;
 
-    voice_callback() : playEndEvent(CreateEventEx(0, 0, 0, EVENT_MODIFY_STATE | SYNCHRONIZE)) {}
-    ~voice_callback() { CloseHandle(playEndEvent); }
+	voice_callback() : playEndEvent(CreateEventEx(0, 0, 0, EVENT_MODIFY_STATE | SYNCHRONIZE)) {}
+	~voice_callback() { CloseHandle(playEndEvent); }
 
-    virtual void __stdcall OnVoiceProcessingPassStart(uint32 bytesRequired) override {}
-    virtual void __stdcall OnVoiceProcessingPassEnd() override {}
-    virtual void __stdcall OnStreamEnd() override 
-    { 
-        SetEvent(playEndEvent); // This for some reason only gets called for the non-streaming clips (where only one buffer is submitted).
-    }
-    virtual void __stdcall OnVoiceError(void* bufferContext, HRESULT error) override {}
-    virtual void __stdcall OnBufferStart(void* bufferContext) override {}
-    virtual void __stdcall OnBufferEnd(void* bufferContext) override 
-    { 
-        if (bufferContext) 
-        { 
-            SetEvent((HANDLE)bufferContext); 
-        } 
-    }
-    virtual void __stdcall OnLoopEnd(void* bufferContext) override {}
+	virtual void __stdcall OnVoiceProcessingPassStart(uint32 bytesRequired) override {}
+	virtual void __stdcall OnVoiceProcessingPassEnd() override {}
+	virtual void __stdcall OnStreamEnd() override
+	{
+		SetEvent(playEndEvent); // This for some reason only gets called for the non-streaming clips (where only one buffer is submitted).
+	}
+	virtual void __stdcall OnVoiceError(void* bufferContext, HRESULT error) override {}
+	virtual void __stdcall OnBufferStart(void* bufferContext) override {}
+	virtual void __stdcall OnBufferEnd(void* bufferContext) override
+	{
+		if (bufferContext)
+		{
+			SetEvent((HANDLE)bufferContext);
+		}
+	}
+	virtual void __stdcall OnLoopEnd(void* bufferContext) override {}
 };
 
 static voice_callback voiceCallback;
-
-
-struct running_voice
-{
-    uint32 key;
-    IXAudio2SourceVoice* voice;
-    void* deleteOnPlaybackEnd = 0;
-};
-
-typedef std::unordered_multimap<uint32, IXAudio2SourceVoice*> voice_list;
 static std::unordered_multimap<uint32, IXAudio2SourceVoice*> freeVoices;
-static std::vector<running_voice> runningVoices;
+static std::mutex mutex;
 
-static IXAudio2SourceVoice* getFreeVoice(const WAVEFORMATEX& wfx, void* deleteOnPlaybackEnd = 0)
+// Only call from mutexed code.
+static void addToList(uint32 slot, uint32& first)
 {
-    IXAudio2SourceVoice* result;
+	if (first != -1)
+	{
+		assert(voiceSlots[first].prev == -1);
+		voiceSlots[first].prev = slot;
+	}
+	voiceSlots[slot].next = first;
+	voiceSlots[slot].prev = -1;
+	first = slot;
+}
 
-    uint32 key = getFormatKey(wfx);
+static void removeFromList(uint32 slot, uint32& first)
+{
+	if (voiceSlots[slot].prev != -1)
+	{
+		voiceSlots[voiceSlots[slot].prev].next = voiceSlots[slot].next;
+	}
+	else
+	{
+		assert(first == slot);
+		first = voiceSlots[slot].next;
+	}
 
-    mutex.lock();
-    auto it = freeVoices.find(key);
-    if (it == freeVoices.end())
-    {
-        checkResult(xaudio->CreateSourceVoice(&result, (WAVEFORMATEX*)&wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, &voiceCallback));
-    }
-    else
-    {
-        result = it->second;
-        result->SetSourceSampleRate(wfx.nSamplesPerSec);
-        freeVoices.erase(it);
-    }
-    runningVoices.push_back({ key, result, deleteOnPlaybackEnd });
-    mutex.unlock();
+	if (voiceSlots[slot].next != -1)
+	{
+		voiceSlots[voiceSlots[slot].next].prev = voiceSlots[slot].prev;
+	}
+}
 
-    checkResult(result->Start());
-    
-    return result;
+static std::pair<uint32, uint32> getFreeVoiceSlot()
+{
+	mutex.lock();
+
+	uint32 result = firstFreeVoiceSlot;
+	uint32 generation = 0;
+	if (firstFreeVoiceSlot != -1)
+	{
+		removeFromList(result, firstFreeVoiceSlot);
+		addToList(result, firstRunningVoiceSlot);
+
+		generation = voiceSlots[result].generation;
+	}
+
+	mutex.unlock();
+
+	if (result == -1)
+	{
+		LOG_WARNING("No free voice slot found");
+	}
+
+	return { result, generation };
+}
+
+static void retireVoiceSlotNoMutex(uint32 slot)
+{
+	++voiceSlots[slot].generation;
+
+	removeFromList(slot, firstRunningVoiceSlot);
+	addToList(slot, firstFreeVoiceSlot);
+}
+
+static void retireVoiceSlot(uint32 slot)
+{
+	const std::lock_guard<std::mutex> lock(mutex);
+	retireVoiceSlotNoMutex(slot);
+}
+
+static std::pair<IXAudio2SourceVoice*, uint32> getFreeVoice(const WAVEFORMATEX& wfx)
+{
+	IXAudio2SourceVoice* result;
+	uint32 key = getFormatKey(wfx);
+
+	mutex.lock();
+	auto it = freeVoices.find(key);
+	if (it == freeVoices.end())
+	{
+		checkResult(xaudio->CreateSourceVoice(&result, (WAVEFORMATEX*)&wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, &voiceCallback));
+	}
+	else
+	{
+		result = it->second;
+		result->SetSourceSampleRate(wfx.nSamplesPerSec);
+		freeVoices.erase(it);
+	}
+	mutex.unlock();
+
+	assert(result);
+	checkResult(result->Start());
+
+	return { result, key };
 }
 
 struct file_stream_context
 {
-    fs::path path;
-    float volume;
-    float pitch;
-    bool loop;
+	fs::path path;
+	uint32 slotIndex;
+	float volume;
+	float pitch;
+	bool loop;
 };
 
 struct procedural_stream_context
 {
-    IXAudio2SourceVoice* sourceVoice;
-    audio_generator* generator;
-    bool loop;
+	audio_generator* generator;
+	uint32 slotIndex;
+	bool loop;
 };
 
 static DWORD WINAPI streamFileAudio(void* parameter)
 {
-    file_stream_context* context = (file_stream_context*)parameter;
+	file_stream_context* context = (file_stream_context*)parameter;
 
-    audio_file file = openAudioFile(context->path);
-    if (file.fileHandle != INVALID_HANDLE_VALUE)
-    {
-        constexpr uint32 MAX_BUFFER_COUNT = 3;
-        constexpr uint32 STREAMING_BUFFER_SIZE = (1024 * 8 * 6);
+	audio_file file = openAudioFile(context->path);
+	if (file.valid())
+	{
+		auto [sourceVoice, voiceKey] = getFreeVoice((const WAVEFORMATEX&)file.wfx);
+		voice_slot& slot = voiceSlots[context->slotIndex];
+		slot.voiceKey = voiceKey;
+		slot.voice = sourceVoice;
+		slot.deleteOnPlaybackEnd = 0;
 
-        BYTE buffers[MAX_BUFFER_COUNT][STREAMING_BUFFER_SIZE];
-
-        uint32 currentBufferIndex = 0;
 
 
-        HANDLE bufferEndEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 
-        IXAudio2SourceVoice* sourceVoice = getFreeVoice((const WAVEFORMATEX&)file.wfx);
-        setVolume(sourceVoice, context->volume);
-        setPitch(sourceVoice, context->pitch);
+		constexpr uint32 MAX_BUFFER_COUNT = 3;
+		constexpr uint32 STREAMING_BUFFER_SIZE = (1024 * 8 * 6);
 
-        bool error = false;
+		BYTE buffers[MAX_BUFFER_COUNT][STREAMING_BUFFER_SIZE];
 
-        while (!error)
-        {
-            uint32 currentPosition = 0;
+		uint32 currentBufferIndex = 0;
 
-            if (SetFilePointer(file.fileHandle, file.dataChunkPosition, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
-            {
-                LOG_ERROR("Could not set file pointer");
-                break;
-            }
 
-            while (currentPosition < file.dataChunkSize)
-            {
-                DWORD size = STREAMING_BUFFER_SIZE;
-                if (ReadFile(file.fileHandle, buffers[currentBufferIndex], size, &size, 0) == 0)
-                {
-                    error = true;
-                    break;
-                }
+		HANDLE bufferEndEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 
-                currentPosition += size;
+		setVolume(sourceVoice, context->volume);
+		setPitch(sourceVoice, context->pitch);
 
-                XAUDIO2_BUFFER buffer = { 0 };
-                buffer.AudioBytes = size;
-                buffer.pAudioData = buffers[currentBufferIndex];
-                buffer.pContext = bufferEndEvent;
+		bool error = false;
 
-                checkResult(sourceVoice->SubmitSourceBuffer(&buffer));
+		while (!error)
+		{
+			uint32 currentPosition = 0;
 
-                XAUDIO2_VOICE_STATE state;
-                sourceVoice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
-                while (state.BuffersQueued > MAX_BUFFER_COUNT - 1)
-                {
-                    WaitForSingleObject(bufferEndEvent, INFINITE);
-                    sourceVoice->GetState(&state);
-                }
-                currentBufferIndex++;
-                currentBufferIndex %= MAX_BUFFER_COUNT;
-            }
+			if (SetFilePointer(file.fileHandle, file.dataChunkPosition, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
+			{
+				LOG_ERROR("Could not set file pointer");
+				break;
+			}
 
-            if (!context->loop)
-            {
-                break;
-            }
-        }
+			while (currentPosition < file.dataChunkSize)
+			{
+				DWORD size = STREAMING_BUFFER_SIZE;
+				if (ReadFile(file.fileHandle, buffers[currentBufferIndex], size, &size, 0) == 0)
+				{
+					error = true;
+					break;
+				}
 
-        XAUDIO2_VOICE_STATE state;
-        while (sourceVoice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED), state.BuffersQueued > 0)
-        {
-            WaitForSingleObject(bufferEndEvent, INFINITE);
-        }
+				currentPosition += size;
 
-        CloseHandle(bufferEndEvent);
-        CloseHandle(file.fileHandle);
+				XAUDIO2_BUFFER buffer = { 0 };
+				buffer.AudioBytes = size;
+				buffer.pAudioData = buffers[currentBufferIndex];
+				buffer.pContext = bufferEndEvent;
 
-        SetEvent(voiceCallback.playEndEvent); // Call play end ourselves. See comment in voice_callback.
-    }
+				checkResult(sourceVoice->SubmitSourceBuffer(&buffer));
 
-    delete context;
+				XAUDIO2_VOICE_STATE state;
+				sourceVoice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
+				while (state.BuffersQueued > MAX_BUFFER_COUNT - 1)
+				{
+					WaitForSingleObject(bufferEndEvent, INFINITE);
+					sourceVoice->GetState(&state);
+				}
+				currentBufferIndex++;
+				currentBufferIndex %= MAX_BUFFER_COUNT;
+			}
 
-    return 0;
+			if (!context->loop)
+			{
+				break;
+			}
+		}
+
+		XAUDIO2_VOICE_STATE state;
+		while (sourceVoice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED), state.BuffersQueued > 0)
+		{
+			WaitForSingleObject(bufferEndEvent, INFINITE);
+		}
+
+		CloseHandle(bufferEndEvent);
+
+		SetEvent(voiceCallback.playEndEvent); // Call play end ourselves. See comment in voice_callback.
+		CloseHandle(file.fileHandle);
+	}
+	else
+	{
+		retireVoiceSlot(context->slotIndex);
+	}
+
+	delete context;
+
+	return 0;
 }
 
 static DWORD WINAPI streamProceduralAudio(void* parameter)
 {
-    procedural_stream_context* context = (procedural_stream_context*)parameter;
+	procedural_stream_context* context = (procedural_stream_context*)parameter;
 
-    constexpr uint32 MAX_BUFFER_COUNT = 3;
-    constexpr uint32 STREAMING_BUFFER_SIZE = (1024 * 8 * 6);
+	constexpr uint32 MAX_BUFFER_COUNT = 3;
+	constexpr uint32 STREAMING_BUFFER_SIZE = (1024 * 8 * 6);
 
-    float buffers[MAX_BUFFER_COUNT][STREAMING_BUFFER_SIZE];
+	float buffers[MAX_BUFFER_COUNT][STREAMING_BUFFER_SIZE];
 
-    uint32 currentBufferIndex = 0;
+	uint32 currentBufferIndex = 0;
 
 
-    HANDLE bufferEndEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+	HANDLE bufferEndEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 
-    IXAudio2SourceVoice* sourceVoice = context->sourceVoice;
+	voice_slot& slot = voiceSlots[context->slotIndex];
+	IXAudio2SourceVoice* sourceVoice = slot.voice;
 
-    bool error = false;
+	bool error = false;
 
-    while (!error)
-    {
-        uint32 currentPosition = 0;
+	while (!error)
+	{
+		uint32 currentPosition = 0;
 
-        while (true)
-        {
-            uint32 size = STREAMING_BUFFER_SIZE;
-            size = context->generator->getNextSamples(buffers[currentBufferIndex], size);
+		while (true)
+		{
+			uint32 size = STREAMING_BUFFER_SIZE;
+			size = context->generator->getNextSamples(buffers[currentBufferIndex], size);
 
-            if (size == 0)
-            {
-                break;
-            }
+			if (size == 0)
+			{
+				break;
+			}
 
-            currentPosition += size;
+			currentPosition += size;
 
-            XAUDIO2_BUFFER buffer = { 0 };
-            buffer.AudioBytes = size * sizeof(float);
-            buffer.pAudioData = (BYTE*)buffers[currentBufferIndex];
-            buffer.pContext = bufferEndEvent;
+			XAUDIO2_BUFFER buffer = { 0 };
+			buffer.AudioBytes = size * sizeof(float);
+			buffer.pAudioData = (BYTE*)buffers[currentBufferIndex];
+			buffer.pContext = bufferEndEvent;
 
-            checkResult(sourceVoice->SubmitSourceBuffer(&buffer));
+			checkResult(sourceVoice->SubmitSourceBuffer(&buffer));
 
-            XAUDIO2_VOICE_STATE state;
-            sourceVoice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
-            while (state.BuffersQueued > MAX_BUFFER_COUNT - 1)
-            {
-                WaitForSingleObject(bufferEndEvent, INFINITE);
-                sourceVoice->GetState(&state);
-            }
-            currentBufferIndex++;
-            currentBufferIndex %= MAX_BUFFER_COUNT;
-        }
+			XAUDIO2_VOICE_STATE state;
+			sourceVoice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
+			while (state.BuffersQueued > MAX_BUFFER_COUNT - 1)
+			{
+				WaitForSingleObject(bufferEndEvent, INFINITE);
+				sourceVoice->GetState(&state);
+			}
+			currentBufferIndex++;
+			currentBufferIndex %= MAX_BUFFER_COUNT;
+		}
 
-        if (!context->loop)
-        {
-            break;
-        }
-    }
+		if (!context->loop)
+		{
+			break;
+		}
+	}
 
-    XAUDIO2_VOICE_STATE state;
-    while (sourceVoice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED), state.BuffersQueued > 0)
-    {
-        WaitForSingleObject(bufferEndEvent, INFINITE);
-    }
+	XAUDIO2_VOICE_STATE state;
+	while (sourceVoice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED), state.BuffersQueued > 0)
+	{
+		WaitForSingleObject(bufferEndEvent, INFINITE);
+	}
 
-    CloseHandle(bufferEndEvent);
+	CloseHandle(bufferEndEvent);
 
-    SetEvent(voiceCallback.playEndEvent); // Call play end ourselves. See comment in voice_callback.
+	SetEvent(voiceCallback.playEndEvent); // Call play end ourselves. See comment in voice_callback.
 
-    delete context;
+	delete context;
 
-    return 0;
+	return 0;
 }
 
 static DWORD WINAPI retireStoppedVoices(void* parameter)
 {
-    while (true)
-    {
-        if (WaitForSingleObject(voiceCallback.playEndEvent, INFINITE) == WAIT_OBJECT_0)
-        {
-            mutex.lock();
+	while (true)
+	{
+		if (WaitForSingleObject(voiceCallback.playEndEvent, INFINITE) == WAIT_OBJECT_0)
+		{
+			mutex.lock();
 
-            uint32 count = (uint32)runningVoices.size();
-            for (uint32 i = 0; i < count; ++i)
-            {
-                auto& v = runningVoices[i];
+			for (uint32 i = firstRunningVoiceSlot; i != -1;)
+			{
+				voice_slot& slot = voiceSlots[i];
 
-                XAUDIO2_VOICE_STATE state;
-                v.voice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
+				XAUDIO2_VOICE_STATE state;
+				slot.voice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
 
-                if (!state.BuffersQueued)
-                {
-                    v.voice->Stop();
-                    if (v.deleteOnPlaybackEnd)
-                    {
-                        delete v.deleteOnPlaybackEnd;
-                    }
+				uint32 next = slot.next;
 
-                    if (v.key != 0)
-                    {
-                        freeVoices.insert({ v.key, v.voice });
-                    }
-                    else
-                    {
-                        v.voice->DestroyVoice();
-                    }
+				if (!state.BuffersQueued)
+				{
+					slot.voice->Stop();
+					if (slot.deleteOnPlaybackEnd)
+					{
+						delete slot.deleteOnPlaybackEnd;
+						slot.deleteOnPlaybackEnd = 0;
+					}
 
-                    v = runningVoices[count - 1];
-                    runningVoices.pop_back();
-                    --count;
-                    --i;
-                }
-            }
+					if (slot.voiceKey != 0)
+					{
+						freeVoices.insert({ slot.voiceKey, slot.voice });
+					}
+					else
+					{
+						slot.voice->DestroyVoice();
+					}
 
-            mutex.unlock();
-        }
-    }
+					retireVoiceSlotNoMutex(i);
+				}
 
-    return 0;
+				i = next;
+			}
+
+			mutex.unlock();
+		}
+	}
+
+	return 0;
 }
 
 bool initializeAudio()
 {
-    uint32 flags = 0;
+	oldMasterAudioVolume = masterAudioVolume;
+
+	uint32 flags = 0;
 #ifdef _DEBUG
-    flags |= XAUDIO2_DEBUG_ENGINE;
+	flags |= XAUDIO2_DEBUG_ENGINE;
 #endif
-    checkResult(XAudio2Create(xaudio.GetAddressOf(), flags));
-    checkResult(xaudio->CreateMasteringVoice(&masterVoice));
+	checkResult(XAudio2Create(xaudio.GetAddressOf(), flags));
+	checkResult(xaudio->CreateMasteringVoice(&masterVoice));
 
-    masterVoice->SetVolume(0.1f);
+	masterVoice->SetVolume(masterAudioVolume);
 
-    DWORD channelMask;
-    masterVoice->GetChannelMask(&channelMask);
+	DWORD channelMask;
+	masterVoice->GetChannelMask(&channelMask);
 
-    X3DAUDIO_HANDLE X3DInstance;
-    X3DAudioInitialize(channelMask, X3DAUDIO_SPEED_OF_SOUND, X3DInstance);
+	X3DAUDIO_HANDLE X3DInstance;
+	X3DAudioInitialize(channelMask, X3DAUDIO_SPEED_OF_SOUND, X3DInstance);
 
-    CreateThread(0, 0, retireStoppedVoices, 0, 0, 0);
+	for (uint32 i = 0; i < NUM_VOICE_SLOTS; ++i)
+	{
+		voiceSlots[i].prev = (i == 0) ? -1 : (i - 1);
+		voiceSlots[i].next = (i == NUM_VOICE_SLOTS - 1) ? -1 : (i + 1);
+	}
 
-    return true;
+	CreateThread(0, 0, retireStoppedVoices, 0, 0, 0);
+
+	return true;
 }
 
 void shutdownAudio()
 {
-    xaudio->StopEngine();
+	xaudio->StopEngine();
 }
 
-bool playAudioFromFile(const fs::path& path, float volume, float pitch, bool stream, bool loop)
+audio_handle playAudioFromFile(const fs::path& path, float volume, float pitch, bool stream, bool loop)
 {
-    if (!stream)
-    {
-        audio_file file = openAudioFile(path);
-        if (file.fileHandle == INVALID_HANDLE_VALUE)
-        {
-            return false;
-        }
+	auto [slotIndex, slotGeneration] = getFreeVoiceSlot();
+	if (slotIndex == -1)
+	{
+		return {};
+	}
+
+	if (!stream)
+	{
+		audio_file file = openAudioFile(path);
+		if (!file.valid())
+		{
+			retireVoiceSlot(slotIndex);
+			return {};
+		}
+
+		auto [sourceVoice, voiceKey] = getFreeVoice((const WAVEFORMATEX&)file.wfx);
+
+		voice_slot& slot = voiceSlots[slotIndex];
+		slot.voiceKey = voiceKey;
+		slot.voice = sourceVoice;
+		slot.deleteOnPlaybackEnd = 0;
 
 
-        // Fill out the audio data buffer with the contents of the fourccDATA chunk.
-        BYTE* dataBuffer = new BYTE[file.dataChunkSize];
-        if (!readChunkData(file, dataBuffer, file.dataChunkSize, file.dataChunkPosition))
-        {
-            delete[] dataBuffer;
-            return false;
-        }
+		// Fill out the audio data buffer with the contents of the fourccDATA chunk.
+		BYTE* dataBuffer = new BYTE[file.dataChunkSize];
+		if (!readChunkData(file, dataBuffer, file.dataChunkSize, file.dataChunkPosition))
+		{
+			CloseHandle(file.fileHandle);
+			delete[] dataBuffer;
+			retireVoiceSlot(slotIndex);
+			return {};
+		}
 
-        XAUDIO2_BUFFER buffer = { 0 };
-        buffer.AudioBytes = file.dataChunkSize;
-        buffer.pAudioData = dataBuffer;
-        if (loop)
-        {
-            buffer.LoopCount = XAUDIO2_LOOP_INFINITE;
-        }
-        else
-        {
-            buffer.Flags = XAUDIO2_END_OF_STREAM;
-        }
+		XAUDIO2_BUFFER buffer = { 0 };
+		buffer.AudioBytes = file.dataChunkSize;
+		buffer.pAudioData = dataBuffer;
+		if (loop)
+		{
+			buffer.LoopCount = XAUDIO2_LOOP_INFINITE;
+		}
+		else
+		{
+			buffer.Flags = XAUDIO2_END_OF_STREAM;
+		}
 
 
-        IXAudio2SourceVoice* sourceVoice = getFreeVoice((const WAVEFORMATEX&)file.wfx, dataBuffer);
+		setVolume(sourceVoice, volume);
+		setPitch(sourceVoice, pitch);
 
-        setVolume(sourceVoice, volume);
-        setPitch(sourceVoice, pitch);
+		checkResult(sourceVoice->SubmitSourceBuffer(&buffer));
 
-        checkResult(sourceVoice->SubmitSourceBuffer(&buffer));
+		CloseHandle(file.fileHandle);
+	}
+	else
+	{
+		voiceSlots[slotIndex].voice = 0;
 
-        CloseHandle(file.fileHandle);
-    }
-    else
-    {
-        HANDLE threadHandle = CreateThread(0, 0, streamFileAudio, new file_stream_context{ path, volume, pitch, loop }, 0, 0);
-        if (!threadHandle)
-        {
-            return false;
-        }
+		HANDLE threadHandle = CreateThread(0, 0, streamFileAudio, new file_stream_context{ path, slotIndex, volume, pitch, loop }, 0, 0);
+		if (!threadHandle)
+		{
+			retireVoiceSlot(slotIndex);
+			return {};
+		}
 
-        CloseHandle(threadHandle);
-    }
+		CloseHandle(threadHandle);
+	}
 
-    return true;
+	return { slotIndex, slotGeneration };
 }
 
-bool playAudioFromData(float* data, uint32 totalNumSamples, uint32 numChannels, uint32 sampleHz, float volume, float pitch, bool loop, bool deleteBufferAfterPlayback)
+audio_handle playAudioFromData(float* data, uint32 totalNumSamples, uint32 numChannels, uint32 sampleHz, float volume, float pitch, bool loop, bool deleteBufferAfterPlayback)
 {
-    WAVEFORMATEX wfx = {};
-    wfx.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
-    wfx.nChannels = numChannels;
-    wfx.nSamplesPerSec = sampleHz;
-    wfx.wBitsPerSample = numChannels * (uint32)sizeof(float) * 8;
-    wfx.nBlockAlign = numChannels * (uint32)sizeof(float);
-    wfx.nAvgBytesPerSec = sampleHz * numChannels * (uint32)sizeof(float);
-    wfx.cbSize = 0; // Set to zero for PCM or IEEE float.
+	auto [slotIndex, slotGeneration] = getFreeVoiceSlot();
+	if (slotIndex == -1)
+	{
+		return {};
+	}
+
+	WAVEFORMATEX wfx = {};
+	wfx.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
+	wfx.nChannels = numChannels;
+	wfx.nSamplesPerSec = sampleHz;
+	wfx.wBitsPerSample = numChannels * (uint32)sizeof(float) * 8;
+	wfx.nBlockAlign = numChannels * (uint32)sizeof(float);
+	wfx.nAvgBytesPerSec = sampleHz * numChannels * (uint32)sizeof(float);
+	wfx.cbSize = 0; // Set to zero for PCM or IEEE float.
 
 
-    XAUDIO2_BUFFER buffer = { 0 };
-    buffer.AudioBytes = totalNumSamples * (uint32)sizeof(float);
-    buffer.pAudioData = (BYTE*)data;
-    if (loop)
-    {
-        buffer.LoopCount = XAUDIO2_LOOP_INFINITE;
-    }
-    else
-    {
-        buffer.Flags = XAUDIO2_END_OF_STREAM;
-    }
+	auto [sourceVoice, voiceKey] = getFreeVoice(wfx);
 
-    IXAudio2SourceVoice* sourceVoice = getFreeVoice(wfx, deleteBufferAfterPlayback ? data : 0);
-    setVolume(sourceVoice, volume);
-    setPitch(sourceVoice, pitch);
+	voice_slot& slot = voiceSlots[slotIndex];
+	slot.voiceKey = voiceKey;
+	slot.voice = sourceVoice;
+	slot.deleteOnPlaybackEnd = deleteBufferAfterPlayback ? data : 0;
 
-    checkResult(sourceVoice->SubmitSourceBuffer(&buffer));
 
-    return true;
+	XAUDIO2_BUFFER buffer = { 0 };
+	buffer.AudioBytes = totalNumSamples * (uint32)sizeof(float);
+	buffer.pAudioData = (BYTE*)data;
+	if (loop)
+	{
+		buffer.LoopCount = XAUDIO2_LOOP_INFINITE;
+	}
+	else
+	{
+		buffer.Flags = XAUDIO2_END_OF_STREAM;
+	}
+
+	setVolume(sourceVoice, volume);
+	setPitch(sourceVoice, pitch);
+
+	checkResult(sourceVoice->SubmitSourceBuffer(&buffer));
+
+	return { slotIndex, slotGeneration };
 }
 
-bool playAudioFromGenerator(audio_generator* generator, float volume, float pitch, bool stream, bool loop)
+audio_handle playAudioFromGenerator(audio_generator* generator, float volume, float pitch, bool stream, bool loop)
 {
-    WAVEFORMATEX wfx = {};
-    wfx.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
-    wfx.nChannels = generator->numChannels;
-    wfx.nSamplesPerSec = generator->sampleHz;
-    wfx.wBitsPerSample = generator->numChannels * (uint32)sizeof(float) * 8;
-    wfx.nBlockAlign = generator->numChannels * (uint32)sizeof(float);
-    wfx.nAvgBytesPerSec = generator->sampleHz * generator->numChannels * (uint32)sizeof(float);
-    wfx.cbSize = 0; // Set to zero for PCM or IEEE float.
+	auto [slotIndex, slotGeneration] = getFreeVoiceSlot();
+	if (slotIndex == -1)
+	{
+		return {};
+	}
+
+	WAVEFORMATEX wfx = {};
+	wfx.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
+	wfx.nChannels = generator->numChannels;
+	wfx.nSamplesPerSec = generator->sampleHz;
+	wfx.wBitsPerSample = generator->numChannels * (uint32)sizeof(float) * 8;
+	wfx.nBlockAlign = generator->numChannels * (uint32)sizeof(float);
+	wfx.nAvgBytesPerSec = generator->sampleHz * generator->numChannels * (uint32)sizeof(float);
+	wfx.cbSize = 0; // Set to zero for PCM or IEEE float.
 
 
-    if (!stream)
-    {
-        float* dataBuffer = new float[generator->totalNumSamples];
+	auto [sourceVoice, voiceKey] = getFreeVoice(wfx);
 
-        generator->getNextSamples(dataBuffer, generator->totalNumSamples);
+	voice_slot& slot = voiceSlots[slotIndex];
+	slot.voiceKey = voiceKey;
+	slot.voice = sourceVoice;
+	slot.deleteOnPlaybackEnd = 0;
 
-        XAUDIO2_BUFFER buffer = { 0 };
-        buffer.AudioBytes = generator->totalNumSamples * (uint32)sizeof(float);
-        buffer.pAudioData = (BYTE*)dataBuffer;
-        if (loop)
-        {
-            buffer.LoopCount = XAUDIO2_LOOP_INFINITE;
-        }
-        else
-        {
-            buffer.Flags = XAUDIO2_END_OF_STREAM;
-        }
 
-        IXAudio2SourceVoice* sourceVoice = getFreeVoice(wfx, dataBuffer);
-        setVolume(sourceVoice, volume);
-        setPitch(sourceVoice, pitch);
+	if (!stream)
+	{
+		float* dataBuffer = new float[generator->totalNumSamples];
 
-        checkResult(sourceVoice->SubmitSourceBuffer(&buffer));
-    }
-    else
-    {
-        IXAudio2SourceVoice* sourceVoice = getFreeVoice(wfx);
-        setVolume(sourceVoice, volume);
-        setPitch(sourceVoice, pitch);
+		generator->getNextSamples(dataBuffer, generator->totalNumSamples);
 
-        HANDLE threadHandle = CreateThread(0, 0, streamProceduralAudio, new procedural_stream_context{ sourceVoice, generator, loop }, 0, 0);
-        if (!threadHandle)
-        {
-            return false;
-        }
+		XAUDIO2_BUFFER buffer = { 0 };
+		buffer.AudioBytes = generator->totalNumSamples * (uint32)sizeof(float);
+		buffer.pAudioData = (BYTE*)dataBuffer;
+		if (loop)
+		{
+			buffer.LoopCount = XAUDIO2_LOOP_INFINITE;
+		}
+		else
+		{
+			buffer.Flags = XAUDIO2_END_OF_STREAM;
+		}
 
-        CloseHandle(threadHandle);
-    }
+		setVolume(sourceVoice, volume);
+		setPitch(sourceVoice, pitch);
 
-    return true;
+		checkResult(sourceVoice->SubmitSourceBuffer(&buffer));
+	}
+	else
+	{
+		setVolume(sourceVoice, volume);
+		setPitch(sourceVoice, pitch);
+
+		HANDLE threadHandle = CreateThread(0, 0, streamProceduralAudio, new procedural_stream_context{ generator, slotIndex, loop }, 0, 0);
+		if (!threadHandle)
+		{
+			retireVoiceSlot(slotIndex);
+			return {};
+		}
+
+		CloseHandle(threadHandle);
+	}
+
+	return { slotIndex, slotGeneration };
 }
 
+void updateAudio()
+{
+	if (masterAudioVolume != oldMasterAudioVolume)
+	{
+		masterVoice->SetVolume(masterAudioVolume);
+		oldMasterAudioVolume = masterAudioVolume;
+	}
+}
+
+bool audio_handle::valid()
+{
+	return slotIndex != -1 && voiceSlots[slotIndex].generation == generation;
+}
