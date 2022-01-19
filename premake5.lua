@@ -235,6 +235,7 @@ project "D3D12Renderer"
 		"DXGI",
 		"dxguid",
 		"dxcompiler",
+		"XAudio2",
 		"uxtheme",
 		"assimp",
 		"yaml-cpp",

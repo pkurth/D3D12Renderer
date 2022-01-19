@@ -108,9 +108,9 @@ int main(int argc, char** argv)
 	initializeMessageLog();
 	initializeFileRegistry();
 
-	sine_wave_audio_source sineC(C_HZ);
-	sine_wave_audio_source sineE(E_HZ);
-	sine_wave_audio_source sineG(G_HZ);
+	sine_wave_audio_generator sineC(5.f, C_HZ);
+	sine_wave_audio_generator sineE(5.f, E_HZ);
+	sine_wave_audio_generator sineG(5.f, G_HZ);
 
 	audio::initialize();
 
@@ -250,11 +250,16 @@ int main(int argc, char** argv)
 			static uint32 index = 0;
 			switch (index)
 			{
-				case 0: audio::playSound(&sineC, 0.1f); break;
-				case 1: audio::playSound(&sineE, 0.1f); break;
-				case 2: audio::playSound(&sineG, 0.1f); break;
+				case 0: audio::play(&sineC, 0.1f, 1.f, false); break;
+				case 1: audio::play(&sineE, 0.1f, 1.f, false); break;
+				case 2: audio::play(&sineG, 0.1f, 1.f, false); break;
 			}
 			++index;
+		}
+
+		if (input.keyboard[key_enter].pressEvent)
+		{
+			audio::playFromFile("assets/audio/drums.wav", 0.5f, 1.f, true, false);
 		}
 
 		// Update and render.

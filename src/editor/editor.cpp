@@ -1627,16 +1627,6 @@ void scene_editor::drawSettings(float dt)
 
 		if (ImGui::BeginTree("Audio"))
 		{
-			bool change = false;
-			if (ImGui::BeginProperties())
-			{
-				change |= ImGui::PropertyDrag("Master volume", audio::masterVolume, 0.05f);
-				ImGui::EndProperties();
-			}
-			if (change)
-			{
-				audio::notifyOnSettingsChange();
-			}
 			ImGui::EndTree();
 		}
 
