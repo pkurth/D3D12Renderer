@@ -1,20 +1,18 @@
 #include "pch.h"
 #include "audio.h"
+#include "audio_file.h"
 #include "core/log.h"
-#include "core/math.h"
 
 #include <xaudio2.h>
 #include <x3daudio.h>
 
 #include <unordered_map>
 
-// Little endian.
-#define fourccRIFF 'FFIR'
-#define fourccDATA 'atad'
-#define fourccFMT ' tmf'
-#define fourccWAVE 'EVAW'
-#define fourccXWMA 'AMWX'
-#define fourccDPDS 'sdpd'
+
+
+static IXAudio2MasteringVoice* masterVoice;
+static com<IXAudio2> xaudio;
+static std::mutex mutex;
 
 
 static uint32 getFormatTag(const WAVEFORMATEX& wfx) noexcept
@@ -177,11 +175,6 @@ struct voice_callback : IXAudio2VoiceCallback
 static voice_callback voiceCallback;
 
 
-
-static IXAudio2MasteringVoice* masterVoice;
-static com<IXAudio2> xaudio;
-static std::mutex mutex;
-
 struct running_voice
 {
     uint32 key;
@@ -216,175 +209,6 @@ static IXAudio2SourceVoice* getFreeVoice(const WAVEFORMATEX& wfx, void* deleteOn
 
     checkResult(result->Start());
     
-    return result;
-}
-
-
-static bool findChunk(HANDLE fileHandle, DWORD fourcc, DWORD& chunkSize, DWORD& chunkDataPosition)
-{
-    if (SetFilePointer(fileHandle, 0, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
-    {
-        LOG_ERROR("Could not set file pointer");
-        return false;
-    }
-
-    DWORD chunkType;
-    DWORD chunkDataSize;
-    DWORD riffDataSize = 0;
-    DWORD fileType;
-    DWORD bytesRead = 0;
-    DWORD offset = 0;
-
-    HRESULT hr = S_OK;
-    while (hr == S_OK)
-    {
-        DWORD dwRead;
-        if (ReadFile(fileHandle, &chunkType, sizeof(DWORD), &dwRead, NULL) == 0)
-        {
-            LOG_ERROR("Could not read chunk type");
-            return false;
-        }
-
-        if (ReadFile(fileHandle, &chunkDataSize, sizeof(DWORD), &dwRead, NULL) == 0)
-        {
-            LOG_ERROR("Could not read chunk data size");
-            return false;
-        }
-
-
-        if (chunkType == fourccRIFF)
-        {
-            riffDataSize = chunkDataSize;
-            chunkDataSize = 4;
-            if (ReadFile(fileHandle, &fileType, sizeof(DWORD), &dwRead, NULL) == 0)
-            {
-                LOG_ERROR("Could not read file type");
-                return false;
-            }
-        }
-        else
-        {
-            if (SetFilePointer(fileHandle, chunkDataSize, NULL, FILE_CURRENT) == INVALID_SET_FILE_POINTER)
-            {
-                LOG_ERROR("Could not set file pointer");
-                return false;
-            }
-        }
-
-        offset += sizeof(DWORD) * 2;
-
-        if (chunkType == fourcc)
-        {
-            chunkSize = chunkDataSize;
-            chunkDataPosition = offset;
-            return true;
-        }
-
-        offset += chunkDataSize;
-
-        if (bytesRead >= riffDataSize)
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-static bool readChunkData(HANDLE fileHandle, void* buffer, DWORD buffersize, DWORD bufferoffset)
-{
-    if (SetFilePointer(fileHandle, bufferoffset, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
-    {
-        LOG_ERROR("Could not set file pointer");
-        return false;
-    }
-
-    DWORD dwRead;
-    if (ReadFile(fileHandle, buffer, buffersize, &dwRead, NULL) == 0)
-    {
-        LOG_ERROR("Could not read chunk");
-        return false;
-    }
-
-    return true;
-}
-
-
-struct audio_file
-{
-    HANDLE fileHandle = INVALID_HANDLE_VALUE;
-    WAVEFORMATEXTENSIBLE wfx;
-
-    DWORD dataChunkSize;
-    DWORD dataChunkPosition;
-};
-
-static audio_file openAudioFile(const fs::path& path)
-{
-    HANDLE fileHandle = CreateFileW(
-        path.c_str(),
-        GENERIC_READ,
-        FILE_SHARE_READ,
-        NULL,
-        OPEN_EXISTING,
-        0,
-        NULL);
-
-    if (fileHandle == INVALID_HANDLE_VALUE)
-    {
-        LOG_ERROR("Could not open file '%ws'", path.c_str());
-        return {};
-    }
-
-
-    DWORD chunkSize;
-    DWORD chunkPosition;
-    WAVEFORMATEXTENSIBLE wfx = { 0 };
-
-
-    //Check the file type, should be fourccWAVE or 'XWMA'.
-    if (!findChunk(fileHandle, fourccRIFF, chunkSize, chunkPosition))
-    {
-        CloseHandle(fileHandle);
-        return {};
-    }
-
-    DWORD filetype;
-    if (!readChunkData(fileHandle, &filetype, sizeof(DWORD), chunkPosition))
-    {
-        CloseHandle(fileHandle);
-        return {};
-    }
-
-    if (filetype != fourccWAVE)
-    {
-        LOG_ERROR("File type of file '%ws' must be WAVE", path.c_str());
-        CloseHandle(fileHandle);
-        return {};
-    }
-
-    if (!findChunk(fileHandle, fourccFMT, chunkSize, chunkPosition))
-    {
-        CloseHandle(fileHandle);
-        return {};
-    }
-    if (!readChunkData(fileHandle, &wfx, chunkSize, chunkPosition))
-    {
-        CloseHandle(fileHandle);
-        return {};
-    }
-
-    if (!findChunk(fileHandle, fourccDATA, chunkSize, chunkPosition))
-    {
-        CloseHandle(fileHandle);
-        return {};
-    }
-
-    audio_file result;
-    result.fileHandle = fileHandle;
-    result.wfx = wfx;
-    result.dataChunkSize = chunkSize;
-    result.dataChunkPosition = chunkPosition;
     return result;
 }
 
@@ -648,7 +472,7 @@ bool playAudioFromFile(const fs::path& path, float volume, float pitch, bool str
 
         // Fill out the audio data buffer with the contents of the fourccDATA chunk.
         BYTE* dataBuffer = new BYTE[file.dataChunkSize];
-        if (!readChunkData(file.fileHandle, dataBuffer, file.dataChunkSize, file.dataChunkPosition))
+        if (!readChunkData(file, dataBuffer, file.dataChunkSize, file.dataChunkPosition))
         {
             delete[] dataBuffer;
             return false;
@@ -777,20 +601,3 @@ bool playAudioFromGenerator(audio_generator* generator, float volume, float pitc
     return true;
 }
 
-uint32 sine_wave_audio_generator::getNextSamples(float* buffer, uint32 numSamples)
-{
-    uint32 offset = this->offset;
-
-    if (offset + numSamples > totalNumSamples)
-    {
-        numSamples = totalNumSamples - offset;
-    }
-
-    float factor = M_TAU / sampleHz * hz;
-    for (uint32 i = 0; i < numSamples; ++i, ++offset)
-    {
-        buffer[i] = sin(offset * factor);
-    }
-    this->offset = offset;
-    return numSamples;
-}
