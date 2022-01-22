@@ -345,36 +345,38 @@ static float sampleCascadedShadowMapSimple(float4x4 vp[4], float3 worldPosition,
 	{
 		return 1.f;
 	}
-
-	float blendArea = blendDistances.x;
-
-	float4 comparison = pixelDepth.xxxx > cascadeDistances;
-
-	int currentCascadeIndex = dot(float4(numCascades > 0, numCascades > 1, numCascades > 2, numCascades > 3), comparison);
-	currentCascadeIndex = min(currentCascadeIndex, numCascades - 1);
-
-	int nextCascadeIndex = min(numCascades - 1, currentCascadeIndex + 1);
-
-	float visibility = sampleShadowMapSimple(vp[currentCascadeIndex], worldPosition, 
-		shadowMap, viewports[currentCascadeIndex],
-		shadowMapSampler, bias[currentCascadeIndex]);
-
-	float blendEnd = cascadeDistances[currentCascadeIndex];
-	float blendStart = blendEnd - blendDistances[currentCascadeIndex];
-	float alpha = smoothstep(blendStart, blendEnd, pixelDepth);
-
-	float nextCascadeVisibility = visibility;
-	
-	[branch]
-	if (currentCascadeIndex != nextCascadeIndex && alpha != 0.f)
+	else
 	{
-		nextCascadeVisibility = sampleShadowMapSimple(vp[nextCascadeIndex], worldPosition,
-			shadowMap, viewports[nextCascadeIndex],
-			shadowMapSampler, bias[nextCascadeIndex]);
-	}
+		float blendArea = blendDistances.x;
 
-	visibility = lerp(visibility, nextCascadeVisibility, alpha);
-	return visibility;
+		float4 comparison = pixelDepth.xxxx > cascadeDistances;
+
+		int currentCascadeIndex = dot(float4(numCascades > 0, numCascades > 1, numCascades > 2, numCascades > 3), comparison);
+		currentCascadeIndex = min(currentCascadeIndex, numCascades - 1);
+
+		int nextCascadeIndex = min(numCascades - 1, currentCascadeIndex + 1);
+
+		float visibility = sampleShadowMapSimple(vp[currentCascadeIndex], worldPosition,
+			shadowMap, viewports[currentCascadeIndex],
+			shadowMapSampler, bias[currentCascadeIndex]);
+
+		float blendEnd = cascadeDistances[currentCascadeIndex];
+		float blendStart = blendEnd - blendDistances[currentCascadeIndex];
+		float alpha = smoothstep(blendStart, blendEnd, pixelDepth);
+
+		float nextCascadeVisibility = visibility;
+
+		[branch]
+		if (currentCascadeIndex != nextCascadeIndex && alpha != 0.f)
+		{
+			nextCascadeVisibility = sampleShadowMapSimple(vp[nextCascadeIndex], worldPosition,
+				shadowMap, viewports[nextCascadeIndex],
+				shadowMapSampler, bias[nextCascadeIndex]);
+		}
+
+		visibility = lerp(visibility, nextCascadeVisibility, alpha);
+		return visibility;
+	}
 }
 
 static float sampleCascadedShadowMapPCF(float4x4 vp[4], float3 worldPosition, 
@@ -386,42 +388,44 @@ static float sampleCascadedShadowMapPCF(float4x4 vp[4], float3 worldPosition,
 	{
 		return 1.f;
 	}
-
-	float4 comparison = pixelDepth.xxxx > cascadeDistances;
-
-	int currentCascadeIndex = dot(float4(numCascades > 0, numCascades > 1, numCascades > 2, numCascades > 3), comparison);
-	currentCascadeIndex = min(currentCascadeIndex, numCascades - 1);
-
-	int nextCascadeIndex = min(numCascades - 1, currentCascadeIndex + 1);
-
-	static const float pcfRadius[4] = {
-		1.5f, 1.f, 0.5f, 0.f,
-	};
-
-	static const float numPCFSamples[4] = {
-		16.f, 9.f, 4.f, 1.f,
-	};
-
-	float visibility = sampleShadowMapPCF(vp[currentCascadeIndex], worldPosition, 
-		shadowMap, viewports[currentCascadeIndex],
-		shadowMapSampler, texelSize, bias[currentCascadeIndex], pcfRadius[currentCascadeIndex], numPCFSamples[currentCascadeIndex]);
-
-	float blendEnd = cascadeDistances[currentCascadeIndex];
-	float blendStart = blendEnd - blendDistances[currentCascadeIndex];
-	float alpha = smoothstep(blendStart, blendEnd, pixelDepth);
-
-	float nextCascadeVisibility = visibility;
-
-	[branch]
-	if (currentCascadeIndex != nextCascadeIndex && alpha != 0.f)
+	else
 	{
-		nextCascadeVisibility = sampleShadowMapPCF(vp[nextCascadeIndex], worldPosition,
-			shadowMap, viewports[nextCascadeIndex],
-			shadowMapSampler, texelSize, bias[nextCascadeIndex], pcfRadius[nextCascadeIndex], numPCFSamples[nextCascadeIndex]);
-	}
+		float4 comparison = pixelDepth.xxxx > cascadeDistances;
 
-	visibility = lerp(visibility, nextCascadeVisibility, alpha);
-	return visibility;
+		int currentCascadeIndex = dot(float4(numCascades > 0, numCascades > 1, numCascades > 2, numCascades > 3), comparison);
+		currentCascadeIndex = min(currentCascadeIndex, numCascades - 1);
+
+		int nextCascadeIndex = min(numCascades - 1, currentCascadeIndex + 1);
+
+		static const float pcfRadius[4] = {
+			1.5f, 1.f, 0.5f, 0.f,
+		};
+
+		static const float numPCFSamples[4] = {
+			16.f, 9.f, 4.f, 1.f,
+		};
+
+		float visibility = sampleShadowMapPCF(vp[currentCascadeIndex], worldPosition,
+			shadowMap, viewports[currentCascadeIndex],
+			shadowMapSampler, texelSize, bias[currentCascadeIndex], pcfRadius[currentCascadeIndex], numPCFSamples[currentCascadeIndex]);
+
+		float blendEnd = cascadeDistances[currentCascadeIndex];
+		float blendStart = blendEnd - blendDistances[currentCascadeIndex];
+		float alpha = smoothstep(blendStart, blendEnd, pixelDepth);
+
+		float nextCascadeVisibility = visibility;
+
+		[branch]
+		if (currentCascadeIndex != nextCascadeIndex && alpha != 0.f)
+		{
+			nextCascadeVisibility = sampleShadowMapPCF(vp[nextCascadeIndex], worldPosition,
+				shadowMap, viewports[nextCascadeIndex],
+				shadowMapSampler, texelSize, bias[nextCascadeIndex], pcfRadius[nextCascadeIndex], numPCFSamples[nextCascadeIndex]);
+		}
+
+		visibility = lerp(visibility, nextCascadeVisibility, alpha);
+		return visibility;
+	}
 }
 
 #endif
