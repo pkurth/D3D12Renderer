@@ -15,6 +15,7 @@
 #include "rendering/shadow_map.h"
 #include "rendering/shadow_map_renderer.h"
 #include "rendering/debug_visualization.h"
+#include "audio/audio.h"
 
 
 struct raytrace_component
