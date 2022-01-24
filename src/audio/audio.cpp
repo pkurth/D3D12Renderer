@@ -652,6 +652,7 @@ audio_handle playAudioFromFile(const fs::path& path, float volume, float pitch, 
 			buffer.Flags = XAUDIO2_END_OF_STREAM;
 		}
 
+		slot.deleteOnPlaybackEnd = dataBuffer;
 
 		setVolume(sourceVoice, volume);
 		setPitch(sourceVoice, pitch);
@@ -750,6 +751,7 @@ audio_handle playAudioFromGenerator(audio_generator* generator, float volume, fl
 	if (!stream)
 	{
 		float* dataBuffer = new float[generator->totalNumSamples];
+		slot.deleteOnPlaybackEnd = dataBuffer;
 
 		generator->getNextSamples(dataBuffer, generator->totalNumSamples);
 
