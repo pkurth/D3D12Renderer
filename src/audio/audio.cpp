@@ -2,6 +2,7 @@
 #include "audio.h"
 #include "audio_file.h"
 #include "core/log.h"
+#include "core/cpu_profiling.h"
 
 #include <xaudio2.h>
 #include <x3daudio.h>
@@ -12,15 +13,27 @@
 
 static IXAudio2MasteringVoice* masterVoice;
 static com<IXAudio2> xaudio;
+static X3DAUDIO_HANDLE xaudio3dInstance;
 
 float masterAudioVolume = 0.1f;
 static float oldMasterAudioVolume;
 
-struct voice_slot
+static X3DAUDIO_LISTENER listener;
+static XAUDIO2_VOICE_DETAILS masterVoiceDetails;
+
+
+struct audio_voice
 {
 	IXAudio2SourceVoice* voice;
+	uint32 numOutputChannels;
+	uint32 key;
+};
+
+struct voice_slot
+{
+	audio_voice voice;
+
 	void* deleteOnPlaybackEnd;
-	uint32 voiceKey;
 
 	uint32 prev;
 	uint32 next;
@@ -156,14 +169,14 @@ static uint32 getFormatKey(const WAVEFORMATEX& x)
 	return result.key;
 }
 
-static void setVolume(IXAudio2SourceVoice* voice, float volume)
+static void setVolume(audio_voice voice, float volume)
 {
-	checkResult(voice->SetVolume(volume));
+	checkResult(voice.voice->SetVolume(volume));
 }
 
-static void setPitch(IXAudio2SourceVoice* voice, float pitch)
+static void setPitch(audio_voice voice, float pitch)
 {
-	checkResult(voice->SetFrequencyRatio(pitch));
+	checkResult(voice.voice->SetFrequencyRatio(pitch));
 }
 
 struct voice_callback : IXAudio2VoiceCallback
@@ -192,7 +205,7 @@ struct voice_callback : IXAudio2VoiceCallback
 };
 
 static voice_callback voiceCallback;
-static std::unordered_multimap<uint32, IXAudio2SourceVoice*> freeVoices;
+static std::unordered_multimap<uint32, audio_voice> freeVoices;
 static std::mutex mutex;
 
 // Only call from mutexed code.
@@ -264,29 +277,61 @@ static void retireVoiceSlot(uint32 slot)
 	retireVoiceSlotNoMutex(slot);
 }
 
-static std::pair<IXAudio2SourceVoice*, uint32> getFreeVoice(const WAVEFORMATEX& wfx)
+static void resetOutputMatrix(audio_voice& voice)
 {
-	IXAudio2SourceVoice* result;
+	assert(masterVoiceDetails.InputChannels == 2);
+
+	float matrix[8];
+	if (voice.numOutputChannels == 1)
+	{
+		matrix[0] = 0.5f;
+		matrix[1] = 0.5f;
+	}
+	else if (voice.numOutputChannels == 2)
+	{
+		matrix[0] = 1.f;
+		matrix[1] = 0.f;
+		matrix[2] = 0.f;
+		matrix[3] = 1.f;
+	}
+	else
+	{
+		assert(false);
+	}
+
+	voice.voice->SetOutputMatrix(masterVoice, voice.numOutputChannels, masterVoiceDetails.InputChannels, matrix);
+}
+
+static audio_voice getFreeVoice(const WAVEFORMATEX& wfx)
+{
+	audio_voice result;
 	uint32 key = getFormatKey(wfx);
 
 	mutex.lock();
 	auto it = freeVoices.find(key);
 	if (it == freeVoices.end())
 	{
-		checkResult(xaudio->CreateSourceVoice(&result, (WAVEFORMATEX*)&wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, &voiceCallback));
+		checkResult(xaudio->CreateSourceVoice(&result.voice, (WAVEFORMATEX*)&wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, &voiceCallback));
+		result.key = key;
+		result.numOutputChannels = wfx.nChannels;
+
+		mutex.unlock();
 	}
 	else
 	{
 		result = it->second;
-		result->SetSourceSampleRate(wfx.nSamplesPerSec);
 		freeVoices.erase(it);
+
+		mutex.unlock();
+
+		result.voice->SetSourceSampleRate(wfx.nSamplesPerSec);
+		resetOutputMatrix(result);
 	}
-	mutex.unlock();
 
-	assert(result);
-	checkResult(result->Start());
+	assert(result.voice);
+	checkResult(result.voice->Start());
 
-	return { result, key };
+	return result;
 }
 
 struct file_stream_context
@@ -312,9 +357,8 @@ static DWORD WINAPI streamFileAudio(void* parameter)
 	audio_file file = openAudioFile(context->path);
 	if (file.valid())
 	{
-		auto [sourceVoice, voiceKey] = getFreeVoice((const WAVEFORMATEX&)file.wfx);
+		audio_voice sourceVoice = getFreeVoice((const WAVEFORMATEX&)file.wfx);
 		voice_slot& slot = voiceSlots[context->slotIndex];
-		slot.voiceKey = voiceKey;
 		slot.voice = sourceVoice;
 		slot.deleteOnPlaybackEnd = 0;
 
@@ -362,14 +406,14 @@ static DWORD WINAPI streamFileAudio(void* parameter)
 				buffer.pAudioData = buffers[currentBufferIndex];
 				buffer.pContext = bufferEndEvent;
 
-				checkResult(sourceVoice->SubmitSourceBuffer(&buffer));
+				checkResult(sourceVoice.voice->SubmitSourceBuffer(&buffer));
 
 				XAUDIO2_VOICE_STATE state;
-				sourceVoice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
+				sourceVoice.voice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
 				while (state.BuffersQueued > MAX_BUFFER_COUNT - 1)
 				{
 					WaitForSingleObject(bufferEndEvent, INFINITE);
-					sourceVoice->GetState(&state);
+					sourceVoice.voice->GetState(&state);
 				}
 				currentBufferIndex++;
 				currentBufferIndex %= MAX_BUFFER_COUNT;
@@ -382,7 +426,7 @@ static DWORD WINAPI streamFileAudio(void* parameter)
 		}
 
 		XAUDIO2_VOICE_STATE state;
-		while (sourceVoice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED), state.BuffersQueued > 0)
+		while (sourceVoice.voice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED), state.BuffersQueued > 0)
 		{
 			WaitForSingleObject(bufferEndEvent, INFINITE);
 		}
@@ -417,7 +461,7 @@ static DWORD WINAPI streamProceduralAudio(void* parameter)
 	HANDLE bufferEndEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 
 	voice_slot& slot = voiceSlots[context->slotIndex];
-	IXAudio2SourceVoice* sourceVoice = slot.voice;
+	audio_voice sourceVoice = slot.voice;
 
 	bool error = false;
 
@@ -442,14 +486,14 @@ static DWORD WINAPI streamProceduralAudio(void* parameter)
 			buffer.pAudioData = (BYTE*)buffers[currentBufferIndex];
 			buffer.pContext = bufferEndEvent;
 
-			checkResult(sourceVoice->SubmitSourceBuffer(&buffer));
+			checkResult(sourceVoice.voice->SubmitSourceBuffer(&buffer));
 
 			XAUDIO2_VOICE_STATE state;
-			sourceVoice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
+			sourceVoice.voice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
 			while (state.BuffersQueued > MAX_BUFFER_COUNT - 1)
 			{
 				WaitForSingleObject(bufferEndEvent, INFINITE);
-				sourceVoice->GetState(&state);
+				sourceVoice.voice->GetState(&state);
 			}
 			currentBufferIndex++;
 			currentBufferIndex %= MAX_BUFFER_COUNT;
@@ -462,7 +506,7 @@ static DWORD WINAPI streamProceduralAudio(void* parameter)
 	}
 
 	XAUDIO2_VOICE_STATE state;
-	while (sourceVoice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED), state.BuffersQueued > 0)
+	while (sourceVoice.voice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED), state.BuffersQueued > 0)
 	{
 		WaitForSingleObject(bufferEndEvent, INFINITE);
 	}
@@ -489,26 +533,26 @@ static DWORD WINAPI retireStoppedVoices(void* parameter)
 				voice_slot& slot = voiceSlots[i];
 
 				XAUDIO2_VOICE_STATE state;
-				slot.voice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
+				slot.voice.voice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
 
 				uint32 next = slot.next;
 
 				if (!state.BuffersQueued)
 				{
-					slot.voice->Stop();
+					slot.voice.voice->Stop();
 					if (slot.deleteOnPlaybackEnd)
 					{
 						delete slot.deleteOnPlaybackEnd;
 						slot.deleteOnPlaybackEnd = 0;
 					}
 
-					if (slot.voiceKey != 0)
+					if (slot.voice.key != 0)
 					{
-						freeVoices.insert({ slot.voiceKey, slot.voice });
+						freeVoices.insert({ slot.voice.key, slot.voice });
 					}
 					else
 					{
-						slot.voice->DestroyVoice();
+						slot.voice.voice->DestroyVoice();
 					}
 
 					retireVoiceSlotNoMutex(i);
@@ -539,15 +583,18 @@ bool initializeAudio()
 
 	DWORD channelMask;
 	masterVoice->GetChannelMask(&channelMask);
+	masterVoice->GetVoiceDetails(&masterVoiceDetails);
 
-	X3DAUDIO_HANDLE X3DInstance;
-	X3DAudioInitialize(channelMask, X3DAUDIO_SPEED_OF_SOUND, X3DInstance);
+	X3DAudioInitialize(channelMask, X3DAUDIO_SPEED_OF_SOUND, xaudio3dInstance);
 
 	for (uint32 i = 0; i < NUM_VOICE_SLOTS; ++i)
 	{
 		voiceSlots[i].prev = (i == 0) ? -1 : (i - 1);
 		voiceSlots[i].next = (i == NUM_VOICE_SLOTS - 1) ? -1 : (i + 1);
 	}
+
+	listener.OrientFront = { 0.f, 0.f, 1.f };
+	listener.OrientTop = { 0.f, 1.f, 0.f };
 
 	CreateThread(0, 0, retireStoppedVoices, 0, 0, 0);
 
@@ -576,10 +623,9 @@ audio_handle playAudioFromFile(const fs::path& path, float volume, float pitch, 
 			return {};
 		}
 
-		auto [sourceVoice, voiceKey] = getFreeVoice((const WAVEFORMATEX&)file.wfx);
+		audio_voice sourceVoice = getFreeVoice((const WAVEFORMATEX&)file.wfx);
 
 		voice_slot& slot = voiceSlots[slotIndex];
-		slot.voiceKey = voiceKey;
 		slot.voice = sourceVoice;
 		slot.deleteOnPlaybackEnd = 0;
 
@@ -610,13 +656,13 @@ audio_handle playAudioFromFile(const fs::path& path, float volume, float pitch, 
 		setVolume(sourceVoice, volume);
 		setPitch(sourceVoice, pitch);
 
-		checkResult(sourceVoice->SubmitSourceBuffer(&buffer));
+		checkResult(sourceVoice.voice->SubmitSourceBuffer(&buffer));
 
 		CloseHandle(file.fileHandle);
 	}
 	else
 	{
-		voiceSlots[slotIndex].voice = 0;
+		voiceSlots[slotIndex].voice.voice = 0;
 
 		HANDLE threadHandle = CreateThread(0, 0, streamFileAudio, new file_stream_context{ path, slotIndex, volume, pitch, loop }, 0, 0);
 		if (!threadHandle)
@@ -649,10 +695,9 @@ audio_handle playAudioFromData(float* data, uint32 totalNumSamples, uint32 numCh
 	wfx.cbSize = 0; // Set to zero for PCM or IEEE float.
 
 
-	auto [sourceVoice, voiceKey] = getFreeVoice(wfx);
+	audio_voice sourceVoice = getFreeVoice(wfx);
 
 	voice_slot& slot = voiceSlots[slotIndex];
-	slot.voiceKey = voiceKey;
 	slot.voice = sourceVoice;
 	slot.deleteOnPlaybackEnd = deleteBufferAfterPlayback ? data : 0;
 
@@ -672,7 +717,7 @@ audio_handle playAudioFromData(float* data, uint32 totalNumSamples, uint32 numCh
 	setVolume(sourceVoice, volume);
 	setPitch(sourceVoice, pitch);
 
-	checkResult(sourceVoice->SubmitSourceBuffer(&buffer));
+	checkResult(sourceVoice.voice->SubmitSourceBuffer(&buffer));
 
 	return { slotIndex, slotGeneration };
 }
@@ -695,10 +740,9 @@ audio_handle playAudioFromGenerator(audio_generator* generator, float volume, fl
 	wfx.cbSize = 0; // Set to zero for PCM or IEEE float.
 
 
-	auto [sourceVoice, voiceKey] = getFreeVoice(wfx);
+	audio_voice sourceVoice = getFreeVoice(wfx);
 
 	voice_slot& slot = voiceSlots[slotIndex];
-	slot.voiceKey = voiceKey;
 	slot.voice = sourceVoice;
 	slot.deleteOnPlaybackEnd = 0;
 
@@ -724,7 +768,7 @@ audio_handle playAudioFromGenerator(audio_generator* generator, float volume, fl
 		setVolume(sourceVoice, volume);
 		setPitch(sourceVoice, pitch);
 
-		checkResult(sourceVoice->SubmitSourceBuffer(&buffer));
+		checkResult(sourceVoice.voice->SubmitSourceBuffer(&buffer));
 	}
 	else
 	{
@@ -744,13 +788,74 @@ audio_handle playAudioFromGenerator(audio_generator* generator, float volume, fl
 	return { slotIndex, slotGeneration };
 }
 
-void updateAudio()
+void setAudioListener(vec3 position, quat rotation, vec3 velocity)
 {
+	vec3 forward = rotation * vec3(0.f, 0.f, -1.f);
+	vec3 up = rotation * vec3(0.f, 1.f, 0.f);
+
+	// XAudio2 uses a lefthanded coordinate system, which is why we need to flip the z-axis.
+	listener.OrientFront = { forward.x, forward.y, -forward.z };
+	listener.OrientTop = { up.x, up.y, -up.z };
+	listener.Position = { position.x, position.y, -position.z };
+	listener.Velocity = { velocity.x, velocity.y, -velocity.z };
+	listener.pCone = 0;
+}
+
+void updateAudio(game_scene& scene)
+{
+	CPU_PROFILE_BLOCK("Update audio");
+
 	if (masterAudioVolume != oldMasterAudioVolume)
 	{
 		masterVoice->SetVolume(masterAudioVolume);
 		oldMasterAudioVolume = masterAudioVolume;
 	}
+
+
+	
+#if 0
+	mutex.lock();
+
+	for (auto [entityHandle, transform, audio] : scene.group(entt::get<transform_component, audio_3d_component>).each())
+	{
+		if (!audio.playingAudio.valid())
+		{
+			continue;
+		}
+
+		vec3 position = transform.position;
+		quat rotation = transform.rotation;
+
+		vec3 forward = rotation * vec3(0.f, 0.f, -1.f);
+		vec3 up = rotation * vec3(0.f, 1.f, 0.f);
+
+
+		X3DAUDIO_EMITTER emitter = { 0 };
+		emitter.ChannelCount = 1;
+		emitter.CurveDistanceScaler = 1.f;
+		emitter.OrientFront = { forward.x, forward.y, -forward.z };
+		emitter.OrientTop = { up.x, up.y, -up.z };
+		emitter.Position = { position.x, position.y, -position.z };
+
+		float matrix[8] = {};
+
+
+		voice_slot& slot = voiceSlots[audio.playingAudio.slotIndex];
+
+		X3DAUDIO_DSP_SETTINGS dspSettings = { 0 };
+		dspSettings.SrcChannelCount = slot.voice.numOutputChannels;
+		dspSettings.DstChannelCount = masterVoiceDetails.InputChannels;
+		dspSettings.pMatrixCoefficients = matrix;
+
+		X3DAudioCalculate(xaudio3dInstance, &listener, &emitter,
+			X3DAUDIO_CALCULATE_MATRIX/* | X3DAUDIO_CALCULATE_DOPPLER | X3DAUDIO_CALCULATE_LPF_DIRECT | X3DAUDIO_CALCULATE_REVERB*/,
+			&dspSettings);
+
+		checkResult(slot.voice.voice->SetOutputMatrix(masterVoice, slot.voice.numOutputChannels, masterVoiceDetails.InputChannels, matrix));
+	}
+
+	mutex.unlock();
+#endif
 }
 
 bool audio_handle::valid()

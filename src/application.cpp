@@ -538,6 +538,8 @@ void application::update(const user_input& input, float dt)
 	renderer->setSun(scene.sun);
 	renderer->setEnvironment(scene.environment);
 
+	setAudioListener(scene.camera.position, scene.camera.rotation, vec3(0.f));
+
 #if 1
 	if (renderer->mode != renderer_mode_pathtraced)
 	{
