@@ -252,16 +252,17 @@ int main(int argc, char** argv)
 			static uint32 index = 0;
 			switch (index)
 			{
-				case 0: cHandle = playAudioFromGenerator(&sineC, 1.f, 1.f, false); break;
-				case 1: playAudioFromGenerator(&sineE, 1.f, 1.f, false); break;
-				case 2: playAudioFromGenerator(&sineG, 1.f, 1.f, false); break;
+				case 0: cHandle = playAudio(createAudioClipFromGenerator(&sineC, false), 1.f, 1.f); break;
+				case 1: playAudio(createAudioClipFromGenerator(&sineE, false), 1.f, 1.f); break;
+				case 2: playAudio(createAudioClipFromGenerator(&sineG, false), 1.f, 1.f); break;
 			}
 			++index;
 		}
 
 		if (input.keyboard[key_enter].pressEvent)
 		{
-			playAudioFromFile("assets/audio/drums.wav", 0.5f, 1.f, true, false);
+			ref<audio_clip> drumsClip = createAudioClipFromFile("assets/audio/price-of-freedom-33106.wav", true, false);
+			playAudio(drumsClip, 0.5f, 1.f);
 		}
 
 		if (input.keyboard['P'].pressEvent)

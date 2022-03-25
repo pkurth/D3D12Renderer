@@ -106,7 +106,7 @@ audio_file openAudioFile(const fs::path& path)
         FILE_SHARE_READ,
         NULL,
         OPEN_EXISTING,
-        0,
+        0, //FILE_FLAG_NO_BUFFERING,
         NULL);
 
     if (fileHandle == INVALID_HANDLE_VALUE)
@@ -165,5 +165,14 @@ audio_file openAudioFile(const fs::path& path)
     result.dataChunkSize = chunkSize;
     result.dataChunkPosition = chunkPosition;
     return result;
+}
+
+void closeAudioFile(audio_file& file)
+{
+    if (file.fileHandle != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(file.fileHandle);
+        file.fileHandle = INVALID_HANDLE_VALUE;
+    }
 }
 

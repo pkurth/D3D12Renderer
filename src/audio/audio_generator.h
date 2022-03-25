@@ -24,7 +24,7 @@ struct audio_generator
 	audio_generator(float duration, uint32 numChannels = 1, uint32 sampleHz = 44100)
 		: totalNumSamples((uint32)(duration* numChannels* sampleHz)), numChannels(numChannels), sampleHz(sampleHz) {}
 
-	virtual uint32 getNextSamples(float* buffer, uint32 numSamples) = 0;
+	virtual uint32 getNextSamples(float* buffer, uint32 offset, uint32 numSamples) const = 0;
 
 	uint32 totalNumSamples;
 	uint32 numChannels;
@@ -36,10 +36,8 @@ struct sine_wave_audio_generator : audio_generator
 	sine_wave_audio_generator(float duration, float hz = C_HZ)
 		: hz(hz), audio_generator(duration) {}
 
-	virtual uint32 getNextSamples(float* buffer, uint32 numSamples) override
+	virtual uint32 getNextSamples(float* buffer, uint32 offset, uint32 numSamples) const override
 	{
-		uint32 offset = this->offset;
-
 		if (offset + numSamples > totalNumSamples)
 		{
 			numSamples = totalNumSamples - offset;
@@ -50,11 +48,9 @@ struct sine_wave_audio_generator : audio_generator
 		{
 			buffer[i] = sin(offset * factor);
 		}
-		this->offset = offset;
 		return numSamples;
 	}
 
 private:
 	float hz;
-	uint32 offset = 0;
 };

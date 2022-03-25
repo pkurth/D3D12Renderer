@@ -32,8 +32,7 @@ struct audio_voice
 struct voice_slot
 {
 	audio_voice voice;
-
-	void* deleteOnPlaybackEnd;
+	ref<audio_clip> clip;
 
 	uint32 prev;
 	uint32 next;
@@ -265,6 +264,7 @@ static std::pair<uint32, uint32> getFreeVoiceSlot()
 
 static void retireVoiceSlotNoMutex(uint32 slot)
 {
+	voiceSlots[slot].clip.reset();
 	++voiceSlots[slot].generation;
 
 	removeFromList(slot, firstRunningVoiceSlot);
@@ -316,6 +316,7 @@ static audio_voice getFreeVoice(const WAVEFORMATEX& wfx)
 		result.numOutputChannels = wfx.nChannels;
 
 		mutex.unlock();
+
 	}
 	else
 	{
@@ -325,8 +326,9 @@ static audio_voice getFreeVoice(const WAVEFORMATEX& wfx)
 		mutex.unlock();
 
 		result.voice->SetSourceSampleRate(wfx.nSamplesPerSec);
-		resetOutputMatrix(result);
 	}
+
+	resetOutputMatrix(result);
 
 	assert(result.voice);
 	checkResult(result.voice->Start());
@@ -334,34 +336,24 @@ static audio_voice getFreeVoice(const WAVEFORMATEX& wfx)
 	return result;
 }
 
-struct file_stream_context
+struct stream_context
 {
-	fs::path path;
+	ref<audio_clip> clip;
 	uint32 slotIndex;
 	float volume;
 	float pitch;
-	bool loop;
-};
-
-struct procedural_stream_context
-{
-	audio_generator* generator;
-	uint32 slotIndex;
-	bool loop;
 };
 
 static DWORD WINAPI streamFileAudio(void* parameter)
 {
-	file_stream_context* context = (file_stream_context*)parameter;
+	stream_context* context = (stream_context*)parameter;
 
-	audio_file file = openAudioFile(context->path);
+	audio_file file = context->clip->file;
 	if (file.valid())
 	{
 		audio_voice sourceVoice = getFreeVoice((const WAVEFORMATEX&)file.wfx);
 		voice_slot& slot = voiceSlots[context->slotIndex];
 		slot.voice = sourceVoice;
-		slot.deleteOnPlaybackEnd = 0;
-
 
 
 
@@ -419,7 +411,7 @@ static DWORD WINAPI streamFileAudio(void* parameter)
 				currentBufferIndex %= MAX_BUFFER_COUNT;
 			}
 
-			if (!context->loop)
+			if (!context->clip->loop)
 			{
 				break;
 			}
@@ -434,7 +426,7 @@ static DWORD WINAPI streamFileAudio(void* parameter)
 		CloseHandle(bufferEndEvent);
 
 		SetEvent(voiceCallback.playEndEvent); // Call play end ourselves. See comment in voice_callback.
-		CloseHandle(file.fileHandle);
+		//CloseHandle(file.fileHandle);
 	}
 	else
 	{
@@ -448,7 +440,7 @@ static DWORD WINAPI streamFileAudio(void* parameter)
 
 static DWORD WINAPI streamProceduralAudio(void* parameter)
 {
-	procedural_stream_context* context = (procedural_stream_context*)parameter;
+	stream_context* context = (stream_context*)parameter;
 
 	constexpr uint32 MAX_BUFFER_COUNT = 3;
 	constexpr uint32 STREAMING_BUFFER_SIZE = (1024 * 8 * 6);
@@ -460,8 +452,9 @@ static DWORD WINAPI streamProceduralAudio(void* parameter)
 
 	HANDLE bufferEndEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 
+	audio_voice sourceVoice = getFreeVoice((const WAVEFORMATEX&)context->clip->file.wfx);
 	voice_slot& slot = voiceSlots[context->slotIndex];
-	audio_voice sourceVoice = slot.voice;
+	slot.voice = sourceVoice;
 
 	bool error = false;
 
@@ -469,15 +462,19 @@ static DWORD WINAPI streamProceduralAudio(void* parameter)
 	{
 		uint32 currentPosition = 0;
 
+		uint32 offset = 0;
+
 		while (true)
 		{
 			uint32 size = STREAMING_BUFFER_SIZE;
-			size = context->generator->getNextSamples(buffers[currentBufferIndex], size);
+			size = context->clip->generator->getNextSamples(buffers[currentBufferIndex], offset, size);
 
 			if (size == 0)
 			{
 				break;
 			}
+
+			offset += size;
 
 			currentPosition += size;
 
@@ -499,7 +496,7 @@ static DWORD WINAPI streamProceduralAudio(void* parameter)
 			currentBufferIndex %= MAX_BUFFER_COUNT;
 		}
 
-		if (!context->loop)
+		if (!context->clip->loop)
 		{
 			break;
 		}
@@ -631,19 +628,21 @@ static DWORD WINAPI audioThread(void* parameter)
 			{
 				voice_slot& slot = voiceSlots[i];
 
+				uint32 next = slot.next;
+
+				if (!slot.voice.voice)
+				{
+					i = next;
+					continue;
+				}
+
 				XAUDIO2_VOICE_STATE state;
 				slot.voice.voice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
 
-				uint32 next = slot.next;
 
 				if (!state.BuffersQueued)
 				{
 					slot.voice.voice->Stop();
-					if (slot.deleteOnPlaybackEnd)
-					{
-						delete slot.deleteOnPlaybackEnd;
-						slot.deleteOnPlaybackEnd = 0;
-					}
 
 					LOG_MESSAGE("Retiring voice slot %u", i);
 
@@ -709,159 +708,33 @@ void shutdownAudio()
 	xaudio->StopEngine();
 }
 
-audio_handle playAudioFromFile(const fs::path& path, float volume, float pitch, bool stream, bool loop)
+audio_handle playAudio(const ref<audio_clip>& clip, float volume, float pitch)
 {
+	if (!clip)
+	{
+		return {};
+	}
+
 	auto [slotIndex, slotGeneration] = getFreeVoiceSlot();
 	if (slotIndex == -1)
 	{
 		return {};
 	}
 
-	if (!stream)
+	voice_slot& slot = voiceSlots[slotIndex];
+	slot.clip = clip;
+	slot.voice.voice = 0;
+
+	if (clip->type == audio_clip_buffer)
 	{
-		audio_file file = openAudioFile(path);
-		if (!file.valid())
-		{
-			retireVoiceSlot(slotIndex);
-			return {};
-		}
+		audio_voice sourceVoice = getFreeVoice((const WAVEFORMATEX&)clip->file.wfx);
 
-		audio_voice sourceVoice = getFreeVoice((const WAVEFORMATEX&)file.wfx);
-
-		voice_slot& slot = voiceSlots[slotIndex];
 		slot.voice = sourceVoice;
-		slot.deleteOnPlaybackEnd = 0;
-
-
-		// Fill out the audio data buffer with the contents of the fourccDATA chunk.
-		BYTE* dataBuffer = new BYTE[file.dataChunkSize];
-		if (!readChunkData(file, dataBuffer, file.dataChunkSize, file.dataChunkPosition))
-		{
-			CloseHandle(file.fileHandle);
-			delete[] dataBuffer;
-			retireVoiceSlot(slotIndex);
-			return {};
-		}
 
 		XAUDIO2_BUFFER buffer = { 0 };
-		buffer.AudioBytes = file.dataChunkSize;
-		buffer.pAudioData = dataBuffer;
-		if (loop)
-		{
-			buffer.LoopCount = XAUDIO2_LOOP_INFINITE;
-		}
-		else
-		{
-			buffer.Flags = XAUDIO2_END_OF_STREAM;
-		}
-
-		slot.deleteOnPlaybackEnd = dataBuffer;
-
-		setVolume(sourceVoice, volume);
-		setPitch(sourceVoice, pitch);
-
-		checkResult(sourceVoice.voice->SubmitSourceBuffer(&buffer));
-
-		CloseHandle(file.fileHandle);
-	}
-	else
-	{
-		voiceSlots[slotIndex].voice.voice = 0;
-
-		HANDLE threadHandle = CreateThread(0, 0, streamFileAudio, new file_stream_context{ path, slotIndex, volume, pitch, loop }, 0, 0);
-		if (!threadHandle)
-		{
-			retireVoiceSlot(slotIndex);
-			return {};
-		}
-
-		CloseHandle(threadHandle);
-	}
-
-	return { slotIndex, slotGeneration };
-}
-
-audio_handle playAudioFromData(float* data, uint32 totalNumSamples, uint32 numChannels, uint32 sampleHz, float volume, float pitch, bool loop, bool deleteBufferAfterPlayback)
-{
-	auto [slotIndex, slotGeneration] = getFreeVoiceSlot();
-	if (slotIndex == -1)
-	{
-		return {};
-	}
-
-	WAVEFORMATEX wfx = {};
-	wfx.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
-	wfx.nChannels = numChannels;
-	wfx.nSamplesPerSec = sampleHz;
-	wfx.wBitsPerSample = numChannels * (uint32)sizeof(float) * 8;
-	wfx.nBlockAlign = numChannels * (uint32)sizeof(float);
-	wfx.nAvgBytesPerSec = sampleHz * numChannels * (uint32)sizeof(float);
-	wfx.cbSize = 0; // Set to zero for PCM or IEEE float.
-
-
-	audio_voice sourceVoice = getFreeVoice(wfx);
-
-	voice_slot& slot = voiceSlots[slotIndex];
-	slot.voice = sourceVoice;
-	slot.deleteOnPlaybackEnd = deleteBufferAfterPlayback ? data : 0;
-
-
-	XAUDIO2_BUFFER buffer = { 0 };
-	buffer.AudioBytes = totalNumSamples * (uint32)sizeof(float);
-	buffer.pAudioData = (BYTE*)data;
-	if (loop)
-	{
-		buffer.LoopCount = XAUDIO2_LOOP_INFINITE;
-	}
-	else
-	{
-		buffer.Flags = XAUDIO2_END_OF_STREAM;
-	}
-
-	setVolume(sourceVoice, volume);
-	setPitch(sourceVoice, pitch);
-
-	checkResult(sourceVoice.voice->SubmitSourceBuffer(&buffer));
-
-	return { slotIndex, slotGeneration };
-}
-
-audio_handle playAudioFromGenerator(audio_generator* generator, float volume, float pitch, bool stream, bool loop)
-{
-	auto [slotIndex, slotGeneration] = getFreeVoiceSlot();
-	if (slotIndex == -1)
-	{
-		return {};
-	}
-
-	WAVEFORMATEX wfx = {};
-	wfx.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
-	wfx.nChannels = generator->numChannels;
-	wfx.nSamplesPerSec = generator->sampleHz;
-	wfx.wBitsPerSample = generator->numChannels * (uint32)sizeof(float) * 8;
-	wfx.nBlockAlign = generator->numChannels * (uint32)sizeof(float);
-	wfx.nAvgBytesPerSec = generator->sampleHz * generator->numChannels * (uint32)sizeof(float);
-	wfx.cbSize = 0; // Set to zero for PCM or IEEE float.
-
-
-	audio_voice sourceVoice = getFreeVoice(wfx);
-
-	voice_slot& slot = voiceSlots[slotIndex];
-	slot.voice = sourceVoice;
-	slot.deleteOnPlaybackEnd = 0;
-
-
-	if (!stream)
-	{
-		float* dataBuffer = new float[generator->totalNumSamples];
-		slot.deleteOnPlaybackEnd = dataBuffer;
-
-		generator->getNextSamples(dataBuffer, generator->totalNumSamples);
-
-		XAUDIO2_BUFFER buffer = { 0 };
-		buffer.AudioBytes = generator->totalNumSamples * (uint32)sizeof(float);
-		buffer.pAudioData = (BYTE*)dataBuffer;
-		if (loop)
+		buffer.AudioBytes = clip->file.dataChunkSize;
+		buffer.pAudioData = clip->dataBuffer;
+		if (clip->loop)
 		{
 			buffer.LoopCount = XAUDIO2_LOOP_INFINITE;
 		}
@@ -877,10 +750,9 @@ audio_handle playAudioFromGenerator(audio_generator* generator, float volume, fl
 	}
 	else
 	{
-		setVolume(sourceVoice, volume);
-		setPitch(sourceVoice, pitch);
+		auto func = (clip->type == audio_clip_streaming_file) ? streamFileAudio : streamProceduralAudio;
 
-		HANDLE threadHandle = CreateThread(0, 0, streamProceduralAudio, new procedural_stream_context{ generator, slotIndex, loop }, 0, 0);
+		HANDLE threadHandle = CreateThread(0, 0, func, new stream_context{ clip, slotIndex, volume, pitch }, 0, 0);
 		if (!threadHandle)
 		{
 			retireVoiceSlot(slotIndex);

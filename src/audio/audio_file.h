@@ -23,4 +23,6 @@ struct audio_file
 };
 
 audio_file openAudioFile(const fs::path& path);
+void closeAudioFile(audio_file& file);
+
 bool readChunkData(const audio_file& file, void* buffer, DWORD buffersize, DWORD bufferoffset);
