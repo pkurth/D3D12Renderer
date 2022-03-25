@@ -113,6 +113,8 @@ int main(int argc, char** argv)
 	sine_wave_audio_generator sineE(5.f, E_HZ);
 	sine_wave_audio_generator sineG(5.f, G_HZ);
 
+	audio_handle cHandle;
+
 
 	dx_window window;
 	window.initialize(TEXT("D3D12 Renderer"), 1920, 1080);
@@ -250,9 +252,9 @@ int main(int argc, char** argv)
 			static uint32 index = 0;
 			switch (index)
 			{
-				case 0: playAudioFromGenerator(&sineC, 0.1f, 1.f, false); break;
-				case 1: playAudioFromGenerator(&sineE, 0.1f, 1.f, false); break;
-				case 2: playAudioFromGenerator(&sineG, 0.1f, 1.f, false); break;
+				case 0: cHandle = playAudioFromGenerator(&sineC, 1.f, 1.f, false); break;
+				case 1: playAudioFromGenerator(&sineE, 1.f, 1.f, false); break;
+				case 2: playAudioFromGenerator(&sineG, 1.f, 1.f, false); break;
 			}
 			++index;
 		}
@@ -260,6 +262,26 @@ int main(int argc, char** argv)
 		if (input.keyboard[key_enter].pressEvent)
 		{
 			playAudioFromFile("assets/audio/drums.wav", 0.5f, 1.f, true, false);
+		}
+
+		if (input.keyboard['P'].pressEvent)
+		{
+			static bool paused = false;
+			if (paused) { cHandle.resume(); }
+			else { cHandle.pause(); }
+			paused = !paused;
+		}
+
+		static float volume = 1.f;
+		if (input.keyboard[key_down].pressEvent)
+		{
+			volume -= 0.1f;
+			cHandle.changeVolume(volume);
+		}
+		if (input.keyboard[key_up].pressEvent)
+		{
+			volume += 0.1f;
+			cHandle.changeVolume(volume);
 		}
 
 		// Update and render.
@@ -277,7 +299,6 @@ int main(int argc, char** argv)
 		meshEditor.draw();
 
 		updateMessageLog(dt);
-		updateAudio();
 
 		renderToMainWindow(window);
 

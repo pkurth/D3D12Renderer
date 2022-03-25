@@ -10,6 +10,11 @@ struct audio_handle
 	uint32 generation;
 
 	bool valid();
+
+	void pause();
+	void resume();
+	void stop();
+	void changeVolume(float volume);
 };
 
 

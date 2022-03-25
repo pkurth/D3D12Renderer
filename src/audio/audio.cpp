@@ -520,11 +520,110 @@ static DWORD WINAPI streamProceduralAudio(void* parameter)
 	return 0;
 }
 
-static DWORD WINAPI retireStoppedVoices(void* parameter)
+enum audio_command_type
+{
+	audio_command_pause,
+	audio_command_resume,
+	audio_command_stop,
+	audio_command_change_volume,
+};
+
+struct audio_command
+{
+	audio_command_type type;
+	audio_handle handle;
+
+	union
+	{
+		struct
+		{
+			float volume;
+		} changeVolume;
+	};
+};
+
+#define MAX_NUM_AUDIO_COMMANDS 512
+
+static audio_command audioCommands[2][MAX_NUM_AUDIO_COMMANDS];
+static std::atomic<uint32> audioCommandIndex;
+static std::atomic<uint32> audioCommandsCompletelyWritten[2];
+
+#define _AUDIO_COMMAND_GET_ARRAY_INDEX(v) ((v) >> 31)
+#define _AUDIO_COMMAND_GET_EVENT_INDEX(v) ((v) & 0xFFFF)
+
+static std::pair<uint32, audio_command*> startAudioCommand(audio_command_type type, audio_handle handle)
+{
+	uint32 arrayAndEventIndex = audioCommandIndex++;
+	uint32 eventIndex = _AUDIO_COMMAND_GET_EVENT_INDEX(arrayAndEventIndex);
+	uint32 arrayIndex = _AUDIO_COMMAND_GET_ARRAY_INDEX(arrayAndEventIndex);
+	assert(eventIndex < MAX_NUM_AUDIO_COMMANDS);
+	audio_command* c = audioCommands[arrayIndex] + eventIndex;
+	c->type = type;
+	c->handle = handle;
+	return { arrayIndex, c };
+}
+
+static void endAudioCommand(uint32 arrayIndex)
+{
+	audioCommandsCompletelyWritten[arrayIndex].fetch_add(1, std::memory_order_release); // Mark this event as written. Release means that the compiler may not reorder the previous writes after this.
+}
+
+static DWORD WINAPI audioThread(void* parameter)
 {
 	while (true)
 	{
-		if (WaitForSingleObject(voiceCallback.playEndEvent, INFINITE) == WAIT_OBJECT_0)
+		Sleep(10);
+
+		uint32 arrayIndex = _AUDIO_COMMAND_GET_ARRAY_INDEX(audioCommandIndex); // We are only interested in the most significant bit here, so don't worry about thread safety.
+		uint32 currentIndex = audioCommandIndex.exchange((1 - arrayIndex) << 31); // Swap array and get current event count.
+
+		audio_command* commands = audioCommands[arrayIndex];
+		uint32 numCommands = _AUDIO_COMMAND_GET_EVENT_INDEX(currentIndex);
+
+		while (numCommands > audioCommandsCompletelyWritten[arrayIndex]) {} // Wait until all events and stats have been written completely.
+		audioCommandsCompletelyWritten[arrayIndex] = 0;
+
+
+		for (uint32 i = 0; i < numCommands; ++i)
+		{
+			audio_command* c = commands + i;
+
+			if (c->handle.valid())
+			{
+				IXAudio2SourceVoice* voice = voiceSlots[c->handle.slotIndex].voice.voice;
+
+				switch (c->type)
+				{
+					case audio_command_pause:
+					{
+						voice->Stop();
+					} break;
+
+					case audio_command_resume:
+					{
+						voice->Start();
+					} break;
+
+					case audio_command_stop:
+					{
+						voice->Stop();
+						voice->FlushSourceBuffers();
+					} break;
+					
+					case audio_command_change_volume:
+					{
+						voice->SetVolume(c->changeVolume.volume);
+					} break;
+				}
+			}
+			else
+			{
+				LOG_MESSAGE("Audio handle %u (generation %u) is not valid", c->handle.slotIndex, c->handle.generation);
+			}
+		}
+
+
+		//if (WaitForSingleObject(voiceCallback.playEndEvent, INFINITE) == WAIT_OBJECT_0)
 		{
 			mutex.lock();
 
@@ -545,6 +644,8 @@ static DWORD WINAPI retireStoppedVoices(void* parameter)
 						delete slot.deleteOnPlaybackEnd;
 						slot.deleteOnPlaybackEnd = 0;
 					}
+
+					LOG_MESSAGE("Retiring voice slot %u", i);
 
 					if (slot.voice.key != 0)
 					{
@@ -596,7 +697,9 @@ bool initializeAudio()
 	listener.OrientFront = { 0.f, 0.f, 1.f };
 	listener.OrientTop = { 0.f, 1.f, 0.f };
 
-	CreateThread(0, 0, retireStoppedVoices, 0, 0, 0);
+	HANDLE audioThreadHandle = CreateThread(0, 0, audioThread, 0, 0, 0);
+	SetThreadPriority(audioThreadHandle, THREAD_PRIORITY_HIGHEST);
+	SetThreadDescription(audioThreadHandle, L"Audio thread");
 
 	return true;
 }
@@ -863,4 +966,29 @@ void updateAudio(game_scene& scene)
 bool audio_handle::valid()
 {
 	return slotIndex != -1 && voiceSlots[slotIndex].generation == generation;
+}
+
+void audio_handle::pause()
+{
+	auto [index, command] = startAudioCommand(audio_command_pause, *this);
+	endAudioCommand(index);
+}
+
+void audio_handle::resume()
+{
+	auto [index, command] = startAudioCommand(audio_command_resume, *this);
+	endAudioCommand(index);
+}
+
+void audio_handle::stop()
+{
+	auto [index, command] = startAudioCommand(audio_command_stop, *this);
+	endAudioCommand(index);
+}
+
+void audio_handle::changeVolume(float volume)
+{
+	auto [index, command] = startAudioCommand(audio_command_change_volume, *this);
+	command->changeVolume.volume = volume;
+	endAudioCommand(index);
 }
