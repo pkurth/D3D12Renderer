@@ -34,7 +34,7 @@ struct audio_generator
 struct sine_wave_audio_generator : audio_generator
 {
 	sine_wave_audio_generator(float duration, float hz = C_HZ)
-		: hz(hz), audio_generator(duration) {}
+		: audio_generator(duration), hz(hz) {}
 
 	virtual uint32 getNextSamples(float* buffer, uint32 offset, uint32 numSamples) const override
 	{
@@ -54,3 +54,4 @@ struct sine_wave_audio_generator : audio_generator
 private:
 	float hz;
 };
+

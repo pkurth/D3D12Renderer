@@ -25,7 +25,8 @@ extern float masterAudioVolume;
 bool initializeAudio();
 void shutdownAudio();
 
-audio_handle playAudio(const ref<audio_clip>& clip, float volume, float pitch);
+audio_handle play2DAudio(const ref<audio_clip>& clip, float volume, float pitch);
+audio_handle play3DAudio(const ref<audio_clip>& clip, float volume, float pitch, vec3 position);
 
 void setAudioListener(vec3 position, quat rotation, vec3 velocity);
 
