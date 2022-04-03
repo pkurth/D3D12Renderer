@@ -755,8 +755,6 @@ void application::update(const user_input& input, float dt)
 	{
 		dynamic = transform;
 	}
-
-	updateAudio(scene);
 }
 
 void application::handleFileDrop(const fs::path& filename)

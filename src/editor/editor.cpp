@@ -1630,7 +1630,7 @@ void scene_editor::drawSettings(float dt)
 			bool change = false;
 			if (ImGui::BeginProperties())
 			{
-				change |= ImGui::PropertyDrag("Master volume", masterAudioVolume, 0.05f);
+				change |= ImGui::PropertySlider("Master volume", masterAudioVolume, 0.f, 3.f);
 				ImGui::EndProperties();
 			}
 			ImGui::EndTree();

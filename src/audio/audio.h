@@ -1,37 +1,35 @@
 #pragma once
 
-#include "audio_generator.h"
-#include "audio_clip.h"
-#include "scene/scene.h"
+#include "sound.h"
+#include "core/math.h"
+#include <xaudio2.h>
 
-
-struct audio_handle
-{
-	uint32 slotIndex = (uint32)-1;
-	uint32 generation;
-
-	bool valid();
-
-	void pause();
-	void resume();
-	void stop();
-	void changeVolume(float volume);
-};
 
 extern float masterAudioVolume;
-
 
 
 bool initializeAudio();
 void shutdownAudio();
 
-audio_handle play2DAudio(const ref<audio_clip>& clip, float volume, float pitch);
-audio_handle play3DAudio(const ref<audio_clip>& clip, float volume, float pitch, vec3 position);
+inline void setAudioListener(vec3 position, quat rotation, vec3 velocity) {}
 
-void setAudioListener(vec3 position, quat rotation, vec3 velocity);
-
-void updateAudio(game_scene& scene);
+void updateAudio(float dt);
 
 
+void unloadSound(uint32 id);
+
+
+struct sound_handle
+{
+	uint32 id;
+	operator bool() { return id != 0; }
+};
+
+sound_handle play2DSound(uint32 id, float volume = 1.f, bool loop = false);
+
+
+
+bool setVolume(sound_handle handle, float volume);
+bool stop(sound_handle handle, float fadeOutTime = 0.1f);
 
 

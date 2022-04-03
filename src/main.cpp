@@ -15,7 +15,7 @@
 #include "rendering/shadow_map_renderer.h"
 #include "editor/asset_editor_panel.h"
 #include "audio/audio.h"
-
+#include "audio/synth.h"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui/imgui_internal.h>
@@ -108,12 +108,6 @@ int main(int argc, char** argv)
 	initializeMessageLog();
 	initializeFileRegistry();
 	initializeAudio();
-
-	sine_wave_audio_generator sineC(5.f, C_HZ);
-	sine_wave_audio_generator sineE(5.f, E_HZ);
-	sine_wave_audio_generator sineG(5.f, G_HZ);
-
-	audio_handle cHandle;
 
 
 	dx_window window;
@@ -247,42 +241,38 @@ int main(int argc, char** argv)
 		if (ImGui::IsKeyPressed(key_enter) && ImGui::IsKeyDown(key_alt)) { window.toggleFullscreen(); } // Also allowed if not focused on main window.
 
 
-		if (input.keyboard[key_space].pressEvent)
-		{
-			static uint32 index = 0;
-			switch (index)
-			{
-				case 0: cHandle = playAudio(createAudioClipFromGenerator(&sineC, false), 1.f, 1.f); break;
-				case 1: playAudio(createAudioClipFromGenerator(&sineE, false), 1.f, 1.f); break;
-				case 2: playAudio(createAudioClipFromGenerator(&sineG, false), 1.f, 1.f); break;
-			}
-			++index;
-		}
-
-		if (input.keyboard[key_enter].pressEvent)
-		{
-			ref<audio_clip> drumsClip = createAudioClipFromFile("assets/audio/price-of-freedom-33106.wav", true, false);
-			playAudio(drumsClip, 0.5f, 1.f);
-		}
-
-		if (input.keyboard['P'].pressEvent)
-		{
-			static bool paused = false;
-			if (paused) { cHandle.resume(); }
-			else { cHandle.pause(); }
-			paused = !paused;
-		}
-
+		static sound_handle soundHandle;
 		static float volume = 1.f;
-		if (input.keyboard[key_down].pressEvent)
+		if (ImGui::IsKeyPressed(key_enter))
 		{
-			volume -= 0.1f;
-			cHandle.changeVolume(volume);
+			if (soundHandle)
+			{
+				stop(soundHandle);
+			}
+			else
+			{
+				uint32 id = 1;
+
+				sine_synth synth(1.5f);
+
+				if (loadSound(id, synth))
+				//if (loadSound(id, "assets/audio/drums.wav", true))
+				{
+					soundHandle = play2DSound(id, volume, true);
+				}
+			}
 		}
-		if (input.keyboard[key_up].pressEvent)
+
+		if (ImGui::IsKeyPressed(key_up))
 		{
-			volume += 0.1f;
-			cHandle.changeVolume(volume);
+			volume += 1;
+			setVolume(soundHandle, volume);
+		}
+
+		if (ImGui::IsKeyPressed(key_down))
+		{
+			volume -= 1;
+			setVolume(soundHandle, volume);
 		}
 
 		// Update and render.
@@ -300,6 +290,8 @@ int main(int argc, char** argv)
 		meshEditor.draw();
 
 		updateMessageLog(dt);
+
+		updateAudio(dt);
 
 		renderToMainWindow(window);
 

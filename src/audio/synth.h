@@ -2,7 +2,6 @@
 
 #include "core/math.h"
 
-
 #define C_HZ		261.63f
 #define C_SHARP_HZ	277.18f
 #define D_HZ		293.66f
@@ -16,27 +15,27 @@
 #define A_SHARP_HZ	466.16f
 #define B_HZ		493.88f
 
-
-struct audio_generator
+struct audio_synth
 {
-	audio_generator(uint32 totalNumSamples, uint32 numChannels = 1, uint32 sampleHz = 44100)
+	audio_synth(uint32 totalNumSamples, uint32 numChannels = 1, uint32 sampleHz = 44100)
 		: totalNumSamples(totalNumSamples), numChannels(numChannels), sampleHz(sampleHz) {}
-	audio_generator(float duration, uint32 numChannels = 1, uint32 sampleHz = 44100)
+	audio_synth(float duration, uint32 numChannels = 1, uint32 sampleHz = 44100)
 		: totalNumSamples((uint32)(duration* numChannels* sampleHz)), numChannels(numChannels), sampleHz(sampleHz) {}
 
-	virtual uint32 getNextSamples(float* buffer, uint32 offset, uint32 numSamples) const = 0;
 
 	uint32 totalNumSamples;
 	uint32 numChannels;
 	uint32 sampleHz;
+
+	virtual uint32 getSamples(float* buffer, uint32 offset, uint32 numSamples) const = 0;
 };
 
-struct sine_wave_audio_generator : audio_generator
+struct sine_synth : audio_synth
 {
-	sine_wave_audio_generator(float duration, float hz = C_HZ)
-		: audio_generator(duration), hz(hz) {}
+	sine_synth(float duration = 10.f, float hz = C_HZ)
+		: audio_synth(duration), hz(hz) {}
 
-	virtual uint32 getNextSamples(float* buffer, uint32 offset, uint32 numSamples) const override
+	virtual uint32 getSamples(float* buffer, uint32 offset, uint32 numSamples) const override
 	{
 		if (offset + numSamples > totalNumSamples)
 		{
