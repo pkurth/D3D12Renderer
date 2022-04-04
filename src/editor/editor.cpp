@@ -1630,7 +1630,27 @@ void scene_editor::drawSettings(float dt)
 			bool change = false;
 			if (ImGui::BeginProperties())
 			{
-				change |= ImGui::PropertySlider("Master volume", masterAudioVolume, 0.f, 3.f);
+				static bool decibel = false;
+				ImGui::PropertyCheckbox("Edit in decibel", decibel);
+
+				const float maxVolume = 3.f;
+
+				if (decibel)
+				{
+					const float minDB = volumeToDB(1e-7f);
+					const float maxDB = volumeToDB(maxVolume);
+
+					float db = volumeToDB(masterAudioVolume);
+					if (ImGui::PropertySlider("Master volume (decibel)", db, minDB, maxDB, "%.3f", ImGuiSliderFlags_Logarithmic))
+					{
+						masterAudioVolume = dbToVolume(db);
+						change = true;
+					}
+				}
+				else
+				{
+					change |= ImGui::PropertySlider("Master volume (amplitude factor)", masterAudioVolume, 0.f, maxVolume);
+				}
 				ImGui::EndProperties();
 			}
 			ImGui::EndTree();

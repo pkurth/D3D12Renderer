@@ -31,3 +31,7 @@ bool setVolume(sound_handle handle, float volume);
 bool stop(sound_handle handle, float fadeOutTime = 0.1f);
 
 
+float dbToVolume(float db);
+float volumeToDB(float volume);
+
+

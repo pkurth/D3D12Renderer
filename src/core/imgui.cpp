@@ -516,40 +516,40 @@ namespace ImGui
 		return result;
 	}
 
-	static bool SliderInternal(ImGuiDataType_ type, int32 count, const char* label, void* f, void* minValue, void* maxValue, const char* format)
+	static bool SliderInternal(ImGuiDataType_ type, int32 count, const char* label, void* f, void* minValue, void* maxValue, const char* format, ImGuiSliderFlags flags = ImGuiSliderFlags_None)
 	{
 		pre(label);
 		bool result;
 		if (count == 1)
 		{
-			result = ImGui::SliderScalar("", type, f, minValue, maxValue, format);
+			result = ImGui::SliderScalar("", type, f, minValue, maxValue, format, flags);
 		}
 		else
 		{
-			result = ImGui::SliderScalarN("", type, f, count, minValue, maxValue, format);
+			result = ImGui::SliderScalarN("", type, f, count, minValue, maxValue, format, flags);
 		}
 		post();
 		return result;
 	}
 
-	bool PropertySlider(const char* label, float& f, float minValue, float maxValue, const char* format)
+	bool PropertySlider(const char* label, float& f, float minValue, float maxValue, const char* format, ImGuiSliderFlags flags)
 	{
-		return SliderInternal(ImGuiDataType_Float, 1, label, &f, &minValue, &maxValue, format);
+		return SliderInternal(ImGuiDataType_Float, 1, label, &f, &minValue, &maxValue, format, flags);
 	}
 
-	bool PropertySlider(const char* label, vec2& f, float minValue, float maxValue, const char* format)
+	bool PropertySlider(const char* label, vec2& f, float minValue, float maxValue, const char* format, ImGuiSliderFlags flags)
 	{
-		return SliderInternal(ImGuiDataType_Float, 2, label, f.data, &minValue, &maxValue, format);
+		return SliderInternal(ImGuiDataType_Float, 2, label, f.data, &minValue, &maxValue, format, flags);
 	}
 
-	bool PropertySlider(const char* label, vec3& f, float minValue, float maxValue, const char* format)
+	bool PropertySlider(const char* label, vec3& f, float minValue, float maxValue, const char* format, ImGuiSliderFlags flags)
 	{
-		return SliderInternal(ImGuiDataType_Float, 3, label, f.data, &minValue, &maxValue, format);
+		return SliderInternal(ImGuiDataType_Float, 3, label, f.data, &minValue, &maxValue, format, flags);
 	}
 
-	bool PropertySlider(const char* label, vec4& f, float minValue, float maxValue, const char* format)
+	bool PropertySlider(const char* label, vec4& f, float minValue, float maxValue, const char* format, ImGuiSliderFlags flags)
 	{
-		return SliderInternal(ImGuiDataType_Float, 4, label, f.data, &minValue, &maxValue, format);
+		return SliderInternal(ImGuiDataType_Float, 4, label, f.data, &minValue, &maxValue, format, flags);
 	}
 
 	bool PropertySliderAngle(const char* label, float& fRad, float minValueDeg, float maxValueDeg, const char* format)

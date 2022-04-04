@@ -1,4 +1,6 @@
 #include "pch.h"
+
+#define XAUDIO2_HELPER_FUNCTIONS
 #include "audio.h"
 #include "sound.h"
 #include "channel.h"
@@ -163,6 +165,16 @@ bool stop(sound_handle handle, float fadeOutTime)
 		}
 	}
 	return false;
+}
+
+float dbToVolume(float db)
+{
+	return XAudio2DecibelsToAmplitudeRatio(db);
+}
+
+float volumeToDB(float volume)
+{
+	return XAudio2AmplitudeRatioToDecibels(volume);
 }
 
 
