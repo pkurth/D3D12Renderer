@@ -121,7 +121,7 @@ void audio_channel::stop(float fadeOutTime)
 	}
 }
 
-bool audio_channel::canBeKilled()
+bool audio_channel::hasStopped()
 {
 	return state == channel_state_stopped && threadStopped;
 }
@@ -230,28 +230,28 @@ static DWORD WINAPI streamSynthAudio(void* parameter)
 	auto sound = channel->sound;
 	auto voice = channel->voice;
 
+
+
 	float buffers[MAX_BUFFER_COUNT][STREAMING_BUFFER_SIZE];
 
 	uint32 currentBufferIndex = 0;
-
 
 	bool quit = false;
 
 	while (!quit)
 	{
-		uint32 offset = 0;
+		uint8 synthBuffer[MAX_SYNTH_SIZE];
+		audio_synth* synth = sound->createSynth(synthBuffer);
 
 		while (true)
 		{
 			uint32 size = STREAMING_BUFFER_SIZE;
-			size = sound->getSynthSamples(buffers[currentBufferIndex], offset, size);
+			size = synth->getSamples(buffers[currentBufferIndex], size);
 
 			if (size == 0)
 			{
 				break;
 			}
-
-			offset += size;
 
 			XAUDIO2_BUFFER buffer = { 0 };
 			buffer.AudioBytes = size * sizeof(float);

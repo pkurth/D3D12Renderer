@@ -67,7 +67,7 @@ void updateAudio(float dt)
 	for (auto it = channels.begin(), end = channels.end(); it != end; ++it)
 	{
 		it->second->update(dt);
-		if (it->second->canBeKilled())
+		if (it->second->hasStopped())
 		{
 			stoppedChannels[numStoppedChannels++] = it;
 			LOG_MESSAGE("Deleting channel");

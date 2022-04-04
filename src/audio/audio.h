@@ -2,6 +2,7 @@
 
 #include "sound.h"
 #include "core/math.h"
+
 #include <xaudio2.h>
 
 
@@ -14,9 +15,6 @@ void shutdownAudio();
 inline void setAudioListener(vec3 position, quat rotation, vec3 velocity) {}
 
 void updateAudio(float dt);
-
-
-void unloadSound(uint32 id);
 
 
 struct sound_handle

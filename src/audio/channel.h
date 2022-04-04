@@ -62,7 +62,7 @@ struct audio_channel
 	void update(float dt);
 	void stop(float fadeOutTime);
 
-	bool canBeKilled();
+	bool hasStopped();
 
 private:
 	void updateVolume(float dt);

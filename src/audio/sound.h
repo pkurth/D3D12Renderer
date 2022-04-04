@@ -1,6 +1,11 @@
 #pragma once
 
+#include "synth.h"
+
 #include <xaudio2.h>
+
+
+#define MAX_SYNTH_SIZE 1024
 
 struct audio_sound
 {
@@ -16,26 +21,24 @@ struct audio_sound
 
     virtual ~audio_sound();
 
-    virtual uint32 getSynthSamples(float* buffer, uint32 offset, uint32 numSamples) const { return 0; };
+    virtual audio_synth* createSynth(void* buffer) const { return 0; }
 };
 
 ref<audio_sound> getSound(uint32 id);
 
 
-bool loadSound(uint32 id, const fs::path& path, bool stream);
+void unloadSound(uint32 id);
 
-template <typename synth_t>
-bool loadSound(uint32 id, const synth_t& synth)
+bool loadFileSound(uint32 id, const fs::path& path, bool stream);
+
+template <typename synth_t, typename... args>
+static bool loadSynthSound(uint32 id, bool stream, const args&... a)
 {
+    static_assert(std::is_base_of_v<audio_synth, synth_t>, "Synthesizer must inherit from audio_synth");
+    static_assert(sizeof(synth_t) <= MAX_SYNTH_SIZE);
+
     bool checkForExistingSound(uint32 id, bool stream);
     void registerSound(uint32 id, const ref<audio_sound>&sound);
-
-    struct synth_sound : audio_sound
-    {
-        synth_t synth;
-
-        virtual uint32 getSynthSamples(float* buffer, uint32 offset, uint32 numSamples) const override { return synth.getSamples(buffer, offset, numSamples); };
-    };
 
 
     if (checkForExistingSound(id, true))
@@ -44,21 +47,59 @@ bool loadSound(uint32 id, const synth_t& synth)
     }
     else
     {
+        struct synth_sound : audio_sound
+        {
+            std::function<audio_synth* (void*)> createFunc;
+
+            virtual audio_synth* createSynth(void* buffer) const override
+            {
+                return createFunc(buffer);
+            }
+        };
+
+        ref<audio_sound> sound;
+
         WAVEFORMATEX wfx = {};
         wfx.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
-        wfx.nChannels = synth.numChannels;
-        wfx.nSamplesPerSec = synth.sampleHz;
-        wfx.wBitsPerSample = synth.numChannels * (uint32)sizeof(float) * 8;
-        wfx.nBlockAlign = synth.numChannels * (uint32)sizeof(float);
-        wfx.nAvgBytesPerSec = synth.sampleHz * synth.numChannels * (uint32)sizeof(float);
+        wfx.nChannels = synth_t::numChannels;
+        wfx.nSamplesPerSec = synth_t::sampleHz;
+        wfx.wBitsPerSample = synth_t::numChannels * (uint32)sizeof(float) * 8;
+        wfx.nBlockAlign = synth_t::numChannels * (uint32)sizeof(float);
+        wfx.nAvgBytesPerSec = synth_t::sampleHz * synth_t::numChannels * (uint32)sizeof(float);
         wfx.cbSize = 0; // Set to zero for PCM or IEEE float.
 
+        BYTE* dataBuffer = 0;
+        uint32 dataSize = 0;
 
-        ref<synth_sound> sound = make_ref<synth_sound>();
-        sound->synth = synth;
-        sound->stream = true;
+        if (!stream)
+        {
+            sound = make_ref<audio_sound>();
+
+            synth_t synth(a...);
+            uint32 totalNumSamples = (uint32)(synth.getDuration() * synth_t::numChannels * synth_t::sampleHz);
+            uint32 size = sizeof(float) * totalNumSamples;
+
+            dataBuffer = new BYTE[size];
+            synth.getSamples((float*)dataBuffer, totalNumSamples);
+
+            dataSize = size;
+        }
+        else
+        {
+            auto s = make_ref<synth_sound>();
+
+            s->createFunc = [=](void* buffer)
+            {
+                return new(buffer) synth_t(a...);
+            };
+
+            sound = s;
+        }
+
+        sound->stream = stream;
         sound->wfx = { wfx };
-        sound->dataBuffer = 0;
+        sound->dataBuffer = dataBuffer;
+        sound->chunkSize = dataSize;
         sound->isSynth = true;
 
         registerSound(id, sound);

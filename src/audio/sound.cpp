@@ -41,7 +41,7 @@ void registerSound(uint32 id, const ref<audio_sound>& sound)
     sounds.insert({ id, sound });
 }
 
-bool loadSound(uint32 id, const fs::path& path, bool stream)
+bool loadFileSound(uint32 id, const fs::path& path, bool stream)
 {
     if (checkForExistingSound(id, stream))
     {

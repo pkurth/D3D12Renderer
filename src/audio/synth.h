@@ -17,25 +17,19 @@
 
 struct audio_synth
 {
-	audio_synth(uint32 totalNumSamples, uint32 numChannels = 1, uint32 sampleHz = 44100)
-		: totalNumSamples(totalNumSamples), numChannels(numChannels), sampleHz(sampleHz) {}
-	audio_synth(float duration, uint32 numChannels = 1, uint32 sampleHz = 44100)
-		: totalNumSamples((uint32)(duration* numChannels* sampleHz)), numChannels(numChannels), sampleHz(sampleHz) {}
-
-
-	uint32 totalNumSamples;
-	uint32 numChannels;
-	uint32 sampleHz;
-
-	virtual uint32 getSamples(float* buffer, uint32 offset, uint32 numSamples) const = 0;
+	virtual uint32 getSamples(float* buffer, uint32 numSamples) = 0;
+	virtual float getDuration() const { return 0.f; } // You only need to override this, if you don't stream the audio.
 };
 
 struct sine_synth : audio_synth
 {
-	sine_synth(float duration = 10.f, float hz = C_HZ)
-		: audio_synth(duration), hz(hz) {}
+	static const uint32 numChannels = 1;
+	static const uint32 sampleHz = 44100;
 
-	virtual uint32 getSamples(float* buffer, uint32 offset, uint32 numSamples) const override
+	sine_synth(float duration = 10.f, float hz = C_HZ)
+		: audio_synth(), totalNumSamples((uint32)(duration * numChannels * sampleHz)), hz(hz), duration(duration) {}
+
+	virtual uint32 getSamples(float* buffer, uint32 numSamples) override
 	{
 		if (offset + numSamples > totalNumSamples)
 		{
@@ -50,7 +44,13 @@ struct sine_synth : audio_synth
 		return numSamples;
 	}
 
+	virtual float getDuration() const override { return duration; }
+
 private:
+	uint32 totalNumSamples;
 	float hz;
+	float duration;
+
+	uint32 offset = 0;
 };
 
