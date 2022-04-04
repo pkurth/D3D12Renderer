@@ -264,12 +264,26 @@ int main(int argc, char** argv)
 
 		if (ImGui::IsKeyPressed(key_up))
 		{
-			soundSettings.volume += 1;
+			if (ImGui::IsKeyDown(key_shift))
+			{
+				soundSettings.pitch += 1;
+			}
+			else
+			{
+				soundSettings.volume += 1;
+			}
 		}
 
 		if (ImGui::IsKeyPressed(key_down))
 		{
-			soundSettings.volume -= 1;
+			if (ImGui::IsKeyDown(key_shift))
+			{
+				soundSettings.pitch -= 1;
+			}
+			else
+			{
+				soundSettings.volume -= 1;
+			}
 		}
 
 		// Update and render.
