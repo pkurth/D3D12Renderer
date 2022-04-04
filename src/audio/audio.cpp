@@ -1,6 +1,10 @@
 #include "pch.h"
 
 #define XAUDIO2_HELPER_FUNCTIONS
+#include <xaudio2.h>
+
+#undef M_PI
+
 #include "audio.h"
 #include "sound.h"
 #include "channel.h"
@@ -107,7 +111,7 @@ void updateAudio(float dt)
 }
 
 
-sound_handle play2DSound(uint32 id, float volume, bool loop)
+sound_handle play2DSound(uint32 id, const sound_settings& settings, bool keepReferenceToSettings)
 {
 	ref<audio_sound> sound = getSound(id);
 	if (!sound)
@@ -117,13 +121,13 @@ sound_handle play2DSound(uint32 id, float volume, bool loop)
 
 	uint32 channelID = nextChannelID++;
 	
-	ref<audio_channel> channel = make_ref<audio_channel>(context, sound, volume, loop);
+	ref<audio_channel> channel = make_ref<audio_channel>(context, sound, settings, keepReferenceToSettings);
 	channels.insert({ channelID, channel });
 
 	return { channelID };
 }
 
-sound_handle play3DSound(uint32 id, vec3 position, float volume, bool loop)
+sound_handle play3DSound(uint32 id, vec3 position, const sound_settings& settings, bool keepReferenceToSettings)
 {
 	ref<audio_sound> sound = getSound(id);
 	if (!sound)
@@ -133,24 +137,15 @@ sound_handle play3DSound(uint32 id, vec3 position, float volume, bool loop)
 
 	uint32 channelID = nextChannelID++;
 
-	ref<audio_channel> channel = make_ref<audio_channel>(context, sound, position, volume, loop);
+	ref<audio_channel> channel = make_ref<audio_channel>(context, sound, position, settings, keepReferenceToSettings);
 	channels.insert({ channelID, channel });
 
 	return { channelID };
 }
 
-bool setVolume(sound_handle handle, float volume)
+bool soundStillPlaying(sound_handle handle)
 {
-	if (handle)
-	{
-		auto it = channels.find(handle.id);
-		if (it != channels.end())
-		{
-			it->second->setVolume(volume);
-			return true;
-		}
-	}
-	return false;
+	return handle && (channels.find(handle.id) != channels.end());
 }
 
 bool stop(sound_handle handle, float fadeOutTime)

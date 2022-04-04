@@ -10,23 +10,26 @@
 
 
 
-audio_channel::audio_channel(const audio_context& context, const ref<audio_sound>& sound, float volume, bool loop)
+audio_channel::audio_channel(const audio_context& context, const ref<audio_sound>& sound, const sound_settings& settings, bool keepReferenceToSettings)
 {
-	initialize(context, sound, volume, loop, false);
+	initialize(context, sound, settings, keepReferenceToSettings, false);
 }
 
-audio_channel::audio_channel(const audio_context& context, const ref<audio_sound>& sound, vec3 position, float volume, bool loop)
+audio_channel::audio_channel(const audio_context& context, const ref<audio_sound>& sound, vec3 position, const sound_settings& settings, bool keepReferenceToSettings)
 {
-	initialize(context, sound, volume, loop, true, position);
+	initialize(context, sound, settings, keepReferenceToSettings, true, position);
 }
 
-void audio_channel::initialize(const audio_context& context, const ref<audio_sound>& sound, float volume, bool loop, bool positioned, vec3 position)
+void audio_channel::initialize(const audio_context& context, const ref<audio_sound>& sound, const sound_settings& settings, bool keepReferenceToSettings, bool positioned, vec3 position)
 {
-	volume = max(0.f, volume);
-
 	this->sound = sound;
 	this->voiceCallback.channel = this;
-	this->loop = loop;
+	this->loop = settings.loop;
+
+	if (keepReferenceToSettings)
+	{
+		userSettings = &settings;
+	}
 
 	this->positioned = positioned;
 	this->position = position;
@@ -34,9 +37,15 @@ void audio_channel::initialize(const audio_context& context, const ref<audio_sou
 	checkResult(context.xaudio->CreateSourceVoice(&voice, (WAVEFORMATEX*)&sound->wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, &voiceCallback));
 	checkResult(voice->Start());
 
-	volumeFader.initialize(volume);
+	volumeFader.initialize(settings.volume);
+	pitchFader.initialize(settings.pitch);
+
+	oldUserVolume = settings.volume;
+	oldUserPitch = settings.pitch;
+
 	stopFader.initialize(1.f);
-	updateVolume(0.f);
+	
+	updateSoundSettings(0.f);
 
 	update3D(context);
 
@@ -53,7 +62,7 @@ void audio_channel::initialize(const audio_context& context, const ref<audio_sou
 		XAUDIO2_BUFFER buffer = { 0 };
 		buffer.AudioBytes = sound->chunkSize;
 		buffer.pAudioData = sound->dataBuffer;
-		if (loop)
+		if (settings.loop)
 		{
 			buffer.LoopCount = XAUDIO2_LOOP_INFINITE;
 		}
@@ -76,12 +85,6 @@ audio_channel::~audio_channel()
 	}
 }
 
-void audio_channel::setVolume(float volume, float fadeTime)
-{
-	volume = max(0.f, volume);
-	volumeFader.startFade(volume, fadeTime);
-}
-
 void audio_channel::update(const audio_context& context, float dt)
 {
 	switch (state)
@@ -97,7 +100,7 @@ void audio_channel::update(const audio_context& context, float dt)
 
 		case channel_state_playing:
 		{
-			updateVolume(dt);
+			updateSoundSettings(dt);
 			update3D(context);
 			if (stopRequested)
 			{
@@ -108,7 +111,7 @@ void audio_channel::update(const audio_context& context, float dt)
 		case channel_state_stopping:
 		{
 			stopFader.update(dt);
-			updateVolume(dt);
+			updateSoundSettings(dt);
 			update3D(context);
 			if (stopFader.current <= 0.f)
 			{
@@ -146,15 +149,39 @@ bool audio_channel::hasStopped()
 	return state == channel_state_stopped && threadStopped;
 }
 
-void audio_channel::updateVolume(float dt)
+void audio_channel::updateSoundSettings(float dt)
 {
+	if (userSettings)
+	{
+		if (userSettings->volume != oldUserVolume)
+		{
+			volumeFader.startFade(userSettings->volume, userSettings->volumeFadeTime);
+			oldUserVolume = userSettings->volume;
+		}
+		if (userSettings->pitch != oldUserPitch)
+		{
+			pitchFader.startFade(userSettings->pitch, userSettings->pitchFadeTime);
+			oldUserPitch = userSettings->pitch;
+		}
+
+		loop = userSettings->loop;
+	}
+
 	volumeFader.update(dt);
+	pitchFader.update(dt);
 
 	float v = volumeFader.current * stopFader.current;
 	if (v != oldVolume)
 	{
 		voice->SetVolume(v);
 		oldVolume = v;
+	}
+
+	float p = pitchFader.current;
+	if (p != oldPitch)
+	{
+		voice->SetFrequencyRatio(p);
+		oldPitch = p;
 	}
 }
 

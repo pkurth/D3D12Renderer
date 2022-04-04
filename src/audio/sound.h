@@ -24,6 +24,16 @@ struct audio_sound
     virtual audio_synth* createSynth(void* buffer) const { return 0; }
 };
 
+struct sound_settings
+{
+    float volume = 1.f;
+    float pitch = 1.f;
+    bool loop = false;
+
+    float volumeFadeTime = 0.1f;
+    float pitchFadeTime = 0.1f;
+};
+
 ref<audio_sound> getSound(uint32 id);
 
 

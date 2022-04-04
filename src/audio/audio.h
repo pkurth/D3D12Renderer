@@ -23,11 +23,14 @@ struct sound_handle
 	operator bool() { return id != 0; }
 };
 
-sound_handle play2DSound(uint32 id, float volume = 1.f, bool loop = false);
-sound_handle play3DSound(uint32 id, vec3 position, float volume = 1.f, bool loop = false);
+// If you pass keepReferenceToSettings=true, you need to hold on to the settings struct.
+// The sound will change it's settings if something in there changes.
+
+sound_handle play2DSound(uint32 id, const sound_settings& settings, bool keepReferenceToSettings = false);
+sound_handle play3DSound(uint32 id, vec3 position, const sound_settings& settings, bool keepReferenceToSettings = false);
 
 
-bool setVolume(sound_handle handle, float volume);
+bool soundStillPlaying(sound_handle handle);
 bool stop(sound_handle handle, float fadeOutTime = 0.1f);
 
 

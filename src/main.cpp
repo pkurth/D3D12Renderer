@@ -242,7 +242,7 @@ int main(int argc, char** argv)
 
 
 		static sound_handle soundHandle;
-		static float volume = 1.f;
+		static sound_settings soundSettings = { 1.f, 1.f, true };
 		if (ImGui::IsKeyPressed(key_enter))
 		{
 			if (soundHandle)
@@ -256,22 +256,20 @@ int main(int argc, char** argv)
 				if (loadSynthSound<sine_synth>(id, true, 1.5f, C_HZ))
 				//if (loadFileSound(id, "assets/audio/price-of-freedom-33106.wav", true))
 				{
-					//soundHandle = play2DSound(id, volume, true);
-					soundHandle = play3DSound(id, vec3(0.f), volume, true);
+					//soundHandle = play2DSound(id, soundSettings, true);
+					soundHandle = play3DSound(id, vec3(0.f), soundSettings, true);
 				}
 			}
 		}
 
 		if (ImGui::IsKeyPressed(key_up))
 		{
-			volume += 1;
-			setVolume(soundHandle, volume);
+			soundSettings.volume += 1;
 		}
 
 		if (ImGui::IsKeyPressed(key_down))
 		{
-			volume -= 1;
-			setVolume(soundHandle, volume);
+			soundSettings.volume -= 1;
 		}
 
 		// Update and render.
