@@ -2,11 +2,25 @@
 #include "channel.h"
 
 
+#define MAX_BUFFER_COUNT 3
+#define STREAMING_BUFFER_SIZE (1024 * 8 * 6)
 
-constexpr uint32 MAX_BUFFER_COUNT = 3;
-constexpr uint32 STREAMING_BUFFER_SIZE = (1024 * 8 * 6);
+#define UPDATE_3D_PERIOD 3 // > 0.
 
-audio_channel::audio_channel(const com<IXAudio2>& xaudio, const ref<audio_sound>& sound, float volume, bool loop)
+
+
+
+audio_channel::audio_channel(const audio_context& context, const ref<audio_sound>& sound, float volume, bool loop)
+{
+	initialize(context, sound, volume, loop, false);
+}
+
+audio_channel::audio_channel(const audio_context& context, const ref<audio_sound>& sound, vec3 position, float volume, bool loop)
+{
+	initialize(context, sound, volume, loop, true, position);
+}
+
+void audio_channel::initialize(const audio_context& context, const ref<audio_sound>& sound, float volume, bool loop, bool positioned, vec3 position)
 {
 	volume = max(0.f, volume);
 
@@ -14,13 +28,17 @@ audio_channel::audio_channel(const com<IXAudio2>& xaudio, const ref<audio_sound>
 	this->voiceCallback.channel = this;
 	this->loop = loop;
 
-	checkResult(xaudio->CreateSourceVoice(&voice, (WAVEFORMATEX*)&sound->wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, &voiceCallback));
+	this->positioned = positioned;
+	this->position = position;
+
+	checkResult(context.xaudio->CreateSourceVoice(&voice, (WAVEFORMATEX*)&sound->wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, &voiceCallback));
 	checkResult(voice->Start());
 
 	volumeFader.initialize(volume);
 	stopFader.initialize(1.f);
 	updateVolume(0.f);
 
+	update3D(context);
 
 	if (sound->stream)
 	{
@@ -64,7 +82,7 @@ void audio_channel::setVolume(float volume, float fadeTime)
 	volumeFader.startFade(volume, fadeTime);
 }
 
-void audio_channel::update(float dt)
+void audio_channel::update(const audio_context& context, float dt)
 {
 	switch (state)
 	{
@@ -80,6 +98,7 @@ void audio_channel::update(float dt)
 		case channel_state_playing:
 		{
 			updateVolume(dt);
+			update3D(context);
 			if (stopRequested)
 			{
 				state = channel_state_stopping;
@@ -90,6 +109,7 @@ void audio_channel::update(float dt)
 		{
 			stopFader.update(dt);
 			updateVolume(dt);
+			update3D(context);
 			if (stopFader.current <= 0.f)
 			{
 				voice->Stop();
@@ -136,6 +156,49 @@ void audio_channel::updateVolume(float dt)
 		voice->SetVolume(v);
 		oldVolume = v;
 	}
+}
+
+void audio_channel::update3D(const audio_context& context)
+{
+	if (!positioned)
+	{
+		return;
+	}
+
+	if (update3DTimer == 0)
+	{
+		quat rotation = quat::identity; // TODO.
+
+		vec3 forward = rotation * vec3(0.f, 0.f, -1.f);
+		vec3 up = rotation * vec3(0.f, 1.f, 0.f);
+
+
+		X3DAUDIO_EMITTER emitter = { 0 };
+		emitter.ChannelCount = 1;
+		emitter.CurveDistanceScaler = 1.f;
+		emitter.OrientFront = { forward.x, forward.y, -forward.z };
+		emitter.OrientTop = { up.x, up.y, -up.z };
+		emitter.Position = { position.x, position.y, -position.z };
+
+		float matrix[8] = {};
+
+
+		X3DAUDIO_DSP_SETTINGS dspSettings = { 0 };
+		dspSettings.SrcChannelCount = sound->wfx.Format.nChannels;
+		dspSettings.DstChannelCount = context.masterVoiceDetails.InputChannels;
+		dspSettings.pMatrixCoefficients = matrix;
+
+		X3DAudioCalculate(context.xaudio3D, &context.listener, &emitter,
+			X3DAUDIO_CALCULATE_MATRIX/* | X3DAUDIO_CALCULATE_DOPPLER | X3DAUDIO_CALCULATE_LPF_DIRECT | X3DAUDIO_CALCULATE_REVERB*/,
+			&dspSettings);
+
+		checkResult(voice->SetOutputMatrix(context.masterVoice, sound->wfx.Format.nChannels, context.masterVoiceDetails.InputChannels, matrix));
+
+
+		update3DTimer = UPDATE_3D_PERIOD;
+	}
+
+	--update3DTimer;
 }
 
 

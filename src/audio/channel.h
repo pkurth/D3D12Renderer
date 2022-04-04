@@ -3,6 +3,8 @@
 #include "sound.h"
 #include "core/math.h"
 
+#include <x3daudio.h>
+
 enum channel_state
 {
 	channel_state_to_play,
@@ -53,21 +55,41 @@ struct property_fader
 	float current;
 };
 
+struct audio_context
+{
+	com<IXAudio2> xaudio;
+	
+	IXAudio2MasteringVoice* masterVoice;
+	XAUDIO2_VOICE_DETAILS masterVoiceDetails;
+
+	X3DAUDIO_HANDLE xaudio3D;
+	X3DAUDIO_LISTENER listener;
+};
+
 struct audio_channel
 {
-	audio_channel(const com<IXAudio2>& xaudio, const ref<audio_sound>& sound, float volume, bool loop);
+	audio_channel(const audio_context& context, const ref<audio_sound>& sound, float volume, bool loop);
+	audio_channel(const audio_context& context, const ref<audio_sound>& sound, vec3 position, float volume, bool loop);
 	~audio_channel();
 
 	void setVolume(float volume, float fadeTime = 0.1f);
-	void update(float dt);
+	void update(const audio_context& context, float dt);
 	void stop(float fadeOutTime);
 
 	bool hasStopped();
 
 private:
+	void initialize(const audio_context& context, const ref<audio_sound>& sound, float volume, bool loop, bool positioned, vec3 position = vec3(0.f));
+
 	void updateVolume(float dt);
+	void update3D(const audio_context& context);
 
 	bool loop;
+
+	bool positioned;
+	vec3 position;
+
+	uint32 update3DTimer = 0;
 
 	volatile channel_state state = channel_state_to_play;
 

@@ -256,7 +256,8 @@ int main(int argc, char** argv)
 				if (loadSynthSound<sine_synth>(id, true, 1.5f, C_HZ))
 				//if (loadFileSound(id, "assets/audio/price-of-freedom-33106.wav", true))
 				{
-					soundHandle = play2DSound(id, volume, true);
+					//soundHandle = play2DSound(id, volume, true);
+					soundHandle = play3DSound(id, vec3(0.f), volume, true);
 				}
 			}
 		}

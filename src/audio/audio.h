@@ -12,7 +12,7 @@ extern float masterAudioVolume;
 bool initializeAudio();
 void shutdownAudio();
 
-inline void setAudioListener(vec3 position, quat rotation, vec3 velocity) {}
+void setAudioListener(vec3 position, quat rotation, vec3 velocity = vec3(0.f));
 
 void updateAudio(float dt);
 
@@ -24,7 +24,7 @@ struct sound_handle
 };
 
 sound_handle play2DSound(uint32 id, float volume = 1.f, bool loop = false);
-
+sound_handle play3DSound(uint32 id, vec3 position, float volume = 1.f, bool loop = false);
 
 
 bool setVolume(sound_handle handle, float volume);
