@@ -191,7 +191,7 @@ static DWORD WINAPI streamFileAudio(void* parameter)
 			while (!quit && state.BuffersQueued > MAX_BUFFER_COUNT - 1)
 			{
 				WaitForSingleObject(channel->bufferEndSemaphore, INFINITE);
-				voice->GetState(&state);
+				voice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
 
 				if (channel->state == channel_state_stopped)
 				{
@@ -239,8 +239,6 @@ static DWORD WINAPI streamSynthAudio(void* parameter)
 
 	while (!quit)
 	{
-		uint32 currentPosition = 0;
-
 		uint32 offset = 0;
 
 		while (true)
@@ -255,8 +253,6 @@ static DWORD WINAPI streamSynthAudio(void* parameter)
 
 			offset += size;
 
-			currentPosition += size;
-
 			XAUDIO2_BUFFER buffer = { 0 };
 			buffer.AudioBytes = size * sizeof(float);
 			buffer.pAudioData = (BYTE*)buffers[currentBufferIndex];
@@ -269,7 +265,7 @@ static DWORD WINAPI streamSynthAudio(void* parameter)
 			while (!quit && state.BuffersQueued > MAX_BUFFER_COUNT - 1)
 			{
 				WaitForSingleObject(channel->bufferEndSemaphore, INFINITE);
-				voice->GetState(&state);
+				voice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
 
 				if (channel->state == channel_state_stopped)
 				{

@@ -253,10 +253,8 @@ int main(int argc, char** argv)
 			{
 				uint32 id = 1;
 
-				sine_synth synth(1.5f);
-
-				if (loadSound(id, synth))
-				//if (loadSound(id, "assets/audio/drums.wav", true))
+				if (loadSound(id, sine_synth(1.5f)))
+				//if (loadSound(id, "assets/audio/price-of-freedom-33106.wav", true))
 				{
 					soundHandle = play2DSound(id, volume, true);
 				}
