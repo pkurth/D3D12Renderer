@@ -35,9 +35,13 @@ void audio_channel::initialize(const audio_context& context, const ref<audio_sou
 	this->position = position;
 
 	XAUDIO2_SEND_DESCRIPTOR sendDescriptors[2];
-	sendDescriptors[0].Flags = XAUDIO2_SEND_USEFILTER; // Direct.
+
+	// Direct.
+	sendDescriptors[0].Flags = XAUDIO2_SEND_USEFILTER;
 	sendDescriptors[0].pOutputVoice = context.soundTypeSubmixVoices[sound->type];
-	sendDescriptors[1].Flags = XAUDIO2_SEND_USEFILTER; // Reverb.
+
+	// Reverb.
+	sendDescriptors[1].Flags = XAUDIO2_SEND_USEFILTER;
 	sendDescriptors[1].pOutputVoice = context.reverbSubmixVoices[sound->type];
 
 	// Reverb only for positioned voices.
@@ -236,9 +240,11 @@ void audio_channel::update3D(const audio_context& context)
 		float matrix[8] = {};
 
 
+		uint32 dstChannels = context.soundTypeSubmixVoiceDetails[sound->type].InputChannels;
+
 		X3DAUDIO_DSP_SETTINGS dspSettings = { 0 };
 		dspSettings.SrcChannelCount = srcChannels;
-		dspSettings.DstChannelCount = context.soundTypeSubmixVoiceDetails[sound->type].InputChannels;
+		dspSettings.DstChannelCount = dstChannels;
 		dspSettings.pMatrixCoefficients = matrix;
 
 		UINT32 flags = 0;
@@ -250,7 +256,7 @@ void audio_channel::update3D(const audio_context& context)
 
 		X3DAudioCalculate(context.xaudio3D, &context.listener, &emitter, flags, &dspSettings);
 
-		checkResult(voice->SetOutputMatrix(context.soundTypeSubmixVoices[sound->type], srcChannels, context.soundTypeSubmixVoiceDetails[sound->type].InputChannels, matrix));
+		checkResult(voice->SetOutputMatrix(context.soundTypeSubmixVoices[sound->type], srcChannels, dstChannels, matrix));
 
 
 		for (uint32 i = 0; i < srcChannels; ++i)

@@ -99,9 +99,9 @@ static void setReverb()
 	{
 		float level[16];
 		float reverbLevel = (masterAudioSettings.reverbPreset != reverb_none) ? 1.f : 0.f;
-		for (uint32 i = 0; i < context.soundTypeSubmixVoiceDetails[i].InputChannels; ++i)
+		for (uint32 j = 0; j < context.soundTypeSubmixVoiceDetails[i].InputChannels; ++j)
 		{
-			level[i] = reverbLevel;
+			level[j] = reverbLevel;
 		}
 
 		context.reverbSubmixVoices[i]->SetOutputMatrix(context.soundTypeSubmixVoices[i], 1, context.soundTypeSubmixVoiceDetails[i].InputChannels, level);
@@ -131,9 +131,6 @@ bool initializeAudio()
 
 
 
-	IUnknown* reverbXAPO;
-	checkResult(XAudio2CreateReverb(&reverbXAPO));
-
 
 	for (uint32 i = 0; i < sound_type_count; ++i)
 	{
@@ -144,6 +141,9 @@ bool initializeAudio()
 		context.soundTypeSubmixVoices[i]->GetVoiceDetails(&context.soundTypeSubmixVoiceDetails[i]);
 		context.soundTypeSubmixVoices[i]->SetVolume(soundTypeVolumes[i]);
 
+
+		IUnknown* reverbXAPO;
+		checkResult(XAudio2CreateReverb(&reverbXAPO));
 
 
 		XAUDIO2_EFFECT_DESCRIPTOR descriptor;
@@ -163,9 +163,10 @@ bool initializeAudio()
 		const XAUDIO2_VOICE_SENDS sendList = { 1, &sendDescriptor };
 
 		checkResult(context.xaudio->CreateSubmixVoice(&context.reverbSubmixVoices[i], 1, context.soundTypeSubmixVoiceDetails[i].InputSampleRate, 0, 0, &sendList, &chain));
+
+		reverbXAPO->Release();
 	}
 
-	reverbXAPO->Release();
 
 	setReverb();
 
