@@ -109,6 +109,17 @@ int main(int argc, char** argv)
 	initializeFileRegistry();
 	initializeAudio();
 
+	uint32 musicID = 1;
+	uint32 explosionID = 2;
+
+	sound_settings soundSettings;
+	soundSettings.loop = true;
+
+	if (loadFileSound(musicID, "assets/audio/price-of-freedom-33106.wav", true))
+	{
+		play2DSound(musicID, soundSettings);
+	}
+
 
 	dx_window window;
 	window.initialize(TEXT("D3D12 Renderer"), 1920, 1080);
@@ -241,41 +252,15 @@ int main(int argc, char** argv)
 		if (ImGui::IsKeyPressed(key_enter) && ImGui::IsKeyDown(key_alt)) { window.toggleFullscreen(); } // Also allowed if not focused on main window.
 
 
-		static sound_handle soundHandle;
 		if (ImGui::IsKeyPressed(key_enter))
 		{
-			if (soundHandle)
+			sound_settings soundSettings;
+
+			//if (loadSynthSound<sine_synth>(id, true, 1.5f, C_HZ))
+			if (loadFileSound(explosionID, "assets/audio/PFVV2TQ-explosion.wav", false))
 			{
-				stop(soundHandle);
+				play3DSound(explosionID, vec3(0.f), soundSettings);
 			}
-			else
-			{
-				uint32 id = 1;
-
-				sound_settings soundSettings;
-				soundSettings.loop = true;
-
-				//if (loadSynthSound<sine_synth>(id, true, 1.5f, C_HZ))
-				if (loadFileSound(id, "assets/audio/PFVV2TQ-explosion.wav", false))
-				{
-					//soundHandle = play2DSound(id, soundSettings);
-					soundHandle = play3DSound(id, vec3(0.f), soundSettings);
-				}
-			}
-		}
-
-		sound_settings* soundSettings = getSettings(soundHandle);
-
-		if (soundSettings && ImGui::IsKeyPressed(key_up))
-		{
-			if (ImGui::IsKeyDown(key_shift)) { soundSettings->pitch += 1; }
-			else { soundSettings->volume += 1; }
-		}
-
-		if (soundSettings && ImGui::IsKeyPressed(key_down))
-		{
-			if (ImGui::IsKeyDown(key_shift)) { soundSettings->pitch -= 1; }
-			else { soundSettings->volume -= 1; }
 		}
 
 		if (ImGui::IsKeyPressed('P'))
