@@ -10,26 +10,22 @@
 
 
 
-audio_channel::audio_channel(const audio_context& context, const ref<audio_sound>& sound, const sound_settings& settings, bool keepReferenceToSettings)
+audio_channel::audio_channel(const audio_context& context, const ref<audio_sound>& sound, const sound_settings& settings)
 {
-	initialize(context, sound, settings, keepReferenceToSettings, false);
+	initialize(context, sound, settings, false);
 }
 
-audio_channel::audio_channel(const audio_context& context, const ref<audio_sound>& sound, vec3 position, const sound_settings& settings, bool keepReferenceToSettings)
+audio_channel::audio_channel(const audio_context& context, const ref<audio_sound>& sound, vec3 position, const sound_settings& settings)
 {
-	initialize(context, sound, settings, keepReferenceToSettings, true, position);
+	initialize(context, sound, settings, true, position);
 }
 
-void audio_channel::initialize(const audio_context& context, const ref<audio_sound>& sound, const sound_settings& settings, bool keepReferenceToSettings, bool positioned, vec3 position)
+void audio_channel::initialize(const audio_context& context, const ref<audio_sound>& sound, const sound_settings& settings, bool positioned, vec3 position)
 {
 	this->sound = sound;
 	this->voiceCallback.channel = this;
-	this->loop = settings.loop;
 
-	if (keepReferenceToSettings)
-	{
-		userSettings = &settings;
-	}
+	userSettings = settings;
 
 	this->positioned = positioned;
 	this->position = position;
@@ -40,13 +36,9 @@ void audio_channel::initialize(const audio_context& context, const ref<audio_sou
 	volumeFader.initialize(settings.volume);
 	pitchFader.initialize(settings.pitch);
 
-	oldUserVolume = settings.volume;
-	oldUserPitch = settings.pitch;
-
 	stopFader.initialize(1.f);
 	
 	updateSoundSettings(0.f);
-
 	update3D(context);
 
 	if (sound->stream)
@@ -151,21 +143,18 @@ bool audio_channel::hasStopped()
 
 void audio_channel::updateSoundSettings(float dt)
 {
-	if (userSettings)
-	{
-		if (userSettings->volume != oldUserVolume)
-		{
-			volumeFader.startFade(userSettings->volume, userSettings->volumeFadeTime);
-			oldUserVolume = userSettings->volume;
-		}
-		if (userSettings->pitch != oldUserPitch)
-		{
-			pitchFader.startFade(userSettings->pitch, userSettings->pitchFadeTime);
-			oldUserPitch = userSettings->pitch;
-		}
+	userSettings.pitch = clamp(userSettings.pitch, 0.f, XAUDIO2_DEFAULT_FREQ_RATIO);
 
-		loop = userSettings->loop;
+	if (userSettings.volume != oldUserSettings.volume)
+	{
+		volumeFader.startFade(userSettings.volume, userSettings.volumeFadeTime);
 	}
+	if (userSettings.pitch != oldUserSettings.pitch)
+	{
+		pitchFader.startFade(userSettings.pitch, userSettings.pitchFadeTime);
+	}
+
+	oldUserSettings = userSettings;
 
 	volumeFader.update(dt);
 	pitchFader.update(dt);
@@ -292,7 +281,7 @@ static DWORD WINAPI streamFileAudio(void* parameter)
 			currentBufferIndex %= MAX_BUFFER_COUNT;
 		}
 
-		if (!channel->loop)
+		if (!channel->userSettings.loop)
 		{
 			break;
 		}
@@ -366,7 +355,7 @@ static DWORD WINAPI streamSynthAudio(void* parameter)
 			currentBufferIndex %= MAX_BUFFER_COUNT;
 		}
 
-		if (!channel->loop)
+		if (!channel->userSettings.loop)
 		{
 			break;
 		}

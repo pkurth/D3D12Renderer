@@ -68,22 +68,22 @@ struct audio_context
 
 struct audio_channel
 {
-	audio_channel(const audio_context& context, const ref<audio_sound>& sound, const sound_settings& settings, bool keepReferenceToSettings);
-	audio_channel(const audio_context& context, const ref<audio_sound>& sound, vec3 position, const sound_settings& settings, bool keepReferenceToSettings);
+	audio_channel(const audio_context& context, const ref<audio_sound>& sound, const sound_settings& settings);
+	audio_channel(const audio_context& context, const ref<audio_sound>& sound, vec3 position, const sound_settings& settings);
 	~audio_channel();
 
 	void update(const audio_context& context, float dt);
 	void stop(float fadeOutTime);
 
+	sound_settings* getSettings() { return &userSettings; }
+
 	bool hasStopped();
 
 private:
-	void initialize(const audio_context& context, const ref<audio_sound>& sound, const sound_settings& settings, bool keepReferenceToSettings, bool positioned, vec3 position = vec3(0.f));
+	void initialize(const audio_context& context, const ref<audio_sound>& sound, const sound_settings& settings, bool positioned, vec3 position = vec3(0.f));
 
 	void updateSoundSettings(float dt);
 	void update3D(const audio_context& context);
-
-	volatile bool loop;
 
 	bool positioned;
 	vec3 position;
@@ -101,13 +101,11 @@ private:
 
 	IXAudio2SourceVoice* voice;
 	
-	const sound_settings* userSettings = 0;
+	sound_settings userSettings;
+	sound_settings oldUserSettings = { -1.f, -1.f, false };
 
 	float oldVolume = -1.f;
 	float oldPitch = -1.f;
-
-	float oldUserVolume;
-	float oldUserPitch;
 
 	ref<audio_sound> sound;
 

@@ -111,7 +111,7 @@ void updateAudio(float dt)
 }
 
 
-sound_handle play2DSound(uint32 id, const sound_settings& settings, bool keepReferenceToSettings)
+sound_handle play2DSound(uint32 id, const sound_settings& settings)
 {
 	ref<audio_sound> sound = getSound(id);
 	if (!sound)
@@ -121,13 +121,13 @@ sound_handle play2DSound(uint32 id, const sound_settings& settings, bool keepRef
 
 	uint32 channelID = nextChannelID++;
 	
-	ref<audio_channel> channel = make_ref<audio_channel>(context, sound, settings, keepReferenceToSettings);
+	ref<audio_channel> channel = make_ref<audio_channel>(context, sound, settings);
 	channels.insert({ channelID, channel });
 
 	return { channelID };
 }
 
-sound_handle play3DSound(uint32 id, vec3 position, const sound_settings& settings, bool keepReferenceToSettings)
+sound_handle play3DSound(uint32 id, vec3 position, const sound_settings& settings)
 {
 	ref<audio_sound> sound = getSound(id);
 	if (!sound)
@@ -137,7 +137,7 @@ sound_handle play3DSound(uint32 id, vec3 position, const sound_settings& setting
 
 	uint32 channelID = nextChannelID++;
 
-	ref<audio_channel> channel = make_ref<audio_channel>(context, sound, position, settings, keepReferenceToSettings);
+	ref<audio_channel> channel = make_ref<audio_channel>(context, sound, position, settings);
 	channels.insert({ channelID, channel });
 
 	return { channelID };
@@ -160,6 +160,19 @@ bool stop(sound_handle handle, float fadeOutTime)
 		}
 	}
 	return false;
+}
+
+sound_settings* getSettings(sound_handle handle)
+{
+	if (handle)
+	{
+		auto it = channels.find(handle.id);
+		if (it != channels.end())
+		{
+			return it->second->getSettings();
+		}
+	}
+	return 0;
 }
 
 float dbToVolume(float db)

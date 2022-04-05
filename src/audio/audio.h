@@ -23,15 +23,16 @@ struct sound_handle
 	operator bool() { return id != 0; }
 };
 
-// If you pass keepReferenceToSettings=true, you need to hold on to the settings struct.
-// The sound will change it's settings if something in there changes.
 
-sound_handle play2DSound(uint32 id, const sound_settings& settings, bool keepReferenceToSettings = false);
-sound_handle play3DSound(uint32 id, vec3 position, const sound_settings& settings, bool keepReferenceToSettings = false);
+sound_handle play2DSound(uint32 id, const sound_settings& settings);
+sound_handle play3DSound(uint32 id, vec3 position, const sound_settings& settings);
 
 
 bool soundStillPlaying(sound_handle handle);
 bool stop(sound_handle handle, float fadeOutTime = 0.1f);
+
+// Only hold on to this pointer for one frame! Retrieve each frame! Returns null, if sound has stopped already.
+sound_settings* getSettings(sound_handle handle);
 
 
 float dbToVolume(float db);
