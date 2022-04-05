@@ -131,7 +131,6 @@ static HANDLE openFile(const fs::path& path)
     if (fileHandle == INVALID_HANDLE_VALUE)
     {
         LOG_ERROR("Could not open file '%ws'", path.c_str());
-        return {};
     }
 
     return fileHandle;
