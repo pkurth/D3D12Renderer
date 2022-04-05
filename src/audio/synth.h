@@ -27,7 +27,17 @@ struct sine_synth : audio_synth
 	static const uint32 sampleHz = 44100;
 
 	sine_synth(float duration = 10.f, float hz = C_HZ)
-		: audio_synth(), totalNumSamples((uint32)(duration * numChannels * sampleHz)), hz(hz), duration(duration) {}
+		: audio_synth()
+	{
+		this->hz = hz;
+
+		// Round duration such that there is an integer amount of waves over the runtime. This prevents clicking for looping sounds.
+		float waves = duration * hz;
+		duration = floor(waves) / hz;
+
+		this->duration = duration;
+		this->totalNumSamples = (uint32)(duration * numChannels * sampleHz);
+	}
 
 	virtual uint32 getSamples(float* buffer, uint32 numSamples) override
 	{
