@@ -252,10 +252,11 @@ int main(int argc, char** argv)
 			{
 				uint32 id = 1;
 
-				sound_settings soundSettings = { 1.f, 1.f, true };
+				sound_settings soundSettings;
+				soundSettings.loop = true;
 
-				if (loadSynthSound<sine_synth>(id, true, 1.5f, C_HZ))
-				//if (loadFileSound(id, "assets/audio/price-of-freedom-33106.wav", true))
+				//if (loadSynthSound<sine_synth>(id, true, 1.5f, C_HZ))
+				if (loadFileSound(id, "assets/audio/PFVV2TQ-explosion.wav", false))
 				{
 					//soundHandle = play2DSound(id, soundSettings);
 					soundHandle = play3DSound(id, vec3(0.f), soundSettings);
@@ -267,26 +268,20 @@ int main(int argc, char** argv)
 
 		if (soundSettings && ImGui::IsKeyPressed(key_up))
 		{
-			if (ImGui::IsKeyDown(key_shift))
-			{
-				soundSettings->pitch += 1;
-			}
-			else
-			{
-				soundSettings->volume += 1;
-			}
+			if (ImGui::IsKeyDown(key_shift)) { soundSettings->pitch += 1; }
+			else { soundSettings->volume += 1; }
 		}
 
 		if (soundSettings && ImGui::IsKeyPressed(key_down))
 		{
-			if (ImGui::IsKeyDown(key_shift))
-			{
-				soundSettings->pitch -= 1;
-			}
-			else
-			{
-				soundSettings->volume -= 1;
-			}
+			if (ImGui::IsKeyDown(key_shift)) { soundSettings->pitch -= 1; }
+			else { soundSettings->volume -= 1; }
+		}
+
+		if (ImGui::IsKeyPressed('P'))
+		{
+			if (masterAudioSettings.reverbPreset == reverb_none) { masterAudioSettings.reverbPreset = reverb_preset_concert_hall; }
+			else { masterAudioSettings.reverbPreset = reverb_none; }
 		}
 
 		// Update and render.

@@ -1,12 +1,21 @@
 #pragma once
 
 #include "sound.h"
+#include "reverb.h"
 #include "core/math.h"
 
 #include <xaudio2.h>
 
 
-extern float masterAudioVolume;
+
+struct master_audio_settings
+{
+	float volume = 0.1f;
+	reverb_preset reverbPreset = reverb_preset_default;
+};
+
+
+extern master_audio_settings masterAudioSettings;
 
 
 bool initializeAudio();

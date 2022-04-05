@@ -2,11 +2,11 @@
 #include "channel.h"
 
 
+
 #define MAX_BUFFER_COUNT 3
 #define STREAMING_BUFFER_SIZE (1024 * 8 * 6)
 
 #define UPDATE_3D_PERIOD 3 // > 0.
-
 
 
 
@@ -27,11 +27,29 @@ void audio_channel::initialize(const audio_context& context, const ref<audio_sou
 
 	userSettings = settings;
 
+	oldUserSettings.volume = -1.f;
+	oldUserSettings.pitch = -1.f;
+	oldUserSettings.loop = false;
+
 	this->positioned = positioned;
 	this->position = position;
 
-	checkResult(context.xaudio->CreateSourceVoice(&voice, (WAVEFORMATEX*)&sound->wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, &voiceCallback));
+	XAUDIO2_SEND_DESCRIPTOR sendDescriptors[2];
+	sendDescriptors[0].Flags = XAUDIO2_SEND_USEFILTER; // Direct.
+	sendDescriptors[0].pOutputVoice = context.masterVoice;
+	sendDescriptors[1].Flags = XAUDIO2_SEND_USEFILTER; // Reverb.
+	sendDescriptors[1].pOutputVoice = context.reverbSubmixVoice;
+
+	// Reverb only for positioned voices.
+	const XAUDIO2_VOICE_SENDS sendList = { positioned ? 2u : 1u, sendDescriptors };
+
+	checkResult(context.xaudio->CreateSourceVoice(&voice, (WAVEFORMATEX*)&sound->wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, &voiceCallback, &sendList));
 	checkResult(voice->Start());
+
+	XAUDIO2_VOICE_DETAILS voiceDetails;
+	voice->GetVoiceDetails(&voiceDetails);
+	srcChannels = voiceDetails.InputChannels;
+
 
 	volumeFader.initialize(settings.volume);
 	pitchFader.initialize(settings.pitch);
@@ -188,10 +206,29 @@ void audio_channel::update3D(const audio_context& context)
 		vec3 forward = rotation * vec3(0.f, 0.f, -1.f);
 		vec3 up = rotation * vec3(0.f, 1.f, 0.f);
 
+		float channelAzimuths[8] = {};
 
 		X3DAUDIO_EMITTER emitter = { 0 };
-		emitter.ChannelCount = 1;
-		emitter.CurveDistanceScaler = 1.f;
+		emitter.ChannelCount = srcChannels;
+		emitter.ChannelRadius = 0.1f;
+		emitter.InnerRadius = 2.f;
+		emitter.InnerRadiusAngle = X3DAUDIO_PI / 4.f;
+		emitter.pChannelAzimuths = channelAzimuths;
+
+
+
+		// A physically correct model would have CurveDistanceScaler=1 and pVolumeCurve=nullptr.
+		// However the default reverb curve is linear, which sounds very weird, because it just stops way before the sound stops being audible.
+		// Thus we just set both curves to linear and use CurveDistanceScaler to scale the curve to the desired radius.
+		
+#if 1
+		emitter.CurveDistanceScaler = userSettings.radius;
+		emitter.pVolumeCurve = (X3DAUDIO_DISTANCE_CURVE*)&X3DAudioDefault_LinearCurve;
+		emitter.pReverbCurve = (X3DAUDIO_DISTANCE_CURVE*)&X3DAudioDefault_LinearCurve;
+#else
+		emitter.CurveDistanceScaler = 1;
+#endif
+
 		emitter.OrientFront = { forward.x, forward.y, -forward.z };
 		emitter.OrientTop = { up.x, up.y, -up.z };
 		emitter.Position = { position.x, position.y, -position.z };
@@ -200,16 +237,36 @@ void audio_channel::update3D(const audio_context& context)
 
 
 		X3DAUDIO_DSP_SETTINGS dspSettings = { 0 };
-		dspSettings.SrcChannelCount = sound->wfx.Format.nChannels;
+		dspSettings.SrcChannelCount = srcChannels;
 		dspSettings.DstChannelCount = context.masterVoiceDetails.InputChannels;
 		dspSettings.pMatrixCoefficients = matrix;
 
-		X3DAudioCalculate(context.xaudio3D, &context.listener, &emitter,
-			X3DAUDIO_CALCULATE_MATRIX/* | X3DAUDIO_CALCULATE_DOPPLER | X3DAUDIO_CALCULATE_LPF_DIRECT | X3DAUDIO_CALCULATE_REVERB*/,
-			&dspSettings);
+		UINT32 flags = 0;
+		flags |= X3DAUDIO_CALCULATE_MATRIX;
+		flags |= X3DAUDIO_CALCULATE_LPF_DIRECT;
+		flags |= X3DAUDIO_CALCULATE_REVERB;
+		flags |= X3DAUDIO_CALCULATE_LPF_REVERB;
+		//flags |= X3DAUDIO_CALCULATE_DOPPLER;
 
-		checkResult(voice->SetOutputMatrix(context.masterVoice, sound->wfx.Format.nChannels, context.masterVoiceDetails.InputChannels, matrix));
+		X3DAudioCalculate(context.xaudio3D, &context.listener, &emitter, flags, &dspSettings);
 
+		checkResult(voice->SetOutputMatrix(context.masterVoice, srcChannels, context.masterVoiceDetails.InputChannels, matrix));
+
+
+		for (uint32 i = 0; i < srcChannels; ++i)
+		{
+			matrix[i] = dspSettings.ReverbLevel;
+		}
+
+		checkResult(voice->SetOutputMatrix(context.reverbSubmixVoice, srcChannels, 1, matrix));
+
+		XAUDIO2_FILTER_PARAMETERS filterParametersDirect = { LowPassFilter, 2.f * sin(X3DAUDIO_PI / 6.f * dspSettings.LPFDirectCoefficient), 1.f };
+		checkResult(voice->SetOutputFilterParameters(context.masterVoice, &filterParametersDirect));
+
+		XAUDIO2_FILTER_PARAMETERS filterParametersReverb = { LowPassFilter, 2.f * sin(X3DAUDIO_PI / 6.f * dspSettings.LPFReverbCoefficient), 1.f };
+		checkResult(voice->SetOutputFilterParameters(context.reverbSubmixVoice, &filterParametersReverb));
+
+		//std::cout << dspSettings.ReverbLevel << ", " << dspSettings.LPFDirectCoefficient << ", " << dspSettings.LPFReverbCoefficient << '\n';
 
 		update3DTimer = UPDATE_3D_PERIOD;
 	}

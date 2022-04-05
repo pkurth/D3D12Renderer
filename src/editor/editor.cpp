@@ -1640,17 +1640,34 @@ void scene_editor::drawSettings(float dt)
 					const float minDB = volumeToDB(1e-7f);
 					const float maxDB = volumeToDB(maxVolume);
 
-					float db = volumeToDB(masterAudioVolume);
+					float db = volumeToDB(masterAudioSettings.volume);
 					if (ImGui::PropertySlider("Master volume (decibel)", db, minDB, maxDB, "%.3f", ImGuiSliderFlags_Logarithmic))
 					{
-						masterAudioVolume = dbToVolume(db);
+						masterAudioSettings.volume = dbToVolume(db);
 						change = true;
 					}
 				}
 				else
 				{
-					change |= ImGui::PropertySlider("Master volume (amplitude factor)", masterAudioVolume, 0.f, maxVolume);
+					change |= ImGui::PropertySlider("Master volume (amplitude factor)", masterAudioSettings.volume, 0.f, maxVolume);
 				}
+
+				static reverb_preset oldReverbPreset = masterAudioSettings.reverbPreset;
+
+				bool reverbEnabled = masterAudioSettings.reverbPreset != reverb_none;
+				if (ImGui::PropertyCheckbox("Reverb enabled", reverbEnabled))
+				{
+					if (reverbEnabled) { masterAudioSettings.reverbPreset = oldReverbPreset; }
+					else { oldReverbPreset = masterAudioSettings.reverbPreset; masterAudioSettings.reverbPreset = reverb_none; }
+
+					change = true;
+				}
+
+				if (reverbEnabled)
+				{
+					change |= ImGui::PropertyDropdown("Reverb preset", reverbPresetNames, reverb_preset_count, (uint32&)masterAudioSettings.reverbPreset);
+				}
+
 				ImGui::EndProperties();
 			}
 			ImGui::EndTree();

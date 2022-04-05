@@ -62,6 +62,8 @@ struct audio_context
 	IXAudio2MasteringVoice* masterVoice;
 	XAUDIO2_VOICE_DETAILS masterVoiceDetails;
 
+	IXAudio2SubmixVoice* reverbSubmixVoice;
+
 	X3DAUDIO_HANDLE xaudio3D;
 	X3DAUDIO_LISTENER listener;
 };
@@ -100,9 +102,11 @@ private:
 	property_fader pitchFader;
 
 	IXAudio2SourceVoice* voice;
+
+	uint32 srcChannels;
 	
 	sound_settings userSettings;
-	sound_settings oldUserSettings = { -1.f, -1.f, false };
+	sound_settings oldUserSettings;
 
 	float oldVolume = -1.f;
 	float oldPitch = -1.f;

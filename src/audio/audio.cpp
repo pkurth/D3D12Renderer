@@ -2,6 +2,7 @@
 
 #define XAUDIO2_HELPER_FUNCTIONS
 #include <xaudio2.h>
+#include <xaudio2fx.h>
 
 #undef M_PI
 
@@ -15,8 +16,9 @@
 #include <x3daudio.h>
 
 
-float masterAudioVolume = 0.1f;
-static float oldMasterVolume = masterAudioVolume;
+master_audio_settings masterAudioSettings;
+master_audio_settings oldMasterAudioSettings;
+
 
 
 static property_fader masterVolumeFader;
@@ -27,6 +29,64 @@ typedef std::unordered_map<uint32, ref<audio_channel>> channel_map;
 static channel_map channels;
 static uint32 nextChannelID = 1;
 
+
+
+
+
+static XAUDIO2FX_REVERB_I3DL2_PARAMETERS reverbPresets[] =
+{
+	XAUDIO2FX_I3DL2_PRESET_DEFAULT,
+	XAUDIO2FX_I3DL2_PRESET_GENERIC,
+	XAUDIO2FX_I3DL2_PRESET_PADDEDCELL,
+	XAUDIO2FX_I3DL2_PRESET_ROOM,
+	XAUDIO2FX_I3DL2_PRESET_BATHROOM,
+	XAUDIO2FX_I3DL2_PRESET_LIVINGROOM,
+	XAUDIO2FX_I3DL2_PRESET_STONEROOM,
+	XAUDIO2FX_I3DL2_PRESET_AUDITORIUM,
+	XAUDIO2FX_I3DL2_PRESET_CONCERTHALL,
+	XAUDIO2FX_I3DL2_PRESET_CAVE,
+	XAUDIO2FX_I3DL2_PRESET_ARENA,
+	XAUDIO2FX_I3DL2_PRESET_HANGAR,
+	XAUDIO2FX_I3DL2_PRESET_CARPETEDHALLWAY,
+	XAUDIO2FX_I3DL2_PRESET_HALLWAY,
+	XAUDIO2FX_I3DL2_PRESET_STONECORRIDOR,
+	XAUDIO2FX_I3DL2_PRESET_ALLEY,
+	XAUDIO2FX_I3DL2_PRESET_FOREST,
+	XAUDIO2FX_I3DL2_PRESET_CITY,
+	XAUDIO2FX_I3DL2_PRESET_MOUNTAINS,
+	XAUDIO2FX_I3DL2_PRESET_QUARRY,
+	XAUDIO2FX_I3DL2_PRESET_PLAIN,
+	XAUDIO2FX_I3DL2_PRESET_PARKINGLOT,
+	XAUDIO2FX_I3DL2_PRESET_SEWERPIPE,
+	XAUDIO2FX_I3DL2_PRESET_UNDERWATER,
+	XAUDIO2FX_I3DL2_PRESET_SMALLROOM,
+	XAUDIO2FX_I3DL2_PRESET_MEDIUMROOM,
+	XAUDIO2FX_I3DL2_PRESET_LARGEROOM,
+	XAUDIO2FX_I3DL2_PRESET_MEDIUMHALL,
+	XAUDIO2FX_I3DL2_PRESET_LARGEHALL,
+	XAUDIO2FX_I3DL2_PRESET_PLATE,
+};
+
+
+
+static void setReverb()
+{
+	if (masterAudioSettings.reverbPreset != reverb_none)
+	{
+		XAUDIO2FX_REVERB_PARAMETERS reverbParameters;
+		ReverbConvertI3DL2ToNative(&reverbPresets[masterAudioSettings.reverbPreset], &reverbParameters);
+		context.reverbSubmixVoice->SetEffectParameters(0, &reverbParameters, sizeof(reverbParameters));
+	}
+
+	float level[16];
+	float reverbLevel = (masterAudioSettings.reverbPreset != reverb_none) ? 1.f : 0.f;
+	for (uint32 i = 0; i < context.masterVoiceDetails.InputChannels; ++i)
+	{
+		level[i] = reverbLevel;
+	}
+	context.reverbSubmixVoice->SetOutputMatrix(context.masterVoice, 1, context.masterVoiceDetails.InputChannels, level);
+}
+
 bool initializeAudio()
 {
 	uint32 flags = 0;
@@ -36,9 +96,8 @@ bool initializeAudio()
 	checkResult(XAudio2Create(context.xaudio.GetAddressOf(), flags));
 	checkResult(context.xaudio->CreateMasteringVoice(&context.masterVoice));
 
-	masterVolumeFader.initialize(masterAudioVolume);
-
-	context.masterVoice->SetVolume(masterAudioVolume);
+	masterVolumeFader.initialize(masterAudioSettings.volume);
+	context.masterVoice->SetVolume(masterAudioSettings.volume);
 
 
 	// 3D.
@@ -49,8 +108,31 @@ bool initializeAudio()
 
 	X3DAudioInitialize(channelMask, X3DAUDIO_SPEED_OF_SOUND, context.xaudio3D);
 
+
 	context.listener.OrientFront = { 0.f, 0.f, 1.f };
 	context.listener.OrientTop = { 0.f, 1.f, 0.f };
+	context.listener.pCone = (X3DAUDIO_CONE*)&X3DAudioDefault_DirectionalCone;
+
+
+	// Reverb submix.
+
+	IUnknown* reverbXAPO;
+	checkResult(XAudio2CreateReverb(&reverbXAPO));
+
+	XAUDIO2_EFFECT_DESCRIPTOR descriptor;
+	descriptor.InitialState = true;
+	descriptor.OutputChannels = 1;
+	descriptor.pEffect = reverbXAPO;
+
+	XAUDIO2_EFFECT_CHAIN chain;
+	chain.EffectCount = 1;
+	chain.pEffectDescriptors = &descriptor;
+
+	context.xaudio->CreateSubmixVoice(&context.reverbSubmixVoice, 1, context.masterVoiceDetails.InputSampleRate, 0, 0, 0, &chain);
+
+	reverbXAPO->Release();
+
+	setReverb();
 
 	return true;
 }
@@ -76,17 +158,23 @@ void setAudioListener(vec3 position, quat rotation, vec3 velocity)
 	context.listener.OrientTop = { up.x, up.y, -up.z };
 	context.listener.Position = { position.x, position.y, -position.z };
 	context.listener.Velocity = { velocity.x, velocity.y, -velocity.z };
-	context.listener.pCone = 0;
 }
 
 void updateAudio(float dt)
 {
-	masterAudioVolume = max(0.f, masterAudioVolume);
-	if (oldMasterVolume != masterAudioVolume)
+	masterAudioSettings.volume = max(0.f, masterAudioSettings.volume);
+
+	if (oldMasterAudioSettings.volume != masterAudioSettings.volume)
 	{
-		masterVolumeFader.startFade(masterAudioVolume, 0.1f);
-		oldMasterVolume = masterAudioVolume;
+		masterVolumeFader.startFade(masterAudioSettings.volume, 0.1f);
 	}
+
+	if (oldMasterAudioSettings.reverbPreset != masterAudioSettings.reverbPreset)
+	{
+		setReverb();
+	}
+
+	oldMasterAudioSettings = masterAudioSettings;
 
 	masterVolumeFader.update(dt);
 	context.masterVoice->SetVolume(masterVolumeFader.current);

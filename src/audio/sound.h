@@ -28,6 +28,7 @@ struct sound_settings
 {
     float volume = 1.f;
     float pitch = 1.f;
+    float radius = 30.f;
     bool loop = false;
 
     float volumeFadeTime = 0.1f;
