@@ -12,6 +12,7 @@
 #include "channel.h"
 
 #include "core/log.h"
+#include "core/cpu_profiling.h"
 
 #include <unordered_map>
 #include <x3daudio.h>
@@ -204,6 +205,8 @@ void setAudioListener(vec3 position, quat rotation, vec3 velocity)
 
 void updateAudio(float dt)
 {
+	CPU_PROFILE_BLOCK("Update audio");
+
 	masterAudioSettings.volume = max(0.f, masterAudioSettings.volume);
 
 	if (oldMasterAudioSettings.volume != masterAudioSettings.volume)
