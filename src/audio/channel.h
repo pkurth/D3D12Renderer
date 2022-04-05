@@ -62,7 +62,9 @@ struct audio_context
 	IXAudio2MasteringVoice* masterVoice;
 	XAUDIO2_VOICE_DETAILS masterVoiceDetails;
 
-	IXAudio2SubmixVoice* reverbSubmixVoice;
+	IXAudio2SubmixVoice* soundTypeSubmixVoices[sound_type_count];
+	XAUDIO2_VOICE_DETAILS soundTypeSubmixVoiceDetails[sound_type_count];
+	IXAudio2SubmixVoice* reverbSubmixVoices[sound_type_count];
 
 	X3DAUDIO_HANDLE xaudio3D;
 	X3DAUDIO_LISTENER listener;

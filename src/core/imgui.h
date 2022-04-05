@@ -127,6 +127,7 @@ namespace ImGui
 
 	bool PropertyButton(const char* label, const char* buttonText, const char* hoverText = 0, ImVec2 size = ImVec2(0, 0));
 
+	void PropertySeparator();
 
 
 

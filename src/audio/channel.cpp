@@ -36,9 +36,9 @@ void audio_channel::initialize(const audio_context& context, const ref<audio_sou
 
 	XAUDIO2_SEND_DESCRIPTOR sendDescriptors[2];
 	sendDescriptors[0].Flags = XAUDIO2_SEND_USEFILTER; // Direct.
-	sendDescriptors[0].pOutputVoice = context.masterVoice;
+	sendDescriptors[0].pOutputVoice = context.soundTypeSubmixVoices[sound->type];
 	sendDescriptors[1].Flags = XAUDIO2_SEND_USEFILTER; // Reverb.
-	sendDescriptors[1].pOutputVoice = context.reverbSubmixVoice;
+	sendDescriptors[1].pOutputVoice = context.reverbSubmixVoices[sound->type];
 
 	// Reverb only for positioned voices.
 	const XAUDIO2_VOICE_SENDS sendList = { positioned ? 2u : 1u, sendDescriptors };
@@ -238,7 +238,7 @@ void audio_channel::update3D(const audio_context& context)
 
 		X3DAUDIO_DSP_SETTINGS dspSettings = { 0 };
 		dspSettings.SrcChannelCount = srcChannels;
-		dspSettings.DstChannelCount = context.masterVoiceDetails.InputChannels;
+		dspSettings.DstChannelCount = context.soundTypeSubmixVoiceDetails[sound->type].InputChannels;
 		dspSettings.pMatrixCoefficients = matrix;
 
 		UINT32 flags = 0;
@@ -250,7 +250,7 @@ void audio_channel::update3D(const audio_context& context)
 
 		X3DAudioCalculate(context.xaudio3D, &context.listener, &emitter, flags, &dspSettings);
 
-		checkResult(voice->SetOutputMatrix(context.masterVoice, srcChannels, context.masterVoiceDetails.InputChannels, matrix));
+		checkResult(voice->SetOutputMatrix(context.soundTypeSubmixVoices[sound->type], srcChannels, context.soundTypeSubmixVoiceDetails[sound->type].InputChannels, matrix));
 
 
 		for (uint32 i = 0; i < srcChannels; ++i)
@@ -258,13 +258,13 @@ void audio_channel::update3D(const audio_context& context)
 			matrix[i] = dspSettings.ReverbLevel;
 		}
 
-		checkResult(voice->SetOutputMatrix(context.reverbSubmixVoice, srcChannels, 1, matrix));
+		checkResult(voice->SetOutputMatrix(context.reverbSubmixVoices[sound->type], srcChannels, 1, matrix));
 
 		XAUDIO2_FILTER_PARAMETERS filterParametersDirect = { LowPassFilter, 2.f * sin(X3DAUDIO_PI / 6.f * dspSettings.LPFDirectCoefficient), 1.f };
-		checkResult(voice->SetOutputFilterParameters(context.masterVoice, &filterParametersDirect));
+		checkResult(voice->SetOutputFilterParameters(context.soundTypeSubmixVoices[sound->type], &filterParametersDirect));
 
 		XAUDIO2_FILTER_PARAMETERS filterParametersReverb = { LowPassFilter, 2.f * sin(X3DAUDIO_PI / 6.f * dspSettings.LPFReverbCoefficient), 1.f };
-		checkResult(voice->SetOutputFilterParameters(context.reverbSubmixVoice, &filterParametersReverb));
+		checkResult(voice->SetOutputFilterParameters(context.reverbSubmixVoices[sound->type], &filterParametersReverb));
 
 		//std::cout << dspSettings.ReverbLevel << ", " << dspSettings.LPFDirectCoefficient << ", " << dspSettings.LPFReverbCoefficient << '\n';
 

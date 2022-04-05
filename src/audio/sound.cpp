@@ -41,7 +41,7 @@ void registerSound(uint32 id, const ref<audio_sound>& sound)
     sounds.insert({ id, sound });
 }
 
-bool loadFileSound(uint32 id, const fs::path& path, bool stream)
+bool loadFileSound(uint32 id, sound_type type, const fs::path& path, bool stream)
 {
     if (checkForExistingSound(id, stream))
     {
@@ -86,6 +86,7 @@ bool loadFileSound(uint32 id, const fs::path& path, bool stream)
                 sound->chunkPosition = chunkPosition;
                 sound->dataBuffer = dataBuffer;
                 sound->isSynth = false;
+                sound->type = type;
 
                 registerSound(id, sound);
             }

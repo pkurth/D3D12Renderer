@@ -16,6 +16,7 @@ struct master_audio_settings
 
 
 extern master_audio_settings masterAudioSettings;
+extern float soundTypeVolumes[sound_type_count];
 
 
 bool initializeAudio();

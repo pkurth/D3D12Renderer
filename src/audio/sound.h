@@ -7,6 +7,20 @@
 
 #define MAX_SYNTH_SIZE 1024
 
+enum sound_type
+{
+    sound_type_music,
+    sound_type_sfx,
+
+    sound_type_count,
+};
+
+static const char* soundTypeNames[] =
+{
+    "Music",
+    "Effects",
+};
+
 struct audio_sound
 {
     fs::path path;
@@ -18,6 +32,8 @@ struct audio_sound
     uint32 chunkSize;
     uint32 chunkPosition;
     BYTE* dataBuffer = 0;
+
+    sound_type type;
 
     virtual ~audio_sound();
 
@@ -40,10 +56,10 @@ ref<audio_sound> getSound(uint32 id);
 
 void unloadSound(uint32 id);
 
-bool loadFileSound(uint32 id, const fs::path& path, bool stream);
+bool loadFileSound(uint32 id, sound_type type, const fs::path& path, bool stream);
 
 template <typename synth_t, typename... args>
-static bool loadSynthSound(uint32 id, bool stream, const args&... a)
+static bool loadSynthSound(uint32 id, sound_type type, bool stream, const args&... a)
 {
     static_assert(std::is_base_of_v<audio_synth, synth_t>, "Synthesizer must inherit from audio_synth");
     static_assert(sizeof(synth_t) <= MAX_SYNTH_SIZE);
@@ -112,6 +128,7 @@ static bool loadSynthSound(uint32 id, bool stream, const args&... a)
         sound->dataBuffer = dataBuffer;
         sound->chunkSize = dataSize;
         sound->isSynth = true;
+        sound->type = type;
 
         registerSound(id, sound);
 

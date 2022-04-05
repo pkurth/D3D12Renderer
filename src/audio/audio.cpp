@@ -4,6 +4,7 @@
 #include <xaudio2.h>
 #include <xaudio2fx.h>
 
+
 #undef M_PI
 
 #include "audio.h"
@@ -19,9 +20,12 @@
 master_audio_settings masterAudioSettings;
 master_audio_settings oldMasterAudioSettings;
 
-
-
 static property_fader masterVolumeFader;
+
+
+float soundTypeVolumes[sound_type_count];
+static float oldSoundTypeVolumes[sound_type_count];
+static property_fader soundTypeVolumeFaders[sound_type_count];
 
 static audio_context context;
 
@@ -69,22 +73,39 @@ static XAUDIO2FX_REVERB_I3DL2_PARAMETERS reverbPresets[] =
 
 
 
+/*
+	Our audio graph looks like this:
+
+	[Source(s)] ----> [Sound type submix] ----> [Master]
+	     `-> [Sound type reverb] -^
+*/
+
+
+
 static void setReverb()
 {
 	if (masterAudioSettings.reverbPreset != reverb_none)
 	{
 		XAUDIO2FX_REVERB_PARAMETERS reverbParameters;
 		ReverbConvertI3DL2ToNative(&reverbPresets[masterAudioSettings.reverbPreset], &reverbParameters);
-		context.reverbSubmixVoice->SetEffectParameters(0, &reverbParameters, sizeof(reverbParameters));
+
+		for (uint32 i = 0; i < sound_type_count; ++i)
+		{
+			context.reverbSubmixVoices[i]->SetEffectParameters(0, &reverbParameters, sizeof(reverbParameters));
+		}
 	}
 
-	float level[16];
-	float reverbLevel = (masterAudioSettings.reverbPreset != reverb_none) ? 1.f : 0.f;
-	for (uint32 i = 0; i < context.masterVoiceDetails.InputChannels; ++i)
+	for (uint32 i = 0; i < sound_type_count; ++i)
 	{
-		level[i] = reverbLevel;
+		float level[16];
+		float reverbLevel = (masterAudioSettings.reverbPreset != reverb_none) ? 1.f : 0.f;
+		for (uint32 i = 0; i < context.soundTypeSubmixVoiceDetails[i].InputChannels; ++i)
+		{
+			level[i] = reverbLevel;
+		}
+
+		context.reverbSubmixVoices[i]->SetOutputMatrix(context.soundTypeSubmixVoices[i], 1, context.soundTypeSubmixVoiceDetails[i].InputChannels, level);
 	}
-	context.reverbSubmixVoice->SetOutputMatrix(context.masterVoice, 1, context.masterVoiceDetails.InputChannels, level);
 }
 
 bool initializeAudio()
@@ -99,40 +120,60 @@ bool initializeAudio()
 	masterVolumeFader.initialize(masterAudioSettings.volume);
 	context.masterVoice->SetVolume(masterAudioSettings.volume);
 
-
-	// 3D.
-
 	DWORD channelMask;
 	context.masterVoice->GetChannelMask(&channelMask);
 	context.masterVoice->GetVoiceDetails(&context.masterVoiceDetails);
 
+
+
+
 	X3DAudioInitialize(channelMask, X3DAUDIO_SPEED_OF_SOUND, context.xaudio3D);
+
+
+
+	IUnknown* reverbXAPO;
+	checkResult(XAudio2CreateReverb(&reverbXAPO));
+
+
+	for (uint32 i = 0; i < sound_type_count; ++i)
+	{
+		soundTypeVolumes[i] = oldSoundTypeVolumes[i] = 1.f;
+		soundTypeVolumeFaders[i].initialize(soundTypeVolumes[i]);
+
+		checkResult(context.xaudio->CreateSubmixVoice(&context.soundTypeSubmixVoices[i], context.masterVoiceDetails.InputChannels, context.masterVoiceDetails.InputSampleRate, 0, 1));
+		context.soundTypeSubmixVoices[i]->GetVoiceDetails(&context.soundTypeSubmixVoiceDetails[i]);
+		context.soundTypeSubmixVoices[i]->SetVolume(soundTypeVolumes[i]);
+
+
+
+		XAUDIO2_EFFECT_DESCRIPTOR descriptor;
+		descriptor.InitialState = true;
+		descriptor.OutputChannels = 1;
+		descriptor.pEffect = reverbXAPO;
+
+		XAUDIO2_EFFECT_CHAIN chain;
+		chain.EffectCount = 1;
+		chain.pEffectDescriptors = &descriptor;
+
+
+		XAUDIO2_SEND_DESCRIPTOR sendDescriptor;
+		sendDescriptor.Flags = 0;
+		sendDescriptor.pOutputVoice = context.soundTypeSubmixVoices[i];
+
+		const XAUDIO2_VOICE_SENDS sendList = { 1, &sendDescriptor };
+
+		checkResult(context.xaudio->CreateSubmixVoice(&context.reverbSubmixVoices[i], 1, context.soundTypeSubmixVoiceDetails[i].InputSampleRate, 0, 0, &sendList, &chain));
+	}
+
+	reverbXAPO->Release();
+
+	setReverb();
+
 
 
 	context.listener.OrientFront = { 0.f, 0.f, 1.f };
 	context.listener.OrientTop = { 0.f, 1.f, 0.f };
 	context.listener.pCone = (X3DAUDIO_CONE*)&X3DAudioDefault_DirectionalCone;
-
-
-	// Reverb submix.
-
-	IUnknown* reverbXAPO;
-	checkResult(XAudio2CreateReverb(&reverbXAPO));
-
-	XAUDIO2_EFFECT_DESCRIPTOR descriptor;
-	descriptor.InitialState = true;
-	descriptor.OutputChannels = 1;
-	descriptor.pEffect = reverbXAPO;
-
-	XAUDIO2_EFFECT_CHAIN chain;
-	chain.EffectCount = 1;
-	chain.pEffectDescriptors = &descriptor;
-
-	context.xaudio->CreateSubmixVoice(&context.reverbSubmixVoice, 1, context.masterVoiceDetails.InputSampleRate, 0, 0, 0, &chain);
-
-	reverbXAPO->Release();
-
-	setReverb();
 
 	return true;
 }
@@ -178,6 +219,30 @@ void updateAudio(float dt)
 
 	masterVolumeFader.update(dt);
 	context.masterVoice->SetVolume(masterVolumeFader.current);
+
+
+
+	for (uint32 i = 0; i < sound_type_count; ++i)
+	{
+		soundTypeVolumes[i] = max(0.f, soundTypeVolumes[i]);
+
+		if (oldSoundTypeVolumes[i] != soundTypeVolumes[i])
+		{
+			soundTypeVolumeFaders[i].startFade(soundTypeVolumes[i], 0.1f);
+		}
+
+		oldSoundTypeVolumes[i] = soundTypeVolumes[i];
+
+		soundTypeVolumeFaders[i].update(dt);
+		context.soundTypeSubmixVoices[i]->SetVolume(soundTypeVolumeFaders[i].current);
+	}
+
+
+
+
+
+
+
 
 	channel_map::iterator stoppedChannels[64];
 	uint32 numStoppedChannels = 0;

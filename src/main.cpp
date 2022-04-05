@@ -112,7 +112,7 @@ int main(int argc, char** argv)
 	uint32 musicID = 1;
 	uint32 explosionID = 2;
 
-	if (loadFileSound(musicID, "assets/audio/price-of-freedom-33106.wav", true))
+	if (loadFileSound(musicID, sound_type_music, "assets/audio/price-of-freedom-33106.wav", true))
 	{
 		sound_settings soundSettings;
 		soundSettings.loop = true;
@@ -254,8 +254,8 @@ int main(int argc, char** argv)
 
 		if (ImGui::IsKeyPressed(key_enter))
 		{
-			//if (loadSynthSound<sine_synth>(id, true, 1.5f, C_HZ))
-			if (loadFileSound(explosionID, "assets/audio/PFVV2TQ-explosion.wav", false))
+			//if (loadSynthSound<sine_synth>(id, sound_type_sfx, true, 1.5f, C_HZ))
+			if (loadFileSound(explosionID, sound_type_sfx, "assets/audio/explosion.wav", false))
 			{
 				sound_settings soundSettings;
 
