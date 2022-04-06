@@ -762,8 +762,7 @@ void application::handleFileDrop(const fs::path& filename)
 	fs::path path = filename;
 	fs::path relative = fs::relative(path, fs::current_path());
 
-	auto mesh = loadMeshFromFile(relative.string());
-	if (mesh)
+	if (auto mesh = loadMeshFromFile(relative.string()))
 	{
 		fs::path path = filename;
 		path = path.stem();

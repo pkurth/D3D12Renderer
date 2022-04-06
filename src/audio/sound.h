@@ -3,6 +3,7 @@
 #include "synth.h"
 
 #include <xaudio2.h>
+#include <functional>
 
 
 #define MAX_SYNTH_SIZE 1024

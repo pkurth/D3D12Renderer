@@ -239,7 +239,7 @@ int main(int argc, char** argv)
 
 		if (ImGui::BeginDragDropTarget())
 		{
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("content_browser_file")) { app.handleFileDrop((const char*)payload->Data); }
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("content_browser_mesh")) { app.handleFileDrop((const char*)payload->Data); }
 			ImGui::EndDragDropTarget();
 		}
 

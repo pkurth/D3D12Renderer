@@ -13,7 +13,7 @@ static path_to_handle pathToHandle;
 static handle_to_path handleToPath;
 
 static std::mutex mutex;
-static const fs::path registryPath = fs::path(L"assets/registry/reg.yaml").lexically_normal();
+static const fs::path registryPath = fs::path(L"resources/files.yaml").lexically_normal();
 
 
 static path_to_handle loadRegistryFromDisk()

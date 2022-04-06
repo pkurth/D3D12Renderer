@@ -167,7 +167,7 @@ void file_browser::draw(mesh_editor_panel& meshEditor)
 							{
 								fs::path fullPath = currentPath / p.filename;
 								std::string str = fullPath.string();
-								ImGui::SetDragDropPayload("content_browser_file", str.c_str(), str.length() + 1, ImGuiCond_Once);
+								ImGui::SetDragDropPayload("content_browser_mesh", str.c_str(), str.length() + 1, ImGuiCond_Once);
 								ImGui::Text("Drop into scene to instantiate.");
 								ImGui::EndDragDropSource();
 							}

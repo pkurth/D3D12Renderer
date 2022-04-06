@@ -13,6 +13,7 @@ void renderImGui(struct dx_command_list* cl);
 LRESULT handleImGuiInput(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 struct dx_texture;
+struct asset_handle;
 
 enum imgui_icon
 {
@@ -126,6 +127,10 @@ namespace ImGui
 	bool PropertyColor(const char* label, vec4& f);
 
 	bool PropertyButton(const char* label, const char* buttonText, const char* hoverText = 0, ImVec2 size = ImVec2(0, 0));
+
+	bool PropertyInputText(const char* label, char* buffer, uint32 bufferSize, bool disableInput = false);
+
+	bool PropertyAssetHandle(const char* label, const char* type, asset_handle& asset);
 
 	void PropertySeparator();
 

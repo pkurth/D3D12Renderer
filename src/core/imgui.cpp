@@ -17,6 +17,8 @@
 #include "dx/dx_command_list.h"
 #include "dx/dx_profiling.h"
 #include "window/dx_window.h"
+#include "core/asset.h"
+#include "core/file_registry.h"
 
 
 #define MAX_NUM_IMGUI_IMAGES_PER_FRAME 128
@@ -733,6 +735,60 @@ namespace ImGui
 		{
 			ImGui::SetTooltip(hoverText);
 		}
+		post();
+		return result;
+	}
+
+	bool PropertyInputText(const char* label, char* buffer, uint32 bufferSize, bool disableInput)
+	{
+		pre(label);
+
+		if (disableInput)
+		{
+			ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.6f);
+		}
+
+		bool result = ImGui::InputText("", buffer, bufferSize, disableInput ? ImGuiInputTextFlags_ReadOnly : 0);
+
+		if (disableInput)
+		{
+			ImGui::PopStyleVar();
+		}
+
+		post();
+		return result;
+	}
+
+	bool PropertyAssetHandle(const char* label, const char* type, asset_handle& asset)
+	{
+		char buffer[32] = "";
+		if (asset)
+		{
+			snprintf(buffer, sizeof(buffer), "%llu", asset.value);
+		}
+
+		pre(label);
+		ImGui::InputText("", buffer, sizeof(buffer), ImGuiInputTextFlags_ReadOnly);
+
+		bool result = false;
+		if (ImGui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(type)) 
+			{
+				asset = getAssetHandleFromPath((const char*)payload->Data);
+				result = true;
+			}
+			ImGui::EndDragDropTarget();
+		}
+		if (ImGui::IsItemHovered() && asset)
+		{
+			fs::path path = getPathFromAssetHandle(asset);
+			if (!path.empty())
+			{
+				ImGui::SetTooltip(path.string().c_str());
+			}
+		}
+
 		post();
 		return result;
 	}
