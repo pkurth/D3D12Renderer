@@ -172,100 +172,6 @@ static float inOutBounce(float t)			{ return (t < 0.5f) ? (0.5f * (1.f - bounceo
 
 
 
-template <typename T>
-static T evaluateSpline(const float* ts, const T* values, int32 num, float t)
-{
-	assert(num >= 2);
-
-	// Find key.
-	int32 k = 0;
-	while (k < num - 1 && ts[k + 1] >= 0.f && ts[k] < t)
-	{
-		++k;
-	}
-
-	if (ts[k + 1] < 0.f)
-	{
-		num = k + 1;
-	}
-
-	// Interpolant.
-	const float h1 = clamp01(inverseLerp(ts[k - 1], ts[k], t));
-	const float h2 = h1 * h1;
-	const float h3 = h2 * h1;
-	const vec4 h(h3, h2, h1, 1.f);
-
-	T result;
-	if constexpr (std::is_same_v<std::remove_cv_t<T>, quat> || std::is_same_v<std::remove_cv_t<T>, dual_quat>)
-	{
-		result = T::zero;
-	}
-	else
-	{
-		result = 0;
-	}
-
-	int32 m = num - 1;
-	result += values[clamp(k - 2, 0, m)] * dot(vec4(-1, 2, -1, 0), h);
-	result += values[k - 1] * dot(vec4(3, -5, 0, 2), h);
-	result += values[k] * dot(vec4(-3, 4, 1, 0), h);
-	result += values[clamp(k + 1, 0, m)] * dot(vec4(1, -1, 0, 0), h);
-
-	result *= 0.5f;
-
-	return result;
-}
-
-// maxNumPoints must be a multiple of 4!
-// If you want to use this in a shader constant buffer, T can currently be either float or vec4.
-template <typename T, uint32 maxNumPoints_>
-struct alignas(16) catmull_rom_spline
-{
-	static_assert(maxNumPoints_ > 0 && maxNumPoints_ % 4 == 0, "Spline max num points must be divisible by 4.");
-
-	float ts[maxNumPoints_];
-	T values[maxNumPoints_];
-
-	enum { maxNumPoints = maxNumPoints_ };
-
-	catmull_rom_spline()
-	{
-		ts[0] = 0;
-		ts[1] = 1;
-		ts[2] = -1;
-
-		if constexpr (std::is_same_v<std::remove_cv_t<T>, quat> || std::is_same_v<std::remove_cv_t<T>, dual_quat>)
-		{
-			values[0] = values[1] = T::identity;
-		}
-		else
-		{
-			values[0] = T(0);
-			values[1] = T(1);
-		}
-	}
-
-	catmull_rom_spline(T (*func)(float))
-	{
-		for (int i = 0; i < maxNumPoints; ++i)
-		{
-			ts[i] = i / float(maxNumPoints - 1);
-			values[i] = func(ts[i]);
-		}
-	}
-
-	inline T evaluate(uint32 numActualPoints, float t) const					
-	{
-		return evaluateSpline(ts, values, numActualPoints, t);
-	}
-};
-
-// Interop for shaders.
-#define spline(T, maxNumPoints) catmull_rom_spline<T, maxNumPoints>
-#define defineSpline(T, maxNumPoints) template struct spline(T, maxNumPoints);
-
-
-
 static float getFramerateIndependentT(float speed, float dt)
 {
 	return 1.f - expf(-speed * dt);
@@ -1046,4 +952,101 @@ inline std::ostream& operator<<(std::ostream& s, const trs& m)
 	s << "Scale: " << m.scale << '\n';
 	return s;
 }
+
+
+
+
+
+template <typename T>
+static T evaluateSpline(const float* ts, const T* values, int32 num, float t)
+{
+	assert(num >= 2);
+
+	// Find key.
+	int32 k = 0;
+	while (k < num - 1 && ts[k + 1] >= 0.f && ts[k] < t)
+	{
+		++k;
+	}
+
+	if (ts[k + 1] < 0.f)
+	{
+		num = k + 1;
+	}
+
+	// Interpolant.
+	const float h1 = clamp01(inverseLerp(ts[k - 1], ts[k], t));
+	const float h2 = h1 * h1;
+	const float h3 = h2 * h1;
+	const vec4 h(h3, h2, h1, 1.f);
+
+	T result;
+	if constexpr (std::is_same_v<std::remove_cv_t<T>, quat> || std::is_same_v<std::remove_cv_t<T>, dual_quat>)
+	{
+		result = T::zero;
+	}
+	else
+	{
+		result = 0;
+	}
+
+	int32 m = num - 1;
+	result += values[clamp(k - 2, 0, m)] * dot(vec4(-1, 2, -1, 0), h);
+	result += values[k - 1] * dot(vec4(3, -5, 0, 2), h);
+	result += values[k] * dot(vec4(-3, 4, 1, 0), h);
+	result += values[clamp(k + 1, 0, m)] * dot(vec4(1, -1, 0, 0), h);
+
+	result *= 0.5f;
+
+	return result;
+}
+
+// maxNumPoints must be a multiple of 4!
+// If you want to use this in a shader constant buffer, T can currently be either float or vec4.
+template <typename T, uint32 maxNumPoints_>
+struct alignas(16) catmull_rom_spline
+{
+	static_assert(maxNumPoints_ > 0 && maxNumPoints_ % 4 == 0, "Spline max num points must be divisible by 4.");
+
+	float ts[maxNumPoints_];
+	T values[maxNumPoints_];
+
+	enum { maxNumPoints = maxNumPoints_ };
+
+	catmull_rom_spline()
+	{
+		ts[0] = 0;
+		ts[1] = 1;
+		ts[2] = -1;
+
+		if constexpr (std::is_same_v<std::remove_cv_t<T>, quat> || std::is_same_v<std::remove_cv_t<T>, dual_quat>)
+		{
+			values[0] = values[1] = T::identity;
+		}
+		else
+		{
+			values[0] = T(0);
+			values[1] = T(1);
+		}
+	}
+
+	catmull_rom_spline(T(*func)(float))
+	{
+		for (int i = 0; i < maxNumPoints; ++i)
+		{
+			ts[i] = i / float(maxNumPoints - 1);
+			values[i] = func(ts[i]);
+		}
+	}
+
+	inline T evaluate(uint32 numActualPoints, float t) const
+	{
+		return evaluateSpline(ts, values, numActualPoints, t);
+	}
+};
+
+// Interop for shaders.
+#define spline(T, maxNumPoints) catmull_rom_spline<T, maxNumPoints>
+#define defineSpline(T, maxNumPoints) template struct spline(T, maxNumPoints);
+
 
