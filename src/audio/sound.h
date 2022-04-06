@@ -137,3 +137,9 @@ static bool loadSynthSound(uint32 id, sound_type type, bool stream, const args&.
     }
 }
 
+bool isSoundExtension(const fs::path& extension);
+bool isSoundExtension(const std::string& extension);
+
+extern bool soundEditorWindowOpen;
+
+void drawSoundEditor();

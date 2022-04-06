@@ -2,7 +2,8 @@
 #include "file_browser.h"
 #include "core/imgui.h"
 #include "core/assimp.h"
-#include "dx/dx_texture.h"
+#include "core/image.h"
+#include "audio/sound.h"
 
 #include <shellapi.h>
 #include <fontawesome/IconsFontAwesome5.h>
@@ -20,6 +21,7 @@ static const char* getTypeIcon(file_browser::dir_entry_type type)
 	if (type == file_browser::dir_entry_type_mesh) return ICON_FA_CUBE;
 	if (type == file_browser::dir_entry_type_image) return ICON_FA_FILE_IMAGE;
 	if (type == file_browser::dir_entry_type_font) return ICON_FA_FONT;
+	if (type == file_browser::dir_entry_type_audio) return ICON_FA_VOLUME_UP;
 
 	return ICON_FA_FILE;
 }
@@ -172,6 +174,16 @@ void file_browser::draw(mesh_editor_panel& meshEditor)
 								ImGui::EndDragDropSource();
 							}
 						}
+						if (p.type == dir_entry_type_audio)
+						{
+							if (ImGui::BeginDragDropSource())
+							{
+								fs::path fullPath = currentPath / p.filename;
+								std::string str = fullPath.string();
+								ImGui::SetDragDropPayload("content_browser_audio", str.c_str(), str.length() + 1, ImGuiCond_Once);
+								ImGui::EndDragDropSource();
+							}
+						}
 					}
 				}
 
@@ -210,6 +222,10 @@ void file_browser::refresh()
 			else if (extension == ".ttf")
 			{
 				type = dir_entry_type_font;
+			}
+			else if (isSoundExtension(extension))
+			{
+				type = dir_entry_type_audio;
 			}
 		}
 

@@ -195,6 +195,13 @@ void scene_editor::drawMainMenuBar()
 
 			ImGui::Separator();
 
+			if (ImGui::MenuItem(soundEditorWindowOpen ? (ICON_FA_VOLUME_UP "  Hide sound editor") : (ICON_FA_VOLUME_UP "  Show sound editor")))
+			{
+				soundEditorWindowOpen = !soundEditorWindowOpen;
+			}
+
+			ImGui::Separator();
+
 			if (ImGui::MenuItem(ICON_FA_DESKTOP "  System"))
 			{
 				systemClicked = true;
@@ -331,6 +338,11 @@ void scene_editor::drawMainMenuBar()
 	if (showDemoWindow)
 	{
 		ImGui::ShowDemoWindow(&showDemoWindow);
+	}
+
+	if (soundEditorWindowOpen)
+	{
+		drawSoundEditor();
 	}
 }
 

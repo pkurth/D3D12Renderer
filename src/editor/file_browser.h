@@ -16,6 +16,7 @@ struct file_browser
 		dir_entry_type_mesh,
 		dir_entry_type_image,
 		dir_entry_type_font,
+		dir_entry_type_audio,
 	};
 
 private:
