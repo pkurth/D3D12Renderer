@@ -19,7 +19,8 @@
 
 static HANDLE openFile(const fs::path& path);
 static void closeFile(HANDLE& fileHandle);
-static bool getWFX(HANDLE fileHandle, const fs::path& path, WAVEFORMATEXTENSIBLE& wfx, uint32& chunkSize, uint32& chunkPosition);
+static bool getWFX(HANDLE fileHandle, const fs::path& path, WAVEFORMATEXTENSIBLE& wfx);
+static bool findChunk(HANDLE fileHandle, uint32 fourcc, uint32& chunkSize, uint32& chunkDataPosition);
 static bool readChunkData(HANDLE fileHandle, void* buffer, uint32 buffersize, uint32 bufferoffset);
 
 
@@ -62,21 +63,26 @@ bool loadFileSound(uint32 id, sound_type type, const fs::path& path, bool stream
             bool success = false;
             BYTE* dataBuffer = 0;
 
-            if (getWFX(fileHandle, path, wfx, chunkSize, chunkPosition))
-            {
-                success = true;
+            // Find and retrieve format chunk.
+            if (getWFX(fileHandle, path, wfx))
+			{
+                // Find data chunk.
+				if (findChunk(fileHandle, fourccDATA, chunkSize, chunkPosition))
+				{
+					success = true;
 
-                if (!stream)
-                {
-                    dataBuffer = new BYTE[chunkSize];
-                    success = readChunkData(fileHandle, dataBuffer, chunkSize, chunkPosition);
-                    if (!success)
-                    {
-                        delete[] dataBuffer;
-                    }
-                    
-                    closeFile(fileHandle);
-                }
+					if (!stream)
+					{
+						dataBuffer = new BYTE[chunkSize];
+						success = readChunkData(fileHandle, dataBuffer, chunkSize, chunkPosition);
+						if (!success)
+						{
+							delete[] dataBuffer;
+						}
+
+						closeFile(fileHandle);
+					}
+				}
             }
 
             if (success)
@@ -249,8 +255,10 @@ static bool readChunkData(HANDLE fileHandle, void* buffer, uint32 buffersize, ui
     return true;
 }
 
-static bool getWFX(HANDLE fileHandle, const fs::path& path, WAVEFORMATEXTENSIBLE& wfx, uint32& chunkSize, uint32& chunkPosition)
+static bool getWFX(HANDLE fileHandle, const fs::path& path, WAVEFORMATEXTENSIBLE& wfx)
 {
+    uint32 chunkSize, chunkPosition;
+
     //Check the file type, should be fourccWAVE or 'XWMA'.
     if (!findChunk(fileHandle, fourccRIFF, chunkSize, chunkPosition))
     {
@@ -274,11 +282,6 @@ static bool getWFX(HANDLE fileHandle, const fs::path& path, WAVEFORMATEXTENSIBLE
         return false;
     }
     if (!readChunkData(fileHandle, &wfx, chunkSize, chunkPosition))
-    {
-        return false;
-    }
-
-    if (!findChunk(fileHandle, fourccDATA, chunkSize, chunkPosition))
     {
         return false;
     }
