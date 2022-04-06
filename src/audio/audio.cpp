@@ -177,6 +177,8 @@ bool initializeAudio()
 	context.listener.OrientTop = { 0.f, 1.f, 0.f };
 	context.listener.pCone = (X3DAUDIO_CONE*)&X3DAudioDefault_DirectionalCone;
 
+	loadSoundRegistry();
+
 	return true;
 }
 

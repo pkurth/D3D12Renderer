@@ -311,6 +311,25 @@ struct sound_spec
 static std::unordered_map<std::string, sound_spec> soundRegistry;
 static const fs::path registryPath = fs::path(L"resources/sounds.yaml").lexically_normal();
 
+void loadSoundRegistry()
+{
+    std::ifstream stream(registryPath);
+    YAML::Node n = YAML::Load(stream);
+
+    for (auto entryNode : n)
+    {
+        std::string name;
+        sound_spec spec = {};
+
+        YAML_LOAD(entryNode, name, "Name");
+        YAML_LOAD(entryNode, spec.asset, "Asset");
+        YAML_LOAD_ENUM(entryNode, spec.type, "Type");
+        YAML_LOAD(entryNode, spec.stream, "Stream");
+
+        soundRegistry.insert({ name, spec });
+    }
+}
+
 void drawSoundEditor()
 {
     if (soundEditorWindowOpen)
@@ -396,10 +415,8 @@ void drawSoundEditor()
 
                 if (ImGui::BeginChild("##SoundList"))
                 {
-                    uint32 i = 0;
                     for (auto& [name, spec] : soundRegistry)
                     {
-                        ImGui::PushID(i);
                         if (filter.PassFilter(name.c_str()))
                         {
                             if (ImGui::BeginTree(name.c_str()))
@@ -416,8 +433,6 @@ void drawSoundEditor()
                                 ImGui::EndTree();
                             }
                         }
-                        ImGui::PopID();
-                        ++i;
                     }
                 }
                 ImGui::EndChild();

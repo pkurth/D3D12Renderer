@@ -142,4 +142,5 @@ bool isSoundExtension(const std::string& extension);
 
 extern bool soundEditorWindowOpen;
 
+void loadSoundRegistry();
 void drawSoundEditor();
