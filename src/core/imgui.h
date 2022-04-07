@@ -77,6 +77,8 @@ namespace ImGui
 
 	void PopupOkButton(uint32 width = 120);
 
+	bool AssetHandle(const char* label, const char* type, asset_handle& asset);
+
 
 	bool BeginProperties();
 	void EndProperties();

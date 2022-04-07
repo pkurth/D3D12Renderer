@@ -464,6 +464,38 @@ namespace ImGui
 		ImGui::SetItemDefaultFocus();
 	}
 
+	bool AssetHandle(const char* label, const char* type, asset_handle& asset)
+	{
+		char buffer[32] = "";
+		if (asset)
+		{
+			snprintf(buffer, sizeof(buffer), "%llu", asset.value);
+		}
+
+		ImGui::InputText("", buffer, sizeof(buffer), ImGuiInputTextFlags_ReadOnly);
+
+		bool result = false;
+		if (ImGui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(type))
+			{
+				asset = getAssetHandleFromPath((const char*)payload->Data);
+				result = true;
+			}
+			ImGui::EndDragDropTarget();
+		}
+		if (ImGui::IsItemHovered() && asset)
+		{
+			fs::path path = getPathFromAssetHandle(asset);
+			if (!path.empty())
+			{
+				ImGui::SetTooltip(path.string().c_str());
+			}
+		}
+
+		return result;
+	}
+
 
 
 
@@ -761,34 +793,8 @@ namespace ImGui
 
 	bool PropertyAssetHandle(const char* label, const char* type, asset_handle& asset)
 	{
-		char buffer[32] = "";
-		if (asset)
-		{
-			snprintf(buffer, sizeof(buffer), "%llu", asset.value);
-		}
-
 		pre(label);
-		ImGui::InputText("", buffer, sizeof(buffer), ImGuiInputTextFlags_ReadOnly);
-
-		bool result = false;
-		if (ImGui::BeginDragDropTarget())
-		{
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(type)) 
-			{
-				asset = getAssetHandleFromPath((const char*)payload->Data);
-				result = true;
-			}
-			ImGui::EndDragDropTarget();
-		}
-		if (ImGui::IsItemHovered() && asset)
-		{
-			fs::path path = getPathFromAssetHandle(asset);
-			if (!path.empty())
-			{
-				ImGui::SetTooltip(path.string().c_str());
-			}
-		}
-
+		bool result = AssetHandle("", type, asset);
 		post();
 		return result;
 	}

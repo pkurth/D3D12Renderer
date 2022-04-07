@@ -15,6 +15,10 @@
 #define A_SHARP_HZ	466.16f
 #define B_HZ		493.88f
 
+
+#define MAX_SYNTH_SIZE 1024
+
+
 struct audio_synth
 {
 	virtual uint32 getSamples(float* buffer, uint32 numSamples) = 0;

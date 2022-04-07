@@ -6,8 +6,6 @@
 #include <functional>
 
 
-#define MAX_SYNTH_SIZE 1024
-
 enum sound_type
 {
     sound_type_music,
