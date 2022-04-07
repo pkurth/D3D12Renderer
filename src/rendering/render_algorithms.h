@@ -179,7 +179,7 @@ void copyShadowMapParts(dx_command_list* cl,
 
 
 void lightAndDecalCulling(dx_command_list* cl,
-	ref<dx_texture> depthStencilBuffer,			// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> depthStencilBuffer,				// NON_PIXEL_SHADER_RESOURCE
 	ref<dx_buffer> pointLights,
 	ref<dx_buffer> spotLights,
 	ref<dx_buffer> decals,
@@ -188,113 +188,111 @@ void lightAndDecalCulling(dx_command_list* cl,
 	dx_dynamic_constant_buffer cameraCBV);
 
 void linearDepthPyramid(dx_command_list* cl,
-	ref<dx_texture> depthStencilBuffer,			// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> linearDepthBuffer,			// UNORDERED_ACCESS
+	ref<dx_texture> depthStencilBuffer,				// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> linearDepthBuffer,				// UNORDERED_ACCESS
 	vec4 projectionParams);
 
 void gaussianBlur(dx_command_list* cl,
-	ref<dx_texture> inputOutput,				// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> temp,						// UNORDERED_ACCESS
+	ref<dx_texture> inputOutput,					// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> temp,							// UNORDERED_ACCESS
 	uint32 inputMip, uint32 outputMip, gaussian_blur_kernel_size kernel, uint32 numIterations = 1);
 
 void dilate(dx_command_list* cl,
-	ref<dx_texture> inputOutput,				// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> temp,						// UNORDERED_ACCESS
+	ref<dx_texture> inputOutput,					// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> temp,							// UNORDERED_ACCESS
 	uint32 radius, uint32 numIterations = 1);
 
 void erode(dx_command_list* cl,
-	ref<dx_texture> inputOutput,				// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> temp,						// UNORDERED_ACCESS
+	ref<dx_texture> inputOutput,					// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> temp,							// UNORDERED_ACCESS
 	uint32 radius, uint32 numIterations = 1);
 
 void depthSobel(dx_command_list* cl,
-	ref<dx_texture> input,						// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> output,						// UNORDERED_ACCESS
+	ref<dx_texture> input,							// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> output,							// UNORDERED_ACCESS
 	vec4 projectionParams, float threshold);
 
 void screenSpaceReflections(dx_command_list* cl,
-	ref<dx_texture> hdrInput,					// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> prevFrameHDR,				// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> depthStencilBuffer,			// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> linearDepthBuffer,			// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> worldNormalsTexture,		// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> reflectanceTexture,			// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> screenVelocitiesTexture,	// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> raycastTexture,				// UNORDERED_ACCESS
-	ref<dx_texture> resolveTexture,				// UNORDERED_ACCESS. After call NON_PIXEL_SHADER_RESOURCE. Also output of this algorithm.
-	ref<dx_texture> ssrTemporalHistory,			// NON_PIXEL_SHADER_RESOURCE. After call UNORDERED_ACCESS.
-	ref<dx_texture> ssrTemporalOutput,			// UNORDERED_ACCESS. After call NON_PIXEL_SHADER_RESOURCE.
+	ref<dx_texture> prevFrameHDR,					// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> depthStencilBuffer,				// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> linearDepthBuffer,				// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> worldNormalsRoughnessTexture,	// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> screenVelocitiesTexture,		// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> raycastTexture,					// UNORDERED_ACCESS
+	ref<dx_texture> resolveTexture,					// UNORDERED_ACCESS. After call D3D12_RESOURCE_STATE_GENERIC_READ. Also output of this algorithm.
+	ref<dx_texture> ssrTemporalHistory,				// NON_PIXEL_SHADER_RESOURCE. After call UNORDERED_ACCESS.
+	ref<dx_texture> ssrTemporalOutput,				// UNORDERED_ACCESS. After call NON_PIXEL_SHADER_RESOURCE.
 	ssr_settings settings,
 	dx_dynamic_constant_buffer cameraCBV);
 
 void specularAmbient(dx_command_list* cl,
-	ref<dx_texture> hdrInput,					// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> ssr,						// NON_PIXEL_SHADER_RESOURCE. Can be null.
-	ref<dx_texture> worldNormalsTexture,		// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> reflectanceTexture,			// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> environment,				// NON_PIXEL_SHADER_RESOURCE. Can be null.
-	ref<dx_texture> ao,							// NON_PIXEL_SHADER_RESOURCE. Can be null.
-	ref<dx_texture> output,						// UNORDERED_ACCESS
+	ref<dx_texture> hdrInput,						// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> ssr,							// NON_PIXEL_SHADER_RESOURCE. Can be null.
+	ref<dx_texture> worldNormalsTexture,			// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> reflectanceTexture,				// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> environment,					// NON_PIXEL_SHADER_RESOURCE. Can be null.
+	ref<dx_texture> ao,								// NON_PIXEL_SHADER_RESOURCE. Can be null.
+	ref<dx_texture> output,							// UNORDERED_ACCESS
 	dx_dynamic_constant_buffer cameraCBV);
 
 void temporalAntiAliasing(dx_command_list* cl,
-	ref<dx_texture> hdrInput,					// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> screenVelocitiesTexture,	// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> depthStencilBuffer,			// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> history,					// NON_PIXEL_SHADER_RESOURCE. After call UNORDERED_ACCESS.
-	ref<dx_texture> output,						// UNORDERED_ACCESS. After call NON_PIXEL_SHADER_RESOURCE.
+	ref<dx_texture> hdrInput,						// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> screenVelocitiesTexture,		// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> depthStencilBuffer,				// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> history,						// NON_PIXEL_SHADER_RESOURCE. After call UNORDERED_ACCESS.
+	ref<dx_texture> output,							// UNORDERED_ACCESS. After call NON_PIXEL_SHADER_RESOURCE.
 	vec4 jitteredCameraProjectionParams);
 
 void downsample(dx_command_list* cl,
-	ref<dx_texture> input,						// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> output,						// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> temp);						// UNORDERED_ACCESS
+	ref<dx_texture> input,							// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> output,							// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> temp);							// UNORDERED_ACCESS
 
 void bloom(dx_command_list* cl,
-	ref<dx_texture> hdrInput,					// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> output,						// Input as UNORDERED_ACCESS. After call NON_PIXEL_SHADER_RESOURCE.
-	ref<dx_texture> bloomTexture,				// UNORDERED_ACCESS
-	ref<dx_texture> bloomTempTexture,			// UNORDERED_ACCESS
+	ref<dx_texture> hdrInput,						// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> output,							// Input as UNORDERED_ACCESS. After call NON_PIXEL_SHADER_RESOURCE.
+	ref<dx_texture> bloomTexture,					// UNORDERED_ACCESS
+	ref<dx_texture> bloomTempTexture,				// UNORDERED_ACCESS
 	bloom_settings settings);
 
 void ambientOcclusion(dx_command_list* cl,
-	ref<dx_texture> linearDepth,				// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> screenVelocitiesTexture,	// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> aoCalculationTexture,		// UNORDERED_ACCESS
-	ref<dx_texture> aoBlurTempTexture,			// UNORDERED_ACCESS
-	ref<dx_texture> history,					// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> output,						// UNORDERED_ACCESS
+	ref<dx_texture> linearDepth,					// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> screenVelocitiesTexture,		// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> aoCalculationTexture,			// UNORDERED_ACCESS
+	ref<dx_texture> aoBlurTempTexture,				// UNORDERED_ACCESS
+	ref<dx_texture> history,						// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> output,							// UNORDERED_ACCESS
 	hbao_settings settings,
 	dx_dynamic_constant_buffer cameraCBV);
 
 void screenSpaceShadows(dx_command_list* cl,
-	ref<dx_texture> linearDepth,				// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> screenVelocitiesTexture,	// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> sssCalculationTexture,		// UNORDERED_ACCESS
-	ref<dx_texture> sssBlurTempTexture,			// UNORDERED_ACCESS
-	ref<dx_texture> history,					// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> output,						// UNORDERED_ACCESS
+	ref<dx_texture> linearDepth,					// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> screenVelocitiesTexture,		// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> sssCalculationTexture,			// UNORDERED_ACCESS
+	ref<dx_texture> sssBlurTempTexture,				// UNORDERED_ACCESS
+	ref<dx_texture> history,						// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> output,							// UNORDERED_ACCESS
 	vec3 sunDirection,
 	sss_settings settings,
 	const mat4& view,
 	dx_dynamic_constant_buffer cameraCBV);
 
 void tonemap(dx_command_list* cl,
-	ref<dx_texture> hdrInput,					// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> ldrOutput,					// UNORDERED_ACCESS
+	ref<dx_texture> hdrInput,						// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> ldrOutput,						// UNORDERED_ACCESS
 	const tonemap_settings& settings);
 
 void blit(dx_command_list* cl,
-	ref<dx_texture> input,						// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> output);					// UNORDERED_ACCESS
+	ref<dx_texture> input,							// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> output);						// UNORDERED_ACCESS
 
 void present(dx_command_list* cl,
-	ref<dx_texture> ldrInput,					// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> output,						// UNORDERED_ACCESS
+	ref<dx_texture> ldrInput,						// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> output,							// UNORDERED_ACCESS
 	sharpen_settings sharpenSettings);
 
 void visualizeSunShadowCascades(dx_command_list* cl,
-	ref<dx_texture> depthBuffer,				// NON_PIXEL_SHADER_RESOURCE
-	ref<dx_texture> output,						// UNORDERED_ACCESS
+	ref<dx_texture> depthBuffer,					// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> output,							// UNORDERED_ACCESS
 	dx_dynamic_constant_buffer sunCBV,
 	const mat4& invViewProj, vec3 cameraPosition, vec3 cameraForward);

@@ -5,20 +5,19 @@
 #include "math.hlsli"
 #include "brdf.hlsli"
 
-ConstantBuffer<ssr_resolve_cb> cb	: register(b0);
-ConstantBuffer<camera_cb> camera	: register(b1);
+ConstantBuffer<ssr_resolve_cb> cb	    : register(b0);
+ConstantBuffer<camera_cb> camera	    : register(b1);
 
-Texture2D<float> depthBuffer		: register(t0);
-Texture2D<float2> worldNormals		: register(t1);
-Texture2D<float4> reflectance		: register(t2);
-Texture2D<float4> reflection		: register(t3);
-Texture2D<float4> hdrColor  		: register(t4);
-Texture2D<float2> motion			: register(t5);
+Texture2D<float> depthBuffer		    : register(t0);
+Texture2D<float3> worldNormalsRoughness	: register(t1);
+Texture2D<float4> reflection		    : register(t2);
+Texture2D<float4> hdrColor  		    : register(t3);
+Texture2D<float2> motion			    : register(t4);
 
-RWTexture2D<float4> output          : register(u0);
+RWTexture2D<float4> output              : register(u0);
 
-SamplerState linearSampler			: register(s0);
-SamplerState pointSampler			: register(s1);
+SamplerState linearSampler			    : register(s0);
+SamplerState pointSampler			    : register(s1);
 
 
 static const int2 resolveOffset[] =
@@ -87,9 +86,11 @@ void main(cs_input IN)
     const uint2 uvInt = (IN.groupID.xy * SSR_BLOCK_SIZE) + IN.groupThreadID.xy - SSR_RESOLVE_RAD;
     const float2 uv = (uvInt.xy + 0.5f) * cb.invDimensions;
 
-    const float3 normal = unpackNormal(worldNormals.SampleLevel(linearSampler, uv, 0));
+    const float2 uvM = motion.SampleLevel(linearSampler, uv, 0);
+    const float3 normalAndRoughness = worldNormalsRoughness.SampleLevel(linearSampler, uv + uvM, 0);
+    const float3 normal = unpackNormal(normalAndRoughness.xy);
     const float3 N = normalize(mul(camera.view, float4(normal, 0.f)).xyz);
-    const float roughness = clamp(reflectance.SampleLevel(linearSampler, uv, 0).a, 0.01f, 0.99f);
+    const float roughness = clamp(normalAndRoughness.z, 0.03f, 0.97f);
      
     const float depth = depthBuffer.SampleLevel(pointSampler, uv, 0);
     const float3 viewPos = restoreViewSpacePosition(camera.invProj, uv, depth);

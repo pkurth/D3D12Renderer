@@ -1221,12 +1221,10 @@ void depthSobel(dx_command_list* cl, ref<dx_texture> input, ref<dx_texture> outp
 }
 
 void screenSpaceReflections(dx_command_list* cl,
-	ref<dx_texture> hdrInput,
 	ref<dx_texture> prevFrameHDR,
 	ref<dx_texture> depthStencilBuffer,
 	ref<dx_texture> linearDepthBuffer,
-	ref<dx_texture> worldNormalsTexture,
-	ref<dx_texture> reflectanceTexture,
+	ref<dx_texture> worldNormalsRoughnessTexture,
 	ref<dx_texture> screenVelocitiesTexture,
 	ref<dx_texture> raycastTexture,
 	ref<dx_texture> resolveTexture,
@@ -1264,9 +1262,9 @@ void screenSpaceReflections(dx_command_list* cl,
 		cl->setDescriptorHeapUAV(SSR_RAYCAST_RS_TEXTURES, 0, raycastTexture);
 		cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 1, depthStencilBuffer);
 		cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 2, linearDepthBuffer);
-		cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 3, worldNormalsTexture);
-		cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 4, reflectanceTexture);
-		cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 5, render_resources::noiseTexture);
+		cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 3, worldNormalsRoughnessTexture);
+		cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 4, render_resources::noiseTexture);
+		cl->setDescriptorHeapSRV(SSR_RAYCAST_RS_TEXTURES, 5, screenVelocitiesTexture);
 
 		cl->dispatch(bucketize(raycastWidth, SSR_BLOCK_SIZE), bucketize(raycastHeight, SSR_BLOCK_SIZE));
 
@@ -1286,11 +1284,10 @@ void screenSpaceReflections(dx_command_list* cl,
 
 		cl->setDescriptorHeapUAV(SSR_RESOLVE_RS_TEXTURES, 0, resolveTexture);
 		cl->setDescriptorHeapSRV(SSR_RESOLVE_RS_TEXTURES, 1, depthStencilBuffer);
-		cl->setDescriptorHeapSRV(SSR_RESOLVE_RS_TEXTURES, 2, worldNormalsTexture);
-		cl->setDescriptorHeapSRV(SSR_RESOLVE_RS_TEXTURES, 3, reflectanceTexture);
-		cl->setDescriptorHeapSRV(SSR_RESOLVE_RS_TEXTURES, 4, raycastTexture);
-		cl->setDescriptorHeapSRV(SSR_RESOLVE_RS_TEXTURES, 5, prevFrameHDR);
-		cl->setDescriptorHeapSRV(SSR_RESOLVE_RS_TEXTURES, 6, screenVelocitiesTexture);
+		cl->setDescriptorHeapSRV(SSR_RESOLVE_RS_TEXTURES, 2, worldNormalsRoughnessTexture);
+		cl->setDescriptorHeapSRV(SSR_RESOLVE_RS_TEXTURES, 3, raycastTexture);
+		cl->setDescriptorHeapSRV(SSR_RESOLVE_RS_TEXTURES, 4, prevFrameHDR);
+		cl->setDescriptorHeapSRV(SSR_RESOLVE_RS_TEXTURES, 5, screenVelocitiesTexture);
 
 		cl->dispatch(bucketize(resolveWidth, SSR_BLOCK_SIZE), bucketize(resolveHeight, SSR_BLOCK_SIZE));
 
@@ -1338,7 +1335,7 @@ void screenSpaceReflections(dx_command_list* cl,
 
 		barrier_batcher(cl)
 			//.uav(resolveTexture)
-			.transition(resolveTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			.transition(resolveTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
 	}
 }
 

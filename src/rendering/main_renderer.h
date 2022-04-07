@@ -156,10 +156,9 @@ private:
 	bool windowHovered = false;
 
 	ref<dx_texture> hdrColorTexture;
-	ref<dx_texture> worldNormalsTexture;
+	ref<dx_texture> worldNormalsRoughnessTexture;
 	ref<dx_texture> screenVelocitiesTexture;
 	ref<dx_texture> objectIDsTexture;
-	ref<dx_texture> reflectanceTexture;
 	ref<dx_texture> depthStencilBuffer;
 	ref<dx_texture> linearDepthBuffer;
 	ref<dx_texture> opaqueDepthBuffer; // The depth-stencil buffer gets copied to this texture after the opaque pass.

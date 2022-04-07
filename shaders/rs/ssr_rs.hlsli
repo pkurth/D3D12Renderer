@@ -54,7 +54,7 @@ struct ssr_resolve_cb
     "RootFlags(0), " \
     "RootConstants(b0, num32BitConstants = 4), " \
     "CBV(b1), " \
-    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 6) )," \
+    "DescriptorTable( UAV(u0, numDescriptors = 1), SRV(t0, numDescriptors = 5) )," \
     "StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \
         "addressV = TEXTURE_ADDRESS_CLAMP," \

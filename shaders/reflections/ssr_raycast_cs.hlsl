@@ -5,20 +5,20 @@
 #include "brdf.hlsli"
 #include "random.hlsli"
 
-ConstantBuffer<ssr_raycast_cb> cb	: register(b0);
-ConstantBuffer<camera_cb> camera	: register(b1);
+ConstantBuffer<ssr_raycast_cb> cb	    : register(b0);
+ConstantBuffer<camera_cb> camera	    : register(b1);
 
-Texture2D<float> depthBuffer		: register(t0);
-Texture2D<float> linearDepthBuffer	: register(t1);
-Texture2D<float2> worldNormals		: register(t2);
-Texture2D<float4> reflectance		: register(t3);
-Texture2D<float2> noise     		: register(t4);
+Texture2D<float> depthBuffer		    : register(t0);
+Texture2D<float> linearDepthBuffer	    : register(t1);
+Texture2D<float3> worldNormalsRoughness	: register(t2);
+Texture2D<float2> noise     		    : register(t3);
+Texture2D<float2> motion			    : register(t4);
 
 
-RWTexture2D<float4> output			: register(u0);
+RWTexture2D<float4> output			    : register(u0);
 
-SamplerState linearSampler			: register(s0);
-SamplerState pointSampler			: register(s1);
+SamplerState linearSampler			    : register(s0);
+SamplerState pointSampler			    : register(s1);
 
 static float distanceSquared(float2 a, float2 b) 
 {
@@ -184,9 +184,11 @@ void main(cs_input IN)
         return;
     }
 
-    const float3 normal = unpackNormal(worldNormals.SampleLevel(linearSampler, uv, 0));
+    const float2 uvM = motion.SampleLevel(linearSampler, uv, 0);
+    const float3 normalAndRoughness = worldNormalsRoughness.SampleLevel(linearSampler, uv + uvM, 0);
+    const float3 normal = unpackNormal(normalAndRoughness.xy);
     const float3 viewNormal = mul(camera.view, float4(normal, 0.f)).xyz;
-    const float roughness = clamp(reflectance.SampleLevel(linearSampler, uv, 0).a, 0.03f, 0.97f);
+    const float roughness = clamp(normalAndRoughness.z, 0.03f, 0.97f);
     
     const float3 viewPos = restoreViewSpacePosition(camera.invProj, uv, depth);
     const float3 viewDir = normalize(viewPos);

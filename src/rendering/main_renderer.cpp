@@ -51,12 +51,9 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 	}
 
 
-	worldNormalsTexture = createTexture(0, renderWidth, renderHeight, worldNormalsFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	SET_NAME(worldNormalsTexture->resource, "World normals");
+	worldNormalsRoughnessTexture = createTexture(0, renderWidth, renderHeight, worldNormalsRoughnessFormat, false, true, false, D3D12_RESOURCE_STATE_GENERIC_READ);
+	SET_NAME(worldNormalsRoughnessTexture->resource, "World normals / roughness");
 
-
-	reflectanceTexture = createTexture(0, renderWidth, renderHeight, reflectanceFormat, false, true, false, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	SET_NAME(reflectanceTexture->resource, "Reflectance");
 
 
 	depthStencilBuffer = createDepthTexture(renderWidth, renderHeight, depthStencilFormat);
@@ -109,7 +106,7 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 	}
 
 
-	hdrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, hdrFormat, false, true, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	hdrPostProcessingTexture = createTexture(0, renderWidth, renderHeight, hdrFormat, false, true, true, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	SET_NAME(hdrPostProcessingTexture->resource, "HDR Post processing");
 
 
@@ -235,9 +232,8 @@ void main_renderer::recalculateViewport(bool resizeTextures)
 		resizeTexture(hdrColorTexture, renderWidth, renderHeight);
 		resizeTexture(prevFrameHDRColorTexture, renderWidth / 2, renderHeight / 2);
 		resizeTexture(prevFrameHDRColorTempTexture, renderWidth / 2, renderHeight / 2);
-		resizeTexture(worldNormalsTexture, renderWidth, renderHeight);
+		resizeTexture(worldNormalsRoughnessTexture, renderWidth, renderHeight);
 		resizeTexture(screenVelocitiesTexture, renderWidth, renderHeight);
-		resizeTexture(reflectanceTexture, renderWidth, renderHeight);
 		resizeTexture(depthStencilBuffer, renderWidth, renderHeight);
 		resizeTexture(opaqueDepthBuffer, renderWidth, renderHeight);
 		resizeTexture(linearDepthBuffer, renderWidth, renderHeight);
@@ -357,6 +353,7 @@ void main_renderer::endFrame(const user_input& input)
 	materialInfo.skyIntensity = settings.skyIntensity;
 	materialInfo.aoTexture = settings.enableAO ? aoTextures[1 - aoHistoryIndex] : render_resources::whiteTexture;
 	materialInfo.sssTexture = settings.enableSSS ? sssTextures[1 - sssHistoryIndex] : render_resources::whiteTexture;
+	materialInfo.ssrTexture = settings.enableSSR ? ssrResolveTexture : 0;
 	materialInfo.tiledCullingGrid = culling.tiledCullingGrid;
 	materialInfo.tiledObjectsIndexList = culling.tiledObjectsIndexList;
 	materialInfo.pointLightBuffer = pointLights;
@@ -486,7 +483,7 @@ void main_renderer::endFrame(const user_input& input)
 
 
 			barrier_batcher(cl)
-				.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+				.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ);
 
 
 			// ----------------------------------------
@@ -506,6 +503,26 @@ void main_renderer::endFrame(const user_input& input)
 					.transition(aoTextures[aoHistoryIndex], D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.
 
 				aoHistoryIndex = aoResultIndex;
+			}
+
+
+			// ----------------------------------------
+			// SCREEN SPACE REFLECTIONS
+			// ----------------------------------------
+
+			if (settings.enableSSR)
+			{
+				barrier_batcher(cl)
+					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+				screenSpaceReflections(cl, prevFrameHDRColorTexture, depthStencilBuffer, linearDepthBuffer, worldNormalsRoughnessTexture,
+					screenVelocitiesTexture, ssrRaycastTexture, ssrResolveTexture, ssrTemporalTextures[ssrHistoryIndex],
+					ssrTemporalTextures[1 - ssrHistoryIndex], settings.ssrSettings, materialInfo.cameraCBV);
+
+				ssrHistoryIndex = 1 - ssrHistoryIndex;
+
+				barrier_batcher(cl)
+					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 			}
 
 
@@ -533,10 +550,13 @@ void main_renderer::endFrame(const user_input& input)
 			// OPAQUE LIGHT PASS
 			// ----------------------------------------
 
+			barrier_batcher(cl)
+				.transition(worldNormalsRoughnessTexture, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+
 			auto hdrOpaqueRenderTarget = dx_render_target(renderWidth, renderHeight)
 				.colorAttachment(hdrColorTexture)
-				.colorAttachment(worldNormalsTexture)
-				.colorAttachment(reflectanceTexture)
+				.colorAttachment(worldNormalsRoughnessTexture)
 				.depthAttachment(depthStencilBuffer);
 
 			opaqueLightPass(cl, hdrOpaqueRenderTarget, opaqueRenderPass, materialInfo, jitteredCamera.viewProj);
@@ -545,14 +565,9 @@ void main_renderer::endFrame(const user_input& input)
 			barrier_batcher(cl)
 				.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ)
-				.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-				.transition(reflectanceTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+				.transition(worldNormalsRoughnessTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ)
 				.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-			{
-				PROFILE_ALL(cl, "Copy depth buffer");
-				cl->copyResource(depthStencilBuffer->resource, opaqueDepthBuffer->resource);
-			}
 
 			cls[1] = cl;
 		});
@@ -562,43 +577,14 @@ void main_renderer::endFrame(const user_input& input)
 			dx_command_list* cl = dxContext.getFreeRenderCommandList();
 			PROFILE_ALL(cl, "Render thread 3");
 
-			barrier_batcher(cl)
-				.transitionBegin(opaqueDepthBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
-
-
-			// ----------------------------------------
-			// SCREEN SPACE REFLECTIONS
-			// ----------------------------------------
-
-			if (settings.enableSSR)
 			{
-				screenSpaceReflections(cl, hdrColorTexture, prevFrameHDRColorTexture, depthStencilBuffer, linearDepthBuffer, worldNormalsTexture,
-					reflectanceTexture, screenVelocitiesTexture, ssrRaycastTexture, ssrResolveTexture, ssrTemporalTextures[ssrHistoryIndex],
-					ssrTemporalTextures[1 - ssrHistoryIndex], settings.ssrSettings, materialInfo.cameraCBV);
-
-				ssrHistoryIndex = 1 - ssrHistoryIndex;
+				PROFILE_ALL(cl, "Copy depth buffer");
+				cl->copyResource(depthStencilBuffer->resource, opaqueDepthBuffer->resource);
 			}
 
-
-			// ----------------------------------------
-			// SPECULAR AMBIENT
-			// ----------------------------------------
-
-			specularAmbient(cl, hdrColorTexture, settings.enableSSR ? ssrResolveTexture : 0, worldNormalsTexture, reflectanceTexture,
-				environment ? environment->environment : 0, materialInfo.aoTexture, hdrPostProcessingTexture, materialInfo.cameraCBV);
-
 			barrier_batcher(cl)
-				//.uav(hdrPostProcessingTexture)
-				.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) // Will be read by rest of post processing stack. 
-				.transitionEnd(opaqueDepthBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-
-			if (settings.enableSSR)
-			{
-				barrier_batcher(cl)
-					.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.
-			}
-
+				.transition(opaqueDepthBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
 
 
@@ -606,12 +592,12 @@ void main_renderer::endFrame(const user_input& input)
 			// After this there is no more camera jittering!
 			materialInfo.cameraCBV = unjitteredCameraCBV;
 			materialInfo.opaqueDepth = opaqueDepthBuffer;
-			materialInfo.worldNormals = worldNormalsTexture;
+			materialInfo.worldNormals = worldNormalsRoughnessTexture;
 
 
 
 
-			ref<dx_texture> hdrResult = hdrPostProcessingTexture; // Specular highlights have been rendered to this texture. It's in read state.
+			ref<dx_texture> hdrResult = hdrColorTexture; // Read state.
 
 
 			// ----------------------------------------
@@ -638,7 +624,11 @@ void main_renderer::endFrame(const user_input& input)
 
 
 
-
+			if (settings.enableSSR)
+			{
+				barrier_batcher(cl)
+					.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.
+			}
 
 			// ----------------------------------------
 			// POST PROCESSING
@@ -654,7 +644,7 @@ void main_renderer::endFrame(const user_input& input)
 				taaHistoryIndex = taaOutputIndex;
 			}
 
-			// At this point hdrResult is either the TAA result or the hdrPostProcessingTexture. Either one is in read state.
+			// At this point hdrResult is either the TAA result or the hdrResult. Either one is in read state.
 
 
 			// Downsample scene. This is also the copy used in SSR next frame.
@@ -669,10 +659,10 @@ void main_renderer::endFrame(const user_input& input)
 			if (settings.enableBloom)
 			{
 				barrier_batcher(cl)
-					.transition(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+					.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-				bloom(cl, hdrResult, hdrColorTexture, bloomTexture, bloomTempTexture, settings.bloomSettings);
-				hdrResult = hdrColorTexture;
+				bloom(cl, hdrResult, hdrPostProcessingTexture, bloomTexture, bloomTempTexture, settings.bloomSettings); // Bloom returns result in read state.
+				hdrResult = hdrPostProcessingTexture;
 			}
 
 			// At this point hdrResult is either the TAA result, the hdrColorTexture, or the hdrPostProcessingTexture. Either one is in read state.
@@ -722,14 +712,11 @@ void main_renderer::endFrame(const user_input& input)
 			barrier_batcher(cl)
 				//.uav(frameResult)
 				.transition(hdrColorTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
-				.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-				.transition(worldNormalsTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
-				.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
+				.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET)
 				.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 				.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON)
 				.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-				.transition(opaqueDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST)
-				.transition(reflectanceTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+				.transition(opaqueDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
 
 			cls[2] = cl;
 		});

@@ -52,15 +52,15 @@ Texture2D<float4> decalTextureAtlas                     : register(t11, space2);
 
 Texture2D<float> aoTexture								: register(t12, space2);
 Texture2D<float> sssTexture								: register(t13, space2);
+Texture2D<float4> ssrTexture							: register(t14, space2);
 
 
 struct ps_output
 {
-	float4 hdrColor		: SV_Target0;
+	float4 hdrColor				: SV_Target0;
 
 #ifndef TRANSPARENT
-	float2 worldNormal	: SV_Target1;
-	float4 reflectance	: SV_Target2;
+	float4 worldNormalRoughness	: SV_Target1;
 #endif
 };
 
@@ -279,16 +279,17 @@ ps_output main(ps_input IN)
 
 
 	// Ambient light.
-	float ao = aoTexture.SampleLevel(clampSampler, IN.screenPosition.xy * camera.invScreenDims, 0);
+	float2 screenUV = IN.screenPosition.xy * camera.invScreenDims;
+	float ao = aoTexture.SampleLevel(clampSampler, screenUV, 0);
+
+	float4 ssr = ssrTexture.SampleLevel(clampSampler, screenUV, 0);
 
 	ambient_factors factors = getAmbientFactors(surface);
 	totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity * ao;
 
-#ifdef TRANSPARENT
-	// Only add ambient specular for transparent objects. Opaque objects get their ambient specular in a later render pass.
-	totalLighting.specular += specularIBL(factors.ks, surface, environmentTexture, brdf, clampSampler) * lighting.environmentIntensity * ao;
-#endif
-
+	float3 specular = specularIBL(factors.ks, surface, environmentTexture, brdf, clampSampler);
+	specular = lerp(specular, ssr.rgb, ssr.a);
+	totalLighting.specular += specular * lighting.environmentIntensity * ao;
 
 
 	// Output.
@@ -298,13 +299,10 @@ ps_output main(ps_input IN)
 	OUT.hdrColor = totalLighting.evaluate(surface.albedo);
 	OUT.hdrColor.rgb += surface.emission;
 
-	OUT.worldNormal = packNormal(surface.N);
-	OUT.reflectance = float4(factors.ks, surface.roughness);
+	OUT.worldNormalRoughness = float4(packNormal(surface.N), surface.roughness, 0.f);
 #else
 
 	OUT.hdrColor = mergeAlphaBlended(totalLighting.diffuse * surface.albedo.rgb, totalLighting.specular, surface.emission, surface.albedo.a);
-
-	// Normal and reflectance are not needed for transparent surfaces.
 #endif
 
 	return OUT;
