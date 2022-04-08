@@ -252,8 +252,13 @@ project "D3D12Renderer"
 		"uxtheme",
 		"assimp",
 		"yaml-cpp",
-		"DirectXTex_Desktop_2019_Win10",
 	}
+
+	filter "action:vs2019"
+		links "DirectXTex_Desktop_2019_Win10"
+	filter "action:vs2022"
+		links "DirectXTex_Desktop_2022_Win10"
+	filter {}
 
 	dependson {
 		"assimp",
