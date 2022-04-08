@@ -97,7 +97,7 @@ Images to the right are links to YouTube videos showcasing the various physics f
 ## System Requirements
 
 Since this project uses Direct3D 12 as the only rendering backend, the only supported platforms are Windows 10 or higher. 
-The project is only tested with Visual Studio 2019, and only on NVIDIA GPUs.
+The project is only tested with Visual Studio 2019 and 2022, and only on NVIDIA GPUs.
 
 For mesh shaders you will need the Windows 10 SDK version 10.0.19041.0 or higher.
 This can be downloaded using the Visual Studio Installer.
@@ -122,13 +122,13 @@ Therefore you will not need any build tools installed on your machine.
 The project uses Premake, but all you need comes with the source.
 
 - Clone the repository and make sure to clone with submodules. 
-- Double-click the _generate.bat_ file in the root directory to generate a Visual Studio 2019 solution.
+- Double-click either the _generate2019.bat_ or _generate2022.bat_ file in the root directory to generate a Visual Studio 2019 or 2022 solution, respectively.
 The build process will automatically enable and disable certain features based on your installed GPU and the available Windows 10 SDK.
 - Open the solution and build. 
 This _should_ work directly. 
 Visual Studio sometimes reports an "Unspecified error" when building. 
 In that case either restart Visual Studio or re-generate the project (_generate.bat_) and you are good to go.
-- If you add new source files (or shaders), re-run the _generate.bat_ file.
+- If you add new source files (or shaders), re-run the _generate\*.bat_ file.
 
 The assets seen in the screenshots above are not included with the source code. 
 

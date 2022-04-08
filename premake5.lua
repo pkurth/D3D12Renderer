@@ -187,15 +187,28 @@ workspace "D3D12Renderer"
 outputdir = "%{cfg.buildcfg}_%{cfg.architecture}"
 shaderoutputdir = "shaders/bin/%{cfg.buildcfg}/"
 
+
 group "Dependencies"
 	include "ext/assimp"
 	include "ext/yaml-cpp"
 
+	
+if _ACTION == "vs2019" then
 
-	externalproject "DirectXTex_Desktop_2019_Win10"
-		location "ext/directxtex/DirectXTex"
-		kind "StaticLib"
-		language "C++"
+		externalproject "DirectXTex_Desktop_2019_Win10"
+			location "ext/directxtex/DirectXTex"
+			kind "StaticLib"
+			language "C++"
+			
+elseif _ACTION == "vs2022" then
+
+	filter "action:vs2022"
+		externalproject "DirectXTex_Desktop_2022_Win10"
+			location "ext/directxtex/DirectXTex"
+			kind "StaticLib"
+			language "C++"
+
+end
 
 group ""
 
