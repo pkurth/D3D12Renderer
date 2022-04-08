@@ -74,7 +74,7 @@ void updateMessageLog(float dt)
 	}
 
 	uint32 numMessagesToShow = count - startIndex;
-	numMessagesToShow = min(numMessagesToShow, 8);
+	numMessagesToShow = min(numMessagesToShow, 8u);
 	startIndex = count - numMessagesToShow;
 
 	if (windowOpen)

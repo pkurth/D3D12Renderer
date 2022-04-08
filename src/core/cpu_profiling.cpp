@@ -65,7 +65,7 @@ static uint32 mapThreadIDToIndex(uint32 threadID)
 
 	if (!description || !description[0])
 	{
-		description = L"Main thread";
+		description = (WCHAR*)L"Main thread";
 	}
 
 	assert(numThreads < MAX_NUM_CPU_PROFILE_THREADS);

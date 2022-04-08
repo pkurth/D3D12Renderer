@@ -1083,8 +1083,8 @@ void gaussianBlur(dx_command_list* cl,
 	cl->setPipelineState(*pipeline.pipeline);
 	cl->setComputeRootSignature(*pipeline.rootSignature);
 
-	uint32 outputWidth = max(1, inputOutput->width >> outputMip);
-	uint32 outputHeight = max(1, inputOutput->height >> outputMip);
+	uint32 outputWidth = max(1u, inputOutput->width >> outputMip);
+	uint32 outputHeight = max(1u, inputOutput->height >> outputMip);
 
 	uint32 widthBuckets = bucketize(outputWidth, POST_PROCESSING_BLOCK_SIZE);
 	uint32 heightBuckets = bucketize(outputHeight, POST_PROCESSING_BLOCK_SIZE);
@@ -1153,7 +1153,7 @@ static void morphologyCommon(dx_command_list* cl, dx_pipeline& pipeline, ref<dx_
 	assert(inputOutput->width == temp->width);
 	assert(inputOutput->height == temp->height);
 
-	radius = min(radius, MORPHOLOGY_MAX_RADIUS);
+	radius = min(radius, (uint32)MORPHOLOGY_MAX_RADIUS);
 
 	cl->setPipelineState(*pipeline.pipeline);
 	cl->setComputeRootSignature(*pipeline.rootSignature);

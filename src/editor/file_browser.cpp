@@ -58,7 +58,7 @@ void file_browser::draw(mesh_editor_panel& meshEditor)
 		{
 			accPath = accPath.empty() ? p : (accPath / p);
 			ImGui::SameLine(0, 0);
-			if (ImGui::SmallButton(p.u8string().c_str()))
+			if (ImGui::SmallButton(p.string().c_str()))
 			{
 				changeCurrentPath(accPath);
 				break;
@@ -93,7 +93,7 @@ void file_browser::draw(mesh_editor_panel& meshEditor)
 
 				if (skipNextTableColumn || ImGui::TableNextColumn())
 				{
-					std::string filename = p.filename.u8string();
+					std::string filename = p.filename.string();
 
 					bool passesSearch = filter.PassFilter(filename.c_str());
 					bool shouldDisplay = passesSearch || !showOnlyPassingItems;

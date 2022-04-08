@@ -4,6 +4,10 @@
 #include "soa.h"
 
 
+struct w4_float;
+struct w8_float;
+struct w16_float;
+
 template <typename simd_t>
 union wN_vec2
 {
@@ -25,7 +29,7 @@ union wN_vec2
 		if constexpr (std::is_same_v<simd_t, w4_float>) { return wN_vec2(w4_float::zero(), w4_float::zero()); }
 		else if constexpr (std::is_same_v<simd_t, w8_float>) { return wN_vec2(w8_float::zero(), w8_float::zero()); }
 		else if constexpr (std::is_same_v<simd_t, w16_float>) { return wN_vec2(w16_float::zero(), w16_float::zero()); }
-		else { static_assert(false); }
+		else { return {}; }
 	}
 };
 
@@ -60,7 +64,7 @@ union wN_vec3
 		if constexpr (std::is_same_v<simd_t, w4_float>) { return wN_vec3(w4_float::zero(), w4_float::zero(), w4_float::zero()); }
 		else if constexpr (std::is_same_v<simd_t, w8_float>) { return wN_vec3(w8_float::zero(), w8_float::zero(), w8_float::zero()); }
 		else if constexpr (std::is_same_v<simd_t, w16_float>) { return wN_vec3(w16_float::zero(), w16_float::zero(), w16_float::zero()); }
-		else { static_assert(false); }
+		else { return {}; }
 	}
 };
 
@@ -100,7 +104,7 @@ union wN_vec4
 		if constexpr (std::is_same_v<simd_t, w4_float>) { return wN_vec4(w4_float::zero(), w4_float::zero(), w4_float::zero(), w4_float::zero()); }
 		else if constexpr (std::is_same_v<simd_t, w8_float>) { return wN_vec4(w8_float::zero(), w8_float::zero(), w8_float::zero(), w8_float::zero()); }
 		else if constexpr (std::is_same_v<simd_t, w16_float>) { return wN_vec4(w16_float::zero(), w16_float::zero(), w16_float::zero(), w16_float::zero()); }
-		else { static_assert(false); }
+		else { return {}; }
 	}
 };
 

@@ -229,15 +229,15 @@ void generateMipMapsOnGPU(dx_command_list* cl, ref<dx_texture>& texture)
 		_BitScanForward(&mipCount, (dstWidth == 1 ? dstHeight : dstWidth) | (dstHeight == 1 ? dstWidth : dstHeight));
 
 		// Maximum number of mips to generate is 4.
-		mipCount = min(4, mipCount + 1);
+		mipCount = min(4, (int)mipCount + 1);
 		// Clamp to total number of mips left over.
 		mipCount = (srcMip + mipCount) >= resourceDesc.MipLevels ?
 			resourceDesc.MipLevels - srcMip - 1 : mipCount;
 
 		// Dimensions should not reduce to 0.
 		// This can happen if the width and height are not the same.
-		dstWidth = max(1, dstWidth);
-		dstHeight = max(1, dstHeight);
+		dstWidth = max(1u, dstWidth);
+		dstHeight = max(1u, dstHeight);
 
 		cb.srcMipLevel = srcMip;
 		cb.numMipLevelsToGenerate = mipCount;
@@ -304,8 +304,9 @@ ref<dx_texture> equirectangularToCubemap(dx_command_list* cl, const ref<dx_textu
 		stagingDesc.Format = getUAVCompatibleFormat(cubemapDesc.Format);
 		stagingDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
+		auto heapDesc = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		checkResult(dxContext.device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			&heapDesc,
 			D3D12_HEAP_FLAG_NONE,
 			&stagingDesc,
 			D3D12_RESOURCE_STATE_COMMON,
@@ -339,7 +340,7 @@ ref<dx_texture> equirectangularToCubemap(dx_command_list* cl, const ref<dx_textu
 	for (uint32 mipSlice = 0; mipSlice < numMips; )
 	{
 		// Maximum number of mips to generate per pass is 5.
-		uint32 numMips = min(5, cubemapDesc.MipLevels - mipSlice);
+		uint32 numMips = min(5u, cubemapDesc.MipLevels - mipSlice);
 
 		equirectangularToCubemapCB.firstMip = mipSlice;
 		equirectangularToCubemapCB.cubemapSize = max((uint32)cubemapDesc.Width, cubemapDesc.Height) >> mipSlice;
@@ -412,8 +413,9 @@ ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& 
 		stagingDesc.Format = getUAVCompatibleFormat(irradianceDesc.Format);
 		stagingDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
+		auto heapDesc = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		checkResult(dxContext.device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			&heapDesc,
 			D3D12_HEAP_FLAG_NONE,
 			&stagingDesc,
 			D3D12_RESOURCE_STATE_COMMON,
@@ -499,8 +501,9 @@ ref<dx_texture> prefilterEnvironment(dx_command_list* cl, const ref<dx_texture>&
 		stagingDesc.Format = getUAVCompatibleFormat(prefilteredDesc.Format);
 		stagingDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
+		auto heapDesc = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		checkResult(dxContext.device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			&heapDesc,
 			D3D12_HEAP_FLAG_NONE,
 			&stagingDesc,
 			D3D12_RESOURCE_STATE_COMMON,
@@ -529,7 +532,7 @@ ref<dx_texture> prefilterEnvironment(dx_command_list* cl, const ref<dx_texture>&
 	for (uint32 mipSlice = 0; mipSlice < prefilteredDesc.MipLevels; )
 	{
 		// Maximum number of mips to generate per pass is 5.
-		uint32 numMips = min(5, prefilteredDesc.MipLevels - mipSlice);
+		uint32 numMips = min(5u, prefilteredDesc.MipLevels - mipSlice);
 
 		prefilterEnvironmentCB.firstMip = mipSlice;
 		prefilterEnvironmentCB.cubemapSize = max((uint32)prefilteredDesc.Width, prefilteredDesc.Height) >> mipSlice;

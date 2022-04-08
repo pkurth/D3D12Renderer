@@ -29,16 +29,16 @@ struct scene_entity
 		{
 			void addColliderToBroadphase(scene_entity entity);
 
-			if (!hasComponent<physics_reference_component>())
+			if (!hasComponent<struct physics_reference_component>())
 			{
-				addComponent<physics_reference_component>();
+				addComponent<struct physics_reference_component>();
 			}
 
-			physics_reference_component& reference = getComponent<physics_reference_component>();
+			struct physics_reference_component& reference = getComponent<struct physics_reference_component>();
 			++reference.numColliders;
 
 			entt::entity child = registry->create();
-			collider_component& collider = registry->emplace<collider_component>(child, std::forward<args>(a)...);
+			struct collider_component& collider = registry->emplace<struct collider_component>(child, std::forward<args>(a)...);
 			addColliderToBroadphase(scene_entity(child, registry));
 
 			collider.parentEntity = handle;
@@ -46,7 +46,7 @@ struct scene_entity
 			reference.firstColliderEntity = child;
 
 
-			if (rigid_body_component* rb = getComponentIfExists<rigid_body_component>())
+			if (struct rigid_body_component* rb = getComponentIfExists<struct rigid_body_component>())
 			{
 				rb->recalculateProperties(registry, reference);
 			}
@@ -58,7 +58,7 @@ struct scene_entity
 			// If component is rigid body, calculate properties.
 			if constexpr (std::is_same_v<component_t, struct rigid_body_component>)
 			{
-				if (physics_reference_component* ref = getComponentIfExists<physics_reference_component>())
+				if (struct physics_reference_component* ref = getComponentIfExists<struct physics_reference_component>())
 				{
 					component.recalculateProperties(registry, *ref);
 				}
@@ -80,7 +80,7 @@ struct scene_entity
 
 			if constexpr (std::is_same_v<component_t, struct transform_component>)
 			{
-				if (cloth_component* cloth = getComponentIfExists<cloth_component>())
+				if (struct cloth_component* cloth = getComponentIfExists<struct cloth_component>())
 				{
 					cloth->setWorldPositionOfFixedVertices(component, true);
 				}
@@ -288,7 +288,7 @@ struct game_scene
 	template <typename context_t>
 	void deleteContextVariable()
 	{
-		registry.unset<context_T>();
+		registry.unset<context_t>();
 	}
 
 	entt::registry registry;

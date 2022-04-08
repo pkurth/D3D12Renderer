@@ -230,11 +230,15 @@ void uploadTextureSubresourceData(ref<dx_texture> texture, D3D12_SUBRESOURCE_DAT
 
 	dx_resource intermediateResource;
 
+	auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(requiredSize);
+
 #if !USE_D3D12_BLOCK_ALLOCATOR
+
+	auto heapDesc = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 	checkResult(dxContext.device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heapDesc,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(requiredSize),
+		&bufferDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		0,
 		IID_PPV_ARGS(&intermediateResource)
@@ -246,7 +250,7 @@ void uploadTextureSubresourceData(ref<dx_texture> texture, D3D12_SUBRESOURCE_DAT
 	D3D12MA::Allocation* allocation;
 	checkResult(dxContext.memoryAllocator->CreateResource(
 		&allocationDesc,
-		&CD3DX12_RESOURCE_DESC::Buffer(requiredSize),
+		&bufferDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		0,
 		&allocation,
@@ -269,7 +273,7 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 
 	result->requestedNumMipLevels = textureDesc.MipLevels;
 
-	uint32 maxNumMipLevels = (uint32)log2((float)max(textureDesc.Width, textureDesc.Height)) + 1;
+	uint32 maxNumMipLevels = (uint32)log2((float)max((uint32)textureDesc.Width, textureDesc.Height)) + 1;
 	textureDesc.MipLevels = min(maxNumMipLevels, result->requestedNumMipLevels);
 
 	D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport;
@@ -304,8 +308,12 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 
 
 	// Create.
+
+
 #if !USE_D3D12_BLOCK_ALLOCATOR
-	checkResult(dxContext.device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+
+	auto heapDesc = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+	checkResult(dxContext.device->CreateCommittedResource(&heapDesc,
 		D3D12_HEAP_FLAG_NONE,
 		&textureDesc,
 		initialState,
@@ -490,8 +498,10 @@ ref<dx_texture> createDepthTexture(uint32 width, uint32 height, DXGI_FORMAT form
 		arrayLength, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 
 #if !USE_D3D12_BLOCK_ALLOCATOR
+
+	auto heapDesc = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 	checkResult(dxContext.device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		&heapDesc,
 		D3D12_HEAP_FLAG_NONE,
 		&desc,
 		initialState,
@@ -594,7 +604,7 @@ std::wstring dx_texture::getName() const
 	wchar name[128];
 	uint32 size = sizeof(name); 
 	resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name); 
-	name[min(arraysize(name) - 1, size)] = 0;
+	name[min((uint32)arraysize(name) - 1, size)] = 0;
 
 	return name;
 }
@@ -618,7 +628,7 @@ ref<dx_texture> createPlacedTexture(dx_heap heap, uint64 offset, D3D12_RESOURCE_
 
 	result->requestedNumMipLevels = textureDesc.MipLevels;
 
-	uint32 maxNumMipLevels = (uint32)log2((float)max(textureDesc.Width, textureDesc.Height)) + 1;
+	uint32 maxNumMipLevels = (uint32)log2((float)max((uint32)textureDesc.Width, textureDesc.Height)) + 1;
 	textureDesc.MipLevels = min(maxNumMipLevels, result->requestedNumMipLevels);
 
 	D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport;
@@ -806,7 +816,7 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 	wchar name[128];
 	uint32 size = sizeof(name);
 	texture->resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);
-	name[min(arraysize(name) - 1, size)] = 0;
+	name[min((uint32)arraysize(name) - 1, size)] = 0;
 
 	bool hasMipUAVs = texture->srvUavAllocation.count > 2;
 
@@ -840,8 +850,10 @@ void resizeTexture(ref<dx_texture> texture, uint32 newWidth, uint32 newHeight, D
 	texture->height = newHeight;
 
 #if !USE_D3D12_BLOCK_ALLOCATOR
+
+	auto heapDesc = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 	checkResult(dxContext.device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		&heapDesc,
 		D3D12_HEAP_FLAG_NONE,
 		&desc,
 		state,
@@ -955,7 +967,7 @@ texture_grave::~texture_grave()
 	{
 		uint32 size = sizeof(name);
 		resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);
-		name[min(arraysize(name) - 1, size)] = 0;
+		name[min((uint32)arraysize(name) - 1, size)] = 0;
 
 		dxContext.srvUavAllocator.free(srvUavAllocation);
 		dxContext.rtvAllocator.free(rtvAllocation);

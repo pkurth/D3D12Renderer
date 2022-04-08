@@ -2,6 +2,7 @@
 
 #include "core/math.h"
 #include "render_pass.h"
+#include "dx/dx_command_list.h"
 
 #include "particles_rs.hlsli"
 

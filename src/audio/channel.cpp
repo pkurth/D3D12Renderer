@@ -9,6 +9,8 @@
 #define UPDATE_3D_PERIOD 3 // > 0.
 
 
+DWORD WINAPI streamFileAudio(void* parameter);
+DWORD WINAPI streamSynthAudio(void* parameter);
 
 audio_channel::audio_channel(const audio_context& context, const ref<audio_sound>& sound, const sound_settings& settings)
 {

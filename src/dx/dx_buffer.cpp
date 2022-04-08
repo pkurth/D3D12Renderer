@@ -82,11 +82,15 @@ static void uploadBufferData(ref<dx_buffer> buffer, const void* bufferData)
 
 	dx_resource intermediateResource;
 
+	auto desc = CD3DX12_RESOURCE_DESC::Buffer(buffer->totalSize);
+
 #if !USE_D3D12_BLOCK_ALLOCATOR
+
+	CD3DX12_HEAP_PROPERTIES props(D3D12_HEAP_TYPE_UPLOAD);
 	checkResult(dxContext.device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&props,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(buffer->totalSize),
+		&desc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		0,
 		IID_PPV_ARGS(&intermediateResource)));
@@ -97,7 +101,7 @@ static void uploadBufferData(ref<dx_buffer> buffer, const void* bufferData)
 	D3D12MA::Allocation* allocation;
 	checkResult(dxContext.memoryAllocator->CreateResource(
 		&allocationDesc,
-		&CD3DX12_RESOURCE_DESC::Buffer(buffer->totalSize),
+		&desc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		0,
 		&allocation,
@@ -131,11 +135,15 @@ void updateBufferDataRange(ref<dx_buffer> buffer, const void* data, uint32 offse
 
 	dx_resource intermediateResource;
 
+	auto desc = CD3DX12_RESOURCE_DESC::Buffer(size);
+
 #if !USE_D3D12_BLOCK_ALLOCATOR
+	
+	CD3DX12_HEAP_PROPERTIES props(D3D12_HEAP_TYPE_UPLOAD);
 	checkResult(dxContext.device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&props,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(size),
+		&desc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		0,
 		IID_PPV_ARGS(&intermediateResource)));
@@ -146,7 +154,7 @@ void updateBufferDataRange(ref<dx_buffer> buffer, const void* data, uint32 offse
 	D3D12MA::Allocation* allocation;
 	checkResult(dxContext.memoryAllocator->CreateResource(
 		&allocationDesc,
-		&CD3DX12_RESOURCE_DESC::Buffer(size),
+		&desc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		0,
 		&allocation,
@@ -190,11 +198,15 @@ static void initializeBuffer(ref<dx_buffer> buffer, uint32 elementSize, uint32 e
 	buffer->gpuClearUAV = {};
 	buffer->raytracingSRV = {};
 
+	auto desc = CD3DX12_RESOURCE_DESC::Buffer(buffer->totalSize, flags);
+
 #if !USE_D3D12_BLOCK_ALLOCATOR
+
+	CD3DX12_HEAP_PROPERTIES props(heapType);
 	checkResult(dxContext.device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(heapType),
+		&props,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(buffer->totalSize, flags),
+		&desc,
 		initialState,
 		0,
 		IID_PPV_ARGS(&buffer->resource)));
@@ -205,7 +217,7 @@ static void initializeBuffer(ref<dx_buffer> buffer, uint32 elementSize, uint32 e
 	D3D12MA::Allocation* allocation;
 	checkResult(dxContext.memoryAllocator->CreateResource(
 		&allocationDesc,
-		&CD3DX12_RESOURCE_DESC::Buffer(buffer->totalSize, flags),
+		&desc,
 		initialState,
 		0,
 		&allocation,
@@ -352,11 +364,15 @@ void resizeBuffer(ref<dx_buffer> buffer, uint32 newElementCount, D3D12_RESOURCE_
 
 	auto desc = buffer->resource->GetDesc();
 
+	auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(buffer->totalSize, desc.Flags);
+
 #if !USE_D3D12_BLOCK_ALLOCATOR
+
+	CD3DX12_HEAP_PROPERTIES props(buffer->heapType);
 	checkResult(dxContext.device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(buffer->heapType),
+		&props,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(buffer->totalSize, desc.Flags),
+		&bufferDesc,
 		initialState,
 		0,
 		IID_PPV_ARGS(&buffer->resource)));
@@ -367,7 +383,7 @@ void resizeBuffer(ref<dx_buffer> buffer, uint32 newElementCount, D3D12_RESOURCE_
 	D3D12MA::Allocation* allocation;
 	checkResult(dxContext.memoryAllocator->CreateResource(
 		&allocationDesc,
-		&CD3DX12_RESOURCE_DESC::Buffer(buffer->totalSize, desc.Flags),
+		&bufferDesc,
 		initialState,
 		0,
 		&allocation,
