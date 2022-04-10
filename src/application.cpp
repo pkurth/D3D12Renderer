@@ -188,15 +188,15 @@ void application::initialize(main_renderer* renderer)
 		//auto test1 = scene.createEntity("Lollipop 1")
 		//	.addComponent<transform_component>(vec3(20.f, 5.f, 0.f), quat::identity)
 		//	.addComponent<raster_component>(testMesh)
-		//	.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f))
-		//	.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f))
+		//	.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, { 0.2f, 0.5f, 4.f }))
+		//	.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, { 0.2f, 0.5f, 4.f }))
 		//	.addComponent<rigid_body_component>(true, 1.f);
 		//
 		//auto test2 = scene.createEntity("Lollipop 2")
 		//	.addComponent<transform_component>(vec3(20.f, 5.f, -2.f), quat::identity)
 		//	.addComponent<raster_component>(testMesh)
-		//	.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, 0.2f, 0.5f, 4.f))
-		//	.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, 0.2f, 0.5f, 4.f))
+		//	.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, { 0.2f, 0.5f, 4.f }))
+		//	.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, { 0.2f, 0.5f, 4.f} ))
 		//	.addComponent<rigid_body_component>(true, 1.f);
 
 		//random_number_generator rng = { 15681923 };
@@ -211,7 +211,7 @@ void application::initialize(main_renderer* renderer)
 		//		scene.createEntity("Cube")
 		//			.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
 		//			.addComponent<raster_component>(boxMesh)
-		//			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), 0.1f, 0.5f, 1.f))
+		//			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), { 0.1f, 0.5f, 1.f }))
 		//			.addComponent<rigid_body_component>(false, 1.f);
 		//	}
 		//	else
@@ -219,7 +219,7 @@ void application::initialize(main_renderer* renderer)
 		//		scene.createEntity("Sphere")
 		//			.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
 		//			.addComponent<raster_component>(sphereMesh)
-		//			.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.f, 0.f), 1.f }, 0.1f, 0.5f, 1.f))
+		//			.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.f, 0.f), 1.f }, { 0.1f, 0.5f, 1.f }))
 		//			.addComponent<rigid_body_component>(false, 1.f);
 		//	}
 		//}
@@ -231,7 +231,7 @@ void application::initialize(main_renderer* renderer)
 		//};
 		//
 		//scene.createEntity("Trigger")
-		//	.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(25.f, 1.f, -5.f), vec3(5.f, 1.f, 5.f)), 0, 0, 0))
+		//	.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(25.f, 1.f, -5.f), vec3(5.f, 1.f, 5.f)), { 0, 0, 0 }))
 		//	.addComponent<trigger_component>(triggerCallback);
 
 		//bounding_hull hull =
@@ -246,19 +246,19 @@ void application::initialize(main_renderer* renderer)
 		//	scene.createEntity("Hull")
 		//		.addComponent<transform_component>(vec3(20.f, 15.f, 0.f), quat::identity)
 		//		.addComponent<raster_component>(loadMeshFromFile("assets/colliders/hull.fbx"))
-		//		.addComponent<collider_component>(collider_component::asHull(hull, 0.1f, 0.5f, 0.1f))
+		//		.addComponent<collider_component>(collider_component::asHull(hull, { 0.1f, 0.5f, 0.1f }))
 		//		.addComponent<rigid_body_component>(false, 0.f);
 		//}
 
 		scene.createEntity("Test ground")
 			.addComponent<transform_component>(vec3(0.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
-			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(100.f, 4.f, 100.f)), 0.1f, 1.f, 4.f));
+			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(100.f, 4.f, 100.f)), { 0.1f, 1.f, 4.f }));
 
 		/*scene.createEntity("Test ground")
 			.addComponent<transform_component>(vec3(20.f, -5.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
-			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f));*/
+			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), { 0.1f, 1.f, 4.f }));*/
 
 
 		auto chainMesh = make_ref<composite_mesh>();
@@ -269,7 +269,7 @@ void application::initialize(main_renderer* renderer)
 		auto fixed = scene.createEntity("Fixed")
 			.addComponent<transform_component>(vec3(37.f, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))
 			.addComponent<raster_component>(chainMesh)
-			.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, 0.2f, 0.5f, 1.f))
+			.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, { 0.2f, 0.5f, 1.f }))
 			.addComponent<rigid_body_component>(true, 1.f);
 
 		//fixed.getComponent<rigid_body_component>().angularVelocity = vec3(0.f, 0.1f, 0.f);
@@ -285,7 +285,7 @@ void application::initialize(main_renderer* renderer)
 			auto chain = scene.createEntity("Chain")
 				.addComponent<transform_component>(vec3(xCurr, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))
 				.addComponent<raster_component>(chainMesh)
-				.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, 0.2f, 0.5f, 1.f))
+				.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, { 0.2f, 0.5f, 1.f }))
 				.addComponent<rigid_body_component>(false, 1.f);
 
 			//addHingeConstraintFromGlobalPoints(prev, chain, vec3(xPrev + 1.18f, 15.f, -2.f), vec3(0.f, 0.f, 1.f), deg2rad(5.f), deg2rad(20.f));

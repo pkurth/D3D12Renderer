@@ -557,7 +557,7 @@ static void getWorldSpaceColliders(game_scene& scene, bounding_box* outWorldspac
 		const transform_component& transform = entity.hasComponent<transform_component>() ? entity.getComponent<transform_component>() : trs::identity;
 
 		col.type = collider.type;
-		col.properties = collider.properties;
+		col.material = collider.material;
 
 		if (entity.hasComponent<rigid_body_component>())
 		{
@@ -1138,7 +1138,7 @@ physics_properties collider_union::calculatePhysicsProperties()
 	{
 		case collider_type_sphere:
 		{
-			result.mass = sphere.volume() * properties.density;
+			result.mass = sphere.volume() * material.density;
 			result.cog = sphere.center;
 			result.inertia = mat3::identity * (2.f / 5.f * result.mass * sphere.radius * sphere.radius);
 		} break;
@@ -1156,15 +1156,15 @@ physics_properties collider_union::calculatePhysicsProperties()
 			quat rotation = rotateFromTo(vec3(0.f, 1.f, 0.f), axis);
 			mat3 rot = quaternionToMat3(rotation);
 
-			result.mass = capsule.volume() * properties.density;
+			result.mass = capsule.volume() * material.density;
 			result.cog = (capsule.positionA + capsule.positionB) * 0.5f;
 			
 			// Inertia.
 			float sqRadius = capsule.radius * capsule.radius;
 			float sqRadiusPI = M_PI * sqRadius;
 
-			float cylinderMass = properties.density * sqRadiusPI * height;
-			float hemiSphereMass = properties.density * 2.f / 3.f * sqRadiusPI * capsule.radius;
+			float cylinderMass = material.density * sqRadiusPI * height;
+			float hemiSphereMass = material.density * 2.f / 3.f * sqRadiusPI * capsule.radius;
 
 			float sqCapsuleHeight = height * height;
 
@@ -1194,7 +1194,7 @@ physics_properties collider_union::calculatePhysicsProperties()
 			quat rotation = rotateFromTo(vec3(0.f, 1.f, 0.f), axis);
 			mat3 rot = quaternionToMat3(rotation);
 
-			result.mass = cylinder.volume() * properties.density;
+			result.mass = cylinder.volume() * material.density;
 			result.cog = (cylinder.positionA + cylinder.positionB) * 0.5f;
 
 			// Inertia.
@@ -1210,7 +1210,7 @@ physics_properties collider_union::calculatePhysicsProperties()
 
 		case collider_type_aabb:
 		{
-			result.mass = aabb.volume() * properties.density;
+			result.mass = aabb.volume() * material.density;
 			result.cog = aabb.getCenter();
 
 			vec3 diameter = aabb.getRadius() * 2.f;
@@ -1222,7 +1222,7 @@ physics_properties collider_union::calculatePhysicsProperties()
 
 		case collider_type_obb:
 		{
-			result.mass = obb.volume() * properties.density;
+			result.mass = obb.volume() * material.density;
 			result.cog = obb.center;
 
 			vec3 diameter = obb.radius * 2.f;
@@ -1292,9 +1292,9 @@ physics_properties collider_union::calculatePhysicsProperties()
 			mat3 CprimeTotal = totalCovariance - totalMass * outerProduct(totalCOG, totalCOG);
 
 			result.cog = totalCOG;
-			result.mass = totalMass * properties.density;
+			result.mass = totalMass * material.density;
 			result.inertia = mat3::identity * trace(CprimeTotal) - CprimeTotal;
-			result.inertia *= properties.density;
+			result.inertia *= material.density;
 		} break;
 
 		default:

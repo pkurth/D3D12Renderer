@@ -618,9 +618,9 @@ bool scene_editor::drawSceneHierarchy()
 
 								if (ImGui::BeginProperties())
 								{
-									ImGui::PropertySlider("Restitution", collider.properties.restitution);
-									ImGui::PropertySlider("Friction", collider.properties.friction);
-									dirty |= ImGui::PropertyInput("Density", collider.properties.density);
+									ImGui::PropertySlider("Restitution", collider.material.restitution);
+									ImGui::PropertySlider("Friction", collider.material.friction);
+									dirty |= ImGui::PropertyInput("Density", collider.material.density);
 
 									ImGui::EndProperties();
 								}

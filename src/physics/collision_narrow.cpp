@@ -1790,8 +1790,8 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collid
 				uint16 rbA = colliderA->objectIndex;
 				uint16 rbB = colliderB->objectIndex;
 
-				collider_properties propsA = colliderA->properties;
-				collider_properties propsB = colliderB->properties;
+				physics_material propsA = colliderA->material;
+				physics_material propsB = colliderB->material;
 
 				float friction = clamp01(sqrt(propsA.friction * propsB.friction));
 				float restitution = clamp01(max(propsA.restitution, propsB.restitution));

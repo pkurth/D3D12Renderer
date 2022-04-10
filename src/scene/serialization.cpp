@@ -259,9 +259,9 @@ static YAML::Emitter& operator<<(YAML::Emitter& out, const collider_component& c
 		} break;
 	}
 
-	out << YAML::Key << "Restitution" << YAML::Value << c.properties.restitution
-		<< YAML::Key << "Friction" << YAML::Value << c.properties.friction
-		<< YAML::Key << "Density" << YAML::Value << c.properties.density
+	out << YAML::Key << "Restitution" << YAML::Value << c.material.restitution
+		<< YAML::Key << "Friction" << YAML::Value << c.material.friction
+		<< YAML::Key << "Density" << YAML::Value << c.material.density
 		<< YAML::EndMap;
 	return out;
 }
@@ -613,10 +613,11 @@ namespace YAML
 					break;
 				}
 			}
-			float restitution, friction, density;
-			YAML_LOAD(n, restitution, "Restitution");
-			YAML_LOAD(n, friction, "Friction");
-			YAML_LOAD(n, density, "Density");
+
+			physics_material material;
+			YAML_LOAD(n, material.restitution, "Restitution");
+			YAML_LOAD(n, material.friction, "Friction");
+			YAML_LOAD(n, material.density, "Density");
 
 			switch (c.type)
 			{
@@ -626,7 +627,7 @@ namespace YAML
 					float radius;
 					YAML_LOAD(n, center, "Center");
 					YAML_LOAD(n, radius, "Radius");
-					c = collider_component::asSphere({ center, radius }, restitution, friction, density);
+					c = collider_component::asSphere({ center, radius }, material);
 				} break;
 
 				case collider_type_capsule:
@@ -636,7 +637,7 @@ namespace YAML
 					YAML_LOAD(n, positionA, "Position A");
 					YAML_LOAD(n, positionB, "Position B");
 					YAML_LOAD(n, radius, "Radius");
-					c = collider_component::asCapsule({ positionA, positionB, radius }, restitution, friction, density);
+					c = collider_component::asCapsule({ positionA, positionB, radius }, material);
 				} break;
 
 				case collider_type_aabb:
@@ -644,7 +645,7 @@ namespace YAML
 					vec3 minCorner, maxCorner;
 					YAML_LOAD(n, minCorner, "Min corner");
 					YAML_LOAD(n, maxCorner, "Max corner");
-					c = collider_component::asAABB(bounding_box::fromMinMax(minCorner, maxCorner), restitution, friction, density);
+					c = collider_component::asAABB(bounding_box::fromMinMax(minCorner, maxCorner), material);
 				} break;
 
 				case collider_type_obb:
@@ -655,7 +656,7 @@ namespace YAML
 					YAML_LOAD(n, radius, "Radius");
 					YAML_LOAD(n, rotation, "Rotation");
 
-					c = collider_component::asOBB({ center, radius, rotation }, restitution, friction, density);
+					c = collider_component::asOBB({ center, radius, rotation }, material);
 				} break;
 
 				case collider_type_hull:

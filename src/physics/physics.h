@@ -17,7 +17,7 @@ struct physics_properties
 	float mass;
 };
 
-struct collider_properties
+struct physics_material
 {
 	float restitution;
 	float friction;
@@ -80,51 +80,57 @@ struct collider_union
 		bounding_hull hull;
 	};
 
-	collider_properties properties;
+	physics_material material;
 };
 
 struct collider_component : collider_union
 {
-	static collider_component asSphere(bounding_sphere s, float restitution, float friction, float density)
+	static collider_component asSphere(bounding_sphere s, physics_material material)
 	{
 		collider_component result;
 		result.sphere = s;
-		result.initialize(collider_type_sphere, restitution, friction, density);
+		result.type = collider_type_sphere;
+		result.material = material;
 		return result;
 	}
-	static collider_component asCapsule(bounding_capsule c, float restitution, float friction, float density)
+	static collider_component asCapsule(bounding_capsule c, physics_material material)
 	{
 		collider_component result;
 		result.capsule = c;
-		result.initialize(collider_type_capsule, restitution, friction, density);
+		result.type = collider_type_capsule;
+		result.material = material;
 		return result;
 	}
-	static collider_component asCylinder(bounding_cylinder c, float restitution, float friction, float density)
+	static collider_component asCylinder(bounding_cylinder c, physics_material material)
 	{
 		collider_component result;
 		result.cylinder = c;
-		result.initialize(collider_type_cylinder, restitution, friction, density);
+		result.type = collider_type_cylinder;
+		result.material = material;
 		return result;
 	}
-	static collider_component asAABB(bounding_box b, float restitution, float friction, float density)
+	static collider_component asAABB(bounding_box b, physics_material material)
 	{
 		collider_component result;
 		result.aabb = b;
-		result.initialize(collider_type_aabb, restitution, friction, density);
+		result.type = collider_type_aabb;
+		result.material = material;
 		return result;
 	}
-	static collider_component asOBB(bounding_oriented_box b, float restitution, float friction, float density)
+	static collider_component asOBB(bounding_oriented_box b, physics_material material)
 	{
 		collider_component result;
 		result.obb = b;
-		result.initialize(collider_type_obb, restitution, friction, density);
+		result.type = collider_type_obb;
+		result.material = material;
 		return result;
 	}
-	static collider_component asHull(bounding_hull h, float restitution, float friction, float density)
+	static collider_component asHull(bounding_hull h, physics_material material)
 	{
 		collider_component result;
 		result.hull = h;
-		result.initialize(collider_type_hull, restitution, friction, density);
+		result.type = collider_type_hull;
+		result.material = material;
 		return result;
 	}
 
@@ -133,15 +139,6 @@ struct collider_component : collider_union
 	// Set by scene on component creation.
 	entt::entity parentEntity;
 	entt::entity nextEntity;
-
-private:
-	void initialize(collider_type type, float restitution, float friction, float density)
-	{
-		this->type = type;
-		this->properties.restitution = restitution;
-		this->properties.friction = friction;
-		this->properties.density = density;
-	}
 };
 
 struct physics_reference_component

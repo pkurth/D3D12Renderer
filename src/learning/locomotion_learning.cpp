@@ -171,9 +171,11 @@ void locomotion_learning_environment::reset()
 
 	rng = { (uint32)time(0) };
 
+	physics_material groundMaterial = { 0.1f, 1.f, 4.f };
+
 	scene.createEntity("Test ground")
 		.addComponent<transform_component>(vec3(0.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
-		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), 0.1f, 1.f, 4.f));
+		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), groundMaterial));
 
 	ragdoll.initialize(scene, vec3(0.f, 1.25f, 0.f));
 
