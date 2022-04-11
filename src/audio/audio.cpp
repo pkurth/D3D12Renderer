@@ -270,7 +270,7 @@ void updateAudio(float dt)
 }
 
 
-sound_handle play2DSound(uint32 id, const sound_settings& settings)
+sound_handle play2DSound(const std::string& id, const sound_settings& settings)
 {
 	ref<audio_sound> sound = getSound(id);
 	if (!sound)
@@ -286,7 +286,7 @@ sound_handle play2DSound(uint32 id, const sound_settings& settings)
 	return { channelID };
 }
 
-sound_handle play3DSound(uint32 id, vec3 position, const sound_settings& settings)
+sound_handle play3DSound(const std::string& id, vec3 position, const sound_settings& settings)
 {
 	ref<audio_sound> sound = getSound(id);
 	if (!sound)

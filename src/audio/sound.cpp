@@ -3,9 +3,6 @@
 #include "audio.h"
 
 #include "core/log.h"
-#include "core/imgui.h"
-#include "core/asset.h"
-#include "core/yaml.h"
 
 #include <unordered_map>
 
@@ -24,9 +21,9 @@ static bool findChunk(HANDLE fileHandle, uint32 fourcc, uint32& chunkSize, uint3
 static bool readChunkData(HANDLE fileHandle, void* buffer, uint32 buffersize, uint32 bufferoffset);
 
 
-static std::unordered_map<uint32, ref<audio_sound>> sounds;
+static std::unordered_map<std::string, ref<audio_sound>> sounds;
 
-bool checkForExistingSound(uint32 id, bool stream)
+bool checkForExistingSound(const std::string& id, bool stream)
 {
     auto it = sounds.find(id);
 
@@ -41,12 +38,12 @@ bool checkForExistingSound(uint32 id, bool stream)
     return false;
 }
 
-void registerSound(uint32 id, const ref<audio_sound>& sound)
+void registerSound(const std::string& id, const ref<audio_sound>& sound)
 {
     sounds.insert({ id, sound });
 }
 
-bool loadFileSound(uint32 id, sound_type type, const fs::path& path, bool stream)
+bool loadFileSound(const std::string& id, sound_type type, const fs::path& path, bool stream)
 {
     if (checkForExistingSound(id, stream))
     {
@@ -112,12 +109,12 @@ bool loadFileSound(uint32 id, sound_type type, const fs::path& path, bool stream
     }
 }
 
-void unloadSound(uint32 id)
+void unloadSound(const std::string& id)
 {
     sounds.erase(id);
 }
 
-ref<audio_sound> getSound(uint32 id)
+ref<audio_sound> getSound(const std::string& id)
 {
     auto it = sounds.find(id);
     return (it != sounds.end()) ? it->second : 0;
@@ -300,147 +297,3 @@ bool isSoundExtension(const std::string& extension)
     return extension == ".wav";
 }
 
-
-bool soundEditorWindowOpen = false;
-
-
-struct sound_spec
-{
-    asset_handle asset;
-    sound_type type;
-    bool stream;
-};
-
-static std::unordered_map<std::string, sound_spec> soundRegistry;
-static const fs::path registryPath = fs::path(L"resources/sounds.yaml").lexically_normal();
-
-void loadSoundRegistry()
-{
-    std::ifstream stream(registryPath);
-    YAML::Node n = YAML::Load(stream);
-
-    for (auto entryNode : n)
-    {
-        std::string name;
-        sound_spec spec = {};
-
-        YAML_LOAD(entryNode, name, "Name");
-        YAML_LOAD(entryNode, spec.asset, "Asset");
-        YAML_LOAD_ENUM(entryNode, spec.type, "Type");
-        YAML_LOAD(entryNode, spec.stream, "Stream");
-
-        soundRegistry.insert({ name, spec });
-    }
-}
-
-void drawSoundEditor()
-{
-    if (soundEditorWindowOpen)
-    {
-        if (ImGui::Begin(ICON_FA_VOLUME_UP "  Sound Editing", &soundEditorWindowOpen))
-        {
-            static bool dirty = false;
-
-
-            ImGui::Text("CREATE NEW SOUND");
-            {
-                static char name[64];
-                static asset_handle asset;
-                static sound_type type = sound_type_music;
-                static bool stream = false;
-
-                if (ImGui::BeginProperties())
-                {
-                    ImGui::PropertyInputText("Name", name, sizeof(name));
-                    ImGui::PropertyAssetHandle("Asset", "content_browser_audio", asset);
-                    ImGui::PropertyDropdown("Type", soundTypeNames, sound_type_count, (uint32&)type);
-                    ImGui::PropertyCheckbox("Stream", stream);
-
-                    ImGui::EndProperties();
-                }
-
-                bool createable = name[0] != '\0' && asset;
-
-                if (ImGui::DisableableButton("Create", createable))
-                {
-                    soundRegistry.insert({ name, sound_spec{ asset, type, stream } });
-
-                    name[0] = '\0';
-                    asset.value = 0;
-
-                    dirty = true;
-                }
-
-                if (!createable)
-                {
-                    ImGui::SameLine();
-                    ImGui::TextColored(ImColor(212, 68, 82), "  Missing name and/or asset");
-                }
-            }
-
-
-
-            ImGui::Separator();
-            ImGui::Separator();
-            ImGui::Separator();
-
-            ImGui::Text("EXISTING SOUNDS");
-
-            if (ImGui::DisableableButton("Save registry", dirty))
-            {
-                YAML::Emitter out;
-                out << YAML::BeginSeq;
-
-                for (const auto& [name, spec] : soundRegistry)
-                {
-                    out << YAML::BeginMap;
-                    out << YAML::Key << "Name" << YAML::Value << name;
-                    out << YAML::Key << "Asset" << YAML::Value << spec.asset;
-                    out << YAML::Key << "Type" << YAML::Value << (uint32)spec.type;
-                    out << YAML::Key << "Stream" << YAML::Value << spec.stream;
-                    out << YAML::EndMap;
-                }
-
-                out << YAML::EndSeq;
-
-                fs::create_directories(registryPath.parent_path());
-
-                LOG_MESSAGE("Rewriting sound registry");
-                std::ofstream fout(registryPath);
-                fout << out.c_str();
-
-                dirty = false;
-            }
-
-            {
-                static ImGuiTextFilter filter;
-                filter.Draw();
-
-                if (ImGui::BeginChild("##SoundList"))
-                {
-                    for (auto& [name, spec] : soundRegistry)
-                    {
-                        if (filter.PassFilter(name.c_str()))
-                        {
-                            if (ImGui::BeginTree(name.c_str()))
-                            {
-                                if (ImGui::BeginProperties())
-                                {
-                                    dirty |= ImGui::PropertyAssetHandle("Asset", "content_browser_audio", spec.asset);
-                                    dirty |= ImGui::PropertyDropdown("Type", soundTypeNames, sound_type_count, (uint32&)spec.type);
-                                    dirty |= ImGui::PropertyCheckbox("Stream", spec.stream);
-
-                                    ImGui::EndProperties();
-                                }
-
-                                ImGui::EndTree();
-                            }
-                        }
-                    }
-                }
-                ImGui::EndChild();
-            }
-        }
-        ImGui::End();
-    }
-}

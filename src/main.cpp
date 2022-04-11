@@ -109,8 +109,8 @@ int main(int argc, char** argv)
 	initializeFileRegistry();
 	initializeAudio();
 
-	uint32 musicID = 1;
-	uint32 explosionID = 2;
+	std::string musicID = "music";
+	std::string explosionID = "explosion";
 
 	if (loadFileSound(musicID, sound_type_music, "assets/audio/price-of-freedom-33106.wav", true))
 	{

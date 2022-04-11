@@ -1,6 +1,7 @@
 #pragma once
 
 #include "sound.h"
+#include "sound_management.h"
 #include "reverb.h"
 #include "core/math.h"
 
@@ -34,8 +35,8 @@ struct sound_handle
 };
 
 
-sound_handle play2DSound(uint32 id, const sound_settings& settings);
-sound_handle play3DSound(uint32 id, vec3 position, const sound_settings& settings);
+sound_handle play2DSound(const std::string& id, const sound_settings& settings);
+sound_handle play3DSound(const std::string& id, vec3 position, const sound_settings& settings);
 
 
 bool soundStillPlaying(sound_handle handle);

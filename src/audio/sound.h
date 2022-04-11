@@ -50,21 +50,21 @@ struct sound_settings
     float pitchFadeTime = 0.1f;
 };
 
-ref<audio_sound> getSound(uint32 id);
+ref<audio_sound> getSound(const std::string& id);
 
 
-void unloadSound(uint32 id);
+void unloadSound(const std::string& id);
 
-bool loadFileSound(uint32 id, sound_type type, const fs::path& path, bool stream);
+bool loadFileSound(const std::string& id, sound_type type, const fs::path& path, bool stream);
 
 template <typename synth_t, typename... args>
-static bool loadSynthSound(uint32 id, sound_type type, bool stream, const args&... a)
+static bool loadSynthSound(const std::string&, sound_type type, bool stream, const args&... a)
 {
     static_assert(std::is_base_of_v<audio_synth, synth_t>, "Synthesizer must inherit from audio_synth");
     static_assert(sizeof(synth_t) <= MAX_SYNTH_SIZE);
 
-    bool checkForExistingSound(uint32 id, bool stream);
-    void registerSound(uint32 id, const ref<audio_sound>&sound);
+    bool checkForExistingSound(const std::string&, bool stream);
+    void registerSound(const std::string&, const ref<audio_sound>&sound);
 
 
     if (checkForExistingSound(id, true))
@@ -138,7 +138,3 @@ static bool loadSynthSound(uint32 id, sound_type type, bool stream, const args&.
 bool isSoundExtension(const fs::path& extension);
 bool isSoundExtension(const std::string& extension);
 
-extern bool soundEditorWindowOpen;
-
-void loadSoundRegistry();
-void drawSoundEditor();
