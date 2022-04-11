@@ -24,13 +24,7 @@ union wN_vec2
 
 	void store(float* xDest, float* yDest) { x.store(xDest); y.store(yDest); }
 
-	static wN_vec2 zero() 
-	{
-		if constexpr (std::is_same_v<simd_t, w4_float>) { return wN_vec2(w4_float::zero(), w4_float::zero()); }
-		else if constexpr (std::is_same_v<simd_t, w8_float>) { return wN_vec2(w8_float::zero(), w8_float::zero()); }
-		else if constexpr (std::is_same_v<simd_t, w16_float>) { return wN_vec2(w16_float::zero(), w16_float::zero()); }
-		else { static_assert(false); }
-	}
+	static wN_vec2 zero() { return wN_vec2<simd_t>(simd_t::zero()); }
 };
 
 template <typename simd_t>
@@ -59,13 +53,7 @@ union wN_vec3
 
 	void store(float* xDest, float* yDest, float* zDest) { x.store(xDest); y.store(yDest); z.store(zDest); }
 
-	static wN_vec3 zero()
-	{
-		if constexpr (std::is_same_v<simd_t, w4_float>) { return wN_vec3(w4_float::zero(), w4_float::zero(), w4_float::zero()); }
-		else if constexpr (std::is_same_v<simd_t, w8_float>) { return wN_vec3(w8_float::zero(), w8_float::zero(), w8_float::zero()); }
-		else if constexpr (std::is_same_v<simd_t, w16_float>) { return wN_vec3(w16_float::zero(), w16_float::zero(), w16_float::zero()); }
-		else { static_assert(false); }
-	}
+	static wN_vec3 zero() { return wN_vec3<simd_t>(simd_t::zero()); }
 };
 
 template <typename simd_t>
@@ -99,13 +87,7 @@ union wN_vec4
 
 	void store(float* xDest, float* yDest, float* zDest, float* wDest) { x.store(xDest); y.store(yDest); z.store(zDest); w.store(wDest); }
 
-	static wN_vec4 zero()
-	{
-		if constexpr (std::is_same_v<simd_t, w4_float>) { return wN_vec4(w4_float::zero(), w4_float::zero(), w4_float::zero(), w4_float::zero()); }
-		else if constexpr (std::is_same_v<simd_t, w8_float>) { return wN_vec4(w8_float::zero(), w8_float::zero(), w8_float::zero(), w8_float::zero()); }
-		else if constexpr (std::is_same_v<simd_t, w16_float>) { return wN_vec4(w16_float::zero(), w16_float::zero(), w16_float::zero(), w16_float::zero()); }
-		else { static_assert(false); }
-	}
+	static wN_vec4 zero() { return wN_vec4<simd_t>(simd_t::zero()); }
 };
 
 template <typename simd_t>
