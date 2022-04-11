@@ -186,6 +186,15 @@ void main(cs_input IN)
 
     const float2 uvM = motion.SampleLevel(linearSampler, uv, 0);
     const float3 normalAndRoughness = worldNormalsRoughness.SampleLevel(linearSampler, uv + uvM, 0);
+
+	if (all(normalAndRoughness.xy == float2(0.f, 0.f)))
+	{
+		// If normal is zero length, just return no hit.
+		// This happens if the window is resized, because we are sampling the last frame's normals.
+		output[IN.dispatchThreadID.xy] = float4(0.f, 0.f, -1.f, 0.f);
+		return;
+	}
+
     const float3 normal = unpackNormal(normalAndRoughness.xy);
     const float3 viewNormal = mul(camera.view, float4(normal, 0.f)).xyz;
     const float roughness = clamp(normalAndRoughness.z, 0.03f, 0.97f);
