@@ -17,7 +17,7 @@ void humanoid_ragdoll::initialize(game_scene& scene, vec3 initialHipPosition, fl
 	float ragdollDensity = 985.f; // Average density of human body in kg/m3.
 	float ragdollFriction = 1.f;
 
-	physics_material material = { 0.2f, ragdollFriction, ragdollDensity };
+	physics_material material = { physics_material_type_flesh, 0.2f, ragdollFriction, ragdollDensity };
 
 	trs torsoTransform(initialHipPosition + scale * vec3(0.f, 0.f, 0.f), quat::identity);
 	trs headTransform(initialHipPosition + scale * vec3(0.f, 1.45f, 0.f), quat::identity);

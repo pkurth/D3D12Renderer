@@ -17,8 +17,30 @@ struct physics_properties
 	float mass;
 };
 
+enum physics_material_type
+{
+	physics_material_type_none = -1,
+
+	physics_material_type_metal,
+	physics_material_type_wood,
+	physics_material_type_flesh,
+
+	physics_material_type_count,
+};
+
+static const char* physicsMaterialTypeNames[] =
+{
+	"Metal",
+	"Wood",
+	"Flesh",
+};
+
+static_assert(arraysize(physicsMaterialTypeNames) == physics_material_type_count);
+
 struct physics_material
 {
+	physics_material_type type; // Currently only used for sound selection.
+
 	float restitution;
 	float friction;
 	float density;

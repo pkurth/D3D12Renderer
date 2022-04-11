@@ -211,7 +211,7 @@ void application::initialize(main_renderer* renderer)
 		//		scene.createEntity("Cube")
 		//			.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
 		//			.addComponent<raster_component>(boxMesh)
-		//			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), { 0.1f, 0.5f, 1.f }))
+		//			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), { physics_material_type_wood, 0.1f, 0.5f, 1.f }))
 		//			.addComponent<rigid_body_component>(false, 1.f);
 		//	}
 		//	else
@@ -231,7 +231,7 @@ void application::initialize(main_renderer* renderer)
 		//};
 		//
 		//scene.createEntity("Trigger")
-		//	.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(25.f, 1.f, -5.f), vec3(5.f, 1.f, 5.f)), { 0, 0, 0 }))
+		//	.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(25.f, 1.f, -5.f), vec3(5.f, 1.f, 5.f)), { physics_material_type_none, 0, 0, 0 }))
 		//	.addComponent<trigger_component>(triggerCallback);
 
 		//bounding_hull hull =
@@ -253,12 +253,12 @@ void application::initialize(main_renderer* renderer)
 		scene.createEntity("Test ground")
 			.addComponent<transform_component>(vec3(0.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
-			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(100.f, 4.f, 100.f)), { 0.1f, 1.f, 4.f }));
+			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(100.f, 4.f, 100.f)), { physics_material_type_metal, 0.1f, 1.f, 4.f }));
 
 		/*scene.createEntity("Test ground")
 			.addComponent<transform_component>(vec3(20.f, -5.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
-			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), { 0.1f, 1.f, 4.f }));*/
+			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), { physics_material_type_metal, 0.1f, 1.f, 4.f }));*/
 
 
 		auto chainMesh = make_ref<composite_mesh>();

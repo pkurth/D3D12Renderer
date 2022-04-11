@@ -110,7 +110,7 @@ static void attach(mesh_builder& builder, ref<pbr_material> material, scene_enti
 
 				capsule.radius = desc.toothWidth * 0.5f;
 
-				axis.addComponent<collider_component>(collider_component::asCapsule(capsule, { 0.2f, desc.friction, desc.density }));
+				axis.addComponent<collider_component>(collider_component::asCapsule(capsule, { physics_material_type_wood, 0.2f, desc.friction, desc.density }));
 			}
 		} break;
 
@@ -131,7 +131,7 @@ static void attach(mesh_builder& builder, ref<pbr_material> material, scene_enti
 			cylinder.positionB = vec3(0.f, rodOffset + desc.height * 0.5f, 0.f);
 			cylinder.radius = desc.radius;
 			
-			axis.addComponent<collider_component>(collider_component::asCylinder(cylinder, { 0.2f, desc.friction, desc.density }));
+			axis.addComponent<collider_component>(collider_component::asCylinder(cylinder, { physics_material_type_wood, 0.2f, desc.friction, desc.density }));
 		} break;
 	}
 
@@ -203,7 +203,7 @@ static scene_entity createGearAxis(game_scene& scene, mesh_builder& builder, ref
 		capsule.positionB = center - vec3(0.f, toothLength * 0.5f, 0.f);
 		capsule.radius = toothWidth * 0.5f;
 
-		axis.addComponent<collider_component>(collider_component::asCapsule(capsule, { 0.2f, friction, density }));
+		axis.addComponent<collider_component>(collider_component::asCapsule(capsule, { physics_material_type_wood, 0.2f, friction, density }));
 
 		capsule_mesh_desc m;
 		m.center = center;
@@ -240,7 +240,7 @@ static scene_entity createWheel(game_scene& scene, mesh_builder& builder, ref<pb
 	cylinder.positionB = vec3(0.f, desc.height * 0.5f, 0.f);
 	cylinder.radius = desc.radius;
 
-	result.addComponent<collider_component>(collider_component::asCylinder(cylinder, { 0.2f, desc.friction, desc.density }));
+	result.addComponent<collider_component>(collider_component::asCylinder(cylinder, { physics_material_type_wood, 0.2f, desc.friction, desc.density }));
 
 	result.addComponent<raster_component>(mesh);
 	result.addComponent<rigid_body_component>(false);
@@ -322,7 +322,7 @@ void vehicle::initialize(game_scene& scene, vec3 initialMotorPosition, float ini
 
 	motor = scene.createEntity("Motor")
 		.addComponent<transform_component>(vec3(0.f, 0.f, 0.f), quat::identity)
-		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f), vec3(0.6f, 0.1f, 1.f)), { 0.2f, 0.f, density }))
+		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f), vec3(0.6f, 0.1f, 1.f)), { physics_material_type_wood, 0.2f, 0.f, density }))
 		.addComponent<rigid_body_component>(false);
 
 	{	
