@@ -109,15 +109,12 @@ int main(int argc, char** argv)
 	initializeFileRegistry();
 	initializeAudio();
 
-	std::string musicID = "music";
-	std::string explosionID = "explosion";
-
-	if (loadFileSound(musicID, sound_type_music, "assets/audio/price-of-freedom-33106.wav", true))
+	if (loadFileSound(SOUND_ID("music")))
 	{
 		sound_settings soundSettings;
 		soundSettings.loop = true;
 
-		play2DSound(musicID, soundSettings);
+		play2DSound(SOUND_ID("music"), soundSettings);
 	}
 
 
@@ -255,11 +252,11 @@ int main(int argc, char** argv)
 		if (ImGui::IsKeyPressed(key_enter))
 		{
 			//if (loadSynthSound<sine_synth>(id, sound_type_sfx, true, 1.5f, C_HZ))
-			if (loadFileSound(explosionID, sound_type_sfx, "assets/audio/explosion.wav", false))
+			if (loadFileSound(SOUND_ID("explosion")))
 			{
 				sound_settings soundSettings;
 
-				play3DSound(explosionID, vec3(0.f), soundSettings);
+				play3DSound(SOUND_ID("explosion"), vec3(0.f), soundSettings);
 			}
 		}
 

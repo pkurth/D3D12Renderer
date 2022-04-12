@@ -1,10 +1,8 @@
 #include "pch.h"
 #include "sound_management.h"
-#include "sound.h"
 
 #include "core/log.h"
 #include "core/imgui.h"
-#include "core/asset.h"
 #include "core/yaml.h"
 
 #if __has_include ("generated/sound_ids.h")
@@ -18,30 +16,6 @@ static const uint32 numSoundIDs = 0;
 
 bool soundEditorWindowOpen = false;
 
-
-struct sound_spec
-{
-    asset_handle asset;
-    sound_type type;
-    bool stream;
-};
-
-namespace std
-{
-    template<>
-    struct hash<sound_id>
-    {
-        size_t operator()(const sound_id& x) const
-        {
-            return x.hash; // Already hashed.
-        }
-    };
-}
-
-static bool operator==(const sound_id& a, const sound_id& b)
-{
-    return a.hash == b.hash; // TODO: Proper compare.
-}
 
 static std::unordered_map<sound_id, sound_spec> soundRegistry;
 static const fs::path registryPath = fs::path(L"resources/sounds.yaml").lexically_normal();
@@ -141,5 +115,10 @@ void drawSoundEditor()
         }
         ImGui::End();
     }
+}
+
+sound_spec getSoundSpec(const sound_id& id)
+{
+    return soundRegistry[id];
 }
 

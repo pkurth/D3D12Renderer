@@ -35,8 +35,8 @@ struct sound_handle
 };
 
 
-sound_handle play2DSound(const std::string& id, const sound_settings& settings);
-sound_handle play3DSound(const std::string& id, vec3 position, const sound_settings& settings);
+sound_handle play2DSound(const sound_id& id, const sound_settings& settings);
+sound_handle play3DSound(const sound_id& id, vec3 position, const sound_settings& settings);
 
 
 bool soundStillPlaying(sound_handle handle);

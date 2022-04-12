@@ -1,8 +1,10 @@
 #include "pch.h"
 #include "sound.h"
 #include "audio.h"
+#include "sound_management.h"
 
 #include "core/log.h"
+#include "core/file_registry.h"
 
 #include <unordered_map>
 
@@ -21,36 +23,30 @@ static bool findChunk(HANDLE fileHandle, uint32 fourcc, uint32& chunkSize, uint3
 static bool readChunkData(HANDLE fileHandle, void* buffer, uint32 buffersize, uint32 bufferoffset);
 
 
-static std::unordered_map<std::string, ref<audio_sound>> sounds;
+static std::unordered_map<sound_id, ref<audio_sound>> sounds;
 
-bool checkForExistingSound(const std::string& id, bool stream)
+bool checkForExistingSound(const sound_id& id)
 {
-    auto it = sounds.find(id);
-
-    if (it != sounds.end())
-    {
-        ref<audio_sound>& sound = it->second;
-        assert(sound->stream == stream);
-
-        return true;
-    }
-
-    return false;
+    return sounds.find(id) != sounds.end();
 }
 
-void registerSound(const std::string& id, const ref<audio_sound>& sound)
+void registerSound(const sound_id& id, const ref<audio_sound>& sound)
 {
     sounds.insert({ id, sound });
 }
 
-bool loadFileSound(const std::string& id, sound_type type, const fs::path& path, bool stream)
+bool loadFileSound(const sound_id& id)
 {
-    if (checkForExistingSound(id, stream))
+    if (checkForExistingSound(id))
     {
         return true;
     }
     else
     {
+        sound_spec spec = getSoundSpec(id);
+
+        fs::path path = getPathFromAssetHandle(spec.asset);
+
         HANDLE fileHandle = openFile(path);
         if (fileHandle != INVALID_HANDLE_VALUE)
         {
@@ -68,7 +64,7 @@ bool loadFileSound(const std::string& id, sound_type type, const fs::path& path,
 				{
 					success = true;
 
-					if (!stream)
+					if (!spec.stream)
 					{
 						dataBuffer = new BYTE[chunkSize];
 						success = readChunkData(fileHandle, dataBuffer, chunkSize, chunkPosition);
@@ -86,14 +82,14 @@ bool loadFileSound(const std::string& id, sound_type type, const fs::path& path,
             {
                 ref<audio_sound> sound = make_ref<audio_sound>();
                 sound->path = path;
-                sound->stream = stream;
+                sound->stream = spec.stream;
                 sound->fileHandle = fileHandle;
                 sound->wfx = wfx;
                 sound->chunkSize = chunkSize;
                 sound->chunkPosition = chunkPosition;
                 sound->dataBuffer = dataBuffer;
                 sound->isSynth = false;
-                sound->type = type;
+                sound->type = spec.type;
 
                 registerSound(id, sound);
             }
@@ -109,12 +105,12 @@ bool loadFileSound(const std::string& id, sound_type type, const fs::path& path,
     }
 }
 
-void unloadSound(const std::string& id)
+void unloadSound(const sound_id& id)
 {
     sounds.erase(id);
 }
 
-ref<audio_sound> getSound(const std::string& id)
+ref<audio_sound> getSound(const sound_id& id)
 {
     auto it = sounds.find(id);
     return (it != sounds.end()) ? it->second : 0;
