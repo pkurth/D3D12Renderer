@@ -83,14 +83,15 @@ struct audio_channel
 
 	bool hasStopped();
 
+	ref<audio_sound> sound;
+	bool positioned;
+	vec3 position;
+
 private:
 	void initialize(const audio_context& context, const ref<audio_sound>& sound, const sound_settings& settings, bool positioned, vec3 position = vec3(0.f));
 
 	void updateSoundSettings(float dt);
 	void update3D(const audio_context& context);
-
-	bool positioned;
-	vec3 position;
 
 	uint32 update3DTimer = 0;
 
@@ -112,8 +113,6 @@ private:
 
 	float oldVolume = -1.f;
 	float oldPitch = -1.f;
-
-	ref<audio_sound> sound;
 
 
 	struct voice_callback : IXAudio2VoiceCallback

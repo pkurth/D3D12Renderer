@@ -219,7 +219,7 @@ void application::initialize(main_renderer* renderer)
 		//		scene.createEntity("Sphere")
 		//			.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
 		//			.addComponent<raster_component>(sphereMesh)
-		//			.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.f, 0.f), 1.f }, { 0.1f, 0.5f, 1.f }))
+		//			.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.f, 0.f), 1.f }, { physics_material_type_wood, 0.1f, 0.5f, 1.f }))
 		//			.addComponent<rigid_body_component>(false, 1.f);
 		//	}
 		//}
@@ -303,6 +303,16 @@ void application::initialize(main_renderer* renderer)
 			builder.createDXMesh();
 	}
 #endif
+
+
+	collisionCallback = [](const collision_event& e)
+	{
+		if (e.type == collision_event_start)
+		{
+			play2DSound(SOUND_ID("explosion"), {});
+		};
+	};
+
 
 	//humanoid_ragdoll::create(scene, vec3(60.f, 1.25f, -2.f));
 	//humanoid_ragdoll ragdoll = humanoid_ragdoll::create(scene, vec3(20.f, 1.25f, 0.f));

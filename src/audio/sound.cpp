@@ -23,16 +23,26 @@ static bool findChunk(HANDLE fileHandle, uint32 fourcc, uint32& chunkSize, uint3
 static bool readChunkData(HANDLE fileHandle, void* buffer, uint32 buffersize, uint32 bufferoffset);
 
 
-static std::unordered_map<sound_id, ref<audio_sound>> sounds;
+static std::unordered_map<sound_id, ref<audio_sound>> fileSounds;
+static std::unordered_map<sound_id, ref<audio_sound>> synthSounds;
+
 
 bool checkForExistingSound(const sound_id& id)
 {
-    return sounds.find(id) != sounds.end();
+    return fileSounds.find(id) != fileSounds.end()
+        || synthSounds.find(id) != synthSounds.end();
 }
 
 void registerSound(const sound_id& id, const ref<audio_sound>& sound)
 {
-    sounds.insert({ id, sound });
+    if (!sound->isSynth)
+    {
+        fileSounds.insert({ id, sound });
+    }
+    else
+    {
+        synthSounds.insert({ id, sound });
+    }
 }
 
 bool loadFileSound(const sound_id& id)
@@ -46,59 +56,62 @@ bool loadFileSound(const sound_id& id)
         sound_spec spec = getSoundSpec(id);
 
         fs::path path = getPathFromAssetHandle(spec.asset);
-
-        HANDLE fileHandle = openFile(path);
-        if (fileHandle != INVALID_HANDLE_VALUE)
+        if (!path.empty())
         {
-            WAVEFORMATEXTENSIBLE wfx;
-            uint32 chunkSize, chunkPosition;
-
-            bool success = false;
-            BYTE* dataBuffer = 0;
-
-            // Find and retrieve format chunk.
-            if (getWFX(fileHandle, path, wfx))
-			{
-                // Find data chunk.
-				if (findChunk(fileHandle, fourccDATA, chunkSize, chunkPosition))
-				{
-					success = true;
-
-					if (!spec.stream)
-					{
-						dataBuffer = new BYTE[chunkSize];
-						success = readChunkData(fileHandle, dataBuffer, chunkSize, chunkPosition);
-						if (!success)
-						{
-							delete[] dataBuffer;
-						}
-
-						closeFile(fileHandle);
-					}
-				}
-            }
-
-            if (success)
+            HANDLE fileHandle = openFile(path);
+            if (fileHandle != INVALID_HANDLE_VALUE)
             {
-                ref<audio_sound> sound = make_ref<audio_sound>();
-                sound->path = path;
-                sound->stream = spec.stream;
-                sound->fileHandle = fileHandle;
-                sound->wfx = wfx;
-                sound->chunkSize = chunkSize;
-                sound->chunkPosition = chunkPosition;
-                sound->dataBuffer = dataBuffer;
-                sound->isSynth = false;
-                sound->type = spec.type;
+                WAVEFORMATEXTENSIBLE wfx;
+                uint32 chunkSize, chunkPosition;
 
-                registerSound(id, sound);
-            }
-            else
-            {
-                closeFile(fileHandle);
-            }
+                bool success = false;
+                BYTE* dataBuffer = 0;
 
-            return success;
+                // Find and retrieve format chunk.
+                if (getWFX(fileHandle, path, wfx))
+                {
+                    // Find data chunk.
+                    if (findChunk(fileHandle, fourccDATA, chunkSize, chunkPosition))
+                    {
+                        success = true;
+
+                        if (!spec.stream)
+                        {
+                            dataBuffer = new BYTE[chunkSize];
+                            success = readChunkData(fileHandle, dataBuffer, chunkSize, chunkPosition);
+                            if (!success)
+                            {
+                                delete[] dataBuffer;
+                            }
+
+                            closeFile(fileHandle);
+                        }
+                    }
+                }
+
+                if (success)
+                {
+                    ref<audio_sound> sound = make_ref<audio_sound>();
+                    sound->id = id;
+                    sound->path = path;
+                    sound->stream = spec.stream;
+                    sound->fileHandle = fileHandle;
+                    sound->wfx = wfx;
+                    sound->chunkSize = chunkSize;
+                    sound->chunkPosition = chunkPosition;
+                    sound->dataBuffer = dataBuffer;
+                    sound->isSynth = false;
+                    sound->type = spec.type;
+
+                    registerSound(id, sound);
+                }
+                else
+                {
+                    closeFile(fileHandle);
+                }
+
+                return success;
+            }
         }
 
         return false;
@@ -107,13 +120,29 @@ bool loadFileSound(const sound_id& id)
 
 void unloadSound(const sound_id& id)
 {
-    sounds.erase(id);
+    fileSounds.erase(id);
+    synthSounds.erase(id);
+}
+
+void unloadAllSounds()
+{
+    fileSounds.clear();
+    synthSounds.clear();
 }
 
 ref<audio_sound> getSound(const sound_id& id)
 {
-    auto it = sounds.find(id);
-    return (it != sounds.end()) ? it->second : 0;
+    auto fileIt = fileSounds.find(id);
+    if (fileIt != fileSounds.end())
+    {
+        return fileIt->second;
+    }
+    auto synthIt = synthSounds.find(id);
+    if (synthIt != synthSounds.end())
+    {
+        return synthIt->second;
+    }
+    return 0;
 }
 
 audio_sound::~audio_sound()

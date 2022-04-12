@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "sound_management.h"
+#include "audio.h"
 
 #include "core/log.h"
 #include "core/imgui.h"
@@ -87,6 +88,10 @@ void drawSoundEditor()
             if (ImGui::DisableableButton("Save registry", dirty))
             {
                 saveSoundRegistry();
+
+                unloadAllSounds(); // Unload, such that the spec gets reloaded when the sound is played the next time.
+                //restartAllSounds();
+
                 dirty = false;
             }
 

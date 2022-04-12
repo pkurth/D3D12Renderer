@@ -40,6 +40,8 @@ struct sound_spec
 
 struct audio_sound
 {
+    sound_id id;
+
     fs::path path;
     bool stream;
     bool isSynth;
@@ -72,18 +74,21 @@ ref<audio_sound> getSound(const sound_id& id);
 
 
 void unloadSound(const sound_id& id);
+void unloadAllSounds();
 
 bool loadFileSound(const sound_id& id);
 
 template <typename synth_t, typename... args>
-static bool loadSynthSound(const sound_id&, sound_type type, bool stream, const args&... a)
+static bool loadSynthSound(const char* idStr, sound_type type, bool stream, const args&... a)
 {
     static_assert(std::is_base_of_v<audio_synth, synth_t>, "Synthesizer must inherit from audio_synth");
     static_assert(sizeof(synth_t) <= MAX_SYNTH_SIZE);
 
-    bool checkForExistingSound(const sound_id&);
-    void registerSound(const sound_id&, const ref<audio_sound>&sound);
+    sound_id id = { idStr, hashString64(idStr) };
+    sound_spec spec = { {}, type, stream };
 
+    bool checkForExistingSound(const sound_id&);
+    void registerSound(const sound_id&, const ref<audio_sound>&);
 
     if (checkForExistingSound(id))
     {
@@ -100,6 +105,7 @@ static bool loadSynthSound(const sound_id&, sound_type type, bool stream, const 
                 return createFunc(buffer);
             }
         };
+
 
         ref<audio_sound> sound;
 
@@ -140,6 +146,7 @@ static bool loadSynthSound(const sound_id&, sound_type type, bool stream, const 
             sound = s;
         }
 
+        sound->id = id;
         sound->stream = stream;
         sound->wfx = { wfx };
         sound->dataBuffer = dataBuffer;

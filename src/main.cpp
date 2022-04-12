@@ -109,7 +109,6 @@ int main(int argc, char** argv)
 	initializeFileRegistry();
 	initializeAudio();
 
-	if (loadFileSound(SOUND_ID("music")))
 	{
 		sound_settings soundSettings;
 		soundSettings.loop = true;
@@ -251,19 +250,8 @@ int main(int argc, char** argv)
 
 		if (ImGui::IsKeyPressed(key_enter))
 		{
-			//if (loadSynthSound<sine_synth>(id, sound_type_sfx, true, 1.5f, C_HZ))
-			if (loadFileSound(SOUND_ID("explosion")))
-			{
-				sound_settings soundSettings;
-
-				play3DSound(SOUND_ID("explosion"), vec3(0.f), soundSettings);
-			}
-		}
-
-		if (ImGui::IsKeyPressed('P'))
-		{
-			if (masterAudioSettings.reverbPreset == reverb_none) { masterAudioSettings.reverbPreset = reverb_preset_concert_hall; }
-			else { masterAudioSettings.reverbPreset = reverb_none; }
+			sound_settings soundSettings;
+			play3DSound(SOUND_ID("explosion"), vec3(0.f), soundSettings);
 		}
 
 		// Update and render.

@@ -275,7 +275,13 @@ sound_handle play2DSound(const sound_id& id, const sound_settings& settings)
 	ref<audio_sound> sound = getSound(id);
 	if (!sound)
 	{
-		return {};
+		// Not all sounds are file sounds, but we have no chance of creating a synth here.
+		if (!loadFileSound(id))
+		{
+			return {};
+		}
+
+		sound = getSound(id);
 	}
 
 	uint32 channelID = nextChannelID++;
@@ -291,7 +297,12 @@ sound_handle play3DSound(const sound_id& id, vec3 position, const sound_settings
 	ref<audio_sound> sound = getSound(id);
 	if (!sound)
 	{
-		return {};
+		if (!loadFileSound(id))
+		{
+			return {};
+		}
+
+		sound = getSound(id);
 	}
 
 	uint32 channelID = nextChannelID++;
@@ -319,6 +330,30 @@ bool stop(sound_handle handle, float fadeOutTime)
 		}
 	}
 	return false;
+}
+
+void restartAllSounds()
+{
+	auto channelsCopy = std::move(channels);
+
+	for (auto it = channelsCopy.begin(), end = channelsCopy.end(); it != end; ++it)
+	{
+		sound_id id = it->second->sound->id;
+		sound_settings settings = *it->second->getSettings();
+		bool positioned = it->second->positioned;
+		vec3 position = it->second->position;
+
+		it->second->stop(0.f);
+
+		if (positioned)
+		{
+			play3DSound(id, position, settings);
+		}
+		else
+		{
+			play2DSound(id, settings);
+		}
+	}
 }
 
 sound_settings* getSettings(sound_handle handle)

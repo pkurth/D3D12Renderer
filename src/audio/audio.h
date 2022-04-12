@@ -38,9 +38,11 @@ struct sound_handle
 sound_handle play2DSound(const sound_id& id, const sound_settings& settings);
 sound_handle play3DSound(const sound_id& id, vec3 position, const sound_settings& settings);
 
+void restartAllSounds();
 
 bool soundStillPlaying(sound_handle handle);
 bool stop(sound_handle handle, float fadeOutTime = 0.1f);
+
 
 // Only hold on to this pointer for one frame! Retrieve each frame! Returns null, if sound has stopped already.
 sound_settings* getSettings(sound_handle handle);
