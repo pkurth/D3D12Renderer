@@ -8,6 +8,7 @@
 #include <functional>
 
 
+// Don't create this manually. Use SOUND_ID below.
 struct sound_id
 {
     const char* id;
