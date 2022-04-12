@@ -16,3 +16,4 @@ learning/__pycache__/
 *.user
 *.dll
 resources/
+src/generated/

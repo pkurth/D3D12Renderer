@@ -58,6 +58,7 @@ constexpr inline auto max(T a, T b)
 	return (a < b) ? b : a;
 }
 
+template <auto V> static constexpr auto force_consteval = V;
 
 #define setBit(mask, bit) mask |= (1 << (bit))
 #define unsetBit(mask, bit) mask ^= (1 << (bit))

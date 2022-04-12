@@ -1,9 +1,19 @@
 #pragma once
 
 #include "synth.h"
+#include "core/string.h"
 
 #include <xaudio2.h>
 #include <functional>
+
+
+struct sound_id
+{
+    const char* id;
+    uint64 hash;
+};
+
+#define SOUND_ID(id) sound_id{ id, force_consteval<hashString64(id)> }
 
 
 enum sound_type

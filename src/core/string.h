@@ -26,3 +26,24 @@ static std::wstring stringToWstring(const std::string& str)
 	MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), &result[0], size);
 	return result;
 }
+
+constexpr uint32 hashString32(const char* s)
+{
+	uint32 hash = 2166136261u;
+	while (*s)
+	{
+		hash = 16777619u * (hash ^ (uint32)(*s++));
+	}
+	return hash;
+}
+
+constexpr uint64 hashString64(const char* s)
+{
+	uint64 hash = 14695981039346656037llu;
+	while (*s)
+	{
+		hash = 1099511628211llu * (hash ^ (uint64)(*s++));
+	}
+	return hash;
+}
+

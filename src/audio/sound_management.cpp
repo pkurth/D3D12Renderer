@@ -7,6 +7,12 @@
 #include "core/asset.h"
 #include "core/yaml.h"
 
+#if __has_include ("generated/sound_ids.h")
+#include "generated/sound_ids.h"
+#else
+static const sound_id soundIDs[1] = {};
+static const uint32 numSoundIDs = 0;
+#endif
 
 
 
