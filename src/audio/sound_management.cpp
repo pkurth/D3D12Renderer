@@ -90,7 +90,7 @@ void drawSoundEditor()
                 saveSoundRegistry();
 
                 unloadAllSounds(); // Unload, such that the spec gets reloaded when the sound is played the next time.
-                //restartAllSounds();
+                restartAllSounds();
 
                 dirty = false;
             }
