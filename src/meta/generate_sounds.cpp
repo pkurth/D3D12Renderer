@@ -5,13 +5,13 @@
 
 #include <fstream>
 #include <regex>
-#include <set>
+#include <unordered_set>
 
 int main()
 {
     std::regex re("SOUND_ID\\(\"(.*)\"\\)");
 
-    std::set<std::string> sounds;
+    std::unordered_set<std::string> sounds;
 
     for (const fs::directory_entry& dirEntry : fs::recursive_directory_iterator("src"))
     {
