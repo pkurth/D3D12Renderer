@@ -10,12 +10,11 @@ enum channel_state
 	channel_state_to_play,
 	channel_state_playing,
 
-	channel_state_pausing,
-	channel_state_paused,
-	channel_state_resuming,
-
 	channel_state_stopping,
 	channel_state_stopped,
+
+	channel_state_virtualizing,
+	channel_state_virtual,
 };
 
 struct property_fader
@@ -90,17 +89,15 @@ struct audio_channel
 private:
 	void initialize(const audio_context& context, const ref<audio_sound>& sound, const sound_settings& settings, bool positioned, vec3 position = vec3(0.f));
 
-	void updateSoundSettings(float dt);
-	void update3D(const audio_context& context);
+	void updateSoundSettings(const audio_context& context, float dt);
+
+	bool shouldBeVirtual();
 
 	uint32 update3DTimer = 0;
 
 	volatile channel_state state = channel_state_to_play;
 
-	bool stopRequested = false;
-	bool pauseRequested = false;
-	property_fader stopFader;
-
+	property_fader upDownFader;
 	property_fader volumeFader;
 	property_fader pitchFader;
 
