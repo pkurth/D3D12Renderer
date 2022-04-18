@@ -313,8 +313,8 @@ void application::initialize(main_renderer* renderer)
 		if (auto* rb = e.entityA.getComponentIfExists<rigid_body_component>()) { velA = rb->linearVelocity; }
 		if (auto* rb = e.entityB.getComponentIfExists<rigid_body_component>()) { velB = rb->linearVelocity; }
 
-		const tag_component& tagA = e.entityA.getComponent<tag_component>();
-		const tag_component& tagB = e.entityB.getComponent<tag_component>();
+		//const tag_component& tagA = e.entityA.getComponent<tag_component>();
+		//const tag_component& tagB = e.entityB.getComponent<tag_component>();
 
 		float relSpeed = length(velA - velB);
 		//LOG_MESSAGE("Collision (%.2f %.2f %.2f) (%.2f %.2f %.2f) -> %.2f", velA.x, velA.y, velA.z, velB.x, velB.y, velB.z, relSpeed);
@@ -326,7 +326,7 @@ void application::initialize(main_renderer* renderer)
 			assert(e.numContacts > 0);
 			vec3 position = e.contacts[0].point;
 		
-			play3DSound(SOUND_ID("explosion"), position, { volume });
+			play3DSound(SOUND_ID("collision"), position, { volume });
 		}
 	};
 
