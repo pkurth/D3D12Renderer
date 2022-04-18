@@ -306,7 +306,7 @@ void application::initialize(main_renderer* renderer)
 #endif
 
 
-	collisionBeginCallback = [](const collision_event& e)
+	collisionBeginCallback = [rng = random_number_generator(512513)](const collision_event& e) mutable
 	{
 		vec3 velA(0.f);
 		vec3 velB(0.f);
@@ -325,8 +325,10 @@ void application::initialize(main_renderer* renderer)
 		{
 			assert(e.numContacts > 0);
 			vec3 position = e.contacts[0].point;
+
+			float pitch = rng.randomFloatBetween(0.8f, 1.2f);
 		
-			play3DSound(SOUND_ID("collision"), position, { volume });
+			play3DSound(SOUND_ID("collision"), position, { volume, pitch });
 		}
 	};
 
