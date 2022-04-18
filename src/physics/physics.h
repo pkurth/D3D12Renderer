@@ -335,27 +335,39 @@ struct physics_settings
 };
 
 
-enum collision_event_type
+
+
+struct contact_info
 {
-	collision_event_start,
-	collision_event_end,
+	vec3 point;
+	float penetrationDepth; // Positive.
+};
+
+struct collision_contact
+{
+	// Don't change the order here.
+	vec3 point;
+	float penetrationDepth;
+	vec3 normal;
+	uint32 friction_restitution; // Packed as 16 bit int each. The packing makes it more convenient for the SIMD code to load the contact data.
 };
 
 struct collision_event
 {
 	scene_entity entityA;
-	scene_entity colliderEntityA;
-	const collider_component& colliderA;
-
 	scene_entity entityB;
-	scene_entity colliderEntityB;
+
+	const collider_component& colliderA;
 	const collider_component& colliderB;
 
-	collision_event_type type;
+	// Only set for collision begin event.
+	collision_contact* contacts;
+	uint32 numContacts;
 };
 
 extern physics_settings physicsSettings;
-extern std::function<void(const collision_event&)> collisionCallback;
+extern std::function<void(const collision_event&)> collisionBeginCallback;
+extern std::function<void(const collision_event&)> collisionEndCallback;
 
 void testPhysicsInteraction(game_scene& scene, ray r);
 void physicsStep(game_scene& scene, memory_arena& arena, float dt);

@@ -6,21 +6,6 @@
 struct collider_union;
 struct collider_pair;
 
-struct contact_info
-{
-	vec3 point;
-	float penetrationDepth; // Positive.
-};
-
-struct collision_contact
-{
-	// Don't change the order here.
-	vec3 point;
-	float penetrationDepth;
-	vec3 normal;
-	uint32 friction_restitution; // Packed as 16 bit int each. The packing makes it more convenient for the SIMD code to load the contact data.
-};
-
 struct non_collision_interaction
 {
 	uint16 rigidBodyIndex;
@@ -38,6 +23,7 @@ struct narrowphase_result
 // After this function returns, the first result.numCollisions entries of collisionPairs indicate the RB-RB collisions, which actually passed the narrow phase.
 narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collider_pair* collisionPairs, uint32 numCollisionPairs,
 	collision_contact* outContacts, constraint_body_pair* outBodyPairs, // result.numContacts many.
+	uint8* numContactsPerPair,
 	non_collision_interaction* outNonCollisionInteractions);			// result.numNonCollisionInteractions many.
 
 

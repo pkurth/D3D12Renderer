@@ -5,6 +5,7 @@
 #include "core/random.h"
 #include "core/color.h"
 #include "core/imgui.h"
+#include "core/log.h"
 #include "dx/dx_context.h"
 #include "dx/dx_profiling.h"
 #include "physics/physics.h"
@@ -199,30 +200,30 @@ void application::initialize(main_renderer* renderer)
 		//	.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, { 0.2f, 0.5f, 4.f} ))
 		//	.addComponent<rigid_body_component>(true, 1.f);
 
-		//random_number_generator rng = { 15681923 };
-		//for (uint32 i = 0; i < 1000; ++i)
-		//{
-		//	//float x = rng.randomFloatBetween(-90.f, 90.f);
-		//	//float z = rng.randomFloatBetween(-90.f, 90.f);
-		//	//float y = rng.randomFloatBetween(20.f, 60.f);
-		//
-		//	if (i % 2 == 0)
-		//	{
-		//		scene.createEntity("Cube")
-		//			.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
-		//			.addComponent<raster_component>(boxMesh)
-		//			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), { physics_material_type_wood, 0.1f, 0.5f, 1.f }))
-		//			.addComponent<rigid_body_component>(false, 1.f);
-		//	}
-		//	else
-		//	{
-		//		scene.createEntity("Sphere")
-		//			.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
-		//			.addComponent<raster_component>(sphereMesh)
-		//			.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.f, 0.f), 1.f }, { physics_material_type_wood, 0.1f, 0.5f, 1.f }))
-		//			.addComponent<rigid_body_component>(false, 1.f);
-		//	}
-		//}
+		random_number_generator rng = { 15681923 };
+		for (uint32 i = 0; i < 10; ++i)
+		{
+			//float x = rng.randomFloatBetween(-90.f, 90.f);
+			//float z = rng.randomFloatBetween(-90.f, 90.f);
+			//float y = rng.randomFloatBetween(20.f, 60.f);
+		
+			if (i % 2 == 0)
+			{
+				scene.createEntity("Cube")
+					.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+					.addComponent<raster_component>(boxMesh)
+					.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), { physics_material_type_wood, 0.1f, 0.5f, 1.f }))
+					.addComponent<rigid_body_component>(false, 1.f);
+			}
+			else
+			{
+				scene.createEntity("Sphere")
+					.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+					.addComponent<raster_component>(sphereMesh)
+					.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.f, 0.f), 1.f }, { physics_material_type_wood, 0.1f, 0.5f, 1.f }))
+					.addComponent<rigid_body_component>(false, 1.f);
+			}
+		}
 
 		//auto triggerCallback = [scene=&scene](trigger_event e)
 		//{
@@ -305,12 +306,28 @@ void application::initialize(main_renderer* renderer)
 #endif
 
 
-	collisionCallback = [](const collision_event& e)
+	collisionBeginCallback = [](const collision_event& e)
 	{
-		if (e.type == collision_event_start)
+		vec3 velA(0.f);
+		vec3 velB(0.f);
+		if (auto* rb = e.entityA.getComponentIfExists<rigid_body_component>()) { velA = rb->linearVelocity; }
+		if (auto* rb = e.entityB.getComponentIfExists<rigid_body_component>()) { velB = rb->linearVelocity; }
+
+		const tag_component& tagA = e.entityA.getComponent<tag_component>();
+		const tag_component& tagB = e.entityB.getComponent<tag_component>();
+
+		float relSpeed = length(velA - velB);
+		//LOG_MESSAGE("Collision (%.2f %.2f %.2f) (%.2f %.2f %.2f) -> %.2f", velA.x, velA.y, velA.z, velB.x, velB.y, velB.z, relSpeed);
+		//LOG_MESSAGE("Collision %s %s -> %.2f", tagA.name, tagB.name, relSpeed);
+		
+		float volume = saturate(inverseLerp(1.f, 20.f, relSpeed));
+		if (volume > 0.f)
 		{
-			play2DSound(SOUND_ID("explosion"), {});
-		};
+			assert(e.numContacts > 0);
+			vec3 position = e.contacts[0].point;
+		
+			play3DSound(SOUND_ID("explosion"), position, { volume });
+		}
 	};
 
 

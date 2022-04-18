@@ -1747,7 +1747,7 @@ static bool overlapCheck(const collider_union* worldSpaceColliders, collider_pai
 }
 
 narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collider_pair* collisionPairs, uint32 numCollisionPairs,
-	collision_contact* outContacts, constraint_body_pair* outBodyPairs, non_collision_interaction* outNonCollisionInteractions)
+	collision_contact* outContacts, constraint_body_pair* outBodyPairs, uint8* numContactsPerPair, non_collision_interaction* outNonCollisionInteractions)
 {
 	CPU_PROFILE_BLOCK("Narrow phase");
 
@@ -1761,22 +1761,22 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collid
 		const collider_union* colliderA = worldSpaceColliders + overlap.colliderA;
 		const collider_union* colliderB = worldSpaceColliders + overlap.colliderB;
 
+		bool pairOfCollidingRBs = false;
+
 		if (colliderA->objectType != physics_object_type_rigid_body && colliderB->objectType != physics_object_type_rigid_body)
 		{
 			// If none of the objects is a rigid body, no collision is generated.
-			continue;
+			goto loopEnd;
 		}
 
 		if (colliderA->objectType == physics_object_type_rigid_body && colliderB->objectType == physics_object_type_rigid_body
 			&& colliderA->objectIndex == colliderB->objectIndex)
 		{
 			// If both colliders belong to the same rigid body, no collision is generated.
-			continue;
+			goto loopEnd;
 		}
 
 		// At this point, either one or both colliders belong to a rigid body. One of them could be a force field, trigger or a solo collider still.
-
-		bool swapBack = true;
 
 		if (colliderA->objectType == physics_object_type_rigid_body && colliderB->objectType == physics_object_type_rigid_body // Both rigid bodies.
 			|| colliderA->objectType == physics_object_type_static_collider || colliderB->objectType == physics_object_type_static_collider) // One is a static collider.
@@ -1798,6 +1798,8 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collid
 
 				uint32 friction_restitution = ((uint32)(friction * 0xFFFF) << 16) | (uint32)(restitution * 0xFFFF);
 
+				numContactsPerPair[i] = (uint8)contact.numContacts;
+
 				for (uint32 contactIndex = 0; contactIndex < contact.numContacts; ++contactIndex)
 				{
 					collision_contact& out = outContacts[numContacts];
@@ -1814,7 +1816,7 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collid
 					++numContacts;
 				}
 
-				swapBack = false;
+				pairOfCollidingRBs = true;
 				++numCollisions;
 			}
 		}
@@ -1824,7 +1826,8 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collid
 			numNonCollisionInteractions += overlapCheck(worldSpaceColliders, overlap, interaction);
 		}
 
-		if (swapBack)
+		loopEnd:
+		if (!pairOfCollidingRBs)
 		{
 			// A copy may be enough, but this preserves all the pairs.
 			std::swap(collisionPairs[i], collisionPairs[numCollisionPairs - 1]);

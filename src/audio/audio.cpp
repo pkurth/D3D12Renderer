@@ -259,7 +259,7 @@ void updateAudio(float dt)
 		if (it->second->hasStopped())
 		{
 			stoppedChannels[numStoppedChannels++] = it;
-			LOG_MESSAGE("Deleting channel");
+			//LOG_MESSAGE("Deleting channel");
 		}
 	}
 
