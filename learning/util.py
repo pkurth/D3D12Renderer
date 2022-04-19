@@ -1,5 +1,5 @@
 import gym
-import gym_loco
+import loco_env
 import torch
 
 from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv, VecNormalize
@@ -10,17 +10,17 @@ from stable_baselines3.common.monitor import Monitor
 from vec_monitor import VecMonitor
 
 
-def make_env(env_id, rank, seed=0):
+def make_env(env_type, rank, seed=0):
     """
     Utility function for multiprocessed env.
 
-    :param env_id: (str) the environment ID
+    :param env_type: (type) the environment type
     :param num_env: (int) the number of environments you wish to have in subprocesses
     :param seed: (int) the inital seed for RNG
     :param rank: (int) index of the subprocess
     """
     def _init():
-        env = gym.make(env_id)
+        env = env_type()
         env.seed(seed + rank)
         return env
     set_random_seed(seed)
@@ -28,10 +28,10 @@ def make_env(env_id, rank, seed=0):
 
 
 def make_loco_env(log_dir) :
-    env_id = "loco-v0"
+    env_type = loco_env.LocoEnv
     num_cpu = 16
     
-    env = SubprocVecEnv([make_env(env_id, i) for i in range(num_cpu)])
+    env = SubprocVecEnv([make_env(env_type, i) for i in range(num_cpu)])
     env = VecMonitor(env, log_dir)
     torch.set_num_threads(num_cpu)
     return env

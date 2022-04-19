@@ -71,7 +71,7 @@ if __name__ == '__main__':
     policy_kwargs = dict(activation_fn=torch.nn.Tanh,
                      net_arch=[dict(pi=[128, 128], vf=[128, 128])])
     
-    start_from_pretrained = True
+    start_from_pretrained = False
 
     device = "cpu"
 
@@ -84,7 +84,7 @@ if __name__ == '__main__':
             ActorCriticPolicy, 
             env, 
             verbose=2, 
-            tensorboard_log=log_dir, 
+            #tensorboard_log=log_dir, 
             policy_kwargs=policy_kwargs,
             clip_range=0.1,
             batch_size=128,

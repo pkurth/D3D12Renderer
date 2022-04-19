@@ -11,6 +11,7 @@ It also features a custom written physics engine written completely from scratch
 - [Other](#other-features)
 - [System Requirements](#system-requirements)
 - [Build Instructions](#build-instructions)
+- [Locomotion Learning](#locomotion-learning)
 
 ## Graphics features
 
@@ -85,7 +86,7 @@ Images to the right are links to YouTube videos showcasing the various physics f
 - SIMD support for constraint resolution (SSE4 and AVX2)
 - Ragdolls
 - Vehicle physics
-- Machine learning for ragdoll locomotion. Based on [Machine Learning Summit: Ragdoll Motion Matching](https://www.youtube.com/watch?v=JZKaqQKcAnw) and [DReCon: Data-Driven Responsive Control of Physics-Based Characters](https://static-wordpress.akamaized.net/montreal.ubisoft.com/wp-content/uploads/2019/11/13214229/DReCon.pdf) by Ubisoft
+- Machine learning for ragdoll locomotion. Based on [Machine Learning Summit: Ragdoll Motion Matching](https://www.youtube.com/watch?v=JZKaqQKcAnw) and [DReCon: Data-Driven Responsive Control of Physics-Based Characters](https://static-wordpress.akamaized.net/montreal.ubisoft.com/wp-content/uploads/2019/11/13214229/DReCon.pdf) by Ubisoft. See [below](#locomotion-learning).
 
 </p>
 
@@ -133,5 +134,44 @@ In that case either restart Visual Studio or re-generate the project (_generate.
 The assets seen in the screenshots above are not included with the source code. 
 
 
+## Locomotion Learning
 
+<a href="https://youtu.be/IVmj8vP_oQM"><img align="right" src="https://img.youtube.com/vi/IVmj8vP_oQM/mqdefault.jpg" width="300" /></a>
+<img align="right" width="100%" />
+
+<p align="left">
+This project implements a very simplified version of learned ragdoll locomotion.
+The ragdoll is constructed of various separate rigid bodies, connected with hinge constraints on elbows and knees, and cone twist constraints on shoulders, hips, neck etc.
+Currently the ragdoll only learns to stand upright, by controlling forces applied to all these constraints.
+It can withstand minor forces.
+
+The neural network has a very simple structure.
+It only features two fully connected layers with a tanh activation.
+
+### Learning
+
+The training is implemented in PyTorch, so you'll need to install Python 3.x and some packages.
+I am using Miniconda, but the steps below should work fine with just Python (replace `conda` calls with `pip`).
+
+To start the training, follow the following instructions:
+- Build the C++ code (see above) in a Release build. This builds a separate DLL (_Physics-DLL.dll_), which is accessed by the Python code.
+- Install Anaconda/Miniconda or simply Python 3
+- Open Anaconda Powersheel (depending on installation, maybe you'll need to start as administrator)
+- `conda create --name learning`
+- `conda activate learning`
+- `conda install pytorch cpuonly -c pytorch` (I'm training on the CPU, but feel free to experiment with training on CUDA)
+- `pip install stable-baselines3`
+- Navigate to root directory of this project
+- `python .\learning\learn_locomotion.py`
+- Wait a couple of hours
+- You can cancel and continue the training at any time. Just set the variable `start_from_pretrained` inside _learning/learn_locomotion.py_ to `True`.
+
+### Inference
+
+I didn't feel like linking against the huge `libtorch` C++ library for inference of such a simple network, so I wrote the inference myself.
+Thus, after learning, execute the following command to export the layer weights and biases from Python to a text file: `python .\learning\convert_model_to_c++.py`.
+Then rebuild the C++ code.
+The weights then get compiled automatically into the C++ executable.
+
+</p>
 
