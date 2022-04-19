@@ -147,29 +147,31 @@ It can withstand minor forces.
 
 The neural network has a very simple structure.
 It only features two fully connected layers with a tanh activation.
+It is trained using the [Proximal Policy Optimization Algorithm (PPO)](https://arxiv.org/abs/1707.06347), implemented in [`stable-baselines3`](https://stable-baselines3.readthedocs.io/en/master/index.html).
 
 ### Learning
 
 The training is implemented in PyTorch, so you'll need to install Python 3.x and some packages.
 I am using Miniconda, but the steps below should work fine with just Python (replace `conda` calls with `pip`).
 
-To start the training, follow the following instructions:
-- Build the C++ code (see above) in a Release build. This builds a separate DLL (_Physics-DLL.dll_), which is accessed by the Python code.
-- Install Anaconda/Miniconda or simply Python 3
-- Open Anaconda Powersheel (depending on installation, maybe you'll need to start as administrator)
+To set up the enviroment, in the Anaconda Powershell execute the following commands (depending on installation, maybe you'll need to start as administrator):
 - `conda create --name learning`
 - `conda activate learning`
 - `conda install pytorch cpuonly -c pytorch` (I'm training on the CPU, but feel free to experiment with training on CUDA)
 - `pip install stable-baselines3`
-- Navigate to root directory of this project
-- `python .\learning\learn_locomotion.py`
-- Wait a couple of hours
+
+
+To start the training:
+- Build the C++ code (see [above](#build-instructions)) in a Release build. This builds a separate DLL (_Physics-DLL.dll_), which is accessed by the Python code.
+- In the Anaconda Powershell, navigate to root directory of this project.
+- `python ./learning/learn_locomotion.py`
+- Wait a couple of hours.
 - You can cancel and continue the training at any time. Just set the variable `start_from_pretrained` inside _learning/learn_locomotion.py_ to `True`.
 
 ### Inference
 
 I didn't feel like linking against the huge `libtorch` C++ library for inference of such a simple network, so I wrote the inference myself.
-Thus, after learning, execute the following command to export the layer weights and biases from Python to a text file: `python .\learning\convert_model_to_c++.py`.
+Thus, after learning, execute the following command to export the layer weights and biases from Python to a text file: `python ./learning/convert_model_to_c++.py`.
 Then rebuild the C++ code.
 The weights then get compiled automatically into the C++ executable.
 
