@@ -175,6 +175,11 @@ static bool gjkIntersectionTest(const shapeA_t& shapeA, const shapeB_t& shapeB, 
 
 	while (true)
 	{
+		if (squaredLength(dir) < 0.0001f)
+		{
+			return false;
+		}
+
 		gjk_support_point a = support(shapeA, shapeB, dir);
 		if (dot(a.minkowski, dir) < 0.f)
 		{

@@ -60,8 +60,11 @@ gjk_internal_success updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a
 		vec3 ad = s.d.minkowski - a.minkowski;
 
 		vec3 bcd = cross(s.c.minkowski - s.b.minkowski, s.d.minkowski - s.b.minkowski);
-		assert(dot(bcd, dir) <= 0.00001f);
-		assert(dot(bcd, s.b.minkowski) >= -0.00001f);
+		if (dot(bcd, dir) > 0.00001f || dot(bcd, s.b.minkowski) < -0.00001f)
+		{
+			std::cerr << "GJK ERROR 0\n";
+			return gjk_unexpected_error;
+		}
 
 		// Normals of faces (point outside).
 		vec3 abc = cross(ac, ab);
@@ -77,7 +80,11 @@ gjk_internal_success updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a
 		flags |= (dot(abd, ao) > 0.f) ? overABDFlag : 0;
 		flags |= (dot(adc, ao) > 0.f) ? overADCFlag : 0;
 
-		assert(flags != (overABCFlag | overABDFlag | overADCFlag));
+		if (flags == (overABCFlag | overABDFlag | overADCFlag))
+		{
+			std::cerr << "GJK ERROR 0\n";
+			return gjk_unexpected_error;
+		}
 
 		if (flags == 0)
 		{

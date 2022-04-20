@@ -857,11 +857,11 @@ static entity_pair_set triggerOverlaps[2];
 static entity_pair_set objectContacts[2];
 static uint32 historyIndex = 0;
 
-
 static void handleCollisionCallbacks(game_scene& scene,
 	const collider_pair* collisionPairs, uint8* numContactsPerPair, uint32 numCollisions, uint32 numColliders,
 	collision_contact* contacts)
 {
+#ifndef PHYSICS_ONLY
 	auto& prevFrameObjectContacts = objectContacts[historyIndex];
 	auto& thisFrameObjectContacts = objectContacts[1 - historyIndex];
 
@@ -926,6 +926,7 @@ static void handleCollisionCallbacks(game_scene& scene,
 			}
 		}
 	}
+#endif
 }
 
 static void handleNonCollisionInteractions(game_scene& scene, 
@@ -949,14 +950,17 @@ static void handleNonCollisionInteractions(game_scene& scene,
 		}
 		else if (interaction.otherType == physics_object_type_trigger)
 		{
+#ifndef PHYSICS_ONLY
 			scene_entity triggerEntity = scene.getEntityFromComponentAtIndex<trigger_component>(numTriggers - 1 - interaction.otherIndex);
 			scene_entity rbEntity = scene.getEntityFromComponent(rb);
 
 			entity_pair overlap = { triggerEntity.handle, rbEntity.handle };
 			thisFrameTriggerOverlaps.insert(overlap);
+#endif
 		}
 	}
 
+#ifndef PHYSICS_ONLY
 	for (entity_pair o : thisFrameTriggerOverlaps)
 	{
 		// Didn't overlap last frame -> fire enter event.
@@ -983,6 +987,7 @@ static void handleNonCollisionInteractions(game_scene& scene,
 			}
 		}
 	}
+#endif
 }
 
 
