@@ -120,12 +120,12 @@ static void getBodyPartTarget(scene_entity entity, scene_entity parent, learning
 
 	for (uint32 i = 0; i < 6; ++i)
 	{
-		vec3 globalPosition = transformPosition(transform, localPositions.p[i]);
-		vec3 pos = inverseTransformPosition(torsoTransform, globalPosition);
+		vec3 pos = transformPosition(transform, localPositions.p[i]);
+		//pos = inverseTransformPosition(torsoTransform, pos);
 		outTarget.targetPositions[i] = pos;
 
-		vec3 globalVelocity = rb.getGlobalPointVelocity(transform, localPositions.p[i]);
-		vec3 vel = inverseTransformDirection(torsoTransform, globalVelocity);
+		vec3 vel = rb.getGlobalPointVelocity(transform, localPositions.p[i]);
+		//vel = inverseTransformDirection(torsoTransform, vel);
 		outTarget.targetVelocities[i] = vel;
 	}
 
@@ -145,12 +145,12 @@ static body_part_error readPartDifference(scene_entity entity, scene_entity pare
 
 	for (uint32 i = 0; i < 6; ++i)
 	{
-		vec3 globalPosition = transformPosition(transform, localPositions.p[i]);
-		vec3 pos = inverseTransformPosition(torsoTransform, globalPosition);
+		vec3 pos = transformPosition(transform, localPositions.p[i]);
+		//pos = inverseTransformPosition(torsoTransform, pos);
 		positionError += length(pos - target.targetPositions[i]);
 
-		vec3 globalVelocity = rb.getGlobalPointVelocity(transform, localPositions.p[i]);
-		vec3 vel = inverseTransformDirection(torsoTransform, globalVelocity);
+		vec3 vel = rb.getGlobalPointVelocity(transform, localPositions.p[i]);
+		//vel = inverseTransformDirection(torsoTransform, vel);
 		velocityError += length(vel - target.targetVelocities[i]);
 	}
 

@@ -100,16 +100,16 @@ trs locomotion_environment::getCoordinateSystem()
 
 	transform_component& torsoTransform = ragdoll.torso.getComponent<transform_component>();
 
-	vec3 forward = torsoTransform.rotation * vec3(0.f, 0.f, -1.f);
-	forward.y = 0.f;
-	forward = normalize(forward);
+	//vec3 forward = torsoTransform.rotation * vec3(0.f, 0.f, -1.f);
+	//forward.y = 0.f;
+	//forward = normalize(forward);
 
 	vec3 cog = ragdoll.torso.getComponent<rigid_body_component>().getGlobalCOGPosition(torsoTransform);
 	cog.y = 0;
 
-	trs transform(cog, rotateFromTo(vec3(0.f, 0.f, -1.f), forward));
-	//trs transform(cog, quat::identity);
-	transform.scale = vec3(1.f);
+	//trs transform(cog, rotateFromTo(vec3(0.f, 0.f, -1.f), forward));
+	//transform.scale = vec3(1.f);
+	trs transform(cog, quat::identity);
 
 	return transform;
 }
