@@ -10,7 +10,7 @@
 #include "scene/particle_systems.h"
 #include "rendering/raytracing.h"
 #include "editor/editor.h"
-#include "learning/locomotion_inference.h"
+#include "learning/learned_locomotion.h"
 
 
 
@@ -55,7 +55,7 @@ private:
 
 	memory_arena stackArena;
 
-	locomotion_inference_environment locomotionInference;
+	learned_locomotion learnedLocomotion;
 
 
 	uint32 numSpotShadowRenderPasses;
