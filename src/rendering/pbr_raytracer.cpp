@@ -3,18 +3,12 @@
 
 
 
-void pbr_raytracer::initialize(const dx_raytracing_pipeline& pipeline)
+void pbr_raytracer::initialize()
 {
     numRayTypes = (uint32)pipeline.shaderBindingTableDesc.hitGroups.size();
     
     bindingTable.initialize(&pipeline);
     descriptorHeap.initialize(2048); // TODO.
-}
-
-void pbr_raytracer::beginFrame()
-{
-    instanceContributionToHitGroupIndex = 0;
-    descriptorHeap.reset();
 }
 
 void pbr_raytracer::pushTexture(const ref<dx_texture>& tex, uint32& flags, uint32 flag)

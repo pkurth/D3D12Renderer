@@ -7,13 +7,12 @@
 
 struct pbr_raytracer : dx_raytracer
 {
-    void beginFrame();
     raytracing_object_type defineObjectType(const ref<raytracing_blas>& blas, const std::vector<ref<pbr_material>>& materials);
     void finalizeForRender();
 
 protected:
 
-    void initialize(const dx_raytracing_pipeline& pipeline);
+    void initialize();
  
     struct shader_data // This struct is 32 bytes large, which together with the 32 byte shader identifier is a nice multiple of the required 32-byte-alignment of the binding table entries.
     {

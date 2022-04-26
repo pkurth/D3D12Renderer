@@ -3,6 +3,7 @@
 
 #include "dx/dx_pipeline.h"
 #include "dx/dx_command_list.h"
+#include "dx/dx_context.h"
 #include "geometry/mesh_builder.h"
 #include "render_utils.h"
 #include "core/imgui.h"
@@ -15,8 +16,15 @@ static dx_pipeline visualizeGridPipeline;
 static dx_mesh sphereMesh;
 static submesh_info sphereSubmesh;
 
+static light_probe_tracer tracer;
+
 void initializeLightProbePipelines()
 {
+	if (!dxContext.featureSupport.raytracing())
+	{
+		return;
+	}
+
 	auto desc = CREATE_GRAPHICS_PIPELINE
 		.inputLayout(inputLayout_position)
 		.renderTargets(ldrFormat, depthStencilFormat);
@@ -29,6 +37,7 @@ void initializeLightProbePipelines()
 	sphereSubmesh = builder.endSubmesh();
 	sphereMesh = builder.createDXMesh();
 
+	tracer.initialize();
 }
 
 
@@ -40,6 +49,11 @@ void initializeLightProbePipelines()
 
 void light_probe_grid::initialize(vec3 minCorner, vec3 dimensions, float cellSize)
 {
+	if (!dxContext.featureSupport.raytracing())
+	{
+		return;
+	}
+
 	uint32 gridSizeX = (uint32)(ceilf(dimensions.x / cellSize));
 	uint32 gridSizeY = (uint32)(ceilf(dimensions.y / cellSize));
 	uint32 gridSizeZ = (uint32)(ceilf(dimensions.z / cellSize));
@@ -209,6 +223,11 @@ PIPELINE_RENDER_IMPL(octahedral_light_probe_grid_pipeline)
 
 void light_probe_grid::visualize(ldr_render_pass* ldrRenderPass)
 {
+	if (!dxContext.featureSupport.raytracing())
+	{
+		return;
+	}
+
 	mat4 transform = createTranslationMatrix(minCorner);
 	visualize_grid_material material = { cellSize, numNodesX, numNodesY, totalNumNodes, irradiance };
 
@@ -278,7 +297,7 @@ void light_probe_tracer::initialize()
 		.hitgroup(L"SHADOW", L"shadowMiss", shadowHitgroup)
 		.finish();
 
-	pbr_raytracer::initialize(pipeline);
+	pbr_raytracer::initialize();
 
 	allocateDescriptorHeapSpaceForGlobalResources<input_resources, output_resources>(descriptorHeap);
 }

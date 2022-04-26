@@ -64,7 +64,7 @@ void path_tracer::initialize()
         .hitgroup(L"SHADOW", L"shadowMiss", shadowHitgroup)
         .finish();
 
-    pbr_raytracer::initialize(pipeline);
+    pbr_raytracer::initialize();
 
     allocateDescriptorHeapSpaceForGlobalResources<input_resources, output_resources>(descriptorHeap);
 }

@@ -3,6 +3,8 @@
 #include "dx/dx_context.h"
 #include "dx/dx_command_list.h"
 
+#include "core/string.h"
+
 #include <dxcapi.h>
 #include <fstream>
 #include <sstream>
@@ -159,7 +161,7 @@ static void reportShaderCompileError(com<IDxcBlobEncoding> blob)
 	char infoLog[2048];
 	memcpy(infoLog, blob->GetBufferPointer(), sizeof(infoLog) - 1);
 	infoLog[sizeof(infoLog) - 1] = 0;
-	std::cerr << "Error: " << infoLog << '\n';
+	std::cerr << "Error:\n" << infoLog << '\n';
 }
 
 static com<IDxcBlob> compileLibrary(const std::wstring& filename, const std::vector<const wchar*>& shaderNameDefines)
@@ -172,21 +174,21 @@ static com<IDxcBlob> compileLibrary(const std::wstring& filename, const std::vec
 	checkResult(library->CreateIncludeHandler(&includeHandler));
 
 
-	std::ifstream stream(filename);
-	if (!stream.is_open())
-	{
-		//std::cerr <<  "File " << filename << " not found." << '\n';
-		return 0;
-	}
-	std::stringstream ss; ss << stream.rdbuf();
-	std::string source = ss.str();
+	std::string source = "#include \"" + wstringToString(filename) + "\"\n";
+
+	//std::ifstream stream(filename);
+	//if (!stream.is_open())
+	//{
+	//	//std::cerr <<  "File " << filename << " not found." << '\n';
+	//	return 0;
+	//}
+	//std::stringstream ss; ss << stream.rdbuf();
+	//std::string source = ss.str();
 
 
 	// Create blob from the string.
 	com<IDxcBlobEncoding> textBlob;
 	checkResult(library->CreateBlobWithEncodingFromPinned((LPBYTE)source.c_str(), (uint32)source.length(), 0, &textBlob));
-
-	std::wstring wfilename(filename.begin(), filename.end());
 
 	std::vector<DxcDefine> defines;
 
@@ -213,7 +215,7 @@ static com<IDxcBlob> compileLibrary(const std::wstring& filename, const std::vec
 
 	// Compile.
 	com<IDxcOperationResult> operationResult;
-	checkResult(compiler->Compile(textBlob.Get(), wfilename.c_str(), L"", L"lib_6_3", 0, 0, defines.data(), (uint32)defines.size(), includeHandler.Get(), &operationResult));
+	checkResult(compiler->Compile(textBlob.Get(), 0, L"", L"lib_6_3", 0, 0, defines.data(), (uint32)defines.size(), includeHandler.Get(), &operationResult));
 
 	// Verify the result.
 	HRESULT resultCode;
