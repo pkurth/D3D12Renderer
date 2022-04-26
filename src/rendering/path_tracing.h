@@ -1,20 +1,14 @@
 #pragma once
 
-#include "raytracer.h"
+#include "pbr_raytracer.h"
 
-#include "material.hlsli"
-#include "pbr.h"
-
-struct path_tracer : dx_raytracer
+struct path_tracer : pbr_raytracer
 {
     void initialize();
-    raytracing_object_type defineObjectType(const ref<raytracing_blas>& blas, const std::vector<ref<pbr_material>>& materials);
-
-    void rebuildBindingTable();
 
     void render(dx_command_list* cl, const raytracing_tlas& tlas,
         const ref<dx_texture>& output,
-        const common_material_info& materialInfo) override;
+        const common_material_info& materialInfo);
 
     void resetRendering();
 
@@ -43,11 +37,6 @@ struct path_tracer : dx_raytracer
 
 
 private:
-    struct shader_data // This struct is 32 bytes large, which together with the 32 byte shader identifier is a nice multiple of the required 32-byte-alignment of the binding table entries.
-    {
-        pbr_material_cb materialCB;
-        dx_cpu_descriptor_handle resources; // Vertex buffer, index buffer, PBR textures.
-    };
 
     // Only descriptors in here!
     struct input_resources
@@ -60,16 +49,4 @@ private:
     {
         dx_cpu_descriptor_handle output;
     };
-
-    bool dirty = false;
-
-    // TODO: The descriptor heap shouldn't be a member of this structure. If we have multiple raytracers which use the same object types, they can share the descriptor heap.
-    // For example, this path tracer defines objects with vertex buffer, index buffer and their PBR textures. Other raytracers, which use the same layout (e.g. a specular reflections
-    // raytracer) may very well use the same descriptor heap.
-    dx_pushable_descriptor_heap descriptorHeap;
-
-    uint32 instanceContributionToHitGroupIndex = 0;
-    uint32 numRayTypes;
-
-    raytracing_binding_table<shader_data> bindingTable;
 };

@@ -761,9 +761,9 @@ void main_renderer::endFrame(const user_input& input)
 
 		dxContext.executeCommandList(cl);
 	}
-	else if (mode == renderer_mode_pathtraced && dxContext.featureSupport.raytracing())
+	else if (mode == renderer_mode_pathtraced && dxContext.featureSupport.raytracing() && tlas)
 	{
-		pathTracer.rebuildBindingTable();
+		pathTracer.finalizeForRender();
 
 		dx_command_list* cl = dxContext.getFreeRenderCommandList();
 

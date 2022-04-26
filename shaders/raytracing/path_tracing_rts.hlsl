@@ -272,7 +272,8 @@ static float3 calculateIndirectLighting(inout uint randSeed, surface_info surfac
 [shader("closesthit")]
 void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-	uint3 tri = load3x32BitIndices(meshIndices); // Use load3x16BitIndices, if you have 16-bit indices.
+	//uint3 tri = load3x32BitIndices(meshIndices);
+	uint3 tri = load3x16BitIndices(meshIndices);
 
 	// Interpolate vertex attributes over triangle.
 	float2 uvs[] = { meshVertices[tri.x].uv, meshVertices[tri.y].uv, meshVertices[tri.z].uv };

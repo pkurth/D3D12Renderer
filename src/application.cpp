@@ -776,6 +776,8 @@ void application::update(const user_input& input, float dt)
 			}
 
 			raytracingTLAS.build();
+
+			renderer->setRaytracingScene(&raytracingTLAS);
 		}
 	}
 #endif

@@ -14,7 +14,6 @@
 
 #include "light_source.hlsli"
 #include "camera.hlsli"
-#include "path_tracing.h"
 
 
 

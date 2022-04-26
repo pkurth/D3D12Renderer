@@ -1006,6 +1006,11 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 	bool inputCaptured = cameraController.update(input, renderer->renderWidth, renderer->renderHeight, dt);
 
+	if (inputCaptured)
+	{
+		renderer->pathTracer.resetRendering();
+	}
+
 	bool objectMovedByGizmo = false;
 
 

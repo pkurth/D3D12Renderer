@@ -5,7 +5,7 @@
 template <typename shader_data>
 struct raytracing_binding_table
 {
-    void initialize(dx_raytracing_pipeline* pipeline);
+    void initialize(const dx_raytracing_pipeline* pipeline);
 
     // This expects an array of length numRayTypes, i.e. shader data for all hit groups.
     void push(const shader_data* sd);
@@ -38,14 +38,14 @@ private:
     binding_table_entry* miss;
     binding_table_entry* hit;
 
-    dx_raytracing_pipeline* pipeline;
+    const dx_raytracing_pipeline* pipeline;
 
     ref<dx_buffer> bindingTableBuffer;
 };
 
 
 template<typename shader_data>
-inline void raytracing_binding_table<shader_data>::initialize(dx_raytracing_pipeline* pipeline)
+inline void raytracing_binding_table<shader_data>::initialize(const dx_raytracing_pipeline* pipeline)
 {
     this->pipeline = pipeline;
 
