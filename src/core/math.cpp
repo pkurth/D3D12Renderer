@@ -1033,6 +1033,15 @@ mat4 invertOrthographicProjectionMatrix(const mat4& m)
 	return inv;
 }
 
+mat4 createTranslationMatrix(vec3 position)
+{
+	mat4 result = mat4::identity;
+	result.m03 = position.x;
+	result.m13 = position.y;
+	result.m23 = position.z;
+	return result;
+}
+
 mat4 createModelMatrix(vec3 position, quat rotation, vec3 scale)
 {
 	mat4 result;

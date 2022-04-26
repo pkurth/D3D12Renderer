@@ -10,6 +10,7 @@
 #include "scene/particle_systems.h"
 #include "bitonic_sort.h"
 #include "debug_visualization.h"
+#include "light_probe.h"
 
 
 // Defined in render_algorithms.cpp.
@@ -25,6 +26,7 @@ void initializeRenderUtils()
 {
 	initializeTexturePreprocessing();
 	initializeSkinning();
+	initializeLightProbePipelines();
 	loadCommonShaders();
 
 	debug_simple_pipeline::initialize();

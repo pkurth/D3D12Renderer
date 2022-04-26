@@ -763,6 +763,7 @@ mat4 createPerspectiveProjectionMatrix(float r, float l, float t, float b, float
 mat4 createOrthographicProjectionMatrix(float r, float l, float t, float b, float nearPlane, float farPlane);
 mat4 invertPerspectiveProjectionMatrix(const mat4& m);
 mat4 invertOrthographicProjectionMatrix(const mat4& m);
+mat4 createTranslationMatrix(vec3 position);
 mat4 createModelMatrix(vec3 position, quat rotation, vec3 scale = vec3(1.f, 1.f, 1.f));
 mat4 createBillboardModelMatrix(vec3 position, vec3 eye, vec3 scale);
 mat4 createViewMatrix(vec3 eye, float pitch, float yaw);

@@ -88,7 +88,7 @@ void application::initialize(main_renderer* renderer)
 		"assets/sponza/textures/Sponza_Curtain_metallic.tga",
 		vec4(0.f), vec4(1.f), 1.f, 1.f, true);
 
-#if 0
+#if 1
 	if (auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj"))
 	{
 		auto blas = defineBlasFromMesh(sponzaMesh, renderer->pathTracer);
@@ -98,7 +98,9 @@ void application::initialize(main_renderer* renderer)
 			.addComponent<raster_component>(sponzaMesh)
 			.addComponent<raytrace_component>(blas);
 	}
+#endif
 
+#if 0
 	if (auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx"))
 	{
 		scene.createEntity("Stormtrooper 1")
@@ -155,7 +157,7 @@ void application::initialize(main_renderer* renderer)
 	}
 #endif
 
-#if 1
+#if 0
 	{
 		//scene.createEntity("Force field")
 		//	.addComponent<transform_component>(vec3(0.f), quat::identity)
@@ -334,11 +336,11 @@ void application::initialize(main_renderer* renderer)
 
 
 	//humanoid_ragdoll::create(scene, vec3(60.f, 1.25f, -2.f));
-	//humanoid_ragdoll ragdoll = humanoid_ragdoll::create(scene, vec3(20.f, 1.25f, 0.f));
 
 	//vehicle::create(scene, vec3(0.f, 1.f, 0.f));
 
-	//locomotionInference.initialize(scene, ragdoll);
+	//humanoid_ragdoll ragdoll = humanoid_ragdoll::create(scene, vec3(0.f, 1.25f, 0.f));
+	//learnedLocomotion.initialize(scene, ragdoll);
 
 
 	editor.setEnvironment("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
@@ -408,6 +410,7 @@ void application::initialize(main_renderer* renderer)
 	}
 #endif
 
+	lightProbeGrid.initialize(vec3(2.f), vec3(4.f), 4.f);
 
 	scene.sun.direction = normalize(vec3(-0.6f, -1.f, -0.3f));
 	scene.sun.color = vec3(1.f, 0.93f, 0.76f);
@@ -535,7 +538,8 @@ void application::update(const user_input& input, float dt)
 {
 	stackArena.reset();
 
-	//locomotionInference.update(scene);
+	//dt = 1.f / 60.f;
+	//learnedLocomotion.update(scene);
 
 	resetRenderPasses();
 
@@ -544,6 +548,7 @@ void application::update(const user_input& input, float dt)
 
 	scene_entity selectedEntity = editor.selectedEntity;
 
+	lightProbeGrid.visualize(&ldrRenderPass);
 
 	// Particles.
 
