@@ -88,6 +88,7 @@ struct dx_frame_descriptor_allocator
 struct dx_pushable_descriptor_heap
 {
 	void initialize(uint32 maxSize, bool shaderVisible = true);
+	void reset();
 	dx_cpu_descriptor_handle push();
 
 	com<ID3D12DescriptorHeap> descriptorHeap;
