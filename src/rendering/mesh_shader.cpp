@@ -2,6 +2,7 @@
 #include "mesh_shader.h"
 #include "dx/dx_pipeline.h"
 #include "dx/dx_command_list.h"
+#include "dx/dx_profiling.h"
 #include "material.h"
 #include "render_utils.h"
 
@@ -120,6 +121,8 @@ PIPELINE_SETUP_IMPL(mesh_shader_blob_pipeline)
 
 PIPELINE_RENDER_IMPL(mesh_shader_blob_pipeline)
 {
+	DX_PROFILE_BLOCK(cl, "Mesh shader blob");
+
 	struct constant_cb
 	{
 		vec4 balls[MAX_BALL_COUNT];
@@ -146,7 +149,7 @@ void initializeMeshShader()
 {
 	D3D12_RT_FORMAT_ARRAY renderTargetFormat = {};
 	renderTargetFormat.NumRenderTargets = 1;
-	renderTargetFormat.RTFormats[0] = ldrFormat;
+	renderTargetFormat.RTFormats[0] = hdrFormat;
 
 	{
 		struct pipeline_state_stream : dx_pipeline_stream_base
@@ -166,7 +169,7 @@ void initializeMeshShader()
 		};
 
 		pipeline_state_stream stream;
-		stream.dsvFormat = ldrFormat;
+		stream.dsvFormat = depthStencilFormat;
 		stream.rtvFormats = renderTargetFormat;
 
 		graphics_pipeline_files files = {};
@@ -203,7 +206,7 @@ void initializeMeshShader()
 		rasterizerDesc.FrontCounterClockwise = TRUE; // Righthanded coordinate system.
 
 		pipeline_state_stream stream;
-		stream.dsvFormat = ldrFormat;
+		stream.dsvFormat = depthStencilFormat;
 		stream.rtvFormats = renderTargetFormat;
 		stream.rasterizer = rasterizerDesc;
 
@@ -218,7 +221,7 @@ void initializeMeshShader()
 	}
 }
 
-void testRenderMeshShader(ldr_render_pass* ldrRenderPass)
+void testRenderMeshShader(transparent_render_pass* ldrRenderPass, float dt)
 {
 	/*overlayRenderPass->renderObjectWithMeshShader(1, 1, 1,
 		cubeMaterial,
@@ -242,20 +245,19 @@ void testRenderMeshShader(ldr_render_pass* ldrRenderPass)
 
 	static mesh_shader_blob_material blobMaterial;
 
-	float animation_speed = 0.5f;
-	animation_speed *= animation_speed;
-	const float frame_time = animation_speed * 0.001f;
+	const float animationSpeed = 0.25f;
+	const float frameTime = animationSpeed * dt;
 	for (uint32 i = 0; i < BALL_COUNT; ++i)
 	{
 		vec3 d = vec3(0.5f, 0.5f, 0.5f) - blobMaterial.balls[i].pos;
-		blobMaterial.balls[i].dir += d * (5.0f * frame_time / (2.0f + dot(d, d)));
-		blobMaterial.balls[i].pos += blobMaterial.balls[i].dir * frame_time;
+		blobMaterial.balls[i].dir += d * (5.f * frameTime / (2.f + dot(d, d)));
+		blobMaterial.balls[i].pos += blobMaterial.balls[i].dir * frameTime;
 	}
 
 
 	const uint32 gridSize = (1 << SHIFT);
 
-	ldrRenderPass->renderOverlay<mesh_shader_blob_pipeline>(mat4::identity, {}, {}, submesh_info{}, blobMaterial);
+	ldrRenderPass->renderObject<mesh_shader_blob_pipeline>(mat4::identity, {}, {}, submesh_info{}, blobMaterial);
 }
 
 
