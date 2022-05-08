@@ -266,34 +266,8 @@ void light_probe_tracer::initialize()
 		arraysize(globalRootParameters), globalRootParameters,
 		1, &globalStaticSampler
 	};
-
-
-	// 6 Elements: Vertex buffer, index buffer, albedo texture, normal map, roughness texture, metallic texture.
-	CD3DX12_DESCRIPTOR_RANGE hitSRVRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0, 1);
-	CD3DX12_ROOT_PARAMETER hitRootParameters[] =
-	{
-		root_constants<pbr_material_cb>(0, 1),
-		root_descriptor_table(1, &hitSRVRange),
-	};
-
-	D3D12_ROOT_SIGNATURE_DESC hitDesc =
-	{
-		arraysize(hitRootParameters), hitRootParameters
-	};
-
-
-	raytracing_mesh_hitgroup radianceHitgroup = { L"radianceClosestHit" };
-	raytracing_mesh_hitgroup shadowHitgroup = { };
-
-	pipeline =
-		raytracing_pipeline_builder(shaderPath, maxPayloadSize, maxRecursionDepth, true, false)
-		.globalRootSignature(globalDesc)
-		.raygen(L"rayGen")
-		.hitgroup(L"RADIANCE", L"radianceMiss", radianceHitgroup, hitDesc)
-		.hitgroup(L"SHADOW", L"shadowMiss", shadowHitgroup)
-		.finish();
-
-	pbr_raytracer::initialize();
+	
+	pbr_raytracer::initialize(shaderPath, maxPayloadSize, maxRecursionDepth, globalDesc);
 
 	allocateDescriptorHeapSpaceForGlobalResources<input_resources, output_resources>(descriptorHeap);
 }

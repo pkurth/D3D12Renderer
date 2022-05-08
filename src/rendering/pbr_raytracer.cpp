@@ -2,13 +2,48 @@
 #include "pbr_raytracer.h"
 
 
-
-void pbr_raytracer::initialize()
+void pbr_raytracer::initialize(const wchar* shaderPath, uint32 maxPayloadSize, uint32 maxRecursionDepth, const D3D12_ROOT_SIGNATURE_DESC& globalDesc)
 {
+    // 6 Elements: Vertex buffer, index buffer, albedo texture, normal map, roughness texture, metallic texture.
+    CD3DX12_DESCRIPTOR_RANGE hitSRVRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0, 1);
+    CD3DX12_ROOT_PARAMETER hitRootParameters[] =
+    {
+        root_constants<pbr_material_cb>(0, 1),
+        root_descriptor_table(1, &hitSRVRange),
+    };
+
+    D3D12_ROOT_SIGNATURE_DESC hitDesc =
+    {
+        arraysize(hitRootParameters), hitRootParameters
+    };
+
+
+    raytracing_mesh_hitgroup radianceHitgroup = { L"radianceClosestHit" };
+    raytracing_mesh_hitgroup shadowHitgroup = { };
+
+    pipeline =
+        raytracing_pipeline_builder(shaderPath, maxPayloadSize, maxRecursionDepth, true, false)
+        .globalRootSignature(globalDesc)
+        .raygen(L"rayGen")
+        .hitgroup(L"RADIANCE", L"radianceMiss", radianceHitgroup, hitDesc)
+        .hitgroup(L"SHADOW", L"shadowMiss", shadowHitgroup)
+        .finish();
+
+    assert(numRayTypes == 0 || numRayTypes == (uint32)pipeline.shaderBindingTableDesc.hitGroups.size());
     numRayTypes = (uint32)pipeline.shaderBindingTableDesc.hitGroups.size();
-    
+
     bindingTable.initialize(&pipeline);
-    descriptorHeap.initialize(2048); // TODO.
+
+
+
+    // Common stuff.
+
+    if (!descriptorHeap.descriptorHeap)
+    {
+        descriptorHeap.initialize(2048); // TODO.
+    }
+
+    registeredPBRRaytracers.push_back(this);
 }
 
 void pbr_raytracer::pushTexture(const ref<dx_texture>& tex, uint32& flags, uint32 flag)
@@ -26,6 +61,14 @@ void pbr_raytracer::pushTexture(const ref<dx_texture>& tex, uint32& flags, uint3
 
 raytracing_object_type pbr_raytracer::defineObjectType(const ref<raytracing_blas>& blas, const std::vector<ref<pbr_material>>& materials)
 {
+    /*
+    HitGroupRecordAddress = D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StartAddress +
+            D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StrideInBytes *
+                (RayContributionToHitGroupIndex +
+                (MultiplierForGeometryContributionToHitGroupIndex * GeometryContributionToHitGroupIndex) + D3D12_RAYTRACING_INSTANCE_DESC.InstanceContributionToHitGroupIndex)
+    */
+
+
     uint32 numGeometries = (uint32)blas->geometries.size();
 
     shader_data* hitData = (shader_data*)alloca(sizeof(shader_data) * numRayTypes);
@@ -59,7 +102,10 @@ raytracing_object_type pbr_raytracer::defineObjectType(const ref<raytracing_blas
 
         // The other shader types don't need any data, so we don't set it here.
 
-        bindingTable.push(hitData);
+        for (auto rt : registeredPBRRaytracers)
+        {
+            rt->bindingTable.push(hitData);
+        }
     }
 
 
@@ -67,7 +113,10 @@ raytracing_object_type pbr_raytracer::defineObjectType(const ref<raytracing_blas
 
     instanceContributionToHitGroupIndex += numGeometries * numRayTypes;
 
-    dirty = true;
+    for (auto rt : registeredPBRRaytracers)
+    {
+        rt->dirty = true;
+    }
 
     return result;
 }

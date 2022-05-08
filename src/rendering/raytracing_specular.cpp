@@ -45,33 +45,7 @@ void specular_reflections_raytracer::initialize()
         arraysize(globalStaticSamplers), globalStaticSamplers
     };
 
-
-
-    CD3DX12_DESCRIPTOR_RANGE hitSRVRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0, 1);
-    CD3DX12_ROOT_PARAMETER hitRootParameters[] =
-    {
-        root_constants<pbr_material_cb>(0, 1),
-        root_descriptor_table(1, &hitSRVRange),
-    };
-
-    D3D12_ROOT_SIGNATURE_DESC hitDesc =
-    {
-        arraysize(hitRootParameters), hitRootParameters
-    };
-
-
-    raytracing_mesh_hitgroup radianceHitgroup = { L"radianceClosestHit" };
-    raytracing_mesh_hitgroup shadowHitgroup = { L"shadowClosestHit" };
-
-    pipeline =
-        raytracing_pipeline_builder(shaderPath, 4 * sizeof(float), maxRecursionDepth, true, false)
-        .globalRootSignature(globalDesc)
-        .raygen(L"rayGen")
-        .hitgroup(L"RADIANCE", L"radianceMiss", radianceHitgroup, hitDesc)
-        .hitgroup(L"SHADOW", L"shadowMiss", shadowHitgroup)
-        .finish();
-
-    pbr_raytracer::initialize();
+    pbr_raytracer::initialize(shaderPath, 4 * sizeof(float), maxRecursionDepth, globalDesc);
 
     allocateDescriptorHeapSpaceForGlobalResources<input_resources, output_resources>(descriptorHeap);
 }

@@ -24,7 +24,7 @@ struct raytrace_component
 	raytracing_object_type type;
 };
 
-static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh, path_tracer& pathTracer)
+static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh)
 {
 	if (dxContext.featureSupport.raytracing())
 	{
@@ -38,7 +38,7 @@ static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh
 		}
 
 		ref<raytracing_blas> blas = blasBuilder.finish();
-		raytracing_object_type type = pathTracer.defineObjectType(blas, raytracingMaterials);
+		raytracing_object_type type = pbr_raytracer::defineObjectType(blas, raytracingMaterials);
 		return type;
 	}
 	else
@@ -77,7 +77,7 @@ void application::initialize(main_renderer* renderer)
 #if 1
 	if (auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj"))
 	{
-		auto blas = defineBlasFromMesh(sponzaMesh, renderer->pathTracer);
+		auto blas = defineBlasFromMesh(sponzaMesh);
 	
 		scene.createEntity("Sponza")
 			.addComponent<transform_component>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
