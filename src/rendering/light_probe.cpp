@@ -6,6 +6,7 @@
 #include "dx/dx_context.h"
 #include "geometry/mesh_builder.h"
 #include "render_utils.h"
+#include "render_resources.h"
 #include "core/imgui.h"
 
 #include "light_probe_rs.hlsli"
@@ -76,7 +77,7 @@ void light_probe_grid::initialize(vec3 minCorner, vec3 dimensions, float cellSiz
 	uint32 depthTexWidth = numNodesY * depthYSliceWidth;
 	uint32 depthTexHeight = numNodesZ * LIGHT_PROBE_TOTAL_DEPTH_RESOLUTION;
 
-#if 1
+#if 0
 	struct color_rgba
 	{
 		uint8 r, g, b, a;
@@ -236,6 +237,8 @@ void light_probe_grid::visualize(ldr_render_pass* ldrRenderPass)
 
 
 
+#define LIGHT_PROBE_TRACING_RS_RESOURCES	0
+#define LIGHT_PROBE_TRACING_RS_CB			1
 
 
 void light_probe_tracer::initialize()
@@ -272,6 +275,44 @@ void light_probe_tracer::initialize()
 	allocateDescriptorHeapSpaceForGlobalResources<input_resources, output_resources>(descriptorHeap);
 }
 
-void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas, const light_probe_grid& grid, const common_material_info& materialInfo)
+void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas, const light_probe_grid& grid, const ref<dx_texture>& sky)
 {
+	if (!tlas.tlas)
+	{
+		return;
+	}
+
+	input_resources in;
+	in.tlas = tlas.tlas->raytracingSRV;
+	in.sky = sky->defaultSRV;
+
+	output_resources out;
+	out.output = grid.irradiance->defaultUAV;
+
+
+	dx_gpu_descriptor_handle gpuHandle = copyGlobalResourcesToDescriptorHeap(in, out);
+
+
+	// Fill out description.
+	D3D12_DISPATCH_RAYS_DESC raytraceDesc;
+	fillOutRayTracingRenderDesc(bindingTable.getBuffer(), raytraceDesc,
+		grid.irradiance->width, grid.irradiance->height, 1,
+		numRayTypes, bindingTable.getNumberOfHitGroups());
+
+
+	// Set up pipeline.
+	cl->setDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, descriptorHeap.descriptorHeap);
+
+	cl->setPipelineState(pipeline.pipeline);
+	cl->setComputeRootSignature(pipeline.rootSignature);
+
+	light_probe_trace_cb cb;
+	cb.countX = grid.numNodesX;
+
+	cl->setComputeDescriptorTable(LIGHT_PROBE_TRACING_RS_RESOURCES, gpuHandle);
+	cl->setCompute32BitConstants(LIGHT_PROBE_TRACING_RS_CB, cb);
+
+	cl->raytrace(raytraceDesc);
+
+	cl->uavBarrier(grid.irradiance);
 }

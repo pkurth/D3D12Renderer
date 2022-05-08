@@ -29,7 +29,7 @@ struct light_probe_tracer : pbr_raytracer
 
 	void render(dx_command_list* cl, const raytracing_tlas& tlas,
 		const light_probe_grid& grid,
-		const common_material_info& materialInfo);
+		const ref<dx_texture>& sky);
 
 private:
 
@@ -41,6 +41,7 @@ private:
 	struct input_resources
 	{
 		dx_cpu_descriptor_handle tlas;
+		dx_cpu_descriptor_handle sky;
 	};
 
 	struct output_resources

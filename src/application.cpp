@@ -14,7 +14,7 @@
 #include "core/threading.h"
 #include "rendering/mesh_shader.h"
 #include "rendering/shadow_map.h"
-#include "rendering/shadow_map_renderer.h"
+#include "rendering/global_effects_renderer.h"
 #include "rendering/debug_visualization.h"
 #include "audio/audio.h"
 
@@ -396,7 +396,7 @@ void application::initialize(main_renderer* renderer)
 	}
 #endif
 
-	lightProbeGrid.initialize(vec3(2.f), vec3(4.f), 4.f);
+	lightProbeGrid.initialize(vec3(-30.f, -1.f, -30.f), vec3(60.f, 20.f, 60.f), 1.5f);
 
 	scene.sun.direction = normalize(vec3(-0.6f, -1.f, -0.3f));
 	scene.sun.color = vec3(1.f, 0.93f, 0.76f);
@@ -507,17 +507,19 @@ void application::submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 num
 	renderer->submitRenderPass(&transparentRenderPass);
 	renderer->submitRenderPass(&ldrRenderPass);
 
-	shadow_map_renderer::submitRenderPass(&sunShadowRenderPass);
+	global_effects_renderer::submitShadowRenderPass(&sunShadowRenderPass);
 
 	for (uint32 i = 0; i < numSpotLightShadowPasses; ++i)
 	{
-		shadow_map_renderer::submitRenderPass(&spotShadowRenderPasses[i]);
+		global_effects_renderer::submitShadowRenderPass(&spotShadowRenderPasses[i]);
 	}
 
 	for (uint32 i = 0; i < numPointLightShadowPasses; ++i)
 	{
-		shadow_map_renderer::submitRenderPass(&pointShadowRenderPasses[i]);
+		global_effects_renderer::submitShadowRenderPass(&pointShadowRenderPasses[i]);
 	}
+
+	global_effects_renderer::raytraceLightProbes(lightProbeGrid, &raytracingTLAS, scene.environment);
 }
 
 void application::update(const user_input& input, float dt)
@@ -560,6 +562,23 @@ void application::update(const user_input& input, float dt)
 	renderer->setEnvironment(scene.environment);
 
 	setAudioListener(scene.camera.position, scene.camera.rotation, vec3(0.f));
+
+
+
+	if (dxContext.featureSupport.raytracing())
+	{
+		raytracingTLAS.reset();
+
+		for (auto [entityHandle, transform, raytrace] : scene.group(entt::get<transform_component, raytrace_component>).each())
+		{
+			raytracingTLAS.instantiate(raytrace.type, transform);
+		}
+
+		raytracingTLAS.build();
+
+		renderer->setRaytracingScene(&raytracingTLAS);
+	}
+
 
 #if 1
 	if (renderer->mode != renderer_mode_pathtraced)
@@ -761,22 +780,6 @@ void application::update(const user_input& input, float dt)
 		}
 
 		submitRenderPasses(numSpotShadowRenderPasses, numPointShadowRenderPasses);
-	}
-	else
-	{
-		if (dxContext.featureSupport.raytracing())
-		{
-			raytracingTLAS.reset();
-
-			for (auto [entityHandle, transform, raytrace] : scene.group(entt::get<transform_component, raytrace_component>).each())
-			{
-				raytracingTLAS.instantiate(raytrace.type, transform);
-			}
-
-			raytracingTLAS.build();
-
-			renderer->setRaytracingScene(&raytracingTLAS);
-		}
 	}
 #endif
 

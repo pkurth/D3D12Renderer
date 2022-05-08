@@ -12,7 +12,7 @@
 #include "application.h"
 #include "rendering/render_utils.h"
 #include "rendering/main_renderer.h"
-#include "rendering/shadow_map_renderer.h"
+#include "rendering/global_effects_renderer.h"
 #include "editor/asset_editor_panel.h"
 #include "audio/audio.h"
 #include "audio/synth.h"
@@ -108,6 +108,8 @@ int main(int argc, char** argv)
 	initializeMessageLog();
 	initializeFileRegistry();
 	initializeAudio();
+
+	global_effects_renderer::initialize();
 
 	{
 		sound_settings soundSettings;
@@ -256,13 +258,13 @@ int main(int argc, char** argv)
 
 		// Update and render.
 
-		shadow_map_renderer::beginFrame();
+		global_effects_renderer::beginFrame();
 		renderer.beginFrame(renderWidth, renderHeight);
 		
 		app.update(input, dt);
 
 		endFrameCommon();
-		shadow_map_renderer::endFrame();
+		global_effects_renderer::endFrame();
 		renderer.endFrame(input);
 
 		fileBrowser.draw(meshEditor);

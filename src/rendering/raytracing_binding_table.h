@@ -113,5 +113,5 @@ inline void raytracing_binding_table<shader_data>::push(const shader_data* sd)
 template<typename shader_data>
 inline void raytracing_binding_table<shader_data>::build()
 {
-    bindingTableBuffer = createBuffer(1, totalBindingTableSize, bindingTable);
+    bindingTableBuffer = createBuffer(1, max(totalBindingTableSize, 1u), bindingTable);
 }
