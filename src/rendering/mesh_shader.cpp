@@ -2,12 +2,11 @@
 #include "mesh_shader.h"
 #include "dx/dx_pipeline.h"
 #include "dx/dx_command_list.h"
+#include "dx/dx_profiling.h"
 #include "material.h"
 #include "render_utils.h"
 
-void initializeMeshShader() {}
-
-#if 0
+#if 1
 
 static dx_pipeline cubePipeline;
 static dx_pipeline meshPipeline;
@@ -63,70 +62,23 @@ struct mesh_shader_mesh
 static ref<mesh_shader_mesh> loadMeshShaderMeshFromFile(const char* filename);
 
 
-struct mesh_shader_cube_material : material_base
-{
-	static void setupOpaquePipeline(dx_command_list* cl, const common_material_info& info)
-	{
-		cl->setPipelineState(*cubePipeline.pipeline);
-		cl->setGraphicsRootSignature(*cubePipeline.rootSignature);
-	}
 
-	void prepareForRendering(dx_command_list* cl)
-	{
-	}
+struct meta_ball
+{
+	vec3 pos;
+	vec3 dir;
+	float radius;
 };
 
-struct mesh_shader_mesh_material : material_base
+static const uint32 DEFAULT_SHIFT = 7; // 128x128x128 cubes by default. (1 << 7) == 128
+static const uint32 DEFAULT_BALL_COUNT = 32;
+static const uint32 MAX_BALL_COUNT = 128;
+static const uint32 BALL_COUNT = DEFAULT_BALL_COUNT;
+static const uint32 SHIFT = DEFAULT_SHIFT;
+
+struct mesh_shader_blob_material
 {
-	ref<mesh_shader_mesh> mesh;
-
-	static void setupOpaquePipeline(dx_command_list* cl, const common_material_info& info)
-	{
-		cl->setPipelineState(*meshPipeline.pipeline);
-		cl->setGraphicsRootSignature(*meshPipeline.rootSignature);
-	}
-
-	void prepareForRendering(dx_command_list* cl)
-	{
-		cl->setRootGraphicsSRV(1, mesh->vertices);
-		cl->setRootGraphicsSRV(2, mesh->meshlets);
-		cl->setRootGraphicsSRV(3, mesh->uniqueVertexIndices);
-		cl->setRootGraphicsSRV(4, mesh->primitiveIndices);
-	}
-};
-
-struct mesh_shader_blob_material : material_base
-{
-	static void setupPipeline(dx_command_list* cl, const common_material_info& info)
-	{
-		cl->setPipelineState(*blobPipeline.pipeline);
-		cl->setGraphicsRootSignature(*blobPipeline.rootSignature);
-
-		cl->setGraphicsDynamicConstantBuffer(1, info.cameraCBV);
-		cl->setRootGraphicsSRV(2, marchingCubesBuffer);
-
-		cl->setDescriptorHeapSRV(3, 0, info.sky);
-	}
-
-	struct meta_ball
-	{
-		vec3 pos;
-		vec3 dir;
-		float radius;
-	};
-
-	static const uint32 DEFAULT_SHIFT = 7; // 128x128x128 cubes by default. (1 << 7) == 128
-	static const uint32 DEFAULT_BALL_COUNT = 32;
-	static const uint32 MAX_BALL_COUNT = 128;
-	static const uint32 BALL_COUNT = DEFAULT_BALL_COUNT;
-	static const uint32 SHIFT = DEFAULT_SHIFT;
-
 	meta_ball balls[MAX_BALL_COUNT];
-
-	struct constant_cb
-	{
-		vec4 balls[MAX_BALL_COUNT];
-	};
 
 	mesh_shader_blob_material()
 	{
@@ -146,39 +98,58 @@ struct mesh_shader_blob_material : material_base
 			balls[i].radius = float(rand() % RAND_MAX) / float(RAND_MAX - 1) * 0.04f + 0.02f;
 		}
 	}
-
-	void prepareForRendering(dx_command_list* cl)
-	{
-		constant_cb cb;
-
-		float animation_speed = 0.5f;
-		animation_speed *= animation_speed;
-		const float frame_time = animation_speed * 0.001f;
-		for (uint32 i = 0; i < BALL_COUNT; ++i)
-		{
-			vec3 d = vec3(0.5f, 0.5f, 0.5f) - balls[i].pos;
-			balls[i].dir += d * (5.0f * frame_time / (2.0f + dot(d, d)));
-			balls[i].pos += balls[i].dir * frame_time;
-
-			float radius = balls[i].radius;
-			cb.balls[i] = vec4(balls[i].pos, radius * radius);
-		}
-
-		auto b = dxContext.uploadDynamicConstantBuffer(cb);
-
-		cl->setGraphicsDynamicConstantBuffer(0, b);
-	}
 };
 
-static ref<mesh_shader_cube_material> cubeMaterial;
-static ref<mesh_shader_mesh_material> meshMaterial;
-static ref<mesh_shader_blob_material> blobMaterial;
+struct mesh_shader_blob_pipeline
+{
+	using material_t = mesh_shader_blob_material;
+
+	PIPELINE_SETUP_DECL;
+	PIPELINE_RENDER_DECL;
+};
+
+PIPELINE_SETUP_IMPL(mesh_shader_blob_pipeline)
+{
+	cl->setPipelineState(*blobPipeline.pipeline);
+	cl->setGraphicsRootSignature(*blobPipeline.rootSignature);
+
+	cl->setGraphicsDynamicConstantBuffer(1, materialInfo.cameraCBV);
+	cl->setRootGraphicsSRV(2, marchingCubesBuffer);
+
+	cl->setDescriptorHeapSRV(3, 0, materialInfo.sky);
+}
+
+PIPELINE_RENDER_IMPL(mesh_shader_blob_pipeline)
+{
+	DX_PROFILE_BLOCK(cl, "Mesh shader blob");
+
+	struct constant_cb
+	{
+		vec4 balls[MAX_BALL_COUNT];
+	};
+
+	constant_cb cb;
+
+	for (uint32 i = 0; i < BALL_COUNT; ++i)
+	{
+		float radius = rc.material.balls[i].radius;
+		cb.balls[i] = vec4(rc.material.balls[i].pos, radius * radius);
+	}
+
+	auto b = dxContext.uploadDynamicConstantBuffer(cb);
+
+	cl->setGraphicsDynamicConstantBuffer(0, b);
+
+
+	const uint32 gridSize = (1 << SHIFT);
+	cl->dispatchMesh((gridSize / 4)* (gridSize / 4)* (gridSize / 4), 1, 1);
+};
 
 void initializeMeshShader()
 {
 	D3D12_RT_FORMAT_ARRAY renderTargetFormat = {};
 	renderTargetFormat.NumRenderTargets = 1;
-	renderTargetFormat.RTFormats[0] = ldrFormat;
+	renderTargetFormat.RTFormats[0] = hdrFormat;
 
 	{
 		struct pipeline_state_stream : dx_pipeline_stream_base
@@ -198,7 +169,7 @@ void initializeMeshShader()
 		};
 
 		pipeline_state_stream stream;
-		stream.dsvFormat = ldrFormat;
+		stream.dsvFormat = depthStencilFormat;
 		stream.rtvFormats = renderTargetFormat;
 
 		graphics_pipeline_files files = {};
@@ -209,10 +180,6 @@ void initializeMeshShader()
 
 		files.ms = "mesh_shader_v2_ms";
 		meshPipeline = createReloadablePipelineFromStream(stream, files, rs_in_mesh_shader);
-
-		cubeMaterial = make_ref<mesh_shader_cube_material>();
-		meshMaterial = make_ref<mesh_shader_mesh_material>();
-		meshMaterial->mesh = loadMeshShaderMeshFromFile("assets/meshes/Dragon_LOD0.bin");
 	}
 	{
 		struct pipeline_state_stream : dx_pipeline_stream_base
@@ -239,7 +206,7 @@ void initializeMeshShader()
 		rasterizerDesc.FrontCounterClockwise = TRUE; // Righthanded coordinate system.
 
 		pipeline_state_stream stream;
-		stream.dsvFormat = ldrFormat;
+		stream.dsvFormat = depthStencilFormat;
 		stream.rtvFormats = renderTargetFormat;
 		stream.rasterizer = rasterizerDesc;
 
@@ -251,12 +218,10 @@ void initializeMeshShader()
 		marchingCubesBuffer = createBuffer(sizeof(marching_cubes_lookup), arraysize(marchingCubesLookup), (void*)marchingCubesLookup);
 
 		blobPipeline = createReloadablePipelineFromStream(stream, files, rs_in_mesh_shader);
-
-		blobMaterial = make_ref<mesh_shader_blob_material>();
 	}
 }
 
-void testRenderMeshShader(ldr_render_pass* ldrRenderPass)
+void testRenderMeshShader(transparent_render_pass* ldrRenderPass, float dt)
 {
 	/*overlayRenderPass->renderObjectWithMeshShader(1, 1, 1,
 		cubeMaterial,
@@ -278,12 +243,21 @@ void testRenderMeshShader(ldr_render_pass* ldrRenderPass)
 
 
 
-	const uint32 gridSize = (1 << blobMaterial->SHIFT);
+	static mesh_shader_blob_material blobMaterial;
 
-	overlayRenderPass->renderObjectWithMeshShader((gridSize / 4) * (gridSize / 4) * (gridSize / 4), 1, 1,
-		blobMaterial,
-		mat4::identity,
-		false);
+	const float animationSpeed = 0.25f;
+	const float frameTime = animationSpeed * dt;
+	for (uint32 i = 0; i < BALL_COUNT; ++i)
+	{
+		vec3 d = vec3(0.5f, 0.5f, 0.5f) - blobMaterial.balls[i].pos;
+		blobMaterial.balls[i].dir += d * (5.f * frameTime / (2.f + dot(d, d)));
+		blobMaterial.balls[i].pos += blobMaterial.balls[i].dir * frameTime;
+	}
+
+
+	const uint32 gridSize = (1 << SHIFT);
+
+	ldrRenderPass->renderObject<mesh_shader_blob_pipeline>(mat4::identity, {}, {}, submesh_info{}, blobMaterial);
 }
 
 
@@ -928,6 +902,11 @@ const marching_cubes_lookup marchingCubesLookup[256] =
 	{ { 0x00020100, 0x00000000, 0x00000000, 0x00000000 }, { 010, 040, 020, 000, 000, 000, 000, 000, 000, 000, 000, 000 }, 1, 3 },
 	{ { 0x00000000, 0x00000000, 0x00000000, 0x00000000 }, { 000, 000, 000, 000, 000, 000, 000, 000, 000, 000, 000, 000 }, 0, 0 },
 };
+
+
+#else
+
+void initializeMeshShader() {}
 
 #endif
 

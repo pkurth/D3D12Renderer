@@ -3,4 +3,4 @@
 #include "render_pass.h"
 
 void initializeMeshShader();
-void testRenderMeshShader(ldr_render_pass* ldrRenderPass);
+void testRenderMeshShader(transparent_render_pass* ldrRenderPass, float dt);
