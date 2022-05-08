@@ -16,8 +16,6 @@ static dx_pipeline visualizeGridPipeline;
 static dx_mesh sphereMesh;
 static submesh_info sphereSubmesh;
 
-static light_probe_tracer tracer;
-
 void initializeLightProbePipelines()
 {
 	if (!dxContext.featureSupport.raytracing())
@@ -36,8 +34,6 @@ void initializeLightProbePipelines()
 	builder.pushSphere({});
 	sphereSubmesh = builder.endSubmesh();
 	sphereMesh = builder.createDXMesh();
-
-	tracer.initialize();
 }
 
 

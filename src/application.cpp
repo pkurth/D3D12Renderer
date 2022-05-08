@@ -55,8 +55,6 @@ void application::loadCustomShaders()
 	}
 }
 
-static ref<pbr_material> clothMaterial;
-
 void application::initialize(main_renderer* renderer)
 {
 	this->renderer = renderer;
@@ -75,18 +73,6 @@ void application::initialize(main_renderer* renderer)
 	//	.addComponent<cloth_component>(10.f, 10.f, 20u, 20u, 8.f)
 	//	.addComponent<cloth_render_component>();
 
-	//clothMaterial = createPBRMaterial(
-	//	"assets/sphere/Tiles074_2K_Color.jpg",
-	//	"assets/sphere/Tiles074_2K_Normal.jpg",
-	//	"assets/sphere/Tiles074_2K_Roughness.jpg",
-	//	{}, vec4(0.f), vec4(1.f), 1.f, 1.f, true);
-
-	clothMaterial = createPBRMaterial(
-		"assets/sponza/textures/Sponza_Curtain_Red_diffuse.tga",
-		"assets/sponza/textures/Sponza_Curtain_Red_normal.tga",
-		"assets/sponza/textures/Sponza_Curtain_roughness.tga",
-		"assets/sponza/textures/Sponza_Curtain_metallic.tga",
-		vec4(0.f), vec4(1.f), 1.f, 1.f, true);
 
 #if 1
 	if (auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj"))
@@ -730,6 +716,13 @@ void application::update(const user_input& input, float dt)
 
 			for (auto [entityHandle, cloth, render] : scene.group<cloth_component, cloth_render_component>().each())
 			{
+				static auto clothMaterial = createPBRMaterial(
+					"assets/sponza/textures/Sponza_Curtain_Red_diffuse.tga",
+					"assets/sponza/textures/Sponza_Curtain_Red_normal.tga",
+					"assets/sponza/textures/Sponza_Curtain_roughness.tga",
+					"assets/sponza/textures/Sponza_Curtain_metallic.tga",
+					vec4(0.f), vec4(1.f), 1.f, 1.f, true);
+
 				auto [vb, prevFrameVB, ib, sm] = render.getRenderData(cloth);
 				opaqueRenderPass.renderAnimatedObject(mat4::identity, mat4::identity, vb, prevFrameVB, ib, sm, clothMaterial, (uint32)entityHandle);
 
