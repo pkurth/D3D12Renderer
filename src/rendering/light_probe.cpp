@@ -230,9 +230,9 @@ void light_probe_grid::visualize(ldr_render_pass* ldrRenderPass)
 
 	ldrRenderPass->renderObject<octahedral_light_probe_grid_pipeline>(transform, sphereMesh.vertexBuffer, sphereMesh.indexBuffer, sphereSubmesh, material);
 
-	ImGui::Begin("Light probe");
-	ImGui::Image(irradiance, irradiance->width * 15, irradiance->height * 15);
-	ImGui::End();
+	//ImGui::Begin("Light probe");
+	//ImGui::Image(irradiance, irradiance->width, irradiance->height);
+	//ImGui::End();
 }
 
 
@@ -308,6 +308,8 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 
 	light_probe_trace_cb cb;
 	cb.countX = grid.numNodesX;
+	cb.minCorner = grid.minCorner;
+	cb.cellSize = grid.cellSize;
 
 	cl->setComputeDescriptorTable(LIGHT_PROBE_TRACING_RS_RESOURCES, gpuHandle);
 	cl->setCompute32BitConstants(LIGHT_PROBE_TRACING_RS_CB, cb);

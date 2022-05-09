@@ -88,5 +88,7 @@ struct light_probe_visualization_cb
 
 struct light_probe_trace_cb
 {
+	vec3 minCorner;
+	float cellSize;
 	uint32 countX;
 };

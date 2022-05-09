@@ -70,7 +70,7 @@ static float3 traceRadianceRay(float3 origin, float3 direction)
 	return payload.color;
 }
 
-static float traceShadowRay(float3 origin, float3 direction, float distance, uint recursion)
+static float traceShadowRay(float3 origin, float3 direction, float distance)
 {
 #ifdef SHADOW
 	RayDesc ray;
@@ -122,7 +122,7 @@ void rayGen()
 	else
 	{
 		uint2 probeIndex2 = launchIndex.xy / LIGHT_PROBE_TOTAL_RESOLUTION;
-		uint3 probeIndex = uint3(probeIndex2.x % cb.countX, probeIndex2.y, probeIndex2.x / cb.countX);
+		uint3 probeIndex = uint3(probeIndex2.x % cb.countX, probeIndex2.x / cb.countX, probeIndex2.y);
 		
 		uint2 pixelIndex = launchIndex.xy % LIGHT_PROBE_TOTAL_RESOLUTION; // [1, 6]
 		pixelIndex -= 1; // Subtract the border -> [0, 5]
@@ -130,9 +130,11 @@ void rayGen()
 		float2 uv = ((float2)pixelIndex + 0.5f) / LIGHT_PROBE_RESOLUTION;
 		float2 oct = uv * 2.f - 1.f;
 
-		float3 dir = decodeOctahedral(oct);
+		float3 direction = decodeOctahedral(oct);
+		float3 origin = probeIndex * cb.cellSize + cb.minCorner;
 
-		color = dir;// traceRadianceRay(origin, direction);
+		//color = probeIndex.z / 10.f;
+		color = traceRadianceRay(origin, direction);
 	}
 
 	output[launchIndex.xy] = float4(color, 1.f);
@@ -158,10 +160,9 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float2 uv = interpolateAttribute(uvs, attribs);
 
 	surface_info surface;
-	surface.N = normalize(transformDirectionToWorld(interpolateAttribute(normals, attribs)));
+	surface.N = normalize(transformDirectionToWorld(interpolateAttribute(normals, attribs))); // We ignore normal maps.
 	surface.V = -WorldRayDirection();
 	surface.P = hitWorldPosition();
-
 
 	uint mipLevel = 0;
 	uint flags = material.getFlags();
@@ -170,8 +171,6 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 		? albedoTex.SampleLevel(wrapSampler, uv, mipLevel)
 		: float4(1.f, 1.f, 1.f, 1.f))
 		* unpackColor(material.albedoTint));
-
-	// We ignore normal maps for now.
 
 	surface.roughness = (flags & USE_ROUGHNESS_TEXTURE)
 		? roughTex.SampleLevel(wrapSampler, uv, mipLevel)
@@ -186,7 +185,18 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 
 	surface.inferRemainingProperties();
 
-	payload.color = surface.albedo.rgb;
+
+
+	float3 L = -normalize(float3(-0.6f, -1.f, -0.3f));
+	float sunVisibility = traceShadowRay(surface.P, L, 10000.f);
+
+	light_info light;
+	light.initialize(surface, L, float3(1.f, 0.93f, 0.76f) * 50.f);
+
+	light_contribution totalLighting = { float3(0.f, 0.f, 0.f), float3(0.f, 0.f, 0.f) };
+	totalLighting.add(calculateDirectLighting(surface, light), sunVisibility);
+
+	payload.color = totalLighting.evaluate(surface.albedo) + surface.emission;
 }
 
 [shader("miss")]
