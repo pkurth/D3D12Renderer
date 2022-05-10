@@ -18,20 +18,14 @@ struct vs_output
 
 vs_output main(vs_input IN)
 {
-	uint slice = cb.countX * cb.countY;
-	uint z = IN.instanceID / slice;
-	uint xy = IN.instanceID % slice;
-	uint y = xy / cb.countX;
-	uint x = xy % cb.countX;
-
-	float3 index = float3(x, y, z);
+	float3 index = linearIndexTo3DIndex(IN.instanceID, cb.countX, cb.countY);
 
 	float radius = 0.1f;
 
 	vs_output OUT;
 	OUT.normal = IN.position;
 	OUT.position = mul(cb.mvp, float4(IN.position * radius + index * cb.cellSize, 1.f));
-	OUT.uvOffset = float2(y * cb.countX + x, z);
+	OUT.uvOffset = float2(index.y * cb.countX + index.x, index.z);
 	OUT.uvScale = cb.uvScale;
 	return OUT;
 }

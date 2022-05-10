@@ -54,7 +54,16 @@ static vec3 decodeOctahedral(vec2 o)
 	return normalize(v);
 }
 
-#endif
+static vec3 linearIndexTo3DIndex(uint32 i, uint32 countX, uint32 countY)
+{
+	uint32 slice = countX * countY;
+	uint32 z = i / slice;
+	uint32 xy = i % slice;
+	uint32 y = xy / countX;
+	uint32 x = xy % countX;
+
+	return vec3((float)x, (float)y, (float)z);
+}
 
 
 struct light_probe_visualization_cb
@@ -84,11 +93,35 @@ struct light_probe_visualization_cb
 #define LIGHT_PROBE_GRID_VISUALIZATION_RS_IRRADIANCE	1
 
 
+struct light_probe_update_cb
+{
+	uint32 countX;
+	uint32 countY;
+};
 
+#define LIGHT_PROBE_UPDATE_RS \
+	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
+	"DENY_VERTEX_SHADER_ROOT_ACCESS |" \
+	"DENY_HULL_SHADER_ROOT_ACCESS |" \
+	"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
+	"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
+	"RootConstants(num32BitConstants=2, b0, visibility=SHADER_VISIBILITY_PIXEL), " \
+	"DescriptorTable(SRV(t0, numDescriptors=2), visibility=SHADER_VISIBILITY_PIXEL)"
+
+#define LIGHT_PROBE_UPDATE_RS_CB				0
+#define LIGHT_PROBE_UPDATE_RS_RAYTRACE_RESULTS	1
+
+
+
+
+#define NUM_RAYS_PER_PROBE 128
 
 struct light_probe_trace_cb
 {
 	vec3 minCorner;
 	float cellSize;
 	uint32 countX;
+	uint32 countY;
 };
+
+#endif

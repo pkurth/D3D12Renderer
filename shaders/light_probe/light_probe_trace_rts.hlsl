@@ -19,8 +19,10 @@ struct mesh_vertex
 
 // Global.
 RaytracingAccelerationStructure rtScene		: register(t0);
+TextureCube<float4> sky						: register(t1);
 
-RWTexture2D<float4> output					: register(u0);
+RWTexture2D<float3> radianceOutput			: register(u0);
+RWTexture2D<float4> directionDepthOutput	: register(u1);
 
 ConstantBuffer<light_probe_trace_cb> cb		: register(b0);
 
@@ -40,6 +42,7 @@ Texture2D<float> metalTex					: register(t5, space1);
 struct radiance_ray_payload
 {
 	float3 color;
+	float distance;
 };
 
 struct shadow_ray_payload
@@ -48,7 +51,7 @@ struct shadow_ray_payload
 };
 
 
-static float3 traceRadianceRay(float3 origin, float3 direction)
+static float4 traceRadianceRay(float3 origin, float3 direction)
 {
 	RayDesc ray;
 	ray.Origin = origin;
@@ -56,7 +59,7 @@ static float3 traceRadianceRay(float3 origin, float3 direction)
 	ray.TMin = 0.01f;
 	ray.TMax = 10000.f;
 
-	radiance_ray_payload payload = { float3(0.f, 0.f, 0.f) };
+	radiance_ray_payload payload = { float3(0.f, 0.f, 0.f), -1.f };
 
 	TraceRay(rtScene,
 		RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
@@ -67,7 +70,7 @@ static float3 traceRadianceRay(float3 origin, float3 direction)
 		ray,
 		payload);
 
-	return payload.color;
+	return float4(payload.color, payload.distance);
 }
 
 static float traceShadowRay(float3 origin, float3 direction, float distance)
@@ -104,40 +107,51 @@ static float traceShadowRay(float3 origin, float3 direction, float distance)
 // RAY GENERATION
 // ----------------------------------------
 
+
+//	https://www.lgdv.tf.fau.de/publications/spherical-fibonacci-mapping/
+static float3 sphericalFibonacci(float i, float n)
+{
+	const float PHI = sqrt(5.f) * 0.5f + 0.5f;
+#   define madfrac(a, b) ((a)*(b)-floor((a)*(b)))
+	float phi = 2.f * M_PI * madfrac(i, PHI - 1);
+	float cosTheta = 1.f - (2.f * i + 1.f) * (1.f / n);
+	float sinTheta = sqrt(saturate(1.f - cosTheta * cosTheta));
+
+	float sinPhi, cosPhi;
+	sincos(phi, sinPhi, cosPhi);
+
+	return float3(
+		cosPhi * sinTheta,
+		sinPhi * sinTheta,
+		cosTheta);
+
+#   undef madfrac
+}
+
+
 [shader("raygeneration")]
 void rayGen()
 {
 	uint3 launchIndex = DispatchRaysIndex();
 	uint3 launchDim = DispatchRaysDimensions();
 
-	float3 color = float3(1.f, 0.f, 1.f);
+	uint rayID = launchIndex.x;
+	uint probeID = launchIndex.y;
 
-	if (launchIndex.x % LIGHT_PROBE_TOTAL_RESOLUTION == 0
-		|| launchIndex.x % LIGHT_PROBE_TOTAL_RESOLUTION == 7
-		|| launchIndex.y % LIGHT_PROBE_TOTAL_RESOLUTION == 0
-		|| launchIndex.y % LIGHT_PROBE_TOTAL_RESOLUTION == 7)
-	{
-		// Border pixel.
-	}
-	else
-	{
-		uint2 probeIndex2 = launchIndex.xy / LIGHT_PROBE_TOTAL_RESOLUTION;
-		uint3 probeIndex = uint3(probeIndex2.x % cb.countX, probeIndex2.x / cb.countX, probeIndex2.y);
-		
-		uint2 pixelIndex = launchIndex.xy % LIGHT_PROBE_TOTAL_RESOLUTION; // [1, 6]
-		pixelIndex -= 1; // Subtract the border -> [0, 5]
+	float3 probeIndex = linearIndexTo3DIndex(probeID, cb.countX, cb.countY);
 
-		float2 uv = ((float2)pixelIndex + 0.5f) / LIGHT_PROBE_RESOLUTION;
-		float2 oct = uv * 2.f - 1.f;
+	float3 origin = probeIndex * cb.cellSize + cb.minCorner;
+	float3 direction = sphericalFibonacci(rayID, NUM_RAYS_PER_PROBE);
 
-		float3 direction = decodeOctahedral(oct);
-		float3 origin = probeIndex * cb.cellSize + cb.minCorner;
+	float4 radianceAndDistance = traceRadianceRay(origin, direction);
+	radianceOutput[launchIndex.xy] = radianceAndDistance.xyz;
+	directionDepthOutput[launchIndex.xy] = float4(direction, radianceAndDistance.w);
 
-		//color = probeIndex.z / 10.f;
-		color = traceRadianceRay(origin, direction);
-	}
 
-	output[launchIndex.xy] = float4(color, 1.f);
+	// TODO:
+	// Output: 
+	// - Radiance 11 11 10
+	// - Direction, distance 16 16 16 16
 }
 
 
@@ -197,12 +211,13 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	totalLighting.add(calculateDirectLighting(surface, light), sunVisibility);
 
 	payload.color = totalLighting.evaluate(surface.albedo) + surface.emission;
+	payload.distance = RayTCurrent();
 }
 
 [shader("miss")]
 void radianceMiss(inout radiance_ray_payload payload)
 {
-	payload.color = float3(0.f, 0.f, 0.f);
+	payload.color = sky.SampleLevel(wrapSampler, WorldRayDirection(), 0).xyz;
 }
 
 

@@ -396,7 +396,7 @@ void application::initialize(main_renderer* renderer)
 	}
 #endif
 
-	lightProbeGrid.initialize(vec3(-30.f, -1.f, -30.f), vec3(60.f, 20.f, 60.f), 1.5f);
+	lightProbeGrid.initialize(vec3(-20.f, -1.f, -20.f), vec3(40.f, 20.f, 40.f), 1.5f);
 
 	scene.sun.direction = normalize(vec3(-0.6f, -1.f, -0.3f));
 	scene.sun.color = vec3(1.f, 0.93f, 0.76f);

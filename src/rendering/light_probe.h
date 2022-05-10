@@ -19,6 +19,9 @@ struct light_probe_grid
 	ref<dx_texture> irradiance;
 	ref<dx_texture> depth;
 
+	ref<dx_texture> raytracedRadiance;
+	ref<dx_texture> raytracedDirectionAndDistance;
+
 	void initialize(vec3 minCorner, vec3 dimensions, float cellSize);
 	void visualize(ldr_render_pass* ldrRenderPass);
 };
@@ -34,7 +37,7 @@ struct light_probe_tracer : pbr_raytracer
 private:
 
 	const uint32 maxRecursionDepth = 2;
-	const uint32 maxPayloadSize = 3 * sizeof(float); // Radiance-payload is 1 x float3.
+	const uint32 maxPayloadSize = 4 * sizeof(float); // Radiance-payload is 1 x float3, 1 x float.
 
 
 	// Only descriptors in here!
@@ -46,7 +49,8 @@ private:
 
 	struct output_resources
 	{
-		dx_cpu_descriptor_handle output;
+		dx_cpu_descriptor_handle radiance;
+		dx_cpu_descriptor_handle directionAndDistance;
 	};
 };
 
