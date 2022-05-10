@@ -44,8 +44,7 @@ void initializeLightProbePipelines()
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.renderTargets(DXGI_FORMAT_R11G11B10_FLOAT)
 			.depthSettings(false, false)
-			//.alphaBlending(0)
-			;
+			.alphaBlending(0);
 
 		probeUpdatePipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "light_probe_update_ps" });
 	}

@@ -146,15 +146,10 @@ void rayGen()
 	float4 radianceAndDistance = traceRadianceRay(origin, direction);
 	radianceOutput[launchIndex.xy] = radianceAndDistance.xyz;
 	directionDepthOutput[launchIndex.xy] = float4(direction, radianceAndDistance.w);
-
-
-	// TODO:
-	// Output: 
-	// - Radiance 11 11 10
-	// - Direction, distance 16 16 16 16
 }
 
 
+// TODO: Take sun as parameter.
 
 
 // ----------------------------------------
