@@ -47,6 +47,40 @@ struct random_number_generator
 	{
 		return remap(randomFloat01(), 0.f, 1.f, lo, hi);
 	}
+
+	inline vec2 randomVec2Between(float lo, float hi)
+	{
+		return vec2(
+			randomFloatBetween(lo, hi),
+			randomFloatBetween(lo, hi));
+	}
+
+	inline vec3 randomVec3Between(float lo, float hi)
+	{
+		return vec3(
+			randomFloatBetween(lo, hi),
+			randomFloatBetween(lo, hi),
+			randomFloatBetween(lo, hi));
+	}
+
+	inline vec4 randomVec4Between(float lo, float hi)
+	{
+		return vec4(
+			randomFloatBetween(lo, hi),
+			randomFloatBetween(lo, hi),
+			randomFloatBetween(lo, hi),
+			randomFloatBetween(lo, hi));
+	}
+
+	inline vec3 randomPointOnUnitSphere()
+	{
+		return normalize(randomVec3Between(-1.f, 1.f));
+	}
+
+	inline quat randomRotation(float maxAngle = M_PI)
+	{
+		return quat(randomPointOnUnitSphere(), randomFloatBetween(-maxAngle, maxAngle));
+	}
 };
 
 static float halton(uint32 index, uint32 base)
