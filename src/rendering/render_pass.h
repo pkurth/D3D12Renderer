@@ -42,18 +42,22 @@ struct opaque_render_pass
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material,
 		uint32 objectID = -1,
-		bool doubleSided = false)
+		bool doubleSided = false,
+		bool includeInDepthPrepass = true)
 	{
 		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, material);
 
-		float depth = 0.f; // TODO
-		auto& buffer = doubleSided ? staticDoublesidedDepthPrepass : staticDepthPrepass;
-		auto& depthCommand = buffer.emplace_back(depth);
-		depthCommand.transform = transform;
-		depthCommand.vertexBuffer = vertexBuffer.positions;
-		depthCommand.indexBuffer = indexBuffer;
-		depthCommand.submesh = submesh;
-		depthCommand.objectID = objectID;
+		if (includeInDepthPrepass)
+		{
+			float depth = 0.f; // TODO
+			auto& buffer = doubleSided ? staticDoublesidedDepthPrepass : staticDepthPrepass;
+			auto& depthCommand = buffer.emplace_back(depth);
+			depthCommand.transform = transform;
+			depthCommand.vertexBuffer = vertexBuffer.positions;
+			depthCommand.indexBuffer = indexBuffer;
+			depthCommand.submesh = submesh;
+			depthCommand.objectID = objectID;
+		}
 	}
 
 	template <typename pipeline_t>
@@ -64,19 +68,23 @@ struct opaque_render_pass
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material,
 		uint32 objectID = -1,
-		bool doubleSided = false)
+		bool doubleSided = false,
+		bool includeInDepthPrepass = true)
 	{
 		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, material);
 
-		float depth = 0.f; // TODO
-		auto& buffer = doubleSided ? dynamicDoublesidedDepthPrepass : dynamicDepthPrepass;
-		auto& depthCommand = buffer.emplace_back(depth);
-		depthCommand.transform = transform;
-		depthCommand.prevFrameTransform = prevFrameTransform;
-		depthCommand.vertexBuffer = vertexBuffer.positions;
-		depthCommand.indexBuffer = indexBuffer;
-		depthCommand.submesh = submesh;
-		depthCommand.objectID = objectID;
+		if (includeInDepthPrepass)
+		{
+			float depth = 0.f; // TODO
+			auto& buffer = doubleSided ? dynamicDoublesidedDepthPrepass : dynamicDepthPrepass;
+			auto& depthCommand = buffer.emplace_back(depth);
+			depthCommand.transform = transform;
+			depthCommand.prevFrameTransform = prevFrameTransform;
+			depthCommand.vertexBuffer = vertexBuffer.positions;
+			depthCommand.indexBuffer = indexBuffer;
+			depthCommand.submesh = submesh;
+			depthCommand.objectID = objectID;
+		}
 	}
 
 	template <typename pipeline_t>
@@ -88,20 +96,24 @@ struct opaque_render_pass
 		submesh_info submesh,
 		const typename pipeline_t::material_t& material,
 		uint32 objectID = -1,
-		bool doubleSided = false)
+		bool doubleSided = false,
+		bool includeInDepthPrepass = true)
 	{
 		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, material);
 
-		float depth = 0.f; // TODO
-		auto& buffer = doubleSided ? animatedDoublesidedDepthPrepass : animatedDepthPrepass;
-		auto& depthCommand = buffer.emplace_back(depth);
-		depthCommand.transform = transform;
-		depthCommand.prevFrameTransform = prevFrameTransform;
-		depthCommand.vertexBuffer = vertexBuffer.positions;
-		depthCommand.prevFrameVertexBufferAddress = prevFrameVertexBuffer.positions ? prevFrameVertexBuffer.positions.view.BufferLocation : vertexBuffer.positions.view.BufferLocation;
-		depthCommand.indexBuffer = indexBuffer;
-		depthCommand.submesh = submesh;
-		depthCommand.objectID = objectID;
+		if (includeInDepthPrepass)
+		{
+			float depth = 0.f; // TODO
+			auto& buffer = doubleSided ? animatedDoublesidedDepthPrepass : animatedDepthPrepass;
+			auto& depthCommand = buffer.emplace_back(depth);
+			depthCommand.transform = transform;
+			depthCommand.prevFrameTransform = prevFrameTransform;
+			depthCommand.vertexBuffer = vertexBuffer.positions;
+			depthCommand.prevFrameVertexBufferAddress = prevFrameVertexBuffer.positions ? prevFrameVertexBuffer.positions.view.BufferLocation : vertexBuffer.positions.view.BufferLocation;
+			depthCommand.indexBuffer = indexBuffer;
+			depthCommand.submesh = submesh;
+			depthCommand.objectID = objectID;
+		}
 	}
 
 
@@ -112,15 +124,16 @@ struct opaque_render_pass
 		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const ref<pbr_material>& material,
-		uint32 objectID = -1)
+		uint32 objectID = -1,
+		bool includeInDepthPrepass = true)
 	{
 		if (material->doubleSided)
 		{
-			renderStaticObject<opaque_pbr_pipeline::double_sided>(transform, vertexBuffer, indexBuffer, submesh, material, objectID, true);
+			renderStaticObject<opaque_pbr_pipeline::double_sided>(transform, vertexBuffer, indexBuffer, submesh, material, objectID, true, includeInDepthPrepass);
 		}
 		else
 		{
-			renderStaticObject<opaque_pbr_pipeline::standard>(transform, vertexBuffer, indexBuffer, submesh, material, objectID, false);
+			renderStaticObject<opaque_pbr_pipeline::standard>(transform, vertexBuffer, indexBuffer, submesh, material, objectID, false, includeInDepthPrepass);
 		}
 	}
 
@@ -130,15 +143,16 @@ struct opaque_render_pass
 		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const ref<pbr_material>& material,
-		uint32 objectID = -1)
+		uint32 objectID = -1,
+		bool includeInDepthPrepass = true)
 	{
 		if (material->doubleSided)
 		{
-			renderDynamicObject<opaque_pbr_pipeline::double_sided>(transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh, material, objectID, true);
+			renderDynamicObject<opaque_pbr_pipeline::double_sided>(transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh, material, objectID, true, includeInDepthPrepass);
 		}
 		else
 		{
-			renderDynamicObject<opaque_pbr_pipeline::standard>(transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh, material, objectID, false);
+			renderDynamicObject<opaque_pbr_pipeline::standard>(transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh, material, objectID, false, includeInDepthPrepass);
 		}
 	}
 
@@ -149,15 +163,16 @@ struct opaque_render_pass
 		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
 		const ref<pbr_material>& material,
-		uint32 objectID = -1)
+		uint32 objectID = -1,
+		bool includeInDepthPrepass = true)
 	{
 		if (material->doubleSided)
 		{
-			renderAnimatedObject<opaque_pbr_pipeline::double_sided>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, material, objectID, true);
+			renderAnimatedObject<opaque_pbr_pipeline::double_sided>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, material, objectID, true, includeInDepthPrepass);
 		}
 		else
 		{
-			renderAnimatedObject<opaque_pbr_pipeline::standard>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, material, objectID, false);
+			renderAnimatedObject<opaque_pbr_pipeline::standard>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, material, objectID, false, includeInDepthPrepass);
 		}
 	}
 
