@@ -34,7 +34,7 @@ void initializeLightProbePipelines()
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.inputLayout(inputLayout_position)
-			.renderTargets(ldrFormat, depthStencilFormat);
+			.renderTargets(hdrFormat, depthStencilFormat);
 
 		visualizeGridPipeline = createReloadablePipeline(desc, { "light_probe_grid_visualization_vs", "light_probe_grid_visualization_ps" });
 	}
@@ -42,7 +42,7 @@ void initializeLightProbePipelines()
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			.primitiveTopology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE)
-			.renderTargets(ldrFormat, depthStencilFormat);
+			.renderTargets(hdrFormat, depthStencilFormat);
 
 		visualizeRaysPipeline = createReloadablePipeline(desc, { "light_probe_ray_visualization_vs", "light_probe_ray_visualization_ps" });
 	}
@@ -286,7 +286,7 @@ PIPELINE_RENDER_IMPL(visualize_rays_pipeline)
 }
 
 
-void light_probe_grid::visualize(ldr_render_pass* ldrRenderPass)
+void light_probe_grid::visualize(opaque_render_pass* renderPass)
 {
 	if (!dxContext.featureSupport.raytracing())
 	{
@@ -296,12 +296,12 @@ void light_probe_grid::visualize(ldr_render_pass* ldrRenderPass)
 	mat4 transform = createTranslationMatrix(minCorner);
 	visualize_material material = { cellSize, numNodesX, numNodesY, totalNumNodes, irradiance };
 
-	ldrRenderPass->renderObject<visualize_grid_pipeline>(transform, sphereMesh.vertexBuffer, sphereMesh.indexBuffer, sphereSubmesh, material);
+	renderPass->renderStaticObject<visualize_grid_pipeline>(transform, sphereMesh.vertexBuffer, sphereMesh.indexBuffer, sphereSubmesh, material, -1, false, false);
 
 
 	material.texture0 = raytracedRadiance;
 	material.texture1 = raytracedDirectionAndDistance;
-	//ldrRenderPass->renderObject<visualize_rays_pipeline>(transform, {}, {}, {}, material);
+	renderPass->renderStaticObject<visualize_rays_pipeline>(transform, {}, {}, {}, material, -1, false, false);
 
 	ImGui::Begin("Light probe");
 	ImGui::Image(irradiance);

@@ -23,7 +23,7 @@ struct light_probe_grid
 	ref<dx_texture> raytracedDirectionAndDistance;
 
 	void initialize(vec3 minCorner, vec3 dimensions, float cellSize);
-	void visualize(ldr_render_pass* ldrRenderPass);
+	void visualize(opaque_render_pass* renderPass);
 };
 
 struct light_probe_tracer : pbr_raytracer
