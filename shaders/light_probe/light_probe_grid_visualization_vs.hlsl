@@ -1,6 +1,6 @@
 #include "light_probe_rs.hlsli"
 
-ConstantBuffer<light_probe_visualization_cb> cb : register(b0);
+ConstantBuffer<light_probe_grid_visualization_cb> cb : register(b0);
 
 struct vs_input
 {

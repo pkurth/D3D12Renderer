@@ -23,26 +23,12 @@ float4 main(ps_input IN) : SV_TARGET
 
 	uint2 pixelIndex = coord % LIGHT_PROBE_TOTAL_RESOLUTION; // [1, 6]
 
-	if (pixelIndex.x == 0) 
-	{ 
-		pixelIndex.x = 1;
-		pixelIndex.y = LIGHT_PROBE_TOTAL_RESOLUTION - pixelIndex.y - 1;
-	}
-	if (pixelIndex.x == LIGHT_PROBE_TOTAL_RESOLUTION - 1)
-	{
-		pixelIndex.x = LIGHT_PROBE_TOTAL_RESOLUTION - 2;
-		pixelIndex.y = LIGHT_PROBE_TOTAL_RESOLUTION - pixelIndex.y - 1;
-	}
-	if (pixelIndex.y == 0)
-	{
-		pixelIndex.y = 1;
-		pixelIndex.x = LIGHT_PROBE_TOTAL_RESOLUTION - pixelIndex.x - 1;
-	}
-	if (pixelIndex.y == LIGHT_PROBE_TOTAL_RESOLUTION - 1)
-	{
-		pixelIndex.y = LIGHT_PROBE_TOTAL_RESOLUTION - 2;
-		pixelIndex.x = LIGHT_PROBE_TOTAL_RESOLUTION - pixelIndex.x - 1;
-	}
+
+	// Map borders to wrapping interior texel.
+	pixelIndex = (pixelIndex.x == 0) ? uint2(1, LIGHT_PROBE_TOTAL_RESOLUTION - pixelIndex.y - 1) : pixelIndex;
+	pixelIndex = (pixelIndex.x == LIGHT_PROBE_TOTAL_RESOLUTION - 1) ? uint2(LIGHT_PROBE_TOTAL_RESOLUTION - 2, LIGHT_PROBE_TOTAL_RESOLUTION - pixelIndex.y - 1) : pixelIndex;
+	pixelIndex = (pixelIndex.y == 0) ? uint2(LIGHT_PROBE_TOTAL_RESOLUTION - pixelIndex.x - 1, 1) : pixelIndex;
+	pixelIndex = (pixelIndex.y == LIGHT_PROBE_TOTAL_RESOLUTION - 1) ? uint2(LIGHT_PROBE_TOTAL_RESOLUTION - pixelIndex.x - 1, LIGHT_PROBE_TOTAL_RESOLUTION - 2) : pixelIndex;
 
 
 	pixelIndex -= 1; // Subtract the border -> [0, 5]
@@ -58,7 +44,7 @@ float4 main(ps_input IN) : SV_TARGET
 	{
 		uint2 c = uint2(r, probeIndex);
 		
-		float3 rad = radiance[c];
+		float3 rad = radiance[c] * ENERGY_CONSERVATION;
 		
 		float4 dirDist = directionAndDistance[c];
 		float3 rayDirection = dirDist.xyz;
@@ -68,10 +54,10 @@ float4 main(ps_input IN) : SV_TARGET
 		irradiance += float4(rad * weight, weight);
 	}
 
-	if (irradiance.w > 1e-3f)
+	if (irradiance.w > 1e-5f)
 	{
 		irradiance.xyz /= irradiance.w;
-		irradiance.w = 0.1f;
+		irradiance.w = 0.03f;
 	}
 
 	return irradiance;

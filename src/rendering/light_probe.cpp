@@ -1,10 +1,13 @@
 #include "pch.h"
 #include "light_probe.h"
 
+#include "core/random.h"
+
 #include "dx/dx_pipeline.h"
 #include "dx/dx_command_list.h"
 #include "dx/dx_context.h"
 #include "dx/dx_barrier_batcher.h"
+#include "dx/dx_profiling.h"
 #include "geometry/mesh_builder.h"
 #include "render_utils.h"
 #include "render_resources.h"
@@ -13,12 +16,13 @@
 #include "light_probe_rs.hlsli"
 
 
-
 static dx_pipeline visualizeGridPipeline;
+static dx_pipeline visualizeRaysPipeline;
 static dx_mesh sphereMesh;
 static submesh_info sphereSubmesh;
 
-static dx_pipeline probeUpdatePipeline;
+static dx_pipeline probeUpdateIrradiancePipeline;
+static dx_pipeline probeUpdateDepthPipeline;
 
 void initializeLightProbePipelines()
 {
@@ -35,6 +39,14 @@ void initializeLightProbePipelines()
 		visualizeGridPipeline = createReloadablePipeline(desc, { "light_probe_grid_visualization_vs", "light_probe_grid_visualization_ps" });
 	}
 
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.primitiveTopology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE)
+			.renderTargets(ldrFormat, depthStencilFormat);
+
+		visualizeRaysPipeline = createReloadablePipeline(desc, { "light_probe_ray_visualization_vs", "light_probe_ray_visualization_ps" });
+	}
+
 	mesh_builder builder(mesh_creation_flags_with_positions);
 	builder.pushSphere({});
 	sphereSubmesh = builder.endSubmesh();
@@ -46,7 +58,16 @@ void initializeLightProbePipelines()
 			.depthSettings(false, false)
 			.alphaBlending(0);
 
-		probeUpdatePipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "light_probe_update_ps" });
+		probeUpdateIrradiancePipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "light_probe_update_irradiance_ps" });
+	}
+
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.renderTargets(DXGI_FORMAT_R16G16_FLOAT)
+			.depthSettings(false, false)
+			.alphaBlending(0);
+
+		probeUpdateDepthPipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "light_probe_update_depth_ps" });
 	}
 }
 
@@ -80,7 +101,6 @@ void light_probe_grid::initialize(vec3 minCorner, vec3 dimensions, float cellSiz
 	this->numNodesY = gridSizeY + 1;
 	this->numNodesZ = gridSizeZ + 1;
 	this->totalNumNodes = numNodesX * numNodesY * numNodesZ;
-
 
 	uint32 irradianceYSliceWidth = numNodesX * LIGHT_PROBE_TOTAL_RESOLUTION;
 	uint32 irradianceTexWidth = numNodesY * irradianceYSliceWidth;
@@ -195,42 +215,74 @@ void light_probe_grid::initialize(vec3 minCorner, vec3 dimensions, float cellSiz
 }
 
 
-struct visualize_grid_material
+struct visualize_material
 {
 	float cellSize;
 	uint32 countX;
 	uint32 countY;
 	uint32 total;
 
-	ref<dx_texture> irradianceTexture;
+	ref<dx_texture> texture0;
+	ref<dx_texture> texture1;
 };
 
-struct octahedral_light_probe_grid_pipeline
+struct visualize_grid_pipeline
 {
-	using material_t = visualize_grid_material;
+	using material_t = visualize_material;
 
 	PIPELINE_SETUP_DECL;
 	PIPELINE_RENDER_DECL;
 };
 
 
-PIPELINE_SETUP_IMPL(octahedral_light_probe_grid_pipeline)
+PIPELINE_SETUP_IMPL(visualize_grid_pipeline)
 {
 	cl->setPipelineState(*visualizeGridPipeline.pipeline);
 	cl->setGraphicsRootSignature(*visualizeGridPipeline.rootSignature);
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
-PIPELINE_RENDER_IMPL(octahedral_light_probe_grid_pipeline)
+PIPELINE_RENDER_IMPL(visualize_grid_pipeline)
 {
-	vec2 uvScale = (float)LIGHT_PROBE_TOTAL_RESOLUTION / vec2((float)rc.material.irradianceTexture->width, (float)rc.material.irradianceTexture->height);
-	cl->setGraphics32BitConstants(LIGHT_PROBE_GRID_VISUALIZATION_RS_CB, light_probe_visualization_cb{ viewProj * rc.transform, uvScale, rc.material.cellSize, rc.material.countX, rc.material.countY });
-	cl->setDescriptorHeapSRV(LIGHT_PROBE_GRID_VISUALIZATION_RS_IRRADIANCE, 0, rc.material.irradianceTexture);
+	vec2 uvScale = (float)LIGHT_PROBE_TOTAL_RESOLUTION / vec2((float)rc.material.texture0->width, (float)rc.material.texture0->height);
+	cl->setGraphics32BitConstants(LIGHT_PROBE_GRID_VISUALIZATION_RS_CB, light_probe_grid_visualization_cb{ viewProj * rc.transform, uvScale, rc.material.cellSize, rc.material.countX, rc.material.countY });
+	cl->setDescriptorHeapSRV(LIGHT_PROBE_GRID_VISUALIZATION_RS_IRRADIANCE, 0, rc.material.texture0);
 
 	cl->setVertexBuffer(0, rc.vertexBuffer.positions);
 	cl->setVertexBuffer(1, rc.vertexBuffer.others);
 	cl->setIndexBuffer(rc.indexBuffer);
 	cl->drawIndexed(rc.submesh.numIndices, rc.material.total, rc.submesh.firstIndex, rc.submesh.baseVertex, 0);
+}
+
+
+
+struct visualize_rays_pipeline
+{
+	using material_t = visualize_material;
+
+	PIPELINE_SETUP_DECL;
+	PIPELINE_RENDER_DECL;
+};
+
+
+PIPELINE_SETUP_IMPL(visualize_rays_pipeline)
+{
+	cl->setPipelineState(*visualizeRaysPipeline.pipeline);
+	cl->setGraphicsRootSignature(*visualizeRaysPipeline.rootSignature);
+	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+}
+
+PIPELINE_RENDER_IMPL(visualize_rays_pipeline)
+{
+	cl->setGraphics32BitConstants(LIGHT_PROBE_RAY_VISUALIZATION_RS_CB, light_probe_ray_visualization_cb{ viewProj * rc.transform, rc.material.cellSize, rc.material.countX, rc.material.countY });
+	cl->setDescriptorHeapSRV(LIGHT_PROBE_RAY_VISUALIZATION_RS_RAYS, 0, rc.material.texture0);
+	cl->setDescriptorHeapSRV(LIGHT_PROBE_RAY_VISUALIZATION_RS_RAYS, 1, rc.material.texture1);
+
+	cl->transitionBarrier(rc.material.texture0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+	cl->transitionBarrier(rc.material.texture1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+	cl->draw(2, NUM_RAYS_PER_PROBE * rc.material.total, 0, 0);
+	cl->transitionBarrier(rc.material.texture0, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	cl->transitionBarrier(rc.material.texture1, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 }
 
 
@@ -242,12 +294,19 @@ void light_probe_grid::visualize(ldr_render_pass* ldrRenderPass)
 	}
 
 	mat4 transform = createTranslationMatrix(minCorner);
-	visualize_grid_material material = { cellSize, numNodesX, numNodesY, totalNumNodes, irradiance };
+	visualize_material material = { cellSize, numNodesX, numNodesY, totalNumNodes, irradiance };
 
-	ldrRenderPass->renderObject<octahedral_light_probe_grid_pipeline>(transform, sphereMesh.vertexBuffer, sphereMesh.indexBuffer, sphereSubmesh, material);
+	ldrRenderPass->renderObject<visualize_grid_pipeline>(transform, sphereMesh.vertexBuffer, sphereMesh.indexBuffer, sphereSubmesh, material);
+
+
+	material.texture0 = raytracedRadiance;
+	material.texture1 = raytracedDirectionAndDistance;
+	//ldrRenderPass->renderObject<visualize_rays_pipeline>(transform, {}, {}, {}, material);
 
 	ImGui::Begin("Light probe");
-	ImGui::Image(irradiance, irradiance->width, irradiance->height);
+	ImGui::Image(irradiance);
+	//ImGui::Image(depth);
+	//ImGui::Image(raytracedRadiance);
 	ImGui::End();
 }
 
@@ -299,6 +358,8 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 	}
 
 	{
+		PROFILE_ALL(cl, "Raytrace probes");
+
 		input_resources in;
 		in.tlas = tlas.tlas->raytracingSRV;
 		in.sky = sky->defaultSRV;
@@ -324,7 +385,18 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 		cl->setPipelineState(pipeline.pipeline);
 		cl->setComputeRootSignature(pipeline.rootSignature);
 
+		static random_number_generator rng = { 61913 };
+		static mat4 rayRotation = mat4::identity;
+		
+		ImGui::Begin("Light probe");
+		//if (ImGui::Button("Rotate"))
+		{
+			rayRotation = createModelMatrix(0.f, normalize(rng.randomRotation()));
+		}
+		ImGui::End();
+
 		light_probe_trace_cb cb;
+		cb.rayRotation = rayRotation;
 		cb.countX = grid.numNodesX;
 		cb.countY = grid.numNodesY;
 		cb.minCorner = grid.minCorner;
@@ -345,8 +417,10 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 		.transition(grid.depth, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	{
-		cl->setPipelineState(*probeUpdatePipeline.pipeline);
-		cl->setGraphicsRootSignature(*probeUpdatePipeline.rootSignature);
+		PROFILE_ALL(cl, "Update irradiance");
+
+		cl->setPipelineState(*probeUpdateIrradiancePipeline.pipeline);
+		cl->setGraphicsRootSignature(*probeUpdateIrradiancePipeline.rootSignature);
 
 		auto renderTarget = dx_render_target(grid.irradiance->width, grid.irradiance->height)
 			.colorAttachment(grid.irradiance);
@@ -358,6 +432,29 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 		cb.countX = grid.numNodesX;
 		cb.countY = grid.numNodesY;
 		
+		cl->setGraphics32BitConstants(LIGHT_PROBE_UPDATE_RS_CB, cb);
+		cl->setDescriptorHeapSRV(LIGHT_PROBE_UPDATE_RS_RAYTRACE_RESULTS, 0, grid.raytracedRadiance);
+		cl->setDescriptorHeapSRV(LIGHT_PROBE_UPDATE_RS_RAYTRACE_RESULTS, 1, grid.raytracedDirectionAndDistance);
+
+		cl->drawFullscreenTriangle();
+	}
+
+	{
+		PROFILE_ALL(cl, "Update depth");
+
+		cl->setPipelineState(*probeUpdateDepthPipeline.pipeline);
+		cl->setGraphicsRootSignature(*probeUpdateDepthPipeline.rootSignature);
+
+		auto renderTarget = dx_render_target(grid.depth->width, grid.depth->height)
+			.colorAttachment(grid.depth);
+
+		cl->setRenderTarget(renderTarget);
+		cl->setViewport(0.f, 0.f, (float)grid.depth->width, (float)grid.depth->height);
+
+		light_probe_update_cb cb;
+		cb.countX = grid.numNodesX;
+		cb.countY = grid.numNodesY;
+
 		cl->setGraphics32BitConstants(LIGHT_PROBE_UPDATE_RS_CB, cb);
 		cl->setDescriptorHeapSRV(LIGHT_PROBE_UPDATE_RS_RAYTRACE_RESULTS, 0, grid.raytracedRadiance);
 		cl->setDescriptorHeapSRV(LIGHT_PROBE_UPDATE_RS_RAYTRACE_RESULTS, 1, grid.raytracedDirectionAndDistance);

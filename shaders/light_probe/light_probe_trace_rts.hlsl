@@ -59,7 +59,7 @@ static float4 traceRadianceRay(float3 origin, float3 direction)
 	ray.TMin = 0.01f;
 	ray.TMax = 10000.f;
 
-	radiance_ray_payload payload = { float3(0.f, 0.f, 0.f), -1.f };
+	radiance_ray_payload payload = { float3(0.f, 0.f, 0.f), 10000.f };
 
 	TraceRay(rtScene,
 		RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
@@ -143,6 +143,8 @@ void rayGen()
 	float3 origin = probeIndex * cb.cellSize + cb.minCorner;
 	float3 direction = sphericalFibonacci(rayID, NUM_RAYS_PER_PROBE);
 
+	direction = mul(cb.rayRotation, float4(direction, 0.f)).xyz;
+
 	float4 radianceAndDistance = traceRadianceRay(origin, direction);
 	radianceOutput[launchIndex.xy] = radianceAndDistance.xyz;
 	directionDepthOutput[launchIndex.xy] = float4(direction, radianceAndDistance.w);
@@ -173,7 +175,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	surface.V = -WorldRayDirection();
 	surface.P = hitWorldPosition();
 
-	uint mipLevel = 0;
+	uint mipLevel = 3;
 	uint flags = material.getFlags();
 
 	surface.albedo = (((flags & USE_ALBEDO_TEXTURE)
@@ -212,7 +214,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 [shader("miss")]
 void radianceMiss(inout radiance_ray_payload payload)
 {
-	payload.color = sky.SampleLevel(wrapSampler, WorldRayDirection(), 0).xyz;
+	payload.color = sky.SampleLevel(wrapSampler, WorldRayDirection(), 8).xyz; // We sample a very high mip level of the sky here, because a small sun makes the samples very noisy.
 }
 
 

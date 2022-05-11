@@ -8,7 +8,9 @@
 #define LIGHT_PROBE_DEPTH_RESOLUTION	14
 #define LIGHT_PROBE_TOTAL_DEPTH_RESOLUTION (LIGHT_PROBE_DEPTH_RESOLUTION + 2)
 
+#define NUM_RAYS_PER_PROBE 64
 
+#define ENERGY_CONSERVATION 0.95f
 
 
 
@@ -66,7 +68,7 @@ static vec3 linearIndexTo3DIndex(uint32 i, uint32 countX, uint32 countY)
 }
 
 
-struct light_probe_visualization_cb
+struct light_probe_grid_visualization_cb
 {
 	mat4 mvp;
 	vec2 uvScale;
@@ -93,6 +95,30 @@ struct light_probe_visualization_cb
 #define LIGHT_PROBE_GRID_VISUALIZATION_RS_IRRADIANCE	1
 
 
+
+struct light_probe_ray_visualization_cb
+{
+	mat4 mvp;
+	float cellSize;
+	uint32 countX;
+	uint32 countY;
+};
+
+#define LIGHT_PROBE_RAY_VISUALIZATION_RS \
+	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
+	"DENY_HULL_SHADER_ROOT_ACCESS |" \
+	"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
+	"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
+	"RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
+	"DescriptorTable(SRV(t0, numDescriptors=2), visibility=SHADER_VISIBILITY_VERTEX)"
+
+#define LIGHT_PROBE_RAY_VISUALIZATION_RS_CB			0
+#define LIGHT_PROBE_RAY_VISUALIZATION_RS_RAYS		1
+
+
+
+
+
 struct light_probe_update_cb
 {
 	uint32 countX;
@@ -114,10 +140,10 @@ struct light_probe_update_cb
 
 
 
-#define NUM_RAYS_PER_PROBE 128
-
 struct light_probe_trace_cb
 {
+	mat4 rayRotation;
+
 	vec3 minCorner;
 	float cellSize;
 	uint32 countX;
