@@ -1,20 +1,18 @@
 #include "light_probe_rs.hlsli"
-
-struct ps_input
-{
-	float2 uv				: TEXCOORDS;
-	float4 screenPosition	: SV_POSITION;
-};
+#include "cs.hlsli"
 
 ConstantBuffer<light_probe_update_cb> cb	: register(b0);
 Texture2D<float3> radiance					: register(t0);
 Texture2D<float4> directionAndDistance		: register(t1);
 
+RWTexture2D<float3> output					: register(u0);
 
+
+[numthreads(LIGHT_PROBE_BLOCK_SIZE, LIGHT_PROBE_BLOCK_SIZE, 1)]
 [RootSignature(LIGHT_PROBE_UPDATE_RS)]
-float4 main(ps_input IN) : SV_TARGET
+void main(cs_input IN)
 {
-	uint2 coord = (uint2)IN.screenPosition.xy;
+	uint2 coord = IN.dispatchThreadID.xy;
 
 	uint2 probeIndex2 = coord / LIGHT_PROBE_TOTAL_RESOLUTION;
 	uint3 probeIndex3 = uint3(probeIndex2.x % cb.countX, probeIndex2.x / cb.countX, probeIndex2.y);
@@ -38,7 +36,8 @@ float4 main(ps_input IN) : SV_TARGET
 
 	float3 pixelDirection = decodeOctahedral(oct);
 
-	float4 irradiance = float4(0.f, 0.f, 0.f, 0.f);
+	float3 result = float3(0.f, 0.f, 0.f);
+	float totalWeight = 0.f;
 
 	for (uint r = 0; r < NUM_RAYS_PER_PROBE; ++r)
 	{
@@ -51,14 +50,12 @@ float4 main(ps_input IN) : SV_TARGET
 		float rayDistance = dirDist.w;
 
 		float weight = max(0.f, dot(rayDirection, pixelDirection));
-		irradiance += float4(rad * weight, weight);
+		result += rad * weight;
+		totalWeight += weight;
 	}
 
-	if (irradiance.w > 1e-5f)
-	{
-		irradiance.xyz /= irradiance.w;
-		irradiance.w = 0.03f;
-	}
+	result *= 1.f / (2.f * max(totalWeight, 1e-4f));
 
-	return irradiance;
+	float3 previous = output[coord];
+	output[coord] = lerp(previous, result, 0.03f);
 }

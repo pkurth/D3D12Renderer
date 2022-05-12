@@ -13,6 +13,8 @@
 #define ENERGY_CONSERVATION 0.95f
 
 
+#define LIGHT_PROBE_BLOCK_SIZE 16
+
 
 static float signNotZero(float v)
 {
@@ -126,13 +128,9 @@ struct light_probe_update_cb
 };
 
 #define LIGHT_PROBE_UPDATE_RS \
-	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
-	"DENY_VERTEX_SHADER_ROOT_ACCESS |" \
-	"DENY_HULL_SHADER_ROOT_ACCESS |" \
-	"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
-	"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-	"RootConstants(num32BitConstants=2, b0, visibility=SHADER_VISIBILITY_PIXEL), " \
-	"DescriptorTable(SRV(t0, numDescriptors=2), visibility=SHADER_VISIBILITY_PIXEL)"
+	"RootFlags(0)," \
+	"RootConstants(num32BitConstants=2, b0), " \
+	"DescriptorTable(SRV(t0, numDescriptors=2), UAV(u0, numDescriptors=1))"
 
 #define LIGHT_PROBE_UPDATE_RS_CB				0
 #define LIGHT_PROBE_UPDATE_RS_RAYTRACE_RESULTS	1

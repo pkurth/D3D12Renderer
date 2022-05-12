@@ -24,6 +24,11 @@ static submesh_info sphereSubmesh;
 static dx_pipeline probeUpdateIrradiancePipeline;
 static dx_pipeline probeUpdateDepthPipeline;
 
+static const DXGI_FORMAT irradianceFormat = DXGI_FORMAT_R11G11B10_FLOAT;
+static const DXGI_FORMAT depthFormat = DXGI_FORMAT_R16G16_FLOAT;
+static const DXGI_FORMAT raytracedRadianceFormat = DXGI_FORMAT_R11G11B10_FLOAT;
+static const DXGI_FORMAT raytracedDirectionAndDistanceFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+
 void initializeLightProbePipelines()
 {
 	if (!dxContext.featureSupport.raytracing())
@@ -51,24 +56,9 @@ void initializeLightProbePipelines()
 	builder.pushSphere({});
 	sphereSubmesh = builder.endSubmesh();
 	sphereMesh = builder.createDXMesh();
-
-	{
-		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(DXGI_FORMAT_R11G11B10_FLOAT)
-			.depthSettings(false, false)
-			.alphaBlending(0);
-
-		probeUpdateIrradiancePipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "light_probe_update_irradiance_ps" });
-	}
-
-	{
-		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(DXGI_FORMAT_R16G16_FLOAT)
-			.depthSettings(false, false)
-			.alphaBlending(0);
-
-		probeUpdateDepthPipeline = createReloadablePipeline(desc, { "fullscreen_triangle_vs", "light_probe_update_depth_ps" });
-	}
+	
+	probeUpdateIrradiancePipeline = createReloadablePipeline("light_probe_update_irradiance_cs");
+	probeUpdateDepthPipeline = createReloadablePipeline("light_probe_update_depth_cs");
 }
 
 
@@ -205,13 +195,13 @@ void light_probe_grid::initialize(vec3 minCorner, vec3 dimensions, float cellSiz
 
 	delete[] testBuffer;
 #else
-	this->irradiance = createTexture(0, irradianceTexWidth, irradianceTexHeight, DXGI_FORMAT_R11G11B10_FLOAT, false, true, false, D3D12_RESOURCE_STATE_GENERIC_READ);
+	this->irradiance = createTexture(0, irradianceTexWidth, irradianceTexHeight, irradianceFormat, false, false, true, D3D12_RESOURCE_STATE_GENERIC_READ);
 #endif
 
-	this->depth = createTexture(0, depthTexWidth, depthTexHeight, DXGI_FORMAT_R16G16_FLOAT, false, true, false, D3D12_RESOURCE_STATE_GENERIC_READ);
+	this->depth = createTexture(0, depthTexWidth, depthTexHeight, depthFormat, false, false, true, D3D12_RESOURCE_STATE_GENERIC_READ);
 
-	this->raytracedRadiance = createTexture(0, NUM_RAYS_PER_PROBE, totalNumNodes, DXGI_FORMAT_R11G11B10_FLOAT, 0, 0, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	this->raytracedDirectionAndDistance = createTexture(0, NUM_RAYS_PER_PROBE, totalNumNodes, DXGI_FORMAT_R16G16B16A16_FLOAT, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	this->raytracedRadiance = createTexture(0, NUM_RAYS_PER_PROBE, totalNumNodes, raytracedRadianceFormat, 0, 0, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	this->raytracedDirectionAndDistance = createTexture(0, NUM_RAYS_PER_PROBE, totalNumNodes, raytracedDirectionAndDistanceFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 }
 
 
@@ -301,13 +291,13 @@ void light_probe_grid::visualize(opaque_render_pass* renderPass)
 
 	material.texture0 = raytracedRadiance;
 	material.texture1 = raytracedDirectionAndDistance;
-	renderPass->renderStaticObject<visualize_rays_pipeline>(transform, {}, {}, {}, material, -1, false, false);
+	//renderPass->renderStaticObject<visualize_rays_pipeline>(transform, {}, {}, {}, material, -1, false, false);
 
-	ImGui::Begin("Light probe");
-	ImGui::Image(irradiance);
+	//ImGui::Begin("Light probe");
+	//ImGui::Image(irradiance);
 	//ImGui::Image(depth);
 	//ImGui::Image(raytracedRadiance);
-	ImGui::End();
+	//ImGui::End();
 }
 
 
@@ -411,61 +401,51 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 	}
 
 	barrier_batcher(cl)
-		.transition(grid.raytracedRadiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
-		.transition(grid.raytracedDirectionAndDistance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
-		.transition(grid.irradiance, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET)
-		.transition(grid.depth, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		.transition(grid.raytracedRadiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+		.transition(grid.raytracedDirectionAndDistance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+		.transition(grid.irradiance, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+		.transition(grid.depth, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	{
 		PROFILE_ALL(cl, "Update irradiance");
 
 		cl->setPipelineState(*probeUpdateIrradiancePipeline.pipeline);
-		cl->setGraphicsRootSignature(*probeUpdateIrradiancePipeline.rootSignature);
-
-		auto renderTarget = dx_render_target(grid.irradiance->width, grid.irradiance->height)
-			.colorAttachment(grid.irradiance);
-
-		cl->setRenderTarget(renderTarget);
-		cl->setViewport(0.f, 0.f, (float)grid.irradiance->width, (float)grid.irradiance->height);
+		cl->setComputeRootSignature(*probeUpdateIrradiancePipeline.rootSignature);
 
 		light_probe_update_cb cb;
 		cb.countX = grid.numNodesX;
 		cb.countY = grid.numNodesY;
 		
-		cl->setGraphics32BitConstants(LIGHT_PROBE_UPDATE_RS_CB, cb);
+		cl->setCompute32BitConstants(LIGHT_PROBE_UPDATE_RS_CB, cb);
 		cl->setDescriptorHeapSRV(LIGHT_PROBE_UPDATE_RS_RAYTRACE_RESULTS, 0, grid.raytracedRadiance);
 		cl->setDescriptorHeapSRV(LIGHT_PROBE_UPDATE_RS_RAYTRACE_RESULTS, 1, grid.raytracedDirectionAndDistance);
+		cl->setDescriptorHeapUAV(LIGHT_PROBE_UPDATE_RS_RAYTRACE_RESULTS, 2, grid.irradiance);
 
-		cl->drawFullscreenTriangle();
+		cl->dispatch(bucketize(grid.irradiance->width, LIGHT_PROBE_BLOCK_SIZE), bucketize(grid.irradiance->height, LIGHT_PROBE_BLOCK_SIZE));
 	}
 
 	{
 		PROFILE_ALL(cl, "Update depth");
 
 		cl->setPipelineState(*probeUpdateDepthPipeline.pipeline);
-		cl->setGraphicsRootSignature(*probeUpdateDepthPipeline.rootSignature);
-
-		auto renderTarget = dx_render_target(grid.depth->width, grid.depth->height)
-			.colorAttachment(grid.depth);
-
-		cl->setRenderTarget(renderTarget);
-		cl->setViewport(0.f, 0.f, (float)grid.depth->width, (float)grid.depth->height);
+		cl->setComputeRootSignature(*probeUpdateDepthPipeline.rootSignature);
 
 		light_probe_update_cb cb;
 		cb.countX = grid.numNodesX;
 		cb.countY = grid.numNodesY;
 
-		cl->setGraphics32BitConstants(LIGHT_PROBE_UPDATE_RS_CB, cb);
+		cl->setCompute32BitConstants(LIGHT_PROBE_UPDATE_RS_CB, cb);
 		cl->setDescriptorHeapSRV(LIGHT_PROBE_UPDATE_RS_RAYTRACE_RESULTS, 0, grid.raytracedRadiance);
 		cl->setDescriptorHeapSRV(LIGHT_PROBE_UPDATE_RS_RAYTRACE_RESULTS, 1, grid.raytracedDirectionAndDistance);
+		cl->setDescriptorHeapUAV(LIGHT_PROBE_UPDATE_RS_RAYTRACE_RESULTS, 2, grid.depth);
 
-		cl->drawFullscreenTriangle();
+		cl->dispatch(bucketize(grid.depth->width, LIGHT_PROBE_BLOCK_SIZE), bucketize(grid.depth->height, LIGHT_PROBE_BLOCK_SIZE));
 	}
 
 	barrier_batcher(cl)
-		.transition(grid.raytracedRadiance, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-		.transition(grid.raytracedDirectionAndDistance, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-		.transition(grid.irradiance, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ)
-		.transition(grid.depth, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ);
+		.transition(grid.raytracedRadiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+		.transition(grid.raytracedDirectionAndDistance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+		.transition(grid.irradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ)
+		.transition(grid.depth, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
 
 }
