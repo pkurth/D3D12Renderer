@@ -138,9 +138,7 @@ void rayGen()
 	uint rayID = launchIndex.x;
 	uint probeID = launchIndex.y;
 
-	float3 probeIndex = linearIndexTo3DIndex(probeID, cb.countX, cb.countY);
-
-	float3 origin = probeIndex * cb.cellSize + cb.minCorner;
+	float3 origin = cb.grid.linearIndexToPosition(probeID);
 	float3 direction = sphericalFibonacci(rayID, NUM_RAYS_PER_PROBE);
 
 	direction = mul(cb.rayRotation, float4(direction, 0.f)).xyz;
@@ -207,7 +205,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	light_contribution totalLighting = { float3(0.f, 0.f, 0.f), float3(0.f, 0.f, 0.f) };
 	totalLighting.add(calculateDirectLighting(surface, light), sunVisibility);
 
-	payload.color = totalLighting.evaluate(surface.albedo) + surface.emission;
+	payload.color = totalLighting.evaluate(surface.albedo).rgb + surface.emission;
 	payload.distance = RayTCurrent();
 }
 

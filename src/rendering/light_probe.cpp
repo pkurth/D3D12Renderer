@@ -29,6 +29,12 @@ static const DXGI_FORMAT depthFormat = DXGI_FORMAT_R16G16_FLOAT;
 static const DXGI_FORMAT raytracedRadianceFormat = DXGI_FORMAT_R11G11B10_FLOAT;
 static const DXGI_FORMAT raytracedDirectionAndDistanceFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
+
+
+static light_probe_tracer lightProbeTracer;
+
+
+
 void initializeLightProbePipelines()
 {
 	if (!dxContext.featureSupport.raytracing())
@@ -59,6 +65,9 @@ void initializeLightProbePipelines()
 	
 	probeUpdateIrradiancePipeline = createReloadablePipeline("light_probe_update_irradiance_cs");
 	probeUpdateDepthPipeline = createReloadablePipeline("light_probe_update_depth_cs");
+
+
+	lightProbeTracer.initialize();
 }
 
 
@@ -300,6 +309,18 @@ void light_probe_grid::visualize(opaque_render_pass* renderPass)
 	//ImGui::End();
 }
 
+void light_probe_grid::update(dx_command_list* cl, const raytracing_tlas& lightProbeTlas, const ref<dx_texture>& sky) const
+{
+	if (!dxContext.featureSupport.raytracing())
+	{
+		return;
+	}
+
+	lightProbeTracer.finalizeForRender();
+	lightProbeTracer.render(cl, lightProbeTlas, *this, sky);
+}
+
+
 
 
 #define LIGHT_PROBE_TRACING_RS_RESOURCES	0
@@ -376,21 +397,23 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 		cl->setComputeRootSignature(pipeline.rootSignature);
 
 		static random_number_generator rng = { 61913 };
-		static mat4 rayRotation = mat4::identity;
+		static quat rayRotation = quat::identity;
+		static bool autoRotate = true;
 		
 		ImGui::Begin("Light probe");
-		//if (ImGui::Button("Rotate"))
+		ImGui::Checkbox("Auto rotate", &autoRotate);
+		if (autoRotate || ImGui::Button("Rotate"))
 		{
-			rayRotation = createModelMatrix(0.f, normalize(rng.randomRotation()));
+			rayRotation = rng.randomRotation();
 		}
 		ImGui::End();
 
 		light_probe_trace_cb cb;
-		cb.rayRotation = rayRotation;
-		cb.countX = grid.numNodesX;
-		cb.countY = grid.numNodesY;
-		cb.minCorner = grid.minCorner;
-		cb.cellSize = grid.cellSize;
+		cb.rayRotation = createModelMatrix(0.f, rayRotation);
+		cb.grid.countX = grid.numNodesX;
+		cb.grid.countY = grid.numNodesY;
+		cb.grid.minCorner = grid.minCorner;
+		cb.grid.cellSize = grid.cellSize;
 
 		cl->setComputeDescriptorTable(LIGHT_PROBE_TRACING_RS_RESOURCES, gpuHandle);
 		cl->setCompute32BitConstants(LIGHT_PROBE_TRACING_RS_CB, cb);

@@ -33,6 +33,4 @@ private:
 	static const light_probe_grid* lightProbeGrid;
 	static raytracing_tlas* lightProbeTlas;
 	static ref<dx_texture> sky;
-
-	static light_probe_tracer lightProbeTracer;
 };

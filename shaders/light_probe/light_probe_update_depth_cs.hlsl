@@ -19,7 +19,7 @@ void main(cs_input IN)
 
 	uint probeIndex = probeIndex3.z * cb.countX * cb.countY + probeIndex3.y * cb.countX + probeIndex3.x;
 
-	uint2 pixelIndex = coord % LIGHT_PROBE_TOTAL_DEPTH_RESOLUTION; // [1, 6]
+	uint2 pixelIndex = coord % LIGHT_PROBE_TOTAL_DEPTH_RESOLUTION; // [1, 14]
 
 
 	// Map borders to wrapping interior texel.
@@ -29,7 +29,7 @@ void main(cs_input IN)
 	pixelIndex = (pixelIndex.y == LIGHT_PROBE_TOTAL_DEPTH_RESOLUTION - 1) ? uint2(LIGHT_PROBE_TOTAL_DEPTH_RESOLUTION - pixelIndex.x - 1, LIGHT_PROBE_TOTAL_DEPTH_RESOLUTION - 2) : pixelIndex;
 
 
-	pixelIndex -= 1; // Subtract the border -> [0, 5]
+	pixelIndex -= 1; // Subtract the border -> [0, 13]
 
 	float2 uv = ((float2)pixelIndex + 0.5f) / LIGHT_PROBE_DEPTH_RESOLUTION;
 	float2 oct = uv * 2.f - 1.f;
@@ -58,5 +58,5 @@ void main(cs_input IN)
 	result *= 1.f / (max(totalWeight, 1e-4f));
 
 	float2 previous = output[coord];
-	output[coord] = lerp(previous, result, 0.03f);
+	output[coord] = lerp(previous, result, 0.01f);
 }

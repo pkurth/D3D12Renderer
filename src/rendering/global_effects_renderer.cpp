@@ -18,11 +18,8 @@ const light_probe_grid* global_effects_renderer::lightProbeGrid;
 raytracing_tlas* global_effects_renderer::lightProbeTlas;
 ref<dx_texture> global_effects_renderer::sky;
 
-light_probe_tracer global_effects_renderer::lightProbeTracer;
-
 void global_effects_renderer::initialize()
 {
-	lightProbeTracer.initialize();
 }
 
 void global_effects_renderer::beginFrame()
@@ -52,16 +49,13 @@ void global_effects_renderer::endFrame()
 		cl->transitionBarrier(render_resources::shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	}
 
+	if (dxContext.featureSupport.raytracing() && lightProbeGrid && lightProbeTlas)
 	{
-		PROFILE_ALL(cl, "Raytrace light probes");
-
-		lightProbeTracer.finalizeForRender();
+		PROFILE_ALL(cl, "Update light probes");
 
 		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // Wait for AS-rebuilds. TODO: This is not the way to go here. We should wait for the specific value returned by executeCommandList.
 
-		lightProbeTracer.render(cl, *lightProbeTlas, *lightProbeGrid, sky);
-
-		cl->resetToDynamicDescriptorHeap();
+		lightProbeGrid->update(cl, *lightProbeTlas, sky);
 	}
 
 	dxContext.executeCommandList(cl);

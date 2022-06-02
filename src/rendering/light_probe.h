@@ -24,6 +24,8 @@ struct light_probe_grid
 
 	void initialize(vec3 minCorner, vec3 dimensions, float cellSize);
 	void visualize(opaque_render_pass* renderPass);
+
+	void update(dx_command_list* cl, const raytracing_tlas& lightProbeTlas, const ref<dx_texture>& sky) const;
 };
 
 struct light_probe_tracer : pbr_raytracer

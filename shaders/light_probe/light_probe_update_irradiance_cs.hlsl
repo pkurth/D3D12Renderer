@@ -57,5 +57,5 @@ void main(cs_input IN)
 	result *= 1.f / (2.f * max(totalWeight, 1e-4f));
 
 	float3 previous = output[coord];
-	output[coord] = lerp(previous, result, 0.03f);
+	output[coord] = lerp(previous, result, 0.01f);
 }
