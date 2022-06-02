@@ -90,6 +90,7 @@ namespace std
 		}
 	};
 
+#if _MSC_VER < 1930
 	template <>
 	struct hash<fs::path>
 	{
@@ -98,5 +99,6 @@ namespace std
 			return std::hash<fs::path::string_type>{}(p.native());
 		}
 	};
+#endif
 }
 
