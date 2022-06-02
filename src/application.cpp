@@ -316,7 +316,7 @@ void application::initialize(main_renderer* renderer)
 
 			float pitch = rng.randomFloatBetween(0.8f, 1.2f);
 		
-			play3DSound(SOUND_ID("collision"), position, { volume, pitch });
+			play3DSound(sound_id_collision, position, { volume, pitch });
 		}
 	};
 

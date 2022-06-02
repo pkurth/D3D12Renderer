@@ -23,31 +23,28 @@ static bool findChunk(HANDLE fileHandle, uint32 fourcc, uint32& chunkSize, uint3
 static bool readChunkData(HANDLE fileHandle, void* buffer, uint32 buffersize, uint32 bufferoffset);
 
 
-static std::unordered_map<sound_id, ref<audio_sound>> fileSounds;
-static std::unordered_map<sound_id, ref<audio_sound>> synthSounds;
+static ref<audio_sound> fileSounds[sound_id_count];
+static ref<audio_sound> synthSounds[sound_id_count];
 
 
-bool checkForExistingSound(const sound_id& id)
-{
-    return fileSounds.find(id) != fileSounds.end()
-        || synthSounds.find(id) != synthSounds.end();
-}
+bool checkForExistingFileSound(sound_id id) { return fileSounds[id] != 0; }
+bool checkForExistingSynthSound(sound_id id) { return fileSounds[id] != 0; }
 
-void registerSound(const sound_id& id, const ref<audio_sound>& sound)
+void registerSound(sound_id id, const ref<audio_sound>& sound)
 {
     if (!sound->isSynth)
     {
-        fileSounds.insert({ id, sound });
+        fileSounds[id] = sound;
     }
     else
     {
-        synthSounds.insert({ id, sound });
+        synthSounds[id] = sound;
     }
 }
 
-bool loadFileSound(const sound_id& id)
+bool loadFileSound(sound_id id)
 {
-    if (checkForExistingSound(id))
+    if (checkForExistingFileSound(id))
     {
         return true;
     }
@@ -118,30 +115,28 @@ bool loadFileSound(const sound_id& id)
     }
 }
 
-void unloadSound(const sound_id& id)
+void unloadSound(sound_id id)
 {
-    fileSounds.erase(id);
-    synthSounds.erase(id);
+    fileSounds[id].reset();
+    synthSounds[id].reset();
 }
 
 void unloadAllSounds()
 {
-    fileSounds.clear();
-    synthSounds.clear();
+    for (uint32 i = 0; i < sound_id_count; ++i)
+    {
+        unloadSound((sound_id)i);
+    }
 }
 
-ref<audio_sound> getSound(const sound_id& id)
+ref<audio_sound> getSound(sound_id id)
 {
-    auto fileIt = fileSounds.find(id);
-    if (fileIt != fileSounds.end())
-    {
-        return fileIt->second;
-    }
-    auto synthIt = synthSounds.find(id);
-    if (synthIt != synthSounds.end())
-    {
-        return synthIt->second;
-    }
+    auto result = fileSounds[id];
+    if (result) { return result; }
+
+    result = synthSounds[id];
+    if (result) { return result; }
+
     return 0;
 }
 

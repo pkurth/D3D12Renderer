@@ -3,19 +3,11 @@
 #include "synth.h"
 #include "core/string.h"
 #include "core/asset.h"
+#include "sound_ids.h"
 
 #include <xaudio2.h>
 #include <functional>
 
-
-// Don't create this manually. Use SOUND_ID below.
-struct sound_id
-{
-    const char* id;
-    uint64 hash;
-};
-
-#define SOUND_ID(id) sound_id{ id, force_consteval<hashString64(id)> }
 
 enum sound_type
 {
@@ -71,13 +63,13 @@ struct sound_settings
     float pitchFadeTime = 0.1f;
 };
 
-ref<audio_sound> getSound(const sound_id& id);
+ref<audio_sound> getSound(sound_id id);
 
 
-void unloadSound(const sound_id& id);
+void unloadSound(sound_id id);
 void unloadAllSounds();
 
-bool loadFileSound(const sound_id& id);
+bool loadFileSound(sound_id id);
 
 template <typename synth_t, typename... args>
 static bool loadSynthSound(const char* idStr, sound_type type, bool stream, const args&... a)
@@ -88,10 +80,10 @@ static bool loadSynthSound(const char* idStr, sound_type type, bool stream, cons
     sound_id id = { idStr, hashString64(idStr) };
     sound_spec spec = { {}, type, stream };
 
-    bool checkForExistingSound(const sound_id&);
-    void registerSound(const sound_id&, const ref<audio_sound>&);
+    bool checkForExistingSynthSound(sound_id);
+    void registerSound(sound_id, const ref<audio_sound>&);
 
-    if (checkForExistingSound(id))
+    if (checkForExistingSynthSound(id))
     {
         return true;
     }
@@ -164,20 +156,3 @@ static bool loadSynthSound(const char* idStr, sound_type type, bool stream, cons
 bool isSoundExtension(const fs::path& extension);
 bool isSoundExtension(const std::string& extension);
 
-
-namespace std
-{
-    template<>
-    struct hash<sound_id>
-    {
-        size_t operator()(const sound_id& x) const
-        {
-            return x.hash; // Already hashed.
-        }
-    };
-}
-
-static bool operator==(const sound_id& a, const sound_id& b)
-{
-    return a.hash == b.hash; // TODO: Proper compare.
-}

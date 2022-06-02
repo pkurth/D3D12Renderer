@@ -216,77 +216,6 @@ group ""
 
 
 
-
------------------------------------------
--- GENERATE META PROGRAM
------------------------------------------
-
-project "Meta"
-	kind "ConsoleApp"
-	language "C++"
-	cppdialect "C++17"
-	staticruntime "Off"
-
-	targetdir ("./bin/" .. outputdir)
-	objdir ("./bin_int/" .. outputdir ..  "/%{prj.name}")
-
-	-- We only ever build the Release version of the meta program. It gets executed in both the Debug and Release variant of the solution.
-	configmap {
-        ["Debug"] = "Release",
-        ["Release"] = "Release"
-    }
-
-	debugdir "."
-	debugenvs {
-		"PATH=ext/bin;%PATH%;"
-	}
-
-	pchheader "pch.h"
-	pchsource "src/pch.cpp"
-
-	includedirs {
-		"src",
-	}
-
-	sysincludedirs {
-		"ext/entt/src",
-	}
-
-	vectorextensions "AVX2"
-	floatingpoint "Fast"
-
-	files {
-		"src/meta/generate_sounds.cpp",
-		"src/pch.*",
-	}
-
-	vpaths {
-		["Headers/*"] = { "src/**.h" },
-		["Sources/*"] = { "src/**.cpp" },
-	}
-
-	filter "system:windows"
-		systemversion "latest"
-
-		defines {
-			"_UNICODE",
-			"UNICODE",
-			"_CRT_SECURE_NO_WARNINGS",
-		}
-
-	filter "configurations:Debug"
-        runtime "Debug"
-		symbols "On"
-		
-	filter "configurations:Release"
-        runtime "Release"
-		optimize "On"
-
-
-
-
-
-
 -----------------------------------------
 -- GENERATE MAIN PROGRAM
 -----------------------------------------
@@ -314,8 +243,6 @@ project "D3D12Renderer"
 		"src/**.cpp",
 		"shaders/**.hlsl*",
 	}
-
-	excludes "src/meta/**"
 
 	vpaths {
 		["Headers/*"] = { "src/**.h" },
@@ -345,7 +272,6 @@ project "D3D12Renderer"
 		"assimp",
 		"yaml-cpp",
 		"DirectXTex_Desktop_2019_Win10",
-		"Meta",
 	}
 
 	includedirs {
@@ -365,7 +291,6 @@ project "D3D12Renderer"
 
 	prebuildcommands {
 		"ECHO Compiling shaders...",
-		"bin\\Release_x86_64\\Meta.exe",
 	}
 
 	vectorextensions "AVX2"

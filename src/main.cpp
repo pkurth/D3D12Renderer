@@ -115,7 +115,7 @@ int main(int argc, char** argv)
 		sound_settings soundSettings;
 		soundSettings.loop = true;
 
-		play2DSound(SOUND_ID("music"), soundSettings);
+		//play2DSound(sound_id_music, soundSettings);
 	}
 
 
@@ -253,7 +253,7 @@ int main(int argc, char** argv)
 		if (ImGui::IsKeyPressed(key_enter))
 		{
 			sound_settings soundSettings;
-			play3DSound(SOUND_ID("explosion"), vec3(0.f), soundSettings);
+			play3DSound(sound_id_explosion, vec3(0.f), soundSettings);
 		}
 
 		// Update and render.

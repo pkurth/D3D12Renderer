@@ -6,19 +6,14 @@
 #include "core/imgui.h"
 #include "core/yaml.h"
 
-#if __has_include ("generated/sound_ids.h")
-#include "generated/sound_ids.h"
-#else
-static const sound_id soundIDs[1] = {};
-static const uint32 numSoundIDs = 0;
-#endif
+#include "sound_ids.h"
 
 
 
 bool soundEditorWindowOpen = false;
 
 
-static std::unordered_map<sound_id, sound_spec> soundRegistry;
+static sound_spec soundRegistry[sound_id_count];
 static const fs::path registryPath = fs::path(L"resources/sounds.yaml").lexically_normal();
 
 
@@ -28,12 +23,9 @@ void loadSoundRegistry()
     std::ifstream stream(registryPath);
     YAML::Node n = YAML::Load(stream);
 
-    soundRegistry.clear();
-
-    for (uint32 i = 0; i < numSoundIDs; ++i)
+    for (uint32 i = 0; i < sound_id_count; ++i)
     {
-        sound_id id = soundIDs[i];
-        if (auto entryNode = n[id.hash])
+        if (auto entryNode = n[soundIDNames[i]])
         {
             sound_spec spec = {};
 
@@ -41,7 +33,7 @@ void loadSoundRegistry()
             YAML_LOAD_ENUM(entryNode, spec.type, "Type");
             YAML_LOAD(entryNode, spec.stream, "Stream");
 
-            soundRegistry.insert({ id, spec });
+            soundRegistry[i] = spec;
         }
     }
 }
@@ -51,12 +43,11 @@ static void saveSoundRegistry()
     YAML::Emitter out;
     out << YAML::BeginMap;
 
-    for (uint32 i = 0; i < numSoundIDs; ++i)
+    for (uint32 i = 0; i < sound_id_count; ++i)
     {
-        sound_id id = soundIDs[i];
-        sound_spec spec = soundRegistry[id];
+        sound_spec spec = soundRegistry[i];
 
-        out << YAML::Key << id.hash << YAML::Value;
+        out << YAML::Key << soundIDNames[i] << YAML::Value;
         
         out << YAML::BeginMap;
         out << YAML::Key << "Asset" << YAML::Value << spec.asset;
@@ -95,14 +86,13 @@ void drawSoundEditor()
                 dirty = false;
             }
 
-            for (uint32 i = 0; i < numSoundIDs; ++i)
+            for (uint32 i = 0; i < sound_id_count; ++i)
             {
-                sound_id id = soundIDs[i];
-                if (filter.PassFilter(id.id))
+                if (filter.PassFilter(soundIDNames[i]))
                 {
-                    sound_spec& spec = soundRegistry[id];
+                    sound_spec& spec = soundRegistry[i];
 
-                    if (ImGui::BeginTree(id.id))
+                    if (ImGui::BeginTree(soundIDNames[i]))
                     {
                         if (ImGui::BeginProperties())
                         {
