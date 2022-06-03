@@ -580,7 +580,6 @@ void application::update(const user_input& input, float dt)
 	}
 
 
-#if 1
 	if (renderer->mode != renderer_mode_pathtraced)
 	{
 		if (dxContext.featureSupport.meshShaders())
@@ -781,7 +780,6 @@ void application::update(const user_input& input, float dt)
 
 		submitRenderPasses(numSpotShadowRenderPasses, numPointShadowRenderPasses);
 	}
-#endif
 
 	for (auto [entityHandle, transform, dynamic] : scene.group(entt::get<transform_component, dynamic_transform_component>).each())
 	{

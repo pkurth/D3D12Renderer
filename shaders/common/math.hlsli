@@ -27,6 +27,9 @@ static float solidAngleOfSphere(float radius, float distance)
 	return 2.f * M_PI * (1.f - sqrt(max(0.f, 1.f - s * s)));
 }
 
+static float square(float v) { return v * v; }
+static float pow3(float v) { return v * v * v; }
+
 static uint flatten2D(uint2 coord, uint2 dim)
 {
 	return coord.x + coord.y * dim.x;

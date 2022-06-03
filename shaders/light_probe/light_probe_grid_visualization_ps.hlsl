@@ -7,7 +7,7 @@ struct ps_input
 	float3 normal			: NORMAL;
 };
 
-Texture2D<float4> irradiance	: register(t0);
+Texture2D<float3> irradiance	: register(t0);
 SamplerState linearSampler		: register(s0);
 
 
@@ -21,5 +21,5 @@ float4 main(ps_input IN) : SV_TARGET
 	oct *= octScale;
 	float2 uv = (IN.uvOffset + oct * 0.5f + 0.5f) * IN.uvScale;
 
-	return irradiance.Sample(linearSampler, uv);
+	return float4(irradiance.Sample(linearSampler, uv), 1.f);
 }
