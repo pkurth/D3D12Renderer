@@ -14,7 +14,6 @@
 #include "core/threading.h"
 #include "rendering/mesh_shader.h"
 #include "rendering/shadow_map.h"
-#include "rendering/global_effects_renderer.h"
 #include "rendering/debug_visualization.h"
 #include "audio/audio.h"
 
@@ -497,7 +496,7 @@ void application::resetRenderPasses()
 	numPointShadowRenderPasses = 0;
 }
 
-void application::submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 numPointLightShadowPasses)
+void application::submitRendererParams(uint32 numSpotLightShadowPasses, uint32 numPointLightShadowPasses)
 {
 	opaqueRenderPass.sort();
 	transparentRenderPass.sort();
@@ -507,19 +506,25 @@ void application::submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 num
 	renderer->submitRenderPass(&transparentRenderPass);
 	renderer->submitRenderPass(&ldrRenderPass);
 
-	global_effects_renderer::submitShadowRenderPass(&sunShadowRenderPass);
+	main_renderer::submitShadowRenderPass(&sunShadowRenderPass);
 
 	for (uint32 i = 0; i < numSpotLightShadowPasses; ++i)
 	{
-		global_effects_renderer::submitShadowRenderPass(&spotShadowRenderPasses[i]);
+		main_renderer::submitShadowRenderPass(&spotShadowRenderPasses[i]);
 	}
 
 	for (uint32 i = 0; i < numPointLightShadowPasses; ++i)
 	{
-		global_effects_renderer::submitShadowRenderPass(&pointShadowRenderPasses[i]);
+		main_renderer::submitShadowRenderPass(&pointShadowRenderPasses[i]);
 	}
 
-	global_effects_renderer::raytraceLightProbes(lightProbeGrid, &raytracingTLAS, scene.environment);
+	main_renderer::setRaytracingScene(&raytracingTLAS);
+	main_renderer::raytraceLightProbes(lightProbeGrid);
+	main_renderer::setEnvironment(scene.environment);
+	main_renderer::setSun(scene.sun);
+
+
+	renderer->setCamera(scene.camera);
 }
 
 void application::update(const user_input& input, float dt)
@@ -557,9 +562,6 @@ void application::update(const user_input& input, float dt)
 	scene.sun.updateMatrices(scene.camera);
 
 	// Set global rendering stuff.
-	renderer->setCamera(scene.camera);
-	renderer->setSun(scene.sun);
-	renderer->setEnvironment(scene.environment);
 
 	setAudioListener(scene.camera.position, scene.camera.rotation, vec3(0.f));
 
@@ -576,7 +578,7 @@ void application::update(const user_input& input, float dt)
 
 		raytracingTLAS.build();
 
-		renderer->setRaytracingScene(&raytracingTLAS);
+		main_renderer::setRaytracingScene(&raytracingTLAS);
 	}
 
 
@@ -627,7 +629,7 @@ void application::update(const user_input& input, float dt)
 			unmapBuffer(pointLightBuffer[dxContext.bufferedFrameID], true, { 0, numPointLights });
 			unmapBuffer(pointLightShadowInfoBuffer[dxContext.bufferedFrameID], true, { 0, numPointShadowRenderPasses });
 
-			renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], numPointLights, pointLightShadowInfoBuffer[dxContext.bufferedFrameID]);
+			main_renderer::setPointLights(pointLightBuffer[dxContext.bufferedFrameID], numPointLights, pointLightShadowInfoBuffer[dxContext.bufferedFrameID]);
 		}
 
 		uint32 numSpotLights = scene.numberOfComponentsOfType<spot_light_component>();
@@ -653,7 +655,7 @@ void application::update(const user_input& input, float dt)
 			unmapBuffer(spotLightBuffer[dxContext.bufferedFrameID], true, { 0, numSpotLights });
 			unmapBuffer(spotLightShadowInfoBuffer[dxContext.bufferedFrameID], true, { 0, numSpotShadowRenderPasses });
 
-			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], numSpotLights, spotLightShadowInfoBuffer[dxContext.bufferedFrameID]);
+			main_renderer::setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], numSpotLights, spotLightShadowInfoBuffer[dxContext.bufferedFrameID]);
 		}
 
 
@@ -758,7 +760,7 @@ void application::update(const user_input& input, float dt)
 		if (decals.size())
 		{
 			updateUploadBufferData(decalBuffer[dxContext.bufferedFrameID], decals.data(), (uint32)(sizeof(pbr_decal_cb) * decals.size()));
-			renderer->setDecals(decalBuffer[dxContext.bufferedFrameID], (uint32)decals.size(), decalTexture);
+			main_renderer::setDecals(decalBuffer[dxContext.bufferedFrameID], (uint32)decals.size(), decalTexture);
 		}
 
 		if (selectedEntity)
@@ -778,7 +780,7 @@ void application::update(const user_input& input, float dt)
 			}
 		}
 
-		submitRenderPasses(numSpotShadowRenderPasses, numPointShadowRenderPasses);
+		submitRendererParams(numSpotShadowRenderPasses, numPointShadowRenderPasses);
 	}
 
 	for (auto [entityHandle, transform, dynamic] : scene.group(entt::get<transform_component, dynamic_transform_component>).each())

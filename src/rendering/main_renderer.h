@@ -11,9 +11,15 @@
 #include "render_resources.h"
 #include "render_utils.h"
 #include "path_tracing.h"
+#include "light_probe.h"
 
 #include "light_source.hlsli"
 #include "camera.hlsli"
+
+#define MAX_NUM_SUN_LIGHT_SHADOW_PASSES 16
+#define MAX_NUM_SPOT_LIGHT_SHADOW_PASSES 16
+#define MAX_NUM_POINT_LIGHT_SHADOW_PASSES 16
+
 
 
 
@@ -92,23 +98,40 @@ struct main_renderer
 	main_renderer() {}
 	void initialize(color_depth colorDepth, uint32 windowWidth, uint32 windowHeight, renderer_spec spec);
 
+	static void beginFrameCommon();
+	static void endFrameCommon();
+
 	void beginFrame(uint32 windowWidth, uint32 windowHeight);
 	void endFrame(const user_input& input);
 
 
 	// Set these with your application.
 	void setCamera(const render_camera& camera);
-	void setEnvironment(const ref<pbr_environment>& environment);
-	void setSun(const directional_light& light);
-
-	void setPointLights(const ref<dx_buffer>& lights, uint32 numLights, const ref<dx_buffer>& shadowInfoBuffer);
-	void setSpotLights(const ref<dx_buffer>& lights, uint32 numLights, const ref<dx_buffer>& shadowInfoBuffer);
-	void setDecals(const ref<dx_buffer>& decals, uint32 numDecals, const ref<dx_texture>& textureAtlas);
 
 	void submitRenderPass(opaque_render_pass* renderPass) {	assert(!opaqueRenderPass); opaqueRenderPass = renderPass; }
 	void submitRenderPass(transparent_render_pass* renderPass) { assert(!transparentRenderPass); transparentRenderPass = renderPass; }
 	void submitRenderPass(ldr_render_pass* renderPass) { assert(!ldrRenderPass); ldrRenderPass = renderPass; }
-	void setRaytracingScene(raytracing_tlas* tlas) { this->tlas = tlas;	}
+
+
+
+
+
+	static void submitShadowRenderPass(sun_shadow_render_pass* renderPass) { assert(numSunLightShadowRenderPasses < MAX_NUM_SUN_LIGHT_SHADOW_PASSES); sunShadowRenderPasses[numSunLightShadowRenderPasses++] = renderPass; }
+	static void submitShadowRenderPass(spot_shadow_render_pass* renderPass) { assert(numSpotLightShadowRenderPasses < MAX_NUM_SPOT_LIGHT_SHADOW_PASSES);	spotLightShadowRenderPasses[numSpotLightShadowRenderPasses++] = renderPass; }
+	static void submitShadowRenderPass(point_shadow_render_pass* renderPass) { assert(numPointLightShadowRenderPasses < MAX_NUM_POINT_LIGHT_SHADOW_PASSES); pointLightShadowRenderPasses[numPointLightShadowRenderPasses++] = renderPass; }
+
+	static void setRaytracingScene(raytracing_tlas* tlas) { main_renderer::tlas = tlas; }
+	static void raytraceLightProbes(const light_probe_grid& grid) { lightProbeGrid = &grid; }
+
+	static void setEnvironment(const ref<pbr_environment>& environment);
+	static void setSun(const directional_light& light);
+
+	static void setPointLights(const ref<dx_buffer>& lights, uint32 numLights, const ref<dx_buffer>& shadowInfoBuffer);
+	static void setSpotLights(const ref<dx_buffer>& lights, uint32 numLights, const ref<dx_buffer>& shadowInfoBuffer);
+	static void setDecals(const ref<dx_buffer>& decals, uint32 numDecals, const ref<dx_texture>& textureAtlas);
+
+
+
 
 
 
@@ -138,9 +161,42 @@ struct main_renderer
 	const ref<dx_texture>& getSSRResult() const { return ssrResolveTexture; }
 	const ref<dx_texture>& getBloomResult() const { return bloomTexture; }
 
+
 private:
 
-	raytracing_tlas* tlas;
+	static const sun_shadow_render_pass* sunShadowRenderPasses[MAX_NUM_SUN_LIGHT_SHADOW_PASSES];
+	static const spot_shadow_render_pass* spotLightShadowRenderPasses[MAX_NUM_SPOT_LIGHT_SHADOW_PASSES];
+	static const point_shadow_render_pass* pointLightShadowRenderPasses[MAX_NUM_POINT_LIGHT_SHADOW_PASSES];
+	static uint32 numSunLightShadowRenderPasses;
+	static uint32 numSpotLightShadowRenderPasses;
+	static uint32 numPointLightShadowRenderPasses;
+
+	static const light_probe_grid* lightProbeGrid;
+	static raytracing_tlas* tlas;
+
+	static ref<pbr_environment> environment;
+	static directional_light_cb sun;
+
+
+	static ref<dx_buffer> pointLights;
+	static ref<dx_buffer> spotLights;
+	static ref<dx_buffer> pointLightShadowInfoBuffer;
+	static ref<dx_buffer> spotLightShadowInfoBuffer;
+	static ref<dx_buffer> decals;
+	static uint32 numPointLights;
+	static uint32 numSpotLights;
+	static uint32 numDecals;
+	
+	static ref<dx_texture> decalTextureAtlas;
+
+
+
+	static dx_dynamic_constant_buffer sunCBV;
+
+
+
+
+
 
 	const opaque_render_pass* opaqueRenderPass;
 	const transparent_render_pass* transparentRenderPass;
@@ -192,21 +248,8 @@ private:
 
 	ref<dx_buffer> hoveredObjectIDReadbackBuffer;
 
-	ref<pbr_environment> environment;
-	ref<dx_buffer> pointLights;
-	ref<dx_buffer> spotLights;
-	ref<dx_buffer> pointLightShadowInfoBuffer;
-	ref<dx_buffer> spotLightShadowInfoBuffer;
-	ref<dx_buffer> decals;
-	uint32 numPointLights = 0;
-	uint32 numSpotLights = 0;
-	uint32 numDecals = 0;
-
-	ref<dx_texture> decalTextureAtlas;
-
 	camera_cb jitteredCamera;
 	camera_cb unjitteredCamera;
-	directional_light_cb sun;
 
 
 	light_culling culling;

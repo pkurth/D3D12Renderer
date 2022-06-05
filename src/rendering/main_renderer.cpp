@@ -17,6 +17,33 @@
 #define SSR_RESOLVE_WIDTH (renderWidth / 2)
 #define SSR_RESOLVE_HEIGHT (renderHeight / 2)
 
+const sun_shadow_render_pass* main_renderer::sunShadowRenderPasses[MAX_NUM_SUN_LIGHT_SHADOW_PASSES];
+const spot_shadow_render_pass* main_renderer::spotLightShadowRenderPasses[MAX_NUM_SPOT_LIGHT_SHADOW_PASSES];
+const point_shadow_render_pass* main_renderer::pointLightShadowRenderPasses[MAX_NUM_POINT_LIGHT_SHADOW_PASSES];
+uint32 main_renderer::numSunLightShadowRenderPasses;
+uint32 main_renderer::numSpotLightShadowRenderPasses;
+uint32 main_renderer::numPointLightShadowRenderPasses;
+
+const light_probe_grid* main_renderer::lightProbeGrid;
+raytracing_tlas* main_renderer::tlas;
+
+ref<pbr_environment> main_renderer::environment;
+directional_light_cb main_renderer::sun;
+
+ref<dx_buffer> main_renderer::pointLights;
+ref<dx_buffer> main_renderer::spotLights;
+ref<dx_buffer> main_renderer::pointLightShadowInfoBuffer;
+ref<dx_buffer> main_renderer::spotLightShadowInfoBuffer;
+ref<dx_buffer> main_renderer::decals;
+uint32 main_renderer::numPointLights;
+uint32 main_renderer::numSpotLights;
+uint32 main_renderer::numDecals;
+
+ref<dx_texture> main_renderer::decalTextureAtlas;
+
+
+
+dx_dynamic_constant_buffer main_renderer::sunCBV;
 
 
 void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint32 windowHeight, renderer_spec spec)
@@ -154,8 +181,17 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 	}
 }
 
-void main_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
+void main_renderer::beginFrameCommon()
 {
+	numSunLightShadowRenderPasses = 0;
+	numSpotLightShadowRenderPasses = 0;
+	numPointLightShadowRenderPasses = 0;
+
+	lightProbeGrid = 0;
+
+	environment = 0;
+	tlas = 0;
+
 	pointLights = 0;
 	spotLights = 0;
 	numPointLights = 0;
@@ -163,6 +199,10 @@ void main_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 	decals = 0;
 	numDecals = 0;
 	decalTextureAtlas = 0;
+}
+
+void main_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
+{
 
 	if (this->windowWidth != windowWidth || this->windowHeight != windowHeight)
 	{
@@ -189,13 +229,6 @@ void main_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 	opaqueRenderPass = 0;
 	transparentRenderPass = 0;
 	ldrRenderPass = 0;
-
-	pointLights = 0;
-	spotLights = 0;
-	numPointLights = 0;
-	numSpotLights = 0;
-
-	environment = 0;
 }
 
 void main_renderer::recalculateViewport(bool resizeTextures)
@@ -277,7 +310,7 @@ void main_renderer::setCamera(const render_camera& camera)
 
 void main_renderer::setEnvironment(const ref<pbr_environment>& environment)
 {
-	this->environment = environment;
+	main_renderer::environment = environment;
 }
 
 void main_renderer::setSun(const directional_light& light)
@@ -310,9 +343,42 @@ void main_renderer::setSpotLights(const ref<dx_buffer>& lights, uint32 numLights
 void main_renderer::setDecals(const ref<dx_buffer>& decals, uint32 numDecals, const ref<dx_texture>& textureAtlas)
 {
 	assert(numDecals < MAX_NUM_TOTAL_DECALS);
-	this->decals = decals;
-	this->numDecals = numDecals;
-	this->decalTextureAtlas = textureAtlas;
+	main_renderer::decals = decals;
+	main_renderer::numDecals = numDecals;
+	main_renderer::decalTextureAtlas = textureAtlas;
+}
+
+void main_renderer::endFrameCommon()
+{
+	sunCBV = dxContext.uploadDynamicConstantBuffer(sun);
+
+
+	dx_command_list* cl = dxContext.getFreeRenderCommandList();
+
+	{
+		PROFILE_ALL(cl, "Shadow maps");
+
+		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		cl->transitionBarrier(render_resources::shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+
+		shadowPasses(cl, sunShadowRenderPasses, numSunLightShadowRenderPasses,
+			spotLightShadowRenderPasses, numSpotLightShadowRenderPasses,
+			pointLightShadowRenderPasses, numPointLightShadowRenderPasses);
+
+		cl->transitionBarrier(render_resources::shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	}
+
+	if (dxContext.featureSupport.raytracing() && lightProbeGrid && tlas)
+	{
+		PROFILE_ALL(cl, "Update light probes");
+
+		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // Wait for AS-rebuilds. TODO: This is not the way to go here. We should wait for the specific value returned by executeCommandList.
+
+		lightProbeGrid->updateProbes(cl, *tlas, environment ? environment->sky : 0, sunCBV);
+	}
+
+	dxContext.executeCommandList(cl);
 }
 
 void main_renderer::endFrame(const user_input& input)
@@ -327,7 +393,6 @@ void main_renderer::endFrame(const user_input& input)
 
 	auto jitteredCameraCBV = dxContext.uploadDynamicConstantBuffer(jitteredCamera);
 	auto unjitteredCameraCBV = dxContext.uploadDynamicConstantBuffer(unjitteredCamera);
-	auto sunCBV = dxContext.uploadDynamicConstantBuffer(sun);
 
 
 	settings.enableAO &= spec.allowAO;

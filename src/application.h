@@ -27,7 +27,7 @@ struct application
 private:
 
 	void resetRenderPasses();
-	void submitRenderPasses(uint32 numSpotLightShadowPasses, uint32 numPointLightShadowPasses);
+	void submitRendererParams(uint32 numSpotLightShadowPasses, uint32 numPointLightShadowPasses);
 
 
 	raytracing_tlas raytracingTLAS;

@@ -382,7 +382,7 @@ void light_probe_grid::visualize(opaque_render_pass* renderPass)
 	}
 }
 
-void light_probe_grid::update(dx_command_list* cl, const raytracing_tlas& lightProbeTlas, const ref<dx_texture>& sky) const
+void light_probe_grid::updateProbes(dx_command_list* cl, const raytracing_tlas& lightProbeTlas, const ref<dx_texture>& sky, dx_dynamic_constant_buffer sunCBV) const
 {
 	if (!dxContext.featureSupport.raytracing())
 	{
@@ -390,7 +390,7 @@ void light_probe_grid::update(dx_command_list* cl, const raytracing_tlas& lightP
 	}
 
 	lightProbeTracer.finalizeForRender();
-	lightProbeTracer.render(cl, lightProbeTlas, *this, sky);
+	lightProbeTracer.render(cl, lightProbeTlas, *this, sky, sunCBV);
 }
 
 
@@ -398,6 +398,7 @@ void light_probe_grid::update(dx_command_list* cl, const raytracing_tlas& lightP
 
 #define LIGHT_PROBE_TRACING_RS_RESOURCES	0
 #define LIGHT_PROBE_TRACING_RS_CB			1
+#define LIGHT_PROBE_TRACING_RS_SUN			2
 
 
 void light_probe_tracer::initialize()
@@ -419,6 +420,7 @@ void light_probe_tracer::initialize()
 	{
 		root_descriptor_table(arraysize(resourceRanges), resourceRanges),
 		root_constants<light_probe_trace_cb>(0),
+		root_cbv(1),
 	};
 
 	CD3DX12_STATIC_SAMPLER_DESC globalStaticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
@@ -434,7 +436,7 @@ void light_probe_tracer::initialize()
 	allocateDescriptorHeapSpaceForGlobalResources<input_resources, output_resources>(descriptorHeap);
 }
 
-void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas, const light_probe_grid& grid, const ref<dx_texture>& sky)
+void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas, const light_probe_grid& grid, const ref<dx_texture>& sky, dx_dynamic_constant_buffer sunCBV)
 {
 	if (!tlas.tlas)
 	{
@@ -446,7 +448,7 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 
 		input_resources in;
 		in.tlas = tlas.tlas->raytracingSRV;
-		in.sky = sky->defaultSRV;
+		in.sky = sky ? sky->defaultSRV : render_resources::nullTextureSRV;
 
 		output_resources out;
 		out.radiance = grid.raytracedRadiance->defaultUAV;
@@ -491,6 +493,7 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 
 		cl->setComputeDescriptorTable(LIGHT_PROBE_TRACING_RS_RESOURCES, gpuHandle);
 		cl->setCompute32BitConstants(LIGHT_PROBE_TRACING_RS_CB, cb);
+		cl->setComputeDynamicConstantBuffer(LIGHT_PROBE_TRACING_RS_SUN, sunCBV);
 
 		cl->raytrace(raytraceDesc);
 

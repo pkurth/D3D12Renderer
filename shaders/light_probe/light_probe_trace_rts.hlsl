@@ -25,6 +25,7 @@ RWTexture2D<float3> radianceOutput			: register(u0);
 RWTexture2D<float4> directionDepthOutput	: register(u1);
 
 ConstantBuffer<light_probe_trace_cb> cb		: register(b0);
+ConstantBuffer<directional_light_cb> sun	: register(b1);
 
 SamplerState wrapSampler					: register(s0);
 
@@ -149,8 +150,6 @@ void rayGen()
 }
 
 
-// TODO: Take sun as parameter.
-
 
 // ----------------------------------------
 // RADIANCE
@@ -196,11 +195,11 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 
 
 
-	float3 L = -normalize(float3(-0.6f, -1.f, -0.3f));
+	float3 L = -sun.direction;
 	float sunVisibility = traceShadowRay(surface.P, L, 10000.f);
 
 	light_info light;
-	light.initialize(surface, L, float3(1.f, 0.93f, 0.76f) * 50.f);
+	light.initialize(surface, L, sun.radiance);
 
 	light_contribution totalLighting = { float3(0.f, 0.f, 0.f), float3(0.f, 0.f, 0.f) };
 	totalLighting.add(calculateDirectLighting(surface, light), sunVisibility);
