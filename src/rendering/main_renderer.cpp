@@ -203,7 +203,6 @@ void main_renderer::beginFrameCommon()
 
 void main_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 {
-
 	if (this->windowWidth != windowWidth || this->windowHeight != windowHeight)
 	{
 		this->windowWidth = windowWidth;

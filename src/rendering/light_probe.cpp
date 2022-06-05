@@ -309,6 +309,7 @@ struct test_sample_material
 
 	ref<dx_texture> irradiance;
 	ref<dx_texture> depth;
+	ref<dx_texture> bakedIrradiance;
 };
 
 struct test_sample_pipeline
@@ -334,6 +335,7 @@ PIPELINE_RENDER_IMPL(test_sample_pipeline)
 	cl->setGraphics32BitConstants(LIGHT_PROBE_TEST_SAMPLE_RS_GRID, light_probe_grid_cb{ rc.material.minCorner, rc.material.cellSize, rc.material.countX, rc.material.countY, rc.material.countZ });
 	cl->setDescriptorHeapSRV(LIGHT_PROBE_TEST_SAMPLE_RS_TEXTURES, 0, rc.material.irradiance);
 	cl->setDescriptorHeapSRV(LIGHT_PROBE_TEST_SAMPLE_RS_TEXTURES, 1, rc.material.depth);
+	cl->setDescriptorHeapSRV(LIGHT_PROBE_TEST_SAMPLE_RS_TEXTURES, 2, rc.material.bakedIrradiance);
 
 	cl->setVertexBuffer(0, rc.vertexBuffer.positions);
 	cl->setVertexBuffer(1, rc.vertexBuffer.others);
@@ -341,7 +343,7 @@ PIPELINE_RENDER_IMPL(test_sample_pipeline)
 	cl->drawIndexed(rc.submesh.numIndices, 1, rc.submesh.firstIndex, rc.submesh.baseVertex, 0);
 }
 
-void light_probe_grid::visualize(opaque_render_pass* renderPass)
+void light_probe_grid::visualize(opaque_render_pass* renderPass, const ref<pbr_environment>& environment)
 {
 	if (!dxContext.featureSupport.raytracing())
 	{
@@ -360,23 +362,23 @@ void light_probe_grid::visualize(opaque_render_pass* renderPass)
 	}
 
 	//ImGui::Begin("Light probe");
-	//ImGui::Image(irradiance);
+	//ImGui::Image(irradiance, irradiance->width * 20);
 	//ImGui::Image(depth);
-	//ImGui::Image(raytracedRadiance);
+	//ImGui::Image(raytracedRadiance, raytracedRadiance->width * 20);
 	//ImGui::End();
 
 	{
-		test_sample_material material = { minCorner, cellSize, numNodesX, numNodesY, numNodesZ, irradiance, depth };
+		test_sample_material material = { minCorner, cellSize, numNodesX, numNodesY, numNodesZ, irradiance, depth, environment->irradiance };
 
-		static float time = 0.2f * M_TAU;
-		time += 1.f / 500.f;
-
-		vec3 testPos = vec3(
-			sin(time) * 9.f,
-			cos(time) * 10.f + 11.f,
-			0.f
-			);
-		//vec3 testPos = vec3(0.f, 3.f, 0.f);
+		//static float time = 0.2f * M_TAU;
+		//time += 1.f / 500.f;
+		//
+		//vec3 testPos = vec3(
+		//	sin(time) * 9.f,
+		//	cos(time) * 10.f + 11.f,
+		//	0.f
+		//	);
+		vec3 testPos = vec3(0.f, 3.f, 0.f);
 
 		renderPass->renderStaticObject<test_sample_pipeline>(createModelMatrix(testPos, quat::identity, 0.5f), sphereMesh.vertexBuffer, sphereMesh.indexBuffer, sphereSubmesh, material, -1, false, false);
 	}

@@ -23,7 +23,7 @@ struct light_probe_grid
 	ref<dx_texture> raytracedDirectionAndDistance;
 
 	void initialize(vec3 minCorner, vec3 dimensions, float cellSize);
-	void visualize(opaque_render_pass* renderPass);
+	void visualize(opaque_render_pass* renderPass, const ref<pbr_environment>& environment);
 
 	void updateProbes(dx_command_list* cl, const raytracing_tlas& lightProbeTlas, const ref<dx_texture>& sky, dx_dynamic_constant_buffer sunCBV) const;
 };

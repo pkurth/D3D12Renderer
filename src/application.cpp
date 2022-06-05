@@ -541,7 +541,7 @@ void application::update(const user_input& input, float dt)
 
 	scene_entity selectedEntity = editor.selectedEntity;
 
-	lightProbeGrid.visualize(&opaqueRenderPass);
+	lightProbeGrid.visualize(&opaqueRenderPass, scene.environment);
 
 	// Particles.
 
