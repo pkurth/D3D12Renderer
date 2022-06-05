@@ -30,7 +30,7 @@ static dx_mesh sphereMesh;
 static submesh_info sphereSubmesh;
 
 
-static const DXGI_FORMAT irradianceFormat = DXGI_FORMAT_R11G11B10_FLOAT;
+static const DXGI_FORMAT irradianceFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;// DXGI_FORMAT_R11G11B10_FLOAT;
 static const DXGI_FORMAT depthFormat = DXGI_FORMAT_R16G16_FLOAT;
 static const DXGI_FORMAT raytracedRadianceFormat = DXGI_FORMAT_R11G11B10_FLOAT;
 static const DXGI_FORMAT raytracedDirectionAndDistanceFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;

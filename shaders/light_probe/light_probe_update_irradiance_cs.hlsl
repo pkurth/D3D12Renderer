@@ -8,6 +8,7 @@ Texture2D<float4> directionAndDistance		: register(t1);
 RWTexture2D<float3> output					: register(u0);
 
 
+
 [numthreads(LIGHT_PROBE_BLOCK_SIZE, LIGHT_PROBE_BLOCK_SIZE, 1)]
 [RootSignature(LIGHT_PROBE_UPDATE_RS)]
 void main(cs_input IN)
@@ -54,8 +55,17 @@ void main(cs_input IN)
 		totalWeight += weight;
 	}
 
-	result *= 1.f / (2.f * max(totalWeight, 1e-4f));
+	result *= 1.f / max(totalWeight, 1e-4f);
 
-	float3 previous = output[coord];
-	output[coord] = lerp(previous, result, 0.01f);
+	const float hysteresis = 0.99f;
+
+
+	const float3 previous = output[coord];
+	float3 delta = result - previous;
+
+	static const float c_threshold = 1.f / 1024.f;
+	float3 lerpDelta = (1.f - hysteresis) * delta;
+	lerpDelta = min(max(c_threshold, abs(lerpDelta)), abs(delta)) * sign(lerpDelta);
+	
+	output[coord] = previous + lerpDelta;// lerp(previous, result, 1.f - hysteresis);
 }

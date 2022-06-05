@@ -30,6 +30,8 @@ static float solidAngleOfSphere(float radius, float distance)
 static float square(float v) { return v * v; }
 static float pow3(float v) { return v * v * v; }
 
+static float maxComponent(float3 a) { return max(a.x, max(a.y, a.z)); }
+
 static uint flatten2D(uint2 coord, uint2 dim)
 {
 	return coord.x + coord.y * dim.x;
