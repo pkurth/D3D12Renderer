@@ -291,7 +291,7 @@ ps_output main(ps_input IN)
 
 	ambient_factors factors = getAmbientFactors(surface);
 	//totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity * ao;
-	totalLighting.diffuse += lightProbeGrid.sampleIrradianceAtPosition(surface.P, surface.N, lightProbeIrradiance, lightProbeDepth, wrapSampler);
+	totalLighting.diffuse += lightProbeGrid.sampleIrradianceAtPosition(surface.P, surface.N, lightProbeIrradiance, lightProbeDepth, wrapSampler) * lighting.environmentIntensity * ao;
 
 	//float3 specular = specularIBL(factors.ks, surface, environmentTexture, brdf, clampSampler);
 	float3 specular = float3(0.f, 0.f, 0.f);
