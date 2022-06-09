@@ -48,6 +48,8 @@ private:
 	{
 		dx_cpu_descriptor_handle tlas;
 		dx_cpu_descriptor_handle sky;
+		dx_cpu_descriptor_handle irradiance;
+		dx_cpu_descriptor_handle depth;
 	};
 
 	struct output_resources

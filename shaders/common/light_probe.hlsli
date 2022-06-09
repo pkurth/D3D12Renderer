@@ -152,7 +152,7 @@ struct light_probe_grid_cb
 			pointToProbe *= (1.f / distToProbe); // Normalize.
 
 			float2 depthUV = (uvOffset + directionToUV(-pointToProbe, depthOctScale));
-			float2 meanAndVariance = depth.Sample(linearSampler, depthUV);
+			float2 meanAndVariance = depth.SampleLevel(linearSampler, depthUV, 0);
 
 			float mean = meanAndVariance.x;
 			float variance = abs(square(meanAndVariance.x) - meanAndVariance.y);
@@ -170,11 +170,11 @@ struct light_probe_grid_cb
 
 
 			float2 irradianceUV = (uvOffset + irradianceOct) * uvScale;
-			irradianceSum += irradiance.Sample(linearSampler, irradianceUV) * weight;
+			irradianceSum += irradiance.SampleLevel(linearSampler, irradianceUV, 0) * weight;
 			weightSum += weight;
 		}
 
-		return irradianceSum * (1.f / weightSum) * ENERGY_CONSERVATION;
+		return irradianceSum * (1.f / max(weightSum, 1e-5f)) * ENERGY_CONSERVATION;
 	}
 #endif
 

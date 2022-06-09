@@ -21,13 +21,16 @@ struct mesh_vertex
 RaytracingAccelerationStructure rtScene		: register(t0);
 TextureCube<float4> sky						: register(t1);
 
+Texture2D<float3> irradiance				: register(t2);
+Texture2D<float2> depth						: register(t3);
+
 RWTexture2D<float3> radianceOutput			: register(u0);
 RWTexture2D<float4> directionDepthOutput	: register(u1);
 
 ConstantBuffer<light_probe_trace_cb> cb		: register(b0);
 ConstantBuffer<directional_light_cb> sun	: register(b1);
 
-SamplerState wrapSampler					: register(s0);
+SamplerState linearSampler					: register(s0);
 
 
 // Radiance hit group.
@@ -176,16 +179,16 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	uint flags = material.getFlags();
 
 	surface.albedo = (((flags & USE_ALBEDO_TEXTURE)
-		? albedoTex.SampleLevel(wrapSampler, uv, mipLevel)
+		? albedoTex.SampleLevel(linearSampler, uv, mipLevel)
 		: float4(1.f, 1.f, 1.f, 1.f))
 		* unpackColor(material.albedoTint));
 
 	surface.roughness = (flags & USE_ROUGHNESS_TEXTURE)
-		? roughTex.SampleLevel(wrapSampler, uv, mipLevel)
+		? roughTex.SampleLevel(linearSampler, uv, mipLevel)
 		: material.getRoughnessOverride();
 
 	surface.metallic = (flags & USE_METALLIC_TEXTURE)
-		? metalTex.SampleLevel(wrapSampler, uv, mipLevel)
+		? metalTex.SampleLevel(linearSampler, uv, mipLevel)
 		: material.getMetallicOverride();
 
 	surface.emission = material.emission;
@@ -204,6 +207,8 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	light_contribution totalLighting = { float3(0.f, 0.f, 0.f), float3(0.f, 0.f, 0.f) };
 	totalLighting.add(calculateDirectLighting(surface, light), sunVisibility);
 
+	totalLighting.diffuse += cb.grid.sampleIrradianceAtPosition(surface.P, surface.N, irradiance, depth, linearSampler);
+
 	payload.color = totalLighting.evaluate(surface.albedo).rgb + surface.emission;
 	payload.distance = RayTCurrent();
 }
@@ -211,7 +216,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 [shader("miss")]
 void radianceMiss(inout radiance_ray_payload payload)
 {
-	payload.color = sky.SampleLevel(wrapSampler, WorldRayDirection(), 8).xyz; // We sample a very high mip level of the sky here, because a small sun makes the samples very noisy.
+	payload.color = sky.SampleLevel(linearSampler, WorldRayDirection(), 8).xyz; // We sample a very high mip level of the sky here, because a small sun makes the samples very noisy.
 }
 
 

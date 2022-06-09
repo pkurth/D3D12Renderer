@@ -63,9 +63,19 @@ void main(cs_input IN)
 	const float3 previous = output[coord];
 	float3 delta = result - previous;
 
-	static const float c_threshold = 1.f / 1024.f;
+#if 0
+	const float maxStep = 0.1f;
+	float sqStep = dot(delta, delta);
+	if (sqStep > maxStep * maxStep)
+	{
+		delta = delta * maxStep / sqrt(sqStep);
+	}
+#endif
+
 	float3 lerpDelta = (1.f - hysteresis) * delta;
-	lerpDelta = min(max(c_threshold, abs(lerpDelta)), abs(delta)) * sign(lerpDelta);
+
+	static const float c_threshold = 1.f / 1024.f;
+	//lerpDelta = min(max(c_threshold, abs(lerpDelta)), abs(delta)) * sign(lerpDelta);
 	
 	output[coord] = previous + lerpDelta;// lerp(previous, result, 1.f - hysteresis);
 }

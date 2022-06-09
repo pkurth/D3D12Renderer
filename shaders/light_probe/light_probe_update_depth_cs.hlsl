@@ -40,6 +40,7 @@ void main(cs_input IN)
 	float totalWeight = 0.f;
 
 	const float depthSharpness = 3.f;
+	const float maxRayDistance = 3.f;
 
 	for (uint r = 0; r < NUM_RAYS_PER_PROBE; ++r)
 	{
@@ -49,6 +50,8 @@ void main(cs_input IN)
 		float3 rayDirection = dirDist.xyz;
 		float rayDistance = dirDist.w;
 
+		rayDistance = min(rayDistance, maxRayDistance);
+
 		float weight = pow(max(0.f, dot(rayDirection, pixelDirection)), depthSharpness);
 		float weightedDistance = weight * rayDistance;
 		result += float2(weightedDistance, weightedDistance * rayDistance);
@@ -57,6 +60,8 @@ void main(cs_input IN)
 
 	result *= 1.f / (max(totalWeight, 1e-4f));
 
+	const float hysteresis = 0.99f;
+
 	float2 previous = output[coord];
-	output[coord] = lerp(previous, result, 0.01f);
+	output[coord] = lerp(previous, result, 1.f - hysteresis);
 }

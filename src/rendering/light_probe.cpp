@@ -451,6 +451,8 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 		input_resources in;
 		in.tlas = tlas.tlas->raytracingSRV;
 		in.sky = sky ? sky->defaultSRV : render_resources::nullTextureSRV;
+		in.irradiance = grid.irradiance->defaultSRV;
+		in.depth = grid.depth->defaultSRV;
 
 		output_resources out;
 		out.radiance = grid.raytracedRadiance->defaultUAV;
