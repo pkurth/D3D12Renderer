@@ -489,11 +489,7 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 
 		light_probe_trace_cb cb;
 		cb.rayRotation = createModelMatrix(0.f, rayRotation);
-		cb.grid.countX = grid.numNodesX;
-		cb.grid.countY = grid.numNodesY;
-		cb.grid.countZ = grid.numNodesZ;
-		cb.grid.minCorner = grid.minCorner;
-		cb.grid.cellSize = grid.cellSize;
+		cb.grid = grid.getCB();
 
 		cl->setComputeDescriptorTable(LIGHT_PROBE_TRACING_RS_RESOURCES, gpuHandle);
 		cl->setCompute32BitConstants(LIGHT_PROBE_TRACING_RS_CB, cb);
@@ -528,6 +524,7 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 		cl->dispatch(bucketize(grid.irradiance->width, LIGHT_PROBE_BLOCK_SIZE), bucketize(grid.irradiance->height, LIGHT_PROBE_BLOCK_SIZE));
 	}
 
+#if 0
 	{
 		PROFILE_ALL(cl, "Update depth");
 
@@ -545,6 +542,7 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 
 		cl->dispatch(bucketize(grid.depth->width, LIGHT_PROBE_BLOCK_SIZE), bucketize(grid.depth->height, LIGHT_PROBE_BLOCK_SIZE));
 	}
+#endif
 
 	barrier_batcher(cl)
 		.transition(grid.raytracedRadiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)

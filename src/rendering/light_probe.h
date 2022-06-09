@@ -6,6 +6,8 @@
 #include "render_pass.h"
 #include "pbr_raytracer.h"
 
+#include "light_probe.hlsli"
+
 struct light_probe_grid
 {
 	vec3 minCorner;
@@ -26,6 +28,8 @@ struct light_probe_grid
 	void visualize(opaque_render_pass* renderPass, const ref<pbr_environment>& environment);
 
 	void updateProbes(dx_command_list* cl, const raytracing_tlas& lightProbeTlas, const ref<dx_texture>& sky, dx_dynamic_constant_buffer sunCBV) const;
+
+	light_probe_grid_cb getCB() const { return { minCorner, cellSize, numNodesX, numNodesY, numNodesZ }; }
 };
 
 struct light_probe_tracer : pbr_raytracer

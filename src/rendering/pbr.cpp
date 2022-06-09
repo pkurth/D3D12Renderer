@@ -187,6 +187,7 @@ static void setupPBRCommon(dx_command_list* cl, const common_material_info& info
 	dx_cpu_descriptor_handle nullBuffer = render_resources::nullBufferSRV;
 
 	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_LIGHTING, lighting_cb{ vec2(1.f / info.shadowMap->width, 1.f / info.shadowMap->height), info.environmentIntensity });
+	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_LIGHT_PROBE_GRID, info.lightProbeGrid);
 
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 0, info.irradiance ? info.irradiance->defaultSRV : nullTexture);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 1, info.environment ? info.environment->defaultSRV : nullTexture);
@@ -203,6 +204,8 @@ static void setupPBRCommon(dx_command_list* cl, const common_material_info& info
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 12, info.aoTexture ? info.aoTexture : render_resources::whiteTexture);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 13, info.sssTexture ? info.sssTexture : render_resources::whiteTexture);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 14, info.ssrTexture ? info.ssrTexture->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 15, info.lightProbeIrradiance ? info.lightProbeIrradiance->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 16, info.lightProbeDepth ? info.lightProbeDepth->defaultSRV : nullTexture);
 
 	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_SUN, info.sunCBV);
 

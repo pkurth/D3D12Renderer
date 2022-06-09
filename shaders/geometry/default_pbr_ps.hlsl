@@ -3,6 +3,7 @@
 #include "camera.hlsli"
 #include "light_culling_rs.hlsli"
 #include "light_source.hlsli"
+#include "light_probe.hlsli"
 #include "normal.hlsli"
 #include "material.hlsli"
 
@@ -19,6 +20,7 @@ struct ps_input
 ConstantBuffer<pbr_material_cb> material				: register(b0, space1);
 ConstantBuffer<camera_cb> camera						: register(b1, space1);
 ConstantBuffer<lighting_cb> lighting					: register(b2, space1);
+ConstantBuffer<light_probe_grid_cb> lightProbeGrid		: register(b3, space1);
 
 
 SamplerState wrapSampler								: register(s0);
@@ -53,6 +55,9 @@ Texture2D<float4> decalTextureAtlas                     : register(t11, space2);
 Texture2D<float> aoTexture								: register(t12, space2);
 Texture2D<float> sssTexture								: register(t13, space2);
 Texture2D<float4> ssrTexture							: register(t14, space2);
+
+Texture2D<float3> lightProbeIrradiance					: register(t15, space2);
+Texture2D<float2> lightProbeDepth						: register(t16, space2);
 
 
 struct ps_output
@@ -285,9 +290,11 @@ ps_output main(ps_input IN)
 	float4 ssr = ssrTexture.SampleLevel(clampSampler, screenUV, 0);
 
 	ambient_factors factors = getAmbientFactors(surface);
-	totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity * ao;
+	//totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity * ao;
+	totalLighting.diffuse += lightProbeGrid.sampleIrradianceAtPosition(surface.P, surface.N, lightProbeIrradiance, lightProbeDepth, wrapSampler);
 
-	float3 specular = specularIBL(factors.ks, surface, environmentTexture, brdf, clampSampler);
+	//float3 specular = specularIBL(factors.ks, surface, environmentTexture, brdf, clampSampler);
+	float3 specular = float3(0.f, 0.f, 0.f);
 	specular = lerp(specular, ssr.rgb, ssr.a);
 	totalLighting.specular += specular * lighting.environmentIntensity * ao;
 

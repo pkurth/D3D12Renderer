@@ -430,6 +430,9 @@ void main_renderer::endFrame(const user_input& input)
 	materialInfo.volumetricsTexture = 0;
 	materialInfo.cameraCBV = jitteredCameraCBV;
 	materialInfo.sunCBV = sunCBV;
+	materialInfo.lightProbeIrradiance = lightProbeGrid ? lightProbeGrid->irradiance : 0;
+	materialInfo.lightProbeDepth = lightProbeGrid ? lightProbeGrid->depth : 0;
+	materialInfo.lightProbeGrid = lightProbeGrid ? lightProbeGrid->getCB() : light_probe_grid_cb{};
 
 
 

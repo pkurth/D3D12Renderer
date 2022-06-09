@@ -4,6 +4,8 @@
 #include "dx/dx_buffer.h"
 #include "dx/dx_texture.h"
 
+#include "light_probe.hlsli"
+
 struct dx_command_list;
 
 struct common_material_info
@@ -15,6 +17,10 @@ struct common_material_info
 	ref<dx_texture> aoTexture;
 	ref<dx_texture> sssTexture;
 	ref<dx_texture> ssrTexture;
+
+	ref<dx_texture> lightProbeIrradiance;
+	ref<dx_texture> lightProbeDepth;
+	light_probe_grid_cb lightProbeGrid;
 
 	ref<dx_texture> tiledCullingGrid;
 	ref<dx_buffer> tiledObjectsIndexList;

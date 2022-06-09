@@ -127,7 +127,7 @@ struct light_probe_grid_cb
 
 		float2 uvScale = 1.f / float2(countX * countY, countZ);
 
-		const float normalBias = 0.001f;
+		const float normalBias = 0.0001f;
 
 		for (int i = 0; i < 8; ++i)
 		{
@@ -146,6 +146,7 @@ struct light_probe_grid_cb
 
 
 			// Moment visibility.
+#if 0
 			pointToProbe -= normal * normalBias; // Offset a bit to avoid sampling directly at the surface. This shortens the vector.
 
 			float distToProbe = length(pointToProbe);
@@ -161,6 +162,7 @@ struct light_probe_grid_cb
 
 			chebyshevWeight = max(pow3(chebyshevWeight), 0.f); // Increase contrast in the weight.
 			weight *= (distToProbe <= mean) ? 1.f : chebyshevWeight;
+#endif
 
 
 			
