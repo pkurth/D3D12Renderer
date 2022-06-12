@@ -7,7 +7,12 @@ Texture2D<float4> directionAndDistance		: register(t1);
 
 RWTexture2D<float3> output					: register(u0);
 
+#define USE_SHARED_MEMORY 1
 
+#if USE_SHARED_MEMORY
+groupshared float3 g_radiance[NUM_RAYS_PER_PROBE];
+groupshared float4 g_directionAndDistance[NUM_RAYS_PER_PROBE];
+#endif
 
 [numthreads(LIGHT_PROBE_BLOCK_SIZE, LIGHT_PROBE_BLOCK_SIZE, 1)]
 [RootSignature(LIGHT_PROBE_UPDATE_RS)]
@@ -15,10 +20,21 @@ void main(cs_input IN)
 {
 	uint2 coord = IN.dispatchThreadID.xy;
 
-	uint2 probeIndex2 = coord / LIGHT_PROBE_TOTAL_RESOLUTION;
+	uint2 probeIndex2 = IN.groupID.xy;// coord / LIGHT_PROBE_TOTAL_RESOLUTION;
 	uint3 probeIndex3 = uint3(probeIndex2.x % cb.countX, probeIndex2.x / cb.countX, probeIndex2.y);
 
 	uint probeIndex = probeIndex3.z * cb.countX * cb.countY + probeIndex3.y * cb.countX + probeIndex3.x;
+
+#if USE_SHARED_MEMORY
+	for (uint i = IN.groupIndex; i < NUM_RAYS_PER_PROBE; i += (LIGHT_PROBE_BLOCK_SIZE * LIGHT_PROBE_BLOCK_SIZE))
+	{
+		uint2 c = uint2(i, probeIndex);
+		g_radiance[i] = radiance[c];
+		g_directionAndDistance[i] = directionAndDistance[c];
+	}
+	GroupMemoryBarrierWithGroupSync();
+#endif
+
 
 	uint2 pixelIndex = coord % LIGHT_PROBE_TOTAL_RESOLUTION; // [1, 6]
 
@@ -40,13 +56,17 @@ void main(cs_input IN)
 	float3 result = float3(0.f, 0.f, 0.f);
 	float totalWeight = 0.f;
 
-	for (uint r = 0; r < NUM_RAYS_PER_PROBE; ++r)
+	for (uint j = 0; j < NUM_RAYS_PER_PROBE; ++j)
 	{
-		uint2 c = uint2(r, probeIndex);
-		
-		float3 rad = radiance[c] * ENERGY_CONSERVATION;
-		
+#if USE_SHARED_MEMORY
+		float3 rad = g_radiance[j];
+		float4 dirDist = g_directionAndDistance[j];
+#else
+		uint2 c = uint2(j, probeIndex);
+		float3 rad = radiance[c];
 		float4 dirDist = directionAndDistance[c];
+#endif
+
 		float3 rayDirection = dirDist.xyz;
 		float rayDistance = dirDist.w;
 
@@ -55,27 +75,16 @@ void main(cs_input IN)
 		totalWeight += weight;
 	}
 
-	result *= 1.f / max(totalWeight, 1e-4f);
+	result *= ENERGY_CONSERVATION / max(totalWeight, 1e-4f);
 
-	const float hysteresis = 0.99f;
-
+	float hysteresis = 0.99f;
 
 	const float3 previous = output[coord];
-	float3 delta = result - previous;
 
-#if 0
-	const float maxStep = 0.1f;
-	float sqStep = dot(delta, delta);
-	if (sqStep > maxStep * maxStep)
+	if (dot(previous, previous) == 0.f)
 	{
-		delta = delta * maxStep / sqrt(sqStep);
+		hysteresis = 0.f; // Speed up first frame's convergence.
 	}
-#endif
 
-	float3 lerpDelta = (1.f - hysteresis) * delta;
-
-	static const float c_threshold = 1.f / 1024.f;
-	//lerpDelta = min(max(c_threshold, abs(lerpDelta)), abs(delta)) * sign(lerpDelta);
-	
-	output[coord] = previous + lerpDelta;// lerp(previous, result, 1.f - hysteresis);
+	output[coord] = lerp(previous, result, 1.f - hysteresis);
 }

@@ -4,7 +4,7 @@
 #include "../common/light_probe.hlsli"
 
 
-#define LIGHT_PROBE_BLOCK_SIZE 16
+#define LIGHT_PROBE_BLOCK_SIZE LIGHT_PROBE_TOTAL_RESOLUTION
 
 
 struct light_probe_grid_visualization_cb
