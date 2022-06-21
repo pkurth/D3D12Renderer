@@ -6,7 +6,6 @@
 #include "undo_stack.h"
 #include "transformation_gizmo.h"
 #include "rendering/main_renderer.h"
-#include "tree_generation.h"
 
 struct scene_editor
 {
@@ -44,9 +43,6 @@ private:
 	vec3 selectedEntityEulerRotation;
 
 	system_info systemInfo;
-
-	tree_generator treeGenerator;
-	scene_entity treeEntity;
 
 	friend struct selection_undo;
 };

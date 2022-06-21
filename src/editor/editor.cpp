@@ -90,12 +90,6 @@ void scene_editor::initialize(game_scene* scene, main_renderer* renderer)
 	cameraController.initialize(&scene->camera);
 
 	systemInfo = getSystemInfo();
-
-
-
-	treeEntity = scene->createEntity("Test tree")
-		.addComponent<transform_component>(trs::identity)
-		.addComponent<raster_component>(make_ref<composite_mesh>());
 }
 
 bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPass, float dt)
@@ -1590,24 +1584,6 @@ void scene_editor::drawSettings(float dt)
 				ImGui::PropertySlider("Environment intensity", renderer->settings.environmentIntensity, 0.f, 2.f);
 				ImGui::PropertySlider("Sky intensity", renderer->settings.skyIntensity, 0.f, 2.f);
 				ImGui::EndProperties();
-			}
-
-			ImGui::EndTree();
-		}
-
-		if (ImGui::BeginTree("Tree generation"))
-		{
-			if (treeGenerator.edit())
-			{
-				auto mesh = treeEntity.getComponent<raster_component>().mesh;
-				auto gen = treeGenerator.generatedMesh;
-				mesh->mesh = gen;
-				mesh->submeshes.clear();
-				mesh->submeshes.push_back({ submesh_info{ gen.indexBuffer->elementCount, 0, 0, gen.vertexBuffer.positions->elementCount }, 
-					{},
-					trs::identity,
-					getDefaultPBRMaterial()
-					});
 			}
 
 			ImGui::EndTree();
