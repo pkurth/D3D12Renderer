@@ -48,6 +48,23 @@ struct renderer_settings
 	bool enableSharpen = true;
 	sharpen_settings sharpenSettings;
 };
+REFLECT_STRUCT(renderer_settings,
+	(tonemapSettings, "Tonemap"),
+	(environmentIntensity, "Environment intensity"),
+	(skyIntensity, "Sky intensity"),
+	(enableAO, "Enable AO"),
+	(aoSettings, "AO"),
+	(enableSSS, "Enable SSS"),
+	(sssSettings, "SSS"),
+	(enableSSR, "Enable SSR"),
+	(ssrSettings, "SSR"),
+	(enableTAA, "Enable TAA"),
+	(taaSettings, "TAA"),
+	(enableBloom, "Enable Bloom"),
+	(bloomSettings, "Bloom"),
+	(enableSharpen, "Enable sharpen"),
+	(sharpenSettings, "Sharpen")
+);
 
 
 enum aspect_ratio_mode

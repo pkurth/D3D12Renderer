@@ -7,564 +7,76 @@
 
 #include "physics/physics.h"
 
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const render_camera& camera)
+namespace YAML
 {
-	out << YAML::BeginMap
-		<< YAML::Key << "Position" << YAML::Value << camera.position
-		<< YAML::Key << "Rotation" << YAML::Value << camera.rotation
-		<< YAML::Key << "Near plane" << YAML::Value << camera.nearPlane
-		<< YAML::Key << "Far plane" << YAML::Value << camera.farPlane
-		<< YAML::Key << "Type" << YAML::Value << camera.type;
-
-	if (camera.type == camera_type_ingame)
+	template<typename T>
+	struct convert
 	{
-		out << YAML::Key << "FOV" << YAML::Value << camera.verticalFOV;
-	}
-	else
-	{
-		out << YAML::Key << "Fx" << YAML::Value << camera.fx
-			<< YAML::Key << "Fy" << YAML::Value << camera.fy
-			<< YAML::Key << "Cx" << YAML::Value << camera.cx
-			<< YAML::Key << "Cy" << YAML::Value << camera.cy;
-	}
-
-	out << YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const directional_light& sun)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Color" << YAML::Value << sun.color
-		<< YAML::Key << "Intensity" << YAML::Value << sun.intensity
-		<< YAML::Key << "Direction" << YAML::Value << sun.direction
-		<< YAML::Key << "Shadow dimensions" << YAML::Value << sun.shadowDimensions
-		<< YAML::Key << "Cascades" << YAML::Value << sun.numShadowCascades
-		<< YAML::Key << "Distances" << YAML::Value << sun.cascadeDistances
-		<< YAML::Key << "Bias" << YAML::Value << sun.bias
-		<< YAML::Key << "Blend distances" << YAML::Value << sun.blendDistances
-		<< YAML::Key << "Stabilize" << YAML::Value << sun.stabilize
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const tonemap_settings& s)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "A" << YAML::Value << s.A
-		<< YAML::Key << "B" << YAML::Value << s.B
-		<< YAML::Key << "C" << YAML::Value << s.C
-		<< YAML::Key << "D" << YAML::Value << s.D
-		<< YAML::Key << "E" << YAML::Value << s.E
-		<< YAML::Key << "F" << YAML::Value << s.F
-		<< YAML::Key << "Linear white" << YAML::Value << s.linearWhite
-		<< YAML::Key << "Exposure" << YAML::Value << s.exposure
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const hbao_settings& s)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Radius" << YAML::Value << s.radius
-		<< YAML::Key << "Num rays" << YAML::Value << s.numRays
-		<< YAML::Key << "Max num steps per ray" << YAML::Value << s.maxNumStepsPerRay
-		<< YAML::Key << "Strength" << YAML::Value << s.strength
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const sss_settings& s)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Num steps" << YAML::Value << s.numSteps
-		<< YAML::Key << "Ray distance" << YAML::Value << s.rayDistance
-		<< YAML::Key << "Thickness" << YAML::Value << s.thickness
-		<< YAML::Key << "Max distance" << YAML::Value << s.maxDistanceFromCamera
-		<< YAML::Key << "Distance fadeout" << YAML::Value << s.distanceFadeoutRange
-		<< YAML::Key << "Border fadeout" << YAML::Value << s.borderFadeout
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const ssr_settings& s)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Num steps" << YAML::Value << s.numSteps
-		<< YAML::Key << "Max distance" << YAML::Value << s.maxDistance
-		<< YAML::Key << "Stride cutoff" << YAML::Value << s.strideCutoff
-		<< YAML::Key << "Min stride" << YAML::Value << s.minStride
-		<< YAML::Key << "Max stride" << YAML::Value << s.maxStride
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const taa_settings& s)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Camera jitter" << YAML::Value << s.cameraJitterStrength
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const bloom_settings& s)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Threshold" << YAML::Value << s.threshold
-		<< YAML::Key << "Strength" << YAML::Value << s.strength
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const sharpen_settings& s)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Strength" << YAML::Value << s.strength
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const renderer_settings& s)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Tone map" << YAML::Value << s.tonemapSettings
-		<< YAML::Key << "Environment intensity" << YAML::Value << s.environmentIntensity
-		<< YAML::Key << "Sky intensity" << YAML::Value << s.skyIntensity
-		<< YAML::Key << "Enable SSR" << YAML::Value << s.enableSSR
-		<< YAML::Key << "SSR" << YAML::Value << s.ssrSettings
-		<< YAML::Key << "Enable TAA" << YAML::Value << s.enableTAA
-		<< YAML::Key << "TAA" << YAML::Value << s.taaSettings
-		<< YAML::Key << "Enable AO" << YAML::Value << s.enableAO
-		<< YAML::Key << "AO" << YAML::Value << s.aoSettings
-		<< YAML::Key << "Enable SSS" << YAML::Value << s.enableSSS
-		<< YAML::Key << "SSS" << YAML::Value << s.sssSettings
-		<< YAML::Key << "Enable Bloom" << YAML::Value << s.enableBloom
-		<< YAML::Key << "Bloom" << YAML::Value << s.bloomSettings
-		<< YAML::Key << "Enable Sharpen" << YAML::Value << s.enableSharpen
-		<< YAML::Key << "Sharpen" << YAML::Value << s.sharpenSettings
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const transform_component& c)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Rotation" << YAML::Value << c.rotation
-		<< YAML::Key << "Position" << YAML::Value << c.position
-		<< YAML::Key << "Scale" << YAML::Value << c.scale
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const position_component& c)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Position" << YAML::Value << c.position
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const position_rotation_component& c)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Rotation" << YAML::Value << c.rotation
-		<< YAML::Key << "Position" << YAML::Value << c.position
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const point_light_component& c)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Color" << YAML::Value << c.color
-		<< YAML::Key << "Intensity" << YAML::Value << c.intensity
-		<< YAML::Key << "Radius" << YAML::Value << c.radius
-		<< YAML::Key << "Casts shadow" << YAML::Value << c.castsShadow
-		<< YAML::Key << "Shadow resolution" << YAML::Value << c.shadowMapResolution
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const spot_light_component& c)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Color" << YAML::Value << c.color
-		<< YAML::Key << "Intensity" << YAML::Value << c.intensity
-		<< YAML::Key << "Distance" << YAML::Value << c.distance
-		<< YAML::Key << "Inner angle" << YAML::Value << c.innerAngle
-		<< YAML::Key << "Outer angle" << YAML::Value << c.outerAngle
-		<< YAML::Key << "Casts shadow" << YAML::Value << c.castsShadow
-		<< YAML::Key << "Shadow resolution" << YAML::Value << c.shadowMapResolution
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const rigid_body_component& c)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Local COG" << YAML::Value << c.localCOGPosition
-		<< YAML::Key << "Inv mass" << YAML::Value << c.invMass
-		<< YAML::Key << "Inv inertia" << YAML::Value << c.invInertia
-		<< YAML::Key << "Gravity factor" << YAML::Value << c.gravityFactor
-		<< YAML::Key << "Linear damping" << YAML::Value << c.linearDamping
-		<< YAML::Key << "Angular damping" << YAML::Value << c.angularDamping
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const force_field_component& c)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Force" << YAML::Value << c.force
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const collider_component& c)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Type" << YAML::Value << colliderTypeNames[c.type];
-
-	switch (c.type)
-	{
-		case collider_type_sphere:
+		template <typename = std::enable_if_t<is_reflected_v<T>>>
+		static Node encode(const T& v)
 		{
-			out << YAML::Key << "Center" << YAML::Value << c.sphere.center
-				<< YAML::Key << "Radius" << YAML::Value << c.sphere.radius;
-		} break;
+			Node n;
+			type_descriptor<T>::apply(
+				[&n](const char* name, auto& member)
+				{
+					using T = std::decay_t<decltype(member)>;
+					if constexpr (std::is_enum_v<T>)
+					{
+						n[name] = (int)member;
+					}
+					else
+					{
+						n[name] = member;
+					}
+				},
+				v
+			);
+			return n;
+		}
 
-		case collider_type_capsule:
+		template <typename = std::enable_if_t<is_reflected_v<T>>>
+		static bool decode(const Node& n, T& v)
 		{
-			out << YAML::Key << "Position A" << YAML::Value << c.capsule.positionA
-				<< YAML::Key << "Position B" << YAML::Value << c.capsule.positionB
-				<< YAML::Key << "Radius" << YAML::Value << c.capsule.radius;
-		} break;
+			if (!n.IsMap()) { return false; }
 
-		case collider_type_aabb:
-		{
-			out << YAML::Key << "Min corner" << YAML::Value << c.aabb.minCorner
-				<< YAML::Key << "Max corner" << YAML::Value << c.aabb.maxCorner;
-		} break;
+			type_descriptor<T>::apply(
+				[&n](const char* name, auto& member)
+				{
+					using T = std::decay_t<decltype(member)>;
+					if constexpr (std::is_enum_v<T>)
+					{
+						YAML_LOAD_ENUM(n, member, name);
+					}
+					else
+					{
+						YAML_LOAD(n, member, name);
+					}
+				},
+				v
+			);
 
-		case collider_type_obb:
-		{
-			out << YAML::Key << "Center" << YAML::Value << c.obb.center
-				<< YAML::Key << "Radius" << YAML::Value << c.obb.radius
-				<< YAML::Key << "Rotation" << YAML::Value << c.obb.rotation;
-		} break;
-
-		case collider_type_hull:
-		{
-		} break;
-	}
-
-	out << YAML::Key << "Restitution" << YAML::Value << c.material.restitution
-		<< YAML::Key << "Friction" << YAML::Value << c.material.friction
-		<< YAML::Key << "Density" << YAML::Value << c.material.density
-		<< YAML::EndMap;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const cloth_component& c)
-{
-	out << YAML::BeginMap
-		<< YAML::Key << "Width" << YAML::Value << c.width
-		<< YAML::Key << "Height" << YAML::Value << c.height
-		<< YAML::Key << "Grid size x" << YAML::Value << c.gridSizeX
-		<< YAML::Key << "Grid size y" << YAML::Value << c.gridSizeY
-		<< YAML::Key << "Total mass" << YAML::Value << c.totalMass
-		<< YAML::Key << "Stiffness" << YAML::Value << c.stiffness
-		<< YAML::Key << "Damping" << YAML::Value << c.damping
-		<< YAML::Key << "Gravity factor" << YAML::Value << c.gravityFactor
-		<< YAML::EndMap;
-
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const raster_component& c)
-{
-	auto mesh = c.mesh;
-
-	out << YAML::BeginMap
-		<< YAML::Key << "Handle" << YAML::Value << mesh->handle
-		<< YAML::Key << "Flags" << YAML::Value << mesh->flags
-		<< YAML::EndMap;
-
-	return out;
+			return true;
+		}
+	};
 }
 
 namespace YAML
 {
 	template<>
-	struct convert<render_camera>
-	{
-		static bool decode(const Node& n, render_camera& camera) 
-		{
-			if (!n.IsMap()) { return false; }
-
-			YAML_LOAD(n, camera.position, "Position");
-			YAML_LOAD(n, camera.rotation, "Rotation");
-			YAML_LOAD(n, camera.nearPlane, "Near plane");
-			YAML_LOAD(n, camera.farPlane, "Far plane");
-			YAML_LOAD_ENUM(n, camera.type, "Type");
-
-			if (camera.type == camera_type_ingame)
-			{
-				YAML_LOAD(n, camera.verticalFOV, "FOV");
-			}
-			else
-			{
-				YAML_LOAD(n, camera.fx, "Fx");
-				YAML_LOAD(n, camera.fy, "Fy");
-				YAML_LOAD(n, camera.cx, "Cx");
-				YAML_LOAD(n, camera.cy, "Cy");
-			}
-
-			return true; 
-		}
-	};
-
-	template<>
-	struct convert<tonemap_settings>
-	{
-		static bool decode(const Node& n, tonemap_settings& s)
-		{
-			if (!n.IsMap()) { return false; }
-
-			YAML_LOAD(n, s.A, "A");
-			YAML_LOAD(n, s.B, "B");
-			YAML_LOAD(n, s.C, "C");
-			YAML_LOAD(n, s.D, "D");
-			YAML_LOAD(n, s.E, "E");
-			YAML_LOAD(n, s.F, "F");
-			YAML_LOAD(n, s.linearWhite, "Linear white");
-			YAML_LOAD(n, s.exposure, "Exposure");
-
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<hbao_settings>
-	{
-		static bool decode(const Node& n, hbao_settings& s)
-		{
-			if (!n.IsMap()) { return false; }
-
-			YAML_LOAD(n, s.radius, "Radius");
-			YAML_LOAD(n, s.numRays, "Num rays");
-			YAML_LOAD(n, s.maxNumStepsPerRay, "Max num steps per ray");
-			YAML_LOAD(n, s.strength, "Strength");
-
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<sss_settings>
-	{
-		static bool decode(const Node& n, sss_settings& s)
-		{
-			if (!n.IsMap()) { return false; }
-
-			YAML_LOAD(n, s.numSteps, "Num steps");
-			YAML_LOAD(n, s.rayDistance, "Ray distance");
-			YAML_LOAD(n, s.thickness, "Thickness");
-			YAML_LOAD(n, s.maxDistanceFromCamera, "Max distance");
-			YAML_LOAD(n, s.distanceFadeoutRange, "Distance fadeout");
-			YAML_LOAD(n, s.borderFadeout, "Border fadeout");
-
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<ssr_settings>
-	{
-		static bool decode(const Node& n, ssr_settings& s)
-		{
-			if (!n.IsMap()) { return false; }
-
-			YAML_LOAD(n, s.numSteps, "Num steps");
-			YAML_LOAD(n, s.maxDistance, "Max distance");
-			YAML_LOAD(n, s.strideCutoff, "Stride cutoff");
-			YAML_LOAD(n, s.minStride, "Min stride");
-			YAML_LOAD(n, s.maxStride, "Max stride");
-
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<taa_settings>
-	{
-		static bool decode(const Node& n, taa_settings& s)
-		{
-			if (!n.IsMap()) { return false; }
-
-			YAML_LOAD(n, s.cameraJitterStrength, "Camera jitter");
-
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<bloom_settings>
-	{
-		static bool decode(const Node& n, bloom_settings& s)
-		{
-			if (!n.IsMap()) { return false; }
-
-			YAML_LOAD(n, s.threshold, "Threshold");
-			YAML_LOAD(n, s.strength, "Strength");
-
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<sharpen_settings>
-	{
-		static bool decode(const Node& n, sharpen_settings& s)
-		{
-			if (!n.IsMap()) { return false; }
-
-			YAML_LOAD(n, s.strength, "Strength");
-
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<renderer_settings>
-	{
-		static bool decode(const Node& n, renderer_settings& settings)
-		{
-			if (!n.IsMap()) { return false; }
-
-			YAML_LOAD(n, settings.tonemapSettings, "Tone map");
-			YAML_LOAD(n, settings.environmentIntensity, "Environment intensity");
-			YAML_LOAD(n, settings.skyIntensity, "Sky intensity");
-			YAML_LOAD(n, settings.enableSSR, "Enable SSR");
-			YAML_LOAD(n, settings.ssrSettings, "SSR");
-			YAML_LOAD(n, settings.enableTAA, "Enable TAA");
-			YAML_LOAD(n, settings.taaSettings, "TAA");
-			YAML_LOAD(n, settings.enableAO, "Enable AO");
-			YAML_LOAD(n, settings.aoSettings, "AO");
-			YAML_LOAD(n, settings.enableSSS, "Enable SSS");
-			YAML_LOAD(n, settings.sssSettings, "SSS");
-			YAML_LOAD(n, settings.enableBloom, "Enable Bloom");
-			YAML_LOAD(n, settings.bloomSettings, "Bloom");
-			YAML_LOAD(n, settings.enableSharpen, "Enable Sharpen");
-			YAML_LOAD(n, settings.sharpenSettings, "Sharpen");
-
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<directional_light>
-	{
-		static bool decode(const Node& n, directional_light& sun)
-		{
-			if (!n.IsMap()) { return false; }
-
-			YAML_LOAD(n, sun.color, "Color");
-			YAML_LOAD(n, sun.intensity, "Intensity");
-			YAML_LOAD(n, sun.direction, "Direction");
-			YAML_LOAD(n, sun.shadowDimensions, "Shadow dimensions");
-			YAML_LOAD(n, sun.numShadowCascades, "Cascades");
-			YAML_LOAD(n, sun.cascadeDistances, "Distances");
-			YAML_LOAD(n, sun.bias, "Bias");
-			YAML_LOAD(n, sun.blendDistances, "Blend distances");
-			YAML_LOAD(n, sun.stabilize, "Stabilize");
-
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<transform_component>
-	{
-		static bool decode(const Node& n, transform_component& c)
-		{
-			if (!n.IsMap()) { return false; }
-
-			YAML_LOAD(n, c.rotation, "Rotation");
-			YAML_LOAD(n, c.position, "Position");
-			YAML_LOAD(n, c.scale, "Scale");
-
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<position_component>
-	{
-		static bool decode(const Node& n, position_component& c)
-		{
-			if (!n.IsMap()) { return false; }
-
-			YAML_LOAD(n, c.position, "Position");
-
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<position_rotation_component>
-	{
-		static bool decode(const Node& n, position_rotation_component& c)
-		{
-			if (!n.IsMap()) { return false; }
-
-			YAML_LOAD(n, c.rotation, "Rotation");
-			YAML_LOAD(n, c.position, "Position");
-
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<point_light_component>
-	{
-		static bool decode(const Node& n, point_light_component& c)
-		{
-			if (!n.IsMap()) { return false; }
-
-			YAML_LOAD(n, c.color, "Color");
-			YAML_LOAD(n, c.intensity, "Intensity");
-			YAML_LOAD(n, c.radius, "Radius");
-			YAML_LOAD(n, c.castsShadow, "Casts shadow");
-			YAML_LOAD(n, c.shadowMapResolution, "Shadow resolution");
-
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<spot_light_component>
-	{
-		static bool decode(const Node& n, spot_light_component& c)
-		{
-			if (!n.IsMap()) { return false; }
-
-			YAML_LOAD(n, c.color, "Color");
-			YAML_LOAD(n, c.intensity, "Intensity");
-			YAML_LOAD(n, c.distance, "Distance");
-			YAML_LOAD(n, c.innerAngle, "Inner angle");
-			YAML_LOAD(n, c.outerAngle, "Outer angle");
-			YAML_LOAD(n, c.castsShadow, "Casts shadow");
-			YAML_LOAD(n, c.shadowMapResolution, "Shadow resolution");
-
-			return true;
-		}
-	};
-
-	template<>
 	struct convert<rigid_body_component>
 	{
+		static Node encode(const rigid_body_component& c)
+		{
+			Node n;
+			n["Local COG"] = c.localCOGPosition;
+			n["Inv mass"] = c.invMass;
+			n["Inv inertia"] = c.invInertia;
+			n["Gravity factor"] = c.gravityFactor;
+			n["Linear damping"] = c.linearDamping;
+			n["Angular damping"] = c.angularDamping;
+			return n;
+		}
+
 		static bool decode(const Node& n, rigid_body_component& c)
 		{
 			if (!n.IsMap()) { return false; }
@@ -583,6 +95,13 @@ namespace YAML
 	template<>
 	struct convert<force_field_component>
 	{
+		static Node encode(const force_field_component& c)
+		{
+			Node n;
+			n["Force"] = c.force;
+			return n;
+		}
+
 		static bool decode(const Node& n, force_field_component& c)
 		{
 			if (!n.IsMap()) { return false; }
@@ -596,6 +115,50 @@ namespace YAML
 	template<>
 	struct convert<collider_component>
 	{
+		static Node encode(const collider_component& c)
+		{
+			Node n;
+			n["Type"] = colliderTypeNames[c.type];
+
+			switch (c.type)
+			{
+			case collider_type_sphere:
+			{
+				n["Center"] = c.sphere.center;
+				n["Radius"]= c.sphere.radius;
+			} break;
+
+			case collider_type_capsule:
+			{
+				n["Position A"] = c.capsule.positionA;
+				n["Position B"] = c.capsule.positionB;
+				n["Radius"] =c.capsule.radius;
+			} break;
+
+			case collider_type_aabb:
+			{
+				n["Min corner"] = c.aabb.minCorner;
+				n["Max corner"] = c.aabb.maxCorner;
+			} break;
+
+			case collider_type_obb:
+			{
+				n["Center"] = c.obb.center;
+				n["Radius"] = c.obb.radius;
+				n["Rotation"] = c.obb.rotation;
+			} break;
+
+			case collider_type_hull:
+			{
+			} break;
+			}
+
+			n["Restitution"] = c.material.restitution;
+			n["Friction"] = c.material.friction;
+			n["Density"] = c.material.density;
+			return n;
+		}
+
 		static bool decode(const Node& n, collider_component& c)
 		{
 			if (!n.IsMap())
@@ -674,6 +237,20 @@ namespace YAML
 	template<>
 	struct convert<cloth_component>
 	{
+		static Node encode(const cloth_component& c)
+		{
+			Node n;
+			n["Width"] = c.width;
+			n["Height"] = c.height;
+			n["Grid size x"] = c.gridSizeX;
+			n["Grid size y"] = c.gridSizeY;
+			n["Total mass"] = c.totalMass;
+			n["Stiffness"] = c.stiffness;
+			n["Damping"] = c.damping;
+			n["Gravity factor"] = c.gravityFactor;
+			return n;
+		}
+
 		static bool decode(const Node& n, cloth_component& c)
 		{
 			if (!n.IsMap()) { return false; }
@@ -699,6 +276,14 @@ namespace YAML
 	template<>
 	struct convert<raster_component>
 	{
+		static Node encode(const raster_component& c)
+		{
+			Node n;
+			n["Handle"] = c.mesh->handle;
+			n["Flags"] = c.mesh->flags;
+			return n;
+		}
+
 		static bool decode(const Node& n, raster_component& c)
 		{
 			if (!n.IsMap()) { return false; }
@@ -729,74 +314,67 @@ void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSe
 		scene.savePath = filename;
 	}
 
-	YAML::Emitter out;
-	out << YAML::BeginMap;
+	YAML::Node out;
+	out["Scene"] = "My scene";
+	out["Camera"] = scene.camera;
+	out["Rendering"] = rendererSettings;
+	out["Sun"] = scene.sun;
+	out["Environment"] = (scene.environment ? scene.environment->name : fs::path());
 
-	out << YAML::Key << "Scene" << YAML::Value << "My scene";
-	out << YAML::Key << "Camera" << YAML::Value << scene.camera;
-	out << YAML::Key << "Rendering" << YAML::Value << rendererSettings;
-	out << YAML::Key << "Sun" << YAML::Value << scene.sun;
-	out << YAML::Key << "Environment" << (scene.environment ? scene.environment->name : fs::path());
+	YAML::Node entityNode;
 
-	out << YAML::Key << "Entities"
-		<< YAML::Value
-		<< YAML::BeginSeq;
-
-
-	scene.forEachEntity([&out, &scene](entt::entity entityID)
+	scene.forEachEntity([&entityNode, &scene](entt::entity entityID)
 	{
 		scene_entity entity = { entityID, scene };
 
 		// Only entities with tags are valid top level entities. All others are helpers like colliders and constraints.
 		if (tag_component* tag = entity.getComponentIfExists<tag_component>())
 		{
-			out << YAML::BeginMap;
+			YAML::Node n;
+			n["Tag"] = tag->name;
 
-			out << YAML::Key << "Tag" << YAML::Value << tag->name;
-
-			if (auto* c = entity.getComponentIfExists<transform_component>()) { out << YAML::Key << "Transform" << YAML::Value << *c; }
-			if (auto* c = entity.getComponentIfExists<position_component>()) { out << YAML::Key << "Position" << YAML::Value << *c; }
-			if (auto* c = entity.getComponentIfExists<position_rotation_component>()) { out << YAML::Key << "Position/Rotation" << YAML::Value << *c; }
-			if (entity.hasComponent<dynamic_transform_component>()) { out << YAML::Key << "Dynamic" << YAML::Value << true; }
-			if (auto* c = entity.getComponentIfExists<point_light_component>()) { out << YAML::Key << "Point light" << YAML::Value << *c; }
-			if (auto* c = entity.getComponentIfExists<spot_light_component>()) { out << YAML::Key << "Spot light" << YAML::Value << *c; }
-			if (auto* c = entity.getComponentIfExists<rigid_body_component>()) { out << YAML::Key << "Rigid body" << YAML::Value << *c; }
-			if (auto* c = entity.getComponentIfExists<force_field_component>()) { out << YAML::Key << "Force field" << YAML::Value << *c; }
-			if (auto* c = entity.getComponentIfExists<cloth_component>()) { out << YAML::Key << "Cloth" << YAML::Value << *c; }
-			if (auto* c = entity.getComponentIfExists<raster_component>()) { out << YAML::Key << "Raster" << YAML::Value << *c; }
-			if (auto* c = entity.getComponentIfExists<physics_reference_component>()) 
-			{ 
+			if (auto* c = entity.getComponentIfExists<transform_component>()) { n["Transform"] = *c; }
+			if (auto* c = entity.getComponentIfExists<position_component>()) { n["Position"] = *c; }
+			if (auto* c = entity.getComponentIfExists<position_rotation_component>()) { n["Position/Rotation"] = *c; }
+			if (entity.hasComponent<dynamic_transform_component>()) { n["Dynamic"] = true; }
+			if (auto* c = entity.getComponentIfExists<point_light_component>()) { n["Point light"] = *c; }
+			if (auto* c = entity.getComponentIfExists<spot_light_component>()) { n["Spot light"] = *c; }
+			if (auto* c = entity.getComponentIfExists<rigid_body_component>()) { n["Rigid body"] = *c; }
+			if (auto* c = entity.getComponentIfExists<force_field_component>()) { n["Force field"] = *c; }
+			if (auto* c = entity.getComponentIfExists<cloth_component>()) { n["Cloth"] = *c; }
+			if (auto* c = entity.getComponentIfExists<raster_component>()) { n["Raster"] = *c; }
+			if (auto* c = entity.getComponentIfExists<physics_reference_component>())
+			{
 				if (c->numColliders)
 				{
-					out << YAML::Key << "Colliders" << YAML::Value;
-					out << YAML::BeginSeq;
+					YAML::Node c;
 					for (collider_component& collider : collider_component_iterator(entity))
 					{
-						out << collider;
+						c.push_back(collider);
 					}
-					out << YAML::EndSeq;
+					n["Colliders"] = c;
 				}
 			}
 
 
-			/* 
+			/*
 			TODO:
 				- Animation
 				- Raytrace
 				- Constraints
 			*/
-			out << YAML::EndMap;
+			
+			entityNode.push_back(n);
 		}
 	});
 
-	out << YAML::EndSeq;
+	out["Entities"] = entityNode;
 
-	out << YAML::EndMap;
 
 	fs::create_directories(scene.savePath.parent_path());
 
 	std::ofstream fout(scene.savePath);
-	fout << out.c_str();
+	fout << out;
 
 	LOG_MESSAGE("Scene saved to '%ws'", scene.savePath.c_str());
 }

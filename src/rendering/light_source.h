@@ -2,6 +2,7 @@
 
 #include "core/math.h"
 #include "core/camera.h"
+#include "core/reflect.h"
 
 #include "light_source.hlsli"
 
@@ -9,11 +10,11 @@
 
 struct directional_light
 {
-	vec3 direction;
-	uint32 numShadowCascades;
-
 	vec3 color;
 	float intensity; // Final radiance is color * intensity.
+
+	vec3 direction;
+	uint32 numShadowCascades;
 
 	vec4 cascadeDistances;
 	vec4 bias;
@@ -28,6 +29,17 @@ struct directional_light
 
 	void updateMatrices(const render_camera& camera);
 };
+REFLECT_STRUCT(directional_light,
+	(color, "Color"),
+	(intensity, "Intensity"),
+	(direction, "Direction"),
+	(numShadowCascades, "Cascades"),
+	(cascadeDistances, "Cascade distances"),
+	(bias, "Bias"),
+	(blendDistances, "Blend distances"),
+	(shadowDimensions, "Shadow dimensions"),
+	(stabilize, "Stabilize")
+);
 
 struct point_light_component
 {
@@ -42,6 +54,13 @@ struct point_light_component
 		: color(color), intensity(intensity), radius(radius), castsShadow(castsShadow), shadowMapResolution(shadowMapResolution) {}
 	point_light_component(const point_light_component&) = default;
 };
+REFLECT_STRUCT(point_light_component,
+	(color, "Color"),
+	(intensity, "Intensity"),
+	(radius, "Radius"),
+	(castsShadow, "Casts shadow"),
+	(shadowMapResolution, "Shadow resolution")
+);
 
 struct spot_light_component
 {
@@ -58,6 +77,15 @@ struct spot_light_component
 		: color(color), intensity(intensity), distance(distance), innerAngle(innerAngle), outerAngle(outerAngle), castsShadow(castsShadow), shadowMapResolution(shadowMapResolution) {}
 	spot_light_component(const spot_light_component&) = default;
 };
+REFLECT_STRUCT(spot_light_component,
+	(color, "Color"),
+	(intensity, "Intensity"),
+	(distance, "Distance"),
+	(innerAngle, "Inner angle"),
+	(outerAngle, "Outer angle"),
+	(castsShadow, "Casts shadow"),
+	(shadowMapResolution, "Shadow resolution")
+);
 
 mat4 getSpotLightViewProjectionMatrix(const spot_light_cb& sl);
 

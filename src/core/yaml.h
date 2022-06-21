@@ -7,103 +7,108 @@
 #include "asset.h"
 
 
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const vec2& v)
-{
-	out << YAML::Flow << YAML::BeginSeq << v.x << v.y << YAML::EndSeq;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const vec3& v)
-{
-	out << YAML::Flow << YAML::BeginSeq << v.x << v.y << v.z << YAML::EndSeq;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const vec4& v)
-{
-	out << YAML::Flow << YAML::BeginSeq << v.x << v.y << v.z << v.w << YAML::EndSeq;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const quat& v)
-{
-	out << v.v4;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const mat2& m)
-{
-	out << YAML::Flow << YAML::BeginSeq << m.m00 << m.m01 << m.m10 << m.m11 << YAML::EndSeq;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const mat3& m)
-{
-	out << YAML::Flow << YAML::BeginSeq << m.m00 << m.m01 << m.m02 << m.m10 << m.m11 << m.m12 << m.m20 << m.m21 << m.m22 << YAML::EndSeq;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const mat4& m)
-{
-	out << YAML::Flow << YAML::BeginSeq << m.m00 << m.m01 << m.m02 << m.m03 << m.m10 << m.m11 << m.m12 << m.m13 << m.m20 << m.m21 << m.m22 << m.m23 << m.m30 << m.m31 << m.m32 << m.m33 << YAML::EndSeq;
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, const fs::path& p)
-{
-	out << p.string(); // TODO: This should really output wstrings.
-	return out;
-}
-
-static YAML::Emitter& operator<<(YAML::Emitter& out, asset_handle a)
-{
-	out << a.value;
-	return out;
-}
-
 namespace YAML
 {
 	template<>
 	struct convert<vec2>
 	{
-		static bool decode(const Node& n, vec2& v) { if (!n.IsSequence() || n.size() != 2) return false; v.x = n[0].as<float>(); v.y = n[1].as<float>(); return true; }
+		static Node encode(const vec2& v)
+		{
+			Node n; n.SetStyle(EmitterStyle::Flow); n.push_back(v.x); n.push_back(v.y); return n;
+		}
+
+		static bool decode(const Node& n, vec2& v)
+		{
+			if (!n.IsSequence() || n.size() != 2) { return false; } v.x = n[0].as<float>(); v.y = n[1].as<float>(); return true;
+		}
 	};
 
 	template<>
 	struct convert<vec3>
 	{
-		static bool decode(const Node& n, vec3& v) { if (!n.IsSequence() || n.size() != 3) return false; v.x = n[0].as<float>(); v.y = n[1].as<float>(); v.z = n[2].as<float>(); return true; }
+		static Node encode(const vec3& v)
+		{
+			Node n; n.SetStyle(EmitterStyle::Flow); n.push_back(v.x); n.push_back(v.y); n.push_back(v.z); return n;
+		}
+
+		static bool decode(const Node& n, vec3& v)
+		{
+			if (!n.IsSequence() || n.size() != 3) { return false; } v.x = n[0].as<float>(); v.y = n[1].as<float>(); v.z = n[2].as<float>(); return true;
+		}
 	};
 
 	template<>
 	struct convert<vec4>
 	{
-		static bool decode(const Node& n, vec4& v) { if (!n.IsSequence() || n.size() != 4) return false; v.x = n[0].as<float>(); v.y = n[1].as<float>(); v.z = n[2].as<float>(); v.w = n[3].as<float>(); return true; }
+		static Node encode(const vec4& v)
+		{
+			Node n; n.SetStyle(EmitterStyle::Flow); n.push_back(v.x); n.push_back(v.y); n.push_back(v.z); n.push_back(v.w);  return n;
+		}
+
+		static bool decode(const Node& n, vec4& v)
+		{
+			if (!n.IsSequence() || n.size() != 4) { return false; } v.x = n[0].as<float>(); v.y = n[1].as<float>(); v.z = n[2].as<float>(); v.w = n[3].as<float>(); return true;
+		}
 	};
 
 	template<>
 	struct convert<quat>
 	{
-		static bool decode(const Node& n, quat& v) { return convert<vec4>::decode(n, v.v4); }
+		static Node encode(const quat& v)
+		{
+			Node n; n.SetStyle(EmitterStyle::Flow); n.push_back(v.x); n.push_back(v.y); n.push_back(v.z); n.push_back(v.w);  return n;
+		}
+
+		static bool decode(const Node& n, quat& v)
+		{
+			if (!n.IsSequence() || n.size() != 4) { return false; } v.x = n[0].as<float>(); v.y = n[1].as<float>(); v.z = n[2].as<float>(); v.w = n[3].as<float>(); return true;
+		}
 	};
 
 	template<>
 	struct convert<mat2>
 	{
+		static Node encode(const mat2& m)
+		{
+			Node n;
+			n.SetStyle(EmitterStyle::Flow);
+			n.push_back(m.m00);
+			n.push_back(m.m01);
+			n.push_back(m.m10);
+			n.push_back(m.m11);
+			return n;
+		}
+
 		static bool decode(const Node& n, mat2& m)
-		{ 
-			if (!n.IsSequence() || n.size() != 4) return false; 
-			m.m00 = n[0].as<float>(); 
+		{
+			if (!n.IsSequence() || n.size() != 4) return false;
+			m.m00 = n[0].as<float>();
 			m.m01 = n[1].as<float>();
 			m.m10 = n[2].as<float>();
 			m.m11 = n[3].as<float>();
-			return true; }
+			return true;
+		}
 	};
 
 	template<>
 	struct convert<mat3>
 	{
+		static Node encode(const mat3& m)
+		{
+			Node n;
+			n.SetStyle(EmitterStyle::Flow);
+			n.push_back(m.m00);
+			n.push_back(m.m01);
+			n.push_back(m.m02);
+			n.push_back(m.m10);
+			n.push_back(m.m11);
+			n.push_back(m.m12);
+			n.push_back(m.m20);
+			n.push_back(m.m21);
+			n.push_back(m.m22);
+			return n;
+		}
+
 		static bool decode(const Node& n, mat3& m)
 		{
 			if (!n.IsSequence() || n.size() != 9) return false;
@@ -123,6 +128,29 @@ namespace YAML
 	template<>
 	struct convert<mat4>
 	{
+		static Node encode(const mat4& m)
+		{
+			Node n;
+			n.SetStyle(EmitterStyle::Flow);
+			n.push_back(m.m00);
+			n.push_back(m.m01);
+			n.push_back(m.m02);
+			n.push_back(m.m03);
+			n.push_back(m.m10);
+			n.push_back(m.m11);
+			n.push_back(m.m12);
+			n.push_back(m.m13);
+			n.push_back(m.m20);
+			n.push_back(m.m21);
+			n.push_back(m.m22);
+			n.push_back(m.m23);
+			n.push_back(m.m30);
+			n.push_back(m.m31);
+			n.push_back(m.m32);
+			n.push_back(m.m33);
+			return n;
+		}
+
 		static bool decode(const Node& n, mat4& m)
 		{
 			if (!n.IsSequence() || n.size() != 16) return false;
@@ -149,18 +177,20 @@ namespace YAML
 	template<>
 	struct convert<fs::path>
 	{
+		static Node encode(const fs::path& v) { Node n; n = v.string(); return n; }
 		static bool decode(const Node& n, fs::path& v) { v = n.as<std::string>(); return true; }
 	};
 
 	template<>
 	struct convert<asset_handle>
 	{
+		static Node encode(const asset_handle& v) { Node n; n = v.value; return n; }
 		static bool decode(const Node& n, asset_handle& h) { h.value = n.as<uint64>(); return true; }
 	};
 }
 
 
 #define YAML_LOAD(node, var, name) { auto nc = node[name]; if (nc) { var = nc.as<std::remove_reference_t<decltype(var)>>(); } }
-#define YAML_LOAD_ENUM(node, var, name) { auto nc = node[name]; if (nc) { var = (decltype(var))(nc.as<int>()); } }
+#define YAML_LOAD_ENUM(node, var, name) { auto nc = node[name]; if (nc) { var = (std::remove_reference_t<decltype(var)>)(nc.as<int>()); } }
 
 

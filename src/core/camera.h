@@ -2,6 +2,7 @@
 
 #include "math.h"
 #include "physics/bounding_volumes.h"
+#include "core/reflect.h"
 
 union camera_frustum_corners
 {
@@ -71,15 +72,8 @@ struct render_camera
 
 	camera_type type;
 
-	union
-	{
-		float verticalFOV; // For ingame cameras.
-
-		struct
-		{
-			float fx, fy, cx, cy; // For calibrated cameras.
-		};
-	};
+	float verticalFOV; // For ingame cameras.
+	float fx, fy, cx, cy; // For calibrated cameras.
 
 
 	// Derived values.
@@ -129,6 +123,18 @@ struct render_camera
 
 	render_camera getJitteredVersion(vec2 offset) const;
 };
+REFLECT_STRUCT(render_camera,
+	(rotation, "Rotation"),
+	(position, "Position"),
+	(nearPlane, "Near plane"),
+	(farPlane, "Far plane"),
+	(type, "Type"),
+	(verticalFOV, "Vertical FOV"),
+	(fx, "Fx"),
+	(fy, "Fy"),
+	(cx, "Cx"),
+	(cy, "Cy")
+);
 
 
 camera_frustum_planes getWorldSpaceFrustumPlanes(const mat4& viewProj);

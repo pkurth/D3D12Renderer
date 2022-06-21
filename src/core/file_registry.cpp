@@ -42,22 +42,19 @@ static path_to_handle loadRegistryFromDisk()
 
 static void writeRegistryToDisk()
 {
-	YAML::Emitter out;
-	out << YAML::BeginSeq;
+	YAML::Node out;
 
 	for (const auto& [path, handle] : pathToHandle)
 	{
-		out << YAML::BeginMap;
-		out << YAML::Key << "Handle" << YAML::Value << handle;
-		out << YAML::Key << "Path" << YAML::Value << path;
-		out << YAML::EndMap;
+		YAML::Node n;
+		n["Handle"] = handle;
+		n["Path"] = path;
+		out.push_back(n);
 	}
-
-	out << YAML::EndSeq;
 
 	fs::create_directories(registryPath.parent_path());
 	std::ofstream fout(registryPath);
-	fout << out.c_str();
+	fout << out;
 }
 
 static void readDirectory(const fs::path& path, const path_to_handle& loadedRegistry)

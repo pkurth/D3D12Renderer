@@ -7,6 +7,7 @@
 #include "render_pass.h"
 #include "material.h"
 #include "light_source.h"
+#include "core/reflect.h"
 
 #define MAX_NUM_TOTAL_DECALS 256   // Total per frame (not per tile). MUST MATCH light_culling_rs.hlsli
 
@@ -27,17 +28,31 @@ struct ssr_settings
 	float minStride = 5.f;
 	float maxStride = 30.f;
 };
+REFLECT_STRUCT(ssr_settings,
+	(numSteps, "Num steps"),
+	(maxDistance, "Max distance"),
+	(strideCutoff, "Stride cutoff"),
+	(minStride, "Min stride"),
+	(maxStride, "Max stride")
+);
 
 struct taa_settings
 {
 	float cameraJitterStrength = 1.f;
 };
+REFLECT_STRUCT(taa_settings,
+	(cameraJitterStrength, "Camera jitter strength")
+);
 
 struct bloom_settings
 {
 	float threshold = 100.f;
 	float strength = 0.1f;
 };
+REFLECT_STRUCT(bloom_settings,
+	(threshold, "Threshold"),
+	(strength, "Strength")
+);
 
 struct hbao_settings
 {
@@ -46,11 +61,20 @@ struct hbao_settings
 	uint32 maxNumStepsPerRay = 10;
 	float strength = 1.f;
 };
+REFLECT_STRUCT(hbao_settings,
+	(radius, "Threshold"),
+	(numRays, "Num rays"),
+	(maxNumStepsPerRay, "Max num steps per ray"),
+	(strength, "Strength")
+);
 
 struct sharpen_settings
 {
 	float strength = 0.5f;
 };
+REFLECT_STRUCT(sharpen_settings,
+	(strength, "Strength")
+);
 
 struct sss_settings
 {
@@ -61,6 +85,14 @@ struct sss_settings
 	float distanceFadeoutRange = 2.f; // In meters.
 	float borderFadeout = 0.1f; // In UV-space.
 };
+REFLECT_STRUCT(sss_settings,
+	(numSteps, "Num steps"),
+	(rayDistance, "Ray distance"),
+	(thickness, "Thickness"),
+	(maxDistanceFromCamera, "Max distance from camera"),
+	(distanceFadeoutRange, "Distance fadeout range"),
+	(borderFadeout, "Border fadeout")
+);
 
 struct tonemap_settings
 {
@@ -86,6 +118,16 @@ struct tonemap_settings
 		return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - (E / F);
 	}
 };
+REFLECT_STRUCT(tonemap_settings,
+	(A),
+	(B),
+	(C),
+	(D),
+	(E),
+	(F),
+	(linearWhite, "Linear white"),
+	(exposure, "Exposure")
+);
 
 struct light_culling
 {

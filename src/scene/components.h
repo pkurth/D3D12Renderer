@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/math.h"
+#include "core/reflect.h"
 
 struct tag_component
 {
@@ -20,6 +21,11 @@ struct transform_component : trs
 	transform_component(vec3 position, quat rotation, vec3 scale = vec3(1.f, 1.f, 1.f)) : trs(position, rotation, scale) {}
 	transform_component& operator=(const trs& t) { trs::operator=(t); return *this; }
 };
+REFLECT_STRUCT(transform_component,
+	(position, "Position"),
+	(rotation, "Rotation"),
+	(scale, "Scale")
+);
 
 struct dynamic_transform_component : trs
 {
@@ -33,9 +39,16 @@ struct position_component
 {
 	vec3 position;
 };
+REFLECT_STRUCT(position_component,
+	(position, "Position")
+);
 
 struct position_rotation_component
 {
 	vec3 position;
 	quat rotation;
 };
+REFLECT_STRUCT(position_rotation_component,
+	(position, "Position"),
+	(rotation, "Rotation")
+);
