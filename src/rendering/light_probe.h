@@ -16,7 +16,7 @@ struct light_probe_grid
 	uint32 numNodesX;
 	uint32 numNodesY;
 	uint32 numNodesZ;
-	uint32 totalNumNodes;
+	uint32 totalNumNodes = 0;
 
 	ref<dx_texture> irradiance;
 	ref<dx_texture> depth;

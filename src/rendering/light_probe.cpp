@@ -345,7 +345,7 @@ PIPELINE_RENDER_IMPL(test_sample_pipeline)
 
 void light_probe_grid::visualize(opaque_render_pass* renderPass, const ref<pbr_environment>& environment)
 {
-	if (!dxContext.featureSupport.raytracing())
+	if (!dxContext.featureSupport.raytracing() || totalNumNodes == 0)
 	{
 		return;
 	}
@@ -386,7 +386,7 @@ void light_probe_grid::visualize(opaque_render_pass* renderPass, const ref<pbr_e
 
 void light_probe_grid::updateProbes(dx_command_list* cl, const raytracing_tlas& lightProbeTlas, const ref<dx_texture>& sky, dx_dynamic_constant_buffer sunCBV) const
 {
-	if (!dxContext.featureSupport.raytracing())
+	if (!dxContext.featureSupport.raytracing() || totalNumNodes == 0)
 	{
 		return;
 	}
@@ -440,7 +440,7 @@ void light_probe_tracer::initialize()
 
 void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas, const light_probe_grid& grid, const ref<dx_texture>& sky, dx_dynamic_constant_buffer sunCBV)
 {
-	if (!tlas.tlas)
+	if (!tlas.tlas || grid.totalNumNodes == 0)
 	{
 		return;
 	}
