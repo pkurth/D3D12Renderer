@@ -518,13 +518,7 @@ void application::submitRendererParams(uint32 numSpotLightShadowPasses, uint32 n
 		main_renderer::submitShadowRenderPass(&pointShadowRenderPasses[i]);
 	}
 
-	main_renderer::setRaytracingScene(&raytracingTLAS);
 	main_renderer::raytraceLightProbes(lightProbeGrid);
-	main_renderer::setEnvironment(scene.environment);
-	main_renderer::setSun(scene.sun);
-
-
-	renderer->setCamera(scene.camera);
 }
 
 void application::update(const user_input& input, float dt)
@@ -580,6 +574,13 @@ void application::update(const user_input& input, float dt)
 
 		main_renderer::setRaytracingScene(&raytracingTLAS);
 	}
+
+
+
+	main_renderer::setRaytracingScene(&raytracingTLAS);
+	main_renderer::setEnvironment(scene.environment);
+	main_renderer::setSun(scene.sun);
+	renderer->setCamera(scene.camera);
 
 
 	if (renderer->mode != renderer_mode_pathtraced)
