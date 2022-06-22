@@ -272,8 +272,9 @@ static float3 calculateIndirectLighting(inout uint randSeed, surface_info surfac
 [shader("closesthit")]
 void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-	//uint3 tri = load3x32BitIndices(meshIndices);
-	uint3 tri = load3x16BitIndices(meshIndices);
+	uint flags = material.getFlags();
+
+	uint3 tri = (flags & USE_32_BIT_INDICES) ? load3x32BitIndices(meshIndices) : load3x16BitIndices(meshIndices);
 
 	// Interpolate vertex attributes over triangle.
 	float2 uvs[] = { meshVertices[tri.x].uv, meshVertices[tri.y].uv, meshVertices[tri.z].uv };
@@ -294,7 +295,6 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	if (constants.useRealMaterials)
 	{
 		uint mipLevel = 0;
-		uint flags = material.getFlags();
 
 		surface.albedo = (((flags & USE_ALBEDO_TEXTURE)
 			? albedoTex.SampleLevel(wrapSampler, uv, mipLevel)

@@ -101,6 +101,7 @@ struct texture_atlas_cb
 #define USE_ROUGHNESS_TEXTURE		(1 << 2)
 #define USE_METALLIC_TEXTURE		(1 << 3)
 #define USE_AO_TEXTURE				(1 << 4)
+#define USE_32_BIT_INDICES			(1 << 5) // Ugly to put this in the material. Only used in the ray tracing shaders.
 
 struct pbr_material_cb // 24 bytes.
 {

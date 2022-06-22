@@ -91,6 +91,11 @@ raytracing_object_type pbr_raytracer::defineObjectType(const ref<raytracing_blas
         pushTexture(material->roughness, flags, USE_ROUGHNESS_TEXTURE);
         pushTexture(material->metallic, flags, USE_METALLIC_TEXTURE);
 
+        if (blas->geometries[i].indexBuffer->elementSize == 4)
+        {
+            flags |= USE_32_BIT_INDICES;
+        }
+
         hitData[0].materialCB.initialize(
             material->albedoTint,
             material->emission.xyz,

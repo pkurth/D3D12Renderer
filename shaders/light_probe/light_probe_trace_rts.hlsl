@@ -161,8 +161,9 @@ void rayGen()
 [shader("closesthit")]
 void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-	//uint3 tri = load3x32BitIndices(meshIndices);
-	uint3 tri = load3x16BitIndices(meshIndices);
+	uint flags = material.getFlags();
+
+	uint3 tri = (flags & USE_32_BIT_INDICES) ? load3x32BitIndices(meshIndices) : load3x16BitIndices(meshIndices);
 
 	// Interpolate vertex attributes over triangle.
 	float2 uvs[] = { meshVertices[tri.x].uv, meshVertices[tri.y].uv, meshVertices[tri.z].uv };
@@ -176,7 +177,6 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	surface.P = hitWorldPosition();
 
 	uint mipLevel = 3;
-	uint flags = material.getFlags();
 
 	surface.albedo = (((flags & USE_ALBEDO_TEXTURE)
 		? albedoTex.SampleLevel(linearSampler, uv, mipLevel)
