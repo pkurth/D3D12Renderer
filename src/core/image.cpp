@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "image.h"
 #include "log.h"
+#include "memory.h"
 
 #define NANOSVG_IMPLEMENTATION
 #include <nanosvg/nanosvg.h>
@@ -138,7 +139,7 @@ static void postProcessImage(DirectX::ScratchImage& scratchImage, DirectX::TexMe
 
 	scratchImage.OverrideFormat(metadata.format);
 
-	if (flags & image_load_flags_gen_mips_on_cpu)
+	if (flags & image_load_flags_gen_mips_on_cpu && !DirectX::IsCompressed(metadata.format))
 	{
 		DirectX::ScratchImage mipchainImage;
 
@@ -148,7 +149,7 @@ static void postProcessImage(DirectX::ScratchImage& scratchImage, DirectX::TexMe
 	}
 	else
 	{
-		metadata.mipLevels = 1;
+		metadata.mipLevels = max(1u, (uint32)metadata.mipLevels);
 	}
 
 	if (flags & image_load_flags_premultiply_alpha)
@@ -160,42 +161,58 @@ static void postProcessImage(DirectX::ScratchImage& scratchImage, DirectX::TexMe
 		metadata = scratchImage.GetMetadata();
 	}
 
-	if (flags & image_load_flags_compress)
+	if (DirectX::IsCompressed(metadata.format) && metadata.width == 1 && metadata.height == 1)
+	{
+		assert(metadata.mipLevels == 1);
+		assert(scratchImage.GetImageCount() == 1);
+
+		DirectX::TexMetadata scaledMetadata = metadata;
+		scaledMetadata.width = 4;
+		scaledMetadata.height = 4;
+		scaledMetadata.mipLevels = 1;
+
+		DirectX::ScratchImage scaledImage;
+		checkResult(scaledImage.Initialize(scaledMetadata));
+
+		memcpy(scaledImage.GetImage(0, 0, 0)->pixels, scratchImage.GetImage(0, 0, 0)->pixels, scratchImage.GetPixelsSize());
+
+		scratchImage = std::move(scaledImage);
+		metadata = scratchImage.GetMetadata();
+	}
+
+	if (flags & image_load_flags_compress && !DirectX::IsCompressed(metadata.format))
 	{
 		if (metadata.width % 4 == 0 && metadata.height % 4 == 0)
 		{
-			if (!DirectX::IsCompressed(metadata.format))
+			uint32 numChannels = getNumberOfChannels(metadata.format);
+
+			DXGI_FORMAT compressedFormat;
+
+			switch (numChannels)
 			{
-				uint32 numChannels = getNumberOfChannels(metadata.format);
+				case 1: compressedFormat = DXGI_FORMAT_BC4_UNORM; break;
+				case 2: compressedFormat = DXGI_FORMAT_BC5_UNORM; break;
 
-				DXGI_FORMAT compressedFormat;
-
-				switch (numChannels)
+				case 3:
+				case 4:
 				{
-					case 1: compressedFormat = DXGI_FORMAT_BC4_UNORM; break;
-					case 2: compressedFormat = DXGI_FORMAT_BC5_UNORM; break;
-
-					case 3:
-					case 4:
+					if (scratchImage.IsAlphaAllOpaque())
 					{
-						if (scratchImage.IsAlphaAllOpaque())
-						{
-							compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
-						}
-						else
-						{
-							compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;  // 7 would be better, but takes forever to compress.
-						}
-					} break;
-				}
-
-				DirectX::ScratchImage compressedImage;
-
-				checkResult(DirectX::Compress(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata,
-					compressedFormat, DirectX::TEX_COMPRESS_PARALLEL, DirectX::TEX_THRESHOLD_DEFAULT, compressedImage));
-				scratchImage = std::move(compressedImage);
-				metadata = scratchImage.GetMetadata();
+						compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
+					}
+					else
+					{
+						compressedFormat = DirectX::IsSRGB(metadata.format) ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;  // 7 would be better, but takes forever to compress.
+					}
+				} break;
 			}
+
+			DirectX::ScratchImage compressedImage;
+
+			checkResult(DirectX::Compress(scratchImage.GetImages(), scratchImage.GetImageCount(), metadata,
+				compressedFormat, DirectX::TEX_COMPRESS_PARALLEL, DirectX::TEX_THRESHOLD_DEFAULT, compressedImage));
+			scratchImage = std::move(compressedImage);
+			metadata = scratchImage.GetMetadata();
 		}
 		else
 		{
