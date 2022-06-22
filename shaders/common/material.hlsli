@@ -96,11 +96,12 @@ struct texture_atlas_cb
 
 
 
-#define USE_ALBEDO_TEXTURE		(1 << 0)
-#define USE_NORMAL_TEXTURE		(1 << 1)
-#define USE_ROUGHNESS_TEXTURE	(1 << 2)
-#define USE_METALLIC_TEXTURE	(1 << 3)
-#define USE_AO_TEXTURE			(1 << 4)
+#define USE_ALBEDO_TEXTURE			(1 << 0)
+#define USE_NORMAL_TEXTURE			(1 << 1)
+#define USE_ROUGHNESS_TEXTURE		(1 << 2)
+#define USE_METALLIC_TEXTURE		(1 << 3)
+#define USE_AO_TEXTURE				(1 << 4)
+#define NORMAL_TEXTURE_2_CHANNELS	(1 << 5)
 
 struct pbr_material_cb // 24 bytes.
 {

@@ -58,4 +58,17 @@ static float3 unpackNormal(float2 enc)
 
 #endif
 
+
+static float3 sampleNormalMap(Texture2D<float3> normalMap, SamplerState s, float2 uv, bool twoChannels = false)
+{
+    float3 N = normalMap.Sample(s, uv).xyz * 2.f - 1.f;
+
+    if (twoChannels)
+    {
+        N.z = sqrt(1.f - dot(N.xy, N.xy));
+    }
+
+    return N;
+}
+
 #endif

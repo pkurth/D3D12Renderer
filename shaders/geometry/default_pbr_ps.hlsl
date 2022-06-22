@@ -85,7 +85,7 @@ ps_output main(ps_input IN)
 
 	const float normalMapStrength = material.getNormalMapStrength() * 0.2f;
 	surface.N = (flags & USE_NORMAL_TEXTURE)
-		? mul(float3(normalMapStrength, normalMapStrength, 1.f) * (normalTex.Sample(wrapSampler, materialUV).xyz * 2.f - 1.f), IN.tbn)
+		? mul(float3(normalMapStrength, normalMapStrength, 1.f) * sampleNormalMap(normalTex, wrapSampler, materialUV, flags & NORMAL_TEXTURE_2_CHANNELS), IN.tbn)
 		: IN.tbn[2];
 	surface.N = normalize(surface.N);
 	if (material.doubleSided() && !IN.isFrontFace)
