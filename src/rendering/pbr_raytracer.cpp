@@ -90,10 +90,6 @@ raytracing_object_type pbr_raytracer::defineObjectType(const ref<raytracing_blas
         pushTexture(material->normal, flags, USE_NORMAL_TEXTURE);
         pushTexture(material->roughness, flags, USE_ROUGHNESS_TEXTURE);
         pushTexture(material->metallic, flags, USE_METALLIC_TEXTURE);
-        if (material->normal && getNumberOfChannels(material->normal->format) == 2)
-        {
-            flags |= NORMAL_TEXTURE_2_CHANNELS;
-        }
 
         hitData[0].materialCB.initialize(
             material->albedoTint,

@@ -237,11 +237,6 @@ static void renderPBRCommon(dx_command_list* cl, const mat4& viewProj, const def
 	{
 		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 1, mat->normal);
 		flags |= USE_NORMAL_TEXTURE;
-
-		if (getNumberOfChannels(mat->normal->format) == 2)
-		{
-			flags |= NORMAL_TEXTURE_2_CHANNELS;
-		}
 	}
 	if (mat->roughness)
 	{
