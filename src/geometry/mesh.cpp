@@ -32,21 +32,22 @@ static ref<composite_mesh> loadMeshFromFileInternal(asset_handle handle, const f
 {
 	Assimp::Importer importer;
 
-	const aiScene* scene = loadAssimpSceneFile(sceneFilename, importer, !(flags & mesh_creation_flags_with_skin)); // Currently, Assimp fails to split skinned meshes: https://github.com/assimp/assimp/issues/3576
+	bool allow16BitIndices = !(flags & mesh_creation_flags_with_skin); // Currently, Assimp fails to split skinned meshes: https://github.com/assimp/assimp/issues/3576
+	const aiScene* scene = loadAssimpSceneFile(sceneFilename, importer, allow16BitIndices);
 
 	if (!scene)
 	{
 		return 0;
 	}
 
-	mesh_index_type indexType = mesh_index_uint16;
-	for (uint32 m = 0; m < scene->mNumMeshes; ++m)
+	mesh_index_type indexType = allow16BitIndices ? mesh_index_uint16 : mesh_index_uint32;
+
+	if (indexType == mesh_index_uint16)
 	{
-		aiMesh* mesh = scene->mMeshes[m];
-		if (mesh->mNumVertices > UINT16_MAX)
+		for (uint32 m = 0; m < scene->mNumMeshes; ++m)
 		{
-			indexType = mesh_index_uint32;
-			break;
+			aiMesh* mesh = scene->mMeshes[m];
+			assert(mesh->mNumVertices <= UINT16_MAX);
 		}
 	}
 
