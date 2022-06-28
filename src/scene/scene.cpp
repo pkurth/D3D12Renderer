@@ -2,6 +2,8 @@
 #include "scene.h"
 #include "physics/physics.h"
 #include "physics/collision_broad.h"
+#include "rendering/raytracing.h"
+
 
 game_scene::game_scene()
 {
@@ -23,6 +25,41 @@ void game_scene::clearAll()
 
 	deleteAllConstraints(*this);
 	registry.clear();
+}
+
+void game_scene::cloneTo(game_scene& target)
+{
+	target.registry.assign(registry.data(), registry.data() + registry.size(), registry.released());
+
+#if 1
+	copyComponentPoolsTo <
+		tag_component,
+		transform_component,
+		dynamic_transform_component,
+		position_component,
+		position_rotation_component,
+#ifndef PHYSICS_ONLY
+		point_light_component,
+		spot_light_component,
+#endif
+		collider_component,
+		rigid_body_component,
+		force_field_component,
+		cloth_component,
+		physics_reference_component,
+		sap_endpoint_indirection_component,
+		animation_component,
+		raster_component,
+		raytrace_component,
+
+		distance_constraint,
+		ball_constraint,
+		fixed_constraint,
+		hinge_constraint,
+		cone_twist_constraint,
+		slider_constraint
+	> (target);
+#endif
 }
 
 scene_entity game_scene::copyEntity(scene_entity src)

@@ -18,11 +18,6 @@
 #include "audio/audio.h"
 
 
-struct raytrace_component
-{
-	raytracing_object_type type;
-};
-
 static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh)
 {
 	if (dxContext.featureSupport.raytracing())

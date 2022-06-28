@@ -25,7 +25,7 @@ struct sap_context
 
 void addColliderToBroadphase(scene_entity entity)
 {
-	sap_context& context = entity.registry->ctx_or_set<sap_context>();
+	sap_context& context = createOrGetContextVariable<sap_context>(*entity.registry);
 
 	sap_endpoint_indirection_component endpointIndirection;
 
@@ -62,7 +62,7 @@ void removeColliderFromBroadphase(scene_entity entity)
 {
 	sap_endpoint_indirection_component& endpointIndirection = entity.getComponent<sap_endpoint_indirection_component>();
 
-	sap_context& context = entity.registry->ctx<sap_context>();
+	sap_context& context = getContextVariable<sap_context>(*entity.registry);
 
 	removeEndpoint(endpointIndirection.startEndpoint, *entity.registry, context);
 	removeEndpoint(endpointIndirection.endEndpoint, *entity.registry, context);
@@ -75,7 +75,8 @@ void removeColliderFromBroadphase(scene_entity entity)
 
 void clearBroadphase(game_scene& scene)
 {
-	if (sap_context* context = scene.registry.try_ctx<sap_context>())
+	auto c = scene.registry.ctx();
+	if (sap_context* context = c.find<sap_context>())
 	{
 		context->endpoints.clear();
 		context->sortingAxis = 0;

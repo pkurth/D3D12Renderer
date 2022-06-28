@@ -93,7 +93,7 @@ static void addConstraintEdge(scene_entity& e, constraint_entity_reference_compo
 
 	physics_reference_component& reference = e.getComponent<physics_reference_component>();
 
-	constraint_context& context = e.registry->ctx_or_set<constraint_context>();
+	constraint_context& context = createOrGetContextVariable<constraint_context>(*e.registry);
 
 	constraint_edge& edge = context.getFreeConstraintEdge();
 	uint16 edgeIndex = (uint16)(&edge - context.constraintEdges.data());
@@ -398,7 +398,7 @@ static void deleteConstraint(entt::registry* registry, entt::entity constraintEn
 	scene_entity parentEntityA = { constraint.entityA, registry };
 	scene_entity parentEntityB = { constraint.entityB, registry };
 
-	constraint_context& context = registry->ctx<constraint_context>();
+	constraint_context& context = getContextVariable<constraint_context>(*registry);
 
 	constraint_edge& edgeA = context.constraintEdges[constraint.edgeA];
 	constraint_edge& edgeB = context.constraintEdges[constraint.edgeB];
@@ -442,7 +442,7 @@ void deleteConstraint(game_scene& scene, slider_constraint_handle handle)
 void deleteAllConstraintsFromEntity(scene_entity& entity)
 {
 	entt::registry* registry = entity.registry;
-	if (constraint_context* context = registry->try_ctx<constraint_context>())
+	if (constraint_context* context = tryGetContextVariable<constraint_context>(*registry))
 	{
 		if (physics_reference_component* ref = entity.getComponentIfExists<physics_reference_component>())
 		{
@@ -459,14 +459,14 @@ void deleteAllConstraintsFromEntity(scene_entity& entity)
 
 constraint_entity_iterator::iterator& constraint_entity_iterator::iterator::operator++()
 {
-	constraint_context& context = registry->ctx<constraint_context>();
+	constraint_context& context = getContextVariable<constraint_context>(*registry);
 	constraintEdgeIndex = context.constraintEdges[constraintEdgeIndex].nextConstraintEdge;
 	return *this;
 }
 
 std::pair<scene_entity, constraint_type> constraint_entity_iterator::iterator::operator*()
 {
-	constraint_context& context = registry->ctx<constraint_context>();
+	constraint_context& context = getContextVariable<constraint_context>(*registry);
 	return { { context.constraintEdges[constraintEdgeIndex].constraintEntity, registry }, context.constraintEdges[constraintEdgeIndex].type };
 }
 

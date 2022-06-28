@@ -59,6 +59,11 @@ struct raytracing_object_type
 	uint32 instanceContributionToHitGroupIndex;
 };
 
+struct raytrace_component
+{
+	raytracing_object_type type;
+};
+
 
 struct raytracing_shader
 {

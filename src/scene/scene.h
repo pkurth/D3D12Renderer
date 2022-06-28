@@ -2,6 +2,7 @@
 
 //#define ENTT_ID_TYPE uint64
 //#include <entt/entt.hpp>
+#include <entt/entity/entity.hpp>
 #include <entt/entity/registry.hpp>
 #include <entt/entity/helper.hpp>
 #include "components.h"
@@ -12,6 +13,7 @@
 #endif
 
 struct game_scene;
+
 
 struct scene_entity
 {
@@ -123,16 +125,8 @@ struct scene_entity
 	template <typename component_t>
 	uint32 getComponentIndex() const
 	{
-		auto pool = registry->pool_if_exists<component_t>();
-		assert(pool);
-		return (uint32)pool->index(handle);
-	}
-
-	template <typename component_t>
-	uint32 getComponentIndexIfExists() const
-	{
-		auto pool = registry->pool_if_exists<component_t>();
-		return (pool && pool->contains(handle)) ? (uint32)pool->index(handle) : (uint32)-1;
+		auto& s = registry->storage<component_t>();
+		return (uint32)s.index(handle);
 	}
 
 	template <typename component_t>
@@ -169,6 +163,46 @@ struct scene_entity
 	entt::entity handle = entt::null;
 	entt::registry* registry;
 };
+
+template <typename context_t, typename... args>
+inline context_t& createOrGetContextVariable(entt::registry& registry, args&&... a)
+{
+	auto& c = registry.ctx();
+	context_t* context = c.find<context_t>();
+	if (!context)
+	{
+		context = &c.emplace<context_t>(std::forward<args>(a)...);
+	}
+	return *context;
+}
+
+template <typename context_t>
+inline context_t& getContextVariable(entt::registry& registry)
+{
+	auto& c = registry.ctx();
+	return *c.find<context_t>();
+}
+
+template <typename context_t>
+inline context_t* tryGetContextVariable(entt::registry& registry)
+{
+	auto& c = registry.ctx();
+	return c.find<context_t>();
+}
+
+template <typename context_t>
+inline bool doesContextVariableExist(entt::registry& registry)
+{
+	auto& c = registry.ctx();
+	return c.contains<context_t>();
+}
+
+template <typename context_t>
+inline void deleteContextVariable(entt::registry& registry)
+{
+	auto& c = registry.ctx();
+	c.erase<context_t>();
+}
 
 struct game_scene
 {
@@ -237,7 +271,8 @@ struct game_scene
 	template <typename component_t>
 	auto raw()
 	{
-		component_t** r = registry.view<component_t>().raw();
+		auto& s = registry.storage<component_t>();
+		component_t** r = s.raw();
 		return r ? *r : 0;
 	}
 
@@ -250,15 +285,15 @@ struct game_scene
 	template <typename component_t>
 	uint32 numberOfComponentsOfType()
 	{
-		return (uint32)registry.size<component_t>();
+		auto v = view<component_t>();
+		return (uint32)v.size();
 	}
 
 	template <typename component_t>
 	component_t& getComponentAtIndex(uint32 index)
 	{
-		auto pool = registry.pool_if_exists<component_t>();
-		assert(pool);
-		return pool->element_at(index);
+		auto& s = registry.storage<component_t>();
+		return s.element_at(index);
 	}
 
 	template <typename component_t>
@@ -270,26 +305,42 @@ struct game_scene
 	template <typename context_t, typename... args>
 	context_t& createOrGetContextVariable(args&&... a)
 	{
-		return registry.ctx_or_set<context_t>(std::forward<args>(a)...);
+		return ::createOrGetContextVariable<context_t, args...>(registry, std::forward<args>(a)...);
 	}
 
 	template <typename context_t>
 	context_t& getContextVariable()
 	{
-		return registry.ctx<context_t>();
+		return ::getContextVariable<context_t>(registry);
 	}
 
 	template <typename context_t>
 	bool doesContextVariableExist()
 	{
-		return registry.try_ctx<context_t>() != 0;
+		return ::doesContextVariableExist<context_t>(registry);
 	}
 
 	template <typename context_t>
 	void deleteContextVariable()
 	{
-		registry.unset<context_t>();
+		return ::deleteContextVariable<context_t>(registry);
 	}
+
+	template <typename component_t>
+	void copyComponentPoolTo(game_scene& target)
+	{
+		auto v = view<component_t>();
+		auto& s = registry.storage<component_t>();
+		target.registry.insert(v.begin(), v.end(), s.begin());
+	}
+
+	template <typename... component_t>
+	void copyComponentPoolsTo(game_scene& target)
+	{
+		(copyComponentPoolTo<component_t>(target),...);
+	}
+
+	void cloneTo(game_scene& target);
 
 	entt::registry registry;
 
