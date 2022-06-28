@@ -32,7 +32,7 @@ static ref<composite_mesh> loadMeshFromFileInternal(asset_handle handle, const f
 {
 	Assimp::Importer importer;
 
-	const aiScene* scene = loadAssimpSceneFile(sceneFilename, importer);
+	const aiScene* scene = loadAssimpSceneFile(sceneFilename, importer, !(flags & mesh_creation_flags_with_skin)); // Currently, Assimp fails to split skinned meshes: https://github.com/assimp/assimp/issues/3576
 
 	if (!scene)
 	{
@@ -43,7 +43,7 @@ static ref<composite_mesh> loadMeshFromFileInternal(asset_handle handle, const f
 	for (uint32 m = 0; m < scene->mNumMeshes; ++m)
 	{
 		aiMesh* mesh = scene->mMeshes[m];
-		if (mesh->mNumVertices >= UINT16_MAX)
+		if (mesh->mNumVertices > UINT16_MAX)
 		{
 			indexType = mesh_index_uint32;
 			break;

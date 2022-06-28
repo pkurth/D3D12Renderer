@@ -22,7 +22,7 @@ struct assimp_logger : public Assimp::LogStream
 	}
 };
 
-const aiScene* loadAssimpSceneFile(const fs::path& filepath, Assimp::Importer& importer)
+const aiScene* loadAssimpSceneFile(const fs::path& filepath, Assimp::Importer& importer, bool allow16BitIndices)
 {
 #if 0
 	if (Assimp::DefaultLogger::isNullLogger())
@@ -79,7 +79,10 @@ const aiScene* loadAssimpSceneFile(const fs::path& filepath, Assimp::Importer& i
 #endif
 		std::cout << '\n';
 
-		//importer.SetPropertyInteger(AI_CONFIG_PP_SLM_VERTEX_LIMIT, UINT16_MAX); // So that we can use 16 bit indices.
+		if (allow16BitIndices)
+		{
+			importer.SetPropertyInteger(AI_CONFIG_PP_SLM_VERTEX_LIMIT, UINT16_MAX);
+		}
 
 		uint32 importFlags = aiProcessPreset_TargetRealtime_MaxQuality | aiProcess_OptimizeGraph | aiProcess_FlipUVs;
 		uint32 exportFlags = 0;

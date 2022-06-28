@@ -66,9 +66,11 @@ uint32 allocateBoundingHullGeometry(const std::string& meshFilepath)
 		return INVALID_BOUNDING_HULL_INDEX;
 	}
 
+	assert(scene->mNumMeshes == 1);
+	assert(scene->mMeshes[0]->mNumVertices <= UINT16_MAX);
+
 	mesh_builder builder(mesh_creation_flags_with_positions);
 
-	assert(scene->mNumMeshes == 1);
 	builder.pushAssimpMesh(scene->mMeshes[0], 1.f);
 
 
