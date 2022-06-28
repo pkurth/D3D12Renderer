@@ -7,8 +7,8 @@
    viewBox="0 0 67.630486 67.63051"
    version="1.1"
    id="svg5"
-   inkscape:version="1.1 (c68e22c387, 2021-05-23)"
-   sodipodi:docname="icons.svg"
+   inkscape:version="1.1.1 (3bf5ae0d25, 2021-09-20)"
+   sodipodi:docname="icons_ui.svg"
    inkscape:export-filename="C:\Users\philipp\Documents\Projects\LGDV\D3D12Renderer\assets\icons\icons.png"
    inkscape:export-xdpi="50.980968"
    inkscape:export-ydpi="50.980968"
@@ -26,15 +26,15 @@
      inkscape:pagecheckerboard="0"
      inkscape:document-units="mm"
      showgrid="false"
-     inkscape:zoom="5.6568544"
-     inkscape:cx="105.62407"
-     inkscape:cy="63.904774"
+     inkscape:zoom="2.8284271"
+     inkscape:cx="29.168155"
+     inkscape:cy="133.46641"
      inkscape:window-width="2560"
      inkscape:window-height="1377"
-     inkscape:window-x="-8"
+     inkscape:window-x="2552"
      inkscape:window-y="-8"
      inkscape:window-maximized="1"
-     inkscape:current-layer="g10679"
+     inkscape:current-layer="g10569"
      fit-margin-top="0"
      fit-margin-left="0"
      fit-margin-right="0"
@@ -974,6 +974,50 @@
          height="8.064497"
          x="-132.15019"
          y="184.2198" />
+      <path
+         sodipodi:type="star"
+         style="fill:#ebffff;fill-opacity:1;stroke:none;stroke-width:0.00724341;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:0.0144868, 0.00724341;stroke-dashoffset:0;stroke-opacity:1;paint-order:stroke markers fill"
+         id="path1181"
+         inkscape:flatsided="true"
+         sodipodi:sides="3"
+         sodipodi:cx="75.75"
+         sodipodi:cy="74.5"
+         sodipodi:r1="32.03904"
+         sodipodi:r2="16.01952"
+         sodipodi:arg1="-2.0943951"
+         sodipodi:arg2="-1.0471976"
+         inkscape:rounded="0"
+         inkscape:randomized="0"
+         d="M 59.73048,46.753378 107.78904,74.5 59.73048,102.24662 Z"
+         transform="matrix(0.35862906,0,0,0.40571931,-87.300678,150.77036)"
+         inkscape:transform-center-x="-1.5359549"
+         inkscape:transform-center-y="-5.0111038e-06" />
+      <g
+         id="g1597"
+         transform="matrix(0.90246803,0,0,0.90246803,-68.718902,48.912193)"
+         style="fill:#ebffff;fill-opacity:1;stroke:none;stroke-width:0;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1">
+        <rect
+           style="fill:#ebffff;fill-opacity:1;stroke:none;stroke-width:0;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:stroke markers fill"
+           id="rect1365"
+           width="3.5874565"
+           height="25.112196"
+           x="-64.548622"
+           y="168.80624" />
+        <rect
+           style="fill:#ebffff;fill-opacity:1;stroke:none;stroke-width:0;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:stroke markers fill"
+           id="rect1365-1"
+           width="3.5874565"
+           height="25.112196"
+           x="-53.662544"
+           y="168.80624" />
+      </g>
+      <rect
+         style="fill:#ebffff;fill-opacity:1;stroke:none;stroke-width:0;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:stroke markers fill"
+         id="rect1645"
+         width="22.613089"
+         height="22.613089"
+         x="-36.979046"
+         y="169.6899" />
     </g>
   </g>
 </svg>

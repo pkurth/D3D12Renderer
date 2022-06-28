@@ -23,6 +23,9 @@ enum imgui_icon
 	imgui_icon_rotate,
 	imgui_icon_scale,
 	imgui_icon_cross,
+	imgui_icon_play,
+	imgui_icon_stop,
+	imgui_icon_pause,
 };
 
 static const char* imguiIconNames[] =
@@ -33,10 +36,16 @@ static const char* imguiIconNames[] =
 	"Rotate (E)",
 	"Scale (R)",
 	"No gizmo (Q)",
+	"Play",
+	"Stop",
+	"Pause",
 };
 
 #define IMGUI_ICON_COLS 4
 #define IMGUI_ICON_ROWS 4
+
+#define IMGUI_ICON_DEFAULT_SIZE 35
+#define IMGUI_ICON_DEFAULT_SPACING 3.f
 
 namespace ImGui
 {

@@ -44,5 +44,14 @@ private:
 
 	system_info systemInfo;
 
+	enum simulation_mode
+	{
+		simulation_mode_playing,
+		simulation_mode_paused,
+		simulation_mode_stopped,
+	};
+
+	simulation_mode simulationMode = simulation_mode_stopped;
+
 	friend struct selection_undo;
 };

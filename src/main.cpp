@@ -238,8 +238,6 @@ int main(int argc, char** argv)
 			ImGui::EndDragDropTarget();
 		}
 
-		ImGui::End();
-
 		appFocusedLastFrame = ImGui::IsMousePosValid();
 
 		if (input.keyboard['V'].pressEvent && !(input.keyboard[key_ctrl].down || input.keyboard[key_shift].down || input.keyboard[key_alt].down)) { window.toggleVSync(); }
@@ -270,6 +268,10 @@ int main(int argc, char** argv)
 		updateMessageLog(dt);
 
 		updateAudio(dt);
+
+		
+
+		ImGui::End();
 
 		renderToMainWindow(window);
 

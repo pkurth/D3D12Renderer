@@ -455,9 +455,6 @@ bool transformation_gizmo::handleUserInput(bool allowKeyboardInput,
 		}
 	}
 
-	const uint32 iconSize = 35;
-	const float iconSpacing = 3.f;
-
 	if (ImGui::BeginControlsWindow("##GizmoControls"))
 	{
 		transformation_space constantLocal = transformation_local;
@@ -473,25 +470,25 @@ bool transformation_gizmo::handleUserInput(bool allowKeyboardInput,
 		}
 
 		ImGui::PushID(&this->space);
-		uiInteraction |= ImGui::IconRadioButton(imgui_icon_global, (int*)&space, transformation_global, iconSize, allowGlobal);
-		ImGui::SameLine(0.f, iconSpacing);
-		uiInteraction |= ImGui::IconRadioButton(imgui_icon_local, (int*)&space, transformation_local, iconSize, allowLocal);
+		uiInteraction |= ImGui::IconRadioButton(imgui_icon_global, (int*)&space, transformation_global, IMGUI_ICON_DEFAULT_SIZE, allowGlobal);
+		ImGui::SameLine(0.f, IMGUI_ICON_DEFAULT_SPACING);
+		uiInteraction |= ImGui::IconRadioButton(imgui_icon_local, (int*)&space, transformation_local, IMGUI_ICON_DEFAULT_SIZE, allowLocal);
 		ImGui::PopID();
 
-		ImGui::SameLine(0.f, (float)iconSize);
+		ImGui::SameLine(0.f, (float)IMGUI_ICON_DEFAULT_SIZE);
 
 
 		ImGui::PushID(&type);
-		uiInteraction |= ImGui::IconRadioButton(imgui_icon_cross, (int*)&type, transformation_type_none, iconSize, true);
-		ImGui::SameLine(0.f, iconSpacing);
-		uiInteraction |= ImGui::IconRadioButton(imgui_icon_translate, (int*)&type, transformation_type_translation, iconSize, allowTranslation);
-		ImGui::SameLine(0.f, iconSpacing);
-		uiInteraction |= ImGui::IconRadioButton(imgui_icon_rotate, (int*)&type, transformation_type_rotation, iconSize, allowRotation);
-		ImGui::SameLine(0.f, iconSpacing);
-		uiInteraction |= ImGui::IconRadioButton(imgui_icon_scale, (int*)&type, transformation_type_scale, iconSize, allowScaling);
+		uiInteraction |= ImGui::IconRadioButton(imgui_icon_cross, (int*)&type, transformation_type_none, IMGUI_ICON_DEFAULT_SIZE, true);
+		ImGui::SameLine(0.f, IMGUI_ICON_DEFAULT_SPACING);
+		uiInteraction |= ImGui::IconRadioButton(imgui_icon_translate, (int*)&type, transformation_type_translation, IMGUI_ICON_DEFAULT_SIZE, allowTranslation);
+		ImGui::SameLine(0.f, IMGUI_ICON_DEFAULT_SPACING);
+		uiInteraction |= ImGui::IconRadioButton(imgui_icon_rotate, (int*)&type, transformation_type_rotation, IMGUI_ICON_DEFAULT_SIZE, allowRotation);
+		ImGui::SameLine(0.f, IMGUI_ICON_DEFAULT_SPACING);
+		uiInteraction |= ImGui::IconRadioButton(imgui_icon_scale, (int*)&type, transformation_type_scale, IMGUI_ICON_DEFAULT_SIZE, allowScaling);
 		ImGui::PopID();
 
-		ImGui::SameLine(0.f, (float)iconSize);
+		ImGui::SameLine(0.f, (float)IMGUI_ICON_DEFAULT_SIZE);
 
 		ImGui::PopStyleColor();
 	}

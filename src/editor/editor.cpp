@@ -1120,7 +1120,37 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 		ImGui::PopStyleColor();
 	}
+	ImGui::End();
 
+	// Current window is expected to be scene viewport!
+	ImVec2 viewportPos = ImGui::GetWindowPos();
+	ImVec2 viewportSize = ImGui::GetWindowSize();
+	if (ImGui::BeginControlsWindow("##SimulationControls"))
+	{
+		float width = IMGUI_ICON_DEFAULT_SIZE * 3 + IMGUI_ICON_DEFAULT_SPACING * 2 + ImGui::GetStyle().WindowPadding.x * 2;
+
+		ImVec2 pos = ImGui::GetWindowPos(); // Initially this is the position read from the imgui.ini file.
+		ImGui::SetWindowPos(ImVec2(viewportPos.x + (viewportSize.x - width) * 0.5f, pos.y));
+
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+
+		if (ImGui::IconButton(imgui_icon_play, imgui_icon_play, IMGUI_ICON_DEFAULT_SIZE, simulationMode == simulation_mode_stopped || simulationMode == simulation_mode_paused))
+		{
+			simulationMode = simulation_mode_playing;
+		}
+		ImGui::SameLine(0.f, IMGUI_ICON_DEFAULT_SPACING);
+		if (ImGui::IconButton(imgui_icon_pause, imgui_icon_pause, IMGUI_ICON_DEFAULT_SIZE, simulationMode == simulation_mode_playing))
+		{
+			simulationMode = simulation_mode_paused;
+		}
+		ImGui::SameLine(0.f, IMGUI_ICON_DEFAULT_SPACING);
+		if (ImGui::IconButton(imgui_icon_stop, imgui_icon_stop, IMGUI_ICON_DEFAULT_SIZE, simulationMode == simulation_mode_playing || simulationMode == simulation_mode_paused))
+		{
+			simulationMode = simulation_mode_stopped;
+		}
+
+		ImGui::PopStyleColor();
+	}
 	ImGui::End();
 
 
