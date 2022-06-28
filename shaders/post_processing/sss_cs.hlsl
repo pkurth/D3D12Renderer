@@ -28,8 +28,7 @@ void main(cs_input IN)
         float3 rayOrigin = camera.restoreViewSpacePositionEyeDepth(uv, depth);
         float3 rayDirection = cb.lightDirection;
 
-        float jitter = 0.f;
-        jitter = random(uv * 51239.f + cb.seed) * 0.05f;
+        float jitter = random(uv * 51239.f + cb.seed) * 0.05f + 1.2f;
 
         float occlusion = 0.f;
 
@@ -37,6 +36,8 @@ void main(cs_input IN)
         float3 step = rayDirection * stepSize;
 
         float3 rayPos = rayOrigin + step * jitter;
+
+        float threshold = 0.02f;
 
         for (uint i = 0; i < cb.numSteps; ++i)
         {
@@ -53,7 +54,7 @@ void main(cs_input IN)
                 float depth = linearDepthBuffer.SampleLevel(pointSampler, uv, 1);
                 float delta = rayDepth - depth;
 
-                if (delta > 0.02f * (1.f - jitter) && delta < cb.thickness)
+                if (delta > threshold && delta < cb.thickness)
                 {
                     float borderDist = min(1.f - max(uv.x, uv.y), min(uv.x, uv.y));
                     occlusion = saturate(borderDist * cb.invBorderFadeout);

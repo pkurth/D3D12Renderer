@@ -81,7 +81,7 @@ struct sss_settings
 	uint32 numSteps = 16;
     float rayDistance = 0.5f; // In meters.
     float thickness = 0.05f; // In meters.
-	float maxDistanceFromCamera = 30.f; // In meters.
+	float maxDistanceFromCamera = 15.f; // In meters.
 	float distanceFadeoutRange = 2.f; // In meters.
 	float borderFadeout = 0.1f; // In UV-space.
 };
