@@ -21,8 +21,8 @@ float4 main(ps_input IN) : SV_TARGET
 	float c = dot(V, N);
 	float d = ETA * c;
 	float k = saturate(d * d + (1.f - ETA * ETA));
-	float3 reflVec = V - 2.f * c * N;
-	float3 refrVec = ETA * V - (d + sqrt(k)) * N;
+	float3 reflVec = V - 2.f * c * N;				// reflect(V, N)
+	float3 refrVec = ETA * V - (d + sqrt(k)) * N;	// refract(V, N, ETA)
 
 	// Sample and blend.
 	float3 refl = tex.Sample(texSampler, reflVec).rgb;

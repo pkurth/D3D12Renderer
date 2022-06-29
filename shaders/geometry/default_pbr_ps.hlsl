@@ -289,12 +289,15 @@ ps_output main(ps_input IN)
 
 	float4 ssr = ssrTexture.SampleLevel(clampSampler, screenUV, 0);
 
-	ambient_factors factors = getAmbientFactors(surface);
-	//totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity * ao;
+#if 0
 	totalLighting.diffuse += lightProbeGrid.sampleIrradianceAtPosition(surface.P, surface.N, lightProbeIrradiance, lightProbeDepth, wrapSampler) * lighting.environmentIntensity * ao;
-
-	//float3 specular = specularIBL(factors.ks, surface, environmentTexture, brdf, clampSampler);
 	float3 specular = float3(0.f, 0.f, 0.f);
+#else
+	ambient_factors factors = getAmbientFactors(surface);
+	totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity * ao;
+	float3 specular = specularIBL(factors.ks, surface, environmentTexture, brdf, clampSampler);
+#endif
+
 	specular = lerp(specular, ssr.rgb, ssr.a);
 	totalLighting.specular += specular * lighting.environmentIntensity * ao;
 

@@ -287,8 +287,6 @@ void testRenderMeshShader(transparent_render_pass* ldrRenderPass, float dt)
 	}
 
 
-	const uint32 gridSize = (1 << SHIFT);
-
 	ldrRenderPass->renderObject<mesh_shader_blob_pipeline>(mat4::identity, {}, {}, submesh_info{}, blobMaterial);
 	//ldrRenderPass->renderObject<mesh_shader_koch_pipeline>(mat4::identity, {}, {}, submesh_info{}, 0);
 }
