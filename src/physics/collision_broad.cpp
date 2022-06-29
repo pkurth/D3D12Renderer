@@ -8,11 +8,11 @@
 struct sap_endpoint
 {
 	float value;
-	entt::entity entity = entt::null;
+	entity_handle entity = entt::null;
 	bool start;
 	uint16 colliderIndex; // Set each frame.
 
-	sap_endpoint(entt::entity entity, bool start) : entity(entity), start(start) { }
+	sap_endpoint(entity_handle entity, bool start) : entity(entity), start(start) { }
 	sap_endpoint(const sap_endpoint&) = default;
 };
 

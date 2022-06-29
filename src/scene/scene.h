@@ -14,14 +14,16 @@
 
 struct game_scene;
 
+using entity_handle = entt::entity;
+static const auto null_entity = entt::null;
 
 struct scene_entity
 {
 	scene_entity() = default;
-	inline scene_entity(entt::entity handle, game_scene& scene);
+	inline scene_entity(entity_handle handle, game_scene& scene);
 	inline scene_entity(uint32 id, game_scene& scene);
-	scene_entity(entt::entity handle, entt::registry* registry) : handle(handle), registry(registry) {}
-	scene_entity(uint32 id, entt::registry* reg) : handle((entt::entity)id), registry(reg) {}
+	scene_entity(entity_handle handle, entt::registry* registry) : handle(handle), registry(registry) {}
+	scene_entity(uint32 id, entt::registry* reg) : handle((entity_handle)id), registry(reg) {}
 	scene_entity(const scene_entity&) = default;
 
 	template <typename component_t, typename... args>
@@ -39,7 +41,7 @@ struct scene_entity
 			struct physics_reference_component& reference = getComponent<struct physics_reference_component>();
 			++reference.numColliders;
 
-			entt::entity child = registry->create();
+			entity_handle child = registry->create();
 			struct collider_component& collider = registry->emplace<struct collider_component>(child, std::forward<args>(a)...);
 			addColliderToBroadphase(scene_entity(child, registry));
 
@@ -155,12 +157,12 @@ struct scene_entity
 		return !(*this == o);
 	}
 
-	inline bool operator==(entt::entity o) const
+	inline bool operator==(entity_handle o) const
 	{
 		return handle == o;
 	}
 
-	entt::entity handle = entt::null;
+	entity_handle handle = entt::null;
 	entt::registry* registry;
 };
 
@@ -233,7 +235,7 @@ struct game_scene
 	template <typename component_t>
 	scene_entity getEntityFromComponent(const component_t& c)
 	{
-		entt::entity e = entt::to_entity(registry, c);
+		entity_handle e = entt::to_entity(registry, c);
 		return { e, &registry };
 	}
 
@@ -358,8 +360,8 @@ private:
 	}
 };
 
-inline scene_entity::scene_entity(entt::entity handle, game_scene& scene) : handle(handle), registry(&scene.registry) {}
-inline scene_entity::scene_entity(uint32 id, game_scene& scene) : handle((entt::entity)id), registry(&scene.registry) {}
+inline scene_entity::scene_entity(entity_handle handle, game_scene& scene) : handle(handle), registry(&scene.registry) {}
+inline scene_entity::scene_entity(uint32 id, game_scene& scene) : handle((entity_handle)id), registry(&scene.registry) {}
 
 enum scene_state
 {

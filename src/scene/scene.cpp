@@ -121,7 +121,7 @@ void game_scene::deleteEntity(scene_entity e)
 		while (colliderEntity)
 		{
 			collider_component& collider = colliderEntity.getComponent<collider_component>();
-			entt::entity next = collider.nextEntity;
+			entity_handle next = collider.nextEntity;
 
 			removeColliderFromBroadphase(colliderEntity);
 		

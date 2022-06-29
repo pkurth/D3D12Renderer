@@ -31,7 +31,7 @@ enum constraint_type
 
 struct constraint_edge
 {
-	entt::entity constraintEntity;
+	entity_handle constraintEntity;
 	constraint_type type;
 	uint16 prevConstraintEdge;
 	uint16 nextConstraintEdge;
@@ -58,8 +58,8 @@ struct constraint_body_pair
 
 struct constraint_entity_reference_component
 {
-	entt::entity entityA = entt::null;
-	entt::entity entityB = entt::null;
+	entity_handle entityA = entt::null;
+	entity_handle entityB = entt::null;
 	uint16 edgeA = INVALID_CONSTRAINT_EDGE;
 	uint16 edgeB = INVALID_CONSTRAINT_EDGE;
 };

@@ -323,7 +323,7 @@ void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSe
 
 	YAML::Node entityNode;
 
-	scene.forEachEntity([&entityNode, &scene](entt::entity entityID)
+	scene.forEachEntity([&entityNode, &scene](entity_handle entityID)
 	{
 		scene_entity entity = { entityID, scene };
 

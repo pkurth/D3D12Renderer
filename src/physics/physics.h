@@ -159,14 +159,14 @@ struct collider_component : collider_union
 	collider_component() = default;
 
 	// Set by scene on component creation.
-	entt::entity parentEntity;
-	entt::entity nextEntity;
+	entity_handle parentEntity;
+	entity_handle nextEntity;
 };
 
 struct physics_reference_component
 {
 	uint32 numColliders = 0;
-	entt::entity firstColliderEntity = entt::null;
+	entity_handle firstColliderEntity = entt::null;
 
 	uint16 firstConstraintEdge = INVALID_CONSTRAINT_EDGE;
 };
@@ -198,12 +198,12 @@ struct trigger_component
 
 uint32 allocateBoundingHullGeometry(const std::string& meshFilepath);
 
-struct distance_constraint_handle { entt::entity entity; };
-struct ball_constraint_handle { entt::entity entity; };
-struct fixed_constraint_handle { entt::entity entity; };
-struct hinge_constraint_handle { entt::entity entity; };
-struct cone_twist_constraint_handle { entt::entity entity; };
-struct slider_constraint_handle { entt::entity entity; };
+struct distance_constraint_handle { entity_handle entity; };
+struct ball_constraint_handle { entity_handle entity; };
+struct fixed_constraint_handle { entity_handle entity; };
+struct hinge_constraint_handle { entity_handle entity; };
+struct cone_twist_constraint_handle { entity_handle entity; };
+struct slider_constraint_handle { entity_handle entity; };
 
 // Local anchors are always in the space of the entities.
 distance_constraint_handle addDistanceConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB, float distance);
@@ -247,7 +247,7 @@ void deleteAllConstraintsFromEntity(scene_entity& entity);
 
 static scene_entity getOtherEntity(const constraint_entity_reference_component& constraint, scene_entity first)
 {
-	entt::entity result = (first == constraint.entityA) ? constraint.entityB : constraint.entityA;
+	entity_handle result = (first == constraint.entityA) ? constraint.entityB : constraint.entityA;
 	return { result, first.registry };
 }
 
@@ -272,7 +272,7 @@ struct collider_entity_iterator
 	};
 
 	iterator begin() { return iterator{ firstColliderEntity }; }
-	iterator end() { return iterator{ scene_entity{ entt::entity(entt::null), firstColliderEntity.registry } }; }
+	iterator end() { return iterator{ scene_entity{ entity_handle(entt::null), firstColliderEntity.registry } }; }
 
 	scene_entity firstColliderEntity = {};
 };
@@ -287,7 +287,7 @@ struct collider_component_iterator : collider_entity_iterator
 	};
 
 	iterator begin() { return iterator{ firstColliderEntity }; }
-	iterator end() { return iterator{ scene_entity{ entt::entity(entt::null), firstColliderEntity.registry } }; }
+	iterator end() { return iterator{ scene_entity{ entity_handle(entt::null), firstColliderEntity.registry } }; }
 };
 
 struct constraint_entity_iterator

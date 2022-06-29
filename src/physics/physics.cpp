@@ -84,7 +84,7 @@ uint32 allocateBoundingHullGeometry(const std::string& meshFilepath)
 }
 #endif
 
-static void addConstraintEdge(scene_entity& e, constraint_entity_reference_component& constraintEntityReference, entt::entity constraintEntity, constraint_type type)
+static void addConstraintEdge(scene_entity& e, constraint_entity_reference_component& constraintEntityReference, entity_handle constraintEntity, constraint_type type)
 {
 	if (!e.hasComponent<physics_reference_component>())
 	{
@@ -128,7 +128,7 @@ distance_constraint_handle addDistanceConstraintFromLocalPoints(scene_entity& a,
 	assert(a.registry == b.registry);
 
 	entt::registry& registry = *a.registry;
-	entt::entity constraintEntity = registry.create();
+	entity_handle constraintEntity = registry.create();
 	distance_constraint& constraint = registry.emplace<distance_constraint>(constraintEntity);
 	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
 
@@ -158,7 +158,7 @@ ball_constraint_handle addBallConstraintFromLocalPoints(scene_entity& a, scene_e
 	assert(a.registry == b.registry);
 
 	entt::registry& registry = *a.registry;
-	entt::entity constraintEntity = registry.create();
+	entity_handle constraintEntity = registry.create();
 	ball_constraint& constraint = registry.emplace<ball_constraint>(constraintEntity);
 	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
 
@@ -186,7 +186,7 @@ fixed_constraint_handle addFixedConstraintFromLocalPoints(scene_entity& a, scene
 	assert(a.registry == b.registry);
 
 	entt::registry& registry = *a.registry;
-	entt::entity constraintEntity = registry.create();
+	entity_handle constraintEntity = registry.create();
 	fixed_constraint& constraint = registry.emplace<fixed_constraint>(constraintEntity);
 	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
 
@@ -204,7 +204,7 @@ fixed_constraint_handle addFixedConstraintFromGlobalPoints(scene_entity& a, scen
 	assert(a.registry == b.registry);
 
 	entt::registry& registry = *a.registry;
-	entt::entity constraintEntity = registry.create();
+	entity_handle constraintEntity = registry.create();
 	fixed_constraint& constraint = registry.emplace<fixed_constraint>(constraintEntity);
 	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
 
@@ -228,7 +228,7 @@ hinge_constraint_handle addHingeConstraintFromGlobalPoints(scene_entity& a, scen
 	assert(a.registry == b.registry);
 
 	entt::registry& registry = *a.registry;
-	entt::entity constraintEntity = registry.create();
+	entity_handle constraintEntity = registry.create();
 	hinge_constraint& constraint = registry.emplace<hinge_constraint>(constraintEntity);
 	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
 
@@ -264,7 +264,7 @@ cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity
 	assert(a.registry == b.registry);
 
 	entt::registry& registry = *a.registry;
-	entt::entity constraintEntity = registry.create();
+	entity_handle constraintEntity = registry.create();
 	cone_twist_constraint& constraint = registry.emplace<cone_twist_constraint>(constraintEntity);
 	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
 
@@ -304,7 +304,7 @@ slider_constraint_handle addSliderConstraintFromGlobalPoints(scene_entity& a, sc
 	assert(a.registry == b.registry);
 
 	entt::registry& registry = *a.registry;
-	entt::entity constraintEntity = registry.create();
+	entity_handle constraintEntity = registry.create();
 	slider_constraint& constraint = registry.emplace<slider_constraint>(constraintEntity);
 	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
 
@@ -390,7 +390,7 @@ static void removeConstraintEdge(scene_entity entity, constraint_edge& edge, con
 	context.freeConstraintEdge(edge);
 }
 
-static void deleteConstraint(entt::registry* registry, entt::entity constraintEntityHandle)
+static void deleteConstraint(entt::registry* registry, entity_handle constraintEntityHandle)
 {
 	scene_entity constraintEntity = { constraintEntityHandle, registry };
 	constraint_entity_reference_component& constraint = constraintEntity.getComponent<constraint_entity_reference_component>();
@@ -842,8 +842,8 @@ void validate(uint32 line, simd_collision_constraint_batch* constraints, uint32 
 
 struct entity_pair
 {
-	entt::entity a;
-	entt::entity b;
+	entity_handle a;
+	entity_handle b;
 };
 
 namespace std

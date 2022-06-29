@@ -1140,6 +1140,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		if (ImGui::IconButton(imgui_icon_play, imgui_icon_play, IMGUI_ICON_DEFAULT_SIZE, state == scene_state_editor || state == scene_state_runtime_paused))
 		{
 			this->scene->play();
+			setSelectedEntityNoUndo({});
 		}
 		ImGui::SameLine(0.f, IMGUI_ICON_DEFAULT_SPACING);
 		if (ImGui::IconButton(imgui_icon_pause, imgui_icon_pause, IMGUI_ICON_DEFAULT_SIZE, state == scene_state_runtime_playing))
@@ -1150,6 +1151,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		if (ImGui::IconButton(imgui_icon_stop, imgui_icon_stop, IMGUI_ICON_DEFAULT_SIZE, state == scene_state_runtime_playing || state == scene_state_runtime_paused))
 		{
 			this->scene->stop();
+			setSelectedEntityNoUndo({});
 		}
 
 		scene = &this->scene->getCurrentScene();
