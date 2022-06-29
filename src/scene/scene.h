@@ -326,20 +326,6 @@ struct game_scene
 		return ::deleteContextVariable<context_t>(registry);
 	}
 
-	template <typename component_t>
-	void copyComponentPoolTo(game_scene& target)
-	{
-		auto v = view<component_t>();
-		auto& s = registry.storage<component_t>();
-		target.registry.insert(v.begin(), v.end(), s.begin());
-	}
-
-	template <typename... component_t>
-	void copyComponentPoolsTo(game_scene& target)
-	{
-		(copyComponentPoolTo<component_t>(target),...);
-	}
-
 	void cloneTo(game_scene& target);
 
 	entt::registry registry;
@@ -352,6 +338,24 @@ struct game_scene
 	directional_light sun;
 	ref<pbr_environment> environment;
 #endif
+
+
+
+private:
+
+	template <typename component_t>
+	void copyComponentPoolTo(game_scene& target)
+	{
+		auto v = view<component_t>();
+		auto& s = registry.storage<component_t>();
+		target.registry.insert<component_t>(v.begin(), v.end(), s.cbegin());
+	}
+
+	template <typename... component_t>
+	void copyComponentPoolsTo(game_scene& target)
+	{
+		(copyComponentPoolTo<component_t>(target), ...);
+	}
 };
 
 inline scene_entity::scene_entity(entt::entity handle, game_scene& scene) : handle(handle), registry(&scene.registry) {}

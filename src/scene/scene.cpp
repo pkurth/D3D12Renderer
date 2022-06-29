@@ -31,26 +31,31 @@ void game_scene::cloneTo(game_scene& target)
 {
 	target.registry.assign(registry.data(), registry.data() + registry.size(), registry.released());
 
-#if 1
 	copyComponentPoolsTo <
 		tag_component,
 		transform_component,
 		dynamic_transform_component,
 		position_component,
 		position_rotation_component,
+
 #ifndef PHYSICS_ONLY
 		point_light_component,
 		spot_light_component,
+		cloth_render_component,
 #endif
-		collider_component,
-		rigid_body_component,
-		force_field_component,
-		cloth_component,
-		physics_reference_component,
-		sap_endpoint_indirection_component,
+
 		animation_component,
 		raster_component,
 		raytrace_component,
+
+		collider_component,
+		rigid_body_component,
+		force_field_component,
+		trigger_component,
+		cloth_component,
+		physics_reference_component,
+		sap_endpoint_indirection_component,
+		constraint_entity_reference_component,
 
 		distance_constraint,
 		ball_constraint,
@@ -59,6 +64,13 @@ void game_scene::cloneTo(game_scene& target)
 		cone_twist_constraint,
 		slider_constraint
 	> (target);
+
+	target.registry.ctx() = registry.ctx();
+
+#ifndef PHYSICS_ONLY
+	target.camera = camera;
+	target.sun = sun;
+	target.environment = environment;
 #endif
 }
 
