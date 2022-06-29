@@ -9,7 +9,7 @@
 
 struct scene_editor
 {
-	void initialize(game_scene* scene, main_renderer* renderer);
+	void initialize(editor_scene* scene, main_renderer* renderer);
 
 	bool update(const user_input& input, ldr_render_pass* ldrRenderPass, float dt);
 
@@ -32,7 +32,7 @@ private:
 	void serializeToFile();
 	bool deserializeFromFile();
 
-	game_scene* scene;
+	editor_scene* scene;
 	main_renderer* renderer;
 
 	undo_stack undoStack;
@@ -43,15 +43,6 @@ private:
 	vec3 selectedEntityEulerRotation;
 
 	system_info systemInfo;
-
-	enum simulation_mode
-	{
-		simulation_mode_playing,
-		simulation_mode_paused,
-		simulation_mode_stopped,
-	};
-
-	simulation_mode simulationMode = simulation_mode_stopped;
 
 	friend struct selection_undo;
 };

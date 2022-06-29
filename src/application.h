@@ -51,7 +51,7 @@ private:
 
 	main_renderer* renderer;
 
-	game_scene scene;
+	editor_scene scene;
 	scene_editor editor;
 
 	memory_arena stackArena;

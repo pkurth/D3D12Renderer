@@ -997,13 +997,11 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 {
 	CPU_PROFILE_BLOCK("Physics step");
 
-	if (physicsSettings.globalTimeScale <= 0.f)
+	dt = min(dt, 1.f / 30.f);
+	if (dt <= 0.f)
 	{
 		return;
 	}
-
-	dt = min(dt, 1.f / 30.f);
-	dt *= physicsSettings.globalTimeScale;
 
 	uint32 numRigidBodies = scene.numberOfComponentsOfType<rigid_body_component>();
 	uint32 numCloths = scene.numberOfComponentsOfType<cloth_component>();

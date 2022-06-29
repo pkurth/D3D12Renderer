@@ -83,11 +83,11 @@ void scene_editor::setSelectedEntityNoUndo(scene_entity entity)
 	updateSelectedEntityUIRotation();
 }
 
-void scene_editor::initialize(game_scene* scene, main_renderer* renderer)
+void scene_editor::initialize(editor_scene* scene, main_renderer* renderer)
 {
 	this->scene = scene;
 	this->renderer = renderer;
-	cameraController.initialize(&scene->camera);
+	cameraController.initialize(&scene->getCurrentScene().camera);
 
 	systemInfo = getSystemInfo();
 }
@@ -96,7 +96,7 @@ bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPas
 {
 	CPU_PROFILE_BLOCK("Update editor");
 
-	if (selectedEntity && !scene->isEntityValid(selectedEntity))
+	if (selectedEntity && !scene->getCurrentScene().isEntityValid(selectedEntity))
 	{
 		setSelectedEntityNoUndo({});
 	}
@@ -360,7 +360,7 @@ static void drawComponent(scene_entity entity, const char* componentName, ui_fun
 
 bool scene_editor::drawSceneHierarchy()
 {
-	game_scene& scene = *this->scene;
+	game_scene& scene = this->scene->getCurrentScene();
 
 	bool objectMovedByWidget = false;
 
@@ -982,6 +982,8 @@ bool scene_editor::drawSceneHierarchy()
 
 bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldrRenderPass, float dt)
 {
+	game_scene* scene = &this->scene->getCurrentScene();
+
 	// Returns true, if the user dragged an object using a gizmo.
 
 	if (input.keyboard['F'].pressEvent && selectedEntity && selectedEntity.hasComponent<transform_component>())
@@ -1134,20 +1136,24 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 
-		if (ImGui::IconButton(imgui_icon_play, imgui_icon_play, IMGUI_ICON_DEFAULT_SIZE, simulationMode == simulation_mode_stopped || simulationMode == simulation_mode_paused))
+		scene_state state = this->scene->state;
+		if (ImGui::IconButton(imgui_icon_play, imgui_icon_play, IMGUI_ICON_DEFAULT_SIZE, state == scene_state_editor || state == scene_state_runtime_paused))
 		{
-			simulationMode = simulation_mode_playing;
+			this->scene->play();
 		}
 		ImGui::SameLine(0.f, IMGUI_ICON_DEFAULT_SPACING);
-		if (ImGui::IconButton(imgui_icon_pause, imgui_icon_pause, IMGUI_ICON_DEFAULT_SIZE, simulationMode == simulation_mode_playing))
+		if (ImGui::IconButton(imgui_icon_pause, imgui_icon_pause, IMGUI_ICON_DEFAULT_SIZE, state == scene_state_runtime_playing))
 		{
-			simulationMode = simulation_mode_paused;
+			this->scene->pause();
 		}
 		ImGui::SameLine(0.f, IMGUI_ICON_DEFAULT_SPACING);
-		if (ImGui::IconButton(imgui_icon_stop, imgui_icon_stop, IMGUI_ICON_DEFAULT_SIZE, simulationMode == simulation_mode_playing || simulationMode == simulation_mode_paused))
+		if (ImGui::IconButton(imgui_icon_stop, imgui_icon_stop, IMGUI_ICON_DEFAULT_SIZE, state == scene_state_runtime_playing || state == scene_state_runtime_paused))
 		{
-			simulationMode = simulation_mode_stopped;
+			this->scene->stop();
 		}
+
+		scene = &this->scene->getCurrentScene();
+		cameraController.camera = &scene->camera;
 
 		ImGui::PopStyleColor();
 	}
@@ -1170,7 +1176,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		}
 		if (!inputCaptured && ImGui::IsKeyDown(key_ctrl) && ImGui::IsKeyPressed('S'))
 		{
-			serializeSceneToDisk(*scene, renderer->settings);
+			serializeSceneToDisk(this->scene->editorScene, renderer->settings);
 			inputCaptured = true;
 			ImGui::GetIO().KeysDown['S'] = false; // Hack: Window does not get notified of inputs due to the file dialog.
 		}
@@ -1220,6 +1226,8 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 void scene_editor::drawEntityCreationPopup()
 {
+	game_scene* scene = &this->scene->getCurrentScene();
+
 	if (ImGui::BeginPopup("CreateEntityPopup"))
 	{
 		bool clicked = false;
@@ -1296,6 +1304,8 @@ void scene_editor::drawEntityCreationPopup()
 
 void scene_editor::setEnvironment(const fs::path& filename)
 {
+	game_scene* scene = &this->scene->getCurrentScene();
+
 	scene->environment = createEnvironment(filename); // Currently synchronous (on render queue).
 	renderer->pathTracer.resetRendering();
 
@@ -1308,14 +1318,16 @@ void scene_editor::setEnvironment(const fs::path& filename)
 
 void scene_editor::serializeToFile()
 {
-	serializeSceneToDisk(*scene, renderer->settings);
+	serializeSceneToDisk(scene->editorScene, renderer->settings);
 }
 
 bool scene_editor::deserializeFromFile()
 {
 	std::string environmentName;
-	if (deserializeSceneFromDisk(*scene, renderer->settings, environmentName))
+	if (deserializeSceneFromDisk(scene->editorScene, renderer->settings, environmentName))
 	{
+		scene->stop();
+
 		setSelectedEntityNoUndo({});
 		setEnvironment(environmentName);
 
@@ -1566,6 +1578,8 @@ static bool editSharpen(bool& enable, sharpen_settings& settings)
 
 void scene_editor::drawSettings(float dt)
 {
+	game_scene* scene = &this->scene->getCurrentScene();
+
 	if (ImGui::Begin("Settings"))
 	{
 		path_tracer& pathTracer = renderer->pathTracer;
@@ -1623,15 +1637,7 @@ void scene_editor::drawSettings(float dt)
 		{
 			if (ImGui::BeginProperties())
 			{
-				bool physicsPaused = physicsSettings.globalTimeScale < 0.f;
-				if (ImGui::PropertyCheckbox("Pause", physicsPaused))
-				{
-					physicsSettings.globalTimeScale *= -1.f;
-				}
-				if (physicsSettings.globalTimeScale >= 0.f)
-				{
-					ImGui::PropertySlider("Time scale", physicsSettings.globalTimeScale);
-				}
+				ImGui::PropertySlider("Time scale", this->scene->timestepScale);
 
 				ImGui::PropertySlider("Rigid solver iterations", physicsSettings.numRigidSolverIterations, 1, 200);
 

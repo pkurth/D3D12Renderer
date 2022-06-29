@@ -58,9 +58,10 @@ void application::initialize(main_renderer* renderer)
 		raytracingTLAS.initialize();
 	}
 
+	game_scene& scene = this->scene.getCurrentScene();
 	scene.camera.initializeIngame(vec3(0.f, 1.f, 5.f), quat::identity, deg2rad(70.f), 0.1f);
 
-	editor.initialize(&scene, renderer);
+	editor.initialize(&this->scene, renderer);
 
 	//scene.createEntity("Cloth")
 	//	.addComponent<transform_component>(vec3(0.f, 10.f, 0.f), quat::identity)
@@ -68,14 +69,14 @@ void application::initialize(main_renderer* renderer)
 	//	.addComponent<cloth_render_component>();
 
 
-#if 1
-	if (auto sponzaMesh = loadMeshFromFile("assets/sponza/sponza.obj"))
+#if 0
+	if (auto mesh = loadMeshFromFile("assets/bistro/BistroExterior.fbx"))
 	{
-		auto blas = defineBlasFromMesh(sponzaMesh);
+		auto blas = defineBlasFromMesh(mesh);
 	
 		scene.createEntity("Sponza")
 			.addComponent<transform_component>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
-			.addComponent<raster_component>(sponzaMesh)
+			.addComponent<raster_component>(mesh)
 			.addComponent<raytrace_component>(blas);
 	}
 #endif
@@ -137,7 +138,7 @@ void application::initialize(main_renderer* renderer)
 	}
 #endif
 
-#if 0
+#if 1
 	{
 		//scene.createEntity("Force field")
 		//	.addComponent<transform_component>(vec3(0.f), quat::identity)
@@ -183,7 +184,7 @@ void application::initialize(main_renderer* renderer)
 		//	.addComponent<rigid_body_component>(true, 1.f);
 
 		random_number_generator rng = { 15681923 };
-		for (uint32 i = 0; i < 10; ++i)
+		for (uint32 i = 0; i < 2000; ++i)
 		{
 			//float x = rng.randomFloatBetween(-90.f, 90.f);
 			//float z = rng.randomFloatBetween(-90.f, 90.f);
@@ -525,8 +526,11 @@ void application::update(const user_input& input, float dt)
 
 	resetRenderPasses();
 
-	physicsStep(scene, stackArena, dt);
+	game_scene& scene = this->scene.getCurrentScene();
 	bool objectDragged = editor.update(input, &ldrRenderPass, dt);
+
+	dt *= this->scene.getTimestepScale();
+	physicsStep(scene, stackArena, dt);
 
 	scene_entity selectedEntity = editor.selectedEntity;
 
@@ -795,7 +799,7 @@ void application::handleFileDrop(const fs::path& filename)
 		fs::path path = filename;
 		path = path.stem();
 
-		scene.createEntity(path.string().c_str())
+		scene.getCurrentScene().createEntity(path.string().c_str())
 			.addComponent<transform_component>(vec3(0.f), quat::identity)
 			.addComponent<raster_component>(mesh);
 	}

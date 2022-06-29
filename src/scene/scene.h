@@ -360,3 +360,53 @@ private:
 
 inline scene_entity::scene_entity(entt::entity handle, game_scene& scene) : handle(handle), registry(&scene.registry) {}
 inline scene_entity::scene_entity(uint32 id, game_scene& scene) : handle((entt::entity)id), registry(&scene.registry) {}
+
+enum scene_state
+{
+	scene_state_editor,
+	scene_state_runtime_playing,
+	scene_state_runtime_paused,
+};
+
+struct editor_scene
+{
+	game_scene& getCurrentScene()
+	{
+		return (state == scene_state_editor) ? editorScene : runtimeScene;
+	}
+
+	float getTimestepScale()
+	{
+		return (state == scene_state_editor || state == scene_state_runtime_paused) ? 0.f : timestepScale;
+	}
+
+	void play()
+	{
+		if (state == scene_state_editor)
+		{
+			runtimeScene = game_scene();
+			editorScene.cloneTo(runtimeScene);
+		}
+		state = scene_state_runtime_playing;
+	}
+
+	void pause()
+	{
+		if (state == scene_state_runtime_playing)
+		{
+			state = scene_state_runtime_paused;
+		}
+	}
+
+	void stop()
+	{
+		state = scene_state_editor;
+	}
+
+	game_scene editorScene;
+	game_scene runtimeScene;
+
+	scene_state state = scene_state_editor;
+	float timestepScale = 1.f;
+};
+
