@@ -8,9 +8,9 @@
 
 #if 1
 
-static dx_pipeline cubePipeline;
-static dx_pipeline meshPipeline;
+static dx_pipeline meshletPipeline;
 static dx_pipeline blobPipeline;
+static dx_pipeline kochPipeline;
 
 static ref<dx_buffer> marchingCubesBuffer;
 
@@ -70,7 +70,7 @@ struct meta_ball
 	float radius;
 };
 
-static const uint32 DEFAULT_SHIFT = 7; // 128x128x128 cubes by default. (1 << 7) == 128
+static const uint32 DEFAULT_SHIFT = 7;
 static const uint32 DEFAULT_BALL_COUNT = 32;
 static const uint32 MAX_BALL_COUNT = 128;
 static const uint32 BALL_COUNT = DEFAULT_BALL_COUNT;
@@ -145,6 +145,36 @@ PIPELINE_RENDER_IMPL(mesh_shader_blob_pipeline)
 	cl->dispatchMesh((gridSize / 4)* (gridSize / 4)* (gridSize / 4), 1, 1);
 };
 
+
+
+struct mesh_shader_koch_pipeline
+{
+	using material_t = void*;
+
+	PIPELINE_SETUP_DECL;
+	PIPELINE_RENDER_DECL;
+};
+
+PIPELINE_SETUP_IMPL(mesh_shader_koch_pipeline)
+{
+	cl->setPipelineState(*kochPipeline.pipeline);
+	cl->setGraphicsRootSignature(*kochPipeline.rootSignature);
+
+	cl->setGraphicsDynamicConstantBuffer(0, materialInfo.cameraCBV);
+	cl->setRootGraphicsSRV(1, marchingCubesBuffer);
+
+	cl->setDescriptorHeapSRV(2, 0, materialInfo.sky);
+}
+
+PIPELINE_RENDER_IMPL(mesh_shader_koch_pipeline)
+{
+	DX_PROFILE_BLOCK(cl, "Mesh shader koch");
+
+	const uint32 gridSize = (1 << SHIFT);
+	cl->dispatchMesh((gridSize / 4) * (gridSize / 4) * (gridSize / 4), 1, 1);
+};
+
+
 void initializeMeshShader()
 {
 	D3D12_RT_FORMAT_ARRAY renderTargetFormat = {};
@@ -173,13 +203,9 @@ void initializeMeshShader()
 		stream.rtvFormats = renderTargetFormat;
 
 		graphics_pipeline_files files = {};
-		files.ms = "mesh_shader_v0_ms";
+		files.ms = "meshlet_ms";
 		files.ps = "mesh_shader_ps";
-
-		cubePipeline = createReloadablePipelineFromStream(stream, files, rs_in_mesh_shader);
-
-		files.ms = "mesh_shader_v2_ms";
-		meshPipeline = createReloadablePipelineFromStream(stream, files, rs_in_mesh_shader);
+		meshletPipeline = createReloadablePipelineFromStream(stream, files, rs_in_mesh_shader);
 	}
 	{
 		struct pipeline_state_stream : dx_pipeline_stream_base
@@ -211,13 +237,19 @@ void initializeMeshShader()
 		stream.rasterizer = rasterizerDesc;
 
 		graphics_pipeline_files files = {};
-		files.as = "mesh_shader_v4_as";
-		files.ms = "mesh_shader_v4_ms";
-		files.ps = "mesh_shader_v4_ps";
+		files.as = "meta_ball_as";
+		files.ms = "meta_ball_ms";
+		files.ps = "glass_ps";
+		blobPipeline = createReloadablePipelineFromStream(stream, files, rs_in_mesh_shader);
+
+
+		files.as = "koch_as";
+		files.ms = "koch_ms";
+		kochPipeline = createReloadablePipelineFromStream(stream, files, rs_in_mesh_shader);
+
 
 		marchingCubesBuffer = createBuffer(sizeof(marching_cubes_lookup), arraysize(marchingCubesLookup), (void*)marchingCubesLookup);
 
-		blobPipeline = createReloadablePipelineFromStream(stream, files, rs_in_mesh_shader);
 	}
 }
 
@@ -258,6 +290,7 @@ void testRenderMeshShader(transparent_render_pass* ldrRenderPass, float dt)
 	const uint32 gridSize = (1 << SHIFT);
 
 	ldrRenderPass->renderObject<mesh_shader_blob_pipeline>(mat4::identity, {}, {}, submesh_info{}, blobMaterial);
+	//ldrRenderPass->renderObject<mesh_shader_koch_pipeline>(mat4::identity, {}, {}, submesh_info{}, 0);
 }
 
 

@@ -1,17 +1,5 @@
-#include "mesh_shader_v4_common.hlsli"
+#include "marching_cubes_common.hlsli"
 #include "camera.hlsli"
-
-#define MESH_RS \
-    "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
-	"DENY_VERTEX_SHADER_ROOT_ACCESS |" \
-    "DENY_HULL_SHADER_ROOT_ACCESS |" \
-    "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
-    "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-    "CBV(b0), " \
-    "CBV(b1), " \
-	"SRV(t0), " \
-	"StaticSampler(s0, space=1), " \
-	"DescriptorTable(SRV(t0, space=1, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL)"
 
 
 struct mesh_output
@@ -22,10 +10,6 @@ struct mesh_output
 };
 
 
-ConstantBuffer<camera_cb> camera								: register(b1);
-StructuredBuffer<marching_cubes_lookup> marchingCubesLookup     : register(t0);
-
-
 struct cube_corner
 {
 	float3 normal;
@@ -33,6 +17,8 @@ struct cube_corner
 };
 groupshared cube_corner corners[8];
 
+ConstantBuffer<camera_cb> camera								: register(b1);
+StructuredBuffer<marching_cubes_lookup> marchingCubesLookup     : register(t0);
 
 [RootSignature(MESH_RS)]
 [outputtopology("triangle")]
@@ -42,8 +28,7 @@ void main(
 	in uint groupThreadID : SV_GroupThreadID,
 	in payload mesh_payload p,
 	out vertices mesh_output outVerts[12],
-	out indices uint3 outTriangles[5]
-)
+	out indices uint3 outTriangles[5])
 {
 	const uint meshletID = p.meshletIDs[groupID];
 

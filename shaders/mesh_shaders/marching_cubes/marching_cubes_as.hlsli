@@ -1,18 +1,17 @@
-#include "mesh_shader_v4_common.hlsli"
-
+#include "marching_cubes_common.hlsli"
 
 groupshared uint values[5][5][5]; // 125 intermediate values for the 5x5x5 corners of 4x4x4 cubes.
 
 [numthreads(32, 1, 1)]
 void main(
-	in uint groupThreadID : SV_GroupThreadID, 
+	in uint groupThreadID : SV_GroupThreadID,
 	in uint groupID : SV_GroupID
 )
 {
 	uint miX = 4 * ((groupID >> (0 * (SHIFT - 2))) & (GRID_SIZE / 4 - 1));
 	uint miY = 4 * ((groupID >> (1 * (SHIFT - 2))) & (GRID_SIZE / 4 - 1));
 	uint miZ = 4 * ((groupID >> (2 * (SHIFT - 2))));
-
+	
 	// 125 values are needed, so this loops 4 times, 3 lanes get wasted on last iteration.
 	for (uint i = groupThreadID; i < 5 * 5 * 5; i += 32)
 	{
@@ -28,6 +27,7 @@ void main(
 	// Two loops, all lanes used.
 	uint count = 0;
 	mesh_payload payload;
+	payload.meshletIDs[0] = 0; // This suppresses a warning, but is not necessary.
 
 	for (i = groupThreadID; i < 64; i += 32)
 	{
