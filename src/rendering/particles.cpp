@@ -84,7 +84,7 @@ void particle_system::initializeInternal(uint32 particleStructSize, uint32 maxNu
 
 void particle_system::initializeAsBillboard(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, sort_mode sortMode)
 {
-	submesh_info submesh = { 2, 0, 0, 6 };
+	submesh_info submesh = { 6, 0, 0, 4 };
 	initializeInternal(particleStructSize, maxNumParticles, emitRate, submesh, sortMode);
 }
 
