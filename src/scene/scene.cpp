@@ -68,7 +68,6 @@ void game_scene::cloneTo(game_scene& target)
 	target.registry.ctx() = registry.ctx();
 
 #ifndef PHYSICS_ONLY
-	target.camera = camera;
 	target.sun = sun;
 	target.environment = environment;
 #endif

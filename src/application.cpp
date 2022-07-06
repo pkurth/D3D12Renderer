@@ -58,10 +58,10 @@ void application::initialize(main_renderer* renderer)
 		raytracingTLAS.initialize();
 	}
 
-	game_scene& scene = this->scene.getCurrentScene();
-	scene.camera.initializeIngame(vec3(0.f, 1.f, 5.f), quat::identity, deg2rad(70.f), 0.1f);
-
+	this->scene.camera.initializeIngame(vec3(0.f, 1.f, 5.f), quat::identity, deg2rad(70.f), 0.1f);
 	editor.initialize(&this->scene, renderer);
+
+	game_scene& scene = this->scene.getCurrentScene();
 
 	//scene.createEntity("Cloth")
 	//	.addComponent<transform_component>(vec3(0.f, 10.f, 0.f), quat::identity)
@@ -524,6 +524,8 @@ void application::update(const user_input& input, float dt)
 	//dt = 1.f / 60.f;
 	//learnedLocomotion.update(scene);
 
+	render_camera& camera = this->scene.camera;
+
 	resetRenderPasses();
 
 	game_scene& scene = this->scene.getCurrentScene();
@@ -552,11 +554,11 @@ void application::update(const user_input& input, float dt)
 	//smokeParticleSystem.render(&transparentRenderPass);
 #endif
 
-	scene.sun.updateMatrices(scene.camera);
+	scene.sun.updateMatrices(camera);
 
 	// Set global rendering stuff.
 
-	setAudioListener(scene.camera.position, scene.camera.rotation, vec3(0.f));
+	setAudioListener(camera.position, camera.rotation, vec3(0.f));
 
 
 
@@ -579,7 +581,7 @@ void application::update(const user_input& input, float dt)
 	main_renderer::setRaytracingScene(&raytracingTLAS);
 	main_renderer::setEnvironment(scene.environment);
 	main_renderer::setSun(scene.sun);
-	renderer->setCamera(scene.camera);
+	renderer->setCamera(camera);
 
 
 	if (renderer->mode != renderer_mode_pathtraced)

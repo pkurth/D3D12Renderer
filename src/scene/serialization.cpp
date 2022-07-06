@@ -301,7 +301,7 @@ namespace YAML
 	};
 }
 
-void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSettings)
+void serializeSceneToDisk(game_scene& scene, const render_camera& camera, const renderer_settings& rendererSettings)
 {
 	if (scene.savePath.empty())
 	{
@@ -316,7 +316,7 @@ void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSe
 
 	YAML::Node out;
 	out["Scene"] = "My scene";
-	out["Camera"] = scene.camera;
+	out["Camera"] = camera;
 	out["Rendering"] = rendererSettings;
 	out["Sun"] = scene.sun;
 	out["Environment"] = (scene.environment ? scene.environment->name : fs::path());
@@ -379,7 +379,7 @@ void serializeSceneToDisk(game_scene& scene, const renderer_settings& rendererSe
 	LOG_MESSAGE("Scene saved to '%ws'", scene.savePath.c_str());
 }
 
-bool deserializeSceneFromDisk(game_scene& scene, renderer_settings& rendererSettings, std::string& environmentName)
+bool deserializeSceneFromDisk(game_scene& scene, render_camera& camera, renderer_settings& rendererSettings, std::string& environmentName)
 {
 	fs::path filename = openFileDialog("Scene files", "sc");
 	if (filename.empty())
@@ -399,7 +399,7 @@ bool deserializeSceneFromDisk(game_scene& scene, renderer_settings& rendererSett
 
 	std::string sceneName = n["Scene"].as<std::string>();
 
-	YAML_LOAD(n, scene.camera, "Camera");
+	YAML_LOAD(n, camera, "Camera");
 	YAML_LOAD(n, rendererSettings, "Rendering");
 	YAML_LOAD(n, scene.sun, "Sun");
 

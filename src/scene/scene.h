@@ -336,7 +336,6 @@ struct game_scene
 	fs::path savePath;
 
 #ifndef PHYSICS_ONLY
-	render_camera camera;
 	directional_light sun;
 	ref<pbr_environment> environment;
 #endif
@@ -363,52 +362,71 @@ private:
 inline scene_entity::scene_entity(entity_handle handle, game_scene& scene) : handle(handle), registry(&scene.registry) {}
 inline scene_entity::scene_entity(uint32 id, game_scene& scene) : handle((entity_handle)id), registry(&scene.registry) {}
 
-enum scene_state
+enum scene_mode
 {
-	scene_state_editor,
-	scene_state_runtime_playing,
-	scene_state_runtime_paused,
+	scene_mode_editor,
+	scene_mode_runtime_playing,
+	scene_mode_runtime_paused,
 };
 
 struct editor_scene
 {
 	game_scene& getCurrentScene()
 	{
-		return (state == scene_state_editor) ? editorScene : runtimeScene;
+		return (mode == scene_mode_editor) ? editorScene : runtimeScene;
 	}
 
 	float getTimestepScale()
 	{
-		return (state == scene_state_editor || state == scene_state_runtime_paused) ? 0.f : timestepScale;
+		return (mode == scene_mode_editor || mode == scene_mode_runtime_paused) ? 0.f : timestepScale;
 	}
 
 	void play()
 	{
-		if (state == scene_state_editor)
+		if (mode == scene_mode_editor)
 		{
 			runtimeScene = game_scene();
 			editorScene.cloneTo(runtimeScene);
 		}
-		state = scene_state_runtime_playing;
+		mode = scene_mode_runtime_playing;
 	}
 
 	void pause()
 	{
-		if (state == scene_state_runtime_playing)
+		if (mode == scene_mode_runtime_playing)
 		{
-			state = scene_state_runtime_paused;
+			mode = scene_mode_runtime_paused;
 		}
 	}
 
 	void stop()
 	{
-		state = scene_state_editor;
+		mode = scene_mode_editor;
+	}
+
+	bool isPlayable()
+	{
+		return mode == scene_mode_editor || mode == scene_mode_runtime_paused;
+	}
+
+	bool isPausable()
+	{
+		return mode == scene_mode_runtime_playing;
+	}
+
+	bool isStoppable()
+	{
+		return mode == scene_mode_runtime_playing || mode == scene_mode_runtime_paused;
 	}
 
 	game_scene editorScene;
 	game_scene runtimeScene;
 
-	scene_state state = scene_state_editor;
+	scene_mode mode = scene_mode_editor;
 	float timestepScale = 1.f;
+
+#ifndef PHYSICS_ONLY
+	render_camera camera;
+#endif
 };
 

@@ -87,7 +87,7 @@ void scene_editor::initialize(editor_scene* scene, main_renderer* renderer)
 {
 	this->scene = scene;
 	this->renderer = renderer;
-	cameraController.initialize(&scene->getCurrentScene().camera);
+	cameraController.initialize(&scene->camera);
 
 	systemInfo = getSystemInfo();
 }
@@ -1010,6 +1010,8 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 	bool objectMovedByGizmo = false;
 
 
+	render_camera& camera = this->scene->camera;
+
 	if (selectedEntity)
 	{
 		if (transform_component* transform = selectedEntity.getComponentIfExists<transform_component>())
@@ -1020,7 +1022,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 			bool draggingBefore = gizmo.dragging;
 
-			if (gizmo.manipulateTransformation(*transform, scene->camera, input, !inputCaptured, ldrRenderPass))
+			if (gizmo.manipulateTransformation(*transform, camera, input, !inputCaptured, ldrRenderPass))
 			{
 				updateSelectedEntityUIRotation();
 				inputCaptured = true;
@@ -1061,21 +1063,21 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		}
 		else if (position_component* pc = selectedEntity.getComponentIfExists<position_component>())
 		{
-			if (gizmo.manipulatePosition(pc->position, scene->camera, input, !inputCaptured, ldrRenderPass))
+			if (gizmo.manipulatePosition(pc->position, camera, input, !inputCaptured, ldrRenderPass))
 			{
 				inputCaptured = true;
 			}
 		}
 		else if (position_rotation_component* prc = selectedEntity.getComponentIfExists<position_rotation_component>())
 		{
-			if (gizmo.manipulatePositionRotation(prc->position, prc->rotation, scene->camera, input, !inputCaptured, ldrRenderPass))
+			if (gizmo.manipulatePositionRotation(prc->position, prc->rotation, camera, input, !inputCaptured, ldrRenderPass))
 			{
 				inputCaptured = true;
 			}
 		}
 		else
 		{
-			gizmo.manipulateNothing(scene->camera, input, !inputCaptured, ldrRenderPass);
+			gizmo.manipulateNothing(camera, input, !inputCaptured, ldrRenderPass);
 		}
 
 		if (!inputCaptured && !ImGui::IsAnyItemActive())
@@ -1100,7 +1102,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 	}
 	else
 	{
-		gizmo.manipulateNothing(scene->camera, input, !inputCaptured, ldrRenderPass);
+		gizmo.manipulateNothing(camera, input, !inputCaptured, ldrRenderPass);
 	}
 
 
@@ -1136,26 +1138,25 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 
-		scene_state state = this->scene->state;
-		if (ImGui::IconButton(imgui_icon_play, imgui_icon_play, IMGUI_ICON_DEFAULT_SIZE, state == scene_state_editor || state == scene_state_runtime_paused))
+		if (ImGui::IconButton(imgui_icon_play, imgui_icon_play, IMGUI_ICON_DEFAULT_SIZE, this->scene->isPlayable()))
 		{
 			this->scene->play();
 			setSelectedEntityNoUndo({});
 		}
 		ImGui::SameLine(0.f, IMGUI_ICON_DEFAULT_SPACING);
-		if (ImGui::IconButton(imgui_icon_pause, imgui_icon_pause, IMGUI_ICON_DEFAULT_SIZE, state == scene_state_runtime_playing))
+		if (ImGui::IconButton(imgui_icon_pause, imgui_icon_pause, IMGUI_ICON_DEFAULT_SIZE, this->scene->isPausable()))
 		{
 			this->scene->pause();
 		}
 		ImGui::SameLine(0.f, IMGUI_ICON_DEFAULT_SPACING);
-		if (ImGui::IconButton(imgui_icon_stop, imgui_icon_stop, IMGUI_ICON_DEFAULT_SIZE, state == scene_state_runtime_playing || state == scene_state_runtime_paused))
+		if (ImGui::IconButton(imgui_icon_stop, imgui_icon_stop, IMGUI_ICON_DEFAULT_SIZE, this->scene->isStoppable()))
 		{
 			this->scene->stop();
 			setSelectedEntityNoUndo({});
 		}
 
 		scene = &this->scene->getCurrentScene();
-		cameraController.camera = &scene->camera;
+		cameraController.camera = &camera;
 
 		ImGui::PopStyleColor();
 	}
@@ -1178,7 +1179,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		}
 		if (!inputCaptured && ImGui::IsKeyDown(key_ctrl) && ImGui::IsKeyPressed('S'))
 		{
-			serializeSceneToDisk(this->scene->editorScene, renderer->settings);
+			serializeSceneToDisk(this->scene->editorScene, this->scene->camera, renderer->settings);
 			inputCaptured = true;
 			ImGui::GetIO().KeysDown['S'] = false; // Hack: Window does not get notified of inputs due to the file dialog.
 		}
@@ -1200,11 +1201,11 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		// Temporary.
 		if (input.keyboard[key_shift].down)
 		{
-			testPhysicsInteraction(*scene, scene->camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY));
+			testPhysicsInteraction(*scene, camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY));
 		}
 		else if (input.keyboard[key_ctrl].down)
 		{
-			vec3 dir = -scene->camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY).direction;
+			vec3 dir = -camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY).direction;
 			undoStack.pushAction("sun direction", sun_direction_undo{ &scene->sun, scene->sun.direction, dir });
 			scene->sun.direction = dir;
 			inputCaptured = true;
@@ -1229,6 +1230,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 void scene_editor::drawEntityCreationPopup()
 {
 	game_scene* scene = &this->scene->getCurrentScene();
+	render_camera& camera = this->scene->camera;
 
 	if (ImGui::BeginPopup("CreateEntityPopup"))
 	{
@@ -1237,7 +1239,7 @@ void scene_editor::drawEntityCreationPopup()
 		if (ImGui::MenuItem("Point light", "P") || ImGui::IsKeyPressed('P'))
 		{
 			auto pl = scene->createEntity("Point light")
-				.addComponent<position_component>(scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f))
+				.addComponent<position_component>(camera.position + camera.rotation * vec3(0.f, 0.f, -3.f))
 				.addComponent<point_light_component>(
 					vec3(1.f, 1.f, 1.f),
 					1.f,
@@ -1253,7 +1255,7 @@ void scene_editor::drawEntityCreationPopup()
 		if (ImGui::MenuItem("Spot light", "S") || ImGui::IsKeyPressed('S'))
 		{
 			auto sl = scene->createEntity("Spot light")
-				.addComponent<position_rotation_component>(scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f), quat::identity)
+				.addComponent<position_rotation_component>(camera.position + camera.rotation * vec3(0.f, 0.f, -3.f), quat::identity)
 				.addComponent<spot_light_component>(
 					vec3(1.f, 1.f, 1.f),
 					1.f,
@@ -1273,7 +1275,7 @@ void scene_editor::drawEntityCreationPopup()
 		if (ImGui::MenuItem("Cloth", "C") || ImGui::IsKeyPressed('C'))
 		{
 			auto cloth = scene->createEntity("Cloth")
-				.addComponent<transform_component>(scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f), scene->camera.rotation)
+				.addComponent<transform_component>(camera.position + camera.rotation * vec3(0.f, 0.f, -3.f), camera.rotation)
 				.addComponent<cloth_component>(10.f, 10.f, 20u, 20u, 8.f)
 				.addComponent<cloth_render_component>();
 
@@ -1283,14 +1285,14 @@ void scene_editor::drawEntityCreationPopup()
 
 		if (ImGui::MenuItem("Humanoid ragdoll", "R") || ImGui::IsKeyPressed('R'))
 		{
-			auto ragdoll = humanoid_ragdoll::create(*scene, scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -3.f));
+			auto ragdoll = humanoid_ragdoll::create(*scene, camera.position + camera.rotation * vec3(0.f, 0.f, -3.f));
 			setSelectedEntity(ragdoll.torso);
 			clicked = true;
 		}
 
 		if (ImGui::MenuItem("Vehicle", "V") || ImGui::IsKeyPressed('V'))
 		{
-			auto vehicle = vehicle::create(*scene, scene->camera.position + scene->camera.rotation * vec3(0.f, 0.f, -4.f));
+			auto vehicle = vehicle::create(*scene, camera.position + camera.rotation * vec3(0.f, 0.f, -4.f));
 			setSelectedEntity(vehicle.motor);
 			clicked = true;
 		}
@@ -1320,13 +1322,13 @@ void scene_editor::setEnvironment(const fs::path& filename)
 
 void scene_editor::serializeToFile()
 {
-	serializeSceneToDisk(scene->editorScene, renderer->settings);
+	serializeSceneToDisk(scene->editorScene, scene->camera, renderer->settings);
 }
 
 bool scene_editor::deserializeFromFile()
 {
 	std::string environmentName;
-	if (deserializeSceneFromDisk(scene->editorScene, renderer->settings, environmentName))
+	if (deserializeSceneFromDisk(scene->editorScene, scene->camera, renderer->settings, environmentName))
 	{
 		scene->stop();
 
@@ -1590,6 +1592,8 @@ void scene_editor::drawSettings(float dt)
 
 		if (ImGui::BeginProperties())
 		{
+			ImGui::PropertySlider("Time scale", this->scene->timestepScale);
+
 			if (ImGui::PropertyDropdown("Renderer mode", rendererModeNames, renderer_mode_count, (uint32&)renderer->mode))
 			{
 				pathTracer.resetRendering();
@@ -1607,7 +1611,7 @@ void scene_editor::drawSettings(float dt)
 			ImGui::EndProperties();
 		}
 
-		editCamera(scene->camera);
+		editCamera(this->scene->camera);
 		plotAndEditTonemapping(renderer->settings.tonemapSettings);
 		editSunShadowParameters(scene->sun);
 
@@ -1639,8 +1643,6 @@ void scene_editor::drawSettings(float dt)
 		{
 			if (ImGui::BeginProperties())
 			{
-				ImGui::PropertySlider("Time scale", this->scene->timestepScale);
-
 				ImGui::PropertySlider("Rigid solver iterations", physicsSettings.numRigidSolverIterations, 1, 200);
 
 				ImGui::PropertySlider("Cloth velocity iterations", physicsSettings.numClothVelocityIterations, 0, 10);
