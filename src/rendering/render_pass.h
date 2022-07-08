@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/math.h"
+#include "core/cpu_profiling.h"
 #include "material.h"
 #include "render_command.h"
 #include "render_command_buffer.h"
@@ -11,6 +12,8 @@ struct opaque_render_pass
 {
 	void sort()
 	{
+		CPU_PROFILE_BLOCK("Sort opaque render passes");
+
 		staticDepthPrepass.sort();
 		dynamicDepthPrepass.sort();
 		animatedDepthPrepass.sort();
@@ -210,6 +213,8 @@ struct transparent_render_pass
 {
 	void sort()
 	{
+		CPU_PROFILE_BLOCK("Sort transparent render pass");
+
 		pass.sort();
 	}
 
@@ -268,6 +273,8 @@ struct ldr_render_pass
 {
 	void sort()
 	{
+		CPU_PROFILE_BLOCK("Sort LDR render passes");
+
 		ldrPass.sort();
 		overlays.sort();
 		// We don't sort the outlines.

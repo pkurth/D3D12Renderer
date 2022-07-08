@@ -494,9 +494,13 @@ void application::resetRenderPasses()
 
 void application::submitRendererParams(uint32 numSpotLightShadowPasses, uint32 numPointLightShadowPasses)
 {
-	opaqueRenderPass.sort();
-	transparentRenderPass.sort();
-	ldrRenderPass.sort();
+	{
+		CPU_PROFILE_BLOCK("Sort render passes");
+	
+		opaqueRenderPass.sort();
+		transparentRenderPass.sort();
+		ldrRenderPass.sort();
+	}
 
 	renderer->submitRenderPass(&opaqueRenderPass);
 	renderer->submitRenderPass(&transparentRenderPass);
