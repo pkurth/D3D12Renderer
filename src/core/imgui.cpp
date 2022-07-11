@@ -207,7 +207,8 @@ namespace ImGui
 	{
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.f);
 		ImGui::SetNextWindowSize(ImVec2(0.f, 0.f)); // Auto-resize to content.
-		bool result = ImGui::Begin(name, 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove);
+		bool result = ImGui::Begin(name, 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove
+		 | ImGuiWindowFlags_NoBringToFrontOnFocus);
 		ImGui::PopStyleVar();	
 		return result;
 	}

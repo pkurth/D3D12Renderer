@@ -55,7 +55,9 @@ void updateMessageLog(float dt)
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.f);
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 0.1f));
 	ImGui::SetNextWindowSize(ImVec2(0.f, 0.f)); // Auto-resize to content.
-	bool windowOpen = ImGui::Begin("##MessageLog", 0, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoInputs);
+	bool windowOpen = ImGui::Begin("##MessageLog", 0, 
+		ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | 
+		ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBringToFrontOnFocus);
 	ImGui::PopStyleVar(2);
 
 	uint32 count = (uint32)messages.size();
