@@ -177,23 +177,23 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 
 	uint flags = material.getFlags();
 
-	float4 albedo = ((flags & USE_ALBEDO_TEXTURE)
+	float4 albedo = ((flags & MATERIAL_USE_ALBEDO_TEXTURE)
 		? albedoTex.SampleLevel(wrapSampler, uv, mipLevel)
 		: float4(1.f, 1.f, 1.f, 1.f))
 		* unpackColor(material.albedoTint);
 
 	// We ignore normal maps for now.
 
-	float roughness = (flags & USE_ROUGHNESS_TEXTURE)
+	float roughness = (flags & MATERIAL_USE_ROUGHNESS_TEXTURE)
 		? roughTex.SampleLevel(wrapSampler, uv, mipLevel)
 		: getRoughnessOverride(material);
 	roughness = clamp(roughness, 0.01f, 0.99f);
 
-	float metallic = (flags & USE_METALLIC_TEXTURE)
+	float metallic = (flags & MATERIAL_USE_METALLIC_TEXTURE)
 		? metalTex.SampleLevel(wrapSampler, uv, mipLevel)
 		: getMetallicOverride(material);
 
-	float ao = 1.f;// (flags & USE_AO_TEXTURE) ? RMAO.z : 1.f;
+	float ao = 1.f;// (flags & MATERIAL_USE_AO_TEXTURE) ? RMAO.z : 1.f;
 
 
 

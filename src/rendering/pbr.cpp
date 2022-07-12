@@ -16,6 +16,8 @@
 #include <unordered_map>
 #include <memory>
 
+static_assert(sizeof(pbr_indexed_material_cb) == 32);
+
 static dx_pipeline opaquePBRPipeline;
 static dx_pipeline opaqueDoubleSidedPBRPipeline;
 static dx_pipeline transparentPBRPipeline;
@@ -231,26 +233,30 @@ static void renderPBRCommon(dx_command_list* cl, const mat4& viewProj, const def
 	if (mat->albedo)
 	{
 		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 0, mat->albedo);
-		flags |= USE_ALBEDO_TEXTURE;
+		flags |= MATERIAL_USE_ALBEDO_TEXTURE;
 	}
 	if (mat->normal)
 	{
 		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 1, mat->normal);
-		flags |= USE_NORMAL_TEXTURE;
+		flags |= MATERIAL_USE_NORMAL_TEXTURE;
 	}
 	if (mat->roughness)
 	{
 		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 2, mat->roughness);
-		flags |= USE_ROUGHNESS_TEXTURE;
+		flags |= MATERIAL_USE_ROUGHNESS_TEXTURE;
 	}
 	if (mat->metallic)
 	{
 		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 3, mat->metallic);
-		flags |= USE_METALLIC_TEXTURE;
+		flags |= MATERIAL_USE_METALLIC_TEXTURE;
+	}
+	if (mat->doubleSided)
+	{
+		flags |= MATERIAL_DOUBLE_SIDED;
 	}
 
 	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_MATERIAL,
-		pbr_material_cb(mat->albedoTint, mat->emission.xyz, mat->roughnessOverride, mat->metallicOverride, flags, 1.f, 0.f, mat->doubleSided, mat->uvScale)
+		pbr_indexed_material_cb(0, 0, 0, 0, mat->albedoTint, mat->emission.xyz, mat->roughnessOverride, mat->metallicOverride, flags, 1.f, 0.f, mat->uvScale)
 	);
 
 

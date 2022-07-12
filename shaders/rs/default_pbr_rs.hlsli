@@ -15,7 +15,7 @@ struct lighting_cb
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
     "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX),"  \
-    "RootConstants(num32BitConstants=6, b0, space=1, visibility=SHADER_VISIBILITY_PIXEL),"  \
+    "RootConstants(num32BitConstants=8, b0, space=1, visibility=SHADER_VISIBILITY_PIXEL),"  \
     "RootConstants(num32BitConstants=3, b2, space=1, visibility=SHADER_VISIBILITY_PIXEL),"  \
     "RootConstants(num32BitConstants=8, b3, space=1, visibility=SHADER_VISIBILITY_PIXEL),"  \
     "CBV(b1, space=1, visibility=SHADER_VISIBILITY_PIXEL), " \

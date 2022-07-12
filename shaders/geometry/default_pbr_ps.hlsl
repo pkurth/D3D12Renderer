@@ -17,7 +17,7 @@ struct ps_input
 	bool isFrontFace		: SV_IsFrontFace;
 };
 
-ConstantBuffer<pbr_material_cb> material				: register(b0, space1);
+ConstantBuffer<pbr_indexed_material_cb> material		: register(b0, space1);
 ConstantBuffer<camera_cb> camera						: register(b1, space1);
 ConstantBuffer<lighting_cb> lighting					: register(b2, space1);
 ConstantBuffer<light_probe_grid_cb> lightProbeGrid		: register(b3, space1);
@@ -78,27 +78,27 @@ ps_output main(ps_input IN)
 
 	surface_info surface;
 
-	surface.albedo = ((flags & USE_ALBEDO_TEXTURE)
+	surface.albedo = ((flags & MATERIAL_USE_ALBEDO_TEXTURE)
 		? albedoTex.Sample(wrapSampler, materialUV)
 		: float4(1.f, 1.f, 1.f, 1.f))
 		* material.getAlbedo();
 
 	const float normalMapStrength = material.getNormalMapStrength() * 0.2f;
-	surface.N = (flags & USE_NORMAL_TEXTURE)
+	surface.N = (flags & MATERIAL_USE_NORMAL_TEXTURE)
 		? mul(float3(normalMapStrength, normalMapStrength, 1.f) * sampleNormalMap(normalTex, wrapSampler, materialUV), IN.tbn)
 		: IN.tbn[2];
 	surface.N = normalize(surface.N);
-	if (material.doubleSided() && !IN.isFrontFace)
+	if ((flags & MATERIAL_DOUBLE_SIDED) && !IN.isFrontFace)
 	{
 		surface.N = -surface.N;
 	}
 
-	surface.roughness = (flags & USE_ROUGHNESS_TEXTURE)
+	surface.roughness = (flags & MATERIAL_USE_ROUGHNESS_TEXTURE)
 		? roughTex.Sample(wrapSampler, materialUV)
 		: material.getRoughnessOverride();
 	surface.roughness = clamp(surface.roughness, 0.01f, 0.99f);
 
-	surface.metallic = (flags & USE_METALLIC_TEXTURE)
+	surface.metallic = (flags & MATERIAL_USE_METALLIC_TEXTURE)
 		? metalTex.Sample(wrapSampler, materialUV)
 		: material.getMetallicOverride();
 

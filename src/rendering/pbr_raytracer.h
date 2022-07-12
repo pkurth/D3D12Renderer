@@ -20,6 +20,8 @@ protected:
         dx_cpu_descriptor_handle resources; // Vertex buffer, index buffer, PBR textures.
     };
 
+    static_assert(sizeof(pbr_material_cb) == 24);
+    static_assert(sizeof(shader_data) == 32);
 
 
     static inline uint32 numRayTypes = 0;

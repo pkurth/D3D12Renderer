@@ -163,7 +163,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 {
 	uint flags = material.getFlags();
 
-	uint3 tri = (flags & USE_32_BIT_INDICES) ? load3x32BitIndices(meshIndices) : load3x16BitIndices(meshIndices);
+	uint3 tri = (flags & MATERIAL_USE_32_BIT_INDICES) ? load3x32BitIndices(meshIndices) : load3x16BitIndices(meshIndices);
 
 	// Interpolate vertex attributes over triangle.
 	float2 uvs[] = { meshVertices[tri.x].uv, meshVertices[tri.y].uv, meshVertices[tri.z].uv };
@@ -178,16 +178,16 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 
 	uint mipLevel = 3;
 
-	surface.albedo = (((flags & USE_ALBEDO_TEXTURE)
+	surface.albedo = (((flags & MATERIAL_USE_ALBEDO_TEXTURE)
 		? albedoTex.SampleLevel(linearSampler, uv, mipLevel)
 		: float4(1.f, 1.f, 1.f, 1.f))
 		* unpackColor(material.albedoTint));
 
-	surface.roughness = (flags & USE_ROUGHNESS_TEXTURE)
+	surface.roughness = (flags & MATERIAL_USE_ROUGHNESS_TEXTURE)
 		? roughTex.SampleLevel(linearSampler, uv, mipLevel)
 		: material.getRoughnessOverride();
 
-	surface.metallic = (flags & USE_METALLIC_TEXTURE)
+	surface.metallic = (flags & MATERIAL_USE_METALLIC_TEXTURE)
 		? metalTex.SampleLevel(linearSampler, uv, mipLevel)
 		: material.getMetallicOverride();
 

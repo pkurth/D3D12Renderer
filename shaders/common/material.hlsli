@@ -96,21 +96,21 @@ struct texture_atlas_cb
 
 
 
-#define USE_ALBEDO_TEXTURE			(1 << 0)
-#define USE_NORMAL_TEXTURE			(1 << 1)
-#define USE_ROUGHNESS_TEXTURE		(1 << 2)
-#define USE_METALLIC_TEXTURE		(1 << 3)
-#define USE_AO_TEXTURE				(1 << 4)
-#define USE_32_BIT_INDICES			(1 << 5) // Ugly to put this in the material. Only used in the ray tracing shaders.
+#define MATERIAL_USE_ALBEDO_TEXTURE			(1 << 0)
+#define MATERIAL_USE_NORMAL_TEXTURE			(1 << 1)
+#define MATERIAL_USE_ROUGHNESS_TEXTURE		(1 << 2)
+#define MATERIAL_USE_METALLIC_TEXTURE		(1 << 3)
+#define MATERIAL_DOUBLE_SIDED				(1 << 4)
+#define MATERIAL_USE_32_BIT_INDICES			(1 << 5) // Ugly to put this in the material. Only used in the ray tracing shaders.
 
 struct pbr_material_cb // 24 bytes.
 {
     vec3 emission;      // Since emission can be HDR, we use full precision floats here.
     uint32 albedoTint;  // RGBA packed into one uint32. Can only be between 0 and 1, which is why we are only using 8 bit per channel.
     uint32 roughness_metallic_flags_refraction; // 8 bit each.
-	uint32 normalMapStrength_doubleSided_uvScale; // 8 bit each for normal map and double sidedness, 16 bit half for uvScale.
+	uint32 normalMapStrength_unused_uvScale; // 8 bit for normal map strength, 8 bit unused, 16 bit half for uvScale.
 
-    void initialize(vec4 albedo_, vec3 emission_, float roughness_, float metallic_, uint32 flags_, float normalMapStrength_ = 1.f, float refractionStrength_ = 0.f, bool doubleSided_ = false,
+    void initialize(vec4 albedo_, vec3 emission_, float roughness_, float metallic_, uint32 flags_, float normalMapStrength_ = 1.f, float refractionStrength_ = 0.f,
 		float uvScale = 1.f)
     {
         emission = emission_;
@@ -133,18 +133,18 @@ struct pbr_material_cb // 24 bytes.
 		uint32 uvScaleHalf = f32tof16(uvScale);
 #endif
 		
-		normalMapStrength_doubleSided_uvScale =
+		normalMapStrength_unused_uvScale =
 			((uint32)(normalMapStrength_ * 0xFF) << 24) |
-			((uint32)(doubleSided_) << 16) |
+			0 |
 			uvScaleHalf;
     }
 
 #ifndef HLSL
     pbr_material_cb() {}
 
-    pbr_material_cb(vec4 albedo_, vec3 emission_, float roughness_, float metallic_, uint32 flags_, float normalMapStrength_ = 1.f, float refractionStrength_ = 0.f, bool doubleSided_ = false, float uvScale_ = 1.f)
+    pbr_material_cb(vec4 albedo_, vec3 emission_, float roughness_, float metallic_, uint32 flags_, float normalMapStrength_ = 1.f, float refractionStrength_ = 0.f, float uvScale_ = 1.f)
     {
-        initialize(albedo_, emission_, roughness_, metallic_, flags_, normalMapStrength_, refractionStrength_, doubleSided_, uvScale_);
+        initialize(albedo_, emission_, roughness_, metallic_, flags_, normalMapStrength_, refractionStrength_, uvScale_);
     }
 #endif
 
@@ -155,27 +155,22 @@ struct pbr_material_cb // 24 bytes.
 
     float getRoughnessOverride()
     {
-        return ((roughness_metallic_flags_refraction >> 24) & 0xFF) / (float)0xFF;
+        return ((roughness_metallic_flags_refraction >> 24) & 0xFF) * (1.f / 255.f);
     }
 
     float getMetallicOverride()
     {
-        return ((roughness_metallic_flags_refraction >> 16) & 0xFF) / (float)0xFF;
+        return ((roughness_metallic_flags_refraction >> 16) & 0xFF) * (1.f / 255.f);
     }
 
 	float getNormalMapStrength()
 	{
-		return ((normalMapStrength_doubleSided_uvScale >> 24) & 0xFF) / (float)0xFF;
-	}
-
-	bool doubleSided()
-	{
-		return ((normalMapStrength_doubleSided_uvScale >> 16) & 0xFF) != 0;
+		return ((normalMapStrength_unused_uvScale >> 24) & 0xFF) * (1.f / 255.f);
 	}
 
 	float uvScale()
 	{
-		uint32 uvScaleHalf = normalMapStrength_doubleSided_uvScale & 0xFFFF;
+		uint32 uvScaleHalf = normalMapStrength_unused_uvScale & 0xFFFF;
 #ifndef HLSL
 		return half((uint16)uvScaleHalf);
 #else
@@ -185,12 +180,51 @@ struct pbr_material_cb // 24 bytes.
 
 	float getRefractionStrength()
 	{
-		return ((roughness_metallic_flags_refraction >> 0) & 0xFF) / (float)0xFF;
+		return ((roughness_metallic_flags_refraction >> 0) & 0xFF) * (1.f / 255.f);
 	}
 
 	uint32 getFlags()
 	{
 		return (roughness_metallic_flags_refraction >> 8) & 0xFF;
+	}
+};
+
+struct pbr_indexed_material_cb : pbr_material_cb
+{
+	uint32 albedoNormalIndex;
+	uint32 roughnessMetallicIndex;
+
+#ifndef HLSL
+	pbr_indexed_material_cb() {}
+
+	pbr_indexed_material_cb(
+		uint32 albedoIndex, uint32 normalIndex, uint32 roughnessIndex, uint32 metallicIndex,
+		vec4 albedo_, vec3 emission_, float roughness_, float metallic_, uint32 flags_, float normalMapStrength_ = 1.f, float refractionStrength_ = 0.f, float uvScale_ = 1.f)
+	{
+		initialize(albedo_, emission_, roughness_, metallic_, flags_, normalMapStrength_, refractionStrength_, uvScale_);
+		albedoNormalIndex = (albedoIndex << 16) | normalIndex;
+		roughnessMetallicIndex = (roughnessIndex << 16) | metallicIndex;
+	}
+#endif
+
+	uint32 albedoIndex()
+	{
+		return albedoNormalIndex >> 16;
+	}
+
+	uint32 normalMapIndex()
+	{
+		return albedoNormalIndex & 0xFFFF;
+	}
+
+	uint32 roughnessIndex()
+	{
+		return roughnessMetallicIndex >> 16;
+	}
+
+	uint32 metallicIndex()
+	{
+		return roughnessMetallicIndex & 0xFFFF;
 	}
 };
 

@@ -86,14 +86,14 @@ raytracing_object_type pbr_raytracer::defineObjectType(const ref<raytracing_blas
         descriptorHeap.push().createRawBufferSRV(blas->geometries[i].indexBuffer, { submesh.firstIndex, submesh.numIndices });
 
         uint32 flags = 0;
-        pushTexture(material->albedo, flags, USE_ALBEDO_TEXTURE);
-        pushTexture(material->normal, flags, USE_NORMAL_TEXTURE);
-        pushTexture(material->roughness, flags, USE_ROUGHNESS_TEXTURE);
-        pushTexture(material->metallic, flags, USE_METALLIC_TEXTURE);
+        pushTexture(material->albedo, flags, MATERIAL_USE_ALBEDO_TEXTURE);
+        pushTexture(material->normal, flags, MATERIAL_USE_NORMAL_TEXTURE);
+        pushTexture(material->roughness, flags, MATERIAL_USE_ROUGHNESS_TEXTURE);
+        pushTexture(material->metallic, flags, MATERIAL_USE_METALLIC_TEXTURE);
 
         if (blas->geometries[i].indexBuffer->elementSize == 4)
         {
-            flags |= USE_32_BIT_INDICES;
+            flags |= MATERIAL_USE_32_BIT_INDICES;
         }
 
         hitData[0].materialCB.initialize(

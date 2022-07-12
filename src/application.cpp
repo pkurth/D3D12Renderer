@@ -69,8 +69,8 @@ void application::initialize(main_renderer* renderer)
 	//	.addComponent<cloth_render_component>();
 
 
-#if 0
-	if (auto mesh = loadMeshFromFile("assets/bistro/BistroExterior.fbx"))
+#if 1
+	if (auto mesh = loadMeshFromFile("assets/sponza/sponza.obj"))
 	{
 		auto blas = defineBlasFromMesh(mesh);
 	
