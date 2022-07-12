@@ -132,11 +132,11 @@ struct opaque_render_pass
 	{
 		if (material->doubleSided)
 		{
-			renderStaticObject<opaque_pbr_pipeline::double_sided>(transform, vertexBuffer, indexBuffer, submesh, material, objectID, true, includeInDepthPrepass);
+			renderStaticObject<pbr_pipeline::opaque_double_sided>(transform, vertexBuffer, indexBuffer, submesh, material, objectID, true, includeInDepthPrepass);
 		}
 		else
 		{
-			renderStaticObject<opaque_pbr_pipeline::standard>(transform, vertexBuffer, indexBuffer, submesh, material, objectID, false, includeInDepthPrepass);
+			renderStaticObject<pbr_pipeline::opaque>(transform, vertexBuffer, indexBuffer, submesh, material, objectID, false, includeInDepthPrepass);
 		}
 	}
 
@@ -151,11 +151,11 @@ struct opaque_render_pass
 	{
 		if (material->doubleSided)
 		{
-			renderDynamicObject<opaque_pbr_pipeline::double_sided>(transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh, material, objectID, true, includeInDepthPrepass);
+			renderDynamicObject<pbr_pipeline::opaque_double_sided>(transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh, material, objectID, true, includeInDepthPrepass);
 		}
 		else
 		{
-			renderDynamicObject<opaque_pbr_pipeline::standard>(transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh, material, objectID, false, includeInDepthPrepass);
+			renderDynamicObject<pbr_pipeline::opaque>(transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh, material, objectID, false, includeInDepthPrepass);
 		}
 	}
 
@@ -171,11 +171,11 @@ struct opaque_render_pass
 	{
 		if (material->doubleSided)
 		{
-			renderAnimatedObject<opaque_pbr_pipeline::double_sided>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, material, objectID, true, includeInDepthPrepass);
+			renderAnimatedObject<pbr_pipeline::opaque_double_sided>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, material, objectID, true, includeInDepthPrepass);
 		}
 		else
 		{
-			renderAnimatedObject<opaque_pbr_pipeline::standard>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, material, objectID, false, includeInDepthPrepass);
+			renderAnimatedObject<pbr_pipeline::opaque>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, material, objectID, false, includeInDepthPrepass);
 		}
 	}
 
@@ -263,7 +263,7 @@ struct transparent_render_pass
 		submesh_info submesh,
 		const ref<pbr_material>& material)
 	{
-		renderObject<transparent_pbr_pipeline>(transform, vertexBuffer, indexBuffer, submesh, material);
+		renderObject<pbr_pipeline::transparent>(transform, vertexBuffer, indexBuffer, submesh, material);
 	}
 
 	render_command_buffer<float> pass;

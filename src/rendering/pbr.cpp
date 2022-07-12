@@ -181,7 +181,33 @@ ref<pbr_environment> createEnvironment(const fs::path& filename, uint32 skyResol
 	return sp;
 }
 
-static void setupPBRCommon(dx_command_list* cl, const common_material_info& info)
+void pbr_pipeline::initialize()
+{
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.inputLayout(inputLayout_position_uv_normal_tangent)
+			.renderTargets(opaqueLightPassFormats, arraysize(opaqueLightPassFormats), depthStencilFormat)
+			.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
+
+		opaquePBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_ps" });
+
+		desc.cullingOff();
+		opaqueDoubleSidedPBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_ps" });
+	}
+
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.inputLayout(inputLayout_position_uv_normal_tangent)
+			.renderTargets(transparentLightPassFormats, arraysize(transparentLightPassFormats), depthStencilFormat)
+			.alphaBlending(0);
+
+		transparentPBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_transparent_ps" });
+	}
+}
+
+
+
+void pbr_pipeline::setupPBRCommon(dx_command_list* cl, const common_material_info& info)
 {
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -223,8 +249,32 @@ static void setupPBRCommon(dx_command_list* cl, const common_material_info& info
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 3, nullTexture);
 }
 
-template <typename pipeline_t>
-static void renderPBRCommon(dx_command_list* cl, const mat4& viewProj, const default_render_command<pipeline_t>& rc)
+
+PIPELINE_SETUP_IMPL(pbr_pipeline::opaque)
+{
+	cl->setPipelineState(*opaquePBRPipeline.pipeline);
+	cl->setGraphicsRootSignature(*opaquePBRPipeline.rootSignature);
+
+	setupPBRCommon(cl, materialInfo);
+}
+
+PIPELINE_SETUP_IMPL(pbr_pipeline::opaque_double_sided)
+{
+	cl->setPipelineState(*opaqueDoubleSidedPBRPipeline.pipeline);
+	cl->setGraphicsRootSignature(*opaqueDoubleSidedPBRPipeline.rootSignature);
+
+	setupPBRCommon(cl, materialInfo);
+}
+
+PIPELINE_SETUP_IMPL(pbr_pipeline::transparent)
+{
+	cl->setPipelineState(*transparentPBRPipeline.pipeline);
+	cl->setGraphicsRootSignature(*transparentPBRPipeline.rootSignature);
+
+	setupPBRCommon(cl, materialInfo);
+}
+
+PIPELINE_RENDER_IMPL(pbr_pipeline)
 {
 	const auto& mat = rc.material;
 
@@ -269,64 +319,4 @@ static void renderPBRCommon(dx_command_list* cl, const mat4& viewProj, const def
 	cl->setVertexBuffer(1, rc.vertexBuffer.others);
 	cl->setIndexBuffer(rc.indexBuffer);
 	cl->drawIndexed(submesh.numIndices, 1, submesh.firstIndex, submesh.baseVertex, 0);
-}
-
-void opaque_pbr_pipeline::initialize()
-{
-	auto desc = CREATE_GRAPHICS_PIPELINE
-		.inputLayout(inputLayout_position_uv_normal_tangent)
-		.renderTargets(opaqueLightPassFormats, arraysize(opaqueLightPassFormats), depthStencilFormat)
-		.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
-
-	opaquePBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_ps" });
-
-	desc.cullingOff();
-	opaqueDoubleSidedPBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_ps" });
-}
-
-void transparent_pbr_pipeline::initialize()
-{
-	auto desc = CREATE_GRAPHICS_PIPELINE
-		.inputLayout(inputLayout_position_uv_normal_tangent)
-		.renderTargets(transparentLightPassFormats, arraysize(transparentLightPassFormats), depthStencilFormat)
-		.alphaBlending(0);
-
-	transparentPBRPipeline = createReloadablePipeline(desc, { "default_vs", "default_pbr_transparent_ps" });
-}
-
-
-
-
-PIPELINE_SETUP_IMPL(opaque_pbr_pipeline::standard)
-{
-	cl->setPipelineState(*opaquePBRPipeline.pipeline);
-	cl->setGraphicsRootSignature(*opaquePBRPipeline.rootSignature);
-
-	setupPBRCommon(cl, materialInfo);
-}
-
-PIPELINE_SETUP_IMPL(opaque_pbr_pipeline::double_sided)
-{
-	cl->setPipelineState(*opaqueDoubleSidedPBRPipeline.pipeline);
-	cl->setGraphicsRootSignature(*opaqueDoubleSidedPBRPipeline.rootSignature);
-
-	setupPBRCommon(cl, materialInfo);
-}
-
-PIPELINE_RENDER_IMPL(opaque_pbr_pipeline)
-{
-	renderPBRCommon(cl, viewProj, rc);
-}
-
-PIPELINE_SETUP_IMPL(transparent_pbr_pipeline)
-{
-	cl->setPipelineState(*transparentPBRPipeline.pipeline);
-	cl->setGraphicsRootSignature(*transparentPBRPipeline.rootSignature);
-
-	setupPBRCommon(cl, materialInfo);
-}
-
-PIPELINE_RENDER_IMPL(transparent_pbr_pipeline)
-{
-	renderPBRCommon(cl, viewProj, rc);
 }

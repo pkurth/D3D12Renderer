@@ -43,7 +43,7 @@ struct pbr_material
 	float uvScale;
 };
 
-struct opaque_pbr_pipeline
+struct pbr_pipeline
 {
 	using material_t = ref<pbr_material>;
 
@@ -51,28 +51,27 @@ struct opaque_pbr_pipeline
 
 	PIPELINE_RENDER_DECL;
 
-	struct standard;
-	struct double_sided;
+	struct opaque;
+	struct opaque_double_sided;
+	struct transparent;
+
+protected:
+	static void setupPBRCommon(dx_command_list* cl, const common_material_info& info);
 };
 
-struct opaque_pbr_pipeline::standard : opaque_pbr_pipeline
+struct pbr_pipeline::opaque : pbr_pipeline
 {
 	PIPELINE_SETUP_DECL;
 };
 
-struct opaque_pbr_pipeline::double_sided : opaque_pbr_pipeline
+struct pbr_pipeline::opaque_double_sided : pbr_pipeline
 {
 	PIPELINE_SETUP_DECL;
 };
 
-struct transparent_pbr_pipeline
+struct pbr_pipeline::transparent : pbr_pipeline
 {
-	using material_t = ref<pbr_material>;
-
-	static void initialize();
-
 	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
 };
 
 
