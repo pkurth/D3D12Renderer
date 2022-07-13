@@ -43,7 +43,7 @@ void render_resources::initializeGlobalResources()
 		SET_NAME(blackCubeTexture->resource, "Black cube");
 	}
 
-	noiseTexture = loadTextureFromFile("assets/noise/blue_noise.dds", image_load_flags_noncolor); // Already compressed and in DDS format.
+	noiseTexture = loadTextureFromFile("resources/noise/blue_noise.dds", image_load_flags_noncolor); // Already compressed and in DDS format.
 
 	shadowMap = createDepthTexture(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, shadowDepthFormat, 1, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	SET_NAME(shadowMap->resource, "Shadow map");

@@ -6,6 +6,7 @@ bin_int/
 *.filters
 shaders/bin/
 assets/
+asset_cache/
 shaders/generated/
 learning/gym-loco/gym_loco.egg-info/
 learning/gym-loco/gym_loco/__pycache__/
@@ -15,5 +16,5 @@ tmp/
 learning/__pycache__/
 *.user
 *.dll
-resources/
 src/generated/
+resources/files.yaml

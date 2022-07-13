@@ -118,7 +118,7 @@ int main(int argc, char** argv)
 
 	dx_window window;
 	window.initialize(TEXT("D3D12 Renderer"), 1920, 1080);
-	window.setIcon("assets/icons/project_icon.png");
+	window.setIcon("resources/icons/project_icon.png");
 	window.setCustomWindowStyle();
 
 	application app = {};

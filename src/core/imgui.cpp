@@ -95,14 +95,14 @@ ImGuiContext* initializeImGui(struct dx_window& window)
 
 	setStyle();
 
-	io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/opensans/OpenSans-Regular.ttf", 18.f);
+	io.FontDefault = io.Fonts->AddFontFromFileTTF("resources/fonts/opensans/OpenSans-Regular.ttf", 18.f);
 
 	// Merge in icons.
 	static const ImWchar iconsRanges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
 	ImFontConfig iconsConfig;
 	iconsConfig.MergeMode = true; 
 	iconsConfig.PixelSnapH = true;
-	io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/icons/" FONT_ICON_FILE_NAME_FAS, 16.f, &iconsConfig, iconsRanges);
+	io.FontDefault = io.Fonts->AddFontFromFileTTF("resources/fonts/icons/" FONT_ICON_FILE_NAME_FAS, 16.f, &iconsConfig, iconsRanges);
 
 
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
@@ -125,7 +125,7 @@ ImGuiContext* initializeImGui(struct dx_window& window)
 		startGPUDescriptor);
 
 	{
-		iconsTexture = loadTextureFromFile("assets/icons/icons_ui.svg", image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
+		iconsTexture = loadTextureFromFile("resources/icons/icons_ui.svg", image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
 
 		CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(startCPUDescriptor, 1, descriptorHandleIncrementSize);
 		CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(startGPUDescriptor, 1, descriptorHandleIncrementSize);
