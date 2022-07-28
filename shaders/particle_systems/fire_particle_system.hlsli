@@ -5,7 +5,7 @@ struct fire_particle_data
 {
 	vec3 position;
 	uint32 maxLife_life;
-	vec3 startVelocity;
+	vec3 velocity;
 	uint32 sinAngle_cosAngle;
 };
 
@@ -55,10 +55,10 @@ static particle_data emitParticle(uint emitIndex)
 	float2 diskPoint = getRandomPointOnDisk(rng, radiusAtDistanceOne);
 
 	float3 position = cb.emitPosition;
-	float3 velocity = normalize(float3(1.f, diskPoint.x, diskPoint.y)) * 2.f;
-	velocity.z *= 3.f;
+	float3 velocity = normalize(float3(1.f, diskPoint.x, diskPoint.y));
+	velocity.x *= 4.f;
 
-	float maxLife = nextRandBetween(rng, 1.5f, 2.5f);
+	float maxLife = nextRandBetween(rng, 1.3f, 1.8f);
 
 	float angle = nextRand(rng) * 2.f * M_PI;
 	float sinAngle, cosAngle;
@@ -88,12 +88,15 @@ static bool simulateParticle(inout particle_data particle, float dt, out float s
 		float maxLife = unpackHalfsLeft(particle.maxLife_life);
 		float relLife = getRelLife(life, maxLife);
 
-		float3 velocity = particle.startVelocity;
-		velocity.y += smoothstep(0.45f, 0.6f, relLife) * 4.f;
-		velocity.x += smoothstep(0.8f, 0.f, relLife) * 8.f;
+		float3 velocity = particle.velocity;
+		velocity.y += 5.f * dt;
+
+		const float damping = 1.f;
+		//velocity *= 1.f / (1.f + dt * damping);
 
 		particle.position = particle.position + velocity * dt;
 		particle.maxLife_life = packHalfs(maxLife, life);
+		particle.velocity = velocity;
 
 		float3 V = particle.position - cb.cameraPosition;
 		sortKey = dot(V, V);
@@ -183,7 +186,7 @@ static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> parti
 
 	OUT.uv0 = getUVs(atlas, (uint)atlasIndex, originalUV);
 	OUT.uv1 = getUVs(atlas, (uint)atlasIndex + 1, originalUV);
-	OUT.uvBlend = 1.f - frac(atlasIndex);
+	OUT.uvBlend = frac(atlasIndex);
 
 	OUT.alphaScale = 1.f - smoothstep(0.9f, 1.f, atlasProgression);
 
