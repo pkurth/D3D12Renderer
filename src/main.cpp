@@ -268,7 +268,17 @@ int main(int argc, char** argv)
 			fs::create_directories(dir);
 
 			fs::path path = dir / (getTimeString() + ".png");
-			renderer.takeScreenShot(path);
+
+			if (ImGui::IsKeyDown(key_ctrl))
+			{
+				saveTextureToFile(window.backBuffers[window.currentBackbufferIndex], window.clientWidth, window.clientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, path);
+			}
+			else
+			{
+				//saveTextureToFile(window.backBuffers[window.currentBackbufferIndex], window.clientWidth, window.clientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, path);
+				saveTextureToFile(renderer.frameResult, path);
+			}
+
 			LOG_MESSAGE("Saved screenshot to '%ws'", path.c_str());
 		}
 

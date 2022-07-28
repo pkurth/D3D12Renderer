@@ -300,6 +300,7 @@ bool win32_window::initialize(const TCHAR* name, uint32 clientWidth, uint32 clie
 		}
 
 		RegisterHotKey(0, 0, 0, VK_SNAPSHOT);
+		RegisterHotKey(0, 1, MOD_CONTROL, VK_SNAPSHOT);
 
 		windowClassInitialized = true;
 	}
