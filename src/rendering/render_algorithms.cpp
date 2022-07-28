@@ -298,16 +298,18 @@ static void batchRenderRigidDepthPrepass(dx_command_list* cl,
 #endif
 
 static void depthPrePassInternal(dx_command_list* cl,
-	dx_pipeline& pipeline,
+	dx_pipeline& rigidPipeline,
+	dx_pipeline& animatedPipeline,
 	const sort_key_vector<float, static_depth_only_render_command>& staticCommands,
 	const sort_key_vector<float, dynamic_depth_only_render_command>& dynamicCommands,
+	const sort_key_vector<float, animated_depth_only_render_command>& animatedCommands,
 	const mat4& viewProj, const mat4& prevFrameViewProj,
 	depth_only_camera_jitter_cb jitterCB)
 {
 	if (staticCommands.size() > 0 || dynamicCommands.size() > 0)
 	{
-		cl->setPipelineState(*pipeline.pipeline);
-		cl->setGraphicsRootSignature(*pipeline.rootSignature);
+		cl->setPipelineState(*rigidPipeline.pipeline);
+		cl->setGraphicsRootSignature(*rigidPipeline.rootSignature);
 
 		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
 	}
@@ -343,20 +345,14 @@ static void depthPrePassInternal(dx_command_list* cl,
 			cl->drawIndexed(dc.submesh.numIndices, 1, dc.submesh.firstIndex, dc.submesh.baseVertex, 0);
 		}
 	}
-}
 
-static void depthPrePassInternal(dx_command_list* cl,
-	dx_pipeline& pipeline,
-	const sort_key_vector<float, animated_depth_only_render_command>& animatedCommands,
-	const mat4& viewProj, const mat4& prevFrameViewProj,
-	depth_only_camera_jitter_cb jitterCB)
-{
+	// Animated.
 	if (animatedCommands.size() > 0)
 	{
 		PROFILE_ALL(cl, "Animated");
 
-		cl->setPipelineState(*pipeline.pipeline);
-		cl->setGraphicsRootSignature(*pipeline.rootSignature);
+		cl->setPipelineState(*animatedPipeline.pipeline);
+		cl->setGraphicsRootSignature(*animatedPipeline.rootSignature);
 
 		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
 
@@ -389,11 +385,12 @@ void depthPrePass(dx_command_list* cl,
 
 		depth_only_camera_jitter_cb jitterCB = { jitter, prevFrameJitter };
 
-		depthPrePassInternal(cl, depthPrePassPipeline, opaqueRenderPass->staticDepthPrepass, opaqueRenderPass->dynamicDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
-		depthPrePassInternal(cl, doubleSidedDepthPrePassPipeline, opaqueRenderPass->staticDoublesidedDepthPrepass, opaqueRenderPass->dynamicDoublesidedDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
-
-		depthPrePassInternal(cl, animatedDepthPrePassPipeline, opaqueRenderPass->animatedDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
-		depthPrePassInternal(cl, doubleSidedAnimatedDepthPrePassPipeline, opaqueRenderPass->animatedDoublesidedDepthPrepass, viewProj, prevFrameViewProj, jitterCB);
+		depthPrePassInternal(cl, depthPrePassPipeline, animatedDepthPrePassPipeline, 
+			opaqueRenderPass->staticDepthPrepass, opaqueRenderPass->dynamicDepthPrepass, opaqueRenderPass->animatedDepthPrepass, 
+			viewProj, prevFrameViewProj, jitterCB);
+		depthPrePassInternal(cl, doubleSidedDepthPrePassPipeline, doubleSidedAnimatedDepthPrePassPipeline, 
+			opaqueRenderPass->staticDoublesidedDepthPrepass, opaqueRenderPass->dynamicDoublesidedDepthPrepass, opaqueRenderPass->animatedDoublesidedDepthPrepass, 
+			viewProj, prevFrameViewProj, jitterCB);
 	}
 }
 

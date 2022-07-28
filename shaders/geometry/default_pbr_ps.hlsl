@@ -17,7 +17,7 @@ struct ps_input
 	bool isFrontFace		: SV_IsFrontFace;
 };
 
-ConstantBuffer<pbr_indexed_material_cb> material		: register(b0, space1);
+ConstantBuffer<pbr_material_cb> material				: register(b0, space1);
 ConstantBuffer<camera_cb> camera						: register(b1, space1);
 ConstantBuffer<lighting_cb> lighting					: register(b2, space1);
 ConstantBuffer<light_probe_grid_cb> lightProbeGrid		: register(b3, space1);

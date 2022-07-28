@@ -189,45 +189,6 @@ struct pbr_material_cb // 24 bytes.
 	}
 };
 
-struct pbr_indexed_material_cb : pbr_material_cb
-{
-	uint32 albedoNormalIndex;
-	uint32 roughnessMetallicIndex;
-
-#ifndef HLSL
-	pbr_indexed_material_cb() {}
-
-	pbr_indexed_material_cb(
-		uint32 albedoIndex, uint32 normalIndex, uint32 roughnessIndex, uint32 metallicIndex,
-		vec4 albedo_, vec3 emission_, float roughness_, float metallic_, uint32 flags_, float normalMapStrength_ = 1.f, float refractionStrength_ = 0.f, float uvScale_ = 1.f)
-	{
-		initialize(albedo_, emission_, roughness_, metallic_, flags_, normalMapStrength_, refractionStrength_, uvScale_);
-		albedoNormalIndex = (albedoIndex << 16) | normalIndex;
-		roughnessMetallicIndex = (roughnessIndex << 16) | metallicIndex;
-	}
-#endif
-
-	uint32 albedoIndex()
-	{
-		return albedoNormalIndex >> 16;
-	}
-
-	uint32 normalMapIndex()
-	{
-		return albedoNormalIndex & 0xFFFF;
-	}
-
-	uint32 roughnessIndex()
-	{
-		return roughnessMetallicIndex >> 16;
-	}
-
-	uint32 metallicIndex()
-	{
-		return roughnessMetallicIndex & 0xFFFF;
-	}
-};
-
 
 
 

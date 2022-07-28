@@ -16,7 +16,7 @@
 #include <unordered_map>
 #include <memory>
 
-static_assert(sizeof(pbr_indexed_material_cb) == 32);
+static_assert(sizeof(pbr_material_cb) == 24);
 
 static dx_pipeline opaquePBRPipeline;
 static dx_pipeline opaqueDoubleSidedPBRPipeline;
@@ -306,7 +306,7 @@ PIPELINE_RENDER_IMPL(pbr_pipeline)
 	}
 
 	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_MATERIAL,
-		pbr_indexed_material_cb(0, 0, 0, 0, mat->albedoTint, mat->emission.xyz, mat->roughnessOverride, mat->metallicOverride, flags, 1.f, 0.f, mat->uvScale)
+		pbr_material_cb(mat->albedoTint, mat->emission.xyz, mat->roughnessOverride, mat->metallicOverride, flags, 1.f, 0.f, mat->uvScale)
 	);
 
 
