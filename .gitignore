@@ -1,20 +1,27 @@
-.vs/
+# Binaries
 bin/
 bin_int/
+shaders/bin/
+*.dll
+
+# Visual studio files
+.vs/
 *.sln
 *.vcxproj
 *.filters
-shaders/bin/
+*.user
+
+# Our files
+src/generated/
+shaders/generated/
+resources/files.yaml
 assets/
 asset_cache/
-shaders/generated/
+
+# Learning
 learning/gym-loco/gym_loco.egg-info/
 learning/gym-loco/gym_loco/__pycache__/
 learning/gym-loco/gym_loco/envs/__pycache__/
-trained_models/ppo/loco-v0.pt
-tmp/
 learning/__pycache__/
-*.user
-*.dll
-src/generated/
-resources/files.yaml
+trained_models/
+tmp/
