@@ -121,6 +121,8 @@ struct main_renderer
 	void beginFrame(uint32 windowWidth, uint32 windowHeight);
 	void endFrame(const user_input& input);
 
+	void takeScreenShot(const fs::path& path);
+
 
 	// Set these with your application.
 	void setCamera(const render_camera& camera);

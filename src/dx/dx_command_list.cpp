@@ -92,15 +92,26 @@ void dx_command_list::copyResource(dx_resource from, dx_resource to)
 
 void dx_command_list::copyTextureRegionToBuffer(const ref<dx_texture>& from, const ref<dx_buffer>& to, uint32 bufferElementOffset, uint32 x, uint32 y, uint32 width, uint32 height)
 {
-	assert(to->elementCount >= width * height);
-	assert(to->elementSize == getFormatSize(from->format));
+	uint32 numPixelsToCopy = width * height;
 
-	uint32 totalSize = to->elementCount * to->elementSize;
+	uint32 numRows = bucketize(numPixelsToCopy, from->width);
+	uint32 destWidth = (numRows == 1) ? to->elementCount : from->width;
 
-	D3D12_TEXTURE_COPY_LOCATION destLocation = { to->resource.Get(), D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
-		D3D12_PLACED_SUBRESOURCE_FOOTPRINT { 0, D3D12_SUBRESOURCE_FOOTPRINT { from->format, to->elementCount, 1, 1, alignTo(totalSize, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT) } } };
+	D3D12_TEXTURE_COPY_LOCATION destLocation = {};
+	destLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+	destLocation.pResource = to->resource.Get();
+	destLocation.SubresourceIndex = 0;
+	destLocation.PlacedFootprint.Offset = 0;
+	destLocation.PlacedFootprint.Footprint.Format = from->format;
+	destLocation.PlacedFootprint.Footprint.Width = destWidth;
+	destLocation.PlacedFootprint.Footprint.Height = numRows;
+	destLocation.PlacedFootprint.Footprint.Depth = 1;
+	destLocation.PlacedFootprint.Footprint.RowPitch = alignTo(destWidth * getFormatSize(from->format), D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
 
-	D3D12_TEXTURE_COPY_LOCATION srcLocation = { from->resource.Get(), D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX, 0 };
+	D3D12_TEXTURE_COPY_LOCATION srcLocation = {};
+	srcLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+	srcLocation.SubresourceIndex = 0;
+	srcLocation.pResource = from->resource.Get();
 
 	D3D12_BOX srcBox = { x, y, 0, x + width, y + height, 1 };
 	commandList->CopyTextureRegion(&destLocation, bufferElementOffset, 0, 0, &srcLocation, &srcBox);

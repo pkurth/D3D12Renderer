@@ -881,3 +881,59 @@ void main_renderer::endFrame(const user_input& input)
 	aoWasOnLastFrame = settings.enableAO;
 	sssWasOnLastFrame = settings.enableSSS;
 }
+
+void main_renderer::takeScreenShot(const fs::path& path)
+{
+	uint32 width = frameResult->width;
+	uint32 height = frameResult->height;
+
+
+	assert(frameResult->format == DXGI_FORMAT_R8G8B8A8_UNORM);
+	uint32 outputSize = 4;
+
+	uint32 readbackPitch = alignTo(width, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+	ref<dx_buffer> readbackBuffer = createReadbackBuffer(outputSize, readbackPitch * height);
+
+	dx_command_list* cl = dxContext.getFreeRenderCommandList();
+
+	cl->transitionBarrier(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_GENERIC_READ);
+	cl->copyTextureRegionToBuffer(frameResult, readbackBuffer, 0, 0, 0, width, height);
+	cl->transitionBarrier(frameResult, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COMMON);
+
+	uint64 fence = dxContext.executeCommandList(cl);
+
+	dxContext.renderQueue.waitForFence(fence);
+
+	uint8* output = new uint8[width * height * outputSize];
+
+	uint8* dest = output;
+	uint32 destPitch = outputSize * width;
+
+	uint8* result = (uint8*)mapBuffer(readbackBuffer, true);
+	uint32 resultPitch = (uint32)alignTo(outputSize * width, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+
+	for (uint32 h = 0; h < height; ++h)
+	{
+		memcpy(dest, result, destPitch);
+		result += resultPitch;
+		dest += destPitch;
+	}
+
+	unmapBuffer(readbackBuffer, false);
+
+
+
+	DirectX::Image image;
+	image.width = width;
+	image.height = height;
+	image.format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	image.rowPitch = width * getFormatSize(image.format);
+	image.slicePitch = image.rowPitch * height;
+	image.pixels = output;
+
+	saveImageToFile(path, image);
+
+
+	delete[] output;
+}
+

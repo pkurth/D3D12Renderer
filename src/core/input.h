@@ -16,6 +16,7 @@ enum key_code
 	key_right = VK_RIGHT,
 	key_up = VK_UP,
 	key_down = VK_DOWN,
+	key_print = VK_SNAPSHOT,
 	key_f1 = VK_F1,
 	key_f2 = VK_F2,
 	key_f3 = VK_F3,

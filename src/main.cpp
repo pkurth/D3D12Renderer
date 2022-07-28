@@ -262,6 +262,16 @@ int main(int argc, char** argv)
 		main_renderer::endFrameCommon();
 		renderer.endFrame(input);
 
+		if (ImGui::IsKeyPressed(key_print))
+		{
+			const fs::path dir = "captures";
+			fs::create_directories(dir);
+
+			fs::path path = dir / (getTimeString() + ".png");
+			renderer.takeScreenShot(path);
+			LOG_MESSAGE("Saved screenshot to '%ws'", path.c_str());
+		}
+
 		fileBrowser.draw(meshEditor);
 		meshEditor.draw();
 

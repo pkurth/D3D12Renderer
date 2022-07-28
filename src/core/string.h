@@ -47,3 +47,16 @@ constexpr uint64 hashString64(const char* s)
 	return hash;
 }
 
+static inline std::string getTimeString()
+{
+	time_t now = time(0);
+	char nowString[100];
+	ctime_s(nowString, 100, &now);
+	std::string time = nowString;
+	std::replace(time.begin(), time.end(), ' ', '_');
+	std::replace(time.begin(), time.end(), ':', '.');
+	time.pop_back(); // Pop last \n.
+
+	return time;
+}
+

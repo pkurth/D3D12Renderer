@@ -17,6 +17,7 @@ shaders/generated/
 resources/files.yaml
 assets/
 asset_cache/
+captures/
 
 # Learning
 learning/gym-loco/gym_loco.egg-info/
