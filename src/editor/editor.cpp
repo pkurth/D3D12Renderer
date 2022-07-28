@@ -282,6 +282,11 @@ void scene_editor::drawMainMenuBar()
 			"window to add it to the scene."
 		);
 		ImGui::Separator();
+		ImGui::Text(
+			"Press the Print key to capture a screenshot of the scene viewport or Ctrl+Print to capture\n"
+			"one including the editor UI."
+		);
+		ImGui::Separator();
 
 		ImGui::PopupOkButton();
 		ImGui::EndPopup();
