@@ -176,6 +176,11 @@ void proceduralSky(dx_command_list* cl,
 	const mat4& proj, const mat4& view,
 	float skyIntensity);
 
+void stylisticSky(dx_command_list* cl,
+	const dx_render_target& skyRenderTarget,
+	const mat4& proj, const mat4& view,
+	vec3 sunDirection, float skyIntensity);
+
 void sphericalHarmonicsSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
 	const mat4& proj, const mat4& view,

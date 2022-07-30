@@ -31,6 +31,7 @@ static dx_pipeline doubleSidedPointLightShadowPipeline;
 static dx_pipeline textureSkyPipeline;
 static dx_pipeline proceduralSkyPipeline;
 static dx_pipeline preethamSkyPipeline;
+static dx_pipeline stylisticSkyPipeline;
 static dx_pipeline sphericalHarmonicsSkyPipeline;
 
 static dx_pipeline outlineMarkerPipeline;
@@ -115,6 +116,7 @@ void loadCommonShaders()
 		textureSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_texture_ps" });
 		proceduralSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_procedural_ps" });
 		preethamSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_preetham_ps" });
+		stylisticSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_stylistic_ps" });
 		sphericalHarmonicsSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_sh_ps" });
 	}
 
@@ -430,6 +432,25 @@ void proceduralSky(dx_command_list* cl,
 
 	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
 	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, skyIntensity);
+
+	cl->drawCubeTriangleStrip();
+}
+
+void stylisticSky(dx_command_list* cl,
+	const dx_render_target& skyRenderTarget,
+	const mat4& proj, const mat4& view,
+	vec3 sunDirection, float skyIntensity)
+{
+	PROFILE_ALL(cl, "Sky");
+
+	cl->setRenderTarget(skyRenderTarget);
+	cl->setViewport(skyRenderTarget.viewport);
+
+	cl->setPipelineState(*stylisticSkyPipeline.pipeline);
+	cl->setGraphicsRootSignature(*stylisticSkyPipeline.rootSignature);
+
+	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
+	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_cb{ skyIntensity, sunDirection });
 
 	cl->drawCubeTriangleStrip();
 }
