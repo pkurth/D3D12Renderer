@@ -34,6 +34,59 @@ float getStars(float3 V)
 	return stars;
 }
 
+float getCloudValue(float2 p, float intensity)
+{
+	const float density = 0.5f;
+	const float sharpness = 0.1f;
+	const float scale = 1.f / 0.05f;
+
+	float noise = fbm(p);
+
+	noise = saturate(1.f - exp(-(noise - density) * sharpness)) * scale;
+	return noise * intensity;
+}
+
+float3 getClouds(float3 V)
+{
+	const float height = 1000.f;
+
+	float ndotd = -V.y;
+	if (abs(ndotd) < 1e-6f)
+	{
+		return 0.f;
+	}
+
+	float t = -height / ndotd;
+	if (t < 0.f)
+	{
+		return 0.f;
+	}
+
+	float3 hit = t * V;
+	float l = length(hit.xz);
+
+	float intensity = 1.f - smoothstep(0.f, 30000.f, l);
+
+	float2 p = hit.xz * 0.0007f;
+	float value = getCloudValue(p, intensity);
+
+#if 0
+	const float delta = 0.1f;
+	const float invDelta = 1.f / delta;
+
+	float nx = getCloudValue(p + float2(delta, 0.f), intensity);
+	float nz = getCloudValue(p + float2(0.f, delta), intensity);
+
+	float3 N = normalize(float3(
+		-(nx - value) * invDelta,
+		-1.f,
+		-(nz - value) * invDelta
+	));
+
+#endif
+	return value;
+}
+
 [RootSignature(SKY_STYLISTIC_RS)]
 ps_output main(ps_input IN)
 {
@@ -89,6 +142,11 @@ ps_output main(ps_input IN)
 
 	color += (getStars(V * 1.5f) + getStars(V * 3.f)) * saturate(-0.3f - L.y);
 
+	
+	// Clouds.
+	float3 cloudcolor = getClouds(V);
+
+	color += cloudcolor;
 
 #endif
 
