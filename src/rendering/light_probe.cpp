@@ -524,6 +524,7 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 		light_probe_trace_cb cb;
 		cb.rayRotation = createModelMatrix(0.f, grid.rayRotation);
 		cb.grid = grid.getCB();
+		cb.sampleSkyFromTexture = sky != nullptr;
 
 		cl->setComputeDescriptorTable(LIGHT_PROBE_TRACING_RS_RESOURCES, gpuHandle);
 		cl->setCompute32BitConstants(LIGHT_PROBE_TRACING_RS_CB, cb);

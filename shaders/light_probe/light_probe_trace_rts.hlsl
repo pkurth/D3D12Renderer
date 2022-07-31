@@ -4,6 +4,7 @@
 #include "../common/random.hlsli"
 #include "../common/light_source.hlsli"
 #include "../common/raytracing.hlsli"
+#include "../common/stylistic_sky.hlsli"
 #include "../rs/light_probe_rs.hlsli"
 
 // Raytracing intrinsics: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#ray-system-values
@@ -216,7 +217,14 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 [shader("miss")]
 void radianceMiss(inout radiance_ray_payload payload)
 {
-	payload.color = sky.SampleLevel(linearSampler, WorldRayDirection(), 8).xyz; // We sample a very high mip level of the sky here, because a small sun makes the samples very noisy.
+	if (cb.sampleSkyFromTexture == 1)
+	{
+		payload.color = sky.SampleLevel(linearSampler, WorldRayDirection(), 8).xyz; // We sample a very high mip level of the sky here, because a small sun makes the samples very noisy.
+	}
+	else
+	{
+		payload.color = stylisticSkySimple(normalize(WorldRayDirection()), normalize(-sun.direction));
+	}
 }
 
 

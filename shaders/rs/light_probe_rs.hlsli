@@ -99,6 +99,7 @@ struct light_probe_trace_cb
 {
 	mat4 rayRotation;
 	light_probe_grid_cb grid;
+	uint32 sampleSkyFromTexture;
 };
 
 #endif
