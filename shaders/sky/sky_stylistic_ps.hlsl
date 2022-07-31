@@ -1,5 +1,6 @@
 #include "math.hlsli"
 #include "sky_rs.hlsli"
+#include "random.hlsli"
 
 
 ConstantBuffer<sky_cb> cb : register(b1);
@@ -18,6 +19,30 @@ struct ps_output
 	uint objectID			: SV_Target2;
 };
 
+// https://www.shadertoy.com/view/ttScDc
+float getGlow(float dist, float radius, float intensity) 
+{
+	dist = max(dist, 1e-7);
+	return pow(radius / dist, intensity);
+}
+
+float getStars(float3 rayDir) 
+{
+	float scale = 60.0;
+	float3 id = floor(rayDir * scale);
+	float d = length(scale * rayDir - (id + 0.5));
+
+	float stars = 0.0;
+
+	float2 uv = id.xy + vec2(37.0, 17.0) * id.z;
+	float rnd = random(uv + 0.5f);
+
+	if (rnd.x > 0.92 && d < 0.15) {
+		stars = getGlow(d, 0.075, 2.5 - 2.0);
+	}
+	return stars;
+}
+
 [RootSignature(SKY_STYLISTIC_RS)]
 ps_output main(ps_input IN)
 {
@@ -26,8 +51,10 @@ ps_output main(ps_input IN)
 
 	float LdotV = dot(V, L);
 
+
+#if 0
 	float3 horizonColor = float3(1.f, 0.6f, 0.2f);
-	float3 skyColor = float3(182, 220, 240) / 255.f;
+	float3 skyColor = float3(233, 241, 247) / 255.f;
 
 	skyColor = lerp(float3(0.2, 0.25, 0.30) * 0.1, skyColor, saturate(L.y + 0.6f));
 
@@ -49,6 +76,30 @@ ps_output main(ps_input IN)
 	color = lerp(color, sunColor, smoothstep(sunThresh, sunThresh + 0.001f, LdotV));
 
 	color = lerp(color, float3(0.f, 0.f, 0.f), smoothstep(0.f, 1.f, saturate(-V.y)));
+
+#else
+	// https://www.shadertoy.com/view/tt3cDl
+	float3 skycolor = vec3(0.2, 0.4, 0.8) * max(0.2, L.y);
+	float3 suncolor = saturate(lerp(vec3(0.99, 0.3, 0.1), vec3(1.0, 1.0, 0.8), L.y));
+	float3 sunhalo =
+		lerp(
+			max(0.0, (1.0 - max(0.0, (1.0 - L.y * 3.0)) * V.y * 4.0)),
+			0.0,
+			L.y)
+		* saturate(pow(0.5 * LdotV + 0.5, (8.0 - L.y * 5.0)))
+		* suncolor;
+
+
+	float3 color = skycolor;
+	//color += saturate(2.f * pow(saturate(LdotV), 800.f)) * (suncolor + 0.4f.xxx);
+	color += saturate(2.f * pow(saturate(LdotV), 2500.f)) * (suncolor + 0.4f.xxx) * 300.f;
+	color += pow(sunhalo, 2.f);
+	color += pow(1.f - V.y, 2.0) * suncolor * 0.5f;
+
+	color += (getStars(V * 1.5f) + getStars(V * 3.f)) * saturate(-0.3f - L.y);
+
+
+#endif
 
 	float2 ndc = (IN.ndc.xy / IN.ndc.z) - cb.jitter;
 	float2 prevNDC = (IN.prevFrameNDC.xy / IN.prevFrameNDC.z) - cb.prevFrameJitter;

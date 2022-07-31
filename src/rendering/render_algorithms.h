@@ -47,7 +47,7 @@ REFLECT_STRUCT(taa_settings,
 struct bloom_settings
 {
 	float threshold = 100.f;
-	float strength = 0.1f;
+	float strength = 0.05f;
 };
 REFLECT_STRUCT(bloom_settings,
 	(threshold, "Threshold"),
