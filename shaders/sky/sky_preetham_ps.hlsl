@@ -88,6 +88,18 @@ ps_output main(ps_input IN)
 	float LdotV = dot(V, L);
 
 	float3 color = max(calculateSkyLuminanceRGB(L, V, turbidity), 0.f.xxx) * 0.08f * cb.intensity;
+
+
+
+	float sunThresh = 0.9985f;
+	float3 sunColorHigh = float3(1.f, 0.93f, 0.76f) * 700.f;
+	float3 sunColorLow = float3(0.3f, 0.08f, 0.05f) * 50.f;
+
+	float3 sunColor = lerp(sunColorLow, sunColorHigh, saturate(L.y));
+
+	color = lerp(color, sunColor, smoothstep(sunThresh, sunThresh + 0.001f, LdotV));
+
+
 	float2 ndc = (IN.ndc.xy / IN.ndc.z) - cb.jitter;
 	float2 prevNDC = (IN.prevFrameNDC.xy / IN.prevFrameNDC.z) - cb.prevFrameJitter;
 
