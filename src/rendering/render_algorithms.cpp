@@ -398,9 +398,10 @@ void depthPrePass(dx_command_list* cl,
 
 void texturedSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const mat4& proj, const mat4& view,
+	const mat4& proj, const mat4& view, const mat4& prevFrameView,
 	ref<dx_texture> sky,
-	float skyIntensity)
+	float skyIntensity,
+	vec2 jitter, vec2 prevFrameJitter)
 {
 	PROFILE_ALL(cl, "Sky");
 
@@ -410,8 +411,8 @@ void texturedSky(dx_command_list* cl,
 	cl->setPipelineState(*textureSkyPipeline.pipeline);
 	cl->setGraphicsRootSignature(*textureSkyPipeline.rootSignature);
 
-	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
-	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, skyIntensity);
+	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view), proj * createSkyViewMatrix(prevFrameView) });
+	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_cb{ jitter, prevFrameJitter, skyIntensity });
 	cl->setDescriptorHeapSRV(SKY_RS_TEX, 0, sky);
 
 	cl->drawCubeTriangleStrip();
@@ -419,8 +420,9 @@ void texturedSky(dx_command_list* cl,
 
 void proceduralSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const mat4& proj, const mat4& view,
-	float skyIntensity)
+	const mat4& proj, const mat4& view, const mat4& prevFrameView,
+	float skyIntensity,
+	vec2 jitter, vec2 prevFrameJitter)
 {
 	PROFILE_ALL(cl, "Sky");
 
@@ -430,16 +432,17 @@ void proceduralSky(dx_command_list* cl,
 	cl->setPipelineState(*proceduralSkyPipeline.pipeline);
 	cl->setGraphicsRootSignature(*proceduralSkyPipeline.rootSignature);
 
-	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
-	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, skyIntensity);
+	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view), proj * createSkyViewMatrix(prevFrameView) });
+	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_cb{ jitter, prevFrameJitter, skyIntensity });
 
 	cl->drawCubeTriangleStrip();
 }
 
 void stylisticSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const mat4& proj, const mat4& view,
-	vec3 sunDirection, float skyIntensity)
+	const mat4& proj, const mat4& view, const mat4& prevFrameView,
+	vec3 sunDirection, float skyIntensity,
+	vec2 jitter, vec2 prevFrameJitter)
 {
 	PROFILE_ALL(cl, "Sky");
 
@@ -449,17 +452,18 @@ void stylisticSky(dx_command_list* cl,
 	cl->setPipelineState(*stylisticSkyPipeline.pipeline);
 	cl->setGraphicsRootSignature(*stylisticSkyPipeline.rootSignature);
 
-	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
-	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_cb{ skyIntensity, sunDirection });
+	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view), proj * createSkyViewMatrix(prevFrameView) });
+	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_cb{ jitter, prevFrameJitter, skyIntensity, sunDirection });
 
 	cl->drawCubeTriangleStrip();
 }
 
 void sphericalHarmonicsSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const mat4& proj, const mat4& view,
+	const mat4& proj, const mat4& view, const mat4& prevFrameView,
 	const ref<dx_buffer>& sh, uint32 shIndex,
-	float skyIntensity)
+	float skyIntensity,
+	vec2 jitter, vec2 prevFrameJitter)
 {
 	PROFILE_ALL(cl, "Sky");
 
@@ -469,8 +473,8 @@ void sphericalHarmonicsSky(dx_command_list* cl,
 	cl->setPipelineState(*sphericalHarmonicsSkyPipeline.pipeline);
 	cl->setGraphicsRootSignature(*sphericalHarmonicsSkyPipeline.rootSignature);
 
-	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
-	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, skyIntensity);
+	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view), proj * createSkyViewMatrix(prevFrameView) });
+	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_cb{ jitter, prevFrameJitter, skyIntensity });
 	cl->setRootGraphicsSRV(SKY_RS_SH, sh->gpuVirtualAddress + sizeof(spherical_harmonics) * shIndex);
 
 	cl->drawCubeTriangleStrip();
@@ -478,8 +482,9 @@ void sphericalHarmonicsSky(dx_command_list* cl,
 
 void preethamSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const mat4& proj, const mat4& view,
-	vec3 sunDirection, float skyIntensity)
+	const mat4& proj, const mat4& view, const mat4& prevFrameView,
+	vec3 sunDirection, float skyIntensity,
+	vec2 jitter, vec2 prevFrameJitter)
 {
 	PROFILE_ALL(cl, "Sky");
 
@@ -489,8 +494,8 @@ void preethamSky(dx_command_list* cl,
 	cl->setPipelineState(*preethamSkyPipeline.pipeline);
 	cl->setGraphicsRootSignature(*preethamSkyPipeline.rootSignature);
 
-	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view) });
-	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_cb{ skyIntensity, sunDirection });
+	cl->setGraphics32BitConstants(SKY_RS_VP, sky_transform_cb{ proj * createSkyViewMatrix(view), proj * createSkyViewMatrix(prevFrameView) });
+	cl->setGraphics32BitConstants(SKY_RS_INTENSITY, sky_cb{ jitter, prevFrameJitter, skyIntensity, sunDirection });
 
 	cl->drawCubeTriangleStrip();
 }

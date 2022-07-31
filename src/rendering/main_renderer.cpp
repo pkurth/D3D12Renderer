@@ -519,13 +519,16 @@ void main_renderer::endFrame(const user_input& input)
 
 			if (environment)
 			{
-				texturedSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, environment->sky, settings.skyIntensity);
+				texturedSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, jitteredCamera.prevFrameView, environment->sky, settings.skyIntensity,
+					jitteredCamera.jitter, jitteredCamera.prevFrameJitter);
 			}
 			else
 			{
 				//proceduralSky(cl, skyRenderTarget, textureSkyPipeline, jitteredCamera.proj, jitteredCamera.view, skyIntensity);
-				//preethamSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, sun.direction, settings.skyIntensity);
-				stylisticSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, sun.direction, settings.skyIntensity);
+				//preethamSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, jitteredCamera.prevFrameView, sun.direction, settings.skyIntensity,
+					//jitteredCamera.jitter, jitteredCamera.prevFrameJitter);
+				stylisticSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, jitteredCamera.prevFrameView, sun.direction, settings.skyIntensity,
+					jitteredCamera.jitter, jitteredCamera.prevFrameJitter);
 			}
 
 

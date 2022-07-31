@@ -167,30 +167,35 @@ void depthPrePass(dx_command_list* cl,
 
 void texturedSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const mat4& proj, const mat4& view,
+	const mat4& proj, const mat4& view, const mat4& prevFrameView,
 	ref<dx_texture> sky,
-	float skyIntensity);
+	float skyIntensity, 
+	vec2 jitter, vec2 prevFrameJitter);
 
 void proceduralSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const mat4& proj, const mat4& view,
-	float skyIntensity);
+	const mat4& proj, const mat4& view, const mat4& prevFrameView,
+	float skyIntensity, 
+	vec2 jitter, vec2 prevFrameJitter);
 
 void stylisticSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const mat4& proj, const mat4& view,
-	vec3 sunDirection, float skyIntensity);
+	const mat4& proj, const mat4& view, const mat4& prevFrameView,
+	vec3 sunDirection, float skyIntensity,
+	vec2 jitter, vec2 prevFrameJitter);
 
 void sphericalHarmonicsSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const mat4& proj, const mat4& view,
+	const mat4& proj, const mat4& view, const mat4& prevFrameView,
 	const ref<dx_buffer>& sh, uint32 shIndex,
-	float skyIntensity);
+	float skyIntensity,
+	vec2 jitter, vec2 prevFrameJitter);
 
 void preethamSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
-	const mat4& proj, const mat4& view,
-	vec3 sunDirection, float skyIntensity);
+	const mat4& proj, const mat4& view, const mat4& prevFrameView,
+	vec3 sunDirection, float skyIntensity,
+	vec2 jitter, vec2 prevFrameJitter);
 
 void shadowPasses(dx_command_list* cl,
 	const sun_shadow_render_pass** sunShadowRenderPasses, uint32 numSunLightShadowRenderPasses,

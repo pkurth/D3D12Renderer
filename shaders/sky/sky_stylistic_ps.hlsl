@@ -2,11 +2,13 @@
 #include "sky_rs.hlsli"
 
 
-ConstantBuffer<sky_cb> sky : register(b1);
+ConstantBuffer<sky_cb> cb : register(b1);
 
 struct ps_input
 {
-	float3 uv		: TEXCOORDS;
+	float3 uv				: TEXCOORDS;
+	float3 ndc				: NDC;
+	float3 prevFrameNDC		: PREV_FRAME_NDC;
 };
 
 struct ps_output
@@ -20,7 +22,7 @@ struct ps_output
 ps_output main(ps_input IN)
 {
 	float3 V = normalize(IN.uv);
-	float3 L = -sky.sunDirection;
+	float3 L = -cb.sunDirection;
 
 	float LdotV = dot(V, L);
 
@@ -48,10 +50,17 @@ ps_output main(ps_input IN)
 
 	color = lerp(color, float3(0.f, 0.f, 0.f), smoothstep(0.f, 1.f, saturate(-V.y)));
 
+	float2 ndc = (IN.ndc.xy / IN.ndc.z) - cb.jitter;
+	float2 prevNDC = (IN.prevFrameNDC.xy / IN.prevFrameNDC.z) - cb.prevFrameJitter;
+
+	float2 motion = (prevNDC - ndc) * float2(0.5f, -0.5f);
+
+	color *= cb.intensity;
+
 
 	ps_output OUT;
 	OUT.color = float4(max(color, 0.f), 0.f);
-	OUT.screenVelocity = float2(0.f, 0.f); // TODO: This is of course not the correct screen velocity for the sky.
+	OUT.screenVelocity = motion;
 	OUT.objectID = 0xFFFFFFFF; // -1.
 	return OUT;
 }

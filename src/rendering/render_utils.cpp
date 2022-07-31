@@ -69,6 +69,7 @@ void buildCameraConstantBuffer(const render_camera& camera, float cameraJitterSt
 
 void buildCameraConstantBuffer(const render_camera& camera, vec2 jitter, camera_cb& outCB)
 {
+	outCB.prevFrameView = outCB.view;
 	outCB.prevFrameViewProj = outCB.viewProj;
 	outCB.viewProj = camera.viewProj;
 	outCB.view = camera.view;
