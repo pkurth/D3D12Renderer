@@ -1,5 +1,5 @@
 #include "sky_rs.hlsli"
-
+#include "math.hlsli"
 
 ConstantBuffer<sky_cb> cb : register(b1);
 
@@ -23,14 +23,9 @@ struct ps_output
 [RootSignature(SKY_TEXTURE_RS)]
 ps_output main(ps_input IN)
 {
-	float2 ndc = (IN.ndc.xy / IN.ndc.z) - cb.jitter;
-	float2 prevNDC = (IN.prevFrameNDC.xy / IN.prevFrameNDC.z) - cb.prevFrameJitter;
-
-	float2 motion = (prevNDC - ndc) * float2(0.5f, -0.5f);
-
 	ps_output OUT;
 	OUT.color = float4((tex.Sample(texSampler, IN.uv) * cb.intensity).xyz, 0.f);
-	OUT.screenVelocity = motion;
+	OUT.screenVelocity = screenSpaceVelocity(IN.ndc, IN.prevFrameNDC, cb.jitter, cb.prevFrameJitter);
 	OUT.objectID = 0xFFFFFFFF; // -1.
 	return OUT;
 }

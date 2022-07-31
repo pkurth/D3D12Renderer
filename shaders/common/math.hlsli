@@ -62,6 +62,15 @@ inline bool isSaturated(float3 a) { return isSaturated(a.x) && isSaturated(a.y) 
 inline bool isSaturated(float4 a) { return isSaturated(a.x) && isSaturated(a.y) && isSaturated(a.z) && isSaturated(a.w); }
 
 
+static float2 screenSpaceVelocity(float3 ndc, float3 prevFrameNDC, float2 jitter, float2 prevFrameJitter)
+{
+	float2 currNDC = (ndc.xy / ndc.z) - jitter;
+	float2 prevNDC = (prevFrameNDC.xy / prevFrameNDC.z) - prevFrameJitter;
+
+	float2 motion = (prevNDC - currNDC) * float2(0.5f, -0.5f);
+	return motion;
+}
+
 static float2 quadFromVertexID(uint vertexID)
 {
 	return float2((vertexID << 1) & 2, vertexID & 2) - 1.f;
