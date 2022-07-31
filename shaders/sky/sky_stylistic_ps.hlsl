@@ -19,27 +19,18 @@ struct ps_output
 	uint objectID			: SV_Target2;
 };
 
-// https://www.shadertoy.com/view/ttScDc
-float getGlow(float dist, float radius, float intensity) 
+float getStars(float3 V) 
 {
-	dist = max(dist, 1e-7);
-	return pow(radius / dist, intensity);
-}
+	const float scale = 60.f;
+	float3 id = floor(V * scale);
+	float d = length(scale * V - (id + 0.5f));
 
-float getStars(float3 rayDir) 
-{
-	float scale = 60.0;
-	float3 id = floor(rayDir * scale);
-	float d = length(scale * rayDir - (id + 0.5));
-
-	float stars = 0.0;
-
-	float2 uv = id.xy + vec2(37.0, 17.0) * id.z;
+	float2 uv = id.xy + vec2(37.f, 17.f) * id.z;
 	float rnd = random(uv + 0.5f);
 
-	if (rnd.x > 0.92 && d < 0.15) {
-		stars = getGlow(d, 0.075, 2.5 - 2.0);
-	}
+	// https://www.shadertoy.com/view/ttScDc
+	float stars = sqrt(0.075f / max(d, 1e-7f)) * (rnd.x > 0.92f && d < 0.15f);
+
 	return stars;
 }
 
@@ -79,22 +70,22 @@ ps_output main(ps_input IN)
 
 #else
 	// https://www.shadertoy.com/view/tt3cDl
-	float3 skycolor = vec3(0.2, 0.4, 0.8) * max(0.2, L.y);
-	float3 suncolor = saturate(lerp(vec3(0.99, 0.3, 0.1), vec3(1.0, 1.0, 0.8), L.y));
+	float3 skycolor = float3(0.2f, 0.4f, 0.8f) * max(0.2f, L.y);
+	float3 suncolor = saturate(lerp(float3(0.99f, 0.3f, 0.1f), float3(1.f, 1.f, 0.8f), L.y));
 	float3 sunhalo =
 		lerp(
-			max(0.0, (1.0 - max(0.0, (1.0 - L.y * 3.0)) * V.y * 4.0)),
-			0.0,
+			max(0.f, (1.f - max(0.f, (1.f - L.y * 3.f)) * V.y * 4.f)),
+			0.f,
 			L.y)
-		* saturate(pow(0.5 * LdotV + 0.5, (8.0 - L.y * 5.0)))
+		* saturate(pow(0.5f * LdotV + 0.5f, (8.f - L.y * 5.f)))
 		* suncolor;
 
 
 	float3 color = skycolor;
 	//color += saturate(2.f * pow(saturate(LdotV), 800.f)) * (suncolor + 0.4f.xxx);
 	color += saturate(2.f * pow(saturate(LdotV), 2500.f)) * (suncolor + 0.4f.xxx) * 300.f;
-	color += pow(sunhalo, 2.f);
-	color += pow(1.f - V.y, 2.0) * suncolor * 0.5f;
+	color += square(sunhalo);
+	color += square(1.f - V.y) * suncolor * 0.5f;
 
 	color += (getStars(V * 1.5f) + getStars(V * 3.f)) * saturate(-0.3f - L.y);
 

@@ -28,6 +28,9 @@ static float solidAngleOfSphere(float radius, float distance)
 }
 
 static float square(float v) { return v * v; }
+static float2 square(float2 v) { return v * v; }
+static float3 square(float3 v) { return v * v; }
+static float4 square(float4 v) { return v * v; }
 static float pow3(float v) { return v * v * v; }
 
 static float maxComponent(float3 a) { return max(a.x, max(a.y, a.z)); }
