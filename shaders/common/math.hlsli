@@ -153,4 +153,25 @@ static inline float cross2(float2 a, float2 b)
 	return a.x * b.y - a.y * b.x; 
 }
 
+//	https://www.lgdv.tf.fau.de/publications/spherical-fibonacci-mapping/
+static float3 sphericalFibonacci(float i, float n)
+{
+	const float PHI = sqrt(5.f) * 0.5f + 0.5f;
+#   define madfrac(a, b) ((a)*(b)-floor((a)*(b)))
+	float phi = 2.f * M_PI * madfrac(i, PHI - 1);
+	float cosTheta = 1.f - (2.f * i + 1.f) * (1.f / n);
+	float sinTheta = sqrt(saturate(1.f - cosTheta * cosTheta));
+
+	float sinPhi, cosPhi;
+	sincos(phi, sinPhi, cosPhi);
+
+	return float3(
+		cosPhi * sinTheta,
+		sinPhi * sinTheta,
+		cosTheta);
+
+#   undef madfrac
+}
+
+
 #endif

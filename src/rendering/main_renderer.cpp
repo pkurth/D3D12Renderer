@@ -404,14 +404,14 @@ void main_renderer::endFrame(const user_input& input)
 	if (environment)
 	{
 		materialInfo.sky = environment->sky;
-		materialInfo.environment = environment->environment;
 		materialInfo.irradiance = environment->irradiance;
+		materialInfo.prefilteredRadiance = environment->prefilteredRadiance;
 	}
 	else
 	{
 		materialInfo.sky = render_resources::blackCubeTexture;
-		materialInfo.environment = render_resources::blackCubeTexture;
 		materialInfo.irradiance = render_resources::blackCubeTexture;
+		materialInfo.prefilteredRadiance = render_resources::blackCubeTexture;
 	}
 	materialInfo.environmentIntensity = settings.environmentIntensity;
 	materialInfo.skyIntensity = settings.skyIntensity;

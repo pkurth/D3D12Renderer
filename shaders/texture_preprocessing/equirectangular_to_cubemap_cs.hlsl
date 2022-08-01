@@ -13,7 +13,7 @@
 
 #define BLOCK_SIZE 16
 
-cbuffer equirectangular_to_cubemap_cb : register(b0)
+cbuffer cb : register(b0)
 {
 	uint cubemapSize;				// Size of the cubemap face in pixels at the current mipmap level.
 	uint firstMip;					// The first mip level to generate.

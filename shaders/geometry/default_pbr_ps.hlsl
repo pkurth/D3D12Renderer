@@ -37,7 +37,7 @@ Texture2D<float> metalTex								: register(t3, space1);
 ConstantBuffer<directional_light_cb> sun				: register(b0, space2);
 
 TextureCube<float4> irradianceTexture					: register(t0, space2);
-TextureCube<float4> environmentTexture					: register(t1, space2);
+TextureCube<float4> prefilteredRadianceTexture			: register(t1, space2);
 
 Texture2D<float2> brdf									: register(t2, space2);
 
@@ -289,13 +289,13 @@ ps_output main(ps_input IN)
 
 	float4 ssr = ssrTexture.SampleLevel(clampSampler, screenUV, 0);
 
-#if 0
+#if 1
 	totalLighting.diffuse += lightProbeGrid.sampleIrradianceAtPosition(surface.P, surface.N, lightProbeIrradiance, lightProbeDepth, wrapSampler) * lighting.environmentIntensity * ao;
 	float3 specular = float3(0.f, 0.f, 0.f);
 #else
 	ambient_factors factors = getAmbientFactors(surface);
 	totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity * ao;
-	float3 specular = specularIBL(factors.ks, surface, environmentTexture, brdf, clampSampler);
+	float3 specular = specularIBL(factors.ks, surface, prefilteredRadianceTexture, brdf, clampSampler);
 #endif
 
 	specular = lerp(specular, ssr.rgb, ssr.a);

@@ -302,7 +302,7 @@ PIPELINE_SETUP_IMPL(boid_particle_system::boid_pipeline)
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 0, materialInfo.irradiance);
-	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 1, materialInfo.environment);
+	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 1, materialInfo.prefilteredRadiance);
 	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 2, render_resources::brdfTex);
 }
 

@@ -16,7 +16,7 @@
 #include "random.hlsli"
 
 
-cbuffer prefilter_environment_cb : register(b0)
+cbuffer cb : register(b0)
 {
 	uint cubemapSize;				// Size of the cubemap face in pixels at the current mipmap level.
 	uint firstMip;					// The first mip level to generate.

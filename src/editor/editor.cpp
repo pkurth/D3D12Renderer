@@ -1315,7 +1315,7 @@ void scene_editor::setEnvironment(const fs::path& filename)
 {
 	game_scene* scene = &this->scene->getCurrentScene();
 
-	scene->environment = createEnvironment(filename); // Currently synchronous (on render queue).
+	scene->environment = createPBREnvironment(filename); // Currently synchronous (on render queue).
 	renderer->pathTracer.resetRendering();
 
 	if (!scene->environment)

@@ -10,9 +10,13 @@
 
 static dx_pipeline mipmapPipeline;
 static dx_pipeline equirectangularToCubemapPipeline;
-static dx_pipeline cubemapToIrradiancePipeline;
-static dx_pipeline cubemapToIrradianceSHPipeline;
-static dx_pipeline prefilterEnvironmentPipeline;
+
+static dx_pipeline texturedSkyToIrradiancePipeline;
+static dx_pipeline texturedSkyToIrradianceSHPipeline;
+static dx_pipeline texturedSkyToPrefilteredRadiancePipeline;
+
+static dx_pipeline proceduralSkyToIrradiancePipeline;
+
 static dx_pipeline integrateBRDFPipeline;
 
 
@@ -34,17 +38,23 @@ struct equirectangular_to_cubemap_cb
 	uint32 isSRGB;
 };
 
-struct cubemap_to_irradiance_cb
+struct textured_sky_to_irradiance_cb
 {
 	uint32 irradianceMapSize;
 };
 
-struct cubemap_to_irradiance_sh_cb
+struct textured_sky_to_irradiance_sh_cb
 {
 	uint32 mipLevel;
 };
 
-struct prefilter_environment_cb
+struct procedural_sky_to_irradiance_cb
+{
+	vec3 sunDirection;
+	uint32 irradianceMapSize;
+};
+
+struct textured_sky_to_prefiltered_radiance_cb
 {
 	uint32 cubemapSize;				// Size of the cubemap face in pixels at the current mipmap level.
 	uint32 firstMip;				// The first mip level to generate.
@@ -61,9 +71,13 @@ void initializeTexturePreprocessing()
 {
 	mipmapPipeline = createReloadablePipeline("generate_mips_cs");
 	equirectangularToCubemapPipeline = createReloadablePipeline("equirectangular_to_cubemap_cs");
-	cubemapToIrradiancePipeline = createReloadablePipeline("cubemap_to_irradiance_cs");
-	cubemapToIrradianceSHPipeline = createReloadablePipeline("cubemap_to_irradiance_sh_cs");
-	prefilterEnvironmentPipeline = createReloadablePipeline("prefilter_environment_cs");
+
+	texturedSkyToIrradiancePipeline = createReloadablePipeline("textured_sky_to_irradiance_cs");
+	texturedSkyToIrradianceSHPipeline = createReloadablePipeline("textured_sky_to_irradiance_sh_cs");
+	texturedSkyToPrefilteredRadiancePipeline = createReloadablePipeline("textured_sky_to_prefiltered_radiance_cs");
+
+	proceduralSkyToIrradiancePipeline = createReloadablePipeline("procedural_sky_to_irradiance_cs");
+
 	integrateBRDFPipeline = createReloadablePipeline("integrate_brdf_cs");
 }
 
@@ -375,11 +389,11 @@ ref<dx_texture> equirectangularToCubemap(dx_command_list* cl, const ref<dx_textu
 	return cubemap;
 }
 
-ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& environment, uint32 resolution, uint32 sourceSlice)
+ref<dx_texture> texturedSkyToIrradiance(dx_command_list* cl, const ref<dx_texture>& sky, uint32 resolution, uint32 sourceSlice)
 {
-	assert(environment->resource);
+	assert(sky->resource);
 
-	CD3DX12_RESOURCE_DESC irradianceDesc(environment->resource->GetDesc());
+	CD3DX12_RESOURCE_DESC irradianceDesc(sky->resource->GetDesc());
 
 	if (isSRGBFormat(irradianceDesc.Format))
 	{
@@ -428,11 +442,11 @@ ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& 
 		stagingTexture->resource = stagingResource;
 	}
 
-	cl->setPipelineState(*cubemapToIrradiancePipeline.pipeline);
-	cl->setComputeRootSignature(*cubemapToIrradiancePipeline.rootSignature);
+	cl->setPipelineState(*texturedSkyToIrradiancePipeline.pipeline);
+	cl->setComputeRootSignature(*texturedSkyToIrradiancePipeline.rootSignature);
 
-	cubemap_to_irradiance_cb cubemapToIrradianceCB;
-	cubemapToIrradianceCB.irradianceMapSize = resolution;
+	textured_sky_to_irradiance_cb cb;
+	cb.irradianceMapSize = resolution;
 
 
 	dx_descriptor_range descriptors = dxContext.frameDescriptorAllocator.allocateContiguousDescriptorRange(2);
@@ -444,18 +458,18 @@ ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& 
 	dx_double_descriptor_handle srvOffset = descriptors.pushHandle();
 	if (sourceSlice == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
 	{
-		srvOffset.createCubemapSRV(environment);
+		srvOffset.createCubemapSRV(sky);
 	}
 	else
 	{
-		srvOffset.createCubemapArraySRV(environment, { 0, 1 }, sourceSlice, 1);
+		srvOffset.createCubemapArraySRV(sky, { 0, 1 }, sourceSlice, 1);
 	}
 
-	cl->setCompute32BitConstants(0, cubemapToIrradianceCB);
+	cl->setCompute32BitConstants(0, cb);
 	cl->setComputeDescriptorTable(1, srvOffset);
 	cl->setComputeDescriptorTable(2, uavOffset);
 
-	cl->dispatch(bucketize(cubemapToIrradianceCB.irradianceMapSize, 16), bucketize(cubemapToIrradianceCB.irradianceMapSize, 16), 6);
+	cl->dispatch(bucketize(cb.irradianceMapSize, 16), bucketize(cb.irradianceMapSize, 16), 6);
 
 	cl->uavBarrier(stagingResource);
 
@@ -468,11 +482,11 @@ ref<dx_texture> cubemapToIrradiance(dx_command_list* cl, const ref<dx_texture>& 
 	return irradiance;
 }
 
-ref<dx_texture> prefilterEnvironment(dx_command_list* cl, const ref<dx_texture>& environment, uint32 resolution)
+ref<dx_texture> texturedSkyToPrefilteredRadiance(dx_command_list* cl, const ref<dx_texture>& sky, uint32 resolution)
 {
-	assert(environment->resource);
+	assert(sky->resource);
 
-	CD3DX12_RESOURCE_DESC prefilteredDesc(environment->resource->GetDesc());
+	CD3DX12_RESOURCE_DESC prefilteredDesc(sky->resource->GetDesc());
 	prefilteredDesc.Width = prefilteredDesc.Height = resolution;
 	prefilteredDesc.DepthOrArraySize = 6;
 	prefilteredDesc.MipLevels = 0;
@@ -516,17 +530,17 @@ ref<dx_texture> prefilterEnvironment(dx_command_list* cl, const ref<dx_texture>&
 		SET_NAME(stagingResource, "Staging resource for environment prefiltering");
 	}
 
-	cl->setPipelineState(*prefilterEnvironmentPipeline.pipeline);
-	cl->setComputeRootSignature(*prefilterEnvironmentPipeline.rootSignature);
+	cl->setPipelineState(*texturedSkyToPrefilteredRadiancePipeline.pipeline);
+	cl->setComputeRootSignature(*texturedSkyToPrefilteredRadiancePipeline.rootSignature);
 
-	prefilter_environment_cb prefilterEnvironmentCB;
-	prefilterEnvironmentCB.totalNumMipLevels = prefilteredDesc.MipLevels;
+	textured_sky_to_prefiltered_radiance_cb cb;
+	cb.totalNumMipLevels = prefilteredDesc.MipLevels;
 
 	dx_descriptor_range descriptors = dxContext.frameDescriptorAllocator.allocateContiguousDescriptorRange(prefilteredDesc.MipLevels + 1);
 	cl->setDescriptorHeap(descriptors);
 
 	dx_double_descriptor_handle srvOffset = descriptors.pushHandle();
-	srvOffset.createCubemapSRV(environment);
+	srvOffset.createCubemapSRV(sky);
 	cl->setComputeDescriptorTable(1, srvOffset);
 
 	for (uint32 mipSlice = 0; mipSlice < prefilteredDesc.MipLevels; )
@@ -534,11 +548,11 @@ ref<dx_texture> prefilterEnvironment(dx_command_list* cl, const ref<dx_texture>&
 		// Maximum number of mips to generate per pass is 5.
 		uint32 numMips = min(5u, prefilteredDesc.MipLevels - mipSlice);
 
-		prefilterEnvironmentCB.firstMip = mipSlice;
-		prefilterEnvironmentCB.cubemapSize = max((uint32)prefilteredDesc.Width, prefilteredDesc.Height) >> mipSlice;
-		prefilterEnvironmentCB.numMipLevelsToGenerate = numMips;
+		cb.firstMip = mipSlice;
+		cb.cubemapSize = max((uint32)prefilteredDesc.Width, prefilteredDesc.Height) >> mipSlice;
+		cb.numMipLevelsToGenerate = numMips;
 
-		cl->setCompute32BitConstants(0, prefilterEnvironmentCB);
+		cl->setCompute32BitConstants(0, cb);
 
 		for (uint32 mip = 0; mip < numMips; ++mip)
 		{
@@ -550,7 +564,7 @@ ref<dx_texture> prefilterEnvironment(dx_command_list* cl, const ref<dx_texture>&
 			}
 		}
 
-		cl->dispatch(bucketize(prefilterEnvironmentCB.cubemapSize, 16), bucketize(prefilterEnvironmentCB.cubemapSize, 16), 6);
+		cl->dispatch(bucketize(cb.cubemapSize, 16), bucketize(cb.cubemapSize, 16), 6);
 
 		mipSlice += numMips;
 	}
@@ -564,6 +578,83 @@ ref<dx_texture> prefilterEnvironment(dx_command_list* cl, const ref<dx_texture>&
 	}
 
 	return prefiltered;
+}
+
+ref<dx_texture> proceduralSkyToIrradiance(dx_command_list* cl, vec3 sunDirection, uint32 resolution, DXGI_FORMAT format)
+{
+	CD3DX12_RESOURCE_DESC irradianceDesc = CD3DX12_RESOURCE_DESC::Tex2D(format, resolution, resolution, 6, 1);
+
+	if (isSRGBFormat(irradianceDesc.Format))
+	{
+		std::cout << "Warning: Irradiance of sRGB-Format!\n";
+	}
+
+	if (isUAVCompatibleFormat(irradianceDesc.Format))
+	{
+		irradianceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	}
+
+	ref<dx_texture> irradiance = createTexture(irradianceDesc, 0, 0);
+
+	irradianceDesc = CD3DX12_RESOURCE_DESC(irradiance->resource->GetDesc());
+
+	dx_resource irradianceResource = irradiance->resource;
+	SET_NAME(irradianceResource, "Irradiance");
+	dx_resource stagingResource = irradianceResource;
+
+	ref<dx_texture> stagingTexture = make_ref<dx_texture>();
+	stagingTexture->resource = irradianceResource;
+
+
+	if ((irradianceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) == 0)
+	{
+		CD3DX12_RESOURCE_DESC stagingDesc = irradianceDesc;
+		stagingDesc.Format = getUAVCompatibleFormat(irradianceDesc.Format);
+		stagingDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+		auto heapDesc = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		checkResult(dxContext.device->CreateCommittedResource(
+			&heapDesc,
+			D3D12_HEAP_FLAG_NONE,
+			&stagingDesc,
+			D3D12_RESOURCE_STATE_COMMON,
+			0,
+			IID_PPV_ARGS(&stagingResource)
+		));
+
+		SET_NAME(stagingResource, "Staging resource for cubemap to irradiance");
+
+		stagingTexture->resource = stagingResource;
+	}
+
+	cl->setPipelineState(*proceduralSkyToIrradiancePipeline.pipeline);
+	cl->setComputeRootSignature(*proceduralSkyToIrradiancePipeline.rootSignature);
+
+	procedural_sky_to_irradiance_cb cb;
+	cb.sunDirection = -sunDirection;
+	cb.irradianceMapSize = resolution;
+
+
+	dx_descriptor_range descriptors = dxContext.frameDescriptorAllocator.allocateContiguousDescriptorRange(1);
+	cl->setDescriptorHeap(descriptors);
+
+	dx_double_descriptor_handle uavOffset = descriptors.pushHandle();
+	uavOffset.create2DTextureArrayUAV(stagingTexture, 0, getUAVCompatibleFormat(irradianceDesc.Format));
+
+	cl->setCompute32BitConstants(0, cb);
+	cl->setComputeDescriptorTable(1, uavOffset);
+
+	cl->dispatch(bucketize(cb.irradianceMapSize, 16), bucketize(cb.irradianceMapSize, 16), 6);
+
+	cl->uavBarrier(stagingResource);
+
+	if (stagingResource != irradianceResource)
+	{
+		cl->copyResource(stagingTexture->resource, irradiance->resource);
+		cl->transitionBarrier(irradiance->resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
+	}
+
+	return irradiance;
 }
 
 ref<dx_texture> integrateBRDF(dx_command_list* cl, uint32 resolution)
@@ -602,17 +693,17 @@ ref<dx_texture> integrateBRDF(dx_command_list* cl, uint32 resolution)
 	return brdf;
 }
 
-void cubemapToIrradianceSH(dx_command_list* cl, const ref<dx_texture>& environment, ref<dx_buffer> shBuffer, uint32 shIndex)
+void texturedSkyToIrradianceSH(dx_command_list* cl, const ref<dx_texture>& environment, ref<dx_buffer> shBuffer, uint32 shIndex)
 {
-	cl->setPipelineState(*cubemapToIrradianceSHPipeline.pipeline);
-	cl->setComputeRootSignature(*cubemapToIrradianceSHPipeline.rootSignature);
+	cl->setPipelineState(*texturedSkyToIrradianceSHPipeline.pipeline);
+	cl->setComputeRootSignature(*texturedSkyToIrradianceSHPipeline.rootSignature);
 
 	assert(environment->width == environment->height);
 	assert(environment->width >= 64);
 	assert(environment->depth == 6);
 	assert(shBuffer->elementCount > shIndex);
 
-	cubemap_to_irradiance_sh_cb cb;
+	textured_sky_to_irradiance_sh_cb cb;
 	cb.mipLevel = environment->numMipLevels == 1 ? 0 : (environment->numMipLevels - 6);
 
 	cl->setCompute32BitConstants(0, cb);
@@ -623,10 +714,10 @@ void cubemapToIrradianceSH(dx_command_list* cl, const ref<dx_texture>& environme
 	cl->uavBarrier(shBuffer);
 }
 
-ref<dx_buffer> cubemapToIrradianceSH(dx_command_list* cl, const ref<dx_texture>& environment)
+ref<dx_buffer> texturedSkyToIrradianceSH(dx_command_list* cl, const ref<dx_texture>& environment)
 {
 	ref<dx_buffer> buffer = createBuffer(sizeof(spherical_harmonics), 1, 0, true);
-	cubemapToIrradianceSH(cl, environment, buffer, 0);
+	texturedSkyToIrradianceSH(cl, environment, buffer, 0);
 	return buffer;
 }
 

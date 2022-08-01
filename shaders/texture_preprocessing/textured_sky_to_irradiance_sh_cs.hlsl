@@ -13,7 +13,7 @@
 #include "brdf.hlsli"
 #include "light_source.hlsli"
 
-cbuffer cubemap_to_irradiance_sh_cb : register(b0)
+cbuffer cb : register(b0)
 {
 	uint mipLevel;
 };

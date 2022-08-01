@@ -132,53 +132,43 @@ ref<pbr_material> getDefaultPBRMaterial()
 	return material;
 }
 
-ref<pbr_environment> createEnvironment(const fs::path& filename, uint32 skyResolution, uint32 environmentResolution, uint32 irradianceResolution, bool asyncCompute)
+ref<pbr_environment> createPBREnvironment(const fs::path& filename, uint32 skyResolution, uint32 environmentResolution, uint32 irradianceResolution, bool asyncCompute)
 {
-	static std::unordered_map<fs::path, weakref<pbr_environment>> cache;
-	static std::mutex mutex;
+	ref<pbr_environment> environment = make_ref<pbr_environment>();
 
-	mutex.lock();
+	ref<dx_texture> equiSky = loadTextureFromFile(filename,
+		image_load_flags_noncolor | image_load_flags_cache_to_dds | image_load_flags_gen_mips_on_cpu);
 
-	auto sp = cache[filename].lock();
-	if (!sp)
+	if (equiSky)
 	{
-		ref<dx_texture> equiSky = loadTextureFromFile(filename,
-			image_load_flags_noncolor | image_load_flags_cache_to_dds | image_load_flags_gen_mips_on_cpu);
+		ref<pbr_environment> environment = make_ref<pbr_environment>();
 
-		if (equiSky)
+		dx_command_list* cl;
+		if (asyncCompute)
 		{
-			ref<pbr_environment> environment = make_ref<pbr_environment>();
-
-			dx_command_list* cl;
-			if (asyncCompute)
-			{
-				dxContext.computeQueue.waitForOtherQueue(dxContext.copyQueue);
-				cl = dxContext.getFreeComputeCommandList(true);
-			}
-			else
-			{
-				dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
-				cl = dxContext.getFreeRenderCommandList();
-			}
-			//generateMipMapsOnGPU(cl, equiSky);
-			environment->sky = equirectangularToCubemap(cl, equiSky, skyResolution, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
-			environment->environment = prefilterEnvironment(cl, environment->sky, environmentResolution);
-			environment->irradiance = cubemapToIrradiance(cl, environment->sky, irradianceResolution);
-
-			SET_NAME(environment->sky->resource, "Sky");
-			SET_NAME(environment->environment->resource, "Environment");
-			SET_NAME(environment->irradiance->resource, "Irradiance");
-
-			environment->name = filename;
-
-			dxContext.executeCommandList(cl);
-
-			cache[filename] = sp = environment;
+			dxContext.computeQueue.waitForOtherQueue(dxContext.copyQueue);
+			cl = dxContext.getFreeComputeCommandList(true);
 		}
+		else
+		{
+			dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
+			cl = dxContext.getFreeRenderCommandList();
+		}
+		//generateMipMapsOnGPU(cl, equiSky);
+		environment->sky = equirectangularToCubemap(cl, equiSky, skyResolution, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
+		environment->irradiance = texturedSkyToIrradiance(cl, environment->sky, irradianceResolution);
+		environment->prefilteredRadiance = texturedSkyToPrefilteredRadiance(cl, environment->sky, environmentResolution);
+
+		SET_NAME(environment->sky->resource, "Sky");
+		SET_NAME(environment->irradiance->resource, "Irradiance");
+		SET_NAME(environment->prefilteredRadiance->resource, "Prefiltered Radiance");
+
+		environment->name = filename;
+
+		dxContext.executeCommandList(cl);
 	}
 
-	mutex.unlock();
-	return sp;
+	return environment;
 }
 
 void pbr_pipeline::initialize()
@@ -218,7 +208,7 @@ void pbr_pipeline::setupPBRCommon(dx_command_list* cl, const common_material_inf
 	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_LIGHT_PROBE_GRID, info.lightProbeGrid);
 
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 0, info.irradiance ? info.irradiance->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 1, info.environment ? info.environment->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 1, info.prefilteredRadiance ? info.prefilteredRadiance->defaultSRV : nullTexture);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 2, render_resources::brdfTex);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 3, info.tiledCullingGrid ? info.tiledCullingGrid->defaultSRV : nullTexture);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 4, info.tiledObjectsIndexList ? info.tiledObjectsIndexList->defaultSRV : nullBuffer);

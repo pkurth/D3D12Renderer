@@ -81,8 +81,8 @@ struct pbr_pipeline::transparent : pbr_pipeline
 struct pbr_environment
 {
 	ref<dx_texture> sky;
-	ref<dx_texture> environment;
 	ref<dx_texture> irradiance;
+	ref<dx_texture> prefilteredRadiance;
 
 	fs::path name;
 };
@@ -91,5 +91,5 @@ ref<pbr_material> createPBRMaterial(const fs::path& albedoTex, const fs::path& n
 	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f, bool doubleSided = false, float uvScale = 1.f);
 ref<pbr_material> getDefaultPBRMaterial();
 
-ref<pbr_environment> createEnvironment(const fs::path& filename, uint32 skyResolution = 2048, uint32 environmentResolution = 128, uint32 irradianceResolution = 32, bool asyncCompute = false);
+ref<pbr_environment> createPBREnvironment(const fs::path& filename, uint32 skyResolution = 2048, uint32 environmentResolution = 128, uint32 irradianceResolution = 32, bool asyncCompute = false);
 

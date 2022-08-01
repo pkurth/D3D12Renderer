@@ -59,7 +59,7 @@ void specular_reflections_raytracer::render(dx_command_list* cl, const raytracin
     in.depthBuffer = materialInfo.opaqueDepth->defaultSRV;
     in.screenSpaceNormals = materialInfo.worldNormals->defaultSRV;
     in.irradiance = materialInfo.irradiance->defaultSRV;
-    in.environment = materialInfo.environment->defaultSRV;
+    in.environment = materialInfo.prefilteredRadiance->defaultSRV;
     in.sky = materialInfo.sky->defaultSRV;
     in.brdf = render_resources::brdfTex->defaultSRV;
 

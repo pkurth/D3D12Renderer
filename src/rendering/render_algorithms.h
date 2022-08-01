@@ -175,25 +175,6 @@ void texturedSky(dx_command_list* cl,
 void proceduralSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
 	const mat4& proj, const mat4& view, const mat4& prevFrameView,
-	float skyIntensity, 
-	vec2 jitter, vec2 prevFrameJitter);
-
-void stylisticSky(dx_command_list* cl,
-	const dx_render_target& skyRenderTarget,
-	const mat4& proj, const mat4& view, const mat4& prevFrameView,
-	vec3 sunDirection, float skyIntensity,
-	vec2 jitter, vec2 prevFrameJitter);
-
-void sphericalHarmonicsSky(dx_command_list* cl,
-	const dx_render_target& skyRenderTarget,
-	const mat4& proj, const mat4& view, const mat4& prevFrameView,
-	const ref<dx_buffer>& sh, uint32 shIndex,
-	float skyIntensity,
-	vec2 jitter, vec2 prevFrameJitter);
-
-void preethamSky(dx_command_list* cl,
-	const dx_render_target& skyRenderTarget,
-	const mat4& proj, const mat4& view, const mat4& prevFrameView,
 	vec3 sunDirection, float skyIntensity,
 	vec2 jitter, vec2 prevFrameJitter);
 

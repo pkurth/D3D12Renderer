@@ -29,7 +29,7 @@ static dx_pipeline doubleSidedShadowPipeline;
 static dx_pipeline doubleSidedPointLightShadowPipeline;
 
 static dx_pipeline textureSkyPipeline;
-static dx_pipeline stylisticSkyPipeline;
+static dx_pipeline proceduralSkyPipeline;
 
 static dx_pipeline outlineMarkerPipeline;
 static dx_pipeline outlineDrawerPipeline;
@@ -111,7 +111,7 @@ void loadCommonShaders()
 			.cullFrontFaces();
 
 		textureSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_texture_ps" });
-		stylisticSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_stylistic_ps" });
+		proceduralSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_procedural_ps" });
 	}
 
 	// Depth prepass.
@@ -412,7 +412,7 @@ void texturedSky(dx_command_list* cl,
 	cl->drawCubeTriangleStrip();
 }
 
-void stylisticSky(dx_command_list* cl,
+void proceduralSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,
 	const mat4& proj, const mat4& view, const mat4& prevFrameView,
 	vec3 sunDirection, float skyIntensity,
@@ -423,8 +423,8 @@ void stylisticSky(dx_command_list* cl,
 	cl->setRenderTarget(skyRenderTarget);
 	cl->setViewport(skyRenderTarget.viewport);
 
-	cl->setPipelineState(*stylisticSkyPipeline.pipeline);
-	cl->setGraphicsRootSignature(*stylisticSkyPipeline.rootSignature);
+	cl->setPipelineState(*proceduralSkyPipeline.pipeline);
+	cl->setGraphicsRootSignature(*proceduralSkyPipeline.rootSignature);
 
 	cl->setGraphics32BitConstants(SKY_RS_TRANSFORM, sky_transform_cb{ proj * createSkyViewMatrix(view), proj * createSkyViewMatrix(prevFrameView) });
 	cl->setGraphics32BitConstants(SKY_RS_CB, sky_cb{ jitter, prevFrameJitter, skyIntensity, sunDirection });

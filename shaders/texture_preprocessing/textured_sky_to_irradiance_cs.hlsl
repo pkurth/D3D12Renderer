@@ -13,7 +13,7 @@
 
 #define BLOCK_SIZE 16
 
-cbuffer cubemap_to_irradiance_cb : register(b0)
+cbuffer cb : register(b0)
 {
 	uint irradianceMapSize;
 };

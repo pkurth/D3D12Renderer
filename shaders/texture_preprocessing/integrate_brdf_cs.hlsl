@@ -9,7 +9,7 @@
 
 #define BLOCK_SIZE 16
 
-cbuffer integrate_brdf_cb : register(b0)
+cbuffer cb : register(b0)
 {
 	uint textureDim;
 };

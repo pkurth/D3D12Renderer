@@ -324,7 +324,7 @@ void application::initialize(main_renderer* renderer)
 	//learnedLocomotion.initialize(scene, ragdoll);
 
 
-	editor.setEnvironment("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
+	//editor.setEnvironment("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
 
 
 
