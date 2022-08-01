@@ -1,5 +1,5 @@
-#ifndef STYLISTIC_SKY_HLSLI
-#define STYLISTIC_SKY_HLSLI
+#ifndef PROCEDURAL_SKY_HLSLI
+#define PROCEDURAL_SKY_HLSLI
 
 #include "random.hlsli"
 #include "math.hlsli"
@@ -73,7 +73,7 @@ static float3 getClouds(float3 V)
 	return value;
 }
 
-static float3 stylisticSky(float3 V, float3 L)
+static float3 proceduralSky(float3 V, float3 L)
 {
 	float LdotV = dot(V, L);
 
@@ -102,7 +102,7 @@ static float3 stylisticSky(float3 V, float3 L)
 	return color;
 }
 
-static float3 stylisticSkySimple(float3 V, float3 L)
+static float3 proceduralSkySimple(float3 V, float3 L)
 {
 	float LdotV = dot(V, L);
 

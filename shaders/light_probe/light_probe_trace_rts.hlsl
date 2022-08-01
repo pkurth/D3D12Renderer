@@ -4,7 +4,7 @@
 #include "../common/random.hlsli"
 #include "../common/light_source.hlsli"
 #include "../common/raytracing.hlsli"
-#include "../common/stylistic_sky.hlsli"
+#include "../common/procedural_sky.hlsli"
 #include "../rs/light_probe_rs.hlsli"
 
 // Raytracing intrinsics: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#ray-system-values
@@ -223,7 +223,7 @@ void radianceMiss(inout radiance_ray_payload payload)
 	}
 	else
 	{
-		payload.color = stylisticSkySimple(normalize(WorldRayDirection()), normalize(-sun.direction));
+		payload.color = proceduralSkySimple(normalize(WorldRayDirection()), normalize(-sun.direction));
 	}
 }
 

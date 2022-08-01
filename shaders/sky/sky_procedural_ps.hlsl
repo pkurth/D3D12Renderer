@@ -1,6 +1,6 @@
 #include "math.hlsli"
 #include "sky_rs.hlsli"
-#include "stylistic_sky.hlsli"
+#include "procedural_sky.hlsli"
 
 
 ConstantBuffer<sky_cb> cb : register(b1);
@@ -19,13 +19,13 @@ struct ps_output
 	uint objectID			: SV_Target2;
 };
 
-[RootSignature(SKY_STYLISTIC_RS)]
+[RootSignature(SKY_PROCEDURAL_RS)]
 ps_output main(ps_input IN)
 {
 	float3 V = normalize(IN.uv);
 	float3 L = -cb.sunDirection;
 
-	float3 color = stylisticSky(V, L);
+	float3 color = proceduralSky(V, L);
 
 	color *= cb.intensity;
 

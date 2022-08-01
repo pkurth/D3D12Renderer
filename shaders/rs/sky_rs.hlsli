@@ -15,7 +15,7 @@ struct sky_cb
 	vec3 sunDirection;
 };
 
-#define SKY_STYLISTIC_RS \
+#define SKY_PROCEDURAL_RS \
 	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
 	"DENY_HULL_SHADER_ROOT_ACCESS |" \
 	"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \

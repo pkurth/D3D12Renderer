@@ -524,7 +524,7 @@ void main_renderer::endFrame(const user_input& input)
 			}
 			else
 			{
-				stylisticSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, jitteredCamera.prevFrameView, sun.direction, settings.skyIntensity,
+				proceduralSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, jitteredCamera.prevFrameView, sun.direction, settings.skyIntensity,
 					jitteredCamera.jitter, jitteredCamera.prevFrameJitter);
 			}
 
