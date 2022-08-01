@@ -342,7 +342,7 @@ PIPELINE_RENDER_IMPL(test_sample_pipeline)
 	cl->drawIndexed(rc.submesh.numIndices, 1, rc.submesh.firstIndex, rc.submesh.baseVertex, 0);
 }
 
-void light_probe_grid::visualize(opaque_render_pass* renderPass, const ref<pbr_environment>& environment)
+void light_probe_grid::visualize(opaque_render_pass* renderPass, const pbr_environment& environment)
 {
 	if (!dxContext.featureSupport.raytracing() || totalNumNodes == 0)
 	{
@@ -408,7 +408,7 @@ void light_probe_grid::visualize(opaque_render_pass* renderPass, const ref<pbr_e
 
 	if (showTestSphere)
 	{
-		test_sample_material material = { minCorner, cellSize, numNodesX, numNodesY, numNodesZ, irradiance, depth, environment->irradiance };
+		test_sample_material material = { minCorner, cellSize, numNodesX, numNodesY, numNodesZ, irradiance, depth, environment.irradiance };
 
 		//static float time = 0.2f * M_TAU;
 		//time += 1.f / 500.f;

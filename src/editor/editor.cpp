@@ -1318,7 +1318,7 @@ void scene_editor::setEnvironment(const fs::path& filename)
 	scene->environment = createPBREnvironment(filename); // Currently synchronous (on render queue).
 	renderer->pathTracer.resetRendering();
 
-	if (!scene->environment)
+	if (scene->environment.type == pbr_environment_type_uninitialized)
 	{
 		LOG_WARNING("Could not load environment '%ws'. Renderer will use procedural sky box. Procedural sky boxes currently cannot contribute to global illumination, so expect very dark lighting", filename.c_str());
 		std::cout << "Could not load environment '" << filename << "'. Renderer will use procedural sky box. Procedural sky boxes currently cannot contribute to global illumination, so expect very dark lighting.\n";

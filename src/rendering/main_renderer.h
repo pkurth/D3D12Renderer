@@ -140,7 +140,7 @@ struct main_renderer
 	static void setRaytracingScene(raytracing_tlas* tlas) { main_renderer::tlas = tlas; }
 	static void raytraceLightProbes(const light_probe_grid& grid) { lightProbeGrid = &grid; }
 
-	static void setEnvironment(const ref<pbr_environment>& environment);
+	static void setEnvironment(const pbr_environment& environment);
 	static void setSun(const directional_light& light);
 
 	static void setPointLights(const ref<dx_buffer>& lights, uint32 numLights, const ref<dx_buffer>& shadowInfoBuffer);
@@ -189,9 +189,9 @@ private:
 	static uint32 numPointLightShadowRenderPasses;
 
 	static const light_probe_grid* lightProbeGrid;
-	static raytracing_tlas* tlas;
+	static const raytracing_tlas* tlas;
 
-	static ref<pbr_environment> environment;
+	static const pbr_environment* environment;
 	static directional_light_cb sun;
 
 

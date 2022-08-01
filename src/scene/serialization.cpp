@@ -299,6 +299,27 @@ namespace YAML
 			return true;
 		}
 	};
+
+	template<>
+	struct convert<pbr_environment>
+	{
+		static Node encode(const pbr_environment& c)
+		{
+			Node n;
+			n["Type"] = pbrEnvironmentTypeNames[c.type];
+			n["Name"] = c.name;
+			return n;
+		}
+
+		static bool decode(const Node& n, pbr_environment& c)
+		{
+			if (!n.IsMap()) { return false; }
+
+			c.name = n["Name"].as<fs::path>();
+
+			return true;
+		}
+	};
 }
 
 void serializeSceneToDisk(game_scene& scene, const render_camera& camera, const renderer_settings& rendererSettings)
@@ -319,7 +340,7 @@ void serializeSceneToDisk(game_scene& scene, const render_camera& camera, const 
 	out["Camera"] = camera;
 	out["Rendering"] = rendererSettings;
 	out["Sun"] = scene.sun;
-	out["Environment"] = (scene.environment ? scene.environment->name : fs::path());
+	out["Environment"] = scene.environment;
 
 	YAML::Node entityNode;
 

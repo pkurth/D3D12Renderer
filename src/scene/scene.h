@@ -337,7 +337,7 @@ struct game_scene
 
 #ifndef PHYSICS_ONLY
 	directional_light sun;
-	ref<pbr_environment> environment;
+	pbr_environment environment;
 #endif
 
 

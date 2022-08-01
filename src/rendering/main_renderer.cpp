@@ -25,9 +25,9 @@ uint32 main_renderer::numSpotLightShadowRenderPasses;
 uint32 main_renderer::numPointLightShadowRenderPasses;
 
 const light_probe_grid* main_renderer::lightProbeGrid;
-raytracing_tlas* main_renderer::tlas;
+const raytracing_tlas* main_renderer::tlas;
 
-ref<pbr_environment> main_renderer::environment;
+const pbr_environment* main_renderer::environment;
 directional_light_cb main_renderer::sun;
 
 ref<dx_buffer> main_renderer::pointLights;
@@ -307,9 +307,9 @@ void main_renderer::setCamera(const render_camera& camera)
 	buildCameraConstantBuffer(camera, 0.f, this->unjitteredCamera);
 }
 
-void main_renderer::setEnvironment(const ref<pbr_environment>& environment)
+void main_renderer::setEnvironment(const pbr_environment& environment)
 {
-	main_renderer::environment = environment;
+	main_renderer::environment = &environment;
 }
 
 void main_renderer::setSun(const directional_light& light)
@@ -401,18 +401,11 @@ void main_renderer::endFrame(const user_input& input)
 	settings.enableTAA &= spec.allowTAA;
 
 	common_material_info materialInfo;
-	if (environment)
-	{
-		materialInfo.sky = environment->sky;
-		materialInfo.irradiance = environment->irradiance;
-		materialInfo.prefilteredRadiance = environment->prefilteredRadiance;
-	}
-	else
-	{
-		materialInfo.sky = render_resources::blackCubeTexture;
-		materialInfo.irradiance = render_resources::blackCubeTexture;
-		materialInfo.prefilteredRadiance = render_resources::blackCubeTexture;
-	}
+
+	materialInfo.sky = (environment && environment->sky) ? environment->sky : render_resources::blackCubeTexture;
+	materialInfo.irradiance = (environment && environment->irradiance) ? environment->irradiance : render_resources::blackCubeTexture;
+	materialInfo.prefilteredRadiance = (environment && environment->prefilteredRadiance) ? environment->prefilteredRadiance : render_resources::blackCubeTexture;
+
 	materialInfo.environmentIntensity = settings.environmentIntensity;
 	materialInfo.skyIntensity = settings.skyIntensity;
 	materialInfo.aoTexture = settings.enableAO ? aoTextures[1 - aoHistoryIndex] : render_resources::whiteTexture;
@@ -517,7 +510,7 @@ void main_renderer::endFrame(const user_input& input)
 				.colorAttachment(objectIDsTexture, render_resources::nullObjectIDsRTV)
 				.depthAttachment(depthStencilBuffer);
 
-			if (environment)
+			if (environment && environment->type == pbr_environment_type_textured)
 			{
 				texturedSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, jitteredCamera.prevFrameView, environment->sky, settings.skyIntensity,
 					jitteredCamera.jitter, jitteredCamera.prevFrameJitter);
