@@ -166,6 +166,220 @@ void mesh_builder::pushBox(const box_mesh_desc& desc, bool flipWindingOrder)
 	}
 }
 
+void mesh_builder::pushTesselatedBox(const tesselated_box_mesh_desc& desc, bool flipWindingOrder)
+{
+	const uint32 numVerticesPerEdge = desc.numIntervals + 1;
+	const uint32 numVertices = 6 * numVerticesPerEdge * numVerticesPerEdge - 12 * numVerticesPerEdge + 8;
+	const uint32 numTriangles = desc.numIntervals * desc.numIntervals * 2 * 6;
+
+	auto [positionPtr, othersPtr, indexPtr, indexOffset] = beginPrimitive(numVertices, numTriangles);
+
+	float distanceBetweenVertices = 1.f / desc.numIntervals;
+
+	uint32 vertexIndex = 0;
+	uint32 triangleIndex = 0;
+
+	vec3 center = desc.center;
+	quat rotation = desc.rotation;
+	vec3 radius = desc.radius;
+
+	// Upper face.
+	for (uint32 z = 0; z < numVerticesPerEdge; ++z)
+	{
+		for (uint32 x = 0; x < numVerticesPerEdge; ++x)
+		{
+			assert(vertexIndex < numVertices);
+			pushVertex(center + rotation * (radius * vec3(x * distanceBetweenVertices, 1.f, z * distanceBetweenVertices)), {}, {}, {}, {});
+
+			if (z < numVerticesPerEdge - 1 && x < numVerticesPerEdge - 1)
+			{
+				assert(triangleIndex < numTriangles);
+				pushTriangle(z * numVerticesPerEdge + x, (z + 1) * numVerticesPerEdge + x, (z + 1) * numVerticesPerEdge + (x + 1));
+				assert(triangleIndex < numTriangles);
+				pushTriangle((z + 1) * numVerticesPerEdge + (x + 1), z * numVerticesPerEdge + (x + 1), z * numVerticesPerEdge + x);
+
+				triangleIndex += 2;
+			}
+
+			++vertexIndex;
+		}
+	}
+
+	const uint32 ringSize = (numVerticesPerEdge - 1) * 4;
+
+	// Sides.
+	uint32 y = 1;
+
+	vec3 directions[] = { vec3(1.f, 0.f, 0.f), vec3(0.f, 0.f, 1.f), vec3(-1.f, 0.f, 0.f), vec3(0.f, 0.f, -1.f) };
+	uint32 directionIndex = 0;
+
+	vec3 currentPos(0.f, 1.f - y * distanceBetweenVertices, 0.f);
+
+	uint32 ringStart = vertexIndex;
+
+	while (y < numVerticesPerEdge)
+	{
+		vec3 direction = directions[directionIndex];
+		for (uint32 i = 0; i < numVerticesPerEdge - 1; ++i)
+		{
+			assert(vertexIndex < numVertices);
+			pushVertex(desc.center + desc.rotation * (radius * currentPos), {}, {}, {}, {});
+			currentPos += distanceBetweenVertices * direction;
+
+			uint32 top, topLeft;
+			if (y == 1)
+			{
+				switch (directionIndex)
+				{
+				case 0:
+					top = i;
+					topLeft = top + 1;
+					break;
+				case 1:
+					top = i * numVerticesPerEdge + (numVerticesPerEdge - 1);
+					topLeft = top + numVerticesPerEdge;
+					break;
+				case 2:
+					top = numVerticesPerEdge * numVerticesPerEdge - 1 - i;
+					topLeft = top - 1;
+					break;
+				case 3:
+					top = (numVerticesPerEdge - 1 - i) * numVerticesPerEdge;
+					topLeft = top - numVerticesPerEdge;
+					break;
+				}
+			}
+			else
+			{
+				top = vertexIndex - ringSize;
+				topLeft = top + 1;
+				if (ringStart == topLeft)
+				{
+					topLeft -= ringSize;
+				}
+			}
+
+			uint32 left = vertexIndex + 1;
+			if (ringStart + ringSize == left)
+			{
+				left -= ringSize;
+			}
+
+			assert(triangleIndex < numTriangles);
+			pushTriangle(topLeft, left, vertexIndex);
+			assert(triangleIndex < numTriangles);
+			pushTriangle(vertexIndex, top, topLeft);
+
+			triangleIndex += 2;
+
+			++vertexIndex;
+		}
+
+		directionIndex = (directionIndex + 1) % 4;
+		if (directionIndex == 0)
+		{
+			++y;
+			ringStart = vertexIndex;
+			currentPos.y = 1.f - y * distanceBetweenVertices;
+		}
+	}
+
+	// Bottom face.
+	uint32 firstOfLastRing = vertexIndex - ringSize;
+	for (uint32 z = 1; z < numVerticesPerEdge - 1; ++z)
+	{
+		for (uint32 x = 1; x < numVerticesPerEdge - 1; ++x)
+		{
+			assert(vertexIndex < numVertices);
+			pushVertex(desc.center + desc.rotation * (radius * vec3(x * distanceBetweenVertices, 0.f, z * distanceBetweenVertices)), {}, {}, {}, {});
+
+			uint32 top = vertexIndex - (numVerticesPerEdge - 2);
+			if (z == 1)
+			{
+				top = firstOfLastRing + x;
+			}
+
+			uint32 right = vertexIndex + 1;
+			uint32 topRight = vertexIndex + 1 - (numVerticesPerEdge - 2);
+			if (x == numVerticesPerEdge - 2)
+			{
+				right = firstOfLastRing + numVerticesPerEdge - 1 + z;
+				topRight = right - 1;
+			}
+			else if (z == 1)
+			{
+				topRight = top + 1;
+			}
+
+			// Only valid if x == 1.
+			uint32 left = firstOfLastRing + ringSize - z;
+
+			if (x == 1)
+			{
+				uint32 topLeft = left + 1;
+				if (firstOfLastRing + ringSize == topLeft)
+				{
+					topLeft -= ringSize;
+				}
+				assert(triangleIndex < numTriangles);
+				pushTriangle(topLeft, top, vertexIndex);
+				assert(triangleIndex < numTriangles);
+				pushTriangle(vertexIndex, left, topLeft);
+
+				triangleIndex += 2;
+			}
+
+			assert(triangleIndex < numTriangles);
+			pushTriangle(top, topRight, right);
+			assert(triangleIndex < numTriangles);
+			pushTriangle(right, vertexIndex, top);
+
+			triangleIndex += 2;
+
+			if (z == numVerticesPerEdge - 2)
+			{
+				uint32 bottom = firstOfLastRing + (numVerticesPerEdge - 1) * 3 - x;
+				uint32 bottomLeft = bottom + 1;
+				uint32 bottomRight = bottom - 1;
+
+				if (x == 1)
+				{
+					assert(triangleIndex < numTriangles);
+					pushTriangle(left, vertexIndex, bottom);
+					assert(triangleIndex < numTriangles);
+					pushTriangle(bottom, bottomLeft, left);
+
+					triangleIndex += 2;
+				}
+
+				assert(triangleIndex < numTriangles);
+				pushTriangle(vertexIndex, right, bottomRight);
+				assert(triangleIndex < numTriangles);
+				pushTriangle(bottomRight, bottom, vertexIndex);
+
+				triangleIndex += 2;
+			}
+
+			++vertexIndex;
+		}
+	}
+
+	if (desc.numIntervals == 1)
+	{
+		// Connect last two faces.
+
+		assert(numVertices == 8);
+
+		pushTriangle(4, 5, 7);
+		pushTriangle(5, 6, 7);
+
+		triangleIndex += 2;
+	}
+
+	assert(vertexIndex == numVertices);
+	assert(triangleIndex == numTriangles);
+}
+
 void mesh_builder::pushSphere(const sphere_mesh_desc& desc, bool flipWindingOrder)
 {
 	uint32 slices = desc.slices;

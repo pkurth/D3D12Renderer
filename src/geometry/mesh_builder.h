@@ -63,6 +63,14 @@ struct box_mesh_desc
 	quat rotation = quat::identity;
 };
 
+struct tesselated_box_mesh_desc
+{
+	vec3 center = 0.f;
+	vec3 radius = 1.f;
+	uint32 numIntervals = 1;
+	quat rotation = quat::identity;
+};
+
 struct sphere_mesh_desc
 {
 	vec3 center = 0.f;
@@ -159,6 +167,7 @@ struct mesh_builder
 
 	void pushQuad(const quad_mesh_desc& desc, bool flipWindingOrder = false);
 	void pushBox(const box_mesh_desc& desc, bool flipWindingOrder = false);
+	void pushTesselatedBox(const tesselated_box_mesh_desc& desc, bool flipWindingOrder = false);
 	void pushSphere(const sphere_mesh_desc& desc, bool flipWindingOrder = false);
 	void pushIcoSphere(const icosphere_mesh_desc& desc, bool flipWindingOrder = false);
 	void pushCapsule(const capsule_mesh_desc& desc, bool flipWindingOrder = false);
