@@ -132,67 +132,6 @@ ref<pbr_material> getDefaultPBRMaterial()
 	return material;
 }
 
-pbr_environment createPBREnvironment(const fs::path& filename, uint32 skyResolution, uint32 irradianceResolution, uint32 prefilteredRadianceResolution, bool asyncCompute)
-{
-	pbr_environment environment;
-
-	ref<dx_texture> equiSky = loadTextureFromFile(filename,
-		image_load_flags_noncolor | image_load_flags_cache_to_dds | image_load_flags_gen_mips_on_cpu);
-
-	if (equiSky)
-	{
-		dx_command_list* cl;
-		if (asyncCompute)
-		{
-			dxContext.computeQueue.waitForOtherQueue(dxContext.copyQueue);
-			cl = dxContext.getFreeComputeCommandList(true);
-		}
-		else
-		{
-			dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
-			cl = dxContext.getFreeRenderCommandList();
-		}
-		//generateMipMapsOnGPU(cl, equiSky);
-		environment.sky = equirectangularToCubemap(cl, equiSky, skyResolution, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
-		environment.irradiance = texturedSkyToIrradiance(cl, environment.sky, irradianceResolution);
-		environment.prefilteredRadiance = texturedSkyToPrefilteredRadiance(cl, environment.sky, prefilteredRadianceResolution);
-
-		SET_NAME(environment.sky->resource, "Sky");
-		SET_NAME(environment.irradiance->resource, "Irradiance");
-		SET_NAME(environment.prefilteredRadiance->resource, "Prefiltered Radiance");
-
-		environment.name = filename;
-		environment.type = pbr_environment_type_textured;
-
-		dxContext.executeCommandList(cl);
-	}
-
-	return environment;
-}
-
-pbr_environment createProceduralPBREnvironment(vec3 sunDirection, uint32 irradianceResolution, uint32 prefilteredRadianceResolution, bool asyncCompute)
-{
-	dx_command_list* cl;
-	if (asyncCompute)
-	{
-		dxContext.computeQueue.waitForOtherQueue(dxContext.copyQueue);
-		cl = dxContext.getFreeComputeCommandList(true);
-	}
-	else
-	{
-		dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
-		cl = dxContext.getFreeRenderCommandList();
-	}
-
-	pbr_environment environment;
-	environment.irradiance = proceduralSkyToIrradiance(cl, sunDirection, irradianceResolution);
-	environment.type = pbr_environment_type_procedural;
-
-	dxContext.executeCommandList(cl);
-
-	return environment;
-}
-
 void pbr_pipeline::initialize()
 {
 	{

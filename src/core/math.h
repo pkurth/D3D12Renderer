@@ -514,6 +514,7 @@ static vec2& operator/=(vec2& a, float b) { a = a / b; return a; }
 static vec2 operator-(vec2 a) { return vec2(-a.x, -a.y); }
 
 static bool operator==(vec2 a, vec2 b) { return a.x == b.x && a.y == b.y; }
+static bool operator!=(vec2 a, vec2 b) { return !(a == b); }
 
 
 // Vec3 operators.
@@ -535,6 +536,7 @@ static vec3& operator/=(vec3& a, float b) { a = a / b; return a; }
 static vec3 operator-(vec3 a) { return vec3(-a.x, -a.y, -a.z); }
 
 static bool operator==(vec3 a, vec3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; }
+static bool operator!=(vec3 a, vec3 b) { return !(a == b); }
 
 
 // Vec4 operators.
@@ -556,6 +558,7 @@ static vec4& operator/=(vec4& a, float b) { a = a / b; return a; }
 static vec4 operator-(vec4 a) { return vec4(-a.f4); }
 
 static bool operator==(vec4 a, vec4 b) { return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w; }
+static bool operator!=(vec4 a, vec4 b) { return !(a == b); }
 
 
 static float dot(vec2 a, vec2 b) { float result = a.x * b.x + a.y * b.y; return result; }

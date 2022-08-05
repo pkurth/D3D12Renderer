@@ -12,10 +12,11 @@ void initializeTexturePreprocessing();
 void generateMipMapsOnGPU(dx_command_list* cl, ref<dx_texture>& texture);
 ref<dx_texture> equirectangularToCubemap(dx_command_list* cl, const ref<dx_texture>& equirectangular, uint32 resolution, uint32 numMips = 0, DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN);
 
-ref<dx_texture> texturedSkyToIrradiance(dx_command_list* cl, const ref<dx_texture>& sky, uint32 resolution = 32, uint32 sourceSlice = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-ref<dx_texture> texturedSkyToPrefilteredRadiance(dx_command_list* cl, const ref<dx_texture>& sky, uint32 resolution);
+void texturedSkyToIrradiance(dx_command_list* cl, const ref<dx_texture>& sky, ref<dx_texture>& outIrradiance);
+void texturedSkyToPrefilteredRadiance(dx_command_list* cl, const ref<dx_texture>& sky, ref<dx_texture>& outPrefilteredRadiance);
 
-ref<dx_texture> proceduralSkyToIrradiance(dx_command_list* cl, vec3 sunDirection, uint32 resolution, DXGI_FORMAT format = DXGI_FORMAT_R16G16B16A16_FLOAT);
+void proceduralSkyToIrradiance(dx_command_list* cl, vec3 sunDirection, ref<dx_texture>& outIrradiance);
+//void proceduralSkyToPrefilteredRadiance(dx_command_list* cl, vec3 sunDirection, ref<dx_texture>& outPrefilteredRadiance);
 
 ref<dx_texture> integrateBRDF(dx_command_list* cl, uint32 resolution = 512);
 

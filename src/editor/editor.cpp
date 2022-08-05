@@ -1157,6 +1157,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		if (ImGui::IconButton(imgui_icon_stop, imgui_icon_stop, IMGUI_ICON_DEFAULT_SIZE, this->scene->isStoppable()))
 		{
 			this->scene->stop();
+			this->scene->editorScene.environment.forceUpdate(this->scene->editorScene.sun.direction);
 			setSelectedEntityNoUndo({});
 		}
 
@@ -1311,20 +1312,6 @@ void scene_editor::drawEntityCreationPopup()
 	}
 }
 
-void scene_editor::setEnvironment(const fs::path& filename)
-{
-	game_scene* scene = &this->scene->getCurrentScene();
-
-	scene->environment = createPBREnvironment(filename); // Currently synchronous (on render queue).
-	renderer->pathTracer.resetRendering();
-
-	if (scene->environment.type == pbr_environment_type_uninitialized)
-	{
-		LOG_WARNING("Could not load environment '%ws'. Renderer will use procedural sky box. Procedural sky boxes currently cannot contribute to global illumination, so expect very dark lighting", filename.c_str());
-		std::cout << "Could not load environment '" << filename << "'. Renderer will use procedural sky box. Procedural sky boxes currently cannot contribute to global illumination, so expect very dark lighting.\n";
-	}
-}
-
 void scene_editor::serializeToFile()
 {
 	serializeSceneToDisk(scene->editorScene, scene->camera, renderer->settings);
@@ -1338,7 +1325,9 @@ bool scene_editor::deserializeFromFile()
 		scene->stop();
 
 		setSelectedEntityNoUndo({});
-		setEnvironment(environmentName);
+		scene->editorScene.environment.setFromTexture(environmentName);
+		scene->editorScene.environment.forceUpdate(this->scene->editorScene.sun.direction);
+		renderer->pathTracer.resetRendering();
 
 		return true;
 	}

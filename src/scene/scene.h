@@ -9,6 +9,7 @@
 #ifndef PHYSICS_ONLY
 #include "rendering/light_source.h"
 #include "rendering/pbr.h"
+#include "rendering/pbr_environment.h"
 #include "core/camera.h"
 #endif
 

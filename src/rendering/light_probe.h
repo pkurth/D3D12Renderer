@@ -6,6 +6,7 @@
 
 #include "render_pass.h"
 #include "pbr_raytracer.h"
+#include "pbr_environment.h"
 
 #include "light_probe.hlsli"
 

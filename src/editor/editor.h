@@ -15,8 +15,6 @@ struct scene_editor
 
 	scene_entity selectedEntity;
 
-	void setEnvironment(const fs::path& filename);
-
 private:
 	void drawSettings(float dt);
 	void drawMainMenuBar();

@@ -306,8 +306,8 @@ namespace YAML
 		static Node encode(const pbr_environment& c)
 		{
 			Node n;
-			n["Type"] = pbrEnvironmentTypeNames[c.type];
-			n["Name"] = c.name;
+			//n["Type"] = pbrEnvironmentTypeNames[c.type];
+			//n["Name"] = c.name;
 			return n;
 		}
 

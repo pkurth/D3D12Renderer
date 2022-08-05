@@ -76,33 +76,6 @@ struct pbr_pipeline::transparent : pbr_pipeline
 
 
 
-enum pbr_environment_type
-{
-	pbr_environment_type_uninitialized,
-	pbr_environment_type_textured,
-	pbr_environment_type_procedural,
-};
-
-static const char* pbrEnvironmentTypeNames[] =
-{
-	"Uninitialized",
-	"Textured",
-	"Procedural",
-};
-
-struct pbr_environment
-{
-	pbr_environment_type type = pbr_environment_type_uninitialized;
-	fs::path name;
-
-	ref<dx_texture> sky;
-	ref<dx_texture> irradiance;
-	ref<dx_texture> prefilteredRadiance;
-};
-
 ref<pbr_material> createPBRMaterial(const fs::path& albedoTex, const fs::path& normalTex, const fs::path& roughTex, const fs::path& metallicTex,
 	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f, bool doubleSided = false, float uvScale = 1.f);
 ref<pbr_material> getDefaultPBRMaterial();
-
-pbr_environment createPBREnvironment(const fs::path& filename, uint32 skyResolution = 2048, uint32 irradianceResolution = 32, uint32 prefilteredRadianceResolution = 128, bool asyncCompute = false);
-pbr_environment createProceduralPBREnvironment(vec3 sunDirection, uint32 irradianceResolution = 32, uint32 prefilteredRadianceResolution = 128, bool asyncCompute = false);

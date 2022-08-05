@@ -510,7 +510,7 @@ void main_renderer::endFrame(const user_input& input)
 				.colorAttachment(objectIDsTexture, render_resources::nullObjectIDsRTV)
 				.depthAttachment(depthStencilBuffer);
 
-			if (environment && environment->type == pbr_environment_type_textured)
+			if (environment && environment->sky)
 			{
 				texturedSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, jitteredCamera.prevFrameView, environment->sky, settings.skyIntensity,
 					jitteredCamera.jitter, jitteredCamera.prevFrameJitter);

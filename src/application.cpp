@@ -324,7 +324,7 @@ void application::initialize(main_renderer* renderer)
 	//learnedLocomotion.initialize(scene, ragdoll);
 
 
-	//editor.setEnvironment("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
+	//scene.environment.setFromTexture("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
 
 
 
@@ -539,6 +539,8 @@ void application::update(const user_input& input, float dt)
 	physicsStep(scene, stackArena, dt);
 
 	scene_entity selectedEntity = editor.selectedEntity;
+
+	scene.environment.update(scene.sun.direction);
 
 	lightProbeGrid.visualize(&opaqueRenderPass, scene.environment);
 
