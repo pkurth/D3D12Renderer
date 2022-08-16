@@ -551,10 +551,16 @@ void application::update(const user_input& input, float dt)
 	dt *= this->scene.getTimestepScale();
 
 	physicsTimer += dt;
-	while (physicsTimer >= physicsFixedTimeStep)
+	if (physicsTimer >= physicsFixedTimeStep)
 	{
 		physicsStep(scene, stackArena);
 		physicsTimer -= physicsFixedTimeStep;
+
+		if (physicsTimer >= physicsFixedTimeStep)
+		{
+			LOG_WARNING("Dropping physics frames");
+			physicsTimer = fmod(physicsTimer, physicsFixedTimeStep);
+		}
 	}
 
 	float physicsInterpolationT = physicsTimer / physicsFixedTimeStep;
