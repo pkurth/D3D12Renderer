@@ -7,7 +7,7 @@ struct raytracing_cb
 	uint32 maxRecursionDepth;
 	float fadeoutDistance;
 	float maxRayDistance;
-	float environmentIntensity;
+	float globalIlluminationIntensity;
 	float skyIntensity;
 };
 

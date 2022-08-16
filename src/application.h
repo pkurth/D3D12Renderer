@@ -7,7 +7,6 @@
 #include "core/math.h"
 #include "scene/scene.h"
 #include "rendering/main_renderer.h"
-#include "rendering/light_probe.h"
 #include "scene/particle_systems.h"
 #include "rendering/raytracing.h"
 #include "editor/editor.h"
@@ -57,8 +56,6 @@ private:
 	memory_arena stackArena;
 
 	learned_locomotion learnedLocomotion;
-
-	light_probe_grid lightProbeGrid;
 
 
 	uint32 numSpotShadowRenderPasses;

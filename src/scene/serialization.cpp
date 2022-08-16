@@ -322,7 +322,7 @@ namespace YAML
 	};
 }
 
-void serializeSceneToDisk(game_scene& scene, const render_camera& camera, const renderer_settings& rendererSettings)
+void serializeSceneToDisk(editor_scene& scene, const renderer_settings& rendererSettings)
 {
 	if (scene.savePath.empty())
 	{
@@ -337,14 +337,14 @@ void serializeSceneToDisk(game_scene& scene, const render_camera& camera, const 
 
 	YAML::Node out;
 	out["Scene"] = "My scene";
-	out["Camera"] = camera;
+	out["Camera"] = scene.camera;
 	out["Rendering"] = rendererSettings;
 	out["Sun"] = scene.sun;
 	out["Environment"] = scene.environment;
 
 	YAML::Node entityNode;
 
-	scene.forEachEntity([&entityNode, &scene](entity_handle entityID)
+	scene.editorScene.forEachEntity([&entityNode, &scene = scene.editorScene](entity_handle entityID)
 	{
 		scene_entity entity = { entityID, scene };
 
@@ -400,7 +400,7 @@ void serializeSceneToDisk(game_scene& scene, const render_camera& camera, const 
 	LOG_MESSAGE("Scene saved to '%ws'", scene.savePath.c_str());
 }
 
-bool deserializeSceneFromDisk(game_scene& scene, render_camera& camera, renderer_settings& rendererSettings, std::string& environmentName)
+bool deserializeSceneFromDisk(editor_scene& scene, renderer_settings& rendererSettings, std::string& environmentName)
 {
 	fs::path filename = openFileDialog("Scene files", "sc");
 	if (filename.empty())
@@ -415,12 +415,12 @@ bool deserializeSceneFromDisk(game_scene& scene, render_camera& camera, renderer
 		return false;
 	}
 
-	scene = game_scene();
+	scene.editorScene = game_scene();
 	scene.savePath = std::move(filename);
 
 	std::string sceneName = n["Scene"].as<std::string>();
 
-	YAML_LOAD(n, camera, "Camera");
+	YAML_LOAD(n, scene.camera, "Camera");
 	YAML_LOAD(n, rendererSettings, "Rendering");
 	YAML_LOAD(n, scene.sun, "Sun");
 
@@ -430,7 +430,7 @@ bool deserializeSceneFromDisk(game_scene& scene, render_camera& camera, renderer
 	for (auto entityNode : entitiesNode)
 	{
 		std::string name = entityNode["Tag"].as<std::string>();
-		scene_entity entity = scene.createEntity(name.c_str());
+		scene_entity entity = scene.editorScene.createEntity(name.c_str());
 
 #define LOAD_COMPONENT(type, name) if (auto node = entityNode[name]) { entity.addComponent<type>(node.as<type>()); }
 

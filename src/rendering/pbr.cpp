@@ -12,6 +12,7 @@
 
 #include "default_pbr_rs.hlsli"
 #include "material.hlsli"
+#include "lighting.hlsli"
 
 #include <unordered_map>
 #include <memory>
@@ -165,9 +166,6 @@ void pbr_pipeline::setupPBRCommon(dx_command_list* cl, const common_material_inf
 	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
 	dx_cpu_descriptor_handle nullBuffer = render_resources::nullBufferSRV;
 
-	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_LIGHTING, lighting_cb{ vec2(1.f / info.shadowMap->width, 1.f / info.shadowMap->height), info.environmentIntensity });
-	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_LIGHT_PROBE_GRID, info.lightProbeGrid);
-
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 0, info.irradiance ? info.irradiance->defaultSRV : nullTexture);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 1, info.prefilteredRadiance ? info.prefilteredRadiance->defaultSRV : nullTexture);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 2, render_resources::brdfTex);
@@ -186,9 +184,8 @@ void pbr_pipeline::setupPBRCommon(dx_command_list* cl, const common_material_inf
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 15, info.lightProbeIrradiance ? info.lightProbeIrradiance->defaultSRV : nullTexture);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 16, info.lightProbeDepth ? info.lightProbeDepth->defaultSRV : nullTexture);
 
-	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_SUN, info.sunCBV);
-
 	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_CAMERA, info.cameraCBV);
+	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_LIGHTING, info.lightingCBV);
 
 
 	// Default material properties. This is JUST to make the dynamic descriptor heap happy.

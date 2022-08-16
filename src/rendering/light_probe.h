@@ -6,7 +6,6 @@
 
 #include "render_pass.h"
 #include "pbr_raytracer.h"
-#include "pbr_environment.h"
 
 #include "light_probe.hlsli"
 
@@ -27,7 +26,7 @@ struct light_probe_grid
 	ref<dx_texture> raytracedDirectionAndDistance;
 
 	void initialize(vec3 minCorner, vec3 dimensions, float cellSize);
-	void visualize(opaque_render_pass* renderPass, const pbr_environment& environment);
+	void visualize(opaque_render_pass* renderPass);
 
 	void updateProbes(dx_command_list* cl, const raytracing_tlas& lightProbeTlas, const ref<dx_texture>& sky, dx_dynamic_constant_buffer sunCBV) const;
 
@@ -40,7 +39,7 @@ private:
 	bool showTestSphere = false;
 	bool autoRotateRays = true;
 
-	bool rotateRays = false;
+	mutable bool rotateRays = false;
 
 	float irradianceUIScale = 1.f;
 	float depthUIScale = 1.f;
@@ -50,6 +49,7 @@ private:
 	mutable random_number_generator rng = { 61913 };
 
 	friend struct light_probe_tracer;
+	friend struct scene_editor;
 };
 
 struct light_probe_tracer : pbr_raytracer

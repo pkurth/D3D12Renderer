@@ -58,7 +58,10 @@ void application::initialize(main_renderer* renderer)
 		raytracingTLAS.initialize();
 	}
 
-	this->scene.camera.initializeIngame(vec3(0.f, 1.f, 5.f), quat::identity, deg2rad(70.f), 0.1f);
+	scene.camera.initializeIngame(vec3(0.f, 1.f, 5.f), quat::identity, deg2rad(70.f), 0.1f);
+	scene.environment.setFromTexture("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
+	scene.environment.lightProbeGrid.initialize(vec3(-20.f, -1.f, -20.f), vec3(40.f, 20.f, 40.f), 1.5f);
+
 	editor.initialize(&this->scene, renderer);
 
 	game_scene& scene = this->scene.getCurrentScene();
@@ -324,7 +327,6 @@ void application::initialize(main_renderer* renderer)
 	//learnedLocomotion.initialize(scene, ragdoll);
 
 
-	//scene.environment.setFromTexture("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
 
 
 
@@ -391,18 +393,16 @@ void application::initialize(main_renderer* renderer)
 	}
 #endif
 
-	lightProbeGrid.initialize(vec3(-20.f, -1.f, -20.f), vec3(40.f, 20.f, 40.f), 1.5f);
+	this->scene.sun.direction = normalize(vec3(-0.6f, -1.f, -0.3f));
+	this->scene.sun.color = vec3(1.f, 0.93f, 0.76f);
+	this->scene.sun.intensity = 50.f;
 
-	scene.sun.direction = normalize(vec3(-0.6f, -1.f, -0.3f));
-	scene.sun.color = vec3(1.f, 0.93f, 0.76f);
-	scene.sun.intensity = 50.f;
-
-	scene.sun.numShadowCascades = 3;
-	scene.sun.shadowDimensions = 2048;
-	scene.sun.cascadeDistances = vec4(9.f, 25.f, 50.f, 10000.f);
-	scene.sun.bias = vec4(0.000588f, 0.000784f, 0.000824f, 0.0035f);
-	scene.sun.blendDistances = vec4(5.f, 10.f, 10.f, 10.f);
-	scene.sun.stabilize = true;
+	this->scene.sun.numShadowCascades = 3;
+	this->scene.sun.shadowDimensions = 2048;
+	this->scene.sun.cascadeDistances = vec4(9.f, 25.f, 50.f, 10000.f);
+	this->scene.sun.bias = vec4(0.000588f, 0.000784f, 0.000824f, 0.0035f);
+	this->scene.sun.blendDistances = vec4(5.f, 10.f, 10.f, 10.f);
+	this->scene.sun.stabilize = true;
 
 	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
 	{
@@ -517,8 +517,6 @@ void application::submitRendererParams(uint32 numSpotLightShadowPasses, uint32 n
 	{
 		main_renderer::submitShadowRenderPass(&pointShadowRenderPasses[i]);
 	}
-
-	main_renderer::raytraceLightProbes(lightProbeGrid);
 }
 
 void application::update(const user_input& input, float dt)
@@ -528,21 +526,27 @@ void application::update(const user_input& input, float dt)
 	//dt = 1.f / 60.f;
 	//learnedLocomotion.update(scene);
 
-	render_camera& camera = this->scene.camera;
-
-	resetRenderPasses();
-
-	game_scene& scene = this->scene.getCurrentScene();
 	bool objectDragged = editor.update(input, &ldrRenderPass, dt);
 
+
+
+	render_camera& camera = scene.camera;
+	directional_light& sun = scene.sun;
+	pbr_environment& environment = scene.environment;
+
+	resetRenderPasses();
+	environment.update(sun.direction);
+	sun.updateMatrices(camera);
+	setAudioListener(camera.position, camera.rotation, vec3(0.f));
+	environment.lightProbeGrid.visualize(&opaqueRenderPass);
+
+
+	game_scene& scene = this->scene.getCurrentScene();
 	dt *= this->scene.getTimestepScale();
 	physicsStep(scene, stackArena, dt);
 
-	scene_entity selectedEntity = editor.selectedEntity;
 
-	scene.environment.update(scene.sun.direction);
 
-	lightProbeGrid.visualize(&opaqueRenderPass, scene.environment);
 
 	// Particles.
 
@@ -560,11 +564,11 @@ void application::update(const user_input& input, float dt)
 	//smokeParticleSystem.render(&transparentRenderPass);
 #endif
 
-	scene.sun.updateMatrices(camera);
 
 	// Set global rendering stuff.
 
-	setAudioListener(camera.position, camera.rotation, vec3(0.f));
+
+
 
 
 
@@ -585,10 +589,12 @@ void application::update(const user_input& input, float dt)
 
 
 	main_renderer::setRaytracingScene(&raytracingTLAS);
-	main_renderer::setEnvironment(scene.environment);
-	main_renderer::setSun(scene.sun);
+	main_renderer::setEnvironment(environment);
+	main_renderer::setSun(sun);
 	renderer->setCamera(camera);
 
+
+	scene_entity selectedEntity = editor.selectedEntity;
 
 	if (renderer->mode != renderer_mode_pathtraced)
 	{
@@ -612,7 +618,7 @@ void application::update(const user_input& input, float dt)
 
 
 		// Render shadow maps.
-		renderSunShadowMap(scene.sun, &sunShadowRenderPass, scene, objectDragged);
+		renderSunShadowMap(sun, &sunShadowRenderPass, scene, objectDragged);
 
 		uint32 numPointLights = scene.numberOfComponentsOfType<point_light_component>();
 		if (numPointLights)

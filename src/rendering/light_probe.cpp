@@ -308,7 +308,6 @@ struct test_sample_material
 
 	ref<dx_texture> irradiance;
 	ref<dx_texture> depth;
-	ref<dx_texture> bakedIrradiance;
 };
 
 struct test_sample_pipeline
@@ -334,7 +333,6 @@ PIPELINE_RENDER_IMPL(test_sample_pipeline)
 	cl->setGraphics32BitConstants(LIGHT_PROBE_TEST_SAMPLE_RS_GRID, light_probe_grid_cb{ rc.material.minCorner, rc.material.cellSize, rc.material.countX, rc.material.countY, rc.material.countZ });
 	cl->setDescriptorHeapSRV(LIGHT_PROBE_TEST_SAMPLE_RS_TEXTURES, 0, rc.material.irradiance);
 	cl->setDescriptorHeapSRV(LIGHT_PROBE_TEST_SAMPLE_RS_TEXTURES, 1, rc.material.depth);
-	cl->setDescriptorHeapSRV(LIGHT_PROBE_TEST_SAMPLE_RS_TEXTURES, 2, rc.material.bakedIrradiance);
 
 	cl->setVertexBuffer(0, rc.vertexBuffer.positions);
 	cl->setVertexBuffer(1, rc.vertexBuffer.others);
@@ -342,55 +340,14 @@ PIPELINE_RENDER_IMPL(test_sample_pipeline)
 	cl->drawIndexed(rc.submesh.numIndices, 1, rc.submesh.firstIndex, rc.submesh.baseVertex, 0);
 }
 
-void light_probe_grid::visualize(opaque_render_pass* renderPass, const pbr_environment& environment)
+void light_probe_grid::visualize(opaque_render_pass* renderPass)
 {
 	if (!dxContext.featureSupport.raytracing() || totalNumNodes == 0)
 	{
 		return;
 	}
 
-	rotateRays = false;
-
-	if (ImGui::Begin("Light probe"))
-	{
-		if (ImGui::BeginProperties())
-		{
-			ImGui::PropertyCheckbox("Visualize probes", visualizeProbes);
-			ImGui::PropertyCheckbox("Visualize rays", visualizeRays);
-			ImGui::PropertyCheckbox("Show test sphere", showTestSphere);
-
-			ImGui::PropertyCheckbox("Auto rotate rays", autoRotateRays);
-			if (!autoRotateRays)
-			{
-				rotateRays = ImGui::PropertyButton("Rotate", "Go");
-			}
-
-			ImGui::EndProperties();
-		}
-
-		if (ImGui::BeginTree("Irradiance"))
-		{
-			if (ImGui::BeginProperties()) { ImGui::PropertySlider("Scale", irradianceUIScale, 0.1f, 20.f); ImGui::EndProperties(); }
-			ImGui::Image(irradiance, (uint32)(irradiance->width * irradianceUIScale));
-			ImGui::EndTree();
-		}
-		if (ImGui::BeginTree("Depth"))
-		{
-			if (ImGui::BeginProperties()) { ImGui::PropertySlider("Scale", depthUIScale, 0.1f, 20.f); ImGui::EndProperties(); }
-			ImGui::Image(depth, (uint32)(depth->width * depthUIScale));
-			ImGui::EndTree();
-		}
-		if (ImGui::BeginTree("Raytraced radiance"))
-		{
-			if (ImGui::BeginProperties()) { ImGui::PropertySlider("Scale", raytracedRadianceUIScale, 0.1f, 20.f); ImGui::EndProperties(); }
-			ImGui::Image(raytracedRadiance, (uint32)(raytracedRadiance->width * raytracedRadianceUIScale));
-			ImGui::EndTree();
-		}
-	}
-	ImGui::End();
-
-
-
+	
 	if (visualizeProbes)
 	{
 		mat4 transform = createTranslationMatrix(minCorner);
@@ -408,7 +365,7 @@ void light_probe_grid::visualize(opaque_render_pass* renderPass, const pbr_envir
 
 	if (showTestSphere)
 	{
-		test_sample_material material = { minCorner, cellSize, numNodesX, numNodesY, numNodesZ, irradiance, depth, environment.irradiance };
+		test_sample_material material = { minCorner, cellSize, numNodesX, numNodesY, numNodesZ, irradiance, depth };
 
 		//static float time = 0.2f * M_TAU;
 		//time += 1.f / 500.f;
@@ -434,6 +391,7 @@ void light_probe_grid::updateProbes(dx_command_list* cl, const raytracing_tlas& 
 	if (autoRotateRays || rotateRays)
 	{
 		rayRotation = rng.randomRotation();
+		rotateRays = false;
 	}
 
 

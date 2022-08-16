@@ -8,6 +8,7 @@
 
 #define MAX_NUM_SUN_SHADOW_CASCADES 4
 
+
 static float getAttenuation(float distance, float maxDistance)
 {
 	// https://imdoingitwrong.wordpress.com/2011/02/10/improved-light-attenuation/

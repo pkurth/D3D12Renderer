@@ -334,15 +334,6 @@ struct game_scene
 	entt::registry registry;
 
 
-	fs::path savePath;
-
-#ifndef PHYSICS_ONLY
-	directional_light sun;
-	pbr_environment environment;
-#endif
-
-
-
 private:
 
 	template <typename component_t>
@@ -428,6 +419,11 @@ struct editor_scene
 
 #ifndef PHYSICS_ONLY
 	render_camera camera;
+	directional_light sun;
+	pbr_environment environment;
 #endif
+
+	fs::path savePath;
+
 };
 

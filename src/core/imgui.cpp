@@ -800,6 +800,37 @@ namespace ImGui
 		return result;
 	}
 
+	bool PropertyDragDropStringTarget(const char* label, const char* dragDropID, std::string& value, const char* clearLabel)
+	{
+		pre(label);
+
+		bool result = false;
+
+		ImGui::InputText("", value.data(), value.length(), ImGuiInputTextFlags_ReadOnly);
+		if (ImGui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(dragDropID)) 
+			{ 
+				value = (const char*)payload->Data; 
+				result = true; 
+			}
+
+			ImGui::EndDragDropTarget();
+		}
+
+		if (clearLabel)
+		{
+			if (ImGui::Button(clearLabel))
+			{
+				value.clear();
+				result = true;
+			}
+		}
+
+		post();
+		return result;
+	}
+
 	void PropertySeparator()
 	{
 		ImGui::TableNextColumn();

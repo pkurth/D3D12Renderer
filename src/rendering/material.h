@@ -4,8 +4,6 @@
 #include "dx/dx_buffer.h"
 #include "dx/dx_texture.h"
 
-#include "light_probe.hlsli"
-
 struct dx_command_list;
 
 struct common_material_info
@@ -20,7 +18,6 @@ struct common_material_info
 
 	ref<dx_texture> lightProbeIrradiance;
 	ref<dx_texture> lightProbeDepth;
-	light_probe_grid_cb lightProbeGrid;
 
 	ref<dx_texture> tiledCullingGrid;
 	ref<dx_buffer> tiledObjectsIndexList;
@@ -42,9 +39,9 @@ struct common_material_info
 	ref<dx_texture> worldNormals;
 
 	dx_dynamic_constant_buffer cameraCBV;
-	dx_dynamic_constant_buffer sunCBV;
+	dx_dynamic_constant_buffer lightingCBV;
 
-	float environmentIntensity;
+	float globalIlluminationIntensity;
 	float skyIntensity;
 };
 

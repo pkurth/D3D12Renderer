@@ -80,6 +80,8 @@ struct light_probe_grid_cb
 	uint32 countY;
 	uint32 countZ;
 
+	uint32 padding;
+
 	vec3 linearIndexTo3DIndex(uint32 i)
 	{
 		return ::linearIndexTo3DIndex(i, countX, countY);

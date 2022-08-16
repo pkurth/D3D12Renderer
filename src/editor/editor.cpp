@@ -1157,7 +1157,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		if (ImGui::IconButton(imgui_icon_stop, imgui_icon_stop, IMGUI_ICON_DEFAULT_SIZE, this->scene->isStoppable()))
 		{
 			this->scene->stop();
-			this->scene->editorScene.environment.forceUpdate(this->scene->editorScene.sun.direction);
+			this->scene->environment.forceUpdate(this->scene->sun.direction);
 			setSelectedEntityNoUndo({});
 		}
 
@@ -1185,7 +1185,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		}
 		if (!inputCaptured && ImGui::IsKeyDown(key_ctrl) && ImGui::IsKeyPressed('S'))
 		{
-			serializeSceneToDisk(this->scene->editorScene, this->scene->camera, renderer->settings);
+			serializeSceneToDisk(*this->scene, renderer->settings);
 			inputCaptured = true;
 			ImGui::GetIO().KeysDown['S'] = false; // Hack: Window does not get notified of inputs due to the file dialog.
 		}
@@ -1212,8 +1212,8 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		else if (input.keyboard[key_ctrl].down)
 		{
 			vec3 dir = -camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY).direction;
-			undoStack.pushAction("sun direction", sun_direction_undo{ &scene->sun, scene->sun.direction, dir });
-			scene->sun.direction = dir;
+			undoStack.pushAction("sun direction", sun_direction_undo{ &this->scene->sun, this->scene->sun.direction, dir });
+			this->scene->sun.direction = dir;
 			inputCaptured = true;
 		}
 		else
@@ -1314,19 +1314,19 @@ void scene_editor::drawEntityCreationPopup()
 
 void scene_editor::serializeToFile()
 {
-	serializeSceneToDisk(scene->editorScene, scene->camera, renderer->settings);
+	serializeSceneToDisk(*scene, renderer->settings);
 }
 
 bool scene_editor::deserializeFromFile()
 {
 	std::string environmentName;
-	if (deserializeSceneFromDisk(scene->editorScene, scene->camera, renderer->settings, environmentName))
+	if (deserializeSceneFromDisk(*scene, renderer->settings, environmentName))
 	{
 		scene->stop();
 
 		setSelectedEntityNoUndo({});
-		scene->editorScene.environment.setFromTexture(environmentName);
-		scene->editorScene.environment.forceUpdate(this->scene->editorScene.sun.direction);
+		scene->environment.setFromTexture(environmentName);
+		scene->environment.forceUpdate(this->scene->sun.direction);
 		renderer->pathTracer.resetRendering();
 
 		return true;
@@ -1607,7 +1607,7 @@ void scene_editor::drawSettings(float dt)
 
 		editCamera(this->scene->camera);
 		plotAndEditTonemapping(renderer->settings.tonemapSettings);
-		editSunShadowParameters(scene->sun);
+		editSunShadowParameters(this->scene->sun);
 
 		if (ImGui::BeginTree("Post processing"))
 		{
@@ -1623,12 +1623,75 @@ void scene_editor::drawSettings(float dt)
 
 		if (ImGui::BeginTree("Environment"))
 		{
+			auto& environment = this->scene->environment;
+
 			if (ImGui::BeginProperties())
 			{
-				ImGui::PropertySlider("Environment intensity", renderer->settings.environmentIntensity, 0.f, 2.f);
-				ImGui::PropertySlider("Sky intensity", renderer->settings.skyIntensity, 0.f, 2.f);
+				std::string source = environment.isProcedural() ? "None (procedural)" : environment.name.string();
+				if (ImGui::PropertyDragDropStringTarget("Texture source", "content_browser_sky", source, environment.isProcedural() ? 0 : "Make procedural"))
+				{
+					if (source.empty())
+					{
+						environment.setToProcedural(this->scene->sun.direction);
+					}
+					else
+					{
+						environment.setFromTexture(source);
+					}
+				}
+
+				ImGui::PropertySlider("Sky intensity", environment.skyIntensity, 0.f, 2.f);
+				ImGui::PropertySlider("GI intensity", environment.globalIlluminationIntensity, 0.f, 2.f);
+
+				ImGui::PropertyDropdown("GI mode", environmentGIModeNames, 1 + dxContext.featureSupport.raytracing(), (uint32&)environment.giMode);
+
 				ImGui::EndProperties();
 			}
+
+			if (environment.giMode == environment_gi_update_raytraced)
+			{
+				if (ImGui::BeginTree("Light probe"))
+				{
+					auto& grid = environment.lightProbeGrid;
+
+					if (ImGui::BeginProperties())
+					{
+						ImGui::PropertyCheckbox("Visualize probes", grid.visualizeProbes);
+						ImGui::PropertyCheckbox("Visualize rays", grid.visualizeRays);
+						ImGui::PropertyCheckbox("Show test sphere", grid.showTestSphere);
+
+						ImGui::PropertyCheckbox("Auto rotate rays", grid.autoRotateRays);
+						if (!grid.autoRotateRays)
+						{
+							grid.rotateRays = ImGui::PropertyButton("Rotate", "Go");
+						}
+
+						ImGui::EndProperties();
+					}
+
+					if (ImGui::BeginTree("Irradiance"))
+					{
+						if (ImGui::BeginProperties()) { ImGui::PropertySlider("Scale", grid.irradianceUIScale, 0.1f, 20.f); ImGui::EndProperties(); }
+						ImGui::Image(grid.irradiance, (uint32)(grid.irradiance->width * grid.irradianceUIScale));
+						ImGui::EndTree();
+					}
+					if (ImGui::BeginTree("Depth"))
+					{
+						if (ImGui::BeginProperties()) { ImGui::PropertySlider("Scale", grid.depthUIScale, 0.1f, 20.f); ImGui::EndProperties(); }
+						ImGui::Image(grid.depth, (uint32)(grid.depth->width * grid.depthUIScale));
+						ImGui::EndTree();
+					}
+					if (ImGui::BeginTree("Raytraced radiance"))
+					{
+						if (ImGui::BeginProperties()) { ImGui::PropertySlider("Scale", grid.raytracedRadianceUIScale, 0.1f, 20.f); ImGui::EndProperties(); }
+						ImGui::Image(grid.raytracedRadiance, (uint32)(grid.raytracedRadiance->width * grid.raytracedRadianceUIScale));
+						ImGui::EndTree();
+					}
+
+					ImGui::EndTree();
+				}
+			}
+
 
 			ImGui::EndTree();
 		}

@@ -76,7 +76,7 @@ void specular_reflections_raytracer::render(dx_command_list* cl, const raytracin
         output->width, output->height, 1,
         numRayTypes, bindingTable.getNumberOfHitGroups());
 
-    raytracing_cb raytracingCB = { numBounces, fadeoutDistance, maxDistance, materialInfo.environmentIntensity, materialInfo.skyIntensity };
+    raytracing_cb raytracingCB = { numBounces, fadeoutDistance, maxDistance, materialInfo.globalIlluminationIntensity, materialInfo.skyIntensity };
 
 
     // Set up pipeline.
@@ -87,7 +87,7 @@ void specular_reflections_raytracer::render(dx_command_list* cl, const raytracin
 
     cl->setComputeDescriptorTable(SPECULAR_REFLECTIONS_RS_RESOURCES, gpuHandle);
     cl->setComputeDynamicConstantBuffer(SPECULAR_REFLECTIONS_RS_CAMERA, materialInfo.cameraCBV);
-    cl->setComputeDynamicConstantBuffer(SPECULAR_REFLECTIONS_RS_SUN, materialInfo.sunCBV);
+    cl->setComputeDynamicConstantBuffer(SPECULAR_REFLECTIONS_RS_SUN, materialInfo.lightingCBV);
     cl->setCompute32BitConstants(SPECULAR_REFLECTIONS_RS_CB, raytracingCB);
 
     cl->raytrace(raytraceDesc);

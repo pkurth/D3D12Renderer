@@ -12,6 +12,7 @@
 #include "render_utils.h"
 #include "path_tracing.h"
 #include "light_probe.h"
+#include "pbr_environment.h"
 
 #include "light_source.hlsli"
 #include "camera.hlsli"
@@ -27,8 +28,6 @@
 struct renderer_settings
 {
 	tonemap_settings tonemapSettings;
-	float environmentIntensity = 1.f;
-	float skyIntensity = 1.f;
 
 	bool enableAO = true;
 	hbao_settings aoSettings;
@@ -50,8 +49,6 @@ struct renderer_settings
 };
 REFLECT_STRUCT(renderer_settings,
 	(tonemapSettings, "Tonemap"),
-	(environmentIntensity, "Environment intensity"),
-	(skyIntensity, "Sky intensity"),
 	(enableAO, "Enable AO"),
 	(aoSettings, "AO"),
 	(enableSSS, "Enable SSS"),
@@ -138,7 +135,6 @@ struct main_renderer
 	static void submitShadowRenderPass(point_shadow_render_pass* renderPass) { assert(numPointLightShadowRenderPasses < MAX_NUM_POINT_LIGHT_SHADOW_PASSES); pointLightShadowRenderPasses[numPointLightShadowRenderPasses++] = renderPass; }
 
 	static void setRaytracingScene(raytracing_tlas* tlas) { main_renderer::tlas = tlas; }
-	static void raytraceLightProbes(const light_probe_grid& grid) { lightProbeGrid = &grid; }
 
 	static void setEnvironment(const pbr_environment& environment);
 	static void setSun(const directional_light& light);
@@ -188,7 +184,6 @@ private:
 	static uint32 numSpotLightShadowRenderPasses;
 	static uint32 numPointLightShadowRenderPasses;
 
-	static const light_probe_grid* lightProbeGrid;
 	static const raytracing_tlas* tlas;
 
 	static const pbr_environment* environment;
@@ -208,7 +203,7 @@ private:
 
 
 
-	static dx_dynamic_constant_buffer sunCBV;
+	static dx_dynamic_constant_buffer lightingCBV;
 
 
 

@@ -9,6 +9,8 @@
 
 #include "raytracing.h"
 
+#include "lighting.hlsli"
+
 
 
 #define SSR_RAYCAST_WIDTH (renderWidth / 2)
@@ -24,7 +26,6 @@ uint32 main_renderer::numSunLightShadowRenderPasses;
 uint32 main_renderer::numSpotLightShadowRenderPasses;
 uint32 main_renderer::numPointLightShadowRenderPasses;
 
-const light_probe_grid* main_renderer::lightProbeGrid;
 const raytracing_tlas* main_renderer::tlas;
 
 const pbr_environment* main_renderer::environment;
@@ -43,7 +44,7 @@ ref<dx_texture> main_renderer::decalTextureAtlas;
 
 
 
-dx_dynamic_constant_buffer main_renderer::sunCBV;
+dx_dynamic_constant_buffer main_renderer::lightingCBV;
 
 
 void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint32 windowHeight, renderer_spec spec)
@@ -186,8 +187,6 @@ void main_renderer::beginFrameCommon()
 	numSunLightShadowRenderPasses = 0;
 	numSpotLightShadowRenderPasses = 0;
 	numPointLightShadowRenderPasses = 0;
-
-	lightProbeGrid = 0;
 
 	environment = 0;
 	tlas = 0;
@@ -349,7 +348,13 @@ void main_renderer::setDecals(const ref<dx_buffer>& decals, uint32 numDecals, co
 
 void main_renderer::endFrameCommon()
 {
-	sunCBV = dxContext.uploadDynamicConstantBuffer(sun);
+	lighting_cb lightingCB = {
+		sun,
+		environment->lightProbeGrid.getCB(),
+		vec2(1.f / SHADOW_MAP_WIDTH, 1.f / SHADOW_MAP_HEIGHT),
+		environment ? environment->globalIlluminationIntensity : 1.f, (environment && environment->giMode == environment_gi_update_raytraced),  };
+
+	lightingCBV = dxContext.uploadDynamicConstantBuffer(lightingCB);
 
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
@@ -368,13 +373,15 @@ void main_renderer::endFrameCommon()
 		cl->transitionBarrier(render_resources::shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	}
 
-	if (dxContext.featureSupport.raytracing() && lightProbeGrid && tlas)
+	if (dxContext.featureSupport.raytracing() && 
+		environment && environment->giMode == environment_gi_update_raytraced &&
+		tlas)
 	{
 		PROFILE_ALL(cl, "Update light probes");
 
 		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // Wait for AS-rebuilds. TODO: This is not the way to go here. We should wait for the specific value returned by executeCommandList.
 
-		lightProbeGrid->updateProbes(cl, *tlas, environment ? environment->sky : 0, sunCBV);
+		environment->lightProbeGrid.updateProbes(cl, *tlas, environment ? environment->sky : 0, lightingCBV);
 	}
 
 	dxContext.executeCommandList(cl);
@@ -400,14 +407,15 @@ void main_renderer::endFrame(const user_input& input)
 	settings.enableBloom &= spec.allowBloom;
 	settings.enableTAA &= spec.allowTAA;
 
+
 	common_material_info materialInfo;
 
 	materialInfo.sky = (environment && environment->sky) ? environment->sky : render_resources::blackCubeTexture;
 	materialInfo.irradiance = (environment && environment->irradiance) ? environment->irradiance : render_resources::blackCubeTexture;
 	materialInfo.prefilteredRadiance = (environment && environment->prefilteredRadiance) ? environment->prefilteredRadiance : render_resources::blackCubeTexture;
 
-	materialInfo.environmentIntensity = settings.environmentIntensity;
-	materialInfo.skyIntensity = settings.skyIntensity;
+	materialInfo.globalIlluminationIntensity = environment ? environment->globalIlluminationIntensity : 1.f;
+	materialInfo.skyIntensity = environment ? environment->skyIntensity : 1.f;
 	materialInfo.aoTexture = settings.enableAO ? aoTextures[1 - aoHistoryIndex] : render_resources::whiteTexture;
 	materialInfo.sssTexture = settings.enableSSS ? sssTextures[1 - sssHistoryIndex] : render_resources::whiteTexture;
 	materialInfo.ssrTexture = settings.enableSSR ? ssrResolveTexture : 0;
@@ -422,10 +430,9 @@ void main_renderer::endFrame(const user_input& input)
 	materialInfo.spotLightShadowInfoBuffer = spotLightShadowInfoBuffer;
 	materialInfo.volumetricsTexture = 0;
 	materialInfo.cameraCBV = jitteredCameraCBV;
-	materialInfo.sunCBV = sunCBV;
-	materialInfo.lightProbeIrradiance = lightProbeGrid ? lightProbeGrid->irradiance : 0;
-	materialInfo.lightProbeDepth = lightProbeGrid ? lightProbeGrid->depth : 0;
-	materialInfo.lightProbeGrid = lightProbeGrid ? lightProbeGrid->getCB() : light_probe_grid_cb{};
+	materialInfo.lightingCBV = lightingCBV;
+	materialInfo.lightProbeIrradiance = (environment && environment->giMode == environment_gi_update_raytraced) ? environment->lightProbeGrid.irradiance : 0;
+	materialInfo.lightProbeDepth = (environment && environment->giMode == environment_gi_update_raytraced) ? environment->lightProbeGrid.depth : 0;
 
 
 
@@ -510,14 +517,16 @@ void main_renderer::endFrame(const user_input& input)
 				.colorAttachment(objectIDsTexture, render_resources::nullObjectIDsRTV)
 				.depthAttachment(depthStencilBuffer);
 
-			if (environment && environment->sky)
+			if (environment && !environment->isProcedural())
 			{
-				texturedSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, jitteredCamera.prevFrameView, environment->sky, settings.skyIntensity,
+				assert(environment->sky);
+
+				texturedSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, jitteredCamera.prevFrameView, environment->sky, environment->skyIntensity,
 					jitteredCamera.jitter, jitteredCamera.prevFrameJitter);
 			}
 			else
 			{
-				proceduralSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, jitteredCamera.prevFrameView, sun.direction, settings.skyIntensity,
+				proceduralSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, jitteredCamera.prevFrameView, sun.direction, environment ? environment->skyIntensity : 1.f,
 					jitteredCamera.jitter, jitteredCamera.prevFrameJitter);
 			}
 
@@ -813,7 +822,7 @@ void main_renderer::endFrame(const user_input& input)
 			.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 			.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		visualizeSunShadowCascades(cl, depthStencilBuffer, frameResult, sunCBV, unjitteredCamera.invViewProj, unjitteredCamera.position.xyz, unjitteredCamera.forward.xyz);
+		visualizeSunShadowCascades(cl, depthStencilBuffer, frameResult, lightingCBV, unjitteredCamera.invViewProj, unjitteredCamera.position.xyz, unjitteredCamera.forward.xyz);
 
 		barrier_batcher(cl)
 			//.uav(frameResult)

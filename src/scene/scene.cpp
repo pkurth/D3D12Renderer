@@ -66,11 +66,6 @@ void game_scene::cloneTo(game_scene& target)
 	> (target);
 
 	target.registry.ctx() = registry.ctx();
-
-#ifndef PHYSICS_ONLY
-	target.sun = sun;
-	target.environment = environment;
-#endif
 }
 
 scene_entity game_scene::copyEntity(scene_entity src)

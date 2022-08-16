@@ -143,6 +143,8 @@ namespace ImGui
 
 	bool PropertyAssetHandle(const char* label, const char* type, asset_handle& asset);
 
+	bool PropertyDragDropStringTarget(const char* label, const char* dragDropID, std::string& value, const char* clearLabel = 0);
+
 	void PropertySeparator();
 
 

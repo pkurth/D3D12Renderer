@@ -47,8 +47,7 @@ void pbr_environment::setToProcedural(vec3 sunDirection)
 
 void pbr_environment::update(vec3 sunDirection)
 {
-	bool isProcedural = sky == 0;
-	if (isProcedural && lastSunDirection != sunDirection)
+	if (isProcedural() && lastSunDirection != sunDirection)
 	{
 		setToProcedural(sunDirection);
 	}
@@ -56,8 +55,7 @@ void pbr_environment::update(vec3 sunDirection)
 
 void pbr_environment::forceUpdate(vec3 sunDirection)
 {
-	bool isProcedural = sky == 0;
-	if (isProcedural)
+	if (isProcedural())
 	{
 		setToProcedural(sunDirection);
 	}

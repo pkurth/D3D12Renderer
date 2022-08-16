@@ -4,5 +4,5 @@
 #include "core/camera.h"
 #include "rendering/main_renderer.h"
 
-void serializeSceneToDisk(game_scene& scene, const render_camera& camera, const renderer_settings& rendererSettings);
-bool deserializeSceneFromDisk(game_scene& scene, render_camera& camera, renderer_settings& rendererSettings, std::string& environmentName);
+void serializeSceneToDisk(editor_scene& scene, const renderer_settings& rendererSettings);
+bool deserializeSceneFromDisk(editor_scene& scene, renderer_settings& rendererSettings, std::string& environmentName);

@@ -20,6 +20,7 @@ static const char* getTypeIcon(file_browser::dir_entry_type type)
 	if (type == file_browser::dir_entry_type_empty_directory) return ICON_FA_FOLDER;
 	if (type == file_browser::dir_entry_type_mesh) return ICON_FA_CUBE;
 	if (type == file_browser::dir_entry_type_image) return ICON_FA_FILE_IMAGE;
+	if (type == file_browser::dir_entry_type_image_hdr) return ICON_FA_CLOUD_SUN;
 	if (type == file_browser::dir_entry_type_font) return ICON_FA_FONT;
 	if (type == file_browser::dir_entry_type_audio) return ICON_FA_VOLUME_UP;
 
@@ -184,6 +185,16 @@ void file_browser::draw(mesh_editor_panel& meshEditor)
 								ImGui::EndDragDropSource();
 							}
 						}
+						if (p.type == dir_entry_type_image_hdr)
+						{
+							if (ImGui::BeginDragDropSource())
+							{
+								fs::path fullPath = currentPath / p.filename;
+								std::string str = fullPath.string();
+								ImGui::SetDragDropPayload("content_browser_sky", str.c_str(), str.length() + 1, ImGuiCond_Once);
+								ImGui::EndDragDropSource();
+							}
+						}
 					}
 				}
 
@@ -218,6 +229,10 @@ void file_browser::refresh()
 			else if (isImageExtension(extension))
 			{
 				type = dir_entry_type_image;
+				if (extension == ".hdr")
+				{
+					type = dir_entry_type_image_hdr;
+				}
 			}
 			else if (extension == ".ttf")
 			{

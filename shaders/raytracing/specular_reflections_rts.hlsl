@@ -206,7 +206,7 @@ void radianceClosestHit(inout radiance_ray_payload payload, in BuiltInTriangleIn
 	float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
 	
 	payload.color = calculateDirectLighting(albedo, radiance, N, L, V, F0, roughness, metallic);
-	payload.color += calculateAmbientLighting(albedo, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao) * raytracing.environmentIntensity;
+	payload.color += calculateAmbientLighting(albedo, irradianceTexture, environmentTexture, brdf, clampSampler, N, V, F0, roughness, metallic, ao) * raytracing.globalIlluminationIntensity;
 
 	float3 reflectionDirection = normalize(reflect(WorldRayDirection(), N));
 	float3 bounceRadiance = traceRadianceRay(hitPosition, reflectionDirection, payload.recursion);

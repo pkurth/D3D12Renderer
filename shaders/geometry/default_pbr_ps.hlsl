@@ -2,8 +2,7 @@
 #include "brdf.hlsli"
 #include "camera.hlsli"
 #include "light_culling_rs.hlsli"
-#include "light_source.hlsli"
-#include "light_probe.hlsli"
+#include "lighting.hlsli"
 #include "normal.hlsli"
 #include "material.hlsli"
 
@@ -20,7 +19,6 @@ struct ps_input
 ConstantBuffer<pbr_material_cb> material				: register(b0, space1);
 ConstantBuffer<camera_cb> camera						: register(b1, space1);
 ConstantBuffer<lighting_cb> lighting					: register(b2, space1);
-ConstantBuffer<light_probe_grid_cb> lightProbeGrid		: register(b3, space1);
 
 
 SamplerState wrapSampler								: register(s0);
@@ -33,8 +31,6 @@ Texture2D<float3> normalTex								: register(t1, space1);
 Texture2D<float> roughTex								: register(t2, space1);
 Texture2D<float> metalTex								: register(t3, space1);
 
-
-ConstantBuffer<directional_light_cb> sun				: register(b0, space2);
 
 TextureCube<float4> irradianceTexture					: register(t0, space2);
 TextureCube<float4> prefilteredRadianceTexture			: register(t1, space2);
@@ -262,15 +258,15 @@ ps_output main(ps_input IN)
 
 	// Sun.
 	{
-		float3 L = -sun.direction;
+		float3 L = -lighting.sun.direction;
 
 		light_info light;
-		light.initialize(surface, L, sun.radiance);
+		light.initialize(surface, L, lighting.sun.radiance);
 
-		float visibility = sampleCascadedShadowMapPCF(sun.viewProjs, surface.P,
-			shadowMap, sun.viewports,
-			shadowSampler, lighting.shadowMapTexelSize, pixelDepth, sun.numShadowCascades,
-			sun.cascadeDistances, sun.bias, sun.blendDistances);
+		float visibility = sampleCascadedShadowMapPCF(lighting.sun.viewProjs, surface.P,
+			shadowMap, lighting.sun.viewports,
+			shadowSampler, lighting.shadowMapTexelSize, pixelDepth, lighting.sun.numShadowCascades,
+			lighting.sun.cascadeDistances, lighting.sun.bias, lighting.sun.blendDistances);
 
 		float sss = sssTexture.SampleLevel(clampSampler, IN.screenPosition.xy * camera.invScreenDims, 0);
 		visibility *= sss;
@@ -289,17 +285,24 @@ ps_output main(ps_input IN)
 
 	float4 ssr = ssrTexture.SampleLevel(clampSampler, screenUV, 0);
 
-#if 1
-	totalLighting.diffuse += lightProbeGrid.sampleIrradianceAtPosition(surface.P, surface.N, lightProbeIrradiance, lightProbeDepth, wrapSampler) * lighting.environmentIntensity * ao;
+
 	float3 specular = float3(0.f, 0.f, 0.f);
-#else
-	ambient_factors factors = getAmbientFactors(surface);
-	totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.environmentIntensity * ao;
-	float3 specular = specularIBL(factors.ks, surface, prefilteredRadianceTexture, brdf, clampSampler);
-#endif
+
+	[branch]
+	if (lighting.useRaytracedGlobalIllumination)
+	{
+		totalLighting.diffuse += lighting.lightProbeGrid.sampleIrradianceAtPosition(surface.P, surface.N, lightProbeIrradiance, lightProbeDepth, wrapSampler) * lighting.globalIlluminationIntensity * ao;
+		// TODO: Specular.
+	}
+	else
+	{
+		ambient_factors factors = getAmbientFactors(surface);
+		totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.globalIlluminationIntensity * ao;
+		specular = specularIBL(factors.ks, surface, prefilteredRadianceTexture, brdf, clampSampler);
+	}
 
 	specular = lerp(specular, ssr.rgb, ssr.a);
-	totalLighting.specular += specular * lighting.environmentIntensity * ao;
+	totalLighting.specular += specular * lighting.globalIlluminationIntensity * ao;
 
 
 	// Output.
