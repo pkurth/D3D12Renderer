@@ -550,17 +550,20 @@ void application::update(const user_input& input, float dt)
 	game_scene& scene = this->scene.getCurrentScene();
 	dt *= this->scene.getTimestepScale();
 
+	const uint32 maxPhysicsIterationsPerFrame = 4;
+
 	physicsTimer += dt;
-	if (physicsTimer >= physicsFixedTimeStep)
+	uint32 physicsIterations = 0;
+	while (physicsTimer >= physicsFixedTimeStep && physicsIterations++ < maxPhysicsIterationsPerFrame)
 	{
 		physicsStep(scene, stackArena);
 		physicsTimer -= physicsFixedTimeStep;
+	}
 
-		if (physicsTimer >= physicsFixedTimeStep)
-		{
-			LOG_WARNING("Dropping physics frames");
-			physicsTimer = fmod(physicsTimer, physicsFixedTimeStep);
-		}
+	if (physicsTimer >= physicsFixedTimeStep)
+	{
+		physicsTimer = fmod(physicsTimer, physicsFixedTimeStep);
+		LOG_WARNING("Dropping physics frames");
 	}
 
 	float physicsInterpolationT = physicsTimer / physicsFixedTimeStep;
