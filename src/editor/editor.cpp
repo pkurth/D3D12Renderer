@@ -1019,7 +1019,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 	if (selectedEntity)
 	{
-		if (transform_component* transform = selectedEntity.getComponentIfExists<transform_component>())
+		if (physics_transform_component* transform = selectedEntity.getComponentIfExists<physics_transform_component>())
 		{
 			// Saved rigid-body properties. When an RB is dragged, we make it kinematic.
 			static bool saved = false;
@@ -1027,7 +1027,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 			bool draggingBefore = gizmo.dragging;
 
-			if (gizmo.manipulateTransformation(*transform, camera, input, !inputCaptured, ldrRenderPass))
+			if (gizmo.manipulateTransformation(transform->t1, camera, input, !inputCaptured, ldrRenderPass))
 			{
 				updateSelectedEntityUIRotation();
 				inputCaptured = true;
@@ -1044,18 +1044,11 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 					saved = true;
 				}
 
-				if (cloth_component* cloth = selectedEntity.getComponentIfExists<cloth_component>())
-				{
-					cloth->setWorldPositionOfFixedVertices(*transform, input.keyboard[key_shift].down);
-				}
+				transform->t0 = transform->t1;
+				selectedEntity.getComponent<transform_component>() = transform->t1;
 			}
 			else
 			{
-				if (draggingBefore)
-				{
-					undoStack.pushAction("transform entity", transform_undo{ selectedEntity, gizmo.originalTransform, *transform });
-				}
-
 				if (saved)
 				{
 					assert(selectedEntity.hasComponent<rigid_body_component>());
@@ -1063,6 +1056,20 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 					rb.invMass = invMass;
 					saved = false;
+				}
+			}
+		}
+		else if (transform_component* transform = selectedEntity.getComponentIfExists<transform_component>())
+		{
+			if (gizmo.manipulateTransformation(*transform, camera, input, !inputCaptured, ldrRenderPass))
+			{
+				updateSelectedEntityUIRotation();
+				inputCaptured = true;
+				objectMovedByGizmo = true;
+
+				if (cloth_component* cloth = selectedEntity.getComponentIfExists<cloth_component>())
+				{
+					cloth->setWorldPositionOfFixedVertices(*transform, input.keyboard[key_shift].down);
 				}
 			}
 		}
