@@ -45,8 +45,14 @@ struct rigid_body_component
 	vec3 torqueAccumulator;
 };
 
-struct physics_transform_component
+struct physics_transform0_component : trs 
 {
-	trs t0;
-	trs t1;
+	physics_transform0_component() {}
+	physics_transform0_component(const trs& t) : trs(t) {}
+};
+
+struct physics_transform1_component : trs
+{
+	physics_transform1_component() {}
+	physics_transform1_component(const trs& t) : trs(t) {}
 };

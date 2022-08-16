@@ -487,9 +487,9 @@ void testPhysicsInteraction(game_scene& scene, ray r)
 		scene_entity entity = { collider.parentEntity, scene };
 		if (rigid_body_component* rb = entity.getComponentIfExists<rigid_body_component>())
 		{
-			physics_transform_component* physicsTransformComponent = entity.getComponentIfExists<physics_transform_component>();
+			physics_transform1_component* physicsTransformComponent = entity.getComponentIfExists<physics_transform1_component>();
 			transform_component* transformComponent = entity.getComponentIfExists<transform_component>();
-			const trs& transform = physicsTransformComponent ? physicsTransformComponent->t1 : transformComponent ? *transformComponent : trs::identity;
+			const trs& transform = physicsTransformComponent ? *physicsTransformComponent : transformComponent ? *transformComponent : trs::identity;
 
 			ray localR = { inverseTransformPosition(transform, r.origin), inverseTransformDirection(transform, r.direction) };
 			float t;
@@ -565,9 +565,9 @@ static void getWorldSpaceColliders(game_scene& scene, bounding_box* outWorldspac
 
 		scene_entity entity = { collider.parentEntity, scene };
 
-		physics_transform_component* physicsTransformComponent = entity.getComponentIfExists<physics_transform_component>();
+		physics_transform1_component* physicsTransformComponent = entity.getComponentIfExists<physics_transform1_component>();
 		transform_component* transformComponent = entity.getComponentIfExists<transform_component>();
-		const trs& transform = physicsTransformComponent ? physicsTransformComponent->t1 : transformComponent ? *transformComponent : trs::identity;
+		const trs& transform = physicsTransformComponent ? *physicsTransformComponent : transformComponent ? *transformComponent : trs::identity;
 
 		col.type = collider.type;
 		col.material = collider.material;
@@ -1081,11 +1081,11 @@ void physicsStepInternal(game_scene& scene, memory_arena& arena)
 		CPU_PROFILE_BLOCK("Integrate rigid body forces");
 
 		uint32 rbIndex = numRigidBodies - 1; // EnTT iterates back to front.
-		for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, physics_transform_component>().each())
+		for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, physics_transform1_component>().each())
 		{
 			rigid_body_global_state& global = rbGlobal[rbIndex--];
 			rb.forceAccumulator += globalForceField;
-			rb.applyGravityAndIntegrateForces(global, transform.t1, dt);
+			rb.applyGravityAndIntegrateForces(global, transform, dt);
 		}
 	}
 
@@ -1146,12 +1146,11 @@ void physicsStepInternal(game_scene& scene, memory_arena& arena)
 		CPU_PROFILE_BLOCK("Integrate rigid body velocities");
 
 		uint32 rbIndex = numRigidBodies - 1; // EnTT iterates back to front.
-		for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, physics_transform_component>().each())
+		for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, physics_transform1_component>().each())
 		{
 			rigid_body_global_state& global = rbGlobal[rbIndex--];
 
-			transform.t0 = transform.t1;
-			rb.integrateVelocity(global, transform.t1, dt);
+			rb.integrateVelocity(global, transform, dt);
 		}
 	}
 
@@ -1179,10 +1178,18 @@ void physicsStep(game_scene& scene, memory_arena& arena, float& timer, float dt)
 
 	timer += dt;
 	uint32 physicsIterations = 0;
-	while (timer >= physicsFixedTimeStep && physicsIterations++ < maxPhysicsIterationsPerFrame)
+	if (timer >= physicsFixedTimeStep)
 	{
-		physicsStepInternal(scene, arena);
-		timer -= physicsFixedTimeStep;
+		for (auto [entityHandle, transform0, transform1] : scene.group(entt::get<physics_transform0_component, physics_transform1_component>).each())
+		{
+			transform0 = transform1;
+		}
+
+		while (timer >= physicsFixedTimeStep && physicsIterations++ < maxPhysicsIterationsPerFrame)
+		{
+			physicsStepInternal(scene, arena);
+			timer -= physicsFixedTimeStep;
+		}
 	}
 
 	if (timer >= physicsFixedTimeStep)
@@ -1197,9 +1204,9 @@ void physicsStep(game_scene& scene, memory_arena& arena, float& timer, float dt)
 	float physicsInterpolationT = timer / physicsFixedTimeStep;
 	assert(physicsInterpolationT >= 0.f && physicsInterpolationT <= 1.f);
 
-	for (auto [entityHandle, transform, physicsTransform] : scene.group(entt::get<transform_component, physics_transform_component>).each())
+	for (auto [entityHandle, transform, physicsTransform0, physicsTransform1] : scene.group(entt::get<transform_component, physics_transform0_component, physics_transform1_component>).each())
 	{
-		transform = lerp(physicsTransform.t0, physicsTransform.t1, physicsInterpolationT);
+		transform = lerp(physicsTransform0, physicsTransform1, physicsInterpolationT);
 	}
 }
 

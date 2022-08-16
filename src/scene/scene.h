@@ -73,10 +73,8 @@ struct scene_entity
 				}
 				if (auto* transform = getComponentIfExists<transform_component>())
 				{
-					if (!hasComponent<struct physics_transform_component>())
-					{
-						addComponent<struct physics_transform_component>(*transform, *transform);
-					}
+					addComponent<struct physics_transform0_component>(*transform);
+					addComponent<struct physics_transform1_component>(*transform);
 				}
 			}
 
@@ -99,7 +97,8 @@ struct scene_entity
 
 				if (hasComponent<struct rigid_body_component>())
 				{
-					addComponent<struct physics_transform_component>(component, component);
+					addComponent<struct physics_transform0_component>(component);
+					addComponent<struct physics_transform1_component>(component);
 				}
 			}
 		}
