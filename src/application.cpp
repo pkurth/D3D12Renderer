@@ -545,35 +545,10 @@ void application::update(const user_input& input, float dt)
 
 
 	static float physicsTimer = 0.f;
-	float physicsFixedTimeStep = 1.f / (float)physicsSettings.frameRate;
 
 	game_scene& scene = this->scene.getCurrentScene();
 	dt *= this->scene.getTimestepScale();
-
-	const uint32 maxPhysicsIterationsPerFrame = 4;
-
-	physicsTimer += dt;
-	uint32 physicsIterations = 0;
-	while (physicsTimer >= physicsFixedTimeStep && physicsIterations++ < maxPhysicsIterationsPerFrame)
-	{
-		physicsStep(scene, stackArena);
-		physicsTimer -= physicsFixedTimeStep;
-	}
-
-	if (physicsTimer >= physicsFixedTimeStep)
-	{
-		physicsTimer = fmod(physicsTimer, physicsFixedTimeStep);
-		LOG_WARNING("Dropping physics frames");
-	}
-
-	float physicsInterpolationT = physicsTimer / physicsFixedTimeStep;
-	assert(physicsInterpolationT >= 0.f && physicsInterpolationT <= 1.f);
-
-	for (auto [entityHandle, transform, physicsTransform] : scene.group(entt::get<transform_component, physics_transform_component>).each())
-	{
-		transform = lerp(physicsTransform.t0, physicsTransform.t1, physicsInterpolationT);
-	}
-
+	physicsStep(scene, stackArena, physicsTimer, dt);
 
 
 	// Particles.

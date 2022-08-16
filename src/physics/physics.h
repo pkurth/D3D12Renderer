@@ -370,4 +370,4 @@ extern std::function<void(const collision_event&)> collisionBeginCallback;
 extern std::function<void(const collision_event&)> collisionEndCallback;
 
 void testPhysicsInteraction(game_scene& scene, ray r);
-void physicsStep(game_scene& scene, memory_arena& arena);
+void physicsStep(game_scene& scene, memory_arena& arena, float& timer, float dt);

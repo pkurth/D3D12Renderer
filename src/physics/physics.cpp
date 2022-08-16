@@ -5,6 +5,10 @@
 #include "geometry/mesh_builder.h"
 #include "core/cpu_profiling.h"
 
+#ifndef PHYSICS_ONLY
+#include "core/log.h"
+#endif
+
 #include <unordered_set>
 
 physics_settings physicsSettings = {};
@@ -998,7 +1002,7 @@ static void handleNonCollisionInteractions(game_scene& scene,
 }
 
 
-void physicsStep(game_scene& scene, memory_arena& arena)
+void physicsStepInternal(game_scene& scene, memory_arena& arena)
 {
 	CPU_PROFILE_BLOCK("Physics step");
 
@@ -1166,6 +1170,37 @@ void physicsStep(game_scene& scene, memory_arena& arena)
 
 
 	historyIndex = 1 - historyIndex;
+}
+
+void physicsStep(game_scene& scene, memory_arena& arena, float& timer, float dt)
+{
+	const float physicsFixedTimeStep = 1.f / (float)physicsSettings.frameRate;
+	const uint32 maxPhysicsIterationsPerFrame = 4;
+
+	timer += dt;
+	uint32 physicsIterations = 0;
+	while (timer >= physicsFixedTimeStep && physicsIterations++ < maxPhysicsIterationsPerFrame)
+	{
+		physicsStepInternal(scene, arena);
+		timer -= physicsFixedTimeStep;
+	}
+
+	if (timer >= physicsFixedTimeStep)
+	{
+		timer = fmod(timer, physicsFixedTimeStep);
+
+#ifndef PHYSICS_ONLY
+		LOG_WARNING("Dropping physics frames");
+#endif
+	}
+
+	float physicsInterpolationT = timer / physicsFixedTimeStep;
+	assert(physicsInterpolationT >= 0.f && physicsInterpolationT <= 1.f);
+
+	for (auto [entityHandle, transform, physicsTransform] : scene.group(entt::get<transform_component, physics_transform_component>).each())
+	{
+		transform = lerp(physicsTransform.t0, physicsTransform.t1, physicsInterpolationT);
+	}
 }
 
 // This function returns the inertia tensors with respect to the center of gravity, so with a coordinate system centered at the COG.
