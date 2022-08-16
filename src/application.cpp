@@ -523,9 +523,10 @@ void application::submitRendererParams(uint32 numSpotLightShadowPasses, uint32 n
 
 void application::update(const user_input& input, float dt)
 {
+	resetRenderPasses();
+
 	stackArena.reset();
 
-	//dt = 1.f / 60.f;
 	//learnedLocomotion.update(scene);
 
 	bool objectDragged = editor.update(input, &ldrRenderPass, dt);
@@ -536,7 +537,6 @@ void application::update(const user_input& input, float dt)
 	directional_light& sun = scene.sun;
 	pbr_environment& environment = scene.environment;
 
-	resetRenderPasses();
 	environment.update(sun.direction);
 	sun.updateMatrices(camera);
 	setAudioListener(camera.position, camera.rotation, vec3(0.f));
