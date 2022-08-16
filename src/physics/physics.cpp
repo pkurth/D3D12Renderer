@@ -480,10 +480,12 @@ void testPhysicsInteraction(game_scene& scene, ray r)
 
 	for (auto [entityHandle, collider] : scene.view<collider_component>().each())
 	{
-		scene_entity rbEntity = { collider.parentEntity, scene };
-		if (rigid_body_component* rb = rbEntity.getComponentIfExists<rigid_body_component>())
+		scene_entity entity = { collider.parentEntity, scene };
+		if (rigid_body_component* rb = entity.getComponentIfExists<rigid_body_component>())
 		{
-			transform_component& transform = rbEntity.getComponent<transform_component>();
+			physics_transform_component* physicsTransformComponent = entity.getComponentIfExists<physics_transform_component>();
+			transform_component* transformComponent = entity.getComponentIfExists<transform_component>();
+			const trs& transform = physicsTransformComponent ? physicsTransformComponent->t1 : transformComponent ? *transformComponent : trs::identity;
 
 			ray localR = { inverseTransformPosition(transform, r.origin), inverseTransformDirection(transform, r.direction) };
 			float t;
@@ -558,7 +560,10 @@ static void getWorldSpaceColliders(game_scene& scene, bounding_box* outWorldspac
 		++pushIndex;
 
 		scene_entity entity = { collider.parentEntity, scene };
-		const transform_component& transform = entity.hasComponent<transform_component>() ? entity.getComponent<transform_component>() : trs::identity;
+
+		physics_transform_component* physicsTransformComponent = entity.getComponentIfExists<physics_transform_component>();
+		transform_component* transformComponent = entity.getComponentIfExists<transform_component>();
+		const trs& transform = physicsTransformComponent ? physicsTransformComponent->t1 : transformComponent ? *transformComponent : trs::identity;
 
 		col.type = collider.type;
 		col.material = collider.material;
@@ -993,15 +998,11 @@ static void handleNonCollisionInteractions(game_scene& scene,
 }
 
 
-void physicsStep(game_scene& scene, memory_arena& arena, float dt)
+void physicsStep(game_scene& scene, memory_arena& arena)
 {
 	CPU_PROFILE_BLOCK("Physics step");
 
-	dt = min(dt, 1.f / 30.f);
-	if (dt <= 0.f)
-	{
-		return;
-	}
+	float dt = 1.f / (float)physicsSettings.frameRate;
 
 	uint32 numRigidBodies = scene.numberOfComponentsOfType<rigid_body_component>();
 	uint32 numCloths = scene.numberOfComponentsOfType<cloth_component>();
@@ -1076,11 +1077,11 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 		CPU_PROFILE_BLOCK("Integrate rigid body forces");
 
 		uint32 rbIndex = numRigidBodies - 1; // EnTT iterates back to front.
-		for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, transform_component>().each())
+		for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, physics_transform_component>().each())
 		{
 			rigid_body_global_state& global = rbGlobal[rbIndex--];
 			rb.forceAccumulator += globalForceField;
-			rb.applyGravityAndIntegrateForces(global, transform, dt);
+			rb.applyGravityAndIntegrateForces(global, transform.t1, dt);
 		}
 	}
 
@@ -1141,10 +1142,12 @@ void physicsStep(game_scene& scene, memory_arena& arena, float dt)
 		CPU_PROFILE_BLOCK("Integrate rigid body velocities");
 
 		uint32 rbIndex = numRigidBodies - 1; // EnTT iterates back to front.
-		for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, transform_component>().each())
+		for (auto [entityHandle, rb, transform] : scene.group<rigid_body_component, physics_transform_component>().each())
 		{
 			rigid_body_global_state& global = rbGlobal[rbIndex--];
-			rb.integrateVelocity(global, transform, dt);
+
+			transform.t0 = transform.t1;
+			rb.integrateVelocity(global, transform.t1, dt);
 		}
 	}
 

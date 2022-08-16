@@ -1700,6 +1700,14 @@ void scene_editor::drawSettings(float dt)
 		{
 			if (ImGui::BeginProperties())
 			{
+				ImGui::PropertyInput("Fixed frame rate", physicsSettings.frameRate);
+				if (physicsSettings.frameRate < 30)
+				{
+					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.f, 0.f, 0.f, 1.f));
+					ImGui::PropertyValue("", "Low frame rate");
+					ImGui::PopStyleColor();
+				}
+
 				ImGui::PropertySlider("Rigid solver iterations", physicsSettings.numRigidSolverIterations, 1, 200);
 
 				ImGui::PropertySlider("Cloth velocity iterations", physicsSettings.numClothVelocityIterations, 0, 10);

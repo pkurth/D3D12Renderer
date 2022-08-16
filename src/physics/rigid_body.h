@@ -44,3 +44,9 @@ struct rigid_body_component
 	vec3 forceAccumulator;
 	vec3 torqueAccumulator;
 };
+
+struct physics_transform_component
+{
+	trs t0;
+	trs t1;
+};

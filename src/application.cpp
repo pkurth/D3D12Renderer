@@ -292,6 +292,7 @@ void application::initialize(main_renderer* renderer)
 #endif
 
 
+#if 0
 	collisionBeginCallback = [rng = random_number_generator(512513)](const collision_event& e) mutable
 	{
 		vec3 velA(0.f);
@@ -317,6 +318,7 @@ void application::initialize(main_renderer* renderer)
 			play3DSound(sound_id_collision, position, { volume, pitch });
 		}
 	};
+#endif
 
 
 	//humanoid_ragdoll::create(scene, vec3(60.f, 1.25f, -2.f));
@@ -541,10 +543,27 @@ void application::update(const user_input& input, float dt)
 	environment.lightProbeGrid.visualize(&opaqueRenderPass);
 
 
+
+	static float physicsTimer = 0.f;
+	float physicsFixedTimeStep = 1.f / (float)physicsSettings.frameRate;
+
 	game_scene& scene = this->scene.getCurrentScene();
 	dt *= this->scene.getTimestepScale();
-	physicsStep(scene, stackArena, dt);
 
+	physicsTimer += dt;
+	while (physicsTimer >= physicsFixedTimeStep)
+	{
+		physicsStep(scene, stackArena);
+		physicsTimer -= physicsFixedTimeStep;
+	}
+
+	float physicsInterpolationT = physicsTimer / physicsFixedTimeStep;
+	assert(physicsInterpolationT >= 0.f && physicsInterpolationT <= 1.f);
+
+	for (auto [entityHandle, transform, physicsTransform] : scene.group(entt::get<transform_component, physics_transform_component>).each())
+	{
+		transform = lerp(physicsTransform.t0, physicsTransform.t1, physicsInterpolationT);
+	}
 
 
 

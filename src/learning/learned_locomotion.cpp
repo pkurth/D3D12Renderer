@@ -465,7 +465,8 @@ extern "C" __declspec(dllexport) int updatePhysics(float* action, float* outStat
 		testPhysicsInteraction(trainingScene, ray{ origin, direction });
 	}
 
-	physicsStep(trainingScene, stackArena, 1.f / 60.f);
+	physicsSettings.frameRate = 60;
+	physicsStep(trainingScene, stackArena);
 
 	bool failure = trainingEnv->getState(*(learned_locomotion::learning_state*)outState);
 	*outReward = 0.f;

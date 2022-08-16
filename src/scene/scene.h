@@ -71,6 +71,13 @@ struct scene_entity
 				{
 					addComponent<dynamic_transform_component>();
 				}
+				if (auto* transform = getComponentIfExists<transform_component>())
+				{
+					if (!hasComponent<struct physics_transform_component>())
+					{
+						addComponent<struct physics_transform_component>(*transform, *transform);
+					}
+				}
 			}
 
 
@@ -88,6 +95,11 @@ struct scene_entity
 				if (struct cloth_component* cloth = getComponentIfExists<struct cloth_component>())
 				{
 					cloth->setWorldPositionOfFixedVertices(component, true);
+				}
+
+				if (hasComponent<struct rigid_body_component>())
+				{
+					addComponent<struct physics_transform_component>(component, component);
 				}
 			}
 		}

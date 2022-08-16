@@ -9,8 +9,8 @@ game_scene::game_scene()
 {
 	// Construct groups early. Ingore the return types.
 	(void)registry.group<collider_component, sap_endpoint_indirection_component>(); // Colliders and SAP endpoints are always sorted in the same order.
-	(void)registry.group<transform_component, dynamic_transform_component, rigid_body_component>();
-	(void)registry.group<transform_component, rigid_body_component>();
+	(void)registry.group<transform_component, dynamic_transform_component, rigid_body_component, physics_transform_component>();
+	(void)registry.group<transform_component, rigid_body_component, physics_transform_component>();
 
 #ifndef PHYSICS_ONLY
 	(void)registry.group<position_component, point_light_component>();
@@ -56,6 +56,8 @@ void game_scene::cloneTo(game_scene& target)
 		physics_reference_component,
 		sap_endpoint_indirection_component,
 		constraint_entity_reference_component,
+
+		physics_transform_component,
 
 		distance_constraint,
 		ball_constraint,

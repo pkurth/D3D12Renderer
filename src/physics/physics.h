@@ -321,6 +321,8 @@ struct constraint_entity_iterator
 
 struct physics_settings
 {
+	uint32 frameRate = 120;
+
 	uint32 numRigidSolverIterations = 30;
 
 	uint32 numClothVelocityIterations = 0;
@@ -368,4 +370,4 @@ extern std::function<void(const collision_event&)> collisionBeginCallback;
 extern std::function<void(const collision_event&)> collisionEndCallback;
 
 void testPhysicsInteraction(game_scene& scene, ray r);
-void physicsStep(game_scene& scene, memory_arena& arena, float dt);
+void physicsStep(game_scene& scene, memory_arena& arena);
