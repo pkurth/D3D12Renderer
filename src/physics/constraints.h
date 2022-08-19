@@ -65,10 +65,15 @@ struct constraint_entity_reference_component
 };
 
 
+#define CONSTRAINT_CAPACITY (2 * 1024)
+
+
 // Distance constraint.
 
 struct distance_constraint
 {
+	static constexpr std::size_t page_size = CONSTRAINT_CAPACITY;
+
 	vec3 localAnchorA;
 	vec3 localAnchorB;
 	float globalLength;
@@ -123,6 +128,8 @@ struct simd_distance_constraint_solver
 
 struct ball_constraint
 {
+	static constexpr std::size_t page_size = CONSTRAINT_CAPACITY;
+
 	vec3 localAnchorA;
 	vec3 localAnchorB;
 };
@@ -167,6 +174,8 @@ struct simd_ball_constraint_solver
 
 struct fixed_constraint
 {
+	static constexpr std::size_t page_size = CONSTRAINT_CAPACITY;
+
 	quat initialInvRotationDifference;
 
 	vec3 localAnchorA;
@@ -219,6 +228,8 @@ struct simd_fixed_constraint_solver
 
 struct hinge_constraint
 {
+	static constexpr std::size_t page_size = CONSTRAINT_CAPACITY;
+
 	vec3 localAnchorA;
 	vec3 localAnchorB;
 	vec3 localHingeAxisA;
@@ -334,6 +345,8 @@ struct simd_hinge_constraint_solver
 
 struct cone_twist_constraint
 {
+	static constexpr std::size_t page_size = CONSTRAINT_CAPACITY;
+
 	vec3 localAnchorA;
 	vec3 localAnchorB;
 
@@ -483,6 +496,8 @@ struct simd_cone_twist_constraint_solver
 
 struct slider_constraint
 {
+	static constexpr std::size_t page_size = CONSTRAINT_CAPACITY;
+
 	quat initialInvRotationDifference;
 	vec3 localAnchorA;
 	vec3 localAnchorB;
@@ -744,4 +759,9 @@ private:
 	collision_constraint_solver collisionConstraintSolver;
 	simd_collision_constraint_solver collisionConstraintSolverSIMD;
 };
+
+
+
+
+
 
