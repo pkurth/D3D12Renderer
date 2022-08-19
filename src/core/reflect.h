@@ -48,9 +48,7 @@ struct member_list : member_list_base
 
 
 template <typename T> struct is_reflected : std::is_base_of<member_list_base, type_descriptor<T>> {};
-template <typename T> static inline constexpr bool is_reflected_v = typename is_reflected<T>::value;
-
-
+template <typename T> inline constexpr bool is_reflected_v = is_reflected<T>::value;
 
 
 template <typename T, typename = std::enable_if_t<is_reflected_v<T>>>
