@@ -1653,6 +1653,11 @@ void scene_editor::drawSettings(float dt)
 				ImGui::PropertyDropdown("GI mode", environmentGIModeNames, 1 + dxContext.featureSupport.raytracing(), (uint32&)environment.giMode);
 
 				ImGui::EndProperties();
+
+				if (environment.giMode == environment_gi_update_raytraced)
+				{
+					ImGui::TextColored(ImVec4(1, 0, 0, 1), "Raytraced GI currently is diffuse only");
+				}
 			}
 
 			if (environment.giMode == environment_gi_update_raytraced)
