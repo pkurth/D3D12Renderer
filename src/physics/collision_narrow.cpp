@@ -7,6 +7,30 @@
 #include "collision_sat.h"
 #include "core/cpu_profiling.h"
 
+#include "core/math_simd.h"
+
+#define COLLISION_SIMD_WIDTH 8
+
+#if COLLISION_SIMD_WIDTH == 4
+typedef w4_vec2 w_vec2;
+typedef w4_vec3 w_vec3;
+typedef w4_vec4 w_vec4;
+typedef w4_quat w_quat;
+typedef w4_mat2 w_mat2;
+typedef w4_mat3 w_mat3;
+typedef w4_float w_float;
+typedef w4_int w_int;
+#elif COLLISION_SIMD_WIDTH == 8 && defined(SIMD_AVX_2)
+typedef w8_vec2 w_vec2;
+typedef w8_vec3 w_vec3;
+typedef w8_vec4 w_vec4;
+typedef w8_quat w_quat;
+typedef w8_mat2 w_mat2;
+typedef w8_mat3 w_mat3;
+typedef w8_float w_float;
+typedef w8_int w_int;
+#endif
+
 
 struct contact_manifold
 {
@@ -341,6 +365,8 @@ static bool clipPointsAndBuildContact(clipping_polygon& polygon, const vec4* cli
 
 	return false;
 }
+
+
 
 // Sphere tests.
 static bool intersection(const bounding_sphere& s1, const bounding_sphere& s2, contact_manifold& outContact)
@@ -1555,13 +1581,13 @@ static bool intersection(const bounding_hull& a, const bounding_hull& b, contact
 	return true;
 }
 
-static bool collisionCheck(const collider_union* worldSpaceColliders, collider_pair overlap, contact_manifold& contact)
+static bool collisionCheck(const collider_union* worldSpaceColliders, collider_pair pair, contact_manifold& contact)
 {
-	const collider_union* colliderA = worldSpaceColliders + overlap.colliderA;
-	const collider_union* colliderB = worldSpaceColliders + overlap.colliderB;
+	const collider_union* colliderA = worldSpaceColliders + pair.colliderA;
+	const collider_union* colliderB = worldSpaceColliders + pair.colliderB;
 
-	contact.colliderA = overlap.colliderA;
-	contact.colliderB = overlap.colliderB;
+	contact.colliderA = pair.colliderA;
+	contact.colliderB = pair.colliderB;
 
 	bool collides = false;
 
@@ -1640,10 +1666,10 @@ static bool collisionCheck(const collider_union* worldSpaceColliders, collider_p
 	return collides;
 }
 
-static bool overlapCheck(const collider_union* worldSpaceColliders, collider_pair overlap, non_collision_interaction& interaction)
+static bool overlapCheck(const collider_union* worldSpaceColliders, collider_pair pair, non_collision_interaction& interaction)
 {
-	const collider_union* colliderA = worldSpaceColliders + overlap.colliderA;
-	const collider_union* colliderB = worldSpaceColliders + overlap.colliderB;
+	const collider_union* colliderA = worldSpaceColliders + pair.colliderA;
+	const collider_union* colliderB = worldSpaceColliders + pair.colliderB;
 
 	assert(colliderA->objectType == physics_object_type_rigid_body || colliderB->objectType == physics_object_type_rigid_body);
 	assert(colliderA->objectType != physics_object_type_rigid_body || colliderB->objectType != physics_object_type_rigid_body);
@@ -1738,7 +1764,7 @@ static bool overlapCheck(const collider_union* worldSpaceColliders, collider_pai
 	return overlaps;
 }
 
-narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collider_pair* collisionPairs, uint32 numCollisionPairs,
+narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collider_pair* collisionPairs, uint32 numCollisionPairs, memory_arena& arena,
 	collision_contact* outContacts, constraint_body_pair* outBodyPairs, uint8* numContactsPerPair, non_collision_interaction* outNonCollisionInteractions)
 {
 	CPU_PROFILE_BLOCK("Narrow phase");
@@ -1747,79 +1773,417 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collid
 	uint32 numContacts = 0;
 	uint32 numNonCollisionInteractions = 0;
 
-
-	for (uint32 i = 0; i < numCollisionPairs; ++i)
 	{
-		collider_pair overlap = collisionPairs[i];
-		const collider_union* colliderA = worldSpaceColliders + overlap.colliderA;
-		const collider_union* colliderB = worldSpaceColliders + overlap.colliderB;
+		CPU_PROFILE_BLOCK("Check");
 
-		if (colliderA->objectType != physics_object_type_rigid_body && colliderB->objectType != physics_object_type_rigid_body)
+		for (uint32 i = 0; i < numCollisionPairs; ++i)
 		{
-			// If none of the objects is a rigid body, no collision is generated.
-			continue;
-		}
+			collider_pair pair = collisionPairs[i];
 
-		if (colliderA->objectType == physics_object_type_rigid_body && colliderB->objectType == physics_object_type_rigid_body
-			&& colliderA->objectIndex == colliderB->objectIndex)
-		{
-			// If both colliders belong to the same rigid body, no collision is generated.
-			continue;
-		}
+			const collider_union* colliderA = worldSpaceColliders + pair.colliderA;
+			const collider_union* colliderB = worldSpaceColliders + pair.colliderB;
 
-		// At this point, either one or both colliders belong to a rigid body. One of them could be a force field, trigger or a solo collider still.
-
-		overlap = (colliderA->type < colliderB->type) ? overlap : collider_pair{ overlap.colliderB, overlap.colliderA };
-
-		if (colliderA->objectType == physics_object_type_rigid_body && colliderB->objectType == physics_object_type_rigid_body // Both rigid bodies.
-			|| colliderA->objectType == physics_object_type_static_collider || colliderB->objectType == physics_object_type_static_collider) // One is a static collider.
-		{
-			contact_manifold contact;
-			if (collisionCheck(worldSpaceColliders, overlap, contact))
+			if (colliderA->objectType != physics_object_type_rigid_body && colliderB->objectType != physics_object_type_rigid_body)
 			{
-				const collider_union* colliderA = worldSpaceColliders + contact.colliderA;
-				const collider_union* colliderB = worldSpaceColliders + contact.colliderB;
-
-				uint16 rbA = colliderA->objectIndex;
-				uint16 rbB = colliderB->objectIndex;
-
-				physics_material propsA = colliderA->material;
-				physics_material propsB = colliderB->material;
-
-				float friction = clamp01(sqrt(propsA.friction * propsB.friction));
-				float restitution = clamp01(max(propsA.restitution, propsB.restitution));
-
-				uint32 friction_restitution = ((uint32)(friction * 0xFFFF) << 16) | (uint32)(restitution * 0xFFFF);
-
-				numContactsPerPair[i] = (uint8)contact.numContacts;
-
-				for (uint32 contactIndex = 0; contactIndex < contact.numContacts; ++contactIndex)
-				{
-					collision_contact& out = outContacts[numContacts];
-					constraint_body_pair& pair = outBodyPairs[numContacts];
-
-					out.normal = contact.collisionNormal;
-					out.penetrationDepth = contact.contacts[contactIndex].penetrationDepth;
-					out.point = contact.contacts[contactIndex].point;
-					out.friction_restitution = friction_restitution;
-
-					pair.rbA = rbA;
-					pair.rbB = rbB;
-
-					++numContacts;
-				}
-
-				collisionPairs[numCollisions] = overlap;
-				++numCollisions;
+				// If none of the objects is a rigid body, no collision is generated.
+				continue;
 			}
-		}
-		else
-		{
-			non_collision_interaction& interaction = outNonCollisionInteractions[numNonCollisionInteractions];
-			numNonCollisionInteractions += overlapCheck(worldSpaceColliders, overlap, interaction);
+
+			if (colliderA->objectType == physics_object_type_rigid_body && colliderB->objectType == physics_object_type_rigid_body
+				&& colliderA->objectIndex == colliderB->objectIndex)
+			{
+				// If both colliders belong to the same rigid body, no collision is generated.
+				continue;
+			}
+
+
+			// At this point, either one or both colliders belong to a rigid body. One of them could be a force field, trigger or a solo collider still.
+
+			pair = (colliderA->type < colliderB->type) ? pair : collider_pair{ pair.colliderB, pair.colliderA };
+
+			if (colliderA->objectType == physics_object_type_rigid_body && colliderB->objectType == physics_object_type_rigid_body // Both rigid bodies.
+				|| colliderA->objectType == physics_object_type_static_collider || colliderB->objectType == physics_object_type_static_collider) // One is a static collider.
+			{
+				contact_manifold contact;
+				if (collisionCheck(worldSpaceColliders, pair, contact))
+				{
+					const collider_union* colliderA = worldSpaceColliders + contact.colliderA;
+					const collider_union* colliderB = worldSpaceColliders + contact.colliderB;
+
+					uint16 rbA = colliderA->objectIndex;
+					uint16 rbB = colliderB->objectIndex;
+
+					physics_material propsA = colliderA->material;
+					physics_material propsB = colliderB->material;
+
+					float friction = clamp01(sqrt(propsA.friction * propsB.friction));
+					float restitution = clamp01(max(propsA.restitution, propsB.restitution));
+
+					uint32 friction_restitution = ((uint32)(friction * 0xFFFF) << 16) | (uint32)(restitution * 0xFFFF);
+
+					numContactsPerPair[i] = (uint8)contact.numContacts;
+
+					for (uint32 contactIndex = 0; contactIndex < contact.numContacts; ++contactIndex)
+					{
+						collision_contact& out = outContacts[numContacts];
+						constraint_body_pair& pair = outBodyPairs[numContacts];
+
+						out.normal = contact.collisionNormal;
+						out.penetrationDepth = contact.contacts[contactIndex].penetrationDepth;
+						out.point = contact.contacts[contactIndex].point;
+						out.friction_restitution = friction_restitution;
+
+						pair.rbA = rbA;
+						pair.rbB = rbB;
+
+						++numContacts;
+					}
+
+					collisionPairs[numCollisions] = pair;
+					++numCollisions;
+				}
+			}
+			else
+			{
+				non_collision_interaction& interaction = outNonCollisionInteractions[numNonCollisionInteractions];
+				numNonCollisionInteractions += overlapCheck(worldSpaceColliders, pair, interaction);
+			}
 		}
 	}
 
 	return narrowphase_result{ numCollisions, numContacts, numNonCollisionInteractions };
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+struct simd_load_store_indices
+{
+	uint16 indices[COLLISION_SIMD_WIDTH];
+};
+
+static simd_load_store_indices getStoreIndices(uint32 mask)
+{
+	simd_load_store_indices result;
+	for (uint32 i = 0, ptr = 0; i < COLLISION_SIMD_WIDTH; ++i)
+	{
+		result.indices[i] = (mask & (1 << i)) ? (uint16)ptr++ : COLLISION_SIMD_WIDTH;
+	}
+	return result;
+}
+
+struct w_bounding_sphere
+{
+	w_vec3 center;
+	w_float radius;
+};
+
+struct w_bounding_capsule
+{
+	w_vec3 positionA;
+	w_vec3 positionB;
+	w_float radius;
+};
+
+struct w_bounding_cylinder
+{
+	w_vec3 positionA;
+	w_vec3 positionB;
+	w_float radius;
+};
+
+struct w_bounding_box
+{
+	w_vec3 minCorner;
+	w_vec3 maxCorner;
+};
+
+template <typename collider_t>
+static collider_t loadBoundingVolumeSIMD(const collider_union* worldSpaceColliders, uint16* indices) { static_assert(false); }
+
+template <>
+static w_bounding_sphere loadBoundingVolumeSIMD<w_bounding_sphere>(const collider_union* worldSpaceColliders, uint16* indices)
+{
+	w_bounding_sphere result;
+	load4((float*)&worldSpaceColliders->sphere, indices, sizeof(collider_union),
+		result.center.x, result.center.y, result.center.z, result.radius);
+	return result;
+}
+
+template <>
+static w_bounding_capsule loadBoundingVolumeSIMD<w_bounding_capsule>(const collider_union* worldSpaceColliders, uint16* indices)
+{
+	w_bounding_capsule result;
+	w_float dummy;
+	load8((float*)&worldSpaceColliders->capsule, indices, sizeof(collider_union),
+		result.positionA.x, result.positionA.y, result.positionA.z,
+		result.positionB.x, result.positionB.y, result.positionB.z,
+		result.radius, dummy);
+	return result;
+}
+
+template <>
+static w_bounding_cylinder loadBoundingVolumeSIMD<w_bounding_cylinder>(const collider_union* worldSpaceColliders, uint16* indices)
+{
+	w_bounding_cylinder result;
+	w_float dummy;
+	load8((float*)&worldSpaceColliders->cylinder, indices, sizeof(collider_union),
+		result.positionA.x, result.positionA.y, result.positionA.z,
+		result.positionB.x, result.positionB.y, result.positionB.z,
+		result.radius, dummy);
+	return result;
+}
+
+template <>
+static w_bounding_box loadBoundingVolumeSIMD<w_bounding_box>(const collider_union* worldSpaceColliders, uint16* indices)
+{
+	w_bounding_box result;
+	w_float dummy0, dummy1;
+	load8((float*)&worldSpaceColliders->aabb, indices, sizeof(collider_union),
+		result.minCorner.x, result.minCorner.y, result.minCorner.z,
+		result.maxCorner.x, result.maxCorner.y, result.maxCorner.z,
+		dummy0, dummy1);
+	return result;
+}
+
+
+struct w_physics_material
+{
+	w_float restitution;
+	w_float friction;
+	w_float density;
+};
+
+
+static uint32 intersectionSIMD(const w_bounding_sphere& s1, const w_bounding_sphere& s2, w_float friction_restitution, collision_contact* outContacts)
+{
+	w_vec3 n = s2.center - s1.center;
+	w_float radiusSum = s2.radius + s1.radius;
+	w_float sqDistance = squaredLength(n);
+
+	auto intersects = (sqDistance <= radiusSum * radiusSum);
+
+	uint32 result = toBitMask(intersects);
+
+	if (result)
+	{
+		auto degenerate = (sqDistance == 0.f);
+		w_float distance = ifThen(degenerate, 0.f, sqrt(sqDistance));
+		w_vec3 collisionNormal = ifThen(degenerate, w_vec3(0.f, 1.f, 0.f), n / distance);
+
+		w_float numContacts = reinterpret(w_int(1));
+		w_float penetrationDepth = radiusSum - distance; // Flipped to change sign.
+		w_vec3 point = w_float(0.5f) * (s1.center + s1.radius * collisionNormal + s2.center - s2.radius * collisionNormal);
+
+		simd_load_store_indices storeIndices = getStoreIndices(result);
+
+		store8((float*)outContacts, storeIndices.indices, sizeof(collision_contact),
+			point.x, point.y, point.z,
+			penetrationDepth,
+			collisionNormal.x, collisionNormal.y, collisionNormal.z,
+			friction_restitution);
+	}
+
+	return __popcnt(result);
+}
+
+
+
+template <typename collider_a, typename collider_b>
+static uint32 collisionSIMD(const collider_union* worldSpaceColliders, collider_pair* colliderPairs, uint32 numColliderPairs, 
+	collision_contact* outContacts, constraint_body_pair* outBodyPairs)
+{
+	uint32 result = 0;
+
+	for (uint32 i = 0; i < numColliderPairs; i += COLLISION_SIMD_WIDTH)
+	{
+		uint16 aIndices[COLLISION_SIMD_WIDTH];
+		uint16 bIndices[COLLISION_SIMD_WIDTH];
+
+		for (uint32 j = 0; j < COLLISION_SIMD_WIDTH; ++j)
+		{
+			collider_pair pair = colliderPairs[j];
+			aIndices[j] = pair.colliderA;
+			bIndices[j] = pair.colliderB;
+		}
+
+		collider_a a = loadBoundingVolumeSIMD<collider_a>(worldSpaceColliders, aIndices);
+		collider_b b = loadBoundingVolumeSIMD<collider_b>(worldSpaceColliders, bIndices);
+
+
+		w_physics_material propsA, propsB;
+		w_float rbA, rbB;
+
+		load4(&worldSpaceColliders->material.restitution, aIndices, sizeof(collider_union),
+			propsA.restitution, propsA.friction, propsA.density, rbA);
+		load4(&worldSpaceColliders->material.restitution, bIndices, sizeof(collider_union),
+			propsB.restitution, propsB.friction, propsB.density, rbB);
+
+		rbA = rbA & 0xFFFF;
+		rbB = rbB & 0xFFFF;
+
+
+		w_float friction = clamp01(sqrt(propsA.friction * propsB.friction));
+		w_float restitution = clamp01(maximum(propsA.restitution, propsB.restitution));
+
+		w_float friction_restitution = ((friction * 0xFFFF) << 16) | (restitution * 0xFFFF);
+
+		result += intersectionSIMD(a, b, friction_restitution, outContacts);
+
+		// TODO: Write body pairs.
+	}
+
+	return result;
+}
+
+narrowphase_result narrowphaseSIMD(const collider_union* worldSpaceColliders, collider_pair* collisionPairs, uint32 numCollisionPairs, memory_arena& arena,
+	collision_contact* outContacts, constraint_body_pair* outBodyPairs, uint8* numContactsPerPair, non_collision_interaction* outNonCollisionInteractions)
+{
+	CPU_PROFILE_BLOCK("Narrow phase SIMD");
+
+	uint32 numCollisions = 0;
+	uint32 numContacts = 0;
+	uint32 numNonCollisionInteractions = 0;
+
+	uint32 numCollisionChecks = 0;
+	uint32 numIntersectionChecks = 0;
+	
+	memory_marker marker = arena.getMarker();
+
+	uint32 collisionCountMatrix[collider_type_count][collider_type_count] = {};
+	uint32 intersectionCountMatrix[collider_type_count][collider_type_count] = {};
+
+	{
+		CPU_PROFILE_BLOCK("Prune, classify and count");
+
+		// Prune collision pairs based on type and RB index.
+
+		uint32 count = numCollisionPairs;
+		for (uint32 i = 0; i < count; ++i)
+		{
+			collider_pair pair = collisionPairs[i];
+			const collider_union* colliderA = worldSpaceColliders + pair.colliderA;
+			const collider_union* colliderB = worldSpaceColliders + pair.colliderB;
+
+			if (colliderA->objectType != physics_object_type_rigid_body && colliderB->objectType != physics_object_type_rigid_body)
+			{
+				// If none of the objects is a rigid body, no collision is generated.
+				continue;
+			}
+
+			if (colliderA->objectType == physics_object_type_rigid_body && colliderB->objectType == physics_object_type_rigid_body
+				&& colliderA->objectIndex == colliderB->objectIndex)
+			{
+				// If both colliders belong to the same rigid body, no collision is generated.
+				continue;
+			}
+
+
+			// At this point, either one or both colliders belong to a rigid body. One of them could be a force field, trigger or a solo collider still.
+
+			pair = (colliderA->type < colliderB->type) ? pair : collider_pair{ pair.colliderB, pair.colliderA };
+			colliderA = worldSpaceColliders + pair.colliderA;
+			colliderB = worldSpaceColliders + pair.colliderB;
+
+			if (colliderA->objectType == physics_object_type_rigid_body && colliderB->objectType == physics_object_type_rigid_body // Both rigid bodies.
+				|| colliderA->objectType == physics_object_type_static_collider || colliderB->objectType == physics_object_type_static_collider) // One is a static collider.
+			{
+				++collisionCountMatrix[colliderA->type][colliderB->type];
+
+				collisionPairs[numCollisionChecks++] = pair;
+			}
+			else
+			{
+				++intersectionCountMatrix[colliderA->type][colliderB->type];
+
+				uint32 lastIndex = numCollisionPairs - 1 - numIntersectionChecks++;
+				collisionPairs[i] = collisionPairs[lastIndex];
+				collisionPairs[lastIndex] = pair;
+
+				--i;
+				--count;
+			}
+		}
+	}
+
+	collider_pair* intersectionPairs = collisionPairs + numCollisionChecks;
+
+	collider_pair* collisionPairMatrix[collider_type_count][collider_type_count];
+	collider_pair* intersectionPairMatrix[collider_type_count][collider_type_count];
+
+	{
+		collider_pair* sortedCollisionPairs = arena.allocate<collider_pair>(numCollisionChecks);
+		collider_pair* sortedIntersectionPairs = arena.allocate<collider_pair>(numIntersectionChecks);
+
+		uint32 collisionTotal = 0;
+		uint32 intersectionTotal = 0;
+
+		for (uint32 i = 0; i < collider_type_count; ++i)
+		{
+			for (uint32 j = i; j < collider_type_count; ++j)
+			{
+				collisionPairMatrix[i][j] = sortedCollisionPairs + collisionTotal;
+				collisionTotal += collisionCountMatrix[i][j];
+
+				intersectionPairMatrix[i][j] = sortedIntersectionPairs + intersectionTotal;
+				intersectionTotal += intersectionCountMatrix[i][j];
+			}
+		}
+	}
+
+
+	{
+		uint32 collisionWriteIndexMatrix[collider_type_count][collider_type_count] = {};
+		uint32 intersectionWriteIndexMatrix[collider_type_count][collider_type_count] = {};
+
+		for (uint32 i = 0; i < numCollisionChecks; ++i)
+		{
+			collider_pair pair = collisionPairs[i];
+
+			const collider_union* colliderA = worldSpaceColliders + pair.colliderA;
+			const collider_union* colliderB = worldSpaceColliders + pair.colliderB;
+
+			uint32& writeIndex = collisionWriteIndexMatrix[colliderA->type][colliderB->type];
+			collisionPairMatrix[colliderA->type][colliderB->type][writeIndex++] = pair;
+		}
+
+
+		for (uint32 i = 0; i < numIntersectionChecks; ++i)
+		{
+			collider_pair pair = intersectionPairs[i];
+
+			const collider_union* colliderA = worldSpaceColliders + pair.colliderA;
+			const collider_union* colliderB = worldSpaceColliders + pair.colliderB;
+
+			uint32& writeIndex = intersectionWriteIndexMatrix[colliderA->type][colliderB->type];
+			intersectionPairMatrix[colliderA->type][colliderB->type][writeIndex++] = pair;
+		}
+	}
+
+
+
+	// Collision checks.
+
+	collisionSIMD<w_bounding_sphere, w_bounding_sphere>(worldSpaceColliders,
+		collisionPairMatrix[collider_type_sphere][collider_type_sphere], collisionCountMatrix[collider_type_sphere][collider_type_sphere],
+		outContacts, outBodyPairs);
+
+
+
+	arena.resetToMarker(marker);
+
+
+	return narrowphase_result{ numCollisions, numContacts, numNonCollisionInteractions };
+}
+
 

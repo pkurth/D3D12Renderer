@@ -870,6 +870,8 @@ static void handleCollisionCallbacks(game_scene& scene,
 	const std::function<void(const collision_event&)>& collisionBeginCallback,
 	const std::function<void(const collision_event&)>& collisionEndCallback)
 {
+	CPU_PROFILE_BLOCK("Handle collision callbacks");
+
 #ifndef PHYSICS_ONLY
 	auto& prevFrameObjectContacts = objectContacts[historyIndex];
 	auto& thisFrameObjectContacts = objectContacts[1 - historyIndex];
@@ -1053,7 +1055,7 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 	constraint_body_pair* collisionBodyPairs = allConstraintBodyPairs + numConstraints;
 
 	// Narrow phase.
-	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, collisionPairs, numBroadphaseOverlaps, 
+	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, collisionPairs, numBroadphaseOverlaps, arena,
 		contacts, collisionBodyPairs, numContactsPerPair, nonCollisionInteractions);
 	VALIDATE(contacts, narrowPhaseResult.numContacts);
 

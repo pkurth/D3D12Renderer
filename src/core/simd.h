@@ -756,6 +756,16 @@ static w8_int concatLow(w8_int a, w8_int b)
 	return _mm256_permute2x128_si256(a, b, 0 | (0 << 4));
 }
 
+static w4_float getLower(w8_float a)
+{
+	return _mm256_castps256_ps128(a);
+}
+
+static w4_float getUpper(w8_float a)
+{
+	return _mm256_extractf128_ps(a, 1);
+}
+
 static w8_int fillWithFirstLane(w8_int a)
 {
 	w8_int first = _mm256_shuffle_epi32(a, _MM_SHUFFLE(0, 0, 0, 0));
@@ -836,6 +846,32 @@ static void load8(const float* baseAddress, const uint16* indices, uint32 stride
 	out7 = w8_float(baseAddress + strideInFloats * indices[7]);
 
 	transpose(out0, out1, out2, out3, out4, out5, out6, out7);
+}
+
+static void store4(float* baseAddress, const uint16* indices, uint32 stride,
+	w8_float in0, w8_float in1, w8_float in2, w8_float in3)
+{
+	const uint32 strideInFloats = stride / sizeof(float);
+
+	transpose32(in0, in1, in2, in3);
+
+	w4_float tmp0 = getLower(in0);
+	w4_float tmp1 = getLower(in1);
+	w4_float tmp2 = getLower(in2);
+	w4_float tmp3 = getLower(in3);
+	w4_float tmp4 = getUpper(in0);
+	w4_float tmp5 = getUpper(in1);
+	w4_float tmp6 = getUpper(in2);
+	w4_float tmp7 = getUpper(in3);
+
+	tmp0.store(baseAddress + strideInFloats * indices[0]);
+	tmp1.store(baseAddress + strideInFloats * indices[1]);
+	tmp2.store(baseAddress + strideInFloats * indices[2]);
+	tmp3.store(baseAddress + strideInFloats * indices[3]);
+	tmp4.store(baseAddress + strideInFloats * indices[4]);
+	tmp5.store(baseAddress + strideInFloats * indices[5]);
+	tmp6.store(baseAddress + strideInFloats * indices[6]);
+	tmp7.store(baseAddress + strideInFloats * indices[7]);
 }
 
 static void store8(float* baseAddress, const uint16* indices, uint32 stride,
