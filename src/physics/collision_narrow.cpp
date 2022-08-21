@@ -1557,15 +1557,11 @@ static bool intersection(const bounding_hull& a, const bounding_hull& b, contact
 
 static bool collisionCheck(const collider_union* worldSpaceColliders, collider_pair overlap, contact_manifold& contact)
 {
-	const collider_union* colliderAInitial = worldSpaceColliders + overlap.colliderA;
-	const collider_union* colliderBInitial = worldSpaceColliders + overlap.colliderB;
+	const collider_union* colliderA = worldSpaceColliders + overlap.colliderA;
+	const collider_union* colliderB = worldSpaceColliders + overlap.colliderB;
 
-	bool keepOrder = (colliderAInitial->type < colliderBInitial->type);
-	const collider_union* colliderA = keepOrder ? colliderAInitial : colliderBInitial;
-	const collider_union* colliderB = keepOrder ? colliderBInitial : colliderAInitial;
-
-	contact.colliderA = keepOrder ? overlap.colliderA : overlap.colliderB;
-	contact.colliderB = keepOrder ? overlap.colliderB : overlap.colliderA;
+	contact.colliderA = overlap.colliderA;
+	contact.colliderB = overlap.colliderB;
 
 	bool collides = false;
 
@@ -1646,12 +1642,8 @@ static bool collisionCheck(const collider_union* worldSpaceColliders, collider_p
 
 static bool overlapCheck(const collider_union* worldSpaceColliders, collider_pair overlap, non_collision_interaction& interaction)
 {
-	const collider_union* colliderAInitial = worldSpaceColliders + overlap.colliderA;
-	const collider_union* colliderBInitial = worldSpaceColliders + overlap.colliderB;
-
-	bool keepOrder = (colliderAInitial->type < colliderBInitial->type);
-	const collider_union* colliderA = keepOrder ? colliderAInitial : colliderBInitial;
-	const collider_union* colliderB = keepOrder ? colliderBInitial : colliderAInitial;
+	const collider_union* colliderA = worldSpaceColliders + overlap.colliderA;
+	const collider_union* colliderB = worldSpaceColliders + overlap.colliderB;
 
 	assert(colliderA->objectType == physics_object_type_rigid_body || colliderB->objectType == physics_object_type_rigid_body);
 	assert(colliderA->objectType != physics_object_type_rigid_body || colliderB->objectType != physics_object_type_rigid_body);
@@ -1755,28 +1747,29 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collid
 	uint32 numContacts = 0;
 	uint32 numNonCollisionInteractions = 0;
 
+
 	for (uint32 i = 0; i < numCollisionPairs; ++i)
 	{
 		collider_pair overlap = collisionPairs[i];
 		const collider_union* colliderA = worldSpaceColliders + overlap.colliderA;
 		const collider_union* colliderB = worldSpaceColliders + overlap.colliderB;
 
-		bool pairOfCollidingRBs = false;
-
 		if (colliderA->objectType != physics_object_type_rigid_body && colliderB->objectType != physics_object_type_rigid_body)
 		{
 			// If none of the objects is a rigid body, no collision is generated.
-			goto loopEnd;
+			continue;
 		}
 
 		if (colliderA->objectType == physics_object_type_rigid_body && colliderB->objectType == physics_object_type_rigid_body
 			&& colliderA->objectIndex == colliderB->objectIndex)
 		{
 			// If both colliders belong to the same rigid body, no collision is generated.
-			goto loopEnd;
+			continue;
 		}
 
 		// At this point, either one or both colliders belong to a rigid body. One of them could be a force field, trigger or a solo collider still.
+
+		overlap = (colliderA->type < colliderB->type) ? overlap : collider_pair{ overlap.colliderB, overlap.colliderA };
 
 		if (colliderA->objectType == physics_object_type_rigid_body && colliderB->objectType == physics_object_type_rigid_body // Both rigid bodies.
 			|| colliderA->objectType == physics_object_type_static_collider || colliderB->objectType == physics_object_type_static_collider) // One is a static collider.
@@ -1816,7 +1809,7 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collid
 					++numContacts;
 				}
 
-				pairOfCollidingRBs = true;
+				collisionPairs[numCollisions] = overlap;
 				++numCollisions;
 			}
 		}
@@ -1824,15 +1817,6 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collid
 		{
 			non_collision_interaction& interaction = outNonCollisionInteractions[numNonCollisionInteractions];
 			numNonCollisionInteractions += overlapCheck(worldSpaceColliders, overlap, interaction);
-		}
-
-		loopEnd:
-		if (!pairOfCollidingRBs)
-		{
-			// A copy may be enough, but this preserves all the pairs.
-			std::swap(collisionPairs[i], collisionPairs[numCollisionPairs - 1]);
-			--numCollisionPairs;
-			--i;
 		}
 	}
 
