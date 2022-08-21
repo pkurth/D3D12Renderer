@@ -287,9 +287,13 @@ static w4_int& operator^=(w4_int& a, w4_int b) { a = a ^ b; return a; }
 static w4_int operator~(w4_int a) { a = andNot(a, w4_int::allOnes()); return a; }
 
 static w4_int operator>>(w4_int a, int b) { return _mm_srli_epi32(a, b); }
+static w4_int operator>>(w4_int a, w4_int b) { return _mm_srlv_epi32(a, b); }
 static w4_int& operator>>=(w4_int& a, int b) { a = a >> b; return a; }
+static w4_int& operator>>=(w4_int& a, w4_int b) { a = a >> b; return a; }
 static w4_int operator<<(w4_int a, int b) { return _mm_slli_epi32(a, b); }
+static w4_int operator<<(w4_int a, w4_int b) { return _mm_sllv_epi32(a, b); }
 static w4_int& operator<<=(w4_int& a, int b) { a = a << b; return a; }
+static w4_int& operator<<=(w4_int& a, w4_int b) { a = a << b; return a; }
 
 static w4_int operator-(w4_int a) { return _mm_sub_epi32(w4_int::zero(), a); }
 
@@ -594,9 +598,13 @@ static w8_int& operator^=(w8_int& a, w8_int b) { a = a ^ b; return a; }
 static w8_int operator~(w8_int a) { a = andNot(a, w8_int::allOnes()); return a; }
 
 static w8_int operator>>(w8_int a, int b) { return _mm256_srli_epi32(a, b); }
+static w8_int operator>>(w8_int a, w8_int b) { return _mm256_srlv_epi32(a, b); }
 static w8_int& operator>>=(w8_int& a, int b) { a = a >> b; return a; }
+static w8_int& operator>>=(w8_int& a, w8_int b) { a = a >> b; return a; }
 static w8_int operator<<(w8_int a, int b) { return _mm256_slli_epi32(a, b); }
+static w8_int operator<<(w8_int a, w8_int b) { return _mm256_sllv_epi32(a, b); }
 static w8_int& operator<<=(w8_int& a, int b) { a = a << b; return a; }
+static w8_int& operator<<=(w8_int& a, w8_int b) { a = a << b; return a; }
 
 static w8_int operator-(w8_int a) { return _mm256_sub_epi32(w8_int::zero(), a); }
 
