@@ -6,6 +6,7 @@
 #include "undo_stack.h"
 #include "transformation_gizmo.h"
 #include "rendering/main_renderer.h"
+#include "physics/physics.h"
 
 struct scene_editor
 {
@@ -14,6 +15,7 @@ struct scene_editor
 	bool update(const user_input& input, ldr_render_pass* ldrRenderPass, float dt);
 
 	scene_entity selectedEntity;
+	physics_settings physicsSettings;
 
 private:
 	void drawSettings(float dt);
@@ -35,6 +37,8 @@ private:
 
 	undo_stack undoStack;
 	transformation_gizmo gizmo;
+
+	float physicsTestForce = 1000.f;
 
 	camera_controller cameraController;
 

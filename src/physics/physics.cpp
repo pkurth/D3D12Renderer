@@ -11,10 +11,6 @@
 
 #include <unordered_set>
 
-physics_settings physicsSettings = {};
-std::function<void(const collision_event&)> collisionBeginCallback;
-std::function<void(const collision_event&)> collisionEndCallback;
-
 static std::vector<bounding_hull_geometry> boundingHullGeometries;
 
 struct constraint_context
@@ -475,7 +471,7 @@ std::pair<scene_entity, constraint_type> constraint_entity_iterator::iterator::o
 }
 
 
-void testPhysicsInteraction(game_scene& scene, ray r)
+void testPhysicsInteraction(game_scene& scene, ray r, float strength)
 {
 	float minT = FLT_MAX;
 	rigid_body_component* minRB = 0;
@@ -538,7 +534,7 @@ void testPhysicsInteraction(game_scene& scene, ray r)
 
 				vec3 cogPosition = rb->getGlobalCOGPosition(transform);
 
-				force = r.direction * physicsSettings.testForce;
+				force = r.direction * strength;
 				torque = cross(globalHit - cogPosition, force);
 			}
 		}
@@ -870,7 +866,9 @@ static uint32 historyIndex = 0;
 
 static void handleCollisionCallbacks(game_scene& scene,
 	const collider_pair* collisionPairs, uint8* numContactsPerPair, uint32 numCollisions, uint32 numColliders,
-	collision_contact* contacts)
+	collision_contact* contacts, 
+	const std::function<void(const collision_event&)>& collisionBeginCallback,
+	const std::function<void(const collision_event&)>& collisionEndCallback)
 {
 #ifndef PHYSICS_ONLY
 	auto& prevFrameObjectContacts = objectContacts[historyIndex];
@@ -1002,11 +1000,9 @@ static void handleNonCollisionInteractions(game_scene& scene,
 }
 
 
-void physicsStepInternal(game_scene& scene, memory_arena& arena)
+static void physicsStepInternal(game_scene& scene, memory_arena& arena, const physics_settings& settings, float dt)
 {
 	CPU_PROFILE_BLOCK("Physics step");
-
-	float dt = 1.f / (float)physicsSettings.frameRate;
 
 	uint32 numRigidBodies = scene.numberOfComponentsOfType<rigid_body_component>();
 	uint32 numCloths = scene.numberOfComponentsOfType<cloth_component>();
@@ -1067,7 +1063,8 @@ void physicsStepInternal(game_scene& scene, memory_arena& arena)
 
 	handleNonCollisionInteractions(scene, ffGlobal, nonCollisionInteractions, narrowPhaseResult.numNonCollisionInteractions,
 		numRigidBodies, numTriggers);
-	handleCollisionCallbacks(scene, collisionPairs, numContactsPerPair, narrowPhaseResult.numCollisions, numColliders, contacts);
+	handleCollisionCallbacks(scene, collisionPairs, numContactsPerPair, narrowPhaseResult.numCollisions, numColliders, contacts,
+		settings.collisionBeginCallback, settings.collisionEndCallback);
 
 	CPU_PROFILE_STAT("Num rigid bodies", numRigidBodies);
 	CPU_PROFILE_STAT("Num colliders", numColliders);
@@ -1129,12 +1126,12 @@ void physicsStepInternal(game_scene& scene, memory_arena& arena)
 		coneTwistConstraints, coneTwistConstraintBodyPairs, numConeTwistConstraints,
 		sliderConstraints, sliderConstraintBodyPairs, numSliderConstraints,
 		contacts, collisionBodyPairs, numContacts,
-		dummyRigidBodyIndex, physicsSettings.simd, dt);
+		dummyRigidBodyIndex, settings.simd, dt);
 
 	{
 		CPU_PROFILE_BLOCK("Solve constraints");
 
-		for (uint32 it = 0; it < physicsSettings.numRigidSolverIterations; ++it)
+		for (uint32 it = 0; it < settings.numRigidSolverIterations; ++it)
 		{
 			constraintSolver.solveOneIteration();
 		}
@@ -1161,7 +1158,7 @@ void physicsStepInternal(game_scene& scene, memory_arena& arena)
 	for (auto [entityHandle, cloth] : scene.view<cloth_component>().each())
 	{
 		cloth.applyWindForce(globalForceField);
-		cloth.simulate(physicsSettings.numClothVelocityIterations, physicsSettings.numClothPositionIterations, physicsSettings.numClothDriftIterations, dt);
+		cloth.simulate(settings.numClothVelocityIterations, settings.numClothPositionIterations, settings.numClothDriftIterations, dt);
 	}
 
 
@@ -1171,42 +1168,54 @@ void physicsStepInternal(game_scene& scene, memory_arena& arena)
 	historyIndex = 1 - historyIndex;
 }
 
-void physicsStep(game_scene& scene, memory_arena& arena, float& timer, float dt)
+void physicsStep(game_scene& scene, memory_arena& arena, float& timer, const physics_settings& settings, float dt)
 {
-	const float physicsFixedTimeStep = 1.f / (float)physicsSettings.frameRate;
-	const uint32 maxPhysicsIterationsPerFrame = 4;
-
-	timer += dt;
-	uint32 physicsIterations = 0;
-	if (timer >= physicsFixedTimeStep)
+	if (settings.fixedFrameRate)
 	{
-		for (auto [entityHandle, transform0, transform1] : scene.group(entt::get<physics_transform0_component, physics_transform1_component>).each())
+		const float physicsFixedTimeStep = 1.f / (float)settings.frameRate;
+		const uint32 maxPhysicsIterationsPerFrame = settings.maxPhysicsIterationsPerFrame;
+
+		timer += dt;
+		uint32 physicsIterations = 0;
+		if (timer >= physicsFixedTimeStep)
 		{
-			transform0 = transform1;
+			for (auto [entityHandle, transform0, transform1] : scene.group(entt::get<physics_transform0_component, physics_transform1_component>).each())
+			{
+				transform0 = transform1;
+			}
+
+			while (timer >= physicsFixedTimeStep && physicsIterations++ < maxPhysicsIterationsPerFrame)
+			{
+				physicsStepInternal(scene, arena, settings, physicsFixedTimeStep);
+				timer -= physicsFixedTimeStep;
+			}
 		}
 
-		while (timer >= physicsFixedTimeStep && physicsIterations++ < maxPhysicsIterationsPerFrame)
+		if (timer >= physicsFixedTimeStep)
 		{
-			physicsStepInternal(scene, arena);
-			timer -= physicsFixedTimeStep;
-		}
-	}
-
-	if (timer >= physicsFixedTimeStep)
-	{
-		timer = fmod(timer, physicsFixedTimeStep);
+			timer = fmod(timer, physicsFixedTimeStep);
 
 #ifndef PHYSICS_ONLY
-		LOG_WARNING("Dropping physics frames");
+			LOG_WARNING("Dropping physics frames");
 #endif
+		}
+
+		float physicsInterpolationT = timer / physicsFixedTimeStep;
+		assert(physicsInterpolationT >= 0.f && physicsInterpolationT <= 1.f);
+
+		for (auto [entityHandle, transform, physicsTransform0, physicsTransform1] : scene.group(entt::get<transform_component, physics_transform0_component, physics_transform1_component>).each())
+		{
+			transform = lerp(physicsTransform0, physicsTransform1, physicsInterpolationT);
+		}
 	}
-
-	float physicsInterpolationT = timer / physicsFixedTimeStep;
-	assert(physicsInterpolationT >= 0.f && physicsInterpolationT <= 1.f);
-
-	for (auto [entityHandle, transform, physicsTransform0, physicsTransform1] : scene.group(entt::get<transform_component, physics_transform0_component, physics_transform1_component>).each())
+	else
 	{
-		transform = lerp(physicsTransform0, physicsTransform1, physicsInterpolationT);
+		physicsStepInternal(scene, arena, settings, dt);
+
+		for (auto [entityHandle, transform, physicsTransform1] : scene.group(entt::get<transform_component, physics_transform1_component>).each())
+		{
+			transform = physicsTransform1;
+		}
 	}
 }
 

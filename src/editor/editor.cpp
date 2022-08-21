@@ -7,7 +7,6 @@
 #include "scene/components.h"
 #include "animation/animation.h"
 #include "geometry/mesh.h"
-#include "physics/physics.h"
 #include "physics/ragdoll.h"
 #include "physics/vehicle.h"
 #include "scene/serialization.h"
@@ -1214,7 +1213,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		// Temporary.
 		if (input.keyboard[key_shift].down)
 		{
-			testPhysicsInteraction(*scene, camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY));
+			testPhysicsInteraction(*scene, camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY), physicsTestForce);
 		}
 		else if (input.keyboard[key_ctrl].down)
 		{
@@ -1712,12 +1711,19 @@ void scene_editor::drawSettings(float dt)
 		{
 			if (ImGui::BeginProperties())
 			{
-				ImGui::PropertyInput("Fixed frame rate", physicsSettings.frameRate);
-				if (physicsSettings.frameRate < 30)
+				ImGui::PropertyCheckbox("Fixed frame rate (deterministic)", physicsSettings.fixedFrameRate);
+
+				if (physicsSettings.fixedFrameRate)
 				{
-					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.f, 0.f, 0.f, 1.f));
-					ImGui::PropertyValue("", "Low frame rate");
-					ImGui::PopStyleColor();
+					ImGui::PropertyInput("Frame rate", physicsSettings.frameRate);
+					if (physicsSettings.frameRate < 30)
+					{
+						ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.f, 0.f, 0.f, 1.f));
+						ImGui::PropertyValue("", "Low frame rate");
+						ImGui::PopStyleColor();
+					}
+
+					ImGui::PropertyInput("Max physics steps per frame", physicsSettings.maxPhysicsIterationsPerFrame);
 				}
 
 				ImGui::PropertySlider("Rigid solver iterations", physicsSettings.numRigidSolverIterations, 1, 200);
@@ -1726,7 +1732,7 @@ void scene_editor::drawSettings(float dt)
 				ImGui::PropertySlider("Cloth position iterations", physicsSettings.numClothPositionIterations, 0, 10);
 				ImGui::PropertySlider("Cloth drift iterations", physicsSettings.numClothDriftIterations, 0, 10);
 
-				ImGui::PropertySlider("Test force", physicsSettings.testForce, 1.f, 10000.f);
+				ImGui::PropertySlider("Test force", physicsTestForce, 1.f, 10000.f);
 
 				ImGui::PropertyCheckbox("Use SIMD", physicsSettings.simd);
 

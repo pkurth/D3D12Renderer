@@ -465,11 +465,12 @@ extern "C" __declspec(dllexport) int updatePhysics(float* action, float* outStat
 		testPhysicsInteraction(trainingScene, ray{ origin, direction });
 	}
 
+	physics_settings physicsSettings;
 	physicsSettings.frameRate = 60;
 
 	const float physicsFixedTimeStep = 1.f / (float)physicsSettings.frameRate;
 	float physicsTimer = 0.f;
-	physicsStep(trainingScene, stackArena, physicsTimer, physicsFixedTimeStep);
+	physicsStep(trainingScene, stackArena, physicsTimer, physicsSettings, physicsFixedTimeStep);
 
 	bool failure = trainingEnv->getState(*(learned_locomotion::learning_state*)outState);
 	*outReward = 0.f;

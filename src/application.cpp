@@ -293,7 +293,7 @@ void application::initialize(main_renderer* renderer)
 
 
 #if 0
-	collisionBeginCallback = [rng = random_number_generator(512513)](const collision_event& e) mutable
+	editor.physicsSettings.collisionBeginCallback = [rng = random_number_generator(512513)](const collision_event& e) mutable
 	{
 		vec3 velA(0.f);
 		vec3 velB(0.f);
@@ -548,7 +548,7 @@ void application::update(const user_input& input, float dt)
 
 	game_scene& scene = this->scene.getCurrentScene();
 	dt *= this->scene.getTimestepScale();
-	physicsStep(scene, stackArena, physicsTimer, dt);
+	physicsStep(scene, stackArena, physicsTimer, editor.physicsSettings, dt);
 
 
 	// Particles.

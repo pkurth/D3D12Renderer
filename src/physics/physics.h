@@ -319,23 +319,6 @@ struct constraint_entity_iterator
 };
 
 
-struct physics_settings
-{
-	uint32 frameRate = 120;
-
-	uint32 numRigidSolverIterations = 30;
-
-	uint32 numClothVelocityIterations = 0;
-	uint32 numClothPositionIterations = 1;
-	uint32 numClothDriftIterations = 0;
-
-	float testForce = 1000.f;
-
-	bool simd = true;
-};
-
-
-
 
 struct contact_info
 {
@@ -365,9 +348,27 @@ struct collision_event
 	uint32 numContacts;
 };
 
-extern physics_settings physicsSettings;
-extern std::function<void(const collision_event&)> collisionBeginCallback;
-extern std::function<void(const collision_event&)> collisionEndCallback;
 
-void testPhysicsInteraction(game_scene& scene, ray r);
-void physicsStep(game_scene& scene, memory_arena& arena, float& timer, float dt);
+
+struct physics_settings
+{
+	bool fixedFrameRate = true;
+	uint32 frameRate = 120;
+	uint32 maxPhysicsIterationsPerFrame = 4;
+
+	uint32 numRigidSolverIterations = 30;
+
+	uint32 numClothVelocityIterations = 0;
+	uint32 numClothPositionIterations = 1;
+	uint32 numClothDriftIterations = 0;
+
+	bool simd = true;
+
+	std::function<void(const collision_event&)> collisionBeginCallback;
+	std::function<void(const collision_event&)> collisionEndCallback;
+};
+
+
+
+void testPhysicsInteraction(game_scene& scene, ray r, float strength = 1000.f);
+void physicsStep(game_scene& scene, memory_arena& arena, float& timer, const physics_settings& settings, float dt);
