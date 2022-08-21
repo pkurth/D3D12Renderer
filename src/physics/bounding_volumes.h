@@ -280,3 +280,100 @@ bool hullVsHull(const bounding_hull& a, const bounding_hull& b);
 vec3 closestPoint_PointSegment(const vec3& q, const line_segment& l);
 vec3 closestPoint_PointAABB(const vec3& q, const bounding_box& aabb);
 float closestPoint_SegmentSegment(const line_segment& l1, const line_segment& l2, vec3& c1, vec3& c2);
+
+
+
+
+// Inline functions:
+
+inline float signedDistanceToPlane(const vec3& p, const vec4& plane)
+{
+	return dot(vec4(p, 1.f), plane);
+}
+
+inline bool sphereVsSphere(const bounding_sphere& a, const bounding_sphere& b)
+{
+	vec3 d = a.center - b.center;
+	float dist2 = dot(d, d);
+	float radiusSum = a.radius + b.radius;
+	return dist2 <= radiusSum * radiusSum;
+}
+
+inline bool sphereVsPlane(const bounding_sphere& s, const vec4& p)
+{
+	return abs(signedDistanceToPlane(s.center, p)) <= s.radius;
+}
+
+inline bool sphereVsCapsule(const bounding_sphere& s, const bounding_capsule& c)
+{
+	vec3 closestPoint = closestPoint_PointSegment(s.center, line_segment{ c.positionA, c.positionB });
+	return sphereVsSphere(s, bounding_sphere{ closestPoint, c.radius });
+}
+
+inline bool sphereVsAABB(const bounding_sphere& s, const bounding_box& a)
+{
+	vec3 p = closestPoint_PointAABB(s.center, a);
+	vec3 n = p - s.center;
+	float sqDistance = squaredLength(n);
+	return sqDistance <= s.radius * s.radius;
+}
+
+inline bool sphereVsOBB(const bounding_sphere& s, const bounding_oriented_box& o)
+{
+	bounding_box aabb = bounding_box::fromCenterRadius(o.center, o.radius);
+	bounding_sphere s_ = {
+		conjugate(o.rotation) * (s.center - o.center) + o.center,
+		s.radius };
+
+	return sphereVsAABB(s_, aabb);
+}
+
+inline bool capsuleVsCapsule(const bounding_capsule& a, const bounding_capsule& b)
+{
+	vec3 closestPoint1, closestPoint2;
+	closestPoint_SegmentSegment(line_segment{ a.positionA, a.positionB }, line_segment{ b.positionA, b.positionB }, closestPoint1, closestPoint2);
+	return sphereVsSphere(bounding_sphere{ closestPoint1, a.radius }, bounding_sphere{ closestPoint2, b.radius });
+}
+
+inline bool capsuleVsCylinder(const bounding_capsule& a, const bounding_cylinder& b)
+{
+	vec3 closestPoint1, closestPoint2;
+	closestPoint_SegmentSegment(line_segment{ a.positionA, a.positionB }, line_segment{ b.positionA, b.positionB }, closestPoint1, closestPoint2);
+	return sphereVsCylinder(bounding_sphere{ closestPoint1, a.radius }, b);
+}
+
+inline bool aabbVsAABB(const bounding_box& a, const bounding_box& b)
+{
+	if (a.maxCorner.x < b.minCorner.x || a.minCorner.x > b.maxCorner.x) return false;
+	if (a.maxCorner.z < b.minCorner.z || a.minCorner.z > b.maxCorner.z) return false;
+	if (a.maxCorner.y < b.minCorner.y || a.minCorner.y > b.maxCorner.y) return false;
+	return true;
+}
+
+inline bool aabbVsOBB(const bounding_box& a, const bounding_oriented_box& o)
+{
+	return obbVsOBB(bounding_oriented_box{ a.getCenter(), a.getRadius(), quat::identity }, o);
+}
+
+inline vec3 closestPoint_PointSegment(const vec3& q, const line_segment& l)
+{
+	vec3 ab = l.b - l.a;
+	float t = dot(q - l.a, ab) / squaredLength(ab);
+	t = clamp(t, 0.f, 1.f);
+	return l.a + t * ab;
+}
+
+inline vec3 closestPoint_PointAABB(const vec3& q, const bounding_box& aabb)
+{
+	vec3 result;
+	for (int i = 0; i < 3; i++)
+	{
+		float v = q.data[i];
+		if (v < aabb.minCorner.data[i]) v = aabb.minCorner.data[i];
+		if (v > aabb.maxCorner.data[i]) v = aabb.maxCorner.data[i];
+		result.data[i] = v;
+	}
+	return result;
+}
+
+
