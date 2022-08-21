@@ -193,22 +193,42 @@ uint32 broadphase(game_scene& scene, bounding_box* worldSpaceAABBs, memory_arena
 
 	memory_marker marker = arena.getMarker();
 
+#if 1
+
+#define CACHE_AABBS 1
+
 	{
 		CPU_PROFILE_BLOCK("Determine overlaps");
 
+		uint32 activeListCapacity = numColliders; // Conservative estimate.
+
 		uint32 numActive = 0;
-		uint16* activeList = arena.allocate<uint16>(numColliders); // Conservative estimate.
+		uint16* activeList = arena.allocate<uint16>(activeListCapacity);
+
+#if CACHE_AABBS
+		bounding_box* activeBBs = arena.allocate<bounding_box>(activeListCapacity);
+#endif
+
 		uint16* positionInActiveList = arena.allocate<uint16>(numColliders);
+
+		uint32 maxNumActive = 0;
 
 		for (uint32 i = 0; i < numEndpoints; ++i)
 		{
 			sap_endpoint ep = endpoints[i];
 			if (ep.start)
 			{
+				const bounding_box& a = worldSpaceAABBs[ep.colliderIndex];
 				for (uint32 active = 0; active < numActive; ++active)
 				{
-					bounding_box& a = worldSpaceAABBs[ep.colliderIndex];
-					bounding_box& b = worldSpaceAABBs[activeList[active]];
+#if CACHE_AABBS
+					const bounding_box& b = activeBBs[active];
+#else
+					const bounding_box& b = worldSpaceAABBs[activeList[active]];
+#endif
+
+					//outCollisions[numCollisions] = { ep.colliderIndex, activeList[active] };
+					//numCollisions += aabbVsAABB(a, b);
 
 					if (aabbVsAABB(a, b))
 					{
@@ -218,37 +238,115 @@ uint32 broadphase(game_scene& scene, bounding_box* worldSpaceAABBs, memory_arena
 
 				assert(ep.colliderIndex < numColliders);
 				positionInActiveList[ep.colliderIndex] = numActive;
+
+#if CACHE_AABBS
+				activeBBs[numActive] = worldSpaceAABBs[ep.colliderIndex];
+#endif
+
 				activeList[numActive++] = ep.colliderIndex;
+
+				maxNumActive = max(maxNumActive, numActive);
 			}
 			else
 			{
-#if 0
-				for (uint32 a = 0; a < numActive; ++a)
-				{
-					if (ep.colliderIndex == activeList[a])
-					{
-						activeList[a] = activeList[numActive - 1];
-						--numActive;
-						break;
-					}
-				}
-#else
 				uint16 pos = positionInActiveList[ep.colliderIndex];
 
-				uint16 lastColliderInActiveList = activeList[numActive - 1];
+				--numActive;
+
+				uint16 lastColliderInActiveList = activeList[numActive];
 				positionInActiveList[lastColliderInActiveList] = pos;
 
-				activeList[pos] = activeList[numActive - 1];
-				--numActive;
+				activeList[pos] = activeList[numActive];
+
+#if CACHE_AABBS
+				activeBBs[pos] = activeBBs[numActive];
 #endif
 			}
 		}
 
 		assert(numActive == 0);
+
+		CPU_PROFILE_STAT("Max num active in SAP", maxNumActive);
 	}
 
-	arena.resetToMarker(marker);
+#else
 
+	uint32 paddedNumEndpoints = alignTo(numEndpoints, BP_SIMD_WIDTH);
+	int32* packedEndpoints = arena.allocate<int32>(paddedNumEndpoints);
+
+	for (uint32 i = 0; i < numEndpoints; ++i)
+	{
+		const sap_endpoint& e = endpoints[i];
+		packedEndpoints[i] = (e.start << 16) | e.colliderIndex;
+	}
+
+	for (uint32 i = 0; i < numEndpoints; i += BP_SIMD_WIDTH)
+	{
+		uint16 localActiveList[BP_SIMD_WIDTH];
+		uint32 numLocalActive = 0;
+
+		uint16 testAgainstGlobalActive[BP_SIMD_WIDTH];
+		uint32 numTestAgaistGlobalActive = 0;
+
+		uint16 removeFromGlobalActive[BP_SIMD_WIDTH];
+		uint32 numRemoveFromGlobalActive = 0;
+
+		for (uint32 j = 0; j < BP_SIMD_WIDTH; ++j)
+		{
+			int32 ep = packedEndpoints[i + j];
+			int16 start = ep >> 16;
+			uint16 colliderIndex = ep & 0xFFFF;
+
+			if (start)
+			{
+				for (uint32 k = 0; k < numLocalActive; ++k)
+				{
+					if (aabbVsAABB(worldSpaceAABBs[colliderIndex], worldSpaceAABBs[localActiveList[k]]))
+					{ 
+						outCollisions[numCollisions++] = { colliderIndex, localActiveList[k] };
+					}
+				}
+
+				localActiveList[numLocalActive++] = colliderIndex;
+				testAgainstGlobalActive[numTestAgaistGlobalActive++] = colliderIndex;
+			}
+			else
+			{
+				bool found = false;
+				for (uint32 k = 0; k < numLocalActive; ++k)
+				{
+					if (colliderIndex == localActiveList[k])
+					{
+						localActiveList[k] = localActiveList[--numLocalActive];
+						found = true;
+						break;
+					}
+				}
+				if (!found)
+				{
+					removeFromGlobalActive[numRemoveFromGlobalActive++] = colliderIndex;
+				}
+			}
+		}
+
+
+
+	}
+
+	for (uint32 i = 0; i < numEndpoints; i += BP_SIMD_WIDTH)
+	{
+		w_int ep = packedEndpoints + i;
+		w_int start = ep >> 16;
+		w_int colliderIndex = ep & 0xFFFF;
+
+		//uint32 numStarts = popcnt(toBitMask(start == 1));
+	}
+
+
+#endif
+
+
+	arena.resetToMarker(marker);
 
 
 	// Fix up indirections.
