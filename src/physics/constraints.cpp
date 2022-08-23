@@ -18,35 +18,22 @@
 
 
 #if CONSTRAINT_SIMD_WIDTH == 4
-typedef w4_vec2 w_vec2;
-typedef w4_vec3 w_vec3;
-typedef w4_vec4 w_vec4;
-typedef w4_quat w_quat;
-typedef w4_mat2 w_mat2;
-typedef w4_mat3 w_mat3;
 typedef w4_float w_float;
 typedef w4_int w_int;
 #elif CONSTRAINT_SIMD_WIDTH == 8 && defined(SIMD_AVX_2)
-typedef w8_vec2 w_vec2;
-typedef w8_vec3 w_vec3;
-typedef w8_vec4 w_vec4;
-typedef w8_quat w_quat;
-typedef w8_mat2 w_mat2;
-typedef w8_mat3 w_mat3;
 typedef w8_float w_float;
 typedef w8_int w_int;
 #elif CONSTRAINT_SIMD_WIDTH == 16 && defined(SIMD_AVX_512)
-typedef w16_vec2 w_vec2;
-typedef w16_vec3 w_vec3;
-typedef w16_vec4 w_vec4;
-typedef w16_quat w_quat;
-typedef w16_mat2 w_mat2;
-typedef w16_mat3 w_mat3;
 typedef w16_float w_float;
 typedef w16_int w_int;
-#else
-#error Invalid SIMD width.
 #endif
+
+typedef wN_vec2<w_float> w_vec2;
+typedef wN_vec3<w_float> w_vec3;
+typedef wN_vec4<w_float> w_vec4;
+typedef wN_quat<w_float> w_quat;
+typedef wN_mat2<w_float> w_mat2;
+typedef wN_mat3<w_float> w_mat3;
 
 
 

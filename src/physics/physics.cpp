@@ -1055,8 +1055,17 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 	constraint_body_pair* collisionBodyPairs = allConstraintBodyPairs + numConstraints;
 
 	// Narrow phase.
-	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, collisionPairs, numBroadphaseOverlaps, arena,
-		contacts, collisionBodyPairs, numContactsPerPair, nonCollisionInteractions);
+	narrowphase_result narrowPhaseResult;
+	if (settings.simdCollisionDetection)
+	{
+		narrowPhaseResult = narrowphaseSIMD(worldSpaceColliders, collisionPairs, numBroadphaseOverlaps, arena,
+			contacts, collisionBodyPairs, numContactsPerPair, nonCollisionInteractions);
+	}
+	else
+	{
+		narrowPhaseResult = narrowphase(worldSpaceColliders, collisionPairs, numBroadphaseOverlaps, arena,
+			contacts, collisionBodyPairs, numContactsPerPair, nonCollisionInteractions);
+	}
 	VALIDATE(contacts, narrowPhaseResult.numContacts);
 
 
@@ -1128,7 +1137,7 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 		coneTwistConstraints, coneTwistConstraintBodyPairs, numConeTwistConstraints,
 		sliderConstraints, sliderConstraintBodyPairs, numSliderConstraints,
 		contacts, collisionBodyPairs, numContacts,
-		dummyRigidBodyIndex, settings.simd, dt);
+		dummyRigidBodyIndex, settings.simdConstraintSolver, dt);
 
 	{
 		CPU_PROFILE_BLOCK("Solve constraints");

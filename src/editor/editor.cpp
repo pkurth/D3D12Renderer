@@ -1734,7 +1734,8 @@ void scene_editor::drawSettings(float dt)
 
 				ImGui::PropertySlider("Test force", physicsTestForce, 1.f, 10000.f);
 
-				ImGui::PropertyCheckbox("Use SIMD", physicsSettings.simd);
+				ImGui::PropertyCheckbox("SIMD collision detection", physicsSettings.simdCollisionDetection);
+				ImGui::PropertyCheckbox("SIMD constraint solver", physicsSettings.simdConstraintSolver);
 
 				ImGui::EndProperties();
 			}

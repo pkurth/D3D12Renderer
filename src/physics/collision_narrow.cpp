@@ -7,10 +7,33 @@
 #include "collision_sat.h"
 #include "core/cpu_profiling.h"
 
-#define COLLISION_SIMD_WIDTH 8
-
-#define BV_SIMD_WIDTH COLLISION_SIMD_WIDTH
 #include "bounding_volumes_simd.h"
+
+#define COLLISION_SIMD_WIDTH 8u
+
+
+#if COLLISION_SIMD_WIDTH == 4
+typedef w4_float w_float;
+typedef w4_int w_int;
+#elif COLLISION_SIMD_WIDTH == 8 && defined(SIMD_AVX_2)
+typedef w8_float w_float;
+typedef w8_int w_int;
+#endif
+
+typedef wN_vec2<w_float> w_vec2;
+typedef wN_vec3<w_float> w_vec3;
+typedef wN_vec4<w_float> w_vec4;
+typedef wN_quat<w_float> w_quat;
+typedef wN_mat2<w_float> w_mat2;
+typedef wN_mat3<w_float> w_mat3;
+
+typedef wN_bounding_sphere<w_float> w_bounding_sphere;
+typedef wN_bounding_capsule<w_float> w_bounding_capsule;
+typedef wN_bounding_cylinder<w_float> w_bounding_cylinder;
+typedef wN_bounding_box<w_float> w_bounding_box;
+typedef wN_line_segment<w_float> w_line_segment;
+
+
 
 
 struct contact_manifold
@@ -1976,12 +1999,16 @@ static uint32 collisionSIMD(const collider_union* worldSpaceColliders, collider_
 
 	for (uint32 i = 0; i < numColliderPairs; i += COLLISION_SIMD_WIDTH)
 	{
-		uint16 aIndices[COLLISION_SIMD_WIDTH];
-		uint16 bIndices[COLLISION_SIMD_WIDTH];
+		uint32 numValidLanes = clamp(numColliderPairs - i, 0u, COLLISION_SIMD_WIDTH);
+		uint32 validLanesMask = (1 << numValidLanes) - 1;
 
-		for (uint32 j = 0; j < COLLISION_SIMD_WIDTH; ++j)
+		uint16 aIndices[COLLISION_SIMD_WIDTH] = {};
+		uint16 bIndices[COLLISION_SIMD_WIDTH] = {};
+
+		// TODO: This could be done with SIMD.
+		for (uint32 j = 0; j < numValidLanes; ++j)
 		{
-			collider_pair pair = colliderPairs[j];
+			collider_pair pair = colliderPairs[i + j];
 			aIndices[j] = pair.colliderA;
 			bIndices[j] = pair.colliderB;
 		}
@@ -1998,6 +2025,9 @@ static uint32 collisionSIMD(const collider_union* worldSpaceColliders, collider_
 			w_float restitutionB, frictionB, densityB;
 			w_float rbA, rbB;
 
+			const uint32 restitutionOffset = offsetof(collider_union, material) + offsetof(physics_material, restitution);
+			const uint32 objectIndexOffset = offsetof(collider_union, objectIndex);
+
 			load4(&worldSpaceColliders->material.restitution, aIndices, sizeof(collider_union),
 				restitutionA, frictionA, densityA, rbA);
 			load4(&worldSpaceColliders->material.restitution, bIndices, sizeof(collider_union),
@@ -2006,8 +2036,11 @@ static uint32 collisionSIMD(const collider_union* worldSpaceColliders, collider_
 			w_float friction = clamp01(sqrt(frictionA * frictionB));
 			w_float restitution = clamp01(maximum(restitutionA, restitutionB));
 
-			w_float friction_restitution = ((friction * 0xFFFF) << 16) | (restitution * 0xFFFF);
-			w_int bodyPairs = reinterpret((rbA << 16) | (rbB & 0xFFFF));
+			w_float friction_restitution = reinterpret((convert(friction * 0xFFFF) << 16) | convert(restitution * 0xFFFF));
+			
+			rbA >>= 16;
+			rbB >>= 16;
+			w_int bodyPairs = reinterpret((rbB << 16) | rbA);
 
 
 			for (uint32 j = 0; j < numWideContacts; ++j)
@@ -2017,37 +2050,42 @@ static uint32 collisionSIMD(const collider_union* worldSpaceColliders, collider_
 				uint32 mask = c.mask;
 				assert(mask != 0);
 
-				w_float v[] =
-				{
-					c.point.x,
-					c.point.y,
-					c.point.z,
-					c.penetrationDepth,
-					c.normal.x,
-					c.normal.y,
-					c.normal.z,
-					friction_restitution,
-				};
+				mask &= validLanesMask;
 
-#if COLLISION_SIMD_WIDTH == 4
-				transpose(v[0], v[1], v[2], v[3]);
-				transpose(v[4], v[5], v[6], v[7]);
-#elif COLLISION_SIMD_WIDTH == 8
-				transpose(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
-#endif
-
-				for (uint32 k = 0; k < COLLISION_SIMD_WIDTH; ++k)
+				if (mask)
 				{
-					if (mask & (1 << k))
+					w_float v[] =
 					{
-						v[k].store((float*)outContacts);
+						c.point.x,
+						c.point.y,
+						c.point.z,
+						c.penetrationDepth,
+						c.normal.x,
+						c.normal.y,
+						c.normal.z,
+						friction_restitution,
+					};
+
 #if COLLISION_SIMD_WIDTH == 4
-						v[k + 4].store((float*)outContacts + 4);
+					transpose(v[0], v[1], v[2], v[3]);
+					transpose(v[4], v[5], v[6], v[7]);
+#elif COLLISION_SIMD_WIDTH == 8
+					transpose(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
 #endif
 
-						++totalNumContacts;
-						++outContacts;
-						*((int*)(outBodyPairs++)) = bodyPairs[k]; // TODO: Check order.
+					for (uint32 k = 0; k < numValidLanes; ++k)
+					{
+						if (mask & (1 << k))
+						{
+							v[k].store((float*)outContacts);
+#if COLLISION_SIMD_WIDTH == 4
+							v[k + 4].store((float*)outContacts + 4);
+#endif
+
+							++totalNumContacts;
+							++outContacts;
+							*((int*)(outBodyPairs++)) = bodyPairs[k]; // TODO: Check order.
+						}
 					}
 				}
 			}
@@ -2185,18 +2223,19 @@ narrowphase_result narrowphaseSIMD(const collider_union* worldSpaceColliders, co
 
 	// Collision checks.
 
-	numCollisions += collisionSIMD<w_bounding_sphere, w_bounding_sphere>(worldSpaceColliders,
+	numContacts += collisionSIMD<w_bounding_sphere, w_bounding_sphere>(worldSpaceColliders,
 		collisionPairMatrix[collider_type_sphere][collider_type_sphere], collisionCountMatrix[collider_type_sphere][collider_type_sphere],
-		outContacts + numCollisions, outBodyPairs + numCollisions);
+		outContacts + numContacts, outBodyPairs + numContacts);
 
-	numCollisions += collisionSIMD<w_bounding_sphere, w_bounding_capsule>(worldSpaceColliders,
+	numContacts += collisionSIMD<w_bounding_sphere, w_bounding_capsule>(worldSpaceColliders,
 		collisionPairMatrix[collider_type_sphere][collider_type_capsule], collisionCountMatrix[collider_type_sphere][collider_type_capsule],
-		outContacts + numCollisions, outBodyPairs + numCollisions);
+		outContacts + numContacts, outBodyPairs + numContacts);
 
-	numCollisions += collisionSIMD<w_bounding_sphere, w_bounding_box>(worldSpaceColliders,
+	numContacts += collisionSIMD<w_bounding_sphere, w_bounding_box>(worldSpaceColliders,
 		collisionPairMatrix[collider_type_sphere][collider_type_aabb], collisionCountMatrix[collider_type_sphere][collider_type_aabb],
-		outContacts + numCollisions, outBodyPairs + numCollisions);
+		outContacts + numContacts, outBodyPairs + numContacts);
 
+	// TODO: Write valid collision pairs and numCollisions.
 
 
 	arena.resetToMarker(marker);
