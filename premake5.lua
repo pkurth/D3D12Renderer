@@ -58,7 +58,9 @@ print("Installed GPU: ", gpu_name)
 
 
 if win_version < sdk_version then
+	term.pushColor(term.warningColor)
 	print("Your Windows SDK is newer than your Windows OS. Consider updating your OS or there might be compatability issues.")
+	term.popColor()
 end
 
 local turing_or_higher = gpu_model_number >= 1650
@@ -68,7 +70,9 @@ local new_sdk_available = sdk_version >= new_sdk_version
 local mesh_shaders_supported = turing_or_higher and new_sdk_available and win_version >= new_sdk_version
 
 if not mesh_shaders_supported then
+	term.pushColor(term.infoColor)
 	print("Disabling mesh shader compilation, since not all requirements are met.")
+	term.popColor()
 end
 
 
@@ -366,12 +370,6 @@ project "D3D12Renderer"
 			"/WX",
 			"/all_resources_bound",
 		}
-
-		if turing_or_higher then
-			shaderoptions {
-				"/denorm ftz",
-			}
-		end
 	
 	if turing_or_higher then
 		filter { "configurations:Debug", "files:**.hlsl" }
