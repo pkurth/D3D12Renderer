@@ -366,7 +366,7 @@ inline vec3 closestPoint_PointSegment(const vec3& q, const line_segment& l)
 inline vec3 closestPoint_PointAABB(const vec3& q, const bounding_box& aabb)
 {
 	vec3 result;
-	for (int i = 0; i < 3; i++)
+	for (uint32 i = 0; i < 3; ++i)
 	{
 		float v = q.data[i];
 		if (v < aabb.minCorner.data[i]) v = aabb.minCorner.data[i];

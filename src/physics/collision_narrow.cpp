@@ -7,29 +7,10 @@
 #include "collision_sat.h"
 #include "core/cpu_profiling.h"
 
-#include "core/math_simd.h"
-
 #define COLLISION_SIMD_WIDTH 8
 
-#if COLLISION_SIMD_WIDTH == 4
-typedef w4_vec2 w_vec2;
-typedef w4_vec3 w_vec3;
-typedef w4_vec4 w_vec4;
-typedef w4_quat w_quat;
-typedef w4_mat2 w_mat2;
-typedef w4_mat3 w_mat3;
-typedef w4_float w_float;
-typedef w4_int w_int;
-#elif COLLISION_SIMD_WIDTH == 8 && defined(SIMD_AVX_2)
-typedef w8_vec2 w_vec2;
-typedef w8_vec3 w_vec3;
-typedef w8_vec4 w_vec4;
-typedef w8_quat w_quat;
-typedef w8_mat2 w_mat2;
-typedef w8_mat3 w_mat3;
-typedef w8_float w_float;
-typedef w8_int w_int;
-#endif
+#define BV_SIMD_WIDTH COLLISION_SIMD_WIDTH
+#include "bounding_volumes_simd.h"
 
 
 struct contact_manifold
@@ -1866,48 +1847,6 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collid
 
 
 
-
-struct simd_load_store_indices
-{
-	uint16 indices[COLLISION_SIMD_WIDTH];
-};
-
-static simd_load_store_indices getStoreIndices(uint32 mask)
-{
-	simd_load_store_indices result;
-	for (uint32 i = 0, ptr = 0; i < COLLISION_SIMD_WIDTH; ++i)
-	{
-		result.indices[i] = (mask & (1 << i)) ? (uint16)ptr++ : COLLISION_SIMD_WIDTH;
-	}
-	return result;
-}
-
-struct w_bounding_sphere
-{
-	w_vec3 center;
-	w_float radius;
-};
-
-struct w_bounding_capsule
-{
-	w_vec3 positionA;
-	w_vec3 positionB;
-	w_float radius;
-};
-
-struct w_bounding_cylinder
-{
-	w_vec3 positionA;
-	w_vec3 positionB;
-	w_float radius;
-};
-
-struct w_bounding_box
-{
-	w_vec3 minCorner;
-	w_vec3 maxCorner;
-};
-
 template <typename collider_t>
 static collider_t loadBoundingVolumeSIMD(const collider_union* worldSpaceColliders, uint16* indices) { static_assert(false); }
 
@@ -1957,15 +1896,16 @@ static w_bounding_box loadBoundingVolumeSIMD<w_bounding_box>(const collider_unio
 }
 
 
-struct w_physics_material
+struct w_collision_contact
 {
-	w_float restitution;
-	w_float friction;
-	w_float density;
+	w_vec3 point;
+	w_float penetrationDepth;
+	w_vec3 normal;
+	uint32 mask;
 };
 
 
-static uint32 intersectionSIMD(const w_bounding_sphere& s1, const w_bounding_sphere& s2, w_float friction_restitution, collision_contact* outContacts)
+static uint32 intersectionSIMD(const w_bounding_sphere& s1, const w_bounding_sphere& s2, w_collision_contact* outContacts)
 {
 	w_vec3 n = s2.center - s1.center;
 	w_float radiusSum = s2.radius + s1.radius;
@@ -1973,37 +1913,66 @@ static uint32 intersectionSIMD(const w_bounding_sphere& s1, const w_bounding_sph
 
 	auto intersects = (sqDistance <= radiusSum * radiusSum);
 
-	uint32 result = toBitMask(intersects);
+	uint32 mask = toBitMask(intersects);
 
-	if (result)
+	if (mask)
 	{
 		auto degenerate = (sqDistance == 0.f);
 		w_float distance = ifThen(degenerate, 0.f, sqrt(sqDistance));
 		w_vec3 collisionNormal = ifThen(degenerate, w_vec3(0.f, 1.f, 0.f), n / distance);
 
-		w_float numContacts = reinterpret(w_int(1));
 		w_float penetrationDepth = radiusSum - distance; // Flipped to change sign.
 		w_vec3 point = w_float(0.5f) * (s1.center + s1.radius * collisionNormal + s2.center - s2.radius * collisionNormal);
 
-		simd_load_store_indices storeIndices = getStoreIndices(result);
+		outContacts[0].point = point;
+		outContacts[0].penetrationDepth = penetrationDepth;
+		outContacts[0].normal = collisionNormal;
+		outContacts[0].mask = mask;
 
-		store8((float*)outContacts, storeIndices.indices, sizeof(collision_contact),
-			point.x, point.y, point.z,
-			penetrationDepth,
-			collisionNormal.x, collisionNormal.y, collisionNormal.z,
-			friction_restitution);
+		return 1;
 	}
 
-	return __popcnt(result);
+	return 0;
 }
 
+static uint32 intersectionSIMD(const w_bounding_sphere& s, const w_bounding_capsule& c, w_collision_contact* outContacts)
+{
+	w_vec3 closestPoint = closestPoint_PointSegment(s.center, w_line_segment{ c.positionA, c.positionB });
+	return intersectionSIMD(s, w_bounding_sphere{ closestPoint, c.radius }, outContacts);
+}
+
+static uint32 intersectionSIMD(const w_bounding_sphere& s, const w_bounding_box& a, w_collision_contact* outContacts)
+{
+	w_vec3 p = closestPoint_PointAABB(s.center, a);
+	w_vec3 n = p - s.center;
+	w_float sqDistance = squaredLength(n);
+
+	auto intersects = sqDistance <= s.radius * s.radius;
+
+	uint32 mask = toBitMask(intersects);
+
+	if (mask)
+	{
+		auto valid = (sqDistance > 0.f);
+		w_float dist = ifThen(valid, sqrt(sqDistance), 0.f);
+		n = ifThen(valid, n / dist, w_vec3(0.f, 1.f, 0.f));
+
+		outContacts[0].point = w_float(0.5f) * (p + s.center + n * s.radius);
+		outContacts[0].penetrationDepth = s.radius - dist; // Flipped to change sign.
+		outContacts[0].normal = n;
+		outContacts[0].mask = mask;
+
+		return 1;
+	}
+	return 0;
+}
 
 
 template <typename collider_a, typename collider_b>
 static uint32 collisionSIMD(const collider_union* worldSpaceColliders, collider_pair* colliderPairs, uint32 numColliderPairs, 
 	collision_contact* outContacts, constraint_body_pair* outBodyPairs)
 {
-	uint32 result = 0;
+	uint32 totalNumContacts = 0;
 
 	for (uint32 i = 0; i < numColliderPairs; i += COLLISION_SIMD_WIDTH)
 	{
@@ -2020,30 +1989,72 @@ static uint32 collisionSIMD(const collider_union* worldSpaceColliders, collider_
 		collider_a a = loadBoundingVolumeSIMD<collider_a>(worldSpaceColliders, aIndices);
 		collider_b b = loadBoundingVolumeSIMD<collider_b>(worldSpaceColliders, bIndices);
 
+		w_collision_contact wideContacts[4];
+		uint32 numWideContacts = intersectionSIMD(a, b, wideContacts);
 
-		w_physics_material propsA, propsB;
-		w_float rbA, rbB;
+		if (numWideContacts > 0)
+		{
+			w_float restitutionA, frictionA, densityA;
+			w_float restitutionB, frictionB, densityB;
+			w_float rbA, rbB;
 
-		load4(&worldSpaceColliders->material.restitution, aIndices, sizeof(collider_union),
-			propsA.restitution, propsA.friction, propsA.density, rbA);
-		load4(&worldSpaceColliders->material.restitution, bIndices, sizeof(collider_union),
-			propsB.restitution, propsB.friction, propsB.density, rbB);
+			load4(&worldSpaceColliders->material.restitution, aIndices, sizeof(collider_union),
+				restitutionA, frictionA, densityA, rbA);
+			load4(&worldSpaceColliders->material.restitution, bIndices, sizeof(collider_union),
+				restitutionB, frictionB, densityB, rbB);
 
-		rbA = rbA & 0xFFFF;
-		rbB = rbB & 0xFFFF;
+			w_float friction = clamp01(sqrt(frictionA * frictionB));
+			w_float restitution = clamp01(maximum(restitutionA, restitutionB));
+
+			w_float friction_restitution = ((friction * 0xFFFF) << 16) | (restitution * 0xFFFF);
+			w_int bodyPairs = reinterpret((rbA << 16) | (rbB & 0xFFFF));
 
 
-		w_float friction = clamp01(sqrt(propsA.friction * propsB.friction));
-		w_float restitution = clamp01(maximum(propsA.restitution, propsB.restitution));
+			for (uint32 j = 0; j < numWideContacts; ++j)
+			{
+				const w_collision_contact& c = wideContacts[j];
 
-		w_float friction_restitution = ((friction * 0xFFFF) << 16) | (restitution * 0xFFFF);
+				uint32 mask = c.mask;
+				assert(mask != 0);
 
-		result += intersectionSIMD(a, b, friction_restitution, outContacts);
+				w_float v[] =
+				{
+					c.point.x,
+					c.point.y,
+					c.point.z,
+					c.penetrationDepth,
+					c.normal.x,
+					c.normal.y,
+					c.normal.z,
+					friction_restitution,
+				};
 
-		// TODO: Write body pairs.
+#if COLLISION_SIMD_WIDTH == 4
+				transpose(v[0], v[1], v[2], v[3]);
+				transpose(v[4], v[5], v[6], v[7]);
+#elif COLLISION_SIMD_WIDTH == 8
+				transpose(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
+#endif
+
+				for (uint32 k = 0; k < COLLISION_SIMD_WIDTH; ++k)
+				{
+					if (mask & (1 << k))
+					{
+						v[k].store((float*)outContacts);
+#if COLLISION_SIMD_WIDTH == 4
+						v[k + 4].store((float*)outContacts + 4);
+#endif
+
+						++totalNumContacts;
+						++outContacts;
+						*((int*)(outBodyPairs++)) = bodyPairs[k]; // TODO: Check order.
+					}
+				}
+			}
+		}
 	}
 
-	return result;
+	return totalNumContacts;
 }
 
 narrowphase_result narrowphaseSIMD(const collider_union* worldSpaceColliders, collider_pair* collisionPairs, uint32 numCollisionPairs, memory_arena& arena,
@@ -2174,9 +2185,17 @@ narrowphase_result narrowphaseSIMD(const collider_union* worldSpaceColliders, co
 
 	// Collision checks.
 
-	collisionSIMD<w_bounding_sphere, w_bounding_sphere>(worldSpaceColliders,
+	numCollisions += collisionSIMD<w_bounding_sphere, w_bounding_sphere>(worldSpaceColliders,
 		collisionPairMatrix[collider_type_sphere][collider_type_sphere], collisionCountMatrix[collider_type_sphere][collider_type_sphere],
-		outContacts, outBodyPairs);
+		outContacts + numCollisions, outBodyPairs + numCollisions);
+
+	numCollisions += collisionSIMD<w_bounding_sphere, w_bounding_capsule>(worldSpaceColliders,
+		collisionPairMatrix[collider_type_sphere][collider_type_capsule], collisionCountMatrix[collider_type_sphere][collider_type_capsule],
+		outContacts + numCollisions, outBodyPairs + numCollisions);
+
+	numCollisions += collisionSIMD<w_bounding_sphere, w_bounding_box>(worldSpaceColliders,
+		collisionPairMatrix[collider_type_sphere][collider_type_aabb], collisionCountMatrix[collider_type_sphere][collider_type_aabb],
+		outContacts + numCollisions, outBodyPairs + numCollisions);
 
 
 

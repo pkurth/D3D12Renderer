@@ -185,6 +185,7 @@ struct w4_float
 #endif
 
 	operator __m128() { return f; }
+	float operator[](uint32 i) const { return this->f.m128_f32[i]; }
 
 	void store(float* f_) const { _mm_storeu_ps(f_, f); }
 
@@ -232,6 +233,7 @@ struct w4_int
 #endif
 
 	operator __m128i() { return i; }
+	int operator[](uint32 i) const { return this->i.m128i_i32[i]; }
 
 	void store(int* i_) const { _mm_storeu_si128((__m128i*)i_, i); }
 
@@ -485,6 +487,7 @@ struct w8_float
 	w8_float(const float* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) : w8_float(baseAddress, _mm256_setr_epi32(a, b, c, d, e, f, g, h)) {}
 
 	operator __m256() { return f; }
+	float operator[](uint32 i) const { return this->f.m256_f32[i]; }
 
 	void store(float* f_) const { _mm256_storeu_ps(f_, f); }
 
@@ -535,6 +538,7 @@ struct w8_int
 	w8_int(const int* baseAddress, int a, int b, int c, int d, int e, int f, int g, int h) : w8_int(baseAddress, _mm256_setr_epi32(a, b, c, d, e, f, g, h)) {}
 
 	operator __m256i() { return i; }
+	int operator[](uint32 i) const { return this->i.m256i_i32[i]; }
 
 	void store(int* i_) const { _mm256_storeu_epi32(i_, i); }
 
