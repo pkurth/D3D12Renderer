@@ -1964,6 +1964,71 @@ static uint32 intersectionSIMD(const w_bounding_sphere& s, const w_bounding_caps
 	return intersectionSIMD(s, w_bounding_sphere{ closestPoint, c.radius }, outContacts);
 }
 
+static uint32 intersectionSIMD(const w_bounding_sphere& s, const w_bounding_cylinder& c, w_collision_contact* outContacts)
+{
+	w_vec3 ab = c.positionB - c.positionA;
+	w_float t = dot(s.center - c.positionA, ab) / squaredLength(ab);
+
+	auto tSaturated = t >= 0.f & t <= 1.f;
+
+	uint32 sphereSphereTest = 0;
+	if (anyTrue(tSaturated))
+	{
+		sphereSphereTest = intersectionSIMD(s, w_bounding_sphere{ lerp(c.positionA, c.positionB, t), c.radius }, outContacts);
+
+		if (allTrue(tSaturated))
+		{
+			return sphereSphereTest;
+		}
+	}
+
+
+
+	w_vec3 p = ifThen(t <= 0.f, c.positionA, c.positionB);
+	w_vec3 up = ifThen(t <= 0.f, -ab, ab);
+
+	w_vec3 projectedDirToCenter = normalize(cross(cross(up, s.center - p), up));
+	w_vec3 endA = p + projectedDirToCenter * c.radius;
+	w_vec3 endB = p - projectedDirToCenter * c.radius;
+
+	w_vec3 closestToSphere = closestPoint_PointSegment(s.center, w_line_segment{ endA, endB });
+	w_vec3 normal = closestToSphere - s.center; // From sphere to cylinder.
+	w_float sqDistance = squaredLength(normal);
+
+	auto intersects = (sqDistance <= s.radius * s.radius);
+
+	uint32 mask = toBitMask(intersects);
+
+	if (mask)
+	{
+		auto degenerate = sqDistance == 0.f;
+
+		w_float distance = ifThen(degenerate, 0.f, sqrt(sqDistance));
+		normal = ifThen(degenerate, -normalize(up), normal / distance);
+		
+		w_float penetrationDepth = s.radius - distance;
+		w_vec3 point = closestToSphere + 0.5f * penetrationDepth * normal;
+
+		if (anyTrue(tSaturated))
+		{
+			point = ifThen(tSaturated, outContacts[0].point, point);
+			penetrationDepth = ifThen(tSaturated, outContacts[0].penetrationDepth, penetrationDepth);
+			normal = ifThen(tSaturated, outContacts[0].normal, normal);
+
+			mask |= toBitMask(tSaturated);
+		}
+
+		outContacts[0].point = point;
+		outContacts[0].penetrationDepth = penetrationDepth;
+		outContacts[0].normal = normal;
+		outContacts[0].mask = mask;
+		
+		return 1;
+	}
+
+	return sphereSphereTest;
+}
+
 static uint32 intersectionSIMD(const w_bounding_sphere& s, const w_bounding_box& a, w_collision_contact* outContacts)
 {
 	w_vec3 p = closestPoint_PointAABB(s.center, a);
