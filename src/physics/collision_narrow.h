@@ -24,8 +24,6 @@ struct narrowphase_result
 narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collider_pair* collisionPairs, uint32 numCollisionPairs, memory_arena& arena,
 	collision_contact* outContacts, constraint_body_pair* outBodyPairs, // result.numContacts many.
 	uint8* numContactsPerPair,
-	non_collision_interaction* outNonCollisionInteractions);			// result.numNonCollisionInteractions many.
-
-narrowphase_result narrowphaseSIMD(const collider_union* worldSpaceColliders, collider_pair* collisionPairs, uint32 numCollisionPairs, memory_arena& arena,
-	collision_contact* outContacts, constraint_body_pair* outBodyPairs, uint8* numContactsPerPair, non_collision_interaction* outNonCollisionInteractions);
+	non_collision_interaction* outNonCollisionInteractions,			// result.numNonCollisionInteractions many.
+	bool simd);
 

@@ -135,7 +135,7 @@ bounding_box bounding_oriented_box::transformToAABB(quat rotation, vec3 translat
 
 bounding_oriented_box bounding_oriented_box::transformToOBB(quat rotation, vec3 translation) const
 {
-	return bounding_oriented_box{ rotation * center + translation, radius, rotation * this->rotation };
+	return bounding_oriented_box{ rotation * this->rotation, rotation * center + translation, radius };
 }
 
 bounding_box_corners bounding_oriented_box::getCorners() const

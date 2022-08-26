@@ -315,9 +315,9 @@ template <typename simd_t> static wN_vec3<simd_t> operator*(wN_quat<simd_t> q, w
 
 template <typename simd_t> static auto operator==(wN_quat<simd_t> a, wN_quat<simd_t> b) { return a.x == b.x & a.y == b.y & a.z == b.z & a.w == b.w; }
 
-template <typename simd_t> static wN_vec2<simd_t> lerp(wN_vec2<simd_t> l, wN_vec2<simd_t> u, simd_t t) { return fmadd(t, u - l, l); }
-template <typename simd_t> static wN_vec3<simd_t> lerp(wN_vec3<simd_t> l, wN_vec3<simd_t> u, simd_t t) { return fmadd(t, u - l, l); }
-template <typename simd_t> static wN_vec4<simd_t> lerp(wN_vec4<simd_t> l, wN_vec4<simd_t> u, simd_t t) { return fmadd(t, u - l, l); }
+template <typename simd_t> static wN_vec2<simd_t> lerp(wN_vec2<simd_t> l, wN_vec2<simd_t> u, simd_t t) { return fmadd(wN_vec2<simd_t>(t), u - l, l); }
+template <typename simd_t> static wN_vec3<simd_t> lerp(wN_vec3<simd_t> l, wN_vec3<simd_t> u, simd_t t) { return fmadd(wN_vec3<simd_t>(t), u - l, l); }
+template <typename simd_t> static wN_vec4<simd_t> lerp(wN_vec4<simd_t> l, wN_vec4<simd_t> u, simd_t t) { return fmadd(wN_vec4<simd_t>(t), u - l, l); }
 template <typename simd_t> static wN_quat<simd_t> lerp(wN_quat<simd_t> l, wN_quat<simd_t> u, simd_t t) { wN_quat result; result.v4 = lerp(l.v4, u.v4, t); return normalize(result); }
 
 template <typename simd_t> static wN_vec2<simd_t> exp(wN_vec2<simd_t> v) { return wN_vec2(exp(v.x), exp(v.y)); }

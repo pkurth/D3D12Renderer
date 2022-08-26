@@ -30,6 +30,24 @@ struct wN_bounding_box
 {
 	wN_vec3<simd_t> minCorner;
 	wN_vec3<simd_t> maxCorner;
+
+	static wN_bounding_box wN_bounding_box::fromMinMax(wN_vec3<simd_t> minCorner, wN_vec3<simd_t> maxCorner)
+	{
+		return wN_bounding_box{ minCorner, maxCorner };
+	}
+
+	static wN_bounding_box wN_bounding_box::fromCenterRadius(wN_vec3<simd_t> center, wN_vec3<simd_t> radius)
+	{
+		return wN_bounding_box{ center - radius, center + radius };
+	}
+};
+
+template <typename simd_t>
+struct wN_bounding_oriented_box
+{
+	wN_vec3<simd_t> center;
+	wN_vec3<simd_t> radius;
+	wN_quat<simd_t> rotation;
 };
 
 template <typename simd_t>

@@ -1055,17 +1055,8 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 	constraint_body_pair* collisionBodyPairs = allConstraintBodyPairs + numConstraints;
 
 	// Narrow phase.
-	narrowphase_result narrowPhaseResult;
-	if (settings.simdCollisionDetection)
-	{
-		narrowPhaseResult = narrowphaseSIMD(worldSpaceColliders, collisionPairs, numBroadphaseOverlaps, arena,
-			contacts, collisionBodyPairs, numContactsPerPair, nonCollisionInteractions);
-	}
-	else
-	{
-		narrowPhaseResult = narrowphase(worldSpaceColliders, collisionPairs, numBroadphaseOverlaps, arena,
-			contacts, collisionBodyPairs, numContactsPerPair, nonCollisionInteractions);
-	}
+	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, collisionPairs, numBroadphaseOverlaps, arena,
+		contacts, collisionBodyPairs, numContactsPerPair, nonCollisionInteractions, settings.simdCollisionDetection);
 	VALIDATE(contacts, narrowPhaseResult.numContacts);
 
 
@@ -1074,8 +1065,8 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 
 	handleNonCollisionInteractions(scene, ffGlobal, nonCollisionInteractions, narrowPhaseResult.numNonCollisionInteractions,
 		numRigidBodies, numTriggers);
-	handleCollisionCallbacks(scene, collisionPairs, numContactsPerPair, narrowPhaseResult.numCollisions, numColliders, contacts,
-		settings.collisionBeginCallback, settings.collisionEndCallback);
+	//handleCollisionCallbacks(scene, collisionPairs, numContactsPerPair, narrowPhaseResult.numCollisions, numColliders, contacts,
+	//	settings.collisionBeginCallback, settings.collisionEndCallback);
 
 	CPU_PROFILE_STAT("Num rigid bodies", numRigidBodies);
 	CPU_PROFILE_STAT("Num colliders", numColliders);

@@ -130,9 +130,9 @@ struct bounding_box
 
 struct bounding_oriented_box
 {
+	quat rotation;
 	vec3 center;
 	vec3 radius;
-	quat rotation;
 
 	float volume()
 	{
@@ -352,7 +352,7 @@ inline bool aabbVsAABB(const bounding_box& a, const bounding_box& b)
 
 inline bool aabbVsOBB(const bounding_box& a, const bounding_oriented_box& o)
 {
-	return obbVsOBB(bounding_oriented_box{ a.getCenter(), a.getRadius(), quat::identity }, o);
+	return obbVsOBB(bounding_oriented_box{ quat::identity, a.getCenter(), a.getRadius() }, o);
 }
 
 inline vec3 closestPoint_PointSegment(const vec3& q, const line_segment& l)

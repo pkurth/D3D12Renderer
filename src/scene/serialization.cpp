@@ -219,7 +219,7 @@ namespace YAML
 					YAML_LOAD(n, radius, "Radius");
 					YAML_LOAD(n, rotation, "Rotation");
 
-					c = collider_component::asOBB({ center, radius, rotation }, material);
+					c = collider_component::asOBB({ rotation, center, radius }, material);
 				} break;
 
 				case collider_type_hull:

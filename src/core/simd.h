@@ -1068,7 +1068,8 @@ static w16_float acos(w16_float x) { return acosInternal(x); }
 
 #endif
 
-
+static bool anyTrue(int32 mask) { return mask > 0; }
+static bool anyTrue(uint32 mask) { return mask > 0; }
 
 
 
