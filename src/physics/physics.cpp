@@ -1045,7 +1045,7 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 	VALIDATE(worldSpaceAABBs, numColliders);
 
 	// Broad phase.
-	uint32 numBroadphaseOverlaps = broadphase(scene, worldSpaceAABBs, arena, collisionPairs);
+	uint32 numBroadphaseOverlaps = broadphase(scene, worldSpaceAABBs, arena, collisionPairs, settings.simdBroadPhase);
 
 	non_collision_interaction* nonCollisionInteractions = arena.allocate<non_collision_interaction>(numBroadphaseOverlaps);
 	collision_contact* contacts = arena.allocate<collision_contact>(numBroadphaseOverlaps * 4); // Each collision can have up to 4 contact points.
@@ -1056,7 +1056,7 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 
 	// Narrow phase.
 	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, collisionPairs, numBroadphaseOverlaps, arena,
-		contacts, collisionBodyPairs, numContactsPerPair, nonCollisionInteractions, settings.simdCollisionDetection);
+		contacts, collisionBodyPairs, numContactsPerPair, nonCollisionInteractions, settings.simdNarrowPhase);
 	VALIDATE(contacts, narrowPhaseResult.numContacts);
 
 

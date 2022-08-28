@@ -362,7 +362,8 @@ struct physics_settings
 	uint32 numClothPositionIterations = 1;
 	uint32 numClothDriftIterations = 0;
 
-	bool simdCollisionDetection = true;
+	bool simdBroadPhase = true;
+	bool simdNarrowPhase = true;
 	bool simdConstraintSolver = true;
 
 	std::function<void(const collision_event&)> collisionBeginCallback;
