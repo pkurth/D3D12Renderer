@@ -402,6 +402,13 @@ static w4_int fillWithFirstLane(w4_int a)
 	return first;
 }
 
+static w4_int popcount(w4_int i)
+{
+	i = i - ((i >> 1) & 0x55555555);
+	i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
+	return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
+}
+
 static void transpose(w4_float& out0, w4_float& out1, w4_float& out2, w4_float& out3)
 {
 	_MM_TRANSPOSE4_PS(out0.f, out1.f, out2.f, out3.f);
@@ -775,6 +782,13 @@ static w8_int fillWithFirstLane(w8_int a)
 	w8_int first = _mm256_shuffle_epi32(a, _MM_SHUFFLE(0, 0, 0, 0));
 	first = concatLow(first, first);
 	return first;
+}
+
+static w8_int popcount(w8_int i)
+{
+	i = i - ((i >> 1) & 0x55555555);
+	i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
+	return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
 }
 
 static void transpose32(w8_float& out0, w8_float& out1, w8_float& out2, w8_float& out3)
