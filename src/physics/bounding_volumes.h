@@ -345,8 +345,8 @@ inline bool capsuleVsCylinder(const bounding_capsule& a, const bounding_cylinder
 inline bool aabbVsAABB(const bounding_box& a, const bounding_box& b)
 {
 	if (a.maxCorner.x < b.minCorner.x || a.minCorner.x > b.maxCorner.x) return false;
-	if (a.maxCorner.z < b.minCorner.z || a.minCorner.z > b.maxCorner.z) return false;
 	if (a.maxCorner.y < b.minCorner.y || a.minCorner.y > b.maxCorner.y) return false;
+	if (a.maxCorner.z < b.minCorner.z || a.minCorner.z > b.maxCorner.z) return false;
 	return true;
 }
 

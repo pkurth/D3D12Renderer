@@ -973,7 +973,8 @@ float closestPoint_SegmentSegment(const line_segment& l1, const line_segment& l2
 		t = f / e; // s = 0 => t = (b*s + f) / e = f / e
 		t = clamp(t, 0.f, 1.f);
 	}
-	else {
+	else 
+	{
 		float c = dot(d1, r);
 		if (e <= EPSILON)
 		{

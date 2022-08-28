@@ -1771,6 +1771,7 @@ struct w_collision_contact
 };
 
 
+// Sphere tests.
 static uint32 intersectionSIMD(const w_bounding_sphere& s1, const w_bounding_sphere& s2, w_collision_contact* outContacts)
 {
 	w_vec3 n = s2.center - s1.center;
@@ -1918,6 +1919,141 @@ static uint32 intersectionSIMD(const w_bounding_sphere& s, const w_bounding_orie
 	return 0;
 }
 
+// Capsule tests.
+static uint32 intersectionSIMD(const w_bounding_capsule& a, const w_bounding_capsule& b, w_collision_contact* outContacts)
+{
+	w_vec3 aDir = a.positionB - a.positionA;
+	w_vec3 bDir = normalize(b.positionB - b.positionA);
+
+	w_float aDirLength = length(aDir);
+	aDir *= 1.f / aDirLength;
+
+	w_float alignment = dot(aDir, bDir);
+
+	auto valid = (abs(alignment) <= 0.99f);
+
+	uint32 result = 0;
+
+	int32 validMask = toBitMask(valid);
+
+	if (anyTrue(validMask))
+	{
+		w_vec3 closestPoint1, closestPoint2;
+		closestPoint_SegmentSegment(w_line_segment{ a.positionA, a.positionB }, w_line_segment{ b.positionA, b.positionB }, closestPoint1, closestPoint2);
+		result = intersectionSIMD(w_bounding_sphere{ closestPoint1, a.radius }, w_bounding_sphere{ closestPoint2, b.radius }, outContacts);
+
+		if (allTrue(valid))
+		{
+			return result;
+		}
+	}
+
+	// Parallel case.
+
+	w_vec3 pAa = a.positionA;
+	w_vec3 pAb = a.positionB;
+	w_vec3 pBa = b.positionA;
+	w_vec3 pBb = b.positionB;
+
+	auto swap = alignment < 0.f;
+	
+	if (anyTrue(swap))
+	{
+		w_vec3 tmp = pBa;
+		pBa = ifThen(swap, pBb, pBa);
+		pBb = ifThen(swap, tmp, pBb);
+	}
+
+	w_vec3 referencePoint = a.positionA;
+
+	w_float a0 = 0.f;
+	w_float a1 = aDirLength;
+
+	w_float b0 = dot(aDir, pBa - referencePoint);
+	w_float b1 = dot(aDir, pBb - referencePoint);
+
+	w_float left = maximum(a0, b0);
+	w_float right = minimum(a1, b1);
+
+	auto endToEnd = right < left;
+	if (anyTrue(endToEnd))
+	{
+		auto mask = a0 > b1;
+		w_vec3 refA = ifThen(mask, pAa, pAb);
+		w_vec3 refB = ifThen(mask, pBb, pBa);
+
+		w_collision_contact contact;
+		uint32 endToEndTest = intersectionSIMD(w_bounding_sphere{ refA, a.radius }, w_bounding_sphere{ refB, b.radius }, &contact);
+
+		if (endToEndTest)
+		{
+			outContacts[0].point = ifThen(valid, outContacts[0].point, contact.point);
+			outContacts[0].penetrationDepth = ifThen(valid, outContacts[0].penetrationDepth, contact.penetrationDepth);
+			outContacts[0].normal = ifThen(valid, outContacts[0].normal, contact.normal);
+			outContacts[0].mask |= contact.mask;
+			valid |= mask;
+		}
+
+		result = max(endToEndTest, result);
+
+		if (allTrue(valid))
+		{
+			return result;
+		}
+	}
+
+	w_vec3 contactA0 = referencePoint + left * aDir;
+	w_vec3 contactA1 = referencePoint + right * aDir;
+
+	w_vec3 contactB0 = closestPoint_PointSegment(contactA0, w_line_segment{ pBa, pBb });
+	w_vec3 contactB1 = contactB0 + (right - left) * aDir;
+
+	w_vec3 normal = contactB0 - contactA0;
+	w_float d = length(normal);
+
+	auto degenerate = (d < EPSILON);
+
+	d = ifThen(degenerate, 0.f, d);
+	normal = ifThen(degenerate, w_vec3(0.f, 1.f, 0.f), normal / d);
+
+	w_float radiusSum = a.radius + b.radius;
+
+	w_float penetration = radiusSum - d;
+	auto collision = (penetration >= 0.f);
+
+	int32 mask = toBitMask(collision);
+
+	if (!mask)
+	{
+		return result;
+	}
+
+	w_vec3 point0 = (contactA0 + contactB0) * w_float(0.5f);
+	w_float penetration0 = penetration;
+	w_vec3 normal0 = normal;
+	int32 mask0 = mask;
+
+	if (anyTrue(validMask))
+	{
+		point0 = ifThen(valid, outContacts[0].point, point0);
+		penetration0 = ifThen(valid, outContacts[0].penetrationDepth, penetration0);
+		normal0 = ifThen(valid, outContacts[0].normal, normal0);
+
+		mask0 |= validMask;
+	}
+
+	outContacts[0].point = point0;
+	outContacts[0].penetrationDepth = penetration0;
+	outContacts[0].normal = normal0;
+	outContacts[0].mask = mask0;
+
+	outContacts[1].point = (contactA1 + contactB1) * w_float(0.5f);
+	outContacts[1].penetrationDepth = penetration;
+	outContacts[1].normal = normal;
+	outContacts[1].mask = mask;
+
+	return 2;
+}
 
 
 
@@ -2390,6 +2526,28 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collid
 		numContacts += collision<bounding_hull, bounding_hull>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_hull][collider_type_hull], collisionCountMatrix[collider_type_hull][collider_type_hull],
 			outContacts + numContacts, outBodyPairs + numContacts, simd);
+	}
+
+	{
+		CPU_PROFILE_BLOCK("Check for overlaps");
+
+		for (uint32 i = 0; i < collider_type_count; ++i)
+		{
+			for (uint32 j = i; j < collider_type_count; ++j)
+			{
+				uint32 count = intersectionCountMatrix[i][j];
+				collider_pair* pairs = intersectionPairMatrix[i][j];
+
+				for (uint32 k = 0; k < count; ++k)
+				{
+					non_collision_interaction interaction;
+					if (overlapCheck(worldSpaceColliders, pairs[k], interaction))
+					{
+						outNonCollisionInteractions[numNonCollisionInteractions++] = interaction;
+					}
+				}
+			}
+		}
 	}
 
 
