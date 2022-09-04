@@ -2,8 +2,14 @@
 #include "animation.h"
 #include "core/assimp.h"
 #include "core/imgui.h"
+#include "core/string.h"
 #include "geometry/mesh.h"
 #include "skinning.h"
+
+#include "dx/dx_context.h"
+#include "rendering/debug_visualization.h"
+
+#include <algorithm>
 
 static void readJointAnimation(animation_clip& clip, animation_joint& joint, const aiNodeAnim* channel)
 {
@@ -127,6 +133,51 @@ void animation_skeleton::pushAssimpAnimationsInDirectory(const fs::path& directo
 	for (auto& p : fs::directory_iterator(directory))
 	{
 		pushAssimpAnimations(p.path(), scale);
+	}
+}
+
+void animation_skeleton::analyzeJoints(const vec3* positions, const void* others, uint32 otherStride, uint32 numVertices)
+{
+	for (skeleton_joint& j : joints)
+	{
+		std::string name = j.name;
+		std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+
+		joint_class c = joint_class_unknown;
+
+		bool left = contains(name, "left") || endsWith(name, ".l") || endsWith(name, "_l");
+
+		if (contains(name, "spine") || contains(name, "hip") || contains(name, "rib") || contains(name, "pelvis") || contains(name, "shoulder") || contains(name, "clavicle")) { c = joint_class_torso; }
+		else if (contains(name, "head") || contains(name, "neck")) { c = joint_class_head; }
+		else if (contains(name, "arm"))
+		{
+			joint_class parentClass = (j.parentID != NO_PARENT) ? joints[j.parentID].jointClass : joint_class_unknown;
+
+			if (contains(name, "lower") || contains(name, "lo") || contains(name, "fore")) { c = left ? joint_class_lower_arm_left : joint_class_lower_arm_right; }
+			else if (contains(name, "upper") || contains(name, "up")) { c = left ? joint_class_upper_arm_left : joint_class_upper_arm_right; }
+			else if (parentClass == joint_class_torso) { c = left ? joint_class_upper_arm_left : joint_class_upper_arm_right; }
+			else { c = left ? joint_class_lower_arm_left : joint_class_lower_arm_right; }
+		}
+		else if (contains(name, "hand") || contains(name, "finger") || contains(name, "thumb") || contains(name, "index") || contains(name, "middle") || contains(name, "ring") || contains(name, "pinky"))
+		{
+			c = left ? joint_class_hand_left : joint_class_hand_right;
+		}
+		else if (contains(name, "leg") || contains(name, "thigh") || contains(name, "shin") || contains(name, "calf"))
+		{
+			joint_class parentClass = (j.parentID != NO_PARENT) ? joints[j.parentID].jointClass : joint_class_unknown;
+
+			if (contains(name, "lower") || contains(name, "lo") || contains(name, "shin") || contains(name, "calf")) { c = left ? joint_class_lower_leg_left : joint_class_lower_leg_right; }
+			else if (contains(name, "upper") || contains(name, "up") || contains(name, "thigh")) { c = left ? joint_class_upper_leg_left : joint_class_upper_leg_right; }
+			else if (parentClass == joint_class_torso) { c = left ? joint_class_upper_leg_left : joint_class_upper_leg_right; }
+			else { c = left ? joint_class_lower_leg_left : joint_class_lower_leg_right; }
+		}
+		else if (contains(name, "foot") || contains(name, "toe") || contains(name, "ball"))
+		{
+			c = left ? joint_class_foot_left : joint_class_foot_right;
+		}
+
+		j.jointClass = c;
+		j.ik = contains(name, "ik");
 	}
 }
 
@@ -408,6 +459,27 @@ void animation_skeleton::getSkinningMatricesFromLocalTransforms(const trs* local
 	}
 }
 
+void animation_skeleton::getSkinningMatricesFromLocalTransforms(const trs* localTransforms, trs* outGlobalTransforms, mat4* outSkinningMatrices, const trs& worldTransform) const
+{
+	uint32 numJoints = (uint32)joints.size();
+
+	for (uint32 i = 0; i < numJoints; ++i)
+	{
+		const skeleton_joint& skelJoint = joints[i];
+		if (skelJoint.parentID != NO_PARENT)
+		{
+			assert(i > skelJoint.parentID); // Parent already processed.
+			outGlobalTransforms[i] = outGlobalTransforms[skelJoint.parentID] * localTransforms[i];
+		}
+		else
+		{
+			outGlobalTransforms[i] = worldTransform * localTransforms[i];
+		}
+
+		outSkinningMatrices[i] = trsToMat4(outGlobalTransforms[i]) * joints[i].invBindTransform;
+	}
+}
+
 void animation_skeleton::getSkinningMatricesFromGlobalTransforms(const trs* globalTransforms, mat4* outSkinningMatrices) const
 {
 	uint32 numJoints = (uint32)joints.size();
@@ -624,10 +696,12 @@ void animation_blend_tree_1d::setBlendValue(float value)
 }
 #endif
 
-void animation_component::update(const ref<composite_mesh>& mesh, float dt, trs* transform)
+void animation_component::update(const ref<composite_mesh>& mesh, memory_arena& arena, float dt, trs* transform)
 {
 	const dx_mesh& dxMesh = mesh->mesh;
 	animation_skeleton& skeleton = mesh->skeleton;
+
+	currentGlobalTransforms = 0;
 
 	if (animation.valid())
 	{
@@ -640,13 +714,17 @@ void animation_component::update(const ref<composite_mesh>& mesh, float dt, trs*
 		trs deltaRootMotion;
 		animation.update(skeleton, dt * timeScale, localTransforms, deltaRootMotion);
 
-		skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, skinningMatrices);
+		trs* globalTransforms = arena.allocate<trs>((uint32)skeleton.joints.size());
+
+		skeleton.getSkinningMatricesFromLocalTransforms(localTransforms, globalTransforms, skinningMatrices);
 
 		if (transform)
 		{
 			*transform = *transform * deltaRootMotion;
 			transform->rotation = normalize(transform->rotation);
 		}
+
+		currentGlobalTransforms = globalTransforms;
 	}
 	else
 	{
@@ -656,4 +734,69 @@ void animation_component::update(const ref<composite_mesh>& mesh, float dt, trs*
 			prevFrameVertexBuffer = currentVertexBuffer;
 		}
 	}
+}
+
+static vec3 jointClassColors[] =
+{
+	vec3(1.f, 0.f, 1.f),
+
+	vec3(1.f, 0.f, 0.f),
+	vec3(0.f, 1.f, 0.f),
+
+	vec3(0.f, 0.f, 1.f),
+	vec3(0.f, 0.f, 1.f),
+	vec3(0.f, 0.f, 1.f),
+
+	vec3(0.f, 0.f, 1.f),
+	vec3(0.f, 0.f, 1.f),
+	vec3(0.f, 0.f, 1.f),
+
+	vec3(1.f, 1.f, 0.f),
+	vec3(1.f, 1.f, 0.f),
+	vec3(1.f, 1.f, 0.f),
+
+	vec3(1.f, 1.f, 0.f),
+	vec3(1.f, 1.f, 0.f),
+	vec3(1.f, 1.f, 0.f),
+};
+
+void animation_component::drawCurrentSkeleton(const ref<composite_mesh>& mesh, const trs& transform, ldr_render_pass* renderPass)
+{
+	const dx_mesh& dxMesh = mesh->mesh;
+	animation_skeleton& skeleton = mesh->skeleton;
+
+	uint32 numJoints = (uint32)skeleton.joints.size();
+
+	auto [vb, vertexPtr] = dxContext.createDynamicVertexBuffer(sizeof(position_color), numJoints * 2);
+	auto [ib, indexPtr] = dxContext.createDynamicIndexBuffer(sizeof(uint16), numJoints * 2);
+
+	position_color* vertices = (position_color*)vertexPtr;
+	indexed_line16* lines = (indexed_line16*)indexPtr;
+
+	for (uint32 i = 0; i < numJoints; ++i)
+	{
+		const auto& joint = skeleton.joints[i];
+		if (joint.parentID != NO_PARENT && !joint.ik)
+		{
+			if (currentGlobalTransforms)
+			{
+				*vertices++ = { currentGlobalTransforms[joint.parentID].position, jointClassColors[joint.jointClass] };
+				*vertices++ = { currentGlobalTransforms[i].position, jointClassColors[joint.jointClass] };
+			}
+			else
+			{
+				*vertices++ = { skeleton.joints[joint.parentID].bindTransform.col3.xyz, jointClassColors[joint.jointClass] };
+				*vertices++ = { joint.bindTransform.col3.xyz, jointClassColors[joint.jointClass] };
+			}
+		}
+		else
+		{
+			*vertices++ = vec3(0.f, 0.f, 0.f);
+			*vertices++ = vec3(0.f, 0.f, 0.f);
+		}
+
+		*lines++ = { (uint16)(2 * i), (uint16)(2 * i + 1) };
+	}
+
+	renderWireDebug(trsToMat4(transform), vb, ib, vec4(1.f, 1.f, 1.f, 1.f), renderPass, true);
 }

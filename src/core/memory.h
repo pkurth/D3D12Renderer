@@ -69,6 +69,9 @@ struct memory_arena
 		return (T*)allocate(sizeof(T) * count, alignof(T), clearToZero);
 	}
 
+
+	// Get and set current are not thread safe.
+
 	void* getCurrent(uint64 alignment = 1);
 
 	template <typename T>
@@ -89,6 +92,9 @@ struct memory_arena
 
 
 protected:
+
+	void ensureFreeSizeInternal(uint64 size);
+
 	uint8* memory = 0;
 	uint64 committedMemory = 0;
 
@@ -101,6 +107,8 @@ protected:
 	uint64 minimumBlockSize = 0;
 
 	uint64 reserveSize = 0;
+
+	std::mutex mutex;
 };
 
 struct scope_temp_memory

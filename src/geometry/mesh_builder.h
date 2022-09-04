@@ -185,11 +185,13 @@ struct mesh_builder
 	dx_mesh createDXMesh();
 
 	vec3* getPositions() { return (vec3*)positionArena.base(); }
-	void* getOthers() { return positionArena.base(); }
+	void* getOthers() { return othersArena.base(); }
 	void* getTriangles() { return indexArena.base(); }
 
 	uint32 getNumVertices() { return totalNumVertices; }
 	uint32 getNumTriangles() { return totalNumTriangles; }
+	uint32 getSkinOffset() { return skinOffset; }
+	uint32 getOthersSize() { return othersSize; }
 
 private:
 

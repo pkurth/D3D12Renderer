@@ -3,7 +3,7 @@
 #include <string>
 
 // https://codingtidbit.com/2020/02/09/c17-codecvt_utf8-is-deprecated/
-static std::string wstringToString(const std::wstring& wstr)
+static std::string wstringToString(const std::wstring_view& wstr)
 {
 	if (wstr.empty())
 	{
@@ -15,7 +15,7 @@ static std::string wstringToString(const std::wstring& wstr)
 	return result;
 }
 
-static std::wstring stringToWstring(const std::string& str)
+static std::wstring stringToWstring(const std::string_view& str)
 {
 	if (str.empty())
 	{
@@ -60,3 +60,16 @@ static inline std::string getTimeString()
 	return time;
 }
 
+static inline bool contains(const std::string_view& s, const char* sub)
+{
+	return s.find(sub) != std::string::npos;
+}
+
+static inline bool endsWith(const std::string_view& s, const std::string_view& sub)
+{
+	if (s.length() >= sub.length())
+	{
+		return s.compare(s.length() - sub.length(), sub.length(), sub) == 0;
+	}
+	return false;
+}

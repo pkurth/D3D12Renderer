@@ -2,6 +2,7 @@
 
 #include "core/math.h"
 #include "core/random.h"
+#include "core/memory.h"
 #include "dx/dx_buffer.h"
 #include <unordered_map>
 
@@ -13,9 +14,37 @@ struct skinning_weights
 	uint8 skinWeights[4];
 };
 
+
+enum joint_class
+{
+	joint_class_unknown,
+
+	joint_class_torso,
+	joint_class_head,
+
+	joint_class_upper_arm_right,
+	joint_class_lower_arm_right,
+	joint_class_hand_right,
+
+	joint_class_upper_arm_left,
+	joint_class_lower_arm_left,
+	joint_class_hand_left,
+
+	joint_class_upper_leg_right,
+	joint_class_lower_leg_right,
+	joint_class_foot_right,
+
+	joint_class_upper_leg_left,
+	joint_class_lower_leg_left,
+	joint_class_foot_left,
+};
+
 struct skeleton_joint
 {
 	std::string name;
+	joint_class jointClass;
+	bool ik;
+
 	mat4 invBindTransform; // Transforms from model space to joint space.
 	mat4 bindTransform;	  // Position of joint relative to model space.
 	uint32 parentID;
@@ -77,10 +106,13 @@ struct animation_skeleton
 	void pushAssimpAnimations(const fs::path& sceneFilename, float scale = 1.f);
 	void pushAssimpAnimationsInDirectory(const fs::path& directory, float scale = 1.f);
 
+	void analyzeJoints(const vec3* positions, const void* others, uint32 otherStride, uint32 numVertices);
+
 	void sampleAnimation(const animation_clip& clip, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
 	void sampleAnimation(uint32 index, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;
 	void blendLocalTransforms(const trs* localTransforms1, const trs* localTransforms2, float t, trs* outBlendedLocalTransforms) const;
 	void getSkinningMatricesFromLocalTransforms(const trs* localTransforms, mat4* outSkinningMatrices, const trs& worldTransform = trs::identity) const;
+	void getSkinningMatricesFromLocalTransforms(const trs* localTransforms, trs* outGlobalTransforms, mat4* outSkinningMatrices, const trs& worldTransform = trs::identity) const;
 	void getSkinningMatricesFromGlobalTransforms(const trs* globalTransforms, mat4* outSkinningMatrices) const;
 
 	std::vector<uint32> getClipsByName(const std::string& name);
@@ -134,7 +166,9 @@ struct animation_component
 
 	dx_vertex_buffer_group_view currentVertexBuffer;
 	dx_vertex_buffer_group_view prevFrameVertexBuffer;
+	trs* currentGlobalTransforms = 0;
 
-	void update(const ref<struct composite_mesh>& mesh, float dt, trs* transform = 0);
+	void update(const ref<struct composite_mesh>& mesh, memory_arena& arena, float dt, trs* transform = 0);
+	void drawCurrentSkeleton(const ref<struct composite_mesh>& mesh, const trs& transform, struct ldr_render_pass* renderPass);
 };
 

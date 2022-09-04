@@ -6,6 +6,16 @@
 
 #include "visualization_rs.hlsli"
 
+
+struct position_color
+{
+	vec3 position;
+	vec3 color;
+
+	position_color(vec3 p, vec3 c = vec3(1.f, 1.f, 1.f))
+		: position(p), color(c) {}
+};
+
 struct debug_material
 {
 	vec4 color;
@@ -49,6 +59,9 @@ struct debug_unlit_line_pipeline
 	PIPELINE_RENDER_DECL;
 };
 
+void renderWireDebug(const mat4& transform, const struct dx_dynamic_vertex_buffer& vb, const struct dx_dynamic_index_buffer& ib, vec4 color, ldr_render_pass* renderPass, bool overlay = false);
+
+void renderLine(vec3 positionA, vec3 positionB, vec4 color, ldr_render_pass* renderPass, bool overlay = false);
 void renderWireSphere(vec3 position, float radius, vec4 color, ldr_render_pass* renderPass);
 void renderWireCone(vec3 position, vec3 direction, float distance, float angle, vec4 color, ldr_render_pass* renderPass);
 void renderWireBox(vec3 position, vec3 radius, quat rotation, vec4 color, ldr_render_pass* renderPass);

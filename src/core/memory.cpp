@@ -19,6 +19,13 @@ void memory_arena::initialize(uint64 minimumBlockSize, uint64 reserveSize)
 
 void memory_arena::ensureFreeSize(uint64 size)
 {
+	mutex.lock();
+	ensureFreeSizeInternal(size);
+	mutex.unlock();
+}
+
+void memory_arena::ensureFreeSizeInternal(uint64 size)
+{
 	if (sizeLeftCurrent < size)
 	{
 		uint64 allocationSize = max(size, minimumBlockSize);
@@ -38,6 +45,8 @@ void* memory_arena::allocate(uint64 size, uint64 alignment, bool clearToZero)
 		return 0;
 	}
 
+	mutex.lock();
+
 	uint64 mask = alignment - 1;
 	uint64 misalignment = current & mask;
 	uint64 adjustment = (misalignment == 0) ? 0 : (alignment - misalignment);
@@ -48,7 +57,7 @@ void* memory_arena::allocate(uint64 size, uint64 alignment, bool clearToZero)
 
 	assert(sizeLeftTotal >= size);
 
-	ensureFreeSize(size);
+	ensureFreeSizeInternal(size);
 
 	uint8* result = memory + current;
 	if (clearToZero)
@@ -58,6 +67,8 @@ void* memory_arena::allocate(uint64 size, uint64 alignment, bool clearToZero)
 	current += size;
 	sizeLeftCurrent -= size;
 	sizeLeftTotal -= size;
+
+	mutex.unlock();
 
 	return result;
 }

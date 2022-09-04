@@ -97,6 +97,11 @@ static ref<composite_mesh> loadMeshFromFileInternal(asset_handle handle, const f
 		result->aabb.grow(sub.aabb.maxCorner);
 	}
 
+	if (flags & mesh_creation_flags_with_skin)
+	{
+		result->skeleton.analyzeJoints(builder.getPositions(), (uint8*)builder.getOthers() + builder.getSkinOffset(), builder.getOthersSize(), builder.getNumVertices());
+	}
+
 	result->mesh = builder.createDXMesh();
 
 	result->handle = handle;

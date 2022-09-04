@@ -2,8 +2,15 @@
 
 ConstantBuffer<visualization_cb> cb		: register(b1);
 
-[RootSignature(FLAT_UNLIT_RS)]
-float4 main() : SV_TARGET
+
+
+struct ps_input
 {
-	return cb.color;
+	float3 color		: COLOR;
+};
+
+[RootSignature(FLAT_UNLIT_RS)]
+float4 main(ps_input IN) : SV_TARGET
+{
+	return cb.color * float4(IN.color, 1.f);
 }
