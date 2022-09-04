@@ -84,7 +84,7 @@ void clearBroadphase(game_scene& scene)
 	}
 }
 
-static uint32 overlapTestScalar(const sap_endpoint* endpoints, uint32 numEndpoints, const bounding_box* worldSpaceAABBs, uint32 numColliders, memory_arena& arena,
+static uint32 determineOverlapsScalar(const sap_endpoint* endpoints, uint32 numEndpoints, const bounding_box* worldSpaceAABBs, uint32 numColliders, memory_arena& arena,
 	collider_pair* outCollisions)
 {
 	CPU_PROFILE_BLOCK("Determine overlaps");
@@ -165,10 +165,10 @@ static uint32 overlapTestScalar(const sap_endpoint* endpoints, uint32 numEndpoin
 #undef CACHE_AABBS
 }
 
-static uint32 overlapTestSIMD(const sap_endpoint* endpoints, uint32 numEndpoints, const bounding_box* worldSpaceAABBs, uint32 numColliders, memory_arena& arena,
+static uint32 determineOverlapsSIMD(const sap_endpoint* endpoints, uint32 numEndpoints, const bounding_box* worldSpaceAABBs, uint32 numColliders, memory_arena& arena,
 	collider_pair* outCollisions)
 {
-	CPU_PROFILE_BLOCK("Determine overlaps");
+	CPU_PROFILE_BLOCK("Determine overlaps SIMD");
 
 #define COLLISION_SIMD_WIDTH 8u
 
@@ -407,11 +407,11 @@ uint32 broadphase(game_scene& scene, bounding_box* worldSpaceAABBs, memory_arena
 
 	if (simd)
 	{
-		numCollisions = overlapTestSIMD(endpoints.data(), numEndpoints, worldSpaceAABBs, numColliders, arena, outCollisions);
+		numCollisions = determineOverlapsSIMD(endpoints.data(), numEndpoints, worldSpaceAABBs, numColliders, arena, outCollisions);
 	}
 	else
 	{
-		numCollisions = overlapTestScalar(endpoints.data(), numEndpoints, worldSpaceAABBs, numColliders, arena, outCollisions);
+		numCollisions = determineOverlapsScalar(endpoints.data(), numEndpoints, worldSpaceAABBs, numColliders, arena, outCollisions);
 	}
 
 	
