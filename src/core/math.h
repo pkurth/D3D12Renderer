@@ -561,6 +561,10 @@ static bool operator==(vec4 a, vec4 b) { return a.x == b.x && a.y == b.y && a.z 
 static bool operator!=(vec4 a, vec4 b) { return !(a == b); }
 
 
+static vec2 diagonal(const mat2& m) { return vec2(m.m00, m.m11); }
+static vec3 diagonal(const mat3& m) { return vec3(m.m00, m.m11, m.m22); }
+static vec4 diagonal(const mat4& m) { return vec4(m.m00, m.m11, m.m22, m.m33); }
+
 static float dot(vec2 a, vec2 b) { float result = a.x * b.x + a.y * b.y; return result; }
 static float dot(vec3 a, vec3 b) { float result = a.x * b.x + a.y * b.y + a.z * b.z; return result; }
 static float dot(vec4 a, vec4 b) { w4_float m = a.f4 * b.f4; return addElements(m); }
@@ -795,6 +799,31 @@ vec3 getTangent(vec3 normal);
 
 // W = PDF = 1 / 4pi
 vec4 uniformSampleSphere(vec2 E);
+
+
+
+
+
+struct singular_value_decomposition
+{
+	mat3 U;
+	mat3 V;
+	vec3 singularValues;
+};
+
+struct qr_decomposition
+{
+	mat3 Q, R;
+};
+
+singular_value_decomposition computeSVD(const mat3& A);
+qr_decomposition qrDecomposition(const mat3& mat);
+bool getEigen(const mat3& A, vec3& outEigenValues, mat3& outEigenVectors);
+
+
+
+
+
 
 static bool fuzzyEquals(float a, float b, float threshold = 1e-4f) { return abs(a - b) < threshold; }
 static bool fuzzyEquals(vec2 a, vec2 b, float threshold = 1e-4f) { return fuzzyEquals(a.x, b.x, threshold) && fuzzyEquals(a.y, b.y, threshold); }

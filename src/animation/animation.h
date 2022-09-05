@@ -6,7 +6,7 @@
 #include "dx/dx_buffer.h"
 #include <unordered_map>
 
-#define NO_PARENT 0xFFFFFFFF
+#define INVALID_JOINT 0xFFFFFFFF
 
 struct skinning_weights
 {
@@ -95,10 +95,11 @@ struct animation_clip
 	trs getLastRootTransform() const;
 };
 
-struct limb_dimension
+struct skeleton_limb
 {
 	vec3 mean;
 	vec3 principalAxis;
+	uint32 representativeJoint = INVALID_JOINT;
 };
 
 struct animation_skeleton
@@ -109,7 +110,7 @@ struct animation_skeleton
 	std::vector<animation_clip> clips;
 	std::vector<fs::path> files;
 
-	limb_dimension limbs[joint_class_count];
+	skeleton_limb limbs[joint_class_count];
 
 	void loadFromAssimp(const struct aiScene* scene, float scale = 1.f);
 	void pushAssimpAnimation(const fs::path& sceneFilename, const struct aiAnimation* animation, float scale = 1.f);

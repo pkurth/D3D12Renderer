@@ -3,7 +3,6 @@
 #include "core/assimp.h"
 #include "core/imgui.h"
 #include "core/string.h"
-#include "core/svd.h"
 #include "geometry/mesh.h"
 #include "skinning.h"
 
@@ -105,7 +104,7 @@ void animation_skeleton::pushAssimpAnimation(const fs::path& sceneFilename, cons
 	{
 		for (uint32 i = 0; i < (uint32)joints.size(); ++i)
 		{
-			if (joints[i].parentID == NO_PARENT)
+			if (joints[i].parentID == INVALID_JOINT)
 			{
 				scaleKeyframes(clip, clip.joints[i], scale);
 			}
@@ -139,8 +138,10 @@ void animation_skeleton::pushAssimpAnimationsInDirectory(const fs::path& directo
 
 void animation_skeleton::analyzeJoints(const vec3* positions, const void* others, uint32 otherStride, uint32 numVertices)
 {
-	for (skeleton_joint& j : joints)
+	for (uint32 jointID = 0; jointID < (uint32)joints.size(); ++jointID)
 	{
+		skeleton_joint& j = joints[jointID];
+
 		std::string name = j.name;
 		std::transform(name.begin(), name.end(), name.begin(), ::tolower);
 
@@ -152,7 +153,7 @@ void animation_skeleton::analyzeJoints(const vec3* positions, const void* others
 		else if (contains(name, "head") || contains(name, "neck")) { c = joint_class_head; }
 		else if (contains(name, "arm"))
 		{
-			joint_class parentClass = (j.parentID != NO_PARENT) ? joints[j.parentID].jointClass : joint_class_unknown;
+			joint_class parentClass = (j.parentID != INVALID_JOINT) ? joints[j.parentID].jointClass : joint_class_unknown;
 
 			if (contains(name, "lower") || contains(name, "lo") || contains(name, "fore")) { c = left ? joint_class_lower_arm_left : joint_class_lower_arm_right; }
 			else if (contains(name, "upper") || contains(name, "up")) { c = left ? joint_class_upper_arm_left : joint_class_upper_arm_right; }
@@ -165,7 +166,7 @@ void animation_skeleton::analyzeJoints(const vec3* positions, const void* others
 		}
 		else if (contains(name, "leg") || contains(name, "thigh") || contains(name, "shin") || contains(name, "calf"))
 		{
-			joint_class parentClass = (j.parentID != NO_PARENT) ? joints[j.parentID].jointClass : joint_class_unknown;
+			joint_class parentClass = (j.parentID != INVALID_JOINT) ? joints[j.parentID].jointClass : joint_class_unknown;
 
 			if (contains(name, "lower") || contains(name, "lo") || contains(name, "shin") || contains(name, "calf")) { c = left ? joint_class_lower_leg_left : joint_class_lower_leg_right; }
 			else if (contains(name, "upper") || contains(name, "up") || contains(name, "thigh")) { c = left ? joint_class_upper_leg_left : joint_class_upper_leg_right; }
@@ -179,6 +180,13 @@ void animation_skeleton::analyzeJoints(const vec3* positions, const void* others
 
 		j.jointClass = c;
 		j.ik = contains(name, "ik");
+
+		if (limbs[c].representativeJoint == INVALID_JOINT)
+		{
+			// The highest joint in the hierarchy for this class is chosen as the representative.
+			// Because we order the joints, the first joint we encounter is automatically the highest in the hierarchy.
+			limbs[c].representativeJoint = jointID;
+		}
 	}
 
 	struct joint_analysis
@@ -252,8 +260,16 @@ void animation_skeleton::analyzeJoints(const vec3* positions, const void* others
 		{
 			analysis[i].covariance *= 1.f / (float)analysis[i].numVertices;
 
-			svd3 svd = computeSVD(analysis[i].covariance);
-			vec3 principalAxis = col(svd.U, 0);
+			//singular_value_decomposition svd = computeSVD(analysis[i].covariance);
+			//vec3 principalAxis = col(svd.U, 0);
+
+			vec3 eigenValues;
+			mat3 eigenVectors;
+
+			getEigen(analysis[i].covariance, eigenValues, eigenVectors);
+			uint32 maxComponent = (eigenValues.x > eigenValues.y) ? (eigenValues.x > eigenValues.z) ? 0 : 2 : (eigenValues.y > eigenValues.z) ? 1 : 2;
+
+			vec3 principalAxis = col(eigenVectors, maxComponent);
 
 			limbs[i].mean = analysis[i].vertexMean;
 			limbs[i].principalAxis = principalAxis;
@@ -261,7 +277,7 @@ void animation_skeleton::analyzeJoints(const vec3* positions, const void* others
 	}
 }
 
-static void readAssimpSkeletonHierarchy(const aiNode* node, animation_skeleton& skeleton, uint32& insertIndex, uint32 parentID = NO_PARENT)
+static void readAssimpSkeletonHierarchy(const aiNode* node, animation_skeleton& skeleton, uint32& insertIndex, uint32 parentID = INVALID_JOINT)
 {
 	std::string name = node->mName.C_Str();
 
@@ -525,7 +541,7 @@ void animation_skeleton::getSkinningMatricesFromLocalTransforms(const trs* local
 	for (uint32 i = 0; i < numJoints; ++i)
 	{
 		const skeleton_joint& skelJoint = joints[i];
-		if (skelJoint.parentID != NO_PARENT)
+		if (skelJoint.parentID != INVALID_JOINT)
 		{
 			assert(i > skelJoint.parentID); // Parent already processed.
 			globalTransforms[i] = globalTransforms[skelJoint.parentID] * localTransforms[i];
@@ -546,7 +562,7 @@ void animation_skeleton::getSkinningMatricesFromLocalTransforms(const trs* local
 	for (uint32 i = 0; i < numJoints; ++i)
 	{
 		const skeleton_joint& skelJoint = joints[i];
-		if (skelJoint.parentID != NO_PARENT)
+		if (skelJoint.parentID != INVALID_JOINT)
 		{
 			assert(i > skelJoint.parentID); // Parent already processed.
 			outGlobalTransforms[i] = outGlobalTransforms[skelJoint.parentID] * localTransforms[i];
@@ -597,7 +613,7 @@ static void prettyPrint(const animation_skeleton& skeleton, uint32 parent, uint3
 
 void animation_skeleton::prettyPrintHierarchy() const
 {
-	prettyPrint(*this, NO_PARENT, 0);
+	prettyPrint(*this, INVALID_JOINT, 0);
 }
 
 void animation_clip::edit()
@@ -845,7 +861,7 @@ void animation_component::drawCurrentSkeleton(const ref<composite_mesh>& mesh, c
 	const dx_mesh& dxMesh = mesh->mesh;
 	animation_skeleton& skeleton = mesh->skeleton;
 
-#if 1
+#if 0
 
 	uint32 numJoints = (uint32)skeleton.joints.size();
 
@@ -858,7 +874,7 @@ void animation_component::drawCurrentSkeleton(const ref<composite_mesh>& mesh, c
 	for (uint32 i = 0; i < numJoints; ++i)
 	{
 		const auto& joint = skeleton.joints[i];
-		if (joint.parentID != NO_PARENT && !joint.ik)
+		if (joint.parentID != INVALID_JOINT && !joint.ik)
 		{
 			const auto& parentJoint = skeleton.joints[joint.parentID];
 			if (currentGlobalTransforms)
