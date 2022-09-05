@@ -743,21 +743,21 @@ static vec3 jointClassColors[] =
 	vec3(1.f, 0.f, 0.f),
 	vec3(0.f, 1.f, 0.f),
 
-	vec3(0.f, 0.f, 1.f),
-	vec3(0.f, 0.f, 1.f),
-	vec3(0.f, 0.f, 1.f),
-
-	vec3(0.f, 0.f, 1.f),
-	vec3(0.f, 0.f, 1.f),
-	vec3(0.f, 0.f, 1.f),
+	vec3(1.f, 1.f, 0.f),
+	vec3(0.f, 1.f, 1.f),
+	vec3(1.f, 1.f, 1.f),
 
 	vec3(1.f, 1.f, 0.f),
-	vec3(1.f, 1.f, 0.f),
-	vec3(1.f, 1.f, 0.f),
+	vec3(0.f, 1.f, 1.f),
+	vec3(1.f, 1.f, 1.f),
 
 	vec3(1.f, 1.f, 0.f),
+	vec3(0.f, 1.f, 1.f),
+	vec3(1.f, 1.f, 1.f),
+
 	vec3(1.f, 1.f, 0.f),
-	vec3(1.f, 1.f, 0.f),
+	vec3(0.f, 1.f, 1.f),
+	vec3(1.f, 1.f, 1.f),
 };
 
 void animation_component::drawCurrentSkeleton(const ref<composite_mesh>& mesh, const trs& transform, ldr_render_pass* renderPass)
@@ -778,15 +778,16 @@ void animation_component::drawCurrentSkeleton(const ref<composite_mesh>& mesh, c
 		const auto& joint = skeleton.joints[i];
 		if (joint.parentID != NO_PARENT && !joint.ik)
 		{
+			const auto& parentJoint = skeleton.joints[joint.parentID];
 			if (currentGlobalTransforms)
 			{
-				*vertices++ = { currentGlobalTransforms[joint.parentID].position, jointClassColors[joint.jointClass] };
-				*vertices++ = { currentGlobalTransforms[i].position, jointClassColors[joint.jointClass] };
+				*vertices++ = { currentGlobalTransforms[joint.parentID].position, jointClassColors[parentJoint.jointClass] };
+				*vertices++ = { currentGlobalTransforms[i].position, jointClassColors[parentJoint.jointClass] };
 			}
 			else
 			{
-				*vertices++ = { skeleton.joints[joint.parentID].bindTransform.col3.xyz, jointClassColors[joint.jointClass] };
-				*vertices++ = { joint.bindTransform.col3.xyz, jointClassColors[joint.jointClass] };
+				*vertices++ = { skeleton.joints[joint.parentID].bindTransform.col3.xyz, jointClassColors[parentJoint.jointClass] };
+				*vertices++ = { joint.bindTransform.col3.xyz, jointClassColors[parentJoint.jointClass] };
 			}
 		}
 		else

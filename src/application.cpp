@@ -611,13 +611,18 @@ void application::update(const user_input& input, float dt)
 		// Update animated meshes.
 		for (auto [entityHandle, anim, raster, transform] : scene.group(entt::get<animation_component, raster_component, transform_component>).each())
 		{
-			context.addWork([&anim = anim, mesh = raster.mesh, &transform = transform, dt]()
+			context.addWork([&anim = anim, mesh = raster.mesh, &transform = transform, &arena = stackArena, dt]()
 			{
-				anim.update(mesh, dt, &transform);
+				anim.update(mesh, arena, dt, &transform);
 			});
 		}
 
 		context.waitForWorkCompletion();
+
+		for (auto [entityHandle, anim, raster, transform] : scene.group(entt::get<animation_component, raster_component, transform_component>).each())
+		{
+			anim.drawCurrentSkeleton(raster.mesh, transform, &ldrRenderPass);
+		}
 
 
 		// Render shadow maps.
