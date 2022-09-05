@@ -3,6 +3,7 @@
 #include "core/assimp.h"
 #include "core/imgui.h"
 #include "core/string.h"
+#include "core/svd.h"
 #include "geometry/mesh.h"
 #include "skinning.h"
 
@@ -178,6 +179,85 @@ void animation_skeleton::analyzeJoints(const vec3* positions, const void* others
 
 		j.jointClass = c;
 		j.ik = contains(name, "ik");
+	}
+
+	struct joint_analysis
+	{
+		vec3 vertexMean;
+		uint32 numVertices;
+		mat3 covariance;
+	};
+
+	joint_analysis analysis[joint_class_count] = {};
+
+	for (uint32 i = 0; i < numVertices; ++i)
+	{
+		vec3 p = positions[i];
+		skinning_weights w = *(skinning_weights*)((uint8*)others + i * otherStride);
+		for (uint32 j = 0; j < 4; ++j)
+		{
+			if (w.skinWeights[j] > 150)
+			{
+				const auto& joint = joints[w.skinIndices[j]];
+				joint_class c = joint.jointClass;
+				if (c != joint_class_unknown)
+				{
+					joint_analysis& a = analysis[c];
+					a.vertexMean += p;
+					++a.numVertices;
+				}
+			}
+		}
+	}
+
+	for (uint32 i = 0; i < joint_class_count; ++i)
+	{
+		if (analysis[i].numVertices)
+		{
+			analysis[i].vertexMean /= (float)analysis[i].numVertices;
+		}
+	}
+
+
+	for (uint32 i = 0; i < numVertices; ++i)
+	{
+		vec3 p = positions[i];
+		skinning_weights w = *(skinning_weights*)((uint8*)others + i * otherStride);
+		for (uint32 j = 0; j < 4; ++j)
+		{
+			if (w.skinWeights[j] > 150)
+			{
+				const auto& joint = joints[w.skinIndices[j]];
+				joint_class c = joint.jointClass;
+				if (c != joint_class_unknown)
+				{
+					joint_analysis& a = analysis[c];
+					vec3 m = a.vertexMean;
+
+					for (uint32 y = 0; y < 3; ++y)
+					{
+						for (uint32 x = 0; x < 3; ++x)
+						{
+							a.covariance.m[3 * y + x] += (m.data[y] - p.data[y]) * (m.data[x] - p.data[x]);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	for (uint32 i = 0; i < joint_class_count; ++i)
+	{
+		if (analysis[i].numVertices)
+		{
+			analysis[i].covariance *= 1.f / (float)analysis[i].numVertices;
+
+			svd3 svd = computeSVD(analysis[i].covariance);
+			vec3 principalAxis = col(svd.U, 0);
+
+			limbs[i].mean = analysis[i].vertexMean;
+			limbs[i].principalAxis = principalAxis;
+		}
 	}
 }
 
@@ -765,6 +845,8 @@ void animation_component::drawCurrentSkeleton(const ref<composite_mesh>& mesh, c
 	const dx_mesh& dxMesh = mesh->mesh;
 	animation_skeleton& skeleton = mesh->skeleton;
 
+#if 1
+
 	uint32 numJoints = (uint32)skeleton.joints.size();
 
 	auto [vb, vertexPtr] = dxContext.createDynamicVertexBuffer(sizeof(position_color), numJoints * 2);
@@ -800,4 +882,25 @@ void animation_component::drawCurrentSkeleton(const ref<composite_mesh>& mesh, c
 	}
 
 	renderWireDebug(trsToMat4(transform), vb, ib, vec4(1.f, 1.f, 1.f, 1.f), renderPass, true);
+
+#else
+
+	auto [vb, vertexPtr] = dxContext.createDynamicVertexBuffer(sizeof(position_color), joint_class_count * 2);
+	auto [ib, indexPtr] = dxContext.createDynamicIndexBuffer(sizeof(uint16), joint_class_count * 2);
+
+	position_color* vertices = (position_color*)vertexPtr;
+	indexed_line16* lines = (indexed_line16*)indexPtr;
+
+	for (uint32 i = 0; i < joint_class_count; ++i)
+	{
+		const auto& limb = skeleton.limbs[i];
+		*vertices++ = { limb.mean - limb.principalAxis / transform.scale * 0.2f, jointClassColors[i] };
+		*vertices++ = { limb.mean + limb.principalAxis / transform.scale * 0.2f, jointClassColors[i] };
+
+		*lines++ = { (uint16)(2 * i), (uint16)(2 * i + 1) };
+	}
+
+	renderWireDebug(trsToMat4(transform), vb, ib, vec4(1.f, 1.f, 1.f, 1.f), renderPass, true);
+
+#endif
 }

@@ -37,6 +37,8 @@ enum joint_class
 	joint_class_upper_leg_left,
 	joint_class_lower_leg_left,
 	joint_class_foot_left,
+
+	joint_class_count,
 };
 
 struct skeleton_joint
@@ -93,6 +95,12 @@ struct animation_clip
 	trs getLastRootTransform() const;
 };
 
+struct limb_dimension
+{
+	vec3 mean;
+	vec3 principalAxis;
+};
+
 struct animation_skeleton
 {
 	std::vector<skeleton_joint> joints;
@@ -100,6 +108,8 @@ struct animation_skeleton
 
 	std::vector<animation_clip> clips;
 	std::vector<fs::path> files;
+
+	limb_dimension limbs[joint_class_count];
 
 	void loadFromAssimp(const struct aiScene* scene, float scale = 1.f);
 	void pushAssimpAnimation(const fs::path& sceneFilename, const struct aiAnimation* animation, float scale = 1.f);
