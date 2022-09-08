@@ -126,6 +126,45 @@ static std::tuple<dx_dynamic_vertex_buffer, dx_dynamic_index_buffer> getWireRing
 	return { vb, ib };
 }
 
+static std::tuple<dx_dynamic_vertex_buffer, dx_dynamic_index_buffer> getWireCapsuleCrossSection(float length, float radius)
+{
+	const uint32 numSegmentsPerHalf = 16;
+
+	uint32 numVertices = numSegmentsPerHalf * 2 + 2;
+	uint32 numLines = numVertices;
+
+	auto [vb, vertexPtr] = dxContext.createDynamicVertexBuffer(sizeof(position_color), numVertices);
+	auto [ib, indexPtr] = dxContext.createDynamicIndexBuffer(sizeof(uint16), numLines * 2);
+
+	position_color* verticesA = (position_color*)vertexPtr;
+	position_color* verticesB = verticesA + (numSegmentsPerHalf + 1);
+	indexed_line16* lines = (indexed_line16*)indexPtr;
+
+
+	float deltaRot = M_PI / numSegmentsPerHalf;
+	float rot = 0.f;
+	float halfLength = length * 0.5f;
+	for (uint32 i = 0; i < numSegmentsPerHalf + 1; ++i)
+	{
+		float x = cos(rot), y = sin(rot);
+		*verticesA++ =  vec3(radius * x, radius * y + halfLength, 0.f);
+		*verticesB++ = -vec3(radius * x, radius * y + halfLength, 0.f);
+		rot += deltaRot;
+	}
+
+	for (uint16 i = 0; i < numLines; ++i)
+	{
+		uint16 next = i + 1;
+		if (i == numLines - 1)
+		{
+			next = 0;
+		}
+		*lines++ = { i, next };
+	}
+
+	return { vb, ib };
+}
+
 void renderWireDebug(const mat4& transform, const dx_dynamic_vertex_buffer& vb, const dx_dynamic_index_buffer& ib, vec4 color, ldr_render_pass* renderPass, bool overlay)
 {
 	assert(vb.view.StrideInBytes == sizeof(position_color));
@@ -164,18 +203,30 @@ void renderLine(vec3 positionA, vec3 positionB, vec4 color, ldr_render_pass* ren
 	renderWireDebug(mat4::identity, vb, ib, color, renderPass, overlay);
 }
 
-void renderWireSphere(vec3 position, float radius, vec4 color, ldr_render_pass* renderPass)
+void renderWireSphere(vec3 position, float radius, vec4 color, ldr_render_pass* renderPass, bool overlay)
 {
 	CPU_PROFILE_BLOCK("Render wire sphere");
 
 	auto [vb, ib] = getWireRing();
 
-	renderWireDebug(createModelMatrix(position, quat::identity, radius), vb, ib, color, renderPass);
-	renderWireDebug(createModelMatrix(position, quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), radius), vb, ib, color, renderPass);
-	renderWireDebug(createModelMatrix(position, quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), radius), vb, ib, color, renderPass);
+	renderWireDebug(createModelMatrix(position, quat::identity, radius), vb, ib, color, renderPass, overlay);
+	renderWireDebug(createModelMatrix(position, quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), radius), vb, ib, color, renderPass, overlay);
+	renderWireDebug(createModelMatrix(position, quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f)), radius), vb, ib, color, renderPass, overlay);
 }
 
-void renderWireCone(vec3 position, vec3 direction, float distance, float angle, vec4 color, ldr_render_pass* renderPass)
+void renderWireCapsule(vec3 positionA, vec3 positionB, float radius, vec4 color, ldr_render_pass* renderPass, bool overlay)
+{
+	CPU_PROFILE_BLOCK("Render wire capsule");
+
+	vec3 center = 0.5f * (positionA + positionB);
+	quat rotation = rotateFromTo(vec3(0.f, 1.f, 0.f), positionA - positionB);
+	auto [vb, ib] = getWireCapsuleCrossSection(length(positionA - positionB), radius);
+
+	renderWireDebug(createModelMatrix(center, rotation * quat::identity, 1.f), vb, ib, color, renderPass, overlay);
+	renderWireDebug(createModelMatrix(center, rotation * quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), 1.f), vb, ib, color, renderPass, overlay);
+}
+
+void renderWireCone(vec3 position, vec3 direction, float distance, float angle, vec4 color, ldr_render_pass* renderPass, bool overlay)
 {
 	CPU_PROFILE_BLOCK("Render wire cone");
 
@@ -230,10 +281,10 @@ void renderWireCone(vec3 position, vec3 direction, float distance, float angle, 
 		*lines++ = { cur, next };
 	}
 
-	renderWireDebug(mat4::identity, vb, ib, color, renderPass);
+	renderWireDebug(mat4::identity, vb, ib, color, renderPass, overlay);
 }
 
-void renderWireBox(vec3 position, vec3 radius, quat rotation, vec4 color, ldr_render_pass* renderPass)
+void renderWireBox(vec3 position, vec3 radius, quat rotation, vec4 color, ldr_render_pass* renderPass, bool overlay)
 {
 	CPU_PROFILE_BLOCK("Render wire box");
 
@@ -266,10 +317,10 @@ void renderWireBox(vec3 position, vec3 radius, quat rotation, vec4 color, ldr_re
 	*lines++ = { 2, 6 };
 	*lines++ = { 3, 7 };
 
-	renderWireDebug(createModelMatrix(position, rotation, radius), vb, ib, color, renderPass);
+	renderWireDebug(createModelMatrix(position, rotation, radius), vb, ib, color, renderPass, overlay);
 }
 
-void renderCameraFrustum(const render_camera& frustum, vec4 color, ldr_render_pass* renderPass, float alternativeFarPlane)
+void renderCameraFrustum(const render_camera& frustum, vec4 color, ldr_render_pass* renderPass, float alternativeFarPlane, bool overlay)
 {
 	CPU_PROFILE_BLOCK("Render camera frustum");
 
@@ -299,7 +350,7 @@ void renderCameraFrustum(const render_camera& frustum, vec4 color, ldr_render_pa
 	*lines++ = { 2, 6 };
 	*lines++ = { 3, 7 };
 
-	renderWireDebug(mat4::identity, vb, ib, color, renderPass);
+	renderWireDebug(mat4::identity, vb, ib, color, renderPass, overlay);
 }
 
 PIPELINE_SETUP_IMPL(debug_unlit_line_pipeline)
