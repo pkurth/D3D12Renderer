@@ -114,7 +114,7 @@ namespace ImGui
 	bool PropertySliderAngle(const char* label, float& fRad, float minValueDeg = -360.f, float maxValueDeg = 360.f, const char* format = "%.0f deg");
 
 	bool PropertySlider(const char* label, int32& v, int minValue, int maxValue, const char* format = "%d");
-	bool PropertySlider(const char* label, uint32& v, uint32 minValue, uint32 maxValue, const char* format = "%d");
+	bool PropertySlider(const char* label, uint32& v, uint32 minValue, uint32 maxValue, const char* format = "%u");
 
 	bool PropertyInput(const char* label, float& f, const char* format = "%.3f");
 	bool PropertyInput(const char* label, vec2& f, const char* format = "%.3f");
