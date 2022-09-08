@@ -15,36 +15,36 @@ struct skinning_weights
 };
 
 
-enum joint_class
+enum limb_type
 {
-	joint_class_unknown,
+	limb_type_unknown,
 
-	joint_class_torso,
-	joint_class_head,
+	limb_type_torso,
+	limb_type_head,
 
-	joint_class_upper_arm_right,
-	joint_class_lower_arm_right,
-	joint_class_hand_right,
+	limb_type_upper_arm_right,
+	limb_type_lower_arm_right,
+	limb_type_hand_right,
 
-	joint_class_upper_arm_left,
-	joint_class_lower_arm_left,
-	joint_class_hand_left,
+	limb_type_upper_arm_left,
+	limb_type_lower_arm_left,
+	limb_type_hand_left,
 
-	joint_class_upper_leg_right,
-	joint_class_lower_leg_right,
-	joint_class_foot_right,
+	limb_type_upper_leg_right,
+	limb_type_lower_leg_right,
+	limb_type_foot_right,
 
-	joint_class_upper_leg_left,
-	joint_class_lower_leg_left,
-	joint_class_foot_left,
+	limb_type_upper_leg_left,
+	limb_type_lower_leg_left,
+	limb_type_foot_left,
 
-	joint_class_count,
+	limb_type_count,
 };
 
 struct skeleton_joint
 {
 	std::string name;
-	joint_class jointClass;
+	limb_type limbType;
 	bool ik;
 
 	mat4 invBindTransform; // Transforms from model space to joint space.
@@ -95,11 +95,16 @@ struct animation_clip
 	trs getLastRootTransform() const;
 };
 
+struct limb_dimensions
+{
+	float minY, maxY;
+	float radius;
+};
+
 struct skeleton_limb
 {
-	vec3 mean;
-	vec3 principalAxis;
 	uint32 representativeJoint = INVALID_JOINT;
+	limb_dimensions dimensions;
 };
 
 struct animation_skeleton
@@ -110,7 +115,7 @@ struct animation_skeleton
 	std::vector<animation_clip> clips;
 	std::vector<fs::path> files;
 
-	skeleton_limb limbs[joint_class_count];
+	skeleton_limb limbs[limb_type_count];
 
 	void loadFromAssimp(const struct aiScene* scene, float scale = 1.f);
 	void pushAssimpAnimation(const fs::path& sceneFilename, const struct aiAnimation* animation, float scale = 1.f);
