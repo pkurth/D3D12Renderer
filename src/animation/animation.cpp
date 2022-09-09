@@ -305,7 +305,7 @@ void animation_skeleton::analyzeJoints(const vec3* positions, const void* others
 
 						d.minY = min(d.minY, p.y);
 						d.maxY = max(d.maxY, p.y);
-						d.radius = max(d.radius, length(vec2(p.x, p.z)));
+						d.radius = max(d.radius, squaredLength(vec2(p.x, p.z)));
 					}
 				}
 			}
@@ -315,11 +315,20 @@ void animation_skeleton::analyzeJoints(const vec3* positions, const void* others
 	for (uint32 i = 0; i < limb_type_count; ++i)
 	{
 		limb_dimensions& d = limbs[i].dimensions;
+
+		d.radius = sqrt(d.radius); // Above, we calculate the squared radius.
+
+		float c = 0.5f * (d.minY + d.maxY);
+
+		const float scaleFactor = 0.8f;
+		d.minY = (d.minY - c) * scaleFactor + c;
+		d.maxY = (d.maxY - c) * scaleFactor + c;
+		d.radius *= scaleFactor;
+
 		d.minY += d.radius;
 		d.maxY -= d.radius;
 		if (d.minY > d.maxY)
 		{
-			float c = 0.5f * (d.minY + d.maxY);
 			d.minY = c - EPSILON;
 			d.maxY = c + EPSILON;
 		}
