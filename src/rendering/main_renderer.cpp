@@ -387,7 +387,7 @@ void main_renderer::endFrameCommon()
 	dxContext.executeCommandList(cl);
 }
 
-void main_renderer::endFrame(const user_input& input)
+void main_renderer::endFrame(const user_input* input)
 {
 	bool aspectRatioModeChanged = aspectRatioMode != oldAspectRatioMode;
 	oldAspectRatioMode = aspectRatioMode;
@@ -533,20 +533,20 @@ void main_renderer::endFrame(const user_input& input)
 
 
 			// Copy hovered object id to readback buffer.
-			if (objectIDsTexture)
+			if (objectIDsTexture && input)
 			{
-				windowHovered = input.overWindow
-					&& (input.mouse.x - windowXOffset >= 0)
-					&& (input.mouse.x - windowXOffset < (int32)renderWidth)
-					&& (input.mouse.y - windowYOffset >= 0)
-					&& (input.mouse.y - windowYOffset < (int32)renderHeight);
+				windowHovered = input->overWindow
+					&& (input->mouse.x - windowXOffset >= 0)
+					&& (input->mouse.x - windowXOffset < (int32)renderWidth)
+					&& (input->mouse.y - windowYOffset >= 0)
+					&& (input->mouse.y - windowYOffset < (int32)renderHeight);
 
 				if (windowHovered)
 				{
 					PROFILE_ALL(cl, "Copy hovered object ID");
 
 					cl->transitionBarrier(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-					cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer, dxContext.bufferedFrameID, input.mouse.x - windowXOffset, input.mouse.y - windowYOffset, 1, 1);
+					cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer, dxContext.bufferedFrameID, input->mouse.x - windowXOffset, input->mouse.y - windowYOffset, 1, 1);
 					cl->transitionBarrier(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
 				}
 			}

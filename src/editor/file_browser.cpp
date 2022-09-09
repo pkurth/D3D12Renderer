@@ -37,7 +37,7 @@ static bool isFile(file_browser::dir_entry_type type)
 	return !isDirectory(type);
 }
 
-void file_browser::draw(mesh_editor_panel& meshEditor)
+void file_browser::draw()
 {
 	static ImGuiTextFilter filter;
 	static bool showOnlyPassingItems = true;
@@ -143,12 +143,6 @@ void file_browser::draw(mesh_editor_panel& meshEditor)
 						// Context menu.
 						if (ImGui::BeginPopupContextItem(0, ImGuiPopupFlags_MouseButtonRight))
 						{
-							if (p.type == dir_entry_type_mesh && ImGui::MenuItem("Edit"))
-							{
-								fs::path fullPath = currentPath / p.filename;
-								meshEditor.setAsset(fullPath);
-							}
-
 							if (ImGui::MenuItem("Reveal in Windows Explorer"))
 							{
 								fs::path fullPath = currentPath / p.filename;

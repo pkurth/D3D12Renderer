@@ -5,7 +5,7 @@
 struct file_browser
 {
 	file_browser();
-	void draw(mesh_editor_panel& meshEditor);
+	void draw();
 
 	enum dir_entry_type
 	{

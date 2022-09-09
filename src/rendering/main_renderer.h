@@ -116,7 +116,7 @@ struct main_renderer
 	static void endFrameCommon();
 
 	void beginFrame(uint32 windowWidth, uint32 windowHeight);
-	void endFrame(const user_input& input);
+	void endFrame(const user_input* input);
 
 
 	// Set these with your application.

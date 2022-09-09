@@ -2,14 +2,16 @@
 #include "asset_editor_panel.h"
 #include "core/imgui.h"
 #include "geometry/mesh.h"
+#include "animation/animation.h"
 
-
-void asset_editor_panel::draw()
+void asset_editor_panel::beginFrame()
 {
-	if (open)
+	windowOpen = windowOpenInternal;
+
+	if (windowOpen)
 	{
 		ImGui::SetNextWindowSize(ImVec2(1280, 800), ImGuiCond_FirstUseEver);
-		if (ImGui::Begin(title, &open, ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+		if (ImGui::Begin(title, &windowOpenInternal, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
 		{
 			if (ImGui::BeginTable("##table", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable))
 			{
@@ -24,7 +26,17 @@ void asset_editor_panel::draw()
 					ref<dx_texture> rendering = getRendering();
 					if (rendering)
 					{
+						ImVec2 minCorner = ImGui::GetCursorPos();
 						ImGui::Image(rendering, contentSize);
+
+						ImGui::SetCursorPos(ImVec2(minCorner.x + 4.5f, minCorner.y + 4.5f));
+						ImGui::Dummy(ImVec2(contentSize.x - 9.f, contentSize.y - 9.f));
+
+						if (dragDropTarget && ImGui::BeginDragDropTarget())
+						{
+							if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(dragDropTarget)) { setDragDropData(payload->Data, payload->DataSize); }
+							ImGui::EndDragDropTarget();
+						}
 					}
 				}
 
@@ -40,60 +52,56 @@ void asset_editor_panel::draw()
 	}
 }
 
+void asset_editor_panel::open()
+{
+	windowOpenInternal = true;
+}
+
+void asset_editor_panel::close()
+{
+	windowOpenInternal = false;
+}
+
 
 mesh_editor_panel::mesh_editor_panel()
 {
-#if 0
-	title = "Mesh editor";
-	renderer.initialize(1280, 800);
+	title = ICON_FA_CUBE "  Mesh editor";
+	dragDropTarget = "content_browser_mesh";
+
+	renderer_spec spec = { false, false, false, false, false, false };
+
+	renderer.initialize(color_depth_8, 1280, 800, spec);
 
 	camera.initializeIngame(vec3(0.f, 0.f, 25.f), quat::identity, deg2rad(70.f), 0.01f);
-
-	environment = createEnvironment("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
-
-	sun.direction = normalize(vec3(-0.6f, -1.f, -0.3f));
-	sun.color = vec3(1.f, 0.93f, 0.76f);
-	sun.intensity = 50.f;
-	sun.numShadowCascades = 0;
-#endif
-}
-
-void mesh_editor_panel::setAsset(const fs::path& path)
-{
-#if 0
-	open = true;
-	asset = loadMeshFromFile(path.u8string());
-#endif
 }
 
 void mesh_editor_panel::edit(uint32 renderWidth, uint32 renderHeight)
 {
-#if 0
 	renderer.beginFrame(renderWidth, renderHeight);
 	camera.setViewport(renderWidth, renderHeight);
 	camera.updateMatrices();
 
-	opaqueRenderPass.reset();
+	renderPass.reset();
 
-	if (asset)
+
+	if (this->mesh)
 	{
-		const dx_mesh& mesh = asset->mesh;
+		const dx_mesh& mesh = this->mesh->mesh;
 
-		for (auto& sm : asset->submeshes)
+		for (auto& sm : this->mesh->submeshes)
 		{
 			submesh_info submesh = sm.info;
 			const ref<pbr_material>& material = sm.material;
 
-			opaqueRenderPass.renderStaticObject(mesh.vertexBuffer, mesh.indexBuffer, submesh, material, mat4::identity, 0, false);
+			renderPass.renderStaticObject(mat4::identity, mesh.vertexBuffer, mesh.indexBuffer, submesh, material);
 		}
 	}
 
-	renderer.submitRenderPass(&opaqueRenderPass);
-	renderer.setCamera(camera);
-	renderer.setEnvironment(environment);
-	renderer.setSun(sun);
 
-	renderer.endFrame();
+
+	renderer.submitRenderPass(&renderPass);
+	renderer.setCamera(camera);
+
 
 	if (ImGui::BeginTabBar("Tabs"))
 	{
@@ -121,12 +129,28 @@ void mesh_editor_panel::edit(uint32 renderWidth, uint32 renderHeight)
 
 		ImGui::EndTabBar();
 	}
-#endif
+}
+
+void mesh_editor_panel::endFrame()
+{
+	if (isOpen())
+	{
+		renderer.endFrame(0);
+	}
 }
 
 ref<dx_texture> mesh_editor_panel::getRendering()
 {
-	//return renderer.frameResult;
-	return 0;
+	return renderer.frameResult;
+}
+
+void mesh_editor_panel::setDragDropData(void* data, uint32 size)
+{
+	const char* filename = (const char*)data;
+
+	fs::path path = filename;
+	fs::path relative = fs::relative(path, fs::current_path());
+
+	this->mesh = loadMeshFromFile(relative.string());
 }
 

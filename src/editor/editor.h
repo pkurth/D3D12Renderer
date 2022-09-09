@@ -5,12 +5,13 @@
 #include "core/system.h"
 #include "undo_stack.h"
 #include "transformation_gizmo.h"
+#include "asset_editor_panel.h"
 #include "rendering/main_renderer.h"
 #include "physics/physics.h"
 
 struct scene_editor
 {
-	void initialize(editor_scene* scene, main_renderer* renderer);
+	void initialize(editor_scene* scene, main_renderer* renderer, editor_panels* editorPanels);
 
 	bool update(const user_input& input, ldr_render_pass* ldrRenderPass, float dt);
 
@@ -36,6 +37,7 @@ private:
 
 	editor_scene* scene;
 	main_renderer* renderer;
+	editor_panels* editorPanels;
 
 	undo_stack undoStack;
 	transformation_gizmo gizmo;

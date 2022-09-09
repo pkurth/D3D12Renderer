@@ -84,10 +84,11 @@ void scene_editor::setSelectedEntityNoUndo(scene_entity entity)
 	selectedColliderEntity = {};
 }
 
-void scene_editor::initialize(editor_scene* scene, main_renderer* renderer)
+void scene_editor::initialize(editor_scene* scene, main_renderer* renderer, editor_panels* editorPanels)
 {
 	this->scene = scene;
 	this->renderer = renderer;
+	this->editorPanels = editorPanels;
 	cameraController.initialize(&scene->camera);
 
 	systemInfo = getSystemInfo();
@@ -113,9 +114,8 @@ bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPas
 
 void scene_editor::drawMainMenuBar()
 {
-	static bool showIconsWindow = false;
-	static bool showDemoWindow = false;
-	static bool showSystemWindow = false;
+	static bool iconsWindowOpen = false;
+	static bool demoWindowOpen = false;
 
 	bool controlsClicked = false;
 	bool aboutClicked = false;
@@ -159,14 +159,14 @@ void scene_editor::drawMainMenuBar()
 
 		if (ImGui::BeginMenu(ICON_FA_TOOLS "  Developer"))
 		{
-			if (ImGui::MenuItem(showIconsWindow ? (ICON_FA_ICONS "  Hide available icons") : (ICON_FA_ICONS "  Show available icons")))
+			if (ImGui::MenuItem(iconsWindowOpen ? (ICON_FA_ICONS "  Hide available icons") : (ICON_FA_ICONS "  Show available icons")))
 			{
-				showIconsWindow = !showIconsWindow;
+				iconsWindowOpen = !iconsWindowOpen;
 			}
 
-			if (ImGui::MenuItem(showDemoWindow ? (ICON_FA_PUZZLE_PIECE "  Hide demo window") : (ICON_FA_PUZZLE_PIECE "  Show demo window")))
+			if (ImGui::MenuItem(demoWindowOpen ? (ICON_FA_PUZZLE_PIECE "  Hide demo window") : (ICON_FA_PUZZLE_PIECE "  Show demo window")))
 			{
-				showDemoWindow = !showDemoWindow;
+				demoWindowOpen = !demoWindowOpen;
 			}
 
 			ImGui::Separator();
@@ -193,6 +193,11 @@ void scene_editor::drawMainMenuBar()
 			if (ImGui::MenuItem(soundEditorWindowOpen ? (ICON_FA_VOLUME_UP "  Hide sound editor") : (ICON_FA_VOLUME_UP "  Show sound editor")))
 			{
 				soundEditorWindowOpen = !soundEditorWindowOpen;
+			}
+
+			if (ImGui::MenuItem(editorPanels->meshEditor.isOpen() ? (ICON_FA_CUBE "  Hide mesh editor") : (ICON_FA_CUBE "  Show mesh editor")))
+			{
+				editorPanels->meshEditor.isOpen() ? editorPanels->meshEditor.close() : editorPanels->meshEditor.open();
 			}
 
 			ImGui::Separator();
@@ -301,7 +306,10 @@ void scene_editor::drawMainMenuBar()
 	ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 	if (ImGui::BeginPopupModal(ICON_FA_QUESTION "  About", 0, ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		ImGui::Text("Direct3D renderer");
+		ImGui::Dummy(ImVec2(300.f, 1.f));
+		ImGui::CenteredText("Direct3D renderer");
+		ImGui::CenteredText("written from scratch by Philipp Kurth");
+
 		ImGui::Separator();
 
 		ImGui::PopupOkButton();
@@ -309,9 +317,9 @@ void scene_editor::drawMainMenuBar()
 	}
 
 
-	if (showIconsWindow)
+	if (iconsWindowOpen)
 	{
-		ImGui::Begin(ICON_FA_ICONS "  Icons", &showIconsWindow);
+		ImGui::Begin(ICON_FA_ICONS "  Icons", &iconsWindowOpen);
 
 		static ImGuiTextFilter filter;
 		filter.Draw();
@@ -335,9 +343,9 @@ void scene_editor::drawMainMenuBar()
 		ImGui::End();
 	}
 
-	if (showDemoWindow)
+	if (demoWindowOpen)
 	{
-		ImGui::ShowDemoWindow(&showDemoWindow);
+		ImGui::ShowDemoWindow(&demoWindowOpen);
 	}
 
 	if (soundEditorWindowOpen)
@@ -380,14 +388,7 @@ bool scene_editor::drawSceneHierarchy()
 				const char* name = tag.name;
 				scene_entity entity = { entityHandle, scene };
 
-				if (entity == selectedEntity)
-				{
-					ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), name);
-				}
-				else
-				{
-					ImGui::Text(name);
-				}
+				ImGui::Selectable(name, entity == selectedEntity);
 
 				if (ImGui::IsItemClicked(0) || ImGui::IsItemClicked(1))
 				{

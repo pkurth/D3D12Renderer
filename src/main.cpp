@@ -12,9 +12,9 @@
 #include "application.h"
 #include "rendering/render_utils.h"
 #include "rendering/main_renderer.h"
-#include "editor/asset_editor_panel.h"
 #include "audio/audio.h"
 #include "audio/synth.h"
+#include "editor/asset_editor_panel.h"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui/imgui_internal.h>
@@ -142,10 +142,11 @@ int main(int argc, char** argv)
 	main_renderer renderer;
 	renderer.initialize(window.colorDepth, window.clientWidth, window.clientHeight, spec);
 
-	app.initialize(&renderer);
+	editor_panels editorPanels;
+
+	app.initialize(&renderer, &editorPanels);
 
 	file_browser fileBrowser;
-	mesh_editor_panel meshEditor;
 
 
 	// Wait for initialization to finish.
@@ -255,12 +256,16 @@ int main(int argc, char** argv)
 
 		main_renderer::beginFrameCommon();
 		renderer.beginFrame(renderWidth, renderHeight);
+
+		editorPanels.meshEditor.beginFrame();
 		
 		app.update(input, dt);
 
 		endFrameCommon();
 		main_renderer::endFrameCommon();
-		renderer.endFrame(input);
+		renderer.endFrame(&input);
+
+		editorPanels.meshEditor.endFrame();
 
 		if (ImGui::IsKeyPressed(key_print))
 		{
@@ -282,8 +287,7 @@ int main(int argc, char** argv)
 			LOG_MESSAGE("Saved screenshot to '%ws'", path.c_str());
 		}
 
-		fileBrowser.draw(meshEditor);
-		meshEditor.draw();
+		fileBrowser.draw();
 
 		updateMessageLog(dt);
 

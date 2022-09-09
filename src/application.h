@@ -18,7 +18,7 @@
 struct application
 {
 	void loadCustomShaders();
-	void initialize(main_renderer* renderer);
+	void initialize(main_renderer* renderer, editor_panels* editorPanels);
 	void update(const user_input& input, float dt);
 
 	void handleFileDrop(const fs::path& filename);

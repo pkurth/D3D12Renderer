@@ -49,7 +49,7 @@ void application::loadCustomShaders()
 	}
 }
 
-void application::initialize(main_renderer* renderer)
+void application::initialize(main_renderer* renderer, editor_panels* editorPanels)
 {
 	this->renderer = renderer;
 
@@ -62,7 +62,7 @@ void application::initialize(main_renderer* renderer)
 	scene.environment.setFromTexture("assets/sky/sunset_in_the_chalk_quarry_4k.hdr");
 	scene.environment.lightProbeGrid.initialize(vec3(-20.f, -1.f, -20.f), vec3(40.f, 20.f, 40.f), 1.5f);
 
-	editor.initialize(&this->scene, renderer);
+	editor.initialize(&this->scene, renderer, editorPanels);
 
 	game_scene& scene = this->scene.getCurrentScene();
 

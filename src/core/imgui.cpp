@@ -457,6 +457,13 @@ namespace ImGui
 		ImGui::TreePop();
 	}
 
+	void CenteredText(const char* text)
+	{
+		float w = ImGui::CalcTextSize(text).x;
+		ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - w) * 0.5f);
+		ImGui::Text(text);
+	}
+
 	void PopupOkButton(uint32 width)
 	{
 		float w = (float)width;

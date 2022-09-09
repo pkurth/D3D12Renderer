@@ -1,32 +1,54 @@
 #pragma once
 
 #include "dx/dx_texture.h"
+#include "core/camera.h"
+#include "rendering/main_renderer.h"
+
 
 struct asset_editor_panel
 {
-	virtual void setAsset(const fs::path& path) = 0;
+	void beginFrame();
+	virtual void endFrame() {}
 
-	void draw();
+	bool isOpen() const { return windowOpen; }
+	void open();
+	void close();
 
 protected:
 	const char* title;
-	bool open = false;
+	const char* dragDropTarget;
 
 private:
 	virtual void edit(uint32 renderWidth, uint32 renderHeight) = 0;
 	virtual ref<dx_texture> getRendering() = 0;
-
+	virtual void setDragDropData(void* data, uint32 size) {}
+	
+	bool windowOpen = false;
+	bool windowOpenInternal = false;
 };
-
 
 struct mesh_editor_panel : asset_editor_panel
 {
 	mesh_editor_panel();
 
-	virtual void setAsset(const fs::path& path) override;
+	virtual void endFrame() override;
 
 private:
 	virtual void edit(uint32 renderWidth, uint32 renderHeight) override;
 	virtual ref<dx_texture> getRendering() override;
+	virtual void setDragDropData(void* data, uint32 size) override;
+
+	render_camera camera;
+	ref<composite_mesh> mesh;
+	main_renderer renderer;
+
+	opaque_render_pass renderPass;
 };
+
+
+struct editor_panels
+{
+	mesh_editor_panel meshEditor;
+};
+
 

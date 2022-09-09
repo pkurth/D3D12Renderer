@@ -83,6 +83,7 @@ namespace ImGui
 	inline void Value(const char* prefix, uint64 v) { ImGui::Text("%s: %llu", prefix, v); }
 	inline void Value(const char* prefix, const char* v) { ImGui::Text("%s: %s", prefix, v); }
 
+	void CenteredText(const char* text);
 
 	void PopupOkButton(uint32 width = 120);
 
