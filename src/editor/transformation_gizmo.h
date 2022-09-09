@@ -5,6 +5,7 @@
 #include "core/camera.h"
 #include "rendering/render_pass.h"
 
+#include "physics/bounding_volumes.h"
 
 struct transformation_gizmo
 {
@@ -13,6 +14,12 @@ struct transformation_gizmo
 	bool manipulatePositionRotation(vec3& position, quat& rotation, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
 	bool manipulateNothing(const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
 
+	bool manipulateBoundingSphere(bounding_sphere& sphere, const trs& parentTransform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
+	bool manipulateBoundingCapsule(bounding_capsule& capsule, const trs& parentTransform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
+	bool manipulateBoundingCylinder(bounding_cylinder& cylinder, const trs& parentTransform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
+	bool manipulateBoundingBox(bounding_box& aabb, const trs& parentTransform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
+	bool manipulateOrientedBoundingBox(bounding_oriented_box& obb, const trs& parentTransform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
+
 	// Transform before start of dragging. Only valid if object was dragged.
 	trs originalTransform;
 
@@ -20,7 +27,8 @@ struct transformation_gizmo
 
 private:
 	bool handleUserInput(bool allowKeyboardInput, bool allowTranslation, bool allowRotation, bool allowScaling, bool allowSpaceChange);
-	void manipulateInternal(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
+	void manipulateInternal(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass, bool allowNonUniformScale = true);
+	void manipulateHandles(vec3* handles, uint32 numHandles);
 
 	enum transformation_type
 	{
@@ -41,7 +49,7 @@ private:
 
 	uint32 handleTranslation(trs& transform, ray r, const user_input& input, float snapping, float scaling);
 	uint32 handleRotation(trs& transform, ray r, const user_input& input, float snapping, float scaling);
-	uint32 handleScaling(trs& transform, ray r, const user_input& input, float scaling, const render_camera& camera);
+	uint32 handleScaling(trs& transform, ray r, const user_input& input, float scaling, const render_camera& camera, bool allowNonUniform);
 
 	uint32 axisIndex;
 	float anchor;

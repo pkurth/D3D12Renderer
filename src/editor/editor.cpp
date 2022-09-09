@@ -1068,24 +1068,54 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		const vec4 volumeColor(1.f, 1.f, 0.f, 1.f);
 		if (c.type == collider_type_sphere)
 		{
+			if (gizmo.manipulateBoundingSphere(c.sphere, transform, camera, input, !inputCaptured, ldrRenderPass))
+			{
+				inputCaptured = true;
+				objectMovedByGizmo = true;
+			}
+			gizmoDrawn = true;
 			renderWireSphere(transform.rotation * c.sphere.center + transform.position, c.sphere.radius, volumeColor, ldrRenderPass, true);
 		}
 		else if (c.type == collider_type_capsule)
 		{
+			if (gizmo.manipulateBoundingCapsule(c.capsule, transform, camera, input, !inputCaptured, ldrRenderPass))
+			{
+				inputCaptured = true;
+				objectMovedByGizmo = true;
+			}
+			gizmoDrawn = true;
 			renderWireCapsule(transform.rotation * c.capsule.positionA + transform.position, transform.rotation * c.capsule.positionB + transform.position,
 				c.capsule.radius, volumeColor, ldrRenderPass, true);
 		}
 		else if (c.type == collider_type_cylinder)
 		{
+			if (gizmo.manipulateBoundingCylinder(c.cylinder, transform, camera, input, !inputCaptured, ldrRenderPass))
+			{
+				inputCaptured = true;
+				objectMovedByGizmo = true;
+			}
+			gizmoDrawn = true;
 			renderWireCylinder(transform.rotation * c.cylinder.positionA + transform.position, transform.rotation * c.cylinder.positionB + transform.position,
 				c.cylinder.radius, volumeColor, ldrRenderPass, true);
 		}
 		else if (c.type == collider_type_aabb)
 		{
+			if (gizmo.manipulateBoundingBox(c.aabb, transform, camera, input, !inputCaptured, ldrRenderPass))
+			{
+				inputCaptured = true;
+				objectMovedByGizmo = true;
+			}
+			gizmoDrawn = true;
 			renderWireBox(transform.rotation * c.aabb.getCenter() + transform.position, c.aabb.getRadius(), transform.rotation, volumeColor, ldrRenderPass, true);
 		}
 		else if (c.type == collider_type_obb)
 		{
+			if (gizmo.manipulateOrientedBoundingBox(c.obb, transform, camera, input, !inputCaptured, ldrRenderPass))
+			{
+				inputCaptured = true;
+				objectMovedByGizmo = true;
+			}
+			gizmoDrawn = true;
 			renderWireBox(transform.rotation * c.obb.center + transform.position, c.obb.radius, transform.rotation * c.obb.rotation, volumeColor, ldrRenderPass, true);
 		}
 		if (!gizmoDrawn)

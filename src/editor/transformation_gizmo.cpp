@@ -294,7 +294,7 @@ uint32 transformation_gizmo::handleRotation(trs& transform, ray r, const user_in
 	return dragging ? axisIndex : hoverAxisIndex;
 }
 
-uint32 transformation_gizmo::handleScaling(trs& transform, ray r, const user_input& input, float scaling, const render_camera& camera)
+uint32 transformation_gizmo::handleScaling(trs& transform, ray r, const user_input& input, float scaling, const render_camera& camera, bool allowNonUniform)
 {
 	// We only allow scaling in local space.
 	quat rot = transform.rotation;
@@ -314,7 +314,7 @@ uint32 transformation_gizmo::handleScaling(trs& transform, ray r, const user_inp
 	{
 		hoverAxisIndex = 3;
 	}
-	else
+	else if (allowNonUniform)
 	{
 		float minT = FLT_MAX;
 		for (uint32 i = 0; i < 3; ++i)
@@ -498,7 +498,7 @@ bool transformation_gizmo::handleUserInput(bool allowKeyboardInput,
 	return keyboardInteraction || uiInteraction;
 }
 
-void transformation_gizmo::manipulateInternal(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
+void transformation_gizmo::manipulateInternal(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass, bool allowNonUniformScale)
 {
 	if (!input.mouse.left.down || !allowInput)
 	{
@@ -526,7 +526,7 @@ void transformation_gizmo::manipulateInternal(trs& transform, const render_camer
 		{
 			case transformation_type_translation: highlightAxis = handleTranslation(transform, r, input, snapping, scaling); break;
 			case transformation_type_rotation: highlightAxis = handleRotation(transform, r, input, snapping, scaling); break;
-			case transformation_type_scale: highlightAxis = handleScaling(transform, r, input, scaling, camera); break; // TODO: Snapping for scale.
+			case transformation_type_scale: highlightAxis = handleScaling(transform, r, input, scaling, camera, allowNonUniformScale); break; // TODO: Snapping for scale.
 		}
 	}
 
@@ -550,13 +550,16 @@ void transformation_gizmo::manipulateInternal(trs& transform, const render_camer
 			vec4(0.f, 0.f, 1.f, 1.f),
 		};
 
-		for (uint32 i = 0; i < 3; ++i)
+		if (type != transformation_type_scale || allowNonUniformScale)
 		{
-			ldrRenderPass->renderOverlay<debug_simple_pipeline>(createModelMatrix(transform.position, rotations[i], scaling),
-				mesh.vertexBuffer, mesh.indexBuffer,
-				submeshes[type],
-				debug_material{ colors[i] * (highlightAxis == i ? 0.5f : 1.f) }
-			);
+			for (uint32 i = 0; i < 3; ++i)
+			{
+				ldrRenderPass->renderOverlay<debug_simple_pipeline>(createModelMatrix(transform.position, rotations[i], scaling),
+					mesh.vertexBuffer, mesh.indexBuffer,
+					submeshes[type],
+					debug_material{ colors[i] * (highlightAxis == i ? 0.5f : 1.f) }
+				);
+			}
 		}
 
 		if (type == transformation_type_scale)
@@ -638,5 +641,81 @@ bool transformation_gizmo::manipulateNothing(const render_camera& camera, const 
 	dragging = false;
 	bool inputCaptured = handleUserInput(allowInput, true, true, true, true);
 	return false;
+}
+
+bool transformation_gizmo::manipulateBoundingSphere(bounding_sphere& sphere, const trs& parentTransform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
+{
+	if (type == transformation_type_rotation)
+	{
+		type = transformation_type_translation;
+	}
+
+	bool inputCaptured = handleUserInput(allowInput, true, false, true, true);
+	trs transform = { parentTransform.rotation * sphere.center + parentTransform.position, parentTransform.rotation, vec3(sphere.radius) };
+	manipulateInternal(transform, camera, input, allowInput, ldrRenderPass, false);
+	sphere.center = conjugate(parentTransform.rotation) * (transform.position - parentTransform.position);
+	sphere.radius = transform.scale.x;
+	return dragging;
+}
+
+bool transformation_gizmo::manipulateBoundingCapsule(bounding_capsule& capsule, const trs& parentTransform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
+{
+	bool inputCaptured = handleUserInput(allowInput, true, true, true, true);
+	
+	vec3 a = parentTransform.position + parentTransform.rotation * capsule.positionA;
+	vec3 b = parentTransform.position + parentTransform.rotation * capsule.positionB;
+
+	vec3 center = 0.5f * (a + b);
+	
+	trs transform = { center, parentTransform.rotation, capsule.radius };
+
+	a = inverseTransformPosition(transform, a);
+	b = inverseTransformPosition(transform, b);
+
+	manipulateInternal(transform, camera, input, allowInput, ldrRenderPass, false);
+
+	a = transformPosition(transform, a);
+	b = transformPosition(transform, b);
+
+	capsule.positionA = conjugate(parentTransform.rotation) * (a - parentTransform.position);
+	capsule.positionB = conjugate(parentTransform.rotation) * (b - parentTransform.position);
+
+	capsule.radius = transform.scale.x;
+	return dragging;
+}
+
+bool transformation_gizmo::manipulateBoundingCylinder(bounding_cylinder& cylinder, const trs& parentTransform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
+{
+	bounding_capsule c = { cylinder.positionA, cylinder.positionB, cylinder.radius };
+	bool result = manipulateBoundingCapsule(c, parentTransform, camera, input, allowInput, ldrRenderPass);
+	cylinder = { c.positionA, c.positionB, c.radius };
+	return result;
+}
+
+bool transformation_gizmo::manipulateBoundingBox(bounding_box& aabb, const trs& parentTransform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
+{
+	if (type == transformation_type_rotation)
+	{
+		type = transformation_type_translation;
+	}
+
+	bool inputCaptured = handleUserInput(allowInput, true, false, true, true);
+	trs transform = { parentTransform.rotation * aabb.getCenter() + parentTransform.position, parentTransform.rotation, aabb.getRadius() };
+	manipulateInternal(transform, camera, input, allowInput, ldrRenderPass);
+	vec3 center = conjugate(parentTransform.rotation) * (transform.position - parentTransform.position);
+	vec3 radius = transform.scale;
+	aabb = bounding_box::fromCenterRadius(center, radius);
+	return dragging;
+}
+
+bool transformation_gizmo::manipulateOrientedBoundingBox(bounding_oriented_box& obb, const trs& parentTransform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
+{
+	bool inputCaptured = handleUserInput(allowInput, true, true, true, true);
+	trs transform = { parentTransform.rotation * obb.center + parentTransform.position, parentTransform.rotation, obb.radius };
+	manipulateInternal(transform, camera, input, allowInput, ldrRenderPass);
+	obb.center = conjugate(parentTransform.rotation) * (transform.position - parentTransform.position);
+	obb.rotation = conjugate(parentTransform.rotation) * transform.rotation * obb.rotation;
+	obb.radius = transform.scale;
+	return dragging;
 }
 
