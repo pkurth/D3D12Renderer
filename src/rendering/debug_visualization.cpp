@@ -226,6 +226,50 @@ void renderWireCapsule(vec3 positionA, vec3 positionB, float radius, vec4 color,
 	renderWireDebug(createModelMatrix(center, rotation * quat(vec3(0.f, 1.f, 0.f), deg2rad(90.f)), 1.f), vb, ib, color, renderPass, overlay);
 }
 
+void renderWireCylinder(vec3 positionA, vec3 positionB, float radius, vec4 color, ldr_render_pass* renderPass, bool overlay)
+{
+	CPU_PROFILE_BLOCK("Render wire cylinder");
+
+	quat rotation = rotateFromTo(vec3(0.f, 1.f, 0.f), positionA - positionB);
+
+	{
+		auto [vb, ib] = getWireRing();
+		quat rotate90deg(vec3(1.f, 0.f, 0.f), deg2rad(90.f));
+		renderWireDebug(createModelMatrix(positionA, rotation * rotate90deg, radius), vb, ib, color, renderPass, overlay);
+		renderWireDebug(createModelMatrix(positionB, rotation * rotate90deg, radius), vb, ib, color, renderPass, overlay);
+	}
+
+	{
+		auto [vb, vertexPtr] = dxContext.createDynamicVertexBuffer(sizeof(position_color), 8);
+		auto [ib, indexPtr] = dxContext.createDynamicIndexBuffer(sizeof(uint16), 8);
+
+		position_color* vertices = (position_color*)vertexPtr;
+		indexed_line16* lines = (indexed_line16*)indexPtr;
+
+		vec3 xAxis = rotation * vec3(radius, 0.f, 0.f);
+		vec3 zAxis = rotation * vec3(0.f, 0.f, radius);
+
+		*vertices++ = positionA + xAxis;
+		*vertices++ = positionB + xAxis;
+
+		*vertices++ = positionA + zAxis;
+		*vertices++ = positionB + zAxis;
+
+		*vertices++ = positionA - xAxis;
+		*vertices++ = positionB - xAxis;
+
+		*vertices++ = positionA - zAxis;
+		*vertices++ = positionB - zAxis;
+
+		*lines++ = { 0, 1 };
+		*lines++ = { 2, 3 };
+		*lines++ = { 4, 5 };
+		*lines++ = { 6, 7 };
+
+		renderWireDebug(mat4::identity, vb, ib, color, renderPass, overlay);
+	}
+}
+
 void renderWireCone(vec3 position, vec3 direction, float distance, float angle, vec4 color, ldr_render_pass* renderPass, bool overlay)
 {
 	CPU_PROFILE_BLOCK("Render wire cone");

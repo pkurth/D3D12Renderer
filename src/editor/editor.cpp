@@ -11,6 +11,7 @@
 #include "physics/vehicle.h"
 #include "scene/serialization.h"
 #include "audio/audio.h"
+#include "rendering/debug_visualization.h"
 
 #include <fontawesome/list.h>
 
@@ -80,6 +81,7 @@ void scene_editor::setSelectedEntityNoUndo(scene_entity entity)
 {
 	selectedEntity = entity;
 	updateSelectedEntityUIRotation();
+	selectedColliderEntity = {};
 }
 
 void scene_editor::initialize(editor_scene* scene, main_renderer* renderer)
@@ -597,6 +599,20 @@ bool scene_editor::drawSceneHierarchy()
 											ImGui::EndTree();
 										}
 									} break;
+									case collider_type_cylinder:
+									{
+										if (ImGui::BeginTree("Shape: Cylinder"))
+										{
+											if (ImGui::BeginProperties())
+											{
+												dirty |= ImGui::PropertyInput("Local point A", collider.cylinder.positionA);
+												dirty |= ImGui::PropertyInput("Local point B", collider.cylinder.positionB);
+												dirty |= ImGui::PropertyInput("Radius", collider.cylinder.radius);
+												ImGui::EndProperties();
+											}
+											ImGui::EndTree();
+										}
+									} break;
 									case collider_type_aabb:
 									{
 										if (ImGui::BeginTree("Shape: AABB"))
@@ -610,8 +626,28 @@ bool scene_editor::drawSceneHierarchy()
 											ImGui::EndTree();
 										}
 									} break;
-
-									// TODO: UI for remaining collider types.
+									case collider_type_obb:
+									{
+										if (ImGui::BeginTree("Shape: OBB"))
+										{
+											if (ImGui::BeginProperties())
+											{
+												ImGui::EndProperties();
+											}
+											ImGui::EndTree();
+										}
+									} break;
+									case collider_type_hull:
+									{
+										if (ImGui::BeginTree("Shape: Hull"))
+										{
+											if (ImGui::BeginProperties())
+											{
+												ImGui::EndProperties();
+											}
+											ImGui::EndTree();
+										}
+									} break;
 								}
 
 								if (ImGui::BeginProperties())
@@ -619,6 +655,12 @@ bool scene_editor::drawSceneHierarchy()
 									ImGui::PropertySlider("Restitution", collider.material.restitution);
 									ImGui::PropertySlider("Friction", collider.material.friction);
 									dirty |= ImGui::PropertyInput("Density", collider.material.density);
+
+									bool editCollider = selectedColliderEntity == colliderEntity;
+									if (ImGui::PropertyCheckbox("Edit", editCollider))
+									{
+										selectedColliderEntity = editCollider ? colliderEntity : scene_entity{};
+									}
 
 									ImGui::EndProperties();
 								}
@@ -1016,7 +1058,42 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 	render_camera& camera = this->scene->camera;
 
-	if (selectedEntity)
+
+	if (selectedColliderEntity)
+	{
+		const trs& transform = selectedEntity.getComponent<transform_component>();
+		collider_component& c = selectedColliderEntity.getComponent<collider_component>();
+
+		bool gizmoDrawn = false;
+		const vec4 volumeColor(1.f, 1.f, 0.f, 1.f);
+		if (c.type == collider_type_sphere)
+		{
+			renderWireSphere(transform.rotation * c.sphere.center + transform.position, c.sphere.radius, volumeColor, ldrRenderPass, true);
+		}
+		else if (c.type == collider_type_capsule)
+		{
+			renderWireCapsule(transform.rotation * c.capsule.positionA + transform.position, transform.rotation * c.capsule.positionB + transform.position,
+				c.capsule.radius, volumeColor, ldrRenderPass, true);
+		}
+		else if (c.type == collider_type_cylinder)
+		{
+			renderWireCylinder(transform.rotation * c.cylinder.positionA + transform.position, transform.rotation * c.cylinder.positionB + transform.position,
+				c.cylinder.radius, volumeColor, ldrRenderPass, true);
+		}
+		else if (c.type == collider_type_aabb)
+		{
+			renderWireBox(transform.rotation * c.aabb.getCenter() + transform.position, c.aabb.getRadius(), transform.rotation, volumeColor, ldrRenderPass, true);
+		}
+		else if (c.type == collider_type_obb)
+		{
+			renderWireBox(transform.rotation * c.obb.center + transform.position, c.obb.radius, transform.rotation * c.obb.rotation, volumeColor, ldrRenderPass, true);
+		}
+		if (!gizmoDrawn)
+		{
+			gizmo.manipulateNothing(camera, input, !inputCaptured, ldrRenderPass);
+		}
+	}
+	else if (selectedEntity)
 	{
 		if (physics_transform1_component* transform = selectedEntity.getComponentIfExists<physics_transform1_component>())
 		{

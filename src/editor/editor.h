@@ -18,6 +18,8 @@ struct scene_editor
 	physics_settings physicsSettings;
 
 private:
+	scene_entity selectedColliderEntity;
+
 	void drawSettings(float dt);
 	void drawMainMenuBar();
 	bool drawSceneHierarchy();
