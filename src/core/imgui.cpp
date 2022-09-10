@@ -452,6 +452,14 @@ namespace ImGui
 		return ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_FramePadding | (defaultOpen ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None));
 	}
 
+	bool BeginTreeColoredText(const char* label, vec3 color, bool defaultOpen)
+	{
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(color.x, color.y, color.z, 1.f));
+		bool result = ImGui::BeginTree(label, defaultOpen);
+		ImGui::PopStyleColor();
+		return result;
+	}
+
 	void EndTree()
 	{
 		ImGui::TreePop();

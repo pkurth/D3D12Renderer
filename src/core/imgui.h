@@ -79,6 +79,7 @@ namespace ImGui
 	bool SelectableWrapped(const char* label, int width, bool selected = false, ImGuiSelectableFlags flags = 0);
 
 	bool BeginTree(const char* label, bool defaultOpen = false);
+	bool BeginTreeColoredText(const char* label, vec3 color, bool defaultOpen = false);
 	void EndTree();
 
 	inline void Value(const char* prefix, int64 v) { ImGui::Text("%s: %lld", prefix, v); }

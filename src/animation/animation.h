@@ -102,6 +102,7 @@ struct limb_dimensions
 {
 	float minY, maxY;
 	float radius;
+	float xOffset, zOffset;
 };
 
 struct skeleton_limb

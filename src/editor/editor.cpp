@@ -386,34 +386,34 @@ bool scene_editor::drawSceneHierarchy()
 		{
 			scene.view<tag_component>()
 				.each([this, &scene](auto entityHandle, tag_component& tag)
-			{
-				const char* name = tag.name;
-				scene_entity entity = { entityHandle, scene };
-
-				ImGui::Selectable(name, entity == selectedEntity);
-
-				if (ImGui::IsItemClicked(0) || ImGui::IsItemClicked(1))
-				{
-					setSelectedEntity(entity);
-				}
-
-				bool entityDeleted = false;
-				if (ImGui::BeginPopupContextItem(name))
-				{
-					if (ImGui::MenuItem("Delete"))
 					{
-						entityDeleted = true;
-					}
+						const char* name = tag.name;
+						scene_entity entity = { entityHandle, scene };
 
-					ImGui::EndPopup();
-				}
+						ImGui::Selectable(name, entity == selectedEntity);
 
-				if (entityDeleted)
-				{
-					scene.deleteEntity(entity);
-					setSelectedEntityNoUndo({});
-				}
-			});
+						if (ImGui::IsItemClicked(0) || ImGui::IsItemClicked(1))
+						{
+							setSelectedEntity(entity);
+						}
+
+						bool entityDeleted = false;
+						if (ImGui::BeginPopupContextItem(name))
+						{
+							if (ImGui::MenuItem("Delete"))
+							{
+								entityDeleted = true;
+							}
+
+							ImGui::EndPopup();
+						}
+
+						if (entityDeleted)
+						{
+							scene.deleteEntity(entity);
+							setSelectedEntityNoUndo({});
+						}
+					});
 		}
 		ImGui::EndChild();
 		ImGui::Separator();
@@ -447,636 +447,644 @@ bool scene_editor::drawSceneHierarchy()
 				if (selectedEntity)
 				{
 					drawComponent<transform_component>(selectedEntity, "TRANSFORM", [this, &objectMovedByWidget](transform_component& transform)
-					{
-						objectMovedByWidget |= ImGui::DragFloat3("Position", transform.position.data, 0.1f, 0.f, 0.f);
-
-						if (ImGui::DragFloat3("Rotation", selectedEntityEulerRotation.data, 0.1f, 0.f, 0.f))
 						{
-							vec3 euler = selectedEntityEulerRotation;
-							euler.x = deg2rad(euler.x);
-							euler.y = deg2rad(euler.y);
-							euler.z = deg2rad(euler.z);
-							transform.rotation = eulerToQuat(euler);
+							objectMovedByWidget |= ImGui::DragFloat3("Position", transform.position.data, 0.1f, 0.f, 0.f);
 
-							objectMovedByWidget = true;
-						}
+							if (ImGui::DragFloat3("Rotation", selectedEntityEulerRotation.data, 0.1f, 0.f, 0.f))
+							{
+								vec3 euler = selectedEntityEulerRotation;
+								euler.x = deg2rad(euler.x);
+								euler.y = deg2rad(euler.y);
+								euler.z = deg2rad(euler.z);
+								transform.rotation = eulerToQuat(euler);
 
-						objectMovedByWidget |= ImGui::DragFloat3("Scale", transform.scale.data, 0.1f, 0.f, 0.f);
-					});
+								objectMovedByWidget = true;
+							}
+
+							objectMovedByWidget |= ImGui::DragFloat3("Scale", transform.scale.data, 0.1f, 0.f, 0.f);
+						});
 
 					drawComponent<position_component>(selectedEntity, "TRANSFORM", [&objectMovedByWidget](position_component& position)
-					{
-						objectMovedByWidget |= ImGui::DragFloat3("Position", position.position.data, 0.1f, 0.f, 0.f);
-					});
+						{
+							objectMovedByWidget |= ImGui::DragFloat3("Position", position.position.data, 0.1f, 0.f, 0.f);
+						});
 
 					drawComponent<position_rotation_component>(selectedEntity, "TRANSFORM", [this, &objectMovedByWidget](position_rotation_component& pr)
-					{
-						objectMovedByWidget |= ImGui::DragFloat3("Translation", pr.position.data, 0.1f, 0.f, 0.f);
-						if (ImGui::DragFloat3("Rotation", selectedEntityEulerRotation.data, 0.1f, 0.f, 0.f))
 						{
-							vec3 euler = selectedEntityEulerRotation;
-							euler.x = deg2rad(euler.x);
-							euler.y = deg2rad(euler.y);
-							euler.z = deg2rad(euler.z);
-							pr.rotation = eulerToQuat(euler);
+							objectMovedByWidget |= ImGui::DragFloat3("Translation", pr.position.data, 0.1f, 0.f, 0.f);
+							if (ImGui::DragFloat3("Rotation", selectedEntityEulerRotation.data, 0.1f, 0.f, 0.f))
+							{
+								vec3 euler = selectedEntityEulerRotation;
+								euler.x = deg2rad(euler.x);
+								euler.y = deg2rad(euler.y);
+								euler.z = deg2rad(euler.z);
+								pr.rotation = eulerToQuat(euler);
 
-							objectMovedByWidget = true;
-						}
-					});
+								objectMovedByWidget = true;
+							}
+						});
 
 					drawComponent<dynamic_transform_component>(selectedEntity, "DYNAMIC", [](dynamic_transform_component& dynamic)
-					{
-						ImGui::Text("Dynamic");
-					});
+						{
+							ImGui::Text("Dynamic");
+						});
 
 					drawComponent<raster_component>(selectedEntity, "RASTER", [this](raster_component& raster)
-					{
-						if (ImGui::BeginProperties())
-						{
-							if (ImGui::PropertyAssetHandle("Mesh", EDITOR_ICON_MESH, raster.mesh->handle))
-							{
-								fs::path path = getPathFromAssetHandle(raster.mesh->handle);
-								fs::path relative = fs::relative(path, fs::current_path());
-								if (auto mesh = loadMeshFromFile(relative.string()))
-								{
-									raster.mesh = mesh;
-									selectedEntity.removeComponent<animation_component>(); // For now.
-								}
-							}
-
-
-							ImGui::EndProperties();
-						}
-
-						ImGui::Separator();
-
-						animation_skeleton& skeleton = raster.mesh->skeleton;
-						if (skeleton.joints.size() > 0)
-						{
-							if (ImGui::BeginTree("Skeleton"))
-							{
-								if (ImGui::BeginTree("Joints"))
-								{
-									for (uint32 i = 0; i < (uint32)skeleton.joints.size(); ++i)
-									{
-										const skeleton_joint& j = skeleton.joints[i];
-										vec3 c = limbTypeColors[j.limbType];
-										ImGui::TextColored(ImVec4(c.x, c.y, c.z, 1.f), j.name.c_str());
-									}
-
-									ImGui::EndTree();
-								}
-
-								if (ImGui::BeginTree("Limbs"))
-								{
-									for (uint32 i = 0; i < limb_type_count; ++i)
-									{
-										if (i != limb_type_unknown)
-										{
-											const skeleton_limb& l = skeleton.limbs[i];
-											vec3 c = limbTypeColors[i];
-											ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(c.x, c.y, c.z, 1.f));
-											bool tree = ImGui::BeginTree(limbTypeNames[i]);
-											ImGui::PopStyleColor();
-											if (tree)
-											{
-
-
-												ImGui::EndTree();
-											}
-										}
-									}
-
-									ImGui::EndTree();
-								}
-
-								ImGui::EndTree();
-							}
-						}
-					});
-
-					drawComponent<animation_component>(selectedEntity, "ANIMATION", [this](animation_component& anim)
-					{
-						if (raster_component* raster = selectedEntity.getComponentIfExists<raster_component>())
 						{
 							if (ImGui::BeginProperties())
 							{
-								uint32 animationIndex = anim.animation.clip ? (uint32)(anim.animation.clip - raster->mesh->skeleton.clips.data()) : -1;
-
-								bool animationChanged = ImGui::PropertyDropdown("Currently playing", [](uint32 index, void* data)
+								if (ImGui::PropertyAssetHandle("Mesh", EDITOR_ICON_MESH, raster.mesh->handle))
 								{
-									if (index == -1) { return "---"; }
-
-									animation_skeleton& skeleton = *(animation_skeleton*)data;
-									const char* result = 0;
-									if (index < (uint32)skeleton.clips.size())
+									fs::path path = getPathFromAssetHandle(raster.mesh->handle);
+									fs::path relative = fs::relative(path, fs::current_path());
+									if (auto mesh = loadMeshFromFile(relative.string()))
 									{
-										result = skeleton.clips[index].name.c_str();
+										raster.mesh = mesh;
+										selectedEntity.removeComponent<animation_component>(); // For now.
 									}
-									return result;
-								}, animationIndex, &raster->mesh->skeleton);
-
-								if (animationChanged)
-								{
-									anim.animation.set(&raster->mesh->skeleton.clips[animationIndex]);
 								}
+
 
 								ImGui::EndProperties();
 							}
-						}
-					});
 
-					drawComponent<rigid_body_component>(selectedEntity, "RIGID BODY", [this, &scene](rigid_body_component& rb)
-					{
-						if (ImGui::BeginProperties())
-						{
-							bool kinematic = rb.invMass == 0;
-							if (ImGui::PropertyCheckbox("Kinematic", kinematic))
+							ImGui::Separator();
+
+							animation_skeleton& skeleton = raster.mesh->skeleton;
+							if (skeleton.joints.size() > 0)
 							{
-								if (kinematic)
+								if (ImGui::BeginTree("Skeleton"))
 								{
-									rb.invMass = 0.f;
-									rb.invInertia = mat3::zero;
-									rb.linearVelocity = vec3(0.f);
-									rb.angularVelocity = vec3(0.f);
-									rb.forceAccumulator = vec3(0.f);
-									rb.torqueAccumulator = vec3(0.f);
-								}
-								else
-								{
-									rb.invMass = 1.f;
-									rb.invInertia = mat3::identity;
-
-									if (physics_reference_component* ref = selectedEntity.getComponentIfExists<physics_reference_component>())
+									if (ImGui::BeginTree("Joints"))
 									{
-										rb.recalculateProperties(&scene.registry, *ref);
+										for (uint32 i = 0; i < (uint32)skeleton.joints.size(); ++i)
+										{
+											const skeleton_joint& j = skeleton.joints[i];
+											vec3 c = limbTypeColors[j.limbType];
+											ImGui::TextColored(ImVec4(c.x, c.y, c.z, 1.f), j.name.c_str());
+										}
+
+										ImGui::EndTree();
 									}
+
+									if (ImGui::BeginTree("Limbs"))
+									{
+										for (uint32 i = 0; i < limb_type_count; ++i)
+										{
+											if (i != limb_type_unknown)
+											{
+												skeleton_limb& l = skeleton.limbs[i];
+												vec3 c = limbTypeColors[i];
+												if (ImGui::BeginTreeColoredText(limbTypeNames[i], c))
+												{
+													if (ImGui::BeginProperties())
+													{
+														limb_dimensions& d = l.dimensions;
+														ImGui::PropertyDrag("Min Y", d.minY, 0.01f);
+														ImGui::PropertyDrag("Max Y", d.maxY, 0.01f);
+														ImGui::PropertyDrag("Radius", d.radius, 0.01f);
+
+														ImGui::PropertyDrag("Offset X", d.xOffset, 0.01f);
+														ImGui::PropertyDrag("Offset Z", d.zOffset, 0.01f);
+
+														ImGui::EndProperties();
+													}
+
+													ImGui::EndTree();
+												}
+											}
+										}
+
+										ImGui::EndTree();
+									}
+
+									ImGui::EndTree();
 								}
 							}
+						});
 
-							if (!kinematic)
-							{
-								ImGui::PropertyValue("Mass", 1.f / rb.invMass, "%.3fkg");
-							}
-							ImGui::PropertySlider("Linear velocity damping", rb.linearDamping);
-							ImGui::PropertySlider("Angular velocity damping", rb.angularDamping);
-							ImGui::PropertySlider("Gravity factor", rb.gravityFactor);
-
-							//ImGui::PropertyValue("Linear velocity", rb.linearVelocity);
-							//ImGui::PropertyValue("Angular velocity", rb.angularVelocity);
-
-							ImGui::EndProperties();
-						}
-					});
-
-					drawComponent<physics_reference_component>(selectedEntity, "COLLIDERS", [this, &scene](physics_reference_component& reference)
-					{
-						bool dirty = false;
-
-						for (scene_entity colliderEntity : collider_entity_iterator(selectedEntity))
+					drawComponent<animation_component>(selectedEntity, "ANIMATION", [this](animation_component& anim)
 						{
-							ImGui::PushID((int)colliderEntity.handle);
-
-							drawComponent<collider_component>(colliderEntity, "Collider", [&colliderEntity, &dirty, this](collider_component& collider)
+							if (raster_component* raster = selectedEntity.getComponentIfExists<raster_component>())
 							{
-								switch (collider.type)
-								{
-									case collider_type_sphere:
-									{
-										if (ImGui::BeginTree("Shape: Sphere"))
-										{
-											if (ImGui::BeginProperties())
-											{
-												dirty |= ImGui::PropertyInput("Local center", collider.sphere.center);
-												dirty |= ImGui::PropertyInput("Radius", collider.sphere.radius);
-												ImGui::EndProperties();
-											}
-											ImGui::EndTree();
-										}
-									} break;
-									case collider_type_capsule:
-									{
-										if (ImGui::BeginTree("Shape: Capsule"))
-										{
-											if (ImGui::BeginProperties())
-											{
-												dirty |= ImGui::PropertyInput("Local point A", collider.capsule.positionA);
-												dirty |= ImGui::PropertyInput("Local point B", collider.capsule.positionB);
-												dirty |= ImGui::PropertyInput("Radius", collider.capsule.radius);
-												ImGui::EndProperties();
-											}
-											ImGui::EndTree();
-										}
-									} break;
-									case collider_type_cylinder:
-									{
-										if (ImGui::BeginTree("Shape: Cylinder"))
-										{
-											if (ImGui::BeginProperties())
-											{
-												dirty |= ImGui::PropertyInput("Local point A", collider.cylinder.positionA);
-												dirty |= ImGui::PropertyInput("Local point B", collider.cylinder.positionB);
-												dirty |= ImGui::PropertyInput("Radius", collider.cylinder.radius);
-												ImGui::EndProperties();
-											}
-											ImGui::EndTree();
-										}
-									} break;
-									case collider_type_aabb:
-									{
-										if (ImGui::BeginTree("Shape: AABB"))
-										{
-											if (ImGui::BeginProperties())
-											{
-												dirty |= ImGui::PropertyInput("Local min", collider.aabb.minCorner);
-												dirty |= ImGui::PropertyInput("Local max", collider.aabb.maxCorner);
-												ImGui::EndProperties();
-											}
-											ImGui::EndTree();
-										}
-									} break;
-									case collider_type_obb:
-									{
-										if (ImGui::BeginTree("Shape: OBB"))
-										{
-											if (ImGui::BeginProperties())
-											{
-												ImGui::EndProperties();
-											}
-											ImGui::EndTree();
-										}
-									} break;
-									case collider_type_hull:
-									{
-										if (ImGui::BeginTree("Shape: Hull"))
-										{
-											if (ImGui::BeginProperties())
-											{
-												ImGui::EndProperties();
-											}
-											ImGui::EndTree();
-										}
-									} break;
-								}
-
 								if (ImGui::BeginProperties())
 								{
-									ImGui::PropertySlider("Restitution", collider.material.restitution);
-									ImGui::PropertySlider("Friction", collider.material.friction);
-									dirty |= ImGui::PropertyInput("Density", collider.material.density);
+									uint32 animationIndex = anim.animation.clip ? (uint32)(anim.animation.clip - raster->mesh->skeleton.clips.data()) : -1;
 
-									bool editCollider = selectedColliderEntity == colliderEntity;
-									if (ImGui::PropertyCheckbox("Edit", editCollider))
+									bool animationChanged = ImGui::PropertyDropdown("Currently playing", [](uint32 index, void* data)
+										{
+											if (index == -1) { return "---"; }
+
+											animation_skeleton& skeleton = *(animation_skeleton*)data;
+											const char* result = 0;
+											if (index < (uint32)skeleton.clips.size())
+											{
+												result = skeleton.clips[index].name.c_str();
+											}
+											return result;
+										}, animationIndex, &raster->mesh->skeleton);
+
+									if (animationChanged)
 									{
-										selectedColliderEntity = editCollider ? colliderEntity : scene_entity{};
+										anim.animation.set(&raster->mesh->skeleton.clips[animationIndex]);
 									}
 
 									ImGui::EndProperties();
 								}
-							});
-
-							ImGui::PopID();
-						}
-
-						if (dirty)
-						{
-							if (rigid_body_component* rb = selectedEntity.getComponentIfExists<rigid_body_component>())
-							{
-								rb->recalculateProperties(&scene.registry, reference);
 							}
-						}
-					});
+						});
 
-					drawComponent<physics_reference_component>(selectedEntity, "CONSTRAINTS", [this](physics_reference_component& reference)
-					{
-						for (auto [constraintEntity, constraintType] : constraint_entity_iterator(selectedEntity))
+					drawComponent<rigid_body_component>(selectedEntity, "RIGID BODY", [this, &scene](rigid_body_component& rb)
 						{
-							ImGui::PushID((int)constraintEntity.handle);
-
-							switch (constraintType)
+							if (ImGui::BeginProperties())
 							{
-								case constraint_type_distance:
+								bool kinematic = rb.invMass == 0;
+								if (ImGui::PropertyCheckbox("Kinematic", kinematic))
 								{
-									drawComponent<distance_constraint>(constraintEntity, "Distance constraint", [this, constraintEntity = constraintEntity](distance_constraint& constraint)
+									if (kinematic)
 									{
+										rb.invMass = 0.f;
+										rb.invInertia = mat3::zero;
+										rb.linearVelocity = vec3(0.f);
+										rb.angularVelocity = vec3(0.f);
+										rb.forceAccumulator = vec3(0.f);
+										rb.torqueAccumulator = vec3(0.f);
+									}
+									else
+									{
+										rb.invMass = 1.f;
+										rb.invInertia = mat3::identity;
+
+										if (physics_reference_component* ref = selectedEntity.getComponentIfExists<physics_reference_component>())
+										{
+											rb.recalculateProperties(&scene.registry, *ref);
+										}
+									}
+								}
+
+								if (!kinematic)
+								{
+									ImGui::PropertyValue("Mass", 1.f / rb.invMass, "%.3fkg");
+								}
+								ImGui::PropertySlider("Linear velocity damping", rb.linearDamping);
+								ImGui::PropertySlider("Angular velocity damping", rb.angularDamping);
+								ImGui::PropertySlider("Gravity factor", rb.gravityFactor);
+
+								//ImGui::PropertyValue("Linear velocity", rb.linearVelocity);
+								//ImGui::PropertyValue("Angular velocity", rb.angularVelocity);
+
+								ImGui::EndProperties();
+							}
+						});
+
+					drawComponent<physics_reference_component>(selectedEntity, "COLLIDERS", [this, &scene](physics_reference_component& reference)
+						{
+							bool dirty = false;
+
+							for (scene_entity colliderEntity : collider_entity_iterator(selectedEntity))
+							{
+								ImGui::PushID((int)colliderEntity.handle);
+
+								drawComponent<collider_component>(colliderEntity, "Collider", [&colliderEntity, &dirty, this](collider_component& collider)
+									{
+										switch (collider.type)
+										{
+										case collider_type_sphere:
+										{
+											if (ImGui::BeginTree("Shape: Sphere"))
+											{
+												if (ImGui::BeginProperties())
+												{
+													dirty |= ImGui::PropertyInput("Local center", collider.sphere.center);
+													dirty |= ImGui::PropertyInput("Radius", collider.sphere.radius);
+													ImGui::EndProperties();
+												}
+												ImGui::EndTree();
+											}
+										} break;
+										case collider_type_capsule:
+										{
+											if (ImGui::BeginTree("Shape: Capsule"))
+											{
+												if (ImGui::BeginProperties())
+												{
+													dirty |= ImGui::PropertyInput("Local point A", collider.capsule.positionA);
+													dirty |= ImGui::PropertyInput("Local point B", collider.capsule.positionB);
+													dirty |= ImGui::PropertyInput("Radius", collider.capsule.radius);
+													ImGui::EndProperties();
+												}
+												ImGui::EndTree();
+											}
+										} break;
+										case collider_type_cylinder:
+										{
+											if (ImGui::BeginTree("Shape: Cylinder"))
+											{
+												if (ImGui::BeginProperties())
+												{
+													dirty |= ImGui::PropertyInput("Local point A", collider.cylinder.positionA);
+													dirty |= ImGui::PropertyInput("Local point B", collider.cylinder.positionB);
+													dirty |= ImGui::PropertyInput("Radius", collider.cylinder.radius);
+													ImGui::EndProperties();
+												}
+												ImGui::EndTree();
+											}
+										} break;
+										case collider_type_aabb:
+										{
+											if (ImGui::BeginTree("Shape: AABB"))
+											{
+												if (ImGui::BeginProperties())
+												{
+													dirty |= ImGui::PropertyInput("Local min", collider.aabb.minCorner);
+													dirty |= ImGui::PropertyInput("Local max", collider.aabb.maxCorner);
+													ImGui::EndProperties();
+												}
+												ImGui::EndTree();
+											}
+										} break;
+										case collider_type_obb:
+										{
+											if (ImGui::BeginTree("Shape: OBB"))
+											{
+												if (ImGui::BeginProperties())
+												{
+													ImGui::EndProperties();
+												}
+												ImGui::EndTree();
+											}
+										} break;
+										case collider_type_hull:
+										{
+											if (ImGui::BeginTree("Shape: Hull"))
+											{
+												if (ImGui::BeginProperties())
+												{
+													ImGui::EndProperties();
+												}
+												ImGui::EndTree();
+											}
+										} break;
+										}
+
 										if (ImGui::BeginProperties())
 										{
-											scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
-											if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
+											ImGui::PropertySlider("Restitution", collider.material.restitution);
+											ImGui::PropertySlider("Friction", collider.material.friction);
+											dirty |= ImGui::PropertyInput("Density", collider.material.density);
+
+											bool editCollider = selectedColliderEntity == colliderEntity;
+											if (ImGui::PropertyCheckbox("Edit", editCollider))
 											{
-												setSelectedEntity(otherEntity);
+												selectedColliderEntity = editCollider ? colliderEntity : scene_entity{};
 											}
 
-											ImGui::PropertySlider("Length", constraint.globalLength);
 											ImGui::EndProperties();
 										}
 									});
+
+								ImGui::PopID();
+							}
+
+							if (dirty)
+							{
+								if (rigid_body_component* rb = selectedEntity.getComponentIfExists<rigid_body_component>())
+								{
+									rb->recalculateProperties(&scene.registry, reference);
+								}
+							}
+						});
+
+					drawComponent<physics_reference_component>(selectedEntity, "CONSTRAINTS", [this](physics_reference_component& reference)
+						{
+							for (auto [constraintEntity, constraintType] : constraint_entity_iterator(selectedEntity))
+							{
+								ImGui::PushID((int)constraintEntity.handle);
+
+								switch (constraintType)
+								{
+								case constraint_type_distance:
+								{
+									drawComponent<distance_constraint>(constraintEntity, "Distance constraint", [this, constraintEntity = constraintEntity](distance_constraint& constraint)
+										{
+											if (ImGui::BeginProperties())
+											{
+												scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
+												if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
+												{
+													setSelectedEntity(otherEntity);
+												}
+
+												ImGui::PropertySlider("Length", constraint.globalLength);
+												ImGui::EndProperties();
+											}
+										});
 								} break;
 
 								case constraint_type_ball:
 								{
 									drawComponent<ball_constraint>(constraintEntity, "Ball constraint", [this, constraintEntity = constraintEntity](ball_constraint& constraint)
-									{
-										if (ImGui::BeginProperties())
 										{
-											scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
-											if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
+											if (ImGui::BeginProperties())
 											{
-												setSelectedEntity(otherEntity);
-											}
+												scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
+												if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
+												{
+													setSelectedEntity(otherEntity);
+												}
 
-											ImGui::EndProperties();
-										}
-									});
+												ImGui::EndProperties();
+											}
+										});
 								} break;
 
 								case constraint_type_fixed:
 								{
 									drawComponent<fixed_constraint>(constraintEntity, "Fixed constraint", [this, constraintEntity = constraintEntity](fixed_constraint& constraint)
-									{
-										if (ImGui::BeginProperties())
 										{
-											scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
-											if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
+											if (ImGui::BeginProperties())
 											{
-												setSelectedEntity(otherEntity);
-											}
+												scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
+												if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
+												{
+													setSelectedEntity(otherEntity);
+												}
 
-											ImGui::EndProperties();
-										}
-									});
+												ImGui::EndProperties();
+											}
+										});
 								} break;
 
 								case constraint_type_hinge:
 								{
 									drawComponent<hinge_constraint>(constraintEntity, "Hinge constraint", [this, constraintEntity = constraintEntity](hinge_constraint& constraint)
-									{
-										if (ImGui::BeginProperties())
 										{
-											scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
-											if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
+											if (ImGui::BeginProperties())
 											{
-												setSelectedEntity(otherEntity);
-											}
-
-											bool minLimitActive = constraint.minRotationLimit <= 0.f;
-											if (ImGui::PropertyCheckbox("Lower limit active", minLimitActive))
-											{
-												constraint.minRotationLimit = -constraint.minRotationLimit;
-											}
-											if (minLimitActive)
-											{
-												float minLimit = -constraint.minRotationLimit;
-												ImGui::PropertySliderAngle("Lower limit", minLimit, 0.f, 180.f, "-%.0f deg");
-												constraint.minRotationLimit = -minLimit;
-											}
-
-											bool maxLimitActive = constraint.maxRotationLimit >= 0.f;
-											if (ImGui::PropertyCheckbox("Upper limit active", maxLimitActive))
-											{
-												constraint.maxRotationLimit = -constraint.maxRotationLimit;
-											}
-											if (maxLimitActive)
-											{
-												ImGui::PropertySliderAngle("Upper limit", constraint.maxRotationLimit, 0.f, 180.f);
-											}
-
-											bool motorActive = constraint.maxMotorTorque > 0.f;
-											if (ImGui::PropertyCheckbox("Motor active", motorActive))
-											{
-												constraint.maxMotorTorque = -constraint.maxMotorTorque;
-											}
-											if (motorActive)
-											{
-												ImGui::PropertyDropdown("Motor type", constraintMotorTypeNames, arraysize(constraintMotorTypeNames), (uint32&)constraint.motorType);
-
-												if (constraint.motorType == constraint_velocity_motor)
+												scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
+												if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
 												{
-													ImGui::PropertySliderAngle("Motor velocity", constraint.motorVelocity, -1000.f, 1000.f);
-												}
-												else
-												{
-													float lo = minLimitActive ? constraint.minRotationLimit : -M_PI;
-													float hi = maxLimitActive ? constraint.maxRotationLimit : M_PI;
-													ImGui::PropertySliderAngle("Motor target angle", constraint.motorTargetAngle, rad2deg(lo), rad2deg(hi));
+													setSelectedEntity(otherEntity);
 												}
 
-												ImGui::PropertySlider("Max motor torque", constraint.maxMotorTorque, 0.001f, 10000.f);
+												bool minLimitActive = constraint.minRotationLimit <= 0.f;
+												if (ImGui::PropertyCheckbox("Lower limit active", minLimitActive))
+												{
+													constraint.minRotationLimit = -constraint.minRotationLimit;
+												}
+												if (minLimitActive)
+												{
+													float minLimit = -constraint.minRotationLimit;
+													ImGui::PropertySliderAngle("Lower limit", minLimit, 0.f, 180.f, "-%.0f deg");
+													constraint.minRotationLimit = -minLimit;
+												}
+
+												bool maxLimitActive = constraint.maxRotationLimit >= 0.f;
+												if (ImGui::PropertyCheckbox("Upper limit active", maxLimitActive))
+												{
+													constraint.maxRotationLimit = -constraint.maxRotationLimit;
+												}
+												if (maxLimitActive)
+												{
+													ImGui::PropertySliderAngle("Upper limit", constraint.maxRotationLimit, 0.f, 180.f);
+												}
+
+												bool motorActive = constraint.maxMotorTorque > 0.f;
+												if (ImGui::PropertyCheckbox("Motor active", motorActive))
+												{
+													constraint.maxMotorTorque = -constraint.maxMotorTorque;
+												}
+												if (motorActive)
+												{
+													ImGui::PropertyDropdown("Motor type", constraintMotorTypeNames, arraysize(constraintMotorTypeNames), (uint32&)constraint.motorType);
+
+													if (constraint.motorType == constraint_velocity_motor)
+													{
+														ImGui::PropertySliderAngle("Motor velocity", constraint.motorVelocity, -1000.f, 1000.f);
+													}
+													else
+													{
+														float lo = minLimitActive ? constraint.minRotationLimit : -M_PI;
+														float hi = maxLimitActive ? constraint.maxRotationLimit : M_PI;
+														ImGui::PropertySliderAngle("Motor target angle", constraint.motorTargetAngle, rad2deg(lo), rad2deg(hi));
+													}
+
+													ImGui::PropertySlider("Max motor torque", constraint.maxMotorTorque, 0.001f, 10000.f);
+												}
+												ImGui::EndProperties();
 											}
-											ImGui::EndProperties();
-										}
-									});
+										});
 								} break;
 
 								case constraint_type_cone_twist:
 								{
 									drawComponent<cone_twist_constraint>(constraintEntity, "Cone twist constraint", [this, constraintEntity = constraintEntity](cone_twist_constraint& constraint)
-									{
-										if (ImGui::BeginProperties())
 										{
-											scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
-											if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
+											if (ImGui::BeginProperties())
 											{
-												setSelectedEntity(otherEntity);
-											}
-
-											bool swingLimitActive = constraint.swingLimit >= 0.f;
-											if (ImGui::PropertyCheckbox("Swing limit active", swingLimitActive))
-											{
-												constraint.swingLimit = -constraint.swingLimit;
-											}
-											if (swingLimitActive)
-											{
-												ImGui::PropertySliderAngle("Swing limit", constraint.swingLimit, 0.f, 180.f);
-											}
-
-											bool twistLimitActive = constraint.twistLimit >= 0.f;
-											if (ImGui::PropertyCheckbox("Twist limit active", twistLimitActive))
-											{
-												constraint.twistLimit = -constraint.twistLimit;
-											}
-											if (twistLimitActive)
-											{
-												ImGui::PropertySliderAngle("Twist limit", constraint.twistLimit, 0.f, 180.f);
-											}
-
-											bool twistMotorActive = constraint.maxTwistMotorTorque > 0.f;
-											if (ImGui::PropertyCheckbox("Twist motor active", twistMotorActive))
-											{
-												constraint.maxTwistMotorTorque = -constraint.maxTwistMotorTorque;
-											}
-											if (twistMotorActive)
-											{
-												ImGui::PropertyDropdown("Twist motor type", constraintMotorTypeNames, arraysize(constraintMotorTypeNames), (uint32&)constraint.twistMotorType);
-
-												if (constraint.twistMotorType == constraint_velocity_motor)
+												scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
+												if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
 												{
-													ImGui::PropertySliderAngle("Twist motor velocity", constraint.twistMotorVelocity, -360.f, 360.f);
-												}
-												else
-												{
-													float li = twistLimitActive ? constraint.twistLimit : -M_PI;
-													ImGui::PropertySliderAngle("Twist motor target angle", constraint.twistMotorTargetAngle, rad2deg(-li), rad2deg(li));
+													setSelectedEntity(otherEntity);
 												}
 
-												ImGui::PropertySlider("Max twist motor torque", constraint.maxTwistMotorTorque, 0.001f, 1000.f);
-											}
-
-											bool swingMotorActive = constraint.maxSwingMotorTorque > 0.f;
-											if (ImGui::PropertyCheckbox("Swing motor active", swingMotorActive))
-											{
-												constraint.maxSwingMotorTorque = -constraint.maxSwingMotorTorque;
-											}
-											if (swingMotorActive)
-											{
-												ImGui::PropertyDropdown("Swing motor type", constraintMotorTypeNames, arraysize(constraintMotorTypeNames), (uint32&)constraint.swingMotorType);
-
-												if (constraint.swingMotorType == constraint_velocity_motor)
+												bool swingLimitActive = constraint.swingLimit >= 0.f;
+												if (ImGui::PropertyCheckbox("Swing limit active", swingLimitActive))
 												{
-													ImGui::PropertySliderAngle("Swing motor velocity", constraint.swingMotorVelocity, -360.f, 360.f);
+													constraint.swingLimit = -constraint.swingLimit;
 												}
-												else
+												if (swingLimitActive)
 												{
-													float li = swingLimitActive ? constraint.swingLimit : -M_PI;
-													ImGui::PropertySliderAngle("Swing motor target angle", constraint.swingMotorTargetAngle, rad2deg(-li), rad2deg(li));
+													ImGui::PropertySliderAngle("Swing limit", constraint.swingLimit, 0.f, 180.f);
 												}
 
-												ImGui::PropertySliderAngle("Swing motor axis angle", constraint.swingMotorAxis, -180.f, 180.f);
-												ImGui::PropertySlider("Max swing motor torque", constraint.maxSwingMotorTorque, 0.001f, 1000.f);
+												bool twistLimitActive = constraint.twistLimit >= 0.f;
+												if (ImGui::PropertyCheckbox("Twist limit active", twistLimitActive))
+												{
+													constraint.twistLimit = -constraint.twistLimit;
+												}
+												if (twistLimitActive)
+												{
+													ImGui::PropertySliderAngle("Twist limit", constraint.twistLimit, 0.f, 180.f);
+												}
+
+												bool twistMotorActive = constraint.maxTwistMotorTorque > 0.f;
+												if (ImGui::PropertyCheckbox("Twist motor active", twistMotorActive))
+												{
+													constraint.maxTwistMotorTorque = -constraint.maxTwistMotorTorque;
+												}
+												if (twistMotorActive)
+												{
+													ImGui::PropertyDropdown("Twist motor type", constraintMotorTypeNames, arraysize(constraintMotorTypeNames), (uint32&)constraint.twistMotorType);
+
+													if (constraint.twistMotorType == constraint_velocity_motor)
+													{
+														ImGui::PropertySliderAngle("Twist motor velocity", constraint.twistMotorVelocity, -360.f, 360.f);
+													}
+													else
+													{
+														float li = twistLimitActive ? constraint.twistLimit : -M_PI;
+														ImGui::PropertySliderAngle("Twist motor target angle", constraint.twistMotorTargetAngle, rad2deg(-li), rad2deg(li));
+													}
+
+													ImGui::PropertySlider("Max twist motor torque", constraint.maxTwistMotorTorque, 0.001f, 1000.f);
+												}
+
+												bool swingMotorActive = constraint.maxSwingMotorTorque > 0.f;
+												if (ImGui::PropertyCheckbox("Swing motor active", swingMotorActive))
+												{
+													constraint.maxSwingMotorTorque = -constraint.maxSwingMotorTorque;
+												}
+												if (swingMotorActive)
+												{
+													ImGui::PropertyDropdown("Swing motor type", constraintMotorTypeNames, arraysize(constraintMotorTypeNames), (uint32&)constraint.swingMotorType);
+
+													if (constraint.swingMotorType == constraint_velocity_motor)
+													{
+														ImGui::PropertySliderAngle("Swing motor velocity", constraint.swingMotorVelocity, -360.f, 360.f);
+													}
+													else
+													{
+														float li = swingLimitActive ? constraint.swingLimit : -M_PI;
+														ImGui::PropertySliderAngle("Swing motor target angle", constraint.swingMotorTargetAngle, rad2deg(-li), rad2deg(li));
+													}
+
+													ImGui::PropertySliderAngle("Swing motor axis angle", constraint.swingMotorAxis, -180.f, 180.f);
+													ImGui::PropertySlider("Max swing motor torque", constraint.maxSwingMotorTorque, 0.001f, 1000.f);
+												}
+												ImGui::EndProperties();
 											}
-											ImGui::EndProperties();
-										}
-									});
+										});
 								} break;
 
 								case constraint_type_slider:
 								{
 									drawComponent<slider_constraint>(constraintEntity, "Slider constraint", [this, constraintEntity = constraintEntity](slider_constraint& constraint)
-									{
-										if (ImGui::BeginProperties())
 										{
-											scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
-											if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
+											if (ImGui::BeginProperties())
 											{
-												setSelectedEntity(otherEntity);
-											}
-
-											bool minLimitActive = constraint.negDistanceLimit <= 0.f;
-											if (ImGui::PropertyCheckbox("Lower limit active", minLimitActive))
-											{
-												constraint.negDistanceLimit = -constraint.negDistanceLimit;
-											}
-											if (minLimitActive)
-											{
-												float minLimit = -constraint.negDistanceLimit;
-												ImGui::PropertySlider("Lower limit", minLimit, 0.f, 1000.f, "-%.3f");
-												constraint.negDistanceLimit = -minLimit;
-											}
-
-											bool maxLimitActive = constraint.posDistanceLimit >= 0.f;
-											if (ImGui::PropertyCheckbox("Upper limit active", maxLimitActive))
-											{
-												constraint.posDistanceLimit = -constraint.posDistanceLimit;
-											}
-											if (maxLimitActive)
-											{
-												ImGui::PropertySlider("Upper limit", constraint.posDistanceLimit, 0.f, 1000.f);
-											}
-
-											bool motorActive = constraint.maxMotorForce > 0.f;
-											if (ImGui::PropertyCheckbox("Motor active", motorActive))
-											{
-												constraint.maxMotorForce = -constraint.maxMotorForce;
-											}
-											if (motorActive)
-											{
-												ImGui::PropertyDropdown("Motor type", constraintMotorTypeNames, arraysize(constraintMotorTypeNames), (uint32&)constraint.motorType);
-
-												if (constraint.motorType == constraint_velocity_motor)
+												scene_entity otherEntity = getOtherEntity(constraintEntity.getComponent<constraint_entity_reference_component>(), selectedEntity);
+												if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
 												{
-													ImGui::PropertySlider("Motor velocity", constraint.motorVelocity, -10.f, 10.f);
-												}
-												else
-												{
-													float lo = minLimitActive ? constraint.negDistanceLimit : -100.f;
-													float hi = maxLimitActive ? constraint.posDistanceLimit : 100.f;
-													ImGui::PropertySlider("Motor target distance", constraint.motorTargetDistance, lo, hi);
+													setSelectedEntity(otherEntity);
 												}
 
-												ImGui::PropertySlider("Max motor force", constraint.maxMotorForce, 0.001f, 1000.f);
+												bool minLimitActive = constraint.negDistanceLimit <= 0.f;
+												if (ImGui::PropertyCheckbox("Lower limit active", minLimitActive))
+												{
+													constraint.negDistanceLimit = -constraint.negDistanceLimit;
+												}
+												if (minLimitActive)
+												{
+													float minLimit = -constraint.negDistanceLimit;
+													ImGui::PropertySlider("Lower limit", minLimit, 0.f, 1000.f, "-%.3f");
+													constraint.negDistanceLimit = -minLimit;
+												}
+
+												bool maxLimitActive = constraint.posDistanceLimit >= 0.f;
+												if (ImGui::PropertyCheckbox("Upper limit active", maxLimitActive))
+												{
+													constraint.posDistanceLimit = -constraint.posDistanceLimit;
+												}
+												if (maxLimitActive)
+												{
+													ImGui::PropertySlider("Upper limit", constraint.posDistanceLimit, 0.f, 1000.f);
+												}
+
+												bool motorActive = constraint.maxMotorForce > 0.f;
+												if (ImGui::PropertyCheckbox("Motor active", motorActive))
+												{
+													constraint.maxMotorForce = -constraint.maxMotorForce;
+												}
+												if (motorActive)
+												{
+													ImGui::PropertyDropdown("Motor type", constraintMotorTypeNames, arraysize(constraintMotorTypeNames), (uint32&)constraint.motorType);
+
+													if (constraint.motorType == constraint_velocity_motor)
+													{
+														ImGui::PropertySlider("Motor velocity", constraint.motorVelocity, -10.f, 10.f);
+													}
+													else
+													{
+														float lo = minLimitActive ? constraint.negDistanceLimit : -100.f;
+														float hi = maxLimitActive ? constraint.posDistanceLimit : 100.f;
+														ImGui::PropertySlider("Motor target distance", constraint.motorTargetDistance, lo, hi);
+													}
+
+													ImGui::PropertySlider("Max motor force", constraint.maxMotorForce, 0.001f, 1000.f);
+												}
+												ImGui::EndProperties();
 											}
-											ImGui::EndProperties();
-										}
-									});
+										});
 								} break;
-							}
+								}
 
-							ImGui::PopID();
-						}
-					});
+								ImGui::PopID();
+							}
+						});
 
 					drawComponent<cloth_component>(selectedEntity, "CLOTH", [](cloth_component& cloth)
-					{
-						bool dirty = false;
-						if (ImGui::BeginProperties())
 						{
-							dirty |= ImGui::PropertyInput("Total mass", cloth.totalMass);
-							dirty |= ImGui::PropertySlider("Stiffness", cloth.stiffness, 0.01f, 0.7f);
+							bool dirty = false;
+							if (ImGui::BeginProperties())
+							{
+								dirty |= ImGui::PropertyInput("Total mass", cloth.totalMass);
+								dirty |= ImGui::PropertySlider("Stiffness", cloth.stiffness, 0.01f, 0.7f);
 
-							// These two don't need to notify the cloth on change.
-							ImGui::PropertySlider("Velocity damping", cloth.damping, 0.f, 1.f);
-							ImGui::PropertySlider("Gravity factor", cloth.gravityFactor, 0.f, 1.f);
+								// These two don't need to notify the cloth on change.
+								ImGui::PropertySlider("Velocity damping", cloth.damping, 0.f, 1.f);
+								ImGui::PropertySlider("Gravity factor", cloth.gravityFactor, 0.f, 1.f);
 
-							ImGui::EndProperties();
-						}
+								ImGui::EndProperties();
+							}
 
-						if (dirty)
-						{
-							cloth.recalculateProperties();
-						}
-					});
+							if (dirty)
+							{
+								cloth.recalculateProperties();
+							}
+						});
 
 					drawComponent<point_light_component>(selectedEntity, "POINT LIGHT", [](point_light_component& pl)
-					{
-						if (ImGui::BeginProperties())
 						{
-							ImGui::PropertyColor("Color", pl.color);
-							ImGui::PropertySlider("Intensity", pl.intensity, 0.f, 10.f);
-							ImGui::PropertySlider("Radius", pl.radius, 0.f, 100.f);
-							ImGui::PropertyCheckbox("Casts shadow", pl.castsShadow);
-							if (pl.castsShadow)
+							if (ImGui::BeginProperties())
 							{
-								ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, pl.shadowMapResolution);
-							}
+								ImGui::PropertyColor("Color", pl.color);
+								ImGui::PropertySlider("Intensity", pl.intensity, 0.f, 10.f);
+								ImGui::PropertySlider("Radius", pl.radius, 0.f, 100.f);
+								ImGui::PropertyCheckbox("Casts shadow", pl.castsShadow);
+								if (pl.castsShadow)
+								{
+									ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, pl.shadowMapResolution);
+								}
 
-							ImGui::EndProperties();
-						}
-					});
+								ImGui::EndProperties();
+							}
+						});
 
 					drawComponent<spot_light_component>(selectedEntity, "SPOT LIGHT", [](spot_light_component& sl)
-					{
-						if (ImGui::BeginProperties())
 						{
-							float inner = rad2deg(sl.innerAngle);
-							float outer = rad2deg(sl.outerAngle);
-
-							ImGui::PropertyColor("Color", sl.color);
-							ImGui::PropertySlider("Intensity", sl.intensity, 0.f, 10.f);
-							ImGui::PropertySlider("Distance", sl.distance, 0.f, 100.f);
-							ImGui::PropertySlider("Inner angle", inner, 0.1f, 80.f);
-							ImGui::PropertySlider("Outer angle", outer, 0.2f, 85.f);
-							ImGui::PropertyCheckbox("Casts shadow", sl.castsShadow);
-							if (sl.castsShadow)
+							if (ImGui::BeginProperties())
 							{
-								ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, sl.shadowMapResolution);
+								float inner = rad2deg(sl.innerAngle);
+								float outer = rad2deg(sl.outerAngle);
+
+								ImGui::PropertyColor("Color", sl.color);
+								ImGui::PropertySlider("Intensity", sl.intensity, 0.f, 10.f);
+								ImGui::PropertySlider("Distance", sl.distance, 0.f, 100.f);
+								ImGui::PropertySlider("Inner angle", inner, 0.1f, 80.f);
+								ImGui::PropertySlider("Outer angle", outer, 0.2f, 85.f);
+								ImGui::PropertyCheckbox("Casts shadow", sl.castsShadow);
+								if (sl.castsShadow)
+								{
+									ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, sl.shadowMapResolution);
+								}
+
+								sl.innerAngle = deg2rad(inner);
+								sl.outerAngle = deg2rad(outer);
+
+								ImGui::EndProperties();
 							}
-
-							sl.innerAngle = deg2rad(inner);
-							sl.outerAngle = deg2rad(outer);
-
-							ImGui::EndProperties();
-						}
-					});
+						});
 
 					if (objectMovedByWidget)
 					{
@@ -1434,7 +1442,7 @@ void scene_editor::drawEntityCreationPopup()
 					10.f,
 					false,
 					512u
-				);
+					);
 
 			setSelectedEntity(pl);
 			clicked = true;
@@ -1452,7 +1460,7 @@ void scene_editor::drawEntityCreationPopup()
 					deg2rad(30.f),
 					false,
 					512u
-				);
+					);
 
 			setSelectedEntity(sl);
 			clicked = true;
@@ -1545,7 +1553,7 @@ static bool editCamera(render_camera& camera)
 
 			ImGui::EndProperties();
 		}
-		
+
 		ImGui::EndTree();
 	}
 	return result;
@@ -1558,11 +1566,11 @@ static bool plotAndEditTonemapping(tonemap_settings& tonemap)
 	{
 		ImGui::PlotLines("",
 			[](void* data, int idx)
-		{
-			float t = idx * 0.01f;
-			tonemap_settings& aces = *(tonemap_settings*)data;
-			return aces.tonemap(t);
-		},
+			{
+				float t = idx * 0.01f;
+				tonemap_settings& aces = *(tonemap_settings*)data;
+				return aces.tonemap(t);
+			},
 			&tonemap, 100, 0, 0, 0.f, 1.f, ImVec2(250.f, 250.f));
 
 		if (ImGui::BeginProperties())

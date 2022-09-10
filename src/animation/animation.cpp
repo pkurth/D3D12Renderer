@@ -1014,8 +1014,8 @@ void animation_component::drawCurrentSkeleton(const ref<composite_mesh>& mesh, c
 		if (limb.representativeJoint != INVALID_JOINT)
 		{
 			const auto& joint = skeleton.joints[limb.representativeJoint];
-			vec3 a = vec3(0.f, limb.dimensions.minY, 0.f);
-			vec3 b = vec3(0.f, limb.dimensions.maxY, 0.f);
+			vec3 a = vec3(limb.dimensions.xOffset, limb.dimensions.minY, limb.dimensions.zOffset);
+			vec3 b = vec3(limb.dimensions.xOffset, limb.dimensions.maxY, limb.dimensions.zOffset);
 			a = transformPosition(joint.bindTransform, a);
 			b = transformPosition(joint.bindTransform, b);
 			a = transformPosition(transform, a);
