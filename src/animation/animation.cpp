@@ -892,7 +892,31 @@ void animation_component::update(const ref<composite_mesh>& mesh, memory_arena& 
 	}
 }
 
-static vec3 limbTypeColors[] =
+const char* limbTypeNames[] =
+{
+	"Unknown",
+
+	"Torso",
+	"Head",
+
+	"Upper arm right",
+	"Lower arm right",
+	"Hand right",
+
+	"Upper arm left",
+	"Lower arm left",
+	"Hand left",
+
+	"Upper leg right",
+	"Lower leg right",
+	"Foot right",
+
+	"Upper leg left",
+	"Lower leg left",
+	"Foot left",
+};
+
+const vec3 limbTypeColors[] =
 {
 	vec3(1.f, 0.f, 1.f),
 

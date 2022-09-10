@@ -3,6 +3,7 @@
 #include "core/imgui.h"
 #include "geometry/mesh.h"
 #include "animation/animation.h"
+#include "editor_icons.h"
 
 void asset_editor_panel::beginFrame()
 {
@@ -65,8 +66,8 @@ void asset_editor_panel::close()
 
 mesh_editor_panel::mesh_editor_panel()
 {
-	title = ICON_FA_CUBE "  Mesh editor";
-	dragDropTarget = "content_browser_mesh";
+	title = EDITOR_ICON_MESH "  Mesh editor";
+	dragDropTarget = EDITOR_ICON_MESH;
 
 	renderer_spec spec = { false, false, false, false, false, false };
 

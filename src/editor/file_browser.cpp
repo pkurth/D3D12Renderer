@@ -1,12 +1,12 @@
 #include "pch.h"
 #include "file_browser.h"
+#include "editor_icons.h"
 #include "core/imgui.h"
 #include "core/assimp.h"
 #include "core/image.h"
 #include "audio/sound.h"
 
 #include <shellapi.h>
-#include <fontawesome/IconsFontAwesome5.h>
 #include <imgui/imgui_internal.h>
 
 file_browser::file_browser()
@@ -18,11 +18,12 @@ static const char* getTypeIcon(file_browser::dir_entry_type type)
 {
 	if (type == file_browser::dir_entry_type_directory) return ICON_FA_FOLDER_OPEN;
 	if (type == file_browser::dir_entry_type_empty_directory) return ICON_FA_FOLDER;
-	if (type == file_browser::dir_entry_type_mesh) return ICON_FA_CUBE;
-	if (type == file_browser::dir_entry_type_image) return ICON_FA_FILE_IMAGE;
-	if (type == file_browser::dir_entry_type_image_hdr) return ICON_FA_CLOUD_SUN;
-	if (type == file_browser::dir_entry_type_font) return ICON_FA_FONT;
-	if (type == file_browser::dir_entry_type_audio) return ICON_FA_VOLUME_UP;
+
+	if (type == file_browser::dir_entry_type_mesh) return EDITOR_ICON_MESH;
+	if (type == file_browser::dir_entry_type_image) return EDITOR_ICON_IMAGE;
+	if (type == file_browser::dir_entry_type_image_hdr) return EDITOR_ICON_IMAGE_HDR;
+	if (type == file_browser::dir_entry_type_font) return EDITOR_ICON_FONT;
+	if (type == file_browser::dir_entry_type_audio) return EDITOR_ICON_AUDIO;
 
 	return ICON_FA_FILE;
 }
@@ -134,7 +135,7 @@ void file_browser::draw()
 								ImGui::PopID();
 								break;
 							}
-							else if (p.type == dir_entry_type_mesh)
+							else if (p.type == dir_entry_type_mesh || p.type == dir_entry_type_image_hdr)
 							{
 								ImGui::SetTooltip("Drag&drop into scene to instantiate.");
 							}
@@ -164,7 +165,7 @@ void file_browser::draw()
 							{
 								fs::path fullPath = currentPath / p.filename;
 								std::string str = fullPath.string();
-								ImGui::SetDragDropPayload("content_browser_mesh", str.c_str(), str.length() + 1, ImGuiCond_Once);
+								ImGui::SetDragDropPayload(EDITOR_ICON_MESH, str.c_str(), str.length() + 1, ImGuiCond_Once);
 								ImGui::Text("Drop into scene to instantiate.");
 								ImGui::EndDragDropSource();
 							}
@@ -175,7 +176,7 @@ void file_browser::draw()
 							{
 								fs::path fullPath = currentPath / p.filename;
 								std::string str = fullPath.string();
-								ImGui::SetDragDropPayload("content_browser_audio", str.c_str(), str.length() + 1, ImGuiCond_Once);
+								ImGui::SetDragDropPayload(EDITOR_ICON_AUDIO, str.c_str(), str.length() + 1, ImGuiCond_Once);
 								ImGui::EndDragDropSource();
 							}
 						}
@@ -185,7 +186,8 @@ void file_browser::draw()
 							{
 								fs::path fullPath = currentPath / p.filename;
 								std::string str = fullPath.string();
-								ImGui::SetDragDropPayload("content_browser_sky", str.c_str(), str.length() + 1, ImGuiCond_Once);
+								ImGui::SetDragDropPayload(EDITOR_ICON_IMAGE_HDR, str.c_str(), str.length() + 1, ImGuiCond_Once);
+								ImGui::Text("Drop into scene to instantiate.");
 								ImGui::EndDragDropSource();
 							}
 						}

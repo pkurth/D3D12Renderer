@@ -315,7 +315,7 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			c.name = n["Name"].as<fs::path>();
+			c.handle = n["Handle"].as<asset_handle>();
 
 			return true;
 		}

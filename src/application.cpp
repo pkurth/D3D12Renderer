@@ -6,6 +6,7 @@
 #include "core/color.h"
 #include "core/imgui.h"
 #include "core/log.h"
+#include "core/assimp.h"
 #include "dx/dx_context.h"
 #include "dx/dx_profiling.h"
 #include "physics/physics.h"
@@ -815,14 +816,22 @@ void application::handleFileDrop(const fs::path& filename)
 {
 	fs::path path = filename;
 	fs::path relative = fs::relative(path, fs::current_path());
+	fs::path ext = relative.extension();
 
-	if (auto mesh = loadMeshFromFile(relative.string()))
+	if (isMeshExtension(ext))
 	{
-		fs::path path = filename;
-		path = path.stem();
+		if (auto mesh = loadMeshFromFile(relative.string()))
+		{
+			fs::path path = filename;
+			path = path.stem();
 
-		scene.getCurrentScene().createEntity(path.string().c_str())
-			.addComponent<transform_component>(vec3(0.f), quat::identity)
-			.addComponent<raster_component>(mesh);
+			scene.getCurrentScene().createEntity(path.string().c_str())
+				.addComponent<transform_component>(vec3(0.f), quat::identity)
+				.addComponent<raster_component>(mesh);
+		}
+	}
+	else if (ext == ".hdr")
+	{
+		scene.environment.setFromTexture(relative);
 	}
 }

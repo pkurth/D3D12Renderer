@@ -59,6 +59,8 @@ namespace ImGui
 	void Image(const ref<dx_texture>& texture, ImVec2 size);
 	void Image(const ref<dx_texture>& texture, uint32 width = 0, uint32 height = 0);
 
+	inline float CalcButtonWidth(const char* text) { return CalcTextSize(text).x + (GetStyle().FramePadding.x + GetStyle().FrameBorderSize) * 2.f; }
+
 	bool ImageButton(struct dx_cpu_descriptor_handle& handle, ImVec2 size, ImVec2 uvTopLeft = ImVec2(0, 0), ImVec2 uvBottomRight = ImVec2(1, 1));
 	bool ImageButton(struct dx_cpu_descriptor_handle& handle, uint32 width, uint32 height, ImVec2 uvTopLeft = ImVec2(0, 0), ImVec2 uvBottomRight = ImVec2(1, 1));
 	bool ImageButton(const ref<dx_texture>& texture, ImVec2 size, ImVec2 uvTopLeft = ImVec2(0, 0), ImVec2 uvBottomRight = ImVec2(1, 1));
@@ -87,7 +89,7 @@ namespace ImGui
 
 	void PopupOkButton(uint32 width = 120);
 
-	bool AssetHandle(const char* label, const char* type, asset_handle& asset);
+	bool AssetHandle(const char* label, const char* type, asset_handle& asset, const char* clearText = 0);
 
 
 	bool BeginProperties();
@@ -142,7 +144,7 @@ namespace ImGui
 
 	bool PropertyInputText(const char* label, char* buffer, uint32 bufferSize, bool disableInput = false);
 
-	bool PropertyAssetHandle(const char* label, const char* type, asset_handle& asset);
+	bool PropertyAssetHandle(const char* label, const char* type, asset_handle& asset, const char* clearText = 0);
 
 	bool PropertyDragDropStringTarget(const char* label, const char* dragDropID, std::string& value, const char* clearLabel = 0);
 

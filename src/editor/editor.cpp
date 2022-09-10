@@ -1,8 +1,10 @@
 #include "pch.h"
 #include "editor.h"
+#include "editor_icons.h"
 #include "core/imgui.h"
 #include "core/cpu_profiling.h"
 #include "core/log.h"
+#include "core/file_registry.h"
 #include "dx/dx_profiling.h"
 #include "scene/components.h"
 #include "animation/animation.h"
@@ -190,12 +192,12 @@ void scene_editor::drawMainMenuBar()
 
 			ImGui::Separator();
 
-			if (ImGui::MenuItem(soundEditorWindowOpen ? (ICON_FA_VOLUME_UP "  Hide sound editor") : (ICON_FA_VOLUME_UP "  Show sound editor")))
+			if (ImGui::MenuItem(soundEditorWindowOpen ? (EDITOR_ICON_AUDIO "  Hide sound editor") : (EDITOR_ICON_AUDIO "  Show sound editor")))
 			{
 				soundEditorWindowOpen = !soundEditorWindowOpen;
 			}
 
-			if (ImGui::MenuItem(editorPanels->meshEditor.isOpen() ? (ICON_FA_CUBE "  Hide mesh editor") : (ICON_FA_CUBE "  Show mesh editor")))
+			if (ImGui::MenuItem(editorPanels->meshEditor.isOpen() ? (EDITOR_ICON_MESH "  Hide mesh editor") : (EDITOR_ICON_MESH "  Show mesh editor")))
 			{
 				editorPanels->meshEditor.isOpen() ? editorPanels->meshEditor.close() : editorPanels->meshEditor.open();
 			}
@@ -485,6 +487,72 @@ bool scene_editor::drawSceneHierarchy()
 					drawComponent<dynamic_transform_component>(selectedEntity, "DYNAMIC", [](dynamic_transform_component& dynamic)
 					{
 						ImGui::Text("Dynamic");
+					});
+
+					drawComponent<raster_component>(selectedEntity, "RASTER", [this](raster_component& raster)
+					{
+						if (ImGui::BeginProperties())
+						{
+							if (ImGui::PropertyAssetHandle("Mesh", EDITOR_ICON_MESH, raster.mesh->handle))
+							{
+								fs::path path = getPathFromAssetHandle(raster.mesh->handle);
+								fs::path relative = fs::relative(path, fs::current_path());
+								if (auto mesh = loadMeshFromFile(relative.string()))
+								{
+									raster.mesh = mesh;
+									selectedEntity.removeComponent<animation_component>(); // For now.
+								}
+							}
+
+
+							ImGui::EndProperties();
+						}
+
+						ImGui::Separator();
+
+						animation_skeleton& skeleton = raster.mesh->skeleton;
+						if (skeleton.joints.size() > 0)
+						{
+							if (ImGui::BeginTree("Skeleton"))
+							{
+								if (ImGui::BeginTree("Joints"))
+								{
+									for (uint32 i = 0; i < (uint32)skeleton.joints.size(); ++i)
+									{
+										const skeleton_joint& j = skeleton.joints[i];
+										vec3 c = limbTypeColors[j.limbType];
+										ImGui::TextColored(ImVec4(c.x, c.y, c.z, 1.f), j.name.c_str());
+									}
+
+									ImGui::EndTree();
+								}
+
+								if (ImGui::BeginTree("Limbs"))
+								{
+									for (uint32 i = 0; i < limb_type_count; ++i)
+									{
+										if (i != limb_type_unknown)
+										{
+											const skeleton_limb& l = skeleton.limbs[i];
+											vec3 c = limbTypeColors[i];
+											ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(c.x, c.y, c.z, 1.f));
+											bool tree = ImGui::BeginTree(limbTypeNames[i]);
+											ImGui::PopStyleColor();
+											if (tree)
+											{
+
+
+												ImGui::EndTree();
+											}
+										}
+									}
+
+									ImGui::EndTree();
+								}
+
+								ImGui::EndTree();
+							}
+						}
 					});
 
 					drawComponent<animation_component>(selectedEntity, "ANIMATION", [this](animation_component& anim)
@@ -1741,16 +1809,16 @@ void scene_editor::drawSettings(float dt)
 
 			if (ImGui::BeginProperties())
 			{
-				std::string source = environment.isProcedural() ? "None (procedural)" : environment.name.string();
-				if (ImGui::PropertyDragDropStringTarget("Texture source", "content_browser_sky", source, environment.isProcedural() ? 0 : "Make procedural"))
+				asset_handle handle = environment.handle;
+				if (ImGui::PropertyAssetHandle("Texture source", EDITOR_ICON_IMAGE_HDR, handle, "Make proc"))
 				{
-					if (source.empty())
+					if (handle)
 					{
-						environment.setToProcedural(this->scene->sun.direction);
+						environment.setFromTexture(getPathFromAssetHandle(handle));
 					}
 					else
 					{
-						environment.setFromTexture(source);
+						environment.setToProcedural(this->scene->sun.direction);
 					}
 				}
 

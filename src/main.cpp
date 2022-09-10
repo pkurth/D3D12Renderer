@@ -10,6 +10,7 @@
 #include "core/file_registry.h"
 #include "editor/file_browser.h"
 #include "application.h"
+#include "editor/editor_icons.h"
 #include "rendering/render_utils.h"
 #include "rendering/main_renderer.h"
 #include "audio/audio.h"
@@ -235,7 +236,8 @@ int main(int argc, char** argv)
 
 		if (ImGui::BeginDragDropTarget())
 		{
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("content_browser_mesh")) { app.handleFileDrop((const char*)payload->Data); }
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(EDITOR_ICON_MESH)) { app.handleFileDrop((const char*)payload->Data); }
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(EDITOR_ICON_IMAGE_HDR)) { app.handleFileDrop((const char*)payload->Data); }
 			ImGui::EndDragDropTarget();
 		}
 

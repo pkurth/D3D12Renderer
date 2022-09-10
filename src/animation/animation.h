@@ -41,6 +41,9 @@ enum limb_type
 	limb_type_count,
 };
 
+extern const char* limbTypeNames[limb_type_count];
+extern const vec3 limbTypeColors[limb_type_count];
+
 struct skeleton_joint
 {
 	std::string name;

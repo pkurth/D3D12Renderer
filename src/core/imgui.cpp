@@ -472,12 +472,22 @@ namespace ImGui
 		ImGui::SetItemDefaultFocus();
 	}
 
-	bool AssetHandle(const char* label, const char* type, asset_handle& asset)
+	bool AssetHandle(const char* label, const char* type, asset_handle& asset, const char* clearText)
 	{
 		char buffer[32] = "";
 		if (asset)
 		{
-			snprintf(buffer, sizeof(buffer), "%llu", asset.value);
+			snprintf(buffer, sizeof(buffer), "%s  %llu", type, asset.value);
+		}
+		else
+		{
+			snprintf(buffer, sizeof(buffer), "%s", type);
+		}
+
+		if (clearText)
+		{
+			float resetWidth = ImGui::CalcButtonWidth(clearText) + ImGui::GetStyle().ItemSpacing.x;
+			ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - resetWidth);
 		}
 
 		ImGui::InputText("", buffer, sizeof(buffer), ImGuiInputTextFlags_ReadOnly);
@@ -498,6 +508,16 @@ namespace ImGui
 			if (!path.empty())
 			{
 				ImGui::SetTooltip(path.string().c_str());
+			}
+		}
+
+		if (clearText)
+		{
+			ImGui::SameLine();
+			if (ImGui::DisableableButton(clearText, asset))
+			{
+				asset = {};
+				result = true;
 			}
 		}
 
@@ -799,10 +819,10 @@ namespace ImGui
 		return result;
 	}
 
-	bool PropertyAssetHandle(const char* label, const char* type, asset_handle& asset)
+	bool PropertyAssetHandle(const char* label, const char* type, asset_handle& asset, const char* clearText)
 	{
 		pre(label);
-		bool result = AssetHandle("", type, asset);
+		bool result = AssetHandle("", type, asset, clearText);
 		post();
 		return result;
 	}

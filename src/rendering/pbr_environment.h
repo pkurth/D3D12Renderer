@@ -2,6 +2,7 @@
 
 #include "dx/dx_texture.h"
 #include "rendering/light_probe.h"
+#include "core/asset.h"
 
 enum environment_gi_mode
 {
@@ -18,7 +19,7 @@ static const char* environmentGIModeNames[] =
 struct pbr_environment
 {
 	environment_gi_mode giMode = environment_gi_update_baked;
-	fs::path name;
+	asset_handle handle = {};
 
 	ref<dx_texture> sky;
 	ref<dx_texture> irradiance;

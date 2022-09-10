@@ -3,6 +3,7 @@
 #include "texture_preprocessing.h"
 #include "render_resources.h"
 #include "dx/dx_context.h"
+#include "core/file_registry.h"
 
 void pbr_environment::setFromTexture(const fs::path& filename)
 {
@@ -24,7 +25,7 @@ void pbr_environment::setFromTexture(const fs::path& filename)
 
 		SET_NAME(sky->resource, "Sky");
 
-		name = filename;
+		handle = getAssetHandleFromPath(filename.lexically_normal());
 
 		dxContext.executeCommandList(cl);
 	}
@@ -37,6 +38,7 @@ void pbr_environment::setToProcedural(vec3 sunDirection)
 	allocate();
 
 	sky = 0;
+	handle = {};
 	proceduralSkyToIrradiance(cl, sunDirection, irradiance);
 	// TODO: Prefiltered radiance.
 

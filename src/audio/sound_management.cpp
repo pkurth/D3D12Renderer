@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "sound_management.h"
 #include "audio.h"
+#include "editor/editor_icons.h"
 
 #include "core/log.h"
 #include "core/imgui.h"
@@ -69,7 +70,7 @@ void drawSoundEditor()
 {
     if (soundEditorWindowOpen)
     {
-        if (ImGui::Begin(ICON_FA_VOLUME_UP "  Sound Editing", &soundEditorWindowOpen))
+        if (ImGui::Begin(EDITOR_ICON_AUDIO "  Sound Editing", &soundEditorWindowOpen))
         {
             static ImGuiTextFilter filter;
             filter.Draw();
@@ -96,7 +97,7 @@ void drawSoundEditor()
                     {
                         if (ImGui::BeginProperties())
                         {
-                            dirty |= ImGui::PropertyAssetHandle("Asset", "content_browser_audio", spec.asset);
+                            dirty |= ImGui::PropertyAssetHandle("Asset", EDITOR_ICON_AUDIO, spec.asset);
                             dirty |= ImGui::PropertyDropdown("Type", soundTypeNames, sound_type_count, (uint32&)spec.type);
                             dirty |= ImGui::PropertyCheckbox("Stream", spec.stream);
 
