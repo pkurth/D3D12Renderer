@@ -1136,6 +1136,31 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 	render_camera& camera = this->scene->camera;
 
 
+
+
+	if (!inputCaptured && !ImGui::IsAnyItemActive() && ImGui::IsKeyDown(key_shift) && ImGui::IsKeyPressed('A'))
+	{
+		ImGui::OpenPopup("CreateEntityPopup");
+		inputCaptured = true;
+	}
+
+	inputCaptured |= drawEntityCreationPopup();
+
+	if (ImGui::BeginControlsWindow("##EntityControls"))
+	{
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+
+		if (ImGui::Button(ICON_FA_PLUS)) { ImGui::OpenPopup("CreateEntityPopup"); }
+		if (ImGui::IsItemHovered()) { ImGui::SetTooltip("Create entity (Shift+A)"); }
+		inputCaptured |= drawEntityCreationPopup();
+
+		ImGui::PopStyleColor();
+	}
+	ImGui::End();
+
+
+
+
 	if (selectedColliderEntity)
 	{
 		const trs& transform = selectedEntity.getComponent<transform_component>();
@@ -1301,26 +1326,6 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 	}
 
 
-	if (!inputCaptured && !ImGui::IsAnyItemActive() && ImGui::IsKeyDown(key_shift) && ImGui::IsKeyPressed('A'))
-	{
-		ImGui::OpenPopup("CreateEntityPopup");
-		inputCaptured = true;
-	}
-
-	drawEntityCreationPopup();
-
-	if (ImGui::BeginControlsWindow("##EntityControls"))
-	{
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-
-		if (ImGui::Button(ICON_FA_PLUS)) { ImGui::OpenPopup("CreateEntityPopup"); }
-		if (ImGui::IsItemHovered()) { ImGui::SetTooltip("Create entity (Shift+A)"); }
-		drawEntityCreationPopup();
-
-		ImGui::PopStyleColor();
-	}
-	ImGui::End();
-
 	// Current window is expected to be scene viewport!
 	ImVec2 viewportPos = ImGui::GetWindowPos();
 	ImVec2 viewportSize = ImGui::GetWindowSize();
@@ -1423,15 +1428,15 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 	return objectMovedByGizmo;
 }
 
-void scene_editor::drawEntityCreationPopup()
+bool scene_editor::drawEntityCreationPopup()
 {
 	game_scene* scene = &this->scene->getCurrentScene();
 	render_camera& camera = this->scene->camera;
+	
+	bool clicked = false;
 
 	if (ImGui::BeginPopup("CreateEntityPopup"))
 	{
-		bool clicked = false;
-
 		if (ImGui::MenuItem("Point light", "P") || ImGui::IsKeyPressed('P'))
 		{
 			auto pl = scene->createEntity("Point light")
@@ -1500,6 +1505,8 @@ void scene_editor::drawEntityCreationPopup()
 
 		ImGui::EndPopup();
 	}
+
+	return clicked;
 }
 
 void scene_editor::serializeToFile()
