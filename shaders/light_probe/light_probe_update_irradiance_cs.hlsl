@@ -26,6 +26,7 @@ void main(cs_input IN)
 	uint probeIndex = probeIndex3.z * cb.countX * cb.countY + probeIndex3.y * cb.countX + probeIndex3.x;
 
 #if USE_SHARED_MEMORY
+	[unroll]
 	for (uint i = IN.groupIndex; i < NUM_RAYS_PER_PROBE; i += (LIGHT_PROBE_BLOCK_SIZE * LIGHT_PROBE_BLOCK_SIZE))
 	{
 		uint2 c = uint2(i, probeIndex);

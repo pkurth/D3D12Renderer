@@ -85,7 +85,7 @@ static float3 proceduralSky(float3 V, float3 L)
 			max(0.f, (1.f - max(0.f, (1.f - L.y * 3.f)) * V.y * 4.f)),
 			0.f,
 			L.y)
-		* saturate(pow(0.5f * LdotV + 0.5f, (8.f - L.y * 5.f)))
+		* saturate(pow(saturate(0.5f * LdotV + 0.5f), (8.f - L.y * 5.f)))
 		* suncolor;
 
 
@@ -114,7 +114,7 @@ static float3 proceduralSkySimple(float3 V, float3 L)
 			max(0.f, (1.f - max(0.f, (1.f - L.y * 3.f)) * V.y * 4.f)),
 			0.f,
 			L.y)
-		* saturate(pow(0.5f * LdotV + 0.5f, (8.f - L.y * 5.f)))
+		* saturate(pow(saturate(0.5f * LdotV + 0.5f), (8.f - L.y * 5.f)))
 		* suncolor;
 
 
