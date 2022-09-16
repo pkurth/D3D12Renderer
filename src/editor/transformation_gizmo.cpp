@@ -64,7 +64,7 @@ static dx_mesh mesh;
 
 void initializeTransformationGizmos()
 {
-	mesh_builder mesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals);
+	mesh_builder mesh(mesh_creation_flags_with_positions | mesh_creation_flags_with_normals);
 	float shaftLength = 1.f;
 	float headLength = 0.2f;
 	float radius = 0.03f;

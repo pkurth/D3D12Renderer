@@ -19,20 +19,20 @@ void humanoid_ragdoll::initialize(game_scene& scene, vec3 initialHipPosition, fl
 
 	physics_material material = { physics_material_type_flesh, 0.2f, ragdollFriction, ragdollDensity };
 
-	trs torsoTransform(initialHipPosition + scale * vec3(0.f, 0.f, 0.f), quat::identity);
-	trs headTransform(initialHipPosition + scale * vec3(0.f, 1.45f, 0.f), quat::identity);
-	trs leftUpperArmTransform(initialHipPosition + scale * vec3(-0.6f, 0.75f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-30.f)));
-	trs leftLowerArmTransform(initialHipPosition + scale * vec3(-0.884f, 0.044f, -0.043f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-20.f)));
-	trs rightUpperArmTransform(initialHipPosition + scale * vec3(0.6f, 0.75f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(30.f)));
-	trs rightLowerArmTransform(initialHipPosition + scale * vec3(0.884f, 0.044f, -0.043f), quat(vec3(0.f, 0.f, 1.f), deg2rad(20.f)));
-	trs leftUpperLegTransform(initialHipPosition + scale * vec3(-0.371f, -0.812f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-10.f)));
-	trs leftLowerLegTransform(initialHipPosition + scale * vec3(-0.452f, -1.955f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-3.5f)));
-	trs leftFootTransform(initialHipPosition + scale * vec3(-0.498f, -2.585f, -0.18f), quat::identity);
-	trs leftToesTransform(initialHipPosition + scale * vec3(-0.498f, -2.585f, -0.637f), quat::identity);
-	trs rightUpperLegTransform(initialHipPosition + scale * vec3(0.371f, -0.812f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(10.f)));
-	trs rightLowerLegTransform(initialHipPosition + scale * vec3(0.452f, -1.955f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(3.5f)));
-	trs rightFootTransform(initialHipPosition + scale * vec3(0.498f, -2.585f, -0.18f), quat::identity);
-	trs rightToesTransform(initialHipPosition + scale * vec3(0.498f, -2.585f, -0.637f), quat::identity);
+	trs torsoTransform(scale * vec3(0.f, 0.f, 0.f), quat::identity);
+	trs headTransform(scale * vec3(0.f, 1.45f, 0.f), quat::identity);
+	trs leftUpperArmTransform(scale * vec3(-0.6f, 0.75f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-30.f)));
+	trs leftLowerArmTransform(scale * vec3(-0.884f, 0.044f, -0.043f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-20.f)));
+	trs rightUpperArmTransform(scale * vec3(0.6f, 0.75f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(30.f)));
+	trs rightLowerArmTransform(scale * vec3(0.884f, 0.044f, -0.043f), quat(vec3(0.f, 0.f, 1.f), deg2rad(20.f)));
+	trs leftUpperLegTransform(scale * vec3(-0.371f, -0.812f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-10.f)));
+	trs leftLowerLegTransform(scale * vec3(-0.452f, -1.955f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(-3.5f)));
+	trs leftFootTransform(scale * vec3(-0.498f, -2.585f, -0.18f), quat::identity);
+	trs leftToesTransform(scale * vec3(-0.498f, -2.585f, -0.637f), quat::identity);
+	trs rightUpperLegTransform(scale * vec3(0.371f, -0.812f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(10.f)));
+	trs rightLowerLegTransform(scale * vec3(0.452f, -1.955f, 0.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(3.5f)));
+	trs rightFootTransform(scale * vec3(0.498f, -2.585f, -0.18f), quat::identity);
+	trs rightToesTransform(scale * vec3(0.498f, -2.585f, -0.637f), quat::identity);
 
 	torso = scene.createEntity("Torso")
 		.addComponent<transform_component>(torsoTransform)
@@ -125,15 +125,13 @@ void humanoid_ragdoll::initialize(game_scene& scene, vec3 initialHipPosition, fl
 
 
 	quat rotation(vec3(0.f, 1.f, 0.f), initialRotation);
-	auto rotateTransform = [rotation](trs& transform)
-	{
-		transform.rotation = rotation * transform.rotation;
-		transform.position = rotation * transform.position;
-	};
-
 	for (uint32 i = 0; i < arraysize(bodyParts); ++i)
 	{
-		rotateTransform(bodyParts[i].getComponent<transform_component>());
+		transform_component& transform = bodyParts[i].getComponent<transform_component>();
+		transform.rotation = rotation * transform.rotation;
+		transform.position = rotation * transform.position + initialHipPosition;
+
+		bodyParts[i].getComponent<physics_transform0_component>() = bodyParts[i].getComponent<physics_transform1_component>() = transform;
 	}
 
 #if 0

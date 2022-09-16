@@ -84,6 +84,7 @@ void scene_editor::setSelectedEntityNoUndo(scene_entity entity)
 	selectedEntity = entity;
 	updateSelectedEntityUIRotation();
 	selectedColliderEntity = {};
+	selectedConstraintEntity = {};
 }
 
 void scene_editor::initialize(editor_scene* scene, main_renderer* renderer, editor_panels* editorPanels)
@@ -100,7 +101,8 @@ bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPas
 {
 	CPU_PROFILE_BLOCK("Update editor");
 
-	if (selectedEntity && !scene->getCurrentScene().isEntityValid(selectedEntity))
+	auto& scene = this->scene->getCurrentScene();
+	if (selectedEntity && !scene.isEntityValid(selectedEntity))
 	{
 		setSelectedEntityNoUndo({});
 	}
@@ -110,6 +112,62 @@ bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPas
 	objectDragged |= drawSceneHierarchy();
 	drawMainMenuBar();
 	drawSettings(dt);
+
+
+	if (selectedConstraintEntity)
+	{
+		if (auto* ref = selectedConstraintEntity.getComponentIfExists<constraint_entity_reference_component>())
+		{
+			scene_entity entityA = { ref->entityA, scene };
+			scene_entity entityB = { ref->entityB, scene };
+
+			const trs& transformA = entityA.getComponent<transform_component>();
+			const trs& transformB = entityB.getComponent<transform_component>();
+
+			const vec4 constraintColor(1.f, 1.f, 0.f, 1.f);
+
+			if (distance_constraint* c = selectedConstraintEntity.getComponentIfExists<distance_constraint>())
+			{
+				vec3 a = transformPosition(transformA, c->localAnchorA);
+				vec3 b = transformPosition(transformB, c->localAnchorB);
+				vec3 center = 0.5f * (a + b);
+				vec3 d = normalize(b - a);
+				a -= d * (c->globalLength * 0.5f);
+				b += d * (c->globalLength * 0.5f);
+
+				renderLine(a, b, constraintColor, ldrRenderPass, true);
+			}
+			else if (ball_constraint* c = selectedConstraintEntity.getComponentIfExists<ball_constraint>())
+			{
+
+			}
+			else if (fixed_constraint* c = selectedConstraintEntity.getComponentIfExists<fixed_constraint>())
+			{
+
+			}
+			else if (hinge_constraint* c = selectedConstraintEntity.getComponentIfExists<hinge_constraint>())
+			{
+				vec3 pos = transformPosition(transformA, c->localAnchorA);
+				vec3 hingeAxis = transformDirection(transformA, c->localHingeAxisA);
+				vec3 zeroDegAxis = transformDirection(transformB, c->localHingeTangentB);
+				vec3 localHingeCompareA = conjugate(transformA.rotation) * (transformB.rotation * c->localHingeTangentB);
+				float curAngle = atan2(dot(localHingeCompareA, c->localHingeBitangentA), dot(localHingeCompareA, c->localHingeTangentA));
+				float minAngle = c->minRotationLimit - curAngle;
+				float maxAngle = c->maxRotationLimit - curAngle;
+
+				renderAngleRing(pos, hingeAxis, 0.2f, 0.17f, zeroDegAxis, minAngle, maxAngle, constraintColor, ldrRenderPass, true);
+				renderLine(pos, pos + hingeAxis * 0.2f, constraintColor, ldrRenderPass, true);
+			}
+			else if (cone_twist_constraint* c = selectedConstraintEntity.getComponentIfExists<cone_twist_constraint>())
+			{
+
+			}
+			else if (slider_constraint* c = selectedConstraintEntity.getComponentIfExists<slider_constraint>())
+			{
+
+			}
+		}
+	}
 
 	return objectDragged;
 }
@@ -387,12 +445,11 @@ bool scene_editor::drawSceneHierarchy()
 			scene.view<tag_component>()
 				.each([this, &scene](auto entityHandle, tag_component& tag)
 			{
+				ImGui::PushID((uint32)entityHandle);
 				const char* name = tag.name;
 				scene_entity entity = { entityHandle, scene };
 
-				ImGui::Selectable(name, entity == selectedEntity);
-
-				if (ImGui::IsItemClicked(0) || ImGui::IsItemClicked(1))
+				if (ImGui::Selectable(name, entity == selectedEntity))
 				{
 					setSelectedEntity(entity);
 				}
@@ -410,9 +467,13 @@ bool scene_editor::drawSceneHierarchy()
 
 				if (entityDeleted)
 				{
+					if (entity == selectedEntity)
+					{
+						setSelectedEntityNoUndo({});
+					}
 					scene.deleteEntity(entity);
-					setSelectedEntityNoUndo({});
 				}
+				ImGui::PopID();
 			});
 		}
 		ImGui::EndChild();
@@ -507,60 +568,6 @@ bool scene_editor::drawSceneHierarchy()
 
 							ImGui::EndProperties();
 						}
-
-						ImGui::Separator();
-
-						animation_skeleton& skeleton = raster.mesh->skeleton;
-						if (skeleton.joints.size() > 0)
-						{
-							if (ImGui::BeginTree("Skeleton"))
-							{
-								if (ImGui::BeginTree("Joints"))
-								{
-									for (uint32 i = 0; i < (uint32)skeleton.joints.size(); ++i)
-									{
-										const skeleton_joint& j = skeleton.joints[i];
-										vec3 c = limbTypeColors[j.limbType];
-										ImGui::TextColored(ImVec4(c.x, c.y, c.z, 1.f), j.name.c_str());
-									}
-
-									ImGui::EndTree();
-								}
-
-								if (ImGui::BeginTree("Limbs"))
-								{
-									for (uint32 i = 0; i < limb_type_count; ++i)
-									{
-										if (i != limb_type_unknown)
-										{
-											skeleton_limb& l = skeleton.limbs[i];
-											vec3 c = limbTypeColors[i];
-											if (ImGui::BeginTreeColoredText(limbTypeNames[i], c))
-											{
-												if (ImGui::BeginProperties())
-												{
-													limb_dimensions& d = l.dimensions;
-													ImGui::PropertyDrag("Min Y", d.minY, 0.01f);
-													ImGui::PropertyDrag("Max Y", d.maxY, 0.01f);
-													ImGui::PropertyDrag("Radius", d.radius, 0.01f);
-
-													ImGui::PropertyDrag("Offset X", d.xOffset, 0.01f);
-													ImGui::PropertyDrag("Offset Z", d.zOffset, 0.01f);
-
-													ImGui::EndProperties();
-												}
-
-												ImGui::EndTree();
-											}
-										}
-									}
-
-									ImGui::EndTree();
-								}
-
-								ImGui::EndTree();
-							}
-						}
 					});
 
 					drawComponent<animation_component>(selectedEntity, "ANIMATION", [this](animation_component& anim)
@@ -590,6 +597,58 @@ bool scene_editor::drawSceneHierarchy()
 								}
 
 								ImGui::EndProperties();
+							}
+
+							animation_skeleton& skeleton = raster->mesh->skeleton;
+							if (skeleton.joints.size() > 0)
+							{
+								if (ImGui::BeginTree("Skeleton"))
+								{
+									if (ImGui::BeginTree("Joints"))
+									{
+										for (uint32 i = 0; i < (uint32)skeleton.joints.size(); ++i)
+										{
+											const skeleton_joint& j = skeleton.joints[i];
+											vec3 c = limbTypeColors[j.limbType];
+											ImGui::TextColored(ImVec4(c.x, c.y, c.z, 1.f), j.name.c_str());
+										}
+
+										ImGui::EndTree();
+									}
+
+									if (ImGui::BeginTree("Limbs"))
+									{
+										for (uint32 i = 0; i < limb_type_count; ++i)
+										{
+											if (i != limb_type_unknown)
+											{
+												skeleton_limb& l = skeleton.limbs[i];
+												vec3 c = limbTypeColors[i];
+												if (ImGui::BeginTreeColoredText(limbTypeNames[i], c))
+												{
+													if (ImGui::BeginProperties())
+													{
+														limb_dimensions& d = l.dimensions;
+														ImGui::PropertyDrag("Min Y", d.minY, 0.01f);
+														ImGui::PropertyDrag("Max Y", d.maxY, 0.01f);
+														ImGui::PropertyDrag("Radius", d.radius, 0.01f);
+
+														ImGui::PropertyDrag("Offset X", d.xOffset, 0.01f);
+														ImGui::PropertyDrag("Offset Z", d.zOffset, 0.01f);
+
+														ImGui::EndProperties();
+													}
+
+													ImGui::EndTree();
+												}
+											}
+										}
+
+										ImGui::EndTree();
+									}
+
+									ImGui::EndTree();
+								}
 							}
 						}
 					});
@@ -775,6 +834,12 @@ bool scene_editor::drawSceneHierarchy()
 												setSelectedEntity(otherEntity);
 											}
 
+											bool visConstraint = selectedConstraintEntity == constraintEntity;
+											if (ImGui::PropertyCheckbox("Visualize", visConstraint))
+											{
+												selectedConstraintEntity = visConstraint ? constraintEntity : scene_entity{};
+											}
+
 											ImGui::PropertySlider("Length", constraint.globalLength);
 											ImGui::EndProperties();
 										}
@@ -793,6 +858,12 @@ bool scene_editor::drawSceneHierarchy()
 												setSelectedEntity(otherEntity);
 											}
 
+											bool visConstraint = selectedConstraintEntity == constraintEntity;
+											if (ImGui::PropertyCheckbox("Visualize", visConstraint))
+											{
+												selectedConstraintEntity = visConstraint ? constraintEntity : scene_entity{};
+											}
+
 											ImGui::EndProperties();
 										}
 									});
@@ -808,6 +879,12 @@ bool scene_editor::drawSceneHierarchy()
 											if (ImGui::PropertyButton("Connected entity", ICON_FA_CUBE, otherEntity.getComponent<tag_component>().name))
 											{
 												setSelectedEntity(otherEntity);
+											}
+
+											bool visConstraint = selectedConstraintEntity == constraintEntity;
+											if (ImGui::PropertyCheckbox("Visualize", visConstraint))
+											{
+												selectedConstraintEntity = visConstraint ? constraintEntity : scene_entity{};
 											}
 
 											ImGui::EndProperties();
@@ -870,6 +947,12 @@ bool scene_editor::drawSceneHierarchy()
 												}
 
 												ImGui::PropertySlider("Max motor torque", constraint.maxMotorTorque, 0.001f, 10000.f);
+											}
+
+											bool visConstraint = selectedConstraintEntity == constraintEntity;
+											if (ImGui::PropertyCheckbox("Visualize", visConstraint))
+											{
+												selectedConstraintEntity = visConstraint ? constraintEntity : scene_entity{};
 											}
 											ImGui::EndProperties();
 										}
@@ -952,6 +1035,12 @@ bool scene_editor::drawSceneHierarchy()
 												ImGui::PropertySliderAngle("Swing motor axis angle", constraint.swingMotorAxis, -180.f, 180.f);
 												ImGui::PropertySlider("Max swing motor torque", constraint.maxSwingMotorTorque, 0.001f, 1000.f);
 											}
+
+											bool visConstraint = selectedConstraintEntity == constraintEntity;
+											if (ImGui::PropertyCheckbox("Visualize", visConstraint))
+											{
+												selectedConstraintEntity = visConstraint ? constraintEntity : scene_entity{};
+											}
 											ImGui::EndProperties();
 										}
 									});
@@ -1012,6 +1101,12 @@ bool scene_editor::drawSceneHierarchy()
 												}
 
 												ImGui::PropertySlider("Max motor force", constraint.maxMotorForce, 0.001f, 1000.f);
+											}
+
+											bool visConstraint = selectedConstraintEntity == constraintEntity;
+											if (ImGui::PropertyCheckbox("Visualize", visConstraint))
+											{
+												selectedConstraintEntity = visConstraint ? constraintEntity : scene_entity{};
 											}
 											ImGui::EndProperties();
 										}
@@ -1135,13 +1230,14 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 	render_camera& camera = this->scene->camera;
 
+	bool gizmoDrawn = false;
 
-	if (selectedColliderEntity)
+	collider_component* selectedCollider = selectedColliderEntity ? selectedColliderEntity.getComponentIfExists<collider_component>() : 0;
+
+	if (selectedCollider)
 	{
 		const trs& transform = selectedEntity.getComponent<transform_component>();
-		collider_component& c = selectedColliderEntity.getComponent<collider_component>();
-
-		bool gizmoDrawn = false;
+		auto& c = *selectedCollider;
 		const vec4 volumeColor(1.f, 1.f, 0.f, 1.f);
 		if (c.type == collider_type_sphere)
 		{

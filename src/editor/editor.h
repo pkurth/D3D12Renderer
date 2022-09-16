@@ -20,6 +20,7 @@ struct scene_editor
 
 private:
 	scene_entity selectedColliderEntity;
+	scene_entity selectedConstraintEntity;
 
 	void drawSettings(float dt);
 	void drawMainMenuBar();

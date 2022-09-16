@@ -974,14 +974,14 @@ void animation_component::drawCurrentSkeleton(const ref<composite_mesh>& mesh, c
 		}
 		else
 		{
-			*vertices++ = vec3(0.f, 0.f, 0.f);
-			*vertices++ = vec3(0.f, 0.f, 0.f);
+			*vertices++ = { vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 1.f) };
+			*vertices++ = { vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 1.f) };
 		}
 
 		*lines++ = { (uint16)(2 * i), (uint16)(2 * i + 1) };
 	}
 
-	renderWireDebug(trsToMat4(transform), vb, ib, vec4(1.f, 1.f, 1.f, 1.f), renderPass, true);
+	renderDebug<debug_unlit_line_pipeline::position_color>(trsToMat4(transform), vb, ib, vec4(1.f, 1.f, 1.f, 1.f), renderPass, true);
 
 #else
 
@@ -1003,7 +1003,7 @@ void animation_component::drawCurrentSkeleton(const ref<composite_mesh>& mesh, c
 		*lines++ = { (uint16)(2 * i), (uint16)(2 * i + 1) };
 	}
 
-	renderWireDebug(trsToMat4(transform), vb, ib, vec4(1.f, 1.f, 1.f, 1.f), renderPass, true);
+	renderDebug<debug_unlit_line_pipeline::position_color>(trsToMat4(transform), vb, ib, vec4(1.f, 1.f, 1.f, 1.f), renderPass, true);
 
 #else
 
