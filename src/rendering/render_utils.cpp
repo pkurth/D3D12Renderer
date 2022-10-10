@@ -11,6 +11,7 @@
 #include "bitonic_sort.h"
 #include "debug_visualization.h"
 #include "light_probe.h"
+#include "terrain/terrain.h"
 
 
 // Defined in render_algorithms.cpp.
@@ -33,6 +34,7 @@ void initializeRenderUtils()
 	debug_unlit_pipeline::initialize();
 	debug_unlit_line_pipeline::initialize();
 	pbr_pipeline::initialize();
+	terrain_pipeline::initialize();
 	particle_system::initializePipeline();
 	initializeBitonicSort();
 	loadAllParticleSystemPipelines();

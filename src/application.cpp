@@ -17,6 +17,7 @@
 #include "rendering/shadow_map.h"
 #include "rendering/debug_visualization.h"
 #include "audio/audio.h"
+#include "terrain/terrain.h"
 
 
 static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh)
@@ -84,6 +85,17 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			.addComponent<raytrace_component>(blas);
 	}
 #endif
+
+	auto terrain = scene.createEntity("Terrain")
+		.addComponent<terrain_component>(60.f, 25.f);
+
+	terrain_component& terrainComponent = terrain.getComponent<terrain_component>();
+
+	for (uint32 i = 0; i < 10; ++i)
+	{
+		terrainComponent.chunks.push_back({ vec2(60.f * i, 0.f) });
+	}
+
 
 #if 0
 	if (auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx"))
@@ -624,6 +636,21 @@ void application::update(const user_input& input, float dt)
 		{
 			anim.drawCurrentSkeleton(raster.mesh, transform, &ldrRenderPass);
 		}
+
+
+
+		for (auto [entityHandle, terrain] : scene.view<terrain_component>().each())
+		{
+			int32 lod = 0;
+			for (auto& chunk : terrain.chunks)
+			{
+				terrain_material material = { chunk.minCorner, lod, terrain.chunkSize, terrain.amplitudeScale, 2 - lod, 2 - lod, 0, 0 };
+				opaqueRenderPass.renderStaticObject<terrain_pipeline>(mat4::identity, {}, {}, {}, material, -1, false, false);
+
+				lod = 2 - lod;
+			}
+		}
+
 
 
 		// Render shadow maps.
