@@ -4,7 +4,7 @@
 #include <fontawesome/IconsFontAwesome5.h>
 
 #include "dx/dx.h"
-#include "core/math.h"
+#include "math.h"
 
 ImGuiContext* initializeImGui(struct dx_window& window);
 void newImGuiFrame(float dt);

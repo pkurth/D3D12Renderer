@@ -2,9 +2,7 @@
 #include "assimp.h"
 #include "log.h"
 
-#ifndef PHYSICS_ONLY
 #include "rendering/pbr.h"
-#endif
 
 #include <assimp/Exporter.hpp>
 #include <assimp/postprocess.h>

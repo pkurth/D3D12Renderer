@@ -5,7 +5,6 @@
 #include "rendering/pbr.h"
 #include "geometry/mesh.h"
 #include "geometry/mesh_builder.h"
-#include "core/imgui.h"
 #endif
 
 void humanoid_ragdoll::initialize(game_scene& scene, vec3 initialHipPosition, float initialRotation)

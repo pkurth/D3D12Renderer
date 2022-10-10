@@ -1,8 +1,8 @@
 #include "pch.h"
 #include "cloth.h"
 #include "physics.h"
+#include "core/random.h"
 #include "core/cpu_profiling.h"
-#include "dx/dx_context.h"
 
 cloth_component::cloth_component(float width, float height, uint32 gridSizeX, uint32 gridSizeY, float totalMass, float stiffness, float damping, float gravityFactor)
 	: gridSizeX(gridSizeX), gridSizeY(gridSizeY), width(width), height(height)

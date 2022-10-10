@@ -1,12 +1,6 @@
 #include "pch.h"
 #include "vehicle.h"
 
-#ifndef PHYSICS_ONLY
-#include "rendering/pbr.h"
-#include "geometry/mesh.h"
-#include "geometry/mesh_builder.h"
-#include "core/imgui.h"
-#endif
 
 struct gear_description
 {

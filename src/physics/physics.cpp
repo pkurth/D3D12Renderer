@@ -2,7 +2,6 @@
 #include "physics.h"
 #include "collision_broad.h"
 #include "collision_narrow.h"
-#include "geometry/mesh_builder.h"
 #include "core/cpu_profiling.h"
 
 #ifndef PHYSICS_ONLY
@@ -52,6 +51,7 @@ struct force_field_global_state
 #ifndef PHYSICS_ONLY
 // This is a bit dirty. PHYSICS_ONLY is defined when building the learning DLL, where we don't need bounding hulls.
 
+#include "geometry/mesh_builder.h"
 #include "core/assimp.h"
 
 uint32 allocateBoundingHullGeometry(const std::string& meshFilepath)

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/threading.h"
+#include "threading.h"
 #include "profiling_internal.h"
 
 extern bool cpuProfilerWindowOpen;
