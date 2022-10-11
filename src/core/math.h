@@ -37,6 +37,7 @@ static constexpr float smoothstep(float l, float u, float v) { return smoothstep
 static constexpr uint32 bucketize(uint32 problemSize, uint32 bucketSize) { return (problemSize + bucketSize - 1) / bucketSize; }
 static constexpr uint64 bucketize(uint64 problemSize, uint64 bucketSize) { return (problemSize + bucketSize - 1) / bucketSize; }
 
+static float frac(float v) { return fmodf(v, 1.f); }
 static void copySign(float from, float& to) { to = copysign(to, from); }
 
 static void flushDenormalsToZero() { _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON); }
@@ -596,9 +597,17 @@ static vec2 abs(vec2 a) { return vec2(abs(a.x), abs(a.y)); }
 static vec3 abs(vec3 a) { return vec3(abs(a.x), abs(a.y), abs(a.z)); }
 static vec4 abs(vec4 a) { return vec4(abs(a.f4)); }
 
+static vec2 floor(vec2 a) { return vec2(floor(a.x), floor(a.y)); }
+static vec3 floor(vec3 a) { return vec3(floor(a.x), floor(a.y), floor(a.z)); }
+static vec4 floor(vec4 a) { return vec4(floor(a.f4)); }
+
 static vec2 round(vec2 a) { return vec2(round(a.x), round(a.y)); }
 static vec3 round(vec3 a) { return vec3(round(a.x), round(a.y), round(a.z)); }
 static vec4 round(vec4 a) { return vec4(round(a.f4)); }
+
+static vec2 frac(vec2 a) { return vec2(frac(a.x), frac(a.y)); }
+static vec3 frac(vec3 a) { return vec3(frac(a.x), frac(a.y), frac(a.z)); }
+static vec4 frac(vec4 a) { return vec4(frac(a.x), frac(a.y), frac(a.z), frac(a.w)); }
 
 static quat normalize(quat a) { return { normalize(a.v4).f4 }; }
 static quat conjugate(quat a) { return { -a.x, -a.y, -a.z, a.w }; }

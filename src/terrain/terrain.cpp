@@ -2,7 +2,11 @@
 #include "terrain.h"
 
 #include "dx/dx_command_list.h"
+
 #include "rendering/render_utils.h"
+#include "rendering/render_pass.h"
+
+#include "core/random.h"
 
 #include "terrain_rs.hlsli"
 
@@ -10,10 +14,69 @@
 static dx_pipeline terrainPipeline;
 static ref<dx_index_buffer> terrainIndexBuffers[TERRAIN_MAX_LOD + 1];
 
-terrain_component::terrain_component(float chunkSize, float amplitudeScale)
+terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale)
 {
+	this->chunksPerDim = chunksPerDim;
 	this->chunkSize = chunkSize;
 	this->amplitudeScale = amplitudeScale;
+	this->chunks.resize(chunksPerDim * chunksPerDim);
+
+
+
+
+
+	uint16* heights = new uint16[TERRAIN_LOD_0_VERTICES_PER_DIMENSION * TERRAIN_LOD_0_VERTICES_PER_DIMENSION];
+
+
+	uint32 numSegmentsPerDim = TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1;
+	float norm = chunkSize / (float)numSegmentsPerDim;
+
+	for (uint32 z = 0; z < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++z)
+	{
+		for (uint32 x = 0; x < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++x)
+		{
+			vec2 position(x * norm, z * norm);
+			float height = fbm(position * 0.05f);
+
+			assert(height >= 0 && height <= 1.f);
+
+			heights[z * TERRAIN_LOD_0_VERTICES_PER_DIMENSION + x] = (uint16)(height * UINT16_MAX);
+		}
+	}
+
+	testheightmap = createTexture(heights, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R16_UNORM);
+
+	delete[] heights;
+}
+
+void terrain_component::render(opaque_render_pass* renderPass, vec3 positionOffset)
+{
+	auto testLOD = [](int32 x, int32 z)
+	{
+		return ((x & 1) != (z & 1)) ? 2 : 0;
+	};
+
+	float xzOffset = -(chunkSize * chunksPerDim) * 0.5f;
+	vec3 offset = vec3(xzOffset, 0.f, xzOffset) + positionOffset;
+
+	for (int32 z = 0; z < (int32)chunksPerDim; ++z)
+	{
+		for (int32 x = 0; x < (int32)chunksPerDim; ++x)
+		{
+			auto& c = chunk(x, z);
+
+			if (c.active)
+			{
+				int32 lod = testLOD(x, z);
+
+				vec3 minCorner = vec3(x * chunkSize, 0.f, z * chunkSize) + offset;
+
+				terrain_render_data data = { minCorner, lod, chunkSize, amplitudeScale, testLOD(x - 1, z), testLOD(x + 1, z), testLOD(x, z - 1), testLOD(x, z + 1),
+					testheightmap };
+				renderPass->renderStaticObject<terrain_pipeline>(mat4::identity, {}, {}, {}, data, -1, false, false);
+			}
+		}
+	}
 }
 
 void terrain_pipeline::initialize()
@@ -50,7 +113,6 @@ void terrain_pipeline::initialize()
 		terrainIndexBuffers[lod] = createIndexBuffer(sizeof(uint16), numTris * 3, tris);
 	}
 
-
 	delete[] tris;
 }
 
@@ -75,7 +137,8 @@ PIPELINE_RENDER_IMPL(terrain_pipeline)
 	uint32 scaleDownByLODs = SCALE_DOWN_BY_LODS(lod_negX, lod_posX, lod_negZ, lod_posZ);
 
 	cl->setGraphics32BitConstants(TERRAIN_RS_TRANSFORM, viewProj);
-	cl->setGraphics32BitConstants(TERRAIN_RS_CB, terrain_cb{ (uint32)rc.data.lod, rc.data.minCorner, rc.data.amplitudeScale, rc.data.chunkSize, scaleDownByLODs });
+	cl->setGraphics32BitConstants(TERRAIN_RS_CB, terrain_cb{ rc.data.minCorner, (uint32)rc.data.lod, rc.data.amplitudeScale, rc.data.chunkSize, scaleDownByLODs });
+	cl->setDescriptorHeapSRV(TERRAIN_RS_HEIGHTMAP, 0, rc.data.heightmap);
 
 	cl->setIndexBuffer(terrainIndexBuffers[rc.data.lod]);
 	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);

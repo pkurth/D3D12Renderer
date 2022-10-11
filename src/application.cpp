@@ -86,14 +86,20 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 	}
 #endif
 
+	uint32 numTerrainChunks = 1;
+
 	auto terrain = scene.createEntity("Terrain")
-		.addComponent<terrain_component>(60.f, 25.f);
+		.addComponent<position_component>(vec3(0.f, 0.f, 0.f))
+		.addComponent<terrain_component>(numTerrainChunks, 64.f, 15.f);
 
 	terrain_component& terrainComponent = terrain.getComponent<terrain_component>();
 
-	for (uint32 i = 0; i < 10; ++i)
+	for (uint32 z = 0; z < numTerrainChunks; ++z)
 	{
-		terrainComponent.chunks.push_back({ vec2(60.f * i, 0.f) });
+		for (uint32 x = 0; x < numTerrainChunks; ++x)
+		{
+			terrainComponent.chunk(x, z).active = true;
+		}
 	}
 
 
@@ -639,16 +645,9 @@ void application::update(const user_input& input, float dt)
 
 
 
-		for (auto [entityHandle, terrain] : scene.view<terrain_component>().each())
+		for (auto [entityHandle, terrain, position] : scene.group(entt::get<terrain_component, position_component>).each())
 		{
-			int32 lod = 0;
-			for (auto& chunk : terrain.chunks)
-			{
-				terrain_render_data data = { chunk.minCorner, lod, terrain.chunkSize, terrain.amplitudeScale, 2 - lod, 2 - lod, 0, 0 };
-				opaqueRenderPass.renderStaticObject<terrain_pipeline>(mat4::identity, {}, {}, {}, data, -1, false, false);
-
-				lod = 2 - lod;
-			}
+			terrain.render(&opaqueRenderPass, position.position);
 		}
 
 

@@ -8,25 +8,35 @@
 
 struct terrain_chunk
 {
-	vec2 minCorner;
-	ref<dx_texture> heightmap;
+	bool active;
 };
 
 struct terrain_component
 {
-	terrain_component(float chunkSize, float amplitudeScale);
+	terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale);
 	terrain_component(terrain_component&&) = default;
 	terrain_component& operator=(terrain_component&&) = default;
 
-	std::vector<terrain_chunk> chunks;
+	terrain_chunk& chunk(uint32 x, uint32 z) { return chunks[z * chunksPerDim + x]; }
+	const terrain_chunk& chunk(uint32 x, uint32 z) const { return chunks[z * chunksPerDim + x]; }
+
+	uint32 chunksPerDim;
 	float chunkSize;
 	float amplitudeScale;
+
+
+	void render(struct opaque_render_pass* renderPass, vec3 positionOffset);
+
+private:
+	std::vector<terrain_chunk> chunks;
+
+	ref<dx_texture> testheightmap; // Temporary.
 };
 
 
 struct terrain_render_data
 {
-	vec2 minCorner;
+	vec3 minCorner;
 	int32 lod;
 	float chunkSize;
 	float amplitudeScale;
@@ -35,6 +45,8 @@ struct terrain_render_data
 	int32 lod_posX;
 	int32 lod_negZ;
 	int32 lod_posZ;
+
+	ref<dx_texture> heightmap;
 };
 
 struct terrain_pipeline

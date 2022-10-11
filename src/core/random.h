@@ -101,3 +101,77 @@ static vec2 halton23(uint32 index)
 	return vec2(halton(index, 2), halton(index, 3));
 }
 
+
+
+static uint32 hash(uint32 x)
+{
+	x += (x << 10u);
+	x ^= (x >> 6u);
+	x += (x << 3u);
+	x ^= (x >> 11u);
+	x += (x << 15u);
+	return x;
+}
+
+// Compound versions of the hashing algorithm I whipped together.
+static uint32 hash(uint32 x, uint32 y) { return hash(x ^ hash(y)); }
+static uint32 hash(uint32 x, uint32 y, uint32 z) { return hash(x ^ hash(y) ^ hash(z)); }
+static uint32 hash(uint32 x, uint32 y, uint32 z, uint32 w) { return hash(x ^ hash(y) ^ hash(z) ^ hash(w)); }
+
+
+#define asfloat(u) (*(float*)&u)
+#define asuint(f) (*(uint32*)&f)
+
+// Construct a float with half-open range [0:1] using low 23 bits.
+// All zeroes yields 0.0, all ones yields the next smallest representable value below 1.0.
+static float floatConstruct(uint32 m)
+{
+	const uint32 ieeeMantissa = 0x007FFFFFu; // binary32 mantissa bitmask
+	const uint32 ieeeOne = 0x3F800000u; // 1.0 in IEEE binary32
+
+	m &= ieeeMantissa;                     // Keep only mantissa bits (fractional part)
+	m |= ieeeOne;                          // Add fractional part to 1.0
+
+	float  f = asfloat(m);       // Range [1:2]
+	return f - 1.f;              // Range [0:1]
+}
+
+// Pseudo-random value in half-open range [0:1].
+static float random(float  x) { return floatConstruct(hash(asuint(x))); }
+static float random(vec2 v) { return floatConstruct(hash(asuint(v.x), asuint(v.y))); }
+static float random(vec3 v) { return floatConstruct(hash(asuint(v.x), asuint(v.y), asuint(v.z))); }
+static float random(vec4 v) { return floatConstruct(hash(asuint(v.x), asuint(v.y), asuint(v.z), asuint(v.w))); }
+
+// Based on Morgan McGuire @morgan3d
+// https://www.shadertoy.com/view/4dS3Wd
+static float fbmNoise(vec2 st)
+{
+	vec2 i = floor(st);
+	vec2 f = frac(st);
+
+	// Four corners in 2D of a tile
+	float a = random(i);
+	float b = random(i + vec2(1.f, 0.f));
+	float c = random(i + vec2(0.f, 1.f));
+	float d = random(i + vec2(1.f, 1.f));
+
+	vec2 u = f * f * (3.f - 2.f * f);
+
+	return lerp(a, b, u.x) + lerp((c - a) * u.y, (d - b) * u.y, u.x);
+}
+
+static float fbm(vec2 st, uint32 numOctaves = 6, float lacunarity = 2.f, float gain = 0.5f)
+{
+	float value = 0.f;
+	float amplitude = .5f;
+	float frequency = 1.f;
+
+	for (uint32 i = 0; i < numOctaves; ++i)
+	{
+		value += amplitude * fbmNoise(frequency * st);
+		frequency *= lacunarity;
+		amplitude *= gain;
+	}
+	return value;
+}
+

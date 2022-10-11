@@ -3,6 +3,9 @@
 ConstantBuffer<terrain_transform_cb> transform	: register(b0);
 ConstantBuffer<terrain_cb> terrain				: register(b1);
 
+SamplerState texSampler							: register(s0);
+Texture2D<float> heightmap						: register(t0);
+
 struct vs_input
 {
 	uint vertexID	: SV_VertexID;
@@ -59,7 +62,7 @@ vs_output main(vs_input IN)
 
 	float norm = 1.f / (float)numSegmentsPerDim;
 
-	float height = 0.f * terrain.amplitudeScale;
+	float height = heightmap[uint2(x, z)] * terrain.amplitudeScale;
 
 	float2 uv = float2(x * norm, z * norm);
 

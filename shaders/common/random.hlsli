@@ -203,12 +203,12 @@ float fbmNoise(float2 st)
 float fbm(float2 st) 
 {
 	// Initial values
-	float value = 0.0;
-	float amplitude = .5;
-	float frequency = 0.;
+	float value = 0.f;
+	float amplitude = .5f;
+	float frequency = 0.f;
 	//
 	// Loop of octaves
-	for (int i = 0; i < FBM_OCTAVES; i++) 
+	for (int i = 0; i < FBM_OCTAVES; ++i)
 	{
 		value += amplitude * fbmNoise(st);
 		st *= 2.;
