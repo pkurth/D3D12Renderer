@@ -16,9 +16,10 @@ struct vs_output
 
 static uint getMask(uint isBorder, uint scaleDownByLOD)
 {
-	//return ~(((1 << scaleDownByLOD) - 1) * isBorder);
 	return ~0 << (scaleDownByLOD * isBorder);
 }
+
+#define ENSURE_CONSISTENT_ORIENTATION 1
 
 vs_output main(vs_input IN)
 {
@@ -31,12 +32,29 @@ vs_output main(vs_input IN)
 	uint scaleDownByLOD_left, scaleDownByLOD_right, scaleDownByLOD_top, scaleDownByLOD_bottom;
 	DECODE_LOD_SCALE(terrain.scaleDownByLODs, scaleDownByLOD_left, scaleDownByLOD_right, scaleDownByLOD_top, scaleDownByLOD_bottom);
 
-	const uint scaleDownMask_z = getMask(x == 0, scaleDownByLOD_left) & getMask(x == numVerticesPerDim - 1, scaleDownByLOD_right);
-	const uint scaleDownMask_x = getMask(z == 0, scaleDownByLOD_top) & getMask(z == numVerticesPerDim - 1, scaleDownByLOD_bottom);
+	const uint leftMask = getMask(x == 0, scaleDownByLOD_left);
+	const uint rightMask = getMask(x == numVerticesPerDim - 1, scaleDownByLOD_right);
+	const uint topMask = getMask(z == 0, scaleDownByLOD_top);
+	const uint bottomMask = getMask(z == numVerticesPerDim - 1, scaleDownByLOD_bottom);
 
+	const uint zMask = leftMask & rightMask;
+	const uint xMask = topMask & bottomMask;
 
-	x &= scaleDownMask_x;
-	z &= scaleDownMask_z;
+#if ENSURE_CONSISTENT_ORIENTATION
+	// Will this vertex be shifted by the mask?
+	const uint shiftedRight = (z & ~rightMask) != 0;
+	const uint shiftedTop = (x & ~topMask) != 0;
+#endif
+
+	x &= xMask;
+	z &= zMask;
+
+#if ENSURE_CONSISTENT_ORIENTATION
+	// Offset shifted vertices to next neighbor.
+	x += shiftedTop * (1 << scaleDownByLOD_top);
+	z += shiftedRight * (1 << scaleDownByLOD_right);
+#endif
+
 
 
 	float norm = 1.f / (float)numSegmentsPerDim;
@@ -45,8 +63,10 @@ vs_output main(vs_input IN)
 
 	float2 uv = float2(x * norm, z * norm);
 
+	float3 position = float3(uv.x * terrain.chunkSize, height, uv.y * terrain.chunkSize) + terrain.minCorner;
+
 	vs_output OUT;
 	OUT.uv = uv;
-	OUT.position = mul(transform.vp, float4(terrain.minCorner.x + uv.x * terrain.chunkSize, height, terrain.minCorner.y + uv.y * terrain.chunkSize, 1.f));
+	OUT.position = mul(transform.vp, float4(position, 1.f));
 	return OUT;
 }
