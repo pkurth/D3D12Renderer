@@ -45,7 +45,7 @@ struct pbr_material
 
 struct pbr_pipeline
 {
-	using material_t = ref<pbr_material>;
+	using render_data_t = ref<pbr_material>;
 
 	static void initialize();
 
@@ -56,7 +56,7 @@ struct pbr_pipeline
 	struct transparent;
 
 protected:
-	static void setupPBRCommon(dx_command_list* cl, const common_material_info& info);
+	static void setupPBRCommon(dx_command_list* cl, const common_render_data& common);
 };
 
 struct pbr_pipeline::opaque : pbr_pipeline

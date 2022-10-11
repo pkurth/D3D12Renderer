@@ -24,7 +24,7 @@ struct terrain_component
 };
 
 
-struct terrain_material
+struct terrain_render_data
 {
 	vec2 minCorner;
 	int32 lod;
@@ -39,7 +39,7 @@ struct terrain_material
 
 struct terrain_pipeline
 {
-	using material_t = terrain_material;
+	using render_data_t = terrain_render_data;
 
 	static void initialize();
 

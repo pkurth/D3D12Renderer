@@ -4,9 +4,9 @@
 
 
 struct dx_command_list;
-struct common_material_info;
+struct common_render_data;
 
-typedef void (*pipeline_setup_func)(dx_command_list*, const common_material_info&);
+typedef void (*pipeline_setup_func)(dx_command_list*, const common_render_data&);
 typedef void (*pipeline_render_func)(dx_command_list*, const mat4&, void*);
 
 template <typename key_t>

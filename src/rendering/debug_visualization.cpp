@@ -36,13 +36,13 @@ PIPELINE_SETUP_IMPL(debug_simple_pipeline)
 	cl->setGraphicsRootSignature(*simplePipeline.rootSignature);
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	cl->setGraphicsDynamicConstantBuffer(FLAT_SIMPLE_RS_CAMERA, materialInfo.cameraCBV);
+	cl->setGraphicsDynamicConstantBuffer(FLAT_SIMPLE_RS_CAMERA, common.cameraCBV);
 }
 
 PIPELINE_RENDER_IMPL(debug_simple_pipeline)
 {
 	cl->setGraphics32BitConstants(FLAT_SIMPLE_RS_TRANFORM, transform_cb{ viewProj * rc.transform, rc.transform });
-	cl->setGraphics32BitConstants(FLAT_SIMPLE_RS_CB, visualization_cb{ rc.material.color });
+	cl->setGraphics32BitConstants(FLAT_SIMPLE_RS_CB, visualization_cb{ rc.data.color });
 	cl->setVertexBuffer(0, rc.vertexBuffer.positions);
 	cl->setVertexBuffer(1, rc.vertexBuffer.others);
 	cl->setIndexBuffer(rc.indexBuffer);
@@ -82,7 +82,7 @@ PIPELINE_SETUP_IMPL(debug_unlit_pipeline::position_color)
 PIPELINE_RENDER_IMPL(debug_unlit_pipeline)
 {
 	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_TRANFORM, viewProj * rc.transform);
-	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_CB, visualization_cb{ rc.material.color });
+	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_CB, visualization_cb{ rc.data.color });
 	cl->setVertexBuffer(0, rc.vertexBuffer.positions);
 	cl->setIndexBuffer(rc.indexBuffer);
 	cl->drawIndexed(rc.submesh.numIndices, 1, rc.submesh.firstIndex, rc.submesh.baseVertex, 0);
@@ -120,7 +120,7 @@ PIPELINE_SETUP_IMPL(debug_unlit_line_pipeline::position_color)
 PIPELINE_RENDER_IMPL(debug_unlit_line_pipeline)
 {
 	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_TRANFORM, viewProj * rc.transform);
-	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_CB, rc.material.color);
+	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_CB, rc.data.color);
 	cl->setVertexBuffer(0, rc.vertexBuffer.positions);
 	cl->setIndexBuffer(rc.indexBuffer);
 	cl->drawIndexed(rc.submesh.numIndices, 1, rc.submesh.firstIndex, rc.submesh.baseVertex, 0);

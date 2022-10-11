@@ -644,8 +644,8 @@ void application::update(const user_input& input, float dt)
 			int32 lod = 0;
 			for (auto& chunk : terrain.chunks)
 			{
-				terrain_material material = { chunk.minCorner, lod, terrain.chunkSize, terrain.amplitudeScale, 2 - lod, 2 - lod, 0, 0 };
-				opaqueRenderPass.renderStaticObject<terrain_pipeline>(mat4::identity, {}, {}, {}, material, -1, false, false);
+				terrain_render_data data = { chunk.minCorner, lod, terrain.chunkSize, terrain.amplitudeScale, 2 - lod, 2 - lod, 0, 0 };
+				opaqueRenderPass.renderStaticObject<terrain_pipeline>(mat4::identity, {}, {}, {}, data, -1, false, false);
 
 				lod = 2 - lod;
 			}

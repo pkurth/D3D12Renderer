@@ -63,14 +63,14 @@ private:
 	template <typename T> friend struct particle_render_pipeline;
 };
 
-template <typename material_t>
+template <typename render_data_t>
 struct particle_render_pipeline
 {
-	static void render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<material_t>& rc);
+	static void render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<render_data_t>& rc);
 };
 
-template<typename material_t>
-inline void particle_render_pipeline<material_t>::render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<material_t>& rc)
+template<typename render_data_t>
+inline void particle_render_pipeline<render_data_t>::render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<render_data_t>& rc)
 {
 	const particle_draw_info& info = rc.drawInfo;
 

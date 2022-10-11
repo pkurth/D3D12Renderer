@@ -102,7 +102,7 @@ struct mesh_shader_blob_material
 
 struct mesh_shader_blob_pipeline
 {
-	using material_t = mesh_shader_blob_material;
+	using render_data_t = mesh_shader_blob_material;
 
 	PIPELINE_SETUP_DECL;
 	PIPELINE_RENDER_DECL;
@@ -113,10 +113,10 @@ PIPELINE_SETUP_IMPL(mesh_shader_blob_pipeline)
 	cl->setPipelineState(*blobPipeline.pipeline);
 	cl->setGraphicsRootSignature(*blobPipeline.rootSignature);
 
-	cl->setGraphicsDynamicConstantBuffer(1, materialInfo.cameraCBV);
+	cl->setGraphicsDynamicConstantBuffer(1, common.cameraCBV);
 	cl->setRootGraphicsSRV(2, marchingCubesBuffer);
 
-	cl->setDescriptorHeapSRV(3, 0, materialInfo.sky);
+	cl->setDescriptorHeapSRV(3, 0, common.sky);
 }
 
 PIPELINE_RENDER_IMPL(mesh_shader_blob_pipeline)
@@ -132,8 +132,8 @@ PIPELINE_RENDER_IMPL(mesh_shader_blob_pipeline)
 
 	for (uint32 i = 0; i < BALL_COUNT; ++i)
 	{
-		float radius = rc.material.balls[i].radius;
-		cb.balls[i] = vec4(rc.material.balls[i].pos, radius * radius);
+		float radius = rc.data.balls[i].radius;
+		cb.balls[i] = vec4(rc.data.balls[i].pos, radius * radius);
 	}
 
 	auto b = dxContext.uploadDynamicConstantBuffer(cb);
@@ -149,7 +149,7 @@ PIPELINE_RENDER_IMPL(mesh_shader_blob_pipeline)
 
 struct mesh_shader_koch_pipeline
 {
-	using material_t = void*;
+	using render_data_t = void*;
 
 	PIPELINE_SETUP_DECL;
 	PIPELINE_RENDER_DECL;
@@ -160,10 +160,10 @@ PIPELINE_SETUP_IMPL(mesh_shader_koch_pipeline)
 	cl->setPipelineState(*kochPipeline.pipeline);
 	cl->setGraphicsRootSignature(*kochPipeline.rootSignature);
 
-	cl->setGraphicsDynamicConstantBuffer(0, materialInfo.cameraCBV);
+	cl->setGraphicsDynamicConstantBuffer(0, common.cameraCBV);
 	cl->setRootGraphicsSRV(1, marchingCubesBuffer);
 
-	cl->setDescriptorHeapSRV(2, 0, materialInfo.sky);
+	cl->setDescriptorHeapSRV(2, 0, common.sky);
 }
 
 PIPELINE_RENDER_IMPL(mesh_shader_koch_pipeline)

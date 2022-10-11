@@ -43,12 +43,12 @@ struct opaque_render_pass
 		const dx_vertex_buffer_group_view& vertexBuffer,
 		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
-		const typename pipeline_t::material_t& material,
+		const typename pipeline_t::render_data_t& data,
 		uint32 objectID = -1,
 		bool doubleSided = false,
 		bool includeInDepthPrepass = true)
 	{
-		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, material);
+		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, data);
 
 		if (includeInDepthPrepass)
 		{
@@ -69,12 +69,12 @@ struct opaque_render_pass
 		const dx_vertex_buffer_group_view& vertexBuffer,
 		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
-		const typename pipeline_t::material_t& material,
+		const typename pipeline_t::render_data_t& data,
 		uint32 objectID = -1,
 		bool doubleSided = false,
 		bool includeInDepthPrepass = true)
 	{
-		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, material);
+		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, data);
 
 		if (includeInDepthPrepass)
 		{
@@ -97,12 +97,12 @@ struct opaque_render_pass
 		dx_vertex_buffer_group_view& prevFrameVertexBuffer,
 		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
-		const typename pipeline_t::material_t& material,
+		const typename pipeline_t::render_data_t& data,
 		uint32 objectID = -1,
 		bool doubleSided = false,
 		bool includeInDepthPrepass = true)
 	{
-		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, material);
+		renderObjectCommon<pipeline_t>(transform, vertexBuffer, indexBuffer, submesh, data);
 
 		if (includeInDepthPrepass)
 		{
@@ -195,17 +195,17 @@ private:
 		const dx_vertex_buffer_group_view& vertexBuffer,
 		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
-		const typename pipeline_t::material_t& material)
+		const typename pipeline_t::render_data_t& data)
 	{
-		using material_t = typename pipeline_t::material_t;
+		using render_data_t = typename pipeline_t::render_data_t;
 
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		auto& command = pass.emplace_back<pipeline_t, default_render_command<material_t>>(sortKey);
+		auto& command = pass.emplace_back<pipeline_t, default_render_command<render_data_t>>(sortKey);
 		command.transform = transform;
 		command.vertexBuffer = vertexBuffer;
 		command.indexBuffer = indexBuffer;
 		command.submesh = submesh;
-		command.material = material;
+		command.data = data;
 	}
 };
 
@@ -228,33 +228,33 @@ struct transparent_render_pass
 		const dx_vertex_buffer_group_view& vertexBuffer,
 		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
-		const typename pipeline_t::material_t& material)
+		const typename pipeline_t::render_data_t& data)
 	{
-		using material_t = typename pipeline_t::material_t;
+		using render_data_t = typename pipeline_t::render_data_t;
 
 		float depth = 0.f; // TODO
-		auto& command = pass.emplace_back<pipeline_t, default_render_command<material_t>>(-depth); // Negative depth -> sort from back to front.
+		auto& command = pass.emplace_back<pipeline_t, default_render_command<render_data_t>>(-depth); // Negative depth -> sort from back to front.
 		command.transform = transform;
 		command.vertexBuffer = vertexBuffer;
 		command.indexBuffer = indexBuffer;
 		command.submesh = submesh;
-		command.material = material;
+		command.data = data;
 	}
 
 	template <typename pipeline_t>
 	void renderParticles(const dx_vertex_buffer_group_view& vertexBuffer,
 		const dx_index_buffer_view& indexBuffer,
 		const particle_draw_info& drawInfo,
-		const typename pipeline_t::material_t& material)
+		const typename pipeline_t::render_data_t& data)
 	{
-		using material_t = typename pipeline_t::material_t;
+		using render_data_t = typename pipeline_t::render_data_t;
 
 		float depth = 0.f; // TODO
-		auto& command = pass.emplace_back<pipeline_t, particle_render_command<material_t>>(-depth); // Negative depth -> sort from back to front.
+		auto& command = pass.emplace_back<pipeline_t, particle_render_command<render_data_t>>(-depth); // Negative depth -> sort from back to front.
 		command.vertexBuffer = vertexBuffer;
 		command.indexBuffer = indexBuffer;
 		command.drawInfo = drawInfo;
-		command.material = material;
+		command.data = data;
 	}
 
 	void renderObject(const mat4& transform,
@@ -292,17 +292,17 @@ struct ldr_render_pass
 		const dx_vertex_buffer_group_view& vertexBuffer,
 		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
-		const typename pipeline_t::material_t& material)
+		const typename pipeline_t::render_data_t& data)
 	{
-		using material_t = typename pipeline_t::material_t;
+		using render_data_t = typename pipeline_t::render_data_t;
 
 		float depth = 0.f; // TODO
-		auto& command = ldrPass.emplace_back<pipeline_t, default_render_command<material_t>>(depth);
+		auto& command = ldrPass.emplace_back<pipeline_t, default_render_command<render_data_t>>(depth);
 		command.transform = transform;
 		command.vertexBuffer = vertexBuffer;
 		command.indexBuffer = indexBuffer;
 		command.submesh = submesh;
-		command.material = material;
+		command.data = data;
 	}
 
 	template <typename pipeline_t>
@@ -310,17 +310,17 @@ struct ldr_render_pass
 		const dx_vertex_buffer_group_view& vertexBuffer,
 		const dx_index_buffer_view& indexBuffer,
 		submesh_info submesh,
-		const typename pipeline_t::material_t& material)
+		const typename pipeline_t::render_data_t& data)
 	{
-		using material_t = typename pipeline_t::material_t;
+		using render_data_t = typename pipeline_t::render_data_t;
 
 		float depth = 0.f; // TODO
-		auto& command = overlays.emplace_back<pipeline_t, default_render_command<material_t>>(depth);
+		auto& command = overlays.emplace_back<pipeline_t, default_render_command<render_data_t>>(depth);
 		command.transform = transform;
 		command.vertexBuffer = vertexBuffer;
 		command.indexBuffer = indexBuffer;
 		command.submesh = submesh;
-		command.material = material;
+		command.data = data;
 	}
 
 	void renderOutline(const mat4& transform,

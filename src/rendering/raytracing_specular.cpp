@@ -52,15 +52,15 @@ void specular_reflections_raytracer::initialize()
 
 void specular_reflections_raytracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
     const ref<dx_texture>& output,
-    const common_material_info& materialInfo)
+    const common_render_data& common)
 {
     input_resources in;
     in.tlas = tlas.tlas->raytracingSRV;
-    in.depthBuffer = materialInfo.opaqueDepth->defaultSRV;
-    in.screenSpaceNormals = materialInfo.worldNormals->defaultSRV;
-    in.irradiance = materialInfo.irradiance->defaultSRV;
-    in.environment = materialInfo.prefilteredRadiance->defaultSRV;
-    in.sky = materialInfo.sky->defaultSRV;
+    in.depthBuffer = common.opaqueDepth->defaultSRV;
+    in.screenSpaceNormals = common.worldNormals->defaultSRV;
+    in.irradiance = common.irradiance->defaultSRV;
+    in.environment = common.prefilteredRadiance->defaultSRV;
+    in.sky = common.sky->defaultSRV;
     in.brdf = render_resources::brdfTex->defaultSRV;
 
     output_resources out;
@@ -76,7 +76,7 @@ void specular_reflections_raytracer::render(dx_command_list* cl, const raytracin
         output->width, output->height, 1,
         numRayTypes, bindingTable.getNumberOfHitGroups());
 
-    raytracing_cb raytracingCB = { numBounces, fadeoutDistance, maxDistance, materialInfo.globalIlluminationIntensity, materialInfo.skyIntensity };
+    raytracing_cb raytracingCB = { numBounces, fadeoutDistance, maxDistance, common.globalIlluminationIntensity, common.skyIntensity };
 
 
     // Set up pipeline.
@@ -86,8 +86,8 @@ void specular_reflections_raytracer::render(dx_command_list* cl, const raytracin
     cl->setComputeRootSignature(pipeline.rootSignature);
 
     cl->setComputeDescriptorTable(SPECULAR_REFLECTIONS_RS_RESOURCES, gpuHandle);
-    cl->setComputeDynamicConstantBuffer(SPECULAR_REFLECTIONS_RS_CAMERA, materialInfo.cameraCBV);
-    cl->setComputeDynamicConstantBuffer(SPECULAR_REFLECTIONS_RS_SUN, materialInfo.lightingCBV);
+    cl->setComputeDynamicConstantBuffer(SPECULAR_REFLECTIONS_RS_CAMERA, common.cameraCBV);
+    cl->setComputeDynamicConstantBuffer(SPECULAR_REFLECTIONS_RS_SUN, common.lightingCBV);
     cl->setCompute32BitConstants(SPECULAR_REFLECTIONS_RS_CB, raytracingCB);
 
     cl->raytrace(raytraceDesc);

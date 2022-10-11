@@ -240,7 +240,7 @@ struct visualize_material
 
 struct visualize_grid_pipeline
 {
-	using material_t = visualize_material;
+	using render_data_t = visualize_material;
 
 	PIPELINE_SETUP_DECL;
 	PIPELINE_RENDER_DECL;
@@ -256,21 +256,21 @@ PIPELINE_SETUP_IMPL(visualize_grid_pipeline)
 
 PIPELINE_RENDER_IMPL(visualize_grid_pipeline)
 {
-	vec2 uvScale = 1.f / vec2((float)(rc.material.countX * rc.material.countY), (float)rc.material.countZ);
-	cl->setGraphics32BitConstants(LIGHT_PROBE_GRID_VISUALIZATION_RS_CB, light_probe_grid_visualization_cb{ viewProj * rc.transform, uvScale, rc.material.cellSize, rc.material.countX, rc.material.countY });
-	cl->setDescriptorHeapSRV(LIGHT_PROBE_GRID_VISUALIZATION_RS_IRRADIANCE, 0, rc.material.texture0);
+	vec2 uvScale = 1.f / vec2((float)(rc.data.countX * rc.data.countY), (float)rc.data.countZ);
+	cl->setGraphics32BitConstants(LIGHT_PROBE_GRID_VISUALIZATION_RS_CB, light_probe_grid_visualization_cb{ viewProj * rc.transform, uvScale, rc.data.cellSize, rc.data.countX, rc.data.countY });
+	cl->setDescriptorHeapSRV(LIGHT_PROBE_GRID_VISUALIZATION_RS_IRRADIANCE, 0, rc.data.texture0);
 
 	cl->setVertexBuffer(0, rc.vertexBuffer.positions);
 	cl->setVertexBuffer(1, rc.vertexBuffer.others);
 	cl->setIndexBuffer(rc.indexBuffer);
-	cl->drawIndexed(rc.submesh.numIndices, rc.material.total, rc.submesh.firstIndex, rc.submesh.baseVertex, 0);
+	cl->drawIndexed(rc.submesh.numIndices, rc.data.total, rc.submesh.firstIndex, rc.submesh.baseVertex, 0);
 }
 
 
 
 struct visualize_rays_pipeline
 {
-	using material_t = visualize_material;
+	using render_data_t = visualize_material;
 
 	PIPELINE_SETUP_DECL;
 	PIPELINE_RENDER_DECL;
@@ -286,15 +286,15 @@ PIPELINE_SETUP_IMPL(visualize_rays_pipeline)
 
 PIPELINE_RENDER_IMPL(visualize_rays_pipeline)
 {
-	cl->setGraphics32BitConstants(LIGHT_PROBE_RAY_VISUALIZATION_RS_CB, light_probe_ray_visualization_cb{ viewProj * rc.transform, rc.material.cellSize, rc.material.countX, rc.material.countY });
-	cl->setDescriptorHeapSRV(LIGHT_PROBE_RAY_VISUALIZATION_RS_RAYS, 0, rc.material.texture0);
-	cl->setDescriptorHeapSRV(LIGHT_PROBE_RAY_VISUALIZATION_RS_RAYS, 1, rc.material.texture1);
+	cl->setGraphics32BitConstants(LIGHT_PROBE_RAY_VISUALIZATION_RS_CB, light_probe_ray_visualization_cb{ viewProj * rc.transform, rc.data.cellSize, rc.data.countX, rc.data.countY });
+	cl->setDescriptorHeapSRV(LIGHT_PROBE_RAY_VISUALIZATION_RS_RAYS, 0, rc.data.texture0);
+	cl->setDescriptorHeapSRV(LIGHT_PROBE_RAY_VISUALIZATION_RS_RAYS, 1, rc.data.texture1);
 
-	cl->transitionBarrier(rc.material.texture0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
-	cl->transitionBarrier(rc.material.texture1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
-	cl->draw(2, NUM_RAYS_PER_PROBE * rc.material.total, 0, 0);
-	cl->transitionBarrier(rc.material.texture0, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	cl->transitionBarrier(rc.material.texture1, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	cl->transitionBarrier(rc.data.texture0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+	cl->transitionBarrier(rc.data.texture1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+	cl->draw(2, NUM_RAYS_PER_PROBE * rc.data.total, 0, 0);
+	cl->transitionBarrier(rc.data.texture0, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	cl->transitionBarrier(rc.data.texture1, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 }
 
 
@@ -312,7 +312,7 @@ struct test_sample_material
 
 struct test_sample_pipeline
 {
-	using material_t = test_sample_material;
+	using render_data_t = test_sample_material;
 
 	PIPELINE_SETUP_DECL;
 	PIPELINE_RENDER_DECL;
@@ -330,9 +330,9 @@ PIPELINE_RENDER_IMPL(test_sample_pipeline)
 {
 	const mat4& m = rc.transform;
 	cl->setGraphics32BitConstants(LIGHT_PROBE_TEST_SAMPLE_RS_TRANSFORM, transform_cb{ viewProj * m, m });
-	cl->setGraphics32BitConstants(LIGHT_PROBE_TEST_SAMPLE_RS_GRID, light_probe_grid_cb{ rc.material.minCorner, rc.material.cellSize, rc.material.countX, rc.material.countY, rc.material.countZ });
-	cl->setDescriptorHeapSRV(LIGHT_PROBE_TEST_SAMPLE_RS_TEXTURES, 0, rc.material.irradiance);
-	cl->setDescriptorHeapSRV(LIGHT_PROBE_TEST_SAMPLE_RS_TEXTURES, 1, rc.material.depth);
+	cl->setGraphics32BitConstants(LIGHT_PROBE_TEST_SAMPLE_RS_GRID, light_probe_grid_cb{ rc.data.minCorner, rc.data.cellSize, rc.data.countX, rc.data.countY, rc.data.countZ });
+	cl->setDescriptorHeapSRV(LIGHT_PROBE_TEST_SAMPLE_RS_TEXTURES, 0, rc.data.irradiance);
+	cl->setDescriptorHeapSRV(LIGHT_PROBE_TEST_SAMPLE_RS_TEXTURES, 1, rc.data.depth);
 
 	cl->setVertexBuffer(0, rc.vertexBuffer.positions);
 	cl->setVertexBuffer(1, rc.vertexBuffer.others);

@@ -14,7 +14,7 @@ struct particle_draw_info
 };
 
 
-template <typename material_t>
+template <typename render_data_t>
 struct default_render_command
 {
 	mat4 transform;
@@ -22,17 +22,17 @@ struct default_render_command
 	dx_index_buffer_view indexBuffer;
 	submesh_info submesh;
 
-	material_t material;
+	render_data_t data;
 };
 
-template <typename material_t>
+template <typename render_data_t>
 struct particle_render_command
 {
 	dx_vertex_buffer_group_view vertexBuffer;
 	dx_index_buffer_view indexBuffer;
 	particle_draw_info drawInfo;
 
-	material_t material;
+	render_data_t data;
 };
 
 struct static_depth_only_render_command

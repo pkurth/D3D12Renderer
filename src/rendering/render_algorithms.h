@@ -186,20 +186,20 @@ void shadowPasses(dx_command_list* cl,
 void opaqueLightPass(dx_command_list* cl,
 	const dx_render_target& renderTarget,
 	const opaque_render_pass* opaqueRenderPass,
-	const common_material_info& materialInfo,
+	const common_render_data& common,
 	const mat4& viewProj);
 
 void transparentLightPass(dx_command_list* cl,
 	const dx_render_target& renderTarget,
 	const transparent_render_pass* transparentRenderPass,
-	const common_material_info& materialInfo,
+	const common_render_data& common,
 	const mat4& viewProj);
 
 void ldrPass(dx_command_list* cl,
 	const dx_render_target& ldrRenderTarget,
 	ref<dx_texture> depthStencilBuffer,			// DEPTH_WRITE. Must be same as DSV bound to render-target.
 	const ldr_render_pass* ldrRenderPass,
-	const common_material_info& materialInfo,
+	const common_render_data& common,
 	const mat4& viewProj);
 
 void copyShadowMapParts(dx_command_list* cl,

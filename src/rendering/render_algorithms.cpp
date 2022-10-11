@@ -774,7 +774,7 @@ void shadowPasses(dx_command_list* cl,
 void opaqueLightPass(dx_command_list* cl,
 	const dx_render_target& renderTarget,
 	const opaque_render_pass* opaqueRenderPass,
-	const common_material_info& materialInfo,
+	const common_render_data& common,
 	const mat4& viewProj)
 {
 	if (opaqueRenderPass && opaqueRenderPass->pass.size() > 0)
@@ -790,7 +790,7 @@ void opaqueLightPass(dx_command_list* cl,
 		{
 			if (dc.setup != lastSetupFunc)
 			{
-				dc.setup(cl, materialInfo);
+				dc.setup(cl, common);
 				lastSetupFunc = dc.setup;
 			}
 			dc.render(cl, viewProj, dc.data);
@@ -801,7 +801,7 @@ void opaqueLightPass(dx_command_list* cl,
 void transparentLightPass(dx_command_list* cl,
 	const dx_render_target& renderTarget,
 	const transparent_render_pass* transparentRenderPass,
-	const common_material_info& materialInfo,
+	const common_render_data& common,
 	const mat4& viewProj)
 {
 	if (transparentRenderPass && transparentRenderPass->pass.size() > 0)
@@ -817,7 +817,7 @@ void transparentLightPass(dx_command_list* cl,
 		{
 			if (dc.setup != lastSetupFunc)
 			{
-				dc.setup(cl, materialInfo);
+				dc.setup(cl, common);
 				lastSetupFunc = dc.setup;
 			}
 			dc.render(cl, viewProj, dc.data);
@@ -829,7 +829,7 @@ void ldrPass(dx_command_list* cl,
 	const dx_render_target& ldrRenderTarget,
 	ref<dx_texture> depthStencilBuffer,
 	const ldr_render_pass* ldrRenderPass,
-	const common_material_info& materialInfo,
+	const common_render_data& common,
 	const mat4& viewProj)
 {
 	if (ldrRenderPass)
@@ -850,7 +850,7 @@ void ldrPass(dx_command_list* cl,
 			{
 				if (dc.setup != lastSetupFunc)
 				{
-					dc.setup(cl, materialInfo);
+					dc.setup(cl, common);
 					lastSetupFunc = dc.setup;
 				}
 				dc.render(cl, viewProj, dc.data);
@@ -869,7 +869,7 @@ void ldrPass(dx_command_list* cl,
 			{
 				if (dc.setup != lastSetupFunc)
 				{
-					dc.setup(cl, materialInfo);
+					dc.setup(cl, common);
 					lastSetupFunc = dc.setup;
 				}
 				dc.render(cl, viewProj, dc.data);

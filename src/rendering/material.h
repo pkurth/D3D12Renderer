@@ -6,7 +6,7 @@
 
 struct dx_command_list;
 
-struct common_material_info
+struct common_render_data
 {
 	ref<dx_texture> sky;
 	ref<dx_texture> irradiance;
@@ -46,12 +46,12 @@ struct common_material_info
 };
 
 
-#define PIPELINE_SETUP_DECL					static void setup(dx_command_list* cl, const common_material_info& materialInfo)
-#define PIPELINE_SETUP_IMPL(name)			void name::setup(dx_command_list* cl, const common_material_info& materialInfo)
+#define PIPELINE_SETUP_DECL					static void setup(dx_command_list* cl, const common_render_data& common)
+#define PIPELINE_SETUP_IMPL(name)			void name::setup(dx_command_list* cl, const common_render_data& common)
 
-#define PIPELINE_RENDER_DECL				static void render(dx_command_list* cl, const mat4& viewProj, const default_render_command<material_t>& rc)
-#define PIPELINE_RENDER_IMPL(name)			void name::render(dx_command_list* cl, const mat4& viewProj, const default_render_command<material_t>& rc)
+#define PIPELINE_RENDER_DECL				static void render(dx_command_list* cl, const mat4& viewProj, const default_render_command<render_data_t>& rc)
+#define PIPELINE_RENDER_IMPL(name)			void name::render(dx_command_list* cl, const mat4& viewProj, const default_render_command<render_data_t>& rc)
 
-#define PARTICLE_PIPELINE_RENDER_DECL		static void render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<material_t>& rc)
-#define PARTICLE_PIPELINE_RENDER_IMPL(name)	void name::render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<material_t>& rc)
+#define PARTICLE_PIPELINE_RENDER_DECL		static void render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<render_data_t>& rc)
+#define PARTICLE_PIPELINE_RENDER_IMPL(name)	void name::render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<render_data_t>& rc)
 

@@ -45,11 +45,11 @@ void path_tracer::initialize()
 
 void path_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
     const ref<dx_texture>& output,
-    const common_material_info& materialInfo)
+    const common_render_data& common)
 {
     input_resources in;
     in.tlas = tlas.tlas->raytracingSRV;
-    in.sky = materialInfo.sky->defaultSRV;
+    in.sky = common.sky->defaultSRV;
 
     output_resources out;
     out.output = output->defaultUAV;
@@ -74,7 +74,7 @@ void path_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
     uint32 depth = min(recursionDepth, maxRecursionDepth - 1);
 
     cl->setComputeDescriptorTable(PATH_TRACING_RS_RESOURCES, gpuHandle);
-    cl->setComputeDynamicConstantBuffer(PATH_TRACING_RS_CAMERA, materialInfo.cameraCBV);
+    cl->setComputeDynamicConstantBuffer(PATH_TRACING_RS_CAMERA, common.cameraCBV);
     cl->setCompute32BitConstants(PATH_TRACING_RS_CB, 
         path_tracing_cb
         { 

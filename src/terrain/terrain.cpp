@@ -64,19 +64,19 @@ PIPELINE_SETUP_IMPL(terrain_pipeline)
 
 PIPELINE_RENDER_IMPL(terrain_pipeline)
 {
-	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> rc.material.lod;
+	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> rc.data.lod;
 	uint32 numTris = numSegmentsPerDim * numSegmentsPerDim * 2;
 
-	uint32 lod_negX = max(0, rc.material.lod_negX - rc.material.lod);
-	uint32 lod_posX = max(0, rc.material.lod_posX - rc.material.lod);
-	uint32 lod_negZ = max(0, rc.material.lod_negZ - rc.material.lod);
-	uint32 lod_posZ = max(0, rc.material.lod_posZ - rc.material.lod);
+	uint32 lod_negX = max(0, rc.data.lod_negX - rc.data.lod);
+	uint32 lod_posX = max(0, rc.data.lod_posX - rc.data.lod);
+	uint32 lod_negZ = max(0, rc.data.lod_negZ - rc.data.lod);
+	uint32 lod_posZ = max(0, rc.data.lod_posZ - rc.data.lod);
 
 	uint32 scaleDownByLODs = SCALE_DOWN_BY_LODS(lod_negX, lod_posX, lod_negZ, lod_posZ);
 
 	cl->setGraphics32BitConstants(TERRAIN_RS_TRANSFORM, viewProj);
-	cl->setGraphics32BitConstants(TERRAIN_RS_CB, terrain_cb{ (uint32)rc.material.lod, rc.material.minCorner, rc.material.amplitudeScale, rc.material.chunkSize, scaleDownByLODs });
+	cl->setGraphics32BitConstants(TERRAIN_RS_CB, terrain_cb{ (uint32)rc.data.lod, rc.data.minCorner, rc.data.amplitudeScale, rc.data.chunkSize, scaleDownByLODs });
 
-	cl->setIndexBuffer(terrainIndexBuffers[rc.material.lod]);
+	cl->setIndexBuffer(terrainIndexBuffers[rc.data.lod]);
 	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);
 }

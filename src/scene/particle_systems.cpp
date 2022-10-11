@@ -104,14 +104,14 @@ PIPELINE_SETUP_IMPL(fire_particle_system::fire_pipeline)
 {
 	cl->setPipelineState(*renderPipeline.pipeline);
 	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);
-	cl->setGraphicsDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_RENDERING_RS_CAMERA, materialInfo.cameraCBV);
+	cl->setGraphicsDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_RENDERING_RS_CAMERA, common.cameraCBV);
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
 PARTICLE_PIPELINE_RENDER_IMPL(fire_particle_system::fire_pipeline)
 {
-	cl->setGraphicsDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_RENDERING_RS_CBV, rc.material.settingsCBV);
-	cl->setDescriptorHeapSRV(FIRE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE, 0, rc.material.atlas.texture);
+	cl->setGraphicsDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_RENDERING_RS_CBV, rc.data.settingsCBV);
+	cl->setDescriptorHeapSRV(FIRE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE, 0, rc.data.atlas.texture);
 
 	particle_render_pipeline::render(cl, viewProj, rc);
 }
@@ -191,14 +191,14 @@ PIPELINE_SETUP_IMPL(smoke_particle_system::smoke_pipeline)
 {
 	cl->setPipelineState(*renderPipeline.pipeline);
 	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);
-	cl->setGraphicsDynamicConstantBuffer(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_CAMERA, materialInfo.cameraCBV);
+	cl->setGraphicsDynamicConstantBuffer(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_CAMERA, common.cameraCBV);
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
 PARTICLE_PIPELINE_RENDER_IMPL(smoke_particle_system::smoke_pipeline)
 {
-	cl->setGraphicsDynamicConstantBuffer(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_CBV, rc.material.settingsCBV);
-	cl->setDescriptorHeapSRV(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE, 0, rc.material.atlas.texture);
+	cl->setGraphicsDynamicConstantBuffer(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_CBV, rc.data.settingsCBV);
+	cl->setDescriptorHeapSRV(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE, 0, rc.data.atlas.texture);
 
 	particle_render_pipeline::render(cl, viewProj, rc);
 }
@@ -298,17 +298,17 @@ PIPELINE_SETUP_IMPL(boid_particle_system::boid_pipeline)
 {
 	cl->setPipelineState(*renderPipeline.pipeline);
 	cl->setGraphicsRootSignature(*renderPipeline.rootSignature);
-	cl->setGraphicsDynamicConstantBuffer(BOID_PARTICLE_SYSTEM_RENDERING_RS_CAMERA, materialInfo.cameraCBV);
+	cl->setGraphicsDynamicConstantBuffer(BOID_PARTICLE_SYSTEM_RENDERING_RS_CAMERA, common.cameraCBV);
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 0, materialInfo.irradiance);
-	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 1, materialInfo.prefilteredRadiance);
+	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 0, common.irradiance);
+	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 1, common.prefilteredRadiance);
 	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 2, render_resources::brdfTex);
 }
 
 PARTICLE_PIPELINE_RENDER_IMPL(boid_particle_system::boid_pipeline)
 {
-	cl->setGraphicsDynamicConstantBuffer(BOID_PARTICLE_SYSTEM_RENDERING_RS_CBV, rc.material.settingsCBV);
+	cl->setGraphicsDynamicConstantBuffer(BOID_PARTICLE_SYSTEM_RENDERING_RS_CBV, rc.data.settingsCBV);
 
 	particle_render_pipeline::render(cl, viewProj, rc);
 }

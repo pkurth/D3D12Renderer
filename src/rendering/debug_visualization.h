@@ -22,7 +22,7 @@ struct debug_simple_pipeline
 {
 	// Layout: position, normal.
 
-	using material_t = debug_material;
+	using render_data_t = debug_material;
 
 	static void initialize();
 
@@ -32,7 +32,7 @@ struct debug_simple_pipeline
 
 struct debug_unlit_pipeline
 {
-	using material_t = debug_material;
+	using render_data_t = debug_material;
 
 	static void initialize();
 
@@ -47,7 +47,7 @@ struct debug_unlit_pipeline::position_color : debug_unlit_pipeline { PIPELINE_SE
 
 struct debug_unlit_line_pipeline
 {
-	using material_t = debug_material;
+	using render_data_t = debug_material;
 
 	static void initialize();
 

@@ -8,7 +8,7 @@ struct path_tracer : pbr_raytracer
 
     void render(dx_command_list* cl, const raytracing_tlas& tlas,
         const ref<dx_texture>& output,
-        const common_material_info& materialInfo);
+        const common_render_data& common);
 
     void resetRendering();
 

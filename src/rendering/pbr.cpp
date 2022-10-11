@@ -159,33 +159,33 @@ void pbr_pipeline::initialize()
 
 
 
-void pbr_pipeline::setupPBRCommon(dx_command_list* cl, const common_material_info& info)
+void pbr_pipeline::setupPBRCommon(dx_command_list* cl, const common_render_data& common)
 {
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
 	dx_cpu_descriptor_handle nullBuffer = render_resources::nullBufferSRV;
 
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 0, info.irradiance ? info.irradiance->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 1, info.prefilteredRadiance ? info.prefilteredRadiance->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 0, common.irradiance ? common.irradiance->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 1, common.prefilteredRadiance ? common.prefilteredRadiance->defaultSRV : nullTexture);
 	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 2, render_resources::brdfTex);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 3, info.tiledCullingGrid ? info.tiledCullingGrid->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 4, info.tiledObjectsIndexList ? info.tiledObjectsIndexList->defaultSRV : nullBuffer);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 5, info.pointLightBuffer ? info.pointLightBuffer->defaultSRV : nullBuffer);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 6, info.spotLightBuffer ? info.spotLightBuffer->defaultSRV : nullBuffer);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 7, info.decalBuffer ? info.decalBuffer->defaultSRV : nullBuffer);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 8, info.shadowMap ? info.shadowMap->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 9, info.pointLightShadowInfoBuffer ? info.pointLightShadowInfoBuffer->defaultSRV : nullBuffer);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 10, info.spotLightShadowInfoBuffer ? info.spotLightShadowInfoBuffer->defaultSRV : nullBuffer);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 11, info.decalTextureAtlas ? info.decalTextureAtlas->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 12, info.aoTexture ? info.aoTexture : render_resources::whiteTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 13, info.sssTexture ? info.sssTexture : render_resources::whiteTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 14, info.ssrTexture ? info.ssrTexture->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 15, info.lightProbeIrradiance ? info.lightProbeIrradiance->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 16, info.lightProbeDepth ? info.lightProbeDepth->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 3, common.tiledCullingGrid ? common.tiledCullingGrid->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 4, common.tiledObjectsIndexList ? common.tiledObjectsIndexList->defaultSRV : nullBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 5, common.pointLightBuffer ? common.pointLightBuffer->defaultSRV : nullBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 6, common.spotLightBuffer ? common.spotLightBuffer->defaultSRV : nullBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 7, common.decalBuffer ? common.decalBuffer->defaultSRV : nullBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 8, common.shadowMap ? common.shadowMap->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 9, common.pointLightShadowInfoBuffer ? common.pointLightShadowInfoBuffer->defaultSRV : nullBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 10, common.spotLightShadowInfoBuffer ? common.spotLightShadowInfoBuffer->defaultSRV : nullBuffer);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 11, common.decalTextureAtlas ? common.decalTextureAtlas->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 12, common.aoTexture ? common.aoTexture : render_resources::whiteTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 13, common.sssTexture ? common.sssTexture : render_resources::whiteTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 14, common.ssrTexture ? common.ssrTexture->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 15, common.lightProbeIrradiance ? common.lightProbeIrradiance->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_FRAME_CONSTANTS, 16, common.lightProbeDepth ? common.lightProbeDepth->defaultSRV : nullTexture);
 
-	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_CAMERA, info.cameraCBV);
-	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_LIGHTING, info.lightingCBV);
+	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_CAMERA, common.cameraCBV);
+	cl->setGraphicsDynamicConstantBuffer(DEFAULT_PBR_RS_LIGHTING, common.lightingCBV);
 
 
 	// Default material properties. This is JUST to make the dynamic descriptor heap happy.
@@ -203,7 +203,7 @@ PIPELINE_SETUP_IMPL(pbr_pipeline::opaque)
 	cl->setPipelineState(*opaquePBRPipeline.pipeline);
 	cl->setGraphicsRootSignature(*opaquePBRPipeline.rootSignature);
 
-	setupPBRCommon(cl, materialInfo);
+	setupPBRCommon(cl, common);
 }
 
 PIPELINE_SETUP_IMPL(pbr_pipeline::opaque_double_sided)
@@ -211,7 +211,7 @@ PIPELINE_SETUP_IMPL(pbr_pipeline::opaque_double_sided)
 	cl->setPipelineState(*opaqueDoubleSidedPBRPipeline.pipeline);
 	cl->setGraphicsRootSignature(*opaqueDoubleSidedPBRPipeline.rootSignature);
 
-	setupPBRCommon(cl, materialInfo);
+	setupPBRCommon(cl, common);
 }
 
 PIPELINE_SETUP_IMPL(pbr_pipeline::transparent)
@@ -219,12 +219,12 @@ PIPELINE_SETUP_IMPL(pbr_pipeline::transparent)
 	cl->setPipelineState(*transparentPBRPipeline.pipeline);
 	cl->setGraphicsRootSignature(*transparentPBRPipeline.rootSignature);
 
-	setupPBRCommon(cl, materialInfo);
+	setupPBRCommon(cl, common);
 }
 
 PIPELINE_RENDER_IMPL(pbr_pipeline)
 {
-	const auto& mat = rc.material;
+	const auto& mat = rc.data;
 
 	uint32 flags = 0;
 

@@ -40,7 +40,7 @@ private:
 
 	struct fire_pipeline : particle_render_pipeline<fire_material>
 	{
-		using material_t = fire_material;
+		using render_data_t = fire_material;
 		
 		PIPELINE_SETUP_DECL;
 		PARTICLE_PIPELINE_RENDER_DECL;
@@ -79,7 +79,7 @@ private:
 
 	struct smoke_pipeline : particle_render_pipeline<smoke_material>
 	{
-		using material_t = smoke_material;
+		using render_data_t = smoke_material;
 
 		PIPELINE_SETUP_DECL;
 		PARTICLE_PIPELINE_RENDER_DECL;
@@ -120,7 +120,7 @@ private:
 
 	struct boid_pipeline : particle_render_pipeline<boid_material>
 	{
-		using material_t = boid_material;
+		using render_data_t = boid_material;
 
 		PIPELINE_SETUP_DECL;
 		PARTICLE_PIPELINE_RENDER_DECL;
