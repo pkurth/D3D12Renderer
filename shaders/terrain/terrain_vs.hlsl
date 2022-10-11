@@ -16,7 +16,8 @@ struct vs_output
 
 static uint getMask(uint isBorder, uint scaleDownByLOD)
 {
-	return ~(((1 << scaleDownByLOD) - 1) * isBorder);
+	//return ~(((1 << scaleDownByLOD) - 1) * isBorder);
+	return ~0 << (scaleDownByLOD * isBorder);
 }
 
 vs_output main(vs_input IN)
