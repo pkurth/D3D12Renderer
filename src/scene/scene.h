@@ -1,7 +1,5 @@
 #pragma once
 
-//#define ENTT_ID_TYPE uint64
-//#include <entt/entt.hpp>
 #include <entt/entity/entity.hpp>
 #include <entt/entity/registry.hpp>
 #include <entt/entity/helper.hpp>
