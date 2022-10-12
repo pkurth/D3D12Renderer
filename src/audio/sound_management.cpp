@@ -41,29 +41,26 @@ void loadSoundRegistry()
 
 static void saveSoundRegistry()
 {
-    YAML::Emitter out;
-    out << YAML::BeginMap;
+    YAML::Node out;
 
     for (uint32 i = 0; i < sound_id_count; ++i)
     {
         sound_spec spec = soundRegistry[i];
 
-        out << YAML::Key << soundIDNames[i] << YAML::Value;
-        
-        out << YAML::BeginMap;
-        out << YAML::Key << "Asset" << YAML::Value << spec.asset;
-        out << YAML::Key << "Type" << YAML::Value << (uint32)spec.type;
-        out << YAML::Key << "Stream" << YAML::Value << spec.stream;
-        out << YAML::EndMap;
+        YAML::Node n;
+        n["Asset"] = spec.asset;
+        n["Type"] = (uint32)spec.type;
+        n["Stream"] = spec.stream;
+
+        out[soundIDNames[i]] = n;
     }
 
-    out << YAML::EndMap;
 
     fs::create_directories(registryPath.parent_path());
 
     LOG_MESSAGE("Rewriting sound registry");
     std::ofstream fout(registryPath);
-    fout << out.c_str();
+    fout << out;
 }
 
 void drawSoundEditor()
