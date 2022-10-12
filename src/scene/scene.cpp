@@ -42,6 +42,8 @@ void game_scene::cloneTo(game_scene& target)
 		point_light_component,
 		spot_light_component,
 		cloth_render_component,
+
+		terrain_component,
 #endif
 
 		animation_component,
@@ -87,6 +89,8 @@ scene_entity game_scene::copyEntity(scene_entity src)
 	if (auto* c = src.getComponentIfExists<point_light_component>()) { dest.addComponent<point_light_component>(*c); }
 	if (auto* c = src.getComponentIfExists<spot_light_component>()) { dest.addComponent<spot_light_component>(*c); }
 	if (auto* c = src.getComponentIfExists<cloth_render_component>()) { dest.addComponent<cloth_render_component>(*c); }
+
+	if (auto* c = src.getComponentIfExists<terrain_component>()) { dest.addComponent<terrain_component>(*c); }
 #endif
 
 	if (auto* c = src.getComponentIfExists<animation_component>()) { dest.addComponent<animation_component>(*c); }

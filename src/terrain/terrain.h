@@ -14,7 +14,9 @@ struct terrain_chunk
 struct terrain_component
 {
 	terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale);
+	terrain_component(const terrain_component&) = default;
 	terrain_component(terrain_component&&) = default;
+	terrain_component& operator=(const terrain_component&) = default;
 	terrain_component& operator=(terrain_component&&) = default;
 
 	terrain_chunk& chunk(uint32 x, uint32 z) { return chunks[z * chunksPerDim + x]; }

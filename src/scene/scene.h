@@ -11,6 +11,7 @@
 #include "rendering/pbr.h"
 #include "rendering/pbr_environment.h"
 #include "core/camera.h"
+#include "terrain/terrain.h"
 #endif
 
 struct game_scene;
