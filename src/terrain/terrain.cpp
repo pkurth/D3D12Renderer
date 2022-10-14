@@ -27,37 +27,56 @@ terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float
 
 	uint16* heights = new uint16[TERRAIN_LOD_0_VERTICES_PER_DIMENSION * TERRAIN_LOD_0_VERTICES_PER_DIMENSION];
 
-
 	uint32 numSegmentsPerDim = TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1;
 	float norm = chunkSize / (float)numSegmentsPerDim;
 
-	for (uint32 z = 0; z < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++z)
+	for (int32 cz = 0; cz < (int32)chunksPerDim; ++cz)
 	{
-		for (uint32 x = 0; x < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++x)
+		for (int32 cx = 0; cx < (int32)chunksPerDim; ++cx)
 		{
-			vec2 position(x * norm, z * norm);
-			float height = fbm(position * 0.05f);
+			auto& c = chunk(cx, cz);
 
-			assert(height >= 0 && height <= 1.f);
+			vec2 minCorner = vec2(cx * chunkSize, cz * chunkSize);
 
-			heights[z * TERRAIN_LOD_0_VERTICES_PER_DIMENSION + x] = (uint16)(height * UINT16_MAX);
+
+			for (uint32 z = 0; z < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++z)
+			{
+				for (uint32 x = 0; x < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++x)
+				{
+					vec2 position = vec2(x * norm, z * norm) + minCorner;
+					float height = fbm(position * 0.01f);
+
+					assert(height >= 0 && height <= 1.f);
+
+					heights[z * TERRAIN_LOD_0_VERTICES_PER_DIMENSION + x] = (uint16)(height * UINT16_MAX);
+				}
+			}
+
+			c.testheightmap = createTexture(heights, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R16_UNORM);
+
+
 		}
 	}
 
-	testheightmap = createTexture(heights, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R16_UNORM);
-
+	
 	delete[] heights;
 }
 
-void terrain_component::render(opaque_render_pass* renderPass, vec3 positionOffset)
+void terrain_component::render(const render_camera& camera, opaque_render_pass* renderPass, vec3 positionOffset)
 {
-	auto testLOD = [](int32 x, int32 z)
-	{
-		return ((x & 1) != (z & 1)) ? 2 : 0;
-	};
+	camera_frustum_planes frustum = camera.getWorldSpaceFrustumPlanes();
 
 	float xzOffset = -(chunkSize * chunksPerDim) * 0.5f;
 	vec3 offset = vec3(xzOffset, 0.f, xzOffset) + positionOffset;
+
+	auto chunkLOD = [chunkSize = this->chunkSize, offset = offset + vec3(0.f, chunkSize * 0.5f, 0.f), camPos = camera.position](int x, int z)
+	{
+		//return ((x & 1) != (z & 1)) ? 2 : 0; // Checkerboard LOD.
+		vec3 chunkCenter = vec3(x * chunkSize, 0.f, z * chunkSize) + offset;
+		float distance = length(chunkCenter - camPos);
+		int32 lod = (int32)(saturate(distance / 500.f) * TERRAIN_MAX_LOD);
+		return lod;
+	};
 
 	for (int32 z = 0; z < (int32)chunksPerDim; ++z)
 	{
@@ -67,13 +86,18 @@ void terrain_component::render(opaque_render_pass* renderPass, vec3 positionOffs
 
 			if (c.active)
 			{
-				int32 lod = testLOD(x, z);
+				int32 lod = chunkLOD(x, z);
 
 				vec3 minCorner = vec3(x * chunkSize, 0.f, z * chunkSize) + offset;
+				vec3 maxCorner = minCorner + vec3(chunkSize, amplitudeScale, chunkSize);
 
-				terrain_render_data data = { minCorner, lod, chunkSize, amplitudeScale, testLOD(x - 1, z), testLOD(x + 1, z), testLOD(x, z - 1), testLOD(x, z + 1),
-					testheightmap };
-				renderPass->renderStaticObject<terrain_pipeline>(mat4::identity, {}, {}, {}, data, -1, false, false);
+				bounding_box aabb = { minCorner, maxCorner };
+				if (!frustum.cullWorldSpaceAABB(aabb))
+				{
+					terrain_render_data data = { minCorner, lod, chunkSize, amplitudeScale, chunkLOD(x - 1, z), chunkLOD(x + 1, z), chunkLOD(x, z - 1), chunkLOD(x, z + 1),
+						c.testheightmap };
+					renderPass->renderStaticObject<terrain_pipeline>(mat4::identity, {}, {}, {}, data, -1, false, false);
+				}
 			}
 		}
 	}
@@ -94,7 +118,7 @@ void terrain_pipeline::initialize()
 
 	indexed_triangle16* tris = new indexed_triangle16[numTrisLod0];
 
-	for (uint32 lod = 0; lod < TERRAIN_MAX_LOD; ++lod)
+	for (uint32 lod = 0; lod < TERRAIN_MAX_LOD + 1; ++lod)
 	{
 		uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> lod;
 		uint32 stride = numSegmentsPerDim + 1;

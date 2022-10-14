@@ -86,11 +86,11 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 	}
 #endif
 
-	uint32 numTerrainChunks = 1;
+	uint32 numTerrainChunks = 10;
 
 	auto terrain = scene.createEntity("Terrain")
 		.addComponent<position_component>(vec3(0.f, 0.f, 0.f))
-		.addComponent<terrain_component>(numTerrainChunks, 64.f, 15.f);
+		.addComponent<terrain_component>(numTerrainChunks, 64.f, 50.f);
 
 	terrain_component& terrainComponent = terrain.getComponent<terrain_component>();
 
@@ -647,7 +647,7 @@ void application::update(const user_input& input, float dt)
 
 		for (auto [entityHandle, terrain, position] : scene.group(entt::get<terrain_component, position_component>).each())
 		{
-			terrain.render(&opaqueRenderPass, position.position);
+			terrain.render(this->scene.camera, &opaqueRenderPass, position.position);
 		}
 
 

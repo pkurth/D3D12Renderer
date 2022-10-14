@@ -1,6 +1,8 @@
 #pragma once
 
 #include "core/math.h"
+#include "core/camera.h"
+
 #include "dx/dx_texture.h"
 
 #include "rendering/material.h"
@@ -9,6 +11,8 @@
 struct terrain_chunk
 {
 	bool active;
+
+	ref<dx_texture> testheightmap; // Temporary.
 };
 
 struct terrain_component
@@ -27,12 +31,10 @@ struct terrain_component
 	float amplitudeScale;
 
 
-	void render(struct opaque_render_pass* renderPass, vec3 positionOffset);
+	void render(const render_camera& camera, struct opaque_render_pass* renderPass, vec3 positionOffset);
 
 private:
 	std::vector<terrain_chunk> chunks;
-
-	ref<dx_texture> testheightmap; // Temporary.
 };
 
 
