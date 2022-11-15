@@ -349,6 +349,7 @@ struct collision_event
 };
 
 
+typedef std::function<void(const collision_event&)> collision_event_func;
 
 struct physics_settings
 {
@@ -366,8 +367,8 @@ struct physics_settings
 	bool simdNarrowPhase = true;
 	bool simdConstraintSolver = true;
 
-	std::function<void(const collision_event&)> collisionBeginCallback;
-	std::function<void(const collision_event&)> collisionEndCallback;
+	collision_event_func collisionBeginCallback;
+	collision_event_func collisionEndCallback;
 };
 
 

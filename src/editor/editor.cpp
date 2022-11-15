@@ -1259,7 +1259,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 	if (selectedCollider)
 	{
-		const trs& transform = selectedEntity.getComponent<transform_component>();
+		const trs& transform = selectedEntity.hasComponent<transform_component>() ? selectedEntity.getComponent<transform_component>() : trs::identity;
 		auto& c = *selectedCollider;
 		const vec4 volumeColor(1.f, 1.f, 0.f, 1.f);
 		if (c.type == collider_type_sphere)
