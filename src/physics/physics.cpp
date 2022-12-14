@@ -853,6 +853,7 @@ struct entity_pair
 	operator uint64() const { return ((uint64)a << 32) | (uint64)b; }
 	bool operator<(entity_pair o) const { return (uint64)*this < (uint64)o; }
 	bool operator==(entity_pair o) const { return a == o.a && b == o.b; }
+	bool operator!=(entity_pair o) const { return !(*this == o); }
 };
 
 struct entity_pair_set
@@ -866,7 +867,7 @@ struct entity_pair_set
 	entity_pair_set& operator=(const entity_pair_set&) = delete;
 	entity_pair_set& operator=(entity_pair_set&&) = default;
 
-	void push(entity_pair pair) { pairs.push_back(pair); }
+	void push(entity_pair pair) { if (pairs.empty() || pairs.front() != pair) { pairs.push_back(pair); } }
 	void sort() { std::sort(pairs.begin(), pairs.end()); }
 
 	struct iterator
@@ -988,23 +989,18 @@ static void handleNonCollisionInteractions(game_scene& scene,
 	prevFrameTriggerOverlaps = std::move(triggerOverlaps);
 }
 
-static void handleCollisionCallbacks(game_scene& scene, const constraint_body_pair* bodyPairs, const collider_pair* colliderPairs, uint32 numContacts,
-	uint32 numRigidBodies, uint32 numColliders, const collision_event_func& collisionBeginCallback, const collision_event_func& collisionEndCallback)
+static void handleCollisionCallbacks(game_scene& scene, const collider_pair* colliderPairs, uint32 numContacts,
+	uint32 numColliders, const collision_begin_event_func& collisionBeginCallback, const collision_end_event_func& collisionEndCallback)
 {
 	entity_pair_set collisions;
 
 	for (uint32 i = 0; i < numContacts; ++i)
 	{
-		constraint_body_pair bodyPair = bodyPairs[i];
-
 		collider_pair colliderPair = colliderPairs[i];
 
-		scene_entity aEntity = (bodyPair.rbA < numRigidBodies) 
-			? scene.getEntityFromComponentAtIndex<rigid_body_component>(numRigidBodies - 1 - bodyPair.rbA)
-			: scene_entity();
-		scene_entity bEntity = (bodyPair.rbB < numRigidBodies) 
-			? scene.getEntityFromComponentAtIndex<rigid_body_component>(numRigidBodies - 1 - bodyPair.rbB)
-			: scene_entity();
+		scene_entity aEntity = scene.getEntityFromComponentAtIndex<collider_component>(numColliders - 1 - colliderPair.colliderA);
+		scene_entity bEntity = scene.getEntityFromComponentAtIndex<collider_component>(numColliders - 1 - colliderPair.colliderB);
+
 
 		entity_pair overlap = { aEntity.handle, bEntity.handle };
 		collisions.push(overlap);
@@ -1018,7 +1014,103 @@ static void handleCollisionCallbacks(game_scene& scene, const constraint_body_pa
 	auto prevEnd = prevFrameCollisions.end();
 	auto thisEnd = collisions.end();
 
+	while (prevIterator != prevEnd && thisIterator != thisEnd)
+	{
+		entity_pair p = *prevIterator;
+		entity_pair t = *thisIterator;
 
+		if (p == t)
+		{
+			++prevIterator;
+			++thisIterator;
+			continue;
+		}
+
+		bool begin;
+		entity_pair pair;
+
+		if (p < t)
+		{
+			begin = false;
+			pair = p;
+			++prevIterator;
+		}
+		else
+		{
+			begin = true;
+			pair = t;
+			++thisIterator;
+		}
+
+		if ((begin && !collisionBeginCallback) || (!begin && !collisionEndCallback))
+		{
+			continue;
+		}
+
+		scene_entity colliderAEntity = { pair.a, scene };
+		scene_entity colliderBEntity = { pair.b, scene };
+
+		const collider_component& colliderA = colliderAEntity.getComponent<collider_component>();
+		const collider_component& colliderB = colliderBEntity.getComponent<collider_component>();
+
+		scene_entity rbAEntity = { colliderA.parentEntity, scene };
+		scene_entity rbBEntity = { colliderB.parentEntity, scene };
+
+		if (begin)
+		{
+			collision_begin_event e = { rbAEntity, rbBEntity, colliderA, colliderB };
+			collisionBeginCallback(e);
+		}
+		else
+		{
+			collision_end_event e = { rbAEntity, rbBEntity, colliderA, colliderB };
+			collisionEndCallback(e);
+		}
+	}
+
+	if (collisionEndCallback)
+	{
+		while (prevIterator != prevEnd)
+		{
+			entity_pair pair = *prevIterator;
+
+			scene_entity colliderAEntity = { pair.a, scene };
+			scene_entity colliderBEntity = { pair.b, scene };
+
+			const collider_component& colliderA = colliderAEntity.getComponent<collider_component>();
+			const collider_component& colliderB = colliderBEntity.getComponent<collider_component>();
+
+			scene_entity rbAEntity = { colliderA.parentEntity, scene };
+			scene_entity rbBEntity = { colliderB.parentEntity, scene };
+
+			collision_end_event e = { rbAEntity, rbBEntity, colliderA, colliderB };
+			collisionEndCallback(e);
+
+			++prevIterator;
+		}
+	}
+
+	if (collisionBeginCallback)
+	{
+		while (thisIterator != thisEnd)
+		{
+			entity_pair pair = *thisIterator;
+
+			scene_entity colliderAEntity = { pair.a, scene };
+			scene_entity colliderBEntity = { pair.b, scene };
+
+			const collider_component& colliderA = colliderAEntity.getComponent<collider_component>();
+			const collider_component& colliderB = colliderBEntity.getComponent<collider_component>();
+
+			scene_entity rbAEntity = { colliderA.parentEntity, scene };
+			scene_entity rbBEntity = { colliderB.parentEntity, scene };
+
+			collision_begin_event e = { rbAEntity, rbBEntity, colliderA, colliderB };
+			collisionBeginCallback(e);
+
+			++thisIterator;
+		}
+	}
 
 	prevFrameCollisions = std::move(collisions);
 }
@@ -1085,7 +1177,7 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 
 	handleNonCollisionInteractions(scene, ffGlobal, nonCollisionInteractions, narrowPhaseResult.numNonCollisionInteractions,
 		numRigidBodies, numTriggers);
-	handleCollisionCallbacks(scene, collisionBodyPairs, collidingColliderPairs, narrowPhaseResult.numContacts, numRigidBodies, numColliders,
+	handleCollisionCallbacks(scene, collidingColliderPairs, narrowPhaseResult.numContacts, numColliders,
 		settings.collisionBeginCallback, settings.collisionEndCallback);
 
 	CPU_PROFILE_STAT("Num rigid bodies", numRigidBodies);

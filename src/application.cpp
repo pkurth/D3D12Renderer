@@ -240,6 +240,19 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		//	.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(25.f, 1.f, -5.f), vec3(5.f, 1.f, 5.f)), { physics_material_type_none, 0, 0, 0 }))
 		//	.addComponent<trigger_component>(triggerCallback);
 
+#if 1
+		editor.physicsSettings.collisionBeginCallback = [](const collision_begin_event& e) mutable
+		{
+			std::cout << "Begin\n";
+		};
+
+		editor.physicsSettings.collisionEndCallback = [](const collision_end_event& e) mutable
+		{
+			std::cout << "End\n";
+		};
+#endif
+
+
 		//bounding_hull hull =
 		//{
 		//	quat::identity,
@@ -308,35 +321,6 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		chainMesh->mesh =
 			builder.createDXMesh();
 	}
-#endif
-
-
-#if 0
-	editor.physicsSettings.collisionBeginCallback = [rng = random_number_generator(512513)](const collision_event& e) mutable
-	{
-		vec3 velA(0.f);
-		vec3 velB(0.f);
-		if (auto* rb = e.entityA.getComponentIfExists<rigid_body_component>()) { velA = rb->linearVelocity; }
-		if (auto* rb = e.entityB.getComponentIfExists<rigid_body_component>()) { velB = rb->linearVelocity; }
-
-		//const tag_component& tagA = e.entityA.getComponent<tag_component>();
-		//const tag_component& tagB = e.entityB.getComponent<tag_component>();
-
-		float relSpeed = length(velA - velB);
-		//LOG_MESSAGE("Collision (%.2f %.2f %.2f) (%.2f %.2f %.2f) -> %.2f", velA.x, velA.y, velA.z, velB.x, velB.y, velB.z, relSpeed);
-		//LOG_MESSAGE("Collision %s %s -> %.2f", tagA.name, tagB.name, relSpeed);
-		
-		float volume = saturate(inverseLerp(1.f, 20.f, relSpeed));
-		if (volume > 0.f)
-		{
-			assert(e.numContacts > 0);
-			vec3 position = e.contacts[0].point;
-
-			float pitch = rng.randomFloatBetween(0.8f, 1.2f);
-		
-			play3DSound(sound_id_collision, position, { volume, pitch });
-		}
-	};
 #endif
 
 

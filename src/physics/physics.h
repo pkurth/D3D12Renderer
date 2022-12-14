@@ -335,7 +335,7 @@ struct collision_contact
 	uint32 friction_restitution; // Packed as 16 bit int each. The packing makes it more convenient for the SIMD code to load the contact data.
 };
 
-struct collision_event
+struct collision_begin_event
 {
 	scene_entity entityA;
 	scene_entity entityB;
@@ -343,13 +343,22 @@ struct collision_event
 	const collider_component& colliderA;
 	const collider_component& colliderB;
 
-	// Only set for collision begin event.
-	collision_contact* contacts;
-	uint32 numContacts;
+	vec3 position;
+	vec3 normal;
+};
+
+struct collision_end_event
+{
+	scene_entity entityA;
+	scene_entity entityB;
+
+	const collider_component& colliderA;
+	const collider_component& colliderB;
 };
 
 
-typedef std::function<void(const collision_event&)> collision_event_func;
+typedef std::function<void(const collision_begin_event&)> collision_begin_event_func;
+typedef std::function<void(const collision_end_event&)> collision_end_event_func;
 
 struct physics_settings
 {
@@ -367,8 +376,8 @@ struct physics_settings
 	bool simdNarrowPhase = true;
 	bool simdConstraintSolver = true;
 
-	collision_event_func collisionBeginCallback;
-	collision_event_func collisionEndCallback;
+	collision_begin_event_func collisionBeginCallback;
+	collision_end_event_func collisionEndCallback;
 };
 
 
