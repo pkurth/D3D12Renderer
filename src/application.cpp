@@ -20,7 +20,7 @@
 #include "terrain/terrain.h"
 
 
-static raytracing_object_type defineBlasFromMesh(const ref<composite_mesh>& mesh)
+static raytracing_object_type defineBlasFromMesh(const ref<multi_mesh>& mesh)
 {
 	if (dxContext.featureSupport.raytracing())
 	{
@@ -174,7 +174,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			"assets/cc0/sphere/Tiles074_2K_Roughness.jpg",
 			{}, vec4(0.f), vec4(1.f), 1.f, 0.5f, false, 3.f);
 
-		auto groundMesh = make_ref<composite_mesh>();
+		auto groundMesh = make_ref<multi_mesh>();
 		builder.pushBox({ vec3(0.f), vec3(100.f, 4.f, 100.f) });
 		groundMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, lollipopMaterial });
 
@@ -183,11 +183,11 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			"assets/desert/textures/WoodenCrate2_Normal.png",
 			{}, {});
 
-		auto boxMesh = make_ref<composite_mesh>();
+		auto boxMesh = make_ref<multi_mesh>();
 		builder.pushBox({ vec3(0.f), vec3(1.f, 1.f, 2.f) });
 		boxMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, woodMaterial });
 
-		auto sphereMesh = make_ref<composite_mesh>();
+		auto sphereMesh = make_ref<multi_mesh>();
 		builder.pushSphere({ });
 		sphereMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, woodMaterial });
 
@@ -280,7 +280,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), { physics_material_type_metal, 0.1f, 1.f, 4.f }));*/
 
 
-		auto chainMesh = make_ref<composite_mesh>();
+		auto chainMesh = make_ref<multi_mesh>();
 #if 0
 		builder.pushCapsule(capsule_mesh_desc(vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f));
 		chainMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, lollipopMaterial });

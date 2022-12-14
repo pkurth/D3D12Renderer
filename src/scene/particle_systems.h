@@ -109,7 +109,7 @@ private:
 	static dx_pipeline simulatePipeline;
 	static dx_pipeline renderPipeline;
 
-	ref<composite_mesh> cartoonMesh;
+	ref<multi_mesh> cartoonMesh;
 	dx_vertex_buffer_group_view skinnedVertexBuffer;
 	float time = 0.f;
 

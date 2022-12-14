@@ -852,7 +852,7 @@ void animation_blend_tree_1d::setBlendValue(float value)
 }
 #endif
 
-void animation_component::update(const ref<composite_mesh>& mesh, memory_arena& arena, float dt, trs* transform)
+void animation_component::update(const ref<multi_mesh>& mesh, memory_arena& arena, float dt, trs* transform)
 {
 	const dx_mesh& dxMesh = mesh->mesh;
 	animation_skeleton& skeleton = mesh->skeleton;
@@ -940,7 +940,7 @@ const vec3 limbTypeColors[] =
 	vec3(1.f, 1.f, 1.f),
 };
 
-void animation_component::drawCurrentSkeleton(const ref<composite_mesh>& mesh, const trs& transform, ldr_render_pass* renderPass)
+void animation_component::drawCurrentSkeleton(const ref<multi_mesh>& mesh, const trs& transform, ldr_render_pass* renderPass)
 {
 	const dx_mesh& dxMesh = mesh->mesh;
 	animation_skeleton& skeleton = mesh->skeleton;

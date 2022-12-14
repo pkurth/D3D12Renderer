@@ -144,7 +144,7 @@ static scene_entity createAxis(game_scene& scene, mesh_builder& builder, ref<pbr
 	scene_entity axis = scene.createEntity("Axis")
 		.addComponent<transform_component>(position, rotation);
 
-	auto mesh = make_ref<composite_mesh>();
+	auto mesh = make_ref<multi_mesh>();
 
 	axis_attachment centerGearAttachment(0.f, 0.f, desc);
 	attach(builder, material, axis, centerGearAttachment, 1.f);
@@ -174,7 +174,7 @@ static scene_entity createGearAxis(game_scene& scene, mesh_builder& builder, ref
 	scene_entity axis = scene.createEntity("Gear Axis")
 		.addComponent<transform_component>(position, rotation);
 
-	auto mesh = make_ref<composite_mesh>();
+	auto mesh = make_ref<multi_mesh>();
 
 	box_mesh_desc m;
 	m.radius = vec3(length * 0.5f, toothWidth * 0.5f, toothWidth * 0.5f);
@@ -220,7 +220,7 @@ static scene_entity createWheel(game_scene& scene, mesh_builder& builder, ref<pb
 	scene_entity result = scene.createEntity("Wheel")
 		.addComponent<transform_component>(position, rotation);
 
-	auto mesh = make_ref<composite_mesh>();
+	auto mesh = make_ref<multi_mesh>();
 
 	hollow_cylinder_mesh_desc m;
 	m.height = desc.height;
@@ -250,7 +250,7 @@ static scene_entity createWheelSuspension(game_scene& scene, mesh_builder& build
 	scene_entity result = scene.createEntity("Wheel suspension")
 		.addComponent<transform_component>(position, rotation);
 
-	auto mesh = make_ref<composite_mesh>();
+	auto mesh = make_ref<multi_mesh>();
 
 	float xSign = right ? 1.f : -1.f;
 
@@ -286,7 +286,7 @@ static scene_entity createRod(game_scene& scene, mesh_builder& builder, ref<pbr_
 	scene_entity result = scene.createEntity("Rod")
 		.addComponent<transform_component>(position, rotation);
 
-	auto mesh = make_ref<composite_mesh>();
+	auto mesh = make_ref<multi_mesh>();
 
 	box_mesh_desc m;
 	m.radius = vec3(thickness * 0.5f, len * 0.5f, thickness * 0.5f);
@@ -320,7 +320,7 @@ void vehicle::initialize(game_scene& scene, vec3 initialMotorPosition, float ini
 		.addComponent<rigid_body_component>(false);
 
 	{	
-		auto motorMesh = make_ref<composite_mesh>();
+		auto motorMesh = make_ref<multi_mesh>();
 
 		box_mesh_desc m;
 		m.radius = vec3(0.6f, 0.1f, 1.f);

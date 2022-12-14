@@ -8,7 +8,7 @@
 #include "core/assimp.h"
 
 
-static void getMeshNamesAndTransforms(const aiNode* node, ref<composite_mesh>& mesh, const mat4& parentTransform = mat4::identity)
+static void getMeshNamesAndTransforms(const aiNode* node, ref<multi_mesh>& mesh, const mat4& parentTransform = mat4::identity)
 {
 	mat4 transform = parentTransform * readAssimpMatrix(node->mTransformation);
 	for (uint32 i = 0; i < node->mNumMeshes; ++i)
@@ -25,10 +25,10 @@ static void getMeshNamesAndTransforms(const aiNode* node, ref<composite_mesh>& m
 	}
 }
 
-static std::unordered_map<asset_handle, weakref<composite_mesh>> meshCache; // TODO: Pack flags into key.
+static std::unordered_map<asset_handle, weakref<multi_mesh>> meshCache; // TODO: Pack flags into key.
 static std::mutex mutex;
 
-static ref<composite_mesh> loadMeshFromFileInternal(asset_handle handle, const fs::path& sceneFilename, uint32 flags)
+static ref<multi_mesh> loadMeshFromFileInternal(asset_handle handle, const fs::path& sceneFilename, uint32 flags)
 {
 	Assimp::Importer importer;
 
@@ -53,7 +53,7 @@ static ref<composite_mesh> loadMeshFromFileInternal(asset_handle handle, const f
 
 	mesh_builder builder(flags, indexType);
 
-	ref<composite_mesh> result = make_ref<composite_mesh>();
+	ref<multi_mesh> result = make_ref<multi_mesh>();
 
 	if (flags & mesh_creation_flags_with_skin)
 	{
@@ -109,7 +109,7 @@ static ref<composite_mesh> loadMeshFromFileInternal(asset_handle handle, const f
 	return result;
 }
 
-ref<composite_mesh> loadMeshFromFile(const fs::path& sceneFilename, uint32 flags)
+ref<multi_mesh> loadMeshFromFile(const fs::path& sceneFilename, uint32 flags)
 {
 	asset_handle handle = getAssetHandleFromPath(sceneFilename.lexically_normal());
 
@@ -125,7 +125,7 @@ ref<composite_mesh> loadMeshFromFile(const fs::path& sceneFilename, uint32 flags
 	return sp;
 }
 
-ref<composite_mesh> loadMeshFromHandle(asset_handle handle, uint32 flags)
+ref<multi_mesh> loadMeshFromHandle(asset_handle handle, uint32 flags)
 {
 	fs::path sceneFilename = getPathFromAssetHandle(handle);
 

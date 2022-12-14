@@ -180,7 +180,7 @@ void humanoid_ragdoll::initialize(game_scene& scene, vec3 initialHipPosition, fl
 		{}, {}, {}, {}, vec4(0.f), vec4(161.f, 102.f, 94.f, 255.f) / 255.f, 1.f, 0.f);
 	//auto ragdollMaterial = lollipopMaterial;
 
-	auto ragdollTorsoMesh = make_ref<composite_mesh>();
+	auto ragdollTorsoMesh = make_ref<multi_mesh>();
 	{
 		builder.pushCapsule(capsule_mesh_desc(scale * vec3(-0.2f, 0.f, 0.f), scale * vec3(0.2f, 0.f, 0.f), scale * 0.25f));
 		builder.pushCapsule(capsule_mesh_desc(scale * vec3(-0.16f, 0.32f, 0.f), scale * vec3(0.16f, 0.32f, 0.f), scale * 0.2f));
@@ -189,37 +189,37 @@ void humanoid_ragdoll::initialize(game_scene& scene, vec3 initialHipPosition, fl
 		ragdollTorsoMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, ragdollMaterial });
 	}
 	
-	auto ragdollHeadMesh = make_ref<composite_mesh>();
+	auto ragdollHeadMesh = make_ref<multi_mesh>();
 	{
 		builder.pushCapsule(capsule_mesh_desc(scale * vec3(0.f, -0.075f, 0.f), scale * vec3(0.f, 0.075f, 0.f), scale * 0.25f));
 		ragdollHeadMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, ragdollMaterial });
 	}
 
-	auto ragdollArmMesh = make_ref<composite_mesh>();
+	auto ragdollArmMesh = make_ref<multi_mesh>();
 	{
 		builder.pushCapsule(capsule_mesh_desc(scale * vec3(0.f, -0.2f, 0.f), scale * vec3(0.f, 0.2f, 0.f), scale * 0.15f));
 		ragdollArmMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, ragdollMaterial });
 	}
 
-	auto ragdollUpperLegMesh = make_ref<composite_mesh>();
+	auto ragdollUpperLegMesh = make_ref<multi_mesh>();
 	{
 		builder.pushCapsule(capsule_mesh_desc(scale * vec3(0.f, -0.3f, 0.f), scale * vec3(0.f, 0.3f, 0.f), scale * 0.25f));
 		ragdollUpperLegMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, ragdollMaterial });
 	}
 
-	auto ragdollLowerLegMesh = make_ref<composite_mesh>();
+	auto ragdollLowerLegMesh = make_ref<multi_mesh>();
 	{
 		builder.pushCapsule(capsule_mesh_desc(scale * vec3(0.f, -0.3f, 0.f), scale * vec3(0.f, 0.3f, 0.f), scale * 0.18f));
 		ragdollLowerLegMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, ragdollMaterial });
 	}
 
-	auto ragdollFootMesh = make_ref<composite_mesh>();
+	auto ragdollFootMesh = make_ref<multi_mesh>();
 	{
 		builder.pushBox(box_mesh_desc{ vec3(0.f), scale * vec3(0.1587f, 0.1f, 0.3424f) });
 		ragdollFootMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, ragdollMaterial });
 	}
 
-	auto ragdollToesMesh = make_ref<composite_mesh>();
+	auto ragdollToesMesh = make_ref<multi_mesh>();
 	{
 		builder.pushCapsule(capsule_mesh_desc(scale * vec3(-0.0587f, 0.f, 0.f), scale * vec3(0.0587f, 0.f, 0.f), scale * 0.1f));
 		ragdollToesMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, ragdollMaterial });

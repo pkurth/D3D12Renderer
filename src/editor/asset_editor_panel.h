@@ -39,7 +39,7 @@ private:
 	virtual void setDragDropData(void* data, uint32 size) override;
 
 	render_camera camera;
-	ref<composite_mesh> mesh;
+	ref<multi_mesh> mesh;
 	main_renderer renderer;
 
 	opaque_render_pass renderPass;
