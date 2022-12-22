@@ -891,14 +891,14 @@ static void handleNonCollisionInteractions(game_scene& scene,
 
 			entity_pair overlap = { triggerEntity.handle, rbEntity.handle };
 
-			if (triggerOverlaps.empty() || triggerOverlaps.back() != overlap)
-			{
-				triggerOverlaps.push_back(overlap);
-			}
+			triggerOverlaps.push_back(overlap);
 		}
 	}
 
 	std::sort(triggerOverlaps.begin(), triggerOverlaps.end());
+
+	// De-duplicate. Since we operate on entities here, multiple colliders may report the same overlap.
+	triggerOverlaps.erase(std::unique(triggerOverlaps.begin(), triggerOverlaps.end()), triggerOverlaps.end());
 
 	event_context& context = scene.createOrGetContextVariable<event_context>();
 
@@ -907,6 +907,14 @@ static void handleNonCollisionInteractions(game_scene& scene,
 
 	auto prevEnd = context.prevFrameTriggerOverlaps.end();
 	auto thisEnd = triggerOverlaps.end();
+
+	auto triggerEvent = [&scene](entity_pair pair, trigger_event_type type)
+	{
+		scene_entity triggerEntity = { pair.a, scene };
+		scene_entity otherEntity = { pair.b, scene };
+		const trigger_component& triggerComp = triggerEntity.getComponent<trigger_component>();
+		triggerComp.callback(trigger_event{ triggerEntity, otherEntity, type });
+	};
 
 	while (prevIterator != prevEnd && thisIterator != thisEnd)
 	{
@@ -920,49 +928,26 @@ static void handleNonCollisionInteractions(game_scene& scene,
 			continue;
 		}
 
-		trigger_event_type type;
-		entity_pair pair;
-
 		if (p < t)
 		{
-			type = trigger_event_leave;
-			pair = p;
+			triggerEvent(p, trigger_event_leave);
 			++prevIterator;
 		}
 		else
 		{
-			type = trigger_event_enter;
-			pair = t;
+			triggerEvent(t, trigger_event_enter);
 			++thisIterator;
 		}
-
-
-		scene_entity triggerEntity = { pair.a, scene };
-		scene_entity otherEntity = { pair.b, scene };
-		const trigger_component& triggerComp = triggerEntity.getComponent<trigger_component>();
-		triggerComp.callback(trigger_event{ triggerEntity, otherEntity, type });
 	}
 
 	while (prevIterator != prevEnd)
 	{
-		entity_pair pair = *prevIterator;
-		scene_entity triggerEntity = { pair.a, scene };
-		scene_entity otherEntity = { pair.b, scene };
-		const trigger_component& triggerComp = triggerEntity.getComponent<trigger_component>();
-		triggerComp.callback(trigger_event{ triggerEntity, otherEntity, trigger_event_leave });
-
-		++prevIterator;
+		triggerEvent(*(prevIterator++), trigger_event_leave);
 	}
 
 	while (thisIterator != thisEnd)
 	{
-		entity_pair pair = *thisIterator;
-		scene_entity triggerEntity = { pair.a, scene };
-		scene_entity otherEntity = { pair.b, scene };
-		const trigger_component& triggerComp = triggerEntity.getComponent<trigger_component>();
-		triggerComp.callback(trigger_event{ triggerEntity, otherEntity, trigger_event_enter});
-
-		++thisIterator;
+		triggerEvent(*(thisIterator++), trigger_event_enter);
 	}
 
 	context.prevFrameTriggerOverlaps = std::move(triggerOverlaps);
@@ -1091,8 +1076,7 @@ static void handleCollisionCallbacks(game_scene& scene, const collider_pair* col
 		{
 			while (prevIterator != prevEnd)
 			{
-				collision_entity_pair pair = *(prevIterator++);
-				endEvent(pair);
+				endEvent(*(prevIterator++));
 			}
 		}
 
@@ -1100,8 +1084,7 @@ static void handleCollisionCallbacks(game_scene& scene, const collider_pair* col
 		{
 			while (thisIterator != thisEnd)
 			{
-				collision_entity_pair pair = *(thisIterator++);
-				beginEvent(pair);
+				beginEvent(*(thisIterator++));
 			}
 		}
 	}
