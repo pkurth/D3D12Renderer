@@ -8,5 +8,5 @@ extern bool soundEditorWindowOpen;
 void loadSoundRegistry();
 void drawSoundEditor();
 
-sound_spec getSoundSpec(const sound_id& id);
+const sound_spec& getSoundSpec(const sound_id& id);
 

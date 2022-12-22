@@ -249,7 +249,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			settings.pitch = rng.randomFloatBetween(0.5f, 1.5f);
 			settings.volume = saturate(remap(speed, 0.2f, 20.f, 0.f, 1.f));
 
-			play3DSound(sound_id_collision, e.position, settings);
+			play3DSound(SOUND_ID("Collision"), e.position, settings);
 		};
 
 		//editor.physicsSettings.collisionEndCallback = [](const collision_end_event& e) mutable

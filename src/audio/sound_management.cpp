@@ -7,14 +7,12 @@
 #include "core/imgui.h"
 #include "core/yaml.h"
 
-#include "sound_ids.h"
-
 
 
 bool soundEditorWindowOpen = false;
 
 
-static sound_spec soundRegistry[sound_id_count];
+static std::unordered_map<uint64, sound_spec> soundRegistry;
 static const fs::path registryPath = fs::path(L"resources/sounds.yaml").lexically_normal();
 
 
@@ -24,18 +22,18 @@ void loadSoundRegistry()
     std::ifstream stream(registryPath);
     YAML::Node n = YAML::Load(stream);
 
-    for (uint32 i = 0; i < sound_id_count; ++i)
+    for (auto entryNode : n)
     {
-        if (auto entryNode = n[soundIDNames[i]])
-        {
-            sound_spec spec = {};
+        sound_spec spec = {};
 
-            YAML_LOAD(entryNode, spec.asset, "Asset");
-            YAML_LOAD_ENUM(entryNode, spec.type, "Type");
-            YAML_LOAD(entryNode, spec.stream, "Stream");
+        YAML_LOAD(entryNode, spec.asset, "Asset");
+        YAML_LOAD_ENUM(entryNode, spec.type, "Type");
+        YAML_LOAD(entryNode, spec.stream, "Stream");
+        YAML_LOAD(entryNode, spec.name, "Tag");
 
-            soundRegistry[i] = spec;
-        }
+        uint64 hash = hashString64(spec.name.c_str());
+
+        soundRegistry[hash] = spec;
     }
 }
 
@@ -43,18 +41,16 @@ static void saveSoundRegistry()
 {
     YAML::Node out;
 
-    for (uint32 i = 0; i < sound_id_count; ++i)
+    for (auto [id, spec] : soundRegistry)
     {
-        sound_spec spec = soundRegistry[i];
-
         YAML::Node n;
+        n["Tag"] = spec.name;
         n["Asset"] = spec.asset;
         n["Type"] = (uint32)spec.type;
         n["Stream"] = spec.stream;
 
-        out[soundIDNames[i]] = n;
+        out.push_back(n);
     }
-
 
     fs::create_directories(registryPath.parent_path());
 
@@ -84,13 +80,12 @@ void drawSoundEditor()
                 dirty = false;
             }
 
-            for (uint32 i = 0; i < sound_id_count; ++i)
+            for (auto& [id, spec] : soundRegistry)
             {
-                if (filter.PassFilter(soundIDNames[i]))
+                std::string& name = spec.name;
+                if (filter.PassFilter(name.c_str()))
                 {
-                    sound_spec& spec = soundRegistry[i];
-
-                    if (ImGui::BeginTree(soundIDNames[i]))
+                    if (ImGui::BeginTree(name.c_str()))
                     {
                         if (ImGui::BeginProperties())
                         {
@@ -105,13 +100,32 @@ void drawSoundEditor()
                     }
                 }
             }
+
+            ImGui::Separator();
+
+            static char input[128] = "";
+            ImGui::InputText("##input", input, sizeof(input));
+            ImGui::SameLine();
+            if (ImGui::DisableableButton("Add sound", input[0] != 0))
+            {
+                sound_spec spec = {};
+                spec.name = input;
+                
+                uint64 hash = hashString64(input);
+                soundRegistry.insert({ hash, spec });
+
+                input[0] = 0;
+            }
         }
         ImGui::End();
     }
 }
 
-sound_spec getSoundSpec(const sound_id& id)
+static sound_spec nullSpec = {};
+
+const sound_spec& getSoundSpec(const sound_id& id)
 {
-    return soundRegistry[id];
+    auto it = soundRegistry.find(id.hash);
+    return (it != soundRegistry.end()) ? it->second : nullSpec;
 }
 

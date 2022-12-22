@@ -23,22 +23,31 @@ static bool findChunk(HANDLE fileHandle, uint32 fourcc, uint32& chunkSize, uint3
 static bool readChunkData(HANDLE fileHandle, void* buffer, uint32 buffersize, uint32 bufferoffset);
 
 
-static ref<audio_sound> fileSounds[sound_id_count];
-static ref<audio_sound> synthSounds[sound_id_count];
+static std::unordered_map<uint64, ref<audio_sound>> fileSounds;
+static std::unordered_map<uint64, ref<audio_sound>> synthSounds;
 
 
-bool checkForExistingFileSound(sound_id id) { return fileSounds[id] != 0; }
-bool checkForExistingSynthSound(sound_id id) { return fileSounds[id] != 0; }
+bool checkForExistingFileSound(sound_id id) 
+{ 
+    auto it = fileSounds.find(id.hash);
+    return (it != fileSounds.end()) && it->second != 0;
+}
+
+bool checkForExistingSynthSound(sound_id id) 
+{ 
+    auto it = synthSounds.find(id.hash);
+    return (it != synthSounds.end()) && it->second != 0;
+}
 
 void registerSound(sound_id id, const ref<audio_sound>& sound)
 {
     if (!sound->isSynth)
     {
-        fileSounds[id] = sound;
+        fileSounds[id.hash] = sound;
     }
     else
     {
-        synthSounds[id] = sound;
+        synthSounds[id.hash] = sound;
     }
 }
 
@@ -50,7 +59,7 @@ bool loadFileSound(sound_id id)
     }
     else
     {
-        sound_spec spec = getSoundSpec(id);
+        const sound_spec& spec = getSoundSpec(id);
 
         fs::path path = getPathFromAssetHandle(spec.asset);
         if (!path.empty())
@@ -117,27 +126,25 @@ bool loadFileSound(sound_id id)
 
 void unloadSound(sound_id id)
 {
-    fileSounds[id].reset();
-    synthSounds[id].reset();
+    fileSounds.erase(id.hash);
+    synthSounds.erase(id.hash);
 }
 
 void unloadAllSounds()
 {
-    for (uint32 i = 0; i < sound_id_count; ++i)
-    {
-        unloadSound((sound_id)i);
-    }
+    fileSounds.clear();
+    synthSounds.clear();
 }
 
 ref<audio_sound> getSound(sound_id id)
 {
-    auto result = fileSounds[id];
+    auto it = fileSounds.find(id.hash);
+    ref<audio_sound> result = (it != fileSounds.end()) ? it->second : 0;
     if (result) { return result; }
 
-    result = synthSounds[id];
-    if (result) { return result; }
-
-    return 0;
+    it = synthSounds.find(id.hash);
+    result = (it != synthSounds.end()) ? it->second : 0;
+    return result;
 }
 
 audio_sound::~audio_sound()

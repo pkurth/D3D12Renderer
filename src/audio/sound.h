@@ -3,10 +3,18 @@
 #include "synth.h"
 #include "core/string.h"
 #include "core/asset.h"
-#include "sound_ids.h"
 
 #include <xaudio2.h>
 #include <functional>
+
+
+struct sound_id
+{
+    const char* id;
+    uint64 hash;
+};
+
+#define SOUND_ID(id) sound_id{ id, force_consteval<hashString64(id)> }
 
 
 enum sound_type
@@ -25,6 +33,7 @@ static const char* soundTypeNames[] =
 
 struct sound_spec
 {
+    std::string name;
     asset_handle asset;
     sound_type type;
     bool stream;
