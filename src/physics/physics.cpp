@@ -891,7 +891,10 @@ static void handleNonCollisionInteractions(game_scene& scene,
 
 			entity_pair overlap = { triggerEntity.handle, rbEntity.handle };
 
-			triggerOverlaps.push_back(overlap); 
+			if (triggerOverlaps.empty() || triggerOverlaps.back() != overlap)
+			{
+				triggerOverlaps.push_back(overlap);
+			}
 		}
 	}
 
@@ -966,7 +969,8 @@ static void handleNonCollisionInteractions(game_scene& scene,
 }
 
 static void handleCollisionCallbacks(game_scene& scene, const collider_pair* colliderPairs, uint8* contactCountPerCollision, uint32 numColliderPairs,
-	uint32 numColliders, const collision_contact* contacts, const collision_begin_event_func& collisionBeginCallback, const collision_end_event_func& collisionEndCallback)
+	uint32 numColliders, const collision_contact* contacts, const rigid_body_global_state* rbGlobal, uint32 dummyRigidBodyIndex,
+	const collision_begin_event_func& collisionBeginCallback, const collision_end_event_func& collisionEndCallback)
 {
 	std::vector<collision_entity_pair> collisions;
 
@@ -998,7 +1002,7 @@ static void handleCollisionCallbacks(game_scene& scene, const collider_pair* col
 		auto prevEnd = context.prevFrameCollisions.end();
 		auto thisEnd = collisions.end();
 
-		auto beginEvent = [contacts, &collisionBeginCallback, &scene](collision_entity_pair pair)
+		auto beginEvent = [contacts, rbGlobal, &collisionBeginCallback, &scene, dummyRigidBodyIndex](collision_entity_pair pair)
 		{
 			if (collisionBeginCallback)
 			{
@@ -1029,7 +1033,14 @@ static void handleCollisionCallbacks(game_scene& scene, const collider_pair* col
 				point *= norm;
 				normal *= norm;
 
-				collision_begin_event e = { rbAEntity, rbBEntity, colliderA, colliderB, point, normal };
+
+				auto& rbAGlobal = rbGlobal[rbAEntity.hasComponent<rigid_body_component>() ? rbAEntity.getComponentIndex<rigid_body_component>() : dummyRigidBodyIndex];
+				auto& rbBGlobal = rbGlobal[rbBEntity.hasComponent<rigid_body_component>() ? rbBEntity.getComponentIndex<rigid_body_component>() : dummyRigidBodyIndex];
+
+				vec3 velA = rbAGlobal.linearVelocity + cross(rbAGlobal.angularVelocity, point - rbAGlobal.position);
+				vec3 velB = rbBGlobal.linearVelocity + cross(rbBGlobal.angularVelocity, point - rbBGlobal.position);
+
+				collision_begin_event e = { rbAEntity, rbBEntity, colliderA, colliderB, point, normal, velB - velA };
 				collisionBeginCallback(e);
 			}
 		};
@@ -1161,8 +1172,6 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 
 	handleNonCollisionInteractions(scene, ffGlobal, nonCollisionInteractions, narrowPhaseResult.numNonCollisionInteractions,
 		numRigidBodies, numTriggers);
-	handleCollisionCallbacks(scene, collidingColliderPairs, contactCountPerCollision, narrowPhaseResult.numCollisions, numColliders, contacts,
-		settings.collisionBeginCallback, settings.collisionEndCallback);
 
 	CPU_PROFILE_STAT("Num rigid bodies", numRigidBodies);
 	CPU_PROFILE_STAT("Num colliders", numColliders);
@@ -1188,6 +1197,13 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 	memset(&rbGlobal[dummyRigidBodyIndex], 0, sizeof(rigid_body_global_state));
 
 	VALIDATE(rbGlobal, numRigidBodies);
+
+
+	handleCollisionCallbacks(scene, collidingColliderPairs, contactCountPerCollision, narrowPhaseResult.numCollisions, numColliders, contacts, rbGlobal, dummyRigidBodyIndex,
+		settings.collisionBeginCallback, settings.collisionEndCallback);
+
+
+
 
 	// Collect constraints.
 	uint32 numContacts = narrowPhaseResult.numContacts;

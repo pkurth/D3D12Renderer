@@ -243,8 +243,11 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 #if 1
 		editor.physicsSettings.collisionBeginCallback = [rng = random_number_generator{ 519431 }](const collision_begin_event& e) mutable
 		{
+			float speed = length(e.relativeVelocity);
+
 			sound_settings settings;
 			settings.pitch = rng.randomFloatBetween(0.5f, 1.5f);
+			settings.volume = saturate(remap(speed, 0.2f, 20.f, 0.f, 1.f));
 
 			play3DSound(sound_id_collision, e.position, settings);
 		};

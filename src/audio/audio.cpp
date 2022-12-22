@@ -272,6 +272,11 @@ void updateAudio(float dt)
 
 sound_handle play2DSound(const sound_id& id, const sound_settings& settings)
 {
+	if (settings.volume <= 0.f)
+	{
+		return {};
+	}
+
 	ref<audio_sound> sound = getSound(id);
 	if (!sound)
 	{
@@ -294,6 +299,11 @@ sound_handle play2DSound(const sound_id& id, const sound_settings& settings)
 
 sound_handle play3DSound(const sound_id& id, vec3 position, const sound_settings& settings)
 {
+	if (settings.volume <= 0.f)
+	{
+		return {};
+	}
+
 	ref<audio_sound> sound = getSound(id);
 	if (!sound)
 	{

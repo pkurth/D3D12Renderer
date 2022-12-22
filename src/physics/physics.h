@@ -345,6 +345,7 @@ struct collision_begin_event
 
 	vec3 position;
 	vec3 normal;
+	vec3 relativeVelocity;
 };
 
 struct collision_end_event
