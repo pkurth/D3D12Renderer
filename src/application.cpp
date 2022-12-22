@@ -230,26 +230,28 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			}
 		}
 
-		//auto triggerCallback = [scene=&scene](trigger_event e)
-		//{
-		//	//scene->deleteEntity(e.other);
-		//	std::cout << ((e.type == trigger_event_enter) ? "Enter" : "Leave") << '\n';
-		//};
-		//
-		//scene.createEntity("Trigger")
-		//	.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(25.f, 1.f, -5.f), vec3(5.f, 1.f, 5.f)), { physics_material_type_none, 0, 0, 0 }))
-		//	.addComponent<trigger_component>(triggerCallback);
+		auto triggerCallback = [scene=&scene](trigger_event e)
+		{
+			//scene->deleteEntity(e.other);
+			//std::cout << ((e.type == trigger_event_enter) ? "Enter" : "Leave") << '\n';
+		};
+		
+		scene.createEntity("Trigger")
+			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(25.f, 1.f, -5.f), vec3(5.f, 1.f, 5.f)), { physics_material_type_none, 0, 0, 0 }))
+			.addComponent<trigger_component>(triggerCallback);
 
 #if 1
-		editor.physicsSettings.collisionBeginCallback = [](const collision_begin_event& e) mutable
+		editor.physicsSettings.collisionBeginCallback = [rng = random_number_generator{ 519431 }](const collision_begin_event& e) mutable
 		{
-			std::cout << "Begin\n";
+			sound_settings settings;
+			settings.pitch = rng.randomFloatBetween(0.5f, 1.5f);
+
+			play3DSound(sound_id_collision, e.position, settings);
 		};
 
-		editor.physicsSettings.collisionEndCallback = [](const collision_end_event& e) mutable
-		{
-			std::cout << "End\n";
-		};
+		//editor.physicsSettings.collisionEndCallback = [](const collision_end_event& e) mutable
+		//{
+		//};
 #endif
 
 
@@ -330,7 +332,6 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 
 	//humanoid_ragdoll ragdoll = humanoid_ragdoll::create(scene, vec3(0.f, 1.25f, 0.f));
 	//learnedLocomotion.initialize(scene, ragdoll);
-
 
 
 

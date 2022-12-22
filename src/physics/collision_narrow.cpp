@@ -2078,12 +2078,36 @@ template <> struct scalar_to_wide<bounding_box> { using type = w_bounding_box; }
 template <> struct scalar_to_wide<bounding_oriented_box> { using type = w_bounding_oriented_box; };
 
 
-static uint32 writeWideContact(const collider_union* worldSpaceColliders, const w_collision_contact* wideContacts, uint32 numWideContacts,
-	uint16* aIndices, uint16* bIndices, uint32 numValidLanes,
-	collision_contact* outContacts, constraint_body_pair* outBodyPairs, collider_pair* outColliderPairs)
+struct collision_write_context
 {
-	uint32 totalNumContacts = 0;
+	collision_contact* outContacts;
+	constraint_body_pair* outBodyPairs;
 
+	collider_pair* outColliderPairs;
+	uint8* outContactCountPerCollision;
+
+	uint32 numContacts;
+	uint32 numCollisions;
+
+	std::pair<collision_contact&, constraint_body_pair&> pushContact()
+	{
+		std::pair<collision_contact&, constraint_body_pair&> result = { outContacts[numContacts], outBodyPairs[numContacts] };
+		++numContacts;
+		return result;
+	}
+
+	void pushCollision(uint16 colliderA, uint16 colliderB, uint32 numContacts)
+	{
+		outColliderPairs[numCollisions] = { colliderA, colliderB };
+		outContactCountPerCollision[numCollisions] = (uint8)numContacts;
+		++numCollisions;
+	}
+};
+
+static void writeWideContact(const collider_union* worldSpaceColliders, const w_collision_contact* wideContacts, uint32 numWideContacts,
+	uint16* aIndices, uint16* bIndices, uint32 numValidLanes,
+	collision_write_context& writeContext)
+{
 	if (numWideContacts > 0)
 	{
 		uint32 validLanesMask = (1 << numValidLanes) - 1;
@@ -2091,9 +2115,6 @@ static uint32 writeWideContact(const collider_union* worldSpaceColliders, const 
 		w_float restitutionA, frictionA, densityA;
 		w_float restitutionB, frictionB, densityB;
 		w_float rbA, rbB;
-
-		const uint32 restitutionOffset = offsetof(collider_union, material) + offsetof(physics_material, restitution);
-		const uint32 objectIndexOffset = offsetof(collider_union, objectIndex);
 
 		load4(&worldSpaceColliders->material.restitution, aIndices, sizeof(collider_union),
 			restitutionA, frictionA, densityA, rbA);
@@ -2109,6 +2130,33 @@ static uint32 writeWideContact(const collider_union* worldSpaceColliders, const 
 		rbB >>= 16;
 		w_int bodyPairs = reinterpret((rbB << 16) | rbA);
 
+
+		uint32 numContactsPerLane[COLLISION_SIMD_WIDTH] = {};
+		for (uint32 j = 0; j < numWideContacts; ++j)
+		{
+			uint32 mask = wideContacts[j].mask;
+			assert(mask != 0);
+
+			mask &= validLanesMask;
+
+			for (uint32 k = 0; k < numValidLanes; ++k)
+			{
+				if (mask & (1 << k))
+				{
+					++numContactsPerLane[k];
+				}
+			}
+		}
+		uint32 offsetPerLane[COLLISION_SIMD_WIDTH];
+		prefixSum(numContactsPerLane, offsetPerLane, numValidLanes, false);
+
+		for (uint32 k = 0; k < numValidLanes; ++k)
+		{
+			if (numContactsPerLane[k] > 0)
+			{
+				writeContext.pushCollision(aIndices[k], bIndices[k], numContactsPerLane[k]);
+			}
+		}
 
 		for (uint32 j = 0; j < numWideContacts; ++j)
 		{
@@ -2144,30 +2192,29 @@ static uint32 writeWideContact(const collider_union* worldSpaceColliders, const 
 				{
 					if (mask & (1 << k))
 					{
-						v[k].store((float*)outContacts);
+						uint32 offset = offsetPerLane[k];
+
+						auto& [outContact, outBodyPair] = writeContext.pushContact();
+
+						v[k].store((float*)&outContact);
 #if COLLISION_SIMD_WIDTH == 4
-						v[k + 4].store((float*)outContacts + 4);
+						v[k + 4].store((float*)&outContact + 4);
 #endif
 
-						++totalNumContacts;
-						++outContacts;
-						*((int*)(outBodyPairs++)) = bodyPairs[k];
-						*outColliderPairs++ = { aIndices[k], bIndices[k] };
+						*(int*)&outBodyPair = bodyPairs[k];
+						
+						++offsetPerLane[k];
 					}
 				}
 			}
 		}
 	}
-
-	return totalNumContacts;
 }
 
-static uint32 writeScalarContact(const collider_union* worldSpaceColliders, const contact_manifold& contact,
+static void writeScalarContact(const collider_union* worldSpaceColliders, const contact_manifold& contact,
 	uint16 aIndex, uint16 bIndex,
-	collision_contact* outContacts, constraint_body_pair* outBodyPairs, collider_pair* outColliderPairs)
+	collision_write_context& writeContext)
 {
-	uint32 totalNumContacts = 0;
-
 	const collider_union* colliderA = worldSpaceColliders + aIndex;
 	const collider_union* colliderB = worldSpaceColliders + bIndex;
 
@@ -2182,33 +2229,26 @@ static uint32 writeScalarContact(const collider_union* worldSpaceColliders, cons
 
 	uint32 friction_restitution = ((uint32)(friction * 0xFFFF) << 16) | (uint32)(restitution * 0xFFFF);
 
+	writeContext.pushCollision(aIndex, bIndex, contact.numContacts);
+
 	for (uint32 contactIndex = 0; contactIndex < contact.numContacts; ++contactIndex)
 	{
-		collision_contact& out = outContacts[totalNumContacts];
-		constraint_body_pair& pair = outBodyPairs[totalNumContacts];
+		auto& [outContact, outBodyPair] = writeContext.pushContact();
 
-		out.normal = contact.collisionNormal;
-		out.penetrationDepth = contact.contacts[contactIndex].penetrationDepth;
-		out.point = contact.contacts[contactIndex].point;
-		out.friction_restitution = friction_restitution;
+		outContact.normal = contact.collisionNormal;
+		outContact.penetrationDepth = contact.contacts[contactIndex].penetrationDepth;
+		outContact.point = contact.contacts[contactIndex].point;
+		outContact.friction_restitution = friction_restitution;
 
-		pair.rbA = rbA;
-		pair.rbB = rbB;
-
-		outColliderPairs[totalNumContacts] = { aIndex, bIndex };
-
-		++totalNumContacts;
+		outBodyPair.rbA = rbA;
+		outBodyPair.rbB = rbB;
 	}
-
-	return totalNumContacts;
 }
 
 template <typename collider_a, typename collider_b>
-static uint32 collisionSIMD(const collider_union* worldSpaceColliders, collider_pair* colliderPairs, uint32 numColliderPairs,
-	collision_contact* outContacts, constraint_body_pair* outBodyPairs, collider_pair* outColliderPairs)
+static void collisionSIMD(const collider_union* worldSpaceColliders, collider_pair* colliderPairs, uint32 numColliderPairs,
+	collision_write_context& writeContext)
 {
-	uint32 totalNumContacts = 0;
-
 	for (uint32 i = 0; i < numColliderPairs; i += COLLISION_SIMD_WIDTH)
 	{
 		uint32 numValidLanes = clamp(numColliderPairs - i, 0u, COLLISION_SIMD_WIDTH);
@@ -2230,23 +2270,14 @@ static uint32 collisionSIMD(const collider_union* worldSpaceColliders, collider_
 		w_collision_contact wideContacts[4];
 		uint32 numWideContacts = intersectionSIMD(bvA, bvB, wideContacts);
 
-		uint32 numContacts = writeWideContact(worldSpaceColliders, wideContacts, numWideContacts, aIndices, bIndices, numValidLanes, 
-			outContacts, outBodyPairs, outColliderPairs);
-
-		outContacts += numContacts;
-		outBodyPairs += numContacts;
-		totalNumContacts += numContacts;
+		writeWideContact(worldSpaceColliders, wideContacts, numWideContacts, aIndices, bIndices, numValidLanes, writeContext);
 	}
-
-	return totalNumContacts;
 }
 
 template <typename collider_a, typename collider_b>
-static uint32 collisionScalar(const collider_union* worldSpaceColliders, collider_pair* colliderPairs, uint32 numColliderPairs,
-	collision_contact* outContacts, constraint_body_pair* outBodyPairs, collider_pair* outColliderPairs)
+static void collisionScalar(const collider_union* worldSpaceColliders, collider_pair* colliderPairs, uint32 numColliderPairs,
+	collision_write_context& writeContext)
 {
-	uint32 totalNumContacts = 0;
-
 	for (uint32 i = 0; i < numColliderPairs; ++i)
 	{
 		collider_pair pair = colliderPairs[i];
@@ -2258,21 +2289,14 @@ static uint32 collisionScalar(const collider_union* worldSpaceColliders, collide
 
 		if (intersection(bvA, bvB, contact))
 		{
-			uint32 numContacts = writeScalarContact(worldSpaceColliders, contact, pair.colliderA, pair.colliderB,
-				outContacts, outBodyPairs, outColliderPairs);
-
-			outContacts += numContacts;
-			outBodyPairs += numContacts;
-			totalNumContacts += numContacts;
+			writeScalarContact(worldSpaceColliders, contact, pair.colliderA, pair.colliderB, writeContext);
 		}
 	}
-
-	return totalNumContacts;
 }
 
 template <typename collider_a, typename collider_b>
-static uint32 collision(const collider_union* worldSpaceColliders, collider_pair* colliderPairs, uint32 numColliderPairs, 
-	collision_contact* outContacts, constraint_body_pair* outBodyPairs, collider_pair* outColliderPairs, bool simd)
+static void collision(const collider_union* worldSpaceColliders, collider_pair* colliderPairs, uint32 numColliderPairs, 
+	collision_write_context& writeContext, bool simd)
 {
 	if (simd)
 	{
@@ -2281,26 +2305,27 @@ static uint32 collision(const collider_union* worldSpaceColliders, collider_pair
 
 		if constexpr (simd_intersection_available<wide_collider_a, wide_collider_b>::value)
 		{
-			return collisionSIMD<wide_collider_a, wide_collider_b>(worldSpaceColliders, colliderPairs, numColliderPairs, outContacts, outBodyPairs, outColliderPairs);
+			collisionSIMD<wide_collider_a, wide_collider_b>(worldSpaceColliders, colliderPairs, numColliderPairs, writeContext);
 		}
 		else
 		{
-			return collisionScalar<collider_a, collider_b>(worldSpaceColliders, colliderPairs, numColliderPairs, outContacts, outBodyPairs, outColliderPairs);
+			collisionScalar<collider_a, collider_b>(worldSpaceColliders, colliderPairs, numColliderPairs, writeContext);
 		}
 	}
 	else
 	{
-		return collisionScalar<collider_a, collider_b>(worldSpaceColliders, colliderPairs, numColliderPairs, outContacts, outBodyPairs, outColliderPairs);
+		collisionScalar<collider_a, collider_b>(worldSpaceColliders, colliderPairs, numColliderPairs, writeContext);
 	}
 }
 
 narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collider_pair* colliderPairs, uint32 numCollisionPairs, memory_arena& arena,
-	collision_contact* outContacts, constraint_body_pair* outBodyPairs, collider_pair* outColliderPairs, non_collision_interaction* outNonCollisionInteractions,
+	collision_contact* outContacts, constraint_body_pair* outBodyPairs, 
+	collider_pair* outColliderPairs, uint8* outContactCountPerCollision,
+	non_collision_interaction* outNonCollisionInteractions,
 	bool simd)
 {
 	CPU_PROFILE_BLOCK("Narrow phase");
 
-	uint32 numContacts = 0;
 	uint32 numNonCollisionInteractions = 0;
 
 	uint32 numCollisionChecks = 0;
@@ -2427,107 +2452,115 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collid
 
 	// SPHERE.
 
+	collision_write_context writeContext;
+	writeContext.numCollisions = 0;
+	writeContext.numContacts = 0;
+	writeContext.outContacts = outContacts;
+	writeContext.outBodyPairs = outBodyPairs;
+	writeContext.outColliderPairs = outColliderPairs;
+	writeContext.outContactCountPerCollision = outContactCountPerCollision;
+
 	{
 		CPU_PROFILE_BLOCK("Check for collisions");
 
-		numContacts += collision<bounding_sphere, bounding_sphere>(worldSpaceColliders,
+		collision<bounding_sphere, bounding_sphere>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_sphere][collider_type_sphere], collisionCountMatrix[collider_type_sphere][collider_type_sphere],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
-		numContacts += collision<bounding_sphere, bounding_capsule>(worldSpaceColliders,
+		collision<bounding_sphere, bounding_capsule>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_sphere][collider_type_capsule], collisionCountMatrix[collider_type_sphere][collider_type_capsule],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
-		numContacts += collision<bounding_sphere, bounding_cylinder>(worldSpaceColliders,
+		collision<bounding_sphere, bounding_cylinder>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_sphere][collider_type_cylinder], collisionCountMatrix[collider_type_sphere][collider_type_cylinder],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
-		numContacts += collision<bounding_sphere, bounding_box>(worldSpaceColliders,
+		collision<bounding_sphere, bounding_box>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_sphere][collider_type_aabb], collisionCountMatrix[collider_type_sphere][collider_type_aabb],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
-		numContacts += collision<bounding_sphere, bounding_oriented_box>(worldSpaceColliders,
+		collision<bounding_sphere, bounding_oriented_box>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_sphere][collider_type_obb], collisionCountMatrix[collider_type_sphere][collider_type_obb],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
-		numContacts += collision<bounding_sphere, bounding_hull>(worldSpaceColliders,
+		collision<bounding_sphere, bounding_hull>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_sphere][collider_type_hull], collisionCountMatrix[collider_type_sphere][collider_type_hull],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
 
 		// CAPSULE.
 
-		numContacts += collision<bounding_capsule, bounding_capsule>(worldSpaceColliders,
+		collision<bounding_capsule, bounding_capsule>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_capsule][collider_type_capsule], collisionCountMatrix[collider_type_capsule][collider_type_capsule],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
-		numContacts += collision<bounding_capsule, bounding_cylinder>(worldSpaceColliders,
+		collision<bounding_capsule, bounding_cylinder>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_capsule][collider_type_cylinder], collisionCountMatrix[collider_type_capsule][collider_type_cylinder],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
-		numContacts += collision<bounding_capsule, bounding_box>(worldSpaceColliders,
+		collision<bounding_capsule, bounding_box>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_capsule][collider_type_aabb], collisionCountMatrix[collider_type_capsule][collider_type_aabb],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
-		numContacts += collision<bounding_capsule, bounding_oriented_box>(worldSpaceColliders,
+		collision<bounding_capsule, bounding_oriented_box>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_capsule][collider_type_obb], collisionCountMatrix[collider_type_capsule][collider_type_obb],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
-		numContacts += collision<bounding_capsule, bounding_hull>(worldSpaceColliders,
+		collision<bounding_capsule, bounding_hull>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_capsule][collider_type_hull], collisionCountMatrix[collider_type_capsule][collider_type_hull],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
 
 		// CYLINDER.
 
-		numContacts += collision<bounding_cylinder, bounding_cylinder>(worldSpaceColliders,
+		collision<bounding_cylinder, bounding_cylinder>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_cylinder][collider_type_cylinder], collisionCountMatrix[collider_type_cylinder][collider_type_cylinder],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
-		numContacts += collision<bounding_cylinder, bounding_box>(worldSpaceColliders,
+		collision<bounding_cylinder, bounding_box>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_cylinder][collider_type_aabb], collisionCountMatrix[collider_type_cylinder][collider_type_aabb],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
-		numContacts += collision<bounding_cylinder, bounding_oriented_box>(worldSpaceColliders,
+		collision<bounding_cylinder, bounding_oriented_box>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_cylinder][collider_type_obb], collisionCountMatrix[collider_type_cylinder][collider_type_obb],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
-		numContacts += collision<bounding_cylinder, bounding_hull>(worldSpaceColliders,
+		collision<bounding_cylinder, bounding_hull>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_cylinder][collider_type_hull], collisionCountMatrix[collider_type_cylinder][collider_type_hull],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
 
 		// AABB.
 
-		numContacts += collision<bounding_box, bounding_box>(worldSpaceColliders,
+		collision<bounding_box, bounding_box>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_aabb][collider_type_aabb], collisionCountMatrix[collider_type_aabb][collider_type_aabb],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
-		numContacts += collision<bounding_box, bounding_oriented_box>(worldSpaceColliders,
+		collision<bounding_box, bounding_oriented_box>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_aabb][collider_type_obb], collisionCountMatrix[collider_type_aabb][collider_type_obb],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
-		numContacts += collision<bounding_box, bounding_hull>(worldSpaceColliders,
+		collision<bounding_box, bounding_hull>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_aabb][collider_type_hull], collisionCountMatrix[collider_type_aabb][collider_type_hull],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
 
 		// OBB.
 
-		numContacts += collision<bounding_oriented_box, bounding_oriented_box>(worldSpaceColliders,
+		collision<bounding_oriented_box, bounding_oriented_box>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_obb][collider_type_obb], collisionCountMatrix[collider_type_obb][collider_type_obb],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
-		numContacts += collision<bounding_oriented_box, bounding_hull>(worldSpaceColliders,
+		collision<bounding_oriented_box, bounding_hull>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_obb][collider_type_hull], collisionCountMatrix[collider_type_obb][collider_type_hull],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 
 
 		// HULL.
 
-		numContacts += collision<bounding_hull, bounding_hull>(worldSpaceColliders,
+		collision<bounding_hull, bounding_hull>(worldSpaceColliders,
 			collisionPairMatrix[collider_type_hull][collider_type_hull], collisionCountMatrix[collider_type_hull][collider_type_hull],
-			outContacts + numContacts, outBodyPairs + numContacts, outColliderPairs + numContacts, simd);
+			writeContext, simd);
 	}
 
 	{
@@ -2559,7 +2592,7 @@ narrowphase_result narrowphase(const collider_union* worldSpaceColliders, collid
 	arena.resetToMarker(marker);
 
 
-	return narrowphase_result{ numContacts, numNonCollisionInteractions };
+	return narrowphase_result{ writeContext.numCollisions, writeContext.numContacts, numNonCollisionInteractions };
 }
 
 
