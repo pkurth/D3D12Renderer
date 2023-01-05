@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/math.h"
-#include "render_pass.h"
+#include "rendering/render_pass.h"
 #include "dx/dx_command_list.h"
 
 #include "particles_rs.hlsli"
@@ -20,24 +20,36 @@ struct particle_system
 	float emitRate;
 
 protected:
+
+	struct particle_parameter_setter
+	{
+		virtual void setRootParameters(dx_command_list* cl) = 0;
+	};
+
+
 	void initializeAsBillboard(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, sort_mode sortMode = sort_mode_none);
 	void initializeAsMesh(uint32 particleStructSize, dx_mesh mesh, submesh_info submesh, uint32 maxNumParticles, float emitRate, sort_mode sortMode = sort_mode_none);
 
-	void update(float dt, const struct dx_pipeline& emitPipeline, const struct dx_pipeline& simulatePipeline);
+	void update(float dt, const dx_pipeline& emitPipeline, const dx_pipeline& simulatePipeline, particle_parameter_setter* parameterSetter);
+	void emit(dx_command_list* cl, float count, float dt, const struct dx_pipeline& emitPipeline, particle_parameter_setter* parameterSetter);
+	void simulate(dx_command_list* cl, float dt, const struct dx_pipeline& simulatePipeline, particle_parameter_setter* parameterSetter);
 
 	particle_draw_info getDrawInfo(const struct dx_pipeline& renderPipeline);
 
-	virtual void setSimulationParameters(dx_command_list* cl) = 0;
-
 	static dx_mesh billboardMesh;
 	submesh_info submesh;
+
+	uint32 numBursts = 0;
 
 private:
 	static void initializePipeline();
 
 	void initializeInternal(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, submesh_info submesh, sort_mode sortMode);
 
-	void setResources(dx_command_list* cl, const struct particle_sim_cb& cb, uint32 offset, bool setUserResources);
+	void setStartResources(dx_command_list* cl, const struct particle_start_cb& cb, uint32 offset, particle_parameter_setter* parameterSetter);
+	void setSimResources(dx_command_list* cl, const struct particle_sim_cb& cb, uint32 offset, particle_parameter_setter* parameterSetter);
+	void setResources(dx_command_list* cl, uint32 offset, particle_parameter_setter* parameterSetter);
+
 	uint32 getAliveListOffset(uint32 alive);
 	uint32 getDeadListOffset();
 	uint32 getNumUserRootParameters(const struct dx_pipeline& pipeline);
@@ -86,3 +98,18 @@ inline void particle_render_pipeline<render_data_t>::render(dx_command_list* cl,
 
 	cl->drawIndirect(particle_system::particleCommandSignature, 1, info.commandBuffer, info.commandBufferOffset);
 }
+
+#define BUILD_PARTICLE_SHADER_NAME(name, suffix) name##suffix
+
+#define EMIT_PIPELINE_NAME(name) BUILD_PARTICLE_SHADER_NAME(name, "_emit_cs")
+#define SIMULATE_PIPELINE_NAME(name) BUILD_PARTICLE_SHADER_NAME(name, "_sim_cs")
+#define VERTEX_SHADER_NAME(name) BUILD_PARTICLE_SHADER_NAME(name, "_vs")
+#define PIXEL_SHADER_NAME(name) BUILD_PARTICLE_SHADER_NAME(name, "_ps")
+
+
+struct particle_system_component
+{
+	ref<particle_system> system;
+};
+
+

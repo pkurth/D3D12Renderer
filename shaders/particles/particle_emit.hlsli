@@ -1,7 +1,7 @@
 #include "cs.hlsli"
 #include "particles_rs.hlsli"
 
-ConstantBuffer<particle_sim_cb> simCB					: register(b0, space1);
+ConstantBuffer<particle_start_cb> simCB					: register(b0, space1);
 
 RWStructuredBuffer<particle_draw> drawInfo				: register(u1, space1);
 RWStructuredBuffer<particle_counters> counters			: register(u2, space1);
@@ -12,7 +12,7 @@ RWStructuredBuffer<uint> currentAliveList				: register(u5, space1);
 
 
 [numthreads(PARTICLES_EMIT_BLOCK_SIZE, 1, 1)]
-[RootSignature(PARTICLE_COMPUTE_RS)]
+[RootSignature(PARTICLE_START_RS)]
 void main(cs_input IN)
 {
 	const uint i = IN.dispatchThreadID.x;

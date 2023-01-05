@@ -28,13 +28,17 @@ struct particle_counters
 
 
 
-struct particle_sim_cb
+struct particle_start_cb
 {
-	float emitRate;
-	float dt;
+	float newParticlesRequest;
 	uint32 indexCount;
 	uint32 startIndex;
 	uint32 baseVertex;
+};
+
+struct particle_sim_cb
+{
+	float dt;
 };
 
 #ifndef USER_PARTICLE_SIMULATION_RS
@@ -43,9 +47,7 @@ struct particle_sim_cb
 #define USER_APPEND_PARTICLE_SIMULATION_RS USER_PARTICLE_SIMULATION_RS ", "
 #endif
 
-#define PARTICLE_COMPUTE_RS \
-	USER_APPEND_PARTICLE_SIMULATION_RS \
-	"RootConstants(num32BitConstants=5, b0, space=1), " \
+#define PARTICLE_COMPUTE_COMMON  \
     "UAV(u0, space=1), " \
     "UAV(u1, space=1), " \
     "UAV(u2, space=1), " \
@@ -54,6 +56,16 @@ struct particle_sim_cb
     "UAV(u5, space=1), " \
     "UAV(u6, space=1), " \
     "UAV(u7, space=1)"
+
+#define PARTICLE_START_RS \
+	USER_APPEND_PARTICLE_SIMULATION_RS \
+	"RootConstants(num32BitConstants=4, b0, space=1), " \
+	PARTICLE_COMPUTE_COMMON
+
+#define PARTICLE_SIM_RS \
+	USER_APPEND_PARTICLE_SIMULATION_RS \
+	"RootConstants(num32BitConstants=1, b0, space=1), " \
+	PARTICLE_COMPUTE_COMMON
 	
 
 #define PARTICLE_COMPUTE_RS_CB					0

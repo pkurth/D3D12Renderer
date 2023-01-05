@@ -8,14 +8,16 @@ struct boid_particle_data
 	uint32 color;
 };
 
-struct boid_particle_cb
+struct boid_particle_settings
 {
-	// Simulation.
+	float radius;
+};
+
+struct boid_simulation_cb
+{
 	vec3 emitPosition;
 	uint32 frameIndex;
 	float radius;
-
-	// Rendering.
 };
 
 #ifdef HLSL
@@ -27,9 +29,9 @@ struct boid_particle_cb
 #ifdef PARTICLE_SIMULATION
 
 #define USER_PARTICLE_SIMULATION_RS \
-	"CBV(b0)"
+	"RootConstants(num32BitConstants=5, b0)"
 
-ConstantBuffer<boid_particle_cb> cb		: register(b0);
+ConstantBuffer<boid_simulation_cb> cb		: register(b0);
 
 static particle_data emitParticle(uint emitIndex)
 {
@@ -89,8 +91,7 @@ static bool simulateParticle(inout particle_data particle, float dt)
 #include "brdf.hlsli"
 
 #define USER_PARTICLE_RENDERING_RS \
-    "CBV(b0, visibility=SHADER_VISIBILITY_VERTEX), " \
-    "CBV(b1), " \
+    "CBV(b0), " \
 	"DescriptorTable(SRV(t0, numDescriptors=3), visibility=SHADER_VISIBILITY_PIXEL), " \
 	"StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \
@@ -116,8 +117,7 @@ struct vs_output
 	float4 position				: SV_Position;
 };
 
-ConstantBuffer<boid_particle_cb> cb		: register(b0);
-ConstantBuffer<camera_cb> camera		: register(b1);
+ConstantBuffer<camera_cb> camera		: register(b0);
 
 TextureCube<float4> irradianceTexture	: register(t0);
 TextureCube<float4> environmentTexture	: register(t1);
@@ -205,6 +205,5 @@ static float4 pixelShader(vs_output IN)
 #define BOID_PARTICLE_SYSTEM_COMPUTE_RS_CBV			0
 
 // Rendering.
-#define BOID_PARTICLE_SYSTEM_RENDERING_RS_CBV		0
-#define BOID_PARTICLE_SYSTEM_RENDERING_RS_CAMERA	1
-#define BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR		2
+#define BOID_PARTICLE_SYSTEM_RENDERING_RS_CAMERA	0
+#define BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR		1

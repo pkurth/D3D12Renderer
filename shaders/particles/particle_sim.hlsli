@@ -18,7 +18,7 @@ RWStructuredBuffer<float> sortKeys						: register(u7, space1);
 
 
 [numthreads(PARTICLES_SIMULATE_BLOCK_SIZE, 1, 1)]
-[RootSignature(PARTICLE_COMPUTE_RS)]
+[RootSignature(PARTICLE_SIM_RS)]
 void main(cs_input IN)
 {
 	const uint i = IN.dispatchThreadID.x;

@@ -1,7 +1,7 @@
 #include "cs.hlsli"
 #include "particles_rs.hlsli"
 
-ConstantBuffer<particle_sim_cb> cb						: register(b0, space1);
+ConstantBuffer<particle_start_cb> cb					: register(b0, space1);
 
 RWStructuredBuffer<particle_dispatch> dispatchInfo		: register(u0, space1);
 RWStructuredBuffer<particle_draw> drawInfo				: register(u1, space1);
@@ -15,16 +15,14 @@ static uint bucketize(uint problemSize, uint bucketSize)
 
 
 [numthreads(1, 1, 1)]
-[RootSignature(PARTICLE_COMPUTE_RS)]
+[RootSignature(PARTICLE_START_RS)]
 void main(cs_input IN)
 {
 	particle_counters c = counters[0];
 	particle_draw draw = drawInfo[0];
 	particle_dispatch dispatch = dispatchInfo[0];
 
-	const float dt = cb.dt;
-	const float emitRate = cb.emitRate;
-	c.emitRateAccum += emitRate * dt; // TODO: How do we prevent this from running to infinity, if the system is saturated?
+	c.emitRateAccum += cb.newParticlesRequest; // TODO: How do we prevent this from running to infinity, if the system is saturated?
 
 	uint spaceLeft = c.numDeadParticles;
 	uint numNewParticles = min((uint)c.emitRateAccum, spaceLeft);

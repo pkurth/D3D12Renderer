@@ -12,18 +12,24 @@ struct fire_particle_data
 defineSpline(float, 4)
 defineSpline(float, 8)
 
-struct fire_particle_cb
+struct fire_particle_settings
 {
-	// Simulation.
-	vec3 emitPosition;
-	uint32 frameIndex; 
-	vec3 cameraPosition;
-	uint32 padding;
-
-	// Rendering.
 	spline(float, 4) sizeOverLifetime;
 	spline(float, 4) intensityOverLifetime;
 	spline(float, 4) atlasProgressionOverLifetime;
+};
+
+struct fire_simulation_cb
+{
+	vec3 emitPosition;
+	uint32 frameIndex;
+	vec3 cameraPosition;
+	uint32 padding;
+};
+
+struct fire_rendering_cb
+{
+	fire_particle_settings settings;
 	texture_atlas_cb atlas;
 };
 
@@ -43,9 +49,9 @@ static float getRelLife(float life, float maxLife)
 #define REQUIRES_SORTING
 
 #define USER_PARTICLE_SIMULATION_RS \
-	"CBV(b0)"
+	"RootConstants(num32BitConstants=8, b0)"
 
-ConstantBuffer<fire_particle_cb> cb		: register(b0);
+ConstantBuffer<fire_simulation_cb> cb		: register(b0);
 
 static particle_data emitParticle(uint emitIndex)
 {
@@ -139,7 +145,7 @@ struct vs_output
 	float4 position			: SV_Position;
 };
 
-ConstantBuffer<fire_particle_cb> cb		: register(b0);
+ConstantBuffer<fire_rendering_cb> cb	: register(b0);
 ConstantBuffer<camera_cb> camera		: register(b1);
 
 Texture2D<float4> tex					: register(t0);
@@ -170,19 +176,19 @@ static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> parti
 	float2 rotation; // Sin(angle), cos(angle).
 	unpackHalfs(particles[index].sinAngle_cosAngle, rotation.x, rotation.y);
 
-	float size = cb.sizeOverLifetime.evaluate(4, relLife);
+	float size = cb.settings.sizeOverLifetime.evaluate(4, relLife);
 	float2 localPosition = IN.position.xy * size;
 	localPosition = float2(dot(localPosition, float2(rotation.y, -rotation.x)), dot(localPosition, rotation));
 	pos += localPosition.x * camera.right.xyz + localPosition.y * camera.up.xyz;
 
 	texture_atlas_cb atlas = cb.atlas;
-	float atlasProgression = cb.atlasProgressionOverLifetime.evaluate(4, relLife);
+	float atlasProgression = cb.settings.atlasProgressionOverLifetime.evaluate(4, relLife);
 	float atlasIndex = atlasProgression * (atlas.getTotalNumCells() - 1);
 	float2 originalUV = IN.position.xy * 0.5f + 0.5f;
 
 	vs_output OUT;
 	OUT.position = mul(camera.viewProj, float4(pos, 1.f));
-	OUT.intensity = 20 * cb.intensityOverLifetime.evaluate(4, relLife);
+	OUT.intensity = 20 * cb.settings.intensityOverLifetime.evaluate(4, relLife);
 
 	OUT.uv0 = getUVs(atlas, (uint)atlasIndex, originalUV);
 	OUT.uv1 = getUVs(atlas, (uint)atlasIndex + 1, originalUV);

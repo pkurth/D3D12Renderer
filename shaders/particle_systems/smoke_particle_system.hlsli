@@ -12,18 +12,28 @@ struct smoke_particle_data
 defineSpline(float, 4)
 defineSpline(float, 8)
 
-struct smoke_particle_cb
+struct smoke_particle_settings
 {
-	// Simulation.
+	spline(float, 8) lifeScaleFromDistance;
+	spline(float, 4) intensityOverLifetime;
+	spline(float, 4) atlasProgressionOverLifetime;
+};
+
+struct smoke_simulation_cb
+{
 	vec3 emitPosition;
 	uint32 frameIndex;
 	vec3 cameraPosition;
 	uint32 padding;
-	spline(float, 8) lifeScaleFromDistance;
 
-	// Rendering.
+	spline(float, 8) lifeScaleFromDistance;
+};
+
+struct smoke_rendering_cb
+{
 	spline(float, 4) intensityOverLifetime;
 	spline(float, 4) atlasProgressionOverLifetime;
+
 	texture_atlas_cb atlas;
 };
 
@@ -38,7 +48,7 @@ struct smoke_particle_cb
 #define USER_PARTICLE_SIMULATION_RS \
 	"CBV(b0)"
 
-ConstantBuffer<smoke_particle_cb> cb		: register(b0);
+ConstantBuffer<smoke_simulation_cb> cb		: register(b0);
 
 static particle_data emitParticle(uint emitIndex)
 {
@@ -125,7 +135,7 @@ struct vs_output
 	float4 position			: SV_Position;
 };
 
-ConstantBuffer<smoke_particle_cb> cb		: register(b0);
+ConstantBuffer<smoke_rendering_cb> cb	: register(b0);
 ConstantBuffer<camera_cb> camera		: register(b1);
 
 Texture2D<float4> tex					: register(t0);
