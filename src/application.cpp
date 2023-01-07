@@ -434,6 +434,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 	fireParticleSystem.initialize(10000, 50.f, "assets/particles/fire_explosion.tif", 6, 6);
 	smokeParticleSystem.initialize(10000, 500.f, "assets/particles/smoke1.tif", 5, 5);
 	boidParticleSystem.initialize(10000, 2000.f);
+	debrisParticleSystem.initialize(10000);
 #endif
 
 	stackArena.initialize();
@@ -560,18 +561,25 @@ void application::update(const user_input& input, float dt)
 
 	// Particles.
 
-#if 0
-	fireParticleSystem.settings.cameraPosition = camera.position;
-	smokeParticleSystem.settings.cameraPosition = camera.position;
-
+#if 1
 	boidParticleSystem.update(dt);
 	boidParticleSystem.render(&transparentRenderPass);
 
-	fireParticleSystem.update(dt);
+	fireParticleSystem.update(camera.position, dt);
 	fireParticleSystem.render(&transparentRenderPass);
 
-	//smokeParticleSystem.update(dt);
-	//smokeParticleSystem.render(&transparentRenderPass);
+	smokeParticleSystem.update(camera.position, dt);
+	smokeParticleSystem.render(&transparentRenderPass);
+
+
+
+	if (input.keyboard[key_backspace].pressEvent)
+	{
+		debrisParticleSystem.burst(camera.position + camera.rotation * vec3(0.f, 0.f, -3.f));
+	}
+	debrisParticleSystem.update(camera.position, dt);
+	debrisParticleSystem.render(&transparentRenderPass);
+
 #endif
 
 

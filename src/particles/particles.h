@@ -17,8 +17,6 @@ enum sort_mode
 
 struct particle_system
 {
-	float emitRate;
-
 protected:
 
 	struct particle_parameter_setter
@@ -27,27 +25,28 @@ protected:
 	};
 
 
-	void initializeAsBillboard(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, sort_mode sortMode = sort_mode_none);
-	void initializeAsMesh(uint32 particleStructSize, dx_mesh mesh, submesh_info submesh, uint32 maxNumParticles, float emitRate, sort_mode sortMode = sort_mode_none);
+	void initializeAsBillboard(uint32 particleStructSize, uint32 maxNumParticles, sort_mode sortMode = sort_mode_none);
+	void initializeAsMesh(uint32 particleStructSize, dx_mesh mesh, submesh_info submesh, uint32 maxNumParticles, sort_mode sortMode = sort_mode_none);
 
-	void update(float dt, const dx_pipeline& emitPipeline, const dx_pipeline& simulatePipeline, particle_parameter_setter* parameterSetter);
-	void emit(dx_command_list* cl, float count, float dt, const struct dx_pipeline& emitPipeline, particle_parameter_setter* parameterSetter);
-	void simulate(dx_command_list* cl, float dt, const struct dx_pipeline& simulatePipeline, particle_parameter_setter* parameterSetter);
+	void update(float newParticles, float dt, const dx_pipeline& emitPipeline, const dx_pipeline& simulatePipeline, particle_parameter_setter* parameterSetter);
 
 	particle_draw_info getDrawInfo(const struct dx_pipeline& renderPipeline);
 
 	static dx_mesh billboardMesh;
 	submesh_info submesh;
 
-	uint32 numBursts = 0;
-
 private:
 	static void initializePipeline();
 
-	void initializeInternal(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, submesh_info submesh, sort_mode sortMode);
+	void initializeInternal(uint32 particleStructSize, uint32 maxNumParticles, submesh_info submesh, sort_mode sortMode);
 
-	void setStartResources(dx_command_list* cl, const struct particle_start_cb& cb, uint32 offset, particle_parameter_setter* parameterSetter);
-	void setSimResources(dx_command_list* cl, const struct particle_sim_cb& cb, uint32 offset, particle_parameter_setter* parameterSetter);
+	template <typename T>
+	void setResources(dx_command_list* cl, const T& cb, uint32 offset, particle_parameter_setter* parameterSetter)
+	{
+		cl->setCompute32BitConstants(offset + PARTICLE_COMPUTE_RS_CB, cb);
+		setResources(cl, offset, parameterSetter);
+	}
+
 	void setResources(dx_command_list* cl, uint32 offset, particle_parameter_setter* parameterSetter);
 
 	uint32 getAliveListOffset(uint32 alive);
@@ -65,8 +64,6 @@ private:
 	sort_mode sortMode;
 
 	uint32 index;
-
-
 
 	static ref<dx_buffer> particleDrawCommandBuffer;
 	static dx_command_signature particleCommandSignature;

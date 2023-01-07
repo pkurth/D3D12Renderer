@@ -15,6 +15,7 @@ struct boid_particle_system : particle_system
 	void update(float dt);
 	void render(transparent_render_pass* renderPass);
 
+	float emitRate;
 	boid_particle_settings settings;
 
 private:

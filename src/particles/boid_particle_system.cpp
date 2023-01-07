@@ -31,10 +31,11 @@ void boid_particle_system::initializePipeline()
 
 void boid_particle_system::initialize(uint32 maxNumParticles, float emitRate)
 {
+	this->emitRate = emitRate;
 	cartoonMesh = loadAnimatedMeshFromFile("assets/cartoon/cartoon.fbx");
 	if (cartoonMesh)
 	{
-		particle_system::initializeAsMesh(sizeof(boid_particle_data), cartoonMesh->mesh, cartoonMesh->submeshes[0].info, maxNumParticles, emitRate, sort_mode_none);
+		particle_system::initializeAsMesh(sizeof(boid_particle_data), cartoonMesh->mesh, cartoonMesh->submeshes[0].info, maxNumParticles, sort_mode_none);
 
 		settings.radius = 15.f;
 	}
@@ -80,7 +81,7 @@ void boid_particle_system::update(float dt)
 		s.cb.frameIndex = (uint32)dxContext.frameID;
 		s.cb.radius = settings.radius;
 
-		particle_system::update(dt, emitPipeline, simulatePipeline, &s);
+		particle_system::update(emitRate * dt, dt, emitPipeline, simulatePipeline, &s);
 	}
 }
 

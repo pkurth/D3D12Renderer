@@ -32,6 +32,7 @@ void fire_particle_system::initializePipeline()
 
 void fire_particle_system::initialize(uint32 maxNumParticles, float emitRate, const std::string& textureFilename, uint32 cols, uint32 rows)
 {
+	this->emitRate = emitRate;
 	auto tex = loadTextureFromFile(textureFilename);
 
 	if (!tex)
@@ -39,7 +40,7 @@ void fire_particle_system::initialize(uint32 maxNumParticles, float emitRate, co
 		tex = render_resources::whiteTexture;
 	}
 
-	particle_system::initializeAsBillboard(sizeof(fire_particle_data), maxNumParticles, emitRate, sort_mode_back_to_front);
+	particle_system::initializeAsBillboard(sizeof(fire_particle_data), maxNumParticles, sort_mode_back_to_front);
 
 	atlas.texture = tex;
 	atlas.cols = cols;
@@ -77,7 +78,7 @@ void fire_particle_system::update(vec3 cameraPosition, float dt)
 	s.cb.emitPosition = vec3(0.f, 20.f, -10.f); // TEMPORARY.
 	s.cb.frameIndex = (uint32)dxContext.frameID;
 
-	particle_system::update(dt, emitPipeline, simulatePipeline, &s);
+	particle_system::update(emitRate* dt, dt, emitPipeline, simulatePipeline, &s);
 }
 
 void fire_particle_system::render(transparent_render_pass* renderPass)

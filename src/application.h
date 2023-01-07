@@ -10,6 +10,7 @@
 #include "particles/fire_particle_system.h"
 #include "particles/smoke_particle_system.h"
 #include "particles/boid_particle_system.h"
+#include "particles/debris_particle_system.h"
 #include "rendering/raytracing.h"
 #include "editor/editor.h"
 #include "learning/learned_locomotion.h"
@@ -49,6 +50,7 @@ private:
 	fire_particle_system fireParticleSystem;
 	smoke_particle_system smokeParticleSystem;
 	boid_particle_system boidParticleSystem;
+	debris_particle_system debrisParticleSystem;
 
 	main_renderer* renderer;
 

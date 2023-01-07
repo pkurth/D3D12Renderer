@@ -15,6 +15,7 @@ struct smoke_particle_system : particle_system
 	void update(vec3 cameraPosition, float dt);
 	void render(transparent_render_pass* renderPass);
 
+	float emitRate;
 	smoke_particle_settings settings;
 
 private:

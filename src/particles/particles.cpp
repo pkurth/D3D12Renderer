@@ -33,10 +33,9 @@ void particle_system::initializePipeline()
 	billboardMesh = builder.createDXMesh();
 }
 
-void particle_system::initializeInternal(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, submesh_info submesh, sort_mode sortMode)
+void particle_system::initializeInternal(uint32 particleStructSize, uint32 maxNumParticles, submesh_info submesh, sort_mode sortMode)
 {
 	this->maxNumParticles = maxNumParticles;
-	this->emitRate = emitRate;
 	this->index = atomicIncrement(particleSystemCounter);
 	this->submesh = submesh;
 	this->sortMode = sortMode;
@@ -82,15 +81,15 @@ void particle_system::initializeInternal(uint32 particleStructSize, uint32 maxNu
 	updateBufferDataRange(particleDrawCommandBuffer, &draw, (uint32)sizeof(particle_draw) * index, (uint32)sizeof(particle_draw));
 }
 
-void particle_system::initializeAsBillboard(uint32 particleStructSize, uint32 maxNumParticles, float emitRate, sort_mode sortMode)
+void particle_system::initializeAsBillboard(uint32 particleStructSize, uint32 maxNumParticles, sort_mode sortMode)
 {
 	submesh_info submesh = { 6, 0, 0, 4 };
-	initializeInternal(particleStructSize, maxNumParticles, emitRate, submesh, sortMode);
+	initializeInternal(particleStructSize, maxNumParticles, submesh, sortMode);
 }
 
-void particle_system::initializeAsMesh(uint32 particleStructSize, dx_mesh mesh, submesh_info submesh, uint32 maxNumParticles, float emitRate, sort_mode sortMode)
+void particle_system::initializeAsMesh(uint32 particleStructSize, dx_mesh mesh, submesh_info submesh, uint32 maxNumParticles, sort_mode sortMode)
 {
-	initializeInternal(particleStructSize, maxNumParticles, emitRate, submesh, sortMode);
+	initializeInternal(particleStructSize, maxNumParticles, submesh, sortMode);
 }
 
 particle_draw_info particle_system::getDrawInfo(const struct dx_pipeline& renderPipeline)
@@ -105,7 +104,7 @@ particle_draw_info particle_system::getDrawInfo(const struct dx_pipeline& render
 	return result;
 }
 
-void particle_system::update(float dt, const dx_pipeline& emitPipeline, const dx_pipeline& simulatePipeline, particle_parameter_setter* parameterSetter)
+void particle_system::update(float newParticles, float dt, const dx_pipeline& emitPipeline, const dx_pipeline& simulatePipeline, particle_parameter_setter* parameterSetter)
 {
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
@@ -115,116 +114,94 @@ void particle_system::update(float dt, const dx_pipeline& emitPipeline, const dx
 		// Buffers get promoted to D3D12_RESOURCE_STATE_UNORDERED_ACCESS implicitly, so we can omit this.
 		//cl->transitionBarrier(dispatchBuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		emit(cl, emitRate * dt, dt, emitPipeline, parameterSetter);
-		simulate(cl, dt, simulatePipeline, parameterSetter);
+		particle_start_cb startCB = { newParticles, submesh.numIndices, submesh.firstIndex, submesh.baseVertex };
+
+		// ----------------------------------------
+		// START
+		// ----------------------------------------
+
+		{
+			DX_PROFILE_BLOCK(cl, "Start emit");
+
+			cl->setPipelineState(*startPipeline.pipeline);
+			cl->setComputeRootSignature(*startPipeline.rootSignature);
+
+			cl->setRootComputeUAV(PARTICLE_COMPUTE_RS_DISPATCH_INFO, dispatchBuffer);
+			setResources(cl, startCB, 0, 0);
+
+			cl->dispatch(1);
+			barrier_batcher(cl)
+				//.uav(dispatchBuffer)
+				.transition(dispatchBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
+		}
+
+		// ----------------------------------------
+		// EMIT
+		// ----------------------------------------
+
+		{
+			DX_PROFILE_BLOCK(cl, "Emit");
+
+			cl->setPipelineState(*emitPipeline.pipeline);
+			cl->setComputeRootSignature(*emitPipeline.rootSignature);
+
+			uint32 numUserRootParameters = getNumUserRootParameters(emitPipeline);
+			setResources(cl, startCB, numUserRootParameters, parameterSetter);
+
+			cl->dispatchIndirect(1, dispatchBuffer, 0);
+			barrier_batcher(cl)
+				.uav(particleDrawCommandBuffer)
+				.uav(particlesBuffer)
+				.uav(listBuffer);
+		}
+
+		particle_sim_cb simCB = { dt };
+
+		// ----------------------------------------
+		// SIMULATE
+		// ----------------------------------------
+
+		{
+			DX_PROFILE_BLOCK(cl, "Simulate");
+
+			cl->setPipelineState(*simulatePipeline.pipeline);
+			cl->setComputeRootSignature(*simulatePipeline.rootSignature);
+
+			uint32 numUserRootParameters = getNumUserRootParameters(simulatePipeline);
+			setResources(cl, simCB, numUserRootParameters, parameterSetter);
+
+			cl->dispatchIndirect(1, dispatchBuffer, sizeof(D3D12_DISPATCH_ARGUMENTS));
+			barrier_batcher(cl)
+				.uav(particleDrawCommandBuffer)
+				.uav(particlesBuffer)
+				.uav(listBuffer)
+				.uav(sortBuffer);
+		}
+
+		currentAlive = 1 - currentAlive;
+
+		// ----------------------------------------
+		// SORT
+		// ----------------------------------------
+
+		if (sortMode != sort_mode_none)
+		{
+			barrier_batcher(cl)
+				.transition(particleDrawCommandBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+			bitonicSortFloat(cl,
+				sortBuffer, 0,
+				listBuffer, getAliveListOffset(currentAlive),
+				maxNumParticles,
+				particleDrawCommandBuffer, sizeof(particle_draw) * index + offsetof(particle_draw, arguments) + offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, InstanceCount),
+				sortMode == sort_mode_front_to_back);
+		}
 
 		// Buffers decay to D3D12_RESOURCE_STATE_COMMON implicitly, so we can omit this.
 		//cl->transitionBarrier(dispatchBuffer, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_COMMON);
 	}
 
 	dxContext.executeCommandList(cl);
-}
-
-void particle_system::emit(dx_command_list* cl, float count, float dt, const dx_pipeline& emitPipeline, particle_parameter_setter* parameterSetter)
-{
-	particle_start_cb cb = { count, submesh.numIndices, submesh.firstIndex, submesh.baseVertex };
-
-	// ----------------------------------------
-	// START
-	// ----------------------------------------
-
-	{
-		DX_PROFILE_BLOCK(cl, "Start");
-
-		cl->setPipelineState(*startPipeline.pipeline);
-		cl->setComputeRootSignature(*startPipeline.rootSignature);
-
-		cl->setRootComputeUAV(PARTICLE_COMPUTE_RS_DISPATCH_INFO, dispatchBuffer);
-		setStartResources(cl, cb, 0, 0);
-
-		cl->dispatch(1);
-		barrier_batcher(cl)
-			//.uav(dispatchBuffer)
-			.uav(particleDrawCommandBuffer)
-			.transition(dispatchBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
-	}
-
-	// ----------------------------------------
-	// EMIT
-	// ----------------------------------------
-
-	{
-		DX_PROFILE_BLOCK(cl, "Emit");
-
-		cl->setPipelineState(*emitPipeline.pipeline);
-		cl->setComputeRootSignature(*emitPipeline.rootSignature);
-
-		uint32 numUserRootParameters = getNumUserRootParameters(emitPipeline);
-		setStartResources(cl, cb, numUserRootParameters, parameterSetter);
-
-		cl->dispatchIndirect(1, dispatchBuffer, 0);
-		barrier_batcher(cl)
-			.uav(particleDrawCommandBuffer)
-			.uav(particlesBuffer)
-			.uav(listBuffer);
-	}
-}
-
-void particle_system::simulate(dx_command_list* cl, float dt, const dx_pipeline& simulatePipeline, particle_parameter_setter* parameterSetter)
-{
-	particle_sim_cb cb = { dt };
-
-	// ----------------------------------------
-	// SIMULATE
-	// ----------------------------------------
-
-	{
-		DX_PROFILE_BLOCK(cl, "Simulate");
-
-		cl->setPipelineState(*simulatePipeline.pipeline);
-		cl->setComputeRootSignature(*simulatePipeline.rootSignature);
-
-		uint32 numUserRootParameters = getNumUserRootParameters(simulatePipeline);
-		setSimResources(cl, cb, numUserRootParameters, parameterSetter);
-
-		cl->dispatchIndirect(1, dispatchBuffer, sizeof(D3D12_DISPATCH_ARGUMENTS));
-		barrier_batcher(cl)
-			.uav(particleDrawCommandBuffer)
-			.uav(particlesBuffer)
-			.uav(listBuffer)
-			.uav(sortBuffer);
-	}
-
-	currentAlive = 1 - currentAlive;
-
-	// ----------------------------------------
-	// SORT
-	// ----------------------------------------
-
-	if (sortMode != sort_mode_none)
-	{
-		barrier_batcher(cl)
-			.transition(particleDrawCommandBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-
-		bitonicSortFloat(cl,
-			sortBuffer, 0,
-			listBuffer, getAliveListOffset(currentAlive),
-			maxNumParticles,
-			particleDrawCommandBuffer, sizeof(particle_draw) * index + offsetof(particle_draw, arguments) + offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, InstanceCount),
-			sortMode == sort_mode_front_to_back);
-	}
-}
-
-void particle_system::setStartResources(dx_command_list* cl, const particle_start_cb& cb, uint32 offset, particle_parameter_setter* parameterSetter)
-{
-	cl->setCompute32BitConstants(offset + PARTICLE_COMPUTE_RS_CB, cb);
-	setResources(cl, offset, parameterSetter);
-}
-
-void particle_system::setSimResources(dx_command_list* cl, const particle_sim_cb& cb, uint32 offset, particle_parameter_setter* parameterSetter)
-{
-	cl->setCompute32BitConstants(offset + PARTICLE_COMPUTE_RS_CB, cb);
-	setResources(cl, offset, parameterSetter);
 }
 
 void particle_system::setResources(dx_command_list* cl, uint32 offset, particle_parameter_setter* parameterSetter)

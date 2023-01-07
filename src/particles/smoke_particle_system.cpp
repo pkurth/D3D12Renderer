@@ -30,6 +30,7 @@ void smoke_particle_system::initializePipeline()
 
 void smoke_particle_system::initialize(uint32 maxNumParticles, float emitRate, const std::string& textureFilename, uint32 cols, uint32 rows)
 {
+	this->emitRate = emitRate;
 	auto tex = loadTextureFromFile(textureFilename);
 
 	if (!tex)
@@ -37,7 +38,7 @@ void smoke_particle_system::initialize(uint32 maxNumParticles, float emitRate, c
 		tex = render_resources::whiteTexture;
 	}
 
-	particle_system::initializeAsBillboard(sizeof(smoke_particle_data), maxNumParticles, emitRate, sort_mode_back_to_front);
+	particle_system::initializeAsBillboard(sizeof(smoke_particle_data), maxNumParticles, sort_mode_back_to_front);
 
 	atlas.texture = tex;
 	atlas.cols = cols;
@@ -67,7 +68,7 @@ void smoke_particle_system::update(vec3 cameraPosition, float dt)
 	setter s;
 	s.cb = dxContext.uploadDynamicConstantBuffer(cb);
 
-	particle_system::update(dt, emitPipeline, simulatePipeline, &s);
+	particle_system::update(emitRate* dt, dt, emitPipeline, simulatePipeline, &s);
 }
 
 void smoke_particle_system::render(transparent_render_pass* renderPass)
