@@ -1,5 +1,5 @@
-#ifndef MATERIAL_H
-#define MATERIAL_H
+#ifndef MATERIAL_HLSLI
+#define MATERIAL_HLSLI
 
 
 static uint32 packColor(uint32 r, uint32 g, uint32 b, uint32 a)

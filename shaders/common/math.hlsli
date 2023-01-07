@@ -1,5 +1,5 @@
-#ifndef MATH_H
-#define MATH_H
+#ifndef MATH_HLSLI
+#define MATH_HLSLI
 
 
 #define M_PI 3.14159265359f

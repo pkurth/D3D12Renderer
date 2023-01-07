@@ -1,5 +1,5 @@
-#ifndef NORMAL_H
-#define NORMAL_H
+#ifndef NORMAL_HLSLI
+#define NORMAL_HLSLI
 
 
 #if 0

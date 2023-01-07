@@ -1,5 +1,5 @@
-#ifndef COLOR_H
-#define COLOR_H
+#ifndef COLOR_HLSLI
+#define COLOR_HLSLI
 
 static float3 linearToSRGB(float3 color)
 {

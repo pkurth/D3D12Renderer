@@ -1,5 +1,5 @@
-#ifndef RANDOM_H
-#define RANDOM_H
+#ifndef RANDOM_HLSLI
+#define RANDOM_HLSLI
 
 #include "math.hlsli"
 

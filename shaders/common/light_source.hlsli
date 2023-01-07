@@ -1,5 +1,5 @@
-#ifndef LIGHT_SOURCE_H
-#define LIGHT_SOURCE_H
+#ifndef LIGHT_SOURCE_HLSLI
+#define LIGHT_SOURCE_HLSLI
 
 #define M_SQRT_PI 1.77245385090f
 

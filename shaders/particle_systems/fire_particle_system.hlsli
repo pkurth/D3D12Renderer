@@ -1,5 +1,6 @@
 #include "material.hlsli"
 #include "camera.hlsli"
+#include "particles.hlsli"
 
 struct fire_particle_data
 {
@@ -35,13 +36,6 @@ struct fire_rendering_cb
 
 #ifdef HLSL
 #define particle_data fire_particle_data
-
-static float getRelLife(float life, float maxLife)
-{
-	float relLife = saturate((maxLife - life) / maxLife);
-	return relLife;
-}
-
 #endif
 
 #ifdef PARTICLE_SIMULATION

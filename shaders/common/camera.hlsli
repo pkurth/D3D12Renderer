@@ -1,5 +1,5 @@
-#ifndef CAMERA_H
-#define CAMERA_H
+#ifndef CAMERA_HLSLI
+#define CAMERA_HLSLI
 
 struct camera_cb
 {

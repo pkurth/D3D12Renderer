@@ -1,5 +1,5 @@
-#ifndef RAYTRACING_H
-#define RAYTRACING_H
+#ifndef RAYTRACING_HLSLI
+#define RAYTRACING_HLSLI
 
 
 struct raytracing_cb

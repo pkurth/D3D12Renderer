@@ -1,5 +1,5 @@
-#ifndef CS_H
-#define CS_H
+#ifndef CS_HLSLI
+#define CS_HLSLI
 
 struct cs_input
 {
