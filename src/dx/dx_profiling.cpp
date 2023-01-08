@@ -78,6 +78,12 @@ void dxProfilingResolveTimeStamps(uint64* timestamps)
 
 		dx_profile_frame& frame = profileFrames[profileFrameWriteIndex];
 
+		uint64 frequencies[] =
+		{
+			dxContext.renderQueue.timeStampFrequency,
+			dxContext.computeQueue.timeStampFrequency
+		};
+
 		for (uint32 i = 0; i < numQueries; ++i)
 		{
 			profile_event* e = events + i;
@@ -99,7 +105,7 @@ void dxProfilingResolveTimeStamps(uint64* timestamps)
 				{
 					frame.count[cl] = count[cl];
 
-					uint64 freq = (cl == profile_cl_graphics) ? dxContext.renderQueue.timeStampFrequency : dxContext.computeQueue.timeStampFrequency;
+					uint64 freq = frequencies[cl];
 
 					for (uint32 i = 0; i < frame.count[cl]; ++i)
 					{
@@ -145,16 +151,19 @@ void dxProfilingResolveTimeStamps(uint64* timestamps)
 
 				timeline.drawHighlightFrameInfo(frame);
 
-				profile_block* blocks = frame.blocks[profile_cl_graphics];
-				uint32 count = frame.count[profile_cl_graphics];
-
-
-				if (count > 0)
+				for (uint32 clIndex = 0; clIndex < profile_cl_count; ++clIndex)
 				{
-					timeline.drawCallStack(blocks, 0);
-					timeline.drawMillisecondSpacings(frame);
-					timeline.handleUserInteractions();
+					profile_block* blocks = frame.blocks[clIndex];
+					uint32 count = frame.count[clIndex];
+
+					if (count > 0)
+					{
+						timeline.drawCallStack(blocks, 0, clIndex == profile_cl_graphics ? "GRAPHICS" : "COMPUTE");
+					}
 				}
+
+				timeline.drawMillisecondSpacings(frame);
+				timeline.handleUserInteractions();
 			}
 
 		}

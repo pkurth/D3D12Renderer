@@ -2,7 +2,7 @@
 #define PROFILING_INTERNAL
 #include "profiling_internal.h"
 #include "core/imgui.h"
-
+#include "core/input.h"
 
 bool handleProfileEvent(profile_event* events, uint32 eventIndex, uint32 numEvents, uint16* stack, uint32& d, profile_block* blocks, uint32& numBlocksUsed, uint64& frameEndTimestamp, bool lookahead)
 {
@@ -257,7 +257,7 @@ void profiler_timeline::drawHighlightFrameInfo(profile_frame& frame)
 	ImGui::Text("Frame %llu (%fms)", frame.globalFrameID, frame.duration);
 }
 
-void profiler_timeline::drawCallStack(profile_block* blocks, uint16 startIndex)
+void profiler_timeline::drawCallStack(profile_block* blocks, uint16 startIndex, const char* name)
 {
 #if 0
 	ImGui::SameLine();
@@ -306,6 +306,17 @@ void profiler_timeline::drawCallStack(profile_block* blocks, uint16 startIndex)
 	}
 #endif
 
+	if (name)
+	{
+		ImGui::SetCursorPos(ImVec2(leftPadding, callStackTop - 5.f));
+		ImGui::Text(name);
+	}
+
+	if (callStackTop != highlightTop)
+	{
+		ImGui::SetCursorPos(ImVec2(leftPadding, callStackTop - 5.f));
+		ImGui::ColorButton("", ImGui::white, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder, ImVec2(totalWidth + rightPadding, 1));
+	}
 
 	static const float barHeight = verticalBarStride * 0.8f;
 
@@ -315,6 +326,7 @@ void profiler_timeline::drawCallStack(profile_block* blocks, uint16 startIndex)
 	// Call stack.
 	uint16 currentIndex = startIndex;
 	uint32 depth = 0;
+	uint32 maxDepth = 0;
 
 	while (currentIndex != INVALID_PROFILE_BLOCK)
 	{
@@ -389,8 +401,10 @@ void profiler_timeline::drawMillisecondSpacings(profile_frame& frame)
 	const float frameWidth16ms = totalWidth * persistent.frameWidthMultiplier;
 	const float frameWidth33ms = frameWidth16ms * 2.f;
 
+	float callStackHeight = callStackTop - highlightTop;
+
 	const float textSpacing = 30.f;
-	const float lineHeight = (maxDepth + 1) * verticalBarStride + textSpacing;
+	const float lineHeight = callStackHeight + textSpacing;
 	const float lineTop = highlightTop - textSpacing;
 
 	// 0ms.
@@ -441,15 +455,17 @@ void profiler_timeline::handleUserInteractions()
 	const float frameWidth16ms = totalWidth * persistent.frameWidthMultiplier;
 	const float frameWidth33ms = frameWidth16ms * 2.f;
 
+	float callStackHeight = callStackTop - highlightTop;
+
 	const float textSpacing = 30.f;
-	const float lineHeight = (maxDepth + 1) * verticalBarStride + textSpacing;
+	const float lineHeight = callStackHeight + textSpacing;
 	const float lineTop = highlightTop - textSpacing;
 
 
 
 	// Invisible widget to block window dragging in this area.
 	ImGui::SetCursorPos(ImVec2(leftPadding, highlightTop));
-	ImGui::InvisibleButton("Blocker", ImVec2(totalWidth + rightPadding, (maxDepth + 1) * verticalBarStride));
+	ImGui::InvisibleButton("Blocker", ImVec2(totalWidth + rightPadding, callStackHeight));
 
 
 	ImVec2 mousePos = ImGui::GetMousePos();
@@ -459,7 +475,7 @@ void profiler_timeline::handleUserInteractions()
 
 	bool overStack = false;
 	if (!ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) && // If dropdown or smth is open, don't interact with call stack.
-		ImGui::IsMouseHoveringRect(ImVec2(leftPadding + windowPos.x, highlightTop + windowPos.y), ImVec2(leftPadding + totalWidth + rightPadding + windowPos.x, highlightTop + (maxDepth + 1) * verticalBarStride + windowPos.y), false))
+		ImGui::IsMouseHoveringRect(ImVec2(leftPadding + windowPos.x, highlightTop + windowPos.y), ImVec2(leftPadding + totalWidth + rightPadding + windowPos.x, highlightTop + callStackHeight + windowPos.y), false))
 	{
 		overStack = true;
 
@@ -498,7 +514,7 @@ void profiler_timeline::handleUserInteractions()
 	{
 		float zoom = ImGui::GetIO().MouseWheel;
 
-		if (zoom != 0.f)
+		if (zoom != 0.f && ImGui::IsKeyDown(key_ctrl))
 		{
 			float t = inverseLerp(persistent.callstackLeftPadding, persistent.callstackLeftPadding + frameWidth16ms, relMouseX);
 
@@ -510,5 +526,5 @@ void profiler_timeline::handleUserInteractions()
 		}
 	}
 
-	ImGui::SetCursorPos(ImVec2(leftPadding, highlightTop + (maxDepth + 1) * verticalBarStride));
+	ImGui::SetCursorPos(ImVec2(leftPadding, highlightTop + callStackHeight));
 }

@@ -80,9 +80,7 @@ struct profiler_timeline
 	float barWidth;
 	float callStackTop;
 
-
 	uint32 colorIndex = 0;
-	uint32 maxDepth = 0;
 
 	profiler_persistent& persistent;
 
@@ -93,7 +91,7 @@ struct profiler_timeline
 	void endOverview();
 
 	void drawHighlightFrameInfo(profile_frame& frame);
-	void drawCallStack(profile_block* blocks, uint16 startIndex);
+	void drawCallStack(profile_block* blocks, uint16 startIndex, const char* name = 0);
 	void drawMillisecondSpacings(profile_frame& frame);
 	void handleUserInteractions();
 };

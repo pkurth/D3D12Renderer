@@ -21,9 +21,21 @@ void dx_command_queue::initialize(dx_device device, D3D12_COMMAND_LIST_TYPE type
 	checkResult(device->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
 
 	timeStampFrequency = 0; // Default value, if timing is not supported on this queue.
+	timeStampToCPU = 0;
 	if (SUCCEEDED(commandQueue->GetTimestampFrequency(&timeStampFrequency)))
 	{
-		// TODO: Calibrate command queue time line with CPU.
+		uint64 gpuTimestamp, cpuTimestamp;
+		if (SUCCEEDED(commandQueue->GetClockCalibration(&gpuTimestamp, &cpuTimestamp)))
+		{
+			if (gpuTimestamp > cpuTimestamp)
+			{
+				timeStampToCPU = (int64)(gpuTimestamp - cpuTimestamp);
+			}
+			else
+			{
+				timeStampToCPU = -(int64)(cpuTimestamp - gpuTimestamp);
+			}
+		}
 	}
 
 	processThreadHandle = CreateThread(0, 0, processRunningCommandLists, this, 0, 0);

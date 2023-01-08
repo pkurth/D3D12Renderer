@@ -17,6 +17,7 @@ struct dx_command_queue
 
 
 	uint64 timeStampFrequency; // In Hz.
+	int64 timeStampToCPU; // GPU queue - CPU.
 
 	D3D12_COMMAND_LIST_TYPE commandListType;
 	com<ID3D12CommandQueue>	commandQueue;
