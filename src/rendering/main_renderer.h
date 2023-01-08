@@ -122,10 +122,7 @@ struct main_renderer
 	void submitRenderPass(opaque_render_pass* renderPass) {	assert(!opaqueRenderPass); opaqueRenderPass = renderPass; }
 	void submitRenderPass(transparent_render_pass* renderPass) { assert(!transparentRenderPass); transparentRenderPass = renderPass; }
 	void submitRenderPass(ldr_render_pass* renderPass) { assert(!ldrRenderPass); ldrRenderPass = renderPass; }
-
-
-
-
+	void submitComputePass(compute_pass* computePass) { assert(!this->computePass); this->computePass = computePass; }
 
 	void submitShadowRenderPass(sun_shadow_render_pass* renderPass) { assert(numSunLightShadowRenderPasses < MAX_NUM_SUN_LIGHT_SHADOW_PASSES); sunShadowRenderPasses[numSunLightShadowRenderPasses++] = renderPass; }
 	void submitShadowRenderPass(spot_shadow_render_pass* renderPass) { assert(numSpotLightShadowRenderPasses < MAX_NUM_SPOT_LIGHT_SHADOW_PASSES);	spotLightShadowRenderPasses[numSpotLightShadowRenderPasses++] = renderPass; }
@@ -142,17 +139,12 @@ struct main_renderer
 
 
 
-
-
-
 	// Settings.
 	renderer_mode mode = renderer_mode_rasterized;
 	aspect_ratio_mode aspectRatioMode = aspect_ratio_free;
 
 
 	renderer_settings settings;
-
-
 
 
 	uint32 renderWidth;
@@ -202,6 +194,7 @@ private:
 	const opaque_render_pass* opaqueRenderPass;
 	const transparent_render_pass* transparentRenderPass;
 	const ldr_render_pass* ldrRenderPass;
+	const compute_pass* computePass;
 
 
 	uint32 windowWidth;

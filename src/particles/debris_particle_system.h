@@ -10,11 +10,13 @@ struct debris_particle_system : particle_system
 {
 	static void initializePipeline();
 
+	debris_particle_system() {}
+	debris_particle_system(uint32 maxNumParticles);
 	void initialize(uint32 maxNumParticles);
 
 	void burst(vec3 position);
 
-	void update(vec3 cameraPosition, float dt);
+	virtual void update(struct dx_command_list* cl, vec3 cameraPosition, float dt) override;
 	void render(transparent_render_pass* renderPass);
 
 private:

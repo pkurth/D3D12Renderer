@@ -30,6 +30,11 @@ void fire_particle_system::initializePipeline()
 #undef name
 }
 
+fire_particle_system::fire_particle_system(uint32 maxNumParticles, float emitRate, const std::string& textureFilename, uint32 cols, uint32 rows)
+{
+	initialize(maxNumParticles, emitRate, textureFilename, cols, rows);
+}
+
 void fire_particle_system::initialize(uint32 maxNumParticles, float emitRate, const std::string& textureFilename, uint32 cols, uint32 rows)
 {
 	this->emitRate = emitRate;
@@ -61,7 +66,7 @@ void fire_particle_system::initialize(uint32 maxNumParticles, float emitRate, co
 	settings.intensityOverLifetime.values[3] = 1.f;
 }
 
-void fire_particle_system::update(vec3 cameraPosition, float dt)
+void fire_particle_system::update(struct dx_command_list* cl, vec3 cameraPosition, float dt)
 {
 	struct setter : public particle_parameter_setter
 	{
@@ -78,7 +83,7 @@ void fire_particle_system::update(vec3 cameraPosition, float dt)
 	s.cb.emitPosition = vec3(0.f, 20.f, -10.f); // TEMPORARY.
 	s.cb.frameIndex = (uint32)dxContext.frameID;
 
-	particle_system::update(emitRate* dt, dt, emitPipeline, simulatePipeline, &s);
+	updateInternal(cl, emitRate * dt, dt, emitPipeline, simulatePipeline, &s);
 }
 
 void fire_particle_system::render(transparent_render_pass* renderPass)

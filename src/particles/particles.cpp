@@ -104,10 +104,8 @@ particle_draw_info particle_system::getDrawInfo(const struct dx_pipeline& render
 	return result;
 }
 
-void particle_system::update(float newParticles, float dt, const dx_pipeline& emitPipeline, const dx_pipeline& simulatePipeline, particle_parameter_setter* parameterSetter)
+void particle_system::updateInternal(struct dx_command_list* cl, float newParticles, float dt, const dx_pipeline& emitPipeline, const dx_pipeline& simulatePipeline, particle_parameter_setter* parameterSetter)
 {
-	dx_command_list* cl = dxContext.getFreeRenderCommandList();
-
 	{
 		DX_PROFILE_BLOCK(cl, "Particle system update");
 
@@ -184,10 +182,14 @@ void particle_system::update(float newParticles, float dt, const dx_pipeline& em
 		// SORT
 		// ----------------------------------------
 
+		auto drawState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+
 		if (sortMode != sort_mode_none)
 		{
 			barrier_batcher(cl)
 				.transition(particleDrawCommandBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+			drawState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
 			bitonicSortFloat(cl,
 				sortBuffer, 0,
@@ -197,11 +199,12 @@ void particle_system::update(float newParticles, float dt, const dx_pipeline& em
 				sortMode == sort_mode_front_to_back);
 		}
 
+		barrier_batcher(cl)
+			.transition(particleDrawCommandBuffer, drawState, D3D12_RESOURCE_STATE_COMMON);
+
 		// Buffers decay to D3D12_RESOURCE_STATE_COMMON implicitly, so we can omit this.
 		//cl->transitionBarrier(dispatchBuffer, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_COMMON);
 	}
-
-	dxContext.executeCommandList(cl);
 }
 
 void particle_system::setResources(dx_command_list* cl, uint32 offset, particle_parameter_setter* parameterSetter)

@@ -511,6 +511,7 @@ void application::resetRenderPasses()
 	transparentRenderPass.reset();
 	ldrRenderPass.reset();
 	sunShadowRenderPass.reset();
+	computePass.reset();
 
 	for (uint32 i = 0; i < numSpotShadowRenderPasses; ++i)
 	{
@@ -539,6 +540,7 @@ void application::submitRendererParams(uint32 numSpotLightShadowPasses, uint32 n
 	renderer->submitRenderPass(&opaqueRenderPass);
 	renderer->submitRenderPass(&transparentRenderPass);
 	renderer->submitRenderPass(&ldrRenderPass);
+	renderer->submitComputePass(&computePass);
 
 	renderer->submitShadowRenderPass(&sunShadowRenderPass);
 
@@ -586,22 +588,20 @@ void application::update(const user_input& input, float dt)
 	// Particles.
 
 #if 1
-	boidParticleSystem.update(dt);
-	boidParticleSystem.render(&transparentRenderPass);
-
-	fireParticleSystem.update(camera.position, dt);
-	fireParticleSystem.render(&transparentRenderPass);
-
-	smokeParticleSystem.update(camera.position, dt);
-	smokeParticleSystem.render(&transparentRenderPass);
-
-
-
 	if (input.keyboard[key_backspace].pressEvent)
 	{
 		debrisParticleSystem.burst(camera.position + camera.rotation * vec3(0.f, 0.f, -3.f));
 	}
-	debrisParticleSystem.update(camera.position, dt);
+
+	computePass.dt = dt;
+	computePass.updateParticleSystem(&boidParticleSystem);
+	computePass.updateParticleSystem(&fireParticleSystem);
+	computePass.updateParticleSystem(&smokeParticleSystem);
+	computePass.updateParticleSystem(&debrisParticleSystem);
+
+	boidParticleSystem.render(&transparentRenderPass);
+	fireParticleSystem.render(&transparentRenderPass);
+	smokeParticleSystem.render(&transparentRenderPass);
 	debrisParticleSystem.render(&transparentRenderPass);
 
 #endif

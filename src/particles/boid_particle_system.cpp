@@ -29,6 +29,11 @@ void boid_particle_system::initializePipeline()
 #undef name
 }
 
+boid_particle_system::boid_particle_system(uint32 maxNumParticles, float emitRate)
+{
+	initialize(maxNumParticles, emitRate);
+}
+
 void boid_particle_system::initialize(uint32 maxNumParticles, float emitRate)
 {
 	this->emitRate = emitRate;
@@ -46,7 +51,7 @@ void boid_particle_system::initialize(uint32 maxNumParticles, float emitRate)
 	}
 }
 
-void boid_particle_system::update(float dt)
+void boid_particle_system::update(struct dx_command_list* cl, vec3 cameraPosition, float dt)
 {
 	if (cartoonMesh)
 	{
@@ -81,7 +86,7 @@ void boid_particle_system::update(float dt)
 		s.cb.frameIndex = (uint32)dxContext.frameID;
 		s.cb.radius = settings.radius;
 
-		particle_system::update(emitRate * dt, dt, emitPipeline, simulatePipeline, &s);
+		updateInternal(cl, emitRate * dt, dt, emitPipeline, simulatePipeline, &s);
 	}
 }
 

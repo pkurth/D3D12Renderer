@@ -17,6 +17,10 @@ enum sort_mode
 
 struct particle_system
 {
+	virtual ~particle_system() {}
+
+	virtual void update(struct dx_command_list* cl, vec3 cameraPosition, float dt) = 0;
+
 protected:
 
 	struct particle_parameter_setter
@@ -24,16 +28,16 @@ protected:
 		virtual void setRootParameters(dx_command_list* cl) = 0;
 	};
 
-
 	void initializeAsBillboard(uint32 particleStructSize, uint32 maxNumParticles, sort_mode sortMode = sort_mode_none);
 	void initializeAsMesh(uint32 particleStructSize, dx_mesh mesh, submesh_info submesh, uint32 maxNumParticles, sort_mode sortMode = sort_mode_none);
-
-	void update(float newParticles, float dt, const dx_pipeline& emitPipeline, const dx_pipeline& simulatePipeline, particle_parameter_setter* parameterSetter);
 
 	particle_draw_info getDrawInfo(const struct dx_pipeline& renderPipeline);
 
 	static dx_mesh billboardMesh;
 	submesh_info submesh;
+
+protected:
+	void updateInternal(struct dx_command_list* cl, float newParticles, float dt, const dx_pipeline& emitPipeline, const dx_pipeline& simulatePipeline, particle_parameter_setter* parameterSetter);
 
 private:
 	static void initializePipeline();

@@ -10,9 +10,11 @@ struct smoke_particle_system : particle_system
 {
 	static void initializePipeline();
 
+	smoke_particle_system() {}
+	smoke_particle_system(uint32 maxNumParticles, float emitRate, const std::string& textureFilename, uint32 cols, uint32 rows);
 	void initialize(uint32 maxNumParticles, float emitRate, const std::string& textureFilename, uint32 cols, uint32 rows);
 
-	void update(vec3 cameraPosition, float dt);
+	virtual void update(struct dx_command_list* cl, vec3 cameraPosition, float dt) override;
 	void render(transparent_render_pass* renderPass);
 
 	float emitRate;

@@ -10,9 +10,11 @@ struct boid_particle_system : particle_system
 {
 	static void initializePipeline();
 
+	boid_particle_system() {}
+	boid_particle_system(uint32 maxNumParticles, float emitRate);
 	void initialize(uint32 maxNumParticles, float emitRate);
 
-	void update(float dt);
+	virtual void update(struct dx_command_list* cl, vec3 cameraPosition, float dt) override;
 	void render(transparent_render_pass* renderPass);
 
 	float emitRate;

@@ -28,6 +28,11 @@ void smoke_particle_system::initializePipeline()
 #undef name
 }
 
+smoke_particle_system::smoke_particle_system(uint32 maxNumParticles, float emitRate, const std::string& textureFilename, uint32 cols, uint32 rows)
+{
+	initialize(maxNumParticles, emitRate, textureFilename, cols, rows);
+}
+
 void smoke_particle_system::initialize(uint32 maxNumParticles, float emitRate, const std::string& textureFilename, uint32 cols, uint32 rows)
 {
 	this->emitRate = emitRate;
@@ -47,7 +52,7 @@ void smoke_particle_system::initialize(uint32 maxNumParticles, float emitRate, c
 	atlasCB.initialize(rows, cols);
 }
 
-void smoke_particle_system::update(vec3 cameraPosition, float dt)
+void smoke_particle_system::update(struct dx_command_list* cl, vec3 cameraPosition, float dt)
 {
 	struct setter : public particle_parameter_setter
 	{
@@ -68,7 +73,7 @@ void smoke_particle_system::update(vec3 cameraPosition, float dt)
 	setter s;
 	s.cb = dxContext.uploadDynamicConstantBuffer(cb);
 
-	particle_system::update(emitRate* dt, dt, emitPipeline, simulatePipeline, &s);
+	updateInternal(cl, emitRate * dt, dt, emitPipeline, simulatePipeline, &s);
 }
 
 void smoke_particle_system::render(transparent_render_pass* renderPass)

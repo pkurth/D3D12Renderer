@@ -483,3 +483,20 @@ struct point_shadow_render_pass : shadow_render_pass_base
 
 
 
+struct compute_pass
+{
+	void reset()
+	{
+		particleSystemUpdates.clear();
+	}
+
+	void updateParticleSystem(struct particle_system* p)
+	{
+		particleSystemUpdates.push_back(p);
+	}
+
+	float dt;
+	std::vector<struct particle_system*> particleSystemUpdates;
+};
+
+

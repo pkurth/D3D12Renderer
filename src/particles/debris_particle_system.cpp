@@ -29,6 +29,11 @@ void debris_particle_system::initializePipeline()
 #undef name
 }
 
+debris_particle_system::debris_particle_system(uint32 maxNumParticles)
+{
+	initialize(maxNumParticles);
+}
+
 void debris_particle_system::initialize(uint32 maxNumParticles)
 {
 	particle_system::initializeAsBillboard(sizeof(debris_particle_data), maxNumParticles, sort_mode_back_to_front);
@@ -39,7 +44,7 @@ void debris_particle_system::burst(vec3 position)
 	bursts.push_back({ position });
 }
 
-void debris_particle_system::update(vec3 cameraPosition, float dt)
+void debris_particle_system::update(struct dx_command_list* cl, vec3 cameraPosition, float dt)
 {
 	struct setter : public particle_parameter_setter
 	{
@@ -62,7 +67,7 @@ void debris_particle_system::update(vec3 cameraPosition, float dt)
 		s.cb.emitPositions[i] = vec4(bursts[i].position, 1.f);
 	}
 
-	particle_system::update((float)numNewParticles, dt, emitPipeline, simulatePipeline, &s);
+	updateInternal(cl, (float)numNewParticles, dt, emitPipeline, simulatePipeline, &s);
 
 	bursts.clear();
 }

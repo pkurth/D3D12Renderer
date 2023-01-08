@@ -71,6 +71,7 @@ private:
 	spot_shadow_render_pass spotShadowRenderPasses[16];
 	point_shadow_render_pass pointShadowRenderPasses[16];
 	ldr_render_pass ldrRenderPass;
+	compute_pass computePass;
 
 
 };

@@ -9,6 +9,7 @@
 
 #include "raytracing.h"
 #include "animation/skinning.h"
+#include "particles/particles.h"
 
 #include "lighting.hlsli"
 
@@ -184,7 +185,7 @@ void main_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 	opaqueRenderPass = 0;
 	transparentRenderPass = 0;
 	ldrRenderPass = 0;
-
+	computePass = 0;
 
 
 	numSunLightShadowRenderPasses = 0;
@@ -385,6 +386,7 @@ void main_renderer::endFrame(const user_input* input)
 
 	uint64 tlasRebuildFence = 0;
 	uint64 giFence = 0;
+	uint64 particleUpdateFence = 0;
 
 	if (dxContext.featureSupport.raytracing() && tlas)
 	{
@@ -405,6 +407,18 @@ void main_renderer::endFrame(const user_input* input)
 
 			giFence = dxContext.executeCommandList(cl);
 		}
+	}
+
+	if (computePass && computePass->particleSystemUpdates.size() > 0)
+	{
+		dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
+
+		for (auto& cc : computePass->particleSystemUpdates)
+		{
+			cc->update(cl, unjitteredCamera.position.xyz, computePass->dt);
+		}
+
+		particleUpdateFence = dxContext.executeCommandList(cl);
 	}
 
 
@@ -798,7 +812,7 @@ void main_renderer::endFrame(const user_input* input)
 		dx_command_list* prePassCLs[] = { cl0, cl1 };
 		dxContext.executeCommandLists(prePassCLs, arraysize(prePassCLs));
 
-		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, giFence);
+		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, max(giFence, particleUpdateFence));
 
 		dx_command_list* mainPassCLs[] = { cl2, cl3 };
 		dxContext.executeCommandLists(mainPassCLs, arraysize(mainPassCLs));
