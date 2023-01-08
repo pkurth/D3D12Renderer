@@ -216,10 +216,10 @@ void light_probe_grid::initialize(vec3 minCorner, vec3 dimensions, float cellSiz
 
 	delete[] testBuffer;
 #else
-	this->irradiance = createTexture(0, irradianceTexWidth, irradianceTexHeight, irradianceFormat, false, false, true, D3D12_RESOURCE_STATE_GENERIC_READ);
+	this->irradiance = createTexture(0, irradianceTexWidth, irradianceTexHeight, irradianceFormat, false, false, true);
 #endif
 
-	this->depth = createTexture(0, depthTexWidth, depthTexHeight, depthFormat, false, false, true, D3D12_RESOURCE_STATE_GENERIC_READ);
+	this->depth = createTexture(0, depthTexWidth, depthTexHeight, depthFormat, false, false, true);
 
 	this->raytracedRadiance = createTexture(0, NUM_RAYS_PER_PROBE, totalNumNodes, raytracedRadianceFormat, 0, 0, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	this->raytracedDirectionAndDistance = createTexture(0, NUM_RAYS_PER_PROBE, totalNumNodes, raytracedDirectionAndDistanceFormat, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -496,8 +496,8 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 	barrier_batcher(cl)
 		.transition(grid.raytracedRadiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 		.transition(grid.raytracedDirectionAndDistance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-		.transition(grid.irradiance, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-		.transition(grid.depth, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		.transition(grid.irradiance, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+		.transition(grid.depth, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	{
 		PROFILE_ALL(cl, "Update irradiance");
@@ -540,7 +540,7 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 	barrier_batcher(cl)
 		.transition(grid.raytracedRadiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 		.transition(grid.raytracedDirectionAndDistance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-		.transition(grid.irradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ)
-		.transition(grid.depth, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+		.transition(grid.irradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON)
+		.transition(grid.depth, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
 
 }

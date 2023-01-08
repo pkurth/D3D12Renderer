@@ -256,7 +256,6 @@ int main(int argc, char** argv)
 
 		// Update and render.
 
-		main_renderer::beginFrameCommon();
 		renderer.beginFrame(renderWidth, renderHeight);
 
 		editorPanels.meshEditor.beginFrame();
@@ -264,7 +263,6 @@ int main(int argc, char** argv)
 		app.update(input, dt);
 
 		endFrameCommon();
-		main_renderer::endFrameCommon();
 		renderer.endFrame(&input);
 
 		editorPanels.meshEditor.endFrame();

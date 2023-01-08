@@ -68,6 +68,11 @@ void dx_command_queue::waitForOtherQueue(dx_command_queue& other)
 	commandQueue->Wait(other.fence.Get(), other.signal());
 }
 
+void dx_command_queue::waitForOtherQueue(dx_command_queue& other, uint64 fenceValue)
+{
+	commandQueue->Wait(other.fence.Get(), fenceValue);
+}
+
 void dx_command_queue::flush()
 {
 	while (numRunningCommandLists) {}

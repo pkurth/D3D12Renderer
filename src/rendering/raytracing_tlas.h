@@ -14,7 +14,7 @@ struct raytracing_tlas
 	// Call these each frame to rebuild the structure.
 	void reset();
 	raytracing_instance_handle instantiate(raytracing_object_type type, const trs& transform);
-	void build();
+	uint64 build();
 
 
 	std::vector<D3D12_RAYTRACING_INSTANCE_DESC> allInstances;

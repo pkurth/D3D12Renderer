@@ -15,9 +15,6 @@ void endFrameCommon();
 void buildCameraConstantBuffer(const render_camera& camera, float cameraJitterStrength, camera_cb& outCB);
 void buildCameraConstantBuffer(const render_camera& camera, vec2 jitter, camera_cb& outCB);
 
-void waitForSkinningToFinish();
-
-
 
 static constexpr DXGI_FORMAT hdrFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 static constexpr DXGI_FORMAT ldrFormat = DXGI_FORMAT_R10G10B10A2_UNORM; // Not really LDR. But I don't like the idea of converting to 8 bit and then to sRGB in separate passes.

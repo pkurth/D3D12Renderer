@@ -101,7 +101,31 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			terrainComponent.chunk(x, z).active = true;
 		}
 	}
+#endif
 
+
+	if (auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx"))
+	{
+		auto stormtrooper = scene.createEntity("Stormtrooper 1")
+			.addComponent<transform_component>(vec3(-5.f, 0.f, -1.f), quat::identity)
+			.addComponent<raster_component>(stormtrooperMesh)
+			.addComponent<animation_component>()
+			.addComponent<dynamic_transform_component>();
+
+
+		stormtrooper.getComponent<animation_component>().animation.set(&stormtrooperMesh->skeleton.clips[0]);
+	}
+
+	if (auto pilotMesh = loadAnimatedMeshFromFile("assets/pilot/pilot.fbx"))
+	{
+		auto pilot = scene.createEntity("Pilot")
+			.addComponent<transform_component>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
+			.addComponent<raster_component>(pilotMesh)
+			.addComponent<animation_component>()
+			.addComponent<dynamic_transform_component>();
+
+		pilot.getComponent<animation_component>().animation.set(&pilotMesh->skeleton.clips[0]);
+	}
 
 #if 0
 	if (auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx"))
@@ -516,16 +540,16 @@ void application::submitRendererParams(uint32 numSpotLightShadowPasses, uint32 n
 	renderer->submitRenderPass(&transparentRenderPass);
 	renderer->submitRenderPass(&ldrRenderPass);
 
-	main_renderer::submitShadowRenderPass(&sunShadowRenderPass);
+	renderer->submitShadowRenderPass(&sunShadowRenderPass);
 
 	for (uint32 i = 0; i < numSpotLightShadowPasses; ++i)
 	{
-		main_renderer::submitShadowRenderPass(&spotShadowRenderPasses[i]);
+		renderer->submitShadowRenderPass(&spotShadowRenderPasses[i]);
 	}
 
 	for (uint32 i = 0; i < numPointLightShadowPasses; ++i)
 	{
-		main_renderer::submitShadowRenderPass(&pointShadowRenderPasses[i]);
+		renderer->submitShadowRenderPass(&pointShadowRenderPasses[i]);
 	}
 }
 
@@ -599,16 +623,14 @@ void application::update(const user_input& input, float dt)
 			raytracingTLAS.instantiate(raytrace.type, transform);
 		}
 
-		raytracingTLAS.build();
-
-		main_renderer::setRaytracingScene(&raytracingTLAS);
+		renderer->setRaytracingScene(&raytracingTLAS);
 	}
 
 
 
-	main_renderer::setRaytracingScene(&raytracingTLAS);
-	main_renderer::setEnvironment(environment);
-	main_renderer::setSun(sun);
+	renderer->setRaytracingScene(&raytracingTLAS);
+	renderer->setEnvironment(environment);
+	renderer->setSun(sun);
 	renderer->setCamera(camera);
 
 
@@ -634,10 +656,10 @@ void application::update(const user_input& input, float dt)
 
 		context.waitForWorkCompletion();
 
-		for (auto [entityHandle, anim, raster, transform] : scene.group(entt::get<animation_component, raster_component, transform_component>).each())
-		{
-			anim.drawCurrentSkeleton(raster.mesh, transform, &ldrRenderPass);
-		}
+		//for (auto [entityHandle, anim, raster, transform] : scene.group(entt::get<animation_component, raster_component, transform_component>).each())
+		//{
+		//	anim.drawCurrentSkeleton(raster.mesh, transform, &ldrRenderPass);
+		//}
 
 
 
@@ -674,7 +696,7 @@ void application::update(const user_input& input, float dt)
 			unmapBuffer(pointLightBuffer[dxContext.bufferedFrameID], true, { 0, numPointLights });
 			unmapBuffer(pointLightShadowInfoBuffer[dxContext.bufferedFrameID], true, { 0, numPointShadowRenderPasses });
 
-			main_renderer::setPointLights(pointLightBuffer[dxContext.bufferedFrameID], numPointLights, pointLightShadowInfoBuffer[dxContext.bufferedFrameID]);
+			renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], numPointLights, pointLightShadowInfoBuffer[dxContext.bufferedFrameID]);
 		}
 
 		uint32 numSpotLights = scene.numberOfComponentsOfType<spot_light_component>();
@@ -700,7 +722,7 @@ void application::update(const user_input& input, float dt)
 			unmapBuffer(spotLightBuffer[dxContext.bufferedFrameID], true, { 0, numSpotLights });
 			unmapBuffer(spotLightShadowInfoBuffer[dxContext.bufferedFrameID], true, { 0, numSpotShadowRenderPasses });
 
-			main_renderer::setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], numSpotLights, spotLightShadowInfoBuffer[dxContext.bufferedFrameID]);
+			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], numSpotLights, spotLightShadowInfoBuffer[dxContext.bufferedFrameID]);
 		}
 
 
@@ -805,7 +827,7 @@ void application::update(const user_input& input, float dt)
 		if (decals.size())
 		{
 			updateUploadBufferData(decalBuffer[dxContext.bufferedFrameID], decals.data(), (uint32)(sizeof(pbr_decal_cb) * decals.size()));
-			main_renderer::setDecals(decalBuffer[dxContext.bufferedFrameID], (uint32)decals.size(), decalTexture);
+			renderer->setDecals(decalBuffer[dxContext.bufferedFrameID], (uint32)decals.size(), decalTexture);
 		}
 
 		if (selectedEntity)

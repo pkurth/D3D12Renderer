@@ -12,6 +12,7 @@ struct dx_command_queue
 	bool isFenceComplete(uint64 fenceValue);
 	void waitForFence(uint64 fenceValue);
 	void waitForOtherQueue(dx_command_queue& other);
+	void waitForOtherQueue(dx_command_queue& other, uint64 fenceValue);
 	void flush();
 
 

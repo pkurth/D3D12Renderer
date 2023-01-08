@@ -8,6 +8,7 @@
 #include "dx/dx_profiling.h"
 
 #include "raytracing.h"
+#include "animation/skinning.h"
 
 #include "lighting.hlsli"
 
@@ -19,32 +20,6 @@
 #define SSR_RESOLVE_WIDTH (renderWidth / 2)
 #define SSR_RESOLVE_HEIGHT (renderHeight / 2)
 
-const sun_shadow_render_pass* main_renderer::sunShadowRenderPasses[MAX_NUM_SUN_LIGHT_SHADOW_PASSES];
-const spot_shadow_render_pass* main_renderer::spotLightShadowRenderPasses[MAX_NUM_SPOT_LIGHT_SHADOW_PASSES];
-const point_shadow_render_pass* main_renderer::pointLightShadowRenderPasses[MAX_NUM_POINT_LIGHT_SHADOW_PASSES];
-uint32 main_renderer::numSunLightShadowRenderPasses;
-uint32 main_renderer::numSpotLightShadowRenderPasses;
-uint32 main_renderer::numPointLightShadowRenderPasses;
-
-const raytracing_tlas* main_renderer::tlas;
-
-const pbr_environment* main_renderer::environment;
-directional_light_cb main_renderer::sun;
-
-ref<dx_buffer> main_renderer::pointLights;
-ref<dx_buffer> main_renderer::spotLights;
-ref<dx_buffer> main_renderer::pointLightShadowInfoBuffer;
-ref<dx_buffer> main_renderer::spotLightShadowInfoBuffer;
-ref<dx_buffer> main_renderer::decals;
-uint32 main_renderer::numPointLights;
-uint32 main_renderer::numSpotLights;
-uint32 main_renderer::numDecals;
-
-ref<dx_texture> main_renderer::decalTextureAtlas;
-
-
-
-dx_dynamic_constant_buffer main_renderer::lightingCBV;
 
 
 void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint32 windowHeight, renderer_spec spec)
@@ -182,24 +157,6 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 	}
 }
 
-void main_renderer::beginFrameCommon()
-{
-	numSunLightShadowRenderPasses = 0;
-	numSpotLightShadowRenderPasses = 0;
-	numPointLightShadowRenderPasses = 0;
-
-	environment = 0;
-	tlas = 0;
-
-	pointLights = 0;
-	spotLights = 0;
-	numPointLights = 0;
-	numSpotLights = 0;
-	decals = 0;
-	numDecals = 0;
-	decalTextureAtlas = 0;
-}
-
 void main_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 {
 	if (this->windowWidth != windowWidth || this->windowHeight != windowHeight)
@@ -227,6 +184,23 @@ void main_renderer::beginFrame(uint32 windowWidth, uint32 windowHeight)
 	opaqueRenderPass = 0;
 	transparentRenderPass = 0;
 	ldrRenderPass = 0;
+
+
+
+	numSunLightShadowRenderPasses = 0;
+	numSpotLightShadowRenderPasses = 0;
+	numPointLightShadowRenderPasses = 0;
+
+	environment = 0;
+	tlas = 0;
+
+	pointLights = 0;
+	spotLights = 0;
+	numPointLights = 0;
+	numSpotLights = 0;
+	decals = 0;
+	numDecals = 0;
+	decalTextureAtlas = 0;
 }
 
 void main_renderer::recalculateViewport(bool resizeTextures)
@@ -296,7 +270,7 @@ void main_renderer::recalculateViewport(bool resizeTextures)
 
 		resizeTexture(ldrPostProcessingTexture, renderWidth, renderHeight);
 	}
-	
+
 	culling.allocateIfNecessary(renderWidth, renderHeight);
 }
 
@@ -346,47 +320,6 @@ void main_renderer::setDecals(const ref<dx_buffer>& decals, uint32 numDecals, co
 	main_renderer::decalTextureAtlas = textureAtlas;
 }
 
-void main_renderer::endFrameCommon()
-{
-	lighting_cb lightingCB = {
-		sun,
-		environment->lightProbeGrid.getCB(),
-		vec2(1.f / SHADOW_MAP_WIDTH, 1.f / SHADOW_MAP_HEIGHT),
-		environment ? environment->globalIlluminationIntensity : 1.f, (environment && environment->giMode == environment_gi_update_raytraced),  };
-
-	lightingCBV = dxContext.uploadDynamicConstantBuffer(lightingCB);
-
-
-	dx_command_list* cl = dxContext.getFreeRenderCommandList();
-
-	{
-		PROFILE_ALL(cl, "Shadow maps");
-
-		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-		cl->transitionBarrier(render_resources::shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-
-		shadowPasses(cl, sunShadowRenderPasses, numSunLightShadowRenderPasses,
-			spotLightShadowRenderPasses, numSpotLightShadowRenderPasses,
-			pointLightShadowRenderPasses, numPointLightShadowRenderPasses);
-
-		cl->transitionBarrier(render_resources::shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	}
-
-	if (dxContext.featureSupport.raytracing() && 
-		environment && environment->giMode == environment_gi_update_raytraced &&
-		tlas)
-	{
-		PROFILE_ALL(cl, "Update light probes");
-
-		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // Wait for AS-rebuilds. TODO: This is not the way to go here. We should wait for the specific value returned by executeCommandList.
-
-		environment->lightProbeGrid.updateProbes(cl, *tlas, environment ? environment->sky : 0, lightingCBV);
-	}
-
-	dxContext.executeCommandList(cl);
-}
-
 void main_renderer::endFrame(const user_input* input)
 {
 	bool aspectRatioModeChanged = aspectRatioMode != oldAspectRatioMode;
@@ -406,6 +339,16 @@ void main_renderer::endFrame(const user_input* input)
 	settings.enableSSR &= spec.allowSSR;
 	settings.enableBloom &= spec.allowBloom;
 	settings.enableTAA &= spec.allowTAA;
+
+
+	lighting_cb lightingCB = {
+		sun,
+		environment->lightProbeGrid.getCB(),
+		vec2(1.f / SHADOW_MAP_WIDTH, 1.f / SHADOW_MAP_HEIGHT),
+		environment ? environment->globalIlluminationIntensity : 1.f, (environment && environment->giMode == environment_gi_update_raytraced),
+	};
+
+	dx_dynamic_constant_buffer lightingCBV = dxContext.uploadDynamicConstantBuffer(lightingCB);
 
 
 	common_render_data common;
@@ -436,12 +379,66 @@ void main_renderer::endFrame(const user_input* input)
 
 
 
+	uint64 skinningFence = performSkinning();
+
+
+
+	uint64 tlasRebuildFence = 0;
+	uint64 giFence = 0;
+
+	if (dxContext.featureSupport.raytracing() && tlas)
+	{
+		tlasRebuildFence = tlas->build();
+
+
+		if (environment && environment->giMode == environment_gi_update_raytraced)
+		{
+			dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
+
+			{
+				PROFILE_ALL(cl, "Update light probes");
+
+				dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, tlasRebuildFence);
+
+				environment->lightProbeGrid.updateProbes(cl, *tlas, environment ? environment->sky : 0, lightingCBV);
+			}
+
+			giFence = dxContext.executeCommandList(cl);
+		}
+	}
+
+
 	if (mode == renderer_mode_rasterized)
 	{
-		dx_command_list* cls[3];
+		dx_command_list* cl0 = 0;
+		dx_command_list* cl1 = 0;
+		dx_command_list* cl2 = 0;
+		dx_command_list* cl3 = 0;
 
 
 		thread_job_context context;
+
+		context.addWork([&]()
+		{
+			dx_command_list* cl = dxContext.getFreeRenderCommandList();
+			PROFILE_ALL(cl, "Render thread 0");
+
+			{
+				PROFILE_ALL(cl, "Shadow maps");
+
+				cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+				cl->transitionBarrier(render_resources::shadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+
+				shadowPasses(cl, sunShadowRenderPasses, numSunLightShadowRenderPasses,
+					spotLightShadowRenderPasses, numSpotLightShadowRenderPasses,
+					pointLightShadowRenderPasses, numPointLightShadowRenderPasses);
+
+				cl->transitionBarrier(render_resources::shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			}
+
+			cl0 = cl;
+		});
 
 		context.addWork([&]()
 		{
@@ -458,8 +455,6 @@ void main_renderer::endFrame(const user_input* input)
 
 
 			cl->clearDepthAndStencil(depthStencilBuffer);
-
-			waitForSkinningToFinish();
 
 
 			// ----------------------------------------
@@ -498,7 +493,7 @@ void main_renderer::endFrame(const user_input* input)
 				.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
-			cls[0] = cl;
+			cl1 = cl;
 		});
 
 		context.addWork([&]()
@@ -639,7 +634,7 @@ void main_renderer::endFrame(const user_input* input)
 				.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 
-			cls[1] = cl;
+			cl2 = cl;
 		});
 
 		context.addWork([&]()
@@ -788,15 +783,31 @@ void main_renderer::endFrame(const user_input* input)
 				.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 				.transition(opaqueDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
 
-			cls[2] = cl;
+			cl3 = cl;
 		});
+
+
+
 
 		context.waitForWorkCompletion();
 
-		dxContext.executeCommandLists(cls, arraysize(cls));
+
+
+		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, skinningFence);
+
+		dx_command_list* prePassCLs[] = { cl0, cl1 };
+		dxContext.executeCommandLists(prePassCLs, arraysize(prePassCLs));
+
+		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, giFence);
+
+		dx_command_list* mainPassCLs[] = { cl2, cl3 };
+		dxContext.executeCommandLists(mainPassCLs, arraysize(mainPassCLs));
+
 	}
 	else if (mode == renderer_mode_visualize_sun_shadow_cascades)
 	{
+		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, skinningFence);
+
 		dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
 		if (aspectRatioModeChanged)
@@ -807,8 +818,6 @@ void main_renderer::endFrame(const user_input* input)
 		}
 
 		cl->clearDepthAndStencil(depthStencilBuffer);
-
-		waitForSkinningToFinish();
 
 		auto depthOnlyRenderTarget = dx_render_target(renderWidth, renderHeight)
 			// No screen space velocities or object IDs needed.
@@ -833,6 +842,8 @@ void main_renderer::endFrame(const user_input* input)
 	}
 	else if (mode == renderer_mode_pathtraced && dxContext.featureSupport.raytracing() && tlas)
 	{
+		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, tlasRebuildFence);
+
 		pathTracer.finalizeForRender();
 
 		dx_command_list* cl = dxContext.getFreeRenderCommandList();
@@ -853,8 +864,6 @@ void main_renderer::endFrame(const user_input* input)
 
 		{
 			PROFILE_ALL(cl, "Raytracing");
-
-			dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // Wait for AS-rebuilds. TODO: This is not the way to go here. We should wait for the specific value returned by executeCommandList.
 
 			pathTracer.render(cl, *tlas, hdrColorTexture, common);
 		}

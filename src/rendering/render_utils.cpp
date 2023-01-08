@@ -21,8 +21,6 @@ void loadRemainingRenderResources();
 
 
 static vec2 haltonSequence[128];
-static uint64 skinningFence;
-
 
 void initializeRenderUtils()
 {
@@ -54,7 +52,6 @@ void initializeRenderUtils()
 void endFrameCommon()
 {
 	checkForChangedPipelines();
-	skinningFence = performSkinning();
 }
 
 void buildCameraConstantBuffer(const render_camera& camera, float cameraJitterStrength, camera_cb& outCB)
@@ -91,12 +88,4 @@ void buildCameraConstantBuffer(const render_camera& camera, vec2 jitter, camera_
 	outCB.invScreenDims = vec2(1.f / camera.width, 1.f / camera.height);
 	outCB.prevFrameJitter = outCB.jitter;
 	outCB.jitter = jitter;
-}
-
-void waitForSkinningToFinish()
-{
-	if (skinningFence)
-	{
-		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue); // Wait for GPU skinning.
-	}
 }

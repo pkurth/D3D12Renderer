@@ -32,7 +32,7 @@ raytracing_instance_handle raytracing_tlas::instantiate(raytracing_object_type t
     return { result };
 }
 
-void raytracing_tlas::build()
+uint64 raytracing_tlas::build()
 {
     uint32 totalNumInstances = (uint32)allInstances.size();
 
@@ -112,5 +112,5 @@ void raytracing_tlas::build()
     cl->commandList->BuildRaytracingAccelerationStructure(&asDesc, 0, 0);
     cl->uavBarrier(tlas);
 
-    dxContext.executeCommandList(cl);
+    return dxContext.executeCommandList(cl);
 }
