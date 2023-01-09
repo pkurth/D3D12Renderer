@@ -57,7 +57,7 @@ static particle_data emitParticle(uint emitIndex)
 
 	float2 randomOnDisk = getRandomPointOnUnitDisk(rng) * 0.3f;
 	float3 position = float3(randomOnDisk.x, 0.f, randomOnDisk.y);
-	float maxLife = 1.5f;
+	float maxLife = 5.5f;
 
 	float3 velocity = normalize(position);
 
@@ -115,12 +115,6 @@ static bool simulateParticle(inout particle_data particle, float dt, out float s
 
 		particle.position += particle.velocity * dt;
 
-
-		if (any(isnan(particle.position)))
-		{
-			life = maxLife;
-		}
-
 		particle.maxLife_life = packHalfs(maxLife, life);
 
 		float3 V = particle.position - cb.cameraPosition;
@@ -149,7 +143,7 @@ struct vs_input
 
 struct vs_output
 {
-	float3 color			: COLOR;
+	float2 uv				: TEXCOORD;
 	float4 position			: SV_Position;
 };
 
@@ -162,6 +156,8 @@ static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> parti
 	float2 rotation; // Sin(angle), cos(angle).
 	unpackHalfs(particles[index].sinAngle_cosAngle, rotation.x, rotation.y);
 
+	float2 uv = IN.position.xy * 0.5f + 0.5f;
+
 	float size = 0.1f;
 	float2 localPosition = IN.position.xy * size;
 	localPosition = float2(dot(localPosition, float2(rotation.y, -rotation.x)), dot(localPosition, rotation));
@@ -169,13 +165,22 @@ static vs_output vertexShader(vs_input IN, StructuredBuffer<particle_data> parti
 
 	vs_output OUT;
 	OUT.position = mul(camera.viewProj, float4(pos, 1.f));
-	OUT.color = particles[index].velocity;
+	//OUT.color = particles[index].velocity;
+	OUT.uv = uv;
 	return OUT;
 }
 
 static float4 pixelShader(vs_output IN)
 {
-	return float4(IN.color, 1.f);
+	float radius = 0.5f;
+	float2 o = IN.uv - float2(0.5f, 0.5f);
+
+	float2 o2 = o * 2.f;
+	float z = 1 - sqrt(dot(o2, o2));
+	float3 N = float3(o2.xy, z);
+
+	float alpha = step(dot(o, o), radius * radius);
+	return float4(abs(N), alpha);
 }
 
 #endif
