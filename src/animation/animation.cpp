@@ -11,7 +11,7 @@
 
 #include <algorithm>
 
-static void readJointAnimation(animation_clip& clip, animation_joint& joint, const aiNodeAnim* channel)
+static void readJointAnimation(animation_clip& clip, animation_joint& joint, const aiNodeAnim* channel, float timeNormalization)
 {
 	joint.firstPositionKeyframe = (uint32)clip.positionKeyframes.size();
 	joint.firstRotationKeyframe = (uint32)clip.rotationKeyframes.size();
@@ -25,19 +25,19 @@ static void readJointAnimation(animation_clip& clip, animation_joint& joint, con
 	for (uint32 keyID = 0; keyID < channel->mNumPositionKeys; ++keyID)
 	{
 		clip.positionKeyframes.push_back(readAssimpVector(channel->mPositionKeys[keyID].mValue));
-		clip.positionTimestamps.push_back((float)channel->mPositionKeys[keyID].mTime * 0.001f);
+		clip.positionTimestamps.push_back((float)channel->mPositionKeys[keyID].mTime * timeNormalization);
 	}
 
 	for (uint32 keyID = 0; keyID < channel->mNumRotationKeys; ++keyID)
 	{
 		clip.rotationKeyframes.push_back(readAssimpQuaternion(channel->mRotationKeys[keyID].mValue));
-		clip.rotationTimestamps.push_back((float)channel->mRotationKeys[keyID].mTime * 0.001f);
+		clip.rotationTimestamps.push_back((float)channel->mRotationKeys[keyID].mTime * timeNormalization);
 	}
 
 	for (uint32 keyID = 0; keyID < channel->mNumScalingKeys; ++keyID)
 	{
 		clip.scaleKeyframes.push_back(readAssimpVector(channel->mScalingKeys[keyID].mValue));
-		clip.scaleTimestamps.push_back((float)channel->mScalingKeys[keyID].mTime * 0.001f);
+		clip.scaleTimestamps.push_back((float)channel->mScalingKeys[keyID].mTime * timeNormalization);
 	}
 
 	joint.isAnimated = true;
@@ -70,9 +70,8 @@ void animation_skeleton::pushAssimpAnimation(const fs::path& sceneFilename, cons
 
 	clip.filename = sceneFilename;
 
-	clip.lengthInSeconds = (float)animation->mDuration * 0.001f;
-
 	float timeNormalization = 1.f / (float)animation->mTicksPerSecond;
+	clip.lengthInSeconds = (float)animation->mDuration * timeNormalization;
 
 	clip.joints.resize(joints.size());
 	clip.positionKeyframes.clear();
@@ -88,11 +87,11 @@ void animation_skeleton::pushAssimpAnimation(const fs::path& sceneFilename, cons
 		if (it != nameToJointID.end())
 		{
 			animation_joint& joint = clip.joints[it->second];
-			readJointAnimation(clip, joint, channel);
+			readJointAnimation(clip, joint, channel, timeNormalization);
 		}
 		else if (jointName == "root")
 		{
-			readJointAnimation(clip, clip.rootMotionJoint, channel);
+			readJointAnimation(clip, clip.rootMotionJoint, channel, timeNormalization);
 		}
 	}
 
