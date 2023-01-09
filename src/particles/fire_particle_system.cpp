@@ -66,7 +66,7 @@ void fire_particle_system::initialize(uint32 maxNumParticles, float emitRate, co
 	settings.intensityOverLifetime.values[3] = 1.f;
 }
 
-void fire_particle_system::update(struct dx_command_list* cl, vec3 cameraPosition, float dt)
+void fire_particle_system::update(struct dx_command_list* cl, const common_particle_simulation_data& common, float dt)
 {
 	struct setter : public particle_parameter_setter
 	{
@@ -79,7 +79,7 @@ void fire_particle_system::update(struct dx_command_list* cl, vec3 cameraPositio
 	};
 
 	setter s;
-	s.cb.cameraPosition = cameraPosition;
+	s.cb.cameraPosition = common.cameraPosition;
 	s.cb.emitPosition = vec3(0.f, 20.f, -10.f); // TEMPORARY.
 	s.cb.frameIndex = (uint32)dxContext.frameID;
 

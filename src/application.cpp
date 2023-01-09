@@ -588,7 +588,7 @@ void application::update(const user_input& input, float dt)
 	// Particles.
 
 #if 1
-	if (input.keyboard[key_backspace].pressEvent)
+	if (input.keyboard['T'].pressEvent)
 	{
 		debrisParticleSystem.burst(camera.position + camera.rotation * vec3(0.f, 0.f, -3.f));
 	}

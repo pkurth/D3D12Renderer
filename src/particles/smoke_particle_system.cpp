@@ -52,7 +52,7 @@ void smoke_particle_system::initialize(uint32 maxNumParticles, float emitRate, c
 	atlasCB.initialize(rows, cols);
 }
 
-void smoke_particle_system::update(struct dx_command_list* cl, vec3 cameraPosition, float dt)
+void smoke_particle_system::update(struct dx_command_list* cl, const common_particle_simulation_data& common, float dt)
 {
 	struct setter : public particle_parameter_setter
 	{
@@ -65,7 +65,7 @@ void smoke_particle_system::update(struct dx_command_list* cl, vec3 cameraPositi
 	};
 
 	smoke_simulation_cb cb;
-	cb.cameraPosition = cameraPosition;
+	cb.cameraPosition = common.cameraPosition;
 	cb.emitPosition = vec3(20.f, 20.f, -10.f); // TEMPORARY.
 	cb.frameIndex = (uint32)dxContext.frameID;
 	cb.lifeScaleFromDistance = settings.lifeScaleFromDistance;

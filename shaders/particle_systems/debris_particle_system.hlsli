@@ -14,6 +14,9 @@ struct debris_simulation_cb
 {
 	vec4 emitPositions[4];
 
+	mat4 cameraVP;
+	vec4 cameraProjectionParams;
+
 	vec3 cameraPosition;
 	uint32 frameIndex;
 };
@@ -25,28 +28,44 @@ struct debris_simulation_cb
 
 #ifdef PARTICLE_SIMULATION
 
+#include "normal.hlsli"
+#include "random.hlsli"
+
 #define REQUIRES_SORTING
 
 #define USER_PARTICLE_SIMULATION_RS \
-	"RootConstants(num32BitConstants=20, b0)"
+	"CBV(b0), " \
+	"DescriptorTable(SRV(t0, numDescriptors=2)), " \
+    "StaticSampler(s0," \
+        "addressU = TEXTURE_ADDRESS_BORDER," \
+        "addressV = TEXTURE_ADDRESS_BORDER," \
+        "addressW = TEXTURE_ADDRESS_BORDER," \
+		"borderColor = STATIC_BORDER_COLOR_OPAQUE_WHITE," \
+        "filter = FILTER_MIN_MAG_MIP_POINT)"
 
-ConstantBuffer<debris_simulation_cb> cb		: register(b0);
+ConstantBuffer<debris_simulation_cb> cb	: register(b0);
+Texture2D<float> depthBuffer			: register(t0);
+Texture2D<float2> sceneNormals			: register(t1);
+SamplerState pointSampler				: register(s0);
 
 static particle_data emitParticle(uint emitIndex)
 {
+	uint rng = initRand(emitIndex, cb.frameIndex);
+
 	uint emitBatch = emitIndex / 256;
 	emitIndex = emitIndex % 256;
 
-	float i = saturate((float)emitIndex / 256.f) * 2.f * M_PI;
-	float sinAngle, cosAngle;
-	sincos(i, sinAngle, cosAngle);
-
-	float3 position = float3(cosAngle, 0.f, sinAngle) * 0.3f;
+	float2 randomOnDisk = getRandomPointOnUnitDisk(rng) * 0.3f;
+	float3 position = float3(randomOnDisk.x, 0.f, randomOnDisk.y);
 	float maxLife = 1.5f;
 
 	float3 velocity = normalize(position);
 
 	position += cb.emitPositions[emitBatch].xyz;
+
+	float i = (float)emitIndex * 2.f * M_PI;
+	float sinAngle, cosAngle;
+	sincos(i, sinAngle, cosAngle);
 
 	particle_data particle = {
 		position,
@@ -73,18 +92,40 @@ static bool simulateParticle(inout particle_data particle, float dt, out float s
 		float relLife = getRelLife(life, maxLife);
 
 		particle.velocity.y -= 9.81f * dt;
+
+		float4 p = mul(cb.cameraVP, float4(particle.position, 1.f));
+		p.xyz /= p.w;
+		float2 uv = p.xy * float2(0.5f, -0.5f) + float2(0.5f, 0.5f);
+
+		float particleDepth = depthBufferDepthToEyeDepth(p.z, cb.cameraProjectionParams);
+		float sceneDepth = depthBufferDepthToEyeDepth(isSaturated(p.z) ? depthBuffer.SampleLevel(pointSampler, uv, 0) : 1.f, cb.cameraProjectionParams); // Due to the border sampler, this defaults to 1 (infinite depth) outside the image.
+
+
+		if (particleDepth > sceneDepth - 0.05f)
+		{
+			float3 sceneNormal = normalize(unpackNormal(sceneNormals.SampleLevel(pointSampler, uv, 0)));
+
+			float VdotN = dot(particle.velocity, sceneNormal);
+			if (VdotN < 0.f)
+			{
+				particle.velocity = reflect(particle.velocity, sceneNormal) * 0.5f;
+				//particle.position += sceneNormal * (particleDepth - sceneDepth);
+			}
+		}
+
 		particle.position += particle.velocity * dt;
 
-		if (particle.position.y < 2.f && particle.velocity.y < 0.f)
+
+		if (any(isnan(particle.position)))
 		{
-			particle.position.y = 2.f;
-			particle.velocity.y *= -0.5f;
+			life = maxLife;
 		}
 
 		particle.maxLife_life = packHalfs(maxLife, life);
 
 		float3 V = particle.position - cb.cameraPosition;
 		sortKey = dot(V, V);
+
 
 		return true;
 	}
@@ -142,6 +183,7 @@ static float4 pixelShader(vs_output IN)
 
 // Simulation.
 #define DEBRIS_PARTICLE_SYSTEM_COMPUTE_RS_CBV				0
+#define DEBRIS_PARTICLE_SYSTEM_COMPUTE_RS_TEXTURES			1
 
 // Rendering.
 #define DEBRIS_PARTICLE_SYSTEM_RENDERING_RS_CAMERA			0

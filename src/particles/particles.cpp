@@ -130,6 +130,7 @@ void particle_system::updateInternal(struct dx_command_list* cl, float newPartic
 			cl->dispatch(1);
 			barrier_batcher(cl)
 				//.uav(dispatchBuffer)
+				.uav(listBuffer)
 				.transition(dispatchBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
 		}
 

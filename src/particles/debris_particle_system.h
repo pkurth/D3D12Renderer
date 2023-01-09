@@ -16,7 +16,7 @@ struct debris_particle_system : particle_system
 
 	void burst(vec3 position);
 
-	virtual void update(struct dx_command_list* cl, vec3 cameraPosition, float dt) override;
+	virtual void update(struct dx_command_list* cl, const common_particle_simulation_data& common, float dt) override;
 	void render(transparent_render_pass* renderPass);
 
 private:

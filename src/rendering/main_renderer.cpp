@@ -61,7 +61,7 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 
 
 	depthStencilBuffer = createDepthTexture(renderWidth, renderHeight, depthStencilFormat);
-	opaqueDepthBuffer = createDepthTexture(renderWidth, renderHeight, depthStencilFormat, 1, D3D12_RESOURCE_STATE_COPY_DEST);
+	opaqueDepthBuffer = createDepthTexture(renderWidth, renderHeight, depthStencilFormat, 1, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	D3D12_RESOURCE_DESC linearDepthDesc = CD3DX12_RESOURCE_DESC::Tex2D(linearDepthFormat, renderWidth, renderHeight, 1,
 		6, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 	linearDepthBuffer = createTexture(linearDepthDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
@@ -352,31 +352,43 @@ void main_renderer::endFrame(const user_input* input)
 	dx_dynamic_constant_buffer lightingCBV = dxContext.uploadDynamicConstantBuffer(lightingCB);
 
 
-	common_render_data common;
+	common_render_data commonRenderData;
 
-	common.sky = (environment && environment->sky) ? environment->sky : render_resources::blackCubeTexture;
-	common.irradiance = (environment && environment->irradiance) ? environment->irradiance : render_resources::blackCubeTexture;
-	common.prefilteredRadiance = (environment && environment->prefilteredRadiance) ? environment->prefilteredRadiance : render_resources::blackCubeTexture;
+	commonRenderData.sky = (environment && environment->sky) ? environment->sky : render_resources::blackCubeTexture;
+	commonRenderData.irradiance = (environment && environment->irradiance) ? environment->irradiance : render_resources::blackCubeTexture;
+	commonRenderData.prefilteredRadiance = (environment && environment->prefilteredRadiance) ? environment->prefilteredRadiance : render_resources::blackCubeTexture;
 
-	common.globalIlluminationIntensity = environment ? environment->globalIlluminationIntensity : 1.f;
-	common.skyIntensity = environment ? environment->skyIntensity : 1.f;
-	common.aoTexture = settings.enableAO ? aoTextures[1 - aoHistoryIndex] : render_resources::whiteTexture;
-	common.sssTexture = settings.enableSSS ? sssTextures[1 - sssHistoryIndex] : render_resources::whiteTexture;
-	common.ssrTexture = settings.enableSSR ? ssrResolveTexture : 0;
-	common.tiledCullingGrid = culling.tiledCullingGrid;
-	common.tiledObjectsIndexList = culling.tiledObjectsIndexList;
-	common.pointLightBuffer = pointLights;
-	common.spotLightBuffer = spotLights;
-	common.decalBuffer = decals;
-	common.shadowMap = render_resources::shadowMap;
-	common.decalTextureAtlas = decalTextureAtlas;
-	common.pointLightShadowInfoBuffer = pointLightShadowInfoBuffer;
-	common.spotLightShadowInfoBuffer = spotLightShadowInfoBuffer;
-	common.volumetricsTexture = 0;
-	common.cameraCBV = jitteredCameraCBV;
-	common.lightingCBV = lightingCBV;
-	common.lightProbeIrradiance = (environment && environment->giMode == environment_gi_update_raytraced) ? environment->lightProbeGrid.irradiance : 0;
-	common.lightProbeDepth = (environment && environment->giMode == environment_gi_update_raytraced) ? environment->lightProbeGrid.depth : 0;
+	commonRenderData.globalIlluminationIntensity = environment ? environment->globalIlluminationIntensity : 1.f;
+	commonRenderData.skyIntensity = environment ? environment->skyIntensity : 1.f;
+	commonRenderData.aoTexture = settings.enableAO ? aoTextures[1 - aoHistoryIndex] : render_resources::whiteTexture;
+	commonRenderData.sssTexture = settings.enableSSS ? sssTextures[1 - sssHistoryIndex] : render_resources::whiteTexture;
+	commonRenderData.ssrTexture = settings.enableSSR ? ssrResolveTexture : 0;
+	commonRenderData.tiledCullingGrid = culling.tiledCullingGrid;
+	commonRenderData.tiledObjectsIndexList = culling.tiledObjectsIndexList;
+	commonRenderData.pointLightBuffer = pointLights;
+	commonRenderData.spotLightBuffer = spotLights;
+	commonRenderData.decalBuffer = decals;
+	commonRenderData.shadowMap = render_resources::shadowMap;
+	commonRenderData.decalTextureAtlas = decalTextureAtlas;
+	commonRenderData.pointLightShadowInfoBuffer = pointLightShadowInfoBuffer;
+	commonRenderData.spotLightShadowInfoBuffer = spotLightShadowInfoBuffer;
+	commonRenderData.volumetricsTexture = 0;
+	commonRenderData.cameraCBV = jitteredCameraCBV;
+	commonRenderData.lightingCBV = lightingCBV;
+	commonRenderData.lightProbeIrradiance = (environment && environment->giMode == environment_gi_update_raytraced) ? environment->lightProbeGrid.irradiance : 0;
+	commonRenderData.lightProbeDepth = (environment && environment->giMode == environment_gi_update_raytraced) ? environment->lightProbeGrid.depth : 0;
+
+
+
+	common_particle_simulation_data commonParticleData;
+
+	commonParticleData.cameraPosition = unjitteredCamera.position.xyz;
+	commonParticleData.prevFrameCameraView = unjitteredCamera.prevFrameView;
+	commonParticleData.prevFrameCameraViewProj = unjitteredCamera.prevFrameViewProj;
+	commonParticleData.cameraProjectionParams = unjitteredCamera.projectionParams;
+	commonParticleData.prevFrameDepthBuffer = opaqueDepthBuffer;
+	commonParticleData.prevFrameNormals = worldNormalsRoughnessTexture;
+
 
 
 
@@ -415,7 +427,7 @@ void main_renderer::endFrame(const user_input* input)
 
 		for (auto& cc : computePass->particleSystemUpdates)
 		{
-			cc->update(cl, unjitteredCamera.position.xyz, computePass->dt);
+			cc->update(cl, commonParticleData, computePass->dt);
 		}
 
 		particleUpdateFence = dxContext.executeCommandList(cl);
@@ -492,7 +504,7 @@ void main_renderer::endFrame(const user_input* input)
 			// LIGHT & DECAL CULLING
 			// ----------------------------------------
 
-			lightAndDecalCulling(cl, depthStencilBuffer, pointLights, spotLights, decals, culling, numPointLights, numSpotLights, numDecals, common.cameraCBV);
+			lightAndDecalCulling(cl, depthStencilBuffer, pointLights, spotLights, decals, culling, numPointLights, numSpotLights, numDecals, commonRenderData.cameraCBV);
 
 
 			// ----------------------------------------
@@ -574,7 +586,7 @@ void main_renderer::endFrame(const user_input* input)
 				uint32 aoResultIndex = 1 - aoHistoryIndex;
 				ref<dx_texture> aoHistory = aoWasOnLastFrame ? aoTextures[aoHistoryIndex] : render_resources::whiteTexture;
 				ref<dx_texture> aoResult = aoTextures[aoResultIndex];
-				ambientOcclusion(cl, linearDepthBuffer, screenVelocitiesTexture, aoCalculationTexture, aoBlurTempTexture, aoHistory, aoResult, settings.aoSettings, common.cameraCBV);
+				ambientOcclusion(cl, linearDepthBuffer, screenVelocitiesTexture, aoCalculationTexture, aoBlurTempTexture, aoHistory, aoResult, settings.aoSettings, commonRenderData.cameraCBV);
 
 				barrier_batcher(cl)
 					// UAV barrier is done by hbao-function.
@@ -596,7 +608,7 @@ void main_renderer::endFrame(const user_input* input)
 
 				screenSpaceReflections(cl, prevFrameHDRColorTexture, depthStencilBuffer, linearDepthBuffer, worldNormalsRoughnessTexture,
 					screenVelocitiesTexture, ssrRaycastTexture, ssrResolveTexture, ssrTemporalTextures[ssrHistoryIndex],
-					ssrTemporalTextures[1 - ssrHistoryIndex], settings.ssrSettings, common.cameraCBV);
+					ssrTemporalTextures[1 - ssrHistoryIndex], settings.ssrSettings, commonRenderData.cameraCBV);
 
 				ssrHistoryIndex = 1 - ssrHistoryIndex;
 
@@ -614,7 +626,7 @@ void main_renderer::endFrame(const user_input* input)
 				uint32 sssResultIndex = 1 - sssHistoryIndex;
 				ref<dx_texture> sssHistory = sssWasOnLastFrame ? sssTextures[sssHistoryIndex] : render_resources::whiteTexture;
 				ref<dx_texture> sssResult = sssTextures[sssResultIndex];
-				screenSpaceShadows(cl, linearDepthBuffer, screenVelocitiesTexture, sssCalculationTexture, sssBlurTempTexture, sssHistory, sssResult, sun.direction, settings.sssSettings, jitteredCamera.view, common.cameraCBV);
+				screenSpaceShadows(cl, linearDepthBuffer, screenVelocitiesTexture, sssCalculationTexture, sssBlurTempTexture, sssHistory, sssResult, sun.direction, settings.sssSettings, jitteredCamera.view, commonRenderData.cameraCBV);
 
 				barrier_batcher(cl)
 					// UAV barrier is done by sss-function.
@@ -638,7 +650,7 @@ void main_renderer::endFrame(const user_input* input)
 				.colorAttachment(worldNormalsRoughnessTexture)
 				.depthAttachment(depthStencilBuffer);
 
-			opaqueLightPass(cl, hdrOpaqueRenderTarget, opaqueRenderPass, common, jitteredCamera.viewProj);
+			opaqueLightPass(cl, hdrOpaqueRenderTarget, opaqueRenderPass, commonRenderData, jitteredCamera.viewProj);
 
 
 			barrier_batcher(cl)
@@ -656,6 +668,8 @@ void main_renderer::endFrame(const user_input* input)
 			dx_command_list* cl = dxContext.getFreeRenderCommandList();
 			PROFILE_ALL(cl, "Render thread 3");
 
+			barrier_batcher(cl)
+				.transition(opaqueDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
 
 			{
 				PROFILE_ALL(cl, "Copy depth buffer");
@@ -669,9 +683,9 @@ void main_renderer::endFrame(const user_input* input)
 
 
 			// After this there is no more camera jittering!
-			common.cameraCBV = unjitteredCameraCBV;
-			common.opaqueDepth = opaqueDepthBuffer;
-			common.worldNormals = worldNormalsRoughnessTexture;
+			commonRenderData.cameraCBV = unjitteredCameraCBV;
+			commonRenderData.opaqueDepth = opaqueDepthBuffer;
+			commonRenderData.worldNormals = worldNormalsRoughnessTexture;
 
 
 
@@ -694,7 +708,7 @@ void main_renderer::endFrame(const user_input* input)
 					.colorAttachment(hdrResult)
 					.depthAttachment(depthStencilBuffer);
 
-				transparentLightPass(cl, hdrTransparentRenderTarget, transparentRenderPass, common, unjitteredCamera.viewProj);
+				transparentLightPass(cl, hdrTransparentRenderTarget, transparentRenderPass, commonRenderData, unjitteredCamera.viewProj);
 
 				barrier_batcher(cl)
 					.transition(hdrResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
@@ -769,7 +783,7 @@ void main_renderer::endFrame(const user_input* input)
 					.colorAttachment(ldrPostProcessingTexture)
 					.depthAttachment(depthStencilBuffer);
 
-				ldrPass(cl, ldrRenderTarget, depthStencilBuffer, ldrRenderPass, common, unjitteredCamera.viewProj);
+				ldrPass(cl, ldrRenderTarget, depthStencilBuffer, ldrRenderPass, commonRenderData, unjitteredCamera.viewProj);
 
 				barrier_batcher(cl)
 					.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -794,8 +808,7 @@ void main_renderer::endFrame(const user_input* input)
 				.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET)
 				.transition(ldrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 				.transition(frameResult, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON)
-				.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-				.transition(opaqueDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+				.transition(linearDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 			cl3 = cl;
 		});
@@ -879,7 +892,7 @@ void main_renderer::endFrame(const user_input* input)
 		{
 			PROFILE_ALL(cl, "Raytracing");
 
-			pathTracer.render(cl, *tlas, hdrColorTexture, common);
+			pathTracer.render(cl, *tlas, hdrColorTexture, commonRenderData);
 		}
 
 		cl->resetToDynamicDescriptorHeap();

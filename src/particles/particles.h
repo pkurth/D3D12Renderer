@@ -15,11 +15,24 @@ enum sort_mode
 	sort_mode_back_to_front,
 };
 
+struct common_particle_simulation_data
+{
+	mat4 prevFrameCameraView;
+	mat4 prevFrameCameraViewProj;
+
+	vec4 cameraProjectionParams;
+
+	vec3 cameraPosition;
+
+	ref<dx_texture> prevFrameDepthBuffer;
+	ref<dx_texture> prevFrameNormals;
+};
+
 struct particle_system
 {
 	virtual ~particle_system() {}
 
-	virtual void update(struct dx_command_list* cl, vec3 cameraPosition, float dt) = 0;
+	virtual void update(struct dx_command_list* cl, const common_particle_simulation_data& common, float dt) = 0;
 
 protected:
 
@@ -106,11 +119,5 @@ inline void particle_render_pipeline<render_data_t>::render(dx_command_list* cl,
 #define SIMULATE_PIPELINE_NAME(name) BUILD_PARTICLE_SHADER_NAME(name, "_sim_cs")
 #define VERTEX_SHADER_NAME(name) BUILD_PARTICLE_SHADER_NAME(name, "_vs")
 #define PIXEL_SHADER_NAME(name) BUILD_PARTICLE_SHADER_NAME(name, "_ps")
-
-
-struct particle_system_component
-{
-	ref<particle_system> system;
-};
 
 

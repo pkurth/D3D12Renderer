@@ -44,28 +44,39 @@ void debris_particle_system::burst(vec3 position)
 	bursts.push_back({ position });
 }
 
-void debris_particle_system::update(struct dx_command_list* cl, vec3 cameraPosition, float dt)
+void debris_particle_system::update(struct dx_command_list* cl, const common_particle_simulation_data& common, float dt)
 {
 	struct setter : public particle_parameter_setter
 	{
-		debris_simulation_cb cb;
+		dx_dynamic_constant_buffer cbv;
+		ref<dx_texture> depthBuffer;
+		ref<dx_texture> normals;
 
 		virtual void setRootParameters(dx_command_list* cl) override
 		{
-			cl->setCompute32BitConstants(DEBRIS_PARTICLE_SYSTEM_COMPUTE_RS_CBV, cb);
+			cl->setComputeDynamicConstantBuffer(DEBRIS_PARTICLE_SYSTEM_COMPUTE_RS_CBV, cbv);
+			cl->setDescriptorHeapSRV(DEBRIS_PARTICLE_SYSTEM_COMPUTE_RS_TEXTURES, 0, depthBuffer);
+			cl->setDescriptorHeapSRV(DEBRIS_PARTICLE_SYSTEM_COMPUTE_RS_TEXTURES, 1, normals);
 		}
 	};
 
-	setter s;
-	s.cb.cameraPosition = cameraPosition;
-	s.cb.frameIndex = (uint32)dxContext.frameID;
+	debris_simulation_cb cb;
+	cb.cameraVP = common.prevFrameCameraViewProj;
+	cb.cameraProjectionParams = common.cameraProjectionParams;
+	cb.cameraPosition = common.cameraPosition;
+	cb.frameIndex = (uint32)dxContext.frameID;
 
-	uint32 numBursts = (uint32)min(arraysize(s.cb.emitPositions), bursts.size());
+	uint32 numBursts = (uint32)min(arraysize(cb.emitPositions), bursts.size());
 	uint32 numNewParticles = numBursts * 256;
 	for (uint32 i = 0; i < numBursts; ++i)
 	{
-		s.cb.emitPositions[i] = vec4(bursts[i].position, 1.f);
+		cb.emitPositions[i] = vec4(bursts[i].position, 1.f);
 	}
+
+	setter s;
+	s.cbv = dxContext.uploadDynamicConstantBuffer(cb);
+	s.depthBuffer = common.prevFrameDepthBuffer;
+	s.normals = common.prevFrameNormals;
 
 	updateInternal(cl, (float)numNewParticles, dt, emitPipeline, simulatePipeline, &s);
 

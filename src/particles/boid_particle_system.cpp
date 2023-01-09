@@ -51,7 +51,7 @@ void boid_particle_system::initialize(uint32 maxNumParticles, float emitRate)
 	}
 }
 
-void boid_particle_system::update(struct dx_command_list* cl, vec3 cameraPosition, float dt)
+void boid_particle_system::update(struct dx_command_list* cl, const common_particle_simulation_data& common, float dt)
 {
 	if (cartoonMesh)
 	{
