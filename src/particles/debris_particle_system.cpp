@@ -60,11 +60,14 @@ void debris_particle_system::update(struct dx_command_list* cl, const common_par
 		}
 	};
 
+	const float linearDamping = 0.4f;
+
 	debris_simulation_cb cb;
 	cb.cameraVP = common.prevFrameCameraViewProj;
 	cb.cameraProjectionParams = common.cameraProjectionParams;
 	cb.cameraPosition = common.cameraPosition;
 	cb.frameIndex = (uint32)dxContext.frameID;
+	cb.drag = 1.f / (1.f + dt * linearDamping);
 
 	uint32 numBursts = (uint32)min(arraysize(cb.emitPositions), bursts.size());
 	uint32 numNewParticles = numBursts * 256;

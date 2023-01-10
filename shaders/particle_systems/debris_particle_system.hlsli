@@ -19,6 +19,7 @@ struct debris_simulation_cb
 
 	vec3 cameraPosition;
 	uint32 frameIndex;
+	float drag;
 };
 
 #ifdef HLSL
@@ -92,6 +93,7 @@ static bool simulateParticle(inout particle_data particle, float dt, out float s
 		float relLife = getRelLife(life, maxLife);
 
 		particle.velocity.y -= 9.81f * dt;
+		particle.velocity *= cb.drag;
 
 		float4 p = mul(cb.cameraVP, float4(particle.position, 1.f));
 		p.xyz /= p.w;
@@ -101,7 +103,7 @@ static bool simulateParticle(inout particle_data particle, float dt, out float s
 		float sceneDepth = depthBufferDepthToEyeDepth(isSaturated(p.z) ? depthBuffer.SampleLevel(pointSampler, uv, 0) : 1.f, cb.cameraProjectionParams); // Due to the border sampler, this defaults to 1 (infinite depth) outside the image.
 
 
-		if (particleDepth > sceneDepth - 0.05f)
+		if (particleDepth > sceneDepth - 0.05f && particleDepth < sceneDepth + 1.f)
 		{
 			float3 sceneNormal = normalize(unpackNormal(sceneNormals.SampleLevel(pointSampler, uv, 0)));
 
