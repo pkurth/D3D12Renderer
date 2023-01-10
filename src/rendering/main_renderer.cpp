@@ -346,7 +346,8 @@ void main_renderer::endFrame(const user_input* input)
 		sun,
 		environment->lightProbeGrid.getCB(),
 		vec2(1.f / SHADOW_MAP_WIDTH, 1.f / SHADOW_MAP_HEIGHT),
-		environment ? environment->globalIlluminationIntensity : 1.f, (environment && environment->giMode == environment_gi_update_raytraced),
+		environment ? environment->globalIlluminationIntensity : 1.f, 
+		(environment && environment->giMode == environment_gi_update_raytraced),
 	};
 
 	dx_dynamic_constant_buffer lightingCBV = dxContext.uploadDynamicConstantBuffer(lightingCB);
@@ -414,7 +415,7 @@ void main_renderer::endFrame(const user_input* input)
 
 				dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, tlasRebuildFence);
 
-				environment->lightProbeGrid.updateProbes(cl, *tlas, environment ? environment->sky : 0, lightingCBV);
+				environment->lightProbeGrid.updateProbes(cl, *tlas, environment ? environment->sky : render_resources::blackCubeTexture, lightingCBV);
 			}
 
 			giFence = dxContext.executeCommandList(cl);
