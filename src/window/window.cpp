@@ -518,6 +518,11 @@ void win32_window::toggleVisibility()
 	}
 }
 
+void win32_window::maximize()
+{
+	ShowWindow(windowHandle, SW_MAXIMIZE);
+}
+
 void win32_window::setMinimumSize(int32 minimumWidth, int32 minimumHeight)
 {
 	this->minimumWidth = minimumWidth;

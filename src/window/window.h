@@ -41,6 +41,8 @@ struct win32_window
 
 	void toggleVisibility();
 
+	void maximize();
+
 	void setMinimumSize(int32 minimumWidth = -1, int32 minimumHeight = -1); // -1 means default Windows limits.
 
 	void moveTo(int x, int y);

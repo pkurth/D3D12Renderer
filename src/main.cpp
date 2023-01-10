@@ -121,6 +121,7 @@ int main(int argc, char** argv)
 	window.initialize(TEXT("D3D12 Renderer"), 1920, 1080);
 	window.setIcon("resources/icons/project_icon.png");
 	window.setCustomWindowStyle();
+	window.maximize();
 
 	application app = {};
 	app.loadCustomShaders();
