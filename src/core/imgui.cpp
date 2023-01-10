@@ -482,10 +482,11 @@ namespace ImGui
 
 	bool AssetHandle(const char* label, const char* type, asset_handle& asset, const char* clearText)
 	{
-		char buffer[32] = "";
+		char buffer[512] = "";
 		if (asset)
 		{
-			snprintf(buffer, sizeof(buffer), "%s  %llu", type, asset.value);
+			fs::path path = getPathFromAssetHandle(asset);
+			snprintf(buffer, sizeof(buffer), "%s  %s", type, path.string().c_str());
 		}
 		else
 		{
@@ -515,7 +516,10 @@ namespace ImGui
 			fs::path path = getPathFromAssetHandle(asset);
 			if (!path.empty())
 			{
-				ImGui::SetTooltip(path.string().c_str());
+				ImGui::BeginTooltip();
+				ImGui::Text(path.string().c_str());
+				ImGui::Text("Asset handle: % llu", asset.value);
+				ImGui::EndTooltip();
 			}
 		}
 
@@ -776,13 +780,13 @@ namespace ImGui
 		return result;
 	}
 
-	static constexpr int32 colorEditFlags = ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel | 
-		ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoDragDrop | ImGuiColorEditFlags_PickerHueWheel;
-
+	static constexpr int32 colorEditFlags = ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel |
+		ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoDragDrop | ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_Float;
+	
 	bool PropertyColor(const char* label, vec3& f)
 	{
 		pre(label);
-		bool result = ImGui::ColorPicker3("", f.data, colorEditFlags | ImGuiColorEditFlags_Float);
+		bool result = ImGui::ColorEdit3("", f.data, colorEditFlags);
 		post();
 		return result;
 	}
@@ -790,7 +794,23 @@ namespace ImGui
 	bool PropertyColor(const char* label, vec4& f)
 	{
 		pre(label);
-		bool result = ImGui::ColorPicker4("", f.data, colorEditFlags | ImGuiColorEditFlags_Float);
+		bool result = ImGui::ColorEdit4("", f.data, colorEditFlags);
+		post();
+		return result;
+	}
+
+	bool PropertyColorWheel(const char* label, vec3& f)
+	{
+		pre(label);
+		bool result = ImGui::ColorPicker3("", f.data, colorEditFlags);
+		post();
+		return result;
+	}
+
+	bool PropertyColorWheel(const char* label, vec4& f)
+	{
+		pre(label);
+		bool result = ImGui::ColorPicker4("", f.data, colorEditFlags);
 		post();
 		return result;
 	}

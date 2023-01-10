@@ -141,6 +141,9 @@ namespace ImGui
 	bool PropertyColor(const char* label, vec3& f);
 	bool PropertyColor(const char* label, vec4& f);
 
+	bool PropertyColorWheel(const char* label, vec3& f);
+	bool PropertyColorWheel(const char* label, vec4& f);
+
 	bool PropertyButton(const char* label, const char* buttonText, const char* hoverText = 0, ImVec2 size = ImVec2(0, 0));
 
 	bool PropertyInputText(const char* label, char* buffer, uint32 bufferSize, bool disableInput = false);

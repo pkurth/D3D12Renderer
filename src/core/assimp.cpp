@@ -271,9 +271,9 @@ ref<pbr_material> loadAssimpMaterial(const aiScene* scene, const fs::path& scene
 	// TODO: This circumvents the material caching. Do we need the caching?
 
 	ref<dx_texture> albedo = loadAssimpTexture(scene, sceneFilepath, albedoName);
-	ref<dx_texture> normal = loadAssimpTexture(scene, sceneFilepath, normalName, image_load_flags_default | image_load_flags_noncolor);
-	ref<dx_texture> roughness = loadAssimpTexture(scene, sceneFilepath, roughnessName, image_load_flags_default | image_load_flags_noncolor);
-	ref<dx_texture> metallic = loadAssimpTexture(scene, sceneFilepath, metallicName, image_load_flags_default | image_load_flags_noncolor);
+	ref<dx_texture> normal = loadAssimpTexture(scene, sceneFilepath, normalName, image_load_flags_default_noncolor);
+	ref<dx_texture> roughness = loadAssimpTexture(scene, sceneFilepath, roughnessName, image_load_flags_default_noncolor);
+	ref<dx_texture> metallic = loadAssimpTexture(scene, sceneFilepath, metallicName, image_load_flags_default_noncolor);
 
 	ref<pbr_material> result = make_ref<pbr_material>();
 

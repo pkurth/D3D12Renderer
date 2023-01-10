@@ -170,6 +170,16 @@ void file_browser::draw()
 								ImGui::EndDragDropSource();
 							}
 						}
+						if (p.type == dir_entry_type_image)
+						{
+							if (ImGui::BeginDragDropSource())
+							{
+								fs::path fullPath = currentPath / p.filename;
+								std::string str = fullPath.string();
+								ImGui::SetDragDropPayload(EDITOR_ICON_IMAGE, str.c_str(), str.length() + 1, ImGuiCond_Once);
+								ImGui::EndDragDropSource();
+							}
+						}
 						if (p.type == dir_entry_type_audio)
 						{
 							if (ImGui::BeginDragDropSource())

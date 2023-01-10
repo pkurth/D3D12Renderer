@@ -3,6 +3,7 @@
 #include "dx_context.h"
 #include "dx_command_list.h"
 #include "core/hash.h"
+#include "core/file_registry.h"
 #include "rendering/texture_preprocessing.h"
 
 #include <d3d12memoryallocator/D3D12MemAlloc.h>
@@ -60,7 +61,9 @@ static ref<dx_texture> loadTextureInternal(const fs::path& path, uint32 flags)
 		return 0;
 	}
 
-	return uploadImageToGPU(scratchImage, textureDesc, flags);
+	ref<dx_texture> result = uploadImageToGPU(scratchImage, textureDesc, flags);
+	result->handle = getAssetHandleFromPath(path.lexically_normal());
+	return result;
 }
 
 static ref<dx_texture> loadTextureFromMemoryInternal(const void* ptr, uint32 size, image_format imageFormat, const fs::path& cachePath, uint32 flags)

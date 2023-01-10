@@ -564,9 +564,57 @@ bool scene_editor::drawSceneHierarchy()
 									selectedEntity.removeComponent<animation_component>(); // For now.
 								}
 							}
-
-
 							ImGui::EndProperties();
+						}
+						if (ImGui::BeginTree("Submeshes"))
+						{
+							for (const auto& sub : raster.mesh->submeshes)
+							{
+								ImGui::PushID(&sub);
+								if (ImGui::BeginTree(sub.name.c_str()))
+								{
+									if (ImGui::BeginProperties())
+									{
+										auto& material = sub.material;
+										asset_handle dummy = {};
+
+										auto editTexture = [](const char* name, ref<dx_texture>& tex, uint32 loadFlags)
+										{
+											asset_handle asset = {};
+											if (tex)
+											{
+												asset = tex->handle;
+											}
+											if (ImGui::PropertyAssetHandle(name, EDITOR_ICON_IMAGE, asset))
+											{
+												fs::path path = getPathFromAssetHandle(asset);
+												fs::path relative = fs::relative(path, fs::current_path());
+												if (auto newTex = loadTextureFromFile(relative.string(), loadFlags))
+												{
+													tex = newTex;
+												}
+											}
+										};
+
+										editTexture("Albedo", material->albedo, image_load_flags_default);
+										editTexture("Normal", material->normal, image_load_flags_default_noncolor);
+										editTexture("Roughness", material->roughness, image_load_flags_default_noncolor);
+										editTexture("Metallic", material->metallic, image_load_flags_default_noncolor);
+										
+										ImGui::PropertyColor("Emission", material->emission);
+										ImGui::PropertyColor("Albedo tint", material->albedoTint);
+										ImGui::PropertyCheckbox("Double sided", material->doubleSided);
+										ImGui::PropertySlider("UV scale", material->uvScale);
+
+										ImGui::EndProperties();
+									}
+
+									ImGui::EndTree();
+								}
+								ImGui::PopID();
+							}
+
+							ImGui::EndTree();
 						}
 					});
 
@@ -1143,7 +1191,7 @@ bool scene_editor::drawSceneHierarchy()
 					{
 						if (ImGui::BeginProperties())
 						{
-							ImGui::PropertyColor("Color", pl.color);
+							ImGui::PropertyColorWheel("Color", pl.color);
 							ImGui::PropertySlider("Intensity", pl.intensity, 0.f, 10.f);
 							ImGui::PropertySlider("Radius", pl.radius, 0.f, 100.f);
 							ImGui::PropertyCheckbox("Casts shadow", pl.castsShadow);
@@ -1163,7 +1211,7 @@ bool scene_editor::drawSceneHierarchy()
 							float inner = rad2deg(sl.innerAngle);
 							float outer = rad2deg(sl.outerAngle);
 
-							ImGui::PropertyColor("Color", sl.color);
+							ImGui::PropertyColorWheel("Color", sl.color);
 							ImGui::PropertySlider("Intensity", sl.intensity, 0.f, 10.f);
 							ImGui::PropertySlider("Distance", sl.distance, 0.f, 100.f);
 							ImGui::PropertySlider("Inner angle", inner, 0.1f, 80.f);
@@ -1700,7 +1748,7 @@ static bool editSunShadowParameters(directional_light& sun)
 		if (ImGui::BeginProperties())
 		{
 			result |= ImGui::PropertySlider("Intensity", sun.intensity, 0.f, 1000.f);
-			result |= ImGui::PropertyColor("Color", sun.color);
+			result |= ImGui::PropertyColorWheel("Color", sun.color);
 
 			result |= ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, sun.shadowDimensions);
 			result |= ImGui::PropertyCheckbox("Stabilize", sun.stabilize);
