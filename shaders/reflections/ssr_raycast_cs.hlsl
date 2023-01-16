@@ -197,7 +197,7 @@ void main(cs_input IN)
 
     const float3 normal = unpackNormal(normalAndRoughness.xy);
     const float3 viewNormal = mul(camera.view, float4(normal, 0.f)).xyz;
-    const float roughness = clamp(normalAndRoughness.z, 0.03f, 0.97f);
+    const float roughness = clamp(normalAndRoughness.z * normalAndRoughness.z * normalAndRoughness.z, 0.03f, 0.97f); // Raising the roughness to a power gets rid of some jittering.
     
     const float3 viewPos = restoreViewSpacePosition(camera.invProj, uv, depth);
     const float3 viewDir = normalize(viewPos);
