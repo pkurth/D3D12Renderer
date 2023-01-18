@@ -118,9 +118,14 @@ All other dependencies (external libraries) either come directly with the source
 
 ## Build Instructions
 
+<a href="https://youtu.be/Ey90fI_2MFU"><img align="right" src="https://img.youtube.com/vi/Ey90fI_2MFU/mqdefault.jpg" width="300" /></a>
+
+<p align="left">
+
 I have tried to keep the build process as simple as possible.
 Therefore you will not need any build tools installed on your machine.
 The project uses Premake, but all you need comes with the source.
+See also the video linked to the right for detailed instructions.
 
 - Clone the repository and make sure to clone with submodules. 
 - Double-click either the _generate2019.bat_ or _generate2022.bat_ file in the root directory to generate a Visual Studio 2019 or 2022 solution, respectively.
@@ -133,6 +138,7 @@ In that case either restart Visual Studio or re-generate the project (_generate.
 
 The assets seen in the screenshots above are not included with the source code. 
 
+</p>
 
 ## Locomotion Learning
 
