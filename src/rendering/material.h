@@ -36,13 +36,14 @@ struct common_render_data
 
 	// These two are only set, if the material is rendered after the opaque pass.
 	ref<dx_texture> opaqueDepth;
-	ref<dx_texture> worldNormals;
+	ref<dx_texture> worldNormalsAndRoughness;
 
 	dx_dynamic_constant_buffer cameraCBV;
 	dx_dynamic_constant_buffer lightingCBV;
 
 	float globalIlluminationIntensity;
 	float skyIntensity;
+	bool proceduralSky;
 };
 
 

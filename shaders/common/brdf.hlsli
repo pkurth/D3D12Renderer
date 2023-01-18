@@ -25,6 +25,7 @@ struct surface_info
 	float alphaRoughnessSquared;
 	float NdotV;
 	float3 F0;
+	float3 F;
 	float3 R;
 
 
@@ -35,6 +36,9 @@ struct surface_info
 		NdotV = saturate(dot(N, V));
 		F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo.xyz, metallic);
 		R = reflect(-V, N);
+
+		float F90 = saturate(50.f * dot(F0, 0.33f));
+		F = F0 + (F90 - F0) * pow(1.f - NdotV, 5.f); // Fresnel.
 	}
 };
 
@@ -116,6 +120,11 @@ struct light_info
 static float3 fresnelSchlick(float LdotH, float3 F0)
 {
 	return F0 + (float3(1.f, 1.f, 1.f) - F0) * pow(1.f - LdotH, 5.f);
+}
+
+static float3 fresnelSchlick(float3 F0, float F90, float VdotH)
+{
+	return F0 + (F90 - F0) * pow(1.f - VdotH, 5.f);
 }
 
 static float3 fresnelSchlickRoughness(float LdotH, float3 F0, float roughness)

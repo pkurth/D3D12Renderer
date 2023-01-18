@@ -301,7 +301,7 @@ ps_output main(ps_input IN)
 		specular = specularIBL(factors.ks, surface, prefilteredRadianceTexture, brdf, clampSampler);
 	}
 
-	specular = lerp(specular, ssr.rgb, ssr.a);
+	specular = lerp(specular, ssr.rgb * surface.F, ssr.a);
 	totalLighting.specular += specular * lighting.globalIlluminationIntensity * ao;
 
 

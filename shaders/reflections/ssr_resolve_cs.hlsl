@@ -110,7 +110,6 @@ void main(cs_input IN)
 
     const float2 m = motion.SampleLevel(linearSampler, raycastResult.xy, 0);
     float4 sceneColor = hdrColor.SampleLevel(linearSampler, raycastResult.xy + m, sourceMip);
-    sceneColor.rgb *= pow(0.2f, sourceMip); // This makes no sense at all physically. For some reason it helps against light "feedback" where the scene gets very bright.
     sceneColor.w = hit; // Store hit result.
 
     packResolveData(IN.groupIndex, raycastResult, sceneColor);

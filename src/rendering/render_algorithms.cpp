@@ -1175,6 +1175,57 @@ void depthSobel(dx_command_list* cl, ref<dx_texture> input, ref<dx_texture> outp
 	cl->dispatch(bucketize(input->width, POST_PROCESSING_BLOCK_SIZE), bucketize(input->height, POST_PROCESSING_BLOCK_SIZE));
 }
 
+
+void ssrTemporal(dx_command_list* cl, 
+	ref<dx_texture> screenVelocitiesTexture,
+	ref<dx_texture> resolveTexture,
+	ref<dx_texture> ssrTemporalHistory,
+	ref<dx_texture> ssrTemporalOutput)
+{
+	uint32 resolveWidth = resolveTexture->width;
+	uint32 resolveHeight = resolveTexture->height;
+
+	{
+		PROFILE_ALL(cl, "Temporal");
+
+		cl->setPipelineState(*ssrTemporalPipeline.pipeline);
+		cl->setComputeRootSignature(*ssrTemporalPipeline.rootSignature);
+
+		cl->setCompute32BitConstants(SSR_TEMPORAL_RS_CB, ssr_temporal_cb{ vec2(1.f / resolveWidth, 1.f / resolveHeight) });
+
+		cl->setDescriptorHeapUAV(SSR_TEMPORAL_RS_TEXTURES, 0, ssrTemporalOutput);
+		cl->setDescriptorHeapSRV(SSR_TEMPORAL_RS_TEXTURES, 1, resolveTexture);
+		cl->setDescriptorHeapSRV(SSR_TEMPORAL_RS_TEXTURES, 2, ssrTemporalHistory);
+		cl->setDescriptorHeapSRV(SSR_TEMPORAL_RS_TEXTURES, 3, screenVelocitiesTexture);
+
+		cl->dispatch(bucketize(resolveWidth, SSR_BLOCK_SIZE), bucketize(resolveHeight, SSR_BLOCK_SIZE));
+
+		barrier_batcher(cl)
+			//.uav(ssrOutput)
+			.transition(ssrTemporalOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+			.transition(ssrTemporalHistory, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+			.transition(resolveTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	}
+
+	{
+		PROFILE_ALL(cl, "Median Blur");
+
+		cl->setPipelineState(*ssrMedianBlurPipeline.pipeline);
+		cl->setComputeRootSignature(*ssrMedianBlurPipeline.rootSignature);
+
+		cl->setCompute32BitConstants(SSR_MEDIAN_BLUR_RS_CB, ssr_median_blur_cb{ vec2(1.f / resolveWidth, 1.f / resolveHeight) });
+
+		cl->setDescriptorHeapUAV(SSR_MEDIAN_BLUR_RS_TEXTURES, 0, resolveTexture); // We reuse the resolve texture here.
+		cl->setDescriptorHeapSRV(SSR_MEDIAN_BLUR_RS_TEXTURES, 1, ssrTemporalOutput);
+
+		cl->dispatch(bucketize(resolveWidth, SSR_BLOCK_SIZE), bucketize(resolveHeight, SSR_BLOCK_SIZE));
+
+		barrier_batcher(cl)
+			//.uav(resolveTexture)
+			.transition(resolveTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+	}
+}
+
 void screenSpaceReflections(dx_command_list* cl,
 	ref<dx_texture> prevFrameHDR,
 	ref<dx_texture> depthStencilBuffer,
@@ -1252,46 +1303,7 @@ void screenSpaceReflections(dx_command_list* cl,
 			.transition(raycastTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	}
 
-
-	{
-		PROFILE_ALL(cl, "Temporal");
-
-		cl->setPipelineState(*ssrTemporalPipeline.pipeline);
-		cl->setComputeRootSignature(*ssrTemporalPipeline.rootSignature);
-
-		cl->setCompute32BitConstants(SSR_TEMPORAL_RS_CB, ssr_temporal_cb{ vec2(1.f / resolveWidth, 1.f / resolveHeight) });
-
-		cl->setDescriptorHeapUAV(SSR_TEMPORAL_RS_TEXTURES, 0, ssrTemporalOutput);
-		cl->setDescriptorHeapSRV(SSR_TEMPORAL_RS_TEXTURES, 1, resolveTexture);
-		cl->setDescriptorHeapSRV(SSR_TEMPORAL_RS_TEXTURES, 2, ssrTemporalHistory);
-		cl->setDescriptorHeapSRV(SSR_TEMPORAL_RS_TEXTURES, 3, screenVelocitiesTexture);
-
-		cl->dispatch(bucketize(resolveWidth, SSR_BLOCK_SIZE), bucketize(resolveHeight, SSR_BLOCK_SIZE));
-
-		barrier_batcher(cl)
-			//.uav(ssrOutput)
-			.transition(ssrTemporalOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-			.transition(ssrTemporalHistory, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-			.transition(resolveTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	}
-
-	{
-		PROFILE_ALL(cl, "Median Blur");
-
-		cl->setPipelineState(*ssrMedianBlurPipeline.pipeline);
-		cl->setComputeRootSignature(*ssrMedianBlurPipeline.rootSignature);
-
-		cl->setCompute32BitConstants(SSR_MEDIAN_BLUR_RS_CB, ssr_median_blur_cb{ vec2(1.f / resolveWidth, 1.f / resolveHeight) });
-
-		cl->setDescriptorHeapUAV(SSR_MEDIAN_BLUR_RS_TEXTURES, 0, resolveTexture); // We reuse the resolve texture here.
-		cl->setDescriptorHeapSRV(SSR_MEDIAN_BLUR_RS_TEXTURES, 1, ssrTemporalOutput);
-
-		cl->dispatch(bucketize(resolveWidth, SSR_BLOCK_SIZE), bucketize(resolveHeight, SSR_BLOCK_SIZE));
-
-		barrier_batcher(cl)
-			//.uav(resolveTexture)
-			.transition(resolveTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
-	}
+	ssrTemporal(cl, screenVelocitiesTexture, resolveTexture, ssrTemporalHistory, ssrTemporalOutput);
 }
 
 void specularAmbient(dx_command_list* cl,
