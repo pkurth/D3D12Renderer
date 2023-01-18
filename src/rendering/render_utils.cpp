@@ -12,7 +12,7 @@
 #include "bitonic_sort.h"
 #include "debug_visualization.h"
 #include "light_probe.h"
-#include "raytracing_specular.h"
+#include "raytraced_reflections.h"
 #include "terrain/terrain.h"
 
 

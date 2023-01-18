@@ -8,7 +8,7 @@
 #include "dx/dx_profiling.h"
 
 #include "raytracing.h"
-#include "raytracing_specular.h"
+#include "raytraced_reflections.h"
 #include "animation/skinning.h"
 #include "particles/particles.h"
 

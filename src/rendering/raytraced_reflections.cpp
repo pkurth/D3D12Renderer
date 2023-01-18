@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "raytracing_specular.h"
+#include "raytraced_reflections.h"
 #include "core/color.h"
 #include "render_resources.h"
 #include "pbr_raytracer.h"
