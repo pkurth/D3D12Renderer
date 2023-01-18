@@ -8,6 +8,7 @@
 #include "dx/dx_profiling.h"
 
 #include "raytracing.h"
+#include "raytracing_specular.h"
 #include "animation/skinning.h"
 #include "particles/particles.h"
 
@@ -30,6 +31,7 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 	const_cast<renderer_spec&>(this->spec) = spec;
 
 	settings.enableSharpen = spec.allowTAA;
+	spec.allowSSR |= dxContext.featureSupport.raytracing(); // For now, since raytraced reflections use the same intermediate textures.
 
 	recalculateViewport(false);
 
@@ -347,7 +349,7 @@ void main_renderer::endFrame(const user_input* input)
 		environment->lightProbeGrid.getCB(),
 		vec2(1.f / SHADOW_MAP_WIDTH, 1.f / SHADOW_MAP_HEIGHT),
 		environment ? environment->globalIlluminationIntensity : 1.f, 
-		(environment && environment->giMode == environment_gi_update_raytraced),
+		(environment && environment->giMode == environment_gi_raytraced),
 	};
 
 	dx_dynamic_constant_buffer lightingCBV = dxContext.uploadDynamicConstantBuffer(lightingCB);
@@ -355,6 +357,7 @@ void main_renderer::endFrame(const user_input* input)
 
 	common_render_data commonRenderData;
 
+	commonRenderData.proceduralSky = !(environment && environment->sky);
 	commonRenderData.sky = (environment && environment->sky) ? environment->sky : render_resources::blackCubeTexture;
 	commonRenderData.irradiance = (environment && environment->irradiance) ? environment->irradiance : render_resources::blackCubeTexture;
 	commonRenderData.prefilteredRadiance = (environment && environment->prefilteredRadiance) ? environment->prefilteredRadiance : render_resources::blackCubeTexture;
@@ -376,8 +379,8 @@ void main_renderer::endFrame(const user_input* input)
 	commonRenderData.volumetricsTexture = 0;
 	commonRenderData.cameraCBV = jitteredCameraCBV;
 	commonRenderData.lightingCBV = lightingCBV;
-	commonRenderData.lightProbeIrradiance = (environment && environment->giMode == environment_gi_update_raytraced) ? environment->lightProbeGrid.irradiance : 0;
-	commonRenderData.lightProbeDepth = (environment && environment->giMode == environment_gi_update_raytraced) ? environment->lightProbeGrid.depth : 0;
+	commonRenderData.lightProbeIrradiance = (environment && environment->giMode == environment_gi_raytraced) ? environment->lightProbeGrid.irradiance : 0;
+	commonRenderData.lightProbeDepth = (environment && environment->giMode == environment_gi_raytraced) ? environment->lightProbeGrid.depth : 0;
 
 
 
@@ -406,16 +409,13 @@ void main_renderer::endFrame(const user_input* input)
 		tlasRebuildFence = tlas->build();
 
 
-		if (environment && environment->giMode == environment_gi_update_raytraced)
+		if (environment && environment->giMode == environment_gi_raytraced)
 		{
 			dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
 
 			{
 				PROFILE_ALL(cl, "Update light probes");
-
-				dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, tlasRebuildFence);
-
-				environment->lightProbeGrid.updateProbes(cl, *tlas, environment ? environment->sky : render_resources::blackCubeTexture, lightingCBV);
+				environment->lightProbeGrid.updateProbes(cl, *tlas, commonRenderData);
 			}
 
 			giFence = dxContext.executeCommandList(cl);
@@ -602,7 +602,22 @@ void main_renderer::endFrame(const user_input* input)
 			// SCREEN SPACE REFLECTIONS
 			// ----------------------------------------
 
-			if (settings.enableSSR)
+			if (environment && environment->giMode == environment_gi_raytraced)
+			{
+				barrier_batcher(cl)
+					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+				PROFILE_ALL(cl, "Specular reflections");
+				raytraceRTReflections(cl, *tlas, depthStencilBuffer, worldNormalsRoughnessTexture, 
+					screenVelocitiesTexture, ssrRaycastTexture, ssrResolveTexture, ssrTemporalTextures[ssrHistoryIndex],
+					ssrTemporalTextures[1 - ssrHistoryIndex], commonRenderData);
+
+				ssrHistoryIndex = 1 - ssrHistoryIndex;
+
+				barrier_batcher(cl)
+					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+			}
+			else if (settings.enableSSR)
 			{
 				barrier_batcher(cl)
 					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -686,7 +701,7 @@ void main_renderer::endFrame(const user_input* input)
 			// After this there is no more camera jittering!
 			commonRenderData.cameraCBV = unjitteredCameraCBV;
 			commonRenderData.opaqueDepth = opaqueDepthBuffer;
-			commonRenderData.worldNormals = worldNormalsRoughnessTexture;
+			commonRenderData.worldNormalsAndRoughness = worldNormalsRoughnessTexture;
 
 
 
@@ -718,7 +733,7 @@ void main_renderer::endFrame(const user_input* input)
 
 
 
-			if (settings.enableSSR)
+			if ((environment && environment->giMode == environment_gi_raytraced) || settings.enableSSR)
 			{
 				barrier_batcher(cl)
 					.transition(ssrResolveTexture, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); // For next frame.

@@ -5,7 +5,6 @@
 #include "dx/dx_texture.h"
 
 #include "render_pass.h"
-#include "pbr_raytracer.h"
 
 #include "light_probe.hlsli"
 
@@ -28,7 +27,7 @@ struct light_probe_grid
 	void initialize(vec3 minCorner, vec3 dimensions, float cellSize);
 	void visualize(opaque_render_pass* renderPass);
 
-	void updateProbes(dx_command_list* cl, const raytracing_tlas& lightProbeTlas, const ref<dx_texture>& sky, dx_dynamic_constant_buffer sunCBV) const;
+	void updateProbes(dx_command_list* cl, const struct raytracing_tlas& lightProbeTlas, const common_render_data& common) const;
 
 	light_probe_grid_cb getCB() const { return { minCorner, cellSize, numNodesX, numNodesY, numNodesZ }; }
 
@@ -51,38 +50,6 @@ private:
 	friend struct light_probe_tracer;
 	friend struct scene_editor;
 };
-
-struct light_probe_tracer : pbr_raytracer
-{
-	void initialize();
-
-	void render(dx_command_list* cl, const raytracing_tlas& tlas,
-		const light_probe_grid& grid,
-		const ref<dx_texture>& sky,
-		dx_dynamic_constant_buffer sunCBV);
-
-private:
-
-	const uint32 maxRecursionDepth = 2;
-	const uint32 maxPayloadSize = 4 * sizeof(float); // Radiance-payload is 1 x float3, 1 x float.
-
-
-	// Only descriptors in here!
-	struct input_resources
-	{
-		dx_cpu_descriptor_handle tlas;
-		dx_cpu_descriptor_handle sky;
-		dx_cpu_descriptor_handle irradiance;
-		dx_cpu_descriptor_handle depth;
-	};
-
-	struct output_resources
-	{
-		dx_cpu_descriptor_handle radiance;
-		dx_cpu_descriptor_handle directionAndDistance;
-	};
-};
-
 
 void initializeLightProbePipelines();
 

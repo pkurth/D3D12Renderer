@@ -2,6 +2,7 @@
 #include "light_probe.h"
 #include "render_utils.h"
 #include "render_resources.h"
+#include "pbr_raytracer.h"
 
 #include "core/imgui.h"
 
@@ -33,6 +34,41 @@ static const DXGI_FORMAT irradianceFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;// DX
 static const DXGI_FORMAT depthFormat = DXGI_FORMAT_R16G16_FLOAT;
 static const DXGI_FORMAT raytracedRadianceFormat = DXGI_FORMAT_R11G11B10_FLOAT;
 static const DXGI_FORMAT raytracedDirectionAndDistanceFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+
+
+
+
+
+struct light_probe_tracer : pbr_raytracer
+{
+	void initialize();
+
+	void render(dx_command_list* cl, const raytracing_tlas& tlas,
+		const light_probe_grid& grid,
+		const common_render_data& common);
+
+private:
+
+	const uint32 maxRecursionDepth = 2;
+	const uint32 maxPayloadSize = 4 * sizeof(float); // Radiance-payload is 1 x float3, 1 x float.
+
+
+	// Only descriptors in here!
+	struct input_resources
+	{
+		dx_cpu_descriptor_handle tlas;
+		dx_cpu_descriptor_handle sky;
+		dx_cpu_descriptor_handle irradiance;
+		dx_cpu_descriptor_handle depth;
+	};
+
+	struct output_resources
+	{
+		dx_cpu_descriptor_handle radiance;
+		dx_cpu_descriptor_handle directionAndDistance;
+	};
+};
+
 
 
 
@@ -381,7 +417,7 @@ void light_probe_grid::visualize(opaque_render_pass* renderPass)
 	}
 }
 
-void light_probe_grid::updateProbes(dx_command_list* cl, const raytracing_tlas& lightProbeTlas, const ref<dx_texture>& sky, dx_dynamic_constant_buffer sunCBV) const
+void light_probe_grid::updateProbes(dx_command_list* cl, const raytracing_tlas& lightProbeTlas, const common_render_data& common) const
 {
 	if (!dxContext.featureSupport.raytracing() || totalNumNodes == 0)
 	{
@@ -396,7 +432,7 @@ void light_probe_grid::updateProbes(dx_command_list* cl, const raytracing_tlas& 
 
 
 	lightProbeTracer.finalizeForRender();
-	lightProbeTracer.render(cl, lightProbeTlas, *this, sky, sunCBV);
+	lightProbeTracer.render(cl, lightProbeTlas, *this, common);
 }
 
 
@@ -442,7 +478,7 @@ void light_probe_tracer::initialize()
 	allocateDescriptorHeapSpaceForGlobalResources<input_resources, output_resources>(descriptorHeap);
 }
 
-void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas, const light_probe_grid& grid, const ref<dx_texture>& sky, dx_dynamic_constant_buffer sunCBV)
+void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas, const light_probe_grid& grid, const common_render_data& common)
 {
 	if (!tlas.tlas || grid.totalNumNodes == 0)
 	{
@@ -454,7 +490,7 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 
 		input_resources in;
 		in.tlas = tlas.tlas->raytracingSRV;
-		in.sky = sky->defaultSRV;
+		in.sky = common.sky->defaultSRV;
 		in.irradiance = grid.irradiance->defaultSRV;
 		in.depth = grid.depth->defaultSRV;
 
@@ -482,11 +518,11 @@ void light_probe_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas
 		light_probe_trace_cb cb;
 		cb.rayRotation = createModelMatrix(0.f, grid.rayRotation);
 		cb.grid = grid.getCB();
-		cb.sampleSkyFromTexture = sky != nullptr;
+		cb.sampleSkyFromTexture = !common.proceduralSky;
 
 		cl->setComputeDescriptorTable(LIGHT_PROBE_TRACING_RS_RESOURCES, gpuHandle);
 		cl->setCompute32BitConstants(LIGHT_PROBE_TRACING_RS_CB, cb);
-		cl->setComputeDynamicConstantBuffer(LIGHT_PROBE_TRACING_RS_SUN, sunCBV);
+		cl->setComputeDynamicConstantBuffer(LIGHT_PROBE_TRACING_RS_SUN, common.lightingCBV);
 
 		cl->raytrace(raytraceDesc);
 

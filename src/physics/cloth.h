@@ -57,6 +57,7 @@ private:
 
 #include "geometry/mesh_builder.h"
 #include "dx/dx_buffer.h"
+#include "dx/dx_context.h"
 
 struct cloth_render_component
 {

@@ -1,16 +1,6 @@
 #ifndef RAYTRACING_HLSLI
 #define RAYTRACING_HLSLI
 
-
-struct raytracing_cb
-{
-	uint32 maxRecursionDepth;
-	float fadeoutDistance;
-	float maxRayDistance;
-	float globalIlluminationIntensity;
-	float skyIntensity;
-};
-
 struct path_tracing_cb
 {
 	uint32 frameCount;

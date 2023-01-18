@@ -12,6 +12,7 @@
 #include "bitonic_sort.h"
 #include "debug_visualization.h"
 #include "light_probe.h"
+#include "raytracing_specular.h"
 #include "terrain/terrain.h"
 
 
@@ -27,6 +28,7 @@ void initializeRenderUtils()
 	initializeTexturePreprocessing();
 	initializeSkinning();
 	initializeLightProbePipelines();
+	initializeRTReflectionsPipelines();
 	loadCommonShaders();
 
 	debug_simple_pipeline::initialize();

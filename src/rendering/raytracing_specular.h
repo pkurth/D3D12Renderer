@@ -1,39 +1,16 @@
 #pragma once
 
-#include "pbr_raytracer.h"
+#include "dx/dx_texture.h"
 
-struct specular_reflections_raytracer : pbr_raytracer
-{
-    void initialize();
+void initializeRTReflectionsPipelines();
+void raytraceRTReflections(struct dx_command_list* cl, const struct raytracing_tlas& tlas, 
+	ref<dx_texture> depthStencilBuffer,				// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> worldNormalsRoughnessTexture,	// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> screenVelocitiesTexture,		// NON_PIXEL_SHADER_RESOURCE
+	ref<dx_texture> raycastTexture,					// UNORDERED_ACCESS
+	ref<dx_texture> resolveTexture,					// UNORDERED_ACCESS. After call D3D12_RESOURCE_STATE_GENERIC_READ. Also output of this algorithm.
+	ref<dx_texture> temporalHistory,				// NON_PIXEL_SHADER_RESOURCE. After call UNORDERED_ACCESS.
+	ref<dx_texture> temporalOutput,					// UNORDERED_ACCESS. After call NON_PIXEL_SHADER_RESOURCE.
+	const struct common_render_data& common);
 
-    void render(dx_command_list* cl, const raytracing_tlas& tlas,
-        const ref<dx_texture>& output,
-        const common_render_data& common);
 
-
-    // Parameters. Can be changed in each frame.
-    uint32 numBounces = 1;
-    float fadeoutDistance = 80.f; 
-    float maxDistance = 100.f;
-
-private:
-
-    // Only descriptors in here!
-    struct input_resources
-    {
-        dx_cpu_descriptor_handle tlas;
-        dx_cpu_descriptor_handle depthBuffer;
-        dx_cpu_descriptor_handle screenSpaceNormals;
-        dx_cpu_descriptor_handle irradiance;
-        dx_cpu_descriptor_handle environment;
-        dx_cpu_descriptor_handle sky;
-        dx_cpu_descriptor_handle brdf;
-    };
-
-    struct output_resources
-    {
-        dx_cpu_descriptor_handle output;
-    };
-
-    const uint32 maxRecursionDepth = 4;
-};
