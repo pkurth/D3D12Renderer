@@ -86,6 +86,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 	}
 #endif
 
+#if 0
 	uint32 numTerrainChunks = 10;
 
 	auto terrain = scene.createEntity("Terrain")
@@ -196,7 +197,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			"assets/cc0/sphere/Tiles074_2K_Color.jpg",
 			"assets/cc0/sphere/Tiles074_2K_Normal.jpg",
 			"assets/cc0/sphere/Tiles074_2K_Roughness.jpg",
-			{}, vec4(0.f), vec4(1.f), 1.f, 0.5f, false, 3.f);
+			{}, vec4(0.f), vec4(1.f), 0.2f, 0.5f, false, 3.f);
 
 		auto groundMesh = make_ref<multi_mesh>();
 		builder.pushBox({ vec3(0.f), vec3(100.f, 4.f, 100.f) });
@@ -230,7 +231,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		//	.addComponent<rigid_body_component>(true, 1.f);
 
 		random_number_generator rng = { 15681923 };
-		for (uint32 i = 0; i < 2000; ++i)
+		for (uint32 i = 0; i < 3; ++i)
 		{
 			//float x = rng.randomFloatBetween(-90.f, 90.f);
 			//float z = rng.randomFloatBetween(-90.f, 90.f);
@@ -454,7 +455,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		SET_NAME(pointLightShadowInfoBuffer[i]->resource, "Point light shadow infos");
 	}
 
-#if 1
+#if 0
 	fireParticleSystem.initialize(10000, 50.f, "assets/particles/fire_explosion.tif", 6, 6);
 	smokeParticleSystem.initialize(10000, 500.f, "assets/particles/smoke1.tif", 5, 5);
 	boidParticleSystem.initialize(10000, 2000.f);
@@ -587,7 +588,7 @@ void application::update(const user_input& input, float dt)
 
 	// Particles.
 
-#if 1
+#if 0
 	if (input.keyboard['T'].pressEvent)
 	{
 		debrisParticleSystem.burst(camera.position + camera.rotation * vec3(0.f, 0.f, -3.f));
