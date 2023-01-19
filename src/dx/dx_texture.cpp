@@ -440,6 +440,178 @@ ref<dx_texture> createTexture(const void* data, uint32 width, uint32 height, DXG
 	}
 }
 
+dx_tiled_texture createTiledTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_RESOURCE_STATES initialState, bool mipUAVs)
+{
+	ref<dx_texture> result = make_ref<dx_texture>();
+
+	result->requestedNumMipLevels = textureDesc.MipLevels;
+
+	uint32 maxNumMipLevels = (uint32)log2((float)max((uint32)textureDesc.Width, textureDesc.Height)) + 1;
+	textureDesc.MipLevels = min(maxNumMipLevels, result->requestedNumMipLevels);
+	textureDesc.Layout = D3D12_TEXTURE_LAYOUT_64KB_UNDEFINED_SWIZZLE;
+
+	D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport;
+	formatSupport.Format = textureDesc.Format;
+	checkResult(dxContext.device->CheckFeatureSupport(
+		D3D12_FEATURE_FORMAT_SUPPORT,
+		&formatSupport,
+		sizeof(D3D12_FEATURE_DATA_FORMAT_SUPPORT)));
+
+	result->supportsRTV = (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) && formatSupportsRTV(formatSupport);
+	result->supportsDSV = (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) && formatSupportsDSV(formatSupport);
+	result->supportsUAV = (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) && formatSupportsUAV(formatSupport);
+	result->supportsSRV = formatSupportsSRV(formatSupport);
+
+	if (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET && !result->supportsRTV)
+	{
+		std::cerr << "Warning. Requested RTV, but not supported by format.\n";
+		__debugbreak();
+	}
+
+	if (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL && !result->supportsDSV)
+	{
+		std::cerr << "Warning. Requested DSV, but not supported by format.\n";
+		__debugbreak();
+	}
+
+	if (textureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS && !result->supportsUAV)
+	{
+		std::cerr << "Warning. Requested UAV, but not supported by format.\n";
+		__debugbreak();
+	}
+
+
+	// Create.
+
+	checkResult(dxContext.device->CreateReservedResource(
+		&textureDesc,
+		initialState,
+		0,
+		IID_PPV_ARGS(&result->resource)));
+
+	result->numMipLevels = result->resource->GetDesc().MipLevels;
+
+	result->format = textureDesc.Format;
+	result->width = (uint32)textureDesc.Width;
+	result->height = textureDesc.Height;
+	result->depth = textureDesc.DepthOrArraySize;
+
+
+	result->initialState = initialState;
+
+
+	uint32 numUAVMips = 0;
+	if (result->supportsUAV)
+	{
+		numUAVMips = (mipUAVs ? result->numMipLevels : 1);
+	}
+	result->srvUavAllocation = dxContext.srvUavAllocator.allocate(1 + numUAVMips);
+
+	// SRV.
+	if (textureDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+	{
+		result->defaultSRV = dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(0)).createVolumeTextureSRV(result);
+	}
+	else if (textureDesc.DepthOrArraySize == 6)
+	{
+		result->defaultSRV = dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(0)).createCubemapSRV(result);
+	}
+	else
+	{
+		result->defaultSRV = dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(0)).create2DTextureSRV(result);
+	}
+
+	// RTV.
+	if (result->supportsRTV)
+	{
+		result->rtvAllocation = dxContext.rtvAllocator.allocate(textureDesc.DepthOrArraySize);
+		for (uint32 i = 0; i < textureDesc.DepthOrArraySize; ++i)
+		{
+			dx_rtv_descriptor_handle(result->rtvAllocation.cpuAt(i)).create2DTextureRTV(result, i);
+		}
+		result->defaultRTV = result->rtvAllocation.cpuAt(0);
+	}
+
+	// UAV.
+	if (result->supportsUAV)
+	{
+		result->defaultUAV = result->srvUavAllocation.cpuAt(1);
+
+		for (uint32 i = 0; i < numUAVMips; ++i)
+		{
+			if (textureDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+			{
+				dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(1 + i)).createVolumeTextureUAV(result, i);
+			}
+			else if (textureDesc.DepthOrArraySize == 6)
+			{
+				dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(1 + i)).createCubemapUAV(result, i);
+			}
+			else
+			{
+				dx_cpu_descriptor_handle(result->srvUavAllocation.cpuAt(1 + i)).create2DTextureUAV(result, i);
+			}
+		}
+	}
+
+
+
+	dx_tiled_texture tiled;
+	tiled.texture = result;
+
+
+	uint32 numTiles = 0;
+	D3D12_TILE_SHAPE tileShape = {};
+	uint32 subresourceCount = result->numMipLevels;
+	std::vector<D3D12_SUBRESOURCE_TILING> tilings(subresourceCount);
+	D3D12_PACKED_MIP_INFO packedMipInfo;
+
+	dxContext.device->GetResourceTiling(result->resource.Get(), &numTiles, &packedMipInfo, &tileShape, &subresourceCount, 0, &tilings[0]);
+
+	tiled.tileShape = tileShape;
+	tiled.mipDescs.resize(result->numMipLevels);
+	tiled.numStandard = packedMipInfo.NumStandardMips;
+	tiled.numPacked = packedMipInfo.NumPackedMips;
+
+	assert(tiled.numStandard + tiled.numPacked == result->numMipLevels);
+
+	for (uint32 i = 0; i < result->numMipLevels; ++i)
+	{
+		auto& mip = tiled.mipDescs[i];
+
+		mip.startCoordinate = CD3DX12_TILED_RESOURCE_COORDINATE(0, 0, 0, i);
+		mip.regionSize.Width = tilings[i].WidthInTiles;
+		mip.regionSize.Height = tilings[i].HeightInTiles;
+		mip.regionSize.Depth = tilings[i].DepthInTiles;
+		mip.regionSize.NumTiles = tilings[i].WidthInTiles * tilings[i].HeightInTiles * tilings[i].DepthInTiles;
+		mip.regionSize.UseBox = true;
+
+		// Handle packed mips.
+		if (i >= packedMipInfo.NumStandardMips)
+		{
+			// All packed mips have the same start coordinate and size.
+			mip.startCoordinate.Subresource = packedMipInfo.NumStandardMips;
+			mip.regionSize.NumTiles = packedMipInfo.NumTilesForPackedMips;
+			mip.regionSize.UseBox = false;
+		}
+	}
+
+	return tiled;
+}
+
+dx_tiled_texture createTiledTexture(uint32 width, uint32 height, DXGI_FORMAT format, bool allocateMips, bool allowRenderTarget, bool allowUnorderedAccess, D3D12_RESOURCE_STATES initialState, bool mipUAVs)
+{
+	D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE
+		| (allowRenderTarget ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE)
+		| (allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE)
+		;
+
+	uint32 numMips = allocateMips ? 0 : 1;
+	CD3DX12_RESOURCE_DESC textureDesc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, numMips, 1, 0, flags, D3D12_TEXTURE_LAYOUT_64KB_UNDEFINED_SWIZZLE);
+
+	return createTiledTexture(textureDesc, initialState, mipUAVs);
+}
+
 static void initializeDepthTexture(ref<dx_texture> result, uint32 width, uint32 height, DXGI_FORMAT format, uint32 arrayLength, D3D12_RESOURCE_STATES initialState, bool allocateDescriptors)
 {
 	result->numMipLevels = 1;
