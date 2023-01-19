@@ -29,13 +29,24 @@ enum dx_mesh_shader_tier
 	dx_mesh_shader_1_0,
 };
 
+enum dx_tiling_tier
+{
+	dx_tiling_not_available,
+	dx_tiling_1,
+	dx_tiling_2,
+	dx_tiling_3,
+	dx_tiling_4,
+};
+
 struct dx_feature_support
 {
-	dx_raytracing_tier raytracingTier;
-	dx_mesh_shader_tier meshShaderTier;
+	dx_raytracing_tier raytracingTier = dx_raytracing_not_available;
+	dx_mesh_shader_tier meshShaderTier = dx_mesh_shader_not_available;
+	dx_tiling_tier tilingTier = dx_tiling_not_available;
 
 	bool raytracing() { return raytracingTier >= dx_raytracing_1_0; }
 	bool meshShaders() { return meshShaderTier >= dx_mesh_shader_1_0; }
+	bool tiling() { return tilingTier >= dx_tiling_1; }
 };
 
 struct dx_context

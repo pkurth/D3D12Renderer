@@ -383,22 +383,6 @@ struct indirect_dispatch : D3D12_INDIRECT_ARGUMENT_DESC
 	}
 };
 
-struct indirect_raytrace : D3D12_INDIRECT_ARGUMENT_DESC
-{
-	indirect_raytrace()
-	{
-		Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH_RAYS;
-	}
-};
-
-struct indirect_mesh_shader : D3D12_INDIRECT_ARGUMENT_DESC
-{
-	indirect_mesh_shader()
-	{
-		Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH_MESH;
-	}
-};
-
 struct dx_pipeline_stream_base
 {
 	virtual void setVertexShader(dx_blob blob) {}

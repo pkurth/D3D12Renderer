@@ -78,6 +78,7 @@ static void enableDebugLayer()
 	checkResult(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface)));
 	debugInterface->EnableDebugLayer();
 	//debugInterface->SetEnableAutoDebugName(true);
+	//debugInterface->SetEnableGPUBasedValidation(true);
 #endif
 }
 
@@ -223,7 +224,7 @@ static dx_feature_support checkFeatureSupport(dx_device device)
 		result.raytracingTier = (dx_raytracing_tier)options5.RaytracingTier;
 	}
 
-#if ADVANCED_GPU_FEATURES_ENABLED
+#ifdef SDK_SUPPORTS_MESH_SHADERS
 	D3D12_FEATURE_DATA_D3D12_OPTIONS7 options7 = {};
 	if (SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options7, sizeof(options7))))
 	{
@@ -234,6 +235,12 @@ static dx_feature_support checkFeatureSupport(dx_device device)
 		std::cerr << "Checking support for mesh shader feature failed. Maybe you need to update your Windows version.\n";
 	}
 #endif
+
+	D3D12_FEATURE_DATA_D3D12_OPTIONS options1 = {};
+	if (SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options1, sizeof(options1))))
+	{
+		result.tilingTier = (dx_tiling_tier)options1.TiledResourcesTier;
+	}
 
 	return result;
 }

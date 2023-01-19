@@ -67,6 +67,18 @@ local turing_or_higher = gpu_model_number >= 1650
 
 local new_sdk_version = 19041
 local new_sdk_available = sdk_version >= new_sdk_version
+
+
+local force_old_sdk = false
+
+local sdk_version_string = "latest"
+if force_old_sdk then
+	sdk_version_string = "10.0.18362.0"
+	new_sdk_available = false
+end
+
+
+
 local mesh_shaders_supported = turing_or_higher and new_sdk_available and win_version >= new_sdk_version
 
 if not mesh_shaders_supported then
@@ -309,7 +321,7 @@ project "D3D12Renderer"
 		optimize "On"
 
 	filter "system:windows"
-		systemversion "latest"
+		systemversion (sdk_version_string)
 
 		defines {
 			"_UNICODE",
@@ -319,14 +331,6 @@ project "D3D12Renderer"
 			"ENABLE_DX_PROFILING=1",
 			"ENABLE_MESSAGE_LOG=1",
 		}
-		
-		if turing_or_higher then
-			defines { "TURING_GPU_OR_NEWER_AVAILABLE" }
-		end
-
-		if new_sdk_available then
-			defines { "WINDOWS_SDK_19041_OR_NEWER_AVAILABLE" }
-		end
 
 		defines { "SHADER_BIN_DIR=L\"" .. shaderoutputdir .. "\"" }
 

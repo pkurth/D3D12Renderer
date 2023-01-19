@@ -116,7 +116,7 @@ void main(cs_input IN)
 	{
 		g_sh[linearIndex].add(g_sh[linearIndex + 1]);
 
-		outSphericalHarmonics[0].initialize(g_sh[0].r, g_sh[0].g, g_sh[0].b);
+		outSphericalHarmonics[0].initialize(g_sh[0].r.v, g_sh[0].g.v, g_sh[0].b.v);
 	}
 }
 

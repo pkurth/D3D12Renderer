@@ -574,7 +574,7 @@ void dx_command_list::dispatchIndirect(uint32 maxNumCommands, const ref<dx_buffe
 
 void dx_command_list::dispatchMesh(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ)
 {
-#if ADVANCED_GPU_FEATURES_ENABLED
+#ifdef SDK_SUPPORTS_MESH_SHADERS
 	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
 	commandList->DispatchMesh(numGroupsX, numGroupsY, numGroupsZ);
 #else

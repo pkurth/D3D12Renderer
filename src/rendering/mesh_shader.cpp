@@ -6,7 +6,7 @@
 #include "material.h"
 #include "render_utils.h"
 
-#if 1
+#ifdef SDK_SUPPORTS_MESH_SHADERS
 
 static dx_pipeline meshletPipeline;
 static dx_pipeline blobPipeline;
@@ -938,6 +938,7 @@ const marching_cubes_lookup marchingCubesLookup[256] =
 #else
 
 void initializeMeshShader() {}
+void testRenderMeshShader(transparent_render_pass* ldrRenderPass, float dt) {}
 
 #endif
 
