@@ -12,7 +12,10 @@ struct terrain_chunk
 {
 	bool active;
 
-	ref<dx_texture> testheightmap; // Temporary.
+	float minHeight, maxHeight;
+
+	ref<dx_texture> heightmap;
+	ref<dx_texture> normalmap;
 };
 
 struct terrain_component
@@ -43,7 +46,6 @@ struct terrain_render_data
 	vec3 minCorner;
 	int32 lod;
 	float chunkSize;
-	float amplitudeScale;
 
 	int32 lod_negX;
 	int32 lod_posX;
@@ -51,6 +53,7 @@ struct terrain_render_data
 	int32 lod_posZ;
 
 	ref<dx_texture> heightmap;
+	ref<dx_texture> normalmap;
 };
 
 struct terrain_pipeline

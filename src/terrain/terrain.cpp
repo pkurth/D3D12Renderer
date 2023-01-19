@@ -22,80 +22,152 @@ terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float
 	this->chunks.resize(chunksPerDim * chunksPerDim);
 
 
+	const uint32 normalMapDimension = 1024;
 
-
-
-	uint16* heights = new uint16[TERRAIN_LOD_0_VERTICES_PER_DIMENSION * TERRAIN_LOD_0_VERTICES_PER_DIMENSION];
 
 	uint32 numSegmentsPerDim = TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1;
-	float norm = chunkSize / (float)numSegmentsPerDim;
+	float positionScale = chunkSize / (float)numSegmentsPerDim;
+	float normalScale = chunkSize / (float)(normalMapDimension - 1);
+
+	thread_job_context context;
 
 	for (int32 cz = 0; cz < (int32)chunksPerDim; ++cz)
 	{
 		for (int32 cx = 0; cx < (int32)chunksPerDim; ++cx)
 		{
-			auto& c = chunk(cx, cz);
-
-			vec2 minCorner = vec2(cx * chunkSize, cz * chunkSize);
-
-
-			for (uint32 z = 0; z < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++z)
+			context.addWork([this, cx, cz, chunkSize, positionScale, normalScale, normalMapDimension, amplitudeScale]()
 			{
-				for (uint32 x = 0; x < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++x)
+				vec2 minCorner = vec2(cx * chunkSize, cz * chunkSize);
+
+				float* heights = new float[TERRAIN_LOD_0_VERTICES_PER_DIMENSION * TERRAIN_LOD_0_VERTICES_PER_DIMENSION];
+				vec2* normals = new vec2[normalMapDimension * normalMapDimension];
+
+				auto& c = chunk(cx, cz);
+
+				float minHeight = FLT_MAX;
+				float maxHeight = -FLT_MAX;
+
+				for (uint32 z = 0; z < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++z)
 				{
-					vec2 position = vec2(x * norm, z * norm) + minCorner;
-					float height = fbm(position * 0.01f);
+					for (uint32 x = 0; x < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++x)
+					{
+						vec2 position = vec2(x * positionScale, z * positionScale) + minCorner;
 
-					assert(height >= 0 && height <= 1.f);
+						vec3 value = fbm(position * 0.01f).x;
+						float height = value.x;
+						height = abs(height);
 
-					heights[z * TERRAIN_LOD_0_VERTICES_PER_DIMENSION + x] = (uint16)(height * UINT16_MAX);
+						height *= amplitudeScale;
+
+						height = amplitudeScale - height;
+
+						minHeight = min(minHeight, height);
+						maxHeight = max(maxHeight, height);
+
+						heights[z * TERRAIN_LOD_0_VERTICES_PER_DIMENSION + x] = height;
+					}
 				}
-			}
 
-			c.testheightmap = createTexture(heights, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R16_UNORM);
+				c.minHeight = minHeight;
+				c.maxHeight = maxHeight;
+				c.heightmap = createTexture(heights, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R32_FLOAT);
 
 
+				for (uint32 z = 0; z < normalMapDimension; ++z)
+				{
+					for (uint32 x = 0; x < normalMapDimension; ++x)
+					{
+						vec2 position = vec2(x * normalScale, z * normalScale) + minCorner;
+
+						vec3 value = fbm(position * 0.01f);
+						float& height = value.x;
+						vec2& grad = value.yz;
+
+						grad *= 0.01f;
+
+						if (height < 0.f)
+						{
+							value = -value;
+						}
+
+						grad *= amplitudeScale;
+
+						grad = -grad;
+
+						normals[z * normalMapDimension + x] = -grad;
+					}
+				}
+
+				c.normalmap = createTexture(normals, normalMapDimension, normalMapDimension, DXGI_FORMAT_R32G32_FLOAT);
+
+				delete[] normals;
+				delete[] heights;
+			});
 		}
 	}
 
-	
-	delete[] heights;
+	context.waitForWorkCompletion();
 }
 
 void terrain_component::render(const render_camera& camera, opaque_render_pass* renderPass, vec3 positionOffset)
 {
 	camera_frustum_planes frustum = camera.getWorldSpaceFrustumPlanes();
 
-	float xzOffset = -(chunkSize * chunksPerDim) * 0.5f;
-	vec3 offset = vec3(xzOffset, 0.f, xzOffset) + positionOffset;
+	float xzOffset = -(chunkSize * chunksPerDim) * 0.5f; // Offsets entire terrain by half.
+	positionOffset += vec3(xzOffset, 0.f, xzOffset);
 
-	auto chunkLOD = [chunkSize = this->chunkSize, offset = offset + vec3(0.f, chunkSize * 0.5f, 0.f), camPos = camera.position](int x, int z)
+	int32 lodStride = (chunksPerDim + 2);
+	uint32 paddedNumChunks = (chunksPerDim + 2) * (chunksPerDim + 2);
+	int32* lodBuffer = (int32*)alloca(sizeof(int32) * paddedNumChunks);
+	int32* lods = lodBuffer + lodStride + 1;
+
+	vec3 chunkCenterOffset = vec3(chunkSize, 0.f, chunkSize) * 0.5f;
+
+	for (int32 z = -1; z < (int32)chunksPerDim + 1; ++z)
 	{
-		//return ((x & 1) != (z & 1)) ? 2 : 0; // Checkerboard LOD.
-		vec3 chunkCenter = vec3(x * chunkSize, 0.f, z * chunkSize) + offset;
-		float distance = length(chunkCenter - camPos);
-		int32 lod = (int32)(saturate(distance / 500.f) * TERRAIN_MAX_LOD);
-		return lod;
-	};
+		for (int32 x = -1; x < (int32)chunksPerDim + 1; ++x)
+		{
+			vec3 localMinCorner(x * chunkSize, 0.f, z * chunkSize);
+			vec3 minCorner = localMinCorner + positionOffset;
+			vec3 chunkCenter = minCorner + chunkCenterOffset;
+
+			float distance = length(chunkCenter - camera.position);
+			int32 lod = (int32)(saturate(distance / 500.f) * TERRAIN_MAX_LOD);
+			lods[z * lodStride + x] = lod;
+		}
+	}
 
 	for (int32 z = 0; z < (int32)chunksPerDim; ++z)
 	{
 		for (int32 x = 0; x < (int32)chunksPerDim; ++x)
 		{
-			auto& c = chunk(x, z);
+			const terrain_chunk& c = chunk(x, z);
 
 			if (c.active)
 			{
-				int32 lod = chunkLOD(x, z);
+				int32 lod = lods[z * lodStride + x];
 
-				vec3 minCorner = vec3(x * chunkSize, 0.f, z * chunkSize) + offset;
-				vec3 maxCorner = minCorner + vec3(chunkSize, amplitudeScale, chunkSize);
+				vec3 localMinCorner(x * chunkSize, 0.f, z * chunkSize);
+				vec3 minCorner = localMinCorner + positionOffset;
+				vec3 maxCorner = minCorner + vec3(chunkSize, 0.f, chunkSize);
+
 
 				bounding_box aabb = { minCorner, maxCorner };
+				aabb.minCorner.y += c.minHeight;
+				aabb.maxCorner.y += c.maxHeight;
+
 				if (!frustum.cullWorldSpaceAABB(aabb))
 				{
-					terrain_render_data data = { minCorner, lod, chunkSize, amplitudeScale, chunkLOD(x - 1, z), chunkLOD(x + 1, z), chunkLOD(x, z - 1), chunkLOD(x, z + 1),
-						c.testheightmap };
+					terrain_render_data data = { 
+						minCorner, 
+						lod, 
+						chunkSize, 
+						lods[(z) * lodStride + (x - 1)],
+						lods[(z) * lodStride + (x + 1)],
+						lods[(z - 1) * lodStride + (x)],
+						lods[(z + 1) * lodStride + (x)],
+						c.heightmap,
+						c.normalmap };
 					renderPass->renderStaticObject<terrain_pipeline>(mat4::identity, {}, {}, {}, data, -1, false, false);
 				}
 			}
@@ -106,8 +178,8 @@ void terrain_component::render(const render_camera& camera, opaque_render_pass* 
 void terrain_pipeline::initialize()
 {
 	auto desc = CREATE_GRAPHICS_PIPELINE
-		.renderTargets(opaqueLightPassFormats, arraysize(opaqueLightPassFormats), depthStencilFormat)
-		.wireframe();
+		//.wireframe()
+		.renderTargets(opaqueLightPassFormats, arraysize(opaqueLightPassFormats), depthStencilFormat);
 
 	terrainPipeline = createReloadablePipeline(desc, { "terrain_vs", "terrain_ps" });
 
@@ -129,7 +201,7 @@ void terrain_pipeline::initialize()
 		{
 			for (uint32 x = 0; x < numSegmentsPerDim; ++x)
 			{
-				tris[i++] = { (uint16)(stride * z + x), (uint16)(stride * (z + 1) + x), (uint16)(stride * z + x + 1) };
+				tris[i++] = { (uint16)(stride * z + x),		(uint16)(stride * (z + 1) + x), (uint16)(stride * z + x + 1) };
 				tris[i++] = { (uint16)(stride * z + x + 1), (uint16)(stride * (z + 1) + x), (uint16)(stride * (z + 1) + x + 1) };
 			}
 		}
@@ -161,8 +233,9 @@ PIPELINE_RENDER_IMPL(terrain_pipeline)
 	uint32 scaleDownByLODs = SCALE_DOWN_BY_LODS(lod_negX, lod_posX, lod_negZ, lod_posZ);
 
 	cl->setGraphics32BitConstants(TERRAIN_RS_TRANSFORM, viewProj);
-	cl->setGraphics32BitConstants(TERRAIN_RS_CB, terrain_cb{ rc.data.minCorner, (uint32)rc.data.lod, rc.data.amplitudeScale, rc.data.chunkSize, scaleDownByLODs });
+	cl->setGraphics32BitConstants(TERRAIN_RS_CB, terrain_cb{ rc.data.minCorner, (uint32)rc.data.lod, rc.data.chunkSize, scaleDownByLODs });
 	cl->setDescriptorHeapSRV(TERRAIN_RS_HEIGHTMAP, 0, rc.data.heightmap);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_NORMALMAP, 0, rc.data.normalmap);
 
 	cl->setIndexBuffer(terrainIndexBuffers[rc.data.lod]);
 	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);

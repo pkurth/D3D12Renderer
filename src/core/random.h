@@ -142,36 +142,112 @@ static float random(vec2 v) { return floatConstruct(hash(asuint(v.x), asuint(v.y
 static float random(vec3 v) { return floatConstruct(hash(asuint(v.x), asuint(v.y), asuint(v.z))); }
 static float random(vec4 v) { return floatConstruct(hash(asuint(v.x), asuint(v.y), asuint(v.z), asuint(v.w))); }
 
-// Based on Morgan McGuire @morgan3d
-// https://www.shadertoy.com/view/4dS3Wd
-static float fbmNoise(vec2 st)
+static vec3 fbmNoise(vec2 x)
 {
-	vec2 i = floor(st);
-	vec2 f = frac(st);
+	vec2 p = floor(x);
+	vec2 w = frac(x);
 
-	// Four corners in 2D of a tile
-	float a = random(i);
-	float b = random(i + vec2(1.f, 0.f));
-	float c = random(i + vec2(0.f, 1.f));
-	float d = random(i + vec2(1.f, 1.f));
+	vec2 u = w * w * w * (w * (w * 6.f - 15.f) + 10.f);
+	vec2 du = 30.f * w * w * (w * (w - 2.f) + 1.f);
 
-	vec2 u = f * f * (3.f - 2.f * f);
+	float a = random(p);
+	float b = random(p + vec2(1, 0));
+	float c = random(p + vec2(0, 1));
+	float d = random(p + vec2(1, 1));
 
-	return lerp(a, b, u.x) + lerp((c - a) * u.y, (d - b) * u.y, u.x);
+	float k0 = a;
+	float k1 = b - a;
+	float k2 = c - a;
+	float k3 = a - b - c + d;
+
+	float value = -1.f + 2.f * (k0 + k1 * u.x + k2 * u.y + k3 * u.x * u.y);
+	vec2 deriv = 2.f * du *
+		vec2(
+			k1 + k3 * u.y,
+			k2 + k3 * u.x);
+
+	return vec3(value, deriv.x, deriv.y);
 }
 
-static float fbm(vec2 st, uint32 numOctaves = 6, float lacunarity = 2.f, float gain = 0.5f)
+static vec4 fbmNoise(vec3 x)
+{
+	vec3 p = floor(x);
+	vec3 w = frac(x);
+
+	vec3 u = w * w * w * (w * (w * 6.f - 15.f) + 10.f);
+	vec3 du = 30.f * w * w * (w * (w - 2.f) + 1.f);
+
+	float a = random(p + vec3(0, 0, 0));
+	float b = random(p + vec3(1, 0, 0));
+	float c = random(p + vec3(0, 1, 0));
+	float d = random(p + vec3(1, 1, 0));
+	float e = random(p + vec3(0, 0, 1));
+	float f = random(p + vec3(1, 0, 1));
+	float g = random(p + vec3(0, 1, 1));
+	float h = random(p + vec3(1, 1, 1));
+
+	float k0 = a;
+	float k1 = b - a;
+	float k2 = c - a;
+	float k3 = e - a;
+	float k4 = a - b - c + d;
+	float k5 = a - c - e + g;
+	float k6 = a - b - e + f;
+	float k7 = -a + b + c - d + e - f - g + h;
+
+	float value = -1.f + 2.f * (k0 + k1 * u.x + k2 * u.y + k3 * u.z + k4 * u.x * u.y + k5 * u.y * u.z + k6 * u.z * u.x + k7 * u.x * u.y * u.z);
+	vec3 deriv = 2.f * du * 
+		vec3(
+			k1 + k4 * u.y + k6 * u.z + k7 * u.y * u.z,
+			k2 + k5 * u.z + k4 * u.x + k7 * u.z * u.x,
+			k3 + k6 * u.x + k5 * u.y + k7 * u.x * u.y);
+
+	return vec4(value, deriv.x, deriv.y, deriv.z);
+}
+
+static vec3 fbm(vec2 x, uint32 numOctaves = 6, float lacunarity = 1.98f, float gain = 0.49f)
 {
 	float value = 0.f;
-	float amplitude = .5f;
-	float frequency = 1.f;
+	float amplitude = 0.5f;
+
+	vec2 deriv(0.f);
+	float m = 1.f;
 
 	for (uint32 i = 0; i < numOctaves; ++i)
 	{
-		value += amplitude * fbmNoise(frequency * st);
-		frequency *= lacunarity;
+		vec3 n = fbmNoise(x);
+
+		value += amplitude * n.x;		// Accumulate values.
+		deriv += amplitude * m * n.yz;  // Accumulate derivatives.
+
 		amplitude *= gain;
+
+		x *= lacunarity;
+		m *= lacunarity;
 	}
-	return value;
+	return vec3(value, deriv.x, deriv.y);
+}
+
+static vec4 fbm(vec3 x, uint32 numOctaves = 6, float lacunarity = 1.98f, float gain = 0.49f)
+{
+	float value = 0.f;
+	float amplitude = 0.5;
+
+	vec3 deriv(0.f);
+	float m = 1.f;
+
+	for (uint32 i = 0; i < numOctaves; ++i)
+	{
+		vec4 n = fbmNoise(x);
+
+		value += amplitude * n.x;		// Accumulate values.
+		deriv += amplitude * m * n.yzw; // Accumulate derivatives.
+
+		amplitude *= gain;
+
+		x *= lacunarity;
+		m *= lacunarity;
+	}
+	return vec4(value, deriv.x, deriv.y, deriv.z);
 }
 
