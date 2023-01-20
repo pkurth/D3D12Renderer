@@ -37,6 +37,9 @@ struct terrain_component
 	void render(const render_camera& camera, struct opaque_render_pass* renderPass, vec3 positionOffset);
 
 private:
+	void generateChunkCPU(uint32 x, uint32 z);
+	void generateChunkGPU(uint32 x, uint32 z);
+
 	std::vector<terrain_chunk> chunks;
 
 	ref<pbr_material> groundMaterial; 

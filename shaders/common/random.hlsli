@@ -178,44 +178,58 @@ static float2 getRandomPointOnDisk(inout uint randSeed, float radius)
 
 
 
-
-// Based on Morgan McGuire @morgan3d
-// https://www.shadertoy.com/view/4dS3Wd
-float fbmNoise(float2 st) 
+static float3 valueNoise(float2 x)
 {
-	float2 i = floor(st);
-	float2 f = frac(st);
+	float2 p = floor(x);
+	float2 w = frac(x);
 
-	// Four corners in 2D of a tile
-	float a = random(i);
-	float b = random(i + float2(1.f, 0.f));
-	float c = random(i + float2(0.f, 1.f));
-	float d = random(i + float2(1.f, 1.f));
+	float2 u = w * w * w * (w * (w * 6.f - 15.f) + 10.f);
+	float2 du = 30.f * w * w * (w * (w - 2.f) + 1.f);
 
-	vec2 u = f * f * (3.f - 2.f * f);
+	float a = random(p);
+	float b = random(p + float2(1, 0));
+	float c = random(p + float2(0, 1));
+	float d = random(p + float2(1, 1));
 
-	return lerp(a, b, u.x) +
-		(c - a) * u.y * (1.f - u.x) +
-		(d - b) * u.x * u.y;
+	float k0 = a;
+	float k1 = b - a;
+	float k2 = c - a;
+	float k3 = a - b - c + d;
+
+	float value = -1.f + 2.f * (k0 + k1 * u.x + k2 * u.y + k3 * u.x * u.y);
+	float2 deriv = 2.f * du *
+		float2(
+			k1 + k3 * u.y,
+			k2 + k3 * u.x);
+
+	return float3(value, deriv.x, deriv.y);
 }
 
-#define FBM_OCTAVES 6
-float fbm(float2 st) 
+static float3 fbm(float2 x, uint numOctaves = 6, float lacunarity = 1.98f, float gain = 0.49f)
 {
-	// Initial values
 	float value = 0.f;
-	float amplitude = .5f;
-	float frequency = 0.f;
-	//
-	// Loop of octaves
-	for (int i = 0; i < FBM_OCTAVES; ++i)
+	float amplitude = 0.5f;
+
+	float2 deriv = 0.f;
+	float m = 1.f;
+
+	for (uint32 i = 0; i < numOctaves; ++i)
 	{
-		value += amplitude * fbmNoise(st);
-		st *= 2.;
-		amplitude *= .5;
+		float3 n = valueNoise(x);
+
+		value += amplitude * n.x;		// Accumulate values.
+		deriv += amplitude * m * n.yz;  // Accumulate derivatives.
+
+		amplitude *= gain;
+
+		x *= lacunarity;
+		m *= lacunarity;
 	}
-	return value;
+	return float3(value, deriv.x, deriv.y);
 }
+
+
+
 
 
 #endif

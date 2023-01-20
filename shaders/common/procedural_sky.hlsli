@@ -20,13 +20,59 @@ static float getStars(float3 V)
 	return stars;
 }
 
+
+
+// Based on Morgan McGuire @morgan3d
+// https://www.shadertoy.com/view/4dS3Wd
+float fbmNoise(float2 st)
+{
+	float2 i = floor(st);
+	float2 f = frac(st);
+
+	// Four corners in 2D of a tile
+	float a = random(i);
+	float b = random(i + float2(1.f, 0.f));
+	float c = random(i + float2(0.f, 1.f));
+	float d = random(i + float2(1.f, 1.f));
+
+	vec2 u = f * f * (3.f - 2.f * f);
+
+	return lerp(a, b, u.x) +
+		(c - a) * u.y * (1.f - u.x) +
+		(d - b) * u.x * u.y;
+}
+
+#define FBM_OCTAVES 6
+float cloudFBM(float2 st)
+{
+	// Initial values
+	float value = 0.f;
+	float amplitude = .5f;
+	float frequency = 0.f;
+	//
+	// Loop of octaves
+	for (int i = 0; i < FBM_OCTAVES; ++i)
+	{
+		value += amplitude * fbmNoise(st);
+		st *= 2.;
+		amplitude *= .5;
+	}
+	return value;
+}
+
+
+
+
+
+
+
 static float getCloudValue(float2 p, float intensity)
 {
 	const float density = 0.5f;
 	const float sharpness = 0.1f;
 	const float scale = 1.f / 0.05f;
 
-	float noise = fbm(p);
+	float noise = cloudFBM(p);
 
 	noise = saturate(1.f - exp(-(noise - density) * sharpness)) * scale;
 	return noise * intensity;

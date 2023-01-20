@@ -59,5 +59,35 @@ struct terrain_transform_cb
 #define TERRAIN_RS_TEXTURES			6
 #define TERRAIN_RS_FRAME_CONSTANTS  7
 
+
+
+
+
+
+
+
+struct terrain_generation_cb
+{
+	uint32 heightWidth;
+	uint32 heightHeight;
+	uint32 normalWidth;
+	uint32 normalHeight;
+	vec2 minCorner;
+	float positionScale;
+	float normalScale;
+	float amplitudeScale;
+	float domainWarpStrength;
+};
+
+#define TERRAIN_GENERATION_RS \
+	"RootConstants(num32BitConstants=10, b0), " \
+	"DescriptorTable(UAV(u0, numDescriptors=2))"
+
+#define TERRAIN_GENERATION_RS_CB		0
+#define TERRAIN_GENERATION_RS_TEXTURES	1
+
+
+
+
 #endif
 
