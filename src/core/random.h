@@ -142,7 +142,7 @@ static float random(vec2 v) { return floatConstruct(hash(asuint(v.x), asuint(v.y
 static float random(vec3 v) { return floatConstruct(hash(asuint(v.x), asuint(v.y), asuint(v.z))); }
 static float random(vec4 v) { return floatConstruct(hash(asuint(v.x), asuint(v.y), asuint(v.z), asuint(v.w))); }
 
-static vec3 fbmNoise(vec2 x)
+static vec3 valueNoise(vec2 x)
 {
 	vec2 p = floor(x);
 	vec2 w = frac(x);
@@ -169,7 +169,7 @@ static vec3 fbmNoise(vec2 x)
 	return vec3(value, deriv.x, deriv.y);
 }
 
-static vec4 fbmNoise(vec3 x)
+static vec4 valueNoise(vec3 x)
 {
 	vec3 p = floor(x);
 	vec3 w = frac(x);
@@ -215,7 +215,7 @@ static vec3 fbm(vec2 x, uint32 numOctaves = 6, float lacunarity = 1.98f, float g
 
 	for (uint32 i = 0; i < numOctaves; ++i)
 	{
-		vec3 n = fbmNoise(x);
+		vec3 n = valueNoise(x);
 
 		assert(n.x <= 1.f);
 		assert(n.x >= -1.f);
@@ -241,7 +241,7 @@ static vec4 fbm(vec3 x, uint32 numOctaves = 6, float lacunarity = 1.98f, float g
 
 	for (uint32 i = 0; i < numOctaves; ++i)
 	{
-		vec4 n = fbmNoise(x);
+		vec4 n = valueNoise(x);
 
 		value += amplitude * n.x;		// Accumulate values.
 		deriv += amplitude * m * n.yzw; // Accumulate derivatives.
