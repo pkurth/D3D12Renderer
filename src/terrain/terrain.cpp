@@ -61,12 +61,13 @@ terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float
 
 						vec3 largeScaleValue = fbm(largeScaleFbmPosition, 3);
 						float largeScaleHeight = largeScaleValue.x;
-						height *= largeScaleHeight;
+
+						height = largeScaleHeight * 0.2f + height * 0.8f;
 
 						height = abs(height);
 
 						height = 1.f - height;
-						height *= height;
+						height = height * height;
 
 						minHeight = min(minHeight, height * amplitudeScale);
 						maxHeight = max(maxHeight, height * amplitudeScale);
@@ -103,18 +104,18 @@ terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float
 						float largeScaleHeight = largeScaleValue.x;
 						vec2 J_largeScaleHeight_largeScaleFbmPosition = largeScaleValue.yz;
 
-						float combinedHeight = height * largeScaleHeight;
-						vec2 J_combinedHeight_height = largeScaleHeight;
-						vec2 J_combinedHeight_largeScaleHeight = height;
+						float combinedHeight = largeScaleHeight * 0.2f + height * 0.8f;
+						vec2 J_combinedHeight_height = 0.8f;
+						vec2 J_combinedHeight_largeScaleHeight = 0.2f;
 
-						//float absHeight = (combinedHeight < 0.f) ? -combinedHeight : combinedHeight;
+						float absHeight = (combinedHeight < 0.f) ? -combinedHeight : combinedHeight;
 						float J_absHeight_combinedHeight = (combinedHeight < 0.f) ? -1.f : 1.f;
 
-						//float oneMinusHeight = 1.f - absHeight;
+						float oneMinusHeight = 1.f - absHeight;
 						float J_oneMinusHeight_absHeight = -1.f;
 
-						//float powHeight = oneMinusHeight * oneMinusHeight;
-						float J_powHeight_oneMinusHeight = 2.f;
+						float powHeight = oneMinusHeight * oneMinusHeight;
+						float J_powHeight_oneMinusHeight = 2.f * oneMinusHeight;
 
 						float J_shaderHeight_powHeight = amplitudeScale; // For the heights, this is done in the shader.
 
