@@ -15,9 +15,10 @@ static dx_pipeline terrainPipeline;
 static ref<dx_index_buffer> terrainIndexBuffers[TERRAIN_MAX_LOD + 1];
 
 
-
 struct height_generator
 {
+	fbm_noise_2D noiseFunc = valueNoise;
+
 	virtual float height(vec2 position) const = 0;
 	virtual vec2 grad(vec2 position) const = 0;
 };
@@ -30,10 +31,10 @@ struct height_generator_warped : height_generator
 	{
 		vec2 fbmPosition = position * 0.01f;
 
-		vec3 domainWarpValue = fbm(fbmPosition, 3);
+		vec3 domainWarpValue = fbm(noiseFunc, fbmPosition, 3);
 
 		vec2 warpedFbmPosition = fbmPosition + vec2(domainWarpValue.x * domainWarpStrength) + vec2(1000.f);
-		vec3 value = fbm(warpedFbmPosition);
+		vec3 value = fbm(noiseFunc, warpedFbmPosition);
 		float height = value.x;
 
 		height = height * 0.5f + 0.5f;
@@ -46,7 +47,7 @@ struct height_generator_warped : height_generator
 		vec2 fbmPosition = position * 0.01f;
 		float J_fbmPosition_position = 0.01f;
 
-		vec3 domainWarpValue = fbm(fbmPosition, 3);
+		vec3 domainWarpValue = fbm(noiseFunc, fbmPosition, 3);
 		float domainWarpHeight = domainWarpValue.x;
 		vec2 J_domainWarpHeight_fbmPosition = domainWarpValue.yz;
 
@@ -54,7 +55,7 @@ struct height_generator_warped : height_generator
 		float J_warpedFbmPosition_fbmPosition = 1.f;
 		float J_warpedFbmPosition_domainWarpHeight = domainWarpStrength;
 
-		vec3 value = fbm(warpedFbmPosition);
+		vec3 value = fbm(noiseFunc, warpedFbmPosition);
 		float height = value.x;
 		vec2 J_height_warpedFbmPosition = value.yz;
 
@@ -79,10 +80,10 @@ struct height_generator_layered : height_generator
 
 		vec2 largeScaleFbmPosition = position * 0.0001f;
 
-		vec3 value = fbm(fbmPosition);
+		vec3 value = fbm(noiseFunc, fbmPosition);
 		float height = value.x;
 
-		vec3 largeScaleValue = fbm(largeScaleFbmPosition, 3);
+		vec3 largeScaleValue = fbm(noiseFunc, largeScaleFbmPosition, 3);
 		float largeScaleHeight = largeScaleValue.x;
 
 		height = largeScaleHeight * largeScaleWeight + height * smallScaleWeight;
@@ -103,11 +104,11 @@ struct height_generator_layered : height_generator
 		vec2 largeScaleFbmPosition = position * 0.0001f;
 		float J_largeScaleFbmPosition_position = 0.0001f;
 
-		vec3 value = fbm(fbmPosition);
+		vec3 value = fbm(noiseFunc, fbmPosition);
 		float height = value.x;
 		vec2 J_height_fbmPosition = value.yz;
 
-		vec3 largeScaleValue = fbm(largeScaleFbmPosition, 3);
+		vec3 largeScaleValue = fbm(noiseFunc, largeScaleFbmPosition, 3);
 		float largeScaleHeight = largeScaleValue.x;
 		vec2 J_largeScaleHeight_largeScaleFbmPosition = largeScaleValue.yz;
 

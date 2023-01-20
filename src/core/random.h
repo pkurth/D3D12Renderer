@@ -119,8 +119,8 @@ static uint32 hash(uint32 x, uint32 y, uint32 z) { return hash(x ^ hash(y) ^ has
 static uint32 hash(uint32 x, uint32 y, uint32 z, uint32 w) { return hash(x ^ hash(y) ^ hash(z) ^ hash(w)); }
 
 
-#define asfloat(u) (*(float*)&u)
-#define asuint(f) (*(uint32*)&f)
+inline float asfloat(uint32 u) { return *(float*)&u; }
+inline uint32 asuint(float f) { return *(uint32*)&f; }
 
 // Construct a float with half-open range [0:1] using low 23 bits.
 // All zeroes yields 0.0, all ones yields the next smallest representable value below 1.0.
@@ -137,10 +137,13 @@ static float floatConstruct(uint32 m)
 }
 
 // Pseudo-random value in half-open range [0:1].
-static float random(float  x) { return floatConstruct(hash(asuint(x))); }
-static float random(vec2 v) { return floatConstruct(hash(asuint(v.x), asuint(v.y))); }
-static float random(vec3 v) { return floatConstruct(hash(asuint(v.x), asuint(v.y), asuint(v.z))); }
-static float random(vec4 v) { return floatConstruct(hash(asuint(v.x), asuint(v.y), asuint(v.z), asuint(v.w))); }
+static float random1(float x) { return floatConstruct(hash(asuint(x))); }
+static float random1(vec2 v)  { return floatConstruct(hash(asuint(v.x), asuint(v.y))); }
+static float random1(vec3 v)  { return floatConstruct(hash(asuint(v.x), asuint(v.y), asuint(v.z))); }
+static float random1(vec4 v)  { return floatConstruct(hash(asuint(v.x), asuint(v.y), asuint(v.z), asuint(v.w))); }
+
+static vec2 random2(vec2 v) { return vec2(floatConstruct(hash(asuint(v.x * 15123.6989f))), floatConstruct(hash(asuint(v.y * 6192.234f)))); }
+static vec3 random3(vec3 v) { return vec3(floatConstruct(hash(asuint(v.x * 15123.6989f))), floatConstruct(hash(asuint(v.y * 6192.234f))), floatConstruct(hash(asuint(v.z * 31923.123f)))); }
 
 static vec3 valueNoise(vec2 x)
 {
@@ -150,10 +153,10 @@ static vec3 valueNoise(vec2 x)
 	vec2 u = w * w * w * (w * (w * 6.f - 15.f) + 10.f);
 	vec2 du = 30.f * w * w * (w * (w - 2.f) + 1.f);
 
-	float a = random(p);
-	float b = random(p + vec2(1, 0));
-	float c = random(p + vec2(0, 1));
-	float d = random(p + vec2(1, 1));
+	float a = random1(p);
+	float b = random1(p + vec2(1, 0));
+	float c = random1(p + vec2(0, 1));
+	float d = random1(p + vec2(1, 1));
 
 	float k0 = a;
 	float k1 = b - a;
@@ -177,14 +180,14 @@ static vec4 valueNoise(vec3 x)
 	vec3 u = w * w * w * (w * (w * 6.f - 15.f) + 10.f);
 	vec3 du = 30.f * w * w * (w * (w - 2.f) + 1.f);
 
-	float a = random(p + vec3(0, 0, 0));
-	float b = random(p + vec3(1, 0, 0));
-	float c = random(p + vec3(0, 1, 0));
-	float d = random(p + vec3(1, 1, 0));
-	float e = random(p + vec3(0, 0, 1));
-	float f = random(p + vec3(1, 0, 1));
-	float g = random(p + vec3(0, 1, 1));
-	float h = random(p + vec3(1, 1, 1));
+	float a = random1(p + vec3(0, 0, 0));
+	float b = random1(p + vec3(1, 0, 0));
+	float c = random1(p + vec3(0, 1, 0));
+	float d = random1(p + vec3(1, 1, 0));
+	float e = random1(p + vec3(0, 0, 1));
+	float f = random1(p + vec3(1, 0, 1));
+	float g = random1(p + vec3(0, 1, 1));
+	float h = random1(p + vec3(1, 1, 1));
 
 	float k0 = a;
 	float k1 = b - a;
@@ -205,7 +208,109 @@ static vec4 valueNoise(vec3 x)
 	return vec4(value, deriv.x, deriv.y, deriv.z);
 }
 
-static vec3 fbm(vec2 x, uint32 numOctaves = 6, float lacunarity = 1.98f, float gain = 0.49f)
+static vec3 gradientNoise(vec2 x)
+{
+	vec2 p = floor(x);
+	vec2 w = frac(x);
+
+	vec2 u = w * w * w * (w * (w * 6.f - 15.f) + 10.f);
+	vec2 du = 30.f * w * w * (w * (w - 2.f) + 1.f);
+
+	// Gradients
+	vec2 ga = random2(p);
+	vec2 gb = random2(p + vec2(1, 0));
+	vec2 gc = random2(p + vec2(0, 1));
+	vec2 gd = random2(p + vec2(1, 1));
+
+	// Projections
+	float va = dot(ga, w);
+	float vb = dot(gb, w - vec2(1, 0));
+	float vc = dot(gc, w - vec2(0, 1));
+	float vd = dot(gd, w - vec2(1, 1));
+
+	// Interpolation
+	float v = va +
+		u.x * (vb - va) +
+		u.y * (vc - va) +
+		u.x * u.y * (va - vb - vc + vd);
+
+	float k = (va - vb - vc + vd);
+
+	vec2 d = ga +
+		u.x * (gb - ga) +
+		u.y * (gc - ga) +
+		u.x * u.y * (ga - gb - gc + gd) +
+
+		du * vec2(
+			vb - va + u.y * k,
+			vc - va + u.x * k
+		);
+
+	return vec3(v, d.x, d.y);
+}
+
+static vec4 gradientNoise(vec3 x)
+{
+	vec3 p = floor(x);
+	vec3 w = frac(x);
+
+	vec3 u = w * w * w * (w * (w * 6.f - 15.f) + 10.f);
+	vec3 du = 30.f * w * w * (w * (w - 2.f) + 1.f);
+
+	// Gradients
+	vec3 ga = random3(p + vec3(0, 0, 0));
+	vec3 gb = random3(p + vec3(1, 0, 0));
+	vec3 gc = random3(p + vec3(0, 1, 0));
+	vec3 gd = random3(p + vec3(1, 1, 0));
+	vec3 ge = random3(p + vec3(0, 0, 1));
+	vec3 gf = random3(p + vec3(1, 0, 1));
+	vec3 gg = random3(p + vec3(0, 1, 1));
+	vec3 gh = random3(p + vec3(1, 1, 1));
+
+	// Projections
+	float va = dot(ga, w - vec3(0, 0, 0));
+	float vb = dot(gb, w - vec3(1, 0, 0));
+	float vc = dot(gc, w - vec3(0, 1, 0));
+	float vd = dot(gd, w - vec3(1, 1, 0));
+	float ve = dot(ge, w - vec3(0, 0, 1));
+	float vf = dot(gf, w - vec3(1, 0, 1));
+	float vg = dot(gg, w - vec3(0, 1, 1));
+	float vh = dot(gh, w - vec3(1, 1, 1));
+
+	// Interpolation
+	float v = va +
+		u.x * (vb - va) +
+		u.y * (vc - va) +
+		u.z * (ve - va) +
+		u.x * u.y * (va - vb - vc + vd) +
+		u.y * u.z * (va - vc - ve + vg) +
+		u.z * u.x * (va - vb - ve + vf) +
+		u.x * u.y * u.z * (-va + vb + vc - vd + ve - vf - vg + vh);
+
+	vec3 yzx(u.y, u.z, u.x);
+	vec3 zxy(u.z, u.x, u.y);
+
+	vec3 d = ga +
+		u.x * (gb - ga) +
+		u.y * (gc - ga) +
+		u.z * (ge - ga) +
+		u.x * u.y * (ga - gb - gc + gd) +
+		u.y * u.z * (ga - gc - ge + gg) +
+		u.z * u.x * (ga - gb - ge + gf) +
+		u.x * u.y * u.z * (-ga + gb + gc - gd + ge - gf - gg + gh) +
+
+		du * (vec3(vb - va, vc - va, ve - va) +
+			yzx * vec3(va - vb - vc + vd, va - vc - ve + vg, va - vb - ve + vf) +
+			zxy * vec3(va - vb - ve + vf, va - vb - vc + vd, va - vc - ve + vg) +
+			yzx * zxy * (-va + vb + vc - vd + ve - vf - vg + vh));
+
+	return vec4(v, d.x, d.y, d.z);
+}
+
+typedef vec3(*fbm_noise_2D)(vec2);
+typedef vec4(*fbm_noise_3D)(vec3);
+
+static vec3 fbm(fbm_noise_2D noiseFunc, vec2 x, uint32 numOctaves = 6, float lacunarity = 1.98f, float gain = 0.49f)
 {
 	float value = 0.f;
 	float amplitude = 0.5f;
@@ -215,7 +320,7 @@ static vec3 fbm(vec2 x, uint32 numOctaves = 6, float lacunarity = 1.98f, float g
 
 	for (uint32 i = 0; i < numOctaves; ++i)
 	{
-		vec3 n = valueNoise(x);
+		vec3 n = noiseFunc(x);
 
 		assert(n.x <= 1.f);
 		assert(n.x >= -1.f);
@@ -231,7 +336,7 @@ static vec3 fbm(vec2 x, uint32 numOctaves = 6, float lacunarity = 1.98f, float g
 	return vec3(value, deriv.x, deriv.y);
 }
 
-static vec4 fbm(vec3 x, uint32 numOctaves = 6, float lacunarity = 1.98f, float gain = 0.49f)
+static vec4 fbm(fbm_noise_3D noiseFunc, vec3 x, uint32 numOctaves = 6, float lacunarity = 1.98f, float gain = 0.49f)
 {
 	float value = 0.f;
 	float amplitude = 0.5;
@@ -241,7 +346,7 @@ static vec4 fbm(vec3 x, uint32 numOctaves = 6, float lacunarity = 1.98f, float g
 
 	for (uint32 i = 0; i < numOctaves; ++i)
 	{
-		vec4 n = valueNoise(x);
+		vec4 n = noiseFunc(x);
 
 		value += amplitude * n.x;		// Accumulate values.
 		deriv += amplitude * m * n.yzw; // Accumulate derivatives.
