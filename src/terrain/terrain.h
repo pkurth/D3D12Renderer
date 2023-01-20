@@ -20,7 +20,7 @@ struct terrain_chunk
 
 struct terrain_component
 {
-	terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale);
+	terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale, ref<pbr_material> groundMaterial, ref<pbr_material> rockMaterial);
 	terrain_component(const terrain_component&) = default;
 	terrain_component(terrain_component&&) = default;
 	terrain_component& operator=(const terrain_component&) = default;
@@ -38,6 +38,9 @@ struct terrain_component
 
 private:
 	std::vector<terrain_chunk> chunks;
+
+	ref<pbr_material> groundMaterial; 
+	ref<pbr_material> rockMaterial;
 };
 
 
@@ -55,6 +58,9 @@ struct terrain_render_data
 
 	ref<dx_texture> heightmap;
 	ref<dx_texture> normalmap;
+
+	ref<pbr_material> groundMaterial;
+	ref<pbr_material> rockMaterial;
 };
 
 struct terrain_pipeline

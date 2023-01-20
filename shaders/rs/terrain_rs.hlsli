@@ -32,6 +32,10 @@ struct terrain_transform_cb
 	"RootConstants(num32BitConstants=7, b1, visibility=SHADER_VISIBILITY_VERTEX)," \
 	"DescriptorTable(SRV(t0, numDescriptors=1), visibility=SHADER_VISIBILITY_VERTEX)," \
 	"DescriptorTable(SRV(t1, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL)," \
+	"CBV(b1, space=1), " \
+	"CBV(b2, space=1), " \
+	"DescriptorTable(SRV(t0, space=1, numDescriptors=4), visibility=SHADER_VISIBILITY_PIXEL)," \
+    "DescriptorTable(SRV(t0, space=2, numDescriptors=3), visibility=SHADER_VISIBILITY_PIXEL), " \
 	"StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \
         "addressV = TEXTURE_ADDRESS_CLAMP," \
@@ -39,17 +43,21 @@ struct terrain_transform_cb
         "filter = FILTER_MIN_MAG_MIP_LINEAR," \
         "visibility=SHADER_VISIBILITY_PIXEL), " \
 	"StaticSampler(s1," \
-        "addressU = TEXTURE_ADDRESS_CLAMP," \
-        "addressV = TEXTURE_ADDRESS_CLAMP," \
-        "addressW = TEXTURE_ADDRESS_CLAMP," \
-        "filter = FILTER_MIN_MAG_MIP_POINT," \
+        "addressU = TEXTURE_ADDRESS_WRAP," \
+        "addressV = TEXTURE_ADDRESS_WRAP," \
+        "addressW = TEXTURE_ADDRESS_WRAP," \
+        "filter = FILTER_ANISOTROPIC," \
         "visibility=SHADER_VISIBILITY_PIXEL)"
 
 
-#define TERRAIN_RS_TRANSFORM	0
-#define TERRAIN_RS_CB			1
-#define TERRAIN_RS_HEIGHTMAP	2
-#define TERRAIN_RS_NORMALMAP	3
+#define TERRAIN_RS_TRANSFORM		0
+#define TERRAIN_RS_CB				1
+#define TERRAIN_RS_HEIGHTMAP		2
+#define TERRAIN_RS_NORMALMAP		3
+#define TERRAIN_RS_CAMERA			4
+#define TERRAIN_RS_LIGHTING			5
+#define TERRAIN_RS_TEXTURES			6
+#define TERRAIN_RS_FRAME_CONSTANTS  7
 
 #endif
 

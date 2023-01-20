@@ -89,9 +89,12 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 #if 0
 	uint32 numTerrainChunks = 10;
 
+	auto terrainGroundMaterial = createPBRMaterial("assets/terrain/ground/Ground003_2K_Color.jpg", {}, "assets/terrain/ground/Ground003_2K_Roughness.jpg", {});
+	auto terrainRockMaterial = createPBRMaterial("assets/terrain/rock/Rock045_2K_Color.jpg", {},	"assets/terrain/rock/Rock045_2K_Roughness.jpg", {});
+
 	auto terrain = scene.createEntity("Terrain")
 		.addComponent<position_component>(vec3(0.f, 0.f, 0.f))
-		.addComponent<terrain_component>(numTerrainChunks, 64.f, 50.f);
+		.addComponent<terrain_component>(numTerrainChunks, 64.f, 50.f, terrainGroundMaterial, terrainRockMaterial);
 
 	terrain_component& terrainComponent = terrain.getComponent<terrain_component>();
 

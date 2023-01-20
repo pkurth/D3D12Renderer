@@ -5,6 +5,7 @@
 
 #include "rendering/render_utils.h"
 #include "rendering/render_pass.h"
+#include "rendering/render_resources.h"
 
 #include "core/random.h"
 
@@ -55,7 +56,7 @@ struct height_generator_warped : height_generator
 		float J_warpedFbmPosition_fbmPosition = 1.f;
 		float J_warpedFbmPosition_domainWarpHeight = domainWarpStrength;
 
-		vec3 value = fbm(noiseFunc, warpedFbmPosition);
+		vec3 value = fbm(noiseFunc, warpedFbmPosition, 15);
 		float height = value.x;
 		vec2 J_height_warpedFbmPosition = value.yz;
 
@@ -141,15 +142,17 @@ struct height_generator_layered : height_generator
 
 
 
-terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale)
+terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale, ref<pbr_material> groundMaterial, ref<pbr_material> rockMaterial)
 {
 	this->chunksPerDim = chunksPerDim;
 	this->chunkSize = chunkSize;
 	this->amplitudeScale = amplitudeScale;
 	this->chunks.resize(chunksPerDim * chunksPerDim);
 
+	this->groundMaterial = groundMaterial;
+	this->rockMaterial = rockMaterial;
 
-	const uint32 normalMapDimension = 512;
+	const uint32 normalMapDimension = 2048;
 
 
 	uint32 numSegmentsPerDim = TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1;
@@ -284,7 +287,9 @@ void terrain_component::render(const render_camera& camera, opaque_render_pass* 
 						lods[(z - 1) * lodStride + (x)],
 						lods[(z + 1) * lodStride + (x)],
 						c.heightmap,
-						c.normalmap };
+						c.normalmap,
+						groundMaterial, rockMaterial 
+					};
 					renderPass->renderStaticObject<terrain_pipeline>(mat4::identity, {}, {}, {}, data, -1, false, false);
 				}
 			}
@@ -335,6 +340,13 @@ PIPELINE_SETUP_IMPL(terrain_pipeline)
 	cl->setGraphicsRootSignature(*terrainPipeline.rootSignature);
 
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	cl->setGraphicsDynamicConstantBuffer(TERRAIN_RS_CAMERA, common.cameraCBV);
+	cl->setGraphicsDynamicConstantBuffer(TERRAIN_RS_LIGHTING, common.lightingCBV);
+
+	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 0, common.irradiance);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 1, common.prefilteredRadiance);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 2, render_resources::brdfTex);
 }
 
 PIPELINE_RENDER_IMPL(terrain_pipeline)
@@ -353,6 +365,10 @@ PIPELINE_RENDER_IMPL(terrain_pipeline)
 	cl->setGraphics32BitConstants(TERRAIN_RS_CB, terrain_cb{ rc.data.minCorner, (uint32)rc.data.lod, rc.data.chunkSize, rc.data.amplitudeScale, scaleDownByLODs });
 	cl->setDescriptorHeapSRV(TERRAIN_RS_HEIGHTMAP, 0, rc.data.heightmap);
 	cl->setDescriptorHeapSRV(TERRAIN_RS_NORMALMAP, 0, rc.data.normalmap);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 0, rc.data.groundMaterial->albedo);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 1, rc.data.groundMaterial->roughness);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 2, rc.data.rockMaterial->albedo);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 3, rc.data.rockMaterial->roughness);
 
 	cl->setIndexBuffer(terrainIndexBuffers[rc.data.lod]);
 	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);

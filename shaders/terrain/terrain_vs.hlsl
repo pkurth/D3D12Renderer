@@ -12,8 +12,9 @@ struct vs_input
 
 struct vs_output
 {
-	float2 uv		: TEXCOORDS;
-	float4 position : SV_Position;
+	float2 uv				: TEXCOORDS;
+	float3 worldPosition	: POSITION;
+	float4 position			: SV_Position;
 };
 
 static uint getMask(uint isBorder, uint scaleDownByLOD)
@@ -69,6 +70,7 @@ vs_output main(vs_input IN)
 
 	vs_output OUT;
 	OUT.uv = uv;
+	OUT.worldPosition = position;
 	OUT.position = mul(transform.vp, float4(position, 1.f));
 	return OUT;
 }
