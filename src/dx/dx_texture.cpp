@@ -145,6 +145,11 @@ static std::mutex mutex;
 
 ref<dx_texture> loadTextureFromFile(const fs::path& filename, uint32 flags)
 {
+	if (!fs::exists(filename))
+	{
+		return 0;
+	}
+
 	mutex.lock();
 
 	auto sp = textureCache[filename].lock();

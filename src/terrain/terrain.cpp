@@ -427,10 +427,13 @@ PIPELINE_RENDER_IMPL(terrain_pipeline)
 	cl->setGraphics32BitConstants(TERRAIN_RS_CB, terrain_cb{ rc.data.minCorner, (uint32)rc.data.lod, rc.data.chunkSize, rc.data.amplitudeScale, scaleDownByLODs });
 	cl->setDescriptorHeapSRV(TERRAIN_RS_HEIGHTMAP, 0, rc.data.heightmap);
 	cl->setDescriptorHeapSRV(TERRAIN_RS_NORMALMAP, 0, rc.data.normalmap);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 0, rc.data.groundMaterial->albedo);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 1, rc.data.groundMaterial->roughness);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 2, rc.data.rockMaterial->albedo);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 3, rc.data.rockMaterial->roughness);
+
+	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
+
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 0, rc.data.groundMaterial->albedo ? rc.data.groundMaterial->albedo->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 1, rc.data.groundMaterial->roughness ? rc.data.groundMaterial->roughness->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 2, rc.data.rockMaterial->albedo ? rc.data.rockMaterial->albedo->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 3, rc.data.rockMaterial->roughness ? rc.data.rockMaterial->roughness->defaultSRV : nullTexture);
 
 	cl->setIndexBuffer(terrainIndexBuffers[rc.data.lod]);
 	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);

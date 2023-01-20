@@ -110,9 +110,9 @@ ref<pbr_material> createPBRMaterial(
 		ref<pbr_material> material = make_ref<pbr_material>();
 
 		if (!albedoTex.empty()) material->albedo = loadTextureFromFile(albedoTex);
-		if (!normalTex.empty()) material->normal = loadTextureFromFile(normalTex, image_load_flags_default | image_load_flags_noncolor);
-		if (!roughTex.empty()) material->roughness = loadTextureFromFile(roughTex, image_load_flags_default | image_load_flags_noncolor);
-		if (!metallicTex.empty()) material->metallic = loadTextureFromFile(metallicTex, image_load_flags_default | image_load_flags_noncolor);
+		if (!normalTex.empty()) material->normal = loadTextureFromFile(normalTex, image_load_flags_default_noncolor);
+		if (!roughTex.empty()) material->roughness = loadTextureFromFile(roughTex, image_load_flags_default_noncolor);
+		if (!metallicTex.empty()) material->metallic = loadTextureFromFile(metallicTex, image_load_flags_default_noncolor);
 		material->emission = emission;
 		material->albedoTint = albedoTint;
 		material->roughnessOverride = roughOverride;
