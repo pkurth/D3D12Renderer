@@ -8,6 +8,7 @@
 #include "rendering/render_utils.h"
 #include "rendering/render_pass.h"
 #include "rendering/render_resources.h"
+#include "rendering/texture_preprocessing.h"
 
 #include "core/random.h"
 
@@ -250,7 +251,7 @@ void terrain_component::generateChunkGPU(uint32 cx, uint32 cz)
 
 	auto& c = chunk(cx, cz);
 	c.heightmap = createTexture(0, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R16_UNORM, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	c.normalmap = createTexture(0, normalMapDimension, normalMapDimension, DXGI_FORMAT_R32G32_FLOAT, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	c.normalmap = createTexture(0, normalMapDimension, normalMapDimension, DXGI_FORMAT_R32G32_FLOAT, true, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	terrain_generation_cb cb;
 	cb.heightWidth = TERRAIN_LOD_0_VERTICES_PER_DIMENSION;
@@ -278,6 +279,8 @@ void terrain_component::generateChunkGPU(uint32 cx, uint32 cz)
 	barrier_batcher(cl)
 		.transition(c.heightmap, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON)
 		.transition(c.normalmap, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
+
+	generateMipMapsOnGPU(cl, c.normalmap);
 
 	dxContext.executeCommandList(cl);
 
