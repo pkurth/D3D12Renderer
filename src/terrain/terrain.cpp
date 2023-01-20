@@ -14,6 +14,132 @@
 static dx_pipeline terrainPipeline;
 static ref<dx_index_buffer> terrainIndexBuffers[TERRAIN_MAX_LOD + 1];
 
+
+
+struct height_generator
+{
+	virtual float height(vec2 position) const = 0;
+	virtual vec2 grad(vec2 position) const = 0;
+};
+
+struct height_generator_warped : height_generator
+{
+	float domainWarpStrength = 1.2f;
+
+	virtual float height(vec2 position) const override
+	{
+		vec2 fbmPosition = position * 0.01f;
+
+		vec3 domainWarpValue = fbm(fbmPosition, 3);
+
+		vec2 warpedFbmPosition = fbmPosition + vec2(domainWarpValue.x * domainWarpStrength) + vec2(1000.f);
+		vec3 value = fbm(warpedFbmPosition);
+		float height = value.x;
+
+		height = height * 0.5f + 0.5f;
+
+		return height;
+	}
+
+	virtual vec2 grad(vec2 position) const override
+	{
+		vec2 fbmPosition = position * 0.01f;
+		float J_fbmPosition_position = 0.01f;
+
+		vec3 domainWarpValue = fbm(fbmPosition, 3);
+		float domainWarpHeight = domainWarpValue.x;
+		vec2 J_domainWarpHeight_fbmPosition = domainWarpValue.yz;
+
+		vec2 warpedFbmPosition = fbmPosition + vec2(domainWarpHeight * domainWarpStrength) + vec2(1000.f);
+		float J_warpedFbmPosition_fbmPosition = 1.f;
+		float J_warpedFbmPosition_domainWarpHeight = domainWarpStrength;
+
+		vec3 value = fbm(warpedFbmPosition);
+		float height = value.x;
+		vec2 J_height_warpedFbmPosition = value.yz;
+
+		float scaledHeight = height * 0.5f + 0.5f;
+		float J_scaledHeight_height = 0.5f;
+
+		vec2 grad = J_scaledHeight_height * J_height_warpedFbmPosition *
+			(J_warpedFbmPosition_fbmPosition + J_warpedFbmPosition_domainWarpHeight * J_domainWarpHeight_fbmPosition) * J_fbmPosition_position;
+
+		return grad;
+	}
+};
+
+struct height_generator_layered : height_generator
+{
+	float largeScaleWeight = 0.2f;
+	float smallScaleWeight = 0.8f;
+
+	virtual float height(vec2 position) const override
+	{
+		vec2 fbmPosition = position * 0.01f;
+
+		vec2 largeScaleFbmPosition = position * 0.0001f;
+
+		vec3 value = fbm(fbmPosition);
+		float height = value.x;
+
+		vec3 largeScaleValue = fbm(largeScaleFbmPosition, 3);
+		float largeScaleHeight = largeScaleValue.x;
+
+		height = largeScaleHeight * largeScaleWeight + height * smallScaleWeight;
+
+		height = abs(height);
+
+		height = 1.f - height;
+		height = height * height;
+
+		return height;
+	}
+
+	virtual vec2 grad(vec2 position) const override
+	{
+		vec2 fbmPosition = position * 0.01f;
+		float J_fbmPosition_position = 0.01f;
+
+		vec2 largeScaleFbmPosition = position * 0.0001f;
+		float J_largeScaleFbmPosition_position = 0.0001f;
+
+		vec3 value = fbm(fbmPosition);
+		float height = value.x;
+		vec2 J_height_fbmPosition = value.yz;
+
+		vec3 largeScaleValue = fbm(largeScaleFbmPosition, 3);
+		float largeScaleHeight = largeScaleValue.x;
+		vec2 J_largeScaleHeight_largeScaleFbmPosition = largeScaleValue.yz;
+
+		float combinedHeight = largeScaleHeight * largeScaleWeight + height * smallScaleWeight;
+		vec2 J_combinedHeight_height = smallScaleWeight;
+		vec2 J_combinedHeight_largeScaleHeight = largeScaleWeight;
+
+		float absHeight = (combinedHeight < 0.f) ? -combinedHeight : combinedHeight;
+		float J_absHeight_combinedHeight = (combinedHeight < 0.f) ? -1.f : 1.f;
+
+		float oneMinusHeight = 1.f - absHeight;
+		float J_oneMinusHeight_absHeight = -1.f;
+
+		float powHeight = oneMinusHeight * oneMinusHeight;
+		float J_powHeight_oneMinusHeight = 2.f * oneMinusHeight;
+
+		vec2 J_combinedHeight_position =
+			J_combinedHeight_height * J_height_fbmPosition * J_fbmPosition_position
+			+ J_combinedHeight_largeScaleHeight * J_largeScaleHeight_largeScaleFbmPosition * J_largeScaleFbmPosition_position;
+
+		vec2 grad =
+			J_powHeight_oneMinusHeight
+			* J_oneMinusHeight_absHeight
+			* J_absHeight_combinedHeight
+			* J_combinedHeight_position;
+
+		return grad;
+	}
+};
+
+
+
 terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale)
 {
 	this->chunksPerDim = chunksPerDim;
@@ -29,13 +155,15 @@ terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float
 	float positionScale = chunkSize / (float)numSegmentsPerDim;
 	float normalScale = chunkSize / (float)(normalMapDimension - 1);
 
+	height_generator_warped generator;
+
 	thread_job_context context;
 
 	for (int32 cz = 0; cz < (int32)chunksPerDim; ++cz)
 	{
 		for (int32 cx = 0; cx < (int32)chunksPerDim; ++cx)
 		{
-			context.addWork([this, cx, cz, chunkSize, positionScale, normalScale, normalMapDimension, amplitudeScale]()
+			context.addWork([this, cx, cz, chunkSize, positionScale, normalScale, normalMapDimension, amplitudeScale, generator]()
 			{
 				vec2 minCorner = vec2(cx * chunkSize, cz * chunkSize);
 
@@ -52,22 +180,8 @@ terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float
 					for (uint32 x = 0; x < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++x)
 					{
 						vec2 position = vec2(x * positionScale, z * positionScale) + minCorner;
-						vec2 fbmPosition = position * 0.01f;
 
-						vec2 largeScaleFbmPosition = position * 0.0001f;
-
-						vec3 value = fbm(fbmPosition);
-						float height = value.x;
-
-						vec3 largeScaleValue = fbm(largeScaleFbmPosition, 3);
-						float largeScaleHeight = largeScaleValue.x;
-
-						height = largeScaleHeight * 0.2f + height * 0.8f;
-
-						height = abs(height);
-
-						height = 1.f - height;
-						height = height * height;
+						float height = generator.height(position);
 
 						minHeight = min(minHeight, height * amplitudeScale);
 						maxHeight = max(maxHeight, height * amplitudeScale);
@@ -90,46 +204,10 @@ terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float
 					{
 						vec2 position = vec2(x * normalScale, z * normalScale) + minCorner;
 
-						vec2 fbmPosition = position * 0.01f;
-						float J_fbmPosition_position = 0.01f;
+						vec2 grad = generator.grad(position);
 
-						vec2 largeScaleFbmPosition = position * 0.0001f;
-						float J_largeScaleFbmPosition_position = 0.0001f;
-
-						vec3 value = fbm(fbmPosition);
-						float height = value.x;
-						vec2 J_height_fbmPosition = value.yz;
-
-						vec3 largeScaleValue = fbm(largeScaleFbmPosition, 3);
-						float largeScaleHeight = largeScaleValue.x;
-						vec2 J_largeScaleHeight_largeScaleFbmPosition = largeScaleValue.yz;
-
-						float combinedHeight = largeScaleHeight * 0.2f + height * 0.8f;
-						vec2 J_combinedHeight_height = 0.8f;
-						vec2 J_combinedHeight_largeScaleHeight = 0.2f;
-
-						float absHeight = (combinedHeight < 0.f) ? -combinedHeight : combinedHeight;
-						float J_absHeight_combinedHeight = (combinedHeight < 0.f) ? -1.f : 1.f;
-
-						float oneMinusHeight = 1.f - absHeight;
-						float J_oneMinusHeight_absHeight = -1.f;
-
-						float powHeight = oneMinusHeight * oneMinusHeight;
-						float J_powHeight_oneMinusHeight = 2.f * oneMinusHeight;
-
-						float J_shaderHeight_powHeight = amplitudeScale; // For the heights, this is done in the shader.
-
-
-						vec2 J_combinedHeight_position = 
-							J_combinedHeight_height * J_height_fbmPosition * J_fbmPosition_position
-							+ J_combinedHeight_largeScaleHeight * J_largeScaleHeight_largeScaleFbmPosition * J_largeScaleFbmPosition_position;
-
-						vec2 grad = 
-							J_shaderHeight_powHeight 
-							* J_powHeight_oneMinusHeight 
-							* J_oneMinusHeight_absHeight 
-							* J_absHeight_combinedHeight 
-							* J_combinedHeight_position;
+						float J_shaderHeight_absHeight = amplitudeScale; // For the heights, this is done in the shader.
+						grad *= J_shaderHeight_absHeight;
 
 						normals[z * normalMapDimension + x] = -grad;
 					}
