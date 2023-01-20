@@ -10,6 +10,7 @@ struct terrain_cb
 	vec3 minCorner;
 	uint32 lod;
 	float chunkSize;
+	float amplitudeScale;
 	uint32 scaleDownByLODs; // 4 * 8 bit.
 };
 
@@ -28,7 +29,7 @@ struct terrain_transform_cb
 	"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
 	"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
 	"RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX)," \
-	"RootConstants(num32BitConstants=6, b1, visibility=SHADER_VISIBILITY_VERTEX)," \
+	"RootConstants(num32BitConstants=7, b1, visibility=SHADER_VISIBILITY_VERTEX)," \
 	"DescriptorTable(SRV(t0, numDescriptors=1), visibility=SHADER_VISIBILITY_VERTEX)," \
 	"DescriptorTable(SRV(t1, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL)," \
 	"StaticSampler(s0," \

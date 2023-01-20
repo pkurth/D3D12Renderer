@@ -39,7 +39,7 @@ terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float
 			{
 				vec2 minCorner = vec2(cx * chunkSize, cz * chunkSize);
 
-				float* heights = new float[TERRAIN_LOD_0_VERTICES_PER_DIMENSION * TERRAIN_LOD_0_VERTICES_PER_DIMENSION];
+				uint16* heights = new uint16[TERRAIN_LOD_0_VERTICES_PER_DIMENSION * TERRAIN_LOD_0_VERTICES_PER_DIMENSION];
 				vec2* normals = new vec2[normalMapDimension * normalMapDimension];
 
 				auto& c = chunk(cx, cz);
@@ -52,25 +52,28 @@ terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float
 					for (uint32 x = 0; x < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++x)
 					{
 						vec2 position = vec2(x * positionScale, z * positionScale) + minCorner;
+						position *= 0.01f;
 
-						vec3 value = fbm(position * 0.01f).x;
+						vec3 value = fbm(position);
 						float height = value.x;
+
 						height = abs(height);
 
-						height *= amplitudeScale;
+						height = 1.f - height;
 
-						height = amplitudeScale - height;
+						minHeight = min(minHeight, height * amplitudeScale);
+						maxHeight = max(maxHeight, height * amplitudeScale);
 
-						minHeight = min(minHeight, height);
-						maxHeight = max(maxHeight, height);
+						assert(height >= 0.f);
+						assert(height <= 1.f);
 
-						heights[z * TERRAIN_LOD_0_VERTICES_PER_DIMENSION + x] = height;
+						heights[z * TERRAIN_LOD_0_VERTICES_PER_DIMENSION + x] = (uint16)(height * UINT16_MAX);
 					}
 				}
 
 				c.minHeight = minHeight;
 				c.maxHeight = maxHeight;
-				c.heightmap = createTexture(heights, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R32_FLOAT);
+				c.heightmap = createTexture(heights, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R16_UNORM);
 
 
 				for (uint32 z = 0; z < normalMapDimension; ++z)
@@ -78,21 +81,22 @@ terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float
 					for (uint32 x = 0; x < normalMapDimension; ++x)
 					{
 						vec2 position = vec2(x * normalScale, z * normalScale) + minCorner;
+						position *= 0.01f;
 
-						vec3 value = fbm(position * 0.01f);
+						vec3 value = fbm(position);
 						float& height = value.x;
 						vec2& grad = value.yz;
 
-						grad *= 0.01f;
+						grad *= 0.01f; // Chain rule.
 
 						if (height < 0.f)
 						{
 							value = -value;
 						}
 
-						grad *= amplitudeScale;
-
 						grad = -grad;
+
+						grad *= amplitudeScale; // For the heights, this is done in the shader.
 
 						normals[z * normalMapDimension + x] = -grad;
 					}
@@ -162,6 +166,7 @@ void terrain_component::render(const render_camera& camera, opaque_render_pass* 
 						minCorner, 
 						lod, 
 						chunkSize, 
+						amplitudeScale,
 						lods[(z) * lodStride + (x - 1)],
 						lods[(z) * lodStride + (x + 1)],
 						lods[(z - 1) * lodStride + (x)],
@@ -233,7 +238,7 @@ PIPELINE_RENDER_IMPL(terrain_pipeline)
 	uint32 scaleDownByLODs = SCALE_DOWN_BY_LODS(lod_negX, lod_posX, lod_negZ, lod_posZ);
 
 	cl->setGraphics32BitConstants(TERRAIN_RS_TRANSFORM, viewProj);
-	cl->setGraphics32BitConstants(TERRAIN_RS_CB, terrain_cb{ rc.data.minCorner, (uint32)rc.data.lod, rc.data.chunkSize, scaleDownByLODs });
+	cl->setGraphics32BitConstants(TERRAIN_RS_CB, terrain_cb{ rc.data.minCorner, (uint32)rc.data.lod, rc.data.chunkSize, rc.data.amplitudeScale, scaleDownByLODs });
 	cl->setDescriptorHeapSRV(TERRAIN_RS_HEIGHTMAP, 0, rc.data.heightmap);
 	cl->setDescriptorHeapSRV(TERRAIN_RS_NORMALMAP, 0, rc.data.normalmap);
 

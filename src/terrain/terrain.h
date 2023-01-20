@@ -46,6 +46,7 @@ struct terrain_render_data
 	vec3 minCorner;
 	int32 lod;
 	float chunkSize;
+	float amplitudeScale;
 
 	int32 lod_negX;
 	int32 lod_posX;

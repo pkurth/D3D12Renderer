@@ -61,7 +61,7 @@ vs_output main(vs_input IN)
 
 	float norm = 1.f / (float)numSegmentsPerDim;
 
-	float height = heightmap[uint2(x << terrain.lod, z << terrain.lod)];
+	float height = heightmap[uint2(x << terrain.lod, z << terrain.lod)] * terrain.amplitudeScale;
 
 	float2 uv = float2(x * norm, z * norm);
 
