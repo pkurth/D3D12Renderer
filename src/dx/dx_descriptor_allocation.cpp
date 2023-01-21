@@ -182,6 +182,7 @@ dx_descriptor_range dx_frame_descriptor_allocator::allocateContiguousDescriptorR
 			freePage->base.gpuHandle = freePage->descriptorHeap->GetGPUDescriptorHandleForHeapStart();
 		}
 
+		freePages = freePage->next;
 		freePage->usedDescriptors = 0;
 		freePage->next = current;
 		usedPages[currentFrame] = freePage;
