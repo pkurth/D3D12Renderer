@@ -40,30 +40,46 @@ struct ps_output
 	float4 worldNormalRoughness	: SV_Target1;
 };
 
-struct triplanar_coefficients
+struct triplanar_mapping
 {
 	float2 uvX, uvY, uvZ;
-	float wX, wY, wZ;
+	float3 weights;
+
+
+	void initialize(float3 position, float3 normal, float3 textureScale, float sharpness)
+	{
+		uvX = position.zy * textureScale.x;
+		uvY = position.xz * textureScale.y;
+		uvZ = position.xy * textureScale.z;
+
+		weights = pow(abs(normal), sharpness);
+		weights /= dot(weights, 1.f);
+	}
+
+	float3 normalmap(float3 normal, float3 tnormalX, float3 tnormalY, float3 tnormalZ)
+	{
+		// Whiteout blend: https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a
+
+		tnormalX = float3(
+			tnormalX.xy + normal.zy,
+			abs(tnormalX.z) * normal.x
+			);
+		tnormalY = float3(
+			tnormalY.xy + normal.xz,
+			abs(tnormalY.z) * normal.y
+			);
+		tnormalZ = float3(
+			tnormalZ.xy + normal.xy,
+			abs(tnormalZ.z) * normal.z
+			);
+
+		return normalize(
+			tnormalX.zyx * weights.x +
+			tnormalY.xzy * weights.y +
+			tnormalZ.xyz * weights.z
+		);
+	}
 };
-
-static triplanar_coefficients triplanar(float3 position, float3 normal, float textureScale, float sharpness)
-{
-	triplanar_coefficients result;
-
-	float3 scaledPosition = position * textureScale;
-	result.uvX = scaledPosition.zy;
-	result.uvY = scaledPosition.xz;
-	result.uvZ = scaledPosition.xy;
-
-	float3 blendWeights = pow(abs(normal), sharpness);
-	blendWeights /= (blendWeights.x + blendWeights.y + blendWeights.z);
-
-	result.wX = blendWeights.x;
-	result.wY = blendWeights.y;
-	result.wZ = blendWeights.z;
-
-	return result;
-}
 
 [RootSignature(TERRAIN_RS)]
 ps_output main(ps_input IN)
@@ -71,46 +87,28 @@ ps_output main(ps_input IN)
 	float2 n = normals.Sample(clampSampler, IN.uv) * terrain.amplitudeScale;
 	float3 N = normalize(float3(n.x, 1.f, n.y));
 	
-	float texScale = 0.1f;
+	float groundTexScale = 0.1f;
+	float rockTexScale = 0.1f;
 
-	triplanar_coefficients tri = triplanar(IN.worldPosition, N, texScale, 15.f);
+	triplanar_mapping tri;
+	tri.initialize(IN.worldPosition, N, float3(rockTexScale, groundTexScale, rockTexScale), 15.f);
 	
 	float4 albedo =
-		rockAlbedoTexture.Sample(wrapSampler, tri.uvX) * tri.wX +
-		groundAlbedoTexture.Sample(wrapSampler, tri.uvY) * tri.wY +
-		rockAlbedoTexture.Sample(wrapSampler, tri.uvZ) * tri.wZ;
+		rockAlbedoTexture.Sample(wrapSampler, tri.uvX) * tri.weights.x +
+		groundAlbedoTexture.Sample(wrapSampler, tri.uvY) * tri.weights.y +
+		rockAlbedoTexture.Sample(wrapSampler, tri.uvZ) * tri.weights.z;
 
 	float roughness =
-		rockRoughnessTexture.Sample(wrapSampler, tri.uvX) * tri.wX +
-		groundRoughnessTexture.Sample(wrapSampler, tri.uvY) * tri.wY +
-		rockRoughnessTexture.Sample(wrapSampler, tri.uvZ) * tri.wZ;
+		rockRoughnessTexture.Sample(wrapSampler, tri.uvX) * tri.weights.x +
+		groundRoughnessTexture.Sample(wrapSampler, tri.uvY) * tri.weights.y +
+		rockRoughnessTexture.Sample(wrapSampler, tri.uvZ) * tri.weights.z;
 
 
 	float3 tnormalX = sampleNormalMap(rockNormalTexture, wrapSampler, tri.uvX);
 	float3 tnormalY = sampleNormalMap(groundNormalTexture, wrapSampler, tri.uvY);
 	float3 tnormalZ = sampleNormalMap(rockNormalTexture, wrapSampler, tri.uvZ);
 
-	tnormalX = float3(
-		tnormalX.xy + N.zy,
-		abs(tnormalX.z) * N.x
-		);
-	tnormalY = float3(
-		tnormalY.xy + N.xz,
-		abs(tnormalY.z) * N.y
-		);
-	tnormalZ = float3(
-		tnormalZ.xy + N.xy,
-		abs(tnormalZ.z) * N.z
-		);
-
-	float3 normalmapN = normalize(
-		tnormalX.zyx * tri.wX +
-		tnormalY.xzy * tri.wY +
-		tnormalZ.xyz * tri.wZ
-	);
-
-	N = normalmapN;
-
+	N = tri.normalmap(N, tnormalX, tnormalY, tnormalZ);
 
 
 	surface_info surface;
