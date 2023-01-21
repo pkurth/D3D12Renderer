@@ -9,6 +9,7 @@ Texture2D<float2> normals					: register(t1);
 SamplerState clampSampler					: register(s0);
 SamplerState wrapSampler					: register(s1);
 
+ConstantBuffer<terrain_cb> terrain			: register(b1);
 
 ConstantBuffer<camera_cb> camera			: register(b1, space1);
 ConstantBuffer<lighting_cb> lighting		: register(b2, space1);
@@ -65,7 +66,7 @@ static triplanar_coefficients triplanar(float3 position, float3 normal, float te
 [RootSignature(TERRAIN_RS)]
 ps_output main(ps_input IN)
 {
-	float2 n = normals.Sample(clampSampler, IN.uv);
+	float2 n = normals.Sample(clampSampler, IN.uv) * terrain.amplitudeScale;
 	float3 N = normalize(float3(n.x, 1.f, n.y));
 	
 	triplanar_coefficients tri = triplanar(IN.worldPosition, N, 0.5f, 15.f);

@@ -18,9 +18,22 @@ struct terrain_chunk
 	ref<dx_texture> normalmap;
 };
 
+struct terrain_generation_settings
+{
+	float scale = 0.01f;
+	
+	float domainWarpStrength = 1.2f;
+	vec2 domainWarpNoiseOffset = vec2(0.f, 0.f);
+	uint32 domainWarpOctaves = 3;
+	
+	vec2 noiseOffset = vec2(0.f, 0.f);
+	uint32 noiseOctaves = 15;
+};
+
 struct terrain_component
 {
-	terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale, ref<pbr_material> groundMaterial, ref<pbr_material> rockMaterial);
+	terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale, ref<pbr_material> groundMaterial, ref<pbr_material> rockMaterial, 
+		terrain_generation_settings genSettings = {});
 	terrain_component(const terrain_component&) = default;
 	terrain_component(terrain_component&&) = default;
 	terrain_component& operator=(const terrain_component&) = default;
@@ -33,17 +46,22 @@ struct terrain_component
 	float chunkSize;
 	float amplitudeScale;
 
+	terrain_generation_settings genSettings;
+
+	ref<pbr_material> groundMaterial;
+	ref<pbr_material> rockMaterial;
+
 
 	void render(const render_camera& camera, struct opaque_render_pass* renderPass, vec3 positionOffset);
 
+
 private:
-	void generateChunkCPU(uint32 x, uint32 z);
-	void generateChunkGPU(uint32 x, uint32 z);
+	void generateChunksCPU();
+	void generateChunksGPU();
+
+	terrain_generation_settings oldGenSettings;
 
 	std::vector<terrain_chunk> chunks;
-
-	ref<pbr_material> groundMaterial; 
-	ref<pbr_material> rockMaterial;
 };
 
 

@@ -282,6 +282,8 @@ void generateMipMapsOnGPU(dx_command_list* cl, ref<dx_texture>& texture)
 		cl->copyResource(aliasResource, resource);
 		cl->transitionBarrier(resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
 	}
+
+	cl->resetToDynamicDescriptorHeap();
 }
 
 ref<dx_texture> equirectangularToCubemap(dx_command_list* cl, const ref<dx_texture>& equirectangular, uint32 resolution, uint32 numMips, DXGI_FORMAT format)

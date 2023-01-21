@@ -29,7 +29,7 @@ struct terrain_transform_cb
 	"DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
 	"DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
 	"RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX)," \
-	"RootConstants(num32BitConstants=7, b1, visibility=SHADER_VISIBILITY_VERTEX)," \
+	"RootConstants(num32BitConstants=7, b1)," \
 	"DescriptorTable(SRV(t0, numDescriptors=1), visibility=SHADER_VISIBILITY_VERTEX)," \
 	"DescriptorTable(SRV(t1, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL)," \
 	"CBV(b1, space=1), " \
@@ -63,28 +63,41 @@ struct terrain_transform_cb
 
 
 
-
-
-
-struct terrain_generation_cb
+struct terrain_generation_settings_cb
 {
+	vec2 domainWarpNoiseOffset;
+	vec2 noiseOffset;
+
 	uint32 heightWidth;
 	uint32 heightHeight;
 	uint32 normalWidth;
 	uint32 normalHeight;
-	vec2 minCorner;
+
 	float positionScale;
 	float normalScale;
-	float amplitudeScale;
+
+	float scale;
+
 	float domainWarpStrength;
+
+	uint32 domainWarpOctaves;
+
+	uint32 noiseOctaves;
+};
+
+struct terrain_generation_cb
+{
+	vec2 minCorner;
 };
 
 #define TERRAIN_GENERATION_RS \
-	"RootConstants(num32BitConstants=10, b0), " \
+	"RootConstants(num32BitConstants=2, b0), " \
+	"CBV(b1), " \
 	"DescriptorTable(UAV(u0, numDescriptors=2))"
 
 #define TERRAIN_GENERATION_RS_CB		0
-#define TERRAIN_GENERATION_RS_TEXTURES	1
+#define TERRAIN_GENERATION_RS_SETTINGS	1
+#define TERRAIN_GENERATION_RS_TEXTURES	2
 
 
 

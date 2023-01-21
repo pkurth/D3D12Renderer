@@ -4,6 +4,7 @@
 #include "dx/dx_context.h"
 #include "dx/dx_command_list.h"
 #include "dx/dx_barrier_batcher.h"
+#include "dx/dx_profiling.h"
 
 #include "rendering/render_utils.h"
 #include "rendering/render_pass.h"
@@ -30,16 +31,16 @@ struct height_generator
 
 struct height_generator_warped : height_generator
 {
-	float domainWarpStrength = 1.2f;
+	terrain_generation_settings settings;
 
 	virtual float height(vec2 position) const override
 	{
-		vec2 fbmPosition = position * 0.01f;
+		vec2 fbmPosition = position * settings.scale;
 
-		vec3 domainWarpValue = fbm(noiseFunc, fbmPosition, 3);
+		vec3 domainWarpValue = fbm(noiseFunc, fbmPosition + settings.domainWarpNoiseOffset, settings.domainWarpOctaves);
 
-		vec2 warpedFbmPosition = fbmPosition + vec2(domainWarpValue.x * domainWarpStrength) + vec2(1000.f);
-		vec3 value = fbm(noiseFunc, warpedFbmPosition);
+		vec2 warpedFbmPosition = fbmPosition + vec2(domainWarpValue.x * settings.domainWarpStrength) + settings.noiseOffset + vec2(1000.f);
+		vec3 value = fbm(noiseFunc, warpedFbmPosition); // We are using a lower number of noise octaves here, since the heightmap is lowres anyway.
 		float height = value.x;
 
 		height = height * 0.5f + 0.5f;
@@ -49,18 +50,18 @@ struct height_generator_warped : height_generator
 
 	virtual vec2 grad(vec2 position) const override
 	{
-		vec2 fbmPosition = position * 0.01f;
-		float J_fbmPosition_position = 0.01f;
+		vec2 fbmPosition = position * settings.scale;
+		float J_fbmPosition_position = settings.scale;
 
-		vec3 domainWarpValue = fbm(noiseFunc, fbmPosition, 3);
+		vec3 domainWarpValue = fbm(noiseFunc, fbmPosition + settings.domainWarpNoiseOffset, settings.domainWarpOctaves);
 		float domainWarpHeight = domainWarpValue.x;
 		vec2 J_domainWarpHeight_fbmPosition = domainWarpValue.yz;
 
-		vec2 warpedFbmPosition = fbmPosition + vec2(domainWarpHeight * domainWarpStrength) + vec2(1000.f);
+		vec2 warpedFbmPosition = fbmPosition + vec2(domainWarpHeight * settings.domainWarpStrength) + settings.noiseOffset + vec2(1000.f);
 		float J_warpedFbmPosition_fbmPosition = 1.f;
-		float J_warpedFbmPosition_domainWarpHeight = domainWarpStrength;
+		float J_warpedFbmPosition_domainWarpHeight = settings.domainWarpStrength;
 
-		vec3 value = fbm(noiseFunc, warpedFbmPosition, 15);
+		vec3 value = fbm(noiseFunc, warpedFbmPosition, settings.noiseOctaves);
 		float height = value.x;
 		vec2 J_height_warpedFbmPosition = value.yz;
 
@@ -146,150 +147,195 @@ struct height_generator_layered : height_generator
 
 
 
-terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale, ref<pbr_material> groundMaterial, ref<pbr_material> rockMaterial)
+const uint32 normalMapDimension = 2048;
+
+
+terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale, ref<pbr_material> groundMaterial, ref<pbr_material> rockMaterial,
+	terrain_generation_settings genSettings)
+	: chunksPerDim(chunksPerDim), chunkSize(chunkSize), genSettings(genSettings), oldGenSettings(genSettings)
 {
-	this->chunksPerDim = chunksPerDim;
-	this->chunkSize = chunkSize;
 	this->amplitudeScale = amplitudeScale;
 	this->chunks.resize(chunksPerDim * chunksPerDim);
 
 	this->groundMaterial = groundMaterial;
 	this->rockMaterial = rockMaterial;
 
+	generateChunksGPU();
+}
 
+void terrain_component::generateChunksCPU()
+{
 	thread_job_context context;
+
+	height_generator_warped generator;
+	generator.settings = genSettings;
+
+	uint32 numSegmentsPerDim = TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1;
+	float positionScale = chunkSize / (float)numSegmentsPerDim;
+	float normalScale = chunkSize / (float)(normalMapDimension - 1);
 
 	for (int32 cz = 0; cz < (int32)chunksPerDim; ++cz)
 	{
 		for (int32 cx = 0; cx < (int32)chunksPerDim; ++cx)
 		{
-#if 1
-			generateChunkGPU(cx, cz);
-#else
-			context.addWork([this, cx, cz]()
+			context.addWork([this, cx, cz, generator, positionScale, normalScale]()
 			{
-				generateChunkCPU(cx, cz);
+				vec2 minCorner = vec2(cx * chunkSize, cz * chunkSize);
+
+				uint16* heights = new uint16[TERRAIN_LOD_0_VERTICES_PER_DIMENSION * TERRAIN_LOD_0_VERTICES_PER_DIMENSION];
+				vec2* normals = new vec2[normalMapDimension * normalMapDimension];
+
+				auto& c = chunk(cx, cz);
+
+				float minHeight = FLT_MAX;
+				float maxHeight = -FLT_MAX;
+
+				for (uint32 z = 0; z < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++z)
+				{
+					for (uint32 x = 0; x < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++x)
+					{
+						vec2 position = vec2(x * positionScale, z * positionScale) + minCorner;
+
+						float height = generator.height(position);
+
+						minHeight = min(minHeight, height * amplitudeScale);
+						maxHeight = max(maxHeight, height * amplitudeScale);
+
+						assert(height >= 0.f);
+						assert(height <= 1.f);
+
+						heights[z * TERRAIN_LOD_0_VERTICES_PER_DIMENSION + x] = (uint16)(height * UINT16_MAX);
+					}
+				}
+
+				c.minHeight = minHeight;
+				c.maxHeight = maxHeight;
+				c.heightmap = createTexture(heights, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R16_UNORM);
+
+
+				for (uint32 z = 0; z < normalMapDimension; ++z)
+				{
+					for (uint32 x = 0; x < normalMapDimension; ++x)
+					{
+						vec2 position = vec2(x * normalScale, z * normalScale) + minCorner;
+
+						vec2 grad = generator.grad(position);
+
+						normals[z * normalMapDimension + x] = -grad;
+					}
+				}
+
+				c.normalmap = createTexture(normals, normalMapDimension, normalMapDimension, DXGI_FORMAT_R32G32_FLOAT);
+
+				delete[] normals;
+				delete[] heights;
 			});
-#endif
 		}
 	}
 
 	context.waitForWorkCompletion();
 }
 
-const uint32 normalMapDimension = 2048;
-
-void terrain_component::generateChunkCPU(uint32 cx, uint32 cz)
-{
-	height_generator_warped generator;
-
-	uint32 numSegmentsPerDim = TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1;
-	float positionScale = chunkSize / (float)numSegmentsPerDim;
-	float normalScale = chunkSize / (float)(normalMapDimension - 1);
-
-	vec2 minCorner = vec2(cx * chunkSize, cz * chunkSize);
-
-	uint16* heights = new uint16[TERRAIN_LOD_0_VERTICES_PER_DIMENSION * TERRAIN_LOD_0_VERTICES_PER_DIMENSION];
-	vec2* normals = new vec2[normalMapDimension * normalMapDimension];
-
-	auto& c = chunk(cx, cz);
-
-	float minHeight = FLT_MAX;
-	float maxHeight = -FLT_MAX;
-
-	for (uint32 z = 0; z < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++z)
-	{
-		for (uint32 x = 0; x < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++x)
-		{
-			vec2 position = vec2(x * positionScale, z * positionScale) + minCorner;
-
-			float height = generator.height(position);
-
-			minHeight = min(minHeight, height * amplitudeScale);
-			maxHeight = max(maxHeight, height * amplitudeScale);
-
-			assert(height >= 0.f);
-			assert(height <= 1.f);
-
-			heights[z * TERRAIN_LOD_0_VERTICES_PER_DIMENSION + x] = (uint16)(height * UINT16_MAX);
-		}
-	}
-
-	c.minHeight = minHeight;
-	c.maxHeight = maxHeight;
-	c.heightmap = createTexture(heights, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R16_UNORM);
-
-
-	for (uint32 z = 0; z < normalMapDimension; ++z)
-	{
-		for (uint32 x = 0; x < normalMapDimension; ++x)
-		{
-			vec2 position = vec2(x * normalScale, z * normalScale) + minCorner;
-
-			vec2 grad = generator.grad(position);
-
-			float J_shaderHeight_absHeight = amplitudeScale; // For the heights, this is done in the shader.
-			grad *= J_shaderHeight_absHeight;
-
-			normals[z * normalMapDimension + x] = -grad;
-		}
-	}
-
-	c.normalmap = createTexture(normals, normalMapDimension, normalMapDimension, DXGI_FORMAT_R32G32_FLOAT);
-
-	delete[] normals;
-	delete[] heights;
-}
-
-void terrain_component::generateChunkGPU(uint32 cx, uint32 cz)
+void terrain_component::generateChunksGPU()
 {
 	uint32 numSegmentsPerDim = TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1;
 	float positionScale = chunkSize / (float)numSegmentsPerDim;
 	float normalScale = chunkSize / (float)(normalMapDimension - 1);
 
-	vec2 minCorner = vec2(cx * chunkSize, cz * chunkSize);
+	terrain_generation_settings_cb settings;
+	settings.heightWidth = TERRAIN_LOD_0_VERTICES_PER_DIMENSION;
+	settings.heightHeight = TERRAIN_LOD_0_VERTICES_PER_DIMENSION;
+	settings.normalWidth = normalMapDimension;
+	settings.normalHeight = normalMapDimension;
+	settings.positionScale = positionScale;
+	settings.normalScale = normalScale;
 
-	auto& c = chunk(cx, cz);
-	c.heightmap = createTexture(0, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R16_UNORM, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	c.normalmap = createTexture(0, normalMapDimension, normalMapDimension, DXGI_FORMAT_R32G32_FLOAT, true, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	settings.scale = genSettings.scale;
+	settings.domainWarpStrength = genSettings.domainWarpStrength;
+	settings.domainWarpNoiseOffset = genSettings.domainWarpNoiseOffset;
+	settings.domainWarpOctaves = genSettings.domainWarpOctaves;
+	settings.noiseOffset = genSettings.noiseOffset;
+	settings.noiseOctaves = genSettings.noiseOctaves;
 
-	terrain_generation_cb cb;
-	cb.heightWidth = TERRAIN_LOD_0_VERTICES_PER_DIMENSION;
-	cb.heightHeight = TERRAIN_LOD_0_VERTICES_PER_DIMENSION;
-	cb.normalWidth = normalMapDimension;
-	cb.normalHeight = normalMapDimension;
-	cb.minCorner = minCorner;
-	cb.positionScale = positionScale;
-	cb.normalScale = normalScale;
-	cb.amplitudeScale = amplitudeScale;
-	cb.domainWarpStrength = 1.2f;
+	auto settingsCBV = dxContext.uploadDynamicConstantBuffer(settings);
+
+
+	bool mipmaps = true;
 
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
-	cl->setPipelineState(*terrainGenerationPipeline.pipeline);
-	cl->setComputeRootSignature(*terrainGenerationPipeline.rootSignature);
+	{
+		PROFILE_ALL(cl, "Generate terrain chunks");
 
-	cl->setCompute32BitConstants(TERRAIN_GENERATION_RS_CB, cb);
-	cl->setDescriptorHeapUAV(TERRAIN_GENERATION_RS_TEXTURES, 0, c.heightmap);
-	cl->setDescriptorHeapUAV(TERRAIN_GENERATION_RS_TEXTURES, 1, c.normalmap);
+		for (int32 cz = 0; cz < (int32)chunksPerDim; ++cz)
+		{
+			for (int32 cx = 0; cx < (int32)chunksPerDim; ++cx)
+			{
+				cl->setPipelineState(*terrainGenerationPipeline.pipeline);
+				cl->setComputeRootSignature(*terrainGenerationPipeline.rootSignature);
+				cl->setComputeDynamicConstantBuffer(TERRAIN_GENERATION_RS_SETTINGS, settingsCBV);
 
-	cl->dispatch(bucketize(normalMapDimension, 16), bucketize(normalMapDimension, 16));
 
-	barrier_batcher(cl)
-		.transition(c.heightmap, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON)
-		.transition(c.normalmap, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
+				vec2 minCorner = vec2(cx * chunkSize, cz * chunkSize);
 
-	generateMipMapsOnGPU(cl, c.normalmap);
+				auto& c = chunk(cx, cz);
+
+				if (!c.heightmap)
+				{
+					c.heightmap = createTexture(0, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R16_UNORM, false, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+					c.normalmap = createTexture(0, normalMapDimension, normalMapDimension, DXGI_FORMAT_R32G32_FLOAT, mipmaps, false, true, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				}
+				else
+				{
+					barrier_batcher(cl)
+						.transition(c.heightmap, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+						.transition(c.normalmap, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				}
+
+				terrain_generation_cb cb;
+				cb.minCorner = minCorner;
+
+				cl->setCompute32BitConstants(TERRAIN_GENERATION_RS_CB, cb);
+				cl->setDescriptorHeapUAV(TERRAIN_GENERATION_RS_TEXTURES, 0, c.heightmap);
+				cl->setDescriptorHeapUAV(TERRAIN_GENERATION_RS_TEXTURES, 1, c.normalmap);
+
+				cl->dispatch(bucketize(normalMapDimension, 16), bucketize(normalMapDimension, 16));
+
+
+
+
+
+
+				barrier_batcher(cl)
+					.transition(c.heightmap, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON)
+					.transition(c.normalmap, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
+
+				if (mipmaps)
+				{
+					generateMipMapsOnGPU(cl, c.normalmap);
+				}
+
+				c.minHeight = 0.f;
+				c.maxHeight = amplitudeScale;
+			}
+		}
+
+	}
 
 	dxContext.executeCommandList(cl);
-
-	c.minHeight = 0.f;
-	c.maxHeight = amplitudeScale;
 }
 
 void terrain_component::render(const render_camera& camera, opaque_render_pass* renderPass, vec3 positionOffset)
 {
+	if (memcmp(&genSettings, &oldGenSettings, sizeof(terrain_generation_settings)) != 0)
+	{
+		generateChunksGPU();
+
+		oldGenSettings = genSettings;
+	}
+
+
 	camera_frustum_planes frustum = camera.getWorldSpaceFrustumPlanes();
 
 	float xzOffset = -(chunkSize * chunksPerDim) * 0.5f; // Offsets entire terrain by half.

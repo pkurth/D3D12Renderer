@@ -14,6 +14,7 @@
 #include "scene/serialization.h"
 #include "audio/audio.h"
 #include "rendering/debug_visualization.h"
+#include "terrain/terrain.h"
 
 #include <fontawesome/list.h>
 
@@ -432,6 +433,44 @@ static void drawComponent(scene_entity entity, const char* componentName, ui_fun
 	}
 }
 
+static void editMaterial(const ref<pbr_material>& material)
+{
+	if (ImGui::BeginProperties())
+	{
+		asset_handle dummy = {};
+
+		auto editTexture = [](const char* name, ref<dx_texture>& tex, uint32 loadFlags)
+		{
+			asset_handle asset = {};
+			if (tex)
+			{
+				asset = tex->handle;
+			}
+			if (ImGui::PropertyAssetHandle(name, EDITOR_ICON_IMAGE, asset))
+			{
+				fs::path path = getPathFromAssetHandle(asset);
+				fs::path relative = fs::relative(path, fs::current_path());
+				if (auto newTex = loadTextureFromFile(relative.string(), loadFlags))
+				{
+					tex = newTex;
+				}
+			}
+		};
+
+		editTexture("Albedo", material->albedo, image_load_flags_default);
+		editTexture("Normal", material->normal, image_load_flags_default_noncolor);
+		editTexture("Roughness", material->roughness, image_load_flags_default_noncolor);
+		editTexture("Metallic", material->metallic, image_load_flags_default_noncolor);
+
+		ImGui::PropertyColor("Emission", material->emission);
+		ImGui::PropertyColor("Albedo tint", material->albedoTint);
+		ImGui::PropertyCheckbox("Double sided", material->doubleSided);
+		ImGui::PropertySlider("UV scale", material->uvScale);
+
+		ImGui::EndProperties();
+	}
+}
+
 bool scene_editor::drawSceneHierarchy()
 {
 	game_scene& scene = this->scene->getCurrentScene();
@@ -573,47 +612,42 @@ bool scene_editor::drawSceneHierarchy()
 								ImGui::PushID(&sub);
 								if (ImGui::BeginTree(sub.name.c_str()))
 								{
-									if (ImGui::BeginProperties())
-									{
-										auto& material = sub.material;
-										asset_handle dummy = {};
-
-										auto editTexture = [](const char* name, ref<dx_texture>& tex, uint32 loadFlags)
-										{
-											asset_handle asset = {};
-											if (tex)
-											{
-												asset = tex->handle;
-											}
-											if (ImGui::PropertyAssetHandle(name, EDITOR_ICON_IMAGE, asset))
-											{
-												fs::path path = getPathFromAssetHandle(asset);
-												fs::path relative = fs::relative(path, fs::current_path());
-												if (auto newTex = loadTextureFromFile(relative.string(), loadFlags))
-												{
-													tex = newTex;
-												}
-											}
-										};
-
-										editTexture("Albedo", material->albedo, image_load_flags_default);
-										editTexture("Normal", material->normal, image_load_flags_default_noncolor);
-										editTexture("Roughness", material->roughness, image_load_flags_default_noncolor);
-										editTexture("Metallic", material->metallic, image_load_flags_default_noncolor);
-										
-										ImGui::PropertyColor("Emission", material->emission);
-										ImGui::PropertyColor("Albedo tint", material->albedoTint);
-										ImGui::PropertyCheckbox("Double sided", material->doubleSided);
-										ImGui::PropertySlider("UV scale", material->uvScale);
-
-										ImGui::EndProperties();
-									}
+									editMaterial(sub.material);
 
 									ImGui::EndTree();
 								}
 								ImGui::PopID();
 							}
 
+							ImGui::EndTree();
+						}
+					});
+
+					drawComponent<terrain_component>(selectedEntity, "TERRAIN", [this](terrain_component& terrain)
+					{
+						if (ImGui::BeginProperties())
+						{
+							ImGui::PropertyDrag("Amplitude scale", terrain.amplitudeScale, 0.1f);
+
+							auto& settings = terrain.genSettings;
+							ImGui::PropertyDrag("Noise scale", settings.scale, 0.001f);
+							ImGui::PropertyDrag("Domain warp strength", settings.domainWarpStrength, 0.05f);
+							ImGui::PropertySlider("Domain warp octaves", settings.domainWarpOctaves, 1, 16);
+
+							ImGui::PropertySlider("Noise octaves", settings.noiseOctaves, 1, 32);
+
+							ImGui::EndProperties();
+						}
+
+						if (ImGui::BeginTree("Ground"))
+						{
+							editMaterial(terrain.groundMaterial);
+							ImGui::EndTree();
+						}
+
+						if (ImGui::BeginTree("Rock"))
+						{
+							editMaterial(terrain.rockMaterial);
 							ImGui::EndTree();
 						}
 					});
