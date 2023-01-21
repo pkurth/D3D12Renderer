@@ -15,9 +15,11 @@ ConstantBuffer<camera_cb> camera			: register(b1, space1);
 ConstantBuffer<lighting_cb> lighting		: register(b2, space1);
 
 Texture2D<float4> groundAlbedoTexture		: register(t0, space1);
-Texture2D<float1> groundRoughnessTexture	: register(t1, space1);
-Texture2D<float4> rockAlbedoTexture			: register(t2, space1);
-Texture2D<float1> rockRoughnessTexture		: register(t3, space1);
+Texture2D<float3> groundNormalTexture		: register(t1, space1);
+Texture2D<float1> groundRoughnessTexture	: register(t2, space1);
+Texture2D<float4> rockAlbedoTexture			: register(t3, space1);
+Texture2D<float3> rockNormalTexture			: register(t4, space1);
+Texture2D<float1> rockRoughnessTexture		: register(t5, space1);
 
 
 TextureCube<float4> irradianceTexture					: register(t0, space2);
@@ -44,7 +46,7 @@ struct triplanar_coefficients
 	float wX, wY, wZ;
 };
 
-static triplanar_coefficients triplanar(float3 position, float3 normal, float textureScale, float sharpness)
+static triplanar_coefficients triplanar(float3 position, float3 normal, float3 textureScale, float sharpness)
 {
 	triplanar_coefficients result;
 
@@ -63,13 +65,23 @@ static triplanar_coefficients triplanar(float3 position, float3 normal, float te
 	return result;
 }
 
+static float3 rnmBlendUnpacked(float3 n1, float3 n2)
+{
+	n1 += float3(0, 0, 1);
+	n2 *= float3(-1, -1, 1);
+	return n1 * dot(n1, n2) / n1.z - n2;
+}
+
 [RootSignature(TERRAIN_RS)]
 ps_output main(ps_input IN)
 {
 	float2 n = normals.Sample(clampSampler, IN.uv) * terrain.amplitudeScale;
 	float3 N = normalize(float3(n.x, 1.f, n.y));
 	
-	triplanar_coefficients tri = triplanar(IN.worldPosition, N, 0.5f, 15.f);
+	float groundTexScale = 0.5f;
+	float rockTexScale = 0.1f;
+
+	triplanar_coefficients tri = triplanar(IN.worldPosition, N, float3(rockTexScale, groundTexScale, rockTexScale), 15.f);
 	
 	float4 albedo =
 		rockAlbedoTexture.Sample(wrapSampler, tri.uvX) * tri.wX +
@@ -81,9 +93,38 @@ ps_output main(ps_input IN)
 		groundRoughnessTexture.Sample(wrapSampler, tri.uvY) * tri.wY +
 		rockRoughnessTexture.Sample(wrapSampler, tri.uvZ) * tri.wZ;
 
-	albedo.xyz *= 0.4f;
-	
 
+	float3 tnormalX = sampleNormalMap(rockNormalTexture, wrapSampler, tri.uvX);
+	float3 tnormalY = sampleNormalMap(groundNormalTexture, wrapSampler, tri.uvY);
+	float3 tnormalZ = sampleNormalMap(rockNormalTexture, wrapSampler, tri.uvZ);
+
+	half3 absNormal = abs(N);
+	// Swizzle world normals to match tangent space and apply RNM blend
+	tnormalX = rnmBlendUnpacked(float3(N.zy, absNormal.x), tnormalX);
+	tnormalY = rnmBlendUnpacked(float3(N.xz, absNormal.y), tnormalY);
+	tnormalZ = rnmBlendUnpacked(float3(N.xy, absNormal.z), tnormalZ);
+
+	// Get the sign (-1 or 1) of the surface normal
+	half3 axisSign = sign(N);
+
+	// Reapply sign to Z
+	tnormalX.z *= axisSign.x;
+	tnormalY.z *= axisSign.y;
+	tnormalZ.z *= axisSign.z;
+
+	// Triblend normals and add to world normal
+	float3 normalmapN = normalize(
+		tnormalX.zyx * tri.wX +
+		tnormalY.xzy * tri.wY +
+		tnormalZ.xyz * tri.wZ +
+		N
+	);
+
+	N = normalmapN;
+
+
+	albedo.xyz *= 0.1f;
+	
 
 
 

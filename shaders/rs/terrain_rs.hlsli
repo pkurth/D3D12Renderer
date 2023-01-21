@@ -34,7 +34,7 @@ struct terrain_transform_cb
 	"DescriptorTable(SRV(t1, numDescriptors=1), visibility=SHADER_VISIBILITY_PIXEL)," \
 	"CBV(b1, space=1), " \
 	"CBV(b2, space=1), " \
-	"DescriptorTable(SRV(t0, space=1, numDescriptors=4), visibility=SHADER_VISIBILITY_PIXEL)," \
+	"DescriptorTable(SRV(t0, space=1, numDescriptors=6), visibility=SHADER_VISIBILITY_PIXEL)," \
     "DescriptorTable(SRV(t0, space=2, numDescriptors=3), visibility=SHADER_VISIBILITY_PIXEL), " \
 	"StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \

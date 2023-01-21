@@ -208,8 +208,6 @@ void terrain_component::generateChunksCPU()
 					}
 				}
 
-				c.minHeight = minHeight;
-				c.maxHeight = maxHeight;
 				c.heightmap = createTexture(heights, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R16_UNORM);
 
 
@@ -315,9 +313,6 @@ void terrain_component::generateChunksGPU()
 				{
 					generateMipMapsOnGPU(cl, c.normalmap);
 				}
-
-				c.minHeight = 0.f;
-				c.maxHeight = amplitudeScale;
 			}
 		}
 
@@ -374,13 +369,10 @@ void terrain_component::render(const render_camera& camera, opaque_render_pass* 
 
 				vec3 localMinCorner(x * chunkSize, 0.f, z * chunkSize);
 				vec3 minCorner = localMinCorner + positionOffset;
-				vec3 maxCorner = minCorner + vec3(chunkSize, 0.f, chunkSize);
+				vec3 maxCorner = minCorner + vec3(chunkSize, amplitudeScale, chunkSize);
 
 
 				bounding_box aabb = { minCorner, maxCorner };
-				aabb.minCorner.y += c.minHeight;
-				aabb.maxCorner.y += c.maxHeight;
-
 				if (!frustum.cullWorldSpaceAABB(aabb))
 				{
 					terrain_render_data data = { 
@@ -459,6 +451,8 @@ PIPELINE_SETUP_IMPL(terrain_pipeline)
 
 PIPELINE_RENDER_IMPL(terrain_pipeline)
 {
+	PROFILE_ALL(cl, "Terrain");
+
 	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> rc.data.lod;
 	uint32 numTris = numSegmentsPerDim * numSegmentsPerDim * 2;
 
@@ -477,9 +471,12 @@ PIPELINE_RENDER_IMPL(terrain_pipeline)
 	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
 
 	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 0, rc.data.groundMaterial->albedo ? rc.data.groundMaterial->albedo->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 1, rc.data.groundMaterial->roughness ? rc.data.groundMaterial->roughness->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 2, rc.data.rockMaterial->albedo ? rc.data.rockMaterial->albedo->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 3, rc.data.rockMaterial->roughness ? rc.data.rockMaterial->roughness->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 1, rc.data.groundMaterial->normal ? rc.data.groundMaterial->normal->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 2, rc.data.groundMaterial->roughness ? rc.data.groundMaterial->roughness->defaultSRV : nullTexture);
+
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 3, rc.data.rockMaterial->albedo ? rc.data.rockMaterial->albedo->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 4, rc.data.rockMaterial->normal ? rc.data.rockMaterial->normal->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 5, rc.data.rockMaterial->roughness ? rc.data.rockMaterial->roughness->defaultSRV : nullTexture);
 
 	cl->setIndexBuffer(terrainIndexBuffers[rc.data.lod]);
 	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);

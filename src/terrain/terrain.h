@@ -12,8 +12,6 @@ struct terrain_chunk
 {
 	bool active;
 
-	float minHeight, maxHeight;
-
 	ref<dx_texture> heightmap;
 	ref<dx_texture> normalmap;
 };
