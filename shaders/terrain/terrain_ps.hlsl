@@ -46,7 +46,7 @@ struct triplanar_coefficients
 	float wX, wY, wZ;
 };
 
-static triplanar_coefficients triplanar(float3 position, float3 normal, float3 textureScale, float sharpness)
+static triplanar_coefficients triplanar(float3 position, float3 normal, float textureScale, float sharpness)
 {
 	triplanar_coefficients result;
 
@@ -65,23 +65,15 @@ static triplanar_coefficients triplanar(float3 position, float3 normal, float3 t
 	return result;
 }
 
-static float3 rnmBlendUnpacked(float3 n1, float3 n2)
-{
-	n1 += float3(0, 0, 1);
-	n2 *= float3(-1, -1, 1);
-	return n1 * dot(n1, n2) / n1.z - n2;
-}
-
 [RootSignature(TERRAIN_RS)]
 ps_output main(ps_input IN)
 {
 	float2 n = normals.Sample(clampSampler, IN.uv) * terrain.amplitudeScale;
 	float3 N = normalize(float3(n.x, 1.f, n.y));
 	
-	float groundTexScale = 0.5f;
-	float rockTexScale = 0.1f;
+	float texScale = 0.1f;
 
-	triplanar_coefficients tri = triplanar(IN.worldPosition, N, float3(rockTexScale, groundTexScale, rockTexScale), 15.f);
+	triplanar_coefficients tri = triplanar(IN.worldPosition, N, texScale, 15.f);
 	
 	float4 albedo =
 		rockAlbedoTexture.Sample(wrapSampler, tri.uvX) * tri.wX +
@@ -98,33 +90,26 @@ ps_output main(ps_input IN)
 	float3 tnormalY = sampleNormalMap(groundNormalTexture, wrapSampler, tri.uvY);
 	float3 tnormalZ = sampleNormalMap(rockNormalTexture, wrapSampler, tri.uvZ);
 
-	half3 absNormal = abs(N);
-	// Swizzle world normals to match tangent space and apply RNM blend
-	tnormalX = rnmBlendUnpacked(float3(N.zy, absNormal.x), tnormalX);
-	tnormalY = rnmBlendUnpacked(float3(N.xz, absNormal.y), tnormalY);
-	tnormalZ = rnmBlendUnpacked(float3(N.xy, absNormal.z), tnormalZ);
+	tnormalX = float3(
+		tnormalX.xy + N.zy,
+		abs(tnormalX.z) * N.x
+		);
+	tnormalY = float3(
+		tnormalY.xy + N.xz,
+		abs(tnormalY.z) * N.y
+		);
+	tnormalZ = float3(
+		tnormalZ.xy + N.xy,
+		abs(tnormalZ.z) * N.z
+		);
 
-	// Get the sign (-1 or 1) of the surface normal
-	half3 axisSign = sign(N);
-
-	// Reapply sign to Z
-	tnormalX.z *= axisSign.x;
-	tnormalY.z *= axisSign.y;
-	tnormalZ.z *= axisSign.z;
-
-	// Triblend normals and add to world normal
 	float3 normalmapN = normalize(
 		tnormalX.zyx * tri.wX +
 		tnormalY.xzy * tri.wY +
-		tnormalZ.xyz * tri.wZ +
-		N
+		tnormalZ.xyz * tri.wZ
 	);
 
 	N = normalmapN;
-
-
-	albedo.xyz *= 0.1f;
-	
 
 
 
@@ -178,5 +163,10 @@ ps_output main(ps_input IN)
 	ps_output OUT;
 	OUT.hdrColor = totalLighting.evaluate(surface.albedo);
 	OUT.worldNormalRoughness = float4(packNormal(N), surface.roughness, 0.f);
+
+	//OUT.hdrColor.rgb = roughness.xxx;
+
+	OUT.hdrColor.rgb *= 0.3f;
+
 	return OUT;
 }
