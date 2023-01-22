@@ -87,25 +87,39 @@ ps_output main(ps_input IN)
 	float2 n = normals.Sample(clampSampler, IN.uv) * terrain.amplitudeScale;
 	float3 N = normalize(float3(n.x, 1.f, n.y));
 	
-	float groundTexScale = 0.1f;
+	float groundTexScale = 0.3f;
 	float rockTexScale = 0.1f;
 
 	triplanar_mapping tri;
 	tri.initialize(IN.worldPosition, N, float3(rockTexScale, groundTexScale, rockTexScale), 15.f);
+
+
+	float2 groundUV = tri.uvY;
+
+#if 1
+	float2 tileUV = IN.uv + 0.1f * float2(fbm(IN.uv * 13.f, 2).x, fbm(IN.uv * 15.f, 3).x);
+	float2 tileID = floor(tileUV * 20.f) / 20.f;
+	float tileRotation = random(tileID) * M_PI * 2.f;
+
+	float sinRotation, cosRotation;
+	sincos(tileRotation, sinRotation, cosRotation);
+
+	groundUV = float2(cosRotation * tri.uvY.x - sinRotation * tri.uvY.y, sinRotation * tri.uvY.x + cosRotation * tri.uvY.y);
+#endif
 	
 	float4 albedo =
 		rockAlbedoTexture.Sample(wrapSampler, tri.uvX) * tri.weights.x +
-		groundAlbedoTexture.Sample(wrapSampler, tri.uvY) * tri.weights.y +
+		groundAlbedoTexture.Sample(wrapSampler, groundUV) * tri.weights.y +
 		rockAlbedoTexture.Sample(wrapSampler, tri.uvZ) * tri.weights.z;
 
 	float roughness =
 		rockRoughnessTexture.Sample(wrapSampler, tri.uvX) * tri.weights.x +
-		groundRoughnessTexture.Sample(wrapSampler, tri.uvY) * tri.weights.y +
+		groundRoughnessTexture.Sample(wrapSampler, groundUV) * tri.weights.y +
 		rockRoughnessTexture.Sample(wrapSampler, tri.uvZ) * tri.weights.z;
 
 
 	float3 tnormalX = sampleNormalMap(rockNormalTexture, wrapSampler, tri.uvX);
-	float3 tnormalY = sampleNormalMap(groundNormalTexture, wrapSampler, tri.uvY);
+	float3 tnormalY = sampleNormalMap(groundNormalTexture, wrapSampler, groundUV);
 	float3 tnormalZ = sampleNormalMap(rockNormalTexture, wrapSampler, tri.uvZ);
 
 	N = tri.normalmap(N, tnormalX, tnormalY, tnormalZ);
@@ -165,6 +179,8 @@ ps_output main(ps_input IN)
 	//OUT.hdrColor.rgb = roughness.xxx;
 
 	OUT.hdrColor.rgb *= 0.3f;
+
+	//OUT.hdrColor.rgb = float3(tileRotation.xxx);
 
 	return OUT;
 }
