@@ -388,7 +388,7 @@ void terrain_component::render(const render_camera& camera, opaque_render_pass* 
 						c.normalmap,
 						groundMaterial, rockMaterial 
 					};
-					renderPass->renderStaticObject<terrain_pipeline>(mat4::identity, {}, {}, {}, data, -1, false, false);
+					//renderPass->renderStaticObject<terrain_pipeline>(mat4::identity, {}, {}, {}, data, -1, false, false);
 				}
 			}
 		}

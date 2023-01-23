@@ -293,83 +293,11 @@ static void batchRenderRigidDepthPrepass(dx_command_list* cl,
 }
 #endif
 
-static void depthPrePassInternal(dx_command_list* cl,
-	dx_pipeline& rigidPipeline,
-	dx_pipeline& animatedPipeline,
-	const sort_key_vector<float, static_depth_only_render_command>& staticCommands,
-	const sort_key_vector<float, dynamic_depth_only_render_command>& dynamicCommands,
-	const sort_key_vector<float, animated_depth_only_render_command>& animatedCommands,
-	const mat4& viewProj, const mat4& prevFrameViewProj,
-	depth_only_camera_jitter_cb jitterCB)
-{
-	if (staticCommands.size() > 0 || dynamicCommands.size() > 0)
-	{
-		cl->setPipelineState(*rigidPipeline.pipeline);
-		cl->setGraphicsRootSignature(*rigidPipeline.rootSignature);
-
-		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
-	}
-
-	// Static.
-	if (staticCommands.size() > 0)
-	{
-		PROFILE_ALL(cl, "Static");
-
-		for (const auto& dc : staticCommands)
-		{
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, dc.objectID);
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.transform });
-
-			cl->setVertexBuffer(0, dc.vertexBuffer);
-			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(dc.submesh.numIndices, 1, dc.submesh.firstIndex, dc.submesh.baseVertex, 0);
-		}
-	}
-
-	// Dynamic.
-	if (dynamicCommands.size() > 0)
-	{
-		PROFILE_ALL(cl, "Dynamic");
-
-		for (const auto& dc : dynamicCommands)
-		{
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, dc.objectID);
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.prevFrameTransform });
-
-			cl->setVertexBuffer(0, dc.vertexBuffer);
-			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(dc.submesh.numIndices, 1, dc.submesh.firstIndex, dc.submesh.baseVertex, 0);
-		}
-	}
-
-	// Animated.
-	if (animatedCommands.size() > 0)
-	{
-		PROFILE_ALL(cl, "Animated");
-
-		cl->setPipelineState(*animatedPipeline.pipeline);
-		cl->setGraphicsRootSignature(*animatedPipeline.rootSignature);
-
-		cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
-
-		for (const auto& dc : animatedCommands)
-		{
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, dc.objectID);
-			cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.prevFrameTransform });
-			cl->setRootGraphicsSRV(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS, dc.prevFrameVertexBufferAddress + dc.submesh.baseVertex * dc.vertexBuffer.view.StrideInBytes);
-
-			cl->setVertexBuffer(0, dc.vertexBuffer);
-			cl->setIndexBuffer(dc.indexBuffer);
-			cl->drawIndexed(dc.submesh.numIndices, 1, dc.submesh.firstIndex, dc.submesh.baseVertex, 0);
-		}
-	}
-}
-
 void depthPrePass(dx_command_list* cl,
 	const dx_render_target& depthOnlyRenderTarget,
 	const opaque_render_pass* opaqueRenderPass,
 	const mat4& viewProj, const mat4& prevFrameViewProj,
-	vec2 jitter, vec2 prevFrameJitter)
+	const common_render_data& common)
 {
 	if (opaqueRenderPass)
 	{
@@ -377,16 +305,20 @@ void depthPrePass(dx_command_list* cl,
 
 		cl->setRenderTarget(depthOnlyRenderTarget);
 		cl->setViewport(depthOnlyRenderTarget.viewport);
-		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		depth_only_camera_jitter_cb jitterCB = { jitter, prevFrameJitter };
+		{
+			pipeline_setup_func lastSetupFunc = 0;
 
-		depthPrePassInternal(cl, depthPrePassPipeline, animatedDepthPrePassPipeline, 
-			opaqueRenderPass->staticDepthPrepass, opaqueRenderPass->dynamicDepthPrepass, opaqueRenderPass->animatedDepthPrepass, 
-			viewProj, prevFrameViewProj, jitterCB);
-		depthPrePassInternal(cl, doubleSidedDepthPrePassPipeline, doubleSidedAnimatedDepthPrePassPipeline, 
-			opaqueRenderPass->staticDoublesidedDepthPrepass, opaqueRenderPass->dynamicDoublesidedDepthPrepass, opaqueRenderPass->animatedDoublesidedDepthPrepass, 
-			viewProj, prevFrameViewProj, jitterCB);
+			for (const auto& dc : opaqueRenderPass->depthPrepass)
+			{
+				if (dc.setup != lastSetupFunc)
+				{
+					dc.setup(cl, common);
+					lastSetupFunc = dc.setup;
+				}
+				dc.render(cl, viewProj, prevFrameViewProj, dc.data);
+			}
+		}
 	}
 }
 

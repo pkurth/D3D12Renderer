@@ -163,7 +163,7 @@ void depthPrePass(dx_command_list* cl,
 	const dx_render_target& depthOnlyRenderTarget,
 	const opaque_render_pass* opaqueRenderPass,
 	const mat4& viewProj, const mat4& prevFrameViewProj,
-	vec2 jitter, vec2 prevFrameJitter);
+	const common_render_data& common);
 
 void texturedSky(dx_command_list* cl,
 	const dx_render_target& skyRenderTarget,

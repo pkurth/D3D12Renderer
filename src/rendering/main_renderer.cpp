@@ -382,6 +382,9 @@ void main_renderer::endFrame(const user_input* input)
 	commonRenderData.lightProbeIrradiance = (environment && environment->giMode == environment_gi_raytraced) ? environment->lightProbeGrid.irradiance : 0;
 	commonRenderData.lightProbeDepth = (environment && environment->giMode == environment_gi_raytraced) ? environment->lightProbeGrid.depth : 0;
 
+	commonRenderData.cameraJitter = jitteredCamera.jitter;
+	commonRenderData.prevFrameCameraJitter = jitteredCamera.prevFrameJitter;
+
 
 
 	common_particle_simulation_data commonParticleData;
@@ -494,7 +497,7 @@ void main_renderer::endFrame(const user_input* input)
 				.depthAttachment(depthStencilBuffer);
 
 			depthPrePass(cl, depthOnlyRenderTarget, opaqueRenderPass,
-				jitteredCamera.viewProj, jitteredCamera.prevFrameViewProj, jitteredCamera.jitter, jitteredCamera.prevFrameJitter);
+				jitteredCamera.viewProj, jitteredCamera.prevFrameViewProj, commonRenderData);
 
 
 			barrier_batcher(cl)
@@ -867,7 +870,7 @@ void main_renderer::endFrame(const user_input* input)
 			.depthAttachment(depthStencilBuffer);
 
 		depthPrePass(cl, depthOnlyRenderTarget, opaqueRenderPass,
-			unjitteredCamera.viewProj, unjitteredCamera.prevFrameViewProj, unjitteredCamera.jitter, unjitteredCamera.prevFrameJitter);
+			unjitteredCamera.viewProj, unjitteredCamera.prevFrameViewProj, commonRenderData);
 
 
 		barrier_batcher(cl)

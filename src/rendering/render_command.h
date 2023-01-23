@@ -35,34 +35,12 @@ struct particle_render_command
 	render_data_t data;
 };
 
-struct static_depth_only_render_command
+template <typename render_data_t>
+struct depth_only_render_command
 {
-	mat4 transform;
-	dx_vertex_buffer_view vertexBuffer;
-	dx_index_buffer_view indexBuffer;
-	submesh_info submesh;
 	uint32 objectID;
-};
 
-struct dynamic_depth_only_render_command
-{
-	mat4 transform;
-	mat4 prevFrameTransform;
-	dx_vertex_buffer_view vertexBuffer;
-	dx_index_buffer_view indexBuffer;
-	submesh_info submesh;
-	uint32 objectID;
-};
-
-struct animated_depth_only_render_command
-{
-	mat4 transform;
-	mat4 prevFrameTransform;
-	dx_vertex_buffer_view vertexBuffer;
-	D3D12_GPU_VIRTUAL_ADDRESS prevFrameVertexBufferAddress;
-	dx_index_buffer_view indexBuffer;
-	submesh_info submesh;
-	uint32 objectID;
+	render_data_t data;
 };
 
 struct outline_render_command

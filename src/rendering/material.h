@@ -44,11 +44,18 @@ struct common_render_data
 	float globalIlluminationIntensity;
 	float skyIntensity;
 	bool proceduralSky;
+
+	vec2 cameraJitter;
+	vec2 prevFrameCameraJitter;
 };
+
 
 
 #define PIPELINE_SETUP_DECL					static void setup(dx_command_list* cl, const common_render_data& common)
 #define PIPELINE_SETUP_IMPL(name)			void name::setup(dx_command_list* cl, const common_render_data& common)
+
+#define DEPTH_ONLY_RENDER_DECL				static void render(dx_command_list* cl, const mat4& viewProj, const mat4& prevFrameViewProj, const depth_only_render_command<render_data_t>& rc)
+#define DEPTH_ONLY_RENDER_IMPL(name)		void name::render(dx_command_list* cl, const mat4& viewProj, const mat4& prevFrameViewProj, const depth_only_render_command<render_data_t>& rc)
 
 #define PIPELINE_RENDER_DECL				static void render(dx_command_list* cl, const mat4& viewProj, const default_render_command<render_data_t>& rc)
 #define PIPELINE_RENDER_IMPL(name)			void name::render(dx_command_list* cl, const mat4& viewProj, const default_render_command<render_data_t>& rc)

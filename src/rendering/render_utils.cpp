@@ -26,6 +26,7 @@ static vec2 haltonSequence[128];
 void initializeRenderUtils()
 {
 	initializeTexturePreprocessing();
+	initializeDepthPrepassPipelines();
 	initializeSkinning();
 	initializeLightProbePipelines();
 	initializeRTReflectionsPipelines();
