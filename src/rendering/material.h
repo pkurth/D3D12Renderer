@@ -57,8 +57,8 @@ struct common_render_data
 #define DEPTH_ONLY_RENDER_DECL				static void render(dx_command_list* cl, const mat4& viewProj, const mat4& prevFrameViewProj, const depth_only_render_command<render_data_t>& rc)
 #define DEPTH_ONLY_RENDER_IMPL(name)		void name::render(dx_command_list* cl, const mat4& viewProj, const mat4& prevFrameViewProj, const depth_only_render_command<render_data_t>& rc)
 
-#define PIPELINE_RENDER_DECL				static void render(dx_command_list* cl, const mat4& viewProj, const default_render_command<render_data_t>& rc)
-#define PIPELINE_RENDER_IMPL(name)			void name::render(dx_command_list* cl, const mat4& viewProj, const default_render_command<render_data_t>& rc)
+#define PIPELINE_RENDER_DECL				static void render(dx_command_list* cl, const mat4& viewProj, const render_command<render_data_t>& rc)
+#define PIPELINE_RENDER_IMPL(name)			void name::render(dx_command_list* cl, const mat4& viewProj, const render_command<render_data_t>& rc)
 
 #define PARTICLE_PIPELINE_RENDER_DECL		static void render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<render_data_t>& rc)
 #define PARTICLE_PIPELINE_RENDER_IMPL(name)	void name::render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<render_data_t>& rc)

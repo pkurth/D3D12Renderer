@@ -15,13 +15,8 @@ struct particle_draw_info
 
 
 template <typename render_data_t>
-struct default_render_command
+struct render_command
 {
-	mat4 transform;
-	dx_vertex_buffer_group_view vertexBuffer;
-	dx_index_buffer_view indexBuffer;
-	submesh_info submesh;
-
 	render_data_t data;
 };
 

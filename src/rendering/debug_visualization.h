@@ -13,8 +13,13 @@ struct position_color
 	vec3 color;
 };
 
-struct debug_material
+struct debug_render_data
 {
+	mat4 transform;
+	dx_vertex_buffer_group_view vertexBuffer;
+	dx_index_buffer_view indexBuffer;
+	submesh_info submesh;
+
 	vec4 color;
 };
 
@@ -22,7 +27,7 @@ struct debug_simple_pipeline
 {
 	// Layout: position, normal.
 
-	using render_data_t = debug_material;
+	using render_data_t = debug_render_data;
 
 	static void initialize();
 
@@ -32,7 +37,7 @@ struct debug_simple_pipeline
 
 struct debug_unlit_pipeline
 {
-	using render_data_t = debug_material;
+	using render_data_t = debug_render_data;
 
 	static void initialize();
 
@@ -47,7 +52,7 @@ struct debug_unlit_pipeline::position_color : debug_unlit_pipeline { PIPELINE_SE
 
 struct debug_unlit_line_pipeline
 {
-	using render_data_t = debug_material;
+	using render_data_t = debug_render_data;
 
 	static void initialize();
 
@@ -72,13 +77,17 @@ static void renderDebug(const mat4& transform, const struct dx_dynamic_vertex_bu
 	sm.firstIndex = 0;
 	sm.numIndices = ib.view.SizeInBytes / getFormatSize(ib.view.Format);
 
+	debug_render_data data = {
+		transform, dx_vertex_buffer_group_view(vb), ib, sm, color
+	};
+
 	if (overlay)
 	{
-		renderPass->renderOverlay<pipeline_t>(transform, dx_vertex_buffer_group_view(vb), ib, sm, debug_material{ color });
+		renderPass->renderOverlay<pipeline_t>(data);
 	}
 	else
 	{
-		renderPass->renderObject<pipeline_t>(transform, dx_vertex_buffer_group_view(vb), ib, sm, debug_material{ color });
+		renderPass->renderObject<pipeline_t>(data);
 	}
 }
 

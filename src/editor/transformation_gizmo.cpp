@@ -554,21 +554,27 @@ void transformation_gizmo::manipulateInternal(trs& transform, const render_camer
 		{
 			for (uint32 i = 0; i < 3; ++i)
 			{
-				ldrRenderPass->renderOverlay<debug_simple_pipeline>(createModelMatrix(transform.position, rotations[i], scaling),
+				debug_render_data data = {
+					createModelMatrix(transform.position, rotations[i], scaling),
 					mesh.vertexBuffer, mesh.indexBuffer,
 					submeshes[type],
-					debug_material{ colors[i] * (highlightAxis == i ? 0.5f : 1.f) }
-				);
+					colors[i] * (highlightAxis == i ? 0.5f : 1.f)
+				};
+
+				ldrRenderPass->renderOverlay<debug_simple_pipeline>(data);
 			}
 		}
 
 		if (type == transformation_type_scale)
 		{
-			ldrRenderPass->renderOverlay<debug_simple_pipeline>(createModelMatrix(transform.position, rot, scaling),
+			debug_render_data data = {
+				createModelMatrix(transform.position, rot, scaling),
 				mesh.vertexBuffer, mesh.indexBuffer,
 				boxSubmesh,
-				debug_material{ vec4(0.5f) * (highlightAxis == 3 ? 0.5f : 1.f) }
-			);
+				vec4(0.5f) * (highlightAxis == 3 ? 0.5f : 1.f)
+			};
+
+			ldrRenderPass->renderOverlay<debug_simple_pipeline>(data);
 		}
 	}
 
@@ -590,11 +596,14 @@ void transformation_gizmo::manipulateInternal(trs& transform, const render_camer
 
 		for (uint32 i = 0; i < 3; ++i)
 		{
-			ldrRenderPass->renderOverlay<debug_simple_pipeline>(createModelMatrix(transform.position, rotations[i], scaling),
+			debug_render_data data = {
+				createModelMatrix(transform.position, rotations[i], scaling),
 				mesh.vertexBuffer, mesh.indexBuffer,
 				planeSubmesh,
-				debug_material{ colors[i] * (highlightAxis == i + 3 ? 0.5f : 1.f) }
-			);
+				colors[i] * (highlightAxis == i + 3 ? 0.5f : 1.f)
+			};
+
+			ldrRenderPass->renderOverlay<debug_simple_pipeline>(data);
 		}
 	}
 }

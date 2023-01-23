@@ -76,11 +76,11 @@ static const uint32 MAX_BALL_COUNT = 128;
 static const uint32 BALL_COUNT = DEFAULT_BALL_COUNT;
 static const uint32 SHIFT = DEFAULT_SHIFT;
 
-struct mesh_shader_blob_material
+struct mesh_shader_blob_render_data
 {
 	meta_ball balls[MAX_BALL_COUNT];
 
-	mesh_shader_blob_material()
+	mesh_shader_blob_render_data()
 	{
 		for (uint32 i = 0; i < BALL_COUNT; ++i)
 		{
@@ -102,7 +102,7 @@ struct mesh_shader_blob_material
 
 struct mesh_shader_blob_pipeline
 {
-	using render_data_t = mesh_shader_blob_material;
+	using render_data_t = mesh_shader_blob_render_data;
 
 	PIPELINE_SETUP_DECL;
 	PIPELINE_RENDER_DECL;
@@ -275,20 +275,20 @@ void testRenderMeshShader(transparent_render_pass* ldrRenderPass, float dt)
 
 
 
-	static mesh_shader_blob_material blobMaterial;
+	static mesh_shader_blob_render_data blobData;
 
 	const float animationSpeed = 0.25f;
 	const float frameTime = animationSpeed * dt;
 	for (uint32 i = 0; i < BALL_COUNT; ++i)
 	{
-		vec3 d = vec3(0.5f, 0.5f, 0.5f) - blobMaterial.balls[i].pos;
-		blobMaterial.balls[i].dir += d * (5.f * frameTime / (2.f + dot(d, d)));
-		blobMaterial.balls[i].pos += blobMaterial.balls[i].dir * frameTime;
+		vec3 d = vec3(0.5f, 0.5f, 0.5f) - blobData.balls[i].pos;
+		blobData.balls[i].dir += d * (5.f * frameTime / (2.f + dot(d, d)));
+		blobData.balls[i].pos += blobData.balls[i].dir * frameTime;
 	}
 
 
-	ldrRenderPass->renderObject<mesh_shader_blob_pipeline>(mat4::identity, {}, {}, submesh_info{}, blobMaterial);
-	//ldrRenderPass->renderObject<mesh_shader_koch_pipeline>(mat4::identity, {}, {}, submesh_info{}, 0);
+	ldrRenderPass->renderObject<mesh_shader_blob_pipeline>(blobData);
+	//ldrRenderPass->renderObject<mesh_shader_koch_pipeline>(0);
 }
 
 

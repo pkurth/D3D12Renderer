@@ -43,9 +43,19 @@ struct pbr_material
 	float uvScale;
 };
 
+struct pbr_render_data
+{
+	mat4 transform;
+	dx_vertex_buffer_group_view vertexBuffer;
+	dx_index_buffer_view indexBuffer;
+	submesh_info submesh;
+
+	ref<pbr_material> material;
+};
+
 struct pbr_pipeline
 {
-	using render_data_t = ref<pbr_material>;
+	using render_data_t = pbr_render_data;
 
 	static void initialize();
 

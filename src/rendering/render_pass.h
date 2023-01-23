@@ -34,7 +34,7 @@ struct opaque_render_pass
 			using render_data_t = typename pipeline_t::render_data_t;
 
 			uint64 sortKey = (uint64)pipeline_t::setup;
-			auto& command = pass.emplace_back<pipeline_t, default_render_command<render_data_t>>(sortKey);
+			auto& command = pass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey);
 			command.data = renderData;
 		}
 	}
@@ -135,12 +135,12 @@ private:
 		using render_data_t = typename pipeline_t::render_data_t;
 
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		auto& command = pass.emplace_back<pipeline_t, default_render_command<render_data_t>>(sortKey);
-		command.transform = transform;
-		command.vertexBuffer = vertexBuffer;
-		command.indexBuffer = indexBuffer;
-		command.submesh = submesh;
-		command.data = material;
+		auto& command = pass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey);
+		command.data.transform = transform;
+		command.data.vertexBuffer = vertexBuffer;
+		command.data.indexBuffer = indexBuffer;
+		command.data.submesh = submesh;
+		command.data.material = material;
 	}
 	
 	template <typename pipeline_t>
@@ -217,20 +217,12 @@ struct transparent_render_pass
 	}
 
 	template <typename pipeline_t>
-	void renderObject(const mat4& transform,
-		const dx_vertex_buffer_group_view& vertexBuffer,
-		const dx_index_buffer_view& indexBuffer,
-		submesh_info submesh,
-		const typename pipeline_t::render_data_t& data)
+	void renderObject(const typename pipeline_t::render_data_t& data)
 	{
 		using render_data_t = typename pipeline_t::render_data_t;
 
 		float depth = 0.f; // TODO
-		auto& command = pass.emplace_back<pipeline_t, default_render_command<render_data_t>>(-depth); // Negative depth -> sort from back to front.
-		command.transform = transform;
-		command.vertexBuffer = vertexBuffer;
-		command.indexBuffer = indexBuffer;
-		command.submesh = submesh;
+		auto& command = pass.emplace_back<pipeline_t, render_command<render_data_t>>(-depth); // Negative depth -> sort from back to front.
 		command.data = data;
 	}
 
@@ -256,7 +248,15 @@ struct transparent_render_pass
 		submesh_info submesh,
 		const ref<pbr_material>& material)
 	{
-		renderObject<pbr_pipeline::transparent>(transform, vertexBuffer, indexBuffer, submesh, material);
+		using render_data_t = typename pbr_pipeline::transparent::render_data_t;
+
+		float depth = 0.f; // TODO
+		auto& command = pass.emplace_back<pbr_pipeline::transparent, render_command<render_data_t>>(-depth); // Negative depth -> sort from back to front.
+		command.data.transform = transform;
+		command.data.vertexBuffer = vertexBuffer;
+		command.data.indexBuffer = indexBuffer;
+		command.data.submesh = submesh;
+		command.data.material = material;
 	}
 
 	render_command_buffer<float> pass;
@@ -281,38 +281,22 @@ struct ldr_render_pass
 	}
 
 	template <typename pipeline_t>
-	void renderObject(const mat4& transform,
-		const dx_vertex_buffer_group_view& vertexBuffer,
-		const dx_index_buffer_view& indexBuffer,
-		submesh_info submesh,
-		const typename pipeline_t::render_data_t& data)
+	void renderObject(const typename pipeline_t::render_data_t& data)
 	{
 		using render_data_t = typename pipeline_t::render_data_t;
 
 		float depth = 0.f; // TODO
-		auto& command = ldrPass.emplace_back<pipeline_t, default_render_command<render_data_t>>(depth);
-		command.transform = transform;
-		command.vertexBuffer = vertexBuffer;
-		command.indexBuffer = indexBuffer;
-		command.submesh = submesh;
+		auto& command = ldrPass.emplace_back<pipeline_t, render_command<render_data_t>>(depth);
 		command.data = data;
 	}
 
 	template <typename pipeline_t>
-	void renderOverlay(const mat4& transform,
-		const dx_vertex_buffer_group_view& vertexBuffer,
-		const dx_index_buffer_view& indexBuffer,
-		submesh_info submesh,
-		const typename pipeline_t::render_data_t& data)
+	void renderOverlay(const typename pipeline_t::render_data_t& data)
 	{
 		using render_data_t = typename pipeline_t::render_data_t;
 
 		float depth = 0.f; // TODO
-		auto& command = overlays.emplace_back<pipeline_t, default_render_command<render_data_t>>(depth);
-		command.transform = transform;
-		command.vertexBuffer = vertexBuffer;
-		command.indexBuffer = indexBuffer;
-		command.submesh = submesh;
+		auto& command = overlays.emplace_back<pipeline_t, render_command<render_data_t>>(depth);
 		command.data = data;
 	}
 
