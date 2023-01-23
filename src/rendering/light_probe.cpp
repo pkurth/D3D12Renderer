@@ -262,8 +262,13 @@ void light_probe_grid::initialize(vec3 minCorner, vec3 dimensions, float cellSiz
 }
 
 
-struct visualize_material
+struct visualize_grid_render_data
 {
+	mat4 transform;
+	dx_vertex_buffer_group_view vertexBuffer;
+	dx_index_buffer_view indexBuffer;
+	submesh_info submesh;
+
 	float cellSize;
 	uint32 countX;
 	uint32 countY;
@@ -276,7 +281,7 @@ struct visualize_material
 
 struct visualize_grid_pipeline
 {
-	using render_data_t = visualize_material;
+	using render_data_t = visualize_grid_render_data;
 
 	PIPELINE_SETUP_DECL;
 	PIPELINE_RENDER_DECL;
@@ -293,20 +298,33 @@ PIPELINE_SETUP_IMPL(visualize_grid_pipeline)
 PIPELINE_RENDER_IMPL(visualize_grid_pipeline)
 {
 	vec2 uvScale = 1.f / vec2((float)(rc.data.countX * rc.data.countY), (float)rc.data.countZ);
-	cl->setGraphics32BitConstants(LIGHT_PROBE_GRID_VISUALIZATION_RS_CB, light_probe_grid_visualization_cb{ viewProj * rc.transform, uvScale, rc.data.cellSize, rc.data.countX, rc.data.countY });
+	cl->setGraphics32BitConstants(LIGHT_PROBE_GRID_VISUALIZATION_RS_CB, light_probe_grid_visualization_cb{ viewProj * rc.data.transform, uvScale, rc.data.cellSize, rc.data.countX, rc.data.countY });
 	cl->setDescriptorHeapSRV(LIGHT_PROBE_GRID_VISUALIZATION_RS_IRRADIANCE, 0, rc.data.texture0);
 
-	cl->setVertexBuffer(0, rc.vertexBuffer.positions);
-	cl->setVertexBuffer(1, rc.vertexBuffer.others);
-	cl->setIndexBuffer(rc.indexBuffer);
-	cl->drawIndexed(rc.submesh.numIndices, rc.data.total, rc.submesh.firstIndex, rc.submesh.baseVertex, 0);
+	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
+	cl->setVertexBuffer(1, rc.data.vertexBuffer.others);
+	cl->setIndexBuffer(rc.data.indexBuffer);
+	cl->drawIndexed(rc.data.submesh.numIndices, rc.data.total, rc.data.submesh.firstIndex, rc.data.submesh.baseVertex, 0);
 }
 
 
+struct visualize_rays_render_data
+{
+	mat4 transform;
+
+	float cellSize;
+	uint32 countX;
+	uint32 countY;
+	uint32 countZ;
+	uint32 total;
+
+	ref<dx_texture> texture0;
+	ref<dx_texture> texture1;
+};
 
 struct visualize_rays_pipeline
 {
-	using render_data_t = visualize_material;
+	using render_data_t = visualize_rays_render_data;
 
 	PIPELINE_SETUP_DECL;
 	PIPELINE_RENDER_DECL;
@@ -322,7 +340,7 @@ PIPELINE_SETUP_IMPL(visualize_rays_pipeline)
 
 PIPELINE_RENDER_IMPL(visualize_rays_pipeline)
 {
-	cl->setGraphics32BitConstants(LIGHT_PROBE_RAY_VISUALIZATION_RS_CB, light_probe_ray_visualization_cb{ viewProj * rc.transform, rc.data.cellSize, rc.data.countX, rc.data.countY });
+	cl->setGraphics32BitConstants(LIGHT_PROBE_RAY_VISUALIZATION_RS_CB, light_probe_ray_visualization_cb{ viewProj * rc.data.transform, rc.data.cellSize, rc.data.countX, rc.data.countY });
 	cl->setDescriptorHeapSRV(LIGHT_PROBE_RAY_VISUALIZATION_RS_RAYS, 0, rc.data.texture0);
 	cl->setDescriptorHeapSRV(LIGHT_PROBE_RAY_VISUALIZATION_RS_RAYS, 1, rc.data.texture1);
 
@@ -331,49 +349,6 @@ PIPELINE_RENDER_IMPL(visualize_rays_pipeline)
 	cl->draw(2, NUM_RAYS_PER_PROBE * rc.data.total, 0, 0);
 	cl->transitionBarrier(rc.data.texture0, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	cl->transitionBarrier(rc.data.texture1, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-}
-
-
-struct test_sample_material
-{
-	vec3 minCorner;
-	float cellSize;
-	uint32 countX;
-	uint32 countY;
-	uint32 countZ;
-
-	ref<dx_texture> irradiance;
-	ref<dx_texture> depth;
-};
-
-struct test_sample_pipeline
-{
-	using render_data_t = test_sample_material;
-
-	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
-};
-
-
-PIPELINE_SETUP_IMPL(test_sample_pipeline)
-{
-	cl->setPipelineState(*testSamplePipeline.pipeline);
-	cl->setGraphicsRootSignature(*testSamplePipeline.rootSignature);
-	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-}
-
-PIPELINE_RENDER_IMPL(test_sample_pipeline)
-{
-	const mat4& m = rc.transform;
-	cl->setGraphics32BitConstants(LIGHT_PROBE_TEST_SAMPLE_RS_TRANSFORM, transform_cb{ viewProj * m, m });
-	cl->setGraphics32BitConstants(LIGHT_PROBE_TEST_SAMPLE_RS_GRID, light_probe_grid_cb{ rc.data.minCorner, rc.data.cellSize, rc.data.countX, rc.data.countY, rc.data.countZ });
-	cl->setDescriptorHeapSRV(LIGHT_PROBE_TEST_SAMPLE_RS_TEXTURES, 0, rc.data.irradiance);
-	cl->setDescriptorHeapSRV(LIGHT_PROBE_TEST_SAMPLE_RS_TEXTURES, 1, rc.data.depth);
-
-	cl->setVertexBuffer(0, rc.vertexBuffer.positions);
-	cl->setVertexBuffer(1, rc.vertexBuffer.others);
-	cl->setIndexBuffer(rc.indexBuffer);
-	cl->drawIndexed(rc.submesh.numIndices, 1, rc.submesh.firstIndex, rc.submesh.baseVertex, 0);
 }
 
 void light_probe_grid::visualize(opaque_render_pass* renderPass)
@@ -387,33 +362,19 @@ void light_probe_grid::visualize(opaque_render_pass* renderPass)
 	if (visualizeProbes)
 	{
 		mat4 transform = createTranslationMatrix(minCorner);
-		visualize_material material = { cellSize, numNodesX, numNodesY, numNodesZ, totalNumNodes, irradiance };
+		visualize_grid_render_data data = 
+		{ 
+			transform, sphereMesh.vertexBuffer, sphereMesh.indexBuffer, sphereSubmesh, cellSize, numNodesX, numNodesY, numNodesZ, totalNumNodes, irradiance 
+		};
 
-		//renderPass->renderStaticObject<visualize_grid_pipeline>(transform, sphereMesh.vertexBuffer, sphereMesh.indexBuffer, sphereSubmesh, material, -1, false, false);
+		renderPass->renderObject<visualize_grid_pipeline>(data);
 	}
 	if (visualizeRays)
 	{
 		mat4 transform = createTranslationMatrix(minCorner);
-		visualize_material material = { cellSize, numNodesX, numNodesY, numNodesZ, totalNumNodes, raytracedRadiance, raytracedDirectionAndDistance };
+		visualize_rays_render_data data = { transform, cellSize, numNodesX, numNodesY, numNodesZ, totalNumNodes, raytracedRadiance, raytracedDirectionAndDistance };
 
-		//renderPass->renderStaticObject<visualize_rays_pipeline>(transform, {}, {}, {}, material, -1, false, false);
-	}
-
-	if (showTestSphere)
-	{
-		test_sample_material material = { minCorner, cellSize, numNodesX, numNodesY, numNodesZ, irradiance, depth };
-
-		//static float time = 0.2f * M_TAU;
-		//time += 1.f / 500.f;
-		//
-		//vec3 testPos = vec3(
-		//	sin(time) * 9.f,
-		//	cos(time) * 10.f + 11.f,
-		//	0.f
-		//	);
-		vec3 testPos = vec3(0.f, 3.f, 0.f);
-
-		//renderPass->renderStaticObject<test_sample_pipeline>(createModelMatrix(testPos, quat::identity, 0.5f), sphereMesh.vertexBuffer, sphereMesh.indexBuffer, sphereSubmesh, material, -1, false, false);
+		renderPass->renderObject<visualize_rays_pipeline>(data);
 	}
 }
 

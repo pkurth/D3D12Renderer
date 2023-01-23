@@ -35,7 +35,6 @@ struct light_probe_grid
 private:
 	bool visualizeProbes = false;
 	bool visualizeRays = false;
-	bool showTestSphere = false;
 	bool autoRotateRays = true;
 
 	mutable bool rotateRays = false;

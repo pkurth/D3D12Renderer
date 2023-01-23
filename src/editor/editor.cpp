@@ -2031,7 +2031,6 @@ void scene_editor::drawSettings(float dt)
 					{
 						ImGui::PropertyCheckbox("Visualize probes", grid.visualizeProbes);
 						ImGui::PropertyCheckbox("Visualize rays", grid.visualizeRays);
-						ImGui::PropertyCheckbox("Show test sphere", grid.showTestSphere);
 
 						ImGui::PropertyCheckbox("Auto rotate rays", grid.autoRotateRays);
 						if (!grid.autoRotateRays)
