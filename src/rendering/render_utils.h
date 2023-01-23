@@ -34,6 +34,8 @@ static constexpr DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM;
 static constexpr DXGI_FORMAT opaqueLightPassFormats[] = { hdrFormat, worldNormalsRoughnessFormat };
 static constexpr DXGI_FORMAT transparentLightPassFormats[] = { hdrFormat };
 static constexpr DXGI_FORMAT skyPassFormats[] = { hdrFormat, screenVelocitiesFormat, objectIDsFormat };
+static constexpr DXGI_FORMAT depthOnlyFormat[] = { screenVelocitiesFormat, objectIDsFormat };
+
 
 enum color_depth
 {

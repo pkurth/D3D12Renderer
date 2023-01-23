@@ -389,14 +389,14 @@ void light_probe_grid::visualize(opaque_render_pass* renderPass)
 		mat4 transform = createTranslationMatrix(minCorner);
 		visualize_material material = { cellSize, numNodesX, numNodesY, numNodesZ, totalNumNodes, irradiance };
 
-		renderPass->renderStaticObject<visualize_grid_pipeline>(transform, sphereMesh.vertexBuffer, sphereMesh.indexBuffer, sphereSubmesh, material, -1, false, false);
+		//renderPass->renderStaticObject<visualize_grid_pipeline>(transform, sphereMesh.vertexBuffer, sphereMesh.indexBuffer, sphereSubmesh, material, -1, false, false);
 	}
 	if (visualizeRays)
 	{
 		mat4 transform = createTranslationMatrix(minCorner);
 		visualize_material material = { cellSize, numNodesX, numNodesY, numNodesZ, totalNumNodes, raytracedRadiance, raytracedDirectionAndDistance };
 
-		renderPass->renderStaticObject<visualize_rays_pipeline>(transform, {}, {}, {}, material, -1, false, false);
+		//renderPass->renderStaticObject<visualize_rays_pipeline>(transform, {}, {}, {}, material, -1, false, false);
 	}
 
 	if (showTestSphere)
@@ -413,7 +413,7 @@ void light_probe_grid::visualize(opaque_render_pass* renderPass)
 		//	);
 		vec3 testPos = vec3(0.f, 3.f, 0.f);
 
-		renderPass->renderStaticObject<test_sample_pipeline>(createModelMatrix(testPos, quat::identity, 0.5f), sphereMesh.vertexBuffer, sphereMesh.indexBuffer, sphereSubmesh, material, -1, false, false);
+		//renderPass->renderStaticObject<test_sample_pipeline>(createModelMatrix(testPos, quat::identity, 0.5f), sphereMesh.vertexBuffer, sphereMesh.indexBuffer, sphereSubmesh, material, -1, false, false);
 	}
 }
 

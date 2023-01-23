@@ -39,7 +39,6 @@ template <typename render_data_t>
 struct depth_only_render_command
 {
 	uint32 objectID;
-
 	render_data_t data;
 };
 

@@ -669,7 +669,7 @@ void application::update(const user_input& input, float dt)
 
 		for (auto [entityHandle, terrain, position] : scene.group(entt::get<terrain_component, position_component>).each())
 		{
-			terrain.render(this->scene.camera, &opaqueRenderPass, position.position);
+			terrain.render(this->scene.camera, &opaqueRenderPass, position.position, (uint32)entityHandle);
 		}
 
 

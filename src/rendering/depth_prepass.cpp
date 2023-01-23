@@ -16,8 +16,6 @@ static dx_pipeline doubleSidedAnimatedPipeline;
 
 void initializeDepthPrepassPipelines()
 {
-	DXGI_FORMAT depthOnlyFormat[] = { screenVelocitiesFormat, objectIDsFormat };
-
 	auto desc = CREATE_GRAPHICS_PIPELINE
 		.renderTargets(depthOnlyFormat, arraysize(depthOnlyFormat), depthStencilFormat)
 		.inputLayout(inputLayout_position);
@@ -38,7 +36,6 @@ static void setupDepthPrepassCommon(dx_command_list* cl, const dx_pipeline& pipe
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	depth_only_camera_jitter_cb jitterCB = { jitter, prevFrameJitter };
-
 	cl->setGraphics32BitConstants(DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
 }
 

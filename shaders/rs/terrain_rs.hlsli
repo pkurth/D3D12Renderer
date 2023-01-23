@@ -62,6 +62,27 @@ struct terrain_transform_cb
 
 
 
+#define TERRAIN_DEPTH_ONLY_RS \
+    "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
+    "DENY_HULL_SHADER_ROOT_ACCESS |" \
+    "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
+    "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
+    "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "RootConstants(num32BitConstants=7, b1, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "RootConstants(num32BitConstants=1, space=1, b0, visibility=SHADER_VISIBILITY_PIXEL), " \
+    "RootConstants(num32BitConstants=4, space=1, b1, visibility=SHADER_VISIBILITY_PIXEL), " \
+	"DescriptorTable(SRV(t0, numDescriptors=1), visibility=SHADER_VISIBILITY_VERTEX)"
+
+#define TERRAIN_DEPTH_ONLY_RS_TRANSFORM		0
+#define TERRAIN_DEPTH_ONLY_RS_CB			1
+#define TERRAIN_DEPTH_ONLY_RS_OBJECT_ID     2
+#define TERRAIN_DEPTH_ONLY_RS_CAMERA_JITTER 3
+#define TERRAIN_DEPTH_ONLY_RS_HEIGHTMAP		4
+
+
+
+
+
 
 struct terrain_generation_settings_cb
 {

@@ -2,8 +2,8 @@
 #include "camera.hlsli"
 #include "math.hlsli"
 
-ConstantBuffer<depth_only_object_id_cb> id			: register(b1);
-ConstantBuffer<depth_only_camera_jitter_cb> jitter	: register(b2);
+ConstantBuffer<depth_only_object_id_cb> id			: register(b0, space1);
+ConstantBuffer<depth_only_camera_jitter_cb> jitter	: register(b1, space1);
 
 struct ps_input
 {

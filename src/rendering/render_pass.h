@@ -25,6 +25,41 @@ struct opaque_render_pass
 		depthPrepass.clear();
 	}
 
+
+
+	template <typename pipeline_t>
+	void renderObject(const typename pipeline_t::render_data_t& renderData)
+	{
+		{
+			using render_data_t = typename pipeline_t::render_data_t;
+
+			uint64 sortKey = (uint64)pipeline_t::setup;
+			auto& command = pass.emplace_back<pipeline_t, default_render_command<render_data_t>>(sortKey);
+			command.data = renderData;
+		}
+	}
+
+	template <typename pipeline_t, typename depth_prepass_pipeline_t>
+	void renderObject(const typename pipeline_t::render_data_t& renderData, 
+		const typename depth_prepass_pipeline_t::render_data_t& depthPrepassRenderData, 
+		uint32 objectID = -1)
+	{
+		renderObject<pipeline_t>(renderData);
+
+		{
+			using render_data_t = typename depth_prepass_pipeline_t::render_data_t;
+
+			uint64 sortKey = (uint64)depth_prepass_pipeline_t::setup;
+			auto& command = depthPrepass.emplace_back<depth_prepass_pipeline_t, depth_only_render_command<render_data_t>>(sortKey);
+			command.data = depthPrepassRenderData;
+			command.objectID = objectID;
+		}
+	}
+
+
+
+	// Specializations for PBR materials, since these are the common ones.
+
 	void renderStaticObject(const mat4& transform,
 		const dx_vertex_buffer_group_view& vertexBuffer,
 		const dx_index_buffer_view& indexBuffer,

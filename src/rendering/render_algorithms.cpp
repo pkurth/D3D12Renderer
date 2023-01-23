@@ -16,11 +16,6 @@
 #include "transform.hlsli"
 #include "visualization_rs.hlsli"
 
-static dx_pipeline depthPrePassPipeline;
-static dx_pipeline animatedDepthPrePassPipeline;
-
-static dx_pipeline doubleSidedDepthPrePassPipeline;
-static dx_pipeline doubleSidedAnimatedDepthPrePassPipeline;
 
 static dx_pipeline shadowPipeline;
 static dx_pipeline pointLightShadowPipeline;
@@ -74,9 +69,6 @@ static dx_pipeline depthSobelPipeline;
 
 static dx_pipeline visualizeSunShadowCascadesPipeline;
 
-static dx_command_signature rigidDepthPrePassCommandSignature;
-static dx_command_signature animatedDepthPrePassCommandSignature;
-
 
 #pragma pack(push, 1)
 struct indirect_rigid_depth_prepass_command
@@ -112,22 +104,6 @@ void loadCommonShaders()
 
 		textureSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_texture_ps" });
 		proceduralSkyPipeline = createReloadablePipeline(desc, { "sky_vs", "sky_procedural_ps" });
-	}
-
-	// Depth prepass.
-	{
-		DXGI_FORMAT depthOnlyFormat[] = { screenVelocitiesFormat, objectIDsFormat };
-
-		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(depthOnlyFormat, arraysize(depthOnlyFormat), depthStencilFormat)
-			.inputLayout(inputLayout_position);
-
-		depthPrePassPipeline = createReloadablePipeline(desc, { "depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
-		animatedDepthPrePassPipeline = createReloadablePipeline(desc, { "depth_only_animated_vs", "depth_only_ps" }, rs_in_vertex_shader);
-
-		desc.cullingOff();
-		doubleSidedDepthPrePassPipeline = createReloadablePipeline(desc, { "depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
-		doubleSidedAnimatedDepthPrePassPipeline = createReloadablePipeline(desc, { "depth_only_animated_vs", "depth_only_ps" }, rs_in_vertex_shader);
 	}
 
 	// Shadow.
@@ -233,65 +209,8 @@ void loadCommonShaders()
 
 void loadRemainingRenderResources()
 {
-	D3D12_INDIRECT_ARGUMENT_DESC rigidDepthPrepassDescs[] =
-	{
-		indirect_vertex_buffer(0),
-		indirect_index_buffer(),
-		indirect_root_constants<depth_only_transform_cb>(DEPTH_ONLY_RS_MVP),
-		indirect_root_constants<uint32>(DEPTH_ONLY_RS_OBJECT_ID),
-		indirect_draw_indexed(),
-	};
-
-	rigidDepthPrePassCommandSignature = createCommandSignature(*depthPrePassPipeline.rootSignature,
-		rigidDepthPrepassDescs, arraysize(rigidDepthPrepassDescs),
-		sizeof(indirect_rigid_depth_prepass_command));
-
-	D3D12_INDIRECT_ARGUMENT_DESC animatedDepthPrepassDescs[] =
-	{
-		indirect_vertex_buffer(0),
-		indirect_index_buffer(),
-		indirect_root_constants<depth_only_transform_cb>(DEPTH_ONLY_RS_MVP),
-		indirect_root_constants<uint32>(DEPTH_ONLY_RS_OBJECT_ID),
-		indirect_srv(DEPTH_ONLY_RS_PREV_FRAME_POSITIONS),
-		indirect_draw_indexed(),
-	};
-
-	animatedDepthPrePassCommandSignature = createCommandSignature(*animatedDepthPrePassPipeline.rootSignature,
-		animatedDepthPrepassDescs, arraysize(animatedDepthPrepassDescs),
-		sizeof(indirect_animated_depth_prepass_command));
+	
 }
-
-#if 0
-static void batchRenderRigidDepthPrepass(dx_command_list* cl,
-	const sort_key_vector<float, static_depth_only_render_command>& commands,
-	const mat4& viewProj, const mat4& prevFrameViewProj)
-{
-	PROFILE_ALL(cl, "Batch depth pre-pass");
-
-	dx_allocation allocation = dxContext.allocateDynamicBuffer(
-		(uint32)(commands.size() * sizeof(indirect_rigid_depth_prepass_command)));
-	indirect_rigid_depth_prepass_command* ptr = (indirect_rigid_depth_prepass_command*)allocation.cpuPtr;
-
-	for (const auto& dc : commands)
-	{
-		ptr->vertexBufferView = dc.vertexBuffer.view;
-		ptr->indexBufferView = dc.indexBuffer.view;
-		ptr->transform = depth_only_transform_cb{ viewProj * dc.transform, prevFrameViewProj * dc.transform };
-		ptr->objectID = dc.objectID;
-		ptr->drawArguments.StartInstanceLocation = 0;
-		ptr->drawArguments.InstanceCount = 1;
-		ptr->drawArguments.BaseVertexLocation = dc.submesh.baseVertex;
-		ptr->drawArguments.IndexCountPerInstance = dc.submesh.numTriangles * 3;
-		ptr->drawArguments.StartIndexLocation = dc.submesh.firstTriangle * 3;
-
-		++ptr;
-	}
-
-	cl->drawIndirect(rigidDepthPrePassCommandSignature, (uint32)commands.size(),
-		allocation.resource,
-		allocation.offsetInResource);
-}
-#endif
 
 void depthPrePass(dx_command_list* cl,
 	const dx_render_target& depthOnlyRenderTarget,
