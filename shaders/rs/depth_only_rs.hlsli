@@ -6,13 +6,11 @@ struct shadow_transform_cb
     mat4 mvp;
 };
 
-struct point_shadow_transform_cb
+struct point_shadow_cb
 {
-    mat4 m;
     vec3 lightPosition;
     float maxDistance;
     float flip;
-    float padding[3];
 };
 
 struct depth_only_object_id_cb
@@ -46,7 +44,8 @@ struct depth_only_transform_cb
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS |" \
     "DENY_PIXEL_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=24, b0, visibility=SHADER_VISIBILITY_VERTEX)"
+    "RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "RootConstants(num32BitConstants=5, b1, visibility=SHADER_VISIBILITY_VERTEX), " \
 
 #define DEPTH_ONLY_RS \
     "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
@@ -73,6 +72,7 @@ struct depth_only_transform_cb
 #define DEPTH_ONLY_RS_PREV_FRAME_POSITIONS  3
 
 #define SHADOW_RS_MVP                       0
+#define POINT_SHADOW_RS_CB                  1
 
 #endif
 

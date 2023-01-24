@@ -181,7 +181,8 @@ void proceduralSky(dx_command_list* cl,
 void shadowPasses(dx_command_list* cl,
 	const sun_shadow_render_pass** sunShadowRenderPasses, uint32 numSunLightShadowRenderPasses,
 	const spot_shadow_render_pass** spotLightShadowRenderPasses, uint32 numSpotLightShadowRenderPasses,
-	const point_shadow_render_pass** pointLightShadowRenderPasses, uint32 numPointLightShadowRenderPasses);
+	const point_shadow_render_pass** pointLightShadowRenderPasses, uint32 numPointLightShadowRenderPasses,
+	const common_render_data& common);
 
 void opaqueLightPass(dx_command_list* cl,
 	const dx_render_target& renderTarget,

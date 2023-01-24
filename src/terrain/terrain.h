@@ -50,7 +50,7 @@ struct terrain_component
 	ref<pbr_material> rockMaterial;
 
 
-	void render(const render_camera& camera, struct opaque_render_pass* renderPass, vec3 positionOffset, uint32 entityID = -1);
+	void render(const render_camera& camera, struct opaque_render_pass* renderPass, struct sun_shadow_render_pass* shadowPass, vec3 positionOffset, uint32 entityID = -1);
 
 
 private:
@@ -63,48 +63,7 @@ private:
 };
 
 
-struct terrain_render_data_common
-{
-	vec3 minCorner;
-	int32 lod;
-	float chunkSize;
-	float amplitudeScale;
-
-	int32 lod_negX;
-	int32 lod_posX;
-	int32 lod_negZ;
-	int32 lod_posZ;
-
-	ref<dx_texture> heightmap;
-};
-
-struct terrain_render_data
-{
-	terrain_render_data_common common;
-
-	ref<dx_texture> normalmap;
-
-	ref<pbr_material> groundMaterial;
-	ref<pbr_material> rockMaterial;
-};
-
-struct terrain_pipeline
-{
-	using render_data_t = terrain_render_data;
-
-	static void initialize();
-
-	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
-};
-
-struct terrain_depth_prepass_pipeline
-{
-	using render_data_t = terrain_render_data_common;
-
-	PIPELINE_SETUP_DECL;
-	DEPTH_ONLY_RENDER_DECL;
-};
+void initializeTerrainPipelines();
 
 
 

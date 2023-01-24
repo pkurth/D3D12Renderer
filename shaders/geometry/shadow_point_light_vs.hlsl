@@ -1,7 +1,8 @@
 #include "depth_only_rs.hlsli"
 
 
-ConstantBuffer<point_shadow_transform_cb> transform : register(b0);
+ConstantBuffer<shadow_transform_cb> transform	: register(b0);
+ConstantBuffer<point_shadow_cb> cb				: register(b1);
 
 struct vs_input
 {
@@ -17,11 +18,11 @@ struct vs_output
 [RootSignature(POINT_SHADOW_RS)]
 vs_output main(vs_input IN)
 {
-	float3 position = mul(transform.m, float4(IN.position, 1.f)).xyz;
+	float3 position = mul(transform.mvp, float4(IN.position, 1.f)).xyz;
 	
-	float3 L = position - transform.lightPosition;
+	float3 L = position - cb.lightPosition;
 
-	L.z *= transform.flip;
+	L.z *= cb.flip;
 
 	float l = length(L);
 	L /= l;
@@ -30,6 +31,6 @@ vs_output main(vs_input IN)
 
 	vs_output OUT;
 	OUT.clipDepth = L.z;
-	OUT.position = float4(L.xy, l / transform.maxDistance, 1.f);
+	OUT.position = float4(L.xy, l / cb.maxDistance, 1.f);
 	return OUT;
 }

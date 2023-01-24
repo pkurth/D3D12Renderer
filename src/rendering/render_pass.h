@@ -30,13 +30,11 @@ struct opaque_render_pass
 	template <typename pipeline_t>
 	void renderObject(const typename pipeline_t::render_data_t& renderData)
 	{
-		{
-			using render_data_t = typename pipeline_t::render_data_t;
+		using render_data_t = typename pipeline_t::render_data_t;
 
-			uint64 sortKey = (uint64)pipeline_t::setup;
-			auto& command = pass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey);
-			command.data = renderData;
-		}
+		uint64 sortKey = (uint64)pipeline_t::setup;
+		auto& command = pass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey);
+		command.data = renderData;
 	}
 
 	template <typename pipeline_t, typename depth_prepass_pipeline_t>
@@ -331,55 +329,41 @@ struct ldr_render_pass
 
 struct shadow_render_pass_base
 {
-	void renderStaticObject(const mat4& transform, const dx_vertex_buffer_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
+	void sort()
 	{
-		auto& dcs = doubleSided ? doubleSidedStaticDrawCalls : staticDrawCalls;
-		dcs.push_back(
-			{
-				transform,
-				vertexBuffer,
-				indexBuffer,
-				submesh,
-			}
-		);
-	}
-
-	void renderDynamicObject(const mat4& transform, const dx_vertex_buffer_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
-	{
-		auto& dcs = doubleSided ? doubleSidedDynamicDrawCalls : dynamicDrawCalls;
-		dcs.push_back(
-			{
-				transform,
-				vertexBuffer,
-				indexBuffer,
-				submesh,
-			}
-		);
-	}
-
-	void renderStaticObject(const mat4& transform, const dx_vertex_buffer_group_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
-	{
-		renderStaticObject(transform, vertexBuffer.positions, indexBuffer, submesh);
-	}
-
-	void renderDynamicObject(const mat4& transform, const dx_vertex_buffer_group_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
-	{
-		renderDynamicObject(transform, vertexBuffer.positions, indexBuffer, submesh);
+		staticPass.sort();
+		dynamicPass.sort();
 	}
 
 	void reset()
 	{
-		staticDrawCalls.clear();
-		dynamicDrawCalls.clear();
-		doubleSidedStaticDrawCalls.clear();
-		doubleSidedDynamicDrawCalls.clear();
+		staticPass.clear();
+		dynamicPass.clear();
 	}
 
-	std::vector<shadow_render_command> staticDrawCalls;
-	std::vector<shadow_render_command> dynamicDrawCalls;
 
-	std::vector<shadow_render_command> doubleSidedStaticDrawCalls;
-	std::vector<shadow_render_command> doubleSidedDynamicDrawCalls;
+	template <typename pipeline_t>
+	void renderStaticObject(const typename pipeline_t::render_data_t& renderData)
+	{
+		using render_data_t = typename pipeline_t::render_data_t;
+
+		uint64 sortKey = (uint64)pipeline_t::setup;
+		auto& command = staticPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey);
+		command.data = renderData;
+	}
+
+	template <typename pipeline_t>
+	void renderDynamicObject(const typename pipeline_t::render_data_t& renderData)
+	{
+		using render_data_t = typename pipeline_t::render_data_t;
+
+		uint64 sortKey = (uint64)pipeline_t::setup;
+		auto& command = dynamicPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey);
+		command.data = renderData;
+	}
+
+	render_command_buffer<uint64> staticPass;
+	render_command_buffer<uint64> dynamicPass;
 };
 
 struct sun_cascade_render_pass : shadow_render_pass_base
@@ -391,24 +375,17 @@ struct sun_cascade_render_pass : shadow_render_pass_base
 struct sun_shadow_render_pass
 {
 	// Since each cascade includes the next lower one, if you submit a draw to cascade N, it will also be rendered in N-1 automatically. No need to add it to the lower one.
-	void renderStaticObject(uint32 cascadeIndex, const mat4& transform, const dx_vertex_buffer_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
+
+	template <typename pipeline_t>
+	void renderStaticObject(uint32 cascadeIndex, const typename pipeline_t::render_data_t& renderData)
 	{
-		cascades[cascadeIndex].renderStaticObject(transform, vertexBuffer, indexBuffer, submesh, doubleSided);
+		cascades[cascadeIndex].renderStaticObject<pipeline_t>(renderData);
 	}
 
-	void renderStaticObject(uint32 cascadeIndex, const mat4& transform, const dx_vertex_buffer_group_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
+	template <typename pipeline_t>
+	void renderDynamicObject(uint32 cascadeIndex, const typename pipeline_t::render_data_t& renderData)
 	{
-		renderStaticObject(cascadeIndex, transform, vertexBuffer.positions, indexBuffer, submesh, doubleSided);
-	}
-
-	void renderDynamicObject(uint32 cascadeIndex, const mat4& transform, const dx_vertex_buffer_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
-	{
-		cascades[cascadeIndex].renderDynamicObject(transform, vertexBuffer, indexBuffer, submesh, doubleSided);
-	}
-
-	void renderDynamicObject(uint32 cascadeIndex, const mat4& transform, const dx_vertex_buffer_group_view& vertexBuffer, const dx_index_buffer_view& indexBuffer, submesh_info submesh, bool doubleSided = false)
-	{
-		renderDynamicObject(cascadeIndex, transform, vertexBuffer.positions, indexBuffer, submesh, doubleSided);
+		cascades[cascadeIndex].renderDynamicObject<pipeline_t>(renderData);
 	}
 
 	void reset()

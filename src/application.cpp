@@ -539,6 +539,21 @@ void application::submitRendererParams(uint32 numSpotLightShadowPasses, uint32 n
 		opaqueRenderPass.sort();
 		transparentRenderPass.sort();
 		ldrRenderPass.sort();
+
+		for (uint32 i = 0; i < sunShadowRenderPass.numCascades; ++i)
+		{
+			sunShadowRenderPass.cascades[i].sort();
+		}
+
+		for (uint32 i = 0; i < numSpotLightShadowPasses; ++i)
+		{
+			spotShadowRenderPasses[i].sort();
+		}
+
+		for (uint32 i = 0; i < numPointLightShadowPasses; ++i)
+		{
+			pointShadowRenderPasses[i].sort();
+		}
 	}
 
 	renderer->submitRenderPass(&opaqueRenderPass);
@@ -666,14 +681,6 @@ void application::update(const user_input& input, float dt)
 		//}
 
 
-
-		for (auto [entityHandle, terrain, position] : scene.group(entt::get<terrain_component, position_component>).each())
-		{
-			terrain.render(this->scene.camera, &opaqueRenderPass, position.position, (uint32)entityHandle);
-		}
-
-
-
 		// Render shadow maps.
 		renderSunShadowMap(sun, &sunShadowRenderPass, scene, objectDragged);
 
@@ -729,6 +736,12 @@ void application::update(const user_input& input, float dt)
 			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], numSpotLights, spotLightShadowInfoBuffer[dxContext.bufferedFrameID]);
 		}
 
+
+
+		for (auto [entityHandle, terrain, position] : scene.group(entt::get<terrain_component, position_component>).each())
+		{
+			terrain.render(this->scene.camera, &opaqueRenderPass, sunShadowRenderPass.copyFromStaticCache ? 0 : &sunShadowRenderPass, position.position, (uint32)entityHandle);
+		}
 
 
 		{

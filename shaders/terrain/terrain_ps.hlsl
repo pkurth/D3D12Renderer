@@ -81,6 +81,7 @@ struct triplanar_mapping
 	}
 };
 
+[earlydepthstencil]
 [RootSignature(TERRAIN_RS)]
 ps_output main(ps_input IN)
 {

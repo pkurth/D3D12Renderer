@@ -3,6 +3,8 @@
 #include "render_resources.h"
 #include "shadow_map_cache.h"
 
+#include "depth_only_rs.hlsli"
+
 static void renderStaticGeometryToSunShadowMap(sun_shadow_render_pass* renderPass, game_scene& scene)
 {
 	for (auto [entityHandle, raster, transform] : 
@@ -13,7 +15,8 @@ static void renderStaticGeometryToSunShadowMap(sun_shadow_render_pass* renderPas
 
 		for (auto& sm : raster.mesh->submeshes)
 		{
-			renderPass->renderStaticObject(0, m, mesh.vertexBuffer, mesh.indexBuffer, sm.info);
+			shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
+			renderPass->renderStaticObject<shadow_pipeline::single_sided>(0, data);
 		}
 	}
 }
@@ -28,7 +31,8 @@ static void renderDynamicGeometryToSunShadowMap(sun_shadow_render_pass* renderPa
 
 		for (auto& sm : raster.mesh->submeshes)
 		{
-			renderPass->renderDynamicObject(0, m, mesh.vertexBuffer, mesh.indexBuffer, sm.info);
+			shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
+			renderPass->renderDynamicObject<shadow_pipeline::single_sided>(0, data);
 		}
 	}
 
@@ -42,7 +46,9 @@ static void renderDynamicGeometryToSunShadowMap(sun_shadow_render_pass* renderPa
 		{
 			auto submesh = raster.mesh->submeshes[i].info;
 			submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
-			renderPass->renderDynamicObject(0, m, anim.currentVertexBuffer, mesh.indexBuffer, submesh);
+			
+			shadow_render_data data = { m, anim.currentVertexBuffer.positions, mesh.indexBuffer, submesh };
+			renderPass->renderDynamicObject<shadow_pipeline::single_sided>(0, data);
 		}
 	}
 }
@@ -57,7 +63,8 @@ static void renderStaticGeometryToSpotShadowMap(spot_shadow_render_pass* renderP
 
 		for (auto& sm : raster.mesh->submeshes)
 		{
-			renderPass->renderStaticObject(m, mesh.vertexBuffer, mesh.indexBuffer, sm.info);
+			shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
+			renderPass->renderStaticObject<shadow_pipeline::single_sided>(data);
 		}
 	}
 }
@@ -72,7 +79,8 @@ static void renderDynamicGeometryToSpotShadowMap(spot_shadow_render_pass* render
 
 		for (auto& sm : raster.mesh->submeshes)
 		{
-			renderPass->renderDynamicObject(m, mesh.vertexBuffer, mesh.indexBuffer, sm.info);
+			shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
+			renderPass->renderDynamicObject<shadow_pipeline::single_sided>(data);
 		}
 	}
 
@@ -86,7 +94,9 @@ static void renderDynamicGeometryToSpotShadowMap(spot_shadow_render_pass* render
 		{
 			auto submesh = raster.mesh->submeshes[i].info;
 			submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
-			renderPass->renderDynamicObject(m, anim.currentVertexBuffer, mesh.indexBuffer, submesh);
+
+			shadow_render_data data = { m, anim.currentVertexBuffer.positions, mesh.indexBuffer, submesh };
+			renderPass->renderDynamicObject<shadow_pipeline::single_sided>(data);
 		}
 	}
 }
@@ -101,7 +111,8 @@ static void renderStaticGeometryToPointShadowMap(point_shadow_render_pass* rende
 
 		for (auto& sm : raster.mesh->submeshes)
 		{
-			renderPass->renderStaticObject(m, mesh.vertexBuffer, mesh.indexBuffer, sm.info);
+			shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
+			renderPass->renderStaticObject<point_shadow_pipeline::single_sided>(data);
 		}
 	}
 }
@@ -116,7 +127,8 @@ static void renderDynamicGeometryToPointShadowMap(point_shadow_render_pass* rend
 
 		for (auto& sm : raster.mesh->submeshes)
 		{
-			renderPass->renderDynamicObject(m, mesh.vertexBuffer, mesh.indexBuffer, sm.info);
+			shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
+			renderPass->renderDynamicObject<point_shadow_pipeline::single_sided>(data);
 		}
 	}
 
@@ -130,7 +142,9 @@ static void renderDynamicGeometryToPointShadowMap(point_shadow_render_pass* rend
 		{
 			auto submesh = raster.mesh->submeshes[i].info;
 			submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
-			renderPass->renderDynamicObject(m, anim.currentVertexBuffer, mesh.indexBuffer, submesh);
+
+			shadow_render_data data = { m, anim.currentVertexBuffer.positions, mesh.indexBuffer, submesh };
+			renderPass->renderDynamicObject<point_shadow_pipeline::single_sided>(data);
 		}
 	}
 }
@@ -233,4 +247,101 @@ point_shadow_info renderPointShadowMap(const point_light_cb& pointLight, uint32 
 	si.viewport1 = vec4(vp1.x, vp1.y, vp1.size, vp1.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
 	return si;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+static dx_pipeline shadowPipeline;
+static dx_pipeline doubleSidedShadowPipeline;
+
+static dx_pipeline pointLightShadowPipeline;
+static dx_pipeline doubleSidedPointLightShadowPipeline;
+
+void initializeShadowPipelines()
+{
+	auto desc = CREATE_GRAPHICS_PIPELINE
+		.renderTargets(0, 0, shadowDepthFormat)
+		.inputLayout(inputLayout_position)
+		//.cullFrontFaces()
+		;
+
+	shadowPipeline = createReloadablePipeline(desc, { "shadow_vs" }, rs_in_vertex_shader);
+	pointLightShadowPipeline = createReloadablePipeline(desc, { "shadow_point_light_vs", "shadow_point_light_ps" }, rs_in_vertex_shader);
+
+	desc.cullingOff();
+	doubleSidedShadowPipeline = createReloadablePipeline(desc, { "shadow_vs" }, rs_in_vertex_shader);
+	doubleSidedPointLightShadowPipeline = createReloadablePipeline(desc, { "shadow_point_light_vs", "shadow_point_light_ps" }, rs_in_vertex_shader);
+}
+
+PIPELINE_SETUP_IMPL(shadow_pipeline::single_sided)
+{
+	cl->setPipelineState(*shadowPipeline.pipeline);
+	cl->setGraphicsRootSignature(*shadowPipeline.rootSignature);
+
+	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+}
+
+PIPELINE_SETUP_IMPL(shadow_pipeline::double_sided)
+{
+	cl->setPipelineState(*doubleSidedShadowPipeline.pipeline);
+	cl->setGraphicsRootSignature(*doubleSidedShadowPipeline.rootSignature);
+
+	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+}
+
+PIPELINE_RENDER_IMPL(shadow_pipeline)
+{
+	cl->setGraphics32BitConstants(SHADOW_RS_MVP, viewProj * rc.data.transform);
+
+	cl->setVertexBuffer(0, rc.data.vertexBuffer);
+	cl->setIndexBuffer(rc.data.indexBuffer);
+
+	cl->drawIndexed(rc.data.submesh.numIndices, 1, rc.data.submesh.firstIndex, rc.data.submesh.baseVertex, 0);
+}
+
+
+
+
+PIPELINE_SETUP_IMPL(point_shadow_pipeline::single_sided)
+{
+	cl->setPipelineState(*pointLightShadowPipeline.pipeline);
+	cl->setGraphicsRootSignature(*pointLightShadowPipeline.rootSignature);
+
+	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+}
+
+PIPELINE_SETUP_IMPL(point_shadow_pipeline::double_sided)
+{
+	cl->setPipelineState(*doubleSidedPointLightShadowPipeline.pipeline);
+	cl->setGraphicsRootSignature(*doubleSidedPointLightShadowPipeline.rootSignature);
+
+	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+}
+
+PIPELINE_RENDER_IMPL(point_shadow_pipeline)
+{
+	cl->setGraphics32BitConstants(SHADOW_RS_MVP, rc.data.transform);
+
+	cl->setVertexBuffer(0, rc.data.vertexBuffer);
+	cl->setIndexBuffer(rc.data.indexBuffer);
+
+	cl->drawIndexed(rc.data.submesh.numIndices, 1, rc.data.submesh.firstIndex, rc.data.submesh.baseVertex, 0);
+}
+
+
+
+
+
+
 

@@ -20,7 +20,245 @@
 static dx_pipeline terrainGenerationPipeline;
 static dx_pipeline terrainPipeline;
 static dx_pipeline terrainDepthOnlyPipeline;
+static dx_pipeline terrainShadowPipeline;
 static ref<dx_index_buffer> terrainIndexBuffers[TERRAIN_MAX_LOD + 1];
+
+
+
+
+struct terrain_render_data_common
+{
+	vec3 minCorner;
+	int32 lod;
+	float chunkSize;
+	float amplitudeScale;
+
+	int32 lod_negX;
+	int32 lod_posX;
+	int32 lod_negZ;
+	int32 lod_posZ;
+
+	ref<dx_texture> heightmap;
+};
+
+struct terrain_render_data
+{
+	terrain_render_data_common common;
+
+	ref<dx_texture> normalmap;
+
+	ref<pbr_material> groundMaterial;
+	ref<pbr_material> rockMaterial;
+};
+
+struct terrain_pipeline
+{
+	using render_data_t = terrain_render_data;
+
+	PIPELINE_SETUP_DECL;
+	PIPELINE_RENDER_DECL;
+};
+
+struct terrain_depth_prepass_pipeline
+{
+	using render_data_t = terrain_render_data_common;
+
+	PIPELINE_SETUP_DECL;
+	DEPTH_ONLY_RENDER_DECL;
+};
+
+struct terrain_shadow_pipeline
+{
+	using render_data_t = terrain_render_data_common;
+
+	PIPELINE_SETUP_DECL;
+	PIPELINE_RENDER_DECL;
+};
+
+
+
+
+
+void initializeTerrainPipelines()
+{
+	terrainGenerationPipeline = createReloadablePipeline("terrain_generation_cs");
+
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			//.wireframe()
+			.renderTargets(opaqueLightPassFormats, arraysize(opaqueLightPassFormats), depthStencilFormat)
+			.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
+
+		terrainPipeline = createReloadablePipeline(desc, { "terrain_vs", "terrain_ps" });
+	}
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.renderTargets(depthOnlyFormat, arraysize(depthOnlyFormat), depthStencilFormat)
+			.inputLayout(inputLayout_position);
+
+		terrainDepthOnlyPipeline = createReloadablePipeline(desc, { "terrain_depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
+	}
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.renderTargets(0, 0, shadowDepthFormat)
+			.inputLayout(inputLayout_position)
+			;
+
+		terrainShadowPipeline = createReloadablePipeline(desc, { "terrain_shadow_vs" }, rs_in_vertex_shader);
+		//pointLightShadowPipeline = createReloadablePipeline(desc, { "shadow_point_light_vs", "shadow_point_light_ps" }, rs_in_vertex_shader);
+	}
+
+
+
+	uint32 numSegmentsPerDim = TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1;
+	uint32 numTrisLod0 = numSegmentsPerDim * numSegmentsPerDim * 2;
+
+	indexed_triangle16* tris = new indexed_triangle16[numTrisLod0];
+
+	for (uint32 lod = 0; lod < TERRAIN_MAX_LOD + 1; ++lod)
+	{
+		uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> lod;
+		uint32 stride = numSegmentsPerDim + 1;
+		uint32 numTris = numSegmentsPerDim * numSegmentsPerDim * 2;
+
+		uint32 i = 0;
+		for (uint32 z = 0; z < numSegmentsPerDim; ++z)
+		{
+			for (uint32 x = 0; x < numSegmentsPerDim; ++x)
+			{
+				tris[i++] = { (uint16)(stride * z + x),		(uint16)(stride * (z + 1) + x), (uint16)(stride * z + x + 1) };
+				tris[i++] = { (uint16)(stride * z + x + 1), (uint16)(stride * (z + 1) + x), (uint16)(stride * (z + 1) + x + 1) };
+			}
+		}
+
+		terrainIndexBuffers[lod] = createIndexBuffer(sizeof(uint16), numTris * 3, tris);
+	}
+
+	delete[] tris;
+}
+
+PIPELINE_SETUP_IMPL(terrain_pipeline)
+{
+	cl->setPipelineState(*terrainPipeline.pipeline);
+	cl->setGraphicsRootSignature(*terrainPipeline.rootSignature);
+
+	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	cl->setGraphicsDynamicConstantBuffer(TERRAIN_RS_CAMERA, common.cameraCBV);
+	cl->setGraphicsDynamicConstantBuffer(TERRAIN_RS_LIGHTING, common.lightingCBV);
+
+	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 0, common.irradiance);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 1, common.prefilteredRadiance);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 2, render_resources::brdfTex);
+}
+
+static terrain_cb getTerrainCB(const terrain_render_data_common& common)
+{
+	uint32 lod_negX = max(0, common.lod_negX - common.lod);
+	uint32 lod_posX = max(0, common.lod_posX - common.lod);
+	uint32 lod_negZ = max(0, common.lod_negZ - common.lod);
+	uint32 lod_posZ = max(0, common.lod_posZ - common.lod);
+
+	uint32 scaleDownByLODs = SCALE_DOWN_BY_LODS(lod_negX, lod_posX, lod_negZ, lod_posZ);
+
+	return terrain_cb{ common.minCorner, (uint32)common.lod, common.chunkSize, common.amplitudeScale, scaleDownByLODs };
+}
+
+PIPELINE_RENDER_IMPL(terrain_pipeline)
+{
+	PROFILE_ALL(cl, "Terrain");
+
+	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> rc.data.common.lod;
+	uint32 numTris = numSegmentsPerDim * numSegmentsPerDim * 2;
+
+	auto cb = getTerrainCB(rc.data.common);
+
+	cl->setGraphics32BitConstants(TERRAIN_RS_TRANSFORM, viewProj);
+	cl->setGraphics32BitConstants(TERRAIN_RS_CB, cb);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_HEIGHTMAP, 0, rc.data.common.heightmap);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_NORMALMAP, 0, rc.data.normalmap);
+
+	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
+
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 0, rc.data.groundMaterial->albedo ? rc.data.groundMaterial->albedo->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 1, rc.data.groundMaterial->normal ? rc.data.groundMaterial->normal->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 2, rc.data.groundMaterial->roughness ? rc.data.groundMaterial->roughness->defaultSRV : nullTexture);
+
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 3, rc.data.rockMaterial->albedo ? rc.data.rockMaterial->albedo->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 4, rc.data.rockMaterial->normal ? rc.data.rockMaterial->normal->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 5, rc.data.rockMaterial->roughness ? rc.data.rockMaterial->roughness->defaultSRV : nullTexture);
+
+	cl->setIndexBuffer(terrainIndexBuffers[rc.data.common.lod]);
+	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);
+}
+
+
+PIPELINE_SETUP_IMPL(terrain_depth_prepass_pipeline)
+{
+	cl->setPipelineState(*terrainDepthOnlyPipeline.pipeline);
+	cl->setGraphicsRootSignature(*terrainDepthOnlyPipeline.rootSignature);
+
+	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	
+	depth_only_camera_jitter_cb jitterCB = { common.cameraJitter, common.prevFrameCameraJitter };
+	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
+}
+
+DEPTH_ONLY_RENDER_IMPL(terrain_depth_prepass_pipeline)
+{
+	PROFILE_ALL(cl, "Terrain depth prepass");
+
+	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> rc.data.lod;
+	uint32 numTris = numSegmentsPerDim * numSegmentsPerDim * 2;
+
+	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_OBJECT_ID, rc.objectID);
+	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_TRANSFORM, depth_only_transform_cb{ viewProj, prevFrameViewProj });
+
+	auto cb = getTerrainCB(rc.data);
+	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_CB, cb);
+	cl->setDescriptorHeapSRV(TERRAIN_DEPTH_ONLY_RS_HEIGHTMAP, 0, rc.data.heightmap);
+
+	cl->setIndexBuffer(terrainIndexBuffers[rc.data.lod]);
+	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);
+}
+
+
+PIPELINE_SETUP_IMPL(terrain_shadow_pipeline)
+{
+	cl->setPipelineState(*terrainShadowPipeline.pipeline);
+	cl->setGraphicsRootSignature(*terrainShadowPipeline.rootSignature);
+
+	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+}
+
+PIPELINE_RENDER_IMPL(terrain_shadow_pipeline)
+{
+	PROFILE_ALL(cl, "Terrain shadow");
+
+	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> rc.data.lod;
+	uint32 numTris = numSegmentsPerDim * numSegmentsPerDim * 2;
+
+	cl->setGraphics32BitConstants(TERRAIN_SHADOW_RS_TRANSFORM, viewProj);
+	auto cb = getTerrainCB(rc.data);
+	cl->setGraphics32BitConstants(TERRAIN_SHADOW_RS_CB, cb);
+	cl->setDescriptorHeapSRV(TERRAIN_SHADOW_RS_HEIGHTMAP, 0, rc.data.heightmap);
+
+	cl->setIndexBuffer(terrainIndexBuffers[rc.data.lod]);
+	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 struct height_generator
@@ -323,7 +561,7 @@ void terrain_component::generateChunksGPU()
 	dxContext.executeCommandList(cl);
 }
 
-void terrain_component::render(const render_camera& camera, opaque_render_pass* renderPass, vec3 positionOffset, uint32 entityID)
+void terrain_component::render(const render_camera& camera, opaque_render_pass* renderPass, sun_shadow_render_pass* shadowPass, vec3 positionOffset, uint32 entityID)
 {
 	if (memcmp(&genSettings, &oldGenSettings, sizeof(terrain_generation_settings)) != 0)
 	{
@@ -373,168 +611,51 @@ void terrain_component::render(const render_camera& camera, opaque_render_pass* 
 				vec3 minCorner = localMinCorner + positionOffset;
 				vec3 maxCorner = minCorner + vec3(chunkSize, amplitudeScale, chunkSize);
 
+				terrain_render_data_common common =
+				{
+					minCorner,
+					lod,
+					chunkSize,
+					amplitudeScale,
+					lods[(z)*lodStride + (x - 1)],
+					lods[(z)*lodStride + (x + 1)],
+					lods[(z - 1) * lodStride + (x)],
+					lods[(z + 1) * lodStride + (x)],
+					c.heightmap,
+				};
 
 				bounding_box aabb = { minCorner, maxCorner };
 				if (!frustum.cullWorldSpaceAABB(aabb))
 				{
-					terrain_render_data_common common =
-					{
-						minCorner,
-						lod,
-						chunkSize,
-						amplitudeScale,
-						lods[(z)*lodStride + (x - 1)],
-						lods[(z)*lodStride + (x + 1)],
-						lods[(z - 1) * lodStride + (x)],
-						lods[(z + 1) * lodStride + (x)],
-						c.heightmap,
-					};
 
-					terrain_render_data data = { 
+					terrain_render_data data = {
 						common,
 						c.normalmap,
-						groundMaterial, rockMaterial 
+						groundMaterial, rockMaterial
 					};
 					renderPass->renderObject<terrain_pipeline, terrain_depth_prepass_pipeline>(data, common, entityID);
+				}
+
+				if (shadowPass)
+				{
+					shadowPass->renderStaticObject<terrain_shadow_pipeline>(0, common);
 				}
 			}
 		}
 	}
 }
 
-void terrain_pipeline::initialize()
-{
-	terrainGenerationPipeline = createReloadablePipeline("terrain_generation_cs");
-
-	{
-		auto desc = CREATE_GRAPHICS_PIPELINE
-			//.wireframe()
-			.renderTargets(opaqueLightPassFormats, arraysize(opaqueLightPassFormats), depthStencilFormat)
-			.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
-
-		terrainPipeline = createReloadablePipeline(desc, { "terrain_vs", "terrain_ps" });
-	}
-	{
-		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(depthOnlyFormat, arraysize(depthOnlyFormat), depthStencilFormat)
-			.inputLayout(inputLayout_position);
-
-		terrainDepthOnlyPipeline = createReloadablePipeline(desc, { "terrain_depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
-	}
 
 
 
-	uint32 numSegmentsPerDim = TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1;
-	uint32 numTrisLod0 = numSegmentsPerDim * numSegmentsPerDim * 2;
-
-	indexed_triangle16* tris = new indexed_triangle16[numTrisLod0];
-
-	for (uint32 lod = 0; lod < TERRAIN_MAX_LOD + 1; ++lod)
-	{
-		uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> lod;
-		uint32 stride = numSegmentsPerDim + 1;
-		uint32 numTris = numSegmentsPerDim * numSegmentsPerDim * 2;
-
-		uint32 i = 0;
-		for (uint32 z = 0; z < numSegmentsPerDim; ++z)
-		{
-			for (uint32 x = 0; x < numSegmentsPerDim; ++x)
-			{
-				tris[i++] = { (uint16)(stride * z + x),		(uint16)(stride * (z + 1) + x), (uint16)(stride * z + x + 1) };
-				tris[i++] = { (uint16)(stride * z + x + 1), (uint16)(stride * (z + 1) + x), (uint16)(stride * (z + 1) + x + 1) };
-			}
-		}
-
-		terrainIndexBuffers[lod] = createIndexBuffer(sizeof(uint16), numTris * 3, tris);
-	}
-
-	delete[] tris;
-}
-
-PIPELINE_SETUP_IMPL(terrain_pipeline)
-{
-	cl->setPipelineState(*terrainPipeline.pipeline);
-	cl->setGraphicsRootSignature(*terrainPipeline.rootSignature);
-
-	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	cl->setGraphicsDynamicConstantBuffer(TERRAIN_RS_CAMERA, common.cameraCBV);
-	cl->setGraphicsDynamicConstantBuffer(TERRAIN_RS_LIGHTING, common.lightingCBV);
-
-	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 0, common.irradiance);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 1, common.prefilteredRadiance);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 2, render_resources::brdfTex);
-}
-
-static terrain_cb getTerrainCB(const terrain_render_data_common& common)
-{
-	uint32 lod_negX = max(0, common.lod_negX - common.lod);
-	uint32 lod_posX = max(0, common.lod_posX - common.lod);
-	uint32 lod_negZ = max(0, common.lod_negZ - common.lod);
-	uint32 lod_posZ = max(0, common.lod_posZ - common.lod);
-
-	uint32 scaleDownByLODs = SCALE_DOWN_BY_LODS(lod_negX, lod_posX, lod_negZ, lod_posZ);
-
-	return terrain_cb{ common.minCorner, (uint32)common.lod, common.chunkSize, common.amplitudeScale, scaleDownByLODs };
-}
-
-PIPELINE_RENDER_IMPL(terrain_pipeline)
-{
-	PROFILE_ALL(cl, "Terrain");
-
-	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> rc.data.common.lod;
-	uint32 numTris = numSegmentsPerDim * numSegmentsPerDim * 2;
-
-	auto cb = getTerrainCB(rc.data.common);
-
-	cl->setGraphics32BitConstants(TERRAIN_RS_TRANSFORM, viewProj);
-	cl->setGraphics32BitConstants(TERRAIN_RS_CB, cb);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_HEIGHTMAP, 0, rc.data.common.heightmap);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_NORMALMAP, 0, rc.data.normalmap);
-
-	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
-
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 0, rc.data.groundMaterial->albedo ? rc.data.groundMaterial->albedo->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 1, rc.data.groundMaterial->normal ? rc.data.groundMaterial->normal->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 2, rc.data.groundMaterial->roughness ? rc.data.groundMaterial->roughness->defaultSRV : nullTexture);
-
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 3, rc.data.rockMaterial->albedo ? rc.data.rockMaterial->albedo->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 4, rc.data.rockMaterial->normal ? rc.data.rockMaterial->normal->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 5, rc.data.rockMaterial->roughness ? rc.data.rockMaterial->roughness->defaultSRV : nullTexture);
-
-	cl->setIndexBuffer(terrainIndexBuffers[rc.data.common.lod]);
-	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);
-}
 
 
-PIPELINE_SETUP_IMPL(terrain_depth_prepass_pipeline)
-{
-	cl->setPipelineState(*terrainDepthOnlyPipeline.pipeline);
-	cl->setGraphicsRootSignature(*terrainDepthOnlyPipeline.rootSignature);
 
-	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	
-	depth_only_camera_jitter_cb jitterCB = { common.cameraJitter, common.prevFrameCameraJitter };
-	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
-}
 
-DEPTH_ONLY_RENDER_IMPL(terrain_depth_prepass_pipeline)
-{
-	PROFILE_ALL(cl, "Terrain depth prepass");
 
-	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> rc.data.lod;
-	uint32 numTris = numSegmentsPerDim * numSegmentsPerDim * 2;
 
-	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_OBJECT_ID, rc.objectID);
-	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_TRANSFORM, depth_only_transform_cb{ viewProj, prevFrameViewProj });
 
-	auto cb = getTerrainCB(rc.data);
-	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_CB, cb);
-	cl->setDescriptorHeapSRV(TERRAIN_DEPTH_ONLY_RS_HEIGHTMAP, 0, rc.data.heightmap);
 
-	cl->setIndexBuffer(terrainIndexBuffers[rc.data.lod]);
-	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);
-}
 
 
 

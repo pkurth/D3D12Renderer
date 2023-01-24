@@ -462,7 +462,8 @@ void main_renderer::endFrame(const user_input* input)
 
 				shadowPasses(cl, sunShadowRenderPasses, numSunLightShadowRenderPasses,
 					spotLightShadowRenderPasses, numSpotLightShadowRenderPasses,
-					pointLightShadowRenderPasses, numPointLightShadowRenderPasses);
+					pointLightShadowRenderPasses, numPointLightShadowRenderPasses,
+					commonRenderData);
 
 				cl->transitionBarrier(render_resources::shadowMap, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			}

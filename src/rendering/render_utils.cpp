@@ -13,6 +13,7 @@
 #include "debug_visualization.h"
 #include "light_probe.h"
 #include "raytraced_reflections.h"
+#include "shadow_map.h"
 #include "terrain/terrain.h"
 
 
@@ -28,6 +29,8 @@ void initializeRenderUtils()
 	initializeTexturePreprocessing();
 	initializeDepthPrepassPipelines();
 	initializeSkinning();
+	initializeShadowPipelines();
+	initializeTerrainPipelines();
 	initializeLightProbePipelines();
 	initializeRTReflectionsPipelines();
 	loadCommonShaders();
@@ -36,7 +39,6 @@ void initializeRenderUtils()
 	debug_unlit_pipeline::initialize();
 	debug_unlit_line_pipeline::initialize();
 	pbr_pipeline::initialize();
-	terrain_pipeline::initialize();
 	particle_system::initializePipeline();
 	initializeBitonicSort();
 	loadAllParticleSystemPipelines();
