@@ -8,6 +8,7 @@
 Texture2D<float2> normals					: register(t1);
 SamplerState clampSampler					: register(s0);
 SamplerState wrapSampler					: register(s1);
+SamplerComparisonState shadowSampler					: register(s2);
 
 ConstantBuffer<terrain_cb> terrain			: register(b1);
 
@@ -27,11 +28,19 @@ TextureCube<float4> prefilteredRadianceTexture			: register(t1, space2);
 
 Texture2D<float2> brdf									: register(t2, space2);
 
+Texture2D<float> shadowMap								: register(t3, space2);
+
+Texture2D<float> aoTexture								: register(t4, space2);
+Texture2D<float> sssTexture								: register(t5, space2);
+Texture2D<float4> ssrTexture							: register(t6, space2);
+
 
 struct ps_input
 {
 	float2 uv				: TEXCOORDS;
 	float3 worldPosition	: POSITION;
+
+	float4 screenPosition	: SV_POSITION;
 };
 
 struct ps_output
@@ -142,6 +151,8 @@ ps_output main(ps_input IN)
 	surface.inferRemainingProperties();
 
 
+	float pixelDepth = dot(camera.forward.xyz, camToP);
+
 
 
 
@@ -156,7 +167,13 @@ ps_output main(ps_input IN)
 		light_info light;
 		light.initialize(surface, L, lighting.sun.radiance);
 
-		float visibility = 1.f;
+		float visibility = sampleCascadedShadowMapPCF(lighting.sun.viewProjs, surface.P,
+			shadowMap, lighting.sun.viewports,
+			shadowSampler, lighting.shadowMapTexelSize, pixelDepth, lighting.sun.numShadowCascades,
+			lighting.sun.cascadeDistances, lighting.sun.bias, lighting.sun.blendDistances);
+
+		float sss = sssTexture.SampleLevel(clampSampler, IN.screenPosition.xy * camera.invScreenDims, 0);
+		visibility *= sss;
 
 		[branch]
 		if (visibility > 0.f)
@@ -166,7 +183,21 @@ ps_output main(ps_input IN)
 	}
 
 
-	totalLighting.add(calculateAmbientIBL(surface, irradianceTexture, prefilteredRadianceTexture, brdf, clampSampler), 1.f);
+
+	// Ambient light.
+	float2 screenUV = IN.screenPosition.xy * camera.invScreenDims;
+	float ao = aoTexture.SampleLevel(clampSampler, screenUV, 0);
+
+	float4 ssr = ssrTexture.SampleLevel(clampSampler, screenUV, 0);
+
+
+	ambient_factors factors = getAmbientFactors(surface);
+	totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.globalIlluminationIntensity * ao;
+	float3 specular = specularIBL(factors.ks, surface, prefilteredRadianceTexture, brdf, clampSampler);
+
+	specular = lerp(specular, ssr.rgb * surface.F, ssr.a);
+	totalLighting.specular += specular * lighting.globalIlluminationIntensity * ao;
+
 
 
 	//float value = step(0.9f, N.y);

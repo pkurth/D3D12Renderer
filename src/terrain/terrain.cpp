@@ -147,9 +147,15 @@ PIPELINE_SETUP_IMPL(terrain_pipeline)
 	cl->setGraphicsDynamicConstantBuffer(TERRAIN_RS_CAMERA, common.cameraCBV);
 	cl->setGraphicsDynamicConstantBuffer(TERRAIN_RS_LIGHTING, common.lightingCBV);
 
+	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
+
 	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 0, common.irradiance);
 	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 1, common.prefilteredRadiance);
 	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 2, render_resources::brdfTex);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 3, common.shadowMap);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 4, common.aoTexture ? common.aoTexture : render_resources::whiteTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 5, common.sssTexture ? common.sssTexture : render_resources::whiteTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_FRAME_CONSTANTS, 6, common.ssrTexture ? common.ssrTexture->defaultSRV : nullTexture);
 }
 
 static terrain_cb getTerrainCB(const terrain_render_data_common& common)

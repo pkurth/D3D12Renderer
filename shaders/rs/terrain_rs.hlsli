@@ -35,7 +35,7 @@ struct terrain_transform_cb
 	"CBV(b1, space=1), " \
 	"CBV(b2, space=1), " \
 	"DescriptorTable(SRV(t0, space=1, numDescriptors=6), visibility=SHADER_VISIBILITY_PIXEL)," \
-    "DescriptorTable(SRV(t0, space=2, numDescriptors=3), visibility=SHADER_VISIBILITY_PIXEL), " \
+    "DescriptorTable(SRV(t0, space=2, numDescriptors=7), visibility=SHADER_VISIBILITY_PIXEL), " \
 	"StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \
         "addressV = TEXTURE_ADDRESS_CLAMP," \
@@ -47,6 +47,12 @@ struct terrain_transform_cb
         "addressV = TEXTURE_ADDRESS_WRAP," \
         "addressW = TEXTURE_ADDRESS_WRAP," \
         "filter = FILTER_ANISOTROPIC," \
+        "visibility=SHADER_VISIBILITY_PIXEL), " \
+    "StaticSampler(s2," \
+        "addressU = TEXTURE_ADDRESS_CLAMP," \
+        "addressV = TEXTURE_ADDRESS_CLAMP," \
+        "addressW = TEXTURE_ADDRESS_CLAMP," \
+        "filter = FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT," \
         "visibility=SHADER_VISIBILITY_PIXEL)"
 
 
