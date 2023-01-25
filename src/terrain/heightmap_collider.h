@@ -4,53 +4,38 @@
 #include "core/memory.h"
 #include "physics/bounding_volumes.h"
 
-struct heightmap_area
-{
-	float* heights;
-	uint32 numX;
-	uint32 numY;
-	uint32 strideX;
-
-	vec2 minCorner;
-	float segmentSize;
-	float minHeight, maxHeight;
-
-
-	inline float heightAt(uint32 x, uint32 y) const
-	{
-		return heights[y * strideX + x];
-	}
-};
-
 struct heightmap_collider
 {
 	heightmap_collider(uint32 numVerticesPerDim)
 		: numVerticesPerDim(numVerticesPerDim)
 	{}
 
-
-	void setHeights(uint16* heights) {}
-
-	//heightmap_area getHeightsInArea(vec2 minCorner, vec2 maxCorner);
+	void setHeights(uint16* heights);
 
 	template <typename callback_func>
 	void iterateTrianglesInVolume(uint32 volMinX, uint32 volMinZ, uint32 volMaxX, uint32 volMaxZ,
-		uint32 volMinY, uint32 volMaxY, float chunkScale, vec3 chunkMinCorner, memory_arena& arena, const callback_func& func);
+		uint32 volMinY, uint32 volMaxY, float chunkScale, float heightScale, vec3 chunkMinCorner, memory_arena& arena, const callback_func& func);
 
 private:
-	//vec2 positionInSegmentSpace(vec2 position);
-
 	uint32 numVerticesPerDim;
 	uint16* heights = 0;
+
+
+	struct heightmap_min_max
+	{
+		uint16 min, max;
+	};
+
+	std::vector<std::vector<heightmap_min_max>> mips;
 };
 
 template <typename callback_func>
 void heightmap_collider::iterateTrianglesInVolume(uint32 volMinX, uint32 volMinZ, uint32 volMaxX, uint32 volMaxZ, 
-	uint32 volMinY, uint32 volMaxY, float chunkScale, vec3 chunkMinCorner, memory_arena& arena, const callback_func& func)
+	uint32 volMinY, uint32 volMaxY, float chunkScale, float heightScale, vec3 chunkMinCorner, memory_arena& arena, const callback_func& func)
 {
 	if (!heights)
 	{
-		//return;
+		return;
 	}
 
 	memory_marker marker = arena.getMarker();
@@ -65,7 +50,7 @@ void heightmap_collider::iterateTrianglesInVolume(uint32 volMinX, uint32 volMinZ
 	uint32 stackSize = 0;
 
 
-	uint32 numMips = log2(numVerticesPerDim - 1) + 1;
+	uint32 numMips = (uint32)mips.size();
 
 	stack[stackSize++] = { (uint16)(numMips - 1), 0, 0 };
 
@@ -81,6 +66,12 @@ void heightmap_collider::iterateTrianglesInVolume(uint32 volMinX, uint32 volMinZ
 		if (maxX < volMinX || minX > volMaxX) continue;
 		if (maxZ < volMinZ || minZ > volMaxZ) continue;
 
+
+		uint32 numSegmentsPerDim = (numVerticesPerDim - 1) >> entry.mipLevel;
+		heightmap_min_max minmax = mips[entry.mipLevel][entry.z * numSegmentsPerDim + entry.x];
+		if (minmax.max < volMinY || minmax.min > volMaxY) continue;
+
+
 		if (entry.mipLevel == 0)
 		{
 			uint32 stride = numVerticesPerDim;
@@ -95,10 +86,10 @@ void heightmap_collider::iterateTrianglesInVolume(uint32 volMinX, uint32 volMinZ
 			vec2 c = vec2((float)(entry.x + 1), (float)(entry.z)) * chunkScale;
 			vec2 d = vec2((float)(entry.x + 1), (float)(entry.z + 1)) * chunkScale;
 
-			float heightA = 0.f; // TODO
-			float heightB = 0.f; // TODO
-			float heightC = 0.f; // TODO
-			float heightD = 0.f; // TODO
+			float heightA = heights[aIndex] * heightScale;
+			float heightB = heights[bIndex] * heightScale;
+			float heightC = heights[cIndex] * heightScale;
+			float heightD = heights[dIndex] * heightScale;
 
 			vec3 posA = vec3(a.x, heightA, a.y) + chunkMinCorner;
 			vec3 posB = vec3(b.x, heightB, b.y) + chunkMinCorner;
@@ -155,6 +146,7 @@ private:
 	float invChunkSize;
 	uint32 numVerticesPerDim;
 	float chunkScale;
+	float heightScale;
 
 	uint32 chunksPerDim;
 	std::vector<heightmap_collider> colliders;
@@ -182,6 +174,7 @@ inline void terrain_collider_context::iterateTrianglesInVolume(bounding_box volu
 	uint32 maxZ = (uint32)min((int32)volume.maxCorner.z, (int32)chunksPerDim - 1);
 
 
+	// Convert y to uint16
 
 	volume.minCorner.y *= invAmplitudeScale;
 	volume.maxCorner.y *= invAmplitudeScale;
@@ -212,7 +205,7 @@ inline void terrain_collider_context::iterateTrianglesInVolume(bounding_box volu
 			vec3 chunkMinCorner = vec3(x * chunkSize, 0.f, z * chunkSize) + this->minCorner;
 
 			collider(x, z).iterateTrianglesInVolume(chunkSpaceMinX, chunkSpaceMinZ, chunkSpaceMaxX, chunkSpaceMaxZ, 
-				minHeight, maxHeight, chunkScale, chunkMinCorner, arena, func);
+				minHeight, maxHeight, chunkScale, heightScale, chunkMinCorner, arena, func);
 		}
 	}
 }

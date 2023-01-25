@@ -2,38 +2,86 @@
 #include "heightmap_collider.h"
 
 
-
-//heightmap_area heightmap_collider::getHeightsInArea(vec2 minCorner, vec2 maxCorner)
-//{
-//	vec2 sMinCorner = positionInSegmentSpace(minCorner);
-//	vec2 sMaxCorner = positionInSegmentSpace(maxCorner);
-//
-//	int32 minX = max((int32)floor(sMinCorner.x), 0);
-//	int32 minY = max((int32)floor(sMinCorner.y), 0);
-//	int32 maxX = min((int32)ceil(sMaxCorner.x), (int32)numVerticesPerDim - 1);
-//	int32 maxY = min((int32)ceil(sMaxCorner.y), (int32)numVerticesPerDim - 1);
-//
-//	int32 minIndex = minY * numVerticesPerDim + minX;
-//
-//	heightmap_area result;
-//	result.heights = heights + minIndex;
-//	result.numX = maxX - minX + 1;
-//	result.numY = maxY - minY + 1;
-//	result.strideX = (int32)numVerticesPerDim;
-//	result.minHeight = 0.f; // TODO
-//	result.maxHeight = 1.f; // TODO
-//	result.minCorner = minCorner + vec2((float)minX, (float)minY) * segmentSize;
-//	result.segmentSize = segmentSize;
-//	return result;
-//}
-
-//vec2 heightmap_collider::positionInSegmentSpace(vec2 position)
-//{
-//	return (position - vec2(minCorner.x, minCorner.z)) * invSegmentSize;
-//}
-
 void terrain_collider_context::update(vec3 minCorner, float amplitudeScale)
 {
 	this->minCorner = minCorner;
 	this->invAmplitudeScale = 1.f / amplitudeScale;
+	this->heightScale = amplitudeScale / UINT16_MAX;
+}
+
+void heightmap_collider::setHeights(uint16* heights)
+{
+	this->heights = heights;
+
+	uint32 numSegments = numVerticesPerDim - 1;
+	uint32 numMips = log2(numSegments) + 1;
+
+	mips.resize(numMips);
+
+
+
+
+	{
+		uint32 readStride = numVerticesPerDim;
+
+		auto& mip = mips.front();
+		mip.resize(numSegments * numSegments);
+		for (uint32 z = 0; z < numSegments; ++z)
+		{
+			for (uint32 x = 0; x < numSegments; ++x)
+			{
+				uint32 aIndex = (readStride * z + x);
+				uint32 bIndex = (readStride * (z + 1) + x);
+				uint32 cIndex = (readStride * z + x + 1);
+				uint32 dIndex = (readStride * (z + 1) + x + 1);
+
+				uint16 a = heights[aIndex];
+				uint16 b = heights[bIndex];
+				uint16 c = heights[cIndex];
+				uint16 d = heights[dIndex];
+
+				heightmap_min_max v =
+				{
+					min(a, min(b, min(c, d))),
+					max(a, max(b, max(c, d))),
+				};
+
+				mip[numSegments * z + x] = v;
+			}
+		}
+	}
+
+	for (uint32 i = 1; i < numMips; ++i)
+	{
+		uint32 readStride = numSegments;
+
+		numSegments >>= 1;
+
+		auto& readMip = mips[i - 1];
+		auto& writeMip = mips[i];
+		writeMip.resize(numSegments * numSegments);
+		for (uint32 z = 0; z < numSegments; ++z)
+		{
+			for (uint32 x = 0; x < numSegments; ++x)
+			{
+				uint32 x0 = x * 2;
+				uint32 x1 = x * 2 + 1;
+				uint32 z0 = z * 2;
+				uint32 z1 = z * 2 + 1;
+
+				heightmap_min_max a = readMip[readStride * z0 + x0];
+				heightmap_min_max b = readMip[readStride * z1 + x0];
+				heightmap_min_max c = readMip[readStride * z0 + x1];
+				heightmap_min_max d = readMip[readStride * z1 + x1];
+
+				heightmap_min_max v =
+				{
+					min(a.min, min(b.min, min(c.min, d.min))),
+					max(a.max, max(b.max, max(c.max, d.max))),
+				};
+
+				writeMip[numSegments * z + x] = v;
+			}
+		}
+	}
 }
