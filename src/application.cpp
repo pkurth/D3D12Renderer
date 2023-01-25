@@ -88,23 +88,15 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 
 #if 1
 	uint32 numTerrainChunks = 10;
+	float terrainChunkSize = 64.f;
 
 	auto terrainGroundMaterial = createPBRMaterial("assets/terrain/ground/Ground037_2K_Color.png", "assets/terrain/ground/Ground037_2K_NormalDX.png", "assets/terrain/ground/Ground037_2K_Roughness.png", {});
 	auto terrainRockMaterial = createPBRMaterial("assets/terrain/rock/Rock034_2K_Color.png", "assets/terrain/rock/Rock034_2K_NormalDX.png",	"assets/terrain/rock/Rock034_2K_Roughness.png", {});
 
 	auto terrain = scene.createEntity("Terrain")
 		.addComponent<position_component>(vec3(0.f, -64.f, 0.f))
-		.addComponent<terrain_component>(numTerrainChunks, 64.f, 50.f, terrainGroundMaterial, terrainRockMaterial);
-
-	terrain_component& terrainComponent = terrain.getComponent<terrain_component>();
-
-	for (uint32 z = 0; z < numTerrainChunks; ++z)
-	{
-		for (uint32 x = 0; x < numTerrainChunks; ++x)
-		{
-			terrainComponent.chunk(x, z).active = true;
-		}
-	}
+		.addComponent<terrain_component>(numTerrainChunks, terrainChunkSize, 50.f, terrainGroundMaterial, terrainRockMaterial)
+		.addComponent<heightmap_collider_component>(numTerrainChunks, terrainChunkSize);
 #endif
 
 
@@ -603,9 +595,11 @@ void application::update(const user_input& input, float dt)
 	// Must happen before physics update.
 	for (auto [entityHandle, terrain, position] : scene.group(entt::get<terrain_component, position_component>).each())
 	{
-		terrain.update(position.position);
-	}
+		scene_entity entity = { entityHandle, scene };
+		heightmap_collider_component* collider = entity.getComponentIfExists<heightmap_collider_component>();
 
+		terrain.update(position.position, collider);
+	}
 
 
 	static float physicsTimer = 0.f;

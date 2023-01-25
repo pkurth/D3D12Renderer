@@ -2,18 +2,27 @@
 #include "heightmap_collider.h"
 
 
-void terrain_collider_context::update(vec3 minCorner, float amplitudeScale)
+heightmap_collider_component::heightmap_collider_component(uint32 chunksPerDim, float chunkSize)
+	: chunksPerDim(chunksPerDim), chunkSize(chunkSize), invChunkSize(1.f / chunkSize)
+{
+	colliders.resize(chunksPerDim * chunksPerDim);
+
+	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1);
+	chunkScale = chunkSize / numSegmentsPerDim;
+}
+
+void heightmap_collider_component::update(vec3 minCorner, float amplitudeScale)
 {
 	this->minCorner = minCorner;
 	this->invAmplitudeScale = 1.f / amplitudeScale;
 	this->heightScale = amplitudeScale / UINT16_MAX;
 }
 
-void heightmap_collider::setHeights(uint16* heights)
+void heightmap_collider_chunk::setHeights(uint16* heights)
 {
 	this->heights = heights;
 
-	uint32 numSegments = numVerticesPerDim - 1;
+	uint32 numSegments = TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1;
 	uint32 numMips = log2(numSegments) + 1;
 
 	mips.resize(numMips);
@@ -22,7 +31,7 @@ void heightmap_collider::setHeights(uint16* heights)
 
 
 	{
-		uint32 readStride = numVerticesPerDim;
+		uint32 readStride = TERRAIN_LOD_0_VERTICES_PER_DIMENSION;
 
 		auto& mip = mips.front();
 		mip.resize(numSegments * numSegments);
@@ -84,4 +93,6 @@ void heightmap_collider::setHeights(uint16* heights)
 			}
 		}
 	}
+
+	assert(mips.back().size() == 1);
 }

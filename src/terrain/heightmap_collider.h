@@ -4,12 +4,13 @@
 #include "core/memory.h"
 #include "physics/bounding_volumes.h"
 
-struct heightmap_collider
-{
-	heightmap_collider(uint32 numVerticesPerDim)
-		: numVerticesPerDim(numVerticesPerDim)
-	{}
+#ifndef TERRAIN_LOD_0_VERTICES_PER_DIMENSION
+// Must match terrain_rs.hlsli
+#define TERRAIN_LOD_0_VERTICES_PER_DIMENSION 129
+#endif
 
+struct heightmap_collider_chunk
+{
 	void setHeights(uint16* heights);
 
 	template <typename callback_func>
@@ -17,7 +18,6 @@ struct heightmap_collider
 		uint32 volMinY, uint32 volMaxY, float chunkScale, float heightScale, vec3 chunkMinCorner, memory_arena& arena, const callback_func& func);
 
 private:
-	uint32 numVerticesPerDim;
 	uint16* heights = 0;
 
 
@@ -30,7 +30,7 @@ private:
 };
 
 template <typename callback_func>
-void heightmap_collider::iterateTrianglesInVolume(uint32 volMinX, uint32 volMinZ, uint32 volMaxX, uint32 volMaxZ, 
+void heightmap_collider_chunk::iterateTrianglesInVolume(uint32 volMinX, uint32 volMinZ, uint32 volMaxX, uint32 volMaxZ,
 	uint32 volMinY, uint32 volMaxY, float chunkScale, float heightScale, vec3 chunkMinCorner, memory_arena& arena, const callback_func& func)
 {
 	if (!heights)
@@ -67,14 +67,14 @@ void heightmap_collider::iterateTrianglesInVolume(uint32 volMinX, uint32 volMinZ
 		if (maxZ < volMinZ || minZ > volMaxZ) continue;
 
 
-		uint32 numSegmentsPerDim = (numVerticesPerDim - 1) >> entry.mipLevel;
+		uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> entry.mipLevel;
 		heightmap_min_max minmax = mips[entry.mipLevel][entry.z * numSegmentsPerDim + entry.x];
 		if (minmax.max < volMinY || minmax.min > volMaxY) continue;
 
 
 		if (entry.mipLevel == 0)
 		{
-			uint32 stride = numVerticesPerDim;
+			uint32 stride = TERRAIN_LOD_0_VERTICES_PER_DIMENSION;
 
 			uint32 aIndex = (stride * entry.z + entry.x);
 			uint32 bIndex = (stride * (entry.z + 1) + entry.x);
@@ -117,45 +117,34 @@ void heightmap_collider::iterateTrianglesInVolume(uint32 volMinX, uint32 volMinZ
 
 
 
-struct terrain_collider_context
+struct heightmap_collider_component
 {
-	terrain_collider_context(uint32 chunksPerDim, float chunkSize, uint32 numVerticesPerDim)
-		: chunksPerDim(chunksPerDim), chunkSize(chunkSize), invChunkSize(1.f / chunkSize), numVerticesPerDim(numVerticesPerDim)
-	{
-		assert(isPowerOfTwo(numVerticesPerDim - 1));
-
-		colliders.resize(chunksPerDim * chunksPerDim, numVerticesPerDim);
-
-		uint32 numSegmentsPerDim = (numVerticesPerDim - 1);
-		chunkScale = chunkSize / numSegmentsPerDim;
-	}
+	heightmap_collider_component(uint32 chunksPerDim, float chunkSize);
 
 	void update(vec3 minCorner, float amplitudeScale);
 
 	template <typename callback_func>
 	void iterateTrianglesInVolume(bounding_box volume, memory_arena& arena, const callback_func& func);
 
-	heightmap_collider& collider(uint32 x, uint32 z) { return colliders[z * chunksPerDim + x]; }
-	const heightmap_collider& collider(uint32 x, uint32 z) const { return colliders[z * chunksPerDim + x]; }
+	heightmap_collider_chunk& collider(uint32 x, uint32 z) { return colliders[z * chunksPerDim + x]; }
+	const heightmap_collider_chunk& collider(uint32 x, uint32 z) const { return colliders[z * chunksPerDim + x]; }
 
 private:
-
 	vec3 minCorner;
-	float invAmplitudeScale;
+	float invAmplitudeScale = 1.f;
 	float chunkSize;
 	float invChunkSize;
-	uint32 numVerticesPerDim;
 	float chunkScale;
-	float heightScale;
+	float heightScale = 0.f;
 
 	uint32 chunksPerDim;
-	std::vector<heightmap_collider> colliders;
+	std::vector<heightmap_collider_chunk> colliders;
 };
 
 
 
 template<typename callback_func>
-inline void terrain_collider_context::iterateTrianglesInVolume(bounding_box volume, memory_arena& arena, const callback_func& func)
+inline void heightmap_collider_component::iterateTrianglesInVolume(bounding_box volume, memory_arena& arena, const callback_func& func)
 {
 	volume.minCorner -= this->minCorner;
 	volume.maxCorner -= this->minCorner;
@@ -170,9 +159,8 @@ inline void terrain_collider_context::iterateTrianglesInVolume(bounding_box volu
 
 	uint32 minX = max((int32)volume.minCorner.x, 0);
 	uint32 minZ = max((int32)volume.minCorner.z, 0);
-	uint32 maxX = (uint32)min((int32)volume.maxCorner.x, (int32)chunksPerDim - 1);
-	uint32 maxZ = (uint32)min((int32)volume.maxCorner.z, (int32)chunksPerDim - 1);
-
+	uint32 maxX = (uint32)clamp((int32)volume.maxCorner.x, 0, (int32)chunksPerDim - 1);
+	uint32 maxZ = (uint32)clamp((int32)volume.maxCorner.z, 0, (int32)chunksPerDim - 1);
 
 	// Convert y to uint16
 
@@ -197,10 +185,10 @@ inline void terrain_collider_context::iterateTrianglesInVolume(bounding_box volu
 			float relMaxZ = (volume.maxCorner.z > (z + 1)) ? 1.f : frac(volume.maxCorner.z);
 
 
-			uint32 chunkSpaceMinX = (uint32)(relMinX * numVerticesPerDim);
-			uint32 chunkSpaceMinZ = (uint32)(relMinZ * numVerticesPerDim);
-			uint32 chunkSpaceMaxX = (uint32)(relMaxX * numVerticesPerDim);
-			uint32 chunkSpaceMaxZ = (uint32)(relMaxZ * numVerticesPerDim);
+			uint32 chunkSpaceMinX = (uint32)(relMinX * TERRAIN_LOD_0_VERTICES_PER_DIMENSION);
+			uint32 chunkSpaceMinZ = (uint32)(relMinZ * TERRAIN_LOD_0_VERTICES_PER_DIMENSION);
+			uint32 chunkSpaceMaxX = (uint32)(relMaxX * TERRAIN_LOD_0_VERTICES_PER_DIMENSION);
+			uint32 chunkSpaceMaxZ = (uint32)(relMaxZ * TERRAIN_LOD_0_VERTICES_PER_DIMENSION);
 
 			vec3 chunkMinCorner = vec3(x * chunkSize, 0.f, z * chunkSize) + this->minCorner;
 

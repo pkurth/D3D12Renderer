@@ -400,18 +400,15 @@ terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float
 	terrain_generation_settings genSettings)
 	: chunksPerDim(chunksPerDim), 
 	chunkSize(chunkSize), 
-	genSettings(genSettings), 
-	oldGenSettings(genSettings), 
-	colliderContext(chunksPerDim, chunkSize, TERRAIN_LOD_0_VERTICES_PER_DIMENSION)
+	genSettings(genSettings)
 {
+	oldGenSettings.scale = -FLT_MAX; // Set to garbage so that it is updated in the first frame.
+
 	this->amplitudeScale = amplitudeScale;
 	this->chunks.resize(chunksPerDim * chunksPerDim);
 
 	this->groundMaterial = groundMaterial;
 	this->rockMaterial = rockMaterial;
-
-	generateChunksGPU();
-	updateColliders();
 }
 
 void terrain_component::generateChunksCPU()
@@ -589,21 +586,7 @@ void terrain_component::generateChunksGPU()
 	}
 }
 
-void terrain_component::updateColliders()
-{
-	for (int32 cz = 0; cz < (int32)chunksPerDim; ++cz)
-	{
-		for (int32 cx = 0; cx < (int32)chunksPerDim; ++cx)
-		{
-			auto& terrainChunk = chunk(cx, cz);
-			auto& terrainCollider = colliderContext.collider(cx, cz);
-
-			terrainCollider.setHeights(terrainChunk.heights.data());
-		}
-	}
-}
-
-void terrain_component::update(vec3 positionOffset)
+void terrain_component::update(vec3 positionOffset, heightmap_collider_component* collider)
 {
 	if (memcmp(&genSettings, &oldGenSettings, sizeof(terrain_generation_settings)) != 0)
 	{
@@ -611,14 +594,29 @@ void terrain_component::update(vec3 positionOffset)
 
 		oldGenSettings = genSettings;
 
-		updateColliders();
+		if (collider)
+		{
+			for (int32 cz = 0; cz < (int32)chunksPerDim; ++cz)
+			{
+				for (int32 cx = 0; cx < (int32)chunksPerDim; ++cx)
+				{
+					auto& terrainChunk = chunk(cx, cz);
+					auto& terrainCollider = collider->collider(cx, cz);
+
+					terrainCollider.setHeights(terrainChunk.heights.data());
+				}
+			}
+		}
 	}
 
 
 	float xzOffset = -(chunkSize * chunksPerDim) * 0.5f; // Offsets entire terrain by half.
 	positionOffset += vec3(xzOffset, 0.f, xzOffset);
 
-	colliderContext.update(positionOffset, amplitudeScale);
+	if (collider)
+	{
+		collider->update(positionOffset, amplitudeScale);
+	}
 }
 
 void terrain_component::render(const render_camera& camera, opaque_render_pass* renderPass, sun_shadow_render_pass* shadowPass, vec3 positionOffset, uint32 entityID)
@@ -655,43 +653,40 @@ void terrain_component::render(const render_camera& camera, opaque_render_pass* 
 		{
 			const terrain_chunk& c = chunk(x, z);
 
-			if (c.active)
+			int32 lod = lods[z * lodStride + x];
+
+			vec3 localMinCorner(x * chunkSize, 0.f, z * chunkSize);
+			vec3 minCorner = localMinCorner + positionOffset;
+			vec3 maxCorner = minCorner + vec3(chunkSize, amplitudeScale, chunkSize);
+
+			terrain_render_data_common common =
 			{
-				int32 lod = lods[z * lodStride + x];
+				minCorner,
+				lod,
+				chunkSize,
+				amplitudeScale,
+				lods[(z)*lodStride + (x - 1)],
+				lods[(z)*lodStride + (x + 1)],
+				lods[(z - 1) * lodStride + (x)],
+				lods[(z + 1) * lodStride + (x)],
+				c.heightmap,
+			};
 
-				vec3 localMinCorner(x * chunkSize, 0.f, z * chunkSize);
-				vec3 minCorner = localMinCorner + positionOffset;
-				vec3 maxCorner = minCorner + vec3(chunkSize, amplitudeScale, chunkSize);
+			bounding_box aabb = { minCorner, maxCorner };
+			if (!frustum.cullWorldSpaceAABB(aabb))
+			{
 
-				terrain_render_data_common common =
-				{
-					minCorner,
-					lod,
-					chunkSize,
-					amplitudeScale,
-					lods[(z)*lodStride + (x - 1)],
-					lods[(z)*lodStride + (x + 1)],
-					lods[(z - 1) * lodStride + (x)],
-					lods[(z + 1) * lodStride + (x)],
-					c.heightmap,
+				terrain_render_data data = {
+					common,
+					c.normalmap,
+					groundMaterial, rockMaterial
 				};
+				renderPass->renderObject<terrain_pipeline, terrain_depth_prepass_pipeline>(data, common, entityID);
+			}
 
-				bounding_box aabb = { minCorner, maxCorner };
-				if (!frustum.cullWorldSpaceAABB(aabb))
-				{
-
-					terrain_render_data data = {
-						common,
-						c.normalmap,
-						groundMaterial, rockMaterial
-					};
-					renderPass->renderObject<terrain_pipeline, terrain_depth_prepass_pipeline>(data, common, entityID);
-				}
-
-				if (shadowPass)
-				{
-					shadowPass->renderStaticObject<terrain_shadow_pipeline>(0, common);
-				}
+			if (shadowPass)
+			{
+				shadowPass->renderStaticObject<terrain_shadow_pipeline>(0, common);
 			}
 		}
 	}

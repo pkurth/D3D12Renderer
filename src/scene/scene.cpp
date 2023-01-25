@@ -3,6 +3,7 @@
 #include "physics/physics.h"
 #include "physics/collision_broad.h"
 #include "rendering/raytracing.h"
+#include "terrain/heightmap_collider.h"
 
 
 game_scene::game_scene()
@@ -45,6 +46,7 @@ void game_scene::cloneTo(game_scene& target)
 
 		terrain_component,
 #endif
+		heightmap_collider_component,
 
 		animation_component,
 		raster_component,

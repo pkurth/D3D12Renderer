@@ -12,8 +12,6 @@
 
 struct terrain_chunk
 {
-	bool active;
-
 	ref<dx_texture> heightmap;
 	ref<dx_texture> normalmap;
 
@@ -54,15 +52,12 @@ struct terrain_component
 	ref<pbr_material> rockMaterial;
 
 
-	void update(vec3 positionOffset);
+	void update(vec3 positionOffset, heightmap_collider_component* collider);
 	void render(const render_camera& camera, struct opaque_render_pass* renderPass, struct sun_shadow_render_pass* shadowPass, vec3 positionOffset, uint32 entityID = -1);
-
-	terrain_collider_context colliderContext;
 
 private:
 	void generateChunksCPU();
 	void generateChunksGPU();
-	void updateColliders();
 
 	terrain_generation_settings oldGenSettings;
 
