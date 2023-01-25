@@ -1348,8 +1348,8 @@ bool scene_editor::drawSceneHierarchy()
 							uint32 axisA = (axis + 1) % 3;
 							uint32 axisB = (axis + 2) % 3;
 							float cRadius = max(r.data[axisA], r.data[axisB]);
-							vec3 a = aabb.minCorner; a.data[axisA] += r.data[axisA]; a.data[axisB] += r.data[axisB]; a.data[axis] += cRadius;
-							vec3 b = aabb.maxCorner; b.data[axisA] -= r.data[axisA]; b.data[axisB] -= r.data[axisB]; b.data[axis] -= cRadius;
+							vec3 a = aabb.minCorner; a.data[axisA] += r.data[axisA]; a.data[axisB] += r.data[axisB];
+							vec3 b = aabb.maxCorner; b.data[axisA] -= r.data[axisA]; b.data[axisB] -= r.data[axisB];
 							selectedEntity.addComponent<collider_component>(collider_component::asCylinder({ a, b, cRadius }, material));
 						}
 						if (ImGui::MenuItem("AABB"))
