@@ -47,6 +47,10 @@ constexpr uint64 hashString64(const char* s)
 	return hash;
 }
 
+#define COMPILE_TIME_STRING_HASH_32(str) (force_consteval<hashString32(str)>)
+#define COMPILE_TIME_STRING_HASH_64(str) (force_consteval<hashString64(str)>)
+
+
 static inline std::string getTimeString()
 {
 	time_t now = time(0);

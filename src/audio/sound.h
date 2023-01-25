@@ -14,7 +14,7 @@ struct sound_id
     uint64 hash;
 };
 
-#define SOUND_ID(id) sound_id{ id, force_consteval<hashString64(id)> }
+#define SOUND_ID(id) sound_id{ id, COMPILE_TIME_STRING_HASH_64(id) }
 
 
 enum sound_type
