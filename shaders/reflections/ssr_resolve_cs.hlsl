@@ -175,16 +175,14 @@ void main(cs_input IN)
         float borderAttenuation = saturate(borderDist / borderAttenuationDistance);
        
         neighborSceneColor.a = borderAttenuation * neighborHit;
-        neighborSceneColor.rgb /= 1.f + dot(neighborSceneColor.rgb, luminanceWeights);
+        //neighborSceneColor.rgb /= 1.f + dot(neighborSceneColor.rgb, luminanceWeights);
 
         result += neighborSceneColor * weight;
         totalWeight += weight;
     }
 
     result /= totalWeight;
-    result.rgb /= 1.f - dot(result.rgb, luminanceWeights);
+    //result.rgb /= 1.f - dot(result.rgb, luminanceWeights);
 
     output[uvInt.xy] = max(1e-5f, result);
-
-    //output[uvInt.xy] = float4(raycastResult.xy, 0.f, 1.f);
 }
