@@ -688,13 +688,24 @@ static vec2 pow(vec2 v, float e) { return vec2(pow(v.x, e), pow(v.y, e)); }
 static vec3 pow(vec3 v, float e) { return vec3(pow(v.x, e), pow(v.y, e), pow(v.z, e)); }
 static vec4 pow(vec4 v, float e) { return vec4(pow(v.f4, w4_float(e))); }
 
-static vec2 minimum(vec2 a, vec2 b) { return vec2(min(a.x, b.x), min(a.y, b.y)); }
-static vec3 minimum(vec3 a, vec3 b) { return vec3(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }
-static vec4 minimum(vec4 a, vec4 b) { return vec4(minimum(a.f4, b.f4)); }
+static vec2 min(vec2 a, vec2 b) { return vec2(min(a.x, b.x), min(a.y, b.y)); }
+static vec3 min(vec3 a, vec3 b) { return vec3(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }
+static vec4 min(vec4 a, vec4 b) { return vec4(minimum(a.f4, b.f4)); }
 
-static vec2 maximum(vec2 a, vec2 b) { return vec2(max(a.x, b.x), max(a.y, b.y)); }
-static vec3 maximum(vec3 a, vec3 b) { return vec3(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }
-static vec4 maximum(vec4 a, vec4 b) { return vec4(maximum(a.f4, b.f4)); }
+static vec2 max(vec2 a, vec2 b) { return vec2(max(a.x, b.x), max(a.y, b.y)); }
+static vec3 max(vec3 a, vec3 b) { return vec3(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }
+static vec4 max(vec4 a, vec4 b) { return vec4(maximum(a.f4, b.f4)); }
+
+static float maxElement(vec2 a) { return max(a.x, a.y); }
+static float maxElement(vec3 a) { return max(a.x, max(a.y, a.z)); }
+static float maxElement(vec4 a) { return max(a.x, max(a.y, max(a.z, a.w))); }
+
+static uint32 maxElementIndex(vec2 a) { return (a.x > a.y) ? 0 : 1; }
+static uint32 maxElementIndex(vec3 a) { return (a.x > a.y) ? ((a.x > a.z) ? 0 : 2) : ((a.y > a.z) ? 1 : 2); }
+static uint32 maxElementIndex(vec4 a) { return (a.x > a.y)	? ((a.x > a.z)	? ((a.x > a.w) ? 0 : 3) 
+																			: ((a.z > a.w) ? 2 : 3)) 
+															: ((a.y > a.z)	? ((a.y > a.w) ? 1 : 3) 
+																			: ((a.z > a.w) ? 2 : 3)); }
 
 static vec2 remap(vec2 v, vec2 oldL, vec2 oldU, vec2 newL, vec2 newU)
 {

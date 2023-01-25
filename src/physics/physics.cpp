@@ -633,7 +633,7 @@ static void getWorldSpaceColliders(game_scene& scene, bounding_box* outWorldspac
 
 				vec3 e = radius * vec3(x, y, z);
 
-				bb = bounding_box::fromMinMax(minimum(posA - e, posB - e), maximum(posA + e, posB + e));
+				bb = bounding_box::fromMinMax(min(posA - e, posB - e), max(posA + e, posB + e));
 
 				col.cylinder = { posA, posB, radius };
 			} break;

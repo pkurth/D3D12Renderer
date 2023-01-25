@@ -93,7 +93,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 	auto terrainRockMaterial = createPBRMaterial("assets/terrain/rock/Rock034_2K_Color.png", "assets/terrain/rock/Rock034_2K_NormalDX.png",	"assets/terrain/rock/Rock034_2K_Roughness.png", {});
 
 	auto terrain = scene.createEntity("Terrain")
-		.addComponent<position_component>(vec3(0.f, 0.f, 0.f))
+		.addComponent<position_component>(vec3(0.f, -64.f, 0.f))
 		.addComponent<terrain_component>(numTerrainChunks, 64.f, 50.f, terrainGroundMaterial, terrainRockMaterial);
 
 	terrain_component& terrainComponent = terrain.getComponent<terrain_component>();
@@ -203,7 +203,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			{}, vec4(0.f), vec4(1.f), 0.2f, 0.5f, false, 3.f);
 
 		auto groundMesh = make_ref<multi_mesh>();
-		builder.pushBox({ vec3(0.f), vec3(100.f, 4.f, 100.f) });
+		builder.pushBox({ vec3(0.f), vec3(30.f, 4.f, 30.f) });
 		groundMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, lollipopMaterial });
 
 		auto woodMaterial = createPBRMaterial(
@@ -303,9 +303,9 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		//}
 
 		scene.createEntity("Test ground")
-			.addComponent<transform_component>(vec3(0.f, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
+			.addComponent<transform_component>(vec3(10, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
-			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(100.f, 4.f, 100.f)), { physics_material_type_metal, 0.1f, 1.f, 4.f }));
+			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(30.f, 4.f, 30.f)), { physics_material_type_metal, 0.1f, 1.f, 4.f }));
 
 		/*scene.createEntity("Test ground")
 			.addComponent<transform_component>(vec3(20.f, -5.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))

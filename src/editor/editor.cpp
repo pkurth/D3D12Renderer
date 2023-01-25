@@ -433,6 +433,41 @@ static void drawComponent(scene_entity entity, const char* componentName, ui_fun
 	}
 }
 
+static bounding_box getObjectBoundingBox(scene_entity entity, bool applyPosition)
+{
+	bounding_box aabb = entity.hasComponent<raster_component>() ? entity.getComponent<raster_component>().mesh->aabb : bounding_box::fromCenterRadius(0.f, 1.f);
+
+	if (transform_component* transform = entity.getComponentIfExists<transform_component>())
+	{
+		aabb.minCorner *= transform->scale;
+		aabb.maxCorner *= transform->scale;
+
+		if (applyPosition)
+		{
+			aabb.minCorner += transform->position;
+			aabb.maxCorner += transform->position;
+		}
+	}
+	else if (position_component* transform = entity.getComponentIfExists<position_component>())
+	{
+		if (applyPosition)
+		{
+			aabb.minCorner += transform->position;
+			aabb.maxCorner += transform->position;
+		}
+	}
+	else if (position_rotation_component* transform = entity.getComponentIfExists<position_rotation_component>())
+	{
+		if (applyPosition)
+		{
+			aabb.minCorner += transform->position;
+			aabb.maxCorner += transform->position;
+		}
+	}
+
+	return aabb;
+}
+
 static void editMaterial(const ref<pbr_material>& material)
 {
 	if (ImGui::BeginProperties())
@@ -543,7 +578,6 @@ bool scene_editor::drawSceneHierarchy()
 				{
 					ImGui::SetTooltip("Delete entity");
 				}
-
 				if (selectedEntity)
 				{
 					drawComponent<transform_component>(selectedEntity, "TRANSFORM", [this, &objectMovedByWidget](transform_component& transform)
@@ -1271,6 +1305,69 @@ bool scene_editor::drawSceneHierarchy()
 						}
 					}
 				}
+
+
+				if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered())
+				{
+					ImGui::OpenPopup("CreateComponentPopup");
+				}
+
+				if (ImGui::BeginPopup("CreateComponentPopup"))
+				{
+					ImGui::Text("Create component");
+					ImGui::Separator();
+
+					if (ImGui::MenuItem("Rigid body"))
+					{
+						selectedEntity.addComponent<rigid_body_component>(false);
+					}
+					if (ImGui::BeginMenu("Collider"))
+					{
+						bounding_box aabb = getObjectBoundingBox(selectedEntity, false);
+						physics_material material = { physics_material_type_wood, 0.1f, 0.5f, 1.f };
+
+						if (ImGui::MenuItem("Sphere"))
+						{
+							selectedEntity.addComponent<collider_component>(collider_component::asSphere({ aabb.getCenter(), maxElement(aabb.getRadius()) }, material));
+						}
+						if (ImGui::MenuItem("Capsule"))
+						{
+							vec3 r = aabb.getRadius();
+							uint32 axis = maxElementIndex(r);
+							uint32 axisA = (axis + 1) % 3;
+							uint32 axisB = (axis + 2) % 3;
+							float cRadius = max(r.data[axisA], r.data[axisB]);
+							vec3 a = aabb.minCorner; a.data[axisA] += r.data[axisA]; a.data[axisB] += r.data[axisB]; a.data[axis] += cRadius;
+							vec3 b = aabb.maxCorner; b.data[axisA] -= r.data[axisA]; b.data[axisB] -= r.data[axisB]; b.data[axis] -= cRadius;
+							selectedEntity.addComponent<collider_component>(collider_component::asCapsule({ a, b, cRadius }, material));
+						}
+						if (ImGui::MenuItem("Cylinder"))
+						{
+							vec3 r = aabb.getRadius();
+							uint32 axis = maxElementIndex(r);
+							uint32 axisA = (axis + 1) % 3;
+							uint32 axisB = (axis + 2) % 3;
+							float cRadius = max(r.data[axisA], r.data[axisB]);
+							vec3 a = aabb.minCorner; a.data[axisA] += r.data[axisA]; a.data[axisB] += r.data[axisB]; a.data[axis] += cRadius;
+							vec3 b = aabb.maxCorner; b.data[axisA] -= r.data[axisA]; b.data[axisB] -= r.data[axisB]; b.data[axis] -= cRadius;
+							selectedEntity.addComponent<collider_component>(collider_component::asCylinder({ a, b, cRadius }, material));
+						}
+						if (ImGui::MenuItem("AABB"))
+						{
+							selectedEntity.addComponent<collider_component>(collider_component::asAABB(aabb, material));
+						}
+						if (ImGui::MenuItem("OBB"))
+						{
+							selectedEntity.addComponent<collider_component>(collider_component::asOBB({ quat::identity, aabb.getCenter(), aabb.getRadius() }, material));
+						}
+
+						ImGui::EndMenu();
+					}
+					
+					ImGui::EndPopup();
+				}
+
+
 			}
 			ImGui::EndChild();
 		}
@@ -1286,17 +1383,9 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 	// Returns true, if the user dragged an object using a gizmo.
 
-	if (input.keyboard['F'].pressEvent && selectedEntity && selectedEntity.hasComponent<transform_component>())
+	if (input.keyboard['F'].pressEvent && selectedEntity)
 	{
-		auto& transform = selectedEntity.getComponent<transform_component>();
-
-		auto aabb = selectedEntity.hasComponent<raster_component>() ? selectedEntity.getComponent<raster_component>().mesh->aabb : bounding_box::fromCenterRadius(0.f, 1.f);
-		aabb.minCorner *= transform.scale;
-		aabb.maxCorner *= transform.scale;
-
-		aabb.minCorner += transform.position;
-		aabb.maxCorner += transform.position;
-
+		bounding_box aabb = getObjectBoundingBox(selectedEntity, true);
 		cameraController.centerCameraOnObject(aabb);
 	}
 
