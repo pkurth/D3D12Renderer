@@ -398,7 +398,11 @@ const uint32 normalMapDimension = 2048;
 
 terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale, ref<pbr_material> groundMaterial, ref<pbr_material> rockMaterial,
 	terrain_generation_settings genSettings)
-	: chunksPerDim(chunksPerDim), chunkSize(chunkSize), genSettings(genSettings), oldGenSettings(genSettings)
+	: chunksPerDim(chunksPerDim), 
+	chunkSize(chunkSize), 
+	genSettings(genSettings), 
+	oldGenSettings(genSettings), 
+	colliderContext(chunksPerDim, chunkSize, TERRAIN_LOD_0_VERTICES_PER_DIMENSION)
 {
 	this->amplitudeScale = amplitudeScale;
 	this->chunks.resize(chunksPerDim * chunksPerDim);
@@ -407,6 +411,7 @@ terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float
 	this->rockMaterial = rockMaterial;
 
 	generateChunksGPU();
+	updateColliders();
 }
 
 void terrain_component::generateChunksCPU()
@@ -428,10 +433,11 @@ void terrain_component::generateChunksCPU()
 			{
 				vec2 minCorner = vec2(cx * chunkSize, cz * chunkSize);
 
-				uint16* heights = new uint16[TERRAIN_LOD_0_VERTICES_PER_DIMENSION * TERRAIN_LOD_0_VERTICES_PER_DIMENSION];
-				vec2* normals = new vec2[normalMapDimension * normalMapDimension];
-
 				auto& c = chunk(cx, cz);
+
+				c.heights.resize(TERRAIN_LOD_0_VERTICES_PER_DIMENSION * TERRAIN_LOD_0_VERTICES_PER_DIMENSION);
+				uint16* heights = c.heights.data();
+				vec2* normals = new vec2[normalMapDimension * normalMapDimension];
 
 				float minHeight = FLT_MAX;
 				float maxHeight = -FLT_MAX;
@@ -472,7 +478,6 @@ void terrain_component::generateChunksCPU()
 				c.normalmap = createTexture(normals, normalMapDimension, normalMapDimension, DXGI_FORMAT_R32G32_FLOAT);
 
 				delete[] normals;
-				delete[] heights;
 			});
 		}
 	}
@@ -559,24 +564,65 @@ void terrain_component::generateChunksGPU()
 				{
 					generateMipMapsOnGPU(cl, c.normalmap);
 				}
+
 			}
 		}
 
 	}
 
 	dxContext.executeCommandList(cl);
+
+
+	{
+		CPU_PROFILE_BLOCK("Copy heights to CPU");
+
+		for (int32 cz = 0; cz < (int32)chunksPerDim; ++cz)
+		{
+			for (int32 cx = 0; cx < (int32)chunksPerDim; ++cx)
+			{
+				auto& c = chunk(cx, cz);
+
+				c.heights.resize(TERRAIN_LOD_0_VERTICES_PER_DIMENSION * TERRAIN_LOD_0_VERTICES_PER_DIMENSION);
+				copyTextureToCPUBuffer(c.heightmap, c.heights.data());
+			}
+		}
+	}
 }
 
-void terrain_component::render(const render_camera& camera, opaque_render_pass* renderPass, sun_shadow_render_pass* shadowPass, vec3 positionOffset, uint32 entityID)
+void terrain_component::updateColliders()
+{
+	for (int32 cz = 0; cz < (int32)chunksPerDim; ++cz)
+	{
+		for (int32 cx = 0; cx < (int32)chunksPerDim; ++cx)
+		{
+			auto& terrainChunk = chunk(cx, cz);
+			auto& terrainCollider = colliderContext.collider(cx, cz);
+
+			terrainCollider.setHeights(terrainChunk.heights.data());
+		}
+	}
+}
+
+void terrain_component::update(vec3 positionOffset)
 {
 	if (memcmp(&genSettings, &oldGenSettings, sizeof(terrain_generation_settings)) != 0)
 	{
 		generateChunksGPU();
 
 		oldGenSettings = genSettings;
+
+		updateColliders();
 	}
 
 
+	float xzOffset = -(chunkSize * chunksPerDim) * 0.5f; // Offsets entire terrain by half.
+	positionOffset += vec3(xzOffset, 0.f, xzOffset);
+
+	colliderContext.update(positionOffset, amplitudeScale);
+}
+
+void terrain_component::render(const render_camera& camera, opaque_render_pass* renderPass, sun_shadow_render_pass* shadowPass, vec3 positionOffset, uint32 entityID)
+{
 	camera_frustum_planes frustum = camera.getWorldSpaceFrustumPlanes();
 
 	float xzOffset = -(chunkSize * chunksPerDim) * 0.5f; // Offsets entire terrain by half.

@@ -3,6 +3,8 @@
 #include "core/math.h"
 #include "core/camera.h"
 
+#include "heightmap_collider.h"
+
 #include "dx/dx_texture.h"
 
 #include "rendering/material.h"
@@ -14,6 +16,8 @@ struct terrain_chunk
 
 	ref<dx_texture> heightmap;
 	ref<dx_texture> normalmap;
+
+	std::vector<uint16> heights;
 };
 
 struct terrain_generation_settings
@@ -50,12 +54,15 @@ struct terrain_component
 	ref<pbr_material> rockMaterial;
 
 
+	void update(vec3 positionOffset);
 	void render(const render_camera& camera, struct opaque_render_pass* renderPass, struct sun_shadow_render_pass* shadowPass, vec3 positionOffset, uint32 entityID = -1);
 
+	terrain_collider_context colliderContext;
 
 private:
 	void generateChunksCPU();
 	void generateChunksGPU();
+	void updateColliders();
 
 	terrain_generation_settings oldGenSettings;
 

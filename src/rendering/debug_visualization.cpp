@@ -129,6 +129,23 @@ PIPELINE_RENDER_IMPL(debug_unlit_line_pipeline)
 
 
 
+void renderTriangle(vec3 a, vec3 b, vec3 c, vec4 color, ldr_render_pass* renderPass, bool overlay)
+{
+	auto [vb, vertexPtr] = dxContext.createDynamicVertexBuffer(sizeof(vec3), 3);
+	auto [ib, indexPtr] = dxContext.createDynamicIndexBuffer(sizeof(uint16), 3);
+
+	vec3* vertices = (vec3*)vertexPtr;
+	indexed_triangle16* triangles = (indexed_triangle16*)indexPtr;
+
+	*vertices++ = a;
+	*vertices++ = b;
+	*vertices++ = c;
+
+	*triangles = { 0, 1, 2 };
+
+	renderDebug<debug_unlit_pipeline::position>(mat4::identity, vb, ib, color, renderPass, overlay);
+}
+
 void renderDisk(vec3 position, vec3 upAxis, float radius, vec4 color, ldr_render_pass* renderPass, bool overlay)
 {
 	const uint32 numSegments = 32;
@@ -347,6 +364,23 @@ void renderLine(vec3 positionA, vec3 positionB, vec4 color, ldr_render_pass* ren
 	*vertices++ = positionB;
 
 	*lines++ = { 0, 1 };
+
+	renderDebug<debug_unlit_line_pipeline::position>(mat4::identity, vb, ib, color, renderPass, overlay);
+}
+
+void renderWireTriangle(vec3 a, vec3 b, vec3 c, vec4 color, ldr_render_pass* renderPass, bool overlay)
+{
+	auto [vb, vertexPtr] = dxContext.createDynamicVertexBuffer(sizeof(vec3), 3);
+	auto [ib, indexPtr] = dxContext.createDynamicIndexBuffer(sizeof(uint16), 3);
+
+	vec3* vertices = (vec3*)vertexPtr;
+	indexed_triangle16* triangles = (indexed_triangle16*)indexPtr;
+
+	*vertices++ = a;
+	*vertices++ = b;
+	*vertices++ = c;
+
+	*triangles = { 0, 1, 2 };
 
 	renderDebug<debug_unlit_line_pipeline::position>(mat4::identity, vb, ib, color, renderPass, overlay);
 }

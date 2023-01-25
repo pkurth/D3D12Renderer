@@ -596,11 +596,19 @@ void application::update(const user_input& input, float dt)
 	environment.lightProbeGrid.visualize(&opaqueRenderPass);
 
 
-
-	static float physicsTimer = 0.f;
-
 	game_scene& scene = this->scene.getCurrentScene();
 	dt *= this->scene.getTimestepScale();
+
+
+	// Must happen before physics update.
+	for (auto [entityHandle, terrain, position] : scene.group(entt::get<terrain_component, position_component>).each())
+	{
+		terrain.update(position.position);
+	}
+
+
+
+	static float physicsTimer = 0.f;
 	physicsStep(scene, stackArena, physicsTimer, editor.physicsSettings, dt);
 
 

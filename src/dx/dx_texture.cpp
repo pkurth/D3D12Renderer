@@ -1211,4 +1211,36 @@ void saveTextureToFile(dx_resource texture, uint32 width, uint32 height, DXGI_FO
 	delete[] output;
 }
 
+void copyTextureToCPUBuffer(const ref<dx_texture>& texture, void* buffer)
+{
+	uint32 outputSize = getFormatSize(texture->format);
+
+	uint32 readbackPitch = alignTo(texture->width, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+	ref<dx_buffer> readbackBuffer = createReadbackBuffer(outputSize, readbackPitch * texture->height);
+
+	dx_command_list* cl = dxContext.getFreeRenderCommandList();
+
+	cl->transitionBarrier(texture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_GENERIC_READ);
+	cl->copyTextureRegionToBuffer(texture->resource, texture->width, texture->format, readbackBuffer, 0, 0, 0, texture->width, texture->height);
+	cl->transitionBarrier(texture, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COMMON);
+
+	uint64 fence = dxContext.executeCommandList(cl);
+
+	dxContext.renderQueue.waitForFence(fence);
+
+	uint8* dest = (uint8*)buffer;
+	uint32 destPitch = outputSize * texture->width;
+
+	uint8* result = (uint8*)mapBuffer(readbackBuffer, true);
+	uint32 resultPitch = (uint32)alignTo(outputSize * texture->width, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+
+	for (uint32 h = 0; h < texture->height; ++h)
+	{
+		memcpy(dest, result, destPitch);
+		result += resultPitch;
+		dest += destPitch;
+	}
+
+	unmapBuffer(readbackBuffer, false);
+}
 

@@ -208,11 +208,7 @@ ps_output main(ps_input IN)
 	OUT.hdrColor = totalLighting.evaluate(surface.albedo);
 	OUT.worldNormalRoughness = float4(packNormal(N), surface.roughness, 0.f);
 
-	//OUT.hdrColor.rgb = roughness.xxx;
-
 	OUT.hdrColor.rgb *= 0.3f;
-
-	//OUT.hdrColor.rgb = float3(tileRotation.xxx);
 
 	return OUT;
 }
