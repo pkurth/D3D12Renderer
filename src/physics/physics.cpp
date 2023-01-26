@@ -2,6 +2,7 @@
 #include "physics.h"
 #include "collision_broad.h"
 #include "collision_narrow.h"
+#include "heightmap_collision.h"
 #include "core/cpu_profiling.h"
 
 #ifndef PHYSICS_ONLY
@@ -1124,7 +1125,7 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 	bounding_box* worldSpaceAABBs = arena.allocate<bounding_box>(numColliders);
 	collider_union* worldSpaceColliders = arena.allocate<collider_union>(numColliders);
 
-	collider_pair* overlappingColliderPairs = arena.allocate<collider_pair>(numColliders * numColliders); // Conservative estimate.
+	collider_pair* overlappingColliderPairs = arena.allocate<collider_pair>(numColliders * numColliders + 5000); // Conservative estimate.
 
 	uint32 dummyRigidBodyIndex = numRigidBodies;
 
@@ -1138,7 +1139,7 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 
 	non_collision_interaction* nonCollisionInteractions = arena.allocate<non_collision_interaction>(numBroadphaseOverlaps);
 	collision_contact* contacts = arena.allocate<collision_contact>(numBroadphaseOverlaps * 4); // Each collision can have up to 4 contact points.
-	constraint_body_pair* allConstraintBodyPairs = arena.allocate<constraint_body_pair>(numConstraints + numBroadphaseOverlaps * 4);
+	constraint_body_pair* allConstraintBodyPairs = arena.allocate<constraint_body_pair>(numConstraints + numBroadphaseOverlaps * 4 + 5000);
 	collider_pair* collidingColliderPairs = overlappingColliderPairs; // We reuse this buffer.
 	uint8* contactCountPerCollision = arena.allocate<uint8>(numColliders * numColliders);
 
@@ -1147,8 +1148,22 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 	// Narrow phase.
 	narrowphase_result narrowPhaseResult = narrowphase(worldSpaceColliders, overlappingColliderPairs, numBroadphaseOverlaps, arena,
 		contacts, collisionBodyPairs, collidingColliderPairs, contactCountPerCollision, nonCollisionInteractions, settings.simdNarrowPhase);
-	VALIDATE(contacts, narrowPhaseResult.numContacts);
+	
 
+	// Heightmap collisions.
+	for (auto [entityHandle, heightmap] : scene.view<heightmap_collider_component>().each())
+	{
+		narrowphase_result heightmapCollisionResult = heightmapCollision(heightmap, worldSpaceColliders, worldSpaceAABBs, numColliders,
+			contacts + narrowPhaseResult.numContacts, collisionBodyPairs + narrowPhaseResult.numContacts,
+			collidingColliderPairs + narrowPhaseResult.numCollisions, contactCountPerCollision + narrowPhaseResult.numCollisions,
+			arena, (uint16)dummyRigidBodyIndex);
+
+		narrowPhaseResult.numCollisions += heightmapCollisionResult.numCollisions;
+		narrowPhaseResult.numContacts += heightmapCollisionResult.numContacts;
+		narrowPhaseResult.numNonCollisionInteractions += heightmapCollisionResult.numNonCollisionInteractions;
+	}
+
+	VALIDATE(contacts, narrowPhaseResult.numContacts);
 
 
 	vec3 globalForceField = getForceFieldStates(scene, ffGlobal);
@@ -1182,8 +1197,8 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 	VALIDATE(rbGlobal, numRigidBodies);
 
 
-	handleCollisionCallbacks(scene, collidingColliderPairs, contactCountPerCollision, narrowPhaseResult.numCollisions, numColliders, contacts, rbGlobal, dummyRigidBodyIndex,
-		settings.collisionBeginCallback, settings.collisionEndCallback);
+	//handleCollisionCallbacks(scene, collidingColliderPairs, contactCountPerCollision, narrowPhaseResult.numCollisions, numColliders, contacts, rbGlobal, dummyRigidBodyIndex,
+	//	settings.collisionBeginCallback, settings.collisionEndCallback);
 
 
 

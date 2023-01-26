@@ -256,6 +256,7 @@ bool sphereVsCylinder(const bounding_sphere& s, const bounding_cylinder& c);
 bool sphereVsAABB(const bounding_sphere& s, const bounding_box& a);
 bool sphereVsOBB(const bounding_sphere& s, const bounding_oriented_box& o);
 bool sphereVsHull(const bounding_sphere& s, const bounding_hull& h);
+bool sphereVsTriangle(const bounding_sphere& s, vec3 a, vec3 b, vec3 c);
 
 bool capsuleVsCapsule(const bounding_capsule& a, const bounding_capsule& b);
 bool capsuleVsCylinder(const bounding_capsule& a, const bounding_cylinder& b);
@@ -280,7 +281,7 @@ bool hullVsHull(const bounding_hull& a, const bounding_hull& b);
 vec3 closestPoint_PointSegment(const vec3& q, const line_segment& l);
 vec3 closestPoint_PointAABB(const vec3& q, const bounding_box& aabb);
 float closestPoint_SegmentSegment(const line_segment& l1, const line_segment& l2, vec3& c1, vec3& c2);
-
+vec3 closestPoint_PointTriangle(const vec3& q, const vec3& a, const vec3& b, const vec3& c);
 
 
 

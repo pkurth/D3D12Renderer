@@ -2,8 +2,8 @@
 #include "heightmap_collider.h"
 
 
-heightmap_collider_component::heightmap_collider_component(uint32 chunksPerDim, float chunkSize)
-	: chunksPerDim(chunksPerDim), chunkSize(chunkSize), invChunkSize(1.f / chunkSize)
+heightmap_collider_component::heightmap_collider_component(uint32 chunksPerDim, float chunkSize, physics_material material)
+	: chunksPerDim(chunksPerDim), chunkSize(chunkSize), invChunkSize(1.f / chunkSize), material(material)
 {
 	colliders.resize(chunksPerDim * chunksPerDim);
 

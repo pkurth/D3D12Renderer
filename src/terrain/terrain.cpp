@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "terrain.h"
 
+#include "heightmap_collider.h"
+
 #include "dx/dx_context.h"
 #include "dx/dx_command_list.h"
 #include "dx/dx_barrier_batcher.h"

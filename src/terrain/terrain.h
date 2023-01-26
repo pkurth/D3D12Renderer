@@ -3,8 +3,6 @@
 #include "core/math.h"
 #include "core/camera.h"
 
-#include "heightmap_collider.h"
-
 #include "dx/dx_texture.h"
 
 #include "rendering/material.h"
@@ -52,7 +50,7 @@ struct terrain_component
 	ref<pbr_material> rockMaterial;
 
 
-	void update(vec3 positionOffset, heightmap_collider_component* collider);
+	void update(vec3 positionOffset, struct heightmap_collider_component* collider = 0);
 	void render(const render_camera& camera, struct opaque_render_pass* renderPass, struct sun_shadow_render_pass* shadowPass, vec3 positionOffset, uint32 entityID = -1);
 
 private:

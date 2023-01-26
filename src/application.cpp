@@ -18,6 +18,7 @@
 #include "rendering/debug_visualization.h"
 #include "audio/audio.h"
 #include "terrain/terrain.h"
+#include "terrain/heightmap_collider.h"
 
 
 static raytracing_object_type defineBlasFromMesh(const ref<multi_mesh>& mesh)
@@ -96,7 +97,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 	auto terrain = scene.createEntity("Terrain")
 		.addComponent<position_component>(vec3(0.f, -64.f, 0.f))
 		.addComponent<terrain_component>(numTerrainChunks, terrainChunkSize, 50.f, terrainGroundMaterial, terrainRockMaterial)
-		.addComponent<heightmap_collider_component>(numTerrainChunks, terrainChunkSize);
+		.addComponent<heightmap_collider_component>(numTerrainChunks, terrainChunkSize, physics_material{ physics_material_type_metal, 0.1f, 1.f, 4.f });
 #endif
 
 
@@ -600,6 +601,7 @@ void application::update(const user_input& input, float dt)
 
 		terrain.update(position.position, collider);
 	}
+
 
 
 	static float physicsTimer = 0.f;

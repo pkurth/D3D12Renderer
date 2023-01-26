@@ -466,11 +466,13 @@ project "Physics-Lib"
 		"src/physics/cloth.*",
 		"src/physics/rigid_body.*",
 		"src/physics/ragdoll.*",
+		"src/physics/heightmap_collision.*",
 		"src/learning/**",
 		"src/core/math.*",
 		"src/core/memory.*",
 		"src/core/threading.*",
 		"src/scene/scene.*",
+		"src/terrain/heightmap_collider.*",
 		"src/pch.*",
 	}
 

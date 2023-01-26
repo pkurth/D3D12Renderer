@@ -727,6 +727,13 @@ bool sphereVsHull(const bounding_sphere& s, const bounding_hull& h)
 	return gjkIntersectionTest(sphereSupport, hullSupport, gjkSimplex);
 }
 
+bool sphereVsTriangle(const bounding_sphere& s, vec3 a, vec3 b, vec3 c)
+{
+	vec3 p = closestPoint_PointTriangle(s.center, a, b, c);
+	vec3 v = p - s.center;
+	return dot(v, v) <= s.radius * s.radius;
+}
+
 bool capsuleVsAABB(const bounding_capsule& c, const bounding_box& b)
 {
 	capsule_support_fn capsuleSupport{ c };
@@ -1012,6 +1019,58 @@ float closestPoint_SegmentSegment(const line_segment& l1, const line_segment& l2
 	c1 = l1.a + d1 * s;
 	c2 = l2.a + d2 * t;
 	return squaredLength(c1 - c2);
+}
+
+vec3 closestPoint_PointTriangle(const vec3& p, const vec3& a, const vec3& b, const vec3& c)
+{
+	vec3 ab = b - a;
+	vec3 ac = c - a;
+	vec3 ap = p - a;
+	float d1 = dot(ab, ap);
+	float d2 = dot(ac, ap);
+	if (d1 <= 0.f && d2 <= 0.f) return a; // Barycentric coordinates (1,0,0)
+
+	// Check if P in vertex region outside B
+	vec3 bp = p - b;
+	float d3 = dot(ab, bp);
+	float d4 = dot(ac, bp);
+	if (d3 >= 0.f && d4 <= d3) return b; // Barycentric coordinates (0,1,0)
+
+	// Check if P in edge region of AB, if so return projection of P onto AB
+	float vc = d1 * d4 - d3 * d2;
+	if (vc <= 0.f && d1 >= 0.f && d3 <= 0.f) 
+	{
+		float v = d1 / (d1 - d3);
+		return a + v * ab; // Barycentric coordinates (1-v,v,0)
+	}
+
+	// Check if P in vertex region outside C
+	vec3 cp = p - c;
+	float d5 = dot(ab, cp);
+	float d6 = dot(ac, cp);
+	if (d6 >= 0.f && d5 <= d6) return c; // Barycentric coordinates (0,0,1)
+
+	// Check if P in edge region of AC, if so return projection of P onto AC
+	float vb = d5 * d2 - d1 * d6;
+	if (vb <= 0.f && d2 >= 0.f && d6 <= 0.f) 
+	{
+		float w = d2 / (d2 - d6);
+		return a + w * ac; // Barycentric coordinates (1-w,0,w)
+	}
+
+	// Check if P in edge region of BC, if so return projection of P onto BC
+	float va = d3 * d6 - d5 * d4;
+	if (va <= 0.f && (d4 - d3) >= 0.f && (d5 - d6) >= 0.f) 
+	{
+		float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+		return b + w * (c - b); // Barycentric coordinates (0,1-w,w)
+	}
+
+	// P inside face region. Compute Q through its barycentric coordinates (u,v,w)
+	float denom = 1.f / (va + vb + vc);
+	float v = vb * denom;
+	float w = vc * denom;
+	return a + ab * v + ac * w; // = u*a + v*b + w*c, u = va * denom = 1.0f - v - w
 }
 
 static void addBoundingHullEdge(uint32 a, uint32 b, uint32 face, std::unordered_map<uint32, bounding_hull_edge*>& edgeMap, std::vector<bounding_hull_edge>& edges, uint32& edgeIndex)

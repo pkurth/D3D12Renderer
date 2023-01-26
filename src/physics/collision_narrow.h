@@ -16,7 +16,7 @@ struct non_collision_interaction
 struct narrowphase_result
 {
 	uint32 numCollisions;
-	uint32 numContacts;						// Number of contacts between colliders. Each collision (see above) may have up to 4 contacts for a stable contact.
+	uint32 numContacts;						// Number of contacts between colliders. Each collision may have up to 4 contacts for a stable contact.
 	uint32 numNonCollisionInteractions;		// Number of interactions between RBs and triggers, force fields etc.
 };
 

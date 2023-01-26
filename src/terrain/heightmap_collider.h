@@ -3,6 +3,7 @@
 #include "core/math.h"
 #include "core/memory.h"
 #include "physics/bounding_volumes.h"
+#include "physics/physics.h"
 
 #ifndef TERRAIN_LOD_0_VERTICES_PER_DIMENSION
 // Must match terrain_rs.hlsli
@@ -15,7 +16,7 @@ struct heightmap_collider_chunk
 
 	template <typename callback_func>
 	void iterateTrianglesInVolume(uint32 volMinX, uint32 volMinZ, uint32 volMaxX, uint32 volMaxZ,
-		uint32 volMinY, uint32 volMaxY, float chunkScale, float heightScale, vec3 chunkMinCorner, memory_arena& arena, const callback_func& func);
+		uint32 volMinY, uint32 volMaxY, float chunkScale, float heightScale, vec3 chunkMinCorner, memory_arena& arena, const callback_func& func) const;
 
 private:
 	uint16* heights = 0;
@@ -31,7 +32,7 @@ private:
 
 template <typename callback_func>
 void heightmap_collider_chunk::iterateTrianglesInVolume(uint32 volMinX, uint32 volMinZ, uint32 volMaxX, uint32 volMaxZ,
-	uint32 volMinY, uint32 volMaxY, float chunkScale, float heightScale, vec3 chunkMinCorner, memory_arena& arena, const callback_func& func)
+	uint32 volMinY, uint32 volMaxY, float chunkScale, float heightScale, vec3 chunkMinCorner, memory_arena& arena, const callback_func& func) const
 {
 	if (!heights)
 	{
@@ -119,15 +120,17 @@ void heightmap_collider_chunk::iterateTrianglesInVolume(uint32 volMinX, uint32 v
 
 struct heightmap_collider_component
 {
-	heightmap_collider_component(uint32 chunksPerDim, float chunkSize);
+	heightmap_collider_component(uint32 chunksPerDim, float chunkSize, physics_material material);
 
 	void update(vec3 minCorner, float amplitudeScale);
 
 	template <typename callback_func>
-	void iterateTrianglesInVolume(bounding_box volume, memory_arena& arena, const callback_func& func);
+	void iterateTrianglesInVolume(bounding_box volume, memory_arena& arena, const callback_func& func) const;
 
 	heightmap_collider_chunk& collider(uint32 x, uint32 z) { return colliders[z * chunksPerDim + x]; }
 	const heightmap_collider_chunk& collider(uint32 x, uint32 z) const { return colliders[z * chunksPerDim + x]; }
+
+	physics_material material;
 
 private:
 	vec3 minCorner;
@@ -144,7 +147,7 @@ private:
 
 
 template<typename callback_func>
-inline void heightmap_collider_component::iterateTrianglesInVolume(bounding_box volume, memory_arena& arena, const callback_func& func)
+inline void heightmap_collider_component::iterateTrianglesInVolume(bounding_box volume, memory_arena& arena, const callback_func& func) const
 {
 	volume.minCorner -= this->minCorner;
 	volume.maxCorner -= this->minCorner;

@@ -1583,6 +1583,13 @@ static bool intersection(const bounding_hull& a, const bounding_hull& b, contact
 	return true;
 }
 
+
+
+
+
+
+
+
 static bool overlapCheck(const collider_union* worldSpaceColliders, collider_pair pair, non_collision_interaction& interaction)
 {
 	const collider_union* colliderA = worldSpaceColliders + pair.colliderA;
