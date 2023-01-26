@@ -965,15 +965,19 @@ static void handleCollisionCallbacks(game_scene& scene, const collider_pair* col
 	for (uint32 i = 0; i < numColliderPairs; ++i)
 	{
 		collider_pair colliderPair = colliderPairs[i];
-		uint16 numContacts = contactCountPerCollision[i];
 
-		scene_entity aEntity = scene.getEntityFromComponentAtIndex<collider_component>(numColliders - 1 - colliderPair.colliderA);
-		scene_entity bEntity = scene.getEntityFromComponentAtIndex<collider_component>(numColliders - 1 - colliderPair.colliderB);
+		if (colliderPair.colliderB < numColliders)
+		{
+			uint16 numContacts = contactCountPerCollision[i];
 
-		collision_entity_pair overlap = { aEntity.handle, bEntity.handle, contactOffset, numContacts };
+			scene_entity aEntity = scene.getEntityFromComponentAtIndex<collider_component>(numColliders - 1 - colliderPair.colliderA);
+			scene_entity bEntity = scene.getEntityFromComponentAtIndex<collider_component>(numColliders - 1 - colliderPair.colliderB);
 
-		collisions.push_back(overlap);
-		contactOffset += numContacts;
+			collision_entity_pair overlap = { aEntity.handle, bEntity.handle, contactOffset, numContacts };
+
+			collisions.push_back(overlap);
+			contactOffset += numContacts;
+		}
 	}
 
 	std::sort(collisions.begin(), collisions.end());
@@ -1138,7 +1142,7 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 	uint32 numBroadphaseOverlaps = broadphase(scene, worldSpaceAABBs, arena, overlappingColliderPairs, settings.simdBroadPhase);
 
 	non_collision_interaction* nonCollisionInteractions = arena.allocate<non_collision_interaction>(numBroadphaseOverlaps);
-	collision_contact* contacts = arena.allocate<collision_contact>(numBroadphaseOverlaps * 4); // Each collision can have up to 4 contact points.
+	collision_contact* contacts = arena.allocate<collision_contact>(numBroadphaseOverlaps * 4 + 5000); // Each collision can have up to 4 contact points.
 	constraint_body_pair* allConstraintBodyPairs = arena.allocate<constraint_body_pair>(numConstraints + numBroadphaseOverlaps * 4 + 5000);
 	collider_pair* collidingColliderPairs = overlappingColliderPairs; // We reuse this buffer.
 	uint8* contactCountPerCollision = arena.allocate<uint8>(numColliders * numColliders);
@@ -1197,8 +1201,8 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 	VALIDATE(rbGlobal, numRigidBodies);
 
 
-	//handleCollisionCallbacks(scene, collidingColliderPairs, contactCountPerCollision, narrowPhaseResult.numCollisions, numColliders, contacts, rbGlobal, dummyRigidBodyIndex,
-	//	settings.collisionBeginCallback, settings.collisionEndCallback);
+	handleCollisionCallbacks(scene, collidingColliderPairs, contactCountPerCollision, narrowPhaseResult.numCollisions, numColliders, contacts, rbGlobal, dummyRigidBodyIndex,
+		settings.collisionBeginCallback, settings.collisionEndCallback);
 
 
 
