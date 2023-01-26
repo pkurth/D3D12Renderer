@@ -272,9 +272,13 @@ bool cylinderVsHull(const bounding_cylinder& c, const bounding_hull& h);
 bool aabbVsAABB(const bounding_box& a, const bounding_box& b);
 bool aabbVsOBB(const bounding_box& a, const bounding_oriented_box& o);
 bool aabbVsHull(const bounding_box& a, const bounding_hull& h);
+bool aabbVsPlane(const bounding_box& a, vec4 plane);
+bool aabbVsTriangle(const bounding_box& aabb, vec3 a, vec3 b, vec3 c);
 
 bool obbVsOBB(const bounding_oriented_box& a, const bounding_oriented_box& b);
 bool obbVsHull(const bounding_oriented_box& o, const bounding_hull& h);
+bool obbVsPlane(const bounding_oriented_box& a, vec4 plane);
+bool obbVsTriangle(const bounding_oriented_box& obb, vec3 a, vec3 b, vec3 c);
 
 bool hullVsHull(const bounding_hull& a, const bounding_hull& b);
 

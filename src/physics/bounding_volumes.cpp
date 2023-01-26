@@ -810,6 +810,248 @@ bool aabbVsHull(const bounding_box& a, const bounding_hull& h)
 	return gjkIntersectionTest(aabbSupport, hullSupport, gjkSimplex);
 }
 
+bool aabbVsPlane(const bounding_box& a, vec4 plane)
+{
+	vec3 center = a.getCenter();
+	vec3 radius = a.getRadius();
+
+	float r = dot(radius, abs(plane.xyz));
+	float s = abs(signedDistanceToPlane(center, plane));
+
+	return s <= r;
+}
+
+bool aabbVsTriangle(const bounding_box& aabb, vec3 a, vec3 b, vec3 c)
+{
+	vec3 radius = aabb.getRadius();
+	vec3 center = aabb.getCenter();
+
+	a -= center;
+	b -= center;
+	c -= center;
+
+	vec3 f0 = b - a;
+	vec3 f1 = c - b;
+	vec3 f2 = a - c;
+
+	// Test axis (1, 0, 0) x f0 = (0, -f0.z, f0.y)
+	{
+		// p0	= dot(a, axis)
+		//		= (-a.y * f0.z) + (a.z * f0.y)
+		//		= -a.y * (b.z - a.z) + a.z * (b.y - a.y)
+		//		= (-a.y * b.z) + (a.y * a.z) + (a.z * b.y) - (a.z * a.y)
+		//		= (-a.y * b.z) + (a.z * b.y)
+
+		// p1	= dot(b, axis)
+		//		= (-b.y * f0.z) + (b.z * f0.y)
+		//		= -b.y * (b.z - a.z) + b.z * (b.y - a.y)
+		//		= (-b.y * b.z) + (b.y - a.z) + (b.z * b.y) - (b.z * a.y)
+		//		= (b.y - a.z) - (b.z * a.y)
+		//		= p0
+
+		// p2	= dot(c, axis)
+		//		= (-c.y * f0.z) + (c.z * f0.y)
+
+		float p0 = (a.z * f0.y) - (a.y * f0.z);
+		float p2 = (c.z * f0.y) - (c.y * f0.z);
+		float r = radius.y * abs(f0.z) + radius.z * abs(f0.y);
+		if (max(-max(p0, p2), min(p0, p2)) > r) return false;
+	}
+
+	// Test axis (1, 0, 0) x f1 = (0, -f1.z, f1.y)
+	{
+		// p0	= dot(a, axis)
+		//		= (-a.y * f1.z) + (a.z * f1.y)
+		//		= -a.y * (c.z - b.z) + a.z * (c.y - b.y)
+		//		= (-a.y * c.z) + (a.y * b.z) + (a.z * c.y) - (a.z * b.y)
+
+		// p1	= dot(b, axis)
+		//		= (-b.y * f1.z) + (b.z * f1.y)
+		//		= -b.y * (c.z - b.z) + b.z * (c.y - b.y)
+		//		= (-b.y * c.z) + (b.y * b.z) + (b.z * c.y) - (b.z * b.y)
+		//		= (-b.y * c.z) + (b.z * c.y)
+
+		// p2	= dot(c, axis)
+		//		= (-c.y * f1.z) + (c.z * f1.y)
+		//		= -c.y * (c.z - b.z) + c.z * (c.y - b.y)
+		//		= (-c.y * c.z) + (c.y * b.z) + (c.z * c.y) - (c.z * b.y)
+		//		= (c.y * b.z) - (c.z * b.y)
+		//		= p1
+
+		float p0 = (a.z * f1.y) - (a.y * f1.z);
+		float p1 = (b.z * f1.y) - (b.y * f1.z);
+		float r = radius.y * abs(f1.z) + radius.z * abs(f1.y);
+		if (max(-max(p0, p1), min(p0, p1)) > r) return false;
+	}
+
+	// Test axis (1, 0, 0) x f2 = (0, -f2.z, f2.y)
+	{
+		// p0	= dot(a, axis)
+		//		= (-a.y * f2.z) + (a.z * f2.y)
+		//		= -a.y * (a.z - c.z) + a.z * (a.y - c.y)
+		//		= (-a.y * a.z) + (a.y * c.z) + (a.z * a.y) - (a.z * c.y)
+		//		= (a.y * c.z) - (a.z * c.y)
+
+		// p1	= dot(b, axis)
+		//		= (-b.y * f2.z) + (b.z * f2.y)
+		//		= -b.y * (a.z - c.z) + b.z * (a.y - c.y)
+		//		= (-b.y * a.z) + (b.y * c.z) + (b.z * a.y) - (b.z * c.y)
+
+		// p2	= dot(c, axis)
+		//		= (-c.y * f2.z) + (c.z * f2.y)
+		//		= -c.y * (a.z - c.z) + c.z * (a.y - c.y)
+		//		= (-c.y * a.z) + (c.y * c.z) + (c.z * a.y) - (c.z * c.y)
+		//		= (-c.y * a.z) + (c.z * a.y)
+		//		= p0
+
+		float p0 = (a.z * f2.y) - (a.y * f2.z);
+		float p1 = (b.z * f0.y) - (b.y * f2.z);
+		float r = radius.y * abs(f2.z) + radius.z * abs(f2.y);
+		if (max(-max(p0, p1), min(p0, p1)) > r) return false;
+	}
+
+
+	// Test axis (0, 1, 0) x f0 = (f0.z, 0, -f0.x)
+	{
+		// p0	= dot(a, axis)
+		//		= (a.x * f0.z) - (a.z * f0.x)
+		//		= a.x * (b.z - a.z) - a.z * (b.x - a.x)
+		//		= (a.x * b.z) - (a.x * a.z) - (a.z * b.x) + (a.z * a.x)
+		//		= (a.x * b.z) - (a.z * b.x)
+
+		// p1	= dot(b, axis)
+		//		= (b.x * f0.z) - (b.z * f0.x)
+		//		= b.x * (b.z - a.z) - b.z * (b.x - a.x)
+		//		= (b.x * b.z) - (b.x * a.z) - (b.z * b.x) + (b.z * a.x)
+		//		= (b.z * a.x) - (b.x * a.z)
+		//		= p0
+
+		// p2	= dot(c, axis)
+		//		= (c.x * f0.z) - (c.z * f0.x)
+
+		float p0 = (a.x * f0.z) - (a.z * f0.x);
+		float p2 = (c.x * f0.z) - (c.z * f0.x);
+		float r = radius.x * abs(f0.z) + radius.z * abs(f0.x);
+		if (max(-max(p0, p2), min(p0, p2)) > r) return false;
+	}
+
+	// Test axis (0, 1, 0) x f1 = (f1.z, 0, -f1.x)
+	{
+		// p0	= dot(a, axis)
+		//		= (a.x * f1.z) - (a.z * f1.x)
+
+		// p1	= dot(b, axis)
+		//		= (b.x * f1.z) - (b.z * f1.x)
+
+		// p2	= dot(c, axis)
+		//		= (c.x * f1.z) - (c.z * f1.x)
+		//		= p1
+
+		float p0 = (a.x * f1.z) - (a.z * f1.x);
+		float p1 = (b.x * f1.z) - (b.z * f1.x);
+		float r = radius.x * abs(f1.z) + radius.z * abs(f1.x);
+		if (max(-max(p0, p1), min(p0, p1)) > r) return false;
+	}
+
+	// Test axis (0, 1, 0) x f2 = (f2.z, 0, -f2.x)
+	{
+		// p0	= dot(a, axis)
+		//		= (a.x * f2.z) - (a.z * f2.x)
+
+		// p1	= dot(b, axis)
+		//		= (b.x * f2.z) - (b.z * f2.x)
+
+		// p2	= dot(c, axis)
+		//		= (c.x * f2.z) - (c.z * f2.x)
+		//		= p0
+
+		float p0 = (a.x * f2.z) - (a.z * f2.x);
+		float p1 = (b.x * f2.z) - (b.z * f2.x);
+		float r = radius.x * abs(f2.z) + radius.z * abs(f2.x);
+		if (max(-max(p0, p1), min(p0, p1)) > r) return false;
+	}
+
+
+	// Test axis (0, 0, 1) x f0 = (-f0.y, f0.x, 0)
+	{
+		// p0	= dot(a, axis)
+		//		= (-a.x * f0.y) + (a.y * f0.x)
+
+		// p1	= dot(b, axis)
+		//		= (-b.x * f0.y) + (b.y * f0.x)
+		//		= p0
+
+		// p2	= dot(c, axis)
+		//		= (-c.x * f0.y) + (c.y * f0.x)
+
+		float p0 = (a.y * f0.x) - (a.x * f0.y);
+		float p2 = (c.y * f0.x) - (c.x * f0.y);
+		float r = radius.x * abs(f0.y) + radius.y * abs(f0.x);
+		if (max(-max(p0, p2), min(p0, p2)) > r) return false;
+	}
+
+	// Test axis (0, 0, 1) x f1 = (-f1.y, f1.x, 0)
+	{
+		// p0	= dot(a, axis)
+		//		= (-a.x * f1.y) + (a.y * f1.x)
+
+		// p1	= dot(b, axis)
+		//		= (-b.x * f1.y) + (b.y * f1.x)
+
+		// p2	= dot(c, axis)
+		//		= (-c.x * f1.y) + (c.y * f1.x)
+		//		= p1
+
+		float p0 = (a.y * f1.x) - (a.x * f1.y);
+		float p1 = (b.y * f1.x) - (b.x * f1.y);
+		float r = radius.x * abs(f1.y) + radius.y * abs(f1.x);
+		if (max(-max(p0, p1), min(p0, p1)) > r) return false;
+	}
+
+	// Test axis (0, 0, 1) x f2 = (-f2.y, f2.x, 0)
+	{
+		// p0	= dot(a, axis)
+		//		= (-a.x * f2.y) + (a.y * f2.x)
+
+		// p1	= dot(b, axis)
+		//		= (-b.x * f2.y) + (b.y * f2.x)
+
+		// p2	= dot(c, axis)
+		//		= (-c.x * f2.y) + (c.y * f2.x)
+		//		= p0
+
+		float p0 = (a.y * f2.x) - (a.x * f2.y);
+		float p1 = (b.y * f2.x) - (b.x * f2.y);
+		float r = radius.x * abs(f2.y) + radius.y * abs(f2.x);
+		if (max(-max(p0, p1), min(p0, p1)) > r) return false;
+	}
+
+
+	// Test face normals of AABB. Exit if...
+	// ... [-radius.x, radius.x] and [min(a.x,b.x,c.x), max(a.x,b.x,c.x)] do not overlap
+	if (max(a.x, max(b.x, c.x)) < -radius.x || min(a.x, min(b.x, c.x)) > radius.x) return false;
+	// ... [-radius.y, radius.y] and [min(a.y,b.y,c.y), max(a.y,b.y,c.y)] do not overlap
+	if (max(a.y, max(b.y, c.y)) < -radius.y || min(a.y, min(b.y, c.y)) > radius.y) return false;
+	// ... [-radius.z, radius.z] and [min(a.z,b.z,c.z), max(a.z,b.z,c.z)] do not overlap
+	if (max(a.z, max(b.z, c.z)) < -radius.z || min(a.z, min(b.z, c.z)) > radius.z) return false;
+
+
+	{
+		vec3 triNormal = cross(f0, f1);
+		float triD = dot(triNormal, a);
+
+		float r = dot(radius, abs(triNormal));
+		float s = abs(triD);
+
+		if (s > r)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
 bool obbVsOBB(const bounding_oriented_box& a, const bounding_oriented_box& b)
 {
 	union obb_axes
@@ -939,6 +1181,33 @@ bool obbVsHull(const bounding_oriented_box& o, const bounding_hull& h)
 
 	gjk_simplex gjkSimplex;
 	return gjkIntersectionTest(obbSupport, hullSupport, gjkSimplex);
+}
+
+bool obbVsPlane(const bounding_oriented_box& a, vec4 plane)
+{
+	vec3 center = a.center;
+	vec3 radius = a.radius;
+
+	vec3 e0 = a.rotation * vec3(1.f, 0.f, 0.f);
+	vec3 e1 = a.rotation * vec3(0.f, 1.f, 0.f);
+	vec3 e2 = a.rotation * vec3(0.f, 0.f, 1.f);
+
+	float r = radius.x * abs(dot(plane.xyz, e0))
+			+ radius.y * abs(dot(plane.xyz, e1))
+			+ radius.z * abs(dot(plane.xyz, e2));
+
+	float s = abs(signedDistanceToPlane(center, plane));
+
+	return s <= r;
+}
+
+bool obbVsTriangle(const bounding_oriented_box& obb, vec3 a, vec3 b, vec3 c)
+{
+	a = conjugate(obb.rotation) * (a - obb.center);
+	b = conjugate(obb.rotation) * (b - obb.center);
+	c = conjugate(obb.rotation) * (c - obb.center);
+
+	return aabbVsTriangle({ -obb.radius, obb.radius }, a, b, c);
 }
 
 bool hullVsHull(const bounding_hull& a, const bounding_hull& b)
