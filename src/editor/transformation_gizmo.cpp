@@ -455,7 +455,7 @@ bool transformation_gizmo::handleUserInput(bool allowKeyboardInput,
 		}
 	}
 
-	if (ImGui::BeginControlsWindow("##GizmoControls"))
+	if (ImGui::BeginControlsWindow("##GizmoControls", ImVec2(0.f, 0.f), ImVec2(20.f, 20.f)))
 	{
 		transformation_space constantLocal = transformation_local;
 		transformation_space& space = (type == transformation_type_scale) ? constantLocal : this->space;

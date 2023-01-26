@@ -52,7 +52,7 @@ namespace ImGui
 	bool AnyModifiersDown();
 
 	bool BeginWindowHiddenTabBar(const char* name, bool* open = 0, ImGuiWindowFlags flags = 0);
-	bool BeginControlsWindow(const char* name);
+	bool BeginControlsWindow(const char* name, ImVec2 parentRelativeOffset, ImVec2 parentAbsoluteOffset);
 
 	void Image(struct dx_cpu_descriptor_handle& handle, ImVec2 size);
 	void Image(struct dx_cpu_descriptor_handle& handle, uint32 width, uint32 height);

@@ -1412,7 +1412,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 	inputCaptured |= drawEntityCreationPopup();
 
-	if (ImGui::BeginControlsWindow("##EntityControls"))
+	if (ImGui::BeginControlsWindow("##EntityControls", ImVec2(0.f, 0.f), ImVec2(20.f, 90.f)))
 	{
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 
@@ -1591,16 +1591,10 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 	}
 
 
-	// Current window is expected to be scene viewport!
-	ImVec2 viewportPos = ImGui::GetWindowPos();
-	ImVec2 viewportSize = ImGui::GetWindowSize();
-	if (ImGui::BeginControlsWindow("##SimulationControls"))
+	float simControlsWidth = IMGUI_ICON_DEFAULT_SIZE * 3 + IMGUI_ICON_DEFAULT_SPACING * 2 + ImGui::GetStyle().WindowPadding.x * 2;
+
+	if (ImGui::BeginControlsWindow("##SimulationControls", ImVec2(0.5f, 0.f), ImVec2(-simControlsWidth * 0.5f, 20.f)))
 	{
-		float width = IMGUI_ICON_DEFAULT_SIZE * 3 + IMGUI_ICON_DEFAULT_SPACING * 2 + ImGui::GetStyle().WindowPadding.x * 2;
-
-		ImVec2 pos = ImGui::GetWindowPos(); // Initially this is the position read from the imgui.ini file.
-		ImGui::SetWindowPos(ImVec2(viewportPos.x + (viewportSize.x - width) * 0.5f, pos.y));
-
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 
 		if (ImGui::IconButton(imgui_icon_play, imgui_icon_play, IMGUI_ICON_DEFAULT_SIZE, this->scene->isPlayable()))

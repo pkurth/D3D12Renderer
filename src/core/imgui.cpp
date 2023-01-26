@@ -203,13 +203,24 @@ namespace ImGui
 		return result;
 	}
 
-	bool BeginControlsWindow(const char* name)
+	bool BeginControlsWindow(const char* name, ImVec2 parentRelativeOffset, ImVec2 parentAbsoluteOffset)
 	{
+		if (ImGui::GetCurrentWindow())
+		{
+			// Only do this if there is a parent window.
+
+			ImVec2 parentPos = ImGui::GetWindowPos();
+			ImVec2 parentSize = ImGui::GetWindowSize();
+
+			ImGui::SetNextWindowPos(parentPos + parentSize * parentRelativeOffset + parentAbsoluteOffset);
+		}
+
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.f);
 		ImGui::SetNextWindowSize(ImVec2(0.f, 0.f)); // Auto-resize to content.
 		bool result = ImGui::Begin(name, 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove
-		 | ImGuiWindowFlags_NoBringToFrontOnFocus);
-		ImGui::PopStyleVar();	
+		 | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings);
+		ImGui::PopStyleVar();
+
 		return result;
 	}
 
