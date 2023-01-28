@@ -905,7 +905,7 @@ bool aabbVsTriangle(const bounding_box& aabb, vec3 a, vec3 b, vec3 c)
 		//		= p0
 
 		float p0 = (a.z * f2.y) - (a.y * f2.z);
-		float p1 = (b.z * f0.y) - (b.y * f2.z);
+		float p1 = (b.z * f2.y) - (b.y * f2.z);
 		float r = radius.y * abs(f2.z) + radius.z * abs(f2.y);
 		if (max(-max(p0, p1), min(p0, p1)) > r) return false;
 	}

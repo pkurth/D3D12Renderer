@@ -91,7 +91,7 @@ static uint32 intersection(const bounding_box& aabb, const heightmap_collider_co
 
 		{
 			float p0 = (a.z * f2.y) - (a.y * f2.z);
-			float p1 = (b.z * f0.y) - (b.y * f2.z);
+			float p1 = (b.z * f2.y) - (b.y * f2.z);
 			float r = radius.y * abs(f2.z) + radius.z * abs(f2.y);
 
 			float penetration = r - max(-max(p0, p1), min(p0, p1));
