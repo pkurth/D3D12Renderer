@@ -18,6 +18,8 @@ struct heightmap_collider_chunk
 	void iterateTrianglesInVolume(uint32 volMinX, uint32 volMinZ, uint32 volMaxX, uint32 volMaxZ,
 		uint32 volMinY, uint32 volMaxY, float chunkScale, float heightScale, vec3 chunkMinCorner, memory_arena& arena, const callback_func& func) const;
 
+	float getHeightAt(vec2 coord, float heightScale, float heightOffset) const;
+
 private:
 	uint16* heights = 0;
 
@@ -126,6 +128,8 @@ struct heightmap_collider_component
 
 	template <typename callback_func>
 	void iterateTrianglesInVolume(bounding_box volume, memory_arena& arena, const callback_func& func) const;
+
+	float getHeightAt(vec2 coord) const; // Returns -FLT_MAX if outside bounds.
 
 	heightmap_collider_chunk& collider(uint32 x, uint32 z) { return colliders[z * chunksPerDim + x]; }
 	const heightmap_collider_chunk& collider(uint32 x, uint32 z) const { return colliders[z * chunksPerDim + x]; }
