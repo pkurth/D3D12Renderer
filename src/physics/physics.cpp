@@ -1145,7 +1145,7 @@ static void physicsStepInternal(game_scene& scene, memory_arena& arena, const ph
 	collision_contact* contacts = arena.allocate<collision_contact>(numBroadphaseOverlaps * 4 + 5000); // Each collision can have up to 4 contact points.
 	constraint_body_pair* allConstraintBodyPairs = arena.allocate<constraint_body_pair>(numConstraints + numBroadphaseOverlaps * 4 + 5000);
 	collider_pair* collidingColliderPairs = overlappingColliderPairs; // We reuse this buffer.
-	uint8* contactCountPerCollision = arena.allocate<uint8>(numColliders * numColliders);
+	uint8* contactCountPerCollision = arena.allocate<uint8>(numColliders * numColliders + 5000);
 
 	constraint_body_pair* collisionBodyPairs = allConstraintBodyPairs + numConstraints;
 
