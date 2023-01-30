@@ -69,12 +69,6 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 
 	game_scene& scene = this->scene.getCurrentScene();
 
-	//scene.createEntity("Cloth")
-	//	.addComponent<transform_component>(vec3(0.f, 10.f, 0.f), quat::identity)
-	//	.addComponent<cloth_component>(10.f, 10.f, 20u, 20u, 8.f)
-	//	.addComponent<cloth_render_component>();
-
-
 #if 1
 	if (auto mesh = loadMeshFromFile("assets/sponza/sponza.obj"))
 	{
@@ -124,69 +118,8 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		pilot.getComponent<animation_component>().animation.set(&pilotMesh->skeleton.clips[0]);
 	}
 
-#if 0
-	if (auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx"))
-	{
-		scene.createEntity("Stormtrooper 1")
-			.addComponent<transform_component>(vec3(-5.f, 0.f, -1.f), quat::identity)
-			.addComponent<raster_component>(stormtrooperMesh)
-			.addComponent<animation_component>()
-			.addComponent<dynamic_transform_component>();
-
-		scene.createEntity("Stormtrooper 2")
-			.addComponent<transform_component>(vec3(0.f, 0.f, -2.f), quat::identity)
-			.addComponent<raster_component>(stormtrooperMesh)
-			.addComponent<animation_component>()
-			.addComponent<dynamic_transform_component>();
-
-		scene.createEntity("Stormtrooper 3")
-			.addComponent<transform_component>(vec3(5.f, 0.f, -1.f), quat::identity)
-			.addComponent<raster_component>(stormtrooperMesh)
-			.addComponent<animation_component>()
-			.addComponent<dynamic_transform_component>();
-	}
-
-	if (auto pilotMesh = loadAnimatedMeshFromFile("assets/pilot/pilot.fbx"))
-	{
-		scene.createEntity("Pilot")
-			.addComponent<transform_component>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
-			.addComponent<raster_component>(pilotMesh)
-			.addComponent<animation_component>()
-			.addComponent<dynamic_transform_component>();
-	}
-
-	if (auto unrealMesh = loadAnimatedMeshFromFile("assets/unreal/unreal_mannequin.fbx"))
-	{
-		unrealMesh->skeleton.pushAssimpAnimationsInDirectory("assets/unreal/animations");
-
-		scene.createEntity("Mannequin")
-			.addComponent<transform_component>(vec3(-2.5f, 0.f, -1.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)), 0.019f)
-			.addComponent<raster_component>(unrealMesh)
-			.addComponent<animation_component>()
-			.addComponent<dynamic_transform_component>();
-	}
-#endif
-
-#if 0
-	if (auto ragdollMesh = loadAnimatedMeshFromFile("assets/ragdoll/locomotion_pack/xbot.fbx"))
-	{
-		//ragdollMesh->skeleton.prettyPrintHierarchy();
-		ragdollMesh->skeleton.pushAssimpAnimationsInDirectory("assets/ragdoll/locomotion_pack/animations");
-
-		scene.createEntity("Ragdoll")
-			.addComponent<transform_component>(vec3(-2.5f, 0.f, -1.f), quat::identity, 0.01f)
-			.addComponent<raster_component>(ragdollMesh)
-			.addComponent<animation_component>()
-			.addComponent<dynamic_geometry_component>();
-	}
-#endif
-
 #if 1
 	{
-		//scene.createEntity("Force field")
-		//	.addComponent<transform_component>(vec3(0.f), quat::identity)
-		//	.addComponent<force_field_component>(vec3(0.f, 0.f, -1.f));
-
 		mesh_builder builder;
 
 		auto lollipopMaterial = createPBRMaterial(
@@ -212,22 +145,8 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		builder.pushSphere({ });
 		sphereMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, woodMaterial });
 
-		//auto test1 = scene.createEntity("Lollipop 1")
-		//	.addComponent<transform_component>(vec3(20.f, 5.f, 0.f), quat::identity)
-		//	.addComponent<raster_component>(testMesh)
-		//	.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, { 0.2f, 0.5f, 4.f }))
-		//	.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, { 0.2f, 0.5f, 4.f }))
-		//	.addComponent<rigid_body_component>(true, 1.f);
-		//
-		//auto test2 = scene.createEntity("Lollipop 2")
-		//	.addComponent<transform_component>(vec3(20.f, 5.f, -2.f), quat::identity)
-		//	.addComponent<raster_component>(testMesh)
-		//	.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -0.5f, 0.f), vec3(0.f, 0.5f, 0.f), 0.1f }, { 0.2f, 0.5f, 4.f }))
-		//	.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.5f + 0.1f + 0.4f, 0.f), 0.4f }, { 0.2f, 0.5f, 4.f} ))
-		//	.addComponent<rigid_body_component>(true, 1.f);
-
 		random_number_generator rng = { 15681923 };
-		for (uint32 i = 0; i < 3; ++i)
+		for (uint32 i = 0; i < 200; ++i)
 		{
 			//float x = rng.randomFloatBetween(-90.f, 90.f);
 			//float z = rng.randomFloatBetween(-90.f, 90.f);
@@ -279,31 +198,10 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 #endif
 
 
-		//bounding_hull hull =
-		//{
-		//	quat::identity,
-		//	vec3(0.f),
-		//	allocateBoundingHullGeometry("assets/colliders/hull.fbx")
-		//};
-		//
-		//if (hull.geometryIndex != INVALID_BOUNDING_HULL_INDEX)
-		//{
-		//	scene.createEntity("Hull")
-		//		.addComponent<transform_component>(vec3(20.f, 15.f, 0.f), quat::identity)
-		//		.addComponent<raster_component>(loadMeshFromFile("assets/colliders/hull.fbx"))
-		//		.addComponent<collider_component>(collider_component::asHull(hull, { 0.1f, 0.5f, 0.1f }))
-		//		.addComponent<rigid_body_component>(false, 0.f);
-		//}
-
 		scene.createEntity("Test ground")
 			.addComponent<transform_component>(vec3(10, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
 			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(30.f, 4.f, 30.f)), { physics_material_type_metal, 0.1f, 1.f, 4.f }));
-
-		/*scene.createEntity("Test ground")
-			.addComponent<transform_component>(vec3(20.f, -5.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
-			.addComponent<raster_component>(groundMesh)
-			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(20.f, 4.f, 20.f)), { physics_material_type_metal, 0.1f, 1.f, 4.f }));*/
 
 
 		auto chainMesh = make_ref<multi_mesh>();
@@ -350,78 +248,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 #endif
 
 
-	//humanoid_ragdoll::create(scene, vec3(60.f, 1.25f, -2.f));
-
-	//vehicle::create(scene, vec3(0.f, 1.f, 0.f));
-
-	//humanoid_ragdoll ragdoll = humanoid_ragdoll::create(scene, vec3(0.f, 1.25f, 0.f));
-	//learnedLocomotion.initialize(scene, ragdoll);
-
-
-
-
 	random_number_generator rng = { 14878213 };
-
-#if 0
-	scene.createEntity("Spot light 0")
-		.addComponent<position_rotation_component>(vec3(2.f, 3.f, 0.f), lookAtQuaternion(vec3(1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f)))
-		.addComponent<spot_light_component>(
-			randomRGB(rng),
-			5.f,
-			25.f,
-			deg2rad(20.f),
-			deg2rad(30.f),
-			true,
-			512u
-		);
-	
-	scene.createEntity("Spot light 1")
-		.addComponent<position_rotation_component>(vec3(-2.f, 3.f, 0.f), lookAtQuaternion(vec3(-1.f, 0.f, 0.f), vec3(0.f, 1.f, 0.f)))
-		.addComponent<spot_light_component>(
-			randomRGB(rng),
-			5.f,
-			25.f,
-			deg2rad(20.f),
-			deg2rad(30.f),
-			true,
-			512u
-		);
-
-	scene.createEntity("Point light 0")
-		.addComponent<position_component>(vec3(0.f, 8.f, 0.f))
-		.addComponent<point_light_component>(
-			randomRGB(rng),
-			1.f,
-			10.f,
-			true,
-			512u
-		);
-#endif
-
-#if 0
-	decalTexture = loadTextureFromFile("assets/decals/explosion.png");
-
-	if (decalTexture)
-	{
-		decals.resize(5);
-
-		for (uint32 i = 0; i < decals.size(); ++i)
-		{
-			decals[i].initialize(
-				vec3(-7.f + i * 3, 2.f, -3.f),
-				vec3(3.f, 0.f, 0.f),
-				vec3(0.f, 3.f, 0.f),
-				vec3(0.f, 0.f, -0.75f),
-				vec4(1.f, 1.f, 1.f, 1.f),
-				1.f,
-				1.f,
-				vec4(0.f, 0.f, 1.f, 1.f)
-			);
-		}
-
-		SET_NAME(decalTexture->resource, "Decal");
-	}
-#endif
 
 	this->scene.sun.direction = normalize(vec3(-0.6f, -1.f, -0.3f));
 	this->scene.sun.color = vec3(1.f, 0.93f, 0.76f);
@@ -603,7 +430,6 @@ void application::update(const user_input& input, float dt)
 	}
 
 
-
 	static float physicsTimer = 0.f;
 	physicsStep(scene, stackArena, physicsTimer, editor.physicsSettings, dt);
 
@@ -663,7 +489,7 @@ void application::update(const user_input& input, float dt)
 	{
 		if (dxContext.featureSupport.meshShaders())
 		{
-			//testRenderMeshShader(&transparentRenderPass, dt);
+			testRenderMeshShader(&transparentRenderPass, dt);
 		}
 
 		thread_job_context context;
