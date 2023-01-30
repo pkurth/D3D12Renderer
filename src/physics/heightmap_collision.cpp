@@ -40,6 +40,31 @@ static void getAABBIncidentEdge(vec3 aabbRadius, vec3 normal, vec3& outA, vec3& 
 }
 
 
+static uint32 collideSphereVsTriangle(vec3 center, float radius, vec3 a, vec3 b, vec3 c, collision_contact* outContacts)
+{
+	vec3 closestPoint = closestPoint_PointTriangle(center, a, b, c);
+	vec3 n = closestPoint - center;
+
+	float sqLength = squaredLength(n);
+	if (sqLength <= radius * radius)
+	{
+		float distance = sqrt(sqLength);
+		n *= 1.f / distance;
+
+		float penetrationDepth = radius - distance;
+		assert(penetrationDepth >= 0.f);
+
+		collision_contact& contact = outContacts[0];
+		contact.point = closestPoint;
+		contact.normal = n;
+		contact.penetrationDepth = penetrationDepth;
+
+		return 1;
+	}
+
+	return 0;
+}
+
 static uint32 collideAABBvsTriangle(vec3 center, vec3 radius, vec3 a, vec3 b, vec3 c, collision_contact* outContacts)
 {
 	a -= center;
@@ -389,25 +414,38 @@ static uint32 intersection(const bounding_sphere& s, const bounding_box& aabb, c
 {
 	uint32 numContacts = 0;
 
-	heightmap.iterateTrianglesInVolume(aabb, arena, [&s, outContacts, &numContacts](vec3 a, vec3 b, vec3 c)
+	heightmap.iterateTrianglesInVolume(aabb, arena, [s, outContacts, &numContacts](vec3 a, vec3 b, vec3 c)
 	{
-		vec3 closestPoint = closestPoint_PointTriangle(s.center, a, b, c);
-		vec3 n = closestPoint - s.center;
+		numContacts += collideSphereVsTriangle(s.center, s.radius, a, b, c, outContacts + numContacts);
+	});
 
-		float sqLength = squaredLength(n);
-		if (sqLength <= s.radius * s.radius)
-		{
-			float distance = sqrt(sqLength);
-			n *= 1.f / distance;
+	// TODO: De-duplicate contacts (for if we hit triangle edges or vertices).
 
-			float penetrationDepth = s.radius - distance;
-			assert(penetrationDepth >= 0.f);
+	return numContacts;
+}
 
-			collision_contact& c = outContacts[numContacts++];
-			c.point = closestPoint;
-			c.normal = n;
-			c.penetrationDepth = penetrationDepth;
-		}
+static uint32 intersection(const bounding_capsule& capsule, const bounding_box& aabb, const heightmap_collider_component& heightmap, memory_arena& arena,
+	collision_contact* outContacts)
+{
+	uint32 numContacts = 0;
+
+	ray r = { capsule.positionA, normalize(capsule.positionB - capsule.positionA) };
+
+	heightmap.iterateTrianglesInVolume(aabb, arena, [r, capsule, outContacts, &numContacts](vec3 a, vec3 b, vec3 c)
+	{
+		vec3 triNormal = normalize(cross(b - a, c - a));
+		float d = -dot(triNormal, a);
+
+		float ndotd = dot(r.direction, triNormal);
+
+		float t = -(dot(r.origin, triNormal) + d) / ndotd;
+
+		vec3 trace = r.origin + t * r.direction;
+		vec3 closest = closestPoint_PointTriangle(trace, a, b, c);
+
+		vec3 reference = closestPoint_PointSegment(closest, { capsule.positionA, capsule.positionB });
+
+		numContacts += collideSphereVsTriangle(reference, capsule.radius, a, b, c, outContacts + numContacts);
 	});
 
 	// TODO: De-duplicate contacts (for if we hit triangle edges or vertices).
@@ -425,7 +463,7 @@ static uint32 intersection(const bounding_box& aabb, const heightmap_collider_co
 
 	heightmap.iterateTrianglesInVolume(aabb, arena, [center, radius, outContacts, &numContacts](vec3 a, vec3 b, vec3 c)
 	{
-		numContacts += collideAABBvsTriangle(center, radius, a, b, c, outContacts);
+		numContacts += collideAABBvsTriangle(center, radius, a, b, c, outContacts + numContacts);
 	});
 
 	// TODO: De-duplicate contacts (for if we hit triangle edges or vertices).
@@ -438,7 +476,7 @@ static uint32 intersection(const bounding_oriented_box& obb, const bounding_box&
 {
 	uint32 numContacts = 0;
 
-	heightmap.iterateTrianglesInVolume(aabb, arena, [&obb, outContacts, &numContacts](vec3 a, vec3 b, vec3 c)
+	heightmap.iterateTrianglesInVolume(aabb, arena, [obb, outContacts, &numContacts](vec3 a, vec3 b, vec3 c)
 	{
 		a = conjugate(obb.rotation) * (a - obb.center);
 		b = conjugate(obb.rotation) * (b - obb.center);
@@ -480,6 +518,7 @@ narrowphase_result heightmapCollision(const heightmap_collider_component& height
 		switch (collider.type)
 		{
 			case collider_type_sphere: numContacts = intersection(collider.sphere, aabb, heightmap, arena, contactPtr); break;
+			case collider_type_capsule: numContacts = intersection(collider.capsule, aabb, heightmap, arena, contactPtr); break;
 			case collider_type_aabb: numContacts = intersection(collider.aabb, heightmap, arena, contactPtr); break;
 			case collider_type_obb: numContacts = intersection(collider.obb, aabb, heightmap, arena, contactPtr); break;
 		}
