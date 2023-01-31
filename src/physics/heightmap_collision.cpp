@@ -46,18 +46,21 @@ static uint32 collideSphereVsTriangle(vec3 center, float radius, vec3 a, vec3 b,
 	
 	vec3 n = closestPoint - center;
 
-	float sqLength = squaredLength(n);
-	if (sqLength <= radius * radius)
+	float sqDistance = squaredLength(n);
+	if (sqDistance <= radius * radius)
 	{
-		if (sqLength == 0.f)
+		float distance;
+		if (sqDistance == 0.f)
 		{
 			vec3 triNormal = cross(b - a, c - a);
 			n = -triNormal;
-			sqLength = squaredLength(triNormal);
+			distance = 0.f;
 		}
-
-		float distance = sqrt(sqLength);
-		n *= 1.f / distance;
+		else
+		{
+			distance = sqrt(sqDistance);
+			n *= 1.f / distance;
+		}
 
 
 		float penetrationDepth = radius - distance;
