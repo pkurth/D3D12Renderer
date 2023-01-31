@@ -263,6 +263,7 @@ bool capsuleVsCylinder(const bounding_capsule& a, const bounding_cylinder& b);
 bool capsuleVsAABB(const bounding_capsule& c, const bounding_box& b);
 bool capsuleVsOBB(const bounding_capsule& c, const bounding_oriented_box& o);
 bool capsuleVsHull(const bounding_capsule& c, const bounding_hull& h);
+bool capsuleVsTriangle(const bounding_capsule& capsule, vec3 a, vec3 b, vec3 c);
 
 bool cylinderVsCylinder(const bounding_cylinder& a, const bounding_cylinder& b);
 bool cylinderVsAABB(const bounding_cylinder& c, const bounding_box& b);

@@ -763,6 +763,25 @@ bool capsuleVsHull(const bounding_capsule& c, const bounding_hull& h)
 	return gjkIntersectionTest(capsuleSupport, hullSupport, gjkSimplex);
 }
 
+bool capsuleVsTriangle(const bounding_capsule& capsule, vec3 a, vec3 b, vec3 c)
+{
+	ray r = { capsule.positionA, normalize(capsule.positionB - capsule.positionA) };
+
+	vec3 triNormal = normalize(cross(b - a, c - a));
+	float d = -dot(triNormal, a);
+
+	float ndotd = dot(r.direction, triNormal);
+
+	float t = -(dot(r.origin, triNormal) + d) / ndotd;
+
+	vec3 trace = r.origin + t * r.direction;
+	vec3 closest = closestPoint_PointTriangle(trace, a, b, c);
+
+	vec3 reference = closestPoint_PointSegment(closest, { capsule.positionA, capsule.positionB });
+
+	return sphereVsTriangle(bounding_sphere{ reference, capsule.radius }, a, b, c);
+}
+
 bool cylinderVsCylinder(const bounding_cylinder& a, const bounding_cylinder& b)
 {
 	cylinder_support_fn cylinderSupportA{ a };
