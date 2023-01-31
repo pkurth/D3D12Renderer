@@ -131,6 +131,16 @@ void dx_command_list::copyTextureRegionToTexture(const ref<dx_texture>& from, co
 	commandList->CopyTextureRegion(&destLocation, destX, destY, 0, &srcLocation, &srcBox);
 }
 
+void dx_command_list::copyBufferRegionToBuffer(const ref<dx_buffer>& from, const ref<dx_buffer>& to, uint32 fromElementOffset, uint32 numElements, uint32 toElementOffset)
+{
+	commandList->CopyBufferRegion(to->resource.Get(), toElementOffset * to->elementSize, from->resource.Get(), fromElementOffset * from->elementSize, numElements * from->elementSize);
+}
+
+void dx_command_list::copyBufferRegionToBuffer_ByteOffset(const ref<dx_buffer>& from, const ref<dx_buffer>& to, uint32 fromByteOffset, uint32 numBytes, uint32 toByteOffset)
+{
+	commandList->CopyBufferRegion(to->resource.Get(), toByteOffset, from->resource.Get(), fromByteOffset, numBytes);
+}
+
 void dx_command_list::setPipelineState(dx_pipeline_state pipelineState)
 {
 	commandList->SetPipelineState(pipelineState.Get());
@@ -272,6 +282,11 @@ void dx_command_list::setComputeDescriptorTable(uint32 rootParameterIndex, CD3DX
 }
 
 void dx_command_list::clearUAV(const ref<dx_buffer>& buffer, float val)
+{
+	clearUAV(buffer->resource, buffer->cpuClearUAV, buffer->gpuClearUAV, val);
+}
+
+void dx_command_list::clearUAV(const ref<dx_buffer>& buffer, uint32 val)
 {
 	clearUAV(buffer->resource, buffer->cpuClearUAV, buffer->gpuClearUAV, val);
 }

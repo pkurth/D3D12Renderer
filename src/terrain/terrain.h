@@ -50,6 +50,12 @@ struct terrain_component
 	ref<pbr_material> rockMaterial;
 
 
+	vec3 getMinCorner(vec3 positionOffset) const
+	{
+		float xzOffset = -(chunkSize * chunksPerDim) * 0.5f; // Offsets entire terrain by half.
+		return positionOffset + vec3(xzOffset, 0.f, xzOffset);
+	}
+
 	void update(vec3 positionOffset, struct heightmap_collider_component* collider = 0);
 	void render(const render_camera& camera, struct opaque_render_pass* renderPass, struct sun_shadow_render_pass* shadowPass, vec3 positionOffset, uint32 entityID = -1);
 

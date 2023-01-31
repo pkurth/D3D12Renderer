@@ -691,7 +691,7 @@ void lightAndDecalCulling(dx_command_list* cl,
 		{
 			PROFILE_ALL(cl, "Sort objects into tiles");
 
-			cl->clearUAV(culling.tiledCullingIndexCounter, 0.f);
+			cl->clearUAV(culling.tiledCullingIndexCounter, 0u);
 			//cl->uavBarrier(tiledCullingIndexCounter);
 			cl->setPipelineState(*lightCullingPipeline.pipeline);
 			cl->setComputeRootSignature(*lightCullingPipeline.rootSignature);

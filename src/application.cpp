@@ -19,6 +19,7 @@
 #include "audio/audio.h"
 #include "terrain/terrain.h"
 #include "terrain/heightmap_collider.h"
+#include "terrain/proc_placement.h"
 
 
 static raytracing_object_type defineBlasFromMesh(const ref<multi_mesh>& mesh)
@@ -81,19 +82,6 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 	}
 #endif
 
-#if 1
-	uint32 numTerrainChunks = 10;
-	float terrainChunkSize = 64.f;
-
-	auto terrainGroundMaterial = createPBRMaterial("assets/terrain/ground/Ground037_2K_Color.png", "assets/terrain/ground/Ground037_2K_NormalDX.png", "assets/terrain/ground/Ground037_2K_Roughness.png", {});
-	auto terrainRockMaterial = createPBRMaterial("assets/terrain/rock/Rock034_2K_Color.png", "assets/terrain/rock/Rock034_2K_NormalDX.png",	"assets/terrain/rock/Rock034_2K_Roughness.png", {});
-
-	auto terrain = scene.createEntity("Terrain")
-		.addComponent<position_component>(vec3(0.f, -64.f, 0.f))
-		.addComponent<terrain_component>(numTerrainChunks, terrainChunkSize, 50.f, terrainGroundMaterial, terrainRockMaterial)
-		.addComponent<heightmap_collider_component>(numTerrainChunks, terrainChunkSize, physics_material{ physics_material_type_metal, 0.1f, 1.f, 4.f });
-#endif
-
 
 	if (auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx"))
 	{
@@ -118,10 +106,22 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		pilot.getComponent<animation_component>().animation.set(&pilotMesh->skeleton.clips[0]);
 	}
 
+
+	auto woodMaterial = createPBRMaterial(
+		"assets/desert/textures/WoodenCrate2_Albedo.png",
+		"assets/desert/textures/WoodenCrate2_Normal.png",
+		{}, {});
+
+
+	mesh_builder builder;
+
+	auto sphereMesh = make_ref<multi_mesh>();
+	builder.pushSphere({ });
+	sphereMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, woodMaterial });
+
+
 #if 1
 	{
-		mesh_builder builder;
-
 		auto lollipopMaterial = createPBRMaterial(
 			"assets/cc0/sphere/Tiles074_2K_Color.jpg",
 			"assets/cc0/sphere/Tiles074_2K_Normal.jpg",
@@ -132,38 +132,29 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		builder.pushBox({ vec3(0.f), vec3(30.f, 4.f, 30.f) });
 		groundMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, lollipopMaterial });
 
-		auto woodMaterial = createPBRMaterial(
-			"assets/desert/textures/WoodenCrate2_Albedo.png",
-			"assets/desert/textures/WoodenCrate2_Normal.png",
-			{}, {});
-
 		auto boxMesh = make_ref<multi_mesh>();
 		builder.pushBox({ vec3(0.f), vec3(1.f, 1.f, 2.f) });
 		boxMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, woodMaterial });
 
-		auto sphereMesh = make_ref<multi_mesh>();
-		builder.pushSphere({ });
-		sphereMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, woodMaterial });
-
 		random_number_generator rng = { 15681923 };
-		for (uint32 i = 0; i < 200; ++i)
+		for (uint32 i = 0; i < 3; ++i)
 		{
 			//float x = rng.randomFloatBetween(-90.f, 90.f);
 			//float z = rng.randomFloatBetween(-90.f, 90.f);
 			//float y = rng.randomFloatBetween(20.f, 60.f);
 		
-			if (i % 2 == 0)
-			{
-				scene.createEntity("Cube")
-					.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
-					.addComponent<raster_component>(boxMesh)
-					.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), { physics_material_type_wood, 0.1f, 0.5f, 1.f }))
-					.addComponent<rigid_body_component>(false, 1.f);
-			}
-			else
+			//if (i % 2 == 0)
+			//{
+			//	scene.createEntity("Cube")
+			//		.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+			//		.addComponent<raster_component>(boxMesh)
+			//		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), { physics_material_type_wood, 0.1f, 0.5f, 1.f }))
+			//		.addComponent<rigid_body_component>(false, 1.f);
+			//}
+			//else
 			{
 				scene.createEntity("Sphere")
-					.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
+					.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)), vec3(1.f))
 					.addComponent<raster_component>(sphereMesh)
 					.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.f, 0.f), 1.f }, { physics_material_type_wood, 0.1f, 0.5f, 1.f }))
 					.addComponent<rigid_body_component>(false, 1.f);
@@ -246,6 +237,35 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			builder.createDXMesh();
 	}
 #endif
+
+
+
+
+#if 1
+	{
+		uint32 numTerrainChunks = 10;
+		float terrainChunkSize = 64.f;
+
+		auto terrainGroundMaterial = createPBRMaterial("assets/terrain/ground/Ground037_2K_Color.png", "assets/terrain/ground/Ground037_2K_NormalDX.png", "assets/terrain/ground/Ground037_2K_Roughness.png", {});
+		auto terrainRockMaterial = createPBRMaterial("assets/terrain/rock/Rock034_2K_Color.png", "assets/terrain/rock/Rock034_2K_NormalDX.png", "assets/terrain/rock/Rock034_2K_Roughness.png", {});
+
+		std::vector<proc_placement_layer_desc> layers =
+		{
+			proc_placement_layer_desc {
+				2.f,
+				{ sphereMesh }
+			}
+		};
+
+		auto terrain = scene.createEntity("Terrain")
+			.addComponent<position_component>(vec3(0.f, -64.f, 0.f))
+			.addComponent<terrain_component>(numTerrainChunks, terrainChunkSize, 50.f, terrainGroundMaterial, terrainRockMaterial)
+			.addComponent<heightmap_collider_component>(numTerrainChunks, terrainChunkSize, physics_material{ physics_material_type_metal, 0.1f, 1.f, 4.f })
+			.addComponent<proc_placement_component>(numTerrainChunks, layers);
+	}
+#endif
+
+
 
 
 	random_number_generator rng = { 14878213 };
@@ -566,6 +586,13 @@ void application::update(const user_input& input, float dt)
 			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], numSpotLights, spotLightShadowInfoBuffer[dxContext.bufferedFrameID]);
 		}
 
+
+
+		for (auto [entityHandle, terrain, position, placement] : scene.group(entt::get<terrain_component, position_component, proc_placement_component>).each())
+		{
+			placement.generate(this->scene.camera, terrain, position.position);
+			placement.render(&ldrRenderPass);
+		}
 
 
 		for (auto [entityHandle, terrain, position] : scene.group(entt::get<terrain_component, position_component>).each())

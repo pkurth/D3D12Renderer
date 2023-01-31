@@ -15,6 +15,7 @@
 #include "raytraced_reflections.h"
 #include "shadow_map.h"
 #include "terrain/terrain.h"
+#include "terrain/proc_placement.h"
 
 
 // Defined in render_algorithms.cpp.
@@ -33,6 +34,7 @@ void initializeRenderUtils()
 	initializeTerrainPipelines();
 	initializeLightProbePipelines();
 	initializeRTReflectionsPipelines();
+	initializeProceduralPlacementPipelines();
 	loadCommonShaders();
 
 	debug_simple_pipeline::initialize();

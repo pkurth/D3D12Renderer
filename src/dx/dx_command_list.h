@@ -59,6 +59,8 @@ struct dx_command_list
 	void copyTextureRegionToBuffer(const ref<dx_texture>& from, const ref<dx_buffer>& to, uint32 bufferElementOffset, uint32 x, uint32 y, uint32 width, uint32 height);
 	void copyTextureRegionToBuffer(const dx_resource& from, uint32 fromWidth, DXGI_FORMAT format, const ref<dx_buffer>& to, uint32 bufferElementOffset, uint32 x, uint32 y, uint32 width, uint32 height);
 	void copyTextureRegionToTexture(const ref<dx_texture>& from, const ref<dx_texture>& to, uint32 sourceX, uint32 sourceY, uint32 destX, uint32 destY, uint32 width, uint32 height);
+	void copyBufferRegionToBuffer(const ref<dx_buffer>& from, const ref<dx_buffer>& to, uint32 fromElementOffset, uint32 numElements, uint32 toElementOffset);
+	void copyBufferRegionToBuffer_ByteOffset(const ref<dx_buffer>& from, const ref<dx_buffer>& to, uint32 fromByteOffset, uint32 numBytes, uint32 toByteOffset);
 
 
 	// Pipeline.
@@ -105,6 +107,7 @@ struct dx_command_list
 	void setComputeDescriptorTable(uint32 rootParameterIndex, CD3DX12_GPU_DESCRIPTOR_HANDLE handle);
 
 	void clearUAV(const ref<dx_buffer>& buffer, float val = 0.f);
+	void clearUAV(const ref<dx_buffer>& buffer, uint32 val = 0);
 	void clearUAV(dx_resource resource, dx_cpu_descriptor_handle cpuHandle, dx_gpu_descriptor_handle gpuHandle, float val = 0.f);
 	void clearUAV(dx_resource resource, dx_cpu_descriptor_handle cpuHandle, dx_gpu_descriptor_handle gpuHandle, uint32 val = 0);
 

@@ -611,13 +611,9 @@ void terrain_component::update(vec3 positionOffset, heightmap_collider_component
 		}
 	}
 
-
-	float xzOffset = -(chunkSize * chunksPerDim) * 0.5f; // Offsets entire terrain by half.
-	positionOffset += vec3(xzOffset, 0.f, xzOffset);
-
 	if (collider)
 	{
-		collider->update(positionOffset, amplitudeScale);
+		collider->update(getMinCorner(positionOffset), amplitudeScale);
 	}
 }
 
@@ -625,8 +621,7 @@ void terrain_component::render(const render_camera& camera, opaque_render_pass* 
 {
 	camera_frustum_planes frustum = camera.getWorldSpaceFrustumPlanes();
 
-	float xzOffset = -(chunkSize * chunksPerDim) * 0.5f; // Offsets entire terrain by half.
-	positionOffset += vec3(xzOffset, 0.f, xzOffset);
+	positionOffset = getMinCorner(positionOffset);
 
 	int32 lodStride = (chunksPerDim + 2);
 	uint32 paddedNumChunks = (chunksPerDim + 2) * (chunksPerDim + 2);
