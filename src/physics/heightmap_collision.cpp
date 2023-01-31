@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "heightmap_collision.h"
 #include "core/cpu_profiling.h"
+#include "collision_gjk.h"
 
 static void getAABBIncidentEdge(vec3 aabbRadius, vec3 normal, vec3& outA, vec3& outB)
 {
@@ -39,17 +40,25 @@ static void getAABBIncidentEdge(vec3 aabbRadius, vec3 normal, vec3& outA, vec3& 
 	outB *= vec3(sx, sy, sz);
 }
 
-
 static uint32 collideSphereVsTriangle(vec3 center, float radius, vec3 a, vec3 b, vec3 c, collision_contact* outContacts)
 {
 	vec3 closestPoint = closestPoint_PointTriangle(center, a, b, c);
+	
 	vec3 n = closestPoint - center;
 
 	float sqLength = squaredLength(n);
 	if (sqLength <= radius * radius)
 	{
+		if (sqLength == 0.f)
+		{
+			vec3 triNormal = cross(b - a, c - a);
+			n = -triNormal;
+			sqLength = squaredLength(triNormal);
+		}
+
 		float distance = sqrt(sqLength);
 		n *= 1.f / distance;
+
 
 		float penetrationDepth = radius - distance;
 		assert(penetrationDepth >= 0.f);
@@ -407,8 +416,6 @@ static uint32 collideAABBvsTriangle(vec3 center, vec3 radius, vec3 a, vec3 b, ve
 	return 1;
 }
 
-
-
 static uint32 intersection(const bounding_sphere& s, const bounding_box& aabb, const heightmap_collider_component& heightmap, memory_arena& arena,
 	collision_contact* outContacts)
 {
@@ -453,13 +460,13 @@ static uint32 intersection(const bounding_capsule& capsule, const bounding_box& 
 	return numContacts;
 }
 
-static uint32 intersection(const bounding_box& aabb, const heightmap_collider_component& heightmap, memory_arena& arena,
+static uint32 intersection(const bounding_box& box, const bounding_box& aabb, const heightmap_collider_component& heightmap, memory_arena& arena,
 	collision_contact* outContacts)
 {
 	uint32 numContacts = 0;
 
-	vec3 center = aabb.getCenter();
-	vec3 radius = aabb.getRadius();
+	vec3 center = box.getCenter();
+	vec3 radius = box.getRadius();
 
 	heightmap.iterateTrianglesInVolume(aabb, arena, [center, radius, outContacts, &numContacts](vec3 a, vec3 b, vec3 c)
 	{
@@ -509,18 +516,54 @@ narrowphase_result heightmapCollision(const heightmap_collider_component& height
 	for (uint32 i = 0; i < numColliders; ++i)
 	{
 		const collider_union& collider = worldSpaceColliders[i];
-		const bounding_box& aabb = worldSpaceAABBs[i];
+
+		if (collider.objectType != physics_object_type_rigid_body)
+		{
+			continue;
+		}
+
+
+		bounding_box aabb = worldSpaceAABBs[i];
+		aabb.maxCorner.y += 10.f;
 
 		uint32 numContacts = 0;
 
 		collision_contact* contactPtr = outContacts + totalNumContacts;
 
+
+		vec3 lowestPoint;
+
 		switch (collider.type)
 		{
-			case collider_type_sphere: numContacts = intersection(collider.sphere, aabb, heightmap, arena, contactPtr); break;
-			case collider_type_capsule: numContacts = intersection(collider.capsule, aabb, heightmap, arena, contactPtr); break;
-			case collider_type_aabb: numContacts = intersection(collider.aabb, heightmap, arena, contactPtr); break;
-			case collider_type_obb: numContacts = intersection(collider.obb, aabb, heightmap, arena, contactPtr); break;
+			case collider_type_sphere:
+			{
+				numContacts = intersection(collider.sphere, aabb, heightmap, arena, contactPtr);
+				lowestPoint = sphere_support_fn{ collider.sphere }(vec3(0.f, -1.f, 0.f));
+			} break;
+			case collider_type_capsule:
+			{
+				numContacts = intersection(collider.capsule, aabb, heightmap, arena, contactPtr);
+				lowestPoint = capsule_support_fn{ collider.capsule }(vec3(0.f, -1.f, 0.f));
+			} break;
+			case collider_type_aabb:
+			{
+				numContacts = intersection(collider.aabb, aabb, heightmap, arena, contactPtr);
+				lowestPoint = aabb_support_fn{ collider.aabb }(vec3(0.f, -1.f, 0.f));
+			} break;
+			case collider_type_obb:
+			{
+				numContacts = intersection(collider.obb, aabb, heightmap, arena, contactPtr);
+				lowestPoint = obb_support_fn{ collider.obb }(vec3(0.f, -1.f, 0.f));
+			} break;
+		}
+
+		float heightAtLowestPoint = heightmap.getHeightAt(vec2(lowestPoint.x, lowestPoint.z));
+		if (lowestPoint.y < heightAtLowestPoint)
+		{
+			collision_contact& contact = contactPtr[numContacts++];
+			contact.normal = vec3(0.f, -1.f, 0.f);
+			contact.point = lowestPoint;
+			contact.penetrationDepth = heightAtLowestPoint - lowestPoint.y;
 		}
 
 
@@ -544,6 +587,26 @@ narrowphase_result heightmapCollision(const heightmap_collider_component& height
 			outColliderPairs[totalNumCollisions++] = { (uint16)i, UINT16_MAX };
 		}
 
+#if 0
+		for (uint32 j = 0; j < numContacts; ++j)
+		{
+			float px = contactPtr[j].point.x;
+			float py = contactPtr[j].point.y;
+			float pz = contactPtr[j].point.z;
+			float nx = contactPtr[j].normal.x;
+			float ny = contactPtr[j].normal.y;
+			float nz = contactPtr[j].normal.z;
+			float pen = contactPtr[j].penetrationDepth;
+
+			if (isnan(px)) { __debugbreak(); }
+			if (isnan(py)) { __debugbreak(); }
+			if (isnan(pz)) { __debugbreak(); }
+			if (isnan(nx)) { __debugbreak(); }
+			if (isnan(ny)) { __debugbreak(); }
+			if (isnan(nz)) { __debugbreak(); }
+			if (isnan(pen)) { __debugbreak(); }
+		}
+#endif
 
 		totalNumContacts += numContacts;
 	}

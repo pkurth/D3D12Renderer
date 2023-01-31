@@ -99,6 +99,40 @@ struct hull_support_fn
 	};
 };
 
+union extruded_triangle_support_fn
+{
+	struct
+	{
+		vec3 a, b, c;
+		vec3 d, e, f;
+	};
+	vec3 points[6];
+
+	extruded_triangle_support_fn(vec3 a, vec3 b, vec3 c, float extrusion = 10.f)
+		: a(a), b(b), c(c),
+		d(a.x, a.y - extrusion, a.z),
+		e(b.x, b.y - extrusion, b.z),
+		f(c.x, c.y - extrusion, c.z)
+	{}
+
+	vec3 operator()(vec3 dir) const
+	{
+		float maxD = dot(a, dir);
+		vec3 result = a;
+
+		for (uint32 i = 1; i < 6; ++i)
+		{
+			float d = dot(points[i], dir);
+			if (d > maxD)
+			{
+				maxD = d;
+				result = points[i];
+			}
+		}
+
+		return result;
+	}
+};
 
 
 struct gjk_support_point

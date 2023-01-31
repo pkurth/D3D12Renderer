@@ -198,7 +198,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 #endif
 
 
-		scene.createEntity("Test ground")
+		scene.createEntity("Platform")
 			.addComponent<transform_component>(vec3(10, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
 			.addComponent<raster_component>(groundMesh)
 			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(30.f, 4.f, 30.f)), { physics_material_type_metal, 0.1f, 1.f, 4.f }));
