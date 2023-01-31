@@ -488,7 +488,7 @@ void testPhysicsInteraction(game_scene& scene, ray r, float strength)
 			transform_component* transformComponent = entity.getComponentIfExists<transform_component>();
 			const trs& transform = physicsTransformComponent ? *physicsTransformComponent : transformComponent ? *transformComponent : trs::identity;
 
-			ray localR = { inverseTransformPosition(transform, r.origin), inverseTransformDirection(transform, r.direction) };
+			ray localR = { conjugate(transform.rotation) * (r.origin - transform.position), conjugate(transform.rotation) * r.direction };
 			float t;
 			bool hit = false;
 
