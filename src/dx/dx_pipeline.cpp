@@ -10,6 +10,8 @@
 #include <deque>
 
 static void handlePipelineChanges(const file_system_event& e);
+static void loadRootSignature(struct reloadable_root_signature& r);
+static void loadPipeline(struct reloadable_pipeline_state& p);
 
 struct shader_file
 {
@@ -180,10 +182,9 @@ static reloadable_root_signature* pushBlob(const char* filename, reloadable_pipe
 }
 
 dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files,
-	dx_root_signature userRootSignature)
+	dx_root_signature userRootSignature, bool loadImmediately)
 {
-	pipelines.emplace_back();
-	auto& state = pipelines.back();
+	auto& state = pipelines.emplace_back();
 
 	pushBlob(files.vs, &state);
 	pushBlob(files.ps, &state);
@@ -201,13 +202,18 @@ dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& d
 	state.initialize(desc, files, rootSignature);
 
 	dx_pipeline result = { &state.pipeline, rootSignature };
+
+	if (loadImmediately)
+	{
+		loadPipeline(state);
+	}
+
 	return result;
 }
 
-dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files, rs_file rootSignatureFile)
+dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files, rs_file rootSignatureFile, bool loadImmediately)
 {
-	pipelines.emplace_back();
-	auto& state = pipelines.back();
+	auto& state = pipelines.emplace_back();
 
 	reloadable_root_signature* reloadableRS = pushBlob(files.shaders[rootSignatureFile], &state, true);
 	pushBlob(files.vs, &state);
@@ -224,13 +230,19 @@ dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& d
 	state.initialize(desc, files, rootSignature);
 
 	dx_pipeline result = { &state.pipeline, rootSignature };
+
+	if (loadImmediately)
+	{
+		loadRootSignature(*reloadableRS);
+		loadPipeline(state);
+	}
+
 	return result;
 }
 
-dx_pipeline createReloadablePipeline(const char* csFile, dx_root_signature userRootSignature)
+dx_pipeline createReloadablePipeline(const char* csFile, dx_root_signature userRootSignature, bool loadImmediately)
 {
-	pipelines.emplace_back();
-	auto& state = pipelines.back();
+	auto& state = pipelines.emplace_back();
 
 	pushBlob(csFile, &state);
 
@@ -241,13 +253,18 @@ dx_pipeline createReloadablePipeline(const char* csFile, dx_root_signature userR
 	state.initialize(csFile, rootSignature);
 
 	dx_pipeline result = { &state.pipeline, rootSignature };
+
+	if (loadImmediately)
+	{
+		loadPipeline(state);
+	}
+
 	return result;
 }
 
-dx_pipeline createReloadablePipeline(const char* csFile)
+dx_pipeline createReloadablePipeline(const char* csFile, bool loadImmediately)
 {
-	pipelines.emplace_back();
-	auto& state = pipelines.back();
+	auto& state = pipelines.emplace_back();
 
 	reloadable_root_signature* reloadableRS = pushBlob(csFile, &state, true);
 
@@ -256,14 +273,20 @@ dx_pipeline createReloadablePipeline(const char* csFile)
 	state.initialize(csFile, rootSignature);
 
 	dx_pipeline result = { &state.pipeline, rootSignature };
+
+	if (loadImmediately)
+	{
+		loadRootSignature(*reloadableRS);
+		loadPipeline(state);
+	}
+
 	return result;
 }
 
 dx_pipeline createReloadablePipeline(const D3D12_PIPELINE_STATE_STREAM_DESC& desc, dx_pipeline_stream_base* stream, const graphics_pipeline_files& files, 
-	dx_root_signature userRootSignature)
+	dx_root_signature userRootSignature, bool loadImmediately)
 {
-	pipelines.emplace_back();
-	auto& state = pipelines.back();
+	auto& state = pipelines.emplace_back();
 
 	pushBlob(files.vs, &state);
 	pushBlob(files.ps, &state);
@@ -280,10 +303,17 @@ dx_pipeline createReloadablePipeline(const D3D12_PIPELINE_STATE_STREAM_DESC& des
 	state.initialize(desc, stream, files, rootSignature);
 
 	dx_pipeline result = { &state.pipeline, rootSignature };
+
+	if (loadImmediately)
+	{
+		loadPipeline(state);
+	}
+
 	return result;
 }
 
-dx_pipeline createReloadablePipeline(const D3D12_PIPELINE_STATE_STREAM_DESC& desc, dx_pipeline_stream_base* stream, const graphics_pipeline_files& files, rs_file rootSignatureFile)
+dx_pipeline createReloadablePipeline(const D3D12_PIPELINE_STATE_STREAM_DESC& desc, dx_pipeline_stream_base* stream, const graphics_pipeline_files& files, 
+	rs_file rootSignatureFile, bool loadImmediately)
 {
 	pipelines.emplace_back();
 	auto& state = pipelines.back();
@@ -302,6 +332,13 @@ dx_pipeline createReloadablePipeline(const D3D12_PIPELINE_STATE_STREAM_DESC& des
 	state.initialize(desc, stream, files, rootSignature);
 
 	dx_pipeline result = { &state.pipeline, rootSignature };
+
+	if (loadImmediately)
+	{
+		loadRootSignature(*reloadableRS);
+		loadPipeline(state);
+	}
+
 	return result;
 }
 
@@ -358,38 +395,38 @@ static void loadPipeline(reloadable_pipeline_state& p)
 
 void createAllPendingReloadablePipelines()
 {
-	static int rsOffset = 0;
-	static int pipelineOffset = 0;
-
 	thread_job_context context;
-	for (uint32 i = rsOffset; i < (uint32)rootSignaturesFromFiles.size(); ++i)
+	for (uint32 i = 0; i < (uint32)rootSignaturesFromFiles.size(); ++i)
 	{
-#if MULTI_THREADED_CREATION
-		context.addWork([i]()
+		if (!rootSignaturesFromFiles[i].rootSignature.rootSignature)
 		{
-#endif
-			loadRootSignature(rootSignaturesFromFiles[i]);
 #if MULTI_THREADED_CREATION
-		});
+			context.addWork([i]()
+			{
 #endif
+				loadRootSignature(rootSignaturesFromFiles[i]);
+#if MULTI_THREADED_CREATION
+			});
+#endif
+		}
 	}
 	context.waitForWorkCompletion();
 
-	for (uint32 i = pipelineOffset; i < (uint32)pipelines.size(); ++i)
+	for (uint32 i = 0; i < (uint32)pipelines.size(); ++i)
 	{
-#if MULTI_THREADED_CREATION
-		context.addWork([i]()
+		if (!pipelines[i].pipeline)
 		{
-#endif
-			loadPipeline(pipelines[i]);
 #if MULTI_THREADED_CREATION
-		});
+			context.addWork([i]()
+			{
 #endif
+				loadPipeline(pipelines[i]);
+#if MULTI_THREADED_CREATION
+			});
+#endif
+		}
 	}
 	context.waitForWorkCompletion();
-
-	rsOffset = (int)rootSignaturesFromFiles.size();
-	pipelineOffset = (int)pipelines.size();
 
 	//static HANDLE thread = CreateThread(0, 0, checkForFileChanges, 0, 0, 0); // Static, so that we only do this once.
 	static bool observing = observeDirectory(SHADER_BIN_DIR, handlePipelineChanges); // Static, so that we only do this once.

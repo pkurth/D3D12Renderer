@@ -185,11 +185,6 @@ void loadCommonShaders()
 	visualizeSunShadowCascadesPipeline = createReloadablePipeline("sun_shadow_cascades_cs");
 }
 
-void loadRemainingRenderResources()
-{
-	
-}
-
 void depthPrePass(dx_command_list* cl,
 	const dx_render_target& depthOnlyRenderTarget,
 	const opaque_render_pass* opaqueRenderPass,

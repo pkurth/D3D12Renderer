@@ -429,11 +429,11 @@ enum rs_file
 	rs_in_amplification_shader,
 };
 
-dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files, dx_root_signature userRootSignature);
-dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files, rs_file rootSignatureFile = rs_in_pixel_shader);
+dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files, dx_root_signature userRootSignature, bool loadImmediately = false);
+dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, const graphics_pipeline_files& files, rs_file rootSignatureFile = rs_in_pixel_shader, bool loadImmediately = false);
 
-dx_pipeline createReloadablePipeline(const char* csFile, dx_root_signature userRootSignature);
-dx_pipeline createReloadablePipeline(const char* csFile);
+dx_pipeline createReloadablePipeline(const char* csFile, dx_root_signature userRootSignature, bool loadImmediately = false);
+dx_pipeline createReloadablePipeline(const char* csFile, bool loadImmediately = false);
 
 
 template <typename stream_t>
@@ -446,8 +446,8 @@ inline dx_pipeline createReloadablePipelineFromStream(const stream_t& stream, co
 		sizeof(stream_t) - 8, (uint8*)streamCopy + 8 // Offset for vTable. This seems very broken. TODO: Verify that this always works.
 	};
 
-	dx_pipeline createReloadablePipeline(const D3D12_PIPELINE_STATE_STREAM_DESC& desc, dx_pipeline_stream_base* stream, const graphics_pipeline_files& files, dx_root_signature userRootSignature);
-	return createReloadablePipeline(desc, streamCopy, files, userRootSignature);
+	dx_pipeline createReloadablePipeline(const D3D12_PIPELINE_STATE_STREAM_DESC& desc, dx_pipeline_stream_base* stream, const graphics_pipeline_files& files, dx_root_signature userRootSignature, bool loadImmediately);
+	return createReloadablePipeline(desc, streamCopy, files, userRootSignature, false);
 }
 
 template <typename stream_t>
@@ -460,8 +460,8 @@ inline dx_pipeline createReloadablePipelineFromStream(const stream_t& stream, co
 		sizeof(stream_t) - 8, (uint8*)streamCopy + 8 // Offset for vTable. This seems very broken. TODO: Verify that this always works.
 	};
 
-	dx_pipeline createReloadablePipeline(const D3D12_PIPELINE_STATE_STREAM_DESC& desc, dx_pipeline_stream_base* stream, const graphics_pipeline_files& files, rs_file rootSignatureFile);
-	return createReloadablePipeline(desc, streamCopy, files, rootSignatureFile);
+	dx_pipeline createReloadablePipeline(const D3D12_PIPELINE_STATE_STREAM_DESC& desc, dx_pipeline_stream_base* stream, const graphics_pipeline_files& files, rs_file rootSignatureFile, bool loadImmediately);
+	return createReloadablePipeline(desc, streamCopy, files, rootSignatureFile, false);
 }
 
 void createAllPendingReloadablePipelines();

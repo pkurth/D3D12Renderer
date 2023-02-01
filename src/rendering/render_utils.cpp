@@ -20,7 +20,6 @@
 
 // Defined in render_algorithms.cpp.
 void loadCommonShaders();
-void loadRemainingRenderResources();
 
 
 static vec2 haltonSequence[128];
@@ -48,7 +47,6 @@ void initializeRenderUtils()
 
 	createAllPendingReloadablePipelines();
 	render_resources::initializeGlobalResources();
-	loadRemainingRenderResources();
 
 	for (uint32 i = 0; i < arraysize(haltonSequence); ++i)
 	{
