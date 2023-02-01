@@ -68,8 +68,6 @@ struct render_proc_placement_layer_data
 
 	dx_vertex_buffer_group_view vertexBuffer;
 	dx_index_buffer_view indexBuffer;
-
-	vec3 offset;
 };
 
 struct render_proc_placement_layer_pipeline
@@ -93,7 +91,6 @@ PIPELINE_RENDER_IMPL(render_proc_placement_layer_pipeline)
 	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
 	cl->setIndexBuffer(rc.data.indexBuffer);
 
-	cl->setGraphics32BitConstants(0, rc.data.offset);
 	cl->setRootGraphicsSRV(2, rc.data.transforms);
 	cl->drawIndirect(visualizePointsCommandSignature, 1, rc.data.commandBuffer, rc.data.commandBufferOffset * sizeof(placement_draw));
 }
@@ -341,15 +338,21 @@ void proc_placement_component::render(ldr_render_pass* renderPass)
 	renderPass->renderObject<render_proc_placement_layer_pipeline>(data);
 #else
 	
+	uint32 drawCallOffset = 1;
+
 	for (const auto& layer : layers)
 	{
 		for (uint32 i = 0; i < layer.numMeshes; ++i)
 		{
-			uint32 offset = layer.globalMeshOffset + i;
-			render_proc_placement_layer_data data = { transformBuffer, drawIndirectBuffer, offset, 
-				layer.meshes[i]->mesh.vertexBuffer, layer.meshes[i]->mesh.indexBuffer,
-				vec3(0.f, (float)offset, 0.f) };
-			renderPass->renderObject<render_proc_placement_layer_pipeline>(data);
+			for (uint32 j = 0; j < (uint32)layer.meshes[i]->submeshes.size(); ++j)
+			{
+				render_proc_placement_layer_data data = { transformBuffer, drawIndirectBuffer, drawCallOffset,
+					layer.meshes[i]->mesh.vertexBuffer, layer.meshes[i]->mesh.indexBuffer };
+
+				renderPass->renderObject<render_proc_placement_layer_pipeline>(data);
+
+				++drawCallOffset;
+			}
 		}
 	}
 

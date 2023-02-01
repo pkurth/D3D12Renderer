@@ -5,7 +5,7 @@
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS |" \
     "DENY_PIXEL_SHADER_ROOT_ACCESS)," \
-    "RootConstants(b0, num32BitConstants=3, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "RootConstants(b0, num32BitConstants=1, visibility=SHADER_VISIBILITY_VERTEX), " \
     "CBV(b1, visibility=SHADER_VISIBILITY_VERTEX), " \
     "SRV(t0, visibility=SHADER_VISIBILITY_VERTEX)"
 
