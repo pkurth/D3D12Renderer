@@ -16,21 +16,18 @@ struct placement_draw
 	D3D12_DRAW_INDEXED_ARGUMENTS draw;
 };
 
+struct placement_transform
+{
+	mat4 m;
+};
+
+
 
 
 
 
 struct proc_placement_generate_points_cb
 {
-#ifndef HLSL
-	uint32 firstSubmeshPerLayerObject[4];
-	uint32 numSubmeshesPerLayerObject[4];
-#else
-	uint4 firstSubmeshPerLayerObject;
-	uint4 numSubmeshesPerLayerObject;
-#endif
-
-
 	vec3 chunkCorner;
 	float chunkSize;
 
@@ -38,11 +35,13 @@ struct proc_placement_generate_points_cb
 
 	float uvScale;
 	float uvStride;
+	
+	uint32 globalMeshOffset;
 };
 
 #define PROC_PLACEMENT_GENERATE_POINTS_RS \
-	"RootConstants(num32BitConstants=15, b0), " \
-	"DescriptorTable(SRV(t0, numDescriptors=2), UAV(u0, numDescriptors=3)), " \
+	"RootConstants(num32BitConstants=8, b0), " \
+	"DescriptorTable(SRV(t0, numDescriptors=2), UAV(u0, numDescriptors=2)), " \
     "StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \
         "addressV = TEXTURE_ADDRESS_CLAMP," \
@@ -51,6 +50,51 @@ struct proc_placement_generate_points_cb
 
 #define PROC_PLACEMENT_GENERATE_POINTS_RS_CB        0
 #define PROC_PLACEMENT_GENERATE_POINTS_RS_RESOURCES 1
+
+
+
+struct prefix_sum_cb
+{
+	uint32 size;
+};
+
+#define PROC_PLACEMENT_PREFIX_SUM_RS \
+	"RootConstants(num32BitConstants=1, b0), " \
+	"UAV(u0), " \
+	"SRV(t0)"
+
+#define PROC_PLACEMENT_PREFIX_SUM_RS_CB		0
+#define PROC_PLACEMENT_PREFIX_SUM_RS_OUTPUT	1
+#define PROC_PLACEMENT_PREFIX_SUM_RS_INPUT	2
+
+
+
+#define PROC_PLACEMENT_CREATE_DRAW_CALLS_BLOCK_SIZE 32
+#define PROC_PLACEMENT_CREATE_TRANSFORMS_BLOCK_SIZE 256
+
+
+#define PROC_PLACEMENT_CREATE_DRAW_CALLS_RS \
+	"UAV(u0), " \
+	"SRV(t0), " \
+	"SRV(t1)"
+
+#define PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_OUTPUT			0
+#define PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_MESH_COUNTS		1
+#define PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_SUBMESH_TO_MESH	2
+
+
+
+#define PROC_PLACEMENT_CREATE_TRANSFORMS_RS \
+	"UAV(u0), " \
+	"UAV(u1), " \
+	"SRV(t0), " \
+	"SRV(t1)"
+
+#define PROC_PLACEMENT_CREATE_TRANSFORMS_RS_TRANSFORMS		0
+#define PROC_PLACEMENT_CREATE_TRANSFORMS_RS_MESH_COUNTS		1
+#define PROC_PLACEMENT_CREATE_TRANSFORMS_RS_POINTS			2
+#define PROC_PLACEMENT_CREATE_TRANSFORMS_RS_MESH_OFFSETS	3
+
 
 
 static const uint32 SAMPLE_NUM = 1024;

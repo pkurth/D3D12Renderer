@@ -8,8 +8,7 @@ Texture2D<float> heightmap								: register(t0);
 Texture2D<float2> normalmap								: register(t1);
 
 RWStructuredBuffer<placement_point> placementPoints		: register(u0);
-RWStructuredBuffer<uint> pointCount						: register(u1);
-RWStructuredBuffer<uint> submeshCount					: register(u2);
+RWStructuredBuffer<uint> pointAndMeshCount				: register(u1);
 
 SamplerState clampSampler								: register(s0);
 
@@ -59,7 +58,7 @@ void main(cs_input IN)
 
 	if (IN.groupIndex == 0)
 	{
-		InterlockedAdd(pointCount[0], groupCount, groupStartOffset);
+		InterlockedAdd(pointAndMeshCount[0], groupCount, groupStartOffset);
 	}
 
 	GroupMemoryBarrierWithGroupSync();
@@ -73,22 +72,15 @@ void main(cs_input IN)
 
 
 		uint lodIndex = 0;
-		uint meshIndex = 0;
+		uint meshIndex = 0; // [0, 3].
+		uint globalMeshIndex = cb.globalMeshOffset + meshIndex;
 
-
-		uint firstSubmesh = cb.firstSubmeshPerLayerObject[meshIndex];
-		uint numSubmeshes = cb.numSubmeshesPerLayerObject[meshIndex];
-
-		for (uint i = firstSubmesh; i < firstSubmesh + numSubmeshes; ++i)
-		{
-			InterlockedAdd(submeshCount[i], 1);
-		}
-
+		InterlockedAdd(pointAndMeshCount[globalMeshIndex], 1);
 
 		placement_point result;
 		result.position = position;
 		result.normal = normal;
-		result.meshID = meshIndex;
+		result.meshID = globalMeshIndex;
 		result.lod = lodIndex;
 		placementPoints[groupStartOffset + innerGroupIndex] = result;
 	}

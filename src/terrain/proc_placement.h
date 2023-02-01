@@ -21,7 +21,10 @@ private:
 	struct placement_layer
 	{
 		float footprint;
-		uint32 globalSubmeshOffset;
+		
+		uint32 globalMeshOffset;
+		uint32 numMeshes;
+
 		ref<multi_mesh> meshes[4];
 	};
 
@@ -29,8 +32,10 @@ private:
 	std::vector<placement_layer> layers;
 
 	ref<dx_buffer> placementPointBuffer;
-	ref<dx_buffer> placementPointCountBuffer;
-	ref<dx_buffer> submeshCountBuffer;
+	ref<dx_buffer> transformBuffer;
+	ref<dx_buffer> meshCountBuffer;
+	ref<dx_buffer> meshOffsetBuffer;
+	ref<dx_buffer> submeshToMeshBuffer;
 	ref<dx_buffer> drawIndirectBuffer;
 };
 
