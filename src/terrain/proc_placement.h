@@ -30,6 +30,7 @@ private:
 
 
 	std::vector<placement_layer> layers;
+	std::vector<uint32> submeshToMesh;
 
 	ref<dx_buffer> placementPointBuffer;
 	ref<dx_buffer> transformBuffer;

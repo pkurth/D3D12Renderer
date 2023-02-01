@@ -20,7 +20,7 @@ void main(cs_input IN)
 	}
 
 	placement_point p = placementPoints[id];
-
+	
 	uint globalOffset = meshOffsets[p.meshID];
 	
 	uint localOffset;
@@ -30,7 +30,7 @@ void main(cs_input IN)
 	float3 yAxis = p.normal;
 	float3 xAxis = normalize(cross(yAxis, float3(0.f, 0.f, 1.f)));
 	float3 zAxis = cross(xAxis, yAxis);
-	
+
 	float4x4 m = {
 		{ xAxis.x, yAxis.x, zAxis.x, p.position.x },
 		{ xAxis.y, yAxis.y, zAxis.y, p.position.y },

@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "proc_placement.h"
 
+#include "core/log.h"
+
 #include "dx/dx_command_list.h"
 #include "dx/dx_pipeline.h"
 #include "dx/dx_barrier_batcher.h"
@@ -38,7 +40,7 @@ void initializeProceduralPlacementPipelines()
 			.inputLayout(inputLayout_position)
 			.renderTargets(ldrFormat, depthStencilFormat);
 
-		visualizePointsPipeline = createReloadablePipeline(desc, { "proc_placement_points_vs", "proc_placement_points_ps" });
+		visualizePointsPipeline = createReloadablePipeline(desc, { "proc_placement_points_vs", "proc_placement_points_ps" }, rs_in_pixel_shader, true);
 	}
 
 
@@ -49,9 +51,11 @@ void initializeProceduralPlacementPipelines()
 	visualizePointsMesh = builder.createDXMesh();
 
 
-	D3D12_INDIRECT_ARGUMENT_DESC argumentDesc;
-	argumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
-	visualizePointsCommandSignature = createCommandSignature({}, &argumentDesc, 1, sizeof(placement_draw));
+	D3D12_INDIRECT_ARGUMENT_DESC argumentDescs[2] = {};
+	argumentDescs[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT;
+	argumentDescs[0].Constant.Num32BitValuesToSet = 1;
+	argumentDescs[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+	visualizePointsCommandSignature = createCommandSignature(*visualizePointsPipeline.rootSignature, argumentDescs, arraysize(argumentDescs), sizeof(placement_draw));
 }
 
 
@@ -64,6 +68,8 @@ struct render_proc_placement_layer_data
 
 	dx_vertex_buffer_group_view vertexBuffer;
 	dx_index_buffer_view indexBuffer;
+
+	vec3 offset;
 };
 
 struct render_proc_placement_layer_pipeline
@@ -87,7 +93,8 @@ PIPELINE_RENDER_IMPL(render_proc_placement_layer_pipeline)
 	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
 	cl->setIndexBuffer(rc.data.indexBuffer);
 
-	cl->setRootGraphicsSRV(0, rc.data.transforms);
+	cl->setGraphics32BitConstants(0, rc.data.offset);
+	cl->setRootGraphicsSRV(2, rc.data.transforms);
 	cl->drawIndirect(visualizePointsCommandSignature, 1, rc.data.commandBuffer, rc.data.commandBufferOffset * sizeof(placement_draw));
 }
 
@@ -97,12 +104,12 @@ PIPELINE_RENDER_IMPL(render_proc_placement_layer_pipeline)
 
 #if READBACK
 static ref<dx_buffer> readbackIndirect;
+static ref<dx_buffer> readbackMeshOffsets;
 #endif
 
 proc_placement_component::proc_placement_component(uint32 chunksPerDim, const std::vector<proc_placement_layer_desc>& layers)
 {
 	std::vector<placement_draw> drawArgs;
-	std::vector<uint32> submeshToMesh;
 
 	{
 		placement_draw draw;
@@ -167,6 +174,7 @@ proc_placement_component::proc_placement_component(uint32 chunksPerDim, const st
 
 #if READBACK
 	readbackIndirect = createReadbackBuffer(sizeof(placement_draw), (uint32)drawArgs.size());
+	readbackMeshOffsets = createReadbackBuffer(sizeof(uint32), globalMeshOffset);
 #endif
 }
 
@@ -300,6 +308,7 @@ void proc_placement_component::generate(const render_camera& camera, const terra
 #if READBACK
 	cl->transitionBarrier(drawIndirectBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
 	cl->copyBufferRegionToBuffer(drawIndirectBuffer, readbackIndirect, 0, drawIndirectBuffer->elementCount, 0);
+	cl->copyBufferRegionToBuffer(meshOffsetBuffer, readbackMeshOffsets, 0, meshOffsetBuffer->elementCount, 0);
 #endif
 
 	dxContext.executeCommandList(cl);
@@ -310,7 +319,17 @@ void proc_placement_component::generate(const render_camera& camera, const terra
 
 	{	
 		placement_draw* draw = (placement_draw*)mapBuffer(readbackIndirect, true);
+		uint32* offsets = (uint32*)mapBuffer(readbackMeshOffsets, true);
+
+		LOG_MESSAGE("%u (%u/%u), %u (%u/%u), %u (%u/%u)", 
+			draw[0].draw.InstanceCount, draw[0].offset, offsets[0], 
+			draw[1].draw.InstanceCount, draw[1].offset, offsets[1],
+			draw[2].draw.InstanceCount, draw[2].offset, offsets[2]);
+
+		unmapBuffer(readbackMeshOffsets, false);
 		unmapBuffer(readbackIndirect, false);
+	}
+	{
 	}
 #endif
 }
@@ -321,13 +340,15 @@ void proc_placement_component::render(ldr_render_pass* renderPass)
 	render_proc_placement_layer_data data = { transformBuffer, drawIndirectBuffer, 0, visualizePointsMesh.vertexBuffer, visualizePointsMesh.indexBuffer };
 	renderPass->renderObject<render_proc_placement_layer_pipeline>(data);
 #else
-
+	
 	for (const auto& layer : layers)
 	{
 		for (uint32 i = 0; i < layer.numMeshes; ++i)
 		{
 			uint32 offset = layer.globalMeshOffset + i;
-			render_proc_placement_layer_data data = { transformBuffer, drawIndirectBuffer, offset, layer.meshes[i]->mesh.vertexBuffer, layer.meshes[i]->mesh.indexBuffer };
+			render_proc_placement_layer_data data = { transformBuffer, drawIndirectBuffer, offset, 
+				layer.meshes[i]->mesh.vertexBuffer, layer.meshes[i]->mesh.indexBuffer,
+				vec3(0.f, (float)offset, 0.f) };
 			renderPass->renderObject<render_proc_placement_layer_pipeline>(data);
 		}
 	}

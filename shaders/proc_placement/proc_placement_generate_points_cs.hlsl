@@ -1,6 +1,7 @@
 #include "cs.hlsli"
 #include "proc_placement_rs.hlsli"
 #include "math.hlsli"
+#include "random.hlsli"
 
 ConstantBuffer<proc_placement_generate_points_cb> cb	: register(b0);
 
@@ -72,7 +73,7 @@ void main(cs_input IN)
 
 
 		uint lodIndex = 0;
-		uint meshIndex = 0; // [0, 3].
+		uint meshIndex = (uint)(random(xz) * 1.99f);// (uint)xz.x % 2; // [0, 3].
 		uint globalMeshIndex = cb.globalMeshOffset + meshIndex;
 
 		InterlockedAdd(pointAndMeshCount[globalMeshIndex], 1);

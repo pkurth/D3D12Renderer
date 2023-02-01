@@ -1,7 +1,13 @@
 #include "proc_placement_rs.hlsli"
 #include "camera.hlsli"
 
-ConstantBuffer<camera_cb> camera						: register(b0);
+struct proc_placement_points_cb
+{
+	uint32 offset;
+};
+
+ConstantBuffer<proc_placement_points_cb> cb				: register(b0);
+ConstantBuffer<camera_cb> camera						: register(b1);
 StructuredBuffer<placement_transform> transforms		: register(t0);
 
 struct vs_input
@@ -17,7 +23,7 @@ struct vs_output
 
 vs_output main(vs_input IN)
 {
-	float4x4 mvp = mul(camera.viewProj, transforms[IN.instanceID].m);
+	float4x4 mvp = mul(camera.viewProj, transforms[IN.instanceID + cb.offset].m);
 
 	vs_output OUT;
 	OUT.position = mul(mvp, float4(IN.position * 0.2f, 1.f));

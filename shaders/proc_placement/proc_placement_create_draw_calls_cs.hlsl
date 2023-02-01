@@ -14,5 +14,5 @@ void main(cs_input IN)
 	uint id = IN.dispatchThreadID.x;
 	uint meshID = submeshToMesh[id];
 	draws[id].draw.InstanceCount = meshCounts[meshID];
-	draws[id].draw.StartInstanceLocation = meshOffsets[meshID];
+	draws[id].offset = meshOffsets[meshID];
 }

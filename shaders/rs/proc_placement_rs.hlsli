@@ -13,6 +13,7 @@ struct placement_point
 
 struct placement_draw
 {
+	uint32 offset;
 	D3D12_DRAW_INDEXED_ARGUMENTS draw;
 };
 
