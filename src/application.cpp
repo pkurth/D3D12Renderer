@@ -74,7 +74,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 	if (auto mesh = loadMeshFromFile("assets/sponza/sponza.obj"))
 	{
 		auto blas = defineBlasFromMesh(mesh);
-	
+
 		scene.createEntity("Sponza")
 			.addComponent<transform_component>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
 			.addComponent<raster_component>(mesh)
@@ -107,21 +107,26 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 	}
 
 
-	auto woodMaterial = createPBRMaterial(
-		"assets/desert/textures/WoodenCrate2_Albedo.png",
-		"assets/desert/textures/WoodenCrate2_Normal.png",
-		{}, {});
-
-
-	mesh_builder builder;
-
-	auto sphereMesh = make_ref<multi_mesh>();
-	builder.pushSphere({ });
-	sphereMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, woodMaterial });
-
-
 #if 1
 	{
+		auto woodMaterial = createPBRMaterial(
+			"assets/desert/textures/WoodenCrate2_Albedo.png",
+			"assets/desert/textures/WoodenCrate2_Normal.png",
+			{}, {});
+
+
+		mesh_builder builder;
+
+		auto sphereMesh = make_ref<multi_mesh>();
+		builder.pushSphere({ });
+		sphereMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, woodMaterial });
+
+		auto boxMesh = make_ref<multi_mesh>();
+		builder.pushBox({ vec3(0.f), vec3(1.f, 1.f, 2.f) });
+		boxMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, woodMaterial });
+
+
+
 		auto lollipopMaterial = createPBRMaterial(
 			"assets/cc0/sphere/Tiles074_2K_Color.jpg",
 			"assets/cc0/sphere/Tiles074_2K_Normal.jpg",
@@ -132,17 +137,13 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		builder.pushBox({ vec3(0.f), vec3(30.f, 4.f, 30.f) });
 		groundMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, lollipopMaterial });
 
-		auto boxMesh = make_ref<multi_mesh>();
-		builder.pushBox({ vec3(0.f), vec3(1.f, 1.f, 2.f) });
-		boxMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, woodMaterial });
-
 		random_number_generator rng = { 15681923 };
 		for (uint32 i = 0; i < 3; ++i)
 		{
 			//float x = rng.randomFloatBetween(-90.f, 90.f);
 			//float z = rng.randomFloatBetween(-90.f, 90.f);
 			//float y = rng.randomFloatBetween(20.f, 60.f);
-		
+
 			//if (i % 2 == 0)
 			//{
 			//	scene.createEntity("Cube")
@@ -161,12 +162,12 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			}
 		}
 
-		auto triggerCallback = [scene=&scene](trigger_event e)
+		auto triggerCallback = [scene = &scene](trigger_event e)
 		{
 			//scene->deleteEntity(e.other);
 			//std::cout << ((e.type == trigger_event_enter) ? "Enter" : "Leave") << '\n';
 		};
-		
+
 		scene.createEntity("Trigger")
 			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(25.f, 1.f, -5.f), vec3(5.f, 1.f, 5.f)), { physics_material_type_none, 0, 0, 0 }))
 			.addComponent<trigger_component>(triggerCallback);
@@ -230,10 +231,10 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 #endif
 
 
-		groundMesh->mesh = 
-		boxMesh->mesh = 
-		sphereMesh->mesh =
-		chainMesh->mesh =
+		groundMesh->mesh =
+			boxMesh->mesh =
+			sphereMesh->mesh =
+			chainMesh->mesh =
 			builder.createDXMesh();
 	}
 #endif
@@ -243,6 +244,22 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 
 #if 1
 	{
+		auto sphereMesh = make_ref<multi_mesh>();
+		auto boxMesh = make_ref<multi_mesh>();
+
+		{
+			mesh_builder builder;
+			builder.pushSphere({ });
+			sphereMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity });
+			sphereMesh->mesh = builder.createDXMesh();
+		}
+		{
+			mesh_builder builder;
+			builder.pushBox({ vec3(0.f), vec3(1.f, 1.f, 2.f) });
+			boxMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity });
+			boxMesh->mesh = builder.createDXMesh();
+		}
+
 		uint32 numTerrainChunks = 10;
 		float terrainChunkSize = 64.f;
 
@@ -253,7 +270,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		{
 			proc_placement_layer_desc {
 				2.f,
-				{ sphereMesh }
+				{ sphereMesh, boxMesh }
 			}
 		};
 
@@ -375,7 +392,7 @@ void application::submitRendererParams(uint32 numSpotLightShadowPasses, uint32 n
 {
 	{
 		CPU_PROFILE_BLOCK("Sort render passes");
-	
+
 		opaqueRenderPass.sort();
 		transparentRenderPass.sort();
 		ldrRenderPass.sort();
