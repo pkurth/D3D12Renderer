@@ -56,21 +56,25 @@ void initializeProceduralPlacementPipelines()
 
 
 
-struct visualize_points_render_data
+struct render_proc_placement_layer_data
 {
 	ref<dx_buffer> transforms;
 	ref<dx_buffer> commandBuffer;
+	uint32 commandBufferOffset;
+
+	dx_vertex_buffer_group_view vertexBuffer;
+	dx_index_buffer_view indexBuffer;
 };
 
-struct visualize_points_pipeline
+struct render_proc_placement_layer_pipeline
 {
-	using render_data_t = visualize_points_render_data;
+	using render_data_t = render_proc_placement_layer_data;
 
 	PIPELINE_SETUP_DECL;
 	PIPELINE_RENDER_DECL;
 };
 
-PIPELINE_SETUP_IMPL(visualize_points_pipeline)
+PIPELINE_SETUP_IMPL(render_proc_placement_layer_pipeline)
 {
 	cl->setPipelineState(*visualizePointsPipeline.pipeline);
 	cl->setGraphicsRootSignature(*visualizePointsPipeline.rootSignature);
@@ -78,20 +82,22 @@ PIPELINE_SETUP_IMPL(visualize_points_pipeline)
 	cl->setGraphicsDynamicConstantBuffer(1, common.cameraCBV);
 }
 
-PIPELINE_RENDER_IMPL(visualize_points_pipeline)
+PIPELINE_RENDER_IMPL(render_proc_placement_layer_pipeline)
 {
-	cl->setVertexBuffer(0, visualizePointsMesh.vertexBuffer.positions);
-	cl->setIndexBuffer(visualizePointsMesh.indexBuffer);
+	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
+	cl->setIndexBuffer(rc.data.indexBuffer);
 
 	cl->setRootGraphicsSRV(0, rc.data.transforms);
-	cl->drawIndirect(visualizePointsCommandSignature, 1, rc.data.commandBuffer);
+	cl->drawIndirect(visualizePointsCommandSignature, 1, rc.data.commandBuffer, rc.data.commandBufferOffset * sizeof(placement_draw));
 }
 
 
 
+#define READBACK 0
 
-
-
+#if READBACK
+static ref<dx_buffer> readbackIndirect;
+#endif
 
 proc_placement_component::proc_placement_component(uint32 chunksPerDim, const std::vector<proc_placement_layer_desc>& layers)
 {
@@ -157,6 +163,11 @@ proc_placement_component::proc_placement_component(uint32 chunksPerDim, const st
 	meshOffsetBuffer = createBuffer(sizeof(uint32), globalMeshOffset, 0, true, true);
 	submeshToMeshBuffer = createBuffer(sizeof(uint32), (uint32)submeshToMesh.size(), submeshToMesh.data());
 	drawIndirectBuffer = createBuffer(sizeof(placement_draw), (uint32)drawArgs.size(), drawArgs.data(), true);
+
+
+#if READBACK
+	readbackIndirect = createReadbackBuffer(sizeof(placement_draw), (uint32)drawArgs.size());
+#endif
 }
 
 void proc_placement_component::generate(const render_camera& camera, const terrain_component& terrain, vec3 positionOffset)
@@ -246,8 +257,10 @@ void proc_placement_component::generate(const render_camera& camera, const terra
 			cl->setRootComputeSRV(PROC_PLACEMENT_PREFIX_SUM_RS_INPUT, meshCountBuffer->gpuVirtualAddress + meshCountBuffer->elementSize);
 		
 			cl->dispatch(1);
-			cl->uavBarrier(meshOffsetBuffer);
 		}
+
+		barrier_batcher(cl)
+			.transition(meshOffsetBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
 		
 		{
 			PROFILE_ALL(cl, "Create draw calls");
@@ -257,13 +270,13 @@ void proc_placement_component::generate(const render_camera& camera, const terra
 		
 			cl->setRootComputeUAV(PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_OUTPUT, drawIndirectBuffer);
 			cl->setRootComputeSRV(PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_MESH_COUNTS, meshCountBuffer);
+			cl->setRootComputeSRV(PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_MESH_OFFSETS, meshOffsetBuffer);
 			cl->setRootComputeSRV(PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_SUBMESH_TO_MESH, submeshToMeshBuffer);
 		
 			cl->dispatch(bucketize(drawIndirectBuffer->elementCount, PROC_PLACEMENT_CREATE_DRAW_CALLS_BLOCK_SIZE));
 		}
 
 		barrier_batcher(cl)
-			.transition(meshOffsetBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ)
 			.transition(meshCountBuffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 			.uav(drawIndirectBuffer);
 
@@ -284,11 +297,40 @@ void proc_placement_component::generate(const render_camera& camera, const terra
 		}
 	}
 
+#if READBACK
+	cl->transitionBarrier(drawIndirectBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+	cl->copyBufferRegionToBuffer(drawIndirectBuffer, readbackIndirect, 0, drawIndirectBuffer->elementCount, 0);
+#endif
+
 	dxContext.executeCommandList(cl);
+
+
+#if READBACK
+	dxContext.flushApplication();
+
+	{	
+		placement_draw* draw = (placement_draw*)mapBuffer(readbackIndirect, true);
+		unmapBuffer(readbackIndirect, false);
+	}
+#endif
 }
 
 void proc_placement_component::render(ldr_render_pass* renderPass)
 {
-	visualize_points_render_data data = { transformBuffer, drawIndirectBuffer };
-	renderPass->renderObject<visualize_points_pipeline>(data);
+#if 0
+	render_proc_placement_layer_data data = { transformBuffer, drawIndirectBuffer, 0, visualizePointsMesh.vertexBuffer, visualizePointsMesh.indexBuffer };
+	renderPass->renderObject<render_proc_placement_layer_pipeline>(data);
+#else
+
+	for (const auto& layer : layers)
+	{
+		for (uint32 i = 0; i < layer.numMeshes; ++i)
+		{
+			uint32 offset = layer.globalMeshOffset + i;
+			render_proc_placement_layer_data data = { transformBuffer, drawIndirectBuffer, offset, layer.meshes[i]->mesh.vertexBuffer, layer.meshes[i]->mesh.indexBuffer };
+			renderPass->renderObject<render_proc_placement_layer_pipeline>(data);
+		}
+	}
+
+#endif
 }

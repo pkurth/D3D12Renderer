@@ -2,7 +2,8 @@
 #include "proc_placement_rs.hlsli"
 
 StructuredBuffer<uint> meshCounts			: register(t0);
-StructuredBuffer<uint> submeshToMesh		: register(t1);
+StructuredBuffer<uint> meshOffsets			: register(t1);
+StructuredBuffer<uint> submeshToMesh		: register(t2);
 RWStructuredBuffer<placement_draw> draws	: register(u0);
 
 
@@ -11,6 +12,7 @@ RWStructuredBuffer<placement_draw> draws	: register(u0);
 void main(cs_input IN)
 {
 	uint id = IN.dispatchThreadID.x;
-	draws[id].draw.InstanceCount = meshCounts[submeshToMesh[id]];
+	uint meshID = submeshToMesh[id];
+	draws[id].draw.InstanceCount = meshCounts[meshID];
+	draws[id].draw.StartInstanceLocation = meshOffsets[meshID];
 }
-
