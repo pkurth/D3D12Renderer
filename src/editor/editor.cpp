@@ -15,6 +15,7 @@
 #include "audio/audio.h"
 #include "rendering/debug_visualization.h"
 #include "terrain/terrain.h"
+#include "terrain/proc_placement.h"
 
 #include <fontawesome/list.h>
 
@@ -468,29 +469,47 @@ static bounding_box getObjectBoundingBox(scene_entity entity, bool applyPosition
 	return aabb;
 }
 
+static void editTexture(const char* name, ref<dx_texture>& tex, uint32 loadFlags)
+{
+	asset_handle asset = {};
+	if (tex)
+	{
+		asset = tex->handle;
+	}
+	if (ImGui::PropertyAssetHandle(name, EDITOR_ICON_IMAGE, asset))
+	{
+		fs::path path = getPathFromAssetHandle(asset);
+		fs::path relative = fs::relative(path, fs::current_path());
+		if (auto newTex = loadTextureFromFile(relative.string(), loadFlags))
+		{
+			tex = newTex;
+		}
+	}
+}
+
+static void editMesh(const char* name, ref<multi_mesh>& mesh, uint32 loadFlags)
+{
+	asset_handle asset = {};
+	if (mesh)
+	{
+		asset = mesh->handle;
+	}
+	if (ImGui::PropertyAssetHandle(name, EDITOR_ICON_MESH, asset))
+	{
+		fs::path path = getPathFromAssetHandle(asset);
+		fs::path relative = fs::relative(path, fs::current_path());
+		if (auto newMesh = loadMeshFromFile(relative.string(), loadFlags))
+		{
+			mesh = newMesh;
+		}
+	}
+}
+
 static void editMaterial(const ref<pbr_material>& material)
 {
 	if (ImGui::BeginProperties())
 	{
 		asset_handle dummy = {};
-
-		auto editTexture = [](const char* name, ref<dx_texture>& tex, uint32 loadFlags)
-		{
-			asset_handle asset = {};
-			if (tex)
-			{
-				asset = tex->handle;
-			}
-			if (ImGui::PropertyAssetHandle(name, EDITOR_ICON_IMAGE, asset))
-			{
-				fs::path path = getPathFromAssetHandle(asset);
-				fs::path relative = fs::relative(path, fs::current_path());
-				if (auto newTex = loadTextureFromFile(relative.string(), loadFlags))
-				{
-					tex = newTex;
-				}
-			}
-		};
 
 		editTexture("Albedo", material->albedo, image_load_flags_default);
 		editTexture("Normal", material->normal, image_load_flags_default_noncolor);
@@ -627,16 +646,7 @@ bool scene_editor::drawSceneHierarchy()
 					{
 						if (ImGui::BeginProperties())
 						{
-							if (ImGui::PropertyAssetHandle("Mesh", EDITOR_ICON_MESH, raster.mesh->handle))
-							{
-								fs::path path = getPathFromAssetHandle(raster.mesh->handle);
-								fs::path relative = fs::relative(path, fs::current_path());
-								if (auto mesh = loadMeshFromFile(relative.string()))
-								{
-									raster.mesh = mesh;
-									selectedEntity.removeComponent<animation_component>(); // For now.
-								}
-							}
+							editMesh("Mesh", raster.mesh, mesh_creation_flags_default);
 							ImGui::EndProperties();
 						}
 						if (ImGui::BeginTree("Submeshes"))
@@ -683,6 +693,22 @@ bool scene_editor::drawSceneHierarchy()
 						{
 							editMaterial(terrain.rockMaterial);
 							ImGui::EndTree();
+						}
+					});
+
+					drawComponent<proc_placement_component>(selectedEntity, "PROCEDURAL PLACEMENT", [this](proc_placement_component& placement)
+					{
+						for (auto& layer : placement.layers)
+						{
+							if (ImGui::BeginTree(layer.name))
+							{
+								if (ImGui::BeginProperties())
+								{
+									ImGui::PropertyDrag("Footprint", layer.footprint, 0.05f);
+									ImGui::EndProperties();
+								}
+								ImGui::EndTree();
+							}
 						}
 					});
 
