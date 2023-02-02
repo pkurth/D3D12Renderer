@@ -269,8 +269,14 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		std::vector<proc_placement_layer_desc> layers =
 		{
 			proc_placement_layer_desc {
-				2.f,
-				{ sphereMesh, boxMesh }
+				"Trees and rocks",
+				5.f,
+				{ 
+					loadMeshFromFile("assets/desert/palmtree0.fbx"), 
+					loadMeshFromFile("assets/desert/palmtree1.fbx"),
+					loadMeshFromFile("assets/desert/rock1.fbx"),
+					loadMeshFromFile("assets/desert/rock4.fbx"),
+				}
 			}
 		};
 

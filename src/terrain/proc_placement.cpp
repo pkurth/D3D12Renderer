@@ -37,7 +37,7 @@ void initializeProceduralPlacementPipelines()
 
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
-			.inputLayout(inputLayout_position)
+			.inputLayout(inputLayout_position_uv_normal_tangent)
 			.renderTargets(ldrFormat, depthStencilFormat);
 
 		visualizePointsPipeline = createReloadablePipeline(desc, { "proc_placement_points_vs", "proc_placement_points_ps" }, rs_in_pixel_shader, true);
@@ -52,8 +52,8 @@ void initializeProceduralPlacementPipelines()
 
 
 	D3D12_INDIRECT_ARGUMENT_DESC argumentDescs[2] = {};
-	argumentDescs[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT;
-	argumentDescs[0].Constant.Num32BitValuesToSet = 1;
+	argumentDescs[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_SHADER_RESOURCE_VIEW;
+	argumentDescs[0].ShaderResourceView.RootParameterIndex = 1;
 	argumentDescs[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
 	visualizePointsCommandSignature = createCommandSignature(*visualizePointsPipeline.rootSignature, argumentDescs, arraysize(argumentDescs), sizeof(placement_draw));
 }
@@ -62,12 +62,13 @@ void initializeProceduralPlacementPipelines()
 
 struct render_proc_placement_layer_data
 {
-	ref<dx_buffer> transforms;
 	ref<dx_buffer> commandBuffer;
 	uint32 commandBufferOffset;
 
 	dx_vertex_buffer_group_view vertexBuffer;
 	dx_index_buffer_view indexBuffer;
+
+	ref<dx_texture> albedo;
 };
 
 struct render_proc_placement_layer_pipeline
@@ -83,15 +84,15 @@ PIPELINE_SETUP_IMPL(render_proc_placement_layer_pipeline)
 	cl->setPipelineState(*visualizePointsPipeline.pipeline);
 	cl->setGraphicsRootSignature(*visualizePointsPipeline.rootSignature);
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	cl->setGraphicsDynamicConstantBuffer(1, common.cameraCBV);
+	cl->setGraphicsDynamicConstantBuffer(0, common.cameraCBV);
 }
 
 PIPELINE_RENDER_IMPL(render_proc_placement_layer_pipeline)
 {
 	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
+	cl->setVertexBuffer(1, rc.data.vertexBuffer.others);
 	cl->setIndexBuffer(rc.data.indexBuffer);
-
-	cl->setRootGraphicsSRV(2, rc.data.transforms);
+	cl->setDescriptorHeapSRV(2, 0, rc.data.albedo);
 	cl->drawIndirect(visualizePointsCommandSignature, 1, rc.data.commandBuffer, rc.data.commandBufferOffset * sizeof(placement_draw));
 }
 
@@ -126,6 +127,7 @@ proc_placement_component::proc_placement_component(uint32 chunksPerDim, const st
 	for (const auto& layerDesc : layers)
 	{
 		placement_layer layer;
+		layer.name = layerDesc.name;
 		layer.footprint = layerDesc.footprint;
 		layer.globalMeshOffset = globalMeshOffset;
 		layer.numMeshes = 0;
@@ -150,6 +152,8 @@ proc_placement_component::proc_placement_component(uint32 chunksPerDim, const st
 					drawArgs.push_back(draw);
 
 					submeshToMesh.push_back(globalMeshOffset + i);
+
+					hasValidMeshes = true;
 				}
 			}
 		}
@@ -177,6 +181,11 @@ proc_placement_component::proc_placement_component(uint32 chunksPerDim, const st
 
 void proc_placement_component::generate(const render_camera& camera, const terrain_component& terrain, vec3 positionOffset)
 {
+	if (!hasValidMeshes)
+	{
+		return;
+	}
+
 	dx_command_list* cl = dxContext.getFreeComputeCommandList(false);
 
 	{
@@ -229,7 +238,7 @@ void proc_placement_component::generate(const render_camera& camera, const terra
 							uint32 numGroupsPerDim = (uint32)ceil(scaling);
 
 							cb.uvScale = 1.f / scaling;
-							cb.uvStride = 1.f / scaling;
+							cb.numMeshes = layer.numMeshes;
 							cb.globalMeshOffset = layer.globalMeshOffset;
 
 							cl->setCompute32BitConstants(PROC_PLACEMENT_GENERATE_POINTS_RS_CB, cb);
@@ -273,6 +282,7 @@ void proc_placement_component::generate(const render_camera& camera, const terra
 			cl->setPipelineState(*createDrawCallsPipeline.pipeline);
 			cl->setComputeRootSignature(*createDrawCallsPipeline.rootSignature);
 		
+			cl->setCompute32BitConstants(PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_CB, proc_placement_create_draw_calls_cb{ transformBuffer->gpuVirtualAddress, transformBuffer->elementSize });
 			cl->setRootComputeUAV(PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_OUTPUT, drawIndirectBuffer);
 			cl->setRootComputeSRV(PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_MESH_COUNTS, meshCountBuffer);
 			cl->setRootComputeSRV(PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_MESH_OFFSETS, meshOffsetBuffer);
@@ -346,8 +356,9 @@ void proc_placement_component::render(ldr_render_pass* renderPass)
 		{
 			for (uint32 j = 0; j < (uint32)layer.meshes[i]->submeshes.size(); ++j)
 			{
-				render_proc_placement_layer_data data = { transformBuffer, drawIndirectBuffer, drawCallOffset,
-					layer.meshes[i]->mesh.vertexBuffer, layer.meshes[i]->mesh.indexBuffer };
+				// TODO: We could pack the vertex and index buffer into the indirect call, but I'm not sure if that fits well with stuff like procedural objects.
+				render_proc_placement_layer_data data = { drawIndirectBuffer, drawCallOffset,
+					layer.meshes[i]->mesh.vertexBuffer, layer.meshes[i]->mesh.indexBuffer, layer.meshes[i]->submeshes[j].material->albedo };
 
 				renderPass->renderObject<render_proc_placement_layer_pipeline>(data);
 

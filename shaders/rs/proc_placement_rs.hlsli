@@ -13,7 +13,7 @@ struct placement_point
 
 struct placement_draw
 {
-	uint32 offset;
+	D3D12_GPU_VIRTUAL_ADDRESS transformSRV;
 	D3D12_DRAW_INDEXED_ARGUMENTS draw;
 };
 
@@ -35,9 +35,9 @@ struct proc_placement_generate_points_cb
 	float amplitudeScale;
 
 	float uvScale;
-	float uvStride;
 	
 	uint32 globalMeshOffset;
+	uint32 numMeshes;
 };
 
 #define PROC_PLACEMENT_GENERATE_POINTS_RS \
@@ -74,16 +74,24 @@ struct prefix_sum_cb
 #define PROC_PLACEMENT_CREATE_TRANSFORMS_BLOCK_SIZE 256
 
 
+struct proc_placement_create_draw_calls_cb
+{
+	D3D12_GPU_VIRTUAL_ADDRESS transformAddress;
+	uint32 stride;
+};
+
 #define PROC_PLACEMENT_CREATE_DRAW_CALLS_RS \
+	"RootConstants(num32BitConstants=4, b0), " \
 	"UAV(u0), " \
 	"SRV(t0), " \
 	"SRV(t1), " \
 	"SRV(t2)"
 
-#define PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_OUTPUT			0
-#define PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_MESH_COUNTS		1
-#define PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_MESH_OFFSETS	2
-#define PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_SUBMESH_TO_MESH	3
+#define PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_CB				0
+#define PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_OUTPUT			1
+#define PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_MESH_COUNTS		2
+#define PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_MESH_OFFSETS	3
+#define PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_SUBMESH_TO_MESH	4
 
 
 
