@@ -16,6 +16,7 @@
 #include "rendering/debug_visualization.h"
 #include "terrain/terrain.h"
 #include "terrain/proc_placement.h"
+#include "terrain/grass.h"
 
 #include <fontawesome/list.h>
 
@@ -709,6 +710,17 @@ bool scene_editor::drawSceneHierarchy()
 								}
 								ImGui::EndTree();
 							}
+						}
+					});
+
+					drawComponent<grass_component>(selectedEntity, "GRASS", [this](grass_component& grass)
+					{
+						if (ImGui::BeginProperties())
+						{
+							ImGui::PropertySlider("Segments", grass.settings.numSegmentsLOD0, 2, 10);
+							ImGui::PropertySlider("Blade height", grass.settings.bladeHeight, 0.f, 2.f);
+							ImGui::PropertySlider("Blade width", grass.settings.bladeWidth, 0.f, 1.f);
+							ImGui::EndProperties();
 						}
 					});
 

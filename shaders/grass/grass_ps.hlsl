@@ -8,6 +8,6 @@ struct ps_input
 [RootSignature(GRASS_RS)]
 float4 main(ps_input IN) : SV_TARGET
 {
-	return float4(IN.uv, 0.f, 1.f);
+	return float4(0.f, 1.f, 0.f, 1.f);
 }
 

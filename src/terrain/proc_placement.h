@@ -12,7 +12,7 @@ struct proc_placement_layer_desc
 
 struct proc_placement_component
 {
-	proc_placement_component(uint32 chunksPerDim, const std::vector<proc_placement_layer_desc>& layers);
+	proc_placement_component(const std::vector<proc_placement_layer_desc>& layers);
 	void generate(const render_camera& camera, const terrain_component& terrain, vec3 positionOffset);
 	void render(struct ldr_render_pass* renderPass);
 

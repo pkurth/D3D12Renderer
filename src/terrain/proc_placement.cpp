@@ -105,7 +105,7 @@ static ref<dx_buffer> readbackIndirect;
 static ref<dx_buffer> readbackMeshOffsets;
 #endif
 
-proc_placement_component::proc_placement_component(uint32 chunksPerDim, const std::vector<proc_placement_layer_desc>& layers)
+proc_placement_component::proc_placement_component(const std::vector<proc_placement_layer_desc>& layers)
 {
 	std::vector<placement_draw> drawArgs;
 
@@ -335,8 +335,6 @@ void proc_placement_component::generate(const render_camera& camera, const terra
 
 		unmapBuffer(readbackMeshOffsets, false);
 		unmapBuffer(readbackIndirect, false);
-	}
-	{
 	}
 #endif
 }

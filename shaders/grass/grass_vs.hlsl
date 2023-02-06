@@ -1,6 +1,9 @@
 #include "grass_rs.hlsli"
+#include "camera.hlsli"
 
-ConstantBuffer<grass_cb> cb : register(b0);
+ConstantBuffer<grass_cb> cb				: register(b0);
+ConstantBuffer<camera_cb> camera		: register(b1);
+StructuredBuffer<grass_blade> blades	: register(t0);
 
 struct vs_output
 {
@@ -16,7 +19,7 @@ static float getRelY(uint vertexID, uint lod)
 	return (float)vertical * (1.f / numLevels);
 }
 
-vs_output main(uint vertexID : SV_VertexID)
+vs_output main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 {
 	uint leftRight = vertexID & 1;
 	float relX = (float)leftRight * 2.f - 1.f;
@@ -40,8 +43,10 @@ vs_output main(uint vertexID : SV_VertexID)
 	pos += xzOffset;
 
 
+	pos += blades[instanceID].position;
+
 	vs_output OUT;
 	OUT.uv = uv;
-	OUT.position = mul(cb.mvp, float4(pos, 1.f));
+	OUT.position = mul(camera.viewProj, float4(pos, 1.f));
 	return OUT;
 }
