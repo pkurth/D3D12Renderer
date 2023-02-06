@@ -2,6 +2,7 @@
 #include "grass.h"
 
 #include "core/math.h"
+#include "core/log.h"
 
 #include "rendering/render_command.h"
 #include "rendering/material.h"
@@ -15,8 +16,12 @@
 #include "proc_placement_rs.hlsli"
 
 
+static const uint32 numSegmentsLOD0 = 4;
+
+
 static dx_pipeline grassPipeline;
 static dx_pipeline grassGenerationPipeline;
+static dx_pipeline grassCreateDrawCallsPipeline;
 
 static dx_command_signature grassCommandSignature;
 
@@ -32,7 +37,7 @@ void initializeGrassPipelines()
 	}
 
 	grassGenerationPipeline = createReloadablePipeline("grass_generation_cs");
-
+	grassCreateDrawCallsPipeline = createReloadablePipeline("grass_create_draw_calls_cs");
 
 
 	D3D12_INDIRECT_ARGUMENT_DESC argumentDesc;
@@ -44,7 +49,8 @@ struct grass_render_data
 {
 	grass_settings settings;
 	ref<dx_buffer> drawBuffer;
-	ref<dx_buffer> bladeBuffer;
+	ref<dx_buffer> bladeBufferLOD0;
+	ref<dx_buffer> bladeBufferLOD1;
 };
 
 struct grass_pipeline
@@ -72,7 +78,7 @@ PIPELINE_RENDER_IMPL(grass_pipeline)
 
 	vec3 windDirection = normalize(vec3(1.f, 0.f, 1.f));
 
-	uint32 numVerticesLOD0 = rc.data.settings.numSegmentsLOD0 * 2 + 1;
+	uint32 numVerticesLOD0 = numSegmentsLOD0 * 2 + 1;
 	uint32 numVerticesLOD1 = numVerticesLOD0 / 2 + 1;
 
 	{
@@ -80,15 +86,27 @@ PIPELINE_RENDER_IMPL(grass_pipeline)
 		cb.numVertices = numVerticesLOD0;
 		cb.halfWidth = rc.data.settings.bladeWidth * 0.5f;
 		cb.height = rc.data.settings.bladeHeight;
-		cb.lod = sin(time / 5.f) * 0.5f + 0.5f;
 		cb.time = time;
 		cb.windDirection = windDirection;
 
-		cl->setRootGraphicsSRV(GRASS_RS_BLADES, rc.data.bladeBuffer);
+		cl->setRootGraphicsSRV(GRASS_RS_BLADES, rc.data.bladeBufferLOD0);
 		cl->setGraphics32BitConstants(GRASS_RS_CB, cb);
 
-		//cl->draw(numVerticesLOD0, 50000, 0, 0);
-		cl->drawIndirect(grassCommandSignature, 1, rc.data.drawBuffer, 0);
+		cl->drawIndirect(grassCommandSignature, 1, rc.data.drawBuffer, 0 * sizeof(grass_draw));
+	}
+
+	{
+		grass_cb cb;
+		cb.numVertices = numVerticesLOD1;
+		cb.halfWidth = rc.data.settings.bladeWidth * 0.5f;
+		cb.height = rc.data.settings.bladeHeight;
+		cb.time = time;
+		cb.windDirection = windDirection;
+
+		cl->setRootGraphicsSRV(GRASS_RS_BLADES, rc.data.bladeBufferLOD1);
+		cl->setGraphics32BitConstants(GRASS_RS_CB, cb);
+
+		cl->drawIndirect(grassCommandSignature, 1, rc.data.drawBuffer, 1 * sizeof(grass_draw));
 	}
 }
 
@@ -104,19 +122,21 @@ static ref<dx_buffer> readbackIndirect;
 
 grass_component::grass_component()
 {
-	grass_draw draw;
-	draw.draw.InstanceCount = 0;
-	draw.draw.StartInstanceLocation = 0;
-	draw.draw.StartVertexLocation = 0;
-	draw.draw.VertexCountPerInstance = settings.numSegmentsLOD0 * 2 + 1;
+	uint32 numVerticesLOD0 = numSegmentsLOD0 * 2 + 1;
+	uint32 numVerticesLOD1 = numVerticesLOD0 / 2 + 1;
 
-	drawBuffer = createBuffer(sizeof(grass_draw), 1, &draw, true);
-	countBuffer = createBuffer(sizeof(uint32), 1, 0, true, true);
-	bladeBuffer = createBuffer(sizeof(grass_blade), 1000000, 0, true);
+	grass_draw draw[2] = {};
+	draw[0].draw.VertexCountPerInstance = numVerticesLOD0;
+	draw[1].draw.VertexCountPerInstance = numVerticesLOD1;
+
+	drawBuffer = createBuffer(sizeof(grass_draw), 2, &draw, true);
+	countBuffer = createBuffer(sizeof(uint32), 2, 0, true, true);
+	bladeBufferLOD0 = createBuffer(sizeof(grass_blade), 1000000, 0, true);
+	bladeBufferLOD1 = createBuffer(sizeof(grass_blade), 1000000, 0, true);
 
 
 #if READBACK
-	readbackIndirect = createReadbackBuffer(sizeof(grass_draw), 1);
+	readbackIndirect = createReadbackBuffer(sizeof(grass_draw), 2);
 #endif
 }
 
@@ -144,6 +164,23 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 
 			cl->clearUAV(countBuffer, 0u);
 
+
+
+			float footprint = settings.footprint;
+			float scaling = diameterInWorldSpace / footprint;
+			uint32 numGroupsPerDim = (uint32)ceil(scaling);
+
+			grass_generation_common_cb common;
+			memcpy(common.frustumPlanes, frustum.planes, sizeof(vec4) * 6);
+			common.amplitudeScale = terrain.amplitudeScale;
+			common.chunkSize = terrain.chunkSize;
+			common.uvScale = 1.f / scaling;
+			common.cameraPosition = camera.position;
+
+			auto commonCBV = dxContext.uploadDynamicConstantBuffer(common);
+			cl->setComputeDynamicConstantBuffer(GRASS_GENERATION_RS_COMMON, commonCBV);
+
+
 			for (uint32 z = 0; z < terrain.chunksPerDim; ++z)
 			{
 				for (uint32 x = 0; x < terrain.chunksPerDim; ++x)
@@ -157,40 +194,42 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 					{
 						cl->setDescriptorHeapSRV(GRASS_GENERATION_RS_RESOURCES, 0, chunk.heightmap);
 						cl->setDescriptorHeapSRV(GRASS_GENERATION_RS_RESOURCES, 1, chunk.normalmap);
-						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 2, bladeBuffer);
-						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 3, countBuffer);
+						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 2, bladeBufferLOD0);
+						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 3, bladeBufferLOD1);
+						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 4, countBuffer);
 
-
-						float footprint = settings.footprint;
-						float scaling = diameterInWorldSpace / footprint;
-						uint32 numGroupsPerDim = (uint32)ceil(scaling);
-
-
-						grass_generation_cb cb;
-						cb.amplitudeScale = terrain.amplitudeScale;
-						cb.chunkCorner = chunkMinCorner;
-						cb.chunkSize = terrain.chunkSize;
-						cb.uvScale = 1.f / scaling;
-
-						cl->setCompute32BitConstants(GRASS_GENERATION_RS_CB, cb);
+						cl->setCompute32BitConstants(GRASS_GENERATION_RS_CB, grass_generation_cb{ chunkMinCorner });
 
 						cl->dispatch(numGroupsPerDim, numGroupsPerDim, 1);
 
 						barrier_batcher(cl)
-							.uav(bladeBuffer)
+							.uav(bladeBufferLOD0)
+							.uav(bladeBufferLOD1)
 							.uav(countBuffer);
 					}
 				}
 			}
 		}
 
-		cl->transitionBarrier(countBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-		cl->copyBufferRegionToBuffer_ByteOffset(countBuffer, drawBuffer, 0, sizeof(uint32), offsetof(D3D12_DRAW_ARGUMENTS, InstanceCount));
+		cl->transitionBarrier(countBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+
+		{
+			PROFILE_ALL(cl, "Create draw calls");
+
+			cl->setPipelineState(*grassCreateDrawCallsPipeline.pipeline);
+			cl->setComputeRootSignature(*grassCreateDrawCallsPipeline.rootSignature);
+
+			cl->setCompute32BitConstants(GRASS_CREATE_DRAW_CALLS_RS_CB, grass_create_draw_calls_cb{ bladeBufferLOD0->elementCount });
+			cl->setRootComputeUAV(GRASS_CREATE_DRAW_CALLS_RS_OUTPUT, drawBuffer);
+			cl->setRootComputeSRV(GRASS_CREATE_DRAW_CALLS_RS_MESH_COUNTS, countBuffer);
+
+			cl->dispatch(bucketize(drawBuffer->elementCount, GRASS_CREATE_DRAW_CALLS_BLOCK_SIZE));
+		}
 	}
 
 
 #if READBACK
-	cl->transitionBarrier(drawBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
+	cl->transitionBarrier(drawBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
 	cl->copyBufferRegionToBuffer(drawBuffer, readbackIndirect, 0, drawBuffer->elementCount, 0);
 #endif
 
@@ -202,7 +241,7 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 
 	{
 		grass_draw* draw = (grass_draw*)mapBuffer(readbackIndirect, true);
-
+		LOG_MESSAGE("%u, %u grass blades", draw[0].draw.InstanceCount, draw[1].draw.InstanceCount);
 		unmapBuffer(readbackIndirect, false);
 	}
 #endif
@@ -210,5 +249,5 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 
 void grass_component::render(ldr_render_pass* renderPass)
 {
-	renderPass->renderObject<grass_pipeline>({ settings, drawBuffer, bladeBuffer });
+	renderPass->renderObject<grass_pipeline>({ settings, drawBuffer, bladeBufferLOD0, bladeBufferLOD1 });
 }

@@ -5,10 +5,9 @@
 
 struct grass_settings
 {
-	uint32 numSegmentsLOD0 = 6;
 	float bladeHeight = 1.f;
 	float bladeWidth = 0.2f;
-	float footprint = 0.5f;
+	float footprint = 0.15f;
 };
 
 struct grass_component
@@ -23,7 +22,8 @@ struct grass_component
 private:
 	ref<dx_buffer> drawBuffer;
 	ref<dx_buffer> countBuffer;
-	ref<dx_buffer> bladeBuffer;
+	ref<dx_buffer> bladeBufferLOD0;
+	ref<dx_buffer> bladeBufferLOD1;
 };
 
 void initializeGrassPipelines();

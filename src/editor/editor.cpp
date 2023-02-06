@@ -717,7 +717,7 @@ bool scene_editor::drawSceneHierarchy()
 					{
 						if (ImGui::BeginProperties())
 						{
-							ImGui::PropertySlider("Segments", grass.settings.numSegmentsLOD0, 2, 10);
+							ImGui::PropertyDrag("Footprint", grass.settings.footprint, 0.05f);
 							ImGui::PropertySlider("Blade height", grass.settings.bladeHeight, 0.f, 2.f);
 							ImGui::PropertySlider("Blade width", grass.settings.bladeWidth, 0.f, 1.f);
 							ImGui::EndProperties();
