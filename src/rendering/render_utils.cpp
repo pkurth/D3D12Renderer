@@ -16,6 +16,7 @@
 #include "shadow_map.h"
 #include "terrain/terrain.h"
 #include "terrain/proc_placement.h"
+#include "terrain/grass.h"
 
 
 // Defined in render_algorithms.cpp.
@@ -34,6 +35,7 @@ void initializeRenderUtils()
 	initializeLightProbePipelines();
 	initializeRTReflectionsPipelines();
 	initializeProceduralPlacementPipelines();
+	initializeGrassPipelines();
 	loadCommonShaders();
 
 	debug_simple_pipeline::initialize();

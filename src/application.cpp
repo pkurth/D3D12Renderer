@@ -20,6 +20,7 @@
 #include "terrain/terrain.h"
 #include "terrain/heightmap_collider.h"
 #include "terrain/proc_placement.h"
+#include "terrain/grass.h"
 
 
 static raytracing_object_type defineBlasFromMesh(const ref<multi_mesh>& mesh)
@@ -617,11 +618,12 @@ void application::update(const user_input& input, float dt)
 			placement.render(&ldrRenderPass);
 		}
 
-
 		for (auto [entityHandle, terrain, position] : scene.group(entt::get<terrain_component, position_component>).each())
 		{
 			terrain.render(this->scene.camera, &opaqueRenderPass, sunShadowRenderPass.copyFromStaticCache ? 0 : &sunShadowRenderPass, position.position, (uint32)entityHandle);
 		}
+
+		renderBladeOfGrass(&ldrRenderPass);
 
 
 		{
