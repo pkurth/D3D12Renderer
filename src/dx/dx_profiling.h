@@ -4,13 +4,28 @@
 #include "core/profiling_internal.h"
 #include "core/cpu_profiling.h"
 
+
 extern bool dxProfilerWindowOpen;
 
 
 #if ENABLE_DX_PROFILING
 
+
+#if __has_include(<pix/pix3.h>)
+#define USE_PIX
+#include <pix/pix3.h>
+#pragma comment( lib, "WinPixEventRuntime" )
+#else
+#define PIXScopedEvent(...)
+#define PIX_COLOR(...)
+#endif
+
+
+
 #define _DX_PROFILE_BLOCK_(counter, cl, name) dx_profile_block_recorder COMPOSITE_VARNAME(__DX_PROFILE_BLOCK, counter)(cl, name)
-#define DX_PROFILE_BLOCK(cl, name) _DX_PROFILE_BLOCK_(__COUNTER__, cl, name)
+#define DX_PROFILE_BLOCK(cl, name) \
+	_DX_PROFILE_BLOCK_(__COUNTER__, cl, name); \
+	PIXScopedEvent(cl->commandList.Get(), PIX_COLOR(255, 255, 0), name);
 
 
 #define MAX_NUM_DX_PROFILE_BLOCKS 2048
@@ -76,4 +91,5 @@ void dxProfilingResolveTimeStamps(uint64* timestamps);
 
 
 #define PROFILE_ALL(cl, name) DX_PROFILE_BLOCK(cl, name); CPU_PROFILE_BLOCK(name)
+
 

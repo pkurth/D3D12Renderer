@@ -266,6 +266,10 @@ project "D3D12Renderer"
 		["Shaders/*"] = { "shaders/**.hlsl" },
 	}
 
+	libdirs {
+		"ext/lib",
+	}
+
 	links {
 		"d3d12",
 		"D3Dcompiler",
