@@ -82,7 +82,8 @@ ref<pbr_material> createPBRMaterial(
 	float roughOverride, 
 	float metallicOverride, 
 	bool doubleSided,
-	float uvScale)
+	float uvScale, 
+	bool disableTextureCompression)
 {
 	material_key s =
 	{
@@ -109,10 +110,16 @@ ref<pbr_material> createPBRMaterial(
 	{
 		ref<pbr_material> material = make_ref<pbr_material>();
 
-		if (!albedoTex.empty()) material->albedo = loadTextureFromFile(albedoTex);
-		if (!normalTex.empty()) material->normal = loadTextureFromFile(normalTex, image_load_flags_default_noncolor);
-		if (!roughTex.empty()) material->roughness = loadTextureFromFile(roughTex, image_load_flags_default_noncolor);
-		if (!metallicTex.empty()) material->metallic = loadTextureFromFile(metallicTex, image_load_flags_default_noncolor);
+		uint32 removeFlags = 0xFFFFFFFF;
+		if (disableTextureCompression)
+		{
+			removeFlags = ~image_load_flags_compress;
+		}
+
+		if (!albedoTex.empty()) material->albedo = loadTextureFromFile(albedoTex, image_load_flags_default & removeFlags);
+		if (!normalTex.empty()) material->normal = loadTextureFromFile(normalTex, image_load_flags_default_noncolor & removeFlags);
+		if (!roughTex.empty()) material->roughness = loadTextureFromFile(roughTex, image_load_flags_default_noncolor & removeFlags);
+		if (!metallicTex.empty()) material->metallic = loadTextureFromFile(metallicTex, image_load_flags_default_noncolor & removeFlags);
 		material->emission = emission;
 		material->albedoTint = albedoTint;
 		material->roughnessOverride = roughOverride;
