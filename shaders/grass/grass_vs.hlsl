@@ -26,6 +26,7 @@ vs_output main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 
 	uint leftRight = vertexID & 1;
 	float relX = (float)leftRight * 2.f - 1.f;
+	relX *= (vertexID != cb.numVertices - 1);
 
 	float relY0 = getRelY(vertexID, 0);
 	float relY1 = getRelY(vertexID, 1);
@@ -35,14 +36,31 @@ vs_output main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 	float2 uv = float2(relX, relY);
 
 
-	float w = cb.halfWidth * (vertexID != cb.numVertices - 1);
-	float x = relX * w;
+#if 1
+	float relTipOffsetZ = 0.5f;
+	float controlPointZ = relTipOffsetZ * 0.5f;
+	float controlPointY = 0.8f;
+
+	float relY2 = relY * relY;
+	float2 yz = float2(controlPointY, controlPointZ) * (2.f * relY - 2.f * relY2) + float2(1.f, relTipOffsetZ) * relY2;
+	float2 d_yz = float2(controlPointY, controlPointZ) * (2.f - 4.f * relY) + float2(1.f, relTipOffsetZ) * 2.f * relY;
+
+	yz *= cb.height;
+	float y = yz.x;
+	float z = yz.y;
+#else
 	float y = relY * cb.height;
+	float z = 0.f;
+#endif
+
+	float w = cb.halfWidth;
+	float x = relX * cb.halfWidth;
+
 
 	float3 pos = float3(
-		blade.facing.y * x,
+		blade.facing.y * x - blade.facing.x * z,
 		y, 
-		blade.facing.x * x);
+		blade.facing.x * x + blade.facing.y * z);
 
 
 #if 0
