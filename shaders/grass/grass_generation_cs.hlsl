@@ -46,12 +46,11 @@ static lod_decision decideLOD(float3 position)
 	float rand = random(position);
 	float distance = length(position - common.cameraPosition);
 
-	float lod_01 = smoothstep(150.f, 180.f, distance + rand * 20.f);
-	float lod_1cull = smoothstep(240.f, 270.f, distance + rand * 20.f);
+	float cullCutoff = smoothstep(15.f, 150.f, distance) - 0.1f;
+	float lod = smoothstep(40.f, 90.f, distance + rand * 15.f);
 
-	float totalLOD = lod_01 + lod_1cull;
+	lod_decision result = { lod, rand < cullCutoff };
 
-	lod_decision result = { totalLOD, totalLOD >= 2.f };
 	return result;
 }
 
@@ -80,14 +79,14 @@ void main(cs_input IN)
 
 			if (!lod.cull)
 			{
+				uint lodIndex = (uint)lod.lod;
+
 				grass_blade blade;
 				blade.initialize(
 					position,
 					random(xz) * M_PI * 2.f,
-					0,
+					lodIndex,
 					lod.lod > 1.f ? 0.f : lod.lod);
-
-				uint lodIndex = (uint)lod.lod;
 
 				uint index;
 				InterlockedAdd(count[lodIndex], 1, index);

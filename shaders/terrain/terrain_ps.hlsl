@@ -97,7 +97,7 @@ ps_output main(ps_input IN)
 	float2 n = normals.Sample(clampSampler, IN.uv) * terrain.amplitudeScale;
 	float3 N = normalize(float3(n.x, 1.f, n.y));
 	
-	float groundTexScale = 0.3f;
+	float groundTexScale = 0.1f;
 	float rockTexScale = 0.1f;
 
 	triplanar_mapping tri;
@@ -106,7 +106,7 @@ ps_output main(ps_input IN)
 
 	float2 groundUV = tri.uvY;
 
-#if 1
+#if 0
 	float2 tileUV = IN.uv + 0.1f * float2(fbm(IN.uv * 13.f, 2).x, fbm(IN.uv * 15.f, 3).x);
 	float2 tileID = floor(tileUV * 20.f) / 20.f;
 	float tileRotation = random(tileID) * M_PI * 2.f;

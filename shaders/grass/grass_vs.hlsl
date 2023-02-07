@@ -1,5 +1,6 @@
 #include "grass_rs.hlsli"
 #include "camera.hlsli"
+#include "random.hlsli"
 
 ConstantBuffer<grass_cb> cb				: register(b0);
 ConstantBuffer<camera_cb> camera		: register(b1);
@@ -43,10 +44,16 @@ vs_output main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 		y, 
 		blade.facing.x * x);
 
-	float swing = cos(cb.time - relY * 1.3f) * 0.7f + 0.2f;
+
+#if 0
+	float swing = cos(cb.time - relY * 1.3f + fbm(blade.position.xz * 0.6f + 10000.f).x) * 0.7f + 0.2f;
 	float3 xzOffset = cb.windDirection * swing * relY;
 	pos += xzOffset;
-
+#else
+	float windStrength = fbm(blade.position.xz * 0.6f + cb.time * 0.3f + 10000.f).x + 0.6f;
+	float3 xzOffset = cb.windDirection * windStrength * relY;
+	pos += xzOffset;
+#endif
 
 	pos += blade.position;
 

@@ -113,7 +113,7 @@ PIPELINE_RENDER_IMPL(grass_pipeline)
 
 
 
-#define READBACK 1
+#define READBACK 0
 
 #if READBACK
 static ref<dx_buffer> readbackIndirect;
@@ -202,10 +202,10 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 
 						cl->dispatch(numGroupsPerDim, numGroupsPerDim, 1);
 
-						barrier_batcher(cl)
-							.uav(bladeBufferLOD0)
-							.uav(bladeBufferLOD1)
-							.uav(countBuffer);
+						//barrier_batcher(cl)
+						//	.uav(bladeBufferLOD0)
+						//	.uav(bladeBufferLOD1)
+						//	.uav(countBuffer);
 					}
 				}
 			}
