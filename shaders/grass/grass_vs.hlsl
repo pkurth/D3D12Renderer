@@ -9,6 +9,7 @@ StructuredBuffer<grass_blade> blades	: register(t0);
 struct vs_output
 {
 	float2 uv		: TEXCOORDS;
+	float3 normal	: NORMAL;
 	float4 position : SV_POSITION;
 };
 
@@ -36,47 +37,49 @@ vs_output main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 	float2 uv = float2(relX, relY);
 
 
-#if 1
-	float relTipOffsetZ = 0.5f;
+	float relTipOffsetZ = 0.7f;
 	float controlPointZ = relTipOffsetZ * 0.5f;
 	float controlPointY = 0.8f;
 
 	float relY2 = relY * relY;
 	float2 yz = float2(controlPointY, controlPointZ) * (2.f * relY - 2.f * relY2) + float2(1.f, relTipOffsetZ) * relY2;
-	float2 d_yz = float2(controlPointY, controlPointZ) * (2.f - 4.f * relY) + float2(1.f, relTipOffsetZ) * 2.f * relY;
+	float2 d_yz = float2(controlPointY, controlPointZ) * (2.f - 4.f * relY) + float2(1.f, relTipOffsetZ) * (2.f * relY);
 
 	yz *= cb.height;
+
+	float x = relX * cb.halfWidth;
 	float y = yz.x;
 	float z = yz.y;
-#else
-	float y = relY * cb.height;
-	float z = 0.f;
-#endif
 
-	float w = cb.halfWidth;
-	float x = relX * cb.halfWidth;
+	float nx = 0.f;
+	float ny = -d_yz.y;
+	float nz = d_yz.x;
 
 
-	float3 pos = float3(
+	// Apply rotation.
+	float3 position = float3(
 		blade.facing.y * x - blade.facing.x * z,
 		y, 
 		blade.facing.x * x + blade.facing.y * z);
 
-
-#if 0
-	float swing = cos(cb.time - relY * 1.3f + fbm(blade.position.xz * 0.6f + 10000.f).x) * 0.7f + 0.2f;
-	float3 xzOffset = cb.windDirection * swing * relY;
-	pos += xzOffset;
-#else
+	// Add wind.
 	float windStrength = fbm(blade.position.xz * 0.6f + cb.time * 0.3f + 10000.f).x + 0.6f;
 	float3 xzOffset = cb.windDirection * windStrength * relY;
-	pos += xzOffset;
-#endif
+	position += xzOffset;
 
-	pos += blade.position;
+	position += blade.position;
+
+
+	float3 normal = float3(
+		blade.facing.y * nx - blade.facing.x * nz,
+		ny,
+		blade.facing.x * nx + blade.facing.y * nz);
+
+
 
 	vs_output OUT;
 	OUT.uv = uv;
-	OUT.position = mul(camera.viewProj, float4(pos, 1.f));
+	OUT.normal = normal;
+	OUT.position = mul(camera.viewProj, float4(position, 1.f));
 	return OUT;
 }
