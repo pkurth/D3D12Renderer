@@ -2021,7 +2021,7 @@ static bool editSSR(bool& enable, ssr_settings& settings, const ref<dx_texture>&
 	return result;
 }
 
-static bool editTAA(bool& enable, taa_settings& settings)
+static bool editTAA(bool& enable, taa_settings& settings, const ref<dx_texture>& velocityTexture)
 {
 	bool result = false;
 	if (ImGui::BeginProperties())
@@ -2032,6 +2032,11 @@ static bool editTAA(bool& enable, taa_settings& settings)
 			result |= ImGui::PropertySlider("Jitter strength", settings.cameraJitterStrength);
 		}
 		ImGui::EndProperties();
+	}
+	if (enable && velocityTexture && ImGui::BeginTree("Show##ShowTAA"))
+	{
+		ImGui::Image(velocityTexture);
+		ImGui::EndTree();
 	}
 	return result;
 }
@@ -2112,7 +2117,7 @@ void scene_editor::drawSettings(float dt)
 			if (renderer->spec.allowAO) { editAO(renderer->settings.enableAO, renderer->settings.aoSettings, renderer->getAOResult()); ImGui::Separator(); }
 			if (renderer->spec.allowSSS) { editSSS(renderer->settings.enableSSS, renderer->settings.sssSettings, renderer->getSSSResult()); ImGui::Separator(); }
 			if (renderer->spec.allowSSR) { editSSR(renderer->settings.enableSSR, renderer->settings.ssrSettings, renderer->getSSRResult()); ImGui::Separator(); }
-			if (renderer->spec.allowTAA) { editTAA(renderer->settings.enableTAA, renderer->settings.taaSettings); ImGui::Separator(); }
+			if (renderer->spec.allowTAA) { editTAA(renderer->settings.enableTAA, renderer->settings.taaSettings, renderer->getScreenVelocities()); ImGui::Separator(); }
 			if (renderer->spec.allowBloom) { editBloom(renderer->settings.enableBloom, renderer->settings.bloomSettings, renderer->getBloomResult()); ImGui::Separator(); }
 			editSharpen(renderer->settings.enableSharpen, renderer->settings.sharpenSettings);
 

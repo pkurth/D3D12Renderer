@@ -18,7 +18,7 @@ struct grass_component
 	grass_component();
 
 	void generate(const render_camera& camera, const terrain_component& terrain, vec3 positionOffset);
-	void render(struct ldr_render_pass* renderPass);
+	void render(struct opaque_render_pass* renderPass, uint32 entityID = -1);
 
 	grass_settings settings;
 

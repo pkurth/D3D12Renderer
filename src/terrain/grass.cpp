@@ -13,13 +13,14 @@
 #include "dx/dx_barrier_batcher.h"
 
 #include "grass_rs.hlsli"
-#include "proc_placement_rs.hlsli"
+#include "depth_only_rs.hlsli"
 
 
 static const uint32 numSegmentsLOD0 = 4;
 
 
 static dx_pipeline grassPipeline;
+static dx_pipeline grassDepthOnlyPipeline;
 static dx_pipeline grassGenerationPipeline;
 static dx_pipeline grassCreateDrawCallsPipeline;
 
@@ -29,11 +30,18 @@ void initializeGrassPipelines()
 {
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
+			.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL)
 			.cullingOff()
-			//.wireframe()
-			.renderTargets(ldrFormat, depthStencilFormat);
+			.renderTargets(opaqueLightPassFormats, arraysize(opaqueLightPassFormats), depthStencilFormat);
 
 		grassPipeline = createReloadablePipeline(desc, { "grass_vs", "grass_ps" });
+	}
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.cullingOff()
+			.renderTargets(depthOnlyFormat, arraysize(depthOnlyFormat), depthStencilFormat);
+
+		grassDepthOnlyPipeline = createReloadablePipeline(desc, { "grass_depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
 	}
 
 	grassGenerationPipeline = createReloadablePipeline("grass_generation_cs");
@@ -77,7 +85,7 @@ PIPELINE_RENDER_IMPL(grass_pipeline)
 	static float time = 0.f;
 	time += 1.f / 150.f;
 
-	vec3 windDirection = normalize(vec3(1.f, 0.f, 1.f));
+	vec2 windDirection = normalize(vec2(1.f, 1.f));
 
 	uint32 numVerticesLOD0 = numSegmentsLOD0 * 2 + 1;
 	uint32 numVerticesLOD1 = numVerticesLOD0 / 2 + 1;
@@ -111,6 +119,69 @@ PIPELINE_RENDER_IMPL(grass_pipeline)
 	}
 }
 
+
+
+struct grass_depth_prepass_pipeline
+{
+	using render_data_t = grass_render_data;
+
+	PIPELINE_SETUP_DECL;
+	DEPTH_ONLY_RENDER_DECL;
+};
+
+PIPELINE_SETUP_IMPL(grass_depth_prepass_pipeline)
+{
+	cl->setPipelineState(*grassDepthOnlyPipeline.pipeline);
+	cl->setGraphicsRootSignature(*grassDepthOnlyPipeline.rootSignature);
+	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+	depth_only_camera_jitter_cb jitterCB = { common.cameraJitter, common.prevFrameCameraJitter };
+	cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
+	cl->setGraphicsDynamicConstantBuffer(GRASS_DEPTH_ONLY_RS_CAMERA, common.cameraCBV);
+}
+
+DEPTH_ONLY_RENDER_IMPL(grass_depth_prepass_pipeline)
+{
+	PROFILE_ALL(cl, "Grass depth prepass");
+
+	static float time = 0.f;
+	time += 1.f / 150.f;
+
+	vec2 windDirection = normalize(vec2(1.f, 1.f));
+
+	uint32 numVerticesLOD0 = numSegmentsLOD0 * 2 + 1;
+	uint32 numVerticesLOD1 = numVerticesLOD0 / 2 + 1;
+
+	cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_OBJECT_ID, rc.objectID);
+
+	{
+		grass_cb cb;
+		cb.numVertices = numVerticesLOD0;
+		cb.halfWidth = rc.data.settings.bladeWidth * 0.5f;
+		cb.height = rc.data.settings.bladeHeight;
+		cb.time = time;
+		cb.windDirection = windDirection;
+
+		cl->setRootGraphicsSRV(GRASS_DEPTH_ONLY_RS_BLADES, rc.data.bladeBufferLOD0);
+		cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_CB, cb);
+
+		cl->drawIndirect(grassCommandSignature, 1, rc.data.drawBuffer, 0 * sizeof(grass_draw));
+	}
+
+	{
+		grass_cb cb;
+		cb.numVertices = numVerticesLOD1;
+		cb.halfWidth = rc.data.settings.bladeWidth * 0.5f;
+		cb.height = rc.data.settings.bladeHeight;
+		cb.time = time;
+		cb.windDirection = windDirection;
+
+		cl->setRootGraphicsSRV(GRASS_DEPTH_ONLY_RS_BLADES, rc.data.bladeBufferLOD1);
+		cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_CB, cb);
+
+		cl->drawIndirect(grassCommandSignature, 1, rc.data.drawBuffer, 1 * sizeof(grass_draw));
+	}
+}
 
 
 
@@ -258,7 +329,8 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 #endif
 }
 
-void grass_component::render(ldr_render_pass* renderPass)
+void grass_component::render(opaque_render_pass* renderPass, uint32 entityID)
 {
-	renderPass->renderObject<grass_pipeline>({ settings, drawBuffer, bladeBufferLOD0, bladeBufferLOD1 });
+	grass_render_data data = { settings, drawBuffer, bladeBufferLOD0, bladeBufferLOD1 };
+	renderPass->renderObject<grass_pipeline, grass_depth_prepass_pipeline>(data, data, entityID);
 }

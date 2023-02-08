@@ -622,7 +622,7 @@ void application::update(const user_input& input, float dt)
 		for (auto [entityHandle, terrain, position, grass] : scene.group(entt::get<terrain_component, position_component, grass_component>).each())
 		{
 			grass.generate(this->scene.camera, terrain, position.position);
-			grass.render(&ldrRenderPass);
+			grass.render(&opaqueRenderPass, (uint32)entityHandle);
 		}
 
 		for (auto [entityHandle, terrain, position] : scene.group(entt::get<terrain_component, position_component>).each())

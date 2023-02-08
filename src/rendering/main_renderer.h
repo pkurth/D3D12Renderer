@@ -162,6 +162,7 @@ struct main_renderer
 	const ref<dx_texture>& getSSSResult() const { return sssTextures[sssHistoryIndex]; }
 	const ref<dx_texture>& getSSRResult() const { return ssrResolveTexture; }
 	const ref<dx_texture>& getBloomResult() const { return bloomTexture; }
+	const ref<dx_texture>& getScreenVelocities() const { return screenVelocitiesTexture; }
 
 
 private:

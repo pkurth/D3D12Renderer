@@ -381,6 +381,8 @@ void main_renderer::endFrame(const user_input* input)
 	commonRenderData.lightingCBV = lightingCBV;
 	commonRenderData.lightProbeIrradiance = (environment && environment->giMode == environment_gi_raytraced) ? environment->lightProbeGrid.irradiance : 0;
 	commonRenderData.lightProbeDepth = (environment && environment->giMode == environment_gi_raytraced) ? environment->lightProbeGrid.depth : 0;
+	commonRenderData.opaqueDepth = opaqueDepthBuffer;
+	commonRenderData.worldNormalsAndRoughness = worldNormalsRoughnessTexture;
 
 	commonRenderData.cameraJitter = jitteredCamera.jitter;
 	commonRenderData.prevFrameCameraJitter = jitteredCamera.prevFrameJitter;
@@ -683,8 +685,13 @@ void main_renderer::endFrame(const user_input* input)
 			cl2 = cl;
 		});
 
-		context.addWork([&]()
+		context.addWork([&, commonRenderData=commonRenderData]() mutable // Copy commonRenderData, since we change it in here.
 		{
+			// After this there is no more camera jittering!
+			commonRenderData.cameraCBV = unjitteredCameraCBV;
+
+
+
 			dx_command_list* cl = dxContext.getFreeRenderCommandList();
 			PROFILE_ALL(cl, "Render thread 3");
 
@@ -698,15 +705,6 @@ void main_renderer::endFrame(const user_input* input)
 
 			barrier_batcher(cl)
 				.transition(opaqueDepthBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-
-
-
-
-			// After this there is no more camera jittering!
-			commonRenderData.cameraCBV = unjitteredCameraCBV;
-			commonRenderData.opaqueDepth = opaqueDepthBuffer;
-			commonRenderData.worldNormalsAndRoughness = worldNormalsRoughnessTexture;
-
 
 
 

@@ -1,6 +1,7 @@
 #include "grass_rs.hlsli"
 #include "camera.hlsli"
 #include "lighting.hlsli"
+#include "normal.hlsli"
 
 ConstantBuffer<camera_cb> camera		: register(b1);
 ConstantBuffer<lighting_cb> lighting	: register(b2);
@@ -16,8 +17,15 @@ struct ps_input
 	bool isFrontFace		: SV_IsFrontFace;
 };
 
+
+struct ps_output
+{
+	float4 hdrColor				: SV_Target0;
+	float4 worldNormalRoughness	: SV_Target1;
+};
+
 [RootSignature(GRASS_RS)]
-float4 main(ps_input IN) : SV_TARGET
+ps_output main(ps_input IN)
 {
 	float3 L = -lighting.sun.direction;
 
@@ -57,7 +65,12 @@ float4 main(ps_input IN) : SV_TARGET
 		totalIntensity += sssIntensity;
 	}
 
-	return float4(totalIntensity * albedo, 1.f);
+	float roughness = 0.7f;
+
+	ps_output OUT;
+	OUT.hdrColor = float4(totalIntensity * albedo, 1.f);
+	OUT.worldNormalRoughness = float4(packNormal(N), roughness, 0.f);
+	return OUT;
 
 }
 

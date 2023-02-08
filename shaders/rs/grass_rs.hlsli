@@ -37,7 +37,7 @@ struct grass_draw
 
 struct grass_cb
 {
-    vec3 windDirection;
+    vec2 windDirection;
     float time;
 
     uint32 numVertices;
@@ -50,7 +50,7 @@ struct grass_cb
     "DENY_HULL_SHADER_ROOT_ACCESS |" \
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-    "RootConstants(b0, num32BitConstants=7, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "RootConstants(num32BitConstants=6, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
     "SRV(t0, visibility=SHADER_VISIBILITY_VERTEX), " \
     "CBV(b1), " \
     "CBV(b2, visibility=SHADER_VISIBILITY_PIXEL)"
@@ -59,6 +59,24 @@ struct grass_cb
 #define GRASS_RS_BLADES     1
 #define GRASS_RS_CAMERA     2
 #define GRASS_RS_LIGHTING   3
+
+
+#define GRASS_DEPTH_ONLY_RS \
+    "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
+    "DENY_HULL_SHADER_ROOT_ACCESS |" \
+    "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
+    "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
+    "RootConstants(num32BitConstants=6, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "SRV(t0, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "CBV(b1, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "RootConstants(num32BitConstants=1, space=1, b0, visibility=SHADER_VISIBILITY_PIXEL), " \
+    "RootConstants(num32BitConstants=4, space=1, b1, visibility=SHADER_VISIBILITY_PIXEL)"
+
+#define GRASS_DEPTH_ONLY_RS_CB              0
+#define GRASS_DEPTH_ONLY_RS_BLADES          1
+#define GRASS_DEPTH_ONLY_RS_CAMERA          2
+#define GRASS_DEPTH_ONLY_RS_OBJECT_ID       3
+#define GRASS_DEPTH_ONLY_RS_CAMERA_JITTER   4
 
 
 
