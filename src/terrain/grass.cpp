@@ -67,6 +67,7 @@ PIPELINE_SETUP_IMPL(grass_pipeline)
 	cl->setGraphicsRootSignature(*grassPipeline.rootSignature);
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 	cl->setGraphicsDynamicConstantBuffer(GRASS_RS_CAMERA, common.cameraCBV);
+	cl->setGraphicsDynamicConstantBuffer(GRASS_RS_LIGHTING, common.lightingCBV);
 }
 
 PIPELINE_RENDER_IMPL(grass_pipeline)

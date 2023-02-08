@@ -49,15 +49,16 @@ struct grass_cb
 	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
     "DENY_HULL_SHADER_ROOT_ACCESS |" \
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
-    "DENY_GEOMETRY_SHADER_ROOT_ACCESS |" \
-    "DENY_PIXEL_SHADER_ROOT_ACCESS)," \
+    "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
     "RootConstants(b0, num32BitConstants=7, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "SRV(t0, visibility=SHADER_VISIBILITY_VERTEX), " \
     "CBV(b1), " \
-    "SRV(t0)"
+    "CBV(b2, visibility=SHADER_VISIBILITY_PIXEL)"
 
 #define GRASS_RS_CB         0
-#define GRASS_RS_CAMERA     1
-#define GRASS_RS_BLADES     2
+#define GRASS_RS_BLADES     1
+#define GRASS_RS_CAMERA     2
+#define GRASS_RS_LIGHTING   3
 
 
 

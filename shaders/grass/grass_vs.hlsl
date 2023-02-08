@@ -8,8 +8,11 @@ StructuredBuffer<grass_blade> blades	: register(t0);
 
 struct vs_output
 {
-	float2 uv		: TEXCOORDS;
-	float3 normal	: NORMAL;
+	float2 uv				: TEXCOORDS;
+	float3 normal			: NORMAL;
+	float3 tangent			: TANGENT;
+	float3 worldPosition	: POSITION;
+
 	float4 position : SV_POSITION;
 };
 
@@ -45,8 +48,10 @@ vs_output main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 	float2 yz = float2(controlPointY, controlPointZ) * (2.f * relY - 2.f * relY2) + float2(1.f, relTipOffsetZ) * relY2;
 	//yz = float2(relY, 0.f); // REMOVE
 	float2 d_yz = float2(controlPointY, controlPointZ) * (2.f - 4.f * relY) + float2(1.f, relTipOffsetZ) * (2.f * relY);
+	//d_yz = float2(1.f, 0.f); // REMOVE
 
-	yz *= cb.height;
+	float height = cb.height + (fbm(blade.position.xz * 2.f + 10000.f, 3).x * 0.8f);
+	yz *= height;
 
 	float x = relX * cb.halfWidth;
 	float y = yz.x;
@@ -79,11 +84,14 @@ vs_output main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 		ny,
 		blade.facing.x * nx + blade.facing.y * nz);
 
+	normal = lerp(normal, float3(0.f, 1.f, 0.f), 0.6f);
 
 
 	vs_output OUT;
 	OUT.uv = uv;
 	OUT.normal = normal;
+	OUT.tangent = float3(blade.facing.y, 0.f, blade.facing.x);
+	OUT.worldPosition = position;
 	OUT.position = mul(camera.viewProj, float4(position, 1.f));
 	return OUT;
 }
