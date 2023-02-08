@@ -152,10 +152,7 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 
 			camera_frustum_planes frustum = camera.getWorldSpaceFrustumPlanes();
 
-			const float radiusInUVSpace = sqrt(1.f / (2.f * sqrt(3.f) * arraysize(POISSON_SAMPLES)));
-			float diameterInUVSpace = radiusInUVSpace * 2.f;
-			float diameterInWorldSpace = diameterInUVSpace * terrain.chunkSize;
-
+			
 			cl->setPipelineState(*grassGenerationPipeline.pipeline);
 			cl->setComputeRootSignature(*grassGenerationPipeline.rootSignature);
 
@@ -165,16 +162,14 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 			cl->clearUAV(countBuffer, 0u);
 
 
+			const uint32 numGrassBladesPerDim = 256;
+			const float lodChangeDistance = 100.f;
 
-			float footprint = settings.footprint;
-			float scaling = diameterInWorldSpace / footprint;
-			uint32 numGroupsPerDim = (uint32)ceil(scaling);
 
 			grass_generation_common_cb common;
 			memcpy(common.frustumPlanes, frustum.planes, sizeof(vec4) * 6);
 			common.amplitudeScale = terrain.amplitudeScale;
 			common.chunkSize = terrain.chunkSize;
-			common.uvScale = 1.f / scaling;
 			common.cameraPosition = camera.position;
 
 			auto commonCBV = dxContext.uploadDynamicConstantBuffer(common);
@@ -192,15 +187,25 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 					bounding_box aabb = { chunkMinCorner, chunkMaxCorner };
 					if (!frustum.cullWorldSpaceAABB(aabb))
 					{
+						uint32 chunkNumGrassBladesPerDim = numGrassBladesPerDim;
+						uint32 lodIndex = 0;
+
+						float sqDistance = pointInBox(camera.position, aabb.minCorner, aabb.maxCorner) ? 0.f : squaredLength(camera.position - closestPoint_PointAABB(camera.position, aabb));
+						if (sqDistance > lodChangeDistance * lodChangeDistance)
+						{
+							chunkNumGrassBladesPerDim /= 2;
+							lodIndex = 1;
+						}
+
 						cl->setDescriptorHeapSRV(GRASS_GENERATION_RS_RESOURCES, 0, chunk.heightmap);
 						cl->setDescriptorHeapSRV(GRASS_GENERATION_RS_RESOURCES, 1, chunk.normalmap);
 						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 2, bladeBufferLOD0);
 						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 3, bladeBufferLOD1);
 						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 4, countBuffer);
 
-						cl->setCompute32BitConstants(GRASS_GENERATION_RS_CB, grass_generation_cb{ chunkMinCorner });
+						cl->setCompute32BitConstants(GRASS_GENERATION_RS_CB, grass_generation_cb{ chunkMinCorner, 1.f / chunkNumGrassBladesPerDim, lodIndex });
 
-						cl->dispatch(numGroupsPerDim, numGroupsPerDim, 1);
+						cl->dispatch(bucketize(chunkNumGrassBladesPerDim, GRASS_GENERATION_BLOCK_SIZE), bucketize(chunkNumGrassBladesPerDim, GRASS_GENERATION_BLOCK_SIZE), 1);
 
 						//barrier_batcher(cl)
 						//	.uav(bladeBufferLOD0)

@@ -1,6 +1,5 @@
 #include "cs.hlsli"
 #include "grass_rs.hlsli"
-#include "proc_placement_rs.hlsli"
 #include "math.hlsli"
 #include "random.hlsli"
 
@@ -35,32 +34,22 @@ static bool cull(float3 minCorner, float3 maxCorner)
 	return false;
 }
 
-struct lod_decision
+static const float cullCutoffs[2][2] =
 {
-	float lod;
-	bool cull;
+	{ 2.f, 0.25f },
+	{ 0.75f, 0.8f },
 };
 
-static lod_decision decideLOD(float3 position)
-{
-	float rand = random(position);
-	float distance = length(position - common.cameraPosition);
-
-	float cullCutoff = smoothstep(15.f, 150.f, distance) - 0.1f;
-	float lod = smoothstep(40.f, 90.f, distance + rand * 15.f);
-
-	lod_decision result = { lod, rand < cullCutoff };
-
-	return result;
-}
-
-
 [RootSignature(GRASS_GENERATION_RS)]
-[numthreads(32, 32, 1)]
+[numthreads(GRASS_GENERATION_BLOCK_SIZE, GRASS_GENERATION_BLOCK_SIZE, 1)]
 void main(cs_input IN)
 {
-	float2 samplePoint = POISSON_SAMPLES[IN.groupIndex];
-	float2 uv = (samplePoint + IN.groupID.xy) * common.uvScale;
+	uint seed = initRand(IN.dispatchThreadID.x, IN.dispatchThreadID.y);
+
+	float2 uv = (IN.dispatchThreadID.xy + 0.5f) * cb.uvScale;
+	float uvOffsetX = (nextRand(seed) * 2.f - 1.f) * cb.uvScale;
+	float uvOffsetZ = (nextRand(seed) * 2.f - 1.f) * cb.uvScale;
+	uv += float2(uvOffsetX, uvOffsetZ);
 
 	if (isSaturated(uv))
 	{
@@ -73,20 +62,32 @@ void main(cs_input IN)
 
 		float3 position = float3(xz.x, height, xz.y) + cb.chunkCorner;
 
-		if (normal.y > 0.95f && !cull(position - float3(0.2f, 0.f, 0.2f), position + float3(0.2f, 1.f, 0.2f)))
+		if (normal.y > 0.9f && !cull(position - float3(0.5f, 0.f, 0.5f), position + float3(0.5f, 1.5f, 0.5f)))
 		{
-			lod_decision lod = decideLOD(position);
+			bool cull = false;
+			float lod = 0.f;
 
-			if (!lod.cull)
+			if (cb.lodIndex == 0)
 			{
-				uint lodIndex = (uint)lod.lod;
+				float distance = length(position - common.cameraPosition);
+				float cullValue = smoothstep(50.f, 100.f, distance) - nextRand(seed) * 0.1f;
+
+				float cutoff = cullCutoffs[IN.dispatchThreadID.x & 1][IN.dispatchThreadID.y & 1];
+
+				cull = cullValue >= cutoff;
+				lod = cullValue;
+			}
+
+			if (!cull)
+			{
+				uint lodIndex = cb.lodIndex;
 
 				grass_blade blade;
 				blade.initialize(
 					position,
 					random(xz) * M_PI * 2.f,
-					lodIndex,
-					lod.lod > 1.f ? 0.f : lod.lod);
+					0, // TODO: Type.
+					lod);
 
 				uint index;
 				InterlockedAdd(count[lodIndex], 1, index);

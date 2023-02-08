@@ -43,6 +43,7 @@ vs_output main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 
 	float relY2 = relY * relY;
 	float2 yz = float2(controlPointY, controlPointZ) * (2.f * relY - 2.f * relY2) + float2(1.f, relTipOffsetZ) * relY2;
+	//yz = float2(relY, 0.f); // REMOVE
 	float2 d_yz = float2(controlPointY, controlPointZ) * (2.f - 4.f * relY) + float2(1.f, relTipOffsetZ) * (2.f * relY);
 
 	yz *= cb.height;
@@ -56,6 +57,8 @@ vs_output main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 	float nz = d_yz.x;
 
 
+	//blade.facing = float2(0.f, 1.f); // REMOVE
+
 	// Apply rotation.
 	float3 position = float3(
 		blade.facing.y * x - blade.facing.x * z,
@@ -65,6 +68,7 @@ vs_output main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 	// Add wind.
 	float windStrength = fbm(blade.position.xz * 0.6f + cb.time * 0.3f + 10000.f).x + 0.6f;
 	float3 xzOffset = cb.windDirection * windStrength * relY;
+	//xzOffset = float3(0.f, 0.f, 0.f); // REMOVE
 	position += xzOffset;
 
 	position += blade.position;

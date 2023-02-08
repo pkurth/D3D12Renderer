@@ -61,23 +61,26 @@ struct grass_cb
 
 
 
+#define GRASS_GENERATION_BLOCK_SIZE 8
+
 
 struct grass_generation_common_cb
 {
     vec4 frustumPlanes[6];
     vec3 cameraPosition;
     float chunkSize;
-    float uvScale;
     float amplitudeScale;
 };
 
 struct grass_generation_cb
 {
     vec3 chunkCorner;
+    float uvScale;
+    uint32 lodIndex;
 };
 
 #define GRASS_GENERATION_RS \
-	"RootConstants(num32BitConstants=3, b0), " \
+	"RootConstants(num32BitConstants=5, b0), " \
 	"CBV(b1), " \
 	"DescriptorTable(SRV(t0, numDescriptors=2), UAV(u0, numDescriptors=3)), " \
     "StaticSampler(s0," \

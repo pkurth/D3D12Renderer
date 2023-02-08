@@ -811,6 +811,7 @@ mat4 invertAffine(const mat4& m);
 
 bool pointInTriangle(vec3 point, vec3 triA, vec3 triB, vec3& triC);
 bool pointInRectangle(vec2 p, vec2 topLeft, vec2 bottomRight);
+bool pointInBox(vec3 p, vec3 minCorner, vec3 maxCorner);
 
 vec2 directionToPanoramaUV(vec3 dir);
 

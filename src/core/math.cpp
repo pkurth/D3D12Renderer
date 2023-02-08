@@ -1294,6 +1294,11 @@ bool pointInRectangle(vec2 p, vec2 topLeft, vec2 bottomRight)
 	return p.x >= topLeft.x && p.y >= topLeft.y && p.x <= bottomRight.x && p.y <= bottomRight.y;
 }
 
+bool pointInBox(vec3 p, vec3 minCorner, vec3 maxCorner)
+{
+	return p.x >= minCorner.x && p.y >= minCorner.y && p.z >= minCorner.z && p.x <= maxCorner.x && p.y <= maxCorner.y && p.z <= maxCorner.z;
+}
+
 vec2 directionToPanoramaUV(vec3 dir)
 {
 	const vec2 invAtan = vec2(INV_TAU, INV_PI);

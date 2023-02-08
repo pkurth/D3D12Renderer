@@ -21,8 +21,10 @@ float4 main(ps_input IN) : SV_TARGET
 
 	float NdotL = 1.f;// saturate(dot(N, L));
 
+	float3 albedo = lerp(pow(float3(121, 208, 33) / 255, 2.2), pow(float3(193, 243, 118) / 255, 2.2), IN.uv.y);
+
 	return float4(
-		NdotL * lerp(pow(float3(121, 208, 33) / 255, 2.2), pow(float3(193, 243, 118) / 255, 2.2), IN.uv.y)
-		, 1.f);
+		NdotL * albedo, 
+		1.f);
 }
 
