@@ -717,11 +717,15 @@ bool scene_editor::drawSceneHierarchy()
 					{
 						if (ImGui::BeginProperties())
 						{
-							ImGui::PropertyDrag("Footprint", grass.settings.footprint, 0.05f);
+							ImGui::PropertyDrag("Blades per chunk dim", grass.settings.numGrassBladesPerChunkDim, 2);
 							ImGui::PropertySlider("Blade height", grass.settings.bladeHeight, 0.f, 2.f);
 							ImGui::PropertySlider("Blade width", grass.settings.bladeWidth, 0.f, 1.f);
+
+							ImGui::PropertyDrag("LOD change start distance", grass.settings.lodChangeStartDistance, 0.5f);
+							ImGui::PropertyDrag("LOD change transition distance", grass.settings.lodChangeTransitionDistance, 0.5f);
 							ImGui::EndProperties();
 						}
+
 					});
 
 					drawComponent<animation_component>(selectedEntity, "ANIMATION", [this](animation_component& anim)

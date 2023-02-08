@@ -70,6 +70,9 @@ struct grass_generation_common_cb
     vec3 cameraPosition;
     float chunkSize;
     float amplitudeScale;
+
+    float lodChangeStartDistance;
+    float lodChangeEndDistance;
 };
 
 struct grass_generation_cb

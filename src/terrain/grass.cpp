@@ -162,8 +162,9 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 			cl->clearUAV(countBuffer, 0u);
 
 
-			const uint32 numGrassBladesPerDim = 256;
-			const float lodChangeDistance = 100.f;
+			uint32 numGrassBladesPerDim = settings.numGrassBladesPerChunkDim & (~1); // Make sure this is an even number.
+			numGrassBladesPerDim = min(numGrassBladesPerDim, 1024u);
+			const float lodChangeEndDistance = settings.lodChangeStartDistance + settings.lodChangeTransitionDistance;
 
 
 			grass_generation_common_cb common;
@@ -171,6 +172,8 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 			common.amplitudeScale = terrain.amplitudeScale;
 			common.chunkSize = terrain.chunkSize;
 			common.cameraPosition = camera.position;
+			common.lodChangeStartDistance = settings.lodChangeStartDistance;
+			common.lodChangeEndDistance = lodChangeEndDistance;
 
 			auto commonCBV = dxContext.uploadDynamicConstantBuffer(common);
 			cl->setComputeDynamicConstantBuffer(GRASS_GENERATION_RS_COMMON, commonCBV);
@@ -190,8 +193,10 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 						uint32 chunkNumGrassBladesPerDim = numGrassBladesPerDim;
 						uint32 lodIndex = 0;
 
-						float sqDistance = pointInBox(camera.position, aabb.minCorner, aabb.maxCorner) ? 0.f : squaredLength(camera.position - closestPoint_PointAABB(camera.position, aabb));
-						if (sqDistance > lodChangeDistance * lodChangeDistance)
+						float sqDistance = pointInBox(camera.position, aabb.minCorner, aabb.maxCorner) 
+							? 0.f 
+							: squaredLength(camera.position - closestPoint_PointAABB(camera.position, aabb));
+						if (sqDistance > lodChangeEndDistance * lodChangeEndDistance)
 						{
 							chunkNumGrassBladesPerDim /= 2;
 							lodIndex = 1;

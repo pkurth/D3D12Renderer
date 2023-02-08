@@ -6,8 +6,11 @@
 struct grass_settings
 {
 	float bladeHeight = 1.f;
-	float bladeWidth = 0.2f;
-	float footprint = 0.15f;
+	float bladeWidth = 0.2f; 
+	uint32 numGrassBladesPerChunkDim = 256;
+
+	float lodChangeStartDistance = 50.f;
+	float lodChangeTransitionDistance = 50.f;
 };
 
 struct grass_component

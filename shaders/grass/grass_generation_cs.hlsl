@@ -44,7 +44,7 @@ static const float cullCutoffs[2][2] =
 [numthreads(GRASS_GENERATION_BLOCK_SIZE, GRASS_GENERATION_BLOCK_SIZE, 1)]
 void main(cs_input IN)
 {
-	uint seed = initRand(IN.dispatchThreadID.x, IN.dispatchThreadID.y);
+	uint seed = initRand(IN.dispatchThreadID.x << cb.lodIndex, IN.dispatchThreadID.y << cb.lodIndex);
 
 	float2 uv = (IN.dispatchThreadID.xy + 0.5f) * cb.uvScale;
 	float uvOffsetX = (nextRand(seed) * 2.f - 1.f) * cb.uvScale;
@@ -70,7 +70,7 @@ void main(cs_input IN)
 			if (cb.lodIndex == 0)
 			{
 				float distance = length(position - common.cameraPosition);
-				float cullValue = smoothstep(50.f, 100.f, distance) - nextRand(seed) * 0.1f;
+				float cullValue = smoothstep(common.lodChangeStartDistance, common.lodChangeEndDistance, distance) - nextRand(seed) * 0.1f;
 
 				float cutoff = cullCutoffs[IN.dispatchThreadID.x & 1][IN.dispatchThreadID.y & 1];
 
