@@ -89,6 +89,7 @@ struct grass_generation_common_cb
     vec3 cameraPosition;
     float chunkSize;
     float amplitudeScale;
+    float uvScale;
 
     float lodChangeStartDistance;
     float lodChangeEndDistance;
@@ -97,12 +98,11 @@ struct grass_generation_common_cb
 struct grass_generation_cb
 {
     vec3 chunkCorner;
-    float uvScale;
     uint32 lodIndex;
 };
 
 #define GRASS_GENERATION_RS \
-	"RootConstants(num32BitConstants=5, b0), " \
+	"RootConstants(num32BitConstants=4, b0), " \
 	"CBV(b1), " \
 	"DescriptorTable(SRV(t0, numDescriptors=2), UAV(u0, numDescriptors=3)), " \
     "StaticSampler(s0," \

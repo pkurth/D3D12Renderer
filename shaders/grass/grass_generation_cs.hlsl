@@ -46,9 +46,9 @@ void main(cs_input IN)
 {
 	uint seed = initRand(IN.dispatchThreadID.x << cb.lodIndex, IN.dispatchThreadID.y << cb.lodIndex);
 
-	float2 uv = (IN.dispatchThreadID.xy + 0.5f) * cb.uvScale;
-	float uvOffsetX = (nextRand(seed) * 2.f - 1.f) * cb.uvScale;
-	float uvOffsetZ = (nextRand(seed) * 2.f - 1.f) * cb.uvScale;
+	float2 uv = ((IN.dispatchThreadID.xy << cb.lodIndex) + 0.5f) * common.uvScale;
+	float uvOffsetX = (nextRand(seed) * 2.f - 1.f) * common.uvScale;
+	float uvOffsetZ = (nextRand(seed) * 2.f - 1.f) * common.uvScale;
 	uv += float2(uvOffsetX, uvOffsetZ);
 
 	if (isSaturated(uv))
@@ -70,7 +70,7 @@ void main(cs_input IN)
 			if (cb.lodIndex == 0)
 			{
 				float distance = length(position - common.cameraPosition);
-				float cullValue = smoothstep(common.lodChangeStartDistance, common.lodChangeEndDistance, distance) - nextRand(seed) * 0.1f;
+				float cullValue = smoothstep(common.lodChangeStartDistance, common.lodChangeEndDistance, distance);// -nextRand(seed) * 0.1f;
 
 				float cutoff = cullCutoffs[IN.dispatchThreadID.x & 1][IN.dispatchThreadID.y & 1];
 

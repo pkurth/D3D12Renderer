@@ -246,6 +246,7 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 			common.cameraPosition = camera.position;
 			common.lodChangeStartDistance = settings.lodChangeStartDistance;
 			common.lodChangeEndDistance = lodChangeEndDistance;
+			common.uvScale = 1.f / numGrassBladesPerDim;
 
 			auto commonCBV = dxContext.uploadDynamicConstantBuffer(common);
 			cl->setComputeDynamicConstantBuffer(GRASS_GENERATION_RS_COMMON, commonCBV);
@@ -280,7 +281,7 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 3, bladeBufferLOD1);
 						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 4, countBuffer);
 
-						cl->setCompute32BitConstants(GRASS_GENERATION_RS_CB, grass_generation_cb{ chunkMinCorner, 1.f / chunkNumGrassBladesPerDim, lodIndex });
+						cl->setCompute32BitConstants(GRASS_GENERATION_RS_CB, grass_generation_cb{ chunkMinCorner, lodIndex });
 
 						cl->dispatch(bucketize(chunkNumGrassBladesPerDim, GRASS_GENERATION_BLOCK_SIZE), bucketize(chunkNumGrassBladesPerDim, GRASS_GENERATION_BLOCK_SIZE), 1);
 
