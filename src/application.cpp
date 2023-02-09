@@ -285,8 +285,9 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			.addComponent<position_component>(vec3(0.f, -64.f, 0.f))
 			.addComponent<terrain_component>(numTerrainChunks, terrainChunkSize, 50.f, terrainGroundMaterial, terrainRockMaterial)
 			.addComponent<heightmap_collider_component>(numTerrainChunks, terrainChunkSize, physics_material{ physics_material_type_metal, 0.1f, 1.f, 4.f })
-			.addComponent<proc_placement_component>(layers)
-			.addComponent<grass_component>();
+			//.addComponent<proc_placement_component>(layers)
+			.addComponent<grass_component>()
+			;
 	}
 #endif
 
@@ -462,6 +463,7 @@ void application::update(const user_input& input, float dt)
 
 
 	game_scene& scene = this->scene.getCurrentScene();
+	float unscaledDt = dt;
 	dt *= this->scene.getTimestepScale();
 
 
@@ -621,7 +623,7 @@ void application::update(const user_input& input, float dt)
 
 		for (auto [entityHandle, terrain, position, grass] : scene.group(entt::get<terrain_component, position_component, grass_component>).each())
 		{
-			grass.generate(this->scene.camera, terrain, position.position);
+			grass.generate(this->scene.camera, terrain, position.position, unscaledDt);
 			grass.render(&opaqueRenderPass, (uint32)entityHandle);
 		}
 

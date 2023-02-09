@@ -41,6 +41,7 @@ struct ps_output
 	float4 worldNormalRoughness	: SV_Target1;
 };
 
+[earlydepthstencil]
 [RootSignature(GRASS_RS)]
 ps_output main(ps_input IN)
 {

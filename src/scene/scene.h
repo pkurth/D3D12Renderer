@@ -10,6 +10,8 @@
 #include "rendering/pbr_environment.h"
 #include "core/camera.h"
 #include "terrain/terrain.h"
+#include "terrain/proc_placement.h"
+#include "terrain/grass.h"
 #endif
 
 struct game_scene;
