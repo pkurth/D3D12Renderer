@@ -2,9 +2,26 @@
 #include "camera.hlsli"
 #include "lighting.hlsli"
 #include "normal.hlsli"
+#include "brdf.hlsli"
 
 ConstantBuffer<camera_cb> camera		: register(b1);
 ConstantBuffer<lighting_cb> lighting	: register(b2);
+
+TextureCube<float4> irradianceTexture			: register(t0, space2);
+TextureCube<float4> prefilteredRadianceTexture	: register(t1, space2);
+
+Texture2D<float2> brdf							: register(t2, space2);
+
+Texture2D<float> shadowMap						: register(t3, space2);
+
+Texture2D<float> aoTexture						: register(t4, space2);
+Texture2D<float> sssTexture						: register(t5, space2);
+Texture2D<float4> ssrTexture					: register(t6, space2);
+
+SamplerState clampSampler						: register(s0);
+SamplerComparisonState shadowSampler			: register(s1);
+
+
 
 struct ps_input
 {
@@ -35,41 +52,91 @@ ps_output main(ps_input IN)
 	{
 		N = -N;
 	}
-	N = normalize(N + T * IN.uv.x);
+	N = normalize(N);
+	N = normalize(N + T * IN.uv.x * 0.8);
+
+
+	surface_info surface;
+
+	surface.albedo = float4(lerp(pow(float3(121, 208, 33) / 255, 2.2), pow(float3(193, 243, 118) / 255, 2.2), IN.uv.y), 1.f);
+	surface.N = N;
+	surface.roughness = 0.9f;
+	surface.roughness = clamp(surface.roughness, 0.01f, 0.99f);
+	surface.metallic = 0.f;
+	surface.emission = 0.f;
+
+	surface.P = IN.worldPosition;
+	float3 camToP = surface.P - camera.position.xyz;
+	surface.V = -normalize(camToP);
+
+	surface.inferRemainingProperties();
+
+	float pixelDepth = dot(camera.forward.xyz, camToP);
 
 
 
-	float3 albedo = lerp(pow(float3(121, 208, 33) / 255, 2.2), pow(float3(193, 243, 118) / 255, 2.2), IN.uv.y);
-
-	float totalIntensity = 0.f;
+	light_contribution totalLighting = { float3(0.f, 0.f, 0.f), float3(0.f, 0.f, 0.f) };
 
 
-	// Standard lighting.
+	// Sun.
 	{
-		float NdotL = saturate(dot(N, L));
-		totalIntensity += NdotL;
+		float3 L = -lighting.sun.direction;
+
+		light_info light;
+		light.initialize(surface, L, lighting.sun.radiance);
+
+		float visibility = sampleCascadedShadowMapPCF(lighting.sun.viewProjs, surface.P,
+			shadowMap, lighting.sun.viewports,
+			shadowSampler, lighting.shadowMapTexelSize, pixelDepth, lighting.sun.numShadowCascades,
+			lighting.sun.cascadeDistances, lighting.sun.bias, lighting.sun.blendDistances);
+
+		float sss = sssTexture.SampleLevel(clampSampler, IN.screenPosition.xy * camera.invScreenDims, 0);
+		visibility *= sss;
+
+		[branch]
+		if (visibility > 0.f)
+		{
+			totalLighting.add(calculateDirectLighting(surface, light), visibility);
+
+
+			// Subsurface scattering.
+			{
+				// https://www.alanzucconi.com/2017/08/30/fast-subsurface-scattering-1/
+				const float distortion = 0.4f;
+				float3 sssH = L + N * distortion;
+				float sssVdotH = saturate(dot(surface.V, -sssH));
+
+				float sssIntensity = sssVdotH;
+				totalLighting.diffuse += sssIntensity.x * lighting.sun.radiance * visibility;
+			}
+		}
 	}
 
 
-	// Subsurface scattering.
-	{
-		float3 camToP = IN.worldPosition - camera.position.xyz;
-		float3 V = -normalize(camToP);
 
-		// https://www.alanzucconi.com/2017/08/30/fast-subsurface-scattering-1/
-		const float distortion = 0.3f;
-		float3 sssH = L + N * distortion;
-		float sssVdotH = saturate(dot(V, -sssH));
 
-		float sssIntensity = sssVdotH;
-		totalIntensity += sssIntensity;
-	}
+	// Ambient light.
+	float2 screenUV = IN.screenPosition.xy * camera.invScreenDims;
+	float ao = aoTexture.SampleLevel(clampSampler, screenUV, 0);
 
-	float roughness = 0.7f;
+	float4 ssr = ssrTexture.SampleLevel(clampSampler, screenUV, 0);
+
+
+	ambient_factors factors = getAmbientFactors(surface);
+	totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.globalIlluminationIntensity * ao;
+	float3 specular = specularIBL(factors.ks, surface, prefilteredRadianceTexture, brdf, clampSampler);
+
+	specular = lerp(specular, ssr.rgb * surface.F, ssr.a);
+	totalLighting.specular += specular * lighting.globalIlluminationIntensity * ao;
+
+
 
 	ps_output OUT;
-	OUT.hdrColor = float4(totalIntensity * albedo, 1.f);
-	OUT.worldNormalRoughness = float4(packNormal(N), roughness, 0.f);
+	OUT.hdrColor = totalLighting.evaluate(surface.albedo);
+	OUT.worldNormalRoughness = float4(packNormal(surface.N), surface.roughness, 0.f);
+
+	OUT.hdrColor.rgb *= 0.3f;
+
 	return OUT;
 
 }

@@ -8,7 +8,7 @@
 Texture2D<float2> normals					: register(t1);
 SamplerState clampSampler					: register(s0);
 SamplerState wrapSampler					: register(s1);
-SamplerComparisonState shadowSampler					: register(s2);
+SamplerComparisonState shadowSampler		: register(s2);
 
 ConstantBuffer<terrain_cb> terrain			: register(b1);
 

@@ -7,6 +7,7 @@
 #include "rendering/render_command.h"
 #include "rendering/material.h"
 #include "rendering/render_utils.h"
+#include "rendering/render_resources.h"
 
 #include "dx/dx_command_list.h"
 #include "dx/dx_profiling.h"
@@ -76,6 +77,17 @@ PIPELINE_SETUP_IMPL(grass_pipeline)
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 	cl->setGraphicsDynamicConstantBuffer(GRASS_RS_CAMERA, common.cameraCBV);
 	cl->setGraphicsDynamicConstantBuffer(GRASS_RS_LIGHTING, common.lightingCBV);
+
+
+	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
+
+	cl->setDescriptorHeapSRV(GRASS_RS_FRAME_CONSTANTS, 0, common.irradiance);
+	cl->setDescriptorHeapSRV(GRASS_RS_FRAME_CONSTANTS, 1, common.prefilteredRadiance);
+	cl->setDescriptorHeapSRV(GRASS_RS_FRAME_CONSTANTS, 2, render_resources::brdfTex);
+	cl->setDescriptorHeapSRV(GRASS_RS_FRAME_CONSTANTS, 3, common.shadowMap);
+	cl->setDescriptorHeapSRV(GRASS_RS_FRAME_CONSTANTS, 4, common.aoTexture ? common.aoTexture : render_resources::whiteTexture);
+	cl->setDescriptorHeapSRV(GRASS_RS_FRAME_CONSTANTS, 5, common.sssTexture ? common.sssTexture : render_resources::whiteTexture);
+	cl->setDescriptorHeapSRV(GRASS_RS_FRAME_CONSTANTS, 6, common.ssrTexture ? common.ssrTexture->defaultSRV : nullTexture);
 }
 
 PIPELINE_RENDER_IMPL(grass_pipeline)
@@ -83,6 +95,7 @@ PIPELINE_RENDER_IMPL(grass_pipeline)
 	PROFILE_ALL(cl, "Grass");
 
 	static float time = 0.f;
+	float prevTime = time;
 	time += 1.f / 150.f;
 
 	vec2 windDirection = normalize(vec2(1.f, 1.f));
@@ -96,6 +109,7 @@ PIPELINE_RENDER_IMPL(grass_pipeline)
 		cb.halfWidth = rc.data.settings.bladeWidth * 0.5f;
 		cb.height = rc.data.settings.bladeHeight;
 		cb.time = time;
+		cb.prevFrameTime = prevTime;
 		cb.windDirection = windDirection;
 
 		cl->setRootGraphicsSRV(GRASS_RS_BLADES, rc.data.bladeBufferLOD0);
@@ -110,6 +124,7 @@ PIPELINE_RENDER_IMPL(grass_pipeline)
 		cb.halfWidth = rc.data.settings.bladeWidth * 0.5f;
 		cb.height = rc.data.settings.bladeHeight;
 		cb.time = time;
+		cb.prevFrameTime = prevTime;
 		cb.windDirection = windDirection;
 
 		cl->setRootGraphicsSRV(GRASS_RS_BLADES, rc.data.bladeBufferLOD1);
@@ -145,6 +160,7 @@ DEPTH_ONLY_RENDER_IMPL(grass_depth_prepass_pipeline)
 	PROFILE_ALL(cl, "Grass depth prepass");
 
 	static float time = 0.f;
+	float prevTime = time;
 	time += 1.f / 150.f;
 
 	vec2 windDirection = normalize(vec2(1.f, 1.f));
@@ -160,6 +176,7 @@ DEPTH_ONLY_RENDER_IMPL(grass_depth_prepass_pipeline)
 		cb.halfWidth = rc.data.settings.bladeWidth * 0.5f;
 		cb.height = rc.data.settings.bladeHeight;
 		cb.time = time;
+		cb.prevFrameTime = prevTime;
 		cb.windDirection = windDirection;
 
 		cl->setRootGraphicsSRV(GRASS_DEPTH_ONLY_RS_BLADES, rc.data.bladeBufferLOD0);
@@ -174,6 +191,7 @@ DEPTH_ONLY_RENDER_IMPL(grass_depth_prepass_pipeline)
 		cb.halfWidth = rc.data.settings.bladeWidth * 0.5f;
 		cb.height = rc.data.settings.bladeHeight;
 		cb.time = time;
+		cb.prevFrameTime = prevTime;
 		cb.windDirection = windDirection;
 
 		cl->setRootGraphicsSRV(GRASS_DEPTH_ONLY_RS_BLADES, rc.data.bladeBufferLOD1);

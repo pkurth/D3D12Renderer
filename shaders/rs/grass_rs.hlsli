@@ -39,6 +39,7 @@ struct grass_cb
 {
     vec2 windDirection;
     float time;
+    float prevFrameTime;
 
     uint32 numVertices;
     float halfWidth;
@@ -50,15 +51,29 @@ struct grass_cb
     "DENY_HULL_SHADER_ROOT_ACCESS |" \
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=6, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "RootConstants(num32BitConstants=7, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
     "SRV(t0, visibility=SHADER_VISIBILITY_VERTEX), " \
     "CBV(b1), " \
-    "CBV(b2, visibility=SHADER_VISIBILITY_PIXEL)"
+    "CBV(b2, visibility=SHADER_VISIBILITY_PIXEL), " \
+    "DescriptorTable(SRV(t0, space=2, numDescriptors=7), visibility=SHADER_VISIBILITY_PIXEL), " \
+	"StaticSampler(s0," \
+        "addressU = TEXTURE_ADDRESS_CLAMP," \
+        "addressV = TEXTURE_ADDRESS_CLAMP," \
+        "addressW = TEXTURE_ADDRESS_CLAMP," \
+        "filter = FILTER_MIN_MAG_MIP_LINEAR," \
+        "visibility=SHADER_VISIBILITY_PIXEL), " \
+    "StaticSampler(s1," \
+        "addressU = TEXTURE_ADDRESS_CLAMP," \
+        "addressV = TEXTURE_ADDRESS_CLAMP," \
+        "addressW = TEXTURE_ADDRESS_CLAMP," \
+        "filter = FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT," \
+        "visibility=SHADER_VISIBILITY_PIXEL)"
 
-#define GRASS_RS_CB         0
-#define GRASS_RS_BLADES     1
-#define GRASS_RS_CAMERA     2
-#define GRASS_RS_LIGHTING   3
+#define GRASS_RS_CB                 0
+#define GRASS_RS_BLADES             1
+#define GRASS_RS_CAMERA             2
+#define GRASS_RS_LIGHTING           3
+#define GRASS_RS_FRAME_CONSTANTS    4
 
 
 #define GRASS_DEPTH_ONLY_RS \
@@ -66,7 +81,7 @@ struct grass_cb
     "DENY_HULL_SHADER_ROOT_ACCESS |" \
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=6, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "RootConstants(num32BitConstants=7, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
     "SRV(t0, visibility=SHADER_VISIBILITY_VERTEX), " \
     "CBV(b1, visibility=SHADER_VISIBILITY_VERTEX), " \
     "RootConstants(num32BitConstants=1, space=1, b0, visibility=SHADER_VISIBILITY_PIXEL), " \

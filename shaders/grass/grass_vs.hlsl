@@ -27,15 +27,11 @@ vs_output main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 
 	grass_blade blade = blades[instanceID];
 
-#if DISABLE_ALL_GRASS_DYNAMICS
-	blade.facing = float2(0.f, 1.f);
-#endif
-
-
 	float2 uv = grassUV(blade, vertexID, cb.numVertices);
 	float2 wind = grassWind(blade, cb.windDirection, cb.time);
-	float3 position = grassPosition(blade, uv, cb.height, cb.halfWidth, bendSettings, wind);
-	float3 normal = grassNormal(blade, uv, bendSettings, wind);
+	float height = grassHeight(blade, cb.height);
+	float3 position = grassPosition(blade, uv, height, cb.halfWidth, bendSettings, wind);
+	float3 normal = grassNormal(blade, uv, cb.height, bendSettings, wind);
 
 
 

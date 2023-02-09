@@ -62,7 +62,7 @@ void main(cs_input IN)
 
 		float3 position = float3(xz.x, height, xz.y) + cb.chunkCorner;
 
-		if (normal.y > 0.9f && !cull(position - float3(0.5f, 0.f, 0.5f), position + float3(0.5f, 1.5f, 0.5f)))
+		if (normal.y > 0.9f && !cull(position - float3(1.f, 0.f, 1.f), position + float3(1.f, 2.f, 1.f)))
 		{
 			bool cull = false;
 			float lod = 0.f;
