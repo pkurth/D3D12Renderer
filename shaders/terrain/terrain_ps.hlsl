@@ -199,16 +199,8 @@ ps_output main(ps_input IN)
 	totalLighting.specular += specular * lighting.globalIlluminationIntensity * ao;
 
 
-
-	//float value = step(0.9f, N.y);
-	//col = value.xxx;
-
-
 	ps_output OUT;
 	OUT.hdrColor = totalLighting.evaluate(surface.albedo);
 	OUT.worldNormalRoughness = float4(packNormal(N), surface.roughness, 0.f);
-
-	OUT.hdrColor.rgb *= 0.3f;
-
 	return OUT;
 }
