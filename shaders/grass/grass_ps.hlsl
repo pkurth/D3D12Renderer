@@ -55,6 +55,12 @@ ps_output main(ps_input IN)
 	N = normalize(N);
 	N = normalize(N + T * IN.uv.x * 0.8);
 
+	float3 camToP = IN.worldPosition - camera.position.xyz;
+	float pixelDepth = dot(camera.forward.xyz, camToP);
+
+#if 1
+	N = lerp(N, float3(0.f, 1.f, 0.f), smoothstep(80.f, 100.f, pixelDepth) * 0.4f);
+#endif
 
 	surface_info surface;
 
@@ -66,13 +72,9 @@ ps_output main(ps_input IN)
 	surface.emission = 0.f;
 
 	surface.P = IN.worldPosition;
-	float3 camToP = surface.P - camera.position.xyz;
 	surface.V = -normalize(camToP);
 
 	surface.inferRemainingProperties();
-
-	float pixelDepth = dot(camera.forward.xyz, camToP);
-
 
 
 	light_contribution totalLighting = { float3(0.f, 0.f, 0.f), float3(0.f, 0.f, 0.f) };
