@@ -149,6 +149,6 @@ ref<dx_texture> loadTextureFromFile(const fs::path& filename, uint32 flags = ima
 ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format imageFormat, const fs::path& cacheFilename, uint32 flags = image_load_flags_default);
 ref<dx_texture> loadVolumeTextureFromDirectory(const fs::path& dirname, uint32 flags = image_load_flags_compress | image_load_flags_cache_to_dds | image_load_flags_noncolor);
 
-void copyTextureToCPUBuffer(const ref<dx_texture>& texture, void* buffer);
+void copyTextureToCPUBuffer(const ref<dx_texture>& texture, void* buffer, D3D12_RESOURCE_STATES beforeAndAfterState = D3D12_RESOURCE_STATE_COMMON);
 void saveTextureToFile(const ref<dx_texture>& texture, const fs::path& path);
 void saveTextureToFile(dx_resource texture, uint32 width, uint32 height, DXGI_FORMAT format, const fs::path& path);

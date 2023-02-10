@@ -1211,7 +1211,7 @@ void saveTextureToFile(dx_resource texture, uint32 width, uint32 height, DXGI_FO
 	delete[] output;
 }
 
-void copyTextureToCPUBuffer(const ref<dx_texture>& texture, void* buffer)
+void copyTextureToCPUBuffer(const ref<dx_texture>& texture, void* buffer, D3D12_RESOURCE_STATES beforeAndAfterState)
 {
 	uint32 outputSize = getFormatSize(texture->format);
 
@@ -1220,9 +1220,17 @@ void copyTextureToCPUBuffer(const ref<dx_texture>& texture, void* buffer)
 
 	dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
-	cl->transitionBarrier(texture, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_GENERIC_READ);
+	bool transition = false;
+	if ((beforeAndAfterState & D3D12_RESOURCE_STATE_COPY_SOURCE) == 0)
+	{
+		cl->transitionBarrier(texture, beforeAndAfterState, D3D12_RESOURCE_STATE_GENERIC_READ);
+		transition = true;
+	}
 	cl->copyTextureRegionToBuffer(texture->resource, texture->width, texture->format, readbackBuffer, 0, 0, 0, texture->width, texture->height);
-	cl->transitionBarrier(texture, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COMMON);
+	if (transition)
+	{
+		cl->transitionBarrier(texture, D3D12_RESOURCE_STATE_GENERIC_READ, beforeAndAfterState);
+	}
 
 	uint64 fence = dxContext.executeCommandList(cl);
 

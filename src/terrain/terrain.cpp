@@ -95,16 +95,13 @@ void initializeTerrainPipelines()
 	}
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(depthOnlyFormat, arraysize(depthOnlyFormat), depthStencilFormat)
-			.inputLayout(inputLayout_position);
+			.renderTargets(depthOnlyFormat, arraysize(depthOnlyFormat), depthStencilFormat);
 
 		terrainDepthOnlyPipeline = createReloadablePipeline(desc, { "terrain_depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
 	}
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
-			.renderTargets(0, 0, shadowDepthFormat)
-			.inputLayout(inputLayout_position)
-			;
+			.renderTargets(0, 0, shadowDepthFormat);
 
 		terrainShadowPipeline = createReloadablePipeline(desc, { "terrain_shadow_vs" }, rs_in_vertex_shader);
 		//pointLightShadowPipeline = createReloadablePipeline(desc, { "shadow_point_light_vs", "shadow_point_light_ps" }, rs_in_vertex_shader);
@@ -582,7 +579,7 @@ void terrain_component::generateChunksGPU()
 				auto& c = chunk(cx, cz);
 
 				c.heights.resize(TERRAIN_LOD_0_VERTICES_PER_DIMENSION * TERRAIN_LOD_0_VERTICES_PER_DIMENSION);
-				copyTextureToCPUBuffer(c.heightmap, c.heights.data());
+				copyTextureToCPUBuffer(c.heightmap, c.heights.data(), D3D12_RESOURCE_STATE_GENERIC_READ);
 			}
 		}
 	}
