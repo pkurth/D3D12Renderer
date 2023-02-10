@@ -459,7 +459,7 @@ void terrain_component::generateChunksCPU()
 					}
 				}
 
-				c.heightmap = createTexture(heights, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R16_UNORM);
+				c.heightmap = createTexture(heights, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R16_UNORM, false, false, true, D3D12_RESOURCE_STATE_GENERIC_READ);
 
 
 				for (uint32 z = 0; z < normalMapDimension; ++z)
@@ -537,8 +537,8 @@ void terrain_component::generateChunksGPU()
 				else
 				{
 					barrier_batcher(cl)
-						.transition(c.heightmap, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-						.transition(c.normalmap, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+						.transition(c.heightmap, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+						.transition(c.normalmap, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 				}
 
 				terrain_generation_cb cb;
@@ -556,8 +556,8 @@ void terrain_component::generateChunksGPU()
 
 
 				barrier_batcher(cl)
-					.transition(c.heightmap, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON)
-					.transition(c.normalmap, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
+					.transition(c.heightmap, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ)
+					.transition(c.normalmap, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
 
 				if (mipmaps)
 				{

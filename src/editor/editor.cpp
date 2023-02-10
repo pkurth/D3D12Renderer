@@ -668,18 +668,18 @@ bool scene_editor::drawSceneHierarchy()
 						}
 					});
 
-					drawComponent<terrain_component>(selectedEntity, "TERRAIN", [this](terrain_component& terrain)
+					drawComponent<terrain_component>(selectedEntity, "TERRAIN", [this, &objectMovedByWidget](terrain_component& terrain)
 					{
 						if (ImGui::BeginProperties())
 						{
-							ImGui::PropertyDrag("Amplitude scale", terrain.amplitudeScale, 0.1f);
+							objectMovedByWidget |= ImGui::PropertyDrag("Amplitude scale", terrain.amplitudeScale, 0.1f);
 
 							auto& settings = terrain.genSettings;
-							ImGui::PropertyDrag("Noise scale", settings.scale, 0.001f);
-							ImGui::PropertyDrag("Domain warp strength", settings.domainWarpStrength, 0.05f);
-							ImGui::PropertySlider("Domain warp octaves", settings.domainWarpOctaves, 1, 16);
+							objectMovedByWidget |= ImGui::PropertyDrag("Noise scale", settings.scale, 0.001f);
+							objectMovedByWidget |= ImGui::PropertyDrag("Domain warp strength", settings.domainWarpStrength, 0.05f);
+							objectMovedByWidget |= ImGui::PropertySlider("Domain warp octaves", settings.domainWarpOctaves, 1, 16);
 
-							ImGui::PropertySlider("Noise octaves", settings.noiseOctaves, 1, 32);
+							objectMovedByWidget |= ImGui::PropertySlider("Noise octaves", settings.noiseOctaves, 1, 32);
 
 							ImGui::EndProperties();
 						}
