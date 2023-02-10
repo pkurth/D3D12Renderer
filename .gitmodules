@@ -9,7 +9,7 @@
 	url = ../entt.git
 [submodule "ext/directxtex"]
 	path = ext/directxtex
-	url = ../../microsoft/DirectXTex.git
+	url = ../DirectXTex.git
 [submodule "ext/yaml-cpp"]
 	path = ext/yaml-cpp
 	url = ../yaml-cpp.git
