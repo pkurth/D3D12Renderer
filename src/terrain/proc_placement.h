@@ -27,6 +27,7 @@ struct proc_placement_component
 		uint32 numMeshes;
 
 		ref<multi_mesh> meshes[4];
+		float densities[4] = { 0.25f, 0.25f, 0.25f, 0.25f };
 	};
 
 

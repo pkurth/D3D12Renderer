@@ -273,8 +273,8 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 				"Trees and rocks",
 				5.f,
 				{ 
-					loadMeshFromFile("assets/desert/palmtree0.fbx"), 
-					loadMeshFromFile("assets/desert/palmtree1.fbx"),
+					loadMeshFromFile("assets/hoewa/hoewa1.fbx"), 
+					loadMeshFromFile("assets/hoewa/hoewa2.fbx"),
 					loadMeshFromFile("assets/desert/rock1.fbx"),
 					loadMeshFromFile("assets/desert/rock4.fbx"),
 				}

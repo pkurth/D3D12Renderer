@@ -237,6 +237,13 @@ void proc_placement_component::generate(const render_camera& camera, const terra
 							float scaling = diameterInWorldSpace / footprint;
 							uint32 numGroupsPerDim = (uint32)ceil(scaling);
 
+							cb.densities = vec4(0.f);
+							for (uint32 i = 0; i < layer.numMeshes; ++i)
+							{
+								cb.densities.data[i] = layer.densities[i];
+							}
+
+							
 							cb.uvScale = 1.f / scaling;
 							cb.numMeshes = layer.numMeshes;
 							cb.globalMeshOffset = layer.globalMeshOffset;

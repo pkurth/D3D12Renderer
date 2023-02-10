@@ -157,15 +157,22 @@ namespace ImGui
 
 
 
-	float SplineValue(float p, const float* x, const float* y, uint32 numPoints);
 	bool Spline(const char* label, ImVec2 size, uint32 maxNumPoints, float* x, float* y, uint32 drawResolution = 256);
 
-#ifdef spline
-	template <uint32 maxNumPoints> bool Spline(const char* label, ImVec2 size, struct spline(float, maxNumPoints)& s, uint32 drawResolution = 256)
+	template <uint32 maxNumPoints> 
+	bool Spline(const char* label, ImVec2 size, catmull_rom_spline<float, maxNumPoints>& s, uint32 drawResolution = 256)
 	{
 		return Spline(label, size, maxNumPoints, s.ts, s.values, drawResolution);
 	}
-#endif
+
+
+	bool PropertySpline(const char* label, uint32 maxNumPoints, float* x, float* y, uint32 drawResolution = 256);
+
+	template <uint32 maxNumPoints>
+	bool PropertySpline(const char* label, catmull_rom_spline<float, maxNumPoints>& s, uint32 drawResolution = 256)
+	{
+		return PropertySpline(label, maxNumPoints, s.ts, s.values, drawResolution);
+	}
 
 	static const ImColor white(1.f, 1.f, 1.f, 1.f);
 	static const ImColor yellow(1.f, 1.f, 0.f, 1.f);

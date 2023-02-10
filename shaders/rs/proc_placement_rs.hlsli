@@ -29,6 +29,8 @@ struct placement_transform
 
 struct proc_placement_generate_points_cb
 {
+	vec4 densities;
+
 	vec3 chunkCorner;
 	float chunkSize;
 
@@ -41,7 +43,7 @@ struct proc_placement_generate_points_cb
 };
 
 #define PROC_PLACEMENT_GENERATE_POINTS_RS \
-	"RootConstants(num32BitConstants=8, b0), " \
+	"RootConstants(num32BitConstants=12, b0), " \
 	"DescriptorTable(SRV(t0, numDescriptors=2), UAV(u0, numDescriptors=2)), " \
     "StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \

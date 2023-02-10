@@ -990,7 +990,7 @@ namespace tween
 
 namespace ImGui
 {
-	float SplineValue(float p, const float* x, const float* y, uint32 numPoints)
+	static float SplineValue(float p, const float* x, const float* y, uint32 numPoints)
 	{
 		if (numPoints < 2 || !x || !y)
 		{
@@ -1326,6 +1326,15 @@ namespace ImGui
 		PopID();
 
 		return modified;
+	}
+
+	bool PropertySpline(const char* label, uint32 maxNumPoints, float* x, float* y, uint32 drawResolution)
+	{
+		pre(label);
+		float size = ImGui::GetContentRegionAvail().x;
+		bool result = ImGui::Spline("", ImVec2(size, size), maxNumPoints, x, y, drawResolution);
+		post();
+		return result;
 	}
 
 }

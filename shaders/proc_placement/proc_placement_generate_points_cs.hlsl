@@ -15,28 +15,16 @@ SamplerState clampSampler								: register(s0);
 
 
 
-groupshared uint groupCount;
-groupshared uint groupStartOffset;
-
-
 [RootSignature(PROC_PLACEMENT_GENERATE_POINTS_RS)]
 [numthreads(32, 32, 1)]
 void main(cs_input IN)
 {
-	if (IN.groupIndex == 0)
-	{
-		groupCount = 0;
-	}
-
-	GroupMemoryBarrierWithGroupSync();
-
 	float2 samplePoint = POISSON_SAMPLES[IN.groupIndex];
 	float2 uv = (samplePoint + IN.groupID.xy) * cb.uvScale;
 
 	float height = 0.f;
 	float3 normal = float3(0.f, 1.f, 0.f);
 
-	uint valid = 0;
 	if (isSaturated(uv))
 	{
 		height = heightmap.SampleLevel(clampSampler, uv, 0) * cb.amplitudeScale;
@@ -45,44 +33,50 @@ void main(cs_input IN)
 
 		if (normal.y > 0.9f)
 		{
-			valid = 1;
+			float2 xz = uv * cb.chunkSize;
+			float3 position = float3(xz.x, height, xz.y) + cb.chunkCorner;
+
+
+			float4 densities = cb.densities;
+
+
+			float densitySum = dot(densities, (float4)1.f);
+
+			densitySum = max(densitySum, 1.f); // Only normalize if we are above 1.
+			densities *= 1.f / densitySum;
+
+			vec4 unusedChannels = vec4(cb.numMeshes < 1, cb.numMeshes < 2, cb.numMeshes < 3, cb.numMeshes < 4);
+			densities += unusedChannels; // Initialize unused channels to high.
+
+			densities.y += densities.x;
+			densities.z += densities.y;
+			densities.w += densities.z;
+
+
+
+
+			float threshold = fbm(uv * 1.5f, 4).x * 0.5f + 0.5f;
+
+			float4 comparison = (float4)threshold > densities;
+			uint meshIndex = (uint)dot(comparison, comparison);
+
+			//uint meshIndex = (uint)(random(xz) * cb.numMeshes - 0.001f);
+			
+			
+			uint globalMeshIndex = cb.globalMeshOffset + meshIndex;
+
+			uint lodIndex = 0; // TODO
+
+			uint offset;
+			InterlockedAdd(pointAndMeshCount[0], 1, offset);
+			InterlockedAdd(pointAndMeshCount[globalMeshIndex], 1);
+
+			placement_point result;
+			result.position = position;
+			result.normal = normal;
+			result.meshID = globalMeshIndex;
+			result.lod = lodIndex;
+			placementPoints[offset] = result;
 		}
-	}
-
-
-	uint innerGroupIndex;
-	InterlockedAdd(groupCount, valid, innerGroupIndex);
-
-
-
-	GroupMemoryBarrierWithGroupSync();
-
-	if (IN.groupIndex == 0)
-	{
-		InterlockedAdd(pointAndMeshCount[0], groupCount, groupStartOffset);
-	}
-
-	GroupMemoryBarrierWithGroupSync();
-
-
-
-	if (valid)
-	{
-		float2 xz = uv * cb.chunkSize;
-		float3 position = float3(xz.x, height, xz.y) + cb.chunkCorner;
-
-
-		uint lodIndex = 0;
-		uint meshIndex = (uint)(random(xz) * cb.numMeshes - 0.001f);// (uint)xz.x % 2; // [0, 3].
-		uint globalMeshIndex = cb.globalMeshOffset + meshIndex;
-
-		InterlockedAdd(pointAndMeshCount[globalMeshIndex], 1);
-
-		placement_point result;
-		result.position = position;
-		result.normal = normal;
-		result.meshID = globalMeshIndex;
-		result.lod = lodIndex;
-		placementPoints[groupStartOffset + innerGroupIndex] = result;
 	}
 }

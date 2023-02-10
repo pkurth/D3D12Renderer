@@ -706,6 +706,12 @@ bool scene_editor::drawSceneHierarchy()
 								if (ImGui::BeginProperties())
 								{
 									ImGui::PropertyDrag("Footprint", layer.footprint, 0.05f);
+									for (uint32 i = 0; i < layer.numMeshes; ++i)
+									{
+										ImGui::PushID(i);
+										ImGui::PropertySlider("Density", layer.densities[i]);
+										ImGui::PopID();
+									}
 									ImGui::EndProperties();
 								}
 								ImGui::EndTree();
