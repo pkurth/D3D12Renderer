@@ -28,10 +28,9 @@ vs_output main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 	grass_blade blade = blades[instanceID];
 
 	float2 uv = grassUV(blade, vertexID, cb.numVertices);
-	float2 wind = grassWind(blade, cb.windDirection, cb.time);
-	float height = grassHeight(blade, cb.height);
-	float3 position = grassPosition(blade, uv, height, cb.halfWidth, bendSettings, wind);
-	float3 normal = grassNormal(blade, uv, cb.height, bendSettings, wind);
+	float2 wind = cb.windDirection * blade.windStrength();
+	float3 position = grassPosition(blade, uv, blade.height, cb.halfWidth, bendSettings, wind);
+	float3 normal = grassNormal(blade, uv, blade.height, bendSettings, wind);
 
 
 

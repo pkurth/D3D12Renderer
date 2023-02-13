@@ -30,11 +30,10 @@ vs_output main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 	grass_blade blade = blades[instanceID];
 
 	float2 uv = grassUV(blade, vertexID, cb.numVertices);
-	float2 wind = grassWind(blade, cb.windDirection, cb.time);
-	float height = grassHeight(blade, cb.height);
-	float3 position = grassPosition(blade, uv, height, cb.halfWidth, bendSettings, wind);
+	float2 wind = cb.windDirection * blade.windStrength();
+	float2 prevFrameWind = cb.windDirection * blade.prevFrameWindStrength();
+	float3 position = grassPosition(blade, uv, blade.height, cb.halfWidth, bendSettings, wind);
 
-	float2 prevFrameWind = grassWind(blade, cb.windDirection, cb.prevFrameTime);
 	float3 prevFramePosition = position;
 	prevFramePosition.xz += uv.y * (prevFrameWind - wind);
 

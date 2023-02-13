@@ -82,12 +82,18 @@ void main(cs_input IN)
 			{
 				uint lodIndex = cb.lodIndex;
 
+				float height = common.baseHeight + fbm(position.xz * 2.f + 10000.f, 3).x * 0.8f;
+				float windStrength = fbm(position.xz * 0.6f + common.time * 0.3f + 10000.f).x + 0.6f;
+				float prevFrameWindStrength = fbm(position.xz * 0.6f + common.prevFrameTime * 0.3f + 10000.f).x + 0.6f;
+
 				grass_blade blade;
 				blade.initialize(
 					position,
 					random(xz) * M_PI * 2.f,
 					0, // TODO: Type.
-					lod);
+					lod,
+					height,
+					windStrength, prevFrameWindStrength);
 
 				uint index;
 				InterlockedAdd(count[lodIndex], 1, index);

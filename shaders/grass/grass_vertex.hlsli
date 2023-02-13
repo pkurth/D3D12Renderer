@@ -41,20 +41,6 @@ static float2 grassUV(grass_blade blade, uint vertexID, uint numVertices)
 	return uv;
 }
 
-static float2 grassWind(grass_blade blade, float2 windDirection, float time)
-{
-	float windStrength = fbm(blade.position.xz * 0.6f + time * 0.3f + 10000.f).x + 0.6f;
-#if DISABLE_ALL_GRASS_DYNAMICS || DISABLE_WIND
-	windStrength = 0.f;
-#endif
-	return windDirection * windStrength;
-}
-
-static float grassHeight(grass_blade blade, float baseHeight)
-{
-	return baseHeight + (fbm(blade.position.xz * 2.f + 10000.f, 3).x * 0.8f);
-}
-
 static float3 grassPosition(grass_blade blade, float2 uv, float height, float halfWidth, grass_bend_settings bend, float2 wind)
 {
 	float relX = uv.x;
@@ -82,6 +68,9 @@ static float3 grassPosition(grass_blade blade, float2 uv, float height, float ha
 		facing.x * x + facing.y * z);
 
 
+#if DISABLE_ALL_GRASS_DYNAMICS || DISABLE_WIND
+	wind = float2(0.f, 0.f);
+#endif
 	position.xz += wind * relY;
 	position += blade.position;
 
@@ -108,9 +97,16 @@ static float3 grassNormal(grass_blade blade, float2 uv, float height, grass_bend
 	float z = d_zy.x;
 	float y = d_zy.y;
 
-	float d_x = height * (-facing.x * z) + wind.x;
+	float d_x = height * (-facing.x * z);
 	float d_y = height * y;
-	float d_z = height * (facing.y * z) + wind.y;
+	float d_z = height * (facing.y * z);
+
+#if DISABLE_ALL_GRASS_DYNAMICS || DISABLE_WIND
+	wind = float2(0.f, 0.f);
+#endif
+
+	d_x += wind.x;
+	d_z += wind.y;
 
 	float3 tangent = float3(facing.y, 0.f, facing.x);
 	float3 normal = cross(tangent, float3(d_x, d_y, d_z));

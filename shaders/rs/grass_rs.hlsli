@@ -8,13 +8,17 @@ struct grass_blade
     vec3 position;
     uint32 misc; // Type, lod
     vec2 facing; // sin(angle), cos(angle)
+    float height;
+    uint32 windStrength_prevWindStrength;
 
 #ifdef HLSL
-    void initialize(float3 position_, float angle, uint type, float lod)
+    void initialize(float3 position_, float angle, uint type, float lod, float height_, float windStrength, float prevFrameWindStrength)
     {
         position = position_;
         sincos(angle, facing.x, facing.y);
         misc = (type << 16) | f32tof16(lod);
+        height = height_;
+        windStrength_prevWindStrength = (f32tof16(windStrength) << 16) | f32tof16(prevFrameWindStrength);
     }
 
     uint type()
@@ -25,6 +29,16 @@ struct grass_blade
     float lod()
     {
         return f16tof32(misc & 0xFFFF);
+    }
+
+    float windStrength()
+    {
+        return f16tof32(windStrength_prevWindStrength >> 16);
+    }
+
+    float prevFrameWindStrength()
+    {
+        return f16tof32(windStrength_prevWindStrength & 0xFFFF);
     }
 #endif
 };
@@ -38,12 +52,9 @@ struct grass_draw
 struct grass_cb
 {
     vec2 windDirection;
-    float time;
-    float prevFrameTime;
 
     uint32 numVertices;
     float halfWidth;
-    float height;
 };
 
 #define GRASS_RS \
@@ -51,7 +62,7 @@ struct grass_cb
     "DENY_HULL_SHADER_ROOT_ACCESS |" \
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=7, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "RootConstants(num32BitConstants=4, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
     "SRV(t0, visibility=SHADER_VISIBILITY_VERTEX), " \
     "CBV(b1), " \
     "CBV(b2, visibility=SHADER_VISIBILITY_PIXEL), " \
@@ -108,6 +119,10 @@ struct grass_generation_common_cb
 
     float lodChangeStartDistance;
     float lodChangeEndDistance;
+
+    float time;
+    float prevFrameTime;
+    float baseHeight;
 };
 
 struct grass_generation_cb

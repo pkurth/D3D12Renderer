@@ -54,29 +54,26 @@ void initializeGrassPipelines()
 	grassCommandSignature = createCommandSignature({}, &argumentDesc, 1, sizeof(grass_draw));
 }
 
-static grass_cb createGrassCB(const grass_settings& settings, float time, float prevTime, vec2 windDirection, uint32 numVertices)
+static grass_cb createGrassCB(const grass_settings& settings, vec2 windDirection, uint32 numVertices)
 {
 	grass_cb cb;
 	cb.numVertices = numVertices;
 	cb.halfWidth = settings.bladeWidth * 0.5f;
-	cb.height = settings.bladeHeight;
-	cb.time = time;
-	cb.prevFrameTime = prevTime;
 	cb.windDirection = windDirection;
 	return cb;
 }
 
-static grass_cb createGrassCB_LOD0(const grass_settings& settings, float time, float prevTime, vec2 windDirection)
+static grass_cb createGrassCB_LOD0(const grass_settings& settings, vec2 windDirection)
 {
 	const uint32 numVerticesLOD0 = numSegmentsLOD0 * 2 + 1;
-	return createGrassCB(settings, time, prevTime, windDirection, numVerticesLOD0);
+	return createGrassCB(settings, windDirection, numVerticesLOD0);
 }
 
-static grass_cb createGrassCB_LOD1(const grass_settings& settings, float time, float prevTime, vec2 windDirection)
+static grass_cb createGrassCB_LOD1(const grass_settings& settings, vec2 windDirection)
 {
 	const uint32 numVerticesLOD0 = numSegmentsLOD0 * 2 + 1;
 	const uint32 numVerticesLOD1 = numVerticesLOD0 / 2 + 1;
-	return createGrassCB(settings, time, prevTime, windDirection, numVerticesLOD1);
+	return createGrassCB(settings, windDirection, numVerticesLOD1);
 }
 
 struct grass_render_data
@@ -86,8 +83,6 @@ struct grass_render_data
 	ref<dx_buffer> bladeBufferLOD0;
 	ref<dx_buffer> bladeBufferLOD1;
 
-	float time;
-	float prevTime;
 	vec2 windDirection;
 };
 
@@ -124,7 +119,7 @@ PIPELINE_RENDER_IMPL(grass_pipeline)
 	PROFILE_ALL(cl, "Grass");
 
 	{
-		grass_cb cb = createGrassCB_LOD0(rc.data.settings, rc.data.time, rc.data.prevTime, rc.data.windDirection);
+		grass_cb cb = createGrassCB_LOD0(rc.data.settings, rc.data.windDirection);
 		
 		cl->setRootGraphicsSRV(GRASS_RS_BLADES, rc.data.bladeBufferLOD0);
 		cl->setGraphics32BitConstants(GRASS_RS_CB, cb);
@@ -133,7 +128,7 @@ PIPELINE_RENDER_IMPL(grass_pipeline)
 	}
 
 	{
-		grass_cb cb = createGrassCB_LOD1(rc.data.settings, rc.data.time, rc.data.prevTime, rc.data.windDirection);
+		grass_cb cb = createGrassCB_LOD1(rc.data.settings, rc.data.windDirection);
 
 		cl->setRootGraphicsSRV(GRASS_RS_BLADES, rc.data.bladeBufferLOD1);
 		cl->setGraphics32BitConstants(GRASS_RS_CB, cb);
@@ -170,7 +165,7 @@ DEPTH_ONLY_RENDER_IMPL(grass_depth_prepass_pipeline)
 	cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_OBJECT_ID, rc.objectID);
 
 	{
-		grass_cb cb = createGrassCB_LOD0(rc.data.settings, rc.data.time, rc.data.prevTime, rc.data.windDirection);
+		grass_cb cb = createGrassCB_LOD0(rc.data.settings, rc.data.windDirection);
 
 		cl->setRootGraphicsSRV(GRASS_DEPTH_ONLY_RS_BLADES, rc.data.bladeBufferLOD0);
 		cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_CB, cb);
@@ -179,7 +174,7 @@ DEPTH_ONLY_RENDER_IMPL(grass_depth_prepass_pipeline)
 	}
 
 	{
-		grass_cb cb = createGrassCB_LOD1(rc.data.settings, rc.data.time, rc.data.prevTime, rc.data.windDirection);
+		grass_cb cb = createGrassCB_LOD1(rc.data.settings, rc.data.windDirection);
 
 		cl->setRootGraphicsSRV(GRASS_DEPTH_ONLY_RS_BLADES, rc.data.bladeBufferLOD1);
 		cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_CB, cb);
@@ -255,6 +250,9 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 			common.lodChangeStartDistance = settings.lodChangeStartDistance;
 			common.lodChangeEndDistance = lodChangeEndDistance;
 			common.uvScale = 1.f / numGrassBladesPerDim;
+			common.baseHeight = settings.bladeHeight;
+			common.time = time;
+			common.prevFrameTime = prevTime;
 
 			auto commonCBV = dxContext.uploadDynamicConstantBuffer(common);
 			cl->setComputeDynamicConstantBuffer(GRASS_GENERATION_RS_COMMON, commonCBV);
@@ -340,6 +338,6 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 
 void grass_component::render(opaque_render_pass* renderPass, uint32 entityID)
 {
-	grass_render_data data = { settings, drawBuffer, bladeBufferLOD0, bladeBufferLOD1, time, prevTime, windDirection };
+	grass_render_data data = { settings, drawBuffer, bladeBufferLOD0, bladeBufferLOD1, windDirection };
 	renderPass->renderObject<grass_pipeline, grass_depth_prepass_pipeline>(data, data, entityID);
 }
