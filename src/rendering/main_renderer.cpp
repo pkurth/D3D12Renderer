@@ -63,7 +63,7 @@ void main_renderer::initialize(color_depth colorDepth, uint32 windowWidth, uint3
 
 
 	depthStencilBuffer = createDepthTexture(renderWidth, renderHeight, depthStencilFormat);
-	opaqueDepthBuffer = createDepthTexture(renderWidth, renderHeight, depthStencilFormat, 1, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	opaqueDepthBuffer = createDepthTexture(renderWidth, renderHeight, depthStencilFormat, 1, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	D3D12_RESOURCE_DESC linearDepthDesc = CD3DX12_RESOURCE_DESC::Tex2D(linearDepthFormat, renderWidth, renderHeight, 1,
 		6, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 	linearDepthBuffer = createTexture(linearDepthDesc, 0, 0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
@@ -381,6 +381,7 @@ void main_renderer::endFrame(const user_input* input)
 	commonRenderData.lightingCBV = lightingCBV;
 	commonRenderData.lightProbeIrradiance = (environment && environment->giMode == environment_gi_raytraced) ? environment->lightProbeGrid.irradiance : 0;
 	commonRenderData.lightProbeDepth = (environment && environment->giMode == environment_gi_raytraced) ? environment->lightProbeGrid.depth : 0;
+	commonRenderData.opaqueColor = hdrPostProcessingTexture;
 	commonRenderData.opaqueDepth = opaqueDepthBuffer;
 	commonRenderData.worldNormalsAndRoughness = worldNormalsRoughnessTexture;
 
@@ -696,7 +697,7 @@ void main_renderer::endFrame(const user_input* input)
 			PROFILE_ALL(cl, "Render thread 3");
 
 			barrier_batcher(cl)
-				.transition(opaqueDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+				.transition(opaqueDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
 
 			{
 				PROFILE_ALL(cl, "Copy depth buffer");
@@ -704,7 +705,7 @@ void main_renderer::endFrame(const user_input* input)
 			}
 
 			barrier_batcher(cl)
-				.transition(opaqueDepthBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+				.transition(opaqueDepthBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 
 
@@ -718,8 +719,20 @@ void main_renderer::endFrame(const user_input* input)
 
 			if (transparentRenderPass && transparentRenderPass->pass.size() > 0)
 			{
+				// There are some really ugly barriers in this scope.
+
 				barrier_batcher(cl)
-					.transition(hdrResult, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
+					.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST)
+					.transition(hdrResult, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+				{
+					DX_PROFILE_BLOCK(cl, "Copy opaque color");
+					cl->copyResource(hdrResult->resource, hdrPostProcessingTexture->resource);
+				}
+
+				barrier_batcher(cl)
+					.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
+					.transition(hdrResult, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET)
 					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 				auto hdrTransparentRenderTarget = dx_render_target(renderWidth, renderHeight)
@@ -729,6 +742,7 @@ void main_renderer::endFrame(const user_input* input)
 				transparentLightPass(cl, hdrTransparentRenderTarget, transparentRenderPass, commonRenderData, unjitteredCamera.viewProj);
 
 				barrier_batcher(cl)
+					.transition(hdrPostProcessingTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 					.transition(hdrResult, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 					.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ);
 			}

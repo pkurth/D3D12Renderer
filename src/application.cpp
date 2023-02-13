@@ -21,6 +21,7 @@
 #include "terrain/heightmap_collider.h"
 #include "terrain/proc_placement.h"
 #include "terrain/grass.h"
+#include "terrain/water.h"
 
 
 static raytracing_object_type defineBlasFromMesh(const ref<multi_mesh>& mesh)
@@ -264,7 +265,8 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		uint32 numTerrainChunks = 10;
 		float terrainChunkSize = 64.f;
 
-		auto terrainGroundMaterial = createPBRMaterial("assets/terrain/ground/Ground037_2K_Color.png", "assets/terrain/ground/Ground037_2K_NormalDX.png", "assets/terrain/ground/Ground037_2K_Roughness.png", {});
+		auto terrainGroundMaterial = createPBRMaterial("assets/terrain/ground/Grass002_2K_Color.png", "assets/terrain/ground/Grass002_2K_NormalDX.png", "assets/terrain/ground/Grass002_2K_Roughness.png", {},
+			vec4(0.f), vec4(1.f), 1.f, 0.f, false, 1.f, true);
 		auto terrainRockMaterial = createPBRMaterial("assets/terrain/rock/Rock034_2K_Color.png", "assets/terrain/rock/Rock034_2K_NormalDX.png", "assets/terrain/rock/Rock034_2K_Roughness.png", {});
 
 		std::vector<proc_placement_layer_desc> layers =
@@ -288,6 +290,10 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			//.addComponent<proc_placement_component>(layers)
 			.addComponent<grass_component>()
 			;
+
+		auto water = scene.createEntity("Water")
+			.addComponent<position_component>(vec3(0.f, -20.f, 0.f))
+			.addComponent<water_component>();
 	}
 #endif
 
@@ -630,6 +636,12 @@ void application::update(const user_input& input, float dt)
 		for (auto [entityHandle, terrain, position] : scene.group(entt::get<terrain_component, position_component>).each())
 		{
 			terrain.render(this->scene.camera, &opaqueRenderPass, sunShadowRenderPass.copyFromStaticCache ? 0 : &sunShadowRenderPass, position.position, (uint32)entityHandle);
+		}
+
+
+		for (auto [entityHandle, water, position] : scene.group(entt::get<water_component, position_component>).each())
+		{
+			water.render(this->scene.camera, &transparentRenderPass, position.position, (uint32)entityHandle);
 		}
 
 

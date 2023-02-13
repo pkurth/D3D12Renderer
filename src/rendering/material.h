@@ -35,6 +35,7 @@ struct common_render_data
 	ref<dx_texture> volumetricsTexture;
 
 	// These two are only set, if the material is rendered after the opaque pass.
+	ref<dx_texture> opaqueColor;
 	ref<dx_texture> opaqueDepth;
 	ref<dx_texture> worldNormalsAndRoughness;
 

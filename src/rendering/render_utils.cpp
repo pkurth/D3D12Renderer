@@ -17,6 +17,7 @@
 #include "terrain/terrain.h"
 #include "terrain/proc_placement.h"
 #include "terrain/grass.h"
+#include "terrain/water.h"
 
 
 // Defined in render_algorithms.cpp.
@@ -36,6 +37,7 @@ void initializeRenderUtils()
 	initializeRTReflectionsPipelines();
 	initializeProceduralPlacementPipelines();
 	initializeGrassPipelines();
+	initializeWaterPipelines();
 	loadCommonShaders();
 
 	debug_simple_pipeline::initialize();
