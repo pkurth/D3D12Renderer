@@ -1,15 +1,11 @@
+#include "water_rs.hlsli"
+#include "camera.hlsli"
 
-#define WATER_RS \
-	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
-    "DENY_HULL_SHADER_ROOT_ACCESS |" \
-    "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
-    "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
-    "DescriptorTable(SRV(t0, numDescriptors=2), visibility=SHADER_VISIBILITY_PIXEL)," \
+ConstantBuffer<water_cb> cb			: register(b1);
+ConstantBuffer<camera_cb> camera	: register(b2);
 
-
-Texture2D<float4> opaqueColor   : register(t0);
-Texture2D<float> opaqueDepth    : register(t1);
+Texture2D<float4> opaqueColor		: register(t0);
+Texture2D<float> opaqueDepth		: register(t1);
 
 
 struct ps_input
@@ -21,5 +17,16 @@ struct ps_input
 [RootSignature(WATER_RS)]
 float4 main(ps_input IN) : SV_TARGET
 {
-	return opaqueColor[uint2(IN.screenPosition.xy)] * float4(0.f, 0.f, 1.f, 1.f);
+	uint2 screen = uint2(IN.screenPosition.xy);
+	float4 backgroundColor = opaqueColor[screen];
+	float backgroundDepth = camera.depthBufferDepthToEyeDepth(opaqueDepth[screen]);
+	float thisDepth = camera.depthBufferDepthToEyeDepth(IN.screenPosition.z);
+
+	float waterDepth = backgroundDepth - thisDepth;
+
+	float t = smoothstep(0.f, cb.transition, waterDepth);
+
+	float4 color = lerp(cb.shallowColor, cb.deepColor, t);
+
+	return float4(color.xyz, 1.f) * backgroundColor;
 }

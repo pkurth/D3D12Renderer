@@ -11,6 +11,7 @@
 
 #include "geometry/mesh_builder.h"
 
+#include "water_rs.hlsli"
 #include "transform.hlsli"
 
 
@@ -39,6 +40,8 @@ void initializeWaterPipelines()
 struct water_render_data
 {
 	mat4 m;
+
+	water_settings settings;
 };
 
 struct water_pipeline
@@ -56,15 +59,22 @@ PIPELINE_SETUP_IMPL(water_pipeline)
 
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	
-	cl->setDescriptorHeapSRV(1, 0, common.opaqueColor);
-	cl->setDescriptorHeapSRV(1, 1, common.opaqueDepth);
+	cl->setGraphicsDynamicConstantBuffer(WATER_RS_CAMERA, common.cameraCBV);
+	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 0, common.opaqueColor);
+	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 1, common.opaqueDepth);
 }
 
 PIPELINE_RENDER_IMPL(water_pipeline)
 {
 	PROFILE_ALL(cl, "Water");
 
-	cl->setGraphics32BitConstants(0, viewProj * rc.data.m);
+	water_cb cb;
+	cb.deepColor = vec4(rc.data.settings.deepWaterColor, 1.f);
+	cb.shallowColor = vec4(rc.data.settings.shallowWaterColor, 1.f);
+	cb.transition = rc.data.settings.transition;
+
+	cl->setGraphics32BitConstants(WATER_RS_TRANSFORM, viewProj * rc.data.m);
+	cl->setGraphics32BitConstants(WATER_RS_SETTINGS, cb);
 	cl->setVertexBuffer(0, waterMesh.vertexBuffer.positions);
 	cl->setIndexBuffer(waterMesh.indexBuffer);
 	cl->drawIndexed(waterSubmesh.numIndices, 1, 0, 0, 0);
@@ -72,5 +82,5 @@ PIPELINE_RENDER_IMPL(water_pipeline)
 
 void water_component::render(const render_camera& camera, transparent_render_pass* renderPass, vec3 positionOffset, uint32 entityID)
 {
-	renderPass->renderObject<water_pipeline>({ createModelMatrix(positionOffset, quat::identity) });
+	renderPass->renderObject<water_pipeline>({ createModelMatrix(positionOffset, quat::identity), settings });
 }

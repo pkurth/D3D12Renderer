@@ -17,6 +17,7 @@
 #include "terrain/terrain.h"
 #include "terrain/proc_placement.h"
 #include "terrain/grass.h"
+#include "terrain/water.h"
 
 #include <fontawesome/list.h>
 
@@ -733,7 +734,19 @@ bool scene_editor::drawSceneHierarchy()
 							ImGui::PropertyDrag("LOD change transition distance", grass.settings.lodChangeTransitionDistance, 0.5f);
 							ImGui::EndProperties();
 						}
+					});
 
+					drawComponent<water_component>(selectedEntity, "WATER", [this](water_component& water)
+					{
+						if (ImGui::BeginProperties())
+						{
+							ImGui::PropertyColor("Deep color", water.settings.deepWaterColor);
+							ImGui::PropertyColor("Shallow color", water.settings.shallowWaterColor);
+
+							ImGui::PropertyDrag("Transition", water.settings.transition, 0.05f);
+
+							ImGui::EndProperties();
+						}
 					});
 
 					drawComponent<animation_component>(selectedEntity, "ANIMATION", [this](animation_component& anim)
