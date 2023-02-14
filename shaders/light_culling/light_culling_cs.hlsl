@@ -205,9 +205,9 @@ static uint getLightMask(float sphereCenterDepth, float radius, float depthRange
 #define groupAppendDecal(type, index)                               \
     {                                                               \
         const uint v = MAX_NUM_TOTAL_DECALS - index - 1;            \
-        const uint bucket = v >> 5;                                 \
-        const uint bit = v & ((1 << 5) - 1);                        \
-        InterlockedOr(groupObjectsList##type[bucket], 1 << bit);    \
+        const uint bucket = v >> 5u;                                \
+        const uint bit = v & ((1u << 5u) - 1);                      \
+        InterlockedOr(groupObjectsList##type[bucket], 1u << bit);   \
     }
 
 #define groupAppendLightOpaque(index) groupAppendLight(Opaque, index)
@@ -279,7 +279,7 @@ void main(cs_input IN)
 
     const float depthRangeRecip = 31.f / (farZ - nearZ);
     const uint depthMaskIndex = max(0, min(31, floor((myZ - nearZ) * depthRangeRecip)));
-    InterlockedOr(groupTileDepthMask, 1 << depthMaskIndex);
+    InterlockedOr(groupTileDepthMask, 1u << depthMaskIndex);
 
 
     const light_culling_frustum_plane cameraNearPlane = {  forward,  dot(forward, cameraPos + camera.projectionParams.x * forward) };

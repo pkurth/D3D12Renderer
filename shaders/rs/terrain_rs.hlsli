@@ -2,8 +2,8 @@
 #define TERRAIN_RS_HLSLI
 
 // Must match heightmap_collider.h
-#define TERRAIN_LOD_0_VERTICES_PER_DIMENSION 129
-#define TERRAIN_MAX_LOD 5
+#define TERRAIN_LOD_0_VERTICES_PER_DIMENSION 129u
+#define TERRAIN_MAX_LOD 5u
 
 
 struct terrain_cb

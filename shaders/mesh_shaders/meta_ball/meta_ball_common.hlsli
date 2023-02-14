@@ -7,7 +7,7 @@ static const uint MAX_BALL_COUNT = 128;
 static const uint BALL_COUNT = DEFAULT_BALL_COUNT;
 static const uint SHIFT = DEFAULT_SHIFT;
 
-#define GRID_SIZE (1 << SHIFT)
+#define GRID_SIZE (1u << SHIFT)
 #define STEP_SIZE (1.f / float(GRID_SIZE))
 
 struct constant_cb

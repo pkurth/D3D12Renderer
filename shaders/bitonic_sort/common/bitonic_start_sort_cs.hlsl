@@ -36,7 +36,7 @@ RWStructuredBuffer<D3D12_DISPATCH_ARGUMENTS> dispatch	: register(u0);
 
 uint nextPowerOfTwo(uint i)
 {
-	uint mask = (1 << firstbithigh(i)) - 1;
+	uint mask = (1u << firstbithigh(i)) - 1;
 	return (i + mask) & ~mask;
 }
 
@@ -50,7 +50,7 @@ void main(cs_input IN)
 	}
 
 	uint listCount = counterBuffer[cb.counterOffset];
-	uint k = 2048 << IN.groupIndex;
+	uint k = 2048u << IN.groupIndex;
 
 	// We need one more iteration every time the number of thread groups doubles.
 	if (k > nextPowerOfTwo((listCount + 2047) & ~2047))

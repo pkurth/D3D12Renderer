@@ -5,7 +5,7 @@
 
 static uint getMask(uint isBorder, uint scaleDownByLOD)
 {
-	return ~0 << (scaleDownByLOD * isBorder);
+	return ~0u << (scaleDownByLOD * isBorder);
 }
 
 #define ENSURE_CONSISTENT_ORIENTATION 1
@@ -40,8 +40,8 @@ static void terrainVertexPosition(terrain_cb terrain, uint vertexID, Texture2D<f
 
 #if ENSURE_CONSISTENT_ORIENTATION
 	// Offset shifted vertices to next neighbor.
-	x += shiftedTop * (1 << scaleDownByLOD_top);
-	z += shiftedRight * (1 << scaleDownByLOD_right);
+	x += shiftedTop * (1u << scaleDownByLOD_top);
+	z += shiftedRight * (1u << scaleDownByLOD_right);
 #endif
 
 

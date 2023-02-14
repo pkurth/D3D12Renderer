@@ -143,7 +143,7 @@ ps_output main(ps_input IN)
 		while (bucket)
 		{
 			const uint indexOfLowestSetBit = firstbitlow(bucket);
-			bucket ^= 1 << indexOfLowestSetBit; // Unset this bit.
+			bucket ^= 1u << indexOfLowestSetBit; // Unset this bit.
 
 			uint decalIndex = decalBucketIndex * 32 + indexOfLowestSetBit;
 			decalIndex = MAX_NUM_TOTAL_DECALS - decalIndex - 1; // Reverse of operation in culling shader.

@@ -3,7 +3,7 @@
 static const uint DEFAULT_SHIFT = 7;
 static const uint SHIFT = DEFAULT_SHIFT;
 
-#define GRID_SIZE (1 << SHIFT)
+#define GRID_SIZE (1u << SHIFT)
 #define STEP_SIZE (1.f / float(GRID_SIZE))
 
 // From here: https://www.shadertoy.com/view/sdtcR2

@@ -7,7 +7,7 @@
 
 #ifndef TERRAIN_LOD_0_VERTICES_PER_DIMENSION
 // Must match terrain_rs.hlsli
-#define TERRAIN_LOD_0_VERTICES_PER_DIMENSION 129
+#define TERRAIN_LOD_0_VERTICES_PER_DIMENSION 129u
 #endif
 
 struct heightmap_collider_chunk

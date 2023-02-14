@@ -55,7 +55,7 @@ void main(
 
 		if (accept)
 		{
-			uint index = countbits(ballot.x & ((1 << groupThreadID) - 1));
+			uint index = countbits(ballot.x & ((1u << groupThreadID) - 1));
 
 			// Output a linear meshlet ID for the mesh shader.
 			uint meshletID = ((((miZ + z) << SHIFT) + miY + y) << SHIFT) + miX + x;

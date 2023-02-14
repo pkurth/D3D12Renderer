@@ -20,7 +20,7 @@ vs_output main(vs_input IN)
 {
 	vs_output OUT;
 
-	uint b = 1 << IN.vertexID;
+	uint b = 1u << IN.vertexID;
 	float3 pos = float3(
 		(0x287a & b) != 0, 
 		(0x02af & b) != 0, 
