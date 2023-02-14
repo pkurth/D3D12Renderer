@@ -128,7 +128,7 @@ void main(cs_input IN)
 
 	if (centerPos.z < -1000.f)
 	{
-		resultTexture[IN.dispatchThreadID.xy] = 0.f;
+		resultTexture[IN.dispatchThreadID.xy] = 1.f;
 		return;
 	}
 

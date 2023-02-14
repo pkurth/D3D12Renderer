@@ -31,7 +31,10 @@ static constexpr DXGI_FORMAT sssFormat = DXGI_FORMAT_R8_UNORM;
 static constexpr DXGI_FORMAT shadowDepthFormat = DXGI_FORMAT_D16_UNORM;
 
 
-static constexpr DXGI_FORMAT opaqueLightPassFormats[] = { hdrFormat, worldNormalsRoughnessFormat };
+static constexpr DXGI_FORMAT opaqueLightPassFormats[] = { hdrFormat, worldNormalsRoughnessFormat, screenVelocitiesFormat, objectIDsFormat };
+static constexpr uint32 OPQAUE_LIGHT_PASS_FULL = arraysize(opaqueLightPassFormats);
+static constexpr uint32 OPQAUE_LIGHT_PASS_NO_VELOCITIES_NO_OBJECT_ID = 2;
+
 static constexpr DXGI_FORMAT transparentLightPassFormats[] = { hdrFormat };
 static constexpr DXGI_FORMAT skyPassFormats[] = { hdrFormat, screenVelocitiesFormat, objectIDsFormat };
 static constexpr DXGI_FORMAT depthOnlyFormat[] = { screenVelocitiesFormat, objectIDsFormat };

@@ -723,6 +723,8 @@ bool scene_editor::drawSceneHierarchy()
 					{
 						if (ImGui::BeginProperties())
 						{
+							ImGui::PropertyCheckbox("Depth prepass", grass_settings::depthPrepass);
+
 							ImGui::PropertyDrag("Blades per chunk dim", grass.settings.numGrassBladesPerChunkDim, 2);
 							ImGui::PropertySlider("Blade height", grass.settings.bladeHeight, 0.f, 2.f);
 							ImGui::PropertySlider("Blade width", grass.settings.bladeWidth, 0.f, 1.f);

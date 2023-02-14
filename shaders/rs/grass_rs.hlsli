@@ -57,6 +57,13 @@ struct grass_cb
     float halfWidth;
 };
 
+#ifdef NO_DEPTH_PREPASS
+#define GRASS_OBJECT_ID ", RootConstants(num32BitConstants=1, b3, visibility=SHADER_VISIBILITY_PIXEL)"
+#else
+#define GRASS_OBJECT_ID ""
+#endif
+
+
 #define GRASS_RS \
 	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
     "DENY_HULL_SHADER_ROOT_ACCESS |" \
@@ -78,13 +85,15 @@ struct grass_cb
         "addressV = TEXTURE_ADDRESS_CLAMP," \
         "addressW = TEXTURE_ADDRESS_CLAMP," \
         "filter = FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT," \
-        "visibility=SHADER_VISIBILITY_PIXEL)"
+        "visibility=SHADER_VISIBILITY_PIXEL)" \
+    GRASS_OBJECT_ID
 
 #define GRASS_RS_CB                 0
 #define GRASS_RS_BLADES             1
 #define GRASS_RS_CAMERA             2
 #define GRASS_RS_LIGHTING           3
 #define GRASS_RS_FRAME_CONSTANTS    4
+#define GRASS_RS_OBJECT_ID          5
 
 
 #define GRASS_DEPTH_ONLY_RS \

@@ -57,11 +57,11 @@ print("Windows SDK version: ", sdk_version)
 print("Installed GPU: ", gpu_name)
 
 
-if win_version < sdk_version then
-	term.pushColor(term.warningColor)
-	print("Your Windows SDK is newer than your Windows OS. Consider updating your OS or there might be compatability issues.")
-	term.popColor()
-end
+--if win_version < sdk_version then
+--	term.pushColor(term.warningColor)
+--	print("Your Windows SDK is newer than your Windows OS. Consider updating your OS or there might be compatability issues.")
+--	term.popColor()
+--end
 
 local turing_or_higher = gpu_model_number >= 1650
 

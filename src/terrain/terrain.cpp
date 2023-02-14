@@ -88,7 +88,7 @@ void initializeTerrainPipelines()
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
 			//.wireframe()
-			.renderTargets(opaqueLightPassFormats, arraysize(opaqueLightPassFormats), depthStencilFormat)
+			.renderTargets(opaqueLightPassFormats, OPQAUE_LIGHT_PASS_NO_VELOCITIES_NO_OBJECT_ID, depthStencilFormat)
 			.depthSettings(true, false, D3D12_COMPARISON_FUNC_EQUAL);
 
 		terrainPipeline = createReloadablePipeline(desc, { "terrain_vs", "terrain_ps" });

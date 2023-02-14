@@ -5,6 +5,8 @@
 
 struct grass_settings
 {
+	static inline bool depthPrepass = true;
+
 	float bladeHeight = 1.f;
 	float bladeWidth = 0.05f; 
 	uint32 numGrassBladesPerChunkDim = 350;

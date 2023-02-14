@@ -3,6 +3,7 @@
 #include "lighting.hlsli"
 #include "normal.hlsli"
 #include "brdf.hlsli"
+#include "depth_only_rs.hlsli"
 
 ConstantBuffer<camera_cb> camera		: register(b1);
 ConstantBuffer<lighting_cb> lighting	: register(b2);
@@ -22,6 +23,10 @@ SamplerState clampSampler						: register(s0);
 SamplerComparisonState shadowSampler			: register(s1);
 
 
+#ifdef NO_DEPTH_PREPASS
+ConstantBuffer<depth_only_object_id_cb> id		: register(b3);
+#endif
+
 
 struct ps_input
 {
@@ -29,6 +34,11 @@ struct ps_input
 	float3 normal			: NORMAL;
 	float3 tangent			: TANGENT;
 	float3 worldPosition	: POSITION;
+
+#ifdef NO_DEPTH_PREPASS
+	float3 ndc				: NDC;
+	float3 prevFrameNDC		: PREV_FRAME_NDC;
+#endif
 
 	float4 screenPosition	: SV_POSITION;
 	bool isFrontFace		: SV_IsFrontFace;
@@ -39,6 +49,11 @@ struct ps_output
 {
 	float4 hdrColor				: SV_Target0;
 	float4 worldNormalRoughness	: SV_Target1;
+
+#ifdef NO_DEPTH_PREPASS
+	float2 screenVelocity		: SV_Target2;
+	uint objectID				: SV_Target3;
+#endif
 };
 
 [earlydepthstencil]
@@ -133,10 +148,18 @@ ps_output main(ps_input IN)
 	totalLighting.specular += specular * lighting.globalIlluminationIntensity * ao;
 
 
+	surface.roughness = 1.f;
 
 	ps_output OUT;
 	OUT.hdrColor = totalLighting.evaluate(surface.albedo);
 	OUT.worldNormalRoughness = float4(packNormal(surface.N), surface.roughness, 0.f);
+
+
+#ifdef NO_DEPTH_PREPASS
+	OUT.screenVelocity = screenSpaceVelocity(IN.ndc, IN.prevFrameNDC, camera.jitter, camera.prevFrameJitter);
+	OUT.objectID = id.id;
+#endif
+
 	return OUT;
 
 }

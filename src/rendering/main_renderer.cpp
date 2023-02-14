@@ -560,27 +560,6 @@ void main_renderer::endFrame(const user_input* input)
 			}
 
 
-
-			// Copy hovered object id to readback buffer.
-			if (objectIDsTexture && input)
-			{
-				windowHovered = input->overWindow
-					&& (input->mouse.x - windowXOffset >= 0)
-					&& (input->mouse.x - windowXOffset < (int32)renderWidth)
-					&& (input->mouse.y - windowYOffset >= 0)
-					&& (input->mouse.y - windowYOffset < (int32)renderHeight);
-
-				if (windowHovered)
-				{
-					PROFILE_ALL(cl, "Copy hovered object ID");
-
-					cl->transitionBarrier(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-					cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer, dxContext.bufferedFrameID, input->mouse.x - windowXOffset, input->mouse.y - windowYOffset, 1, 1);
-					cl->transitionBarrier(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
-				}
-			}
-
-
 			barrier_batcher(cl)
 				.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ);
 
@@ -665,12 +644,15 @@ void main_renderer::endFrame(const user_input* input)
 			// ----------------------------------------
 
 			barrier_batcher(cl)
-				.transition(worldNormalsRoughnessTexture, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET);
+				.transition(worldNormalsRoughnessTexture, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET)
+				.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 
 			auto hdrOpaqueRenderTarget = dx_render_target(renderWidth, renderHeight)
 				.colorAttachment(hdrColorTexture)
 				.colorAttachment(worldNormalsRoughnessTexture)
+				.colorAttachment(screenVelocitiesTexture, render_resources::nullScreenVelocitiesRTV)
+				.colorAttachment(objectIDsTexture, render_resources::nullObjectIDsRTV)
 				.depthAttachment(depthStencilBuffer);
 
 			opaqueLightPass(cl, hdrOpaqueRenderTarget, opaqueRenderPass, commonRenderData, jitteredCamera.viewProj);
@@ -680,7 +662,30 @@ void main_renderer::endFrame(const user_input* input)
 				.transition(hdrColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
 				.transition(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ)
 				.transition(worldNormalsRoughnessTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ)
+				.transition(screenVelocitiesTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ)
 				.transition(frameResult, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+
+
+
+			// Copy hovered object id to readback buffer.
+			if (objectIDsTexture && input)
+			{
+				windowHovered = input->overWindow
+					&& (input->mouse.x - windowXOffset >= 0)
+					&& (input->mouse.x - windowXOffset < (int32)renderWidth)
+					&& (input->mouse.y - windowYOffset >= 0)
+					&& (input->mouse.y - windowYOffset < (int32)renderHeight);
+
+				if (windowHovered)
+				{
+					PROFILE_ALL(cl, "Copy hovered object ID");
+
+					cl->transitionBarrier(objectIDsTexture, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+					cl->copyTextureRegionToBuffer(objectIDsTexture, hoveredObjectIDReadbackBuffer, dxContext.bufferedFrameID, input->mouse.x - windowXOffset, input->mouse.y - windowYOffset, 1, 1);
+					cl->transitionBarrier(objectIDsTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+				}
+			}
 
 
 			cl2 = cl;

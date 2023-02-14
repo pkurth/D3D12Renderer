@@ -13,6 +13,11 @@ struct vs_output
 	float3 tangent			: TANGENT;
 	float3 worldPosition	: POSITION;
 
+#ifdef NO_DEPTH_PREPASS
+	float3 ndc				: NDC;
+	float3 prevFrameNDC		: PREV_FRAME_NDC;
+#endif
+
 	float4 position : SV_POSITION;
 };
 
@@ -40,5 +45,15 @@ vs_output main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 	OUT.tangent = float3(blade.facing.y, 0.f, blade.facing.x);
 	OUT.worldPosition = position;
 	OUT.position = mul(camera.viewProj, float4(position, 1.f));
+
+#ifdef NO_DEPTH_PREPASS
+	float2 prevFrameWind = cb.windDirection * blade.prevFrameWindStrength();
+	float3 prevFramePosition = position;
+	prevFramePosition.xz += uv.y * (prevFrameWind - wind);
+
+	OUT.ndc = OUT.position.xyw;
+	OUT.prevFrameNDC = mul(camera.prevFrameViewProj, float4(prevFramePosition, 1.f)).xyw;
+#endif
+
 	return OUT;
 }
