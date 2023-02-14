@@ -98,18 +98,10 @@ struct grass_render_data
 	uint32 objectID;
 };
 
-struct grass_pipeline
+static void setup(dx_command_list* cl, const common_render_data& common, const dx_pipeline& pipeline)
 {
-	using render_data_t = grass_render_data;
-
-	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
-};
-
-PIPELINE_SETUP_IMPL(grass_pipeline)
-{
-	cl->setPipelineState(*grassPipeline.pipeline);
-	cl->setGraphicsRootSignature(*grassPipeline.rootSignature);
+	cl->setPipelineState(*pipeline.pipeline);
+	cl->setGraphicsRootSignature(*pipeline.rootSignature);
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 	cl->setGraphicsDynamicConstantBuffer(GRASS_RS_CAMERA, common.cameraCBV);
 	cl->setGraphicsDynamicConstantBuffer(GRASS_RS_LIGHTING, common.lightingCBV);
@@ -126,132 +118,84 @@ PIPELINE_SETUP_IMPL(grass_pipeline)
 	cl->setDescriptorHeapSRV(GRASS_RS_FRAME_CONSTANTS, 6, common.ssrTexture ? common.ssrTexture->defaultSRV : nullTexture);
 }
 
-PIPELINE_RENDER_IMPL(grass_pipeline)
+static void render(dx_command_list* cl, const grass_render_data& data, uint32 cbRootParameterIndex, uint32 bladeRootParameterIndex)
 {
-	PROFILE_ALL(cl, "Grass");
-
 	{
-		grass_cb cb = createGrassCB_LOD0(rc.data.settings, rc.data.windDirection);
-		
-		cl->setRootGraphicsSRV(GRASS_RS_BLADES, rc.data.bladeBufferLOD0);
-		cl->setGraphics32BitConstants(GRASS_RS_CB, cb);
+		grass_cb cb = createGrassCB_LOD0(data.settings, data.windDirection);
 
-		cl->drawIndirect(grassCommandSignature, 1, rc.data.drawBuffer, 0 * sizeof(grass_draw));
+		cl->setRootGraphicsSRV(bladeRootParameterIndex, data.bladeBufferLOD0);
+		cl->setGraphics32BitConstants(cbRootParameterIndex, cb);
+
+		cl->drawIndirect(grassCommandSignature, 1, data.drawBuffer, 0 * sizeof(grass_draw));
 	}
 
 	{
-		grass_cb cb = createGrassCB_LOD1(rc.data.settings, rc.data.windDirection);
+		grass_cb cb = createGrassCB_LOD1(data.settings, data.windDirection);
 
-		cl->setRootGraphicsSRV(GRASS_RS_BLADES, rc.data.bladeBufferLOD1);
-		cl->setGraphics32BitConstants(GRASS_RS_CB, cb);
+		cl->setRootGraphicsSRV(bladeRootParameterIndex, data.bladeBufferLOD1);
+		cl->setGraphics32BitConstants(cbRootParameterIndex, cb);
 
-		cl->drawIndirect(grassCommandSignature, 1, rc.data.drawBuffer, 1 * sizeof(grass_draw));
+		cl->drawIndirect(grassCommandSignature, 1, data.drawBuffer, 1 * sizeof(grass_draw));
 	}
 }
 
+struct grass_pipeline
+{
+	using render_data_t = grass_render_data;
 
+	PIPELINE_SETUP_DECL
+	{
+		::setup(cl, common, grassPipeline);
+	}
+
+	PIPELINE_RENDER_DECL
+	{
+		PROFILE_ALL(cl, "Grass");
+		::render(cl, rc.data, GRASS_RS_CB, GRASS_RS_BLADES);
+	}
+};
 
 struct grass_depth_prepass_pipeline
 {
 	using render_data_t = grass_render_data;
 
-	PIPELINE_SETUP_DECL;
-	DEPTH_ONLY_RENDER_DECL;
+	PIPELINE_SETUP_DECL
+	{
+		cl->setPipelineState(*grassDepthOnlyPipeline.pipeline);
+		cl->setGraphicsRootSignature(*grassDepthOnlyPipeline.rootSignature);
+		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+		depth_only_camera_jitter_cb jitterCB = { common.cameraJitter, common.prevFrameCameraJitter };
+		cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
+		cl->setGraphicsDynamicConstantBuffer(GRASS_DEPTH_ONLY_RS_CAMERA, common.cameraCBV);
+	}
+
+	DEPTH_ONLY_RENDER_DECL
+	{
+		PROFILE_ALL(cl, "Grass depth prepass");
+
+		cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_OBJECT_ID, rc.objectID);
+		::render(cl, rc.data, GRASS_DEPTH_ONLY_RS_CB, GRASS_DEPTH_ONLY_RS_BLADES);
+	}
 };
-
-PIPELINE_SETUP_IMPL(grass_depth_prepass_pipeline)
-{
-	cl->setPipelineState(*grassDepthOnlyPipeline.pipeline);
-	cl->setGraphicsRootSignature(*grassDepthOnlyPipeline.rootSignature);
-	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-
-	depth_only_camera_jitter_cb jitterCB = { common.cameraJitter, common.prevFrameCameraJitter };
-	cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
-	cl->setGraphicsDynamicConstantBuffer(GRASS_DEPTH_ONLY_RS_CAMERA, common.cameraCBV);
-}
-
-DEPTH_ONLY_RENDER_IMPL(grass_depth_prepass_pipeline)
-{
-	PROFILE_ALL(cl, "Grass depth prepass");
-
-	cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_OBJECT_ID, rc.objectID);
-
-	{
-		grass_cb cb = createGrassCB_LOD0(rc.data.settings, rc.data.windDirection);
-
-		cl->setRootGraphicsSRV(GRASS_DEPTH_ONLY_RS_BLADES, rc.data.bladeBufferLOD0);
-		cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_CB, cb);
-
-		cl->drawIndirect(grassCommandSignature, 1, rc.data.drawBuffer, 0 * sizeof(grass_draw));
-	}
-
-	{
-		grass_cb cb = createGrassCB_LOD1(rc.data.settings, rc.data.windDirection);
-
-		cl->setRootGraphicsSRV(GRASS_DEPTH_ONLY_RS_BLADES, rc.data.bladeBufferLOD1);
-		cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_CB, cb);
-
-		cl->drawIndirect(grassCommandSignature, 1, rc.data.drawBuffer, 1 * sizeof(grass_draw));
-	}
-}
-
-
-
-
-
 
 struct grass_no_depth_prepass_pipeline
 {
 	using render_data_t = grass_render_data;
 
-	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
+	PIPELINE_SETUP_DECL
+	{
+		::setup(cl, common, grassNoDepthPrepassPipeline);
+	}
+
+	PIPELINE_RENDER_DECL
+	{
+		PROFILE_ALL(cl, "Grass");
+		
+		cl->setGraphics32BitConstants(GRASS_RS_OBJECT_ID, rc.data.objectID);
+		::render(cl, rc.data, GRASS_RS_CB, GRASS_RS_BLADES);
+	}
 };
-
-PIPELINE_SETUP_IMPL(grass_no_depth_prepass_pipeline)
-{
-	cl->setPipelineState(*grassNoDepthPrepassPipeline.pipeline);
-	cl->setGraphicsRootSignature(*grassNoDepthPrepassPipeline.rootSignature);
-	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-	cl->setGraphicsDynamicConstantBuffer(GRASS_RS_CAMERA, common.cameraCBV);
-	cl->setGraphicsDynamicConstantBuffer(GRASS_RS_LIGHTING, common.lightingCBV);
-
-
-	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
-
-	cl->setDescriptorHeapSRV(GRASS_RS_FRAME_CONSTANTS, 0, common.irradiance);
-	cl->setDescriptorHeapSRV(GRASS_RS_FRAME_CONSTANTS, 1, common.prefilteredRadiance);
-	cl->setDescriptorHeapSRV(GRASS_RS_FRAME_CONSTANTS, 2, render_resources::brdfTex);
-	cl->setDescriptorHeapSRV(GRASS_RS_FRAME_CONSTANTS, 3, common.shadowMap);
-	cl->setDescriptorHeapSRV(GRASS_RS_FRAME_CONSTANTS, 4, common.aoTexture ? common.aoTexture : render_resources::whiteTexture);
-	cl->setDescriptorHeapSRV(GRASS_RS_FRAME_CONSTANTS, 5, common.sssTexture ? common.sssTexture : render_resources::whiteTexture);
-	cl->setDescriptorHeapSRV(GRASS_RS_FRAME_CONSTANTS, 6, common.ssrTexture ? common.ssrTexture->defaultSRV : nullTexture);
-}
-
-PIPELINE_RENDER_IMPL(grass_no_depth_prepass_pipeline)
-{
-	PROFILE_ALL(cl, "Grass");
-
-	cl->setGraphics32BitConstants(GRASS_RS_OBJECT_ID, rc.data.objectID);
-
-	{
-		grass_cb cb = createGrassCB_LOD0(rc.data.settings, rc.data.windDirection);
-
-		cl->setRootGraphicsSRV(GRASS_RS_BLADES, rc.data.bladeBufferLOD0);
-		cl->setGraphics32BitConstants(GRASS_RS_CB, cb);
-
-		cl->drawIndirect(grassCommandSignature, 1, rc.data.drawBuffer, 0 * sizeof(grass_draw));
-	}
-
-	{
-		grass_cb cb = createGrassCB_LOD1(rc.data.settings, rc.data.windDirection);
-
-		cl->setRootGraphicsSRV(GRASS_RS_BLADES, rc.data.bladeBufferLOD1);
-		cl->setGraphics32BitConstants(GRASS_RS_CB, cb);
-
-		cl->drawIndirect(grassCommandSignature, 1, rc.data.drawBuffer, 1 * sizeof(grass_draw));
-	}
-}
 
 
 
