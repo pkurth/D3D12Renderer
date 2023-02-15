@@ -645,6 +645,21 @@ bool transformation_gizmo::manipulatePositionRotation(vec3& position, quat& rota
 	return dragging;
 }
 
+bool transformation_gizmo::manipulatePositionScale(vec3& position, vec3& scale, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
+{
+	if (type == transformation_type_rotation)
+	{
+		type = transformation_type_translation;
+	}
+
+	bool inputCaptured = handleUserInput(allowInput, true, false, true, false);
+	trs transform = { position, quat::identity, scale };
+	manipulateInternal(transform, camera, input, allowInput, ldrRenderPass);
+	position = transform.position;
+	scale = transform.scale;
+	return dragging;
+}
+
 bool transformation_gizmo::manipulateNothing(const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass)
 {
 	dragging = false;

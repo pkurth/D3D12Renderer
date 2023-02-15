@@ -37,7 +37,7 @@ struct surface_info
 		F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo.xyz, metallic);
 		R = reflect(-V, N);
 
-		float F90 = saturate(50.f * dot(F0, 0.33f));
+		float F90 = saturate(50.f * dot(F0, (1.f / 3.f)));
 		F = F0 + (F90 - F0) * pow(1.f - NdotV, 5.f); // Fresnel.
 	}
 };

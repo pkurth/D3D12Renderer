@@ -292,7 +292,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			;
 
 		auto water = scene.createEntity("Water")
-			.addComponent<position_component>(vec3(0.f, -20.f, 0.f))
+			.addComponent<position_scale_component>(vec3(-3.920f, -48.223f, -85.580f), vec3(9.088f))
 			.addComponent<water_component>();
 	}
 #endif
@@ -639,9 +639,10 @@ void application::update(const user_input& input, float dt)
 		}
 
 
-		for (auto [entityHandle, water, position] : scene.group(entt::get<water_component, position_component>).each())
+		for (auto [entityHandle, water, transform] : scene.group(entt::get<water_component, position_scale_component>).each())
 		{
-			water.render(this->scene.camera, &transparentRenderPass, position.position, (uint32)entityHandle);
+			water.update(unscaledDt);
+			water.render(this->scene.camera, &transparentRenderPass, transform.position, vec2(transform.scale.x, transform.scale.z), (uint32)entityHandle);
 		}
 
 

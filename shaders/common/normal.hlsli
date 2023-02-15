@@ -73,4 +73,15 @@ static float3 sampleNormalMap(Texture2D<float3> normalMap, SamplerState s, float
     return N;
 }
 
+static float3 combineNormalMaps(float3 n1, float3 n2)
+{
+    // Whiteout blend: https://blog.selfshadow.com/publications/blending-in-detail/
+    return normalize(float3(n1.xy + n2.xy, n1.z * n2.z));
+}
+
+static float3 scaleNormalMap(float3 n, float strength)
+{
+    return n * float3(strength, strength, 1.f);
+}
+
 #endif

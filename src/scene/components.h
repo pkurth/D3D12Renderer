@@ -52,3 +52,13 @@ REFLECT_STRUCT(position_rotation_component,
 	(position, "Position"),
 	(rotation, "Rotation")
 );
+
+struct position_scale_component
+{
+	vec3 position;
+	vec3 scale;
+};
+REFLECT_STRUCT(position_scale_component,
+	(position, "Position"),
+	(scale, "Scale")
+);

@@ -292,7 +292,6 @@ ps_output main(ps_input IN)
 	if (lighting.useRaytracedGlobalIllumination)
 	{
 		totalLighting.diffuse += lighting.lightProbeGrid.sampleIrradianceAtPosition(surface.P, surface.N, lightProbeIrradiance, lightProbeDepth, wrapSampler) * lighting.globalIlluminationIntensity * ao;
-		// TODO: Specular.
 	}
 	else
 	{

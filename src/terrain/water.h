@@ -5,17 +5,22 @@
 
 struct water_settings
 {
-	vec3 deepWaterColor = vec3(0.184f, 0.184f, 0.838f);
-	vec3 shallowWaterColor = vec3(0.748f, 0.790f, 0.885f);
-	float transition = 3.f;
+	vec4 deepWaterColor = vec4(0.f, 0.241f, 0.799f, 0.76f);
+	vec4 shallowWaterColor = vec4(0.120f, 0.546f, 0.941f, 0.176f);
+	float shallowDepth = 3.f;
+	float transitionStrength = 0.07f;
 	float normalStrength = 1.f;
 };
 
 struct water_component
 {
-	void render(const render_camera& camera, struct transparent_render_pass* renderPass, vec3 positionOffset, uint32 entityID = -1);
+	void update(float dt);
+	void render(const render_camera& camera, struct transparent_render_pass* renderPass, vec3 positionOffset, vec2 scale, uint32 entityID = -1);
 
 	water_settings settings;
+
+private:
+	float time = 0.f;
 };
 
 void initializeWaterPipelines();

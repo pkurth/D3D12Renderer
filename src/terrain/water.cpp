@@ -20,6 +20,8 @@ static dx_pipeline waterPipeline;
 static dx_mesh waterMesh;
 static submesh_info waterSubmesh;
 
+static ref<dx_texture> normalmap;
+
 void initializeWaterPipelines()
 {
 	{
@@ -34,6 +36,8 @@ void initializeWaterPipelines()
 	builder.pushQuad({ vec3(0.f), 10.f, quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)) });
 	waterSubmesh = builder.endSubmesh();
 	waterMesh = builder.createDXMesh();
+
+	normalmap = loadTextureFromFile("assets/water/water_normal.jpg", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
 }
 
 
@@ -42,6 +46,7 @@ struct water_render_data
 	mat4 m;
 
 	water_settings settings;
+	float time;
 };
 
 struct water_pipeline
@@ -60,8 +65,20 @@ PIPELINE_SETUP_IMPL(water_pipeline)
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	
 	cl->setGraphicsDynamicConstantBuffer(WATER_RS_CAMERA, common.cameraCBV);
+	cl->setGraphicsDynamicConstantBuffer(WATER_RS_LIGHTING, common.lightingCBV);
 	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 0, common.opaqueColor);
 	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 1, common.opaqueDepth);
+	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 2, normalmap ? normalmap->defaultSRV : render_resources::nullTextureSRV);
+
+	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
+
+	cl->setDescriptorHeapSRV(WATER_RS_FRAME_CONSTANTS, 0, common.irradiance);
+	cl->setDescriptorHeapSRV(WATER_RS_FRAME_CONSTANTS, 1, common.prefilteredRadiance);
+	cl->setDescriptorHeapSRV(WATER_RS_FRAME_CONSTANTS, 2, render_resources::brdfTex);
+	cl->setDescriptorHeapSRV(WATER_RS_FRAME_CONSTANTS, 3, common.shadowMap);
+	cl->setDescriptorHeapSRV(WATER_RS_FRAME_CONSTANTS, 4, common.aoTexture ? common.aoTexture : render_resources::whiteTexture);
+	cl->setDescriptorHeapSRV(WATER_RS_FRAME_CONSTANTS, 5, common.sssTexture ? common.sssTexture : render_resources::whiteTexture);
+	cl->setDescriptorHeapSRV(WATER_RS_FRAME_CONSTANTS, 6, common.ssrTexture ? common.ssrTexture->defaultSRV : nullTexture);
 }
 
 PIPELINE_RENDER_IMPL(water_pipeline)
@@ -69,18 +86,26 @@ PIPELINE_RENDER_IMPL(water_pipeline)
 	PROFILE_ALL(cl, "Water");
 
 	water_cb cb;
-	cb.deepColor = vec4(rc.data.settings.deepWaterColor, 1.f);
-	cb.shallowColor = vec4(rc.data.settings.shallowWaterColor, 1.f);
-	cb.transition = rc.data.settings.transition;
+	cb.deepColor = rc.data.settings.deepWaterColor;
+	cb.shallowColor = rc.data.settings.shallowWaterColor;
+	cb.shallowDepth = rc.data.settings.shallowDepth;
+	cb.transitionStrength = rc.data.settings.transitionStrength;
+	cb.uvOffset = normalize(vec2(1.f, 1.f)) * rc.data.time * 0.05f;
+	cb.normalmapStrength = rc.data.settings.normalStrength;
 
-	cl->setGraphics32BitConstants(WATER_RS_TRANSFORM, viewProj * rc.data.m);
+	cl->setGraphics32BitConstants(WATER_RS_TRANSFORM, transform_cb{ viewProj * rc.data.m, rc.data.m });
 	cl->setGraphics32BitConstants(WATER_RS_SETTINGS, cb);
 	cl->setVertexBuffer(0, waterMesh.vertexBuffer.positions);
 	cl->setIndexBuffer(waterMesh.indexBuffer);
 	cl->drawIndexed(waterSubmesh.numIndices, 1, 0, 0, 0);
 }
 
-void water_component::render(const render_camera& camera, transparent_render_pass* renderPass, vec3 positionOffset, uint32 entityID)
+void water_component::update(float dt)
 {
-	renderPass->renderObject<water_pipeline>({ createModelMatrix(positionOffset, quat::identity), settings });
+	time += dt;
+}
+
+void water_component::render(const render_camera& camera, transparent_render_pass* renderPass, vec3 positionOffset, vec2 scale, uint32 entityID)
+{
+	renderPass->renderObject<water_pipeline>({ createModelMatrix(positionOffset, quat::identity, vec3(scale.x, 1.f, scale.y)), settings, time });
 }

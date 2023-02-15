@@ -639,6 +639,12 @@ bool scene_editor::drawSceneHierarchy()
 						}
 					});
 
+					drawComponent<position_scale_component>(selectedEntity, "TRANSFORM", [this, &objectMovedByWidget](position_scale_component& ps)
+					{
+						objectMovedByWidget |= ImGui::DragFloat3("Translation", ps.position.data, 0.1f, 0.f, 0.f);
+						objectMovedByWidget |= ImGui::DragFloat3("Scale", ps.scale.data, 0.1f, 0.f, 0.f);
+					});
+
 					drawComponent<dynamic_transform_component>(selectedEntity, "DYNAMIC", [](dynamic_transform_component& dynamic)
 					{
 						ImGui::Text("Dynamic");
@@ -743,7 +749,9 @@ bool scene_editor::drawSceneHierarchy()
 							ImGui::PropertyColor("Deep color", water.settings.deepWaterColor);
 							ImGui::PropertyColor("Shallow color", water.settings.shallowWaterColor);
 
-							ImGui::PropertyDrag("Transition", water.settings.transition, 0.05f);
+							ImGui::PropertyDrag("Shallow depth", water.settings.shallowDepth, 0.05f);
+							ImGui::PropertySlider("Transition strength", water.settings.transitionStrength, 0.f, 2.f);
+							ImGui::PropertySlider("Normal map strength", water.settings.normalStrength);
 
 							ImGui::EndProperties();
 						}
@@ -1619,6 +1627,13 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		else if (position_rotation_component* prc = selectedEntity.getComponentIfExists<position_rotation_component>())
 		{
 			if (gizmo.manipulatePositionRotation(prc->position, prc->rotation, camera, input, !inputCaptured, ldrRenderPass))
+			{
+				inputCaptured = true;
+			}
+		}
+		else if (position_scale_component* psc = selectedEntity.getComponentIfExists<position_scale_component>())
+		{
+			if (gizmo.manipulatePositionScale(psc->position, psc->scale, camera, input, !inputCaptured, ldrRenderPass))
 			{
 				inputCaptured = true;
 			}

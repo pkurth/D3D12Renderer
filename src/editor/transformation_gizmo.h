@@ -12,6 +12,7 @@ struct transformation_gizmo
 	bool manipulateTransformation(trs& transform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
 	bool manipulatePosition(vec3& position, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
 	bool manipulatePositionRotation(vec3& position, quat& rotation, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
+	bool manipulatePositionScale(vec3& position, vec3& scale, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
 	bool manipulateNothing(const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
 
 	bool manipulateBoundingSphere(bounding_sphere& sphere, const trs& parentTransform, const render_camera& camera, const user_input& input, bool allowInput, ldr_render_pass* ldrRenderPass);
