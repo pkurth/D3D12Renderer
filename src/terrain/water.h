@@ -7,6 +7,7 @@ struct water_settings
 {
 	vec4 deepWaterColor = vec4(0.f, 0.241f, 0.799f, 0.76f);
 	vec4 shallowWaterColor = vec4(0.120f, 0.546f, 0.941f, 0.176f);
+	float uvScale = 0.5f;
 	float shallowDepth = 3.f;
 	float transitionStrength = 0.07f;
 	float normalStrength = 1.f;

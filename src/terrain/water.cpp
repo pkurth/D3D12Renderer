@@ -20,7 +20,10 @@ static dx_pipeline waterPipeline;
 static dx_mesh waterMesh;
 static submesh_info waterSubmesh;
 
-static ref<dx_texture> normalmap;
+static ref<dx_texture> normalmap1;
+static ref<dx_texture> normalmap2;
+static ref<dx_texture> foamTexture;
+static ref<dx_texture> noiseTexture;
 
 void initializeWaterPipelines()
 {
@@ -33,11 +36,14 @@ void initializeWaterPipelines()
 	}
 
 	mesh_builder builder(mesh_creation_flags_with_positions);
-	builder.pushQuad({ vec3(0.f), 10.f, quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)) });
+	builder.pushQuad({ vec3(0.f), 1.f, quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)) });
 	waterSubmesh = builder.endSubmesh();
 	waterMesh = builder.createDXMesh();
 
-	normalmap = loadTextureFromFile("assets/water/water_normal.jpg", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
+	normalmap1 = loadTextureFromFile("assets/water/waterNM1.png", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
+	normalmap2 = loadTextureFromFile("assets/water/waterNM2.png", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
+	foamTexture = loadTextureFromFile("assets/water/waterFoam.dds", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
+	noiseTexture = loadTextureFromFile("assets/water/waterNoise.dds", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
 }
 
 
@@ -68,7 +74,10 @@ PIPELINE_SETUP_IMPL(water_pipeline)
 	cl->setGraphicsDynamicConstantBuffer(WATER_RS_LIGHTING, common.lightingCBV);
 	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 0, common.opaqueColor);
 	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 1, common.opaqueDepth);
-	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 2, normalmap ? normalmap->defaultSRV : render_resources::nullTextureSRV);
+	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 2, normalmap1 ? normalmap1->defaultSRV : render_resources::nullTextureSRV);
+	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 3, normalmap2 ? normalmap2->defaultSRV : render_resources::nullTextureSRV);
+	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 4, foamTexture ? foamTexture->defaultSRV : render_resources::nullTextureSRV);
+	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 5, noiseTexture ? noiseTexture->defaultSRV : render_resources::nullTextureSRV);
 
 	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
 
@@ -91,6 +100,7 @@ PIPELINE_RENDER_IMPL(water_pipeline)
 	cb.shallowDepth = rc.data.settings.shallowDepth;
 	cb.transitionStrength = rc.data.settings.transitionStrength;
 	cb.uvOffset = normalize(vec2(1.f, 1.f)) * rc.data.time * 0.05f;
+	cb.uvScale = rc.data.settings.uvScale;
 	cb.normalmapStrength = rc.data.settings.normalStrength;
 
 	cl->setGraphics32BitConstants(WATER_RS_TRANSFORM, transform_cb{ viewProj * rc.data.m, rc.data.m });

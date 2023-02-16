@@ -8,6 +8,7 @@ struct water_cb
     vec4 deepColor;
     vec4 shallowColor;
     vec2 uvOffset;
+    float uvScale;
     float shallowDepth;
     float transitionStrength;
     float normalmapStrength;
@@ -23,7 +24,7 @@ struct water_cb
     "RootConstants(num32BitConstants=16, b0, space=1, visibility=SHADER_VISIBILITY_PIXEL), " \
     "CBV(b1, space=1, visibility=SHADER_VISIBILITY_PIXEL), " \
     "CBV(b2, space=1, visibility=SHADER_VISIBILITY_PIXEL), " \
-    "DescriptorTable(SRV(t0, numDescriptors=3), visibility=SHADER_VISIBILITY_PIXEL)," \
+    "DescriptorTable(SRV(t0, numDescriptors=6), visibility=SHADER_VISIBILITY_PIXEL)," \
     "DescriptorTable(SRV(t0, space=2, numDescriptors=7), visibility=SHADER_VISIBILITY_PIXEL), " \
     "StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_CLAMP," \

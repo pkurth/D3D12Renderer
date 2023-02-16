@@ -124,8 +124,9 @@ ps_output main(ps_input IN)
 				float3 sssH = L + N * distortion;
 				float sssVdotH = saturate(dot(surface.V, -sssH));
 
-				float sssIntensity = sssVdotH;
-				totalLighting.diffuse += sssIntensity.x * lighting.sun.radiance * visibility;
+				const float sssScale = 0.5f;
+				float sssIntensity = sssVdotH * sssScale;
+				totalLighting.diffuse += sssIntensity * lighting.sun.radiance * visibility;
 			}
 		}
 	}

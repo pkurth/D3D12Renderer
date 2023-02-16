@@ -277,7 +277,7 @@ static float3 diffuseIBL(float3 kd, surface_info surface, TextureCube<float4> ir
 	return kd * irradiance;
 }
 
-static float3 specularIBL(float3 F, surface_info surface, TextureCube<float4> environmentTexture, Texture2D<float2> brdf, SamplerState clampSampler)
+static float3 specularIBL(float3 F, surface_info surface, TextureCube<float4> environmentTexture, Texture2D<float2> brdf, SamplerState clampSampler, float specularScale = 1.f)
 {
 	uint width, height, numMipLevels;
 	environmentTexture.GetDimensions(0, width, height, numMipLevels);
@@ -285,7 +285,7 @@ static float3 specularIBL(float3 F, surface_info surface, TextureCube<float4> en
 
 	float3 prefilteredColor = environmentTexture.SampleLevel(clampSampler, surface.R, lod).rgb;
 	float2 envBRDF = brdf.SampleLevel(clampSampler, float2(surface.roughness, surface.NdotV), 0);
-	float3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y);
+	float3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y) * specularScale;
 
 	return specular;
 }
@@ -335,7 +335,7 @@ static light_contribution calculateAmbientIBL(surface_info surface, TextureCube<
 	return result;
 }
 
-static light_contribution calculateDirectLighting(surface_info surface, light_info light)
+static light_contribution calculateDirectLighting(surface_info surface, light_info light, float specularScale = 1.f)
 {
 	float D = distributionGGX(surface, light);
 	float G = geometrySmith(surface, light);
@@ -345,9 +345,7 @@ static light_contribution calculateDirectLighting(surface_info surface, light_in
 	kD *= 1.f - surface.metallic;
 	float3 diffuse = kD * M_INV_PI * light.radiance * light.NdotL;
 
-	float3 numerator = D * G * F;
-	float denominator = 4.f * surface.NdotV * light.NdotL;
-	float3 specular = numerator / max(denominator, 0.001f) * light.radiance * light.NdotL;
+	float3 specular = (D * G * F) / max(4.f * surface.NdotV, 0.001f) * light.radiance * specularScale;
 
 	light_contribution result = { diffuse, specular };
 	return result;

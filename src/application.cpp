@@ -292,7 +292,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			;
 
 		auto water = scene.createEntity("Water")
-			.addComponent<position_scale_component>(vec3(-3.920f, -48.223f, -85.580f), vec3(9.088f))
+			.addComponent<position_scale_component>(vec3(-3.920f, -48.223f, -85.580f), vec3(90.f))
 			.addComponent<water_component>();
 	}
 #endif

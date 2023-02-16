@@ -15,7 +15,10 @@ ConstantBuffer<lighting_cb> lighting					: register(b2, space1);
 
 Texture2D<float3> opaqueColor							: register(t0);
 Texture2D<float> opaqueDepth							: register(t1);
-Texture2D<float3> normalmap								: register(t2);
+Texture2D<float3> normalmap1							: register(t2);
+Texture2D<float3> normalmap2							: register(t3);
+Texture2D<float3> foamTexture							: register(t4);
+Texture2D<float> noiseTexture							: register(t5);
 
 TextureCube<float4> irradianceTexture					: register(t0, space2);
 TextureCube<float4> prefilteredRadianceTexture			: register(t1, space2);
@@ -38,22 +41,45 @@ struct ps_input
 };
 
 
+[earlydepthstencil]
 [RootSignature(WATER_RS)]
 float4 main(ps_input IN) : SV_TARGET
 {
-	uint2 screen = uint2(IN.screenPosition.xy);
-	float3 sceneColor = opaqueColor[screen];
-	float sceneDepth = camera.depthBufferDepthToEyeDepth(opaqueDepth[screen]);
+	float2 uv = IN.worldPosition.xz * 0.1f * cb.uvScale;
+	float2 uv0 = uv - cb.uvOffset;
+	float2 uv1 = (uv + cb.uvOffset) * 0.7f;
+
+	float3 N0 = scaleNormalMap(sampleNormalMap(normalmap2, wrapSampler, uv0), cb.normalmapStrength);
+	float3 N1 = scaleNormalMap(sampleNormalMap(normalmap1, wrapSampler, uv1), cb.normalmapStrength * 0.6f);
+
+	float3 N = combineNormalMaps(N0, N1).xzy;
+
+
+	const float refractionDistortionFactor = 0.015f;
+
+	float2 screenUV = IN.screenPosition.xy * camera.invScreenDims;
+	float2 distortedScreenUV = (screenUV + ((N.xz + N.xy) * 0.5f) * refractionDistortionFactor);
+
+
+	float sceneDepth = camera.depthBufferDepthToEyeDepth(opaqueDepth.Sample(clampSampler, distortedScreenUV));
 	float thisDepth = camera.depthBufferDepthToEyeDepth(IN.screenPosition.z);
+	if (sceneDepth < thisDepth)
+	{
+		distortedScreenUV = screenUV;
+		sceneDepth = camera.depthBufferDepthToEyeDepth(opaqueDepth.Sample(clampSampler, distortedScreenUV));
+	}
+
+	float3 sceneColor = opaqueColor.Sample(clampSampler, distortedScreenUV);
 
 	float transition = saturate((sceneDepth - (thisDepth + cb.shallowDepth)) * cb.transitionStrength);
 
 
-	float2 uv = IN.worldPosition.xz * 0.1f;
-	float3 N0 = scaleNormalMap(sampleNormalMap(normalmap, wrapSampler, uv - cb.uvOffset), cb.normalmapStrength);
-	float3 N1 = scaleNormalMap(sampleNormalMap(normalmap, wrapSampler, (uv + cb.uvOffset) * 0.7f), cb.normalmapStrength * 0.5f);
+	const float noiseUVScale = 0.7f;
+	float specularNoise = 1.f + 
+		3.f * noiseTexture.Sample(wrapSampler, uv0 * noiseUVScale) * 
+		noiseTexture.Sample(wrapSampler, uv1 * noiseUVScale) *
+		noiseTexture.Sample(wrapSampler, uv * noiseUVScale);
 
-	float3 N = combineNormalMaps(N0, N1).xzy;
 
 
 	surface_info surface;
@@ -94,24 +120,23 @@ float4 main(ps_input IN) : SV_TARGET
 			shadowSampler, lighting.shadowMapTexelSize, pixelDepth, lighting.sun.numShadowCascades,
 			lighting.sun.cascadeDistances, lighting.sun.bias, lighting.sun.blendDistances);
 
-		float sss = sssTexture.SampleLevel(clampSampler, IN.screenPosition.xy * camera.invScreenDims, 0);
+		float sss = sssTexture.SampleLevel(clampSampler, screenUV, 0);
 		visibility *= sss;
 
 		[branch]
 		if (visibility > 0.f)
 		{
-			totalLighting.add(calculateDirectLighting(surface, light), visibility);
+			totalLighting.add(calculateDirectLighting(surface, light, specularNoise), visibility);
 		}
 	}
 
 
 	// Ambient light.
-	float2 screenUV = IN.screenPosition.xy * camera.invScreenDims;
 	float ao = aoTexture.SampleLevel(clampSampler, screenUV, 0);
 
 	ambient_factors factors = getAmbientFactors(surface);
 	totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.globalIlluminationIntensity * ao;
-	float3 specular = specularIBL(factors.ks, surface, prefilteredRadianceTexture, brdf, clampSampler);
+	float3 specular = specularIBL(factors.ks, surface, prefilteredRadianceTexture, brdf, clampSampler, specularNoise);
 	totalLighting.specular += specular * lighting.globalIlluminationIntensity * ao;
 
 

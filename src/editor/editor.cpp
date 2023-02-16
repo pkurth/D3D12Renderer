@@ -752,6 +752,7 @@ bool scene_editor::drawSceneHierarchy()
 							ImGui::PropertyDrag("Shallow depth", water.settings.shallowDepth, 0.05f);
 							ImGui::PropertySlider("Transition strength", water.settings.transitionStrength, 0.f, 2.f);
 							ImGui::PropertySlider("Normal map strength", water.settings.normalStrength);
+							ImGui::PropertyDrag("UV scale", water.settings.uvScale, 0.05f);
 
 							ImGui::EndProperties();
 						}
