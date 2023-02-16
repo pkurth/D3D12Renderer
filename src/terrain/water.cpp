@@ -17,9 +17,6 @@
 
 static dx_pipeline waterPipeline;
 
-static dx_mesh waterMesh;
-static submesh_info waterSubmesh;
-
 static ref<dx_texture> normalmap1;
 static ref<dx_texture> normalmap2;
 static ref<dx_texture> foamTexture;
@@ -29,16 +26,11 @@ void initializeWaterPipelines()
 {
 	{
 		auto desc = CREATE_GRAPHICS_PIPELINE
-			.inputLayout(inputLayout_position)
+			.cullingOff()
 			.renderTargets(transparentLightPassFormats, arraysize(transparentLightPassFormats), depthStencilFormat);
 
 		waterPipeline = createReloadablePipeline(desc, { "water_vs", "water_ps" });
 	}
-
-	mesh_builder builder(mesh_creation_flags_with_positions);
-	builder.pushQuad({ vec3(0.f), 1.f, quat(vec3(1.f, 0.f, 0.f), deg2rad(-90.f)) });
-	waterSubmesh = builder.endSubmesh();
-	waterMesh = builder.createDXMesh();
 
 	normalmap1 = loadTextureFromFile("assets/water/waterNM1.png", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
 	normalmap2 = loadTextureFromFile("assets/water/waterNM2.png", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
@@ -68,7 +60,7 @@ PIPELINE_SETUP_IMPL(water_pipeline)
 	cl->setPipelineState(*waterPipeline.pipeline);
 	cl->setGraphicsRootSignature(*waterPipeline.rootSignature);
 
-	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 	
 	cl->setGraphicsDynamicConstantBuffer(WATER_RS_CAMERA, common.cameraCBV);
 	cl->setGraphicsDynamicConstantBuffer(WATER_RS_LIGHTING, common.lightingCBV);
@@ -105,9 +97,7 @@ PIPELINE_RENDER_IMPL(water_pipeline)
 
 	cl->setGraphics32BitConstants(WATER_RS_TRANSFORM, transform_cb{ viewProj * rc.data.m, rc.data.m });
 	cl->setGraphics32BitConstants(WATER_RS_SETTINGS, cb);
-	cl->setVertexBuffer(0, waterMesh.vertexBuffer.positions);
-	cl->setIndexBuffer(waterMesh.indexBuffer);
-	cl->drawIndexed(waterSubmesh.numIndices, 1, 0, 0, 0);
+	cl->draw(4, 1, 0, 0);
 }
 
 void water_component::update(float dt)
