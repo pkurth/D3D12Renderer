@@ -147,25 +147,29 @@ ps_output main(ps_input IN)
 		float height = water.waterHeights[w];
 		float3 minCorner = float3(minMax.x, height, minMax.y);
 		float3 maxCorner = float3(minMax.z, height, minMax.w);
-	
+
 		float dx = max(max(minCorner.x - IN.worldPosition.x, 0), IN.worldPosition.x - maxCorner.x);
 		float dz = max(max(minCorner.z - IN.worldPosition.z, 0), IN.worldPosition.z - maxCorner.z);
 		float dy = abs(height - IN.worldPosition.y);
-	
+
 		float3 d = float3(dx, dy, dz);
-	
+
 		float distance = length(d);
-	
+
 		float m = max(
-			dx == 0.f && dz == 0.f && IN.worldPosition.y <= height, 
+			dx == 0.f && dz == 0.f && IN.worldPosition.y <= height,
 			smoothstep(2.f, 0.f, distance));
-	
+
 		mudMask = max(mudMask, m);
 	}
 
-	albedo = lerp(albedo, mudAlbedoTexture.Sample(wrapSampler, groundUV), mudMask);
-	N = normalize(lerp(N, sampleNormalMap(mudNormalTexture, wrapSampler, groundUV), mudMask));
-	roughness = lerp(roughness, mudRoughnessTexture.Sample(wrapSampler, groundUV), mudMask);
+	[branch]
+	if (mudMask > 0.f)
+	{
+		albedo = lerp(albedo, mudAlbedoTexture.Sample(wrapSampler, groundUV), mudMask);
+		N = normalize(lerp(N, sampleNormalMap(mudNormalTexture, wrapSampler, groundUV), mudMask));
+		roughness = lerp(roughness, mudRoughnessTexture.Sample(wrapSampler, groundUV), mudMask);
+	}
 
 
 	surface_info surface;
