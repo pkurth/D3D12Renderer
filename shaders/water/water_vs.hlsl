@@ -12,7 +12,7 @@ struct vs_output
 
 vs_output main(uint vertexID : SV_VertexID)
 {
-	float3 pos = float3(vertexID & 1, 0.f, vertexID >> 1) * 2.f - 1.f;
+	float3 pos = float3(vertexID & 1, 0.5f, vertexID >> 1) * 2.f - 1.f;
 
 	vs_output OUT;
 	OUT.worldPosition = mul(cb.m, float4(pos, 1.f));

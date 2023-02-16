@@ -5,22 +5,26 @@
 #include "brdf.hlsli"
 #include "lighting.hlsli"
 
-Texture2D<float2> normals					: register(t1);
-SamplerState clampSampler					: register(s0);
-SamplerState wrapSampler					: register(s1);
-SamplerComparisonState shadowSampler		: register(s2);
+Texture2D<float2> normals						: register(t1);
+SamplerState clampSampler						: register(s0);
+SamplerState wrapSampler						: register(s1);
+SamplerComparisonState shadowSampler			: register(s2);
 
-ConstantBuffer<terrain_cb> terrain			: register(b1);
+ConstantBuffer<terrain_cb> cb					: register(b1);
+ConstantBuffer<terrain_water_plane_cb> water	: register(b2);
 
-ConstantBuffer<camera_cb> camera			: register(b1, space1);
-ConstantBuffer<lighting_cb> lighting		: register(b2, space1);
+ConstantBuffer<camera_cb> camera				: register(b1, space1);
+ConstantBuffer<lighting_cb> lighting			: register(b2, space1);
 
-Texture2D<float4> groundAlbedoTexture		: register(t0, space1);
-Texture2D<float3> groundNormalTexture		: register(t1, space1);
-Texture2D<float1> groundRoughnessTexture	: register(t2, space1);
-Texture2D<float4> rockAlbedoTexture			: register(t3, space1);
-Texture2D<float3> rockNormalTexture			: register(t4, space1);
-Texture2D<float1> rockRoughnessTexture		: register(t5, space1);
+Texture2D<float4> groundAlbedoTexture			: register(t0, space1);
+Texture2D<float3> groundNormalTexture			: register(t1, space1);
+Texture2D<float1> groundRoughnessTexture		: register(t2, space1);
+Texture2D<float4> rockAlbedoTexture				: register(t3, space1);
+Texture2D<float3> rockNormalTexture				: register(t4, space1);
+Texture2D<float1> rockRoughnessTexture			: register(t5, space1);
+Texture2D<float4> mudAlbedoTexture				: register(t6, space1);
+Texture2D<float3> mudNormalTexture				: register(t7, space1);
+Texture2D<float1> mudRoughnessTexture			: register(t8, space1);
 
 
 TextureCube<float4> irradianceTexture					: register(t0, space2);
@@ -94,7 +98,7 @@ struct triplanar_mapping
 [RootSignature(TERRAIN_RS)]
 ps_output main(ps_input IN)
 {
-	float2 n = normals.Sample(clampSampler, IN.uv) * terrain.amplitudeScale;
+	float2 n = normals.Sample(clampSampler, IN.uv) * cb.amplitudeScale;
 	float3 N = normalize(float3(n.x, 1.f, n.y));
 	
 	float groundTexScale = 0.1f;
@@ -133,6 +137,35 @@ ps_output main(ps_input IN)
 	float3 tnormalZ = sampleNormalMap(rockNormalTexture, wrapSampler, tri.uvZ);
 
 	N = tri.normalmap(N, tnormalX, tnormalY, tnormalZ);
+
+
+
+	float mudMask = 0.f;
+	for (uint w = 0; w < water.numWaterPlanes; ++w)
+	{
+		float4 minMax = water.waterMinMaxXZ[w];
+		float height = water.waterHeights[w];
+		float3 minCorner = float3(minMax.x, height, minMax.y);
+		float3 maxCorner = float3(minMax.z, height, minMax.w);
+	
+		float dx = max(max(minCorner.x - IN.worldPosition.x, 0), IN.worldPosition.x - maxCorner.x);
+		float dz = max(max(minCorner.z - IN.worldPosition.z, 0), IN.worldPosition.z - maxCorner.z);
+		float dy = abs(height - IN.worldPosition.y);
+	
+		float3 d = float3(dx, dy, dz);
+	
+		float distance = length(d);
+	
+		float m = max(
+			dx == 0.f && dz == 0.f && IN.worldPosition.y <= height, 
+			smoothstep(2.f, 0.f, distance));
+	
+		mudMask = max(mudMask, m);
+	}
+
+	albedo = lerp(albedo, mudAlbedoTexture.Sample(wrapSampler, groundUV), mudMask);
+	N = normalize(lerp(N, sampleNormalMap(mudNormalTexture, wrapSampler, groundUV), mudMask));
+	roughness = lerp(roughness, mudRoughnessTexture.Sample(wrapSampler, groundUV), mudMask);
 
 
 	surface_info surface;

@@ -268,6 +268,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		auto terrainGroundMaterial = createPBRMaterial("assets/terrain/ground/Grass002_2K_Color.png", "assets/terrain/ground/Grass002_2K_NormalDX.png", "assets/terrain/ground/Grass002_2K_Roughness.png", {},
 			vec4(0.f), vec4(1.f), 1.f, 0.f, false, 1.f, true);
 		auto terrainRockMaterial = createPBRMaterial("assets/terrain/rock/Rock034_2K_Color.png", "assets/terrain/rock/Rock034_2K_NormalDX.png", "assets/terrain/rock/Rock034_2K_Roughness.png", {});
+		auto terrainMudMaterial = createPBRMaterial("assets/terrain/mud/Ground049B_2K_Color.png", "assets/terrain/mud/Ground049B_2K_NormalDX.png", "assets/terrain/mud/Ground049B_2K_Roughness.png", {});
 
 		std::vector<proc_placement_layer_desc> layers =
 		{
@@ -285,14 +286,14 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 
 		auto terrain = scene.createEntity("Terrain")
 			.addComponent<position_component>(vec3(0.f, -64.f, 0.f))
-			.addComponent<terrain_component>(numTerrainChunks, terrainChunkSize, 50.f, terrainGroundMaterial, terrainRockMaterial)
+			.addComponent<terrain_component>(numTerrainChunks, terrainChunkSize, 50.f, terrainGroundMaterial, terrainRockMaterial, terrainMudMaterial)
 			.addComponent<heightmap_collider_component>(numTerrainChunks, terrainChunkSize, physics_material{ physics_material_type_metal, 0.1f, 1.f, 4.f })
 			//.addComponent<proc_placement_component>(layers)
 			.addComponent<grass_component>()
 			;
 
 		auto water = scene.createEntity("Water")
-			.addComponent<position_scale_component>(vec3(-3.920f, -48.223f, -85.580f), vec3(90.f))
+			.addComponent<position_scale_component>(vec3(-3.920f, -48.689f, -85.580f), vec3(90.f))
 			.addComponent<water_component>();
 	}
 #endif
@@ -633,17 +634,24 @@ void application::update(const user_input& input, float dt)
 			grass.render(&opaqueRenderPass, (uint32)entityHandle);
 		}
 
-		for (auto [entityHandle, terrain, position] : scene.group(entt::get<terrain_component, position_component>).each())
-		{
-			terrain.render(this->scene.camera, &opaqueRenderPass, sunShadowRenderPass.copyFromStaticCache ? 0 : &sunShadowRenderPass, position.position, (uint32)entityHandle);
-		}
-
+		position_scale_component waterPlaneTransforms[4];
+		uint32 numWaterPlanes = 0;
 
 		for (auto [entityHandle, water, transform] : scene.group(entt::get<water_component, position_scale_component>).each())
 		{
 			water.update(unscaledDt);
 			water.render(this->scene.camera, &transparentRenderPass, transform.position, vec2(transform.scale.x, transform.scale.z), (uint32)entityHandle);
+
+			waterPlaneTransforms[numWaterPlanes++] = transform;
 		}
+
+		for (auto [entityHandle, terrain, position] : scene.group(entt::get<terrain_component, position_component>).each())
+		{
+			terrain.render(this->scene.camera, &opaqueRenderPass, sunShadowRenderPass.copyFromStaticCache ? 0 : &sunShadowRenderPass, position.position, (uint32)entityHandle,
+				waterPlaneTransforms, numWaterPlanes);
+		}
+
+
 
 
 		{

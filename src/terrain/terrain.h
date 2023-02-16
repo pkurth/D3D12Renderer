@@ -30,7 +30,8 @@ struct terrain_generation_settings
 
 struct terrain_component
 {
-	terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale, ref<pbr_material> groundMaterial, ref<pbr_material> rockMaterial, 
+	terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale, 
+		ref<pbr_material> groundMaterial, ref<pbr_material> rockMaterial, ref<pbr_material> mudMaterial,
 		terrain_generation_settings genSettings = {});
 	terrain_component(const terrain_component&) = default;
 	terrain_component(terrain_component&&) = default;
@@ -48,6 +49,7 @@ struct terrain_component
 
 	ref<pbr_material> groundMaterial;
 	ref<pbr_material> rockMaterial;
+	ref<pbr_material> mudMaterial;
 
 
 	vec3 getMinCorner(vec3 positionOffset) const
@@ -57,7 +59,8 @@ struct terrain_component
 	}
 
 	void update(vec3 positionOffset, struct heightmap_collider_component* collider = 0);
-	void render(const render_camera& camera, struct opaque_render_pass* renderPass, struct sun_shadow_render_pass* shadowPass, vec3 positionOffset, uint32 entityID = -1);
+	void render(const render_camera& camera, struct opaque_render_pass* renderPass, struct sun_shadow_render_pass* shadowPass, vec3 positionOffset, uint32 entityID = -1,
+		struct position_scale_component* waterPlaneTransforms = 0, uint32 numWaters = 0);
 
 private:
 	void generateChunksCPU();

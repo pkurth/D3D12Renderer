@@ -14,6 +14,7 @@
 #include "rendering/texture_preprocessing.h"
 
 #include "core/random.h"
+#include "scene/components.h"
 
 #include "terrain_rs.hlsli"
 #include "depth_only_rs.hlsli"
@@ -51,6 +52,9 @@ struct terrain_render_data
 
 	ref<pbr_material> groundMaterial;
 	ref<pbr_material> rockMaterial;
+	ref<pbr_material> mudMaterial;
+
+	dx_dynamic_constant_buffer waterPlanesCBV;
 };
 
 struct terrain_pipeline
@@ -180,6 +184,7 @@ PIPELINE_RENDER_IMPL(terrain_pipeline)
 
 	cl->setGraphics32BitConstants(TERRAIN_RS_TRANSFORM, viewProj);
 	cl->setGraphics32BitConstants(TERRAIN_RS_CB, cb);
+	cl->setGraphicsDynamicConstantBuffer(TERRAIN_RS_WATER, rc.data.waterPlanesCBV);
 	cl->setDescriptorHeapSRV(TERRAIN_RS_HEIGHTMAP, 0, rc.data.common.heightmap);
 	cl->setDescriptorHeapSRV(TERRAIN_RS_NORMALMAP, 0, rc.data.normalmap);
 
@@ -192,6 +197,10 @@ PIPELINE_RENDER_IMPL(terrain_pipeline)
 	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 3, rc.data.rockMaterial->albedo ? rc.data.rockMaterial->albedo->defaultSRV : nullTexture);
 	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 4, rc.data.rockMaterial->normal ? rc.data.rockMaterial->normal->defaultSRV : nullTexture);
 	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 5, rc.data.rockMaterial->roughness ? rc.data.rockMaterial->roughness->defaultSRV : nullTexture);
+
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 6, rc.data.mudMaterial->albedo ? rc.data.mudMaterial->albedo->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 7, rc.data.mudMaterial->normal ? rc.data.mudMaterial->normal->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 8, rc.data.mudMaterial->roughness ? rc.data.mudMaterial->roughness->defaultSRV : nullTexture);
 
 	cl->setIndexBuffer(terrainIndexBuffers[rc.data.common.lod]);
 	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);
@@ -395,7 +404,8 @@ struct height_generator_layered : height_generator
 const uint32 normalMapDimension = 2048;
 
 
-terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale, ref<pbr_material> groundMaterial, ref<pbr_material> rockMaterial,
+terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float amplitudeScale, 
+	ref<pbr_material> groundMaterial, ref<pbr_material> rockMaterial, ref<pbr_material> mudMaterial,
 	terrain_generation_settings genSettings)
 	: chunksPerDim(chunksPerDim), 
 	chunkSize(chunkSize), 
@@ -408,6 +418,7 @@ terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float
 
 	this->groundMaterial = groundMaterial;
 	this->rockMaterial = rockMaterial;
+	this->mudMaterial = mudMaterial;
 }
 
 void terrain_component::generateChunksCPU()
@@ -614,7 +625,8 @@ void terrain_component::update(vec3 positionOffset, heightmap_collider_component
 	}
 }
 
-void terrain_component::render(const render_camera& camera, opaque_render_pass* renderPass, sun_shadow_render_pass* shadowPass, vec3 positionOffset, uint32 entityID)
+void terrain_component::render(const render_camera& camera, opaque_render_pass* renderPass, sun_shadow_render_pass* shadowPass, vec3 positionOffset, uint32 entityID,
+	position_scale_component* waterPlaneTransforms, uint32 numWaters)
 {
 	camera_frustum_planes frustum = camera.getWorldSpaceFrustumPlanes();
 
@@ -640,6 +652,18 @@ void terrain_component::render(const render_camera& camera, opaque_render_pass* 
 			lods[z * lodStride + x] = lod;
 		}
 	}
+
+	terrain_water_plane_cb waterPlanes;
+	waterPlanes.numWaterPlanes = min(numWaters, 4u);
+	for (uint32 i = 0; i < waterPlanes.numWaterPlanes; ++i)
+	{
+		vec3 pos = waterPlaneTransforms[i].position;
+		vec3 scale = waterPlaneTransforms[i].scale;
+		waterPlanes.waterMinMaxXZ[i] = vec4(pos.x, pos.z, pos.x, pos.z) + vec4(-scale.x, -scale.z, scale.x, scale.z);
+		waterPlanes.waterHeights.data[i] = pos.y;
+	}
+
+	auto waterCBV = dxContext.uploadDynamicConstantBuffer(waterPlanes);
 
 	for (int32 z = 0; z < (int32)chunksPerDim; ++z)
 	{
@@ -669,11 +693,11 @@ void terrain_component::render(const render_camera& camera, opaque_render_pass* 
 			bounding_box aabb = { minCorner, maxCorner };
 			if (!frustum.cullWorldSpaceAABB(aabb))
 			{
-
 				terrain_render_data data = {
 					common,
 					c.normalmap,
-					groundMaterial, rockMaterial
+					groundMaterial, rockMaterial, mudMaterial,
+					waterCBV
 				};
 				renderPass->renderObject<terrain_pipeline, terrain_depth_prepass_pipeline>(data, common, entityID);
 			}
