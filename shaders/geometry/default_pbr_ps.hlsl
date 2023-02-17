@@ -1,7 +1,5 @@
 #include "default_pbr_rs.hlsli"
-#include "brdf.hlsli"
 #include "camera.hlsli"
-#include "light_culling_rs.hlsli"
 #include "lighting.hlsli"
 #include "normal.hlsli"
 #include "material.hlsli"
@@ -121,11 +119,7 @@ ps_output main(ps_input IN)
 	const uint2 tiledIndexData = tiledCullingGrid[tileIndex].zw;
 #endif
 
-	const uint pointLightCount = (tiledIndexData.y >> 20) & 0x3FF;
-	const uint spotLightCount = (tiledIndexData.y >> 10) & 0x3FF;
 	const uint decalReadOffset = tiledIndexData.x;
-	uint lightReadIndex = tiledIndexData.x + TILE_LIGHT_OFFSET;
-
 
 
 	// Decals.
@@ -197,112 +191,26 @@ ps_output main(ps_input IN)
 
 	surface.inferRemainingProperties();
 
-	uint i;
-
-	// Point lights.
-	for (i = 0; i < pointLightCount; ++i)
-	{
-		point_light_cb pl = pointLights[tiledObjectsIndexList[lightReadIndex++]];
-
-		light_info light;
-		light.initializeFromPointLight(surface, pl);
-
-		float visibility = 1.f;
-
-		[branch]
-		if (pl.shadowInfoIndex != -1)
-		{
-			point_shadow_info info = pointShadowInfos[pl.shadowInfoIndex];
-			
-			visibility = samplePointLightShadowMapPCF(surface.P, pl.position,
-				shadowMap,
-				info.viewport0, info.viewport1,
-				shadowSampler,
-				lighting.shadowMapTexelSize, pl.radius);
-		}
-
-		[branch]
-		if (visibility > 0.f)
-		{
-			totalLighting.add(calculateDirectLighting(surface, light), visibility);
-		}
-	}
-
-	// Spot lights.
-	for (i = 0; i < spotLightCount; ++i)
-	{
-		spot_light_cb sl = spotLights[tiledObjectsIndexList[lightReadIndex++]];
-
-		light_info light;
-		light.initializeFromSpotLight(surface, sl);
-
-		float visibility = 1.f;
-
-		[branch]
-		if (sl.shadowInfoIndex != -1)
-		{
-			spot_shadow_info info = spotShadowInfos[sl.shadowInfoIndex];
-			visibility = sampleShadowMapPCF(info.viewProj, surface.P,
-				shadowMap, info.viewport,
-				shadowSampler,
-				lighting.shadowMapTexelSize, info.bias);
-		}
-
-		[branch]
-		if (visibility > 0.f)
-		{
-			totalLighting.add(calculateDirectLighting(surface, light), visibility);
-		}
-	}
-
-
-	// Sun.
-	{
-		float3 L = -lighting.sun.direction;
-
-		light_info light;
-		light.initialize(surface, L, lighting.sun.radiance);
-
-		float visibility = sampleCascadedShadowMapPCF(lighting.sun.viewProjs, surface.P,
-			shadowMap, lighting.sun.viewports,
-			shadowSampler, lighting.shadowMapTexelSize, pixelDepth, lighting.sun.numShadowCascades,
-			lighting.sun.cascadeDistances, lighting.sun.bias, lighting.sun.blendDistances);
-
-		float sss = sssTexture.SampleLevel(clampSampler, IN.screenPosition.xy * camera.invScreenDims, 0);
-		visibility *= sss;
-
-		[branch]
-		if (visibility > 0.f)
-		{
-			totalLighting.add(calculateDirectLighting(surface, light), visibility);
-		}
-	}
-
-
-	// Ambient light.
 	float2 screenUV = IN.screenPosition.xy * camera.invScreenDims;
-	float ao = aoTexture.SampleLevel(clampSampler, screenUV, 0);
 
-	float4 ssr = ssrTexture.SampleLevel(clampSampler, screenUV, 0);
+	totalLighting.addPointLights(surface, pointLights, pointShadowInfos, tiledObjectsIndexList, tiledIndexData, 
+		shadowMap, shadowSampler, lighting.shadowMapTexelSize);
 
+	totalLighting.addSpotLights(surface, spotLights, spotShadowInfos, tiledObjectsIndexList, tiledIndexData,
+		shadowMap, shadowSampler, lighting.shadowMapTexelSize);
 
-	float3 specular = float3(0.f, 0.f, 0.f);
+	totalLighting.addSunLight(surface, lighting, screenUV, pixelDepth, 
+		shadowMap, shadowSampler, lighting.shadowMapTexelSize, sssTexture, clampSampler);
 
 	[branch]
 	if (lighting.useRaytracedGlobalIllumination)
 	{
-		totalLighting.diffuse += lighting.lightProbeGrid.sampleIrradianceAtPosition(surface.P, surface.N, lightProbeIrradiance, lightProbeDepth, wrapSampler) * lighting.globalIlluminationIntensity * ao;
+		totalLighting.addRaytracedAmbientLighting(surface, lighting, lightProbeIrradiance, lightProbeDepth, ssrTexture, aoTexture, clampSampler, screenUV);
 	}
 	else
 	{
-		ambient_factors factors = getAmbientFactors(surface);
-		totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.globalIlluminationIntensity * ao;
-		specular = specularIBL(factors.ks, surface, prefilteredRadianceTexture, brdf, clampSampler);
+		totalLighting.addImageBasedAmbientLighting(surface, irradianceTexture, prefilteredRadianceTexture, brdf, ssrTexture, aoTexture, clampSampler, screenUV, lighting.globalIlluminationIntensity);
 	}
-
-	specular = lerp(specular, ssr.rgb * surface.F, ssr.a);
-	totalLighting.specular += specular * lighting.globalIlluminationIntensity * ao;
-
 
 	// Output.
 	ps_output OUT;

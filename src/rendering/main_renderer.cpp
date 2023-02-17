@@ -12,7 +12,7 @@
 #include "animation/skinning.h"
 #include "particles/particles.h"
 
-#include "lighting.hlsli"
+#include "light_source.hlsli"
 
 
 

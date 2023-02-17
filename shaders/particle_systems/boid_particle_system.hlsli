@@ -88,7 +88,7 @@ static bool simulateParticle(inout particle_data particle, float dt)
 
 #ifdef PARTICLE_RENDERING
 
-#include "brdf.hlsli"
+#include "lighting.hlsli"
 
 #define USER_PARTICLE_RENDERING_RS \
     "CBV(b0), " \

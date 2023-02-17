@@ -1,9 +1,8 @@
 #include "../common/camera.hlsli"
 #include "../common/raytracing.hlsli"
-#include "../common/brdf.hlsli"
 #include "../common/material.hlsli"
 #include "../common/random.hlsli"
-#include "../common/light_source.hlsli"
+#include "../common/lighting.hlsli"
 
 // Raytracing intrinsics: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#ray-system-values
 // Ray flags: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#ray-flags

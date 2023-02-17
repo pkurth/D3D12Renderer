@@ -1,6 +1,6 @@
 #include "cs.hlsli"
 #include "camera.hlsli"
-#include "light_source.hlsli"
+#include "lighting.hlsli"
 
 #define RS \
     "RootFlags(0), " \

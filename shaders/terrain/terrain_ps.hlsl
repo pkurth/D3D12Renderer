@@ -2,7 +2,6 @@
 #include "normal.hlsli"
 #include "random.hlsli"
 #include "camera.hlsli"
-#include "brdf.hlsli"
 #include "lighting.hlsli"
 
 Texture2D<float2> normals						: register(t1);
@@ -192,48 +191,19 @@ ps_output main(ps_input IN)
 
 
 
+	float2 screenUV = IN.screenPosition.xy * camera.invScreenDims;
 
 
 	light_contribution totalLighting = { float3(0.f, 0.f, 0.f), float3(0.f, 0.f, 0.f) };
 
+	totalLighting.addSunLight(surface, lighting, screenUV, pixelDepth,
+		shadowMap, shadowSampler, lighting.shadowMapTexelSize, sssTexture, clampSampler);
 
-	// Sun.
-	{
-		float3 L = -lighting.sun.direction;
-
-		light_info light;
-		light.initialize(surface, L, lighting.sun.radiance);
-
-		float visibility = sampleCascadedShadowMapPCF(lighting.sun.viewProjs, surface.P,
-			shadowMap, lighting.sun.viewports,
-			shadowSampler, lighting.shadowMapTexelSize, pixelDepth, lighting.sun.numShadowCascades,
-			lighting.sun.cascadeDistances, lighting.sun.bias, lighting.sun.blendDistances);
-
-		float sss = sssTexture.SampleLevel(clampSampler, IN.screenPosition.xy * camera.invScreenDims, 0);
-		visibility *= sss;
-
-		[branch]
-		if (visibility > 0.f)
-		{
-			totalLighting.add(calculateDirectLighting(surface, light), visibility);
-		}
-	}
+	totalLighting.addImageBasedAmbientLighting(surface, irradianceTexture, prefilteredRadianceTexture, brdf, ssrTexture, aoTexture,
+		clampSampler, screenUV, lighting.globalIlluminationIntensity);
 
 
 
-	// Ambient light.
-	float2 screenUV = IN.screenPosition.xy * camera.invScreenDims;
-	float ao = aoTexture.SampleLevel(clampSampler, screenUV, 0);
-
-	float4 ssr = ssrTexture.SampleLevel(clampSampler, screenUV, 0);
-
-
-	ambient_factors factors = getAmbientFactors(surface);
-	totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.globalIlluminationIntensity * ao;
-	float3 specular = specularIBL(factors.ks, surface, prefilteredRadianceTexture, brdf, clampSampler);
-
-	specular = lerp(specular, ssr.rgb * surface.F, ssr.a);
-	totalLighting.specular += specular * lighting.globalIlluminationIntensity * ao;
 
 
 	surface.roughness = 1.f; // This is a fake to disable SSR on terrain (I find it costs more than it's worth for the grassy terrain we have).

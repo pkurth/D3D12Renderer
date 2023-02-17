@@ -1,8 +1,7 @@
 #include "grass_rs.hlsli"
 #include "camera.hlsli"
-#include "lighting.hlsli"
 #include "normal.hlsli"
-#include "brdf.hlsli"
+#include "lighting.hlsli"
 #include "depth_only_rs.hlsli"
 
 ConstantBuffer<camera_cb> camera		: register(b1);
@@ -93,60 +92,18 @@ ps_output main(ps_input IN)
 	surface.inferRemainingProperties();
 
 
+	float2 screenUV = IN.screenPosition.xy * camera.invScreenDims;
+
 	light_contribution totalLighting = { float3(0.f, 0.f, 0.f), float3(0.f, 0.f, 0.f) };
 
+	totalLighting.addSunLight(surface, lighting, screenUV, pixelDepth,
+		shadowMap, shadowSampler, lighting.shadowMapTexelSize, sssTexture, clampSampler, 0.5f);
 
-	// Sun.
-	{
-		float3 L = -lighting.sun.direction;
-
-		light_info light;
-		light.initialize(surface, L, lighting.sun.radiance);
-
-		float visibility = sampleCascadedShadowMapPCF(lighting.sun.viewProjs, surface.P,
-			shadowMap, lighting.sun.viewports,
-			shadowSampler, lighting.shadowMapTexelSize, pixelDepth, lighting.sun.numShadowCascades,
-			lighting.sun.cascadeDistances, lighting.sun.bias, lighting.sun.blendDistances);
-
-		float sss = sssTexture.SampleLevel(clampSampler, IN.screenPosition.xy * camera.invScreenDims, 0);
-		visibility *= sss;
-
-		[branch]
-		if (visibility > 0.f)
-		{
-			totalLighting.add(calculateDirectLighting(surface, light), visibility);
-
-
-			// Subsurface scattering.
-			{
-				// https://www.alanzucconi.com/2017/08/30/fast-subsurface-scattering-1/
-				const float distortion = 0.4f;
-				float3 sssH = L + N * distortion;
-				float sssVdotH = saturate(dot(surface.V, -sssH));
-
-				const float sssScale = 0.5f;
-				float sssIntensity = sssVdotH * sssScale;
-				totalLighting.diffuse += sssIntensity * lighting.sun.radiance * visibility;
-			}
-		}
-	}
+	totalLighting.addImageBasedAmbientLighting(surface, irradianceTexture, prefilteredRadianceTexture, brdf, ssrTexture, aoTexture,
+		clampSampler, screenUV, lighting.globalIlluminationIntensity);
 
 
 
-
-	// Ambient light.
-	float2 screenUV = IN.screenPosition.xy * camera.invScreenDims;
-	float ao = aoTexture.SampleLevel(clampSampler, screenUV, 0);
-
-	float4 ssr = ssrTexture.SampleLevel(clampSampler, screenUV, 0);
-
-
-	ambient_factors factors = getAmbientFactors(surface);
-	totalLighting.diffuse += diffuseIBL(factors.kd, surface, irradianceTexture, clampSampler) * lighting.globalIlluminationIntensity * ao;
-	float3 specular = specularIBL(factors.ks, surface, prefilteredRadianceTexture, brdf, clampSampler);
-
-	specular = lerp(specular, ssr.rgb * surface.F, ssr.a);
-	totalLighting.specular += specular * lighting.globalIlluminationIntensity * ao;
 
 
 	surface.roughness = 1.f;

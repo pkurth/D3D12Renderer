@@ -1,6 +1,6 @@
 #include "cs.hlsli"
 #include "post_processing_rs.hlsli"
-#include "brdf.hlsli"
+#include "lighting.hlsli"
 #include "normal.hlsli"
 #include "camera.hlsli"
 

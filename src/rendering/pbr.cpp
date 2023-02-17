@@ -12,7 +12,7 @@
 
 #include "default_pbr_rs.hlsli"
 #include "material.hlsli"
-#include "lighting.hlsli"
+#include "light_source.hlsli"
 
 #include <unordered_map>
 #include <memory>

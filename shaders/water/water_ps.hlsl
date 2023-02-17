@@ -1,7 +1,6 @@
 #include "water_rs.hlsli"
 #include "camera.hlsli"
 #include "normal.hlsli"
-#include "brdf.hlsli"
 #include "lighting.hlsli"
 
 
@@ -108,28 +107,8 @@ float4 main(ps_input IN) : SV_TARGET
 
 	light_contribution totalLighting = { float3(0.f, 0.f, 0.f), float3(0.f, 0.f, 0.f) };
 
-
-	// Sun.
-	{
-		float3 L = -lighting.sun.direction;
-
-		light_info light;
-		light.initialize(surface, L, lighting.sun.radiance);
-
-		float visibility = sampleCascadedShadowMapPCF(lighting.sun.viewProjs, surface.P,
-			shadowMap, lighting.sun.viewports,
-			shadowSampler, lighting.shadowMapTexelSize, pixelDepth, lighting.sun.numShadowCascades,
-			lighting.sun.cascadeDistances, lighting.sun.bias, lighting.sun.blendDistances);
-
-		float sss = sssTexture.SampleLevel(clampSampler, screenUV, 0);
-		visibility *= sss;
-
-		[branch]
-		if (visibility > 0.f)
-		{
-			totalLighting.add(calculateDirectLighting(surface, light, specularNoise), visibility);
-		}
-	}
+	totalLighting.addSunLight(surface, lighting, screenUV, pixelDepth,
+		shadowMap, shadowSampler, lighting.shadowMapTexelSize, sssTexture, clampSampler);
 
 
 	// Ambient light.
