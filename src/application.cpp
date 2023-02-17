@@ -305,7 +305,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 
 	this->scene.sun.direction = normalize(vec3(-0.6f, -1.f, -0.3f));
 	this->scene.sun.color = vec3(1.f, 0.93f, 0.76f);
-	this->scene.sun.intensity = 15.f;
+	this->scene.sun.intensity = 6.f;
 
 	this->scene.sun.numShadowCascades = 3;
 	this->scene.sun.shadowDimensions = 2048;
