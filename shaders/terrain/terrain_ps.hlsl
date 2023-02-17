@@ -236,6 +236,9 @@ ps_output main(ps_input IN)
 	totalLighting.specular += specular * lighting.globalIlluminationIntensity * ao;
 
 
+	surface.roughness = 1.f; // This is a fake to disable SSR on terrain (I find it costs more than it's worth for the grassy terrain we have).
+
+
 	ps_output OUT;
 	OUT.hdrColor = totalLighting.evaluate(surface.albedo);
 	OUT.worldNormalRoughness = float4(packNormal(N), surface.roughness, 0.f);
