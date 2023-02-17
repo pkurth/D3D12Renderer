@@ -42,6 +42,7 @@ struct render_resources
 	static ref<dx_texture> blackTexture;
 	static ref<dx_texture> blackCubeTexture;
 	static ref<dx_texture> noiseTexture;
+	static ref<dx_texture> defaultNormalMap;
 
 	static ref<dx_texture> shadowMap;
 	static ref<dx_texture> staticShadowMapCache;

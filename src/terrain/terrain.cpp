@@ -188,19 +188,17 @@ PIPELINE_RENDER_IMPL(terrain_pipeline)
 	cl->setDescriptorHeapSRV(TERRAIN_RS_HEIGHTMAP, 0, rc.data.common.heightmap);
 	cl->setDescriptorHeapSRV(TERRAIN_RS_NORMALMAP, 0, rc.data.normalmap);
 
-	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 0, rc.data.groundMaterial->albedo ? rc.data.groundMaterial->albedo : render_resources::blackTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 1, rc.data.groundMaterial->normal ? rc.data.groundMaterial->normal : render_resources::defaultNormalMap);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 2, rc.data.groundMaterial->roughness ? rc.data.groundMaterial->roughness : render_resources::whiteTexture);
 
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 0, rc.data.groundMaterial->albedo ? rc.data.groundMaterial->albedo->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 1, rc.data.groundMaterial->normal ? rc.data.groundMaterial->normal->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 2, rc.data.groundMaterial->roughness ? rc.data.groundMaterial->roughness->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 3, rc.data.rockMaterial->albedo ? rc.data.rockMaterial->albedo : render_resources::blackTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 4, rc.data.rockMaterial->normal ? rc.data.rockMaterial->normal : render_resources::defaultNormalMap);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 5, rc.data.rockMaterial->roughness ? rc.data.rockMaterial->roughness : render_resources::whiteTexture);
 
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 3, rc.data.rockMaterial->albedo ? rc.data.rockMaterial->albedo->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 4, rc.data.rockMaterial->normal ? rc.data.rockMaterial->normal->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 5, rc.data.rockMaterial->roughness ? rc.data.rockMaterial->roughness->defaultSRV : nullTexture);
-
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 6, rc.data.mudMaterial->albedo ? rc.data.mudMaterial->albedo->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 7, rc.data.mudMaterial->normal ? rc.data.mudMaterial->normal->defaultSRV : nullTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 8, rc.data.mudMaterial->roughness ? rc.data.mudMaterial->roughness->defaultSRV : nullTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 6, rc.data.mudMaterial->albedo ? rc.data.mudMaterial->albedo : render_resources::blackTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 7, rc.data.mudMaterial->normal ? rc.data.mudMaterial->normal : render_resources::defaultNormalMap);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 8, rc.data.mudMaterial->roughness ? rc.data.mudMaterial->roughness : render_resources::whiteTexture);
 
 	cl->setIndexBuffer(terrainIndexBuffers[rc.data.common.lod]);
 	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);

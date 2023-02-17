@@ -66,10 +66,10 @@ PIPELINE_SETUP_IMPL(water_pipeline)
 	cl->setGraphicsDynamicConstantBuffer(WATER_RS_LIGHTING, common.lightingCBV);
 	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 0, common.opaqueColor);
 	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 1, common.opaqueDepth);
-	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 2, normalmap1 ? normalmap1->defaultSRV : render_resources::nullTextureSRV);
-	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 3, normalmap2 ? normalmap2->defaultSRV : render_resources::nullTextureSRV);
-	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 4, foamTexture ? foamTexture->defaultSRV : render_resources::nullTextureSRV);
-	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 5, noiseTexture ? noiseTexture->defaultSRV : render_resources::nullTextureSRV);
+	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 2, normalmap1 ? normalmap1 : render_resources::defaultNormalMap);
+	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 3, normalmap2 ? normalmap2 : render_resources::defaultNormalMap);
+	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 4, foamTexture ? foamTexture : render_resources::blackTexture);
+	cl->setDescriptorHeapSRV(WATER_RS_TEXTURES, 5, noiseTexture ? noiseTexture : render_resources::blackTexture);
 
 	dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
 

@@ -12,6 +12,7 @@ ref<dx_texture> render_resources::whiteTexture;
 ref<dx_texture> render_resources::blackTexture;
 ref<dx_texture> render_resources::blackCubeTexture;
 ref<dx_texture> render_resources::noiseTexture;
+ref<dx_texture> render_resources::defaultNormalMap;
 				
 ref<dx_texture> render_resources::shadowMap;
 ref<dx_texture> render_resources::staticShadowMapCache;
@@ -41,6 +42,11 @@ void render_resources::initializeGlobalResources()
 
 		blackCubeTexture = createCubeTexture(black, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
 		SET_NAME(blackCubeTexture->resource, "Black cube");
+	}
+	{
+		uint8 up[] = { 128, 128, 255, 255 };
+		defaultNormalMap = createTexture(up, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
+		SET_NAME(defaultNormalMap->resource, "Default normal map");
 	}
 
 	noiseTexture = loadTextureFromFile("resources/noise/blue_noise.dds", image_load_flags_noncolor); // Already compressed and in DDS format.

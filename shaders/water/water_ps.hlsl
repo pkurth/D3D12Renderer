@@ -74,6 +74,7 @@ float4 main(ps_input IN) : SV_TARGET
 	float transition = saturate((sceneDepth - (thisDepth + cb.shallowDepth)) * cb.transitionStrength);
 
 
+	// Inspired by https://alextardif.com/Water.html
 	const float noiseUVScale = 0.7f;
 	float specularNoise = 1.f + 
 		3.f * noiseTexture.Sample(wrapSampler, uv0 * noiseUVScale) * 
