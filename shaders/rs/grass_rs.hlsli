@@ -129,6 +129,9 @@ struct grass_generation_common_cb
     float lodChangeStartDistance;
     float lodChangeEndDistance;
 
+    float cullStartDistance;
+    float cullEndDistance;
+
     float time;
     float prevFrameTime;
     float baseHeight;

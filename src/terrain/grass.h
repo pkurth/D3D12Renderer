@@ -13,6 +13,9 @@ struct grass_settings
 
 	float lodChangeStartDistance = 50.f;
 	float lodChangeTransitionDistance = 75.f;
+
+	float cullStartDistance = 350.f;
+	float cullTransitionDistance = 50.f;
 };
 
 struct grass_component

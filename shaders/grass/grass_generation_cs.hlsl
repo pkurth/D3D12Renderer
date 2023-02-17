@@ -34,9 +34,15 @@ static bool cull(float3 minCorner, float3 maxCorner)
 	return false;
 }
 
-static const float cullCutoffs[2][2] =
+static const float cullCutoffsLOD0[2][2] =
 {
 	{ 2.f, 0.25f },
+	{ 0.75f, 0.8f },
+};
+
+static const float cullCutoffsLOD1[2][2] =
+{
+	{ 1.f, 0.25f },
 	{ 0.75f, 0.8f },
 };
 
@@ -64,19 +70,18 @@ void main(cs_input IN)
 
 		if (normal.y > 0.9f && !cull(position - float3(1.f, 0.f, 1.f), position + float3(1.f, 2.f, 1.f)))
 		{
-			bool cull = false;
-			float lod = 0.f;
+			float distance = length(position - common.cameraPosition);
 
-			if (cb.lodIndex == 0)
-			{
-				float distance = length(position - common.cameraPosition);
-				float cullValue = smoothstep(common.lodChangeStartDistance, common.lodChangeEndDistance, distance);// -nextRand(seed) * 0.1f;
+			float cullStartDistance = (cb.lodIndex == 0) ? common.lodChangeStartDistance : common.cullStartDistance;
+			float cullEndDistance = (cb.lodIndex == 0) ? common.lodChangeEndDistance : common.cullEndDistance;
+			float cutoff = (cb.lodIndex == 0) 
+				? cullCutoffsLOD0[IN.dispatchThreadID.x & 1][IN.dispatchThreadID.y & 1] 
+				: cullCutoffsLOD1[IN.dispatchThreadID.x & 1][IN.dispatchThreadID.y & 1];
 
-				float cutoff = cullCutoffs[IN.dispatchThreadID.x & 1][IN.dispatchThreadID.y & 1];
+			float cullValue = smoothstep(cullStartDistance, cullEndDistance, distance);// -nextRand(seed) * 0.1f;
 
-				cull = cullValue >= cutoff;
-				lod = cullValue;
-			}
+			bool cull = cullValue >= cutoff;
+			float lod = (cb.lodIndex == 0) ? cullValue : 0.f;
 
 			if (!cull)
 			{

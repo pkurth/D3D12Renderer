@@ -738,6 +738,9 @@ bool scene_editor::drawSceneHierarchy()
 
 							ImGui::PropertyDrag("LOD change start distance", grass.settings.lodChangeStartDistance, 0.5f);
 							ImGui::PropertyDrag("LOD change transition distance", grass.settings.lodChangeTransitionDistance, 0.5f);
+
+							ImGui::PropertyDrag("Cull start distance", grass.settings.cullStartDistance, 0.5f);
+							ImGui::PropertyDrag("Cull transition distance", grass.settings.cullTransitionDistance, 0.5f);
 							ImGui::EndProperties();
 						}
 					});

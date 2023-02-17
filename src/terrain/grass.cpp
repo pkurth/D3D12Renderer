@@ -254,7 +254,7 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 			uint32 numGrassBladesPerDim = settings.numGrassBladesPerChunkDim & (~1); // Make sure this is an even number.
 			numGrassBladesPerDim = min(numGrassBladesPerDim, 1024u);
 			const float lodChangeEndDistance = settings.lodChangeStartDistance + settings.lodChangeTransitionDistance;
-
+			const float cullEndDistance = settings.cullStartDistance + settings.cullTransitionDistance;
 
 			grass_generation_common_cb common;
 			memcpy(common.frustumPlanes, frustum.planes, sizeof(vec4) * 6);
@@ -263,6 +263,8 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 			common.cameraPosition = camera.position;
 			common.lodChangeStartDistance = settings.lodChangeStartDistance;
 			common.lodChangeEndDistance = lodChangeEndDistance;
+			common.cullStartDistance = settings.cullStartDistance;
+			common.cullEndDistance = cullEndDistance;
 			common.uvScale = 1.f / numGrassBladesPerDim;
 			common.baseHeight = settings.bladeHeight;
 			common.time = time;
@@ -293,6 +295,10 @@ void grass_component::generate(const render_camera& camera, const terrain_compon
 						{
 							chunkNumGrassBladesPerDim /= 2;
 							lodIndex = 1;
+						}
+						if (sqDistance > cullEndDistance * cullEndDistance)
+						{
+							continue;
 						}
 
 						cl->setDescriptorHeapSRV(GRASS_GENERATION_RS_RESOURCES, 0, chunk.heightmap);
