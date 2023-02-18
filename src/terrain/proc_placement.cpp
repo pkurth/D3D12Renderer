@@ -102,6 +102,7 @@ PIPELINE_RENDER_IMPL(render_proc_placement_layer_pipeline)
 
 #if READBACK
 static ref<dx_buffer> readbackIndirect;
+static ref<dx_buffer> readbackMeshCounts;
 static ref<dx_buffer> readbackMeshOffsets;
 #endif
 
@@ -175,6 +176,7 @@ proc_placement_component::proc_placement_component(const std::vector<proc_placem
 
 #if READBACK
 	readbackIndirect = createReadbackBuffer(sizeof(placement_draw), (uint32)drawArgs.size());
+	readbackMeshCounts = createReadbackBuffer(sizeof(uint32), globalMeshOffset);
 	readbackMeshOffsets = createReadbackBuffer(sizeof(uint32), globalMeshOffset);
 #endif
 }
@@ -289,7 +291,11 @@ void proc_placement_component::generate(const render_camera& camera, const terra
 			cl->setPipelineState(*createDrawCallsPipeline.pipeline);
 			cl->setComputeRootSignature(*createDrawCallsPipeline.rootSignature);
 		
-			cl->setCompute32BitConstants(PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_CB, proc_placement_create_draw_calls_cb{ transformBuffer->gpuVirtualAddress, transformBuffer->elementSize });
+			proc_placement_create_draw_calls_cb cb;
+			cb.transformAddressHigh = (uint32)(transformBuffer->gpuVirtualAddress >> 32);
+			cb.transformAddressLow = (uint32)(transformBuffer->gpuVirtualAddress & 0xFFFFFFFF);
+			cb.stride = transformBuffer->elementSize;
+			cl->setCompute32BitConstants(PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_CB, cb);
 			cl->setRootComputeUAV(PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_OUTPUT, drawIndirectBuffer);
 			cl->setRootComputeSRV(PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_MESH_COUNTS, meshCountBuffer);
 			cl->setRootComputeSRV(PROC_PLACEMENT_CREATE_DRAW_CALLS_RS_MESH_OFFSETS, meshOffsetBuffer);
@@ -297,6 +303,10 @@ void proc_placement_component::generate(const render_camera& camera, const terra
 		
 			cl->dispatch(bucketize(drawIndirectBuffer->elementCount, PROC_PLACEMENT_CREATE_DRAW_CALLS_BLOCK_SIZE));
 		}
+
+#if READBACK
+		cl->copyBufferRegionToBuffer(meshCountBuffer, readbackMeshCounts, 0, meshCountBuffer->elementCount, 0);
+#endif
 
 		barrier_batcher(cl)
 			.transition(meshCountBuffer, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
@@ -334,12 +344,26 @@ void proc_placement_component::generate(const render_camera& camera, const terra
 	{	
 		placement_draw* draw = (placement_draw*)mapBuffer(readbackIndirect, true);
 		uint32* offsets = (uint32*)mapBuffer(readbackMeshOffsets, true);
+		uint32* counts = (uint32*)mapBuffer(readbackMeshCounts, true);
 
-		LOG_MESSAGE("%u (%u/%u), %u (%u/%u), %u (%u/%u)", 
-			draw[0].draw.InstanceCount, draw[0].offset, offsets[0], 
-			draw[1].draw.InstanceCount, draw[1].offset, offsets[1],
-			draw[2].draw.InstanceCount, draw[2].offset, offsets[2]);
+		for (uint32 i = 0; i < readbackIndirect->elementCount; ++i)
+		{
+			uint32 meshID = submeshToMesh[i];
 
+			D3D12_GPU_VIRTUAL_ADDRESS expectedAddress = transformBuffer->gpuVirtualAddress + offsets[meshID] * transformBuffer->elementSize;
+			uint32 expectedHigh = (uint32)(expectedAddress >> 32);
+			uint32 expectedLow = (uint32)(expectedAddress & 0xFFFFFFFF);
+
+			assert(draw[i].transformSRVHigh == expectedHigh);
+			assert(draw[i].transformSRVLow == expectedLow);
+		}
+
+		LOG_MESSAGE("%u vs %u (%u), %u vs %u (%u), %u vs %u (%u)", 
+			draw[0].draw.InstanceCount, counts[0], offsets[0], 
+			draw[1].draw.InstanceCount, counts[1], offsets[1],
+			draw[2].draw.InstanceCount, counts[2], offsets[2]);
+
+		unmapBuffer(readbackMeshCounts, false);
 		unmapBuffer(readbackMeshOffsets, false);
 		unmapBuffer(readbackIndirect, false);
 	}

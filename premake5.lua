@@ -1,7 +1,6 @@
 local gpu_name = ""
 local gpu_model_number = 0
 local sdk_version = 0
-local win_version = 0
 
 
 -------------------------
@@ -37,31 +36,8 @@ end
 sdk_directory_handle:close()
 
 
--------------------------
--- CHECK WINDOWS VERSION
--------------------------
-
-local win_ver_handle = io.popen("ver")
-local win_ver_string = win_ver_handle:read("*a")
-win_ver_handle:close()
-for version in string.gmatch(win_ver_string, "10.0.(%d+).%d+") do
-	local v = tonumber(version)
-	if v > win_version then
-		win_version = v
-	end
-end
-
-
-print("Windows version: ", win_version)
 print("Windows SDK version: ", sdk_version)
 print("Installed GPU: ", gpu_name)
-
-
---if win_version < sdk_version then
---	term.pushColor(term.warningColor)
---	print("Your Windows SDK is newer than your Windows OS. Consider updating your OS or there might be compatability issues.")
---	term.popColor()
---end
 
 local turing_or_higher = gpu_model_number >= 1650
 
@@ -79,7 +55,7 @@ end
 
 
 
-local mesh_shaders_supported = turing_or_higher and new_sdk_available and win_version >= new_sdk_version
+local mesh_shaders_supported = turing_or_higher and new_sdk_available
 
 if not mesh_shaders_supported then
 	term.pushColor(term.infoColor)
@@ -315,6 +291,10 @@ project "D3D12Renderer"
 
 		defines { "SHADER_BIN_DIR=L\"" .. shaderoutputdir .. "\"" }
 
+		if mesh_shaders_supported then
+			defines { "MESH_SHADER_SUPPORTED "}
+		end
+
 
 	filter "files:**.hlsl"
 		if turing_or_higher and new_sdk_available then
@@ -348,7 +328,9 @@ project "D3D12Renderer"
 			"vec2=float2",
 			"vec3=float3",
 			"vec4=float4",
-			"uint32=uint"
+			"int32=int",
+			"uint32=uint",
+			"uint64=uint64_t",
 		}
 	
 		shaderoptions {

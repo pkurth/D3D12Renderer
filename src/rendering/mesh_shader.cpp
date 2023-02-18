@@ -6,7 +6,7 @@
 #include "material.h"
 #include "render_utils.h"
 
-#ifdef SDK_SUPPORTS_MESH_SHADERS
+#if defined(SDK_SUPPORTS_MESH_SHADERS) && defined(MESH_SHADER_SUPPORTED)
 
 static dx_pipeline meshletPipeline;
 static dx_pipeline blobPipeline;

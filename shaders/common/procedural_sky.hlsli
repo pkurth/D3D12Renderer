@@ -78,45 +78,42 @@ static float getCloudValue(float2 p, float intensity)
 	return noise * intensity;
 }
 
-static float3 getClouds(float3 V)
+static float getClouds(float3 V)
 {
 	const float height = 1000.f;
 
 	float ndotd = -V.y;
-	if (abs(ndotd) < 1e-6f)
+
+	float result = 0.f;
+	if (abs(ndotd) >= 1e-6f)
 	{
-		return 0.f;
-	}
+		float t = -height / ndotd;
+		if (t > 0.f)
+		{
+			float3 hit = t * V;
+			float l = length(hit.xz);
 
-	float t = -height / ndotd;
-	if (t < 0.f)
-	{
-		return 0.f;
-	}
+			float intensity = 1.f - smoothstep(0.f, 30000.f, l);
 
-	float3 hit = t * V;
-	float l = length(hit.xz);
-
-	float intensity = 1.f - smoothstep(0.f, 30000.f, l);
-
-	float2 p = hit.xz * 0.0007f;
-	float value = getCloudValue(p, intensity);
-
+			float2 p = hit.xz * 0.0007f;
+			result = getCloudValue(p, intensity);
+		}
 #if 0
-	const float delta = 0.1f;
-	const float invDelta = 1.f / delta;
+		const float delta = 0.1f;
+		const float invDelta = 1.f / delta;
 
-	float nx = getCloudValue(p + float2(delta, 0.f), intensity);
-	float nz = getCloudValue(p + float2(0.f, delta), intensity);
+		float nx = getCloudValue(p + float2(delta, 0.f), intensity);
+		float nz = getCloudValue(p + float2(0.f, delta), intensity);
 
-	float3 N = normalize(float3(
-		-(nx - value) * invDelta,
-		-1.f,
-		-(nz - value) * invDelta
-		));
+		float3 N = normalize(float3(
+			-(nx - value) * invDelta,
+			-1.f,
+			-(nz - value) * invDelta
+			));
 
 #endif
-	return value;
+	}
+	return result;
 }
 
 static float3 proceduralSky(float3 V, float3 L)

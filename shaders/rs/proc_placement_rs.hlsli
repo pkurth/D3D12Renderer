@@ -13,7 +13,8 @@ struct placement_point
 
 struct placement_draw
 {
-	D3D12_GPU_VIRTUAL_ADDRESS transformSRV;
+	uint32 transformSRVLow;
+	uint32 transformSRVHigh;
 	D3D12_DRAW_INDEXED_ARGUMENTS draw;
 };
 
@@ -78,12 +79,13 @@ struct prefix_sum_cb
 
 struct proc_placement_create_draw_calls_cb
 {
-	D3D12_GPU_VIRTUAL_ADDRESS transformAddress;
+	uint32 transformAddressLow;
+	uint32 transformAddressHigh;
 	uint32 stride;
 };
 
 #define PROC_PLACEMENT_CREATE_DRAW_CALLS_RS \
-	"RootConstants(num32BitConstants=4, b0), " \
+	"RootConstants(num32BitConstants=3, b0), " \
 	"UAV(u0), " \
 	"SRV(t0), " \
 	"SRV(t1), " \

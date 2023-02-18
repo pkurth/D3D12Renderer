@@ -14,6 +14,12 @@ void main(cs_input IN)
 {
 	uint id = IN.dispatchThreadID.x;
 	uint meshID = submeshToMesh[id];
-	draws[id].draw.InstanceCount = meshCounts[meshID];
-	draws[id].transformSRV = cb.transformAddress + meshOffsets[meshID] * cb.stride;
+
+	placement_draw draw = draws[id];
+	draw.draw.InstanceCount = meshCounts[meshID];
+
+	uint offset = meshOffsets[meshID] * cb.stride;
+	draw.transformSRVLow = cb.transformAddressLow + offset;
+	draw.transformSRVHigh = cb.transformAddressHigh + uint(draw.transformSRVLow < cb.transformAddressLow);
+	draws[id] = draw;
 }

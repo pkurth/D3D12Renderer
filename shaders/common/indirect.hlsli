@@ -26,8 +26,6 @@ struct D3D12_DRAW_INDEXED_ARGUMENTS
 	uint32 StartInstanceLocation;
 };
 
-#define D3D12_GPU_VIRTUAL_ADDRESS uint64_t
-
 #endif
 
 #endif
