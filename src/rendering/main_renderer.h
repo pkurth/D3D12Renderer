@@ -166,6 +166,7 @@ struct main_renderer
 
 
 private:
+	uint64 executeComputeTasks(compute_pass_event eventTime);
 
 	const sun_shadow_render_pass* sunShadowRenderPasses[MAX_NUM_SUN_LIGHT_SHADOW_PASSES];
 	const spot_shadow_render_pass* spotLightShadowRenderPasses[MAX_NUM_SPOT_LIGHT_SHADOW_PASSES];

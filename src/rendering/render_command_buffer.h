@@ -7,10 +7,12 @@ struct dx_command_list;
 struct common_render_data;
 
 typedef void (*pipeline_setup_func)(dx_command_list*, const common_render_data&);
-typedef void (*pipeline_render_func)(dx_command_list*, const mat4&, void*);
-typedef void (*depth_prepass_render_func)(dx_command_list*, const mat4&, const mat4&, void*);
 
-template <typename key_t, typename render_func = pipeline_render_func>
+typedef void (*default_execute_func)(dx_command_list*, const mat4&, void*);
+typedef void (*depth_prepass_execute_func)(dx_command_list*, const mat4&, const mat4&, void*);
+typedef void (*compute_execute_func)(dx_command_list*, void*);
+
+template <typename key_t, typename execute_func = default_execute_func>
 struct render_command_buffer
 {
 private:
@@ -23,7 +25,7 @@ private:
 	struct command_header
 	{
 		pipeline_setup_func setup;
-		render_func render;
+		execute_func execute;
 	};
 
 	struct command_wrapper_base
@@ -48,24 +50,32 @@ private:
 		new (commandWrapper) command_wrapper;
 
 		commandWrapper->header.setup = pipeline_t::setup;
+		commandWrapper->header.execute = 0;
 
-		if constexpr (std::is_same_v<render_func, pipeline_render_func>)
+		if constexpr (std::is_same_v<execute_func, default_execute_func>)
 		{
-			commandWrapper->header.render = [](dx_command_list* cl, const mat4& viewProj, void* data)
+			commandWrapper->header.execute = [](dx_command_list* cl, const mat4& viewProj, void* data)
 			{
 				command_wrapper* wrapper = (command_wrapper*)data;
 				pipeline_t::render(cl, viewProj, wrapper->command);
 			};
 		}
-		else
+		else if constexpr (std::is_same_v<execute_func, depth_prepass_execute_func>)
 		{
-			commandWrapper->header.render = [](dx_command_list* cl, const mat4& viewProj, const mat4& prevFrameViewProj, void* data)
+			commandWrapper->header.execute = [](dx_command_list* cl, const mat4& viewProj, const mat4& prevFrameViewProj, void* data)
 			{
 				command_wrapper* wrapper = (command_wrapper*)data;
 				pipeline_t::render(cl, viewProj, prevFrameViewProj, wrapper->command);
 			};
 		}
-
+		else if constexpr (std::is_same_v<execute_func, compute_execute_func>)
+		{
+			commandWrapper->header.execute = [](dx_command_list* cl, void* data)
+			{
+				command_wrapper* wrapper = (command_wrapper*)data;
+				pipeline_t::compute(cl, wrapper->command);
+			};
+		}
 
 		command_key key;
 		key.key = sortKey;

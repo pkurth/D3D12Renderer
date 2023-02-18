@@ -64,3 +64,6 @@ struct common_render_data
 #define PARTICLE_PIPELINE_RENDER_DECL		static void render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<render_data_t>& rc)
 #define PARTICLE_PIPELINE_RENDER_IMPL(name)	void name::render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<render_data_t>& rc)
 
+#define PIPELINE_COMPUTE_DECL				static void compute(dx_command_list* cl, const render_command<render_data_t>& rc)
+#define PIPELINE_COMPUTE_IMPL(name)			void name::compute(dx_command_list* cl, const render_command<render_data_t>& rc)
+

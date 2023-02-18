@@ -22,6 +22,7 @@
 #include "terrain/proc_placement.h"
 #include "terrain/grass.h"
 #include "terrain/water.h"
+#include "animation/skinning.h"
 
 
 static raytracing_object_type defineBlasFromMesh(const ref<multi_mesh>& mesh)
@@ -630,7 +631,7 @@ void application::update(const user_input& input, float dt)
 
 		for (auto [entityHandle, terrain, position, grass] : scene.group(entt::get<terrain_component, position_component, grass_component>).each())
 		{
-			grass.generate(this->scene.camera, terrain, position.position, unscaledDt);
+			grass.generate(&computePass, this->scene.camera, terrain, position.position, unscaledDt);
 			grass.render(&opaqueRenderPass, (uint32)entityHandle);
 		}
 
@@ -781,6 +782,8 @@ void application::update(const user_input& input, float dt)
 	{
 		dynamic = transform;
 	}
+
+	performSkinning(&computePass);
 }
 
 void application::handleFileDrop(const fs::path& filename)

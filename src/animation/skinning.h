@@ -19,4 +19,4 @@ std::tuple<dx_vertex_buffer_group_view, mat4*> skinObject(const dx_vertex_buffer
 
 dx_vertex_buffer_group_view skinCloth(const dx_vertex_buffer_view& positions, uint32 gridSizeX, uint32 gridSizeY);
 
-uint64 performSkinning();
+void performSkinning(struct compute_pass* computePass);

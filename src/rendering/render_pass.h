@@ -33,8 +33,7 @@ struct opaque_render_pass
 		using render_data_t = typename pipeline_t::render_data_t;
 
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		auto& command = pass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey);
-		command.data = renderData;
+		pass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, renderData);
 	}
 
 	template <typename pipeline_t, typename depth_prepass_pipeline_t>
@@ -48,9 +47,31 @@ struct opaque_render_pass
 			using render_data_t = typename depth_prepass_pipeline_t::render_data_t;
 
 			uint64 sortKey = (uint64)depth_prepass_pipeline_t::setup;
-			auto& command = depthPrepass.emplace_back<depth_prepass_pipeline_t, depth_only_render_command<render_data_t>>(sortKey);
-			command.data = depthPrepassRenderData;
-			command.objectID = objectID;
+			depthPrepass.emplace_back<depth_prepass_pipeline_t, depth_only_render_command<render_data_t>>(sortKey, objectID, depthPrepassRenderData);
+		}
+	}
+
+	template <typename pipeline_t>
+	void renderObject(typename pipeline_t::render_data_t&& renderData)
+	{
+		using render_data_t = typename pipeline_t::render_data_t;
+
+		uint64 sortKey = (uint64)pipeline_t::setup;
+		pass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(renderData));
+	}
+
+	template <typename pipeline_t, typename depth_prepass_pipeline_t>
+	void renderObject(typename pipeline_t::render_data_t&& renderData,
+		typename depth_prepass_pipeline_t::render_data_t&& depthPrepassRenderData,
+		uint32 objectID = -1)
+	{
+		renderObject<pipeline_t>(std::move(renderData));
+
+		{
+			using render_data_t = typename depth_prepass_pipeline_t::render_data_t;
+
+			uint64 sortKey = (uint64)depth_prepass_pipeline_t::setup;
+			depthPrepass.emplace_back<depth_prepass_pipeline_t, depth_only_render_command<render_data_t>>(sortKey, objectID, std::move(depthPrepassRenderData));
 		}
 	}
 
@@ -119,7 +140,7 @@ struct opaque_render_pass
 	}
 
 	render_command_buffer<uint64> pass;
-	render_command_buffer<uint64, depth_prepass_render_func> depthPrepass;
+	render_command_buffer<uint64, depth_prepass_execute_func> depthPrepass;
 
 private:
 
@@ -220,8 +241,7 @@ struct transparent_render_pass
 		using render_data_t = typename pipeline_t::render_data_t;
 
 		float depth = 0.f; // TODO
-		auto& command = pass.emplace_back<pipeline_t, render_command<render_data_t>>(-depth); // Negative depth -> sort from back to front.
-		command.data = data;
+		pass.emplace_back<pipeline_t, render_command<render_data_t>>(-depth, data); // Negative depth -> sort from back to front.
 	}
 
 	template <typename pipeline_t>
@@ -284,8 +304,16 @@ struct ldr_render_pass
 		using render_data_t = typename pipeline_t::render_data_t;
 
 		float depth = 0.f; // TODO
-		auto& command = ldrPass.emplace_back<pipeline_t, render_command<render_data_t>>(depth);
-		command.data = data;
+		ldrPass.emplace_back<pipeline_t, render_command<render_data_t>>(depth, data);
+	}
+
+	template <typename pipeline_t>
+	void renderObject(typename pipeline_t::render_data_t&& data)
+	{
+		using render_data_t = typename pipeline_t::render_data_t;
+
+		float depth = 0.f; // TODO
+		ldrPass.emplace_back<pipeline_t, render_command<render_data_t>>(depth, std::move(data));
 	}
 
 	template <typename pipeline_t>
@@ -294,8 +322,16 @@ struct ldr_render_pass
 		using render_data_t = typename pipeline_t::render_data_t;
 
 		float depth = 0.f; // TODO
-		auto& command = overlays.emplace_back<pipeline_t, render_command<render_data_t>>(depth);
-		command.data = data;
+		overlays.emplace_back<pipeline_t, render_command<render_data_t>>(depth, data);
+	}
+
+	template <typename pipeline_t>
+	void renderOverlay(typename pipeline_t::render_data_t&& data)
+	{
+		using render_data_t = typename pipeline_t::render_data_t;
+
+		float depth = 0.f; // TODO
+		overlays.emplace_back<pipeline_t, render_command<render_data_t>>(depth, std::move(data));
 	}
 
 	void renderOutline(const mat4& transform,
@@ -348,8 +384,16 @@ struct shadow_render_pass_base
 		using render_data_t = typename pipeline_t::render_data_t;
 
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		auto& command = staticPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey);
-		command.data = renderData;
+		staticPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, renderData);
+	}
+
+	template <typename pipeline_t>
+	void renderStaticObject(typename pipeline_t::render_data_t&& renderData)
+	{
+		using render_data_t = typename pipeline_t::render_data_t;
+
+		uint64 sortKey = (uint64)pipeline_t::setup;
+		staticPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(renderData));
 	}
 
 	template <typename pipeline_t>
@@ -358,8 +402,16 @@ struct shadow_render_pass_base
 		using render_data_t = typename pipeline_t::render_data_t;
 
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		auto& command = dynamicPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey);
-		command.data = renderData;
+		dynamicPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, renderData);
+	}
+
+	template <typename pipeline_t>
+	void renderDynamicObject(typename pipeline_t::render_data_t&& renderData)
+	{
+		using render_data_t = typename pipeline_t::render_data_t;
+
+		uint64 sortKey = (uint64)pipeline_t::setup;
+		dynamicPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(renderData));
 	}
 
 	render_command_buffer<uint64> staticPass;
@@ -383,9 +435,21 @@ struct sun_shadow_render_pass
 	}
 
 	template <typename pipeline_t>
+	void renderStaticObject(uint32 cascadeIndex, typename pipeline_t::render_data_t&& renderData)
+	{
+		cascades[cascadeIndex].renderStaticObject<pipeline_t>(std::move(renderData));
+	}
+
+	template <typename pipeline_t>
 	void renderDynamicObject(uint32 cascadeIndex, const typename pipeline_t::render_data_t& renderData)
 	{
 		cascades[cascadeIndex].renderDynamicObject<pipeline_t>(renderData);
+	}
+
+	template <typename pipeline_t>
+	void renderDynamicObject(uint32 cascadeIndex, typename pipeline_t::render_data_t&& renderData)
+	{
+		cascades[cascadeIndex].renderDynamicObject<pipeline_t>(std::move(renderData));
 	}
 
 	void reset()
@@ -437,11 +501,26 @@ struct point_shadow_render_pass : shadow_render_pass_base
 
 
 
+enum compute_pass_event
+{
+	compute_pass_frame_start,
+	compute_pass_before_depth_prepass,
+	compute_pass_before_opaque,
+	compute_pass_before_transparent_and_post_processing,
+
+	compute_pass_event_count,
+};
+
 struct compute_pass
 {
 	void reset()
 	{
 		particleSystemUpdates.clear();
+
+		for (uint32 i = 0; i < compute_pass_event_count; ++i)
+		{
+			passes[i].clear();
+		}
 	}
 
 	void updateParticleSystem(struct particle_system* p)
@@ -449,8 +528,25 @@ struct compute_pass
 		particleSystemUpdates.push_back(p);
 	}
 
+	template <typename pipeline_t>
+	void addTask(compute_pass_event eventTime, const typename pipeline_t::render_data_t& data)
+	{
+		using render_data_t = typename pipeline_t::render_data_t;
+		passes[eventTime].emplace_back<pipeline_t, render_command<render_data_t>>(eventTime, data);
+	}
+
+	template <typename pipeline_t>
+	void addTask(compute_pass_event eventTime, typename pipeline_t::render_data_t&& data)
+	{
+		using render_data_t = typename pipeline_t::render_data_t;
+		passes[eventTime].emplace_back<pipeline_t, render_command<render_data_t>>(eventTime, std::move(data));
+	}
+
+
 	float dt;
 	std::vector<struct particle_system*> particleSystemUpdates;
+
+	render_command_buffer<uint64, compute_execute_func> passes[compute_pass_event_count];
 };
 
 

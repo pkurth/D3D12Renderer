@@ -22,7 +22,7 @@ struct grass_component
 {
 	grass_component();
 
-	void generate(const render_camera& camera, const terrain_component& terrain, vec3 positionOffset, float dt);
+	void generate(struct compute_pass* computePass, const render_camera& camera, const terrain_component& terrain, vec3 positionOffset, float dt);
 	void render(struct opaque_render_pass* renderPass, uint32 entityID = -1);
 
 	grass_settings settings;

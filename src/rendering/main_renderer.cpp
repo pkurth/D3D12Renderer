@@ -9,7 +9,6 @@
 
 #include "raytracing.h"
 #include "raytraced_reflections.h"
-#include "animation/skinning.h"
 #include "particles/particles.h"
 
 #include "light_source.hlsli"
@@ -323,6 +322,23 @@ void main_renderer::setDecals(const ref<dx_buffer>& decals, uint32 numDecals, co
 	main_renderer::decalTextureAtlas = textureAtlas;
 }
 
+uint64 main_renderer::executeComputeTasks(compute_pass_event eventTime)
+{
+	uint64 result = 0;
+	if (computePass && computePass->passes[eventTime].size() > 0)
+	{
+		dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
+
+		for (const auto& dc : computePass->passes[eventTime])
+		{
+			dc.execute(cl, dc.data);
+		}
+
+		result = dxContext.executeCommandList(cl);
+	}
+	return result;
+}
+
 void main_renderer::endFrame(const user_input* input)
 {
 	bool aspectRatioModeChanged = aspectRatioMode != oldAspectRatioMode;
@@ -400,9 +416,6 @@ void main_renderer::endFrame(const user_input* input)
 	commonParticleData.prevFrameNormals = worldNormalsRoughnessTexture;
 
 
-
-
-	uint64 skinningFence = performSkinning();
 
 
 
@@ -856,21 +869,29 @@ void main_renderer::endFrame(const user_input* input)
 		context.waitForWorkCompletion();
 
 
+		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, executeComputeTasks(compute_pass_frame_start));
+		dxContext.executeCommandList(cl0);
 
-		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, skinningFence);
+		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, executeComputeTasks(compute_pass_before_depth_prepass));
+		dxContext.executeCommandList(cl1);
 
-		dx_command_list* prePassCLs[] = { cl0, cl1 };
-		dxContext.executeCommandLists(prePassCLs, arraysize(prePassCLs));
+		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, executeComputeTasks(compute_pass_before_opaque));
+		dxContext.executeCommandList(cl2);
 
-		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, max(giFence, particleUpdateFence));
-
-		dx_command_list* mainPassCLs[] = { cl2, cl3 };
-		dxContext.executeCommandLists(mainPassCLs, arraysize(mainPassCLs));
+		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, executeComputeTasks(compute_pass_before_transparent_and_post_processing));
+		dxContext.executeCommandList(cl3);
 
 	}
 	else if (mode == renderer_mode_visualize_sun_shadow_cascades)
 	{
-		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, skinningFence);
+		uint64 maxFence = 0;
+		for (uint32 i = 0; i < compute_pass_event_count; ++i)
+		{
+			uint64 fence = executeComputeTasks((compute_pass_event)i);
+			maxFence = max(maxFence, fence);
+		}
+
+		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, maxFence);
 
 		dx_command_list* cl = dxContext.getFreeRenderCommandList();
 

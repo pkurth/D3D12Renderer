@@ -69,6 +69,8 @@ private:
 	terrain_generation_settings oldGenSettings;
 
 	std::vector<terrain_chunk> chunks;
+
+	friend struct grass_component;
 };
 
 
