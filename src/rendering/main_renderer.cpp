@@ -338,7 +338,7 @@ uint64 main_renderer::executeComputeTasks(compute_pass_event eventTime, const fu
 		{
 			for (const auto& dc : computePass->passes[eventTime])
 			{
-				dc.execute(cl, dc.data);
+				dc.compute(cl, dc.data);
 			}
 		}
 

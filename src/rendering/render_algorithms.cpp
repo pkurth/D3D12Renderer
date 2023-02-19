@@ -207,7 +207,7 @@ void depthPrePass(dx_command_list* cl,
 				dc.setup(cl, common);
 				lastSetupFunc = dc.setup;
 			}
-			dc.execute(cl, viewProj, prevFrameViewProj, dc.data);
+			dc.render(cl, viewProj, prevFrameViewProj, dc.data);
 		}
 	}
 }
@@ -255,7 +255,7 @@ void proceduralSky(dx_command_list* cl,
 }
 
 
-static void renderShadow(dx_command_list* cl, const render_command_buffer<uint64>& pass, const mat4& viewProj, const common_render_data& common)
+static void renderShadow(dx_command_list* cl, const default_render_command_buffer<uint64>& pass, const mat4& viewProj, const common_render_data& common)
 {
 	pipeline_setup_func lastSetupFunc = 0;
 
@@ -266,7 +266,7 @@ static void renderShadow(dx_command_list* cl, const render_command_buffer<uint64
 			dc.setup(cl, common);
 			lastSetupFunc = dc.setup;
 		}
-		dc.execute(cl, viewProj, dc.data);
+		dc.render(cl, viewProj, dc.data);
 	}
 }
 
@@ -321,7 +321,7 @@ static void renderPointShadows(dx_command_list* cl, const point_shadow_render_pa
 
 				cl->setGraphics32BitConstants(POINT_SHADOW_RS_CB, cb);
 			}
-			dc.execute(cl, mat4::identity, dc.data);
+			dc.render(cl, mat4::identity, dc.data);
 		}
 	}
 }
@@ -506,7 +506,7 @@ void opaqueLightPass(dx_command_list* cl,
 				dc.setup(cl, common);
 				lastSetupFunc = dc.setup;
 			}
-			dc.execute(cl, viewProj, dc.data);
+			dc.render(cl, viewProj, dc.data);
 		}
 	}
 }
@@ -533,7 +533,7 @@ void transparentLightPass(dx_command_list* cl,
 				dc.setup(cl, common);
 				lastSetupFunc = dc.setup;
 			}
-			dc.execute(cl, viewProj, dc.data);
+			dc.render(cl, viewProj, dc.data);
 		}
 	}
 }
@@ -566,7 +566,7 @@ void ldrPass(dx_command_list* cl,
 					dc.setup(cl, common);
 					lastSetupFunc = dc.setup;
 				}
-				dc.execute(cl, viewProj, dc.data);
+				dc.render(cl, viewProj, dc.data);
 			}
 		}
 
@@ -585,7 +585,7 @@ void ldrPass(dx_command_list* cl,
 					dc.setup(cl, common);
 					lastSetupFunc = dc.setup;
 				}
-				dc.execute(cl, viewProj, dc.data);
+				dc.render(cl, viewProj, dc.data);
 			}
 		}
 

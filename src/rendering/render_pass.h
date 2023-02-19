@@ -139,8 +139,8 @@ struct opaque_render_pass
 		}
 	}
 
-	render_command_buffer<uint64> pass;
-	render_command_buffer<uint64, depth_prepass_execute_func> depthPrepass;
+	default_render_command_buffer<uint64> pass;
+	depth_prepass_render_command_buffer<uint64> depthPrepass;
 
 private:
 
@@ -277,7 +277,7 @@ struct transparent_render_pass
 		command.data.material = material;
 	}
 
-	render_command_buffer<float> pass;
+	default_render_command_buffer<float> pass;
 };
 
 struct ldr_render_pass
@@ -354,8 +354,8 @@ struct ldr_render_pass
 		renderOutline(transform, vertexBuffer.positions, indexBuffer, submesh);
 	}
 
-	render_command_buffer<float> ldrPass;
-	render_command_buffer<float> overlays;
+	default_render_command_buffer<float> ldrPass;
+	default_render_command_buffer<float> overlays;
 	std::vector<outline_render_command> outlines;
 };
 
@@ -414,8 +414,8 @@ struct shadow_render_pass_base
 		dynamicPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(renderData));
 	}
 
-	render_command_buffer<uint64> staticPass;
-	render_command_buffer<uint64> dynamicPass;
+	default_render_command_buffer<uint64> staticPass;
+	default_render_command_buffer<uint64> dynamicPass;
 };
 
 struct sun_cascade_render_pass : shadow_render_pass_base
@@ -546,7 +546,7 @@ struct compute_pass
 	float dt;
 	std::vector<struct particle_system*> particleSystemUpdates;
 
-	render_command_buffer<uint64, compute_execute_func> passes[compute_pass_event_count];
+	compute_command_buffer<uint64> passes[compute_pass_event_count];
 };
 
 

@@ -6,13 +6,7 @@
 struct dx_command_list;
 struct common_render_data;
 
-typedef void (*pipeline_setup_func)(dx_command_list*, const common_render_data&);
-
-typedef void (*default_execute_func)(dx_command_list*, const mat4&, void*);
-typedef void (*depth_prepass_execute_func)(dx_command_list*, const mat4&, const mat4&, void*);
-typedef void (*compute_execute_func)(dx_command_list*, void*);
-
-template <typename key_t, typename execute_func = default_execute_func>
+template <typename key_t, typename command_header>
 struct render_command_buffer
 {
 private:
@@ -20,12 +14,6 @@ private:
 	{
 		key_t key;
 		void* data;
-	};
-
-	struct command_header
-	{
-		pipeline_setup_func setup;
-		execute_func execute;
 	};
 
 	struct command_wrapper_base
@@ -49,33 +37,7 @@ private:
 		command_wrapper* commandWrapper = arena.allocate<command_wrapper>();
 		new (commandWrapper) command_wrapper;
 
-		commandWrapper->header.setup = pipeline_t::setup;
-		commandWrapper->header.execute = 0;
-
-		if constexpr (std::is_same_v<execute_func, default_execute_func>)
-		{
-			commandWrapper->header.execute = [](dx_command_list* cl, const mat4& viewProj, void* data)
-			{
-				command_wrapper* wrapper = (command_wrapper*)data;
-				pipeline_t::render(cl, viewProj, wrapper->command);
-			};
-		}
-		else if constexpr (std::is_same_v<execute_func, depth_prepass_execute_func>)
-		{
-			commandWrapper->header.execute = [](dx_command_list* cl, const mat4& viewProj, const mat4& prevFrameViewProj, void* data)
-			{
-				command_wrapper* wrapper = (command_wrapper*)data;
-				pipeline_t::render(cl, viewProj, prevFrameViewProj, wrapper->command);
-			};
-		}
-		else if constexpr (std::is_same_v<execute_func, compute_execute_func>)
-		{
-			commandWrapper->header.execute = [](dx_command_list* cl, void* data)
-			{
-				command_wrapper* wrapper = (command_wrapper*)data;
-				pipeline_t::compute(cl, wrapper->command);
-			};
-		}
+		commandWrapper->header.initialize<pipeline_t, command_wrapper>();
 
 		command_key key;
 		key.key = sortKey;
@@ -158,65 +120,82 @@ public:
 
 };
 
-template <typename key_t, typename value_t>
-struct sort_key_vector
+
+
+
+typedef void (*pipeline_setup_func)(dx_command_list*, const common_render_data&);
+
+
+struct default_command_header
 {
-private:
-	struct sort_key
+	typedef void (*pipeline_render_func)(dx_command_list*, const mat4&, void*);
+
+	pipeline_setup_func setup;
+	pipeline_render_func render;
+
+	template <typename pipeline_t, typename command_wrapper>
+	void initialize()
 	{
-		key_t key;
-		uint32 index;
-	};
-
-	std::vector<sort_key> keys;
-	std::vector<value_t> values;
-
-public:
-
-	uint64 size() const { return keys.size(); }
-	void reserve(uint64 newCapacity) { keys.reserve(newCapacity); values.reserve(newCapacity); }
-	void resize(uint64 newSize) { keys.resize(newSize); values.resize(newSize); }
-
-	void clear() { keys.clear(); values.clear(); }
-
-	void push_back(key_t key, const value_t& value) { uint32 index = (uint32)size(); keys.push_back({ key, index }); values.push_back(value); }
-	void push_back(key_t key, value_t&& value) { uint32 index = (uint32)size(); keys.push_back({ key, index }); values.push_back(std::move(value)); }
-
-	template <typename... args_t>
-	value_t& emplace_back(key_t key, args_t&&... args) { uint32 index = (uint32)size(); keys.push_back({ key, index }); return values.emplace_back(std::forward<args_t>(args)...); }
-
-	void sort() { std::sort(keys.begin(), keys.end(), [](sort_key a, sort_key b) { return a.key < b.key; }); }
-
-	struct iterator
-	{
-		typename std::vector<sort_key>::iterator keyIterator;
-		value_t* values;
-
-		friend bool operator==(const iterator& a, const iterator& b) { return a.keyIterator == b.keyIterator && a.values == b.values; }
-		friend bool operator!=(const iterator& a, const iterator& b) { return !(a == b); }
-		iterator& operator++() { ++keyIterator; return *this; }
-
-		value_t& operator*() { return values[keyIterator->index]; }
-	};
-
-	struct const_iterator
-	{
-		typename std::vector<sort_key>::const_iterator keyIterator;
-		const value_t* values;
-
-		friend bool operator==(const const_iterator& a, const const_iterator& b) { return a.keyIterator == b.keyIterator && a.values == b.values; }
-		friend bool operator!=(const const_iterator& a, const const_iterator& b) { return !(a == b); }
-		const_iterator& operator++() { ++keyIterator; return *this; }
-
-		const value_t& operator*() { return values[keyIterator->index]; }
-	};
-
-	iterator begin() { return iterator{ keys.begin(), values.data() }; }
-	iterator end() { return iterator{ keys.end(), values.data() }; }
-	
-	const_iterator begin() const { return const_iterator{ keys.begin(), values.data() }; }
-	const_iterator end() const { return const_iterator{ keys.end(), values.data() }; }
+		setup = pipeline_t::setup;
+		render = [](dx_command_list* cl, const mat4& viewProj, void* data)
+		{
+			command_wrapper* wrapper = (command_wrapper*)data;
+			pipeline_t::render(cl, viewProj, wrapper->command);
+		};
+	}
 };
 
+template <typename key_t>
+struct default_render_command_buffer : render_command_buffer<key_t, default_command_header> {};
+
+
+
+
+
+struct depth_prepass_command_header
+{
+	typedef void (*pipeline_render_func)(dx_command_list*, const mat4&, const mat4&, void*);
+
+	pipeline_setup_func setup;
+	pipeline_render_func render;
+
+	template <typename pipeline_t, typename command_wrapper>
+	void initialize()
+	{
+		setup = pipeline_t::setup;
+		render = [](dx_command_list* cl, const mat4& viewProj, const mat4& prevFrameViewProj, void* data)
+		{
+			command_wrapper* wrapper = (command_wrapper*)data;
+			pipeline_t::render(cl, viewProj, prevFrameViewProj, wrapper->command);
+		};
+	}
+};
+
+template <typename key_t>
+struct depth_prepass_render_command_buffer : render_command_buffer<key_t, depth_prepass_command_header> {};
+
+
+
+
+
+struct compute_command_header
+{
+	typedef void (*compute_func)(dx_command_list*, void*);
+
+	compute_func compute;
+
+	template <typename pipeline_t, typename command_wrapper>
+	void initialize()
+	{
+		compute = [](dx_command_list* cl, void* data)
+		{
+			command_wrapper* wrapper = (command_wrapper*)data;
+			pipeline_t::compute(cl, wrapper->command);
+		};
+	}
+};
+
+template <typename key_t>
+struct compute_command_buffer : render_command_buffer<key_t, compute_command_header> {};
 
 
