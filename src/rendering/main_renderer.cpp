@@ -322,20 +322,34 @@ void main_renderer::setDecals(const ref<dx_buffer>& decals, uint32 numDecals, co
 	main_renderer::decalTextureAtlas = textureAtlas;
 }
 
-uint64 main_renderer::executeComputeTasks(compute_pass_event eventTime)
+template <typename func_t>
+uint64 main_renderer::executeComputeTasks(compute_pass_event eventTime, const func_t& additionalTasksCallback)
 {
 	uint64 result = 0;
-	if (computePass && computePass->passes[eventTime].size() > 0)
+
+	bool hasComputePassEvents = computePass && computePass->passes[eventTime].size() > 0;
+	bool hasAdditionalTasks = !std::is_null_pointer_v<func_t>;
+
+	if (hasComputePassEvents || hasAdditionalTasks)
 	{
 		dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
 
-		for (const auto& dc : computePass->passes[eventTime])
+		if (hasComputePassEvents)
 		{
-			dc.execute(cl, dc.data);
+			for (const auto& dc : computePass->passes[eventTime])
+			{
+				dc.execute(cl, dc.data);
+			}
+		}
+
+		if constexpr (!std::is_null_pointer_v<func_t>)
+		{
+			additionalTasksCallback(cl);
 		}
 
 		result = dxContext.executeCommandList(cl);
 	}
+
 	return result;
 }
 
@@ -419,39 +433,7 @@ void main_renderer::endFrame(const user_input* input)
 
 
 
-	uint64 tlasRebuildFence = 0;
-	uint64 giFence = 0;
-	uint64 particleUpdateFence = 0;
-
-	if (dxContext.featureSupport.raytracing() && tlas)
-	{
-		tlasRebuildFence = tlas->build();
-
-
-		if (environment && environment->giMode == environment_gi_raytraced)
-		{
-			dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
-
-			{
-				PROFILE_ALL(cl, "Update light probes");
-				environment->lightProbeGrid.updateProbes(cl, *tlas, commonRenderData);
-			}
-
-			giFence = dxContext.executeCommandList(cl);
-		}
-	}
-
-	if (computePass && computePass->particleSystemUpdates.size() > 0)
-	{
-		dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
-
-		for (auto& cc : computePass->particleSystemUpdates)
-		{
-			cc->update(cl, commonParticleData, computePass->dt);
-		}
-
-		particleUpdateFence = dxContext.executeCommandList(cl);
-	}
+	
 
 
 	if (mode == renderer_mode_rasterized)
@@ -875,7 +857,30 @@ void main_renderer::endFrame(const user_input* input)
 		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, executeComputeTasks(compute_pass_before_depth_prepass));
 		dxContext.executeCommandList(cl1);
 
-		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, executeComputeTasks(compute_pass_before_opaque));
+		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, executeComputeTasks(compute_pass_before_opaque, 
+			[this, &commonRenderData, &commonParticleData](dx_command_list* cl)
+		{
+			if (dxContext.featureSupport.raytracing() && tlas)
+			{
+				tlas->build(cl);
+
+				if (environment && environment->giMode == environment_gi_raytraced)
+				{
+					PROFILE_ALL(cl, "Update light probes");
+					environment->lightProbeGrid.updateProbes(cl, *tlas, commonRenderData);
+				}
+			}
+
+			if (computePass && computePass->particleSystemUpdates.size() > 0)
+			{
+				dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
+
+				for (auto& cc : computePass->particleSystemUpdates)
+				{
+					cc->update(cl, commonParticleData, computePass->dt);
+				}
+			}
+		}));
 		dxContext.executeCommandList(cl2);
 
 		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, executeComputeTasks(compute_pass_before_transparent_and_post_processing));
@@ -927,6 +932,13 @@ void main_renderer::endFrame(const user_input* input)
 	}
 	else if (mode == renderer_mode_pathtraced && dxContext.featureSupport.raytracing() && tlas)
 	{
+		uint64 tlasRebuildFence;
+		{
+			dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
+			tlas->build(cl);
+			tlasRebuildFence = dxContext.executeCommandList(cl);
+		}
+
 		dxContext.renderQueue.waitForOtherQueue(dxContext.computeQueue, tlasRebuildFence);
 
 		pathTracer.finalizeForRender();

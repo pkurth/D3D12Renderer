@@ -32,7 +32,7 @@ raytracing_instance_handle raytracing_tlas::instantiate(raytracing_object_type t
     return { result };
 }
 
-uint64 raytracing_tlas::build()
+void raytracing_tlas::build(dx_command_list* cl)
 {
     uint32 totalNumInstances = (uint32)allInstances.size();
 
@@ -85,7 +85,6 @@ uint64 raytracing_tlas::build()
 
 
 
-    dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
     dx_dynamic_constant_buffer gpuInstances = dxContext.uploadDynamicConstantBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalNumInstances, allInstances.data()).first;
 
     inputs.InstanceDescs = gpuInstances.gpuPtr;
@@ -111,6 +110,4 @@ uint64 raytracing_tlas::build()
 
     cl->commandList->BuildRaytracingAccelerationStructure(&asDesc, 0, 0);
     cl->uavBarrier(tlas);
-
-    return dxContext.executeCommandList(cl);
 }

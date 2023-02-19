@@ -9,13 +9,8 @@
 
 #include "skinning_rs.hlsli"
 
-#define MAX_NUM_SKINNING_MATRICES_PER_FRAME 4096
-#define MAX_NUM_SKINNED_VERTICES_PER_FRAME (1024 * 256)
 
-static ref<dx_buffer> skinningMatricesBuffer; // Buffered frames are in a single dx_buffer.
 
-static uint32 currentSkinnedVertexBuffer;
-static vertex_buffer_group skinnedVertexBuffer[2]; // We have two of these, so that we can compute screen space velocities.
 
 static dx_pipeline skinningPipeline;
 static dx_pipeline clothSkinningPipeline;
@@ -37,6 +32,100 @@ struct cloth_skinning_call
 	uint32 gridSizeY;
 	uint32 vertexOffset;
 };
+
+struct skinning_data
+{
+	vertex_buffer_group skinnedVertexBuffer;
+	ref<dx_buffer> skinningMatricesBuffer;
+
+	mat4* skinningMatrices;
+	uint32 numSkinningMatrices;
+	uint32 matrixOffset;
+
+	skinning_call* calls;
+	uint32 numCalls;
+
+	cloth_skinning_call* clothCalls;
+	uint32 numClothCalls;
+};
+
+struct skinning_pipeline
+{
+	using render_data_t = skinning_data;
+
+	PIPELINE_SETUP_DECL{}
+
+		PIPELINE_COMPUTE_DECL
+	{
+		PROFILE_ALL(cl, "Skinning");
+
+		if (rc.data.numCalls)
+		{
+			PROFILE_ALL(cl, "Skeletal");
+
+			mat4* mats = (mat4*)mapBuffer(rc.data.skinningMatricesBuffer, false);
+			memcpy(mats + rc.data.matrixOffset, rc.data.skinningMatrices, sizeof(mat4) * rc.data.numSkinningMatrices);
+			unmapBuffer(rc.data.skinningMatricesBuffer, true, map_range{ rc.data.matrixOffset, rc.data.numSkinningMatrices });
+
+
+			cl->setPipelineState(*skinningPipeline.pipeline);
+			cl->setComputeRootSignature(*skinningPipeline.rootSignature);
+
+			cl->setRootComputeSRV(SKINNING_RS_MATRICES, rc.data.skinningMatricesBuffer->gpuVirtualAddress + sizeof(mat4) * rc.data.matrixOffset);
+			cl->setRootComputeUAV(SKINNING_RS_OUTPUT0, rc.data.skinnedVertexBuffer.positions);
+			cl->setRootComputeUAV(SKINNING_RS_OUTPUT1, rc.data.skinnedVertexBuffer.others);
+
+			for (uint32 i = 0; i < rc.data.numCalls; ++i)
+			{
+				auto& c = rc.data.calls[i];
+				cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER0, c.vertexBuffer.positions.view.BufferLocation);
+				cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER1, c.vertexBuffer.others.view.BufferLocation);
+				cl->setCompute32BitConstants(SKINNING_RS_CB, skinning_cb{ c.jointOffset, c.numJoints, c.range.firstVertex, c.range.numVertices, c.vertexOffset });
+				cl->dispatch(bucketize(c.range.numVertices, 512));
+			}
+		}
+		if (rc.data.numClothCalls)
+		{
+			PROFILE_ALL(cl, "Cloth");
+
+			cl->setPipelineState(*clothSkinningPipeline.pipeline);
+			cl->setComputeRootSignature(*clothSkinningPipeline.rootSignature);
+
+			cl->setRootComputeUAV(CLOTH_SKINNING_RS_OUTPUT0, rc.data.skinnedVertexBuffer.positions);
+			cl->setRootComputeUAV(CLOTH_SKINNING_RS_OUTPUT1, rc.data.skinnedVertexBuffer.others);
+
+			for (uint32 i = 0; i < rc.data.numClothCalls; ++i)
+			{
+				auto& c = rc.data.clothCalls[i];
+				cl->setRootComputeSRV(CLOTH_SKINNING_RS_INPUT, c.vertexBuffer.view.BufferLocation);
+				cl->setCompute32BitConstants(CLOTH_SKINNING_RS_CB, cloth_skinning_cb{ c.gridSizeX, c.gridSizeY, c.vertexOffset });
+				cl->dispatch(bucketize(c.gridSizeX, 15), bucketize(c.gridSizeY, 15)); // 15 is correct here.
+			}
+		}
+
+		// Not necessary, since the command list ends here.
+		//barrier_batcher(cl)
+		//	.uav(rc.data.skinnedVertexBuffer.positions)
+		//	.uav(rc.data.skinnedVertexBuffer.others);
+	}
+};
+
+
+
+
+
+
+
+
+
+#define MAX_NUM_SKINNING_MATRICES_PER_FRAME 4096
+#define MAX_NUM_SKINNED_VERTICES_PER_FRAME (1024 * 256)
+
+static ref<dx_buffer> skinningMatricesBuffer; // Buffered frames are in a single dx_buffer.
+
+static uint32 currentSkinnedVertexBuffer;
+static vertex_buffer_group skinnedVertexBuffer[2]; // We have two of these, so that we can compute screen space velocities.
+
 
 static mat4 skinningMatrices[MAX_NUM_SKINNING_MATRICES_PER_FRAME];
 static volatile uint32 numSkinningMatricesThisFrame;
@@ -143,85 +232,34 @@ dx_vertex_buffer_group_view skinCloth(const dx_vertex_buffer_view& inpositions, 
 }
 
 
-struct grass_update_pipeline
-{
-	using render_data_t = void*;
-
-	PIPELINE_SETUP_DECL{}
-
-	PIPELINE_COMPUTE_DECL
-	{ 
-		PROFILE_ALL(cl, "Skinning");
-
-		if (numCalls)
-		{
-			PROFILE_ALL(cl, "Skeletal");
-
-			uint32 matrixOffset = dxContext.bufferedFrameID * MAX_NUM_SKINNING_MATRICES_PER_FRAME;
-
-			mat4* mats = (mat4*)mapBuffer(skinningMatricesBuffer, false);
-			memcpy(mats + matrixOffset, skinningMatrices, sizeof(mat4) * numSkinningMatricesThisFrame);
-			unmapBuffer(skinningMatricesBuffer, true, map_range{ matrixOffset, numSkinningMatricesThisFrame });
-
-
-			cl->setPipelineState(*skinningPipeline.pipeline);
-			cl->setComputeRootSignature(*skinningPipeline.rootSignature);
-
-			cl->setRootComputeSRV(SKINNING_RS_MATRICES, skinningMatricesBuffer->gpuVirtualAddress + sizeof(mat4) * matrixOffset);
-			cl->setRootComputeUAV(SKINNING_RS_OUTPUT0, skinnedVertexBuffer[currentSkinnedVertexBuffer].positions);
-			cl->setRootComputeUAV(SKINNING_RS_OUTPUT1, skinnedVertexBuffer[currentSkinnedVertexBuffer].others);
-
-			for (uint32 i = 0; i < numCalls; ++i)
-			{
-				auto& c = calls[i];
-				cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER0, c.vertexBuffer.positions.view.BufferLocation);
-				cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER1, c.vertexBuffer.others.view.BufferLocation);
-				cl->setCompute32BitConstants(SKINNING_RS_CB, skinning_cb{ c.jointOffset, c.numJoints, c.range.firstVertex, c.range.numVertices, c.vertexOffset });
-				cl->dispatch(bucketize(c.range.numVertices, 512));
-			}
-		}
-		if (numClothCalls)
-		{
-			PROFILE_ALL(cl, "Cloth");
-
-			cl->setPipelineState(*clothSkinningPipeline.pipeline);
-			cl->setComputeRootSignature(*clothSkinningPipeline.rootSignature);
-
-			cl->setRootComputeUAV(CLOTH_SKINNING_RS_OUTPUT0, skinnedVertexBuffer[currentSkinnedVertexBuffer].positions);
-			cl->setRootComputeUAV(CLOTH_SKINNING_RS_OUTPUT1, skinnedVertexBuffer[currentSkinnedVertexBuffer].others);
-
-			for (uint32 i = 0; i < numClothCalls; ++i)
-			{
-				auto& c = clothCalls[i];
-				cl->setRootComputeSRV(CLOTH_SKINNING_RS_INPUT, c.vertexBuffer.view.BufferLocation);
-				cl->setCompute32BitConstants(CLOTH_SKINNING_RS_CB, cloth_skinning_cb{ c.gridSizeX, c.gridSizeY, c.vertexOffset });
-				cl->dispatch(bucketize(c.gridSizeX, 15), bucketize(c.gridSizeY, 15)); // 15 is correct here.
-			}
-		}
-
-		// Not necessary, since the command list ends here.
-		//barrier_batcher(cl)
-		//	.uav(skinnedVertexBuffer[currentSkinnedVertexBuffer].positions)
-		//	.uav(skinnedVertexBuffer[currentSkinnedVertexBuffer].others);
-
-
-		currentSkinnedVertexBuffer = 1 - currentSkinnedVertexBuffer;
-		::numCalls = 0;
-		::numClothCalls = 0;
-		numSkinningMatricesThisFrame = 0;
-		totalNumVertices = 0;
-	}
-};
-
-
 void performSkinning(compute_pass* computePass)
 {
-	uint64 result = 0;
-
 	// TODO: We currently make no attempt to ensure that all draw calls have actually been written completely, if executed on another thread. 
 	if (numCalls > 0 || numClothCalls > 0)
 	{
-		computePass->addTask<grass_update_pipeline>(compute_pass_frame_start, 0);
+		skinning_data data;
+		data.skinnedVertexBuffer = skinnedVertexBuffer[currentSkinnedVertexBuffer];
+		data.skinningMatricesBuffer = skinningMatricesBuffer;
+
+		data.skinningMatrices = skinningMatrices;
+		data.numSkinningMatrices = numSkinningMatricesThisFrame;
+		data.matrixOffset = dxContext.bufferedFrameID * MAX_NUM_SKINNING_MATRICES_PER_FRAME;
+
+		data.calls = calls;
+		data.numCalls = numCalls;
+
+		data.clothCalls = clothCalls;
+		data.numClothCalls = numClothCalls;
+
+
+		computePass->addTask<skinning_pipeline>(compute_pass_frame_start, data);
+
+
+		currentSkinnedVertexBuffer = 1 - currentSkinnedVertexBuffer;
+		numCalls = 0;
+		numClothCalls = 0;
+		numSkinningMatricesThisFrame = 0;
+		totalNumVertices = 0;
 	}
 }
 
