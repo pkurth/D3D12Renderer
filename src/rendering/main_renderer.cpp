@@ -873,8 +873,6 @@ void main_renderer::endFrame(const user_input* input)
 
 			if (computePass && computePass->particleSystemUpdates.size() > 0)
 			{
-				dx_command_list* cl = dxContext.getFreeComputeCommandList(true);
-
 				for (auto& cc : computePass->particleSystemUpdates)
 				{
 					cc->update(cl, commonParticleData, computePass->dt);
