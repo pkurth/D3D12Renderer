@@ -130,10 +130,7 @@ See also the video linked to the right for detailed instructions.
 - Clone the repository and make sure to clone with submodules. 
 - Double-click either the _generate2019.bat_ or _generate2022.bat_ file in the root directory to generate a Visual Studio 2019 or 2022 solution, respectively.
 The build process will automatically enable and disable certain features based on your installed GPU and the available Windows 10 SDK.
-- Open the solution and build. 
-This _should_ work directly. 
-Visual Studio sometimes reports an "Unspecified error" when building. 
-In that case either restart Visual Studio or re-generate the project (_generate.bat_) and you are good to go.
+- Open the solution and build.
 - If you add new source files (or shaders), re-run the _generate\*.bat_ file.
 
 The assets seen in the screenshots above are not included with the source code. 
