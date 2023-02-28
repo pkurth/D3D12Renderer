@@ -1,10 +1,10 @@
 #include "pch.h"
 #include "editor.h"
 #include "editor_icons.h"
-#include "core/imgui.h"
 #include "core/cpu_profiling.h"
 #include "core/log.h"
 #include "core/file_registry.h"
+#include "core/imgui.h"
 #include "dx/dx_profiling.h"
 #include "scene/components.h"
 #include "animation/animation.h"
@@ -21,35 +21,113 @@
 
 #include <fontawesome/list.h>
 
-struct transform_undo
+
+
+
+template <typename component_t, typename member_t>
+struct component_member_undo
 {
+	component_member_undo(scene_entity entity, member_t& member, member_t before)
+	{
+		this->entity = entity;
+		this->byteOffset = (uint8*)&member - (uint8*)&entity.getComponent<component_t>();
+		this->before = before;
+		this->after = member;
+	}
+
+	void undo() { getMember() = before; }
+	void redo() { getMember() = after; }
+
+private:
+	member_t& getMember()
+	{
+		component_t& comp = entity.getComponent<component_t>();
+		return *(member_t*)((uint8*)&comp + byteOffset);
+	}
+
 	scene_entity entity;
-	trs before;
-	trs after;
+	uint64 byteOffset;
 
-	void undo() { entity.getComponent<transform_component>() = before; }
-	void redo() { entity.getComponent<transform_component>() = after; }
+	member_t before;
+	member_t after;
 };
 
-struct selection_undo
+template <typename... component_t>
+struct component_undo
 {
-	scene_editor* editor;
-	scene_entity before;
-	scene_entity after;
+	component_undo(scene_entity entity, component_t... before)
+	{
+		this->entity = entity;
+		this->before = std::make_tuple(before...);
+		this->after = std::make_tuple(entity.getComponent<component_t>()...);
+	}
 
-	void undo() { editor->setSelectedEntityNoUndo(before); }
-	void redo() { editor->setSelectedEntityNoUndo(after); }
+	void undo() { std::apply([this](auto... c) { (set(c), ...); }, before); }
+	void redo() { std::apply([this](auto... c) { (set(c), ...); }, after); }
+
+private:
+	template <typename T>
+	void set(const T& c)
+	{
+		entity.getComponent<T>() = c;
+	}
+
+	scene_entity entity;
+
+	std::tuple<component_t...> before;
+	std::tuple<component_t...> after;
 };
 
-struct sun_direction_undo
+template <typename value_t>
+struct settings_undo
 {
-	directional_light* sun;
-	vec3 before;
-	vec3 after;
+	settings_undo(value_t& value, value_t before)
+		: value(value)
+	{
+		this->before = before;
+		this->after = value;
+	}
 
-	void undo() { sun->direction = before; }
-	void redo() { sun->direction = after; }
+	void undo() { value = before; }
+	void redo() { value = after; }
+
+private:
+	value_t& value;
+
+	value_t before;
+	value_t after;
 };
+
+#define UNDOABLE_COMPONENT_SETTING(undoLabel, val, command)																			\
+	{																																\
+		using val_t = std::decay_t<decltype(val)>;																					\
+		val_t before = val;																											\
+		command;																													\
+		if (ImGui::IsItemActive() && !ImGui::IsItemActiveLastFrame())																\
+		{																															\
+			undoBuffer.as<val_t>() = before;																						\
+		}																															\
+		if (ImGui::IsItemDeactivatedAfterEdit() || (!ImGui::IsItemActive() && (before != val)))										\
+		{																															\
+			undoStack.pushAction(undoLabel, component_member_undo<component_t, val_t>(selectedEntity, val, undoBuffer.as<val_t>()));\
+		}																															\
+	}
+
+#define UNDOABLE_SETTING(undoLabel, val, command)																					\
+	{																																\
+		using val_t = std::decay_t<decltype(val)>;																					\
+		val_t before = val;																											\
+		command;																													\
+		if (ImGui::IsItemActive() && !ImGui::IsItemActiveLastFrame())																\
+		{																															\
+			undoBuffer.as<val_t>() = before;																						\
+		}																															\
+		if (ImGui::IsItemDeactivatedAfterEdit() || (!ImGui::IsItemActive() && (before != val)))										\
+		{																															\
+			undoStack.pushAction(undoLabel, settings_undo<val_t>(val, undoBuffer.as<val_t>()));										\
+		}																															\
+	}
+
 
 void scene_editor::updateSelectedEntityUIRotation()
 {
@@ -75,12 +153,13 @@ void scene_editor::updateSelectedEntityUIRotation()
 
 void scene_editor::setSelectedEntity(scene_entity entity)
 {
-	if (selectedEntity != entity)
-	{
-		undoStack.pushAction("selection", selection_undo{ this, selectedEntity, entity });
-	}
-
+	auto before = selectedEntity;
 	setSelectedEntityNoUndo(entity);
+
+	if (before != entity)
+	{
+		undoStack.pushAction("entity selection", settings_undo<scene_entity>(selectedEntity, before));
+	}
 }
 
 void scene_editor::setSelectedEntityNoUndo(scene_entity entity)
@@ -105,17 +184,74 @@ bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPas
 {
 	CPU_PROFILE_BLOCK("Update editor");
 
+#if 0
+	{
+		if (ImGui::Begin("Test"))
+		{
+			if (ImGui::BeginProperties())
+			{
+				uint32 values[] = { 1, 2 };
+				const char* names[] = { "1", "2" };
+
+				static uint32 val = 0;
+				static decltype(val) undo;
+				auto before = val;
+
+
+				//ImGui::PropertyDropdown("Test", names, 2, val);
+				ImGui::PropertyDrag("Test", val);
+
+
+				//if (ImGui::IsItemActivated()) { LOG_MESSAGE("Actived"); }
+				//if (ImGui::IsItemActive()) { LOG_MESSAGE("Active"); }
+				//if (ImGui::IsItemDeactivated()) { LOG_MESSAGE("Deactived"); }
+				//if (ImGui::IsItemToggledOpen()) { LOG_MESSAGE("Toggled open"); }
+
+				if (ImGui::IsItemActive() && !ImGui::IsItemActiveLastFrame())
+				{
+					undo = before;
+				}
+
+				if (ImGui::IsItemDeactivatedAfterEdit()
+					|| (!ImGui::IsItemActive() && (before != val)))
+				{
+					LOG_MESSAGE("CHANGED FROM %u to %u", undo, val);
+				}
+
+				ImGui::EndProperties();
+			}
+		}
+		ImGui::End();
+	}
+#endif
+
+
+	auto selectedEntityBefore = selectedEntity;
+
 	auto& scene = this->scene->getCurrentScene();
 	if (selectedEntity && !scene.isEntityValid(selectedEntity))
 	{
 		setSelectedEntityNoUndo({});
 	}
 
-	bool objectDragged = false;
-	objectDragged |= handleUserInput(input, ldrRenderPass, dt);
-	objectDragged |= drawSceneHierarchy();
-	drawMainMenuBar();
+	bool objectChanged = false;
+	objectChanged |= handleUserInput(input, ldrRenderPass, dt);
+	objectChanged |= drawSceneHierarchy();
+	objectChanged |= drawMainMenuBar();
 	drawSettings(dt);
+
+	if (objectChanged)
+	{
+		onObjectMoved();
+	}
+
+
+	if (selectedEntity != selectedEntityBefore)
+	{
+		updateSelectedEntityUIRotation();
+		selectedColliderEntity = {};
+		selectedConstraintEntity = {};
+	}
 
 
 	if (selectedConstraintEntity)
@@ -173,13 +309,15 @@ bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPas
 		}
 	}
 
-	return objectDragged;
+	return objectChanged;
 }
 
-void scene_editor::drawMainMenuBar()
+bool scene_editor::drawMainMenuBar()
 {
 	static bool iconsWindowOpen = false;
 	static bool demoWindowOpen = false;
+
+	bool objectPotentiallyMoved = false;
 
 	bool controlsClicked = false;
 	bool aboutClicked = false;
@@ -194,12 +332,14 @@ void scene_editor::drawMainMenuBar()
 			if (ImGui::MenuItem(textBuffer, "Ctrl+Z", false, undoStack.undoPossible()))
 			{
 				undoStack.undo();
+				objectPotentiallyMoved = true;
 			}
 
 			snprintf(textBuffer, sizeof(textBuffer), ICON_FA_REDO " Redo %s", undoStack.redoPossible() ? undoStack.getRedoName() : "");
 			if (ImGui::MenuItem(textBuffer, "Ctrl+Y", false, undoStack.redoPossible()))
 			{
 				undoStack.redo();
+				objectPotentiallyMoved = true;
 			}
 			ImGui::Separator();
 
@@ -416,6 +556,8 @@ void scene_editor::drawMainMenuBar()
 	{
 		drawSoundEditor();
 	}
+
+	return objectPotentiallyMoved;
 }
 
 template<typename component_t, typename ui_func>
@@ -586,8 +728,26 @@ bool scene_editor::drawSceneHierarchy()
 				ImGui::AlignTextToFramePadding();
 
 				ImGui::PushID((uint32)selectedEntity);
-				ImGui::InputText("Name", selectedEntity.getComponent<tag_component>().name, sizeof(tag_component::name));
+
+				{
+					tag_component& tag = selectedEntity.getComponent<tag_component>();
+					tag_component tagBefore = tag;
+					ImGui::InputText("Name", tag.name, sizeof(tag_component::name));
+
+					if (ImGui::IsItemActive() && !ImGui::IsItemActiveLastFrame())
+					{
+						undoBuffer.as<tag_component>() = tagBefore;
+					}
+					if (ImGui::IsItemDeactivatedAfterEdit())
+					{
+						undoStack.pushAction("entity name", component_undo<tag_component>(selectedEntity, undoBuffer.as<tag_component>()));
+					}
+				}
+
 				ImGui::PopID();
+
+
+
 				ImGui::SameLine();
 				if (ImGui::Button(ICON_FA_TRASH_ALT))
 				{
@@ -603,9 +763,12 @@ bool scene_editor::drawSceneHierarchy()
 				{
 					drawComponent<transform_component>(selectedEntity, "TRANSFORM", [this, &objectMovedByWidget](transform_component& transform)
 					{
-						objectMovedByWidget |= ImGui::DragFloat3("Position", transform.position.data, 0.1f, 0.f, 0.f);
+						using component_t = transform_component;
 
-						if (ImGui::DragFloat3("Rotation", selectedEntityEulerRotation.data, 0.1f, 0.f, 0.f))
+						UNDOABLE_COMPONENT_SETTING("position", transform.position,
+							objectMovedByWidget |= ImGui::Drag("Position", transform.position, 0.1f));
+
+						if (ImGui::Drag("Rotation", selectedEntityEulerRotation, 0.1f))
 						{
 							vec3 euler = selectedEntityEulerRotation;
 							euler.x = deg2rad(euler.x);
@@ -616,33 +779,45 @@ bool scene_editor::drawSceneHierarchy()
 							objectMovedByWidget = true;
 						}
 
-						objectMovedByWidget |= ImGui::DragFloat3("Scale", transform.scale.data, 0.1f, 0.f, 0.f);
+						UNDOABLE_COMPONENT_SETTING("scale", transform.scale,
+							objectMovedByWidget |= ImGui::Drag("Scale", transform.scale, 0.1f));
 					});
 
-					drawComponent<position_component>(selectedEntity, "TRANSFORM", [&objectMovedByWidget](position_component& position)
+					drawComponent<position_component>(selectedEntity, "TRANSFORM", [this, &objectMovedByWidget](position_component& transform)
 					{
-						objectMovedByWidget |= ImGui::DragFloat3("Position", position.position.data, 0.1f, 0.f, 0.f);
+						using component_t = position_component;
+
+						UNDOABLE_COMPONENT_SETTING("position", transform.position,
+							objectMovedByWidget |= ImGui::Drag("Position", transform.position, 0.1f));
 					});
 
-					drawComponent<position_rotation_component>(selectedEntity, "TRANSFORM", [this, &objectMovedByWidget](position_rotation_component& pr)
+					drawComponent<position_rotation_component>(selectedEntity, "TRANSFORM", [this, &objectMovedByWidget](position_rotation_component& transform)
 					{
-						objectMovedByWidget |= ImGui::DragFloat3("Translation", pr.position.data, 0.1f, 0.f, 0.f);
-						if (ImGui::DragFloat3("Rotation", selectedEntityEulerRotation.data, 0.1f, 0.f, 0.f))
+						using component_t = position_rotation_component;
+
+						UNDOABLE_COMPONENT_SETTING("position", transform.position,
+							objectMovedByWidget |= ImGui::Drag("Position", transform.position, 0.1f));
+
+						if (ImGui::Drag("Rotation", selectedEntityEulerRotation, 0.1f))
 						{
 							vec3 euler = selectedEntityEulerRotation;
 							euler.x = deg2rad(euler.x);
 							euler.y = deg2rad(euler.y);
 							euler.z = deg2rad(euler.z);
-							pr.rotation = eulerToQuat(euler);
+							transform.rotation = eulerToQuat(euler);
 
 							objectMovedByWidget = true;
 						}
 					});
 
-					drawComponent<position_scale_component>(selectedEntity, "TRANSFORM", [this, &objectMovedByWidget](position_scale_component& ps)
+					drawComponent<position_scale_component>(selectedEntity, "TRANSFORM", [this, &objectMovedByWidget](position_scale_component& transform)
 					{
-						objectMovedByWidget |= ImGui::DragFloat3("Translation", ps.position.data, 0.1f, 0.f, 0.f);
-						objectMovedByWidget |= ImGui::DragFloat3("Scale", ps.scale.data, 0.1f, 0.f, 0.f);
+						using component_t = position_scale_component;
+
+						UNDOABLE_COMPONENT_SETTING("position", transform.position,
+							objectMovedByWidget |= ImGui::Drag("Position", transform.position, 0.1f));
+						UNDOABLE_COMPONENT_SETTING("scale", transform.scale,
+							objectMovedByWidget |= ImGui::Drag("Scale", transform.scale, 0.1f));
 					});
 
 					drawComponent<dynamic_transform_component>(selectedEntity, "DYNAMIC", [](dynamic_transform_component& dynamic)
@@ -652,6 +827,8 @@ bool scene_editor::drawSceneHierarchy()
 
 					drawComponent<raster_component>(selectedEntity, "RASTER", [this](raster_component& raster)
 					{
+						using component_t = raster_component;
+
 						if (ImGui::BeginProperties())
 						{
 							editMesh("Mesh", raster.mesh, mesh_creation_flags_default);
@@ -677,16 +854,22 @@ bool scene_editor::drawSceneHierarchy()
 
 					drawComponent<terrain_component>(selectedEntity, "TERRAIN", [this, &objectMovedByWidget](terrain_component& terrain)
 					{
+						using component_t = terrain_component;
+
 						if (ImGui::BeginProperties())
 						{
-							objectMovedByWidget |= ImGui::PropertyDrag("Amplitude scale", terrain.amplitudeScale, 0.1f);
+							UNDOABLE_COMPONENT_SETTING("terrain amplitude scale", terrain.amplitudeScale, 
+								objectMovedByWidget |= ImGui::PropertyDrag("Amplitude scale", terrain.amplitudeScale, 0.1f, 0.f));
 
 							auto& settings = terrain.genSettings;
-							objectMovedByWidget |= ImGui::PropertyDrag("Noise scale", settings.scale, 0.001f);
-							objectMovedByWidget |= ImGui::PropertyDrag("Domain warp strength", settings.domainWarpStrength, 0.05f);
-							objectMovedByWidget |= ImGui::PropertySlider("Domain warp octaves", settings.domainWarpOctaves, 1, 16);
-
-							objectMovedByWidget |= ImGui::PropertySlider("Noise octaves", settings.noiseOctaves, 1, 32);
+							UNDOABLE_COMPONENT_SETTING("terrain noise scale", settings.scale, 
+								objectMovedByWidget |= ImGui::PropertyDrag("Noise scale", settings.scale, 0.001f));
+							UNDOABLE_COMPONENT_SETTING("terrain domain warp strength", settings.domainWarpStrength, 
+								objectMovedByWidget |= ImGui::PropertyDrag("Domain warp strength", settings.domainWarpStrength, 0.05f, 0.f));
+							UNDOABLE_COMPONENT_SETTING("terrain domain warp octaves", settings.domainWarpOctaves, 
+								objectMovedByWidget |= ImGui::PropertySlider("Domain warp octaves", settings.domainWarpOctaves, 1, 16));
+							UNDOABLE_COMPONENT_SETTING("terrain noise octaves", settings.noiseOctaves, 
+								objectMovedByWidget |= ImGui::PropertySlider("Noise octaves", settings.noiseOctaves, 1, 32));
 
 							ImGui::EndProperties();
 						}
@@ -706,17 +889,21 @@ bool scene_editor::drawSceneHierarchy()
 
 					drawComponent<proc_placement_component>(selectedEntity, "PROCEDURAL PLACEMENT", [this](proc_placement_component& placement)
 					{
+						using component_t = proc_placement_component;
+
 						for (auto& layer : placement.layers)
 						{
 							if (ImGui::BeginTree(layer.name))
 							{
 								if (ImGui::BeginProperties())
 								{
-									ImGui::PropertyDrag("Footprint", layer.footprint, 0.05f);
+									UNDOABLE_COMPONENT_SETTING("proc placement layer footprint", layer.footprint, 
+										ImGui::PropertyDrag("Footprint", layer.footprint, 0.05f, 0.01f));
 									for (uint32 i = 0; i < layer.numMeshes; ++i)
 									{
 										ImGui::PushID(i);
-										ImGui::PropertySlider("Density", layer.densities[i]);
+										UNDOABLE_COMPONENT_SETTING("proc placement layer density", layer.densities[i], 
+											ImGui::PropertySlider("Density", layer.densities[i]));
 										ImGui::PopID();
 									}
 									ImGui::EndProperties();
@@ -728,34 +915,56 @@ bool scene_editor::drawSceneHierarchy()
 
 					drawComponent<grass_component>(selectedEntity, "GRASS", [this](grass_component& grass)
 					{
+						using component_t = grass_component;
+
 						if (ImGui::BeginProperties())
 						{
-							ImGui::PropertyCheckbox("Depth prepass", grass_settings::depthPrepass);
+							UNDOABLE_SETTING("grass depth prepass", grass_settings::depthPrepass, 
+								ImGui::PropertyCheckbox("Depth prepass", grass_settings::depthPrepass));
 
-							ImGui::PropertyDrag("Blades per chunk dim", grass.settings.numGrassBladesPerChunkDim, 2);
-							ImGui::PropertySlider("Blade height", grass.settings.bladeHeight, 0.f, 2.f);
-							ImGui::PropertySlider("Blade width", grass.settings.bladeWidth, 0.f, 1.f);
+							grass_settings& settings = grass.settings;
 
-							ImGui::PropertyDrag("LOD change start distance", grass.settings.lodChangeStartDistance, 0.5f);
-							ImGui::PropertyDrag("LOD change transition distance", grass.settings.lodChangeTransitionDistance, 0.5f);
+							UNDOABLE_COMPONENT_SETTING("grass blades per chunk dim", settings.numGrassBladesPerChunkDim, 
+								ImGui::PropertyDrag("Blades per chunk dim", settings.numGrassBladesPerChunkDim, 2));
+							UNDOABLE_COMPONENT_SETTING("grass blade height", settings.bladeHeight, 
+								ImGui::PropertySlider("Blade height", settings.bladeHeight, 0.f, 2.f));
+							UNDOABLE_COMPONENT_SETTING("grass blade width", settings.bladeWidth, 
+								ImGui::PropertySlider("Blade width", settings.bladeWidth, 0.f, 1.f));
 
-							ImGui::PropertyDrag("Cull start distance", grass.settings.cullStartDistance, 0.5f);
-							ImGui::PropertyDrag("Cull transition distance", grass.settings.cullTransitionDistance, 0.5f);
+							UNDOABLE_COMPONENT_SETTING("grass LOD change start distance", settings.lodChangeStartDistance, 
+								ImGui::PropertyDrag("LOD change start distance", settings.lodChangeStartDistance, 0.5f, 0.f));
+							UNDOABLE_COMPONENT_SETTING("grass LOD change transition distance", settings.lodChangeTransitionDistance,
+								ImGui::PropertyDrag("LOD change transition distance", settings.lodChangeTransitionDistance, 0.5f, 0.f));
+
+							UNDOABLE_COMPONENT_SETTING("grass cull start distance", settings.cullStartDistance, 
+								ImGui::PropertyDrag("Cull start distance", settings.cullStartDistance, 0.5f, 0.f));
+							UNDOABLE_COMPONENT_SETTING("grass cull transition distance", settings.cullTransitionDistance,
+								ImGui::PropertyDrag("Cull transition distance", settings.cullTransitionDistance, 0.5f, 0.f));
 							ImGui::EndProperties();
 						}
 					});
 
 					drawComponent<water_component>(selectedEntity, "WATER", [this](water_component& water)
 					{
+						using component_t = water_component;
+
 						if (ImGui::BeginProperties())
 						{
-							ImGui::PropertyColor("Deep color", water.settings.deepWaterColor);
-							ImGui::PropertyColor("Shallow color", water.settings.shallowWaterColor);
+							water_settings& settings = water.settings;
 
-							ImGui::PropertyDrag("Shallow depth", water.settings.shallowDepth, 0.05f);
-							ImGui::PropertySlider("Transition strength", water.settings.transitionStrength, 0.f, 2.f);
-							ImGui::PropertySlider("Normal map strength", water.settings.normalStrength);
-							ImGui::PropertyDrag("UV scale", water.settings.uvScale, 0.05f);
+							UNDOABLE_COMPONENT_SETTING("deep water color", settings.deepWaterColor, 
+								ImGui::PropertyColor("Deep color", settings.deepWaterColor));
+							UNDOABLE_COMPONENT_SETTING("shallow water color", settings.shallowWaterColor,
+								ImGui::PropertyColor("Shallow color", settings.shallowWaterColor));
+
+							UNDOABLE_COMPONENT_SETTING("shallow water depth", settings.shallowDepth,
+								ImGui::PropertyDrag("Shallow depth", settings.shallowDepth, 0.05f, 0.f));
+							UNDOABLE_COMPONENT_SETTING("water transition strength", settings.transitionStrength,
+								ImGui::PropertySlider("Transition strength", settings.transitionStrength, 0.f, 2.f));
+							UNDOABLE_COMPONENT_SETTING("water normal map strength", settings.normalStrength,
+								ImGui::PropertySlider("Normal map strength", settings.normalStrength));
+							UNDOABLE_COMPONENT_SETTING("water UV scale", settings.uvScale,
+								ImGui::PropertyDrag("UV scale", settings.uvScale, 0.05f, 0.f));
 
 							ImGui::EndProperties();
 						}
@@ -846,11 +1055,14 @@ bool scene_editor::drawSceneHierarchy()
 
 					drawComponent<rigid_body_component>(selectedEntity, "RIGID BODY", [this, &scene](rigid_body_component& rb)
 					{
+						using component_t = rigid_body_component;
+
 						if (ImGui::BeginProperties())
 						{
 							bool kinematic = rb.invMass == 0;
 							if (ImGui::PropertyCheckbox("Kinematic", kinematic))
 							{
+								// TODO UNDO
 								if (kinematic)
 								{
 									rb.invMass = 0.f;
@@ -876,9 +1088,12 @@ bool scene_editor::drawSceneHierarchy()
 							{
 								ImGui::PropertyValue("Mass", 1.f / rb.invMass, "%.3fkg");
 							}
-							ImGui::PropertySlider("Linear velocity damping", rb.linearDamping);
-							ImGui::PropertySlider("Angular velocity damping", rb.angularDamping);
-							ImGui::PropertySlider("Gravity factor", rb.gravityFactor);
+							UNDOABLE_COMPONENT_SETTING("rigid body linear velocity damping", rb.linearDamping, 
+								ImGui::PropertySlider("Linear velocity damping", rb.linearDamping));
+							UNDOABLE_COMPONENT_SETTING("rigid body angular velocity damping", rb.angularDamping,
+								ImGui::PropertySlider("Angular velocity damping", rb.angularDamping));
+							UNDOABLE_COMPONENT_SETTING("rigid body gravity factor", rb.gravityFactor,
+								ImGui::PropertySlider("Gravity factor", rb.gravityFactor));
 
 							//ImGui::PropertyValue("Linear velocity", rb.linearVelocity);
 							//ImGui::PropertyValue("Angular velocity", rb.angularVelocity);
@@ -889,6 +1104,7 @@ bool scene_editor::drawSceneHierarchy()
 
 					drawComponent<physics_reference_component>(selectedEntity, "COLLIDERS", [this, &scene](physics_reference_component& reference)
 					{
+						// TODO UNDO
 						bool dirty = false;
 
 						for (scene_entity colliderEntity : collider_entity_iterator(selectedEntity))
@@ -1007,6 +1223,7 @@ bool scene_editor::drawSceneHierarchy()
 
 					drawComponent<physics_reference_component>(selectedEntity, "CONSTRAINTS", [this](physics_reference_component& reference)
 					{
+						// TODO UNDO
 						for (auto [constraintEntity, constraintType] : constraint_entity_iterator(selectedEntity))
 						{
 							ImGui::PushID((int)constraintEntity.handle);
@@ -1309,76 +1526,76 @@ bool scene_editor::drawSceneHierarchy()
 						}
 					});
 
-					drawComponent<cloth_component>(selectedEntity, "CLOTH", [](cloth_component& cloth)
+					drawComponent<cloth_component>(selectedEntity, "CLOTH", [this](cloth_component& cloth)
 					{
-						bool dirty = false;
+						using component_t = cloth_component;
+
 						if (ImGui::BeginProperties())
 						{
-							dirty |= ImGui::PropertyInput("Total mass", cloth.totalMass);
-							dirty |= ImGui::PropertySlider("Stiffness", cloth.stiffness, 0.01f, 0.7f);
-
-							// These two don't need to notify the cloth on change.
-							ImGui::PropertySlider("Velocity damping", cloth.damping, 0.f, 1.f);
-							ImGui::PropertySlider("Gravity factor", cloth.gravityFactor, 0.f, 1.f);
+							UNDOABLE_COMPONENT_SETTING("cloth total mass", cloth.totalMass, 
+								ImGui::PropertyInput("Total mass", cloth.totalMass));
+							UNDOABLE_COMPONENT_SETTING("cloth stiffness", cloth.stiffness, 
+								ImGui::PropertySlider("Stiffness", cloth.stiffness, 0.01f, 0.7f));
+							UNDOABLE_COMPONENT_SETTING("cloth velocity damping", cloth.damping, 
+								ImGui::PropertySlider("Velocity damping", cloth.damping, 0.f, 1.f));
+							UNDOABLE_COMPONENT_SETTING("cloth gravity factor", cloth.gravityFactor, 
+								ImGui::PropertySlider("Gravity factor", cloth.gravityFactor, 0.f, 1.f));
 
 							ImGui::EndProperties();
 						}
-
-						if (dirty)
-						{
-							cloth.recalculateProperties();
-						}
 					});
 
-					drawComponent<point_light_component>(selectedEntity, "POINT LIGHT", [](point_light_component& pl)
+					drawComponent<point_light_component>(selectedEntity, "POINT LIGHT", [this](point_light_component& pl)
 					{
+						using component_t = point_light_component;
+
 						if (ImGui::BeginProperties())
 						{
-							ImGui::PropertyColorWheel("Color", pl.color);
-							ImGui::PropertySlider("Intensity", pl.intensity, 0.f, 10.f);
-							ImGui::PropertySlider("Radius", pl.radius, 0.f, 100.f);
-							ImGui::PropertyCheckbox("Casts shadow", pl.castsShadow);
+							UNDOABLE_COMPONENT_SETTING("point light color", pl.color, 
+								ImGui::PropertyColorWheel("Color", pl.color));
+							UNDOABLE_COMPONENT_SETTING("point light intensity", pl.intensity, 
+								ImGui::PropertySlider("Intensity", pl.intensity, 0.f, 10.f));
+							UNDOABLE_COMPONENT_SETTING("point light radius", pl.radius, 
+								ImGui::PropertySlider("Radius", pl.radius, 0.f, 100.f));
+							UNDOABLE_COMPONENT_SETTING("point light casts shadow", pl.castsShadow, 
+								ImGui::PropertyCheckbox("Casts shadow", pl.castsShadow));
 							if (pl.castsShadow)
 							{
-								ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, pl.shadowMapResolution);
+								UNDOABLE_COMPONENT_SETTING("point light shadow resolution", pl.shadowMapResolution,
+									ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, pl.shadowMapResolution));
 							}
 
 							ImGui::EndProperties();
 						}
 					});
 
-					drawComponent<spot_light_component>(selectedEntity, "SPOT LIGHT", [](spot_light_component& sl)
+					drawComponent<spot_light_component>(selectedEntity, "SPOT LIGHT", [this](spot_light_component& sl)
 					{
+						using component_t = spot_light_component;
+
 						if (ImGui::BeginProperties())
 						{
-							float inner = rad2deg(sl.innerAngle);
-							float outer = rad2deg(sl.outerAngle);
-
-							ImGui::PropertyColorWheel("Color", sl.color);
-							ImGui::PropertySlider("Intensity", sl.intensity, 0.f, 10.f);
-							ImGui::PropertySlider("Distance", sl.distance, 0.f, 100.f);
-							ImGui::PropertySlider("Inner angle", inner, 0.1f, 80.f);
-							ImGui::PropertySlider("Outer angle", outer, 0.2f, 85.f);
-							ImGui::PropertyCheckbox("Casts shadow", sl.castsShadow);
+							UNDOABLE_COMPONENT_SETTING("spot light color", sl.color, 
+								ImGui::PropertyColorWheel("Color", sl.color));
+							UNDOABLE_COMPONENT_SETTING("spot light intensity", sl.intensity,
+								ImGui::PropertySlider("Intensity", sl.intensity, 0.f, 10.f));
+							UNDOABLE_COMPONENT_SETTING("spot light distance", sl.distance,
+								ImGui::PropertySlider("Distance", sl.distance, 0.f, 100.f));
+							UNDOABLE_COMPONENT_SETTING("spot light inner angle", sl.innerAngle, 
+								ImGui::PropertySliderAngle("Inner angle", sl.innerAngle, 0.1f, 80.f));
+							UNDOABLE_COMPONENT_SETTING("spot light outer angle", sl.outerAngle, 
+								ImGui::PropertySliderAngle("Outer angle", sl.outerAngle, 0.2f, 85.f));
+							UNDOABLE_COMPONENT_SETTING("spot light casts shadow", sl.castsShadow,
+								ImGui::PropertyCheckbox("Casts shadow", sl.castsShadow));
 							if (sl.castsShadow)
 							{
-								ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, sl.shadowMapResolution);
+								UNDOABLE_COMPONENT_SETTING("spot light shadow resolution", sl.shadowMapResolution,
+									ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, sl.shadowMapResolution));
 							}
-
-							sl.innerAngle = deg2rad(inner);
-							sl.outerAngle = deg2rad(outer);
 
 							ImGui::EndProperties();
 						}
 					});
-
-					if (objectMovedByWidget)
-					{
-						if (cloth_component* cloth = selectedEntity.getComponentIfExists<cloth_component>())
-						{
-							cloth->setWorldPositionOfFixedVertices(selectedEntity.getComponent<transform_component>(), true);
-						}
-					}
 				}
 
 
@@ -1450,6 +1667,17 @@ bool scene_editor::drawSceneHierarchy()
 	ImGui::End();
 
 	return objectMovedByWidget;
+}
+
+void scene_editor::onObjectMoved()
+{
+	if (selectedEntity)
+	{
+		if (cloth_component* cloth = selectedEntity.getComponentIfExists<cloth_component>())
+		{
+			cloth->setWorldPositionOfFixedVertices(selectedEntity.getComponent<transform_component>(), true);
+		}
+	}
 }
 
 bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldrRenderPass, float dt)
@@ -1567,13 +1795,13 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 	}
 	else if (selectedEntity)
 	{
+		bool draggingBefore = gizmo.dragging;
+
 		if (physics_transform1_component* transform = selectedEntity.getComponentIfExists<physics_transform1_component>())
 		{
 			// Saved rigid-body properties. When an RB is dragged, we make it kinematic.
 			static bool saved = false;
 			static float invMass;
-
-			bool draggingBefore = gizmo.dragging;
 
 			if (gizmo.manipulateTransformation(*transform, camera, input, !inputCaptured, ldrRenderPass))
 			{
@@ -1597,6 +1825,16 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 			}
 			else
 			{
+				if (draggingBefore)
+				{
+					undoStack.pushAction("object transform",
+						component_undo<transform_component, physics_transform0_component, physics_transform1_component>(selectedEntity, 
+							gizmo.originalTransform,
+							gizmo.originalTransform,
+							gizmo.originalTransform
+							));
+				}
+
 				if (saved)
 				{
 					assert(selectedEntity.hasComponent<rigid_body_component>());
@@ -1614,11 +1852,11 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 				updateSelectedEntityUIRotation();
 				inputCaptured = true;
 				objectMovedByGizmo = true;
-
-				if (cloth_component* cloth = selectedEntity.getComponentIfExists<cloth_component>())
-				{
-					cloth->setWorldPositionOfFixedVertices(*transform, input.keyboard[key_shift].down);
-				}
+			}
+			else if (draggingBefore)
+			{
+				undoStack.pushAction("object transform", 
+					component_undo<transform_component>(selectedEntity, transform_component(gizmo.originalTransform)));
 			}
 		}
 		else if (position_component* pc = selectedEntity.getComponentIfExists<position_component>())
@@ -1626,13 +1864,26 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 			if (gizmo.manipulatePosition(pc->position, camera, input, !inputCaptured, ldrRenderPass))
 			{
 				inputCaptured = true;
+				objectMovedByGizmo = true;
+			}
+			else if (draggingBefore)
+			{
+				undoStack.pushAction("object transform", 
+					component_undo<position_component>(selectedEntity, position_component{ gizmo.originalTransform.position }));
 			}
 		}
 		else if (position_rotation_component* prc = selectedEntity.getComponentIfExists<position_rotation_component>())
 		{
 			if (gizmo.manipulatePositionRotation(prc->position, prc->rotation, camera, input, !inputCaptured, ldrRenderPass))
 			{
+				updateSelectedEntityUIRotation();
 				inputCaptured = true;
+				objectMovedByGizmo = true;
+			}
+			else if (draggingBefore)
+			{
+				undoStack.pushAction("object transform", 
+					component_undo<position_rotation_component>(selectedEntity, position_rotation_component{ gizmo.originalTransform.position, gizmo.originalTransform.rotation }));
 			}
 		}
 		else if (position_scale_component* psc = selectedEntity.getComponentIfExists<position_scale_component>())
@@ -1640,6 +1891,12 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 			if (gizmo.manipulatePositionScale(psc->position, psc->scale, camera, input, !inputCaptured, ldrRenderPass))
 			{
 				inputCaptured = true;
+				objectMovedByGizmo = true;
+			}
+			else if (draggingBefore)
+			{
+				undoStack.pushAction("object transform",
+					component_undo<position_scale_component>(selectedEntity, position_scale_component{ gizmo.originalTransform.position, gizmo.originalTransform.scale }));
 			}
 		}
 		else
@@ -1748,8 +2005,9 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		else if (input.keyboard[key_ctrl].down)
 		{
 			vec3 dir = -camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY).direction;
-			undoStack.pushAction("sun direction", sun_direction_undo{ &this->scene->sun, this->scene->sun.direction, dir });
+			vec3 beforeDir = this->scene->sun.direction;
 			this->scene->sun.direction = dir;
+			undoStack.pushAction("sun direction", settings_undo<vec3>(this->scene->sun.direction, beforeDir));
 			inputCaptured = true;
 		}
 		else
@@ -1872,18 +2130,22 @@ bool scene_editor::deserializeFromFile()
 	return false;
 }
 
-static bool editCamera(render_camera& camera)
+bool scene_editor::editCamera(render_camera& camera)
 {
 	bool result = false;
 	if (ImGui::BeginTree("Camera"))
 	{
 		if (ImGui::BeginProperties())
 		{
-			result |= ImGui::PropertySliderAngle("Field of view", camera.verticalFOV, 1.f, 150.f);
-			result |= ImGui::PropertyInput("Near plane", camera.nearPlane);
+			UNDOABLE_SETTING("field of view", camera.verticalFOV,
+				result |= ImGui::PropertySliderAngle("Field of view", camera.verticalFOV, 1.f, 150.f));
+			UNDOABLE_SETTING("near plane", camera.nearPlane, 
+				result |= ImGui::PropertyInput("Near plane", camera.nearPlane));
 			bool infiniteFarplane = camera.farPlane < 0.f;
+
 			if (ImGui::PropertyCheckbox("Infinite far plane", infiniteFarplane))
 			{
+				// TODO UNDO
 				if (!infiniteFarplane)
 				{
 					camera.farPlane = (camera.farPlane == -1.f) ? 500.f : -camera.farPlane;
@@ -1896,7 +2158,8 @@ static bool editCamera(render_camera& camera)
 			}
 			if (!infiniteFarplane)
 			{
-				result |= ImGui::PropertyInput("Far plane", camera.farPlane);
+				UNDOABLE_SETTING("far plane", camera.farPlane, 
+					result |= ImGui::PropertyInput("Far plane", camera.farPlane));
 			}
 
 			ImGui::EndProperties();
@@ -1907,7 +2170,7 @@ static bool editCamera(render_camera& camera)
 	return result;
 }
 
-static bool plotAndEditTonemapping(tonemap_settings& tonemap)
+bool scene_editor::editTonemapping(tonemap_settings& tonemap)
 {
 	bool result = false;
 	if (ImGui::BeginTree("Tonemapping"))
@@ -1923,14 +2186,22 @@ static bool plotAndEditTonemapping(tonemap_settings& tonemap)
 
 		if (ImGui::BeginProperties())
 		{
-			result |= ImGui::PropertySlider("Shoulder strength", tonemap.A, 0.f, 1.f);
-			result |= ImGui::PropertySlider("Linear strength", tonemap.B, 0.f, 1.f);
-			result |= ImGui::PropertySlider("Linear angle", tonemap.C, 0.f, 1.f);
-			result |= ImGui::PropertySlider("Toe strength", tonemap.D, 0.f, 1.f);
-			result |= ImGui::PropertySlider("Tone numerator", tonemap.E, 0.f, 1.f);
-			result |= ImGui::PropertySlider("Toe denominator", tonemap.F, 0.f, 1.f);
-			result |= ImGui::PropertySlider("Linear white", tonemap.linearWhite, 0.f, 100.f);
-			result |= ImGui::PropertySlider("Exposure", tonemap.exposure, -3.f, 3.f);
+			UNDOABLE_SETTING("shoulder strength", tonemap.A, 
+				result |= ImGui::PropertySlider("Shoulder strength", tonemap.A, 0.f, 1.f));
+			UNDOABLE_SETTING("linear strength", tonemap.B, 
+				result |= ImGui::PropertySlider("Linear strength", tonemap.B, 0.f, 1.f));
+			UNDOABLE_SETTING("linear angle", tonemap.C, 
+				result |= ImGui::PropertySlider("Linear angle", tonemap.C, 0.f, 1.f));
+			UNDOABLE_SETTING("toe strength", tonemap.D, 
+				result |= ImGui::PropertySlider("Toe strength", tonemap.D, 0.f, 1.f));
+			UNDOABLE_SETTING("tone numerator", tonemap.E, 
+				result |= ImGui::PropertySlider("Tone numerator", tonemap.E, 0.f, 1.f));
+			UNDOABLE_SETTING("toe denominator", tonemap.F, 
+				result |= ImGui::PropertySlider("Toe denominator", tonemap.F, 0.f, 1.f));
+			UNDOABLE_SETTING("linear white", tonemap.linearWhite, 
+				result |= ImGui::PropertySlider("Linear white", tonemap.linearWhite, 0.f, 100.f));
+			UNDOABLE_SETTING("exposure", tonemap.exposure, 
+				result |= ImGui::PropertySlider("Exposure", tonemap.exposure, -3.f, 3.f));
 			ImGui::EndProperties();
 		}
 
@@ -1939,47 +2210,64 @@ static bool plotAndEditTonemapping(tonemap_settings& tonemap)
 	return result;
 }
 
-static bool editSunShadowParameters(directional_light& sun)
+bool scene_editor::editSunShadowParameters(directional_light& sun)
 {
 	bool result = false;
 	if (ImGui::BeginTree("Sun"))
 	{
 		if (ImGui::BeginProperties())
 		{
-			result |= ImGui::PropertySlider("Intensity", sun.intensity, 0.f, 1000.f);
-			result |= ImGui::PropertyColorWheel("Color", sun.color);
+			UNDOABLE_SETTING("sun intensity", sun.intensity,
+				result |= ImGui::PropertySlider("Intensity", sun.intensity, 0.f, 1000.f));
+			UNDOABLE_SETTING("sun color", sun.color, 
+				result |= ImGui::PropertyColorWheel("Color", sun.color));
 
-			result |= ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, sun.shadowDimensions);
-			result |= ImGui::PropertyCheckbox("Stabilize", sun.stabilize);
+			UNDOABLE_SETTING("sun shadow resolution", sun.shadowDimensions,
+				result |= ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, sun.shadowDimensions));
+			UNDOABLE_SETTING("stabilize", sun.stabilize, 
+				result |= ImGui::PropertyCheckbox("Stabilize", sun.stabilize));
 
-			result |= ImGui::PropertySlider("# Cascades", sun.numShadowCascades, 1, 4);
+			UNDOABLE_SETTING("cascade count", sun.numShadowCascades, 
+				result |= ImGui::PropertySlider("Cascade count", sun.numShadowCascades, 1, 4));
 
 			const float minCascadeDistance = 0.f, maxCascadeDistance = 300.f;
 			const float minBias = 0.f, maxBias = 0.0015f;
 			const float minBlend = 0.f, maxBlend = 10.f;
 			if (sun.numShadowCascades == 1)
 			{
-				result |= ImGui::PropertySlider("Distance", sun.cascadeDistances.x, minCascadeDistance, maxCascadeDistance);
-				result |= ImGui::PropertySlider("Bias", sun.bias.x, minBias, maxBias, "%.6f");
-				result |= ImGui::PropertySlider("Blend distances", sun.blendDistances.x, minBlend, maxBlend, "%.6f");
+				UNDOABLE_SETTING("cascade distance", sun.cascadeDistances.x, 
+					result |= ImGui::PropertySlider("Distance", sun.cascadeDistances.x, minCascadeDistance, maxCascadeDistance));
+				UNDOABLE_SETTING("cascade bias", sun.bias.x, 
+					result |= ImGui::PropertySlider("Bias", sun.bias.x, minBias, maxBias, "%.6f"));
+				UNDOABLE_SETTING("cascade blend distances", sun.blendDistances.x, 
+					result |= ImGui::PropertySlider("Blend distances", sun.blendDistances.x, minBlend, maxBlend, "%.6f"));
 			}
 			else if (sun.numShadowCascades == 2)
 			{
-				result |= ImGui::PropertySlider("Distance", sun.cascadeDistances.xy, minCascadeDistance, maxCascadeDistance);
-				result |= ImGui::PropertySlider("Bias", sun.bias.xy, minBias, maxBias, "%.6f");
-				result |= ImGui::PropertySlider("Blend distances", sun.blendDistances.xy, minBlend, maxBlend, "%.6f");
+				UNDOABLE_SETTING("cascade distance", sun.cascadeDistances.xy,
+					result |= ImGui::PropertySlider("Distance", sun.cascadeDistances.xy, minCascadeDistance, maxCascadeDistance));
+				UNDOABLE_SETTING("cascade bias", sun.bias.xy,
+					result |= ImGui::PropertySlider("Bias", sun.bias.xy, minBias, maxBias, "%.6f"));
+				UNDOABLE_SETTING("cascade blend distances", sun.blendDistances.xy,
+					result |= ImGui::PropertySlider("Blend distances", sun.blendDistances.xy, minBlend, maxBlend, "%.6f"));
 			}
 			else if (sun.numShadowCascades == 3)
 			{
-				result |= ImGui::PropertySlider("Distance", sun.cascadeDistances.xyz, minCascadeDistance, maxCascadeDistance);
-				result |= ImGui::PropertySlider("Bias", sun.bias.xyz, minBias, maxBias, "%.6f");
-				result |= ImGui::PropertySlider("Blend distances", sun.blendDistances.xyz, minBlend, maxBlend, "%.6f");
+				UNDOABLE_SETTING("cascade distance", sun.cascadeDistances.xyz,
+					result |= ImGui::PropertySlider("Distance", sun.cascadeDistances.xyz, minCascadeDistance, maxCascadeDistance));
+				UNDOABLE_SETTING("cascade bias", sun.bias.xyz, 
+					result |= ImGui::PropertySlider("Bias", sun.bias.xyz, minBias, maxBias, "%.6f"));
+				UNDOABLE_SETTING("cascade blend distances", sun.blendDistances.xyz,
+					result |= ImGui::PropertySlider("Blend distances", sun.blendDistances.xyz, minBlend, maxBlend, "%.6f"));
 			}
 			else if (sun.numShadowCascades == 4)
 			{
-				result |= ImGui::PropertySlider("Distance", sun.cascadeDistances, minCascadeDistance, maxCascadeDistance);
-				result |= ImGui::PropertySlider("Bias", sun.bias, minBias, maxBias, "%.6f");
-				result |= ImGui::PropertySlider("Blend distances", sun.blendDistances, minBlend, maxBlend, "%.6f");
+				UNDOABLE_SETTING("cascade distance", sun.cascadeDistances,
+					result |= ImGui::PropertySlider("Distance", sun.cascadeDistances, minCascadeDistance, maxCascadeDistance));
+				UNDOABLE_SETTING("cascade bias", sun.bias,
+					result |= ImGui::PropertySlider("Bias", sun.bias, minBias, maxBias, "%.6f"));
+				UNDOABLE_SETTING("cascade blend distances", sun.blendDistances,
+					result |= ImGui::PropertySlider("Blend distances", sun.blendDistances, minBlend, maxBlend, "%.6f"));
 			}
 
 			ImGui::EndProperties();
@@ -1990,18 +2278,23 @@ static bool editSunShadowParameters(directional_light& sun)
 	return result;
 }
 
-static bool editAO(bool& enable, hbao_settings& settings, const ref<dx_texture>& aoTexture)
+bool scene_editor::editAO(bool& enable, hbao_settings& settings, const ref<dx_texture>& aoTexture)
 {
 	bool result = false;
 	if (ImGui::BeginProperties())
 	{
-		result |= ImGui::PropertyCheckbox("Enable HBAO", enable);
+		UNDOABLE_SETTING("enable HBAO", enable, 
+			result |= ImGui::PropertyCheckbox("Enable HBAO", enable));
 		if (enable)
 		{
-			result |= ImGui::PropertySlider("Num rays", settings.numRays, 1, 16);
-			result |= ImGui::PropertySlider("Max num steps per ray", settings.maxNumStepsPerRay, 1, 16);
-			result |= ImGui::PropertySlider("Radius", settings.radius, 0.f, 1.f, "%.3fm");
-			result |= ImGui::PropertySlider("Strength", settings.strength, 0.f, 2.f);
+			UNDOABLE_SETTING("num AO rays", settings.numRays, 
+				result |= ImGui::PropertySlider("Num rays", settings.numRays, 1, 16));
+			UNDOABLE_SETTING("max num steps per AO ray", settings.maxNumStepsPerRay,
+				result |= ImGui::PropertySlider("Max num steps per ray", settings.maxNumStepsPerRay, 1, 16));
+			UNDOABLE_SETTING("AO radius", settings.radius, 
+				result |= ImGui::PropertySlider("Radius", settings.radius, 0.f, 1.f, "%.3fm"));
+			UNDOABLE_SETTING("AO strength", settings.strength, 
+				result |= ImGui::PropertySlider("Strength", settings.strength, 0.f, 2.f));
 		}
 		ImGui::EndProperties();
 	}
@@ -2013,20 +2306,27 @@ static bool editAO(bool& enable, hbao_settings& settings, const ref<dx_texture>&
 	return result;
 }
 
-static bool editSSS(bool& enable, sss_settings& settings, const ref<dx_texture>& sssTexture)
+bool scene_editor::editSSS(bool& enable, sss_settings& settings, const ref<dx_texture>& sssTexture)
 {
 	bool result = false;
 	if (ImGui::BeginProperties())
 	{
-		result |= ImGui::PropertyCheckbox("Enable SSS", enable);
+		UNDOABLE_SETTING("enable SSS", enable, 
+			result |= ImGui::PropertyCheckbox("Enable SSS", enable));
 		if (enable)
 		{
-			result |= ImGui::PropertySlider("Num iterations", settings.numSteps, 1, 64);
-			result |= ImGui::PropertySlider("Ray distance", settings.rayDistance, 0.05f, 3.f, "%.3fm");
-			result |= ImGui::PropertySlider("Thickness", settings.thickness, 0.05f, 1.f, "%.3fm");
-			result |= ImGui::PropertySlider("Max distance from camera", settings.maxDistanceFromCamera, 5.f, 1000.f, "%.3fm");
-			result |= ImGui::PropertySlider("Distance fadeout range", settings.distanceFadeoutRange, 1.f, 5.f, "%.3fm");
-			result |= ImGui::PropertySlider("Border fadeout", settings.borderFadeout, 0.f, 0.5f);
+			UNDOABLE_SETTING("num SSS iterations", settings.numSteps, 
+				result |= ImGui::PropertySlider("Num iterations", settings.numSteps, 1, 64));
+			UNDOABLE_SETTING("SSS ray distance", settings.rayDistance, 
+				result |= ImGui::PropertySlider("Ray distance", settings.rayDistance, 0.05f, 3.f, "%.3fm"));
+			UNDOABLE_SETTING("SSS thickness", settings.thickness, 
+				result |= ImGui::PropertySlider("Thickness", settings.thickness, 0.05f, 1.f, "%.3fm"));
+			UNDOABLE_SETTING("SSS max distance from camera", settings.maxDistanceFromCamera, 
+				result |= ImGui::PropertySlider("Max distance from camera", settings.maxDistanceFromCamera, 5.f, 1000.f, "%.3fm"));
+			UNDOABLE_SETTING("SSS distance fadeout range", settings.distanceFadeoutRange, 
+				result |= ImGui::PropertySlider("Distance fadeout range", settings.distanceFadeoutRange, 1.f, 5.f, "%.3fm"));
+			UNDOABLE_SETTING("SSS border fadeout", settings.borderFadeout, 
+				result |= ImGui::PropertySlider("Border fadeout", settings.borderFadeout, 0.f, 0.5f));
 		}
 		ImGui::EndProperties();
 	}
@@ -2038,18 +2338,23 @@ static bool editSSS(bool& enable, sss_settings& settings, const ref<dx_texture>&
 	return result;
 }
 
-static bool editSSR(bool& enable, ssr_settings& settings, const ref<dx_texture>& ssrTexture)
+bool scene_editor::editSSR(bool& enable, ssr_settings& settings, const ref<dx_texture>& ssrTexture)
 {
 	bool result = false;
 	if (ImGui::BeginProperties())
 	{
-		result |= ImGui::PropertyCheckbox("Enable SSR", enable);
+		UNDOABLE_SETTING("enable SSR", enable, 
+			result |= ImGui::PropertyCheckbox("Enable SSR", enable));
 		if (enable)
 		{
-			result |= ImGui::PropertySlider("Num iterations", settings.numSteps, 1, 1024);
-			result |= ImGui::PropertySlider("Max distance", settings.maxDistance, 5.f, 1000.f, "%.3fm");
-			result |= ImGui::PropertySlider("Min stride", settings.minStride, 1.f, 50.f, "%.3fm");
-			result |= ImGui::PropertySlider("Max stride", settings.maxStride, settings.minStride, 50.f, "%.3fm");
+			UNDOABLE_SETTING("num SSR iterations", settings.numSteps, 
+				result |= ImGui::PropertySlider("Num iterations", settings.numSteps, 1, 1024));
+			UNDOABLE_SETTING("SSR max distance", settings.maxDistance, 
+				result |= ImGui::PropertySlider("Max distance", settings.maxDistance, 5.f, 1000.f, "%.3fm"));
+			UNDOABLE_SETTING("SSR min stride", settings.minStride, 
+				result |= ImGui::PropertySlider("Min stride", settings.minStride, 1.f, 50.f, "%.3fm"));
+			UNDOABLE_SETTING("SSR max stride", settings.maxStride, 
+				result |= ImGui::PropertySlider("Max stride", settings.maxStride, settings.minStride, 50.f, "%.3fm"));
 		}
 		ImGui::EndProperties();
 	}
@@ -2061,15 +2366,17 @@ static bool editSSR(bool& enable, ssr_settings& settings, const ref<dx_texture>&
 	return result;
 }
 
-static bool editTAA(bool& enable, taa_settings& settings, const ref<dx_texture>& velocityTexture)
+bool scene_editor::editTAA(bool& enable, taa_settings& settings, const ref<dx_texture>& velocityTexture)
 {
 	bool result = false;
 	if (ImGui::BeginProperties())
 	{
-		result |= ImGui::PropertyCheckbox("Enable TAA", enable);
+		UNDOABLE_SETTING("enable TAA", enable, 
+			result |= ImGui::PropertyCheckbox("Enable TAA", enable));
 		if (enable)
 		{
-			result |= ImGui::PropertySlider("Jitter strength", settings.cameraJitterStrength);
+			UNDOABLE_SETTING("TAA jitter strength", settings.cameraJitterStrength, 
+				result |= ImGui::PropertySlider("Jitter strength", settings.cameraJitterStrength));
 		}
 		ImGui::EndProperties();
 	}
@@ -2081,16 +2388,19 @@ static bool editTAA(bool& enable, taa_settings& settings, const ref<dx_texture>&
 	return result;
 }
 
-static bool editBloom(bool& enable, bloom_settings& settings, const ref<dx_texture>& bloomTexture)
+bool scene_editor::editBloom(bool& enable, bloom_settings& settings, const ref<dx_texture>& bloomTexture)
 {
 	bool result = false;
 	if (ImGui::BeginProperties())
 	{
-		result |= ImGui::PropertyCheckbox("Enable bloom", enable);
+		UNDOABLE_SETTING("enable bloom", enable, 
+			result |= ImGui::PropertyCheckbox("Enable bloom", enable));
 		if (enable)
 		{
-			result |= ImGui::PropertySlider("Bloom threshold", settings.threshold, 0.5f, 100.f);
-			result |= ImGui::PropertySlider("Bloom strength", settings.strength);
+			UNDOABLE_SETTING("bloom threshold", settings.threshold, 
+				result |= ImGui::PropertySlider("Bloom threshold", settings.threshold, 0.5f, 100.f));
+			UNDOABLE_SETTING("bloom strength", settings.strength, 
+				result |= ImGui::PropertySlider("Bloom strength", settings.strength));
 		}
 		ImGui::EndProperties();
 	}
@@ -2102,15 +2412,17 @@ static bool editBloom(bool& enable, bloom_settings& settings, const ref<dx_textu
 	return result;
 }
 
-static bool editSharpen(bool& enable, sharpen_settings& settings)
+bool scene_editor::editSharpen(bool& enable, sharpen_settings& settings)
 {
 	bool result = false;
 	if (ImGui::BeginProperties())
 	{
-		result |= ImGui::PropertyCheckbox("Enable sharpen", enable);
+		UNDOABLE_SETTING("enable sharpen", enable, 
+			result |= ImGui::PropertyCheckbox("Enable sharpen", enable));
 		if (enable)
 		{
-			result |= ImGui::PropertySlider("Sharpen strength", settings.strength);
+			UNDOABLE_SETTING("sharpen strength", settings.strength, 
+				result |= ImGui::PropertySlider("Sharpen strength", settings.strength));
 		}
 		ImGui::EndProperties();
 	}
@@ -2129,27 +2441,31 @@ void scene_editor::drawSettings(float dt)
 
 		if (ImGui::BeginProperties())
 		{
-			ImGui::PropertySlider("Time scale", this->scene->timestepScale);
+			UNDOABLE_SETTING("time scale", this->scene->timestepScale, 
+				ImGui::PropertySlider("Time scale", this->scene->timestepScale));
 
-			if (ImGui::PropertyDropdown("Renderer mode", rendererModeNames, renderer_mode_count, (uint32&)renderer->mode))
-			{
-				pathTracer.resetRendering();
-			}
+			UNDOABLE_SETTING("renderer mode", renderer->mode,
+				if (ImGui::PropertyDropdown("Renderer mode", rendererModeNames, renderer_mode_count, (uint32&)renderer->mode))
+				{
+					pathTracer.resetRendering();
+				});
 
 			dx_memory_usage memoryUsage = dxContext.getMemoryUsage();
 
 			ImGui::PropertyValue("Video memory usage", "%u / %uMB", memoryUsage.currentlyUsed, memoryUsage.available);
 			//ImGui::PropertyValue("Running command lists", "%u", dxContext.renderQueue.numRunningCommandLists);
 
-			ImGui::PropertyDropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->aspectRatioMode);
+			UNDOABLE_SETTING("aspect ratio", renderer->aspectRatioMode,
+				ImGui::PropertyDropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->aspectRatioMode));
 
-			ImGui::PropertyCheckbox("Static shadow map caching", enableStaticShadowMapCaching);
+			UNDOABLE_SETTING("static shadow map caching", enableStaticShadowMapCaching, 
+				ImGui::PropertyCheckbox("Static shadow map caching", enableStaticShadowMapCaching));
 
 			ImGui::EndProperties();
 		}
 
 		editCamera(this->scene->camera);
-		plotAndEditTonemapping(renderer->settings.tonemapSettings);
+		editTonemapping(renderer->settings.tonemapSettings);
 		editSunShadowParameters(this->scene->sun);
 
 		if (ImGui::BeginTree("Post processing"))
@@ -2183,10 +2499,13 @@ void scene_editor::drawSettings(float dt)
 					}
 				}
 
-				ImGui::PropertySlider("Sky intensity", environment.skyIntensity, 0.f, 2.f);
-				ImGui::PropertySlider("GI intensity", environment.globalIlluminationIntensity, 0.f, 2.f);
+				UNDOABLE_SETTING("sky intensity", environment.skyIntensity, 
+					ImGui::PropertySlider("Sky intensity", environment.skyIntensity, 0.f, 2.f));
+				UNDOABLE_SETTING("GI intensity", environment.globalIlluminationIntensity,
+					ImGui::PropertySlider("GI intensity", environment.globalIlluminationIntensity, 0.f, 2.f));
 
-				ImGui::PropertyDropdown("GI mode", environmentGIModeNames, 1 + dxContext.featureSupport.raytracing(), (uint32&)environment.giMode);
+				UNDOABLE_SETTING("GI mode", environment.giMode,
+					ImGui::PropertyDropdown("GI mode", environmentGIModeNames, 1 + dxContext.featureSupport.raytracing(), (uint32&)environment.giMode));
 
 				ImGui::EndProperties();
 			}
@@ -2199,10 +2518,13 @@ void scene_editor::drawSettings(float dt)
 
 					if (ImGui::BeginProperties())
 					{
-						ImGui::PropertyCheckbox("Visualize probes", grid.visualizeProbes);
-						ImGui::PropertyCheckbox("Visualize rays", grid.visualizeRays);
+						UNDOABLE_SETTING("visualize probes", grid.visualizeProbes, 
+							ImGui::PropertyCheckbox("Visualize probes", grid.visualizeProbes));
+						UNDOABLE_SETTING("visualize rays", grid.visualizeRays, 
+							ImGui::PropertyCheckbox("Visualize rays", grid.visualizeRays));
 
-						ImGui::PropertyCheckbox("Auto rotate rays", grid.autoRotateRays);
+						UNDOABLE_SETTING("auto rotate rays", grid.autoRotateRays, 
+							ImGui::PropertyCheckbox("Auto rotate rays", grid.autoRotateRays));
 						if (!grid.autoRotateRays)
 						{
 							grid.rotateRays = ImGui::PropertyButton("Rotate", "Go");
@@ -2213,19 +2535,34 @@ void scene_editor::drawSettings(float dt)
 
 					if (ImGui::BeginTree("Irradiance"))
 					{
-						if (ImGui::BeginProperties()) { ImGui::PropertySlider("Scale", grid.irradianceUIScale, 0.1f, 20.f); ImGui::EndProperties(); }
+						if (ImGui::BeginProperties()) 
+						{ 
+							UNDOABLE_SETTING("irradiance UI scale", grid.irradianceUIScale,
+								ImGui::PropertySlider("Scale", grid.irradianceUIScale, 0.1f, 20.f));
+							ImGui::EndProperties(); 
+						}
 						ImGui::Image(grid.irradiance, (uint32)(grid.irradiance->width * grid.irradianceUIScale));
 						ImGui::EndTree();
 					}
 					if (ImGui::BeginTree("Depth"))
 					{
-						if (ImGui::BeginProperties()) { ImGui::PropertySlider("Scale", grid.depthUIScale, 0.1f, 20.f); ImGui::EndProperties(); }
+						if (ImGui::BeginProperties()) 
+						{ 
+							UNDOABLE_SETTING("depth UI scale", grid.depthUIScale, 
+								ImGui::PropertySlider("Scale", grid.depthUIScale, 0.1f, 20.f));
+							ImGui::EndProperties(); 
+						}
 						ImGui::Image(grid.depth, (uint32)(grid.depth->width * grid.depthUIScale));
 						ImGui::EndTree();
 					}
 					if (ImGui::BeginTree("Raytraced radiance"))
 					{
-						if (ImGui::BeginProperties()) { ImGui::PropertySlider("Scale", grid.raytracedRadianceUIScale, 0.1f, 20.f); ImGui::EndProperties(); }
+						if (ImGui::BeginProperties()) 
+						{ 
+							UNDOABLE_SETTING("raytraced radiance UI scale", grid.raytracedRadianceUIScale, 
+								ImGui::PropertySlider("Scale", grid.raytracedRadianceUIScale, 0.1f, 20.f));
+							ImGui::EndProperties(); 
+						}
 						ImGui::Image(grid.raytracedRadiance, (uint32)(grid.raytracedRadiance->width * grid.raytracedRadianceUIScale));
 						ImGui::EndTree();
 					}
@@ -2242,11 +2579,13 @@ void scene_editor::drawSettings(float dt)
 		{
 			if (ImGui::BeginProperties())
 			{
-				ImGui::PropertyCheckbox("Fixed frame rate (deterministic)", physicsSettings.fixedFrameRate);
+				UNDOABLE_SETTING("fixed frame rate", physicsSettings.fixedFrameRate, 
+					ImGui::PropertyCheckbox("Fixed frame rate (deterministic)", physicsSettings.fixedFrameRate));
 
 				if (physicsSettings.fixedFrameRate)
 				{
-					ImGui::PropertyInput("Frame rate", physicsSettings.frameRate);
+					UNDOABLE_SETTING("frame rate", physicsSettings.frameRate, 
+						ImGui::PropertyInput("Frame rate", physicsSettings.frameRate));
 					if (physicsSettings.frameRate < 30)
 					{
 						ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.f, 0.f, 0.f, 1.f));
@@ -2254,20 +2593,29 @@ void scene_editor::drawSettings(float dt)
 						ImGui::PopStyleColor();
 					}
 
-					ImGui::PropertyInput("Max physics steps per frame", physicsSettings.maxPhysicsIterationsPerFrame);
+					UNDOABLE_SETTING("max physics steps per frame", physicsSettings.maxPhysicsIterationsPerFrame, 
+						ImGui::PropertyInput("Max physics steps per frame", physicsSettings.maxPhysicsIterationsPerFrame));
 				}
 
-				ImGui::PropertySlider("Rigid solver iterations", physicsSettings.numRigidSolverIterations, 1, 200);
+				UNDOABLE_SETTING("rigid solver iterations", physicsSettings.numRigidSolverIterations, 
+					ImGui::PropertySlider("Rigid solver iterations", physicsSettings.numRigidSolverIterations, 1, 200));
 
-				ImGui::PropertySlider("Cloth velocity iterations", physicsSettings.numClothVelocityIterations, 0, 10);
-				ImGui::PropertySlider("Cloth position iterations", physicsSettings.numClothPositionIterations, 0, 10);
-				ImGui::PropertySlider("Cloth drift iterations", physicsSettings.numClothDriftIterations, 0, 10);
+				UNDOABLE_SETTING("cloth velocity iterations", physicsSettings.numClothVelocityIterations,
+					ImGui::PropertySlider("Cloth velocity iterations", physicsSettings.numClothVelocityIterations, 0, 10));
+				UNDOABLE_SETTING("cloth position iterations", physicsSettings.numClothPositionIterations, 
+					ImGui::PropertySlider("Cloth position iterations", physicsSettings.numClothPositionIterations, 0, 10));
+				UNDOABLE_SETTING("cloth drift iterations", physicsSettings.numClothDriftIterations, 
+					ImGui::PropertySlider("Cloth drift iterations", physicsSettings.numClothDriftIterations, 0, 10));
 
-				ImGui::PropertySlider("Test force", physicsTestForce, 1.f, 10000.f);
+				UNDOABLE_SETTING("test force", physicsTestForce, 
+					ImGui::PropertySlider("Test force", physicsTestForce, 1.f, 10000.f));
 
-				ImGui::PropertyCheckbox("SIMD broad phase", physicsSettings.simdBroadPhase);
-				ImGui::PropertyCheckbox("SIMD narrow phase", physicsSettings.simdNarrowPhase);
-				ImGui::PropertyCheckbox("SIMD constraint solver", physicsSettings.simdConstraintSolver);
+				UNDOABLE_SETTING("SIMD broad phase", physicsSettings.simdBroadPhase, 
+					ImGui::PropertyCheckbox("SIMD broad phase", physicsSettings.simdBroadPhase));
+				UNDOABLE_SETTING("SIMD narrow phase", physicsSettings.simdNarrowPhase,
+					ImGui::PropertyCheckbox("SIMD narrow phase", physicsSettings.simdNarrowPhase));
+				UNDOABLE_SETTING("SIMD constraint solver", physicsSettings.simdConstraintSolver, 
+					ImGui::PropertyCheckbox("SIMD constraint solver", physicsSettings.simdConstraintSolver));
 
 				ImGui::EndProperties();
 			}
@@ -2280,13 +2628,15 @@ void scene_editor::drawSettings(float dt)
 			if (ImGui::BeginProperties())
 			{
 				const float maxVolume = 3.f;
-				change |= ImGui::PropertySlider("Master volume", masterAudioSettings.volume, 0.f, maxVolume);
+				UNDOABLE_SETTING("master volume", masterAudioSettings.volume, 
+					change |= ImGui::PropertySlider("Master volume", masterAudioSettings.volume, 0.f, maxVolume));
 
 				ImGui::PropertySeparator();
 
 				for (uint32 i = 0; i < sound_type_count; ++i)
 				{
-					change |= ImGui::PropertySlider(soundTypeNames[i], soundTypeVolumes[i], 0.f, 1.f);
+					UNDOABLE_SETTING(soundTypeNames[i], soundTypeVolumes[i], 
+						change |= ImGui::PropertySlider(soundTypeNames[i], soundTypeVolumes[i], 0.f, 1.f));
 				}
 
 				ImGui::PropertySeparator();
@@ -2296,6 +2646,7 @@ void scene_editor::drawSettings(float dt)
 				bool reverbEnabled = masterAudioSettings.reverbPreset != reverb_none;
 				if (ImGui::PropertyCheckbox("Reverb enabled", reverbEnabled))
 				{
+					// TODO UNDO
 					if (reverbEnabled) { masterAudioSettings.reverbPreset = oldReverbPreset; }
 					else { oldReverbPreset = masterAudioSettings.reverbPreset; masterAudioSettings.reverbPreset = reverb_none; }
 
@@ -2304,7 +2655,8 @@ void scene_editor::drawSettings(float dt)
 
 				if (reverbEnabled)
 				{
-					change |= ImGui::PropertyDropdown("Reverb preset", reverbPresetNames, reverb_preset_count, (uint32&)masterAudioSettings.reverbPreset);
+					UNDOABLE_SETTING("reverb preset", masterAudioSettings.reverbPreset,
+						change |= ImGui::PropertyDropdown("Reverb preset", reverbPresetNames, reverb_preset_count, (uint32&)masterAudioSettings.reverbPreset));
 				}
 
 				ImGui::EndProperties();
@@ -2314,34 +2666,39 @@ void scene_editor::drawSettings(float dt)
 
 		if (renderer->mode == renderer_mode_pathtraced)
 		{
-			bool pathTracerDirty = false;
 			if (ImGui::BeginProperties())
 			{
-				pathTracerDirty |= ImGui::PropertySlider("Max recursion depth", pathTracer.recursionDepth, 0, pathTracer.maxRecursionDepth - 1);
-				pathTracerDirty |= ImGui::PropertySlider("Start russian roulette after", pathTracer.startRussianRouletteAfter, 0, pathTracer.recursionDepth);
-				pathTracerDirty |= ImGui::PropertyCheckbox("Use thin lens camera", pathTracer.useThinLensCamera);
-				if (pathTracer.useThinLensCamera)
-				{
-					pathTracerDirty |= ImGui::PropertySlider("Focal length", pathTracer.focalLength, 0.5f, 50.f);
-					pathTracerDirty |= ImGui::PropertySlider("F-Number", pathTracer.fNumber, 1.f, 128.f);
-				}
-				pathTracerDirty |= ImGui::PropertyCheckbox("Use real materials", pathTracer.useRealMaterials);
-				pathTracerDirty |= ImGui::PropertyCheckbox("Enable direct lighting", pathTracer.enableDirectLighting);
-				if (pathTracer.enableDirectLighting)
-				{
-					pathTracerDirty |= ImGui::PropertySlider("Light intensity scale", pathTracer.lightIntensityScale, 0.f, 50.f);
-					pathTracerDirty |= ImGui::PropertySlider("Point light radius", pathTracer.pointLightRadius, 0.01f, 1.f);
+				auto& settings = pathTracer.settings;
 
-					pathTracerDirty |= ImGui::PropertyCheckbox("Multiple importance sampling", pathTracer.multipleImportanceSampling);
+				UNDOABLE_SETTING("max recursion depth", settings.recursionDepth,
+					ImGui::PropertySlider("Max recursion depth", settings.recursionDepth, 0, settings.maxRecursionDepth - 1));
+				UNDOABLE_SETTING("start russion roulette after", settings.startRussianRouletteAfter,
+					ImGui::PropertySlider("Start russian roulette after", settings.startRussianRouletteAfter, 0, settings.recursionDepth));
+				UNDOABLE_SETTING("use thin lens camera", settings.useThinLensCamera,
+					ImGui::PropertyCheckbox("Use thin lens camera", settings.useThinLensCamera));
+				if (settings.useThinLensCamera)
+				{
+					UNDOABLE_SETTING("focal length", settings.focalLength,
+						ImGui::PropertySlider("Focal length", settings.focalLength, 0.5f, 50.f));
+					UNDOABLE_SETTING("f-number", settings.fNumber,
+						ImGui::PropertySlider("F-Number", settings.fNumber, 1.f, 128.f));
+				}
+				UNDOABLE_SETTING("use real materials", settings.useRealMaterials,
+					ImGui::PropertyCheckbox("Use real materials", settings.useRealMaterials));
+				UNDOABLE_SETTING("enable direct lighting", settings.enableDirectLighting,
+					ImGui::PropertyCheckbox("Enable direct lighting", settings.enableDirectLighting));
+				if (settings.enableDirectLighting)
+				{
+					UNDOABLE_SETTING("light intensity scale", settings.lightIntensityScale,
+						ImGui::PropertySlider("Light intensity scale", settings.lightIntensityScale, 0.f, 50.f));
+					UNDOABLE_SETTING("point light radius", settings.pointLightRadius,
+						ImGui::PropertySlider("Point light radius", settings.pointLightRadius, 0.01f, 1.f));
+
+					UNDOABLE_SETTING("multiple importance sampling", settings.multipleImportanceSampling,
+						ImGui::PropertyCheckbox("Multiple importance sampling", settings.multipleImportanceSampling));
 				}
 
 				ImGui::EndProperties();
-			}
-
-
-			if (pathTracerDirty)
-			{
-				pathTracer.numAveragedFrames = 0;
 			}
 		}
 		else

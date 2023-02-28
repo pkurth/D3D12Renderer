@@ -7,6 +7,8 @@ struct tag_component
 {
 	char name[16];
 
+	tag_component() {}
+
 	tag_component(const char* n)
 	{
 		strncpy(name, n, sizeof(name));

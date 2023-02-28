@@ -75,6 +75,8 @@ cloth_component::cloth_component(float width, float height, uint32 gridSizeX, ui
 		}
 	}
 
+	oldTotalMass = totalMass;
+	oldStiffness = stiffness;
 }
 
 void cloth_component::setWorldPositionOfFixedVertices(const trs& transform, bool moveRigid)
@@ -178,6 +180,15 @@ struct cloth_constraint_temp
 void cloth_component::simulate(uint32 velocityIterations, uint32 positionIterations, uint32 driftIterations, float dt)
 {
 	CPU_PROFILE_BLOCK("Simulate cloth");
+
+	if (totalMass != oldTotalMass || stiffness != oldStiffness)
+	{
+		recalculateProperties();
+
+		oldTotalMass = totalMass;
+		oldStiffness = stiffness;
+	}
+
 
 	float gravityVelocity = GRAVITY * dt * gravityFactor;
 	uint32 numParticles = gridSizeX * gridSizeY;

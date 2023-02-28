@@ -2,25 +2,13 @@
 
 #include "pbr_raytracer.h"
 
-struct path_tracer : pbr_raytracer
+struct path_tracer_settings
 {
-    void initialize();
-
-    void render(dx_command_list* cl, const raytracing_tlas& tlas,
-        const ref<dx_texture>& output,
-        const common_render_data& common);
-
-    void resetRendering();
-
-
-    const uint32 maxRecursionDepth = 4;
-    const uint32 maxPayloadSize = 5 * sizeof(float); // Radiance-payload is 1 x float3, 2 x uint.
-
-
+    static const uint32 maxRecursionDepth = 4;
+    static const uint32 maxPayloadSize = 5 * sizeof(float); // Radiance-payload is 1 x float3, 2 x uint.
 
     // Parameters.
 
-    uint32 numAveragedFrames = 0;
     uint32 recursionDepth = maxRecursionDepth - 1; // [0, maxRecursionDepth - 1]. 0 and 1 don't really make sense. 0 means, that no primary ray is shot. 1 means that no bounce is computed, which leads to 0 light reaching the primary hit.
     uint32 startRussianRouletteAfter = recursionDepth; // [0, recursionDepth].
 
@@ -34,9 +22,23 @@ struct path_tracer : pbr_raytracer
     float pointLightRadius = 0.1f;
 
     bool multipleImportanceSampling = true;
+};
 
+struct path_tracer : pbr_raytracer
+{
+    void initialize();
+
+    void render(dx_command_list* cl, const raytracing_tlas& tlas,
+        const ref<dx_texture>& output,
+        const common_render_data& common);
+
+    void resetRendering();
+
+    path_tracer_settings settings;
 
 private:
+    uint32 numAveragedFrames = 0;
+    path_tracer_settings oldSettings;
 
     // Only descriptors in here!
     struct input_resources

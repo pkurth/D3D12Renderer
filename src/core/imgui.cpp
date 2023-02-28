@@ -32,6 +32,7 @@ static uint32 numImagesThisFrame;
 static ref<dx_texture> iconsTexture;
 static ImTextureID iconsTextureID;
 
+
 static void setStyle()
 {
 	auto& colors = ImGui::GetStyle().Colors;
@@ -190,6 +191,16 @@ namespace ImGui
 	bool AnyModifiersDown()
 	{
 		return ImGui::IsKeyDown(key_ctrl) || ImGui::IsKeyDown(key_shift) || ImGui::IsKeyDown(key_alt);
+	}
+
+	bool IsItemActiveLastFrame()
+	{
+		ImGuiContext& g = *GImGui;
+		if (g.ActiveIdPreviousFrame)
+		{
+			return g.ActiveIdPreviousFrame == g.LastItemData.ID;
+		}
+		return false;
 	}
 
 	bool BeginWindowHiddenTabBar(const char* name, bool* open, ImGuiWindowFlags flags)
@@ -547,6 +558,38 @@ namespace ImGui
 		return result;
 	}
 
+	bool Drag(const char* label, float& f, float speed, float min, float max, const char* format)
+	{
+		return ImGui::DragScalar(label, ImGuiDataType_Float, &f, speed, &min, &max, format);
+	}
+
+	bool Drag(const char* label, vec2& f, float speed, float min, float max, const char* format)
+	{
+		return DragScalarN(label, ImGuiDataType_Float, f.data, 2, speed, &min, &max, format);
+	}
+
+	bool Drag(const char* label, vec3& f, float speed, float min, float max, const char* format)
+	{
+		return DragScalarN(label, ImGuiDataType_Float, f.data, 3, speed, &min, &max, format);
+	}
+
+	bool Drag(const char* label, vec4& f, float speed, float min, float max, const char* format)
+	{
+		return DragScalarN(label, ImGuiDataType_Float, f.data, 4, speed, &min, &max, format);
+	}
+
+	bool Drag(const char* label, int32& f, float speed, int32 min, int32 max, const char* format)
+	{
+		return DragScalarN(label, ImGuiDataType_S32, &f, 2, speed, &min, &max, format);
+	}
+
+	bool Drag(const char* label, uint32& f, float speed, uint32 min, uint32 max, const char* format)
+	{
+		return ImGui::DragScalar(label, ImGuiDataType_U32, &f, speed, &min, &max, format);
+	}
+
+
+
 
 
 
@@ -601,7 +644,7 @@ namespace ImGui
 		return result;
 	}
 
-	static bool SliderInternal(ImGuiDataType_ type, int32 count, const char* label, void* f, void* minValue, void* maxValue, const char* format, ImGuiSliderFlags flags = ImGuiSliderFlags_None)
+	static bool PropertySliderInternal(ImGuiDataType_ type, int32 count, const char* label, void* f, void* minValue, void* maxValue, const char* format, ImGuiSliderFlags flags = ImGuiSliderFlags_None)
 	{
 		pre(label);
 		bool result;
@@ -619,22 +662,22 @@ namespace ImGui
 
 	bool PropertySlider(const char* label, float& f, float minValue, float maxValue, const char* format, ImGuiSliderFlags flags)
 	{
-		return SliderInternal(ImGuiDataType_Float, 1, label, &f, &minValue, &maxValue, format, flags);
+		return ImGui::PropertySliderInternal(ImGuiDataType_Float, 1, label, &f, &minValue, &maxValue, format, flags);
 	}
 
 	bool PropertySlider(const char* label, vec2& f, float minValue, float maxValue, const char* format, ImGuiSliderFlags flags)
 	{
-		return SliderInternal(ImGuiDataType_Float, 2, label, f.data, &minValue, &maxValue, format, flags);
+		return ImGui::PropertySliderInternal(ImGuiDataType_Float, 2, label, f.data, &minValue, &maxValue, format, flags);
 	}
 
 	bool PropertySlider(const char* label, vec3& f, float minValue, float maxValue, const char* format, ImGuiSliderFlags flags)
 	{
-		return SliderInternal(ImGuiDataType_Float, 3, label, f.data, &minValue, &maxValue, format, flags);
+		return ImGui::PropertySliderInternal(ImGuiDataType_Float, 3, label, f.data, &minValue, &maxValue, format, flags);
 	}
 
 	bool PropertySlider(const char* label, vec4& f, float minValue, float maxValue, const char* format, ImGuiSliderFlags flags)
 	{
-		return SliderInternal(ImGuiDataType_Float, 4, label, f.data, &minValue, &maxValue, format, flags);
+		return ImGui::PropertySliderInternal(ImGuiDataType_Float, 4, label, f.data, &minValue, &maxValue, format, flags);
 	}
 
 	bool PropertySliderAngle(const char* label, float& fRad, float minValueDeg, float maxValueDeg, const char* format)
@@ -647,15 +690,15 @@ namespace ImGui
 
 	bool PropertySlider(const char* label, int32& v, int minValue, int maxValue, const char* format)
 	{
-		return SliderInternal(ImGuiDataType_S32, 1, label, &v, &minValue, &maxValue, format);
+		return ImGui::PropertySliderInternal(ImGuiDataType_S32, 1, label, &v, &minValue, &maxValue, format);
 	}
 
 	bool PropertySlider(const char* label, uint32& v, uint32 minValue, uint32 maxValue, const char* format)
 	{
-		return SliderInternal(ImGuiDataType_U32, 1, label, &v, &minValue, &maxValue, format);
+		return ImGui::PropertySliderInternal(ImGuiDataType_U32, 1, label, &v, &minValue, &maxValue, format);
 	}
 
-	static bool InputInternal(ImGuiDataType_ type, int32 count, const char* label, void* f, const char* format)
+	static bool PropertyInputInternal(ImGuiDataType_ type, int32 count, const char* label, void* f, const char* format)
 	{
 		pre(label);
 		bool result;
@@ -673,78 +716,78 @@ namespace ImGui
 
 	bool PropertyInput(const char* label, float& f, const char* format)
 	{
-		return ImGui::InputInternal(ImGuiDataType_Float, 1, label, &f, format);
+		return ImGui::PropertyInputInternal(ImGuiDataType_Float, 1, label, &f, format);
 	}
 
 	bool PropertyInput(const char* label, vec2& f, const char* format)
 	{
-		return ImGui::InputInternal(ImGuiDataType_Float, 2, label, f.data, format);
+		return ImGui::PropertyInputInternal(ImGuiDataType_Float, 2, label, f.data, format);
 	}
 
 	bool PropertyInput(const char* label, vec3& f, const char* format)
 	{
-		return ImGui::InputInternal(ImGuiDataType_Float, 3, label, f.data, format);
+		return ImGui::PropertyInputInternal(ImGuiDataType_Float, 3, label, f.data, format);
 	}
 
 	bool PropertyInput(const char* label, vec4& f, const char* format)
 	{
-		return ImGui::InputInternal(ImGuiDataType_Float, 4, label, f.data, format);
+		return ImGui::PropertyInputInternal(ImGuiDataType_Float, 4, label, f.data, format);
 	}
 	
 	bool PropertyInput(const char* label, int32& f, const char* format)
 	{
-		return ImGui::InputInternal(ImGuiDataType_S32, 1, label, &f, format);
+		return ImGui::PropertyInputInternal(ImGuiDataType_S32, 1, label, &f, format);
 	}
 
 	bool PropertyInput(const char* label, uint32& f, const char* format)
 	{
-		return ImGui::InputInternal(ImGuiDataType_U32, 1, label, &f, format);
+		return ImGui::PropertyInputInternal(ImGuiDataType_U32, 1, label, &f, format);
 	}
 
-	static bool DragInternal(ImGuiDataType_ type, int32 count, const char* label, void* f, float speed, const char* format)
+	static bool PropertyDragInternal(ImGuiDataType_ type, int32 count, const char* label, void* f, float speed, void* min, void* max, const char* format)
 	{
 		pre(label);
 		bool result;
 		if (count == 1)
 		{
-			result = ImGui::DragScalar("", type, f, speed, 0, 0, format);
+			result = ImGui::DragScalar("", type, f, speed, min, max, format);
 		}
 		else
 		{
-			result = ImGui::DragScalarN("", type, f, count, speed, 0, 0, format);
+			result = ImGui::DragScalarN("", type, f, count, speed, min, max, format);
 		}
 		post();
 		return result;
 	}
 
-	bool PropertyDrag(const char* label, float& f, float speed, const char* format)
+	bool PropertyDrag(const char* label, float& f, float speed, float min, float max, const char* format)
 	{
-		return ImGui::DragInternal(ImGuiDataType_Float, 1, label, &f, speed, format);
+		return ImGui::PropertyDragInternal(ImGuiDataType_Float, 1, label, &f, speed, &min, &max, format);
 	}
 
-	bool PropertyDrag(const char* label, vec2& f, float speed, const char* format)
+	bool PropertyDrag(const char* label, vec2& f, float speed, float min, float max, const char* format)
 	{
-		return ImGui::DragInternal(ImGuiDataType_Float, 2, label, f.data, speed, format);
+		return ImGui::PropertyDragInternal(ImGuiDataType_Float, 2, label, f.data, speed, &min, &max, format);
 	}
 
-	bool PropertyDrag(const char* label, vec3& f, float speed, const char* format)
+	bool PropertyDrag(const char* label, vec3& f, float speed, float min, float max, const char* format)
 	{
-		return ImGui::DragInternal(ImGuiDataType_Float, 3, label, f.data, speed, format);
+		return ImGui::PropertyDragInternal(ImGuiDataType_Float, 3, label, f.data, speed, &min, &max, format);
 	}
 
-	bool PropertyDrag(const char* label, vec4& f, float speed, const char* format)
+	bool PropertyDrag(const char* label, vec4& f, float speed, float min, float max, const char* format)
 	{
-		return ImGui::DragInternal(ImGuiDataType_Float, 4, label, f.data, speed, format);
+		return ImGui::PropertyDragInternal(ImGuiDataType_Float, 4, label, f.data, speed, &min, &max, format);
 	}
 
-	bool PropertyDrag(const char* label, int32& f, float speed, const char* format)
+	bool PropertyDrag(const char* label, int32& f, float speed, int32 min, int32 max, const char* format)
 	{
-		return ImGui::DragInternal(ImGuiDataType_S32, 1, label, &f, speed, format);
+		return ImGui::PropertyDragInternal(ImGuiDataType_S32, 1, label, &f, speed, &min, &max, format);
 	}
 
-	bool PropertyDrag(const char* label, uint32& f, float speed, const char* format)
+	bool PropertyDrag(const char* label, uint32& f, float speed, uint32 min, uint32 max, const char* format)
 	{
-		return ImGui::DragInternal(ImGuiDataType_U32, 1, label, &f, speed, format);
+		return ImGui::PropertyDragInternal(ImGuiDataType_U32, 1, label, &f, speed, &min, &max, format);
 	}
 
 

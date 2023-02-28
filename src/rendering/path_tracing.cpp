@@ -38,15 +38,23 @@ void path_tracer::initialize()
         1, &globalStaticSampler
     };
 
-    pbr_raytracer::initialize(shaderPath, maxPayloadSize, maxRecursionDepth, globalDesc);
+    pbr_raytracer::initialize(shaderPath, settings.maxPayloadSize, settings.maxRecursionDepth, globalDesc);
 
     allocateDescriptorHeapSpaceForGlobalResources<input_resources, output_resources>(descriptorHeap);
+
+    oldSettings = settings;
 }
 
 void path_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
     const ref<dx_texture>& output,
     const common_render_data& common)
 {
+    if (memcmp(&settings, &oldSettings, sizeof(path_tracer_settings)) != 0)
+    {
+        resetRendering();
+        oldSettings = settings;
+    }
+
     input_resources in;
     in.tlas = tlas.tlas->raytracingSRV;
     in.sky = common.sky->defaultSRV;
@@ -71,7 +79,7 @@ void path_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
     cl->setPipelineState(pipeline.pipeline);
     cl->setComputeRootSignature(pipeline.rootSignature);
 
-    uint32 depth = min(recursionDepth, maxRecursionDepth - 1);
+    uint32 depth = min(settings.recursionDepth, settings.maxRecursionDepth - 1);
 
     cl->setComputeDescriptorTable(PATH_TRACING_RS_RESOURCES, gpuHandle);
     cl->setComputeDynamicConstantBuffer(PATH_TRACING_RS_CAMERA, common.cameraCBV);
@@ -79,17 +87,17 @@ void path_tracer::render(dx_command_list* cl, const raytracing_tlas& tlas,
         path_tracing_cb
         { 
             (uint32)dxContext.frameID, 
-            numAveragedFrames, 
+            numAveragedFrames,
             depth,
-            clamp(startRussianRouletteAfter, 0u, depth),
-            (uint32)useThinLensCamera, 
-            focalLength, 
-            focalLength / (2.f * fNumber),
-            (uint32)useRealMaterials,
-            (uint32)enableDirectLighting,
-            lightIntensityScale,
-            pointLightRadius,
-            (uint32)multipleImportanceSampling,
+            clamp(settings.startRussianRouletteAfter, 0u, depth),
+            (uint32)settings.useThinLensCamera,
+            settings.focalLength,
+            settings.focalLength / (2.f * settings.fNumber),
+            (uint32)settings.useRealMaterials,
+            (uint32)settings.enableDirectLighting,
+            settings.lightIntensityScale,
+            settings.pointLightRadius,
+            (uint32)settings.multipleImportanceSampling,
         });
 
     cl->raytrace(raytraceDesc);

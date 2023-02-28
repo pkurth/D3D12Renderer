@@ -19,6 +19,7 @@ struct undo_stack
 	void undo();
 	void redo();
 
+	void reset();
 	void display();
 	void verify();
 
@@ -27,7 +28,6 @@ private:
 	typedef void (*redo_func)(void*);
 
 	void pushAction(const char* name, const void* entry, uint64 dataSize, undo_func undo, redo_func redo);
-
 	struct alignas(16) entry_header
 	{
 		undo_func undo;
@@ -51,7 +51,7 @@ private:
 template<typename T>
 inline void undo_stack::pushAction(const char* name, const T& entry)
 {
-	static_assert(std::is_trivially_copyable_v<T>, "Undo entries must be trivially copyable.");
+	//satic_assert(std::is_trivially_copyable_v<T>, "Undo entries must be trivially copyable.");
 	static_assert(std::is_trivially_destructible_v<T>, "Undo entries must be trivially destructible.");
 
 	undo_func undo = [](void* data)

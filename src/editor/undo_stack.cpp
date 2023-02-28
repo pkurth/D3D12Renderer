@@ -6,9 +6,7 @@ undo_stack::undo_stack()
 {
 	memorySize = MB(2);
 	memory = (uint8*)malloc(memorySize);
-	nextToWrite = memory;
-	oldest = 0;
-	newest = 0;
+	reset();
 }
 
 void undo_stack::pushAction(const char* name, const void* entry, uint64 dataSize, undo_func undo, redo_func redo)
@@ -146,6 +144,13 @@ void undo_stack::redo()
 		nextToWrite = (uint8*)alignTo(((uint8*)data + oldest->dataSize), 16);
 		newest = oldest;
 	}
+}
+
+void undo_stack::reset()
+{
+	nextToWrite = memory;
+	oldest = 0;
+	newest = 0;
 }
 
 void undo_stack::display()

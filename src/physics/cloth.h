@@ -17,8 +17,6 @@ struct cloth_component
 	void applyWindForce(vec3 force);
 	void simulate(uint32 velocityIterations, uint32 positionIterations, uint32 driftIterations, float dt);
 
-	void recalculateProperties(); // Call if stiffness or total mass changed. No need for changes in damping or gravity factor.
-
 	float totalMass;
 	float gravityFactor;
 	float damping;
@@ -28,6 +26,11 @@ struct cloth_component
 	float width, height;
 
 private:
+	float oldTotalMass;
+	float oldStiffness;
+
+	void recalculateProperties();
+
 	struct cloth_constraint
 	{
 		uint32 a, b;
