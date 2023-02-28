@@ -23,15 +23,35 @@
 
 
 
+static vec3 getEuler(quat q)
+{
+	vec3 euler = quatToEuler(q);
+	euler.x = rad2deg(angleToZeroToTwoPi(euler.x));
+	euler.y = rad2deg(angleToZeroToTwoPi(euler.y));
+	euler.z = rad2deg(angleToZeroToTwoPi(euler.z));
+	return euler;
+}
+
+static quat getQuat(vec3 euler)
+{
+	euler.x = deg2rad(euler.x);
+	euler.y = deg2rad(euler.y);
+	euler.z = deg2rad(euler.z);
+	return eulerToQuat(euler);
+}
+
+
 
 template <typename component_t, typename member_t>
 struct component_member_undo
 {
-	component_member_undo(scene_entity entity, member_t& member, member_t before)
+	component_member_undo(scene_entity entity, member_t& member, member_t before, void (*callback)(member_t, void*) = 0, void* userData = 0)
 	{
 		this->entity = entity;
 		this->byteOffset = (uint8*)&member - (uint8*)&entity.getComponent<component_t>();
 		this->before = before;
+		this->callback = callback;
+		this->userData = userData;
 	}
 
 	void toggle() 
@@ -41,6 +61,11 @@ struct component_member_undo
 			component_t& comp = entity.getComponent<component_t>();
 			auto& member = *(member_t*)((uint8*)&comp + byteOffset);
 			std::swap(member, before);
+
+			if (callback)
+			{
+				callback(member, userData);
+			}
 		}
 	}
 
@@ -49,6 +74,9 @@ private:
 	uint64 byteOffset;
 
 	member_t before;
+
+	void (*callback)(member_t, void*) = 0;
+	void* userData = 0;
 };
 
 template <typename... component_t>
@@ -94,34 +122,39 @@ private:
 	value_t before;
 };
 
-#define UNDOABLE_COMPONENT_SETTING(undoLabel, val, command)																			\
-	{																																\
-		using val_t = std::decay_t<decltype(val)>;																					\
-		val_t before = val;																											\
-		command;																													\
-		if (ImGui::IsItemActive() && !ImGui::IsItemActiveLastFrame())																\
-		{																															\
-			undoBuffer.as<val_t>() = before;																						\
-		}																															\
-		if (ImGui::IsItemDeactivatedAfterEdit() || (!ImGui::IsItemActive() && (before != val)))										\
-		{																															\
-			undoStack.pushAction(undoLabel, component_member_undo<component_t, val_t>(selectedEntity, val, undoBuffer.as<val_t>()));\
-		}																															\
+static void rotationUndoCallback(quat rot, void* userData)
+{
+	*(vec3*)userData = getEuler(rot);
+}
+
+#define UNDOABLE_COMPONENT_SETTING(undoLabel, val, command, ...)																					\
+	{																																				\
+		using val_t = std::decay_t<decltype(val)>;																									\
+		val_t before = val;																															\
+		command;																																	\
+		if (ImGui::IsItemActive() && !ImGui::IsItemActiveLastFrame())																				\
+		{																																			\
+			undoBuffer.as<val_t>() = before;																										\
+		}																																			\
+		if (ImGui::IsItemDeactivatedAfterEdit() || (!ImGui::IsItemActive() && (before != val)))														\
+		{																																			\
+			undoStack.pushAction(undoLabel, component_member_undo<component_t, val_t>(selectedEntity, val, undoBuffer.as<val_t>(), __VA_ARGS__));	\
+		}																																			\
 	}
 
-#define UNDOABLE_SETTING(undoLabel, val, command)																					\
-	{																																\
-		using val_t = std::decay_t<decltype(val)>;																					\
-		val_t before = val;																											\
-		command;																													\
-		if (ImGui::IsItemActive() && !ImGui::IsItemActiveLastFrame())																\
-		{																															\
-			undoBuffer.as<val_t>() = before;																						\
-		}																															\
-		if (ImGui::IsItemDeactivatedAfterEdit() || (!ImGui::IsItemActive() && (before != val)))										\
-		{																															\
-			undoStack.pushAction(undoLabel, settings_undo<val_t>(val, undoBuffer.as<val_t>()));										\
-		}																															\
+#define UNDOABLE_SETTING(undoLabel, val, command)																									\
+	{																																				\
+		using val_t = std::decay_t<decltype(val)>;																									\
+		val_t before = val;																															\
+		command;																																	\
+		if (ImGui::IsItemActive() && !ImGui::IsItemActiveLastFrame())																				\
+		{																																			\
+			undoBuffer.as<val_t>() = before;																										\
+		}																																			\
+		if (ImGui::IsItemDeactivatedAfterEdit() || (!ImGui::IsItemActive() && (before != val)))														\
+		{																																			\
+			undoStack.pushAction(undoLabel, settings_undo<val_t>(val, undoBuffer.as<val_t>()));														\
+		}																																			\
 	}
 
 
@@ -140,10 +173,7 @@ void scene_editor::updateSelectedEntityUIRotation()
 			rotation = prc->rotation;
 		}
 
-		selectedEntityEulerRotation = quatToEuler(rotation);
-		selectedEntityEulerRotation.x = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.x));
-		selectedEntityEulerRotation.y = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.y));
-		selectedEntityEulerRotation.z = rad2deg(angleToZeroToTwoPi(selectedEntityEulerRotation.z));
+		selectedEntityEulerRotation = getEuler(rotation);
 	}
 }
 
@@ -225,6 +255,8 @@ bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPas
 	auto selectedEntityBefore = selectedEntity;
 
 	auto& scene = this->scene->getCurrentScene();
+
+	// Clear selected entity, if it became invalid (e.g. if it was deleted).
 	if (selectedEntity && !scene.isEntityValid(selectedEntity))
 	{
 		setSelectedEntityNoUndo({});
@@ -241,12 +273,10 @@ bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPas
 		onObjectMoved();
 	}
 
-
+	// This is triggered on undo.
 	if (selectedEntity != selectedEntityBefore)
 	{
-		updateSelectedEntityUIRotation();
-		selectedColliderEntity = {};
-		selectedConstraintEntity = {};
+		setSelectedEntityNoUndo(selectedEntity);
 	}
 
 
@@ -763,21 +793,15 @@ bool scene_editor::drawSceneHierarchy()
 					{
 						using component_t = transform_component;
 
-						UNDOABLE_COMPONENT_SETTING("position", transform.position,
+						UNDOABLE_COMPONENT_SETTING("entity position", transform.position,
 							objectMovedByWidget |= ImGui::Drag("Position", transform.position, 0.1f));
-
-						if (ImGui::Drag("Rotation", selectedEntityEulerRotation, 0.1f))
-						{
-							vec3 euler = selectedEntityEulerRotation;
-							euler.x = deg2rad(euler.x);
-							euler.y = deg2rad(euler.y);
-							euler.z = deg2rad(euler.z);
-							transform.rotation = eulerToQuat(euler);
-
-							objectMovedByWidget = true;
-						}
-
-						UNDOABLE_COMPONENT_SETTING("scale", transform.scale,
+						UNDOABLE_COMPONENT_SETTING("entity rotation", transform.rotation,
+							if (ImGui::Drag("Rotation", selectedEntityEulerRotation, 0.1f))
+							{
+								transform.rotation = getQuat(selectedEntityEulerRotation);
+								objectMovedByWidget = true;
+							}, rotationUndoCallback, &selectedEntityEulerRotation);
+						UNDOABLE_COMPONENT_SETTING("entity scale", transform.scale,
 							objectMovedByWidget |= ImGui::Drag("Scale", transform.scale, 0.1f));
 					});
 
@@ -785,7 +809,7 @@ bool scene_editor::drawSceneHierarchy()
 					{
 						using component_t = position_component;
 
-						UNDOABLE_COMPONENT_SETTING("position", transform.position,
+						UNDOABLE_COMPONENT_SETTING("entity position", transform.position,
 							objectMovedByWidget |= ImGui::Drag("Position", transform.position, 0.1f));
 					});
 
@@ -793,28 +817,23 @@ bool scene_editor::drawSceneHierarchy()
 					{
 						using component_t = position_rotation_component;
 
-						UNDOABLE_COMPONENT_SETTING("position", transform.position,
+						UNDOABLE_COMPONENT_SETTING("entity position", transform.position,
 							objectMovedByWidget |= ImGui::Drag("Position", transform.position, 0.1f));
-
-						if (ImGui::Drag("Rotation", selectedEntityEulerRotation, 0.1f))
-						{
-							vec3 euler = selectedEntityEulerRotation;
-							euler.x = deg2rad(euler.x);
-							euler.y = deg2rad(euler.y);
-							euler.z = deg2rad(euler.z);
-							transform.rotation = eulerToQuat(euler);
-
-							objectMovedByWidget = true;
-						}
+						UNDOABLE_COMPONENT_SETTING("entity rotation", transform.rotation,
+							if (ImGui::Drag("Rotation", selectedEntityEulerRotation, 0.1f))
+							{
+								transform.rotation = getQuat(selectedEntityEulerRotation);
+								objectMovedByWidget = true;
+							}, rotationUndoCallback, & selectedEntityEulerRotation);
 					});
 
 					drawComponent<position_scale_component>(selectedEntity, "TRANSFORM", [this, &objectMovedByWidget](position_scale_component& transform)
 					{
 						using component_t = position_scale_component;
 
-						UNDOABLE_COMPONENT_SETTING("position", transform.position,
+						UNDOABLE_COMPONENT_SETTING("entity position", transform.position,
 							objectMovedByWidget |= ImGui::Drag("Position", transform.position, 0.1f));
-						UNDOABLE_COMPONENT_SETTING("scale", transform.scale,
+						UNDOABLE_COMPONENT_SETTING("entity scale", transform.scale,
 							objectMovedByWidget |= ImGui::Drag("Scale", transform.scale, 0.1f));
 					});
 
@@ -938,6 +957,7 @@ bool scene_editor::drawSceneHierarchy()
 								ImGui::PropertyDrag("Cull start distance", settings.cullStartDistance, 0.5f, 0.f));
 							UNDOABLE_COMPONENT_SETTING("grass cull transition distance", settings.cullTransitionDistance,
 								ImGui::PropertyDrag("Cull transition distance", settings.cullTransitionDistance, 0.5f, 0.f));
+
 							ImGui::EndProperties();
 						}
 					});
@@ -1119,8 +1139,8 @@ bool scene_editor::drawSceneHierarchy()
 										{
 											if (ImGui::BeginProperties())
 											{
-												dirty |= ImGui::PropertyInput("Local center", collider.sphere.center);
-												dirty |= ImGui::PropertyInput("Radius", collider.sphere.radius);
+												dirty |= ImGui::PropertyDrag("Local center", collider.sphere.center, 0.05f);
+												dirty |= ImGui::PropertyDrag("Radius", collider.sphere.radius, 0.05f, 0.f);
 												ImGui::EndProperties();
 											}
 											ImGui::EndTree();
@@ -1132,9 +1152,9 @@ bool scene_editor::drawSceneHierarchy()
 										{
 											if (ImGui::BeginProperties())
 											{
-												dirty |= ImGui::PropertyInput("Local point A", collider.capsule.positionA);
-												dirty |= ImGui::PropertyInput("Local point B", collider.capsule.positionB);
-												dirty |= ImGui::PropertyInput("Radius", collider.capsule.radius);
+												dirty |= ImGui::PropertyDrag("Local point A", collider.capsule.positionA, 0.05f);
+												dirty |= ImGui::PropertyDrag("Local point B", collider.capsule.positionB, 0.05f);
+												dirty |= ImGui::PropertyDrag("Radius", collider.capsule.radius, 0.05f, 0.f);
 												ImGui::EndProperties();
 											}
 											ImGui::EndTree();
@@ -1146,9 +1166,9 @@ bool scene_editor::drawSceneHierarchy()
 										{
 											if (ImGui::BeginProperties())
 											{
-												dirty |= ImGui::PropertyInput("Local point A", collider.cylinder.positionA);
-												dirty |= ImGui::PropertyInput("Local point B", collider.cylinder.positionB);
-												dirty |= ImGui::PropertyInput("Radius", collider.cylinder.radius);
+												dirty |= ImGui::PropertyDrag("Local point A", collider.cylinder.positionA, 0.05f);
+												dirty |= ImGui::PropertyDrag("Local point B", collider.cylinder.positionB, 0.05f);
+												dirty |= ImGui::PropertyDrag("Radius", collider.cylinder.radius, 0.05f, 0.f);
 												ImGui::EndProperties();
 											}
 											ImGui::EndTree();
@@ -1160,8 +1180,8 @@ bool scene_editor::drawSceneHierarchy()
 										{
 											if (ImGui::BeginProperties())
 											{
-												dirty |= ImGui::PropertyInput("Local min", collider.aabb.minCorner);
-												dirty |= ImGui::PropertyInput("Local max", collider.aabb.maxCorner);
+												dirty |= ImGui::PropertyDrag("Local min", collider.aabb.minCorner, 0.05f);
+												dirty |= ImGui::PropertyDrag("Local max", collider.aabb.maxCorner, 0.05f);
 												ImGui::EndProperties();
 											}
 											ImGui::EndTree();
@@ -1195,7 +1215,7 @@ bool scene_editor::drawSceneHierarchy()
 								{
 									ImGui::PropertySlider("Restitution", collider.material.restitution);
 									ImGui::PropertySlider("Friction", collider.material.friction);
-									dirty |= ImGui::PropertyInput("Density", collider.material.density);
+									dirty |= ImGui::PropertyDrag("Density", collider.material.density, 0.05f, 0.f);
 
 									bool editCollider = selectedColliderEntity == colliderEntity;
 									if (ImGui::PropertyCheckbox("Edit", editCollider))
@@ -1531,7 +1551,7 @@ bool scene_editor::drawSceneHierarchy()
 						if (ImGui::BeginProperties())
 						{
 							UNDOABLE_COMPONENT_SETTING("cloth total mass", cloth.totalMass, 
-								ImGui::PropertyInput("Total mass", cloth.totalMass));
+								ImGui::PropertyDrag("Total mass", cloth.totalMass, 0.1f, 0.f));
 							UNDOABLE_COMPONENT_SETTING("cloth stiffness", cloth.stiffness, 
 								ImGui::PropertySlider("Stiffness", cloth.stiffness, 0.01f, 0.7f));
 							UNDOABLE_COMPONENT_SETTING("cloth velocity damping", cloth.damping, 
@@ -1729,6 +1749,8 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 	collider_component* selectedCollider = selectedColliderEntity ? selectedColliderEntity.getComponentIfExists<collider_component>() : 0;
 
+	bool draggingBefore = gizmo.dragging;
+
 	if (selectedCollider)
 	{
 		const trs& transform = selectedEntity.hasComponent<transform_component>() ? selectedEntity.getComponent<transform_component>() : trs::identity;
@@ -1741,6 +1763,18 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 				inputCaptured = true;
 				objectMovedByGizmo = true;
 			}
+#if 0
+			else if (draggingBefore)
+			{
+				const trs& origWorldTransform = gizmo.originalTransform;
+				bounding_sphere before =
+				{
+					conjugate(transform.rotation) * (origWorldTransform.position - transform.position),
+					origWorldTransform.scale.x
+				};
+				undoStack.pushAction("sphere collider", component_member_undo<collider_component, bounding_sphere>(selectedColliderEntity, c.sphere, before));
+			}
+#endif
 			gizmoDrawn = true;
 			renderWireSphere(transform.rotation * c.sphere.center + transform.position, c.sphere.radius, volumeColor, ldrRenderPass, true);
 		}
@@ -1751,6 +1785,21 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 				inputCaptured = true;
 				objectMovedByGizmo = true;
 			}
+#if 0
+			else if (draggingBefore)
+			{
+				const trs& origWorldTransform = gizmo.originalTransform;
+				vec3 a = transform.position + transform.rotation * c.capsule.positionA;
+				vec3 b = transform.position + transform.rotation * c.capsule.positionB;
+				bounding_capsule before =
+				{
+					conjugate(transform.rotation) * (transformPosition(origWorldTransform, a) - transform.position),
+					conjugate(transform.rotation) * (transformPosition(origWorldTransform, b) - transform.position),
+					origWorldTransform.scale.x
+				};
+				undoStack.pushAction("capsule collider", component_member_undo<collider_component, bounding_capsule>(selectedColliderEntity, c.capsule, before));
+			}
+#endif
 			gizmoDrawn = true;
 			renderWireCapsule(transform.rotation * c.capsule.positionA + transform.position, transform.rotation * c.capsule.positionB + transform.position,
 				c.capsule.radius, volumeColor, ldrRenderPass, true);
@@ -1793,8 +1842,6 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 	}
 	else if (selectedEntity)
 	{
-		bool draggingBefore = gizmo.dragging;
-
 		if (physics_transform1_component* transform = selectedEntity.getComponentIfExists<physics_transform1_component>())
 		{
 			// Saved rigid-body properties. When an RB is dragged, we make it kinematic.
@@ -2138,26 +2185,26 @@ bool scene_editor::editCamera(render_camera& camera)
 			UNDOABLE_SETTING("field of view", camera.verticalFOV,
 				result |= ImGui::PropertySliderAngle("Field of view", camera.verticalFOV, 1.f, 150.f));
 			UNDOABLE_SETTING("near plane", camera.nearPlane, 
-				result |= ImGui::PropertyInput("Near plane", camera.nearPlane));
+				result |= ImGui::PropertyDrag("Near plane", camera.nearPlane, 0.01f, 0.f));
+			
 			bool infiniteFarplane = camera.farPlane < 0.f;
-
-			if (ImGui::PropertyCheckbox("Infinite far plane", infiniteFarplane))
-			{
-				// TODO UNDO
-				if (!infiniteFarplane)
+			UNDOABLE_SETTING("infinite far plane", camera.farPlane,
+				if (ImGui::PropertyCheckbox("Infinite far plane", infiniteFarplane))
 				{
-					camera.farPlane = (camera.farPlane == -1.f) ? 500.f : -camera.farPlane;
-				}
-				else
-				{
-					camera.farPlane = -camera.farPlane;
-				}
-				result = true;
-			}
+					if (!infiniteFarplane)
+					{
+						camera.farPlane = (camera.farPlane == -1.f) ? 500.f : -camera.farPlane;
+					}
+					else
+					{
+						camera.farPlane = -camera.farPlane;
+					}
+					result = true;
+				});
 			if (!infiniteFarplane)
 			{
 				UNDOABLE_SETTING("far plane", camera.farPlane, 
-					result |= ImGui::PropertyInput("Far plane", camera.farPlane));
+					result |= ImGui::PropertyDrag("Far plane", camera.farPlane, 0.1f, 0.f));
 			}
 
 			ImGui::EndProperties();
@@ -2592,7 +2639,7 @@ void scene_editor::drawSettings(float dt)
 					}
 
 					UNDOABLE_SETTING("max physics steps per frame", physicsSettings.maxPhysicsIterationsPerFrame, 
-						ImGui::PropertyInput("Max physics steps per frame", physicsSettings.maxPhysicsIterationsPerFrame));
+						ImGui::PropertyDrag("Max physics steps per frame", physicsSettings.maxPhysicsIterationsPerFrame));
 				}
 
 				UNDOABLE_SETTING("rigid solver iterations", physicsSettings.numRigidSolverIterations, 
@@ -2639,19 +2686,10 @@ void scene_editor::drawSettings(float dt)
 
 				ImGui::PropertySeparator();
 
-				static reverb_preset oldReverbPreset = masterAudioSettings.reverbPreset;
+				UNDOABLE_SETTING("toggle reverb", masterAudioSettings.reverbEnabled,
+					ImGui::PropertyCheckbox("Reverb enabled", masterAudioSettings.reverbEnabled));
 
-				bool reverbEnabled = masterAudioSettings.reverbPreset != reverb_none;
-				if (ImGui::PropertyCheckbox("Reverb enabled", reverbEnabled))
-				{
-					// TODO UNDO
-					if (reverbEnabled) { masterAudioSettings.reverbPreset = oldReverbPreset; }
-					else { oldReverbPreset = masterAudioSettings.reverbPreset; masterAudioSettings.reverbPreset = reverb_none; }
-
-					change = true;
-				}
-
-				if (reverbEnabled)
+				if (masterAudioSettings.reverbEnabled)
 				{
 					UNDOABLE_SETTING("reverb preset", masterAudioSettings.reverbPreset,
 						change |= ImGui::PropertyDropdown("Reverb preset", reverbPresetNames, reverb_preset_count, (uint32&)masterAudioSettings.reverbPreset));

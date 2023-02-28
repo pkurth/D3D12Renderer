@@ -588,6 +588,16 @@ namespace ImGui
 		return ImGui::DragScalar(label, ImGuiDataType_U32, &f, speed, &min, &max, format);
 	}
 
+	bool DragRange(const char* label, float& lo, float& hi, float speed, float min, float max, const char* format)
+	{
+		return ImGui::DragFloatRange2(label, &lo, &hi, speed, min, max, format, 0, ImGuiSliderFlags_AlwaysClamp);
+	}
+
+	bool DragRange(const char* label, int32& lo, int32& hi, float speed, int32 min, int32 max, const char* format)
+	{
+		return ImGui::DragIntRange2(label, &lo, &hi, speed, min, max, format, 0, ImGuiSliderFlags_AlwaysClamp);
+	}
+
 
 
 
@@ -788,6 +798,22 @@ namespace ImGui
 	bool PropertyDrag(const char* label, uint32& f, float speed, uint32 min, uint32 max, const char* format)
 	{
 		return ImGui::PropertyDragInternal(ImGuiDataType_U32, 1, label, &f, speed, &min, &max, format);
+	}
+
+	bool PropertyDragRange(const char* label, float& lo, float& hi, float speed, float min, float max, const char* format)
+	{
+		pre(label);
+		bool result = ImGui::DragRange("", lo, hi, speed, min, max, format);
+		post();
+		return result;
+	}
+
+	bool PropertyDragRange(const char* label, int32& lo, int32& hi, float speed, int32 min, int32 max, const char* format)
+	{
+		pre(label);
+		bool result = ImGui::DragRange("", lo, hi, speed, min, max, format);
+		post();
+		return result;
 	}
 
 

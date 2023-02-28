@@ -103,7 +103,8 @@ namespace ImGui
 	bool Drag(const char* label, vec4& f, float speed = 1.f, float min = -FLT_MAX, float max = FLT_MAX, const char* format = "%.3f");
 	bool Drag(const char* label, int32& f, float speed = 1.f, int32 min = INT32_MIN, int32 max = INT32_MAX, const char* format = "%d");
 	bool Drag(const char* label, uint32& f, float speed = 1.f, uint32 min = 0, uint32 max = UINT32_MAX, const char* format = "%u");
-
+	bool DragRange(const char* label, float& lo, float& hi, float speed = 1.f, float min = -FLT_MAX, float max = FLT_MAX, const char* format = "%.3f");
+	bool DragRange(const char* label, int32& lo, int32& hi, float speed = 1.f, int32 min = INT32_MIN, int32 max = INT32_MAX, const char* format = "%.3f");
 
 
 	bool BeginProperties();
@@ -146,6 +147,9 @@ namespace ImGui
 	bool PropertyDrag(const char* label, vec4& f, float speed = 1.f, float min = -FLT_MAX, float max = FLT_MAX, const char* format = "%.3f");
 	bool PropertyDrag(const char* label, int32& f, float speed = 1.f, int32 min = INT32_MIN, int32 max = INT32_MAX, const char* format = "%d");
 	bool PropertyDrag(const char* label, uint32& f, float speed = 1.f, uint32 min = 0, uint32 max = UINT32_MAX, const char* format = "%u");
+	bool PropertyDragRange(const char* label, float& lo, float& hi, float speed = 1.f, float min = -FLT_MAX, float max = FLT_MAX, const char* format = "%.3f");
+	bool PropertyDragRange(const char* label, int32& lo, int32& hi, float speed = 1.f, int32 min = INT32_MIN, int32 max = INT32_MAX, const char* format = "%.3f");
+
 
 	bool PropertyDropdown(const char* label, const char** names, uint32 count, uint32& current);
 	bool PropertyDropdown(const char* label, const char* (*name_func)(uint32, void*), uint32& current, void* data = 0);

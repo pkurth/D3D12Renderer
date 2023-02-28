@@ -654,6 +654,7 @@ static dual_quat& operator*=(dual_quat& q, float v) { q = q * v; return q; }
 static dual_quat normalize(const dual_quat& q) { float n = 1.f / length(q.real.v4); return q * n; }
 
 static bool operator==(quat a, quat b) { return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w; }
+static bool operator!=(quat a, quat b) { return !(a == b); }
 
 static vec2 operator*(mat2 a, vec2 b) { vec2 result = { dot(row(a, 0), b), dot(row(a, 1), b) }; return result; }
 static vec3 operator*(mat3 a, vec3 b) { vec3 result = { dot(row(a, 0), b), dot(row(a, 1), b), dot(row(a, 2), b) }; return result; }

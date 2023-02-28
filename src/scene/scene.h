@@ -247,7 +247,7 @@ struct game_scene
 
 	bool isEntityValid(scene_entity e)
 	{
-		return registry.valid(e.handle);
+		return &registry == e.registry && registry.valid(e.handle);
 	}
 
 	template <typename component_t>

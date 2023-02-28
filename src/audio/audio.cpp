@@ -85,7 +85,9 @@ static XAUDIO2FX_REVERB_I3DL2_PARAMETERS reverbPresets[] =
 
 static void setReverb()
 {
-	if (masterAudioSettings.reverbPreset != reverb_none)
+	bool reverbOn = masterAudioSettings.reverbEnabled && masterAudioSettings.reverbPreset != reverb_none;
+
+	if (reverbOn)
 	{
 		XAUDIO2FX_REVERB_PARAMETERS reverbParameters;
 		ReverbConvertI3DL2ToNative(&reverbPresets[masterAudioSettings.reverbPreset], &reverbParameters);
@@ -99,7 +101,7 @@ static void setReverb()
 	for (uint32 i = 0; i < sound_type_count; ++i)
 	{
 		float level[16];
-		float reverbLevel = (masterAudioSettings.reverbPreset != reverb_none) ? 1.f : 0.f;
+		float reverbLevel = reverbOn ? 1.f : 0.f;
 		for (uint32 j = 0; j < context.soundTypeSubmixVoiceDetails[i].InputChannels; ++j)
 		{
 			level[j] = reverbLevel;
@@ -216,7 +218,7 @@ void updateAudio(float dt)
 		masterVolumeFader.startFade(masterAudioSettings.volume, 0.1f);
 	}
 
-	if (oldMasterAudioSettings.reverbPreset != masterAudioSettings.reverbPreset)
+	if (oldMasterAudioSettings.reverbEnabled != masterAudioSettings.reverbEnabled || oldMasterAudioSettings.reverbPreset != masterAudioSettings.reverbPreset)
 	{
 		setReverb();
 	}

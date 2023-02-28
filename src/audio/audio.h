@@ -12,6 +12,7 @@
 struct master_audio_settings
 {
 	float volume = 0.1f;
+	bool reverbEnabled = true;
 	reverb_preset reverbPreset = reverb_preset_default;
 };
 
