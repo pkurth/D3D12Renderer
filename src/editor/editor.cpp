@@ -32,24 +32,23 @@ struct component_member_undo
 		this->entity = entity;
 		this->byteOffset = (uint8*)&member - (uint8*)&entity.getComponent<component_t>();
 		this->before = before;
-		this->after = member;
 	}
 
-	void undo() { getMember() = before; }
-	void redo() { getMember() = after; }
+	void toggle() 
+	{
+		if (entity.valid())
+		{
+			component_t& comp = entity.getComponent<component_t>();
+			auto& member = *(member_t*)((uint8*)&comp + byteOffset);
+			std::swap(member, before);
+		}
+	}
 
 private:
-	member_t& getMember()
-	{
-		component_t& comp = entity.getComponent<component_t>();
-		return *(member_t*)((uint8*)&comp + byteOffset);
-	}
-
 	scene_entity entity;
 	uint64 byteOffset;
 
 	member_t before;
-	member_t after;
 };
 
 template <typename... component_t>
@@ -59,43 +58,40 @@ struct component_undo
 	{
 		this->entity = entity;
 		this->before = std::make_tuple(before...);
-		this->after = std::make_tuple(entity.getComponent<component_t>()...);
 	}
 
-	void undo() { std::apply([this](auto... c) { (set(c), ...); }, before); }
-	void redo() { std::apply([this](auto... c) { (set(c), ...); }, after); }
+	void toggle() 
+	{
+		if (entity.valid())
+		{
+			std::apply([this](auto&... c) { (set(c), ...); }, before);
+		}
+	}
 
 private:
 	template <typename T>
-	void set(const T& c)
+	void set(T& c)
 	{
-		entity.getComponent<T>() = c;
+		std::swap(entity.getComponent<T>(), c);
 	}
 
 	scene_entity entity;
 
 	std::tuple<component_t...> before;
-	std::tuple<component_t...> after;
 };
 
 template <typename value_t>
 struct settings_undo
 {
 	settings_undo(value_t& value, value_t before)
-		: value(value)
-	{
-		this->before = before;
-		this->after = value;
-	}
+		: value(value), before(before) {}
 
-	void undo() { value = before; }
-	void redo() { value = after; }
+	void toggle() { std::swap(value, before); }
 
 private:
 	value_t& value;
 
 	value_t before;
-	value_t after;
 };
 
 #define UNDOABLE_COMPONENT_SETTING(undoLabel, val, command)																			\
@@ -328,15 +324,17 @@ bool scene_editor::drawMainMenuBar()
 		if (ImGui::BeginMenu(ICON_FA_FILE "  File"))
 		{
 			char textBuffer[128];
-			snprintf(textBuffer, sizeof(textBuffer), ICON_FA_UNDO " Undo %s", undoStack.undoPossible() ? undoStack.getUndoName() : "");
-			if (ImGui::MenuItem(textBuffer, "Ctrl+Z", false, undoStack.undoPossible()))
+			auto [undoPossible, undoName] = undoStack.undoPossible();
+			snprintf(textBuffer, sizeof(textBuffer), ICON_FA_UNDO " Undo %s", undoPossible ? undoName : "");
+			if (ImGui::MenuItem(textBuffer, "Ctrl+Z", false, undoPossible))
 			{
 				undoStack.undo();
 				objectPotentiallyMoved = true;
 			}
 
-			snprintf(textBuffer, sizeof(textBuffer), ICON_FA_REDO " Redo %s", undoStack.redoPossible() ? undoStack.getRedoName() : "");
-			if (ImGui::MenuItem(textBuffer, "Ctrl+Y", false, undoStack.redoPossible()))
+			auto [redoPossible, redoName] = undoStack.redoPossible();
+			snprintf(textBuffer, sizeof(textBuffer), ICON_FA_REDO " Redo %s", redoPossible ? redoName : "");
+			if (ImGui::MenuItem(textBuffer, "Ctrl+Y", false, redoPossible))
 			{
 				undoStack.redo();
 				objectPotentiallyMoved = true;

@@ -10,11 +10,8 @@ struct undo_stack
 	template <typename T>
 	void pushAction(const char* name, const T& entry); // Type T must have member functions void undo() and void redo().
 
-	bool undoPossible();
-	bool redoPossible();
-
-	const char* getUndoName();
-	const char* getRedoName();
+	std::pair<bool, const char*> undoPossible();
+	std::pair<bool, const char*> redoPossible();
 
 	void undo();
 	void redo();
@@ -24,14 +21,12 @@ struct undo_stack
 	void verify();
 
 private:
-	typedef void (*undo_func)(void*);
-	typedef void (*redo_func)(void*);
+	typedef void (*toggle_func)(void*);
 
-	void pushAction(const char* name, const void* entry, uint64 dataSize, undo_func undo, redo_func redo);
+	void pushAction(const char* name, const void* entry, uint64 dataSize, toggle_func toggle);
 	struct alignas(16) entry_header
 	{
-		undo_func undo;
-		redo_func redo;
+		toggle_func toggle;
 
 		entry_header* newer;
 		entry_header* older;
@@ -54,17 +49,11 @@ inline void undo_stack::pushAction(const char* name, const T& entry)
 	//satic_assert(std::is_trivially_copyable_v<T>, "Undo entries must be trivially copyable.");
 	static_assert(std::is_trivially_destructible_v<T>, "Undo entries must be trivially destructible.");
 
-	undo_func undo = [](void* data)
+	toggle_func toggle = [](void* data)
 	{
 		T* t = (T*)data;
-		t->undo();
+		t->toggle();
 	};
 
-	redo_func redo = [](void* data)
-	{
-		T* t = (T*)data;
-		t->redo();
-	};
-
-	pushAction(name, &entry, sizeof(T), undo, redo);
+	pushAction(name, &entry, sizeof(T), toggle);
 }

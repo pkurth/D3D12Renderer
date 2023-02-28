@@ -360,8 +360,6 @@ uint32 transformation_gizmo::handleScaling(trs& transform, ray r, const user_inp
 			anchor = dot(r.origin + t * r.direction - transform.position, axis);
 			anchor = max(anchor, 0.0001f);
 			originalScale = transform.scale;
-
-			originalTransform = transform;
 		}
 		else
 		{
@@ -379,6 +377,8 @@ uint32 transformation_gizmo::handleScaling(trs& transform, ray r, const user_inp
 			anchor = max(anchor, 0.0001f);
 			originalScale = transform.scale;
 		}
+
+		originalTransform = transform;
 	}
 
 	if (dragging)

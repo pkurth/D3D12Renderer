@@ -160,6 +160,11 @@ struct scene_entity
 		return handle != entt::null;
 	}
 
+	inline bool valid() const
+	{
+		return registry->valid(handle);
+	}
+
 	inline bool operator==(const scene_entity& o) const
 	{
 		return handle == o.handle && registry == o.registry;

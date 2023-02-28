@@ -9,7 +9,7 @@ undo_stack::undo_stack()
 	reset();
 }
 
-void undo_stack::pushAction(const char* name, const void* entry, uint64 dataSize, undo_func undo, redo_func redo)
+void undo_stack::pushAction(const char* name, const void* entry, uint64 dataSize, toggle_func toggle)
 {
 	uint64 requiredSpace = dataSize + sizeof(entry_header);
 	uint64 availableSpaceAtEnd = memory + memorySize - nextToWrite;
@@ -72,8 +72,7 @@ void undo_stack::pushAction(const char* name, const void* entry, uint64 dataSize
 
 	header->newer = 0;
 
-	header->undo = undo;
-	header->redo = redo;
+	header->toggle = toggle;
 
 	header->name = name;
 	header->dataSize = dataSize;
@@ -83,24 +82,22 @@ void undo_stack::pushAction(const char* name, const void* entry, uint64 dataSize
 	nextToWrite = end;
 }
 
-bool undo_stack::undoPossible()
+std::pair<bool, const char*> undo_stack::undoPossible()
 {
-	return newest != 0;
+	return 
+	{ 
+		newest != 0, 
+		newest ? newest->name : 0 
+	};
 }
 
-bool undo_stack::redoPossible()
+std::pair<bool, const char*> undo_stack::redoPossible()
 {
-	return newest && newest->newer || !newest && oldest;
-}
-
-const char* undo_stack::getUndoName()
-{
-	return newest ? newest->name : 0;
-}
-
-const char* undo_stack::getRedoName()
-{
-	return (newest && newest->newer) ? newest->newer->name : (!newest && oldest) ? oldest->name : 0;
+	return 
+	{ 
+		newest && newest->newer || !newest && oldest,
+		(newest && newest->newer) ? newest->newer->name : (!newest && oldest) ? oldest->name : 0 
+	};
 }
 
 void undo_stack::undo()
@@ -108,7 +105,7 @@ void undo_stack::undo()
 	if (newest)
 	{
 		void* data = (newest + 1);
-		newest->undo(data);
+		newest->toggle(data);
 
 		newest = newest->older;
 		if (newest)
@@ -131,7 +128,7 @@ void undo_stack::redo()
 		newest = newest->newer;
 
 		void* data = (newest + 1);
-		newest->redo(data);
+		newest->toggle(data);
 
 		nextToWrite = (uint8*)alignTo(((uint8*)data + newest->dataSize), 16);
 	}
@@ -139,7 +136,7 @@ void undo_stack::redo()
 	if (!newest && oldest)
 	{
 		void* data = (oldest + 1);
-		oldest->redo(data);
+		oldest->toggle(data);
 
 		nextToWrite = (uint8*)alignTo(((uint8*)data + oldest->dataSize), 16);
 		newest = oldest;
