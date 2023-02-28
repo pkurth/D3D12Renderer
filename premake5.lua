@@ -196,6 +196,7 @@ group ""
 
 
 project "D3D12Renderer"
+	location "bin/D3D12Renderer"
 	kind "ConsoleApp"
 	language "C++"
 	cppdialect "C++17"
@@ -389,6 +390,7 @@ project "D3D12Renderer"
 -----------------------------------------
 
 project "Physics-Lib"
+	location "bin/Physics-Lib"
 	kind "SharedLib"
 	language "C++"
 	cppdialect "C++17"
