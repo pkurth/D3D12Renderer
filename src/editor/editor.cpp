@@ -45,7 +45,7 @@ static quat getQuat(vec3 euler)
 template <typename component_t, typename member_t>
 struct component_member_undo
 {
-	component_member_undo(scene_entity entity, member_t& member, member_t before, void (*callback)(member_t, void*) = 0, void* userData = 0)
+	component_member_undo(scene_entity entity, member_t& member, member_t before, void (*callback)(component_t&, member_t, void*) = 0, void* userData = 0)
 	{
 		this->entity = entity;
 		this->byteOffset = (uint8*)&member - (uint8*)&entity.getComponent<component_t>();
@@ -64,7 +64,7 @@ struct component_member_undo
 
 			if (callback)
 			{
-				callback(member, userData);
+				callback(comp, member, userData);
 			}
 		}
 	}
@@ -75,7 +75,7 @@ private:
 
 	member_t before;
 
-	void (*callback)(member_t, void*) = 0;
+	void (*callback)(component_t&, member_t, void*) = 0;
 	void* userData = 0;
 };
 
@@ -121,11 +121,6 @@ private:
 
 	value_t before;
 };
-
-static void rotationUndoCallback(quat rot, void* userData)
-{
-	*(vec3*)userData = getEuler(rot);
-}
 
 #define UNDOABLE_COMPONENT_SETTING(undoLabel, val, command, ...)																					\
 	{																																				\
@@ -800,7 +795,7 @@ bool scene_editor::drawSceneHierarchy()
 							{
 								transform.rotation = getQuat(selectedEntityEulerRotation);
 								objectMovedByWidget = true;
-							}, rotationUndoCallback, &selectedEntityEulerRotation);
+							}, [](transform_component&, quat rot, void* userData) { *(vec3*)userData = getEuler(rot); }, & selectedEntityEulerRotation);
 						UNDOABLE_COMPONENT_SETTING("entity scale", transform.scale,
 							objectMovedByWidget |= ImGui::Drag("Scale", transform.scale, 0.1f));
 					});
@@ -824,7 +819,7 @@ bool scene_editor::drawSceneHierarchy()
 							{
 								transform.rotation = getQuat(selectedEntityEulerRotation);
 								objectMovedByWidget = true;
-							}, rotationUndoCallback, & selectedEntityEulerRotation);
+							}, [](position_rotation_component&, quat rot, void* userData) { *(vec3*)userData = getEuler(rot); }, & selectedEntityEulerRotation);
 					});
 
 					drawComponent<position_scale_component>(selectedEntity, "TRANSFORM", [this, &objectMovedByWidget](position_scale_component& transform)
@@ -1077,32 +1072,7 @@ bool scene_editor::drawSceneHierarchy()
 
 						if (ImGui::BeginProperties())
 						{
-							bool kinematic = rb.invMass == 0;
-							if (ImGui::PropertyCheckbox("Kinematic", kinematic))
-							{
-								// TODO UNDO
-								if (kinematic)
-								{
-									rb.invMass = 0.f;
-									rb.invInertia = mat3::zero;
-									rb.linearVelocity = vec3(0.f);
-									rb.angularVelocity = vec3(0.f);
-									rb.forceAccumulator = vec3(0.f);
-									rb.torqueAccumulator = vec3(0.f);
-								}
-								else
-								{
-									rb.invMass = 1.f;
-									rb.invInertia = mat3::identity;
-
-									if (physics_reference_component* ref = selectedEntity.getComponentIfExists<physics_reference_component>())
-									{
-										rb.recalculateProperties(&scene.registry, *ref);
-									}
-								}
-							}
-
-							if (!kinematic)
+							if (rb.invMass != 0)
 							{
 								ImGui::PropertyValue("Mass", 1.f / rb.invMass, "%.3fkg");
 							}
