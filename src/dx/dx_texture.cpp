@@ -5,12 +5,13 @@
 #include "core/hash.h"
 #include "core/file_registry.h"
 #include "rendering/texture_preprocessing.h"
+#include "rendering/render_resources.h"
 
 #include <d3d12memoryallocator/D3D12MemAlloc.h>
 
+static void initializeTexture(ref<dx_texture> result, D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON, bool mipUAVs = false);
 
-
-static ref<dx_texture> uploadImageToGPU(DirectX::ScratchImage& scratchImage, D3D12_RESOURCE_DESC& textureDesc, uint32 flags)
+static void uploadImageToGPU(ref<dx_texture> result, DirectX::ScratchImage& scratchImage, D3D12_RESOURCE_DESC& textureDesc, uint32 flags)
 {
 	const DirectX::Image* images = scratchImage.GetImages();
 	uint32 numImages = (uint32)scratchImage.GetImageCount();
@@ -24,7 +25,7 @@ static ref<dx_texture> uploadImageToGPU(DirectX::ScratchImage& scratchImage, D3D
 		subresource.pData = images[i].pixels;
 	}
 
-	ref<dx_texture> result = createTexture(textureDesc, subresources, numImages);
+	initializeTexture(result, textureDesc, subresources, numImages);
 	SET_NAME(result->resource, "Loaded from file");
 
 	if (flags & image_load_flags_gen_mips_on_gpu)
@@ -34,7 +35,12 @@ static ref<dx_texture> uploadImageToGPU(DirectX::ScratchImage& scratchImage, D3D
 		generateMipMapsOnGPU(cl, result);
 		dxContext.executeCommandList(cl);
 	}
+}
 
+static ref<dx_texture> uploadImageToGPU(DirectX::ScratchImage& scratchImage, D3D12_RESOURCE_DESC& textureDesc, uint32 flags)
+{
+	ref<dx_texture> result = make_ref<dx_texture>();
+	uploadImageToGPU(result, scratchImage, textureDesc, flags);
 	return result;
 }
 
@@ -46,23 +52,61 @@ static ref<dx_texture> loadTextureInternal(const fs::path& path, uint32 flags)
 		flags |= image_load_flags_allocate_full_mipchain;
 	}
 
-	DirectX::ScratchImage scratchImage;
-	D3D12_RESOURCE_DESC textureDesc;
-
-	if (path.extension() == ".svg")
+	ref<dx_texture> result;
+	//if (flags & image_load_flags_synchronous)
 	{
-		if (!loadSVGFromFile(path, flags, scratchImage, textureDesc))
+		DirectX::ScratchImage scratchImage;
+		D3D12_RESOURCE_DESC textureDesc;
+
+		if (path.extension() == ".svg")
+		{
+			if (!loadSVGFromFile(path, flags, scratchImage, textureDesc))
+			{
+				return 0;
+			}
+		}
+		else if (!loadImageFromFile(path, flags, scratchImage, textureDesc))
 		{
 			return 0;
 		}
-	}
-	else if (!loadImageFromFile(path, flags, scratchImage, textureDesc))
-	{
-		return 0;
-	}
 
-	ref<dx_texture> result = uploadImageToGPU(scratchImage, textureDesc, flags);
+		result = uploadImageToGPU(scratchImage, textureDesc, flags);
+	}
+#if 0
+	else
+	{
+		result = make_ref<dx_texture>();
+		result->width = 1;
+		result->height = 1;
+		result->depth = 1;
+		result->format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		result->defaultSRV = render_resources::nullTextureSRV;
+
+
+		addAsyncLoadWork([path, flags, result]()
+		{
+			DirectX::ScratchImage scratchImage;
+			D3D12_RESOURCE_DESC textureDesc;
+
+			if (path.extension() == ".svg")
+			{
+				if (!loadSVGFromFile(path, flags, scratchImage, textureDesc))
+				{
+					return;
+				}
+			}
+			else if (!loadImageFromFile(path, flags, scratchImage, textureDesc))
+			{
+				return;
+			}
+
+			uploadImageToGPU(result, scratchImage, textureDesc, flags);
+		});
+	}
+#endif
+
 	result->handle = getAssetHandleFromPath(path.lexically_normal());
+	result->flags = flags;
 	return result;
 }
 
@@ -76,7 +120,9 @@ static ref<dx_texture> loadTextureFromMemoryInternal(const void* ptr, uint32 siz
 		return nullptr;
 	}
 
-	return uploadImageToGPU(scratchImage, textureDesc, flags);
+	ref<dx_texture> result = uploadImageToGPU(scratchImage, textureDesc, flags);
+	result->flags = flags;
+	return result;
 }
 
 static ref<dx_texture> loadVolumeTextureInternal(const fs::path& dirname, uint32 flags)
@@ -160,6 +206,12 @@ ref<dx_texture> loadTextureFromFile(const fs::path& filename, uint32 flags)
 
 	mutex.unlock();
 	return sp;
+}
+
+ref<dx_texture> loadTextureFromHandle(asset_handle handle, uint32 flags)
+{
+	fs::path sceneFilename = getPathFromAssetHandle(handle);
+	return loadTextureFromFile(sceneFilename, flags);
 }
 
 ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format imageFormat, const fs::path& cacheFilename, uint32 flags)
@@ -275,10 +327,8 @@ void uploadTextureSubresourceData(ref<dx_texture> texture, D3D12_SUBRESOURCE_DAT
 	dxContext.executeCommandList(cl);
 }
 
-ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState, bool mipUAVs)
+static void initializeTexture(ref<dx_texture> result, D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState, bool mipUAVs)
 {
-	ref<dx_texture> result = make_ref<dx_texture>();
-
 	result->requestedNumMipLevels = textureDesc.MipLevels;
 
 	uint32 maxNumMipLevels = (uint32)log2((float)max((uint32)textureDesc.Width, textureDesc.Height)) + 1;
@@ -414,7 +464,12 @@ ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE
 			}
 		}
 	}
+}
 
+ref<dx_texture> createTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState, bool mipUAVs)
+{
+	ref<dx_texture> result = make_ref<dx_texture>();
+	initializeTexture(result, textureDesc, subresourceData, numSubresources, initialState, mipUAVs);
 	return result;
 }
 
