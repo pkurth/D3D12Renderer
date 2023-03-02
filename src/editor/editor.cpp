@@ -1989,6 +1989,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		if (ImGui::IconButton(imgui_icon_play, imgui_icon_play, IMGUI_ICON_DEFAULT_SIZE, this->scene->isPlayable()))
 		{
 			this->scene->play();
+			undoStacks[1].reset();
 			setSelectedEntity({});
 		}
 		ImGui::SameLine(0.f, IMGUI_ICON_DEFAULT_SPACING);
