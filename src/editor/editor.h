@@ -60,8 +60,12 @@ private:
 	main_renderer* renderer;
 	editor_panels* editorPanels;
 
-	undo_stack undoStack;
-	undo_buffer undoBuffer;
+	undo_stack undoStacks[2];
+	undo_buffer undoBuffers[2];
+
+	undo_stack* currentUndoStack;
+	undo_buffer* currentUndoBuffer;
+
 	transformation_gizmo gizmo;
 
 	float physicsTestForce = 1000.f;

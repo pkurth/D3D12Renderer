@@ -168,11 +168,12 @@ private:
 		command;																																	\
 		if (ImGui::IsItemActive() && !ImGui::IsItemActiveLastFrame())																				\
 		{																																			\
-			undoBuffer.as<val_t>() = before;																										\
+			currentUndoBuffer->as<val_t>() = before;																								\
 		}																																			\
 		if (ImGui::IsItemDeactivatedAfterEdit() || (!ImGui::IsItemActive() && (before != val)))														\
 		{																																			\
-			undoStack.pushAction(undoLabel, component_member_undo<component_t, val_t>(selectedEntity, val, undoBuffer.as<val_t>(), __VA_ARGS__));	\
+			currentUndoStack->pushAction(undoLabel,																									\
+				component_member_undo<component_t, val_t>(selectedEntity, val, currentUndoBuffer->as<val_t>(), __VA_ARGS__));						\
 		}																																			\
 	}
 
@@ -183,11 +184,11 @@ private:
 		command;																																	\
 		if (ImGui::IsItemActive() && !ImGui::IsItemActiveLastFrame())																				\
 		{																																			\
-			undoBuffer.as<val_t>() = before;																										\
+			currentUndoBuffer->as<val_t>() = before;																								\
 		}																																			\
 		if (ImGui::IsItemDeactivatedAfterEdit() || (!ImGui::IsItemActive() && (before != val)))														\
 		{																																			\
-			undoStack.pushAction(undoLabel, settings_undo<val_t>(val, undoBuffer.as<val_t>()));														\
+			currentUndoStack->pushAction(undoLabel, settings_undo<val_t>(val, currentUndoBuffer->as<val_t>()));										\
 		}																																			\
 	}
 
@@ -232,6 +233,9 @@ void scene_editor::initialize(editor_scene* scene, main_renderer* renderer, edit
 bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPass, float dt)
 {
 	CPU_PROFILE_BLOCK("Update editor");
+
+	currentUndoStack = &undoStacks[this->scene->mode > 0];
+	currentUndoBuffer = &undoBuffers[this->scene->mode > 0];
 
 #if 0
 	{
@@ -357,8 +361,7 @@ bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPas
 			}
 		}
 	}
-
-	return objectChanged;
+	return objectChanged;
 }
 
 bool scene_editor::drawMainMenuBar()
@@ -377,19 +380,19 @@ bool scene_editor::drawMainMenuBar()
 		if (ImGui::BeginMenu(ICON_FA_FILE "  File"))
 		{
 			char textBuffer[128];
-			auto [undoPossible, undoName] = undoStack.undoPossible();
+			auto [undoPossible, undoName] = currentUndoStack->undoPossible();
 			snprintf(textBuffer, sizeof(textBuffer), ICON_FA_UNDO " Undo %s", undoPossible ? undoName : "");
 			if (ImGui::MenuItem(textBuffer, "Ctrl+Z", false, undoPossible))
 			{
-				undoStack.undo();
+				currentUndoStack->undo();
 				objectPotentiallyMoved = true;
 			}
 
-			auto [redoPossible, redoName] = undoStack.redoPossible();
+			auto [redoPossible, redoName] = currentUndoStack->redoPossible();
 			snprintf(textBuffer, sizeof(textBuffer), ICON_FA_REDO " Redo %s", redoPossible ? redoName : "");
 			if (ImGui::MenuItem(textBuffer, "Ctrl+Y", false, redoPossible))
 			{
-				undoStack.redo();
+				currentUndoStack->redo();
 				objectPotentiallyMoved = true;
 			}
 			ImGui::Separator();
@@ -759,7 +762,7 @@ bool scene_editor::drawSceneHierarchy()
 					{
 						setSelectedEntity({});
 					}
-					undoStack.pushAction("entity deletion", entity_existence_undo(scene, entity));
+					currentUndoStack->pushAction("entity deletion", entity_existence_undo(scene, entity));
 					scene.deleteEntity(entity);
 				}
 				ImGui::PopID();
@@ -788,11 +791,11 @@ bool scene_editor::drawSceneHierarchy()
 
 					if (ImGui::IsItemActive() && !ImGui::IsItemActiveLastFrame())
 					{
-						undoBuffer.as<tag_component>() = tagBefore;
+						currentUndoBuffer->as<tag_component>() = tagBefore;
 					}
 					if (ImGui::IsItemDeactivatedAfterEdit())
 					{
-						undoStack.pushAction("entity name", component_undo<tag_component>(selectedEntity, undoBuffer.as<tag_component>()));
+						currentUndoStack->pushAction("entity name", component_undo<tag_component>(selectedEntity, currentUndoBuffer->as<tag_component>()));
 					}
 				}
 
@@ -803,7 +806,7 @@ bool scene_editor::drawSceneHierarchy()
 				ImGui::SameLine();
 				if (ImGui::Button(ICON_FA_TRASH_ALT))
 				{
-					undoStack.pushAction("entity deletion", entity_existence_undo(scene, selectedEntity));
+					currentUndoStack->pushAction("entity deletion", entity_existence_undo(scene, selectedEntity));
 					scene.deleteEntity(selectedEntity);
 					setSelectedEntity({});
 					objectMovedByWidget = true;
@@ -1702,6 +1705,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 {
 	game_scene* scene = &this->scene->getCurrentScene();
 
+
 	// Returns true, if the user dragged an object using a gizmo.
 
 	if (input.keyboard['F'].pressEvent && selectedEntity)
@@ -1872,7 +1876,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 			{
 				if (draggingBefore)
 				{
-					undoStack.pushAction("object transform",
+					currentUndoStack->pushAction("object transform",
 						component_undo<transform_component, physics_transform0_component, physics_transform1_component>(selectedEntity, 
 							gizmo.originalTransform,
 							gizmo.originalTransform,
@@ -1900,7 +1904,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 			}
 			else if (draggingBefore)
 			{
-				undoStack.pushAction("object transform", 
+				currentUndoStack->pushAction("object transform", 
 					component_undo<transform_component>(selectedEntity, transform_component(gizmo.originalTransform)));
 			}
 		}
@@ -1913,7 +1917,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 			}
 			else if (draggingBefore)
 			{
-				undoStack.pushAction("object transform", 
+				currentUndoStack->pushAction("object transform",
 					component_undo<position_component>(selectedEntity, position_component{ gizmo.originalTransform.position }));
 			}
 		}
@@ -1927,7 +1931,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 			}
 			else if (draggingBefore)
 			{
-				undoStack.pushAction("object transform", 
+				currentUndoStack->pushAction("object transform",
 					component_undo<position_rotation_component>(selectedEntity, position_rotation_component{ gizmo.originalTransform.position, gizmo.originalTransform.rotation }));
 			}
 		}
@@ -1940,7 +1944,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 			}
 			else if (draggingBefore)
 			{
-				undoStack.pushAction("object transform",
+				currentUndoStack->pushAction("object transform",
 					component_undo<position_scale_component>(selectedEntity, position_scale_component{ gizmo.originalTransform.position, gizmo.originalTransform.scale }));
 			}
 		}
@@ -1954,7 +1958,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 			if (ImGui::IsKeyPressed(key_backspace) || ImGui::IsKeyPressed(key_delete))
 			{
 				// Delete entity.
-				undoStack.pushAction("entity deletion", entity_existence_undo(*scene, selectedEntity));
+				currentUndoStack->pushAction("entity deletion", entity_existence_undo(*scene, selectedEntity));
 				scene->deleteEntity(selectedEntity);
 				setSelectedEntity({});
 				inputCaptured = true;
@@ -2003,6 +2007,9 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		scene = &this->scene->getCurrentScene();
 		cameraController.camera = &camera;
 
+		currentUndoStack = &undoStacks[this->scene->mode > 0];
+		currentUndoBuffer = &undoBuffers[this->scene->mode > 0];
+
 		ImGui::PopStyleColor();
 	}
 	ImGui::End();
@@ -2012,13 +2019,13 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 	{
 		if (!inputCaptured && ImGui::IsKeyDown(key_ctrl) && ImGui::IsKeyPressed('Z'))
 		{
-			undoStack.undo();
+			currentUndoStack->undo();
 			inputCaptured = true;
 			objectMovedByGizmo = true;
 		}
 		if (!inputCaptured && ImGui::IsKeyDown(key_ctrl) && ImGui::IsKeyPressed('Y'))
 		{
-			undoStack.redo();
+			currentUndoStack->redo();
 			inputCaptured = true;
 			objectMovedByGizmo = true;
 		}
@@ -2053,7 +2060,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 			vec3 dir = -camera.generateWorldSpaceRay(input.mouse.relX, input.mouse.relY).direction;
 			vec3 beforeDir = this->scene->sun.direction;
 			this->scene->sun.direction = dir;
-			undoStack.pushAction("sun direction", settings_undo<vec3>(this->scene->sun.direction, beforeDir));
+			currentUndoStack->pushAction("sun direction", settings_undo<vec3>(this->scene->sun.direction, beforeDir));
 			inputCaptured = true;
 		}
 		else
@@ -2094,7 +2101,7 @@ bool scene_editor::drawEntityCreationPopup()
 					512u
 					);
 
-			undoStack.pushAction("entity creation", entity_existence_undo(*scene, pl));
+			currentUndoStack->pushAction("entity creation", entity_existence_undo(*scene, pl));
 
 			setSelectedEntity(pl);
 			clicked = true;
@@ -2114,7 +2121,7 @@ bool scene_editor::drawEntityCreationPopup()
 					512u
 					);
 
-			undoStack.pushAction("entity creation", entity_existence_undo(*scene, sl));
+			currentUndoStack->pushAction("entity creation", entity_existence_undo(*scene, sl));
 
 			setSelectedEntity(sl);
 			clicked = true;
@@ -2129,7 +2136,7 @@ bool scene_editor::drawEntityCreationPopup()
 				.addComponent<cloth_component>(10.f, 10.f, 20u, 20u, 8.f)
 				.addComponent<cloth_render_component>();
 
-			undoStack.pushAction("entity creation", entity_existence_undo(*scene, cloth));
+			currentUndoStack->pushAction("entity creation", entity_existence_undo(*scene, cloth));
 
 			setSelectedEntity(cloth);
 			clicked = true;
