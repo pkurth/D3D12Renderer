@@ -32,5 +32,7 @@ struct thread_job_context
 	void waitForWorkCompletion();
 };
 
+void addAsyncLoadWork(const std::function<void()>& cb);
+
 void initializeJobSystem();
 

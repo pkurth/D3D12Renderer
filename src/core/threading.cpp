@@ -4,10 +4,66 @@
 #include <intrin.h>
 
 
+
+
 template <typename T, uint32 capacity>
-struct thread_safe_ring_buffer
+struct work_queue
 {
-	bool push_back(const T& t)
+	void initialize(uint32 numThreads, uint32 threadOffset, int threadPriority, const wchar* description)
+	{
+		semaphoreHandle = CreateSemaphoreEx(0, 0, numThreads, 0, 0, SEMAPHORE_ALL_ACCESS);
+
+		for (uint32 i = 0; i < numThreads; ++i)
+		{
+			std::thread thread([this]() { workerThreadProc(); });
+
+			HANDLE handle = (HANDLE)thread.native_handle();
+			SetThreadPriority(handle, threadPriority);
+
+			uint64 affinityMask = 1ull << (i + threadOffset);
+			SetThreadAffinityMask(handle, affinityMask);
+			SetThreadDescription(handle, description);
+
+			thread.detach();
+		}
+	}
+
+	void workerThreadProc()
+	{
+		while (true)
+		{
+			if (!performWork())
+			{
+				WaitForSingleObjectEx(semaphoreHandle, INFINITE, FALSE);
+			}
+		}
+	}
+
+	bool performWork()
+	{
+		T entry;
+		if (pop(entry))
+		{
+			entry.process();
+			return true;
+		}
+
+		return false;
+	}
+
+	void push(const T& t)
+	{
+		while (!pushInternal(t))
+		{
+			performWork();
+		}
+
+		ReleaseSemaphore(semaphoreHandle, 1, 0);
+	}
+
+private:
+
+	bool pushInternal(const T& t)
 	{
 		bool result = false;
 		mutex.lock();
@@ -22,7 +78,7 @@ struct thread_safe_ring_buffer
 		return result;
 	}
 
-	bool pop_front(T& t)
+	bool pop(T& t)
 	{
 		bool result = false;
 		mutex.lock();
@@ -36,47 +92,44 @@ struct thread_safe_ring_buffer
 		return result;
 	}
 
+
+
 	uint32 nextItemToRead = 0;
 	uint32 nextItemToWrite = 0;
 	T data[capacity];
 
 	std::mutex mutex;
+	HANDLE semaphoreHandle;
 };
 
 
-struct work_queue_entry
+struct frame_queue_entry
 {
 	std::function<void()> callback;
 	thread_job_context* context;
+
+	void process()
+	{
+		callback();
+		atomicDecrement(context->numJobs);
+	}
 };
 
-static thread_safe_ring_buffer< work_queue_entry, 256> queue;
-static HANDLE semaphoreHandle;
-
-static bool performWork()
+struct load_queue_entry
 {
-	work_queue_entry entry;
-	if (queue.pop_front(entry))
+	std::function<void()> callback;
+
+	void process()
 	{
-		entry.callback();
-		atomicDecrement(entry.context->numJobs);
-
-		return true;
+		callback();
 	}
+};
 
-	return false;
-}
+static work_queue<frame_queue_entry, 256> frameQueue;
+static work_queue<load_queue_entry, 256> loadQueue;
 
-static void workerThreadProc()
-{
-	while (true)
-	{
-		if (!performWork())
-		{
-			WaitForSingleObjectEx(semaphoreHandle, INFINITE, FALSE);
-		}
-	}
-}
+
+
 
 void initializeJobSystem()
 {
@@ -85,50 +138,52 @@ void initializeJobSystem()
 	SetThreadPriority(handle, THREAD_PRIORITY_HIGHEST);
 	CloseHandle(handle);
 
+	uint32 numHardwareThreads = std::thread::hardware_concurrency();
 
-	uint32 numThreads = std::thread::hardware_concurrency();
-	numThreads = clamp(numThreads, 1u, 8u);
-	semaphoreHandle = CreateSemaphoreEx(0, 0, numThreads, 0, 0, SEMAPHORE_ALL_ACCESS);
+	uint32 numFrameThreads = clamp(numHardwareThreads, 1u, 4u);
+	frameQueue.initialize(numFrameThreads, 1, THREAD_PRIORITY_NORMAL, L"Worker thread"); // 1 is the main thread.
 
-	for (uint32 i = 0; i < numThreads; ++i)
-	{
-		std::thread thread(workerThreadProc);
-
-		HANDLE handle = (HANDLE)thread.native_handle();
-
-		uint64 affinityMask = 1ull << (i + 1); // 1 is the main thread.
-		SetThreadAffinityMask(handle, affinityMask);
-
-		//SetThreadPriority(handle, THREAD_PRIORITY_HIGHEST);
-		SetThreadDescription(handle, L"Worker thread");
-
-		thread.detach();
-	}
+	uint32 numLoadThreads = 4;
+	loadQueue.initialize(numLoadThreads, numFrameThreads + 1, THREAD_PRIORITY_BELOW_NORMAL, L"Loader thread"); // 1 is the main thread.
 }
+
+
+
+
+
+
+
+
+
+
+
 
 void thread_job_context::addWork(const std::function<void()>& cb)
 {
-	work_queue_entry entry;
+	frame_queue_entry entry;
 	entry.callback = cb;
 	entry.context = this;
 	atomicIncrement(numJobs);
 
-	while (!queue.push_back(entry))
-	{
-		performWork();
-	}
-
-	ReleaseSemaphore(semaphoreHandle, 1, 0);
+	frameQueue.push(entry);
 }
 
 void thread_job_context::waitForWorkCompletion()
 {
 	while (numJobs)
 	{
-		if (!performWork())
+		if (!frameQueue.performWork())
 		{
 			while (numJobs) {}
 			break;
 		}
 	}
+}
+
+void addAsyncLoadWork(const std::function<void()>& cb)
+{
+	load_queue_entry entry;
+	entry.callback = cb;
+
+	loadQueue.push(entry);
 }
