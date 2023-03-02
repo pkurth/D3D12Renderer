@@ -35,9 +35,10 @@ void game_scene::cloneTo(game_scene& target)
 	copyComponentPoolsTo <
 		tag_component,
 		transform_component,
-		dynamic_transform_component,
 		position_component,
 		position_rotation_component,
+		position_scale_component,
+		dynamic_transform_component,
 
 #ifndef PHYSICS_ONLY
 		point_light_component,

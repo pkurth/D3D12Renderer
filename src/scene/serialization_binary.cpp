@@ -106,11 +106,13 @@ struct component_group {};
 
 using serialized_components = component_group<
 
-	// Transforms.
 	tag_component,
+
+	// Transforms.
 	transform_component,
 	position_component,
 	position_rotation_component,
+	position_scale_component,
 	dynamic_transform_component,
 
 	// Rendering.
