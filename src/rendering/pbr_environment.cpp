@@ -8,7 +8,7 @@
 void pbr_environment::setFromTexture(const fs::path& filename)
 {
 	ref<dx_texture> equiSky = loadTextureFromFile(filename,
-		image_load_flags_noncolor | image_load_flags_cache_to_dds | image_load_flags_gen_mips_on_cpu);
+		image_load_flags_noncolor | image_load_flags_cache_to_dds | image_load_flags_gen_mips_on_cpu | image_load_flags_synchronous);
 
 	if (equiSky)
 	{
@@ -20,6 +20,7 @@ void pbr_environment::setFromTexture(const fs::path& filename)
 		allocate();
 
 		sky = equirectangularToCubemap(cl, equiSky, skyResolution, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
+		sky->handle = equiSky->handle;
 		texturedSkyToIrradiance(cl, sky, irradiance);
 		texturedSkyToPrefilteredRadiance(cl, sky, prefilteredRadiance);
 
