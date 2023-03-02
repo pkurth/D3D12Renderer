@@ -50,6 +50,7 @@ struct dx_texture
 	uint32 numMipLevels;
 
 	asset_handle handle;
+	uint32 flags = 0;
 
 	void setName(const wchar* name);
 	std::wstring getName() const;
@@ -146,6 +147,7 @@ dx_tiled_texture createTiledTexture(uint32 width, uint32 height, DXGI_FORMAT for
 // TODO: Maybe we want to keep the texture around for a couple more frames?
 
 ref<dx_texture> loadTextureFromFile(const fs::path& filename, uint32 flags = image_load_flags_default);
+ref<dx_texture> loadTextureFromHandle(asset_handle handle, uint32 flags = image_load_flags_default);
 ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format imageFormat, const fs::path& cacheFilename, uint32 flags = image_load_flags_default);
 ref<dx_texture> loadVolumeTextureFromDirectory(const fs::path& dirname, uint32 flags = image_load_flags_compress | image_load_flags_cache_to_dds | image_load_flags_noncolor);
 

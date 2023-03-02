@@ -1,11 +1,19 @@
 #include "pch.h"
-#include "serialization.h"
+#include "serialization_yaml.h"
 
 #include "editor/file_dialog.h"
 #include "core/yaml.h"
 #include "core/log.h"
 
+#include "core/file_registry.h"
+
 #include "physics/physics.h"
+#include "physics/cloth.h"
+
+#include "terrain/terrain.h"
+#include "terrain/grass.h"
+#include "terrain/water.h"
+#include "terrain/proc_placement.h"
 
 namespace YAML
 {
@@ -122,35 +130,35 @@ namespace YAML
 
 			switch (c.type)
 			{
-			case collider_type_sphere:
-			{
-				n["Center"] = c.sphere.center;
-				n["Radius"]= c.sphere.radius;
-			} break;
+				case collider_type_sphere:
+				{
+					n["Center"] = c.sphere.center;
+					n["Radius"] = c.sphere.radius;
+				} break;
 
-			case collider_type_capsule:
-			{
-				n["Position A"] = c.capsule.positionA;
-				n["Position B"] = c.capsule.positionB;
-				n["Radius"] =c.capsule.radius;
-			} break;
+				case collider_type_capsule:
+				{
+					n["Position A"] = c.capsule.positionA;
+					n["Position B"] = c.capsule.positionB;
+					n["Radius"] = c.capsule.radius;
+				} break;
 
-			case collider_type_aabb:
-			{
-				n["Min corner"] = c.aabb.minCorner;
-				n["Max corner"] = c.aabb.maxCorner;
-			} break;
+				case collider_type_aabb:
+				{
+					n["Min corner"] = c.aabb.minCorner;
+					n["Max corner"] = c.aabb.maxCorner;
+				} break;
 
-			case collider_type_obb:
-			{
-				n["Center"] = c.obb.center;
-				n["Radius"] = c.obb.radius;
-				n["Rotation"] = c.obb.rotation;
-			} break;
+				case collider_type_obb:
+				{
+					n["Center"] = c.obb.center;
+					n["Radius"] = c.obb.radius;
+					n["Rotation"] = c.obb.rotation;
+				} break;
 
-			case collider_type_hull:
-			{
-			} break;
+				case collider_type_hull:
+				{
+				} break;
 			}
 
 			n["Restitution"] = c.material.restitution;
@@ -306,8 +314,20 @@ namespace YAML
 		static Node encode(const pbr_environment& c)
 		{
 			Node n;
-			//n["Type"] = pbrEnvironmentTypeNames[c.type];
-			//n["Name"] = c.name;
+			if (!c.isProcedural())
+			{
+				n["Type"] = "Texture";
+				n["Handle"] = c.sky->handle;
+			}
+			else
+			{
+				n["Type"] = "Procedural";
+				n["Sun direction"] = c.lastSunDirection;
+			}
+			n["GI mode"] = (int)c.giMode;
+			n["GI intensity"] = c.globalIlluminationIntensity;
+			n["Sky intensity"] = c.skyIntensity;
+
 			return n;
 		}
 
@@ -315,14 +335,32 @@ namespace YAML
 		{
 			if (!n.IsMap()) { return false; }
 
-			c.handle = n["Handle"].as<asset_handle>();
+			std::string type = n["Type"].as<std::string>();
+			if (type == "Texture")
+			{
+				asset_handle handle;
+				YAML_LOAD(n, handle, "Handle");
+
+				c.setFromTexture(getPathFromAssetHandle(handle));
+			}
+			else
+			{
+				vec3 sunDirection;
+				YAML_LOAD(n, sunDirection, "Sun direction");
+
+				c.setToProcedural(sunDirection);
+			}
+
+			YAML_LOAD_ENUM(n, c.giMode, "GI mode");
+			YAML_LOAD(n, c.globalIlluminationIntensity, "GI intensity");
+			YAML_LOAD(n, c.skyIntensity, "Sky intensity");
 
 			return true;
 		}
 	};
 }
 
-void serializeSceneToDisk(editor_scene& scene, const renderer_settings& rendererSettings)
+void serializeSceneToYAMLFile(editor_scene& scene, const renderer_settings& rendererSettings)
 {
 	if (scene.savePath.empty())
 	{
@@ -354,16 +392,23 @@ void serializeSceneToDisk(editor_scene& scene, const renderer_settings& renderer
 			YAML::Node n;
 			n["Tag"] = tag->name;
 
+			// Transforms.
 			if (auto* c = entity.getComponentIfExists<transform_component>()) { n["Transform"] = *c; }
 			if (auto* c = entity.getComponentIfExists<position_component>()) { n["Position"] = *c; }
 			if (auto* c = entity.getComponentIfExists<position_rotation_component>()) { n["Position/Rotation"] = *c; }
-			if (entity.hasComponent<dynamic_transform_component>()) { n["Dynamic"] = true; }
+			if (auto* c = entity.getComponentIfExists<position_scale_component>()) { n["Position/Scale"] = *c; }
+			if (auto* c = entity.getComponentIfExists<dynamic_transform_component>()) { n["Dynamic"] = true; }
+
+			// Rendering.
+			if (auto* c = entity.getComponentIfExists<raster_component>()) { n["Raster"] = *c; }
 			if (auto* c = entity.getComponentIfExists<point_light_component>()) { n["Point light"] = *c; }
 			if (auto* c = entity.getComponentIfExists<spot_light_component>()) { n["Spot light"] = *c; }
+
+			// Physics.
 			if (auto* c = entity.getComponentIfExists<rigid_body_component>()) { n["Rigid body"] = *c; }
 			if (auto* c = entity.getComponentIfExists<force_field_component>()) { n["Force field"] = *c; }
 			if (auto* c = entity.getComponentIfExists<cloth_component>()) { n["Cloth"] = *c; }
-			if (auto* c = entity.getComponentIfExists<raster_component>()) { n["Raster"] = *c; }
+			if (auto* c = entity.getComponentIfExists<cloth_render_component>()) { n["Cloth render"] = true; }
 			if (auto* c = entity.getComponentIfExists<physics_reference_component>())
 			{
 				if (c->numColliders)
@@ -377,6 +422,12 @@ void serializeSceneToDisk(editor_scene& scene, const renderer_settings& renderer
 				}
 			}
 
+			// Terrain.
+			//if (auto* c = entity.getComponentIfExists<terrain_component>()) { n["Terrain"] = *c; }
+			//if (auto* c = entity.getComponentIfExists<grass_component>()) { n["Grass"] = *c; }
+			//if (auto* c = entity.getComponentIfExists<proc_placement_component>()) { n["Procedural placement"] = *c; }
+			//if (auto* c = entity.getComponentIfExists<water_component>()) { n["Water"] = *c; }
+
 
 			/*
 			TODO:
@@ -384,7 +435,7 @@ void serializeSceneToDisk(editor_scene& scene, const renderer_settings& renderer
 				- Raytrace
 				- Constraints
 			*/
-			
+
 			entityNode.push_back(n);
 		}
 	});
@@ -400,7 +451,7 @@ void serializeSceneToDisk(editor_scene& scene, const renderer_settings& renderer
 	LOG_MESSAGE("Scene saved to '%ws'", scene.savePath.c_str());
 }
 
-bool deserializeSceneFromDisk(editor_scene& scene, renderer_settings& rendererSettings, std::string& environmentName)
+bool deserializeSceneFromYAMLFile(editor_scene& scene, renderer_settings& rendererSettings, std::string& environmentName)
 {
 	fs::path filename = openFileDialog("Scene files", "sc");
 	if (filename.empty())
@@ -434,17 +485,23 @@ bool deserializeSceneFromDisk(editor_scene& scene, renderer_settings& rendererSe
 
 #define LOAD_COMPONENT(type, name) if (auto node = entityNode[name]) { entity.addComponent<type>(node.as<type>()); }
 
+		// Transforms.
 		LOAD_COMPONENT(transform_component, "Transform");
 		LOAD_COMPONENT(position_component, "Position");
 		LOAD_COMPONENT(position_rotation_component, "Position/Rotation");
+		LOAD_COMPONENT(position_scale_component, "Position/Scale");
 		if (entityNode["Dynamic"]) { entity.addComponent<dynamic_transform_component>(); }
+
+		// Rendering.
+		LOAD_COMPONENT(raster_component, "Raster");
 		LOAD_COMPONENT(point_light_component, "Point light");
 		LOAD_COMPONENT(spot_light_component, "Spot light");
+
+		// Physics.
 		LOAD_COMPONENT(rigid_body_component, "Rigid body");
 		LOAD_COMPONENT(force_field_component, "Force field");
 		LOAD_COMPONENT(cloth_component, "Cloth");
-		LOAD_COMPONENT(raster_component, "Raster");
-
+		if (entityNode["Cloth render"]) { entity.addComponent<cloth_render_component>(); }
 		if (auto collidersNode = entityNode["Colliders"])
 		{
 			for (uint32 i = 0; i < collidersNode.size(); ++i)
@@ -452,6 +509,12 @@ bool deserializeSceneFromDisk(editor_scene& scene, renderer_settings& rendererSe
 				entity.addComponent<collider_component>(collidersNode[i].as<collider_component>());
 			}
 		}
+
+		// Terrain.
+		//LOAD_COMPONENT(terrain_component, "Terrain");
+		//LOAD_COMPONENT(grass_component, "Grass");
+		//LOAD_COMPONENT(proc_placement_component, "Procedural placement");
+		//LOAD_COMPONENT(water_component, "Water");
 	}
 
 	LOG_MESSAGE("Scene loaded from '%ws'", scene.savePath.c_str());

@@ -660,6 +660,11 @@ void application::update(const user_input& input, float dt)
 
 			for (auto [entityHandle, raster, transform] : scene.group(entt::get<raster_component, transform_component>).each())
 			{
+				if (!raster.mesh)
+				{
+					continue;
+				}
+
 				const dx_mesh& mesh = raster.mesh->mesh;
 				mat4 m = trsToMat4(transform);
 
@@ -671,14 +676,12 @@ void application::update(const user_input& input, float dt)
 
 				if (animation_component* anim = entity.getComponentIfExists<animation_component>())
 				{
-					uint32 numSubmeshes = (uint32)raster.mesh->submeshes.size();
-
-					for (uint32 i = 0; i < numSubmeshes; ++i)
+					for (auto& sm : raster.mesh->submeshes)
 					{
-						submesh_info submesh = raster.mesh->submeshes[i].info;
+						submesh_info submesh = sm.info;
 						submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
 
-						const ref<pbr_material>& material = raster.mesh->submeshes[i].material;
+						const ref<pbr_material>& material = sm.material;
 
 						if (material->albedoTint.a < 1.f)
 						{

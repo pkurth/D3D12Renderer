@@ -122,6 +122,8 @@ static void addConstraintEdge(scene_entity& e, constraint_entity_reference_compo
 		constraintEntityReference.edgeB = edgeIndex;
 		constraintEntityReference.entityB = e.handle;
 	}
+
+	++reference.numConstraints;
 }
 
 distance_constraint_handle addDistanceConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB, float distance)
@@ -331,6 +333,84 @@ slider_constraint_handle addSliderConstraintFromGlobalPoints(scene_entity& a, sc
 	return { constraintEntity };
 }
 
+distance_constraint_handle addConstraint(scene_entity& a, scene_entity& b, const distance_constraint& c)
+{
+	entt::registry& registry = *a.registry;
+	entity_handle constraintEntity = registry.create();
+	registry.emplace<distance_constraint>(constraintEntity, c);
+	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
+
+	addConstraintEdge(a, ref, constraintEntity, constraint_type_distance);
+	addConstraintEdge(b, ref, constraintEntity, constraint_type_distance);
+
+	return { constraintEntity };
+}
+
+ball_constraint_handle addConstraint(scene_entity& a, scene_entity& b, const ball_constraint& c)
+{
+	entt::registry& registry = *a.registry;
+	entity_handle constraintEntity = registry.create();
+	registry.emplace<ball_constraint>(constraintEntity, c);
+	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
+
+	addConstraintEdge(a, ref, constraintEntity, constraint_type_ball);
+	addConstraintEdge(b, ref, constraintEntity, constraint_type_ball);
+
+	return { constraintEntity };
+}
+
+fixed_constraint_handle addConstraint(scene_entity& a, scene_entity& b, const fixed_constraint& c)
+{
+	entt::registry& registry = *a.registry;
+	entity_handle constraintEntity = registry.create();
+	registry.emplace<fixed_constraint>(constraintEntity, c);
+	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
+
+	addConstraintEdge(a, ref, constraintEntity, constraint_type_fixed);
+	addConstraintEdge(b, ref, constraintEntity, constraint_type_fixed);
+
+	return { constraintEntity };
+}
+
+hinge_constraint_handle addConstraint(scene_entity& a, scene_entity& b, const hinge_constraint& c)
+{
+	entt::registry& registry = *a.registry;
+	entity_handle constraintEntity = registry.create();
+	registry.emplace<hinge_constraint>(constraintEntity, c);
+	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
+
+	addConstraintEdge(a, ref, constraintEntity, constraint_type_hinge);
+	addConstraintEdge(b, ref, constraintEntity, constraint_type_hinge);
+
+	return { constraintEntity };
+}
+
+cone_twist_constraint_handle addConstraint(scene_entity& a, scene_entity& b, const cone_twist_constraint& c)
+{
+	entt::registry& registry = *a.registry;
+	entity_handle constraintEntity = registry.create();
+	registry.emplace<cone_twist_constraint>(constraintEntity, c);
+	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
+
+	addConstraintEdge(a, ref, constraintEntity, constraint_type_cone_twist);
+	addConstraintEdge(b, ref, constraintEntity, constraint_type_cone_twist);
+
+	return { constraintEntity };
+}
+
+slider_constraint_handle addConstraint(scene_entity& a, scene_entity& b, const slider_constraint& c)
+{
+	entt::registry& registry = *a.registry;
+	entity_handle constraintEntity = registry.create();
+	registry.emplace<slider_constraint>(constraintEntity, c);
+	constraint_entity_reference_component& ref = registry.emplace<constraint_entity_reference_component>(constraintEntity);
+
+	addConstraintEdge(a, ref, constraintEntity, constraint_type_slider);
+	addConstraintEdge(b, ref, constraintEntity, constraint_type_slider);
+
+	return { constraintEntity };
+}
+
 distance_constraint& getConstraint(game_scene& scene, distance_constraint_handle handle)
 {
 	return scene_entity{ handle.entity, scene }.getComponent<distance_constraint>();
@@ -373,15 +453,16 @@ void deleteAllConstraints(game_scene& scene)
 
 static void removeConstraintEdge(scene_entity entity, constraint_edge& edge, constraint_context& context)
 {
+	physics_reference_component& ref = entity.getComponent<physics_reference_component>();
 	if (edge.prevConstraintEdge != INVALID_CONSTRAINT_EDGE)
 	{
 		context.constraintEdges[edge.prevConstraintEdge].nextConstraintEdge = edge.nextConstraintEdge;
 	}
 	else
 	{
-		physics_reference_component& ref = entity.getComponent<physics_reference_component>();
 		ref.firstConstraintEdge = edge.nextConstraintEdge;
 	}
+	--ref.numConstraints;
 
 	if (edge.nextConstraintEdge != INVALID_CONSTRAINT_EDGE)
 	{

@@ -40,6 +40,12 @@ inline ref<T> make_ref(Args&&... args)
 	return std::make_shared<T>(std::forward<Args>(args)...); 
 }
 
+template <typename T> struct is_ref : std::false_type {};
+template <typename T> struct is_ref<ref<T>> : std::true_type {};
+
+template <typename T> inline constexpr bool is_ref_v = is_ref<T>::value;
+
+
 template <typename T>
 using com = Microsoft::WRL::ComPtr<T>;
 

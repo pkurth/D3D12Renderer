@@ -156,6 +156,13 @@ struct collider_component : collider_union
 		return result;
 	}
 
+	static collider_component fromUnion(const collider_union& u)
+	{
+		collider_component result;
+		memcpy(&result, &u, sizeof(u));
+		return result;
+	}
+
 	collider_component() = default;
 
 	// Set by scene on component creation.
@@ -168,6 +175,7 @@ struct physics_reference_component
 	uint32 numColliders = 0;
 	entity_handle firstColliderEntity = entt::null;
 
+	uint32 numConstraints = 0;
 	uint16 firstConstraintEdge = INVALID_CONSTRAINT_EDGE;
 };
 
@@ -225,6 +233,16 @@ cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity
 	float swingLimit, float twistLimit);
 
 slider_constraint_handle addSliderConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis, float minLimit = 1.f, float maxLimit = -1.f);
+
+
+
+distance_constraint_handle addConstraint(scene_entity& a, scene_entity& b, const distance_constraint& c);
+ball_constraint_handle addConstraint(scene_entity& a, scene_entity& b, const ball_constraint& c);
+fixed_constraint_handle addConstraint(scene_entity& a, scene_entity& b, const fixed_constraint& c);
+hinge_constraint_handle addConstraint(scene_entity& a, scene_entity& b, const hinge_constraint& c);
+cone_twist_constraint_handle addConstraint(scene_entity& a, scene_entity& b, const cone_twist_constraint& c);
+slider_constraint_handle addConstraint(scene_entity& a, scene_entity& b, const slider_constraint& c);
+
 
 
 distance_constraint& getConstraint(game_scene& scene, distance_constraint_handle handle);

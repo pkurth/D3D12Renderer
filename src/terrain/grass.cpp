@@ -336,8 +336,10 @@ struct grass_update_pipeline
 };
 
 
-grass_component::grass_component()
+grass_component::grass_component(grass_settings settings)
 {
+	this->settings = settings;
+
 	uint32 numVerticesLOD0 = numSegmentsLOD0 * 2 + 1;
 	uint32 numVerticesLOD1 = numVerticesLOD0 / 2 + 1;
 

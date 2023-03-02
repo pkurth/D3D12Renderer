@@ -11,7 +11,8 @@
 #include "geometry/mesh.h"
 #include "physics/ragdoll.h"
 #include "physics/vehicle.h"
-#include "scene/serialization.h"
+#include "scene/serialization_yaml.h"
+#include "scene/serialization_binary.h"
 #include "audio/audio.h"
 #include "rendering/debug_visualization.h"
 #include "terrain/terrain.h"
@@ -122,6 +123,44 @@ private:
 	value_t before;
 };
 
+struct entity_existence_undo
+{
+	entity_existence_undo(game_scene& scene, scene_entity entity)
+		: scene(scene), entity(entity)
+	{
+		size = serializeEntityToMemory(entity, buffer, sizeof(buffer));
+	}
+
+	void toggle()
+	{
+		if (entity.valid())	{ deleteEntity(); }
+		else { restoreEntity(); }
+	}
+
+private:
+	void deleteEntity()
+	{
+		size = serializeEntityToMemory(entity, buffer, sizeof(buffer));
+		scene.deleteEntity(entity);
+	}
+
+	void restoreEntity()
+	{
+		entity_handle place = entity.handle;
+		entity = scene.tryCreateEntityInPlace(entity, "");
+		assert(entity.handle == place);
+
+		bool success = deserializeEntityFromMemory(entity, buffer, size);
+		assert(success);
+	}
+
+	game_scene& scene;
+	scene_entity entity;
+	uint8 buffer[1024];
+	uint64 size;
+};
+
+
 #define UNDOABLE_COMPONENT_SETTING(undoLabel, val, command, ...)																					\
 	{																																				\
 		using val_t = std::decay_t<decltype(val)>;																									\
@@ -173,17 +212,6 @@ void scene_editor::updateSelectedEntityUIRotation()
 }
 
 void scene_editor::setSelectedEntity(scene_entity entity)
-{
-	auto before = selectedEntity;
-	setSelectedEntityNoUndo(entity);
-
-	if (before != entity)
-	{
-		undoStack.pushAction("entity selection", settings_undo<scene_entity>(selectedEntity, before));
-	}
-}
-
-void scene_editor::setSelectedEntityNoUndo(scene_entity entity)
 {
 	selectedEntity = entity;
 	updateSelectedEntityUIRotation();
@@ -254,7 +282,7 @@ bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPas
 	// Clear selected entity, if it became invalid (e.g. if it was deleted).
 	if (selectedEntity && !scene.isEntityValid(selectedEntity))
 	{
-		setSelectedEntityNoUndo({});
+		setSelectedEntity({});
 	}
 
 	bool objectChanged = false;
@@ -271,7 +299,7 @@ bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPas
 	// This is triggered on undo.
 	if (selectedEntity != selectedEntityBefore)
 	{
-		setSelectedEntityNoUndo(selectedEntity);
+		setSelectedEntity(selectedEntity);
 	}
 
 
@@ -729,8 +757,9 @@ bool scene_editor::drawSceneHierarchy()
 				{
 					if (entity == selectedEntity)
 					{
-						setSelectedEntityNoUndo({});
+						setSelectedEntity({});
 					}
+					undoStack.pushAction("entity deletion", entity_existence_undo(scene, entity));
 					scene.deleteEntity(entity);
 				}
 				ImGui::PopID();
@@ -774,8 +803,9 @@ bool scene_editor::drawSceneHierarchy()
 				ImGui::SameLine();
 				if (ImGui::Button(ICON_FA_TRASH_ALT))
 				{
+					undoStack.pushAction("entity deletion", entity_existence_undo(scene, selectedEntity));
 					scene.deleteEntity(selectedEntity);
-					setSelectedEntityNoUndo({});
+					setSelectedEntity({});
 					objectMovedByWidget = true;
 				}
 				if (ImGui::IsItemHovered())
@@ -1924,6 +1954,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 			if (ImGui::IsKeyPressed(key_backspace) || ImGui::IsKeyPressed(key_delete))
 			{
 				// Delete entity.
+				undoStack.pushAction("entity deletion", entity_existence_undo(*scene, selectedEntity));
 				scene->deleteEntity(selectedEntity);
 				setSelectedEntity({});
 				inputCaptured = true;
@@ -1954,7 +1985,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		if (ImGui::IconButton(imgui_icon_play, imgui_icon_play, IMGUI_ICON_DEFAULT_SIZE, this->scene->isPlayable()))
 		{
 			this->scene->play();
-			setSelectedEntityNoUndo({});
+			setSelectedEntity({});
 		}
 		ImGui::SameLine(0.f, IMGUI_ICON_DEFAULT_SPACING);
 		if (ImGui::IconButton(imgui_icon_pause, imgui_icon_pause, IMGUI_ICON_DEFAULT_SIZE, this->scene->isPausable()))
@@ -1966,7 +1997,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		{
 			this->scene->stop();
 			this->scene->environment.forceUpdate(this->scene->sun.direction);
-			setSelectedEntityNoUndo({});
+			setSelectedEntity({});
 		}
 
 		scene = &this->scene->getCurrentScene();
@@ -1993,7 +2024,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 		}
 		if (!inputCaptured && ImGui::IsKeyDown(key_ctrl) && ImGui::IsKeyPressed('S'))
 		{
-			serializeSceneToDisk(*this->scene, renderer->settings);
+			serializeToFile();
 			inputCaptured = true;
 			ImGui::GetIO().KeysDown['S'] = false; // Hack: Window does not get notified of inputs due to the file dialog.
 		}
@@ -2063,6 +2094,8 @@ bool scene_editor::drawEntityCreationPopup()
 					512u
 					);
 
+			undoStack.pushAction("entity creation", entity_existence_undo(*scene, pl));
+
 			setSelectedEntity(pl);
 			clicked = true;
 		}
@@ -2081,6 +2114,8 @@ bool scene_editor::drawEntityCreationPopup()
 					512u
 					);
 
+			undoStack.pushAction("entity creation", entity_existence_undo(*scene, sl));
+
 			setSelectedEntity(sl);
 			clicked = true;
 		}
@@ -2093,6 +2128,8 @@ bool scene_editor::drawEntityCreationPopup()
 				.addComponent<transform_component>(camera.position + camera.rotation * vec3(0.f, 0.f, -3.f), camera.rotation)
 				.addComponent<cloth_component>(10.f, 10.f, 20u, 20u, 8.f)
 				.addComponent<cloth_render_component>();
+
+			undoStack.pushAction("entity creation", entity_existence_undo(*scene, cloth));
 
 			setSelectedEntity(cloth);
 			clicked = true;
@@ -2125,17 +2162,17 @@ bool scene_editor::drawEntityCreationPopup()
 
 void scene_editor::serializeToFile()
 {
-	serializeSceneToDisk(*scene, renderer->settings);
+	serializeSceneToYAMLFile(*scene, renderer->settings);
 }
 
 bool scene_editor::deserializeFromFile()
 {
 	std::string environmentName;
-	if (deserializeSceneFromDisk(*scene, renderer->settings, environmentName))
+	if (deserializeSceneFromYAMLFile(*scene, renderer->settings, environmentName))
 	{
 		scene->stop();
 
-		setSelectedEntityNoUndo({});
+		setSelectedEntity({});
 		scene->environment.setFromTexture(environmentName);
 		scene->environment.forceUpdate(this->scene->sun.direction);
 		renderer->pathTracer.resetRendering();

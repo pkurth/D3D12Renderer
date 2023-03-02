@@ -12,6 +12,7 @@
 #include "terrain/terrain.h"
 #include "terrain/proc_placement.h"
 #include "terrain/grass.h"
+#include "terrain/water.h"
 #endif
 
 struct game_scene;
@@ -231,6 +232,12 @@ struct game_scene
 	scene_entity createEntity(const char* name)
 	{
 		return scene_entity(registry.create(), &registry)
+			.addComponent<tag_component>(name);
+	}
+
+	scene_entity tryCreateEntityInPlace(scene_entity place, const char* name)
+	{
+		return scene_entity(registry.create(place.handle), &registry)
 			.addComponent<tag_component>(name);
 	}
 

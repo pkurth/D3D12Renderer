@@ -47,6 +47,7 @@ void game_scene::cloneTo(game_scene& target)
 		terrain_component,
 		grass_component,
 		proc_placement_component,
+		water_component,
 #endif
 		heightmap_collider_component,
 

@@ -10,45 +10,54 @@ static void renderStaticGeometryToSunShadowMap(sun_shadow_render_pass* renderPas
 	for (auto [entityHandle, raster, transform] : 
 		scene.group(entt::get<raster_component, transform_component>, entt::exclude<dynamic_transform_component>).each())
 	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (auto& sm : raster.mesh->submeshes)
+		if (raster.mesh)
 		{
-			shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
-			renderPass->renderStaticObject<shadow_pipeline::single_sided>(0, data);
+			const dx_mesh& mesh = raster.mesh->mesh;
+			mat4 m = trsToMat4(transform);
+
+			for (auto& sm : raster.mesh->submeshes)
+			{
+				shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
+				renderPass->renderStaticObject<shadow_pipeline::single_sided>(0, data);
+			}
 		}
 	}
 }
 
 static void renderDynamicGeometryToSunShadowMap(sun_shadow_render_pass* renderPass, game_scene& scene)
 {
-	for (auto [entityHandle, raster, transform, dynamic] : 
+	for (auto [entityHandle, raster, transform, dynamic] :
 		scene.group(entt::get<raster_component, transform_component, dynamic_transform_component>, entt::exclude<animation_component>).each())
 	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (auto& sm : raster.mesh->submeshes)
+		if (raster.mesh)
 		{
-			shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
-			renderPass->renderDynamicObject<shadow_pipeline::single_sided>(0, data);
+			const dx_mesh& mesh = raster.mesh->mesh;
+			mat4 m = trsToMat4(transform);
+
+			for (auto& sm : raster.mesh->submeshes)
+			{
+				shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
+				renderPass->renderDynamicObject<shadow_pipeline::single_sided>(0, data);
+			}
 		}
 	}
 
 	for (auto [entityHandle, raster, anim, transform, dynamic] :
 		scene.group(entt::get<raster_component, animation_component, transform_component, dynamic_transform_component>).each())
 	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (uint32 i = 0; i < (uint32)raster.mesh->submeshes.size(); ++i)
+		if (raster.mesh)
 		{
-			auto submesh = raster.mesh->submeshes[i].info;
-			submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
-			
-			shadow_render_data data = { m, anim.currentVertexBuffer.positions, mesh.indexBuffer, submesh };
-			renderPass->renderDynamicObject<shadow_pipeline::single_sided>(0, data);
+			const dx_mesh& mesh = raster.mesh->mesh;
+			mat4 m = trsToMat4(transform);
+
+			for (auto& sm : raster.mesh->submeshes)
+			{
+				auto submesh = sm.info;
+				submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
+
+				shadow_render_data data = { m, anim.currentVertexBuffer.positions, mesh.indexBuffer, submesh };
+				renderPass->renderDynamicObject<shadow_pipeline::single_sided>(0, data);
+			}
 		}
 	}
 }
@@ -58,13 +67,16 @@ static void renderStaticGeometryToSpotShadowMap(spot_shadow_render_pass* renderP
 	for (auto [entityHandle, raster, transform] : 
 		scene.group(entt::get<raster_component, transform_component>, entt::exclude<dynamic_transform_component>).each())
 	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (auto& sm : raster.mesh->submeshes)
+		if (raster.mesh)
 		{
-			shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
-			renderPass->renderStaticObject<shadow_pipeline::single_sided>(data);
+			const dx_mesh& mesh = raster.mesh->mesh;
+			mat4 m = trsToMat4(transform);
+
+			for (auto& sm : raster.mesh->submeshes)
+			{
+				shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
+				renderPass->renderStaticObject<shadow_pipeline::single_sided>(data);
+			}
 		}
 	}
 }
@@ -74,29 +86,35 @@ static void renderDynamicGeometryToSpotShadowMap(spot_shadow_render_pass* render
 	for (auto [entityHandle, raster, transform, dynamic] : 
 		scene.group(entt::get<raster_component, transform_component, dynamic_transform_component>, entt::exclude<animation_component>).each())
 	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (auto& sm : raster.mesh->submeshes)
+		if (raster.mesh)
 		{
-			shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
-			renderPass->renderDynamicObject<shadow_pipeline::single_sided>(data);
+			const dx_mesh& mesh = raster.mesh->mesh;
+			mat4 m = trsToMat4(transform);
+
+			for (auto& sm : raster.mesh->submeshes)
+			{
+				shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
+				renderPass->renderDynamicObject<shadow_pipeline::single_sided>(data);
+			}
 		}
 	}
 
 	for (auto [entityHandle, raster, anim, transform, dynamic] : 
 		scene.group(entt::get<raster_component, animation_component, transform_component, dynamic_transform_component>).each())
 	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (uint32 i = 0; i < (uint32)raster.mesh->submeshes.size(); ++i)
+		if (raster.mesh)
 		{
-			auto submesh = raster.mesh->submeshes[i].info;
-			submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
+			const dx_mesh& mesh = raster.mesh->mesh;
+			mat4 m = trsToMat4(transform);
 
-			shadow_render_data data = { m, anim.currentVertexBuffer.positions, mesh.indexBuffer, submesh };
-			renderPass->renderDynamicObject<shadow_pipeline::single_sided>(data);
+			for (auto& sm : raster.mesh->submeshes)
+			{
+				auto submesh = sm.info;
+				submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
+
+				shadow_render_data data = { m, anim.currentVertexBuffer.positions, mesh.indexBuffer, submesh };
+				renderPass->renderDynamicObject<shadow_pipeline::single_sided>(data);
+			}
 		}
 	}
 }
@@ -106,13 +124,16 @@ static void renderStaticGeometryToPointShadowMap(point_shadow_render_pass* rende
 	for (auto [entityHandle, raster, transform] : 
 		scene.group(entt::get<raster_component, transform_component>, entt::exclude<dynamic_transform_component>).each())
 	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (auto& sm : raster.mesh->submeshes)
+		if (raster.mesh)
 		{
-			shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
-			renderPass->renderStaticObject<point_shadow_pipeline::single_sided>(data);
+			const dx_mesh& mesh = raster.mesh->mesh;
+			mat4 m = trsToMat4(transform);
+
+			for (auto& sm : raster.mesh->submeshes)
+			{
+				shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
+				renderPass->renderStaticObject<point_shadow_pipeline::single_sided>(data);
+			}
 		}
 	}
 }
@@ -122,29 +143,35 @@ static void renderDynamicGeometryToPointShadowMap(point_shadow_render_pass* rend
 	for (auto [entityHandle, raster, transform, dynamic] : 
 		scene.group(entt::get<raster_component, transform_component, dynamic_transform_component>, entt::exclude<animation_component>).each())
 	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (auto& sm : raster.mesh->submeshes)
+		if (raster.mesh)
 		{
-			shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
-			renderPass->renderDynamicObject<point_shadow_pipeline::single_sided>(data);
+			const dx_mesh& mesh = raster.mesh->mesh;
+			mat4 m = trsToMat4(transform);
+
+			for (auto& sm : raster.mesh->submeshes)
+			{
+				shadow_render_data data = { m, mesh.vertexBuffer.positions, mesh.indexBuffer, sm.info };
+				renderPass->renderDynamicObject<point_shadow_pipeline::single_sided>(data);
+			}
 		}
 	}
 
 	for (auto [entityHandle, raster, anim, transform, dynamic] : 
 		scene.group(entt::get<raster_component, animation_component, transform_component, dynamic_transform_component>).each())
 	{
-		const dx_mesh& mesh = raster.mesh->mesh;
-		mat4 m = trsToMat4(transform);
-
-		for (uint32 i = 0; i < (uint32)raster.mesh->submeshes.size(); ++i)
+		if (raster.mesh)
 		{
-			auto submesh = raster.mesh->submeshes[i].info;
-			submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
+			const dx_mesh& mesh = raster.mesh->mesh;
+			mat4 m = trsToMat4(transform);
 
-			shadow_render_data data = { m, anim.currentVertexBuffer.positions, mesh.indexBuffer, submesh };
-			renderPass->renderDynamicObject<point_shadow_pipeline::single_sided>(data);
+			for (auto& sm : raster.mesh->submeshes)
+			{
+				auto submesh = sm.info;
+				submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
+
+				shadow_render_data data = { m, anim.currentVertexBuffer.positions, mesh.indexBuffer, submesh };
+				renderPass->renderDynamicObject<point_shadow_pipeline::single_sided>(data);
+			}
 		}
 	}
 }

@@ -8,7 +8,8 @@ struct undo_stack
 	undo_stack();
 
 	template <typename T>
-	void pushAction(const char* name, const T& entry); // Type T must have member functions void undo() and void redo().
+	void pushAction(const char* name, const T& entry); // Type T must have member function void toggle().
+
 
 	std::pair<bool, const char*> undoPossible();
 	std::pair<bool, const char*> redoPossible();
@@ -23,7 +24,7 @@ struct undo_stack
 private:
 	typedef void (*toggle_func)(void*);
 
-	void pushAction(const char* name, const void* entry, uint64 dataSize, toggle_func toggle);
+	void pushAction(const char* name, const void* entry, uint64 entrySize, toggle_func toggle);
 	struct alignas(16) entry_header
 	{
 		toggle_func toggle;
@@ -32,7 +33,7 @@ private:
 		entry_header* older;
 
 		const char* name;
-		uint64 dataSize;
+		uint64 entrySize;
 	};
 
 	uint8* memory;

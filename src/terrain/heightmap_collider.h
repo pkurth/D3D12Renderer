@@ -134,17 +134,17 @@ struct heightmap_collider_component
 	heightmap_collider_chunk& collider(uint32 x, uint32 z) { return colliders[z * chunksPerDim + x]; }
 	const heightmap_collider_chunk& collider(uint32 x, uint32 z) const { return colliders[z * chunksPerDim + x]; }
 
+	uint32 chunksPerDim;
+	float chunkSize;
 	physics_material material;
 
 private:
 	vec3 minCorner;
 	float invAmplitudeScale = 1.f;
-	float chunkSize;
 	float invChunkSize;
 	float chunkScale;
 	float heightScale = 0.f;
 
-	uint32 chunksPerDim;
 	std::vector<heightmap_collider_chunk> colliders;
 };
 

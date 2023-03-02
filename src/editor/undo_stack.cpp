@@ -9,9 +9,9 @@ undo_stack::undo_stack()
 	reset();
 }
 
-void undo_stack::pushAction(const char* name, const void* entry, uint64 dataSize, toggle_func toggle)
+void undo_stack::pushAction(const char* name, const void* entry, uint64 entrySize, toggle_func toggle)
 {
-	uint64 requiredSpace = dataSize + sizeof(entry_header);
+	uint64 requiredSpace = sizeof(entry_header) + entrySize;
 	uint64 availableSpaceAtEnd = memory + memorySize - nextToWrite;
 
 	uint8* address;
@@ -37,7 +37,7 @@ void undo_stack::pushAction(const char* name, const void* entry, uint64 dataSize
 		while (true)
 		{
 			void* oldestBegin = oldest;
-			void* oldestEnd = (uint8*)(oldest + 1) + oldest->dataSize;
+			void* oldestEnd = (uint8*)(oldest + 1) + oldest->entrySize;
 
 			if (rangesOverlap(address, end, oldestBegin, oldestEnd))
 			{
@@ -72,12 +72,11 @@ void undo_stack::pushAction(const char* name, const void* entry, uint64 dataSize
 
 	header->newer = 0;
 
-	header->toggle = toggle;
-
 	header->name = name;
-	header->dataSize = dataSize;
+	header->toggle = toggle;
+	header->entrySize = entrySize;
 
-	memcpy(data, entry, dataSize);
+	memcpy(data, entry, entrySize);
 
 	nextToWrite = end;
 }
@@ -110,7 +109,7 @@ void undo_stack::undo()
 		newest = newest->older;
 		if (newest)
 		{
-			nextToWrite = (uint8*)alignTo(((uint8*)data + newest->dataSize), 16);
+			nextToWrite = (uint8*)alignTo(((uint8*)data + newest->entrySize), 16);
 		}
 		else
 		{
@@ -130,7 +129,7 @@ void undo_stack::redo()
 		void* data = (newest + 1);
 		newest->toggle(data);
 
-		nextToWrite = (uint8*)alignTo(((uint8*)data + newest->dataSize), 16);
+		nextToWrite = (uint8*)alignTo(((uint8*)data + newest->entrySize), 16);
 	}
 
 	if (!newest && oldest)
@@ -138,7 +137,7 @@ void undo_stack::redo()
 		void* data = (oldest + 1);
 		oldest->toggle(data);
 
-		nextToWrite = (uint8*)alignTo(((uint8*)data + oldest->dataSize), 16);
+		nextToWrite = (uint8*)alignTo(((uint8*)data + oldest->entrySize), 16);
 		newest = oldest;
 	}
 }

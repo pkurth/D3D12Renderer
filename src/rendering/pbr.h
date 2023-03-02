@@ -89,4 +89,8 @@ struct pbr_pipeline::transparent : pbr_pipeline
 ref<pbr_material> createPBRMaterial(const fs::path& albedoTex, const fs::path& normalTex, const fs::path& roughTex, const fs::path& metallicTex,
 	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f, bool doubleSided = false, 
 	float uvScale = 1.f, bool disableTextureCompression = false);
+ref<pbr_material> createPBRMaterial(const ref<dx_texture>& albedoTex, const ref<dx_texture>& normalTex, const ref<dx_texture>& roughTex, const ref<dx_texture>& metallicTex,
+	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f, bool doubleSided = false,
+	float uvScale = 1.f);
+
 ref<pbr_material> getDefaultPBRMaterial();

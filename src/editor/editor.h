@@ -39,7 +39,6 @@ private:
 	void updateSelectedEntityUIRotation();
 
 	void setSelectedEntity(scene_entity entity);
-	void setSelectedEntityNoUndo(scene_entity entity);
 
 
 	bool editCamera(render_camera& camera);

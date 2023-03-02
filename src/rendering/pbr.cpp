@@ -134,6 +134,34 @@ ref<pbr_material> createPBRMaterial(
 	return sp;
 }
 
+ref<pbr_material> createPBRMaterial(
+	const ref<dx_texture>& albedoTex, 
+	const ref<dx_texture>& normalTex, 
+	const ref<dx_texture>& roughTex, 
+	const ref<dx_texture>& metallicTex, 
+	const vec4& emission, 
+	const vec4& albedoTint,
+	float roughOverride, 
+	float metallicOverride, 
+	bool doubleSided, 
+	float uvScale)
+{
+	ref<pbr_material> material = make_ref<pbr_material>();
+
+	material->albedo = albedoTex;
+	material->normal = normalTex;
+	material->roughness = roughTex;
+	material->metallic = metallicTex;
+	material->emission = emission;
+	material->albedoTint = albedoTint;
+	material->roughnessOverride = roughOverride;
+	material->metallicOverride = metallicOverride;
+	material->doubleSided = doubleSided;
+	material->uvScale = uvScale;
+
+	return material;
+}
+
 ref<pbr_material> getDefaultPBRMaterial()
 {
 	static ref<pbr_material> material = make_ref<pbr_material>(nullptr, nullptr, nullptr, nullptr, vec4(0.f), vec4(1.f, 0.f, 1.f, 1.f), 1.f, 0.f, false, 1.f);

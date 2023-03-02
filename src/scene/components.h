@@ -15,6 +15,9 @@ struct tag_component
 		name[sizeof(name) - 1] = 0;
 	}
 };
+REFLECT_STRUCT(tag_component,
+	(name, "Name")
+);
 
 struct transform_component : trs
 {

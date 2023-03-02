@@ -38,7 +38,8 @@ struct pbr_environment
 
 	light_probe_grid lightProbeGrid;
 
-private:
+
+
 	static const uint32 skyResolution = 2048;
 	static const uint32 irradianceResolution = 32;
 	static const uint32 prefilteredRadianceResolution = 128;
