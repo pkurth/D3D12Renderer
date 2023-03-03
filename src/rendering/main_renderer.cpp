@@ -211,6 +211,8 @@ void main_renderer::recalculateViewport(bool resizeTextures)
 	{
 		renderWidth = windowWidth;
 		renderHeight = windowHeight;
+		windowXOffset = 0;
+		windowYOffset = 0;
 	}
 	else
 	{
