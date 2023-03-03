@@ -157,6 +157,13 @@ bool undo_stack::showHistory(bool& open)
 	{
 		if (ImGui::Begin(ICON_FA_HISTORY "  Undo history", &open))
 		{
+			if (ImGui::Button("Clear history"))
+			{
+				reset();
+			}
+
+			ImGui::Separator();
+
 			bool currentFound = false;
 
 			bool clicked = false;
