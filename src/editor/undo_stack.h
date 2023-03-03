@@ -32,8 +32,23 @@ private:
 		entry_header* newer;
 		entry_header* older;
 
-		const char* name;
+		uint64 nameLength; // Includes null-terminator.
 		uint64 entrySize;
+
+		char* getName() const
+		{
+			return (char*)(this + 1);
+		}
+
+		void* getData()
+		{
+			return (uint8*)getName() + nameLength;
+		}
+
+		void* getOneAfterEnd()
+		{
+			return (uint8*)getData() + entrySize;
+		}
 	};
 
 	uint8* memory;

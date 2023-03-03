@@ -22,7 +22,6 @@ private:
 	struct undo_buffer
 	{
 		uint8 before[128];
-
 		template <typename T> inline T& as() { return *(T*)before; }
 	};
 
@@ -55,6 +54,12 @@ private:
 
 	void serializeToFile();
 	bool deserializeFromFile();
+
+
+	template <typename value_t, typename action_t, typename... args_t>
+	void undoable(const char* undoLabel, value_t before, value_t& now, args_t... args);
+
+
 
 	editor_scene* scene;
 	main_renderer* renderer;

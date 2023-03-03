@@ -21,6 +21,7 @@
 #include "terrain/water.h"
 
 #include <fontawesome/list.h>
+#include <sstream>
 
 
 
@@ -46,7 +47,7 @@ static quat getQuat(vec3 euler)
 template <typename component_t, typename member_t>
 struct component_member_undo
 {
-	component_member_undo(scene_entity entity, member_t& member, member_t before, void (*callback)(component_t&, member_t, void*) = 0, void* userData = 0)
+	component_member_undo(member_t& member, member_t before, scene_entity entity, void (*callback)(component_t&, member_t, void*) = 0, void* userData = 0)
 	{
 		this->entity = entity;
 		this->byteOffset = (uint8*)&member - (uint8*)&entity.getComponent<component_t>();
@@ -161,45 +162,48 @@ private:
 };
 
 
-#define UNDOABLE_COMPONENT_SETTING(undoLabel, val, command, ...)																					\
-	{																																				\
-		using val_t = std::decay_t<decltype(val)>;																									\
-		val_t before = val;																															\
-		command;																																	\
-		if (ImGui::IsItemActive() && !ImGui::IsItemActiveLastFrame())																				\
-		{																																			\
-			currentUndoBuffer->as<val_t>() = before;																								\
-		}																																			\
-		bool changed = ImGui::IsItemDeactivatedAfterEdit();																							\
-		if constexpr (std::is_enum_v<val_t> || std::is_integral_v<val_t>)																			\
-		{																																			\
-			changed |= (!ImGui::IsItemActive() && (before != val));																					\
-		}																																			\
-		if (changed)																																\
-		{																																			\
-			currentUndoStack->pushAction(undoLabel,																									\
-				component_member_undo<component_t, val_t>(selectedEntity, val, currentUndoBuffer->as<val_t>(), __VA_ARGS__));						\
-		}																																			\
+
+template <typename value_t, typename action_t, typename... args_t>
+void scene_editor::undoable(const char* undoLabel, value_t before, value_t& value, 
+	args_t... args)
+{
+	if (ImGui::IsItemActive() && !ImGui::IsItemActiveLastFrame())
+	{
+		currentUndoBuffer->as<value_t>() = before;
 	}
 
-#define UNDOABLE_SETTING(undoLabel, val, command)																									\
-	{																																				\
-		using val_t = std::decay_t<decltype(val)>;																									\
-		val_t before = val;																															\
-		command;																																	\
-		if (ImGui::IsItemActive() && !ImGui::IsItemActiveLastFrame())																				\
-		{																																			\
-			currentUndoBuffer->as<val_t>() = before;																								\
-		}																																			\
-		bool changed = ImGui::IsItemDeactivatedAfterEdit();																							\
-		if constexpr (std::is_enum_v<val_t> || std::is_integral_v<val_t>)																			\
-		{																																			\
-			changed |= (!ImGui::IsItemActive() && (before != val));																					\
-		}																																			\
-		if (changed)																																\
-		{																																			\
-			currentUndoStack->pushAction(undoLabel, settings_undo<val_t>(val, currentUndoBuffer->as<val_t>()));										\
-		}																																			\
+	bool changed = ImGui::IsItemDeactivatedAfterEdit();
+	if constexpr (std::is_enum_v<value_t> || std::is_integral_v<value_t>)
+	{
+		changed |= (!ImGui::IsItemActive() && (before != value));
+	}
+
+	if (changed)
+	{
+		std::stringstream s;
+		s << std::setprecision(4) << std::boolalpha;
+		s << undoLabel << " from " << currentUndoBuffer->as<value_t>() << " to " << value;
+		action_t action(value, currentUndoBuffer->as<value_t>(), std::forward<args_t>(args)...);
+		currentUndoStack->pushAction(s.str().c_str(), action);
+	}
+}
+
+#define UNDOABLE_COMPONENT_SETTING(undoLabel, val, command, ...)					\
+	{																				\
+		using value_t = std::decay_t<decltype(val)>;								\
+		value_t before = val;														\
+		command;																	\
+		undoable<value_t, component_member_undo<component_t, value_t>>(undoLabel,	\
+			before, val, selectedEntity, __VA_ARGS__);								\
+	}
+
+#define UNDOABLE_SETTING(undoLabel, val, command)									\
+	{																				\
+		using value_t = std::decay_t<decltype(val)>;								\
+		value_t before = val;														\
+		command;																	\
+		undoable<value_t, settings_undo<value_t>>(undoLabel,						\
+			before, val);															\
 	}
 
 
@@ -808,7 +812,7 @@ bool scene_editor::drawSceneHierarchy()
 							{
 								transform.rotation = getQuat(selectedEntityEulerRotation);
 								objectMovedByWidget = true;
-							}, [](transform_component&, quat rot, void* userData) { *(vec3*)userData = getEuler(rot); }, & selectedEntityEulerRotation);
+							}, [](transform_component&, quat rot, void* userData) { *(vec3*)userData = getEuler(rot); }, &selectedEntityEulerRotation);
 						UNDOABLE_COMPONENT_SETTING("entity scale", transform.scale,
 							objectMovedByWidget |= ImGui::Drag("Scale", transform.scale, 0.1f));
 					});

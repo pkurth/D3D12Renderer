@@ -11,7 +11,9 @@ undo_stack::undo_stack()
 
 void undo_stack::pushAction(const char* name, const void* entry, uint64 entrySize, toggle_func toggle)
 {
-	uint64 requiredSpace = sizeof(entry_header) + entrySize;
+	uint64 nameLength = strlen(name) + 1;
+	uint64 alignedNameLength = alignTo(nameLength, 16);
+	uint64 requiredSpace = sizeof(entry_header) + alignedNameLength + entrySize;
 	uint64 availableSpaceAtEnd = memory + memorySize - nextToWrite;
 
 	uint8* address;
@@ -37,7 +39,7 @@ void undo_stack::pushAction(const char* name, const void* entry, uint64 entrySiz
 		while (true)
 		{
 			void* oldestBegin = oldest;
-			void* oldestEnd = (uint8*)(oldest + 1) + oldest->entrySize;
+			void* oldestEnd = oldest->getOneAfterEnd();
 
 			if (rangesOverlap(address, end, oldestBegin, oldestEnd))
 			{
@@ -57,7 +59,10 @@ void undo_stack::pushAction(const char* name, const void* entry, uint64 entrySiz
 
 
 	entry_header* header = (entry_header*)address;
-	void* data = (header + 1);
+	header->nameLength = alignedNameLength;
+	
+	char* thisName = header->getName();
+	memcpy(thisName, name, nameLength);
 
 	header->older = newest;
 	if (newest)
@@ -72,10 +77,10 @@ void undo_stack::pushAction(const char* name, const void* entry, uint64 entrySiz
 
 	header->newer = 0;
 
-	header->name = name;
 	header->toggle = toggle;
 	header->entrySize = entrySize;
 
+	void* data = header->getData();
 	memcpy(data, entry, entrySize);
 
 	nextToWrite = end;
@@ -86,7 +91,7 @@ std::pair<bool, const char*> undo_stack::undoPossible()
 	return 
 	{ 
 		newest != 0, 
-		newest ? newest->name : 0 
+		newest ? newest->getName() : 0 
 	};
 }
 
@@ -95,7 +100,7 @@ std::pair<bool, const char*> undo_stack::redoPossible()
 	return 
 	{ 
 		newest && newest->newer || !newest && oldest,
-		(newest && newest->newer) ? newest->newer->name : (!newest && oldest) ? oldest->name : 0 
+		(newest && newest->newer) ? newest->newer->getName() : (!newest && oldest) ? oldest->getName() : 0
 	};
 }
 
@@ -103,7 +108,7 @@ void undo_stack::undo()
 {
 	if (newest)
 	{
-		void* data = (newest + 1);
+		void* data = newest->getData();
 		newest->toggle(data);
 
 		newest = newest->older;
@@ -126,7 +131,7 @@ void undo_stack::redo()
 	{
 		newest = newest->newer;
 
-		void* data = (newest + 1);
+		void* data = newest->getData();
 		newest->toggle(data);
 
 		nextToWrite = (uint8*)alignTo(((uint8*)data + newest->entrySize), 16);
@@ -134,7 +139,7 @@ void undo_stack::redo()
 
 	if (!newest && oldest)
 	{
-		void* data = (oldest + 1);
+		void* data = oldest->getData();
 		oldest->toggle(data);
 
 		nextToWrite = (uint8*)alignTo(((uint8*)data + oldest->entrySize), 16);
@@ -157,7 +162,7 @@ bool undo_stack::showHistory(bool& open)
 	{
 		if (ImGui::Begin(ICON_FA_HISTORY "  Undo history", &open))
 		{
-			if (ImGui::DisableableButton("Clear history", newest != 0))
+			if (ImGui::DisableableButton("Clear history", oldest != 0))
 			{
 				reset();
 			}
@@ -186,7 +191,7 @@ bool undo_stack::showHistory(bool& open)
 
 				bool current = entry == newest;
 				currentFound |= current;
-				if (ImGui::Selectable(entry->name, current) && !current)
+				if (ImGui::Selectable(entry->getName(), current) && !current)
 				{
 					clicked = true;
 					target = entry;
