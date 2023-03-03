@@ -157,7 +157,7 @@ bool undo_stack::showHistory(bool& open)
 	{
 		if (ImGui::Begin(ICON_FA_HISTORY "  Undo history", &open))
 		{
-			if (ImGui::Button("Clear history"))
+			if (ImGui::DisableableButton("Clear history", newest != 0))
 			{
 				reset();
 			}
