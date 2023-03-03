@@ -9,8 +9,6 @@
 
 
 
-bool soundEditorWindowOpen = false;
-
 
 static std::unordered_map<uint64, sound_spec> soundRegistry;
 static const fs::path registryPath = fs::path(L"resources/sounds.yaml").lexically_normal();
@@ -59,11 +57,11 @@ static void saveSoundRegistry()
     fout << out;
 }
 
-void drawSoundEditor()
+void drawSoundEditor(bool& open)
 {
-    if (soundEditorWindowOpen)
+    if (open)
     {
-        if (ImGui::Begin(EDITOR_ICON_AUDIO "  Sound Editing", &soundEditorWindowOpen))
+        if (ImGui::Begin(EDITOR_ICON_AUDIO "  Sound Editing", &open))
         {
             static ImGuiTextFilter filter;
             filter.Draw();

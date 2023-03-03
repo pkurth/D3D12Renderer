@@ -149,23 +149,64 @@ void undo_stack::reset()
 	newest = 0;
 }
 
-void undo_stack::display()
+bool undo_stack::showHistory(bool& open)
 {
-	if (ImGui::Begin("Undo stack"))
+	bool result = false;
+
+	if (open)
 	{
-		for (auto entry = oldest; entry; entry = entry->newer)
+		if (ImGui::Begin(ICON_FA_HISTORY "  Undo history", &open))
 		{
-			if (entry == newest)
+			bool currentFound = false;
+
+			bool clicked = false;
+			entry_header* target = 0;
+			int32 direction = 0;
+
+			bool current = !newest;
+			currentFound |= current;
+			if (ImGui::Selectable("no changes##UndoHistory", current) && !current)
 			{
-				ImGui::TextColored(ImVec4(1, 1, 0, 1), entry->name);
+				clicked = true;
+				target = 0;
+				direction = -1;
 			}
-			else
+
+
+			for (entry_header* entry = oldest; entry; entry = entry->newer)
 			{
-				ImGui::Text(entry->name);
+				ImGui::PushID(entry);
+
+				bool current = entry == newest;
+				currentFound |= current;
+				if (ImGui::Selectable(entry->name, current) && !current)
+				{
+					clicked = true;
+					target = entry;
+					direction = currentFound ? 1 : -1;
+				}
+
+				ImGui::PopID();
+			}
+
+			assert(currentFound);
+
+			if (clicked)
+			{
+				assert(direction != 0);
+
+				while (newest != target)
+				{
+					(direction == 1) ? redo() : undo();
+				}
+
+				result = true;
 			}
 		}
+		ImGui::End();
 	}
-	ImGui::End();
+
+	return result;
 }
 
 void undo_stack::verify()

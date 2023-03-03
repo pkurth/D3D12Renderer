@@ -55,7 +55,7 @@ struct component_member_undo
 		this->userData = userData;
 	}
 
-	void toggle() 
+	void toggle()
 	{
 		if (entity.valid())
 		{
@@ -89,7 +89,7 @@ struct component_undo
 		this->before = std::make_tuple(before...);
 	}
 
-	void toggle() 
+	void toggle()
 	{
 		if (entity.valid())
 		{
@@ -133,7 +133,7 @@ struct entity_existence_undo
 
 	void toggle()
 	{
-		if (entity.valid())	{ deleteEntity(); }
+		if (entity.valid()) { deleteEntity(); }
 		else { restoreEntity(); }
 	}
 
@@ -170,7 +170,12 @@ private:
 		{																																			\
 			currentUndoBuffer->as<val_t>() = before;																								\
 		}																																			\
-		if (ImGui::IsItemDeactivatedAfterEdit() || (!ImGui::IsItemActive() && (before != val)))														\
+		bool changed = ImGui::IsItemDeactivatedAfterEdit();																							\
+		if constexpr (std::is_enum_v<val_t> || std::is_integral_v<val_t>)																			\
+		{																																			\
+			changed |= (!ImGui::IsItemActive() && (before != val));																					\
+		}																																			\
+		if (changed)																																\
 		{																																			\
 			currentUndoStack->pushAction(undoLabel,																									\
 				component_member_undo<component_t, val_t>(selectedEntity, val, currentUndoBuffer->as<val_t>(), __VA_ARGS__));						\
@@ -186,7 +191,12 @@ private:
 		{																																			\
 			currentUndoBuffer->as<val_t>() = before;																								\
 		}																																			\
-		if (ImGui::IsItemDeactivatedAfterEdit() || (!ImGui::IsItemActive() && (before != val)))														\
+		bool changed = ImGui::IsItemDeactivatedAfterEdit();																							\
+		if constexpr (std::is_enum_v<val_t> || std::is_integral_v<val_t>)																			\
+		{																																			\
+			changed |= (!ImGui::IsItemActive() && (before != val));																					\
+		}																																			\
+		if (changed)																																\
 		{																																			\
 			currentUndoStack->pushAction(undoLabel, settings_undo<val_t>(val, currentUndoBuffer->as<val_t>()));										\
 		}																																			\
@@ -236,48 +246,6 @@ bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPas
 
 	currentUndoStack = &undoStacks[this->scene->mode > 0];
 	currentUndoBuffer = &undoBuffers[this->scene->mode > 0];
-
-#if 0
-	{
-		if (ImGui::Begin("Test"))
-		{
-			if (ImGui::BeginProperties())
-			{
-				uint32 values[] = { 1, 2 };
-				const char* names[] = { "1", "2" };
-
-				static uint32 val = 0;
-				static decltype(val) undo;
-				auto before = val;
-
-
-				//ImGui::PropertyDropdown("Test", names, 2, val);
-				ImGui::PropertyDrag("Test", val);
-
-
-				//if (ImGui::IsItemActivated()) { LOG_MESSAGE("Actived"); }
-				//if (ImGui::IsItemActive()) { LOG_MESSAGE("Active"); }
-				//if (ImGui::IsItemDeactivated()) { LOG_MESSAGE("Deactived"); }
-				//if (ImGui::IsItemToggledOpen()) { LOG_MESSAGE("Toggled open"); }
-
-				if (ImGui::IsItemActive() && !ImGui::IsItemActiveLastFrame())
-				{
-					undo = before;
-				}
-
-				if (ImGui::IsItemDeactivatedAfterEdit()
-					|| (!ImGui::IsItemActive() && (before != val)))
-				{
-					LOG_MESSAGE("CHANGED FROM %u to %u", undo, val);
-				}
-
-				ImGui::EndProperties();
-			}
-		}
-		ImGui::End();
-	}
-#endif
-
 
 	auto selectedEntityBefore = selectedEntity;
 
@@ -361,13 +329,48 @@ bool scene_editor::update(const user_input& input, ldr_render_pass* ldrRenderPas
 			}
 		}
 	}
-	return objectChanged;
+
+	return objectChanged;
+}
+
+static void drawIconsWindow(bool& open)
+{
+	if (open)
+	{
+		if (ImGui::Begin(ICON_FA_ICONS "  Icons", &open))
+		{
+			static ImGuiTextFilter filter;
+			filter.Draw();
+
+			if (ImGui::BeginChild("Icons List"))
+			{
+				for (uint32 i = 0; i < arraysize(awesomeIcons); ++i)
+				{
+					ImGui::PushID(i);
+					if (filter.PassFilter(awesomeIconNames[i]))
+					{
+						ImGui::Text("%s: %s", awesomeIconNames[i], awesomeIcons[i]);
+						ImGui::SameLine();
+						if (ImGui::Button("Copy to clipboard"))
+						{
+							ImGui::SetClipboardText(awesomeIconNames[i]);
+						}
+					}
+					ImGui::PopID();
+				}
+			}
+			ImGui::EndChild();
+		}
+		ImGui::End();
+	}
 }
 
 bool scene_editor::drawMainMenuBar()
 {
 	static bool iconsWindowOpen = false;
 	static bool demoWindowOpen = false;
+	static bool undoWindowOpen = false;
+	static bool soundEditorWindowOpen = false;
 
 	bool objectPotentiallyMoved = false;
 
@@ -394,6 +397,11 @@ bool scene_editor::drawMainMenuBar()
 			{
 				currentUndoStack->redo();
 				objectPotentiallyMoved = true;
+			}
+
+			if (ImGui::MenuItem(undoWindowOpen ? (ICON_FA_HISTORY "  Hide undo history") : (ICON_FA_HISTORY "  Show undo history")))
+			{
+				undoWindowOpen = !undoWindowOpen;
 			}
 			ImGui::Separator();
 
@@ -574,42 +582,14 @@ bool scene_editor::drawMainMenuBar()
 		ImGui::EndPopup();
 	}
 
-
-	if (iconsWindowOpen)
-	{
-		ImGui::Begin(ICON_FA_ICONS "  Icons", &iconsWindowOpen);
-
-		static ImGuiTextFilter filter;
-		filter.Draw();
-
-		ImGui::BeginChild("Icons List");
-		for (uint32 i = 0; i < arraysize(awesomeIcons); ++i)
-		{
-			ImGui::PushID(i);
-			if (filter.PassFilter(awesomeIconNames[i]))
-			{
-				ImGui::Text("%s: %s", awesomeIconNames[i], awesomeIcons[i]);
-				ImGui::SameLine();
-				if (ImGui::Button("Copy to clipboard"))
-				{
-					ImGui::SetClipboardText(awesomeIconNames[i]);
-				}
-			}
-			ImGui::PopID();
-		}
-		ImGui::EndChild();
-		ImGui::End();
-	}
-
 	if (demoWindowOpen)
 	{
 		ImGui::ShowDemoWindow(&demoWindowOpen);
 	}
 
-	if (soundEditorWindowOpen)
-	{
-		drawSoundEditor();
-	}
+	drawIconsWindow(iconsWindowOpen);
+	drawSoundEditor(soundEditorWindowOpen);
+	objectPotentiallyMoved |= currentUndoStack->showHistory(undoWindowOpen);
 
 	return objectPotentiallyMoved;
 }
@@ -903,17 +883,17 @@ bool scene_editor::drawSceneHierarchy()
 
 						if (ImGui::BeginProperties())
 						{
-							UNDOABLE_COMPONENT_SETTING("terrain amplitude scale", terrain.amplitudeScale, 
+							UNDOABLE_COMPONENT_SETTING("terrain amplitude scale", terrain.amplitudeScale,
 								objectMovedByWidget |= ImGui::PropertyDrag("Amplitude scale", terrain.amplitudeScale, 0.1f, 0.f));
 
 							auto& settings = terrain.genSettings;
-							UNDOABLE_COMPONENT_SETTING("terrain noise scale", settings.scale, 
+							UNDOABLE_COMPONENT_SETTING("terrain noise scale", settings.scale,
 								objectMovedByWidget |= ImGui::PropertyDrag("Noise scale", settings.scale, 0.001f));
-							UNDOABLE_COMPONENT_SETTING("terrain domain warp strength", settings.domainWarpStrength, 
+							UNDOABLE_COMPONENT_SETTING("terrain domain warp strength", settings.domainWarpStrength,
 								objectMovedByWidget |= ImGui::PropertyDrag("Domain warp strength", settings.domainWarpStrength, 0.05f, 0.f));
-							UNDOABLE_COMPONENT_SETTING("terrain domain warp octaves", settings.domainWarpOctaves, 
+							UNDOABLE_COMPONENT_SETTING("terrain domain warp octaves", settings.domainWarpOctaves,
 								objectMovedByWidget |= ImGui::PropertySlider("Domain warp octaves", settings.domainWarpOctaves, 1, 16));
-							UNDOABLE_COMPONENT_SETTING("terrain noise octaves", settings.noiseOctaves, 
+							UNDOABLE_COMPONENT_SETTING("terrain noise octaves", settings.noiseOctaves,
 								objectMovedByWidget |= ImGui::PropertySlider("Noise octaves", settings.noiseOctaves, 1, 32));
 
 							ImGui::EndProperties();
@@ -942,12 +922,12 @@ bool scene_editor::drawSceneHierarchy()
 							{
 								if (ImGui::BeginProperties())
 								{
-									UNDOABLE_COMPONENT_SETTING("proc placement layer footprint", layer.footprint, 
+									UNDOABLE_COMPONENT_SETTING("proc placement layer footprint", layer.footprint,
 										ImGui::PropertyDrag("Footprint", layer.footprint, 0.05f, 0.01f));
 									for (uint32 i = 0; i < layer.numMeshes; ++i)
 									{
 										ImGui::PushID(i);
-										UNDOABLE_COMPONENT_SETTING("proc placement layer density", layer.densities[i], 
+										UNDOABLE_COMPONENT_SETTING("proc placement layer density", layer.densities[i],
 											ImGui::PropertySlider("Density", layer.densities[i]));
 										ImGui::PopID();
 									}
@@ -964,24 +944,24 @@ bool scene_editor::drawSceneHierarchy()
 
 						if (ImGui::BeginProperties())
 						{
-							UNDOABLE_SETTING("grass depth prepass", grass_settings::depthPrepass, 
+							UNDOABLE_SETTING("grass depth prepass", grass_settings::depthPrepass,
 								ImGui::PropertyCheckbox("Depth prepass", grass_settings::depthPrepass));
 
 							grass_settings& settings = grass.settings;
 
-							UNDOABLE_COMPONENT_SETTING("grass blades per chunk dim", settings.numGrassBladesPerChunkDim, 
+							UNDOABLE_COMPONENT_SETTING("grass blades per chunk dim", settings.numGrassBladesPerChunkDim,
 								ImGui::PropertyDrag("Blades per chunk dim", settings.numGrassBladesPerChunkDim, 2));
-							UNDOABLE_COMPONENT_SETTING("grass blade height", settings.bladeHeight, 
+							UNDOABLE_COMPONENT_SETTING("grass blade height", settings.bladeHeight,
 								ImGui::PropertySlider("Blade height", settings.bladeHeight, 0.f, 2.f));
-							UNDOABLE_COMPONENT_SETTING("grass blade width", settings.bladeWidth, 
+							UNDOABLE_COMPONENT_SETTING("grass blade width", settings.bladeWidth,
 								ImGui::PropertySlider("Blade width", settings.bladeWidth, 0.f, 1.f));
 
-							UNDOABLE_COMPONENT_SETTING("grass LOD change start distance", settings.lodChangeStartDistance, 
+							UNDOABLE_COMPONENT_SETTING("grass LOD change start distance", settings.lodChangeStartDistance,
 								ImGui::PropertyDrag("LOD change start distance", settings.lodChangeStartDistance, 0.5f, 0.f));
 							UNDOABLE_COMPONENT_SETTING("grass LOD change transition distance", settings.lodChangeTransitionDistance,
 								ImGui::PropertyDrag("LOD change transition distance", settings.lodChangeTransitionDistance, 0.5f, 0.f));
 
-							UNDOABLE_COMPONENT_SETTING("grass cull start distance", settings.cullStartDistance, 
+							UNDOABLE_COMPONENT_SETTING("grass cull start distance", settings.cullStartDistance,
 								ImGui::PropertyDrag("Cull start distance", settings.cullStartDistance, 0.5f, 0.f));
 							UNDOABLE_COMPONENT_SETTING("grass cull transition distance", settings.cullTransitionDistance,
 								ImGui::PropertyDrag("Cull transition distance", settings.cullTransitionDistance, 0.5f, 0.f));
@@ -998,7 +978,7 @@ bool scene_editor::drawSceneHierarchy()
 						{
 							water_settings& settings = water.settings;
 
-							UNDOABLE_COMPONENT_SETTING("deep water color", settings.deepWaterColor, 
+							UNDOABLE_COMPONENT_SETTING("deep water color", settings.deepWaterColor,
 								ImGui::PropertyColor("Deep color", settings.deepWaterColor));
 							UNDOABLE_COMPONENT_SETTING("shallow water color", settings.shallowWaterColor,
 								ImGui::PropertyColor("Shallow color", settings.shallowWaterColor));
@@ -1109,7 +1089,7 @@ bool scene_editor::drawSceneHierarchy()
 							{
 								ImGui::PropertyValue("Mass", 1.f / rb.invMass, "%.3fkg");
 							}
-							UNDOABLE_COMPONENT_SETTING("rigid body linear velocity damping", rb.linearDamping, 
+							UNDOABLE_COMPONENT_SETTING("rigid body linear velocity damping", rb.linearDamping,
 								ImGui::PropertySlider("Linear velocity damping", rb.linearDamping));
 							UNDOABLE_COMPONENT_SETTING("rigid body angular velocity damping", rb.angularDamping,
 								ImGui::PropertySlider("Angular velocity damping", rb.angularDamping));
@@ -1553,13 +1533,13 @@ bool scene_editor::drawSceneHierarchy()
 
 						if (ImGui::BeginProperties())
 						{
-							UNDOABLE_COMPONENT_SETTING("cloth total mass", cloth.totalMass, 
+							UNDOABLE_COMPONENT_SETTING("cloth total mass", cloth.totalMass,
 								ImGui::PropertyDrag("Total mass", cloth.totalMass, 0.1f, 0.f));
-							UNDOABLE_COMPONENT_SETTING("cloth stiffness", cloth.stiffness, 
+							UNDOABLE_COMPONENT_SETTING("cloth stiffness", cloth.stiffness,
 								ImGui::PropertySlider("Stiffness", cloth.stiffness, 0.01f, 0.7f));
-							UNDOABLE_COMPONENT_SETTING("cloth velocity damping", cloth.damping, 
+							UNDOABLE_COMPONENT_SETTING("cloth velocity damping", cloth.damping,
 								ImGui::PropertySlider("Velocity damping", cloth.damping, 0.f, 1.f));
-							UNDOABLE_COMPONENT_SETTING("cloth gravity factor", cloth.gravityFactor, 
+							UNDOABLE_COMPONENT_SETTING("cloth gravity factor", cloth.gravityFactor,
 								ImGui::PropertySlider("Gravity factor", cloth.gravityFactor, 0.f, 1.f));
 
 							ImGui::EndProperties();
@@ -1572,13 +1552,13 @@ bool scene_editor::drawSceneHierarchy()
 
 						if (ImGui::BeginProperties())
 						{
-							UNDOABLE_COMPONENT_SETTING("point light color", pl.color, 
+							UNDOABLE_COMPONENT_SETTING("point light color", pl.color,
 								ImGui::PropertyColorWheel("Color", pl.color));
-							UNDOABLE_COMPONENT_SETTING("point light intensity", pl.intensity, 
+							UNDOABLE_COMPONENT_SETTING("point light intensity", pl.intensity,
 								ImGui::PropertySlider("Intensity", pl.intensity, 0.f, 10.f));
-							UNDOABLE_COMPONENT_SETTING("point light radius", pl.radius, 
+							UNDOABLE_COMPONENT_SETTING("point light radius", pl.radius,
 								ImGui::PropertySlider("Radius", pl.radius, 0.f, 100.f));
-							UNDOABLE_COMPONENT_SETTING("point light casts shadow", pl.castsShadow, 
+							UNDOABLE_COMPONENT_SETTING("point light casts shadow", pl.castsShadow,
 								ImGui::PropertyCheckbox("Casts shadow", pl.castsShadow));
 							if (pl.castsShadow)
 							{
@@ -1596,15 +1576,15 @@ bool scene_editor::drawSceneHierarchy()
 
 						if (ImGui::BeginProperties())
 						{
-							UNDOABLE_COMPONENT_SETTING("spot light color", sl.color, 
+							UNDOABLE_COMPONENT_SETTING("spot light color", sl.color,
 								ImGui::PropertyColorWheel("Color", sl.color));
 							UNDOABLE_COMPONENT_SETTING("spot light intensity", sl.intensity,
 								ImGui::PropertySlider("Intensity", sl.intensity, 0.f, 10.f));
 							UNDOABLE_COMPONENT_SETTING("spot light distance", sl.distance,
 								ImGui::PropertySlider("Distance", sl.distance, 0.f, 100.f));
-							UNDOABLE_COMPONENT_SETTING("spot light inner angle", sl.innerAngle, 
+							UNDOABLE_COMPONENT_SETTING("spot light inner angle", sl.innerAngle,
 								ImGui::PropertySliderAngle("Inner angle", sl.innerAngle, 0.1f, 80.f));
-							UNDOABLE_COMPONENT_SETTING("spot light outer angle", sl.outerAngle, 
+							UNDOABLE_COMPONENT_SETTING("spot light outer angle", sl.outerAngle,
 								ImGui::PropertySliderAngle("Outer angle", sl.outerAngle, 0.2f, 85.f));
 							UNDOABLE_COMPONENT_SETTING("spot light casts shadow", sl.castsShadow,
 								ImGui::PropertyCheckbox("Casts shadow", sl.castsShadow));
@@ -1676,7 +1656,7 @@ bool scene_editor::drawSceneHierarchy()
 
 						ImGui::EndMenu();
 					}
-					
+
 					ImGui::EndPopup();
 				}
 
@@ -1877,7 +1857,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 				if (draggingBefore)
 				{
 					currentUndoStack->pushAction("object transform",
-						component_undo<transform_component, physics_transform0_component, physics_transform1_component>(selectedEntity, 
+						component_undo<transform_component, physics_transform0_component, physics_transform1_component>(selectedEntity,
 							gizmo.originalTransform,
 							gizmo.originalTransform,
 							gizmo.originalTransform
@@ -1904,7 +1884,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 			}
 			else if (draggingBefore)
 			{
-				currentUndoStack->pushAction("object transform", 
+				currentUndoStack->pushAction("object transform",
 					component_undo<transform_component>(selectedEntity, transform_component(gizmo.originalTransform)));
 			}
 		}
@@ -2085,7 +2065,7 @@ bool scene_editor::drawEntityCreationPopup()
 {
 	game_scene* scene = &this->scene->getCurrentScene();
 	render_camera& camera = this->scene->camera;
-	
+
 	bool clicked = false;
 
 	if (ImGui::BeginPopup("CreateEntityPopup"))
@@ -2199,9 +2179,9 @@ bool scene_editor::editCamera(render_camera& camera)
 		{
 			UNDOABLE_SETTING("field of view", camera.verticalFOV,
 				result |= ImGui::PropertySliderAngle("Field of view", camera.verticalFOV, 1.f, 150.f));
-			UNDOABLE_SETTING("near plane", camera.nearPlane, 
+			UNDOABLE_SETTING("near plane", camera.nearPlane,
 				result |= ImGui::PropertyDrag("Near plane", camera.nearPlane, 0.01f, 0.f));
-			
+
 			bool infiniteFarplane = camera.farPlane < 0.f;
 			UNDOABLE_SETTING("infinite far plane", camera.farPlane,
 				if (ImGui::PropertyCheckbox("Infinite far plane", infiniteFarplane))
@@ -2218,7 +2198,7 @@ bool scene_editor::editCamera(render_camera& camera)
 				});
 			if (!infiniteFarplane)
 			{
-				UNDOABLE_SETTING("far plane", camera.farPlane, 
+				UNDOABLE_SETTING("far plane", camera.farPlane,
 					result |= ImGui::PropertyDrag("Far plane", camera.farPlane, 0.1f, 0.f));
 			}
 
@@ -2246,21 +2226,21 @@ bool scene_editor::editTonemapping(tonemap_settings& tonemap)
 
 		if (ImGui::BeginProperties())
 		{
-			UNDOABLE_SETTING("shoulder strength", tonemap.A, 
+			UNDOABLE_SETTING("shoulder strength", tonemap.A,
 				result |= ImGui::PropertySlider("Shoulder strength", tonemap.A, 0.f, 1.f));
-			UNDOABLE_SETTING("linear strength", tonemap.B, 
+			UNDOABLE_SETTING("linear strength", tonemap.B,
 				result |= ImGui::PropertySlider("Linear strength", tonemap.B, 0.f, 1.f));
-			UNDOABLE_SETTING("linear angle", tonemap.C, 
+			UNDOABLE_SETTING("linear angle", tonemap.C,
 				result |= ImGui::PropertySlider("Linear angle", tonemap.C, 0.f, 1.f));
-			UNDOABLE_SETTING("toe strength", tonemap.D, 
+			UNDOABLE_SETTING("toe strength", tonemap.D,
 				result |= ImGui::PropertySlider("Toe strength", tonemap.D, 0.f, 1.f));
-			UNDOABLE_SETTING("tone numerator", tonemap.E, 
+			UNDOABLE_SETTING("tone numerator", tonemap.E,
 				result |= ImGui::PropertySlider("Tone numerator", tonemap.E, 0.f, 1.f));
-			UNDOABLE_SETTING("toe denominator", tonemap.F, 
+			UNDOABLE_SETTING("toe denominator", tonemap.F,
 				result |= ImGui::PropertySlider("Toe denominator", tonemap.F, 0.f, 1.f));
-			UNDOABLE_SETTING("linear white", tonemap.linearWhite, 
+			UNDOABLE_SETTING("linear white", tonemap.linearWhite,
 				result |= ImGui::PropertySlider("Linear white", tonemap.linearWhite, 0.f, 100.f));
-			UNDOABLE_SETTING("exposure", tonemap.exposure, 
+			UNDOABLE_SETTING("exposure", tonemap.exposure,
 				result |= ImGui::PropertySlider("Exposure", tonemap.exposure, -3.f, 3.f));
 			ImGui::EndProperties();
 		}
@@ -2279,15 +2259,15 @@ bool scene_editor::editSunShadowParameters(directional_light& sun)
 		{
 			UNDOABLE_SETTING("sun intensity", sun.intensity,
 				result |= ImGui::PropertySlider("Intensity", sun.intensity, 0.f, 1000.f));
-			UNDOABLE_SETTING("sun color", sun.color, 
+			UNDOABLE_SETTING("sun color", sun.color,
 				result |= ImGui::PropertyColorWheel("Color", sun.color));
 
 			UNDOABLE_SETTING("sun shadow resolution", sun.shadowDimensions,
 				result |= ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, sun.shadowDimensions));
-			UNDOABLE_SETTING("stabilize", sun.stabilize, 
+			UNDOABLE_SETTING("stabilize", sun.stabilize,
 				result |= ImGui::PropertyCheckbox("Stabilize", sun.stabilize));
 
-			UNDOABLE_SETTING("cascade count", sun.numShadowCascades, 
+			UNDOABLE_SETTING("cascade count", sun.numShadowCascades,
 				result |= ImGui::PropertySlider("Cascade count", sun.numShadowCascades, 1, 4));
 
 			const float minCascadeDistance = 0.f, maxCascadeDistance = 300.f;
@@ -2295,11 +2275,11 @@ bool scene_editor::editSunShadowParameters(directional_light& sun)
 			const float minBlend = 0.f, maxBlend = 10.f;
 			if (sun.numShadowCascades == 1)
 			{
-				UNDOABLE_SETTING("cascade distance", sun.cascadeDistances.x, 
+				UNDOABLE_SETTING("cascade distance", sun.cascadeDistances.x,
 					result |= ImGui::PropertySlider("Distance", sun.cascadeDistances.x, minCascadeDistance, maxCascadeDistance));
-				UNDOABLE_SETTING("cascade bias", sun.bias.x, 
+				UNDOABLE_SETTING("cascade bias", sun.bias.x,
 					result |= ImGui::PropertySlider("Bias", sun.bias.x, minBias, maxBias, "%.6f"));
-				UNDOABLE_SETTING("cascade blend distances", sun.blendDistances.x, 
+				UNDOABLE_SETTING("cascade blend distances", sun.blendDistances.x,
 					result |= ImGui::PropertySlider("Blend distances", sun.blendDistances.x, minBlend, maxBlend, "%.6f"));
 			}
 			else if (sun.numShadowCascades == 2)
@@ -2315,7 +2295,7 @@ bool scene_editor::editSunShadowParameters(directional_light& sun)
 			{
 				UNDOABLE_SETTING("cascade distance", sun.cascadeDistances.xyz,
 					result |= ImGui::PropertySlider("Distance", sun.cascadeDistances.xyz, minCascadeDistance, maxCascadeDistance));
-				UNDOABLE_SETTING("cascade bias", sun.bias.xyz, 
+				UNDOABLE_SETTING("cascade bias", sun.bias.xyz,
 					result |= ImGui::PropertySlider("Bias", sun.bias.xyz, minBias, maxBias, "%.6f"));
 				UNDOABLE_SETTING("cascade blend distances", sun.blendDistances.xyz,
 					result |= ImGui::PropertySlider("Blend distances", sun.blendDistances.xyz, minBlend, maxBlend, "%.6f"));
@@ -2343,17 +2323,17 @@ bool scene_editor::editAO(bool& enable, hbao_settings& settings, const ref<dx_te
 	bool result = false;
 	if (ImGui::BeginProperties())
 	{
-		UNDOABLE_SETTING("enable HBAO", enable, 
+		UNDOABLE_SETTING("enable HBAO", enable,
 			result |= ImGui::PropertyCheckbox("Enable HBAO", enable));
 		if (enable)
 		{
-			UNDOABLE_SETTING("num AO rays", settings.numRays, 
+			UNDOABLE_SETTING("num AO rays", settings.numRays,
 				result |= ImGui::PropertySlider("Num rays", settings.numRays, 1, 16));
 			UNDOABLE_SETTING("max num steps per AO ray", settings.maxNumStepsPerRay,
 				result |= ImGui::PropertySlider("Max num steps per ray", settings.maxNumStepsPerRay, 1, 16));
-			UNDOABLE_SETTING("AO radius", settings.radius, 
+			UNDOABLE_SETTING("AO radius", settings.radius,
 				result |= ImGui::PropertySlider("Radius", settings.radius, 0.f, 1.f, "%.3fm"));
-			UNDOABLE_SETTING("AO strength", settings.strength, 
+			UNDOABLE_SETTING("AO strength", settings.strength,
 				result |= ImGui::PropertySlider("Strength", settings.strength, 0.f, 2.f));
 		}
 		ImGui::EndProperties();
@@ -2371,21 +2351,21 @@ bool scene_editor::editSSS(bool& enable, sss_settings& settings, const ref<dx_te
 	bool result = false;
 	if (ImGui::BeginProperties())
 	{
-		UNDOABLE_SETTING("enable SSS", enable, 
+		UNDOABLE_SETTING("enable SSS", enable,
 			result |= ImGui::PropertyCheckbox("Enable SSS", enable));
 		if (enable)
 		{
-			UNDOABLE_SETTING("num SSS iterations", settings.numSteps, 
+			UNDOABLE_SETTING("num SSS iterations", settings.numSteps,
 				result |= ImGui::PropertySlider("Num iterations", settings.numSteps, 1, 64));
-			UNDOABLE_SETTING("SSS ray distance", settings.rayDistance, 
+			UNDOABLE_SETTING("SSS ray distance", settings.rayDistance,
 				result |= ImGui::PropertySlider("Ray distance", settings.rayDistance, 0.05f, 3.f, "%.3fm"));
-			UNDOABLE_SETTING("SSS thickness", settings.thickness, 
+			UNDOABLE_SETTING("SSS thickness", settings.thickness,
 				result |= ImGui::PropertySlider("Thickness", settings.thickness, 0.05f, 1.f, "%.3fm"));
-			UNDOABLE_SETTING("SSS max distance from camera", settings.maxDistanceFromCamera, 
+			UNDOABLE_SETTING("SSS max distance from camera", settings.maxDistanceFromCamera,
 				result |= ImGui::PropertySlider("Max distance from camera", settings.maxDistanceFromCamera, 5.f, 1000.f, "%.3fm"));
-			UNDOABLE_SETTING("SSS distance fadeout range", settings.distanceFadeoutRange, 
+			UNDOABLE_SETTING("SSS distance fadeout range", settings.distanceFadeoutRange,
 				result |= ImGui::PropertySlider("Distance fadeout range", settings.distanceFadeoutRange, 1.f, 5.f, "%.3fm"));
-			UNDOABLE_SETTING("SSS border fadeout", settings.borderFadeout, 
+			UNDOABLE_SETTING("SSS border fadeout", settings.borderFadeout,
 				result |= ImGui::PropertySlider("Border fadeout", settings.borderFadeout, 0.f, 0.5f));
 		}
 		ImGui::EndProperties();
@@ -2403,17 +2383,17 @@ bool scene_editor::editSSR(bool& enable, ssr_settings& settings, const ref<dx_te
 	bool result = false;
 	if (ImGui::BeginProperties())
 	{
-		UNDOABLE_SETTING("enable SSR", enable, 
+		UNDOABLE_SETTING("enable SSR", enable,
 			result |= ImGui::PropertyCheckbox("Enable SSR", enable));
 		if (enable)
 		{
-			UNDOABLE_SETTING("num SSR iterations", settings.numSteps, 
+			UNDOABLE_SETTING("num SSR iterations", settings.numSteps,
 				result |= ImGui::PropertySlider("Num iterations", settings.numSteps, 1, 1024));
-			UNDOABLE_SETTING("SSR max distance", settings.maxDistance, 
+			UNDOABLE_SETTING("SSR max distance", settings.maxDistance,
 				result |= ImGui::PropertySlider("Max distance", settings.maxDistance, 5.f, 1000.f, "%.3fm"));
-			UNDOABLE_SETTING("SSR min stride", settings.minStride, 
+			UNDOABLE_SETTING("SSR min stride", settings.minStride,
 				result |= ImGui::PropertySlider("Min stride", settings.minStride, 1.f, 50.f, "%.3fm"));
-			UNDOABLE_SETTING("SSR max stride", settings.maxStride, 
+			UNDOABLE_SETTING("SSR max stride", settings.maxStride,
 				result |= ImGui::PropertySlider("Max stride", settings.maxStride, settings.minStride, 50.f, "%.3fm"));
 		}
 		ImGui::EndProperties();
@@ -2431,11 +2411,11 @@ bool scene_editor::editTAA(bool& enable, taa_settings& settings, const ref<dx_te
 	bool result = false;
 	if (ImGui::BeginProperties())
 	{
-		UNDOABLE_SETTING("enable TAA", enable, 
+		UNDOABLE_SETTING("enable TAA", enable,
 			result |= ImGui::PropertyCheckbox("Enable TAA", enable));
 		if (enable)
 		{
-			UNDOABLE_SETTING("TAA jitter strength", settings.cameraJitterStrength, 
+			UNDOABLE_SETTING("TAA jitter strength", settings.cameraJitterStrength,
 				result |= ImGui::PropertySlider("Jitter strength", settings.cameraJitterStrength));
 		}
 		ImGui::EndProperties();
@@ -2453,13 +2433,13 @@ bool scene_editor::editBloom(bool& enable, bloom_settings& settings, const ref<d
 	bool result = false;
 	if (ImGui::BeginProperties())
 	{
-		UNDOABLE_SETTING("enable bloom", enable, 
+		UNDOABLE_SETTING("enable bloom", enable,
 			result |= ImGui::PropertyCheckbox("Enable bloom", enable));
 		if (enable)
 		{
-			UNDOABLE_SETTING("bloom threshold", settings.threshold, 
+			UNDOABLE_SETTING("bloom threshold", settings.threshold,
 				result |= ImGui::PropertySlider("Bloom threshold", settings.threshold, 0.5f, 100.f));
-			UNDOABLE_SETTING("bloom strength", settings.strength, 
+			UNDOABLE_SETTING("bloom strength", settings.strength,
 				result |= ImGui::PropertySlider("Bloom strength", settings.strength));
 		}
 		ImGui::EndProperties();
@@ -2477,11 +2457,11 @@ bool scene_editor::editSharpen(bool& enable, sharpen_settings& settings)
 	bool result = false;
 	if (ImGui::BeginProperties())
 	{
-		UNDOABLE_SETTING("enable sharpen", enable, 
+		UNDOABLE_SETTING("enable sharpen", enable,
 			result |= ImGui::PropertyCheckbox("Enable sharpen", enable));
 		if (enable)
 		{
-			UNDOABLE_SETTING("sharpen strength", settings.strength, 
+			UNDOABLE_SETTING("sharpen strength", settings.strength,
 				result |= ImGui::PropertySlider("Sharpen strength", settings.strength));
 		}
 		ImGui::EndProperties();
@@ -2501,7 +2481,7 @@ void scene_editor::drawSettings(float dt)
 
 		if (ImGui::BeginProperties())
 		{
-			UNDOABLE_SETTING("time scale", this->scene->timestepScale, 
+			UNDOABLE_SETTING("time scale", this->scene->timestepScale,
 				ImGui::PropertySlider("Time scale", this->scene->timestepScale));
 
 			UNDOABLE_SETTING("renderer mode", renderer->mode,
@@ -2518,7 +2498,7 @@ void scene_editor::drawSettings(float dt)
 			UNDOABLE_SETTING("aspect ratio", renderer->aspectRatioMode,
 				ImGui::PropertyDropdown("Aspect ratio", aspectRatioNames, aspect_ratio_mode_count, (uint32&)renderer->aspectRatioMode));
 
-			UNDOABLE_SETTING("static shadow map caching", enableStaticShadowMapCaching, 
+			UNDOABLE_SETTING("static shadow map caching", enableStaticShadowMapCaching,
 				ImGui::PropertyCheckbox("Static shadow map caching", enableStaticShadowMapCaching));
 
 			ImGui::EndProperties();
@@ -2559,7 +2539,7 @@ void scene_editor::drawSettings(float dt)
 					}
 				}
 
-				UNDOABLE_SETTING("sky intensity", environment.skyIntensity, 
+				UNDOABLE_SETTING("sky intensity", environment.skyIntensity,
 					ImGui::PropertySlider("Sky intensity", environment.skyIntensity, 0.f, 2.f));
 				UNDOABLE_SETTING("GI intensity", environment.globalIlluminationIntensity,
 					ImGui::PropertySlider("GI intensity", environment.globalIlluminationIntensity, 0.f, 2.f));
@@ -2578,12 +2558,12 @@ void scene_editor::drawSettings(float dt)
 
 					if (ImGui::BeginProperties())
 					{
-						UNDOABLE_SETTING("visualize probes", grid.visualizeProbes, 
+						UNDOABLE_SETTING("visualize probes", grid.visualizeProbes,
 							ImGui::PropertyCheckbox("Visualize probes", grid.visualizeProbes));
-						UNDOABLE_SETTING("visualize rays", grid.visualizeRays, 
+						UNDOABLE_SETTING("visualize rays", grid.visualizeRays,
 							ImGui::PropertyCheckbox("Visualize rays", grid.visualizeRays));
 
-						UNDOABLE_SETTING("auto rotate rays", grid.autoRotateRays, 
+						UNDOABLE_SETTING("auto rotate rays", grid.autoRotateRays,
 							ImGui::PropertyCheckbox("Auto rotate rays", grid.autoRotateRays));
 						if (!grid.autoRotateRays)
 						{
@@ -2595,33 +2575,33 @@ void scene_editor::drawSettings(float dt)
 
 					if (ImGui::BeginTree("Irradiance"))
 					{
-						if (ImGui::BeginProperties()) 
-						{ 
+						if (ImGui::BeginProperties())
+						{
 							UNDOABLE_SETTING("irradiance UI scale", grid.irradianceUIScale,
 								ImGui::PropertySlider("Scale", grid.irradianceUIScale, 0.1f, 20.f));
-							ImGui::EndProperties(); 
+							ImGui::EndProperties();
 						}
 						ImGui::Image(grid.irradiance, (uint32)(grid.irradiance->width * grid.irradianceUIScale));
 						ImGui::EndTree();
 					}
 					if (ImGui::BeginTree("Depth"))
 					{
-						if (ImGui::BeginProperties()) 
-						{ 
-							UNDOABLE_SETTING("depth UI scale", grid.depthUIScale, 
+						if (ImGui::BeginProperties())
+						{
+							UNDOABLE_SETTING("depth UI scale", grid.depthUIScale,
 								ImGui::PropertySlider("Scale", grid.depthUIScale, 0.1f, 20.f));
-							ImGui::EndProperties(); 
+							ImGui::EndProperties();
 						}
 						ImGui::Image(grid.depth, (uint32)(grid.depth->width * grid.depthUIScale));
 						ImGui::EndTree();
 					}
 					if (ImGui::BeginTree("Raytraced radiance"))
 					{
-						if (ImGui::BeginProperties()) 
-						{ 
-							UNDOABLE_SETTING("raytraced radiance UI scale", grid.raytracedRadianceUIScale, 
+						if (ImGui::BeginProperties())
+						{
+							UNDOABLE_SETTING("raytraced radiance UI scale", grid.raytracedRadianceUIScale,
 								ImGui::PropertySlider("Scale", grid.raytracedRadianceUIScale, 0.1f, 20.f));
-							ImGui::EndProperties(); 
+							ImGui::EndProperties();
 						}
 						ImGui::Image(grid.raytracedRadiance, (uint32)(grid.raytracedRadiance->width * grid.raytracedRadianceUIScale));
 						ImGui::EndTree();
@@ -2639,12 +2619,12 @@ void scene_editor::drawSettings(float dt)
 		{
 			if (ImGui::BeginProperties())
 			{
-				UNDOABLE_SETTING("fixed frame rate", physicsSettings.fixedFrameRate, 
+				UNDOABLE_SETTING("fixed frame rate", physicsSettings.fixedFrameRate,
 					ImGui::PropertyCheckbox("Fixed frame rate (deterministic)", physicsSettings.fixedFrameRate));
 
 				if (physicsSettings.fixedFrameRate)
 				{
-					UNDOABLE_SETTING("frame rate", physicsSettings.frameRate, 
+					UNDOABLE_SETTING("frame rate", physicsSettings.frameRate,
 						ImGui::PropertyInput("Frame rate", physicsSettings.frameRate));
 					if (physicsSettings.frameRate < 30)
 					{
@@ -2653,28 +2633,28 @@ void scene_editor::drawSettings(float dt)
 						ImGui::PopStyleColor();
 					}
 
-					UNDOABLE_SETTING("max physics steps per frame", physicsSettings.maxPhysicsIterationsPerFrame, 
+					UNDOABLE_SETTING("max physics steps per frame", physicsSettings.maxPhysicsIterationsPerFrame,
 						ImGui::PropertyDrag("Max physics steps per frame", physicsSettings.maxPhysicsIterationsPerFrame));
 				}
 
-				UNDOABLE_SETTING("rigid solver iterations", physicsSettings.numRigidSolverIterations, 
+				UNDOABLE_SETTING("rigid solver iterations", physicsSettings.numRigidSolverIterations,
 					ImGui::PropertySlider("Rigid solver iterations", physicsSettings.numRigidSolverIterations, 1, 200));
 
 				UNDOABLE_SETTING("cloth velocity iterations", physicsSettings.numClothVelocityIterations,
 					ImGui::PropertySlider("Cloth velocity iterations", physicsSettings.numClothVelocityIterations, 0, 10));
-				UNDOABLE_SETTING("cloth position iterations", physicsSettings.numClothPositionIterations, 
+				UNDOABLE_SETTING("cloth position iterations", physicsSettings.numClothPositionIterations,
 					ImGui::PropertySlider("Cloth position iterations", physicsSettings.numClothPositionIterations, 0, 10));
-				UNDOABLE_SETTING("cloth drift iterations", physicsSettings.numClothDriftIterations, 
+				UNDOABLE_SETTING("cloth drift iterations", physicsSettings.numClothDriftIterations,
 					ImGui::PropertySlider("Cloth drift iterations", physicsSettings.numClothDriftIterations, 0, 10));
 
-				UNDOABLE_SETTING("test force", physicsTestForce, 
+				UNDOABLE_SETTING("test force", physicsTestForce,
 					ImGui::PropertySlider("Test force", physicsTestForce, 1.f, 10000.f));
 
-				UNDOABLE_SETTING("SIMD broad phase", physicsSettings.simdBroadPhase, 
+				UNDOABLE_SETTING("SIMD broad phase", physicsSettings.simdBroadPhase,
 					ImGui::PropertyCheckbox("SIMD broad phase", physicsSettings.simdBroadPhase));
 				UNDOABLE_SETTING("SIMD narrow phase", physicsSettings.simdNarrowPhase,
 					ImGui::PropertyCheckbox("SIMD narrow phase", physicsSettings.simdNarrowPhase));
-				UNDOABLE_SETTING("SIMD constraint solver", physicsSettings.simdConstraintSolver, 
+				UNDOABLE_SETTING("SIMD constraint solver", physicsSettings.simdConstraintSolver,
 					ImGui::PropertyCheckbox("SIMD constraint solver", physicsSettings.simdConstraintSolver));
 
 				ImGui::EndProperties();
@@ -2688,14 +2668,14 @@ void scene_editor::drawSettings(float dt)
 			if (ImGui::BeginProperties())
 			{
 				const float maxVolume = 3.f;
-				UNDOABLE_SETTING("master volume", masterAudioSettings.volume, 
+				UNDOABLE_SETTING("master volume", masterAudioSettings.volume,
 					change |= ImGui::PropertySlider("Master volume", masterAudioSettings.volume, 0.f, maxVolume));
 
 				ImGui::PropertySeparator();
 
 				for (uint32 i = 0; i < sound_type_count; ++i)
 				{
-					UNDOABLE_SETTING(soundTypeNames[i], soundTypeVolumes[i], 
+					UNDOABLE_SETTING(soundTypeNames[i], soundTypeVolumes[i],
 						change |= ImGui::PropertySlider(soundTypeNames[i], soundTypeVolumes[i], 0.f, 1.f));
 				}
 

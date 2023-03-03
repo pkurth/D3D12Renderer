@@ -18,7 +18,7 @@ struct undo_stack
 	void redo();
 
 	void reset();
-	void display();
+	bool showHistory(bool& open);
 	void verify();
 
 private:
