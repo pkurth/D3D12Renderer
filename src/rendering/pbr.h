@@ -6,6 +6,22 @@
 
 struct dx_command_list;
 
+enum pbr_material_shader
+{
+	pbr_material_shader_default,
+	pbr_material_shader_double_sided,
+	pbr_material_shader_alpha_cutout,
+
+	pbr_material_shader_count,
+};
+
+static const char* pbrMaterialShaderNames[] =
+{
+	"Default",
+	"Double sided",
+	"Alpha cutout",
+};
+
 struct pbr_material
 {
 	pbr_material() = default;
@@ -17,7 +33,7 @@ struct pbr_material
 		const vec4& albedoTint, 
 		float roughnessOverride, 
 		float metallicOverride,
-		bool doubleSided,
+		pbr_material_shader shader,
 		float uvScale)
 		: albedo(albedo), 
 		normal(normal), 
@@ -27,7 +43,7 @@ struct pbr_material
 		albedoTint(albedoTint), 
 		roughnessOverride(roughnessOverride), 
 		metallicOverride(metallicOverride),
-		doubleSided(doubleSided),
+		shader(shader),
 		uvScale(uvScale) {}
 
 	ref<dx_texture> albedo;
@@ -39,7 +55,7 @@ struct pbr_material
 	vec4 albedoTint;
 	float roughnessOverride;
 	float metallicOverride;
-	bool doubleSided;
+	pbr_material_shader shader;
 	float uvScale;
 };
 
@@ -87,10 +103,10 @@ struct pbr_pipeline::transparent : pbr_pipeline
 
 
 ref<pbr_material> createPBRMaterial(const fs::path& albedoTex, const fs::path& normalTex, const fs::path& roughTex, const fs::path& metallicTex,
-	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f, bool doubleSided = false, 
-	float uvScale = 1.f, bool disableTextureCompression = false);
+	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f, 
+	pbr_material_shader shader = pbr_material_shader_default, float uvScale = 1.f, bool disableTextureCompression = false);
 ref<pbr_material> createPBRMaterial(const ref<dx_texture>& albedoTex, const ref<dx_texture>& normalTex, const ref<dx_texture>& roughTex, const ref<dx_texture>& metallicTex,
-	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f, bool doubleSided = false,
-	float uvScale = 1.f);
+	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f, 
+	pbr_material_shader shader = pbr_material_shader_default, float uvScale = 1.f);
 
 ref<pbr_material> getDefaultPBRMaterial();

@@ -285,7 +285,7 @@ ref<pbr_material> loadAssimpMaterial(const aiScene* scene, const fs::path& scene
 	result->albedoTint = albedoTint;
 	result->roughnessOverride = roughnessOverride;
 	result->metallicOverride = metallicOverride;
-	result->doubleSided = false;
+	result->shader = pbr_material_shader_default;
 	result->uvScale = 1.f;
 
 	return result;

@@ -291,7 +291,7 @@ static void serializeMaterial(const ref<pbr_material>& mat, write_stream& stream
 		stream.write(mat->albedoTint);
 		stream.write(mat->roughnessOverride);
 		stream.write(mat->metallicOverride);
-		stream.write(mat->doubleSided);
+		stream.write(mat->shader);
 		stream.write(mat->uvScale);
 	}
 }
@@ -319,10 +319,10 @@ static ref<pbr_material> deserializeMaterial(read_stream& stream)
 		READ(vec4, albedoTint);
 		READ(float, roughnessOverride);
 		READ(float, metallicOverride);
-		READ(bool, doubleSided);
+		READ(pbr_material_shader, shader);
 		READ(float, uvScale);
 
-		result = createPBRMaterial(albedo, normal, roughness, metallic, emission, albedoTint, roughnessOverride, metallicOverride, doubleSided, uvScale);
+		result = createPBRMaterial(albedo, normal, roughness, metallic, emission, albedoTint, roughnessOverride, metallicOverride, shader, uvScale);
 	}
 
 	return result;

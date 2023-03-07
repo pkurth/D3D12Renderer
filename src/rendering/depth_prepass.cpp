@@ -13,6 +13,8 @@ static dx_pipeline doubleSidedDefaultPipeline;
 static dx_pipeline animatedPipeline;
 static dx_pipeline doubleSidedAnimatedPipeline;
 
+static dx_pipeline alphaCutoutPipeline;
+
 
 void initializeDepthPrepassPipelines()
 {
@@ -26,6 +28,9 @@ void initializeDepthPrepassPipelines()
 	desc.cullingOff();
 	doubleSidedDefaultPipeline = createReloadablePipeline(desc, { "depth_only_vs", "depth_only_ps" }, rs_in_vertex_shader);
 	doubleSidedAnimatedPipeline = createReloadablePipeline(desc, { "depth_only_animated_vs", "depth_only_ps" }, rs_in_vertex_shader);
+
+	desc.inputLayout(inputLayout_position_uv_normal_tangent);
+	alphaCutoutPipeline = createReloadablePipeline(desc, { "depth_only_alpha_cutout_vs", "depth_only_alpha_cutout_ps" }, rs_in_vertex_shader);
 }
 
 static void setupDepthPrepassCommon(dx_command_list* cl, const dx_pipeline& pipeline, vec2 jitter, vec2 prevFrameJitter)
@@ -50,6 +55,11 @@ PIPELINE_SETUP_IMPL(static_depth_prepass_pipeline::double_sided)
 	setupDepthPrepassCommon(cl, doubleSidedDefaultPipeline, common.cameraJitter, common.prevFrameCameraJitter);
 }
 
+PIPELINE_SETUP_IMPL(static_depth_prepass_pipeline::alpha_cutout)
+{
+	setupDepthPrepassCommon(cl, alphaCutoutPipeline, common.cameraJitter, common.prevFrameCameraJitter);
+}
+
 PIPELINE_SETUP_IMPL(dynamic_depth_prepass_pipeline::single_sided)
 {
 	setupDepthPrepassCommon(cl, defaultPipeline, common.cameraJitter, common.prevFrameCameraJitter);
@@ -58,6 +68,11 @@ PIPELINE_SETUP_IMPL(dynamic_depth_prepass_pipeline::single_sided)
 PIPELINE_SETUP_IMPL(dynamic_depth_prepass_pipeline::double_sided)
 {
 	setupDepthPrepassCommon(cl, doubleSidedDefaultPipeline, common.cameraJitter, common.prevFrameCameraJitter);
+}
+
+PIPELINE_SETUP_IMPL(dynamic_depth_prepass_pipeline::alpha_cutout)
+{
+	setupDepthPrepassCommon(cl, alphaCutoutPipeline, common.cameraJitter, common.prevFrameCameraJitter);
 }
 
 PIPELINE_SETUP_IMPL(animated_depth_prepass_pipeline::single_sided)
@@ -105,6 +120,32 @@ DEPTH_ONLY_RENDER_IMPL(animated_depth_prepass_pipeline)
 }
 
 
+
+DEPTH_ONLY_RENDER_IMPL(static_depth_prepass_pipeline::alpha_cutout)
+{
+	cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, rc.objectID);
+	cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * rc.data.transform, prevFrameViewProj * rc.data.transform });
+
+	cl->setDescriptorHeapSRV(DEPTH_ONLY_RS_ALPHA_TEXTURE, 0, rc.data.alphaTexture);
+
+	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
+	cl->setVertexBuffer(1, rc.data.vertexBuffer.others);
+	cl->setIndexBuffer(rc.data.indexBuffer);
+	cl->drawIndexed(rc.data.submesh.numIndices, 1, rc.data.submesh.firstIndex, rc.data.submesh.baseVertex, 0);
+}
+
+DEPTH_ONLY_RENDER_IMPL(dynamic_depth_prepass_pipeline::alpha_cutout)
+{
+	cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, rc.objectID);
+	cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * rc.data.transform, prevFrameViewProj * rc.data.prevFrameTransform });
+
+	cl->setDescriptorHeapSRV(DEPTH_ONLY_RS_ALPHA_TEXTURE, 0, rc.data.alphaTexture);
+
+	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
+	cl->setVertexBuffer(1, rc.data.vertexBuffer.others);
+	cl->setIndexBuffer(rc.data.indexBuffer);
+	cl->drawIndexed(rc.data.submesh.numIndices, 1, rc.data.submesh.firstIndex, rc.data.submesh.baseVertex, 0);
+}
 
 
 

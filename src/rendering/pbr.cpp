@@ -29,7 +29,7 @@ struct material_key
 	vec4 emission;
 	vec4 albedoTint;
 	float roughnessOverride, metallicOverride;
-	bool doubleSided;
+	pbr_material_shader shader;
 	float uvScale;
 };
 
@@ -50,7 +50,7 @@ namespace std
 			hash_combine(seed, x.albedoTint);
 			hash_combine(seed, x.roughnessOverride);
 			hash_combine(seed, x.metallicOverride);
-			hash_combine(seed, x.doubleSided);
+			hash_combine(seed, (uint32)x.shader);
 			hash_combine(seed, x.uvScale);
 
 			return seed;
@@ -68,7 +68,7 @@ static bool operator==(const material_key& a, const material_key& b)
 		&& a.albedoTint == b.albedoTint
 		&& a.roughnessOverride == b.roughnessOverride
 		&& a.metallicOverride == b.metallicOverride
-		&& a.doubleSided == b.doubleSided
+		&& a.shader == b.shader
 		&& a.uvScale == b.uvScale;
 }
 
@@ -81,7 +81,7 @@ ref<pbr_material> createPBRMaterial(
 	const vec4& albedoTint, 
 	float roughOverride, 
 	float metallicOverride, 
-	bool doubleSided,
+	pbr_material_shader shader,
 	float uvScale, 
 	bool disableTextureCompression)
 {
@@ -95,7 +95,7 @@ ref<pbr_material> createPBRMaterial(
 		albedoTint,
 		!roughTex.empty() ? 1.f : roughOverride,			// If texture is set, override does not matter, so set it to consistent value.
 		!metallicTex.empty() ? 0.f : metallicOverride,		// If texture is set, override does not matter, so set it to consistent value.
-		doubleSided,
+		shader,
 		uvScale,
 	};
 
@@ -124,7 +124,7 @@ ref<pbr_material> createPBRMaterial(
 		material->albedoTint = albedoTint;
 		material->roughnessOverride = roughOverride;
 		material->metallicOverride = metallicOverride;
-		material->doubleSided = doubleSided;
+		material->shader = shader;
 		material->uvScale = uvScale;
 
 		cache[s] = sp = material;
@@ -143,7 +143,7 @@ ref<pbr_material> createPBRMaterial(
 	const vec4& albedoTint,
 	float roughOverride, 
 	float metallicOverride, 
-	bool doubleSided, 
+	pbr_material_shader shader,
 	float uvScale)
 {
 	ref<pbr_material> material = make_ref<pbr_material>();
@@ -156,7 +156,7 @@ ref<pbr_material> createPBRMaterial(
 	material->albedoTint = albedoTint;
 	material->roughnessOverride = roughOverride;
 	material->metallicOverride = metallicOverride;
-	material->doubleSided = doubleSided;
+	material->shader = shader;
 	material->uvScale = uvScale;
 
 	return material;
@@ -164,7 +164,8 @@ ref<pbr_material> createPBRMaterial(
 
 ref<pbr_material> getDefaultPBRMaterial()
 {
-	static ref<pbr_material> material = make_ref<pbr_material>(nullptr, nullptr, nullptr, nullptr, vec4(0.f), vec4(1.f, 0.f, 1.f, 1.f), 1.f, 0.f, false, 1.f);
+	static ref<pbr_material> material = make_ref<pbr_material>(nullptr, nullptr, nullptr, nullptr, 
+		vec4(0.f), vec4(1.f, 0.f, 1.f, 1.f), 1.f, 0.f, pbr_material_shader_default, 1.f);
 	return material;
 }
 
@@ -283,7 +284,7 @@ PIPELINE_RENDER_IMPL(pbr_pipeline)
 		cl->setDescriptorHeapSRV(DEFAULT_PBR_RS_PBR_TEXTURES, 3, mat->metallic);
 		flags |= MATERIAL_USE_METALLIC_TEXTURE;
 	}
-	if (mat->doubleSided)
+	if (mat->shader != pbr_material_shader_default)
 	{
 		flags |= MATERIAL_DOUBLE_SIDED;
 	}

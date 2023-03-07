@@ -134,7 +134,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			"assets/cc0/sphere/Tiles074_2K_Color.jpg",
 			"assets/cc0/sphere/Tiles074_2K_Normal.jpg",
 			"assets/cc0/sphere/Tiles074_2K_Roughness.jpg",
-			{}, vec4(0.f), vec4(1.f), 0.2f, 0.5f, false, 3.f);
+			{}, vec4(0.f), vec4(1.f), 0.2f, 0.5f, pbr_material_shader_default, 3.f);
 
 		auto groundMesh = make_ref<multi_mesh>();
 		builder.pushBox({ vec3(0.f), vec3(30.f, 4.f, 30.f) });
@@ -267,7 +267,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		float terrainChunkSize = 64.f;
 
 		auto terrainGroundMaterial = createPBRMaterial("assets/terrain/ground/Grass002_2K_Color.png", "assets/terrain/ground/Grass002_2K_NormalDX.png", "assets/terrain/ground/Grass002_2K_Roughness.png", {},
-			vec4(0.f), vec4(1.f), 1.f, 0.f, false, 1.f, true);
+			vec4(0.f), vec4(1.f), 1.f, 0.f, pbr_material_shader_default, 1.f, true);
 		auto terrainRockMaterial = createPBRMaterial("assets/terrain/rock/Rock034_2K_Color.png", "assets/terrain/rock/Rock034_2K_NormalDX.png", "assets/terrain/rock/Rock034_2K_Roughness.png", {});
 		auto terrainMudMaterial = createPBRMaterial("assets/terrain/mud/Ground049B_2K_Color.png", "assets/terrain/mud/Ground049B_2K_NormalDX.png", "assets/terrain/mud/Ground049B_2K_Roughness.png", {});
 
@@ -739,7 +739,7 @@ void application::update(const user_input& input, float dt)
 					"assets/sponza/textures/Sponza_Curtain_Red_normal.tga",
 					"assets/sponza/textures/Sponza_Curtain_roughness.tga",
 					"assets/sponza/textures/Sponza_Curtain_metallic.tga",
-					vec4(0.f), vec4(1.f), 1.f, 1.f, true);
+					vec4(0.f), vec4(1.f), 1.f, 1.f, pbr_material_shader_double_sided);
 
 				auto [vb, prevFrameVB, ib, sm] = render.getRenderData(cloth);
 				opaqueRenderPass.renderAnimatedObject(mat4::identity, mat4::identity, vb, prevFrameVB, ib, sm, clothMaterial, (uint32)entityHandle);

@@ -86,15 +86,44 @@ struct opaque_render_pass
 		const ref<pbr_material>& material,
 		uint32 objectID = -1)
 	{
-		if (material->doubleSided)
+		pbr_render_data data;
+		data.transform = transform;
+		data.vertexBuffer = vertexBuffer;
+		data.indexBuffer = indexBuffer;
+		data.submesh = submesh;
+		data.material = material;
+
+		switch (material->shader)
 		{
-			addPBRObjectToPass<pbr_pipeline::opaque_double_sided>(transform, vertexBuffer, indexBuffer, submesh, material);
-			addStaticPBRObjectToDepthPrepass<static_depth_prepass_pipeline::double_sided>(transform, vertexBuffer, indexBuffer, submesh, objectID);
-		}
-		else
-		{
-			addPBRObjectToPass<pbr_pipeline::opaque>(transform, vertexBuffer, indexBuffer, submesh, material);
-			addStaticPBRObjectToDepthPrepass<static_depth_prepass_pipeline::single_sided>(transform, vertexBuffer, indexBuffer, submesh, objectID);
+			case pbr_material_shader_default:
+			case pbr_material_shader_double_sided:
+			{
+				static_depth_prepass_data prepassData;
+				prepassData.transform = transform;
+				prepassData.vertexBuffer = vertexBuffer.positions;
+				prepassData.indexBuffer = indexBuffer;
+				prepassData.submesh = submesh;
+
+				if (material->shader == pbr_material_shader_default)
+				{
+					renderObject<pbr_pipeline::opaque, static_depth_prepass_pipeline::single_sided>(data, prepassData, objectID);
+				}
+				else
+				{
+					renderObject<pbr_pipeline::opaque_double_sided, static_depth_prepass_pipeline::double_sided>(data, prepassData, objectID);
+				}
+			} break;
+			case pbr_material_shader_alpha_cutout:
+			{
+				static_alpha_cutout_depth_prepass_data prepassData;
+				prepassData.transform = transform;
+				prepassData.vertexBuffer = vertexBuffer;
+				prepassData.indexBuffer = indexBuffer;
+				prepassData.submesh = submesh;
+				prepassData.alphaTexture = material->albedo;
+
+				renderObject<pbr_pipeline::opaque_double_sided, static_depth_prepass_pipeline::alpha_cutout>(data, prepassData, objectID);
+			} break;
 		}
 	}
 
@@ -106,15 +135,46 @@ struct opaque_render_pass
 		const ref<pbr_material>& material,
 		uint32 objectID = -1)
 	{
-		if (material->doubleSided)
+		pbr_render_data data;
+		data.transform = transform;
+		data.vertexBuffer = vertexBuffer;
+		data.indexBuffer = indexBuffer;
+		data.submesh = submesh;
+		data.material = material;
+
+		switch (material->shader)
 		{
-			addPBRObjectToPass<pbr_pipeline::opaque_double_sided>(transform, vertexBuffer, indexBuffer, submesh, material);
-			addDynamicPBRObjectToDepthPrepass<dynamic_depth_prepass_pipeline::double_sided>(transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh, objectID);
-		}
-		else
-		{
-			addPBRObjectToPass<pbr_pipeline::opaque>(transform, vertexBuffer, indexBuffer, submesh, material);
-			addDynamicPBRObjectToDepthPrepass<dynamic_depth_prepass_pipeline::single_sided>(transform, prevFrameTransform, vertexBuffer, indexBuffer, submesh, objectID);
+			case pbr_material_shader_default:
+			case pbr_material_shader_double_sided:
+			{
+				dynamic_depth_prepass_data prepassData;
+				prepassData.transform = transform;
+				prepassData.prevFrameTransform = prevFrameTransform;
+				prepassData.vertexBuffer = vertexBuffer.positions;
+				prepassData.indexBuffer = indexBuffer;
+				prepassData.submesh = submesh;
+
+				if (material->shader == pbr_material_shader_default)
+				{
+					renderObject<pbr_pipeline::opaque, dynamic_depth_prepass_pipeline::single_sided>(data, prepassData, objectID);
+				}
+				else
+				{
+					renderObject<pbr_pipeline::opaque_double_sided, dynamic_depth_prepass_pipeline::double_sided>(data, prepassData, objectID);
+				}
+			} break;
+			case pbr_material_shader_alpha_cutout:
+			{
+				dynamic_alpha_cutout_depth_prepass_data prepassData;
+				prepassData.transform = transform;
+				prepassData.prevFrameTransform = prevFrameTransform;
+				prepassData.vertexBuffer = vertexBuffer;
+				prepassData.indexBuffer = indexBuffer;
+				prepassData.submesh = submesh;
+				prepassData.alphaTexture = material->albedo;
+
+				renderObject<pbr_pipeline::opaque_double_sided, dynamic_depth_prepass_pipeline::alpha_cutout>(data, prepassData, objectID);
+			} break;
 		}
 	}
 
@@ -127,98 +187,56 @@ struct opaque_render_pass
 		const ref<pbr_material>& material,
 		uint32 objectID = -1)
 	{
-		if (material->doubleSided)
+		pbr_render_data data;
+		data.transform = transform;
+		data.vertexBuffer = vertexBuffer;
+		data.indexBuffer = indexBuffer;
+		data.submesh = submesh;
+		data.material = material;
+
+		switch (material->shader)
 		{
-			addPBRObjectToPass<pbr_pipeline::opaque_double_sided>(transform, vertexBuffer, indexBuffer, submesh, material);
-			addAnimatedPBRObjectToDepthPrepass<animated_depth_prepass_pipeline::double_sided>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, objectID);
-		}
-		else
-		{
-			addPBRObjectToPass<pbr_pipeline::opaque>(transform, vertexBuffer, indexBuffer, submesh, material);
-			addAnimatedPBRObjectToDepthPrepass<animated_depth_prepass_pipeline::single_sided>(transform, prevFrameTransform, vertexBuffer, prevFrameVertexBuffer, indexBuffer, submesh, objectID);
+			case pbr_material_shader_default:
+			case pbr_material_shader_double_sided:
+			{
+				animated_depth_prepass_data prepassData;
+				prepassData.transform = transform;
+				prepassData.prevFrameTransform = prevFrameTransform;
+				prepassData.vertexBuffer = vertexBuffer.positions;
+				prepassData.prevFrameVertexBufferAddress = prevFrameVertexBuffer.positions ? prevFrameVertexBuffer.positions.view.BufferLocation : vertexBuffer.positions.view.BufferLocation;
+				prepassData.indexBuffer = indexBuffer;
+				prepassData.submesh = submesh;
+
+				if (material->shader == pbr_material_shader_default)
+				{
+					renderObject<pbr_pipeline::opaque, animated_depth_prepass_pipeline::single_sided>(data, prepassData, objectID);
+				}
+				else
+				{
+					renderObject<pbr_pipeline::opaque_double_sided, animated_depth_prepass_pipeline::double_sided>(data, prepassData, objectID);
+				}
+			} break;
+			case pbr_material_shader_alpha_cutout:
+			{
+#if 0
+				animated_alpha_cutout_depth_prepass_data prepassData;
+				prepassData.transform = transform;
+				prepassData.prevFrameTransform = prevFrameTransform;
+				prepassData.vertexBuffer = vertexBuffer;
+				prepassData.prevFrameVertexBufferAddress = prevFrameVertexBuffer.positions ? prevFrameVertexBuffer.positions.view.BufferLocation : vertexBuffer.positions.view.BufferLocation;
+				prepassData.indexBuffer = indexBuffer;
+				prepassData.submesh = submesh;
+				prepassData.alphaTexture = material->albedo;
+
+				renderObject<pbr_pipeline::opaque_double_sided, animated_depth_prepass_pipeline::alpha_cutout>(data, prepassData, objectID);
+#endif
+				assert(false);
+			} break;
 		}
 	}
 
 	default_render_command_buffer<uint64> pass;
 	depth_prepass_render_command_buffer<uint64> depthPrepass;
-
-private:
-
-	template <typename pipeline_t>
-	void addPBRObjectToPass(const mat4& transform,
-		const dx_vertex_buffer_group_view& vertexBuffer,
-		const dx_index_buffer_view& indexBuffer,
-		submesh_info submesh, 
-		const ref<pbr_material>& material)
-	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
-		uint64 sortKey = (uint64)pipeline_t::setup;
-		auto& command = pass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey);
-		command.data.transform = transform;
-		command.data.vertexBuffer = vertexBuffer;
-		command.data.indexBuffer = indexBuffer;
-		command.data.submesh = submesh;
-		command.data.material = material;
-	}
-	
-	template <typename pipeline_t>
-	void addStaticPBRObjectToDepthPrepass(const mat4& transform, 
-		const dx_vertex_buffer_group_view& vertexBuffer,
-		const dx_index_buffer_view& indexBuffer, 
-		submesh_info submesh, 
-		uint32 objectID)
-	{
-		uint64 sortKey = (uint64)pipeline_t::setup;
-		auto& command = depthPrepass.emplace_back<pipeline_t, depth_only_render_command<static_depth_prepass_data>>(sortKey);
-		command.objectID = objectID;
-		command.data.transform = transform;
-		command.data.vertexBuffer = vertexBuffer.positions;
-		command.data.indexBuffer = indexBuffer;
-		command.data.submesh = submesh;
-	}
-
-	template <typename pipeline_t>
-	void addDynamicPBRObjectToDepthPrepass(const mat4& transform,
-		const mat4& prevFrameTransform,
-		const dx_vertex_buffer_group_view& vertexBuffer,
-		const dx_index_buffer_view& indexBuffer,
-		submesh_info submesh,
-		uint32 objectID)
-	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
-		uint64 sortKey = (uint64)pipeline_t::setup;
-		auto& command = depthPrepass.emplace_back<pipeline_t, depth_only_render_command<dynamic_depth_prepass_data>>(sortKey);
-		command.objectID = objectID;
-		command.data.transform = transform;
-		command.data.prevFrameTransform = prevFrameTransform;
-		command.data.vertexBuffer = vertexBuffer.positions;
-		command.data.indexBuffer = indexBuffer;
-		command.data.submesh = submesh;
-	}
-
-	template <typename pipeline_t>
-	void addAnimatedPBRObjectToDepthPrepass(const mat4& transform,
-		const mat4& prevFrameTransform,
-		const dx_vertex_buffer_group_view& vertexBuffer,
-		const dx_vertex_buffer_group_view& prevFrameVertexBuffer,
-		const dx_index_buffer_view& indexBuffer,
-		submesh_info submesh,
-		uint32 objectID)
-	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
-		uint64 sortKey = (uint64)pipeline_t::setup;
-		auto& command = depthPrepass.emplace_back<pipeline_t, depth_only_render_command<animated_depth_prepass_data>>(sortKey);
-		command.objectID = objectID;
-		command.data.transform = transform;
-		command.data.prevFrameTransform = prevFrameTransform;
-		command.data.vertexBuffer = vertexBuffer.positions;
-		command.data.prevFrameVertexBufferAddress = prevFrameVertexBuffer.positions ? prevFrameVertexBuffer.positions.view.BufferLocation : vertexBuffer.positions.view.BufferLocation;
-		command.data.indexBuffer = indexBuffer;
-		command.data.submesh = submesh;
-	}
 };
 
 struct transparent_render_pass

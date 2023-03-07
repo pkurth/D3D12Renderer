@@ -700,8 +700,17 @@ static void editMaterial(const ref<pbr_material>& material)
 
 		ImGui::PropertyColor("Emission", material->emission);
 		ImGui::PropertyColor("Albedo tint", material->albedoTint);
-		ImGui::PropertyCheckbox("Double sided", material->doubleSided);
+		ImGui::PropertyDropdown("Shader", pbrMaterialShaderNames, pbr_material_shader_count, (uint32&)material->shader);
 		ImGui::PropertySlider("UV scale", material->uvScale);
+
+		if (!material->roughness)
+		{
+			ImGui::PropertySlider("Roughness override", material->roughnessOverride);
+		}
+		if (!material->metallic)
+		{
+			ImGui::PropertySlider("Metallic override", material->metallicOverride);
+		}
 
 		ImGui::EndProperties();
 	}
