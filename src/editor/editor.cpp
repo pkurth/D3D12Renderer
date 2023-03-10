@@ -618,7 +618,7 @@ static void drawComponent(scene_entity entity, const char* componentName, ui_fun
 
 static bounding_box getObjectBoundingBox(scene_entity entity, bool applyPosition)
 {
-	bounding_box aabb = entity.hasComponent<raster_component>() ? entity.getComponent<raster_component>().mesh->aabb : bounding_box::fromCenterRadius(0.f, 1.f);
+	bounding_box aabb = entity.hasComponent<mesh_component>() ? entity.getComponent<mesh_component>().mesh->aabb : bounding_box::fromCenterRadius(0.f, 1.f);
 
 	if (transform_component* transform = entity.getComponentIfExists<transform_component>())
 	{
@@ -863,9 +863,9 @@ bool scene_editor::drawSceneHierarchy()
 						ImGui::Text("Dynamic");
 					});
 
-					drawComponent<raster_component>(selectedEntity, "RASTER", [this](raster_component& raster)
+					drawComponent<mesh_component>(selectedEntity, "MESH", [this](mesh_component& raster)
 					{
-						using component_t = raster_component;
+						using component_t = mesh_component;
 
 						if (ImGui::BeginProperties())
 						{
@@ -1011,11 +1011,11 @@ bool scene_editor::drawSceneHierarchy()
 
 					drawComponent<animation_component>(selectedEntity, "ANIMATION", [this](animation_component& anim)
 					{
-						if (raster_component* raster = selectedEntity.getComponentIfExists<raster_component>())
+						if (mesh_component* mesh = selectedEntity.getComponentIfExists<mesh_component>())
 						{
 							if (ImGui::BeginProperties())
 							{
-								uint32 animationIndex = anim.animation.clip ? (uint32)(anim.animation.clip - raster->mesh->skeleton.clips.data()) : -1;
+								uint32 animationIndex = anim.animation.clip ? (uint32)(anim.animation.clip - mesh->mesh->skeleton.clips.data()) : -1;
 
 								bool animationChanged = ImGui::PropertyDropdown("Currently playing", [](uint32 index, void* data)
 								{
@@ -1028,17 +1028,17 @@ bool scene_editor::drawSceneHierarchy()
 										result = skeleton.clips[index].name.c_str();
 									}
 									return result;
-								}, animationIndex, &raster->mesh->skeleton);
+								}, animationIndex, & mesh->mesh->skeleton);
 
 								if (animationChanged)
 								{
-									anim.animation.set(&raster->mesh->skeleton.clips[animationIndex]);
+									anim.animation.set(&mesh->mesh->skeleton.clips[animationIndex]);
 								}
 
 								ImGui::EndProperties();
 							}
 
-							animation_skeleton& skeleton = raster->mesh->skeleton;
+							animation_skeleton& skeleton = mesh->mesh->skeleton;
 							if (skeleton.joints.size() > 0)
 							{
 								if (ImGui::BeginTree("Skeleton"))

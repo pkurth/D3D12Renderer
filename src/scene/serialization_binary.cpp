@@ -116,7 +116,7 @@ using serialized_components = component_group<
 	dynamic_transform_component,
 
 	// Rendering.
-	raster_component,
+	mesh_component,
 	point_light_component,
 	spot_light_component,
 
@@ -151,11 +151,13 @@ void deserializeFromMemoryStream(scene_entity entity, read_stream& stream)
 	stream.read(component);
 }
 
+#define READ(type, var) type var; stream.read(var);
+
 template <> void serializeToMemoryStream(scene_entity entity, const dynamic_transform_component& component, write_stream& stream) {}
 template <> void deserializeFromMemoryStream<dynamic_transform_component>(scene_entity entity, read_stream& stream) { entity.addComponent<dynamic_transform_component>(); }
 
 template <>
-void serializeToMemoryStream(scene_entity entity, const raster_component& component, write_stream& stream)
+void serializeToMemoryStream(scene_entity entity, const mesh_component& component, write_stream& stream)
 {
 	asset_handle handle = component.mesh ? component.mesh->handle : 0;
 	uint32 flags = component.mesh ? component.mesh->flags : 0;
@@ -163,16 +165,14 @@ void serializeToMemoryStream(scene_entity entity, const raster_component& compon
 	stream.write(flags);
 }
 
-#define READ(type, var) type var; stream.read(var);
-
 template <>
-void deserializeFromMemoryStream<raster_component>(scene_entity entity, read_stream& stream)
+void deserializeFromMemoryStream<mesh_component>(scene_entity entity, read_stream& stream)
 {
 	READ(asset_handle, handle);
 	READ(uint32, flags);
 
 	auto mesh = loadMeshFromHandle(handle, flags);
-	entity.addComponent<raster_component>(mesh);
+	entity.addComponent<mesh_component>(mesh);
 }
 
 template <>

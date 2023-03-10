@@ -225,20 +225,20 @@ void humanoid_ragdoll::initialize(game_scene& scene, vec3 initialHipPosition, fl
 		ragdollToesMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, ragdollMaterial });
 	}
 
-	torso.addComponent<raster_component>(ragdollTorsoMesh);
-	head.addComponent<raster_component>(ragdollHeadMesh);
-	leftUpperArm.addComponent<raster_component>(ragdollArmMesh);
-	leftLowerArm.addComponent<raster_component>(ragdollArmMesh);
-	rightUpperArm.addComponent<raster_component>(ragdollArmMesh);
-	rightLowerArm.addComponent<raster_component>(ragdollArmMesh);
-	leftUpperLeg.addComponent<raster_component>(ragdollUpperLegMesh);
-	leftLowerLeg.addComponent<raster_component>(ragdollLowerLegMesh);
-	leftFoot.addComponent<raster_component>(ragdollFootMesh);
-	leftToes.addComponent<raster_component>(ragdollToesMesh);
-	rightUpperLeg.addComponent<raster_component>(ragdollUpperLegMesh);
-	rightLowerLeg.addComponent<raster_component>(ragdollLowerLegMesh);
-	rightFoot.addComponent<raster_component>(ragdollFootMesh);
-	rightToes.addComponent<raster_component>(ragdollToesMesh);
+	torso.addComponent<mesh_component>(ragdollTorsoMesh);
+	head.addComponent<mesh_component>(ragdollHeadMesh);
+	leftUpperArm.addComponent<mesh_component>(ragdollArmMesh);
+	leftLowerArm.addComponent<mesh_component>(ragdollArmMesh);
+	rightUpperArm.addComponent<mesh_component>(ragdollArmMesh);
+	rightLowerArm.addComponent<mesh_component>(ragdollArmMesh);
+	leftUpperLeg.addComponent<mesh_component>(ragdollUpperLegMesh);
+	leftLowerLeg.addComponent<mesh_component>(ragdollLowerLegMesh);
+	leftFoot.addComponent<mesh_component>(ragdollFootMesh);
+	leftToes.addComponent<mesh_component>(ragdollToesMesh);
+	rightUpperLeg.addComponent<mesh_component>(ragdollUpperLegMesh);
+	rightLowerLeg.addComponent<mesh_component>(ragdollLowerLegMesh);
+	rightFoot.addComponent<mesh_component>(ragdollFootMesh);
+	rightToes.addComponent<mesh_component>(ragdollToesMesh);
 
 	ragdollTorsoMesh->mesh =
 		ragdollHeadMesh->mesh =

@@ -2,8 +2,8 @@
 #include "scene.h"
 #include "physics/physics.h"
 #include "physics/collision_broad.h"
-#include "rendering/raytracing.h"
 #include "terrain/heightmap_collider.h"
+#include "rendering/raytracing.h"
 
 
 game_scene::game_scene()
@@ -32,7 +32,7 @@ void game_scene::cloneTo(game_scene& target)
 {
 	target.registry.assign(registry.data(), registry.data() + registry.size(), registry.released());
 
-	copyComponentPoolsTo <
+	copyComponentPoolsTo<
 		tag_component,
 		transform_component,
 		position_component,
@@ -49,12 +49,15 @@ void game_scene::cloneTo(game_scene& target)
 		grass_component,
 		proc_placement_component,
 		water_component,
+		tree_component,
 #endif
 		heightmap_collider_component,
 
-		animation_component,
-		raster_component,
+		mesh_component,
+
 		raytrace_component,
+
+		animation_component,
 
 		collider_component,
 		rigid_body_component,
@@ -100,7 +103,7 @@ scene_entity game_scene::copyEntity(scene_entity src)
 #endif
 
 	if (auto* c = src.getComponentIfExists<animation_component>()) { dest.addComponent<animation_component>(*c); }
-	if (auto* c = src.getComponentIfExists<raster_component>()) { dest.addComponent<raster_component>(*c); }
+	if (auto* c = src.getComponentIfExists<mesh_component>()) { dest.addComponent<mesh_component>(*c); }
 	if (auto* c = src.getComponentIfExists<raytrace_component>()) { dest.addComponent<raytrace_component>(*c); }
 
 	for (collider_component& collider : collider_component_iterator(src))

@@ -22,6 +22,7 @@
 #include "terrain/proc_placement.h"
 #include "terrain/grass.h"
 #include "terrain/water.h"
+#include "terrain/tree.h"
 #include "animation/skinning.h"
 
 
@@ -78,10 +79,14 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 	{
 		auto blas = defineBlasFromMesh(mesh);
 
-		scene.createEntity("Sponza")
+		auto sponza = scene.createEntity("Sponza")
 			.addComponent<transform_component>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
-			.addComponent<raster_component>(mesh)
-			.addComponent<raytrace_component>(blas);
+			.addComponent<mesh_component>(mesh);
+
+		if (blas.blas)
+		{
+			sponza.addComponent<raytrace_component>(blas);
+		}
 	}
 #endif
 
@@ -90,7 +95,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 	{
 		auto stormtrooper = scene.createEntity("Stormtrooper 1")
 			.addComponent<transform_component>(vec3(-5.f, 0.f, -1.f), quat::identity)
-			.addComponent<raster_component>(stormtrooperMesh)
+			.addComponent<mesh_component>(stormtrooperMesh)
 			.addComponent<animation_component>()
 			.addComponent<dynamic_transform_component>();
 
@@ -102,12 +107,22 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 	{
 		auto pilot = scene.createEntity("Pilot")
 			.addComponent<transform_component>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
-			.addComponent<raster_component>(pilotMesh)
+			.addComponent<mesh_component>(pilotMesh)
 			.addComponent<animation_component>()
 			.addComponent<dynamic_transform_component>();
 
 		pilot.getComponent<animation_component>().animation.set(&pilotMesh->skeleton.clips[0]);
 	}
+
+#if 1
+	if (auto treeMesh = loadTreeMeshFromFile("assets/tree/chestnut/chestnut.fbx"))
+	{
+		auto tree = scene.createEntity("Chestnut")
+			.addComponent<transform_component>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
+			.addComponent<mesh_component>(treeMesh)
+			.addComponent<tree_component>();
+	}
+#endif
 
 
 #if 1
@@ -151,7 +166,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			//{
 			//	scene.createEntity("Cube")
 			//		.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)))
-			//		.addComponent<raster_component>(boxMesh)
+			//		.addComponent<mesh_component>(boxMesh)
 			//		.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(1.f, 1.f, 2.f)), { physics_material_type_wood, 0.1f, 0.5f, 1.f }))
 			//		.addComponent<rigid_body_component>(false, 1.f);
 			//}
@@ -159,7 +174,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			{
 				scene.createEntity("Sphere")
 					.addComponent<transform_component>(vec3(25.f, 10.f + i * 3.f, -5.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(1.f)), vec3(1.f))
-					.addComponent<raster_component>(sphereMesh)
+					.addComponent<mesh_component>(sphereMesh)
 					.addComponent<collider_component>(collider_component::asSphere({ vec3(0.f, 0.f, 0.f), 1.f }, { physics_material_type_wood, 0.1f, 0.5f, 1.f }))
 					.addComponent<rigid_body_component>(false, 1.f);
 			}
@@ -195,7 +210,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 
 		scene.createEntity("Platform")
 			.addComponent<transform_component>(vec3(10, -4.f, 0.f), quat(vec3(1.f, 0.f, 0.f), deg2rad(0.f)))
-			.addComponent<raster_component>(groundMesh)
+			.addComponent<mesh_component>(groundMesh)
 			.addComponent<collider_component>(collider_component::asAABB(bounding_box::fromCenterRadius(vec3(0.f, 0.f, 0.f), vec3(30.f, 4.f, 30.f)), { physics_material_type_metal, 0.1f, 1.f, 4.f }));
 
 
@@ -206,7 +221,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 
 		auto fixed = scene.createEntity("Fixed")
 			.addComponent<transform_component>(vec3(37.f, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))
-			.addComponent<raster_component>(chainMesh)
+			.addComponent<mesh_component>(chainMesh)
 			.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, { 0.2f, 0.5f, 1.f }))
 			.addComponent<rigid_body_component>(true, 1.f);
 
@@ -222,7 +237,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 
 			auto chain = scene.createEntity("Chain")
 				.addComponent<transform_component>(vec3(xCurr, 15.f, -2.f), quat(vec3(0.f, 0.f, 1.f), deg2rad(90.f)))
-				.addComponent<raster_component>(chainMesh)
+				.addComponent<mesh_component>(chainMesh)
 				.addComponent<collider_component>(collider_component::asCapsule({ vec3(0.f, -1.f, 0.f), vec3(0.f, 1.f, 0.f), 0.18f }, { 0.2f, 0.5f, 1.f }))
 				.addComponent<rigid_body_component>(false, 1.f);
 
@@ -550,9 +565,9 @@ void application::update(const user_input& input, float dt)
 		thread_job_context context;
 
 		// Update animated meshes.
-		for (auto [entityHandle, anim, raster, transform] : scene.group(entt::get<animation_component, raster_component, transform_component>).each())
+		for (auto [entityHandle, anim, mesh, transform] : scene.group(entt::get<animation_component, mesh_component, transform_component>).each())
 		{
-			context.addWork([&anim = anim, mesh = raster.mesh, &transform = transform, &arena = stackArena, dt]()
+			context.addWork([&anim = anim, mesh = mesh.mesh, &transform = transform, &arena = stackArena, dt]()
 			{
 				anim.update(mesh, arena, dt, &transform);
 			});
@@ -560,7 +575,7 @@ void application::update(const user_input& input, float dt)
 
 		context.waitForWorkCompletion();
 
-		//for (auto [entityHandle, anim, raster, transform] : scene.group(entt::get<animation_component, raster_component, transform_component>).each())
+		//for (auto [entityHandle, anim, raster, transform] : scene.group(entt::get<animation_component, mesh_component, transform_component>).each())
 		//{
 		//	anim.drawCurrentSkeleton(raster.mesh, transform, &ldrRenderPass);
 		//}
@@ -658,14 +673,14 @@ void application::update(const user_input& input, float dt)
 		{
 			CPU_PROFILE_BLOCK("Submit render commands");
 
-			for (auto [entityHandle, raster, transform] : scene.group(entt::get<raster_component, transform_component>).each())
+			for (auto [entityHandle, mesh, transform] : scene.group(entt::get<mesh_component, transform_component>, entt::exclude<tree_component>).each())
 			{
-				if (!raster.mesh)
+				if (!mesh.mesh)
 				{
 					continue;
 				}
 
-				const dx_mesh& mesh = raster.mesh->mesh;
+				const dx_mesh& dxMesh = mesh.mesh->mesh;
 				mat4 m = trsToMat4(transform);
 
 				scene_entity entity = { entityHandle, scene };
@@ -676,59 +691,85 @@ void application::update(const user_input& input, float dt)
 
 				if (animation_component* anim = entity.getComponentIfExists<animation_component>())
 				{
-					for (auto& sm : raster.mesh->submeshes)
+					for (auto& sm : mesh.mesh->submeshes)
 					{
 						submesh_info submesh = sm.info;
-						submesh.baseVertex -= raster.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
+						submesh.baseVertex -= mesh.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
 
 						const ref<pbr_material>& material = sm.material;
 
 						if (material->albedoTint.a < 1.f)
 						{
-							transparentRenderPass.renderObject(m, anim->currentVertexBuffer, mesh.indexBuffer, submesh, material);
+							transparentRenderPass.renderObject(m, anim->currentVertexBuffer, dxMesh.indexBuffer, submesh, material);
 						}
 						else
 						{
 							opaqueRenderPass.renderAnimatedObject(m, lastM,
-								anim->currentVertexBuffer, anim->prevFrameVertexBuffer, mesh.indexBuffer,
+								anim->currentVertexBuffer, anim->prevFrameVertexBuffer, dxMesh.indexBuffer,
 								submesh, material,
 								(uint32)entityHandle);
 						}
 
 						if (outline)
 						{
-							ldrRenderPass.renderOutline(m, anim->currentVertexBuffer, mesh.indexBuffer, submesh);
+							ldrRenderPass.renderOutline(m, anim->currentVertexBuffer, dxMesh.indexBuffer, submesh);
 						}
 					}
 				}
 				else
 				{
-					for (auto& sm : raster.mesh->submeshes)
+					for (auto& sm : mesh.mesh->submeshes)
 					{
 						submesh_info submesh = sm.info;
 						const ref<pbr_material>& material = sm.material;
 
 						if (material->albedoTint.a < 1.f)
 						{
-							transparentRenderPass.renderObject(m, mesh.vertexBuffer, mesh.indexBuffer, submesh, material);
+							transparentRenderPass.renderObject(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh, material);
 						}
 						else
 						{
 							if (dynamic)
 							{
-								opaqueRenderPass.renderDynamicObject(m, lastM, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
+								opaqueRenderPass.renderDynamicObject(m, lastM, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh, material, (uint32)entityHandle);
 							}
 							else
 							{
-								opaqueRenderPass.renderStaticObject(m, mesh.vertexBuffer, mesh.indexBuffer, submesh, material, (uint32)entityHandle);
+								opaqueRenderPass.renderStaticObject(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh, material, (uint32)entityHandle);
 							}
 						}
 
 						if (outline)
 						{
-							ldrRenderPass.renderOutline(m, mesh.vertexBuffer, mesh.indexBuffer, submesh);
+							ldrRenderPass.renderOutline(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh);
 						}
 					}
+				}
+			}
+
+			for (auto [entityHandle, tree, mesh, transform] : scene.group(entt::get<tree_component, mesh_component, transform_component>).each())
+			{
+				if (!mesh.mesh)
+				{
+					continue;
+				}
+
+				const dx_mesh& dxMesh = mesh.mesh->mesh;
+				mat4 m = trsToMat4(transform);
+
+				for (auto& sm : mesh.mesh->submeshes)
+				{
+					submesh_info submesh = sm.info;
+					const ref<pbr_material>& material = sm.material;
+
+					pbr_render_data data;
+					data.transform = m;
+					data.vertexBuffer = dxMesh.vertexBuffer;
+					data.indexBuffer = dxMesh.indexBuffer;
+					data.submesh = submesh;
+					data.material = material;
+
+					opaqueRenderPass.renderObject<tree_pipeline>(data);
 				}
 			}
 
@@ -804,7 +845,7 @@ void application::handleFileDrop(const fs::path& filename)
 
 			scene.getCurrentScene().createEntity(path.string().c_str())
 				.addComponent<transform_component>(vec3(0.f), quat::identity)
-				.addComponent<raster_component>(mesh);
+				.addComponent<mesh_component>(mesh);
 		}
 	}
 	else if (ext == ".hdr")

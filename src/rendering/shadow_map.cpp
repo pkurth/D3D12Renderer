@@ -8,7 +8,7 @@
 static void renderStaticGeometryToSunShadowMap(sun_shadow_render_pass* renderPass, game_scene& scene)
 {
 	for (auto [entityHandle, raster, transform] : 
-		scene.group(entt::get<raster_component, transform_component>, entt::exclude<dynamic_transform_component>).each())
+		scene.group(entt::get<mesh_component, transform_component>, entt::exclude<dynamic_transform_component>).each())
 	{
 		if (raster.mesh)
 		{
@@ -27,7 +27,7 @@ static void renderStaticGeometryToSunShadowMap(sun_shadow_render_pass* renderPas
 static void renderDynamicGeometryToSunShadowMap(sun_shadow_render_pass* renderPass, game_scene& scene)
 {
 	for (auto [entityHandle, raster, transform, dynamic] :
-		scene.group(entt::get<raster_component, transform_component, dynamic_transform_component>, entt::exclude<animation_component>).each())
+		scene.group(entt::get<mesh_component, transform_component, dynamic_transform_component>, entt::exclude<animation_component>).each())
 	{
 		if (raster.mesh)
 		{
@@ -43,7 +43,7 @@ static void renderDynamicGeometryToSunShadowMap(sun_shadow_render_pass* renderPa
 	}
 
 	for (auto [entityHandle, raster, anim, transform, dynamic] :
-		scene.group(entt::get<raster_component, animation_component, transform_component, dynamic_transform_component>).each())
+		scene.group(entt::get<mesh_component, animation_component, transform_component, dynamic_transform_component>).each())
 	{
 		if (raster.mesh)
 		{
@@ -65,7 +65,7 @@ static void renderDynamicGeometryToSunShadowMap(sun_shadow_render_pass* renderPa
 static void renderStaticGeometryToSpotShadowMap(spot_shadow_render_pass* renderPass, game_scene& scene)
 {
 	for (auto [entityHandle, raster, transform] : 
-		scene.group(entt::get<raster_component, transform_component>, entt::exclude<dynamic_transform_component>).each())
+		scene.group(entt::get<mesh_component, transform_component>, entt::exclude<dynamic_transform_component>).each())
 	{
 		if (raster.mesh)
 		{
@@ -84,7 +84,7 @@ static void renderStaticGeometryToSpotShadowMap(spot_shadow_render_pass* renderP
 static void renderDynamicGeometryToSpotShadowMap(spot_shadow_render_pass* renderPass, game_scene& scene)
 {
 	for (auto [entityHandle, raster, transform, dynamic] : 
-		scene.group(entt::get<raster_component, transform_component, dynamic_transform_component>, entt::exclude<animation_component>).each())
+		scene.group(entt::get<mesh_component, transform_component, dynamic_transform_component>, entt::exclude<animation_component>).each())
 	{
 		if (raster.mesh)
 		{
@@ -100,7 +100,7 @@ static void renderDynamicGeometryToSpotShadowMap(spot_shadow_render_pass* render
 	}
 
 	for (auto [entityHandle, raster, anim, transform, dynamic] : 
-		scene.group(entt::get<raster_component, animation_component, transform_component, dynamic_transform_component>).each())
+		scene.group(entt::get<mesh_component, animation_component, transform_component, dynamic_transform_component>).each())
 	{
 		if (raster.mesh)
 		{
@@ -122,7 +122,7 @@ static void renderDynamicGeometryToSpotShadowMap(spot_shadow_render_pass* render
 static void renderStaticGeometryToPointShadowMap(point_shadow_render_pass* renderPass, game_scene& scene)
 {
 	for (auto [entityHandle, raster, transform] : 
-		scene.group(entt::get<raster_component, transform_component>, entt::exclude<dynamic_transform_component>).each())
+		scene.group(entt::get<mesh_component, transform_component>, entt::exclude<dynamic_transform_component>).each())
 	{
 		if (raster.mesh)
 		{
@@ -141,7 +141,7 @@ static void renderStaticGeometryToPointShadowMap(point_shadow_render_pass* rende
 static void renderDynamicGeometryToPointShadowMap(point_shadow_render_pass* renderPass, game_scene& scene)
 {
 	for (auto [entityHandle, raster, transform, dynamic] : 
-		scene.group(entt::get<raster_component, transform_component, dynamic_transform_component>, entt::exclude<animation_component>).each())
+		scene.group(entt::get<mesh_component, transform_component, dynamic_transform_component>, entt::exclude<animation_component>).each())
 	{
 		if (raster.mesh)
 		{
@@ -157,7 +157,7 @@ static void renderDynamicGeometryToPointShadowMap(point_shadow_render_pass* rend
 	}
 
 	for (auto [entityHandle, raster, anim, transform, dynamic] : 
-		scene.group(entt::get<raster_component, animation_component, transform_component, dynamic_transform_component>).each())
+		scene.group(entt::get<mesh_component, animation_component, transform_component, dynamic_transform_component>).each())
 	{
 		if (raster.mesh)
 		{

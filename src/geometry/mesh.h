@@ -42,7 +42,7 @@ inline ref<multi_mesh> loadAnimatedMeshFromFile(const fs::path& sceneFilename, u
 	return loadMeshFromFile(sceneFilename, flags, cb);
 }
 
-struct raster_component
+struct mesh_component
 {
 	ref<multi_mesh> mesh;
 };

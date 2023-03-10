@@ -282,9 +282,9 @@ namespace YAML
 	};
 
 	template<>
-	struct convert<raster_component>
+	struct convert<mesh_component>
 	{
-		static Node encode(const raster_component& c)
+		static Node encode(const mesh_component& c)
 		{
 			Node n;
 			n["Handle"] = c.mesh->handle;
@@ -292,7 +292,7 @@ namespace YAML
 			return n;
 		}
 
-		static bool decode(const Node& n, raster_component& c)
+		static bool decode(const Node& n, mesh_component& c)
 		{
 			if (!n.IsMap()) { return false; }
 
@@ -400,7 +400,7 @@ void serializeSceneToYAMLFile(editor_scene& scene, const renderer_settings& rend
 			if (auto* c = entity.getComponentIfExists<dynamic_transform_component>()) { n["Dynamic"] = true; }
 
 			// Rendering.
-			if (auto* c = entity.getComponentIfExists<raster_component>()) { n["Raster"] = *c; }
+			if (auto* c = entity.getComponentIfExists<mesh_component>()) { n["Mesh"] = *c; }
 			if (auto* c = entity.getComponentIfExists<point_light_component>()) { n["Point light"] = *c; }
 			if (auto* c = entity.getComponentIfExists<spot_light_component>()) { n["Spot light"] = *c; }
 
@@ -493,7 +493,7 @@ bool deserializeSceneFromYAMLFile(editor_scene& scene, renderer_settings& render
 		if (entityNode["Dynamic"]) { entity.addComponent<dynamic_transform_component>(); }
 
 		// Rendering.
-		LOAD_COMPONENT(raster_component, "Raster");
+		LOAD_COMPONENT(mesh_component, "Mesh");
 		LOAD_COMPONENT(point_light_component, "Point light");
 		LOAD_COMPONENT(spot_light_component, "Spot light");
 

@@ -161,7 +161,7 @@ static scene_entity createAxis(game_scene& scene, mesh_builder& builder, ref<pbr
 
 	mesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, material });
 
-	axis.addComponent<raster_component>(mesh);
+	axis.addComponent<mesh_component>(mesh);
 	axis.addComponent<rigid_body_component>(false);
 
 	return axis;
@@ -206,7 +206,7 @@ static scene_entity createGearAxis(game_scene& scene, mesh_builder& builder, ref
 		builder.pushCapsule(m);
 	}
 
-	axis.addComponent<raster_component>(mesh);
+	axis.addComponent<mesh_component>(mesh);
 	axis.addComponent<rigid_body_component>(false);
 
 	mesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, material });
@@ -236,7 +236,7 @@ static scene_entity createWheel(game_scene& scene, mesh_builder& builder, ref<pb
 
 	result.addComponent<collider_component>(collider_component::asCylinder(cylinder, { physics_material_type_wood, 0.2f, desc.friction, desc.density }));
 
-	result.addComponent<raster_component>(mesh);
+	result.addComponent<mesh_component>(mesh);
 	result.addComponent<rigid_body_component>(false);
 
 	mesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, material });
@@ -267,7 +267,7 @@ static scene_entity createWheelSuspension(game_scene& scene, mesh_builder& build
 
 	// These rigid bodies don't have colliders, since they penetrate the wheels.
 
-	result.addComponent<raster_component>(mesh);
+	result.addComponent<mesh_component>(mesh);
 	result.addComponent<rigid_body_component>(false);
 
 	mesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, material });
@@ -292,7 +292,7 @@ static scene_entity createRod(game_scene& scene, mesh_builder& builder, ref<pbr_
 	m.radius = vec3(thickness * 0.5f, len * 0.5f, thickness * 0.5f);
 	builder.pushBox(m);
 
-	result.addComponent<raster_component>(mesh);
+	result.addComponent<mesh_component>(mesh);
 	result.addComponent<rigid_body_component>(false);
 
 	mesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, material });
@@ -328,7 +328,7 @@ void vehicle::initialize(game_scene& scene, vec3 initialMotorPosition, float ini
 
 		motorMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, material });
 
-		motor.addComponent<raster_component>(motorMesh);
+		motor.addComponent<mesh_component>(motorMesh);
 	}
 
 	gear_description motorGearDesc;
@@ -466,7 +466,7 @@ void vehicle::initialize(game_scene& scene, vec3 initialMotorPosition, float ini
 		m.radius = vec3(0.01f, gearOffset * 0.5f + 0.05f, 0.01f);
 		m.center = vec3(-rearAxisGearDesc.cylinderRadius * 0.9f, gearOffset * 0.5f + 0.05f, 0.f);
 		builder.pushBox(m);
-		differentialSunGear.getComponent<raster_component>().mesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, material });
+		differentialSunGear.getComponent<mesh_component>().mesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, material });
 	}
 
 	// Differential.
@@ -493,7 +493,7 @@ void vehicle::initialize(game_scene& scene, vec3 initialMotorPosition, float ini
 	auto mesh = builder.createDXMesh();
 	for (uint32 i = 0; i < arraysize(parts); ++i)
 	{
-		parts[i].getComponent<raster_component>().mesh->mesh = mesh;
+		parts[i].getComponent<mesh_component>().mesh->mesh = mesh;
 
 		auto& transform = parts[i].getComponent<transform_component>();
 		transform.position = rotation * transform.position + initialMotorPosition;
