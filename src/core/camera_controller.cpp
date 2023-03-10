@@ -79,6 +79,7 @@ bool camera_controller::update(const user_input& input, uint32 viewportWidth, ui
 
 			vec3 center = camera->position + cameraRotation * vec3(0.f, 0.f, -orbitRadius);
 
+			// https://gamedev.stackexchange.com/questions/136174/im-rotating-an-object-on-two-axes-so-why-does-it-keep-twisting-around-the-thir
 			cameraRotation = quat(vec3(0.f, 1.f, 0.f), turnAngle.x) * cameraRotation;
 			cameraRotation = cameraRotation * quat(vec3(1.f, 0.f, 0.f), turnAngle.y);
 
