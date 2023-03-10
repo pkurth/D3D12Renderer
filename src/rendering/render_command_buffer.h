@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/memory.h"
-
+#include "material.h"
 
 struct dx_command_list;
 struct common_render_data;
@@ -122,16 +122,12 @@ public:
 
 
 
-
-typedef void (*pipeline_setup_func)(dx_command_list*, const common_render_data&);
-
-
 struct default_command_header
 {
-	typedef void (*pipeline_render_func)(dx_command_list*, const mat4&, void*);
+	typedef void (*generic_pipeline_render_func)(dx_command_list*, const mat4&, void*);
 
 	pipeline_setup_func setup;
-	pipeline_render_func render;
+	generic_pipeline_render_func render;
 
 	template <typename pipeline_t, typename command_wrapper>
 	void initialize()
@@ -154,10 +150,10 @@ struct default_render_command_buffer : render_command_buffer<key_t, default_comm
 
 struct depth_prepass_command_header
 {
-	typedef void (*pipeline_render_func)(dx_command_list*, const mat4&, const mat4&, void*);
+	typedef void (*generic_pipeline_render_func)(dx_command_list*, const mat4&, const mat4&, void*);
 
 	pipeline_setup_func setup;
-	pipeline_render_func render;
+	generic_pipeline_render_func render;
 
 	template <typename pipeline_t, typename command_wrapper>
 	void initialize()
@@ -180,9 +176,9 @@ struct depth_prepass_render_command_buffer : render_command_buffer<key_t, depth_
 
 struct compute_command_header
 {
-	typedef void (*compute_func)(dx_command_list*, void*);
+	typedef void (*generic_compute_func)(dx_command_list*, void*);
 
-	compute_func compute;
+	generic_compute_func compute;
 
 	template <typename pipeline_t, typename command_wrapper>
 	void initialize()

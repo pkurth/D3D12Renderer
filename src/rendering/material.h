@@ -3,6 +3,7 @@
 #include "light_source.h"
 #include "dx/dx_buffer.h"
 #include "dx/dx_texture.h"
+#include "render_command.h"
 
 struct dx_command_list;
 
@@ -52,18 +53,28 @@ struct common_render_data
 
 
 
-#define PIPELINE_SETUP_DECL					static void setup(dx_command_list* cl, const common_render_data& common)
-#define PIPELINE_SETUP_IMPL(name)			void name::setup(dx_command_list* cl, const common_render_data& common)
+#define _PIPELINE_SETUP_DECL(name)			void name(dx_command_list* cl, const common_render_data& common)
+#define PIPELINE_SETUP_DECL					static _PIPELINE_SETUP_DECL(setup)
+#define PIPELINE_SETUP_IMPL(name)			_PIPELINE_SETUP_DECL(name::setup)
+using pipeline_setup_func = _PIPELINE_SETUP_DECL((*));
 
-#define DEPTH_ONLY_RENDER_DECL				static void render(dx_command_list* cl, const mat4& viewProj, const mat4& prevFrameViewProj, const depth_only_render_command<render_data_t>& rc)
-#define DEPTH_ONLY_RENDER_IMPL(name)		void name::render(dx_command_list* cl, const mat4& viewProj, const mat4& prevFrameViewProj, const depth_only_render_command<render_data_t>& rc)
+#define _DEPTH_ONLY_RENDER_FUNC(name)		void name(dx_command_list* cl, const mat4& viewProj, const mat4& prevFrameViewProj, const depth_only_render_command<render_data_t>& rc)
+#define DEPTH_ONLY_RENDER_DECL				static _DEPTH_ONLY_RENDER_FUNC(render)
+#define DEPTH_ONLY_RENDER_IMPL(name)		_DEPTH_ONLY_RENDER_FUNC(name::render)
+template <typename render_data_t> using depth_only_pipeline_render_func = _DEPTH_ONLY_RENDER_FUNC((*));
 
-#define PIPELINE_RENDER_DECL				static void render(dx_command_list* cl, const mat4& viewProj, const render_command<render_data_t>& rc)
-#define PIPELINE_RENDER_IMPL(name)			void name::render(dx_command_list* cl, const mat4& viewProj, const render_command<render_data_t>& rc)
+#define _RENDER_FUNC(name)					void name(dx_command_list* cl, const mat4& viewProj, const render_command<render_data_t>& rc)
+#define PIPELINE_RENDER_DECL				static _RENDER_FUNC(render)
+#define PIPELINE_RENDER_IMPL(name)			_RENDER_FUNC(name::render)
+template <typename render_data_t> using pipeline_render_func = _RENDER_FUNC((*));
 
-#define PARTICLE_PIPELINE_RENDER_DECL		static void render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<render_data_t>& rc)
-#define PARTICLE_PIPELINE_RENDER_IMPL(name)	void name::render(dx_command_list* cl, const mat4& viewProj, const particle_render_command<render_data_t>& rc)
+#define _PARTICLE_RENDER_FUNC(name)			void name(dx_command_list* cl, const mat4& viewProj, const particle_render_command<render_data_t>& rc)
+#define PARTICLE_PIPELINE_RENDER_DECL		static _PARTICLE_RENDER_FUNC(render)
+#define PARTICLE_PIPELINE_RENDER_IMPL(name)	_PARTICLE_RENDER_FUNC(name::render)
+template <typename render_data_t> using particle_pipeline_render_func = _PARTICLE_RENDER_FUNC((*));
 
-#define PIPELINE_COMPUTE_DECL				static void compute(dx_command_list* cl, const render_command<render_data_t>& rc)
-#define PIPELINE_COMPUTE_IMPL(name)			void name::compute(dx_command_list* cl, const render_command<render_data_t>& rc)
+#define _COMPUTE_FUNC(name)					void name(dx_command_list* cl, const render_command<render_data_t>& rc)
+#define PIPELINE_COMPUTE_DECL				static _COMPUTE_FUNC(compute)
+#define PIPELINE_COMPUTE_IMPL(name)			_COMPUTE_FUNC(name::compute)
+template <typename render_data_t> using pipeline_compute_func = _COMPUTE_FUNC((*));
 

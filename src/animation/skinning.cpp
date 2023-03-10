@@ -147,7 +147,9 @@ void initializeSkinning()
 	for (uint32 i = 0; i < 2; ++i)
 	{
 		skinnedVertexBuffer[i].positions = createVertexBuffer(sizeof(vec3), MAX_NUM_SKINNED_VERTICES_PER_FRAME, 0, true);
-		skinnedVertexBuffer[i].others = createVertexBuffer(getVertexSize(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents), MAX_NUM_SKINNED_VERTICES_PER_FRAME, 0, true);
+		skinnedVertexBuffer[i].others = createVertexBuffer(
+			getVertexOthersSize(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents), 
+			MAX_NUM_SKINNED_VERTICES_PER_FRAME, 0, true);
 	}
 
 	skinningPipeline = createReloadablePipeline("skinning_cs");

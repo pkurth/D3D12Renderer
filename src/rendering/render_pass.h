@@ -120,8 +120,8 @@ struct opaque_render_pass
 				prepassData.vertexBuffer = vertexBuffer;
 				prepassData.indexBuffer = indexBuffer;
 				prepassData.submesh = submesh;
-				prepassData.alphaTexture = material->albedo;
-
+				prepassData.alphaCutoutTextureSRV = material->albedo->defaultSRV;
+				
 				renderObject<pbr_pipeline::opaque_double_sided, static_depth_prepass_pipeline::alpha_cutout>(data, prepassData, objectID);
 			} break;
 		}
@@ -171,7 +171,7 @@ struct opaque_render_pass
 				prepassData.vertexBuffer = vertexBuffer;
 				prepassData.indexBuffer = indexBuffer;
 				prepassData.submesh = submesh;
-				prepassData.alphaTexture = material->albedo;
+				prepassData.alphaCutoutTextureSRV = material->albedo->defaultSRV;
 
 				renderObject<pbr_pipeline::opaque_double_sided, dynamic_depth_prepass_pipeline::alpha_cutout>(data, prepassData, objectID);
 			} break;

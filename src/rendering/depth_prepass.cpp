@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "depth_prepass.h"
 #include "render_utils.h"
+#include "render_resources.h"
 
 #include "dx/dx_command_list.h"
 
@@ -126,7 +127,7 @@ DEPTH_ONLY_RENDER_IMPL(static_depth_prepass_pipeline::alpha_cutout)
 	cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, rc.objectID);
 	cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * rc.data.transform, prevFrameViewProj * rc.data.transform });
 
-	cl->setDescriptorHeapSRV(DEPTH_ONLY_RS_ALPHA_TEXTURE, 0, rc.data.alphaTexture);
+	cl->setDescriptorHeapSRV(DEPTH_ONLY_RS_ALPHA_TEXTURE, 0, rc.data.alphaCutoutTextureSRV ? rc.data.alphaCutoutTextureSRV : render_resources::whiteTexture->defaultSRV);
 
 	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
 	cl->setVertexBuffer(1, rc.data.vertexBuffer.others);
@@ -139,7 +140,7 @@ DEPTH_ONLY_RENDER_IMPL(dynamic_depth_prepass_pipeline::alpha_cutout)
 	cl->setGraphics32BitConstants(DEPTH_ONLY_RS_OBJECT_ID, rc.objectID);
 	cl->setGraphics32BitConstants(DEPTH_ONLY_RS_MVP, depth_only_transform_cb{ viewProj * rc.data.transform, prevFrameViewProj * rc.data.prevFrameTransform });
 
-	cl->setDescriptorHeapSRV(DEPTH_ONLY_RS_ALPHA_TEXTURE, 0, rc.data.alphaTexture);
+	cl->setDescriptorHeapSRV(DEPTH_ONLY_RS_ALPHA_TEXTURE, 0, rc.data.alphaCutoutTextureSRV ? rc.data.alphaCutoutTextureSRV : render_resources::whiteTexture->defaultSRV);
 
 	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
 	cl->setVertexBuffer(1, rc.data.vertexBuffer.others);

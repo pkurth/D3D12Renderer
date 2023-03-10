@@ -24,7 +24,7 @@ struct static_alpha_cutout_depth_prepass_data
 	dx_index_buffer_view indexBuffer;
 	submesh_info submesh;
 
-	ref<dx_texture> alphaTexture;
+	dx_cpu_descriptor_handle alphaCutoutTextureSRV;
 };
 
 struct static_depth_prepass_pipeline
@@ -80,7 +80,7 @@ struct dynamic_alpha_cutout_depth_prepass_data
 	dx_index_buffer_view indexBuffer;
 	submesh_info submesh;
 
-	ref<dx_texture> alphaTexture;
+	dx_cpu_descriptor_handle alphaCutoutTextureSRV;
 };
 
 struct dynamic_depth_prepass_pipeline

@@ -19,6 +19,35 @@ static vertex_info getVertexInfo(uint32 flags)
 	return result;
 }
 
+static uint32 packColor(uint32 r, uint32 g, uint32 b, uint32 a)
+{
+	return ((a & 0xFF) << 24) | ((b & 0xFF) << 16) | ((g & 0xFF) << 8) | (r & 0xFF);
+}
+
+static uint32 packColor(float r, float g, float b, float a)
+{
+	return packColor(
+		(uint32)clamp(r * 255.f, 0.f, 255.f),
+		(uint32)clamp(g * 255.f, 0.f, 255.f),
+		(uint32)clamp(b * 255.f, 0.f, 255.f),
+		(uint32)clamp(a * 255.f, 0.f, 255.f));
+}
+
+static uint32 packColor(vec4 rgba)
+{
+	return packColor(rgba.r, rgba.g, rgba.b, rgba.a);
+}
+
+static vec4 unpackColor(uint32 c)
+{
+	const float mul = 1.f / 255.f;
+	float r = (c & 0xFF) * mul;
+	float g = ((c >> 8) & 0xFF) * mul;
+	float b = ((c >> 16) & 0xFF) * mul;
+	float a = ((c >> 24) & 0xFF) * mul;
+	return vec4(r, g, b, a);
+}
+
 mesh_builder::mesh_builder(uint32 vertexFlags, mesh_index_type indexType)
 {
 	positionArena.initialize(0, GB(2));
@@ -1255,11 +1284,13 @@ void mesh_builder::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_box*
 	vec3 normal(0.f, 0.f, 0.f);
 	vec3 tangent(0.f, 0.f, 0.f);
 	vec2 uv(0.f, 0.f);
+	uint32 vertexColor = 0;
 
 	bool hasPositions = mesh->HasPositions();
 	bool hasNormals = mesh->HasNormals();
 	bool hasTangents = mesh->HasTangentsAndBitangents();
 	bool hasUVs = mesh->HasTextureCoords(0);
+	bool hasVertexColors = mesh->HasVertexColors(0);
 
 	if (aabb)
 	{
@@ -1287,6 +1318,10 @@ void mesh_builder::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_box*
 		if (hasUVs)
 		{
 			uv = vec2(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y);
+		}
+		if (hasVertexColors)
+		{
+			vertexColor = packColor(vec4(mesh->mColors[0][i].r, mesh->mColors[0][i].g, mesh->mColors[0][i].b, mesh->mColors[0][i].a));
 		}
 
 		pushVertex(position, uv, normal, tangent, {});
