@@ -13,6 +13,7 @@
 #include "terrain/proc_placement.h"
 #include "terrain/grass.h"
 #include "terrain/water.h"
+#include "terrain/tree.h"
 #endif
 
 struct game_scene;

@@ -3,6 +3,8 @@
 #include "math.h"
 #include "random.h"
 
+#include "material.hlsli"
+
 // RGB is in [0,1]^3.
 // HSV is in [0,2pi]x[0,1]x[0,1]
 

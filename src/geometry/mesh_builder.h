@@ -25,6 +25,7 @@ enum mesh_creation_flags
 	mesh_creation_flags_with_normals = (1 << 2),
 	mesh_creation_flags_with_tangents = (1 << 3),
 	mesh_creation_flags_with_skin = (1 << 4),
+	mesh_creation_flags_with_colors = (1 << 5),
 
 	mesh_creation_flags_default = mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents,
 	mesh_creation_flags_animated = mesh_creation_flags_default | mesh_creation_flags_with_skin,
@@ -153,6 +154,7 @@ static uint32 getVertexOthersSize(uint32 meshFlags)
 	if (meshFlags & mesh_creation_flags_with_normals) { size += sizeof(vec3); }
 	if (meshFlags & mesh_creation_flags_with_tangents) { size += sizeof(vec3); }
 	if (meshFlags & mesh_creation_flags_with_skin) { size += sizeof(skinning_weights); }
+	if (meshFlags & mesh_creation_flags_with_colors) { size += sizeof(uint32); }
 	return size;
 }
 
@@ -213,7 +215,6 @@ private:
 	uint32 numTrianglesInCurrentSubmesh = 0;
 
 	uint32 numSubmeshes = 0;
-
 };
 
 
@@ -249,5 +250,13 @@ static D3D12_INPUT_ELEMENT_DESC inputLayout_position_uv_normal_tangent[] = {
 	{ "TEXCOORDS", 0, DXGI_FORMAT_R32G32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+};
+
+static D3D12_INPUT_ELEMENT_DESC inputLayout_position_uv_normal_tangent_colors[] = {
+	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	{ "TEXCOORDS", 0, DXGI_FORMAT_R32G32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	{ "COLOR", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 };
 

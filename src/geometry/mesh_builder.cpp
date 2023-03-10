@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "mesh_builder.h"
+#include "core/color.h"
 
 #include <assimp/scene.h>
 
@@ -16,36 +17,8 @@ static vertex_info getVertexInfo(uint32 flags)
 	if (flags & mesh_creation_flags_with_normals) { result.othersSize += sizeof(vec3); }
 	if (flags & mesh_creation_flags_with_tangents) { result.othersSize += sizeof(vec3); }
 	if (flags & mesh_creation_flags_with_skin) { result.skinOffset = result.othersSize;	result.othersSize += sizeof(skinning_weights); }
+	if (flags & mesh_creation_flags_with_colors) { result.othersSize += sizeof(uint32); }
 	return result;
-}
-
-static uint32 packColor(uint32 r, uint32 g, uint32 b, uint32 a)
-{
-	return ((a & 0xFF) << 24) | ((b & 0xFF) << 16) | ((g & 0xFF) << 8) | (r & 0xFF);
-}
-
-static uint32 packColor(float r, float g, float b, float a)
-{
-	return packColor(
-		(uint32)clamp(r * 255.f, 0.f, 255.f),
-		(uint32)clamp(g * 255.f, 0.f, 255.f),
-		(uint32)clamp(b * 255.f, 0.f, 255.f),
-		(uint32)clamp(a * 255.f, 0.f, 255.f));
-}
-
-static uint32 packColor(vec4 rgba)
-{
-	return packColor(rgba.r, rgba.g, rgba.b, rgba.a);
-}
-
-static vec4 unpackColor(uint32 c)
-{
-	const float mul = 1.f / 255.f;
-	float r = (c & 0xFF) * mul;
-	float g = ((c >> 8) & 0xFF) * mul;
-	float b = ((c >> 16) & 0xFF) * mul;
-	float a = ((c >> 24) & 0xFF) * mul;
-	return vec4(r, g, b, a);
 }
 
 mesh_builder::mesh_builder(uint32 vertexFlags, mesh_index_type indexType)
@@ -67,12 +40,13 @@ mesh_builder::~mesh_builder()
 {
 }
 
-#define pushVertex(pos, uv, nor, tan, skin) \
+#define pushVertex(pos, uv, nor, tan, skin, col) \
 	if (vertexFlags & mesh_creation_flags_with_positions) { *positionPtr++ = pos; }														\
 	if (vertexFlags & mesh_creation_flags_with_uvs) { *(vec2*)othersPtr = uv; othersPtr += sizeof(vec2); }								\
 	if (vertexFlags & mesh_creation_flags_with_normals) { *(vec3*)othersPtr = nor; othersPtr += sizeof(vec3); }							\
 	if (vertexFlags & mesh_creation_flags_with_tangents) { *(vec3*)othersPtr = tan; othersPtr += sizeof(vec3); }						\
-	if (vertexFlags & mesh_creation_flags_with_skin) { *(skinning_weights*)othersPtr = skin; othersPtr += sizeof(skinning_weights); }
+	if (vertexFlags & mesh_creation_flags_with_skin) { *(skinning_weights*)othersPtr = skin; othersPtr += sizeof(skinning_weights); }	\
+	if (vertexFlags & mesh_creation_flags_with_colors) { *(uint32*)othersPtr = col; othersPtr += sizeof(uint32); }
 
 #define triangle(triangle_type, index_type, a, b, c) *(triangle_type*)indexPtr = flipWindingOrder \
 	? triangle_type{ (index_type)((a) + indexOffset), (index_type)((c) + indexOffset), (index_type)((b) + indexOffset) } \
@@ -99,10 +73,10 @@ void mesh_builder::pushQuad(const quad_mesh_desc& desc, bool flipWindingOrder)
 	vec3 x = xAxis * radius.x;
 	vec3 y = yAxis * radius.y;
 
-	pushVertex(center - x - y, vec2(0.f, 0.f), zAxis, yAxis, {});
-	pushVertex(center + x - y, vec2(1.f, 0.f), zAxis, yAxis, {});
-	pushVertex(center - x + y, vec2(0.f, 1.f), zAxis, yAxis, {});
-	pushVertex(center + x + y, vec2(1.f, 1.f), zAxis, yAxis, {});
+	pushVertex(center - x - y, vec2(0.f, 0.f), zAxis, yAxis, {}, 0);
+	pushVertex(center + x - y, vec2(1.f, 0.f), zAxis, yAxis, {}, 0);
+	pushVertex(center - x + y, vec2(0.f, 1.f), zAxis, yAxis, {}, 0);
+	pushVertex(center + x + y, vec2(1.f, 1.f), zAxis, yAxis, {}, 0);
 
 	pushTriangle(0, 1, 2);
 	pushTriangle(1, 3, 2);
@@ -129,14 +103,14 @@ void mesh_builder::pushBox(const box_mesh_desc& desc, bool flipWindingOrder)
 	{
 		auto [positionPtr, othersPtr, indexPtr, indexOffset] = beginPrimitive(8, 12);
 
-		pushVertex(center - x - y + z, {}, {}, {}, {}); // 0
-		pushVertex(center + x - y + z, {}, {}, {}, {});	// x
-		pushVertex(center - x + y + z, {}, {}, {}, {}); // y
-		pushVertex(center + x + y + z, {}, {}, {}, {});	// xy
-		pushVertex(center - x - y - z, {}, {}, {}, {}); // z
-		pushVertex(center + x - y - z, {}, {}, {}, {}); // xz
-		pushVertex(center - x + y - z, {}, {}, {}, {}); // yz
-		pushVertex(center + x + y - z, {}, {}, {}, {}); // xyz
+		pushVertex(center - x - y + z, {}, {}, {}, {}, 0); // 0
+		pushVertex(center + x - y + z, {}, {}, {}, {}, 0);	// x
+		pushVertex(center - x + y + z, {}, {}, {}, {}, 0); // y
+		pushVertex(center + x + y + z, {}, {}, {}, {}, 0);	// xy
+		pushVertex(center - x - y - z, {}, {}, {}, {}, 0); // z
+		pushVertex(center + x - y - z, {}, {}, {}, {}, 0); // xz
+		pushVertex(center - x + y - z, {}, {}, {}, {}, 0); // yz
+		pushVertex(center + x + y - z, {}, {}, {}, {}, 0); // xyz
 
 		pushTriangle(0, 1, 2);
 		pushTriangle(1, 3, 2);
@@ -155,30 +129,30 @@ void mesh_builder::pushBox(const box_mesh_desc& desc, bool flipWindingOrder)
 	{
 		auto [positionPtr, othersPtr, indexPtr, indexOffset] = beginPrimitive(24, 12);
 
-		pushVertex(center - x - y + z, vec2(0.f, 0.f), zAxis, yAxis, {});
-		pushVertex(center + x - y + z, vec2(1.f, 0.f), zAxis, yAxis, {});
-		pushVertex(center - x + y + z, vec2(0.f, 1.f), zAxis, yAxis, {});
-		pushVertex(center + x + y + z, vec2(1.f, 1.f), zAxis, yAxis, {});
-		pushVertex(center + x - y + z, vec2(0.f, 0.f), xAxis, yAxis, {});
-		pushVertex(center + x - y - z, vec2(1.f, 0.f), xAxis, yAxis, {});
-		pushVertex(center + x + y + z, vec2(0.f, 1.f), xAxis, yAxis, {});
-		pushVertex(center + x + y - z, vec2(1.f, 1.f), xAxis, yAxis, {});
-		pushVertex(center + x - y - z, vec2(0.f, 0.f), -zAxis, yAxis, {});
-		pushVertex(center - x - y - z, vec2(1.f, 0.f), -zAxis, yAxis, {});
-		pushVertex(center + x + y - z, vec2(0.f, 1.f), -zAxis, yAxis, {});
-		pushVertex(center - x + y - z, vec2(1.f, 1.f), -zAxis, yAxis, {});
-		pushVertex(center - x - y - z, vec2(0.f, 0.f), -xAxis, yAxis, {});
-		pushVertex(center - x - y + z, vec2(1.f, 0.f), -xAxis, yAxis, {});
-		pushVertex(center - x + y - z, vec2(0.f, 1.f), -xAxis, yAxis, {});
-		pushVertex(center - x + y + z, vec2(1.f, 1.f), -xAxis, yAxis, {});
-		pushVertex(center - x + y + z, vec2(0.f, 0.f), yAxis, xAxis, {});
-		pushVertex(center + x + y + z, vec2(1.f, 0.f), yAxis, xAxis, {});
-		pushVertex(center - x + y - z, vec2(0.f, 1.f), yAxis, xAxis, {});
-		pushVertex(center + x + y - z, vec2(1.f, 1.f), yAxis, xAxis, {});
-		pushVertex(center - x - y - z, vec2(0.f, 0.f), -yAxis, xAxis, {});
-		pushVertex(center + x - y - z, vec2(1.f, 0.f), -yAxis, xAxis, {});
-		pushVertex(center - x - y + z, vec2(0.f, 1.f), -yAxis, xAxis, {});
-		pushVertex(center + x - y + z, vec2(1.f, 1.f), -yAxis, xAxis, {});
+		pushVertex(center - x - y + z, vec2(0.f, 0.f), zAxis, yAxis, {}, 0);
+		pushVertex(center + x - y + z, vec2(1.f, 0.f), zAxis, yAxis, {}, 0);
+		pushVertex(center - x + y + z, vec2(0.f, 1.f), zAxis, yAxis, {}, 0);
+		pushVertex(center + x + y + z, vec2(1.f, 1.f), zAxis, yAxis, {}, 0);
+		pushVertex(center + x - y + z, vec2(0.f, 0.f), xAxis, yAxis, {}, 0);
+		pushVertex(center + x - y - z, vec2(1.f, 0.f), xAxis, yAxis, {}, 0);
+		pushVertex(center + x + y + z, vec2(0.f, 1.f), xAxis, yAxis, {}, 0);
+		pushVertex(center + x + y - z, vec2(1.f, 1.f), xAxis, yAxis, {}, 0);
+		pushVertex(center + x - y - z, vec2(0.f, 0.f), -zAxis, yAxis, {}, 0);
+		pushVertex(center - x - y - z, vec2(1.f, 0.f), -zAxis, yAxis, {}, 0);
+		pushVertex(center + x + y - z, vec2(0.f, 1.f), -zAxis, yAxis, {}, 0);
+		pushVertex(center - x + y - z, vec2(1.f, 1.f), -zAxis, yAxis, {}, 0);
+		pushVertex(center - x - y - z, vec2(0.f, 0.f), -xAxis, yAxis, {}, 0);
+		pushVertex(center - x - y + z, vec2(1.f, 0.f), -xAxis, yAxis, {}, 0);
+		pushVertex(center - x + y - z, vec2(0.f, 1.f), -xAxis, yAxis, {}, 0);
+		pushVertex(center - x + y + z, vec2(1.f, 1.f), -xAxis, yAxis, {}, 0);
+		pushVertex(center - x + y + z, vec2(0.f, 0.f), yAxis, xAxis, {}, 0);
+		pushVertex(center + x + y + z, vec2(1.f, 0.f), yAxis, xAxis, {}, 0);
+		pushVertex(center - x + y - z, vec2(0.f, 1.f), yAxis, xAxis, {}, 0);
+		pushVertex(center + x + y - z, vec2(1.f, 1.f), yAxis, xAxis, {}, 0);
+		pushVertex(center - x - y - z, vec2(0.f, 0.f), -yAxis, xAxis, {}, 0);
+		pushVertex(center + x - y - z, vec2(1.f, 0.f), -yAxis, xAxis, {}, 0);
+		pushVertex(center - x - y + z, vec2(0.f, 1.f), -yAxis, xAxis, {}, 0);
+		pushVertex(center + x - y + z, vec2(1.f, 1.f), -yAxis, xAxis, {}, 0);
 
 		pushTriangle(0, 1, 2);
 		pushTriangle(1, 3, 2);
@@ -218,7 +192,7 @@ void mesh_builder::pushTesselatedBox(const tesselated_box_mesh_desc& desc, bool 
 		for (uint32 x = 0; x < numVerticesPerEdge; ++x)
 		{
 			assert(vertexIndex < numVertices);
-			pushVertex(center + rotation * (radius * vec3(x * distanceBetweenVertices, 1.f, z * distanceBetweenVertices)), {}, {}, {}, {});
+			pushVertex(center + rotation * (radius * vec3(x * distanceBetweenVertices, 1.f, z * distanceBetweenVertices)), {}, {}, {}, {}, 0);
 
 			if (z < numVerticesPerEdge - 1 && x < numVerticesPerEdge - 1)
 			{
@@ -252,7 +226,7 @@ void mesh_builder::pushTesselatedBox(const tesselated_box_mesh_desc& desc, bool 
 		for (uint32 i = 0; i < numVerticesPerEdge - 1; ++i)
 		{
 			assert(vertexIndex < numVertices);
-			pushVertex(desc.center + desc.rotation * (radius * currentPos), {}, {}, {}, {});
+			pushVertex(desc.center + desc.rotation * (radius * currentPos), {}, {}, {}, {}, 0);
 			currentPos += distanceBetweenVertices * direction;
 
 			uint32 top, topLeft;
@@ -320,7 +294,7 @@ void mesh_builder::pushTesselatedBox(const tesselated_box_mesh_desc& desc, bool 
 		for (uint32 x = 1; x < numVerticesPerEdge - 1; ++x)
 		{
 			assert(vertexIndex < numVertices);
-			pushVertex(desc.center + desc.rotation * (radius * vec3(x * distanceBetweenVertices, 0.f, z * distanceBetweenVertices)), {}, {}, {}, {});
+			pushVertex(desc.center + desc.rotation * (radius * vec3(x * distanceBetweenVertices, 0.f, z * distanceBetweenVertices)), {}, {}, {}, {}, 0);
 
 			uint32 top = vertexIndex - (numVerticesPerEdge - 2);
 			if (z == 1)
@@ -425,7 +399,7 @@ void mesh_builder::pushSphere(const sphere_mesh_desc& desc, bool flipWindingOrde
 	auto [positionPtr, othersPtr, indexPtr, indexOffset] = beginPrimitive(slices * rows + 2, 2 * rows * slices);
 
 	// Vertices.
-	pushVertex(center + vec3(0.f, -radius, 0.f), directionToPanoramaUV(vec3(0.f, -1.f, 0.f)), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+	pushVertex(center + vec3(0.f, -radius, 0.f), directionToPanoramaUV(vec3(0.f, -1.f, 0.f)), vec3(0.f, -1.f, 0.f), vec3(1.f, 0.f, 0.f), {}, 0);
 
 	for (uint32 y = 0; y < rows; ++y)
 	{
@@ -440,11 +414,11 @@ void mesh_builder::pushSphere(const sphere_mesh_desc& desc, bool flipWindingOrde
 			vec3 pos(vertexX * radius, vertexY * radius, vertexZ * radius);
 			vec3 nor(vertexX, vertexY, vertexZ);
 
-			pushVertex(center + pos, directionToPanoramaUV(nor), normalize(nor), normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+			pushVertex(center + pos, directionToPanoramaUV(nor), normalize(nor), normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {}, 0);
 		}
 	}
 
-	pushVertex(center + vec3(0.f, radius, 0.f), directionToPanoramaUV(vec3(0.f, 1.f, 0.f)), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {});
+	pushVertex(center + vec3(0.f, radius, 0.f), directionToPanoramaUV(vec3(0.f, 1.f, 0.f)), vec3(0.f, 1.f, 0.f), vec3(1.f, 0.f, 0.f), {}, 0);
 
 	uint32 lastVertex = slices * rows + 2;
 
@@ -576,7 +550,7 @@ void mesh_builder::pushIcoSphere(const icosphere_mesh_desc& desc, bool flipWindi
 
 	for (const vert& v : vertices)
 	{
-		pushVertex(v.p + center, {}, v.n, v.t, {});
+		pushVertex(v.p + center, {}, v.n, v.t, {}, 0);
 	}
 
 	for (auto t : triangles)
@@ -611,7 +585,7 @@ void mesh_builder::pushCapsule(const capsule_mesh_desc& desc, bool flipWindingOr
 	pushVertex(rotation * vec3(0.f, -radius - halfHeight, 0.f) + center, 
 		directionToPanoramaUV(vec3(0.f, -1.f, 0.f)), 
 		rotation * vec3(0.f, -1.f, 0.f), 
-		rotation * vec3(1.f, 0.f, 0.f), {});
+		rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 
 	for (uint32 y = 0; y < rows / 2 + 1; ++y)
 	{
@@ -628,7 +602,7 @@ void mesh_builder::pushCapsule(const capsule_mesh_desc& desc, bool flipWindingOr
 
 			vec2 uv = directionToPanoramaUV(nor);
 			uv.y *= texStretch;
-			pushVertex(rotation * pos + center, uv, rotation * normalize(nor), rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+			pushVertex(rotation * pos + center, uv, rotation * normalize(nor), rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {}, 0);
 		}
 	}
 	for (uint32 y = 0; y < rows / 2 + 1; ++y)
@@ -646,13 +620,13 @@ void mesh_builder::pushCapsule(const capsule_mesh_desc& desc, bool flipWindingOr
 
 			vec2 uv = directionToPanoramaUV(nor);
 			uv.y *= texStretch;
-			pushVertex(rotation * pos + center, uv, rotation * normalize(nor), rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+			pushVertex(rotation * pos + center, uv, rotation * normalize(nor), rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {}, 0);
 		}
 	}
 	pushVertex(rotation * vec3(0.f, radius + halfHeight, 0.f) + center, 
 		directionToPanoramaUV(vec3(0.f, 1.f, 0.f)), 
 		rotation * vec3(0.f, 1.f, 0.f), 
-		rotation * vec3(1.f, 0.f, 0.f), {});
+		rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 
 	uint32 lastVertex = slices * (rows + 1) + 2;
 
@@ -706,7 +680,7 @@ void mesh_builder::pushCylinder(const cylinder_mesh_desc& desc, bool flipWinding
 		angles[x] = { sinf(horzAngle), cosf(horzAngle) };
 	}
 
-	pushVertex(center + rotation * vec3(0.f, -halfHeight, 0.f), vec2(0.25f, 0.75f), rotation * vec3(0.f, -1.f, 0.f), rotation * vec3(1.f, 0.f, 0.f), {});
+	pushVertex(center + rotation * vec3(0.f, -halfHeight, 0.f), vec2(0.25f, 0.75f), rotation * vec3(0.f, -1.f, 0.f), rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 
 	// Bottom row, normal down.
 	for (uint32 x = 0; x < slices; ++x)
@@ -717,7 +691,7 @@ void mesh_builder::pushCylinder(const cylinder_mesh_desc& desc, bool flipWinding
 		vec3 pos(vertexX * radius, -halfHeight, vertexZ * radius);
 		vec3 nor(0.f, -1.f, 0.f);
 
-		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, vec2(0.f, 0.5f), vec2(0.5f, 1.f)), rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, vec2(0.f, 0.5f), vec2(0.5f, 1.f)), rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 	}
 
 	// Bottom row, normal around.
@@ -729,7 +703,7 @@ void mesh_builder::pushCylinder(const cylinder_mesh_desc& desc, bool flipWinding
 		vec3 pos(vertexX * radius, -halfHeight, vertexZ * radius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.5f), rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.5f), rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {}, 0);
 	}
 
 	// Top row, normal around.
@@ -741,7 +715,7 @@ void mesh_builder::pushCylinder(const cylinder_mesh_desc& desc, bool flipWinding
 		vec3 pos(vertexX * radius, halfHeight, vertexZ * radius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.f), rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.f), rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {}, 0);
 	}
 
 	// Top row, normal up.
@@ -753,10 +727,10 @@ void mesh_builder::pushCylinder(const cylinder_mesh_desc& desc, bool flipWinding
 		vec3 pos(vertexX * radius, halfHeight, vertexZ * radius);
 		vec3 nor(0.f, 1.f, 0.f);
 
-		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, vec2(0.5f, 0.5f), vec2(1.f, 1.f)), rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, vec2(0.5f, 0.5f), vec2(1.f, 1.f)), rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 	}
 
-	pushVertex(center + rotation * vec3(0.f, halfHeight, 0.f), vec2(0.75f, 0.75f), rotation * vec3(0.f, 1.f, 0.f), rotation * vec3(1.f, 0.f, 0.f), {});
+	pushVertex(center + rotation * vec3(0.f, halfHeight, 0.f), vec2(0.75f, 0.75f), rotation * vec3(0.f, 1.f, 0.f), rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 
 	uint32 lastVertex = 4 * slices + 2;
 
@@ -815,7 +789,7 @@ void mesh_builder::pushHollowCylinder(const hollow_cylinder_mesh_desc& desc, boo
 		vec3 pos(vertexX * radius, -halfHeight, vertexZ * radius);
 		vec3 nor(0.f, -1.f, 0.f);
 
-		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, vec2(0.f, 0.5f), vec2(0.5f, 1.f)), rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, vec2(0.f, 0.5f), vec2(0.5f, 1.f)), rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 	}
 
 	// Bottom row, normal around.
@@ -826,7 +800,7 @@ void mesh_builder::pushHollowCylinder(const hollow_cylinder_mesh_desc& desc, boo
 		vec3 pos(vertexX * radius, -halfHeight, vertexZ * radius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.5f), rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.5f), rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {}, 0);
 	}
 
 	// Top row, normal around.
@@ -837,7 +811,7 @@ void mesh_builder::pushHollowCylinder(const hollow_cylinder_mesh_desc& desc, boo
 		vec3 pos(vertexX * radius, halfHeight, vertexZ * radius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.f), rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.f), rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {}, 0);
 	}
 
 	// Top row, normal up.
@@ -849,7 +823,7 @@ void mesh_builder::pushHollowCylinder(const hollow_cylinder_mesh_desc& desc, boo
 		vec3 pos(vertexX * radius, halfHeight, vertexZ * radius);
 		vec3 nor(0.f, 1.f, 0.f);
 
-		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, vec2(0.5f, 0.5f), vec2(1.f, 1.f)), rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, vec2(0.5f, 0.5f), vec2(1.f, 1.f)), rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 	}
 
 	vec2 innerUVMin = vec2(0.25f, 0.75f) - 0.25f * radiusRelation;
@@ -863,7 +837,7 @@ void mesh_builder::pushHollowCylinder(const hollow_cylinder_mesh_desc& desc, boo
 		vec3 pos(vertexX * innerRadius, -halfHeight, vertexZ * innerRadius);
 		vec3 nor(0.f, -1.f, 0.f);
 
-		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, innerUVMin, innerUVMax), rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, innerUVMin, innerUVMax), rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 	}
 
 	// Bottom inner row, normal inside.
@@ -874,7 +848,7 @@ void mesh_builder::pushHollowCylinder(const hollow_cylinder_mesh_desc& desc, boo
 		vec3 pos(vertexX * innerRadius, -halfHeight, vertexZ * innerRadius);
 		vec3 nor(-vertexX, 0.f, -vertexZ);
 
-		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.5f), rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.5f), rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 	}
 
 	// Top inner row, normal inside.
@@ -885,7 +859,7 @@ void mesh_builder::pushHollowCylinder(const hollow_cylinder_mesh_desc& desc, boo
 		vec3 pos(vertexX * innerRadius, halfHeight, vertexZ * innerRadius);
 		vec3 nor(-vertexX, 0.f, -vertexZ);
 
-		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.f), rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(center + rotation * pos, vec2(x / (float)(slices - 1), 0.f), rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {}, 0);
 	}
 
 	// Top inner row, normal up.
@@ -896,7 +870,7 @@ void mesh_builder::pushHollowCylinder(const hollow_cylinder_mesh_desc& desc, boo
 		vec3 pos(vertexX * innerRadius, halfHeight, vertexZ * innerRadius);
 		vec3 nor(0.f, 1.f, 0.f);
 
-		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, innerUVMin + vec2(0.5f, 0.f), innerUVMax + vec2(0.5f, 0.f)), rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+		pushVertex(center + rotation * pos, remap(vec2(vertexX, vertexZ), -1.f, 1.f, innerUVMin + vec2(0.5f, 0.f), innerUVMax + vec2(0.5f, 0.f)), rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 	}
 
 
@@ -960,7 +934,7 @@ void mesh_builder::pushArrow(const arrow_mesh_desc& desc, bool flipWindingOrder)
 	auto [positionPtr, othersPtr, indexPtr, indexOffset] = beginPrimitive(7 * slices + 1, 7 * slices);
 
 	vec2 uv(0.f, 0.f);
-	pushVertex(base, uv, rotation * vec3(0.f, -1.f, 0.f), rotation * vec3(1.f, 0.f, 0.f), {});
+	pushVertex(base, uv, rotation * vec3(0.f, -1.f, 0.f), rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 
 	// Bottom row, normal down.
 	for (uint32 x = 0; x < slices; ++x)
@@ -971,7 +945,7 @@ void mesh_builder::pushArrow(const arrow_mesh_desc& desc, bool flipWindingOrder)
 		vec3 pos(vertexX * shaftRadius, 0.f, vertexZ * shaftRadius);
 		vec3 nor(0.f, -1.f, 0.f);
 
-		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 	}
 
 	// Bottom row, normal around.
@@ -983,7 +957,7 @@ void mesh_builder::pushArrow(const arrow_mesh_desc& desc, bool flipWindingOrder)
 		vec3 pos(vertexX * shaftRadius, 0.f, vertexZ * shaftRadius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {}, 0);
 	}
 
 	// Top row, normal around.
@@ -995,7 +969,7 @@ void mesh_builder::pushArrow(const arrow_mesh_desc& desc, bool flipWindingOrder)
 		vec3 pos(vertexX * shaftRadius, shaftLength, vertexZ * shaftRadius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {}, 0);
 	}
 
 	// Top row, normal down.
@@ -1007,7 +981,7 @@ void mesh_builder::pushArrow(const arrow_mesh_desc& desc, bool flipWindingOrder)
 		vec3 pos(vertexX * shaftRadius, shaftLength, vertexZ * shaftRadius);
 		vec3 nor(0.f, -1.f, 0.f);
 
-		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 	}
 
 	// Top outer row, normal down.
@@ -1019,7 +993,7 @@ void mesh_builder::pushArrow(const arrow_mesh_desc& desc, bool flipWindingOrder)
 		vec3 pos(vertexX * headRadius, shaftLength, vertexZ * headRadius);
 		vec3 nor(0.f, -1.f, 0.f);
 
-		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 	}
 
 	vec2 normal2D = normalize(vec2(headLength, headRadius));
@@ -1033,7 +1007,7 @@ void mesh_builder::pushArrow(const arrow_mesh_desc& desc, bool flipWindingOrder)
 		vec3 pos(vertexX * headRadius, shaftLength, vertexZ * headRadius);
 		vec3 nor(vertexX * normal2D.x, normal2D.y, vertexZ * normal2D.x);
 
-		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 	}
 
 	// Top vertex.
@@ -1045,7 +1019,7 @@ void mesh_builder::pushArrow(const arrow_mesh_desc& desc, bool flipWindingOrder)
 		vec3 pos(0.f, shaftLength + headLength, 0.f);
 		vec3 nor(vertexX * normal2D.x, normal2D.y, vertexZ * normal2D.x);
 
-		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 	}
 
 	// Indices.
@@ -1101,7 +1075,7 @@ void mesh_builder::pushTorus(const torus_mesh_desc& desc, bool flipWindingOrder)
 			vec3 pos = segmentRotation * vec3(vertexX * tubeRadius, 0.f, vertexZ * tubeRadius) + segmentOffset;
 			vec3 nor = segmentRotation * vec3(vertexX, 0.f, vertexZ);
 
-			pushVertex(center + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+			pushVertex(center + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 		}
 	}
 
@@ -1143,7 +1117,7 @@ void mesh_builder::pushMace(const mace_mesh_desc& desc, bool flipWindingOrder)
 	auto [positionPtr, othersPtr, indexPtr, indexOffset] = beginPrimitive(8 * slices + 2, 8 * slices);
 
 	vec2 uv(0.f, 0.f);
-	pushVertex(base, uv, rotation * vec3(0.f, -1.f, 0.f), rotation * vec3(1.f, 0.f, 0.f), {});
+	pushVertex(base, uv, rotation * vec3(0.f, -1.f, 0.f), rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 
 	// Bottom row, normal down.
 	for (uint32 x = 0; x < slices; ++x)
@@ -1154,7 +1128,7 @@ void mesh_builder::pushMace(const mace_mesh_desc& desc, bool flipWindingOrder)
 		vec3 pos(vertexX * shaftRadius, 0.f, vertexZ * shaftRadius);
 		vec3 nor(0.f, -1.f, 0.f);
 
-		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 	}
 
 	// Bottom row, normal around.
@@ -1166,7 +1140,7 @@ void mesh_builder::pushMace(const mace_mesh_desc& desc, bool flipWindingOrder)
 		vec3 pos(vertexX * shaftRadius, 0.f, vertexZ * shaftRadius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {}, 0);
 	}
 
 	// Top row, normal around.
@@ -1178,7 +1152,7 @@ void mesh_builder::pushMace(const mace_mesh_desc& desc, bool flipWindingOrder)
 		vec3 pos(vertexX * shaftRadius, shaftLength, vertexZ * shaftRadius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {}, 0);
 	}
 
 	// Top row, normal down.
@@ -1190,7 +1164,7 @@ void mesh_builder::pushMace(const mace_mesh_desc& desc, bool flipWindingOrder)
 		vec3 pos(vertexX * shaftRadius, shaftLength, vertexZ * shaftRadius);
 		vec3 nor(0.f, -1.f, 0.f);
 
-		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 	}
 
 	// Top outer row, normal down.
@@ -1202,7 +1176,7 @@ void mesh_builder::pushMace(const mace_mesh_desc& desc, bool flipWindingOrder)
 		vec3 pos(vertexX * headRadius, shaftLength, vertexZ * headRadius);
 		vec3 nor(0.f, -1.f, 0.f);
 
-		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {}, 0);
 	}
 
 	// Top outer row, normal around.
@@ -1214,7 +1188,7 @@ void mesh_builder::pushMace(const mace_mesh_desc& desc, bool flipWindingOrder)
 		vec3 pos(vertexX * headRadius, shaftLength, vertexZ * headRadius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {}, 0);
 	}
 
 	// Top top outer row, normal around.
@@ -1226,7 +1200,7 @@ void mesh_builder::pushMace(const mace_mesh_desc& desc, bool flipWindingOrder)
 		vec3 pos(vertexX * headRadius, shaftLength + headLength, vertexZ * headRadius);
 		vec3 nor(vertexX, 0.f, vertexZ);
 
-		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {});
+		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * normalize(cross(vec3(0.f, 1.f, 0.f), nor)), {}, 0);
 	}
 
 	// Top top outer row, normal up.
@@ -1238,10 +1212,10 @@ void mesh_builder::pushMace(const mace_mesh_desc& desc, bool flipWindingOrder)
 		vec3 pos(vertexX * headRadius, shaftLength + headLength, vertexZ * headRadius);
 		vec3 nor(0.f, 1.f, 0.f);
 
-		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {});
+		pushVertex(base + rotation * pos, uv, rotation * nor, rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 	}
 
-	pushVertex(base + rotation * vec3(0.f, shaftLength + headLength, 0.f), uv, rotation * vec3(0.f, 1.f, 0.f), rotation * vec3(1.f, 0.f, 0.f), {});
+	pushVertex(base + rotation * vec3(0.f, shaftLength + headLength, 0.f), uv, rotation * vec3(0.f, 1.f, 0.f), rotation * vec3(1.f, 0.f, 0.f), {}, 0);
 
 	uint32 lastVertex = 8 * slices + 2;
 
@@ -1324,7 +1298,7 @@ void mesh_builder::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_box*
 			vertexColor = packColor(vec4(mesh->mColors[0][i].r, mesh->mColors[0][i].g, mesh->mColors[0][i].b, mesh->mColors[0][i].a));
 		}
 
-		pushVertex(position, uv, normal, tangent, {});
+		pushVertex(position, uv, normal, tangent, {}, vertexColor);
 	}
 
 	if ((vertexFlags & mesh_creation_flags_with_skin) && skeleton)

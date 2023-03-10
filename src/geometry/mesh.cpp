@@ -28,7 +28,7 @@ static void getMeshNamesAndTransforms(const aiNode* node, ref<multi_mesh>& mesh,
 static std::unordered_map<asset_handle, weakref<multi_mesh>> meshCache; // TODO: Pack flags into key.
 static std::mutex mutex;
 
-static ref<multi_mesh> loadMeshFromFileInternal(asset_handle handle, const fs::path& sceneFilename, uint32 flags)
+static ref<multi_mesh> loadMeshFromFileInternal(asset_handle handle, const fs::path& sceneFilename, uint32 flags, mesh_load_callback cb)
 {
 	Assimp::Importer importer;
 
@@ -102,6 +102,11 @@ static ref<multi_mesh> loadMeshFromFileInternal(asset_handle handle, const fs::p
 		result->skeleton.analyzeJoints(builder.getPositions(), (uint8*)builder.getOthers() + builder.getSkinOffset(), builder.getOthersSize(), builder.getNumVertices());
 	}
 
+	if (cb)
+	{
+		cb(builder, result->submeshes);
+	}
+
 	result->mesh = builder.createDXMesh();
 
 	result->handle = handle;
@@ -109,34 +114,28 @@ static ref<multi_mesh> loadMeshFromFileInternal(asset_handle handle, const fs::p
 	return result;
 }
 
-ref<multi_mesh> loadMeshFromFile(const fs::path& sceneFilename, uint32 flags)
+static ref<multi_mesh> loadMeshFromFileAndHandle(const fs::path& sceneFilename, asset_handle handle, uint32 flags, mesh_load_callback cb)
 {
-	asset_handle handle = getAssetHandleFromPath(sceneFilename.lexically_normal());
-
 	mutex.lock();
 
 	auto sp = meshCache[handle].lock();
 	if (!sp)
 	{
-		meshCache[handle] = sp = loadMeshFromFileInternal(handle, sceneFilename, flags);
+		meshCache[handle] = sp = loadMeshFromFileInternal(handle, sceneFilename, flags, cb);
 	}
 
 	mutex.unlock();
 	return sp;
 }
 
-ref<multi_mesh> loadMeshFromHandle(asset_handle handle, uint32 flags)
+ref<multi_mesh> loadMeshFromFile(const fs::path& sceneFilename, uint32 flags, mesh_load_callback cb)
+{
+	asset_handle handle = getAssetHandleFromPath(sceneFilename.lexically_normal());
+	return loadMeshFromFileAndHandle(sceneFilename, handle, flags, cb);
+}
+
+ref<multi_mesh> loadMeshFromHandle(asset_handle handle, uint32 flags, mesh_load_callback cb)
 {
 	fs::path sceneFilename = getPathFromAssetHandle(handle);
-
-	mutex.lock();
-
-	auto sp = meshCache[handle].lock();
-	if (!sp)
-	{
-		meshCache[handle] = sp = loadMeshFromFileInternal(handle, sceneFilename, flags);
-	}
-
-	mutex.unlock();
-	return sp;
+	return loadMeshFromFileAndHandle(sceneFilename, handle, flags, cb);
 }

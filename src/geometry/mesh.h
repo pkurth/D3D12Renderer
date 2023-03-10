@@ -31,13 +31,15 @@ struct multi_mesh
 };
 
 
-ref<multi_mesh> loadMeshFromFile(const fs::path& sceneFilename, uint32 flags = mesh_creation_flags_default);
-ref<multi_mesh> loadMeshFromHandle(asset_handle handle, uint32 flags = mesh_creation_flags_default);
+using mesh_load_callback = std::function<void(mesh_builder& builder, std::vector<submesh>& submeshes)>;
+
+ref<multi_mesh> loadMeshFromFile(const fs::path& sceneFilename, uint32 flags = mesh_creation_flags_default, mesh_load_callback cb = nullptr);
+ref<multi_mesh> loadMeshFromHandle(asset_handle handle, uint32 flags = mesh_creation_flags_default, mesh_load_callback cb = nullptr);
 
 // Same function but with different default flags (includes skin).
-inline ref<multi_mesh> loadAnimatedMeshFromFile(const fs::path& sceneFilename, uint32 flags = mesh_creation_flags_animated)
+inline ref<multi_mesh> loadAnimatedMeshFromFile(const fs::path& sceneFilename, uint32 flags = mesh_creation_flags_animated, mesh_load_callback cb = nullptr)
 {
-	return loadMeshFromFile(sceneFilename, flags);
+	return loadMeshFromFile(sceneFilename, flags, cb);
 }
 
 struct raster_component
