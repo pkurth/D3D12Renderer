@@ -34,7 +34,8 @@ struct pbr_material
 		float roughnessOverride, 
 		float metallicOverride,
 		pbr_material_shader shader,
-		float uvScale)
+		float uvScale,
+		float translucency)
 		: albedo(albedo), 
 		normal(normal), 
 		roughness(roughness), 
@@ -44,7 +45,8 @@ struct pbr_material
 		roughnessOverride(roughnessOverride), 
 		metallicOverride(metallicOverride),
 		shader(shader),
-		uvScale(uvScale) {}
+		uvScale(uvScale),
+		translucency(translucency) {}
 
 	ref<dx_texture> albedo;
 	ref<dx_texture> normal;
@@ -57,6 +59,7 @@ struct pbr_material
 	float metallicOverride;
 	pbr_material_shader shader;
 	float uvScale;
+	float translucency;
 };
 
 struct pbr_render_data
@@ -104,9 +107,9 @@ struct pbr_pipeline::transparent : pbr_pipeline
 
 ref<pbr_material> createPBRMaterial(const fs::path& albedoTex, const fs::path& normalTex, const fs::path& roughTex, const fs::path& metallicTex,
 	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f, 
-	pbr_material_shader shader = pbr_material_shader_default, float uvScale = 1.f, bool disableTextureCompression = false);
+	pbr_material_shader shader = pbr_material_shader_default, float uvScale = 1.f, float translucency = 0.f, bool disableTextureCompression = false);
 ref<pbr_material> createPBRMaterial(const ref<dx_texture>& albedoTex, const ref<dx_texture>& normalTex, const ref<dx_texture>& roughTex, const ref<dx_texture>& metallicTex,
 	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f, 
-	pbr_material_shader shader = pbr_material_shader_default, float uvScale = 1.f);
+	pbr_material_shader shader = pbr_material_shader_default, float uvScale = 1.f, float translucency = 0.f);
 
 ref<pbr_material> getDefaultPBRMaterial();

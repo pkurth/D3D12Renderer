@@ -770,23 +770,7 @@ void application::update(const user_input& input, float dt)
 					continue;
 				}
 
-				const dx_mesh& dxMesh = mesh.mesh->mesh;
-				mat4 m = trsToMat4(transform);
-
-				for (auto& sm : mesh.mesh->submeshes)
-				{
-					submesh_info submesh = sm.info;
-					const ref<pbr_material>& material = sm.material;
-
-					pbr_render_data data;
-					data.transform = m;
-					data.vertexBuffer = dxMesh.vertexBuffer;
-					data.indexBuffer = dxMesh.indexBuffer;
-					data.submesh = submesh;
-					data.material = material;
-
-					opaqueRenderPass.renderObject<tree_pipeline>(data);
-				}
+				tree.render(&opaqueRenderPass, transform, mesh.mesh, unscaledDt);
 			}
 
 

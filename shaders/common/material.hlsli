@@ -107,10 +107,10 @@ struct pbr_material_cb // 24 bytes.
 {
     vec3 emission;      // Since emission can be HDR, we use full precision floats here.
     uint32 albedoTint;  // RGBA packed into one uint32. Can only be between 0 and 1, which is why we are only using 8 bit per channel.
-    uint32 roughness_metallic_flags_refraction; // 8 bit each.
+    uint32 roughness_metallic_flags_translucency; // 8 bit each.
 	uint32 normalMapStrength_unused_uvScale; // 8 bit for normal map strength, 8 bit unused, 16 bit half for uvScale.
 
-    void initialize(vec4 albedo_, vec3 emission_, float roughness_, float metallic_, uint32 flags_, float normalMapStrength_ = 1.f, float refractionStrength_ = 0.f,
+    void initialize(vec4 albedo_, vec3 emission_, float roughness_, float metallic_, uint32 flags_, float normalMapStrength_ = 1.f, float translucency_ = 0.f,
 		float uvScale = 1.f)
     {
         emission = emission_;
@@ -118,14 +118,14 @@ struct pbr_material_cb // 24 bytes.
         
 		roughness_ = clamp(roughness_, 0.f, 1.f);
 		metallic_ = clamp(metallic_, 0.f, 1.f);
-		refractionStrength_ = clamp(refractionStrength_, 0.f, 1.f);
+		translucency_ = clamp(translucency_, 0.f, 1.f);
 		normalMapStrength_ = clamp(normalMapStrength_, 0.f, 1.f);
 
-		roughness_metallic_flags_refraction =
+		roughness_metallic_flags_translucency =
 			((uint32)(roughness_ * 0xFF) << 24) |
 			((uint32)(metallic_ * 0xFF) << 16) |
 			(flags_ << 8) |
-			((uint32)(refractionStrength_ * 0xFF) << 0);
+			((uint32)(translucency_ * 0xFF) << 0);
 
 #ifndef HLSL
 		uint32 uvScaleHalf = half(uvScale).h;
@@ -142,9 +142,9 @@ struct pbr_material_cb // 24 bytes.
 #ifndef HLSL
     pbr_material_cb() {}
 
-    pbr_material_cb(vec4 albedo_, vec3 emission_, float roughness_, float metallic_, uint32 flags_, float normalMapStrength_ = 1.f, float refractionStrength_ = 0.f, float uvScale_ = 1.f)
+    pbr_material_cb(vec4 albedo_, vec3 emission_, float roughness_, float metallic_, uint32 flags_, float normalMapStrength_ = 1.f, float translucency_ = 0.f, float uvScale_ = 1.f)
     {
-        initialize(albedo_, emission_, roughness_, metallic_, flags_, normalMapStrength_, refractionStrength_, uvScale_);
+        initialize(albedo_, emission_, roughness_, metallic_, flags_, normalMapStrength_, translucency_, uvScale_);
     }
 #endif
 
@@ -155,12 +155,12 @@ struct pbr_material_cb // 24 bytes.
 
     float getRoughnessOverride()
     {
-        return ((roughness_metallic_flags_refraction >> 24) & 0xFF) * (1.f / 255.f);
+        return ((roughness_metallic_flags_translucency >> 24) & 0xFF) * (1.f / 255.f);
     }
 
     float getMetallicOverride()
     {
-        return ((roughness_metallic_flags_refraction >> 16) & 0xFF) * (1.f / 255.f);
+        return ((roughness_metallic_flags_translucency >> 16) & 0xFF) * (1.f / 255.f);
     }
 
 	float getNormalMapStrength()
@@ -178,14 +178,14 @@ struct pbr_material_cb // 24 bytes.
 #endif
 	}
 
-	float getRefractionStrength()
+	float getTranslucency()
 	{
-		return ((roughness_metallic_flags_refraction >> 0) & 0xFF) * (1.f / 255.f);
+		return ((roughness_metallic_flags_translucency >> 0) & 0xFF) * (1.f / 255.f);
 	}
 
 	uint32 getFlags()
 	{
-		return (roughness_metallic_flags_refraction >> 8) & 0xFF;
+		return (roughness_metallic_flags_translucency >> 8) & 0xFF;
 	}
 };
 

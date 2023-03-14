@@ -59,8 +59,6 @@ struct ps_output
 [RootSignature(GRASS_RS)]
 ps_output main(ps_input IN)
 {
-	float3 L = -lighting.sun.direction;
-
 	float3 N = IN.normal;
 	float3 T = IN.tangent;
 	if (!IN.isFrontFace)

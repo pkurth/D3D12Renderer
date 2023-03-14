@@ -31,6 +31,7 @@ struct material_key
 	float roughnessOverride, metallicOverride;
 	pbr_material_shader shader;
 	float uvScale;
+	float translucency;
 };
 
 namespace std
@@ -52,6 +53,7 @@ namespace std
 			hash_combine(seed, x.metallicOverride);
 			hash_combine(seed, (uint32)x.shader);
 			hash_combine(seed, x.uvScale);
+			hash_combine(seed, x.translucency);
 
 			return seed;
 		}
@@ -69,7 +71,8 @@ static bool operator==(const material_key& a, const material_key& b)
 		&& a.roughnessOverride == b.roughnessOverride
 		&& a.metallicOverride == b.metallicOverride
 		&& a.shader == b.shader
-		&& a.uvScale == b.uvScale;
+		&& a.uvScale == b.uvScale
+		&& a.translucency == b.translucency;
 }
 
 ref<pbr_material> createPBRMaterial(
@@ -82,7 +85,8 @@ ref<pbr_material> createPBRMaterial(
 	float roughOverride, 
 	float metallicOverride, 
 	pbr_material_shader shader,
-	float uvScale, 
+	float uvScale,
+	float translucency,
 	bool disableTextureCompression)
 {
 	material_key s =
@@ -97,6 +101,7 @@ ref<pbr_material> createPBRMaterial(
 		!metallicTex.empty() ? 0.f : metallicOverride,		// If texture is set, override does not matter, so set it to consistent value.
 		shader,
 		uvScale,
+		translucency
 	};
 
 
@@ -126,6 +131,7 @@ ref<pbr_material> createPBRMaterial(
 		material->metallicOverride = metallicOverride;
 		material->shader = shader;
 		material->uvScale = uvScale;
+		material->translucency = translucency;
 
 		cache[s] = sp = material;
 	}
@@ -144,7 +150,8 @@ ref<pbr_material> createPBRMaterial(
 	float roughOverride, 
 	float metallicOverride, 
 	pbr_material_shader shader,
-	float uvScale)
+	float uvScale,
+	float translucency)
 {
 	ref<pbr_material> material = make_ref<pbr_material>();
 
@@ -158,6 +165,7 @@ ref<pbr_material> createPBRMaterial(
 	material->metallicOverride = metallicOverride;
 	material->shader = shader;
 	material->uvScale = uvScale;
+	material->translucency = translucency;
 
 	return material;
 }
@@ -165,7 +173,7 @@ ref<pbr_material> createPBRMaterial(
 ref<pbr_material> getDefaultPBRMaterial()
 {
 	static ref<pbr_material> material = make_ref<pbr_material>(nullptr, nullptr, nullptr, nullptr, 
-		vec4(0.f), vec4(1.f, 0.f, 1.f, 1.f), 1.f, 0.f, pbr_material_shader_default, 1.f);
+		vec4(0.f), vec4(1.f, 0.f, 1.f, 1.f), 1.f, 0.f, pbr_material_shader_default, 1.f, 0.f);
 	return material;
 }
 
@@ -290,7 +298,7 @@ PIPELINE_RENDER_IMPL(pbr_pipeline)
 	}
 
 	cl->setGraphics32BitConstants(DEFAULT_PBR_RS_MATERIAL,
-		pbr_material_cb(mat->albedoTint, mat->emission.xyz, mat->roughnessOverride, mat->metallicOverride, flags, 1.f, 0.f, mat->uvScale)
+		pbr_material_cb(mat->albedoTint, mat->emission.xyz, mat->roughnessOverride, mat->metallicOverride, flags, 1.f, mat->translucency, mat->uvScale)
 	);
 
 

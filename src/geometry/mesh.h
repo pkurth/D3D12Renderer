@@ -31,7 +31,7 @@ struct multi_mesh
 };
 
 
-using mesh_load_callback = std::function<void(mesh_builder& builder, std::vector<submesh>& submeshes)>;
+using mesh_load_callback = std::function<void(mesh_builder& builder, std::vector<submesh>& submeshes, const bounding_box& boundingBox)>;
 
 ref<multi_mesh> loadMeshFromFile(const fs::path& sceneFilename, uint32 flags = mesh_creation_flags_default, mesh_load_callback cb = nullptr);
 ref<multi_mesh> loadMeshFromHandle(asset_handle handle, uint32 flags = mesh_creation_flags_default, mesh_load_callback cb = nullptr);

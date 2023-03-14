@@ -104,7 +104,7 @@ static ref<multi_mesh> loadMeshFromFileInternal(asset_handle handle, const fs::p
 
 	if (cb)
 	{
-		cb(builder, result->submeshes);
+		cb(builder, result->submeshes, result->aabb);
 	}
 
 	result->mesh = builder.createDXMesh();

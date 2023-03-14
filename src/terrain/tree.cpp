@@ -8,6 +8,7 @@
 
 #include "rendering/render_resources.h"
 #include "rendering/pbr.h"
+#include "rendering/render_pass.h"
 
 #include "tree_rs.hlsli"
 
@@ -29,26 +30,129 @@ void initializeTreePipelines()
     }
 }
 
-PIPELINE_SETUP_IMPL(tree_pipeline)
-{
-	cl->setPipelineState(*treePipeline.pipeline);
-	cl->setGraphicsRootSignature(*treePipeline.rootSignature);
 
-	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+struct tree_render_data
+{
+    mat4 transform;
+    dx_vertex_buffer_group_view vertexBuffer;
+    dx_index_buffer_view indexBuffer;
+    submesh_info submesh;
+
+    ref<pbr_material> material;
+
+    float time;
+};
+
+struct tree_pipeline
+{
+    using render_data_t = tree_render_data;
+
+    PIPELINE_SETUP_DECL
+    {
+        cl->setPipelineState(*treePipeline.pipeline);
+        cl->setGraphicsRootSignature(*treePipeline.rootSignature);
+
+        cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        dx_cpu_descriptor_handle nullTexture = render_resources::nullTextureSRV;
+        dx_cpu_descriptor_handle nullBuffer = render_resources::nullBufferSRV;
+
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 0, common.irradiance ? common.irradiance->defaultSRV : nullTexture);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 1, common.prefilteredRadiance ? common.prefilteredRadiance->defaultSRV : nullTexture);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 2, render_resources::brdfTex);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 3, common.tiledCullingGrid ? common.tiledCullingGrid->defaultSRV : nullTexture);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 4, common.tiledObjectsIndexList ? common.tiledObjectsIndexList->defaultSRV : nullBuffer);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 5, common.pointLightBuffer ? common.pointLightBuffer->defaultSRV : nullBuffer);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 6, common.spotLightBuffer ? common.spotLightBuffer->defaultSRV : nullBuffer);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 7, common.decalBuffer ? common.decalBuffer->defaultSRV : nullBuffer);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 8, common.shadowMap ? common.shadowMap->defaultSRV : nullTexture);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 9, common.pointLightShadowInfoBuffer ? common.pointLightShadowInfoBuffer->defaultSRV : nullBuffer);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 10, common.spotLightShadowInfoBuffer ? common.spotLightShadowInfoBuffer->defaultSRV : nullBuffer);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 11, common.decalTextureAtlas ? common.decalTextureAtlas->defaultSRV : nullTexture);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 12, common.aoTexture ? common.aoTexture : render_resources::whiteTexture);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 13, common.sssTexture ? common.sssTexture : render_resources::whiteTexture);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 14, common.ssrTexture ? common.ssrTexture->defaultSRV : nullTexture);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 15, common.lightProbeIrradiance ? common.lightProbeIrradiance->defaultSRV : nullTexture);
+        cl->setDescriptorHeapSRV(TREE_RS_FRAME_CONSTANTS, 16, common.lightProbeDepth ? common.lightProbeDepth->defaultSRV : nullTexture);
+
+        cl->setGraphicsDynamicConstantBuffer(TREE_RS_CAMERA, common.cameraCBV);
+        cl->setGraphicsDynamicConstantBuffer(TREE_RS_LIGHTING, common.lightingCBV);
+    }
+
+    PIPELINE_RENDER_DECL
+    {
+        const auto& mat = rc.data.material;
+
+        uint32 flags = 0;
+
+        if (mat->albedo)
+        {
+            cl->setDescriptorHeapSRV(TREE_RS_PBR_TEXTURES, 0, mat->albedo);
+            flags |= MATERIAL_USE_ALBEDO_TEXTURE;
+        }
+        if (mat->normal)
+        {
+            cl->setDescriptorHeapSRV(TREE_RS_PBR_TEXTURES, 1, mat->normal);
+            flags |= MATERIAL_USE_NORMAL_TEXTURE;
+        }
+        if (mat->roughness)
+        {
+            cl->setDescriptorHeapSRV(TREE_RS_PBR_TEXTURES, 2, mat->roughness);
+            flags |= MATERIAL_USE_ROUGHNESS_TEXTURE;
+        }
+        if (mat->metallic)
+        {
+            cl->setDescriptorHeapSRV(TREE_RS_PBR_TEXTURES, 3, mat->metallic);
+            flags |= MATERIAL_USE_METALLIC_TEXTURE;
+        }
+        flags |= MATERIAL_DOUBLE_SIDED; // Always double sided.
+
+        cl->setGraphics32BitConstants(TREE_RS_MATERIAL,
+            pbr_material_cb(mat->albedoTint, mat->emission.xyz, mat->roughnessOverride, mat->metallicOverride, flags, 1.f, mat->translucency, mat->uvScale)
+        );
+
+
+
+        const mat4 & m = rc.data.transform;
+        const submesh_info& submesh = rc.data.submesh;
+
+        cl->setGraphics32BitConstants(TREE_RS_MVP, transform_cb{ viewProj, m });
+        cl->setGraphics32BitConstants(TREE_RS_CB, tree_cb{ rc.data.time });
+
+        cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
+        cl->setVertexBuffer(1, rc.data.vertexBuffer.others);
+        cl->setIndexBuffer(rc.data.indexBuffer);
+        cl->drawIndexed(submesh.numIndices, 1, submesh.firstIndex, submesh.baseVertex, 0);
+    }
+};
+
+void tree_component::render(opaque_render_pass* renderPass, const trs& transform, const ref<multi_mesh>& mesh, float dt)
+{
+    static float time = 0.f;
+    time += dt;
+
+
+    const dx_mesh& dxMesh = mesh->mesh;
+    mat4 m = trsToMat4(transform);
+
+    for (auto& sm : mesh->submeshes)
+    {
+        submesh_info submesh = sm.info;
+        const ref<pbr_material>& material = sm.material;
+
+        tree_render_data data;
+        data.transform = m;
+        data.vertexBuffer = dxMesh.vertexBuffer;
+        data.indexBuffer = dxMesh.indexBuffer;
+        data.submesh = submesh;
+        data.material = material;
+        data.time = time;
+
+        renderPass->renderObject<tree_pipeline>(data);
+    }
 }
 
-PIPELINE_RENDER_IMPL(tree_pipeline)
-{
-    const mat4& m = rc.data.transform;
-    const submesh_info& submesh = rc.data.submesh;
 
-    cl->setGraphics32BitConstants(TREE_RS_MVP, transform_cb{ viewProj * m, m });
-
-    cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
-    cl->setVertexBuffer(1, rc.data.vertexBuffer.others);
-    cl->setIndexBuffer(rc.data.indexBuffer);
-    cl->drawIndexed(submesh.numIndices, 1, submesh.firstIndex, submesh.baseVertex, 0);
-}
 
 
 struct tree_mesh_others
@@ -94,7 +198,7 @@ static void fillVertices(std::vector<submesh>& submeshes, const vec3* positions,
     }
 }
 
-static void analyzeTreeMesh(mesh_builder& builder, std::vector<submesh>& submeshes)
+static void analyzeTreeMesh(mesh_builder& builder, std::vector<submesh>& submeshes, const bounding_box& boundingBox)
 {
     const uint32 trunkVertexColor = 0xFF000000;  // Black.
     const uint32 branchVertexColor = 0xFFFFFFFF; // White.
@@ -115,6 +219,8 @@ static void analyzeTreeMesh(mesh_builder& builder, std::vector<submesh>& submesh
     point_cloud branchPC(branchPositions, numBranchVertices);
 
 
+    float scale = 1.f / (boundingBox.maxCorner.y - boundingBox.minCorner.y);
+
     for (auto& sub : submeshes)
     {
         for (uint32 i = 0; i < sub.info.numVertices; ++i)
@@ -128,7 +234,13 @@ static void analyzeTreeMesh(mesh_builder& builder, std::vector<submesh>& submesh
 
             distanceToBranch = min(distanceToTrunk, distanceToBranch);
 
-            others[vertexID].color = packColor(query.y / 100.f, distanceToTrunk / 100.f, distanceToBranch / 100.f, 1.f);
+            others[vertexID].color = packColor(
+                saturate(inverseLerp(boundingBox.minCorner.y, boundingBox.maxCorner.y, query.y)),
+                distanceToTrunk * scale,
+                distanceToBranch * scale,
+                1.f);
+
+            int a = 0;
         }
     }
 
@@ -145,3 +257,4 @@ ref<multi_mesh> loadTreeMeshFromHandle(asset_handle handle)
 {
     return loadMeshFromHandle(handle, mesh_creation_flags_default | mesh_creation_flags_with_colors, analyzeTreeMesh);
 }
+

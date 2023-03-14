@@ -12,15 +12,8 @@ struct tree_settings
 struct tree_component
 {
 	tree_settings settings;
-};
 
-
-struct tree_pipeline
-{
-	using render_data_t = pbr_render_data;
-
-	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
+	void render(struct opaque_render_pass* renderPass, const trs& transform, const ref<multi_mesh>& mesh, float dt);
 };
 
 

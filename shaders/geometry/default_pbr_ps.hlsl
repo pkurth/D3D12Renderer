@@ -63,8 +63,15 @@ struct ps_output
 #endif
 };
 
+
+#ifndef RS
+#define RS DEFAULT_PBR_RS
+#endif
+
+#ifndef ALPHA_CUTOUT
 [earlydepthstencil]
-[RootSignature(DEFAULT_PBR_RS)]
+#endif
+[RootSignature(RS)]
 ps_output main(ps_input IN)
 {
 	uint flags = material.getFlags();
@@ -76,6 +83,10 @@ ps_output main(ps_input IN)
 		? albedoTex.Sample(wrapSampler, materialUV)
 		: float4(1.f, 1.f, 1.f, 1.f))
 		* material.getAlbedo();
+
+#ifdef ALPHA_CUTOUT
+	clip(surface.albedo.w - 0.5f);
+#endif
 
 	const float normalMapStrength = material.getNormalMapStrength() * 0.2f;
 	surface.N = (flags & MATERIAL_USE_NORMAL_TEXTURE)
@@ -200,7 +211,7 @@ ps_output main(ps_input IN)
 		shadowMap, shadowSampler, lighting.shadowMapTexelSize);
 
 	totalLighting.addSunLight(surface, lighting, screenUV, pixelDepth, 
-		shadowMap, shadowSampler, lighting.shadowMapTexelSize, sssTexture, clampSampler);
+		shadowMap, shadowSampler, lighting.shadowMapTexelSize, sssTexture, clampSampler, material.getTranslucency());
 
 	[branch]
 	if (lighting.useRaytracedGlobalIllumination)
