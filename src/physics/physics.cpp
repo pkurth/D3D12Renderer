@@ -1373,7 +1373,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float& timer, const phy
 		uint32 physicsIterations = 0;
 		if (timer >= physicsFixedTimeStep)
 		{
-			for (auto [entityHandle, transform0, transform1] : scene.group(entt::get<physics_transform0_component, physics_transform1_component>).each())
+			for (auto [entityHandle, transform0, transform1] : scene.group(component_group<physics_transform0_component, physics_transform1_component>).each())
 			{
 				transform0 = transform1;
 			}
@@ -1397,7 +1397,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float& timer, const phy
 		float physicsInterpolationT = timer / physicsFixedTimeStep;
 		assert(physicsInterpolationT >= 0.f && physicsInterpolationT <= 1.f);
 
-		for (auto [entityHandle, transform, physicsTransform0, physicsTransform1] : scene.group(entt::get<transform_component, physics_transform0_component, physics_transform1_component>).each())
+		for (auto [entityHandle, transform, physicsTransform0, physicsTransform1] : scene.group(component_group<transform_component, physics_transform0_component, physics_transform1_component>).each())
 		{
 			transform = lerp(physicsTransform0, physicsTransform1, physicsInterpolationT);
 		}
@@ -1406,7 +1406,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float& timer, const phy
 	{
 		physicsStepInternal(scene, arena, settings, dt);
 
-		for (auto [entityHandle, transform, physicsTransform1] : scene.group(entt::get<transform_component, physics_transform1_component>).each())
+		for (auto [entityHandle, transform, physicsTransform1] : scene.group(component_group<transform_component, physics_transform1_component>).each())
 		{
 			transform = physicsTransform1;
 		}

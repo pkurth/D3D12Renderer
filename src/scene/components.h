@@ -67,3 +67,10 @@ REFLECT_STRUCT(position_scale_component,
 	(position, "Position"),
 	(scale, "Scale")
 );
+
+
+template <typename... component_t>
+struct component_group_t {};
+
+template<typename... Type>
+inline constexpr component_group_t<Type...> component_group{};

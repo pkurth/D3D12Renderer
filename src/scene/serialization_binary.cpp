@@ -100,11 +100,7 @@ private:
 
 
 
-
-template <typename... component_t>
-struct component_group {};
-
-using serialized_components = component_group<
+using serialized_components = component_group_t<
 
 	tag_component,
 
@@ -452,13 +448,13 @@ void deserializeComponentFromMemoryStream(scene_entity entity, read_stream& stre
 }
 
 template <typename... component_t>
-static void serializeComponentsToMemoryStream(component_group<component_t...>, scene_entity entity, write_stream& stream)
+static void serializeComponentsToMemoryStream(component_group_t<component_t...>, scene_entity entity, write_stream& stream)
 {
 	(serializeComponentToMemoryStream<component_t>(entity, stream), ...);
 }
 
 template <typename... component_t>
-static void deserializeComponentsFromMemoryStream(component_group<component_t...>, scene_entity entity, read_stream& stream)
+static void deserializeComponentsFromMemoryStream(component_group_t<component_t...>, scene_entity entity, read_stream& stream)
 {
 	(deserializeComponentFromMemoryStream<component_t>(entity, stream), ...);
 }

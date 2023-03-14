@@ -491,7 +491,7 @@ void application::update(const user_input& input, float dt)
 
 
 	// Must happen before physics update.
-	for (auto [entityHandle, terrain, position] : scene.group(entt::get<terrain_component, position_component>).each())
+	for (auto [entityHandle, terrain, position] : scene.group(component_group<terrain_component, position_component>).each())
 	{
 		scene_entity entity = { entityHandle, scene };
 		heightmap_collider_component* collider = entity.getComponentIfExists<heightmap_collider_component>();
@@ -537,7 +537,7 @@ void application::update(const user_input& input, float dt)
 	{
 		raytracingTLAS.reset();
 
-		for (auto [entityHandle, transform, raytrace] : scene.group(entt::get<transform_component, raytrace_component>).each())
+		for (auto [entityHandle, transform, raytrace] : scene.group(component_group<transform_component, raytrace_component>).each())
 		{
 			raytracingTLAS.instantiate(raytrace.type, transform);
 		}
@@ -565,7 +565,7 @@ void application::update(const user_input& input, float dt)
 		thread_job_context context;
 
 		// Update animated meshes.
-		for (auto [entityHandle, anim, mesh, transform] : scene.group(entt::get<animation_component, mesh_component, transform_component>).each())
+		for (auto [entityHandle, anim, mesh, transform] : scene.group(component_group<animation_component, mesh_component, transform_component>).each())
 		{
 			context.addWork([&anim = anim, mesh = mesh.mesh, &transform = transform, &arena = stackArena, dt]()
 			{
@@ -575,7 +575,7 @@ void application::update(const user_input& input, float dt)
 
 		context.waitForWorkCompletion();
 
-		//for (auto [entityHandle, anim, raster, transform] : scene.group(entt::get<animation_component, mesh_component, transform_component>).each())
+		//for (auto [entityHandle, anim, raster, transform] : scene.group(component_group<animation_component, mesh_component, transform_component>).each())
 		//{
 		//	anim.drawCurrentSkeleton(raster.mesh, transform, &ldrRenderPass);
 		//}
@@ -638,13 +638,13 @@ void application::update(const user_input& input, float dt)
 
 
 
-		for (auto [entityHandle, terrain, position, placement] : scene.group(entt::get<terrain_component, position_component, proc_placement_component>).each())
+		for (auto [entityHandle, terrain, position, placement] : scene.group(component_group<terrain_component, position_component, proc_placement_component>).each())
 		{
 			placement.generate(this->scene.camera, terrain, position.position);
 			placement.render(&ldrRenderPass);
 		}
 
-		for (auto [entityHandle, terrain, position, grass] : scene.group(entt::get<terrain_component, position_component, grass_component>).each())
+		for (auto [entityHandle, terrain, position, grass] : scene.group(component_group<terrain_component, position_component, grass_component>).each())
 		{
 			grass.generate(&computePass, this->scene.camera, terrain, position.position, unscaledDt);
 			grass.render(&opaqueRenderPass, (uint32)entityHandle);
@@ -653,7 +653,7 @@ void application::update(const user_input& input, float dt)
 		position_scale_component waterPlaneTransforms[4];
 		uint32 numWaterPlanes = 0;
 
-		for (auto [entityHandle, water, transform] : scene.group(entt::get<water_component, position_scale_component>).each())
+		for (auto [entityHandle, water, transform] : scene.group(component_group<water_component, position_scale_component>).each())
 		{
 			water.update(unscaledDt);
 			water.render(this->scene.camera, &transparentRenderPass, transform.position, vec2(transform.scale.x, transform.scale.z), (uint32)entityHandle);
@@ -661,7 +661,7 @@ void application::update(const user_input& input, float dt)
 			waterPlaneTransforms[numWaterPlanes++] = transform;
 		}
 
-		for (auto [entityHandle, terrain, position] : scene.group(entt::get<terrain_component, position_component>).each())
+		for (auto [entityHandle, terrain, position] : scene.group(component_group<terrain_component, position_component>).each())
 		{
 			terrain.render(this->scene.camera, &opaqueRenderPass, sunShadowRenderPass.copyFromStaticCache ? 0 : &sunShadowRenderPass, position.position, (uint32)entityHandle,
 				waterPlaneTransforms, numWaterPlanes);
@@ -673,7 +673,11 @@ void application::update(const user_input& input, float dt)
 		{
 			CPU_PROFILE_BLOCK("Submit render commands");
 
-			for (auto [entityHandle, mesh, transform] : scene.group(entt::get<mesh_component, transform_component>, entt::exclude<tree_component>).each())
+
+			// Animated meshes.
+			for (auto [entityHandle, transform, dynamicTransform, mesh, anim] : scene.group(
+				component_group<transform_component, dynamic_transform_component, mesh_component, animation_component>)
+				.each())
 			{
 				if (!mesh.mesh)
 				{
@@ -686,68 +690,80 @@ void application::update(const user_input& input, float dt)
 				scene_entity entity = { entityHandle, scene };
 				bool outline = selectedEntity == entity;
 
-				dynamic_transform_component* dynamic = entity.getComponentIfExists<dynamic_transform_component>();
-				mat4 lastM = dynamic ? trsToMat4(*dynamic) : m;
+				mat4 lastM = trsToMat4(dynamicTransform);
 
-				if (animation_component* anim = entity.getComponentIfExists<animation_component>())
+				for (auto& sm : mesh.mesh->submeshes)
 				{
-					for (auto& sm : mesh.mesh->submeshes)
+					submesh_info submesh = sm.info;
+					submesh.baseVertex -= mesh.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
+
+					const ref<pbr_material>& material = sm.material;
+
+					if (material->albedoTint.a < 1.f)
 					{
-						submesh_info submesh = sm.info;
-						submesh.baseVertex -= mesh.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
+						transparentRenderPass.renderObject(m, anim.currentVertexBuffer, dxMesh.indexBuffer, submesh, material);
+					}
+					else
+					{
+						opaqueRenderPass.renderAnimatedObject(m, lastM,
+							anim.currentVertexBuffer, anim.prevFrameVertexBuffer, dxMesh.indexBuffer,
+							submesh, material,
+							(uint32)entityHandle);
+					}
 
-						const ref<pbr_material>& material = sm.material;
-
-						if (material->albedoTint.a < 1.f)
-						{
-							transparentRenderPass.renderObject(m, anim->currentVertexBuffer, dxMesh.indexBuffer, submesh, material);
-						}
-						else
-						{
-							opaqueRenderPass.renderAnimatedObject(m, lastM,
-								anim->currentVertexBuffer, anim->prevFrameVertexBuffer, dxMesh.indexBuffer,
-								submesh, material,
-								(uint32)entityHandle);
-						}
-
-						if (outline)
-						{
-							ldrRenderPass.renderOutline(m, anim->currentVertexBuffer, dxMesh.indexBuffer, submesh);
-						}
+					if (outline)
+					{
+						ldrRenderPass.renderOutline(m, anim.currentVertexBuffer, dxMesh.indexBuffer, submesh);
 					}
 				}
-				else
+			};
+
+
+			// Dynamic meshes.
+			for (auto [entityHandle, transform, dynamicTransform, mesh] : scene.group(
+				component_group<transform_component, dynamic_transform_component, mesh_component>,
+				component_group<animation_component>) // Exclude animated meshes, since we already rendered these.
+				.each())
+			{
+				if (!mesh.mesh)
 				{
-					for (auto& sm : mesh.mesh->submeshes)
+					continue;
+				}
+
+				const dx_mesh& dxMesh = mesh.mesh->mesh;
+				mat4 m = trsToMat4(transform);
+
+				scene_entity entity = { entityHandle, scene };
+				bool outline = selectedEntity == entity;
+
+				mat4 lastM = trsToMat4(dynamicTransform);
+
+				for (auto& sm : mesh.mesh->submeshes)
+				{
+					submesh_info submesh = sm.info;
+					const ref<pbr_material>& material = sm.material;
+
+					if (material->albedoTint.a < 1.f)
 					{
-						submesh_info submesh = sm.info;
-						const ref<pbr_material>& material = sm.material;
+						transparentRenderPass.renderObject(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh, material);
+					}
+					else
+					{
+						opaqueRenderPass.renderDynamicObject(m, lastM, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh, material, (uint32)entityHandle);
+					}
 
-						if (material->albedoTint.a < 1.f)
-						{
-							transparentRenderPass.renderObject(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh, material);
-						}
-						else
-						{
-							if (dynamic)
-							{
-								opaqueRenderPass.renderDynamicObject(m, lastM, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh, material, (uint32)entityHandle);
-							}
-							else
-							{
-								opaqueRenderPass.renderStaticObject(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh, material, (uint32)entityHandle);
-							}
-						}
-
-						if (outline)
-						{
-							ldrRenderPass.renderOutline(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh);
-						}
+					if (outline)
+					{
+						ldrRenderPass.renderOutline(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh);
 					}
 				}
 			}
 
-			for (auto [entityHandle, tree, mesh, transform] : scene.group(entt::get<tree_component, mesh_component, transform_component>).each())
+
+			// Trees.
+			for (auto [entityHandle, transform, mesh, tree] : scene.group(
+				component_group<transform_component, mesh_component, tree_component>)
+				.each())
 			{
 				if (!mesh.mesh)
 				{
@@ -772,6 +788,54 @@ void application::update(const user_input& input, float dt)
 					opaqueRenderPass.renderObject<tree_pipeline>(data);
 				}
 			}
+
+
+
+
+			using specialized_components = component_group_t<
+				animation_component,
+				dynamic_transform_component,
+				tree_component
+			>;
+
+			// Render all other objects as default.
+			for (auto [entityHandle, transform, mesh] : scene.group(
+				component_group<transform_component, mesh_component>,
+				specialized_components{}) // Exclude all already handled components.
+				.each())
+			{
+				if (!mesh.mesh)
+				{
+					continue;
+				}
+
+				const dx_mesh& dxMesh = mesh.mesh->mesh;
+				mat4 m = trsToMat4(transform);
+
+				scene_entity entity = { entityHandle, scene };
+				bool outline = selectedEntity == entity;
+
+				for (auto& sm : mesh.mesh->submeshes)
+				{
+					submesh_info submesh = sm.info;
+					const ref<pbr_material>& material = sm.material;
+
+					if (material->albedoTint.a < 1.f)
+					{
+						transparentRenderPass.renderObject(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh, material);
+					}
+					else
+					{
+						opaqueRenderPass.renderStaticObject(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh, material, (uint32)entityHandle);
+					}
+
+					if (outline)
+					{
+						ldrRenderPass.renderOutline(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh);
+					}
+				}
+			}
+
 
 			for (auto [entityHandle, cloth, render] : scene.group<cloth_component, cloth_render_component>().each())
 			{
@@ -822,7 +886,7 @@ void application::update(const user_input& input, float dt)
 		submitRendererParams(numSpotShadowRenderPasses, numPointShadowRenderPasses);
 	}
 
-	for (auto [entityHandle, transform, dynamic] : scene.group(entt::get<transform_component, dynamic_transform_component>).each())
+	for (auto [entityHandle, transform, dynamic] : scene.group(component_group<transform_component, dynamic_transform_component>).each())
 	{
 		dynamic = transform;
 	}

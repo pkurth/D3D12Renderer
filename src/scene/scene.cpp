@@ -32,7 +32,8 @@ void game_scene::cloneTo(game_scene& target)
 {
 	target.registry.assign(registry.data(), registry.data() + registry.size(), registry.released());
 
-	copyComponentPoolsTo<
+
+	using copy_components = component_group_t<
 		tag_component,
 		transform_component,
 		position_component,
@@ -77,7 +78,9 @@ void game_scene::cloneTo(game_scene& target)
 		hinge_constraint,
 		cone_twist_constraint,
 		slider_constraint
-	> (target);
+	>;
+
+	copyComponentPoolsTo(copy_components{}, target);
 
 	target.registry.ctx() = registry.ctx();
 }

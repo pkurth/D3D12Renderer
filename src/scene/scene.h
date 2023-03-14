@@ -290,10 +290,10 @@ struct game_scene
 		return registry.view<component_t...>(); 
 	}
 
-	template<typename... owned_component_t, typename... Get, typename... Exclude>
-	auto group(entt::get_t<Get...> = {}, entt::exclude_t<Exclude...> = {})
+	template<typename... owned_component_t, typename... non_owned_component_t, typename... excluded_components>
+	auto group(component_group_t<non_owned_component_t...> = {}, component_group_t<excluded_components...> = {})
 	{
-		return registry.group<owned_component_t...>(entt::get<Get...>, entt::exclude<Exclude...>);
+		return registry.group<owned_component_t...>(entt::get<non_owned_component_t...>, entt::exclude<excluded_components...>);
 	}
 
 	template <typename component_t>
@@ -374,10 +374,18 @@ private:
 	{
 		(copyComponentPoolTo<component_t>(target), ...);
 	}
+
+	template <typename... component_t>
+	void copyComponentPoolsTo(component_group_t<component_t...>, game_scene& target)
+	{
+		(copyComponentPoolTo<component_t>(target), ...);
+	}
 };
 
 inline scene_entity::scene_entity(entity_handle handle, game_scene& scene) : handle(handle), registry(&scene.registry) {}
 inline scene_entity::scene_entity(uint32 id, game_scene& scene) : handle((entity_handle)id), registry(&scene.registry) {}
+
+
 
 enum scene_mode
 {
