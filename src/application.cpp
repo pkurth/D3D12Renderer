@@ -740,21 +740,18 @@ void application::update(const user_input& input, float dt)
 
 				for (auto& sm : mesh.mesh->submeshes)
 				{
-					submesh_info submesh = sm.info;
-					const ref<pbr_material>& material = sm.material;
-
-					if (material->albedoTint.a < 1.f)
+					if (sm.material->albedoTint.a < 1.f)
 					{
-						transparentRenderPass.renderObject(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh, material);
+						transparentRenderPass.renderObject(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, sm.info, sm.material);
 					}
 					else
 					{
-						opaqueRenderPass.renderDynamicObject(m, lastM, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh, material, (uint32)entityHandle);
+						opaqueRenderPass.renderDynamicObject(m, lastM, dxMesh.vertexBuffer, dxMesh.indexBuffer, sm.info, sm.material, (uint32)entityHandle);
 					}
 
 					if (outline)
 					{
-						ldrRenderPass.renderOutline(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh);
+						ldrRenderPass.renderOutline(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, sm.info);
 					}
 				}
 			}
@@ -770,7 +767,18 @@ void application::update(const user_input& input, float dt)
 					continue;
 				}
 
+				scene_entity entity = { entityHandle, scene };
+				bool outline = selectedEntity == entity;
+
 				tree.render(&opaqueRenderPass, transform, mesh.mesh, unscaledDt);
+
+				if (outline)
+				{
+					for (auto& sm : mesh.mesh->submeshes)
+					{
+						ldrRenderPass.renderOutline(trsToMat4(transform), mesh.mesh->mesh.vertexBuffer, mesh.mesh->mesh.indexBuffer, sm.info);
+					}
+				}
 			}
 
 
@@ -801,21 +809,18 @@ void application::update(const user_input& input, float dt)
 
 				for (auto& sm : mesh.mesh->submeshes)
 				{
-					submesh_info submesh = sm.info;
-					const ref<pbr_material>& material = sm.material;
-
-					if (material->albedoTint.a < 1.f)
+					if (sm.material->albedoTint.a < 1.f)
 					{
-						transparentRenderPass.renderObject(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh, material);
+						transparentRenderPass.renderObject(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, sm.info, sm.material);
 					}
 					else
 					{
-						opaqueRenderPass.renderStaticObject(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh, material, (uint32)entityHandle);
+						opaqueRenderPass.renderStaticObject(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, sm.info, sm.material, (uint32)entityHandle);
 					}
 
 					if (outline)
 					{
-						ldrRenderPass.renderOutline(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, submesh);
+						ldrRenderPass.renderOutline(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, sm.info);
 					}
 				}
 			}
