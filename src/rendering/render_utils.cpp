@@ -6,6 +6,7 @@
 #include "texture_preprocessing.h"
 #include "render_resources.h"
 #include "render_algorithms.h"
+#include "outline.h"
 #include "pbr.h"
 #include "particles/particles.h"
 #include "particles/particle_systems.h"
@@ -31,6 +32,7 @@ void initializeRenderUtils()
 {
 	initializeTexturePreprocessing();
 	initializeDepthPrepassPipelines();
+	initializeOutlinePipelines();
 	initializeSkinning();
 	initializeShadowPipelines();
 	initializeTerrainPipelines();

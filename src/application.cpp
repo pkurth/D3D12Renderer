@@ -13,6 +13,7 @@
 #include "physics/ragdoll.h"
 #include "physics/vehicle.h"
 #include "core/threading.h"
+#include "rendering/outline.h"
 #include "rendering/mesh_shader.h"
 #include "rendering/shadow_map.h"
 #include "rendering/debug_visualization.h"
@@ -663,7 +664,8 @@ void application::update(const user_input& input, float dt)
 
 		for (auto [entityHandle, terrain, position] : scene.group(component_group<terrain_component, position_component>).each())
 		{
-			terrain.render(this->scene.camera, &opaqueRenderPass, sunShadowRenderPass.copyFromStaticCache ? 0 : &sunShadowRenderPass, position.position, (uint32)entityHandle,
+			terrain.render(this->scene.camera, &opaqueRenderPass, sunShadowRenderPass.copyFromStaticCache ? 0 : &sunShadowRenderPass, &ldrRenderPass,
+				position.position, (uint32)entityHandle, selectedEntity == scene_entity(entityHandle, scene),
 				waterPlaneTransforms, numWaterPlanes);
 		}
 
@@ -713,7 +715,7 @@ void application::update(const user_input& input, float dt)
 
 					if (outline)
 					{
-						ldrRenderPass.renderOutline(m, anim.currentVertexBuffer, dxMesh.indexBuffer, submesh);
+						renderOutline(&ldrRenderPass, m, anim.currentVertexBuffer, dxMesh.indexBuffer, submesh);
 					}
 				}
 			};
@@ -751,7 +753,7 @@ void application::update(const user_input& input, float dt)
 
 					if (outline)
 					{
-						ldrRenderPass.renderOutline(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, sm.info);
+						renderOutline(&ldrRenderPass, m, dxMesh.vertexBuffer, dxMesh.indexBuffer, sm.info);
 					}
 				}
 			}
@@ -776,7 +778,7 @@ void application::update(const user_input& input, float dt)
 				{
 					for (auto& sm : mesh.mesh->submeshes)
 					{
-						ldrRenderPass.renderOutline(trsToMat4(transform), mesh.mesh->mesh.vertexBuffer, mesh.mesh->mesh.indexBuffer, sm.info);
+						renderOutline(&ldrRenderPass, trsToMat4(transform), mesh.mesh->mesh.vertexBuffer, mesh.mesh->mesh.indexBuffer, sm.info);
 					}
 				}
 			}
@@ -820,7 +822,7 @@ void application::update(const user_input& input, float dt)
 
 					if (outline)
 					{
-						ldrRenderPass.renderOutline(m, dxMesh.vertexBuffer, dxMesh.indexBuffer, sm.info);
+						renderOutline(&ldrRenderPass, m, dxMesh.vertexBuffer, dxMesh.indexBuffer, sm.info);
 					}
 				}
 			}
@@ -843,7 +845,7 @@ void application::update(const user_input& input, float dt)
 
 				if (outline)
 				{
-					ldrRenderPass.renderOutline(mat4::identity, vb, ib, sm);
+					renderOutline(&ldrRenderPass, mat4::identity, vb, ib, sm);
 				}
 			}
 		}

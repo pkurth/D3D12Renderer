@@ -20,7 +20,6 @@
 static dx_pipeline textureSkyPipeline;
 static dx_pipeline proceduralSkyPipeline;
 
-static dx_pipeline outlineMarkerPipeline;
 static dx_pipeline outlineDrawerPipeline;
 
 static dx_pipeline shadowMapCopyPipeline;
@@ -102,21 +101,6 @@ void loadCommonShaders()
 
 	// Outline.
 	{
-		auto markerDesc = CREATE_GRAPHICS_PIPELINE
-			.inputLayout(inputLayout_position)
-			.renderTargets(0, 0, depthStencilFormat)
-			.stencilSettings(D3D12_COMPARISON_FUNC_ALWAYS,
-				D3D12_STENCIL_OP_REPLACE,
-				D3D12_STENCIL_OP_REPLACE,
-				D3D12_STENCIL_OP_KEEP,
-				D3D12_DEFAULT_STENCIL_READ_MASK,
-				stencil_flag_selected_object) // Mark selected object.
-			.depthSettings(false, false)
-			.cullingOff(); // Since this is fairly light-weight, we only render double sided.
-
-		outlineMarkerPipeline = createReloadablePipeline(markerDesc, { "outline_vs" }, rs_in_vertex_shader);
-
-
 		auto drawerDesc = CREATE_GRAPHICS_PIPELINE
 			.renderTargets(ldrFormat, depthStencilFormat)
 			.stencilSettings(D3D12_COMPARISON_FUNC_EQUAL,
@@ -596,19 +580,18 @@ void ldrPass(dx_command_list* cl,
 			cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			cl->setStencilReference(stencil_flag_selected_object);
 
-			cl->setPipelineState(*outlineMarkerPipeline.pipeline);
-			cl->setGraphicsRootSignature(*outlineMarkerPipeline.rootSignature);
+			pipeline_setup_func lastSetupFunc = 0;
 
-
-			// Mark objects in stencil.
 			for (const auto& dc : ldrRenderPass->outlines)
 			{
-				cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * dc.transform });
-
-				cl->setVertexBuffer(0, dc.vertexBuffer);
-				cl->setIndexBuffer(dc.indexBuffer);
-				cl->drawIndexed(dc.submesh.numIndices, 1, dc.submesh.firstIndex, dc.submesh.baseVertex, 0);
+				if (dc.setup != lastSetupFunc)
+				{
+					dc.setup(cl, common);
+					lastSetupFunc = dc.setup;
+				}
+				dc.render(cl, viewProj, dc.data);
 			}
+
 
 			// Draw outline.
 			cl->transitionBarrier(depthStencilBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ);

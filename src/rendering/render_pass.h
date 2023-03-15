@@ -306,7 +306,7 @@ struct ldr_render_pass
 
 		ldrPass.sort();
 		overlays.sort();
-		// We don't sort the outlines.
+		outlines.sort();
 	}
 
 	void reset()
@@ -321,8 +321,8 @@ struct ldr_render_pass
 	{
 		using render_data_t = typename pipeline_t::render_data_t;
 
-		float depth = 0.f; // TODO
-		ldrPass.emplace_back<pipeline_t, render_command<render_data_t>>(depth, data);
+		uint64 sortKey = (uint64)pipeline_t::setup;
+		ldrPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, data);
 	}
 
 	template <typename pipeline_t>
@@ -330,8 +330,8 @@ struct ldr_render_pass
 	{
 		using render_data_t = typename pipeline_t::render_data_t;
 
-		float depth = 0.f; // TODO
-		ldrPass.emplace_back<pipeline_t, render_command<render_data_t>>(depth, std::move(data));
+		uint64 sortKey = (uint64)pipeline_t::setup;
+		ldrPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(data));
 	}
 
 	template <typename pipeline_t>
@@ -339,8 +339,8 @@ struct ldr_render_pass
 	{
 		using render_data_t = typename pipeline_t::render_data_t;
 
-		float depth = 0.f; // TODO
-		overlays.emplace_back<pipeline_t, render_command<render_data_t>>(depth, data);
+		uint64 sortKey = (uint64)pipeline_t::setup;
+		overlays.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, data);
 	}
 
 	template <typename pipeline_t>
@@ -348,33 +348,31 @@ struct ldr_render_pass
 	{
 		using render_data_t = typename pipeline_t::render_data_t;
 
-		float depth = 0.f; // TODO
-		overlays.emplace_back<pipeline_t, render_command<render_data_t>>(depth, std::move(data));
+		uint64 sortKey = (uint64)pipeline_t::setup;
+		overlays.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(data));
 	}
 
-	void renderOutline(const mat4& transform,
-		const dx_vertex_buffer_view& vertexBuffer,
-		const dx_index_buffer_view& indexBuffer,
-		submesh_info submesh)
+	template <typename pipeline_t>
+	void renderOutline(const typename pipeline_t::render_data_t& data)
 	{
-		auto& command = outlines.emplace_back();
-		command.transform = transform;
-		command.vertexBuffer = vertexBuffer;
-		command.indexBuffer = indexBuffer;
-		command.submesh = submesh;
+		using render_data_t = typename pipeline_t::render_data_t;
+
+		uint64 sortKey = (uint64)pipeline_t::setup;
+		outlines.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, data);
 	}
 
-	void renderOutline(const mat4& transform,
-		const dx_vertex_buffer_group_view& vertexBuffer,
-		const dx_index_buffer_view& indexBuffer,
-		submesh_info submesh)
+	template <typename pipeline_t>
+	void renderOutline(typename pipeline_t::render_data_t&& data)
 	{
-		renderOutline(transform, vertexBuffer.positions, indexBuffer, submesh);
+		using render_data_t = typename pipeline_t::render_data_t;
+
+		uint64 sortKey = (uint64)pipeline_t::setup;
+		outlines.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(data));
 	}
 
-	default_render_command_buffer<float> ldrPass;
-	default_render_command_buffer<float> overlays;
-	std::vector<outline_render_command> outlines;
+	default_render_command_buffer<uint64> ldrPass;
+	default_render_command_buffer<uint64> overlays;
+	default_render_command_buffer<uint64> outlines;
 };
 
 

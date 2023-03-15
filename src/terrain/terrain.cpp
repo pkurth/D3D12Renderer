@@ -12,6 +12,7 @@
 #include "rendering/render_pass.h"
 #include "rendering/render_resources.h"
 #include "rendering/texture_preprocessing.h"
+#include "rendering/render_algorithms.h"
 
 #include "core/random.h"
 #include "scene/components.h"
@@ -24,6 +25,7 @@ static dx_pipeline terrainGenerationPipeline;
 static dx_pipeline terrainPipeline;
 static dx_pipeline terrainDepthOnlyPipeline;
 static dx_pipeline terrainShadowPipeline;
+static dx_pipeline terrainOutlinePipeline;
 static ref<dx_index_buffer> terrainIndexBuffers[TERRAIN_MAX_LOD + 1];
 
 
@@ -81,6 +83,14 @@ struct terrain_shadow_pipeline
 	PIPELINE_RENDER_DECL;
 };
 
+struct terrain_outline_pipeline
+{
+	using render_data_t = terrain_render_data_common;
+
+	PIPELINE_SETUP_DECL;
+	PIPELINE_RENDER_DECL;
+};
+
 
 
 
@@ -109,6 +119,19 @@ void initializeTerrainPipelines()
 
 		terrainShadowPipeline = createReloadablePipeline(desc, { "terrain_shadow_vs" }, rs_in_vertex_shader);
 		//pointLightShadowPipeline = createReloadablePipeline(desc, { "shadow_point_light_vs", "shadow_point_light_ps" }, rs_in_vertex_shader);
+	}
+	{
+		auto desc = CREATE_GRAPHICS_PIPELINE
+			.renderTargets(0, 0, depthStencilFormat)
+			.stencilSettings(D3D12_COMPARISON_FUNC_ALWAYS,
+				D3D12_STENCIL_OP_REPLACE,
+				D3D12_STENCIL_OP_REPLACE,
+				D3D12_STENCIL_OP_KEEP,
+				D3D12_DEFAULT_STENCIL_READ_MASK,
+				stencil_flag_selected_object) // Mark selected object.
+			.depthSettings(false, false);
+
+		terrainOutlinePipeline = createReloadablePipeline(desc, { "terrain_outline_vs" }, rs_in_vertex_shader);
 	}
 
 
@@ -254,6 +277,32 @@ PIPELINE_RENDER_IMPL(terrain_shadow_pipeline)
 	auto cb = getTerrainCB(rc.data);
 	cl->setGraphics32BitConstants(TERRAIN_SHADOW_RS_CB, cb);
 	cl->setDescriptorHeapSRV(TERRAIN_SHADOW_RS_HEIGHTMAP, 0, rc.data.heightmap);
+
+	cl->setIndexBuffer(terrainIndexBuffers[rc.data.lod]);
+	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);
+}
+
+
+PIPELINE_SETUP_IMPL(terrain_outline_pipeline)
+{
+	cl->setPipelineState(*terrainOutlinePipeline.pipeline);
+	cl->setGraphicsRootSignature(*terrainOutlinePipeline.rootSignature);
+
+	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+}
+
+PIPELINE_RENDER_IMPL(terrain_outline_pipeline)
+{
+	PROFILE_ALL(cl, "Terrain outline");
+
+	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> rc.data.lod;
+	uint32 numTris = numSegmentsPerDim * numSegmentsPerDim * 2;
+
+	cl->setGraphics32BitConstants(TERRAIN_OUTLINE_RS_TRANSFORM, terrain_transform_cb{ viewProj });
+
+	auto cb = getTerrainCB(rc.data);
+	cl->setGraphics32BitConstants(TERRAIN_OUTLINE_RS_CB, cb);
+	cl->setDescriptorHeapSRV(TERRAIN_OUTLINE_RS_HEIGHTMAP, 0, rc.data.heightmap);
 
 	cl->setIndexBuffer(terrainIndexBuffers[rc.data.lod]);
 	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);
@@ -623,8 +672,9 @@ void terrain_component::update(vec3 positionOffset, heightmap_collider_component
 	}
 }
 
-void terrain_component::render(const render_camera& camera, opaque_render_pass* renderPass, sun_shadow_render_pass* shadowPass, vec3 positionOffset, uint32 entityID,
-	position_scale_component* waterPlaneTransforms, uint32 numWaters)
+void terrain_component::render(const render_camera& camera, struct opaque_render_pass* renderPass, struct sun_shadow_render_pass* shadowPass, struct ldr_render_pass* ldrPass,
+	vec3 positionOffset, uint32 entityID, bool selected,
+	struct position_scale_component* waterPlaneTransforms, uint32 numWaters)
 {
 	camera_frustum_planes frustum = camera.getWorldSpaceFrustumPlanes();
 
@@ -703,6 +753,11 @@ void terrain_component::render(const render_camera& camera, opaque_render_pass* 
 			if (shadowPass)
 			{
 				shadowPass->renderStaticObject<terrain_shadow_pipeline>(0, common);
+			}
+
+			if (ldrPass && selected)
+			{
+				ldrPass->renderOutline<terrain_outline_pipeline>(common);
 			}
 		}
 	}

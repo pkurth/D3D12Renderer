@@ -59,7 +59,8 @@ struct terrain_component
 	}
 
 	void update(vec3 positionOffset, struct heightmap_collider_component* collider = 0);
-	void render(const render_camera& camera, struct opaque_render_pass* renderPass, struct sun_shadow_render_pass* shadowPass, vec3 positionOffset, uint32 entityID = -1,
+	void render(const render_camera& camera, struct opaque_render_pass* renderPass, struct sun_shadow_render_pass* shadowPass, struct ldr_render_pass* ldrPass,
+		vec3 positionOffset, uint32 entityID = -1, bool selected = false,
 		struct position_scale_component* waterPlaneTransforms = 0, uint32 numWaters = 0);
 
 private:

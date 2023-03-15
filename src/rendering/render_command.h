@@ -49,22 +49,6 @@ struct depth_only_render_command
 		: objectID(objectID), data(data) {}
 };
 
-struct outline_render_command
-{
-	mat4 transform;
-	dx_vertex_buffer_view vertexBuffer;
-	dx_index_buffer_view indexBuffer;
-	submesh_info submesh;
-};
-
-struct shadow_render_command
-{
-	mat4 transform;
-	dx_vertex_buffer_view vertexBuffer;
-	dx_index_buffer_view indexBuffer;
-	submesh_info submesh;
-};
-
 
 
 
