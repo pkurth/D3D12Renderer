@@ -26,7 +26,7 @@ void undo_stack::pushAction(const char* name, const void* entry, uint64 entrySiz
 	}
 	else
 	{
-		assert(oldest);
+		ASSERT(oldest);
 		address = (requiredSpace <= availableSpaceAtEnd) ? nextToWrite : memory;
 	}
 
@@ -201,11 +201,11 @@ bool undo_stack::showHistory(bool& open)
 				ImGui::PopID();
 			}
 
-			assert(currentFound);
+			ASSERT(currentFound);
 
 			if (clicked)
 			{
-				assert(direction != 0);
+				ASSERT(direction != 0);
 
 				while (newest != target)
 				{
@@ -227,11 +227,11 @@ void undo_stack::verify()
 	{
 		if (entry->older)
 		{
-			assert(entry->older->newer == entry);
+			ASSERT(entry->older->newer == entry);
 		}
 		if (entry->newer)
 		{
-			assert(entry->newer->older == entry);
+			ASSERT(entry->newer->older == entry);
 		}
 	}
 }

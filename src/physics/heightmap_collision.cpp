@@ -64,7 +64,7 @@ static uint32 collideSphereVsTriangle(vec3 center, float radius, vec3 a, vec3 b,
 
 
 		float penetrationDepth = radius - distance;
-		assert(penetrationDepth >= 0.f);
+		ASSERT(penetrationDepth >= 0.f);
 
 		collision_contact& contact = outContacts[0];
 		contact.point = closestPoint;
@@ -406,7 +406,7 @@ static uint32 collideAABBvsTriangle(vec3 center, vec3 radius, vec3 a, vec3 b, ve
 		point = p - minNormal * (minPenetration * 0.5f);
 	}
 
-	assert(minPenetration >= 0.f);
+	ASSERT(minPenetration >= 0.f);
 
 	point += center;
 
@@ -585,7 +585,7 @@ narrowphase_result heightmapCollision(const heightmap_collider_component& height
 				bodyPairPtr[j] = { collider.objectIndex, dummyRigidBodyIndex };
 			}
 
-			assert(numContacts < 256);
+			ASSERT(numContacts < 256);
 			outContactCountPerCollision[totalNumCollisions] = (uint8)numContacts;
 			outColliderPairs[totalNumCollisions++] = { (uint16)i, UINT16_MAX };
 		}

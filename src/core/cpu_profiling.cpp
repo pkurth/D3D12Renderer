@@ -58,7 +58,7 @@ static uint32 mapThreadIDToIndex(uint32 threadID)
 	}
 
 	HANDLE handle = OpenThread(THREAD_ALL_ACCESS, false, threadID);
-	assert(handle);
+	ASSERT(handle);
 	WCHAR* description = nullptr;
 	checkResult(GetThreadDescription(handle, &description));
 	CloseHandle(handle);
@@ -68,7 +68,7 @@ static uint32 mapThreadIDToIndex(uint32 threadID)
 		description = (WCHAR*)L"Main thread";
 	}
 
-	assert(numThreads < MAX_NUM_CPU_PROFILE_THREADS);
+	ASSERT(numThreads < MAX_NUM_CPU_PROFILE_THREADS);
 	uint32 index = numThreads++;
 	profileThreads[index] = threadID;
 	snprintf(profileThreadNames[index], sizeof(profileThreadNames[index]), "Thread %u (%ws)", threadID, description);
@@ -179,7 +179,7 @@ void cpuProfilingResolveTimeStamps()
 					profile_block* block = frame->profileBlockPool + i;
 
 					uint64 endClock = (block->endClock == 0) ? frame->endClock : block->endClock;
-					assert(endClock <= frame->endClock);
+					ASSERT(endClock <= frame->endClock);
 
 					if (block->startClock >= frame->startClock)
 					{

@@ -322,8 +322,8 @@ static vec3 fbm(fbm_noise_2D noiseFunc, vec2 x, uint32 numOctaves = 6, float lac
 	{
 		vec3 n = noiseFunc(x);
 
-		assert(n.x <= 1.f);
-		assert(n.x >= -1.f);
+		ASSERT(n.x <= 1.f);
+		ASSERT(n.x >= -1.f);
 
 		value += amplitude * n.x;		// Accumulate values.
 		deriv += amplitude * m * n.yz;  // Accumulate derivatives.

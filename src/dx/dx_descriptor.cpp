@@ -169,7 +169,7 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createBufferSRV(const ref<dx
 dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createRawBufferSRV(const ref<dx_buffer>& buffer, buffer_range bufferRange)
 {
 	uint32 firstElementByteOffset = bufferRange.firstElement * buffer->elementSize;
-	assert(firstElementByteOffset % 16 == 0);
+	ASSERT(firstElementByteOffset % 16 == 0);
 
 	uint32 count = (bufferRange.numElements != -1) ? bufferRange.numElements : (buffer->elementCount - bufferRange.firstElement);
 	uint32 totalSize = count * buffer->elementSize;
@@ -283,7 +283,7 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createBufferUAV(const ref<dx
 dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createBufferUintUAV(const ref<dx_buffer>& buffer, buffer_range bufferRange)
 {
 	uint32 firstElementByteOffset = bufferRange.firstElement * buffer->elementSize;
-	assert(firstElementByteOffset % 16 == 0);
+	ASSERT(firstElementByteOffset % 16 == 0);
 
 	uint32 count = (bufferRange.numElements != -1) ? bufferRange.numElements : (buffer->elementCount - bufferRange.firstElement);
 	uint32 totalSize = count * buffer->elementSize;
@@ -305,7 +305,7 @@ dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createBufferUintUAV(const re
 dx_cpu_descriptor_handle& dx_cpu_descriptor_handle::createRawBufferUAV(const ref<dx_buffer>& buffer, buffer_range bufferRange)
 {
 	uint32 firstElementByteOffset = bufferRange.firstElement * buffer->elementSize;
-	assert(firstElementByteOffset % 16 == 0);
+	ASSERT(firstElementByteOffset % 16 == 0);
 
 	uint32 count = (bufferRange.numElements != -1) ? bufferRange.numElements : (buffer->elementCount - bufferRange.firstElement);
 	uint32 totalSize = count * buffer->elementSize;
@@ -396,7 +396,7 @@ dx_gpu_descriptor_handle dx_gpu_descriptor_handle::operator++(int)
 
 dx_rtv_descriptor_handle& dx_rtv_descriptor_handle::create2DTextureRTV(const ref<dx_texture>& texture, uint32 arraySlice, uint32 mipSlice)
 {
-	assert(texture->supportsRTV);
+	ASSERT(texture->supportsRTV);
 
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc;
 	rtvDesc.Format = texture->format;
@@ -435,8 +435,8 @@ dx_rtv_descriptor_handle& dx_rtv_descriptor_handle::createNullTextureRTV(DXGI_FO
 
 dx_dsv_descriptor_handle& dx_dsv_descriptor_handle::create2DTextureDSV(const ref<dx_texture>& texture, uint32 arraySlice, uint32 mipSlice)
 {
-	assert(texture->supportsDSV);
-	assert(isDepthFormat(texture->format));
+	ASSERT(texture->supportsDSV);
+	ASSERT(isDepthFormat(texture->format));
 
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
 	dsvDesc.Format = texture->format;

@@ -22,7 +22,7 @@ struct dx_render_target
 
 	dx_render_target& colorAttachment(const ref<dx_texture>& attachment, dx_rtv_descriptor_handle useIfNull = CD3DX12_DEFAULT())
 	{
-		assert(pushIndex < arraysize(rtv));
+		ASSERT(pushIndex < arraysize(rtv));
 		rtv[pushIndex++] = attachment ? attachment->defaultRTV : useIfNull;
 
 		if (attachment)
@@ -36,7 +36,7 @@ struct dx_render_target
 
 	dx_render_target& depthAttachment(const ref<dx_texture>& attachment, dx_dsv_descriptor_handle useIfNull = CD3DX12_DEFAULT())
 	{
-		assert(!dsv);
+		ASSERT(!dsv);
 		dsv = attachment ? attachment->defaultDSV : useIfNull;
 		return *this;
 	}

@@ -230,7 +230,7 @@ struct opaque_render_pass
 
 				renderObject<pbr_pipeline::opaque_double_sided, animated_depth_prepass_pipeline::alpha_cutout>(data, prepassData, objectID);
 #endif
-				assert(false);
+				ASSERT(false);
 			} break;
 		}
 	}

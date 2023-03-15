@@ -81,7 +81,7 @@ struct reloadable_pipeline_state
 		this->graphicsFiles = files;
 		this->rootSignature = rootSignature;
 
-		assert(desc.InputLayout.NumElements <= arraysize(inputLayout));
+		ASSERT(desc.InputLayout.NumElements <= arraysize(inputLayout));
 
 		memcpy(inputLayout, desc.InputLayout.pInputElementDescs, sizeof(D3D12_INPUT_ELEMENT_DESC) * desc.InputLayout.NumElements);
 		this->graphicsDesc.InputLayout.pInputElementDescs = inputLayout;
@@ -192,8 +192,8 @@ dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& d
 	pushBlob(files.ds, &state);
 	pushBlob(files.hs, &state);
 
-	assert(!files.ms);
-	assert(!files.as);
+	ASSERT(!files.ms);
+	ASSERT(!files.as);
 
 	userRootSignatures.push_back(userRootSignature);
 	dx_root_signature* rootSignature = &userRootSignatures.back();
@@ -222,8 +222,8 @@ dx_pipeline createReloadablePipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& d
 	pushBlob(files.ds, &state);
 	pushBlob(files.hs, &state);
 
-	assert(!files.ms);
-	assert(!files.as);
+	ASSERT(!files.ms);
+	ASSERT(!files.as);
 
 	dx_root_signature* rootSignature = &reloadableRS->rootSignature;
 

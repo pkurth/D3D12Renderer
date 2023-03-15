@@ -10,8 +10,8 @@ struct dx_descriptor_page;
 
 struct dx_descriptor_allocation
 {
-	inline CD3DX12_CPU_DESCRIPTOR_HANDLE cpuAt(uint32 index = 0) { assert(index < count); return CD3DX12_CPU_DESCRIPTOR_HANDLE(cpuBase, index, descriptorSize); }
-	inline CD3DX12_GPU_DESCRIPTOR_HANDLE gpuAt(uint32 index = 0) { assert(index < count); return CD3DX12_GPU_DESCRIPTOR_HANDLE(gpuBase, index, descriptorSize); }
+	inline CD3DX12_CPU_DESCRIPTOR_HANDLE cpuAt(uint32 index = 0) { ASSERT(index < count); return CD3DX12_CPU_DESCRIPTOR_HANDLE(cpuBase, index, descriptorSize); }
+	inline CD3DX12_GPU_DESCRIPTOR_HANDLE gpuAt(uint32 index = 0) { ASSERT(index < count); return CD3DX12_GPU_DESCRIPTOR_HANDLE(gpuBase, index, descriptorSize); }
 
 	inline bool valid() { return count > 0; }
 	uint64 count = 0;

@@ -57,17 +57,17 @@ static uint32 getIndex(uint32 size)
 
 static shadow_map_viewport allocateShadowViewport(uint32 size)
 {
-	assert(size <= maximumSize);
-	assert(size >= minimumSize);
-	assert(isPowerOfTwo(size));
+	ASSERT(size <= maximumSize);
+	ASSERT(size >= minimumSize);
+	ASSERT(isPowerOfTwo(size));
 
 	uint32 index = getIndex(size);
 
 	uint32 insertIndex = index;
 	for (; insertIndex != -1 && nodes[insertIndex].size() == 0; --insertIndex);
 
-	assert(insertIndex != -1); // TODO: Handle error.
-	assert(nodes[insertIndex].size() > 0);
+	ASSERT(insertIndex != -1); // TODO: Handle error.
+	ASSERT(nodes[insertIndex].size() > 0);
 
 
 	for (uint32 i = insertIndex; i < index; ++i)
@@ -138,7 +138,7 @@ static void freeShadowViewport(shadow_map_viewport remove)
 		}
 	}
 
-	assert(nodesWithThisParent < 4);
+	ASSERT(nodesWithThisParent < 4);
 
 	if (nodesWithThisParent == 3)
 	{

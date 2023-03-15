@@ -1378,10 +1378,10 @@ static void addBoundingHullEdge(uint32 a, uint32 b, uint32 face, std::unordered_
 	}
 	else
 	{
-		assert(it->second->from == from);
-		assert(it->second->to == to);
-		assert(it->second->faceA != UINT16_MAX);
-		assert(it->second->faceB == UINT16_MAX);
+		ASSERT(it->second->from == from);
+		ASSERT(it->second->to == to);
+		ASSERT(it->second->faceA != UINT16_MAX);
+		ASSERT(it->second->faceB == UINT16_MAX);
 		it->second->faceB = face;
 	}
 }
@@ -1431,7 +1431,7 @@ static bounding_hull_geometry hullFromMesh(vec3* vertices, uint32 numVertices, t
 		addBoundingHullEdge(a, c, i, edgeMap, hull.edges, edgeIndex);
 	}
 
-	assert(edgeIndex == numEdges);
+	ASSERT(edgeIndex == numEdges);
 
 	return hull;
 }

@@ -28,7 +28,7 @@ static bool pauseRecording;
 
 void dxProfilingFrameEndMarker(dx_command_list* cl)
 {
-	assert(cl->type == D3D12_COMMAND_LIST_TYPE_DIRECT);
+	ASSERT(cl->type == D3D12_COMMAND_LIST_TYPE_DIRECT);
 
 	uint32 queryIndex = atomicIncrement(dxContext.timestampQueryIndex[dxContext.bufferedFrameID]);
 	cl->queryTimestamp(queryIndex);

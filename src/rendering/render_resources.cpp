@@ -127,7 +127,7 @@ void render_resources::evaluate()
 
 const std::vector<ref<dx_texture>>& render_resources::getTemporaryResources(uint64 id, dx_command_list* cl)
 {
-	assert(!dirty);
+	ASSERT(!dirty);
 
 	std::vector<ref<dx_texture>>& textures = resourceMap[id].textures;
 	

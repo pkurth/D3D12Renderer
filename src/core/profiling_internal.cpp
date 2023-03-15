@@ -86,7 +86,7 @@ bool handleProfileEvent(profile_event* events, uint32 eventIndex, uint32 numEven
 			--d;
 
 			profile_block* block = blocks + stack[d];
-			assert(block->name == e->name);
+			ASSERT(block->name == e->name);
 
 			block->endClock = e->timestamp;
 		} break;
@@ -391,7 +391,7 @@ void profiler_timeline::drawCallStack(profile_block* blocks, uint16 startIndex, 
 		currentIndex = nextIndex;
 	}
 
-	assert(depth == 0);
+	ASSERT(depth == 0);
 
 	callStackTop += (maxDepth + 1) * verticalBarStride + 10.f;
 }

@@ -51,7 +51,7 @@ void rigid_body_component::recalculateProperties(entt::registry* registry, const
 		colliderEntity = { collider.nextEntity, registry };
 	}
 
-	assert(i == numColliders);
+	ASSERT(i == numColliders);
 
 	mat3 inertia = mat3::zero;
 	vec3 cog(0.f);

@@ -306,7 +306,7 @@ static uint32 getFormatSize(DXGI_FORMAT format)
 			break;
 
 		default:
-			assert(false); // Compressed format.
+			ASSERT(false); // Compressed format.
 	}
 
 	return size;
@@ -505,7 +505,7 @@ static uint32 getNumberOfChannels(DXGI_FORMAT format)
 			return 4;
 
 		default:
-			//assert(false);
+			//ASSERT(false);
 			return 0;
 	}
 }

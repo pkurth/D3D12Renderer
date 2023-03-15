@@ -89,7 +89,7 @@ static bool tryLoadFromCache(const fs::path& filepath, uint32 flags, fs::path& c
 			FILETIME cachedFiletime = cachedData.ftLastWriteTime;
 
 			WIN32_FILE_ATTRIBUTE_DATA originalData;
-			assert(GetFileAttributesExW(filepath.c_str(), GetFileExInfoStandard, &originalData));
+			ASSERT(GetFileAttributesExW(filepath.c_str(), GetFileExInfoStandard, &originalData));
 			FILETIME originalFiletime = originalData.ftLastWriteTime;
 
 			if (CompareFileTime(&cachedFiletime, &originalFiletime) >= 0)
@@ -122,7 +122,7 @@ static void createDesc(DirectX::TexMetadata& metadata, uint32 flags, D3D12_RESOU
 			textureDesc = CD3DX12_RESOURCE_DESC::Tex3D(metadata.format, metadata.width, (uint32)metadata.height, (uint16)metadata.depth, (uint16)metadata.mipLevels);
 			break;
 		default:
-			assert(false);
+			ASSERT(false);
 			break;
 	}
 }
@@ -164,8 +164,8 @@ static void postProcessImage(DirectX::ScratchImage& scratchImage, DirectX::TexMe
 
 	if (DirectX::IsCompressed(metadata.format) && metadata.width == 1 && metadata.height == 1)
 	{
-		assert(metadata.mipLevels == 1);
-		assert(scratchImage.GetImageCount() == 1);
+		ASSERT(metadata.mipLevels == 1);
+		ASSERT(scratchImage.GetImageCount() == 1);
 
 		DirectX::TexMetadata scaledMetadata = metadata;
 		scaledMetadata.width = 4;
@@ -291,7 +291,7 @@ bool loadImageFromMemory(const void* data, uint32 size, image_format imageFormat
 		}
 		else
 		{
-			assert(imageFormat == image_format_wic);
+			ASSERT(imageFormat == image_format_wic);
 
 			if (FAILED(DirectX::LoadFromWICMemory(data, size, DirectX::WIC_FLAGS_FORCE_RGB, &metadata, scratchImage)))
 			{

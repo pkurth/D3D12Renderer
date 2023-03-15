@@ -191,14 +191,14 @@ void mesh_builder::pushTesselatedBox(const tesselated_box_mesh_desc& desc, bool 
 	{
 		for (uint32 x = 0; x < numVerticesPerEdge; ++x)
 		{
-			assert(vertexIndex < numVertices);
+			ASSERT(vertexIndex < numVertices);
 			pushVertex(center + rotation * (radius * vec3(x * distanceBetweenVertices, 1.f, z * distanceBetweenVertices)), {}, {}, {}, {}, 0);
 
 			if (z < numVerticesPerEdge - 1 && x < numVerticesPerEdge - 1)
 			{
-				assert(triangleIndex < numTriangles);
+				ASSERT(triangleIndex < numTriangles);
 				pushTriangle(z * numVerticesPerEdge + x, (z + 1) * numVerticesPerEdge + x, (z + 1) * numVerticesPerEdge + (x + 1));
-				assert(triangleIndex < numTriangles);
+				ASSERT(triangleIndex < numTriangles);
 				pushTriangle((z + 1) * numVerticesPerEdge + (x + 1), z * numVerticesPerEdge + (x + 1), z * numVerticesPerEdge + x);
 
 				triangleIndex += 2;
@@ -225,7 +225,7 @@ void mesh_builder::pushTesselatedBox(const tesselated_box_mesh_desc& desc, bool 
 		vec3 direction = directions[directionIndex];
 		for (uint32 i = 0; i < numVerticesPerEdge - 1; ++i)
 		{
-			assert(vertexIndex < numVertices);
+			ASSERT(vertexIndex < numVertices);
 			pushVertex(desc.center + desc.rotation * (radius * currentPos), {}, {}, {}, {}, 0);
 			currentPos += distanceBetweenVertices * direction;
 
@@ -268,9 +268,9 @@ void mesh_builder::pushTesselatedBox(const tesselated_box_mesh_desc& desc, bool 
 				left -= ringSize;
 			}
 
-			assert(triangleIndex < numTriangles);
+			ASSERT(triangleIndex < numTriangles);
 			pushTriangle(topLeft, left, vertexIndex);
-			assert(triangleIndex < numTriangles);
+			ASSERT(triangleIndex < numTriangles);
 			pushTriangle(vertexIndex, top, topLeft);
 
 			triangleIndex += 2;
@@ -293,7 +293,7 @@ void mesh_builder::pushTesselatedBox(const tesselated_box_mesh_desc& desc, bool 
 	{
 		for (uint32 x = 1; x < numVerticesPerEdge - 1; ++x)
 		{
-			assert(vertexIndex < numVertices);
+			ASSERT(vertexIndex < numVertices);
 			pushVertex(desc.center + desc.rotation * (radius * vec3(x * distanceBetweenVertices, 0.f, z * distanceBetweenVertices)), {}, {}, {}, {}, 0);
 
 			uint32 top = vertexIndex - (numVerticesPerEdge - 2);
@@ -324,17 +324,17 @@ void mesh_builder::pushTesselatedBox(const tesselated_box_mesh_desc& desc, bool 
 				{
 					topLeft -= ringSize;
 				}
-				assert(triangleIndex < numTriangles);
+				ASSERT(triangleIndex < numTriangles);
 				pushTriangle(topLeft, top, vertexIndex);
-				assert(triangleIndex < numTriangles);
+				ASSERT(triangleIndex < numTriangles);
 				pushTriangle(vertexIndex, left, topLeft);
 
 				triangleIndex += 2;
 			}
 
-			assert(triangleIndex < numTriangles);
+			ASSERT(triangleIndex < numTriangles);
 			pushTriangle(top, topRight, right);
-			assert(triangleIndex < numTriangles);
+			ASSERT(triangleIndex < numTriangles);
 			pushTriangle(right, vertexIndex, top);
 
 			triangleIndex += 2;
@@ -347,17 +347,17 @@ void mesh_builder::pushTesselatedBox(const tesselated_box_mesh_desc& desc, bool 
 
 				if (x == 1)
 				{
-					assert(triangleIndex < numTriangles);
+					ASSERT(triangleIndex < numTriangles);
 					pushTriangle(left, vertexIndex, bottom);
-					assert(triangleIndex < numTriangles);
+					ASSERT(triangleIndex < numTriangles);
 					pushTriangle(bottom, bottomLeft, left);
 
 					triangleIndex += 2;
 				}
 
-				assert(triangleIndex < numTriangles);
+				ASSERT(triangleIndex < numTriangles);
 				pushTriangle(vertexIndex, right, bottomRight);
-				assert(triangleIndex < numTriangles);
+				ASSERT(triangleIndex < numTriangles);
 				pushTriangle(bottomRight, bottom, vertexIndex);
 
 				triangleIndex += 2;
@@ -371,7 +371,7 @@ void mesh_builder::pushTesselatedBox(const tesselated_box_mesh_desc& desc, bool 
 	{
 		// Connect last two faces.
 
-		assert(numVertices == 8);
+		ASSERT(numVertices == 8);
 
 		pushTriangle(4, 5, 7);
 		pushTriangle(5, 6, 7);
@@ -379,8 +379,8 @@ void mesh_builder::pushTesselatedBox(const tesselated_box_mesh_desc& desc, bool 
 		triangleIndex += 2;
 	}
 
-	assert(vertexIndex == numVertices);
-	assert(triangleIndex == numTriangles);
+	ASSERT(vertexIndex == numVertices);
+	ASSERT(triangleIndex == numTriangles);
 }
 
 void mesh_builder::pushSphere(const sphere_mesh_desc& desc, bool flipWindingOrder)
@@ -390,8 +390,8 @@ void mesh_builder::pushSphere(const sphere_mesh_desc& desc, bool flipWindingOrde
 	vec3 center = desc.center;
 	float radius = desc.radius;
 
-	assert(slices > 2);
-	assert(rows > 0);
+	ASSERT(slices > 2);
+	ASSERT(rows > 0);
 
 	float vertDeltaAngle = M_PI / (rows + 1);
 	float horzDeltaAngle = 2.f * M_PI / slices;
@@ -570,9 +570,9 @@ void mesh_builder::pushCapsule(const capsule_mesh_desc& desc, bool flipWindingOr
 	quat rotation = desc.rotation;
 	vec3 center = desc.center;
 
-	assert(slices > 2);
-	assert(rows > 0);
-	assert(rows % 2 == 1);
+	ASSERT(slices > 2);
+	ASSERT(rows > 0);
+	ASSERT(rows % 2 == 1);
 
 	float vertDeltaAngle = M_PI / (rows + 1);
 	float horzDeltaAngle = 2.f * M_PI / slices;
@@ -666,7 +666,7 @@ void mesh_builder::pushCylinder(const cylinder_mesh_desc& desc, bool flipWinding
 	quat rotation = desc.rotation;
 	vec3 center = desc.center;
 
-	assert(slices > 2);
+	ASSERT(slices > 2);
 
 	float horzDeltaAngle = 2.f * M_PI / slices;
 	float halfHeight = height * 0.5f;
@@ -765,7 +765,7 @@ void mesh_builder::pushHollowCylinder(const hollow_cylinder_mesh_desc& desc, boo
 	quat rotation = desc.rotation;
 	vec3 center = desc.center;
 
-	assert(slices > 2);
+	ASSERT(slices > 2);
 
 	float horzDeltaAngle = 2.f * M_PI / slices;
 	float halfHeight = height * 0.5f;
@@ -927,7 +927,7 @@ void mesh_builder::pushArrow(const arrow_mesh_desc& desc, bool flipWindingOrder)
 	vec3 base = desc.base;
 	uint32 slices = desc.slices;
 
-	assert(slices > 2);
+	ASSERT(slices > 2);
 
 	float horzDeltaAngle = 2.f * M_PI / slices;
 
@@ -1050,8 +1050,8 @@ void mesh_builder::pushTorus(const torus_mesh_desc& desc, bool flipWindingOrder)
 	vec3 center = desc.center;
 	quat rotation = desc.rotation * quat(vec3(1.f, 0.f, 0.f), deg2rad(90.f));
 
-	assert(slices > 2);
-	assert(segments > 2);
+	ASSERT(slices > 2);
+	ASSERT(segments > 2);
 
 	float tubeDeltaAngle = 2.f * M_PI / slices;
 	float torusDeltaAngle = 2.f * M_PI / segments;
@@ -1110,7 +1110,7 @@ void mesh_builder::pushMace(const mace_mesh_desc& desc, bool flipWindingOrder)
 	vec3 base = desc.base;
 	uint32 slices = desc.slices;
 
-	assert(slices > 2);
+	ASSERT(slices > 2);
 
 	float horzDeltaAngle = 2.f * M_PI / slices;
 	
@@ -1248,7 +1248,7 @@ void mesh_builder::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_box*
 {
 	if (indexType == mesh_index_uint16)
 	{
-		assert(mesh->mNumVertices <= UINT16_MAX);
+		ASSERT(mesh->mNumVertices <= UINT16_MAX);
 	}
 
 	auto [positionPtr, othersPtr, indexPtr, indexOffset] = beginPrimitive(mesh->mNumVertices, mesh->mNumFaces);
@@ -1303,18 +1303,18 @@ void mesh_builder::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_box*
 
 	if ((vertexFlags & mesh_creation_flags_with_skin) && skeleton)
 	{
-		assert(mesh->HasBones());
+		ASSERT(mesh->HasBones());
 
 		uint32 numBones = mesh->mNumBones;
 
-		assert(numBones < 256);
+		ASSERT(numBones < 256);
 
 		for (uint32 boneID = 0; boneID < numBones; ++boneID)
 		{
 			const aiBone* bone = mesh->mBones[boneID];
 
 			auto it = skeleton->nameToJointID.find(bone->mName.C_Str());
-			assert(it != skeleton->nameToJointID.end());
+			ASSERT(it != skeleton->nameToJointID.end());
 
 			uint8 jointID = (uint8)it->second;
 
@@ -1323,7 +1323,7 @@ void mesh_builder::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_box*
 				uint32 vertexID = bone->mWeights[weightID].mVertexId;
 				float weight = bone->mWeights[weightID].mWeight;
 
-				assert(vertexID < mesh->mNumVertices);
+				ASSERT(vertexID < mesh->mNumVertices);
 
 				uint8* vertexBase = vertexOthers + (vertexID * othersSize);
 				skinning_weights& weights = *(skinning_weights*)(vertexBase + skinOffset);
@@ -1341,7 +1341,7 @@ void mesh_builder::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_box*
 				}
 				if (!foundFreeSlot)
 				{
-					assert(!"Mesh has more than 4 weights per vertex.");
+					ASSERT(!"Mesh has more than 4 weights per vertex.");
 				}
 			}
 		}
@@ -1352,7 +1352,7 @@ void mesh_builder::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_box*
 			uint8* vertexBase = vertexOthers + i * othersSize;
 			skinning_weights& weights = *(skinning_weights*)(vertexBase + skinOffset);
 
-			assert(weights.skinWeights[0] > 0);
+			ASSERT(weights.skinWeights[0] > 0);
 
 			vec4 v = { (float)weights.skinWeights[0], (float)weights.skinWeights[1], (float)weights.skinWeights[2], (float)weights.skinWeights[3] };
 			v /= 255.f;
@@ -1436,7 +1436,7 @@ std::tuple<vec3*, uint8*, uint8*, uint32> mesh_builder::beginPrimitive(uint32 nu
 	numTrianglesInCurrentSubmesh += numTriangles;
 
 	uint32 maxNumVertices = (indexType == mesh_index_uint16) ? UINT16_MAX : UINT32_MAX;
-	assert(numVerticesInCurrentSubmesh <= maxNumVertices);
+	ASSERT(numVerticesInCurrentSubmesh <= maxNumVertices);
 
 	return { positionPtr, othersPtr, indexPtr, indexOffset };
 }

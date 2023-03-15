@@ -159,13 +159,13 @@ void initializeSkinning()
 std::tuple<dx_vertex_buffer_group_view, mat4*> skinObject(const dx_vertex_buffer_group_view& vertexBuffer, vertex_range range, uint32 numJoints)
 {
 	uint32 jointOffset = atomicAdd(numSkinningMatricesThisFrame, numJoints);
-	assert(jointOffset + numJoints <= MAX_NUM_SKINNING_MATRICES_PER_FRAME);
+	ASSERT(jointOffset + numJoints <= MAX_NUM_SKINNING_MATRICES_PER_FRAME);
 
 	uint32 vertexOffset = atomicAdd(totalNumVertices, range.numVertices);
-	assert(vertexOffset + range.numVertices <= MAX_NUM_SKINNED_VERTICES_PER_FRAME);
+	ASSERT(vertexOffset + range.numVertices <= MAX_NUM_SKINNED_VERTICES_PER_FRAME);
 
 	uint32 callIndex = atomicIncrement(numCalls);
-	assert(callIndex < arraysize(calls));
+	ASSERT(callIndex < arraysize(calls));
 
 	calls[callIndex] = {
 		vertexBuffer,
@@ -208,10 +208,10 @@ dx_vertex_buffer_group_view skinCloth(const dx_vertex_buffer_view& inpositions, 
 {
 	uint32 numVertices = gridSizeX * gridSizeY;
 	uint32 vertexOffset = atomicAdd(totalNumVertices, numVertices);
-	assert(vertexOffset + numVertices <= MAX_NUM_SKINNED_VERTICES_PER_FRAME);
+	ASSERT(vertexOffset + numVertices <= MAX_NUM_SKINNED_VERTICES_PER_FRAME);
 
 	uint32 callIndex = atomicIncrement(numClothCalls);
-	assert(callIndex < arraysize(clothCalls));
+	ASSERT(callIndex < arraysize(clothCalls));
 
 	clothCalls[callIndex] = {
 		inpositions,

@@ -235,7 +235,7 @@ namespace YAML
 					return false;
 				} break;
 
-				default: assert(false); break;
+				default: ASSERT(false); break;
 			}
 
 			return true;

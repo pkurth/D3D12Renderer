@@ -392,7 +392,7 @@ static bool intersection(const bounding_sphere& s1, const bounding_sphere& s2, c
 
 		outContact.numContacts = 1;
 		outContact.contacts[0].penetrationDepth = radiusSum - distance; // Flipped to change sign.
-		assert(outContact.contacts[0].penetrationDepth >= 0.f);
+		ASSERT(outContact.contacts[0].penetrationDepth >= 0.f);
 		outContact.contacts[0].point = 0.5f * (s1.center + s1.radius * outContact.collisionNormal + s2.center - s2.radius * outContact.collisionNormal);
 		return true;
 	}
@@ -441,7 +441,7 @@ static bool intersection(const bounding_sphere& s, const bounding_cylinder& c, c
 
 		outContact.numContacts = 1;
 		outContact.contacts[0].penetrationDepth = s.radius - distance;
-		assert(outContact.contacts[0].penetrationDepth >= 0.f);
+		ASSERT(outContact.contacts[0].penetrationDepth >= 0.f);
 		outContact.contacts[0].point = closestToSphere + 0.5f * outContact.contacts[0].penetrationDepth * normal;
 		return true;
 	}
@@ -550,7 +550,7 @@ static bool intersection(const bounding_capsule& a, const bounding_capsule& b, c
 
 		float b0 = dot(aDir, pBa - referencePoint);
 		float b1 = dot(aDir, pBb - referencePoint);
-		assert(b1 > b0);
+		ASSERT(b1 > b0);
 
 		float left = max(a0, b0);
 		float right = min(a1, b1);
@@ -641,7 +641,7 @@ static bool intersection(const bounding_capsule& a, const bounding_cylinder& b, 
 
 		float b0 = dot(aDir, pBa - referencePoint);
 		float b1 = dot(aDir, pBb - referencePoint);
-		assert(b1 > b0);
+		ASSERT(b1 > b0);
 
 		float left = max(a0, b0);
 		float right = min(a1, b1);
@@ -848,7 +848,7 @@ static bool intersection(const bounding_cylinder& a, const bounding_cylinder& b,
 
 		float b0 = dot(aDir, pBa - referencePoint);
 		float b1 = dot(aDir, pBb - referencePoint);
-		assert(b1 > b0);
+		ASSERT(b1 > b0);
 
 		float left = max(a0, b0);
 		float right = min(a1, b1);
@@ -876,7 +876,7 @@ static bool intersection(const bounding_cylinder& a, const bounding_cylinder& b,
 
 
 		float capPenetration = right - left;
-		assert(capPenetration > 0.f);
+		ASSERT(capPenetration > 0.f);
 
 		if (capPenetration < penetration)
 		{
@@ -1595,8 +1595,8 @@ static bool overlapCheck(const collider_union* worldSpaceColliders, collider_pai
 	const collider_union* colliderA = worldSpaceColliders + pair.colliderA;
 	const collider_union* colliderB = worldSpaceColliders + pair.colliderB;
 
-	assert(colliderA->objectType == physics_object_type_rigid_body || colliderB->objectType == physics_object_type_rigid_body);
-	assert(colliderA->objectType != physics_object_type_rigid_body || colliderB->objectType != physics_object_type_rigid_body);
+	ASSERT(colliderA->objectType == physics_object_type_rigid_body || colliderB->objectType == physics_object_type_rigid_body);
+	ASSERT(colliderA->objectType != physics_object_type_rigid_body || colliderB->objectType != physics_object_type_rigid_body);
 
 	if (colliderA->objectType == physics_object_type_rigid_body)
 	{
@@ -2142,7 +2142,7 @@ static void writeWideContact(const collider_union* worldSpaceColliders, const w_
 		for (uint32 j = 0; j < numWideContacts; ++j)
 		{
 			uint32 mask = wideContacts[j].mask;
-			assert(mask != 0);
+			ASSERT(mask != 0);
 
 			mask &= validLanesMask;
 
@@ -2170,7 +2170,7 @@ static void writeWideContact(const collider_union* worldSpaceColliders, const w_
 			const w_collision_contact& c = wideContacts[j];
 
 			uint32 mask = c.mask;
-			assert(mask != 0);
+			ASSERT(mask != 0);
 
 			mask &= validLanesMask;
 

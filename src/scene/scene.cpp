@@ -87,7 +87,7 @@ void game_scene::cloneTo(game_scene& target)
 
 scene_entity game_scene::copyEntity(scene_entity src)
 {
-	assert(src.hasComponent<tag_component>());
+	ASSERT(src.hasComponent<tag_component>());
 
 	tag_component& tag = src.getComponent<tag_component>();
 	scene_entity dest = createEntity(tag.name);

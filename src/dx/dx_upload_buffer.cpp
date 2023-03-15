@@ -75,7 +75,7 @@ void dx_page_pool::reset()
 
 dx_allocation dx_upload_buffer::allocate(uint64 size, uint64 alignment)
 {
-	assert(size <= pagePool->pageSize);
+	ASSERT(size <= pagePool->pageSize);
 
 	uint64 alignedOffset = currentPage ? alignTo(currentPage->currentOffset, alignment) : 0;
 

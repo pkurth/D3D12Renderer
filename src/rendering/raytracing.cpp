@@ -225,7 +225,7 @@ static com<IDxcBlob> compileLibrary(const std::wstring& filename, const std::vec
 		com<IDxcBlobEncoding> error;
 		checkResult(operationResult->GetErrorBuffer(&error));
 		reportShaderCompileError(error);
-		assert(false);
+		ASSERT(false);
 		return 0;
 	}
 
@@ -247,7 +247,7 @@ raytracing_pipeline_builder::raytracing_pipeline_builder(const wchar* shaderFile
 	this->hasMeshGeometry = hasMeshGeometry;
 	this->hasProceduralGeometry = hasProceduralGeometry;
 
-	assert(hasMeshGeometry || hasProceduralGeometry);
+	ASSERT(hasMeshGeometry || hasProceduralGeometry);
 }
 
 raytracing_pipeline_builder::raytracing_root_signature raytracing_pipeline_builder::createRaytracingRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
@@ -260,7 +260,7 @@ raytracing_pipeline_builder::raytracing_root_signature raytracing_pipeline_build
 
 raytracing_pipeline_builder& raytracing_pipeline_builder::globalRootSignature(D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc)
 {
-	assert(!globalRS.rootSignature.rootSignature);
+	ASSERT(!globalRS.rootSignature.rootSignature);
 
 	globalRS = createRaytracingRootSignature(rootSignatureDesc);
 	SET_NAME(globalRS.rootSignature.rootSignature, "Global raytracing root signature");
@@ -291,7 +291,7 @@ static uint32 getShaderBindingTableSize(const D3D12_ROOT_SIGNATURE_DESC& rootSig
 
 raytracing_pipeline_builder& raytracing_pipeline_builder::raygen(const wchar* entryPoint, D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc)
 {
-	assert(!raygenRS.rootSignature.rootSignature);
+	ASSERT(!raygenRS.rootSignature.rootSignature);
 
 	D3D12_EXPORT_DESC& exp = exports[numExports++];
 	exp.Name = entryPoint;
@@ -426,7 +426,7 @@ raytracing_pipeline_builder& raytracing_pipeline_builder::hitgroup(const wchar* 
 		so.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
 		so.pDesc = &hitGroup;
 
-		assert(procedural.intersection);
+		ASSERT(procedural.intersection);
 
 		if (procedural.closestHit) { exportEntryPoint(procedural.closestHit); }
 		if (procedural.intersection) { exportEntryPoint(procedural.intersection); }
@@ -446,8 +446,8 @@ raytracing_pipeline_builder& raytracing_pipeline_builder::hitgroup(const wchar* 
 
 dx_raytracing_pipeline raytracing_pipeline_builder::finish()
 {
-	assert(raygenRS.rootSignature.rootSignature);
-	assert(globalRS.rootSignature.rootSignature);
+	ASSERT(raygenRS.rootSignature.rootSignature);
+	ASSERT(globalRS.rootSignature.rootSignature);
 
 	auto shaderBlob = compileLibrary(shaderFilename, shaderNameDefines);
 
@@ -552,7 +552,7 @@ dx_raytracing_pipeline raytracing_pipeline_builder::finish()
 		shaderBindingTableDesc.raygen = rtsoProps->GetShaderIdentifier(raygenEntryPoint);
 
 		uint32 numUniqueGroups = (uint32)missEntryPoints.size();
-		assert(numUniqueGroups * numGeometryTypes == numHitGroups);
+		ASSERT(numUniqueGroups * numGeometryTypes == numHitGroups);
 
 		for (uint32 i = 0; i < numUniqueGroups; ++i)
 		{

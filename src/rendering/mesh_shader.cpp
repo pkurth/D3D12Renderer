@@ -420,7 +420,7 @@ static ref<mesh_shader_mesh> loadMeshShaderMeshFromFile(const char* filename)
 
 	char eofbyte;
 	stream.read(&eofbyte, 1); // Read last byte to hit the eof bit.
-	assert(stream.eof()); // There's a problem if we didn't completely consume the file contents..
+	ASSERT(stream.eof()); // There's a problem if we didn't completely consume the file contents..
 
 	stream.close();
 
@@ -445,8 +445,8 @@ static ref<mesh_shader_mesh> loadMeshShaderMeshFromFile(const char* filename)
 			buffer_accessor& accessor = accessors[meshView.indices];
 			buffer_view& bufferView = bufferViews[accessor.bufferView];
 
-			assert(accessor.size == sizeof(uint32));
-			assert(accessor.count * accessor.size == bufferView.size);
+			ASSERT(accessor.size == sizeof(uint32));
+			ASSERT(accessor.count * accessor.size == bufferView.size);
 
 			uint32* start = (uint32*)(m_buffer.data() + bufferView.offset);
 
@@ -463,7 +463,7 @@ static ref<mesh_shader_mesh> loadMeshShaderMeshFromFile(const char* filename)
 			buffer_accessor& accessor = accessors[meshView.indexSubsets];
 			buffer_view& bufferView = bufferViews[accessor.bufferView];
 
-			assert(accessor.count * accessor.size == bufferView.size);
+			ASSERT(accessor.count * accessor.size == bufferView.size);
 
 			subset* start = (subset*)(m_buffer.data() + bufferView.offset);
 
@@ -498,7 +498,7 @@ static ref<mesh_shader_mesh> loadMeshShaderMeshFromFile(const char* filename)
 			}
 			else
 			{
-				assert(sm.numVertices == accessor.count);
+				ASSERT(sm.numVertices == accessor.count);
 			}
 
 			uint8* data = m_buffer.data() + bufferView.offset + accessor.offset;
@@ -527,7 +527,7 @@ static ref<mesh_shader_mesh> loadMeshShaderMeshFromFile(const char* filename)
 
 			meshlet_info* start = (meshlet_info*)(m_buffer.data() + bufferView.offset);
 
-			assert(accessor.count * accessor.size == bufferView.size);
+			ASSERT(accessor.count * accessor.size == bufferView.size);
 
 			sm.firstMeshlet = (uint32)meshlets.size();
 			sm.numMeshlets = accessor.count;
@@ -542,7 +542,7 @@ static ref<mesh_shader_mesh> loadMeshShaderMeshFromFile(const char* filename)
 
 			subset* start = (subset*)(m_buffer.data() + bufferView.offset);
 
-			assert(accessor.count * accessor.size == bufferView.size);
+			ASSERT(accessor.count * accessor.size == bufferView.size);
 
 			sm.firstMeshletSubset = (uint32)meshletSubsets.size();
 			sm.numMeshletSubsets = accessor.count;
@@ -555,7 +555,7 @@ static ref<mesh_shader_mesh> loadMeshShaderMeshFromFile(const char* filename)
 			buffer_accessor& accessor = accessors[meshView.uniqueVertexIndices];
 			buffer_view& bufferView = bufferViews[accessor.bufferView];
 
-			assert(accessor.count * accessor.size == bufferView.size);
+			ASSERT(accessor.count * accessor.size == bufferView.size);
 
 			sm.firstUniqueVertexIndex = (uint32)uniqueVertexIndices.size();
 			sm.numUniqueVertexIndices = accessor.count;
@@ -567,7 +567,7 @@ static ref<mesh_shader_mesh> loadMeshShaderMeshFromFile(const char* filename)
 			}
 			else
 			{
-				assert(accessor.size == sizeof(uint16));
+				ASSERT(accessor.size == sizeof(uint16));
 
 				uint16* start = (uint16*)(m_buffer.data() + bufferView.offset);
 
@@ -588,7 +588,7 @@ static ref<mesh_shader_mesh> loadMeshShaderMeshFromFile(const char* filename)
 
 			packed_triangle* start = (packed_triangle*)(m_buffer.data() + bufferView.offset);
 
-			assert(accessor.count * accessor.size == bufferView.size);
+			ASSERT(accessor.count * accessor.size == bufferView.size);
 
 			sm.firstPackedTriangle = (uint32)primitiveIndices.size();
 			sm.numPackedTriangles = accessor.count;

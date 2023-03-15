@@ -164,7 +164,7 @@ proc_placement_component::proc_placement_component(const std::vector<proc_placem
 		this->layers.push_back(layer);
 	}
 
-	assert(globalMeshOffset <= 512); // Prefix sum currently only supports up to 512 points.
+	ASSERT(globalMeshOffset <= 512); // Prefix sum currently only supports up to 512 points.
 
 	placementPointBuffer = createBuffer(sizeof(placement_point), 100000, 0, true);
 	transformBuffer = createBuffer(sizeof(placement_transform), 100000, 0, true);
@@ -354,8 +354,8 @@ void proc_placement_component::generate(const render_camera& camera, const terra
 			uint32 expectedHigh = (uint32)(expectedAddress >> 32);
 			uint32 expectedLow = (uint32)(expectedAddress & 0xFFFFFFFF);
 
-			assert(draw[i].transformSRVHigh == expectedHigh);
-			assert(draw[i].transformSRVLow == expectedLow);
+			ASSERT(draw[i].transformSRVHigh == expectedHigh);
+			ASSERT(draw[i].transformSRVLow == expectedLow);
 		}
 
 		LOG_MESSAGE("%u vs %u (%u), %u vs %u (%u), %u vs %u (%u)", 

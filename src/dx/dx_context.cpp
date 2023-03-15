@@ -431,7 +431,7 @@ static void enqueueRunningCommandList(dx_command_queue& queue, dx_command_list* 
 	commandList->next = 0;
 	if (queue.newestRunningCommandList)
 	{
-		assert(queue.newestRunningCommandList->next == 0);
+		ASSERT(queue.newestRunningCommandList->next == 0);
 		queue.newestRunningCommandList->next = commandList;
 	}
 	queue.newestRunningCommandList = commandList;

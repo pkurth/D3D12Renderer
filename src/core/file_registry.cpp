@@ -90,7 +90,7 @@ static void handleAssetChange(const file_system_event& e)
 			{
 				LOG_MESSAGE("Asset '%ws' added", e.path.c_str());
 
-				assert(pathToHandle.find(e.path) == pathToHandle.end());
+				ASSERT(pathToHandle.find(e.path) == pathToHandle.end());
 
 				asset_handle handle = asset_handle::generate();
 				pathToHandle.insert({ e.path, handle });
@@ -103,7 +103,7 @@ static void handleAssetChange(const file_system_event& e)
 
 				auto it = pathToHandle.find(e.path);
 
-				assert(it != pathToHandle.end());
+				ASSERT(it != pathToHandle.end());
 
 				asset_handle handle = it->second;
 				pathToHandle.erase(it);
@@ -121,8 +121,8 @@ static void handleAssetChange(const file_system_event& e)
 
 				auto oldIt = pathToHandle.find(e.oldPath);
 
-				assert(oldIt != pathToHandle.end()); // Old path exists.
-				assert(pathToHandle.find(e.path) == pathToHandle.end()); // New path does not exist.
+				ASSERT(oldIt != pathToHandle.end()); // Old path exists.
+				ASSERT(pathToHandle.find(e.path) == pathToHandle.end()); // New path does not exist.
 
 				asset_handle handle = oldIt->second;
 				pathToHandle.erase(oldIt);

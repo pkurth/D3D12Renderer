@@ -1164,7 +1164,7 @@ hinge_constraint_solver initializeHingeVelocityConstraints(memory_arena& arena, 
 			bool minLimitViolated = in.minRotationLimit <= 0.f && angle <= in.minRotationLimit;
 			bool maxLimitViolated = in.maxRotationLimit >= 0.f && angle >= in.maxRotationLimit;
 
-			assert(!(minLimitViolated && maxLimitViolated));
+			ASSERT(!(minLimitViolated && maxLimitViolated));
 
 			out.solveLimit = minLimitViolated || maxLimitViolated;
 			out.solveMotor = in.maxMotorTorque > 0.f;
@@ -1907,7 +1907,7 @@ cone_twist_constraint_solver initializeConeTwistVelocityConstraints(memory_arena
 		// Twist limit and motor.
 		bool mw_intistLimitViolated = in.twistLimit >= 0.f && twistAngle <= -in.twistLimit;
 		bool maxTwistLimitViolated = in.twistLimit >= 0.f && twistAngle >= in.twistLimit; 
-		assert(!(mw_intistLimitViolated && maxTwistLimitViolated));
+		ASSERT(!(mw_intistLimitViolated && maxTwistLimitViolated));
 
 		out.solveTwistLimit = mw_intistLimitViolated || maxTwistLimitViolated;
 		out.solveTwistMotor = in.maxTwistMotorTorque > 0.f;
@@ -2707,7 +2707,7 @@ slider_constraint_solver initializeSliderVelocityConstraints(memory_arena& arena
 			bool minLimitViolated = (in.negDistanceLimit <= 0.f) && (distanceAlongSlider < in.negDistanceLimit);
 			bool maxLimitViolated = (in.posDistanceLimit >= 0.f) && (distanceAlongSlider > in.posDistanceLimit);
 
-			assert(!(minLimitViolated && maxLimitViolated));
+			ASSERT(!(minLimitViolated && maxLimitViolated));
 
 			if (minLimitViolated || maxLimitViolated)
 			{
@@ -3411,7 +3411,7 @@ void solveCollisionVelocityConstraints(collision_constraint_solver constraints, 
 
 			float friction = (float)(contact.friction_restitution >> 16) / (float)0xFFFF;
 			float maxFriction = friction * constraint.impulseInNormalDir;
-			assert(maxFriction >= 0.f);
+			ASSERT(maxFriction >= 0.f);
 			float newImpulse = clamp(constraint.impulseInTangentDir + lambda, -maxFriction, maxFriction);
 			lambda = newImpulse - constraint.impulseInTangentDir;
 			constraint.impulseInTangentDir = newImpulse;

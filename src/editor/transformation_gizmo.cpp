@@ -364,7 +364,7 @@ uint32 transformation_gizmo::handleScaling(trs& transform, ray r, const user_inp
 		else
 		{
 			// Uniform scaling.
-			assert(hoverAxisIndex == 3);
+			ASSERT(hoverAxisIndex == 3);
 
 			dragging = true;
 			axisIndex = hoverAxisIndex;
@@ -398,7 +398,7 @@ uint32 transformation_gizmo::handleScaling(trs& transform, ray r, const user_inp
 		}
 		else
 		{
-			assert(axisIndex == 3);
+			ASSERT(axisIndex == 3);
 
 			float t;
 			r.intersectPlane(plane.xyz, plane.w, t);

@@ -33,7 +33,7 @@ extern bool cpuProfilerWindowOpen;
 	uint32 arrayAndEventIndex = cpuProfileIndex++; \
 	uint32 eventIndex = _CPU_PROFILE_GET_EVENT_INDEX(arrayAndEventIndex); \
 	uint32 arrayIndex = _CPU_PROFILE_GET_ARRAY_INDEX(arrayAndEventIndex); \
-	assert(eventIndex < MAX_NUM_CPU_PROFILE_EVENTS); \
+	ASSERT(eventIndex < MAX_NUM_CPU_PROFILE_EVENTS); \
 	profile_event* e = cpuProfileEvents[arrayIndex] + eventIndex; \
 	e->threadID = getThreadIDFast(); \
 	e->name = name_; \
@@ -97,7 +97,7 @@ struct profile_stat
 	uint32 arrayAndStatIndex = cpuProfileIndex.fetch_add(1 << 20); \
 	uint32 statIndex = _CPU_PROFILE_GET_STAT_INDEX(arrayAndStatIndex); \
 	uint32 arrayIndex = _CPU_PROFILE_GET_ARRAY_INDEX(arrayAndStatIndex); \
-	assert(statIndex < MAX_NUM_CPU_PROFILE_STATS); \
+	ASSERT(statIndex < MAX_NUM_CPU_PROFILE_STATS); \
 	profile_stat* stat = cpuProfileStats[arrayIndex] + statIndex; \
 	stat->label = labelValue; \
 	stat->member = value; \

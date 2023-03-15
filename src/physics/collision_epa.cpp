@@ -20,7 +20,7 @@ bool epa_simplex::isTriangleActive(uint32 index)
 
 void epa_simplex::setTriangleActive(uint32 index)
 {
-	assert(!isTriangleActive(index));
+	ASSERT(!isTriangleActive(index));
 
 	uint32 wordIndex = index / 32;
 	uint32 bitIndex = index % 32;
@@ -30,7 +30,7 @@ void epa_simplex::setTriangleActive(uint32 index)
 
 void epa_simplex::setTriangleInactive(uint32 index)
 {
-	assert(isTriangleActive(index));
+	ASSERT(isTriangleActive(index));
 
 	uint32 wordIndex = index / 32;
 	uint32 bitIndex = index % 32;
@@ -106,7 +106,7 @@ uint32 epa_simplex::findTriangleClosestToOrigin()
 		}
 	}
 
-	assert(closest != -1);
+	ASSERT(closest != -1);
 
 	return closest;
 }
@@ -126,7 +126,7 @@ bool epa_simplex::addNewPointAndUpdate(const gjk_support_point& newPoint)
 			if (d > 0.f)
 			{
 				// Remove triangle and mark edges.
-#define REFERENCE_EDGE(e) assert(e < numEdges); ++edgeReferences[e];
+#define REFERENCE_EDGE(e) ASSERT(e < numEdges); ++edgeReferences[e];
 
 				REFERENCE_EDGE(tri.edgeOppositeA);
 				REFERENCE_EDGE(tri.edgeOppositeB);
@@ -143,7 +143,7 @@ bool epa_simplex::addNewPointAndUpdate(const gjk_support_point& newPoint)
 
 	for (uint32 i = 0; i < numEdges; ++i)
 	{
-		assert(edgeReferences[i] <= 2);
+		ASSERT(edgeReferences[i] <= 2);
 
 		if (edgeReferences[i] == 1)
 		{
@@ -155,7 +155,7 @@ bool epa_simplex::addNewPointAndUpdate(const gjk_support_point& newPoint)
 		}
 	}
 
-	assert(numBorderEdges > 0);
+	ASSERT(numBorderEdges > 0);
 
 	uint16 newEdgePerPoint[arraysize(points)];
 
@@ -176,7 +176,7 @@ bool epa_simplex::addNewPointAndUpdate(const gjk_support_point& newPoint)
 
 		bool triAActive = isTriangleActive(edge.triangleA);
 		bool triBActive = isTriangleActive(edge.triangleB);
-		assert(triAActive != triBActive);
+		ASSERT(triAActive != triBActive);
 
 		uint16 pointToConnect = triBActive ? edge.a : edge.b;
 
@@ -203,7 +203,7 @@ bool epa_simplex::addNewPointAndUpdate(const gjk_support_point& newPoint)
 		{
 			return false;
 		}
-		assert(triangleIndex == triangleIndexTest);
+		ASSERT(triangleIndex == triangleIndexTest);
 
 		// Set edge's new neighbor triangle.
 		uint16& edgeInactiveTriangle = triAActive ? edge.triangleB : edge.triangleA;
@@ -218,7 +218,7 @@ bool epa_simplex::addNewPointAndUpdate(const gjk_support_point& newPoint)
 
 		bool triangleANew = edge.triangleA >= triangleOffset;
 		bool triangleBNew = edge.triangleB >= triangleOffset;
-		assert(triangleANew != triangleBNew);
+		ASSERT(triangleANew != triangleBNew);
 
 		uint16 pointToConnect = triangleBNew ? edge.a : edge.b; // Other way around than above. This is the point which was connected by another loop iteration above.
 
@@ -228,8 +228,8 @@ bool epa_simplex::addNewPointAndUpdate(const gjk_support_point& newPoint)
 		uint16 triangleIndex = i + triangleOffset;
 		epa_triangle& tri = triangles[triangleIndex];
 
-		assert(tri.edgeOppositeB == UINT16_MAX);
-		assert(otherEdge.triangleA == UINT16_MAX);
+		ASSERT(tri.edgeOppositeB == UINT16_MAX);
+		ASSERT(otherEdge.triangleA == UINT16_MAX);
 
 		tri.edgeOppositeB = otherEdgeIndex;
 		otherEdge.triangleA = triangleIndex;

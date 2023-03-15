@@ -99,7 +99,7 @@ static epa_status epaCollisionInfo(const gjk_simplex& gjkSimplex, const shapeA_t
 	// http://www.dyn4j.org/2010/05/epa-expanding-polytope-algorithm/
 	// http://uu.diva-portal.org/smash/get/diva2:343820/FULLTEXT01 page 23+
 
-	assert(gjkSimplex.numPoints == 4);
+	ASSERT(gjkSimplex.numPoints == 4);
 
 	epa_simplex epaSimplex;
 	epaSimplex.numTriangles = 0;

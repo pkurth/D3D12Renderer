@@ -116,7 +116,7 @@ void heightmap_collider_chunk::setHeights(uint16* heights)
 		}
 	}
 
-	assert(mips.back().size() == 1);
+	ASSERT(mips.back().size() == 1);
 }
 
 float heightmap_collider_chunk::getHeightAt(vec2 coord, float heightScale, float heightOffset) const
@@ -126,7 +126,7 @@ float heightmap_collider_chunk::getHeightAt(vec2 coord, float heightScale, float
 		return -FLT_MAX;
 	}
 
-	assert(coord.x >= 0.f && coord.x <= TERRAIN_LOD_0_VERTICES_PER_DIMENSION && coord.y >= 0.f && coord.y <= TERRAIN_LOD_0_VERTICES_PER_DIMENSION);
+	ASSERT(coord.x >= 0.f && coord.x <= TERRAIN_LOD_0_VERTICES_PER_DIMENSION && coord.y >= 0.f && coord.y <= TERRAIN_LOD_0_VERTICES_PER_DIMENSION);
 
 	uint32 x = (uint32)coord.x;
 	uint32 z = (uint32)coord.y;

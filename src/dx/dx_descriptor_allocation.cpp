@@ -84,7 +84,7 @@ dx_descriptor_allocation dx_descriptor_heap::allocate(uint64 count)
 		return {};
 	}
 
-	assert(count <= pageSize);
+	ASSERT(count <= pageSize);
 
 	for (uint32 i = 0; i < (uint32)allPages.size(); ++i)
 	{
@@ -100,7 +100,7 @@ dx_descriptor_allocation dx_descriptor_heap::allocate(uint64 count)
 	allPages.push_back(new dx_descriptor_page(type, pageSize, shaderVisible));
 	
 	auto [allocation, success] = allPages.back()->allocate(count);
-	assert(success);
+	ASSERT(success);
 	allocation.pageIndex = pageIndex;
 
 	return allocation;

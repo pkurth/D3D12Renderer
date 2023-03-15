@@ -185,8 +185,8 @@ inline void heightmap_collider_component::iterateTrianglesInVolume(bounding_box 
 			float relMinX = max(volume.minCorner.x - x, 0.f);
 			float relMinZ = max(volume.minCorner.z - z, 0.f);
 
-			assert(relMinX <= 1.f);
-			assert(relMinZ <= 1.f);
+			ASSERT(relMinX <= 1.f);
+			ASSERT(relMinZ <= 1.f);
 
 			float relMaxX = (volume.maxCorner.x > (x + 1)) ? 1.f : frac(volume.maxCorner.x);
 			float relMaxZ = (volume.maxCorner.z > (z + 1)) ? 1.f : frac(volume.maxCorner.z);

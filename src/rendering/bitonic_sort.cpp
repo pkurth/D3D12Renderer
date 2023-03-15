@@ -180,8 +180,8 @@ void bitonicSortUint(dx_command_list* cl,
 	const ref<dx_buffer>& sortKeysAndValues, uint32 sortOffset, uint32 maxNumElements,
 	const ref<dx_buffer>& counterBuffer, uint32 counterBufferOffset, bool sortAscending)
 {
-	assert(sortOffset % sizeof(uint32) == 0);
-	assert(counterBufferOffset % sizeof(uint32) == 0);
+	ASSERT(sortOffset % sizeof(uint32) == 0);
+	ASSERT(counterBufferOffset % sizeof(uint32) == 0);
 
 	auto [alignedMaxNumElements, maxNumIterations] = getAlignedMaxNumElementsAndNumIterations(maxNumElements);
 	bitonic_sort_cb cb;
@@ -198,9 +198,9 @@ void bitonicSortFloat(dx_command_list* cl,
 	const ref<dx_buffer>& sortValues, uint32 sortValueOffset, uint32 maxNumElements,
 	const ref<dx_buffer>& counterBuffer, uint32 counterBufferOffset, bool sortAscending)
 {
-	assert(sortKeyOffset % sizeof(float) == 0);
-	assert(sortValueOffset % sizeof(uint32) == 0);
-	assert(counterBufferOffset % sizeof(uint32) == 0);
+	ASSERT(sortKeyOffset % sizeof(float) == 0);
+	ASSERT(sortValueOffset % sizeof(uint32) == 0);
+	ASSERT(counterBufferOffset % sizeof(uint32) == 0);
 
 	auto [alignedMaxNumElements, maxNumIterations] = getAlignedMaxNumElementsAndNumIterations(maxNumElements);
 	bitonic_sort_cb cb;

@@ -47,7 +47,7 @@ gjk_internal_success updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a
 			return gjk_dont_stop;
 		}
 
-		//assert(false);
+		//ASSERT(false);
 		std::cerr << "GJK ERROR 0\n";
 		return gjk_unexpected_error;
 	}
@@ -201,12 +201,12 @@ gjk_internal_success updateGJKSimplex(gjk_simplex& s, const gjk_support_point& a
 			goto overADC2;
 		}
 
-		//assert(false);
+		//ASSERT(false);
 		std::cerr << "GJK ERROR 1\n";
 		return gjk_unexpected_error;
 	}
 
-	//assert(false);
+	//ASSERT(false);
 	std::cerr << "GJK ERROR 2\n";
 	return gjk_unexpected_error;
 }

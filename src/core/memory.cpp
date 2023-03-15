@@ -55,7 +55,7 @@ void* memory_arena::allocate(uint64 size, uint64 alignment, bool clearToZero)
 	sizeLeftCurrent -= adjustment;
 	sizeLeftTotal -= adjustment;
 
-	assert(sizeLeftTotal >= size);
+	ASSERT(sizeLeftTotal >= size);
 
 	ensureFreeSizeInternal(size);
 

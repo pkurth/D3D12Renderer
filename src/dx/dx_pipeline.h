@@ -108,7 +108,7 @@ struct dx_graphics_pipeline_generator
 
 	dx_graphics_pipeline_generator& blendState(uint32 renderTargetIndex, D3D12_BLEND srcBlend, D3D12_BLEND destBlend, D3D12_BLEND_OP op)
 	{
-		assert(!desc.BlendState.RenderTarget[renderTargetIndex].LogicOpEnable);
+		ASSERT(!desc.BlendState.RenderTarget[renderTargetIndex].LogicOpEnable);
 		desc.BlendState.RenderTarget[renderTargetIndex].BlendEnable = true;
 		desc.BlendState.RenderTarget[renderTargetIndex].SrcBlend = srcBlend;
 		desc.BlendState.RenderTarget[renderTargetIndex].DestBlend = destBlend;

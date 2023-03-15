@@ -66,7 +66,7 @@ void dx_command_queue::waitForFence(uint64 fenceValue)
 	if (!isFenceComplete(fenceValue))
 	{
 		HANDLE fenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-		assert(fenceEvent && "Failed to create fence event handle.");
+		ASSERT(fenceEvent);
 
 		fence->SetEventOnCompletion(fenceValue, fenceEvent);
 		WaitForSingleObject(fenceEvent, DWORD_MAX);
@@ -107,7 +107,7 @@ static DWORD processRunningCommandLists(void* data)
 				queue.runningCommandLists = list->next;
 				if (list == queue.newestRunningCommandList)
 				{
-					assert(list->next == 0);
+					ASSERT(list->next == 0);
 					queue.newestRunningCommandList = 0;
 				}
 			}

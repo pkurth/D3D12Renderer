@@ -288,7 +288,7 @@ void generateMipMapsOnGPU(dx_command_list* cl, ref<dx_texture>& texture)
 
 ref<dx_texture> equirectangularToCubemap(dx_command_list* cl, const ref<dx_texture>& equirectangular, uint32 resolution, uint32 numMips, DXGI_FORMAT format)
 {
-	assert(equirectangular->resource);
+	ASSERT(equirectangular->resource);
 
 	CD3DX12_RESOURCE_DESC cubemapDesc(equirectangular->resource->GetDesc());
 	cubemapDesc.Width = cubemapDesc.Height = resolution;
@@ -395,12 +395,12 @@ ref<dx_texture> equirectangularToCubemap(dx_command_list* cl, const ref<dx_textu
 
 void texturedSkyToIrradiance(dx_command_list* cl, const ref<dx_texture>& sky, ref<dx_texture>& outIrradiance)
 {
-	assert(sky && sky->resource);
-	assert(outIrradiance && outIrradiance->resource);
+	ASSERT(sky && sky->resource);
+	ASSERT(outIrradiance && outIrradiance->resource);
 
-	assert(outIrradiance->supportsUAV);
-	assert(outIrradiance->depth == 6);
-	assert(outIrradiance->width == outIrradiance->height);
+	ASSERT(outIrradiance->supportsUAV);
+	ASSERT(outIrradiance->depth == 6);
+	ASSERT(outIrradiance->width == outIrradiance->height);
 
 	cl->setPipelineState(*texturedSkyToIrradiancePipeline.pipeline);
 	cl->setComputeRootSignature(*texturedSkyToIrradiancePipeline.rootSignature);
@@ -419,12 +419,12 @@ void texturedSkyToIrradiance(dx_command_list* cl, const ref<dx_texture>& sky, re
 
 void texturedSkyToPrefilteredRadiance(dx_command_list* cl, const ref<dx_texture>& sky, ref<dx_texture>& outPrefilteredRadiance)
 {
-	assert(sky && sky->resource);
-	assert(outPrefilteredRadiance && outPrefilteredRadiance->resource);
+	ASSERT(sky && sky->resource);
+	ASSERT(outPrefilteredRadiance && outPrefilteredRadiance->resource);
 
-	assert(outPrefilteredRadiance->supportsUAV);
-	assert(outPrefilteredRadiance->depth == 6);
-	assert(outPrefilteredRadiance->width == outPrefilteredRadiance->height);
+	ASSERT(outPrefilteredRadiance->supportsUAV);
+	ASSERT(outPrefilteredRadiance->depth == 6);
+	ASSERT(outPrefilteredRadiance->width == outPrefilteredRadiance->height);
 
 	cl->setPipelineState(*texturedSkyToPrefilteredRadiancePipeline.pipeline);
 	cl->setComputeRootSignature(*texturedSkyToPrefilteredRadiancePipeline.rootSignature);
@@ -462,11 +462,11 @@ void texturedSkyToPrefilteredRadiance(dx_command_list* cl, const ref<dx_texture>
 
 void proceduralSkyToIrradiance(dx_command_list* cl, vec3 sunDirection, ref<dx_texture>& outIrradiance)
 {
-	assert(outIrradiance && outIrradiance->resource);
+	ASSERT(outIrradiance && outIrradiance->resource);
 
-	assert(outIrradiance->supportsUAV);
-	assert(outIrradiance->depth == 6);
-	assert(outIrradiance->width == outIrradiance->height);
+	ASSERT(outIrradiance->supportsUAV);
+	ASSERT(outIrradiance->depth == 6);
+	ASSERT(outIrradiance->width == outIrradiance->height);
 
 	cl->setPipelineState(*proceduralSkyToIrradiancePipeline.pipeline);
 	cl->setComputeRootSignature(*proceduralSkyToIrradiancePipeline.rootSignature);
@@ -486,11 +486,11 @@ void proceduralSkyToIrradiance(dx_command_list* cl, vec3 sunDirection, ref<dx_te
 #if 0
 void proceduralSkyToPrefilteredRadiance(dx_command_list* cl, vec3 sunDirection, ref<dx_texture>& outPrefilteredRadiance)
 {
-	assert(outPrefilteredRadiance && outPrefilteredRadiance->resource);
+	ASSERT(outPrefilteredRadiance && outPrefilteredRadiance->resource);
 
-	assert(outPrefilteredRadiance->supportsUAV);
-	assert(outPrefilteredRadiance->depth == 6);
-	assert(outPrefilteredRadiance->width == outPrefilteredRadiance->height);
+	ASSERT(outPrefilteredRadiance->supportsUAV);
+	ASSERT(outPrefilteredRadiance->depth == 6);
+	ASSERT(outPrefilteredRadiance->width == outPrefilteredRadiance->height);
 
 	cl->setPipelineState(*proceduralSkyToPrefilteredRadiancePipeline.pipeline);
 	cl->setComputeRootSignature(*proceduralSkyToPrefilteredRadiancePipeline.rootSignature);
@@ -565,10 +565,10 @@ void texturedSkyToIrradianceSH(dx_command_list* cl, const ref<dx_texture>& envir
 	cl->setPipelineState(*texturedSkyToIrradianceSHPipeline.pipeline);
 	cl->setComputeRootSignature(*texturedSkyToIrradianceSHPipeline.rootSignature);
 
-	assert(environment->width == environment->height);
-	assert(environment->width >= 64);
-	assert(environment->depth == 6);
-	assert(shBuffer->elementCount > shIndex);
+	ASSERT(environment->width == environment->height);
+	ASSERT(environment->width >= 64);
+	ASSERT(environment->depth == 6);
+	ASSERT(shBuffer->elementCount > shIndex);
 
 	textured_sky_to_irradiance_sh_cb cb;
 	cb.mipLevel = environment->numMipLevels == 1 ? 0 : (environment->numMipLevels - 6);

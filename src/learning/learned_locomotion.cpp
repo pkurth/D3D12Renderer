@@ -232,7 +232,7 @@ void training_locomotion::getLocalPositions(scene_entity entity, learning_positi
 		} break;
 		case collider_type_hull:
 		{
-			assert(false);
+			ASSERT(false);
 			bb = bounding_box::negativeInfinity();
 		} break;
 		}
@@ -420,8 +420,8 @@ extern "C" __declspec(dllexport) void getPhysicsRanges(float* stateMin, float* s
 		getLimits(tmpScene, tmpRagdoll.hingeConstraints[i], actionMin, minPushIndex, actionMax, maxPushIndex);
 	}
 
-	assert(minPushIndex == getPhysicsActionSize());
-	assert(maxPushIndex == getPhysicsActionSize());
+	ASSERT(minPushIndex == getPhysicsActionSize());
+	ASSERT(maxPushIndex == getPhysicsActionSize());
 
 	tmpScene.clearAll();
 }

@@ -129,7 +129,7 @@ static void uploadBufferData(ref<dx_buffer> buffer, const void* bufferData)
 
 void updateBufferDataRange(ref<dx_buffer> buffer, const void* data, uint32 offset, uint32 size)
 {
-	assert(offset + size <= buffer->totalSize);
+	ASSERT(offset + size <= buffer->totalSize);
 
 	dx_command_list* cl = dxContext.getFreeCopyCommandList();
 
@@ -272,7 +272,7 @@ static void initializeBuffer(ref<dx_buffer> buffer, uint32 elementSize, uint32 e
 		buffer->raytracingSRV = dx_cpu_descriptor_handle(buffer->descriptorAllocation.cpuAt(index++)).createRaytracingAccelerationStructureSRV(buffer);
 	}
 
-	assert(index == numDescriptors);
+	ASSERT(index == numDescriptors);
 }
 
 ref<dx_buffer> createBuffer(uint32 elementSize, uint32 elementCount, void* data, bool allowUnorderedAccess, bool allowClearing, D3D12_RESOURCE_STATES initialState)
@@ -424,7 +424,7 @@ void resizeBuffer(ref<dx_buffer> buffer, uint32 newElementCount, D3D12_RESOURCE_
 		buffer->raytracingSRV = dx_cpu_descriptor_handle(buffer->descriptorAllocation.cpuAt(index++)).createRaytracingAccelerationStructureSRV(buffer);
 	}
 
-	assert(index == numDescriptors);
+	ASSERT(index == numDescriptors);
 }
 
 buffer_grave::~buffer_grave()

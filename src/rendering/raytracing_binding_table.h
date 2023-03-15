@@ -49,7 +49,7 @@ inline void raytracing_binding_table<shader_data>::initialize(const dx_raytracin
 {
     this->pipeline = pipeline;
 
-    assert(pipeline->shaderBindingTableDesc.entrySize == sizeof(binding_table_entry));
+    ASSERT(pipeline->shaderBindingTableDesc.entrySize == sizeof(binding_table_entry));
 
     numRayTypes = (uint32)pipeline->shaderBindingTableDesc.hitGroups.size();
     maxNumHitGroups = 1024;
@@ -80,9 +80,9 @@ inline void raytracing_binding_table<shader_data>::allocate()
         bindingTable = _aligned_realloc(bindingTable, totalBindingTableSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
     }
 
-    assert(pipeline->shaderBindingTableDesc.raygenOffset == 0);
-    assert(pipeline->shaderBindingTableDesc.missOffset == alignTo(sizeof(binding_table_entry), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT));
-    assert(pipeline->shaderBindingTableDesc.hitOffset == alignTo((1 + numRayTypes) * sizeof(binding_table_entry), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT));
+    ASSERT(pipeline->shaderBindingTableDesc.raygenOffset == 0);
+    ASSERT(pipeline->shaderBindingTableDesc.missOffset == alignTo(sizeof(binding_table_entry), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT));
+    ASSERT(pipeline->shaderBindingTableDesc.hitOffset == alignTo((1 + numRayTypes) * sizeof(binding_table_entry), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT));
 
     raygen = (binding_table_entry*)bindingTable;
     miss = (binding_table_entry*)alignTo(raygen + 1, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);

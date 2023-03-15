@@ -67,8 +67,8 @@ uint32 allocateBoundingHullGeometry(const std::string& meshFilepath)
 		return INVALID_BOUNDING_HULL_INDEX;
 	}
 
-	assert(scene->mNumMeshes == 1);
-	assert(scene->mMeshes[0]->mNumVertices <= UINT16_MAX);
+	ASSERT(scene->mNumMeshes == 1);
+	ASSERT(scene->mMeshes[0]->mNumVertices <= UINT16_MAX);
 
 	mesh_builder builder(mesh_creation_flags_with_positions);
 
@@ -118,7 +118,7 @@ static void addConstraintEdge(scene_entity& e, constraint_entity_reference_compo
 	}
 	else
 	{
-		assert(constraintEntityReference.edgeB == INVALID_CONSTRAINT_EDGE);
+		ASSERT(constraintEntityReference.edgeB == INVALID_CONSTRAINT_EDGE);
 		constraintEntityReference.edgeB = edgeIndex;
 		constraintEntityReference.entityB = e.handle;
 	}
@@ -128,7 +128,7 @@ static void addConstraintEdge(scene_entity& e, constraint_entity_reference_compo
 
 distance_constraint_handle addDistanceConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB, float distance)
 {
-	assert(a.registry == b.registry);
+	ASSERT(a.registry == b.registry);
 
 	entt::registry& registry = *a.registry;
 	entity_handle constraintEntity = registry.create();
@@ -147,7 +147,7 @@ distance_constraint_handle addDistanceConstraintFromLocalPoints(scene_entity& a,
 
 distance_constraint_handle addDistanceConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchorA, vec3 globalAnchorB)
 {
-	assert(a.registry == b.registry);
+	ASSERT(a.registry == b.registry);
 
 	vec3 localAnchorA = inverseTransformPosition(a.getComponent<transform_component>(), globalAnchorA);
 	vec3 localAnchorB = inverseTransformPosition(b.getComponent<transform_component>(), globalAnchorB);
@@ -158,7 +158,7 @@ distance_constraint_handle addDistanceConstraintFromGlobalPoints(scene_entity& a
 
 ball_constraint_handle addBallConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB)
 {
-	assert(a.registry == b.registry);
+	ASSERT(a.registry == b.registry);
 
 	entt::registry& registry = *a.registry;
 	entity_handle constraintEntity = registry.create();
@@ -176,7 +176,7 @@ ball_constraint_handle addBallConstraintFromLocalPoints(scene_entity& a, scene_e
 
 ball_constraint_handle addBallConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor)
 {
-	assert(a.registry == b.registry);
+	ASSERT(a.registry == b.registry);
 
 	vec3 localAnchorA = inverseTransformPosition(a.getComponent<transform_component>(), globalAnchor);
 	vec3 localAnchorB = inverseTransformPosition(b.getComponent<transform_component>(), globalAnchor);
@@ -186,7 +186,7 @@ ball_constraint_handle addBallConstraintFromGlobalPoints(scene_entity& a, scene_
 
 fixed_constraint_handle addFixedConstraintFromLocalPoints(scene_entity& a, scene_entity& b, vec3 localAnchorA, vec3 localAnchorB)
 {
-	assert(a.registry == b.registry);
+	ASSERT(a.registry == b.registry);
 
 	entt::registry& registry = *a.registry;
 	entity_handle constraintEntity = registry.create();
@@ -204,7 +204,7 @@ fixed_constraint_handle addFixedConstraintFromLocalPoints(scene_entity& a, scene
 
 fixed_constraint_handle addFixedConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor)
 {
-	assert(a.registry == b.registry);
+	ASSERT(a.registry == b.registry);
 
 	entt::registry& registry = *a.registry;
 	entity_handle constraintEntity = registry.create();
@@ -228,7 +228,7 @@ fixed_constraint_handle addFixedConstraintFromGlobalPoints(scene_entity& a, scen
 hinge_constraint_handle addHingeConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalHingeAxis,
 	float minLimit, float maxLimit)
 {
-	assert(a.registry == b.registry);
+	ASSERT(a.registry == b.registry);
 
 	entt::registry& registry = *a.registry;
 	entity_handle constraintEntity = registry.create();
@@ -264,7 +264,7 @@ hinge_constraint_handle addHingeConstraintFromGlobalPoints(scene_entity& a, scen
 cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis, 
 	float swingLimit, float twistLimit)
 {
-	assert(a.registry == b.registry);
+	ASSERT(a.registry == b.registry);
 
 	entt::registry& registry = *a.registry;
 	entity_handle constraintEntity = registry.create();
@@ -304,7 +304,7 @@ cone_twist_constraint_handle addConeTwistConstraintFromGlobalPoints(scene_entity
 
 slider_constraint_handle addSliderConstraintFromGlobalPoints(scene_entity& a, scene_entity& b, vec3 globalAnchor, vec3 globalAxis, float minLimit, float maxLimit)
 {
-	assert(a.registry == b.registry);
+	ASSERT(a.registry == b.registry);
 
 	entt::registry& registry = *a.registry;
 	entity_handle constraintEntity = registry.create();
@@ -1089,7 +1089,7 @@ static void handleCollisionCallbacks(game_scene& scene, const collider_pair* col
 
 				const collision_contact* c = contacts + pair.contactOffset;
 				uint32 numContacts = pair.numContacts;
-				assert(numContacts > 0);
+				ASSERT(numContacts > 0);
 
 				float norm = 1.f / numContacts;
 
@@ -1395,7 +1395,7 @@ void physicsStep(game_scene& scene, memory_arena& arena, float& timer, const phy
 		}
 
 		float physicsInterpolationT = timer / physicsFixedTimeStep;
-		assert(physicsInterpolationT >= 0.f && physicsInterpolationT <= 1.f);
+		ASSERT(physicsInterpolationT >= 0.f && physicsInterpolationT <= 1.f);
 
 		for (auto [entityHandle, transform, physicsTransform0, physicsTransform1] : scene.group(component_group<transform_component, physics_transform0_component, physics_transform1_component>).each())
 		{
@@ -1582,7 +1582,7 @@ physics_properties collider_union::calculatePhysicsProperties()
 
 		default:
 		{
-			assert(false);
+			ASSERT(false);
 		} break;
 	}
 	return result;

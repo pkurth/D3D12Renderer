@@ -80,7 +80,7 @@ static constexpr uint32 indexOfMostSignificantSetBit(uint32 i)
 
 static constexpr int32 log2(int32 i)
 {
-	assert(i >= 0);
+	ASSERT(i >= 0);
 
 	uint32 mssb = indexOfMostSignificantSetBit((uint32)i);
 	uint32 lssb = indexOfLeastSignificantSetBit((uint32)i);
@@ -1047,7 +1047,7 @@ inline std::ostream& operator<<(std::ostream& s, const trs& m)
 template <typename T>
 static T evaluateSpline(const float* ts, const T* values, int32 num, float t)
 {
-	assert(num >= 2);
+	ASSERT(num >= 2);
 
 	// Find key.
 	int32 k = 0;

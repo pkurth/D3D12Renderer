@@ -29,7 +29,7 @@ void pbr_raytracer::initialize(const wchar* shaderPath, uint32 maxPayloadSize, u
         .hitgroup(L"SHADOW", L"shadowMiss", shadowHitgroup)
         .finish();
 
-    assert(numRayTypes == 0 || numRayTypes == (uint32)pipeline.shaderBindingTableDesc.hitGroups.size());
+    ASSERT(numRayTypes == 0 || numRayTypes == (uint32)pipeline.shaderBindingTableDesc.hitGroups.size());
     numRayTypes = (uint32)pipeline.shaderBindingTableDesc.hitGroups.size();
 
     bindingTable.initialize(&pipeline);
@@ -75,7 +75,7 @@ raytracing_object_type pbr_raytracer::defineObjectType(const ref<raytracing_blas
 
     for (uint32 i = 0; i < numGeometries; ++i)
     {
-        assert(blas->geometries[i].type == raytracing_mesh_geometry); // For now we only support meshes, not procedurals.
+        ASSERT(blas->geometries[i].type == raytracing_mesh_geometry); // For now we only support meshes, not procedurals.
 
         submesh_info submesh = blas->geometries[i].submesh;
         const ref<pbr_material>& material = materials[i];

@@ -47,7 +47,7 @@ static ref<multi_mesh> loadMeshFromFileInternal(asset_handle handle, const fs::p
 		for (uint32 m = 0; m < scene->mNumMeshes; ++m)
 		{
 			aiMesh* mesh = scene->mMeshes[m];
-			assert(mesh->mNumVertices <= UINT16_MAX);
+			ASSERT(mesh->mNumVertices <= UINT16_MAX);
 		}
 	}
 
@@ -67,8 +67,8 @@ static ref<multi_mesh> loadMeshFromFileInternal(asset_handle handle, const fs::p
 			auto& joint = result->skeleton.joints[i];
 
 			auto it = result->skeleton.nameToJointID.find(joint.name);
-			assert(it != result->skeleton.nameToJointID.end());
-			assert(it->second == i);
+			ASSERT(it != result->skeleton.nameToJointID.end());
+			ASSERT(it->second == i);
 		}
 #endif
 

@@ -77,8 +77,8 @@ void buildIslands(memory_arena& arena, constraint_body_pair* bodyPairs, uint32 n
 		{
 			uint16 rbIndex = rbStack[--stackPtr];
 
-			assert(rbIndex != dummyRigidBodyIndex);
-			assert(!alreadyVisited[rbIndex]);
+			ASSERT(rbIndex != dummyRigidBodyIndex);
+			ASSERT(!alreadyVisited[rbIndex]);
 			alreadyVisited[rbIndex] = true;
 
 
@@ -98,7 +98,7 @@ void buildIslands(memory_arena& arena, constraint_body_pair* bodyPairs, uint32 n
 				if (!alreadyVisited[other])
 				{
 					// Add constraint to island.
-					assert(islandPtr < islandCapacity);
+					ASSERT(islandPtr < islandCapacity);
 					allIslands[islandPtr++] = ref.pairIndex;
 				}
 
@@ -118,10 +118,10 @@ void buildIslands(memory_arena& arena, constraint_body_pair* bodyPairs, uint32 n
 
 
 #if 0
-	assert(islandPtr == islandCapacity);
+	ASSERT(islandPtr == islandCapacity);
 	for (uint32 i = 0; i < numRigidBodies; ++i)
 	{
-		assert(alreadyVisited[i]);
+		ASSERT(alreadyVisited[i]);
 	}
 #endif
 

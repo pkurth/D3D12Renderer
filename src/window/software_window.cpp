@@ -15,7 +15,7 @@ software_window::software_window(software_window&& o) noexcept
 bool software_window::initialize(const TCHAR* name, uint32 requestedClientWidth, uint32 requestedClientHeight, 
 	uint8* buffer, uint32 numChannels, uint32 bufferWidth, uint32 bufferHeight)
 {
-	assert(numChannels == 1 || numChannels == 3 || numChannels == 4);
+	ASSERT(numChannels == 1 || numChannels == 3 || numChannels == 4);
 
 	if (!win32_window::initialize(name, requestedClientWidth, requestedClientHeight))
 	{

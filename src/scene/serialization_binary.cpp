@@ -250,7 +250,7 @@ void deserializeFromMemoryStream<physics_reference_component>(scene_entity entit
 		READ(entity_handle, entityHandleA);
 		READ(entity_handle, entityHandleB);
 
-		assert(entity.handle == entityHandleA || entity.handle == entityHandleB);
+		ASSERT(entity.handle == entityHandleA || entity.handle == entityHandleB);
 
 		scene_entity a = { entityHandleA, entity.registry };
 		scene_entity b = { entityHandleB, entity.registry };

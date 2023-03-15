@@ -80,7 +80,7 @@ void dx_command_list::assertResourceState(dx_resource resource, D3D12_RESOURCE_S
 	ID3D12DebugCommandList* debugCL = 0;
 	if (SUCCEEDED(commandList->QueryInterface(IID_PPV_ARGS(&debugCL))))
 	{
-		assert(debugCL->AssertResourceState(resource.Get(), subresource, state));
+		ASSERT(debugCL->AssertResourceState(resource.Get(), subresource, state));
 	}
 #endif
 }
@@ -593,7 +593,7 @@ void dx_command_list::dispatchMesh(uint32 numGroupsX, uint32 numGroupsY, uint32 
 	dynamicDescriptorHeap.commitStagedDescriptorsForDraw(this);
 	commandList->DispatchMesh(numGroupsX, numGroupsY, numGroupsZ);
 #else
-	assert(!"Mesh shaders are not supported with your Windows SDK version.");
+	ASSERT(!"Mesh shaders are not supported with your Windows SDK version.");
 #endif
 }
 

@@ -318,7 +318,7 @@ void main_renderer::setSpotLights(const ref<dx_buffer>& lights, uint32 numLights
 
 void main_renderer::setDecals(const ref<dx_buffer>& decals, uint32 numDecals, const ref<dx_texture>& textureAtlas)
 {
-	assert(numDecals < MAX_NUM_TOTAL_DECALS);
+	ASSERT(numDecals < MAX_NUM_TOTAL_DECALS);
 	main_renderer::decals = decals;
 	main_renderer::numDecals = numDecals;
 	main_renderer::decalTextureAtlas = textureAtlas;
@@ -545,7 +545,7 @@ void main_renderer::endFrame(const user_input* input)
 
 			if (environment && !environment->isProcedural())
 			{
-				assert(environment->sky);
+				ASSERT(environment->sky);
 
 				texturedSky(cl, skyRenderTarget, jitteredCamera.proj, jitteredCamera.view, jitteredCamera.prevFrameView, environment->sky, environment->skyIntensity,
 					jitteredCamera.jitter, jitteredCamera.prevFrameJitter);

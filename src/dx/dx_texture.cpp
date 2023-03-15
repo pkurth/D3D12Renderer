@@ -128,9 +128,9 @@ static ref<dx_texture> loadTextureFromMemoryInternal(const void* ptr, uint32 siz
 static ref<dx_texture> loadVolumeTextureInternal(const fs::path& dirname, uint32 flags)
 {
 	// No mip maps allowed for now!
-	assert(!(flags & image_load_flags_allocate_full_mipchain));
-	assert(!(flags & image_load_flags_gen_mips_on_cpu));
-	assert(!(flags & image_load_flags_gen_mips_on_gpu));
+	ASSERT(!(flags & image_load_flags_allocate_full_mipchain));
+	ASSERT(!(flags & image_load_flags_gen_mips_on_cpu));
+	ASSERT(!(flags & image_load_flags_gen_mips_on_gpu));
 
 	std::vector<DirectX::ScratchImage> scratchImages;
 	D3D12_RESOURCE_DESC textureDesc = {};
@@ -146,14 +146,14 @@ static ref<dx_texture> loadVolumeTextureInternal(const fs::path& dirname, uint32
 			return nullptr;
 		}
 
-		assert(s.GetImageCount() == 1);
+		ASSERT(s.GetImageCount() == 1);
 		const auto& image = s.GetImages()[0];
 
 		if (scratchImages.size() > 1)
 		{
-			assert(image.width == scratchImages.begin()->GetImages()[0].width);
-			assert(image.height == scratchImages.begin()->GetImages()[0].height);
-			assert(image.slicePitch == scratchImages.begin()->GetImages()[0].slicePitch);
+			ASSERT(image.width == scratchImages.begin()->GetImages()[0].width);
+			ASSERT(image.height == scratchImages.begin()->GetImages()[0].height);
+			ASSERT(image.slicePitch == scratchImages.begin()->GetImages()[0].slicePitch);
 		}
 
 		totalSize += (uint32)image.slicePitch;
@@ -633,7 +633,7 @@ dx_tiled_texture createTiledTexture(D3D12_RESOURCE_DESC textureDesc, D3D12_RESOU
 	tiled.numStandard = packedMipInfo.NumStandardMips;
 	tiled.numPacked = packedMipInfo.NumPackedMips;
 
-	assert(tiled.numStandard + tiled.numPacked == result->numMipLevels);
+	ASSERT(tiled.numStandard + tiled.numPacked == result->numMipLevels);
 
 	for (uint32 i = 0; i < result->numMipLevels; ++i)
 	{
@@ -698,7 +698,7 @@ static void initializeDepthTexture(ref<dx_texture> result, uint32 width, uint32 
 
 	if (allocateDescriptors)
 	{
-		assert(result->supportsDSV);
+		ASSERT(result->supportsDSV);
 
 		result->dsvAllocation = dxContext.dsvAllocator.allocate();
 		result->defaultDSV = dx_dsv_descriptor_handle(result->dsvAllocation.cpuAt(0)).create2DTextureDSV(result);
@@ -1217,7 +1217,7 @@ void saveTextureToFile(const ref<dx_texture>& texture, const fs::path& path)
 
 void saveTextureToFile(dx_resource texture, uint32 width, uint32 height, DXGI_FORMAT format, const fs::path& path)
 {
-	assert(format == DXGI_FORMAT_R8G8B8A8_UNORM);
+	ASSERT(format == DXGI_FORMAT_R8G8B8A8_UNORM);
 	uint32 outputSize = 4;
 
 	uint32 readbackPitch = alignTo(width, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);

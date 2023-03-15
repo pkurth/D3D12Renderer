@@ -128,7 +128,7 @@ static uint32 determineOverlapsScalar(const sap_endpoint* endpoints, uint32 numE
 				}
 			}
 
-			assert(ep.colliderIndex < numColliders);
+			ASSERT(ep.colliderIndex < numColliders);
 			positionInActiveList[ep.colliderIndex] = numActive;
 
 #if CACHE_AABBS
@@ -156,7 +156,7 @@ static uint32 determineOverlapsScalar(const sap_endpoint* endpoints, uint32 numE
 		}
 	}
 
-	assert(numActive == 0);
+	ASSERT(numActive == 0);
 
 	CPU_PROFILE_STAT("Max num active in SAP", maxNumActive);
 
@@ -243,7 +243,7 @@ static uint32 determineOverlapsSIMD(const sap_endpoint* endpoints, uint32 numEnd
 				}
 			}
 
-			assert(ep.colliderIndex < numColliders);
+			ASSERT(ep.colliderIndex < numColliders);
 			positionInActiveList[ep.colliderIndex] = numActive;
 
 			soa_bounding_box& outBB = activeBBs[numActive / COLLISION_SIMD_WIDTH];
@@ -285,7 +285,7 @@ static uint32 determineOverlapsSIMD(const sap_endpoint* endpoints, uint32 numEnd
 		}
 	}
 
-	assert(numActive == 0);
+	ASSERT(numActive == 0);
 
 	CPU_PROFILE_STAT("Max num active in SAP", maxNumActive);
 
@@ -309,7 +309,7 @@ uint32 broadphase(game_scene& scene, bounding_box* worldSpaceAABBs, memory_arena
 
 	uint32 numEndpoints = numColliders * 2;
 
-	assert(numEndpoints == endpoints.size());
+	ASSERT(numEndpoints == endpoints.size());
 
 	uint32 numCollisions = 0;
 
@@ -368,8 +368,8 @@ uint32 broadphase(game_scene& scene, bounding_box* worldSpaceAABBs, memory_arena
 			endpoints[start].colliderIndex = index;
 			endpoints[end].colliderIndex = index;
 
-			assert(endpoints[start].entity == entityHandle);
-			assert(endpoints[end].entity == entityHandle);
+			ASSERT(endpoints[start].entity == entityHandle);
+			ASSERT(endpoints[end].entity == entityHandle);
 
 			vec3 center = aabb.getCenter();
 			s += center;

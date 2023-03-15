@@ -458,8 +458,8 @@ void terrain_component::generateChunksCPU()
 						minHeight = min(minHeight, height * amplitudeScale);
 						maxHeight = max(maxHeight, height * amplitudeScale);
 
-						assert(height >= 0.f);
-						assert(height <= 1.f);
+						ASSERT(height >= 0.f);
+						ASSERT(height <= 1.f);
 
 						heights[z * TERRAIN_LOD_0_VERTICES_PER_DIMENSION + x] = (uint16)(height * UINT16_MAX);
 					}

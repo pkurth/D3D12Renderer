@@ -65,8 +65,8 @@ struct dx_texture_atlas
 
 	std::pair<vec2, vec2> getUVs(uint32 x, uint32 y)
 	{
-		assert(x < cols);
-		assert(y < rows);
+		ASSERT(x < cols);
+		ASSERT(y < rows);
 
 		float width = 1.f / cols;
 		float height = 1.f / rows;

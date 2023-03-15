@@ -17,11 +17,11 @@ void dx_dynamic_descriptor_heap::initialize(uint32 numDescriptorsPerHeap)
 
 void dx_dynamic_descriptor_heap::stageDescriptors(uint32 rootParameterIndex, uint32 offset, uint32 numDescriptors, dx_cpu_descriptor_handle srcDescriptor)
 {
-	assert(numDescriptors <= numDescriptorsPerHeap && rootParameterIndex < maxDescriptorTables);
+	ASSERT(numDescriptors <= numDescriptorsPerHeap && rootParameterIndex < maxDescriptorTables);
 
 	descriptor_table_cache& cache = descriptorTableCache[rootParameterIndex];
 
-	assert((offset + numDescriptors) <= cache.numDescriptors);
+	ASSERT((offset + numDescriptors) <= cache.numDescriptors);
 
 	D3D12_CPU_DESCRIPTOR_HANDLE* dstDescriptor = (cache.baseDescriptor + offset);
 	for (uint32 i = 0; i < numDescriptors; ++i)
@@ -123,8 +123,7 @@ void dx_dynamic_descriptor_heap::parseRootSignature(const dx_root_signature& roo
 		unsetBit(bitmask, rootIndex);
 	}
 
-	assert(currentOffset <= numDescriptorsPerHeap &&
-		"The root signature requires more than the maximum number of descriptors per descriptor heap. Consider increasing the maximum number of descriptors per descriptor heap.");
+	ASSERT(currentOffset <= numDescriptorsPerHeap); // The root signature requires more than the maximum number of descriptors per descriptor heap. Consider increasing the maximum number of descriptors per descriptor heap.
 }
 
 void dx_dynamic_descriptor_heap::reset()

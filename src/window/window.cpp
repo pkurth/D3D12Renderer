@@ -477,7 +477,7 @@ void win32_window::setIcon(const fs::path& filepath)
 	if (loadImageFromFile(filepath, image_load_flags_cache_to_dds, scratchImage, desc) && scratchImage.GetImageCount() > 0)
 	{
 		const auto& image = scratchImage.GetImages()[0];
-		assert(getNumberOfChannels(image.format) == 4);
+		ASSERT(getNumberOfChannels(image.format) == 4);
 		uint8* pixels = image.pixels;
 		uint32 width = (uint32)image.width;
 		uint32 height = (uint32)image.height;

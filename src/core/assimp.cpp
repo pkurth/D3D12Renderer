@@ -50,7 +50,8 @@ const aiScene* loadAssimpSceneFile(const fs::path& filepath, Assimp::Importer& i
 			FILETIME cachedFiletime = cachedData.ftLastWriteTime;
 
 			WIN32_FILE_ATTRIBUTE_DATA originalData;
-			assert(GetFileAttributesExW(filepath.c_str(), GetFileExInfoStandard, &originalData));
+			bool getFileAttributesResult = GetFileAttributesExW(filepath.c_str(), GetFileExInfoStandard, &originalData);
+			ASSERT(getFileAttributesResult);
 			FILETIME originalFiletime = originalData.ftLastWriteTime;
 
 			if (CompareFileTime(&cachedFiletime, &originalFiletime) >= 0)

@@ -42,7 +42,7 @@ void render_camera::updateMatrices()
 	}
 	else
 	{
-		assert(type == camera_type_calibrated);
+		ASSERT(type == camera_type_calibrated);
 		proj = createPerspectiveProjectionMatrix((float)width, (float)height, fx, fy, cx, cy, nearPlane, farPlane);
 	}
 
@@ -64,7 +64,7 @@ camera_projection_extents render_camera::getProjectionExtents() const
 	}
 	else
 	{
-		assert(type == camera_type_calibrated);
+		ASSERT(type == camera_type_calibrated);
 
 		vec3 topLeft = restoreViewSpacePosition(vec2(0.f, 0.f), 0.f) / nearPlane;
 		vec3 bottomRight = restoreViewSpacePosition(vec2(1.f, 1.f), 0.f) / nearPlane;
@@ -150,7 +150,7 @@ float render_camera::eyeDepthToDepthBufferDepth(float eyeDepth) const
 
 float render_camera::linearizeDepthBuffer(float depthBufferDepth) const
 {
-	assert(farPlane > 0.f); // This is not possible with an infinite far plane.
+	ASSERT(farPlane > 0.f); // This is not possible with an infinite far plane.
 
 	float eyeDepth = depthBufferDepthToEyeDepth(depthBufferDepth);
 	return (eyeDepth - nearPlane) / farPlane;

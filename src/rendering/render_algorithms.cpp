@@ -741,7 +741,7 @@ void gaussianBlur(dx_command_list* cl,
 {
 	PROFILE_ALL(cl, "Gaussian Blur");
 
-	assert(inputOutput->format == temp->format);
+	ASSERT(inputOutput->format == temp->format);
 
 	uint32 numChannels = getNumberOfChannels(inputOutput->format);
 
@@ -757,7 +757,7 @@ void gaussianBlur(dx_command_list* cl,
 	uint32 widthBuckets = bucketize(outputWidth, POST_PROCESSING_BLOCK_SIZE);
 	uint32 heightBuckets = bucketize(outputHeight, POST_PROCESSING_BLOCK_SIZE);
 
-	assert(inputMip <= outputMip); // Currently only downsampling supported.
+	ASSERT(inputMip <= outputMip); // Currently only downsampling supported.
 
 	float scale = 1.f / (1 << (outputMip - inputMip));
 
@@ -818,8 +818,8 @@ static void morphologyCommon(dx_command_list* cl, dx_pipeline& pipeline, ref<dx_
 		return;
 	}
 
-	assert(inputOutput->width == temp->width);
-	assert(inputOutput->height == temp->height);
+	ASSERT(inputOutput->width == temp->width);
+	ASSERT(inputOutput->height == temp->height);
 
 	radius = min(radius, (uint32)MORPHOLOGY_MAX_RADIUS);
 

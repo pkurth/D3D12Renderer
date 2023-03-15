@@ -149,10 +149,10 @@ private:
 	{
 		entity_handle place = entity.handle;
 		entity = scene.tryCreateEntityInPlace(entity, "");
-		assert(entity.handle == place);
+		ASSERT(entity.handle == place);
 
 		bool success = deserializeEntityFromMemory(entity, buffer, size);
-		assert(success);
+		ASSERT(success);
 	}
 
 	game_scene& scene;
@@ -1880,7 +1880,7 @@ bool scene_editor::handleUserInput(const user_input& input, ldr_render_pass* ldr
 
 				if (saved)
 				{
-					assert(selectedEntity.hasComponent<rigid_body_component>());
+					ASSERT(selectedEntity.hasComponent<rigid_body_component>());
 					rigid_body_component& rb = selectedEntity.getComponent<rigid_body_component>();
 
 					rb.invMass = invMass;

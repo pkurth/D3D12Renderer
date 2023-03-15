@@ -396,7 +396,7 @@ void animation_skeleton::loadFromAssimp(const aiScene* scene, float scale)
 			else
 			{
 				mat4 invBind = readAssimpMatrix(bone->mOffsetMatrix) * scaleMatrix;
-				assert(invBind == joints[it->second].invBindMatrix);
+				ASSERT(invBind == joints[it->second].invBindMatrix);
 			}
 #endif
 		}
@@ -428,7 +428,7 @@ static vec3 samplePosition(const animation_clip& clip, const animation_joint& an
 			break;
 		}
 	}
-	assert(firstKeyframeIndex != -1);
+	ASSERT(firstKeyframeIndex != -1);
 
 	uint32 secondKeyframeIndex = firstKeyframeIndex + 1;
 
@@ -462,7 +462,7 @@ static quat sampleRotation(const animation_clip& clip, const animation_joint& an
 			break;
 		}
 	}
-	assert(firstKeyframeIndex != -1);
+	ASSERT(firstKeyframeIndex != -1);
 
 	uint32 secondKeyframeIndex = firstKeyframeIndex + 1;
 
@@ -501,7 +501,7 @@ static vec3 sampleScale(const animation_clip& clip, const animation_joint& animJ
 			break;
 		}
 	}
-	assert(firstKeyframeIndex != -1);
+	ASSERT(firstKeyframeIndex != -1);
 
 	uint32 secondKeyframeIndex = firstKeyframeIndex + 1;
 
@@ -515,7 +515,7 @@ static vec3 sampleScale(const animation_clip& clip, const animation_joint& animJ
 
 void animation_skeleton::sampleAnimation(const animation_clip& clip, float time, trs* outLocalTransforms, trs* outRootMotion) const
 {
-	assert(clip.joints.size() == joints.size());
+	ASSERT(clip.joints.size() == joints.size());
 
 	time = clamp(time, 0.f, clip.lengthInSeconds);
 
@@ -602,7 +602,7 @@ void animation_skeleton::getSkinningMatricesFromLocalTransforms(const trs* local
 		const skeleton_joint& skelJoint = joints[i];
 		if (skelJoint.parentID != INVALID_JOINT)
 		{
-			assert(i > skelJoint.parentID); // Parent already processed.
+			ASSERT(i > skelJoint.parentID); // Parent already processed.
 			globalTransforms[i] = globalTransforms[skelJoint.parentID] * localTransforms[i];
 		}
 		else
@@ -623,7 +623,7 @@ void animation_skeleton::getSkinningMatricesFromLocalTransforms(const trs* local
 		const skeleton_joint& skelJoint = joints[i];
 		if (skelJoint.parentID != INVALID_JOINT)
 		{
-			assert(i > skelJoint.parentID); // Parent already processed.
+			ASSERT(i > skelJoint.parentID); // Parent already processed.
 			outGlobalTransforms[i] = outGlobalTransforms[skelJoint.parentID] * localTransforms[i];
 		}
 		else
@@ -779,8 +779,8 @@ void animation_instance::update(const animation_skeleton& skeleton, float dt, tr
 #if 0
 animation_blend_tree_1d::animation_blend_tree_1d(std::initializer_list<animation_clip*> clips, float startBlendValue, float startRelTime)
 {
-	assert(clips.size() <= arraysize(this->clips));
-	assert(clips.size() > 1);
+	ASSERT(clips.size() <= arraysize(this->clips));
+	ASSERT(clips.size() > 1);
 
 	numClips = 0;
 	for (animation_clip* clip : clips)

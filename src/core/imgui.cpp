@@ -835,9 +835,9 @@ namespace ImGui
 
 	bool PropertyDropdownPowerOfTwo(const char* label, uint32 from, uint32 to, uint32& current)
 	{
-		assert(isPowerOfTwo(current));
-		assert(isPowerOfTwo(from));
-		assert(isPowerOfTwo(to));
+		ASSERT(isPowerOfTwo(current));
+		ASSERT(isPowerOfTwo(from));
+		ASSERT(isPowerOfTwo(to));
 		uint32 logCurrent = log2(current);
 		uint32 logFrom = log2(from);
 		uint32 logTo = log2(to);

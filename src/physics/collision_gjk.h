@@ -223,7 +223,7 @@ static bool gjkIntersectionTest(const shapeA_t& shapeA, const shapeB_t& shapeB, 
 		gjk_internal_success success = updateGJKSimplex(outSimplex, a, dir);
 		if (success == gjk_stop)
 		{
-			assert(outSimplex.numPoints == 3);
+			ASSERT(outSimplex.numPoints == 3);
 			outSimplex.a = a;
 			outSimplex.numPoints = 4;
 			break;

@@ -232,7 +232,7 @@ void particle_system::setResources(dx_command_list* cl, uint32 offset, particle_
 
 uint32 particle_system::getAliveListOffset(uint32 alive)
 {
-	assert(alive == 0 || alive == 1);
+	ASSERT(alive == 0 || alive == 1);
 
 	return getDeadListOffset() +
 		(1 + alive) * maxNumParticles * (uint32)sizeof(uint32);
