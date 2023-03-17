@@ -48,7 +48,6 @@ struct outline_pipeline
 		cl->setGraphicsRootSignature(*outlinePipeline.rootSignature);
 
 		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		cl->setStencilReference(stencil_flag_selected_object);
 	}
 
 	PIPELINE_RENDER_DECL

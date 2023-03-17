@@ -288,6 +288,7 @@ ref<pbr_material> loadAssimpMaterial(const aiScene* scene, const fs::path& scene
 	result->metallicOverride = metallicOverride;
 	result->shader = pbr_material_shader_default;
 	result->uvScale = 1.f;
+	result->translucency = 0.f;
 
 	return result;
 }
