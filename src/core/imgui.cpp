@@ -235,20 +235,20 @@ namespace ImGui
 		return result;
 	}
 
-	void Image(::dx_cpu_descriptor_handle& handle, ImVec2 size)
+	void Image(::dx_cpu_descriptor_handle& handle, ImVec2 size, ImVec2 uv0, ImVec2 uv1)
 	{
 		if (numImagesThisFrame < MAX_NUM_IMGUI_IMAGES_PER_FRAME)
 		{
-			ImGui::Image(pushTexture(handle), size);
+			ImGui::Image(pushTexture(handle), size, uv0, uv1);
 		}
 	}
 
-	void Image(::dx_cpu_descriptor_handle& handle, uint32 width, uint32 height)
+	void Image(::dx_cpu_descriptor_handle& handle, uint32 width, uint32 height, ImVec2 uv0, ImVec2 uv1)
 	{
-		ImGui::Image(handle, ImVec2((float)width, (float)height));
+		ImGui::Image(handle, ImVec2((float)width, (float)height), uv0, uv1);
 	}
 
-	void Image(const ref<dx_texture>& texture, ImVec2 size)
+	void Image(const ref<dx_texture>& texture, ImVec2 size, ImVec2 uv0, ImVec2 uv1)
 	{
 		if (size.x == 0)
 		{
@@ -260,12 +260,12 @@ namespace ImGui
 			size.y = texture->height * size.x / (float)texture->width;
 		}
 
-		ImGui::Image(texture->defaultSRV, size);
+		ImGui::Image(texture->defaultSRV, size, uv0, uv1);
 	}
 
-	void Image(const ref<dx_texture>& texture, uint32 width, uint32 height)
+	void Image(const ref<dx_texture>& texture, uint32 width, uint32 height, ImVec2 uv0, ImVec2 uv1)
 	{
-		ImGui::Image(texture, ImVec2((float)width, (float)height));
+		ImGui::Image(texture, ImVec2((float)width, (float)height), uv0, uv1);
 	}
 
 	bool ImageButton(::dx_cpu_descriptor_handle& handle, ImVec2 size, ImVec2 uvTopLeft, ImVec2 uvBottomRight)

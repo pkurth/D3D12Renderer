@@ -36,6 +36,7 @@ struct depth_only_transform_cb
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS |" \
     "DENY_PIXEL_SHADER_ROOT_ACCESS)," \
+    "SRV(t0, visibility=SHADER_VISIBILITY_VERTEX), " \
     "RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX)"
 
 #define POINT_SHADOW_RS \
@@ -44,8 +45,8 @@ struct depth_only_transform_cb
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS |" \
     "DENY_PIXEL_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=16, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
-    "RootConstants(num32BitConstants=5, b1, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "SRV(t0, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "RootConstants(num32BitConstants=5, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
 
 #define DEPTH_ONLY_RS \
     "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
@@ -73,7 +74,8 @@ struct depth_only_transform_cb
 #define DEPTH_ONLY_RS_CAMERA                3
 #define DEPTH_ONLY_RS_ALPHA_TEXTURE         4
 
-#define SHADOW_RS_MVP                       0
+#define SHADOW_RS_TRANSFORMS                0
+#define SHADOW_RS_VIEWPROJ                  1
 #define POINT_SHADOW_RS_CB                  1
 
 #endif

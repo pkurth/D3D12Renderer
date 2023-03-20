@@ -15,8 +15,7 @@ struct water_settings
 
 struct water_component
 {
-	void update(float dt);
-	void render(const render_camera& camera, struct transparent_render_pass* renderPass, vec3 positionOffset, vec2 scale, uint32 entityID = -1);
+	void render(const render_camera& camera, struct transparent_render_pass* renderPass, vec3 positionOffset, vec2 scale, float dt, uint32 entityID = -1);
 
 	water_settings settings;
 

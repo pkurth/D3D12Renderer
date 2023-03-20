@@ -2327,6 +2327,16 @@ bool scene_editor::editSunShadowParameters(directional_light& sun)
 			ImGui::EndProperties();
 		}
 
+		if (ImGui::BeginTree("Show##ShowShadowMaps"))
+		{
+			for (uint32 i = 0; i < sun.numShadowCascades; ++i)
+			{
+				auto vp = sun.shadowMapViewports[i];
+				ImGui::Image(render_resources::shadowMap, ImVec2(0.f, 0.f), ImVec2(vp.x, vp.y), ImVec2(vp.x + vp.z, vp.y + vp.w));
+			}
+			ImGui::EndTree();
+		}
+
 		ImGui::EndTree();
 	}
 	return result;

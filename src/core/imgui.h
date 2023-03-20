@@ -56,10 +56,10 @@ namespace ImGui
 	bool BeginWindowHiddenTabBar(const char* name, bool* open = 0, ImGuiWindowFlags flags = 0);
 	bool BeginControlsWindow(const char* name, ImVec2 parentRelativeOffset, ImVec2 parentAbsoluteOffset);
 
-	void Image(struct dx_cpu_descriptor_handle& handle, ImVec2 size);
-	void Image(struct dx_cpu_descriptor_handle& handle, uint32 width, uint32 height);
-	void Image(const ref<dx_texture>& texture, ImVec2 size);
-	void Image(const ref<dx_texture>& texture, uint32 width = 0, uint32 height = 0);
+	void Image(struct dx_cpu_descriptor_handle& handle, ImVec2 size, ImVec2 uv0 = ImVec2(0.f, 0.f), ImVec2 uv1 = ImVec2(1.f, 1.f));
+	void Image(struct dx_cpu_descriptor_handle& handle, uint32 width, uint32 height, ImVec2 uv0 = ImVec2(0.f, 0.f), ImVec2 uv1 = ImVec2(1.f, 1.f));
+	void Image(const ref<dx_texture>& texture, ImVec2 size, ImVec2 uv0 = ImVec2(0.f, 0.f), ImVec2 uv1 = ImVec2(1.f, 1.f));
+	void Image(const ref<dx_texture>& texture, uint32 width = 0, uint32 height = 0, ImVec2 uv0 = ImVec2(0.f, 0.f), ImVec2 uv1 = ImVec2(1.f, 1.f));
 
 	inline float CalcButtonWidth(const char* text) { return CalcTextSize(text).x + (GetStyle().FramePadding.x + GetStyle().FrameBorderSize) * 2.f; }
 

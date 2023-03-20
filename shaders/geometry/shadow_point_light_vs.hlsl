@@ -1,12 +1,14 @@
 #include "depth_only_rs.hlsli"
 
 
-ConstantBuffer<shadow_transform_cb> transform	: register(b0);
-ConstantBuffer<point_shadow_cb> cb				: register(b1);
+StructuredBuffer<float4x4> transforms	: register(t0);
+ConstantBuffer<point_shadow_cb> cb		: register(b0);
 
 struct vs_input
 {
 	float3 position		: POSITION;
+
+	uint instanceID		: SV_InstanceID;
 };
 
 struct vs_output
@@ -18,9 +20,9 @@ struct vs_output
 [RootSignature(POINT_SHADOW_RS)]
 vs_output main(vs_input IN)
 {
-	float3 position = mul(transform.mvp, float4(IN.position, 1.f)).xyz;
+	float3 worldPosition = mul(transforms[IN.instanceID], float4(IN.position, 1.f)).xyz;
 	
-	float3 L = position - cb.lightPosition;
+	float3 L = worldPosition - cb.lightPosition;
 
 	L.z *= cb.flip;
 

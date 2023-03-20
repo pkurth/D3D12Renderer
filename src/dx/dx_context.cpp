@@ -288,7 +288,7 @@ bool dx_context::initialize()
 
 	for (uint32 i = 0; i < NUM_BUFFERED_FRAMES; ++i)
 	{
-		pagePools[i].initialize(MB(2));
+		pagePools[i].initialize(MB(32));
 
 #if ENABLE_DX_PROFILING
 		timestampHeaps[i].initialize(MAX_NUM_DX_PROFILE_EVENTS);

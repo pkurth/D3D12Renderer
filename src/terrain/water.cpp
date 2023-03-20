@@ -98,12 +98,8 @@ PIPELINE_RENDER_IMPL(water_pipeline, water_render_data)
 	cl->draw(4, 1, 0, 0);
 }
 
-void water_component::update(float dt)
+void water_component::render(const render_camera& camera, transparent_render_pass* renderPass, vec3 positionOffset, vec2 scale, float dt, uint32 entityID)
 {
 	time += dt;
-}
-
-void water_component::render(const render_camera& camera, transparent_render_pass* renderPass, vec3 positionOffset, vec2 scale, uint32 entityID)
-{
 	renderPass->renderObject<water_pipeline, water_render_data>({ createModelMatrix(positionOffset, quat::identity, vec3(scale.x, 1.f, scale.y)), settings, time });
 }

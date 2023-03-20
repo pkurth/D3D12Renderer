@@ -5,6 +5,7 @@
 
 #include "depth_only_rs.hlsli"
 
+#if 0
 static void renderStaticGeometryToSunShadowMap(sun_shadow_render_pass* renderPass, game_scene& scene)
 {
 	for (auto [entityHandle, raster, transform] : 
@@ -175,13 +176,38 @@ static void renderDynamicGeometryToPointShadowMap(point_shadow_render_pass* rend
 		}
 	}
 }
+#endif
 
 
 
 
+shadow_render_command determineSunShadowInfo(directional_light& sun, bool invalidateCache)
+{
+	bool staticCacheAvailable = !invalidateCache;
+
+	uint64 movementHash = getLightMovementHash(sun);
+
+	shadow_render_command result;
+
+	for (uint32 i = 0; i < sun.numShadowCascades; ++i)
+	{
+		auto [vp, cache] = assignShadowMapViewport(i, movementHash, sun.shadowDimensions);
+
+		sun.shadowMapViewports[i] = vec4(vp.x, vp.y, vp.size, vp.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
+		result.viewports[i] = vp;
+
+		staticCacheAvailable &= cache;
+	}
+
+	result.renderStaticGeometry = !staticCacheAvailable;
+	result.renderDynamicGeometry = true;
+
+	return result;
+}
 
 void renderSunShadowMap(directional_light& sun, sun_shadow_render_pass* renderPass, game_scene& scene, bool invalidateCache)
 {
+#if 0
 	bool staticCacheAvailable = !invalidateCache;
 
 	renderPass->numCascades = sun.numShadowCascades;
@@ -211,10 +237,12 @@ void renderSunShadowMap(directional_light& sun, sun_shadow_render_pass* renderPa
 	}
 
 	renderDynamicGeometryToSunShadowMap(renderPass, scene);
+#endif
 }
 
 spot_shadow_info renderSpotShadowMap(const spot_light_cb& spotLight, uint32 lightID, spot_shadow_render_pass* renderPass, game_scene& scene, bool invalidateCache, uint32 resolution)
 {
+#if 0
 	uint64 uniqueID = ((uint64)(lightID + 1) << 32);
 
 	renderPass->viewProjMatrix = getSpotLightViewProjectionMatrix(spotLight);
@@ -240,10 +268,14 @@ spot_shadow_info renderSpotShadowMap(const spot_light_cb& spotLight, uint32 ligh
 	si.viewProj = renderPass->viewProjMatrix;
 	si.bias = 0.00002f;
 	return si;
+#endif
+
+	return {};
 }
 
 point_shadow_info renderPointShadowMap(const point_light_cb& pointLight, uint32 lightID, point_shadow_render_pass* renderPass, game_scene& scene, bool invalidateCache, uint32 resolution)
 {
+#if 0
 	uint64 uniqueID = ((uint64)(lightID + 1) << 32);
 
 	renderPass->lightPosition = pointLight.position;
@@ -273,6 +305,9 @@ point_shadow_info renderPointShadowMap(const point_light_cb& pointLight, uint32 
 	si.viewport0 = vec4(vp0.x, vp0.y, vp0.size, vp0.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
 	si.viewport1 = vec4(vp1.x, vp1.y, vp1.size, vp1.size) / vec4((float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT, (float)SHADOW_MAP_WIDTH, (float)SHADOW_MAP_HEIGHT);
 	return si;
+#endif
+
+	return {};
 }
 
 
@@ -329,12 +364,13 @@ PIPELINE_SETUP_IMPL(shadow_pipeline::double_sided)
 
 PIPELINE_RENDER_IMPL(shadow_pipeline, shadow_render_data)
 {
-	cl->setGraphics32BitConstants(SHADOW_RS_MVP, viewProj * data.transform);
+	cl->setRootGraphicsSRV(SHADOW_RS_TRANSFORMS, data.transformPtr);
+	cl->setGraphics32BitConstants(SHADOW_RS_VIEWPROJ, viewProj);
 
 	cl->setVertexBuffer(0, data.vertexBuffer);
 	cl->setIndexBuffer(data.indexBuffer);
 
-	cl->drawIndexed(data.submesh.numIndices, 1, data.submesh.firstIndex, data.submesh.baseVertex, 0);
+	cl->drawIndexed(data.submesh.numIndices, data.numInstances, data.submesh.firstIndex, data.submesh.baseVertex, 0);
 }
 
 
@@ -358,12 +394,12 @@ PIPELINE_SETUP_IMPL(point_shadow_pipeline::double_sided)
 
 PIPELINE_RENDER_IMPL(point_shadow_pipeline, shadow_render_data)
 {
-	cl->setGraphics32BitConstants(SHADOW_RS_MVP, data.transform);
+	cl->setRootGraphicsSRV(SHADOW_RS_TRANSFORMS, data.transformPtr);
 
 	cl->setVertexBuffer(0, data.vertexBuffer);
 	cl->setIndexBuffer(data.indexBuffer);
 
-	cl->drawIndexed(data.submesh.numIndices, 1, data.submesh.firstIndex, data.submesh.baseVertex, 0);
+	cl->drawIndexed(data.submesh.numIndices, data.numInstances, data.submesh.firstIndex, data.submesh.baseVertex, 0);
 }
 
 

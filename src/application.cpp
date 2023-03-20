@@ -528,33 +528,6 @@ void application::update(const user_input& input, float dt)
 #endif
 
 
-	// Set global rendering stuff.
-
-
-
-
-
-
-	if (dxContext.featureSupport.raytracing())
-	{
-		raytracingTLAS.reset();
-
-		for (auto [entityHandle, transform, raytrace] : scene.group(component_group<transform_component, raytrace_component>).each())
-		{
-			raytracingTLAS.instantiate(raytrace.type, transform);
-		}
-
-		renderer->setRaytracingScene(&raytracingTLAS);
-	}
-
-
-
-	renderer->setRaytracingScene(&raytracingTLAS);
-	renderer->setEnvironment(environment);
-	renderer->setSun(sun);
-	renderer->setCamera(camera);
-
-
 	scene_entity selectedEntity = editor.selectedEntity;
 
 	if (renderer->mode != renderer_mode_pathtraced)
@@ -584,8 +557,6 @@ void application::update(const user_input& input, float dt)
 
 
 		// Render shadow maps.
-		renderSunShadowMap(sun, &sunShadowRenderPass, scene, objectDragged);
-
 		uint32 numPointLights = scene.numberOfComponentsOfType<point_light_component>();
 		if (numPointLights)
 		{
@@ -652,31 +623,9 @@ void application::update(const user_input& input, float dt)
 			grass.render(&opaqueRenderPass, (uint32)entityHandle);
 		}
 
-		position_scale_component waterPlaneTransforms[4];
-		uint32 numWaterPlanes = 0;
 
-		for (auto [entityHandle, water, transform] : scene.group(component_group<water_component, position_scale_component>).each())
-		{
-			water.update(unscaledDt);
-			water.render(this->scene.camera, &transparentRenderPass, transform.position, vec2(transform.scale.x, transform.scale.z), (uint32)entityHandle);
-
-			waterPlaneTransforms[numWaterPlanes++] = transform;
-		}
-
-		for (auto [entityHandle, terrain, position] : scene.group(component_group<terrain_component, position_component>).each())
-		{
-			terrain.render(this->scene.camera, &opaqueRenderPass, sunShadowRenderPass.copyFromStaticCache ? 0 : &sunShadowRenderPass, &ldrRenderPass,
-				position.position, (uint32)entityHandle, selectedEntity == scene_entity(entityHandle, scene),
-				waterPlaneTransforms, numWaterPlanes);
-		}
-
-
-
-
-		{
-			CPU_PROFILE_BLOCK("Submit render commands");
-			renderScene(scene, stackArena, selectedEntity.handle, &opaqueRenderPass, &transparentRenderPass, &ldrRenderPass, unscaledDt);
-		}
+		renderScene(this->scene.camera, scene, stackArena, selectedEntity.handle, sun, objectDragged, 
+			&opaqueRenderPass, &transparentRenderPass, &ldrRenderPass, &sunShadowRenderPass, unscaledDt);
 
 
 		if (decals.size())
@@ -711,6 +660,26 @@ void application::update(const user_input& input, float dt)
 	}
 
 	performSkinning(&computePass);
+
+
+
+
+	if (dxContext.featureSupport.raytracing())
+	{
+		raytracingTLAS.reset();
+
+		for (auto [entityHandle, transform, raytrace] : scene.group(component_group<transform_component, raytrace_component>).each())
+		{
+			raytracingTLAS.instantiate(raytrace.type, transform);
+		}
+
+		renderer->setRaytracingScene(&raytracingTLAS);
+	}
+
+	renderer->setRaytracingScene(&raytracingTLAS);
+	renderer->setEnvironment(environment);
+	renderer->setSun(sun);
+	renderer->setCamera(camera);
 }
 
 void application::handleFileDrop(const fs::path& filename)

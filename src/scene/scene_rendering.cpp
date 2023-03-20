@@ -5,6 +5,7 @@
 #include "rendering/pbr.h"
 #include "rendering/depth_prepass.h"
 #include "rendering/outline.h"
+#include "rendering/shadow_map.h"
 
 #include "geometry/mesh.h"
 
@@ -83,7 +84,7 @@ static void addToRenderPass(pbr_material_shader shader, const pbr_render_data& d
 }
 
 static void renderStaticObjects(game_scene& scene, memory_arena& arena, entity_handle selectedObjectID,
-	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass)
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass)
 {
 	using specialized_components = component_group_t<
 		animation_component,
@@ -167,12 +168,24 @@ static void renderStaticObjects(game_scene& scene, memory_arena& arena, entity_h
 			depthPrepassData.submesh = data.submesh;
 
 			addToRenderPass(sm.material->shader, data, depthPrepassData, opaqueRenderPass, transparentRenderPass);
+
+			if (sunShadowRenderPass)
+			{
+				shadow_render_data shadowData;
+				shadowData.transformPtr = baseM;
+				shadowData.vertexBuffer = dxMesh.vertexBuffer.positions;
+				shadowData.indexBuffer = dxMesh.indexBuffer;
+				shadowData.submesh = data.submesh;
+				shadowData.numInstances = oc.count;
+
+				sunShadowRenderPass->renderStaticObject<shadow_pipeline::single_sided>(0, shadowData);
+			}
 		}
 	}
 }
 
 static void renderDynamicObjects(game_scene& scene, memory_arena& arena, entity_handle selectedObjectID,
-	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass)
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass)
 {
 	auto group = scene.group(
 		component_group<transform_component, dynamic_transform_component, mesh_component>,
@@ -254,12 +267,24 @@ static void renderDynamicObjects(game_scene& scene, memory_arena& arena, entity_
 			depthPrepassData.submesh = data.submesh;
 
 			addToRenderPass(sm.material->shader, data, depthPrepassData, opaqueRenderPass, transparentRenderPass);
+
+			if (sunShadowRenderPass)
+			{
+				shadow_render_data shadowData;
+				shadowData.transformPtr = baseM;
+				shadowData.vertexBuffer = dxMesh.vertexBuffer.positions;
+				shadowData.indexBuffer = dxMesh.indexBuffer;
+				shadowData.submesh = data.submesh;
+				shadowData.numInstances = oc.count;
+
+				sunShadowRenderPass->renderDynamicObject<shadow_pipeline::single_sided>(0, shadowData);
+			}
 		}
 	}
 }
 
 static void renderAnimatedObjects(game_scene& scene, memory_arena& arena, entity_handle selectedObjectID,
-	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass)
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass)
 {
 	auto group = scene.group(
 		component_group<transform_component, dynamic_transform_component, mesh_component, animation_component>);
@@ -323,17 +348,22 @@ static void renderAnimatedObjects(game_scene& scene, memory_arena& arena, entity
 			depthPrepassData.submesh = data.submesh;
 
 			addToRenderPass(sm.material->shader, data, depthPrepassData, opaqueRenderPass, transparentRenderPass);
-		}
 
-
-		if (entityHandle == selectedObjectID)
-		{
-			for (auto& sm : mesh.mesh->submeshes)
+			if (sunShadowRenderPass)
 			{
-				submesh_info submesh = sm.info;
-				submesh.baseVertex -= mesh.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
+				shadow_render_data shadowData;
+				shadowData.transformPtr = baseM;
+				shadowData.vertexBuffer = anim.currentVertexBuffer.positions;
+				shadowData.indexBuffer = dxMesh.indexBuffer;
+				shadowData.submesh = data.submesh;
+				shadowData.numInstances = 1;
 
-				renderOutline(ldrRenderPass, transforms[index], anim.currentVertexBuffer, dxMesh.indexBuffer, submesh);
+				sunShadowRenderPass->renderDynamicObject<shadow_pipeline::single_sided>(0, shadowData);
+			}
+
+			if (entityHandle == selectedObjectID)
+			{
+				renderOutline(ldrRenderPass, transforms[index], anim.currentVertexBuffer, dxMesh.indexBuffer, data.submesh);
 			}
 		}
 		
@@ -341,8 +371,31 @@ static void renderAnimatedObjects(game_scene& scene, memory_arena& arena, entity
 	}
 }
 
+static void renderTerrain(const render_camera& camera, game_scene& scene, memory_arena& arena, entity_handle selectedObjectID,
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass,
+	float dt)
+{
+	memory_marker tempMemoryMarker = arena.getMarker();
+	position_scale_component* waterPlaneTransforms = arena.allocate<position_scale_component>(scene.numberOfComponentsOfType<water_component>());
+	uint32 numWaterPlanes = 0;
+
+	for (auto [entityHandle, water, transform] : scene.group(component_group<water_component, position_scale_component>).each())
+	{
+		water.render(camera, transparentRenderPass, transform.position, vec2(transform.scale.x, transform.scale.z), dt, (uint32)entityHandle);
+
+		waterPlaneTransforms[numWaterPlanes++] = transform;
+	}
+
+	for (auto [entityHandle, terrain, position] : scene.group(component_group<terrain_component, position_component>).each())
+	{
+		terrain.render(camera, opaqueRenderPass, sunShadowRenderPass, ldrRenderPass,
+			position.position, (uint32)entityHandle, selectedObjectID == entityHandle, waterPlaneTransforms, numWaterPlanes);
+	}
+	arena.resetToMarker(tempMemoryMarker);
+}
+
 static void renderTrees(game_scene& scene, memory_arena& arena, entity_handle selectedObjectID,
-	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass,
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass,
 	float dt)
 {
 	auto group = scene.group(
@@ -400,7 +453,7 @@ static void renderTrees(game_scene& scene, memory_arena& arena, entity_handle se
 }
 
 static void renderCloth(game_scene& scene, entity_handle selectedObjectID, 
-	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass)
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass)
 {
 	auto group = scene.group(
 		component_group<cloth_component, cloth_render_component>);
@@ -450,6 +503,17 @@ static void renderCloth(game_scene& scene, entity_handle selectedObjectID,
 
 		addToRenderPass(clothMaterial->shader, data, depthPrepassData, opaqueRenderPass, transparentRenderPass);
 
+		if (sunShadowRenderPass)
+		{
+			shadow_render_data shadowData;
+			shadowData.transformPtr = transformAllocation.gpuPtr;
+			shadowData.vertexBuffer = vb.positions;
+			shadowData.indexBuffer = ib;
+			shadowData.numInstances = 1;
+			shadowData.submesh = data.submesh;
+
+			sunShadowRenderPass->renderDynamicObject<shadow_pipeline::double_sided>(0, shadowData);
+		}
 
 		if (entityHandle == selectedObjectID)
 		{
@@ -460,14 +524,35 @@ static void renderCloth(game_scene& scene, entity_handle selectedObjectID,
 	}
 }
 
-void renderScene(game_scene& scene, memory_arena& arena, entity_handle selectedObjectID,
-	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass,
+static shadow_render_command setupSunShadowPass(directional_light& sun, bool invalidateShadowMapCache, sun_shadow_render_pass* sunShadowRenderPass)
+{
+	shadow_render_command result = determineSunShadowInfo(sun, invalidateShadowMapCache);
+	sunShadowRenderPass->numCascades = sun.numShadowCascades;
+	for (uint32 i = 0; i < sun.numShadowCascades; ++i)
+	{
+		sun_cascade_render_pass& cascadePass = sunShadowRenderPass->cascades[i];
+		cascadePass.viewport = result.viewports[i];
+		cascadePass.viewProj = sun.viewProjs[i];
+	}
+	sunShadowRenderPass->copyFromStaticCache = !result.renderStaticGeometry;
+	return result;
+}
+
+void renderScene(const render_camera& camera, game_scene& scene, memory_arena& arena, entity_handle selectedObjectID, directional_light& sun, bool invalidateShadowMapCache,
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass,
 	float dt)
 {
-	renderStaticObjects(scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass);
-	renderDynamicObjects(scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass);
-	renderAnimatedObjects(scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass);
-	renderTrees(scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, dt);
-	renderCloth(scene, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass);
+	CPU_PROFILE_BLOCK("Submit scene render commands");
+
+	shadow_render_command sunShadow = setupSunShadowPass(sun, invalidateShadowMapCache, sunShadowRenderPass);
+
+	ASSERT(sunShadow.renderDynamicGeometry);
+
+	renderStaticObjects(scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunShadow.renderStaticGeometry ? sunShadowRenderPass : 0);
+	renderDynamicObjects(scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunShadowRenderPass);
+	renderAnimatedObjects(scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunShadowRenderPass);
+	renderTerrain(camera, scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunShadow.renderStaticGeometry ? sunShadowRenderPass : 0, dt);
+	renderTrees(scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunShadowRenderPass, dt);
+	renderCloth(scene, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunShadowRenderPass);
 }
 
