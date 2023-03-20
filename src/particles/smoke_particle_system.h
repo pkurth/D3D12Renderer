@@ -37,10 +37,8 @@ private:
 
 	struct smoke_pipeline : particle_render_pipeline<smoke_material>
 	{
-		using render_data_t = smoke_material;
-
 		PIPELINE_SETUP_DECL;
-		PARTICLE_PIPELINE_RENDER_DECL;
+		PARTICLE_PIPELINE_RENDER_DECL(smoke_material);
 	};
 };
 

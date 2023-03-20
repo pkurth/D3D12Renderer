@@ -141,14 +141,12 @@ static void render(dx_command_list* cl, const grass_render_data& data, uint32 cb
 
 struct grass_pipeline
 {
-	using render_data_t = grass_render_data;
-
 	PIPELINE_SETUP_DECL
 	{
 		::setup(cl, common, grassPipeline);
 	}
 
-	PIPELINE_RENDER_DECL
+	PIPELINE_RENDER_DECL(grass_render_data)
 	{
 		PROFILE_ALL(cl, "Grass");
 		::render(cl, rc.data, GRASS_RS_CB, GRASS_RS_BLADES);
@@ -157,38 +155,32 @@ struct grass_pipeline
 
 struct grass_depth_prepass_pipeline
 {
-	using render_data_t = grass_render_data;
-
 	PIPELINE_SETUP_DECL
 	{
 		cl->setPipelineState(*grassDepthOnlyPipeline.pipeline);
 		cl->setGraphicsRootSignature(*grassDepthOnlyPipeline.rootSignature);
 		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
-		depth_only_camera_jitter_cb jitterCB = { common.cameraJitter, common.prevFrameCameraJitter };
-		cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
 		cl->setGraphicsDynamicConstantBuffer(GRASS_DEPTH_ONLY_RS_CAMERA, common.cameraCBV);
 	}
 
-	DEPTH_ONLY_RENDER_DECL
+	DEPTH_ONLY_RENDER_DECL(grass_render_data)
 	{
 		PROFILE_ALL(cl, "Grass depth prepass");
 
-		cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_OBJECT_ID, rc.objectID);
+		cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_OBJECT_ID, rc.data.objectID);
 		::render(cl, rc.data, GRASS_DEPTH_ONLY_RS_CB, GRASS_DEPTH_ONLY_RS_BLADES);
 	}
 };
 
 struct grass_no_depth_prepass_pipeline
 {
-	using render_data_t = grass_render_data;
-
 	PIPELINE_SETUP_DECL
 	{
 		::setup(cl, common, grassNoDepthPrepassPipeline);
 	}
 
-	PIPELINE_RENDER_DECL
+	PIPELINE_RENDER_DECL(grass_render_data)
 	{
 		PROFILE_ALL(cl, "Grass");
 		
@@ -229,11 +221,7 @@ struct grass_update_data
 
 struct grass_update_pipeline
 {
-	using render_data_t = grass_update_data;
-
-	PIPELINE_SETUP_DECL {}
-
-	PIPELINE_COMPUTE_DECL
+	PIPELINE_COMPUTE_DECL(grass_update_data)
 	{
 		PROFILE_ALL(cl, "Grass generation");
 
@@ -391,7 +379,7 @@ void grass_component::render(opaque_render_pass* renderPass, uint32 entityID)
 	grass_render_data data = { settings, drawBuffer, bladeBufferLOD0, bladeBufferLOD1, windDirection, entityID };
 	if (grass_settings::depthPrepass)
 	{
-		renderPass->renderObject<grass_pipeline, grass_depth_prepass_pipeline>(data, data, entityID);
+		renderPass->renderObject<grass_pipeline, grass_depth_prepass_pipeline>(data, data);
 	}
 	else
 	{

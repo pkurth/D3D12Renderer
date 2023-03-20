@@ -39,7 +39,7 @@ PIPELINE_SETUP_IMPL(debug_simple_pipeline)
 	cl->setGraphicsDynamicConstantBuffer(FLAT_SIMPLE_RS_CAMERA, common.cameraCBV);
 }
 
-PIPELINE_RENDER_IMPL(debug_simple_pipeline)
+PIPELINE_RENDER_IMPL(debug_simple_pipeline, debug_render_data)
 {
 	cl->setGraphics32BitConstants(FLAT_SIMPLE_RS_TRANFORM, transform_cb{ viewProj * rc.data.transform, rc.data.transform });
 	cl->setGraphics32BitConstants(FLAT_SIMPLE_RS_CB, visualization_cb{ rc.data.color });
@@ -79,7 +79,7 @@ PIPELINE_SETUP_IMPL(debug_unlit_pipeline::position_color)
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
-PIPELINE_RENDER_IMPL(debug_unlit_pipeline)
+PIPELINE_RENDER_IMPL(debug_unlit_pipeline, debug_render_data)
 {
 	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_TRANFORM, viewProj * rc.data.transform);
 	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_CB, visualization_cb{ rc.data.color });
@@ -117,7 +117,7 @@ PIPELINE_SETUP_IMPL(debug_unlit_line_pipeline::position_color)
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
 }
 
-PIPELINE_RENDER_IMPL(debug_unlit_line_pipeline)
+PIPELINE_RENDER_IMPL(debug_unlit_line_pipeline, debug_render_data)
 {
 	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_TRANFORM, viewProj * rc.data.transform);
 	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_CB, rc.data.color);

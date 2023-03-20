@@ -110,7 +110,7 @@ PIPELINE_SETUP_IMPL(fire_particle_system::fire_pipeline)
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
-PARTICLE_PIPELINE_RENDER_IMPL(fire_particle_system::fire_pipeline)
+PARTICLE_PIPELINE_RENDER_IMPL(fire_particle_system::fire_pipeline, fire_particle_system::fire_material)
 {
 	cl->setGraphicsDynamicConstantBuffer(FIRE_PARTICLE_SYSTEM_RENDERING_RS_CBV, rc.data.cbv);
 	cl->setDescriptorHeapSRV(FIRE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE, 0, rc.data.atlas.texture);

@@ -51,11 +51,9 @@ struct skinning_data
 
 struct skinning_pipeline
 {
-	using render_data_t = skinning_data;
-
 	PIPELINE_SETUP_DECL{}
 
-		PIPELINE_COMPUTE_DECL
+	PIPELINE_COMPUTE_DECL(skinning_data)
 	{
 		PROFILE_ALL(cl, "Skinning");
 

@@ -103,7 +103,7 @@ PIPELINE_SETUP_IMPL(debris_particle_system::debris_pipeline)
 	cl->setGraphicsDynamicConstantBuffer(DEBRIS_PARTICLE_SYSTEM_RENDERING_RS_CAMERA, common.cameraCBV);
 }
 
-PARTICLE_PIPELINE_RENDER_IMPL(debris_particle_system::debris_pipeline)
+PARTICLE_PIPELINE_RENDER_IMPL(debris_particle_system::debris_pipeline, debris_particle_system::debris_material)
 {
 	particle_render_pipeline::render(cl, viewProj, rc);
 }

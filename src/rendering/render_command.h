@@ -36,19 +36,6 @@ struct particle_render_command
 	render_data_t data;
 };
 
-template <typename render_data_t>
-struct depth_only_render_command
-{
-	uint32 objectID;
-	render_data_t data;
-
-	depth_only_render_command() {}
-	depth_only_render_command(uint32 objectID, const render_data_t& data)
-		: objectID(objectID), data(data) {}
-	depth_only_render_command(uint32 objectID, render_data_t&& data)
-		: objectID(objectID), data(data) {}
-};
-
 
 
 

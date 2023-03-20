@@ -114,7 +114,7 @@ PIPELINE_SETUP_IMPL(boid_particle_system::boid_pipeline)
 	cl->setDescriptorHeapSRV(BOID_PARTICLE_SYSTEM_RENDERING_RS_PBR, 2, render_resources::brdfTex);
 }
 
-PARTICLE_PIPELINE_RENDER_IMPL(boid_particle_system::boid_pipeline)
+PARTICLE_PIPELINE_RENDER_IMPL(boid_particle_system::boid_pipeline, boid_particle_system::boid_material)
 {
 	particle_render_pipeline::render(cl, viewProj, rc);
 }

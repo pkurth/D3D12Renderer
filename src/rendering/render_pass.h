@@ -5,7 +5,6 @@
 #include "material.h"
 #include "render_command.h"
 #include "render_command_buffer.h"
-#include "pbr.h"
 #include "depth_prepass.h"
 
 
@@ -27,212 +26,53 @@ struct opaque_render_pass
 
 
 
-	template <typename pipeline_t>
-	void renderObject(const typename pipeline_t::render_data_t& renderData)
+	template <typename pipeline_t, typename render_data_t>
+	void renderObject(const render_data_t& renderData)
 	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
 		uint64 sortKey = (uint64)pipeline_t::setup;
 		pass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, renderData);
 	}
 
-	template <typename pipeline_t, typename depth_prepass_pipeline_t>
-	void renderObject(const typename pipeline_t::render_data_t& renderData, 
-		const typename depth_prepass_pipeline_t::render_data_t& depthPrepassRenderData, 
-		uint32 objectID = -1)
+	template <typename pipeline_t, typename render_data_t,
+		class = typename std::enable_if_t<!std::is_lvalue_reference_v<render_data_t>>>
+		void renderObject(render_data_t&& renderData)
 	{
-		renderObject<pipeline_t>(renderData);
-
-		{
-			using render_data_t = typename depth_prepass_pipeline_t::render_data_t;
-
-			uint64 sortKey = (uint64)depth_prepass_pipeline_t::setup;
-			depthPrepass.emplace_back<depth_prepass_pipeline_t, depth_only_render_command<render_data_t>>(sortKey, objectID, depthPrepassRenderData);
-		}
-	}
-
-	template <typename pipeline_t>
-	void renderObject(typename pipeline_t::render_data_t&& renderData)
-	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
 		uint64 sortKey = (uint64)pipeline_t::setup;
 		pass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(renderData));
 	}
 
-	template <typename pipeline_t, typename depth_prepass_pipeline_t>
-	void renderObject(typename pipeline_t::render_data_t&& renderData,
-		typename depth_prepass_pipeline_t::render_data_t&& depthPrepassRenderData,
-		uint32 objectID = -1)
+
+	template <typename pipeline_t, typename render_data_t>
+	void renderDepthOnly(const render_data_t& renderData)
 	{
-		renderObject<pipeline_t>(std::move(renderData));
+		uint64 sortKey = (uint64)pipeline_t::setup;
+		depthPrepass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, renderData);
+	}
 
-		{
-			using render_data_t = typename depth_prepass_pipeline_t::render_data_t;
-
-			uint64 sortKey = (uint64)depth_prepass_pipeline_t::setup;
-			depthPrepass.emplace_back<depth_prepass_pipeline_t, depth_only_render_command<render_data_t>>(sortKey, objectID, std::move(depthPrepassRenderData));
-		}
+	template <typename pipeline_t, typename render_data_t,
+		class = typename std::enable_if_t<!std::is_lvalue_reference_v<render_data_t>>>
+		void renderDepthOnly(render_data_t&& renderData)
+	{
+		uint64 sortKey = (uint64)pipeline_t::setup;
+		depthPrepass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(renderData));
 	}
 
 
-
-	// Specializations for PBR materials, since these are the common ones.
-
-	void renderStaticObject(const mat4& transform,
-		const dx_vertex_buffer_group_view& vertexBuffer,
-		const dx_index_buffer_view& indexBuffer,
-		submesh_info submesh,
-		const ref<pbr_material>& material,
-		uint32 objectID = -1)
+	template <typename pipeline_t, typename depth_prepass_pipeline_t, typename render_data_t, typename depth_prepass_render_data_t>
+	void renderObject(const render_data_t& renderData, 
+		const depth_prepass_render_data_t& depthPrepassRenderData)
 	{
-		pbr_render_data data;
-		data.transform = transform;
-		data.vertexBuffer = vertexBuffer;
-		data.indexBuffer = indexBuffer;
-		data.submesh = submesh;
-		data.material = material;
-
-		switch (material->shader)
-		{
-			case pbr_material_shader_default:
-			case pbr_material_shader_double_sided:
-			{
-				static_depth_prepass_data prepassData;
-				prepassData.transform = transform;
-				prepassData.vertexBuffer = vertexBuffer.positions;
-				prepassData.indexBuffer = indexBuffer;
-				prepassData.submesh = submesh;
-
-				if (material->shader == pbr_material_shader_default)
-				{
-					renderObject<pbr_pipeline::opaque, static_depth_prepass_pipeline::single_sided>(data, prepassData, objectID);
-				}
-				else
-				{
-					renderObject<pbr_pipeline::opaque_double_sided, static_depth_prepass_pipeline::double_sided>(data, prepassData, objectID);
-				}
-			} break;
-			case pbr_material_shader_alpha_cutout:
-			{
-				static_alpha_cutout_depth_prepass_data prepassData;
-				prepassData.transform = transform;
-				prepassData.vertexBuffer = vertexBuffer;
-				prepassData.indexBuffer = indexBuffer;
-				prepassData.submesh = submesh;
-				prepassData.alphaCutoutTextureSRV = material->albedo->defaultSRV;
-				
-				renderObject<pbr_pipeline::opaque_double_sided, static_depth_prepass_pipeline::alpha_cutout>(data, prepassData, objectID);
-			} break;
-		}
+		renderObject<pipeline_t, render_data_t>(renderData);
+		renderDepthOnly<depth_prepass_pipeline_t, depth_prepass_render_data_t>(depthPrepassRenderData);
 	}
 
-	void renderDynamicObject(const mat4& transform,
-		const mat4& prevFrameTransform,
-		const dx_vertex_buffer_group_view& vertexBuffer,
-		const dx_index_buffer_view& indexBuffer,
-		submesh_info submesh,
-		const ref<pbr_material>& material,
-		uint32 objectID = -1)
+	template <typename pipeline_t, typename depth_prepass_pipeline_t, typename render_data_t, typename depth_prepass_render_data_t,
+		class = typename std::enable_if_t<!std::is_lvalue_reference_v<render_data_t> && !std::is_lvalue_reference_v<depth_prepass_render_data_t>>>
+	void renderObject(render_data_t&& renderData,
+		depth_prepass_render_data_t&& depthPrepassRenderData)
 	{
-		pbr_render_data data;
-		data.transform = transform;
-		data.vertexBuffer = vertexBuffer;
-		data.indexBuffer = indexBuffer;
-		data.submesh = submesh;
-		data.material = material;
-
-		switch (material->shader)
-		{
-			case pbr_material_shader_default:
-			case pbr_material_shader_double_sided:
-			{
-				dynamic_depth_prepass_data prepassData;
-				prepassData.transform = transform;
-				prepassData.prevFrameTransform = prevFrameTransform;
-				prepassData.vertexBuffer = vertexBuffer.positions;
-				prepassData.indexBuffer = indexBuffer;
-				prepassData.submesh = submesh;
-
-				if (material->shader == pbr_material_shader_default)
-				{
-					renderObject<pbr_pipeline::opaque, dynamic_depth_prepass_pipeline::single_sided>(data, prepassData, objectID);
-				}
-				else
-				{
-					renderObject<pbr_pipeline::opaque_double_sided, dynamic_depth_prepass_pipeline::double_sided>(data, prepassData, objectID);
-				}
-			} break;
-			case pbr_material_shader_alpha_cutout:
-			{
-				dynamic_alpha_cutout_depth_prepass_data prepassData;
-				prepassData.transform = transform;
-				prepassData.prevFrameTransform = prevFrameTransform;
-				prepassData.vertexBuffer = vertexBuffer;
-				prepassData.indexBuffer = indexBuffer;
-				prepassData.submesh = submesh;
-				prepassData.alphaCutoutTextureSRV = material->albedo->defaultSRV;
-
-				renderObject<pbr_pipeline::opaque_double_sided, dynamic_depth_prepass_pipeline::alpha_cutout>(data, prepassData, objectID);
-			} break;
-		}
-	}
-
-	void renderAnimatedObject(const mat4& transform,
-		const mat4& prevFrameTransform,
-		dx_vertex_buffer_group_view& vertexBuffer,
-		dx_vertex_buffer_group_view& prevFrameVertexBuffer,
-		const dx_index_buffer_view& indexBuffer,
-		submesh_info submesh,
-		const ref<pbr_material>& material,
-		uint32 objectID = -1)
-	{
-		pbr_render_data data;
-		data.transform = transform;
-		data.vertexBuffer = vertexBuffer;
-		data.indexBuffer = indexBuffer;
-		data.submesh = submesh;
-		data.material = material;
-
-		switch (material->shader)
-		{
-			case pbr_material_shader_default:
-			case pbr_material_shader_double_sided:
-			{
-				animated_depth_prepass_data prepassData;
-				prepassData.transform = transform;
-				prepassData.prevFrameTransform = prevFrameTransform;
-				prepassData.vertexBuffer = vertexBuffer.positions;
-				prepassData.prevFrameVertexBufferAddress = prevFrameVertexBuffer.positions ? prevFrameVertexBuffer.positions.view.BufferLocation : vertexBuffer.positions.view.BufferLocation;
-				prepassData.indexBuffer = indexBuffer;
-				prepassData.submesh = submesh;
-
-				if (material->shader == pbr_material_shader_default)
-				{
-					renderObject<pbr_pipeline::opaque, animated_depth_prepass_pipeline::single_sided>(data, prepassData, objectID);
-				}
-				else
-				{
-					renderObject<pbr_pipeline::opaque_double_sided, animated_depth_prepass_pipeline::double_sided>(data, prepassData, objectID);
-				}
-			} break;
-			case pbr_material_shader_alpha_cutout:
-			{
-#if 0
-				animated_alpha_cutout_depth_prepass_data prepassData;
-				prepassData.transform = transform;
-				prepassData.prevFrameTransform = prevFrameTransform;
-				prepassData.vertexBuffer = vertexBuffer;
-				prepassData.prevFrameVertexBufferAddress = prevFrameVertexBuffer.positions ? prevFrameVertexBuffer.positions.view.BufferLocation : vertexBuffer.positions.view.BufferLocation;
-				prepassData.indexBuffer = indexBuffer;
-				prepassData.submesh = submesh;
-				prepassData.alphaTexture = material->albedo;
-
-				renderObject<pbr_pipeline::opaque_double_sided, animated_depth_prepass_pipeline::alpha_cutout>(data, prepassData, objectID);
-#endif
-				ASSERT(false);
-			} break;
-		}
+		renderObject<pipeline_t, render_data_t>(std::move(renderData));
+		renderDepthOnly<depth_prepass_pipeline_t, depth_prepass_render_data_t>(std::move(depthPrepassRenderData));
 	}
 
 	default_render_command_buffer<uint64> pass;
@@ -253,46 +93,25 @@ struct transparent_render_pass
 		pass.clear();
 	}
 
-	template <typename pipeline_t>
-	void renderObject(const typename pipeline_t::render_data_t& data)
+	template <typename pipeline_t, typename render_data_t>
+	void renderObject(const render_data_t& data)
 	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
 		float depth = 0.f; // TODO
 		pass.emplace_back<pipeline_t, render_command<render_data_t>>(-depth, data); // Negative depth -> sort from back to front.
 	}
 
-	template <typename pipeline_t>
+	template <typename pipeline_t, typename render_data_t>
 	void renderParticles(const dx_vertex_buffer_group_view& vertexBuffer,
 		const dx_index_buffer_view& indexBuffer,
 		const particle_draw_info& drawInfo,
-		const typename pipeline_t::render_data_t& data)
+		const render_data_t& data)
 	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
 		float depth = 0.f; // TODO
 		auto& command = pass.emplace_back<pipeline_t, particle_render_command<render_data_t>>(-depth); // Negative depth -> sort from back to front.
 		command.vertexBuffer = vertexBuffer;
 		command.indexBuffer = indexBuffer;
 		command.drawInfo = drawInfo;
 		command.data = data;
-	}
-
-	void renderObject(const mat4& transform,
-		const dx_vertex_buffer_group_view& vertexBuffer,
-		const dx_index_buffer_view& indexBuffer,
-		submesh_info submesh,
-		const ref<pbr_material>& material)
-	{
-		using render_data_t = typename pbr_pipeline::transparent::render_data_t;
-
-		float depth = 0.f; // TODO
-		auto& command = pass.emplace_back<pbr_pipeline::transparent, render_command<render_data_t>>(-depth); // Negative depth -> sort from back to front.
-		command.data.transform = transform;
-		command.data.vertexBuffer = vertexBuffer;
-		command.data.indexBuffer = indexBuffer;
-		command.data.submesh = submesh;
-		command.data.material = material;
 	}
 
 	default_render_command_buffer<float> pass;
@@ -316,56 +135,47 @@ struct ldr_render_pass
 		outlines.clear();
 	}
 
-	template <typename pipeline_t>
-	void renderObject(const typename pipeline_t::render_data_t& data)
+	template <typename pipeline_t, typename render_data_t>
+	void renderObject(const render_data_t& data)
 	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
 		uint64 sortKey = (uint64)pipeline_t::setup;
 		ldrPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, data);
 	}
 
-	template <typename pipeline_t>
-	void renderObject(typename pipeline_t::render_data_t&& data)
+	template <typename pipeline_t, typename render_data_t,
+		class = typename std::enable_if_t<!std::is_lvalue_reference_v<render_data_t>>>
+	void renderObject(render_data_t&& data)
 	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
 		uint64 sortKey = (uint64)pipeline_t::setup;
 		ldrPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(data));
 	}
 
-	template <typename pipeline_t>
-	void renderOverlay(const typename pipeline_t::render_data_t& data)
+	template <typename pipeline_t, typename render_data_t>
+	void renderOverlay(const render_data_t& data)
 	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
 		uint64 sortKey = (uint64)pipeline_t::setup;
 		overlays.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, data);
 	}
 
-	template <typename pipeline_t>
-	void renderOverlay(typename pipeline_t::render_data_t&& data)
+	template <typename pipeline_t, typename render_data_t,
+		class = typename std::enable_if_t<!std::is_lvalue_reference_v<render_data_t>>>
+	void renderOverlay(render_data_t&& data)
 	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
 		uint64 sortKey = (uint64)pipeline_t::setup;
 		overlays.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(data));
 	}
 
-	template <typename pipeline_t>
-	void renderOutline(const typename pipeline_t::render_data_t& data)
+	template <typename pipeline_t, typename render_data_t>
+	void renderOutline(const render_data_t& data)
 	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
 		uint64 sortKey = (uint64)pipeline_t::setup;
 		outlines.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, data);
 	}
 
-	template <typename pipeline_t>
-	void renderOutline(typename pipeline_t::render_data_t&& data)
+	template <typename pipeline_t, typename render_data_t,
+		class = typename std::enable_if_t<!std::is_lvalue_reference_v<render_data_t>>>
+	void renderOutline(render_data_t&& data)
 	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
 		uint64 sortKey = (uint64)pipeline_t::setup;
 		outlines.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(data));
 	}
@@ -394,38 +204,32 @@ struct shadow_render_pass_base
 	}
 
 
-	template <typename pipeline_t>
-	void renderStaticObject(const typename pipeline_t::render_data_t& renderData)
+	template <typename pipeline_t, typename render_data_t>
+	void renderStaticObject(const render_data_t& renderData)
 	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
 		uint64 sortKey = (uint64)pipeline_t::setup;
 		staticPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, renderData);
 	}
 
-	template <typename pipeline_t>
-	void renderStaticObject(typename pipeline_t::render_data_t&& renderData)
+	template <typename pipeline_t, typename render_data_t,
+		class = typename std::enable_if_t<!std::is_lvalue_reference_v<render_data_t>>>
+	void renderStaticObject(render_data_t&& renderData)
 	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
 		uint64 sortKey = (uint64)pipeline_t::setup;
 		staticPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(renderData));
 	}
 
-	template <typename pipeline_t>
-	void renderDynamicObject(const typename pipeline_t::render_data_t& renderData)
+	template <typename pipeline_t, typename render_data_t>
+	void renderDynamicObject(const render_data_t& renderData)
 	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
 		uint64 sortKey = (uint64)pipeline_t::setup;
 		dynamicPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, renderData);
 	}
 
-	template <typename pipeline_t>
-	void renderDynamicObject(typename pipeline_t::render_data_t&& renderData)
+	template <typename pipeline_t, typename render_data_t,
+		class = typename std::enable_if_t<!std::is_lvalue_reference_v<render_data_t>>>
+	void renderDynamicObject(render_data_t&& renderData)
 	{
-		using render_data_t = typename pipeline_t::render_data_t;
-
 		uint64 sortKey = (uint64)pipeline_t::setup;
 		dynamicPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(renderData));
 	}
@@ -444,26 +248,28 @@ struct sun_shadow_render_pass
 {
 	// Since each cascade includes the next lower one, if you submit a draw to cascade N, it will also be rendered in N-1 automatically. No need to add it to the lower one.
 
-	template <typename pipeline_t>
-	void renderStaticObject(uint32 cascadeIndex, const typename pipeline_t::render_data_t& renderData)
+	template <typename pipeline_t, typename render_data_t>
+	void renderStaticObject(uint32 cascadeIndex, const render_data_t& renderData)
 	{
 		cascades[cascadeIndex].renderStaticObject<pipeline_t>(renderData);
 	}
 
-	template <typename pipeline_t>
-	void renderStaticObject(uint32 cascadeIndex, typename pipeline_t::render_data_t&& renderData)
+	template <typename pipeline_t, typename render_data_t,
+		class = typename std::enable_if_t<!std::is_lvalue_reference_v<render_data_t>>>
+	void renderStaticObject(uint32 cascadeIndex, render_data_t&& renderData)
 	{
 		cascades[cascadeIndex].renderStaticObject<pipeline_t>(std::move(renderData));
 	}
 
-	template <typename pipeline_t>
-	void renderDynamicObject(uint32 cascadeIndex, const typename pipeline_t::render_data_t& renderData)
+	template <typename pipeline_t, typename render_data_t>
+	void renderDynamicObject(uint32 cascadeIndex, const render_data_t& renderData)
 	{
 		cascades[cascadeIndex].renderDynamicObject<pipeline_t>(renderData);
 	}
 
-	template <typename pipeline_t>
-	void renderDynamicObject(uint32 cascadeIndex, typename pipeline_t::render_data_t&& renderData)
+	template <typename pipeline_t, typename render_data_t,
+		class = typename std::enable_if_t<!std::is_lvalue_reference_v<render_data_t>>>
+	void renderDynamicObject(uint32 cascadeIndex, render_data_t&& renderData)
 	{
 		cascades[cascadeIndex].renderDynamicObject<pipeline_t>(std::move(renderData));
 	}
@@ -544,17 +350,16 @@ struct compute_pass
 		particleSystemUpdates.push_back(p);
 	}
 
-	template <typename pipeline_t>
-	void addTask(compute_pass_event eventTime, const typename pipeline_t::render_data_t& data)
+	template <typename pipeline_t, typename render_data_t>
+	void addTask(compute_pass_event eventTime, const render_data_t& data)
 	{
-		using render_data_t = typename pipeline_t::render_data_t;
 		passes[eventTime].emplace_back<pipeline_t, render_command<render_data_t>>(eventTime, data);
 	}
 
-	template <typename pipeline_t>
-	void addTask(compute_pass_event eventTime, typename pipeline_t::render_data_t&& data)
+	template <typename pipeline_t, typename render_data_t,
+		class = typename std::enable_if_t<!std::is_lvalue_reference_v<render_data_t>>>
+	void addTask(compute_pass_event eventTime, render_data_t&& data)
 	{
-		using render_data_t = typename pipeline_t::render_data_t;
 		passes[eventTime].emplace_back<pipeline_t, render_command<render_data_t>>(eventTime, std::move(data));
 	}
 

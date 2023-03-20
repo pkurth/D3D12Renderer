@@ -281,10 +281,8 @@ struct visualize_grid_render_data
 
 struct visualize_grid_pipeline
 {
-	using render_data_t = visualize_grid_render_data;
-
 	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
+	PIPELINE_RENDER_DECL(visualize_grid_render_data);
 };
 
 
@@ -295,7 +293,7 @@ PIPELINE_SETUP_IMPL(visualize_grid_pipeline)
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
-PIPELINE_RENDER_IMPL(visualize_grid_pipeline)
+PIPELINE_RENDER_IMPL(visualize_grid_pipeline, visualize_grid_render_data)
 {
 	vec2 uvScale = 1.f / vec2((float)(rc.data.countX * rc.data.countY), (float)rc.data.countZ);
 	cl->setGraphics32BitConstants(LIGHT_PROBE_GRID_VISUALIZATION_RS_CB, light_probe_grid_visualization_cb{ viewProj * rc.data.transform, uvScale, rc.data.cellSize, rc.data.countX, rc.data.countY });
@@ -324,10 +322,8 @@ struct visualize_rays_render_data
 
 struct visualize_rays_pipeline
 {
-	using render_data_t = visualize_rays_render_data;
-
 	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
+	PIPELINE_RENDER_DECL(visualize_rays_render_data);
 };
 
 
@@ -338,7 +334,7 @@ PIPELINE_SETUP_IMPL(visualize_rays_pipeline)
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
 }
 
-PIPELINE_RENDER_IMPL(visualize_rays_pipeline)
+PIPELINE_RENDER_IMPL(visualize_rays_pipeline, visualize_rays_render_data)
 {
 	cl->setGraphics32BitConstants(LIGHT_PROBE_RAY_VISUALIZATION_RS_CB, light_probe_ray_visualization_cb{ viewProj * rc.data.transform, rc.data.cellSize, rc.data.countX, rc.data.countY });
 	cl->setDescriptorHeapSRV(LIGHT_PROBE_RAY_VISUALIZATION_RS_RAYS, 0, rc.data.texture0);

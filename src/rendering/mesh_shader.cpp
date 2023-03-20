@@ -105,7 +105,7 @@ struct mesh_shader_blob_pipeline
 	using render_data_t = mesh_shader_blob_render_data;
 
 	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
+	PIPELINE_RENDER_DECL(mesh_shader_blob_render_data);
 };
 
 PIPELINE_SETUP_IMPL(mesh_shader_blob_pipeline)
@@ -119,7 +119,7 @@ PIPELINE_SETUP_IMPL(mesh_shader_blob_pipeline)
 	cl->setDescriptorHeapSRV(3, 0, common.sky);
 }
 
-PIPELINE_RENDER_IMPL(mesh_shader_blob_pipeline)
+PIPELINE_RENDER_IMPL(mesh_shader_blob_pipeline, mesh_shader_blob_render_data)
 {
 	DX_PROFILE_BLOCK(cl, "Mesh shader blob");
 
@@ -149,10 +149,8 @@ PIPELINE_RENDER_IMPL(mesh_shader_blob_pipeline)
 
 struct mesh_shader_koch_pipeline
 {
-	using render_data_t = void*;
-
 	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
+	PIPELINE_RENDER_DECL(void*);
 };
 
 PIPELINE_SETUP_IMPL(mesh_shader_koch_pipeline)
@@ -166,7 +164,7 @@ PIPELINE_SETUP_IMPL(mesh_shader_koch_pipeline)
 	cl->setDescriptorHeapSRV(2, 0, common.sky);
 }
 
-PIPELINE_RENDER_IMPL(mesh_shader_koch_pipeline)
+PIPELINE_RENDER_IMPL(mesh_shader_koch_pipeline, void*)
 {
 	DX_PROFILE_BLOCK(cl, "Mesh shader koch");
 

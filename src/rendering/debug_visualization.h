@@ -27,24 +27,20 @@ struct debug_simple_pipeline
 {
 	// Layout: position, normal.
 
-	using render_data_t = debug_render_data;
-
 	static void initialize();
 
 	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
+	PIPELINE_RENDER_DECL(debug_render_data);
 };
 
 struct debug_unlit_pipeline
 {
-	using render_data_t = debug_render_data;
-
 	static void initialize();
 
 	struct position;
 	struct position_color;
 
-	PIPELINE_RENDER_DECL;
+	PIPELINE_RENDER_DECL(debug_render_data);
 };
 
 struct debug_unlit_pipeline::position : debug_unlit_pipeline { PIPELINE_SETUP_DECL; };
@@ -52,14 +48,12 @@ struct debug_unlit_pipeline::position_color : debug_unlit_pipeline { PIPELINE_SE
 
 struct debug_unlit_line_pipeline
 {
-	using render_data_t = debug_render_data;
-
 	static void initialize();
 
 	struct position;
 	struct position_color;
 
-	PIPELINE_RENDER_DECL;
+	PIPELINE_RENDER_DECL(debug_render_data);
 };
 
 struct debug_unlit_line_pipeline::position : debug_unlit_line_pipeline { PIPELINE_SETUP_DECL; };

@@ -36,10 +36,8 @@ private:
 
 	struct boid_pipeline : particle_render_pipeline<boid_material>
 	{
-		using render_data_t = boid_material;
-
 		PIPELINE_SETUP_DECL;
-		PARTICLE_PIPELINE_RENDER_DECL;
+		PARTICLE_PIPELINE_RENDER_DECL(boid_material);
 	};
 };
 

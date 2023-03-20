@@ -327,7 +327,7 @@ PIPELINE_SETUP_IMPL(shadow_pipeline::double_sided)
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
-PIPELINE_RENDER_IMPL(shadow_pipeline)
+PIPELINE_RENDER_IMPL(shadow_pipeline, shadow_render_data)
 {
 	cl->setGraphics32BitConstants(SHADOW_RS_MVP, viewProj * rc.data.transform);
 
@@ -356,7 +356,7 @@ PIPELINE_SETUP_IMPL(point_shadow_pipeline::double_sided)
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
-PIPELINE_RENDER_IMPL(point_shadow_pipeline)
+PIPELINE_RENDER_IMPL(point_shadow_pipeline, shadow_render_data)
 {
 	cl->setGraphics32BitConstants(SHADOW_RS_MVP, rc.data.transform);
 

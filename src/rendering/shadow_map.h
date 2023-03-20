@@ -19,9 +19,7 @@ struct shadow_render_data
 
 struct shadow_pipeline
 {
-	using render_data_t = shadow_render_data;
-
-	PIPELINE_RENDER_DECL;
+	PIPELINE_RENDER_DECL(shadow_render_data);
 
 	struct single_sided;
 	struct double_sided;
@@ -41,9 +39,7 @@ struct shadow_pipeline::double_sided : shadow_pipeline
 
 struct point_shadow_pipeline
 {
-	using render_data_t = shadow_render_data;
-
-	PIPELINE_RENDER_DECL;
+	PIPELINE_RENDER_DECL(shadow_render_data);
 
 	struct single_sided;
 	struct double_sided;

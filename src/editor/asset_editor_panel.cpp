@@ -94,7 +94,7 @@ void mesh_editor_panel::edit(uint32 renderWidth, uint32 renderHeight)
 			submesh_info submesh = sm.info;
 			const ref<pbr_material>& material = sm.material;
 
-			renderPass.renderStaticObject(mat4::identity, mesh.vertexBuffer, mesh.indexBuffer, submesh, material);
+			//renderPass.renderStaticObject(mat4::identity, mesh.vertexBuffer, mesh.indexBuffer, submesh, material);
 		}
 	}
 

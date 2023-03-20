@@ -2,17 +2,18 @@
 #include "camera.hlsli"
 #include "math.hlsli"
 
-ConstantBuffer<depth_only_object_id_cb> id			: register(b0, space1);
-ConstantBuffer<depth_only_camera_jitter_cb> jitter	: register(b1, space1);
+ConstantBuffer<camera_cb> camera	: register(b0, space1);
 
-Texture2D<float4> alpha								: register(t0, space1);
-SamplerState wrapSampler							: register(s0);
+Texture2D<float4> alpha				: register(t0, space1);
+SamplerState wrapSampler			: register(s0);
 
 struct ps_input
 {
-	float2 uv				: TEXCOORDS;
-	float3 ndc				: NDC;
-	float3 prevFrameNDC		: PREV_FRAME_NDC;
+	float2 uv						: TEXCOORDS;
+	float3 ndc						: NDC;
+	float3 prevFrameNDC				: PREV_FRAME_NDC;
+
+	nointerpolation uint objectID	: OBJECT_ID;
 };
 
 struct ps_output
@@ -27,7 +28,7 @@ ps_output main(ps_input IN)
 	clip(a - 0.5f);
 
 	ps_output OUT;
-	OUT.screenVelocity = screenSpaceVelocity(IN.ndc, IN.prevFrameNDC, jitter.jitter, jitter.prevFrameJitter);
-	OUT.objectID = id.id;
+	OUT.screenVelocity = screenSpaceVelocity(IN.ndc, IN.prevFrameNDC, camera.jitter, camera.prevFrameJitter);
+	OUT.objectID = IN.objectID;
 	return OUT;
 }

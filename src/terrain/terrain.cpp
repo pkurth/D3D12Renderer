@@ -44,6 +44,8 @@ struct terrain_render_data_common
 	int32 lod_posZ;
 
 	ref<dx_texture> heightmap;
+
+	uint32 objectID;
 };
 
 struct terrain_render_data
@@ -61,34 +63,26 @@ struct terrain_render_data
 
 struct terrain_pipeline
 {
-	using render_data_t = terrain_render_data;
-
 	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
+	PIPELINE_RENDER_DECL(terrain_render_data);
 };
 
 struct terrain_depth_prepass_pipeline
 {
-	using render_data_t = terrain_render_data_common;
-
 	PIPELINE_SETUP_DECL;
-	DEPTH_ONLY_RENDER_DECL;
+	DEPTH_ONLY_RENDER_DECL(terrain_render_data_common);
 };
 
 struct terrain_shadow_pipeline
 {
-	using render_data_t = terrain_render_data_common;
-
 	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
+	PIPELINE_RENDER_DECL(terrain_render_data_common);
 };
 
 struct terrain_outline_pipeline
 {
-	using render_data_t = terrain_render_data_common;
-
 	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
+	PIPELINE_RENDER_DECL(terrain_render_data_common);
 };
 
 
@@ -196,7 +190,7 @@ static terrain_cb getTerrainCB(const terrain_render_data_common& common)
 	return terrain_cb{ common.minCorner, (uint32)common.lod, common.chunkSize, common.amplitudeScale, scaleDownByLODs };
 }
 
-PIPELINE_RENDER_IMPL(terrain_pipeline)
+PIPELINE_RENDER_IMPL(terrain_pipeline, terrain_render_data)
 {
 	PROFILE_ALL(cl, "Terrain");
 
@@ -235,18 +229,17 @@ PIPELINE_SETUP_IMPL(terrain_depth_prepass_pipeline)
 
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	
-	depth_only_camera_jitter_cb jitterCB = { common.cameraJitter, common.prevFrameCameraJitter };
-	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_CAMERA_JITTER, jitterCB);
+	cl->setGraphicsDynamicConstantBuffer(TERRAIN_DEPTH_ONLY_RS_CAMERA, common.cameraCBV);
 }
 
-DEPTH_ONLY_RENDER_IMPL(terrain_depth_prepass_pipeline)
+DEPTH_ONLY_RENDER_IMPL(terrain_depth_prepass_pipeline, terrain_render_data_common)
 {
 	PROFILE_ALL(cl, "Terrain depth prepass");
 
 	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> rc.data.lod;
 	uint32 numTris = numSegmentsPerDim * numSegmentsPerDim * 2;
 
-	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_OBJECT_ID, rc.objectID);
+	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_OBJECT_ID, rc.data.objectID);
 	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_TRANSFORM, depth_only_transform_cb{ viewProj, prevFrameViewProj });
 
 	auto cb = getTerrainCB(rc.data);
@@ -266,7 +259,7 @@ PIPELINE_SETUP_IMPL(terrain_shadow_pipeline)
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
-PIPELINE_RENDER_IMPL(terrain_shadow_pipeline)
+PIPELINE_RENDER_IMPL(terrain_shadow_pipeline, terrain_render_data_common)
 {
 	PROFILE_ALL(cl, "Terrain shadow");
 
@@ -291,7 +284,7 @@ PIPELINE_SETUP_IMPL(terrain_outline_pipeline)
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
-PIPELINE_RENDER_IMPL(terrain_outline_pipeline)
+PIPELINE_RENDER_IMPL(terrain_outline_pipeline, terrain_render_data_common)
 {
 	PROFILE_ALL(cl, "Terrain outline");
 
@@ -736,6 +729,7 @@ void terrain_component::render(const render_camera& camera, struct opaque_render
 				lods[(z - 1) * lodStride + (x)],
 				lods[(z + 1) * lodStride + (x)],
 				c.heightmap,
+				entityID,
 			};
 
 			bounding_box aabb = { minCorner, maxCorner };
@@ -747,7 +741,7 @@ void terrain_component::render(const render_camera& camera, struct opaque_render
 					groundMaterial, rockMaterial, mudMaterial,
 					waterCBV
 				};
-				renderPass->renderObject<terrain_pipeline, terrain_depth_prepass_pipeline>(data, common, entityID);
+				renderPass->renderObject<terrain_pipeline, terrain_depth_prepass_pipeline>(data, common);
 			}
 
 			if (shadowPass)

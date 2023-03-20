@@ -52,28 +52,13 @@ struct depth_only_transform_cb
     "DENY_HULL_SHADER_ROOT_ACCESS |" \
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
-    "RootConstants(num32BitConstants=1, space=1, b0, visibility=SHADER_VISIBILITY_PIXEL), " \
-    "RootConstants(num32BitConstants=4, space=1, b1, visibility=SHADER_VISIBILITY_PIXEL)"
-
-#define ANIMATED_DEPTH_ONLY_RS \
-    "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
-    "DENY_HULL_SHADER_ROOT_ACCESS |" \
-    "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
-    "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
-    "RootConstants(num32BitConstants=1, space=1, b0, visibility=SHADER_VISIBILITY_PIXEL), " \
-    "RootConstants(num32BitConstants=4, space=1, b1, visibility=SHADER_VISIBILITY_PIXEL), " \
-    "SRV(t0)"
+    "SRV(t0, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "SRV(t1, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "SRV(t2, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "CBV(b0, space=1)"
 
 #define ALPHA_CUTOUT_DEPTH_ONLY_RS \
-    "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
-    "DENY_HULL_SHADER_ROOT_ACCESS |" \
-    "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
-    "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
-    "RootConstants(num32BitConstants=1, space=1, b0, visibility=SHADER_VISIBILITY_PIXEL), " \
-    "RootConstants(num32BitConstants=4, space=1, b1, visibility=SHADER_VISIBILITY_PIXEL), " \
+    DEPTH_ONLY_RS ", " \
     "DescriptorTable(SRV(t0, numDescriptors=1, space=1), visibility=SHADER_VISIBILITY_PIXEL), " \
     "StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_WRAP," \
@@ -82,11 +67,11 @@ struct depth_only_transform_cb
         "filter = FILTER_MIN_MAG_LINEAR_MIP_POINT," \
         "visibility=SHADER_VISIBILITY_PIXEL)"
 
-#define DEPTH_ONLY_RS_MVP                   0
-#define DEPTH_ONLY_RS_OBJECT_ID             1
-#define DEPTH_ONLY_RS_CAMERA_JITTER         2
-#define DEPTH_ONLY_RS_PREV_FRAME_POSITIONS  3
-#define DEPTH_ONLY_RS_ALPHA_TEXTURE         3
+#define DEPTH_ONLY_RS_TRANSFORM             0
+#define DEPTH_ONLY_RS_PREV_FRAME_TRANSFORM  1
+#define DEPTH_ONLY_RS_OBJECT_ID             2
+#define DEPTH_ONLY_RS_CAMERA                3
+#define DEPTH_ONLY_RS_ALPHA_TEXTURE         4
 
 #define SHADOW_RS_MVP                       0
 #define POINT_SHADOW_RS_CB                  1

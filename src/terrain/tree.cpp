@@ -45,8 +45,6 @@ struct tree_render_data
 
 struct tree_pipeline
 {
-    using render_data_t = tree_render_data;
-
     PIPELINE_SETUP_DECL
     {
         cl->setPipelineState(*treePipeline.pipeline);
@@ -79,7 +77,7 @@ struct tree_pipeline
         cl->setGraphicsDynamicConstantBuffer(TREE_RS_LIGHTING, common.lightingCBV);
     }
 
-    PIPELINE_RENDER_DECL
+    PIPELINE_RENDER_DECL(tree_render_data)
     {
         const auto& mat = rc.data.material;
 

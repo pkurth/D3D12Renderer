@@ -37,9 +37,7 @@ private:
 
 	struct fire_pipeline : particle_render_pipeline<fire_material>
 	{
-		using render_data_t = fire_material;
-
 		PIPELINE_SETUP_DECL;
-		PARTICLE_PIPELINE_RENDER_DECL;
+		PARTICLE_PIPELINE_RENDER_DECL(fire_material);
 	};
 };

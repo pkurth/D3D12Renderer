@@ -31,10 +31,8 @@ private:
 
 	struct debris_pipeline : particle_render_pipeline<debris_material>
 	{
-		using render_data_t = debris_material;
-
 		PIPELINE_SETUP_DECL;
-		PARTICLE_PIPELINE_RENDER_DECL;
+		PARTICLE_PIPELINE_RENDER_DECL(debris_material);
 	};
 
 

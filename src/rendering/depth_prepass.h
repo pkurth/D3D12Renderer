@@ -7,146 +7,46 @@
 
 
 
-struct static_depth_prepass_data
+struct depth_prepass_data
 {
-	mat4 transform;
-
-	dx_vertex_buffer_view vertexBuffer;
-	dx_index_buffer_view indexBuffer;
-	submesh_info submesh;
-};
-
-struct static_alpha_cutout_depth_prepass_data
-{
-	mat4 transform;
+	D3D12_GPU_VIRTUAL_ADDRESS transformPtr;
+	D3D12_GPU_VIRTUAL_ADDRESS prevFrameTransformPtr;
+	D3D12_GPU_VIRTUAL_ADDRESS objectIDPtr;
 
 	dx_vertex_buffer_group_view vertexBuffer;
+	dx_vertex_buffer_view prevFrameVertexBuffer;
 	dx_index_buffer_view indexBuffer;
+
 	submesh_info submesh;
 
-	dx_cpu_descriptor_handle alphaCutoutTextureSRV;
+	uint32 numInstances;
+
+	dx_cpu_descriptor_handle alphaCutoutTextureSRV = {};
 };
 
-struct static_depth_prepass_pipeline
+struct depth_prepass_pipeline
 {
-	using render_data_t = static_depth_prepass_data;
-
-	DEPTH_ONLY_RENDER_DECL;
+	DEPTH_ONLY_RENDER_DECL(depth_prepass_data);
 
 	struct single_sided;
 	struct double_sided;
 	struct alpha_cutout;
 };
 
-struct static_depth_prepass_pipeline::single_sided : static_depth_prepass_pipeline
+struct depth_prepass_pipeline::single_sided : depth_prepass_pipeline
 {
 	PIPELINE_SETUP_DECL;
 };
 
-struct static_depth_prepass_pipeline::double_sided : static_depth_prepass_pipeline
+struct depth_prepass_pipeline::double_sided : depth_prepass_pipeline
 {
 	PIPELINE_SETUP_DECL;
 };
 
-struct static_depth_prepass_pipeline::alpha_cutout : static_depth_prepass_pipeline
-{
-	using render_data_t = static_alpha_cutout_depth_prepass_data;
-
-	PIPELINE_SETUP_DECL;
-	DEPTH_ONLY_RENDER_DECL;
-};
-
-
-
-
-
-
-struct dynamic_depth_prepass_data
-{
-	mat4 transform;
-	mat4 prevFrameTransform;
-
-	dx_vertex_buffer_view vertexBuffer;
-	dx_index_buffer_view indexBuffer;
-	submesh_info submesh;
-};
-
-struct dynamic_alpha_cutout_depth_prepass_data
-{
-	mat4 transform;
-	mat4 prevFrameTransform;
-
-	dx_vertex_buffer_group_view vertexBuffer;
-	dx_index_buffer_view indexBuffer;
-	submesh_info submesh;
-
-	dx_cpu_descriptor_handle alphaCutoutTextureSRV;
-};
-
-struct dynamic_depth_prepass_pipeline
-{
-	using render_data_t = dynamic_depth_prepass_data;
-
-	DEPTH_ONLY_RENDER_DECL;
-
-	struct single_sided;
-	struct double_sided;
-	struct alpha_cutout;
-};
-
-struct dynamic_depth_prepass_pipeline::single_sided : dynamic_depth_prepass_pipeline
+struct depth_prepass_pipeline::alpha_cutout : depth_prepass_pipeline
 {
 	PIPELINE_SETUP_DECL;
-};
-
-struct dynamic_depth_prepass_pipeline::double_sided : dynamic_depth_prepass_pipeline
-{
-	PIPELINE_SETUP_DECL;
-};
-
-struct dynamic_depth_prepass_pipeline::alpha_cutout : dynamic_depth_prepass_pipeline
-{
-	using render_data_t = dynamic_alpha_cutout_depth_prepass_data;
-
-	PIPELINE_SETUP_DECL;
-	DEPTH_ONLY_RENDER_DECL;
-};
-
-
-
-
-
-
-struct animated_depth_prepass_data
-{
-	mat4 transform;
-	mat4 prevFrameTransform;
-
-	D3D12_GPU_VIRTUAL_ADDRESS prevFrameVertexBufferAddress;
-
-	dx_vertex_buffer_view vertexBuffer;
-	dx_index_buffer_view indexBuffer;
-	submesh_info submesh;
-};
-
-struct animated_depth_prepass_pipeline
-{
-	using render_data_t = animated_depth_prepass_data;
-
-	DEPTH_ONLY_RENDER_DECL;
-
-	struct single_sided;
-	struct double_sided;
-};
-
-struct animated_depth_prepass_pipeline::single_sided : animated_depth_prepass_pipeline
-{
-	PIPELINE_SETUP_DECL;
-};
-
-struct animated_depth_prepass_pipeline::double_sided : animated_depth_prepass_pipeline
-{
-	PIPELINE_SETUP_DECL;
+	DEPTH_ONLY_RENDER_DECL(depth_prepass_data);
 };
 
 

@@ -102,16 +102,14 @@ struct grass_cb
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
     "RootConstants(num32BitConstants=7, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
-    "SRV(t0, visibility=SHADER_VISIBILITY_VERTEX), " \
-    "CBV(b1, visibility=SHADER_VISIBILITY_VERTEX), " \
-    "RootConstants(num32BitConstants=1, space=1, b0, visibility=SHADER_VISIBILITY_PIXEL), " \
-    "RootConstants(num32BitConstants=4, space=1, b1, visibility=SHADER_VISIBILITY_PIXEL)"
+    "RootConstants(num32BitConstants=1, b1, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "CBV(b0, space=1), " \
+    "SRV(t0, visibility=SHADER_VISIBILITY_VERTEX)"
 
 #define GRASS_DEPTH_ONLY_RS_CB              0
-#define GRASS_DEPTH_ONLY_RS_BLADES          1
+#define GRASS_DEPTH_ONLY_RS_OBJECT_ID       1
 #define GRASS_DEPTH_ONLY_RS_CAMERA          2
-#define GRASS_DEPTH_ONLY_RS_OBJECT_ID       3
-#define GRASS_DEPTH_ONLY_RS_CAMERA_JITTER   4
+#define GRASS_DEPTH_ONLY_RS_BLADES          3
 
 
 

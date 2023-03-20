@@ -13,6 +13,7 @@
 #include "rendering/render_utils.h"
 #include "rendering/material.h"
 #include "rendering/render_pass.h"
+#include "rendering/pbr.h"
 
 #include "proc_placement_rs.hlsli"
 
@@ -73,10 +74,8 @@ struct render_proc_placement_layer_data
 
 struct render_proc_placement_layer_pipeline
 {
-	using render_data_t = render_proc_placement_layer_data;
-
 	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
+	PIPELINE_RENDER_DECL(render_proc_placement_layer_data);
 };
 
 PIPELINE_SETUP_IMPL(render_proc_placement_layer_pipeline)
@@ -87,7 +86,7 @@ PIPELINE_SETUP_IMPL(render_proc_placement_layer_pipeline)
 	cl->setGraphicsDynamicConstantBuffer(0, common.cameraCBV);
 }
 
-PIPELINE_RENDER_IMPL(render_proc_placement_layer_pipeline)
+PIPELINE_RENDER_IMPL(render_proc_placement_layer_pipeline, render_proc_placement_layer_data)
 {
 	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
 	cl->setVertexBuffer(1, rc.data.vertexBuffer.others);

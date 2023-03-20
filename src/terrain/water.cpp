@@ -49,10 +49,8 @@ struct water_render_data
 
 struct water_pipeline
 {
-	using render_data_t = water_render_data;
-	
 	PIPELINE_SETUP_DECL;
-	PIPELINE_RENDER_DECL;
+	PIPELINE_RENDER_DECL(water_render_data);
 };
 
 PIPELINE_SETUP_IMPL(water_pipeline)
@@ -82,7 +80,7 @@ PIPELINE_SETUP_IMPL(water_pipeline)
 	cl->setDescriptorHeapSRV(WATER_RS_FRAME_CONSTANTS, 6, common.ssrTexture ? common.ssrTexture->defaultSRV : nullTexture);
 }
 
-PIPELINE_RENDER_IMPL(water_pipeline)
+PIPELINE_RENDER_IMPL(water_pipeline, water_render_data)
 {
 	PROFILE_ALL(cl, "Water");
 
@@ -107,5 +105,5 @@ void water_component::update(float dt)
 
 void water_component::render(const render_camera& camera, transparent_render_pass* renderPass, vec3 positionOffset, vec2 scale, uint32 entityID)
 {
-	renderPass->renderObject<water_pipeline>({ createModelMatrix(positionOffset, quat::identity, vec3(scale.x, 1.f, scale.y)), settings, time });
+	renderPass->renderObject<water_pipeline, water_render_data>({ createModelMatrix(positionOffset, quat::identity, vec3(scale.x, 1.f, scale.y)), settings, time });
 }

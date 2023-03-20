@@ -100,7 +100,7 @@ PIPELINE_SETUP_IMPL(smoke_particle_system::smoke_pipeline)
 	cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
-PARTICLE_PIPELINE_RENDER_IMPL(smoke_particle_system::smoke_pipeline)
+PARTICLE_PIPELINE_RENDER_IMPL(smoke_particle_system::smoke_pipeline, smoke_particle_system::smoke_material)
 {
 	cl->setGraphicsDynamicConstantBuffer(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_CBV, rc.data.cbv);
 	cl->setDescriptorHeapSRV(SMOKE_PARTICLE_SYSTEM_RENDERING_RS_TEXTURE, 0, rc.data.atlas.texture);

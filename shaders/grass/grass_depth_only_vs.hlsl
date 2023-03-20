@@ -5,16 +5,21 @@
 
 
 ConstantBuffer<grass_cb> cb							: register(b0);
-ConstantBuffer<camera_cb> camera					: register(b1);
+ConstantBuffer<depth_only_object_id_cb> id			: register(b1);
+
+ConstantBuffer<camera_cb> camera					: register(b0, space1);
+
 StructuredBuffer<grass_blade> blades				: register(t0);
 
 
 struct vs_output
 {
-	float3 ndc				: NDC;
-	float3 prevFrameNDC		: PREV_FRAME_NDC;
+	float3 ndc						: NDC;
+	float3 prevFrameNDC				: PREV_FRAME_NDC;
 
-	float4 position			: SV_POSITION;
+	nointerpolation uint objectID	: OBJECT_ID;
+
+	float4 position					: SV_POSITION;
 };
 
 [RootSignature(GRASS_DEPTH_ONLY_RS)]
@@ -41,5 +46,6 @@ vs_output main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 	OUT.position = mul(camera.viewProj, float4(position, 1.f));
 	OUT.ndc = OUT.position.xyw;
 	OUT.prevFrameNDC = mul(camera.prevFrameViewProj, float4(prevFramePosition, 1.f)).xyw;
+	OUT.objectID = id.id;
 	return OUT;
 }

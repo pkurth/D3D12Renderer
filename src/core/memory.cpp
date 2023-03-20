@@ -60,15 +60,16 @@ void* memory_arena::allocate(uint64 size, uint64 alignment, bool clearToZero)
 	ensureFreeSizeInternal(size);
 
 	uint8* result = memory + current;
-	if (clearToZero)
-	{
-		memset(result, 0, size);
-	}
 	current += size;
 	sizeLeftCurrent -= size;
 	sizeLeftTotal -= size;
 
 	mutex.unlock();
+
+	if (clearToZero)
+	{
+		memset(result, 0, size);
+	}
 
 	return result;
 }

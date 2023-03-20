@@ -16,6 +16,7 @@
 #include "rendering/outline.h"
 #include "rendering/mesh_shader.h"
 #include "rendering/shadow_map.h"
+#include "rendering/batching.h"
 #include "rendering/debug_visualization.h"
 #include "audio/audio.h"
 #include "terrain/terrain.h"
@@ -675,6 +676,7 @@ void application::update(const user_input& input, float dt)
 		{
 			CPU_PROFILE_BLOCK("Submit render commands");
 
+#if 0
 
 			// Animated meshes.
 			for (auto [entityHandle, transform, dynamicTransform, mesh, anim] : scene.group(
@@ -848,6 +850,10 @@ void application::update(const user_input& input, float dt)
 					renderOutline(&ldrRenderPass, mat4::identity, vb, ib, sm);
 				}
 			}
+
+#endif
+
+			renderScene(scene, stackArena, selectedEntity.handle, &opaqueRenderPass, &transparentRenderPass, &ldrRenderPass);
 		}
 
 

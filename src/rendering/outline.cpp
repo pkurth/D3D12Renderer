@@ -40,8 +40,6 @@ struct outline_render_data
 
 struct outline_pipeline
 {
-	using render_data_t = outline_render_data;
-
 	PIPELINE_SETUP_DECL
 	{
 		cl->setPipelineState(*outlinePipeline.pipeline);
@@ -50,7 +48,7 @@ struct outline_pipeline
 		cl->setPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	}
 
-	PIPELINE_RENDER_DECL
+	PIPELINE_RENDER_DECL(outline_render_data)
 	{
 		cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * rc.data.transform });
 
