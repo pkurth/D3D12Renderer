@@ -1,9 +1,10 @@
 #include "pch.h"
 
-#include "batching.h"
-#include "pbr.h"
-#include "depth_prepass.h"
-#include "outline.h"
+#include "scene_rendering.h"
+
+#include "rendering/pbr.h"
+#include "rendering/depth_prepass.h"
+#include "rendering/outline.h"
 
 #include "geometry/mesh.h"
 

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "scene/scene.h"
+#include "scene.h"
 #include "core/memory.h"
-#include "render_pass.h"
+#include "rendering/render_pass.h"
 
 
 void renderScene(game_scene& scene, memory_arena& arena, entity_handle selectedObjectID,
