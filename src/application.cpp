@@ -565,8 +565,7 @@ void application::update(const user_input& input, float dt)
 
 			for (auto [entityHandle, position, pl] : scene.group<position_component, point_light_component>().each())
 			{
-				point_light_cb cb;
-				cb.initialize(position.position, pl.color * pl.intensity, pl.radius);
+				point_light_cb cb(position.position, pl.color * pl.intensity, pl.radius);
 
 				if (pl.castsShadow)
 				{
@@ -591,8 +590,7 @@ void application::update(const user_input& input, float dt)
 
 			for (auto [entityHandle, transform, sl] : scene.group<position_rotation_component, spot_light_component>().each())
 			{
-				spot_light_cb cb;
-				cb.initialize(transform.position, transform.rotation * vec3(0.f, 0.f, -1.f), sl.color * sl.intensity, sl.innerAngle, sl.outerAngle, sl.distance);
+				spot_light_cb cb(transform.position, transform.rotation * vec3(0.f, 0.f, -1.f), sl.color * sl.intensity, sl.innerAngle, sl.outerAngle, sl.distance);
 
 				if (sl.castsShadow)
 				{

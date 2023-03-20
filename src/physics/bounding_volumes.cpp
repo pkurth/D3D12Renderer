@@ -106,6 +106,11 @@ bounding_box_corners bounding_box::getCorners(quat rotation, vec3 translation) c
 	return result;
 }
 
+bounding_box bounding_box::everything()
+{
+	return bounding_box{ vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX), vec3(FLT_MAX, FLT_MAX, FLT_MAX) };
+}
+
 bounding_box bounding_box::negativeInfinity()
 {
 	return bounding_box{ vec3(FLT_MAX, FLT_MAX, FLT_MAX), vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX) };

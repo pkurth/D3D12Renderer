@@ -117,6 +117,7 @@ struct bounding_box
 	bounding_box_corners getCorners() const;
 	bounding_box_corners getCorners(quat rotation, vec3 translation) const;
 
+	static bounding_box everything();
 	static bounding_box negativeInfinity();
 	static bounding_box fromMinMax(vec3 minCorner, vec3 maxCorner);
 	static bounding_box fromCenterRadius(vec3 center, vec3 radius);

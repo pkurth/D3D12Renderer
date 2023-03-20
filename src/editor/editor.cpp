@@ -2280,6 +2280,8 @@ bool scene_editor::editSunShadowParameters(directional_light& sun)
 				result |= ImGui::PropertyDropdownPowerOfTwo("Shadow resolution", 128, 2048, sun.shadowDimensions));
 			UNDOABLE_SETTING("stabilize", sun.stabilize,
 				result |= ImGui::PropertyCheckbox("Stabilize", sun.stabilize));
+			UNDOABLE_SETTING("negative z-offset", sun.negativeZOffset,
+				result |= ImGui::PropertyDrag("Negative z-offset", sun.negativeZOffset, 0.5f, 0.f));
 
 			UNDOABLE_SETTING("cascade count", sun.numShadowCascades,
 				result |= ImGui::PropertySlider("Cascade count", sun.numShadowCascades, 1, 4));

@@ -24,7 +24,7 @@ struct multi_mesh
 	std::vector<submesh> submeshes;
 	animation_skeleton skeleton;
 	dx_mesh mesh;
-	bounding_box aabb;
+	bounding_box aabb = { vec3(0.f), vec3(0.f) };
 
 	asset_handle handle;
 	uint32 flags;
