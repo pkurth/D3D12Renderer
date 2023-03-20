@@ -329,12 +329,12 @@ PIPELINE_SETUP_IMPL(shadow_pipeline::double_sided)
 
 PIPELINE_RENDER_IMPL(shadow_pipeline, shadow_render_data)
 {
-	cl->setGraphics32BitConstants(SHADOW_RS_MVP, viewProj * rc.data.transform);
+	cl->setGraphics32BitConstants(SHADOW_RS_MVP, viewProj * data.transform);
 
-	cl->setVertexBuffer(0, rc.data.vertexBuffer);
-	cl->setIndexBuffer(rc.data.indexBuffer);
+	cl->setVertexBuffer(0, data.vertexBuffer);
+	cl->setIndexBuffer(data.indexBuffer);
 
-	cl->drawIndexed(rc.data.submesh.numIndices, 1, rc.data.submesh.firstIndex, rc.data.submesh.baseVertex, 0);
+	cl->drawIndexed(data.submesh.numIndices, 1, data.submesh.firstIndex, data.submesh.baseVertex, 0);
 }
 
 
@@ -358,12 +358,12 @@ PIPELINE_SETUP_IMPL(point_shadow_pipeline::double_sided)
 
 PIPELINE_RENDER_IMPL(point_shadow_pipeline, shadow_render_data)
 {
-	cl->setGraphics32BitConstants(SHADOW_RS_MVP, rc.data.transform);
+	cl->setGraphics32BitConstants(SHADOW_RS_MVP, data.transform);
 
-	cl->setVertexBuffer(0, rc.data.vertexBuffer);
-	cl->setIndexBuffer(rc.data.indexBuffer);
+	cl->setVertexBuffer(0, data.vertexBuffer);
+	cl->setIndexBuffer(data.indexBuffer);
 
-	cl->drawIndexed(rc.data.submesh.numIndices, 1, rc.data.submesh.firstIndex, rc.data.submesh.baseVertex, 0);
+	cl->drawIndexed(data.submesh.numIndices, 1, data.submesh.firstIndex, data.submesh.baseVertex, 0);
 }
 
 

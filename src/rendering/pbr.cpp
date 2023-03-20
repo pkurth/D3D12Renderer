@@ -114,7 +114,7 @@ PIPELINE_SETUP_IMPL(pbr_pipeline::transparent)
 
 PIPELINE_RENDER_IMPL(pbr_pipeline, pbr_render_data)
 {
-	const auto& mat = rc.data.material;
+	const auto& mat = data.material;
 
 	uint32 flags = 0;
 
@@ -148,13 +148,13 @@ PIPELINE_RENDER_IMPL(pbr_pipeline, pbr_render_data)
 	);
 
 
-	const submesh_info& submesh = rc.data.submesh;
+	const submesh_info& submesh = data.submesh;
 
-	cl->setRootGraphicsSRV(DEFAULT_PBR_RS_TRANSFORM, rc.data.transformPtr);
+	cl->setRootGraphicsSRV(DEFAULT_PBR_RS_TRANSFORM, data.transformPtr);
 
-	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
-	cl->setVertexBuffer(1, rc.data.vertexBuffer.others);
-	cl->setIndexBuffer(rc.data.indexBuffer);
-	cl->drawIndexed(submesh.numIndices, rc.data.numInstances, submesh.firstIndex, submesh.baseVertex, 0);
+	cl->setVertexBuffer(0, data.vertexBuffer.positions);
+	cl->setVertexBuffer(1, data.vertexBuffer.others);
+	cl->setIndexBuffer(data.indexBuffer);
+	cl->drawIndexed(submesh.numIndices, data.numInstances, submesh.firstIndex, submesh.baseVertex, 0);
 }
 

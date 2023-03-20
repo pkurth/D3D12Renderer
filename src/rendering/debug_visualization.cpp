@@ -41,12 +41,12 @@ PIPELINE_SETUP_IMPL(debug_simple_pipeline)
 
 PIPELINE_RENDER_IMPL(debug_simple_pipeline, debug_render_data)
 {
-	cl->setGraphics32BitConstants(FLAT_SIMPLE_RS_TRANFORM, transform_cb{ viewProj * rc.data.transform, rc.data.transform });
-	cl->setGraphics32BitConstants(FLAT_SIMPLE_RS_CB, visualization_cb{ rc.data.color });
-	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
-	cl->setVertexBuffer(1, rc.data.vertexBuffer.others);
-	cl->setIndexBuffer(rc.data.indexBuffer);
-	cl->drawIndexed(rc.data.submesh.numIndices, 1, rc.data.submesh.firstIndex, rc.data.submesh.baseVertex, 0);
+	cl->setGraphics32BitConstants(FLAT_SIMPLE_RS_TRANFORM, transform_cb{ viewProj * data.transform, data.transform });
+	cl->setGraphics32BitConstants(FLAT_SIMPLE_RS_CB, visualization_cb{ data.color });
+	cl->setVertexBuffer(0, data.vertexBuffer.positions);
+	cl->setVertexBuffer(1, data.vertexBuffer.others);
+	cl->setIndexBuffer(data.indexBuffer);
+	cl->drawIndexed(data.submesh.numIndices, 1, data.submesh.firstIndex, data.submesh.baseVertex, 0);
 }
 
 
@@ -81,11 +81,11 @@ PIPELINE_SETUP_IMPL(debug_unlit_pipeline::position_color)
 
 PIPELINE_RENDER_IMPL(debug_unlit_pipeline, debug_render_data)
 {
-	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_TRANFORM, viewProj * rc.data.transform);
-	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_CB, visualization_cb{ rc.data.color });
-	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
-	cl->setIndexBuffer(rc.data.indexBuffer);
-	cl->drawIndexed(rc.data.submesh.numIndices, 1, rc.data.submesh.firstIndex, rc.data.submesh.baseVertex, 0);
+	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_TRANFORM, viewProj * data.transform);
+	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_CB, visualization_cb{ data.color });
+	cl->setVertexBuffer(0, data.vertexBuffer.positions);
+	cl->setIndexBuffer(data.indexBuffer);
+	cl->drawIndexed(data.submesh.numIndices, 1, data.submesh.firstIndex, data.submesh.baseVertex, 0);
 }
 
 
@@ -119,11 +119,11 @@ PIPELINE_SETUP_IMPL(debug_unlit_line_pipeline::position_color)
 
 PIPELINE_RENDER_IMPL(debug_unlit_line_pipeline, debug_render_data)
 {
-	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_TRANFORM, viewProj * rc.data.transform);
-	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_CB, rc.data.color);
-	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
-	cl->setIndexBuffer(rc.data.indexBuffer);
-	cl->drawIndexed(rc.data.submesh.numIndices, 1, rc.data.submesh.firstIndex, rc.data.submesh.baseVertex, 0);
+	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_TRANFORM, viewProj * data.transform);
+	cl->setGraphics32BitConstants(FLAT_UNLIT_RS_CB, data.color);
+	cl->setVertexBuffer(0, data.vertexBuffer.positions);
+	cl->setIndexBuffer(data.indexBuffer);
+	cl->drawIndexed(data.submesh.numIndices, 1, data.submesh.firstIndex, data.submesh.baseVertex, 0);
 }
 
 

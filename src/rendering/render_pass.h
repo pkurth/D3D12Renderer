@@ -30,7 +30,7 @@ struct opaque_render_pass
 	void renderObject(const render_data_t& renderData)
 	{
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		pass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, renderData);
+		pass.emplace_back<pipeline_t, render_data_t>(sortKey, renderData);
 	}
 
 	template <typename pipeline_t, typename render_data_t,
@@ -38,7 +38,7 @@ struct opaque_render_pass
 		void renderObject(render_data_t&& renderData)
 	{
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		pass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(renderData));
+		pass.emplace_back<pipeline_t, render_data_t>(sortKey, std::move(renderData));
 	}
 
 
@@ -46,7 +46,7 @@ struct opaque_render_pass
 	void renderDepthOnly(const render_data_t& renderData)
 	{
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		depthPrepass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, renderData);
+		depthPrepass.emplace_back<pipeline_t, render_data_t>(sortKey, renderData);
 	}
 
 	template <typename pipeline_t, typename render_data_t,
@@ -54,7 +54,7 @@ struct opaque_render_pass
 		void renderDepthOnly(render_data_t&& renderData)
 	{
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		depthPrepass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(renderData));
+		depthPrepass.emplace_back<pipeline_t, render_data_t>(sortKey, std::move(renderData));
 	}
 
 
@@ -97,7 +97,7 @@ struct transparent_render_pass
 	void renderObject(const render_data_t& data)
 	{
 		float depth = 0.f; // TODO
-		pass.emplace_back<pipeline_t, render_command<render_data_t>>(-depth, data); // Negative depth -> sort from back to front.
+		pass.emplace_back<pipeline_t, render_data_t>(-depth, data); // Negative depth -> sort from back to front.
 	}
 
 	template <typename pipeline_t, typename render_data_t>
@@ -139,7 +139,7 @@ struct ldr_render_pass
 	void renderObject(const render_data_t& data)
 	{
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		ldrPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, data);
+		ldrPass.emplace_back<pipeline_t, render_data_t>(sortKey, data);
 	}
 
 	template <typename pipeline_t, typename render_data_t,
@@ -147,14 +147,14 @@ struct ldr_render_pass
 	void renderObject(render_data_t&& data)
 	{
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		ldrPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(data));
+		ldrPass.emplace_back<pipeline_t, render_data_t>(sortKey, std::move(data));
 	}
 
 	template <typename pipeline_t, typename render_data_t>
 	void renderOverlay(const render_data_t& data)
 	{
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		overlays.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, data);
+		overlays.emplace_back<pipeline_t, render_data_t>(sortKey, data);
 	}
 
 	template <typename pipeline_t, typename render_data_t,
@@ -162,14 +162,14 @@ struct ldr_render_pass
 	void renderOverlay(render_data_t&& data)
 	{
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		overlays.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(data));
+		overlays.emplace_back<pipeline_t, render_data_t>(sortKey, std::move(data));
 	}
 
 	template <typename pipeline_t, typename render_data_t>
 	void renderOutline(const render_data_t& data)
 	{
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		outlines.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, data);
+		outlines.emplace_back<pipeline_t, render_data_t>(sortKey, data);
 	}
 
 	template <typename pipeline_t, typename render_data_t,
@@ -177,7 +177,7 @@ struct ldr_render_pass
 	void renderOutline(render_data_t&& data)
 	{
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		outlines.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(data));
+		outlines.emplace_back<pipeline_t, render_data_t>(sortKey, std::move(data));
 	}
 
 	default_render_command_buffer<uint64> ldrPass;
@@ -208,7 +208,7 @@ struct shadow_render_pass_base
 	void renderStaticObject(const render_data_t& renderData)
 	{
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		staticPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, renderData);
+		staticPass.emplace_back<pipeline_t, render_data_t>(sortKey, renderData);
 	}
 
 	template <typename pipeline_t, typename render_data_t,
@@ -216,14 +216,14 @@ struct shadow_render_pass_base
 	void renderStaticObject(render_data_t&& renderData)
 	{
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		staticPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(renderData));
+		staticPass.emplace_back<pipeline_t, render_data_t>(sortKey, std::move(renderData));
 	}
 
 	template <typename pipeline_t, typename render_data_t>
 	void renderDynamicObject(const render_data_t& renderData)
 	{
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		dynamicPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, renderData);
+		dynamicPass.emplace_back<pipeline_t, render_data_t>(sortKey, renderData);
 	}
 
 	template <typename pipeline_t, typename render_data_t,
@@ -231,7 +231,7 @@ struct shadow_render_pass_base
 	void renderDynamicObject(render_data_t&& renderData)
 	{
 		uint64 sortKey = (uint64)pipeline_t::setup;
-		dynamicPass.emplace_back<pipeline_t, render_command<render_data_t>>(sortKey, std::move(renderData));
+		dynamicPass.emplace_back<pipeline_t, render_data_t>(sortKey, std::move(renderData));
 	}
 
 	default_render_command_buffer<uint64> staticPass;
@@ -353,14 +353,14 @@ struct compute_pass
 	template <typename pipeline_t, typename render_data_t>
 	void addTask(compute_pass_event eventTime, const render_data_t& data)
 	{
-		passes[eventTime].emplace_back<pipeline_t, render_command<render_data_t>>(eventTime, data);
+		passes[eventTime].emplace_back<pipeline_t, render_data_t>(eventTime, data);
 	}
 
 	template <typename pipeline_t, typename render_data_t,
 		class = typename std::enable_if_t<!std::is_lvalue_reference_v<render_data_t>>>
 	void addTask(compute_pass_event eventTime, render_data_t&& data)
 	{
-		passes[eventTime].emplace_back<pipeline_t, render_command<render_data_t>>(eventTime, std::move(data));
+		passes[eventTime].emplace_back<pipeline_t, render_data_t>(eventTime, std::move(data));
 	}
 
 

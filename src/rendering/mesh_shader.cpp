@@ -132,8 +132,8 @@ PIPELINE_RENDER_IMPL(mesh_shader_blob_pipeline, mesh_shader_blob_render_data)
 
 	for (uint32 i = 0; i < BALL_COUNT; ++i)
 	{
-		float radius = rc.data.balls[i].radius;
-		cb.balls[i] = vec4(rc.data.balls[i].pos, radius * radius);
+		float radius = data.balls[i].radius;
+		cb.balls[i] = vec4(data.balls[i].pos, radius * radius);
 	}
 
 	auto b = dxContext.uploadDynamicConstantBuffer(cb);

@@ -295,14 +295,14 @@ PIPELINE_SETUP_IMPL(visualize_grid_pipeline)
 
 PIPELINE_RENDER_IMPL(visualize_grid_pipeline, visualize_grid_render_data)
 {
-	vec2 uvScale = 1.f / vec2((float)(rc.data.countX * rc.data.countY), (float)rc.data.countZ);
-	cl->setGraphics32BitConstants(LIGHT_PROBE_GRID_VISUALIZATION_RS_CB, light_probe_grid_visualization_cb{ viewProj * rc.data.transform, uvScale, rc.data.cellSize, rc.data.countX, rc.data.countY });
-	cl->setDescriptorHeapSRV(LIGHT_PROBE_GRID_VISUALIZATION_RS_IRRADIANCE, 0, rc.data.texture0);
+	vec2 uvScale = 1.f / vec2((float)(data.countX * data.countY), (float)data.countZ);
+	cl->setGraphics32BitConstants(LIGHT_PROBE_GRID_VISUALIZATION_RS_CB, light_probe_grid_visualization_cb{ viewProj * data.transform, uvScale, data.cellSize, data.countX, data.countY });
+	cl->setDescriptorHeapSRV(LIGHT_PROBE_GRID_VISUALIZATION_RS_IRRADIANCE, 0, data.texture0);
 
-	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
-	cl->setVertexBuffer(1, rc.data.vertexBuffer.others);
-	cl->setIndexBuffer(rc.data.indexBuffer);
-	cl->drawIndexed(rc.data.submesh.numIndices, rc.data.total, rc.data.submesh.firstIndex, rc.data.submesh.baseVertex, 0);
+	cl->setVertexBuffer(0, data.vertexBuffer.positions);
+	cl->setVertexBuffer(1, data.vertexBuffer.others);
+	cl->setIndexBuffer(data.indexBuffer);
+	cl->drawIndexed(data.submesh.numIndices, data.total, data.submesh.firstIndex, data.submesh.baseVertex, 0);
 }
 
 
@@ -336,15 +336,15 @@ PIPELINE_SETUP_IMPL(visualize_rays_pipeline)
 
 PIPELINE_RENDER_IMPL(visualize_rays_pipeline, visualize_rays_render_data)
 {
-	cl->setGraphics32BitConstants(LIGHT_PROBE_RAY_VISUALIZATION_RS_CB, light_probe_ray_visualization_cb{ viewProj * rc.data.transform, rc.data.cellSize, rc.data.countX, rc.data.countY });
-	cl->setDescriptorHeapSRV(LIGHT_PROBE_RAY_VISUALIZATION_RS_RAYS, 0, rc.data.texture0);
-	cl->setDescriptorHeapSRV(LIGHT_PROBE_RAY_VISUALIZATION_RS_RAYS, 1, rc.data.texture1);
+	cl->setGraphics32BitConstants(LIGHT_PROBE_RAY_VISUALIZATION_RS_CB, light_probe_ray_visualization_cb{ viewProj * data.transform, data.cellSize, data.countX, data.countY });
+	cl->setDescriptorHeapSRV(LIGHT_PROBE_RAY_VISUALIZATION_RS_RAYS, 0, data.texture0);
+	cl->setDescriptorHeapSRV(LIGHT_PROBE_RAY_VISUALIZATION_RS_RAYS, 1, data.texture1);
 
-	cl->transitionBarrier(rc.data.texture0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
-	cl->transitionBarrier(rc.data.texture1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
-	cl->draw(2, NUM_RAYS_PER_PROBE * rc.data.total, 0, 0);
-	cl->transitionBarrier(rc.data.texture0, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	cl->transitionBarrier(rc.data.texture1, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	cl->transitionBarrier(data.texture0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+	cl->transitionBarrier(data.texture1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+	cl->draw(2, NUM_RAYS_PER_PROBE * data.total, 0, 0);
+	cl->transitionBarrier(data.texture0, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	cl->transitionBarrier(data.texture1, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 }
 
 void light_probe_grid::visualize(opaque_render_pass* renderPass)

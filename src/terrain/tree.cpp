@@ -79,7 +79,7 @@ struct tree_pipeline
 
     PIPELINE_RENDER_DECL(tree_render_data)
     {
-        const auto& mat = rc.data.material;
+        const auto& mat = data.material;
 
         uint32 flags = 0;
 
@@ -111,15 +111,15 @@ struct tree_pipeline
 
 
 
-        const mat4 & m = rc.data.transform;
-        const submesh_info& submesh = rc.data.submesh;
+        const mat4 & m = data.transform;
+        const submesh_info& submesh = data.submesh;
 
         cl->setGraphics32BitConstants(TREE_RS_MVP, transform_cb{ viewProj, m });
-        cl->setGraphics32BitConstants(TREE_RS_CB, tree_cb{ rc.data.time });
+        cl->setGraphics32BitConstants(TREE_RS_CB, tree_cb{ data.time });
 
-        cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
-        cl->setVertexBuffer(1, rc.data.vertexBuffer.others);
-        cl->setIndexBuffer(rc.data.indexBuffer);
+        cl->setVertexBuffer(0, data.vertexBuffer.positions);
+        cl->setVertexBuffer(1, data.vertexBuffer.others);
+        cl->setIndexBuffer(data.indexBuffer);
         cl->drawIndexed(submesh.numIndices, 1, submesh.firstIndex, submesh.baseVertex, 0);
     }
 };

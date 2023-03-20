@@ -194,30 +194,30 @@ PIPELINE_RENDER_IMPL(terrain_pipeline, terrain_render_data)
 {
 	PROFILE_ALL(cl, "Terrain");
 
-	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> rc.data.common.lod;
+	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> data.common.lod;
 	uint32 numTris = numSegmentsPerDim * numSegmentsPerDim * 2;
 
-	auto cb = getTerrainCB(rc.data.common);
+	auto cb = getTerrainCB(data.common);
 
 	cl->setGraphics32BitConstants(TERRAIN_RS_TRANSFORM, viewProj);
 	cl->setGraphics32BitConstants(TERRAIN_RS_CB, cb);
-	cl->setGraphicsDynamicConstantBuffer(TERRAIN_RS_WATER, rc.data.waterPlanesCBV);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_HEIGHTMAP, 0, rc.data.common.heightmap);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_NORMALMAP, 0, rc.data.normalmap);
+	cl->setGraphicsDynamicConstantBuffer(TERRAIN_RS_WATER, data.waterPlanesCBV);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_HEIGHTMAP, 0, data.common.heightmap);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_NORMALMAP, 0, data.normalmap);
 
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 0, rc.data.groundMaterial->albedo ? rc.data.groundMaterial->albedo : render_resources::blackTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 1, rc.data.groundMaterial->normal ? rc.data.groundMaterial->normal : render_resources::defaultNormalMap);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 2, rc.data.groundMaterial->roughness ? rc.data.groundMaterial->roughness : render_resources::whiteTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 0, data.groundMaterial->albedo ? data.groundMaterial->albedo : render_resources::blackTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 1, data.groundMaterial->normal ? data.groundMaterial->normal : render_resources::defaultNormalMap);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 2, data.groundMaterial->roughness ? data.groundMaterial->roughness : render_resources::whiteTexture);
 
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 3, rc.data.rockMaterial->albedo ? rc.data.rockMaterial->albedo : render_resources::blackTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 4, rc.data.rockMaterial->normal ? rc.data.rockMaterial->normal : render_resources::defaultNormalMap);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 5, rc.data.rockMaterial->roughness ? rc.data.rockMaterial->roughness : render_resources::whiteTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 3, data.rockMaterial->albedo ? data.rockMaterial->albedo : render_resources::blackTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 4, data.rockMaterial->normal ? data.rockMaterial->normal : render_resources::defaultNormalMap);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 5, data.rockMaterial->roughness ? data.rockMaterial->roughness : render_resources::whiteTexture);
 
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 6, rc.data.mudMaterial->albedo ? rc.data.mudMaterial->albedo : render_resources::blackTexture);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 7, rc.data.mudMaterial->normal ? rc.data.mudMaterial->normal : render_resources::defaultNormalMap);
-	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 8, rc.data.mudMaterial->roughness ? rc.data.mudMaterial->roughness : render_resources::whiteTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 6, data.mudMaterial->albedo ? data.mudMaterial->albedo : render_resources::blackTexture);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 7, data.mudMaterial->normal ? data.mudMaterial->normal : render_resources::defaultNormalMap);
+	cl->setDescriptorHeapSRV(TERRAIN_RS_TEXTURES, 8, data.mudMaterial->roughness ? data.mudMaterial->roughness : render_resources::whiteTexture);
 
-	cl->setIndexBuffer(terrainIndexBuffers[rc.data.common.lod]);
+	cl->setIndexBuffer(terrainIndexBuffers[data.common.lod]);
 	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);
 }
 
@@ -236,17 +236,17 @@ DEPTH_ONLY_RENDER_IMPL(terrain_depth_prepass_pipeline, terrain_render_data_commo
 {
 	PROFILE_ALL(cl, "Terrain depth prepass");
 
-	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> rc.data.lod;
+	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> data.lod;
 	uint32 numTris = numSegmentsPerDim * numSegmentsPerDim * 2;
 
-	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_OBJECT_ID, rc.data.objectID);
+	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_OBJECT_ID, data.objectID);
 	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_TRANSFORM, depth_only_transform_cb{ viewProj, prevFrameViewProj });
 
-	auto cb = getTerrainCB(rc.data);
+	auto cb = getTerrainCB(data);
 	cl->setGraphics32BitConstants(TERRAIN_DEPTH_ONLY_RS_CB, cb);
-	cl->setDescriptorHeapSRV(TERRAIN_DEPTH_ONLY_RS_HEIGHTMAP, 0, rc.data.heightmap);
+	cl->setDescriptorHeapSRV(TERRAIN_DEPTH_ONLY_RS_HEIGHTMAP, 0, data.heightmap);
 
-	cl->setIndexBuffer(terrainIndexBuffers[rc.data.lod]);
+	cl->setIndexBuffer(terrainIndexBuffers[data.lod]);
 	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);
 }
 
@@ -263,15 +263,15 @@ PIPELINE_RENDER_IMPL(terrain_shadow_pipeline, terrain_render_data_common)
 {
 	PROFILE_ALL(cl, "Terrain shadow");
 
-	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> rc.data.lod;
+	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> data.lod;
 	uint32 numTris = numSegmentsPerDim * numSegmentsPerDim * 2;
 
 	cl->setGraphics32BitConstants(TERRAIN_SHADOW_RS_TRANSFORM, viewProj);
-	auto cb = getTerrainCB(rc.data);
+	auto cb = getTerrainCB(data);
 	cl->setGraphics32BitConstants(TERRAIN_SHADOW_RS_CB, cb);
-	cl->setDescriptorHeapSRV(TERRAIN_SHADOW_RS_HEIGHTMAP, 0, rc.data.heightmap);
+	cl->setDescriptorHeapSRV(TERRAIN_SHADOW_RS_HEIGHTMAP, 0, data.heightmap);
 
-	cl->setIndexBuffer(terrainIndexBuffers[rc.data.lod]);
+	cl->setIndexBuffer(terrainIndexBuffers[data.lod]);
 	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);
 }
 
@@ -288,16 +288,16 @@ PIPELINE_RENDER_IMPL(terrain_outline_pipeline, terrain_render_data_common)
 {
 	PROFILE_ALL(cl, "Terrain outline");
 
-	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> rc.data.lod;
+	uint32 numSegmentsPerDim = (TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1) >> data.lod;
 	uint32 numTris = numSegmentsPerDim * numSegmentsPerDim * 2;
 
 	cl->setGraphics32BitConstants(TERRAIN_OUTLINE_RS_TRANSFORM, terrain_transform_cb{ viewProj });
 
-	auto cb = getTerrainCB(rc.data);
+	auto cb = getTerrainCB(data);
 	cl->setGraphics32BitConstants(TERRAIN_OUTLINE_RS_CB, cb);
-	cl->setDescriptorHeapSRV(TERRAIN_OUTLINE_RS_HEIGHTMAP, 0, rc.data.heightmap);
+	cl->setDescriptorHeapSRV(TERRAIN_OUTLINE_RS_HEIGHTMAP, 0, data.heightmap);
 
-	cl->setIndexBuffer(terrainIndexBuffers[rc.data.lod]);
+	cl->setIndexBuffer(terrainIndexBuffers[data.lod]);
 	cl->drawIndexed(numTris * 3, 1, 0, 0, 0);
 }
 

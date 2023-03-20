@@ -57,44 +57,44 @@ struct skinning_pipeline
 	{
 		PROFILE_ALL(cl, "Skinning");
 
-		if (rc.data.numCalls)
+		if (data.numCalls)
 		{
 			PROFILE_ALL(cl, "Skeletal");
 
-			mat4* mats = (mat4*)mapBuffer(rc.data.skinningMatricesBuffer, false);
-			memcpy(mats + rc.data.matrixOffset, rc.data.skinningMatrices, sizeof(mat4) * rc.data.numSkinningMatrices);
-			unmapBuffer(rc.data.skinningMatricesBuffer, true, map_range{ rc.data.matrixOffset, rc.data.numSkinningMatrices });
+			mat4* mats = (mat4*)mapBuffer(data.skinningMatricesBuffer, false);
+			memcpy(mats + data.matrixOffset, data.skinningMatrices, sizeof(mat4) * data.numSkinningMatrices);
+			unmapBuffer(data.skinningMatricesBuffer, true, map_range{ data.matrixOffset, data.numSkinningMatrices });
 
 
 			cl->setPipelineState(*skinningPipeline.pipeline);
 			cl->setComputeRootSignature(*skinningPipeline.rootSignature);
 
-			cl->setRootComputeSRV(SKINNING_RS_MATRICES, rc.data.skinningMatricesBuffer->gpuVirtualAddress + sizeof(mat4) * rc.data.matrixOffset);
-			cl->setRootComputeUAV(SKINNING_RS_OUTPUT0, rc.data.skinnedVertexBuffer.positions);
-			cl->setRootComputeUAV(SKINNING_RS_OUTPUT1, rc.data.skinnedVertexBuffer.others);
+			cl->setRootComputeSRV(SKINNING_RS_MATRICES, data.skinningMatricesBuffer->gpuVirtualAddress + sizeof(mat4) * data.matrixOffset);
+			cl->setRootComputeUAV(SKINNING_RS_OUTPUT0, data.skinnedVertexBuffer.positions);
+			cl->setRootComputeUAV(SKINNING_RS_OUTPUT1, data.skinnedVertexBuffer.others);
 
-			for (uint32 i = 0; i < rc.data.numCalls; ++i)
+			for (uint32 i = 0; i < data.numCalls; ++i)
 			{
-				auto& c = rc.data.calls[i];
+				auto& c = data.calls[i];
 				cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER0, c.vertexBuffer.positions.view.BufferLocation);
 				cl->setRootComputeSRV(SKINNING_RS_INPUT_VERTEX_BUFFER1, c.vertexBuffer.others.view.BufferLocation);
 				cl->setCompute32BitConstants(SKINNING_RS_CB, skinning_cb{ c.jointOffset, c.numJoints, c.range.firstVertex, c.range.numVertices, c.vertexOffset });
 				cl->dispatch(bucketize(c.range.numVertices, 512));
 			}
 		}
-		if (rc.data.numClothCalls)
+		if (data.numClothCalls)
 		{
 			PROFILE_ALL(cl, "Cloth");
 
 			cl->setPipelineState(*clothSkinningPipeline.pipeline);
 			cl->setComputeRootSignature(*clothSkinningPipeline.rootSignature);
 
-			cl->setRootComputeUAV(CLOTH_SKINNING_RS_OUTPUT0, rc.data.skinnedVertexBuffer.positions);
-			cl->setRootComputeUAV(CLOTH_SKINNING_RS_OUTPUT1, rc.data.skinnedVertexBuffer.others);
+			cl->setRootComputeUAV(CLOTH_SKINNING_RS_OUTPUT0, data.skinnedVertexBuffer.positions);
+			cl->setRootComputeUAV(CLOTH_SKINNING_RS_OUTPUT1, data.skinnedVertexBuffer.others);
 
-			for (uint32 i = 0; i < rc.data.numClothCalls; ++i)
+			for (uint32 i = 0; i < data.numClothCalls; ++i)
 			{
-				auto& c = rc.data.clothCalls[i];
+				auto& c = data.clothCalls[i];
 				cl->setRootComputeSRV(CLOTH_SKINNING_RS_INPUT, c.vertexBuffer.view.BufferLocation);
 				cl->setCompute32BitConstants(CLOTH_SKINNING_RS_CB, cloth_skinning_cb{ c.gridSizeX, c.gridSizeY, c.vertexOffset });
 				cl->dispatch(bucketize(c.gridSizeX, 15), bucketize(c.gridSizeY, 15)); // 15 is correct here.
@@ -103,8 +103,8 @@ struct skinning_pipeline
 
 		// Not necessary, since the command list ends here.
 		//barrier_batcher(cl)
-		//	.uav(rc.data.skinnedVertexBuffer.positions)
-		//	.uav(rc.data.skinnedVertexBuffer.others);
+		//	.uav(data.skinnedVertexBuffer.positions)
+		//	.uav(data.skinnedVertexBuffer.others);
 	}
 };
 

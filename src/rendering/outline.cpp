@@ -50,11 +50,11 @@ struct outline_pipeline
 
 	PIPELINE_RENDER_DECL(outline_render_data)
 	{
-		cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * rc.data.transform });
+		cl->setGraphics32BitConstants(OUTLINE_RS_MVP, outline_marker_cb{ viewProj * data.transform });
 
-		cl->setVertexBuffer(0, rc.data.vertexBuffer);
-		cl->setIndexBuffer(rc.data.indexBuffer);
-		cl->drawIndexed(rc.data.submesh.numIndices, 1, rc.data.submesh.firstIndex, rc.data.submesh.baseVertex, 0);
+		cl->setVertexBuffer(0, data.vertexBuffer);
+		cl->setIndexBuffer(data.indexBuffer);
+		cl->drawIndexed(data.submesh.numIndices, 1, data.submesh.firstIndex, data.submesh.baseVertex, 0);
 	}
 };
 

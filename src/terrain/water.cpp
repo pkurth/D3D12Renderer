@@ -85,15 +85,15 @@ PIPELINE_RENDER_IMPL(water_pipeline, water_render_data)
 	PROFILE_ALL(cl, "Water");
 
 	water_cb cb;
-	cb.deepColor = rc.data.settings.deepWaterColor;
-	cb.shallowColor = rc.data.settings.shallowWaterColor;
-	cb.shallowDepth = rc.data.settings.shallowDepth;
-	cb.transitionStrength = rc.data.settings.transitionStrength;
-	cb.uvOffset = normalize(vec2(1.f, 1.f)) * rc.data.time * 0.05f;
-	cb.uvScale = rc.data.settings.uvScale;
-	cb.normalmapStrength = rc.data.settings.normalStrength;
+	cb.deepColor = data.settings.deepWaterColor;
+	cb.shallowColor = data.settings.shallowWaterColor;
+	cb.shallowDepth = data.settings.shallowDepth;
+	cb.transitionStrength = data.settings.transitionStrength;
+	cb.uvOffset = normalize(vec2(1.f, 1.f)) * data.time * 0.05f;
+	cb.uvScale = data.settings.uvScale;
+	cb.normalmapStrength = data.settings.normalStrength;
 
-	cl->setGraphics32BitConstants(WATER_RS_TRANSFORM, transform_cb{ viewProj * rc.data.m, rc.data.m });
+	cl->setGraphics32BitConstants(WATER_RS_TRANSFORM, transform_cb{ viewProj * data.m, data.m });
 	cl->setGraphics32BitConstants(WATER_RS_SETTINGS, cb);
 	cl->draw(4, 1, 0, 0);
 }

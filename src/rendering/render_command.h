@@ -13,19 +13,6 @@ struct particle_draw_info
 	uint32 rootParameterOffset;
 };
 
-
-template <typename render_data_t>
-struct render_command
-{
-	render_data_t data;
-
-	render_command() {}
-	render_command(const render_data_t& data)
-		: data(data) {}
-	render_command(render_data_t&& data)
-		: data(data) {}
-};
-
 template <typename render_data_t>
 struct particle_render_command
 {

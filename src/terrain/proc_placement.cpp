@@ -88,11 +88,11 @@ PIPELINE_SETUP_IMPL(render_proc_placement_layer_pipeline)
 
 PIPELINE_RENDER_IMPL(render_proc_placement_layer_pipeline, render_proc_placement_layer_data)
 {
-	cl->setVertexBuffer(0, rc.data.vertexBuffer.positions);
-	cl->setVertexBuffer(1, rc.data.vertexBuffer.others);
-	cl->setIndexBuffer(rc.data.indexBuffer);
-	cl->setDescriptorHeapSRV(2, 0, rc.data.albedo);
-	cl->drawIndirect(visualizePointsCommandSignature, 1, rc.data.commandBuffer, rc.data.commandBufferOffset * sizeof(placement_draw));
+	cl->setVertexBuffer(0, data.vertexBuffer.positions);
+	cl->setVertexBuffer(1, data.vertexBuffer.others);
+	cl->setIndexBuffer(data.indexBuffer);
+	cl->setDescriptorHeapSRV(2, 0, data.albedo);
+	cl->drawIndirect(visualizePointsCommandSignature, 1, data.commandBuffer, data.commandBufferOffset * sizeof(placement_draw));
 }
 
 

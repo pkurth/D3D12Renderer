@@ -149,7 +149,7 @@ struct grass_pipeline
 	PIPELINE_RENDER_DECL(grass_render_data)
 	{
 		PROFILE_ALL(cl, "Grass");
-		::render(cl, rc.data, GRASS_RS_CB, GRASS_RS_BLADES);
+		::render(cl, data, GRASS_RS_CB, GRASS_RS_BLADES);
 	}
 };
 
@@ -168,8 +168,8 @@ struct grass_depth_prepass_pipeline
 	{
 		PROFILE_ALL(cl, "Grass depth prepass");
 
-		cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_OBJECT_ID, rc.data.objectID);
-		::render(cl, rc.data, GRASS_DEPTH_ONLY_RS_CB, GRASS_DEPTH_ONLY_RS_BLADES);
+		cl->setGraphics32BitConstants(GRASS_DEPTH_ONLY_RS_OBJECT_ID, data.objectID);
+		::render(cl, data, GRASS_DEPTH_ONLY_RS_CB, GRASS_DEPTH_ONLY_RS_BLADES);
 	}
 };
 
@@ -184,8 +184,8 @@ struct grass_no_depth_prepass_pipeline
 	{
 		PROFILE_ALL(cl, "Grass");
 		
-		cl->setGraphics32BitConstants(GRASS_RS_OBJECT_ID, rc.data.objectID);
-		::render(cl, rc.data, GRASS_RS_CB, GRASS_RS_BLADES);
+		cl->setGraphics32BitConstants(GRASS_RS_OBJECT_ID, data.objectID);
+		::render(cl, data, GRASS_RS_CB, GRASS_RS_BLADES);
 	}
 };
 
@@ -231,52 +231,52 @@ struct grass_update_pipeline
 			cl->setPipelineState(*grassGenerationPipeline.pipeline);
 			cl->setComputeRootSignature(*grassGenerationPipeline.rootSignature);
 
-			vec3 minCorner = rc.data.minCorner;
-			vec3 chunkSize(rc.data.chunkSize, rc.data.amplitudeScale, rc.data.chunkSize);
+			vec3 minCorner = data.minCorner;
+			vec3 chunkSize(data.chunkSize, data.amplitudeScale, data.chunkSize);
 
-			cl->clearUAV(rc.data.countBuffer, 0u);
+			cl->clearUAV(data.countBuffer, 0u);
 
 
-			uint32 numGrassBladesPerDim = rc.data.settings.numGrassBladesPerChunkDim & (~1); // Make sure this is an even number.
+			uint32 numGrassBladesPerDim = data.settings.numGrassBladesPerChunkDim & (~1); // Make sure this is an even number.
 			numGrassBladesPerDim = min(numGrassBladesPerDim, 1024u);
-			const float lodChangeEndDistance = rc.data.settings.lodChangeStartDistance + rc.data.settings.lodChangeTransitionDistance;
-			const float cullEndDistance = rc.data.settings.cullStartDistance + rc.data.settings.cullTransitionDistance;
+			const float lodChangeEndDistance = data.settings.lodChangeStartDistance + data.settings.lodChangeTransitionDistance;
+			const float cullEndDistance = data.settings.cullStartDistance + data.settings.cullTransitionDistance;
 
 			grass_generation_common_cb common;
-			memcpy(common.frustumPlanes, rc.data.cameraFrustum.planes, sizeof(vec4) * 6);
-			common.amplitudeScale = rc.data.amplitudeScale;
-			common.chunkSize = rc.data.chunkSize;
-			common.cameraPosition = rc.data.cameraPosition;
-			common.lodChangeStartDistance = rc.data.settings.lodChangeStartDistance;
+			memcpy(common.frustumPlanes, data.cameraFrustum.planes, sizeof(vec4) * 6);
+			common.amplitudeScale = data.amplitudeScale;
+			common.chunkSize = data.chunkSize;
+			common.cameraPosition = data.cameraPosition;
+			common.lodChangeStartDistance = data.settings.lodChangeStartDistance;
 			common.lodChangeEndDistance = lodChangeEndDistance;
-			common.cullStartDistance = rc.data.settings.cullStartDistance;
+			common.cullStartDistance = data.settings.cullStartDistance;
 			common.cullEndDistance = cullEndDistance;
 			common.uvScale = 1.f / numGrassBladesPerDim;
-			common.baseHeight = rc.data.settings.bladeHeight;
-			common.time = rc.data.time;
-			common.prevFrameTime = rc.data.prevTime;
+			common.baseHeight = data.settings.bladeHeight;
+			common.time = data.time;
+			common.prevFrameTime = data.prevTime;
 
 			auto commonCBV = dxContext.uploadDynamicConstantBuffer(common);
 			cl->setComputeDynamicConstantBuffer(GRASS_GENERATION_RS_COMMON, commonCBV);
 
 
-			for (uint32 z = 0; z < rc.data.chunksPerDim; ++z)
+			for (uint32 z = 0; z < data.chunksPerDim; ++z)
 			{
-				for (uint32 x = 0; x < rc.data.chunksPerDim; ++x)
+				for (uint32 x = 0; x < data.chunksPerDim; ++x)
 				{
-					auto& chunk = rc.data.chunks[z * rc.data.chunksPerDim + x];
-					vec3 chunkMinCorner = minCorner + vec3(x * rc.data.chunkSize, 0.f, z * rc.data.chunkSize);
+					auto& chunk = data.chunks[z * data.chunksPerDim + x];
+					vec3 chunkMinCorner = minCorner + vec3(x * data.chunkSize, 0.f, z * data.chunkSize);
 					vec3 chunkMaxCorner = chunkMinCorner + chunkSize;
 
 					bounding_box aabb = { chunkMinCorner, chunkMaxCorner };
-					if (!rc.data.cameraFrustum.cullWorldSpaceAABB(aabb))
+					if (!data.cameraFrustum.cullWorldSpaceAABB(aabb))
 					{
 						uint32 chunkNumGrassBladesPerDim = numGrassBladesPerDim;
 						uint32 lodIndex = 0;
 
-						float sqDistance = pointInBox(rc.data.cameraPosition, aabb.minCorner, aabb.maxCorner)
+						float sqDistance = pointInBox(data.cameraPosition, aabb.minCorner, aabb.maxCorner)
 							? 0.f
-							: squaredLength(rc.data.cameraPosition - closestPoint_PointAABB(rc.data.cameraPosition, aabb));
+							: squaredLength(data.cameraPosition - closestPoint_PointAABB(data.cameraPosition, aabb));
 						if (sqDistance > lodChangeEndDistance * lodChangeEndDistance)
 						{
 							chunkNumGrassBladesPerDim /= 2;
@@ -289,24 +289,24 @@ struct grass_update_pipeline
 
 						cl->setDescriptorHeapSRV(GRASS_GENERATION_RS_RESOURCES, 0, chunk.heightmap);
 						cl->setDescriptorHeapSRV(GRASS_GENERATION_RS_RESOURCES, 1, chunk.normalmap);
-						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 2, rc.data.bladeBufferLOD0);
-						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 3, rc.data.bladeBufferLOD1);
-						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 4, rc.data.countBuffer);
+						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 2, data.bladeBufferLOD0);
+						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 3, data.bladeBufferLOD1);
+						cl->setDescriptorHeapUAV(GRASS_GENERATION_RS_RESOURCES, 4, data.countBuffer);
 
 						cl->setCompute32BitConstants(GRASS_GENERATION_RS_CB, grass_generation_cb{ chunkMinCorner, lodIndex });
 
 						cl->dispatch(bucketize(chunkNumGrassBladesPerDim, GRASS_GENERATION_BLOCK_SIZE), bucketize(chunkNumGrassBladesPerDim, GRASS_GENERATION_BLOCK_SIZE), 1);
 
 						//barrier_batcher(cl)
-						//	.uav(rc.data.bladeBufferLOD0)
-						//	.uav(rc.data.bladeBufferLOD1)
-						//	.uav(rc.data.countBuffer);
+						//	.uav(data.bladeBufferLOD0)
+						//	.uav(data.bladeBufferLOD1)
+						//	.uav(data.countBuffer);
 					}
 				}
 			}
 		}
 
-		cl->transitionBarrier(rc.data.countBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		cl->transitionBarrier(data.countBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
 		{
 			PROFILE_ALL(cl, "Create draw calls");
@@ -314,11 +314,11 @@ struct grass_update_pipeline
 			cl->setPipelineState(*grassCreateDrawCallsPipeline.pipeline);
 			cl->setComputeRootSignature(*grassCreateDrawCallsPipeline.rootSignature);
 
-			cl->setCompute32BitConstants(GRASS_CREATE_DRAW_CALLS_RS_CB, grass_create_draw_calls_cb{ rc.data.bladeBufferLOD0->elementCount });
-			cl->setRootComputeUAV(GRASS_CREATE_DRAW_CALLS_RS_OUTPUT, rc.data.drawBuffer);
-			cl->setRootComputeSRV(GRASS_CREATE_DRAW_CALLS_RS_MESH_COUNTS, rc.data.countBuffer);
+			cl->setCompute32BitConstants(GRASS_CREATE_DRAW_CALLS_RS_CB, grass_create_draw_calls_cb{ data.bladeBufferLOD0->elementCount });
+			cl->setRootComputeUAV(GRASS_CREATE_DRAW_CALLS_RS_OUTPUT, data.drawBuffer);
+			cl->setRootComputeSRV(GRASS_CREATE_DRAW_CALLS_RS_MESH_COUNTS, data.countBuffer);
 
-			cl->dispatch(bucketize(rc.data.drawBuffer->elementCount, GRASS_CREATE_DRAW_CALLS_BLOCK_SIZE));
+			cl->dispatch(bucketize(data.drawBuffer->elementCount, GRASS_CREATE_DRAW_CALLS_BLOCK_SIZE));
 		}
 	}
 };
