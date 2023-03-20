@@ -6,8 +6,6 @@
 
 #include "light_source.hlsli"
 
-#define SHADOW_MAP_NEGATIVE_Z_OFFSET 500.f
-
 struct directional_light
 {
 	vec3 color;
@@ -24,6 +22,8 @@ struct directional_light
 
 	vec4 blendDistances;
 	uint32 shadowDimensions = 2048;
+
+	float negativeZOffset = 500.f;
 
 	bool stabilize;
 

@@ -87,7 +87,7 @@ void directional_light::updateMatrices(const render_camera& camera)
 
 		//viewMatrix = lookAt(shadowCamPos, shadowCamPos + direction, upDir);
 
-		mat4 projMatrix = createOrthographicProjectionMatrix(maxExtents.x, minExtents.x, maxExtents.y, minExtents.y, -SHADOW_MAP_NEGATIVE_Z_OFFSET, cascadeExtents.z);
+		mat4 projMatrix = createOrthographicProjectionMatrix(maxExtents.x, minExtents.x, maxExtents.y, minExtents.y, -negativeZOffset, cascadeExtents.z);
 
 		//if (stabilize)
 		{
