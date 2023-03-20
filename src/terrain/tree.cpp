@@ -33,7 +33,7 @@ void initializeTreePipelines()
 
 struct tree_render_data
 {
-    mat4 transform;
+    D3D12_GPU_VIRTUAL_ADDRESS transformPtr;
     dx_vertex_buffer_group_view vertexBuffer;
     dx_index_buffer_view indexBuffer;
     submesh_info submesh;
@@ -41,6 +41,8 @@ struct tree_render_data
     ref<pbr_material> material;
 
     float time;
+
+    uint32 numInstances;
 };
 
 struct tree_pipeline
@@ -111,27 +113,25 @@ struct tree_pipeline
 
 
 
-        const mat4 & m = data.transform;
         const submesh_info& submesh = data.submesh;
 
-        cl->setGraphics32BitConstants(TREE_RS_MVP, transform_cb{ viewProj, m });
+        cl->setRootGraphicsSRV(TREE_RS_TRANSFORM, data.transformPtr);
         cl->setGraphics32BitConstants(TREE_RS_CB, tree_cb{ data.time });
 
         cl->setVertexBuffer(0, data.vertexBuffer.positions);
         cl->setVertexBuffer(1, data.vertexBuffer.others);
         cl->setIndexBuffer(data.indexBuffer);
-        cl->drawIndexed(submesh.numIndices, 1, submesh.firstIndex, submesh.baseVertex, 0);
+        cl->drawIndexed(submesh.numIndices, data.numInstances, submesh.firstIndex, submesh.baseVertex, 0);
     }
 };
 
-void tree_component::render(opaque_render_pass* renderPass, const trs& transform, const ref<multi_mesh>& mesh, float dt)
+void renderTree(opaque_render_pass* renderPass, D3D12_GPU_VIRTUAL_ADDRESS transforms, uint32 numInstances, const multi_mesh* mesh, float dt)
 {
     static float time = 0.f;
     time += dt;
 
 
     const dx_mesh& dxMesh = mesh->mesh;
-    mat4 m = trsToMat4(transform);
 
     for (auto& sm : mesh->submeshes)
     {
@@ -139,12 +139,13 @@ void tree_component::render(opaque_render_pass* renderPass, const trs& transform
         const ref<pbr_material>& material = sm.material;
 
         tree_render_data data;
-        data.transform = m;
+        data.transformPtr = transforms;
         data.vertexBuffer = dxMesh.vertexBuffer;
         data.indexBuffer = dxMesh.indexBuffer;
         data.submesh = submesh;
         data.material = material;
         data.time = time;
+        data.numInstances = numInstances;
 
         renderPass->renderObject<tree_pipeline>(data);
     }

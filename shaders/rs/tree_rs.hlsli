@@ -13,10 +13,10 @@ struct tree_cb
     "DENY_HULL_SHADER_ROOT_ACCESS |" \
     "DENY_DOMAIN_SHADER_ROOT_ACCESS |" \
     "DENY_GEOMETRY_SHADER_ROOT_ACCESS)," \
-    "RootConstants(num32BitConstants=32, b0, visibility=SHADER_VISIBILITY_VERTEX), " \
+    "SRV(t0, visibility=SHADER_VISIBILITY_VERTEX), " \
     "RootConstants(num32BitConstants=1, b1, visibility=SHADER_VISIBILITY_VERTEX), " \
     "RootConstants(num32BitConstants=6, b0, space=1, visibility=SHADER_VISIBILITY_PIXEL),"  \
-    "CBV(b1, space=1, visibility=SHADER_VISIBILITY_PIXEL), " \
+    "CBV(b1, space=1), " \
     "CBV(b2, space=1, visibility=SHADER_VISIBILITY_PIXEL),"  \
     "DescriptorTable(SRV(t0, numDescriptors=4, space=1), visibility=SHADER_VISIBILITY_PIXEL), " \
     "DescriptorTable(SRV(t0, space=2, numDescriptors=17), visibility=SHADER_VISIBILITY_PIXEL), " \
@@ -40,7 +40,7 @@ struct tree_cb
         "visibility=SHADER_VISIBILITY_PIXEL)"
 
 
-#define TREE_RS_MVP	                0
+#define TREE_RS_TRANSFORM	        0
 #define TREE_RS_CB                  1
 #define TREE_RS_MATERIAL            2
 #define TREE_RS_CAMERA              3

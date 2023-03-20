@@ -2,7 +2,6 @@
 #include "camera.hlsli"
 
 StructuredBuffer<float4x4> transforms	: register(t0);
-StructuredBuffer<float4x4> mvps			: register(t1);
 ConstantBuffer<camera_cb> camera		: register(b1, space1);
 
 struct vs_input

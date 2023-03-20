@@ -1,8 +1,10 @@
 #include "tree_rs.hlsli"
 #include "random.hlsli"
+#include "camera.hlsli"
 
-ConstantBuffer<transform_cb> transform	: register(b0);
+StructuredBuffer<float4x4> transforms	: register(t0);
 ConstantBuffer<tree_cb> cb				: register(b1);
+ConstantBuffer<camera_cb> camera		: register(b1, space1);
 
 struct vs_input
 {
@@ -11,6 +13,8 @@ struct vs_input
 	float3 normal		: NORMAL;
 	float3 tangent		: TANGENT;
 	float4 color		: COLOR;
+
+	uint instanceID		: SV_InstanceID;
 };
 
 struct vs_output
@@ -34,8 +38,8 @@ vs_output main(vs_input IN)
 
 	// Actually movement vector is pushed around by wind vector (stateful).
 
-
-	float3 worldPosition = (mul(transform.m, float4(IN.position, 1.f))).xyz;
+	float4x4 m = transforms[IN.instanceID];
+	float4 worldPosition = mul(m, float4(IN.position, 1.f));
 
 	float trunkSwing = fbm(cb.time * 0.1f, 2).x * 0.4f + 0.6f;
 	float2 trunkMovement = windDirection * (movementScale * trunkSwing * pow(treeDistances.x, bend));
@@ -53,13 +57,13 @@ vs_output main(vs_input IN)
 
 
 	vs_output OUT;
-	OUT.position = mul(transform.mvp, float4(worldPosition, 1.f));
+	OUT.position = mul(camera.viewProj, worldPosition);
 
 	OUT.uv = IN.uv;
-	OUT.worldPosition = worldPosition;
+	OUT.worldPosition = worldPosition.xyz;
 
-	float3 normal = normalize(mul(transform.m, float4(IN.normal, 0.f)).xyz);
-	float3 tangent = normalize(mul(transform.m, float4(IN.tangent, 0.f)).xyz);
+	float3 normal = normalize(mul(m, float4(IN.normal, 0.f)).xyz);
+	float3 tangent = normalize(mul(m, float4(IN.tangent, 0.f)).xyz);
 	float3 bitangent = normalize(cross(normal, tangent));
 	OUT.tbn = float3x3(tangent, bitangent, normal);
 

@@ -9,6 +9,8 @@
 
 #include "dx/dx_context.h"
 
+#include "physics/cloth.h"
+
 
 struct offset_count
 {
@@ -264,7 +266,6 @@ static void renderAnimatedObjects(game_scene& scene, memory_arena& arena, entity
 
 	uint32 groupSize = (uint32)group.size();
 
-
 	dx_allocation transformAllocation = dxContext.allocateDynamicBuffer(groupSize * sizeof(mat4) * 2, 4);
 	mat4* transforms = (mat4*)transformAllocation.cpuPtr;
 	mat4* prevFrameTransforms = transforms + groupSize;
@@ -339,11 +340,133 @@ static void renderAnimatedObjects(game_scene& scene, memory_arena& arena, entity
 	}
 }
 
-void renderScene(game_scene& scene, memory_arena& arena, entity_handle selectedObjectID,
+static void renderTrees(game_scene& scene, memory_arena& arena, entity_handle selectedObjectID,
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass,
+	float dt)
+{
+	auto group = scene.group(
+		component_group<transform_component, mesh_component, tree_component>);
+
+
+	std::unordered_map<multi_mesh*, offset_count> ocPerMesh = getOffsetsPerMesh(group);
+
+	uint32 groupSize = (uint32)group.size();
+
+	dx_allocation transformAllocation = dxContext.allocateDynamicBuffer(groupSize * sizeof(mat4), 4);
+	mat4* transforms = (mat4*)transformAllocation.cpuPtr;
+
+	dx_allocation objectIDAllocation = dxContext.allocateDynamicBuffer(groupSize * sizeof(uint32), 4);
+	uint32* objectIDs = (uint32*)objectIDAllocation.cpuPtr;
+
+	for (auto [entityHandle, transform, mesh, tree] : group.each())
+	{
+		if (!mesh.mesh)
+		{
+			continue;
+		}
+
+		const dx_mesh& dxMesh = mesh.mesh->mesh;
+
+		offset_count& oc = ocPerMesh.at(mesh.mesh.get());
+
+		uint32 index = oc.offset + oc.count;
+		transforms[index] = trsToMat4(transform);
+		objectIDs[index] = (uint32)entityHandle;
+
+		++oc.count;
+
+
+		if (entityHandle == selectedObjectID)
+		{
+			for (auto& sm : mesh.mesh->submeshes)
+			{
+				renderOutline(ldrRenderPass, transforms[index], dxMesh.vertexBuffer, dxMesh.indexBuffer, sm.info);
+			}
+		}
+	}
+
+
+	D3D12_GPU_VIRTUAL_ADDRESS transformsAddress = transformAllocation.gpuPtr;
+	D3D12_GPU_VIRTUAL_ADDRESS objectIDAddress = objectIDAllocation.gpuPtr;
+
+	for (auto& [mesh, oc] : ocPerMesh)
+	{
+		D3D12_GPU_VIRTUAL_ADDRESS baseM = transformsAddress + (oc.offset * sizeof(mat4));
+		D3D12_GPU_VIRTUAL_ADDRESS baseObjectID = objectIDAddress + (oc.offset * sizeof(uint32));
+
+		renderTree(opaqueRenderPass, baseM, oc.count, mesh, dt);
+	}
+}
+
+static void renderCloth(game_scene& scene, entity_handle selectedObjectID, 
 	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass)
+{
+	auto group = scene.group(
+		component_group<cloth_component, cloth_render_component>);
+
+	uint32 groupSize = (uint32)group.size();
+
+	dx_allocation transformAllocation = dxContext.allocateDynamicBuffer(1 * sizeof(mat4), 4);
+	*(mat4*)transformAllocation.cpuPtr = mat4::identity;
+
+	dx_allocation objectIDAllocation = dxContext.allocateDynamicBuffer(groupSize * sizeof(uint32), 4);
+	uint32* objectIDs = (uint32*)objectIDAllocation.cpuPtr;
+
+	D3D12_GPU_VIRTUAL_ADDRESS objectIDAddress = objectIDAllocation.gpuPtr;
+
+	uint32 index = 0;
+	for (auto [entityHandle, cloth, render] : scene.group<cloth_component, cloth_render_component>().each())
+	{
+		static auto clothMaterial = createPBRMaterial(
+			"assets/sponza/textures/Sponza_Curtain_Red_diffuse.tga",
+			"assets/sponza/textures/Sponza_Curtain_Red_normal.tga",
+			"assets/sponza/textures/Sponza_Curtain_roughness.tga",
+			"assets/sponza/textures/Sponza_Curtain_metallic.tga",
+			vec4(0.f), vec4(1.f), 1.f, 1.f, pbr_material_shader_double_sided);
+
+		objectIDs[index] = (uint32)entityHandle;
+		D3D12_GPU_VIRTUAL_ADDRESS baseObjectID = objectIDAddress + (index * sizeof(uint32));
+
+		auto [vb, prevFrameVB, ib, sm] = render.getRenderData(cloth);
+
+		pbr_render_data data;
+		data.transformPtr = transformAllocation.gpuPtr;
+		data.vertexBuffer = vb;
+		data.indexBuffer = ib;
+		data.submesh = sm;
+		data.material = clothMaterial;
+		data.numInstances = 1;
+
+		depth_prepass_data depthPrepassData;
+		depthPrepassData.transformPtr = transformAllocation.gpuPtr;
+		depthPrepassData.prevFrameTransformPtr = transformAllocation.gpuPtr;
+		depthPrepassData.objectIDPtr = baseObjectID;
+		depthPrepassData.vertexBuffer = vb;
+		depthPrepassData.prevFrameVertexBuffer = prevFrameVB.positions ? prevFrameVB.positions : vb.positions;
+		depthPrepassData.indexBuffer = ib;
+		depthPrepassData.submesh = sm;
+		depthPrepassData.numInstances = 1;
+
+		addToRenderPass(clothMaterial->shader, data, depthPrepassData, opaqueRenderPass, transparentRenderPass);
+
+
+		if (entityHandle == selectedObjectID)
+		{
+			renderOutline(ldrRenderPass, mat4::identity, vb, ib, sm);
+		}
+
+		++index;
+	}
+}
+
+void renderScene(game_scene& scene, memory_arena& arena, entity_handle selectedObjectID,
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass,
+	float dt)
 {
 	renderStaticObjects(scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass);
 	renderDynamicObjects(scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass);
 	renderAnimatedObjects(scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass);
+	renderTrees(scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, dt);
+	renderCloth(scene, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass);
 }
 

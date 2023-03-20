@@ -1690,7 +1690,7 @@ void scene_editor::onObjectMoved()
 	{
 		if (cloth_component* cloth = selectedEntity.getComponentIfExists<cloth_component>())
 		{
-			cloth->setWorldPositionOfFixedVertices(selectedEntity.getComponent<transform_component>(), true);
+			cloth->setWorldPositionOfFixedVertices(selectedEntity.getComponent<transform_component>(), false);
 		}
 	}
 }

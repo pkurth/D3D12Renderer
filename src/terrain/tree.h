@@ -12,10 +12,9 @@ struct tree_settings
 struct tree_component
 {
 	tree_settings settings;
-
-	void render(struct opaque_render_pass* renderPass, const trs& transform, const ref<multi_mesh>& mesh, float dt);
 };
 
+void renderTree(struct opaque_render_pass* renderPass, D3D12_GPU_VIRTUAL_ADDRESS transforms, uint32 numInstances, const multi_mesh* mesh, float dt);
 
 
 void initializeTreePipelines();
