@@ -408,18 +408,15 @@ void application::resetRenderPasses()
 	sunShadowRenderPass.reset();
 	computePass.reset();
 
-	for (uint32 i = 0; i < numSpotShadowRenderPasses; ++i)
+	for (uint32 i = 0; i < arraysize(spotShadowRenderPasses); ++i)
 	{
 		spotShadowRenderPasses[i].reset();
 	}
 
-	for (uint32 i = 0; i < numPointShadowRenderPasses; ++i)
+	for (uint32 i = 0; i < arraysize(pointShadowRenderPasses); ++i)
 	{
 		pointShadowRenderPasses[i].reset();
 	}
-
-	numSpotShadowRenderPasses = 0;
-	numPointShadowRenderPasses = 0;
 }
 
 void application::submitRendererParams(uint32 numSpotLightShadowPasses, uint32 numPointLightShadowPasses)
@@ -556,57 +553,15 @@ void application::update(const user_input& input, float dt)
 		//}
 
 
-		// Render shadow maps.
-		uint32 numPointLights = scene.numberOfComponentsOfType<point_light_component>();
-		if (numPointLights)
-		{
-			auto* plPtr = (point_light_cb*)mapBuffer(pointLightBuffer[dxContext.bufferedFrameID], false);
-			auto* siPtr = (point_shadow_info*)mapBuffer(pointLightShadowInfoBuffer[dxContext.bufferedFrameID], false);
-
-			for (auto [entityHandle, position, pl] : scene.group<position_component, point_light_component>().each())
-			{
-				point_light_cb cb(position.position, pl.color * pl.intensity, pl.radius);
-
-				if (pl.castsShadow)
-				{
-					cb.shadowInfoIndex = numPointShadowRenderPasses++;
-					*siPtr++ = renderPointShadowMap(cb, (uint32)entityHandle, &pointShadowRenderPasses[cb.shadowInfoIndex], scene, objectDragged, pl.shadowMapResolution);
-				}
-
-				*plPtr++ = cb;
-			}
-
-			unmapBuffer(pointLightBuffer[dxContext.bufferedFrameID], true, { 0, numPointLights });
-			unmapBuffer(pointLightShadowInfoBuffer[dxContext.bufferedFrameID], true, { 0, numPointShadowRenderPasses });
-
-			renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], numPointLights, pointLightShadowInfoBuffer[dxContext.bufferedFrameID]);
-		}
-
-		uint32 numSpotLights = scene.numberOfComponentsOfType<spot_light_component>();
-		if (numSpotLights)
-		{
-			auto* slPtr = (spot_light_cb*)mapBuffer(spotLightBuffer[dxContext.bufferedFrameID], false);
-			auto* siPtr = (spot_shadow_info*)mapBuffer(spotLightShadowInfoBuffer[dxContext.bufferedFrameID], false);
-
-			for (auto [entityHandle, transform, sl] : scene.group<position_rotation_component, spot_light_component>().each())
-			{
-				spot_light_cb cb(transform.position, transform.rotation * vec3(0.f, 0.f, -1.f), sl.color * sl.intensity, sl.innerAngle, sl.outerAngle, sl.distance);
-
-				if (sl.castsShadow)
-				{
-					cb.shadowInfoIndex = numSpotShadowRenderPasses++;
-					*siPtr++ = renderSpotShadowMap(cb, (uint32)entityHandle, &spotShadowRenderPasses[cb.shadowInfoIndex], scene, objectDragged, sl.shadowMapResolution);
-				}
-
-				*slPtr++ = cb;
-			}
-
-			unmapBuffer(spotLightBuffer[dxContext.bufferedFrameID], true, { 0, numSpotLights });
-			unmapBuffer(spotLightShadowInfoBuffer[dxContext.bufferedFrameID], true, { 0, numSpotShadowRenderPasses });
-
-			renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], numSpotLights, spotLightShadowInfoBuffer[dxContext.bufferedFrameID]);
-		}
-
+		scene_lighting lighting;
+		lighting.spotLightBuffer = spotLightBuffer[dxContext.bufferedFrameID];
+		lighting.pointLightBuffer = pointLightBuffer[dxContext.bufferedFrameID];
+		lighting.spotLightShadowInfoBuffer = spotLightShadowInfoBuffer[dxContext.bufferedFrameID];
+		lighting.pointLightShadowInfoBuffer = pointLightShadowInfoBuffer[dxContext.bufferedFrameID];
+		lighting.spotShadowRenderPasses = spotShadowRenderPasses;
+		lighting.pointShadowRenderPasses = pointShadowRenderPasses;
+		lighting.maxNumSpotShadowRenderPasses = arraysize(spotShadowRenderPasses);
+		lighting.maxNumPointShadowRenderPasses = arraysize(pointShadowRenderPasses);
 
 
 		for (auto [entityHandle, terrain, position, placement] : scene.group(component_group<terrain_component, position_component, proc_placement_component>).each())
@@ -622,8 +577,11 @@ void application::update(const user_input& input, float dt)
 		}
 
 
-		renderScene(this->scene.camera, scene, stackArena, selectedEntity.handle, sun, objectDragged, 
+		renderScene(this->scene.camera, scene, stackArena, selectedEntity.handle, sun, lighting, objectDragged, 
 			&opaqueRenderPass, &transparentRenderPass, &ldrRenderPass, &sunShadowRenderPass, unscaledDt);
+
+		renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], scene.numberOfComponentsOfType<spot_light_component>(), spotLightShadowInfoBuffer[dxContext.bufferedFrameID]);
+		renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], scene.numberOfComponentsOfType<point_light_component>(), pointLightShadowInfoBuffer[dxContext.bufferedFrameID]);
 
 
 		if (decals.size())
@@ -649,7 +607,7 @@ void application::update(const user_input& input, float dt)
 			}
 		}
 
-		submitRendererParams(numSpotShadowRenderPasses, numPointShadowRenderPasses);
+		submitRendererParams(lighting.numSpotShadowRenderPasses, lighting.numPointShadowRenderPasses);
 	}
 
 	for (auto [entityHandle, transform, dynamic] : scene.group(component_group<transform_component, dynamic_transform_component>).each())

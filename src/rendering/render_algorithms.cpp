@@ -646,7 +646,7 @@ void lightAndDecalCulling(dx_command_list* cl,
 	uint32 numPointLights, uint32 numSpotLights, uint32 numDecals,
 	dx_dynamic_constant_buffer cameraCBV)
 {
-	if (numPointLights || numSpotLights || numDecals)
+	//if (numPointLights || numSpotLights || numDecals)
 	{
 		PROFILE_ALL(cl, "Cull lights & decals");
 

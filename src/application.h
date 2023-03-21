@@ -62,9 +62,6 @@ private:
 	learned_locomotion learnedLocomotion;
 
 
-	uint32 numSpotShadowRenderPasses;
-	uint32 numPointShadowRenderPasses;
-
 	opaque_render_pass opaqueRenderPass;
 	transparent_render_pass transparentRenderPass;
 	sun_shadow_render_pass sunShadowRenderPass;

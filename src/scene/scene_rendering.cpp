@@ -22,10 +22,58 @@ struct offset_count
 	uint32 count;
 };
 
+enum light_frustum_type
+{
+	light_frustum_standard,
+	light_frustum_sphere,
+};
+
+struct light_frustum
+{
+	union
+	{
+		camera_frustum_planes frustum;
+		bounding_sphere sphere;
+	};
+
+	light_frustum_type type;
+};
+
+struct shadow_pass
+{
+	light_frustum frustum;
+	shadow_render_pass_base* pass;
+	bool isPointLight;
+};
+
+struct shadow_passes
+{
+	shadow_pass* shadowRenderPasses;
+	uint32 numShadowRenderPasses;
+};
+
+
+static bool shouldRender(bounding_sphere s, bounding_box aabb, const trs& transform)
+{
+	s.center = conjugate(transform.rotation) * (s.center - transform.position) + transform.position;
+	aabb.minCorner *= transform.scale;
+	aabb.maxCorner *= transform.scale;
+	return aabb.contains(s.center) || sphereVsAABB(s, aabb);
+}
 
 static bool shouldRender(const camera_frustum_planes& frustum, const mesh_component& mesh, const transform_component& transform)
 {
 	return mesh.mesh && ((mesh.mesh->aabb.maxCorner.x == mesh.mesh->aabb.minCorner.x) || !frustum.cullModelSpaceAABB(mesh.mesh->aabb, transform));
+}
+
+static bool shouldRender(const bounding_sphere& frustum, const mesh_component& mesh, const transform_component& transform)
+{
+	return mesh.mesh && ((mesh.mesh->aabb.maxCorner.x == mesh.mesh->aabb.minCorner.x) || shouldRender(frustum, mesh.mesh->aabb, transform));
+}
+
+static bool shouldRender(const light_frustum& frustum, const mesh_component& mesh, const transform_component& transform)
+{
+	return (frustum.type == light_frustum_standard) ? shouldRender(frustum.frustum, mesh, transform) : shouldRender(frustum.sphere, mesh, transform);
 }
 
 template <typename group_t>
@@ -86,18 +134,32 @@ static void addToRenderPass(pbr_material_shader shader, const pbr_render_data& d
 	}
 }
 
-static void addToStaticRenderPass(pbr_material_shader shader, const shadow_render_data& shadowData, shadow_render_pass_base* sunShadowRenderPass)
+static void addToStaticRenderPass(pbr_material_shader shader, const shadow_render_data& shadowData, shadow_render_pass_base* shadowRenderPass, bool isPointLight)
 {
 	switch (shader)
 	{
 		case pbr_material_shader_default:
 		{
-			sunShadowRenderPass->renderStaticObject<shadow_pipeline::single_sided>(shadowData);
+			if (isPointLight)
+			{
+				shadowRenderPass->renderStaticObject<point_shadow_pipeline::single_sided>(shadowData);
+			}
+			else
+			{
+				shadowRenderPass->renderStaticObject<shadow_pipeline::single_sided>(shadowData);
+			}
 		} break;
 		case pbr_material_shader_double_sided:
 		case pbr_material_shader_alpha_cutout:
 		{
-			sunShadowRenderPass->renderStaticObject<shadow_pipeline::double_sided>(shadowData);
+			if (isPointLight)
+			{
+				shadowRenderPass->renderStaticObject<point_shadow_pipeline::double_sided>(shadowData);
+			}
+			else
+			{
+				shadowRenderPass->renderStaticObject<shadow_pipeline::double_sided>(shadowData);
+			}
 		} break;
 		case pbr_material_shader_transparent:
 		{
@@ -106,18 +168,32 @@ static void addToStaticRenderPass(pbr_material_shader shader, const shadow_rende
 	}
 }
 
-static void addToDynamicRenderPass(pbr_material_shader shader, const shadow_render_data& shadowData, shadow_render_pass_base* sunShadowRenderPass)
+static void addToDynamicRenderPass(pbr_material_shader shader, const shadow_render_data& shadowData, shadow_render_pass_base* shadowRenderPass, bool isPointLight)
 {
 	switch (shader)
 	{
 		case pbr_material_shader_default:
 		{
-			sunShadowRenderPass->renderDynamicObject<shadow_pipeline::single_sided>(shadowData);
+			if (isPointLight)
+			{
+				shadowRenderPass->renderDynamicObject<point_shadow_pipeline::single_sided>(shadowData);
+			}
+			else
+			{
+				shadowRenderPass->renderDynamicObject<shadow_pipeline::single_sided>(shadowData);
+			}
 		} break;
 		case pbr_material_shader_double_sided:
 		case pbr_material_shader_alpha_cutout:
 		{
-			sunShadowRenderPass->renderDynamicObject<shadow_pipeline::double_sided>(shadowData);
+			if (isPointLight)
+			{
+				shadowRenderPass->renderDynamicObject<point_shadow_pipeline::double_sided>(shadowData);
+			}
+			else
+			{
+				shadowRenderPass->renderDynamicObject<shadow_pipeline::double_sided>(shadowData);
+			}
 		} break;
 		case pbr_material_shader_transparent:
 		{
@@ -218,7 +294,7 @@ static void renderStaticObjectsToMainCamera(group_t group, std::unordered_map<mu
 
 template <typename group_t>
 static void renderStaticObjectsToShadowMap(group_t group, std::unordered_map<multi_mesh*, offset_count> ocPerMesh, 
-	const camera_frustum_planes& frustum, memory_arena& arena, shadow_render_pass_base* shadowRenderPass)
+	const light_frustum& frustum, memory_arena& arena, shadow_render_pass_base* shadowRenderPass)
 {
 	uint32 groupSize = (uint32)group.size();
 
@@ -265,13 +341,13 @@ static void renderStaticObjectsToShadowMap(group_t group, std::unordered_map<mul
 		for (auto& sm : mesh->submeshes)
 		{
 			data.submesh = sm.info;
-			addToStaticRenderPass(sm.material->shader, data, shadowRenderPass);
+			addToStaticRenderPass(sm.material->shader, data, shadowRenderPass, frustum.type == light_frustum_sphere);
 		}
 	}
 }
 
 static void renderStaticObjects(game_scene& scene, const camera_frustum_planes& frustum, memory_arena& arena, entity_handle selectedObjectID,
-	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass)
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, shadow_passes& shadow)
 {
 	CPU_PROFILE_BLOCK("Static objects");
 
@@ -290,10 +366,10 @@ static void renderStaticObjects(game_scene& scene, const camera_frustum_planes& 
 
 	renderStaticObjectsToMainCamera(group, ocPerMesh, frustum, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass);
 
-	if (sunShadowRenderPass)
+	for (uint32 i = 0; i < shadow.numShadowRenderPasses; ++i)
 	{
-		camera_frustum_planes sunFrustum = getWorldSpaceFrustumPlanes(sunShadowRenderPass->cascades[sunShadowRenderPass->numCascades - 1].viewProj);
-		renderStaticObjectsToShadowMap(group, ocPerMesh, sunFrustum, arena, &sunShadowRenderPass->cascades[0]);
+		auto& pass = shadow.shadowRenderPasses[i];
+		renderStaticObjectsToShadowMap(group, ocPerMesh, pass.frustum, arena, pass.pass);
 	}
 }
 
@@ -395,7 +471,7 @@ static void renderDynamicObjectsToMainCamera(group_t group, std::unordered_map<m
 
 template <typename group_t>
 static void renderDynamicObjectsToShadowMap(group_t group, std::unordered_map<multi_mesh*, offset_count> ocPerMesh,
-	const camera_frustum_planes& frustum, memory_arena& arena, shadow_render_pass_base* shadowRenderPass)
+	const light_frustum& frustum, memory_arena& arena, shadow_render_pass_base* shadowRenderPass)
 {
 	uint32 groupSize = (uint32)group.size();
 
@@ -442,13 +518,13 @@ static void renderDynamicObjectsToShadowMap(group_t group, std::unordered_map<mu
 		for (auto& sm : mesh->submeshes)
 		{
 			data.submesh = sm.info;
-			addToDynamicRenderPass(sm.material->shader, data, shadowRenderPass);
+			addToDynamicRenderPass(sm.material->shader, data, shadowRenderPass, frustum.type == light_frustum_sphere);
 		}
 	}
 }
 
 static void renderDynamicObjects(game_scene& scene, const camera_frustum_planes& frustum, memory_arena& arena, entity_handle selectedObjectID,
-	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass)
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, shadow_passes& shadow)
 {
 	CPU_PROFILE_BLOCK("Dynamic objects");
 
@@ -460,15 +536,15 @@ static void renderDynamicObjects(game_scene& scene, const camera_frustum_planes&
 	std::unordered_map<multi_mesh*, offset_count> ocPerMesh = getOffsetsPerMesh(group);
 	renderDynamicObjectsToMainCamera(group, ocPerMesh, frustum, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass);
 
-	if (sunShadowRenderPass)
+	for (uint32 i = 0; i < shadow.numShadowRenderPasses; ++i)
 	{
-		camera_frustum_planes sunFrustum = getWorldSpaceFrustumPlanes(sunShadowRenderPass->cascades[sunShadowRenderPass->numCascades - 1].viewProj);
-		renderDynamicObjectsToShadowMap(group, ocPerMesh, sunFrustum, arena, &sunShadowRenderPass->cascades[0]);
+		auto& pass = shadow.shadowRenderPasses[i];
+		renderDynamicObjectsToShadowMap(group, ocPerMesh, pass.frustum, arena, pass.pass);
 	}
 }
 
 static void renderAnimatedObjects(game_scene& scene, const camera_frustum_planes& frustum, memory_arena& arena, entity_handle selectedObjectID,
-	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass)
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, shadow_passes& shadow)
 {
 	CPU_PROFILE_BLOCK("Animated objects");
 
@@ -535,16 +611,17 @@ static void renderAnimatedObjects(game_scene& scene, const camera_frustum_planes
 
 			addToRenderPass(sm.material->shader, data, depthPrepassData, opaqueRenderPass, transparentRenderPass);
 
-			if (sunShadowRenderPass)
-			{
-				shadow_render_data shadowData;
-				shadowData.transformPtr = baseM;
-				shadowData.vertexBuffer = anim.currentVertexBuffer.positions;
-				shadowData.indexBuffer = dxMesh.indexBuffer;
-				shadowData.submesh = data.submesh;
-				shadowData.numInstances = 1;
+			shadow_render_data shadowData;
+			shadowData.transformPtr = baseM;
+			shadowData.vertexBuffer = anim.currentVertexBuffer.positions;
+			shadowData.indexBuffer = dxMesh.indexBuffer;
+			shadowData.submesh = data.submesh;
+			shadowData.numInstances = 1;
 
-				addToDynamicRenderPass(sm.material->shader, shadowData, &sunShadowRenderPass->cascades[0]);
+			for (uint32 i = 0; i < shadow.numShadowRenderPasses; ++i)
+			{
+				auto& pass = shadow.shadowRenderPasses[i];
+				addToDynamicRenderPass(sm.material->shader, shadowData, pass.pass, pass.frustum.type == light_frustum_sphere);
 			}
 
 			if (entityHandle == selectedObjectID)
@@ -708,7 +785,7 @@ static void renderCloth(game_scene& scene, entity_handle selectedObjectID,
 			shadowData.numInstances = 1;
 			shadowData.submesh = data.submesh;
 
-			addToDynamicRenderPass(clothMaterial->shader, shadowData, &sunShadowRenderPass->cascades[0]);
+			addToDynamicRenderPass(clothMaterial->shader, shadowData, &sunShadowRenderPass->cascades[0], false);
 		}
 
 		if (entityHandle == selectedObjectID)
@@ -720,37 +797,161 @@ static void renderCloth(game_scene& scene, entity_handle selectedObjectID,
 	}
 }
 
-static shadow_render_command setupSunShadowPass(directional_light& sun, bool invalidateShadowMapCache, sun_shadow_render_pass* sunShadowRenderPass)
+static void setupSunShadowPass(directional_light& sun, sun_shadow_render_pass* sunShadowRenderPass, bool invalidateShadowMapCache)
 {
-	shadow_render_command result = determineSunShadowInfo(sun, invalidateShadowMapCache);
+	shadow_render_command command = determineSunShadowInfo(sun, invalidateShadowMapCache);
 	sunShadowRenderPass->numCascades = sun.numShadowCascades;
 	for (uint32 i = 0; i < sun.numShadowCascades; ++i)
 	{
 		sun_cascade_render_pass& cascadePass = sunShadowRenderPass->cascades[i];
-		cascadePass.viewport = result.viewports[i];
+		cascadePass.viewport = command.viewports[i];
 		cascadePass.viewProj = sun.viewProjs[i];
 	}
-	sunShadowRenderPass->copyFromStaticCache = !result.renderStaticGeometry;
-	return result;
+	sunShadowRenderPass->copyFromStaticCache = !command.renderStaticGeometry;
 }
 
-void renderScene(const render_camera& camera, game_scene& scene, memory_arena& arena, entity_handle selectedObjectID, directional_light& sun, bool invalidateShadowMapCache,
+static void setupSpotShadowPasses(game_scene& scene, scene_lighting& lighting, bool invalidateShadowMapCache)
+{
+	uint32 numSpotLights = scene.numberOfComponentsOfType<spot_light_component>();
+	if (numSpotLights)
+	{
+		auto* slPtr = (spot_light_cb*)mapBuffer(lighting.spotLightBuffer, false);
+		auto* siPtr = (spot_shadow_info*)mapBuffer(lighting.spotLightShadowInfoBuffer, false);
+
+		for (auto [entityHandle, transform, sl] : scene.group<position_rotation_component, spot_light_component>().each())
+		{
+			spot_light_cb cb(transform.position, transform.rotation * vec3(0.f, 0.f, -1.f), sl.color * sl.intensity, sl.innerAngle, sl.outerAngle, sl.distance);
+
+			if (sl.castsShadow && lighting.numSpotShadowRenderPasses < lighting.maxNumSpotShadowRenderPasses)
+			{
+				cb.shadowInfoIndex = lighting.numSpotShadowRenderPasses++;
+
+				auto [command, si] = determineSpotShadowInfo(cb, (uint32)entityHandle, sl.shadowMapResolution, invalidateShadowMapCache);
+				spot_shadow_render_pass& pass = lighting.spotShadowRenderPasses[cb.shadowInfoIndex];
+
+				pass.copyFromStaticCache = !command.renderStaticGeometry;
+				pass.viewport = command.viewports[0];
+				pass.viewProjMatrix = si.viewProj;
+
+				*siPtr++ = si;
+			}
+
+			*slPtr++ = cb;
+		}
+
+		unmapBuffer(lighting.spotLightBuffer, true, { 0, numSpotLights });
+		unmapBuffer(lighting.spotLightShadowInfoBuffer, true, { 0, lighting.numSpotShadowRenderPasses });
+	}
+}
+
+static void setupPointShadowPasses(game_scene& scene, scene_lighting& lighting, bool invalidateShadowMapCache)
+{
+	uint32 numPointLights = scene.numberOfComponentsOfType<point_light_component>();
+	if (numPointLights)
+	{
+		auto* plPtr = (point_light_cb*)mapBuffer(lighting.pointLightBuffer, false);
+		auto* siPtr = (point_shadow_info*)mapBuffer(lighting.pointLightShadowInfoBuffer, false);
+
+		for (auto [entityHandle, position, pl] : scene.group<position_component, point_light_component>().each())
+		{
+			point_light_cb cb(position.position, pl.color * pl.intensity, pl.radius);
+
+			if (pl.castsShadow && lighting.numPointShadowRenderPasses < lighting.maxNumPointShadowRenderPasses)
+			{
+				cb.shadowInfoIndex = lighting.numPointShadowRenderPasses++;
+
+				auto [command, si] = determinePointShadowInfo(cb, (uint32)entityHandle, pl.shadowMapResolution, invalidateShadowMapCache);
+				point_shadow_render_pass& pass = lighting.pointShadowRenderPasses[cb.shadowInfoIndex];
+
+				pass.copyFromStaticCache0 = !command.renderStaticGeometry;
+				pass.copyFromStaticCache1 = !command.renderStaticGeometry;
+				pass.viewport0 = command.viewports[0];
+				pass.viewport1 = command.viewports[1];
+				pass.lightPosition = cb.position;
+				pass.maxDistance = cb.radius;
+
+				*siPtr++ = si;
+			}
+
+			*plPtr++ = cb;
+		}
+
+		unmapBuffer(lighting.pointLightBuffer, true, { 0, numPointLights });
+		unmapBuffer(lighting.pointLightShadowInfoBuffer, true, { 0, lighting.numPointShadowRenderPasses });
+	}
+}
+
+void renderScene(const render_camera& camera, game_scene& scene, memory_arena& arena, entity_handle selectedObjectID,
+	directional_light& sun, scene_lighting& lighting, bool invalidateShadowMapCache,
 	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass,
 	float dt)
 {
 	CPU_PROFILE_BLOCK("Submit scene render commands");
 
-	shadow_render_command sunShadow = setupSunShadowPass(sun, invalidateShadowMapCache, sunShadowRenderPass);
+	setupSunShadowPass(sun, sunShadowRenderPass, invalidateShadowMapCache);
+	setupSpotShadowPasses(scene, lighting, invalidateShadowMapCache);
+	setupPointShadowPasses(scene, lighting, invalidateShadowMapCache);
 
-	ASSERT(sunShadow.renderDynamicGeometry);
+	shadow_passes staticShadowPasses = {};
+	shadow_passes dynamicShadowPasses = {};
+
+	memory_marker tempMemoryMarker = arena.getMarker();
+	uint32 numShadowCastingLights = 1 + lighting.numSpotShadowRenderPasses + lighting.numPointShadowRenderPasses;
+	staticShadowPasses.shadowRenderPasses = arena.allocate<shadow_pass>(numShadowCastingLights);
+	dynamicShadowPasses.shadowRenderPasses = arena.allocate<shadow_pass>(numShadowCastingLights);
+
+	{
+		auto& outPass = dynamicShadowPasses.shadowRenderPasses[dynamicShadowPasses.numShadowRenderPasses++];
+		outPass.frustum.frustum = getWorldSpaceFrustumPlanes(sunShadowRenderPass->cascades[sunShadowRenderPass->numCascades - 1].viewProj);
+		outPass.frustum.type = light_frustum_standard;
+		outPass.pass = &sunShadowRenderPass->cascades[0];
+
+		if (!sunShadowRenderPass->copyFromStaticCache)
+		{
+			staticShadowPasses.shadowRenderPasses[staticShadowPasses.numShadowRenderPasses++] = outPass;
+		}
+	}
+
+	for (uint32 i = 0; i < lighting.numSpotShadowRenderPasses; ++i)
+	{
+		auto pass = &lighting.spotShadowRenderPasses[i];
+		auto& outPass = dynamicShadowPasses.shadowRenderPasses[dynamicShadowPasses.numShadowRenderPasses++];
+		outPass.frustum.frustum = getWorldSpaceFrustumPlanes(pass->viewProjMatrix);
+		outPass.frustum.type = light_frustum_standard;
+		outPass.pass = pass;
+
+		if (!pass->copyFromStaticCache)
+		{
+			staticShadowPasses.shadowRenderPasses[staticShadowPasses.numShadowRenderPasses++] = outPass;
+		}
+	}
+
+	for (uint32 i = 0; i < lighting.numPointShadowRenderPasses; ++i)
+	{
+		auto pass = &lighting.pointShadowRenderPasses[i];
+		auto& outPass = dynamicShadowPasses.shadowRenderPasses[dynamicShadowPasses.numShadowRenderPasses++];
+		outPass.frustum.sphere = { pass->lightPosition, pass->maxDistance };
+		outPass.frustum.type = light_frustum_sphere;
+		outPass.pass = pass;
+
+		if (!pass->copyFromStaticCache0)
+		{
+			staticShadowPasses.shadowRenderPasses[staticShadowPasses.numShadowRenderPasses++] = outPass;
+		}
+	}
+
+	bool sunRenderStaticGeometry = !sunShadowRenderPass->copyFromStaticCache;
+
 
 	camera_frustum_planes frustum = camera.getWorldSpaceFrustumPlanes();
 
-	renderStaticObjects(scene, frustum, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunShadow.renderStaticGeometry ? sunShadowRenderPass : 0);
-	renderDynamicObjects(scene, frustum, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunShadowRenderPass);
-	renderAnimatedObjects(scene, frustum, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunShadowRenderPass);
-	renderTerrain(camera, scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunShadow.renderStaticGeometry ? sunShadowRenderPass : 0, dt);
+	renderStaticObjects(scene, frustum, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, staticShadowPasses);
+	renderDynamicObjects(scene, frustum, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, dynamicShadowPasses);
+	renderAnimatedObjects(scene, frustum, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, dynamicShadowPasses);
+	renderTerrain(camera, scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunRenderStaticGeometry ? sunShadowRenderPass : 0, dt);
 	renderTrees(scene, frustum, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunShadowRenderPass, dt);
 	renderCloth(scene, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunShadowRenderPass);
+
+	arena.resetToMarker(tempMemoryMarker);
 }
 
