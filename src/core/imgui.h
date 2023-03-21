@@ -1,5 +1,6 @@
 #pragma once
 
+#define IM_ASSERT(condition) ASSERT(condition)
 #include <imgui/imgui.h>
 #include <fontawesome/IconsFontAwesome5.h>
 

@@ -12,6 +12,7 @@
 #include "core/string.h"
 #include "core/image.h"
 
+#include <DirectXTex/DirectXTex.h>
 
 bool handleWindowsMessages();
 

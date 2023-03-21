@@ -151,7 +151,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			"assets/cc0/sphere/Tiles074_2K_Color.jpg",
 			"assets/cc0/sphere/Tiles074_2K_Normal.jpg",
 			"assets/cc0/sphere/Tiles074_2K_Roughness.jpg",
-			{}, vec4(0.f), vec4(1.f), 0.2f, 0.5f, pbr_material_shader_default, 3.f);
+			{}, vec4(0.f), vec4(1.f), 0.2f, 0.f, pbr_material_shader_default, 3.f);
 
 		auto groundMesh = make_ref<multi_mesh>();
 		builder.pushBox({ vec3(0.f), vec3(30.f, 4.f, 30.f) });

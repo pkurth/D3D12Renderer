@@ -3,6 +3,9 @@
 #include "log.h"
 #include "memory.h"
 
+
+#include <DirectXTex/DirectXTex.h>
+
 #define NANOSVG_IMPLEMENTATION
 #include <nanosvg/nanosvg.h>
 

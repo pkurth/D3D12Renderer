@@ -1,5 +1,7 @@
 #pragma once
 
+#define ENTT_ASSERT(condition, ...) ASSERT(condition)
+
 #include <entt/entity/entity.hpp>
 #include <entt/entity/registry.hpp>
 #include <entt/entity/helper.hpp>

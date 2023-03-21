@@ -8,6 +8,7 @@
 #include "rendering/render_resources.h"
 
 #include <d3d12memoryallocator/D3D12MemAlloc.h>
+#include <DirectXTex/DirectXTex.h>
 
 static void initializeTexture(ref<dx_texture> result, D3D12_RESOURCE_DESC textureDesc, D3D12_SUBRESOURCE_DATA* subresourceData, uint32 numSubresources, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON, bool mipUAVs = false);
 

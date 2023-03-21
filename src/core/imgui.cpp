@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "imgui.h"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui/imgui_draw.cpp>
@@ -12,7 +13,6 @@
 #include <imgui/backends/imgui_impl_dx12.cpp>
 
 #include "input.h"
-#include "imgui.h"
 #include "dx/dx_context.h"
 #include "dx/dx_command_list.h"
 #include "dx/dx_profiling.h"

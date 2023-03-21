@@ -6,7 +6,6 @@
 #include <windowsx.h>
 #include <tchar.h>
 
-#include <cassert>
 #include <limits>
 #include <array>
 #include <string>

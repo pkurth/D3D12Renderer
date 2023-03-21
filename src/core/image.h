@@ -1,7 +1,6 @@
 #pragma once
 
 #include <dx/d3dx12.h>
-#include <DirectXTex/DirectXTex.h>
 
 
 // If the texture_load_flags_cache_to_dds flags is set, the system will cache the texture as DDS to disk for faster loading next time.
@@ -37,6 +36,11 @@ enum image_format
 bool isImageExtension(const fs::path& extension);
 bool isImageExtension(const std::string& extension);
 
+namespace DirectX
+{
+	class ScratchImage;
+	struct Image;
+}
 
 bool loadImageFromMemory(const void* data, uint32 size, image_format imageFormat, const fs::path& cachingFilepath,
 	uint32 flags, DirectX::ScratchImage& scratchImage, D3D12_RESOURCE_DESC& textureDesc);
