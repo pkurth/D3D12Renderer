@@ -670,6 +670,11 @@ void terrain_component::render(const render_camera& camera, struct opaque_render
 	struct position_scale_component* waterPlaneTransforms, uint32 numWaters)
 {
 	camera_frustum_planes frustum = camera.getWorldSpaceFrustumPlanes();
+	camera_frustum_planes sunFrustum = {};
+	if (shadowPass)
+	{
+		sunFrustum = getWorldSpaceFrustumPlanes(shadowPass->cascades[shadowPass->numCascades - 1].viewProj);
+	}
 
 	positionOffset = getMinCorner(positionOffset);
 
@@ -746,7 +751,10 @@ void terrain_component::render(const render_camera& camera, struct opaque_render
 
 			if (shadowPass)
 			{
-				shadowPass->renderStaticObject<terrain_shadow_pipeline>(0, common);
+				if (!sunFrustum.cullWorldSpaceAABB(aabb))
+				{
+					shadowPass->renderStaticObject<terrain_shadow_pipeline>(0, common);
+				}
 			}
 
 			if (ldrPass && selected)

@@ -86,24 +86,53 @@ static void addToRenderPass(pbr_material_shader shader, const pbr_render_data& d
 	}
 }
 
-static void renderStaticObjects(game_scene& scene, const camera_frustum_planes& frustum, memory_arena& arena, entity_handle selectedObjectID,
-	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass)
+static void addToStaticRenderPass(pbr_material_shader shader, const shadow_render_data& shadowData, shadow_render_pass_base* sunShadowRenderPass)
 {
-	CPU_PROFILE_BLOCK("Static objects");
+	switch (shader)
+	{
+		case pbr_material_shader_default:
+		{
+			sunShadowRenderPass->renderStaticObject<shadow_pipeline::single_sided>(shadowData);
+		} break;
+		case pbr_material_shader_double_sided:
+		case pbr_material_shader_alpha_cutout:
+		{
+			sunShadowRenderPass->renderStaticObject<shadow_pipeline::double_sided>(shadowData);
+		} break;
+		case pbr_material_shader_transparent:
+		{
+			// Do nothing.
+		} break;
+	}
+}
 
-	using specialized_components = component_group_t<
-		animation_component,
-		dynamic_transform_component,
-		tree_component
-	>;
+static void addToDynamicRenderPass(pbr_material_shader shader, const shadow_render_data& shadowData, shadow_render_pass_base* sunShadowRenderPass)
+{
+	switch (shader)
+	{
+		case pbr_material_shader_default:
+		{
+			sunShadowRenderPass->renderDynamicObject<shadow_pipeline::single_sided>(shadowData);
+		} break;
+		case pbr_material_shader_double_sided:
+		case pbr_material_shader_alpha_cutout:
+		{
+			sunShadowRenderPass->renderDynamicObject<shadow_pipeline::double_sided>(shadowData);
+		} break;
+		case pbr_material_shader_transparent:
+		{
+			// Do nothing.
+		} break;
+	}
+}
 
-	auto group = scene.group(
-		component_group<transform_component, mesh_component>,
-		specialized_components{});
 
+template <typename group_t>
+static void renderStaticObjectsToMainCamera(group_t group, std::unordered_map<multi_mesh*, offset_count> ocPerMesh,
+	const camera_frustum_planes& frustum, memory_arena& arena, entity_handle selectedObjectID,
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass)
+{
 	uint32 groupSize = (uint32)group.size();
-
-	std::unordered_map<multi_mesh*, offset_count> ocPerMesh = getOffsetsPerMesh(group);
 
 	dx_allocation transformAllocation = dxContext.allocateDynamicBuffer(groupSize * sizeof(mat4), 4);
 	mat4* transforms = (mat4*)transformAllocation.cpuPtr;
@@ -180,18 +209,6 @@ static void renderStaticObjects(game_scene& scene, const camera_frustum_planes& 
 
 			addToRenderPass(sm.material->shader, data, depthPrepassData, opaqueRenderPass, transparentRenderPass);
 
-			if (sunShadowRenderPass)
-			{
-				shadow_render_data shadowData;
-				shadowData.transformPtr = baseM;
-				shadowData.vertexBuffer = dxMesh.vertexBuffer.positions;
-				shadowData.indexBuffer = dxMesh.indexBuffer;
-				shadowData.submesh = data.submesh;
-				shadowData.numInstances = oc.count;
-
-				sunShadowRenderPass->renderStaticObject<shadow_pipeline::single_sided>(0, shadowData);
-			}
-
 			++numDrawCalls;
 		}
 	}
@@ -199,18 +216,96 @@ static void renderStaticObjects(game_scene& scene, const camera_frustum_planes& 
 	CPU_PROFILE_STAT("Static draw calls", numDrawCalls);
 }
 
-static void renderDynamicObjects(game_scene& scene, const camera_frustum_planes& frustum, memory_arena& arena, entity_handle selectedObjectID,
-	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass)
+template <typename group_t>
+static void renderStaticObjectsToShadowMap(group_t group, std::unordered_map<multi_mesh*, offset_count> ocPerMesh, 
+	const camera_frustum_planes& frustum, memory_arena& arena, shadow_render_pass_base* shadowRenderPass)
 {
-	CPU_PROFILE_BLOCK("Dynamic objects");
-
-	auto group = scene.group(
-		component_group<transform_component, dynamic_transform_component, mesh_component>,
-		component_group<animation_component>);
-
 	uint32 groupSize = (uint32)group.size();
 
+	dx_allocation transformAllocation = dxContext.allocateDynamicBuffer(groupSize * sizeof(mat4), 4);
+	mat4* transforms = (mat4*)transformAllocation.cpuPtr;
+
+	for (auto [entityHandle, transform, mesh] : group.each())
+	{
+		if (!shouldRender(frustum, mesh, transform))
+		{
+			continue;
+		}
+
+		const dx_mesh& dxMesh = mesh.mesh->mesh;
+
+		offset_count& oc = ocPerMesh.at(mesh.mesh.get());
+
+		uint32 index = oc.offset + oc.count;
+		transforms[index] = trsToMat4(transform);
+
+		++oc.count;
+	}
+
+
+	D3D12_GPU_VIRTUAL_ADDRESS transformsAddress = transformAllocation.gpuPtr;
+
+	for (auto& [mesh, oc] : ocPerMesh)
+	{
+		if (oc.count == 0)
+		{
+			continue;
+		}
+
+		D3D12_GPU_VIRTUAL_ADDRESS baseM = transformsAddress + (oc.offset * sizeof(mat4));
+
+		const dx_mesh& dxMesh = mesh->mesh;
+
+		shadow_render_data data;
+		data.transformPtr = baseM;
+		data.vertexBuffer = dxMesh.vertexBuffer.positions;
+		data.indexBuffer = dxMesh.indexBuffer;
+		data.numInstances = oc.count;
+
+		for (auto& sm : mesh->submeshes)
+		{
+			data.submesh = sm.info;
+			addToStaticRenderPass(sm.material->shader, data, shadowRenderPass);
+		}
+	}
+}
+
+static void renderStaticObjects(game_scene& scene, const camera_frustum_planes& frustum, memory_arena& arena, entity_handle selectedObjectID,
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass)
+{
+	CPU_PROFILE_BLOCK("Static objects");
+
+	using specialized_components = component_group_t<
+		animation_component,
+		dynamic_transform_component,
+		tree_component
+	>;
+
+	auto group = scene.group(
+		component_group<transform_component, mesh_component>,
+		specialized_components{});
+
 	std::unordered_map<multi_mesh*, offset_count> ocPerMesh = getOffsetsPerMesh(group);
+	
+
+	renderStaticObjectsToMainCamera(group, ocPerMesh, frustum, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass);
+
+	if (sunShadowRenderPass)
+	{
+		camera_frustum_planes sunFrustum = getWorldSpaceFrustumPlanes(sunShadowRenderPass->cascades[sunShadowRenderPass->numCascades - 1].viewProj);
+		renderStaticObjectsToShadowMap(group, ocPerMesh, sunFrustum, arena, &sunShadowRenderPass->cascades[0]);
+	}
+}
+
+
+
+
+template <typename group_t>
+static void renderDynamicObjectsToMainCamera(group_t group, std::unordered_map<multi_mesh*, offset_count> ocPerMesh,
+	const camera_frustum_planes& frustum, memory_arena& arena, entity_handle selectedObjectID,
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass)
+{
+	uint32 groupSize = (uint32)group.size();
 
 	dx_allocation transformAllocation = dxContext.allocateDynamicBuffer(groupSize * sizeof(mat4) * 2, 4);
 	mat4* transforms = (mat4*)transformAllocation.cpuPtr;
@@ -291,23 +386,85 @@ static void renderDynamicObjects(game_scene& scene, const camera_frustum_planes&
 
 			addToRenderPass(sm.material->shader, data, depthPrepassData, opaqueRenderPass, transparentRenderPass);
 
-			if (sunShadowRenderPass)
-			{
-				shadow_render_data shadowData;
-				shadowData.transformPtr = baseM;
-				shadowData.vertexBuffer = dxMesh.vertexBuffer.positions;
-				shadowData.indexBuffer = dxMesh.indexBuffer;
-				shadowData.submesh = data.submesh;
-				shadowData.numInstances = oc.count;
-
-				sunShadowRenderPass->renderDynamicObject<shadow_pipeline::single_sided>(0, shadowData);
-			}
-
 			++numDrawCalls;
 		}
 	}
 
 	CPU_PROFILE_STAT("Dynamic draw calls", numDrawCalls);
+}
+
+template <typename group_t>
+static void renderDynamicObjectsToShadowMap(group_t group, std::unordered_map<multi_mesh*, offset_count> ocPerMesh,
+	const camera_frustum_planes& frustum, memory_arena& arena, shadow_render_pass_base* shadowRenderPass)
+{
+	uint32 groupSize = (uint32)group.size();
+
+	dx_allocation transformAllocation = dxContext.allocateDynamicBuffer(groupSize * sizeof(mat4), 4);
+	mat4* transforms = (mat4*)transformAllocation.cpuPtr;
+
+	for (auto [entityHandle, transform, dynamicTransform, mesh] : group.each())
+	{
+		if (!shouldRender(frustum, mesh, transform))
+		{
+			continue;
+		}
+
+		const dx_mesh& dxMesh = mesh.mesh->mesh;
+
+		offset_count& oc = ocPerMesh.at(mesh.mesh.get());
+
+		uint32 index = oc.offset + oc.count;
+		transforms[index] = trsToMat4(transform);
+
+		++oc.count;
+	}
+
+
+	D3D12_GPU_VIRTUAL_ADDRESS transformsAddress = transformAllocation.gpuPtr;
+
+	for (auto& [mesh, oc] : ocPerMesh)
+	{
+		if (oc.count == 0)
+		{
+			continue;
+		}
+
+		D3D12_GPU_VIRTUAL_ADDRESS baseM = transformsAddress + (oc.offset * sizeof(mat4));
+
+		const dx_mesh& dxMesh = mesh->mesh;
+
+		shadow_render_data data;
+		data.transformPtr = baseM;
+		data.vertexBuffer = dxMesh.vertexBuffer.positions;
+		data.indexBuffer = dxMesh.indexBuffer;
+		data.numInstances = oc.count;
+
+		for (auto& sm : mesh->submeshes)
+		{
+			data.submesh = sm.info;
+			addToDynamicRenderPass(sm.material->shader, data, shadowRenderPass);
+		}
+	}
+}
+
+static void renderDynamicObjects(game_scene& scene, const camera_frustum_planes& frustum, memory_arena& arena, entity_handle selectedObjectID,
+	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass)
+{
+	CPU_PROFILE_BLOCK("Dynamic objects");
+
+	auto group = scene.group(
+		component_group<transform_component, dynamic_transform_component, mesh_component>,
+		component_group<animation_component>);
+
+
+	std::unordered_map<multi_mesh*, offset_count> ocPerMesh = getOffsetsPerMesh(group);
+	renderDynamicObjectsToMainCamera(group, ocPerMesh, frustum, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass);
+
+	if (sunShadowRenderPass)
+	{
+		camera_frustum_planes sunFrustum = getWorldSpaceFrustumPlanes(sunShadowRenderPass->cascades[sunShadowRenderPass->numCascades - 1].viewProj);
+		renderDynamicObjectsToShadowMap(group, ocPerMesh, sunFrustum, arena, &sunShadowRenderPass->cascades[0]);
+	}
 }
 
 static void renderAnimatedObjects(game_scene& scene, const camera_frustum_planes& frustum, memory_arena& arena, entity_handle selectedObjectID,
@@ -387,7 +544,7 @@ static void renderAnimatedObjects(game_scene& scene, const camera_frustum_planes
 				shadowData.submesh = data.submesh;
 				shadowData.numInstances = 1;
 
-				sunShadowRenderPass->renderDynamicObject<shadow_pipeline::single_sided>(0, shadowData);
+				addToDynamicRenderPass(sm.material->shader, shadowData, &sunShadowRenderPass->cascades[0]);
 			}
 
 			if (entityHandle == selectedObjectID)
@@ -551,7 +708,7 @@ static void renderCloth(game_scene& scene, entity_handle selectedObjectID,
 			shadowData.numInstances = 1;
 			shadowData.submesh = data.submesh;
 
-			sunShadowRenderPass->renderDynamicObject<shadow_pipeline::double_sided>(0, shadowData);
+			addToDynamicRenderPass(clothMaterial->shader, shadowData, &sunShadowRenderPass->cascades[0]);
 		}
 
 		if (entityHandle == selectedObjectID)
