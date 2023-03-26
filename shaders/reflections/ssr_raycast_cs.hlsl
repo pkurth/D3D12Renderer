@@ -198,17 +198,19 @@ void main(cs_input IN)
     const float3 normal = unpackNormal(normalAndRoughness.xy);
     const float3 viewNormal = mul(camera.view, float4(normal, 0.f)).xyz;
     float roughness = normalAndRoughness.z;
+#if 1
     if (roughness > 0.85f)
     {
         output[IN.dispatchThreadID.xy] = float4(0.f, 0.f, -1.f, 0.f);
         return;
     }
-
-    roughness = clamp(roughness * roughness * roughness, 0.03f, 0.97f); // Raising the roughness to a power gets rid of some jittering.
-    
+#endif
 
     const float3 viewPos = restoreViewSpacePosition(camera.invProj, uv, depth);
     const float3 viewDir = normalize(viewPos);
+
+#if 1
+    roughness = clamp(roughness * roughness * roughness, 0.03f, 0.97f); // Raising the roughness to a power gets rid of some flickering.
 
     float2 h = halton23(cb.frameIndex & 31);
     uint3 noiseDims;
@@ -218,11 +220,26 @@ void main(cs_input IN)
 
     float4 H = importanceSampleGGX(Xi, viewNormal, roughness);
     float3 reflDir = reflect(viewDir, H.xyz);
+#else
+    // Perfect reflection.
+    float3 reflDir = reflect(viewDir, viewNormal);
+    float4 H = 1.f;
+#endif
 
-    float jitter = interleavedGradientNoise(IN.dispatchThreadID.xy, cb.frameIndex);
+#if 0
+    // Don't allow reflections towards camera.
+    if (dot(reflDir, -viewDir) > 0.f)
+    {
+        output[IN.dispatchThreadID.xy] = float4(0.f, 0.f, -1.f, 0.f);
+        return;
+    }
+#endif
+
+
+    float jitter = 0.f;// interleavedGradientNoise(IN.dispatchThreadID.xy, cb.frameIndex);
 
     float2 hitPixel;
-    bool hit = traceScreenSpaceRay(viewPos + reflDir * 0.001f, reflDir, jitter, roughness, hitPixel);
+    bool hit = traceScreenSpaceRay(viewPos + viewNormal * 0.005f, reflDir, jitter, roughness, hitPixel);
 
     float hitDepth = depthBuffer.SampleLevel(pointSampler, hitPixel, 0);
     float hitMul = hit ? 1.f : -1.f; // We pack the info whether we hit or not in the sign of the depth.

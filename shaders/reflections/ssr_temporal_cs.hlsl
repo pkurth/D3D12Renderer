@@ -132,6 +132,13 @@ void main(cs_input IN)
 {
     const float2 uv = (IN.dispatchThreadID.xy + 0.5f) * cb.invDimensions;
 
+#if 0
+    // Disable.
+    output[IN.dispatchThreadID.xy] = currResolve.SampleLevel(linearSampler, uv, 0.f);
+    return;
+#endif
+
+
     const float2 m = motion.SampleLevel(linearSampler, uv, 0);
     const float2 prevUV = uv + m;
 

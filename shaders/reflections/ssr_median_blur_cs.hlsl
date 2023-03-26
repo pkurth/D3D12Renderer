@@ -29,6 +29,14 @@ void main(cs_input IN)
     //if (depth == 0.0f)
     //    return;
 
+#if 0
+    // Disable.
+    output[IN.dispatchThreadID.xy] = input.SampleLevel(linearSampler, uv, 0);
+    return;
+#endif
+
+
+
     half4 v[25];
 
     // Add the pixels which make up our window to the pixel array.

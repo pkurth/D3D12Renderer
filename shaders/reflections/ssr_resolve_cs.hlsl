@@ -83,6 +83,11 @@ static void getResolveData(uint index, out float4 raycast, out float4 color)
 [RootSignature(SSR_RESOLVE_RS)]
 void main(cs_input IN)
 {
+    const float3 luminanceWeights = float3(0.2126f, 0.7152f, 0.0722f);
+    const float borderAttenuationDistance = 0.25f;
+
+
+
     const uint2 uvInt = (IN.groupID.xy * SSR_BLOCK_SIZE) + IN.groupThreadID.xy - SSR_RESOLVE_RAD;
     const float2 uv = (uvInt.xy + 0.5f) * cb.invDimensions;
 
@@ -127,12 +132,23 @@ void main(cs_input IN)
         return;
     }
 
+
+#if 0
+    // Disable.
+    float borderDist = min(1.f - max(raycastResult.x, raycastResult.y), min(raycastResult.x, raycastResult.y));
+    float borderAttenuation = saturate(borderDist / borderAttenuationDistance);
+
+    output[uvInt.xy] = float4(sceneColor.rgb, borderAttenuation * sceneColor.a);
+
+    output[uvInt.xy] = float4(hit.xxx, 1.f);
+    return;
+#endif
+
+
+
+
     float4 result = 0.f.xxxx;
     float totalWeight = 0.f;
-
-    static const float3 luminanceWeights = float3(0.2126f, 0.7152f, 0.0722f);
-
-    const float borderAttenuationDistance = 0.25f;
 
     [unroll]
     for (uint i = 0; i < 4; ++i)
