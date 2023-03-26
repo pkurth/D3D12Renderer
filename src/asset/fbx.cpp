@@ -8,6 +8,16 @@
 
 static void testDumpToPLY(const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, const std::vector<int32>& indices);
 
+
+enum mesh_flags
+{
+	mesh_flag_load_uvs,
+	mesh_flag_load_normals,
+	mesh_flag_load_materials,
+};
+
+
+
 struct entire_file
 {
 	uint8* content;
@@ -816,7 +826,7 @@ static fbx_model readModel(const fbx_node& node, const std::vector<fbx_node>& no
 	return result;
 }
 
-static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties)
+static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, uint32 flags)
 {
 	auto [id, name] = readObjectIDAndName(node, properties);
 
@@ -832,7 +842,7 @@ static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& node
 
 	if (!isTriangleMesh(originalIndices))
 	{
-		return result;
+		//return result;
 	}
 
 	struct vec2d
@@ -853,13 +863,23 @@ static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& node
 
 	std::vector<offset_count> vertexOffsetCounts(numOriginalPositions, { 0, 0 });
 	std::vector<uint32> originalToNewVertex(originalIndices.size());
+	std::vector<uint8> faceSizes;
+	faceSizes.reserve(originalIndices.size());
 
+	uint8 faceSize = 0;
 	for (int32 index : originalIndices)
 	{
 		int32 decodedIndex = decodeIndex(index);
 		vec3d position = originalPositionsPtr[decodedIndex];
 		result.geometry.positions.push_back(vec3((float)position.x, (float)position.y, (float)position.z));
 		++vertexOffsetCounts[decodedIndex].count;
+
+		++faceSize;
+		if (index < 0)
+		{
+			faceSizes.push_back(faceSize);
+			faceSize = 0;
+		}
 	}
 
 	uint32 offset = 0;
@@ -883,6 +903,7 @@ static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& node
 
 
 	// UVs.
+	if (flags & mesh_flag_load_uvs)
 	{
 		const fbx_node* uvNode = findNode(nodes, { "Objects", "Geometry", "LayerElementUV" });
 		auto [raw, indices, mapping, reference] = readGeometryData<double>(uvNode, nodes, properties, "UV", "UVIndex");
@@ -904,6 +925,7 @@ static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& node
 
 
 	// Normals.
+	if (flags & mesh_flag_load_normals)
 	{
 		const fbx_node* normalsNode = findNode(nodes, { "Objects", "Geometry", "LayerElementNormal" });
 		auto [raw, indices, mapping, reference] = readGeometryData<double>(normalsNode, nodes, properties, "Normals", "NormalsIndex");
@@ -925,17 +947,46 @@ static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& node
 
 
 	// Materials.
+	if (flags & mesh_flag_load_materials)
 	{
 		const fbx_node* materialsNode = node.findChild(nodes, "LayerElementMaterial");
 		auto [materials, _, mapping, reference] = readGeometryData<int32>(materialsNode, nodes, properties, "Materials", "");
+
+		result.geometry.materialIndex = mapDataToVertices(materials, _, mapping, reference, vertexOffsetCounts, originalToNewVertex,
+			(uint32)result.geometry.positions.size());
 	}
 
 
+#if 0
 	result.geometry.indices.resize(originalIndices.size());
 	for (int32 i = 0; i < result.geometry.indices.size(); ++i)
 	{
 		result.geometry.indices[i] = i;
 	}
+#else
+	result.geometry.indices.reserve(originalIndices.size());
+	int32 index = 0;
+	for (uint32 faceSize : faceSizes)
+	{
+		if (faceSize < 3)
+		{
+			index += faceSize;
+			continue;
+		}
+
+		int32 a = index++;
+		int32 b = index++;
+		for (uint32 i = 2; i < faceSize; ++i)
+		{
+			int32 c = index++;
+			result.geometry.indices.push_back(a);
+			result.geometry.indices.push_back(b);
+			result.geometry.indices.push_back(c);
+
+			b = c;
+		}
+	}
+#endif
 
 
 	result.geometry = removeDuplicateVertices(result.geometry);
@@ -1155,6 +1206,8 @@ static void readConnection(const fbx_node& node, const std::vector<fbx_node>& no
 
 void loadFBX(const fs::path& path)
 {
+	uint32 flags = mesh_flag_load_uvs | mesh_flag_load_normals | mesh_flag_load_materials;
+
 	std::string pathStr = path.string();
 	const char* s = pathStr.c_str();
 	entire_file file = loadFile(path);
@@ -1164,6 +1217,8 @@ void loadFBX(const fs::path& path)
 		freeFile(file);
 		return;
 	}
+
+	constexpr char c = 0x1A;
 
 	fbx_header* header = file.consume<fbx_header>();
 	if ((strcmp(header->magic, "Kaydara FBX Binary  ") != 0) || header->unknown[0] != 0x1A || header->unknown[1] != 0x00)
@@ -1208,15 +1263,21 @@ void loadFBX(const fs::path& path)
 		}
 		if (objectNode.name == "Geometry")
 		{
-			meshes.push_back(readMesh(objectNode, nodes, properties));
+			meshes.push_back(readMesh(objectNode, nodes, properties, flags));
 		}
 		else if (objectNode.name == "Material")
 		{
-			materials.push_back(readMaterial(objectNode, nodes, properties));
+			if (flags & mesh_flag_load_materials)
+			{
+				materials.push_back(readMaterial(objectNode, nodes, properties));
+			}
 		}
 		else if (objectNode.name == "Texture")
 		{
-			textures.push_back(readTexture(objectNode, nodes, properties));
+			if (flags & mesh_flag_load_materials)
+			{
+				textures.push_back(readTexture(objectNode, nodes, properties));
+			}
 		}
 	}
 

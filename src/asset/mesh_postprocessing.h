@@ -7,6 +7,7 @@ struct mesh_geometry
 	std::vector<vec3> positions;
 	std::vector<vec2> uvs;
 	std::vector<vec3> normals;
+	std::vector<int32> materialIndex;
 	std::vector<int32> indices;
 };
 
