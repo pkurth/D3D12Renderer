@@ -282,6 +282,7 @@ static void renderStaticObjectsToMainCamera(group_t group, std::unordered_map<mu
 			data.material = sm.material;
 
 			depthPrepassData.submesh = data.submesh;
+			depthPrepassData.alphaCutoutTextureSRV = (sm.material && sm.material->albedo) ? sm.material->albedo->defaultSRV : dx_cpu_descriptor_handle{};
 
 			addToRenderPass(sm.material->shader, data, depthPrepassData, opaqueRenderPass, transparentRenderPass);
 
@@ -459,6 +460,7 @@ static void renderDynamicObjectsToMainCamera(group_t group, std::unordered_map<m
 			data.material = sm.material;
 
 			depthPrepassData.submesh = data.submesh;
+			depthPrepassData.alphaCutoutTextureSRV = (sm.material && sm.material->albedo) ? sm.material->albedo->defaultSRV : dx_cpu_descriptor_handle{};
 
 			addToRenderPass(sm.material->shader, data, depthPrepassData, opaqueRenderPass, transparentRenderPass);
 
@@ -608,6 +610,7 @@ static void renderAnimatedObjects(game_scene& scene, const camera_frustum_planes
 			data.submesh.baseVertex -= mesh.mesh->submeshes[0].info.baseVertex; // Vertex buffer from skinning already points to first vertex.
 
 			depthPrepassData.submesh = data.submesh;
+			depthPrepassData.alphaCutoutTextureSRV = (sm.material && sm.material->albedo) ? sm.material->albedo->defaultSRV : dx_cpu_descriptor_handle{};
 
 			addToRenderPass(sm.material->shader, data, depthPrepassData, opaqueRenderPass, transparentRenderPass);
 
@@ -773,6 +776,7 @@ static void renderCloth(game_scene& scene, entity_handle selectedObjectID,
 		depthPrepassData.indexBuffer = ib;
 		depthPrepassData.submesh = sm;
 		depthPrepassData.numInstances = 1;
+		depthPrepassData.alphaCutoutTextureSRV = (clothMaterial && clothMaterial->albedo) ? clothMaterial->albedo->defaultSRV : dx_cpu_descriptor_handle{};
 
 		addToRenderPass(clothMaterial->shader, data, depthPrepassData, opaqueRenderPass, transparentRenderPass);
 
