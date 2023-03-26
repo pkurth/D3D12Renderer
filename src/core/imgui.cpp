@@ -235,7 +235,7 @@ namespace ImGui
 		return result;
 	}
 
-	void Image(::dx_cpu_descriptor_handle& handle, ImVec2 size, ImVec2 uv0, ImVec2 uv1)
+	static void Image(::dx_cpu_descriptor_handle& handle, ImVec2 size, ImVec2 uv0, ImVec2 uv1)
 	{
 		if (numImagesThisFrame < MAX_NUM_IMGUI_IMAGES_PER_FRAME)
 		{
@@ -243,24 +243,27 @@ namespace ImGui
 		}
 	}
 
-	void Image(::dx_cpu_descriptor_handle& handle, uint32 width, uint32 height, ImVec2 uv0, ImVec2 uv1)
+	static void Image(::dx_cpu_descriptor_handle& handle, uint32 width, uint32 height, ImVec2 uv0, ImVec2 uv1)
 	{
 		ImGui::Image(handle, ImVec2((float)width, (float)height), uv0, uv1);
 	}
 
-	void Image(const ref<dx_texture>& texture, ImVec2 size, ImVec2 uv0, ImVec2 uv1)
+	static void Image(const ref<dx_texture>& texture, ImVec2 size, ImVec2 uv0, ImVec2 uv1)
 	{
-		if (size.x == 0)
+		if (texture)
 		{
-			size.x = min(ImGui::GetContentRegionAvail().x, (float)texture->width);
-		}
+			if (size.x == 0)
+			{
+				size.x = min(ImGui::GetContentRegionAvail().x, (float)texture->width);
+			}
 
-		if (size.y == 0)
-		{
-			size.y = texture->height * size.x / (float)texture->width;
-		}
+			if (size.y == 0)
+			{
+				size.y = texture->height * size.x / (float)texture->width;
+			}
 
-		ImGui::Image(texture->defaultSRV, size, uv0, uv1);
+			ImGui::Image(texture->defaultSRV, size, uv0, uv1);
+		}
 	}
 
 	void Image(const ref<dx_texture>& texture, uint32 width, uint32 height, ImVec2 uv0, ImVec2 uv1)
@@ -268,7 +271,7 @@ namespace ImGui
 		ImGui::Image(texture, ImVec2((float)width, (float)height), uv0, uv1);
 	}
 
-	bool ImageButton(::dx_cpu_descriptor_handle& handle, ImVec2 size, ImVec2 uvTopLeft, ImVec2 uvBottomRight)
+	static bool ImageButton(::dx_cpu_descriptor_handle& handle, ImVec2 size, ImVec2 uvTopLeft, ImVec2 uvBottomRight)
 	{
 		if (numImagesThisFrame < MAX_NUM_IMGUI_IMAGES_PER_FRAME)
 		{
@@ -277,12 +280,12 @@ namespace ImGui
 		return false;
 	}
 
-	bool ImageButton(::dx_cpu_descriptor_handle& handle, uint32 width, uint32 height, ImVec2 uvTopLeft, ImVec2 uvBottomRight)
+	static bool ImageButton(::dx_cpu_descriptor_handle& handle, uint32 width, uint32 height, ImVec2 uvTopLeft, ImVec2 uvBottomRight)
 	{
 		return ImGui::ImageButton(handle, ImVec2((float)width, (float)height), uvTopLeft, uvBottomRight);
 	}
 
-	bool ImageButton(const ref<dx_texture>& texture, ImVec2 size, ImVec2 uvTopLeft, ImVec2 uvBottomRight)
+	static bool ImageButton(const ref<dx_texture>& texture, ImVec2 size, ImVec2 uvTopLeft, ImVec2 uvBottomRight)
 	{
 		return ImGui::ImageButton(texture->defaultSRV, size, uvTopLeft, uvBottomRight);
 	}
@@ -502,7 +505,8 @@ namespace ImGui
 		ImGui::SetItemDefaultFocus();
 	}
 
-	bool AssetHandle(const char* label, const char* type, asset_handle& asset, const char* clearText)
+	template <typename tooptip_func>
+	static bool AssetHandleInternal(const char* label, const char* type, asset_handle& asset, const char* clearText, tooptip_func tooltipFunc)
 	{
 		char buffer[512] = "";
 		if (asset)
@@ -541,6 +545,7 @@ namespace ImGui
 				ImGui::BeginTooltip();
 				ImGui::Text(path.string().c_str());
 				ImGui::Text("Asset handle: % llu", asset.value);
+				tooltipFunc();
 				ImGui::EndTooltip();
 			}
 		}
@@ -556,6 +561,16 @@ namespace ImGui
 		}
 
 		return result;
+	}
+
+	bool AssetHandle(const char* label, const char* type, asset_handle& asset, const char* clearText)
+	{
+		return AssetHandleInternal(label, type, asset, clearText, []() {});
+	}
+
+	bool TextureAssetHandle(const char* label, const char* type, asset_handle& asset, const ref<dx_texture>& texture, uint32 width, uint32 height, ImVec2 uv0, ImVec2 uv1, const char* clearText)
+	{
+		return AssetHandleInternal(label, type, asset, clearText, [=]() { ImGui::Image(texture, width, height, uv0, uv1); });
 	}
 
 	bool Drag(const char* label, float& f, float speed, float min, float max, const char* format)
@@ -931,6 +946,14 @@ namespace ImGui
 	{
 		pre(label);
 		bool result = AssetHandle("", type, asset, clearText);
+		post();
+		return result;
+	}
+
+	bool PropertyTextureAssetHandle(const char* label, const char* type, asset_handle& asset, const ref<dx_texture>& texture, uint32 width, uint32 height, ImVec2 uv0, ImVec2 uv1, const char* clearText)
+	{
+		pre(label);
+		bool result = TextureAssetHandle("", type, asset, texture, width, height, uv0, uv1, clearText);
 		post();
 		return result;
 	}

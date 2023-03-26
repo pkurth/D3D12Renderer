@@ -658,7 +658,7 @@ static void editTexture(const char* name, ref<dx_texture>& tex, uint32 loadFlags
 	{
 		asset = tex->handle;
 	}
-	if (ImGui::PropertyAssetHandle(name, EDITOR_ICON_IMAGE, asset))
+	if (ImGui::PropertyTextureAssetHandle(name, EDITOR_ICON_IMAGE, asset, tex))
 	{
 		fs::path path = getPathFromAssetHandle(asset);
 		fs::path relative = fs::relative(path, fs::current_path());
@@ -2334,7 +2334,7 @@ bool scene_editor::editSunShadowParameters(directional_light& sun)
 			for (uint32 i = 0; i < sun.numShadowCascades; ++i)
 			{
 				auto vp = sun.shadowMapViewports[i];
-				ImGui::Image(render_resources::shadowMap, ImVec2(0.f, 0.f), ImVec2(vp.x, vp.y), ImVec2(vp.x + vp.z, vp.y + vp.w));
+				ImGui::Image(render_resources::shadowMap, 0, 0, ImVec2(vp.x, vp.y), ImVec2(vp.x + vp.z, vp.y + vp.w));
 			}
 			ImGui::EndTree();
 		}

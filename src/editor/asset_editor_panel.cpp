@@ -28,7 +28,7 @@ void asset_editor_panel::beginFrame()
 					if (rendering)
 					{
 						ImVec2 minCorner = ImGui::GetCursorPos();
-						ImGui::Image(rendering, contentSize);
+						ImGui::Image(rendering, (uint32)contentSize.x, (uint32)contentSize.y);
 
 						ImGui::SetCursorPos(ImVec2(minCorner.x + 4.5f, minCorner.y + 4.5f));
 						ImGui::Dummy(ImVec2(contentSize.x - 9.f, contentSize.y - 9.f));
