@@ -2155,7 +2155,7 @@ static void writeWideContact(const collider_union* worldSpaceColliders, const w_
 			}
 		}
 		uint32 offsetPerLane[COLLISION_SIMD_WIDTH];
-		prefixSum(numContactsPerLane, offsetPerLane, numValidLanes, false);
+		exclusivePrefixSum(numContactsPerLane, offsetPerLane, numValidLanes);
 
 		for (uint32 k = 0; k < numValidLanes; ++k)
 		{

@@ -854,14 +854,14 @@ bool getEigen(const mat3& A, vec3& outEigenValues, mat3& outEigenVectors);
 
 
 template <typename T>
-void prefixSum(const T* input, T* output, uint32 count, bool inclusive)
+void exclusivePrefixSum(const T* input, T* output, uint32 count)
 {
 	if (count > 0)
 	{
-		output[0] = inclusive ? input[0] : 0;
+		output[0] = T(0);
 		for (uint32 i = 1; i < count; ++i)
 		{
-			output[i] = output[i - 1] + input[i];
+			output[i] = output[i - 1] + input[i - 1];
 		}
 	}
 }
