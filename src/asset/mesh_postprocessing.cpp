@@ -1,43 +1,11 @@
 #include "pch.h"
 #include "mesh_postprocessing.h"
 
-#include "core/hash.h"
-
 #include <unordered_map>
-
-struct full_vertex
-{
-	vec3 position;
-	vec2 uv;
-	vec3 normal;
-};
-
-namespace std
-{
-	template<>
-	struct hash<full_vertex>
-	{
-		size_t operator()(const full_vertex& x) const
-		{
-			size_t seed = 0;
-
-			hash_combine(seed, x.position);
-			hash_combine(seed, x.uv);
-			hash_combine(seed, x.normal);
-
-			return seed;
-		}
-	};
-}
-
-static bool operator==(const full_vertex& a, const full_vertex& b)
-{
-	return memcmp(&a, &b, sizeof(full_vertex)) == 0;
-}
 
 mesh_geometry removeDuplicateVertices(mesh_geometry& mesh)
 {
-	std::unordered_map<full_vertex, uint32> vertexToIndex;
+	std::unordered_map<full_vertex, int32> vertexToIndex;
 
 	vec2 nullUV(0.f, 0.f);
 	vec3 nullNormal(0.f, 0.f, 0.f);
@@ -51,7 +19,7 @@ mesh_geometry removeDuplicateVertices(mesh_geometry& mesh)
 
 	std::vector<int32> uniqueIndexPerVertex(mesh.positions.size());
 
-	for (uint32 i = 0; i < (uint32)mesh.positions.size(); ++i)
+	for (int32 i = 0; i < (int32)mesh.positions.size(); ++i)
 	{
 		full_vertex vertex = 
 		{ 
