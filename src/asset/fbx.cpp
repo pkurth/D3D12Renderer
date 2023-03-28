@@ -770,6 +770,59 @@ struct fbx_material;
 struct fbx_texture;
 struct fbx_deformer;
 
+struct fbx_global_settings
+{
+	int32 upAxis;
+	int32 upAxisSign;
+
+	int32 frontAxis;
+	int32 frontAxisSign;
+
+	int32 coordAxis;
+	int32 coordAxisSign;
+
+	int32 originalUpAxis;
+	int32 originalUpAxisSign;
+};
+
+static fbx_global_settings readGlobalSettings(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties)
+{
+	const fbx_node* properties70 = node.findChild(nodes, "Properties70");
+
+	fbx_global_settings result = {};
+
+	for (const fbx_node& P : fbx_node_iterator{ properties70, nodes })
+	{
+		ASSERT(P.name == "P");
+
+		auto propIterator = fbx_property_iterator{ &P, properties }.begin();
+		sized_string name = readString(*propIterator++);
+
+		auto readAxis = [&propIterator]()
+		{
+			sized_string dataType = readString(*propIterator++);
+			ASSERT(dataType == "int");
+
+			sized_string longDataType = readString(*propIterator++);
+			ASSERT(longDataType == "Integer");
+
+			int32 value = readInt32(*propIterator++);
+			return value;
+		};
+
+		if (name == "UpAxis") { result.upAxis = readAxis(); }
+		else if (name == "UpAxisSign") { result.upAxisSign = readAxis(); }
+		else if (name == "FrontAxis") { result.frontAxis = readAxis(); }
+		else if (name == "FrontAxisSign") { result.frontAxisSign = readAxis(); }
+		else if (name == "CoordAxis") { result.coordAxis = readAxis(); }
+		else if (name == "CoordAxisSign") { result.coordAxisSign = readAxis(); }
+		else if (name == "OriginalUpAxis") { result.originalUpAxis = readAxis(); }
+		else if (name == "OriginalUpAxisSign") { result.originalUpAxisSign = readAxis(); }
+	}
+
+	return result;
+}
+
 struct fbx_model : fbx_object
 {
 	quat localRotation = quat::identity;
@@ -845,6 +898,8 @@ struct fbx_deformer : fbx_object
 
 	fbx_model* model;
 	fbx_deformer* parentJoint;
+
+	mat4 invBindMatrix;
 };
 
 enum fbx_connection_type
@@ -1194,20 +1249,35 @@ static bool readDeformer(const fbx_node& node, const std::vector<fbx_node>& node
 	fbx_deformer result = {};
 	result.id = id;
 	result.name = name;
+	result.invBindMatrix = mat4::identity;
 
-	const fbx_node* indicesNode = node.findChild(nodes, "Indexes");
-	const fbx_node* weightsNode = node.findChild(nodes, "Weights");
-
-	if (indicesNode && weightsNode)
+	for (const fbx_node& child : fbx_node_iterator{ &node, nodes })
 	{
-		result.vertexIndices = readInt32Array(*indicesNode->getFirstProperty(properties));
-		std::vector<double> weights = readDoubleArray(*weightsNode->getFirstProperty(properties));
-		result.weights.resize(weights.size());
-		for (uint32 i = 0; i < (uint32)weights.size(); ++i)
+		if (child.name == "Indexes")
 		{
-			result.weights[i] = (float)weights[i];
+			result.vertexIndices = readInt32Array(*child.getFirstProperty(properties));
+		}
+		else if (child.name == "Weights")
+		{
+			std::vector<double> weights = readDoubleArray(*child.getFirstProperty(properties));
+			result.weights.resize(weights.size());
+			for (uint32 i = 0; i < (uint32)weights.size(); ++i)
+			{
+				result.weights[i] = (float)weights[i];
+			}
+		}
+		else if (child.name == "Transform")
+		{
+			std::vector<double> matrix = readDoubleArray(*child.getFirstProperty(properties));
+			ASSERT(matrix.size() == 16);
+			for (uint32 i = 0; i < 16; ++i)
+			{
+				result.invBindMatrix.m[i] = (float)matrix[i];
+			}
 		}
 	}
+
+	ASSERT(result.vertexIndices.size() == result.weights.size());
 
 	outDeformers.push_back(std::move(result));
 	return true;
@@ -1555,6 +1625,8 @@ void loadFBX(const fs::path& path)
 		return;
 	}
 #endif
+
+	fbx_global_settings globalSettings = readGlobalSettings(*findNode(nodes, { "GlobalSettings" }), nodes, properties);
 
 	std::vector<fbx_model> models;
 	std::vector<fbx_mesh> meshes;
