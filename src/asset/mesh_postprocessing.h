@@ -2,7 +2,7 @@
 
 #include "core/math.h"
 #include "core/hash.h"
-
+#include "geometry/mesh.h"
 
 struct mesh_geometry
 {
@@ -17,6 +17,7 @@ struct full_vertex
 	vec3 position;
 	vec2 uv;
 	vec3 normal;
+	skinning_weights skin;
 };
 
 namespace std
@@ -31,6 +32,8 @@ namespace std
 			hash_combine(seed, x.position);
 			hash_combine(seed, x.uv);
 			hash_combine(seed, x.normal);
+			hash_combine(seed, *(uint32*)x.skin.skinIndices);
+			hash_combine(seed, *(uint32*)x.skin.skinWeights);
 
 			return seed;
 		}

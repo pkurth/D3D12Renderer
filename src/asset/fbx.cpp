@@ -5,6 +5,8 @@
 
 #include "mesh_postprocessing.h"
 
+#include "core/yaml.h"
+
 
 static void testDumpToPLY(const std::string& filename,
 	const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, const std::vector<int32>& indices,
@@ -485,70 +487,125 @@ struct fbx_node_iterator
 	}
 };
 
-static void printProperty(const fbx_property& prop, FILE* stream, uint32 indent = 0)
+
+struct fbx_node_wrapper
 {
-	fbx_property_type type = prop.type;
+	const fbx_node& node;
+	const std::vector<fbx_node>& nodes;
+	const std::vector<fbx_property>& properties;
+};
 
-#define PRINT_HELPER(typeStr, type, format) \
-	fprintf(stream, typeStr ": ");	\
-	if (prop.numElements == 1) { fprintf(stream, format, *(type*)prop.data); } \
-	else if (prop.encoding == 0) { fprintf(stream, "[ "); for (uint32 j = 0; j < prop.numElements; ++j) { fprintf(stream, format " ", ((type*)prop.data)[j]); } fprintf(stream, "]"); } \
-	else { fprintf(stream, "[%u compressed elements] ", prop.numElements); }
+struct fbx_prop_wrapper
+{
+	const fbx_property& prop;
+};
 
-	fprintf(stream, "%.*s- ", indent, indentStr);
-	switch (type)
+namespace YAML
+{
+	template<>
+	struct convert<fbx_property>
 	{
-		case fbx_property_type_bool:
+		static Node encode(const fbx_property& prop)
 		{
-			PRINT_HELPER("Bool", bool, "%u");
-		} break;
-		case fbx_property_type_float:
+			Node n;
+			Node dataNode;
+			dataNode.SetStyle(EmitterStyle::Flow);
+
+			fbx_property_type type = prop.type;
+
+			switch (type)
+			{
+				case fbx_property_type_bool:
+				{
+					n["Type"] = "Bool";
+					if (prop.numElements == 1) { dataNode = *(bool*)prop.data; }
+					else if (prop.encoding == 0) {for (uint32 j = 0; j < prop.numElements; ++j) { dataNode.push_back(((bool*)prop.data)[j]); } }
+					else { dataNode.push_back(std::to_string(prop.numElements) + " compressed elements"); }
+				} break;
+				case fbx_property_type_float:
+				{
+					n["Type"] = "Float";
+					if (prop.numElements == 1) { dataNode = *(float*)prop.data; }
+					else if (prop.encoding == 0) { for (uint32 j = 0; j < prop.numElements; ++j) { dataNode.push_back(((float*)prop.data)[j]); } }
+					else { dataNode.push_back(std::to_string(prop.numElements) + " compressed elements"); }
+				} break;
+				case fbx_property_type_double:
+				{
+					n["Type"] = "Double";
+					if (prop.numElements == 1) { dataNode = *(double*)prop.data; }
+					else if (prop.encoding == 0) { for (uint32 j = 0; j < prop.numElements; ++j) { dataNode.push_back(((double*)prop.data)[j]); } }
+					else { dataNode.push_back(std::to_string(prop.numElements) + " compressed elements"); }
+				} break;
+				case fbx_property_type_int16:
+				{
+					n["Type"] = "Int16";
+					if (prop.numElements == 1) { dataNode = *(int16*)prop.data; }
+					else if (prop.encoding == 0) { for (uint32 j = 0; j < prop.numElements; ++j) { dataNode.push_back(((int16*)prop.data)[j]); } }
+					else { dataNode.push_back(std::to_string(prop.numElements) + " compressed elements"); }
+				} break;
+				case fbx_property_type_int32:
+				{
+					n["Type"] = "Int32";
+					if (prop.numElements == 1) { dataNode = *(int32*)prop.data; }
+					else if (prop.encoding == 0) { for (uint32 j = 0; j < prop.numElements; ++j) { dataNode.push_back(((int32*)prop.data)[j]); } }
+					else { dataNode.push_back(std::to_string(prop.numElements) + " compressed elements"); }
+				} break;
+				case fbx_property_type_int64:
+				{
+					n["Type"] = "Int64";
+					if (prop.numElements == 1) { dataNode = *(int64*)prop.data; }
+					else if (prop.encoding == 0) { for (uint32 j = 0; j < prop.numElements; ++j) { dataNode.push_back(((int64*)prop.data)[j]); } }
+					else { dataNode.push_back(std::to_string(prop.numElements) + " compressed elements"); }
+				} break;
+				case fbx_property_type_string:
+				{
+					n["Type"] = "String";
+					dataNode = std::string((const char*)prop.data, prop.numElements);
+				} break;
+				case fbx_property_type_raw:
+				{
+					n["Type"] = "Raw";
+				} break;
+				default:
+				{
+					ASSERT(false);
+				} break;
+			}
+
+			n["Data"] = dataNode;
+			return n;
+		}
+	};
+
+	template<>
+	struct convert<fbx_node_wrapper>
+	{
+		static Node encode(const fbx_node_wrapper& c)
 		{
-			PRINT_HELPER("Float", float, "%f");
-		} break;
-		case fbx_property_type_double:
-		{
-			PRINT_HELPER("Double", double, "%f");
-		} break;
-		case fbx_property_type_int16:
-		{
-			PRINT_HELPER("Int16", int16, "%d");
-		} break;
-		case fbx_property_type_int32:
-		{
-			PRINT_HELPER("Int32", int32, "%d");
-		} break;
-		case fbx_property_type_int64:
-		{
-			PRINT_HELPER("Int64", int64, "%lld");
-		} break;
-		case fbx_property_type_string:
-		{
-			fprintf(stream, "String: %.*s", prop.numElements, (char*)prop.data);
-		} break;
-		case fbx_property_type_raw:
-		{
-			fprintf(stream, "Raw: [%u compressed bytes] ", prop.numElements);
-		} break;
-		default:
-		{
-			ASSERT(false);
-		} break;
-	}
-	fprintf(stream, "\n");
+			Node n;
+
+			for (const fbx_property& prop : fbx_property_iterator{ &c.node, c.properties })
+			{
+				n.push_back(prop);
+			}
+
+			for (const fbx_node& node : fbx_node_iterator{ &c.node, c.nodes })
+			{
+				std::string key(node.name.str, node.name.length);
+
+				Node nestedNode;
+				nestedNode[key] = fbx_node_wrapper{ node, c.nodes, c.properties };
+				n.push_back(nestedNode);
+			}
+
+			return n;
+		}
+	};
 }
 
-static void printFBXContent(const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, const fbx_node& parent, FILE* stream = stdout, uint32 indent = 0)
+static void writeFBXContentToYAML(const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, const fbx_node& parent, YAML::Node& out)
 {
-	for (const fbx_node& node : fbx_node_iterator{ &parent, nodes } )
-	{
-		fprintf(stream, "%.*sNODE '%.*s'\n", indent, indentStr, node.name.length, node.name.str);
-		for (const fbx_property& prop : fbx_property_iterator{ &node, properties })
-		{
-			printProperty(prop, stream, indent);
-		}
-		printFBXContent(nodes, properties, node, stream, indent + 1);
-	}
+	out = fbx_node_wrapper{ parent, nodes, properties };
 }
 
 
@@ -701,24 +758,58 @@ static std::vector<data_t> mapDataToVertices(const std::vector<data_t>& data, co
 }
 
 
-
-
 struct fbx_object
 {
 	int64 id;
 	sized_string name;
 };
 
-struct fbx_mesh : fbx_object
+struct fbx_model;
+struct fbx_mesh;
+struct fbx_material;
+struct fbx_texture;
+struct fbx_deformer;
+
+struct fbx_model : fbx_object
 {
-	mesh_geometry geometry;
-	int32 materialIndex;
+	quat localRotation = quat::identity;
+	vec3 localTranslation = vec3(0.f);
+
+	std::vector<fbx_mesh*> meshes;
+	std::vector<fbx_material*> materials;
+	std::vector<fbx_model*> children;
+
+	fbx_model* parent;
+	fbx_deformer* deformer;
 };
 
-struct fbx_texture : fbx_object
+struct fbx_submesh
 {
-	sized_string filename;
-	sized_string relativeFilename;
+	int32 materialIndex;
+
+	std::vector<vec3> positions;
+	std::vector<vec2> uvs;
+	std::vector<vec3> normals;
+	std::vector<skinning_weights> skin;
+	std::vector<int32> indices;
+};
+
+struct fbx_mesh : fbx_object
+{
+	std::vector<vec3> positions;
+	std::vector<vec2> uvs;
+	std::vector<vec3> normals;
+	std::vector<skinning_weights> skin;
+	std::vector<int32> originalIndices;
+
+	std::vector<offset_count> vertexOffsetCounts;
+	std::vector<uint32> originalToNewVertex;
+
+	std::vector<int32> materialIndexPerFace;
+
+	fbx_deformer* deformer;
+
+	std::vector<fbx_submesh> submeshes;
 };
 
 struct fbx_material : fbx_object
@@ -740,13 +831,43 @@ struct fbx_material : fbx_object
 	fbx_texture* metallicTexture;
 };
 
-struct fbx_model : fbx_object
+struct fbx_texture : fbx_object
 {
-	quat localRotation = quat::identity;
-	vec3 localTranslation = vec3(0.f);
+	sized_string filename;
+	sized_string relativeFilename;
+};
 
-	std::vector<fbx_mesh*> meshes;
-	std::vector<fbx_material*> materials;
+struct fbx_deformer : fbx_object
+{
+	std::vector<int32> vertexIndices;
+	std::vector<float> weights;
+	std::vector<fbx_deformer*> joints;
+
+	fbx_model* model;
+	fbx_deformer* parentJoint;
+};
+
+enum fbx_connection_type
+{
+	fbx_connection_type_object_object,
+	fbx_connection_type_object_property,
+};
+
+enum fbx_texture_slot
+{
+	fbx_texture_slot_none,
+	fbx_texture_slot_albedo,
+	fbx_texture_slot_normal,
+	fbx_texture_slot_roughness,
+	fbx_texture_slot_metallic,
+};
+
+struct fbx_connection
+{
+	int64 idA;
+	int64 idB;
+	fbx_connection_type type;
+	fbx_texture_slot textureSlot;
 };
 
 static std::pair<int64, sized_string> readObjectIDAndName(const fbx_node& node, const std::vector<fbx_property>& properties)
@@ -804,7 +925,7 @@ static bool readModel(const fbx_node& node, const std::vector<fbx_node>& nodes, 
 		}
 	}
 
-	outModels.push_back(result);
+	outModels.push_back(std::move(result));
 	return true;
 }
 
@@ -812,11 +933,15 @@ static bool readMesh(const fbx_node& node, const std::vector<fbx_node>& nodes, c
 {
 	auto [id, name] = readObjectIDAndName(node, properties);
 
+	fbx_mesh result = {};
+	result.id = id;
+	result.name = name;
+
 	const fbx_node* positionsNode = node.findChild(nodes, "Vertices");
 	std::vector<double> originalPositionsRaw = readDoubleArray(*positionsNode->getFirstProperty(properties));
 
 	const fbx_node* indicesNode = node.findChild(nodes, "PolygonVertexIndex");
-	std::vector<int32> originalIndices = readInt32Array(*indicesNode->getFirstProperty(properties));
+	result.originalIndices = readInt32Array(*indicesNode->getFirstProperty(properties));
 
 	struct vec2d
 	{
@@ -833,22 +958,18 @@ static bool readMesh(const fbx_node& node, const std::vector<fbx_node>& nodes, c
 
 
 
-	std::vector<vec3> positions;
-	std::vector<vec2> uvs;
-	std::vector<vec3> normals;
+	result.positions.reserve(result.originalIndices.size());
 
-	positions.reserve(originalIndices.size());
-
-	std::vector<offset_count> vertexOffsetCounts(numOriginalPositions, { 0, 0 });
-	std::vector<uint32> originalToNewVertex(originalIndices.size());
+	result.vertexOffsetCounts.resize(numOriginalPositions, { 0, 0 });
+	result.originalToNewVertex.resize(result.originalIndices.size());
 	uint32 numFaces = 0;
 
-	for (int32 index : originalIndices)
+	for (int32 index : result.originalIndices)
 	{
 		int32 decodedIndex = decodeIndex(index);
 		vec3d position = originalPositionsPtr[decodedIndex];
-		positions.push_back(vec3((float)position.x, (float)position.y, (float)position.z));
-		++vertexOffsetCounts[decodedIndex].count;
+		result.positions.push_back(vec3((float)position.x, (float)position.y, (float)position.z));
+		++result.vertexOffsetCounts[decodedIndex].count;
 
 		if (index < 0)
 		{
@@ -859,18 +980,18 @@ static bool readMesh(const fbx_node& node, const std::vector<fbx_node>& nodes, c
 	uint32 offset = 0;
 	for (uint32 i = 0; i < numOriginalPositions; ++i)
 	{
-		vertexOffsetCounts[i].offset = offset;
-		offset += vertexOffsetCounts[i].count;
-		vertexOffsetCounts[i].count = 0;
+		result.vertexOffsetCounts[i].offset = offset;
+		offset += result.vertexOffsetCounts[i].count;
+		result.vertexOffsetCounts[i].count = 0;
 	}
 
-	for (uint32 i = 0; i < (uint32)originalIndices.size(); ++i)
+	for (uint32 i = 0; i < (uint32)result.originalIndices.size(); ++i)
 	{
-		int32 index = originalIndices[i];
+		int32 index = result.originalIndices[i];
 		int32 decodedIndex = decodeIndex(index);
-		uint32 offset = vertexOffsetCounts[decodedIndex].offset;
-		uint32 count = vertexOffsetCounts[decodedIndex].count++;
-		originalToNewVertex[offset + count] = i;
+		uint32 offset = result.vertexOffsetCounts[decodedIndex].offset;
+		uint32 count = result.vertexOffsetCounts[decodedIndex].count++;
+		result.originalToNewVertex[offset + count] = i;
 	}
 
 
@@ -885,15 +1006,15 @@ static bool readMesh(const fbx_node& node, const std::vector<fbx_node>& nodes, c
 
 		if (raw.size())
 		{
-			uvs.resize(raw.size() / 2);
+			result.uvs.resize(raw.size() / 2);
 			vec2d* ptr = (vec2d*)raw.data();
-			for (uint32 i = 0; i < (uint32)uvs.size(); ++i)
+			for (uint32 i = 0; i < (uint32)result.uvs.size(); ++i)
 			{
-				uvs[i] = vec2((float)ptr[i].x, (float)ptr[i].y);
+				result.uvs[i] = vec2((float)ptr[i].x, (float)ptr[i].y);
 			}
 
-			uvs = mapDataToVertices(uvs, indices, mapping, reference, vertexOffsetCounts, originalToNewVertex,
-				(uint32)positions.size());
+			result.uvs = mapDataToVertices(result.uvs, indices, mapping, reference, result.vertexOffsetCounts, result.originalToNewVertex,
+				(uint32)result.positions.size());
 		}
 	}
 
@@ -907,20 +1028,19 @@ static bool readMesh(const fbx_node& node, const std::vector<fbx_node>& nodes, c
 
 		if (raw.size())
 		{
-			normals.resize(raw.size() / 3);
+			result.normals.resize(raw.size() / 3);
 			vec3d* ptr = (vec3d*)raw.data();
-			for (uint32 i = 0; i < (uint32)normals.size(); ++i)
+			for (uint32 i = 0; i < (uint32)result.normals.size(); ++i)
 			{
-				normals[i] = vec3((float)ptr[i].x, (float)ptr[i].y, (float)ptr[i].z);
+				result.normals[i] = vec3((float)ptr[i].x, (float)ptr[i].y, (float)ptr[i].z);
 			}
 
-			normals = mapDataToVertices(normals, indices, mapping, reference, vertexOffsetCounts, originalToNewVertex,
-				(uint32)positions.size());
+			result.normals = mapDataToVertices(result.normals, indices, mapping, reference, result.vertexOffsetCounts, result.originalToNewVertex,
+				(uint32)result.positions.size());
 		}
 	}
 
 
-	std::vector<int32> materialIndices;
 
 	// Materials.
 	if (flags & mesh_flag_load_materials)
@@ -928,114 +1048,29 @@ static bool readMesh(const fbx_node& node, const std::vector<fbx_node>& nodes, c
 		const fbx_node* materialsNode = node.findChild(nodes, "LayerElementMaterial");
 		auto [materials, indices, mapping, reference] = readGeometryData<int32>(materialsNode, nodes, properties, "Materials", "");
 
-		if (mapping == mapping_info_all_same)
+		if (materials.size() > 0)
 		{
-			int32 materialIndex = !materials.empty() ? materials[0] : 0;
-			materialIndices.resize(numFaces, materialIndex);
-		}
-		else if (mapping == mapping_info_by_polygon)
-		{
-			materialIndices = std::move(materials);
-		}
-		else
-		{
-			ASSERT(false);
-		}
-	}
-	else
-	{
-		materialIndices.resize(numFaces, 0);
-	}
-
-
-
-	// Assign materials, remove duplicate vertices and triangulate.
-
-	ASSERT(materialIndices.size() == numFaces);
-
-	struct per_material
-	{
-		std::unordered_map<full_vertex, int32> vertexToIndex;
-		mesh_geometry geometry;
-
-		int32 addVertex(const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals,
-			int32 index)
-		{
-			vec3 position = positions[index];
-			vec2 uv = !uvs.empty() ? uvs[index] : vec2(0.f, 0.f);
-			vec3 normal = !normals.empty() ? normals[index] : vec3(0.f, 0.f, 0.f);
-
-			full_vertex vertex = { position, uv, normal, };
-			auto it = vertexToIndex.find(vertex);
-			if (it == vertexToIndex.end())
+			if (mapping == mapping_info_all_same)
 			{
-				int32 vertexIndex = (int32)geometry.positions.size();
-				vertexToIndex.insert({ vertex, vertexIndex });
-
-				geometry.positions.push_back(position);
-				if (!uvs.empty()) { geometry.uvs.push_back(uv); }
-				if (!normals.empty()) { geometry.normals.push_back(normal); }
-
-				return vertexIndex;
+				int32 materialIndex = !materials.empty() ? materials[0] : 0;
+				result.materialIndexPerFace.resize(numFaces, materialIndex);
+			}
+			else if (mapping == mapping_info_by_polygon)
+			{
+				result.materialIndexPerFace = std::move(materials);
 			}
 			else
 			{
-				return it->second;
+				ASSERT(false);
 			}
 		}
-	};
-
-	std::unordered_map<int32, per_material> materialToMesh;
-
-
-	int32 materialIndex = 0;
-	for (int32 firstIndex = 0, end = (int32)originalIndices.size(); firstIndex < end;)
+	}
+	if (result.materialIndexPerFace.empty())
 	{
-		int32 faceSize = 0;
-		while (firstIndex + faceSize < end)
-		{
-			int32 i = firstIndex + faceSize++;
-			if (originalIndices[i] < 0)
-			{
-				break;
-			}
-		}
-
-		int32 material = materialIndices[materialIndex++];
-
-		if (faceSize < 3)
-		{
-			// Ignore lines and points.
-			firstIndex += faceSize;
-			continue;
-		}
-
-		per_material& perMat = materialToMesh[material];
-
-		int32 a = perMat.addVertex(positions, uvs, normals, firstIndex++);
-		int32 b = perMat.addVertex(positions, uvs, normals, firstIndex++);
-		for (int32 i = 2; i < faceSize; ++i)
-		{
-			int32 c = perMat.addVertex(positions, uvs, normals, firstIndex++);
-
-			perMat.geometry.indices.push_back(a);
-			perMat.geometry.indices.push_back(b);
-			perMat.geometry.indices.push_back(c);
-
-			b = c;
-		}
+		result.materialIndexPerFace.resize(numFaces, 0);
 	}
 
-	for (auto [i, perMat] : materialToMesh)
-	{
-		fbx_mesh out;
-		out.id = id;
-		out.name = name;
-		out.materialIndex = i;
-		out.geometry = std::move(perMat.geometry);
-		outMeshes.push_back(out);
-	}
-
+	outMeshes.push_back(std::move(result));
 	return true;
 }
 
@@ -1114,13 +1149,17 @@ static bool readMaterial(const fbx_node& node, const std::vector<fbx_node>& node
 				{
 					result.reflectionColor = color;
 				}
+				else
+				{
+					printf("Material property '%.*s' not handled.\n", name.length, name.str);
+				}
 			}
 		}
 	}
 
 	ASSERT(result.shadingModel == "Phong");
 
-	outMaterials.push_back(result);
+	outMaterials.push_back(std::move(result));
 	return true;
 }
 
@@ -1144,129 +1183,302 @@ static bool readTexture(const fbx_node& node, const std::vector<fbx_node>& nodes
 		}
 	}
 
-	outTextures.push_back(result);
+	outTextures.push_back(std::move(result));
 	return true;
 }
 
-static void readConnection(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties,
-	std::vector<fbx_model>& models, std::vector<fbx_mesh>& meshes, std::vector<fbx_material>& materials, std::vector<fbx_texture>& textures)
+static bool readDeformer(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, std::vector<fbx_deformer>& outDeformers)
 {
-		ASSERT(node.name == "C");
+	auto [id, name] = readObjectIDAndName(node, properties);
 
-		enum connection_type
+	fbx_deformer result = {};
+	result.id = id;
+	result.name = name;
+
+	const fbx_node* indicesNode = node.findChild(nodes, "Indexes");
+	const fbx_node* weightsNode = node.findChild(nodes, "Weights");
+
+	if (indicesNode && weightsNode)
+	{
+		result.vertexIndices = readInt32Array(*indicesNode->getFirstProperty(properties));
+		std::vector<double> weights = readDoubleArray(*weightsNode->getFirstProperty(properties));
+		result.weights.resize(weights.size());
+		for (uint32 i = 0; i < (uint32)weights.size(); ++i)
 		{
-			connection_type_unknown,
-			connection_type_model,
-			connection_type_mesh,
-			connection_type_material,
-			connection_type_texture,
-		};
-
-		struct connection_index
-		{
-			connection_type type;
-			uint32 first;
-			uint32 count;
-		};
-
-		auto propIterator = fbx_property_iterator{ &node, properties }.begin();
-		sized_string type = readString(*propIterator++);
-		int64 a = readInt64(*propIterator++);
-		int64 b = readInt64(*propIterator++);
-
-		connection_index aType = {};
-		connection_index bType = {};
-
-		for (uint32 i = 0; i < (uint32)models.size(); ++i)
-		{
-			if (models[i].id == a) { aType = { connection_type_model, i, 1 }; break; }
-			if (models[i].id == b) { bType = { connection_type_model, i, 1 }; break; }
+			result.weights[i] = (float)weights[i];
 		}
-		for (uint32 i = 0; i < (uint32)meshes.size(); ++i)
+	}
+
+	outDeformers.push_back(std::move(result));
+	return true;
+}
+
+static bool readConnection(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, std::vector<fbx_connection>& outConnections)
+{
+	ASSERT(node.name == "C");
+
+	fbx_connection result;
+
+	auto propIterator = fbx_property_iterator{ &node, properties }.begin();
+	sized_string type = readString(*propIterator++);
+	result.idA = readInt64(*propIterator++);
+	result.idB = readInt64(*propIterator++);
+
+	if (type == "OO")
+	{
+		// Object-object connection.
+		result.type = fbx_connection_type_object_object;
+	}
+	else if (type == "OP")
+	{
+		// Object-property connection.
+		result.type = fbx_connection_type_object_property;
+
+		if (propIterator != fbx_property_iterator{ &node, properties }.end())
 		{
-			if (meshes[i].id == a) 
-			{ 
-				aType = { connection_type_mesh, i }; 
-				for (uint32 j = 0; j < (uint32)meshes.size() && meshes[j].id == meshes[i].id; ++j)
-				{
-					++aType.count;
-				}
-				break; 
+			sized_string textureSlot = readString(*propIterator++);
+			if (textureSlot == "DiffuseColor")
+			{
+				result.textureSlot = fbx_texture_slot_albedo;
 			}
-			if (meshes[i].id == b) 
-			{ 
-				bType = { connection_type_mesh, i };
-				for (uint32 j = 0; j < (uint32)meshes.size() && meshes[j].id == meshes[i].id; ++j)
+			else if (textureSlot == "NormalMap")
+			{
+				result.textureSlot = fbx_texture_slot_normal;
+			}
+			else if (textureSlot == "ShininessExponent")
+			{
+				result.textureSlot = fbx_texture_slot_roughness;
+			}
+			else if (textureSlot == "ReflectionFactor")
+			{
+				result.textureSlot = fbx_texture_slot_metallic;
+			}
+		}
+	}
+
+	outConnections.push_back(result);
+	return true;
+}
+
+template <typename T>
+static T* findObjectWithID(std::vector<T>& objects, int64 id)
+{
+	for (T& t : objects)
+	{
+		if (t.id == id)
+		{
+			return &t;
+		}
+	}
+	return 0;
+}
+
+static void resolveConnections(std::vector<fbx_model>& models, std::vector<fbx_mesh>& meshes, std::vector<fbx_material>& materials, std::vector<fbx_texture>& textures,
+	std::vector<fbx_deformer>& deformers, const std::vector<fbx_connection>& connections)
+{
+	for (fbx_connection conn : connections)
+	{
+		if (conn.type == fbx_connection_type_object_object)
+		{
+			fbx_model* modelA = findObjectWithID(models, conn.idA);
+			fbx_model* modelB = findObjectWithID(models, conn.idB);
+			fbx_mesh* meshA = findObjectWithID(meshes, conn.idA);
+			fbx_mesh* meshB = findObjectWithID(meshes, conn.idB);
+			fbx_material* materialA = findObjectWithID(materials, conn.idA);
+			fbx_material* materialB = findObjectWithID(materials, conn.idB);
+			fbx_deformer* deformerA = findObjectWithID(deformers, conn.idA);
+			fbx_deformer* deformerB = findObjectWithID(deformers, conn.idB);
+
+			if (modelA && modelB)
+			{
+				modelA->parent = modelB;
+				modelB->children.push_back(modelA);
+			}
+			else if (modelA && deformerB)
+			{
+				deformerB->model = modelA;
+				modelA->deformer = deformerB;
+			}
+			else if (meshA && modelB)
+			{
+				modelB->meshes.push_back(meshA);
+			}
+			else if (deformerA && meshB)
+			{
+				meshB->deformer = deformerA;
+			}
+			else if (deformerA && deformerB)
+			{
+				deformerB->joints.push_back(deformerA);
+			}
+			else if (materialA && modelB)
+			{
+				modelB->materials.push_back(materialA);
+			}
+			else
+			{
+				int a = 0;
+			}
+			// TODO: Note Attributes
+		}
+		else if (conn.type == fbx_connection_type_object_property)
+		{
+			fbx_material* materialA = findObjectWithID(materials, conn.idA);
+			fbx_material* materialB = findObjectWithID(materials, conn.idB);
+			fbx_texture* textureA = findObjectWithID(textures, conn.idA);
+			fbx_texture* textureB = findObjectWithID(textures, conn.idB);
+
+			if (textureA && materialB)
+			{
+				if (conn.textureSlot == fbx_texture_slot_albedo) { materialB->albedoTexture = textureA; }
+				else if (conn.textureSlot == fbx_texture_slot_normal) { materialB->normalTexture = textureA; }
+				else if (conn.textureSlot == fbx_texture_slot_roughness) { materialB->roughnessTexture = textureA; }
+				else if (conn.textureSlot == fbx_texture_slot_metallic) { materialB->metallicTexture = textureA; }
+			}
+		}
+	}
+
+	for (fbx_deformer& deformer : deformers)
+	{
+		if (fbx_model* model = deformer.model)
+		{
+			if (fbx_model* parentModel = model->parent)
+			{
+				if (fbx_deformer* parentDeformer = parentModel->deformer)
 				{
-					++bType.count;
+					deformer.parentJoint = parentDeformer;
 				}
+			}
+		}
+	}
+}
+
+static void finishMesh(fbx_mesh& mesh)
+{
+	// Assign materials and skinning weights, remove duplicate vertices and triangulate.
+
+	if (mesh.deformer)
+	{
+		mesh.skin.resize(mesh.positions.size(), {});
+
+		for (int32 jointID = 0; jointID < (int32)mesh.deformer->joints.size(); ++jointID)
+		{
+			fbx_deformer* joint = mesh.deformer->joints[jointID];
+
+			auto& indices = joint->vertexIndices;
+			auto& weights = joint->weights;
+			ASSERT(indices.size() == weights.size());
+
+			for (uint32 i = 0; i < (uint32)indices.size(); ++i)
+			{
+				int32 index = indices[i];
+				float weight = weights[i];
+
+				uint32 offset = mesh.vertexOffsetCounts[index].offset;
+				uint32 count = mesh.vertexOffsetCounts[index].count;
+				for (uint32 j = 0; j < count; ++j)
+				{
+					uint32 vertexIndex = mesh.originalToNewVertex[j + offset];
+
+					skinning_weights& skin = mesh.skin[vertexIndex];
+
+					bool foundFreeSlot = false;
+					for (uint32 k = 0; k < 4; ++k)
+					{
+						if (skin.skinWeights[k] == 0)
+						{
+							skin.skinIndices[k] = jointID;
+							skin.skinWeights[k] = (uint8)clamp(weight * 255.f, 0.f, 255.f);
+							foundFreeSlot = true;
+							break;
+						}
+					}
+					ASSERT(foundFreeSlot);
+				}
+			}
+		}
+	}
+
+	struct per_material
+	{
+		std::unordered_map<full_vertex, int32> vertexToIndex;
+		fbx_submesh sub;
+
+		int32 addVertex(const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, const std::vector<skinning_weights>& skins,
+			int32 index)
+		{
+			vec3 position = positions[index];
+			vec2 uv = !uvs.empty() ? uvs[index] : vec2(0.f, 0.f);
+			vec3 normal = !normals.empty() ? normals[index] : vec3(0.f, 0.f, 0.f);
+			skinning_weights skin = !skins.empty() ? skins[index] : skinning_weights{};
+
+			full_vertex vertex = { position, uv, normal, skin, };
+			auto it = vertexToIndex.find(vertex);
+			if (it == vertexToIndex.end())
+			{
+				int32 vertexIndex = (int32)sub.positions.size();
+				vertexToIndex.insert({ vertex, vertexIndex });
+
+				sub.positions.push_back(position);
+				if (!uvs.empty()) { sub.uvs.push_back(uv); }
+				if (!normals.empty()) { sub.normals.push_back(normal); }
+				if (!skins.empty()) { sub.skin.push_back(skin); }
+
+				return vertexIndex;
+			}
+			else
+			{
+				return it->second;
+			}
+		}
+	};
+
+	std::unordered_map<int32, per_material> materialToMesh;
+
+
+	int32 faceIndex = 0;
+	for (int32 firstIndex = 0, end = (int32)mesh.originalIndices.size(); firstIndex < end;)
+	{
+		int32 faceSize = 0;
+		while (firstIndex + faceSize < end)
+		{
+			int32 i = firstIndex + faceSize++;
+			if (mesh.originalIndices[i] < 0)
+			{
 				break;
 			}
 		}
-		for (uint32 i = 0; i < (uint32)materials.size(); ++i)
+
+		int32 material = mesh.materialIndexPerFace[faceIndex++];
+
+		if (faceSize < 3)
 		{
-			if (materials[i].id == a) { aType = { connection_type_material, i, 1 }; break; }
-			if (materials[i].id == b) { bType = { connection_type_material, i, 1 }; break; }
-		}
-		for (uint32 i = 0; i < (uint32)textures.size(); ++i)
-		{
-			if (textures[i].id == a) { aType = { connection_type_texture, i, 1 }; break; }
-			if (textures[i].id == b) { bType = { connection_type_texture, i, 1 }; break; }
-		}
-		if (aType.type > bType.type)
-		{
-			std::swap(aType, bType);
+			// Ignore lines and points.
+			firstIndex += faceSize;
+			continue;
 		}
 
-		if (type == "OO")
+		per_material& perMat = materialToMesh[material];
+		perMat.sub.materialIndex = material;
+
+		int32 a = perMat.addVertex(mesh.positions, mesh.uvs, mesh.normals, mesh.skin, firstIndex++);
+		int32 b = perMat.addVertex(mesh.positions, mesh.uvs, mesh.normals, mesh.skin, firstIndex++);
+		for (int32 i = 2; i < faceSize; ++i)
 		{
-			// Object-object connection.
+			int32 c = perMat.addVertex(mesh.positions, mesh.uvs, mesh.normals, mesh.skin, firstIndex++);
 
-			if (aType.type == connection_type_model)
-			{
-				if (bType.type == connection_type_mesh)
-				{
-					for (uint32 i = 0; i < bType.count; ++i)
-					{
-						models[aType.first].meshes.push_back(&meshes[bType.first + i]);
-					}
-				}
-				else if (bType.type == connection_type_material)
-				{
-					models[aType.first].materials.push_back(&materials[bType.first]);
-				}
-			}
+			perMat.sub.indices.push_back(a);
+			perMat.sub.indices.push_back(b);
+			perMat.sub.indices.push_back(c);
+
+			b = c;
 		}
-		else if (type == "OP")
-		{
-			// Object-property connection.
+	}
 
-			if (aType.type == connection_type_material && bType.type == connection_type_texture)
-			{
-				sized_string textureSlot = readString(*propIterator++);
-
-				if (textureSlot == "DiffuseColor")
-				{
-					materials[aType.first].albedoTexture = &textures[bType.first];
-				}
-				else if (textureSlot == "NormalMap")
-				{
-					materials[aType.first].normalTexture = &textures[bType.first];
-				}
-				else if (textureSlot == "ShininessExponent")
-				{
-					materials[aType.first].roughnessTexture = &textures[bType.first];
-				}
-				else if (textureSlot == "ReflectionFactor")
-				{
-					materials[aType.first].metallicTexture = &textures[bType.first];
-				}
-				else
-				{
-					ASSERT(false);
-				}
-			}
-		}
+	for (auto [i, perMat] : materialToMesh)
+	{
+		mesh.submeshes.push_back(std::move(perMat.sub));
+	}
 }
 
 static const fbx_node* findNode(const std::vector<fbx_node>& nodes, std::initializer_list<sized_string> names)
@@ -1310,8 +1522,6 @@ void loadFBX(const fs::path& path)
 		return;
 	}
 
-	constexpr char c = 0x1A;
-
 	fbx_header* header = file.consume<fbx_header>();
 	if ((strcmp(header->magic, "Kaydara FBX Binary  ") != 0) || header->unknown[0] != 0x1A || header->unknown[1] != 0x00)
 	{
@@ -1337,15 +1547,21 @@ void loadFBX(const fs::path& path)
 
 
 #if 0
-	FILE* outFile = fopen("fbx.txt", "w");
-	printFBXContent(nodes, properties, nodes[0], outFile);
-	fclose(outFile);
+	{
+		YAML::Node out;
+		writeFBXContentToYAML(nodes, properties, nodes[0], out);
+		std::ofstream fout("fbx.yaml");
+		fout << out;
+		return;
+	}
 #endif
 
 	std::vector<fbx_model> models;
 	std::vector<fbx_mesh> meshes;
 	std::vector<fbx_material> materials;
 	std::vector<fbx_texture> textures;
+	std::vector<fbx_deformer> deformers;
+	std::vector<fbx_connection> connections;
 
 	for (const fbx_node& objectNode : fbx_node_iterator{ findNode(nodes, { "Objects" }), nodes })
 	{
@@ -1371,12 +1587,23 @@ void loadFBX(const fs::path& path)
 				readTexture(objectNode, nodes, properties, textures);
 			}
 		}
+		else if (objectNode.name == "Deformer")
+		{
+			readDeformer(objectNode, nodes, properties, deformers);
+		}
 	}
 
 
 	for (const fbx_node& connectionNode : fbx_node_iterator{ findNode(nodes, { "Connections" }), nodes })
 	{
-		readConnection(connectionNode, nodes, properties, models, meshes, materials, textures);
+		readConnection(connectionNode, nodes, properties, connections);
+	}
+
+	resolveConnections(models, meshes, materials, textures, deformers, connections);
+
+	for (fbx_mesh& mesh : meshes)
+	{
+		finishMesh(mesh);
 	}
 
 	for (const fbx_model& model : models)
@@ -1393,11 +1620,20 @@ void loadFBX(const fs::path& path)
 		for (uint32 i = 0; i < (uint32)model.meshes.size(); ++i)
 		{
 			const fbx_mesh* mesh = model.meshes[i];
-			std::string indexedName = name + "_" + std::to_string(i) + ".ply";
+			std::string indexedName = name + "_" + std::to_string(i);
 
-			const fbx_material* material = model.materials[mesh->materialIndex];
-			testDumpToPLY(indexedName, mesh->geometry.positions, mesh->geometry.uvs, mesh->geometry.normals, mesh->geometry.indices,
-				(uint8)(material->diffuseColor.x * 255), (uint8)(material->diffuseColor.y * 255), (uint8)(material->diffuseColor.z * 255));
+			for (uint32 j = 0; j < (uint32)mesh->submeshes.size(); ++j)
+			{
+				const fbx_submesh& sub = mesh->submeshes[j];
+
+				vec3 diffuseColor = !model.materials.empty() ? model.materials[sub.materialIndex]->diffuseColor : vec3(1.f, 1.f, 1.f);
+
+				std::string indexedName2 = indexedName + "_" + std::to_string(j) + ".ply";
+
+				testDumpToPLY(indexedName2, sub.positions, sub.uvs, sub.normals, sub.indices,
+					(uint8)(diffuseColor.x * 255), (uint8)(diffuseColor.y * 255), (uint8)(diffuseColor.z * 255));
+			}
+
 		}
 	}
 
