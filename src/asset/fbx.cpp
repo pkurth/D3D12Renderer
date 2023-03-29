@@ -9,7 +9,7 @@
 
 
 static void testDumpToPLY(const std::string& filename,
-	const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, const std::vector<int32>& indices,
+	const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, const std::vector<indexed_triangle16>& triangles,
 	uint8 r = 255, uint8 g = 255, uint8 b = 255);
 
 
@@ -844,7 +844,8 @@ struct fbx_submesh
 	std::vector<vec2> uvs;
 	std::vector<vec3> normals;
 	std::vector<skinning_weights> skin;
-	std::vector<int32> indices;
+
+	std::vector<indexed_triangle16> triangles;
 };
 
 struct fbx_mesh : fbx_object
@@ -1212,7 +1213,7 @@ static bool readMaterial(const fbx_node& node, const std::vector<fbx_node>& node
 		}
 	}
 
-	ASSERT(result.shadingModel == "Phong");
+	ASSERT(result.shadingModel == "Phong" || result.shadingModel == "phong");
 
 	outMaterials.push_back(std::move(result));
 	return true;
@@ -1442,7 +1443,11 @@ static void finishMesh(fbx_mesh& mesh)
 			for (uint32 i = 0; i < (uint32)indices.size(); ++i)
 			{
 				int32 index = indices[i];
-				float weight = weights[i];
+				uint8 weight = (uint8)clamp(weights[i] * 255.f, 0.f, 255.f);
+				if (weight == 0)
+				{
+					continue;
+				}
 
 				uint32 offset = mesh.vertexOffsetCounts[index].offset;
 				uint32 count = mesh.vertexOffsetCounts[index].count;
@@ -1452,18 +1457,33 @@ static void finishMesh(fbx_mesh& mesh)
 
 					skinning_weights& skin = mesh.skin[vertexIndex];
 
-					bool foundFreeSlot = false;
-					for (uint32 k = 0; k < 4; ++k)
+					int32 slot = -1;
+					for (int32 k = 0; k < 4; ++k)
 					{
-						if (skin.skinWeights[k] == 0)
+						if (skin.skinWeights[k] < weight)
 						{
-							skin.skinIndices[k] = jointID;
-							skin.skinWeights[k] = (uint8)clamp(weight * 255.f, 0.f, 255.f);
-							foundFreeSlot = true;
+							slot = k;
 							break;
 						}
 					}
-					ASSERT(foundFreeSlot);
+					if (slot != -1)
+					{
+						if (skin.skinWeights[3] != 0)
+						{
+							printf("Warning: Vertex has more than 4 joints attached.\n");
+						}
+						for (int32 k = 3; k > slot; --k)
+						{
+							skin.skinIndices[k] = skin.skinIndices[k - 1];
+							skin.skinWeights[k] = skin.skinWeights[k - 1];
+						}
+						skin.skinIndices[slot] = jointID;
+						skin.skinWeights[slot] = weight;
+					}
+					else
+					{
+						printf("Warning: Vertex has more than 4 joints attached.\n");
+					}
 				}
 			}
 		}
@@ -1471,10 +1491,61 @@ static void finishMesh(fbx_mesh& mesh)
 
 	struct per_material
 	{
-		std::unordered_map<full_vertex, int32> vertexToIndex;
+		std::unordered_map<full_vertex, uint16> vertexToIndex;
 		fbx_submesh sub;
 
-		int32 addVertex(const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, const std::vector<skinning_weights>& skins,
+		void addTriangles(const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, const std::vector<skinning_weights>& skins,
+			int32 firstIndex, int32 faceSize, std::vector<fbx_submesh>& outSubmeshes)
+		{
+			if (faceSize < 3)
+			{
+				// Ignore lines and points.
+				return;
+			}
+
+			int32 aIndex = firstIndex++;
+			int32 bIndex = firstIndex++;
+			add_vertex_result a = addVertex(positions, uvs, normals, skins, aIndex);
+			add_vertex_result b = addVertex(positions, uvs, normals, skins, bIndex);
+			for (int32 i = 2; i < faceSize; ++i)
+			{
+				int32 cIndex = firstIndex++;
+				add_vertex_result c = addVertex(positions, uvs, normals, skins, cIndex);
+
+				if (!(a.success && b.success && c.success))
+				{
+					flush(outSubmeshes);
+					a = addVertex(positions, uvs, normals, skins, aIndex);
+					b = addVertex(positions, uvs, normals, skins, bIndex);
+					c = addVertex(positions, uvs, normals, skins, cIndex);
+					printf("Too many vertices for 16-bit indices. Splitting mesh!\n");
+				}
+
+				sub.triangles.push_back(indexed_triangle16{ a.index, b.index, c.index });
+
+				b = c;
+				bIndex = cIndex;
+			}
+		}
+
+		void flush(std::vector<fbx_submesh>& outSubmeshes)
+		{
+			if (vertexToIndex.size() > 0)
+			{
+				outSubmeshes.push_back(std::move(sub));
+				vertexToIndex.clear();
+			}
+		}
+
+	private:
+
+		struct add_vertex_result
+		{
+			uint16 index;
+			bool success;
+		};
+
+		add_vertex_result addVertex(const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, const std::vector<skinning_weights>& skins,
 			int32 index)
 		{
 			vec3 position = positions[index];
@@ -1486,19 +1557,25 @@ static void finishMesh(fbx_mesh& mesh)
 			auto it = vertexToIndex.find(vertex);
 			if (it == vertexToIndex.end())
 			{
-				int32 vertexIndex = (int32)sub.positions.size();
-				vertexToIndex.insert({ vertex, vertexIndex });
+				uint32 vertexIndex = (uint32)sub.positions.size();
+				if (vertexIndex > UINT16_MAX)
+				{
+					return { 0, false };
+				}
+
+
+				vertexToIndex.insert({ vertex, (uint16)vertexIndex });
 
 				sub.positions.push_back(position);
 				if (!uvs.empty()) { sub.uvs.push_back(uv); }
 				if (!normals.empty()) { sub.normals.push_back(normal); }
 				if (!skins.empty()) { sub.skin.push_back(skin); }
 
-				return vertexIndex;
+				return { (uint16)vertexIndex, true };
 			}
 			else
 			{
-				return it->second;
+				return { it->second, true };
 			}
 		}
 	};
@@ -1521,33 +1598,17 @@ static void finishMesh(fbx_mesh& mesh)
 
 		int32 material = mesh.materialIndexPerFace[faceIndex++];
 
-		if (faceSize < 3)
-		{
-			// Ignore lines and points.
-			firstIndex += faceSize;
-			continue;
-		}
-
 		per_material& perMat = materialToMesh[material];
 		perMat.sub.materialIndex = material;
 
-		int32 a = perMat.addVertex(mesh.positions, mesh.uvs, mesh.normals, mesh.skin, firstIndex++);
-		int32 b = perMat.addVertex(mesh.positions, mesh.uvs, mesh.normals, mesh.skin, firstIndex++);
-		for (int32 i = 2; i < faceSize; ++i)
-		{
-			int32 c = perMat.addVertex(mesh.positions, mesh.uvs, mesh.normals, mesh.skin, firstIndex++);
+		perMat.addTriangles(mesh.positions, mesh.uvs, mesh.normals, mesh.skin, firstIndex, faceSize, mesh.submeshes);
 
-			perMat.sub.indices.push_back(a);
-			perMat.sub.indices.push_back(b);
-			perMat.sub.indices.push_back(c);
-
-			b = c;
-		}
+		firstIndex += faceSize;
 	}
 
 	for (auto [i, perMat] : materialToMesh)
 	{
-		mesh.submeshes.push_back(std::move(perMat.sub));
+		perMat.flush(mesh.submeshes);
 	}
 }
 
@@ -1702,7 +1763,7 @@ void loadFBX(const fs::path& path)
 
 				std::string indexedName2 = indexedName + "_" + std::to_string(j) + ".ply";
 
-				testDumpToPLY(indexedName2, sub.positions, sub.uvs, sub.normals, sub.indices,
+				testDumpToPLY(indexedName2, sub.positions, sub.uvs, sub.normals, sub.triangles,
 					(uint8)(diffuseColor.x * 255), (uint8)(diffuseColor.y * 255), (uint8)(diffuseColor.z * 255));
 			}
 
@@ -1767,7 +1828,7 @@ static void write(std::ofstream& outfile, T value)
 }
 
 static void testDumpToPLY(const std::string& filename, 
-	const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, const std::vector<int32>& indices, 
+	const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, const std::vector<indexed_triangle16>& triangles,
 	uint8 r, uint8 g, uint8 b)
 {
 	std::ofstream outfile;
@@ -1775,7 +1836,7 @@ static void testDumpToPLY(const std::string& filename,
 	outfile.open(filename, mode);
 
 	uint32 numPoints = (uint32)positions.size();
-	uint32 numFaces = (uint32)indices.size() / 3;
+	uint32 numFaces = (uint32)triangles.size();
 	bool writeUVs = uvs.size() > 0;
 	bool writeNormals = normals.size() > 0;
 	writeHeaderToFile(outfile, numPoints, writeUVs, writeNormals, true, numFaces);
@@ -1792,13 +1853,13 @@ static void testDumpToPLY(const std::string& filename,
 		write(outfile, a);
 	}
 
-	for (uint32 i = 0; i < (uint32)indices.size(); i += 3)
+	for (indexed_triangle16 tri : triangles)
 	{
 		uint8 count = 3;
 		write(outfile, count);
-		write(outfile, indices[i + 0]);
-		write(outfile, indices[i + 1]);
-		write(outfile, indices[i + 2]);
+		write(outfile, (int32)tri.a);
+		write(outfile, (int32)tri.b);
+		write(outfile, (int32)tri.c);
 	}
 
 	outfile.close();
