@@ -26,6 +26,7 @@
 #include "terrain/water.h"
 #include "terrain/tree.h"
 #include "animation/skinning.h"
+#include "asset/model_asset.h"
 
 
 static raytracing_object_type defineBlasFromMesh(const ref<multi_mesh>& mesh)
@@ -92,6 +93,41 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 	}
 #endif
 
+	{	
+		auto woodMaterial = createPBRMaterial(
+			"assets/desert/textures/WoodenCrate2_Albedo.png",
+			"assets/desert/textures/WoodenCrate2_Normal.png",
+			{}, {});
+
+		auto stormtrooperMesh = make_ref<multi_mesh>();
+
+		model_asset asset = load3DModelFromFile("assets/stormtrooper/stormtrooper.fbx");
+		mesh_builder builder(mesh_creation_flags_animated);
+		for (auto& mesh : asset.meshes)
+		{
+			for (auto& sub : mesh.submeshes)
+			{
+				builder.pushMesh(sub, 1.f);
+				stormtrooperMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, woodMaterial });
+			}
+		}
+
+		stormtrooperMesh->mesh = builder.createDXMesh();
+
+		if (!asset.skeletons.empty())
+		{
+			stormtrooperMesh->skeleton.joints = std::move(asset.skeletons[0].joints);
+			stormtrooperMesh->skeleton.nameToJointID = std::move(asset.skeletons[0].nameToJointID);
+
+			stormtrooperMesh->skeleton.analyzeJoints(builder.getPositions(), (uint8*)builder.getOthers() + builder.getSkinOffset(), builder.getOthersSize(), builder.getNumVertices());
+		}
+
+		auto stormtrooper = scene.createEntity("NEW Stormtrooper")
+			.addComponent<transform_component>(vec3(-10.f, 0.f, -1.f), quat::identity)
+			.addComponent<mesh_component>(stormtrooperMesh)
+			.addComponent<animation_component>()
+			.addComponent<dynamic_transform_component>();
+	}
 
 	if (auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx"))
 	{

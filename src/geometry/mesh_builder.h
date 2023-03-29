@@ -179,7 +179,7 @@ struct mesh_builder
 	void pushMace(const mace_mesh_desc& desc, bool flipWindingOrder = false);
 
 	void pushAssimpMesh(const struct aiMesh* mesh, float scale, bounding_box* aabb = 0, animation_skeleton* skeleton = 0);
-
+	void pushMesh(const struct submesh_asset& mesh, float scale);
 
 	submesh_info endSubmesh();
 

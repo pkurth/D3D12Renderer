@@ -2,6 +2,7 @@
 #include "mesh_builder.h"
 #include "core/color.h"
 
+#include "asset/model_asset.h"
 #include <assimp/scene.h>
 
 struct vertex_info
@@ -1371,6 +1372,69 @@ void mesh_builder::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_box*
 	{
 		const aiFace& face = mesh->mFaces[i];
 		pushTriangle(face.mIndices[0], face.mIndices[1], face.mIndices[2]);
+	}
+}
+
+void mesh_builder::pushMesh(const submesh_asset& mesh, float scale)
+{
+	uint32 numVertices = (uint32)mesh.positions.size();
+	uint32 numFaces = (uint32)mesh.triangles.size();
+
+	if (indexType == mesh_index_uint16)
+	{
+		ASSERT(numVertices <= UINT16_MAX);
+	}
+
+	auto [positionPtr, othersPtr, indexPtr, indexOffset] = beginPrimitive(numVertices, numFaces);
+	auto vertexOthers = othersPtr;
+
+	vec3 position(0.f, 0.f, 0.f);
+	vec3 normal(0.f, 0.f, 0.f);
+	vec3 tangent(0.f, 0.f, 0.f);
+	vec2 uv(0.f, 0.f);
+	uint32 vertexColor = 0;
+	skinning_weights skin = {};
+
+	bool hasPositions = true;
+	bool hasNormals = !mesh.normals.empty();
+	bool hasTangents = false;
+	bool hasUVs = !mesh.uvs.empty();
+	bool hasVertexColors = false;
+	bool hasSkin = !mesh.skin.empty();
+
+	for (uint32 i = 0; i < numVertices; ++i)
+	{
+		position = mesh.positions[i] * scale;
+			
+		if (hasNormals)
+		{
+			normal = mesh.normals[i];
+		}
+		if (hasTangents)
+		{
+			//tangent = vec3(mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z);
+		}
+		if (hasUVs)
+		{
+			uv = mesh.uvs[i];
+		}
+		if (hasVertexColors)
+		{
+			//vertexColor = packColor(vec4(mesh->mColors[0][i].r, mesh->mColors[0][i].g, mesh->mColors[0][i].b, mesh->mColors[0][i].a));
+		}
+		if (hasSkin)
+		{
+			skin = mesh.skin[i];
+		}
+
+		pushVertex(position, uv, normal, tangent, skin, vertexColor);
+	}
+
+	const bool flipWindingOrder = false;
+	for (uint32 i = 0; i < numFaces; ++i)
+	{
+		const indexed_triangle16& tri = mesh.triangles[i];
+		pushTriangle(tri.a, tri.b, tri.c);
 	}
 }
 
