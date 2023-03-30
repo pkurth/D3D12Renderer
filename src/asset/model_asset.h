@@ -11,6 +11,19 @@ struct skeleton_asset
 	std::unordered_map<std::string, uint32> nameToJointID;
 };
 
+struct animation_asset
+{
+	std::unordered_map<std::string, animation_joint> joints;
+
+	std::vector<float> positionTimestamps;
+	std::vector<float> rotationTimestamps;
+	std::vector<float> scaleTimestamps;
+
+	std::vector<vec3> positionKeyframes;
+	std::vector<quat> rotationKeyframes;
+	std::vector<vec3> scaleKeyframes;
+};
+
 struct material_asset
 {
 
@@ -39,6 +52,7 @@ struct model_asset
 	std::vector<mesh_asset> meshes;
 	std::vector<material_asset> materials;
 	std::vector<skeleton_asset> skeletons;
+	std::vector<animation_asset> animations;
 };
 
 
@@ -48,9 +62,8 @@ enum mesh_flags
 	mesh_flag_load_uvs			= (1 << 0),
 	mesh_flag_load_normals		= (1 << 1),
 	mesh_flag_load_skin			= (1 << 2),
-	mesh_flag_load_materials	= (1 << 3),
 
-	mesh_flag_default = mesh_flag_load_uvs | mesh_flag_load_normals | mesh_flag_load_skin | mesh_flag_load_materials,
+	mesh_flag_default = mesh_flag_load_uvs | mesh_flag_load_normals | mesh_flag_load_skin,
 };
 
 

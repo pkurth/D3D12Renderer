@@ -119,6 +119,7 @@ struct fbx_node
 	uint32 firstChild;
 	uint32 lastChild;
 	uint32 level;
+	uint32 numChildren;
 
 	uint32 firstProperty;
 	uint32 numProperties;
@@ -303,6 +304,7 @@ static void parseNodes(uint32 version, entire_file& file, std::vector<fbx_node>&
 		node.next = -1;
 		node.firstChild = -1;
 		node.lastChild = -1;
+		node.numChildren = 0;
 		node.firstProperty = (uint32)outProperties.size();
 		node.numProperties = (uint32)currentNode.numProperties;
 
@@ -318,6 +320,7 @@ static void parseNodes(uint32 version, entire_file& file, std::vector<fbx_node>&
 				outNodes[outNodes[parent].lastChild].next = nodeIndex;
 			}
 			outNodes[parent].lastChild = nodeIndex;
+			++outNodes[parent].numChildren;
 		}
 
 		node.numProperties = parseProperties(file, outProperties, (uint32)currentNode.numProperties);
@@ -763,6 +766,10 @@ struct fbx_mesh;
 struct fbx_material;
 struct fbx_texture;
 struct fbx_deformer;
+struct fbx_animation_stack;
+struct fbx_animation_layer;
+struct fbx_animation_curve_node;
+struct fbx_animation_curve;
 
 struct fbx_global_settings
 {
@@ -817,6 +824,37 @@ static fbx_global_settings readGlobalSettings(const fbx_node& node, const std::v
 	return result;
 }
 
+enum fbx_object_type
+{
+	fbx_object_type_unknown,
+
+	fbx_object_type_global,
+	fbx_object_type_model,
+	fbx_object_type_mesh,
+	fbx_object_type_material,
+	fbx_object_type_texture,
+	fbx_object_type_deformer,
+	fbx_object_type_animation_stack,
+	fbx_object_type_animation_layer,
+	fbx_object_type_animation_curve_node,
+	fbx_object_type_animation_curve,
+};
+
+static const char* objectTypeNames[] =
+{
+	"Unknown",
+	"Global",
+	"Model",
+	"Mesh",
+	"Material",
+	"Texture",
+	"Deformer",
+	"Animation stack",
+	"Animation layer",
+	"Animation curve node",
+	"Animation curve",
+};
+
 struct fbx_model : fbx_object
 {
 	quat localRotation = quat::identity;
@@ -843,9 +881,8 @@ struct fbx_mesh : fbx_object
 
 	std::vector<int32> materialIndexPerFace;
 
-	fbx_deformer* deformer;
-
 	std::vector<submesh_asset> submeshes;
+	int64 skeletonID;
 };
 
 struct fbx_material : fbx_object
@@ -877,10 +914,10 @@ struct fbx_deformer : fbx_object
 {
 	std::vector<int32> vertexIndices;
 	std::vector<float> weights;
-	std::vector<fbx_deformer*> joints;
 
 	fbx_model* model;
-	fbx_deformer* parentJoint;
+	int64 skeletonID;
+	uint32 parentID = INVALID_JOINT;
 	uint32 jointID = INVALID_JOINT;
 
 	mat4 invBindMatrix;
@@ -888,20 +925,24 @@ struct fbx_deformer : fbx_object
 
 struct fbx_animation_stack : fbx_object
 {
-	int64 localStop;
-	int64 referenceStop;
+	std::vector<fbx_animation_layer*> layers;
 };
 
 struct fbx_animation_layer : fbx_object
 {
-
+	std::vector<fbx_animation_curve_node*> curveNodes;
 };
 
 struct fbx_animation_curve_node : fbx_object
 {
-	float dx;
-	float dy;
-	float dz;
+	vec3 d;
+
+	fbx_animation_curve* xCurve;
+	fbx_animation_curve* yCurve;
+	fbx_animation_curve* zCurve;
+
+	fbx_model* model;
+	int32 propertyIndex = -1;
 };
 
 struct fbx_animation_curve : fbx_object
@@ -910,29 +951,6 @@ struct fbx_animation_curve : fbx_object
 	uint32 first;
 	uint32 count;
 	int32 flags;
-};
-
-enum fbx_connection_type
-{
-	fbx_connection_type_object_object,
-	fbx_connection_type_object_property,
-};
-
-enum fbx_texture_slot
-{
-	fbx_texture_slot_none,
-	fbx_texture_slot_albedo,
-	fbx_texture_slot_normal,
-	fbx_texture_slot_roughness,
-	fbx_texture_slot_metallic,
-};
-
-struct fbx_connection
-{
-	int64 idA;
-	int64 idB;
-	fbx_connection_type type;
-	fbx_texture_slot textureSlot;
 };
 
 static std::pair<int64, sized_string> readObjectIDAndName(const fbx_node& node, const std::vector<fbx_property>& properties)
@@ -955,7 +973,7 @@ static std::pair<int64, sized_string> readObjectIDAndName(const fbx_node& node, 
 	return { id, name };
 }
 
-static bool readModel(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, std::vector<fbx_model>& outModels)
+static fbx_model readModel(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties)
 {
 	auto [id, name] = readObjectIDAndName(node, properties);
 
@@ -990,11 +1008,10 @@ static bool readModel(const fbx_node& node, const std::vector<fbx_node>& nodes, 
 		}
 	}
 
-	outModels.push_back(std::move(result));
-	return true;
+	return result;
 }
 
-static bool readMesh(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, uint32 flags, std::vector<fbx_mesh>& outMeshes)
+static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, uint32 flags)
 {
 	auto [id, name] = readObjectIDAndName(node, properties);
 
@@ -1108,7 +1125,7 @@ static bool readMesh(const fbx_node& node, const std::vector<fbx_node>& nodes, c
 
 
 	// Materials.
-	if (flags & mesh_flag_load_materials)
+	//if (flags & mesh_flag_load_materials)
 	{
 		const fbx_node* materialsNode = node.findChild(nodes, "LayerElementMaterial");
 		auto [materials, indices, mapping, reference] = readGeometryData<int32>(materialsNode, nodes, properties, "Materials", "");
@@ -1135,11 +1152,10 @@ static bool readMesh(const fbx_node& node, const std::vector<fbx_node>& nodes, c
 		result.materialIndexPerFace.resize(numFaces, 0);
 	}
 
-	outMeshes.push_back(std::move(result));
-	return true;
+	return result;
 }
 
-static bool readMaterial(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, std::vector<fbx_material>& outMaterials)
+static fbx_material readMaterial(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties)
 {
 	auto [id, name] = readObjectIDAndName(node, properties);
 
@@ -1224,11 +1240,10 @@ static bool readMaterial(const fbx_node& node, const std::vector<fbx_node>& node
 
 	ASSERT(result.shadingModel == "Phong" || result.shadingModel == "phong");
 
-	outMaterials.push_back(std::move(result));
-	return true;
+	return result;
 }
 
-static bool readTexture(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, std::vector<fbx_texture>& outTextures)
+static fbx_texture readTexture(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties)
 {
 	auto [id, name] = readObjectIDAndName(node, properties);
 
@@ -1248,11 +1263,10 @@ static bool readTexture(const fbx_node& node, const std::vector<fbx_node>& nodes
 		}
 	}
 
-	outTextures.push_back(std::move(result));
-	return true;
+	return result;
 }
 
-static bool readDeformer(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, std::vector<fbx_deformer>& outDeformers)
+static fbx_deformer readDeformer(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties)
 {
 	auto [id, name] = readObjectIDAndName(node, properties);
 
@@ -1289,17 +1303,17 @@ static bool readDeformer(const fbx_node& node, const std::vector<fbx_node>& node
 
 	ASSERT(result.vertexIndices.size() == result.weights.size());
 
-	outDeformers.push_back(std::move(result));
-	return true;
+	return result;
 }
 
-static bool readAnimationStack(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, std::vector<fbx_animation_stack>& outAnimationStacks)
+static fbx_animation_stack readAnimationStack(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties)
 {
 	auto [id, name] = readObjectIDAndName(node, properties);
 	fbx_animation_stack result = {};
 	result.id = id;
 	result.name = name;
 
+#if 0
 	for (const fbx_node& P : fbx_node_iterator{ node.findChild(nodes, "Properties70"), nodes })
 	{
 		ASSERT(P.name == "P");
@@ -1307,33 +1321,32 @@ static bool readAnimationStack(const fbx_node& node, const std::vector<fbx_node>
 		auto propIterator = fbx_property_iterator{ &P, properties }.begin();
 		sized_string type = readString(*propIterator++);
 		sized_string kTimeStr = readString(*propIterator++);
-		sized_string timeStr = readString(*propIterator++);
+		sized_string description = readString(*propIterator++);
 
-		ASSERT(kTimeStr == "KTime");
-		ASSERT(timeStr == "Time");
+		//ASSERT(kTimeStr == "KTime");
+		//ASSERT(description == "Time");
 
-		int64 time = readInt64(*propIterator++);
-
-		if (type == "LocalStop") { result.localStop = time; }
-		else if (type == "ReferenceStop") { result.referenceStop = time; }
+		//int64 time = readInt64(*propIterator++);
+		//
+		//if (type == "LocalStop") { result.localStop = time; }
+		//else if (type == "ReferenceStop") { result.referenceStop = time; }
 	}
+#endif
 
-	outAnimationStacks.push_back(result);
-	return true;
+	return result;
 }
 
-static bool readAnimationLayer(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, std::vector<fbx_animation_layer>& outAnimationLayers)
+static fbx_animation_layer readAnimationLayer(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties)
 {
 	auto [id, name] = readObjectIDAndName(node, properties);
 	fbx_animation_layer result = {};
 	result.id = id;
 	result.name = name;
 
-	outAnimationLayers.push_back(result);
-	return true;
+	return result;
 }
 
-static bool readAnimationCurveNode(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, std::vector<fbx_animation_curve_node>& outAnimationCurveNodes)
+static fbx_animation_curve_node readAnimationCurveNode(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties)
 {
 	auto [id, name] = readObjectIDAndName(node, properties);
 	fbx_animation_curve_node result = {};
@@ -1353,16 +1366,15 @@ static bool readAnimationCurveNode(const fbx_node& node, const std::vector<fbx_n
 		ASSERT(aStr == "A");
 
 		float value = (float)readDouble(*propIterator++);
-		if (type == "d|X") { result.dx = value; }
-		else if (type == "d|Y") { result.dy = value; }
-		else if (type == "d|Z") { result.dz = value; }
+		if (type == "d|X") { result.d.x = value; }
+		else if (type == "d|Y") { result.d.y = value; }
+		else if (type == "d|Z") { result.d.z = value; }
 	}
 
-	outAnimationCurveNodes.push_back(result);
-	return true;
+	return result;
 }
 
-static bool readAnimationCurve(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, std::vector<fbx_animation_curve>& outAnimationCurves,
+static fbx_animation_curve readAnimationCurve(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties,
 	std::vector<int64>& times, std::vector<float>& values)
 {
 	auto [id, name] = readObjectIDAndName(node, properties);
@@ -1408,158 +1420,235 @@ static bool readAnimationCurve(const fbx_node& node, const std::vector<fbx_node>
 	result.first = first;
 	result.count = count;
 
-	outAnimationCurves.push_back(result);
-	return true;
-}
-
-static bool readConnection(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties, std::vector<fbx_connection>& outConnections)
-{
-	ASSERT(node.name == "C");
-
-	fbx_connection result;
-
-	auto propIterator = fbx_property_iterator{ &node, properties }.begin();
-	sized_string type = readString(*propIterator++);
-	result.idA = readInt64(*propIterator++);
-	result.idB = readInt64(*propIterator++);
-
-	if (type == "OO")
-	{
-		// Object-object connection.
-		result.type = fbx_connection_type_object_object;
-	}
-	else if (type == "OP")
-	{
-		// Object-property connection.
-		result.type = fbx_connection_type_object_property;
-
-		if (propIterator != fbx_property_iterator{ &node, properties }.end())
-		{
-			sized_string textureSlot = readString(*propIterator++);
-			if (textureSlot == "DiffuseColor")
-			{
-				result.textureSlot = fbx_texture_slot_albedo;
-			}
-			else if (textureSlot == "NormalMap")
-			{
-				result.textureSlot = fbx_texture_slot_normal;
-			}
-			else if (textureSlot == "ShininessExponent")
-			{
-				result.textureSlot = fbx_texture_slot_roughness;
-			}
-			else if (textureSlot == "ReflectionFactor")
-			{
-				result.textureSlot = fbx_texture_slot_metallic;
-			}
-		}
-	}
-
-	outConnections.push_back(result);
-	return true;
-}
-
-template <typename T>
-static std::unordered_map<int64, uint32> mapIDToObject(const std::vector<T>& objects)
-{
-	std::unordered_map<int64, uint32> map;
-	map.reserve(objects.size());
-	for (uint32 i = 0; i < (uint32)objects.size(); ++i)
-	{
-		ASSERT(map.find(objects[i].id) == map.end());
-		map[objects[i].id] = i;
-	}
-	return map;
-}
-
-template <typename T>
-static T* findObjectWithID(std::vector<T>& objects, const std::unordered_map<int64, uint32>& map, int64 id)
-{
-	auto it = map.find(id);
-
-	T* result = 0;
-	if (it != map.end())
-	{
-		result = &objects[it->second];
-	}
 	return result;
 }
 
-static void resolveConnections(const std::vector<fbx_connection>& connections, std::vector<fbx_model>& models, std::vector<fbx_mesh>& meshes, 
-	std::vector<fbx_material>& materials, std::vector<fbx_texture>& textures, std::vector<fbx_deformer>& deformers,
-	std::vector<fbx_animation_stack>& animationStacks, std::vector<fbx_animation_layer>& animationLayers,
-	std::vector<fbx_animation_curve_node>& animationCurveNodes, std::vector<fbx_animation_curve>& animationCurves)
+
+
+
+
+
+
+
+
+struct fbx_animation_joint
 {
-	std::unordered_map<int64, uint32> idToModel = mapIDToObject(models);
-	std::unordered_map<int64, uint32> idToMesh = mapIDToObject(meshes);
-	std::unordered_map<int64, uint32> idToMaterial = mapIDToObject(materials);
-	std::unordered_map<int64, uint32> idToTexture = mapIDToObject(textures);
-	std::unordered_map<int64, uint32> idToDeformer = mapIDToObject(deformers);
-
-	for (fbx_connection conn : connections)
+	union
 	{
-		if (conn.type == fbx_connection_type_object_object)
+		struct
 		{
-			fbx_model* modelA = findObjectWithID(models, idToModel, conn.idA);
-			fbx_model* modelB = findObjectWithID(models, idToModel, conn.idB);
-			fbx_mesh* meshA = findObjectWithID(meshes, idToMesh, conn.idA);
-			fbx_mesh* meshB = findObjectWithID(meshes, idToMesh, conn.idB);
-			fbx_material* materialA = findObjectWithID(materials, idToMaterial, conn.idA);
-			fbx_material* materialB = findObjectWithID(materials, idToMaterial, conn.idB);
-			fbx_deformer* deformerA = findObjectWithID(deformers, idToDeformer, conn.idA);
-			fbx_deformer* deformerB = findObjectWithID(deformers, idToDeformer, conn.idB);
+			fbx_animation_curve_node* translation;
+			fbx_animation_curve_node* rotation;
+			fbx_animation_curve_node* scaling;
+		};
+		fbx_animation_curve_node* curveNodes[3];
+	};
+};
 
-			if (modelA && modelB)
+struct fbx_animation
+{
+	std::unordered_map<int64, fbx_animation_joint> joints;
+};
+
+struct fbx_skeleton
+{
+	std::vector<fbx_deformer*> joints;
+};
+
+struct fbx_object_lut
+{
+	using fbx_object_index = std::pair<fbx_object_type, uint32>;
+
+	std::unordered_map<int64, fbx_object_index> idToObject;
+
+	std::vector<fbx_model> models;
+	std::vector<fbx_mesh> meshes;
+	std::vector<fbx_material> materials;
+	std::vector<fbx_texture> textures;
+	std::vector<fbx_deformer> deformers;
+
+	std::vector<fbx_animation_stack> animationStacks;
+	std::vector<fbx_animation_layer> animationLayers;
+	std::vector<fbx_animation_curve_node> animationCurveNodes;
+	std::vector<fbx_animation_curve> animationCurves;
+
+	std::unordered_map<int64, fbx_skeleton> skeletons;
+	std::vector<fbx_animation> animations;
+
+
+	template <typename T>
+	void push(std::vector<T>& vec, T&& t, fbx_object_type type)
+	{
+		uint32 index = (uint32)vec.size();
+		int64 id = t.id;
+		vec.push_back(std::move(t));
+		idToObject[id] = { type, index };
+	}
+
+	void push(fbx_model&& t) { push(models, std::move(t), fbx_object_type_model); }
+	void push(fbx_mesh&& t) { push(meshes, std::move(t), fbx_object_type_mesh); }
+	void push(fbx_material&& t) { push(materials, std::move(t), fbx_object_type_material); }
+	void push(fbx_texture&& t) { push(textures, std::move(t), fbx_object_type_texture); }
+	void push(fbx_deformer&& t) { push(deformers, std::move(t), fbx_object_type_deformer); }
+	void push(fbx_animation_stack&& t) { push(animationStacks, std::move(t), fbx_object_type_animation_stack); }
+	void push(fbx_animation_layer&& t) { push(animationLayers, std::move(t), fbx_object_type_animation_layer); }
+	void push(fbx_animation_curve_node&& t) { push(animationCurveNodes, std::move(t), fbx_object_type_animation_curve_node); }
+	void push(fbx_animation_curve&& t) { push(animationCurves, std::move(t), fbx_object_type_animation_curve); }
+
+	fbx_object_index find(int64 id) 
+	{ 
+		auto it = idToObject.find(id);
+		if (it == idToObject.end())
+		{
+			return { fbx_object_type_unknown, 0 };
+		}
+		return it->second; 
+	}
+};
+
+
+
+static void resolveConnections(const fbx_node* connectionsNode, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties,
+	fbx_object_lut& lut)
+{
+	for (const fbx_node& node : fbx_node_iterator{ connectionsNode, nodes })
+	{
+		ASSERT(node.name == "C");
+
+		auto propIterator = fbx_property_iterator{ &node, properties }.begin();
+		sized_string type = readString(*propIterator++);
+		int64 idA = readInt64(*propIterator++);
+		int64 idB = readInt64(*propIterator++);
+
+		auto [typeA, indexA] = lut.find(idA);
+		auto [typeB, indexB] = lut.find(idB);
+
+		if (type == "OO")
+		{
+			// Object-object connection.
+			if (typeA == fbx_object_type_global || typeB == fbx_object_type_global)
 			{
-				modelA->parent = modelB;
-				modelB->children.push_back(modelA);
+				// Do nothing.
 			}
-			else if (modelA && deformerB)
+			else if (typeA == fbx_object_type_model && typeB == fbx_object_type_model)
 			{
-				deformerB->model = modelA;
-				modelA->deformer = deformerB;
+				// Model-model connection -> A is child of B.
+				fbx_model& a = lut.models[indexA];
+				fbx_model& b = lut.models[indexB];
+				b.children.push_back(&a);
+				a.parent = &b;
 			}
-			else if (meshA && modelB)
+			else if (typeA == fbx_object_type_material && typeB == fbx_object_type_model)
 			{
-				modelB->meshes.push_back(meshA);
+				// Material-model connection -> A is one of B's materials.
+				fbx_material& a = lut.materials[indexA];
+				fbx_model& b = lut.models[indexB];
+				b.materials.push_back(&a);
 			}
-			else if (deformerA && meshB)
+			else if (typeA == fbx_object_type_model && typeB == fbx_object_type_deformer)
 			{
-				meshB->deformer = deformerA;
+				// Model-deformer connection -> B influences A.
+				fbx_model& a = lut.models[indexA];
+				fbx_deformer& b = lut.deformers[indexB];
+				b.model = &a;
+				a.deformer = &b;
 			}
-			else if (deformerA && deformerB)
+			else if (typeA == fbx_object_type_mesh && typeB == fbx_object_type_model)
 			{
-				deformerA->jointID = (uint32)deformerB->joints.size();
-				deformerB->joints.push_back(deformerA);
+				// Mesh-model connection -> B has mesh A.
+				fbx_mesh& a = lut.meshes[indexA];
+				fbx_model& b = lut.models[indexB];
+				b.meshes.push_back(&a);
 			}
-			else if (materialA && modelB)
+			else if (typeA == fbx_object_type_deformer && typeB == fbx_object_type_mesh)
 			{
-				modelB->materials.push_back(materialA);
+				// Deformer-mesh connection -> A deforms B.
+				fbx_deformer& a = lut.deformers[indexA];
+				fbx_mesh& b = lut.meshes[indexB];
+				ASSERT(b.skeletonID == 0);
+				b.skeletonID = idA;
+			}
+			else if (typeA == fbx_object_type_deformer && typeB == fbx_object_type_deformer)
+			{
+				// Deformer-deformer connection -> A is part of B's skeleton, not necessarily its direct child!.
+				fbx_deformer& a = lut.deformers[indexA];
+				fbx_deformer& b = lut.deformers[indexB];
+
+				fbx_skeleton& skel = lut.skeletons[idB];
+				a.jointID = (uint32)skel.joints.size();
+				a.skeletonID = idB;
+				skel.joints.push_back(&a);
+			}
+			else if (typeA == fbx_object_type_animation_layer && typeB == fbx_object_type_animation_stack)
+			{
+				// Layer-stack connection -> A is one of B's layers.
+				fbx_animation_layer& a = lut.animationLayers[indexA];
+				fbx_animation_stack& b = lut.animationStacks[indexB];
+				b.layers.push_back(&a);
+			}
+			else if (typeA == fbx_object_type_animation_curve_node && typeB == fbx_object_type_animation_layer)
+			{
+				// Curvenode-layer connection -> A influences one of B's joints.
+				fbx_animation_curve_node& a = lut.animationCurveNodes[indexA];
+				fbx_animation_layer& b = lut.animationLayers[indexB];
+				b.curveNodes.push_back(&a);
 			}
 			else
 			{
-				int a = 0;
+				printf("Unhandled OO connection: %s - %s.\n", objectTypeNames[typeA], objectTypeNames[typeB]);
 			}
-			// TODO: Note Attributes
 		}
-		else if (conn.type == fbx_connection_type_object_property)
+		else if (type == "OP")
 		{
-			fbx_material* materialA = findObjectWithID(materials, idToMaterial, conn.idA);
-			fbx_material* materialB = findObjectWithID(materials, idToMaterial, conn.idB);
-			fbx_texture* textureA = findObjectWithID(textures, idToTexture, conn.idA);
-			fbx_texture* textureB = findObjectWithID(textures, idToTexture, conn.idB);
+			// Object-property connection.
+			sized_string slot = readString(*propIterator++);
 
-			if (textureA && materialB)
+			if (typeA == fbx_object_type_texture && typeB == fbx_object_type_material)
 			{
-				if (conn.textureSlot == fbx_texture_slot_albedo) { materialB->albedoTexture = textureA; }
-				else if (conn.textureSlot == fbx_texture_slot_normal) { materialB->normalTexture = textureA; }
-				else if (conn.textureSlot == fbx_texture_slot_roughness) { materialB->roughnessTexture = textureA; }
-				else if (conn.textureSlot == fbx_texture_slot_metallic) { materialB->metallicTexture = textureA; }
+				// Texture-material connection -> B uses A.
+				fbx_texture& a = lut.textures[indexA];
+				fbx_material& b = lut.materials[indexB];
+
+				if (slot == "DiffuseColor") { b.albedoTexture = &a; }
+				else if (slot == "NormalMap") { b.normalTexture = &a; }
+				else if (slot == "ShininessExponent") { b.roughnessTexture = &a; }
+				else if (slot == "ReflectionFactor") { b.metallicTexture = &a; }
+				else { printf("Unknown texture slot '%.*s'.\n", slot.length, slot.str); }
+			}
+			else if (typeA == fbx_object_type_animation_curve_node && typeB == fbx_object_type_model)
+			{
+				// Curvenode-model connection -> A influences properties of B (translation, rotation, or scale).
+				fbx_animation_curve_node& a = lut.animationCurveNodes[indexA];
+				fbx_model& b = lut.models[indexB];
+
+				int32 index = -1;
+				if (slot == "Lcl Translation") { index = 0; }
+				else if (slot == "Lcl Rotation") { index = 1; }
+				else if (slot == "Lcl Scaling") { index = 2; }
+				else { printf("Unknown curve node slot '%.*s'.\n", slot.length, slot.str); }
+
+				a.model = &b;
+				a.propertyIndex = index;
+			}
+			else if (typeA == fbx_object_type_animation_curve && typeB == fbx_object_type_animation_curve_node)
+			{
+				// Curve-curvenode connection -> A describes changes in B (x, y, or z).
+				fbx_animation_curve& a = lut.animationCurves[indexA];
+				fbx_animation_curve_node& b = lut.animationCurveNodes[indexB];
+
+				if (slot == "d|X") { b.xCurve = &a; }
+				else if (slot == "d|Y") { b.yCurve = &a; }
+				else if (slot == "d|Z") { b.zCurve = &a; }
+				else { printf("Unknown curve slot '%.*s'.\n", slot.length, slot.str); }
+			}
+			else
+			{
+				printf("Unhandled OP connection: %s - %s.\n", objectTypeNames[typeA], objectTypeNames[typeB]);
 			}
 		}
 	}
 
-	for (fbx_deformer& deformer : deformers)
+	for (fbx_deformer& deformer : lut.deformers)
 	{
 		if (fbx_model* model = deformer.model)
 		{
@@ -1567,24 +1656,44 @@ static void resolveConnections(const std::vector<fbx_connection>& connections, s
 			{
 				if (fbx_deformer* parentDeformer = parentModel->deformer)
 				{
-					deformer.parentJoint = parentDeformer;
+					deformer.parentID = parentDeformer->jointID;
+				}
+			}
+		}
+	}
+
+
+	for (fbx_animation_stack& stack : lut.animationStacks)
+	{
+		fbx_animation& anim = lut.animations.emplace_back();
+
+		ASSERT(stack.layers.size() == 1);
+		for (fbx_animation_layer* layer : stack.layers)
+		{
+			for (fbx_animation_curve_node* curveNode : layer->curveNodes)
+			{
+				if (fbx_model* model = curveNode->model)
+				{
+					fbx_animation_joint& joint = anim.joints[model->id];
+					joint.curveNodes[curveNode->propertyIndex] = curveNode;
 				}
 			}
 		}
 	}
 }
 
-static void finishMesh(fbx_mesh& mesh, uint32 flags)
+static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, fbx_skeleton>& skeletons)
 {
 	// Assign materials and skinning weights, remove duplicate vertices and triangulate.
 
-	if (mesh.deformer && flags & mesh_flag_load_skin)
+	if (mesh.skeletonID && flags & mesh_flag_load_skin)
 	{
 		mesh.skin.resize(mesh.positions.size(), {});
+		fbx_skeleton& skeleton = skeletons[mesh.skeletonID];
 
-		for (int32 jointID = 0; jointID < (int32)mesh.deformer->joints.size(); ++jointID)
+		for (uint32 jointID = 0; jointID < (uint32)skeleton.joints.size(); ++jointID)
 		{
-			fbx_deformer* joint = mesh.deformer->joints[jointID];
+			fbx_deformer* joint = skeleton.joints[jointID];
 
 			auto& indices = joint->vertexIndices;
 			auto& weights = joint->weights;
@@ -1620,19 +1729,19 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags)
 					{
 						if (skin.skinWeights[3] != 0)
 						{
-							printf("Warning: Vertex has more than 4 joints attached.\n");
+							printf("Warning: Vertex is influences by more than 4 joints. Ditching joint with weight %f.\n", skin.skinWeights[3] / 255.f);
 						}
 						for (int32 k = 3; k > slot; --k)
 						{
 							skin.skinIndices[k] = skin.skinIndices[k - 1];
 							skin.skinWeights[k] = skin.skinWeights[k - 1];
 						}
-						skin.skinIndices[slot] = jointID;
+						skin.skinIndices[slot] = (uint8)jointID;
 						skin.skinWeights[slot] = weight;
 					}
 					else
 					{
-						printf("Warning: Vertex has more than 4 joints attached.\n");
+						printf("Warning: Vertex is influences by more than 4 joints. Ditching joint with weight %f.\n", weights[i]);
 					}
 				}
 			}
@@ -1832,6 +1941,7 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 	node.next = -1;
 	node.firstChild = -1;
 	node.lastChild = -1;
+	node.numChildren = 0;
 	nodes.push_back(node);
 
 	std::vector<fbx_property> properties;
@@ -1851,81 +1961,64 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 
 	fbx_global_settings globalSettings = readGlobalSettings(*findNode(nodes, { "GlobalSettings" }), nodes, properties);
 
-	std::vector<fbx_model> models;
-	std::vector<fbx_mesh> meshes;
-	std::vector<fbx_material> materials;
-	std::vector<fbx_texture> textures;
-	std::vector<fbx_deformer> deformers;
-
-	std::vector<fbx_animation_stack> animationStacks;
-	std::vector<fbx_animation_layer> animationLayers;
-	std::vector<fbx_animation_curve_node> animationCurveNodes;
-	std::vector<fbx_animation_curve> animationCurves;
+	
+	fbx_object_lut objectLUT;
 	std::vector<int64> animationTimes;
 	std::vector<float> animationValues;
 
-	std::vector<fbx_connection> connections;
 
-	for (const fbx_node& objectNode : fbx_node_iterator{ findNode(nodes, { "Objects" }), nodes })
+	const fbx_node* objectsNode = findNode(nodes, { "Objects" });
+	objectLUT.idToObject.reserve(objectsNode->numChildren + 1);
+	objectLUT.idToObject[0] = { fbx_object_type_global, 0 };
+
+	for (const fbx_node& objectNode : fbx_node_iterator{ objectsNode, nodes })
 	{
 		if (objectNode.name == "Model")
 		{
-			readModel(objectNode, nodes, properties, models);
+			objectLUT.push(readModel(objectNode, nodes, properties));
 		}
 		if (objectNode.name == "Geometry")
 		{
-			readMesh(objectNode, nodes, properties, flags, meshes);
+			objectLUT.push(readMesh(objectNode, nodes, properties, flags));
 		}
 		else if (objectNode.name == "Material")
 		{
-			if (flags & mesh_flag_load_materials)
-			{
-				readMaterial(objectNode, nodes, properties, materials);
-			}
+			objectLUT.push(readMaterial(objectNode, nodes, properties));
 		}
 		else if (objectNode.name == "Texture")
 		{
-			if (flags & mesh_flag_load_materials)
-			{
-				readTexture(objectNode, nodes, properties, textures);
-			}
+			objectLUT.push(readTexture(objectNode, nodes, properties));
 		}
 		else if (objectNode.name == "Deformer")
 		{
-			readDeformer(objectNode, nodes, properties, deformers);
+			objectLUT.push(readDeformer(objectNode, nodes, properties));
 		}
 		else if (objectNode.name == "AnimationStack")
 		{
-			readAnimationStack(objectNode, nodes, properties, animationStacks);
+			objectLUT.push(readAnimationStack(objectNode, nodes, properties));
 		}
 		else if (objectNode.name == "AnimationLayer")
 		{
-			readAnimationLayer(objectNode, nodes, properties, animationLayers);
+			objectLUT.push(readAnimationLayer(objectNode, nodes, properties));
 		}
 		else if (objectNode.name == "AnimationCurveNode")
 		{
-			readAnimationCurveNode(objectNode, nodes, properties, animationCurveNodes);
+			objectLUT.push(readAnimationCurveNode(objectNode, nodes, properties));
 		}
 		else if (objectNode.name == "AnimationCurve")
 		{
-			readAnimationCurve(objectNode, nodes, properties, animationCurves, animationTimes, animationValues);
+			objectLUT.push(readAnimationCurve(objectNode, nodes, properties, animationTimes, animationValues));
 		}
 	}
 
+	resolveConnections(findNode(nodes, { "Connections" }), nodes, properties, objectLUT);
 
-	for (const fbx_node& connectionNode : fbx_node_iterator{ findNode(nodes, { "Connections" }), nodes })
+	for (fbx_mesh& mesh : objectLUT.meshes)
 	{
-		readConnection(connectionNode, nodes, properties, connections);
+		finishMesh(mesh, flags, objectLUT.skeletons);
 	}
 
-	resolveConnections(connections, models, meshes, materials, textures, deformers, animationStacks, animationLayers, animationCurveNodes, animationCurves);
-
-	for (fbx_mesh& mesh : meshes)
-	{
-		finishMesh(mesh, flags);
-	}
-
-#if 1
+#if 0
 	for (const fbx_model& model : models)
 	{
 		std::string name = nameToString(model.name);
@@ -1954,50 +2047,60 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 
 	model_asset result;
 	
-	result.meshes.reserve(meshes.size());
-	for (fbx_mesh& mesh : meshes)
+	result.meshes.reserve(objectLUT.meshes.size());
+	for (fbx_mesh& mesh : objectLUT.meshes)
 	{
 		result.meshes.push_back(mesh_asset{ std::move(mesh.submeshes), -1 });
 	}
 
-	if (deformers.size() > 0)
+	for (auto& [id, skeleton] : objectLUT.skeletons)
 	{
-		for (fbx_deformer& deformer : deformers)
+		uint32 numJoints = (uint32)skeleton.joints.size();
+
+		skeleton_asset out;
+		out.joints.reserve(numJoints);
+		for (uint32 i = 0; i < numJoints; ++i)
 		{
-			if (!deformer.joints.empty())
+			fbx_deformer* joint = skeleton.joints[i];
+			std::string name = nameToString(joint->model->name); // TODO: Make unique!
+
+			out.joints.push_back({ std::move(name), limb_type_unknown, false, joint->invBindMatrix, invert(joint->invBindMatrix), joint->parentID });
+			out.nameToJointID[name] = i;
+		}
+
+
+		for (uint32 i = 0; i < (uint32)objectLUT.meshes.size(); ++i)
+		{
+			if (objectLUT.meshes[i].skeletonID == id)
 			{
-				// This is a skeleton.
-
-				skeleton_asset skeleton;
-				skeleton.joints.reserve(deformer.joints.size());
-				for (uint32 i = 0; i < (uint32)deformer.joints.size(); ++i)
-				{
-					fbx_deformer* joint = deformer.joints[i];
-					
-					std::string name = nameToString(joint->name); // TODO: Make unique!
-
-					uint32 parentID = INVALID_JOINT;
-					if (joint->parentJoint)
-					{
-						parentID = joint->parentJoint->jointID;
-						ASSERT(parentID < i);
-					}
-
-					skeleton.joints.push_back({ std::move(name), limb_type_unknown, false, joint->invBindMatrix, invert(joint->invBindMatrix), parentID });
-					skeleton.nameToJointID[name] = i;
-				}
-
-
-				for (uint32 i = 0; i < (uint32)meshes.size(); ++i)
-				{
-					if (meshes[i].deformer == &deformer)
-					{
-						result.meshes[i].skeletonIndex = (uint32)result.skeletons.size();
-					}
-				}
-
-				result.skeletons.push_back(std::move(skeleton));
+				result.meshes[i].skeletonIndex = (uint32)result.skeletons.size();
 			}
+		}
+
+		result.skeletons.push_back(std::move(out));
+	}
+
+	for (auto& animation : objectLUT.animations)
+	{
+		uint32 numJoints = (uint32)animation.joints.size();
+
+		if (numJoints)
+		{
+			animation_asset out;
+			out.joints.reserve(animation.joints.size());
+			for (auto [id, j] : animation.joints)
+			{
+				auto [modelType, modelIndex] = objectLUT.find(id);
+				ASSERT(modelType == fbx_object_type_model);
+
+				fbx_model& model = objectLUT.models[modelIndex];
+				std::string name = nameToString(model.name); // TODO: Make unique!
+
+				animation_joint& joint = out.joints[name];
+				// TODO: Fill out.
+			}
+
+			result.animations.push_back(std::move(out));
 		}
 	}
 
