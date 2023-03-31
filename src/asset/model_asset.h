@@ -22,11 +22,13 @@ struct animation_asset
 	std::vector<vec3> positionKeyframes;
 	std::vector<quat> rotationKeyframes;
 	std::vector<vec3> scaleKeyframes;
+
+	float duration;
 };
 
 struct material_asset
 {
-
+	vec3 diffuseColor;
 };
 
 struct submesh_asset

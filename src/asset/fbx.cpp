@@ -14,6 +14,18 @@ static void testDumpToPLY(const std::string& filename,
 	uint8 r = 255, uint8 g = 255, uint8 b = 255);
 
 
+enum rotation_order
+{
+	rotation_order_xyz,
+	rotation_order_xzy,
+	rotation_order_yzx,
+	rotation_order_yxz,
+	rotation_order_zxy,
+	rotation_order_zyx,
+	rotation_order_spheric_xyz,
+
+	rotation_order_count,
+};
 
 
 struct entire_file
@@ -139,6 +151,11 @@ struct fbx_node
 		return 0;
 	}
 
+	const fbx_node* getFirstChild(const std::vector<fbx_node>& nodes) const
+	{
+		return numChildren ? &nodes[firstChild] : 0;
+	}
+
 	const fbx_property* getFirstProperty(const std::vector<fbx_property>& properties) const
 	{
 		return numProperties ? &properties[firstProperty] : 0;
@@ -166,9 +183,6 @@ struct fbx_property
 	uint32 numElements;
 	uint8* data;
 };
-
-const char* indentStr = "                              ";
-
 
 static uint32 parseProperties(entire_file& file, std::vector<fbx_property>& outProperties, uint32 numProperties)
 {
@@ -430,6 +444,11 @@ static bool isTriangleMesh(const std::vector<int32>& indices)
 	}
 
 	return true;
+}
+
+static float convertTime(int64 t)
+{
+	return (float)((double)t / 46186158000.0);
 }
 
 struct fbx_property_iterator
@@ -771,6 +790,32 @@ struct fbx_animation_layer;
 struct fbx_animation_curve_node;
 struct fbx_animation_curve;
 
+struct fbx_definitions
+{
+	union
+	{
+		struct
+		{
+			int32 numGlobalSettings;
+			//int32 numNodeAttributes;
+			int32 numModels;
+			int32 numMeshes;
+			//int32 numPoses;
+			int32 numDeformers;
+			int32 numMaterials;
+			int32 numTextures;
+			//int32 numVideos;
+			int32 numAnimationStacks;
+			int32 numAnimationLayers;
+			int32 numAnimationCurveNodes;
+			int32 numAnimationCurves;
+		};
+		int32 counts[10];
+	};
+
+	rotation_order defaultRotationOrder;
+};
+
 struct fbx_global_settings
 {
 	int32 upAxis;
@@ -784,7 +829,60 @@ struct fbx_global_settings
 
 	int32 originalUpAxis;
 	int32 originalUpAxisSign;
+
+	float frameRate;
 };
+
+static fbx_definitions readDefinitions(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties)
+{
+	fbx_definitions result = {};
+
+	for (const fbx_node& objectTypeNode : fbx_node_iterator{ &node, nodes })
+	{
+		if (objectTypeNode.name == "ObjectType")
+		{
+			sized_string type = readString(*objectTypeNode.getFirstProperty(properties));
+			const fbx_node* countNode = objectTypeNode.findChild(nodes, "Count");
+			int32 count = countNode ? readInt32(*countNode->getFirstProperty(properties)) : 0;
+
+			const fbx_node* propTemplate = objectTypeNode.findChild(nodes, "PropertyTemplate");
+			const fbx_node* properties70 = propTemplate ? propTemplate->findChild(nodes, "Properties70") : 0;
+
+			if (type == "GlobalSettings") { result.numGlobalSettings = count; }
+			//else if (type == "NodeAttribute") { result.numNodeAttributes = count; }
+			//else if (type == "Pose") { result.numPoses = count; }
+			else if (type == "Deformer") { result.numDeformers = count; }
+			else if (type == "AnimationCurve") { result.numAnimationCurves = count; }
+			else if (type == "Material") { result.numMaterials = count; }
+			else if (type == "Texture") { result.numTextures = count; }
+			//else if (type == "Video") { result.numVideos = count; }
+			else if (type == "AnimationStack") { result.numAnimationStacks = count; }
+			else if (type == "AnimationLayer") { result.numAnimationLayers = count; }
+			else if (type == "AnimationCurveNode") { result.numAnimationCurveNodes = count; }
+			else if (type == "Geometry") { result.numMeshes = count; }
+			else if (type == "Model")
+			{
+				result.numModels = count;
+
+				for (const fbx_node& P : fbx_node_iterator{ properties70, nodes })
+				{
+					ASSERT(P.name == "P");
+					auto propIterator = fbx_property_iterator{ &P, properties }.begin();
+
+					sized_string pType = readString(*propIterator++);
+					if (pType == "RotationOrder")
+					{
+						sized_string e = readString(*propIterator++);
+						ASSERT(e == "enum");
+						result.defaultRotationOrder = (rotation_order)readInt32(*propIterator++);
+					}
+				}
+			}
+		}
+	}
+
+	return result;
+}
 
 static fbx_global_settings readGlobalSettings(const fbx_node& node, const std::vector<fbx_node>& nodes, const std::vector<fbx_property>& properties)
 {
@@ -799,26 +897,21 @@ static fbx_global_settings readGlobalSettings(const fbx_node& node, const std::v
 		auto propIterator = fbx_property_iterator{ &P, properties }.begin();
 		sized_string name = readString(*propIterator++);
 
-		auto readAxis = [&propIterator]()
+		auto skipTwo = [&propIterator]()
 		{
 			sized_string dataType = readString(*propIterator++);
-			ASSERT(dataType == "int");
-
 			sized_string longDataType = readString(*propIterator++);
-			ASSERT(longDataType == "Integer");
-
-			int32 value = readInt32(*propIterator++);
-			return value;
 		};
 
-		if (name == "UpAxis") { result.upAxis = readAxis(); }
-		else if (name == "UpAxisSign") { result.upAxisSign = readAxis(); }
-		else if (name == "FrontAxis") { result.frontAxis = readAxis(); }
-		else if (name == "FrontAxisSign") { result.frontAxisSign = readAxis(); }
-		else if (name == "CoordAxis") { result.coordAxis = readAxis(); }
-		else if (name == "CoordAxisSign") { result.coordAxisSign = readAxis(); }
-		else if (name == "OriginalUpAxis") { result.originalUpAxis = readAxis(); }
-		else if (name == "OriginalUpAxisSign") { result.originalUpAxisSign = readAxis(); }
+		if (name == "UpAxis") { skipTwo(); result.upAxis = readInt32(*propIterator++); }
+		else if (name == "UpAxisSign") { skipTwo(); result.upAxisSign = readInt32(*propIterator++); }
+		else if (name == "FrontAxis") { skipTwo(); result.frontAxis = readInt32(*propIterator++); }
+		else if (name == "FrontAxisSign") { skipTwo(); result.frontAxisSign = readInt32(*propIterator++); }
+		else if (name == "CoordAxis") { skipTwo(); result.coordAxis = readInt32(*propIterator++); }
+		else if (name == "CoordAxisSign") { skipTwo(); result.coordAxisSign = readInt32(*propIterator++); }
+		else if (name == "OriginalUpAxis") { skipTwo(); result.originalUpAxis = readInt32(*propIterator++); }
+		else if (name == "OriginalUpAxisSign") { skipTwo(); result.originalUpAxisSign = readInt32(*propIterator++); }
+		else if (name == "CustomFrameRate") { skipTwo(); result.frameRate = (float)readDouble(*propIterator++); }
 	}
 
 	return result;
@@ -926,6 +1019,7 @@ struct fbx_deformer : fbx_object
 struct fbx_animation_stack : fbx_object
 {
 	std::vector<fbx_animation_layer*> layers;
+	int64 duration;
 };
 
 struct fbx_animation_layer : fbx_object
@@ -1313,25 +1407,27 @@ static fbx_animation_stack readAnimationStack(const fbx_node& node, const std::v
 	result.id = id;
 	result.name = name;
 
-#if 0
 	for (const fbx_node& P : fbx_node_iterator{ node.findChild(nodes, "Properties70"), nodes })
 	{
 		ASSERT(P.name == "P");
 
-		auto propIterator = fbx_property_iterator{ &P, properties }.begin();
-		sized_string type = readString(*propIterator++);
-		sized_string kTimeStr = readString(*propIterator++);
-		sized_string description = readString(*propIterator++);
-
-		//ASSERT(kTimeStr == "KTime");
-		//ASSERT(description == "Time");
-
-		//int64 time = readInt64(*propIterator++);
-		//
-		//if (type == "LocalStop") { result.localStop = time; }
-		//else if (type == "ReferenceStop") { result.referenceStop = time; }
+		sized_string type = readString(*P.getFirstProperty(properties));
+		if (type == "LocalStop")
+		{
+			for (const fbx_property& prop : fbx_property_iterator{ &P, properties })
+			{
+				if (prop.type == fbx_property_type_int64)
+				{
+					result.duration = readInt64(prop);
+				}
+			}
+		}
 	}
-#endif
+
+	if (result.duration == 0)
+	{
+		printf("Animation stack has zero duration!\n");
+	}
 
 	return result;
 }
@@ -1448,6 +1544,7 @@ struct fbx_animation_joint
 struct fbx_animation
 {
 	std::unordered_map<int64, fbx_animation_joint> joints;
+	int64 duration;
 };
 
 struct fbx_skeleton
@@ -1475,6 +1572,26 @@ struct fbx_object_lut
 	std::unordered_map<int64, fbx_skeleton> skeletons;
 	std::vector<fbx_animation> animations;
 
+
+	void reserve(const fbx_definitions& definitions)
+	{
+		models.reserve(definitions.numModels);
+		meshes.reserve(definitions.numMeshes);
+		materials.reserve(definitions.numMaterials);
+		textures.reserve(definitions.numTextures);
+		deformers.reserve(definitions.numDeformers);
+		animationStacks.reserve(definitions.numAnimationStacks);
+		animationLayers.reserve(definitions.numAnimationLayers);
+		animationCurveNodes.reserve(definitions.numAnimationCurveNodes);
+		animationCurves.reserve(definitions.numAnimationCurves);
+
+		int32 totalCount = 0;
+		for (uint32 i = 0; i < arraysize(definitions.counts); ++i)
+		{
+			totalCount += definitions.counts[i];
+		}
+		idToObject.reserve(totalCount);
+	}
 
 	template <typename T>
 	void push(std::vector<T>& vec, T&& t, fbx_object_type type)
@@ -1666,6 +1783,7 @@ static void resolveConnections(const fbx_node* connectionsNode, const std::vecto
 	for (fbx_animation_stack& stack : lut.animationStacks)
 	{
 		fbx_animation& anim = lut.animations.emplace_back();
+		anim.duration = stack.duration;
 
 		ASSERT(stack.layers.size() == 1);
 		for (fbx_animation_layer* layer : stack.layers)
@@ -1871,6 +1989,121 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 	}
 }
 
+
+static float sampleAnimationCurve(fbx_animation_curve* curve, int64 time, const std::vector<int64>& animationTimes, const std::vector<float>& animationValues)
+{
+	uint32 first = curve->first;
+	uint32 count = curve->count;
+	if (count == 0)
+	{
+		return curve->defaultValue;
+	}
+	else if (time >= animationTimes[first + count - 1])
+	{
+		return animationValues[first + count - 1];
+	}
+	else if (time <= 0)
+	{
+		return animationValues[first];
+	}
+
+	uint32 index = first;
+	while (index < first + count - 1)
+	{
+		if (time < animationTimes[index + 1])
+		{
+			break;
+		}
+
+		++index;
+	}
+
+	uint32 i0 = index;
+	uint32 i1 = index + 1;
+
+	float t = (float)(time - animationTimes[i0]) / (float)(animationTimes[i1] - animationTimes[i0]);
+	return lerp(animationValues[i0], animationValues[i1], t);
+};
+
+static offset_count transferAnimationCurve(fbx_animation_curve_node* curveNode, std::vector<vec3>& outValues, std::vector<float>& outTimes, int64 animationDuration,
+	const std::vector<int64>& animationTimes, const std::vector<float>& animationValues)
+{
+	fbx_animation_curve* x = curveNode->xCurve;
+	fbx_animation_curve* y = curveNode->yCurve;
+	fbx_animation_curve* z = curveNode->zCurve;
+
+	uint32 count = max(max(x->count, y->count), max(z->count, 2u));
+	offset_count result = { (uint32)outValues.size(), count };
+
+	int64 step = animationDuration / (count - 1);
+	int64 time = 0;
+
+	for (uint32 i = 0; i < count; ++i)
+	{
+		vec3 value;
+		value.x = sampleAnimationCurve(x, time, animationTimes, animationValues);
+		value.y = sampleAnimationCurve(y, time, animationTimes, animationValues);
+		value.z = sampleAnimationCurve(z, time, animationTimes, animationValues);
+
+		outValues.push_back(value);
+		outTimes.push_back(convertTime(time));
+
+		time += step;
+	}
+
+	return result;
+};
+
+static quat convertRotation(vec3 rotation, rotation_order order)
+{
+	quat x(vec3(1.f, 0.f, 0.f), deg2rad(rotation.x));
+	quat y(vec3(0.f, 1.f, 0.f), deg2rad(rotation.y));
+	quat z(vec3(0.f, 0.f, 1.f), deg2rad(rotation.z));
+
+	switch (order)
+	{
+		case rotation_order_xyz: return z * y * x;
+		case rotation_order_xzy: return y * z * x;
+		case rotation_order_yzx: return x * z * y;
+		case rotation_order_yxz: return z * x * y;
+		case rotation_order_zxy: return y * x * z;
+		case rotation_order_zyx: return x * y * z;
+		case rotation_order_spheric_xyz: ASSERT(false); return quat::identity;
+		default: ASSERT(false); return quat::identity;
+	}
+}
+
+static offset_count transferAnimationCurve(fbx_animation_curve_node* curveNode, std::vector<quat>& outValues, std::vector<float>& outTimes, int64 animationDuration,
+	const std::vector<int64>& animationTimes, const std::vector<float>& animationValues, rotation_order rotationOrder)
+{
+	fbx_animation_curve* x = curveNode->xCurve;
+	fbx_animation_curve* y = curveNode->yCurve;
+	fbx_animation_curve* z = curveNode->zCurve;
+
+	uint32 count = max(max(x->count, y->count), max(z->count, 2u));
+	offset_count result = { (uint32)outValues.size(), count };
+
+	int64 step = animationDuration / (count - 1);
+	int64 time = 0;
+
+	for (uint32 i = 0; i < count; ++i)
+	{
+		vec3 value;
+		value.x = sampleAnimationCurve(x, time, animationTimes, animationValues);
+		value.y = sampleAnimationCurve(y, time, animationTimes, animationValues);
+		value.z = sampleAnimationCurve(z, time, animationTimes, animationValues);
+
+		outValues.push_back(convertRotation(value, rotationOrder));
+		outTimes.push_back(convertTime(time));
+
+		time += step;
+	}
+
+	return result;
+}
+
+
+
 static std::string nameToString(sized_string str)
 {
 	std::string name;
@@ -1959,10 +2192,13 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 	}
 #endif
 
+	fbx_definitions definitions = readDefinitions(*findNode(nodes, { "Definitions" }), nodes, properties);
 	fbx_global_settings globalSettings = readGlobalSettings(*findNode(nodes, { "GlobalSettings" }), nodes, properties);
 
 	
 	fbx_object_lut objectLUT;
+	objectLUT.reserve(definitions);
+
 	std::vector<int64> animationTimes;
 	std::vector<float> animationValues;
 
@@ -2018,34 +2254,14 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 		finishMesh(mesh, flags, objectLUT.skeletons);
 	}
 
-#if 0
-	for (const fbx_model& model : models)
-	{
-		std::string name = nameToString(model.name);
-
-		for (uint32 i = 0; i < (uint32)model.meshes.size(); ++i)
-		{
-			const fbx_mesh* mesh = model.meshes[i];
-			std::string indexedName = name + "_" + std::to_string(i);
-
-			for (uint32 j = 0; j < (uint32)mesh->submeshes.size(); ++j)
-			{
-				const submesh_asset& sub = mesh->submeshes[j];
-
-				vec3 diffuseColor = !model.materials.empty() ? model.materials[sub.materialIndex]->diffuseColor : vec3(1.f, 1.f, 1.f);
-
-				std::string indexedName2 = indexedName + "_" + std::to_string(j) + ".ply";
-
-				testDumpToPLY(indexedName2, sub.positions, sub.uvs, sub.normals, sub.triangles,
-					(uint8)(diffuseColor.x * 255), (uint8)(diffuseColor.y * 255), (uint8)(diffuseColor.z * 255));
-			}
-
-		}
-	}
-#endif
-
 
 	model_asset result;
+
+	result.materials.reserve(objectLUT.materials.size());
+	for (fbx_material& material : objectLUT.materials)
+	{
+		result.materials.push_back(material_asset{ material.diffuseColor });
+	}
 	
 	result.meshes.reserve(objectLUT.meshes.size());
 	for (fbx_mesh& mesh : objectLUT.meshes)
@@ -2062,11 +2278,13 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 		for (uint32 i = 0; i < numJoints; ++i)
 		{
 			fbx_deformer* joint = skeleton.joints[i];
-			std::string name = nameToString(joint->model->name); // TODO: Make unique!
+			std::string name = nameToString(joint->model->name);
 
-			out.joints.push_back({ std::move(name), limb_type_unknown, false, joint->invBindMatrix, invert(joint->invBindMatrix), joint->parentID });
 			out.nameToJointID[name] = i;
+			out.joints.push_back({ std::move(name), limb_type_unknown, false, joint->invBindMatrix, invert(joint->invBindMatrix), joint->parentID });
 		}
+
+		ASSERT(out.joints.size() == out.nameToJointID.size());
 
 
 		for (uint32 i = 0; i < (uint32)objectLUT.meshes.size(); ++i)
@@ -2087,6 +2305,7 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 		if (numJoints)
 		{
 			animation_asset out;
+			out.duration = convertTime(animation.duration);
 			out.joints.reserve(animation.joints.size());
 			for (auto [id, j] : animation.joints)
 			{
@@ -2094,10 +2313,25 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 				ASSERT(modelType == fbx_object_type_model);
 
 				fbx_model& model = objectLUT.models[modelIndex];
-				std::string name = nameToString(model.name); // TODO: Make unique!
+				std::string name = nameToString(model.name);
 
 				animation_joint& joint = out.joints[name];
-				// TODO: Fill out.
+				joint.isAnimated = true;
+
+				offset_count position = transferAnimationCurve(j.curveNodes[0], out.positionKeyframes, out.positionTimestamps, animation.duration, 
+					animationTimes, animationValues);
+				joint.firstPositionKeyframe = position.offset;
+				joint.numPositionKeyframes = position.count;
+
+				offset_count rotation = transferAnimationCurve(j.curveNodes[1], out.rotationKeyframes, out.rotationTimestamps, animation.duration,
+					animationTimes, animationValues, definitions.defaultRotationOrder);
+				joint.firstRotationKeyframe = rotation.offset;
+				joint.numRotationKeyframes = rotation.count;
+
+				offset_count scale = transferAnimationCurve(j.curveNodes[2], out.scaleKeyframes, out.scaleTimestamps, animation.duration,
+					animationTimes, animationValues);
+				joint.firstScaleKeyframe = scale.offset;
+				joint.numScaleKeyframes = scale.count;
 			}
 
 			result.animations.push_back(std::move(out));
@@ -2105,6 +2339,40 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 	}
 
 	freeFile(file);
+
+
+
+
+
+
+
+
+
+#if 0
+	for (uint32 i = 0; i < (uint32)result.meshes.size(); ++i)
+	{
+		const mesh_asset& mesh = result.meshes[i];
+		std::string indexedName = "Mesh_" + std::to_string(i);
+
+		for (uint32 j = 0; j < (uint32)mesh.submeshes.size(); ++j)
+		{
+			const submesh_asset& sub = mesh.submeshes[j];
+
+			vec3 diffuseColor = !result.materials.empty() ? result.materials[sub.materialIndex].diffuseColor : vec3(1.f, 1.f, 1.f);
+
+			std::string indexedName2 = indexedName + "_" + std::to_string(j) + ".ply";
+
+			testDumpToPLY(indexedName2, sub.positions, sub.uvs, sub.normals, sub.triangles,
+				(uint8)(diffuseColor.x * 255), (uint8)(diffuseColor.y * 255), (uint8)(diffuseColor.z * 255));
+		}
+	}
+#endif
+
+
+
+
+
+
 	return result;
 }
 
