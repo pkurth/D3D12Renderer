@@ -1397,7 +1397,7 @@ void mesh_builder::pushMesh(const submesh_asset& mesh, float scale)
 
 	bool hasPositions = true;
 	bool hasNormals = !mesh.normals.empty();
-	bool hasTangents = false;
+	bool hasTangents = !mesh.tangents.empty();
 	bool hasUVs = !mesh.uvs.empty();
 	bool hasVertexColors = false;
 	bool hasSkin = !mesh.skin.empty();
@@ -1412,7 +1412,7 @@ void mesh_builder::pushMesh(const submesh_asset& mesh, float scale)
 		}
 		if (hasTangents)
 		{
-			//tangent = vec3(mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z);
+			tangent = mesh.tangents[i];
 		}
 		if (hasUVs)
 		{

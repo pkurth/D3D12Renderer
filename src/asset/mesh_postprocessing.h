@@ -17,6 +17,7 @@ struct full_vertex
 	vec3 position;
 	vec2 uv;
 	vec3 normal;
+	vec3 tangent;
 	skinning_weights skin;
 };
 
@@ -32,6 +33,7 @@ namespace std
 			hash_combine(seed, x.position);
 			hash_combine(seed, x.uv);
 			hash_combine(seed, x.normal);
+			hash_combine(seed, x.tangent);
 			hash_combine(seed, *(uint32*)x.skin.skinIndices);
 			hash_combine(seed, *(uint32*)x.skin.skinWeights);
 

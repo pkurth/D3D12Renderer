@@ -248,12 +248,10 @@ ref<pbr_material> loadAssimpMaterial(const aiScene* scene, const fs::path& scene
 		}
 		else
 		{
-			float shininess;
-			if (material->Get(AI_MATKEY_SHININESS, shininess) != aiReturn_SUCCESS)
-			{
-				shininess = 80.f; // Default value.
-			}
-			roughnessOverride = 1.f - sqrt(shininess * 0.01f);
+			float roughness = 1.f;
+			material->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness);
+
+			roughnessOverride = roughness;
 		}
 
 		if (hasMetallic)

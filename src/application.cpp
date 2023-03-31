@@ -77,7 +77,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 
 	game_scene& scene = this->scene.getCurrentScene();
 
-#if 1
+#if 0
 	if (auto mesh = loadMeshFromFile("assets/sponza/sponza.obj"))
 	{
 		auto blas = defineBlasFromMesh(mesh);
@@ -94,39 +94,74 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 #endif
 
 	{	
-		auto woodMaterial = createPBRMaterial(
-			"assets/desert/textures/WoodenCrate2_Albedo.png",
-			"assets/desert/textures/WoodenCrate2_Normal.png",
-			{}, {});
-
 		auto stormtrooperMesh = make_ref<multi_mesh>();
 
-		model_asset asset = load3DModelFromFile("assets/stormtrooper/stormtrooper.fbx");
+		model_asset asset = load3DModelFromFile("assets/pilot/pilot.fbx");
 		mesh_builder builder(mesh_creation_flags_animated);
 		for (auto& mesh : asset.meshes)
 		{
 			for (auto& sub : mesh.submeshes)
 			{
+				const material_asset& mat = asset.materials[sub.materialIndex];
+				auto material = createPBRMaterial(
+					mat.albedo, mat.normal, mat.roughness, mat.metallic, mat.emission, mat.albedoTint, mat.roughnessOverride, mat.metallicOverride,
+					mat.shader, mat.uvScale, mat.translucency);
+
 				builder.pushMesh(sub, 1.f);
-				stormtrooperMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, woodMaterial });
+				stormtrooperMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, material });
 			}
 		}
 
 		stormtrooperMesh->mesh = builder.createDXMesh();
 
+		animation_skeleton& skeleton = stormtrooperMesh->skeleton;
+
 		if (!asset.skeletons.empty())
 		{
-			stormtrooperMesh->skeleton.joints = std::move(asset.skeletons[0].joints);
-			stormtrooperMesh->skeleton.nameToJointID = std::move(asset.skeletons[0].nameToJointID);
+			skeleton_asset& in = asset.skeletons.front();
 
-			stormtrooperMesh->skeleton.analyzeJoints(builder.getPositions(), (uint8*)builder.getOthers() + builder.getSkinOffset(), builder.getOthersSize(), builder.getNumVertices());
+			skeleton.joints = std::move(in.joints);
+			skeleton.nameToJointID = std::move(in.nameToJointID);
+			skeleton.analyzeJoints(builder.getPositions(), (uint8*)builder.getOthers() + builder.getSkinOffset(), builder.getOthersSize(), builder.getNumVertices());
 		}
+
+#if 1
+		if (!asset.animations.empty())
+		{
+			animation_asset& in = asset.animations.front();
+
+			animation_clip& clip = skeleton.clips.emplace_back();
+			clip.name = "Test";
+			clip.filename = "Test";
+			clip.lengthInSeconds = in.duration;
+			clip.joints.resize(skeleton.joints.size(), {});
+
+			clip.positionKeyframes = std::move(in.positionKeyframes);
+			clip.positionTimestamps = std::move(in.positionTimestamps);
+			clip.rotationKeyframes = std::move(in.rotationKeyframes);
+			clip.rotationTimestamps = std::move(in.rotationTimestamps);
+			clip.scaleKeyframes = std::move(in.scaleKeyframes);
+			clip.scaleTimestamps = std::move(in.scaleTimestamps);
+
+			for (auto [name, joint] : in.joints)
+			{
+				auto it = skeleton.nameToJointID.find(name);
+				if (it != skeleton.nameToJointID.end())
+				{
+					animation_joint& j = clip.joints[it->second];
+					j = joint;
+				}
+			}
+		}
+#endif
 
 		auto stormtrooper = scene.createEntity("NEW Stormtrooper")
 			.addComponent<transform_component>(vec3(-10.f, 0.f, -1.f), quat::identity)
 			.addComponent<mesh_component>(stormtrooperMesh)
 			.addComponent<animation_component>()
 			.addComponent<dynamic_transform_component>();
+
+		stormtrooper.getComponent<animation_component>().animation.set(&stormtrooperMesh->skeleton.clips[0]);
 	}
 
 	if (auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx"))
@@ -583,10 +618,10 @@ void application::update(const user_input& input, float dt)
 
 		context.waitForWorkCompletion();
 
-		//for (auto [entityHandle, anim, raster, transform] : scene.group(component_group<animation_component, mesh_component, transform_component>).each())
-		//{
-		//	anim.drawCurrentSkeleton(raster.mesh, transform, &ldrRenderPass);
-		//}
+		for (auto [entityHandle, anim, raster, transform] : scene.group(component_group<animation_component, mesh_component, transform_component>).each())
+		{
+			anim.drawCurrentSkeleton(raster.mesh, transform, &ldrRenderPass);
+		}
 
 
 		scene_lighting lighting;

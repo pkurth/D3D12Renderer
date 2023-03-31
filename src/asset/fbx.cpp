@@ -966,6 +966,7 @@ struct fbx_mesh : fbx_object
 	std::vector<vec3> positions;
 	std::vector<vec2> uvs;
 	std::vector<vec3> normals;
+	std::vector<vec3> tangents;
 	std::vector<skinning_weights> skin;
 	std::vector<int32> originalIndices;
 
@@ -980,16 +981,13 @@ struct fbx_mesh : fbx_object
 
 struct fbx_material : fbx_object
 {
-	sized_string shadingModel;
-	int32 multiLayer;
-	vec3 diffuseColor;
-	vec3 ambientColor;
-	float ambientFactor;
-	vec3 specularColor;
-	float specularFactor;
-	float shininess;
-	float shininessExponent;
-	vec3 reflectionColor;
+	vec4 emission;
+	vec4 albedoTint;
+	float roughnessOverride;
+	float metallicOverride;
+	pbr_material_shader shader;
+	float uvScale;
+	float translucency;
 
 	fbx_texture* albedoTexture;
 	fbx_texture* normalTexture;
@@ -1187,6 +1185,10 @@ static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& node
 			for (uint32 i = 0; i < (uint32)result.uvs.size(); ++i)
 			{
 				result.uvs[i] = vec2((float)ptr[i].x, (float)ptr[i].y);
+				if (flags & mesh_flag_flip_uvs_vertically)
+				{
+					result.uvs[i].y = 1.f - result.uvs[i].y;
+				}
 			}
 
 			result.uvs = mapDataToVertices(result.uvs, indices, mapping, reference, result.vertexOffsetCounts, result.originalToNewVertex,
@@ -1212,6 +1214,32 @@ static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& node
 			}
 
 			result.normals = mapDataToVertices(result.normals, indices, mapping, reference, result.vertexOffsetCounts, result.originalToNewVertex,
+				(uint32)result.positions.size());
+		}
+	}
+
+
+	// Tangents.
+	if (flags & mesh_flag_load_tangents)
+	{
+		const fbx_node* tangentsNode = node.findChild(nodes, "LayerElementTangents");
+		auto [raw, indices, mapping, reference] = readGeometryData<double>(tangentsNode, nodes, properties, "Tangents", "TangentsIndex");
+		if (raw.empty())
+		{
+			std::tie(raw, indices, mapping, reference) = readGeometryData<double>(tangentsNode, nodes, properties, "Tangent", "TangentIndex");
+		}
+		ASSERT(raw.size() % 3 == 0);
+
+		if (raw.size())
+		{
+			result.tangents.resize(raw.size() / 3);
+			vec3d* ptr = (vec3d*)raw.data();
+			for (uint32 i = 0; i < (uint32)result.tangents.size(); ++i)
+			{
+				result.tangents[i] = vec3((float)ptr[i].x, (float)ptr[i].y, (float)ptr[i].z);
+			}
+
+			result.tangents = mapDataToVertices(result.tangents, indices, mapping, reference, result.vertexOffsetCounts, result.originalToNewVertex,
 				(uint32)result.positions.size());
 		}
 	}
@@ -1257,15 +1285,20 @@ static fbx_material readMaterial(const fbx_node& node, const std::vector<fbx_nod
 	result.id = id;
 	result.name = name;
 
+	result.albedoTint = vec4(1.f);
+	result.emission = vec4(0.f);
+	result.uvScale = 1.f;
+
 	for (const fbx_node& child : fbx_node_iterator{ &node, nodes })
 	{
 		if (child.name == "ShadingModel")
 		{
-			result.shadingModel = readString(*child.getFirstProperty(properties));
+			sized_string shadingModel = readString(*child.getFirstProperty(properties));
+			ASSERT(shadingModel == "Phong" || shadingModel == "phong");
 		}
 		else if (child.name == "MultiLayer")
 		{
-			result.multiLayer = readInt32(*child.getFirstProperty(properties));
+			int32 multiLayer = readInt32(*child.getFirstProperty(properties));
 		}
 		else if (child.name == "Properties70")
 		{
@@ -1294,35 +1327,19 @@ static fbx_material readMaterial(const fbx_node& node, const std::vector<fbx_nod
 
 				if (name == "DiffuseColor")
 				{
-					result.diffuseColor = color;
+					result.albedoTint = vec4(color, 1.f);
 				}
-				else if (name == "AmbientColor")
+				else if (name == "EmissiveColor")
 				{
-					result.ambientColor = color;
+					result.emission = vec4(color, 1.f);
 				}
-				else if (name == "AmbientFactor")
+				else if (name == "ReflectionFactor")
 				{
-					result.ambientFactor = value;
-				}
-				else if (name == "SpecularColor")
-				{
-					result.specularColor = color;
-				}
-				else if (name == "SpecularFactor")
-				{
-					result.specularFactor = value;
-				}
-				else if (name == "Shininess")
-				{
-					result.shininess = value;
+					result.metallicOverride = value;
 				}
 				else if (name == "ShininessExponent")
 				{
-					result.shininessExponent = value;
-				}
-				else if (name == "ReflectionColor")
-				{
-					result.reflectionColor = color;
+					result.roughnessOverride = 1.f - (sqrt(value) * 0.1f);
 				}
 				else
 				{
@@ -1331,8 +1348,6 @@ static fbx_material readMaterial(const fbx_node& node, const std::vector<fbx_nod
 			}
 		}
 	}
-
-	ASSERT(result.shadingModel == "Phong" || result.shadingModel == "phong");
 
 	return result;
 }
@@ -1871,7 +1886,8 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 		std::unordered_map<full_vertex, uint16> vertexToIndex;
 		submesh_asset sub;
 
-		void addTriangles(const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, const std::vector<skinning_weights>& skins,
+		void addTriangles(const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, 
+			const std::vector<vec3>& tangents, const std::vector<skinning_weights>& skins,
 			int32 firstIndex, int32 faceSize, std::vector<submesh_asset>& outSubmeshes)
 		{
 			if (faceSize < 3)
@@ -1882,19 +1898,19 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 
 			int32 aIndex = firstIndex++;
 			int32 bIndex = firstIndex++;
-			add_vertex_result a = addVertex(positions, uvs, normals, skins, aIndex);
-			add_vertex_result b = addVertex(positions, uvs, normals, skins, bIndex);
+			add_vertex_result a = addVertex(positions, uvs, normals, tangents, skins, aIndex);
+			add_vertex_result b = addVertex(positions, uvs, normals, tangents, skins, bIndex);
 			for (int32 i = 2; i < faceSize; ++i)
 			{
 				int32 cIndex = firstIndex++;
-				add_vertex_result c = addVertex(positions, uvs, normals, skins, cIndex);
+				add_vertex_result c = addVertex(positions, uvs, normals, tangents, skins, cIndex);
 
 				if (!(a.success && b.success && c.success))
 				{
 					flush(outSubmeshes);
-					a = addVertex(positions, uvs, normals, skins, aIndex);
-					b = addVertex(positions, uvs, normals, skins, bIndex);
-					c = addVertex(positions, uvs, normals, skins, cIndex);
+					a = addVertex(positions, uvs, normals, tangents, skins, aIndex);
+					b = addVertex(positions, uvs, normals, tangents, skins, bIndex);
+					c = addVertex(positions, uvs, normals, tangents, skins, cIndex);
 					printf("Too many vertices for 16-bit indices. Splitting mesh!\n");
 				}
 
@@ -1922,15 +1938,17 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 			bool success;
 		};
 
-		add_vertex_result addVertex(const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, const std::vector<skinning_weights>& skins,
+		add_vertex_result addVertex(const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, 
+			const std::vector<vec3>& tangents, const std::vector<skinning_weights>& skins,
 			int32 index)
 		{
 			vec3 position = positions[index];
 			vec2 uv = !uvs.empty() ? uvs[index] : vec2(0.f, 0.f);
 			vec3 normal = !normals.empty() ? normals[index] : vec3(0.f, 0.f, 0.f);
+			vec3 tangent = !tangents.empty() ? tangents[index] : vec3(0.f, 0.f, 0.f);
 			skinning_weights skin = !skins.empty() ? skins[index] : skinning_weights{};
 
-			full_vertex vertex = { position, uv, normal, skin, };
+			full_vertex vertex = { position, uv, normal, tangent, skin, };
 			auto it = vertexToIndex.find(vertex);
 			if (it == vertexToIndex.end())
 			{
@@ -1946,6 +1964,7 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 				sub.positions.push_back(position);
 				if (!uvs.empty()) { sub.uvs.push_back(uv); }
 				if (!normals.empty()) { sub.normals.push_back(normal); }
+				if (!tangents.empty()) { sub.tangents.push_back(normal); }
 				if (!skins.empty()) { sub.skin.push_back(skin); }
 
 				return { (uint16)vertexIndex, true };
@@ -1978,7 +1997,7 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 		per_material& perMat = materialToMesh[material];
 		perMat.sub.materialIndex = material;
 
-		perMat.addTriangles(mesh.positions, mesh.uvs, mesh.normals, mesh.skin, firstIndex, faceSize, mesh.submeshes);
+		perMat.addTriangles(mesh.positions, mesh.uvs, mesh.normals, mesh.tangents, mesh.skin, firstIndex, faceSize, mesh.submeshes);
 
 		firstIndex += faceSize;
 	}
@@ -1986,6 +2005,82 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 	for (auto [i, perMat] : materialToMesh)
 	{
 		perMat.flush(mesh.submeshes);
+	}
+
+	if (flags & mesh_flag_gen_tangents)
+	{
+		flags |= mesh_flag_gen_normals;
+	}
+
+	for (submesh_asset& sub : mesh.submeshes)
+	{
+		if (sub.normals.empty() && flags & mesh_flag_gen_normals)
+		{
+			sub.normals.resize(sub.positions.size(), vec3(0.f));
+			for (indexed_triangle16 tri : sub.triangles)
+			{
+				vec3 a = sub.positions[tri.a];
+				vec3 b = sub.positions[tri.b];
+				vec3 c = sub.positions[tri.c];
+
+				vec3 n = cross(b - a, c - a);
+				sub.normals[tri.a] += n;
+				sub.normals[tri.b] += n;
+				sub.normals[tri.c] += n;
+			}
+			for (vec3& n : sub.normals)
+			{
+				n = normalize(n);
+			}
+		}
+
+		if (sub.tangents.empty() && flags & mesh_flag_gen_tangents)
+		{
+			sub.tangents.resize(sub.positions.size(), vec3(0.f));
+			if (!sub.uvs.empty())
+			{
+				// https://stackoverflow.com/a/5257471
+				for (indexed_triangle16 tri : sub.triangles)
+				{
+					vec3 a = sub.positions[tri.a];
+					vec3 b = sub.positions[tri.b];
+					vec3 c = sub.positions[tri.c];
+
+					vec2 h = sub.uvs[tri.a];
+					vec2 k = sub.uvs[tri.b];
+					vec2 l = sub.uvs[tri.c];
+
+					vec3 d = b - a;
+					vec3 e = c - a;
+
+					vec2 f = k - h;
+					vec2 g = l - h;
+
+					float invDet = 1.f / (f.x * g.y - f.y * g.x);
+
+					vec3 t;
+					t.x = g.y * d.x - f.y * e.x;
+					t.y = g.y * d.y - f.y * e.y;
+					t.z = g.y * d.z - f.y * e.z;
+					t *= invDet;
+					sub.tangents[tri.a] += t;
+					sub.tangents[tri.b] += t;
+					sub.tangents[tri.c] += t;
+				}
+				for (vec3& t : sub.tangents)
+				{
+					t = normalize(t);
+				}
+			}
+			else
+			{
+				printf("Mesh has no UVs. Generating suboptimal tangents.\n");
+				for (uint32 i = 0; i < (uint32)sub.positions.size(); ++i)
+				{
+					sub.tangents[i] = getTangent(sub.normals[i]);
+				}
+			}
+		}
 	}
 }
 
@@ -2116,6 +2211,13 @@ static std::string nameToString(sized_string str)
 		}
 	}
 	return name;
+}
+
+static std::string relativeFilepath(sized_string str, const fs::path& scenePath)
+{
+	fs::path abs = scenePath.parent_path() / std::string(str.str, str.length);
+	fs::path rel = fs::relative(abs, fs::current_path());
+	return rel.string();
 }
 
 static const fbx_node* findNode(const std::vector<fbx_node>& nodes, std::initializer_list<sized_string> names)
@@ -2260,7 +2362,20 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 	result.materials.reserve(objectLUT.materials.size());
 	for (fbx_material& material : objectLUT.materials)
 	{
-		result.materials.push_back(material_asset{ material.diffuseColor });
+		material_asset out;
+		out.albedo = material.albedoTexture ? relativeFilepath(material.albedoTexture->relativeFilename, path) : std::string();
+		out.normal = material.normalTexture ? relativeFilepath(material.normalTexture->relativeFilename, path) : std::string();
+		out.roughness = material.roughnessTexture ? relativeFilepath(material.roughnessTexture->relativeFilename, path) : std::string();
+		out.metallic = material.metallicTexture ? relativeFilepath(material.metallicTexture->relativeFilename, path) : std::string();
+		out.albedoTint = material.albedoTint;
+		out.emission = material.emission;
+		out.metallicOverride = material.metallicOverride;
+		out.roughnessOverride = material.roughnessOverride;
+		out.shader = material.shader;
+		out.translucency = material.translucency;
+		out.uvScale = material.uvScale;
+
+		result.materials.push_back(std::move(out));
 	}
 	
 	result.meshes.reserve(objectLUT.meshes.size());
