@@ -2,6 +2,7 @@
 #include "model_asset.h"
 
 model_asset loadFBX(const fs::path& path, uint32 flags);
+model_asset loadOBJ(const fs::path& path, uint32 flags);
 
 model_asset load3DModelFromFile(const fs::path& path, uint32 meshFlags)
 {
@@ -11,6 +12,10 @@ model_asset load3DModelFromFile(const fs::path& path, uint32 meshFlags)
 	if (extension == ".fbx")
 	{
 		return loadFBX(path, meshFlags);
+	}
+	else if (extension == ".obj")
+	{
+		return loadOBJ(path, meshFlags);
 	}
 
 	return {};

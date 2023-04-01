@@ -48,5 +48,9 @@ static bool operator==(const full_vertex& a, const full_vertex& b)
 }
 
 
+void triangulateAndRemoveDuplicateVertices(const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals,
+	const std::vector<vec3>& tangents, const std::vector<skinning_weights>& skins, const std::vector<int32>& originalIndices,
+	const std::vector<int32>& materialIndexPerFace,
+	std::vector<submesh_asset>& outSubmeshes);
 
-mesh_geometry removeDuplicateVertices(mesh_geometry& mesh);
+void generateNormalsAndTangents(std::vector<submesh_asset>& submeshes, uint32 flags);
