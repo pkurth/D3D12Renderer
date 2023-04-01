@@ -2,6 +2,7 @@
 #include "deflate.h"
 #include "model_asset.h"
 #include "core/math.h"
+#include "core/cpu_profiling.h"
 #include "geometry/mesh.h"
 
 #include "mesh_postprocessing.h"
@@ -118,6 +119,35 @@ struct sized_string
 static bool operator==(sized_string a, sized_string b)
 {
 	return a.length == b.length && strncmp(a.str, b.str, a.length) == 0;
+}
+
+static std::string nameToString(sized_string str)
+{
+	std::string name;
+	name.reserve(str.length);
+	for (uint32 j = 0; j < str.length; ++j)
+	{
+		if (str.str[j] == 0x0 || str.str[j] == 0x1)
+		{
+			break;
+		}
+		name.push_back(str.str[j]);
+	}
+
+	size_t posOfFirstOr = name.find_last_of('|');
+	if (posOfFirstOr != std::string::npos)
+	{
+		name = name.substr(posOfFirstOr + 1);
+	}
+
+	return name;
+}
+
+static std::string relativeFilepath(sized_string str, const fs::path& scenePath)
+{
+	fs::path abs = scenePath.parent_path() / std::string(str.str, str.length);
+	fs::path rel = fs::relative(abs, fs::current_path());
+	return rel.string();
 }
 
 struct fbx_property;
@@ -977,6 +1007,8 @@ struct fbx_mesh : fbx_object
 
 	std::vector<submesh_asset> submeshes;
 	int64 skeletonID;
+
+	fbx_model* model;
 };
 
 struct fbx_material : fbx_object
@@ -1343,7 +1375,7 @@ static fbx_material readMaterial(const fbx_node& node, const std::vector<fbx_nod
 				}
 				else
 				{
-					printf("Material property '%.*s' not handled.\n", name.length, name.str);
+					//printf("Material property '%.*s' not handled.\n", name.length, name.str);
 				}
 			}
 		}
@@ -1558,6 +1590,7 @@ struct fbx_animation_joint
 
 struct fbx_animation
 {
+	std::string name;
 	std::unordered_map<int64, fbx_animation_joint> joints;
 	int64 duration;
 };
@@ -1691,6 +1724,7 @@ static void resolveConnections(const fbx_node* connectionsNode, const std::vecto
 				fbx_mesh& a = lut.meshes[indexA];
 				fbx_model& b = lut.models[indexB];
 				b.meshes.push_back(&a);
+				a.model = &b;
 			}
 			else if (typeA == fbx_object_type_deformer && typeB == fbx_object_type_mesh)
 			{
@@ -1727,7 +1761,7 @@ static void resolveConnections(const fbx_node* connectionsNode, const std::vecto
 			}
 			else
 			{
-				printf("Unhandled OO connection: %s - %s.\n", objectTypeNames[typeA], objectTypeNames[typeB]);
+				//printf("Unhandled OO connection: %s - %s.\n", objectTypeNames[typeA], objectTypeNames[typeB]);
 			}
 		}
 		else if (type == "OP")
@@ -1775,7 +1809,7 @@ static void resolveConnections(const fbx_node* connectionsNode, const std::vecto
 			}
 			else
 			{
-				printf("Unhandled OP connection: %s - %s.\n", objectTypeNames[typeA], objectTypeNames[typeB]);
+				//printf("Unhandled OP connection: %s - %s.\n", objectTypeNames[typeA], objectTypeNames[typeB]);
 			}
 		}
 	}
@@ -1799,6 +1833,7 @@ static void resolveConnections(const fbx_node* connectionsNode, const std::vecto
 	{
 		fbx_animation& anim = lut.animations.emplace_back();
 		anim.duration = stack.duration;
+		anim.name = nameToString(stack.name);
 
 		ASSERT(stack.layers.size() == 1);
 		for (fbx_animation_layer* layer : stack.layers)
@@ -1821,6 +1856,8 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 
 	if (mesh.skeletonID && flags & mesh_flag_load_skin)
 	{
+		CPU_PRINT_PROFILE_BLOCK("Assigning skinning weights");
+
 		mesh.skin.resize(mesh.positions.size(), {});
 		fbx_skeleton& skeleton = skeletons[mesh.skeletonID];
 
@@ -1862,7 +1899,7 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 					{
 						if (skin.skinWeights[3] != 0)
 						{
-							printf("Warning: Vertex is influences by more than 4 joints. Ditching joint with weight %f.\n", skin.skinWeights[3] / 255.f);
+							//printf("Warning: Vertex is influences by more than 4 joints. Ditching joint with weight %f.\n", skin.skinWeights[3] / 255.f);
 						}
 						for (int32 k = 3; k > slot; --k)
 						{
@@ -1874,7 +1911,7 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 					}
 					else
 					{
-						printf("Warning: Vertex is influences by more than 4 joints. Ditching joint with weight %f.\n", weights[i]);
+						//printf("Warning: Vertex is influences by more than 4 joints. Ditching joint with weight %f.\n", weights[i]);
 					}
 				}
 			}
@@ -1979,27 +2016,30 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 	std::unordered_map<int32, per_material> materialToMesh;
 
 
-	int32 faceIndex = 0;
-	for (int32 firstIndex = 0, end = (int32)mesh.originalIndices.size(); firstIndex < end;)
 	{
-		int32 faceSize = 0;
-		while (firstIndex + faceSize < end)
+		CPU_PRINT_PROFILE_BLOCK("Triangulating & duplicate vertex removal");
+		int32 faceIndex = 0;
+		for (int32 firstIndex = 0, end = (int32)mesh.originalIndices.size(); firstIndex < end;)
 		{
-			int32 i = firstIndex + faceSize++;
-			if (mesh.originalIndices[i] < 0)
+			int32 faceSize = 0;
+			while (firstIndex + faceSize < end)
 			{
-				break;
+				int32 i = firstIndex + faceSize++;
+				if (mesh.originalIndices[i] < 0)
+				{
+					break;
+				}
 			}
+
+			int32 material = mesh.materialIndexPerFace[faceIndex++];
+
+			per_material& perMat = materialToMesh[material];
+			perMat.sub.materialIndex = material;
+
+			perMat.addTriangles(mesh.positions, mesh.uvs, mesh.normals, mesh.tangents, mesh.skin, firstIndex, faceSize, mesh.submeshes);
+
+			firstIndex += faceSize;
 		}
-
-		int32 material = mesh.materialIndexPerFace[faceIndex++];
-
-		per_material& perMat = materialToMesh[material];
-		perMat.sub.materialIndex = material;
-
-		perMat.addTriangles(mesh.positions, mesh.uvs, mesh.normals, mesh.tangents, mesh.skin, firstIndex, faceSize, mesh.submeshes);
-
-		firstIndex += faceSize;
 	}
 
 	for (auto [i, perMat] : materialToMesh)
@@ -2016,6 +2056,9 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 	{
 		if (sub.normals.empty() && flags & mesh_flag_gen_normals)
 		{
+			printf("Generating normals\n");
+			CPU_PRINT_PROFILE_BLOCK("Generating normals");
+
 			sub.normals.resize(sub.positions.size(), vec3(0.f));
 			for (indexed_triangle16 tri : sub.triangles)
 			{
@@ -2036,6 +2079,9 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 
 		if (sub.tangents.empty() && flags & mesh_flag_gen_tangents)
 		{
+			printf("Generating tangents\n");
+			CPU_PRINT_PROFILE_BLOCK("Generating tangents");
+
 			sub.tangents.resize(sub.positions.size(), vec3(0.f));
 			if (!sub.uvs.empty())
 			{
@@ -2067,9 +2113,16 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 					sub.tangents[tri.b] += t;
 					sub.tangents[tri.c] += t;
 				}
-				for (vec3& t : sub.tangents)
+				for (uint32 i = 0; i < (uint32)sub.positions.size(); ++i)
 				{
-					t = normalize(t);
+					vec3 t = sub.tangents[i];
+					vec3 n = sub.normals[i];
+
+					// Make sure tangent is perpendicular to normal.
+					vec3 b = cross(t, n);
+					t = cross(n, b);
+
+					sub.tangents[i] = normalize(t);
 				}
 			}
 			else
@@ -2199,27 +2252,6 @@ static offset_count transferAnimationCurve(fbx_animation_curve_node* curveNode, 
 
 
 
-static std::string nameToString(sized_string str)
-{
-	std::string name;
-	name.reserve(str.length);
-	for (uint32 j = 0; j < str.length; ++j)
-	{
-		if (str.str[j] != 0x0 && str.str[j] != 0x1)
-		{
-			name.push_back(str.str[j]);
-		}
-	}
-	return name;
-}
-
-static std::string relativeFilepath(sized_string str, const fs::path& scenePath)
-{
-	fs::path abs = scenePath.parent_path() / std::string(str.str, str.length);
-	fs::path rel = fs::relative(abs, fs::current_path());
-	return rel.string();
-}
-
 static const fbx_node* findNode(const std::vector<fbx_node>& nodes, std::initializer_list<sized_string> names)
 {
 	uint32 currentNode = nodes[0].firstChild;
@@ -2281,8 +2313,10 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 
 	std::vector<fbx_property> properties;
 
-	parseNodes(version, file, nodes, properties, 0, 0);
-
+	{
+		CPU_PRINT_PROFILE_BLOCK("Parse FBX nodes");
+		parseNodes(version, file, nodes, properties, 0, 0);
+	}
 
 #if 0
 	{
@@ -2305,55 +2339,65 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 	std::vector<float> animationValues;
 
 
-	const fbx_node* objectsNode = findNode(nodes, { "Objects" });
-	objectLUT.idToObject.reserve(objectsNode->numChildren + 1);
-	objectLUT.idToObject[0] = { fbx_object_type_global, 0 };
-
-	for (const fbx_node& objectNode : fbx_node_iterator{ objectsNode, nodes })
 	{
-		if (objectNode.name == "Model")
+		CPU_PRINT_PROFILE_BLOCK("Reading FBX objects");
+
+		const fbx_node* objectsNode = findNode(nodes, { "Objects" });
+		objectLUT.idToObject.reserve(objectsNode->numChildren + 1);
+		objectLUT.idToObject[0] = { fbx_object_type_global, 0 };
+
+		for (const fbx_node& objectNode : fbx_node_iterator{ objectsNode, nodes })
 		{
-			objectLUT.push(readModel(objectNode, nodes, properties));
-		}
-		if (objectNode.name == "Geometry")
-		{
-			objectLUT.push(readMesh(objectNode, nodes, properties, flags));
-		}
-		else if (objectNode.name == "Material")
-		{
-			objectLUT.push(readMaterial(objectNode, nodes, properties));
-		}
-		else if (objectNode.name == "Texture")
-		{
-			objectLUT.push(readTexture(objectNode, nodes, properties));
-		}
-		else if (objectNode.name == "Deformer")
-		{
-			objectLUT.push(readDeformer(objectNode, nodes, properties));
-		}
-		else if (objectNode.name == "AnimationStack")
-		{
-			objectLUT.push(readAnimationStack(objectNode, nodes, properties));
-		}
-		else if (objectNode.name == "AnimationLayer")
-		{
-			objectLUT.push(readAnimationLayer(objectNode, nodes, properties));
-		}
-		else if (objectNode.name == "AnimationCurveNode")
-		{
-			objectLUT.push(readAnimationCurveNode(objectNode, nodes, properties));
-		}
-		else if (objectNode.name == "AnimationCurve")
-		{
-			objectLUT.push(readAnimationCurve(objectNode, nodes, properties, animationTimes, animationValues));
+			if (objectNode.name == "Model")
+			{
+				objectLUT.push(readModel(objectNode, nodes, properties));
+			}
+			if (objectNode.name == "Geometry")
+			{
+				objectLUT.push(readMesh(objectNode, nodes, properties, flags));
+			}
+			else if (objectNode.name == "Material")
+			{
+				objectLUT.push(readMaterial(objectNode, nodes, properties));
+			}
+			else if (objectNode.name == "Texture")
+			{
+				objectLUT.push(readTexture(objectNode, nodes, properties));
+			}
+			else if (objectNode.name == "Deformer")
+			{
+				objectLUT.push(readDeformer(objectNode, nodes, properties));
+			}
+			else if (objectNode.name == "AnimationStack")
+			{
+				objectLUT.push(readAnimationStack(objectNode, nodes, properties));
+			}
+			else if (objectNode.name == "AnimationLayer")
+			{
+				objectLUT.push(readAnimationLayer(objectNode, nodes, properties));
+			}
+			else if (objectNode.name == "AnimationCurveNode")
+			{
+				objectLUT.push(readAnimationCurveNode(objectNode, nodes, properties));
+			}
+			else if (objectNode.name == "AnimationCurve")
+			{
+				objectLUT.push(readAnimationCurve(objectNode, nodes, properties, animationTimes, animationValues));
+			}
 		}
 	}
 
-	resolveConnections(findNode(nodes, { "Connections" }), nodes, properties, objectLUT);
-
-	for (fbx_mesh& mesh : objectLUT.meshes)
 	{
-		finishMesh(mesh, flags, objectLUT.skeletons);
+		CPU_PRINT_PROFILE_BLOCK("Resolving FBX connections");
+		resolveConnections(findNode(nodes, { "Connections" }), nodes, properties, objectLUT);
+	}
+
+	{
+		CPU_PRINT_PROFILE_BLOCK("Finishing FBX meshes");
+		for (fbx_mesh& mesh : objectLUT.meshes)
+		{
+			finishMesh(mesh, flags, objectLUT.skeletons);
+		}
 	}
 
 
@@ -2381,7 +2425,7 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 	result.meshes.reserve(objectLUT.meshes.size());
 	for (fbx_mesh& mesh : objectLUT.meshes)
 	{
-		result.meshes.push_back(mesh_asset{ std::move(mesh.submeshes), -1 });
+		result.meshes.push_back(mesh_asset{ nameToString(mesh.model->name), std::move(mesh.submeshes), -1 });
 	}
 
 	for (auto& [id, skeleton] : objectLUT.skeletons)
@@ -2413,7 +2457,7 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 		result.skeletons.push_back(std::move(out));
 	}
 
-	for (auto& animation : objectLUT.animations)
+	for (fbx_animation& animation : objectLUT.animations)
 	{
 		uint32 numJoints = (uint32)animation.joints.size();
 
@@ -2422,6 +2466,8 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 			animation_asset out;
 			out.duration = convertTime(animation.duration);
 			out.joints.reserve(animation.joints.size());
+			out.name = animation.name;
+
 			for (auto [id, j] : animation.joints)
 			{
 				auto [modelType, modelIndex] = objectLUT.find(id);

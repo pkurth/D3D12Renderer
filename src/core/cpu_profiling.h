@@ -118,6 +118,42 @@ void cpuProfilingResolveTimeStamps();
 
 #undef recordProfileEvent
 
+
+
+
+
+
+
+#define _CPU_PRINT_PROFILE_BLOCK_(counter, name) cpu_print_profile_block_recorder COMPOSITE_VARNAME(__PROFILE_BLOCK, counter)(name)
+#define CPU_PRINT_PROFILE_BLOCK(name) _CPU_PRINT_PROFILE_BLOCK_(__COUNTER__, name)
+
+struct cpu_print_profile_block_recorder
+{
+	const char* name;
+	uint64 start;
+
+	cpu_print_profile_block_recorder(const char* name)
+		: name(name)
+	{
+		QueryPerformanceCounter((LARGE_INTEGER*)&start);
+	}
+
+	~cpu_print_profile_block_recorder()
+	{
+		uint64 end;
+		QueryPerformanceCounter((LARGE_INTEGER*)&end);
+
+		uint64 clockFrequency;
+		QueryPerformanceFrequency((LARGE_INTEGER*)&clockFrequency);
+
+		float duration = (float)(end - start) / clockFrequency * 1000.f;
+		std::cout << "Profile block '" << name << "' took " << duration << "ms.\n";
+	}
+};
+
+
+
+
 #else
 
 #define CPU_PROFILE_BLOCK(...)
@@ -126,5 +162,8 @@ void cpuProfilingResolveTimeStamps();
 #define cpuProfilingFrameEndMarker(...)
 #define cpuProfilingResolveTimeStamps(...)
 
+#define CPU_PRINT_PROFILE_BLOCK(...)
+
 #endif
+
 

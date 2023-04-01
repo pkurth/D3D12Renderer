@@ -108,7 +108,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 					mat.shader, mat.uvScale, mat.translucency);
 
 				builder.pushMesh(sub, 1.f);
-				stormtrooperMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, material });
+				stormtrooperMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, material, mesh.name });
 			}
 		}
 
@@ -131,7 +131,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			animation_asset& in = asset.animations.front();
 
 			animation_clip& clip = skeleton.clips.emplace_back();
-			clip.name = "Test";
+			clip.name = std::move(in.name);
 			clip.filename = "Test";
 			clip.lengthInSeconds = in.duration;
 			clip.joints.resize(skeleton.joints.size(), {});

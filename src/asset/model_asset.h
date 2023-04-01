@@ -14,6 +14,9 @@ struct skeleton_asset
 
 struct animation_asset
 {
+	std::string name;
+	float duration;
+
 	std::unordered_map<std::string, animation_joint> joints;
 
 	std::vector<float> positionTimestamps;
@@ -23,8 +26,6 @@ struct animation_asset
 	std::vector<vec3> positionKeyframes;
 	std::vector<quat> rotationKeyframes;
 	std::vector<vec3> scaleKeyframes;
-
-	float duration;
 };
 
 struct material_asset
@@ -58,6 +59,7 @@ struct submesh_asset
 
 struct mesh_asset
 {
+	std::string name;
 	std::vector<submesh_asset> submeshes;
 	int32 skeletonIndex;
 };
