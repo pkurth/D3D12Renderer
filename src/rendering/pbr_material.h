@@ -21,6 +21,22 @@ static const char* pbrMaterialShaderNames[] =
 	"Transparent",
 };
 
+struct pbr_material_desc
+{
+	fs::path albedo;
+	fs::path normal;
+	fs::path roughness;
+	fs::path metallic;
+
+	vec4 emission = vec4(0.f);
+	vec4 albedoTint = vec4(1.f);
+	float roughnessOverride = 1.f;
+	float metallicOverride = 0.f;
+	pbr_material_shader shader = pbr_material_shader_default;
+	float uvScale = 1.f;
+	float translucency = 0.f;
+};
+
 struct pbr_material
 {
 	pbr_material() = default;
@@ -67,6 +83,7 @@ ref<pbr_material> createPBRMaterial(const fs::path& albedoTex, const fs::path& n
 ref<pbr_material> createPBRMaterial(const ref<dx_texture>& albedoTex, const ref<dx_texture>& normalTex, const ref<dx_texture>& roughTex, const ref<dx_texture>& metallicTex,
 	const vec4& emission = vec4(0.f), const vec4& albedoTint = vec4(1.f), float roughOverride = 1.f, float metallicOverride = 0.f,
 	pbr_material_shader shader = pbr_material_shader_default, float uvScale = 1.f, float translucency = 0.f);
+ref<pbr_material> createPBRMaterial(const pbr_material_desc& desc);
 
 ref<pbr_material> getDefaultPBRMaterial();
 

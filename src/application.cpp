@@ -102,10 +102,8 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		{
 			for (auto& sub : mesh.submeshes)
 			{
-				const material_asset& mat = asset.materials[sub.materialIndex];
-				auto material = createPBRMaterial(
-					mat.albedo, mat.normal, mat.roughness, mat.metallic, mat.emission, mat.albedoTint, mat.roughnessOverride, mat.metallicOverride,
-					mat.shader, mat.uvScale, mat.translucency);
+				const pbr_material_desc& materialDesc = asset.materials[sub.materialIndex];
+				auto material = createPBRMaterial(materialDesc);
 
 				builder.pushMesh(sub, 1.f);
 				stormtrooperMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, material, mesh.name });

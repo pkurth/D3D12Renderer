@@ -150,6 +150,12 @@ ref<pbr_material> createPBRMaterial(
 	return material;
 }
 
+ref<pbr_material> createPBRMaterial(const pbr_material_desc& desc)
+{
+	return createPBRMaterial(desc.albedo, desc.normal, desc.roughness, desc.metallic, desc.emission, desc.albedoTint, desc.roughnessOverride,
+		desc.metallicOverride, desc.shader, desc.uvScale, desc.translucency);
+}
+
 ref<pbr_material> getDefaultPBRMaterial()
 {
 	static ref<pbr_material> material = make_ref<pbr_material>(nullptr, nullptr, nullptr, nullptr,

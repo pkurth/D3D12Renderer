@@ -180,17 +180,13 @@ struct obj_mesh
 	std::vector<int32> materialIndexPerFace;
 };
 
-struct obj_material
-{
-	std::string name;
-};
-
-static std::vector<obj_material> loadMaterialLibrary(const fs::path& path)
+static std::vector<std::pair<std::string, pbr_material_desc>> loadMaterialLibrary(const fs::path& path)
 {
 	entire_file file = loadFile(path);
 
-	std::vector<obj_material> result;
-	obj_material currentMaterial = {};
+	std::vector<std::pair<std::string, pbr_material_desc>> result;
+	pbr_material_desc currentMaterial = {};
+	std::string currentName;
 
 	{
 		CPU_PRINT_PROFILE_BLOCK("Parse OBJ material library");
@@ -198,23 +194,34 @@ static std::vector<obj_material> loadMaterialLibrary(const fs::path& path)
 		while (file.readOffset < file.size)
 		{
 			sized_string token = readString(file);
+			std::transform(token.str, token.str + token.length, (char*)token.str, [](char c) { return std::tolower(c); });
 
 			if (token == "newmtl")
 			{
-				if (!currentMaterial.name.empty())
+				if (!currentName.empty())
 				{
-					result.push_back(std::move(currentMaterial));
+					result.push_back({ std::move(currentName), std::move(currentMaterial) });
 				}
 
 				sized_string name = readString(file);
-				currentMaterial.name = nameToString(name);
+				currentName = nameToString(name);
 			}
-			else if (token == "Ns")
+			else if (token == "ns")
 			{
 				float value = readFloat(file);
-				float roughness = 1.f - (sqrt(value) * 0.1f);
+				currentMaterial.roughnessOverride = 1.f - (sqrt(value) * 0.1f);
 			}
-			else if (token == "Ni")
+			else if (token == "pr")
+			{
+				float value = readFloat(file);
+				currentMaterial.roughnessOverride = value;
+			}
+			else if (token == "pm")
+			{
+				float value = readFloat(file);
+				currentMaterial.metallicOverride = value;
+			}
+			else if (token == "ni")
 			{
 
 			}
@@ -222,11 +229,17 @@ static std::vector<obj_material> loadMaterialLibrary(const fs::path& path)
 			{
 
 			}
-			else if (token == "Tr")
+			else if (token == "tr")
 			{
-
+				float value = readFloat(file);
+				float alpha = 1.f - value;
+				currentMaterial.albedoTint.w = alpha;
+				if (alpha < 1.f)
+				{
+					currentMaterial.shader = pbr_material_shader_transparent;
+				}
 			}
-			else if (token == "Tf")
+			else if (token == "tf")
 			{
 
 			}
@@ -234,29 +247,33 @@ static std::vector<obj_material> loadMaterialLibrary(const fs::path& path)
 			{
 
 			}
-			else if (token == "Ka")
+			else if (token == "ka")
 			{
 
 			}
-			else if (token == "Kd")
+			else if (token == "kd")
+			{
+				vec3 color = readVec3(file);
+				currentMaterial.albedoTint.xyz = color;
+			}
+			else if (token == "ks")
 			{
 
 			}
-			else if (token == "Ks")
+			else if (token == "ke")
 			{
-
+				vec3 color = readVec3(file);
+				currentMaterial.emission = vec4(color, 1.f);
 			}
-			else if (token == "Ke")
+			else if (token == "map_ka" || token == "map_pm")
 			{
-
+				sized_string str = readString(file);
+				currentMaterial.metallic = relativeFilepath(str, path);
 			}
-			else if (token == "map_Ka")
+			else if (token == "map_kd")
 			{
-
-			}
-			else if (token == "map_Kd")
-			{
-
+				sized_string str = readString(file);
+				currentMaterial.albedo = relativeFilepath(str, path);
 			}
 			else if (token == "map_d")
 			{
@@ -264,11 +281,13 @@ static std::vector<obj_material> loadMaterialLibrary(const fs::path& path)
 			}
 			else if (token == "map_bump")
 			{
-
+				sized_string str = readString(file);
+				currentMaterial.normal = relativeFilepath(str, path);
 			}
-			else if (token == "map_Ns" || token == "map_NS")
+			else if (token == "map_ns" || token == "map_pr")
 			{
-
+				sized_string str = readString(file);
+				currentMaterial.roughness = relativeFilepath(str, path);
 			}
 			else if (token == "bump")
 			{
@@ -286,9 +305,9 @@ static std::vector<obj_material> loadMaterialLibrary(const fs::path& path)
 			discardLine(file);
 		}
 	}
-	if (!currentMaterial.name.empty())
+	if (!currentName.empty())
 	{
-		result.push_back(std::move(currentMaterial));
+		result.push_back({ std::move(currentName), std::move(currentMaterial) });
 	}
 
 	freeFile(file);
@@ -304,7 +323,7 @@ model_asset loadOBJ(const fs::path& path, uint32 flags)
 	std::vector<vec2> uvs;
 	std::vector<vec3> normals;
 
-	std::vector<obj_material> materials;
+	std::vector<pbr_material_desc> materials;
 	std::unordered_map<std::string, int32> nameToMaterialIndex;
 	int32 currentMaterialIndex = 0;
 
@@ -320,10 +339,10 @@ model_asset loadOBJ(const fs::path& path, uint32 flags)
 			if (token == "mtllib")
 			{
 				sized_string lib = readString(file);
-				std::vector<obj_material> libMaterials = loadMaterialLibrary(relativeFilepath(lib, path));
-				for (obj_material& mat : libMaterials)
+				auto libMaterials = loadMaterialLibrary(relativeFilepath(lib, path));
+				for (auto [name, mat] : libMaterials)
 				{
-					nameToMaterialIndex[mat.name] = (int32)materials.size();
+					nameToMaterialIndex[std::move(name)] = (int32)materials.size();
 					materials.push_back(std::move(mat));
 				}
 			}

@@ -2105,7 +2105,7 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 	result.materials.reserve(objectLUT.materials.size());
 	for (fbx_material& material : objectLUT.materials)
 	{
-		material_asset out;
+		pbr_material_desc out;
 		out.albedo = material.albedoTexture ? relativeFilepath(material.albedoTexture->relativeFilename, path) : std::string();
 		out.normal = material.normalTexture ? relativeFilepath(material.normalTexture->relativeFilename, path) : std::string();
 		out.roughness = material.roughnessTexture ? relativeFilepath(material.roughnessTexture->relativeFilename, path) : std::string();

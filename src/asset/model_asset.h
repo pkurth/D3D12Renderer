@@ -28,22 +28,6 @@ struct animation_asset
 	std::vector<vec3> scaleKeyframes;
 };
 
-struct material_asset
-{
-	std::string albedo;
-	std::string normal;
-	std::string roughness;
-	std::string metallic;
-
-	vec4 emission;
-	vec4 albedoTint;
-	float roughnessOverride;
-	float metallicOverride;
-	pbr_material_shader shader;
-	float uvScale;
-	float translucency;
-};
-
 struct submesh_asset
 {
 	int32 materialIndex;
@@ -67,7 +51,7 @@ struct mesh_asset
 struct model_asset
 {
 	std::vector<mesh_asset> meshes;
-	std::vector<material_asset> materials;
+	std::vector<pbr_material_desc> materials;
 	std::vector<skeleton_asset> skeletons;
 	std::vector<animation_asset> animations;
 };
