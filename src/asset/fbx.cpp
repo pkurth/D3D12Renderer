@@ -4,6 +4,7 @@
 #include "model_asset.h"
 #include "core/math.h"
 #include "core/cpu_profiling.h"
+#include "core/color.h"
 #include "geometry/mesh.h"
 
 #include "mesh_postprocessing.h"
@@ -911,8 +912,9 @@ struct fbx_mesh : fbx_object
 	std::vector<vec2> uvs;
 	std::vector<vec3> normals;
 	std::vector<vec3> tangents;
+	std::vector<uint32> colors;
 	std::vector<skinning_weights> skin;
-	std::vector<int32> originalIndices;
+	std::vector<uint8> faceSizes;
 
 	std::vector<offset_count> vertexOffsetCounts;
 	std::vector<uint32> originalToNewVertex;
@@ -1061,7 +1063,7 @@ static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& node
 	std::vector<double> originalPositionsRaw = readDoubleArray(*positionsNode->getFirstProperty(properties));
 
 	const fbx_node* indicesNode = node.findChild(nodes, "PolygonVertexIndex");
-	result.originalIndices = readInt32Array(*indicesNode->getFirstProperty(properties));
+	std::vector<int32> originalIndices = readInt32Array(*indicesNode->getFirstProperty(properties));
 
 	struct vec2d
 	{
@@ -1073,27 +1075,35 @@ static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& node
 		double x, y, z;
 	};
 
+	struct vec4d
+	{
+		double x, y, z, w;
+	};
+
 	vec3d* originalPositionsPtr = (vec3d*)originalPositionsRaw.data();
 	uint32 numOriginalPositions = (uint32)originalPositionsRaw.size() / 3;
 
 
 
-	result.positions.reserve(result.originalIndices.size());
+	result.positions.reserve(originalIndices.size());
+	result.faceSizes.reserve(originalIndices.size());
 
 	result.vertexOffsetCounts.resize(numOriginalPositions, { 0, 0 });
-	result.originalToNewVertex.resize(result.originalIndices.size());
-	uint32 numFaces = 0;
+	result.originalToNewVertex.resize(originalIndices.size());
 
-	for (int32 index : result.originalIndices)
+	uint8 faceSize = 0;
+	for (int32 index : originalIndices)
 	{
 		int32 decodedIndex = decodeIndex(index);
 		vec3d position = originalPositionsPtr[decodedIndex];
 		result.positions.push_back(vec3((float)position.x, (float)position.y, (float)position.z));
 		++result.vertexOffsetCounts[decodedIndex].count;
 
+		++faceSize;
 		if (index < 0)
 		{
-			++numFaces;
+			result.faceSizes.push_back(faceSize);
+			faceSize = 0;
 		}
 	}
 
@@ -1105,9 +1115,9 @@ static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& node
 		result.vertexOffsetCounts[i].count = 0;
 	}
 
-	for (uint32 i = 0; i < (uint32)result.originalIndices.size(); ++i)
+	for (uint32 i = 0; i < (uint32)originalIndices.size(); ++i)
 	{
-		int32 index = result.originalIndices[i];
+		int32 index = originalIndices[i];
 		int32 decodedIndex = decodeIndex(index);
 		uint32 offset = result.vertexOffsetCounts[decodedIndex].offset;
 		uint32 count = result.vertexOffsetCounts[decodedIndex].count++;
@@ -1191,9 +1201,30 @@ static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& node
 	}
 
 
+	// Colors.
+	if (flags & mesh_flag_load_colors)
+	{
+		const fbx_node* colorsNode = node.findChild(nodes, "LayerElementColor");
+		auto [raw, indices, mapping, reference] = readGeometryData<double>(colorsNode, nodes, properties, "Colors", "ColorIndex");
+		ASSERT(raw.size() % 4 == 0);
+
+		if (raw.size())
+		{
+			result.colors.resize(raw.size() / 4);
+			vec4d* ptr = (vec4d*)raw.data();
+			for (uint32 i = 0; i < (uint32)result.colors.size(); ++i)
+			{
+				result.colors[i] = packColor((float)ptr[i].x, (float)ptr[i].y, (float)ptr[i].z, (float)ptr[i].w);
+			}
+
+			result.colors = mapDataToVertices(result.colors, indices, mapping, reference, result.vertexOffsetCounts, result.originalToNewVertex,
+				(uint32)result.positions.size());
+		}
+	}
+
+
 
 	// Materials.
-	//if (flags & mesh_flag_load_materials)
 	{
 		const fbx_node* materialsNode = node.findChild(nodes, "LayerElementMaterial");
 		auto [materials, indices, mapping, reference] = readGeometryData<int32>(materialsNode, nodes, properties, "Materials", "");
@@ -1203,7 +1234,7 @@ static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& node
 			if (mapping == mapping_info_all_same)
 			{
 				int32 materialIndex = !materials.empty() ? materials[0] : 0;
-				result.materialIndexPerFace.resize(numFaces, materialIndex);
+				result.materialIndexPerFace.resize(result.faceSizes.size(), materialIndex);
 			}
 			else if (mapping == mapping_info_by_polygon)
 			{
@@ -1217,7 +1248,7 @@ static fbx_mesh readMesh(const fbx_node& node, const std::vector<fbx_node>& node
 	}
 	if (result.materialIndexPerFace.empty())
 	{
-		result.materialIndexPerFace.resize(numFaces, 0);
+		result.materialIndexPerFace.resize(result.faceSizes.size(), 0);
 	}
 
 	return result;
@@ -1832,7 +1863,31 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 		}
 	}
 
-	triangulateAndRemoveDuplicateVertices(mesh.positions, mesh.uvs, mesh.normals, mesh.tangents, mesh.skin, mesh.originalIndices, mesh.materialIndexPerFace, mesh.submeshes);
+
+
+	std::unordered_map<int32, per_material> materialToMesh;
+
+	{
+		CPU_PRINT_PROFILE_BLOCK("Triangulating & duplicate vertex removal");
+		for (int32 faceIndex = 0, firstIndex = 0; faceIndex < (int32)mesh.faceSizes.size(); ++faceIndex)
+		{
+			int32 faceSize = mesh.faceSizes[faceIndex];
+			int32 material = mesh.materialIndexPerFace[faceIndex];
+
+			per_material& perMat = materialToMesh[material];
+			perMat.sub.materialIndex = material;
+
+			perMat.addTriangles(mesh.positions, mesh.uvs, mesh.normals, mesh.tangents, mesh.colors, mesh.skin, firstIndex, faceSize, mesh.submeshes);
+
+			firstIndex += faceSize;
+		}
+	}
+
+	for (auto [i, perMat] : materialToMesh)
+	{
+		perMat.flush(mesh.submeshes);
+	}
+
 	generateNormalsAndTangents(mesh.submeshes, flags);
 }
 
@@ -2099,6 +2154,23 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 		}
 	}
 
+
+	std::unordered_map<fbx_material*, int32> materialToGlobalIndex;
+	int32 globalMaterialIndex = 0;
+	for (fbx_material& mat : objectLUT.materials)
+	{
+		materialToGlobalIndex[&mat] = globalMaterialIndex++;
+	}
+
+	for (fbx_mesh& mesh : objectLUT.meshes)
+	{
+		fbx_model* model = mesh.model;
+		for (submesh_asset& sub : mesh.submeshes)
+		{
+			fbx_material* mat = model->materials[sub.materialIndex];
+			sub.materialIndex = materialToGlobalIndex[mat];
+		}
+	}
 
 	model_asset result;
 

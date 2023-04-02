@@ -170,16 +170,6 @@ static obj_vertex_indices readVertexIndices(sized_string vertexStr)
 	return { positionIndex, normalIndex, uvIndex };
 }
 
-struct obj_mesh
-{
-	std::vector<vec3> positions;
-	std::vector<vec2> uvs;
-	std::vector<vec3> normals;
-
-	std::vector<int32> indices;
-	std::vector<int32> materialIndexPerFace;
-};
-
 static std::vector<std::pair<std::string, pbr_material_desc>> loadMaterialLibrary(const fs::path& path)
 {
 	entire_file file = loadFile(path);
@@ -317,17 +307,27 @@ static std::vector<std::pair<std::string, pbr_material_desc>> loadMaterialLibrar
 
 model_asset loadOBJ(const fs::path& path, uint32 flags)
 {
+	CPU_PRINT_PROFILE_BLOCK("Loading OBJ");
+
 	entire_file file = loadFile(path);
 
-	std::vector<vec3> positions;
-	std::vector<vec2> uvs;
-	std::vector<vec3> normals;
+	std::vector<vec3> positions; positions.reserve(1 << 16);
+	std::vector<vec2> uvs; uvs.reserve(1 << 16);
+	std::vector<vec3> normals; normals.reserve(1 << 16);
 
 	std::vector<pbr_material_desc> materials;
 	std::unordered_map<std::string, int32> nameToMaterialIndex;
 	int32 currentMaterialIndex = 0;
 
-	obj_mesh mesh;
+	std::vector<submesh_asset> submeshes;
+
+
+	std::unordered_map<int32, per_material> materialToMesh;
+
+
+	std::vector<vec3> positionCache; positionCache.reserve(16);
+	std::vector<vec2> uvCache; uvCache.reserve(16);
+	std::vector<vec3> normalCache; normalCache.reserve(16);
 
 	{
 		CPU_PRINT_PROFILE_BLOCK("Parse OBJ");
@@ -356,7 +356,12 @@ model_asset loadOBJ(const fs::path& path, uint32 flags)
 			}
 			else if (token == "vt")
 			{
-				uvs.push_back(readVec2(file));
+				vec2 uv = readVec2(file);
+				if (flags & mesh_flag_flip_uvs_vertically)
+				{
+					uv.y = 1.f - uv.y;
+				}
+				uvs.push_back(uv);
 			}
 			else if (token == "g")
 			{
@@ -387,7 +392,7 @@ model_asset loadOBJ(const fs::path& path, uint32 flags)
 			}
 			else if (token == "f")
 			{
-				uint32 faceSize = 0;
+				int32 faceSize = 0;
 				while (file.readOffset < file.size && !isEndOfLine((char)file.content[file.readOffset]))
 				{
 					sized_string vertexStr = readString(file, false);
@@ -401,29 +406,35 @@ model_asset loadOBJ(const fs::path& path, uint32 flags)
 					int32 currNumPositions = (int32)positions.size();
 					vertexIndices.positionIndex += (vertexIndices.positionIndex >= 0) ? 0 : currNumPositions;
 					ASSERT(vertexIndices.positionIndex < currNumPositions);
-					mesh.positions.push_back(positions[vertexIndices.positionIndex]);
+					positionCache.push_back(positions[vertexIndices.positionIndex]);
 
-					int32 currNumNormals = (int32)normals.size();
-					vertexIndices.normalIndex += (vertexIndices.normalIndex >= 0) ? 0 : currNumNormals;
-					ASSERT(vertexIndices.normalIndex < currNumNormals);
-					mesh.normals.push_back(normals[vertexIndices.normalIndex]);
+					if (flags & mesh_flag_load_uvs)
+					{
+						int32 currNumUVs = (int32)uvs.size();
+						vertexIndices.uvIndex += (vertexIndices.uvIndex >= 0) ? 0 : currNumUVs;
+						ASSERT(vertexIndices.uvIndex < currNumUVs);
+						uvCache.push_back(uvs[vertexIndices.uvIndex]);
+					}
 
-					int32 currNumUVs = (int32)uvs.size();
-					vertexIndices.uvIndex += (vertexIndices.uvIndex >= 0) ? 0 : currNumUVs;
-					ASSERT(vertexIndices.uvIndex < currNumUVs);
-					mesh.uvs.push_back(uvs[vertexIndices.uvIndex]);
-
-
-					mesh.indices.push_back((int32)mesh.indices.size());
+					if (flags & mesh_flag_load_normals)
+					{
+						int32 currNumNormals = (int32)normals.size();
+						vertexIndices.normalIndex += (vertexIndices.normalIndex >= 0) ? 0 : currNumNormals;
+						ASSERT(vertexIndices.normalIndex < currNumNormals);
+						normalCache.push_back(normals[vertexIndices.normalIndex]);
+					}
 
 					++faceSize;
 				}
 
-				if (faceSize > 0)
-				{
-					mesh.indices.back() = ~mesh.indices.back();
-					mesh.materialIndexPerFace.push_back(currentMaterialIndex);
-				}
+				per_material& perMat = materialToMesh[currentMaterialIndex];
+				perMat.sub.materialIndex = currentMaterialIndex;
+
+				perMat.addTriangles(positionCache, uvCache, normalCache, {}, {}, {}, 0, faceSize, submeshes);
+
+				positionCache.clear();
+				uvCache.clear();
+				normalCache.clear();
 			}
 			else if (token.length == 0)
 			{
@@ -439,16 +450,22 @@ model_asset loadOBJ(const fs::path& path, uint32 flags)
 		}
 	}
 
+	for (auto [i, perMat] : materialToMesh)
+	{
+		perMat.flush(submeshes);
+	}
+
 
 	freeFile(file);
 
 
-	std::vector<submesh_asset> submeshes;
-
-	triangulateAndRemoveDuplicateVertices(mesh.positions, mesh.uvs, mesh.normals, {}, {}, mesh.indices,
-		mesh.materialIndexPerFace, submeshes);
-
 	generateNormalsAndTangents(submeshes, flags);
+
+
+
+	model_asset result;
+	result.meshes.push_back({ path.filename().string(), std::move(submeshes), -1 });
+	result.materials = std::move(materials);
 
 #if 0
 	for (uint32 i = 0; i < (uint32)submeshes.size(); ++i)
@@ -464,5 +481,5 @@ model_asset loadOBJ(const fs::path& path, uint32 flags)
 	}
 #endif
 
-	return {};
+	return result;
 }

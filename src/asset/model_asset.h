@@ -36,6 +36,7 @@ struct submesh_asset
 	std::vector<vec2> uvs;
 	std::vector<vec3> normals;
 	std::vector<vec3> tangents;
+	std::vector<uint32> colors;
 	std::vector<skinning_weights> skin;
 
 	std::vector<indexed_triangle16> triangles;
@@ -66,12 +67,13 @@ enum mesh_flags
 	mesh_flag_load_tangents			= (1 << 3),
 	mesh_flag_gen_normals			= (1 << 4), // Only if mesh has no normals.
 	mesh_flag_gen_tangents			= (1 << 5), // Only if mesh has no tangents.
-	mesh_flag_load_skin				= (1 << 6),
+	mesh_flag_load_colors			= (1 << 6), // Only if mesh has no tangents.
+	mesh_flag_load_skin				= (1 << 7),
 
 	mesh_flag_default = mesh_flag_load_uvs | mesh_flag_flip_uvs_vertically | 
 		mesh_flag_load_normals | mesh_flag_gen_normals | 
-		mesh_flag_load_tangents | mesh_flag_gen_tangents |
-		mesh_flag_load_skin,
+		mesh_flag_load_tangents | mesh_flag_gen_tangents | 
+		mesh_flag_load_colors | mesh_flag_load_skin,
 };
 
 
