@@ -1375,7 +1375,7 @@ void mesh_builder::pushAssimpMesh(const aiMesh* mesh, float scale, bounding_box*
 	}
 }
 
-void mesh_builder::pushMesh(const submesh_asset& mesh, float scale)
+void mesh_builder::pushMesh(const submesh_asset& mesh, float scale, bounding_box* aabb)
 {
 	uint32 numVertices = (uint32)mesh.positions.size();
 	uint32 numFaces = (uint32)mesh.triangles.size();
@@ -1396,16 +1396,29 @@ void mesh_builder::pushMesh(const submesh_asset& mesh, float scale)
 	skinning_weights skin = {};
 
 	bool hasPositions = true;
+	bool hasUVs = !mesh.uvs.empty();
 	bool hasNormals = !mesh.normals.empty();
 	bool hasTangents = !mesh.tangents.empty();
-	bool hasUVs = !mesh.uvs.empty();
-	bool hasVertexColors = false;
+	bool hasVertexColors = !mesh.colors.empty();;
 	bool hasSkin = !mesh.skin.empty();
+
+	if (aabb)
+	{
+		*aabb = bounding_box::negativeInfinity();
+	}
 
 	for (uint32 i = 0; i < numVertices; ++i)
 	{
 		position = mesh.positions[i] * scale;
-			
+		if (aabb)
+		{
+			aabb->grow(position);
+		}
+
+		if (hasUVs)
+		{
+			uv = mesh.uvs[i];
+		}
 		if (hasNormals)
 		{
 			normal = mesh.normals[i];
@@ -1414,13 +1427,9 @@ void mesh_builder::pushMesh(const submesh_asset& mesh, float scale)
 		{
 			tangent = mesh.tangents[i];
 		}
-		if (hasUVs)
-		{
-			uv = mesh.uvs[i];
-		}
 		if (hasVertexColors)
 		{
-			//vertexColor = packColor(vec4(mesh->mColors[0][i].r, mesh->mColors[0][i].g, mesh->mColors[0][i].b, mesh->mColors[0][i].a));
+			vertexColor = mesh.colors[i];
 		}
 		if (hasSkin)
 		{

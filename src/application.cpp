@@ -77,7 +77,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 
 	game_scene& scene = this->scene.getCurrentScene();
 
-#if 0
+#if 1
 	if (auto mesh = loadMeshFromFile("assets/sponza/sponza.obj"))
 	{
 		auto blas = defineBlasFromMesh(mesh);
@@ -92,75 +92,6 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		}
 	}
 #endif
-
-	{	
-		auto stormtrooperMesh = make_ref<multi_mesh>();
-
-		model_asset asset = load3DModelFromFile("assets/pilot/pilot.fbx");
-		mesh_builder builder(mesh_creation_flags_animated);
-		for (auto& mesh : asset.meshes)
-		{
-			for (auto& sub : mesh.submeshes)
-			{
-				const pbr_material_desc& materialDesc = asset.materials[sub.materialIndex];
-				auto material = createPBRMaterial(materialDesc);
-
-				builder.pushMesh(sub, 1.f);
-				stormtrooperMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, material, mesh.name });
-			}
-		}
-
-		stormtrooperMesh->mesh = builder.createDXMesh();
-
-		animation_skeleton& skeleton = stormtrooperMesh->skeleton;
-
-		if (!asset.skeletons.empty())
-		{
-			skeleton_asset& in = asset.skeletons.front();
-
-			skeleton.joints = std::move(in.joints);
-			skeleton.nameToJointID = std::move(in.nameToJointID);
-			skeleton.analyzeJoints(builder.getPositions(), (uint8*)builder.getOthers() + builder.getSkinOffset(), builder.getOthersSize(), builder.getNumVertices());
-		}
-
-#if 1
-		if (!asset.animations.empty())
-		{
-			animation_asset& in = asset.animations.front();
-
-			animation_clip& clip = skeleton.clips.emplace_back();
-			clip.name = std::move(in.name);
-			clip.filename = "Test";
-			clip.lengthInSeconds = in.duration;
-			clip.joints.resize(skeleton.joints.size(), {});
-
-			clip.positionKeyframes = std::move(in.positionKeyframes);
-			clip.positionTimestamps = std::move(in.positionTimestamps);
-			clip.rotationKeyframes = std::move(in.rotationKeyframes);
-			clip.rotationTimestamps = std::move(in.rotationTimestamps);
-			clip.scaleKeyframes = std::move(in.scaleKeyframes);
-			clip.scaleTimestamps = std::move(in.scaleTimestamps);
-
-			for (auto [name, joint] : in.joints)
-			{
-				auto it = skeleton.nameToJointID.find(name);
-				if (it != skeleton.nameToJointID.end())
-				{
-					animation_joint& j = clip.joints[it->second];
-					j = joint;
-				}
-			}
-		}
-#endif
-
-		auto stormtrooper = scene.createEntity("NEW Stormtrooper")
-			.addComponent<transform_component>(vec3(-10.f, 0.f, -1.f), quat::identity)
-			.addComponent<mesh_component>(stormtrooperMesh)
-			.addComponent<animation_component>()
-			.addComponent<dynamic_transform_component>();
-
-		stormtrooper.getComponent<animation_component>().animation.set(&stormtrooperMesh->skeleton.clips[0]);
-	}
 
 	if (auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx"))
 	{
