@@ -30,3 +30,12 @@ namespace std
 		}
 	};
 }
+
+
+enum asset_load_state
+{
+	asset_unloaded,
+	asset_loading,
+	asset_loaded,
+};
+

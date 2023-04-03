@@ -45,7 +45,29 @@ static ref<dx_texture> uploadImageToGPU(DirectX::ScratchImage& scratchImage, D3D
 	return result;
 }
 
-static ref<dx_texture> loadTextureInternal(const fs::path& path, uint32 flags)
+static void textureLoaderThread(ref<dx_texture> result, const fs::path& path, uint32 flags)
+{
+	DirectX::ScratchImage scratchImage;
+	D3D12_RESOURCE_DESC textureDesc;
+
+	if (path.extension() == ".svg")
+	{
+		if (!loadSVGFromFile(path, flags, scratchImage, textureDesc))
+		{
+			return;
+		}
+	}
+	else if (!loadImageFromFile(path, flags, scratchImage, textureDesc))
+	{
+		return;
+	}
+
+	uploadImageToGPU(result, scratchImage, textureDesc, flags);
+
+	result->loadState.store(asset_loaded, std::memory_order_release);
+}
+
+static ref<dx_texture> loadTextureInternal(const fs::path& path, asset_handle handle, uint32 flags)
 {
 	if (flags & image_load_flags_gen_mips_on_gpu)
 	{
@@ -54,7 +76,8 @@ static ref<dx_texture> loadTextureInternal(const fs::path& path, uint32 flags)
 	}
 
 	ref<dx_texture> result;
-	//if (flags & image_load_flags_synchronous)
+
+	if (flags & image_load_flags_synchronous)
 	{
 		DirectX::ScratchImage scratchImage;
 		D3D12_RESOURCE_DESC textureDesc;
@@ -72,8 +95,9 @@ static ref<dx_texture> loadTextureInternal(const fs::path& path, uint32 flags)
 		}
 
 		result = uploadImageToGPU(scratchImage, textureDesc, flags);
+		result->handle = handle;
+		result->flags = flags;
 	}
-#if 0
 	else
 	{
 		result = make_ref<dx_texture>();
@@ -82,32 +106,16 @@ static ref<dx_texture> loadTextureInternal(const fs::path& path, uint32 flags)
 		result->depth = 1;
 		result->format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		result->defaultSRV = render_resources::nullTextureSRV;
+		result->handle = handle;
+		result->flags = flags;
+		result->loadState = asset_loading;
 
-
-		addAsyncLoadWork([path, flags, result]()
+		addAsyncLoadWork([=]()
 		{
-			DirectX::ScratchImage scratchImage;
-			D3D12_RESOURCE_DESC textureDesc;
-
-			if (path.extension() == ".svg")
-			{
-				if (!loadSVGFromFile(path, flags, scratchImage, textureDesc))
-				{
-					return;
-				}
-			}
-			else if (!loadImageFromFile(path, flags, scratchImage, textureDesc))
-			{
-				return;
-			}
-
-			uploadImageToGPU(result, scratchImage, textureDesc, flags);
+			textureLoaderThread(result, path, flags);
 		});
 	}
-#endif
 
-	result->handle = getAssetHandleFromPath(path.lexically_normal());
-	result->flags = flags;
 	return result;
 }
 
@@ -189,7 +197,7 @@ static ref<dx_texture> loadVolumeTextureInternal(const fs::path& dirname, uint32
 
 struct texture_key
 {
-	fs::path path;
+	asset_handle handle;
 	uint32 flags;
 };
 
@@ -201,7 +209,7 @@ namespace std
 		size_t operator()(const texture_key& x) const
 		{
 			size_t seed = 0;
-			hash_combine(seed, x.path);
+			hash_combine(seed, x.handle);
 			hash_combine(seed, x.flags);
 			return seed;
 		}
@@ -210,69 +218,55 @@ namespace std
 
 static bool operator==(const texture_key& a, const texture_key& b)
 {
-	return a.path == b.path && a.flags == b.flags;
+	return a.handle == b.handle && a.flags == b.flags;
 }
 
 static std::unordered_map<texture_key, weakref<dx_texture>> textureCache;
 static std::mutex mutex;
 
-ref<dx_texture> loadTextureFromFile(const fs::path& filename, uint32 flags)
+static ref<dx_texture> loadTextureFromFileAndHandle(const fs::path& filename, asset_handle handle, uint32 flags)
 {
 	if (!fs::exists(filename))
 	{
 		return 0;
 	}
 
-	texture_key key = { filename, flags };
+	texture_key key = { handle, flags };
 
 	mutex.lock();
 
 	auto sp = textureCache[key].lock();
 	if (!sp)
 	{
-		textureCache[key] = sp = loadTextureInternal(filename, flags);
+		textureCache[key] = sp = loadTextureInternal(filename, handle, flags);
 	}
 
 	mutex.unlock();
 	return sp;
+}
+
+ref<dx_texture> loadTextureFromFile(const fs::path& filename, uint32 flags)
+{
+	fs::path path = filename.lexically_normal().make_preferred();
+
+	asset_handle handle = getAssetHandleFromPath(path);
+	return loadTextureFromFileAndHandle(path, handle, flags);
 }
 
 ref<dx_texture> loadTextureFromHandle(asset_handle handle, uint32 flags)
 {
 	fs::path sceneFilename = getPathFromAssetHandle(handle);
-	return loadTextureFromFile(sceneFilename, flags);
+	return loadTextureFromFileAndHandle(sceneFilename, handle, flags);
 }
 
 ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format imageFormat, const fs::path& cacheFilename, uint32 flags)
 {
-	texture_key key = { cacheFilename, flags };
-
-	mutex.lock();
-
-	auto sp = textureCache[key].lock();
-	if (!sp)
-	{
-		textureCache[key] = sp = loadTextureFromMemoryInternal(ptr, size, imageFormat, cacheFilename, flags);
-	}
-
-	mutex.unlock();
-	return sp;
+	return loadTextureFromMemoryInternal(ptr, size, imageFormat, cacheFilename, flags);
 }
 
 ref<dx_texture> loadVolumeTextureFromDirectory(const fs::path& dirname, uint32 flags)
 {
-	texture_key key = { dirname, flags };
-
-	mutex.lock();
-
-	auto sp = textureCache[key].lock();
-	if (!sp)
-	{
-		textureCache[key] = sp = loadVolumeTextureInternal(dirname, flags);
-	}
-
-	mutex.unlock();
-	return sp;
+	return loadVolumeTextureInternal(dirname, flags);
 }
 
 static bool checkFormatSupport(D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport, D3D12_FORMAT_SUPPORT1 support)

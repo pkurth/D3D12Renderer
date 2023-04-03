@@ -26,9 +26,11 @@ static const ImVec4 colorPerType[] =
 
 static memory_arena arena;
 static std::vector<log_message> messages;
+static std::mutex mutex;
 
 void logMessageInternal(message_type type, const char* file, const char* function, uint32 line, const char* format, ...)
 {
+	mutex.lock();
 	arena.ensureFreeSize(1024);
 
 	char* buffer = (char*)arena.getCurrent();
@@ -41,6 +43,7 @@ void logMessageInternal(message_type type, const char* file, const char* functio
 	messages.push_back({ buffer, type, 5.f, file, function, line });
 
 	arena.setCurrentTo(buffer + countWritten + 1);
+	mutex.unlock();
 }
 
 void initializeMessageLog()

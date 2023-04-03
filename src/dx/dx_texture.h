@@ -52,6 +52,8 @@ struct dx_texture
 	asset_handle handle;
 	uint32 flags = 0;
 
+	std::atomic<asset_load_state> loadState = asset_loaded;
+
 	void setName(const wchar* name);
 	std::wstring getName() const;
 };

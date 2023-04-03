@@ -79,16 +79,16 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 #if 1
 	if (auto mesh = loadMeshFromFile("assets/sponza/sponza.obj"))
 	{
-		auto blas = defineBlasFromMesh(mesh);
+		//auto blas = defineBlasFromMesh(mesh);
 
 		auto sponza = scene.createEntity("Sponza")
 			.addComponent<transform_component>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
 			.addComponent<mesh_component>(mesh);
 
-		if (blas.blas)
-		{
-			sponza.addComponent<raytrace_component>(blas);
-		}
+		//if (blas.blas)
+		//{
+		//	sponza.addComponent<raytrace_component>(blas);
+		//}
 	}
 #endif
 
@@ -101,7 +101,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			.addComponent<dynamic_transform_component>();
 
 
-		stormtrooper.getComponent<animation_component>().animation.set(&stormtrooperMesh->skeleton.clips[0]);
+		//stormtrooper.getComponent<animation_component>().animation.set(&stormtrooperMesh->skeleton.clips[0]);
 	}
 
 	if (auto pilotMesh = loadAnimatedMeshFromFile("assets/pilot/pilot.fbx"))
@@ -112,7 +112,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			.addComponent<animation_component>()
 			.addComponent<dynamic_transform_component>();
 
-		pilot.getComponent<animation_component>().animation.set(&pilotMesh->skeleton.clips[0]);
+		//pilot.getComponent<animation_component>().animation.set(&pilotMesh->skeleton.clips[0]);
 	}
 
 #if 1

@@ -7,13 +7,8 @@
 #include "asset/model_asset.h"
 
 
-static std::unordered_map<asset_handle, weakref<multi_mesh>> meshCache; // TODO: Pack flags into key.
-static std::mutex mutex;
-
-static ref<multi_mesh> loadMeshFromFileInternal(asset_handle handle, const fs::path& sceneFilename, uint32 flags, mesh_load_callback cb)
+static void meshLoaderThread(ref<multi_mesh> result, const fs::path& sceneFilename, uint32 flags, mesh_load_callback cb)
 {
-	ref<multi_mesh> result = make_ref<multi_mesh>();
-
 	result->aabb = bounding_box::negativeInfinity();
 
 	model_asset asset = load3DModelFromFile(sceneFilename);
@@ -83,30 +78,82 @@ static ref<multi_mesh> loadMeshFromFileInternal(asset_handle handle, const fs::p
 
 	result->mesh = builder.createDXMesh();
 
+	result->loadState.store(asset_loaded, std::memory_order_release);
+}
+
+
+static ref<multi_mesh> loadMeshFromFileInternal(const fs::path& sceneFilename, asset_handle handle, uint32 flags, mesh_load_callback cb)
+{
+	ref<multi_mesh> result = make_ref<multi_mesh>();
 	result->handle = handle;
 	result->flags = flags;
+	result->loadState = asset_loading;
+
+	addAsyncLoadWork([=]() 
+	{
+		meshLoaderThread(result, sceneFilename, flags, cb);
+	});
+
 	return result;
 }
 
-static ref<multi_mesh> loadMeshFromFileAndHandle(const fs::path& sceneFilename, asset_handle handle, uint32 flags, mesh_load_callback cb)
+struct mesh_key
 {
+	asset_handle handle;
+	uint32 flags;
+};
+
+namespace std
+{
+	template<>
+	struct hash<mesh_key>
+	{
+		size_t operator()(const mesh_key& x) const
+		{
+			size_t seed = 0;
+			hash_combine(seed, x.handle);
+			hash_combine(seed, x.flags);
+			return seed;
+		}
+	};
+}
+
+static bool operator==(const mesh_key& a, const mesh_key& b)
+{
+	return a.handle == b.handle && a.flags == b.flags;
+}
+
+static std::unordered_map<mesh_key, weakref<multi_mesh>> meshCache;
+static std::mutex mutex;
+
+
+static ref<multi_mesh> loadMeshFromFileAndHandle(const fs::path& filename, asset_handle handle, uint32 flags, mesh_load_callback cb)
+{
+	if (!fs::exists(filename))
+	{
+		return 0;
+	}
+
+	mesh_key key = { handle, flags };
+
 	mutex.lock();
 
-	auto sp = meshCache[handle].lock();
+	auto sp = meshCache[key].lock();
 	if (!sp)
 	{
-		fs::path path = sceneFilename.lexically_normal().make_preferred();
-		meshCache[handle] = sp = loadMeshFromFileInternal(handle, path, flags, cb);
+		meshCache[key] = sp = loadMeshFromFileInternal(filename, handle, flags, cb);
 	}
 
 	mutex.unlock();
 	return sp;
 }
 
-ref<multi_mesh> loadMeshFromFile(const fs::path& sceneFilename, uint32 flags, mesh_load_callback cb)
+ref<multi_mesh> loadMeshFromFile(const fs::path& filename, uint32 flags, mesh_load_callback cb)
 {
-	asset_handle handle = getAssetHandleFromPath(sceneFilename.lexically_normal());
-	return loadMeshFromFileAndHandle(sceneFilename, handle, flags, cb);
+	fs::path path = filename.lexically_normal().make_preferred();
+
+	asset_handle handle = getAssetHandleFromPath(path);
+	return loadMeshFromFileAndHandle(path, handle, flags, cb);
 }
 
 ref<multi_mesh> loadMeshFromHandle(asset_handle handle, uint32 flags, mesh_load_callback cb)

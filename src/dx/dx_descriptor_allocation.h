@@ -36,6 +36,7 @@ struct dx_descriptor_heap
 	D3D12_DESCRIPTOR_HEAP_TYPE type;
 
 private:
+	std::mutex mutex;
 	uint64 pageSize;
 	bool shaderVisible;
 	std::vector<dx_descriptor_page*> allPages;

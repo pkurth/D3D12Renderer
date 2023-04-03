@@ -143,7 +143,7 @@ void initializeJobSystem()
 	uint32 numFrameThreads = clamp(numHardwareThreads, 1u, 4u);
 	frameQueue.initialize(numFrameThreads, 1, THREAD_PRIORITY_NORMAL, L"Worker thread"); // 1 is the main thread.
 
-	uint32 numLoadThreads = 4;
+	uint32 numLoadThreads = 8;
 	loadQueue.initialize(numLoadThreads, numFrameThreads + 1, THREAD_PRIORITY_BELOW_NORMAL, L"Loader thread"); // 1 is the main thread.
 }
 

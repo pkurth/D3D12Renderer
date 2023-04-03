@@ -86,12 +86,15 @@ dx_descriptor_allocation dx_descriptor_heap::allocate(uint64 count)
 
 	ASSERT(count <= pageSize);
 
+	mutex.lock();
+
 	for (uint32 i = 0; i < (uint32)allPages.size(); ++i)
 	{
 		auto [allocation, success] = allPages[i]->allocate(count);
 		if (success)
 		{
 			allocation.pageIndex = i;
+			mutex.unlock();
 			return allocation;
 		}
 	}
@@ -102,6 +105,8 @@ dx_descriptor_allocation dx_descriptor_heap::allocate(uint64 count)
 	auto [allocation, success] = allPages.back()->allocate(count);
 	ASSERT(success);
 	allocation.pageIndex = pageIndex;
+	
+	mutex.unlock();
 
 	return allocation;
 }
@@ -110,7 +115,9 @@ void dx_descriptor_heap::free(dx_descriptor_allocation allocation)
 {
 	if (allocation.valid())
 	{
+		mutex.lock();
 		allPages[allocation.pageIndex]->free(allocation);
+		mutex.unlock();
 	}
 }
 
