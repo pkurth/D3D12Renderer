@@ -3,7 +3,7 @@
 #include "dx_context.h"
 #include "dx_command_list.h"
 #include "core/hash.h"
-#include "core/file_registry.h"
+#include "asset/file_registry.h"
 #include "rendering/texture_preprocessing.h"
 #include "rendering/render_resources.h"
 

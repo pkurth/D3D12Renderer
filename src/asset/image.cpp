@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "image.h"
-#include "log.h"
-#include "memory.h"
+#include "core/log.h"
+#include "core/memory.h"
 
 
 #include <DirectXTex/DirectXTex.h>

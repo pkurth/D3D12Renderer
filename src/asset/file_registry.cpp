@@ -1,8 +1,8 @@
 #include "pch.h"
 #include "file_registry.h"
-#include "file_system.h"
-#include "log.h"
-#include "yaml.h"
+#include "core/file_system.h"
+#include "core/log.h"
+#include "core/yaml.h"
 
 
 

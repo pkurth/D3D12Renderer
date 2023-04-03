@@ -2,7 +2,7 @@
 
 #include "synth.h"
 #include "core/string.h"
-#include "core/asset.h"
+#include "asset/asset.h"
 
 #include <xaudio2.h>
 #include <functional>

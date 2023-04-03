@@ -5,7 +5,7 @@
 #include "core/yaml.h"
 #include "core/log.h"
 
-#include "core/file_registry.h"
+#include "asset/file_registry.h"
 
 #include "physics/physics.h"
 #include "physics/cloth.h"

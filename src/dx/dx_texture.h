@@ -2,9 +2,9 @@
 
 #include "dx_descriptor.h"
 #include "dx_descriptor_allocation.h"
-#include "core/asset.h"
 #include "core/math.h"
-#include "core/image.h"
+#include "asset/asset.h"
+#include "asset/image.h"
 
 #include <string>
 

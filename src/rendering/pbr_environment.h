@@ -2,7 +2,7 @@
 
 #include "dx/dx_texture.h"
 #include "rendering/light_probe.h"
-#include "core/asset.h"
+#include "asset/asset.h"
 
 enum environment_gi_mode
 {

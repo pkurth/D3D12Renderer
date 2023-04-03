@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hash.h"
+#include "core/hash.h"
 
 struct asset_handle
 {

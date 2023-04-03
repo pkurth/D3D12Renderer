@@ -3,7 +3,7 @@
 #include "mesh_builder.h"
 #include "rendering/pbr.h"
 #include "core/hash.h"
-#include "core/file_registry.h"
+#include "asset/file_registry.h"
 #include "asset/model_asset.h"
 
 

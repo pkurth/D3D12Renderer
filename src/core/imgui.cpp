@@ -17,8 +17,8 @@
 #include "dx/dx_command_list.h"
 #include "dx/dx_profiling.h"
 #include "window/dx_window.h"
-#include "core/asset.h"
-#include "core/file_registry.h"
+#include "asset/asset.h"
+#include "asset/file_registry.h"
 
 
 #define MAX_NUM_IMGUI_IMAGES_PER_FRAME 128

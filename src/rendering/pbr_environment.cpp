@@ -3,7 +3,7 @@
 #include "texture_preprocessing.h"
 #include "render_resources.h"
 #include "dx/dx_context.h"
-#include "core/file_registry.h"
+#include "asset/file_registry.h"
 
 void pbr_environment::setFromTexture(const fs::path& filename)
 {

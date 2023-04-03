@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "serialization_binary.h"
-#include "core/file_registry.h"
+#include "asset/file_registry.h"
 
 #include "physics/physics.h"
 #include "terrain/heightmap_collider.h"

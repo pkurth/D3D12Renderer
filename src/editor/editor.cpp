@@ -3,7 +3,7 @@
 #include "editor_icons.h"
 #include "core/cpu_profiling.h"
 #include "core/log.h"
-#include "core/file_registry.h"
+#include "asset/file_registry.h"
 #include "core/imgui.h"
 #include "dx/dx_profiling.h"
 #include "scene/components.h"

@@ -7,14 +7,13 @@
 #include "core/imgui.h"
 #include "core/log.h"
 #include "core/cpu_profiling.h"
-#include "core/file_registry.h"
+#include "asset/file_registry.h"
 #include "editor/file_browser.h"
 #include "application.h"
 #include "editor/editor_icons.h"
 #include "rendering/render_utils.h"
 #include "rendering/main_renderer.h"
 #include "audio/audio.h"
-#include "audio/synth.h"
 #include "editor/asset_editor_panel.h"
 
 #define IMGUI_DEFINE_MATH_OPERATORS

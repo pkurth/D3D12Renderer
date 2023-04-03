@@ -4,7 +4,7 @@
 #include "sound_management.h"
 
 #include "core/log.h"
-#include "core/file_registry.h"
+#include "asset/file_registry.h"
 
 #include <unordered_map>
 

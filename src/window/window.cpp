@@ -10,7 +10,7 @@
 #include "software_window.h"
 #include "core/imgui.h"
 #include "core/string.h"
-#include "core/image.h"
+#include "asset/image.h"
 
 #include <DirectXTex/DirectXTex.h>
 

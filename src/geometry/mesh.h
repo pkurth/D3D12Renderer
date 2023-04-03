@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/asset.h"
+#include "asset/asset.h"
 #include "physics/bounding_volumes.h"
 #include "dx/dx_buffer.h"
 #include "animation/animation.h"

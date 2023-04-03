@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "asset.h"
-#include "random.h"
+#include "core/random.h"
 
 static random_number_generator rng = time(0);
 
