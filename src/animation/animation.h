@@ -121,11 +121,6 @@ struct animation_skeleton
 
 	skeleton_limb limbs[limb_type_count];
 
-	void loadFromAssimp(const struct aiScene* scene, float scale = 1.f);
-	void pushAssimpAnimation(const fs::path& sceneFilename, const struct aiAnimation* animation, float scale = 1.f);
-	void pushAssimpAnimations(const fs::path& sceneFilename, float scale = 1.f);
-	void pushAssimpAnimationsInDirectory(const fs::path& directory, float scale = 1.f);
-
 	void analyzeJoints(const vec3* positions, const void* others, uint32 otherStride, uint32 numVertices);
 
 	void sampleAnimation(const animation_clip& clip, float time, trs* outLocalTransforms, trs* outRootMotion = 0) const;

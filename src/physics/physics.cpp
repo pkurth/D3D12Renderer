@@ -53,27 +53,26 @@ struct force_field_global_state
 // This is a bit dirty. PHYSICS_ONLY is defined when building the learning DLL, where we don't need bounding hulls.
 
 #include "geometry/mesh_builder.h"
-#include "core/assimp.h"
+#include "asset/model_asset.h"
 
 uint32 allocateBoundingHullGeometry(const std::string& meshFilepath)
 {
-	Assimp::Importer importer;
-	importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, aiComponent_TEXCOORDS | aiComponent_NORMALS | aiComponent_TANGENTS_AND_BITANGENTS | aiComponent_COLORS);
+	model_asset asset = load3DModelFromFile(meshFilepath);
 
-	const aiScene* scene = loadAssimpSceneFile(meshFilepath, importer);
-
-	if (!scene)
+	if (asset.meshes.empty())
 	{
 		return INVALID_BOUNDING_HULL_INDEX;
 	}
 
-	ASSERT(scene->mNumMeshes == 1);
-	ASSERT(scene->mMeshes[0]->mNumVertices <= UINT16_MAX);
-
 	mesh_builder builder(mesh_creation_flags_with_positions);
 
-	builder.pushAssimpMesh(scene->mMeshes[0], 1.f);
-
+	for (auto& mesh : asset.meshes)
+	{
+		for (auto& sub : mesh.submeshes)
+		{
+			builder.pushMesh(sub, 1.f);
+		}
+	}
 
 	uint32 index = (uint32)boundingHullGeometries.size();
 	boundingHullGeometries.push_back(bounding_hull_geometry::fromMesh(

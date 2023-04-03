@@ -51,6 +51,7 @@ struct mesh_asset
 
 struct model_asset
 {
+	uint32 flags;
 	std::vector<mesh_asset> meshes;
 	std::vector<pbr_material_desc> materials;
 	std::vector<skeleton_asset> skeletons;
@@ -78,4 +79,8 @@ enum mesh_flags
 
 
 model_asset load3DModelFromFile(const fs::path& path, uint32 meshFlags = mesh_flag_default);
+
+
+bool isMeshExtension(const fs::path& extension);
+bool isMeshExtension(const std::string& extension);
 

@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "serialization_binary.h"
+#include "core/file_registry.h"
 
 #include "physics/physics.h"
 #include "terrain/heightmap_collider.h"
@@ -289,14 +290,15 @@ static void serializeMaterial(const ref<pbr_material>& mat, write_stream& stream
 		stream.write(mat->metallicOverride);
 		stream.write(mat->shader);
 		stream.write(mat->uvScale);
+		stream.write(mat->translucency);
 	}
 }
 
-static ref<dx_texture> deserializeTexture(read_stream& stream)
+static std::pair<asset_handle, uint32> deserializeTexture(read_stream& stream)
 {
 	READ(asset_handle, handle);
 	READ(uint32, flags);
-	return loadTextureFromHandle(handle, flags);
+	return { handle, flags };
 }
 
 static ref<pbr_material> deserializeMaterial(read_stream& stream)
@@ -306,10 +308,21 @@ static ref<pbr_material> deserializeMaterial(read_stream& stream)
 	READ(bool, exists);
 	if (exists)
 	{
-		auto albedo = deserializeTexture(stream);
-		auto normal = deserializeTexture(stream);
-		auto roughness = deserializeTexture(stream);
-		auto metallic = deserializeTexture(stream);
+		pbr_material_desc desc;
+
+		auto [albedoHandle, albedoFlags] = deserializeTexture(stream);
+		auto [normalHandle, normalFlags] = deserializeTexture(stream);
+		auto [roughnessHandle, roughnessFlags] = deserializeTexture(stream);
+		auto [metallicHandle, metallicFlags] = deserializeTexture(stream);
+
+		desc.albedo = getPathFromAssetHandle(albedoHandle);
+		desc.albedoFlags = albedoFlags;
+		desc.normal = getPathFromAssetHandle(normalHandle);
+		desc.normalFlags = normalFlags;
+		desc.roughness = getPathFromAssetHandle(roughnessHandle);
+		desc.roughnessFlags = roughnessFlags;
+		desc.metallic = getPathFromAssetHandle(metallicHandle);
+		desc.metallicFlags = metallicFlags;
 
 		READ(vec4, emission);
 		READ(vec4, albedoTint);
@@ -317,8 +330,17 @@ static ref<pbr_material> deserializeMaterial(read_stream& stream)
 		READ(float, metallicOverride);
 		READ(pbr_material_shader, shader);
 		READ(float, uvScale);
+		READ(float, translucency);
 
-		result = createPBRMaterial(albedo, normal, roughness, metallic, emission, albedoTint, roughnessOverride, metallicOverride, shader, uvScale);
+		desc.emission = emission;
+		desc.albedoTint = albedoTint;
+		desc.roughnessOverride = roughnessOverride;
+		desc.metallicOverride = metallicOverride;
+		desc.shader = shader;
+		desc.uvScale = uvScale;
+		desc.translucency = translucency;
+
+		result = createPBRMaterial(desc);
 	}
 
 	return result;

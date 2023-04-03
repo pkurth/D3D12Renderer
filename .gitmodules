@@ -1,9 +1,6 @@
 [submodule "ext/imgui"]
 	path = ext/imgui
 	url = ../../ocornut/imgui.git
-[submodule "ext/assimp"]
-	path = ext/assimp
-	url = ../assimp.git
 [submodule "ext/entt"]
 	path = ext/entt
 	url = ../entt.git

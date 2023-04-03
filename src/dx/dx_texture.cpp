@@ -187,7 +187,33 @@ static ref<dx_texture> loadVolumeTextureInternal(const fs::path& dirname, uint32
 	return result;
 }
 
-static std::unordered_map<fs::path, weakref<dx_texture>> textureCache; // TODO: Pack flags into key.
+struct texture_key
+{
+	fs::path path;
+	uint32 flags;
+};
+
+namespace std
+{
+	template<>
+	struct hash<texture_key>
+	{
+		size_t operator()(const texture_key& x) const
+		{
+			size_t seed = 0;
+			hash_combine(seed, x.path);
+			hash_combine(seed, x.flags);
+			return seed;
+		}
+	};
+}
+
+static bool operator==(const texture_key& a, const texture_key& b)
+{
+	return a.path == b.path && a.flags == b.flags;
+}
+
+static std::unordered_map<texture_key, weakref<dx_texture>> textureCache;
 static std::mutex mutex;
 
 ref<dx_texture> loadTextureFromFile(const fs::path& filename, uint32 flags)
@@ -197,12 +223,14 @@ ref<dx_texture> loadTextureFromFile(const fs::path& filename, uint32 flags)
 		return 0;
 	}
 
+	texture_key key = { filename, flags };
+
 	mutex.lock();
 
-	auto sp = textureCache[filename].lock();
+	auto sp = textureCache[key].lock();
 	if (!sp)
 	{
-		textureCache[filename] = sp = loadTextureInternal(filename, flags);
+		textureCache[key] = sp = loadTextureInternal(filename, flags);
 	}
 
 	mutex.unlock();
@@ -217,12 +245,14 @@ ref<dx_texture> loadTextureFromHandle(asset_handle handle, uint32 flags)
 
 ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format imageFormat, const fs::path& cacheFilename, uint32 flags)
 {
+	texture_key key = { cacheFilename, flags };
+
 	mutex.lock();
 
-	auto sp = textureCache[cacheFilename].lock();
+	auto sp = textureCache[key].lock();
 	if (!sp)
 	{
-		textureCache[cacheFilename] = sp = loadTextureFromMemoryInternal(ptr, size, imageFormat, cacheFilename, flags);
+		textureCache[key] = sp = loadTextureFromMemoryInternal(ptr, size, imageFormat, cacheFilename, flags);
 	}
 
 	mutex.unlock();
@@ -231,12 +261,14 @@ ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format
 
 ref<dx_texture> loadVolumeTextureFromDirectory(const fs::path& dirname, uint32 flags)
 {
+	texture_key key = { dirname, flags };
+
 	mutex.lock();
 
-	auto sp = textureCache[dirname].lock();
+	auto sp = textureCache[key].lock();
 	if (!sp)
 	{
-		textureCache[dirname] = sp = loadVolumeTextureInternal(dirname, flags);
+		textureCache[key] = sp = loadVolumeTextureInternal(dirname, flags);
 	}
 
 	mutex.unlock();

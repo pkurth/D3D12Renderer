@@ -6,6 +6,8 @@
 #include "core/cpu_profiling.h"
 #include "geometry/mesh.h"
 
+//#define PROFILE(name) CPU_PRINT_PROFILE_BLOCK(name)
+#define PROFILE(name) 
 
 void testDumpToPLY(const std::string& filename,
 	const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, const std::vector<indexed_triangle16>& triangles,
@@ -179,7 +181,7 @@ static std::vector<std::pair<std::string, pbr_material_desc>> loadMaterialLibrar
 	std::string currentName;
 
 	{
-		CPU_PRINT_PROFILE_BLOCK("Parse OBJ material library");
+		PROFILE("Parse OBJ material library");
 
 		while (file.readOffset < file.size)
 		{
@@ -307,7 +309,7 @@ static std::vector<std::pair<std::string, pbr_material_desc>> loadMaterialLibrar
 
 model_asset loadOBJ(const fs::path& path, uint32 flags)
 {
-	CPU_PRINT_PROFILE_BLOCK("Loading OBJ");
+	PROFILE("Loading OBJ");
 
 	entire_file file = loadFile(path);
 
@@ -330,7 +332,7 @@ model_asset loadOBJ(const fs::path& path, uint32 flags)
 	std::vector<vec3> normalCache; normalCache.reserve(16);
 
 	{
-		CPU_PRINT_PROFILE_BLOCK("Parse OBJ");
+		PROFILE("Parse OBJ");
 
 		while (file.readOffset < file.size)
 		{
@@ -464,6 +466,7 @@ model_asset loadOBJ(const fs::path& path, uint32 flags)
 
 
 	model_asset result;
+	result.flags = flags;
 	result.meshes.push_back({ path.filename().string(), std::move(submeshes), -1 });
 	result.materials = std::move(materials);
 

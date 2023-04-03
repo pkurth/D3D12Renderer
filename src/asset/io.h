@@ -12,8 +12,14 @@ struct entire_file
 	template <typename T>
 	T* consume(uint32 count = 1)
 	{
+		uint32 readSize = sizeof(T) * count;
+		if (readSize > size - readOffset)
+		{
+			return 0;
+		}
+
 		T* result = (T*)(content + readOffset);
-		readOffset += sizeof(T) * count;
+		readOffset += readSize;
 		return result;
 	}
 };
@@ -86,7 +92,8 @@ static std::string nameToString(sized_string str)
 
 static std::string relativeFilepath(sized_string str, const fs::path& scenePath)
 {
-	fs::path abs = scenePath.parent_path() / std::string(str.str, str.length);
+	fs::path p = std::string(str.str, str.length);
+	fs::path abs = (p.is_absolute()) ? p : scenePath.parent_path() / p;
 	fs::path rel = fs::relative(abs, fs::current_path());
 	return rel.string();
 }

@@ -181,7 +181,6 @@ shaderoutputdir = "shaders/bin/%{cfg.buildcfg}/"
 
 
 group "Dependencies"
-	include "ext/assimp"
 	include "ext/directxtex"
 	include "ext/yaml-cpp"
 group ""
@@ -237,13 +236,11 @@ project "D3D12Renderer"
 		"dxcompiler",
 		"XAudio2",
 		"uxtheme",
-		"assimp",
 		"directxtex",
 		"yaml-cpp",
 	}
 
 	dependson {
-		"assimp",
 		"directxtex",
 		"yaml-cpp",
 	}
@@ -256,7 +253,6 @@ project "D3D12Renderer"
 	}
 
 	sysincludedirs {
-		"ext/assimp/include",
 		"ext/yaml-cpp/include",
 		"ext/entt/src",
 		"ext/directxtex",

@@ -6,7 +6,6 @@
 #include "core/color.h"
 #include "core/imgui.h"
 #include "core/log.h"
-#include "core/assimp.h"
 #include "dx/dx_context.h"
 #include "dx/dx_profiling.h"
 #include "physics/physics.h"
@@ -129,11 +128,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 
 #if 1
 	{
-		auto woodMaterial = createPBRMaterial(
-			"assets/desert/textures/WoodenCrate2_Albedo.png",
-			"assets/desert/textures/WoodenCrate2_Normal.png",
-			{}, {});
-
+		auto woodMaterial = createPBRMaterial({ "assets/desert/textures/WoodenCrate2_Albedo.png", "assets/desert/textures/WoodenCrate2_Normal.png" });
 
 		mesh_builder builder;
 
@@ -146,12 +141,13 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		boxMesh->submeshes.push_back({ builder.endSubmesh(), {}, trs::identity, woodMaterial });
 
 
+		pbr_material_desc lollipopMaterialDesc;
+		lollipopMaterialDesc.albedo = "assets/cc0/sphere/Tiles074_2K_Color.jpg";
+		lollipopMaterialDesc.normal = "assets/cc0/sphere/Tiles074_2K_Normal.jpg";
+		lollipopMaterialDesc.roughness = "assets/cc0/sphere/Tiles074_2K_Roughness.jpg";
+		lollipopMaterialDesc.uvScale = 3.f;
 
-		auto lollipopMaterial = createPBRMaterial(
-			"assets/cc0/sphere/Tiles074_2K_Color.jpg",
-			"assets/cc0/sphere/Tiles074_2K_Normal.jpg",
-			"assets/cc0/sphere/Tiles074_2K_Roughness.jpg",
-			{}, vec4(0.f), vec4(1.f), 0.2f, 0.f, pbr_material_shader_default, 3.f);
+		auto lollipopMaterial = createPBRMaterial(lollipopMaterialDesc);
 
 		auto groundMesh = make_ref<multi_mesh>();
 		builder.pushBox({ vec3(0.f), vec3(30.f, 4.f, 30.f) });
@@ -283,10 +279,27 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		uint32 numTerrainChunks = 10;
 		float terrainChunkSize = 64.f;
 
-		auto terrainGroundMaterial = createPBRMaterial("assets/terrain/ground/Grass002_2K_Color.png", "assets/terrain/ground/Grass002_2K_NormalDX.png", "assets/terrain/ground/Grass002_2K_Roughness.png", {},
-			vec4(0.f), vec4(1.f), 1.f, 0.f, pbr_material_shader_default, 1.f, true);
-		auto terrainRockMaterial = createPBRMaterial("assets/terrain/rock/Rock034_2K_Color.png", "assets/terrain/rock/Rock034_2K_NormalDX.png", "assets/terrain/rock/Rock034_2K_Roughness.png", {});
-		auto terrainMudMaterial = createPBRMaterial("assets/terrain/mud/Ground049B_2K_Color.png", "assets/terrain/mud/Ground049B_2K_NormalDX.png", "assets/terrain/mud/Ground049B_2K_Roughness.png", {});
+
+		pbr_material_desc terrainGroundDesc;
+		terrainGroundDesc.albedo = "assets/terrain/ground/Grass002_2K_Color.png";
+		terrainGroundDesc.normal = "assets/terrain/ground/Grass002_2K_NormalDX.png";
+		terrainGroundDesc.roughness = "assets/terrain/ground/Grass002_2K_Roughness.png";
+		terrainGroundDesc.albedoFlags &= ~image_load_flags_compress;
+
+		pbr_material_desc terrainRockDesc;
+		terrainRockDesc.albedo = "assets/terrain/rock/Rock034_2K_Color.png";
+		terrainRockDesc.normal = "assets/terrain/rock/Rock034_2K_NormalDX.png";
+		terrainRockDesc.roughness = "assets/terrain/rock/Rock034_2K_Roughness.png";
+
+		pbr_material_desc terrainMudDesc;
+		terrainMudDesc.albedo = "assets/terrain/mud/Ground049B_2K_Color.png";
+		terrainMudDesc.normal = "assets/terrain/mud/Ground049B_2K_NormalDX.png";
+		terrainMudDesc.roughness = "assets/terrain/mud/Ground049B_2K_Roughness.png";
+
+
+		auto terrainGroundMaterial = createPBRMaterial(terrainGroundDesc);
+		auto terrainRockMaterial = createPBRMaterial(terrainRockDesc);
+		auto terrainMudMaterial = createPBRMaterial(terrainMudDesc);
 
 		std::vector<proc_placement_layer_desc> layers =
 		{

@@ -176,8 +176,10 @@ void humanoid_ragdoll::initialize(game_scene& scene, vec3 initialHipPosition, fl
 
 	mesh_builder builder(mesh_creation_flags_with_positions | mesh_creation_flags_with_uvs | mesh_creation_flags_with_normals | mesh_creation_flags_with_tangents);
 
-	auto ragdollMaterial = createPBRMaterial(
-		0, 0, 0, 0, vec4(0.f), vec4(161.f, 102.f, 94.f, 255.f) / 255.f, 1.f, 0.f);
+	pbr_material_desc desc;
+	desc.albedoTint = vec4(161.f, 102.f, 94.f, 255.f) / 255.f;
+
+	auto ragdollMaterial = createPBRMaterial(desc);
 	//auto ragdollMaterial = lollipopMaterial;
 
 	auto ragdollTorsoMesh = make_ref<multi_mesh>();

@@ -747,12 +747,14 @@ static void renderCloth(game_scene& scene, entity_handle selectedObjectID,
 	uint32 index = 0;
 	for (auto [entityHandle, cloth, render] : scene.group<cloth_component, cloth_render_component>().each())
 	{
-		static auto clothMaterial = createPBRMaterial(
-			"assets/sponza/textures/Sponza_Curtain_Red_diffuse.tga",
-			"assets/sponza/textures/Sponza_Curtain_Red_normal.tga",
-			"assets/sponza/textures/Sponza_Curtain_roughness.tga",
-			"assets/sponza/textures/Sponza_Curtain_metallic.tga",
-			vec4(0.f), vec4(1.f), 1.f, 1.f, pbr_material_shader_double_sided);
+		pbr_material_desc desc;
+		desc.albedo = "assets/sponza/textures/Sponza_Curtain_Red_diffuse.tga";
+		desc.normal = "assets/sponza/textures/Sponza_Curtain_Red_normal.tga";
+		desc.roughness = "assets/sponza/textures/Sponza_Curtain_roughness.tga";
+		desc.metallic = "assets/sponza/textures/Sponza_Curtain_metallic.tga";
+		desc.shader = pbr_material_shader_double_sided;
+
+		static auto clothMaterial = createPBRMaterial(desc);
 
 		objectIDs[index] = (uint32)entityHandle;
 		D3D12_GPU_VIRTUAL_ADDRESS baseObjectID = objectIDAddress + (index * sizeof(uint32));

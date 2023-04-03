@@ -11,6 +11,9 @@
 
 #include "core/yaml.h"
 
+//#define PROFILE(name) CPU_PRINT_PROFILE_BLOCK(name)
+#define PROFILE(name) 
+
 
 void testDumpToPLY(const std::string& filename,
 	const std::vector<vec3>& positions, const std::vector<vec2>& uvs, const std::vector<vec3>& normals, const std::vector<indexed_triangle16>& triangles,
@@ -1801,7 +1804,7 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 
 	if (mesh.skeletonID && flags & mesh_flag_load_skin)
 	{
-		CPU_PRINT_PROFILE_BLOCK("Assigning skinning weights");
+		PROFILE("Assigning skinning weights");
 
 		mesh.skin.resize(mesh.positions.size(), {});
 		fbx_skeleton& skeleton = skeletons[mesh.skeletonID];
@@ -1868,7 +1871,7 @@ static void finishMesh(fbx_mesh& mesh, uint32 flags, std::unordered_map<int64, f
 	std::unordered_map<int32, per_material> materialToMesh;
 
 	{
-		CPU_PRINT_PROFILE_BLOCK("Triangulating & duplicate vertex removal");
+		PROFILE("Triangulating & duplicate vertex removal");
 		for (int32 faceIndex = 0, firstIndex = 0; faceIndex < (int32)mesh.faceSizes.size(); ++faceIndex)
 		{
 			int32 faceSize = mesh.faceSizes[faceIndex];
@@ -2068,7 +2071,7 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 	std::vector<fbx_property> properties;
 
 	{
-		CPU_PRINT_PROFILE_BLOCK("Parse FBX nodes");
+		PROFILE("Parse FBX nodes");
 		parseNodes(version, file, nodes, properties, 0, 0);
 	}
 
@@ -2094,7 +2097,7 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 
 
 	{
-		CPU_PRINT_PROFILE_BLOCK("Reading FBX objects");
+		PROFILE("Reading FBX objects");
 
 		const fbx_node* objectsNode = findNode(nodes, { "Objects" });
 		objectLUT.idToObject.reserve(objectsNode->numChildren + 1);
@@ -2142,12 +2145,12 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 	}
 
 	{
-		CPU_PRINT_PROFILE_BLOCK("Resolving FBX connections");
+		PROFILE("Resolving FBX connections");
 		resolveConnections(findNode(nodes, { "Connections" }), nodes, properties, objectLUT);
 	}
 
 	{
-		CPU_PRINT_PROFILE_BLOCK("Finishing FBX meshes");
+		PROFILE("Finishing FBX meshes");
 		for (fbx_mesh& mesh : objectLUT.meshes)
 		{
 			finishMesh(mesh, flags, objectLUT.skeletons);
@@ -2173,6 +2176,7 @@ model_asset loadFBX(const fs::path& path, uint32 flags)
 	}
 
 	model_asset result;
+	result.flags = flags;
 
 	result.materials.reserve(objectLUT.materials.size());
 	for (fbx_material& material : objectLUT.materials)

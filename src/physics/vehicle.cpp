@@ -308,10 +308,7 @@ void vehicle::initialize(game_scene& scene, vec3 initialMotorPosition, float ini
 	mesh_builder builder;
 
 
-	auto material = createPBRMaterial(
-		"assets/desert/textures/WoodenCrate2_Albedo.png",
-		"assets/desert/textures/WoodenCrate2_Normal.png",
-		{}, {});
+	auto material = createPBRMaterial({ "assets/desert/textures/WoodenCrate2_Albedo.png", "assets/desert/textures/WoodenCrate2_Normal.png" });
 
 
 	motor = scene.createEntity("Motor")
