@@ -391,7 +391,7 @@ static void loadPipeline(reloadable_pipeline_state& p)
 	}
 }
 
-#define MULTI_THREADED_CREATION 0
+#define MULTI_THREADED_CREATION 1
 
 void createAllPendingReloadablePipelines()
 {

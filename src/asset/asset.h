@@ -37,5 +37,14 @@ enum asset_load_state
 	asset_unloaded,
 	asset_loading,
 	asset_loaded,
+
+	asset_load_state_count,
+};
+
+static const char* assetLoadStateNames[] =
+{
+	"Unloaded",
+	"Loading",
+	"Loaded",
 };
 

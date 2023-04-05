@@ -870,6 +870,7 @@ bool scene_editor::drawSceneHierarchy()
 
 						if (ImGui::BeginProperties())
 						{
+							ImGui::PropertyValue("Load state", assetLoadStateNames[raster.mesh->loadState.load()]);
 							editMesh("Mesh", raster.mesh, mesh_creation_flags_default);
 							ImGui::EndProperties();
 						}
