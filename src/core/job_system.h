@@ -24,7 +24,7 @@ struct job_queue
 
         std::atomic<int32> numUnfinishedJobs;
         int32 parent;
-        int32 continuation;
+        job_handle continuation;
 
 
         static constexpr uint64 SIZE = sizeof(function) + sizeof(templatedFunction) + sizeof(numUnfinishedJobs) + sizeof(parent) + sizeof(continuation);
@@ -47,7 +47,7 @@ struct job_queue
         auto& job = allJobs[handle];
         job.numUnfinishedJobs = 1;
         job.parent = parent.index;
-        job.continuation = -1;
+        job.continuation.index = -1;
 
         if (parent.index != -1)
         {
@@ -77,7 +77,7 @@ private:
 
     friend struct job_handle;
 
-    void addContinuation(int32 first, int32 second);
+    void addContinuation(int32 first, job_handle second);
     void submit(int32 handle);
     void waitForCompletion(int32 handle);
 
@@ -104,7 +104,9 @@ private:
 
 extern job_queue highPriorityJobQueue;
 extern job_queue lowPriorityJobQueue;
+extern job_queue mainThreadJobQueue;
 
 
 void initializeJobSystem();
+void executeMainThreadJobs();
 

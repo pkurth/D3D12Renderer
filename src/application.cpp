@@ -51,8 +51,6 @@ static raytracing_object_type defineBlasFromMesh(const ref<multi_mesh>& mesh)
 	}
 }
 
-// TODO: The scene registry is not thread safe! This should be guarded!
-// Alternative (possibly better): Add system to execute jobs on main thread.
 static void addRaytracingComponentAsync(scene_entity entity, async_mesh_load_result load)
 {
 	struct add_ray_tracing_data
@@ -63,12 +61,22 @@ static void addRaytracingComponentAsync(scene_entity entity, async_mesh_load_res
 
 	add_ray_tracing_data data = { entity, load };
 
-	job_handle blasJob = lowPriorityJobQueue.createJob<add_ray_tracing_data>([](add_ray_tracing_data& data, job_handle job)
+	lowPriorityJobQueue.createJob<add_ray_tracing_data>([](add_ray_tracing_data& data, job_handle)
 	{
-		auto blas = defineBlasFromMesh(data.mesh);
-		data.entity.addComponent<raytrace_component>(blas);
-	}, data);
-	blasJob.submitAfter(load.job);
+		struct create_component_data
+		{
+			scene_entity entity;
+			raytracing_object_type blas;
+		};
+
+		create_component_data createData = { data.entity, defineBlasFromMesh(data.mesh) };
+
+		mainThreadJobQueue.createJob<create_component_data>([](create_component_data& data, job_handle)
+		{
+			data.entity.addComponent<raytrace_component>(data.blas);
+		}, createData).submitNow();
+
+	}, data).submitAfter(load.job);
 }
 
 static void initializeAnimationComponentAsync(scene_entity entity, async_mesh_load_result load)
@@ -81,11 +89,10 @@ static void initializeAnimationComponentAsync(scene_entity entity, async_mesh_lo
 
 	add_animation_data data = { entity, load };
 
-	job_handle blasJob = lowPriorityJobQueue.createJob<add_animation_data>([](add_animation_data& data, job_handle job)
+	mainThreadJobQueue.createJob<add_animation_data>([](add_animation_data& data, job_handle job)
 	{
 		data.entity.getComponent<animation_component>().animation.set(&data.mesh->skeleton.clips[0]);
-	}, data);
-	blasJob.submitAfter(load.job);
+	}, data).submitAfter(load.job);
 }
 
 void application::loadCustomShaders()
@@ -660,6 +667,8 @@ void application::update(const user_input& input, float dt)
 	renderer->setEnvironment(environment);
 	renderer->setSun(sun);
 	renderer->setCamera(camera);
+
+	executeMainThreadJobs();
 }
 
 void application::handleFileDrop(const fs::path& filename)

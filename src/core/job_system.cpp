@@ -23,16 +23,16 @@ void job_queue::initialize(uint32 numThreads, uint32 threadOffset, int threadPri
     }
 }
 
-void job_queue::addContinuation(int32 first, int32 second)
+void job_queue::addContinuation(int32 first, job_handle second)
 {
     job_queue_entry& firstJob = allJobs[first];
-    ASSERT(firstJob.continuation == -1);
+    ASSERT(firstJob.continuation.index == -1);
 
     int32 unfinished = firstJob.numUnfinishedJobs++;
     if (unfinished == 0)
     {
         // First job was finished before adding continuation -> just submit second.
-        submit(second);
+        second.queue->submit(second.index);
     }
     else
     {
@@ -97,9 +97,9 @@ void job_queue::finishJob(int32 handle)
             finishJob(job.parent);
         }
 
-        if (job.continuation != -1)
+        if (job.continuation.index != -1)
         {
-            submit(job.continuation);
+            job.continuation.queue->submit(job.continuation.index);
         }
     }
 }
@@ -139,8 +139,7 @@ void job_handle::submitNow()
 
 void job_handle::submitAfter(job_handle before)
 {
-    ASSERT(queue == before.queue);
-    queue->addContinuation(before.index, index);
+    before.queue->addContinuation(before.index, *this);
 }
 
 void job_handle::waitForCompletion()
@@ -153,118 +152,8 @@ void job_handle::waitForCompletion()
 
 job_queue highPriorityJobQueue;
 job_queue lowPriorityJobQueue;
+job_queue mainThreadJobQueue;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-struct texture
-{
-    int32 index;
-
-    ~texture()
-    {
-        std::cout << "Texture destructor\n";
-    }
-};
-
-struct mesh
-{
-    std::vector<ref<texture>> textures;
-};
-
-static ref<texture> loadTextureAsync(int32 index, job_handle parent = {})
-{
-    ref<texture> result = make_ref<texture>();
-
-
-    struct load_texture_thread_data
-    {
-        ref<texture> data;
-        int32 index;
-    };
-
-    load_texture_thread_data loadData = { result, index };
-
-    job_handle loadJob = lowPriorityJobQueue.createJob<load_texture_thread_data>([](load_texture_thread_data& data, job_handle job)
-    {
-        char buffer[128];
-        sprintf(buffer, "JOB %d: Loading texture %d\n", job.index, data.index);
-        std::cout << buffer;
-        data.data->index = data.index;
-        Sleep(1000);
-    }, loadData, parent);
-
-
-    loadJob.submitNow();
-    
-    return result;
-}
-
-static std::pair<ref<mesh>, job_handle> loadMeshAsync(job_handle parent = {})
-{
-    ref<mesh> result = make_ref<mesh>();
-
-    struct load_mesh_thread_data
-    {
-        ref<mesh> m;
-    };
-
-    load_mesh_thread_data loadData = { result };
-
-    job_handle loadJob = lowPriorityJobQueue.createJob<load_mesh_thread_data>([](load_mesh_thread_data& data, job_handle job)
-    {
-        char buffer[128];
-        sprintf(buffer, "JOB %d: Loading mesh\n", job.index);
-        std::cout << buffer;
-
-        data.m->textures.resize(10);
-
-        for (int32 i = 0; i < (int32)data.m->textures.size(); ++i)
-        {
-            data.m->textures[i] = loadTextureAsync(i, job);
-        }
-    }, loadData);
-
-
-
-
-    struct blas_thread_data
-    {
-        ref<mesh> data;
-    };
-
-
-    blas_thread_data blasData = { result };
-
-    job_handle blasJob = lowPriorityJobQueue.createJob<blas_thread_data>([](blas_thread_data& data, job_handle job)
-    {
-        char buffer[128];
-        sprintf(buffer, "JOB %d: Creating blas\n", job.index);
-        std::cout << buffer;
-    }, blasData);
-
-
-    loadJob.submitNow();
-    blasJob.submitAfter(loadJob);
-
-    return { result, blasJob };
-}
 
 void initializeJobSystem()
 {
@@ -278,16 +167,10 @@ void initializeJobSystem()
 
     highPriorityJobQueue.initialize(4, 1, THREAD_PRIORITY_NORMAL, L"High priority worker");
     lowPriorityJobQueue.initialize(4, 5, THREAD_PRIORITY_BELOW_NORMAL, L"Low priority worker");
+    mainThreadJobQueue.initialize(0, 0, 0, 0);
+}
 
-
-#if 0
-    auto [result, loadJob] = loadMeshAsync();
-
-    std::cout << "Test\n";
-
-    Sleep(1000);
-    loadJob.waitForCompletion();
-
-    std::cout << "Mesh loaded\n";
-#endif
+void executeMainThreadJobs()
+{
+    mainThreadJobQueue.waitForCompletion();
 }
