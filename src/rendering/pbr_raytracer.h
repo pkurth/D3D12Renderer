@@ -34,6 +34,7 @@ private:
     static void pushTexture(const ref<dx_texture>& tex, uint32& flags, uint32 flag);
 
     static inline uint32 instanceContributionToHitGroupIndex = 0;
+    static inline std::mutex mutex;
 
     bool dirty = true;
     static inline std::vector<pbr_raytracer*> registeredPBRRaytracers;

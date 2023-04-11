@@ -43,14 +43,14 @@ static bool operator==(const pbr_material_desc& a, const pbr_material_desc& b)
 		&& a.translucency == b.translucency;
 }
 
+static std::unordered_map<pbr_material_desc, weakref<pbr_material>> materialCache;
+static std::mutex mutex;
+
 ref<pbr_material> createPBRMaterial(const pbr_material_desc& desc)
 {
-	static std::unordered_map<pbr_material_desc, weakref<pbr_material>> cache;
-	static std::mutex mutex;
-
 	mutex.lock();
 
-	auto sp = cache[desc].lock();
+	auto sp = materialCache[desc].lock();
 	if (!sp)
 	{
 		ref<pbr_material> material = make_ref<pbr_material>();
@@ -67,7 +67,35 @@ ref<pbr_material> createPBRMaterial(const pbr_material_desc& desc)
 		material->uvScale = desc.uvScale;
 		material->translucency = desc.translucency;
 
-		cache[desc] = sp = material;
+		materialCache[desc] = sp = material;
+	}
+
+	mutex.unlock();
+	return sp;
+}
+
+ref<pbr_material> createPBRMaterialAsync(const pbr_material_desc& desc, job_handle parentJob)
+{
+	mutex.lock();
+
+	auto sp = materialCache[desc].lock();
+	if (!sp)
+	{
+		ref<pbr_material> material = make_ref<pbr_material>();
+
+		if (!desc.albedo.empty()) material->albedo = loadTextureFromFileAsync(desc.albedo, desc.albedoFlags, parentJob);
+		if (!desc.normal.empty()) material->normal = loadTextureFromFileAsync(desc.normal, desc.normalFlags, parentJob);
+		if (!desc.roughness.empty()) material->roughness = loadTextureFromFileAsync(desc.roughness, desc.roughnessFlags, parentJob);
+		if (!desc.metallic.empty()) material->metallic = loadTextureFromFileAsync(desc.metallic, desc.metallicFlags, parentJob);
+		material->emission = desc.emission;
+		material->albedoTint = desc.albedoTint;
+		material->roughnessOverride = desc.roughnessOverride;
+		material->metallicOverride = desc.metallicOverride;
+		material->shader = desc.shader;
+		material->uvScale = desc.uvScale;
+		material->translucency = desc.translucency;
+
+		materialCache[desc] = sp = material;
 	}
 
 	mutex.unlock();

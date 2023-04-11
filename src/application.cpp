@@ -51,6 +51,43 @@ static raytracing_object_type defineBlasFromMesh(const ref<multi_mesh>& mesh)
 	}
 }
 
+// TODO: The scene registry is not thread safe! This should be guarded!
+// Alternative (possibly better): Add system to execute jobs on main thread.
+static void addRaytracingComponentAsync(scene_entity entity, async_mesh_load_result load)
+{
+	struct add_ray_tracing_data
+	{
+		scene_entity entity;
+		ref<multi_mesh> mesh;
+	};
+
+	add_ray_tracing_data data = { entity, load };
+
+	job_handle blasJob = lowPriorityJobQueue.createJob<add_ray_tracing_data>([](add_ray_tracing_data& data, job_handle job)
+	{
+		auto blas = defineBlasFromMesh(data.mesh);
+		data.entity.addComponent<raytrace_component>(blas);
+	}, data);
+	blasJob.submitAfter(load.job);
+}
+
+static void initializeAnimationComponentAsync(scene_entity entity, async_mesh_load_result load)
+{
+	struct add_animation_data
+	{
+		scene_entity entity;
+		ref<multi_mesh> mesh;
+	};
+
+	add_animation_data data = { entity, load };
+
+	job_handle blasJob = lowPriorityJobQueue.createJob<add_animation_data>([](add_animation_data& data, job_handle job)
+	{
+		data.entity.getComponent<animation_component>().animation.set(&data.mesh->skeleton.clips[0]);
+	}, data);
+	blasJob.submitAfter(load.job);
+}
+
 void application::loadCustomShaders()
 {
 	if (dxContext.featureSupport.meshShaders())
@@ -77,46 +114,40 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 	game_scene& scene = this->scene.getCurrentScene();
 
 #if 1
-	if (auto mesh = loadMeshFromFile("assets/sponza/sponza.obj"))
+	if (auto mesh = loadMeshFromFileAsync("assets/sponza/sponza.obj"))
 	{
-		//auto blas = defineBlasFromMesh(mesh);
-
 		auto sponza = scene.createEntity("Sponza")
 			.addComponent<transform_component>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
 			.addComponent<mesh_component>(mesh);
 
-		//if (blas.blas)
-		//{
-		//	sponza.addComponent<raytrace_component>(blas);
-		//}
+		addRaytracingComponentAsync(sponza, mesh);
 	}
 #endif
 
-	if (auto stormtrooperMesh = loadAnimatedMeshFromFile("assets/stormtrooper/stormtrooper.fbx"))
+	if (auto mesh = loadAnimatedMeshFromFileAsync("assets/stormtrooper/stormtrooper.fbx"))
 	{
 		auto stormtrooper = scene.createEntity("Stormtrooper 1")
 			.addComponent<transform_component>(vec3(-5.f, 0.f, -1.f), quat::identity)
-			.addComponent<mesh_component>(stormtrooperMesh)
+			.addComponent<mesh_component>(mesh)
 			.addComponent<animation_component>()
 			.addComponent<dynamic_transform_component>();
 
-
-		//stormtrooper.getComponent<animation_component>().animation.set(&stormtrooperMesh->skeleton.clips[0]);
+		initializeAnimationComponentAsync(stormtrooper, mesh);
 	}
 
-	if (auto pilotMesh = loadAnimatedMeshFromFile("assets/pilot/pilot.fbx"))
+	if (auto mesh = loadAnimatedMeshFromFileAsync("assets/pilot/pilot.fbx"))
 	{
 		auto pilot = scene.createEntity("Pilot")
 			.addComponent<transform_component>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
-			.addComponent<mesh_component>(pilotMesh)
+			.addComponent<mesh_component>(mesh)
 			.addComponent<animation_component>()
 			.addComponent<dynamic_transform_component>();
 
-		//pilot.getComponent<animation_component>().animation.set(&pilotMesh->skeleton.clips[0]);
+		initializeAnimationComponentAsync(pilot, mesh);
 	}
 
 #if 1
-	if (auto treeMesh = loadTreeMeshFromFile("assets/tree/chestnut/chestnut.fbx"))
+	if (auto treeMesh = loadTreeMeshFromFileAsync("assets/tree/chestnut/chestnut.fbx"))
 	{
 		auto tree = scene.createEntity("Chestnut")
 			.addComponent<transform_component>(vec3(2.5f, 0.f, -1.f), quat::identity, 0.2f)
@@ -128,7 +159,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 
 #if 1
 	{
-		auto woodMaterial = createPBRMaterial({ "assets/desert/textures/WoodenCrate2_Albedo.png", "assets/desert/textures/WoodenCrate2_Normal.png" });
+		auto woodMaterial = createPBRMaterialAsync({ "assets/desert/textures/WoodenCrate2_Albedo.png", "assets/desert/textures/WoodenCrate2_Normal.png" });
 
 		mesh_builder builder;
 
@@ -147,7 +178,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		lollipopMaterialDesc.roughness = "assets/cc0/sphere/Tiles074_2K_Roughness.jpg";
 		lollipopMaterialDesc.uvScale = 3.f;
 
-		auto lollipopMaterial = createPBRMaterial(lollipopMaterialDesc);
+		auto lollipopMaterial = createPBRMaterialAsync(lollipopMaterialDesc);
 
 		auto groundMesh = make_ref<multi_mesh>();
 		builder.pushBox({ vec3(0.f), vec3(30.f, 4.f, 30.f) });
@@ -297,9 +328,9 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		terrainMudDesc.roughness = "assets/terrain/mud/Ground049B_2K_Roughness.png";
 
 
-		auto terrainGroundMaterial = createPBRMaterial(terrainGroundDesc);
-		auto terrainRockMaterial = createPBRMaterial(terrainRockDesc);
-		auto terrainMudMaterial = createPBRMaterial(terrainMudDesc);
+		auto terrainGroundMaterial = createPBRMaterialAsync(terrainGroundDesc);
+		auto terrainRockMaterial = createPBRMaterialAsync(terrainRockDesc);
+		auto terrainMudMaterial = createPBRMaterialAsync(terrainMudDesc);
 
 		std::vector<proc_placement_layer_desc> layers =
 		{
@@ -319,7 +350,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			.addComponent<position_component>(vec3(0.f, -64.f, 0.f))
 			.addComponent<terrain_component>(numTerrainChunks, terrainChunkSize, 50.f, terrainGroundMaterial, terrainRockMaterial, terrainMudMaterial)
 			.addComponent<heightmap_collider_component>(numTerrainChunks, terrainChunkSize, physics_material{ physics_material_type_metal, 0.1f, 1.f, 4.f })
-			//.addComponent<proc_placement_component>(layers)
+			//.addComponent<proc_placement_component>(layers) // TODO: This could be deferred if we want to load the meshes asynchronously.
 			.addComponent<grass_component>()
 			;
 
@@ -547,18 +578,11 @@ void application::update(const user_input& input, float dt)
 			testRenderMeshShader(&transparentRenderPass, dt);
 		}
 
-		thread_job_context context;
-
 		// Update animated meshes.
 		for (auto [entityHandle, anim, mesh, transform] : scene.group(component_group<animation_component, mesh_component, transform_component>).each())
 		{
-			context.addWork([&anim = anim, mesh = mesh.mesh, &transform = transform, &arena = stackArena, dt]()
-			{
-				anim.update(mesh, arena, dt, &transform);
-			});
+			anim.update(mesh.mesh, stackArena, dt, &transform);
 		}
-
-		context.waitForWorkCompletion();
 
 		for (auto [entityHandle, anim, raster, transform] : scene.group(component_group<animation_component, mesh_component, transform_component>).each())
 		{
@@ -577,21 +601,8 @@ void application::update(const user_input& input, float dt)
 		lighting.maxNumPointShadowRenderPasses = arraysize(pointShadowRenderPasses);
 
 
-		for (auto [entityHandle, terrain, position, placement] : scene.group(component_group<terrain_component, position_component, proc_placement_component>).each())
-		{
-			placement.generate(this->scene.camera, terrain, position.position);
-			placement.render(&ldrRenderPass);
-		}
-
-		for (auto [entityHandle, terrain, position, grass] : scene.group(component_group<terrain_component, position_component, grass_component>).each())
-		{
-			grass.generate(&computePass, this->scene.camera, terrain, position.position, unscaledDt);
-			grass.render(&opaqueRenderPass, (uint32)entityHandle);
-		}
-
-
 		renderScene(this->scene.camera, scene, stackArena, selectedEntity.handle, sun, lighting, objectDragged, 
-			&opaqueRenderPass, &transparentRenderPass, &ldrRenderPass, &sunShadowRenderPass, unscaledDt);
+			&opaqueRenderPass, &transparentRenderPass, &ldrRenderPass, &sunShadowRenderPass, &computePass, unscaledDt);
 
 		renderer->setSpotLights(spotLightBuffer[dxContext.bufferedFrameID], scene.numberOfComponentsOfType<spot_light_component>(), spotLightShadowInfoBuffer[dxContext.bufferedFrameID]);
 		renderer->setPointLights(pointLightBuffer[dxContext.bufferedFrameID], scene.numberOfComponentsOfType<point_light_component>(), pointLightShadowInfoBuffer[dxContext.bufferedFrameID]);

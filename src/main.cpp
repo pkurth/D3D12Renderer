@@ -7,6 +7,7 @@
 #include "core/imgui.h"
 #include "core/log.h"
 #include "core/cpu_profiling.h"
+#include "core/job_system.h"
 #include "asset/file_registry.h"
 #include "editor/file_browser.h"
 #include "application.h"

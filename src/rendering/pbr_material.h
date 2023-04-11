@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/math.h"
+#include "core/job_system.h"
 #include "material.h"
 
 enum pbr_material_shader
@@ -59,5 +60,6 @@ struct pbr_material
 };
 
 ref<pbr_material> createPBRMaterial(const pbr_material_desc& desc);
+ref<pbr_material> createPBRMaterialAsync(const pbr_material_desc& desc, job_handle parentJob = {});
 ref<pbr_material> getDefaultPBRMaterial();
 

@@ -36,7 +36,7 @@ smoke_particle_system::smoke_particle_system(uint32 maxNumParticles, float emitR
 void smoke_particle_system::initialize(uint32 maxNumParticles, float emitRate, const std::string& textureFilename, uint32 cols, uint32 rows)
 {
 	this->emitRate = emitRate;
-	auto tex = loadTextureFromFile(textureFilename);
+	auto tex = loadTextureFromFileAsync(textureFilename).texture;
 
 	if (!tex)
 	{

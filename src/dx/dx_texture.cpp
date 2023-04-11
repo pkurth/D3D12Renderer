@@ -67,7 +67,8 @@ static void textureLoaderThread(ref<dx_texture> result, const fs::path& path, ui
 	result->loadState.store(asset_loaded, std::memory_order_release);
 }
 
-static ref<dx_texture> loadTextureInternal(const fs::path& path, asset_handle handle, uint32 flags)
+static async_texture_load_result loadTextureInternal(const fs::path& path, asset_handle handle, uint32 flags,
+	bool async, job_handle parentJob)
 {
 	if (flags & image_load_flags_gen_mips_on_gpu)
 	{
@@ -75,9 +76,7 @@ static ref<dx_texture> loadTextureInternal(const fs::path& path, asset_handle ha
 		flags |= image_load_flags_allocate_full_mipchain;
 	}
 
-	ref<dx_texture> result;
-
-	if (flags & image_load_flags_synchronous)
+	if (!async)
 	{
 		DirectX::ScratchImage scratchImage;
 		D3D12_RESOURCE_DESC textureDesc;
@@ -86,21 +85,23 @@ static ref<dx_texture> loadTextureInternal(const fs::path& path, asset_handle ha
 		{
 			if (!loadSVGFromFile(path, flags, scratchImage, textureDesc))
 			{
-				return 0;
+				return { 0, {} };
 			}
 		}
 		else if (!loadImageFromFile(path, flags, scratchImage, textureDesc))
 		{
-			return 0;
+			return { 0, {} };
 		}
 
-		result = uploadImageToGPU(scratchImage, textureDesc, flags);
+		ref<dx_texture> result = uploadImageToGPU(scratchImage, textureDesc, flags);
 		result->handle = handle;
 		result->flags = flags;
+
+		return { result, {} };
 	}
 	else
 	{
-		result = make_ref<dx_texture>();
+		ref<dx_texture> result = make_ref<dx_texture>();
 		result->width = 1;
 		result->height = 1;
 		result->depth = 1;
@@ -110,13 +111,23 @@ static ref<dx_texture> loadTextureInternal(const fs::path& path, asset_handle ha
 		result->flags = flags;
 		result->loadState = asset_loading;
 
-		addAsyncLoadWork([=]()
+		struct texture_loading_data
 		{
-			textureLoaderThread(result, path, flags);
-		});
-	}
+			ref<dx_texture> texture;
+			fs::path path;
+			uint32 flags;
+		};
 
-	return result;
+		texture_loading_data data = { result, path, flags };
+
+		job_handle job = lowPriorityJobQueue.createJob<texture_loading_data>([](texture_loading_data& data, job_handle)
+		{
+			textureLoaderThread(data.texture, data.path, data.flags);
+		}, data, parentJob);
+		job.submitNow();
+
+		return { result, job };
+	}
 }
 
 static ref<dx_texture> loadTextureFromMemoryInternal(const void* ptr, uint32 size, image_format imageFormat, const fs::path& cachePath, uint32 flags)
@@ -224,25 +235,27 @@ static bool operator==(const texture_key& a, const texture_key& b)
 static std::unordered_map<texture_key, weakref<dx_texture>> textureCache;
 static std::mutex mutex;
 
-static ref<dx_texture> loadTextureFromFileAndHandle(const fs::path& filename, asset_handle handle, uint32 flags)
+static async_texture_load_result loadTextureFromFileAndHandle(const fs::path& filename, asset_handle handle, uint32 flags,
+	bool async = false, job_handle parentJob = {})
 {
 	if (!fs::exists(filename))
 	{
-		return 0;
+		return { 0, {} };
 	}
 
 	texture_key key = { handle, flags };
 
 	mutex.lock();
 
-	auto sp = textureCache[key].lock();
-	if (!sp)
+	async_texture_load_result result = { textureCache[key].lock(), {} };
+	if (!result.texture)
 	{
-		textureCache[key] = sp = loadTextureInternal(filename, handle, flags);
+		result = loadTextureInternal(filename, handle, flags, async, parentJob);
+		textureCache[key] = result.texture;
 	}
 
 	mutex.unlock();
-	return sp;
+	return result;
 }
 
 ref<dx_texture> loadTextureFromFile(const fs::path& filename, uint32 flags)
@@ -250,13 +263,27 @@ ref<dx_texture> loadTextureFromFile(const fs::path& filename, uint32 flags)
 	fs::path path = filename.lexically_normal().make_preferred();
 
 	asset_handle handle = getAssetHandleFromPath(path);
-	return loadTextureFromFileAndHandle(path, handle, flags);
+	return loadTextureFromFileAndHandle(path, handle, flags).texture;
 }
 
 ref<dx_texture> loadTextureFromHandle(asset_handle handle, uint32 flags)
 {
 	fs::path sceneFilename = getPathFromAssetHandle(handle);
-	return loadTextureFromFileAndHandle(sceneFilename, handle, flags);
+	return loadTextureFromFileAndHandle(sceneFilename, handle, flags).texture;
+}
+
+async_texture_load_result loadTextureFromFileAsync(const fs::path& filename, uint32 flags, job_handle parentJob)
+{
+	fs::path path = filename.lexically_normal().make_preferred();
+
+	asset_handle handle = getAssetHandleFromPath(path);
+	return loadTextureFromFileAndHandle(path, handle, flags, true, parentJob);
+}
+
+async_texture_load_result loadTextureFromHandleAsync(asset_handle handle, uint32 flags, job_handle parentJob)
+{
+	fs::path sceneFilename = getPathFromAssetHandle(handle);
+	return loadTextureFromFileAndHandle(sceneFilename, handle, flags, true, parentJob);
 }
 
 ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format imageFormat, const fs::path& cacheFilename, uint32 flags)

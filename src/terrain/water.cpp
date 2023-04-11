@@ -32,10 +32,10 @@ void initializeWaterPipelines()
 		waterPipeline = createReloadablePipeline(desc, { "water_vs", "water_ps" });
 	}
 
-	normalmap1 = loadTextureFromFile("assets/water/waterNM1.png", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
-	normalmap2 = loadTextureFromFile("assets/water/waterNM2.png", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
-	foamTexture = loadTextureFromFile("assets/water/waterFoam.dds", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
-	noiseTexture = loadTextureFromFile("assets/water/waterNoise.dds", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
+	normalmap1 = loadTextureFromFileAsync("assets/water/waterNM1.png", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
+	normalmap2 = loadTextureFromFileAsync("assets/water/waterNM2.png", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
+	foamTexture = loadTextureFromFileAsync("assets/water/waterFoam.dds", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
+	noiseTexture = loadTextureFromFileAsync("assets/water/waterNoise.dds", image_load_flags_noncolor | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds);
 }
 
 

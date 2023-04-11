@@ -15,6 +15,7 @@
 #include "rendering/render_algorithms.h"
 
 #include "core/random.h"
+#include "core/job_system.h"
 #include "scene/components.h"
 
 #include "terrain_rs.hlsli"
@@ -463,73 +464,108 @@ terrain_component::terrain_component(uint32 chunksPerDim, float chunkSize, float
 
 void terrain_component::generateChunksCPU()
 {
-	thread_job_context context;
-
 	height_generator_warped generator;
 	generator.settings = genSettings;
 
-	uint32 numSegmentsPerDim = TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1;
-	float positionScale = chunkSize / (float)numSegmentsPerDim;
-	float normalScale = chunkSize / (float)(normalMapDimension - 1);
-
-	for (int32 cz = 0; cz < (int32)chunksPerDim; ++cz)
+	struct terrain_gen_job_data
 	{
-		for (int32 cx = 0; cx < (int32)chunksPerDim; ++cx)
+		terrain_component& terrain;
+		height_generator_warped generator;
+	};
+
+	terrain_gen_job_data data =
+	{
+		*this,
+		generator,
+	};
+
+	job_handle parentJob = highPriorityJobQueue.createJob<terrain_gen_job_data>([](terrain_gen_job_data& data, job_handle parent)
+	{
+		for (int32 cz = 0; cz < (int32)data.terrain.chunksPerDim; ++cz)
 		{
-			context.addWork([this, cx, cz, generator, positionScale, normalScale]()
+			for (int32 cx = 0; cx < (int32)data.terrain.chunksPerDim; ++cx)
 			{
-				vec2 minCorner = vec2(cx * chunkSize, cz * chunkSize);
-
-				auto& c = chunk(cx, cz);
-
-				c.heights.resize(TERRAIN_LOD_0_VERTICES_PER_DIMENSION * TERRAIN_LOD_0_VERTICES_PER_DIMENSION);
-				uint16* heights = c.heights.data();
-				vec2* normals = new vec2[normalMapDimension * normalMapDimension];
-
-				float minHeight = FLT_MAX;
-				float maxHeight = -FLT_MAX;
-
-				for (uint32 z = 0; z < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++z)
+				struct chunk_gen_job_data
 				{
-					for (uint32 x = 0; x < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++x)
-					{
-						vec2 position = vec2(x * positionScale, z * positionScale) + minCorner;
+					terrain_component& terrain;
+					height_generator_warped generator;
+					int32 cx, cz;
+				};
 
-						float height = generator.height(position);
-
-						minHeight = min(minHeight, height * amplitudeScale);
-						maxHeight = max(maxHeight, height * amplitudeScale);
-
-						ASSERT(height >= 0.f);
-						ASSERT(height <= 1.f);
-
-						heights[z * TERRAIN_LOD_0_VERTICES_PER_DIMENSION + x] = (uint16)(height * UINT16_MAX);
-					}
-				}
-
-				c.heightmap = createTexture(heights, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R16_UNORM, false, false, true, D3D12_RESOURCE_STATE_GENERIC_READ);
-
-
-				for (uint32 z = 0; z < normalMapDimension; ++z)
+				chunk_gen_job_data chunkData = 
 				{
-					for (uint32 x = 0; x < normalMapDimension; ++x)
+					data.terrain,
+					data.generator,
+					cx, cz,
+				};
+
+				job_handle job = highPriorityJobQueue.createJob<chunk_gen_job_data>([](chunk_gen_job_data& data, job_handle)
+				{
+					float chunkSize = data.terrain.chunkSize;
+					uint32 numSegmentsPerDim = TERRAIN_LOD_0_VERTICES_PER_DIMENSION - 1;
+					float positionScale = chunkSize / (float)numSegmentsPerDim;
+					float normalScale = chunkSize / (float)(normalMapDimension - 1);
+
+					int32 cx = data.cx;
+					int32 cz = data.cz;
+					height_generator_warped& generator = data.generator;
+					float amplitudeScale = data.terrain.amplitudeScale;
+
+
+					vec2 minCorner = vec2(cx * chunkSize, cz * chunkSize);
+
+					auto& c = data.terrain.chunk(cx, cz);
+
+					c.heights.resize(TERRAIN_LOD_0_VERTICES_PER_DIMENSION* TERRAIN_LOD_0_VERTICES_PER_DIMENSION);
+					uint16* heights = c.heights.data();
+					vec2* normals = new vec2[normalMapDimension * normalMapDimension];
+
+					float minHeight = FLT_MAX;
+					float maxHeight = -FLT_MAX;
+
+					for (uint32 z = 0; z < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++z)
 					{
-						vec2 position = vec2(x * normalScale, z * normalScale) + minCorner;
+						for (uint32 x = 0; x < TERRAIN_LOD_0_VERTICES_PER_DIMENSION; ++x)
+						{
+							vec2 position = vec2(x * positionScale, z * positionScale) + minCorner;
 
-						vec2 grad = generator.grad(position);
+							float height = generator.height(position);
 
-						normals[z * normalMapDimension + x] = -grad;
+							minHeight = min(minHeight, height * amplitudeScale);
+							maxHeight = max(maxHeight, height * amplitudeScale);
+
+							ASSERT(height >= 0.f);
+							ASSERT(height <= 1.f);
+
+							heights[z * TERRAIN_LOD_0_VERTICES_PER_DIMENSION + x] = (uint16)(height * UINT16_MAX);
+						}
 					}
-				}
 
-				c.normalmap = createTexture(normals, normalMapDimension, normalMapDimension, DXGI_FORMAT_R32G32_FLOAT);
+					c.heightmap = createTexture(heights, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, TERRAIN_LOD_0_VERTICES_PER_DIMENSION, DXGI_FORMAT_R16_UNORM, false, false, true, D3D12_RESOURCE_STATE_GENERIC_READ);
 
-				delete[] normals;
-			});
+
+					for (uint32 z = 0; z < normalMapDimension; ++z)
+					{
+						for (uint32 x = 0; x < normalMapDimension; ++x)
+						{
+							vec2 position = vec2(x * normalScale, z * normalScale) + minCorner;
+
+							vec2 grad = generator.grad(position);
+
+							normals[z * normalMapDimension + x] = -grad;
+						}
+					}
+
+					c.normalmap = createTexture(normals, normalMapDimension, normalMapDimension, DXGI_FORMAT_R32G32_FLOAT);
+
+					delete[] normals;
+				}, chunkData, parent);
+			}
 		}
-	}
+	}, data);
 
-	context.waitForWorkCompletion();
+	parentJob.submitNow();
+	parentJob.waitForCompletion();
 }
 
 void terrain_component::generateChunksGPU()

@@ -639,7 +639,7 @@ static void renderAnimatedObjects(game_scene& scene, const camera_frustum_planes
 
 static void renderTerrain(const render_camera& camera, game_scene& scene, memory_arena& arena, entity_handle selectedObjectID,
 	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass,
-	float dt)
+	compute_pass* computePass, float dt)
 {
 	CPU_PROFILE_BLOCK("Terrain");
 
@@ -660,6 +660,23 @@ static void renderTerrain(const render_camera& camera, game_scene& scene, memory
 			position.position, (uint32)entityHandle, selectedObjectID == entityHandle, waterPlaneTransforms, numWaterPlanes);
 	}
 	arena.resetToMarker(tempMemoryMarker);
+
+
+
+
+
+
+	for (auto [entityHandle, terrain, position, placement] : scene.group(component_group<terrain_component, position_component, proc_placement_component>).each())
+	{
+		placement.generate(camera, terrain, position.position);
+		placement.render(ldrRenderPass);
+	}
+
+	for (auto [entityHandle, terrain, position, grass] : scene.group(component_group<terrain_component, position_component, grass_component>).each())
+	{
+		grass.generate(computePass, camera, terrain, position.position, dt);
+		grass.render(opaqueRenderPass, (uint32)entityHandle);
+	}
 }
 
 static void renderTrees(game_scene& scene, const camera_frustum_planes& frustum, memory_arena& arena, entity_handle selectedObjectID,
@@ -890,7 +907,7 @@ static void setupPointShadowPasses(game_scene& scene, scene_lighting& lighting, 
 void renderScene(const render_camera& camera, game_scene& scene, memory_arena& arena, entity_handle selectedObjectID,
 	directional_light& sun, scene_lighting& lighting, bool invalidateShadowMapCache,
 	opaque_render_pass* opaqueRenderPass, transparent_render_pass* transparentRenderPass, ldr_render_pass* ldrRenderPass, sun_shadow_render_pass* sunShadowRenderPass,
-	float dt)
+	compute_pass* computePass, float dt)
 {
 	CPU_PROFILE_BLOCK("Submit scene render commands");
 
@@ -954,7 +971,8 @@ void renderScene(const render_camera& camera, game_scene& scene, memory_arena& a
 	renderStaticObjects(scene, frustum, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, staticShadowPasses);
 	renderDynamicObjects(scene, frustum, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, dynamicShadowPasses);
 	renderAnimatedObjects(scene, frustum, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, dynamicShadowPasses);
-	renderTerrain(camera, scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunRenderStaticGeometry ? sunShadowRenderPass : 0, dt);
+	renderTerrain(camera, scene, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunRenderStaticGeometry ? sunShadowRenderPass : 0,
+		computePass, dt);
 	renderTrees(scene, frustum, arena, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunShadowRenderPass, dt);
 	renderCloth(scene, selectedObjectID, opaqueRenderPass, transparentRenderPass, ldrRenderPass, sunShadowRenderPass);
 

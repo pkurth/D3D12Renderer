@@ -18,7 +18,6 @@ enum image_load_flags
 	image_load_flags_premultiply_alpha = (1 << 5),
 	image_load_flags_cache_to_dds = (1 << 6),
 	image_load_flags_always_load_from_source = (1 << 7), // By default the system will always try to load a cached version of the texture. You can prevent this with this flag.
-	image_load_flags_synchronous = (1 << 8),
 
 	image_load_flags_default = image_load_flags_compress | image_load_flags_gen_mips_on_cpu | image_load_flags_cache_to_dds,
 	image_load_flags_default_noncolor = image_load_flags_default | image_load_flags_noncolor,

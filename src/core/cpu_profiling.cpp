@@ -31,7 +31,7 @@ struct cpu_profile_frame : profile_frame
 };
 
 static uint32 profileThreads[MAX_NUM_CPU_PROFILE_THREADS];
-static char profileThreadNames[MAX_NUM_CPU_PROFILE_THREADS][32];
+static char profileThreadNames[MAX_NUM_CPU_PROFILE_THREADS][64];
 static uint32 numThreads;
 
 static cpu_profile_frame profileFrames[MAX_NUM_CPU_PROFILE_FRAMES];

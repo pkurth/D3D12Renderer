@@ -71,10 +71,27 @@ template <auto V> static constexpr auto force_consteval = V;
 #define setBit(mask, bit) (mask) |= (1 << (bit))
 #define unsetBit(mask, bit) (mask) ^= (1 << (bit))
 
-static void checkResult(HRESULT hr)
+
+static void checkResultInternal(HRESULT hr, char* file, int32 line)
 {
-	ASSERT(SUCCEEDED(hr));
+	if (FAILED(hr))
+	{
+		char buffer[128];
+
+		FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM,
+			NULL, hr,
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			buffer,
+			sizeof(buffer),
+			NULL);
+
+		std::cout << "Command failed [" << file << " : " << line << "]: " << buffer << ".\n";
+
+		__debugbreak();
+	}
 }
+
+#define checkResult(hr) checkResultInternal(hr, __FILE__, __LINE__)
 
 
 

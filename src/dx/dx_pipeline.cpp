@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "dx_pipeline.h"
-#include "core/threading.h"
 #include "core/string.h"
 #include "core/file_system.h"
 #include "core/log.h"
@@ -391,42 +390,23 @@ static void loadPipeline(reloadable_pipeline_state& p)
 	}
 }
 
-#define MULTI_THREADED_CREATION 1
-
 void createAllPendingReloadablePipelines()
 {
-	thread_job_context context;
 	for (uint32 i = 0; i < (uint32)rootSignaturesFromFiles.size(); ++i)
 	{
 		if (!rootSignaturesFromFiles[i].rootSignature.rootSignature)
 		{
-#if MULTI_THREADED_CREATION
-			context.addWork([i]()
-			{
-#endif
-				loadRootSignature(rootSignaturesFromFiles[i]);
-#if MULTI_THREADED_CREATION
-			});
-#endif
+			loadRootSignature(rootSignaturesFromFiles[i]);
 		}
 	}
-	context.waitForWorkCompletion();
 
 	for (uint32 i = 0; i < (uint32)pipelines.size(); ++i)
 	{
 		if (!pipelines[i].pipeline)
 		{
-#if MULTI_THREADED_CREATION
-			context.addWork([i]()
-			{
-#endif
-				loadPipeline(pipelines[i]);
-#if MULTI_THREADED_CREATION
-			});
-#endif
+			loadPipeline(pipelines[i]);
 		}
 	}
-	context.waitForWorkCompletion();
 
 	//static HANDLE thread = CreateThread(0, 0, checkForFileChanges, 0, 0, 0); // Static, so that we only do this once.
 	static bool observing = observeDirectory(SHADER_BIN_DIR, handlePipelineChanges); // Static, so that we only do this once.
@@ -489,32 +469,15 @@ void checkForChangedPipelines()
 {
 	mutex.lock();
 
-	thread_job_context context;
 	for (uint32 i = 0; i < (uint32)dirtyRootSignatures.size(); ++i)
 	{
-#if MULTI_THREADED_CREATION
-		context.addWork([i]()
-		{
-#endif
-			loadRootSignature(*dirtyRootSignatures[i]);
-#if MULTI_THREADED_CREATION
-		});
-#endif
+		loadRootSignature(*dirtyRootSignatures[i]);
 	}
-	context.waitForWorkCompletion();
 
 	for (uint32 i = 0; i < (uint32)dirtyPipelines.size(); ++i)
 	{
-#if MULTI_THREADED_CREATION
-		context.addWork([i]()
-		{
-#endif
-			loadPipeline(*dirtyPipelines[i]);
-#if MULTI_THREADED_CREATION
-		});
-#endif
+		loadPipeline(*dirtyPipelines[i]);
 	}
-	context.waitForWorkCompletion();
 
 	dirtyRootSignatures.clear();
 	dirtyPipelines.clear();

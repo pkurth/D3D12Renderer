@@ -3,6 +3,7 @@
 #include "dx_descriptor.h"
 #include "dx_descriptor_allocation.h"
 #include "core/math.h"
+#include "core/job_system.h"
 #include "asset/asset.h"
 #include "asset/image.h"
 
@@ -148,8 +149,20 @@ dx_tiled_texture createTiledTexture(uint32 width, uint32 height, DXGI_FORMAT for
 // This means you should keep a reference to your textures yourself and not call this every frame.
 // TODO: Maybe we want to keep the texture around for a couple more frames?
 
+struct async_texture_load_result
+{
+	ref<dx_texture> texture;
+	job_handle job;
+
+	operator bool() { return texture != nullptr; }
+	operator ref<dx_texture>() { return texture; }
+};
+
 ref<dx_texture> loadTextureFromFile(const fs::path& filename, uint32 flags = image_load_flags_default);
 ref<dx_texture> loadTextureFromHandle(asset_handle handle, uint32 flags = image_load_flags_default);
+async_texture_load_result loadTextureFromFileAsync(const fs::path& filename, uint32 flags = image_load_flags_default, job_handle parentJob = {});
+async_texture_load_result loadTextureFromHandleAsync(asset_handle handle, uint32 flags = image_load_flags_default, job_handle parentJob = {});
+
 ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format imageFormat, const fs::path& cacheFilename, uint32 flags = image_load_flags_default);
 ref<dx_texture> loadVolumeTextureFromDirectory(const fs::path& dirname, uint32 flags = image_load_flags_compress | image_load_flags_cache_to_dds | image_load_flags_noncolor);
 

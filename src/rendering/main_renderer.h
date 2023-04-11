@@ -169,6 +169,14 @@ private:
 	template <typename func_t = std::nullptr_t>
 	uint64 executeComputeTasks(compute_pass_event eventTime, const func_t& additionalTasksCallback = nullptr);
 
+
+	dx_command_list* renderThread0(const common_render_data& commonRenderData);
+	dx_command_list* renderThread1(const common_render_data& commonRenderData, bool aspectRatioModeChanged);
+	dx_command_list* renderThread2(const common_render_data& commonRenderData, const user_input* input);
+	dx_command_list* renderThread3(common_render_data commonRenderData, dx_dynamic_constant_buffer unjitteredCameraCBV);
+
+
+
 	const sun_shadow_render_pass* sunShadowRenderPasses[MAX_NUM_SUN_LIGHT_SHADOW_PASSES];
 	const spot_shadow_render_pass* spotLightShadowRenderPasses[MAX_NUM_SPOT_LIGHT_SHADOW_PASSES];
 	const point_shadow_render_pass* pointLightShadowRenderPasses[MAX_NUM_POINT_LIGHT_SHADOW_PASSES];
@@ -218,7 +226,7 @@ private:
 	ref<dx_texture> aoCalculationTexture;
 	ref<dx_texture> aoBlurTempTexture;
 	ref<dx_texture> aoTextures[2]; // These get flip-flopped from frame to frame.
-	uint32 aoHistoryIndex = 0;
+	volatile uint32 aoHistoryIndex = 0;
 	bool aoWasOnLastFrame = false;
 
 	ref<dx_texture> sssCalculationTexture;

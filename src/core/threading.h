@@ -22,17 +22,3 @@ static uint32 getThreadIDFast()
 	uint32 threadID = *(uint32*)(threadLocalStorage + 0x48);
 	return threadID;
 }
-
-
-struct thread_job_context
-{
-	volatile uint32 numJobs = 0;
-
-	void addWork(const std::function<void()>& cb);
-	void waitForWorkCompletion();
-};
-
-void addAsyncLoadWork(const std::function<void()>& cb);
-
-void initializeJobSystem();
-

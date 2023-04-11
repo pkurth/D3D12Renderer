@@ -73,6 +73,8 @@ raytracing_object_type pbr_raytracer::defineObjectType(const ref<raytracing_blas
 
     shader_data* hitData = (shader_data*)alloca(sizeof(shader_data) * numRayTypes);
 
+    mutex.lock();
+
     for (uint32 i = 0; i < numGeometries; ++i)
     {
         ASSERT(blas->geometries[i].type == raytracing_mesh_geometry); // For now we only support meshes, not procedurals.
@@ -122,6 +124,8 @@ raytracing_object_type pbr_raytracer::defineObjectType(const ref<raytracing_blas
     {
         rt->dirty = true;
     }
+
+    mutex.unlock();
 
     return result;
 }

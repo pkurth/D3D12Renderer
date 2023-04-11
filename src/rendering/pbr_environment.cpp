@@ -8,7 +8,7 @@
 void pbr_environment::setFromTexture(const fs::path& filename)
 {
 	ref<dx_texture> equiSky = loadTextureFromFile(filename,
-		image_load_flags_noncolor | image_load_flags_cache_to_dds | image_load_flags_gen_mips_on_cpu | image_load_flags_synchronous);
+		image_load_flags_noncolor | image_load_flags_cache_to_dds | image_load_flags_gen_mips_on_cpu);
 
 	if (equiSky)
 	{
