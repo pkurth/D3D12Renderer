@@ -31,12 +31,8 @@ vs_output main(vs_input IN)
 	const float2 windDirection = normalize(float2(1.f, 1.f));
 	const float3 treeDistances = IN.color.rgb;
 
-	const float movementScale = 15.f;		// Distance of freest vertices. Verts move by the average of the wind direction and the noise vector.
-	const float density;					// Noise scale.
-	const float bend = pow(2, 1.f / 4.f);	// Exponent on the tree distances.
-	const float stretch;					// How much to move back towards parent.
-
-	// Actually movement vector is pushed around by wind vector (stateful).
+	const float movementScale = 15.f;
+	const float bend = pow(2, 1.f / 4.f);
 
 	float4x4 m = transforms[IN.instanceID];
 	float4 worldPosition = mul(m, float4(IN.position, 1.f));

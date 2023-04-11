@@ -339,19 +339,19 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 		auto terrainRockMaterial = createPBRMaterialAsync(terrainRockDesc);
 		auto terrainMudMaterial = createPBRMaterialAsync(terrainMudDesc);
 
-		std::vector<proc_placement_layer_desc> layers =
-		{
-			proc_placement_layer_desc {
-				"Trees and rocks",
-				5.f,
-				{ 
-					loadMeshFromFile("assets/hoewa/hoewa1.fbx"), 
-					loadMeshFromFile("assets/hoewa/hoewa2.fbx"),
-					loadMeshFromFile("assets/desert/rock1.fbx"),
-					loadMeshFromFile("assets/desert/rock4.fbx"),
-				}
-			}
-		};
+		//std::vector<proc_placement_layer_desc> layers =
+		//{
+		//	proc_placement_layer_desc {
+		//		"Trees and rocks",
+		//		5.f,
+		//		{ 
+		//			loadMeshFromFile("assets/hoewa/hoewa1.fbx"), 
+		//			loadMeshFromFile("assets/hoewa/hoewa2.fbx"),
+		//			loadMeshFromFile("assets/desert/rock1.fbx"),
+		//			loadMeshFromFile("assets/desert/rock4.fbx"),
+		//		}
+		//	}
+		//};
 
 		auto terrain = scene.createEntity("Terrain")
 			.addComponent<position_component>(vec3(0.f, -64.f, 0.f))
