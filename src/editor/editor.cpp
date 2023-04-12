@@ -2553,7 +2553,7 @@ void scene_editor::drawSettings(float dt)
 
 			if (ImGui::BeginProperties())
 			{
-				asset_handle handle = environment.handle;
+				asset_handle handle = (environment.sky) ? environment.sky->handle : asset_handle{};
 				if (ImGui::PropertyAssetHandle("Texture source", EDITOR_ICON_IMAGE_HDR, handle, "Make proc"))
 				{
 					if (handle)

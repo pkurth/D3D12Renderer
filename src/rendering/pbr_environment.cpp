@@ -4,31 +4,49 @@
 #include "render_resources.h"
 #include "dx/dx_context.h"
 #include "asset/file_registry.h"
+#include "core/job_system.h"
 
 void pbr_environment::setFromTexture(const fs::path& filename)
 {
-	ref<dx_texture> equiSky = loadTextureFromFile(filename,
+	allocate();
+
+	async_texture_load_result equiSky = loadTextureFromFileAsync(filename,
 		image_load_flags_noncolor | image_load_flags_cache_to_dds | image_load_flags_gen_mips_on_cpu);
 
 	if (equiSky)
 	{
-		dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
-		dx_command_list* cl = dxContext.getFreeRenderCommandList();
+		struct post_process_sky_data
+		{
+			ref<dx_texture> equiSky;
+			ref<dx_texture>& sky;
+			ref<dx_texture>& irradiance;
+			ref<dx_texture>& prefilteredRadiance;
+		};
 
-		//generateMipMapsOnGPU(cl, equiSky);
+		post_process_sky_data data =
+		{
+			equiSky.texture,
+			sky,
+			irradiance,
+			prefilteredRadiance,
+		};
 
-		allocate();
+		lowPriorityJobQueue.createJob<post_process_sky_data>([](post_process_sky_data& data, job_handle)
+		{
+			dxContext.renderQueue.waitForOtherQueue(dxContext.copyQueue);
+			dx_command_list* cl = dxContext.getFreeRenderCommandList();
 
-		sky = equirectangularToCubemap(cl, equiSky, skyResolution, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
-		sky->handle = equiSky->handle;
-		texturedSkyToIrradiance(cl, sky, irradiance);
-		texturedSkyToPrefilteredRadiance(cl, sky, prefilteredRadiance);
+			//generateMipMapsOnGPU(cl, data.equiSky);
 
-		SET_NAME(sky->resource, "Sky");
+			data.sky = equirectangularToCubemap(cl, data.equiSky, skyResolution, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
+			data.sky->handle = data.equiSky->handle;
+			texturedSkyToIrradiance(cl, data.sky, data.irradiance);
+			texturedSkyToPrefilteredRadiance(cl, data.sky, data.prefilteredRadiance);
 
-		handle = getAssetHandleFromPath(filename.lexically_normal());
+			SET_NAME(data.sky->resource, "Sky");
 
-		dxContext.executeCommandList(cl);
+			dxContext.executeCommandList(cl);
+		}, data).submitAfter(equiSky.job);
 	}
 }
 
@@ -39,7 +57,6 @@ void pbr_environment::setToProcedural(vec3 sunDirection)
 	allocate();
 
 	sky = 0;
-	handle = {};
 	proceduralSkyToIrradiance(cl, sunDirection, irradiance);
 	// TODO: Prefiltered radiance.
 

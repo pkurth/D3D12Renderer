@@ -19,7 +19,6 @@ static const char* environmentGIModeNames[] =
 struct pbr_environment
 {
 	environment_gi_mode giMode = environment_gi_baked;
-	asset_handle handle = {};
 
 	ref<dx_texture> sky;
 	ref<dx_texture> irradiance;
