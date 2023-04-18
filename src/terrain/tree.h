@@ -23,6 +23,6 @@ void initializeTreePipelines();
 ref<multi_mesh> loadTreeMeshFromFile(const fs::path& sceneFilename);
 ref<multi_mesh> loadTreeMeshFromHandle(asset_handle handle);
 
-async_mesh_load_result loadTreeMeshFromFileAsync(const fs::path& sceneFilename, job_handle parentJob = {});
-async_mesh_load_result loadTreeMeshFromHandleAsync(asset_handle handle, job_handle parentJob = {});
+ref<multi_mesh> loadTreeMeshFromFileAsync(const fs::path& sceneFilename, job_handle parentJob = {});
+ref<multi_mesh> loadTreeMeshFromHandleAsync(asset_handle handle, job_handle parentJob = {});
 

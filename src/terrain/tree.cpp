@@ -257,12 +257,12 @@ ref<multi_mesh> loadTreeMeshFromHandle(asset_handle handle)
     return loadMeshFromHandle(handle, mesh_creation_flags_default | mesh_creation_flags_with_colors, analyzeTreeMesh);
 }
 
-async_mesh_load_result loadTreeMeshFromFileAsync(const fs::path& sceneFilename, job_handle parentJob)
+ref<multi_mesh> loadTreeMeshFromFileAsync(const fs::path& sceneFilename, job_handle parentJob)
 {
     return loadMeshFromFileAsync(sceneFilename, mesh_creation_flags_default | mesh_creation_flags_with_colors, parentJob, analyzeTreeMesh);
 }
 
-async_mesh_load_result loadTreeMeshFromHandleAsync(asset_handle handle, job_handle parentJob)
+ref<multi_mesh> loadTreeMeshFromHandleAsync(asset_handle handle, job_handle parentJob)
 {
     return loadMeshFromHandleAsync(handle, mesh_creation_flags_default | mesh_creation_flags_with_colors, parentJob, analyzeTreeMesh);
 }

@@ -662,7 +662,7 @@ static void editTexture(const char* name, ref<dx_texture>& tex, uint32 loadFlags
 	{
 		fs::path path = getPathFromAssetHandle(asset);
 		fs::path relative = fs::relative(path, fs::current_path());
-		if (auto newTex = loadTextureFromFile(relative.string(), loadFlags))
+		if (auto newTex = loadTextureFromFileAsync(relative.string(), loadFlags))
 		{
 			tex = newTex;
 		}

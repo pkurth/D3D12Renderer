@@ -10,7 +10,7 @@ void pbr_environment::setFromTexture(const fs::path& filename)
 {
 	allocate();
 
-	async_texture_load_result equiSky = loadTextureFromFileAsync(filename,
+	ref<dx_texture> equiSky = loadTextureFromFileAsync(filename,
 		image_load_flags_noncolor | image_load_flags_cache_to_dds | image_load_flags_gen_mips_on_cpu);
 
 	if (equiSky)
@@ -25,7 +25,7 @@ void pbr_environment::setFromTexture(const fs::path& filename)
 
 		post_process_sky_data data =
 		{
-			equiSky.texture,
+			equiSky,
 			sky,
 			irradiance,
 			prefilteredRadiance,
@@ -46,7 +46,7 @@ void pbr_environment::setFromTexture(const fs::path& filename)
 			SET_NAME(data.sky->resource, "Sky");
 
 			dxContext.executeCommandList(cl);
-		}, data).submitAfter(equiSky.job);
+		}, data).submitAfter(equiSky->loadJob);
 	}
 }
 

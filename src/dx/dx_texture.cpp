@@ -67,7 +67,7 @@ static void textureLoaderThread(ref<dx_texture> result, const fs::path& path, ui
 	result->loadState.store(asset_loaded, std::memory_order_release);
 }
 
-static async_texture_load_result loadTextureInternal(const fs::path& path, asset_handle handle, uint32 flags,
+static ref<dx_texture> loadTextureInternal(const fs::path& path, asset_handle handle, uint32 flags,
 	bool async, job_handle parentJob)
 {
 	if (flags & image_load_flags_gen_mips_on_gpu)
@@ -85,19 +85,20 @@ static async_texture_load_result loadTextureInternal(const fs::path& path, asset
 		{
 			if (!loadSVGFromFile(path, flags, scratchImage, textureDesc))
 			{
-				return { 0, {} };
+				return 0;
 			}
 		}
 		else if (!loadImageFromFile(path, flags, scratchImage, textureDesc))
 		{
-			return { 0, {} };
+			return 0;
 		}
 
 		ref<dx_texture> result = uploadImageToGPU(scratchImage, textureDesc, flags);
 		result->handle = handle;
 		result->flags = flags;
+		result->loadJob = {};
 
-		return { result, {} };
+		return result;
 	}
 	else
 	{
@@ -126,7 +127,9 @@ static async_texture_load_result loadTextureInternal(const fs::path& path, asset
 		}, data, parentJob);
 		job.submitNow();
 
-		return { result, job };
+		result->loadJob = job;
+
+		return result;
 	}
 }
 
@@ -235,23 +238,23 @@ static bool operator==(const texture_key& a, const texture_key& b)
 static std::unordered_map<texture_key, weakref<dx_texture>> textureCache;
 static std::mutex mutex;
 
-static async_texture_load_result loadTextureFromFileAndHandle(const fs::path& filename, asset_handle handle, uint32 flags,
+static ref<dx_texture> loadTextureFromFileAndHandle(const fs::path& filename, asset_handle handle, uint32 flags,
 	bool async = false, job_handle parentJob = {})
 {
 	if (!fs::exists(filename))
 	{
-		return { 0, {} };
+		return 0;
 	}
 
 	texture_key key = { handle, flags };
 
 	mutex.lock();
 
-	async_texture_load_result result = { textureCache[key].lock(), {} };
-	if (!result.texture)
+	ref<dx_texture> result = textureCache[key].lock();
+	if (!result)
 	{
 		result = loadTextureInternal(filename, handle, flags, async, parentJob);
-		textureCache[key] = result.texture;
+		textureCache[key] = result;
 	}
 
 	mutex.unlock();
@@ -263,16 +266,16 @@ ref<dx_texture> loadTextureFromFile(const fs::path& filename, uint32 flags)
 	fs::path path = filename.lexically_normal().make_preferred();
 
 	asset_handle handle = getAssetHandleFromPath(path);
-	return loadTextureFromFileAndHandle(path, handle, flags).texture;
+	return loadTextureFromFileAndHandle(path, handle, flags);
 }
 
 ref<dx_texture> loadTextureFromHandle(asset_handle handle, uint32 flags)
 {
 	fs::path sceneFilename = getPathFromAssetHandle(handle);
-	return loadTextureFromFileAndHandle(sceneFilename, handle, flags).texture;
+	return loadTextureFromFileAndHandle(sceneFilename, handle, flags);
 }
 
-async_texture_load_result loadTextureFromFileAsync(const fs::path& filename, uint32 flags, job_handle parentJob)
+ref<dx_texture> loadTextureFromFileAsync(const fs::path& filename, uint32 flags, job_handle parentJob)
 {
 	fs::path path = filename.lexically_normal().make_preferred();
 
@@ -280,7 +283,7 @@ async_texture_load_result loadTextureFromFileAsync(const fs::path& filename, uin
 	return loadTextureFromFileAndHandle(path, handle, flags, true, parentJob);
 }
 
-async_texture_load_result loadTextureFromHandleAsync(asset_handle handle, uint32 flags, job_handle parentJob)
+ref<dx_texture> loadTextureFromHandleAsync(asset_handle handle, uint32 flags, job_handle parentJob)
 {
 	fs::path sceneFilename = getPathFromAssetHandle(handle);
 	return loadTextureFromFileAndHandle(sceneFilename, handle, flags, true, parentJob);

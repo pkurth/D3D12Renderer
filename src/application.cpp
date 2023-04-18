@@ -51,7 +51,7 @@ static raytracing_object_type defineBlasFromMesh(const ref<multi_mesh>& mesh)
 	}
 }
 
-static void addRaytracingComponentAsync(scene_entity entity, async_mesh_load_result load)
+static void addRaytracingComponentAsync(scene_entity entity, ref<multi_mesh> mesh)
 {
 	struct add_ray_tracing_data
 	{
@@ -59,7 +59,7 @@ static void addRaytracingComponentAsync(scene_entity entity, async_mesh_load_res
 		ref<multi_mesh> mesh;
 	};
 
-	add_ray_tracing_data data = { entity, load };
+	add_ray_tracing_data data = { entity, mesh };
 
 	lowPriorityJobQueue.createJob<add_ray_tracing_data>([](add_ray_tracing_data& data, job_handle)
 	{
@@ -76,10 +76,10 @@ static void addRaytracingComponentAsync(scene_entity entity, async_mesh_load_res
 			data.entity.addComponent<raytrace_component>(data.blas);
 		}, createData).submitNow();
 
-	}, data).submitAfter(load.job);
+	}, data).submitAfter(mesh->loadJob);
 }
 
-static void initializeAnimationComponentAsync(scene_entity entity, async_mesh_load_result load)
+static void initializeAnimationComponentAsync(scene_entity entity, ref<multi_mesh> mesh)
 {
 	struct add_animation_data
 	{
@@ -87,12 +87,12 @@ static void initializeAnimationComponentAsync(scene_entity entity, async_mesh_lo
 		ref<multi_mesh> mesh;
 	};
 
-	add_animation_data data = { entity, load };
+	add_animation_data data = { entity, mesh };
 
 	mainThreadJobQueue.createJob<add_animation_data>([](add_animation_data& data, job_handle job)
 	{
 		data.entity.getComponent<animation_component>().animation.set(&data.mesh->skeleton.clips[0]);
-	}, data).submitAfter(load.job);
+	}, data).submitAfter(mesh->loadJob);
 }
 
 void application::loadCustomShaders()

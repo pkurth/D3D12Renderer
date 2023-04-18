@@ -38,7 +38,7 @@ fire_particle_system::fire_particle_system(uint32 maxNumParticles, float emitRat
 void fire_particle_system::initialize(uint32 maxNumParticles, float emitRate, const std::string& textureFilename, uint32 cols, uint32 rows)
 {
 	this->emitRate = emitRate;
-	auto tex = loadTextureFromFileAsync(textureFilename).texture;
+	auto tex = loadTextureFromFileAsync(textureFilename);
 
 	if (!tex)
 	{

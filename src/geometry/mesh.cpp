@@ -91,7 +91,7 @@ static void meshLoaderThread(ref<multi_mesh> result, const fs::path& sceneFilena
 }
 
 
-static async_mesh_load_result loadMeshFromFileInternal(const fs::path& sceneFilename, asset_handle handle, uint32 flags, mesh_load_callback cb,
+static ref<multi_mesh> loadMeshFromFileInternal(const fs::path& sceneFilename, asset_handle handle, uint32 flags, mesh_load_callback cb,
 	bool async, job_handle parentJob)
 {
 	ref<multi_mesh> result = make_ref<multi_mesh>();
@@ -102,7 +102,8 @@ static async_mesh_load_result loadMeshFromFileInternal(const fs::path& sceneFile
 	if (!async)
 	{
 		meshLoaderThread(result, sceneFilename, flags, cb, false, {});
-		return { result, {} };
+		result->loadJob = {};
+		return result;
 	}
 	else
 	{
@@ -124,7 +125,9 @@ static async_mesh_load_result loadMeshFromFileInternal(const fs::path& sceneFile
 		}, data, parentJob);
 		job.submitNow();
 
-		return { result, job };
+		result->loadJob = job;
+
+		return result;
 	}
 }
 
@@ -158,23 +161,23 @@ static std::unordered_map<mesh_key, weakref<multi_mesh>> meshCache;
 static std::mutex mutex;
 
 
-static async_mesh_load_result loadMeshFromFileAndHandle(const fs::path& filename, asset_handle handle, uint32 flags, mesh_load_callback cb,
+static ref<multi_mesh> loadMeshFromFileAndHandle(const fs::path& filename, asset_handle handle, uint32 flags, mesh_load_callback cb,
 	bool async = false, job_handle parentJob = {})
 {
 	if (!fs::exists(filename))
 	{
-		return { 0, {} };
+		return 0;
 	}
 
 	mesh_key key = { handle, flags };
 
 	mutex.lock();
 
-	async_mesh_load_result result = { meshCache[key].lock(), {} };
-	if (!result.mesh)
+	ref<multi_mesh> result = { meshCache[key].lock(), {} };
+	if (!result)
 	{
 		result = loadMeshFromFileInternal(filename, handle, flags, cb, async, parentJob);
-		meshCache[key] = result.mesh;
+		meshCache[key] = result;
 	}
 
 	mutex.unlock();
@@ -186,16 +189,16 @@ ref<multi_mesh> loadMeshFromFile(const fs::path& filename, uint32 flags, mesh_lo
 	fs::path path = filename.lexically_normal().make_preferred();
 
 	asset_handle handle = getAssetHandleFromPath(path);
-	return loadMeshFromFileAndHandle(path, handle, flags, cb).mesh;
+	return loadMeshFromFileAndHandle(path, handle, flags, cb);
 }
 
 ref<multi_mesh> loadMeshFromHandle(asset_handle handle, uint32 flags, mesh_load_callback cb)
 {
 	fs::path sceneFilename = getPathFromAssetHandle(handle);
-	return loadMeshFromFileAndHandle(sceneFilename, handle, flags, cb).mesh;
+	return loadMeshFromFileAndHandle(sceneFilename, handle, flags, cb);
 }
 
-async_mesh_load_result loadMeshFromFileAsync(const fs::path& filename, uint32 flags, job_handle parentJob, mesh_load_callback cb)
+ref<multi_mesh> loadMeshFromFileAsync(const fs::path& filename, uint32 flags, job_handle parentJob, mesh_load_callback cb)
 {
 	fs::path path = filename.lexically_normal().make_preferred();
 
@@ -203,7 +206,7 @@ async_mesh_load_result loadMeshFromFileAsync(const fs::path& filename, uint32 fl
 	return loadMeshFromFileAndHandle(path, handle, flags, cb, true, parentJob);
 }
 
-async_mesh_load_result loadMeshFromHandleAsync(asset_handle handle, uint32 flags, job_handle parentJob, mesh_load_callback cb)
+ref<multi_mesh> loadMeshFromHandleAsync(asset_handle handle, uint32 flags, job_handle parentJob, mesh_load_callback cb)
 {
 	fs::path sceneFilename = getPathFromAssetHandle(handle);
 	return loadMeshFromFileAndHandle(sceneFilename, handle, flags, cb, true, parentJob);

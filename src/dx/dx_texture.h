@@ -54,6 +54,7 @@ struct dx_texture
 	uint32 flags = 0;
 
 	std::atomic<asset_load_state> loadState = asset_loaded;
+	job_handle loadJob;
 
 	void setName(const wchar* name);
 	std::wstring getName() const;
@@ -149,19 +150,10 @@ dx_tiled_texture createTiledTexture(uint32 width, uint32 height, DXGI_FORMAT for
 // This means you should keep a reference to your textures yourself and not call this every frame.
 // TODO: Maybe we want to keep the texture around for a couple more frames?
 
-struct async_texture_load_result
-{
-	ref<dx_texture> texture;
-	job_handle job;
-
-	operator bool() { return texture != nullptr; }
-	operator ref<dx_texture>() { return texture; }
-};
-
 ref<dx_texture> loadTextureFromFile(const fs::path& filename, uint32 flags = image_load_flags_default);
 ref<dx_texture> loadTextureFromHandle(asset_handle handle, uint32 flags = image_load_flags_default);
-async_texture_load_result loadTextureFromFileAsync(const fs::path& filename, uint32 flags = image_load_flags_default, job_handle parentJob = {});
-async_texture_load_result loadTextureFromHandleAsync(asset_handle handle, uint32 flags = image_load_flags_default, job_handle parentJob = {});
+ref<dx_texture> loadTextureFromFileAsync(const fs::path& filename, uint32 flags = image_load_flags_default, job_handle parentJob = {});
+ref<dx_texture> loadTextureFromHandleAsync(asset_handle handle, uint32 flags = image_load_flags_default, job_handle parentJob = {});
 
 ref<dx_texture> loadTextureFromMemory(const void* ptr, uint32 size, image_format imageFormat, const fs::path& cacheFilename, uint32 flags = image_load_flags_default);
 ref<dx_texture> loadVolumeTextureFromDirectory(const fs::path& dirname, uint32 flags = image_load_flags_compress | image_load_flags_cache_to_dds | image_load_flags_noncolor);

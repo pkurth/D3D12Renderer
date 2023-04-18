@@ -875,29 +875,25 @@ void main_renderer::endFrame(const user_input* input)
 
 		job_handle parentJob = highPriorityJobQueue.createJob<render_job_data>([](render_job_data& data, job_handle parent)
 		{
-			job_handle job0 = highPriorityJobQueue.createJob<render_job_data>([](render_job_data& data, job_handle)
+			highPriorityJobQueue.createJob<render_job_data>([](render_job_data& data, job_handle)
 			{
 				 data.cl0 = data.renderer->renderThread0(data.commonRenderData);
-			}, data, parent);
-			job0.submitNow();
+			}, data, parent).submitNow();
 
-			job_handle job1 = highPriorityJobQueue.createJob<render_job_data>([](render_job_data& data, job_handle)
+			highPriorityJobQueue.createJob<render_job_data>([](render_job_data& data, job_handle)
 			{
 				data.cl1 = data.renderer->renderThread1(data.commonRenderData, data.aspectRatioModeChanged);
-			}, data, parent);
-			job1.submitNow();
+			}, data, parent).submitNow();
 
-			job_handle job2 = highPriorityJobQueue.createJob<render_job_data>([](render_job_data& data, job_handle)
+			highPriorityJobQueue.createJob<render_job_data>([](render_job_data& data, job_handle)
 			{
 				data.cl2 = data.renderer->renderThread2(data.commonRenderData, data.input);
-			}, data, parent);
-			job2.submitNow();
+			}, data, parent).submitNow();
 
-			job_handle job3 = highPriorityJobQueue.createJob<render_job_data>([](render_job_data& data, job_handle)
+			highPriorityJobQueue.createJob<render_job_data>([](render_job_data& data, job_handle)
 			{
 				data.cl3 = data.renderer->renderThread3(data.commonRenderData, data.unjitteredCameraCBV);
-			}, data, parent);
-			job3.submitNow();
+			}, data, parent).submitNow();
 
 		}, jobData);
 
