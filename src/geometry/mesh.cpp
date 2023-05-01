@@ -7,11 +7,12 @@
 #include "asset/model_asset.h"
 
 
-static void meshLoaderThread(ref<multi_mesh> result, const fs::path& sceneFilename, uint32 flags, mesh_load_callback cb,
+static void meshLoaderThread(ref<multi_mesh> result, asset_handle handle, uint32 flags, mesh_load_callback cb,
 	bool async, job_handle parentJob)
 {
 	result->aabb = bounding_box::negativeInfinity();
 
+	fs::path sceneFilename = getPathFromAssetHandle(handle);
 	model_asset asset = load3DModelFromFile(sceneFilename);
 	mesh_builder builder(flags);
 	for (auto& mesh : asset.meshes)
@@ -101,7 +102,7 @@ static ref<multi_mesh> loadMeshFromFileInternal(const fs::path& sceneFilename, a
 
 	if (!async)
 	{
-		meshLoaderThread(result, sceneFilename, flags, cb, false, {});
+		meshLoaderThread(result, handle, flags, cb, false, {});
 		result->loadJob = {};
 		return result;
 	}
@@ -110,18 +111,16 @@ static ref<multi_mesh> loadMeshFromFileInternal(const fs::path& sceneFilename, a
 		struct mesh_loading_data
 		{
 			ref<multi_mesh> mesh;
-			fs::path path;
+			asset_handle handle;
 			uint32 flags;
 			mesh_load_callback cb;
 		};
 
-		constexpr int a = sizeof(mesh_loading_data);
-
-		mesh_loading_data data = { result, sceneFilename, flags, cb };
+		mesh_loading_data data = { result, handle, flags, cb };
 
 		job_handle job = lowPriorityJobQueue.createJob<mesh_loading_data>([](mesh_loading_data& data, job_handle job)
 		{
-			meshLoaderThread(data.mesh, data.path, data.flags, data.cb, true, job);
+			meshLoaderThread(data.mesh, data.handle, data.flags, data.cb, true, job);
 		}, data, parentJob);
 		job.submitNow();
 
