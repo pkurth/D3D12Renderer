@@ -172,14 +172,47 @@ static ref<multi_mesh> loadMeshFromFileAndHandle(const fs::path& filename, asset
 
 	mutex.lock();
 
-	ref<multi_mesh> result = { meshCache[key].lock(), {} };
+	ref<multi_mesh> result = meshCache[key].lock();
 	if (!result)
 	{
 		result = loadMeshFromFileInternal(filename, handle, flags, cb, async, parentJob);
 		meshCache[key] = result;
 	}
+	else
+	{
+		if (async)
+		{
+			if (!result->loadJob.valid())
+			{
+				// Generate new job, which waits on asset completion.
+
+				struct wait_data
+				{
+					ref<multi_mesh> mesh;
+				};
+
+				wait_data data = { result };
+
+				job_handle job = lowPriorityJobQueue.createJob<wait_data>([](wait_data& data, job_handle job)
+				{
+					while (data.mesh->loadState != asset_loaded)
+					{
+						std::this_thread::yield();
+					}
+				}, data, parentJob);
+				job.submitNow();
+
+				result->loadJob = job;
+			}
+		}
+		else
+		{
+
+		}
+	}
 
 	mutex.unlock();
+
 	return result;
 }
 

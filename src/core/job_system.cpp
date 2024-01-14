@@ -90,6 +90,13 @@ void job_queue::waitForCompletion(int32 globalIndex)
     }
 }
 
+bool job_queue::isComplete(int32 globalIndex)
+{
+    job_queue_entry& job = allJobs[globalIndex & indexMask];
+    return (nextFreeJob >= (globalIndex + capacity)) 
+        || (job.numUnfinishedJobs == 0);
+}
+
 void job_queue::finishJob(int32 globalIndex)
 {
     job_queue_entry& job = allJobs[globalIndex & indexMask];
@@ -153,6 +160,11 @@ void job_handle::submitAfter(job_handle before)
 void job_handle::waitForCompletion()
 {
     queues[queueIndex]->waitForCompletion(globalIndex);
+}
+
+bool job_handle::isComplete()
+{
+    return queues[queueIndex]->isComplete(globalIndex);
 }
 
 

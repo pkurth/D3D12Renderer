@@ -7,9 +7,11 @@ struct job_handle
     int32 globalIndex = -1;
     int32 queueIndex = -1;
 
+    bool valid() { return queueIndex != -1; }
     void submitNow();
     void submitAfter(job_handle before);
     void waitForCompletion();
+    bool isComplete();
 };
 
 template <typename data_t>
@@ -82,6 +84,7 @@ private:
     void addContinuation(int32 firstGlobalIndex, job_handle second);
     void submit(int32 globalIndex);
     void waitForCompletion(int32 globalIndex);
+    bool isComplete(int32 globalIndex);
 
 
     void finishJob(int32 globalIndex);
