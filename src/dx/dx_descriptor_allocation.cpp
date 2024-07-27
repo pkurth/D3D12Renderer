@@ -121,6 +121,11 @@ void dx_descriptor_heap::free(dx_descriptor_allocation allocation)
 	}
 }
 
+com<ID3D12DescriptorHeap> dx_descriptor_heap::getHeap(int index) const
+{
+	return allPages[index]->descriptorHeap;
+}
+
 
 
 

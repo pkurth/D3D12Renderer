@@ -65,7 +65,7 @@ void initializeBitonicSort()
 	innerSortFloatPipeline = createReloadablePipeline("bitonic_inner_sort_float_cs");
 	outerSortFloatPipeline = createReloadablePipeline("bitonic_outer_sort_float_cs");
 
-	dispatchBuffer = createBuffer(sizeof(D3D12_DISPATCH_ARGUMENTS), 22 * 23 / 2, 0, true, false, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	dispatchBuffer = createBuffer(sizeof(D3D12_DISPATCH_ARGUMENTS), 22 * 23 / 2, 0, true, false);
 }
 
 static std::pair<uint32, uint32> getAlignedMaxNumElementsAndNumIterations(uint32 maxNumElements)

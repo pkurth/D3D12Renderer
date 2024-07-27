@@ -234,7 +234,9 @@ struct grass_update_pipeline
 			vec3 minCorner = data.minCorner;
 			vec3 chunkSize(data.chunkSize, data.amplitudeScale, data.chunkSize);
 
+			cl->setDescriptorHeap(dxContext.srvUavAllocator.type, dxContext.srvUavAllocatorShaderVisible.getHeap(0).Get());
 			cl->clearUAV(data.countBuffer, 0u);
+			cl->resetToDynamicDescriptorHeap();
 
 
 			uint32 numGrassBladesPerDim = data.settings.numGrassBladesPerChunkDim & (~1); // Make sure this is an even number.

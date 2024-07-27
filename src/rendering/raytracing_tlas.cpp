@@ -74,11 +74,11 @@ void raytracing_tlas::build(dx_command_list* cl)
     {
         if (scratch)
         {
-            resizeBuffer(scratch, (uint32)info.ScratchDataSizeInBytes, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            resizeBuffer(scratch, (uint32)info.ScratchDataSizeInBytes);
         }
         else
         {
-            scratch = createBuffer(1, (uint32)info.ScratchDataSizeInBytes, 0, true, false, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            scratch = createBuffer(1, (uint32)info.ScratchDataSizeInBytes, 0, true, false);
             SET_NAME(scratch->resource, "TLAS Scratch");
         }
     }

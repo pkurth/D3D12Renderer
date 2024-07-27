@@ -28,12 +28,14 @@ private:
 
 struct dx_descriptor_heap
 {
-	void initialize(D3D12_DESCRIPTOR_HEAP_TYPE type, bool shaderVisible, uint64 pageSize = 1024);
+	void initialize(D3D12_DESCRIPTOR_HEAP_TYPE type, bool shaderVisible, uint64 pageSize = 4096);
 
 	dx_descriptor_allocation allocate(uint64 count = 1);
 	void free(dx_descriptor_allocation allocation);
 
 	D3D12_DESCRIPTOR_HEAP_TYPE type;
+
+	com<ID3D12DescriptorHeap> getHeap(int index) const;
 
 private:
 	std::mutex mutex;
