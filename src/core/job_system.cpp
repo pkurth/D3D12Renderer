@@ -148,7 +148,7 @@ void job_queue::threadFunc(int32 threadIndex)
 
 void job_handle::submitNow()
 {
-    std::cout << globalIndex << '\n';
+    //std::cout << globalIndex << '\n';
     queues[queueIndex]->submit(globalIndex);
 }
 

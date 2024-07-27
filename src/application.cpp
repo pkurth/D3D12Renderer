@@ -121,17 +121,18 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 	game_scene& scene = this->scene.getCurrentScene();
 
 #if 1
-	if (auto mesh = loadMeshFromFileAsync("assets/sponza/sponza.obj"))
+	if (auto mesh = loadMeshFromFile("assets/sponza/sponza.obj"))
 	{
+		auto blas = defineBlasFromMesh(mesh);
+
 		auto sponza = scene.createEntity("Sponza")
 			.addComponent<transform_component>(vec3(0.f, 0.f, 0.f), quat::identity, 0.01f)
-			.addComponent<mesh_component>(mesh);
-
-		addRaytracingComponentAsync(sponza, mesh);
+			.addComponent<mesh_component>(mesh)
+			.addComponent<raytrace_component>(blas);
 	}
 #endif
 
-	if (auto mesh = loadAnimatedMeshFromFileAsync("assets/stormtrooper/stormtrooper.fbx"))
+	/*if (auto mesh = loadAnimatedMeshFromFileAsync("assets/stormtrooper/stormtrooper.fbx"))
 	{
 		auto stormtrooper = scene.createEntity("Stormtrooper 1")
 			.addComponent<transform_component>(vec3(-5.f, 0.f, -1.f), quat::identity)
@@ -161,7 +162,7 @@ void application::initialize(main_renderer* renderer, editor_panels* editorPanel
 			.addComponent<mesh_component>(treeMesh)
 			.addComponent<tree_component>();
 	}
-#endif
+#endif*/
 
 
 #if 1
@@ -663,7 +664,6 @@ void application::update(const user_input& input, float dt)
 		renderer->setRaytracingScene(&raytracingTLAS);
 	}
 
-	renderer->setRaytracingScene(&raytracingTLAS);
 	renderer->setEnvironment(environment);
 	renderer->setSun(sun);
 	renderer->setCamera(camera);
