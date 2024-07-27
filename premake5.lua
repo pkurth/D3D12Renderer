@@ -273,6 +273,7 @@ project "D3D12Renderer"
 	filter "configurations:Release"
         runtime "Release"
 		optimize "On"
+		inlining "Auto"
 
 	filter "system:windows"
 		systemversion (sdk_version_string)
@@ -461,4 +462,5 @@ project "Physics-Lib"
 	filter "configurations:Release"
         runtime "Release"
 		optimize "On"
+		inlining "Auto"
 

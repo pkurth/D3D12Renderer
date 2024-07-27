@@ -17,7 +17,7 @@ protected:
     struct shader_data // This struct is 32 bytes large, which together with the 32 byte shader identifier is a nice multiple of the required 32-byte-alignment of the binding table entries.
     {
         pbr_material_cb materialCB;
-        dx_cpu_descriptor_handle resources; // Vertex buffer, index buffer, PBR textures.
+        dx_gpu_descriptor_handle resources; // Vertex buffer, index buffer, PBR textures.
     };
 
     static_assert(sizeof(pbr_material_cb) == 24);

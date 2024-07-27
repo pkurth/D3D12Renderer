@@ -4,12 +4,14 @@
 
 struct job_handle
 {
-    int32 index = -1;
-    struct job_queue* queue;
+    int32 globalIndex = -1;
+    int32 queueIndex = -1;
 
+    bool valid() { return queueIndex != -1; }
     void submitNow();
     void submitAfter(job_handle before);
     void waitForCompletion();
+    bool isComplete();
 };
 
 template <typename data_t>
@@ -17,41 +19,23 @@ using job_function = void (*)(data_t&, job_handle);
 
 struct job_queue
 {
-    struct job_queue_entry
+    void initialize(int32 queueIndex, uint32 numThreads, uint32 threadOffset, int32 threadPriority, const wchar* description);
+
+    template <typename data_t>
+    job_handle createJob(job_function<data_t> function, const data_t& data, job_handle parent = {})
     {
-        void (*function)(void*, void*, job_handle);
-        void* templatedFunction;
+        static_assert(sizeof(data_t) <= job_queue_entry::DATA_SIZE);
 
-        std::atomic<int32> numUnfinishedJobs;
-        int32 parent;
-        job_handle continuation;
-
-
-        static constexpr uint64 SIZE = sizeof(function) + sizeof(templatedFunction) + sizeof(numUnfinishedJobs) + sizeof(parent) + sizeof(continuation);
-        static constexpr uint64 DATA_SIZE = (3 * 64) - SIZE;
-
-        uint8 data[DATA_SIZE];
-    };
-
-    static_assert(sizeof(job_queue_entry) % 64 == 0);
-
-
-
-    void initialize(uint32 numThreads, uint32 threadOffset, int threadPriority, const wchar* description);
-
-    template <typename data_t,
-        typename = std::enable_if_t<sizeof(data_t) <= job_queue_entry::DATA_SIZE>>
-        job_handle createJob(job_function<data_t> function, const data_t& data, job_handle parent = {})
-    {
-        int32 handle = allocateJob();
-        auto& job = allJobs[handle];
+        int32 globalIndex = nextFreeJob++;
+        auto& job = allJobs[globalIndex & indexMask];
         job.numUnfinishedJobs = 1;
-        job.parent = parent.index;
-        job.continuation.index = -1;
+        job.parentGlobalIndex = parent.globalIndex;
+        job.continuation.globalIndex = -1;
 
-        if (parent.index != -1)
+        if (parent.globalIndex != -1)
         {
-            ++allJobs[parent.index].numUnfinishedJobs;
+            ASSERT(parent.queueIndex == queueIndex);
+            ++allJobs[parent.globalIndex & indexMask].numUnfinishedJobs;
         }
 
         job.templatedFunction = function;
@@ -67,7 +51,7 @@ struct job_queue
 
         new(job.data) data_t(data);
 
-        return job_handle{ handle, this };
+        return job_handle{ globalIndex, queueIndex };
     }
 
 
@@ -75,15 +59,35 @@ struct job_queue
 
 private:
 
+    struct job_queue_entry
+    {
+        void (*function)(void*, void*, job_handle);
+        void* templatedFunction;
+
+        std::atomic<int32> numUnfinishedJobs;
+        int32 parentGlobalIndex; // Always in the same queue.
+        job_handle continuation;
+
+
+        static constexpr uint64 SIZE = sizeof(function) + sizeof(templatedFunction) + sizeof(numUnfinishedJobs) + sizeof(parentGlobalIndex) + sizeof(continuation);
+        static constexpr uint64 DATA_SIZE = (2 * 64) - SIZE;
+
+        uint8 data[DATA_SIZE];
+    };
+
+    static_assert(sizeof(job_queue_entry) % 64 == 0);
+
+
+
     friend struct job_handle;
 
-    void addContinuation(int32 first, job_handle second);
-    void submit(int32 handle);
-    void waitForCompletion(int32 handle);
+    void addContinuation(int32 firstGlobalIndex, job_handle second);
+    void submit(int32 globalIndex);
+    void waitForCompletion(int32 globalIndex);
+    bool isComplete(int32 globalIndex);
 
 
-    int32 allocateJob();
-    void finishJob(int32 handle);
+    void finishJob(int32 globalIndex);
     bool executeNextJob();
     void threadFunc(int32 threadIndex);
 
@@ -91,12 +95,13 @@ private:
     moodycamel::ConcurrentQueue<int32> queue;
     std::atomic<uint32> runningJobs = 0;
 
-    static constexpr uint32 capacity = 4096;
-    static constexpr uint32 indexMask = capacity - 1;
+    static constexpr int32 capacity = 4096;
+    static constexpr int32 indexMask = capacity - 1;
 
     job_queue_entry allJobs[capacity];
     std::atomic<uint32> nextFreeJob = 0;
 
+    int32 queueIndex;
 
     std::condition_variable wakeCondition;
     std::mutex wakeMutex;

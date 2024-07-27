@@ -7,11 +7,12 @@
 #include "asset/model_asset.h"
 
 
-static void meshLoaderThread(ref<multi_mesh> result, const fs::path& sceneFilename, uint32 flags, mesh_load_callback cb,
+static void meshLoaderThread(ref<multi_mesh> result, asset_handle handle, uint32 flags, mesh_load_callback cb,
 	bool async, job_handle parentJob)
 {
 	result->aabb = bounding_box::negativeInfinity();
 
+	fs::path sceneFilename = getPathFromAssetHandle(handle);
 	model_asset asset = load3DModelFromFile(sceneFilename);
 	mesh_builder builder(flags);
 	for (auto& mesh : asset.meshes)
@@ -101,7 +102,7 @@ static ref<multi_mesh> loadMeshFromFileInternal(const fs::path& sceneFilename, a
 
 	if (!async)
 	{
-		meshLoaderThread(result, sceneFilename, flags, cb, false, {});
+		meshLoaderThread(result, handle, flags, cb, false, {});
 		result->loadJob = {};
 		return result;
 	}
@@ -110,18 +111,16 @@ static ref<multi_mesh> loadMeshFromFileInternal(const fs::path& sceneFilename, a
 		struct mesh_loading_data
 		{
 			ref<multi_mesh> mesh;
-			fs::path path;
+			asset_handle handle;
 			uint32 flags;
 			mesh_load_callback cb;
 		};
 
-		constexpr int a = sizeof(mesh_loading_data);
-
-		mesh_loading_data data = { result, sceneFilename, flags, cb };
+		mesh_loading_data data = { result, handle, flags, cb };
 
 		job_handle job = lowPriorityJobQueue.createJob<mesh_loading_data>([](mesh_loading_data& data, job_handle job)
 		{
-			meshLoaderThread(data.mesh, data.path, data.flags, data.cb, true, job);
+			meshLoaderThread(data.mesh, data.handle, data.flags, data.cb, true, job);
 		}, data, parentJob);
 		job.submitNow();
 
@@ -173,14 +172,47 @@ static ref<multi_mesh> loadMeshFromFileAndHandle(const fs::path& filename, asset
 
 	mutex.lock();
 
-	ref<multi_mesh> result = { meshCache[key].lock(), {} };
+	ref<multi_mesh> result = meshCache[key].lock();
 	if (!result)
 	{
 		result = loadMeshFromFileInternal(filename, handle, flags, cb, async, parentJob);
 		meshCache[key] = result;
 	}
+	else
+	{
+		if (async)
+		{
+			if (!result->loadJob.valid())
+			{
+				// Generate new job, which waits on asset completion.
+
+				struct wait_data
+				{
+					ref<multi_mesh> mesh;
+				};
+
+				wait_data data = { result };
+
+				job_handle job = lowPriorityJobQueue.createJob<wait_data>([](wait_data& data, job_handle job)
+				{
+					while (data.mesh->loadState != asset_loaded)
+					{
+						std::this_thread::yield();
+					}
+				}, data, parentJob);
+				job.submitNow();
+
+				result->loadJob = job;
+			}
+		}
+		else
+		{
+
+		}
+	}
 
 	mutex.unlock();
+
 	return result;
 }
 
